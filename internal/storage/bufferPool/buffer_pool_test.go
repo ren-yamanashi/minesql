@@ -12,68 +12,68 @@ func TestNewBufferPool(t *testing.T) {
 		poolSize := 10
 
 		// WHEN
-		bufferPool := NewBufferPool(poolSize)
+		bp := NewBufferPool(poolSize)
 
 		// THEN
-		assert.Equal(t, len(bufferPool.BufferPages), poolSize)
-		assert.Equal(t, bufferPool.Pointer, BufferId(0))
-		assert.Equal(t, bufferPool.MaxBufferSize, poolSize)
+		assert.Equal(t, len(bp.BufferPages), poolSize)
+		assert.Equal(t, bp.Pointer, BufferId(0))
+		assert.Equal(t, bp.MaxBufferSize, poolSize)
 	})
 }
 
 func TestAdvancePointer(t *testing.T) {
 	t.Run("ポインタが正しく進む", func(t *testing.T) {
 		// GIVEN
-		bufferPool := NewBufferPool(5)
+		bp := NewBufferPool(5)
 
 		// WHEN
-		bufferPool.AdvancePointer()
+		bp.AdvancePointer()
 
 		// THEN
-		assert.Equal(t, bufferPool.Pointer, BufferId(1))
+		assert.Equal(t, bp.Pointer, BufferId(1))
 	})
 
 	t.Run("ポインタがバッファプールの末尾に達した場合、先頭に戻る", func(t *testing.T) {
 		// GIVEN
-		bufferPool := NewBufferPool(3)
-		bufferPool.Pointer = BufferId(2)
+		bp := NewBufferPool(3)
+		bp.Pointer = BufferId(2)
 
 		// WHEN
-		bufferPool.AdvancePointer()
+		bp.AdvancePointer()
 
 		// THEN
-		assert.Equal(t, bufferPool.Pointer, BufferId(0))
+		assert.Equal(t, bp.Pointer, BufferId(0))
 	})
 }
 
 func TestEvictPage(t *testing.T) {
 	t.Run("バッファプールから追い出すバッファページが選択される", func(t *testing.T) {
 		// GIVEN
-		bufferPool := NewBufferPool(3)
-		bufferPool.BufferPages[0].Referenced = true
-		bufferPool.BufferPages[1].Referenced = false
-		bufferPool.BufferPages[2].Referenced = false
-		bufferPool.Pointer = BufferId(0)
+		bp := NewBufferPool(3)
+		bp.BufferPages[0].Referenced = true
+		bp.BufferPages[1].Referenced = false
+		bp.BufferPages[2].Referenced = false
+		bp.Pointer = BufferId(0)
 
 		// WHEN
-		evictedPage := bufferPool.EvictPage()
+		evictedPage := bp.EvictPage()
 
 		// THEN
-		assert.Equal(t, evictedPage, bufferPool.BufferPages[1])
-		assert.Equal(t, bufferPool.Pointer, BufferId(1))
+		assert.Equal(t, evictedPage, bp.BufferPages[1])
+		assert.Equal(t, bp.Pointer, BufferId(1))
 	})
 
 	t.Run("参照ビットがすべて立っている場合、最初のページが追い出される", func(t *testing.T) {
 		// GIVEN
-		bufferPool := NewBufferPool(2)
-		bufferPool.BufferPages[0].Referenced = true
-		bufferPool.BufferPages[1].Referenced = true
-		bufferPool.Pointer = BufferId(0)
+		bp := NewBufferPool(2)
+		bp.BufferPages[0].Referenced = true
+		bp.BufferPages[1].Referenced = true
+		bp.Pointer = BufferId(0)
 
 		// WHEN
-		evictedPage := bufferPool.EvictPage()
+		evictedPage := bp.EvictPage()
 
 		// THEN
-		assert.Equal(t, evictedPage, bufferPool.BufferPages[0])
+		assert.Equal(t, evictedPage, bp.BufferPages[0])
 	})
 }

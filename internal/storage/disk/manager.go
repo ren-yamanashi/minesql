@@ -5,6 +5,13 @@ import (
 	"os"
 )
 
+// ディスク I/O を抽象化するインターフェース
+type DiskManagerInterface interface {
+	ReadPageData(id PageId, data []byte) error
+	WritePageData(id PageId, data []byte) error
+	AllocatePage() PageId
+}
+
 type DiskManager struct {
 	// ヒープファイルのファイルディスクリプタ
 	heapFile *os.File
