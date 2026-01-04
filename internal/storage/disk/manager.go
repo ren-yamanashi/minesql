@@ -81,8 +81,8 @@ func (disk *DiskManager) AllocatePage() PageId {
 	return id
 }
 
+// 指定されたページ ID に対応するページの先頭にシークする
 func (disk *DiskManager) seek(id PageId) error {
-	// オフセットを計算してシークし
 	offset := PAGE_SIZE * uint64(id)                          // 開始位置を計算
 	_, err := disk.heapFile.Seek(int64(offset), io.SeekStart) // ファイルの先頭から offset バイト移動
 	if err != nil {
