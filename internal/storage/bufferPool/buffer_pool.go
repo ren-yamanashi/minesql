@@ -10,6 +10,7 @@ type BufferPool struct {
 	MaxBufferSize int
 }
 
+// 指定されたサイズのバッファプールを生成
 func NewBufferPool(size int) *BufferPool {
 	pages := make([]BufferPage, size)
 	for i := range pages {
@@ -33,7 +34,7 @@ func (bp *BufferPool) AdvancePointer() {
 	bp.Pointer = (bp.Pointer + 1) % BufferId(bp.MaxBufferSize)
 }
 
-// バッファプールから追い出すフレームを選択する (Clock sweep アルゴリズム)
+// バッファプールから追い出すバッファページを選択する (Clock sweep アルゴリズム)
 func (bp *BufferPool) EvictPage() BufferPage {
 	for {
 		page := bp.BufferPages[bp.Pointer]

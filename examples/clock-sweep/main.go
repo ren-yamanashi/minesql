@@ -5,11 +5,11 @@ import (
 	"os"
 	"path/filepath"
 
-	"minesql/internal/storage/bufferPool"
+	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
 )
 
-func displayBuffer(bpm *bufferPool.BufferPoolManager) {
+func displayBuffer(bpm *bufferpool.BufferPoolManager) {
 	fmt.Println("現在のバッファプールの状態:")
 	bp := bpm.GetBufferPool()
 	for i, page := range bp.BufferPages {
@@ -45,7 +45,7 @@ func main() {
 	}
 
 	// 3 スロットの BufferPoolManager を初期化
-	bpm := bufferPool.NewBufferPoolManager(dm, 3)
+	bpm := bufferpool.NewBufferPoolManager(dm, 3)
 	fmt.Println("3 スロットの BufferPoolManager を初期化しました")
 
 	// ページを作成して書き込み
@@ -103,7 +103,7 @@ func writeTestData(dm *disk.DiskManager, pageId disk.PageId, value byte) {
 	}
 }
 
-func fetchAndDisplay(bpm *bufferPool.BufferPoolManager, pageId disk.PageId) {
+func fetchAndDisplay(bpm *bufferpool.BufferPoolManager, pageId disk.PageId) {
 	page, err := bpm.FetchPage(pageId)
 	if err != nil {
 		panic(err)
