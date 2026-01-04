@@ -6,14 +6,14 @@ import (
 
 type BufferPoolManager struct {
 	diskManager disk.DiskManagerInterface
-	bufpool  BufferPool
+	bufpool     BufferPool
 	pageTable   PageTable
 }
 
 func NewBufferPoolManager(dm disk.DiskManagerInterface, size int) *BufferPoolManager {
 	return &BufferPoolManager{
 		diskManager: dm,
-		bufpool:  *NewBufferPool(size),
+		bufpool:     *NewBufferPool(size),
 		pageTable:   make(PageTable),
 	}
 }
@@ -75,6 +75,12 @@ func (bpm *BufferPoolManager) AddPage(pageId disk.PageId) (*BufferPage, error) {
 	return newBufferPage, nil
 }
 
+// TODO: 後で削除
+// バッファプールを取得
+func (bpm *BufferPoolManager) GetBufferPool() *BufferPool {
+	return &bpm.bufpool
+}
+
 // ページテーブルを更新
 // evictPageId で指定したページが現在のバッファに属している場合のみ削除
 func (bpm *BufferPoolManager) updatePageTable(evictPageId disk.PageId, newPageId disk.PageId, bufferId BufferId) {
@@ -87,9 +93,4 @@ func (bpm *BufferPoolManager) updatePageTable(evictPageId disk.PageId, newPageId
 // ページテーブルに新しいエントリを追加
 func (bpm *BufferPoolManager) addPageToTable(pageId disk.PageId, bufferId BufferId) {
 	bpm.pageTable[pageId] = bufferId
-}
-
-// バッファプールを取得 (動作確認用)
-func (bpm *BufferPoolManager) GetBufferPool() *BufferPool {
-	return &bpm.bufpool
 }
