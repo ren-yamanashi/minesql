@@ -1,0 +1,132 @@
+package disk
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func TestNewDiskManager(t *testing.T) {
+	t.Run("正常に DiskManager が生成される", func(t *testing.T) {
+		// GIVEN
+		tmpFile, _ := os.CreateTemp("", "test_disk.db")
+		defer os.Remove(tmpFile.Name())
+		defer tmpFile.Close()
+
+		// WHEN
+		disk, err := NewDiskManager(tmpFile.Name())
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, PageId(0), disk.nextPageId)
+	})
+
+	t.Run("無効なファイルが指定された場合はエラー", func(t *testing.T) {
+		// GIVEN
+		invalidPath := "/nonexistent/directory/file.db"
+
+		// WHEN
+		_, err := NewDiskManager(invalidPath)
+
+		// THEN
+		assert.Error(t, err)
+	})
+}
+
+func TestReadPageData(t *testing.T) {
+	t.Run("正常にデータを読み込める", func(t *testing.T) {
+		// GIVEN
+		disk, pageId, _ := initDiskManager(t)
+		writeData := createDataBuffer()
+		disk.WritePageData(pageId, writeData)
+
+		// WHEN
+		readData := make([]byte, PAGE_SIZE)
+		err := disk.ReadPageData(pageId, readData)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, writeData, readData)
+	})
+
+	t.Run("書き込むデータのサイズが PAGE_SIZE と異なる場合はエラー", func(t *testing.T) {
+		// GIVEN
+		disk, pageId, _ := initDiskManager(t)
+		invalidData := make([]byte, PAGE_SIZE-1)
+
+		// WHEN
+		err := disk.ReadPageData(pageId, invalidData)
+
+		// THEN
+		assert.Error(t, err)
+	})
+}
+
+func TestWritePageData(t *testing.T) {
+	t.Run("正常にデータを書き込める", func(t *testing.T) {
+		// GIVEN
+		disk, pageId, _ := initDiskManager(t)
+		writeData := createDataBuffer()
+
+		// WHEN
+		err := disk.WritePageData(pageId, writeData)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, PageId(1), disk.nextPageId)
+	})
+
+	t.Run("書き込むデータのサイズが PAGE_SIZE と異なる場合はエラー", func(t *testing.T) {
+		// GIVEN
+		disk, pageId, _ := initDiskManager(t)
+		invalidData := make([]byte, PAGE_SIZE+10)
+
+		// WHEN
+		err := disk.WritePageData(pageId, invalidData)
+
+		// THEN
+		assert.Error(t, err)
+	})
+}
+
+func TestAllocatePage(t *testing.T) {
+	t.Run("新しいページを順次割り当てられる", func(t *testing.T) {
+		// GIVEN
+		tmpFile, _ := os.CreateTemp("", "test_disk_*.db")
+		dm, _ := NewDiskManager(tmpFile.Name())
+		defer os.Remove(tmpFile.Name())
+		defer tmpFile.Close()
+
+		// WHEN
+		pageId1 := dm.AllocatePage()
+		pageId2 := dm.AllocatePage()
+		pageId3 := dm.AllocatePage()
+
+		// THEN
+		assert.Equal(t, PageId(0), pageId1)
+		assert.Equal(t, PageId(1), pageId2)
+		assert.Equal(t, PageId(2), pageId3)
+		assert.Equal(t, PageId(3), dm.nextPageId)
+	})
+}
+
+func initDiskManager(t *testing.T) (*DiskManager, PageId, string) {
+	tmpDir := t.TempDir()
+	dbPath := filepath.Join(tmpDir, "sample.db")
+	dm, err := NewDiskManager(dbPath)
+	if err != nil {
+		t.Fatalf("Failed to open DiskManager: %v", err)
+	}
+	pageId := dm.AllocatePage()
+	return dm, pageId, dbPath
+}
+
+func createDataBuffer() []byte {
+	writeData := make([]byte, PAGE_SIZE)
+	for i := 0; i < PAGE_SIZE; i++ {
+		writeData[i] = byte(i % 256)
+	}
+	return writeData
+}
