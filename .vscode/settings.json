@@ -1,0 +1,17 @@
+{
+  "editor.tabSize": 2,
+  "editor.indentSize": "tabSize",
+  "markdownlint.config": {
+    "MD001": false,
+    "MD033": false,
+    "MD041": false
+  },
+  "cSpell.words": [
+    "Inno",
+    "memcmp",
+    "memcmpable",
+    "Memcomparable",
+    "minesql",
+    "RDBMS"
+  ]
+}
