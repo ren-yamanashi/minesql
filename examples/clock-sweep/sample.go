@@ -87,7 +87,7 @@ func (cb *ClockBuffer) DisplayBuffer() {
 	fmt.Println()
 }
 
-func main() {
+func _main() {
 	// 3 スロットの ClockBuffer を初期化
 	buffer := NewClockBuffer(3)
 
