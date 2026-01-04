@@ -76,7 +76,7 @@ func (bpm *BufferPoolManager) AddPage(pageId disk.PageId) (*BufferPage, error) {
 }
 
 // バッファプール内のすべてのダーティーページをディスクに書き出す
-func (bpm *BufferPoolManager) Flush() error {
+func (bpm *BufferPoolManager) FlushPage() error {
 	for pageId, bufferId := range bpm.pageTable {
 		bufferPage := &bpm.bufpool.BufferPages[bufferId]
 		if !bufferPage.IsDirty {
