@@ -1,6 +1,10 @@
 # バッファプール
 
 - 該当コード:
+  - [buffer/page_table.go](../../internal/storage/bufferpool/page_table.go)
+  - [buffer/buffer_page.go](../../internal/storage/bufferpool/buffer_page.go)
+  - [buffer/buffer_pool.go](../../internal/storage/bufferpool/buffer_pool.go)
+  - [buffer/manager.go](../../internal/storage/bufferpool/manager.go)
 
 ## 概要
 

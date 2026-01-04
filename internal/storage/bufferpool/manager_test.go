@@ -227,3 +227,7 @@ func (spy *DiskManagerSpy) AllocatePage() disk.PageId {
 	spy.nextPageId++
 	return id
 }
+
+func (spy *DiskManagerSpy) Sync() error {
+	return nil
+}

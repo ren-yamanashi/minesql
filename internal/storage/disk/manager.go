@@ -10,6 +10,7 @@ type DiskManagerInterface interface {
 	ReadPageData(id PageId, data []byte) error
 	WritePageData(id PageId, data []byte) error
 	AllocatePage() PageId
+	Sync() error
 }
 
 type DiskManager struct {
@@ -86,6 +87,11 @@ func (disk *DiskManager) AllocatePage() PageId {
 	id := disk.nextPageId
 	disk.nextPageId++
 	return id
+}
+
+// ファイルをディスクに同期する
+func (disk *DiskManager) Sync() error {
+	return disk.heapFile.Sync()
 }
 
 // 指定されたページ ID に対応するページの先頭にシークする
