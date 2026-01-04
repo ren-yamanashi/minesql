@@ -1,4 +1,4 @@
-package bufferPool
+package bufferpool
 
 import "minesql/internal/storage/disk"
 
@@ -15,7 +15,7 @@ func NewBufferPool(size int) *BufferPool {
 	for i := range pages {
 		pages[i] = BufferPage{
 			PageId:     disk.PageId(0),
-			Page:       &Page{},
+			Page:       &disk.Page{},
 			Referenced: false,
 			IsDirty:    false,
 		}

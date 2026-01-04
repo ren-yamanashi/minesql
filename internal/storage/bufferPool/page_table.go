@@ -1,4 +1,4 @@
-package bufferPool
+package bufferpool
 
 import (
 	"minesql/internal/storage/disk"

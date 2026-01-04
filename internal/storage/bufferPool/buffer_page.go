@@ -1,14 +1,13 @@
-package bufferPool
+package bufferpool
 
 import (
 	"minesql/internal/storage/disk"
 )
 
-type Page [disk.PAGE_SIZE]uint8
 
 type BufferPage struct {
 	PageId  disk.PageId
-	Page    *Page
+	Page    *disk.Page
 	// 最近アクセスされたかどうか
 	Referenced bool
 	// ページが変更されたかどうか
@@ -18,7 +17,7 @@ type BufferPage struct {
 func NewBufferPage(pageId disk.PageId) *BufferPage {
 	return &BufferPage{
 		PageId:  pageId,
-		Page:    &Page{},
+		Page:    &disk.Page{},
 		IsDirty: false,
 	}
 }
