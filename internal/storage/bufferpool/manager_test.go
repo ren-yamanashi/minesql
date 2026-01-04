@@ -190,6 +190,61 @@ func TestAddPage(t *testing.T) {
 	})
 }
 
+func TestFlushPage(t *testing.T) {
+	t.Run("ページテーブル内にダーティーページが存在する場合、そのページがディスクに書き込まれる", func(t *testing.T) {
+		// GIVEN
+		size := 3
+		dmSpy := NewDiskManagerSpy()
+		bpm := NewBufferPoolManager(dmSpy, size)
+
+		pageId1 := dmSpy.AllocatePage()
+		pageId2 := dmSpy.AllocatePage()
+		pageId3 := dmSpy.AllocatePage()
+
+		page1, _ := bpm.AddPage(pageId1)
+		page2, _ := bpm.AddPage(pageId2)
+		bpm.AddPage(pageId3)
+
+		page1.IsDirty = true
+		page2.IsDirty = true
+
+		dmSpy.writePageDataCallCount = 0
+
+		// WHEN
+		err := bpm.FlushPage()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 2, dmSpy.writePageDataCallCount)
+		assert.False(t, page1.IsDirty)
+		assert.False(t, page2.IsDirty)
+	})
+
+	t.Run("ページテーブル内のすべてのページがダーティーでない場合、ディスクへの書き込みは発生しない", func(t *testing.T) {
+		// GIVEN
+		size := 3
+		dmSpy := NewDiskManagerSpy()
+		bpm := NewBufferPoolManager(dmSpy, size)
+
+		pageId1 := dmSpy.AllocatePage()
+		pageId2 := dmSpy.AllocatePage()
+		pageId3 := dmSpy.AllocatePage()
+
+		bpm.AddPage(pageId1)
+		bpm.AddPage(pageId2)
+		bpm.AddPage(pageId3)
+
+		dmSpy.writePageDataCallCount = 0
+
+		// WHEN
+		err := bpm.FlushPage()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 0, dmSpy.writePageDataCallCount)
+	})
+}
+
 func initDiskManager(t *testing.T) (*disk.DiskManager, disk.PageId) {
 	tmpdir := t.TempDir()
 	path := filepath.Join(tmpdir, "test.db")
@@ -226,4 +281,8 @@ func (spy *DiskManagerSpy) AllocatePage() disk.PageId {
 	id := spy.nextPageId
 	spy.nextPageId++
 	return id
+}
+
+func (spy *DiskManagerSpy) Sync() error {
+	return nil
 }

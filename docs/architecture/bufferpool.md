@@ -1,6 +1,10 @@
 # バッファプール
 
 - 該当コード:
+  - [buffer/page_table.go](../../internal/storage/bufferpool/page_table.go)
+  - [buffer/buffer_page.go](../../internal/storage/bufferpool/buffer_page.go)
+  - [buffer/buffer_pool.go](../../internal/storage/bufferpool/buffer_pool.go)
+  - [buffer/manager.go](../../internal/storage/bufferpool/manager.go)
 
 ## 概要
 
@@ -86,4 +90,4 @@ graph TD
   - ページを読み込み、ページテーブルを更新する
 - バッファプールに空きがない場合:
   - Clock sweep アルゴリズムで捨てるバッファページを選択する
-  - 選択されたバッファページが `IsDirty` ビットを持っている場合 (バッファプール内のページの内容とディスクのページの内容に差分がある場合) は、ディスクに書き戻す
+  - 選択されたバッファページが `IsDirty` ビットを持っている場合 (バッファプール内のページの内容とディスクのページの内容に差分がある場合) は、ディスクに書き出す
