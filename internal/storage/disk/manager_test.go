@@ -11,9 +11,10 @@ import (
 func TestNewDiskManager(t *testing.T) {
 	t.Run("正常に DiskManager が生成される", func(t *testing.T) {
 		// GIVEN
-		tmpFile, _ := os.CreateTemp("", "test_disk.db")
-		defer os.Remove(tmpFile.Name())
+		tmpFile, err := os.CreateTemp("", "test_disk.db")
+		assert.NoError(t, err)
 		defer tmpFile.Close()
+		defer os.Remove(tmpFile.Name())
 
 		// WHEN
 		disk, err := NewDiskManager(tmpFile.Name())
@@ -38,7 +39,7 @@ func TestNewDiskManager(t *testing.T) {
 func TestReadPageData(t *testing.T) {
 	t.Run("正常にデータを読み込める", func(t *testing.T) {
 		// GIVEN
-		disk, pageId, _ := initDiskManager(t)
+		disk, pageId := initDiskManager(t)
 		writeData := createDataBuffer()
 		disk.WritePageData(pageId, writeData)
 
@@ -53,7 +54,7 @@ func TestReadPageData(t *testing.T) {
 
 	t.Run("書き込むデータのサイズが PAGE_SIZE と異なる場合はエラー", func(t *testing.T) {
 		// GIVEN
-		disk, pageId, _ := initDiskManager(t)
+		disk, pageId := initDiskManager(t)
 		invalidData := make([]byte, PAGE_SIZE-1)
 
 		// WHEN
@@ -67,7 +68,7 @@ func TestReadPageData(t *testing.T) {
 func TestWritePageData(t *testing.T) {
 	t.Run("正常にデータを書き込める", func(t *testing.T) {
 		// GIVEN
-		disk, pageId, _ := initDiskManager(t)
+		disk, pageId := initDiskManager(t)
 		writeData := createDataBuffer()
 
 		// WHEN
@@ -80,7 +81,7 @@ func TestWritePageData(t *testing.T) {
 
 	t.Run("書き込むデータのサイズが PAGE_SIZE と異なる場合はエラー", func(t *testing.T) {
 		// GIVEN
-		disk, pageId, _ := initDiskManager(t)
+		disk, pageId := initDiskManager(t)
 		invalidData := make([]byte, PAGE_SIZE+10)
 
 		// WHEN
@@ -94,10 +95,13 @@ func TestWritePageData(t *testing.T) {
 func TestAllocatePage(t *testing.T) {
 	t.Run("新しいページを順次割り当てられる", func(t *testing.T) {
 		// GIVEN
-		tmpFile, _ := os.CreateTemp("", "test_disk_*.db")
-		dm, _ := NewDiskManager(tmpFile.Name())
-		defer os.Remove(tmpFile.Name())
+		tmpFile, err := os.CreateTemp("", "test_disk_*.db")
+		assert.NoError(t, err)
 		defer tmpFile.Close()
+		defer os.Remove(tmpFile.Name())
+
+		dm, err := NewDiskManager(tmpFile.Name())
+		assert.NoError(t, err)
 
 		// WHEN
 		pageId1 := dm.AllocatePage()
@@ -112,7 +116,7 @@ func TestAllocatePage(t *testing.T) {
 	})
 }
 
-func initDiskManager(t *testing.T) (*DiskManager, PageId, string) {
+func initDiskManager(t *testing.T) (*DiskManager, PageId) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "sample.db")
 	dm, err := NewDiskManager(dbPath)
@@ -120,12 +124,12 @@ func initDiskManager(t *testing.T) (*DiskManager, PageId, string) {
 		t.Fatalf("Failed to open DiskManager: %v", err)
 	}
 	pageId := dm.AllocatePage()
-	return dm, pageId, dbPath
+	return dm, pageId
 }
 
 func createDataBuffer() []byte {
 	writeData := make([]byte, PAGE_SIZE)
-	for i := 0; i < PAGE_SIZE; i++ {
+	for i := range PAGE_SIZE {
 		writeData[i] = byte(i % 256)
 	}
 	return writeData
