@@ -12,7 +12,7 @@ import (
 func displayBuffer(bpm *bufferpool.BufferPoolManager) {
 	fmt.Println("buffer pool status:")
 	bp := bpm.GetBufferPool()
-	for i, page := range bp.BufferPages {
+	for _, page := range bp.BufferPages {
 		ref := 0
 		if page.Referenced {
 			ref = 1
@@ -21,7 +21,7 @@ func displayBuffer(bpm *bufferpool.BufferPoolManager) {
 		if page.IsDirty {
 			dirty = 1
 		}
-		fmt.Printf("  Slot %d: PageID=%d, Referenced=%d, IsDirty=%d\n", i, page.PageId, ref, dirty)
+		fmt.Printf("  PageID=%d, Referenced=%d, IsDirty=%d\n", page.PageId, ref, dirty)
 	}
 	fmt.Printf("  Pointer=%d\n", bp.Pointer)
 	fmt.Println()
