@@ -11,7 +11,7 @@ func TestBinarySearch(t *testing.T) {
 		arr := []int{1, 3, 5, 7, 9}
 		target := 5
 
-		index, found := BinarySearch(len(arr), func(i int) int {
+		index, found := binarySearch(len(arr), func(i int) int {
 			return compare(arr[i], target)
 		})
 
@@ -23,7 +23,7 @@ func TestBinarySearch(t *testing.T) {
 		arr := []int{1, 3, 5, 7, 9}
 		target := 6
 
-		index, found := BinarySearch(len(arr), func(i int) int {
+		index, found := binarySearch(len(arr), func(i int) int {
 			return compare(arr[i], target)
 		})
 
@@ -35,7 +35,7 @@ func TestBinarySearch(t *testing.T) {
 		arr := []int{}
 		target := 1
 
-		index, found := BinarySearch(len(arr), func(i int) int {
+		index, found := binarySearch(len(arr), func(i int) int {
 			return compare(arr[i], target)
 		})
 

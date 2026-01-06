@@ -1,11 +1,21 @@
-package leaf
+package node
 
 import (
 	"encoding/binary"
-	"minesql/internal/storage/access/btree/node"
 	slottedpage "minesql/internal/storage/access/btree/slotted_page"
 	"minesql/internal/storage/disk"
 )
+
+const leafHeaderSize = 16
+
+// B+Tree のリーフノードのヘッダー情報
+// PrevPageId: 8 bytes (0-7)
+// NextPageId: 8 bytes (8-15)
+type LeafHeader struct {
+	PrevPageId disk.PageId
+	NextPageId disk.PageId
+}
+
 
 type LeafNode struct {
 	// ページデータ全体 (ヘッダー + Slotted Page のボディ)
@@ -38,17 +48,16 @@ func (ln *LeafNode) NumPairs() int {
 }
 
 // 指定されたバッファ ID の key-value ペアを取得する
-func (ln *LeafNode) PairAt(bufferId int) node.Pair {
+func (ln *LeafNode) PairAt(bufferId int) Pair {
 	data := ln.body.Data(bufferId)
-	return node.PairFromBytes(data)
-
+	return PairFromBytes(data)
 }
 
 // キーから、対応するバッファ ID を検索する
 // 見つかった場合: (バッファ ID, true)
 // 見つからなかった場合: (0, false)
 func (ln *LeafNode) SearchBufferId(key []byte) (int, bool) {
-	return node.BinarySearch(ln.NumPairs(), func(bufferId int) int {
+	return binarySearch(ln.NumPairs(), func(bufferId int) int {
 		pair := ln.PairAt(bufferId)
 		return pair.CompareKey(key)
 	})
@@ -87,7 +96,7 @@ func (ln *LeafNode) SetNextPageId(nextPageId *disk.PageId) {
 
 // key-value ペアを挿入する
 // 戻り値: 挿入に成功したかどうか
-func (ln *LeafNode) Insert(bufferId int, pair node.Pair) bool {
+func (ln *LeafNode) Insert(bufferId int, pair Pair) bool {
 	pairBytes := pair.ToBytes()
 
 	if len(pairBytes) > ln.MaxPairSize() {
@@ -113,7 +122,7 @@ func (ln *LeafNode) Transfer(dest *LeafNode) {
 	data := ln.body.Data(0)
 
 	if !dest.body.Insert(nextIndex, len(data)) {
-		panic("dest must have space")
+		panic("no space in dest branch")
 	}
 
 	copy(dest.body.Data(nextIndex), data)
@@ -122,7 +131,7 @@ func (ln *LeafNode) Transfer(dest *LeafNode) {
 
 // リーフノードを分割しながらペアを挿入する
 // 新しいリーフノードの最小キーを返す
-func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newPair node.Pair) []byte {
+func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newPair Pair) []byte {
 	newLeafNode.Initialize()
 
 	for {

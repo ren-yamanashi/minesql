@@ -3,8 +3,8 @@ package node
 const headerSize = 8
 
 var (
-	NODE_TYPE_INTERNAL = []byte("INTERNAL")
-	NODE_TYPE_LEAF     = []byte("LEAF    ")
+	NODE_TYPE_LEAF   = []byte("LEAF    ")
+	NODE_TYPE_BRANCH = []byte("BRANCH  ")
 )
 
 type NodeHeader struct {
@@ -28,8 +28,8 @@ func (n *Node) Body() []byte {
 	return n.data[headerSize:]
 }
 
-func (n *Node) InitAsInternalNode() {
-	copy(n.data[0:8], NODE_TYPE_INTERNAL)
+func (n *Node) InitAsBranchNode() {
+	copy(n.data[0:8], NODE_TYPE_BRANCH)
 }
 
 func (n *Node) InitAsLeafNode() {

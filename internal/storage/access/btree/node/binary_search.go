@@ -6,7 +6,7 @@ package node
 // 戻り値:
 // - 見つかった場合: (要素のインデックス, true)
 // - 見つからなかった場合: (挿入すべき位置のインデックス, false)
-func BinarySearch(size int, f func(int) int) (int, bool) {
+func binarySearch(size int, f func(int) int) (int, bool) {
 	left := 0
 	right := size
 
