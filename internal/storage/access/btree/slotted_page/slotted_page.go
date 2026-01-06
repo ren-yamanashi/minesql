@@ -20,15 +20,7 @@ func (sp *SlottedPage) NumSlots() int {
 	return int(binary.LittleEndian.Uint16(sp.data[0:2]))
 }
 
-// Slotted Page の空き領域のサイズを返す (以下の図を参照)
-// pageSize = 4096 bytes
-// headerSize = 8 bytes
-// numSlots = 3
-// pointerSize = 4 bytes
-// |ヘッダー|Ptr0|Ptr1|Ptr2|========空き領域========|Cell2|Cell1|Cell0|
-// 0       8    12   16  20                      4000              4096
-// 　　　　　↑___12 bytes___↑                      ↑
-// 　　　　　pointersSize                          freeSpaceOffset
+// Slotted Page の空き領域のサイズを返す
 func (sp *SlottedPage) FreeSpace() int {
 	freeSpaceOffset := int(binary.LittleEndian.Uint16(sp.data[2:4]))
 	pointersSize := pointerSize * sp.NumSlots()
@@ -67,6 +59,7 @@ func (sp *SlottedPage) setPointer(index int, pointer Pointer) {
 }
 
 // 指定されたインデックスにサイズ分のデータを挿入する (領域の確保のみを行い、実際のデータの書き込みは行わない)
+// size: 挿入するデータのサイズ
 // 空き容量が不足している場合は false を返す
 func (sp *SlottedPage) Insert(index int, size int) bool {
 	if sp.FreeSpace() < pointerSize+size {
@@ -106,6 +99,7 @@ func (sp *SlottedPage) Resize(index int, newSize int) bool {
 	pointer := sp.pointerAt(index)
 	oldSize := int(pointer.size)
 	sizeIncrease := newSize - oldSize
+
 	if sizeIncrease == 0 {
 		return true
 	}
