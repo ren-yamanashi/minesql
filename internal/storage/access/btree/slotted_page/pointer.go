@@ -12,6 +12,13 @@ type Pointer struct {
 	size uint16
 }
 
+func NewPointer(offset, size uint16) Pointer {
+	return Pointer{
+		offset: offset,
+		size:   size,
+	}
+}
+
 // ポインタが指すデータの開始位置と終了位置を返す (開始位置, 終了位置)
 func (p *Pointer) Range() (int, int) {
 	start := int(p.offset)

@@ -31,10 +31,10 @@ func (sp *SlottedPage) FreeSpace() int {
 // 指定されたインデックスのポインタを取得する
 func (sp *SlottedPage) pointerAt(index int) Pointer {
 	base := headerSize + index*pointerSize
-	return Pointer{
-		offset: binary.LittleEndian.Uint16(sp.data[base : base+2]),
-		size:   binary.LittleEndian.Uint16(sp.data[base+2 : base+4]),
-	}
+	return NewPointer(
+		binary.LittleEndian.Uint16(sp.data[base:base+2]),
+		binary.LittleEndian.Uint16(sp.data[base+2:base+4]),
+	)
 }
 
 // 指定されたインデックスのデータを取得する
@@ -85,10 +85,10 @@ func (sp *SlottedPage) Insert(index int, size int) bool {
 	}
 
 	// 新しいポインタを設定
-	sp.setPointer(index, Pointer{
-		offset: uint16(newFreeSpaceOffset),
-		size:   uint16(size),
-	})
+	sp.setPointer(index, NewPointer(
+		uint16(newFreeSpaceOffset),
+		uint16(size),
+	))
 
 	return true
 }
