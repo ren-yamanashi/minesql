@@ -4,6 +4,8 @@
   "markdownlint.config": {
     "MD001": false,
     "MD033": false,
+    "MD034": false,
+    "MD036": false,
     "MD041": false
   },
   "cSpell.words": [
@@ -13,6 +15,7 @@
     "memcmpable",
     "Memcomparable",
     "minesql",
-    "RDBMS"
+    "RDBMS",
+    "slottedpage"
   ]
 }

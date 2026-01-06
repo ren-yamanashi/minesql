@@ -12,6 +12,7 @@ type BufferPool struct {
 
 // 指定されたサイズのバッファプールを生成
 func NewBufferPool(size int) *BufferPool {
+	// メモリ上に空のバッファページを作成
 	pages := make([]BufferPage, size)
 	for i := range pages {
 		pages[i] = BufferPage{
