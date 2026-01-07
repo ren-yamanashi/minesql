@@ -33,16 +33,6 @@ func NewLeafNode(data []byte) *LeafNode {
 	}
 }
 
-func (ln *LeafNode) PrevPageId() *disk.PageId {
-	pageId := disk.PageId(binary.LittleEndian.Uint64(ln.data[0:8])) // ヘッダーの最初の 8 バイトが前のページ ID
-	return &pageId
-}
-
-func (ln *LeafNode) NextPageId() *disk.PageId {
-	pageId := disk.PageId(binary.LittleEndian.Uint64(ln.data[8:16])) // ヘッダーの次の 8 バイトが次のページ ID
-	return &pageId
-}
-
 // key-value ペア数を取得する
 func (ln *LeafNode) NumPairs() int {
 	return ln.body.NumSlots()
@@ -64,9 +54,21 @@ func (ln *LeafNode) SearchBufferId(key []byte) (int, bool) {
 	})
 }
 
-// 最大ペアサイズを取得する
-func (ln *LeafNode) MaxPairSize() int {
-	return ln.body.Capacity()/2 - 4 // Slotted Page の容量の半分 - キーサイズを格納する 4 バイト (2 で割るのは、 key と value の両方を格納するため)
+// key-value ペアを挿入する
+// 戻り値: 挿入に成功したかどうか
+func (ln *LeafNode) Insert(bufferId int, pair Pair) bool {
+	pairBytes := pair.ToBytes()
+
+	if len(pairBytes) > ln.maxPairSize() {
+		return false
+	}
+
+	if ln.body.Insert(bufferId, len(pairBytes)) {
+		copy(ln.body.Data(bufferId), pairBytes)
+		return true
+	}
+
+	return false
 }
 
 // リーフノードを初期化する
@@ -75,6 +77,46 @@ func (ln *LeafNode) Initialize() {
 	binary.LittleEndian.PutUint64(ln.data[0:8], uint64(disk.INVALID_PAGE_ID))  // 初期化時には、前のページ ID を無効値に設定
 	binary.LittleEndian.PutUint64(ln.data[8:16], uint64(disk.INVALID_PAGE_ID)) // 初期化時には、次のページ ID を無効値に設定
 	ln.body.Initialize()
+}
+
+// リーフノードを分割しながらペアを挿入する
+// 新しいリーフノードの最小キーを返す
+func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newPair Pair) []byte {
+	newLeafNode.Initialize()
+
+	for {
+		if newLeafNode.isHalfFull() {
+			bufferId, _ := ln.SearchBufferId(newPair.Key)
+			if !ln.Insert(bufferId, newPair) {
+				panic("old leaf must have space")
+			}
+			break
+		}
+
+		// バッファ ID 0 のペアの方が新しいペアのキーよりも小さい場合、ペアを新しいリーフノードに移動する
+		if ln.PairAt(0).CompareKey(newPair.Key) < 0 {
+			ln.transfer(newLeafNode)
+		} else {
+			// 新しいペアを新しいリーフノードに挿入し、残りのペアを新しいリーフノードに移動する
+			newLeafNode.Insert(newLeafNode.NumPairs(), newPair)
+			for !newLeafNode.isHalfFull() {
+				ln.transfer(newLeafNode)
+			}
+			break
+		}
+	}
+
+	return newLeafNode.PairAt(0).Key
+}
+
+func (ln *LeafNode) PrevPageId() *disk.PageId {
+	pageId := disk.PageId(binary.LittleEndian.Uint64(ln.data[0:8])) // ヘッダーの最初の 8 バイトが前のページ ID
+	return &pageId
+}
+
+func (ln *LeafNode) NextPageId() *disk.PageId {
+	pageId := disk.PageId(binary.LittleEndian.Uint64(ln.data[8:16])) // ヘッダーの次の 8 バイトが次のページ ID
+	return &pageId
 }
 
 func (ln *LeafNode) SetPrevPageId(prevPageId *disk.PageId) {
@@ -97,21 +139,9 @@ func (ln *LeafNode) SetNextPageId(nextPageId *disk.PageId) {
 	binary.LittleEndian.PutUint64(ln.data[8:16], uint64(pageId))
 }
 
-// key-value ペアを挿入する
-// 戻り値: 挿入に成功したかどうか
-func (ln *LeafNode) Insert(bufferId int, pair Pair) bool {
-	pairBytes := pair.ToBytes()
-
-	if len(pairBytes) > ln.MaxPairSize() {
-		return false
-	}
-
-	if ln.body.Insert(bufferId, len(pairBytes)) {
-		copy(ln.body.Data(bufferId), pairBytes)
-		return true
-	}
-
-	return false
+// 最大ペアサイズを取得する
+func (ln *LeafNode) maxPairSize() int {
+	return ln.body.Capacity()/2 - 4 // Slotted Page の容量の半分 - キーサイズを格納する 4 バイト (2 で割るのは、 key と value の両方を格納するため)
 }
 
 // リーフノードが半分以上埋まっているかどうかを判定する
@@ -120,7 +150,7 @@ func (ln *LeafNode) isHalfFull() bool {
 }
 
 // 先頭のペアを別のリーフノードに移動する
-func (ln *LeafNode) Transfer(dest *LeafNode) {
+func (ln *LeafNode) transfer(dest *LeafNode) {
 	nextIndex := dest.NumPairs()
 	data := ln.body.Data(0)
 
@@ -130,34 +160,4 @@ func (ln *LeafNode) Transfer(dest *LeafNode) {
 
 	copy(dest.body.Data(nextIndex), data)
 	ln.body.Remove(0)
-}
-
-// リーフノードを分割しながらペアを挿入する
-// 新しいリーフノードの最小キーを返す
-func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newPair Pair) []byte {
-	newLeafNode.Initialize()
-
-	for {
-		if newLeafNode.isHalfFull() {
-			bufferId, _ := ln.SearchBufferId(newPair.Key)
-			if !ln.Insert(bufferId, newPair) {
-				panic("old leaf must have space")
-			}
-			break
-		}
-
-		// バッファ ID 0 のペアの方が新しいペアのキーよりも小さい場合、ペアを新しいリーフノードに移動する
-		if ln.PairAt(0).CompareKey(newPair.Key) < 0 {
-			ln.Transfer(newLeafNode)
-		} else {
-			// 新しいペアを新しいリーフノードに挿入し、残りのペアを新しいリーフノードに移動する
-			newLeafNode.Insert(newLeafNode.NumPairs(), newPair)
-			for !newLeafNode.isHalfFull() {
-				ln.Transfer(newLeafNode)
-			}
-			break
-		}
-	}
-
-	return newLeafNode.PairAt(0).Key
 }

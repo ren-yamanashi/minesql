@@ -9,6 +9,7 @@ import (
 const branchHeaderSize = 8
 
 type Header struct {
+	// 右の子ノードのポインタ (ページ ID)
 	RightChildPageId disk.PageId
 }
 
@@ -38,7 +39,7 @@ func (bn *BranchNode) PairAt(bufferId int) Pair {
 	return PairFromBytes(data)
 }
 
-// キーから、対応するバッファ ID を検索する
+// キーから、対応するバッファ ID を検索する (二分探索)
 // 見つかった場合: (バッファ ID, true)
 // 見つからなかった場合: (0, false)
 func (bn *BranchNode) SearchBufferId(key []byte) (int, bool) {
@@ -48,17 +49,12 @@ func (bn *BranchNode) SearchBufferId(key []byte) (int, bool) {
 	})
 }
 
-// 最大ペアサイズを取得する
-func (bn *BranchNode) MaxPairSize() int {
-	return bn.body.Capacity()/2 - 4 // Slotted Page の容量の半分 - キーサイズを格納する 4 バイト (2 で割るのは、 key と value の両方を格納するため)
-}
-
 // key-value ペアを挿入する (pageId は value に相当)
 // 戻り値: 挿入に成功したかどうか
 func (bn *BranchNode) Insert(bufferId int, pair Pair) bool {
 	pairBytes := pair.ToBytes()
 
-	if len(pairBytes) > bn.MaxPairSize() {
+	if len(pairBytes) > bn.maxPairSize() {
 		return false
 	}
 
@@ -70,10 +66,14 @@ func (bn *BranchNode) Insert(bufferId int, pair Pair) bool {
 	return false
 }
 
+// ブランチノードを初期化する (初期化時には、ペア数は 1 つ)
+// key: 最初のペアのキー
+// leftChildPageId: 最初のペアの value (左の子ページのページ ID)
+// rightChildPageId: ヘッダー部分に設定する右の子ページのページ ID
 func (bn *BranchNode) Initialize(key []byte, leftChildPageId disk.PageId, rightChildPageId disk.PageId) {
 	bn.body.Initialize()
 
-	// 左子ページ ID を value とした Pair を作成し、挿入
+	// 左の子ページのポインタ (ページ ID) を value とした Pair を作成し
 	leftChildPageIdBytes := make([]byte, 8)
 	binary.LittleEndian.PutUint64(leftChildPageIdBytes, uint64(leftChildPageId))
 	keyPair := NewPair(key, leftChildPageIdBytes)
@@ -82,26 +82,8 @@ func (bn *BranchNode) Initialize(key []byte, leftChildPageId disk.PageId, rightC
 		panic("new branch must have space")
 	}
 
-	// ヘッダー部分に右子ページ ID を設定
+	// ヘッダー部分に右の子ページのポインタ (ページ ID) を設定
 	binary.LittleEndian.PutUint64(bn.data[0:8], uint64(rightChildPageId))
-}
-
-// 右端の子ページ ID を設定し、最後のペアのキーを返す (右端のペアは削除される)
-// 戻り値: 取り出したキー
-func (bn *BranchNode) FillRightChild() []byte {
-	lastId := bn.NumPairs() - 1
-	pair := bn.PairAt(lastId)
-	rightChild := binary.LittleEndian.Uint64(pair.Value)
-	key := make([]byte, len(pair.Key))
-
-	// キーをコピー
-	copy(key, pair.Key)
-	bn.body.Remove(lastId)
-
-	// ヘッダー部分に右子ページ ID を設定
-	binary.LittleEndian.PutUint64(bn.data[0:8], rightChild)
-
-	return key
 }
 
 // ブランチノードを分割しながらペアを挿入する
@@ -120,18 +102,48 @@ func (bn *BranchNode) SplitInsert(newBranchNode *BranchNode, newPair Pair) []byt
 
 		// バッファ ID 0 のペアの方が新しいペアのキーよりも小さい場合、ペアを新しいブランチノードに移動する
 		if bn.PairAt(0).CompareKey(newPair.Key) < 0 {
-			bn.Transfer(newBranchNode)
+			bn.transfer(newBranchNode)
 		} else {
 			// 新しいペアを新しいブランチノードに挿入し、残りのペアを新しいブランチノードに移動する
 			newBranchNode.Insert(newBranchNode.NumPairs(), newPair)
 			for !newBranchNode.isHalfFull() {
-				bn.Transfer(newBranchNode)
+				bn.transfer(newBranchNode)
 			}
 			break
 		}
 	}
 
-	return newBranchNode.FillRightChild()
+	return newBranchNode.fillRightChild()
+}
+
+// キーからこページのインデックスを検索する
+func (bn *BranchNode) SearchChildIdx(key []byte) int {
+	bufferId, found := bn.SearchBufferId(key)
+	if found {
+		return bufferId + 1
+	}
+	return bufferId
+}
+
+// 指定されたインデックスの、子ページのページ ID を取得する
+func (bn *BranchNode) ChildPageIdAt(childIdx int) disk.PageId {
+	if childIdx == bn.NumPairs() {
+		// 右端の子ページ ID を返す
+		return disk.PageId(binary.LittleEndian.Uint64(bn.data[0:8]))
+	}
+	pair := bn.PairAt(childIdx)
+	return disk.PageId(binary.LittleEndian.Uint64(pair.Value))
+}
+
+// キーから子ページのページ ID を検索する
+func (bn *BranchNode) SearchChildPageId(key []byte) disk.PageId {
+	childIdx := bn.SearchChildIdx(key)
+	return bn.ChildPageIdAt(childIdx)
+}
+
+// 最大ペアサイズを取得する
+func (bn *BranchNode) maxPairSize() int {
+	return bn.body.Capacity()/2 - 4 // Slotted Page の容量の半分 - キーサイズを格納する 4 バイト (2 で割るのは、 key と value の両方を格納するため)
 }
 
 // リーフノードが半分以上埋まっているかどうかを判定する
@@ -139,8 +151,26 @@ func (bn *BranchNode) isHalfFull() bool {
 	return 2*bn.body.FreeSpace() < bn.body.Capacity()
 }
 
+// 右端の子ページ ID を設定し、最後のペアのキーを返す (右端のペアは削除される)
+// 戻り値: 取り出したキー
+func (bn *BranchNode) fillRightChild() []byte {
+	lastId := bn.NumPairs() - 1
+	pair := bn.PairAt(lastId)
+	rightChild := binary.LittleEndian.Uint64(pair.Value)
+	key := make([]byte, len(pair.Key))
+
+	// キーをコピー
+	copy(key, pair.Key)
+	bn.body.Remove(lastId)
+
+	// ヘッダー部分に右子ページ ID を設定
+	binary.LittleEndian.PutUint64(bn.data[0:8], rightChild)
+
+	return key
+}
+
 // 先頭のペアを別のリーフノードに移動する
-func (bn *BranchNode) Transfer(dest *BranchNode) {
+func (bn *BranchNode) transfer(dest *BranchNode) {
 	nextIndex := dest.NumPairs()
 	data := bn.body.Data(0)
 
