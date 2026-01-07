@@ -62,12 +62,12 @@ func (bn *BranchNode) Insert(bufferId int, pair Pair) bool {
 		return false
 	}
 
-	if !bn.body.Insert(bufferId, len(pairBytes)) {
-		return false
+	if bn.body.Insert(bufferId, len(pairBytes)) {
+		copy(bn.body.Data(bufferId), pairBytes)
+		return true
 	}
 
-	copy(bn.body.Data(bufferId), pairBytes)
-	return true
+	return false
 }
 
 func (bn *BranchNode) Initialize(key []byte, leftChildPageId disk.PageId, rightChildPageId disk.PageId) {

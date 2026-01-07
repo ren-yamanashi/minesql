@@ -48,10 +48,10 @@ _仮定_
 この場合、Slotted Page は以下のような内訳になる
 
 ```txt
-// |ヘッダー|Ptr0|Ptr1|Ptr2|========空き領域========|Cell2|Cell1|Cell0|
-// 0       8    12   16  20                      4000              4096
-// 　　　　　↑___12 bytes___↑                      ↑
-// 　　　　　pointersSize                          freeSpaceOffset
+|ヘッダー|Ptr0|Ptr1|Ptr2|========空き領域========|Cell2|Cell1|Cell0|
+0       8    12   16  20                      4000              4096
+　　　　　↑___12 bytes___↑                      ↑
+　　　　　pointersSize                          freeSpaceOffset
 ```
 
 フリースペースのサイズ = 4000 (freeSpaceOffset) - 12 (pointersSize) - 8 (ヘッダーサイズ) = 3980 byte
