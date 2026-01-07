@@ -22,7 +22,7 @@ func TestNewBufferPoolManager(t *testing.T) {
 
 		// THEN
 		assert.NotNil(t, bpm)
-		assert.Equal(t, dm, bpm.diskManager)
+		assert.Equal(t, dm, bpm.DiskManager)
 		assert.Equal(t, size, bpm.bufpool.MaxBufferSize)
 		assert.Equal(t, size, len(bpm.bufpool.BufferPages))
 		assert.Equal(t, 0, len(bpm.pageTable))
@@ -242,6 +242,28 @@ func TestFlushPage(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, 0, dmSpy.writePageDataCallCount)
+	})
+}
+
+func TestUnRefPage(t *testing.T) {
+	t.Run("指定されたページの参照ビットがクリアされる", func(t *testing.T) {
+		// GIVEN
+		size := 3
+		dmSpy := NewDiskManagerSpy()
+		pageId := dmSpy.AllocatePage()
+		bpm := NewBufferPoolManager(dmSpy, size)
+
+		bufferPage, err := bpm.AddPage(pageId)
+		assert.NoError(t, err)
+
+		bufferPage.Referenced = true
+
+		// WHEN
+		bpm.UnRefPage(pageId)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.False(t, bufferPage.Referenced)
 	})
 }
 
