@@ -111,11 +111,17 @@ func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newPair Pair) []byte {
 
 func (ln *LeafNode) PrevPageId() *disk.PageId {
 	pageId := disk.PageId(binary.LittleEndian.Uint64(ln.data[0:8])) // ヘッダーの最初の 8 バイトが前のページ ID
+	if pageId == disk.INVALID_PAGE_ID {
+		return nil
+	}
 	return &pageId
 }
 
 func (ln *LeafNode) NextPageId() *disk.PageId {
 	pageId := disk.PageId(binary.LittleEndian.Uint64(ln.data[8:16])) // ヘッダーの次の 8 バイトが次のページ ID
+	if pageId == disk.INVALID_PAGE_ID {
+		return nil
+	}
 	return &pageId
 }
 

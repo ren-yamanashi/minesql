@@ -74,7 +74,7 @@ func (bt *BTree) Insert(bpm *bufferpool.BufferPoolManager, pair node.Pair) error
 	}
 	defer bpm.UnRefPage(rootPageId)
 
-	overflowKey, overflowChildPageId, err := bt.insertInternal(bpm, rootPageBuf, pair)
+	overflowKey, overflowChildPageId, err := bt.insertRecursively(bpm, rootPageBuf, pair)
 	if err != nil {
 		return err
 	}
@@ -95,6 +95,7 @@ func (bt *BTree) Insert(bpm *bufferpool.BufferPoolManager, pair node.Pair) error
 	newRootBranchNode.Initialize(overflowKey, *overflowChildPageId, rootPageId)
 	meta.SetRootPageId(newRootBuf.PageId)
 	metaBuf.IsDirty = true
+	newRootBuf.IsDirty = true
 	return nil
 }
 
@@ -172,7 +173,7 @@ func (bt *BTree) searchRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 }
 
 // 戻り値: (オーバーフローキー, 新しいページ ID, エラー)
-func (bt *BTree) insertInternal(bpm *bufferpool.BufferPoolManager, nodeBuffer *bufferpool.BufferPage, pair node.Pair) ([]byte, *disk.PageId, error) {
+func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer *bufferpool.BufferPage, pair node.Pair) ([]byte, *disk.PageId, error) {
 	_node := node.NewNode(nodeBuffer.Page[:])
 	nodeType := _node.NodeType()
 
@@ -213,17 +214,20 @@ func (bt *BTree) insertInternal(bpm *bufferpool.BufferPoolManager, nodeBuffer *b
 			prevLeafNode.SetNextPageId(&newLeafBuffer.PageId)
 			prevLeafBuffer.IsDirty = true
 		}
-		leafNode.SetNextPageId(&newLeafBuffer.PageId)
-
+	
 		newNode := node.NewNode(newLeafBuffer.Page[:])
 		newNode.InitAsLeafNode()
 		newLeafNode := node.NewLeafNode(newNode.Body())
 		newLeafNode.Initialize()
-		overflowKey := leafNode.SplitInsert(newLeafNode, pair)
+		leafNode.SplitInsert(newLeafNode, pair)
 		newLeafNode.SetNextPageId(&nodeBuffer.PageId)
 		newLeafNode.SetPrevPageId(prevLeafPageId)
+		leafNode.SetPrevPageId(&newLeafBuffer.PageId)
 		nodeBuffer.IsDirty = true
+		newLeafBuffer.IsDirty = true
 
+		// overflowKey は古いリーフノードの最初のキー (親ノードの境界キーになる)
+		overflowKey := leafNode.PairAt(0).Key
 		return overflowKey, &newLeafBuffer.PageId, nil
 	} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
 		branchNode := node.NewBranchNode(_node.Body())
@@ -235,7 +239,7 @@ func (bt *BTree) insertInternal(bpm *bufferpool.BufferPoolManager, nodeBuffer *b
 		}
 		defer bpm.UnRefPage(childPageId)
 
-		overflowKeyFromChild, overflowChildPageId, err := bt.insertInternal(bpm, childNodeBuffer, pair)
+		overflowKeyFromChild, overflowChildPageId, err := bt.insertRecursively(bpm, childNodeBuffer, pair)
 		if err != nil {
 			return nil, nil, err
 		}
