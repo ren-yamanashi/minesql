@@ -104,6 +104,15 @@ func (bpm *BufferPoolManager) GetBufferPool() *BufferPool {
 	return &bpm.bufpool
 }
 
+// TODO: 後で削除
+// 指定されたページ ID のバッファページを取得する
+func (bpm *BufferPoolManager) GetBufferPage(pageId disk.PageId) (*BufferPage, bool) {
+	if bufferId, ok := bpm.pageTable[pageId]; ok {
+		return &bpm.bufpool.BufferPages[bufferId], true
+	}
+	return nil, false
+}
+
 // ページテーブルを更新
 // evictPageId で指定したページが現在のバッファに属している場合のみ削除
 func (bpm *BufferPoolManager) updatePageTable(evictPageId disk.PageId, newPageId disk.PageId, bufferId BufferId) {
@@ -116,12 +125,4 @@ func (bpm *BufferPoolManager) updatePageTable(evictPageId disk.PageId, newPageId
 // ページテーブルに新しいエントリを追加
 func (bpm *BufferPoolManager) addPageToTable(pageId disk.PageId, bufferId BufferId) {
 	bpm.pageTable[pageId] = bufferId
-}
-
-// GetBufferPage は指定されたページ ID のバッファページを取得する (テスト用)
-func (bpm *BufferPoolManager) GetBufferPage(pageId disk.PageId) (*BufferPage, bool) {
-	if bufferId, ok := bpm.pageTable[pageId]; ok {
-		return &bpm.bufpool.BufferPages[bufferId], true
-	}
-	return nil, false
 }
