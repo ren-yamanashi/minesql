@@ -116,7 +116,7 @@ func (bn *BranchNode) SplitInsert(newBranchNode *BranchNode, newPair Pair) []byt
 	return newBranchNode.fillRightChild()
 }
 
-// キーからこページのインデックスを検索する
+// キーから子ページのインデックスを検索する
 func (bn *BranchNode) SearchChildIdx(key []byte) int {
 	bufferId, found := bn.SearchBufferId(key)
 	if found {

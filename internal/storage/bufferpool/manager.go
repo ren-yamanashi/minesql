@@ -5,14 +5,14 @@ import (
 )
 
 type BufferPoolManager struct {
-	diskManager disk.DiskManagerInterface
+	DiskManager disk.DiskManagerInterface
 	bufpool     BufferPool
 	pageTable   PageTable
 }
 
 func NewBufferPoolManager(dm disk.DiskManagerInterface, size int) *BufferPoolManager {
 	return &BufferPoolManager{
-		diskManager: dm,
+		DiskManager: dm,
 		bufpool:     *NewBufferPool(size),
 		pageTable:   make(PageTable),
 	}
@@ -35,7 +35,7 @@ func (bpm *BufferPoolManager) FetchPage(pageId disk.PageId) (*BufferPage, error)
 	}
 
 	// ディスクからページを読み込む
-	err = bpm.diskManager.ReadPageData(pageId, bufferPage.Page[:])
+	err = bpm.DiskManager.ReadPageData(pageId, bufferPage.Page[:])
 	if err != nil {
 		return nil, err
 	}
@@ -60,7 +60,7 @@ func (bpm *BufferPoolManager) AddPage(pageId disk.PageId) (*BufferPage, error) {
 	// バッファに空きがない場合
 	bufferPageForEvict := bpm.bufpool.EvictPage()
 	if bufferPageForEvict.IsDirty {
-		err := bpm.diskManager.WritePageData(bufferPageForEvict.PageId, bufferPageForEvict.Page[:])
+		err := bpm.DiskManager.WritePageData(bufferPageForEvict.PageId, bufferPageForEvict.Page[:])
 		if err != nil {
 			return nil, err
 		}
@@ -75,6 +75,13 @@ func (bpm *BufferPoolManager) AddPage(pageId disk.PageId) (*BufferPage, error) {
 	return newBufferPage, nil
 }
 
+// 指定されたページの参照ビットをクリア
+func (bpm *BufferPoolManager) UnRefPage(pageId disk.PageId) {
+	if bufferId, ok := bpm.pageTable[pageId]; ok {
+		bpm.bufpool.BufferPages[bufferId].Referenced = false
+	}
+}
+
 // バッファプール内のすべてのダーティーページをディスクに書き出す
 func (bpm *BufferPoolManager) FlushPage() error {
 	for pageId, bufferId := range bpm.pageTable {
@@ -82,19 +89,28 @@ func (bpm *BufferPoolManager) FlushPage() error {
 		if !bufferPage.IsDirty {
 			continue
 		}
-		err := bpm.diskManager.WritePageData(pageId, bufferPage.Page[:])
+		err := bpm.DiskManager.WritePageData(pageId, bufferPage.Page[:])
 		if err != nil {
 			return err
 		}
 		bufferPage.IsDirty = false
 	}
-	return bpm.diskManager.Sync()
+	return bpm.DiskManager.Sync()
 }
 
 // TODO: 後で削除
 // バッファプールを取得
 func (bpm *BufferPoolManager) GetBufferPool() *BufferPool {
 	return &bpm.bufpool
+}
+
+// TODO: 後で削除
+// 指定されたページ ID のバッファページを取得する
+func (bpm *BufferPoolManager) GetBufferPage(pageId disk.PageId) (*BufferPage, bool) {
+	if bufferId, ok := bpm.pageTable[pageId]; ok {
+		return &bpm.bufpool.BufferPages[bufferId], true
+	}
+	return nil, false
 }
 
 // ページテーブルを更新

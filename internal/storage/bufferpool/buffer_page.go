@@ -4,10 +4,9 @@ import (
 	"minesql/internal/storage/disk"
 )
 
-
 type BufferPage struct {
-	PageId  disk.PageId
-	Page    *disk.Page
+	PageId disk.PageId
+	Page   *disk.Page
 	// 最近アクセスされたかどうか
 	Referenced bool
 	// ページが変更されたかどうか

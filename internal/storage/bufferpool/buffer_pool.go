@@ -23,7 +23,7 @@ func NewBufferPool(size int) *BufferPool {
 		}
 	}
 	return &BufferPool{
-		BufferPages:         pages,
+		BufferPages:   pages,
 		Pointer:       BufferId(0),
 		MaxBufferSize: size,
 	}
