@@ -1,5 +1,11 @@
 # メタページ
 
+- 実装コード:
+  - [header.go](../../../internal/storage/access/btree/meta_page/header.go)
+  - [meta_page.go](../../../internal/storage/access/btree/meta_page/meta_page.go)
+
+## 概要
+
 - B+Tree のルートノード (のページ ID) を管理するためのページ
 - B+Tree は成長するとルートが変化する可能性があるが、メタページに常に最新のルートノード (のページ ID) を記録しておけば、常に簡単にルートノードにアクセスできる
 

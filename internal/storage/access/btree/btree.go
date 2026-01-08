@@ -19,6 +19,7 @@ type BTree struct {
 }
 
 // 新しい B+Tree を作成
+// メタページとルートノード (リーフノード) を作成する (メタページにはルートノードのページIDを設定する)
 func CreateBTree(bpm *bufferpool.BufferPoolManager) (*BTree, error) {
 	// メタページを作成
 	metaPageId := bpm.DiskManager.AllocatePage()
@@ -26,7 +27,6 @@ func CreateBTree(bpm *bufferpool.BufferPoolManager) (*BTree, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer bpm.UnRefPage(metaPageId)
 	meta := metapage.NewMetaPage(metaBuf.Page[:])
 
 	// ルートノード (リーフノード) を作成
@@ -35,7 +35,6 @@ func CreateBTree(bpm *bufferpool.BufferPoolManager) (*BTree, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer bpm.UnRefPage(rootNodePageId)
 	rootNode := node.NewNode(rootBuf.Page[:])
 	rootNode.InitAsLeafNode()
 	rootLeafNode := node.NewLeafNode(rootNode.Body())
@@ -52,36 +51,22 @@ func NewBTree(metaPageId disk.PageId) *BTree {
 	return &BTree{MetaPageId: metaPageId}
 }
 
-// ルートページを取得
-func (bt *BTree) fetchRootPage(bpm *bufferpool.BufferPoolManager) (*bufferpool.BufferPage, error) {
-	// メタページを取得
-	metaBuf, err := bpm.FetchPage(bt.MetaPageId)
-	if err != nil {
-		return nil, err
-	}
-	defer bpm.UnRefPage(bt.MetaPageId)
-	meta := metapage.NewMetaPage(metaBuf.Page[:])
-
-	// ルートページを取得
-	rootPageId := meta.RootPageId()
-	return bpm.FetchPage(rootPageId)
-}
-
 func (bt *BTree) Search(bpm *bufferpool.BufferPoolManager, searchMode SearchMode) (*Iterator, error) {
 	rootPage, err := bt.fetchRootPage(bpm)
 	if err != nil {
 		return nil, err
 	}
-	return bt.searchInternal(bpm, rootPage, searchMode)
+	return bt.searchRecursively(bpm, rootPage, searchMode)
 }
 
 func (bt *BTree) Insert(bpm *bufferpool.BufferPoolManager, pair node.Pair) error {
-	metaPageBuf, err := bpm.FetchPage(bt.MetaPageId)
+	metaBuf, err := bpm.FetchPage(bt.MetaPageId)
 	if err != nil {
 		return err
 	}
+	// メタページは使い終わったらすぐ不要になる (優先的に evict されたい) ので、 UnRefPage する
 	defer bpm.UnRefPage(bt.MetaPageId)
-	meta := metapage.NewMetaPage(metaPageBuf.Page[:])
+	meta := metapage.NewMetaPage(metaBuf.Page[:])
 	rootPageId := meta.RootPageId()
 	rootPageBuf, err := bpm.FetchPage(rootPageId)
 	if err != nil {
@@ -109,60 +94,78 @@ func (bt *BTree) Insert(bpm *bufferpool.BufferPoolManager, pair node.Pair) error
 	newRootBranchNode := node.NewBranchNode(newRootNode.Body())
 	newRootBranchNode.Initialize(overflowKey, *overflowChildPageId, rootPageId)
 	meta.SetRootPageId(newRootBuf.PageId)
-	metaPageBuf.IsDirty = true
+	metaBuf.IsDirty = true
 	return nil
 }
 
-// 検索 (再起呼び出し用の内部関数)
-func (bt *BTree) searchInternal(bpm *bufferpool.BufferPoolManager, nodeBuffer *bufferpool.BufferPage, searchMode SearchMode) (*Iterator, error) {
+// ルートページを取得
+func (bt *BTree) fetchRootPage(bpm *bufferpool.BufferPoolManager) (*bufferpool.BufferPage, error) {
+	// メタページを取得
+	metaBuf, err := bpm.FetchPage(bt.MetaPageId)
+	if err != nil {
+		return nil, err
+	}
+	// メタページは使い終わったらすぐ不要になる (優先的に evict されたい) ので、 UnRefPage する
+	defer bpm.UnRefPage(bt.MetaPageId)
+	meta := metapage.NewMetaPage(metaBuf.Page[:])
+
+	// ルートページを取得
+	rootPageId := meta.RootPageId()
+	return bpm.FetchPage(rootPageId)
+}
+
+// 再起的にノードを辿って該当のリーフノードを見つける
+// 戻り値: リーフノードのイテレータ
+func (bt *BTree) searchRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer *bufferpool.BufferPage, searchMode SearchMode) (*Iterator, error) {
 	_node := node.NewNode(nodeBuffer.Page[:])
 	nodeType := _node.NodeType()
 
-	if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
-		// リーフノードの場合、nodeBuffer はイテレータに格納される (そのため UnRefPage は呼ばれない)
-		leafNode := node.NewLeafNode(_node.Body())
-		var bufferId int
-
-		switch sm := searchMode.(type) {
-		case SearchModeStart:
-			bufferId = 0
-		case SearchModeKey:
-			var found bool
-			bufferId, found = leafNode.SearchBufferId(sm.Key)
-			if !found {
-				// 見つからなかった場合は挿入位置を返す
-			}
-		}
-
-		isRightMost := leafNode.NumPairs() == bufferId
-		iter := NewIterator(*nodeBuffer, bufferId)
-
-		if isRightMost {
-			iter.Advance(bpm)
-		}
-
-		return iter, nil
-	} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
-		// ブランチノードの場合、再起呼び出し後に UnRefPage を呼び出す
+	if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
+		// ブランチノードの場合、再起呼び出し後に UnRefPage を呼び出す (優先的に evict されたいため、不要になったらすぐ UnRefPage する)
 		defer bpm.UnRefPage(nodeBuffer.PageId)
 
 		branchNode := node.NewBranchNode(_node.Body())
-		var childPageId disk.PageId
 
-		switch sm := searchMode.(type) {
-		case SearchModeStart:
-			childPageId = sm.ChildPageId(branchNode)
-		case SearchModeKey:
-			childPageId = sm.ChildPageId(branchNode)
-		}
-
+		// 子ノードのページを取得
+		childPageId := (func() disk.PageId {
+			switch sm := searchMode.(type) {
+			case SearchModeStart:
+				return sm.ChildPageId(branchNode)
+			case SearchModeKey:
+				return sm.ChildPageId(branchNode)
+			}
+			panic("unreachable")
+		})()
 		childNodePage, err := bpm.FetchPage(childPageId)
 		if err != nil {
 			return nil, err
 		}
 
 		// 再帰呼び出し
-		return bt.searchInternal(bpm, childNodePage, searchMode)
+		return bt.searchRecursively(bpm, childNodePage, searchMode)
+	} else if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
+		leafNode := node.NewLeafNode(_node.Body())
+		bufferId := (func() int {
+			switch sm := searchMode.(type) {
+			case SearchModeStart:
+				return 0
+			case SearchModeKey:
+				bId, _ := leafNode.SearchBufferId(sm.Key)
+				return bId
+			}
+			panic("unreachable")
+		})()
+
+		iter := NewIterator(*nodeBuffer, bufferId)
+
+		// 検索対象のキーが現在のリーフノードの末端のペアより大きい場合、次のリーフノードに進める
+		// 例えば、リーフノードに (1, ...), (3, ...), (5, ...) のペアが格納されている場合に、キー 6 を検索したいときなど
+		// この場合、次のリーフノードに進めてからイテレータを返す
+		if leafNode.NumPairs() == bufferId {
+			iter.Advance(bpm)
+		}
+
+		return iter, nil
 	}
 
 	panic("unknown node type")

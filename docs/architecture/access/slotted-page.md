@@ -1,5 +1,12 @@
 # Slotted Page
 
+- 実装コード
+  - [header.go](../../../internal/storage/access/btree/slotted_page/header.go)
+  - [pointer.go](../../../internal/storage/access/btree/slotted_page/pointer.go)
+  - [slotted_page.go](../../../internal/storage/access/btree/slotted_page/slotted_page.go)
+
+## 概要
+
 - ページ内に複数の可変長のデータを格納するための手法
 - ページを以下の 3 つの部分に分けて管理する
   - ヘッダー
