@@ -184,6 +184,7 @@ func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 			return nil, nil, ErrDuplicateKey
 		}
 
+		// リーフノードに挿入できた場合、終了
 		if leafNode.Insert(bufferId, pair) {
 			nodeBuffer.IsDirty = true
 			return nil, nil, nil
@@ -193,6 +194,8 @@ func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 		prevLeafPageId := leafNode.PrevPageId()
 		var prevLeafBuffer *bufferpool.BufferPage
 		var err error
+
+		// 前のリーフノードが存在する場合、そのページを取得
 		if prevLeafPageId != nil {
 			prevLeafBuffer, err = bpm.FetchPage(*prevLeafPageId)
 			if err != nil {
@@ -201,6 +204,7 @@ func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 			defer bpm.UnRefPage(*prevLeafPageId)
 		}
 
+		// 新しいリーフノードを作成
 		newLeafPageId := bpm.DiskManager.AllocatePage()
 		newLeafBuffer, err := bpm.AddPage(newLeafPageId)
 		if err != nil {
@@ -208,13 +212,15 @@ func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 		}
 		defer bpm.UnRefPage(newLeafPageId)
 
+		// 前のリーフノードが存在する場合、そのリーフノードに格納されている nextPageId を、新しいリーフノードのページID に更新する
 		if prevLeafBuffer != nil {
 			prevNode := node.NewNode(prevLeafBuffer.Page[:])
 			prevLeafNode := node.NewLeafNode(prevNode.Body())
 			prevLeafNode.SetNextPageId(&newLeafBuffer.PageId)
 			prevLeafBuffer.IsDirty = true
 		}
-	
+
+		// 新しいリーフノードに分割挿入する
 		newNode := node.NewNode(newLeafBuffer.Page[:])
 		newNode.InitAsLeafNode()
 		newLeafNode := node.NewLeafNode(newNode.Body())
@@ -226,10 +232,11 @@ func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 		nodeBuffer.IsDirty = true
 		newLeafBuffer.IsDirty = true
 
-		// overflowKey は古いリーフノードの最初のキー (親ノードの境界キーになる)
+		// overflowKey は古いリーフノードの先頭のキー (親ノードの境界キーになる)
 		overflowKey := leafNode.PairAt(0).Key
 		return overflowKey, &newLeafBuffer.PageId, nil
 	} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
+		// 挿入先の子ノードを取得
 		branchNode := node.NewBranchNode(_node.Body())
 		childIndex := branchNode.SearchChildIdx(pair.Key)
 		childPageId := branchNode.ChildPageIdAt(childIndex)
@@ -239,22 +246,25 @@ func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 		}
 		defer bpm.UnRefPage(childPageId)
 
+		// 子ノードに対して挿入処理を再起的に実行
 		overflowKeyFromChild, overflowChildPageId, err := bt.insertRecursively(bpm, childNodeBuffer, pair)
 		if err != nil {
 			return nil, nil, err
 		}
 
+		// 子ノードが分割されなかった場合、終了
 		if overflowChildPageId == nil {
 			return nil, nil, nil
 		}
 
+		// 子ノードが分割された場合、子ノードから返されたキーとページIDをペアとして、ブランチノードに挿入
 		overFlowPair := node.NewPair(overflowKeyFromChild, pageIdToBytes(*overflowChildPageId))
 		if branchNode.Insert(childIndex, overFlowPair) {
 			nodeBuffer.IsDirty = true
 			return nil, nil, nil
 		}
 
-		// ブランチノードが満杯の場合、分割する
+		// ブランチノードが満杯で挿入に失敗した場合、分割する
 		nodeBranchBuffer := bpm.DiskManager.AllocatePage()
 		newBranchBuffer, err := bpm.AddPage(nodeBranchBuffer)
 		if err != nil {
