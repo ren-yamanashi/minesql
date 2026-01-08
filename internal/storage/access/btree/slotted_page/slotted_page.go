@@ -63,9 +63,11 @@ func (sp *SlottedPage) setPointer(index int, pointer Pointer) {
 // 空き容量が不足している場合は false を返す
 // このメソッドを利用する場合、実行後に Data メソッドで取得したバイトスライスに対してデータを書き込む必要がある (以下実装例)
 // ```go
-// if slottedPage.Insert(bufferId, dataSize) {
-//     copy(slottedPage.Data(bufferId), dataBytes)
-// }
+//
+//	if slottedPage.Insert(bufferId, dataSize) {
+//	    copy(slottedPage.Data(bufferId), dataBytes)
+//	}
+//
 // ```
 func (sp *SlottedPage) Insert(index int, size int) bool {
 	if sp.FreeSpace() < pointerSize+size {

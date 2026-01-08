@@ -41,15 +41,19 @@ func (iter *Iterator) Advance(bpm *bufferpool.BufferPoolManager) error {
 	_node := node.NewNode(iter.bufferPage.Page[:])
 	leafNode := node.NewLeafNode(_node.Body())
 
+	// 現在のページ内に、まだ次の key-value ペアがある場合は、何もせずに終了
 	if iter.bufferId < leafNode.NumPairs() {
 		return nil
 	}
 
 	nextPageId := leafNode.NextPageId()
+
+	// 現在のページ内に、次の key-value ペアがないが、次のページも存在しない場合は何もしない
 	if nextPageId == nil {
 		return nil
 	}
 
+	// 現在のページ内に次の key-value ペアがなく、次のページが存在する場合は、次のページに移動する
 	// 古いページの参照ビットをクリア
 	oldPageId := iter.bufferPage.PageId
 	bpm.UnRefPage(oldPageId)
