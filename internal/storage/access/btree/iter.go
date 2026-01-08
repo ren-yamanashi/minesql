@@ -10,6 +10,13 @@ type Iterator struct {
 	bufferId   int
 }
 
+func NewIterator(bufferPage bufferpool.BufferPage, bufferId int) *Iterator {
+	return &Iterator{
+		bufferPage: bufferPage,
+		bufferId:   bufferId,
+	}
+}
+
 // 現在の key-value のペアを取得
 func (iter *Iterator) Get() (node.Pair, bool) {
 	_node := node.NewNode(iter.bufferPage.Page[:])
