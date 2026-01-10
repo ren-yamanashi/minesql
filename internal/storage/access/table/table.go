@@ -7,7 +7,7 @@ import (
 	"minesql/internal/storage/disk"
 )
 
-type SimpleTable struct {
+type Table struct {
 	// テーブルの内容が入っている B+Tree のメタページの ID
 	MetaPageId disk.PageId
 	// プライマリキーの列数 (プライマリキーは先頭から連続している想定)
@@ -16,7 +16,7 @@ type SimpleTable struct {
 }
 
 // 空のテーブルを新規作成する
-func (t *SimpleTable) Create(bpm *bufferpool.BufferPoolManager) error {
+func (t *Table) Create(bpm *bufferpool.BufferPoolManager) error {
 	tree, err := btree.CreateBTree(bpm)
 	if err != nil {
 		return err
@@ -27,7 +27,7 @@ func (t *SimpleTable) Create(bpm *bufferpool.BufferPoolManager) error {
 
 // テーブルに行を挿入する
 // プライマリキーを key, 他のカラム値を value としたペアを作成し、B+Tree に挿入する
-func (t *SimpleTable) Insert(bpm *bufferpool.BufferPoolManager, record [][]byte) error {
+func (t *Table) Insert(bpm *bufferpool.BufferPoolManager, record [][]byte) error {
 	btree := btree.NewBTree(t.MetaPageId)
 
 	// キーをエンコード

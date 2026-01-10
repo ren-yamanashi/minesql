@@ -11,7 +11,7 @@ import (
 )
 
 // Create と Insert をテスト
-func TestSimpleTable(t *testing.T) {
+func TestTable(t *testing.T) {
 	t.Run("テーブルの作成ができ、そのテーブルに値が挿入できる", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		path := filepath.Join(tmpdir, "test.db")
@@ -19,7 +19,7 @@ func TestSimpleTable(t *testing.T) {
 		dm, _ := disk.NewDiskManager(path)
 		bpm := bufferpool.NewBufferPoolManager(dm, 10)
 
-		table := SimpleTable{
+		table := Table{
 			MetaPageId:      disk.PageId(0),
 			PrimaryKeyCount: 1,
 		}
