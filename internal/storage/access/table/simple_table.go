@@ -27,7 +27,7 @@ func (t *SimpleTable) Create(bpm *bufferpool.BufferPoolManager) error {
 
 // テーブルに行を挿入する
 // プライマリキーを key, 他のカラム値を value としたペアを作成し、B+Tree に挿入する
-func (t *SimpleTable) Insert(bpm *bufferpool.BufferPoolManager, primaryKey []uint8, record [][]byte) error {
+func (t *SimpleTable) Insert(bpm *bufferpool.BufferPoolManager, record [][]byte) error {
 	btree := btree.NewBTree(t.MetaPageId)
 
 	// キーをエンコード
