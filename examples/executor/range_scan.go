@@ -35,7 +35,6 @@ func rangeTableScan(bpm *bufferpool.BufferPoolManager, tbl table.Table) {
 	}
 }
 
-
 // 姓が "J" 以上 "N" 未満の範囲のレコードを取得する (インデックス範囲スキャン)
 func rangeIndexScan(bpm *bufferpool.BufferPoolManager, tbl table.Table) {
 	println("=== インデックス範囲スキャン (姓が 'J' 以上 'N' 未満) ===")

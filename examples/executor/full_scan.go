@@ -35,7 +35,6 @@ func fullTableScan(bpm *bufferpool.BufferPoolManager, tbl table.Table) {
 	}
 }
 
-
 // キーが名前のセカンダリインデックスを使って全件スキャン
 func fullIndexScanByFirstName(bpm *bufferpool.BufferPoolManager, tbl table.Table) {
 	println("=== インデックススキャン (キーが名前) ===")
