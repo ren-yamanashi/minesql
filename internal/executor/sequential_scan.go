@@ -25,8 +25,8 @@ func NewSequentialScan(
 
 // 次の Record を取得する
 // データがない場合、継続条件を満たさない場合は (nil, nil) を返す
-func (e *SequentialScan) Next(bpm *bufferpool.BufferPoolManager) (Record, error) {
-	pair, ok, err := e.TableIterator.Next(bpm)
+func (ss *SequentialScan) Next(bpm *bufferpool.BufferPoolManager) (Record, error) {
+	pair, ok, err := ss.TableIterator.Next(bpm)
 	if !ok {
 		return nil, nil
 	}
@@ -40,7 +40,7 @@ func (e *SequentialScan) Next(bpm *bufferpool.BufferPoolManager) (Record, error)
 	table.Decode(pair.Value, &record)
 
 	// 継続条件をチェック
-	if !e.WhileCondition(record) {
+	if !ss.WhileCondition(record) {
 		return nil, nil
 	}
 

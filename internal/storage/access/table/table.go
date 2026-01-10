@@ -13,15 +13,34 @@ type Table struct {
 	// プライマリキーの列数 (プライマリキーは先頭から連続している想定)
 	// 例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる
 	PrimaryKeyCount int
+	// テーブルに紐づくユニークインデックス群
+	UniqueIndexes []*UniqueIndex
+}
+
+func NewTable(metaPageId disk.PageId, primaryKeyCount int, uniqueIndexes []*UniqueIndex) Table {
+	return Table{
+		MetaPageId:      metaPageId,
+		PrimaryKeyCount: primaryKeyCount,
+		UniqueIndexes:   uniqueIndexes,
+	}
 }
 
 // 空のテーブルを新規作成する
 func (t *Table) Create(bpm *bufferpool.BufferPoolManager) error {
+	// テーブルの B+Tree を作成
 	tree, err := btree.CreateBTree(bpm)
 	if err != nil {
 		return err
 	}
 	t.MetaPageId = tree.MetaPageId
+
+	// ユニークインデックスを作成
+	for _, ui := range t.UniqueIndexes {
+		err := ui.Create(bpm)
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -39,8 +58,21 @@ func (t *Table) Insert(bpm *bufferpool.BufferPoolManager, record [][]byte) error
 	Encode(record[t.PrimaryKeyCount:], &encodedValue)
 
 	// B+Tree に挿入
-	return btree.Insert(bpm, node.Pair{
+	err := btree.Insert(bpm, node.Pair{
 		Key:   encodedKey,
 		Value: encodedValue,
 	})
+	if err != nil {
+		return err
+	}
+
+	// ユニークインデックスに挿入
+	for _, ui := range t.UniqueIndexes {
+		err := ui.Insert(bpm, encodedKey, record)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
