@@ -98,13 +98,6 @@ func (bpm *BufferPoolManager) FlushPage() error {
 	return bpm.DiskManager.Sync()
 }
 
-// TODO: 後で削除
-// バッファプールを取得
-func (bpm *BufferPoolManager) GetBufferPool() *BufferPool {
-	return &bpm.bufpool
-}
-
-// TODO: 後で削除
 // 指定されたページ ID のバッファページを取得する
 func (bpm *BufferPoolManager) GetBufferPage(pageId disk.PageId) (*BufferPage, bool) {
 	if bufferId, ok := bpm.pageTable[pageId]; ok {
