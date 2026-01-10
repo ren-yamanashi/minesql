@@ -15,9 +15,9 @@ func TestEncodedSize(t *testing.T) {
 		size3 := 0
 
 		// WHEN
-		result1 := EncodedSize(size1)
-		result2 := EncodedSize(size2)
-		result3 := EncodedSize(size3)
+		result1 := encodedSize(size1)
+		result2 := encodedSize(size2)
+		result3 := encodedSize(size3)
 
 		// THEN
 		assert.Equal(t, 27, result1) // 20 バイトは 3 ブロックに分割されるため、3 * 9 = 27 バイト
@@ -33,14 +33,14 @@ func TestEncodedSize(t *testing.T) {
 		var encoded []byte
 
 		// WHEN
-		EncodeToMemcomparable(src1, &encoded)
-		EncodeToMemcomparable(src2, &encoded)
+		encodeToMemcomparable(src1, &encoded)
+		encodeToMemcomparable(src2, &encoded)
 
 		var decoded1 []byte
 		var decoded2 []byte
 
-		DecodeFromMemcomparable(&encoded, &decoded1)
-		DecodeFromMemcomparable(&encoded, &decoded2)
+		decodeFromMemcomparable(&encoded, &decoded1)
+		decodeFromMemcomparable(&encoded, &decoded2)
 
 		// THEN
 		assert.Equal(t, src1, decoded1)
@@ -55,7 +55,7 @@ func TestEncodeToMemcomparable(t *testing.T) {
 		var destination []byte
 
 		// WHEN
-		EncodeToMemcomparable(src, &destination)
+		encodeToMemcomparable(src, &destination)
 
 		// THEN
 		expected := []byte{
@@ -84,8 +84,8 @@ func TestEncodeToMemcomparable(t *testing.T) {
 			t.Run(tc.name, func(t *testing.T) {
 				// WHEN
 				var encodedA, encodedB []byte
-				EncodeToMemcomparable(tc.a, &encodedA)
-				EncodeToMemcomparable(tc.b, &encodedB)
+				encodeToMemcomparable(tc.a, &encodedA)
+				encodeToMemcomparable(tc.b, &encodedB)
 
 				// 元のバイト列の比較結果
 				originalCompare := bytes.Compare(tc.a, tc.b)
@@ -109,7 +109,7 @@ func TestDecodeFromMemcomparable(t *testing.T) {
 		var destination []byte
 
 		// WHEN
-		DecodeFromMemcomparable(&src, &destination)
+		decodeFromMemcomparable(&src, &destination)
 
 		// THEN
 		expected := []byte("Hello, World!")

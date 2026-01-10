@@ -23,7 +23,7 @@ func TestChildPageId_Start(t *testing.T) {
 		)
 
 		// WHEN
-		pageId := searchMode.ChildPageId(branchNode)
+		pageId := searchMode.childPageId(branchNode)
 
 		// THEN
 		assert.Equal(t, disk.PageId(100), pageId)
@@ -44,7 +44,7 @@ func TestChildPageId_Key(t *testing.T) {
 		)
 
 		// WHEN
-		pageId := searchMode.ChildPageId(branchNode)
+		pageId := searchMode.childPageId(branchNode)
 
 		// THEN
 		assert.Equal(t, disk.PageId(200), pageId)
@@ -65,7 +65,7 @@ func TestChildPageId_Key(t *testing.T) {
 		searchMode := SearchModeKey{Key: []byte("key0")}
 
 		// WHEN
-		pageId := searchMode.ChildPageId(branchNode)
+		pageId := searchMode.childPageId(branchNode)
 
 		// THEN
 		assert.Equal(t, disk.PageId(100), pageId)
@@ -86,7 +86,7 @@ func TestChildPageId_Key(t *testing.T) {
 		searchMode := SearchModeKey{Key: []byte("key9")}
 
 		// WHEN
-		pageId := searchMode.ChildPageId(branchNode)
+		pageId := searchMode.childPageId(branchNode)
 
 		// THEN
 		assert.Equal(t, disk.PageId(400), pageId)
@@ -105,7 +105,7 @@ func TestChildPageId_Key(t *testing.T) {
 		)
 
 		// WHEN
-		pageId := searchMode.ChildPageId(branchNode)
+		pageId := searchMode.childPageId(branchNode)
 
 		// THEN
 		assert.Equal(t, disk.PageId(300), pageId)
@@ -114,9 +114,7 @@ func TestChildPageId_Key(t *testing.T) {
 
 func createBranchNode(pairs []node.Pair, rightChildPageId disk.PageId) *node.BranchNode {
 	page := &disk.Page{}
-	_node := node.NewNode(page[:])
-	_node.InitAsBranchNode()
-	branchNode := node.NewBranchNode(_node.Body())
+	branchNode := node.NewBranchNode(page[:])
 
 	if len(pairs) == 0 {
 		panic("pairs must not be empty")

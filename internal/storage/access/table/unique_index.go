@@ -40,8 +40,5 @@ func (ui *UniqueIndex) Insert(bpm *bufferpool.BufferPoolManager, primaryKey []ui
 	Encode([][]byte{record[ui.SecondaryKey]}, &secondaryKey)
 
 	// B+Tree に挿入
-	return btr.Insert(bpm, node.Pair{
-		Key:   secondaryKey,
-		Value: primaryKey,
-	})
+	return btr.Insert(bpm, node.NewPair(secondaryKey, primaryKey))
 }

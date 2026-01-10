@@ -110,7 +110,7 @@ func TestSetPointer(t *testing.T) {
 		sp.Initialize()
 
 		// WHEN
-		sp.setPointer(0, NewPointer(100, 20))
+		sp.setPointer(0, newPointer(100, 20))
 
 		// THEN
 		pointer := sp.pointerAt(0)

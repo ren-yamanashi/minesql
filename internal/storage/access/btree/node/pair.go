@@ -43,20 +43,17 @@ func (p Pair) CompareKey(otherKey []byte) int {
 
 // バイト列から key-value ペアを復元する
 // フォーマット: [key_size(4 bytes][key][value]
-func PairFromBytes(data []byte) Pair {
+func pairFromBytes(data []byte) Pair {
 	if len(data) < 4 {
-		return Pair{}
+		return NewPair(nil, nil)
 	}
 
 	keySize := binary.LittleEndian.Uint32(data[0:4])
 
 	// キー部分がデータ長を超えている場合は不正なデータなので、空のペアを返す
 	if len(data) < int(4+keySize) {
-		return Pair{}
+		return NewPair(nil, nil)
 	}
 
-	return Pair{
-		Key:   data[4 : 4+keySize],
-		Value: data[4+keySize:],
-	}
+	return NewPair(data[4:4+keySize], data[4+keySize:])
 }

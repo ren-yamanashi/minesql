@@ -1,6 +1,6 @@
 package node
 
-const headerSize = 8
+const nodeHeaderSize = 8
 
 var (
 	NODE_TYPE_LEAF   = []byte("LEAF    ")
@@ -11,27 +11,14 @@ type NodeHeader struct {
 	NodeType [8]byte
 }
 
-type Node struct {
-	// ページデータ全体
-	data []byte
+// Node は B+Tree のノードを表す interface
+type Node interface {
+	// ノードタイプヘッダーを除いたボディ部分を取得する
+	Body() []byte
 }
 
-func NewNode(data []byte) *Node {
-	return &Node{data: data}
-}
-
-func (n *Node) NodeType() []byte {
-	return n.data[0:8]
-}
-
-func (n *Node) Body() []byte {
-	return n.data[headerSize:]
-}
-
-func (n *Node) InitAsBranchNode() {
-	copy(n.data[0:8], NODE_TYPE_BRANCH)
-}
-
-func (n *Node) InitAsLeafNode() {
-	copy(n.data[0:8], NODE_TYPE_LEAF)
+// ページデータからノードタイプを取得する
+// 戻り値: NODE_TYPE_LEAF or NODE_TYPE_BRANCH
+func GetNodeType(data []byte) []byte {
+	return data[0:8]
 }

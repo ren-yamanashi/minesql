@@ -58,10 +58,7 @@ func (t *Table) Insert(bpm *bufferpool.BufferPoolManager, record [][]byte) error
 	Encode(record[t.PrimaryKeyCount:], &encodedValue)
 
 	// B+Tree に挿入
-	err := btree.Insert(bpm, node.Pair{
-		Key:   encodedKey,
-		Value: encodedValue,
-	})
+	err := btree.Insert(bpm, node.NewPair(encodedKey, encodedValue))
 	if err != nil {
 		return err
 	}

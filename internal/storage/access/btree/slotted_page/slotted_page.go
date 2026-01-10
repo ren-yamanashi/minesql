@@ -28,15 +28,6 @@ func (sp *SlottedPage) FreeSpace() int {
 	return freeSpaceOffset - pointersSize - headerSize
 }
 
-// 指定されたインデックスのポインタを取得する
-func (sp *SlottedPage) pointerAt(index int) Pointer {
-	base := headerSize + index*pointerSize
-	return NewPointer(
-		binary.LittleEndian.Uint16(sp.data[base:base+2]),
-		binary.LittleEndian.Uint16(sp.data[base+2:base+4]),
-	)
-}
-
 // 指定されたインデックスのデータを取得する
 func (sp *SlottedPage) Data(index int) []byte {
 	pointer := sp.pointerAt(index)
@@ -49,13 +40,6 @@ func (sp *SlottedPage) Initialize() {
 	binary.LittleEndian.PutUint16(sp.data[0:2], 0)                    // numSlots
 	binary.LittleEndian.PutUint16(sp.data[2:4], uint16(len(sp.data))) // freeOffset = end of data
 	binary.LittleEndian.PutUint32(sp.data[4:8], 0)                    // _pad
-}
-
-// 指定されたインデックスのポインタを設定する
-func (sp *SlottedPage) setPointer(index int, pointer Pointer) {
-	base := headerSize + index*pointerSize
-	binary.LittleEndian.PutUint16(sp.data[base:base+2], pointer.offset) // offset
-	binary.LittleEndian.PutUint16(sp.data[base+2:base+4], pointer.size) // size
 }
 
 // 指定されたインデックスにサイズ分のデータを挿入する (領域の確保のみを行い、実際のデータの書き込みは行わない)
@@ -93,7 +77,7 @@ func (sp *SlottedPage) Insert(index int, size int) bool {
 	}
 
 	// 新しいポインタを設定
-	sp.setPointer(index, NewPointer(
+	sp.setPointer(index, newPointer(
 		uint16(newFreeSpaceOffset),
 		uint16(size),
 	))
@@ -163,4 +147,20 @@ func (sp *SlottedPage) Remove(index int) {
 
 	// numSlots を減らす
 	binary.LittleEndian.PutUint16(sp.data[0:2], uint16(numSlots-1))
+}
+
+// 指定されたインデックスのポインタを取得する
+func (sp *SlottedPage) pointerAt(index int) Pointer {
+	base := headerSize + index*pointerSize
+	return newPointer(
+		binary.LittleEndian.Uint16(sp.data[base:base+2]),
+		binary.LittleEndian.Uint16(sp.data[base+2:base+4]),
+	)
+}
+
+// 指定されたインデックスのポインタを設定する
+func (sp *SlottedPage) setPointer(index int, pointer Pointer) {
+	base := headerSize + index*pointerSize
+	binary.LittleEndian.PutUint16(sp.data[base:base+2], pointer.offset) // offset
+	binary.LittleEndian.PutUint16(sp.data[base+2:base+4], pointer.size) // size
 }

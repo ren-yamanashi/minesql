@@ -12,7 +12,7 @@ type Pointer struct {
 	size uint16
 }
 
-func NewPointer(offset, size uint16) Pointer {
+func newPointer(offset, size uint16) Pointer {
 	return Pointer{
 		offset: offset,
 		size:   size,

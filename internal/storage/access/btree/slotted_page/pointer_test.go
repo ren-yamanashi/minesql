@@ -13,7 +13,7 @@ func TestNewPointer(t *testing.T) {
 		size := uint16(20)
 
 		// WHEN
-		pointer := NewPointer(offset, size)
+		pointer := newPointer(offset, size)
 
 		// THEN
 		assert.Equal(t, offset, pointer.offset)
@@ -26,7 +26,7 @@ func TestNewPointer(t *testing.T) {
 		size := uint16(25)
 
 		// WHEN
-		pointer := NewPointer(offset, size)
+		pointer := newPointer(offset, size)
 		start, end := pointer.Range()
 
 		// THEN

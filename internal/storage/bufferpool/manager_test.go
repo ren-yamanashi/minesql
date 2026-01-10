@@ -308,3 +308,115 @@ func (spy *DiskManagerSpy) AllocatePage() disk.PageId {
 func (spy *DiskManagerSpy) Sync() error {
 	return nil
 }
+
+func TestBufferPoolManagerIntegration(t *testing.T) {
+	t.Run("バッファプールの統合動作テスト (ページアクセス、ページ置換、参照ビット管理)", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		path := filepath.Join(tmpdir, "test.db")
+		dm, err := disk.NewDiskManager(path)
+		assert.NoError(t, err)
+		bpm := NewBufferPoolManager(dm, 3)
+
+		// ページを作成
+		page1 := dm.AllocatePage()
+		page2 := dm.AllocatePage()
+		page3 := dm.AllocatePage()
+		page4 := dm.AllocatePage()
+		page5 := dm.AllocatePage()
+
+		// 各ページにデータを書き込む (PageID と同じ値を書き込む)
+		writeTestData := func(pageId disk.PageId, value byte) {
+			data := make([]byte, disk.PAGE_SIZE)
+			for i := range data {
+				data[i] = value
+			}
+			err := dm.WritePageData(pageId, data)
+			assert.NoError(t, err)
+		}
+
+		writeTestData(page1, byte(page1))
+		writeTestData(page2, byte(page2))
+		writeTestData(page3, byte(page3))
+		writeTestData(page4, byte(page4))
+		writeTestData(page5, byte(page5))
+
+		// ===============================
+		// ページアクセスのシミュレーション
+		// ===============================
+
+		// ### 1. page1, page2, page3 をフェッチ (バッファプールに読み込まれる)
+		fetchedPage1, err := bpm.FetchPage(page1)
+		assert.NoError(t, err)
+		assert.Equal(t, byte(page1), fetchedPage1.Page[0])
+		assert.True(t, fetchedPage1.Referenced)
+
+		fetchedPage2, err := bpm.FetchPage(page2)
+		assert.NoError(t, err)
+		assert.Equal(t, byte(page2), fetchedPage2.Page[0])
+		assert.True(t, fetchedPage2.Referenced)
+
+		fetchedPage3, err := bpm.FetchPage(page3)
+		assert.NoError(t, err)
+		assert.Equal(t, byte(page3), fetchedPage3.Page[0])
+		assert.True(t, fetchedPage3.Referenced)
+
+		assert.Equal(t, 3, len(bpm.pageTable)) // バッファプールが満杯になっている
+
+		// ### 2. page4 をアクセス (ページ置換発生)
+		// すべてのページの Referenced を false にした後、page1 が置換される
+		fetchedPage4, err := bpm.FetchPage(page4)
+		assert.NoError(t, err)
+		assert.Equal(t, byte(page4), fetchedPage4.Page[0])
+		assert.True(t, fetchedPage4.Referenced)
+
+		// page1 がページテーブルから削除される
+		_, page1InBuffer := bpm.pageTable[page1]
+		assert.False(t, page1InBuffer)
+
+		// page4 がバッファプールに追加される
+		_, ok := bpm.pageTable[page4]
+		assert.True(t, ok)
+
+		// page2, page3 の Referenced は false になる
+		assert.False(t, fetchedPage2.Referenced)
+		assert.False(t, fetchedPage3.Referenced)
+
+		// ### 3. page5 をアクセス (ページ置換発生)
+		// page2 が置換される (Referenced が false で最初に見つかるページ)
+		fetchedPage5, err := bpm.FetchPage(page5)
+		assert.NoError(t, err)
+		assert.Equal(t, byte(page5), fetchedPage5.Page[0])
+		assert.True(t, fetchedPage5.Referenced)
+
+		// page2 がページテーブルから削除されることを確認
+		_, page2InBuffer := bpm.pageTable[page2]
+		assert.False(t, page2InBuffer)
+
+		// page5 がバッファプールに追加される
+		_, ok = bpm.pageTable[page5]
+		assert.True(t, ok)
+
+		// ### 4. page1 を再度アクセス
+		// page1 がバッファから追い出されているため、再度ディスクから読み込まれる
+		// page3 が置換される
+		reFetchedPage1, err := bpm.FetchPage(page1)
+		assert.NoError(t, err)
+		assert.Equal(t, byte(page1), reFetchedPage1.Page[0])
+		assert.True(t, reFetchedPage1.Referenced)
+
+		// page3 がページテーブルから削除されることを確認
+		_, page3InBuffer := bpm.pageTable[page3]
+		assert.False(t, page3InBuffer)
+
+		// page1 がバッファプールに存在する
+		_, page1InBuffer = bpm.pageTable[page1]
+		assert.True(t, page1InBuffer)
+
+		// 最終的に page4, page5, page1 がバッファプールに存在
+		assert.Equal(t, 3, len(bpm.pageTable))
+		assert.Contains(t, bpm.pageTable, page4)
+		assert.Contains(t, bpm.pageTable, page5)
+		assert.Contains(t, bpm.pageTable, page1)
+	})
+}

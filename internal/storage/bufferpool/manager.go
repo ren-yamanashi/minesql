@@ -7,14 +7,14 @@ import (
 type BufferPoolManager struct {
 	DiskManager disk.DiskManagerInterface
 	bufpool     BufferPool
-	pageTable   PageTable
+	pageTable   pageTable
 }
 
 func NewBufferPoolManager(dm disk.DiskManagerInterface, size int) *BufferPoolManager {
 	return &BufferPoolManager{
 		DiskManager: dm,
-		bufpool:     *NewBufferPool(size),
-		pageTable:   make(PageTable),
+		bufpool:     *newBufferPool(size),
+		pageTable:   make(pageTable),
 	}
 }
 
@@ -70,9 +70,9 @@ func (bpm *BufferPoolManager) AddPage(pageId disk.PageId) (*BufferPage, error) {
 
 	// 新しいページに置き換え
 	bpm.bufpool.BufferPages[bpm.bufpool.Pointer] = *NewBufferPage(pageId)
-	newBufferPage := &bpm.bufpool.BufferPages[bpm.bufpool.Pointer]
+	newBufPage := &bpm.bufpool.BufferPages[bpm.bufpool.Pointer]
 	bpm.bufpool.AdvancePointer()
-	return newBufferPage, nil
+	return newBufPage, nil
 }
 
 // 指定されたページの参照ビットをクリア
@@ -96,21 +96,6 @@ func (bpm *BufferPoolManager) FlushPage() error {
 		bufferPage.IsDirty = false
 	}
 	return bpm.DiskManager.Sync()
-}
-
-// TODO: 後で削除
-// バッファプールを取得
-func (bpm *BufferPoolManager) GetBufferPool() *BufferPool {
-	return &bpm.bufpool
-}
-
-// TODO: 後で削除
-// 指定されたページ ID のバッファページを取得する
-func (bpm *BufferPoolManager) GetBufferPage(pageId disk.PageId) (*BufferPage, bool) {
-	if bufferId, ok := bpm.pageTable[pageId]; ok {
-		return &bpm.bufpool.BufferPages[bufferId], true
-	}
-	return nil, false
 }
 
 // ページテーブルを更新

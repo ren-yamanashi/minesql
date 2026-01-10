@@ -15,8 +15,9 @@ type BufferPage struct {
 
 func NewBufferPage(pageId disk.PageId) *BufferPage {
 	return &BufferPage{
-		PageId:  pageId,
-		Page:    &disk.Page{},
-		IsDirty: false,
+		PageId:     pageId,
+		Page:       &disk.Page{},
+		Referenced: false,
+		IsDirty:    false,
 	}
 }
