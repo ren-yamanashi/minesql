@@ -4,7 +4,8 @@
       "Bash(go test:*)",
       "Bash(go run:*)",
       "Bash(cat:*)",
-      "Bash(make test:*)"
+      "Bash(make test:*)",
+      "Bash(make fmt:*)"
     ]
   }
 }
