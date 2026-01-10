@@ -31,7 +31,7 @@ func (iter *Iterator) Get() (node.Pair, bool) {
 		return node.NewPair(key, value), true
 	}
 
-	return node.Pair{}, false
+	return node.NewPair(nil, nil), false
 }
 
 // 次の key-value ペアに進む

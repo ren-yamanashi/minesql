@@ -15,12 +15,7 @@ func newBufferPool(size int) *BufferPool {
 	// メモリ上に空のバッファページを作成
 	pages := make([]BufferPage, size)
 	for i := range pages {
-		pages[i] = BufferPage{
-			PageId:     disk.PageId(0),
-			Page:       &disk.Page{},
-			Referenced: false,
-			IsDirty:    false,
-		}
+		pages[i] = *NewBufferPage(disk.PageId(i))
 	}
 	return &BufferPool{
 		BufferPages:   pages,

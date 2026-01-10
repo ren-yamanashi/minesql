@@ -51,7 +51,7 @@ func (bpm *BufferPoolManager) FetchPage(pageId disk.PageId) (*BufferPage, error)
 func (bpm *BufferPoolManager) AddPage(pageId disk.PageId) (*BufferPage, error) {
 	// バッファに空きがある場合
 	if len(bpm.bufpool.BufferPages) < bpm.bufpool.MaxBufferSize {
-		bpm.bufpool.BufferPages = append(bpm.bufpool.BufferPages, *newBufferPage(pageId))
+		bpm.bufpool.BufferPages = append(bpm.bufpool.BufferPages, *NewBufferPage(pageId))
 		bufferId := BufferId(len(bpm.bufpool.BufferPages) - 1)
 		bpm.addPageToTable(pageId, bufferId)
 		return &bpm.bufpool.BufferPages[bufferId], nil
@@ -69,10 +69,10 @@ func (bpm *BufferPoolManager) AddPage(pageId disk.PageId) (*BufferPage, error) {
 	bpm.updatePageTable(bufferPageForEvict.PageId, pageId, bpm.bufpool.Pointer)
 
 	// 新しいページに置き換え
-	bpm.bufpool.BufferPages[bpm.bufpool.Pointer] = *newBufferPage(pageId)
-	newBufferPage := &bpm.bufpool.BufferPages[bpm.bufpool.Pointer]
+	bpm.bufpool.BufferPages[bpm.bufpool.Pointer] = *NewBufferPage(pageId)
+	NewBufferPage := &bpm.bufpool.BufferPages[bpm.bufpool.Pointer]
 	bpm.bufpool.AdvancePointer()
-	return newBufferPage, nil
+	return NewBufferPage, nil
 }
 
 // 指定されたページの参照ビットをクリア
