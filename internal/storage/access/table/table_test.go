@@ -18,7 +18,13 @@ func TestTable(t *testing.T) {
 
 		dm, _ := disk.NewDiskManager(path)
 		bpm := bufferpool.NewBufferPoolManager(dm, 10)
-		table := NewTable(disk.PageId(0), 1)
+		uniqueIndexes := []*UniqueIndex{
+			{
+				MetaPageId: disk.INVALID_PAGE_ID,
+				SecondaryKey: 2,
+			},
+		}
+		table := NewTable(disk.PageId(0), 1, uniqueIndexes)
 
 		// WHEN: テーブルを作成
 		err := table.Create(bpm)
@@ -69,5 +75,49 @@ func TestTable(t *testing.T) {
 			iter.Next(bpm)
 		}
 		assert.Equal(t, len(expectedRecords), i)
+
+		// THEN: ユニークインデックスにもデータが挿入されている
+		uniqueIndexTree := btree.NewBTree(table.UniqueIndexes[0].MetaPageId)
+		uniqueIndexIter, err := uniqueIndexTree.Search(bpm, btree.SearchModeStart{})
+		assert.NoError(t, err)
+
+		// SecondaryKey = 2 なので、3 番目のカラム (姓) がキー、エンコードされたプライマリキーが値
+		// プライマリキーをエンコード
+		var encodedPrimaryKeyA, encodedPrimaryKeyB, encodedPrimaryKeyC, encodedPrimaryKeyD []byte
+		Encode([][]byte{[]byte("a")}, &encodedPrimaryKeyA)
+		Encode([][]byte{[]byte("b")}, &encodedPrimaryKeyB)
+		Encode([][]byte{[]byte("c")}, &encodedPrimaryKeyC)
+		Encode([][]byte{[]byte("d")}, &encodedPrimaryKeyD)
+
+		expectedUniqueIndexRecords := []struct {
+			key   [][]byte
+			value []uint8
+		}{
+			// キーの順序でソートされる
+			{[][]byte{[]byte("Davis")}, encodedPrimaryKeyD},
+			{[][]byte{[]byte("Doe")}, encodedPrimaryKeyA},
+			{[][]byte{[]byte("Johnson")}, encodedPrimaryKeyC},
+			{[][]byte{[]byte("Smith")}, encodedPrimaryKeyB},
+		}
+
+		j := 0
+		for {
+			pair, ok := uniqueIndexIter.Get()
+			if !ok {
+				break
+			}
+			expected := expectedUniqueIndexRecords[j]
+
+			// エンコードされたキーをデコード
+			var decodedKey [][]byte
+			Decode(pair.Key, &decodedKey)
+
+			assert.Equal(t, expected.key, decodedKey)
+			assert.Equal(t, expected.value, pair.Value)
+
+			j++
+			uniqueIndexIter.Next(bpm)
+		}
+		assert.Equal(t, len(expectedUniqueIndexRecords), j)
 	})
 }
