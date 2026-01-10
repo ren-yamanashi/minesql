@@ -33,8 +33,5 @@ func (s *SequentialScan) Start(bpm *bufferpool.BufferPoolManager) (executor.Exec
 	if err != nil {
 		return nil, err
 	}
-	return &executor.SequentialScan{
-		TableIterator:  tableIterator,
-		WhileCondition: s.WhileCondition,
-	}, nil
+	return executor.NewSequentialScan(tableIterator, s.WhileCondition), nil
 }

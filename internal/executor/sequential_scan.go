@@ -16,11 +16,11 @@ type SequentialScan struct {
 func NewSequentialScan(
 	tableIterator *btree.Iterator,
 	whileCondition func(record Record) bool,
-) (*SequentialScan, error) {
+) *SequentialScan {
 	return &SequentialScan{
 		TableIterator:  tableIterator,
 		WhileCondition: whileCondition,
-	}, nil
+	}
 }
 
 // 次の Record を取得する

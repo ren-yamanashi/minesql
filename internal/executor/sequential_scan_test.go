@@ -28,13 +28,12 @@ func TestNewSequentialScan(t *testing.T) {
 		}
 
 		// WHEN
-		seqScan, err := NewSequentialScan(
+		seqScan := NewSequentialScan(
 			tableIterator,
 			whileCondition,
 		)
 
 		// THEN
-		assert.NoError(t, err)
 		assert.NotNil(t, seqScan)
 	})
 }
@@ -47,16 +46,15 @@ func TestSequentialScan(t *testing.T) {
 		bpm := bufferpool.NewBufferPoolManager(dm, 10)
 		table := InitTable(t, bpm)
 		btr := btree.NewBTree(table.MetaPageId)
-		tableIterator, err := btr.Search(bpm, btree.SearchModeStart{})
+		tableIterator, _ := btr.Search(bpm, btree.SearchModeStart{})
 
 		// GIVEN
-		seqScan, err := NewSequentialScan(
+		seqScan := NewSequentialScan(
 			tableIterator,
 			func(record Record) bool {
 				return string(record[0]) < "c" // プライマリキーが "c" 未満の間、継続
 			},
 		)
-		assert.NoError(t, err)
 
 		// WHEN
 		var results []Record
@@ -84,16 +82,15 @@ func TestSequentialScan(t *testing.T) {
 		bpm := bufferpool.NewBufferPoolManager(dm, 10)
 		table := InitTable(t, bpm)
 		btr := btree.NewBTree(table.MetaPageId)
-		tableIterator, err := btr.Search(bpm, btree.SearchModeKey{Key: []byte("b")})
+		tableIterator, _ := btr.Search(bpm, btree.SearchModeKey{Key: []byte("b")})
 
 		// GIVEN
-		seqScan, err := NewSequentialScan(
+		seqScan := NewSequentialScan(
 			tableIterator,
 			func(record Record) bool {
 				return string(record[0]) <= "d" // プライマリキーが d" 以下の間、継続
 			},
 		)
-		assert.NoError(t, err)
 
 		// WHEN
 		var results []Record
