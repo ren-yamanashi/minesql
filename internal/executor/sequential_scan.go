@@ -6,34 +6,27 @@ import (
 	"minesql/internal/storage/bufferpool"
 )
 
-type ExecSequentialScan struct {
+type SequentialScan struct {
 	// テーブルを走査するイテレータ
-	tableIterator *btree.Iterator
+	TableIterator *btree.Iterator
 	// 継続条件を満たすかどうかを判定する関数
-	whileCondition func(record Record) bool
+	WhileCondition func(record Record) bool
 }
 
-func NewExecSequentialScan(
-	bpm *bufferpool.BufferPoolManager,
-	table table.Table,
+func NewSequentialScan(
+	tableIterator *btree.Iterator,
 	whileCondition func(record Record) bool,
-) (*ExecSequentialScan, error) {
-	tree := btree.NewBTree(table.MetaPageId)
-	iter, err := tree.Search(bpm, btree.SearchModeStart{})
-	if err != nil {
-		return nil, err
-	}
-
-	return &ExecSequentialScan{
-		tableIterator:  iter,
-		whileCondition: whileCondition,
+) (*SequentialScan, error) {
+	return &SequentialScan{
+		TableIterator:  tableIterator,
+		WhileCondition: whileCondition,
 	}, nil
 }
 
 // 次の Record を取得する
 // データがない場合、継続条件を満たさない場合は (nil, nil) を返す
-func (e *ExecSequentialScan) Next(bpm *bufferpool.BufferPoolManager) (Record, error) {
-	pair, ok, err := e.tableIterator.Next(bpm)
+func (e *SequentialScan) Next(bpm *bufferpool.BufferPoolManager) (Record, error) {
+	pair, ok, err := e.TableIterator.Next(bpm)
 	if !ok {
 		return nil, nil
 	}
@@ -47,7 +40,7 @@ func (e *ExecSequentialScan) Next(bpm *bufferpool.BufferPoolManager) (Record, er
 	table.Decode(pair.Value, &record)
 
 	// 継続条件をチェック
-	if !e.whileCondition(record) {
+	if !e.WhileCondition(record) {
 		return nil, nil
 	}
 

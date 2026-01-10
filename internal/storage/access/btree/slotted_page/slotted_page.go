@@ -87,7 +87,7 @@ func (sp *SlottedPage) Insert(index int, size int) bool {
 	// ポインタ配列をシフト (index 以降を右にずらす)
 	if index < numSlots {
 		src := headerSize + index*pointerSize // コピー元の開始位置
-		destination := src + pointerSize              // コピー先の開始位置
+		destination := src + pointerSize      // コピー先の開始位置
 		copySize := (numSlots - index) * pointerSize
 		copy(sp.data[destination:destination+copySize], sp.data[src:src+copySize])
 	}
@@ -155,8 +155,8 @@ func (sp *SlottedPage) Remove(index int) {
 
 	// ポインタ配列をシフト (index 以降を左にずらす)
 	if index < numSlots-1 {
-		src := headerSize + (index+1)*pointerSize // コピー元の開始位置
-		destination := headerSize + index*pointerSize     // コピー先の開始位置
+		src := headerSize + (index+1)*pointerSize     // コピー元の開始位置
+		destination := headerSize + index*pointerSize // コピー先の開始位置
 		copySize := (numSlots - index - 1) * pointerSize
 		copy(sp.data[destination:destination+copySize], sp.data[src:src+copySize])
 	}
