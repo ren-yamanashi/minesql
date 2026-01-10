@@ -12,7 +12,7 @@ func TestNewBufferPool(t *testing.T) {
 		poolSize := 10
 
 		// WHEN
-		bp := NewBufferPool(poolSize)
+		bp := newBufferPool(poolSize)
 
 		// THEN
 		assert.Equal(t, len(bp.BufferPages), poolSize)
@@ -24,7 +24,7 @@ func TestNewBufferPool(t *testing.T) {
 func TestAdvancePointer(t *testing.T) {
 	t.Run("ポインタが正しく進む", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(5)
+		bp := newBufferPool(5)
 
 		// WHEN
 		bp.AdvancePointer()
@@ -35,7 +35,7 @@ func TestAdvancePointer(t *testing.T) {
 
 	t.Run("ポインタがバッファプールの末尾に達した場合、先頭に戻る", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(3)
+		bp := newBufferPool(3)
 		bp.Pointer = BufferId(2)
 
 		// WHEN
@@ -49,7 +49,7 @@ func TestAdvancePointer(t *testing.T) {
 func TestEvictPage(t *testing.T) {
 	t.Run("バッファプールから追い出すバッファページが選択される", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(3)
+		bp := newBufferPool(3)
 		bp.BufferPages[0].Referenced = true
 		bp.BufferPages[1].Referenced = false
 		bp.BufferPages[2].Referenced = false
@@ -65,7 +65,7 @@ func TestEvictPage(t *testing.T) {
 
 	t.Run("参照ビットがすべて立っている場合、最初のページが追い出される", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(2)
+		bp := newBufferPool(2)
 		bp.BufferPages[0].Referenced = true
 		bp.BufferPages[1].Referenced = true
 		bp.Pointer = BufferId(0)

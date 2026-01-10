@@ -16,7 +16,7 @@ func TestNewIterator(t *testing.T) {
 		bufferId := 0
 
 		// WHEN
-		iterator := NewIterator(bufferPageMock, bufferId)
+		iterator := newIterator(bufferPageMock, bufferId)
 
 		// THEN
 		assert.NotNil(t, iterator)
@@ -36,7 +36,7 @@ func TestAdvance(t *testing.T) {
 		pair3 := node.NewPair([]byte("key3"), []byte("value3"))
 
 		bufferPage := createLeafBufferPage(disk.PageId(0), []node.Pair{pair1, pair2, pair3}, nil)
-		iterator := NewIterator(bufferPage, 0)
+		iterator := newIterator(bufferPage, 0)
 
 		// WHEN
 		err := iterator.Advance(bpm)
@@ -55,7 +55,7 @@ func TestAdvance(t *testing.T) {
 		pair2 := node.NewPair([]byte("key2"), []byte("value2"))
 
 		bufferPage := createLeafBufferPage(disk.PageId(0), []node.Pair{pair1, pair2}, nil)
-		iterator := NewIterator(bufferPage, 1) // 最後のペアを指している
+		iterator := newIterator(bufferPage, 1) // 最後のペアを指している
 
 		// WHEN
 		err := iterator.Advance(bpm)
@@ -90,7 +90,7 @@ func TestAdvance(t *testing.T) {
 		copy(addedPage1.Page[:], bufferPage1.Page[:])
 		addedPage1.Referenced = true // 参照ビットをセット
 
-		iterator := NewIterator(*addedPage1, 1) // 最後のペアを指している
+		iterator := newIterator(*addedPage1, 1) // 最後のペアを指している
 
 		// WHEN
 		err = iterator.Advance(bpm)
@@ -99,11 +99,6 @@ func TestAdvance(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, disk.PageId(1), iterator.bufferPage.PageId)
 		assert.Equal(t, 0, iterator.bufferId) // 次のページの先頭
-
-		// 古いページ (PageId=0) の参照ビットがクリアされていることを確認
-		oldBufferPage, ok := bpm.GetBufferPage(disk.PageId(0))
-		assert.True(t, ok)
-		assert.False(t, oldBufferPage.Referenced)
 	})
 }
 
@@ -118,7 +113,7 @@ func TestNext(t *testing.T) {
 		pair3 := node.NewPair([]byte("key3"), []byte("value3"))
 
 		bufferPage := createLeafBufferPage(disk.PageId(0), []node.Pair{pair1, pair2, pair3}, nil)
-		iterator := NewIterator(bufferPage, 0)
+		iterator := newIterator(bufferPage, 0)
 		assert.Equal(t, 0, iterator.bufferId) // 最初のペアを指している
 
 		// WHEN

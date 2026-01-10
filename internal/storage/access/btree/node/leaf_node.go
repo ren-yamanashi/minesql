@@ -41,7 +41,7 @@ func (ln *LeafNode) NumPairs() int {
 // 指定されたバッファ ID の key-value ペアを取得する
 func (ln *LeafNode) PairAt(bufferId int) Pair {
 	data := ln.body.Data(bufferId)
-	return PairFromBytes(data)
+	return pairFromBytes(data)
 }
 
 // キーから、対応するバッファ ID を検索する (二分探索)

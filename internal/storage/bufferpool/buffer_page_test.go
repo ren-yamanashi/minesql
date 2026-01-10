@@ -13,7 +13,7 @@ func TestNewBufferPage(t *testing.T) {
 		pageId := disk.PageId(0)
 
 		// WHEN
-		bufferPage := NewBufferPage(pageId)
+		bufferPage := newBufferPage(pageId)
 
 		// THEN
 		assert.Equal(t, bufferPage.PageId, pageId)

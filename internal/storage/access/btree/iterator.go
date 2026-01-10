@@ -10,7 +10,7 @@ type Iterator struct {
 	bufferId   int
 }
 
-func NewIterator(bufferPage bufferpool.BufferPage, bufferId int) *Iterator {
+func newIterator(bufferPage bufferpool.BufferPage, bufferId int) *Iterator {
 	return &Iterator{
 		bufferPage: bufferPage,
 		bufferId:   bufferId,
@@ -75,11 +75,11 @@ func (iter *Iterator) Advance(bpm *bufferpool.BufferPoolManager) error {
 func (iter *Iterator) Next(bpm *bufferpool.BufferPoolManager) (node.Pair, bool, error) {
 	pair, ok := iter.Get()
 	if !ok {
-		return node.Pair{}, false, nil
+		return node.NewPair(nil, nil), false, nil
 	}
 	err := iter.Advance(bpm)
 	if err != nil {
-		return node.Pair{}, false, err
+		return node.NewPair(nil, nil), false, err
 	}
 	return pair, true, nil
 }

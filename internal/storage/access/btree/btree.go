@@ -43,7 +43,7 @@ func CreateBTree(bpm *bufferpool.BufferPoolManager) (*BTree, error) {
 	// メタページにルートページIDを設定
 	meta.SetRootPageId(rootNodePageId)
 
-	return &BTree{MetaPageId: metaPageId}, nil
+	return NewBTree(metaPageId), nil
 }
 
 // 既存の B+Tree を開く
@@ -131,9 +131,9 @@ func (bt *BTree) searchRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 		childPageId := (func() disk.PageId {
 			switch sm := searchMode.(type) {
 			case SearchModeStart:
-				return sm.ChildPageId(branchNode)
+				return sm.childPageId(branchNode)
 			case SearchModeKey:
-				return sm.ChildPageId(branchNode)
+				return sm.childPageId(branchNode)
 			}
 			panic("unreachable")
 		})()
@@ -157,7 +157,7 @@ func (bt *BTree) searchRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 			panic("unreachable")
 		})()
 
-		iter := NewIterator(*nodeBuffer, bufferId)
+		iter := newIterator(*nodeBuffer, bufferId)
 
 		// 検索対象のキーが現在のリーフノードの末端のペアより大きい場合、次のリーフノードに進める
 		// 例えば、リーフノードに (1, ...), (3, ...), (5, ...) のペアが格納されている場合に、キー 6 を検索したいときなど

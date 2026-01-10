@@ -13,7 +13,7 @@ type BufferPage struct {
 	IsDirty bool
 }
 
-func NewBufferPage(pageId disk.PageId) *BufferPage {
+func newBufferPage(pageId disk.PageId) *BufferPage {
 	return &BufferPage{
 		PageId:  pageId,
 		Page:    &disk.Page{},

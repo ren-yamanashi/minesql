@@ -7,14 +7,14 @@ import (
 type BufferPoolManager struct {
 	DiskManager disk.DiskManagerInterface
 	bufpool     BufferPool
-	pageTable   PageTable
+	pageTable   pageTable
 }
 
 func NewBufferPoolManager(dm disk.DiskManagerInterface, size int) *BufferPoolManager {
 	return &BufferPoolManager{
 		DiskManager: dm,
-		bufpool:     *NewBufferPool(size),
-		pageTable:   make(PageTable),
+		bufpool:     *newBufferPool(size),
+		pageTable:   make(pageTable),
 	}
 }
 
@@ -51,7 +51,7 @@ func (bpm *BufferPoolManager) FetchPage(pageId disk.PageId) (*BufferPage, error)
 func (bpm *BufferPoolManager) AddPage(pageId disk.PageId) (*BufferPage, error) {
 	// バッファに空きがある場合
 	if len(bpm.bufpool.BufferPages) < bpm.bufpool.MaxBufferSize {
-		bpm.bufpool.BufferPages = append(bpm.bufpool.BufferPages, *NewBufferPage(pageId))
+		bpm.bufpool.BufferPages = append(bpm.bufpool.BufferPages, *newBufferPage(pageId))
 		bufferId := BufferId(len(bpm.bufpool.BufferPages) - 1)
 		bpm.addPageToTable(pageId, bufferId)
 		return &bpm.bufpool.BufferPages[bufferId], nil
@@ -69,7 +69,7 @@ func (bpm *BufferPoolManager) AddPage(pageId disk.PageId) (*BufferPage, error) {
 	bpm.updatePageTable(bufferPageForEvict.PageId, pageId, bpm.bufpool.Pointer)
 
 	// 新しいページに置き換え
-	bpm.bufpool.BufferPages[bpm.bufpool.Pointer] = *NewBufferPage(pageId)
+	bpm.bufpool.BufferPages[bpm.bufpool.Pointer] = *newBufferPage(pageId)
 	newBufferPage := &bpm.bufpool.BufferPages[bpm.bufpool.Pointer]
 	bpm.bufpool.AdvancePointer()
 	return newBufferPage, nil
@@ -96,14 +96,6 @@ func (bpm *BufferPoolManager) FlushPage() error {
 		bufferPage.IsDirty = false
 	}
 	return bpm.DiskManager.Sync()
-}
-
-// 指定されたページ ID のバッファページを取得する
-func (bpm *BufferPoolManager) GetBufferPage(pageId disk.PageId) (*BufferPage, bool) {
-	if bufferId, ok := bpm.pageTable[pageId]; ok {
-		return &bpm.bufpool.BufferPages[bufferId], true
-	}
-	return nil, false
 }
 
 // ページテーブルを更新

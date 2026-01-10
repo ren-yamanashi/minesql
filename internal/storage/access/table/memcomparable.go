@@ -11,7 +11,7 @@ const DATA_SIZE = BLOCK_SIZE - 1
 // エンコード後のサイズを計測する
 // size: エンコード前のバイト列のサイズ
 // 計測方法: size を 8 バイトずつに分割し、各ブロックに対して 9 バイトを割り当てる
-func EncodedSize(size int) int {
+func encodedSize(size int) int {
 	return ((size + DATA_SIZE - 1) / DATA_SIZE) * BLOCK_SIZE
 }
 
@@ -19,7 +19,7 @@ func EncodedSize(size int) int {
 // エンコード形式: [8 バイトのデータ][1 バイトの長さ情報] のブロックを繰り返す
 // src: エンコード対象のバイト列
 // destination: エンコード結果の格納先のポインタ
-func EncodeToMemcomparable(src []byte, destination *[]byte) {
+func encodeToMemcomparable(src []byte, destination *[]byte) {
 	for len(src) > 0 {
 		// コピーサイズを決定 (最大 8 バイト, src が 8 バイト未満の場合はその長さ)
 		copySize := DATA_SIZE
@@ -51,7 +51,7 @@ func EncodeToMemcomparable(src []byte, destination *[]byte) {
 // memcomparable 形式からバイト列をデコードする
 // src: デコード対象のバイト列のポインタ
 // destination: デコード結果の格納先のポインタ
-func DecodeFromMemcomparable(src *[]byte, destination *[]byte) {
+func decodeFromMemcomparable(src *[]byte, destination *[]byte) {
 	for {
 		// 長さ情報を取得
 		extra := (*src)[DATA_SIZE]

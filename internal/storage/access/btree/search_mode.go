@@ -6,7 +6,7 @@ import (
 )
 
 type SearchMode interface {
-	ChildPageId(bn *node.BranchNode) disk.PageId
+	childPageId(bn *node.BranchNode) disk.PageId
 }
 
 // =======================
@@ -15,7 +15,7 @@ type SearchMode interface {
 type SearchModeStart struct{}
 
 // 先頭の子ページIDを取得
-func (sm SearchModeStart) ChildPageId(bn *node.BranchNode) disk.PageId {
+func (sm SearchModeStart) childPageId(bn *node.BranchNode) disk.PageId {
 	return bn.ChildPageIdAt(0)
 }
 
@@ -27,6 +27,6 @@ type SearchModeKey struct {
 }
 
 // 指定したキーに基づいて子ページIDを取得
-func (sm SearchModeKey) ChildPageId(bn *node.BranchNode) disk.PageId {
+func (sm SearchModeKey) childPageId(bn *node.BranchNode) disk.PageId {
 	return bn.SearchChildPageId(sm.Key)
 }
