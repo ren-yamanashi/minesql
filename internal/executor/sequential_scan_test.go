@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"minesql/internal/storage/access/btree"
 	"minesql/internal/storage/access/table"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
@@ -10,18 +11,47 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSequentialScan(t *testing.T) {
-	t.Run("テーブルをシーケンシャルスキャンできる", func(t *testing.T) {
+func TestNewSequentialScan(t *testing.T) {
+	t.Run("正常に SequentialScan を作成できる", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		path := filepath.Join(tmpdir, "test.db")
 		dm, _ := disk.NewDiskManager(path)
 		bpm := bufferpool.NewBufferPoolManager(dm, 10)
 		table := InitTable(t, bpm)
+		btr := btree.NewBTree(table.MetaPageId)
 
 		// GIVEN
-		seqScan, err := NewExecSequentialScan(
-			bpm,
-			table,
+		tableIterator, err := btr.Search(bpm, btree.SearchModeStart{})
+		assert.NoError(t, err)
+		whileCondition := func(record Record) bool {
+			return true
+		}
+
+		// WHEN
+		seqScan, err := NewSequentialScan(
+			tableIterator,
+			whileCondition,
+		)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, seqScan)
+	})
+}
+
+func TestSequentialScan(t *testing.T) {
+	t.Run("テーブルをシーケンシャルスキャンできる (SearchModeStart を使用)", func(t *testing.T) {
+		tmpdir := t.TempDir()
+		path := filepath.Join(tmpdir, "test.db")
+		dm, _ := disk.NewDiskManager(path)
+		bpm := bufferpool.NewBufferPoolManager(dm, 10)
+		table := InitTable(t, bpm)
+		btr := btree.NewBTree(table.MetaPageId)
+		tableIterator, err := btr.Search(bpm, btree.SearchModeStart{})
+
+		// GIVEN
+		seqScan, err := NewSequentialScan(
+			tableIterator,
 			func(record Record) bool {
 				return string(record[0]) < "c" // プライマリキーが "c" 未満の間、継続
 			},
@@ -46,6 +76,44 @@ func TestSequentialScan(t *testing.T) {
 		}
 		assert.Equal(t, expected, results)
 	})
+
+	t.Run("テーブルをシーケンシャルスキャンできる (SearchModeKey を使用)", func(t *testing.T) {
+		tmpdir := t.TempDir()
+		path := filepath.Join(tmpdir, "test.db")
+		dm, _ := disk.NewDiskManager(path)
+		bpm := bufferpool.NewBufferPoolManager(dm, 10)
+		table := InitTable(t, bpm)
+		btr := btree.NewBTree(table.MetaPageId)
+		tableIterator, err := btr.Search(bpm, btree.SearchModeKey{Key: []byte("b")})
+
+		// GIVEN
+		seqScan, err := NewSequentialScan(
+			tableIterator,
+			func(record Record) bool {
+				return string(record[0]) <= "d" // プライマリキーが d" 以下の間、継続
+			},
+		)
+		assert.NoError(t, err)
+
+		// WHEN
+		var results []Record
+		for {
+			record, err := seqScan.Next(bpm)
+			assert.NoError(t, err)
+			if record == nil {
+				break
+			}
+			results = append(results, record)
+		}
+
+		// THEN
+		expected := []Record{
+			{[]byte("b"), []byte("Alice"), []byte("Smith")},
+			{[]byte("c"), []byte("Bob"), []byte("Johnson")},
+			{[]byte("d"), []byte("Eve"), []byte("Davis")},
+		}
+		assert.Equal(t, expected, results)
+	})
 }
 
 func InitTable(t *testing.T, bpm *bufferpool.BufferPoolManager) table.Table {
@@ -63,6 +131,7 @@ func InitTable(t *testing.T, bpm *bufferpool.BufferPoolManager) table.Table {
 	err = table.Insert(bpm, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 	err = table.Insert(bpm, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
 	err = table.Insert(bpm, [][]byte{[]byte("d"), []byte("Eve"), []byte("Davis")})
+	err = table.Insert(bpm, [][]byte{[]byte("e"), []byte("Charlie"), []byte("Brown")})
 	assert.NoError(t, err)
 
 	return table
