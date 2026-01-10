@@ -3,7 +3,8 @@
     "allow": [
       "Bash(go test:*)",
       "Bash(go run:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(make test:*)"
     ]
   }
 }
