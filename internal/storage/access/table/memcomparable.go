@@ -1,12 +1,15 @@
 package table
 
 // [8 バイトのデータ][1 バイトの長さ情報]
-const ESCAPE_SIZE = 9
-const DATA_SIZE = ESCAPE_SIZE - 1
+const BLOCK_SIZE = 9
+
+// memcomparable のデータ部分のサイズ
+// memcomparable のデータから長さ情報を取得する際には (*src)[DATA_SIZE] のように index アクセスする
+const DATA_SIZE = BLOCK_SIZE - 1
 
 // エンコード後のサイズを計測する
 func EncodedSize(size int) int {
-	return (size + (DATA_SIZE)) / (DATA_SIZE) * ESCAPE_SIZE
+	return ((size + DATA_SIZE - 1) / DATA_SIZE) * BLOCK_SIZE
 }
 
 // バイト列を memcomparable 形式にエンコードする
@@ -25,20 +28,15 @@ func EncodeToMemcomparable(src []byte, destination *[]byte) {
 		*destination = append(*destination, src[0:copySize]...)
 		src = src[copySize:] // コピーした分を src から削除
 
-		// 長さ情報を追加
-		// 残りのデータがない場合は、コピーサイズ + 1 を格納
-		if len(src) == 0 {
-			padSize := DATA_SIZE - copySize
-			// データが 8 バイト未満の場合はパディングを追加 (0 埋め)
-			if padSize > 0 {
-				padding := make([]byte, padSize)
-				*destination = append(*destination, padding...)
-			}
-			*destination = append(*destination, byte(copySize+1))
-			break
+		// データが 8 バイト未満の場合、パディングを追加
+		padSize := DATA_SIZE - copySize
+		if padSize > 0 {
+			padding := make([]byte, padSize)
+			*destination = append(*destination, padding...)
 		}
-		// 残りのデータがある場合は、固定の長さ情報を格納
-		*destination = append(*destination, byte(DATA_SIZE))
+
+		// 長さ情報を追加
+		*destination = append(*destination, byte(copySize))
 	}
 }
 
@@ -46,19 +44,13 @@ func EncodeToMemcomparable(src []byte, destination *[]byte) {
 // src: デコード対象のバイト列のポインタ
 // destination: デコード結果の格納先のポインタ
 func DecodeFromMemcomparable(src *[]byte, destination *[]byte) {
-	for {
-		// コピーサイズを決定 (最大 8 バイト, src が 8 バイト未満の場合はその長さ)
-		extra := (*src)[DATA_SIZE]
-		size := DATA_SIZE
-		if int(extra) < size {
-			size = int(extra)
-		}
+	// 次のブロック (9 バイト) が存在する限りループ
+	for len(*src) >= BLOCK_SIZE {
+		// 長さ情報を取得 (実データのバイト数)
+		dataSize := (*src)[DATA_SIZE]
 
 		// データをコピー
-		*destination = append(*destination, (*src)[0:size]...)
-		*src = (*src)[ESCAPE_SIZE:] // コピーした分を src から削除
-		if extra < byte(ESCAPE_SIZE) {
-			break
-		}
+		*destination = append(*destination, (*src)[0:dataSize]...)
+		*src = (*src)[BLOCK_SIZE:] // 1 ブロック (9 バイト) を削除
 	}
 }
