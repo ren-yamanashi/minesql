@@ -1,6 +1,7 @@
 package table
 
 // [8 バイトのデータ][1 バイトの長さ情報]
+// 長さ情報: 次のブロックがある場合は 9、最後のブロックは実データ長 (0-8)
 const BLOCK_SIZE = 9
 
 // memcomparable のデータ部分のサイズ
@@ -30,15 +31,20 @@ func EncodeToMemcomparable(src []byte, destination *[]byte) {
 		*destination = append(*destination, src[0:copySize]...)
 		src = src[copySize:] // コピーした分を src から削除
 
-		// データが 8 バイト未満の場合、パディングを追加
+		// src がまだ残っている場合、次のブロックがあることを示す 9 を追加
+		if len(src) > 0 {
+			*destination = append(*destination, byte(BLOCK_SIZE))
+			continue
+		}
+
+		// src が空の場合、最後のブロックとして処理 (データが 8 バイト未満の場合、パディングを追加)
 		padSize := DATA_SIZE - copySize
 		if padSize > 0 {
 			padding := make([]byte, padSize)
 			*destination = append(*destination, padding...)
 		}
-
-		// 長さ情報を追加
 		*destination = append(*destination, byte(copySize))
+		break
 	}
 }
 
@@ -46,13 +52,21 @@ func EncodeToMemcomparable(src []byte, destination *[]byte) {
 // src: デコード対象のバイト列のポインタ
 // destination: デコード結果の格納先のポインタ
 func DecodeFromMemcomparable(src *[]byte, destination *[]byte) {
-	// 次のブロック (9 バイト) が存在する限りループ
-	for len(*src) >= BLOCK_SIZE {
-		// 長さ情報を取得 (実データのバイト数)
-		dataSize := (*src)[DATA_SIZE]
+	for {
+		// 長さ情報を取得
+		extra := (*src)[DATA_SIZE]
+		size := DATA_SIZE
+		if int(extra) < size {
+			size = int(extra)
+		}
 
 		// データをコピー
-		*destination = append(*destination, (*src)[0:dataSize]...)
-		*src = (*src)[BLOCK_SIZE:] // 1 ブロック (9 バイト) を削除
+		*destination = append(*destination, (*src)[0:size]...)
+		*src = (*src)[BLOCK_SIZE:]
+
+		// 長さ情報が 9 未満の場合、最後のブロックなので終了
+		if extra < byte(BLOCK_SIZE) {
+			break
+		}
 	}
 }
