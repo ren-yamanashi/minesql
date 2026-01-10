@@ -70,9 +70,9 @@ func (bpm *BufferPoolManager) AddPage(pageId disk.PageId) (*BufferPage, error) {
 
 	// 新しいページに置き換え
 	bpm.bufpool.BufferPages[bpm.bufpool.Pointer] = *NewBufferPage(pageId)
-	NewBufferPage := &bpm.bufpool.BufferPages[bpm.bufpool.Pointer]
+	newBufPage := &bpm.bufpool.BufferPages[bpm.bufpool.Pointer]
 	bpm.bufpool.AdvancePointer()
-	return NewBufferPage, nil
+	return newBufPage, nil
 }
 
 // 指定されたページの参照ビットをクリア
