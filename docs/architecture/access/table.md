@@ -1,6 +1,9 @@
-# Table
+# テーブル
 
 - 実装コード:
+  - [internal/storage/access/table/table.go](../../../internal/storage/access/table/table.go)
+  - [internal/storage/access/table/encode.go](../../../internal/storage/access/table/encode.go)
+  - [internal/storage/access/table/memcomparable.go](../../../internal/storage/access/table/memcomparable.go)
 
 ## 概要
 
