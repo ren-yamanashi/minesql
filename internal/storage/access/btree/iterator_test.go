@@ -138,11 +138,9 @@ func TestNext(t *testing.T) {
 
 // リーフノードを含む BufferPage を作成する
 func createLeafBufferPage(pageId disk.PageId, pairs []node.Pair, nextPageId *disk.PageId) bufferpool.BufferPage {
-	_bufferpool := bufferpool.NewBufferPage(pageId)
+	bufpool := bufferpool.NewBufferPage(pageId)
 
-	_node := node.NewNode(_bufferpool.Page[:])
-	_node.InitAsLeafNode()
-	leafNode := node.NewLeafNode(_node.Body())
+	leafNode := node.NewLeafNode(bufpool.Page[:])
 	leafNode.Initialize()
 
 	// ペアを挿入
@@ -155,7 +153,7 @@ func createLeafBufferPage(pageId disk.PageId, pairs []node.Pair, nextPageId *dis
 	// nextPageId を設定
 	leafNode.SetNextPageId(nextPageId)
 
-	return *_bufferpool
+	return *bufpool
 }
 
 type DiskManagerSpy struct {

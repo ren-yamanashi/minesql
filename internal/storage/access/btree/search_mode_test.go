@@ -114,9 +114,7 @@ func TestChildPageId_Key(t *testing.T) {
 
 func createBranchNode(pairs []node.Pair, rightChildPageId disk.PageId) *node.BranchNode {
 	page := &disk.Page{}
-	_node := node.NewNode(page[:])
-	_node.InitAsBranchNode()
-	branchNode := node.NewBranchNode(_node.Body())
+	branchNode := node.NewBranchNode(page[:])
 
 	if len(pairs) == 0 {
 		panic("pairs must not be empty")

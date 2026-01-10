@@ -19,8 +19,7 @@ func newIterator(bufferPage bufferpool.BufferPage, bufferId int) *Iterator {
 
 // 現在の key-value のペアを取得
 func (iter *Iterator) Get() (node.Pair, bool) {
-	_node := node.NewNode(iter.bufferPage.Page[:])
-	leafNode := node.NewLeafNode(_node.Body())
+	leafNode := node.NewLeafNode(iter.bufferPage.Page[:])
 
 	if iter.bufferId < leafNode.NumPairs() {
 		pair := leafNode.PairAt(iter.bufferId)
@@ -38,8 +37,7 @@ func (iter *Iterator) Get() (node.Pair, bool) {
 func (iter *Iterator) Advance(bpm *bufferpool.BufferPoolManager) error {
 	iter.bufferId++
 
-	_node := node.NewNode(iter.bufferPage.Page[:])
-	leafNode := node.NewLeafNode(_node.Body())
+	leafNode := node.NewLeafNode(iter.bufferPage.Page[:])
 
 	// 現在のページ内に、まだ次の key-value ペアがある場合は、何もせずに終了
 	if iter.bufferId < leafNode.NumPairs() {

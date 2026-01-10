@@ -14,18 +14,30 @@ type Header struct {
 }
 
 type BranchNode struct {
-	// ページデータ全体 (ヘッダー + Slotted Page のボディ)
+	// ページデータ全体 (ノードタイプヘッダー + ブランチノードヘッダー + Slotted Page のボディ)
 	data []byte
 	// Slotted Page のボディ部分
 	body *slottedpage.SlottedPage
 }
 
 func NewBranchNode(data []byte) *BranchNode {
-	body := slottedpage.NewSlottedPage(data[headerSize:])
+	// data[0:8]: ノードタイプ
+	// data[8:16]: 右子ページ ID
+	// data[16:]: Slotted Page
+
+	// ノードタイプを設定
+	copy(data[0:8], NODE_TYPE_BRANCH)
+
+	body := slottedpage.NewSlottedPage(data[nodeHeaderSize+branchHeaderSize:])
 	return &BranchNode{
 		data: data,
 		body: body,
 	}
+}
+
+// ノードタイプヘッダーを除いたボディ部分を取得する (ブランチノードヘッダー + Slotted Page のボディ)
+func (bn *BranchNode) Body() []byte {
+	return bn.data[nodeHeaderSize:]
 }
 
 // key-value ペア数を取得する
@@ -83,7 +95,7 @@ func (bn *BranchNode) Initialize(key []byte, leftChildPageId disk.PageId, rightC
 	}
 
 	// ヘッダー部分に右の子ページのポインタ (ページ ID) を設定
-	binary.LittleEndian.PutUint64(bn.data[0:8], uint64(rightChildPageId))
+	binary.LittleEndian.PutUint64(bn.Body()[0:8], uint64(rightChildPageId))
 }
 
 // ブランチノードを分割しながらペアを挿入する
@@ -129,7 +141,7 @@ func (bn *BranchNode) SearchChildIdx(key []byte) int {
 func (bn *BranchNode) ChildPageIdAt(childIdx int) disk.PageId {
 	if childIdx == bn.NumPairs() {
 		// 右端の子ページ ID を返す
-		return disk.PageId(binary.LittleEndian.Uint64(bn.data[0:8]))
+		return disk.PageId(binary.LittleEndian.Uint64(bn.Body()[0:8]))
 	}
 	pair := bn.PairAt(childIdx)
 	return disk.PageId(binary.LittleEndian.Uint64(pair.Value))
@@ -164,7 +176,7 @@ func (bn *BranchNode) fillRightChild() []byte {
 	bn.body.Remove(lastId)
 
 	// ヘッダー部分に右子ページ ID を設定
-	binary.LittleEndian.PutUint64(bn.data[0:8], rightChild)
+	binary.LittleEndian.PutUint64(bn.Body()[0:8], rightChild)
 
 	return key
 }

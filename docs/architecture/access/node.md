@@ -3,7 +3,14 @@
 - 実装コード
   - [node.go](../../../internal/storage/access/btree/node/node.go)
   - [leaf_node.go](../../../internal/storage/access/btree/node/leaf_node.go)
-  - [internal_node.go](../../../internal/storage/access/btree/node/internal_node.go)
+  - [branch_node.go](../../../internal/storage/access/btree/node/branch_node.go)
+
+## ノード構造
+
+- すべてのノードは、先頭に 8 バイトのノードタイプヘッダーを持つ
+  - ノードタイプヘッダー: 8 バイト
+    - `"LEAF    "` (リーフノード) または `"BRANCH  "` (ブランチノード)
+    - ページデータの先頭 8 バイトを読み取ることで、ノード型を判定できる
 
 ## key-value ペア
 
@@ -20,11 +27,14 @@
 - 構造
 
   ```txt
-  |リーフノードヘッダー|Slotted Page  |
-  ↑____16 bytes____↑__4080 bytes__↑
+  |ノードタイプ |リーフノードヘッダー|Slotted Page  |
+  ↑__8 bytes__↑____16 bytes____↑__4072 bytes__↑
   ```
 
   - 合計 4096 byte (1 ページのサイズ)
+  - ノードタイプ: 8 byte (`"LEAF    "`)
+  - リーフノードヘッダー: 16 byte (前ページ ID + 次ページ ID)
+  - Slotted Page: 4072 byte
 
 - リーフノードのデータ構造は Slotted Page になっているので、データの挿入などは [Slotted Page](./slotted-page.md) の仕様に従う
 - Slotted Page のスロット数 = key-value ペアの数
@@ -32,14 +42,14 @@
 ### リーフノードヘッダーの構成
 
 - サイズ: 16 byte
-  - 前のページへのポインタ (ページ ID): 8 byte (先頭から 8 byte)
+  - 前のページへのポインタ (ページ ID): 8 byte (ノードタイプの次の 8 byte)
     - 前のリーフノードのページ ID を格納する
   - 次のページへのポインタ (ページ ID): 8 byte (前のページへのポインタの次の 8 byte)
     - 次のリーフノードのページ ID を格納する
 
-つまり前のページへのポインタを読み取る際には、Node のデータの先頭から 8 byte を読み取れば良い。(同様に次のページへのポインタもその次の 8 byte を読み取れば良い)
+つまり前のページへのポインタを読み取る際には、ページデータの 8 byte 目から 8 byte を読み取れば良い。(同様に次のページへのポインタは 16 byte 目から 8 byte を読み取れば良い)
 
-書き込みの際も同様に、先頭から 8 byte に前のページ ID を、その次の 8 byte に次のページ ID を書き込めば良い。
+書き込みの際も同様に、8 byte 目から 8 byte に前のページ ID を、16 byte 目から 8 byte に次のページ ID を書き込めば良い。
 
 ### リーフノードの分割
 
@@ -89,11 +99,14 @@ _以下例_
 - 構造
 
   ```txt
-  |ブランチノードヘッダー |Slotted Page  |
-  ↑______8 bytes______↑__4088 bytes__↑
+  |ノードタイプ |ブランチノードヘッダー|Slotted Page  |
+  ↑__8 bytes__↑______8 bytes______↑__4080 bytes__↑
   ```
 
   - 合計 4096 byte (1 ページのサイズ)
+  - ノードタイプ: 8 byte (`"BRANCH  "`)
+  - ブランチノードヘッダー: 8 byte (右子ページ ID)
+  - Slotted Page: 4080 byte
 
 - ブランチノードのデータ構造は Slotted Page になっているので、データの挿入などは [Slotted Page](./slotted-page.md) の仕様に従う
 - Slotted Page のスロット数 = key-value ペアの数
@@ -101,7 +114,7 @@ _以下例_
 ### ブランチノードヘッダーの構成
 
 - サイズ: 8 byte
-  - 右の子ノードへのポインタ (ページ ID): 8 byte (先頭から 8 byte)
+  - 右の子ノードへのポインタ (ページ ID): 8 byte (ノードタイプの次の 8 byte)
     - ブランチノードの右の子ノードのページ ID を格納する (以下例)
 
 #### 右の子ノードのページ ID を格納する理由

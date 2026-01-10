@@ -19,18 +19,31 @@ type LeafHeader struct {
 }
 
 type LeafNode struct {
-	// ページデータ全体 (ヘッダー + Slotted Page のボディ)
+	// ページデータ全体 (ノードタイプヘッダー + リーフノードヘッダー + Slotted Page のボディ)
 	data []byte
 	// Slotted Page のボディ部分
 	body *slottedpage.SlottedPage
 }
 
 func NewLeafNode(data []byte) *LeafNode {
-	body := slottedpage.NewSlottedPage(data[leafHeaderSize:])
+	// data[0:8]: ノードタイプ
+	// data[8:16]: 前ページ ID
+	// data[16:24]: 次ページ ID
+	// data[24:]: Slotted Page
+
+	// ノードタイプを設定
+	copy(data[0:8], NODE_TYPE_LEAF)
+
+	body := slottedpage.NewSlottedPage(data[nodeHeaderSize+leafHeaderSize:])
 	return &LeafNode{
 		data: data,
 		body: body,
 	}
+}
+
+// ノードタイプヘッダーを除いたボディ部分を取得する (リーフノードヘッダー + Slotted Page のボディ)
+func (ln *LeafNode) Body() []byte {
+	return ln.data[nodeHeaderSize:]
 }
 
 // key-value ペア数を取得する
@@ -74,8 +87,8 @@ func (ln *LeafNode) Insert(bufferId int, pair Pair) bool {
 // リーフノードを初期化する
 // 初期化時には、前後のリーフノードのポインタ (ページ ID) には無効値が設定される
 func (ln *LeafNode) Initialize() {
-	binary.LittleEndian.PutUint64(ln.data[0:8], uint64(disk.INVALID_PAGE_ID))  // 初期化時には、前のページ ID を無効値に設定
-	binary.LittleEndian.PutUint64(ln.data[8:16], uint64(disk.INVALID_PAGE_ID)) // 初期化時には、次のページ ID を無効値に設定
+	binary.LittleEndian.PutUint64(ln.Body()[0:8], uint64(disk.INVALID_PAGE_ID))  // 初期化時には、前のページ ID を無効値に設定
+	binary.LittleEndian.PutUint64(ln.Body()[8:16], uint64(disk.INVALID_PAGE_ID)) // 初期化時には、次のページ ID を無効値に設定
 	ln.body.Initialize()
 }
 
@@ -110,7 +123,7 @@ func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newPair Pair) []byte {
 }
 
 func (ln *LeafNode) PrevPageId() *disk.PageId {
-	pageId := disk.PageId(binary.LittleEndian.Uint64(ln.data[0:8])) // ヘッダーの最初の 8 バイトが前のページ ID
+	pageId := disk.PageId(binary.LittleEndian.Uint64(ln.Body()[0:8])) // ヘッダーの最初の 8 バイトが前のページ ID
 	if pageId == disk.INVALID_PAGE_ID {
 		return nil
 	}
@@ -118,7 +131,7 @@ func (ln *LeafNode) PrevPageId() *disk.PageId {
 }
 
 func (ln *LeafNode) NextPageId() *disk.PageId {
-	pageId := disk.PageId(binary.LittleEndian.Uint64(ln.data[8:16])) // ヘッダーの次の 8 バイトが次のページ ID
+	pageId := disk.PageId(binary.LittleEndian.Uint64(ln.Body()[8:16])) // ヘッダーの次の 8 バイトが次のページ ID
 	if pageId == disk.INVALID_PAGE_ID {
 		return nil
 	}
@@ -132,7 +145,7 @@ func (ln *LeafNode) SetPrevPageId(prevPageId *disk.PageId) {
 	} else {
 		pageId = *prevPageId
 	}
-	binary.LittleEndian.PutUint64(ln.data[0:8], uint64(pageId))
+	binary.LittleEndian.PutUint64(ln.Body()[0:8], uint64(pageId))
 }
 
 func (ln *LeafNode) SetNextPageId(nextPageId *disk.PageId) {
@@ -142,7 +155,7 @@ func (ln *LeafNode) SetNextPageId(nextPageId *disk.PageId) {
 	} else {
 		pageId = *nextPageId
 	}
-	binary.LittleEndian.PutUint64(ln.data[8:16], uint64(pageId))
+	binary.LittleEndian.PutUint64(ln.Body()[8:16], uint64(pageId))
 }
 
 // 最大ペアサイズを取得する

@@ -107,11 +107,10 @@ func displayNode(bpm *bufferpool.BufferPoolManager, pageId disk.PageId, depth in
 	}
 	defer bpm.UnRefPage(pageId)
 
-	_node := node.NewNode(nodeBuf.Page[:])
-	nodeType := _node.NodeType()
+	nodeType := node.GetNodeType(nodeBuf.Page[:])
 
 	if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
-		leafNode := node.NewLeafNode(_node.Body())
+		leafNode := node.NewLeafNode(nodeBuf.Page[:])
 		keys := make([]string, 0, leafNode.NumPairs())
 		for i := 0; i < leafNode.NumPairs(); i++ {
 			pair := leafNode.PairAt(i)
@@ -122,7 +121,7 @@ func displayNode(bpm *bufferpool.BufferPoolManager, pageId disk.PageId, depth in
 			indent, label, pageId, strings.Join(keys, ", "))
 	} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
 		// ブランチノードの場合
-		branchNode := node.NewBranchNode(_node.Body())
+		branchNode := node.NewBranchNode(nodeBuf.Page[:])
 		keys := make([]string, 0, branchNode.NumPairs())
 		for i := 0; i < branchNode.NumPairs(); i++ {
 			pair := branchNode.PairAt(i)
