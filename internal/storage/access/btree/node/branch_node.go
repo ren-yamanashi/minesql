@@ -10,7 +10,7 @@ const branchHeaderSize = 8
 
 type Header struct {
 	// 右の子ノードのポインタ (ページ ID)
-	RightChildPageId disk.PageId
+	RightChildPageId disk.OldPageId
 }
 
 type BranchNode struct {
@@ -82,7 +82,7 @@ func (bn *BranchNode) Insert(bufferId int, pair Pair) bool {
 // key: 最初のペアのキー
 // leftChildPageId: 最初のペアの value (左の子ページのページ ID)
 // rightChildPageId: ヘッダー部分に設定する右の子ページのページ ID
-func (bn *BranchNode) Initialize(key []byte, leftChildPageId disk.PageId, rightChildPageId disk.PageId) {
+func (bn *BranchNode) Initialize(key []byte, leftChildPageId disk.OldPageId, rightChildPageId disk.OldPageId) {
 	bn.body.Initialize()
 
 	// 左の子ページのポインタ (ページ ID) を value とした Pair を作成し
@@ -138,17 +138,17 @@ func (bn *BranchNode) SearchChildIdx(key []byte) int {
 }
 
 // 指定されたインデックスの、子ページのページ ID を取得する
-func (bn *BranchNode) ChildPageIdAt(childIdx int) disk.PageId {
+func (bn *BranchNode) ChildPageIdAt(childIdx int) disk.OldPageId {
 	if childIdx == bn.NumPairs() {
 		// 右端の子ページ ID を返す
-		return disk.PageId(binary.LittleEndian.Uint64(bn.Body()[0:8]))
+		return disk.OldPageId(binary.LittleEndian.Uint64(bn.Body()[0:8]))
 	}
 	pair := bn.PairAt(childIdx)
-	return disk.PageId(binary.LittleEndian.Uint64(pair.Value))
+	return disk.OldPageId(binary.LittleEndian.Uint64(pair.Value))
 }
 
 // キーから子ページのページ ID を検索する
-func (bn *BranchNode) SearchChildPageId(key []byte) disk.PageId {
+func (bn *BranchNode) SearchChildPageId(key []byte) disk.OldPageId {
 	childIdx := bn.SearchChildIdx(key)
 	return bn.ChildPageIdAt(childIdx)
 }

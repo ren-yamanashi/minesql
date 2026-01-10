@@ -97,7 +97,7 @@ func displayTreeStructure(bpm *bufferpool.BufferPoolManager, tree *btree.BTree) 
 }
 
 // ノードを再帰的に表示
-func displayNode(bpm *bufferpool.BufferPoolManager, pageId disk.PageId, depth int, label string) {
+func displayNode(bpm *bufferpool.BufferPoolManager, pageId disk.OldPageId, depth int, label string) {
 	indent := strings.Repeat("  ", depth)
 
 	// ノードを取得
@@ -145,7 +145,7 @@ func displayNode(bpm *bufferpool.BufferPoolManager, pageId disk.PageId, depth in
 		}
 
 		// 右端の子ノード (Node Type の後の 8 バイトから読み取る)
-		rightChildPageId := disk.PageId(binary.LittleEndian.Uint64(nodeBuf.Page[8:16]))
+		rightChildPageId := disk.OldPageId(binary.LittleEndian.Uint64(nodeBuf.Page[8:16]))
 		lastPair := branchNode.PairAt(branchNode.NumPairs() - 1)
 		rightLabel := fmt.Sprintf(">= %s", string(lastPair.Key))
 		displayNode(bpm, rightChildPageId, depth+1, rightLabel)

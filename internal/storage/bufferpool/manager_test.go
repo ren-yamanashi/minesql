@@ -69,7 +69,7 @@ func TestFetchPage(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, fetchedPage)
-		assert.Equal(t, pageId, fetchedPage.PageId)
+		assert.Equal(t, pageId, fetchedPage.OldPageId)
 		assert.True(t, fetchedPage.Referenced)
 		assert.False(t, fetchedPage.IsDirty)
 		assert.Equal(t, BufferId(0), bpm.pageTable[pageId])
@@ -96,7 +96,7 @@ func TestAddPage(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, bufferPage)
-		assert.Equal(t, pageId, bufferPage.PageId)
+		assert.Equal(t, pageId, bufferPage.OldPageId)
 		bufferId, ok := bpm.pageTable[pageId]
 		assert.True(t, ok)
 		assert.Equal(t, BufferId(0), bufferId)
@@ -135,7 +135,7 @@ func TestAddPage(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, newPage)
-		assert.Equal(t, pageId4, newPage.PageId)
+		assert.Equal(t, pageId4, newPage.OldPageId)
 		// ダーティーページの書き込みが発生していることを確認
 		assert.Equal(t, 1, dmSpy.writePageDataCallCount)
 		// 新しいページがページテーブルに追加されていることを確認
@@ -178,7 +178,7 @@ func TestAddPage(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, newPage)
-		assert.Equal(t, pageId4, newPage.PageId)
+		assert.Equal(t, pageId4, newPage.OldPageId)
 		// ダーティーでないため、ディスクへの書き込みは発生しない
 		assert.Equal(t, 0, dmSpy.writePageDataCallCount)
 		// 新しいページがページテーブルに追加されていることを確認
@@ -267,7 +267,7 @@ func TestUnRefPage(t *testing.T) {
 	})
 }
 
-func initDiskManager(t *testing.T) (*disk.DiskManager, disk.PageId) {
+func initDiskManager(t *testing.T) (*disk.DiskManager, disk.OldPageId) {
 	tmpdir := t.TempDir()
 	path := filepath.Join(tmpdir, "test.db")
 	dm, err := disk.NewDiskManager(path)
@@ -279,7 +279,7 @@ func initDiskManager(t *testing.T) (*disk.DiskManager, disk.PageId) {
 type DiskManagerSpy struct {
 	readPageDataCallCount  int
 	writePageDataCallCount int
-	nextPageId             disk.PageId
+	nextPageId             disk.OldPageId
 }
 
 func NewDiskManagerSpy() *DiskManagerSpy {
@@ -288,18 +288,18 @@ func NewDiskManagerSpy() *DiskManagerSpy {
 	}
 }
 
-func (spy *DiskManagerSpy) ReadPageData(id disk.PageId, data []byte) error {
+func (spy *DiskManagerSpy) ReadPageData(id disk.OldPageId, data []byte) error {
 	spy.readPageDataCallCount++
 	// データは読み込まないが、エラーも返さない
 	return nil
 }
 
-func (spy *DiskManagerSpy) WritePageData(id disk.PageId, data []byte) error {
+func (spy *DiskManagerSpy) WritePageData(id disk.OldPageId, data []byte) error {
 	spy.writePageDataCallCount++
 	return nil
 }
 
-func (spy *DiskManagerSpy) AllocatePage() disk.PageId {
+func (spy *DiskManagerSpy) AllocatePage() disk.OldPageId {
 	id := spy.nextPageId
 	spy.nextPageId++
 	return id
@@ -326,7 +326,7 @@ func TestBufferPoolManagerIntegration(t *testing.T) {
 		page5 := dm.AllocatePage()
 
 		// 各ページにデータを書き込む (PageID と同じ値を書き込む)
-		writeTestData := func(pageId disk.PageId, value byte) {
+		writeTestData := func(pageId disk.OldPageId, value byte) {
 			data := make([]byte, disk.PAGE_SIZE)
 			for i := range data {
 				data[i] = value

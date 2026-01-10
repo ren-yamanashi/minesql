@@ -7,9 +7,9 @@ import (
 
 // ディスク I/O を抽象化するインターフェース
 type DiskManagerInterface interface {
-	ReadPageData(id PageId, data []byte) error
-	WritePageData(id PageId, data []byte) error
-	AllocatePage() PageId
+	ReadPageData(id OldPageId, data []byte) error
+	WritePageData(id OldPageId, data []byte) error
+	AllocatePage() OldPageId
 	Sync() error
 }
 
@@ -17,7 +17,7 @@ type DiskManager struct {
 	// ヒープファイルのファイルディスクリプタ
 	heapFile *os.File
 	// 採番するページ ID を決めるカウンタ
-	nextPageId PageId
+	nextPageId OldPageId
 }
 
 // 指定されたパスにあるディスク上のヒープファイルを管理する DiskManager を生成する
@@ -37,13 +37,13 @@ func NewDiskManager(path string) (*DiskManager, error) {
 	}
 	return &DiskManager{
 		heapFile:   file,
-		nextPageId: PageId(fileInfo.Size() / PAGE_SIZE),
+		nextPageId: OldPageId(fileInfo.Size() / PAGE_SIZE),
 	}, nil
 }
 
 // 指定されたページ ID のページデータを data に読み込む (読み込んだデータは data に格納される)
 // data の長さは PAGE_SIZE と等しい必要がある
-func (disk *DiskManager) ReadPageData(id PageId, data []byte) error {
+func (disk *DiskManager) ReadPageData(id OldPageId, data []byte) error {
 	if len(data) != PAGE_SIZE {
 		return ErrInvalidDataSize
 	}
@@ -62,7 +62,7 @@ func (disk *DiskManager) ReadPageData(id PageId, data []byte) error {
 
 // 指定されたページ ID に対応するページに data の内容を書き込む
 // data の長さは PAGE_SIZE と等しい必要がある
-func (disk *DiskManager) WritePageData(id PageId, data []byte) error {
+func (disk *DiskManager) WritePageData(id OldPageId, data []byte) error {
 	if len(data) != PAGE_SIZE {
 		return ErrInvalidDataSize
 	}
@@ -83,7 +83,7 @@ func (disk *DiskManager) WritePageData(id PageId, data []byte) error {
 }
 
 // 新しいページ ID を採番する
-func (disk *DiskManager) AllocatePage() PageId {
+func (disk *DiskManager) AllocatePage() OldPageId {
 	id := disk.nextPageId
 	disk.nextPageId++
 	return id
@@ -95,7 +95,7 @@ func (disk *DiskManager) Sync() error {
 }
 
 // 指定されたページ ID に対応するページの先頭にシークする
-func (disk *DiskManager) seek(id PageId) error {
+func (disk *DiskManager) seek(id OldPageId) error {
 	offset := PAGE_SIZE * uint64(id)                          // 開始位置を計算
 	_, err := disk.heapFile.Seek(int64(offset), io.SeekStart) // ファイルの先頭から offset バイト移動
 	if err != nil {

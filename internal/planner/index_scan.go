@@ -8,16 +8,16 @@ import (
 )
 
 type IndexScan struct {
-	TableMetaPageId disk.PageId
-	IndexMetaPageId disk.PageId
+	TableMetaPageId disk.OldPageId
+	IndexMetaPageId disk.OldPageId
 	SearchMode      btree.SearchMode
 	// 継続条件を満たすかどうかを判定する関数
 	WhileCondition func(record executor.Record) bool
 }
 
 func NewIndexScan(
-	tableMetaPageId disk.PageId,
-	indexMetaPageId disk.PageId,
+	tableMetaPageId disk.OldPageId,
+	indexMetaPageId disk.OldPageId,
 	searchMode btree.SearchMode,
 	whileCondition func(record executor.Record) bool,
 ) IndexScan {

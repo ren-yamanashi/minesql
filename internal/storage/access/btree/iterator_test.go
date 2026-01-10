@@ -35,7 +35,7 @@ func TestAdvance(t *testing.T) {
 		pair2 := node.NewPair([]byte("key2"), []byte("value2"))
 		pair3 := node.NewPair([]byte("key3"), []byte("value3"))
 
-		bufferPage := createLeafBufferPage(disk.PageId(0), []node.Pair{pair1, pair2, pair3}, nil)
+		bufferPage := createLeafBufferPage(disk.OldPageId(0), []node.Pair{pair1, pair2, pair3}, nil)
 		iterator := newIterator(bufferPage, 0)
 
 		// WHEN
@@ -43,7 +43,7 @@ func TestAdvance(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, disk.PageId(0), iterator.bufferPage.PageId) // ページは変わらない
+		assert.Equal(t, disk.OldPageId(0), iterator.bufferPage.OldPageId) // ページは変わらない
 	})
 
 	t.Run("現在のページ内に、次の key-value ペアがないが、次のページも存在しない場合は何もしない", func(t *testing.T) {
@@ -54,7 +54,7 @@ func TestAdvance(t *testing.T) {
 		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
 		pair2 := node.NewPair([]byte("key2"), []byte("value2"))
 
-		bufferPage := createLeafBufferPage(disk.PageId(0), []node.Pair{pair1, pair2}, nil)
+		bufferPage := createLeafBufferPage(disk.OldPageId(0), []node.Pair{pair1, pair2}, nil)
 		iterator := newIterator(bufferPage, 1) // 最後のペアを指している
 
 		// WHEN
@@ -62,7 +62,7 @@ func TestAdvance(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, disk.PageId(0), iterator.bufferPage.PageId) // ページは変わらない
+		assert.Equal(t, disk.OldPageId(0), iterator.bufferPage.OldPageId) // ページは変わらない
 	})
 
 	t.Run("現在のページ内に次の key-value ペアがなく、次のページが存在する場合は、次のページに移動する (古いページの参照ビットがクリアされ、次のページの先頭にポインタが置かれる)", func(t *testing.T) {
@@ -73,19 +73,19 @@ func TestAdvance(t *testing.T) {
 		// 最初のページ
 		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
 		pair2 := node.NewPair([]byte("key2"), []byte("value2"))
-		nextPageId := disk.PageId(1)
-		bufferPage1 := createLeafBufferPage(disk.PageId(0), []node.Pair{pair1, pair2}, &nextPageId)
+		nextPageId := disk.OldPageId(1)
+		bufferPage1 := createLeafBufferPage(disk.OldPageId(0), []node.Pair{pair1, pair2}, &nextPageId)
 
 		// 次のページ
 		pair3 := node.NewPair([]byte("key3"), []byte("value3"))
 		pair4 := node.NewPair([]byte("key4"), []byte("value4"))
-		bufferPage2 := createLeafBufferPage(disk.PageId(1), []node.Pair{pair3, pair4}, nil)
+		bufferPage2 := createLeafBufferPage(disk.OldPageId(1), []node.Pair{pair3, pair4}, nil)
 
 		// 次のページをディスクマネージャに登録
-		dmSpy.AddPage(disk.PageId(1), bufferPage2.Page)
+		dmSpy.AddPage(disk.OldPageId(1), bufferPage2.Page)
 
 		// ページ1をバッファプールに追加
-		addedPage1, err := bpm.AddPage(disk.PageId(0))
+		addedPage1, err := bpm.AddPage(disk.OldPageId(0))
 		assert.NoError(t, err)
 		copy(addedPage1.Page[:], bufferPage1.Page[:])
 		addedPage1.Referenced = true // 参照ビットをセット
@@ -97,7 +97,7 @@ func TestAdvance(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, disk.PageId(1), iterator.bufferPage.PageId)
+		assert.Equal(t, disk.OldPageId(1), iterator.bufferPage.OldPageId)
 		assert.Equal(t, 0, iterator.bufferId) // 次のページの先頭
 	})
 }
@@ -112,7 +112,7 @@ func TestNext(t *testing.T) {
 		pair2 := node.NewPair([]byte("key2"), []byte("value2"))
 		pair3 := node.NewPair([]byte("key3"), []byte("value3"))
 
-		bufferPage := createLeafBufferPage(disk.PageId(0), []node.Pair{pair1, pair2, pair3}, nil)
+		bufferPage := createLeafBufferPage(disk.OldPageId(0), []node.Pair{pair1, pair2, pair3}, nil)
 		iterator := newIterator(bufferPage, 0)
 		assert.Equal(t, 0, iterator.bufferId) // 最初のペアを指している
 
@@ -137,7 +137,7 @@ func TestNext(t *testing.T) {
 }
 
 // リーフノードを含む BufferPage を作成する
-func createLeafBufferPage(pageId disk.PageId, pairs []node.Pair, nextPageId *disk.PageId) bufferpool.BufferPage {
+func createLeafBufferPage(pageId disk.OldPageId, pairs []node.Pair, nextPageId *disk.OldPageId) bufferpool.BufferPage {
 	bufpool := bufferpool.NewBufferPage(pageId)
 
 	leafNode := node.NewLeafNode(bufpool.Page[:])
@@ -157,37 +157,37 @@ func createLeafBufferPage(pageId disk.PageId, pairs []node.Pair, nextPageId *dis
 }
 
 type DiskManagerSpy struct {
-	pages map[disk.PageId]*disk.Page
+	pages map[disk.OldPageId]*disk.Page
 }
 
 func NewDiskManagerSpy() *DiskManagerSpy {
 	return &DiskManagerSpy{
-		pages: make(map[disk.PageId]*disk.Page),
+		pages: make(map[disk.OldPageId]*disk.Page),
 	}
 }
 
-func (spy *DiskManagerSpy) ReadPageData(id disk.PageId, data []byte) error {
+func (spy *DiskManagerSpy) ReadPageData(id disk.OldPageId, data []byte) error {
 	if page, ok := spy.pages[id]; ok {
 		copy(data, page[:])
 	}
 	return nil
 }
 
-func (spy *DiskManagerSpy) WritePageData(id disk.PageId, data []byte) error {
+func (spy *DiskManagerSpy) WritePageData(id disk.OldPageId, data []byte) error {
 	page := &disk.Page{}
 	copy(page[:], data)
 	spy.pages[id] = page
 	return nil
 }
 
-func (spy *DiskManagerSpy) AllocatePage() disk.PageId {
-	return disk.PageId(len(spy.pages))
+func (spy *DiskManagerSpy) AllocatePage() disk.OldPageId {
+	return disk.OldPageId(len(spy.pages))
 }
 
 func (spy *DiskManagerSpy) Sync() error {
 	return nil
 }
 
-func (spy *DiskManagerSpy) AddPage(pageId disk.PageId, page *disk.Page) {
+func (spy *DiskManagerSpy) AddPage(pageId disk.OldPageId, page *disk.Page) {
 	spy.pages[pageId] = page
 }

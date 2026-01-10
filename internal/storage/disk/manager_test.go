@@ -21,7 +21,7 @@ func TestNewDiskManager(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, PageId(0), disk.nextPageId)
+		assert.Equal(t, OldPageId(0), disk.nextPageId)
 	})
 
 	t.Run("無効なファイルが指定された場合はエラー", func(t *testing.T) {
@@ -76,7 +76,7 @@ func TestWritePageData(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, PageId(1), disk.nextPageId)
+		assert.Equal(t, OldPageId(1), disk.nextPageId)
 	})
 
 	t.Run("書き込むデータのサイズが PAGE_SIZE と異なる場合はエラー", func(t *testing.T) {
@@ -109,14 +109,14 @@ func TestAllocatePage(t *testing.T) {
 		pageId3 := dm.AllocatePage()
 
 		// THEN
-		assert.Equal(t, PageId(0), pageId1)
-		assert.Equal(t, PageId(1), pageId2)
-		assert.Equal(t, PageId(2), pageId3)
-		assert.Equal(t, PageId(3), dm.nextPageId)
+		assert.Equal(t, OldPageId(0), pageId1)
+		assert.Equal(t, OldPageId(1), pageId2)
+		assert.Equal(t, OldPageId(2), pageId3)
+		assert.Equal(t, OldPageId(3), dm.nextPageId)
 	})
 }
 
-func initDiskManager(t *testing.T) (*DiskManager, PageId) {
+func initDiskManager(t *testing.T) (*DiskManager, OldPageId) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "sample.db")
 	dm, err := NewDiskManager(dbPath)

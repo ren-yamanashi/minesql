@@ -15,8 +15,8 @@ import (
 func TestNewIndexScan(t *testing.T) {
 	t.Run("正常に IndexScan が生成される", func(t *testing.T) {
 		// GIVEN
-		tableMetaPageId := disk.PageId(42)
-		indexMetaPageId := disk.PageId(43)
+		tableMetaPageId := disk.OldPageId(42)
+		indexMetaPageId := disk.OldPageId(43)
 		searchMode := btree.SearchModeStart{}
 		whileCondition := func(record executor.Record) bool {
 			return true
@@ -55,8 +55,8 @@ func TestNewIndexScan(t *testing.T) {
 }
 
 func InitTableForIndexScanPlanner(t *testing.T, bpm *bufferpool.BufferPoolManager) table.Table {
-	uniqueIndexes := table.NewUniqueIndex(disk.INVALID_PAGE_ID, 2)
-	tbl := table.NewTable(disk.PageId(0), 1, []*table.UniqueIndex{uniqueIndexes})
+	uniqueIndexes := table.NewUniqueIndex(disk.OLD_INVALID_PAGE_ID, 2)
+	tbl := table.NewTable(disk.OldPageId(0), 1, []*table.UniqueIndex{uniqueIndexes})
 
 	// テーブルを作成
 	err := tbl.Create(bpm)

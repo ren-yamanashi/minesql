@@ -18,8 +18,8 @@ func TestTable(t *testing.T) {
 
 		dm, _ := disk.NewDiskManager(path)
 		bpm := bufferpool.NewBufferPoolManager(dm, 10)
-		uniqueIndexes := NewUniqueIndex(disk.INVALID_PAGE_ID, 2)
-		table := NewTable(disk.PageId(0), 1, []*UniqueIndex{uniqueIndexes})
+		uniqueIndexes := NewUniqueIndex(disk.OLD_INVALID_PAGE_ID, 2)
+		table := NewTable(disk.OldPageId(0), 1, []*UniqueIndex{uniqueIndexes})
 
 		// WHEN: テーブルを作成
 		err := table.Create(bpm)

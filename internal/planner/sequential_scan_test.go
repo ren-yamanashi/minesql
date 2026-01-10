@@ -15,7 +15,7 @@ import (
 func TestNewSequentialScan(t *testing.T) {
 	t.Run("正常に SequentialScan が生成される", func(t *testing.T) {
 		// GIVEN
-		tableMetaPageId := disk.PageId(42)
+		tableMetaPageId := disk.OldPageId(42)
 		searchMode := btree.SearchModeStart{}
 		whileCondition := func(record executor.Record) bool {
 			return true
@@ -53,8 +53,8 @@ func TestNewSequentialScan(t *testing.T) {
 }
 
 func InitTable(t *testing.T, bpm *bufferpool.BufferPoolManager) table.Table {
-	uniqueIndexes := table.NewUniqueIndex(disk.INVALID_PAGE_ID, 2)
-	table := table.NewTable(disk.PageId(0), 1, []*table.UniqueIndex{uniqueIndexes})
+	uniqueIndexes := table.NewUniqueIndex(disk.OLD_INVALID_PAGE_ID, 2)
+	table := table.NewTable(disk.OldPageId(0), 1, []*table.UniqueIndex{uniqueIndexes})
 
 	// テーブルを作成
 	err := table.Create(bpm)

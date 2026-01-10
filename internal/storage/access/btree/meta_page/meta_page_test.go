@@ -30,7 +30,7 @@ func TestNewMetaPage(t *testing.T) {
 		rootPageId := metaPage.RootPageId()
 
 		// THEN
-		assert.Equal(t, disk.PageId(42), rootPageId)
+		assert.Equal(t, disk.OldPageId(42), rootPageId)
 	})
 
 	t.Run("ルートページ ID が正しく設定できる", func(t *testing.T) {
@@ -42,6 +42,6 @@ func TestNewMetaPage(t *testing.T) {
 		metaPage.SetRootPageId(99)
 
 		// THEN
-		assert.Equal(t, disk.PageId(99), metaPage.RootPageId())
+		assert.Equal(t, disk.OldPageId(99), metaPage.RootPageId())
 	})
 }

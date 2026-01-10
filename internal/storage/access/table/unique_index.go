@@ -8,12 +8,12 @@ import (
 )
 
 type UniqueIndex struct {
-	MetaPageId disk.PageId
+	MetaPageId disk.OldPageId
 	// セカンダリキーに含めるカラムを指定
 	SecondaryKey uint
 }
 
-func NewUniqueIndex(metaPageId disk.PageId, secondaryKey uint) *UniqueIndex {
+func NewUniqueIndex(metaPageId disk.OldPageId, secondaryKey uint) *UniqueIndex {
 	return &UniqueIndex{
 		MetaPageId:   metaPageId,
 		SecondaryKey: secondaryKey,

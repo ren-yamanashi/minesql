@@ -18,7 +18,7 @@ func TestUniqueIndex(t *testing.T) {
 
 		dm, _ := disk.NewDiskManager(path)
 		bpm := bufferpool.NewBufferPoolManager(dm, 10)
-		uniqueIndex := NewUniqueIndex(disk.PageId(0), 0)
+		uniqueIndex := NewUniqueIndex(disk.OldPageId(0), 0)
 
 		// WHEN: ユニークインデックスを作成
 		err := uniqueIndex.Create(bpm)

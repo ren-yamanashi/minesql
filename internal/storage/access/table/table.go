@@ -9,7 +9,7 @@ import (
 
 type Table struct {
 	// テーブルの内容が入っている B+Tree のメタページの ID
-	MetaPageId disk.PageId
+	MetaPageId disk.OldPageId
 	// プライマリキーの列数 (プライマリキーは先頭から連続している想定)
 	// 例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる
 	PrimaryKeyCount int
@@ -17,7 +17,7 @@ type Table struct {
 	UniqueIndexes []*UniqueIndex
 }
 
-func NewTable(metaPageId disk.PageId, primaryKeyCount int, uniqueIndexes []*UniqueIndex) Table {
+func NewTable(metaPageId disk.OldPageId, primaryKeyCount int, uniqueIndexes []*UniqueIndex) Table {
 	return Table{
 		MetaPageId:      metaPageId,
 		PrimaryKeyCount: primaryKeyCount,

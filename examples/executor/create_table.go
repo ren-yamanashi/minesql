@@ -12,11 +12,11 @@ func createTable(bpm *bufferpool.BufferPoolManager) table.Table {
 	// インデックス 0: 名前 (2 番目のカラム)
 	// インデックス 1: 姓 (3 番目のカラム)
 	tbl := table.NewTable(
-		disk.PageId(0),
+		disk.OldPageId(0),
 		1,
 		[]*table.UniqueIndex{
-			table.NewUniqueIndex(disk.INVALID_PAGE_ID, 1), // 名前のインデックス
-			table.NewUniqueIndex(disk.INVALID_PAGE_ID, 2), // 姓のインデックス
+			table.NewUniqueIndex(disk.OLD_INVALID_PAGE_ID, 1), // 名前のインデックス
+			table.NewUniqueIndex(disk.OLD_INVALID_PAGE_ID, 2), // 姓のインデックス
 		},
 	)
 

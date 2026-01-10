@@ -16,7 +16,7 @@ type IndexScan struct {
 }
 
 func NewIndexScan(
-	tableMetaPageId disk.PageId,
+	tableMetaPageId disk.OldPageId,
 	indexIterator *btree.Iterator,
 	whileCondition func(record Record) bool,
 ) *IndexScan {

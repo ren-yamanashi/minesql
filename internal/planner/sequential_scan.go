@@ -8,14 +8,14 @@ import (
 )
 
 type SequentialScan struct {
-	TableMetaPageId disk.PageId
+	TableMetaPageId disk.OldPageId
 	SearchMode      btree.SearchMode
 	// 継続条件を満たすかどうかを判定する関数
 	WhileCondition func(record executor.Record) bool
 }
 
 func NewSequentialScan(
-	tableMetaPageId disk.PageId,
+	tableMetaPageId disk.OldPageId,
 	searchMode btree.SearchMode,
 	whileCondition func(record executor.Record) bool,
 ) SequentialScan {

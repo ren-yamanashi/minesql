@@ -118,8 +118,8 @@ func TestIndexScan(t *testing.T) {
 }
 
 func InitTableForIndexScan(t *testing.T, bpm *bufferpool.BufferPoolManager) table.Table {
-	uniqueIndexes := table.NewUniqueIndex(disk.INVALID_PAGE_ID, 2)
-	tbl := table.NewTable(disk.PageId(0), 1, []*table.UniqueIndex{uniqueIndexes})
+	uniqueIndexes := table.NewUniqueIndex(disk.OLD_INVALID_PAGE_ID, 2)
+	tbl := table.NewTable(disk.OldPageId(0), 1, []*table.UniqueIndex{uniqueIndexes})
 
 	// テーブルを作成
 	err := tbl.Create(bpm)
