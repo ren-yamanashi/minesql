@@ -7,31 +7,38 @@ import (
 	"minesql/internal/storage/disk"
 )
 
-type SequentialScan struct {
+type IndexScan struct {
 	TableMetaPageId disk.PageId
+	IndexMetaPageId disk.PageId
 	SearchMode      btree.SearchMode
 	// 継続条件を満たすかどうかを判定する関数
 	WhileCondition func(record executor.Record) bool
 }
 
-func NewSequentialScan(
+func NewIndexScan(
 	tableMetaPageId disk.PageId,
+	indexMetaPageId disk.PageId,
 	searchMode btree.SearchMode,
 	whileCondition func(record executor.Record) bool,
-) SequentialScan {
-	return SequentialScan{
+) IndexScan {
+	return IndexScan{
 		TableMetaPageId: tableMetaPageId,
+		IndexMetaPageId: indexMetaPageId,
 		SearchMode:      searchMode,
 		WhileCondition:  whileCondition,
 	}
 }
 
 // 実行計画を開始し、Executor を返す
-func (ss *SequentialScan) Start(bpm *bufferpool.BufferPoolManager) (executor.Executor, error) {
-	btr := btree.NewBTree(ss.TableMetaPageId)
-	tableIterator, err := btr.Search(bpm, ss.SearchMode)
+func (is *IndexScan) Start(bpm *bufferpool.BufferPoolManager) (executor.Executor, error) {
+	indexBtr := btree.NewBTree(is.IndexMetaPageId)
+	indexIterator, err := indexBtr.Search(bpm, is.SearchMode)
 	if err != nil {
 		return nil, err
 	}
-	return executor.NewSequentialScan(tableIterator, ss.WhileCondition), nil
+	return executor.NewIndexScan(
+		is.TableMetaPageId,
+		indexIterator,
+		is.WhileCondition,
+	), nil
 }
