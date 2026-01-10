@@ -13,6 +13,14 @@ type Table struct {
 	// プライマリキーの列数 (プライマリキーは先頭から連続している想定)
 	// 例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる
 	PrimaryKeyCount int
+	// テーブルに紐づくユニークインデックス群
+}
+
+func NewTable(metaPageId disk.PageId, primaryKeyCount int) Table{
+	return Table{
+		MetaPageId:      metaPageId,
+		PrimaryKeyCount: primaryKeyCount,
+	}
 }
 
 // 空のテーブルを新規作成する

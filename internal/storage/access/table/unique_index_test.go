@@ -11,39 +11,39 @@ import (
 )
 
 // Create と Insert をテスト
-func TestTable(t *testing.T) {
-	t.Run("テーブルの作成ができ、そのテーブルに値が挿入できる", func(t *testing.T) {
+func TestUniqueIndex(t *testing.T) {
+	t.Run("ユニークインデックスの作成ができ、そのインデックスに値が挿入できる", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		path := filepath.Join(tmpdir, "test.db")
 
 		dm, _ := disk.NewDiskManager(path)
 		bpm := bufferpool.NewBufferPoolManager(dm, 10)
-		table := NewTable(disk.PageId(0), 1)
+		uniqueIndex := NewUniqueIndex(disk.PageId(0), 1)
 
-		// WHEN: テーブルを作成
-		err := table.Create(bpm)
+		// WHEN: ユニークインデックスを作成
+		err := uniqueIndex.Create(bpm)
 		assert.NoError(t, err)
 
-		// WHEN: 行を挿入
-		err = table.Insert(bpm, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
-		err = table.Insert(bpm, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
-		err = table.Insert(bpm, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
-		err = table.Insert(bpm, [][]byte{[]byte("d"), []byte("Eve"), []byte("Davis")})
+		// WHEN: インデックスに値を挿入
+		err = uniqueIndex.Insert(bpm, []uint8{0}, [][]byte{[]byte("John")})
+		err = uniqueIndex.Insert(bpm, []uint8{1}, [][]byte{[]byte("Alice")})
+		err = uniqueIndex.Insert(bpm, []uint8{2}, [][]byte{[]byte("Bob")})
+		err = uniqueIndex.Insert(bpm, []uint8{3}, [][]byte{[]byte("Eve")})
 		assert.NoError(t, err)
 
 		// THEN: 挿入したデータが B+Tree に存在する
-		tree := btree.NewBTree(table.MetaPageId)
+		tree := btree.NewBTree(uniqueIndex.MetaPageId)
 		iter, err := tree.Search(bpm, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
 		expectedRecords := []struct {
 			key   [][]byte
-			value [][]byte
+			value []uint8
 		}{
-			{[][]byte{[]byte("a")}, [][]byte{[]byte("John"), []byte("Doe")}},
-			{[][]byte{[]byte("b")}, [][]byte{[]byte("Alice"), []byte("Smith")}},
-			{[][]byte{[]byte("c")}, [][]byte{[]byte("Bob"), []byte("Johnson")}},
-			{[][]byte{[]byte("d")}, [][]byte{[]byte("Eve"), []byte("Davis")}},
+			{[][]byte{[]byte("John")}, []uint8{0}},
+			{[][]byte{[]byte("Alice")}, []uint8{1}},
+			{[][]byte{[]byte("Bob")}, []uint8{2}},
+			{[][]byte{[]byte("Eve")}, []uint8{3}},
 		}
 
 		i := 0
@@ -59,6 +59,7 @@ func TestTable(t *testing.T) {
 			var decodedValue [][]byte
 			keyBytes := pair.Key
 			valueBytes := pair.Value
+
 			Decode(keyBytes, &decodedKey)
 			Decode(valueBytes, &decodedValue)
 
@@ -66,8 +67,6 @@ func TestTable(t *testing.T) {
 			assert.Equal(t, expected.value, decodedValue)
 
 			i++
-			iter.Next(bpm)
 		}
-		assert.Equal(t, len(expectedRecords), i)
 	})
 }

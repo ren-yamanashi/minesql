@@ -114,10 +114,7 @@ func TestSequentialScan(t *testing.T) {
 }
 
 func InitTable(t *testing.T, bpm *bufferpool.BufferPoolManager) table.Table {
-	table := table.Table{
-		MetaPageId:      disk.PageId(0),
-		PrimaryKeyCount: 1,
-	}
+	table := table.NewTable(disk.PageId(0), 1)
 
 	// テーブルを作成
 	err := table.Create(bpm)
