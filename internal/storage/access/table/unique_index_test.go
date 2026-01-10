@@ -18,7 +18,7 @@ func TestUniqueIndex(t *testing.T) {
 
 		dm, _ := disk.NewDiskManager(path)
 		bpm := bufferpool.NewBufferPoolManager(dm, 10)
-		uniqueIndex := NewUniqueIndex(disk.PageId(0), 1)
+		uniqueIndex := NewUniqueIndex(disk.PageId(0), 0)
 
 		// WHEN: ユニークインデックスを作成
 		err := uniqueIndex.Create(bpm)
@@ -27,8 +27,8 @@ func TestUniqueIndex(t *testing.T) {
 		// WHEN: インデックスに値を挿入
 		err = uniqueIndex.Insert(bpm, []uint8{0}, [][]byte{[]byte("John")})
 		err = uniqueIndex.Insert(bpm, []uint8{1}, [][]byte{[]byte("Alice")})
-		err = uniqueIndex.Insert(bpm, []uint8{2}, [][]byte{[]byte("Bob")})
-		err = uniqueIndex.Insert(bpm, []uint8{3}, [][]byte{[]byte("Eve")})
+		err = uniqueIndex.Insert(bpm, []uint8{2}, [][]byte{[]byte("Eve")})
+		err = uniqueIndex.Insert(bpm, []uint8{3}, [][]byte{[]byte("Bob")})
 		assert.NoError(t, err)
 
 		// THEN: 挿入したデータが B+Tree に存在する
@@ -40,10 +40,11 @@ func TestUniqueIndex(t *testing.T) {
 			key   [][]byte
 			value []uint8
 		}{
-			{[][]byte{[]byte("John")}, []uint8{0}},
+			// キーの順序でソートされる (プライマリキーの順序ではない)
 			{[][]byte{[]byte("Alice")}, []uint8{1}},
-			{[][]byte{[]byte("Bob")}, []uint8{2}},
-			{[][]byte{[]byte("Eve")}, []uint8{3}},
+			{[][]byte{[]byte("Bob")}, []uint8{3}},
+			{[][]byte{[]byte("Eve")}, []uint8{2}},
+			{[][]byte{[]byte("John")}, []uint8{0}},
 		}
 
 		i := 0
@@ -54,19 +55,16 @@ func TestUniqueIndex(t *testing.T) {
 			}
 			expected := expectedRecords[i]
 
-			// エンコードされたキーと値をデコード
+			// エンコードされたキーをデコード
 			var decodedKey [][]byte
-			var decodedValue [][]byte
 			keyBytes := pair.Key
-			valueBytes := pair.Value
-
 			Decode(keyBytes, &decodedKey)
-			Decode(valueBytes, &decodedValue)
 
 			assert.Equal(t, expected.key, decodedKey)
-			assert.Equal(t, expected.value, decodedValue)
+			assert.Equal(t, expected.value, pair.Value)
 
 			i++
+			iter.Next(bpm)
 		}
 	})
 }

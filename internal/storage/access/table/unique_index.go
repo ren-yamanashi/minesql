@@ -30,6 +30,8 @@ func (ui *UniqueIndex) Create(bpm *bufferpool.BufferPoolManager) error {
 	return nil
 }
 
+// ユニークインデックスに行を挿入する
+// value はプライマリキー (primaryKey に指定された値) になるため、エンコードせずそのまま格納する
 func (ui *UniqueIndex) Insert(bpm *bufferpool.BufferPoolManager, primaryKey []uint8, record [][]byte) error {
 	btr := btree.NewBTree(ui.MetaPageId)
 	var secondaryKey []byte
