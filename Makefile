@@ -1,7 +1,7 @@
 .PHONY: fmt test test-cov clean
 
 fmt:
-	find ./internal -name "*.go" -type f -exec goimports -w {} \;
+	find . -name "*.go" -type f -exec goimports -w {} \;
 
 test:
 	go test -v ./internal/...
