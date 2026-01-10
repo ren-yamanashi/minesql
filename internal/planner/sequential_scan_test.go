@@ -53,7 +53,8 @@ func TestNewSequentialScan(t *testing.T) {
 }
 
 func InitTable(t *testing.T, bpm *bufferpool.BufferPoolManager) table.Table {
-	table := table.NewTable(disk.PageId(0), 1)
+	uniqueIndexes := table.NewUniqueIndex(disk.INVALID_PAGE_ID, 2)
+	table := table.NewTable(disk.PageId(0), 1, []*table.UniqueIndex{uniqueIndexes})
 
 	// テーブルを作成
 	err := table.Create(bpm)
