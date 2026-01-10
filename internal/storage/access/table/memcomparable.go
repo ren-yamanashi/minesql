@@ -8,6 +8,8 @@ const BLOCK_SIZE = 9
 const DATA_SIZE = BLOCK_SIZE - 1
 
 // エンコード後のサイズを計測する
+// size: エンコード前のバイト列のサイズ
+// 計測方法: size を 8 バイトずつに分割し、各ブロックに対して 9 バイトを割り当てる
 func EncodedSize(size int) int {
 	return ((size + DATA_SIZE - 1) / DATA_SIZE) * BLOCK_SIZE
 }
