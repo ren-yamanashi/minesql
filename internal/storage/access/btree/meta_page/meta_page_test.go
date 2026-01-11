@@ -24,24 +24,26 @@ func TestNewMetaPage(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
 		metaPage := NewMetaPage(data)
-		metaPage.SetRootPageId(42)
+		expectedPageId := disk.NewPageId(disk.FileId(1), disk.PageNumber(42))
+		metaPage.SetRootPageId(expectedPageId)
 
 		// WHEN
 		rootPageId := metaPage.RootPageId()
 
 		// THEN
-		assert.Equal(t, disk.OldPageId(42), rootPageId)
+		assert.Equal(t, expectedPageId, rootPageId)
 	})
 
 	t.Run("ルートページ ID が正しく設定できる", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
 		metaPage := NewMetaPage(data)
+		expectedPageId := disk.NewPageId(disk.FileId(2), disk.PageNumber(99))
 
 		// WHEN
-		metaPage.SetRootPageId(99)
+		metaPage.SetRootPageId(expectedPageId)
 
 		// THEN
-		assert.Equal(t, disk.OldPageId(99), metaPage.RootPageId())
+		assert.Equal(t, expectedPageId, metaPage.RootPageId())
 	})
 }
