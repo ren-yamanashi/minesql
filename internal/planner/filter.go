@@ -1,9 +1,6 @@
 package planner
 
-import (
-	"minesql/internal/executor"
-	"minesql/internal/storage/bufferpool"
-)
+import "minesql/internal/executor"
 
 type Filter struct {
 	InnerPlanNode Node
@@ -18,10 +15,7 @@ func NewFilter(innerPlanNode Node, condition func(executor.Record) bool) Filter 
 }
 
 // 実行計画を開始し、Executor を返す
-func (f *Filter) Start(bpm *bufferpool.BufferPoolManager) (executor.Executor, error) {
-	innerIterator, err := f.InnerPlanNode.Start(bpm)
-	if err != nil {
-		return nil, err
-	}
-	return executor.NewFilter(innerIterator, f.Condition), nil
+func (f Filter) Start() executor.Executor {
+	innerExecutor := f.InnerPlanNode.Start()
+	return executor.NewFilter(innerExecutor, f.Condition)
 }
