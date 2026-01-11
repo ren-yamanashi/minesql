@@ -1,27 +1,27 @@
 package main
 
 import (
-	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/disk"
+	"minesql/internal/storage"
 	"os"
 )
 
 func main() {
-	dbPath := "executor/sample.db"
-	os.Remove(dbPath) // 既存のファイルがあれば削除
-	dm, err := disk.NewDiskManager(dbPath)
-	if err != nil {
-		panic(err)
-	}
-	bpm := bufferpool.NewBufferPoolManager(dm, 100)
-	tbl := createTable(bpm)
+	dataDir := "examples/executor/data"
+	os.RemoveAll(dataDir) // 既存のデータディレクトリがあれば削除
+	os.MkdirAll(dataDir, 0755)
 
-	fullTableScan(bpm, tbl)
-	rangeTableScan(bpm, tbl)
-	searchConstPrimary(bpm, tbl)
-	filterScan(bpm, tbl)
-	fullIndexScanByFirstName(bpm, tbl)
-	fullIndexScanByLastName(bpm, tbl)
-	rangeIndexScan(bpm, tbl)
-	searchConstUniqueIndex(bpm, tbl)
+	// StorageEngine を初期化
+	os.Setenv("MINESQL_DATA_DIR", dataDir)
+	os.Setenv("MINESQL_BUFFER_SIZE", "100")
+	storage.InitStorageEngine()
+
+	createTable()
+	fullTableScan()
+	rangeTableScan()
+	searchConstPrimary()
+	filterScan()
+	fullIndexScanByFirstName()
+	fullIndexScanByLastName()
+	rangeIndexScan()
+	searchConstUniqueIndex()
 }

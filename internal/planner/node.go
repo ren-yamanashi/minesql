@@ -1,10 +1,7 @@
 package planner
 
-import (
-	"minesql/internal/executor"
-	"minesql/internal/storage/bufferpool"
-)
+import "minesql/internal/executor"
 
 type Node interface {
-	Start(bpm *bufferpool.BufferPoolManager) (executor.Executor, error)
+	Start() executor.Executor
 }

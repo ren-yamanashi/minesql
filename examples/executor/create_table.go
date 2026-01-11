@@ -1,29 +1,28 @@
 package main
 
 import (
+	"minesql/internal/storage"
 	"minesql/internal/storage/access/table"
-	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/disk"
 )
 
 // テーブルを作成し、サンプルデータを挿入する
-func createTable(bpm *bufferpool.BufferPoolManager) table.Table {
-	// テーブルスキーマの定義
-	// インデックス 0: 名前 (2 番目のカラム)
-	// インデックス 1: 姓 (3 番目のカラム)
-	tbl := table.NewTable(
-		disk.OldPageId(0),
+func createTable() {
+	engine := storage.GetStorageEngine()
+
+	// テーブルを作成
+	tbl, err := engine.CreateTable(
+		"users",
 		1,
 		[]*table.UniqueIndex{
-			table.NewUniqueIndex(disk.OLD_INVALID_PAGE_ID, 1), // 名前のインデックス
-			table.NewUniqueIndex(disk.OLD_INVALID_PAGE_ID, 2), // 姓のインデックス
+			table.NewUniqueIndex("first_name", 1), // 名前のインデックス
+			table.NewUniqueIndex("last_name", 2),  // 姓のインデックス
 		},
 	)
-
-	err := tbl.Create(bpm)
 	if err != nil {
 		panic(err)
 	}
+
+	bpm := engine.GetBufferPoolManager()
 
 	// レコードを挿入
 	err = tbl.Insert(bpm, [][]byte{[]byte("z"), []byte("Alice"), []byte("Smith")})
@@ -48,10 +47,8 @@ func createTable(bpm *bufferpool.BufferPoolManager) table.Table {
 	}
 
 	// バッファプールの内容をディスクにフラッシュ
-	err = bpm.FlushPage()
+	err = engine.FlushAll()
 	if err != nil {
 		panic(err)
 	}
-
-	return tbl
 }
