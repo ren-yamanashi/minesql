@@ -152,8 +152,8 @@ func TestCreateTable(t *testing.T) {
 	})
 }
 
-func TestGetTableHandle(t *testing.T) {
-	t.Run("TableHandle を取得できる", func(t *testing.T) {
+func TestGetTableHandler(t *testing.T) {
+	t.Run("TableHandler を取得できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
@@ -164,17 +164,17 @@ func TestGetTableHandle(t *testing.T) {
 		engine.CreateTable("users", 1, []*table.UniqueIndex{})
 
 		// WHEN
-		handle, err := engine.GetTableHandle("users")
+		handler, err := engine.GetTableHandler("users")
 
 		// THEN
 		assert.NoError(t, err)
-		assert.NotNil(t, handle)
-		assert.NotNil(t, handle.bufferPoolManager)
-		assert.Equal(t, "users", handle.table.Name)
-		assert.Equal(t, handle.table.MetaPageId, engine.tables["users"].MetaPageId)
+		assert.NotNil(t, handler)
+		assert.NotNil(t, handler.bufferPoolManager)
+		assert.Equal(t, "users", handler.table.Name)
+		assert.Equal(t, handler.table.MetaPageId, engine.tables["users"].MetaPageId)
 	})
 
-	t.Run("存在しないテーブルの TableHandle を取得するとエラー", func(t *testing.T) {
+	t.Run("存在しないテーブルの TableHandler を取得するとエラー", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
@@ -184,11 +184,11 @@ func TestGetTableHandle(t *testing.T) {
 		engine := GetStorageEngine()
 
 		// WHEN
-		handle, err := engine.GetTableHandle("nonexistent")
+		handler, err := engine.GetTableHandler("nonexistent")
 
 		// THEN
 		assert.Error(t, err)
-		assert.Nil(t, handle)
+		assert.Nil(t, handler)
 	})
 }
 

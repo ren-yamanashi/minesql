@@ -16,7 +16,7 @@ type TableHandler struct {
 	bufferPoolManager *bufferpool.BufferPoolManager
 }
 
-func NewTableHandle(tbl *table.Table, bpm *bufferpool.BufferPoolManager) *TableHandler {
+func NewTableHandler(tbl *table.Table, bpm *bufferpool.BufferPoolManager) *TableHandler {
 	return &TableHandler{
 		iterator:          nil, // 初期化時点ではイテレータは設定しない。`SetXxxIterator` メソッドで設定する
 		table:             tbl,

@@ -30,10 +30,10 @@ func NewSequentialScan(
 func (ss *SequentialScan) Next() (Record, error) {
 	engine := storage.GetStorageEngine()
 
-	// 初回実行時に table handle を作成
+	// 初回実行時に table handler を作成
 	if ss.tableHandler == nil {
 		// TableHandle を取得
-		handler, err := engine.GetTableHandle(ss.tableName)
+		handler, err := engine.GetTableHandler(ss.tableName)
 		if err != nil {
 			return nil, err
 		}

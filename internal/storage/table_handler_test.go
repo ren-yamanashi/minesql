@@ -8,82 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateTableScanBasic(t *testing.T) {
-	t.Run("テーブルイテレータを作成できる", func(t *testing.T) {
-		// GIVEN
-		tmpdir := t.TempDir()
-		t.Setenv("MINESQL_DATA_DIR", tmpdir)
-		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		ResetStorageEngine()
-		InitStorageEngine()
-		engine := GetStorageEngine()
-		tbl, _ := engine.CreateTable("users", 1, []*table.UniqueIndex{})
-		bpm := engine.GetBufferPoolManager()
-		tbl.Insert(bpm, [][]byte{[]byte("a"), []byte("Alice")})
-		tbl.Insert(bpm, [][]byte{[]byte("b"), []byte("Bob")})
-
-		handler, _ := engine.GetTableHandle("users")
-
-		// WHEN
-		err := handler.SetTableIterator(btree.SearchModeStart{})
-
-		// THEN
-		assert.NoError(t, err)
-		assert.NotNil(t, handler.iterator)
-	})
-
-	t.Run("作成したイテレータでレコードを取得できる", func(t *testing.T) {
-		// GIVEN
-		tmpdir := t.TempDir()
-		t.Setenv("MINESQL_DATA_DIR", tmpdir)
-		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		ResetStorageEngine()
-		InitStorageEngine()
-		engine := GetStorageEngine()
-		tbl, _ := engine.CreateTable("users", 1, []*table.UniqueIndex{})
-		bpm := engine.GetBufferPoolManager()
-		tbl.Insert(bpm, [][]byte{[]byte("a"), []byte("Alice")})
-
-		handler, _ := engine.GetTableHandle("users")
-
-		// WHEN
-		err := handler.SetTableIterator(btree.SearchModeStart{})
-		pair, ok, err := handler.Next()
-
-		// THEN
-		assert.NoError(t, err)
-		assert.True(t, ok)
-		assert.NotNil(t, pair)
-	})
-
-	t.Run("SearchModeKey でイテレータを作成できる", func(t *testing.T) {
-		// GIVEN
-		tmpdir := t.TempDir()
-		t.Setenv("MINESQL_DATA_DIR", tmpdir)
-		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		ResetStorageEngine()
-		InitStorageEngine()
-		engine := GetStorageEngine()
-		tbl, _ := engine.CreateTable("users", 1, []*table.UniqueIndex{})
-		bpm := engine.GetBufferPoolManager()
-		tbl.Insert(bpm, [][]byte{[]byte("a"), []byte("Alice")})
-		tbl.Insert(bpm, [][]byte{[]byte("b"), []byte("Bob")})
-
-		handler, _ := engine.GetTableHandle("users")
-
-		var encodedKey []byte
-		table.Encode([][]byte{[]byte("b")}, &encodedKey)
-
-		// WHEN
-		err := handler.SetTableIterator(btree.SearchModeKey{Key: encodedKey})
-
-		// THEN
-		assert.NoError(t, err)
-		assert.NotNil(t, handler.iterator)
-	})
-}
-
-func TestCreateIndexIterator(t *testing.T) {
+func TestSetIndexIterator(t *testing.T) {
 	t.Run("インデックスイテレータを作成できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
@@ -98,7 +23,7 @@ func TestCreateIndexIterator(t *testing.T) {
 		tbl.Insert(bpm, [][]byte{[]byte("a"), []byte("Alice"), []byte("Smith")})
 		tbl.Insert(bpm, [][]byte{[]byte("b"), []byte("Bob"), []byte("Johnson")})
 
-		handler, _ := engine.GetTableHandle("users")
+		handler, _ := engine.GetTableHandler("users")
 
 		// WHEN
 		err := handler.SetIndexIterator("last_name", btree.SearchModeStart{})
@@ -121,7 +46,7 @@ func TestCreateIndexIterator(t *testing.T) {
 		bpm := engine.GetBufferPoolManager()
 		tbl.Insert(bpm, [][]byte{[]byte("a"), []byte("Alice"), []byte("Smith")})
 
-		handler, _ := engine.GetTableHandle("users")
+		handler, _ := engine.GetTableHandler("users")
 
 		// WHEN
 		err := handler.SetIndexIterator("last_name", btree.SearchModeStart{})
@@ -145,7 +70,7 @@ func TestCreateIndexIterator(t *testing.T) {
 		bpm := engine.GetBufferPoolManager()
 		tbl.Insert(bpm, [][]byte{[]byte("a"), []byte("Alice")})
 
-		handler, _ := engine.GetTableHandle("users")
+		handler, _ := engine.GetTableHandler("users")
 
 		// WHEN
 		err := handler.SetIndexIterator("nonexistent", btree.SearchModeStart{})
@@ -170,7 +95,7 @@ func TestCreateIndexIterator(t *testing.T) {
 		tbl.Insert(bpm, [][]byte{[]byte("a"), []byte("Alice"), []byte("Smith")})
 		tbl.Insert(bpm, [][]byte{[]byte("b"), []byte("Bob"), []byte("Johnson")})
 
-		handler, _ := engine.GetTableHandle("users")
+		handler, _ := engine.GetTableHandler("users")
 
 		var encodedKey []byte
 		table.Encode([][]byte{[]byte("Smith")}, &encodedKey)
@@ -184,7 +109,7 @@ func TestCreateIndexIterator(t *testing.T) {
 	})
 }
 
-func TestCreateTableScan(t *testing.T) {
+func TestSetTableIterator(t *testing.T) {
 	t.Run("テーブルイテレータを作成できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
@@ -195,10 +120,60 @@ func TestCreateTableScan(t *testing.T) {
 		engine := GetStorageEngine()
 		engine.CreateTable("users", 1, []*table.UniqueIndex{})
 
-		handler, _ := engine.GetTableHandle("users")
+		handler, _ := engine.GetTableHandler("users")
 
 		// WHEN
 		err := handler.SetTableIterator(btree.SearchModeStart{})
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, handler.iterator)
+	})
+
+	t.Run("作成したイテレータでレコードを取得できる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "10")
+		ResetStorageEngine()
+		InitStorageEngine()
+		engine := GetStorageEngine()
+		tbl, _ := engine.CreateTable("users", 1, []*table.UniqueIndex{})
+		bpm := engine.GetBufferPoolManager()
+		tbl.Insert(bpm, [][]byte{[]byte("a"), []byte("Alice")})
+
+		handler, _ := engine.GetTableHandler("users")
+
+		// WHEN
+		err := handler.SetTableIterator(btree.SearchModeStart{})
+		pair, ok, err := handler.Next()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.NotNil(t, pair)
+	})
+
+	t.Run("SearchModeKey でイテレータを作成できる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "10")
+		ResetStorageEngine()
+		InitStorageEngine()
+		engine := GetStorageEngine()
+		tbl, _ := engine.CreateTable("users", 1, []*table.UniqueIndex{})
+		bpm := engine.GetBufferPoolManager()
+		tbl.Insert(bpm, [][]byte{[]byte("a"), []byte("Alice")})
+		tbl.Insert(bpm, [][]byte{[]byte("b"), []byte("Bob")})
+
+		handler, _ := engine.GetTableHandler("users")
+
+		var encodedKey []byte
+		table.Encode([][]byte{[]byte("b")}, &encodedKey)
+
+		// WHEN
+		err := handler.SetTableIterator(btree.SearchModeKey{Key: encodedKey})
 
 		// THEN
 		assert.NoError(t, err)
@@ -217,7 +192,7 @@ func TestCreateTableScan(t *testing.T) {
 		bpm := engine.GetBufferPoolManager()
 		tbl.Insert(bpm, [][]byte{[]byte("a"), []byte("Alice")})
 
-		handler, _ := engine.GetTableHandle("users")
+		handler, _ := engine.GetTableHandler("users")
 
 		// WHEN
 		err := handler.SetTableIterator(btree.SearchModeStart{})

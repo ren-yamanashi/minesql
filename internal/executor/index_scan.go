@@ -34,9 +34,9 @@ func NewIndexScan(
 func (is *IndexScan) Next() (Record, error) {
 	engine := storage.GetStorageEngine()
 
-	// 初回実行時に handle を作成
+	// 初回実行時に handler を作成
 	if is.indexHandler == nil {
-		indexHandler, err := engine.GetTableHandle(is.tableName)
+		indexHandler, err := engine.GetTableHandler(is.tableName)
 		if err != nil {
 			return nil, err
 		}
@@ -49,7 +49,7 @@ func (is *IndexScan) Next() (Record, error) {
 		is.indexHandler = indexHandler
 
 		// テーブル検索用の TableHandle を取得
-		tableHandler, err := engine.GetTableHandle(is.tableName)
+		tableHandler, err := engine.GetTableHandler(is.tableName)
 		if err != nil {
 			return nil, err
 		}
