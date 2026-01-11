@@ -14,9 +14,9 @@ import (
 // Create と Insert をテスト
 func TestTable(t *testing.T) {
 	t.Run("テーブルの作成ができ、そのテーブルに値が挿入できる", func(t *testing.T) {
-		// // GIVEN
+		// GIVEN
 		uniqueIndex := NewUniqueIndex("last_name", 2)
-		bpm, metaPageId := InitDiskManager(t, "user")
+		bpm, metaPageId, _ := InitDiskManager(t, "users.db")
 
 		// UniqueIndex の metaPageId を割り当て
 		indexMetaPageId, err := bpm.AllocatePageId(metaPageId.FileId)
@@ -122,13 +122,10 @@ func TestTable(t *testing.T) {
 
 	t.Run("テーブルとそのインデックスが同じディスクファイル (同じ FileId) に保存される", func(t *testing.T) {
 		// GIVEN
-		tmpdir := t.TempDir()
-		bpm := bufferpool.NewBufferPoolManager(10, tmpdir)
-
 		// 2つのインデックスを持つテーブルを作成
 		uniqueIndex1 := NewUniqueIndex("first_name", 1)
 		uniqueIndex2 := NewUniqueIndex("last_name", 2)
-		bpm, metaPageId := InitDiskManager(t, "users.db")
+		bpm, metaPageId, tmpdir := InitDiskManager(t, "users.db")
 
 		// UniqueIndex の metaPageId を割り当て
 		indexMetaPageId1, err := bpm.AllocatePageId(metaPageId.FileId)
@@ -165,10 +162,10 @@ func TestTable(t *testing.T) {
 	})
 }
 
-func InitDiskManager(t *testing.T, pathname string) (bufferpoolManager *bufferpool.BufferPoolManager, metaPageId disk.PageId) {
-	tmpdir := t.TempDir()
+func InitDiskManager(t *testing.T, pathname string) (bufferpoolManager *bufferpool.BufferPoolManager, metaPageId disk.PageId, tmpdir string) {
+	tmpdir = t.TempDir()
 	filePath := filepath.Join(tmpdir, pathname)
-	
+
 	bpm := bufferpool.NewBufferPoolManager(10, tmpdir)
 	fileId := bpm.AllocateFileId()
 	dm, err := disk.NewDiskManager(fileId, filePath)
@@ -179,5 +176,5 @@ func InitDiskManager(t *testing.T, pathname string) (bufferpoolManager *bufferpo
 	metaPageId, err = bpm.AllocatePageId(fileId)
 	assert.NoError(t, err)
 
-	return bpm, metaPageId
+	return bpm, metaPageId, tmpdir
 }
