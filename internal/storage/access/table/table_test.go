@@ -11,29 +11,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func InitDiskManager(t *testing.T) (bufferpoolManager *bufferpool.BufferPoolManager, metaPageId disk.PageId) {
-	tmpdir := t.TempDir()
-	bpm := bufferpool.NewBufferPoolManager(10, tmpdir)
-
-	fileId := bpm.AllocateFileId()
-	filePath := filepath.Join(tmpdir, "users.db")
-	dm, err := disk.NewDiskManager(fileId, filePath)
-	assert.NoError(t, err)
-	bpm.RegisterDiskManager(fileId, dm)
-
-	// metaPageId を割り当て
-	metaPageId, err = bpm.AllocatePageId(fileId)
-	assert.NoError(t, err)
-
-	return bpm, metaPageId
-}
-
 // Create と Insert をテスト
 func TestTable(t *testing.T) {
 	t.Run("テーブルの作成ができ、そのテーブルに値が挿入できる", func(t *testing.T) {
 		// // GIVEN
 		uniqueIndex := NewUniqueIndex("last_name", 2)
-		bpm, metaPageId := InitDiskManager(t)
+		bpm, metaPageId := InitDiskManager(t, "user")
 
 		// UniqueIndex の metaPageId を割り当て
 		indexMetaPageId, err := bpm.AllocatePageId(metaPageId.FileId)
@@ -145,7 +128,7 @@ func TestTable(t *testing.T) {
 		// 2つのインデックスを持つテーブルを作成
 		uniqueIndex1 := NewUniqueIndex("first_name", 1)
 		uniqueIndex2 := NewUniqueIndex("last_name", 2)
-		bpm, metaPageId := InitDiskManager(t)
+		bpm, metaPageId := InitDiskManager(t, "users.db")
 
 		// UniqueIndex の metaPageId を割り当て
 		indexMetaPageId1, err := bpm.AllocatePageId(metaPageId.FileId)
@@ -180,4 +163,21 @@ func TestTable(t *testing.T) {
 		_, err = os.Stat(expectedFilePath)
 		assert.NoError(t, err, "users.db ファイルが存在するべき")
 	})
+}
+
+func InitDiskManager(t *testing.T, pathname string) (bufferpoolManager *bufferpool.BufferPoolManager, metaPageId disk.PageId) {
+	tmpdir := t.TempDir()
+	filePath := filepath.Join(tmpdir, pathname)
+	
+	bpm := bufferpool.NewBufferPoolManager(10, tmpdir)
+	fileId := bpm.AllocateFileId()
+	dm, err := disk.NewDiskManager(fileId, filePath)
+	assert.NoError(t, err)
+	bpm.RegisterDiskManager(fileId, dm)
+
+	// metaPageId を割り当て
+	metaPageId, err = bpm.AllocatePageId(fileId)
+	assert.NoError(t, err)
+
+	return bpm, metaPageId
 }

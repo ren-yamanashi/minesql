@@ -8,21 +8,27 @@ import (
 )
 
 type UniqueIndex struct {
-	MetaPageId disk.OldPageId
+	// インデックス名
+	Name string
+	// インデックスの内容が入っている B+Tree のメタページの ID
+	MetaPageId disk.PageId
 	// セカンダリキーに含めるカラムを指定
 	SecondaryKey uint
 }
 
-func NewUniqueIndex(metaPageId disk.OldPageId, secondaryKey uint) *UniqueIndex {
+func NewUniqueIndex(name string, secondaryKey uint) *UniqueIndex {
 	return &UniqueIndex{
-		MetaPageId:   metaPageId,
+		Name:         name,
+		MetaPageId:   disk.INVALID_PAGE_ID,
 		SecondaryKey: secondaryKey,
 	}
 }
 
 // 空のユニークインデックスを新規作成する
-func (ui *UniqueIndex) Create(bpm *bufferpool.BufferPoolManager) error {
-	btr, err := btree.CreateBTree(bpm)
+// 事前に MetaPageId が設定されている必要がある
+func (ui *UniqueIndex) Create(bpm *bufferpool.BufferPoolManager, metaPageId disk.PageId) error {
+	ui.MetaPageId = metaPageId
+	btr, err := btree.CreateBTree(bpm, metaPageId)
 	if err != nil {
 		return err
 	}

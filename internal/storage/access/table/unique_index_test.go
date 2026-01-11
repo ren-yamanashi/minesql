@@ -2,9 +2,6 @@ package table
 
 import (
 	"minesql/internal/storage/access/btree"
-	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/disk"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,25 +10,27 @@ import (
 // Create と Insert をテスト
 func TestUniqueIndex(t *testing.T) {
 	t.Run("ユニークインデックスの作成ができ、そのインデックスに値が挿入できる", func(t *testing.T) {
-		tmpdir := t.TempDir()
-		path := filepath.Join(tmpdir, "test.db")
+		// GIVEN
+		uniqueIndex := NewUniqueIndex("test_index", 0)
+		bpm, metaPageId, _ := InitDiskManager(t, "test.db")
 
-		dm, _ := disk.NewDiskManager(path)
-		bpm := bufferpool.NewBufferPoolManager(dm, 10)
-		uniqueIndex := NewUniqueIndex(disk.OldPageId(0), 0)
+		// UniqueIndex の metaPageId を割り当て
+		indexMetapageId, err := bpm.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex.MetaPageId = indexMetapageId
 
-		// WHEN: ユニークインデックスを作成
-		err := uniqueIndex.Create(bpm)
+		// WHEN
+		err = uniqueIndex.Create(bpm, indexMetapageId)
 		assert.NoError(t, err)
 
-		// WHEN: インデックスに値を挿入
+		// WHEN
 		err = uniqueIndex.Insert(bpm, []uint8{0}, [][]byte{[]byte("John")})
 		err = uniqueIndex.Insert(bpm, []uint8{1}, [][]byte{[]byte("Alice")})
 		err = uniqueIndex.Insert(bpm, []uint8{2}, [][]byte{[]byte("Eve")})
 		err = uniqueIndex.Insert(bpm, []uint8{3}, [][]byte{[]byte("Bob")})
 		assert.NoError(t, err)
 
-		// THEN: 挿入したデータが B+Tree に存在する
+		// THEN
 		tree := btree.NewBTree(uniqueIndex.MetaPageId)
 		iter, err := tree.Search(bpm, btree.SearchModeStart{})
 		assert.NoError(t, err)
