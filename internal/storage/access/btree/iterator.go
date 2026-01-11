@@ -53,7 +53,7 @@ func (iter *Iterator) Advance(bpm *bufferpool.BufferPoolManager) error {
 
 	// 現在のページ内に次の key-value ペアがなく、次のページが存在する場合は、次のページに移動する
 	// 古いページの参照ビットをクリア
-	oldPageId := iter.bufferPage.OldPageId
+	oldPageId := iter.bufferPage.PageId
 	bpm.UnRefPage(oldPageId)
 
 	// 次のページを取得
