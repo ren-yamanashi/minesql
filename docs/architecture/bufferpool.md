@@ -14,29 +14,39 @@
   - 書き込みも同様に、まずバッファプール上のページを書き換え、後でまとめてディスクに書き込むことでディスク I/O を削減する
 - 「どのページのデータがどのバッファに入っているか」の対応関係を、ページテーブルで管理する (以下図を参照)
 
+## BufferPoolManager
+
+BufferPoolManager は低レベルのページキャッシュと I/O 調整を担当する
+
+- FileId を用いて複数の DiskManager を管理し、各テーブルのディスクファイルへのアクセスを調整する
+- 新しいテーブルやインデックス用に一意な FileId を採番する
+
 ```mermaid
 graph TD
   subgraph pageTable[ページテーブル]
     direction TB
-    PT1[ページID: 2<br>バッファID: 0]
-    PT2[ページID: 3<br>バッファID: 2]
-    PT3[ページID: 6<br>バッファID: 1]
+    PT1[PageId: FileId=1, PageNumber=2<br>バッファID: 0]
+    PT2[PageId: FileId=1, PageNumber=3<br>バッファID: 2]
+    PT3[PageId: FileId=2, PageNumber=1<br>バッファID: 1]
     end
 
   subgraph bufferPool[バッファプール]
     direction TB
-    P1[page 3]
-    P2[page 6]
-    P3[page 2]
+    P1[page: FileId=1, PageNumber=3]
+    P2[page: FileId=2, PageNumber=1]
+    P3[page: FileId=1, PageNumber=2]
   end
 
   PT2 --0--> P1
   PT1 --2--> P3
   PT3 --1--> P2
 
-  disk[(ディスク)]
-  
-  bufferPool <--> disk
+  subgraph diskManagers[DiskManager群]
+    DM1[DiskManager<br>FileId=1<br>users.db]
+    DM2[DiskManager<br>FileId=2<br>orders.db]
+  end
+
+  bufferPool <--> diskManagers
 ```
 
 ### ファイルシステムのビルトインのキャッシュを利用せず、バッファプールを実装する理由
@@ -78,16 +88,19 @@ graph TD
 
 ### ページのフェッチ
 
-#### 1. 指定されたページがページテーブルにすでにあるか (=バッファプールにあるか) を確認する
+#### 1. 指定された PageId がページテーブルにすでにあるか (=バッファプールにあるか) を確認する
 
-#### 2. 存在する場合はそのページを返す (ディスク I/O は発生しない)  
+- PageId には FileId と PageNumber が含まれており、どのディスクファイルのどのページかを一意に特定できる
+
+#### 2. 存在する場合はそのページを返す (ディスク I/O は発生しない)
 
 - このとき、該当バッファページの `Referenced` ビットを立てる
 
 #### 3. 存在しない場合、ディスクのページをバッファプールに読み込む
 
+- PageId に含まれる FileId を使って、対応する DiskManager を特定する
 - バッファプールに空きがある場合:
-  - ページを読み込み、ページテーブルを更新する
+  - DiskManager を通じてページを読み込み、ページテーブルを更新する
 - バッファプールに空きがない場合:
   - Clock sweep アルゴリズムで捨てるバッファページを選択する
-  - 選択されたバッファページが `IsDirty` ビットを持っている場合 (バッファプール内のページの内容とディスクのページの内容に差分がある場合) は、ディスクに書き出す
+  - 選択されたバッファページが `IsDirty` ビットを持っている場合 (バッファプール内のページの内容とディスクのページの内容に差分がある場合) は、該当する DiskManager を通じてディスクに書き出す
