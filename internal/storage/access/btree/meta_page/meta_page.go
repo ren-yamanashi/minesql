@@ -1,7 +1,6 @@
 package metapage
 
 import (
-	"encoding/binary"
 	"minesql/internal/storage/disk"
 )
 
@@ -16,10 +15,10 @@ func NewMetaPage(data []byte) *MetaPage {
 
 // メタページのヘッダーからルートページ ID を読み取る
 func (mp *MetaPage) RootPageId() disk.PageId {
-	return disk.PageId(binary.LittleEndian.Uint64(mp.data[0:8]))
+	return disk.ReadPageIdFrom(mp.data, 0)
 }
 
 // メタページのヘッダーにルートページ ID を設定する
 func (mp *MetaPage) SetRootPageId(rootPageId disk.PageId) {
-	binary.LittleEndian.PutUint64(mp.data[0:8], uint64(rootPageId))
+	rootPageId.WriteTo(mp.data, 0)
 }

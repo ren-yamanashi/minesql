@@ -2,23 +2,19 @@ package main
 
 import (
 	"minesql/internal/executor"
-	"minesql/internal/storage/access/btree"
-	"minesql/internal/storage/access/table"
-	"minesql/internal/storage/bufferpool"
 )
 
 // 名前 (2 番目のカラム) が "Charlie" のレコードのみを取得するフィルタースキャン
-func filterScan(bpm *bufferpool.BufferPoolManager, tbl table.Table) {
+func filterScan() {
 	println("=== フィルタースキャン (名前が 'Charlie' のレコード) ===")
 
 	// フルテーブルスキャン用の継続条件
 	whileCondition := func(record executor.Record) bool {
 		return true
 	}
-	btr := btree.NewBTree(tbl.MetaPageId)
-	tableIterator, _ := btr.Search(bpm, btree.SearchModeStart{})
 	seqScan := executor.NewSequentialScan(
-		tableIterator,
+		"users",
+		executor.RecordSearchModeStart{},
 		whileCondition,
 	)
 
@@ -29,7 +25,7 @@ func filterScan(bpm *bufferpool.BufferPoolManager, tbl table.Table) {
 	filter := executor.NewFilter(seqScan, filterCondition)
 
 	for {
-		record, err := filter.Next(bpm)
+		record, err := filter.Next()
 		if err != nil {
 			panic(err)
 		}

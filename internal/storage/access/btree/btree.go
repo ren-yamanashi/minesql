@@ -2,7 +2,6 @@ package btree
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	metapage "minesql/internal/storage/access/btree/meta_page"
 	"minesql/internal/storage/access/btree/node"
@@ -19,10 +18,9 @@ type BTree struct {
 }
 
 // 新しい B+Tree を作成
-// メタページとルートノード (リーフノード) を作成する (メタページにはルートノードのページIDを設定する)
-func CreateBTree(bpm *bufferpool.BufferPoolManager) (*BTree, error) {
-	// メタページを作成
-	metaPageId := bpm.DiskManager.AllocatePage()
+// 渡された metaPageId を使ってメタページを初期化し、ルートノード (リーフノード) を作成する
+func CreateBTree(bpm *bufferpool.BufferPoolManager, metaPageId disk.PageId) (*BTree, error) {
+	// メタページを初期化
 	metaBuf, err := bpm.AddPage(metaPageId)
 	if err != nil {
 		return nil, err
@@ -30,7 +28,10 @@ func CreateBTree(bpm *bufferpool.BufferPoolManager) (*BTree, error) {
 	meta := metapage.NewMetaPage(metaBuf.Page[:])
 
 	// ルートノード (リーフノード) を作成
-	rootNodePageId := bpm.DiskManager.AllocatePage()
+	rootNodePageId, err := bpm.AllocatePageId(metaPageId.FileId)
+	if err != nil {
+		return nil, err
+	}
 	rootBuf, err := bpm.AddPage(rootNodePageId)
 	if err != nil {
 		return nil, err
@@ -49,6 +50,7 @@ func NewBTree(metaPageId disk.PageId) *BTree {
 	return &BTree{MetaPageId: metaPageId}
 }
 
+// 指定された検索モードで B+Tree を検索し、イテレータを返す
 func (bt *BTree) Search(bpm *bufferpool.BufferPoolManager, searchMode SearchMode) (*Iterator, error) {
 	rootPage, err := bt.fetchRootPage(bpm)
 	if err != nil {
@@ -57,6 +59,7 @@ func (bt *BTree) Search(bpm *bufferpool.BufferPoolManager, searchMode SearchMode
 	return bt.searchRecursively(bpm, rootPage, searchMode)
 }
 
+// B+Tree にペアを挿入する
 func (bt *BTree) Insert(bpm *bufferpool.BufferPoolManager, pair node.Pair) error {
 	metaBuf, err := bpm.FetchPage(bt.MetaPageId)
 	if err != nil {
@@ -81,7 +84,10 @@ func (bt *BTree) Insert(bpm *bufferpool.BufferPoolManager, pair node.Pair) error
 	}
 
 	// ルートノードが分割された場合、新しいルートノードを作成する
-	newRootPageId := bpm.DiskManager.AllocatePage()
+	newRootPageId, err := bpm.AllocatePageId(bt.MetaPageId.FileId)
+	if err != nil {
+		return err
+	}
 	newRootBuf, err := bpm.AddPage(newRootPageId)
 	if err != nil {
 		return err
@@ -199,7 +205,10 @@ func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 		}
 
 		// 新しいリーフノードを作成
-		newLeafPageId := bpm.DiskManager.AllocatePage()
+		newLeafPageId, err := bpm.AllocatePageId(bt.MetaPageId.FileId)
+		if err != nil {
+			return nil, nil, err
+		}
 		newLeafBuffer, err := bpm.AddPage(newLeafPageId)
 		if err != nil {
 			return nil, nil, err
@@ -249,19 +258,22 @@ func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 		}
 
 		// 子ノードが分割された場合、子ノードから返されたキーとページIDをペアとして、ブランチノードに挿入
-		overFlowPair := node.NewPair(overflowKeyFromChild, pageIdToBytes(*overflowChildPageId))
+		overFlowPair := node.NewPair(overflowKeyFromChild, overflowChildPageId.ToBytes())
 		if branchNode.Insert(childIndex, overFlowPair) {
 			nodeBuffer.IsDirty = true
 			return nil, nil, nil
 		}
 
 		// ブランチノードが満杯で挿入に失敗した場合、分割する
-		nodeBranchBuffer := bpm.DiskManager.AllocatePage()
-		newBranchBuffer, err := bpm.AddPage(nodeBranchBuffer)
+		newBranchPageId, err := bpm.AllocatePageId(bt.MetaPageId.FileId)
 		if err != nil {
 			return nil, nil, err
 		}
-		defer bpm.UnRefPage(nodeBranchBuffer)
+		newBranchBuffer, err := bpm.AddPage(newBranchPageId)
+		if err != nil {
+			return nil, nil, err
+		}
+		defer bpm.UnRefPage(newBranchPageId)
 		newBranchNode := node.NewBranchNode(newBranchBuffer.Page[:])
 		overflowKey := branchNode.SplitInsert(newBranchNode, overFlowPair)
 		nodeBuffer.IsDirty = true
@@ -271,10 +283,4 @@ func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 	}
 
 	panic("unknown node type")
-}
-
-func pageIdToBytes(id disk.PageId) []byte {
-	b := make([]byte, 8)
-	binary.LittleEndian.PutUint64(b, uint64(id))
-	return b
 }

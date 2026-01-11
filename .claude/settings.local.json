@@ -5,7 +5,11 @@
       "Bash(go run:*)",
       "Bash(cat:*)",
       "Bash(make test:*)",
-      "Bash(make fmt:*)"
+      "Bash(make fmt:*)",
+      "mcp__ide__getDiagnostics",
+      "Bash(grep:*)",
+      "Bash(ls:*)",
+      "Bash(go build:*)"
     ]
   }
 }

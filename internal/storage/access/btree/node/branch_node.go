@@ -1,17 +1,11 @@
 package node
 
 import (
-	"encoding/binary"
 	slottedpage "minesql/internal/storage/access/btree/slotted_page"
 	"minesql/internal/storage/disk"
 )
 
 const branchHeaderSize = 8
-
-type Header struct {
-	// 右の子ノードのポインタ (ページ ID)
-	RightChildPageId disk.PageId
-}
 
 type BranchNode struct {
 	// ページデータ全体 (ノードタイプヘッダー + ブランチノードヘッダー + Slotted Page のボディ)
@@ -85,17 +79,15 @@ func (bn *BranchNode) Insert(bufferId int, pair Pair) bool {
 func (bn *BranchNode) Initialize(key []byte, leftChildPageId disk.PageId, rightChildPageId disk.PageId) {
 	bn.body.Initialize()
 
-	// 左の子ページのポインタ (ページ ID) を value とした Pair を作成し
-	leftChildPageIdBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(leftChildPageIdBytes, uint64(leftChildPageId))
-	keyPair := NewPair(key, leftChildPageIdBytes)
+	// 左の子ページのポインタ (ページ ID) を value とした Pair を作成
+	keyPair := NewPair(key, leftChildPageId.ToBytes())
 
 	if !bn.Insert(0, keyPair) {
 		panic("new branch must have space")
 	}
 
 	// ヘッダー部分に右の子ページのポインタ (ページ ID) を設定
-	binary.LittleEndian.PutUint64(bn.Body()[0:8], uint64(rightChildPageId))
+	rightChildPageId.WriteTo(bn.Body(), 0)
 }
 
 // ブランチノードを分割しながらペアを挿入する
@@ -141,10 +133,10 @@ func (bn *BranchNode) SearchChildIdx(key []byte) int {
 func (bn *BranchNode) ChildPageIdAt(childIdx int) disk.PageId {
 	if childIdx == bn.NumPairs() {
 		// 右端の子ページ ID を返す
-		return disk.PageId(binary.LittleEndian.Uint64(bn.Body()[0:8]))
+		return disk.ReadPageIdFrom(bn.Body(), 0)
 	}
 	pair := bn.PairAt(childIdx)
-	return disk.PageId(binary.LittleEndian.Uint64(pair.Value))
+	return disk.PageIdFromBytes(pair.Value)
 }
 
 // キーから子ページのページ ID を検索する
@@ -168,15 +160,15 @@ func (bn *BranchNode) isHalfFull() bool {
 func (bn *BranchNode) fillRightChild() []byte {
 	lastId := bn.NumPairs() - 1
 	pair := bn.PairAt(lastId)
-	rightChild := binary.LittleEndian.Uint64(pair.Value)
+	rightChild := disk.PageIdFromBytes(pair.Value)
 	key := make([]byte, len(pair.Key))
 
 	// キーをコピー
 	copy(key, pair.Key)
 	bn.body.Remove(lastId)
 
-	// ヘッダー部分に右子ページ ID を設定
-	binary.LittleEndian.PutUint64(bn.Body()[0:8], rightChild)
+	// ブランチノードのヘッダー部分に右子ページ ID を設定
+	rightChild.WriteTo(bn.Body(), 0)
 
 	return key
 }

@@ -2,28 +2,25 @@ package main
 
 import (
 	"minesql/internal/executor"
-	"minesql/internal/storage/access/btree"
-	"minesql/internal/storage/access/table"
-	"minesql/internal/storage/bufferpool"
 )
 
 // プライマリキーが "w" 以上 "y" 以下の範囲のレコードを取得する (範囲スキャン)
-func rangeTableScan(bpm *bufferpool.BufferPoolManager, tbl table.Table) {
+func rangeTableScan() {
 	println("=== 範囲スキャン (プライマリキーが 'w' 以上 'y' 以下) ===")
 
 	// プライマリキーが "w" 以上 "y" 以下の間、継続する継続条件
 	whileCondition := func(record executor.Record) bool {
 		return string(record[0]) <= "y"
 	}
-	btr := btree.NewBTree(tbl.MetaPageId)
-	tableIterator, _ := btr.Search(bpm, btree.SearchModeKey{Key: []byte("w")})
+
 	seqScan := executor.NewSequentialScan(
-		tableIterator,
+		"users",
+		executor.RecordSearchModeKey{Key: [][]byte{[]byte("w")}},
 		whileCondition,
 	)
 
 	for {
-		record, err := seqScan.Next(bpm)
+		record, err := seqScan.Next()
 		if err != nil {
 			panic(err)
 		}
@@ -36,29 +33,25 @@ func rangeTableScan(bpm *bufferpool.BufferPoolManager, tbl table.Table) {
 }
 
 // 姓が "J" 以上 "N" 未満の範囲のレコードを取得する (インデックス範囲スキャン)
-func rangeIndexScan(bpm *bufferpool.BufferPoolManager, tbl table.Table) {
+func rangeIndexScan() {
 	println("=== インデックス範囲スキャン (姓が 'J' 以上 'N' 未満) ===")
 
 	// インデックス経由で姓が "J" 以上 "N" 未満の範囲をスキャン
-	// WhileCondition の引数はセカンダリキー (姓) のみ
+	// whileCondition の引数はセカンダリキー (姓) のみ
 	whileCondition := func(secondaryKey executor.Record) bool {
 		lastName := string(secondaryKey[0])
 		return lastName >= "J" && lastName < "N"
 	}
 
-	lastNameIndexTree := btree.NewBTree(tbl.UniqueIndexes[1].MetaPageId)
-	// 姓が "J" から始まる位置からスキャン開始
-	var encodedKey []byte
-	table.Encode([][]byte{[]byte("J")}, &encodedKey)
-	indexIterator, _ := lastNameIndexTree.Search(bpm, btree.SearchModeKey{Key: encodedKey})
 	indexScan := executor.NewIndexScan(
-		tbl.MetaPageId,
-		indexIterator,
+		"users",
+		"last_name",
+		executor.RecordSearchModeKey{Key: [][]byte{[]byte("J")}},
 		whileCondition,
 	)
 
 	for {
-		record, err := indexScan.Next(bpm)
+		record, err := indexScan.Next()
 		if err != nil {
 			panic(err)
 		}

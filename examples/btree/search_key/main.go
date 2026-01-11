@@ -9,17 +9,21 @@ import (
 )
 
 func main() {
-	dbPath := "btree/test.db"
+	dataDir := "examples/btree/data"
+	dbPath := dataDir + "/test.db"
 
-	dm, err := disk.NewDiskManager(dbPath)
+	bpm := bufferpool.NewBufferPoolManager(10, dataDir)
+	fileId := disk.FileId(1)
+
+	// DiskManager を作成して登録
+	dm, err := disk.NewDiskManager(fileId, dbPath)
 	if err != nil {
 		panic(err)
 	}
-
-	bpm := bufferpool.NewBufferPoolManager(dm, 10)
+	bpm.RegisterDiskManager(fileId, dm)
 
 	// 既存の B+Tree を開く (MetaPageId は 0 と仮定)
-	tree := btree.NewBTree(0)
+	tree := btree.NewBTree(disk.NewPageId(fileId, 0))
 
 	// キーで検索
 	searchKeys := []string{"grape", "lemon", "watermelon"}
