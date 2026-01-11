@@ -50,6 +50,7 @@ func NewBTree(metaPageId disk.PageId) *BTree {
 	return &BTree{MetaPageId: metaPageId}
 }
 
+// 指定された検索モードで B+Tree を検索し、イテレータを返す
 func (bt *BTree) Search(bpm *bufferpool.BufferPoolManager, searchMode SearchMode) (*Iterator, error) {
 	rootPage, err := bt.fetchRootPage(bpm)
 	if err != nil {
@@ -58,6 +59,7 @@ func (bt *BTree) Search(bpm *bufferpool.BufferPoolManager, searchMode SearchMode
 	return bt.searchRecursively(bpm, rootPage, searchMode)
 }
 
+// B+Tree にペアを挿入する
 func (bt *BTree) Insert(bpm *bufferpool.BufferPoolManager, pair node.Pair) error {
 	metaBuf, err := bpm.FetchPage(bt.MetaPageId)
 	if err != nil {
