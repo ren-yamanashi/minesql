@@ -6,14 +6,6 @@ import (
 	"os"
 )
 
-// ディスク I/O を抽象化するインターフェース
-type DiskManagerInterface interface {
-	ReadPageData(id PageId, data []byte) error
-	WritePageData(id PageId, data []byte) error
-	AllocatePage() PageId
-	Sync() error
-}
-
 type DiskManager struct {
 	// このディスクマネージャの FileId
 	fileId FileId

@@ -5,7 +5,7 @@ import (
 )
 
 type BufferPage struct {
-	OldPageId disk.OldPageId
+	PageId disk.PageId
 	Page   *disk.Page
 	// 最近アクセスされたかどうか
 	Referenced bool
@@ -13,9 +13,9 @@ type BufferPage struct {
 	IsDirty bool
 }
 
-func NewBufferPage(pageId disk.OldPageId) *BufferPage {
+func NewBufferPage(pageId disk.PageId) *BufferPage {
 	return &BufferPage{
-		OldPageId:     pageId,
+		PageId:     pageId,
 		Page:       &disk.Page{},
 		Referenced: false,
 		IsDirty:    false,
