@@ -44,6 +44,15 @@ func (bpm *BufferPoolManager) AllocateFileId() disk.FileId {
 	return fileId
 }
 
+// 指定された FileId に対して新しい PageId を割り当てる
+func (bpm *BufferPoolManager) AllocatePageId(fileId disk.FileId) (disk.PageId, error) {
+	dm, err := bpm.GetDiskManager(fileId)
+	if err != nil {
+		return disk.INVALID_PAGE_ID, err
+	}
+	return dm.AllocatePage(), nil
+}
+
 // 指定されたページIDのページをバッファプールから取得
 // ページがバッファプールに存在しない場合は、ディスクから読み込む
 func (bpm *BufferPoolManager) FetchPage(pageId disk.PageId) (*BufferPage, error) {
