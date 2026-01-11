@@ -11,6 +11,7 @@ import (
 	"minesql/internal/storage/access/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 )
 
 func main() {
@@ -107,7 +108,7 @@ func displayTreeStructure(bpm *bufferpool.BufferPoolManager, tree *btree.BTree) 
 }
 
 // ノードを再帰的に表示
-func displayNode(bpm *bufferpool.BufferPoolManager, pageId disk.PageId, depth int, label string) {
+func displayNode(bpm *bufferpool.BufferPoolManager, pageId page.PageId, depth int, label string) {
 	indent := strings.Repeat("  ", depth)
 
 	// ノードを取得

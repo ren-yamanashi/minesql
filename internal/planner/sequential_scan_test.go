@@ -55,7 +55,11 @@ func InitStorageEngineForPlannerTest(t *testing.T, dataDir string) *storage.Stor
 
 	// テーブルを作成
 	uniqueIndexes := table.NewUniqueIndex("last_name", 2)
-	tbl, err := engine.CreateTable("users", 1, []*table.UniqueIndex{uniqueIndexes})
+	createTable := executor.NewCreateTable()
+	err := createTable.Execute("users", 1, []*table.UniqueIndex{uniqueIndexes})
+	assert.NoError(t, err)
+
+	tbl, err := engine.GetTable("users")
 	assert.NoError(t, err)
 
 	bpm := engine.GetBufferPoolManager()

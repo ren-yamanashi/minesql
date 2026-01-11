@@ -79,7 +79,6 @@ func (t *Table) Insert(bpm *bufferpool.BufferPoolManager, record [][]byte) error
 	return nil
 }
 
-
 func (t *Table) GetUniqueIndexByName(indexName string) (*UniqueIndex, error) {
 	for _, ui := range t.UniqueIndexes {
 		if ui.Name == indexName {

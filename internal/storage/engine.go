@@ -6,6 +6,7 @@ import (
 	"minesql/internal/storage/access/table"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 	"os"
 	"path/filepath"
 	"sync"
@@ -59,51 +60,17 @@ func (se *StorageEngine) GetTable(tableName string) (*table.Table, error) {
 	return tbl, nil
 }
 
-func (se *StorageEngine) CreateTable(name string, primaryKeyCount int, uniqueIndexes []*table.UniqueIndex) (*table.Table, error) {
-	// FileId を割り当て
-	fileId := se.bufferPoolManager.AllocateFileId()
-
-	// ディスクファイルを作成
-	filePath := filepath.Join(se.baseDirectory, fmt.Sprintf("%s.db", name))
-	dm, err := disk.NewDiskManager(fileId, filePath)
+// BufferPoolManager に DiskManager を登録する
+func (se *StorageEngine) RegisterDmToBpm(fileId page.FileId, tableName string) error {
+	path := filepath.Join(se.baseDirectory, fmt.Sprintf("%s.db", tableName))
+	dm, err := disk.NewDiskManager(fileId, path)
 	if err != nil {
-		return nil, err
+		return err
 	}
-
-	// DiskManager を登録
 	se.bufferPoolManager.RegisterDiskManager(fileId, dm)
-
-	// テーブルの metaPageId を割り当て
-	metaPageId, err := se.bufferPoolManager.AllocatePageId(fileId)
-	if err != nil {
-		return nil, err
-	}
-
-	// 各 UniqueIndex の metaPageId を割り当て
-	for _, ui := range uniqueIndexes {
-		indexMetaPageId, err := se.bufferPoolManager.AllocatePageId(fileId)
-		if err != nil {
-			return nil, err
-		}
-		ui.MetaPageId = indexMetaPageId
-	}
-
-	// テーブルを作成
-	tbl := table.NewTable(name, metaPageId, primaryKeyCount, uniqueIndexes)
-	err = tbl.Create(se.bufferPoolManager)
-	if err != nil {
-		return nil, err
-	}
-
-	// テーブルマップに登録
-	if _, ok := se.tables[name]; ok {
-		return nil, fmt.Errorf("table %s already exists", name)
-	}
-	se.tables[name] = &tbl
-
-	return &tbl, nil
+	return nil
 }
 
-func (se *StorageEngine) FlushAll() error {
-	return se.bufferPoolManager.FlushPage()
+func (se *StorageEngine) RegisterTable(tbl *table.Table) {
+	se.tables[tbl.Name] = tbl
 }

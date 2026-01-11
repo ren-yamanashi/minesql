@@ -1,8 +1,6 @@
 package storage
 
 import (
-	"minesql/internal/storage/access/table"
-	"minesql/internal/storage/page"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -85,91 +83,6 @@ func TestResetGlobalEngine(t *testing.T) {
 
 		// THEN
 		assert.NotSame(t, engine1, engine2)
-	})
-}
-
-func TestCreateTable(t *testing.T) {
-	t.Run("テーブルを作成できる", func(t *testing.T) {
-		// GIVEN
-		tmpdir := t.TempDir()
-		t.Setenv("MINESQL_DATA_DIR", tmpdir)
-		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		ResetStorageEngine()
-		InitStorageEngine()
-		engine := GetStorageEngine()
-
-		// WHEN
-		tbl, err := engine.CreateTable("users", 1, []*table.UniqueIndex{})
-
-		// THEN
-		assert.NoError(t, err)
-		assert.NotNil(t, tbl)
-		assert.Equal(t, "users", tbl.Name)
-		assert.Equal(t, 1, tbl.PrimaryKeyCount)
-	})
-
-	t.Run("ユニークインデックス付きのテーブルを作成できる", func(t *testing.T) {
-		// GIVEN
-		tmpdir := t.TempDir()
-		t.Setenv("MINESQL_DATA_DIR", tmpdir)
-		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		ResetStorageEngine()
-		InitStorageEngine()
-		engine := GetStorageEngine()
-		uniqueIndex := table.NewUniqueIndex("email", 1)
-
-		// WHEN
-		tbl, err := engine.CreateTable("users", 1, []*table.UniqueIndex{uniqueIndex})
-
-		// THEN
-		assert.NoError(t, err)
-		assert.NotNil(t, tbl)
-		assert.Equal(t, 1, len(tbl.UniqueIndexes))
-		assert.Equal(t, "email", tbl.UniqueIndexes[0].Name)
-	})
-
-	t.Run("テーブルファイルが作成される", func(t *testing.T) {
-		// GIVEN
-		tmpdir := t.TempDir()
-		t.Setenv("MINESQL_DATA_DIR", tmpdir)
-		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		ResetStorageEngine()
-		InitStorageEngine()
-		engine := GetStorageEngine()
-
-		// WHEN
-		tbl, err := engine.CreateTable("users", 1, []*table.UniqueIndex{})
-
-		// THEN
-		assert.NoError(t, err)
-		// FileId が採番されていることを確認
-		assert.NotEqual(t, page.FileId(0), tbl.MetaPageId.FileId)
-		// ディスクマネージャが登録されていることを確認
-		bpm := engine.GetBufferPoolManager()
-		dm, dmErr := bpm.GetDiskManager(tbl.MetaPageId.FileId)
-		assert.NoError(t, dmErr)
-		assert.NotNil(t, dm)
-	})
-}
-
-func TestFlushAll(t *testing.T) {
-	t.Run("バッファプールの内容をディスクにフラッシュできる", func(t *testing.T) {
-		// GIVEN
-		tmpdir := t.TempDir()
-		t.Setenv("MINESQL_DATA_DIR", tmpdir)
-		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		ResetStorageEngine()
-		InitStorageEngine()
-		engine := GetStorageEngine()
-		tbl, _ := engine.CreateTable("users", 1, []*table.UniqueIndex{})
-		bpm := engine.GetBufferPoolManager()
-		tbl.Insert(bpm, [][]byte{[]byte("user1"), []byte("data1")})
-
-		// WHEN
-		err := engine.FlushAll()
-
-		// THEN
-		assert.NoError(t, err)
 	})
 }
 

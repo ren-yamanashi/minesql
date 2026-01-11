@@ -35,7 +35,7 @@ func NewDiskManager(fileId page.FileId, path string) (*DiskManager, error) {
 	return &DiskManager{
 		fileId:     fileId,
 		heapFile:   file,
-		nextPageId: page.NewPageId(fileId, page.PageNumber(fileInfo.Size() / page.PAGE_SIZE)),
+		nextPageId: page.NewPageId(fileId, page.PageNumber(fileInfo.Size()/page.PAGE_SIZE)),
 	}, nil
 }
 
@@ -103,7 +103,7 @@ func (disk *DiskManager) Sync() error {
 
 // 指定されたページ番号に対応するページの先頭にシークする
 func (disk *DiskManager) seek(pageNumber page.PageNumber) error {
-	offset := page.PAGE_SIZE * uint64(pageNumber)                 // 開始位置を計算
+	offset := page.PAGE_SIZE * uint64(pageNumber)             // 開始位置を計算
 	_, err := disk.heapFile.Seek(int64(offset), io.SeekStart) // ファイルの先頭から offset バイト移動
 	if err != nil {
 		return err

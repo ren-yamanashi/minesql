@@ -109,12 +109,17 @@ func InitStorageEngineForTest(t *testing.T, dataDir string) *storage.StorageEngi
 	t.Setenv("MINESQL_DATA_DIR", dataDir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "10")
 
+	storage.ResetStorageEngine()
 	storage.InitStorageEngine()
 	engine := storage.GetStorageEngine()
 
 	// テーブルを作成
 	uniqueIndexes := table.NewUniqueIndex("last_name", 2)
-	tbl, err := engine.CreateTable("users", 1, []*table.UniqueIndex{uniqueIndexes})
+	createTable := NewCreateTable()
+	err := createTable.Execute("users", 1, []*table.UniqueIndex{uniqueIndexes})
+	assert.NoError(t, err)
+
+	tbl, err := engine.GetTable("users")
 	assert.NoError(t, err)
 
 	bpm := engine.GetBufferPoolManager()

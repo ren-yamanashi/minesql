@@ -1,6 +1,7 @@
 package main
 
 import (
+	"minesql/internal/executor"
 	"minesql/internal/storage"
 	"minesql/internal/storage/access/table"
 )
@@ -10,7 +11,8 @@ func createTable() {
 	engine := storage.GetStorageEngine()
 
 	// テーブルを作成
-	tbl, err := engine.CreateTable(
+	createTable := executor.NewCreateTable()
+	err := createTable.Execute(
 		"users",
 		1,
 		[]*table.UniqueIndex{
@@ -18,6 +20,11 @@ func createTable() {
 			table.NewUniqueIndex("last_name", 2),  // 姓のインデックス
 		},
 	)
+	if err != nil {
+		panic(err)
+	}
+
+	tbl, err := engine.GetTable("users")
 	if err != nil {
 		panic(err)
 	}
@@ -46,9 +53,5 @@ func createTable() {
 		panic(err)
 	}
 
-	// バッファプールの内容をディスクにフラッシュ
-	err = engine.FlushAll()
-	if err != nil {
-		panic(err)
-	}
+	bpm.FlushPage()
 }
