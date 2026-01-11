@@ -8,8 +8,10 @@ import (
 )
 
 type Table struct {
+	// テーブル名
+	Name string
 	// テーブルの内容が入っている B+Tree のメタページの ID
-	MetaPageId disk.OldPageId
+	MetaPageId disk.PageId
 	// プライマリキーの列数 (プライマリキーは先頭から連続している想定)
 	// 例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる
 	PrimaryKeyCount int
@@ -17,8 +19,9 @@ type Table struct {
 	UniqueIndexes []*UniqueIndex
 }
 
-func NewTable(metaPageId disk.OldPageId, primaryKeyCount int, uniqueIndexes []*UniqueIndex) Table {
+func NewTable(name string, metaPageId disk.PageId, primaryKeyCount int, uniqueIndexes []*UniqueIndex) Table {
 	return Table{
+		Name:            name,
 		MetaPageId:      metaPageId,
 		PrimaryKeyCount: primaryKeyCount,
 		UniqueIndexes:   uniqueIndexes,
@@ -26,9 +29,10 @@ func NewTable(metaPageId disk.OldPageId, primaryKeyCount int, uniqueIndexes []*U
 }
 
 // 空のテーブルを新規作成する
+// 事前に MetaPageId が設定されている必要がある
 func (t *Table) Create(bpm *bufferpool.BufferPoolManager) error {
 	// テーブルの B+Tree を作成
-	tree, err := btree.CreateBTree(bpm)
+	tree, err := btree.CreateBTree(bpm, t.MetaPageId)
 	if err != nil {
 		return err
 	}
@@ -36,7 +40,7 @@ func (t *Table) Create(bpm *bufferpool.BufferPoolManager) error {
 
 	// ユニークインデックスを作成
 	for _, ui := range t.UniqueIndexes {
-		err := ui.Create(bpm)
+		err = ui.Create(bpm, ui.MetaPageId)
 		if err != nil {
 			return err
 		}

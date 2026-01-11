@@ -18,13 +18,9 @@ type BTree struct {
 }
 
 // 新しい B+Tree を作成
-// メタページとルートノード (リーフノード) を作成する (メタページにはルートノードのページIDを設定する)
-func CreateBTree(bpm *bufferpool.BufferPoolManager, fileId disk.FileId) (*BTree, error) {
-	// メタページを作成
-	metaPageId, err := bpm.AllocatePageId(fileId)
-	if err != nil {
-		return nil, err
-	}
+// 渡された metaPageId を使ってメタページを初期化し、ルートノード (リーフノード) を作成する
+func CreateBTree(bpm *bufferpool.BufferPoolManager, metaPageId disk.PageId) (*BTree, error) {
+	// メタページを初期化
 	metaBuf, err := bpm.AddPage(metaPageId)
 	if err != nil {
 		return nil, err
@@ -32,7 +28,7 @@ func CreateBTree(bpm *bufferpool.BufferPoolManager, fileId disk.FileId) (*BTree,
 	meta := metapage.NewMetaPage(metaBuf.Page[:])
 
 	// ルートノード (リーフノード) を作成
-	rootNodePageId, err := bpm.AllocatePageId(fileId)
+	rootNodePageId, err := bpm.AllocatePageId(metaPageId.FileId)
 	if err != nil {
 		return nil, err
 	}
