@@ -4,28 +4,49 @@ import (
 	"minesql/internal/storage/access/btree"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
+func InitDiskManager(t *testing.T) (bufferpoolManager *bufferpool.BufferPoolManager, metaPageId disk.PageId) {
+	tmpdir := t.TempDir()
+	bpm := bufferpool.NewBufferPoolManager(10, tmpdir)
+
+	fileId := bpm.AllocateFileId()
+	filePath := filepath.Join(tmpdir, "users.db")
+	dm, err := disk.NewDiskManager(fileId, filePath)
+	assert.NoError(t, err)
+	bpm.RegisterDiskManager(fileId, dm)
+
+	// metaPageId を割り当て
+	metaPageId, err = bpm.AllocatePageId(fileId)
+	assert.NoError(t, err)
+
+	return bpm, metaPageId
+}
+
 // Create と Insert をテスト
 func TestTable(t *testing.T) {
 	t.Run("テーブルの作成ができ、そのテーブルに値が挿入できる", func(t *testing.T) {
-		tmpdir := t.TempDir()
-		path := filepath.Join(tmpdir, "test.db")
+		// // GIVEN
+		uniqueIndex := NewUniqueIndex("last_name", 2)
+		bpm, metaPageId := InitDiskManager(t)
 
-		dm, _ := disk.NewDiskManager(path)
-		bpm := bufferpool.NewBufferPoolManager(dm, 10)
-		uniqueIndexes := NewUniqueIndex(disk.OLD_INVALID_PAGE_ID, 2)
-		table := NewTable(disk.OldPageId(0), 1, []*UniqueIndex{uniqueIndexes})
+		// UniqueIndex の metaPageId を割り当て
+		indexMetaPageId, err := bpm.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex.MetaPageId = indexMetaPageId
 
-		// WHEN: テーブルを作成
-		err := table.Create(bpm)
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex})
+
+		// WHEN
+		err = table.Create(bpm)
 		assert.NoError(t, err)
 
-		// WHEN: 行を挿入
+		// WHEN
 		err = table.Insert(bpm, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		err = table.Insert(bpm, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		err = table.Insert(bpm, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
@@ -114,5 +135,49 @@ func TestTable(t *testing.T) {
 			uniqueIndexIter.Next(bpm)
 		}
 		assert.Equal(t, len(expectedUniqueIndexRecords), j)
+	})
+
+	t.Run("テーブルとそのインデックスが同じディスクファイル (同じ FileId) に保存される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		bpm := bufferpool.NewBufferPoolManager(10, tmpdir)
+
+		// 2つのインデックスを持つテーブルを作成
+		uniqueIndex1 := NewUniqueIndex("first_name", 1)
+		uniqueIndex2 := NewUniqueIndex("last_name", 2)
+		bpm, metaPageId := InitDiskManager(t)
+
+		// UniqueIndex の metaPageId を割り当て
+		indexMetaPageId1, err := bpm.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex1.MetaPageId = indexMetaPageId1
+		indexMetaPageId2, err := bpm.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex2.MetaPageId = indexMetaPageId2
+
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex1, uniqueIndex2})
+
+		// WHEN
+		err = table.Create(bpm)
+
+		// THEN: テーブルとすべてのインデックスが同じ FileId を持つ
+		assert.Equal(t, table.MetaPageId.FileId, uniqueIndex1.MetaPageId.FileId, "first_name インデックスはテーブルと同じ FileId を持つべき")
+		assert.Equal(t, table.MetaPageId.FileId, uniqueIndex2.MetaPageId.FileId, "last_name インデックスはテーブルと同じ FileId を持つべき")
+
+		// THEN: MetaPageId は異なる (各 B+Tree は別々のメタページを持つ)
+		assert.NotEqual(t, table.MetaPageId, uniqueIndex1.MetaPageId, "テーブルとインデックスは異なる MetaPageId を持つべき")
+		assert.NotEqual(t, table.MetaPageId, uniqueIndex2.MetaPageId, "テーブルとインデックスは異なる MetaPageId を持つべき")
+		assert.NotEqual(t, uniqueIndex1.MetaPageId, uniqueIndex2.MetaPageId, "各インデックスは異なる MetaPageId を持つべき")
+
+		// THEN: ディスクに作成されたファイルが1つだけである
+		files, err := os.ReadDir(tmpdir)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(files), "ディスクファイルは1つだけ作成されるべき")
+		assert.Equal(t, "users.db", files[0].Name(), "ファイル名はテーブル名.db であるべき")
+
+		// THEN: ファイルパスが正しい
+		expectedFilePath := filepath.Join(tmpdir, "users.db")
+		_, err = os.Stat(expectedFilePath)
+		assert.NoError(t, err, "users.db ファイルが存在するべき")
 	})
 }
