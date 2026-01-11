@@ -6,7 +6,7 @@ import (
 	metapage "minesql/internal/storage/access/btree/meta_page"
 	"minesql/internal/storage/access/btree/node"
 	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 )
 
 var (
@@ -14,12 +14,12 @@ var (
 )
 
 type BTree struct {
-	MetaPageId disk.PageId
+	MetaPageId page.PageId
 }
 
 // 新しい B+Tree を作成
 // 渡された metaPageId を使ってメタページを初期化し、ルートノード (リーフノード) を作成する
-func CreateBTree(bpm *bufferpool.BufferPoolManager, metaPageId disk.PageId) (*BTree, error) {
+func CreateBTree(bpm *bufferpool.BufferPoolManager, metaPageId page.PageId) (*BTree, error) {
 	// メタページを初期化
 	metaBuf, err := bpm.AddPage(metaPageId)
 	if err != nil {
@@ -46,7 +46,7 @@ func CreateBTree(bpm *bufferpool.BufferPoolManager, metaPageId disk.PageId) (*BT
 }
 
 // 既存の B+Tree を開く
-func NewBTree(metaPageId disk.PageId) *BTree {
+func NewBTree(metaPageId page.PageId) *BTree {
 	return &BTree{MetaPageId: metaPageId}
 }
 
@@ -129,7 +129,7 @@ func (bt *BTree) searchRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 		branchNode := node.NewBranchNode(nodeBuffer.Page[:])
 
 		// 子ノードのページを取得
-		childPageId := (func() disk.PageId {
+		childPageId := (func() page.PageId {
 			switch sm := searchMode.(type) {
 			case SearchModeStart:
 				return sm.childPageId(branchNode)
@@ -174,7 +174,7 @@ func (bt *BTree) searchRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 }
 
 // 戻り値: (オーバーフローキー, 新しいページ ID, エラー)
-func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer *bufferpool.BufferPage, pair node.Pair) ([]byte, *disk.PageId, error) {
+func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer *bufferpool.BufferPage, pair node.Pair) ([]byte, *page.PageId, error) {
 	nodeType := node.GetNodeType(nodeBuffer.Page[:])
 
 	if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {

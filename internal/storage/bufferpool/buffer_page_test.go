@@ -1,7 +1,7 @@
 package bufferpool
 
 import (
-	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,7 +10,7 @@ import (
 func TestNewBufferPage(t *testing.T) {
 	t.Run("正常にバッファページが生成される", func(t *testing.T) {
 		// GIVEN
-		pageId := disk.NewPageId(disk.FileId(0), disk.PageNumber(0))
+		pageId := page.NewPageId(page.FileId(0), page.PageNumber(0))
 
 		// WHEN
 		bufferPage := NewBufferPage(pageId)

@@ -1,6 +1,7 @@
 package disk
 
 import (
+	"minesql/internal/storage/page"
 	"os"
 	"path/filepath"
 	"testing"
@@ -17,20 +18,20 @@ func TestNewDiskManager(t *testing.T) {
 
 		// GIVEN
 		filepath := tmpFile.Name()
-		fileId := FileId(0)
+		fileId := page.FileId(0)
 
 		// WHEN
 		disk, err := NewDiskManager(fileId, filepath)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, NewPageId(fileId, PageNumber(0)), disk.nextPageId)
+		assert.Equal(t, page.NewPageId(fileId, page.PageNumber(0)), disk.nextPageId)
 	})
 
 	t.Run("無効なファイルが指定された場合はエラー", func(t *testing.T) {
 		// GIVEN
 		invalidPath := "/nonexistent/directory/file.db"
-		fileId := FileId(0)
+		fileId := page.FileId(0)
 
 		// WHEN
 		_, err := NewDiskManager(fileId, invalidPath)
@@ -48,7 +49,7 @@ func TestReadPageData(t *testing.T) {
 		disk.WritePageData(pageId, writeData)
 
 		// WHEN
-		readData := make([]byte, PAGE_SIZE)
+		readData := make([]byte, page.PAGE_SIZE)
 		err := disk.ReadPageData(pageId, readData)
 
 		// THEN
@@ -59,7 +60,7 @@ func TestReadPageData(t *testing.T) {
 	t.Run("書き込むデータのサイズが PAGE_SIZE と異なる場合はエラー", func(t *testing.T) {
 		// GIVEN
 		disk, pageId := initDiskManager(t)
-		invalidData := make([]byte, PAGE_SIZE-1)
+		invalidData := make([]byte, page.PAGE_SIZE-1)
 
 		// WHEN
 		err := disk.ReadPageData(pageId, invalidData)
@@ -80,13 +81,13 @@ func TestWritePageData(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, NewPageId(FileId(0), PageNumber(1)), disk.nextPageId)
+		assert.Equal(t, page.NewPageId(page.FileId(0), page.PageNumber(1)), disk.nextPageId)
 	})
 
 	t.Run("書き込むデータのサイズが PAGE_SIZE と異なる場合はエラー", func(t *testing.T) {
 		// GIVEN
 		disk, pageId := initDiskManager(t)
-		invalidData := make([]byte, PAGE_SIZE+10)
+		invalidData := make([]byte, page.PAGE_SIZE+10)
 
 		// WHEN
 		err := disk.WritePageData(pageId, invalidData)
@@ -105,7 +106,7 @@ func TestAllocatePage(t *testing.T) {
 
 		// GIVEN
 		filepath := tmpFile.Name()
-		fileId := FileId(0)
+		fileId := page.FileId(0)
 
 		dm, err := NewDiskManager(fileId, filepath)
 		assert.NoError(t, err)
@@ -116,17 +117,17 @@ func TestAllocatePage(t *testing.T) {
 		pageId3 := dm.AllocatePage()
 
 		// THEN
-		assert.Equal(t, NewPageId(fileId, PageNumber(0)), pageId1)
-		assert.Equal(t, NewPageId(fileId, PageNumber(1)), pageId2)
-		assert.Equal(t, NewPageId(fileId, PageNumber(2)), pageId3)
-		assert.Equal(t, NewPageId(fileId, PageNumber(3)), dm.nextPageId)
+		assert.Equal(t, page.NewPageId(fileId, page.PageNumber(0)), pageId1)
+		assert.Equal(t, page.NewPageId(fileId, page.PageNumber(1)), pageId2)
+		assert.Equal(t, page.NewPageId(fileId, page.PageNumber(2)), pageId3)
+		assert.Equal(t, page.NewPageId(fileId, page.PageNumber(3)), dm.nextPageId)
 	})
 }
 
-func initDiskManager(t *testing.T) (*DiskManager, PageId) {
+func initDiskManager(t *testing.T) (*DiskManager, page.PageId) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "sample.db")
-	dm, err := NewDiskManager(FileId(0), dbPath)
+	dm, err := NewDiskManager(page.FileId(0), dbPath)
 	if err != nil {
 		t.Fatalf("Failed to open DiskManager: %v", err)
 	}
@@ -135,8 +136,8 @@ func initDiskManager(t *testing.T) (*DiskManager, PageId) {
 }
 
 func createDataBuffer() []byte {
-	writeData := make([]byte, PAGE_SIZE)
-	for i := range PAGE_SIZE {
+	writeData := make([]byte, page.PAGE_SIZE)
+	for i := range page.PAGE_SIZE {
 		writeData[i] = byte(i % 256)
 	}
 	return writeData

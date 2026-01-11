@@ -16,8 +16,6 @@
 
 ## BufferPoolManager
 
-BufferPoolManager は低レベルのページキャッシュと I/O 調整を担当する
-
 - FileId を用いて複数の DiskManager を管理し、各テーブルのディスクファイルへのアクセスを調整する
 - 新しいテーブルやインデックス用に一意な FileId を採番する
 - 指定された FileId に対して新しい PageId を割り当てる

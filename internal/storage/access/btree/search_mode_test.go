@@ -2,7 +2,7 @@ package btree
 
 import (
 	"minesql/internal/storage/access/btree/node"
-	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,18 +14,18 @@ func TestChildPageId_Start(t *testing.T) {
 		searchMode := SearchModeStart{}
 		branchNode := createBranchNode(
 			[]node.Pair{
-				createPair([]byte("key1"), disk.NewPageId(disk.FileId(0), disk.PageNumber(100))),
-				createPair([]byte("key2"), disk.NewPageId(disk.FileId(0), disk.PageNumber(200))),
-				createPair([]byte("key3"), disk.NewPageId(disk.FileId(0), disk.PageNumber(300))),
+				createPair([]byte("key1"), page.NewPageId(page.FileId(0), page.PageNumber(100))),
+				createPair([]byte("key2"), page.NewPageId(page.FileId(0), page.PageNumber(200))),
+				createPair([]byte("key3"), page.NewPageId(page.FileId(0), page.PageNumber(300))),
 			},
-			disk.NewPageId(disk.FileId(0), disk.PageNumber(400)),
+			page.NewPageId(page.FileId(0), page.PageNumber(400)),
 		)
 
 		// WHEN
 		pageId := searchMode.childPageId(branchNode)
 
 		// THEN
-		assert.Equal(t, disk.NewPageId(disk.FileId(0), disk.PageNumber(100)), pageId)
+		assert.Equal(t, page.NewPageId(page.FileId(0), page.PageNumber(100)), pageId)
 	})
 }
 
@@ -35,29 +35,29 @@ func TestChildPageId_Key(t *testing.T) {
 		searchMode := SearchModeKey{Key: []byte("key1.5")}
 		branchNode := createBranchNode(
 			[]node.Pair{
-				createPair([]byte("key1"), disk.NewPageId(disk.FileId(0), disk.PageNumber(100))),
-				createPair([]byte("key2"), disk.NewPageId(disk.FileId(0), disk.PageNumber(200))),
-				createPair([]byte("key3"), disk.NewPageId(disk.FileId(0), disk.PageNumber(300))),
+				createPair([]byte("key1"), page.NewPageId(page.FileId(0), page.PageNumber(100))),
+				createPair([]byte("key2"), page.NewPageId(page.FileId(0), page.PageNumber(200))),
+				createPair([]byte("key3"), page.NewPageId(page.FileId(0), page.PageNumber(300))),
 			},
-			disk.NewPageId(disk.FileId(0), disk.PageNumber(400)),
+			page.NewPageId(page.FileId(0), page.PageNumber(400)),
 		)
 
 		// WHEN
 		pageId := searchMode.childPageId(branchNode)
 
 		// THEN
-		assert.Equal(t, disk.NewPageId(disk.FileId(0), disk.PageNumber(200)), pageId)
+		assert.Equal(t, page.NewPageId(page.FileId(0), page.PageNumber(200)), pageId)
 	})
 
 	t.Run("検索キーが最小キーより小さい場合、先頭の子ページIDが取得できる", func(t *testing.T) {
 		// GIVEN
 		branchNode := createBranchNode(
 			[]node.Pair{
-				createPair([]byte("key1"), disk.NewPageId(disk.FileId(0), disk.PageNumber(100))),
-				createPair([]byte("key2"), disk.NewPageId(disk.FileId(0), disk.PageNumber(200))),
-				createPair([]byte("key3"), disk.NewPageId(disk.FileId(0), disk.PageNumber(300))),
+				createPair([]byte("key1"), page.NewPageId(page.FileId(0), page.PageNumber(100))),
+				createPair([]byte("key2"), page.NewPageId(page.FileId(0), page.PageNumber(200))),
+				createPair([]byte("key3"), page.NewPageId(page.FileId(0), page.PageNumber(300))),
 			},
-			disk.NewPageId(disk.FileId(0), disk.PageNumber(400)),
+			page.NewPageId(page.FileId(0), page.PageNumber(400)),
 		)
 
 		// key0 を検索する場合、key0 < key1 なので、先頭の子ページ (100) が取得される
@@ -67,18 +67,18 @@ func TestChildPageId_Key(t *testing.T) {
 		pageId := searchMode.childPageId(branchNode)
 
 		// THEN
-		assert.Equal(t, disk.NewPageId(disk.FileId(0), disk.PageNumber(100)), pageId)
+		assert.Equal(t, page.NewPageId(page.FileId(0), page.PageNumber(100)), pageId)
 	})
 
 	t.Run("検索キーが最大キーより大きい場合、右端の子ページIDが取得できる", func(t *testing.T) {
 		// GIVEN
 		branchNode := createBranchNode(
 			[]node.Pair{
-				createPair([]byte("key1"), disk.NewPageId(disk.FileId(0), disk.PageNumber(100))),
-				createPair([]byte("key2"), disk.NewPageId(disk.FileId(0), disk.PageNumber(200))),
-				createPair([]byte("key3"), disk.NewPageId(disk.FileId(0), disk.PageNumber(300))),
+				createPair([]byte("key1"), page.NewPageId(page.FileId(0), page.PageNumber(100))),
+				createPair([]byte("key2"), page.NewPageId(page.FileId(0), page.PageNumber(200))),
+				createPair([]byte("key3"), page.NewPageId(page.FileId(0), page.PageNumber(300))),
 			},
-			disk.NewPageId(disk.FileId(0), disk.PageNumber(400)),
+			page.NewPageId(page.FileId(0), page.PageNumber(400)),
 		)
 
 		// key9 を検索する場合、key3 < key9 なので、右端の子ページ (400) が取得される
@@ -88,7 +88,7 @@ func TestChildPageId_Key(t *testing.T) {
 		pageId := searchMode.childPageId(branchNode)
 
 		// THEN
-		assert.Equal(t, disk.NewPageId(disk.FileId(0), disk.PageNumber(400)), pageId)
+		assert.Equal(t, page.NewPageId(page.FileId(0), page.PageNumber(400)), pageId)
 	})
 
 	t.Run("検索キーが存在する場合、そのキーの右側の子ページIDが取得できる", func(t *testing.T) {
@@ -96,31 +96,31 @@ func TestChildPageId_Key(t *testing.T) {
 		searchMode := SearchModeKey{Key: []byte("key2")}
 		branchNode := createBranchNode(
 			[]node.Pair{
-				createPair([]byte("key1"), disk.NewPageId(disk.FileId(0), disk.PageNumber(100))),
-				createPair([]byte("key2"), disk.NewPageId(disk.FileId(0), disk.PageNumber(200))),
-				createPair([]byte("key3"), disk.NewPageId(disk.FileId(0), disk.PageNumber(300))),
+				createPair([]byte("key1"), page.NewPageId(page.FileId(0), page.PageNumber(100))),
+				createPair([]byte("key2"), page.NewPageId(page.FileId(0), page.PageNumber(200))),
+				createPair([]byte("key3"), page.NewPageId(page.FileId(0), page.PageNumber(300))),
 			},
-			disk.NewPageId(disk.FileId(0), disk.PageNumber(400)),
+			page.NewPageId(page.FileId(0), page.PageNumber(400)),
 		)
 
 		// WHEN
 		pageId := searchMode.childPageId(branchNode)
 
 		// THEN
-		assert.Equal(t, disk.NewPageId(disk.FileId(0), disk.PageNumber(300)), pageId)
+		assert.Equal(t, page.NewPageId(page.FileId(0), page.PageNumber(300)), pageId)
 	})
 }
 
-func createBranchNode(pairs []node.Pair, rightChildPageId disk.PageId) *node.BranchNode {
-	page := &disk.Page{}
-	branchNode := node.NewBranchNode(page[:])
+func createBranchNode(pairs []node.Pair, rightChildPageId page.PageId) *node.BranchNode {
+	p := &page.Page{}
+	branchNode := node.NewBranchNode(p[:])
 
 	if len(pairs) == 0 {
 		panic("pairs must not be empty")
 	}
 
 	// 最初のペアを使って初期化
-	branchNode.Initialize(pairs[0].Key, disk.PageIdFromBytes(pairs[0].Value), rightChildPageId)
+	branchNode.Initialize(pairs[0].Key, page.PageIdFromBytes(pairs[0].Value), rightChildPageId)
 
 	// 残りのペアを挿入
 	for i := 1; i < len(pairs); i++ {
@@ -132,6 +132,6 @@ func createBranchNode(pairs []node.Pair, rightChildPageId disk.PageId) *node.Bra
 	return branchNode
 }
 
-func createPair(key []byte, pageId disk.PageId) node.Pair {
+func createPair(key []byte, pageId page.PageId) node.Pair {
 	return node.NewPair(key, pageId.ToBytes())
 }

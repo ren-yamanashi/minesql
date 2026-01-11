@@ -2,15 +2,16 @@ package executor
 
 import (
 	"minesql/internal/storage"
+	"minesql/internal/storage/access/btree"
 	"minesql/internal/storage/access/table"
 )
 
 type SequentialScan struct {
-	tableName      string
-	searchMode     RecordSearchMode
 	// 継続条件を満たすかどうかを判定する関数
 	whileCondition func(record Record) bool
-	tableHandler    *storage.TableHandler
+	iterator       *btree.Iterator
+	tableName      string
+	searchMode     RecordSearchMode
 }
 
 func NewSequentialScan(
@@ -29,26 +30,27 @@ func NewSequentialScan(
 // データがない場合、継続条件を満たさない場合は (nil, nil) を返す
 func (ss *SequentialScan) Next() (Record, error) {
 	engine := storage.GetStorageEngine()
+	bpm := engine.GetBufferPoolManager()
 
 	// 初回実行時に table handler を作成
-	if ss.tableHandler == nil {
-		// TableHandle を取得
-		handler, err := engine.GetTableHandler(ss.tableName)
+	if ss.iterator == nil {
+		tbl, err := engine.GetTable(ss.tableName)
 		if err != nil {
 			return nil, err
 		}
 
-		// スキャン用の TableHandle を作成 (RecordSearchMode を btree.SearchMode にエンコード)
-		err = handler.SetTableIterator(ss.searchMode.Encode())
+		// テーブルスキャン用のイテレータを作成
+		btr := btree.NewBTree(tbl.MetaPageId)
+		iterator, err := btr.Search(bpm, ss.searchMode.Encode())
 		if err != nil {
 			return nil, err
 		}
 
-		ss.tableHandler = handler
+		ss.iterator = iterator
 	}
 
 	// レコード取得
-	pair, ok, err := ss.tableHandler.Next()
+	pair, ok, err := ss.iterator.Next(bpm)
 	if !ok {
 		return nil, nil
 	}

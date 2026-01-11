@@ -2,7 +2,7 @@ package node
 
 import (
 	slottedpage "minesql/internal/storage/access/btree/slotted_page"
-	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 )
 
 const leafHeaderSize = 16
@@ -76,8 +76,8 @@ func (ln *LeafNode) Insert(bufferId int, pair Pair) bool {
 // リーフノードを初期化する
 // 初期化時には、前後のリーフノードのポインタ (ページ ID) には無効値が設定される
 func (ln *LeafNode) Initialize() {
-	disk.INVALID_PAGE_ID.WriteTo(ln.Body(), 0)  // 前ページ ID
-	disk.INVALID_PAGE_ID.WriteTo(ln.Body(), 8) // 次ページ ID
+	page.INVALID_PAGE_ID.WriteTo(ln.Body(), 0)  // 前ページ ID
+	page.INVALID_PAGE_ID.WriteTo(ln.Body(), 8) // 次ページ ID
 	ln.body.Initialize()
 }
 
@@ -111,36 +111,36 @@ func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newPair Pair) []byte {
 	return newLeafNode.PairAt(0).Key
 }
 
-func (ln *LeafNode) PrevPageId() *disk.PageId {
-	pageId := disk.ReadPageIdFrom(ln.Body(), 0)
+func (ln *LeafNode) PrevPageId() *page.PageId {
+	pageId := page.ReadPageIdFrom(ln.Body(), 0)
 	if pageId.IsInvalid() {
 		return nil
 	}
 	return &pageId
 }
 
-func (ln *LeafNode) NextPageId() *disk.PageId {
-	pageId := disk.ReadPageIdFrom(ln.Body(), 8)
+func (ln *LeafNode) NextPageId() *page.PageId {
+	pageId := page.ReadPageIdFrom(ln.Body(), 8)
 	if pageId.IsInvalid() {
 		return nil
 	}
 	return &pageId
 }
 
-func (ln *LeafNode) SetPrevPageId(prevPageId *disk.PageId) {
-	var pageId disk.PageId
+func (ln *LeafNode) SetPrevPageId(prevPageId *page.PageId) {
+	var pageId page.PageId
 	if prevPageId == nil {
-		pageId = disk.INVALID_PAGE_ID
+		pageId = page.INVALID_PAGE_ID
 	} else {
 		pageId = *prevPageId
 	}
 	pageId.WriteTo(ln.Body(), 0)
 }
 
-func (ln *LeafNode) SetNextPageId(nextPageId *disk.PageId) {
-	var pageId disk.PageId
+func (ln *LeafNode) SetNextPageId(nextPageId *page.PageId) {
+	var pageId page.PageId
 	if nextPageId == nil {
-		pageId = disk.INVALID_PAGE_ID
+		pageId = page.INVALID_PAGE_ID
 	} else {
 		pageId = *nextPageId
 	}

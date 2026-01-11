@@ -2,7 +2,7 @@ package node
 
 import (
 	slottedpage "minesql/internal/storage/access/btree/slotted_page"
-	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 )
 
 const branchHeaderSize = 8
@@ -76,7 +76,7 @@ func (bn *BranchNode) Insert(bufferId int, pair Pair) bool {
 // key: 最初のペアのキー
 // leftChildPageId: 最初のペアの value (左の子ページのページ ID)
 // rightChildPageId: ヘッダー部分に設定する右の子ページのページ ID
-func (bn *BranchNode) Initialize(key []byte, leftChildPageId disk.PageId, rightChildPageId disk.PageId) {
+func (bn *BranchNode) Initialize(key []byte, leftChildPageId page.PageId, rightChildPageId page.PageId) {
 	bn.body.Initialize()
 
 	// 左の子ページのポインタ (ページ ID) を value とした Pair を作成
@@ -130,17 +130,17 @@ func (bn *BranchNode) SearchChildIdx(key []byte) int {
 }
 
 // 指定されたインデックスの、子ページのページ ID を取得する
-func (bn *BranchNode) ChildPageIdAt(childIdx int) disk.PageId {
+func (bn *BranchNode) ChildPageIdAt(childIdx int) page.PageId {
 	if childIdx == bn.NumPairs() {
 		// 右端の子ページ ID を返す
-		return disk.ReadPageIdFrom(bn.Body(), 0)
+		return page.ReadPageIdFrom(bn.Body(), 0)
 	}
 	pair := bn.PairAt(childIdx)
-	return disk.PageIdFromBytes(pair.Value)
+	return page.PageIdFromBytes(pair.Value)
 }
 
 // キーから子ページのページ ID を検索する
-func (bn *BranchNode) SearchChildPageId(key []byte) disk.PageId {
+func (bn *BranchNode) SearchChildPageId(key []byte) page.PageId {
 	childIdx := bn.SearchChildIdx(key)
 	return bn.ChildPageIdAt(childIdx)
 }
@@ -160,7 +160,7 @@ func (bn *BranchNode) isHalfFull() bool {
 func (bn *BranchNode) fillRightChild() []byte {
 	lastId := bn.NumPairs() - 1
 	pair := bn.PairAt(lastId)
-	rightChild := disk.PageIdFromBytes(pair.Value)
+	rightChild := page.PageIdFromBytes(pair.Value)
 	key := make([]byte, len(pair.Key))
 
 	// キーをコピー

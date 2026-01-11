@@ -2,6 +2,7 @@ package bufferpool
 
 import (
 	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 	"path/filepath"
 	"testing"
 
@@ -14,7 +15,7 @@ func TestNewBufferPoolManager(t *testing.T) {
 		size := 5
 		tmpdir := t.TempDir()
 		path := filepath.Join(tmpdir, "test.db")
-		fileId := disk.FileId(0)
+		fileId := page.FileId(0)
 		dm, err := disk.NewDiskManager(fileId, path)
 		assert.NoError(t, err)
 
@@ -40,7 +41,7 @@ func TestFetchPage(t *testing.T) {
 		tmpdir := t.TempDir()
 		dm, pageId := initDiskManager(t, tmpdir)
 		bpm := NewBufferPoolManager(size, tmpdir)
-		bpm.RegisterDiskManager(disk.FileId(0), dm)
+		bpm.RegisterDiskManager(page.FileId(0), dm)
 
 		bufferPage, err := bpm.AddPage(pageId)
 		assert.NoError(t, err)
@@ -61,7 +62,7 @@ func TestFetchPage(t *testing.T) {
 		tmpdir := t.TempDir()
 		dm, pageId := initDiskManager(t, tmpdir)
 		bpm := NewBufferPoolManager(size, tmpdir)
-		bpm.RegisterDiskManager(disk.FileId(0), dm)
+		bpm.RegisterDiskManager(page.FileId(0), dm)
 
 		// WHEN
 		fetchedPage, err := bpm.FetchPage(pageId)
@@ -83,7 +84,7 @@ func TestAddPage(t *testing.T) {
 		tmpdir := t.TempDir()
 		dm, _ := initDiskManager(t, tmpdir)
 		bpm := NewBufferPoolManager(size, tmpdir)
-		bpm.RegisterDiskManager(disk.FileId(0), dm)
+		bpm.RegisterDiskManager(page.FileId(0), dm)
 		pageId := dm.AllocatePage()
 
 		// WHEN
@@ -104,7 +105,7 @@ func TestAddPage(t *testing.T) {
 		tmpdir := t.TempDir()
 		dm, _ := initDiskManager(t, tmpdir)
 		bpm := NewBufferPoolManager(size, tmpdir)
-		bpm.RegisterDiskManager(disk.FileId(0), dm)
+		bpm.RegisterDiskManager(page.FileId(0), dm)
 
 		// バッファプールを満杯にする
 		pageId1 := dm.AllocatePage()
@@ -152,7 +153,7 @@ func TestAddPage(t *testing.T) {
 		tmpdir := t.TempDir()
 		dm, _ := initDiskManager(t, tmpdir)
 		bpm := NewBufferPoolManager(size, tmpdir)
-		bpm.RegisterDiskManager(disk.FileId(0), dm)
+		bpm.RegisterDiskManager(page.FileId(0), dm)
 
 		// バッファプールを満杯にする
 		pageId1 := dm.AllocatePage()
@@ -195,7 +196,7 @@ func TestFlushPage(t *testing.T) {
 		tmpdir := t.TempDir()
 		dm, _ := initDiskManager(t, tmpdir)
 		bpm := NewBufferPoolManager(size, tmpdir)
-		bpm.RegisterDiskManager(disk.FileId(0), dm)
+		bpm.RegisterDiskManager(page.FileId(0), dm)
 
 		pageId1 := dm.AllocatePage()
 		pageId2 := dm.AllocatePage()
@@ -247,7 +248,7 @@ func TestFlushPage(t *testing.T) {
 		tmpdir := t.TempDir()
 		dm, _ := initDiskManager(t, tmpdir)
 		bpm := NewBufferPoolManager(size, tmpdir)
-		bpm.RegisterDiskManager(disk.FileId(0), dm)
+		bpm.RegisterDiskManager(page.FileId(0), dm)
 
 		pageId1 := dm.AllocatePage()
 		pageId2 := dm.AllocatePage()
@@ -279,7 +280,7 @@ func TestUnRefPage(t *testing.T) {
 		tmpdir := t.TempDir()
 		dm, _ := initDiskManager(t, tmpdir)
 		bpm := NewBufferPoolManager(size, tmpdir)
-		bpm.RegisterDiskManager(disk.FileId(0), dm)
+		bpm.RegisterDiskManager(page.FileId(0), dm)
 		pageId := dm.AllocatePage()
 
 		bufferPage, err := bpm.AddPage(pageId)
@@ -301,7 +302,7 @@ func TestBufferPoolManagerIntegration(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		path := filepath.Join(tmpdir, "test.db")
-		fileId := disk.FileId(0)
+		fileId := page.FileId(0)
 		dm, err := disk.NewDiskManager(fileId, path)
 		assert.NoError(t, err)
 		bpm := NewBufferPoolManager(3, tmpdir)
@@ -315,8 +316,8 @@ func TestBufferPoolManagerIntegration(t *testing.T) {
 		page5 := dm.AllocatePage()
 
 		// 各ページにデータを書き込む (PageID と同じ値を書き込む)
-		writeTestData := func(pageId disk.PageId, value byte) {
-			data := make([]byte, disk.PAGE_SIZE)
+		writeTestData := func(pageId page.PageId, value byte) {
+			data := make([]byte, page.PAGE_SIZE)
 			for i := range data {
 				data[i] = value
 			}
@@ -422,9 +423,9 @@ func TestAllocateFileId(t *testing.T) {
 		fileId3 := bpm.AllocateFileId()
 
 		// THEN
-		assert.Equal(t, disk.FileId(1), fileId1)
-		assert.Equal(t, disk.FileId(2), fileId2)
-		assert.Equal(t, disk.FileId(3), fileId3)
+		assert.Equal(t, page.FileId(1), fileId1)
+		assert.Equal(t, page.FileId(2), fileId2)
+		assert.Equal(t, page.FileId(3), fileId3)
 	})
 }
 
@@ -433,7 +434,7 @@ func TestAllocatePageId(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		bpm := NewBufferPoolManager(10, tmpdir)
-		fileId := disk.FileId(1)
+		fileId := page.FileId(1)
 		path := filepath.Join(tmpdir, "test.db")
 		dm, err := disk.NewDiskManager(fileId, path)
 		assert.NoError(t, err)
@@ -447,22 +448,22 @@ func TestAllocatePageId(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, fileId, pageId1.FileId)
 		assert.Equal(t, fileId, pageId2.FileId)
-		assert.Equal(t, disk.PageNumber(0), pageId1.PageNumber)
-		assert.Equal(t, disk.PageNumber(1), pageId2.PageNumber)
+		assert.Equal(t, page.PageNumber(0), pageId1.PageNumber)
+		assert.Equal(t, page.PageNumber(1), pageId2.PageNumber)
 	})
 
 	t.Run("登録されていない FileId に対してエラーが返される", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		bpm := NewBufferPoolManager(10, tmpdir)
-		nonExistentFileId := disk.FileId(999)
+		nonExistentFileId := page.FileId(999)
 
 		// WHEN
 		pageId, err := bpm.AllocatePageId(nonExistentFileId)
 
 		// THEN
 		assert.Error(t, err)
-		assert.Equal(t, disk.INVALID_PAGE_ID, pageId)
+		assert.Equal(t, page.INVALID_PAGE_ID, pageId)
 		assert.Contains(t, err.Error(), "DiskManager for FileId 999 not found")
 	})
 
@@ -471,13 +472,13 @@ func TestAllocatePageId(t *testing.T) {
 		tmpdir := t.TempDir()
 		bpm := NewBufferPoolManager(10, tmpdir)
 
-		fileId1 := disk.FileId(1)
+		fileId1 := page.FileId(1)
 		path1 := filepath.Join(tmpdir, "test1.db")
 		dm1, err := disk.NewDiskManager(fileId1, path1)
 		assert.NoError(t, err)
 		bpm.RegisterDiskManager(fileId1, dm1)
 
-		fileId2 := disk.FileId(2)
+		fileId2 := page.FileId(2)
 		path2 := filepath.Join(tmpdir, "test2.db")
 		dm2, err := disk.NewDiskManager(fileId2, path2)
 		assert.NoError(t, err)
@@ -497,25 +498,25 @@ func TestAllocatePageId(t *testing.T) {
 		// FileId1 のページ
 		assert.Equal(t, fileId1, pageId1_1.FileId)
 		assert.Equal(t, fileId1, pageId1_2.FileId)
-		assert.Equal(t, disk.PageNumber(0), pageId1_1.PageNumber)
-		assert.Equal(t, disk.PageNumber(1), pageId1_2.PageNumber)
+		assert.Equal(t, page.PageNumber(0), pageId1_1.PageNumber)
+		assert.Equal(t, page.PageNumber(1), pageId1_2.PageNumber)
 
 		// FileId2 のページ
 		assert.Equal(t, fileId2, pageId2_1.FileId)
 		assert.Equal(t, fileId2, pageId2_2.FileId)
-		assert.Equal(t, disk.PageNumber(0), pageId2_1.PageNumber)
-		assert.Equal(t, disk.PageNumber(1), pageId2_2.PageNumber)
+		assert.Equal(t, page.PageNumber(0), pageId2_1.PageNumber)
+		assert.Equal(t, page.PageNumber(1), pageId2_2.PageNumber)
 	})
 }
 
-func initDiskManager(t *testing.T, tmpdir string) (*disk.DiskManager, disk.PageId) {
+func initDiskManager(t *testing.T, tmpdir string) (*disk.DiskManager, page.PageId) {
 	path := filepath.Join(tmpdir, "test.db")
-	dm, err := disk.NewDiskManager(disk.FileId(0), path)
+	dm, err := disk.NewDiskManager(page.FileId(0), path)
 	assert.NoError(t, err)
 	pageId := dm.AllocatePage()
 
 	// ページをディスクに書き込む (空のページ)
-	emptyPage := make([]byte, disk.PAGE_SIZE)
+	emptyPage := make([]byte, page.PAGE_SIZE)
 	err = dm.WritePageData(pageId, emptyPage)
 	assert.NoError(t, err)
 

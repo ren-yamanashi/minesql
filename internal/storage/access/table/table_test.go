@@ -4,6 +4,7 @@ import (
 	"minesql/internal/storage/access/btree"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 	"os"
 	"path/filepath"
 	"testing"
@@ -162,7 +163,7 @@ func TestTable(t *testing.T) {
 	})
 }
 
-func InitDiskManager(t *testing.T, pathname string) (bufferpoolManager *bufferpool.BufferPoolManager, metaPageId disk.PageId, tmpdir string) {
+func InitDiskManager(t *testing.T, pathname string) (bufferpoolManager *bufferpool.BufferPoolManager, metaPageId page.PageId, tmpdir string) {
 	tmpdir = t.TempDir()
 	filePath := filepath.Join(tmpdir, pathname)
 

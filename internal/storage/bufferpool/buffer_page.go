@@ -1,22 +1,22 @@
 package bufferpool
 
 import (
-	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 )
 
 type BufferPage struct {
-	PageId disk.PageId
-	Page   *disk.Page
+	PageId page.PageId
+	Page   *page.Page
 	// 最近アクセスされたかどうか
 	Referenced bool
 	// ページが変更されたかどうか
 	IsDirty bool
 }
 
-func NewBufferPage(pageId disk.PageId) *BufferPage {
+func NewBufferPage(pageId page.PageId) *BufferPage {
 	return &BufferPage{
 		PageId:     pageId,
-		Page:       &disk.Page{},
+		Page:       &page.Page{},
 		Referenced: false,
 		IsDirty:    false,
 	}

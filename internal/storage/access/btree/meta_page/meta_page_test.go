@@ -1,7 +1,7 @@
 package metapage
 
 import (
-	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,7 +24,7 @@ func TestNewMetaPage(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
 		metaPage := NewMetaPage(data)
-		expectedPageId := disk.NewPageId(disk.FileId(1), disk.PageNumber(42))
+		expectedPageId := page.NewPageId(page.FileId(1), page.PageNumber(42))
 		metaPage.SetRootPageId(expectedPageId)
 
 		// WHEN
@@ -38,7 +38,7 @@ func TestNewMetaPage(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
 		metaPage := NewMetaPage(data)
-		expectedPageId := disk.NewPageId(disk.FileId(2), disk.PageNumber(99))
+		expectedPageId := page.NewPageId(page.FileId(2), page.PageNumber(99))
 
 		// WHEN
 		metaPage.SetRootPageId(expectedPageId)

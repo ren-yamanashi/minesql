@@ -51,12 +51,12 @@ func (se *StorageEngine) GetBufferPoolManager() *bufferpool.BufferPoolManager {
 	return se.bufferPoolManager
 }
 
-func (se *StorageEngine) GetTableHandler(tableName string) (*TableHandler, error) {
+func (se *StorageEngine) GetTable(tableName string) (*table.Table, error) {
 	tbl, ok := se.tables[tableName]
 	if !ok {
 		return nil, fmt.Errorf("table %s not found", tableName)
 	}
-	return NewTableHandler(tbl, se.bufferPoolManager), nil
+	return tbl, nil
 }
 
 func (se *StorageEngine) CreateTable(name string, primaryKeyCount int, uniqueIndexes []*table.UniqueIndex) (*table.Table, error) {

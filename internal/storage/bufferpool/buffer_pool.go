@@ -1,6 +1,8 @@
 package bufferpool
 
-import "minesql/internal/storage/disk"
+import (
+	"minesql/internal/storage/page"
+)
 
 type BufferId uint64
 
@@ -15,7 +17,7 @@ func newBufferPool(size int) *BufferPool {
 	// メモリ上に空のバッファページを作成
 	pages := make([]BufferPage, size)
 	for i := range pages {
-		pages[i] = *NewBufferPage(disk.INVALID_PAGE_ID) // 仮のページ ID で初期化 (実際にはバッファプールにページが追加されるときに設定される)
+		pages[i] = *NewBufferPage(page.INVALID_PAGE_ID) // 仮のページ ID で初期化 (実際にはバッファプールにページが追加されるときに設定される)
 	}
 	return &BufferPool{
 		BufferPages:   pages,

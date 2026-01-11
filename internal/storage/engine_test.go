@@ -2,7 +2,7 @@ package storage
 
 import (
 	"minesql/internal/storage/access/table"
-	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -143,52 +143,12 @@ func TestCreateTable(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		// FileId が採番されていることを確認
-		assert.NotEqual(t, disk.FileId(0), tbl.MetaPageId.FileId)
+		assert.NotEqual(t, page.FileId(0), tbl.MetaPageId.FileId)
 		// ディスクマネージャが登録されていることを確認
 		bpm := engine.GetBufferPoolManager()
 		dm, dmErr := bpm.GetDiskManager(tbl.MetaPageId.FileId)
 		assert.NoError(t, dmErr)
 		assert.NotNil(t, dm)
-	})
-}
-
-func TestGetTableHandler(t *testing.T) {
-	t.Run("TableHandler を取得できる", func(t *testing.T) {
-		// GIVEN
-		tmpdir := t.TempDir()
-		t.Setenv("MINESQL_DATA_DIR", tmpdir)
-		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		ResetStorageEngine()
-		InitStorageEngine()
-		engine := GetStorageEngine()
-		engine.CreateTable("users", 1, []*table.UniqueIndex{})
-
-		// WHEN
-		handler, err := engine.GetTableHandler("users")
-
-		// THEN
-		assert.NoError(t, err)
-		assert.NotNil(t, handler)
-		assert.NotNil(t, handler.bufferPoolManager)
-		assert.Equal(t, "users", handler.table.Name)
-		assert.Equal(t, handler.table.MetaPageId, engine.tables["users"].MetaPageId)
-	})
-
-	t.Run("存在しないテーブルの TableHandler を取得するとエラー", func(t *testing.T) {
-		// GIVEN
-		tmpdir := t.TempDir()
-		t.Setenv("MINESQL_DATA_DIR", tmpdir)
-		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		ResetStorageEngine()
-		InitStorageEngine()
-		engine := GetStorageEngine()
-
-		// WHEN
-		handler, err := engine.GetTableHandler("nonexistent")
-
-		// THEN
-		assert.Error(t, err)
-		assert.Nil(t, handler)
 	})
 }
 
