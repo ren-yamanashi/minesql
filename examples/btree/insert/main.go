@@ -21,7 +21,7 @@ func main() {
 	os.RemoveAll(dataDir)
 	os.MkdirAll(dataDir, 0755)
 
-	bpm := bufferpool.NewBufferPoolManager(10, dataDir)
+	bpm := bufferpool.NewBufferPoolManager(10)
 	fileId := bpm.AllocateFileId()
 
 	// DiskManager を作成して登録

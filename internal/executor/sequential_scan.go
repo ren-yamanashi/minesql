@@ -32,7 +32,7 @@ func (ss *SequentialScan) Next() (Record, error) {
 	engine := storage.GetStorageEngine()
 	bpm := engine.GetBufferPoolManager()
 
-	// 初回実行時に table handler を作成
+	// 初回実行時はイテレータを作成
 	if ss.iterator == nil {
 		tbl, err := engine.GetTable(ss.tableName)
 		if err != nil {

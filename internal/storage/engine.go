@@ -42,7 +42,7 @@ func newStorageEngine() *StorageEngine {
 	os.MkdirAll(dataDir, 0755)
 
 	return &StorageEngine{
-		bufferPoolManager: bufferpool.NewBufferPoolManager(config.GetBufferPoolSize(), dataDir),
+		bufferPoolManager: bufferpool.NewBufferPoolManager(config.GetBufferPoolSize()),
 		tables:            make(map[string]*table.Table),
 		baseDirectory:     dataDir,
 	}

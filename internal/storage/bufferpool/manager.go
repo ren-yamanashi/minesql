@@ -7,18 +7,18 @@ import (
 )
 
 type BufferPoolManager struct {
-	diskManagers  map[page.FileId]*disk.DiskManager // FileId → DiskManager のマップ
-	bufpool       BufferPool
-	pageTable     pageTable
-	nextFileId    page.FileId // 次に割り当てる FileId
+	diskManagers map[page.FileId]*disk.DiskManager // FileId → DiskManager のマップ
+	bufpool      BufferPool
+	pageTable    pageTable
+	nextFileId   page.FileId // 次に割り当てる FileId
 }
 
 func NewBufferPoolManager(size int) *BufferPoolManager {
 	return &BufferPoolManager{
-		diskManagers:  make(map[page.FileId]*disk.DiskManager),
-		bufpool:       *newBufferPool(size),
-		pageTable:     make(pageTable),
-		nextFileId:    page.FileId(1), // FileId 1 から開始
+		diskManagers: make(map[page.FileId]*disk.DiskManager),
+		bufpool:      *newBufferPool(size),
+		pageTable:    make(pageTable),
+		nextFileId:   page.FileId(1), // FileId 1 から開始
 	}
 }
 

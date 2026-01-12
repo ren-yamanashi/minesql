@@ -13,7 +13,7 @@ func main() {
 	dataDir := "examples/btree/data"
 	dbPath := dataDir + "/test.db"
 
-	bpm := bufferpool.NewBufferPoolManager(10, dataDir)
+	bpm := bufferpool.NewBufferPoolManager(10)
 	fileId := page.FileId(1)
 
 	// DiskManager を作成して登録
