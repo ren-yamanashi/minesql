@@ -35,7 +35,7 @@ func NewIndexScan(
 // 次の Record を取得する
 // データがない場合、継続条件を満たさない場合は (nil, nil) を返す
 func (is *IndexScan) Next() (Record, error) {
-	engine := storage.GetStorageEngine()
+	engine := storage.GetStorageManager()
 	bpm := engine.GetBufferPoolManager()
 
 	// 初回実行時に B+Tree とイテレータを作成

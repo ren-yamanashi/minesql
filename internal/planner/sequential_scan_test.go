@@ -28,7 +28,7 @@ func TestNewSequentialScan(t *testing.T) {
 	t.Run("Start で Executor が生成される", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		InitStorageEngineForPlannerTest(t, tmpdir)
-		defer storage.ResetStorageEngine()
+		defer storage.ResetStorageManager()
 
 		// GIVEN
 		searchMode := executor.RecordSearchModeStart{}
@@ -45,13 +45,13 @@ func TestNewSequentialScan(t *testing.T) {
 	})
 }
 
-func InitStorageEngineForPlannerTest(t *testing.T, dataDir string) *storage.StorageEngine {
+func InitStorageEngineForPlannerTest(t *testing.T, dataDir string) *storage.StorageManager {
 	t.Setenv("MINESQL_DATA_DIR", dataDir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "10")
 
-	storage.ResetStorageEngine()
-	storage.InitStorageEngine()
-	engine := storage.GetStorageEngine()
+	storage.ResetStorageManager()
+	storage.InitStorageManager()
+	engine := storage.GetStorageManager()
 
 	// テーブルを作成
 	createTable := executor.NewCreateTable()

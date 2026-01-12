@@ -29,7 +29,7 @@ func NewSequentialScan(
 // 次の Record を取得する
 // データがない場合、継続条件を満たさない場合は (nil, nil) を返す
 func (ss *SequentialScan) Next() (Record, error) {
-	engine := storage.GetStorageEngine()
+	engine := storage.GetStorageManager()
 	bpm := engine.GetBufferPoolManager()
 
 	// 初回実行時はイテレータを作成

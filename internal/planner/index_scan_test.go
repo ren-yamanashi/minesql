@@ -30,7 +30,7 @@ func TestNewIndexScan(t *testing.T) {
 	t.Run("Start で Executor が生成される", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		InitStorageEngineForPlannerTest(t, tmpdir)
-		defer storage.ResetStorageEngine()
+		defer storage.ResetStorageManager()
 
 		// GIVEN
 		searchMode := executor.RecordSearchModeStart{}

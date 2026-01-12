@@ -24,9 +24,9 @@ func TestExecute(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		storage.ResetStorageEngine()
-		storage.InitStorageEngine()
-		defer storage.ResetStorageEngine()
+		storage.ResetStorageManager()
+		storage.InitStorageManager()
+		defer storage.ResetStorageManager()
 
 		insert := NewInsert("non_existent_table")
 
@@ -42,9 +42,9 @@ func TestExecute(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		storage.ResetStorageEngine()
-		storage.InitStorageEngine()
-		defer storage.ResetStorageEngine()
+		storage.ResetStorageManager()
+		storage.InitStorageManager()
+		defer storage.ResetStorageManager()
 
 		createTable := NewCreateTable()
 		err := createTable.Execute("users", 1, []*IndexParam{})

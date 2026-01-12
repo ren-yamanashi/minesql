@@ -33,7 +33,7 @@ func TestIndexScan(t *testing.T) {
 	t.Run("インデックスでスキャンできる (SearchModeStart を使用)", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageEngine()
+		defer storage.ResetStorageManager()
 
 		// GIVEN
 		indexScan := NewIndexScan(
@@ -68,7 +68,7 @@ func TestIndexScan(t *testing.T) {
 	t.Run("インデックスでスキャンできる (SearchModeKey を使用)", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageEngine()
+		defer storage.ResetStorageManager()
 
 		// GIVEN
 		indexScan := NewIndexScan(

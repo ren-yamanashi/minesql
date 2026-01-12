@@ -13,7 +13,7 @@ func NewInsert(tableName string) *Insert {
 }
 
 func (ins *Insert) Execute(values [][]byte) error {
-	engine := storage.GetStorageEngine()
+	engine := storage.GetStorageManager()
 	bpm := engine.GetBufferPoolManager()
 
 	tbl, err := engine.GetTable(ins.tableName)

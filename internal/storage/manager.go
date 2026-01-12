@@ -13,46 +13,50 @@ import (
 )
 
 var (
-	globalEngine *StorageEngine
+	manager *StorageManager
 	once         sync.Once
 )
 
-func InitStorageEngine() *StorageEngine {
+// グローバルな StorageManager を初期化する
+func InitStorageManager() *StorageManager {
 	once.Do(func() {
-		globalEngine = newStorageEngine()
+		manager = newStorageManager()
 	})
-	return globalEngine
+	return manager
 }
 
-func GetStorageEngine() *StorageEngine {
-	if globalEngine == nil {
-		panic("storage engine not initialized. call InitStorageEngine() first")
+func GetStorageManager() *StorageManager {
+	if manager == nil {
+		panic("storage manager not initialized. call InitStorageManager() first")
 	}
-	return globalEngine
+	return manager
 }
 
-type StorageEngine struct {
+// ストレージエンジン層のリソースの管理を行う
+type StorageManager struct {
 	bufferPoolManager *bufferpool.BufferPoolManager
 	tables            map[string]*table.Table
 	baseDirectory     string
 }
 
-func newStorageEngine() *StorageEngine {
+func newStorageManager() *StorageManager {
 	dataDir := config.GetDataDirectory()
 	os.MkdirAll(dataDir, 0755)
 
-	return &StorageEngine{
+	return &StorageManager{
 		bufferPoolManager: bufferpool.NewBufferPoolManager(config.GetBufferPoolSize()),
 		tables:            make(map[string]*table.Table),
 		baseDirectory:     dataDir,
 	}
 }
 
-func (se *StorageEngine) GetBufferPoolManager() *bufferpool.BufferPoolManager {
+// BufferPoolManager を取得する
+func (se *StorageManager) GetBufferPoolManager() *bufferpool.BufferPoolManager {
 	return se.bufferPoolManager
 }
 
-func (se *StorageEngine) GetTable(tableName string) (*table.Table, error) {
+// テーブル名から Table を取得する
+func (se *StorageManager) GetTable(tableName string) (*table.Table, error) {
 	tbl, ok := se.tables[tableName]
 	if !ok {
 		return nil, fmt.Errorf("table %s not found", tableName)
@@ -61,7 +65,7 @@ func (se *StorageEngine) GetTable(tableName string) (*table.Table, error) {
 }
 
 // BufferPoolManager に DiskManager を登録する
-func (se *StorageEngine) RegisterDmToBpm(fileId page.FileId, tableName string) error {
+func (se *StorageManager) RegisterDmToBpm(fileId page.FileId, tableName string) error {
 	path := filepath.Join(se.baseDirectory, fmt.Sprintf("%s.db", tableName))
 	dm, err := disk.NewDiskManager(fileId, path)
 	if err != nil {
@@ -71,6 +75,7 @@ func (se *StorageEngine) RegisterDmToBpm(fileId page.FileId, tableName string) e
 	return nil
 }
 
-func (se *StorageEngine) RegisterTable(tbl *table.Table) {
+// テーブルを登録する
+func (se *StorageManager) RegisterTable(tbl *table.Table) {
 	se.tables[tbl.Name] = tbl
 }

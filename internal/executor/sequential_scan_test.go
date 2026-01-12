@@ -12,7 +12,7 @@ func TestNewSequentialScan(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageEngine()
+		defer storage.ResetStorageManager()
 
 		whileCondition := func(record Record) bool {
 			return true
@@ -37,7 +37,7 @@ func TestSequentialScan(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageEngine()
+		defer storage.ResetStorageManager()
 
 		seqScan := NewSequentialScan(
 			"users",
@@ -70,7 +70,7 @@ func TestSequentialScan(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageEngine()
+		defer storage.ResetStorageManager()
 
 		seqScan := NewSequentialScan(
 			"users",
@@ -101,16 +101,16 @@ func TestSequentialScan(t *testing.T) {
 	})
 }
 
-// StorageEngine を初期化し、サンプルデータを投入する
-func InitStorageEngineForTest(t *testing.T, dataDir string) *storage.StorageEngine {
-	// グローバル StorageEngine を初期化
+// StorageManager を初期化し、サンプルデータを投入する
+func InitStorageEngineForTest(t *testing.T, dataDir string) *storage.StorageManager {
+	// グローバル StorageManager を初期化
 	// テスト用に一時的に環境変数を設定
 	t.Setenv("MINESQL_DATA_DIR", dataDir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "10")
 
-	storage.ResetStorageEngine()
-	storage.InitStorageEngine()
-	engine := storage.GetStorageEngine()
+	storage.ResetStorageManager()
+	storage.InitStorageManager()
+	engine := storage.GetStorageManager()
 
 	// テーブルを作成
 	createTable := NewCreateTable()

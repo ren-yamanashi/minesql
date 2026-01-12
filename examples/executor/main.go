@@ -10,10 +10,10 @@ func main() {
 	os.RemoveAll(dataDir) // 既存のデータディレクトリがあれば削除
 	os.MkdirAll(dataDir, 0755)
 
-	// StorageEngine を初期化
+	// StorageManager を初期化
 	os.Setenv("MINESQL_DATA_DIR", dataDir)
 	os.Setenv("MINESQL_BUFFER_SIZE", "100")
-	storage.InitStorageEngine()
+	storage.InitStorageManager()
 
 	createTable()
 	fullTableScan()

@@ -18,7 +18,7 @@ func NewCreateTable() *CreateTable {
 }
 
 func (ct *CreateTable) Execute(tableName string, primaryKeyCount int, indexParams []*IndexParam) error {
-	engine := storage.GetStorageEngine()
+	engine := storage.GetStorageManager()
 	bpm := engine.GetBufferPoolManager()
 
 	// FileId を割り当て

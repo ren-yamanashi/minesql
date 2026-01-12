@@ -14,9 +14,9 @@ func TestCreateTable(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		storage.ResetStorageEngine()
-		storage.InitStorageEngine()
-		engine := storage.GetStorageEngine()
+		storage.ResetStorageManager()
+		storage.InitStorageManager()
+		engine := storage.GetStorageManager()
 		createTable := NewCreateTable()
 
 		// WHEN
@@ -36,9 +36,9 @@ func TestCreateTable(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		storage.ResetStorageEngine()
-		storage.InitStorageEngine()
-		engine := storage.GetStorageEngine()
+		storage.ResetStorageManager()
+		storage.InitStorageManager()
+		engine := storage.GetStorageManager()
 		createTable := NewCreateTable()
 
 		// WHEN
@@ -60,9 +60,9 @@ func TestCreateTable(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		storage.ResetStorageEngine()
-		storage.InitStorageEngine()
-		engine := storage.GetStorageEngine()
+		storage.ResetStorageManager()
+		storage.InitStorageManager()
+		engine := storage.GetStorageManager()
 		createTable := NewCreateTable()
 
 		// WHEN

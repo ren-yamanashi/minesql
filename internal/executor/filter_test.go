@@ -31,7 +31,7 @@ func TestNext(t *testing.T) {
 	t.Run("条件を満たすレコードを正しく返す", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageEngine()
+		defer storage.ResetStorageManager()
 
 		// GIVEN
 		seqScan := NewSequentialScan(
@@ -56,7 +56,7 @@ func TestNext(t *testing.T) {
 	t.Run("条件を満たすレコードがない場合、nil を返す", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageEngine()
+		defer storage.ResetStorageManager()
 
 		// GIVEN
 		seqScan := NewSequentialScan(

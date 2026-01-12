@@ -6,7 +6,6 @@
 - [プランナー](#プランナー)
 - [エグゼキュータ](./executor.md)
 - ストレージエンジン
-  - [ストレージエンジン](./storage-engine.md)
   - [アクセスメソッド](./access/overview.md)
   - [バッファプール](bufferpool.md)
   - [ディスク](disk.md)
