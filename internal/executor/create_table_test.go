@@ -2,7 +2,6 @@ package executor
 
 import (
 	"minesql/internal/storage"
-	"minesql/internal/storage/access/table"
 	"minesql/internal/storage/page"
 	"testing"
 
@@ -21,7 +20,7 @@ func TestCreateTable(t *testing.T) {
 		createTable := NewCreateTable()
 
 		// WHEN
-		err := createTable.Execute("users", 1, []*table.UniqueIndex{})
+		err := createTable.Execute("users", 1, nil)
 
 		// THEN
 		assert.NoError(t, err)
@@ -40,11 +39,12 @@ func TestCreateTable(t *testing.T) {
 		storage.ResetStorageEngine()
 		storage.InitStorageEngine()
 		engine := storage.GetStorageEngine()
-		uniqueIndex := table.NewUniqueIndex("email", 1)
 		createTable := NewCreateTable()
 
 		// WHEN
-		err := createTable.Execute("users", 1, []*table.UniqueIndex{uniqueIndex})
+		err := createTable.Execute("users", 1, []*IndexParam{
+			{Name: "email", SecondaryKey: 1},
+		})
 
 		// THEN
 		assert.NoError(t, err)
@@ -66,7 +66,7 @@ func TestCreateTable(t *testing.T) {
 		createTable := NewCreateTable()
 
 		// WHEN
-		err := createTable.Execute("users", 1, []*table.UniqueIndex{})
+		err := createTable.Execute("users", 1, nil)
 
 		// THEN
 		assert.NoError(t, err)

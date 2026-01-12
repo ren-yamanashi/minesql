@@ -2,7 +2,6 @@ package main
 
 import (
 	"minesql/internal/executor"
-	"minesql/internal/storage/access/table"
 )
 
 // テーブルを作成し、サンプルデータを挿入する
@@ -14,9 +13,9 @@ func createTable() {
 	err := createTable.Execute(
 		tableName,
 		1,
-		[]*table.UniqueIndex{
-			table.NewUniqueIndex("first_name", 1), // 名前のインデックス
-			table.NewUniqueIndex("last_name", 2),  // 姓のインデックス
+		[]*executor.IndexParam{
+			{Name: "first_name", SecondaryKey: 1}, // 名前のインデックス
+			{Name: "last_name", SecondaryKey: 2},  // 姓のインデックス
 		},
 	)
 	if err != nil {

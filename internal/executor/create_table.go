@@ -5,6 +5,11 @@ import (
 	"minesql/internal/storage/access/table"
 )
 
+type IndexParam struct {
+	Name         string
+	SecondaryKey uint
+}
+
 type CreateTable struct {
 }
 
@@ -12,7 +17,7 @@ func NewCreateTable() *CreateTable {
 	return &CreateTable{}
 }
 
-func (ct *CreateTable) Execute(tableName string, primaryKeyCount int, uniqueIndexes []*table.UniqueIndex) error {
+func (ct *CreateTable) Execute(tableName string, primaryKeyCount int, indexParams []*IndexParam) error {
 	engine := storage.GetStorageEngine()
 	bpm := engine.GetBufferPoolManager()
 
@@ -32,12 +37,18 @@ func (ct *CreateTable) Execute(tableName string, primaryKeyCount int, uniqueInde
 	}
 
 	// 各 UniqueIndex の metaPageId を設定
-	for i := range uniqueIndexes {
+	uniqueIndexes := make([]*table.UniqueIndex, len(indexParams))
+	if indexParams == nil {
+		indexParams = []*IndexParam{}
+	}
+	for i, indexParam := range indexParams {
 		indexMetaPageId, err := bpm.AllocatePageId(fileId)
 		if err != nil {
 			return err
 		}
-		uniqueIndexes[i].MetaPageId = indexMetaPageId
+		uniqueIndex := table.NewUniqueIndex(indexParam.Name, indexParam.SecondaryKey)
+		uniqueIndex.Create(bpm, indexMetaPageId)
+		uniqueIndexes[i] = uniqueIndex
 	}
 
 	// テーブルを作成

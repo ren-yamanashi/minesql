@@ -3,7 +3,6 @@ package planner
 import (
 	"minesql/internal/executor"
 	"minesql/internal/storage"
-	"minesql/internal/storage/access/table"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -50,13 +49,15 @@ func InitStorageEngineForPlannerTest(t *testing.T, dataDir string) *storage.Stor
 	t.Setenv("MINESQL_DATA_DIR", dataDir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "10")
 
+	storage.ResetStorageEngine()
 	storage.InitStorageEngine()
 	engine := storage.GetStorageEngine()
 
 	// テーブルを作成
-	uniqueIndexes := table.NewUniqueIndex("last_name", 2)
 	createTable := executor.NewCreateTable()
-	err := createTable.Execute("users", 1, []*table.UniqueIndex{uniqueIndexes})
+	err := createTable.Execute("users", 1, []*executor.IndexParam{
+		{Name: "last_name", SecondaryKey: 2},
+	})
 	assert.NoError(t, err)
 
 	tbl, err := engine.GetTable("users")

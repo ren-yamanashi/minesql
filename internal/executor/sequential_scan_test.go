@@ -2,7 +2,6 @@ package executor
 
 import (
 	"minesql/internal/storage"
-	"minesql/internal/storage/access/table"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -114,9 +113,10 @@ func InitStorageEngineForTest(t *testing.T, dataDir string) *storage.StorageEngi
 	engine := storage.GetStorageEngine()
 
 	// テーブルを作成
-	uniqueIndexes := table.NewUniqueIndex("last_name", 2)
 	createTable := NewCreateTable()
-	err := createTable.Execute("users", 1, []*table.UniqueIndex{uniqueIndexes})
+	err := createTable.Execute("users", 1, []*IndexParam{
+		{Name: "last_name", SecondaryKey: 2},
+	})
 	assert.NoError(t, err)
 
 	tbl, err := engine.GetTable("users")
