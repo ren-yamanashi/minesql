@@ -113,10 +113,10 @@ func InitStorageEngineForTest(t *testing.T, dataDir string) *storage.StorageMana
 	engine := storage.GetStorageManager()
 
 	// テーブルを作成
-	createTable := NewCreateTable()
-	err := createTable.Execute("users", 1, []*IndexParam{
+	createTable := NewCreateTable("users", 1, []*IndexParam{
 		{Name: "last_name", SecondaryKey: 2},
 	})
+	_, err := createTable.Next()
 	assert.NoError(t, err)
 
 	tbl, err := engine.GetTable("users")

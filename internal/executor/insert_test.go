@@ -10,11 +10,16 @@ import (
 func TestNewInsert(t *testing.T) {
 	t.Run("正常に Insert Executor を生成できる", func(t *testing.T) {
 		// WHEN
-		insert := NewInsert("users")
+		records := [][][]byte{
+			{[]byte("1"), []byte("Alice")},
+			{[]byte("2"), []byte("Bob")},
+		}
+		insert := NewInsert("users", records)
 
 		// THEN
 		assert.NotNil(t, insert)
 		assert.Equal(t, "users", insert.tableName)
+		assert.Equal(t, records, insert.records)
 	})
 }
 
@@ -28,10 +33,13 @@ func TestExecute(t *testing.T) {
 		storage.InitStorageManager()
 		defer storage.ResetStorageManager()
 
-		insert := NewInsert("non_existent_table")
+		records := [][][]byte{
+			{[]byte("1"), []byte("Alice")},
+		}
+		insert := NewInsert("non_existent_table", records)
 
 		// WHEN
-		err := insert.Execute([][]byte{[]byte("1"), []byte("Alice")})
+		_, err := insert.Next()
 
 		// THEN
 		assert.Error(t, err)
@@ -46,13 +54,19 @@ func TestExecute(t *testing.T) {
 		storage.InitStorageManager()
 		defer storage.ResetStorageManager()
 
-		createTable := NewCreateTable()
-		err := createTable.Execute("users", 1, []*IndexParam{})
+		createTable := NewCreateTable("users", 1, []*IndexParam{
+			{Name: "name", SecondaryKey: 1},
+		})
+		_, err := createTable.Next()
 		assert.NoError(t, err)
-		insert := NewInsert("users")
+		records := [][][]byte{
+			{[]byte("1"), []byte("Alice")},
+			{[]byte("2"), []byte("Bob")},
+		}
+		insert := NewInsert("users", records)
 
 		// WHEN
-		err = insert.Execute([][]byte{[]byte("1"), []byte("Alice")})
+		_, err = insert.Next()
 
 		// THEN
 		assert.NoError(t, err)
@@ -64,10 +78,12 @@ func TestExecute(t *testing.T) {
 			RecordSearchModeStart{},
 			whileCondition,
 		)
-		record, err := seqScan.Next()
+		res, err := ExecutePlan(seqScan)
 		assert.NoError(t, err)
-		assert.NotNil(t, record)
-		assert.Equal(t, []byte("1"), record[0])
-		assert.Equal(t, []byte("Alice"), record[1])
+		assert.Equal(t, 2, len(res))
+		for i, record := range res {
+			assert.Equal(t, records[i][0], record[0])
+			assert.Equal(t, records[i][1], record[1])
+		}
 	})
 }
