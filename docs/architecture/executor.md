@@ -1,9 +1,5 @@
 # エグゼキュータ
 
-- 実装コード:
-  - [executor/sequential_scan.go](../../internal/executor/sequential_scan.go)
-  - [executor/record.go](../../internal/executor/record.go)
-
 ## 概要
 
 - エグゼキュータは、プランナーに指定された通りにクエリを実行する

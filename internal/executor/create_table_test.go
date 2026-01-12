@@ -17,10 +17,10 @@ func TestCreateTable(t *testing.T) {
 		storage.ResetStorageManager()
 		storage.InitStorageManager()
 		engine := storage.GetStorageManager()
-		createTable := NewCreateTable()
+		createTable := NewCreateTable("users", 1, nil)
 
 		// WHEN
-		err := createTable.Execute("users", 1, nil)
+		_, err := createTable.Next()
 
 		// THEN
 		assert.NoError(t, err)
@@ -39,12 +39,12 @@ func TestCreateTable(t *testing.T) {
 		storage.ResetStorageManager()
 		storage.InitStorageManager()
 		engine := storage.GetStorageManager()
-		createTable := NewCreateTable()
-
-		// WHEN
-		err := createTable.Execute("users", 1, []*IndexParam{
+		createTable := NewCreateTable("users", 1, []*IndexParam{
 			{Name: "email", SecondaryKey: 1},
 		})
+
+		// WHEN
+		_, err := createTable.Next()
 
 		// THEN
 		assert.NoError(t, err)
@@ -63,10 +63,10 @@ func TestCreateTable(t *testing.T) {
 		storage.ResetStorageManager()
 		storage.InitStorageManager()
 		engine := storage.GetStorageManager()
-		createTable := NewCreateTable()
+		createTable := NewCreateTable("users", 1, nil)
 
 		// WHEN
-		err := createTable.Execute("users", 1, nil)
+		_, err := createTable.Next()
 
 		// THEN
 		assert.NoError(t, err)
