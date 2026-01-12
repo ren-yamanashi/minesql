@@ -1,7 +1,6 @@
 package executor
 
 import (
-	"io"
 	"minesql/internal/storage"
 	"minesql/internal/storage/access/table"
 )
@@ -15,7 +14,6 @@ type CreateTable struct {
 	tableName       string
 	primaryKeyCount int
 	indexParams     []*IndexParam
-	executed        bool
 }
 
 func NewCreateTable(tableName string, primaryKeyCount int, indexParams []*IndexParam) *CreateTable {
@@ -26,19 +24,14 @@ func NewCreateTable(tableName string, primaryKeyCount int, indexParams []*IndexP
 		tableName:       tableName,
 		primaryKeyCount: primaryKeyCount,
 		indexParams:     indexParams,
-		executed:        false,
 	}
 }
 
 func (ct *CreateTable) Next() (Record, error) {
-	if ct.executed {
-		return nil, io.EOF
-	}
 	err := ct.execute()
 	if err != nil {
 		return nil, err
 	}
-	ct.executed = true
 	return nil, nil
 }
 
@@ -81,6 +74,5 @@ func (ct *CreateTable) execute() error {
 	}
 
 	engine.RegisterTable(&tbl)
-	ct.executed = true
 	return nil
 }
