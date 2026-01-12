@@ -76,8 +76,8 @@ func (ln *LeafNode) Insert(bufferId int, pair Pair) bool {
 // リーフノードを初期化する
 // 初期化時には、前後のリーフノードのポインタ (ページ ID) には無効値が設定される
 func (ln *LeafNode) Initialize() {
-	page.INVALID_PAGE_ID.WriteTo(ln.Body(), 0) // 前ページ ID
-	page.INVALID_PAGE_ID.WriteTo(ln.Body(), 8) // 次ページ ID
+	page.INVALID_PAGE_ID.WriteTo(ln.Body(), 0) // 初期化時には、前のページ ID を無効値に設定
+	page.INVALID_PAGE_ID.WriteTo(ln.Body(), 8) // 初期化時には、次のページ ID を無効値に設定
 	ln.body.Initialize()
 }
 
