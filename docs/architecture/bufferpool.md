@@ -39,13 +39,6 @@ graph TD
   PT2 --0--> P1
   PT1 --2--> P3
   PT3 --1--> P2
-
-  subgraph diskManagers[DiskManager群]
-    DM1[DiskManager<br>FileId=1<br>users.db]
-    DM2[DiskManager<br>FileId=2<br>orders.db]
-  end
-
-  bufferPool <--> diskManagers
 ```
 
 ### ファイルシステムのビルトインのキャッシュを利用せず、バッファプールを実装する理由
