@@ -20,7 +20,7 @@ func TestNewBufferPoolManager(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bpm := NewBufferPoolManager(size, tmpdir)
+		bpm := NewBufferPoolManager(size)
 		bpm.RegisterDiskManager(fileId, dm)
 
 		// THEN
@@ -40,7 +40,7 @@ func TestFetchPage(t *testing.T) {
 		size := 3
 		tmpdir := t.TempDir()
 		dm, pageId := initDiskManager(t, tmpdir)
-		bpm := NewBufferPoolManager(size, tmpdir)
+		bpm := NewBufferPoolManager(size)
 		bpm.RegisterDiskManager(page.FileId(0), dm)
 
 		bufferPage, err := bpm.AddPage(pageId)
@@ -61,7 +61,7 @@ func TestFetchPage(t *testing.T) {
 		size := 3
 		tmpdir := t.TempDir()
 		dm, pageId := initDiskManager(t, tmpdir)
-		bpm := NewBufferPoolManager(size, tmpdir)
+		bpm := NewBufferPoolManager(size)
 		bpm.RegisterDiskManager(page.FileId(0), dm)
 
 		// WHEN
@@ -83,7 +83,7 @@ func TestAddPage(t *testing.T) {
 		size := 3
 		tmpdir := t.TempDir()
 		dm, _ := initDiskManager(t, tmpdir)
-		bpm := NewBufferPoolManager(size, tmpdir)
+		bpm := NewBufferPoolManager(size)
 		bpm.RegisterDiskManager(page.FileId(0), dm)
 		pageId := dm.AllocatePage()
 
@@ -104,7 +104,7 @@ func TestAddPage(t *testing.T) {
 		size := 3
 		tmpdir := t.TempDir()
 		dm, _ := initDiskManager(t, tmpdir)
-		bpm := NewBufferPoolManager(size, tmpdir)
+		bpm := NewBufferPoolManager(size)
 		bpm.RegisterDiskManager(page.FileId(0), dm)
 
 		// バッファプールを満杯にする
@@ -152,7 +152,7 @@ func TestAddPage(t *testing.T) {
 		size := 3
 		tmpdir := t.TempDir()
 		dm, _ := initDiskManager(t, tmpdir)
-		bpm := NewBufferPoolManager(size, tmpdir)
+		bpm := NewBufferPoolManager(size)
 		bpm.RegisterDiskManager(page.FileId(0), dm)
 
 		// バッファプールを満杯にする
@@ -195,7 +195,7 @@ func TestFlushPage(t *testing.T) {
 		size := 3
 		tmpdir := t.TempDir()
 		dm, _ := initDiskManager(t, tmpdir)
-		bpm := NewBufferPoolManager(size, tmpdir)
+		bpm := NewBufferPoolManager(size)
 		bpm.RegisterDiskManager(page.FileId(0), dm)
 
 		pageId1 := dm.AllocatePage()
@@ -247,7 +247,7 @@ func TestFlushPage(t *testing.T) {
 		size := 3
 		tmpdir := t.TempDir()
 		dm, _ := initDiskManager(t, tmpdir)
-		bpm := NewBufferPoolManager(size, tmpdir)
+		bpm := NewBufferPoolManager(size)
 		bpm.RegisterDiskManager(page.FileId(0), dm)
 
 		pageId1 := dm.AllocatePage()
@@ -279,7 +279,7 @@ func TestUnRefPage(t *testing.T) {
 		size := 3
 		tmpdir := t.TempDir()
 		dm, _ := initDiskManager(t, tmpdir)
-		bpm := NewBufferPoolManager(size, tmpdir)
+		bpm := NewBufferPoolManager(size)
 		bpm.RegisterDiskManager(page.FileId(0), dm)
 		pageId := dm.AllocatePage()
 
@@ -305,7 +305,7 @@ func TestBufferPoolManagerIntegration(t *testing.T) {
 		fileId := page.FileId(0)
 		dm, err := disk.NewDiskManager(fileId, path)
 		assert.NoError(t, err)
-		bpm := NewBufferPoolManager(3, tmpdir)
+		bpm := NewBufferPoolManager(3)
 		bpm.RegisterDiskManager(fileId, dm)
 
 		// ページを作成
@@ -414,8 +414,7 @@ func TestBufferPoolManagerIntegration(t *testing.T) {
 func TestAllocateFileId(t *testing.T) {
 	t.Run("FileId が順番に割り当てられる", func(t *testing.T) {
 		// GIVEN
-		tmpdir := t.TempDir()
-		bpm := NewBufferPoolManager(10, tmpdir)
+		bpm := NewBufferPoolManager(10)
 
 		// WHEN
 		fileId1 := bpm.AllocateFileId()
@@ -433,7 +432,7 @@ func TestAllocatePageId(t *testing.T) {
 	t.Run("登録された FileId に対して PageId が正しく割り当てられる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
-		bpm := NewBufferPoolManager(10, tmpdir)
+		bpm := NewBufferPoolManager(10)
 		fileId := page.FileId(1)
 		path := filepath.Join(tmpdir, "test.db")
 		dm, err := disk.NewDiskManager(fileId, path)
@@ -454,8 +453,7 @@ func TestAllocatePageId(t *testing.T) {
 
 	t.Run("登録されていない FileId に対してエラーが返される", func(t *testing.T) {
 		// GIVEN
-		tmpdir := t.TempDir()
-		bpm := NewBufferPoolManager(10, tmpdir)
+		bpm := NewBufferPoolManager(10)
 		nonExistentFileId := page.FileId(999)
 
 		// WHEN
@@ -470,7 +468,7 @@ func TestAllocatePageId(t *testing.T) {
 	t.Run("複数の FileId に対してそれぞれ独立した PageId が割り当てられる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
-		bpm := NewBufferPoolManager(10, tmpdir)
+		bpm := NewBufferPoolManager(10)
 
 		fileId1 := page.FileId(1)
 		path1 := filepath.Join(tmpdir, "test1.db")

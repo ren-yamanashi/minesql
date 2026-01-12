@@ -11,16 +11,14 @@ type BufferPoolManager struct {
 	bufpool       BufferPool
 	pageTable     pageTable
 	nextFileId    page.FileId // 次に割り当てる FileId
-	baseDirectory string      // ディスクファイルの基本ディレクトリ
 }
 
-func NewBufferPoolManager(size int, baseDirectory string) *BufferPoolManager {
+func NewBufferPoolManager(size int) *BufferPoolManager {
 	return &BufferPoolManager{
 		diskManagers:  make(map[page.FileId]*disk.DiskManager),
 		bufpool:       *newBufferPool(size),
 		pageTable:     make(pageTable),
 		nextFileId:    page.FileId(1), // FileId 1 から開始
-		baseDirectory: baseDirectory,
 	}
 }
 
