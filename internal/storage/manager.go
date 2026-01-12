@@ -14,7 +14,7 @@ import (
 
 var (
 	manager *StorageManager
-	once         sync.Once
+	once    sync.Once
 )
 
 // グローバルな StorageManager を初期化する
