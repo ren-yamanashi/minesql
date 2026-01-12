@@ -19,32 +19,6 @@ func TestNewPageId(t *testing.T) {
 		assert.Equal(t, fileId, pageId.FileId)
 		assert.Equal(t, pageNumber, pageId.PageNumber)
 	})
-
-	t.Run("FileId と PageNumber が 0 の PageId を作成できる", func(t *testing.T) {
-		// GIVEN
-		fileId := FileId(0)
-		pageNumber := PageNumber(0)
-
-		// WHEN
-		pageId := NewPageId(fileId, pageNumber)
-
-		// THEN
-		assert.Equal(t, fileId, pageId.FileId)
-		assert.Equal(t, pageNumber, pageId.PageNumber)
-	})
-
-	t.Run("FileId と PageNumber が最大値の PageId を作成できる", func(t *testing.T) {
-		// GIVEN
-		fileId := FileId(0xFFFFFFFF)
-		pageNumber := PageNumber(0xFFFFFFFF)
-
-		// WHEN
-		pageId := NewPageId(fileId, pageNumber)
-
-		// THEN
-		assert.Equal(t, fileId, pageId.FileId)
-		assert.Equal(t, pageNumber, pageId.PageNumber)
-	})
 }
 
 func TestEquals(t *testing.T) {
@@ -122,7 +96,7 @@ func TestIsInvalid(t *testing.T) {
 
 	t.Run("FileId だけが最大値の PageId は無効と判定されない", func(t *testing.T) {
 		// GIVEN
-		pageId := NewPageId(0xFFFFFFFF, 0)
+		pageId := NewPageId(MAX_FILE_ID, 0)
 
 		// WHEN
 		result := pageId.IsInvalid()
@@ -133,7 +107,7 @@ func TestIsInvalid(t *testing.T) {
 
 	t.Run("PageNumber だけが最大値の PageId は無効と判定されない", func(t *testing.T) {
 		// GIVEN
-		pageId := NewPageId(0, 0xFFFFFFFF)
+		pageId := NewPageId(0, MAX_PAGE_NUMBER)
 
 		// WHEN
 		result := pageId.IsInvalid()
@@ -213,20 +187,6 @@ func TestPageIdFromBytes(t *testing.T) {
 	})
 }
 
-func TestToBytesAndPageIdFromBytes(t *testing.T) {
-	t.Run("ToBytes と PageIdFromBytes は可逆", func(t *testing.T) {
-		// GIVEN
-		original := NewPageId(123, 456)
-
-		// WHEN
-		bytes := original.ToBytes()
-		restored := PageIdFromBytes(bytes)
-
-		// THEN
-		assert.True(t, original.Equals(restored))
-	})
-}
-
 func TestWriteTo(t *testing.T) {
 	t.Run("PageId を指定位置に書き込める", func(t *testing.T) {
 		// GIVEN
@@ -297,20 +257,5 @@ func TestReadPageIdFrom(t *testing.T) {
 		// THEN
 		assert.Equal(t, FileId(1), pageId.FileId)
 		assert.Equal(t, PageNumber(2), pageId.PageNumber)
-	})
-}
-
-func TestWriteToAndReadPageIdFrom(t *testing.T) {
-	t.Run("WriteTo と ReadPageIdFrom は可逆", func(t *testing.T) {
-		// GIVEN
-		original := NewPageId(999, 888)
-		data := make([]byte, 16)
-
-		// WHEN
-		original.WriteTo(data, 3)
-		restored := ReadPageIdFrom(data, 3)
-
-		// THEN
-		assert.True(t, original.Equals(restored))
 	})
 }

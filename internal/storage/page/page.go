@@ -6,10 +6,12 @@ import (
 )
 
 const PAGE_SIZE = 4096
+const MAX_FILE_ID = 0xFFFFFFFF
+const MAX_PAGE_NUMBER = 0xFFFFFFFF
 
 var (
 	ErrInvalidDataSize error  = fmt.Errorf("data size must be %d bytes", PAGE_SIZE)
-	INVALID_PAGE_ID    PageId = NewPageId(0xFFFFFFFF, 0xFFFFFFFF)
+	INVALID_PAGE_ID    PageId = NewPageId(MAX_FILE_ID, MAX_PAGE_NUMBER)
 )
 
 type (
