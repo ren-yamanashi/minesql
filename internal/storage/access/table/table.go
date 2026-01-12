@@ -30,7 +30,6 @@ func NewTable(name string, metaPageId page.PageId, primaryKeyCount int, uniqueIn
 }
 
 // 空のテーブルを新規作成する
-// 事前に MetaPageId が設定されている必要がある
 func (t *Table) Create(bpm *bufferpool.BufferPoolManager) error {
 	// テーブルの B+Tree を作成
 	tree, err := btree.CreateBTree(bpm, t.MetaPageId)
@@ -79,6 +78,7 @@ func (t *Table) Insert(bpm *bufferpool.BufferPoolManager, record [][]byte) error
 	return nil
 }
 
+// インデックス名からユニークインデックスを取得する
 func (t *Table) GetUniqueIndexByName(indexName string) (*UniqueIndex, error) {
 	for _, ui := range t.UniqueIndexes {
 		if ui.Name == indexName {

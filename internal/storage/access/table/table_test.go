@@ -12,8 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// Create と Insert をテスト
-func TestTable(t *testing.T) {
+func TestCreateAndInsert(t *testing.T) {
 	t.Run("テーブルの作成ができ、そのテーブルに値が挿入できる", func(t *testing.T) {
 		// GIVEN
 		uniqueIndex := NewUniqueIndex("last_name", 2)
@@ -163,11 +162,40 @@ func TestTable(t *testing.T) {
 	})
 }
 
+func TestGetUniqueIndexByName(t *testing.T) {
+	t.Run("インデックス名からユニークインデックスを取得できる", func(t *testing.T) {
+		// GIVEN
+		uniqueIndex1 := NewUniqueIndex("first_name", 1)
+		uniqueIndex2 := NewUniqueIndex("last_name", 2)
+		table := NewTable("users", page.PageId{}, 1, []*UniqueIndex{uniqueIndex1, uniqueIndex2})
+
+		// WHEN
+		ui, err := table.GetUniqueIndexByName("last_name")
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, uniqueIndex2, ui)
+	})
+
+	t.Run("存在しないインデックス名を指定するとエラーになる", func(t *testing.T) {
+		// GIVEN
+		uniqueIndex := NewUniqueIndex("first_name", 1)
+		table := NewTable("users", page.PageId{}, 1, []*UniqueIndex{uniqueIndex})
+
+		// WHEN
+		ui, err := table.GetUniqueIndexByName("last_name")
+
+		// THEN
+		assert.Nil(t, ui)
+		assert.Error(t, err)
+	})
+}
+
 func InitDiskManager(t *testing.T, pathname string) (bufferpoolManager *bufferpool.BufferPoolManager, metaPageId page.PageId, tmpdir string) {
 	tmpdir = t.TempDir()
 	filePath := filepath.Join(tmpdir, pathname)
 
-	bpm := bufferpool.NewBufferPoolManager(10, tmpdir)
+	bpm := bufferpool.NewBufferPoolManager(10)
 	fileId := bpm.AllocateFileId()
 	dm, err := disk.NewDiskManager(fileId, filePath)
 	assert.NoError(t, err)
