@@ -12,7 +12,7 @@ type UniqueIndex struct {
 	Name string
 	// インデックスの内容が入っている B+Tree のメタページの ID
 	MetaPageId page.PageId
-	// セカンダリキーに含めるカラムを指定
+	// セカンダリキーに含めるカラムを指定 (0 始まりの列番号)
 	SecondaryKey uint
 }
 
