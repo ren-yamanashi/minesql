@@ -29,9 +29,16 @@
 graph TD
     parser[パーサー] --AST--> planner[プランナー]
     planner --実行計画-->executor[エグゼキュータ]
-    executor --> storageEngine
+    executor --1.定義要求--> manager[マネージャ]
+    executor --2.Scan/Insert/Create/...etc--> accessMethod[アクセスメソッド]
 
     subgraph storageEngine[ストレージエンジン]
+        direction TB
+        subgraph accessMethod[アクセスメソッド]
+            b-tree[B+Tree]
+            table[テーブル]
+        end
+        manager[マネージャ<br/> （ストレージエンジン内のリソースを管理）]
         accessMethod[アクセスメソッド] --データ要求-->bufferPool[バッファプール]
         bufferPool --ディスクI/O要求-->diskManager[ディスク]
     end
