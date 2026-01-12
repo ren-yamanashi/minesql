@@ -18,18 +18,7 @@ func rangeTableScan() {
 		executor.RecordSearchModeKey{Key: [][]byte{[]byte("w")}},
 		whileCondition,
 	)
-
-	for {
-		record, err := seqScan.Next()
-		if err != nil {
-			panic(err)
-		}
-		if record == nil {
-			break
-		}
-		// レコードの内容を表示
-		println(string(record[0]), string(record[1]), string(record[2]))
-	}
+	printRecords(seqScan)
 }
 
 // 姓が "J" 以上 "N" 未満の範囲のレコードを取得する (インデックス範囲スキャン)
@@ -49,16 +38,5 @@ func rangeIndexScan() {
 		executor.RecordSearchModeKey{Key: [][]byte{[]byte("J")}},
 		whileCondition,
 	)
-
-	for {
-		record, err := indexScan.Next()
-		if err != nil {
-			panic(err)
-		}
-		if record == nil {
-			break
-		}
-		// レコードの内容を表示
-		println(string(record[0]), string(record[1]), string(record[2]))
-	}
+	printRecords(indexScan)
 }

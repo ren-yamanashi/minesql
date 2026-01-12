@@ -23,16 +23,5 @@ func filterScan() {
 		return string(record[1]) == "Charlie"
 	}
 	filter := executor.NewFilter(seqScan, filterCondition)
-
-	for {
-		record, err := filter.Next()
-		if err != nil {
-			panic(err)
-		}
-		if record == nil {
-			break
-		}
-		// レコードの内容を表示
-		println(string(record[0]), string(record[1]), string(record[2]))
-	}
+	printRecords(filter)
 }

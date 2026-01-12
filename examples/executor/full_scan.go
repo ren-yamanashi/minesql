@@ -17,18 +17,7 @@ func fullTableScan() {
 		executor.RecordSearchModeStart{},
 		whileCondition,
 	)
-
-	for {
-		record, err := seqScan.Next()
-		if err != nil {
-			panic(err)
-		}
-		if record == nil {
-			break
-		}
-		// レコードの内容を表示
-		println(string(record[0]), string(record[1]), string(record[2]))
-	}
+	printRecords(seqScan)
 }
 
 // キーが名前のセカンダリインデックスを使って全件スキャン
@@ -46,18 +35,7 @@ func fullIndexScanByFirstName() {
 		executor.RecordSearchModeStart{},
 		whileCondition,
 	)
-
-	for {
-		record, err := indexScan.Next()
-		if err != nil {
-			panic(err)
-		}
-		if record == nil {
-			break
-		}
-		// レコードの内容を表示
-		println(string(record[0]), string(record[1]), string(record[2]))
-	}
+	printRecords(indexScan)
 }
 
 // キーが姓のセカンダリインデックスを使って全件スキャン
@@ -75,16 +53,5 @@ func fullIndexScanByLastName() {
 		executor.RecordSearchModeStart{},
 		whileCondition,
 	)
-
-	for {
-		record, err := indexScan.Next()
-		if err != nil {
-			panic(err)
-		}
-		if record == nil {
-			break
-		}
-		// レコードの内容を表示
-		println(string(record[0]), string(record[1]), string(record[2]))
-	}
+	printRecords(indexScan)
 }
