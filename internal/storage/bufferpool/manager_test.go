@@ -34,6 +34,161 @@ func TestNewBufferPoolManager(t *testing.T) {
 	})
 }
 
+func TestRegisterDiskManager(t *testing.T) {
+	t.Run("DiskManager が正しく登録される", func(t *testing.T) {
+		// GIVEN
+		size := 5
+		tmpdir := t.TempDir()
+		path := filepath.Join(tmpdir, "test.db")
+		fileId := page.FileId(0)
+		dm, err := disk.NewDiskManager(fileId, path)
+		assert.NoError(t, err)
+
+		bpm := NewBufferPoolManager(size)
+
+		// WHEN
+		bpm.RegisterDiskManager(fileId, dm)
+
+		// THEN
+		retrievedDm, err := bpm.GetDiskManager(fileId)
+		assert.NoError(t, err)
+		assert.Equal(t, dm, retrievedDm)
+	})
+}
+
+func TestGetDiskManager(t *testing.T) {
+	t.Run("登録されている DiskManager を取得できる", func(t *testing.T) {
+		// GIVEN
+		size := 5
+		tmpdir := t.TempDir()
+		path := filepath.Join(tmpdir, "test.db")
+		fileId := page.FileId(0)
+		dm, err := disk.NewDiskManager(fileId, path)
+		assert.NoError(t, err)
+
+		bpm := NewBufferPoolManager(size)
+		bpm.RegisterDiskManager(fileId, dm)
+
+		// WHEN
+		retrievedDm, err := bpm.GetDiskManager(fileId)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, dm, retrievedDm)
+	})
+
+	t.Run("登録されていない FileId を指定するとエラーが発生する", func(t *testing.T) {
+		// GIVEN
+		size := 5
+		bpm := NewBufferPoolManager(size)
+
+		// WHEN
+		nonExistentFileId := page.FileId(999)
+		retrievedDm, err := bpm.GetDiskManager(nonExistentFileId)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, retrievedDm)
+		assert.Contains(t, err.Error(), "DiskManager for FileId 999 not found")
+	})
+}
+
+func TestAllocateFileId(t *testing.T) {
+	t.Run("FileId が順番に割り当てられる", func(t *testing.T) {
+		// GIVEN
+		bpm := NewBufferPoolManager(10)
+
+		// WHEN
+		fileId1 := bpm.AllocateFileId()
+		fileId2 := bpm.AllocateFileId()
+		fileId3 := bpm.AllocateFileId()
+
+		// THEN
+		assert.Equal(t, page.FileId(1), fileId1)
+		assert.Equal(t, page.FileId(2), fileId2)
+		assert.Equal(t, page.FileId(3), fileId3)
+	})
+}
+
+func TestAllocatePageId(t *testing.T) {
+	t.Run("登録された FileId に対して PageId が正しく割り当てられる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		bpm := NewBufferPoolManager(10)
+		fileId := page.FileId(1)
+		path := filepath.Join(tmpdir, "test.db")
+		dm, err := disk.NewDiskManager(fileId, path)
+		assert.NoError(t, err)
+		bpm.RegisterDiskManager(fileId, dm)
+
+		// WHEN
+		pageId1, err := bpm.AllocatePageId(fileId)
+		pageId2, err := bpm.AllocatePageId(fileId)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, fileId, pageId1.FileId)
+		assert.Equal(t, fileId, pageId2.FileId)
+		assert.Equal(t, page.PageNumber(0), pageId1.PageNumber)
+		assert.Equal(t, page.PageNumber(1), pageId2.PageNumber)
+	})
+
+	t.Run("登録されていない FileId に対してエラーが返される", func(t *testing.T) {
+		// GIVEN
+		bpm := NewBufferPoolManager(10)
+		nonExistentFileId := page.FileId(999)
+
+		// WHEN
+		pageId, err := bpm.AllocatePageId(nonExistentFileId)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Equal(t, page.INVALID_PAGE_ID, pageId)
+		assert.Contains(t, err.Error(), "DiskManager for FileId 999 not found")
+	})
+
+	t.Run("複数の FileId に対してそれぞれ独立した PageId が割り当てられる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		bpm := NewBufferPoolManager(10)
+
+		fileId1 := page.FileId(1)
+		path1 := filepath.Join(tmpdir, "test1.db")
+		dm1, err := disk.NewDiskManager(fileId1, path1)
+		assert.NoError(t, err)
+		bpm.RegisterDiskManager(fileId1, dm1)
+
+		fileId2 := page.FileId(2)
+		path2 := filepath.Join(tmpdir, "test2.db")
+		dm2, err := disk.NewDiskManager(fileId2, path2)
+		assert.NoError(t, err)
+		bpm.RegisterDiskManager(fileId2, dm2)
+
+		// WHEN
+		pageId1_1, err := bpm.AllocatePageId(fileId1)
+		assert.NoError(t, err)
+		pageId2_1, err := bpm.AllocatePageId(fileId2)
+		assert.NoError(t, err)
+		pageId1_2, err := bpm.AllocatePageId(fileId1)
+		assert.NoError(t, err)
+		pageId2_2, err := bpm.AllocatePageId(fileId2)
+		assert.NoError(t, err)
+
+		// THEN
+		// FileId1 のページ
+		assert.Equal(t, fileId1, pageId1_1.FileId)
+		assert.Equal(t, fileId1, pageId1_2.FileId)
+		assert.Equal(t, page.PageNumber(0), pageId1_1.PageNumber)
+		assert.Equal(t, page.PageNumber(1), pageId1_2.PageNumber)
+
+		// FileId2 のページ
+		assert.Equal(t, fileId2, pageId2_1.FileId)
+		assert.Equal(t, fileId2, pageId2_2.FileId)
+		assert.Equal(t, page.PageNumber(0), pageId2_1.PageNumber)
+		assert.Equal(t, page.PageNumber(1), pageId2_2.PageNumber)
+	})
+}
+
 func TestFetchPage(t *testing.T) {
 	t.Run("指定されたページがページテーブルに存在する場合、同じページが返される", func(t *testing.T) {
 		// GIVEN
@@ -189,6 +344,30 @@ func TestAddPage(t *testing.T) {
 	})
 }
 
+func TestUnRefPage(t *testing.T) {
+	t.Run("指定されたページの参照ビットがクリアされる", func(t *testing.T) {
+		// GIVEN
+		size := 3
+		tmpdir := t.TempDir()
+		dm, _ := initDiskManager(t, tmpdir)
+		bpm := NewBufferPoolManager(size)
+		bpm.RegisterDiskManager(page.FileId(0), dm)
+		pageId := dm.AllocatePage()
+
+		bufferPage, err := bpm.AddPage(pageId)
+		assert.NoError(t, err)
+
+		bufferPage.Referenced = true
+
+		// WHEN
+		bpm.UnRefPage(pageId)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.False(t, bufferPage.Referenced)
+	})
+}
+
 func TestFlushPage(t *testing.T) {
 	t.Run("ページテーブル内にダーティーページが存在する場合", func(t *testing.T) {
 		// GIVEN
@@ -270,30 +449,6 @@ func TestFlushPage(t *testing.T) {
 		assert.False(t, page1.IsDirty)
 		assert.False(t, page2.IsDirty)
 		assert.False(t, page3.IsDirty)
-	})
-}
-
-func TestUnRefPage(t *testing.T) {
-	t.Run("指定されたページの参照ビットがクリアされる", func(t *testing.T) {
-		// GIVEN
-		size := 3
-		tmpdir := t.TempDir()
-		dm, _ := initDiskManager(t, tmpdir)
-		bpm := NewBufferPoolManager(size)
-		bpm.RegisterDiskManager(page.FileId(0), dm)
-		pageId := dm.AllocatePage()
-
-		bufferPage, err := bpm.AddPage(pageId)
-		assert.NoError(t, err)
-
-		bufferPage.Referenced = true
-
-		// WHEN
-		bpm.UnRefPage(pageId)
-
-		// THEN
-		assert.NoError(t, err)
-		assert.False(t, bufferPage.Referenced)
 	})
 }
 
@@ -408,102 +563,6 @@ func TestBufferPoolManagerIntegration(t *testing.T) {
 		assert.Contains(t, bpm.pageTable, page4)
 		assert.Contains(t, bpm.pageTable, page5)
 		assert.Contains(t, bpm.pageTable, page1)
-	})
-}
-
-func TestAllocateFileId(t *testing.T) {
-	t.Run("FileId が順番に割り当てられる", func(t *testing.T) {
-		// GIVEN
-		bpm := NewBufferPoolManager(10)
-
-		// WHEN
-		fileId1 := bpm.AllocateFileId()
-		fileId2 := bpm.AllocateFileId()
-		fileId3 := bpm.AllocateFileId()
-
-		// THEN
-		assert.Equal(t, page.FileId(1), fileId1)
-		assert.Equal(t, page.FileId(2), fileId2)
-		assert.Equal(t, page.FileId(3), fileId3)
-	})
-}
-
-func TestAllocatePageId(t *testing.T) {
-	t.Run("登録された FileId に対して PageId が正しく割り当てられる", func(t *testing.T) {
-		// GIVEN
-		tmpdir := t.TempDir()
-		bpm := NewBufferPoolManager(10)
-		fileId := page.FileId(1)
-		path := filepath.Join(tmpdir, "test.db")
-		dm, err := disk.NewDiskManager(fileId, path)
-		assert.NoError(t, err)
-		bpm.RegisterDiskManager(fileId, dm)
-
-		// WHEN
-		pageId1, err := bpm.AllocatePageId(fileId)
-		pageId2, err := bpm.AllocatePageId(fileId)
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, fileId, pageId1.FileId)
-		assert.Equal(t, fileId, pageId2.FileId)
-		assert.Equal(t, page.PageNumber(0), pageId1.PageNumber)
-		assert.Equal(t, page.PageNumber(1), pageId2.PageNumber)
-	})
-
-	t.Run("登録されていない FileId に対してエラーが返される", func(t *testing.T) {
-		// GIVEN
-		bpm := NewBufferPoolManager(10)
-		nonExistentFileId := page.FileId(999)
-
-		// WHEN
-		pageId, err := bpm.AllocatePageId(nonExistentFileId)
-
-		// THEN
-		assert.Error(t, err)
-		assert.Equal(t, page.INVALID_PAGE_ID, pageId)
-		assert.Contains(t, err.Error(), "DiskManager for FileId 999 not found")
-	})
-
-	t.Run("複数の FileId に対してそれぞれ独立した PageId が割り当てられる", func(t *testing.T) {
-		// GIVEN
-		tmpdir := t.TempDir()
-		bpm := NewBufferPoolManager(10)
-
-		fileId1 := page.FileId(1)
-		path1 := filepath.Join(tmpdir, "test1.db")
-		dm1, err := disk.NewDiskManager(fileId1, path1)
-		assert.NoError(t, err)
-		bpm.RegisterDiskManager(fileId1, dm1)
-
-		fileId2 := page.FileId(2)
-		path2 := filepath.Join(tmpdir, "test2.db")
-		dm2, err := disk.NewDiskManager(fileId2, path2)
-		assert.NoError(t, err)
-		bpm.RegisterDiskManager(fileId2, dm2)
-
-		// WHEN
-		pageId1_1, err := bpm.AllocatePageId(fileId1)
-		assert.NoError(t, err)
-		pageId2_1, err := bpm.AllocatePageId(fileId2)
-		assert.NoError(t, err)
-		pageId1_2, err := bpm.AllocatePageId(fileId1)
-		assert.NoError(t, err)
-		pageId2_2, err := bpm.AllocatePageId(fileId2)
-		assert.NoError(t, err)
-
-		// THEN
-		// FileId1 のページ
-		assert.Equal(t, fileId1, pageId1_1.FileId)
-		assert.Equal(t, fileId1, pageId1_2.FileId)
-		assert.Equal(t, page.PageNumber(0), pageId1_1.PageNumber)
-		assert.Equal(t, page.PageNumber(1), pageId1_2.PageNumber)
-
-		// FileId2 のページ
-		assert.Equal(t, fileId2, pageId2_1.FileId)
-		assert.Equal(t, fileId2, pageId2_2.FileId)
-		assert.Equal(t, page.PageNumber(0), pageId2_1.PageNumber)
-		assert.Equal(t, page.PageNumber(1), pageId2_2.PageNumber)
 	})
 }
 
