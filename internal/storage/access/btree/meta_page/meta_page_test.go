@@ -1,7 +1,7 @@
 package metapage
 
 import (
-	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,24 +24,26 @@ func TestNewMetaPage(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
 		metaPage := NewMetaPage(data)
-		metaPage.SetRootPageId(42)
+		expectedPageId := page.NewPageId(page.FileId(1), page.PageNumber(42))
+		metaPage.SetRootPageId(expectedPageId)
 
 		// WHEN
 		rootPageId := metaPage.RootPageId()
 
 		// THEN
-		assert.Equal(t, disk.PageId(42), rootPageId)
+		assert.Equal(t, expectedPageId, rootPageId)
 	})
 
 	t.Run("ルートページ ID が正しく設定できる", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
 		metaPage := NewMetaPage(data)
+		expectedPageId := page.NewPageId(page.FileId(2), page.PageNumber(99))
 
 		// WHEN
-		metaPage.SetRootPageId(99)
+		metaPage.SetRootPageId(expectedPageId)
 
 		// THEN
-		assert.Equal(t, disk.PageId(99), metaPage.RootPageId())
+		assert.Equal(t, expectedPageId, metaPage.RootPageId())
 	})
 }

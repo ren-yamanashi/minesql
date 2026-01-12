@@ -2,7 +2,6 @@ package main
 
 import (
 	"bytes"
-	"encoding/binary"
 	"fmt"
 	"os"
 	"strings"
@@ -12,23 +11,35 @@ import (
 	"minesql/internal/storage/access/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 )
 
 func main() {
-	dbPath := "btree/test.db"
+	dataDir := "examples/btree/data"
 
-	// 既存のファイルがあれば削除
-	os.Remove(dbPath)
+	// 既存のデータディレクトリがあれば削除
+	os.RemoveAll(dataDir)
+	os.MkdirAll(dataDir, 0755)
 
-	dm, err := disk.NewDiskManager(dbPath)
+	bpm := bufferpool.NewBufferPoolManager(10)
+	fileId := bpm.AllocateFileId()
+
+	// DiskManager を作成して登録
+	diskPath := dataDir + "/test.db"
+	dm, err := disk.NewDiskManager(fileId, diskPath)
+	if err != nil {
+		panic(err)
+	}
+	bpm.RegisterDiskManager(fileId, dm)
+
+	// metaPageId を割り当て
+	metaPageId, err := bpm.AllocatePageId(fileId)
 	if err != nil {
 		panic(err)
 	}
 
-	bpm := bufferpool.NewBufferPoolManager(dm, 10)
-
 	// B+Tree を作成
-	tree, err := btree.CreateBTree(bpm)
+	tree, err := btree.CreateBTree(bpm, metaPageId)
 	if err != nil {
 		panic(err)
 	}
@@ -97,7 +108,7 @@ func displayTreeStructure(bpm *bufferpool.BufferPoolManager, tree *btree.BTree) 
 }
 
 // ノードを再帰的に表示
-func displayNode(bpm *bufferpool.BufferPoolManager, pageId disk.PageId, depth int, label string) {
+func displayNode(bpm *bufferpool.BufferPoolManager, pageId page.PageId, depth int, label string) {
 	indent := strings.Repeat("  ", depth)
 
 	// ノードを取得
@@ -117,7 +128,7 @@ func displayNode(bpm *bufferpool.BufferPoolManager, pageId disk.PageId, depth in
 			keys = append(keys, string(pair.Key))
 		}
 		// リーフノードの情報を表示
-		fmt.Printf("%s[%s Leaf: PageID=%d, Keys=[%s]]\n",
+		fmt.Printf("%s[%s Leaf: PageID=%v, Keys=[%s]]\n",
 			indent, label, pageId, strings.Join(keys, ", "))
 	} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
 		// ブランチノードの場合
@@ -129,7 +140,7 @@ func displayNode(bpm *bufferpool.BufferPoolManager, pageId disk.PageId, depth in
 		}
 
 		// ブランチノードの情報を表示
-		fmt.Printf("%s[%s Branch: PageID=%d, Keys=[%s]]\n",
+		fmt.Printf("%s[%s Branch: PageID=%v, Keys=[%s]]\n",
 			indent, label, pageId, strings.Join(keys, ", "))
 
 		// 子ノードを再帰的に表示
@@ -144,8 +155,8 @@ func displayNode(bpm *bufferpool.BufferPoolManager, pageId disk.PageId, depth in
 			displayNode(bpm, childPageId, depth+1, childLabel)
 		}
 
-		// 右端の子ノード (Node Type の後の 8 バイトから読み取る)
-		rightChildPageId := disk.PageId(binary.LittleEndian.Uint64(nodeBuf.Page[8:16]))
+		// 右端の子ノード (ブランチノードのヘッダーから読み取る)
+		rightChildPageId := branchNode.ChildPageIdAt(branchNode.NumPairs())
 		lastPair := branchNode.PairAt(branchNode.NumPairs() - 1)
 		rightLabel := fmt.Sprintf(">= %s", string(lastPair.Key))
 		displayNode(bpm, rightChildPageId, depth+1, rightLabel)

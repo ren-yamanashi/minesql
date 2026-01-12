@@ -2,11 +2,11 @@ package btree
 
 import (
 	"minesql/internal/storage/access/btree/node"
-	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 )
 
 type SearchMode interface {
-	childPageId(bn *node.BranchNode) disk.PageId
+	childPageId(bn *node.BranchNode) page.PageId
 }
 
 // =======================
@@ -15,7 +15,7 @@ type SearchMode interface {
 type SearchModeStart struct{}
 
 // 先頭の子ページIDを取得
-func (sm SearchModeStart) childPageId(bn *node.BranchNode) disk.PageId {
+func (sm SearchModeStart) childPageId(bn *node.BranchNode) page.PageId {
 	return bn.ChildPageIdAt(0)
 }
 
@@ -27,6 +27,6 @@ type SearchModeKey struct {
 }
 
 // 指定したキーに基づいて子ページIDを取得
-func (sm SearchModeKey) childPageId(bn *node.BranchNode) disk.PageId {
+func (sm SearchModeKey) childPageId(bn *node.BranchNode) page.PageId {
 	return bn.SearchChildPageId(sm.Key)
 }

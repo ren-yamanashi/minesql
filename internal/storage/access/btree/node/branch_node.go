@@ -1,17 +1,11 @@
 package node
 
 import (
-	"encoding/binary"
 	slottedpage "minesql/internal/storage/access/btree/slotted_page"
-	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 )
 
 const branchHeaderSize = 8
-
-type Header struct {
-	// 右の子ノードのポインタ (ページ ID)
-	RightChildPageId disk.PageId
-}
 
 type BranchNode struct {
 	// ページデータ全体 (ノードタイプヘッダー + ブランチノードヘッダー + Slotted Page のボディ)
@@ -82,20 +76,18 @@ func (bn *BranchNode) Insert(bufferId int, pair Pair) bool {
 // key: 最初のペアのキー
 // leftChildPageId: 最初のペアの value (左の子ページのページ ID)
 // rightChildPageId: ヘッダー部分に設定する右の子ページのページ ID
-func (bn *BranchNode) Initialize(key []byte, leftChildPageId disk.PageId, rightChildPageId disk.PageId) {
+func (bn *BranchNode) Initialize(key []byte, leftChildPageId page.PageId, rightChildPageId page.PageId) {
 	bn.body.Initialize()
 
-	// 左の子ページのポインタ (ページ ID) を value とした Pair を作成し
-	leftChildPageIdBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint64(leftChildPageIdBytes, uint64(leftChildPageId))
-	keyPair := NewPair(key, leftChildPageIdBytes)
+	// 左の子ページのポインタ (ページ ID) を value とした Pair を作成
+	keyPair := NewPair(key, leftChildPageId.ToBytes())
 
 	if !bn.Insert(0, keyPair) {
 		panic("new branch must have space")
 	}
 
 	// ヘッダー部分に右の子ページのポインタ (ページ ID) を設定
-	binary.LittleEndian.PutUint64(bn.Body()[0:8], uint64(rightChildPageId))
+	rightChildPageId.WriteTo(bn.Body(), 0)
 }
 
 // ブランチノードを分割しながらペアを挿入する
@@ -138,17 +130,17 @@ func (bn *BranchNode) SearchChildIdx(key []byte) int {
 }
 
 // 指定されたインデックスの、子ページのページ ID を取得する
-func (bn *BranchNode) ChildPageIdAt(childIdx int) disk.PageId {
+func (bn *BranchNode) ChildPageIdAt(childIdx int) page.PageId {
 	if childIdx == bn.NumPairs() {
 		// 右端の子ページ ID を返す
-		return disk.PageId(binary.LittleEndian.Uint64(bn.Body()[0:8]))
+		return page.ReadPageIdFrom(bn.Body(), 0)
 	}
 	pair := bn.PairAt(childIdx)
-	return disk.PageId(binary.LittleEndian.Uint64(pair.Value))
+	return page.PageIdFromBytes(pair.Value)
 }
 
 // キーから子ページのページ ID を検索する
-func (bn *BranchNode) SearchChildPageId(key []byte) disk.PageId {
+func (bn *BranchNode) SearchChildPageId(key []byte) page.PageId {
 	childIdx := bn.SearchChildIdx(key)
 	return bn.ChildPageIdAt(childIdx)
 }
@@ -168,15 +160,15 @@ func (bn *BranchNode) isHalfFull() bool {
 func (bn *BranchNode) fillRightChild() []byte {
 	lastId := bn.NumPairs() - 1
 	pair := bn.PairAt(lastId)
-	rightChild := binary.LittleEndian.Uint64(pair.Value)
+	rightChild := page.PageIdFromBytes(pair.Value)
 	key := make([]byte, len(pair.Key))
 
 	// キーをコピー
 	copy(key, pair.Key)
 	bn.body.Remove(lastId)
 
-	// ヘッダー部分に右子ページ ID を設定
-	binary.LittleEndian.PutUint64(bn.Body()[0:8], rightChild)
+	// ブランチノードのヘッダー部分に右子ページ ID を設定
+	rightChild.WriteTo(bn.Body(), 0)
 
 	return key
 }

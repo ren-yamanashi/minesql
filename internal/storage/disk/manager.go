@@ -1,27 +1,23 @@
 package disk
 
 import (
+	"fmt"
 	"io"
+	"minesql/internal/storage/page"
 	"os"
 )
 
-// ディスク I/O を抽象化するインターフェース
-type DiskManagerInterface interface {
-	ReadPageData(id PageId, data []byte) error
-	WritePageData(id PageId, data []byte) error
-	AllocatePage() PageId
-	Sync() error
-}
-
 type DiskManager struct {
+	// このディスクマネージャの FileId
+	fileId page.FileId
 	// ヒープファイルのファイルディスクリプタ
 	heapFile *os.File
-	// 採番するページ ID を決めるカウンタ
-	nextPageId PageId
+	// 次に採番するページ ID
+	nextPageId page.PageId
 }
 
 // 指定されたパスにあるディスク上のヒープファイルを管理する DiskManager を生成する
-func NewDiskManager(path string) (*DiskManager, error) {
+func NewDiskManager(fileId page.FileId, path string) (*DiskManager, error) {
 	file, err := os.OpenFile(
 		path,
 		os.O_RDWR|os.O_CREATE, // read-write モードで開き、存在しない場合は作成する
@@ -35,20 +31,26 @@ func NewDiskManager(path string) (*DiskManager, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	return &DiskManager{
+		fileId:     fileId,
 		heapFile:   file,
-		nextPageId: PageId(fileInfo.Size() / PAGE_SIZE),
+		nextPageId: page.NewPageId(fileId, page.PageNumber(fileInfo.Size()/page.PAGE_SIZE)),
 	}, nil
 }
 
 // 指定されたページ ID のページデータを data に読み込む (読み込んだデータは data に格納される)
 // data の長さは PAGE_SIZE と等しい必要がある
-func (disk *DiskManager) ReadPageData(id PageId, data []byte) error {
-	if len(data) != PAGE_SIZE {
-		return ErrInvalidDataSize
+func (disk *DiskManager) ReadPageData(id page.PageId, data []byte) error {
+	if len(data) != page.PAGE_SIZE {
+		return page.ErrInvalidDataSize
 	}
 
-	err := disk.seek(id)
+	if id.FileId != disk.fileId {
+		return fmt.Errorf("invalid FileId: expected %d, got %d", disk.fileId, id.FileId)
+	}
+
+	err := disk.seek(id.PageNumber)
 	if err != nil {
 		return err
 	}
@@ -62,12 +64,16 @@ func (disk *DiskManager) ReadPageData(id PageId, data []byte) error {
 
 // 指定されたページ ID に対応するページに data の内容を書き込む
 // data の長さは PAGE_SIZE と等しい必要がある
-func (disk *DiskManager) WritePageData(id PageId, data []byte) error {
-	if len(data) != PAGE_SIZE {
-		return ErrInvalidDataSize
+func (disk *DiskManager) WritePageData(id page.PageId, data []byte) error {
+	if len(data) != page.PAGE_SIZE {
+		return page.ErrInvalidDataSize
 	}
 
-	err := disk.seek(id)
+	if id.FileId != disk.fileId {
+		return fmt.Errorf("invalid FileId: expected %d, got %d", disk.fileId, id.FileId)
+	}
+
+	err := disk.seek(id.PageNumber)
 	if err != nil {
 		return err
 	}
@@ -76,16 +82,17 @@ func (disk *DiskManager) WritePageData(id PageId, data []byte) error {
 	if err != nil {
 		return err
 	}
-	if n != PAGE_SIZE {
+	if n != page.PAGE_SIZE {
 		return io.ErrShortWrite
 	}
 	return nil
 }
 
 // 新しいページ ID を採番する
-func (disk *DiskManager) AllocatePage() PageId {
+func (disk *DiskManager) AllocatePage() page.PageId {
 	id := disk.nextPageId
-	disk.nextPageId++
+	// 次のページ番号をインクリメント
+	disk.nextPageId = page.NewPageId(disk.fileId, disk.nextPageId.PageNumber+1)
 	return id
 }
 
@@ -94,9 +101,9 @@ func (disk *DiskManager) Sync() error {
 	return disk.heapFile.Sync()
 }
 
-// 指定されたページ ID に対応するページの先頭にシークする
-func (disk *DiskManager) seek(id PageId) error {
-	offset := PAGE_SIZE * uint64(id)                          // 開始位置を計算
+// 指定されたページ番号に対応するページの先頭にシークする
+func (disk *DiskManager) seek(pageNumber page.PageNumber) error {
+	offset := page.PAGE_SIZE * uint64(pageNumber)             // 開始位置を計算
 	_, err := disk.heapFile.Seek(int64(offset), io.SeekStart) // ファイルの先頭から offset バイト移動
 	if err != nil {
 		return err

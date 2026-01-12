@@ -4,25 +4,31 @@ import (
 	"minesql/internal/storage/access/btree"
 	"minesql/internal/storage/access/btree/node"
 	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 )
 
 type UniqueIndex struct {
-	MetaPageId disk.PageId
+	// インデックス名
+	Name string
+	// インデックスの内容が入っている B+Tree のメタページの ID
+	MetaPageId page.PageId
 	// セカンダリキーに含めるカラムを指定
 	SecondaryKey uint
 }
 
-func NewUniqueIndex(metaPageId disk.PageId, secondaryKey uint) *UniqueIndex {
+func NewUniqueIndex(name string, secondaryKey uint) *UniqueIndex {
 	return &UniqueIndex{
-		MetaPageId:   metaPageId,
+		Name:         name,
+		MetaPageId:   page.INVALID_PAGE_ID, // 初期化時には無効なページIDを設定 (Create 時に設定される)
 		SecondaryKey: secondaryKey,
 	}
 }
 
 // 空のユニークインデックスを新規作成する
-func (ui *UniqueIndex) Create(bpm *bufferpool.BufferPoolManager) error {
-	btr, err := btree.CreateBTree(bpm)
+// 事前に MetaPageId が設定されている必要がある
+func (ui *UniqueIndex) Create(bpm *bufferpool.BufferPoolManager, metaPageId page.PageId) error {
+	ui.MetaPageId = metaPageId
+	btr, err := btree.CreateBTree(bpm, metaPageId)
 	if err != nil {
 		return err
 	}

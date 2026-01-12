@@ -1,35 +1,69 @@
 package executor
 
 import (
+	"minesql/internal/storage"
 	"minesql/internal/storage/access/btree"
 	"minesql/internal/storage/access/table"
-	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/disk"
 )
 
 type IndexScan struct {
-	tableBtree *btree.BTree
-	// インデックスを走査するイテレータ
-	indexIterator *btree.Iterator
+	tableName  string
+	indexName  string
+	searchMode RecordSearchMode
 	// 継続条件を満たすかどうかを判定する関数
-	WhileCondition func(record Record) bool
+	whileCondition func(record Record) bool
+	indexIterator  *btree.Iterator
+	tableIterator  *btree.Iterator
+	// テーブル本体の B+Tree (プライマリキーで検索するために使用)
+	tableBTree *btree.BTree
 }
 
 func NewIndexScan(
-	tableMetaPageId disk.PageId,
-	indexIterator *btree.Iterator,
+	tableName string,
+	indexName string,
+	searchMode RecordSearchMode,
 	whileCondition func(record Record) bool,
 ) *IndexScan {
 	return &IndexScan{
-		tableBtree:     btree.NewBTree(tableMetaPageId),
-		indexIterator:  indexIterator,
-		WhileCondition: whileCondition,
+		tableName:      tableName,
+		indexName:      indexName,
+		searchMode:     searchMode,
+		whileCondition: whileCondition,
 	}
 }
 
 // 次の Record を取得する
 // データがない場合、継続条件を満たさない場合は (nil, nil) を返す
-func (is *IndexScan) Next(bpm *bufferpool.BufferPoolManager) (Record, error) {
+func (is *IndexScan) Next() (Record, error) {
+	engine := storage.GetStorageManager()
+	bpm := engine.GetBufferPoolManager()
+
+	// 初回実行時に B+Tree とイテレータを作成
+	if is.indexIterator == nil {
+		tbl, err := engine.GetTable(is.tableName)
+		if err != nil {
+			return nil, err
+		}
+		index, err := tbl.GetUniqueIndexByName(is.indexName)
+		if err != nil {
+			return nil, err
+		}
+
+		// インデックスの B+Tree を取得
+		indexBTree := btree.NewBTree(index.MetaPageId)
+
+		// テーブル本体の B+Tree を保持
+		is.tableBTree = btree.NewBTree(tbl.MetaPageId)
+
+		// インデックス用のイテレータを作成
+		indexIter, err := indexBTree.Search(bpm, is.searchMode.Encode())
+		if err != nil {
+			return nil, err
+		}
+		is.indexIterator = indexIter
+	}
+
+	// セカンダリインデックスから次のペアを取得
 	secondaryIndexPair, ok, err := is.indexIterator.Next(bpm)
 	if !ok {
 		return nil, nil
@@ -43,16 +77,16 @@ func (is *IndexScan) Next(bpm *bufferpool.BufferPoolManager) (Record, error) {
 	table.Decode(secondaryIndexPair.Key, &secondaryKey)
 
 	// 継続条件をチェック
-	if !is.WhileCondition(secondaryKey) {
+	if !is.whileCondition(secondaryKey) {
 		return nil, nil
 	}
 
-	// テーブルの B+Tree を検索
-	tableIterator, err := is.tableBtree.Search(bpm, btree.SearchModeKey{Key: secondaryIndexPair.Value})
+	// エンコードされたプライマリキーでテーブル本体を検索
+	is.tableIterator, err = is.tableBTree.Search(bpm, btree.SearchModeKey{Key: secondaryIndexPair.Value})
 	if err != nil {
 		return nil, err
 	}
-	tablePair, ok, err := tableIterator.Next(bpm)
+	tablePair, ok, err := is.tableIterator.Next(bpm)
 	if err != nil {
 		return nil, err
 	}

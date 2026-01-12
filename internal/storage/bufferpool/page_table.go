@@ -1,7 +1,7 @@
 package bufferpool
 
 import (
-	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 )
 
-type pageTable map[disk.PageId]BufferId
+type pageTable map[page.PageId]BufferId

@@ -1,7 +1,5 @@
 package executor
 
-import "minesql/internal/storage/bufferpool"
-
 type Filter struct {
 	InnerExecutor Executor
 	condition     func(Record) bool
@@ -16,10 +14,10 @@ func NewFilter(innerExecutor Executor, condition func(Record) bool) *Filter {
 
 // 次の Record を取得する
 // データがない場合、継続条件を満たさない場合は (nil, nil) を返す
-func (f *Filter) Next(bpm *bufferpool.BufferPoolManager) (Record, error) {
+func (f *Filter) Next() (Record, error) {
 	// 条件を満たすレコードを探す
 	for {
-		record, err := f.InnerExecutor.Next(bpm)
+		record, err := f.InnerExecutor.Next()
 		if err != nil {
 			return nil, err
 		}

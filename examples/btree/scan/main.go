@@ -6,20 +6,25 @@ import (
 	"minesql/internal/storage/access/btree"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 )
 
 func main() {
-	dbPath := "btree/test.db"
+	dataDir := "examples/btree/data"
+	dbPath := dataDir + "/test.db"
 
-	dm, err := disk.NewDiskManager(dbPath)
+	bpm := bufferpool.NewBufferPoolManager(10)
+	fileId := page.FileId(1)
+
+	// DiskManager を作成して登録
+	dm, err := disk.NewDiskManager(fileId, dbPath)
 	if err != nil {
 		panic(err)
 	}
-
-	bpm := bufferpool.NewBufferPoolManager(dm, 10)
+	bpm.RegisterDiskManager(fileId, dm)
 
 	// 既存の B+Tree を開く (MetaPageId は 0 と仮定)
-	tree := btree.NewBTree(0)
+	tree := btree.NewBTree(page.NewPageId(fileId, 0))
 
 	// 全データをスキャン
 	iter, err := tree.Search(bpm, btree.SearchModeStart{})

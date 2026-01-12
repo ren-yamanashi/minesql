@@ -2,36 +2,31 @@ package planner
 
 import (
 	"minesql/internal/executor"
-	"minesql/internal/storage/access/btree"
-	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/disk"
 )
 
 type SequentialScan struct {
-	TableMetaPageId disk.PageId
-	SearchMode      btree.SearchMode
-	// 継続条件を満たすかどうかを判定する関数
+	TableName      string
+	SearchMode     executor.RecordSearchMode
 	WhileCondition func(record executor.Record) bool
 }
 
 func NewSequentialScan(
-	tableMetaPageId disk.PageId,
-	searchMode btree.SearchMode,
+	tableName string,
+	searchMode executor.RecordSearchMode,
 	whileCondition func(record executor.Record) bool,
 ) SequentialScan {
 	return SequentialScan{
-		TableMetaPageId: tableMetaPageId,
-		SearchMode:      searchMode,
-		WhileCondition:  whileCondition,
+		TableName:      tableName,
+		SearchMode:     searchMode,
+		WhileCondition: whileCondition,
 	}
 }
 
 // 実行計画を開始し、Executor を返す
-func (ss *SequentialScan) Start(bpm *bufferpool.BufferPoolManager) (executor.Executor, error) {
-	btr := btree.NewBTree(ss.TableMetaPageId)
-	tableIterator, err := btr.Search(bpm, ss.SearchMode)
-	if err != nil {
-		return nil, err
-	}
-	return executor.NewSequentialScan(tableIterator, ss.WhileCondition), nil
+func (ss SequentialScan) Start() executor.Executor {
+	return executor.NewSequentialScan(
+		ss.TableName,
+		ss.SearchMode,
+		ss.WhileCondition,
+	)
 }

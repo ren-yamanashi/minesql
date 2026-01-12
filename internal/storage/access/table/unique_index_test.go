@@ -2,9 +2,6 @@ package table
 
 import (
 	"minesql/internal/storage/access/btree"
-	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/disk"
-	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,15 +10,17 @@ import (
 // Create と Insert をテスト
 func TestUniqueIndex(t *testing.T) {
 	t.Run("ユニークインデックスの作成ができ、そのインデックスに値が挿入できる", func(t *testing.T) {
-		tmpdir := t.TempDir()
-		path := filepath.Join(tmpdir, "test.db")
+		// GIVEN
+		uniqueIndex := NewUniqueIndex("test_index", 0)
+		bpm, metaPageId, _ := InitDiskManager(t, "test.db")
 
-		dm, _ := disk.NewDiskManager(path)
-		bpm := bufferpool.NewBufferPoolManager(dm, 10)
-		uniqueIndex := NewUniqueIndex(disk.PageId(0), 0)
+		// UniqueIndex の metaPageId を割り当て
+		indexMetapageId, err := bpm.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex.MetaPageId = indexMetapageId
 
 		// WHEN: ユニークインデックスを作成
-		err := uniqueIndex.Create(bpm)
+		err = uniqueIndex.Create(bpm, indexMetapageId)
 		assert.NoError(t, err)
 
 		// WHEN: インデックスに値を挿入

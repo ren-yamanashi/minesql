@@ -1,57 +1,47 @@
 package main
 
 import (
-	"minesql/internal/storage/access/table"
-	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/disk"
+	"minesql/internal/executor"
 )
 
 // テーブルを作成し、サンプルデータを挿入する
-func createTable(bpm *bufferpool.BufferPoolManager) table.Table {
-	// テーブルスキーマの定義
-	// インデックス 0: 名前 (2 番目のカラム)
-	// インデックス 1: 姓 (3 番目のカラム)
-	tbl := table.NewTable(
-		disk.PageId(0),
+func createTable() {
+	tableName := "users"
+
+	// テーブルを作成
+	createTable := executor.NewCreateTable()
+	err := createTable.Execute(
+		tableName,
 		1,
-		[]*table.UniqueIndex{
-			table.NewUniqueIndex(disk.INVALID_PAGE_ID, 1), // 名前のインデックス
-			table.NewUniqueIndex(disk.INVALID_PAGE_ID, 2), // 姓のインデックス
+		[]*executor.IndexParam{
+			{Name: "first_name", SecondaryKey: 1}, // 名前のインデックス
+			{Name: "last_name", SecondaryKey: 2},  // 姓のインデックス
 		},
 	)
-
-	err := tbl.Create(bpm)
 	if err != nil {
 		panic(err)
 	}
 
 	// レコードを挿入
-	err = tbl.Insert(bpm, [][]byte{[]byte("z"), []byte("Alice"), []byte("Smith")})
+	insert := executor.NewInsert(tableName)
+	err = insert.Execute([][]byte{[]byte("z"), []byte("Alice"), []byte("Smith")})
 	if err != nil {
 		panic(err)
 	}
-	err = tbl.Insert(bpm, [][]byte{[]byte("x"), []byte("Bob"), []byte("Johnson")})
+	err = insert.Execute([][]byte{[]byte("x"), []byte("Bob"), []byte("Johnson")})
 	if err != nil {
 		panic(err)
 	}
-	err = tbl.Insert(bpm, [][]byte{[]byte("y"), []byte("Charlie"), []byte("Williams")})
+	err = insert.Execute([][]byte{[]byte("y"), []byte("Charlie"), []byte("Williams")})
 	if err != nil {
 		panic(err)
 	}
-	err = tbl.Insert(bpm, [][]byte{[]byte("w"), []byte("Dave"), []byte("Miller")})
+	err = insert.Execute([][]byte{[]byte("w"), []byte("Dave"), []byte("Miller")})
 	if err != nil {
 		panic(err)
 	}
-	err = tbl.Insert(bpm, [][]byte{[]byte("v"), []byte("Eve"), []byte("Brown")})
+	err = insert.Execute([][]byte{[]byte("v"), []byte("Eve"), []byte("Brown")})
 	if err != nil {
 		panic(err)
 	}
-
-	// バッファプールの内容をディスクにフラッシュ
-	err = bpm.FlushPage()
-	if err != nil {
-		panic(err)
-	}
-
-	return tbl
 }

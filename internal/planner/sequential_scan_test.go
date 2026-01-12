@@ -2,11 +2,7 @@ package planner
 
 import (
 	"minesql/internal/executor"
-	"minesql/internal/storage/access/btree"
-	"minesql/internal/storage/access/table"
-	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/disk"
-	"path/filepath"
+	"minesql/internal/storage"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,57 +11,69 @@ import (
 func TestNewSequentialScan(t *testing.T) {
 	t.Run("正常に SequentialScan が生成される", func(t *testing.T) {
 		// GIVEN
-		tableMetaPageId := disk.PageId(42)
-		searchMode := btree.SearchModeStart{}
+		tableName := "users"
+		searchMode := executor.RecordSearchModeStart{}
 		whileCondition := func(record executor.Record) bool {
 			return true
 		}
 
 		// WHEN
-		ss := NewSequentialScan(tableMetaPageId, searchMode, whileCondition)
+		ss := NewSequentialScan(tableName, searchMode, whileCondition)
 
 		// THEN
-		assert.Equal(t, tableMetaPageId, ss.TableMetaPageId)
+		assert.Equal(t, tableName, ss.TableName)
 		assert.Equal(t, searchMode, ss.SearchMode)
 	})
 
 	t.Run("Start で Executor が生成される", func(t *testing.T) {
 		tmpdir := t.TempDir()
-		path := filepath.Join(tmpdir, "test.db")
-		dm, _ := disk.NewDiskManager(path)
-		bpm := bufferpool.NewBufferPoolManager(dm, 10)
-		table := InitTable(t, bpm)
+		InitStorageEngineForPlannerTest(t, tmpdir)
+		defer storage.ResetStorageManager()
 
 		// GIVEN
-		searchMode := btree.SearchModeStart{}
+		searchMode := executor.RecordSearchModeStart{}
 		whileCondition := func(record executor.Record) bool {
 			return true
 		}
-		ss := NewSequentialScan(table.MetaPageId, searchMode, whileCondition)
+		ss := NewSequentialScan("users", searchMode, whileCondition)
 
 		// WHEN
-		exec, err := ss.Start(bpm)
+		exec := ss.Start()
 
 		// THEN
-		assert.NoError(t, err)
 		assert.IsType(t, &executor.SequentialScan{}, exec)
 	})
 }
 
-func InitTable(t *testing.T, bpm *bufferpool.BufferPoolManager) table.Table {
-	uniqueIndexes := table.NewUniqueIndex(disk.INVALID_PAGE_ID, 2)
-	table := table.NewTable(disk.PageId(0), 1, []*table.UniqueIndex{uniqueIndexes})
+func InitStorageEngineForPlannerTest(t *testing.T, dataDir string) *storage.StorageManager {
+	t.Setenv("MINESQL_DATA_DIR", dataDir)
+	t.Setenv("MINESQL_BUFFER_SIZE", "10")
+
+	storage.ResetStorageManager()
+	storage.InitStorageManager()
+	engine := storage.GetStorageManager()
 
 	// テーブルを作成
-	err := table.Create(bpm)
+	createTable := executor.NewCreateTable()
+	err := createTable.Execute("users", 1, []*executor.IndexParam{
+		{Name: "last_name", SecondaryKey: 2},
+	})
 	assert.NoError(t, err)
+
+	tbl, err := engine.GetTable("users")
+	assert.NoError(t, err)
+
+	bpm := engine.GetBufferPoolManager()
 
 	// 行を挿入
-	err = table.Insert(bpm, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
-	err = table.Insert(bpm, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
-	err = table.Insert(bpm, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
-	err = table.Insert(bpm, [][]byte{[]byte("d"), []byte("Eve"), []byte("Davis")})
+	err = tbl.Insert(bpm, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+	assert.NoError(t, err)
+	err = tbl.Insert(bpm, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+	assert.NoError(t, err)
+	err = tbl.Insert(bpm, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
+	assert.NoError(t, err)
+	err = tbl.Insert(bpm, [][]byte{[]byte("d"), []byte("Eve"), []byte("Davis")})
 	assert.NoError(t, err)
 
-	return table
+	return engine
 }
