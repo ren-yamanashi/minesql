@@ -25,11 +25,11 @@ func TestCreateAndInsert(t *testing.T) {
 
 		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex})
 
-		// WHEN
+		// WHEN: テーブルを作成
 		err = table.Create(bpm)
 		assert.NoError(t, err)
 
-		// WHEN
+		// WHEN: 行を挿入
 		err = table.Insert(bpm, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		err = table.Insert(bpm, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		err = table.Insert(bpm, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})

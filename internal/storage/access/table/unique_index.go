@@ -19,7 +19,7 @@ type UniqueIndex struct {
 func NewUniqueIndex(name string, secondaryKey uint) *UniqueIndex {
 	return &UniqueIndex{
 		Name:         name,
-		MetaPageId:   page.INVALID_PAGE_ID,
+		MetaPageId:   page.INVALID_PAGE_ID, // 初期化時には無効なページIDを設定 (Create 時に設定される)
 		SecondaryKey: secondaryKey,
 	}
 }

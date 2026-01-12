@@ -19,18 +19,18 @@ func TestUniqueIndex(t *testing.T) {
 		assert.NoError(t, err)
 		uniqueIndex.MetaPageId = indexMetapageId
 
-		// WHEN
+		// WHEN: ユニークインデックスを作成
 		err = uniqueIndex.Create(bpm, indexMetapageId)
 		assert.NoError(t, err)
 
-		// WHEN
+		// WHEN: インデックスに値を挿入
 		err = uniqueIndex.Insert(bpm, []uint8{0}, [][]byte{[]byte("John")})
 		err = uniqueIndex.Insert(bpm, []uint8{1}, [][]byte{[]byte("Alice")})
 		err = uniqueIndex.Insert(bpm, []uint8{2}, [][]byte{[]byte("Eve")})
 		err = uniqueIndex.Insert(bpm, []uint8{3}, [][]byte{[]byte("Bob")})
 		assert.NoError(t, err)
 
-		// THEN
+		// THEN: 挿入したデータが B+Tree に存在する
 		tree := btree.NewBTree(uniqueIndex.MetaPageId)
 		iter, err := tree.Search(bpm, btree.SearchModeStart{})
 		assert.NoError(t, err)
