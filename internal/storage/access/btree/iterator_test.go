@@ -27,12 +27,37 @@ func TestNewIterator(t *testing.T) {
 	})
 }
 
+func TestGet(t *testing.T) {
+	t.Run("現在の key-value ペアが取得できる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		dm, _ := initDiskManagerForIterator(t, tmpdir)
+		bpm := bufferpool.NewBufferPoolManager(3)
+		bpm.RegisterDiskManager(page.FileId(0), dm)
+
+		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
+		pair2 := node.NewPair([]byte("key2"), []byte("value2"))
+		pair3 := node.NewPair([]byte("key3"), []byte("value3"))
+
+		bufferPage := createLeafBufferPage(page.NewPageId(page.FileId(0), page.PageNumber(0)), []node.Pair{pair1, pair2, pair3}, nil)
+		iterator := newIterator(bufferPage, 1) // 2番目のペアを指している
+
+		// WHEN
+		pair, ok := iterator.Get()
+
+		// THEN
+		assert.True(t, ok)
+		assert.Equal(t, []byte("key2"), pair.Key)
+		assert.Equal(t, []byte("value2"), pair.Value)
+	})
+}
+
 func TestAdvance(t *testing.T) {
 	t.Run("現在のページ内に、まだ次の key-value ペアがある場合は何もしない", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		dm, _ := initDiskManagerForIterator(t, tmpdir)
-		bpm := bufferpool.NewBufferPoolManager(3, tmpdir)
+		bpm := bufferpool.NewBufferPoolManager(3)
 		bpm.RegisterDiskManager(page.FileId(0), dm)
 
 		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
@@ -54,7 +79,7 @@ func TestAdvance(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		dm, _ := initDiskManagerForIterator(t, tmpdir)
-		bpm := bufferpool.NewBufferPoolManager(3, tmpdir)
+		bpm := bufferpool.NewBufferPoolManager(3)
 		bpm.RegisterDiskManager(page.FileId(0), dm)
 
 		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
@@ -75,7 +100,7 @@ func TestAdvance(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		dm, _ := initDiskManagerForIterator(t, tmpdir)
-		bpm := bufferpool.NewBufferPoolManager(3, tmpdir)
+		bpm := bufferpool.NewBufferPoolManager(3)
 		bpm.RegisterDiskManager(page.FileId(0), dm)
 
 		// 最初のページ
@@ -116,7 +141,7 @@ func TestNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		dm, _ := initDiskManagerForIterator(t, tmpdir)
-		bpm := bufferpool.NewBufferPoolManager(3, tmpdir)
+		bpm := bufferpool.NewBufferPoolManager(3)
 		bpm.RegisterDiskManager(page.FileId(0), dm)
 
 		pair1 := node.NewPair([]byte("key1"), []byte("value1"))

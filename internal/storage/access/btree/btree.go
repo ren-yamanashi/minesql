@@ -18,7 +18,7 @@ type BTree struct {
 }
 
 // 新しい B+Tree を作成
-// 渡された metaPageId を使ってメタページを初期化し、ルートノード (リーフノード) を作成する
+// 指定された metaPageId を使ってメタページを初期化し、ルートノード (リーフノード) を作成する
 func CreateBTree(bpm *bufferpool.BufferPoolManager, metaPageId page.PageId) (*BTree, error) {
 	// メタページを初期化
 	metaBuf, err := bpm.AddPage(metaPageId)
