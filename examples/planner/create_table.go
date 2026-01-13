@@ -28,7 +28,10 @@ func createTable() {
 	)
 
 	plan := planner.NewPlanner()
-	exec := plan.Plan(ast)
+	exec, err := plan.PlanStart(ast)
+	if err != nil {
+		panic(err)
+	}
 	records, err := executor.ExecutePlan(exec)
 	if err != nil {
 		panic(err)

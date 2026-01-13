@@ -4,6 +4,7 @@ import "minesql/internal/planner/ast/identifier"
 
 type UniqueKeyDef struct {
 	DefType DefType
+	KeyName string
 	Columns []identifier.ColumnId
 }
 
