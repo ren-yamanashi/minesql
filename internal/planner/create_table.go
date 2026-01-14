@@ -2,6 +2,7 @@ package planner
 
 import (
 	"errors"
+	"fmt"
 	"minesql/internal/executor"
 	"minesql/internal/planner/ast/definition"
 	"minesql/internal/planner/ast/statement"
@@ -18,88 +19,69 @@ func NewCreateTableNode(stmt *statement.CreateTableStmt) *CreateTableNode {
 }
 
 func (ctn *CreateTableNode) Next() (executor.Executor, error) {
+	colIndexMap := map[string]int{} // key: column name, value: column index
 	columnNames := []string{}
-	pkColumns := []string{}
-	uniqueKeys := []struct {
-		name string
-		cols []string
-	}{}
 
+	var pkDef *definition.PrimaryKeyDef
+	var ukDefs []*definition.UniqueKeyDef
+
+	currentColIdx := 0
 	for _, def := range ctn.Stmt.CreateDefinitions {
 		switch def := def.(type) {
 		case *definition.ColumnDef:
+			if _, exists := colIndexMap[def.ColName]; exists {
+				return nil, errors.New("duplicate column name: " + def.ColName)
+			}
+			colIndexMap[def.ColName] = currentColIdx
 			columnNames = append(columnNames, def.ColName)
+			currentColIdx++
+
 		case *definition.PrimaryKeyDef:
-			if len(pkColumns) > 0 {
-				return nil, errors.New("multiple primary keys defined")
+			if pkDef != nil {
+				return nil, fmt.Errorf("multiple primary keys defined")
 			}
-			for _, col := range def.Columns {
-				pkColumns = append(pkColumns, col.ColName)
-			}
+			pkDef = def
+
 		case *definition.UniqueKeyDef:
-			uniqueKeyColumnNames := []string{}
-			if len(def.Columns) == 0 {
-				return nil, errors.New("unique key must have at least one column")
-			}
-			if len(uniqueKeyColumnNames) != 1 {
-				return nil, errors.New("only single-column unique keys are supported")
-			}
-			for _, col := range def.Columns {
-				uniqueKeyColumnNames = append(uniqueKeyColumnNames, col.ColName)
-			}
-			uniqueKeys = append(uniqueKeys, struct {
-				name string
-				cols []string
-			}{
-				name: def.KeyName,
-				cols: uniqueKeyColumnNames,
-			})
-		default:
-			continue
+			ukDefs = append(ukDefs, def)
 		}
 	}
 
-	if len(pkColumns) == 0 {
+	if pkDef == nil {
 		return nil, errors.New("primary key is required")
 	}
 
-	primaryKeyIndexes := []int{}
-	for i, colName := range columnNames {
-		for _, pkCol := range pkColumns {
-			if colName == pkCol {
-				primaryKeyIndexes = append(primaryKeyIndexes, i)
-			}
-		}
-	}
-	if len(primaryKeyIndexes) != len(pkColumns) {
-		return nil, errors.New("primary key columns not found in table columns")
-	}
-	if primaryKeyIndexes[0] != 0 {
-		return nil, errors.New("the first column must be part of the primary key")
+	if len(pkDef.Columns) > len(columnNames) {
+		return nil, errors.New("primary key columns exceed total columns")
 	}
 
-	primaryKeyCount := 0
-	for i, idx := range primaryKeyIndexes {
+	for i, pkCol := range pkDef.Columns {
+		idx, exists := colIndexMap[pkCol.ColName]
+		if !exists {
+			return nil, fmt.Errorf("primary key column '%s' does not exist", pkCol.ColName)
+		}
 		if idx != i {
-			return nil, errors.New("primary key columns must be contiguous starting from the first column")
-		}
-		primaryKeyCount++
-	}
-
-	uniqueKeyParams := []*executor.IndexParam{}
-	for i, colName := range columnNames {
-		for _, uniqueKey := range uniqueKeys {
-			if colName == uniqueKey.cols[0] {
-				uniqueKeyParams = append(uniqueKeyParams, &executor.IndexParam{
-					Name:         uniqueKey.name,
-					SecondaryKey: uint(i),
-				})
-			}
+			return nil, errors.New("primary key columns must be defined in order starting from the first column")
 		}
 	}
-	if len(uniqueKeyParams) != len(uniqueKeys) {
-		return nil, errors.New("unique key columns not found in table columns")
+
+	uniqueKeyParams := make([]*executor.IndexParam, 0, len(ukDefs))
+	for _, ukDef := range ukDefs {
+		if len(ukDef.Columns) == 0 {
+			return nil, fmt.Errorf("unique key '%s' must have at least one column", ukDef.KeyName)
+		}
+		if len(ukDef.Columns) != 1 {
+			return nil, fmt.Errorf("only single-column unique keys are supported currently")
+		}
+		idx, exists := colIndexMap[ukDef.Columns[0].ColName]
+		if !exists {
+			return nil, fmt.Errorf("unique key column '%s' does not exist", ukDef.Columns[0].ColName)
+		}
+		uniqueKeyParams = append(uniqueKeyParams, &executor.IndexParam{
+			Name:         ukDef.KeyName,
+			SecondaryKey: uint(idx),
+		})
 	}
 
-	return executor.NewCreateTable(ctn.Stmt.TableName, primaryKeyCount, uniqueKeyParams), nil
+	return executor.NewCreateTable(ctn.Stmt.TableName, len(pkDef.Columns), uniqueKeyParams), nil
 }
