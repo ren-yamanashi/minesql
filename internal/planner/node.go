@@ -6,17 +6,11 @@ import (
 	"minesql/internal/planner/ast/statement"
 )
 
-type Node interface {
+type PlannerNode interface {
 	Start() executor.Executor
 }
 
-type Planner struct{}
-
-func NewPlanner() *Planner {
-	return &Planner{}
-}
-
-func (p *Planner) PlanStart(stmt statement.Statement) (executor.Executor, error) {
+func PlanStart(stmt statement.Statement) (executor.Executor, error) {
 	switch s := stmt.(type) {
 	case *statement.CreateTableStmt:
 		ctn := NewCreateTableNode(s)

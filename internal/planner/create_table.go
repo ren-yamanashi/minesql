@@ -47,24 +47,42 @@ func (ctn *CreateTableNode) Next() (executor.Executor, error) {
 		}
 	}
 
-	if pkDef == nil {
-		return nil, errors.New("primary key is required")
+	if err := validatePkDef(pkDef, colIndexMap); err != nil {
+		return nil, err
 	}
 
-	if len(pkDef.Columns) > len(columnNames) {
-		return nil, errors.New("primary key columns exceed total columns")
+	uniqueKeyParams, err := getUkParams(ukDefs, colIndexMap)
+	if err != nil {
+		return nil, err
+	}
+
+	return executor.NewCreateTable(ctn.Stmt.TableName, len(pkDef.Columns), uniqueKeyParams), nil
+}
+
+func validatePkDef(pkDef *definition.PrimaryKeyDef, colIndexMap map[string]int) error {
+	if pkDef == nil {
+		return errors.New("primary key is required")
+	}
+	if len(pkDef.Columns) == 0 {
+		return errors.New("primary key must have at least one column")
+	}
+	if len(pkDef.Columns) > len(colIndexMap) {
+		return errors.New("primary key columns exceed total columns")
 	}
 
 	for i, pkCol := range pkDef.Columns {
 		idx, exists := colIndexMap[pkCol.ColName]
 		if !exists {
-			return nil, fmt.Errorf("primary key column '%s' does not exist", pkCol.ColName)
+			return fmt.Errorf("primary key column '%s' does not exist", pkCol.ColName)
 		}
 		if idx != i {
-			return nil, errors.New("primary key columns must be defined in order starting from the first column")
+			return errors.New("primary key columns must be defined in order starting from the first column")
 		}
 	}
+	return nil
+}
 
+func getUkParams(ukDefs []*definition.UniqueKeyDef, colIndexMap map[string]int) ([]*executor.IndexParam, error) {
 	uniqueKeyParams := make([]*executor.IndexParam, 0, len(ukDefs))
 	for _, ukDef := range ukDefs {
 		if len(ukDef.Columns) == 0 {
@@ -82,6 +100,5 @@ func (ctn *CreateTableNode) Next() (executor.Executor, error) {
 			SecondaryKey: uint(idx),
 		})
 	}
-
-	return executor.NewCreateTable(ctn.Stmt.TableName, len(pkDef.Columns), uniqueKeyParams), nil
+	return uniqueKeyParams, nil
 }

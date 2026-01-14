@@ -3,11 +3,11 @@ package planner
 import "minesql/internal/executor"
 
 type Filter struct {
-	InnerPlanNode Node
+	InnerPlanNode PlannerNode
 	Condition     func(executor.Record) bool
 }
 
-func NewFilter(innerPlanNode Node, condition func(executor.Record) bool) Filter {
+func NewFilter(innerPlanNode PlannerNode, condition func(executor.Record) bool) Filter {
 	return Filter{
 		InnerPlanNode: innerPlanNode,
 		Condition:     condition,

@@ -9,7 +9,7 @@ import (
 )
 
 func createTable() {
-	ast := statement.NewCreateTableStmt(
+	stmt := statement.NewCreateTableStmt(
 		"users",
 		[]definition.Definition{
 			definition.NewColumnDef("id", definition.DataTypeInt),
@@ -27,8 +27,7 @@ func createTable() {
 		},
 	)
 
-	plan := planner.NewPlanner()
-	exec, err := plan.PlanStart(ast)
+	exec, err := planner.PlanStart(stmt)
 	if err != nil {
 		panic(err)
 	}
