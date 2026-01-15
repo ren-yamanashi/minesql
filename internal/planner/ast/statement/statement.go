@@ -4,6 +4,7 @@ import "minesql/internal/planner/ast/node"
 
 const (
 	StmtTypeCreate StmtType = "create"
+	StmtTypeInsert StmtType = "insert"
 )
 
 type StmtType string

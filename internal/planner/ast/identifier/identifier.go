@@ -5,7 +5,8 @@ import "minesql/internal/planner/ast/node"
 type IdType string
 
 const (
-	TypeColumn IdType = "column"
+	IdTypeColumn IdType = "column"
+	IdTypeTable  IdType = "table"
 )
 
 type Identifier interface {
