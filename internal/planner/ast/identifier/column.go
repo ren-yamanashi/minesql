@@ -1,13 +1,13 @@
 package identifier
 
 type ColumnId struct {
-	IdType IdType
+	IdType  IdType
 	ColName string
 }
 
 func NewColumnId(name string) *ColumnId {
 	return &ColumnId{
-		IdType: TypeColumn,
+		IdType:  TypeColumn,
 		ColName: name,
 	}
 }
