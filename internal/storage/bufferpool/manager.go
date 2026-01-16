@@ -130,6 +130,13 @@ func (bpm *BufferPoolManager) UnRefPage(pageId page.PageId) {
 	}
 }
 
+// 指定されたページの参照ビットをセット
+func (bpm *BufferPoolManager) RefPage(pageId page.PageId) {
+	if bufferId, ok := bpm.pageTable[pageId]; ok {
+		bpm.bufpool.BufferPages[bufferId].Referenced = true
+	}
+}
+
 // バッファプール内のすべてのダーティーページをディスクに書き出す
 func (bpm *BufferPoolManager) FlushPage() error {
 	for pageId, bufferId := range bpm.pageTable {
