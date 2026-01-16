@@ -25,7 +25,7 @@ func (p *Pair) ToBytes() []byte {
 	valueSize := uint32(len(p.Value))
 	data := make([]byte, 4+keySize+valueSize)
 
-	binary.LittleEndian.PutUint32(data[0:4], keySize)
+	binary.BigEndian.PutUint32(data[0:4], keySize)
 	copy(data[4:4+len(p.Key)], p.Key)
 	copy(data[4+len(p.Key):], p.Value)
 
@@ -48,7 +48,7 @@ func pairFromBytes(data []byte) Pair {
 		return NewPair(nil, nil)
 	}
 
-	keySize := binary.LittleEndian.Uint32(data[0:4])
+	keySize := binary.BigEndian.Uint32(data[0:4])
 
 	// キー部分がデータ長を超えている場合は不正なデータなので、空のペアを返す
 	if len(data) < int(4+keySize) {

@@ -46,8 +46,8 @@ func (p *PageId) IsInvalid() bool {
 // 先頭4バイトに FileId、次の4バイトに PageNumber が格納される
 func (p *PageId) ToBytes() []byte {
 	buf := make([]byte, 8)
-	binary.LittleEndian.PutUint32(buf[0:4], uint32(p.FileId))
-	binary.LittleEndian.PutUint32(buf[4:8], uint32(p.PageNumber))
+	binary.BigEndian.PutUint32(buf[0:4], uint32(p.FileId))
+	binary.BigEndian.PutUint32(buf[4:8], uint32(p.PageNumber))
 	return buf
 }
 
@@ -57,21 +57,21 @@ func PageIdFromBytes(data []byte) PageId {
 		panic("data size must be 8 bytes to convert to PageId")
 	}
 	return PageId{
-		FileId:     FileId(binary.LittleEndian.Uint32(data[0:4])),
-		PageNumber: PageNumber(binary.LittleEndian.Uint32(data[4:8])),
+		FileId:     FileId(binary.BigEndian.Uint32(data[0:4])),
+		PageNumber: PageNumber(binary.BigEndian.Uint32(data[4:8])),
 	}
 }
 
 // PageId を指定位置に書き込む
 func (p PageId) WriteTo(data []byte, offset int) {
-	binary.LittleEndian.PutUint32(data[offset:offset+4], uint32(p.FileId))
-	binary.LittleEndian.PutUint32(data[offset+4:offset+8], uint32(p.PageNumber))
+	binary.BigEndian.PutUint32(data[offset:offset+4], uint32(p.FileId))
+	binary.BigEndian.PutUint32(data[offset+4:offset+8], uint32(p.PageNumber))
 }
 
 // 指定位置から PageId を読み取る
 func ReadPageIdFrom(data []byte, offset int) PageId {
 	return PageId{
-		FileId:     FileId(binary.LittleEndian.Uint32(data[offset : offset+4])),
-		PageNumber: PageNumber(binary.LittleEndian.Uint32(data[offset+4 : offset+8])),
+		FileId:     FileId(binary.BigEndian.Uint32(data[offset : offset+4])),
+		PageNumber: PageNumber(binary.BigEndian.Uint32(data[offset+4 : offset+8])),
 	}
 }
