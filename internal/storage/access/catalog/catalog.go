@@ -14,9 +14,6 @@ var (
 	ErrInvalidCatalogFile = fmt.Errorf("invalid database catalog file: magic number mismatch")
 )
 
-type Header struct {
-}
-
 type Catalog struct {
 	// [テーブルのメタページの PageNumber | インデックスのメタページの PageNumber | カラムのメタページの PageNumber] を格納するヘッダーページ
 	header           page.Page

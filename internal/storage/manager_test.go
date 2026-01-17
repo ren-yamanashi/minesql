@@ -172,3 +172,72 @@ func TestRegisterTable(t *testing.T) {
 		assert.Equal(t, tbl, retrievedTbl)
 	})
 }
+
+func TestInitCatalog(t *testing.T) {
+	t.Run("カタログファイルが存在しない場合、新しいカタログが作成される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "10")
+		ResetStorageManager()
+
+		// WHEN
+		engine := InitStorageManager()
+
+		// THEN
+		assert.NotNil(t, engine)
+		assert.NotNil(t, engine.catalog)
+		assert.Equal(t, uint64(0), engine.catalog.NextTableId)
+	})
+
+	t.Run("カタログファイルが既に存在する場合、既存のカタログが開かれる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "10")
+		ResetStorageManager()
+
+		// 最初の初期化でカタログを作成
+		engine1 := InitStorageManager()
+		cat1 := engine1.GetCatalog()
+
+		// テーブルIDを採番してディスクに保存
+		bpm := engine1.GetBufferPoolManager()
+		_, err := cat1.AllocateTableId(bpm)
+		assert.NoError(t, err)
+		_, err = cat1.AllocateTableId(bpm)
+		assert.NoError(t, err)
+
+		// ダーティーページをディスクにフラッシュ
+		err = bpm.FlushPage()
+		assert.NoError(t, err)
+
+		// StorageManager をリセット
+		ResetStorageManager()
+
+		// WHEN: 同じディレクトリで再初期化
+		engine2 := InitStorageManager()
+		cat2 := engine2.GetCatalog()
+
+		// THEN: NextTableId が保存された値 (2) になっている
+		assert.NotNil(t, cat2)
+		assert.Equal(t, uint64(2), cat2.NextTableId)
+	})
+
+	t.Run("カタログの DiskManager が BufferPoolManager に登録される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "10")
+		ResetStorageManager()
+
+		// WHEN
+		engine := InitStorageManager()
+
+		// THEN
+		bpm := engine.GetBufferPoolManager()
+		dm, err := bpm.GetDiskManager(page.FileId(0))
+		assert.NoError(t, err)
+		assert.NotNil(t, dm)
+	})
+}

@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewInsertPlanner(t *testing.T) {
+func TestNewInsert(t *testing.T) {
 	t.Run("正常に InsertPlanner が生成される", func(t *testing.T) {
 		// GIVEN
 		stmt := statement.NewInsertStmt(
@@ -34,9 +34,7 @@ func TestNewInsertPlanner(t *testing.T) {
 		assert.NotNil(t, planner)
 		assert.Equal(t, stmt, planner.Stmt)
 	})
-}
 
-func TestInsertPlanner_Next(t *testing.T) {
 	t.Run("単一レコードの挿入で Executor が生成される", func(t *testing.T) {
 		// GIVEN
 		stmt := statement.NewInsertStmt(
