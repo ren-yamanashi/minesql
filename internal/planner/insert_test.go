@@ -35,6 +35,75 @@ func TestNewInsert(t *testing.T) {
 		assert.Equal(t, stmt, planner.Stmt)
 	})
 
+	t.Run("カラム名が空の場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		stmt := statement.NewInsertStmt(
+			*identifier.NewTableId("users", ""),
+			[]identifier.ColumnId{},
+			[][]literal.Literal{
+				{
+					literal.NewStringLiteral("'1'", "1"),
+					literal.NewStringLiteral("'Alice'", "Alice"),
+				},
+			},
+		)
+		planner := NewInsertPlanner(stmt)
+
+		// WHEN
+		exec, err := planner.Next()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "column names cannot be empty")
+	})
+
+	t.Run("値の数がカラム数と一致しない場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		stmt := statement.NewInsertStmt(
+			*identifier.NewTableId("users", ""),
+			[]identifier.ColumnId{
+				*identifier.NewColumnId("id"),
+				*identifier.NewColumnId("name"),
+			},
+			[][]literal.Literal{
+				{
+					literal.NewStringLiteral("'1'", "1"),
+				},
+			},
+		)
+		planner := NewInsertPlanner(stmt)
+
+		// WHEN
+		exec, err := planner.Next()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "number of values does not match number of columns")
+	})
+
+	t.Run("挿入するレコードが空の場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		stmt := statement.NewInsertStmt(
+			*identifier.NewTableId("users", ""),
+			[]identifier.ColumnId{
+				*identifier.NewColumnId("id"),
+				*identifier.NewColumnId("name"),
+			},
+			[][]literal.Literal{},
+		)
+		planner := NewInsertPlanner(stmt)
+
+		// WHEN
+		exec, err := planner.Next()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "records cannot be empty")
+	})
+
 	t.Run("単一レコードの挿入で Executor が生成される", func(t *testing.T) {
 		// GIVEN
 		stmt := statement.NewInsertStmt(

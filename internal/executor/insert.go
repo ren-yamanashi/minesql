@@ -1,7 +1,6 @@
 package executor
 
 import (
-	"errors"
 	"fmt"
 	"minesql/internal/storage"
 )
@@ -12,18 +11,12 @@ type Insert struct {
 	records   [][][]byte
 }
 
-func NewInsert(tableName string, colNames []string, records [][][]byte) (*Insert, error) {
-	if len(colNames) == 0 {
-		return nil, errors.New("column names cannot be empty")
-	}
-	if len(records) == 0 {
-		return nil, errors.New("records cannot be empty")
-	}
+func NewInsert(tableName string, colNames []string, records [][][]byte) *Insert {
 	return &Insert{
 		tableName: tableName,
 		colNames:  colNames,
 		records:   records,
-	}, nil
+	}
 }
 
 func (ins *Insert) Next() (Record, error) {

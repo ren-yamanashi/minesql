@@ -19,44 +19,13 @@ func TestNewInsert(t *testing.T) {
 		}
 
 		// WHEN
-		insert, err := NewInsert(tableName, cols, records)
+		insert := NewInsert(tableName, cols, records)
 
 		// THEN
-		assert.NoError(t, err)
 		assert.NotNil(t, insert)
 		assert.Equal(t, tableName, insert.tableName)
 		assert.Equal(t, cols, insert.colNames)
 		assert.Equal(t, records, insert.records)
-	})
-
-	t.Run("カラム名が空の場合、エラーが発生する", func(t *testing.T) {
-		// GIVEN
-		tableName := "users"
-		cols := []string{}
-		records := [][][]byte{
-			{[]byte("1"), []byte("Alice")},
-		}
-
-		// WHEN
-		_, err := NewInsert(tableName, cols, records)
-
-		// THEN
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "column names cannot be empty")
-	})
-
-	t.Run("レコードが空の場合、エラーが発生する", func(t *testing.T) {
-		// GIVEN
-		tableName := "users"
-		cols := []string{"id", "name"}
-		records := [][][]byte{}
-
-		// WHEN
-		_, err := NewInsert(tableName, cols, records)
-
-		// THEN
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "records cannot be empty")
 	})
 }
 
@@ -77,9 +46,8 @@ func TestExecute(t *testing.T) {
 		}
 
 		// WHEN
-		insert, err := NewInsert(tableName, cols, records)
-		assert.NoError(t, err)
-		_, err = insert.Next()
+		insert := NewInsert(tableName, cols, records)
+		_, err := insert.Next()
 
 		// THEN
 		assert.Error(t, err)
@@ -108,8 +76,7 @@ func TestExecute(t *testing.T) {
 		}
 
 		// WHEN
-		insert, err := NewInsert(tableName, cols, records)
-		assert.NoError(t, err)
+		insert := NewInsert(tableName, cols, records)
 		_, err = insert.Next()
 
 		// THEN
@@ -143,8 +110,7 @@ func TestExecute(t *testing.T) {
 		}
 
 		// WHEN
-		insert, err := NewInsert(tableName, cols, records)
-		assert.NoError(t, err)
+		insert := NewInsert(tableName, cols, records)
 		_, err = insert.Next()
 
 		// THEN
