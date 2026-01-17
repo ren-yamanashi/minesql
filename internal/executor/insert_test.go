@@ -29,7 +29,7 @@ func TestNewInsert(t *testing.T) {
 		assert.Equal(t, records, insert.records)
 	})
 
-	t.Run("カラム名が空の場合、panic が発生する", func(t *testing.T) {
+	t.Run("カラム名が空の場合、エラーが発生する", func(t *testing.T) {
 		// GIVEN
 		tableName := "users"
 		cols := []string{}
@@ -45,7 +45,7 @@ func TestNewInsert(t *testing.T) {
 		assert.Contains(t, err.Error(), "column names cannot be empty")
 	})
 
-	t.Run("レコードが空の場合、panic が発生する", func(t *testing.T) {
+	t.Run("レコードが空の場合、エラーが発生する", func(t *testing.T) {
 		// GIVEN
 		tableName := "users"
 		cols := []string{"id", "name"}
