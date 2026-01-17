@@ -100,7 +100,7 @@ func displayTreeStructure(bpm *bufferpool.BufferPoolManager, tree *btree.BTree) 
 	}
 	defer bpm.UnRefPage(tree.MetaPageId)
 
-	meta := metapage.NewMetaPage(metaBuf.Page[:])
+	meta := metapage.NewMetaPage(metaBuf.GetReadData())
 	rootPageId := meta.RootPageId()
 
 	// ルートノードを表示
@@ -118,10 +118,10 @@ func displayNode(bpm *bufferpool.BufferPoolManager, pageId page.PageId, depth in
 	}
 	defer bpm.UnRefPage(pageId)
 
-	nodeType := node.GetNodeType(nodeBuf.Page[:])
+	nodeType := node.GetNodeType(nodeBuf.GetReadData())
 
 	if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
-		leafNode := node.NewLeafNode(nodeBuf.Page[:])
+		leafNode := node.NewLeafNode(nodeBuf.GetReadData())
 		keys := make([]string, 0, leafNode.NumPairs())
 		for i := 0; i < leafNode.NumPairs(); i++ {
 			pair := leafNode.PairAt(i)
@@ -132,7 +132,7 @@ func displayNode(bpm *bufferpool.BufferPoolManager, pageId page.PageId, depth in
 			indent, label, pageId, strings.Join(keys, ", "))
 	} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
 		// ブランチノードの場合
-		branchNode := node.NewBranchNode(nodeBuf.Page[:])
+		branchNode := node.NewBranchNode(nodeBuf.GetReadData())
 		keys := make([]string, 0, branchNode.NumPairs())
 		for i := 0; i < branchNode.NumPairs(); i++ {
 			pair := branchNode.PairAt(i)

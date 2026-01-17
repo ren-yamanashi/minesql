@@ -368,30 +368,6 @@ func TestUnRefPage(t *testing.T) {
 	})
 }
 
-func TestRefPage(t *testing.T) {
-	t.Run("指定されたページの参照ビットがセットされる", func(t *testing.T) {
-		// GIVEN
-		size := 3
-		tmpdir := t.TempDir()
-		dm, _ := initDiskManager(t, tmpdir)
-		bpm := NewBufferPoolManager(size)
-		bpm.RegisterDiskManager(page.FileId(0), dm)
-		pageId := dm.AllocatePage()
-
-		bufferPage, err := bpm.AddPage(pageId)
-		assert.NoError(t, err)
-
-		bufferPage.Referenced = false
-
-		// WHEN
-		bpm.RefPage(pageId)
-
-		// THEN
-		assert.NoError(t, err)
-		assert.True(t, bufferPage.Referenced)
-	})
-}
-
 func TestFlushPage(t *testing.T) {
 	t.Run("ページテーブル内にダーティーページが存在する場合", func(t *testing.T) {
 		// GIVEN

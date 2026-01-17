@@ -115,14 +115,13 @@ func TestAdvance(t *testing.T) {
 		bufferPage2 := createLeafBufferPage(page.NewPageId(page.FileId(0), page.PageNumber(1)), []node.Pair{pair3, pair4}, nil)
 
 		// 次のページをディスクに書き込む
-		err := dm.WritePageData(page.NewPageId(page.FileId(0), page.PageNumber(1)), bufferPage2.Page[:])
+		err := dm.WritePageData(page.NewPageId(page.FileId(0), page.PageNumber(1)), bufferPage2.GetReadData())
 		assert.NoError(t, err)
 
 		// ページ1をバッファプールに追加
 		addedPage1, err := bpm.AddPage(page.NewPageId(page.FileId(0), page.PageNumber(0)))
 		assert.NoError(t, err)
-		copy(addedPage1.Page[:], bufferPage1.Page[:])
-		addedPage1.Referenced = true // 参照ビットをセット
+		copy(addedPage1.GetWriteData(), bufferPage1.GetReadData())
 
 		iterator := newIterator(*addedPage1, 1) // 最後のペアを指している
 
@@ -176,7 +175,7 @@ func TestNext(t *testing.T) {
 func createLeafBufferPage(pageId page.PageId, pairs []node.Pair, nextPageId *page.PageId) bufferpool.BufferPage {
 	bufpool := bufferpool.NewBufferPage(pageId)
 
-	leafNode := node.NewLeafNode(bufpool.Page[:])
+	leafNode := node.NewLeafNode(bufpool.GetWriteData())
 	leafNode.Initialize()
 
 	// ペアを挿入

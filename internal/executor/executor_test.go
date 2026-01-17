@@ -2,6 +2,7 @@ package executor
 
 import (
 	"minesql/internal/storage"
+	"minesql/internal/storage/access/catalog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -67,6 +68,9 @@ func TestExecutePlan(t *testing.T) {
 
 		createTable := NewCreateTable("users", 1, []*IndexParam{
 			{Name: "name", SecondaryKey: 1},
+		}, []*ColumnParam{
+			{Name: "id", Type: catalog.ColumnTypeString},
+			{Name: "name", Type: catalog.ColumnTypeString},
 		})
 		_, err := createTable.Next()
 		assert.NoError(t, err)

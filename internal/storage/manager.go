@@ -3,6 +3,7 @@ package storage
 import (
 	"fmt"
 	"minesql/internal/config"
+	"minesql/internal/storage/access/catalog"
 	"minesql/internal/storage/access/table"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
@@ -20,7 +21,11 @@ var (
 // グローバルな StorageManager を初期化する
 func InitStorageManager() *StorageManager {
 	once.Do(func() {
-		manager = newStorageManager()
+		mng, err := newStorageManager()
+		if err != nil {
+			panic(fmt.Sprintf("failed to initialize storage manager: %v", err))
+		}
+		manager = mng
 	})
 	return manager
 }
@@ -36,23 +41,35 @@ func GetStorageManager() *StorageManager {
 type StorageManager struct {
 	bufferPoolManager *bufferpool.BufferPoolManager
 	tables            map[string]*table.Table
+	catalog           *catalog.Catalog
 	baseDirectory     string
 }
 
-func newStorageManager() *StorageManager {
+func newStorageManager() (*StorageManager, error) {
 	dataDir := config.GetDataDirectory()
 	os.MkdirAll(dataDir, 0755)
 
+	bpm := bufferpool.NewBufferPoolManager(config.GetBufferPoolSize())
+	catalog, err := initCatalog(dataDir, bpm)
+	if err != nil {
+		return nil, err
+	}
 	return &StorageManager{
-		bufferPoolManager: bufferpool.NewBufferPoolManager(config.GetBufferPoolSize()),
+		bufferPoolManager: bpm,
 		tables:            make(map[string]*table.Table),
 		baseDirectory:     dataDir,
-	}
+		catalog:           catalog,
+	}, nil
 }
 
 // BufferPoolManager を取得する
 func (se *StorageManager) GetBufferPoolManager() *bufferpool.BufferPoolManager {
 	return se.bufferPoolManager
+}
+
+// カタログを取得する
+func (se *StorageManager) GetCatalog() *catalog.Catalog {
+	return se.catalog
 }
 
 // テーブル名から Table を取得する
@@ -78,4 +95,36 @@ func (se *StorageManager) RegisterDmToBpm(fileId page.FileId, tableName string) 
 // テーブルを登録する
 func (se *StorageManager) RegisterTable(tbl *table.Table) {
 	se.tables[tbl.Name] = tbl
+}
+
+// カタログを初期化する
+func initCatalog(baseDir string, bpm *bufferpool.BufferPoolManager) (*catalog.Catalog, error) {
+	fileId := page.FileId(0)
+	path := filepath.Join(baseDir, "minesql.db")
+
+	dm, err := disk.NewDiskManager(fileId, path)
+	if err != nil {
+		return nil, err
+	}
+	bpm.RegisterDiskManager(fileId, dm)
+
+	// カタログファイルが存在するかチェック
+	_, err = os.Stat(path)
+
+	var cat *catalog.Catalog
+	if os.IsNotExist(err) {
+		// 新しいカタログを作成
+		cat, err = catalog.CreateCatalog(bpm)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		// 既存のカタログを開く
+		cat, err = catalog.NewCatalog(bpm)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return cat, nil
 }

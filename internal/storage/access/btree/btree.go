@@ -25,7 +25,7 @@ func CreateBTree(bpm *bufferpool.BufferPoolManager, metaPageId page.PageId) (*BT
 	if err != nil {
 		return nil, err
 	}
-	meta := metapage.NewMetaPage(metaBuf.Page[:])
+	meta := metapage.NewMetaPage(metaBuf.GetWriteData())
 
 	// ルートノード (リーフノード) を作成
 	rootNodePageId, err := bpm.AllocatePageId(metaPageId.FileId)
@@ -36,7 +36,7 @@ func CreateBTree(bpm *bufferpool.BufferPoolManager, metaPageId page.PageId) (*BT
 	if err != nil {
 		return nil, err
 	}
-	rootLeafNode := node.NewLeafNode(rootBuf.Page[:])
+	rootLeafNode := node.NewLeafNode(rootBuf.GetWriteData())
 	rootLeafNode.Initialize()
 
 	// メタページにルートページIDを設定
@@ -67,7 +67,7 @@ func (bt *BTree) Insert(bpm *bufferpool.BufferPoolManager, pair node.Pair) error
 	}
 	// メタページは使い終わったらすぐ不要になる (優先的に evict されたい) ので、 UnRefPage する
 	defer bpm.UnRefPage(bt.MetaPageId)
-	meta := metapage.NewMetaPage(metaBuf.Page[:])
+	meta := metapage.NewMetaPage(metaBuf.GetReadData())
 	rootPageId := meta.RootPageId()
 	rootPageBuf, err := bpm.FetchPage(rootPageId)
 	if err != nil {
@@ -93,11 +93,12 @@ func (bt *BTree) Insert(bpm *bufferpool.BufferPoolManager, pair node.Pair) error
 		return err
 	}
 	defer bpm.UnRefPage(newRootPageId)
-	newRootBranchNode := node.NewBranchNode(newRootBuf.Page[:])
+	newRootBranchNode := node.NewBranchNode(newRootBuf.GetWriteData())
 	newRootBranchNode.Initialize(overflowKey, *overflowChildPageId, rootPageId)
+
+	// 書き込みが必要なので、meta を GetWriteData() で再取得
+	meta = metapage.NewMetaPage(metaBuf.GetWriteData())
 	meta.SetRootPageId(newRootBuf.PageId)
-	metaBuf.IsDirty = true
-	newRootBuf.IsDirty = true
 	return nil
 }
 
@@ -110,7 +111,7 @@ func (bt *BTree) fetchRootPage(bpm *bufferpool.BufferPoolManager) (*bufferpool.B
 	}
 	// メタページは使い終わったらすぐ不要になる (優先的に evict されたい) ので、 UnRefPage する
 	defer bpm.UnRefPage(bt.MetaPageId)
-	meta := metapage.NewMetaPage(metaBuf.Page[:])
+	meta := metapage.NewMetaPage(metaBuf.GetReadData())
 
 	// ルートページを取得
 	rootPageId := meta.RootPageId()
@@ -120,13 +121,13 @@ func (bt *BTree) fetchRootPage(bpm *bufferpool.BufferPoolManager) (*bufferpool.B
 // 再起的にノードを辿って該当のリーフノードを見つける
 // 戻り値: リーフノードのイテレータ
 func (bt *BTree) searchRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer *bufferpool.BufferPage, searchMode SearchMode) (*Iterator, error) {
-	nodeType := node.GetNodeType(nodeBuffer.Page[:])
+	nodeType := node.GetNodeType(nodeBuffer.GetReadData())
 
 	if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
 		// ブランチノードの場合、再起呼び出し後に UnRefPage を呼び出す (優先的に evict されたいため、不要になったらすぐ UnRefPage する)
 		defer bpm.UnRefPage(nodeBuffer.PageId)
 
-		branchNode := node.NewBranchNode(nodeBuffer.Page[:])
+		branchNode := node.NewBranchNode(nodeBuffer.GetReadData())
 
 		// 子ノードのページを取得
 		childPageId := (func() page.PageId {
@@ -146,7 +147,7 @@ func (bt *BTree) searchRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 		// 再帰呼び出し
 		return bt.searchRecursively(bpm, childNodePage, searchMode)
 	} else if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
-		leafNode := node.NewLeafNode(nodeBuffer.Page[:])
+		leafNode := node.NewLeafNode(nodeBuffer.GetReadData())
 		bufferId := (func() int {
 			switch sm := searchMode.(type) {
 			case SearchModeStart:
@@ -175,10 +176,10 @@ func (bt *BTree) searchRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 
 // 戻り値: (オーバーフローキー, 新しいページ ID, エラー)
 func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer *bufferpool.BufferPage, pair node.Pair) ([]byte, *page.PageId, error) {
-	nodeType := node.GetNodeType(nodeBuffer.Page[:])
+	nodeType := node.GetNodeType(nodeBuffer.GetReadData())
 
 	if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
-		leafNode := node.NewLeafNode(nodeBuffer.Page[:])
+		leafNode := node.NewLeafNode(nodeBuffer.GetWriteData())
 		bufferId, found := leafNode.SearchBufferId(pair.Key)
 		if found {
 			return nil, nil, ErrDuplicateKey
@@ -186,7 +187,6 @@ func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 
 		// リーフノードに挿入できた場合、終了
 		if leafNode.Insert(bufferId, pair) {
-			nodeBuffer.IsDirty = true
 			return nil, nil, nil
 		}
 
@@ -217,27 +217,24 @@ func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 
 		// 前のリーフノードが存在する場合、そのリーフノードに格納されている nextPageId を、新しいリーフノードのページID に更新する
 		if prevLeafBuffer != nil {
-			prevLeafNode := node.NewLeafNode(prevLeafBuffer.Page[:])
+			prevLeafNode := node.NewLeafNode(prevLeafBuffer.GetWriteData())
 			prevLeafNode.SetNextPageId(&newLeafBuffer.PageId)
-			prevLeafBuffer.IsDirty = true
 		}
 
 		// 新しいリーフノードに分割挿入する
-		newLeafNode := node.NewLeafNode(newLeafBuffer.Page[:])
+		newLeafNode := node.NewLeafNode(newLeafBuffer.GetWriteData())
 		newLeafNode.Initialize()
 		leafNode.SplitInsert(newLeafNode, pair)
 		newLeafNode.SetNextPageId(&nodeBuffer.PageId)
 		newLeafNode.SetPrevPageId(prevLeafPageId)
 		leafNode.SetPrevPageId(&newLeafBuffer.PageId)
-		nodeBuffer.IsDirty = true
-		newLeafBuffer.IsDirty = true
 
 		// overflowKey は古いリーフノードの先頭のキー (親ノードの境界キーになる)
 		overflowKey := leafNode.PairAt(0).Key
 		return overflowKey, &newLeafBuffer.PageId, nil
 	} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
 		// 挿入先の子ノードを取得
-		branchNode := node.NewBranchNode(nodeBuffer.Page[:])
+		branchNode := node.NewBranchNode(nodeBuffer.GetWriteData())
 		childIndex := branchNode.SearchChildIdx(pair.Key)
 		childPageId := branchNode.ChildPageIdAt(childIndex)
 		childNodeBuffer, err := bpm.FetchPage(childPageId)
@@ -260,7 +257,6 @@ func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 		// 子ノードが分割された場合、子ノードから返されたキーとページIDをペアとして、ブランチノードに挿入
 		overFlowPair := node.NewPair(overflowKeyFromChild, overflowChildPageId.ToBytes())
 		if branchNode.Insert(childIndex, overFlowPair) {
-			nodeBuffer.IsDirty = true
 			return nil, nil, nil
 		}
 
@@ -274,10 +270,8 @@ func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 			return nil, nil, err
 		}
 		defer bpm.UnRefPage(newBranchPageId)
-		newBranchNode := node.NewBranchNode(newBranchBuffer.Page[:])
+		newBranchNode := node.NewBranchNode(newBranchBuffer.GetWriteData())
 		overflowKey := branchNode.SplitInsert(newBranchNode, overFlowPair)
-		nodeBuffer.IsDirty = true
-		newBranchBuffer.IsDirty = true
 
 		return overflowKey, &newBranchBuffer.PageId, nil
 	}

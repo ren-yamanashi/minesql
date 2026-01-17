@@ -21,3 +21,16 @@ func NewBufferPage(pageId page.PageId) *BufferPage {
 		IsDirty:    false,
 	}
 }
+
+// 書き込み用のデータを取得する (IsDirty と Referenced を true にセットする)
+func (bp *BufferPage) GetWriteData() []byte {
+	bp.IsDirty = true
+	bp.Referenced = true
+	return bp.Page[:]
+}
+
+// 読み込み用のデータを取得する (Referenced のみを true にセットする)
+func (bp *BufferPage) GetReadData() []byte {
+	bp.Referenced = true
+	return bp.Page[:]
+}
