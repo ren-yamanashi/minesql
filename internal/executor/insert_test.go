@@ -53,7 +53,36 @@ func TestExecute(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("カラム名がテーブルのカラムと一致しない場合、エラーになる", func(t *testing.T) {})
+	t.Run("カラム名がテーブルのカラムと一致しない場合、エラーになる", func(t *testing.T) {
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "10")
+		storage.ResetStorageManager()
+		storage.InitStorageManager()
+		defer storage.ResetStorageManager()
+
+		tableName := "users"
+		createTable := NewCreateTable(tableName, 1, nil, []*ColumnParam{
+			{Name: "id", Type: catalog.ColumnTypeString},
+			{Name: "name", Type: catalog.ColumnTypeString},
+		})
+		_, err := createTable.Next()
+		assert.NoError(t, err)
+
+		// GIVEN
+		cols := []string{"id", "email"} // "email" は存在しないカラム
+		records := [][][]byte{
+			{[]byte("1"), []byte("alice@example.com")},
+		}
+
+		// WHEN
+		insert := NewInsert(tableName, cols, records)
+		_, err = insert.Next()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "column name does not match")
+	})
 
 	t.Run("正常にレコードを挿入できる", func(t *testing.T) {
 		tmpdir := t.TempDir()
