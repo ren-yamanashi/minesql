@@ -95,8 +95,6 @@ func (bt *BTree) Insert(bpm *bufferpool.BufferPoolManager, pair node.Pair) error
 	defer bpm.UnRefPage(newRootPageId)
 	newRootBranchNode := node.NewBranchNode(newRootBuf.GetWriteData())
 	newRootBranchNode.Initialize(overflowKey, *overflowChildPageId, rootPageId)
-
-	// 書き込みが必要なので、meta を GetWriteData() で再取得
 	meta = metapage.NewMetaPage(metaBuf.GetWriteData())
 	meta.SetRootPageId(newRootBuf.PageId)
 	return nil
