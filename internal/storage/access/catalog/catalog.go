@@ -30,7 +30,10 @@ type Catalog struct {
 // 既存のカタログを開く
 func NewCatalog(bpm *bufferpool.BufferPoolManager) (*Catalog, error) {
 	fileId := page.FileId(0) // カタログ専用の FileId を使用
-	headerPageId := page.NewPageId(fileId, page.PageNumber(1))
+	headerPageId, err := bpm.AllocatePageId(fileId)
+	if err != nil {
+		return nil, err
+	}
 
 	// ヘッダーページを読み込む
 	bufPage, err := bpm.FetchPage(headerPageId)

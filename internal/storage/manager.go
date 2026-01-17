@@ -102,25 +102,26 @@ func initCatalog(baseDir string, bpm *bufferpool.BufferPoolManager) (*catalog.Ca
 	fileId := page.FileId(0)
 	path := filepath.Join(baseDir, "minesql.db")
 
+	// カタログファイルが存在するかチェック (DiskManager 作成前に確認)
+	_, err := os.Stat(path)
+	catalogExists := !os.IsNotExist(err)
+
 	dm, err := disk.NewDiskManager(fileId, path)
 	if err != nil {
 		return nil, err
 	}
 	bpm.RegisterDiskManager(fileId, dm)
 
-	// カタログファイルが存在するかチェック
-	_, err = os.Stat(path)
-
 	var cat *catalog.Catalog
-	if os.IsNotExist(err) {
-		// 新しいカタログを作成
-		cat, err = catalog.CreateCatalog(bpm)
+	if catalogExists {
+		// 既存のカタログを開く
+		cat, err = catalog.NewCatalog(bpm)
 		if err != nil {
 			return nil, err
 		}
 	} else {
-		// 既存のカタログを開く
-		cat, err = catalog.NewCatalog(bpm)
+		// 新しいカタログを作成
+		cat, err = catalog.CreateCatalog(bpm)
 		if err != nil {
 			return nil, err
 		}

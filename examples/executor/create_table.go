@@ -2,6 +2,7 @@ package main
 
 import (
 	"minesql/internal/executor"
+	"minesql/internal/storage/access/catalog"
 )
 
 // テーブルを作成し、サンプルデータを挿入する
@@ -12,6 +13,10 @@ func createTable() {
 	createTable := executor.NewCreateTable(tableName, 1, []*executor.IndexParam{
 		{Name: "first_name", SecondaryKey: 1}, // 名前のインデックス
 		{Name: "last_name", SecondaryKey: 2},  // 姓のインデックス
+	}, []*executor.ColumnParam{
+		{Name: "id", Type: catalog.ColumnTypeString},
+		{Name: "first_name", Type: catalog.ColumnTypeString},
+		{Name: "last_name", Type: catalog.ColumnTypeString},
 	})
 	printRecords(createTable)
 
