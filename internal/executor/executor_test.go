@@ -66,12 +66,16 @@ func TestExecutePlan(t *testing.T) {
 		defer storage.ResetStorageManager()
 
 		tableName := "users"
-		createTable := NewCreateTable(tableName, 1, []*IndexParam{
-			{Name: "name", SecondaryKey: 1},
-		}, []*ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "name", Type: catalog.ColumnTypeString},
-		})
+		createTable := NewCreateTable(
+			tableName,
+			1,
+			[]*IndexParam{
+				{Name: "name", SecondaryKey: 1},
+			},
+			[]*ColumnParam{
+				{Name: "id", Type: catalog.ColumnTypeString},
+				{Name: "name", Type: catalog.ColumnTypeString},
+			})
 		_, err := createTable.Next()
 		assert.NoError(t, err)
 
