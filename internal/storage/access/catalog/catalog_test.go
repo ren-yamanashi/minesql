@@ -51,7 +51,6 @@ func TestCreateCatalog(t *testing.T) {
 	})
 }
 
-
 func TestAllocateTableId(t *testing.T) {
 	t.Run("テーブルIDを順番に採番できる", func(t *testing.T) {
 		// GIVEN
