@@ -27,9 +27,9 @@ type IndexMetadata struct {
 
 func NewIndexMetadata(tableId uint64, name string, indexType IndexType, dataMetaPageId page.PageId) IndexMetadata {
 	return IndexMetadata{
-		TableId: tableId,
-		Name:    name,
-		Type:    indexType,
+		TableId:        tableId,
+		Name:           name,
+		Type:           indexType,
 		DataMetaPageId: dataMetaPageId,
 	}
 }

@@ -20,7 +20,7 @@ func TestNewInsert(t *testing.T) {
 
 		// WHEN
 		insert, err := NewInsert(tableName, cols, records)
-		
+
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, insert)
@@ -39,7 +39,7 @@ func TestNewInsert(t *testing.T) {
 
 		// WHEN
 		_, err := NewInsert(tableName, cols, records)
-		
+
 		// THEN
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "column names cannot be empty")
@@ -53,7 +53,7 @@ func TestNewInsert(t *testing.T) {
 
 		// WHEN
 		_, err := NewInsert(tableName, cols, records)
-		
+
 		// THEN
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "records cannot be empty")

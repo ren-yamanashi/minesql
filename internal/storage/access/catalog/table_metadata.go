@@ -24,11 +24,11 @@ type TableMetadata struct {
 
 func NewTableMetadata(tableId uint64, name string, nCols uint8, cols []ColumnMetadata, indexes []IndexMetadata, dataMetaPageId page.PageId) TableMetadata {
 	return TableMetadata{
-		TableId: tableId,
-		Name:    name,
-		NCols:   nCols,
-		Cols:    cols,
-		Indexes: indexes,
+		TableId:        tableId,
+		Name:           name,
+		NCols:          nCols,
+		Cols:           cols,
+		Indexes:        indexes,
 		DataMetaPageId: dataMetaPageId,
 	}
 }
