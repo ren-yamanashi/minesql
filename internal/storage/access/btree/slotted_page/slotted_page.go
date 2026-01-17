@@ -17,12 +17,12 @@ func (sp *SlottedPage) Capacity() int {
 
 // Slotted Page のヘッダーから現在のスロット数を読み取る
 func (sp *SlottedPage) NumSlots() int {
-	return int(binary.LittleEndian.Uint16(sp.data[0:2]))
+	return int(binary.BigEndian.Uint16(sp.data[0:2]))
 }
 
 // Slotted Page の空き領域のサイズを返す
 func (sp *SlottedPage) FreeSpace() int {
-	freeSpaceOffset := int(binary.LittleEndian.Uint16(sp.data[2:4]))
+	freeSpaceOffset := int(binary.BigEndian.Uint16(sp.data[2:4]))
 	pointersSize := pointerSize * sp.NumSlots()
 	// MEMO: `- headerSize` しない方が良いかも
 	return freeSpaceOffset - pointersSize - headerSize
@@ -37,9 +37,9 @@ func (sp *SlottedPage) Data(index int) []byte {
 
 // Slotted Page を初期化する
 func (sp *SlottedPage) Initialize() {
-	binary.LittleEndian.PutUint16(sp.data[0:2], 0)                    // numSlots
-	binary.LittleEndian.PutUint16(sp.data[2:4], uint16(len(sp.data))) // freeOffset = end of data
-	binary.LittleEndian.PutUint32(sp.data[4:8], 0)                    // _pad
+	binary.BigEndian.PutUint16(sp.data[0:2], 0)                    // numSlots
+	binary.BigEndian.PutUint16(sp.data[2:4], uint16(len(sp.data))) // freeOffset = end of data
+	binary.BigEndian.PutUint32(sp.data[4:8], 0)                    // _pad
 }
 
 // 指定されたインデックスにサイズ分のデータを挿入する (領域の確保のみを行い、実際のデータの書き込みは行わない)
@@ -59,14 +59,14 @@ func (sp *SlottedPage) Insert(index int, size int) bool {
 	}
 
 	numSlots := sp.NumSlots()
-	freeSpaceOffset := int(binary.LittleEndian.Uint16(sp.data[2:4]))
+	freeSpaceOffset := int(binary.BigEndian.Uint16(sp.data[2:4]))
 
 	// freeSpaceOffset を減らす
 	newFreeSpaceOffset := freeSpaceOffset - size
-	binary.LittleEndian.PutUint16(sp.data[2:4], uint16(newFreeSpaceOffset))
+	binary.BigEndian.PutUint16(sp.data[2:4], uint16(newFreeSpaceOffset))
 
 	// numSlots を増やす
-	binary.LittleEndian.PutUint16(sp.data[0:2], uint16(numSlots+1))
+	binary.BigEndian.PutUint16(sp.data[0:2], uint16(numSlots+1))
 
 	// ポインタ配列をシフト (index 以降を右にずらす)
 	if index < numSlots {
@@ -100,7 +100,7 @@ func (sp *SlottedPage) Resize(index int, newSize int) bool {
 		return false
 	}
 
-	freeSpaceOffset := int(binary.LittleEndian.Uint16(sp.data[2:4]))
+	freeSpaceOffset := int(binary.BigEndian.Uint16(sp.data[2:4]))
 	oldOffset := int(pointer.offset)
 
 	// データ領域をシフト (空き領域を拡張または縮小)
@@ -110,7 +110,7 @@ func (sp *SlottedPage) Resize(index int, newSize int) bool {
 	copy(sp.data[newFreeSpaceOffset:newFreeSpaceOffset+(shiftEnd-shiftStart)], sp.data[shiftStart:shiftEnd])
 
 	// freeSpaceOffset を更新
-	binary.LittleEndian.PutUint16(sp.data[2:4], uint16(newFreeSpaceOffset))
+	binary.BigEndian.PutUint16(sp.data[2:4], uint16(newFreeSpaceOffset))
 
 	// 影響を受けるポインタのオフセットを更新
 	for i := 0; i < sp.NumSlots(); i++ {
@@ -146,21 +146,21 @@ func (sp *SlottedPage) Remove(index int) {
 	}
 
 	// numSlots を減らす
-	binary.LittleEndian.PutUint16(sp.data[0:2], uint16(numSlots-1))
+	binary.BigEndian.PutUint16(sp.data[0:2], uint16(numSlots-1))
 }
 
 // 指定されたインデックスのポインタを取得する
 func (sp *SlottedPage) pointerAt(index int) Pointer {
 	base := headerSize + index*pointerSize
 	return newPointer(
-		binary.LittleEndian.Uint16(sp.data[base:base+2]),
-		binary.LittleEndian.Uint16(sp.data[base+2:base+4]),
+		binary.BigEndian.Uint16(sp.data[base:base+2]),
+		binary.BigEndian.Uint16(sp.data[base+2:base+4]),
 	)
 }
 
 // 指定されたインデックスのポインタを設定する
 func (sp *SlottedPage) setPointer(index int, pointer Pointer) {
 	base := headerSize + index*pointerSize
-	binary.LittleEndian.PutUint16(sp.data[base:base+2], pointer.offset) // offset
-	binary.LittleEndian.PutUint16(sp.data[base+2:base+4], pointer.size) // size
+	binary.BigEndian.PutUint16(sp.data[base:base+2], pointer.offset) // offset
+	binary.BigEndian.PutUint16(sp.data[base+2:base+4], pointer.size) // size
 }

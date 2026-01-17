@@ -75,12 +75,11 @@ func (bpm *BufferPoolManager) FetchPage(pageId page.PageId) (*BufferPage, error)
 	}
 
 	// ディスクからページを読み込む
-	err = dm.ReadPageData(pageId, bufferPage.Page[:])
+	err = dm.ReadPageData(pageId, bufferPage.GetReadData())
 	if err != nil {
 		return nil, err
 	}
 	bufferPage.PageId = pageId
-	bufferPage.Referenced = true
 	bufferPage.IsDirty = false
 
 	return bufferPage, nil
@@ -106,7 +105,7 @@ func (bpm *BufferPoolManager) AddPage(pageId page.PageId) (*BufferPage, error) {
 			return nil, err
 		}
 		// ダーティーページをディスクに書き出す
-		err = dm.WritePageData(bufferPageForEvict.PageId, bufferPageForEvict.Page[:])
+		err = dm.WritePageData(bufferPageForEvict.PageId, bufferPageForEvict.GetReadData())
 		if err != nil {
 			return nil, err
 		}
@@ -145,7 +144,7 @@ func (bpm *BufferPoolManager) FlushPage() error {
 		}
 
 		// ダーティーページをディスクに書き出す
-		err = dm.WritePageData(pageId, bufferPage.Page[:])
+		err = dm.WritePageData(pageId, bufferPage.GetReadData())
 		if err != nil {
 			return err
 		}

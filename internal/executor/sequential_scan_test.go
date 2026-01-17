@@ -2,6 +2,7 @@ package executor
 
 import (
 	"minesql/internal/storage"
+	"minesql/internal/storage/access/catalog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -115,6 +116,10 @@ func InitStorageEngineForTest(t *testing.T, dataDir string) *storage.StorageMana
 	// テーブルを作成
 	createTable := NewCreateTable("users", 1, []*IndexParam{
 		{Name: "last_name", SecondaryKey: 2},
+	}, []*ColumnParam{
+		{Name: "id", Type: catalog.ColumnTypeString},
+		{Name: "first_name", Type: catalog.ColumnTypeString},
+		{Name: "last_name", Type: catalog.ColumnTypeString},
 	})
 	_, err := createTable.Next()
 	assert.NoError(t, err)

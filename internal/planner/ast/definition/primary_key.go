@@ -2,16 +2,16 @@ package definition
 
 import "minesql/internal/planner/ast/identifier"
 
-type PrimaryKeyDef struct {
+type ConstraintPrimaryKeyDef struct {
 	DefType DefType
 	Columns []identifier.ColumnId
 }
 
-func NewConstraintPrimaryKeyDef(columns []identifier.ColumnId) *PrimaryKeyDef {
-	return &PrimaryKeyDef{
+func NewConstraintPrimaryKeyDef(columns []identifier.ColumnId) *ConstraintPrimaryKeyDef {
+	return &ConstraintPrimaryKeyDef{
 		DefType: DefTypeConstraintPrimaryKey,
 		Columns: columns,
 	}
 }
 
-func (pkd *PrimaryKeyDef) definitionNode() {}
+func (pkd *ConstraintPrimaryKeyDef) definitionNode() {}

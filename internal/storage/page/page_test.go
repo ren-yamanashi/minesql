@@ -127,15 +127,15 @@ func TestToBytes(t *testing.T) {
 
 		// THEN
 		assert.Equal(t, 8, len(bytes))
-		// Little Endian で格納されているか確認
-		assert.Equal(t, byte(0x78), bytes[0])
-		assert.Equal(t, byte(0x56), bytes[1])
-		assert.Equal(t, byte(0x34), bytes[2])
-		assert.Equal(t, byte(0x12), bytes[3])
-		assert.Equal(t, byte(0x00), bytes[4])
-		assert.Equal(t, byte(0xEF), bytes[5])
-		assert.Equal(t, byte(0xCD), bytes[6])
-		assert.Equal(t, byte(0xAB), bytes[7])
+		// Big Endian で格納されているか確認
+		assert.Equal(t, byte(0x12), bytes[0])
+		assert.Equal(t, byte(0x34), bytes[1])
+		assert.Equal(t, byte(0x56), bytes[2])
+		assert.Equal(t, byte(0x78), bytes[3])
+		assert.Equal(t, byte(0xAB), bytes[4])
+		assert.Equal(t, byte(0xCD), bytes[5])
+		assert.Equal(t, byte(0xEF), bytes[6])
+		assert.Equal(t, byte(0x00), bytes[7])
 	})
 
 	t.Run("FileId と PageNumber が 0 の PageId をバイト列に変換できる", func(t *testing.T) {
@@ -154,7 +154,7 @@ func TestToBytes(t *testing.T) {
 func TestPageIdFromBytes(t *testing.T) {
 	t.Run("バイト列から PageId を復元できる", func(t *testing.T) {
 		// GIVEN
-		bytes := []byte{0x78, 0x56, 0x34, 0x12, 0x00, 0xEF, 0xCD, 0xAB}
+		bytes := []byte{0x12, 0x34, 0x56, 0x78, 0xAB, 0xCD, 0xEF, 0x00}
 
 		// WHEN
 		pageId := PageIdFromBytes(bytes)
@@ -198,14 +198,14 @@ func TestWriteTo(t *testing.T) {
 
 		// THEN
 		// offset 4 から 8 バイト分に PageId が書き込まれているか確認
-		assert.Equal(t, byte(0x78), data[4])
-		assert.Equal(t, byte(0x56), data[5])
-		assert.Equal(t, byte(0x34), data[6])
-		assert.Equal(t, byte(0x12), data[7])
-		assert.Equal(t, byte(0x00), data[8])
-		assert.Equal(t, byte(0xEF), data[9])
-		assert.Equal(t, byte(0xCD), data[10])
-		assert.Equal(t, byte(0xAB), data[11])
+		assert.Equal(t, byte(0x12), data[4])
+		assert.Equal(t, byte(0x34), data[5])
+		assert.Equal(t, byte(0x56), data[6])
+		assert.Equal(t, byte(0x78), data[7])
+		assert.Equal(t, byte(0xAB), data[8])
+		assert.Equal(t, byte(0xCD), data[9])
+		assert.Equal(t, byte(0xEF), data[10])
+		assert.Equal(t, byte(0x00), data[11])
 		// 他の部分は 0 のまま
 		assert.Equal(t, byte(0), data[0])
 		assert.Equal(t, byte(0), data[3])
@@ -223,21 +223,21 @@ func TestWriteTo(t *testing.T) {
 
 		// THEN
 		// offset 0 から 8 バイト分に PageId が書き込まれているか確認
-		assert.Equal(t, byte(1), data[0])
+		assert.Equal(t, byte(0), data[0])
 		assert.Equal(t, byte(0), data[1])
 		assert.Equal(t, byte(0), data[2])
-		assert.Equal(t, byte(0), data[3])
-		assert.Equal(t, byte(2), data[4])
+		assert.Equal(t, byte(1), data[3])
+		assert.Equal(t, byte(0), data[4])
 		assert.Equal(t, byte(0), data[5])
 		assert.Equal(t, byte(0), data[6])
-		assert.Equal(t, byte(0), data[7])
+		assert.Equal(t, byte(2), data[7])
 	})
 }
 
 func TestReadPageIdFrom(t *testing.T) {
 	t.Run("指定位置から PageId を読み取れる", func(t *testing.T) {
 		// GIVEN
-		data := []byte{0, 0, 0, 0, 0x78, 0x56, 0x34, 0x12, 0x00, 0xEF, 0xCD, 0xAB, 0, 0, 0, 0}
+		data := []byte{0, 0, 0, 0, 0x12, 0x34, 0x56, 0x78, 0xAB, 0xCD, 0xEF, 0x00, 0, 0, 0, 0}
 
 		// WHEN
 		pageId := ReadPageIdFrom(data, 4)
@@ -249,7 +249,7 @@ func TestReadPageIdFrom(t *testing.T) {
 
 	t.Run("offset 0 から PageId を読み取れる", func(t *testing.T) {
 		// GIVEN
-		data := []byte{1, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+		data := []byte{0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0}
 
 		// WHEN
 		pageId := ReadPageIdFrom(data, 0)

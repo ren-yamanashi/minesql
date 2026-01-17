@@ -6,6 +6,7 @@ import (
 	"minesql/internal/executor"
 	"minesql/internal/planner/ast/definition"
 	"minesql/internal/planner/ast/statement"
+	"minesql/internal/storage/access/catalog"
 )
 
 type CreateTableNode struct {
@@ -21,9 +22,10 @@ func NewCreateTableNode(stmt *statement.CreateTableStmt) *CreateTableNode {
 func (ctn *CreateTableNode) Next() (executor.Executor, error) {
 	colIndexMap := map[string]int{} // key: column name, value: column index
 	columnNames := []string{}
+	colParams := []*executor.ColumnParam{}
 
-	var pkDef *definition.PrimaryKeyDef
-	var ukDefs []*definition.UniqueKeyDef
+	var pkDef *definition.ConstraintPrimaryKeyDef
+	var ukDefs []*definition.ConstraintUniqueKeyDef
 
 	currentColIdx := 0
 	for _, def := range ctn.Stmt.CreateDefinitions {
@@ -35,14 +37,18 @@ func (ctn *CreateTableNode) Next() (executor.Executor, error) {
 			colIndexMap[def.ColName] = currentColIdx
 			columnNames = append(columnNames, def.ColName)
 			currentColIdx++
+			colParams = append(colParams, &executor.ColumnParam{
+				Name: def.ColName,
+				Type: catalog.ColumnType(def.DataType),
+			})
 
-		case *definition.PrimaryKeyDef:
+		case *definition.ConstraintPrimaryKeyDef:
 			if pkDef != nil {
 				return nil, fmt.Errorf("multiple primary keys defined")
 			}
 			pkDef = def
 
-		case *definition.UniqueKeyDef:
+		case *definition.ConstraintUniqueKeyDef:
 			ukDefs = append(ukDefs, def)
 		}
 	}
@@ -56,10 +62,10 @@ func (ctn *CreateTableNode) Next() (executor.Executor, error) {
 		return nil, err
 	}
 
-	return executor.NewCreateTable(ctn.Stmt.TableName, len(pkDef.Columns), uniqueKeyParams), nil
+	return executor.NewCreateTable(ctn.Stmt.TableName, len(pkDef.Columns), uniqueKeyParams, colParams), nil
 }
 
-func validatePkDef(pkDef *definition.PrimaryKeyDef, colIndexMap map[string]int) error {
+func validatePkDef(pkDef *definition.ConstraintPrimaryKeyDef, colIndexMap map[string]int) error {
 	if pkDef == nil {
 		return errors.New("primary key is required")
 	}
@@ -82,7 +88,7 @@ func validatePkDef(pkDef *definition.PrimaryKeyDef, colIndexMap map[string]int) 
 	return nil
 }
 
-func getUkParams(ukDefs []*definition.UniqueKeyDef, colIndexMap map[string]int) ([]*executor.IndexParam, error) {
+func getUkParams(ukDefs []*definition.ConstraintUniqueKeyDef, colIndexMap map[string]int) ([]*executor.IndexParam, error) {
 	uniqueKeyParams := make([]*executor.IndexParam, 0, len(ukDefs))
 	for _, ukDef := range ukDefs {
 		if len(ukDef.Columns) == 0 {

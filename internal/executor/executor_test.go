@@ -2,6 +2,7 @@ package executor
 
 import (
 	"minesql/internal/storage"
+	"minesql/internal/storage/access/catalog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -57,7 +58,6 @@ func TestExecutePlan(t *testing.T) {
 	})
 
 	t.Run("レコードを返さない executor (Insert) の場合", func(t *testing.T) {
-		// GIVEN
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
@@ -65,17 +65,28 @@ func TestExecutePlan(t *testing.T) {
 		storage.InitStorageManager()
 		defer storage.ResetStorageManager()
 
-		createTable := NewCreateTable("users", 1, []*IndexParam{
-			{Name: "name", SecondaryKey: 1},
-		})
+		tableName := "users"
+		createTable := NewCreateTable(
+			tableName,
+			1,
+			[]*IndexParam{
+				{Name: "name", SecondaryKey: 1},
+			},
+			[]*ColumnParam{
+				{Name: "id", Type: catalog.ColumnTypeString},
+				{Name: "name", Type: catalog.ColumnTypeString},
+			})
 		_, err := createTable.Next()
 		assert.NoError(t, err)
 
-		insert := NewInsert("users", [][][]byte{
+		// GIVEN
+		cols := []string{"id", "name"}
+		records := [][][]byte{
 			{[]byte("1"), []byte("Alice")},
-		})
+		}
 
 		// WHEN
+		insert := NewInsert(tableName, cols, records)
 		results, err := ExecutePlan(insert)
 
 		// THEN

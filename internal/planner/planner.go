@@ -15,6 +15,9 @@ func PlanStart(stmt statement.Statement) (executor.Executor, error) {
 	case *statement.CreateTableStmt:
 		ctn := NewCreateTableNode(s)
 		return ctn.Next()
+	case *statement.InsertStmt:
+		ip := NewInsertPlanner(s)
+		return ip.Next()
 	default:
 		return nil, fmt.Errorf("unsupported statement: %T", s)
 	}

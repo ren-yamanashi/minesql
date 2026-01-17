@@ -7,7 +7,7 @@ type ColumnId struct {
 
 func NewColumnId(name string) *ColumnId {
 	return &ColumnId{
-		IdType:  TypeColumn,
+		IdType:  IdTypeColumn,
 		ColName: name,
 	}
 }
