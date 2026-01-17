@@ -21,7 +21,7 @@ func createTable() {
 	printRecords(createTable)
 
 	// レコードを挿入
-	insert := executor.NewInsert(
+	insert, err := executor.NewInsert(
 		tableName,
 		[]string{"id", "first_name", "last_name"},
 		[][][]byte{
@@ -31,5 +31,8 @@ func createTable() {
 			{[]byte("w"), []byte("Dave"), []byte("Miller")},
 			{[]byte("v"), []byte("Eve"), []byte("Brown")},
 		})
+	if err != nil {
+		panic(err)
+	}
 	printRecords(insert)
 }
