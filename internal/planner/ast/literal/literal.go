@@ -5,7 +5,6 @@ import "minesql/internal/planner/ast/node"
 type LiteralType string
 
 const (
-	LiteralTypeNumber LiteralType = "number"
 	LiteralTypeString LiteralType = "string"
 )
 

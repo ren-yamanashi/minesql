@@ -82,7 +82,8 @@ func TestExecutePlan(t *testing.T) {
 		}
 
 		// WHEN
-		insert := NewInsert(tableName, cols, records)
+		insert, err := NewInsert(tableName, cols, records)
+		assert.NoError(t, err)
 		results, err := ExecutePlan(insert)
 
 		// THEN

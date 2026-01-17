@@ -1,7 +1,9 @@
 package planner
 
 import (
+	"errors"
 	"minesql/internal/executor"
+	"minesql/internal/planner/ast/literal"
 	"minesql/internal/planner/ast/statement"
 )
 
@@ -16,5 +18,24 @@ func NewInsertPlanner(stmt *statement.InsertStmt) *InsertPlanner {
 }
 
 func (ip *InsertPlanner) Next() (executor.Executor, error) {
-	return nil, nil
+	colNames := []string{}
+	for _, col := range ip.Stmt.Cols {
+		colNames = append(colNames, col.ColName)
+	}
+
+	records := [][][]byte{}
+	for _, valList := range ip.Stmt.Values {
+		record := [][]byte{}
+		for _, val := range valList {
+			switch v := val.(type) {
+			case *literal.StringLiteral:
+				record = append(record, []byte(v.Value))
+			default:
+				return nil, errors.New("unsupported literal type in insert values")
+			}
+		}
+		records = append(records, record)
+	}
+
+	return executor.NewInsert(ip.Stmt.Table.TableName, colNames, records)
 }
