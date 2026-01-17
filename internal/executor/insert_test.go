@@ -10,23 +10,27 @@ import (
 
 func TestNewInsert(t *testing.T) {
 	t.Run("正常に Insert Executor を生成できる", func(t *testing.T) {
-		// WHEN
+		// GIVEN
+		tableName := "users"
+		cols := []string{"id", "name"}
 		records := [][][]byte{
 			{[]byte("1"), []byte("Alice")},
 			{[]byte("2"), []byte("Bob")},
 		}
-		insert := NewInsert("users", records)
+
+		// WHEN
+		insert := NewInsert(tableName, cols, records)
 
 		// THEN
 		assert.NotNil(t, insert)
-		assert.Equal(t, "users", insert.tableName)
+		assert.Equal(t, tableName, insert.tableName)
+		assert.Equal(t, cols, insert.colNames)
 		assert.Equal(t, records, insert.records)
 	})
 }
 
 func TestExecute(t *testing.T) {
 	t.Run("存在しないテーブルに対して挿入しようとするとエラーになる", func(t *testing.T) {
-		// GIVEN
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
@@ -34,20 +38,24 @@ func TestExecute(t *testing.T) {
 		storage.InitStorageManager()
 		defer storage.ResetStorageManager()
 
+		// GIVEN
+		tableName := "non_existent_table"
+		cols := []string{"id", "name"}
 		records := [][][]byte{
 			{[]byte("1"), []byte("Alice")},
 		}
-		insert := NewInsert("non_existent_table", records)
 
 		// WHEN
+		insert := NewInsert(tableName, cols, records)
 		_, err := insert.Next()
 
 		// THEN
 		assert.Error(t, err)
 	})
 
+	t.Run("カラム名がテーブルのカラムと一致しない場合、エラーになる", func(t *testing.T) {})
+
 	t.Run("正常にレコードを挿入できる", func(t *testing.T) {
-		// GIVEN
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
@@ -55,7 +63,8 @@ func TestExecute(t *testing.T) {
 		storage.InitStorageManager()
 		defer storage.ResetStorageManager()
 
-		createTable := NewCreateTable("users", 1, []*IndexParam{
+		tableName := "users"
+		createTable := NewCreateTable(tableName, 1, []*IndexParam{
 			{Name: "name", SecondaryKey: 1},
 		}, []*ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
@@ -63,13 +72,16 @@ func TestExecute(t *testing.T) {
 		})
 		_, err := createTable.Next()
 		assert.NoError(t, err)
+
+		// GIVEN
+		cols := []string{"id", "name"}
 		records := [][][]byte{
 			{[]byte("1"), []byte("Alice")},
 			{[]byte("2"), []byte("Bob")},
 		}
-		insert := NewInsert("users", records)
 
 		// WHEN
+		insert := NewInsert(tableName, cols, records)
 		_, err = insert.Next()
 
 		// THEN
@@ -78,7 +90,7 @@ func TestExecute(t *testing.T) {
 			return true
 		}
 		seqScan := NewSequentialScan(
-			"users",
+			tableName,
 			RecordSearchModeStart{},
 			whileCondition,
 		)

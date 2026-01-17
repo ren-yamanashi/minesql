@@ -21,12 +21,15 @@ func createTable() {
 	printRecords(createTable)
 
 	// レコードを挿入
-	insert := executor.NewInsert(tableName, [][][]byte{
-		{[]byte("z"), []byte("Alice"), []byte("Smith")},
-		{[]byte("x"), []byte("Bob"), []byte("Johnson")},
-		{[]byte("y"), []byte("Charlie"), []byte("Williams")},
-		{[]byte("w"), []byte("Dave"), []byte("Miller")},
-		{[]byte("v"), []byte("Eve"), []byte("Brown")},
-	})
+	insert := executor.NewInsert(
+		tableName,
+		[]string{"id", "first_name", "last_name"},
+		[][][]byte{
+			{[]byte("z"), []byte("Alice"), []byte("Smith")},
+			{[]byte("x"), []byte("Bob"), []byte("Johnson")},
+			{[]byte("y"), []byte("Charlie"), []byte("Williams")},
+			{[]byte("w"), []byte("Dave"), []byte("Miller")},
+			{[]byte("v"), []byte("Eve"), []byte("Brown")},
+		})
 	printRecords(insert)
 }

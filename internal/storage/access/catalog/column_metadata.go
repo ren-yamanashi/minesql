@@ -5,7 +5,6 @@ import "minesql/internal/storage/page"
 type ColumnType string
 
 const (
-	ColumnTypeInt    ColumnType = "int"
 	ColumnTypeString ColumnType = "string"
 )
 
