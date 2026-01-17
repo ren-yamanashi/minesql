@@ -10,14 +10,18 @@ func createTable() {
 	tableName := "users"
 
 	// テーブルを作成
-	createTable := executor.NewCreateTable(tableName, 1, []*executor.IndexParam{
-		{Name: "first_name", SecondaryKey: 1}, // 名前のインデックス
-		{Name: "last_name", SecondaryKey: 2},  // 姓のインデックス
-	}, []*executor.ColumnParam{
-		{Name: "id", Type: catalog.ColumnTypeString},
-		{Name: "first_name", Type: catalog.ColumnTypeString},
-		{Name: "last_name", Type: catalog.ColumnTypeString},
-	})
+	createTable := executor.NewCreateTable(
+		tableName,
+		1,
+		[]*executor.IndexParam{
+			{Name: "first_name", SecondaryKey: 1}, // 名前のインデックス
+			{Name: "last_name", SecondaryKey: 2},  // 姓のインデックス
+		},
+		[]*executor.ColumnParam{
+			{Name: "id", Type: catalog.ColumnTypeString},
+			{Name: "first_name", Type: catalog.ColumnTypeString},
+			{Name: "last_name", Type: catalog.ColumnTypeString},
+		})
 	printRecords(createTable)
 
 	// レコードを挿入
