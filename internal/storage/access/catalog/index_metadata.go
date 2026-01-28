@@ -19,16 +19,19 @@ type IndexMetadata struct {
 	TableId uint64
 	// インデックスの名前
 	Name string
+	// インデックスを構成するカラム名
+	ColName string
 	// インデックスの種類
 	Type IndexType
 	// 実データが格納される B+Tree のメタページID
 	DataMetaPageId page.PageId
 }
 
-func NewIndexMetadata(tableId uint64, name string, indexType IndexType, dataMetaPageId page.PageId) IndexMetadata {
+func NewIndexMetadata(tableId uint64, name string, colName string, indexType IndexType, dataMetaPageId page.PageId) IndexMetadata {
 	return IndexMetadata{
 		TableId:        tableId,
 		Name:           name,
+		ColName:        colName,
 		Type:           indexType,
 		DataMetaPageId: dataMetaPageId,
 	}

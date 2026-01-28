@@ -18,12 +18,8 @@ func createTable() {
 			definition.NewConstraintPrimaryKeyDef([]identifier.ColumnId{
 				*identifier.NewColumnId("id"),
 			}),
-			definition.NewConstraintUniqueKeyDef([]identifier.ColumnId{
-				*identifier.NewColumnId("first_name"),
-			}),
-			definition.NewConstraintUniqueKeyDef([]identifier.ColumnId{
-				*identifier.NewColumnId("last_name"),
-			}),
+			definition.NewConstraintUniqueKeyDef(*identifier.NewColumnId("first_name")),
+			definition.NewConstraintUniqueKeyDef(*identifier.NewColumnId("last_name")),
 		},
 	)
 

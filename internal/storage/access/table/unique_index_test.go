@@ -11,7 +11,7 @@ import (
 func TestUniqueIndex(t *testing.T) {
 	t.Run("ユニークインデックスの作成ができ、そのインデックスに値が挿入できる", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex := NewUniqueIndex("test_index", 0)
+		uniqueIndex := NewUniqueIndex("test_index", "test", 0)
 		bpm, metaPageId, _ := InitDiskManager(t, "test.db")
 
 		// UniqueIndex の metaPageId を割り当て

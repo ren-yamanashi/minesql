@@ -13,6 +13,7 @@ type ColumnParam struct {
 
 type IndexParam struct {
 	Name         string
+	ColName      string
 	SecondaryKey uint
 }
 
@@ -73,7 +74,7 @@ func (ct *CreateTable) execute() error {
 		if err != nil {
 			return err
 		}
-		uniqueIndex := table.NewUniqueIndex(indexParam.Name, indexParam.SecondaryKey)
+		uniqueIndex := table.NewUniqueIndex(indexParam.Name, indexParam.ColName, indexParam.SecondaryKey)
 		uniqueIndex.Create(bpm, indexMetaPageId)
 		uniqueIndexes[i] = uniqueIndex
 	}
@@ -102,7 +103,7 @@ func (ct *CreateTable) execute() error {
 	// インデックスのメタデータを作成
 	idxMeta := make([]catalog.IndexMetadata, len(ct.indexParams))
 	for i, index := range uniqueIndexes {
-		idxMeta[i] = catalog.NewIndexMetadata(tblId, index.Name, catalog.IndexTypeUnique, index.MetaPageId)
+		idxMeta[i] = catalog.NewIndexMetadata(tblId, index.Name, index.ColName, catalog.IndexTypeUnique, index.MetaPageId)
 	}
 
 	// テーブルメタデータを作成

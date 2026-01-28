@@ -14,4 +14,12 @@ func NewStringLiteral(text string, value string) *StringLiteral {
 	}
 }
 
+func (sl *StringLiteral) ToBytes() []byte {
+	return []byte(sl.Value)
+}
+
+func (sl *StringLiteral) ToString() string {
+	return sl.Value
+}
+
 func (sl *StringLiteral) literalNode() {}

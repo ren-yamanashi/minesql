@@ -32,3 +32,33 @@ func NewTableMetadata(tableId uint64, name string, nCols uint8, cols []ColumnMet
 		DataMetaPageId: dataMetaPageId,
 	}
 }
+
+// 指定されたカラム名がテーブルの何番目のカラムか取得
+func (tm *TableMetadata) GetColIndex(colName string) (int, bool) {
+	for i, col := range tm.Cols {
+		if col.Name == colName {
+			return i, true
+		}
+	}
+	return -1, false
+}
+
+// 指定されたカラム名がテーブルに存在するか確認
+func (tm *TableMetadata) HasColumn(colName string) bool {
+	for _, col := range tm.Cols {
+		if col.Name == colName {
+			return true
+		}
+	}
+	return false
+}
+
+// 指定されたカラム名で構成されるインデックスが存在するか確認
+func (tm *TableMetadata) GetIndexByColName(colName string) (*IndexMetadata, bool) {
+	for _, idx := range tm.Indexes {
+		if idx.ColName == colName {
+			return &idx, true
+		}
+	}
+	return nil, false
+}

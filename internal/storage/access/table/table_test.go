@@ -15,7 +15,7 @@ import (
 func TestCreateAndInsert(t *testing.T) {
 	t.Run("テーブルの作成ができ、そのテーブルに値が挿入できる", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex := NewUniqueIndex("last_name", 2)
+		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", 2)
 		bpm, metaPageId, _ := InitDiskManager(t, "users.db")
 
 		// UniqueIndex の metaPageId を割り当て
@@ -123,8 +123,8 @@ func TestCreateAndInsert(t *testing.T) {
 	t.Run("テーブルとそのインデックスが同じディスクファイル (同じ FileId) に保存される", func(t *testing.T) {
 		// GIVEN
 		// 2つのインデックスを持つテーブルを作成
-		uniqueIndex1 := NewUniqueIndex("first_name", 1)
-		uniqueIndex2 := NewUniqueIndex("last_name", 2)
+		uniqueIndex1 := NewUniqueIndex("idx_first_name", "first_name", 1)
+		uniqueIndex2 := NewUniqueIndex("idx_last_name", "last_name", 2)
 		bpm, metaPageId, tmpdir := InitDiskManager(t, "users.db")
 
 		// UniqueIndex の metaPageId を割り当て
@@ -165,12 +165,12 @@ func TestCreateAndInsert(t *testing.T) {
 func TestGetUniqueIndexByName(t *testing.T) {
 	t.Run("インデックス名からユニークインデックスを取得できる", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex1 := NewUniqueIndex("first_name", 1)
-		uniqueIndex2 := NewUniqueIndex("last_name", 2)
+		uniqueIndex1 := NewUniqueIndex("idx_first_name", "first_name", 1)
+		uniqueIndex2 := NewUniqueIndex("idx_last_name", "last_name", 2)
 		table := NewTable("users", page.PageId{}, 1, []*UniqueIndex{uniqueIndex1, uniqueIndex2})
 
 		// WHEN
-		ui, err := table.GetUniqueIndexByName("last_name")
+		ui, err := table.GetUniqueIndexByName("idx_last_name")
 
 		// THEN
 		assert.NoError(t, err)
@@ -179,12 +179,11 @@ func TestGetUniqueIndexByName(t *testing.T) {
 
 	t.Run("存在しないインデックス名を指定するとエラーになる", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex := NewUniqueIndex("first_name", 1)
+		uniqueIndex := NewUniqueIndex("idx_first_name", "first_name", 1)
 		table := NewTable("users", page.PageId{}, 1, []*UniqueIndex{uniqueIndex})
 
 		// WHEN
-		ui, err := table.GetUniqueIndexByName("last_name")
-
+		ui, err := table.GetUniqueIndexByName("idx_last_name")
 		// THEN
 		assert.Nil(t, ui)
 		assert.Error(t, err)
