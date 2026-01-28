@@ -31,35 +31,7 @@ func (sp *SelectPlanner) Next() (executor.Executor, error) {
 		return nil, err
 	}
 
-	// SELECT 句のカラム名を取得
-	colNames := []string{}
-	for _, col := range sp.Stmt.Columns {
-		colNames = append(colNames, col.ColName)
-	}
-	if len(colNames) == 0 {
-		return nil, errors.New("column names cannot be empty")
-	}
-	for _, colName := range colNames {
-		if !tblMeta.HasColumn(colName) {
-			return nil, errors.New("column " + colName + " does not exist in table " + sp.Stmt.From.TableName)
-		}
-	}
-
-	// WHERE 句が設定されていない場合
-	// SELECT 句のカラムがすべてインデックスの場合はインデックススキャンを実行
-	if !sp.Stmt.Where.IsSet && len(sp.Stmt.Columns) == 1 {
-		if idxMeta, ok := tblMeta.GetIndexByColName(sp.Stmt.Columns[0].ColName); ok {
-			return executor.NewIndexScan(
-				sp.Stmt.From.TableName,
-				idxMeta.Name,
-				executor.RecordSearchModeStart{},
-				func(secondaryKey executor.Record) bool {
-					return true // フルインデックススキャンなので常に true を返す
-				},
-			), nil
-		}
-	}
-	// それ以外の場合はフルテーブルスキャンを実行
+	// WHERE 句が設定されていない場合フルテーブルスキャンを実行
 	if !sp.Stmt.Where.IsSet {
 		return executor.NewSequentialScan(
 			sp.Stmt.From.TableName,

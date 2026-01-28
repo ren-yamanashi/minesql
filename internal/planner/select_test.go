@@ -17,10 +17,6 @@ func TestNewSelect(t *testing.T) {
 	t.Run("正常に SelectPlanner が生成される", func(t *testing.T) {
 		// GIVEN
 		stmt := &statement.SelectStmt{
-			Columns: []identifier.ColumnId{
-				*identifier.NewColumnId("id"),
-				*identifier.NewColumnId("name"),
-			},
 			From: *identifier.NewTableId("users", ""),
 			Where: statement.WhereClause{
 				IsSet: false,
@@ -42,9 +38,6 @@ func TestNewSelect(t *testing.T) {
 
 		// GIVEN
 		stmt := &statement.SelectStmt{
-			Columns: []identifier.ColumnId{
-				*identifier.NewColumnId("id"),
-			},
 			From: *identifier.NewTableId("", "sample"),
 			Where: statement.WhereClause{
 				IsSet: false,
@@ -61,82 +54,6 @@ func TestNewSelect(t *testing.T) {
 		assert.Contains(t, err.Error(), "table name cannot be empty")
 	})
 
-	t.Run("カラム名が空の場合、エラーを返す", func(t *testing.T) {
-		tmpdir := t.TempDir()
-		initStorageEngine(t, tmpdir)
-		defer storage.ResetStorageManager()
-
-		// GIVEN
-		stmt := &statement.SelectStmt{
-			Columns: []identifier.ColumnId{},
-			From:    *identifier.NewTableId("users", "sample"),
-			Where: statement.WhereClause{
-				IsSet: false,
-			},
-		}
-		planner := NewSelectPlanner(stmt)
-
-		// WHEN
-		exec, err := planner.Next()
-
-		// THEN
-		assert.Error(t, err)
-		assert.Nil(t, exec)
-		assert.Contains(t, err.Error(), "column names cannot be empty")
-	})
-
-	t.Run("存在しないカラムを指定した場合、エラーを返す", func(t *testing.T) {
-		tmpdir := t.TempDir()
-		initStorageEngine(t, tmpdir)
-		defer storage.ResetStorageManager()
-
-		// GIVEN
-		stmt := &statement.SelectStmt{
-			Columns: []identifier.ColumnId{
-				*identifier.NewColumnId("non_existent_column"),
-			},
-			From: *identifier.NewTableId("users", "sample"),
-			Where: statement.WhereClause{
-				IsSet: false,
-			},
-		}
-		planner := NewSelectPlanner(stmt)
-
-		// WHEN
-		exec, err := planner.Next()
-
-		// THEN
-		assert.Error(t, err)
-		assert.Nil(t, exec)
-		assert.Contains(t, err.Error(), "does not exist in table")
-	})
-
-	t.Run("WHERE 句なしでインデックス付きカラムを指定した場合、IndexScan が生成される", func(t *testing.T) {
-		tmpdir := t.TempDir()
-		initStorageEngine(t, tmpdir)
-		defer storage.ResetStorageManager()
-
-		// GIVEN
-		stmt := &statement.SelectStmt{
-			Columns: []identifier.ColumnId{
-				*identifier.NewColumnId("last_name"),
-			},
-			From: *identifier.NewTableId("users", "sample"),
-			Where: statement.WhereClause{
-				IsSet: false,
-			},
-		}
-		planner := NewSelectPlanner(stmt)
-
-		// WHEN
-		exec, err := planner.Next()
-
-		// THEN
-		assert.NoError(t, err)
-		assert.NotNil(t, exec)
-		assert.IsType(t, &executor.IndexScan{}, exec)
-	})
-
 	t.Run("WHERE 句なしで複数カラムを指定した場合、SequentialScan が生成される", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageEngine(t, tmpdir)
@@ -144,10 +61,6 @@ func TestNewSelect(t *testing.T) {
 
 		// GIVEN
 		stmt := &statement.SelectStmt{
-			Columns: []identifier.ColumnId{
-				*identifier.NewColumnId("id"),
-				*identifier.NewColumnId("first_name"),
-			},
 			From: *identifier.NewTableId("users", "sample"),
 			Where: statement.WhereClause{
 				IsSet: false,
@@ -171,9 +84,6 @@ func TestNewSelect(t *testing.T) {
 
 		// GIVEN
 		stmt := &statement.SelectStmt{
-			Columns: []identifier.ColumnId{
-				*identifier.NewColumnId("id"),
-			},
 			From: *identifier.NewTableId("users", "sample"),
 			Where: statement.WhereClause{
 				Condition: &expression.BinaryExpr{
@@ -201,9 +111,6 @@ func TestNewSelect(t *testing.T) {
 
 		// GIVEN
 		stmt := &statement.SelectStmt{
-			Columns: []identifier.ColumnId{
-				*identifier.NewColumnId("id"),
-			},
 			From: *identifier.NewTableId("users", "sample"),
 			Where: statement.WhereClause{
 				Condition: &expression.BinaryExpr{
@@ -231,9 +138,6 @@ func TestNewSelect(t *testing.T) {
 
 		// GIVEN
 		stmt := &statement.SelectStmt{
-			Columns: []identifier.ColumnId{
-				*identifier.NewColumnId("id"),
-			},
 			From: *identifier.NewTableId("users", "sample"),
 			Where: statement.WhereClause{
 				Condition: &expression.BinaryExpr{
@@ -267,9 +171,6 @@ func TestNewSelect(t *testing.T) {
 		unsupported := &UnsupportedExpr{}
 
 		stmt := &statement.SelectStmt{
-			Columns: []identifier.ColumnId{
-				*identifier.NewColumnId("id"),
-			},
 			From: *identifier.NewTableId("users", "sample"),
 			Where: statement.WhereClause{
 				Condition: unsupported,

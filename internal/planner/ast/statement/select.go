@@ -12,7 +12,16 @@ type WhereClause struct {
 
 type SelectStmt struct {
 	StmtType StmtType
-	Columns  []identifier.ColumnId
 	From     identifier.TableId
 	Where    WhereClause
 }
+
+func NewSelectStmt(from identifier.TableId, where WhereClause) *SelectStmt {
+	return &SelectStmt{
+		StmtType: StmtTypeSelect,
+		From:     from,
+		Where:    where,
+	}
+}
+
+func (ss *SelectStmt) statementNode() {}

@@ -11,4 +11,12 @@ type BinaryExpr struct {
 	Right    literal.Literal
 }
 
+func NewBinaryExpr(left identifier.ColumnId, right literal.Literal) *BinaryExpr {
+	return &BinaryExpr{
+		ExprType: ExprTypeBinary,
+		Left:     left,
+		Right:    right,
+	}
+}
+
 func (be *BinaryExpr) expressionNode() {}

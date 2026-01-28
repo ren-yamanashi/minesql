@@ -18,6 +18,9 @@ func PlanStart(stmt statement.Statement) (executor.Executor, error) {
 	case *statement.InsertStmt:
 		ip := NewInsertPlanner(s)
 		return ip.Next()
+	case *statement.SelectStmt:
+		sp := NewSelectPlanner(s)
+		return sp.Next()
 	default:
 		return nil, fmt.Errorf("unsupported statement: %T", s)
 	}
