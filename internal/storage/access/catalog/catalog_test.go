@@ -170,7 +170,7 @@ func TestInsert(t *testing.T) {
 			NewColumnMetadata(tableId, "email", 1, ColumnTypeString),
 		}
 		idxMeta := []IndexMetadata{
-			NewIndexMetadata(tableId, "email", IndexTypeUnique, indexMetaPageId),
+			NewIndexMetadata(tableId, "idx_email", "email", IndexTypeUnique, indexMetaPageId),
 		}
 		tableMeta := NewTableMetadata(tableId, "users", 2, colMeta, idxMeta, metaPageId)
 
@@ -181,7 +181,7 @@ func TestInsert(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 1, len(cat.metadata))
 		assert.Equal(t, 1, len(cat.metadata[0].Indexes))
-		assert.Equal(t, "email", cat.metadata[0].Indexes[0].Name)
+		assert.Equal(t, "idx_email", cat.metadata[0].Indexes[0].Name)
 	})
 }
 

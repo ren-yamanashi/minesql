@@ -91,18 +91,13 @@ func validatePkDef(pkDef *definition.ConstraintPrimaryKeyDef, colIndexMap map[st
 func getUkParams(ukDefs []*definition.ConstraintUniqueKeyDef, colIndexMap map[string]int) ([]*executor.IndexParam, error) {
 	uniqueKeyParams := make([]*executor.IndexParam, 0, len(ukDefs))
 	for _, ukDef := range ukDefs {
-		if len(ukDef.Columns) == 0 {
-			return nil, fmt.Errorf("unique key '%s' must have at least one column", ukDef.KeyName)
-		}
-		if len(ukDef.Columns) != 1 {
-			return nil, fmt.Errorf("only single-column unique keys are supported currently")
-		}
-		idx, exists := colIndexMap[ukDef.Columns[0].ColName]
+		idx, exists := colIndexMap[ukDef.Column.ColName]
 		if !exists {
-			return nil, fmt.Errorf("unique key column '%s' does not exist", ukDef.Columns[0].ColName)
+			return nil, fmt.Errorf("unique key column '%s' does not exist", ukDef.Column.ColName)
 		}
 		uniqueKeyParams = append(uniqueKeyParams, &executor.IndexParam{
 			Name:         ukDef.KeyName,
+			ColName:      ukDef.Column.ColName,
 			SecondaryKey: uint(idx),
 		})
 	}

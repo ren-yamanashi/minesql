@@ -10,5 +10,7 @@ const (
 
 type Literal interface {
 	node.ASTNode
+	ToString() string
+	ToBytes() []byte
 	literalNode()
 }

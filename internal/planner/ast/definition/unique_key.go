@@ -5,13 +5,13 @@ import "minesql/internal/planner/ast/identifier"
 type ConstraintUniqueKeyDef struct {
 	DefType DefType
 	KeyName string
-	Columns []identifier.ColumnId
+	Column  identifier.ColumnId
 }
 
-func NewConstraintUniqueKeyDef(columns []identifier.ColumnId) *ConstraintUniqueKeyDef {
+func NewConstraintUniqueKeyDef(column identifier.ColumnId) *ConstraintUniqueKeyDef {
 	return &ConstraintUniqueKeyDef{
 		DefType: DefTypeConstraintUniqueKey,
-		Columns: columns,
+		Column:  column,
 	}
 }
 

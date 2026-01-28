@@ -10,15 +10,18 @@ import (
 type UniqueIndex struct {
 	// インデックス名
 	Name string
+	// インデックスを構成するカラム名
+	ColName string
 	// インデックスの内容が入っている B+Tree のメタページの ID
 	MetaPageId page.PageId
 	// セカンダリキーに含めるカラムを指定 (0 始まりの列番号)
 	SecondaryKey uint
 }
 
-func NewUniqueIndex(name string, secondaryKey uint) *UniqueIndex {
+func NewUniqueIndex(name string, colName string, secondaryKey uint) *UniqueIndex {
 	return &UniqueIndex{
 		Name:         name,
+		ColName:      colName,
 		MetaPageId:   page.INVALID_PAGE_ID, // 初期化時には無効なページIDを設定 (Create 時に設定される)
 		SecondaryKey: secondaryKey,
 	}
