@@ -96,14 +96,6 @@ func (disk *DiskManager) AllocatePage() page.PageId {
 	return id
 }
 
-// ファイルをディスクに同期する
-// `file.Write(data)` は OS のキャッシュにデータを書き込むだけで、必ずしもディスクに書き込まれるとは限らないため、明示的に同期を行う必要がある
-// 基本的にはプロセスの終了時に呼び出せば良い
-// 参考: https://www.sobyte.net/post/2022-01/golang-defer-file-close/
-func (disk *DiskManager) Sync() error {
-	return disk.heapFile.Sync()
-}
-
 // 指定されたページ番号に対応するページの先頭にシークする
 func (disk *DiskManager) seek(pageNumber page.PageNumber) error {
 	offset := page.PAGE_SIZE * uint64(pageNumber)             // 開始位置を計算

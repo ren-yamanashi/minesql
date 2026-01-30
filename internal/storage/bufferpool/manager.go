@@ -151,13 +151,6 @@ func (bpm *BufferPoolManager) FlushPage() error {
 		bufferPage.IsDirty = false
 	}
 
-	// すべての DiskManager を Sync
-	for _, dm := range bpm.diskManagers {
-		if err := dm.Sync(); err != nil {
-			return err
-		}
-	}
-
 	return nil
 }
 
