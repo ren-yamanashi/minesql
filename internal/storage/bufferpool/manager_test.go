@@ -473,7 +473,7 @@ func TestBufferPoolManagerIntegration(t *testing.T) {
 
 		// 各ページにデータを書き込む (PageID と同じ値を書き込む)
 		writeTestData := func(pageId page.PageId, value byte) {
-			data := directio.AlignedBlock(directio.BlockSize)  
+			data := directio.AlignedBlock(directio.BlockSize)
 			for i := range data {
 				data[i] = value
 			}
