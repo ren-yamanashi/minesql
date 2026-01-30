@@ -55,12 +55,6 @@ func (bpm *BufferPoolManager) AllocatePageId(fileId page.FileId) (page.PageId, e
 // 指定されたページIDのページをバッファプールから取得
 // ページがバッファプールに存在しない場合は、ディスクから読み込む
 func (bpm *BufferPoolManager) FetchPage(pageId page.PageId) (*BufferPage, error) {
-	// FileId から DiskManager を取得
-	dm, err := bpm.GetDiskManager(pageId.FileId)
-	if err != nil {
-		return nil, err
-	}
-
 	// ページテーブルにページがすでにある場合
 	if bufferId, ok := bpm.pageTable[pageId]; ok {
 		bufferPage := &bpm.bufpool.BufferPages[bufferId]
@@ -75,6 +69,10 @@ func (bpm *BufferPoolManager) FetchPage(pageId page.PageId) (*BufferPage, error)
 	}
 
 	// ディスクからページを読み込む
+	dm, err := bpm.GetDiskManager(pageId.FileId)
+	if err != nil {
+		return nil, err
+	}
 	err = dm.ReadPageData(pageId, bufferPage.GetReadData())
 	if err != nil {
 		return nil, err
