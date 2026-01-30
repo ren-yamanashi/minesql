@@ -15,7 +15,6 @@ var (
 )
 
 type (
-	Page       [PAGE_SIZE]uint8
 	FileId     uint32
 	PageNumber uint32
 )
@@ -42,6 +41,12 @@ func (p *PageId) IsInvalid() bool {
 	return p.Equals(INVALID_PAGE_ID)
 }
 
+// PageId を指定位置に書き込む
+func (p *PageId) WriteTo(data []byte, offset int) {
+	binary.BigEndian.PutUint32(data[offset:offset+4], uint32(p.FileId))
+	binary.BigEndian.PutUint32(data[offset+4:offset+8], uint32(p.PageNumber))
+}
+
 // PageId をバイト列に変換
 // 先頭4バイトに FileId、次の4バイトに PageNumber が格納される
 func (p *PageId) ToBytes() []byte {
@@ -60,12 +65,6 @@ func PageIdFromBytes(data []byte) PageId {
 		FileId:     FileId(binary.BigEndian.Uint32(data[0:4])),
 		PageNumber: PageNumber(binary.BigEndian.Uint32(data[4:8])),
 	}
-}
-
-// PageId を指定位置に書き込む
-func (p PageId) WriteTo(data []byte, offset int) {
-	binary.BigEndian.PutUint32(data[offset:offset+4], uint32(p.FileId))
-	binary.BigEndian.PutUint32(data[offset+4:offset+8], uint32(p.PageNumber))
 }
 
 // 指定位置から PageId を読み取る

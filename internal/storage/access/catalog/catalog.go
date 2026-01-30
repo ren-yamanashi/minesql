@@ -15,8 +15,6 @@ var (
 )
 
 type Catalog struct {
-	// [テーブルのメタページの PageNumber | インデックスのメタページの PageNumber | カラムのメタページの PageNumber] を格納するヘッダーページ
-	header           page.Page
 	TableMetaPageId  page.PageId
 	IndexMetaPageId  page.PageId
 	ColumnMetaPageId page.PageId
@@ -49,7 +47,6 @@ func NewCatalog(bpm *bufferpool.BufferPoolManager) (*Catalog, error) {
 	initTableId := binary.BigEndian.Uint64(data[16:24])
 
 	return &Catalog{
-		header:           *bufPage.Page,
 		TableMetaPageId:  page.NewPageId(fileId, page.PageNumber(tblMetaPageNum)),
 		IndexMetaPageId:  page.NewPageId(fileId, page.PageNumber(idxMetaPageNum)),
 		ColumnMetaPageId: page.NewPageId(fileId, page.PageNumber(colMetaPageNum)),

@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/ncw/directio"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -49,7 +50,7 @@ func TestReadPageData(t *testing.T) {
 		disk.WritePageData(pageId, writeData)
 
 		// WHEN
-		readData := make([]byte, page.PAGE_SIZE)
+		readData := directio.AlignedBlock(directio.BlockSize)
 		err := disk.ReadPageData(pageId, readData)
 
 		// THEN
@@ -136,7 +137,7 @@ func initDiskManager(t *testing.T) (*DiskManager, page.PageId) {
 }
 
 func createDataBuffer() []byte {
-	writeData := make([]byte, page.PAGE_SIZE)
+	writeData := directio.AlignedBlock(directio.BlockSize)
 	for i := range page.PAGE_SIZE {
 		writeData[i] = byte(i % 256)
 	}

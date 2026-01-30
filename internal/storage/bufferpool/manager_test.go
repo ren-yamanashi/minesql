@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/ncw/directio"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -472,7 +473,7 @@ func TestBufferPoolManagerIntegration(t *testing.T) {
 
 		// 各ページにデータを書き込む (PageID と同じ値を書き込む)
 		writeTestData := func(pageId page.PageId, value byte) {
-			data := make([]byte, page.PAGE_SIZE)
+			data := directio.AlignedBlock(directio.BlockSize)
 			for i := range data {
 				data[i] = value
 			}
@@ -573,7 +574,7 @@ func initDiskManager(t *testing.T, tmpdir string) (*disk.DiskManager, page.PageI
 	pageId := dm.AllocatePage()
 
 	// ページをディスクに書き込む (空のページ)
-	emptyPage := make([]byte, page.PAGE_SIZE)
+	emptyPage := directio.AlignedBlock(directio.BlockSize)
 	err = dm.WritePageData(pageId, emptyPage)
 	assert.NoError(t, err)
 
