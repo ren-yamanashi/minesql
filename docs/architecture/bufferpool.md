@@ -1,11 +1,5 @@
 # バッファプール
 
-- 該当コード:
-  - [buffer/page_table.go](../../internal/storage/bufferpool/page_table.go)
-  - [buffer/buffer_page.go](../../internal/storage/bufferpool/buffer_page.go)
-  - [buffer/buffer_pool.go](../../internal/storage/bufferpool/buffer_pool.go)
-  - [buffer/manager.go](../../internal/storage/bufferpool/manager.go)
-
 ## 概要
 
 - ディスク I/O は遅く、頻繁に発生するとパフォーマンスが下がるため、バッファプールを用いてディスク I/O を削減する
@@ -13,12 +7,6 @@
   - 一度読み込んだページをメモリに保持しておき、それ以降の読み取りではメモリから読み取ることでディスク I/O を削減する
   - 書き込みも同様に、まずバッファプール上のページを書き換え、後でまとめてディスクに書き込むことでディスク I/O を削減する
 - 「どのページのデータがどのバッファに入っているか」の対応関係を、ページテーブルで管理する (以下図を参照)
-
-## BufferPoolManager
-
-- FileId を用いて複数の DiskManager を管理し、各テーブルのディスクファイルへのアクセスを調整する
-- 新しいテーブルやインデックス用に一意な FileId を採番する
-- 指定された FileId に対して新しい PageId を割り当てる
 
 ```mermaid
 graph TD
@@ -41,11 +29,6 @@ graph TD
   PT3 --1--> P2
 ```
 
-### ファイルシステムのビルトインのキャッシュを利用せず、バッファプールを実装する理由
-
-- RDBMS の動作を把握している RDBMS 自身がキャッシュ管理した方が、ファイルシステムにキャッシュ管理させるよりも賢く管理をできるため
-  - 例えば LRU (Least Recently Used) アルゴリズムを用いて、最近使われたページを優先的にキャッシュするなど
-
 ### バッファプールの内部
 
 ```mermaid
@@ -64,6 +47,12 @@ graph TD
 - バッファプール
   - 複数のバッファページを格納する
   - `Pointer` (Clock sweep アルゴリズムで使用するポインタ) や `MaxBufferSize` (バッファプールの最大サイズ) などのメタデータを持つ
+
+## ファイルシステムのビルトインのキャッシュを利用せず、バッファプールを実装する理由
+
+- RDBMS の動作を把握している RDBMS 自身がキャッシュ管理した方が、ファイルシステムにキャッシュ管理させるよりも賢く管理をできるため
+  - 例えば LRU (Least Recently Used) アルゴリズムを用いて、最近使われたページを優先的にキャッシュするなど
+- その実現のために、[github.com/ncw/directio](https://github.com/ncw/directio) を利用している
 
 ## バッファプールの整理
 

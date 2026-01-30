@@ -15,7 +15,6 @@ var (
 )
 
 type (
-	Page       [PAGE_SIZE]uint8
 	FileId     uint32
 	PageNumber uint32
 )

@@ -5,6 +5,7 @@ import (
 	"minesql/internal/storage/page"
 	"testing"
 
+	"github.com/ncw/directio"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -112,8 +113,8 @@ func TestChildPageId_Key(t *testing.T) {
 }
 
 func createBranchNode(pairs []node.Pair, rightChildPageId page.PageId) *node.BranchNode {
-	p := &page.Page{}
-	branchNode := node.NewBranchNode(p[:])
+	p := directio.AlignedBlock(directio.BlockSize)
+	branchNode := node.NewBranchNode(p)
 
 	if len(pairs) == 0 {
 		panic("pairs must not be empty")

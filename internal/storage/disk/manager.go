@@ -5,6 +5,8 @@ import (
 	"io"
 	"minesql/internal/storage/page"
 	"os"
+
+	"github.com/ncw/directio"
 )
 
 type DiskManager struct {
@@ -18,9 +20,9 @@ type DiskManager struct {
 
 // 指定されたパスにあるディスク上のヒープファイルを管理する DiskManager を生成する
 func NewDiskManager(fileId page.FileId, path string) (*DiskManager, error) {
-	file, err := os.OpenFile(
+	file, err := directio.OpenFile(
 		path,
-		os.O_RDWR|os.O_CREATE, // read-write モードで開き、存在しない場合は作成する
+		os.O_RDWR|os.O_CREATE, // read-write モードで開き、存在しない場合は作成する (※ os.O_DIRECT は)
 		0666,                  // パーミッション (rw-rw-rw-)([参照](https://web.tku.ac.jp/~densan/local/permission/permission.htm))
 	)
 	if err != nil {
@@ -94,6 +96,14 @@ func (disk *DiskManager) AllocatePage() page.PageId {
 	// 次のページ番号をインクリメント
 	disk.nextPageId = page.NewPageId(disk.fileId, disk.nextPageId.PageNumber+1)
 	return id
+}
+
+// ファイルをディスクに同期する
+// `file.Write(data)` は OS のキャッシュにデータを書き込むだけで、必ずしもディスクに書き込まれるとは限らないため、明示的に同期を行う必要がある
+// 基本的にはプロセスの終了時に呼び出せば良い
+// 参考: https://www.sobyte.net/post/2022-01/golang-defer-file-close/
+func (disk *DiskManager) Sync() error {
+	return disk.heapFile.Sync()
 }
 
 // 指定されたページ番号に対応するページの先頭にシークする
