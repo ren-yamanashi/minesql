@@ -35,12 +35,15 @@ func NewIndexScan(
 // 次の Record を取得する
 // データがない場合、継続条件を満たさない場合は (nil, nil) を返す
 func (is *IndexScan) Next() (Record, error) {
-	engine := storage.GetStorageManager()
-	bpm := engine.GetBufferPoolManager()
+	sm := storage.GetStorageManager()
 
 	// 初回実行時に B+Tree とイテレータを作成
 	if is.indexIterator == nil {
-		tbl, err := engine.GetTable(is.tableName)
+		tblMeta, err := sm.Catalog.GetTableMetadataByName(is.tableName)
+		if err != nil {
+			return nil, err
+		}
+		tbl, err := tblMeta.GetTable()
 		if err != nil {
 			return nil, err
 		}
@@ -56,7 +59,7 @@ func (is *IndexScan) Next() (Record, error) {
 		is.tableBTree = btree.NewBTree(tbl.MetaPageId)
 
 		// インデックス用のイテレータを作成
-		indexIter, err := indexBTree.Search(bpm, is.searchMode.Encode())
+		indexIter, err := indexBTree.Search(sm.BufferPoolManager, is.searchMode.Encode())
 		if err != nil {
 			return nil, err
 		}
@@ -64,7 +67,7 @@ func (is *IndexScan) Next() (Record, error) {
 	}
 
 	// セカンダリインデックスから次のペアを取得
-	secondaryIndexPair, ok, err := is.indexIterator.Next(bpm)
+	secondaryIndexPair, ok, err := is.indexIterator.Next(sm.BufferPoolManager)
 	if !ok {
 		return nil, nil
 	}
@@ -82,11 +85,11 @@ func (is *IndexScan) Next() (Record, error) {
 	}
 
 	// エンコードされたプライマリキーでテーブル本体を検索
-	is.tableIterator, err = is.tableBTree.Search(bpm, btree.SearchModeKey{Key: secondaryIndexPair.Value})
+	is.tableIterator, err = is.tableBTree.Search(sm.BufferPoolManager, btree.SearchModeKey{Key: secondaryIndexPair.Value})
 	if err != nil {
 		return nil, err
 	}
-	tablePair, ok, err := is.tableIterator.Next(bpm)
+	tablePair, ok, err := is.tableIterator.Next(sm.BufferPoolManager)
 	if err != nil {
 		return nil, err
 	}

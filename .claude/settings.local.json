@@ -9,7 +9,17 @@
       "mcp__ide__getDiagnostics",
       "Bash(grep:*)",
       "Bash(ls:*)",
-      "Bash(go build:*)"
+      "Bash(go build:*)",
+      "Bash(git ls-tree:*)",
+      "Bash(tree:*)",
+      "Bash(git diff:*)",
+      "WebSearch",
+      "WebFetch(domain:github.com)",
+      "Bash(xargs dirname:*)",
+      "Bash(go doc:*)",
+      "Bash(timeout 3 godoc:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)"
     ]
   }
 }

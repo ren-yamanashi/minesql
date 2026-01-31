@@ -19,14 +19,13 @@ func NewSelectPlanner(stmt *statement.SelectStmt) *SelectPlanner {
 }
 
 func (sp *SelectPlanner) Next() (executor.Executor, error) {
-	engine := storage.GetStorageManager()
-	cat := engine.GetCatalog()
+	sm := storage.GetStorageManager()
 
 	if sp.Stmt.From.TableName == "" {
 		return nil, errors.New("table name cannot be empty")
 	}
 
-	tblMeta, err := cat.GetTableMetadataByName(sp.Stmt.From.TableName)
+	tblMeta, err := sm.Catalog.GetTableMetadataByName(sp.Stmt.From.TableName)
 	if err != nil {
 		return nil, err
 	}

@@ -28,11 +28,9 @@ func (ins *Insert) Next() (Record, error) {
 }
 
 func (ins *Insert) execute(records [][][]byte) error {
-	engine := storage.GetStorageManager()
-	bpm := engine.GetBufferPoolManager()
-	cat := engine.GetCatalog()
+	sm := storage.GetStorageManager()
 
-	tblMeta, err := cat.GetTableMetadataByName(ins.tableName)
+	tblMeta, err := sm.Catalog.GetTableMetadataByName(ins.tableName)
 	if err != nil {
 		return err
 	}
@@ -44,13 +42,13 @@ func (ins *Insert) execute(records [][][]byte) error {
 		}
 	}
 
-	tbl, err := engine.GetTable(ins.tableName)
+	tbl, err := tblMeta.GetTable()
 	if err != nil {
 		return err
 	}
 
 	for _, record := range records {
-		err := tbl.Insert(bpm, record)
+		err := tbl.Insert(sm.BufferPoolManager, record)
 		if err != nil {
 			return err
 		}

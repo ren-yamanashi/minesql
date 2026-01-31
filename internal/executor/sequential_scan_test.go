@@ -111,11 +111,11 @@ func InitStorageEngineForTest(t *testing.T, dataDir string) *storage.StorageMana
 
 	storage.ResetStorageManager()
 	storage.InitStorageManager()
-	engine := storage.GetStorageManager()
+	sm := storage.GetStorageManager()
 
 	// テーブルを作成
 	createTable := NewCreateTable("users", 1, []*IndexParam{
-		{Name: "last_name", SecondaryKey: 2},
+		{Name: "last_name", ColName: "last_name", SecondaryKey: 2},
 	}, []*ColumnParam{
 		{Name: "id", Type: catalog.ColumnTypeString},
 		{Name: "first_name", Type: catalog.ColumnTypeString},
@@ -124,18 +124,20 @@ func InitStorageEngineForTest(t *testing.T, dataDir string) *storage.StorageMana
 	_, err := createTable.Next()
 	assert.NoError(t, err)
 
-	tbl, err := engine.GetTable("users")
+	tblMeta, err := sm.Catalog.GetTableMetadataByName("users")
 	assert.NoError(t, err)
+	assert.NotNil(t, tblMeta)
 
-	bpm := engine.GetBufferPoolManager()
+	tbl, err := tblMeta.GetTable()
+	assert.NoError(t, err)
 
 	// 行を挿入
-	err = tbl.Insert(bpm, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
-	err = tbl.Insert(bpm, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
-	err = tbl.Insert(bpm, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
-	err = tbl.Insert(bpm, [][]byte{[]byte("d"), []byte("Eve"), []byte("Davis")})
-	err = tbl.Insert(bpm, [][]byte{[]byte("e"), []byte("Charlie"), []byte("Brown")})
+	err = tbl.Insert(sm.BufferPoolManager, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+	err = tbl.Insert(sm.BufferPoolManager, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+	err = tbl.Insert(sm.BufferPoolManager, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
+	err = tbl.Insert(sm.BufferPoolManager, [][]byte{[]byte("d"), []byte("Eve"), []byte("Davis")})
+	err = tbl.Insert(sm.BufferPoolManager, [][]byte{[]byte("e"), []byte("Charlie"), []byte("Brown")})
 	assert.NoError(t, err)
 
-	return engine
+	return sm
 }

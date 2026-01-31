@@ -1,6 +1,8 @@
 package catalog
 
 import (
+	"fmt"
+	"minesql/internal/storage/access/table"
 	"minesql/internal/storage/page"
 )
 
@@ -14,6 +16,9 @@ type TableMetadata struct {
 	Name string
 	// テーブルの列数
 	NCols uint8
+	// プライマリキーの列数 (プライマリキーは先頭から連続している想定)
+	// 例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる
+	PrimaryKeyCount uint8
 	// 実データが格納される B+Tree のメタページID
 	DataMetaPageId page.PageId
 	// テーブルのカラム情報
@@ -22,22 +27,23 @@ type TableMetadata struct {
 	Indexes []IndexMetadata
 }
 
-func NewTableMetadata(tableId uint64, name string, nCols uint8, cols []ColumnMetadata, indexes []IndexMetadata, dataMetaPageId page.PageId) TableMetadata {
+func NewTableMetadata(tableId uint64, name string, nCols uint8, pkCount uint8, cols []ColumnMetadata, indexes []IndexMetadata, dataMetaPageId page.PageId) TableMetadata {
 	return TableMetadata{
-		TableId:        tableId,
-		Name:           name,
-		NCols:          nCols,
-		Cols:           cols,
-		Indexes:        indexes,
-		DataMetaPageId: dataMetaPageId,
+		TableId:         tableId,
+		Name:            name,
+		NCols:           nCols,
+		PrimaryKeyCount: pkCount,
+		Cols:            cols,
+		Indexes:         indexes,
+		DataMetaPageId:  dataMetaPageId,
 	}
 }
 
 // 指定されたカラム名がテーブルの何番目のカラムか取得
 func (tm *TableMetadata) GetColIndex(colName string) (int, bool) {
-	for i, col := range tm.Cols {
+	for _, col := range tm.Cols {
 		if col.Name == colName {
-			return i, true
+			return int(col.Pos), true
 		}
 	}
 	return -1, false
@@ -61,4 +67,25 @@ func (tm *TableMetadata) GetIndexByColName(colName string) (*IndexMetadata, bool
 		}
 	}
 	return nil, false
+}
+
+// テーブル (table.Table) を取得する
+func (tm *TableMetadata) GetTable() (*table.Table, error) {
+	// ユニークインデックスを構築
+	var uniqueIndexes []*table.UniqueIndex
+	for _, idxMeta := range tm.Indexes {
+		if idxMeta.Type == IndexTypeUnique {
+			colIndex, ok := tm.GetColIndex(idxMeta.ColName)
+			if !ok {
+				return nil, fmt.Errorf("column %s not found in table %s", idxMeta.ColName, tm.Name)
+			}
+			ui := table.NewUniqueIndex(idxMeta.Name, idxMeta.ColName, uint(colIndex))
+			ui.MetaPageId = idxMeta.DataMetaPageId
+			uniqueIndexes = append(uniqueIndexes, ui)
+		}
+	}
+
+	// テーブルを構築
+	tbl := table.NewTable(tm.Name, tm.DataMetaPageId, tm.PrimaryKeyCount, uniqueIndexes)
+	return &tbl, nil
 }

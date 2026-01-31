@@ -28,5 +28,6 @@ type SearchModeKey struct {
 
 // 指定したキーに基づいて子ページIDを取得
 func (sm SearchModeKey) childPageId(bn *node.BranchNode) page.PageId {
-	return bn.SearchChildPageId(sm.Key)
+	childIndex := bn.SearchChildSlotNum(sm.Key)
+	return bn.ChildPageIdAt(childIndex)
 }

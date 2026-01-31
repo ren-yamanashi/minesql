@@ -70,7 +70,7 @@ func TestExecutePlan(t *testing.T) {
 			tableName,
 			1,
 			[]*IndexParam{
-				{Name: "name", SecondaryKey: 1},
+				{Name: "name", ColName: "name", SecondaryKey: 1},
 			},
 			[]*ColumnParam{
 				{Name: "id", Type: catalog.ColumnTypeString},
