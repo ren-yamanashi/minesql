@@ -7,7 +7,7 @@ import (
 // プライマリキーが "y" のレコードのみを取得する
 func searchConstPrimary() {
 	println("=== 定数検索 (プライマリキーが 'y') ===")
-	seqScan := executor.NewSequentialScan(
+	seqScan := executor.NewSearchTable(
 		"users",
 		executor.RecordSearchModeKey{Key: [][]byte{[]byte("y")}},
 		func(record executor.Record) bool {
@@ -20,7 +20,7 @@ func searchConstPrimary() {
 // インデックス経由で特定の姓 ("Miller") のレコードのみを取得する
 func searchConstUniqueIndex() {
 	println("=== ユニークインデックス検索 (姓が 'Miller') ===")
-	indexScan := executor.NewIndexScan(
+	indexScan := executor.NewSearchIndex(
 		"users",
 		"idx_last_name",
 		executor.RecordSearchModeKey{Key: [][]byte{[]byte("Miller")}},

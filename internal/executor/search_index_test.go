@@ -7,8 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewIndexScan(t *testing.T) {
-	t.Run("正常に IndexScan を作成できる", func(t *testing.T) {
+func TestNewSearchIndex(t *testing.T) {
+	t.Run("正常に SearchIndex を作成できる", func(t *testing.T) {
 		// GIVEN
 		tableName := "users"
 		indexName := "last_name"
@@ -17,7 +17,7 @@ func TestNewIndexScan(t *testing.T) {
 		}
 
 		// WHEN
-		indexScan := NewIndexScan(
+		indexScan := NewSearchIndex(
 			tableName,
 			indexName,
 			RecordSearchModeStart{},
@@ -29,14 +29,14 @@ func TestNewIndexScan(t *testing.T) {
 	})
 }
 
-func TestIndexScan(t *testing.T) {
-	t.Run("インデックスでスキャンできる (SearchModeStart を使用)", func(t *testing.T) {
+func TestSearchIndex(t *testing.T) {
+	t.Run("SearchModeStart を使用して Index 検索できる", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
 		defer storage.ResetStorageManager()
 
 		// GIVEN
-		indexScan := NewIndexScan(
+		indexScan := NewSearchIndex(
 			"users",
 			"last_name",
 			RecordSearchModeStart{},
@@ -65,13 +65,13 @@ func TestIndexScan(t *testing.T) {
 		assert.Equal(t, expected, results)
 	})
 
-	t.Run("インデックスでスキャンできる (SearchModeKey を使用)", func(t *testing.T) {
+	t.Run("SearchModeKey を使用して Index 検索できる", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
 		defer storage.ResetStorageManager()
 
 		// GIVEN
-		indexScan := NewIndexScan(
+		indexScan := NewSearchIndex(
 			"users",
 			"last_name",
 			RecordSearchModeKey{Key: [][]byte{[]byte("Doe")}},

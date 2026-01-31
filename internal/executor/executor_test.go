@@ -15,7 +15,7 @@ func TestExecutePlan(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer storage.ResetStorageManager()
 
-		seqScan := NewSequentialScan(
+		seqScan := NewSearchTable(
 			"users",
 			RecordSearchModeStart{},
 			func(record Record) bool {
@@ -39,7 +39,7 @@ func TestExecutePlan(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer storage.ResetStorageManager()
 
-		seqScan := NewSequentialScan(
+		seqScan := NewSearchTable(
 			"users",
 			RecordSearchModeStart{},
 			func(record Record) bool {

@@ -74,7 +74,7 @@ func TestNewSelect(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, exec)
-		assert.IsType(t, &executor.SequentialScan{}, exec)
+		assert.IsType(t, &executor.SearchTable{}, exec)
 	})
 
 	t.Run("WHERE 句でインデックス付きカラムを指定した場合、IndexScan が生成される", func(t *testing.T) {
@@ -101,7 +101,7 @@ func TestNewSelect(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, exec)
-		assert.IsType(t, &executor.IndexScan{}, exec)
+		assert.IsType(t, &executor.SearchIndex{}, exec)
 	})
 
 	t.Run("WHERE 句でインデックスなしカラムを指定した場合、SequentialScan が生成される", func(t *testing.T) {
@@ -128,7 +128,7 @@ func TestNewSelect(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, exec)
-		assert.IsType(t, &executor.SequentialScan{}, exec)
+		assert.IsType(t, &executor.SearchTable{}, exec)
 	})
 
 	t.Run("WHERE 句で存在しないカラムを指定した場合、エラーを返す", func(t *testing.T) {

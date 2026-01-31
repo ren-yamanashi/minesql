@@ -58,7 +58,7 @@ func TestExecute(t *testing.T) {
 		whileCondition := func(record Record) bool {
 			return true
 		}
-		seqScan := NewSequentialScan(
+		seqScan := NewSearchTable(
 			tableName,
 			RecordSearchModeStart{},
 			whileCondition,

@@ -7,7 +7,7 @@ import (
 // フルテーブルスキャン
 func fullTableScan() {
 	println("=== フルテーブルスキャン ===")
-	seqScan := executor.NewSequentialScan(
+	seqScan := executor.NewSearchTable(
 		"users",
 		executor.RecordSearchModeStart{},
 		func(record executor.Record) bool { // フルテーブルスキャンなので常に true を返す継続条件
@@ -20,7 +20,7 @@ func fullTableScan() {
 // キーが名前のセカンダリインデックスを使って全件スキャン
 func fullIndexScanByFirstName() {
 	println("=== インデックススキャン (キーが名前) ===")
-	indexScan := executor.NewIndexScan(
+	indexScan := executor.NewSearchIndex(
 		"users",
 		"idx_first_name",
 		executor.RecordSearchModeStart{},
@@ -34,7 +34,7 @@ func fullIndexScanByFirstName() {
 // キーが姓のセカンダリインデックスを使って全件スキャン
 func fullIndexScanByLastName() {
 	println("=== インデックススキャン (キーが姓) ===")
-	indexScan := executor.NewIndexScan(
+	indexScan := executor.NewSearchIndex(
 		"users",
 		"idx_last_name",
 		executor.RecordSearchModeStart{},

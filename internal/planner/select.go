@@ -32,7 +32,7 @@ func (sp *SelectPlanner) Next() (executor.Executor, error) {
 
 	// WHERE 句が設定されていない場合フルテーブルスキャンを実行
 	if !sp.Stmt.Where.IsSet {
-		return executor.NewSequentialScan(
+		return executor.NewSearchTable(
 			sp.Stmt.From.TableName,
 			executor.RecordSearchModeStart{},
 			func(record executor.Record) bool {
@@ -49,7 +49,7 @@ func (sp *SelectPlanner) Next() (executor.Executor, error) {
 		}
 		// カラムがインデックスの場合
 		if idxMeta, ok := tblMeta.GetIndexByColName(e.Left.ColName); ok {
-			return executor.NewIndexScan(
+			return executor.NewSearchIndex(
 				sp.Stmt.From.TableName,
 				idxMeta.Name,
 				executor.RecordSearchModeKey{Key: [][]byte{e.Right.ToBytes()}},
@@ -63,7 +63,7 @@ func (sp *SelectPlanner) Next() (executor.Executor, error) {
 		if !ok {
 			return nil, errors.New("column " + e.Left.ColName + " does not exist in table " + sp.Stmt.From.TableName)
 		}
-		return executor.NewSequentialScan(
+		return executor.NewSearchTable(
 			sp.Stmt.From.TableName,
 			executor.RecordSearchModeKey{Key: [][]byte{e.Right.ToBytes()}},
 			func(record executor.Record) bool {

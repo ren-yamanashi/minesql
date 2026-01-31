@@ -19,7 +19,10 @@
       "Bash(go doc:*)",
       "Bash(timeout 3 godoc:*)",
       "Bash(lsof:*)",
-      "Bash(xargs kill:*)"
+      "Bash(xargs kill:*)",
+      "Bash(go mod tidy:*)",
+      "Bash(go get:*)",
+      "Bash(xargs:*)"
     ]
   }
 }

@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewSequentialScan(t *testing.T) {
-	t.Run("正常に SequentialScan を作成できる", func(t *testing.T) {
+func TestNewSearchTable(t *testing.T) {
+	t.Run("正常に SearchTable を作成できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
@@ -20,7 +20,7 @@ func TestNewSequentialScan(t *testing.T) {
 		}
 
 		// WHEN
-		seqScan := NewSequentialScan(
+		seqScan := NewSearchTable(
 			"users",
 			RecordSearchModeStart{},
 			whileCondition,
@@ -33,14 +33,14 @@ func TestNewSequentialScan(t *testing.T) {
 	})
 }
 
-func TestSequentialScan(t *testing.T) {
-	t.Run("テーブルをシーケンシャルスキャンできる (SearchModeStart を使用)", func(t *testing.T) {
+func TestSearchTable(t *testing.T) {
+	t.Run("SearchModeStart を使用してテーブルを検索できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
 		defer storage.ResetStorageManager()
 
-		seqScan := NewSequentialScan(
+		seqScan := NewSearchTable(
 			"users",
 			RecordSearchModeStart{},
 			func(record Record) bool {
@@ -67,13 +67,13 @@ func TestSequentialScan(t *testing.T) {
 		assert.Equal(t, expected, results)
 	})
 
-	t.Run("テーブルをシーケンシャルスキャンできる (SearchModeKey を使用)", func(t *testing.T) {
+	t.Run("SearchModeKey を使用してテーブルを検索できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
 		defer storage.ResetStorageManager()
 
-		seqScan := NewSequentialScan(
+		seqScan := NewSearchTable(
 			"users",
 			RecordSearchModeKey{Key: [][]byte{[]byte("b")}},
 			func(record Record) bool {
