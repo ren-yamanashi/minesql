@@ -1,15 +1,16 @@
 # テーブル
 
-- 実装コード:
-  - [internal/storage/access/table/table.go](../../../internal/storage/access/table/table.go)
-  - [internal/storage/access/table/encode.go](../../../internal/storage/access/table/encode.go)
-  - [internal/storage/access/table/memcomparable.go](../../../internal/storage/access/table/memcomparable.go)
-
-## 概要
-
-### クラスタ化インデックス
+## クラスタ化インデックス
 
 - プライマリキーはクラスタ化インデックスとする
 - テーブルの実態は、プライマリキーを `key` とし、その他のカラム値を結合したものを `value` とする
 - プライマリキーが複合キーの場合も考慮して (複合キーの場合も正しくソートされるように) Memcomparable format を使用してプライマリキーをエンコードする ([参照](../../about/memcomparable-format.md))
   - データを挿入する際は、key, value をそれぞれエンコードしてから保存 (B+Tree に挿入) する
+
+## セカンダリインデックス
+
+- セカンダリインデックスには、セカンダリインデックスを構成するカラム値を key, プライマリキーを value として格納する
+- 検索の際は、まずセカンダリインデックスを検索し、(必要であれば) その value であるプライマリキーを使って、実際のレコードをテーブルから取得する
+- 現状はユニークインデックスのみサポート
+  - 複合ユニークはサポートしてない
+  - key = セカンダリインデックスのカラム値、value = プライマリキーのペアを Memcomparable format でエンコードしたものを使用
