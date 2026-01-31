@@ -22,7 +22,7 @@ func fullIndexScanByFirstName() {
 	println("=== インデックススキャン (キーが名前) ===")
 	indexScan := executor.NewIndexScan(
 		"users",
-		"first_name",
+		"idx_first_name",
 		executor.RecordSearchModeStart{},
 		func(secondaryKey executor.Record) bool { // フルインデックススキャンなので常に true を返す継続条件
 			return true
@@ -36,7 +36,7 @@ func fullIndexScanByLastName() {
 	println("=== インデックススキャン (キーが姓) ===")
 	indexScan := executor.NewIndexScan(
 		"users",
-		"last_name",
+		"idx_last_name",
 		executor.RecordSearchModeStart{},
 		func(secondaryKey executor.Record) bool {
 			return true

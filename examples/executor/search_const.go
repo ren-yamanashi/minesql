@@ -22,7 +22,7 @@ func searchConstUniqueIndex() {
 	println("=== ユニークインデックス検索 (姓が 'Miller') ===")
 	indexScan := executor.NewIndexScan(
 		"users",
-		"last_name",
+		"idx_last_name",
 		executor.RecordSearchModeKey{Key: [][]byte{[]byte("Miller")}},
 		func(secondaryKey executor.Record) bool {
 			return string(secondaryKey[0]) == "Miller"

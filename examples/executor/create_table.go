@@ -14,8 +14,8 @@ func createTable() {
 		tableName,
 		1,
 		[]*executor.IndexParam{
-			{Name: "first_name", SecondaryKey: 1}, // 名前のインデックス
-			{Name: "last_name", SecondaryKey: 2},  // 姓のインデックス
+			{Name: "idx_first_name", ColName: "first_name", SecondaryKey: 1}, // 名前のインデックス
+			{Name: "idx_last_name", ColName: "last_name", SecondaryKey: 2},   // 姓のインデックス
 		},
 		[]*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},

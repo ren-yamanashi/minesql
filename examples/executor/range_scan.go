@@ -22,7 +22,7 @@ func rangeIndexScan() {
 	println("=== インデックス範囲スキャン (姓が 'J' 以上 'N' 未満) ===")
 	indexScan := executor.NewIndexScan(
 		"users",
-		"last_name",
+		"idx_last_name",
 		executor.RecordSearchModeKey{Key: [][]byte{[]byte("J")}},
 		func(secondaryKey executor.Record) bool {
 			lastName := string(secondaryKey[0])
