@@ -33,7 +33,7 @@ func createTable() {
 	stmt := statement.NewCreateTableStmt(
 		"users",
 		[]definition.Definition{
-			definition.NewColumnDef("id", definition.DataTypeInt),
+			definition.NewColumnDef("id", definition.DataTypeVarchar),
 			definition.NewColumnDef("first_name", definition.DataTypeVarchar),
 			definition.NewColumnDef("last_name", definition.DataTypeVarchar),
 			definition.NewConstraintPrimaryKeyDef([]identifier.ColumnId{

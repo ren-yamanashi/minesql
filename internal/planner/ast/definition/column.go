@@ -3,7 +3,6 @@ package definition
 type DataType string
 
 const (
-	DataTypeInt     DataType = "INT"
 	DataTypeVarchar DataType = "VARCHAR"
 )
 
