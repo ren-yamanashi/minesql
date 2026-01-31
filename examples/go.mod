@@ -4,5 +4,6 @@ go 1.25.5
 
 require minesql v0.0.0
 
-replace minesql => ../
+require github.com/ncw/directio v1.0.5 // indirect
 
+replace minesql => ../

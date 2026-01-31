@@ -6,7 +6,7 @@ import (
 	"minesql/internal/storage/access/table"
 )
 
-type SequentialScan struct {
+type SearchTable struct {
 	// 継続条件を満たすかどうかを判定する関数
 	whileCondition func(record Record) bool
 	iterator       *btree.Iterator
@@ -14,12 +14,12 @@ type SequentialScan struct {
 	searchMode     RecordSearchMode
 }
 
-func NewSequentialScan(
+func NewSearchTable(
 	tableName string,
 	searchMode RecordSearchMode,
 	whileCondition func(record Record) bool,
-) *SequentialScan {
-	return &SequentialScan{
+) *SearchTable {
+	return &SearchTable{
 		tableName:      tableName,
 		searchMode:     searchMode,
 		whileCondition: whileCondition,
@@ -28,7 +28,7 @@ func NewSequentialScan(
 
 // 次の Record を取得する
 // データがない場合、継続条件を満たさない場合は (nil, nil) を返す
-func (ss *SequentialScan) Next() (Record, error) {
+func (ss *SearchTable) Next() (Record, error) {
 	sm := storage.GetStorageManager()
 
 	// 初回実行時はイテレータを作成

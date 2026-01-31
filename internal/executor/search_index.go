@@ -6,7 +6,7 @@ import (
 	"minesql/internal/storage/access/table"
 )
 
-type IndexScan struct {
+type SearchIndex struct {
 	tableName  string
 	indexName  string
 	searchMode RecordSearchMode
@@ -18,13 +18,13 @@ type IndexScan struct {
 	tableBTree *btree.BTree
 }
 
-func NewIndexScan(
+func NewSearchIndex(
 	tableName string,
 	indexName string,
 	searchMode RecordSearchMode,
 	whileCondition func(record Record) bool,
-) *IndexScan {
-	return &IndexScan{
+) *SearchIndex {
+	return &SearchIndex{
 		tableName:      tableName,
 		indexName:      indexName,
 		searchMode:     searchMode,
@@ -34,7 +34,7 @@ func NewIndexScan(
 
 // 次の Record を取得する
 // データがない場合、継続条件を満たさない場合は (nil, nil) を返す
-func (is *IndexScan) Next() (Record, error) {
+func (is *SearchIndex) Next() (Record, error) {
 	sm := storage.GetStorageManager()
 
 	// 初回実行時に B+Tree とイテレータを作成

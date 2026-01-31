@@ -15,10 +15,10 @@ type UniqueIndex struct {
 	// インデックスの内容が入っている B+Tree のメタページの ID
 	MetaPageId page.PageId
 	// セカンダリキーに含めるカラムのインデックス (0 始まりの列番号)
-	SecondaryKeyIdx uint
+	SecondaryKeyIdx uint16
 }
 
-func NewUniqueIndex(name string, colName string, secondaryKeyIdx uint) *UniqueIndex {
+func NewUniqueIndex(name string, colName string, secondaryKeyIdx uint16) *UniqueIndex {
 	return &UniqueIndex{
 		Name:         name,
 		ColName:      colName,

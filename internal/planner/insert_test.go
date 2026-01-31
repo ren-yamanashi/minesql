@@ -5,6 +5,8 @@ import (
 	"minesql/internal/planner/ast/identifier"
 	"minesql/internal/planner/ast/literal"
 	"minesql/internal/planner/ast/statement"
+	"minesql/internal/storage"
+	"minesql/internal/storage/access/catalog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -106,6 +108,14 @@ func TestNewInsert(t *testing.T) {
 
 	t.Run("単一レコードの挿入で Executor が生成される", func(t *testing.T) {
 		// GIVEN
+		initStorageManagerForTest(t)
+		defer storage.ResetStorageManager()
+
+		createTableForTest(t, "users", 1, nil, []*executor.ColumnParam{
+			{Name: "id", Type: catalog.ColumnTypeString},
+			{Name: "name", Type: catalog.ColumnTypeString},
+		})
+
 		stmt := statement.NewInsertStmt(
 			*identifier.NewTableId("users", ""),
 			[]identifier.ColumnId{
@@ -132,6 +142,14 @@ func TestNewInsert(t *testing.T) {
 
 	t.Run("複数レコードの挿入で Executor が生成される", func(t *testing.T) {
 		// GIVEN
+		initStorageManagerForTest(t)
+		defer storage.ResetStorageManager()
+
+		createTableForTest(t, "users", 1, nil, []*executor.ColumnParam{
+			{Name: "id", Type: catalog.ColumnTypeString},
+			{Name: "name", Type: catalog.ColumnTypeString},
+		})
+
 		stmt := statement.NewInsertStmt(
 			*identifier.NewTableId("users", ""),
 			[]identifier.ColumnId{
@@ -166,6 +184,16 @@ func TestNewInsert(t *testing.T) {
 
 	t.Run("複数カラムの挿入で Executor が生成される", func(t *testing.T) {
 		// GIVEN
+		initStorageManagerForTest(t)
+		defer storage.ResetStorageManager()
+
+		createTableForTest(t, "users", 1, nil, []*executor.ColumnParam{
+			{Name: "id", Type: catalog.ColumnTypeString},
+			{Name: "name", Type: catalog.ColumnTypeString},
+			{Name: "email", Type: catalog.ColumnTypeString},
+			{Name: "age", Type: catalog.ColumnTypeString},
+		})
+
 		stmt := statement.NewInsertStmt(
 			*identifier.NewTableId("users", ""),
 			[]identifier.ColumnId{
@@ -196,6 +224,14 @@ func TestNewInsert(t *testing.T) {
 
 	t.Run("サポートされていない literal タイプの場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
+		initStorageManagerForTest(t)
+		defer storage.ResetStorageManager()
+
+		createTableForTest(t, "users", 1, nil, []*executor.ColumnParam{
+			{Name: "id", Type: catalog.ColumnTypeString},
+			{Name: "name", Type: catalog.ColumnTypeString},
+		})
+
 		// StringLiteral 以外の literal を作成するために、カスタム literal を使用
 		type UnsupportedLiteral struct {
 			literal.Literal
@@ -225,4 +261,20 @@ func TestNewInsert(t *testing.T) {
 		assert.Nil(t, exec)
 		assert.Contains(t, err.Error(), "unsupported literal type")
 	})
+}
+
+// StorageManager を初期化する
+func initStorageManagerForTest(t *testing.T) {
+	tmpdir := t.TempDir()
+	t.Setenv("MINESQL_DATA_DIR", tmpdir)
+	t.Setenv("MINESQL_BUFFER_SIZE", "10")
+	storage.ResetStorageManager()
+	storage.InitStorageManager()
+}
+
+// テーブルを作成する
+func createTableForTest(t *testing.T, tableName string, primaryKeyCount uint8, indexes []*executor.IndexParam, columns []*executor.ColumnParam) {
+	createTable := executor.NewCreateTable(tableName, primaryKeyCount, indexes, columns)
+	_, err := createTable.Next()
+	assert.NoError(t, err)
 }

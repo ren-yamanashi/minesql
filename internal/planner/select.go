@@ -32,7 +32,7 @@ func (sp *SelectPlanner) Next() (executor.Executor, error) {
 
 	// WHERE 句が設定されていない場合フルテーブルスキャンを実行
 	if !sp.Stmt.Where.IsSet {
-		return executor.NewSequentialScan(
+		return executor.NewSearchTable(
 			sp.Stmt.From.TableName,
 			executor.RecordSearchModeStart{},
 			func(record executor.Record) bool {
@@ -44,12 +44,12 @@ func (sp *SelectPlanner) Next() (executor.Executor, error) {
 	// WHERE 句が設定されている場合
 	switch e := sp.Stmt.Where.Condition.(type) {
 	case *expression.BinaryExpr:
-		if !tblMeta.HasColumn(e.Left.ColName) {
+		if _, ok := tblMeta.GetColByName(e.Left.ColName); !ok {
 			return nil, errors.New("column " + e.Left.ColName + " does not exist in table " + sp.Stmt.From.TableName)
 		}
 		// カラムがインデックスの場合
 		if idxMeta, ok := tblMeta.GetIndexByColName(e.Left.ColName); ok {
-			return executor.NewIndexScan(
+			return executor.NewSearchIndex(
 				sp.Stmt.From.TableName,
 				idxMeta.Name,
 				executor.RecordSearchModeKey{Key: [][]byte{e.Right.ToBytes()}},
@@ -59,15 +59,15 @@ func (sp *SelectPlanner) Next() (executor.Executor, error) {
 			), nil
 		}
 		// カラムがインデックスでない場合
-		numOfCols, ok := tblMeta.GetColIndex(e.Left.ColName)
+		colMeta, ok := tblMeta.GetColByName(e.Left.ColName)
 		if !ok {
 			return nil, errors.New("column " + e.Left.ColName + " does not exist in table " + sp.Stmt.From.TableName)
 		}
-		return executor.NewSequentialScan(
+		return executor.NewSearchTable(
 			sp.Stmt.From.TableName,
 			executor.RecordSearchModeKey{Key: [][]byte{e.Right.ToBytes()}},
 			func(record executor.Record) bool {
-				return string(record[numOfCols]) == e.Right.ToString()
+				return string(record[colMeta.Pos]) == e.Right.ToString()
 			},
 		), nil
 	default:

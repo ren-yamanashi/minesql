@@ -1,7 +1,6 @@
 package executor
 
 import (
-	"fmt"
 	"minesql/internal/storage"
 )
 
@@ -33,13 +32,6 @@ func (ins *Insert) execute(records [][][]byte) error {
 	tblMeta, err := sm.Catalog.GetTableMetadataByName(ins.tableName)
 	if err != nil {
 		return err
-	}
-
-	// カラム名の順番と数が一致するか確認
-	for i, colName := range ins.colNames {
-		if tblMeta.Cols[i].Name != colName {
-			return fmt.Errorf("column name does not match: expected %s, got %s", tblMeta.Cols[i].Name, colName)
-		}
 	}
 
 	tbl, err := tblMeta.GetTable()

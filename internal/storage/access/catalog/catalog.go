@@ -180,7 +180,7 @@ func (c *Catalog) insertTableMetadata(bpm *bufferpool.BufferPoolManager, tableMe
 	return btr.Insert(bpm, node.NewPair(encodedKey, encodedValue))
 }
 
-func (c *Catalog) insertColumnMetadata(bpm *bufferpool.BufferPoolManager, columnMeta ColumnMetadata) error {
+func (c *Catalog) insertColumnMetadata(bpm *bufferpool.BufferPoolManager, columnMeta *ColumnMetadata) error {
 	btr := btree.NewBTree(c.ColumnMetaPageId)
 
 	// キーをエンコード (TableId, ColName)
@@ -197,7 +197,7 @@ func (c *Catalog) insertColumnMetadata(bpm *bufferpool.BufferPoolManager, column
 	return btr.Insert(bpm, node.NewPair(encodedKey, encodedValue))
 }
 
-func (c *Catalog) insertIndexMetadata(bpm *bufferpool.BufferPoolManager, indexMeta IndexMetadata) error {
+func (c *Catalog) insertIndexMetadata(bpm *bufferpool.BufferPoolManager, indexMeta *IndexMetadata) error {
 	btr := btree.NewBTree(c.IndexMetaPageId)
 
 	// キーをエンコード (TableId, Name)

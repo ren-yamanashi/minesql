@@ -22,12 +22,12 @@ type TableMetadata struct {
 	// 実データが格納される B+Tree のメタページID
 	DataMetaPageId page.PageId
 	// テーブルのカラム情報
-	Cols []ColumnMetadata
+	Cols []*ColumnMetadata
 	// テーブルのインデックス情報
-	Indexes []IndexMetadata
+	Indexes []*IndexMetadata
 }
 
-func NewTableMetadata(tableId uint64, name string, nCols uint8, pkCount uint8, cols []ColumnMetadata, indexes []IndexMetadata, dataMetaPageId page.PageId) TableMetadata {
+func NewTableMetadata(tableId uint64, name string, nCols uint8, pkCount uint8, cols []*ColumnMetadata, indexes []*IndexMetadata, dataMetaPageId page.PageId) TableMetadata {
 	return TableMetadata{
 		TableId:         tableId,
 		Name:            name,
@@ -39,31 +39,21 @@ func NewTableMetadata(tableId uint64, name string, nCols uint8, pkCount uint8, c
 	}
 }
 
-// 指定されたカラム名がテーブルの何番目のカラムか取得
-func (tm *TableMetadata) GetColIndex(colName string) (int, bool) {
+// カラム名からカラムを取得
+func (tm *TableMetadata) GetColByName(colName string) (*ColumnMetadata, bool) {
 	for _, col := range tm.Cols {
 		if col.Name == colName {
-			return int(col.Pos), true
+			return col, true
 		}
 	}
-	return -1, false
+	return nil, false
 }
 
-// 指定されたカラム名がテーブルに存在するか確認
-func (tm *TableMetadata) HasColumn(colName string) bool {
-	for _, col := range tm.Cols {
-		if col.Name == colName {
-			return true
-		}
-	}
-	return false
-}
-
-// 指定されたカラム名で構成されるインデックスが存在するか確認
+// 指定されたカラム名で構成されるインデックスを取得
 func (tm *TableMetadata) GetIndexByColName(colName string) (*IndexMetadata, bool) {
 	for _, idx := range tm.Indexes {
 		if idx.ColName == colName {
-			return &idx, true
+			return idx, true
 		}
 	}
 	return nil, false
@@ -75,11 +65,11 @@ func (tm *TableMetadata) GetTable() (*table.Table, error) {
 	var uniqueIndexes []*table.UniqueIndex
 	for _, idxMeta := range tm.Indexes {
 		if idxMeta.Type == IndexTypeUnique {
-			colIndex, ok := tm.GetColIndex(idxMeta.ColName)
+			colMeta, ok := tm.GetColByName(idxMeta.ColName)
 			if !ok {
 				return nil, fmt.Errorf("column %s not found in table %s", idxMeta.ColName, tm.Name)
 			}
-			ui := table.NewUniqueIndex(idxMeta.Name, idxMeta.ColName, uint(colIndex))
+			ui := table.NewUniqueIndex(idxMeta.Name, idxMeta.ColName, colMeta.Pos)
 			ui.MetaPageId = idxMeta.DataMetaPageId
 			uniqueIndexes = append(uniqueIndexes, ui)
 		}
