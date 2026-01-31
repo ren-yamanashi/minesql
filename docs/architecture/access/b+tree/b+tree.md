@@ -1,10 +1,5 @@
 # B+Tree
 
-- 実装コード
-  - [iterator.go](../../../internal/storage/access/btree/iterator.go)
-  - [search_mode.go](../../../internal/storage/access/btree/search_mode.go)
-  - [btree.go](../../../internal/storage/access/btree/btree.go)
-
 ## 実装順
 
 1. [Slotted Page](./slotted-page.md)
