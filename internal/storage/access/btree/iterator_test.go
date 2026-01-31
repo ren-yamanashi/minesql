@@ -15,15 +15,15 @@ func TestNewIterator(t *testing.T) {
 	t.Run("正常にイテレータを生成できる", func(t *testing.T) {
 		// GIVEN
 		var bufferPageMock bufferpool.BufferPage
-		bufferId := 0
+		slotNum := 0
 
 		// WHEN
-		iterator := newIterator(bufferPageMock, bufferId)
+		iterator := newIterator(bufferPageMock, slotNum)
 
 		// THEN
 		assert.NotNil(t, iterator)
 		assert.Equal(t, bufferPageMock, iterator.bufferPage)
-		assert.Equal(t, bufferId, iterator.bufferId)
+		assert.Equal(t, slotNum, iterator.slotNum)
 	})
 }
 
@@ -131,7 +131,7 @@ func TestAdvance(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, page.NewPageId(page.FileId(0), page.PageNumber(1)), iterator.bufferPage.PageId)
-		assert.Equal(t, 0, iterator.bufferId) // 次のページの先頭
+		assert.Equal(t, 0, iterator.slotNum) // 次のページの先頭
 	})
 }
 
@@ -149,13 +149,13 @@ func TestNext(t *testing.T) {
 
 		bufferPage := createLeafBufferPage(page.NewPageId(page.FileId(0), page.PageNumber(0)), []node.Pair{pair1, pair2, pair3}, nil)
 		iterator := newIterator(bufferPage, 0)
-		assert.Equal(t, 0, iterator.bufferId) // 最初のペアを指している
+		assert.Equal(t, 0, iterator.slotNum) // 最初のペアを指している
 
 		// WHEN
 		pair, ok, err := iterator.Next(bpm)
-		bufferId1 := iterator.bufferId
+		bufferId1 := iterator.slotNum
 		pair2Result, ok2, err2 := iterator.Next(bpm)
-		bufferId2 := iterator.bufferId
+		bufferId2 := iterator.slotNum
 
 		// THEN
 		assert.NoError(t, err)

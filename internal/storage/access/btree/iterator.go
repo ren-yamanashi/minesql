@@ -7,13 +7,14 @@ import (
 
 type Iterator struct {
 	bufferPage bufferpool.BufferPage
-	bufferId   int
+	// 現在参照されているスロット番号 (slotted page のスロット番号)
+	slotNum   int
 }
 
-func newIterator(bufferPage bufferpool.BufferPage, bufferId int) *Iterator {
+func newIterator(bufferPage bufferpool.BufferPage, slotNum int) *Iterator {
 	return &Iterator{
 		bufferPage: bufferPage,
-		bufferId:   bufferId,
+		slotNum:   slotNum,
 	}
 }
 
@@ -21,8 +22,8 @@ func newIterator(bufferPage bufferpool.BufferPage, bufferId int) *Iterator {
 func (iter *Iterator) Get() (node.Pair, bool) {
 	leafNode := node.NewLeafNode(iter.bufferPage.GetReadData())
 
-	if iter.bufferId < leafNode.NumPairs() {
-		pair := leafNode.PairAt(iter.bufferId)
+	if iter.slotNum < leafNode.NumPairs() {
+		pair := leafNode.PairAt(iter.slotNum)
 		key := make([]byte, len(pair.Key))
 		copy(key, pair.Key)
 		value := make([]byte, len(pair.Value))
@@ -35,12 +36,12 @@ func (iter *Iterator) Get() (node.Pair, bool) {
 
 // 次の key-value ペアに進む
 func (iter *Iterator) Advance(bpm *bufferpool.BufferPoolManager) error {
-	iter.bufferId++
+	iter.slotNum++
 
 	leafNode := node.NewLeafNode(iter.bufferPage.GetReadData())
 
 	// 現在のページ内に、まだ次の key-value ペアがある場合は、何もせずに終了
-	if iter.bufferId < leafNode.NumPairs() {
+	if iter.slotNum < leafNode.NumPairs() {
 		return nil
 	}
 
@@ -64,7 +65,7 @@ func (iter *Iterator) Advance(bpm *bufferpool.BufferPoolManager) error {
 
 	// イテレータを更新
 	iter.bufferPage = *buffer
-	iter.bufferId = 0
+	iter.slotNum = 0
 
 	return nil
 }

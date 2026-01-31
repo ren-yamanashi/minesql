@@ -51,6 +51,7 @@ func NewBTree(metaPageId page.PageId) *BTree {
 }
 
 // 指定された検索モードで B+Tree を検索し、イテレータを返す
+// 戻り値: リーフノードのイテレータ
 func (bt *BTree) Search(bpm *bufferpool.BufferPoolManager, searchMode SearchMode) (*Iterator, error) {
 	rootPage, err := bt.fetchRootPage(bpm)
 	if err != nil {
@@ -65,7 +66,7 @@ func (bt *BTree) Insert(bpm *bufferpool.BufferPoolManager, pair node.Pair) error
 	if err != nil {
 		return err
 	}
-	// メタページは使い終わったらすぐ不要になる (優先的に evict されたい) ので、 UnRefPage する
+	// メタページは使い終わったらすぐ不要になる (優先的に evict されたい) ので、UnRefPage する
 	defer bpm.UnRefPage(bt.MetaPageId)
 	meta := metapage.NewMetaPage(metaBuf.GetReadData())
 	rootPageId := meta.RootPageId()
@@ -138,7 +139,7 @@ func (bt *BTree) searchRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 			case SearchModeKey:
 				return sm.childPageId(branchNode)
 			}
-			panic("unreachable")
+			panic("unreachable") // 実際にはここには到達しないので errors.New ではなく panic で良い
 		})()
 		childNodePage, err := bpm.FetchPage(childPageId)
 		if err != nil {
@@ -149,30 +150,30 @@ func (bt *BTree) searchRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 		return bt.searchRecursively(bpm, childNodePage, searchMode)
 	} else if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
 		leafNode := node.NewLeafNode(nodeBuffer.GetReadData())
-		bufferId := (func() int {
+		slotNum := (func() int {
 			switch sm := searchMode.(type) {
 			case SearchModeStart:
 				return 0
 			case SearchModeKey:
-				bId, _ := leafNode.SearchSlotNum(sm.Key)
-				return bId
+				slotNum, _ := leafNode.SearchSlotNum(sm.Key)
+				return slotNum
 			}
-			panic("unreachable")
+			panic("unreachable") // 実際にはここには到達しないので errors.New ではなく panic で良い
 		})()
 
-		iter := newIterator(*nodeBuffer, bufferId)
+		iter := newIterator(*nodeBuffer, slotNum)
 
 		// 検索対象のキーが現在のリーフノードの末端のペアより大きい場合、次のリーフノードに進める
 		// 例えば、リーフノードに (1, ...), (3, ...), (5, ...) のペアが格納されている場合に、キー 6 を検索したいときなど
 		// この場合、次のリーフノードに進めてからイテレータを返す
-		if leafNode.NumPairs() == bufferId {
+		if leafNode.NumPairs() == slotNum {
 			iter.Advance(bpm)
 		}
 
 		return iter, nil
 	}
 
-	panic("unknown node type")
+	panic("unknown node type") // 実際にはここには到達しないので errors.New ではなく panic で良い
 }
 
 // 戻り値: (オーバーフローキー, 新しいページ ID, エラー)
@@ -181,13 +182,13 @@ func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 
 	if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
 		leafNode := node.NewLeafNode(nodeBuffer.GetWriteData())
-		bufferId, found := leafNode.SearchSlotNum(pair.Key)
+		slotNum, found := leafNode.SearchSlotNum(pair.Key)
 		if found {
 			return nil, nil, ErrDuplicateKey
 		}
 
 		// リーフノードに挿入できた場合、終了
-		if leafNode.Insert(bufferId, pair) {
+		if leafNode.Insert(slotNum, pair) {
 			return nil, nil, nil
 		}
 
@@ -283,5 +284,5 @@ func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 		return overflowKey, &newBranchBuffer.PageId, nil
 	}
 
-	panic("unknown node type")
+	panic("unknown node type") // 実際にはここには到達しないので errors.New ではなく panic で良い
 }
