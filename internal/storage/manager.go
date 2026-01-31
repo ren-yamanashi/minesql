@@ -60,13 +60,13 @@ func newStorageManager() (*StorageManager, error) {
 }
 
 // BufferPoolManager に DiskManager を登録する
-func (se *StorageManager) RegisterDmToBpm(fileId page.FileId, tableName string) error {
-	path := filepath.Join(se.baseDirectory, fmt.Sprintf("%s.db", tableName))
+func (sm *StorageManager) RegisterDmToBpm(fileId page.FileId, tableName string) error {
+	path := filepath.Join(sm.baseDirectory, fmt.Sprintf("%s.db", tableName))
 	dm, err := disk.NewDiskManager(fileId, path)
 	if err != nil {
 		return err
 	}
-	se.BufferPoolManager.RegisterDiskManager(fileId, dm)
+	sm.BufferPoolManager.RegisterDiskManager(fileId, dm)
 	return nil
 }
 
