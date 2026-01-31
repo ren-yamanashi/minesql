@@ -34,18 +34,37 @@ func (ip *InsertPlanner) Next() (executor.Executor, error) {
 		}
 	}
 
-	colNames, err := getColNames(ip.Stmt)
+	sm := storage.GetStorageManager()
+	tblMeta, err := sm.Catalog.GetTableMetadataByName(ip.Stmt.Table.TableName)
 	if err != nil {
 		return nil, err
 	}
 
+	// テーブルのカラム名を順序通りに取得
+	colNames := make([]string, len(tblMeta.Cols))
+	for _, colMeta := range tblMeta.Cols {
+		colNames[colMeta.Pos] = colMeta.Name
+	}
+
+	// INSERT 文で指定されたカラムの位置をマッピング
+	colPosMap := make(map[string]uint16)
+	for _, colMeta := range tblMeta.Cols {
+		colPosMap[colMeta.Name] = colMeta.Pos
+	}
+
+	// レコードをテーブルのカラム順序に並び替える
 	records := [][][]byte{}
 	for _, valList := range ip.Stmt.Values {
-		record := [][]byte{}
-		for _, val := range valList {
+		record := make([][]byte, len(tblMeta.Cols))
+		for i, val := range valList {
+			colName := ip.Stmt.Cols[i].ColName
+			pos, ok := colPosMap[colName]
+			if !ok {
+				return nil, errors.New("column does not exist: " + colName)
+			}
 			switch v := val.(type) {
 			case *literal.StringLiteral:
-				record = append(record, []byte(v.Value))
+				record[pos] = []byte(v.Value)
 			default:
 				return nil, errors.New("unsupported literal type in insert values")
 			}
@@ -54,24 +73,4 @@ func (ip *InsertPlanner) Next() (executor.Executor, error) {
 	}
 
 	return executor.NewInsert(ip.Stmt.Table.TableName, colNames, records), nil
-}
-
-// INSERT 文のカラム名を取得する
-// INSERT で指定されるカラムの順序は、`CREATE TABLE` の時の順序と一致している必要はない
-func getColNames(stmt *statement.InsertStmt) ([]string, error) {
-	sm := storage.GetStorageManager()
-	tblMeta, err := sm.Catalog.GetTableMetadataByName(stmt.Table.TableName)
-	if err != nil {
-		return nil, err
-	}
-
-	colNames := make([]string, len(stmt.Cols))
-	for _, col := range stmt.Cols {
-		colMeta, ok := tblMeta.GetColByName(col.ColName)
-		if !ok {
-			return nil, errors.New("column does not exist: " + col.ColName)
-		}
-		colNames[colMeta.Pos] = colMeta.Name
-	}
-	return colNames, nil
 }

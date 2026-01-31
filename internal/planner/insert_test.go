@@ -16,7 +16,7 @@ func TestNewInsert(t *testing.T) {
 	t.Run("正常に InsertPlanner が生成される", func(t *testing.T) {
 		// GIVEN
 		stmt := statement.NewInsertStmt(
-			*identifier.NewTableId("users", ""),
+			*identifier.NewTableId("users"),
 			[]identifier.ColumnId{
 				*identifier.NewColumnId("id"),
 				*identifier.NewColumnId("name"),
@@ -40,7 +40,7 @@ func TestNewInsert(t *testing.T) {
 	t.Run("カラム名が空の場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		stmt := statement.NewInsertStmt(
-			*identifier.NewTableId("users", ""),
+			*identifier.NewTableId("users"),
 			[]identifier.ColumnId{},
 			[][]literal.Literal{
 				{
@@ -63,7 +63,7 @@ func TestNewInsert(t *testing.T) {
 	t.Run("値の数がカラム数と一致しない場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		stmt := statement.NewInsertStmt(
-			*identifier.NewTableId("users", ""),
+			*identifier.NewTableId("users"),
 			[]identifier.ColumnId{
 				*identifier.NewColumnId("id"),
 				*identifier.NewColumnId("name"),
@@ -88,7 +88,7 @@ func TestNewInsert(t *testing.T) {
 	t.Run("挿入するレコードが空の場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		stmt := statement.NewInsertStmt(
-			*identifier.NewTableId("users", ""),
+			*identifier.NewTableId("users"),
 			[]identifier.ColumnId{
 				*identifier.NewColumnId("id"),
 				*identifier.NewColumnId("name"),
@@ -117,7 +117,7 @@ func TestNewInsert(t *testing.T) {
 		})
 
 		stmt := statement.NewInsertStmt(
-			*identifier.NewTableId("users", ""),
+			*identifier.NewTableId("users"),
 			[]identifier.ColumnId{
 				*identifier.NewColumnId("id"),
 				*identifier.NewColumnId("name"),
@@ -151,7 +151,7 @@ func TestNewInsert(t *testing.T) {
 		})
 
 		stmt := statement.NewInsertStmt(
-			*identifier.NewTableId("users", ""),
+			*identifier.NewTableId("users"),
 			[]identifier.ColumnId{
 				*identifier.NewColumnId("id"),
 				*identifier.NewColumnId("name"),
@@ -195,7 +195,7 @@ func TestNewInsert(t *testing.T) {
 		})
 
 		stmt := statement.NewInsertStmt(
-			*identifier.NewTableId("users", ""),
+			*identifier.NewTableId("users"),
 			[]identifier.ColumnId{
 				*identifier.NewColumnId("id"),
 				*identifier.NewColumnId("name"),
@@ -208,6 +208,43 @@ func TestNewInsert(t *testing.T) {
 					literal.NewStringLiteral("'Alice'", "Alice"),
 					literal.NewStringLiteral("'alice@example.com'", "alice@example.com"),
 					literal.NewStringLiteral("'25'", "25"),
+				},
+			},
+		)
+		planner := NewInsertPlanner(stmt)
+
+		// WHEN
+		exec, err := planner.Next()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, exec)
+		assert.IsType(t, &executor.Insert{}, exec)
+	})
+
+	t.Run("カラム順序が異なる挿入で Executor が生成される", func(t *testing.T) {
+		// GIVEN
+		initStorageManagerForTest(t)
+		defer storage.ResetStorageManager()
+
+		createTableForTest(t, "users", 1, nil, []*executor.ColumnParam{
+			{Name: "id", Type: catalog.ColumnTypeString},
+			{Name: "name", Type: catalog.ColumnTypeString},
+			{Name: "email", Type: catalog.ColumnTypeString},
+		})
+
+		stmt := statement.NewInsertStmt(
+			*identifier.NewTableId("users"),
+			[]identifier.ColumnId{
+				*identifier.NewColumnId("name"),
+				*identifier.NewColumnId("email"),
+				*identifier.NewColumnId("id"),
+			},
+			[][]literal.Literal{
+				{
+					literal.NewStringLiteral("'Alice'", "Alice"),
+					literal.NewStringLiteral("'alice@example.com'", "alice@example.com"),
+					literal.NewStringLiteral("'1'", "1"),
 				},
 			},
 		)
@@ -239,7 +276,7 @@ func TestNewInsert(t *testing.T) {
 		unsupported := &UnsupportedLiteral{}
 
 		stmt := statement.NewInsertStmt(
-			*identifier.NewTableId("users", ""),
+			*identifier.NewTableId("users"),
 			[]identifier.ColumnId{
 				*identifier.NewColumnId("id"),
 				*identifier.NewColumnId("name"),

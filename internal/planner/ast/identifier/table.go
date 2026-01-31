@@ -3,14 +3,12 @@ package identifier
 type TableId struct {
 	IdType     IdType
 	TableName  string
-	SchemaName string
 }
 
-func NewTableId(name string, schema string) *TableId {
+func NewTableId(name string) *TableId {
 	return &TableId{
 		IdType:     IdTypeTable,
 		TableName:  name,
-		SchemaName: schema,
 	}
 }
 

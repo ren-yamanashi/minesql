@@ -58,22 +58,22 @@ func createTable() {
 
 func insert() {
 	stmt := statement.NewInsertStmt(
-		*identifier.NewTableId("users", "sample"),
+		*identifier.NewTableId("users"),
 		[]identifier.ColumnId{
 			*identifier.NewColumnId("id"),
-			*identifier.NewColumnId("first_name"),
 			*identifier.NewColumnId("last_name"),
+			*identifier.NewColumnId("first_name"),
 		},
 		[][]literal.Literal{
 			{
 				literal.NewStringLiteral("1", "1"),
-				literal.NewStringLiteral("John", "John"),
 				literal.NewStringLiteral("Doe", "Doe"),
+				literal.NewStringLiteral("John", "John"),
 			},
 			{
 				literal.NewStringLiteral("2", "2"),
-				literal.NewStringLiteral("Jane", "Jane"),
 				literal.NewStringLiteral("Smith", "Smith"),
+				literal.NewStringLiteral("Jane", "Jane"),
 			},
 		},
 	)
@@ -93,7 +93,7 @@ func insert() {
 
 func scan() {
 	stmt := statement.NewSelectStmt(
-		*identifier.NewTableId("users", "sample"),
+		*identifier.NewTableId("users"),
 		statement.WhereClause{
 			IsSet: false,
 		},
@@ -116,7 +116,7 @@ func scan() {
 
 func assertEqual() {
 	stmt := statement.NewSelectStmt(
-		*identifier.NewTableId("users", "sample"),
+		*identifier.NewTableId("users"),
 		statement.WhereClause{
 			Condition: &expression.BinaryExpr{
 				Left:  *identifier.NewColumnId("last_name"),
