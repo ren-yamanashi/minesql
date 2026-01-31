@@ -1,8 +1,5 @@
 # メタページ
 
-- 実装コード:
-  - [meta_page.go](../../../internal/storage/access/btree/meta_page/meta_page.go)
-
 ## 概要
 
 - B+Tree のルートノードの PageId を管理するためのページ

@@ -1,6 +1,7 @@
 package node
 
 import (
+	"errors"
 	slottedpage "minesql/internal/storage/access/btree/slotted_page"
 	"minesql/internal/storage/page"
 )
@@ -40,33 +41,36 @@ func (ln *LeafNode) NumPairs() int {
 	return ln.body.NumSlots()
 }
 
-// 指定されたバッファ ID の key-value ペアを取得する
-func (ln *LeafNode) PairAt(bufferId int) Pair {
-	data := ln.body.Data(bufferId)
+// 指定されたスロット番号の key-value ペアを取得する
+// slotNum: slotted page のスロット番号
+func (ln *LeafNode) PairAt(slotNum int) Pair {
+	data := ln.body.Data(slotNum)
 	return pairFromBytes(data)
 }
 
-// キーから、対応するバッファ ID を検索する (二分探索)
-// 見つかった場合: (バッファ ID, true)
+// キーから、対応するスロット番号 (slotted page のスロット番号) を検索する (二分探索)
+// 見つかった場合: (スロット番号, true)
 // 見つからなかった場合: (0, false)
-func (ln *LeafNode) SearchBufferId(key []byte) (int, bool) {
-	return binarySearch(ln.NumPairs(), func(bufferId int) int {
-		pair := ln.PairAt(bufferId)
+func (ln *LeafNode) SearchSlotNum(key []byte) (int, bool) {
+	return binarySearch(ln.NumPairs(), func(slotNum int) int {
+		pair := ln.PairAt(slotNum)
 		return pair.CompareKey(key)
 	})
 }
 
 // key-value ペアを挿入する
+// slotNum: 挿入先のスロット番号 (slotted page のスロット番号)
+// pair: 挿入する key-value ペア
 // 戻り値: 挿入に成功したかどうか
-func (ln *LeafNode) Insert(bufferId int, pair Pair) bool {
+func (ln *LeafNode) Insert(slotNum int, pair Pair) bool {
 	pairBytes := pair.ToBytes()
 
 	if len(pairBytes) > ln.maxPairSize() {
 		return false
 	}
 
-	if ln.body.Insert(bufferId, len(pairBytes)) {
-		copy(ln.body.Data(bufferId), pairBytes)
+	if ln.body.Insert(slotNum, len(pairBytes)) {
+		copy(ln.body.Data(slotNum), pairBytes)
 		return true
 	}
 
@@ -82,33 +86,39 @@ func (ln *LeafNode) Initialize() {
 }
 
 // リーフノードを分割しながらペアを挿入する
-// 新しいリーフノードの最小キーを返す
-func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newPair Pair) []byte {
+// 戻り値: 新しいリーフノードの最小キー
+func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newPair Pair) ([]byte, error) {
 	newLeafNode.Initialize()
 
 	for {
 		if newLeafNode.isHalfFull() {
-			bufferId, _ := ln.SearchBufferId(newPair.Key)
-			if !ln.Insert(bufferId, newPair) {
-				panic("old leaf must have space")
+			slotNum, _ := ln.SearchSlotNum(newPair.Key)
+			if !ln.Insert(slotNum, newPair) {
+				return nil, errors.New("old leaf must have space")
 			}
 			break
 		}
 
-		// バッファ ID 0 のペアの方が新しいペアのキーよりも小さい場合、ペアを新しいリーフノードに移動する
+		// スロット番号 0 のペアの方が新しいペアのキーよりも小さい場合、ペアを新しいリーフノードに移動する
 		if ln.PairAt(0).CompareKey(newPair.Key) < 0 {
-			ln.transfer(newLeafNode)
+			err := ln.transfer(newLeafNode)
+			if err != nil {
+				return nil, err
+			}
 		} else {
 			// 新しいペアを新しいリーフノードに挿入し、残りのペアを新しいリーフノードに移動する
 			newLeafNode.Insert(newLeafNode.NumPairs(), newPair)
 			for !newLeafNode.isHalfFull() {
-				ln.transfer(newLeafNode)
+				err := ln.transfer(newLeafNode)
+				if err != nil {
+					return nil, err
+				}
 			}
 			break
 		}
 	}
 
-	return newLeafNode.PairAt(0).Key
+	return newLeafNode.PairAt(0).Key, nil
 }
 
 func (ln *LeafNode) PrevPageId() *page.PageId {
@@ -158,14 +168,15 @@ func (ln *LeafNode) isHalfFull() bool {
 }
 
 // 先頭のペアを別のリーフノードに移動する
-func (ln *LeafNode) transfer(dest *LeafNode) {
+func (ln *LeafNode) transfer(dest *LeafNode) error {
 	nextIndex := dest.NumPairs()
 	data := ln.body.Data(0)
 
 	if !dest.body.Insert(nextIndex, len(data)) {
-		panic("no space in dest branch")
+		return errors.New("no space in dest leaf")
 	}
 
 	copy(dest.body.Data(nextIndex), data)
 	ln.body.Remove(0)
+	return nil
 }

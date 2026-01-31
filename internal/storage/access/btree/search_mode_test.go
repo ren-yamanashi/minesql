@@ -121,7 +121,10 @@ func createBranchNode(pairs []node.Pair, rightChildPageId page.PageId) *node.Bra
 	}
 
 	// 最初のペアを使って初期化
-	branchNode.Initialize(pairs[0].Key, page.PageIdFromBytes(pairs[0].Value), rightChildPageId)
+	err := branchNode.Initialize(pairs[0].Key, page.PageIdFromBytes(pairs[0].Value), rightChildPageId)
+	if err != nil {
+		panic("failed to initialize branch node")
+	}
 
 	// 残りのペアを挿入
 	for i := 1; i < len(pairs); i++ {

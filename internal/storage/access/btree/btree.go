@@ -94,7 +94,10 @@ func (bt *BTree) Insert(bpm *bufferpool.BufferPoolManager, pair node.Pair) error
 	}
 	defer bpm.UnRefPage(newRootPageId)
 	newRootBranchNode := node.NewBranchNode(newRootBuf.GetWriteData())
-	newRootBranchNode.Initialize(overflowKey, *overflowChildPageId, rootPageId)
+	err = newRootBranchNode.Initialize(overflowKey, *overflowChildPageId, rootPageId)
+	if err != nil {
+		return err
+	}
 	meta = metapage.NewMetaPage(metaBuf.GetWriteData())
 	meta.SetRootPageId(newRootBuf.PageId)
 	return nil
@@ -151,7 +154,7 @@ func (bt *BTree) searchRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 			case SearchModeStart:
 				return 0
 			case SearchModeKey:
-				bId, _ := leafNode.SearchBufferId(sm.Key)
+				bId, _ := leafNode.SearchSlotNum(sm.Key)
 				return bId
 			}
 			panic("unreachable")
@@ -178,7 +181,7 @@ func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 
 	if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
 		leafNode := node.NewLeafNode(nodeBuffer.GetWriteData())
-		bufferId, found := leafNode.SearchBufferId(pair.Key)
+		bufferId, found := leafNode.SearchSlotNum(pair.Key)
 		if found {
 			return nil, nil, ErrDuplicateKey
 		}
@@ -222,7 +225,10 @@ func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 		// 新しいリーフノードに分割挿入する
 		newLeafNode := node.NewLeafNode(newLeafBuffer.GetWriteData())
 		newLeafNode.Initialize()
-		leafNode.SplitInsert(newLeafNode, pair)
+		_, err = leafNode.SplitInsert(newLeafNode, pair)
+		if err != nil {
+			return nil, nil, err
+		}
 		newLeafNode.SetNextPageId(&nodeBuffer.PageId)
 		newLeafNode.SetPrevPageId(prevLeafPageId)
 		leafNode.SetPrevPageId(&newLeafBuffer.PageId)
@@ -233,7 +239,7 @@ func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 	} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
 		// 挿入先の子ノードを取得
 		branchNode := node.NewBranchNode(nodeBuffer.GetWriteData())
-		childIndex := branchNode.SearchChildIdx(pair.Key)
+		childIndex := branchNode.SearchChildSlotNum(pair.Key)
 		childPageId := branchNode.ChildPageIdAt(childIndex)
 		childNodeBuffer, err := bpm.FetchPage(childPageId)
 		if err != nil {
@@ -269,7 +275,10 @@ func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 		}
 		defer bpm.UnRefPage(newBranchPageId)
 		newBranchNode := node.NewBranchNode(newBranchBuffer.GetWriteData())
-		overflowKey := branchNode.SplitInsert(newBranchNode, overFlowPair)
+		overflowKey, err := branchNode.SplitInsert(newBranchNode, overFlowPair)
+		if err != nil {
+			return nil, nil, err
+		}
 
 		return overflowKey, &newBranchBuffer.PageId, nil
 	}
