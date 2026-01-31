@@ -94,7 +94,7 @@ func TestExecute(t *testing.T) {
 
 		tableName := "users"
 		createTable := NewCreateTable(tableName, 1, []*IndexParam{
-			{Name: "name", SecondaryKey: 1},
+			{Name: "name", ColName: "name", SecondaryKey: 1},
 		}, []*ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "name", Type: catalog.ColumnTypeString},

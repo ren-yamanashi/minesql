@@ -15,7 +15,7 @@ func TestGetColIndex(t *testing.T) {
 			NewColumnMetadata(1, "name", 1, ColumnTypeString),
 			NewColumnMetadata(1, "email", 2, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(1, "users", 3, colMeta, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 3, 1, colMeta, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		idx, found := tableMeta.GetColIndex("name")
@@ -31,7 +31,7 @@ func TestGetColIndex(t *testing.T) {
 			NewColumnMetadata(1, "id", 0, ColumnTypeString),
 			NewColumnMetadata(1, "name", 1, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(1, "users", 2, colMeta, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		idx, found := tableMeta.GetColIndex("id")
@@ -48,7 +48,7 @@ func TestGetColIndex(t *testing.T) {
 			NewColumnMetadata(1, "name", 1, ColumnTypeString),
 			NewColumnMetadata(1, "email", 2, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(1, "users", 3, colMeta, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 3, 1, colMeta, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		idx, found := tableMeta.GetColIndex("email")
@@ -64,7 +64,7 @@ func TestGetColIndex(t *testing.T) {
 			NewColumnMetadata(1, "id", 0, ColumnTypeString),
 			NewColumnMetadata(1, "name", 1, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(1, "users", 2, colMeta, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		idx, found := tableMeta.GetColIndex("non_existent_column")
@@ -76,7 +76,7 @@ func TestGetColIndex(t *testing.T) {
 
 	t.Run("カラムが空のテーブルの場合、false を返す", func(t *testing.T) {
 		// GIVEN
-		tableMeta := NewTableMetadata(1, "empty_table", 0, []ColumnMetadata{}, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "empty_table", 0, 0, []ColumnMetadata{}, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		idx, found := tableMeta.GetColIndex("any_column")
@@ -95,7 +95,7 @@ func TestHasColumn(t *testing.T) {
 			NewColumnMetadata(1, "name", 1, ColumnTypeString),
 			NewColumnMetadata(1, "email", 2, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(1, "users", 3, colMeta, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 3, 1, colMeta, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		result := tableMeta.HasColumn("name")
@@ -110,7 +110,7 @@ func TestHasColumn(t *testing.T) {
 			NewColumnMetadata(1, "id", 0, ColumnTypeString),
 			NewColumnMetadata(1, "name", 1, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(1, "users", 2, colMeta, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		result := tableMeta.HasColumn("id")
@@ -126,7 +126,7 @@ func TestHasColumn(t *testing.T) {
 			NewColumnMetadata(1, "name", 1, ColumnTypeString),
 			NewColumnMetadata(1, "email", 2, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(1, "users", 3, colMeta, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 3, 1, colMeta, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		result := tableMeta.HasColumn("email")
@@ -141,7 +141,7 @@ func TestHasColumn(t *testing.T) {
 			NewColumnMetadata(1, "id", 0, ColumnTypeString),
 			NewColumnMetadata(1, "name", 1, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(1, "users", 2, colMeta, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		result := tableMeta.HasColumn("non_existent_column")
@@ -152,7 +152,7 @@ func TestHasColumn(t *testing.T) {
 
 	t.Run("カラムが空のテーブルの場合、false を返す", func(t *testing.T) {
 		// GIVEN
-		tableMeta := NewTableMetadata(1, "empty_table", 0, []ColumnMetadata{}, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "empty_table", 0, 0, []ColumnMetadata{}, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		result := tableMeta.HasColumn("any_column")
@@ -172,7 +172,7 @@ func TestGetIndexByColName(t *testing.T) {
 		idxMeta := []IndexMetadata{
 			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
 		}
-		tableMeta := NewTableMetadata(1, "users", 2, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		idx, found := tableMeta.GetIndexByColName("email")
@@ -196,7 +196,7 @@ func TestGetIndexByColName(t *testing.T) {
 			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
 			NewIndexMetadata(1, "idx_username", "username", IndexTypeUnique, page.NewPageId(page.FileId(1), 2)),
 		}
-		tableMeta := NewTableMetadata(1, "users", 3, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 3, 1, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		idx, found := tableMeta.GetIndexByColName("username")
@@ -218,7 +218,7 @@ func TestGetIndexByColName(t *testing.T) {
 		idxMeta := []IndexMetadata{
 			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
 		}
-		tableMeta := NewTableMetadata(1, "users", 3, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 3, 1, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		idx, found := tableMeta.GetIndexByColName("name")
@@ -236,7 +236,7 @@ func TestGetIndexByColName(t *testing.T) {
 		idxMeta := []IndexMetadata{
 			NewIndexMetadata(1, "idx_id", "id", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
 		}
-		tableMeta := NewTableMetadata(1, "users", 1, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 1, 1, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		idx, found := tableMeta.GetIndexByColName("non_existent_column")
@@ -252,7 +252,7 @@ func TestGetIndexByColName(t *testing.T) {
 			NewColumnMetadata(1, "id", 0, ColumnTypeString),
 			NewColumnMetadata(1, "name", 1, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(1, "users", 2, colMeta, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		idx, found := tableMeta.GetIndexByColName("name")
@@ -260,5 +260,100 @@ func TestGetIndexByColName(t *testing.T) {
 		// THEN
 		assert.False(t, found)
 		assert.Nil(t, idx)
+	})
+}
+
+func TestGetTable(t *testing.T) {
+	t.Run("インデックスなしのテーブルを取得できる", func(t *testing.T) {
+		// GIVEN
+		colMeta := []ColumnMetadata{
+			NewColumnMetadata(1, "id", 0, ColumnTypeString),
+			NewColumnMetadata(1, "name", 1, ColumnTypeString),
+		}
+		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
+
+		// WHEN
+		tbl, err := tableMeta.GetTable()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, tbl)
+		assert.Equal(t, "users", tbl.Name)
+		assert.Equal(t, uint8(1), tbl.PrimaryKeyCount)
+		assert.Equal(t, 0, len(tbl.UniqueIndexes))
+		assert.Equal(t, page.NewPageId(page.FileId(1), 0), tbl.MetaPageId)
+	})
+
+	t.Run("ユニークインデックス付きのテーブルを取得できる", func(t *testing.T) {
+		// GIVEN
+		colMeta := []ColumnMetadata{
+			NewColumnMetadata(1, "id", 0, ColumnTypeString),
+			NewColumnMetadata(1, "email", 1, ColumnTypeString),
+		}
+		idxMeta := []IndexMetadata{
+			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
+		}
+		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
+
+		// WHEN
+		tbl, err := tableMeta.GetTable()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, tbl)
+		assert.Equal(t, "users", tbl.Name)
+		assert.Equal(t, 1, len(tbl.UniqueIndexes))
+		assert.Equal(t, "idx_email", tbl.UniqueIndexes[0].Name)
+		assert.Equal(t, "email", tbl.UniqueIndexes[0].ColName)
+		assert.Equal(t, uint(1), tbl.UniqueIndexes[0].SecondaryKeyIdx)
+		assert.Equal(t, page.NewPageId(page.FileId(1), 1), tbl.UniqueIndexes[0].MetaPageId)
+	})
+
+	t.Run("複数のユニークインデックス付きのテーブルを取得できる", func(t *testing.T) {
+		// GIVEN
+		colMeta := []ColumnMetadata{
+			NewColumnMetadata(1, "id", 0, ColumnTypeString),
+			NewColumnMetadata(1, "email", 1, ColumnTypeString),
+			NewColumnMetadata(1, "username", 2, ColumnTypeString),
+		}
+		idxMeta := []IndexMetadata{
+			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
+			NewIndexMetadata(1, "idx_username", "username", IndexTypeUnique, page.NewPageId(page.FileId(1), 2)),
+		}
+		tableMeta := NewTableMetadata(1, "users", 3, 1, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
+
+		// WHEN
+		tbl, err := tableMeta.GetTable()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, tbl)
+		assert.Equal(t, 2, len(tbl.UniqueIndexes))
+		assert.Equal(t, "idx_email", tbl.UniqueIndexes[0].Name)
+		assert.Equal(t, "email", tbl.UniqueIndexes[0].ColName)
+		assert.Equal(t, uint(1), tbl.UniqueIndexes[0].SecondaryKeyIdx)
+		assert.Equal(t, "idx_username", tbl.UniqueIndexes[1].Name)
+		assert.Equal(t, "username", tbl.UniqueIndexes[1].ColName)
+		assert.Equal(t, uint(2), tbl.UniqueIndexes[1].SecondaryKeyIdx)
+	})
+
+	t.Run("存在しないカラム名を指定したインデックスがある場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		colMeta := []ColumnMetadata{
+			NewColumnMetadata(1, "id", 0, ColumnTypeString),
+			NewColumnMetadata(1, "name", 1, ColumnTypeString),
+		}
+		idxMeta := []IndexMetadata{
+			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
+		}
+		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
+
+		// WHEN
+		tbl, err := tableMeta.GetTable()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, tbl)
+		assert.Contains(t, err.Error(), "column email not found in table users")
 	})
 }

@@ -53,7 +53,8 @@ func (ctn *CreateTableNode) Next() (executor.Executor, error) {
 		}
 	}
 
-	if err := validatePkDef(pkDef, colIndexMap); err != nil {
+	pkCount, err := getPkCount(pkDef, colIndexMap)
+	if err != nil {
 		return nil, err
 	}
 
@@ -62,30 +63,32 @@ func (ctn *CreateTableNode) Next() (executor.Executor, error) {
 		return nil, err
 	}
 
-	return executor.NewCreateTable(ctn.Stmt.TableName, len(pkDef.Columns), uniqueKeyParams, colParams), nil
+	return executor.NewCreateTable(ctn.Stmt.TableName, uint8(pkCount), uniqueKeyParams, colParams), nil
 }
 
-func validatePkDef(pkDef *definition.ConstraintPrimaryKeyDef, colIndexMap map[string]int) error {
+// プライマリキーのカラム定義を検証し、プライマリキーのカラム数を返す
+// エラーの場合は、`-1, error` を返し、正常な場合は `pkCount, nil` を返す
+func getPkCount(pkDef *definition.ConstraintPrimaryKeyDef, colIndexMap map[string]int) (int, error) {
 	if pkDef == nil {
-		return errors.New("primary key is required")
+		return -1, errors.New("primary key is required")
 	}
 	if len(pkDef.Columns) == 0 {
-		return errors.New("primary key must have at least one column")
+		return -1, errors.New("primary key must have at least one column")
 	}
 	if len(pkDef.Columns) > len(colIndexMap) {
-		return errors.New("primary key columns exceed total columns")
+		return -1, errors.New("primary key columns exceed total columns")
 	}
 
 	for i, pkCol := range pkDef.Columns {
 		idx, exists := colIndexMap[pkCol.ColName]
 		if !exists {
-			return fmt.Errorf("primary key column '%s' does not exist", pkCol.ColName)
+			return -1, fmt.Errorf("primary key column '%s' does not exist", pkCol.ColName)
 		}
 		if idx != i {
-			return errors.New("primary key columns must be defined in order starting from the first column")
+			return -1, errors.New("primary key columns must be defined in order starting from the first column")
 		}
 	}
-	return nil
+	return len(pkDef.Columns), nil
 }
 
 func getUkParams(ukDefs []*definition.ConstraintUniqueKeyDef, colIndexMap map[string]int) ([]*executor.IndexParam, error) {

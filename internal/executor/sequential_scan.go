@@ -29,19 +29,22 @@ func NewSequentialScan(
 // 次の Record を取得する
 // データがない場合、継続条件を満たさない場合は (nil, nil) を返す
 func (ss *SequentialScan) Next() (Record, error) {
-	engine := storage.GetStorageManager()
-	bpm := engine.GetBufferPoolManager()
+	sm := storage.GetStorageManager()
 
 	// 初回実行時はイテレータを作成
 	if ss.iterator == nil {
-		tbl, err := engine.GetTable(ss.tableName)
+		tblMeta, err := sm.Catalog.GetTableMetadataByName(ss.tableName)
+		if err != nil {
+			return nil, err
+		}
+		tbl, err := tblMeta.GetTable()
 		if err != nil {
 			return nil, err
 		}
 
 		// テーブルスキャン用のイテレータを作成
 		btr := btree.NewBTree(tbl.MetaPageId)
-		iterator, err := btr.Search(bpm, ss.searchMode.Encode())
+		iterator, err := btr.Search(sm.BufferPoolManager, ss.searchMode.Encode())
 		if err != nil {
 			return nil, err
 		}
@@ -50,7 +53,7 @@ func (ss *SequentialScan) Next() (Record, error) {
 	}
 
 	// レコード取得
-	pair, ok, err := ss.iterator.Next(bpm)
+	pair, ok, err := ss.iterator.Next(sm.BufferPoolManager)
 	if !ok {
 		return nil, nil
 	}

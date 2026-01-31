@@ -115,7 +115,7 @@ func TestInsert(t *testing.T) {
 			NewColumnMetadata(tableId, "name", 1, ColumnTypeString),
 		}
 		idxMeta := []IndexMetadata{}
-		tableMeta := NewTableMetadata(tableId, "users", 2, colMeta, idxMeta, metaPageId)
+		tableMeta := NewTableMetadata(tableId, "users", 2, 1, colMeta, idxMeta, metaPageId)
 
 		// WHEN
 		err = cat.Insert(bpm, tableMeta)
@@ -142,7 +142,7 @@ func TestInsert(t *testing.T) {
 			NewColumnMetadata(tableId, "email", 2, ColumnTypeString),
 		}
 		idxMeta := []IndexMetadata{}
-		tableMeta := NewTableMetadata(tableId, "users", 3, colMeta, idxMeta, metaPageId)
+		tableMeta := NewTableMetadata(tableId, "users", 3, 1, colMeta, idxMeta, metaPageId)
 
 		// WHEN
 		err = cat.Insert(bpm, tableMeta)
@@ -172,7 +172,7 @@ func TestInsert(t *testing.T) {
 		idxMeta := []IndexMetadata{
 			NewIndexMetadata(tableId, "idx_email", "email", IndexTypeUnique, indexMetaPageId),
 		}
-		tableMeta := NewTableMetadata(tableId, "users", 2, colMeta, idxMeta, metaPageId)
+		tableMeta := NewTableMetadata(tableId, "users", 2, 1, colMeta, idxMeta, metaPageId)
 
 		// WHEN
 		err = cat.Insert(bpm, tableMeta)
@@ -199,7 +199,7 @@ func TestGetTableMetadataByName(t *testing.T) {
 		colMeta := []ColumnMetadata{
 			NewColumnMetadata(tableId, "id", 0, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(tableId, "users", 1, colMeta, []IndexMetadata{}, metaPageId)
+		tableMeta := NewTableMetadata(tableId, "users", 1, 1, colMeta, []IndexMetadata{}, metaPageId)
 		err = cat.Insert(bpm, tableMeta)
 		assert.NoError(t, err)
 
@@ -239,13 +239,13 @@ func TestGetTableMetadataByName(t *testing.T) {
 		assert.NoError(t, err)
 
 		// 複数のテーブルを挿入
-		table1Meta := NewTableMetadata(1, "users", 1, []ColumnMetadata{
+		table1Meta := NewTableMetadata(1, "users", 1, 1, []ColumnMetadata{
 			NewColumnMetadata(1, "id", 0, ColumnTypeString),
 		}, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
-		table2Meta := NewTableMetadata(2, "posts", 1, []ColumnMetadata{
+		table2Meta := NewTableMetadata(2, "posts", 1, 1, []ColumnMetadata{
 			NewColumnMetadata(2, "id", 0, ColumnTypeString),
 		}, []IndexMetadata{}, page.NewPageId(page.FileId(2), 0))
-		table3Meta := NewTableMetadata(3, "comments", 1, []ColumnMetadata{
+		table3Meta := NewTableMetadata(3, "comments", 1, 1, []ColumnMetadata{
 			NewColumnMetadata(3, "id", 0, ColumnTypeString),
 		}, []IndexMetadata{}, page.NewPageId(page.FileId(3), 0))
 

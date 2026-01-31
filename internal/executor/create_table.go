@@ -19,12 +19,12 @@ type IndexParam struct {
 
 type CreateTable struct {
 	tableName       string
-	primaryKeyCount int
+	primaryKeyCount uint8
 	indexParams     []*IndexParam
 	columnParams    []*ColumnParam
 }
 
-func NewCreateTable(tableName string, primaryKeyCount int, indexParams []*IndexParam, columnParams []*ColumnParam) *CreateTable {
+func NewCreateTable(tableName string, primaryKeyCount uint8, indexParams []*IndexParam, columnParams []*ColumnParam) *CreateTable {
 	if indexParams == nil {
 		indexParams = []*IndexParam{}
 	}
@@ -48,21 +48,19 @@ func (ct *CreateTable) Next() (Record, error) {
 }
 
 func (ct *CreateTable) execute() error {
-	engine := storage.GetStorageManager()
-	bpm := engine.GetBufferPoolManager()
-	cat := engine.GetCatalog()
+	sm := storage.GetStorageManager()
 
 	// FileId を割り当て
-	fileId := bpm.AllocateFileId()
+	fileId := sm.BufferPoolManager.AllocateFileId()
 
 	// DiskManager を登録
-	err := engine.RegisterDmToBpm(fileId, ct.tableName)
+	err := sm.RegisterDmToBpm(fileId, ct.tableName)
 	if err != nil {
 		return err
 	}
 
 	// テーブルの metaPageId を設定
-	metaPageId, err := bpm.AllocatePageId(fileId)
+	metaPageId, err := sm.BufferPoolManager.AllocatePageId(fileId)
 	if err != nil {
 		return err
 	}
@@ -70,26 +68,24 @@ func (ct *CreateTable) execute() error {
 	// 各 UniqueIndex の metaPageId を設定
 	uniqueIndexes := make([]*table.UniqueIndex, len(ct.indexParams))
 	for i, indexParam := range ct.indexParams {
-		indexMetaPageId, err := bpm.AllocatePageId(fileId)
+		indexMetaPageId, err := sm.BufferPoolManager.AllocatePageId(fileId)
 		if err != nil {
 			return err
 		}
 		uniqueIndex := table.NewUniqueIndex(indexParam.Name, indexParam.ColName, indexParam.SecondaryKey)
-		uniqueIndex.Create(bpm, indexMetaPageId)
+		uniqueIndex.Create(sm.BufferPoolManager, indexMetaPageId)
 		uniqueIndexes[i] = uniqueIndex
 	}
 
 	// テーブルを作成
 	tbl := table.NewTable(ct.tableName, metaPageId, ct.primaryKeyCount, uniqueIndexes)
-	err = tbl.Create(bpm)
+	err = tbl.Create(sm.BufferPoolManager)
 	if err != nil {
 		return err
 	}
 
-	engine.RegisterTable(&tbl)
-
 	// テーブルIDを採番
-	tblId, err := cat.AllocateTableId(bpm)
+	tblId, err := sm.Catalog.AllocateTableId(sm.BufferPoolManager)
 	if err != nil {
 		return err
 	}
@@ -107,10 +103,10 @@ func (ct *CreateTable) execute() error {
 	}
 
 	// テーブルメタデータを作成
-	tblMeta := catalog.NewTableMetadata(tblId, ct.tableName, uint8(len(ct.columnParams)), colMeta, idxMeta, metaPageId)
+	tblMeta := catalog.NewTableMetadata(tblId, ct.tableName, uint8(len(ct.columnParams)), ct.primaryKeyCount, colMeta, idxMeta, metaPageId)
 
 	// カタログにテーブルを登録
-	cat.Insert(bpm, tblMeta)
+	sm.Catalog.Insert(sm.BufferPoolManager, tblMeta)
 
 	return nil
 }

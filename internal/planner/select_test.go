@@ -33,7 +33,7 @@ func TestNewSelect(t *testing.T) {
 
 	t.Run("テーブル名が空の場合、エラーを返す", func(t *testing.T) {
 		tmpdir := t.TempDir()
-		initStorageEngine(t, tmpdir)
+		initStorageManager(t, tmpdir)
 		defer storage.ResetStorageManager()
 
 		// GIVEN
@@ -56,7 +56,7 @@ func TestNewSelect(t *testing.T) {
 
 	t.Run("WHERE 句なしで複数カラムを指定した場合、SequentialScan が生成される", func(t *testing.T) {
 		tmpdir := t.TempDir()
-		initStorageEngine(t, tmpdir)
+		initStorageManager(t, tmpdir)
 		defer storage.ResetStorageManager()
 
 		// GIVEN
@@ -79,7 +79,7 @@ func TestNewSelect(t *testing.T) {
 
 	t.Run("WHERE 句でインデックス付きカラムを指定した場合、IndexScan が生成される", func(t *testing.T) {
 		tmpdir := t.TempDir()
-		initStorageEngine(t, tmpdir)
+		initStorageManager(t, tmpdir)
 		defer storage.ResetStorageManager()
 
 		// GIVEN
@@ -106,7 +106,7 @@ func TestNewSelect(t *testing.T) {
 
 	t.Run("WHERE 句でインデックスなしカラムを指定した場合、SequentialScan が生成される", func(t *testing.T) {
 		tmpdir := t.TempDir()
-		initStorageEngine(t, tmpdir)
+		initStorageManager(t, tmpdir)
 		defer storage.ResetStorageManager()
 
 		// GIVEN
@@ -133,7 +133,7 @@ func TestNewSelect(t *testing.T) {
 
 	t.Run("WHERE 句で存在しないカラムを指定した場合、エラーを返す", func(t *testing.T) {
 		tmpdir := t.TempDir()
-		initStorageEngine(t, tmpdir)
+		initStorageManager(t, tmpdir)
 		defer storage.ResetStorageManager()
 
 		// GIVEN
@@ -160,7 +160,7 @@ func TestNewSelect(t *testing.T) {
 
 	t.Run("WHERE 句でサポートされていない型を指定した場合、エラーを返す", func(t *testing.T) {
 		tmpdir := t.TempDir()
-		initStorageEngine(t, tmpdir)
+		initStorageManager(t, tmpdir)
 		defer storage.ResetStorageManager()
 
 		// GIVEN
@@ -189,14 +189,14 @@ func TestNewSelect(t *testing.T) {
 	})
 }
 
-// テスト用の storage engine を初期化
-func initStorageEngine(t *testing.T, dataDir string) *storage.StorageManager {
+// テスト用の storage manager を初期化
+func initStorageManager(t *testing.T, dataDir string) *storage.StorageManager {
 	t.Setenv("MINESQL_DATA_DIR", dataDir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "10")
 
 	storage.ResetStorageManager()
 	storage.InitStorageManager()
-	engine := storage.GetStorageManager()
+	sm := storage.GetStorageManager()
 
 	// テーブルを作成
 	createTable := executor.NewCreateTable("users", 1, []*executor.IndexParam{
@@ -209,5 +209,5 @@ func initStorageEngine(t *testing.T, dataDir string) *storage.StorageManager {
 	_, err := createTable.Next()
 	assert.NoError(t, err)
 
-	return engine
+	return sm
 }

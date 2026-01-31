@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"minesql/internal/config"
 	"minesql/internal/storage/access/catalog"
-	"minesql/internal/storage/access/table"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
 	"minesql/internal/storage/page"
@@ -39,9 +38,8 @@ func GetStorageManager() *StorageManager {
 
 // ストレージエンジン層のリソースの管理を行う
 type StorageManager struct {
-	bufferPoolManager *bufferpool.BufferPoolManager
-	tables            map[string]*table.Table
-	catalog           *catalog.Catalog
+	BufferPoolManager *bufferpool.BufferPoolManager
+	Catalog           *catalog.Catalog
 	baseDirectory     string
 }
 
@@ -55,30 +53,10 @@ func newStorageManager() (*StorageManager, error) {
 		return nil, err
 	}
 	return &StorageManager{
-		bufferPoolManager: bpm,
-		tables:            make(map[string]*table.Table),
+		BufferPoolManager: bpm,
+		Catalog:           catalog,
 		baseDirectory:     dataDir,
-		catalog:           catalog,
 	}, nil
-}
-
-// BufferPoolManager を取得する
-func (se *StorageManager) GetBufferPoolManager() *bufferpool.BufferPoolManager {
-	return se.bufferPoolManager
-}
-
-// カタログを取得する
-func (se *StorageManager) GetCatalog() *catalog.Catalog {
-	return se.catalog
-}
-
-// テーブル名から Table を取得する
-func (se *StorageManager) GetTable(tableName string) (*table.Table, error) {
-	tbl, ok := se.tables[tableName]
-	if !ok {
-		return nil, fmt.Errorf("table %s not found", tableName)
-	}
-	return tbl, nil
 }
 
 // BufferPoolManager に DiskManager を登録する
@@ -88,13 +66,8 @@ func (se *StorageManager) RegisterDmToBpm(fileId page.FileId, tableName string) 
 	if err != nil {
 		return err
 	}
-	se.bufferPoolManager.RegisterDiskManager(fileId, dm)
+	se.BufferPoolManager.RegisterDiskManager(fileId, dm)
 	return nil
-}
-
-// テーブルを登録する
-func (se *StorageManager) RegisterTable(tbl *table.Table) {
-	se.tables[tbl.Name] = tbl
 }
 
 // カタログを初期化する

@@ -16,7 +16,7 @@ func TestCreateTable(t *testing.T) {
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
 		storage.ResetStorageManager()
 		storage.InitStorageManager()
-		engine := storage.GetStorageManager()
+		sm := storage.GetStorageManager()
 		createTable := NewCreateTable("users", 1, nil, nil)
 
 		// WHEN
@@ -24,11 +24,10 @@ func TestCreateTable(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		tbl, err := engine.GetTable("users")
-		assert.NoError(t, err)
-		assert.NotNil(t, tbl)
-		assert.Equal(t, "users", tbl.Name)
-		assert.Equal(t, 1, tbl.PrimaryKeyCount)
+		tblMeta, err := sm.Catalog.GetTableMetadataByName("users")
+		assert.NotNil(t, tblMeta)
+		assert.Equal(t, "users", tblMeta.Name)
+		assert.Equal(t, uint8(1), tblMeta.PrimaryKeyCount)
 	})
 
 	t.Run("カラムを指定してテーブルを作成できる", func(t *testing.T) {
@@ -38,8 +37,7 @@ func TestCreateTable(t *testing.T) {
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
 		storage.ResetStorageManager()
 		storage.InitStorageManager()
-		engine := storage.GetStorageManager()
-		cat := engine.GetCatalog()
+		sm := storage.GetStorageManager()
 		createTable := NewCreateTable("users", 1, nil, []*ColumnParam{
 			{Name: "id", Type: "int"},
 			{Name: "name", Type: "string"},
@@ -51,7 +49,7 @@ func TestCreateTable(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		tblMeta, err := cat.GetTableMetadataByName("users")
+		tblMeta, err := sm.Catalog.GetTableMetadataByName("users")
 		assert.NoError(t, err)
 		assert.NotNil(t, tblMeta)
 		assert.Equal(t, uint8(3), tblMeta.NCols)
@@ -74,21 +72,20 @@ func TestCreateTable(t *testing.T) {
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
 		storage.ResetStorageManager()
 		storage.InitStorageManager()
-		engine := storage.GetStorageManager()
+		sm := storage.GetStorageManager()
 		createTable := NewCreateTable("users", 1, []*IndexParam{
-			{Name: "email", SecondaryKey: 1},
+			{Name: "email", ColName: "email", SecondaryKey: 1},
 		}, nil)
 
 		// WHEN
 		_, err := createTable.Next()
 
 		// THEN
+		tblMeta, err := sm.Catalog.GetTableMetadataByName("users")
 		assert.NoError(t, err)
-		tbl, err := engine.GetTable("users")
-		assert.NoError(t, err)
-		assert.NotNil(t, tbl)
-		assert.Equal(t, 1, len(tbl.UniqueIndexes))
-		assert.Equal(t, "email", tbl.UniqueIndexes[0].Name)
+		assert.NotNil(t, tblMeta)
+		assert.Equal(t, 1, len(tblMeta.Indexes))
+		assert.Equal(t, "email", tblMeta.Indexes[0].ColName)
 	})
 
 	t.Run("テーブルファイルが作成される", func(t *testing.T) {
@@ -98,21 +95,19 @@ func TestCreateTable(t *testing.T) {
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
 		storage.ResetStorageManager()
 		storage.InitStorageManager()
-		engine := storage.GetStorageManager()
+		sm := storage.GetStorageManager()
 		createTable := NewCreateTable("users", 1, nil, nil)
 
 		// WHEN
 		_, err := createTable.Next()
 
 		// THEN
-		assert.NoError(t, err)
-		tbl, err := engine.GetTable("users")
+		tblMeta, err := sm.Catalog.GetTableMetadataByName("users")
 		assert.NoError(t, err)
 		// FileId が採番されていることを確認
-		assert.NotEqual(t, page.FileId(0), tbl.MetaPageId.FileId)
+		assert.NotEqual(t, page.FileId(0), tblMeta.DataMetaPageId.FileId)
 		// ディスクマネージャが登録されていることを確認
-		bpm := engine.GetBufferPoolManager()
-		dm, dmErr := bpm.GetDiskManager(tbl.MetaPageId.FileId)
+		dm, dmErr := sm.BufferPoolManager.GetDiskManager(tblMeta.DataMetaPageId.FileId)
 		assert.NoError(t, dmErr)
 		assert.NotNil(t, dm)
 	})

@@ -138,6 +138,7 @@ func (c *Catalog) AllocateTableId(bpm *bufferpool.BufferPoolManager) (uint64, er
 	return id, nil
 }
 
+// カタログにメタデータを挿入する
 func (c *Catalog) Insert(bpm *bufferpool.BufferPoolManager, tableMeta TableMetadata) error {
 	// テーブルメタデータを挿入
 	if err := c.insertTableMetadata(bpm, tableMeta); err != nil {

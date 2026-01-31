@@ -15,12 +15,12 @@ type Table struct {
 	MetaPageId page.PageId
 	// プライマリキーの列数 (プライマリキーは先頭から連続している想定)
 	// 例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる
-	PrimaryKeyCount int
+	PrimaryKeyCount uint8
 	// テーブルに紐づくユニークインデックス群
 	UniqueIndexes []*UniqueIndex
 }
 
-func NewTable(name string, metaPageId page.PageId, primaryKeyCount int, uniqueIndexes []*UniqueIndex) Table {
+func NewTable(name string, metaPageId page.PageId, primaryKeyCount uint8, uniqueIndexes []*UniqueIndex) Table {
 	return Table{
 		Name:            name,
 		MetaPageId:      metaPageId,

@@ -14,16 +14,16 @@ type UniqueIndex struct {
 	ColName string
 	// インデックスの内容が入っている B+Tree のメタページの ID
 	MetaPageId page.PageId
-	// セカンダリキーに含めるカラムを指定 (0 始まりの列番号)
-	SecondaryKey uint
+	// セカンダリキーに含めるカラムのインデックス (0 始まりの列番号)
+	SecondaryKeyIdx uint
 }
 
-func NewUniqueIndex(name string, colName string, secondaryKey uint) *UniqueIndex {
+func NewUniqueIndex(name string, colName string, secondaryKeyIdx uint) *UniqueIndex {
 	return &UniqueIndex{
 		Name:         name,
 		ColName:      colName,
 		MetaPageId:   page.INVALID_PAGE_ID, // 初期化時には無効なページIDを設定 (Create 時に設定される)
-		SecondaryKey: secondaryKey,
+		SecondaryKeyIdx: secondaryKeyIdx,
 	}
 }
 
@@ -46,7 +46,7 @@ func (ui *UniqueIndex) Insert(bpm *bufferpool.BufferPoolManager, primaryKey []ui
 	var secondaryKey []byte
 
 	// セカンダリキーをエンコード
-	Encode([][]byte{record[ui.SecondaryKey]}, &secondaryKey)
+	Encode([][]byte{record[ui.SecondaryKeyIdx]}, &secondaryKey)
 
 	// B+Tree に挿入
 	return btr.Insert(bpm, node.NewPair(secondaryKey, primaryKey))
