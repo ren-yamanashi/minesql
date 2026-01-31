@@ -31,11 +31,7 @@ func TestNewInsert(t *testing.T) {
 
 func TestExecute(t *testing.T) {
 	t.Run("存在しないテーブルに対して挿入しようとするとエラーになる", func(t *testing.T) {
-		tmpdir := t.TempDir()
-		t.Setenv("MINESQL_DATA_DIR", tmpdir)
-		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		storage.ResetStorageManager()
-		storage.InitStorageManager()
+		initStorageManagerForTest(t)
 		defer storage.ResetStorageManager()
 
 		// GIVEN
@@ -54,20 +50,14 @@ func TestExecute(t *testing.T) {
 	})
 
 	t.Run("カラム名がテーブルのカラムと一致しない場合、エラーになる", func(t *testing.T) {
-		tmpdir := t.TempDir()
-		t.Setenv("MINESQL_DATA_DIR", tmpdir)
-		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		storage.ResetStorageManager()
-		storage.InitStorageManager()
+		initStorageManagerForTest(t)
 		defer storage.ResetStorageManager()
 
 		tableName := "users"
-		createTable := NewCreateTable(tableName, 1, nil, []*ColumnParam{
+		createTableForTest(t, tableName, 1, nil, []*ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "name", Type: catalog.ColumnTypeString},
 		})
-		_, err := createTable.Next()
-		assert.NoError(t, err)
 
 		// GIVEN
 		cols := []string{"id", "email"} // "email" は存在しないカラム
@@ -77,7 +67,7 @@ func TestExecute(t *testing.T) {
 
 		// WHEN
 		insert := NewInsert(tableName, cols, records)
-		_, err = insert.Next()
+		_, err := insert.Next()
 
 		// THEN
 		assert.Error(t, err)
@@ -85,22 +75,16 @@ func TestExecute(t *testing.T) {
 	})
 
 	t.Run("正常にレコードを挿入できる", func(t *testing.T) {
-		tmpdir := t.TempDir()
-		t.Setenv("MINESQL_DATA_DIR", tmpdir)
-		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		storage.ResetStorageManager()
-		storage.InitStorageManager()
+		initStorageManagerForTest(t)
 		defer storage.ResetStorageManager()
 
 		tableName := "users"
-		createTable := NewCreateTable(tableName, 1, []*IndexParam{
+		createTableForTest(t, tableName, 1, []*IndexParam{
 			{Name: "name", ColName: "name", SecondaryKey: 1},
 		}, []*ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "name", Type: catalog.ColumnTypeString},
 		})
-		_, err := createTable.Next()
-		assert.NoError(t, err)
 
 		// GIVEN
 		cols := []string{"id", "name"}
@@ -111,7 +95,7 @@ func TestExecute(t *testing.T) {
 
 		// WHEN
 		insert := NewInsert(tableName, cols, records)
-		_, err = insert.Next()
+		_, err := insert.Next()
 
 		// THEN
 		assert.NoError(t, err)
@@ -131,4 +115,18 @@ func TestExecute(t *testing.T) {
 			assert.Equal(t, records[i][1], record[1])
 		}
 	})
+}
+
+func initStorageManagerForTest(t *testing.T) {
+	tmpdir := t.TempDir()
+	t.Setenv("MINESQL_DATA_DIR", tmpdir)
+	t.Setenv("MINESQL_BUFFER_SIZE", "10")
+	storage.ResetStorageManager()
+	storage.InitStorageManager()
+}
+
+func createTableForTest(t *testing.T, tableName string, primaryKeyCount uint8, indexes []*IndexParam, columns []*ColumnParam) {
+	createTable := NewCreateTable(tableName, primaryKeyCount, indexes, columns)
+	_, err := createTable.Next()
+	assert.NoError(t, err)
 }

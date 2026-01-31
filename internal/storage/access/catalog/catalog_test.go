@@ -110,11 +110,11 @@ func TestInsert(t *testing.T) {
 
 		tableId := uint64(1)
 		metaPageId := page.NewPageId(page.FileId(1), 0)
-		colMeta := []ColumnMetadata{
+		colMeta := []*ColumnMetadata{
 			NewColumnMetadata(tableId, "id", 0, ColumnTypeString),
 			NewColumnMetadata(tableId, "name", 1, ColumnTypeString),
 		}
-		idxMeta := []IndexMetadata{}
+		idxMeta := []*IndexMetadata{}
 		tableMeta := NewTableMetadata(tableId, "users", 2, 1, colMeta, idxMeta, metaPageId)
 
 		// WHEN
@@ -136,12 +136,12 @@ func TestInsert(t *testing.T) {
 
 		tableId := uint64(1)
 		metaPageId := page.NewPageId(page.FileId(1), 0)
-		colMeta := []ColumnMetadata{
+		colMeta := []*ColumnMetadata{
 			NewColumnMetadata(tableId, "id", 0, ColumnTypeString),
 			NewColumnMetadata(tableId, "name", 1, ColumnTypeString),
 			NewColumnMetadata(tableId, "email", 2, ColumnTypeString),
 		}
-		idxMeta := []IndexMetadata{}
+		idxMeta := []*IndexMetadata{}
 		tableMeta := NewTableMetadata(tableId, "users", 3, 1, colMeta, idxMeta, metaPageId)
 
 		// WHEN
@@ -165,11 +165,11 @@ func TestInsert(t *testing.T) {
 		tableId := uint64(1)
 		metaPageId := page.NewPageId(page.FileId(1), 0)
 		indexMetaPageId := page.NewPageId(page.FileId(1), 1)
-		colMeta := []ColumnMetadata{
+		colMeta := []*ColumnMetadata{
 			NewColumnMetadata(tableId, "id", 0, ColumnTypeString),
 			NewColumnMetadata(tableId, "email", 1, ColumnTypeString),
 		}
-		idxMeta := []IndexMetadata{
+		idxMeta := []*IndexMetadata{
 			NewIndexMetadata(tableId, "idx_email", "email", IndexTypeUnique, indexMetaPageId),
 		}
 		tableMeta := NewTableMetadata(tableId, "users", 2, 1, colMeta, idxMeta, metaPageId)
@@ -196,10 +196,10 @@ func TestGetTableMetadataByName(t *testing.T) {
 
 		tableId := uint64(1)
 		metaPageId := page.NewPageId(page.FileId(1), 0)
-		colMeta := []ColumnMetadata{
+		colMeta := []*ColumnMetadata{
 			NewColumnMetadata(tableId, "id", 0, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(tableId, "users", 1, 1, colMeta, []IndexMetadata{}, metaPageId)
+		tableMeta := NewTableMetadata(tableId, "users", 1, 1, colMeta, []*IndexMetadata{}, metaPageId)
 		err = cat.Insert(bpm, tableMeta)
 		assert.NoError(t, err)
 
@@ -239,15 +239,15 @@ func TestGetTableMetadataByName(t *testing.T) {
 		assert.NoError(t, err)
 
 		// 複数のテーブルを挿入
-		table1Meta := NewTableMetadata(1, "users", 1, 1, []ColumnMetadata{
+		table1Meta := NewTableMetadata(1, "users", 1, 1, []*ColumnMetadata{
 			NewColumnMetadata(1, "id", 0, ColumnTypeString),
-		}, []IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
-		table2Meta := NewTableMetadata(2, "posts", 1, 1, []ColumnMetadata{
+		}, []*IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
+		table2Meta := NewTableMetadata(2, "posts", 1, 1, []*ColumnMetadata{
 			NewColumnMetadata(2, "id", 0, ColumnTypeString),
-		}, []IndexMetadata{}, page.NewPageId(page.FileId(2), 0))
-		table3Meta := NewTableMetadata(3, "comments", 1, 1, []ColumnMetadata{
+		}, []*IndexMetadata{}, page.NewPageId(page.FileId(2), 0))
+		table3Meta := NewTableMetadata(3, "comments", 1, 1, []*ColumnMetadata{
 			NewColumnMetadata(3, "id", 0, ColumnTypeString),
-		}, []IndexMetadata{}, page.NewPageId(page.FileId(3), 0))
+		}, []*IndexMetadata{}, page.NewPageId(page.FileId(3), 0))
 
 		err = cat.Insert(bpm, table1Meta)
 		assert.NoError(t, err)

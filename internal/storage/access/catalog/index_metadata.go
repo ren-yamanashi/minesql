@@ -24,8 +24,8 @@ type IndexMetadata struct {
 	DataMetaPageId page.PageId
 }
 
-func NewIndexMetadata(tableId uint64, name string, colName string, indexType IndexType, dataMetaPageId page.PageId) IndexMetadata {
-	return IndexMetadata{
+func NewIndexMetadata(tableId uint64, name string, colName string, indexType IndexType, dataMetaPageId page.PageId) *IndexMetadata {
+	return &IndexMetadata{
 		TableId:        tableId,
 		Name:           name,
 		ColName:        colName,

@@ -35,10 +35,11 @@ func (ins *Insert) execute(records [][][]byte) error {
 		return err
 	}
 
-	// カラム名の順番と数が一致するか確認
-	for i, colName := range ins.colNames {
-		if tblMeta.Cols[i].Name != colName {
-			return fmt.Errorf("column name does not match: expected %s, got %s", tblMeta.Cols[i].Name, colName)
+	// カラム名が一致するか検証
+	for _, colName := range ins.colNames {
+		_, found := tblMeta.GetColByName(colName)
+		if !found {
+			return fmt.Errorf("column name does not match: column %s not found in table %s", colName, ins.tableName)
 		}
 	}
 

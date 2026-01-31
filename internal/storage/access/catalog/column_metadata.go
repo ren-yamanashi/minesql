@@ -22,8 +22,8 @@ type ColumnMetadata struct {
 	Type ColumnType
 }
 
-func NewColumnMetadata(tableId uint64, name string, pos uint16, columnType ColumnType) ColumnMetadata {
-	return ColumnMetadata{
+func NewColumnMetadata(tableId uint64, name string, pos uint16, columnType ColumnType) *ColumnMetadata {
+	return &ColumnMetadata{
 		TableId: tableId,
 		Name:    name,
 		Pos:     pos,

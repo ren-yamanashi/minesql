@@ -14,7 +14,7 @@ type ColumnParam struct {
 type IndexParam struct {
 	Name         string
 	ColName      string
-	SecondaryKey uint
+	SecondaryKey uint16
 }
 
 type CreateTable struct {
@@ -91,13 +91,13 @@ func (ct *CreateTable) execute() error {
 	}
 
 	// カラムのメタデータを作成
-	colMeta := make([]catalog.ColumnMetadata, len(ct.columnParams))
+	colMeta := make([]*catalog.ColumnMetadata, len(ct.columnParams))
 	for i, colParam := range ct.columnParams {
 		colMeta[i] = catalog.NewColumnMetadata(tblId, colParam.Name, uint16(i), colParam.Type)
 	}
 
 	// インデックスのメタデータを作成
-	idxMeta := make([]catalog.IndexMetadata, len(ct.indexParams))
+	idxMeta := make([]*catalog.IndexMetadata, len(ct.indexParams))
 	for i, index := range uniqueIndexes {
 		idxMeta[i] = catalog.NewIndexMetadata(tblId, index.Name, index.ColName, catalog.IndexTypeUnique, index.MetaPageId)
 	}
