@@ -94,9 +94,7 @@ func insert() {
 func scan() {
 	stmt := statement.NewSelectStmt(
 		*identifier.NewTableId("users"),
-		statement.WhereClause{
-			IsSet: false,
-		},
+		nil,
 	)
 	exec, err := planner.PlanStart(stmt)
 	if err != nil {
@@ -117,13 +115,13 @@ func scan() {
 func assertEqual() {
 	stmt := statement.NewSelectStmt(
 		*identifier.NewTableId("users"),
-		statement.WhereClause{
-			Condition: &expression.BinaryExpr{
-				Left:  *identifier.NewColumnId("last_name"),
-				Right: literal.NewStringLiteral("Smith", "Smith"),
-			},
-			IsSet: true,
-		},
+		statement.NewWhereClause(
+			expression.NewBinaryExpr(
+				"=",
+				*identifier.NewColumnId("last_name"),
+				expression.NewRhsLiteral(literal.NewStringLiteral("Smith", "Smith")),
+			),
+		),
 	)
 	exec, err := planner.PlanStart(stmt)
 	if err != nil {

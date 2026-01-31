@@ -16,12 +16,10 @@ import (
 func TestNewSelect(t *testing.T) {
 	t.Run("正常に SelectPlanner が生成される", func(t *testing.T) {
 		// GIVEN
-		stmt := &statement.SelectStmt{
-			From: *identifier.NewTableId("users", ""),
-			Where: statement.WhereClause{
-				IsSet: false,
-			},
-		}
+		stmt := statement.NewSelectStmt(
+			*identifier.NewTableId("users"),
+			nil,
+		)
 
 		// WHEN
 		planner := NewSelectPlanner(stmt)
@@ -37,12 +35,10 @@ func TestNewSelect(t *testing.T) {
 		defer storage.ResetStorageManager()
 
 		// GIVEN
-		stmt := &statement.SelectStmt{
-			From: *identifier.NewTableId("", "sample"),
-			Where: statement.WhereClause{
-				IsSet: false,
-			},
-		}
+		stmt := statement.NewSelectStmt(
+			*identifier.NewTableId(""),
+			nil,
+		)
 		planner := NewSelectPlanner(stmt)
 
 		// WHEN
@@ -60,12 +56,10 @@ func TestNewSelect(t *testing.T) {
 		defer storage.ResetStorageManager()
 
 		// GIVEN
-		stmt := &statement.SelectStmt{
-			From: *identifier.NewTableId("users", "sample"),
-			Where: statement.WhereClause{
-				IsSet: false,
-			},
-		}
+		stmt := statement.NewSelectStmt(
+			*identifier.NewTableId("users"),
+			nil,
+		)
 		planner := NewSelectPlanner(stmt)
 
 		// WHEN
@@ -83,16 +77,16 @@ func TestNewSelect(t *testing.T) {
 		defer storage.ResetStorageManager()
 
 		// GIVEN
-		stmt := &statement.SelectStmt{
-			From: *identifier.NewTableId("users", "sample"),
-			Where: statement.WhereClause{
-				Condition: &expression.BinaryExpr{
-					Left:  *identifier.NewColumnId("last_name"),
-					Right: literal.NewStringLiteral("'Doe'", "Doe"),
-				},
-				IsSet: true,
-			},
-		}
+		stmt := statement.NewSelectStmt(
+			*identifier.NewTableId("users"),
+			statement.NewWhereClause(
+				expression.NewBinaryExpr(
+					"=",
+					*identifier.NewColumnId("last_name"),
+					expression.NewRhsLiteral(literal.NewStringLiteral("'Doe'", "Doe")),
+				),
+			),
+		)
 		planner := NewSelectPlanner(stmt)
 
 		// WHEN
@@ -110,16 +104,16 @@ func TestNewSelect(t *testing.T) {
 		defer storage.ResetStorageManager()
 
 		// GIVEN
-		stmt := &statement.SelectStmt{
-			From: *identifier.NewTableId("users", "sample"),
-			Where: statement.WhereClause{
-				Condition: &expression.BinaryExpr{
-					Left:  *identifier.NewColumnId("first_name"),
-					Right: literal.NewStringLiteral("'John'", "John"),
-				},
-				IsSet: true,
-			},
-		}
+		stmt := statement.NewSelectStmt(
+			*identifier.NewTableId("users"),
+			statement.NewWhereClause(
+				expression.NewBinaryExpr(
+					"=",
+					*identifier.NewColumnId("first_name"),
+					expression.NewRhsLiteral(literal.NewStringLiteral("'John'", "John")),
+				),
+			),
+		)
 		planner := NewSelectPlanner(stmt)
 
 		// WHEN
@@ -137,16 +131,16 @@ func TestNewSelect(t *testing.T) {
 		defer storage.ResetStorageManager()
 
 		// GIVEN
-		stmt := &statement.SelectStmt{
-			From: *identifier.NewTableId("users", "sample"),
-			Where: statement.WhereClause{
-				Condition: &expression.BinaryExpr{
-					Left:  *identifier.NewColumnId("non_existent_column"),
-					Right: literal.NewStringLiteral("'value'", "value"),
-				},
-				IsSet: true,
-			},
-		}
+		stmt := statement.NewSelectStmt(
+			*identifier.NewTableId("users"),
+			statement.NewWhereClause(
+				expression.NewBinaryExpr(
+					"=",
+					*identifier.NewColumnId("non_existent_column"),
+					expression.NewRhsLiteral(literal.NewStringLiteral("'value'", "value")),
+				),
+			),
+		)
 		planner := NewSelectPlanner(stmt)
 
 		// WHEN
@@ -170,13 +164,13 @@ func TestNewSelect(t *testing.T) {
 		}
 		unsupported := &UnsupportedExpr{}
 
-		stmt := &statement.SelectStmt{
-			From: *identifier.NewTableId("users", "sample"),
-			Where: statement.WhereClause{
+		stmt := statement.NewSelectStmt(
+			*identifier.NewTableId("users"),
+			&statement.WhereClause{
 				Condition: unsupported,
 				IsSet:     true,
 			},
-		}
+		)
 		planner := NewSelectPlanner(stmt)
 
 		// WHEN
