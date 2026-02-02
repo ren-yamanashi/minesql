@@ -1,14 +1,14 @@
 package identifier
 
 type TableId struct {
-	IdType     IdType
-	TableName  string
+	IdType    IdType
+	TableName string
 }
 
 func NewTableId(name string) *TableId {
 	return &TableId{
-		IdType:     IdTypeTable,
-		TableName:  name,
+		IdType:    IdTypeTable,
+		TableName: name,
 	}
 }
 
