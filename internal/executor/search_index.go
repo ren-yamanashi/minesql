@@ -6,14 +6,11 @@ import (
 	"minesql/internal/storage/access/table"
 )
 
-// SearchIndex はセカンダリインデックスを使用してレコードを検索する
-// whileCondition はフィルタ条件として機能し、false を返すとそのレコードをスキップする
 type SearchIndex struct {
 	tableName  string
 	indexName  string
 	searchMode RecordSearchMode
-	// フィルタ条件を満たすかどうかを判定する関数（セカンダリキーに対して適用）
-	// false を返すとそのレコードをスキップして次のレコードを探す
+	// 継続条件を満たすかどうかを判定する関数
 	whileCondition func(record Record) bool
 	indexIterator  *btree.Iterator
 	tableIterator  *btree.Iterator
@@ -36,9 +33,7 @@ func NewSearchIndex(
 }
 
 // 次の Record を取得する
-// whileCondition が true のレコードのみを返す（セカンダリキーに対して判定）
-// 条件に一致しないレコードはスキップする
-// データがない場合は (nil, nil) を返す
+// データがない場合、継続条件を満たさない場合は (nil, nil) を返す
 func (is *SearchIndex) Next() (Record, error) {
 	sm := storage.GetStorageManager()
 
@@ -71,43 +66,40 @@ func (is *SearchIndex) Next() (Record, error) {
 		is.indexIterator = indexIter
 	}
 
-	// 条件に一致するレコードが見つかるまでループ
-	for {
-		// セカンダリインデックスから次のペアを取得
-		secondaryIndexPair, ok, err := is.indexIterator.Next(sm.BufferPoolManager)
-		if !ok {
-			return nil, nil
-		}
-		if err != nil {
-			return nil, err
-		}
-
-		// セカンダリキーをデコード
-		var secondaryKey [][]byte
-		table.Decode(secondaryIndexPair.Key, &secondaryKey)
-
-		// フィルタ条件をチェックし、条件に一致しない場合は次のレコードへ
-		if !is.whileCondition(secondaryKey) {
-			continue
-		}
-
-		// エンコードされたプライマリキーでテーブル本体を検索
-		is.tableIterator, err = is.tableBTree.Search(sm.BufferPoolManager, btree.SearchModeKey{Key: secondaryIndexPair.Value})
-		if err != nil {
-			return nil, err
-		}
-		tablePair, ok, err := is.tableIterator.Next(sm.BufferPoolManager)
-		if err != nil {
-			return nil, err
-		}
-		if !ok {
-			return nil, nil
-		}
-
-		// レコード (プライマリキー + 値) をデコード
-		var record [][]byte
-		table.Decode(tablePair.Key, &record)
-		table.Decode(tablePair.Value, &record)
-		return record, nil
+	// セカンダリインデックスから次のペアを取得
+	secondaryIndexPair, ok, err := is.indexIterator.Next(sm.BufferPoolManager)
+	if !ok {
+		return nil, nil
 	}
+	if err != nil {
+		return nil, err
+	}
+
+	// セカンダリキーをデコード
+	var secondaryKey [][]byte
+	table.Decode(secondaryIndexPair.Key, &secondaryKey)
+
+	// 継続条件をチェック
+	if !is.whileCondition(secondaryKey) {
+		return nil, nil
+	}
+
+	// エンコードされたプライマリキーでテーブル本体を検索
+	is.tableIterator, err = is.tableBTree.Search(sm.BufferPoolManager, btree.SearchModeKey{Key: secondaryIndexPair.Value})
+	if err != nil {
+		return nil, err
+	}
+	tablePair, ok, err := is.tableIterator.Next(sm.BufferPoolManager)
+	if err != nil {
+		return nil, err
+	}
+	if !ok {
+		return nil, nil
+	}
+
+	// レコード (プライマリキー + 値) をデコード
+	var record [][]byte
+	table.Decode(tablePair.Key, &record)
+	table.Decode(tablePair.Value, &record)
+	return record, nil
 }
