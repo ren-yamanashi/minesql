@@ -5,7 +5,7 @@ import "minesql/internal/storage/page"
 type IndexType string
 
 const (
-	IndexTypeUnique    IndexType = "unique secondary"
+	IndexTypeUnique IndexType = "unique secondary"
 )
 
 // 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-indexes-table.html

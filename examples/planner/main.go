@@ -33,7 +33,7 @@ func createTable() {
 	stmt := statement.NewCreateTableStmt(
 		"users",
 		[]definition.Definition{
-			definition.NewColumnDef("id", definition.DataTypeInt),
+			definition.NewColumnDef("id", definition.DataTypeVarchar),
 			definition.NewColumnDef("first_name", definition.DataTypeVarchar),
 			definition.NewColumnDef("last_name", definition.DataTypeVarchar),
 			definition.NewConstraintPrimaryKeyDef([]identifier.ColumnId{
@@ -58,22 +58,22 @@ func createTable() {
 
 func insert() {
 	stmt := statement.NewInsertStmt(
-		*identifier.NewTableId("users", "sample"),
+		*identifier.NewTableId("users"),
 		[]identifier.ColumnId{
 			*identifier.NewColumnId("id"),
-			*identifier.NewColumnId("first_name"),
 			*identifier.NewColumnId("last_name"),
+			*identifier.NewColumnId("first_name"),
 		},
 		[][]literal.Literal{
 			{
 				literal.NewStringLiteral("1", "1"),
-				literal.NewStringLiteral("John", "John"),
 				literal.NewStringLiteral("Doe", "Doe"),
+				literal.NewStringLiteral("John", "John"),
 			},
 			{
 				literal.NewStringLiteral("2", "2"),
-				literal.NewStringLiteral("Jane", "Jane"),
 				literal.NewStringLiteral("Smith", "Smith"),
+				literal.NewStringLiteral("Jane", "Jane"),
 			},
 		},
 	)
@@ -93,10 +93,8 @@ func insert() {
 
 func scan() {
 	stmt := statement.NewSelectStmt(
-		*identifier.NewTableId("users", "sample"),
-		statement.WhereClause{
-			IsSet: false,
-		},
+		*identifier.NewTableId("users"),
+		nil,
 	)
 	exec, err := planner.PlanStart(stmt)
 	if err != nil {
@@ -116,14 +114,14 @@ func scan() {
 
 func assertEqual() {
 	stmt := statement.NewSelectStmt(
-		*identifier.NewTableId("users", "sample"),
-		statement.WhereClause{
-			Condition: &expression.BinaryExpr{
-				Left:  *identifier.NewColumnId("last_name"),
-				Right: literal.NewStringLiteral("Smith", "Smith"),
-			},
-			IsSet: true,
-		},
+		*identifier.NewTableId("users"),
+		statement.NewWhereClause(
+			expression.NewBinaryExpr(
+				"=",
+				expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
+				expression.NewRhsLiteral(literal.NewStringLiteral("Smith", "Smith")),
+			),
+		),
 	)
 	exec, err := planner.PlanStart(stmt)
 	if err != nil {

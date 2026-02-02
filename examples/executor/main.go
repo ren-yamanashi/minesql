@@ -19,6 +19,7 @@ func main() {
 	fullTableScan()
 	rangeTableScan()
 	searchConstPrimary()
+	filterScan()
 	fullIndexScanByFirstName()
 	fullIndexScanByLastName()
 	rangeIndexScan()

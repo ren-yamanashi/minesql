@@ -14,7 +14,7 @@ func TestNewCreateTableNode(t *testing.T) {
 	t.Run("正常に CreateTableNode が生成される", func(t *testing.T) {
 		// GIVEN
 		stmt := statement.NewCreateTableStmt("users", []definition.Definition{
-			definition.NewColumnDef("id", definition.DataTypeInt),
+			definition.NewColumnDef("id", definition.DataTypeVarchar),
 			definition.NewConstraintPrimaryKeyDef([]identifier.ColumnId{
 				*identifier.NewColumnId("id"),
 			}),
@@ -33,7 +33,7 @@ func TestCreateTableNode_Next(t *testing.T) {
 	t.Run("ユニークキーなしのテーブルを作成できる", func(t *testing.T) {
 		// GIVEN
 		stmt := statement.NewCreateTableStmt("users", []definition.Definition{
-			definition.NewColumnDef("id", definition.DataTypeInt),
+			definition.NewColumnDef("id", definition.DataTypeVarchar),
 			definition.NewColumnDef("name", definition.DataTypeVarchar),
 			definition.NewConstraintPrimaryKeyDef([]identifier.ColumnId{
 				*identifier.NewColumnId("id"),
@@ -56,7 +56,7 @@ func TestCreateTableNode_Next(t *testing.T) {
 		ukDef.KeyName = "uk_email"
 
 		stmt := statement.NewCreateTableStmt("users", []definition.Definition{
-			definition.NewColumnDef("id", definition.DataTypeInt),
+			definition.NewColumnDef("id", definition.DataTypeVarchar),
 			definition.NewColumnDef("email", definition.DataTypeVarchar),
 			definition.NewConstraintPrimaryKeyDef([]identifier.ColumnId{
 				*identifier.NewColumnId("id"),
@@ -83,8 +83,8 @@ func TestCreateTableNode_Next(t *testing.T) {
 		ukDef2.KeyName = "uk_username"
 
 		stmt := statement.NewCreateTableStmt("users", []definition.Definition{
-			definition.NewColumnDef("id", definition.DataTypeInt),
-			definition.NewColumnDef("tenant_id", definition.DataTypeInt),
+			definition.NewColumnDef("id", definition.DataTypeVarchar),
+			definition.NewColumnDef("tenant_id", definition.DataTypeVarchar),
 			definition.NewColumnDef("email", definition.DataTypeVarchar),
 			definition.NewColumnDef("username", definition.DataTypeVarchar),
 			definition.NewConstraintPrimaryKeyDef([]identifier.ColumnId{
@@ -108,7 +108,7 @@ func TestCreateTableNode_Next(t *testing.T) {
 	t.Run("重複したカラム名がある場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		stmt := statement.NewCreateTableStmt("users", []definition.Definition{
-			definition.NewColumnDef("id", definition.DataTypeInt),
+			definition.NewColumnDef("id", definition.DataTypeVarchar),
 			definition.NewColumnDef("id", definition.DataTypeVarchar),
 			definition.NewConstraintPrimaryKeyDef([]identifier.ColumnId{
 				*identifier.NewColumnId("id"),
@@ -128,7 +128,7 @@ func TestCreateTableNode_Next(t *testing.T) {
 	t.Run("プライマリキーが定義されていない場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		stmt := statement.NewCreateTableStmt("users", []definition.Definition{
-			definition.NewColumnDef("id", definition.DataTypeInt),
+			definition.NewColumnDef("id", definition.DataTypeVarchar),
 			definition.NewColumnDef("name", definition.DataTypeVarchar),
 		})
 		node := NewCreateTableNode(stmt)
@@ -145,7 +145,7 @@ func TestCreateTableNode_Next(t *testing.T) {
 	t.Run("複数のプライマリキーが定義されている場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		stmt := statement.NewCreateTableStmt("users", []definition.Definition{
-			definition.NewColumnDef("id", definition.DataTypeInt),
+			definition.NewColumnDef("id", definition.DataTypeVarchar),
 			definition.NewColumnDef("name", definition.DataTypeVarchar),
 			definition.NewConstraintPrimaryKeyDef([]identifier.ColumnId{
 				*identifier.NewColumnId("id"),
@@ -168,7 +168,7 @@ func TestCreateTableNode_Next(t *testing.T) {
 	t.Run("プライマリキーにカラムが指定されていない場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		stmt := statement.NewCreateTableStmt("users", []definition.Definition{
-			definition.NewColumnDef("id", definition.DataTypeInt),
+			definition.NewColumnDef("id", definition.DataTypeVarchar),
 			definition.NewConstraintPrimaryKeyDef([]identifier.ColumnId{}),
 		})
 		node := NewCreateTableNode(stmt)
@@ -185,7 +185,7 @@ func TestCreateTableNode_Next(t *testing.T) {
 	t.Run("プライマリキーに指定されたカラムが存在しない場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		stmt := statement.NewCreateTableStmt("users", []definition.Definition{
-			definition.NewColumnDef("id", definition.DataTypeInt),
+			definition.NewColumnDef("id", definition.DataTypeVarchar),
 			definition.NewConstraintPrimaryKeyDef([]identifier.ColumnId{
 				*identifier.NewColumnId("non_existent_column"),
 			}),
@@ -204,7 +204,7 @@ func TestCreateTableNode_Next(t *testing.T) {
 	t.Run("プライマリキーに指定されたカラムが先頭から順番でない場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		stmt := statement.NewCreateTableStmt("users", []definition.Definition{
-			definition.NewColumnDef("id", definition.DataTypeInt),
+			definition.NewColumnDef("id", definition.DataTypeVarchar),
 			definition.NewColumnDef("name", definition.DataTypeVarchar),
 			definition.NewColumnDef("email", definition.DataTypeVarchar),
 			definition.NewConstraintPrimaryKeyDef([]identifier.ColumnId{
@@ -226,7 +226,7 @@ func TestCreateTableNode_Next(t *testing.T) {
 	t.Run("プライマリキーに指定されたカラム数が全カラム数を超える場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		stmt := statement.NewCreateTableStmt("users", []definition.Definition{
-			definition.NewColumnDef("id", definition.DataTypeInt),
+			definition.NewColumnDef("id", definition.DataTypeVarchar),
 			definition.NewConstraintPrimaryKeyDef([]identifier.ColumnId{
 				*identifier.NewColumnId("id"),
 				*identifier.NewColumnId("name"),
@@ -250,7 +250,7 @@ func TestCreateTableNode_Next(t *testing.T) {
 		ukDef.KeyName = "uk_test"
 
 		stmt := statement.NewCreateTableStmt("users", []definition.Definition{
-			definition.NewColumnDef("id", definition.DataTypeInt),
+			definition.NewColumnDef("id", definition.DataTypeVarchar),
 			definition.NewConstraintPrimaryKeyDef([]identifier.ColumnId{
 				*identifier.NewColumnId("id"),
 			}),

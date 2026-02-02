@@ -43,7 +43,6 @@ func TestGetColByName(t *testing.T) {
 	})
 }
 
-
 func TestGetIndexByColName(t *testing.T) {
 	t.Run("指定したカラム名のインデックスメタデータを取得できる", func(t *testing.T) {
 		// GIVEN
