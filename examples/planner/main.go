@@ -118,7 +118,7 @@ func assertEqual() {
 		statement.NewWhereClause(
 			expression.NewBinaryExpr(
 				"=",
-				*identifier.NewColumnId("last_name"),
+				expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
 				expression.NewRhsLiteral(literal.NewStringLiteral("Smith", "Smith")),
 			),
 		),

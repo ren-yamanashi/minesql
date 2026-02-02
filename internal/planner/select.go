@@ -53,73 +53,144 @@ func (sp *SelectPlanner) Next() (executor.Executor, error) {
 }
 
 func (sp *SelectPlanner) planForBinaryExpr(tblMeta *catalog.TableMetadata, expr expression.BinaryExpr) (executor.Executor, error) {
-	switch rhs := expr.Right.(type) {
-	case *expression.RhsLiteral:
-		if _, ok := tblMeta.GetColByName(expr.Left.ColName); !ok {
-			return nil, errors.New("column " + expr.Left.ColName + " does not exist in table " + sp.Stmt.From.TableName)
-		}
-		// カラムがインデックスの場合
-		if idxMeta, ok := tblMeta.GetIndexByColName(expr.Left.ColName); ok {
-			cond, err := sp.OperatorToCondition(0, rhs)
+	switch lhs := expr.Left.(type) {
+	case *expression.LhsColumn:
+		colName := lhs.Column.ColName
+		switch rhs := expr.Right.(type) {
+		case *expression.RhsLiteral:
+			if _, ok := tblMeta.GetColByName(colName); !ok {
+				return nil, errors.New("column " + colName + " does not exist in table " + sp.Stmt.From.TableName)
+			}
+			// カラムがインデックスの場合
+			if idxMeta, ok := tblMeta.GetIndexByColName(colName); ok {
+				cond, err := sp.operatorToCondition(expr.Operator, 0, rhs.Literal.ToString())
+				if err != nil {
+					return nil, err
+				}
+				return executor.NewSearchIndex(
+					sp.Stmt.From.TableName,
+					idxMeta.Name,
+					executor.RecordSearchModeKey{Key: [][]byte{rhs.Literal.ToBytes()}},
+					cond,
+				), nil
+			}
+			// カラムがインデックスでない場合
+			colMeta, ok := tblMeta.GetColByName(colName)
+			if !ok {
+				return nil, errors.New("column " + colName + " does not exist in table " + sp.Stmt.From.TableName)
+			}
+			cond, err := sp.operatorToCondition(expr.Operator, int(colMeta.Pos), rhs.Literal.ToString())
 			if err != nil {
 				return nil, err
-			} 
-			return executor.NewSearchIndex(
+			}
+			return executor.NewSearchTable(
 				sp.Stmt.From.TableName,
-				idxMeta.Name,
 				executor.RecordSearchModeKey{Key: [][]byte{rhs.Literal.ToBytes()}},
 				cond,
 			), nil
+		default:
+			return nil, errors.New("When LHS is a column, RHS must be a literal")
 		}
-		// カラムがインデックスでない場合
-		colMeta, ok := tblMeta.GetColByName(expr.Left.ColName)
-		if !ok {
-			return nil, errors.New("column " + expr.Left.ColName + " does not exist in table " + sp.Stmt.From.TableName)
-		}
-		cond, err := sp.OperatorToCondition(int(colMeta.Pos), rhs)
+	case *expression.LhsExpr:
+		conditions, err := sp.extractConditions(tblMeta, expr)
 		if err != nil {
 			return nil, err
 		}
 		return executor.NewSearchTable(
 			sp.Stmt.From.TableName,
-			executor.RecordSearchModeKey{Key: [][]byte{rhs.Literal.ToBytes()}},
-			cond,
+			executor.RecordSearchModeStart{},
+			func(record executor.Record) bool {
+				for _, cond := range conditions {
+					if !cond(record) {
+						return false
+					}
+				}
+				return true
+			},
 		), nil
-	case *expression.RhsExpr:
-		// TODO
-		return nil, nil
 	default:
-		return nil, errors.New("unsupported binary expression in WHERE clause")
+		return nil, errors.New("unsupported LHS type in binary expression")
 	}
 }
 
-func (sp *SelectPlanner) OperatorToCondition(pos int, rhs *expression.RhsLiteral) (func(executor.Record) bool, error) {
-	switch op := sp.Stmt.Where.Condition.(*expression.BinaryExpr).Operator; op {
+// 再帰的に binary expression から条件関数のリストを抽出する
+func (sp *SelectPlanner) extractConditions(tblMeta *catalog.TableMetadata, expr expression.BinaryExpr) ([]func(executor.Record) bool, error) {
+	conditions := []func(executor.Record) bool{}
+
+	switch lhs := expr.Left.(type) {
+	case *expression.LhsColumn:
+		colName := lhs.Column.ColName
+		colMeta, ok := tblMeta.GetColByName(colName)
+		if !ok {
+			return nil, errors.New("column " + colName + " does not exist in table " + sp.Stmt.From.TableName)
+		}
+
+		switch rhs := expr.Right.(type) {
+		case *expression.RhsLiteral:
+			cond, err := sp.operatorToCondition(expr.Operator, int(colMeta.Pos), rhs.Literal.ToString())
+			if err != nil {
+				return nil, err
+			}
+			conditions = append(conditions, cond)
+		case *expression.RhsExpr:
+			return nil, errors.New("When LHS is a column, RHS must be a literal")
+		default:
+			panic("unsupported RHS type in extractConditions") // 実際にはここには到達しないので errors.New ではなく panic で良い
+		}
+
+	case *expression.LhsExpr:
+		leftConds, err := sp.extractConditions(tblMeta, *lhs.Expr.(*expression.BinaryExpr))
+		if err != nil {
+			return nil, err
+		}
+		conditions = append(conditions, leftConds...)
+
+		switch rhs := expr.Right.(type) {
+		case *expression.RhsExpr:
+			rightConds, err := sp.extractConditions(tblMeta, *rhs.Expr.(*expression.BinaryExpr))
+			if err != nil {
+				return nil, err
+			}
+			conditions = append(conditions, rightConds...)
+		case *expression.RhsLiteral:
+			return nil, errors.New("When LHS is an expression, RHS cannot be a literal")
+		default:
+			panic("unsupported RHS type in extractConditions") // 実際にはここには到達しないので errors.New ではなく panic で良い
+		}
+	default:
+		panic("unsupported LHS type in extractConditions") // 実際にはここには到達しないので errors.New ではなく panic で良い
+	}
+
+	return conditions, nil
+}
+
+func (sp *SelectPlanner) operatorToCondition(operator string, pos int, value string) (func(executor.Record) bool, error) {
+	switch operator {
 	case "=":
 		return func(record executor.Record) bool {
-			return string(record[pos]) == rhs.Literal.ToString()
+			return string(record[pos]) == value
 		}, nil
 	case "!=":
 		return func(record executor.Record) bool {
-			return string(record[pos]) != rhs.Literal.ToString()
+			return string(record[pos]) != value
 		}, nil
 	case "<":
 		return func(record executor.Record) bool {
-			return string(record[pos]) < rhs.Literal.ToString()
+			return string(record[pos]) < value
 		}, nil
 	case "<=":
 		return func(record executor.Record) bool {
-			return string(record[pos]) <= rhs.Literal.ToString()
+			return string(record[pos]) <= value
 		}, nil
 	case ">":
 		return func(record executor.Record) bool {
-			return string(record[pos]) > rhs.Literal.ToString()
+			return string(record[pos]) > value
 		}, nil
 	case ">=":
 		return func(record executor.Record) bool {
-			return string(record[pos]) >= rhs.Literal.ToString()
+			return string(record[pos]) >= value
 		}, nil
 	default:
-		return nil, fmt.Errorf("unsupported operator in WHERE clause: %s", op)
+		return nil, fmt.Errorf("unsupported operator in WHERE clause: %s", operator)
 	}
 }
