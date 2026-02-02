@@ -6,11 +6,8 @@ import (
 	"minesql/internal/storage/access/table"
 )
 
-// SearchTable はテーブル本体を直接スキャンしてレコードを検索する
-// whileCondition はフィルタ条件として機能し、false を返すとそのレコードをスキップする
 type SearchTable struct {
-	// フィルタ条件を満たすかどうかを判定する関数
-	// false を返すとそのレコードをスキップして次のレコードを探す
+	// 継続条件を満たすかどうかを判定する関数
 	whileCondition func(record Record) bool
 	iterator       *btree.Iterator
 	tableName      string
@@ -30,9 +27,7 @@ func NewSearchTable(
 }
 
 // 次の Record を取得する
-// whileCondition が true のレコードのみを返す
-// 条件に一致しないレコードはスキップする
-// データがない場合は (nil, nil) を返す
+// データがない場合、継続条件を満たさない場合は (nil, nil) を返す
 func (ss *SearchTable) Next() (Record, error) {
 	sm := storage.GetStorageManager()
 
@@ -57,27 +52,24 @@ func (ss *SearchTable) Next() (Record, error) {
 		ss.iterator = iterator
 	}
 
-	// 条件に一致するレコードが見つかるまでループ
-	for {
-		// レコード取得
-		pair, ok, err := ss.iterator.Next(sm.BufferPoolManager)
-		if !ok {
-			return nil, nil
-		}
-		if err != nil {
-			return nil, err
-		}
-
-		// レコード (プライマリキー + 値) をデコード
-		var record [][]byte
-		table.Decode(pair.Key, &record)
-		table.Decode(pair.Value, &record)
-
-		// フィルタ条件をチェックし、条件に一致しない場合は次のレコードへ
-		if !ss.whileCondition(record) {
-			continue
-		}
-
-		return record, nil
+	// レコード取得
+	pair, ok, err := ss.iterator.Next(sm.BufferPoolManager)
+	if !ok {
+		return nil, nil
 	}
+	if err != nil {
+		return nil, err
+	}
+
+	// レコード (プライマリキー + 値) をデコード
+	var record [][]byte
+	table.Decode(pair.Key, &record)
+	table.Decode(pair.Value, &record)
+
+	// 継続条件をチェック
+	if !ss.whileCondition(record) {
+		return nil, nil
+	}
+
+	return record, nil
 }
