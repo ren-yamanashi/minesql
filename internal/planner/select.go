@@ -92,6 +92,9 @@ func (sp *SelectPlanner) planForBinaryExpr(tblMeta *catalog.TableMetadata, expr 
 			return nil, errors.New("When LHS is a column, RHS must be a literal")
 		}
 	case *expression.LhsExpr:
+		if expr.Operator != "AND" {
+			return nil, errors.New("only AND operator is supported for combining multiple conditions")
+		}
 		conditions, err := sp.extractConditions(tblMeta, expr)
 		if err != nil {
 			return nil, err
@@ -145,6 +148,9 @@ func (sp *SelectPlanner) extractConditions(tblMeta *catalog.TableMetadata, expr 
 		}
 
 	case *expression.LhsExpr:
+		if expr.Operator != "AND" {
+			return nil, errors.New("only AND operator is supported for combining multiple conditions")
+		}
 		leftConds, err := sp.extractConditions(tblMeta, *lhs.Expr.(*expression.BinaryExpr))
 		if err != nil {
 			return nil, err

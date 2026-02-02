@@ -27,6 +27,7 @@ func main() {
 	insert()
 	scan()
 	assertEqual()
+	filter()
 }
 
 func createTable() {
@@ -36,10 +37,12 @@ func createTable() {
 			definition.NewColumnDef("id", definition.DataTypeVarchar),
 			definition.NewColumnDef("first_name", definition.DataTypeVarchar),
 			definition.NewColumnDef("last_name", definition.DataTypeVarchar),
+			definition.NewColumnDef("gender", definition.DataTypeVarchar),
+			definition.NewColumnDef("username", definition.DataTypeVarchar),
 			definition.NewConstraintPrimaryKeyDef([]identifier.ColumnId{
 				*identifier.NewColumnId("id"),
 			}),
-			definition.NewConstraintUniqueKeyDef(*identifier.NewColumnId("last_name")),
+			definition.NewConstraintUniqueKeyDef(*identifier.NewColumnId("username")),
 		},
 	)
 
@@ -52,7 +55,7 @@ func createTable() {
 		panic(err)
 	}
 	for _, record := range records {
-		println(string(record[0]), string(record[1]), string(record[2]))
+		println(string(record[0]), string(record[1]), string(record[2]), string(record[3]), string(record[4]))
 	}
 }
 
@@ -61,19 +64,53 @@ func insert() {
 		*identifier.NewTableId("users"),
 		[]identifier.ColumnId{
 			*identifier.NewColumnId("id"),
-			*identifier.NewColumnId("last_name"),
 			*identifier.NewColumnId("first_name"),
+			*identifier.NewColumnId("last_name"),
+			*identifier.NewColumnId("gender"),
+			*identifier.NewColumnId("username"),
 		},
 		[][]literal.Literal{
 			{
 				literal.NewStringLiteral("1", "1"),
-				literal.NewStringLiteral("Doe", "Doe"),
 				literal.NewStringLiteral("John", "John"),
+				literal.NewStringLiteral("Doe", "Doe"),
+				literal.NewStringLiteral("male", "male"),
+				literal.NewStringLiteral("johndoe", "johndoe"),
 			},
 			{
 				literal.NewStringLiteral("2", "2"),
-				literal.NewStringLiteral("Smith", "Smith"),
+				literal.NewStringLiteral("John", "John"),
+				literal.NewStringLiteral("Doe2", "Doe2"),
+				literal.NewStringLiteral("male", "male"),
+				literal.NewStringLiteral("johndoe2", "johndoe2"),
+			},
+			{
+				literal.NewStringLiteral("3", "3"),
+				literal.NewStringLiteral("John", "John"),
+				literal.NewStringLiteral("Doe3", "Doe3"),
+				literal.NewStringLiteral("male", "male"),
+				literal.NewStringLiteral("johndoe3", "johndoe3"),
+			},
+			{
+				literal.NewStringLiteral("4", "4"),
 				literal.NewStringLiteral("Jane", "Jane"),
+				literal.NewStringLiteral("Doe2", "Doe2"),
+				literal.NewStringLiteral("female", "female"),
+				literal.NewStringLiteral("janedoe", "janedoe"),
+			},
+			{
+				literal.NewStringLiteral("5", "5"),
+				literal.NewStringLiteral("Jonathan", "Jonathan"),
+				literal.NewStringLiteral("Black", "Black"),
+				literal.NewStringLiteral("male", "male"),
+				literal.NewStringLiteral("jonathanblack", "jonathanblack"),
+			},
+			{
+				literal.NewStringLiteral("6", "6"),
+				literal.NewStringLiteral("Tom", "Tom"),
+				literal.NewStringLiteral("Brown", "Brown"),
+				literal.NewStringLiteral("male", "male"),
+				literal.NewStringLiteral("tombrown", "tombrown"),
 			},
 		},
 	)
@@ -87,11 +124,12 @@ func insert() {
 		panic(err)
 	}
 	for _, record := range records {
-		println(string(record[0]), string(record[1]), string(record[2]))
+		println(string(record[0]), string(record[1]), string(record[2]), string(record[3]), string(record[4]))
 	}
 }
 
 func scan() {
+	fmt.Println("=== scan all ===")
 	stmt := statement.NewSelectStmt(
 		*identifier.NewTableId("users"),
 		nil,
@@ -113,13 +151,66 @@ func scan() {
 }
 
 func assertEqual() {
+	fmt.Println("=== assert equal ===")
 	stmt := statement.NewSelectStmt(
 		*identifier.NewTableId("users"),
 		statement.NewWhereClause(
 			expression.NewBinaryExpr(
 				"=",
-				expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
-				expression.NewRhsLiteral(literal.NewStringLiteral("Smith", "Smith")),
+				expression.NewLhsColumn(*identifier.NewColumnId("username")),
+				expression.NewRhsLiteral(literal.NewStringLiteral("janedoe", "janedoe")),
+			),
+		),
+	)
+	exec, err := planner.PlanStart(stmt)
+	if err != nil {
+		panic(err)
+	}
+	records, err := executor.ExecutePlan(exec)
+	if err != nil {
+		panic(err)
+	}
+	for _, record := range records {
+		for _, col := range record {
+			fmt.Print(string(col), " ")
+		}
+		fmt.Println()
+	}
+}
+
+func filter() {
+	fmt.Println("=== filter ===")
+	stmt := statement.NewSelectStmt(
+		*identifier.NewTableId("users"),
+		statement.NewWhereClause(
+			expression.NewBinaryExpr(
+				"AND",
+				expression.NewLhsExpr(
+					expression.NewBinaryExpr(
+						"<",
+						expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
+						expression.NewRhsLiteral(literal.NewStringLiteral("K", "K")),
+					),
+				),
+				expression.NewRhsExpr(
+					expression.NewBinaryExpr(
+						"AND",
+						expression.NewLhsExpr(
+							expression.NewBinaryExpr(
+								"=",
+								expression.NewLhsColumn(*identifier.NewColumnId("gender")),
+								expression.NewRhsLiteral(literal.NewStringLiteral("male", "male")),
+							),
+						),
+						expression.NewRhsExpr(
+							expression.NewBinaryExpr(
+								">=",
+								expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
+								expression.NewRhsLiteral(literal.NewStringLiteral("Doe", "Doe")),
+							),
+						),
+					),
+				),
 			),
 		),
 	)
