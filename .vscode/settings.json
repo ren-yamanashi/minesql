@@ -16,6 +16,7 @@
     "Memcomparable",
     "minesql",
     "RDBMS",
-    "slottedpage"
+    "slottedpage",
+    "Varchar"
   ]
 }

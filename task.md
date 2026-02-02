@@ -1,2 +1,0 @@
-- [ ] https://github.com/ren-yamanashi/minesql/issues/29
-- [ ] catalog を利用したバリデーションを (executor から) planner に委譲する
