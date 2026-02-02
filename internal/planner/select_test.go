@@ -194,7 +194,7 @@ func TestNewSelect(t *testing.T) {
 			*identifier.NewTableId("users"),
 			statement.NewWhereClause(
 				expression.NewBinaryExpr(
-					"=",
+					"AND",
 					expression.NewLhsExpr(
 						expression.NewBinaryExpr(
 							"=",
@@ -204,7 +204,7 @@ func TestNewSelect(t *testing.T) {
 					),
 					expression.NewRhsExpr(
 						expression.NewBinaryExpr(
-							"=",
+							"AND",
 							expression.NewLhsExpr(
 								expression.NewBinaryExpr(
 									"=",
@@ -281,7 +281,7 @@ func TestComplexWhereWithData(t *testing.T) {
 			*identifier.NewTableId("users"),
 			statement.NewWhereClause(
 				expression.NewBinaryExpr(
-					"=",
+					"AND",
 					expression.NewLhsExpr(
 						expression.NewBinaryExpr(
 							"=",
