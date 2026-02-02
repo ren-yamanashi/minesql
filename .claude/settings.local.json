@@ -22,7 +22,8 @@
       "Bash(xargs kill:*)",
       "Bash(go mod tidy:*)",
       "Bash(go get:*)",
-      "Bash(xargs:*)"
+      "Bash(xargs:*)",
+      "Bash(go clean:*)"
     ]
   }
 }
