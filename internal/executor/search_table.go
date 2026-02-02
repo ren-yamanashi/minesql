@@ -73,9 +73,8 @@ func (ss *SearchTable) Next() (Record, error) {
 		table.Decode(pair.Key, &record)
 		table.Decode(pair.Value, &record)
 
-		// フィルタ条件をチェック
+		// フィルタ条件をチェックし、条件に一致しない場合は次のレコードへ
 		if !ss.whileCondition(record) {
-			// 条件に一致しない場合は次のレコードへ
 			continue
 		}
 

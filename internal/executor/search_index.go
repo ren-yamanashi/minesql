@@ -86,9 +86,8 @@ func (is *SearchIndex) Next() (Record, error) {
 		var secondaryKey [][]byte
 		table.Decode(secondaryIndexPair.Key, &secondaryKey)
 
-		// フィルタ条件をチェック
+		// フィルタ条件をチェックし、条件に一致しない場合は次のレコードへ
 		if !is.whileCondition(secondaryKey) {
-			// 条件に一致しない場合は次のレコードへ
 			continue
 		}
 
