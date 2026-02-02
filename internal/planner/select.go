@@ -96,9 +96,15 @@ func (sp *SelectPlanner) planForBinaryExpr(tblMeta *catalog.TableMetadata, expr 
 		if err != nil {
 			return nil, err
 		}
-		return executor.NewSearchTable(
+		seqScan := executor.NewSearchTable(
 			sp.Stmt.From.TableName,
 			executor.RecordSearchModeStart{},
+			func(record executor.Record) bool {
+				return true
+			},
+		)
+		return executor.NewFilter(
+			seqScan,
 			func(record executor.Record) bool {
 				for _, cond := range conditions {
 					if !cond(record) {

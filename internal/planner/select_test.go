@@ -232,7 +232,8 @@ func TestNewSelect(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, exec)
-		assert.IsType(t, &executor.SearchTable{}, exec)
+		// 複数条件の場合は Filter が使われる
+		assert.IsType(t, &executor.Filter{}, exec)
 	})
 }
 
