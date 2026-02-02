@@ -40,15 +40,10 @@ func (ip *InsertPlanner) Next() (executor.Executor, error) {
 		return nil, err
 	}
 
-	// テーブルのカラム名を順序通りに取得
 	colNames := make([]string, len(tblMeta.Cols))
-	for _, colMeta := range tblMeta.Cols {
-		colNames[colMeta.Pos] = colMeta.Name
-	}
-
-	// INSERT 文で指定されたカラムの位置をマッピング
 	colPosMap := make(map[string]uint16)
 	for _, colMeta := range tblMeta.Cols {
+		colNames[colMeta.Pos] = colMeta.Name
 		colPosMap[colMeta.Name] = colMeta.Pos
 	}
 

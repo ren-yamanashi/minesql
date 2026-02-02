@@ -8,11 +8,11 @@ import (
 type BinaryExpr struct {
 	ExprType ExprType
 	Operator string
-	Left     identifier.ColumnId
+	Left     LHS
 	Right    RHS
 }
 
-func NewBinaryExpr(operator string, left identifier.ColumnId, right RHS) *BinaryExpr {
+func NewBinaryExpr(operator string, left LHS, right RHS) *BinaryExpr {
 	return &BinaryExpr{
 		ExprType: ExprTypeBinary,
 		Operator: operator,
@@ -22,6 +22,37 @@ func NewBinaryExpr(operator string, left identifier.ColumnId, right RHS) *Binary
 }
 
 func (be *BinaryExpr) expressionNode() {}
+
+// ===========================
+// LHS
+// ===========================
+type LHS interface {
+	lhsNode()
+}
+
+type LhsColumn struct {
+	Column identifier.ColumnId
+}
+
+func NewLhsColumn(col identifier.ColumnId) *LhsColumn {
+	return &LhsColumn{
+		Column: col,
+	}
+}
+
+func (lc *LhsColumn) lhsNode() {}
+
+type LhsExpr struct {
+	Expr Expression
+}
+
+func NewLhsExpr(expr Expression) *LhsExpr {
+	return &LhsExpr{
+		Expr: expr,
+	}
+}
+
+func (le *LhsExpr) lhsNode() {}
 
 // ===========================
 // RHS
