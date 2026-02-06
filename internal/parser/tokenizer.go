@@ -93,6 +93,8 @@ func (t *Tokenizer) Tokenize() {
 		}
 		t.pos++
 	}
+	// 最後に保留中のトークンを emit する
+	t.emitPendingToken()
 }
 
 func (t *Tokenizer) shouldContinue() bool {
