@@ -275,7 +275,7 @@ func (t *Tokenizer) isKeyword(word string) bool {
 		"INSERT", "INTO", "VALUES",
 		"CREATE", "TABLE", "PRIMARY", "UNIQUE", "KEY",
 		"VARCHAR",
-		"AND",
+		"AND", "OR",
 	}
 
 	upperWord := strings.ToUpper(word)

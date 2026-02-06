@@ -197,6 +197,9 @@ func (p *Parser) handleOperator(op string) {
 }
 
 // スタックから要素を取り出し、1つの BinaryExpr を作って nodeStack に戻す
+// e.g. 
+// - nodeStack: [name, "john"], opStack: ["="] -> nodeStack: [BinaryExpr(name = "john")]
+// - nodeStack: [age, 30, BinaryExpr(name = "john")], opStack: [">", "AND"] -> nodeStack: [BinaryExpr(age > 30 AND name = "john")]
 func (p *Parser) reduce() error {
 	// 必要な要素が足りているかチェック
 	if len(p.nodeStack) < 2 || len(p.opStack) < 1 {
