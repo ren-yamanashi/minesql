@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestParser_SimpleSelect(t *testing.T) {
+func TestParserSelect(t *testing.T) {
 	t.Run("WHERE 句なしの SELECT 文をパースできる", func(t *testing.T) {
 		// GIVEN
 		sql := "SELECT * FROM users"
