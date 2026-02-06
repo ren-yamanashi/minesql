@@ -26,6 +26,19 @@ const (
 	CharCodeCarriageReturn rune = '\r'
 )
 
+// symbol
+const (
+	SymbolLeftParen   rune = '('
+	SymbolRightParen  rune = ')'
+	SymbolComma       rune = ','
+	SymbolSemicolon   rune = ';'
+	SymbolEqual       rune = '='
+	SymbolLessThan    rune = '<'
+	SymbolGreaterThan rune = '>'
+	SymbolExclamation rune = '!'
+	SymbolAsterisk    rune = '*'
+)
+
 type TokenHandler interface {
 	OnKeyword(word string)     // SELECT, FROM, WHERE ...
 	OnIdentifier(ident string) // users, id ...
@@ -33,7 +46,6 @@ type TokenHandler interface {
 	OnNumber(num string)       // 123
 	OnSymbol(symbol string)    // (, ), =, >=
 	OnComment(text string)     // -- ...
-	OnError(err error)
 }
 
 type Tokenizer struct {
@@ -136,6 +148,48 @@ func (t *Tokenizer) handleData(char rune) {
 		t.start = currentPos + 1
 		return
 	default:
+		switch char {
+		case SymbolEqual:
+			if t.peekChar() == SymbolLessThan || t.peekChar() == SymbolGreaterThan || t.peekChar() == SymbolExclamation {
+				// = の次に <, >, ! が来た場合、2文字の記号として扱う (e.g. =>, =<, =!)
+				t.emitPendingToken()
+				t.pos++ // 次の文字も消費する
+				symbol := string([]rune{char, t.input[t.pos]})
+				t.callbacks.OnSymbol(symbol)
+				t.start = currentPos + 2
+				return
+			}
+		case SymbolLessThan:
+			if t.peekChar() == SymbolEqual || t.peekChar() == SymbolGreaterThan {
+				// <=, <> の場合
+				t.emitPendingToken()
+				t.pos++ // 次の文字も消費する
+				symbol := string([]rune{char, t.input[t.pos]})
+				t.callbacks.OnSymbol(symbol)
+				t.start = currentPos + 2
+				return
+			}
+		case SymbolGreaterThan:
+			if t.peekChar() == SymbolEqual {
+				// >= の場合
+				t.emitPendingToken()
+				t.pos++ // 次の文字も消費する
+				symbol := string([]rune{char, t.input[t.pos]})
+				t.callbacks.OnSymbol(symbol)
+				t.start = currentPos + 2
+				return
+			}
+		case SymbolExclamation:
+			if t.peekChar() == SymbolEqual {
+				// != の場合
+				t.emitPendingToken()
+				t.pos++ // 次の文字も消費する
+				symbol := string([]rune{char, t.input[t.pos]})
+				t.callbacks.OnSymbol(symbol)
+				t.start = currentPos + 2
+				return
+			}
+		}
 		if t.isSymbol(char) {
 			t.emitPendingToken()
 			t.callbacks.OnSymbol(string(char))
