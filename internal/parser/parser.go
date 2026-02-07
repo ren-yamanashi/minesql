@@ -6,20 +6,13 @@ import (
 	"strings"
 )
 
-var (
-	ErrSelectStmtIsNil  error = errors.New("[internal error] SelectStmt is nil")
-	ErrWhereClauseIsNil error = errors.New("[internal error] WhereClause is nil")
-)
-
 // state
 type ParserState int
 
 const (
-	StateInitial            ParserState = iota
-	StateCreateTable                    // CREATE TABLE [this] (...)
-	StateCreateTableColumns             // CREATE TABLE ... ( [this]
-	StateInsertTable                    // INSERT INTO [this] (...)
-	StateInsertValues                   // INSERT INTO ... VALUES [this] (...)
+	StateInitial           ParserState = iota
+	StateInsertTable                   // INSERT INTO [this] (...)
+	StateInsertValues                  // INSERT INTO ... VALUES [this] (...)
 )
 
 // parser (implements TokenHandler)
@@ -68,6 +61,11 @@ func (p *Parser) OnKeyword(word string) {
 	switch upperWord {
 	case "SELECT":
 		p.currentHandler = NewSelectParser()
+		p.currentHandler.OnKeyword(word)
+		return
+
+	case "CREATE":
+		p.currentHandler = NewCreateParser()
 		p.currentHandler.OnKeyword(word)
 		return
 	}

@@ -11,16 +11,19 @@ import (
 )
 
 const (
-	StateSelectColumns ParserState = 100 + iota // SELECT [this] FROM
-	StateFrom                                   // FROM [this]
-	StateWhere                                  // WHERE [this]
+	StateSelectColumns ParserState = 100 + iota // SELECT
+	StateFrom                                   // FROM
+	StateWhere                                  // WHERE
+)
+
+var (
+	ErrSelectStmtIsNil  error = errors.New("[internal error] SelectStmt is nil")
+	ErrWhereClauseIsNil error = errors.New("[internal error] WhereClause is nil")
 )
 
 type SelectParser struct {
 	// 現在のステート
 	state ParserState
-	// 現在構築中の AST ノード
-	result node.ASTNode
 	// 現在構築中の SELECT 文
 	stmt *statement.SelectStmt
 	// 現在構築中の WHERE 句
@@ -40,15 +43,20 @@ func NewSelectParser() *SelectParser {
 }
 
 func (sp *SelectParser) getResult() node.ASTNode {
-	return sp.result
+	return sp.stmt
 }
 
 func (sp *SelectParser) getError() error {
 	return sp.err
 }
 
-// WHERE 句の構築を完了する
 func (sp *SelectParser) finalize() {
+	// SELECT 文がない場合はエラー
+	if sp.stmt == nil {
+		sp.setError(errors.New("[parse error] must have SELECT statement"))
+		return
+	}
+
 	// FROM 句がない場合はエラー
 	if sp.state == StateSelectColumns {
 		sp.setError(errors.New("[parse error] missing FROM clause"))
@@ -99,7 +107,6 @@ func (sp *SelectParser) OnKeyword(word string) {
 	switch upperWord {
 	case "SELECT":
 		sp.stmt = &statement.SelectStmt{StmtType: statement.StmtTypeSelect}
-		sp.result = sp.stmt
 		sp.state = StateSelectColumns
 		return
 
