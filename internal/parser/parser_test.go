@@ -13,7 +13,7 @@ func TestParserSelect(t *testing.T) {
 	t.Run("WHERE 句なしの SELECT 文をパースできる", func(t *testing.T) {
 		// GIVEN
 		sql := "SELECT * FROM users"
-		parser := NewParser(nil)
+		parser := NewParser()
 
 		// WHEN
 		result, err := parser.Parse(sql)
@@ -34,7 +34,7 @@ func TestParserSelect(t *testing.T) {
 	t.Run("WHERE 句付きの SELECT 文をパースできる", func(t *testing.T) {
 		// GIVEN
 		sql := "SELECT * FROM users WHERE id = '1'"
-		parser := NewParser(nil)
+		parser := NewParser()
 
 		// WHEN
 		result, err := parser.Parse(sql)
@@ -69,7 +69,7 @@ func TestParserSelect(t *testing.T) {
 	t.Run("WHERE 句に AND があるケースをパースできる", func(t *testing.T) {
 		// GIVEN
 		sql := "SELECT * FROM users WHERE id = '1' AND name = 'John'"
-		parser := NewParser(nil)
+		parser := NewParser()
 
 		// WHEN
 		result, err := parser.Parse(sql)
@@ -122,7 +122,7 @@ func TestParserSelect(t *testing.T) {
 	t.Run("WHERE 句に OR があるケースをパースできる", func(t *testing.T) {
 		// GIVEN
 		sql := "SELECT * FROM users WHERE id = '1' OR id = '2'"
-		parser := NewParser(nil)
+		parser := NewParser()
 
 		// WHEN
 		result, err := parser.Parse(sql)
@@ -175,7 +175,7 @@ func TestParserSelect(t *testing.T) {
 	t.Run("WHERE 句に AND と OR の両方があるケースをパースできる", func(t *testing.T) {
 		// GIVEN
 		sql := "SELECT * FROM users WHERE id = '1' AND name = 'John' OR name = 'Jane'"
-		parser := NewParser(nil)
+		parser := NewParser()
 
 		// WHEN
 		result, err := parser.Parse(sql)

@@ -46,6 +46,7 @@ type TokenHandler interface {
 	OnNumber(num string)       // 123
 	OnSymbol(symbol string)    // (, ), =, >=
 	OnComment(text string)     // -- ...
+	OnError(err error)         // エラー通知
 }
 
 type Tokenizer struct {
