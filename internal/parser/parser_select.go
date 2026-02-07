@@ -63,8 +63,9 @@ func (sp *SelectParser) finalize() {
 		return
 	}
 
-	// WHERE 句がない場合は何もしない
+	// WHERE 句がない場合は空の WhereClause を設定
 	if sp.whereClause == nil {
+		sp.stmt.Where = &statement.WhereClause{IsSet: false}
 		return
 	}
 

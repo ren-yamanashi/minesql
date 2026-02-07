@@ -69,7 +69,6 @@ func (cp *CreateParser) OnKeyword(word string) {
 	if cp.err != nil {
 		return
 	}
-
 	if cp.activeSubParser != nil {
 		cp.activeSubParser.OnKeyword(word)
 		return
@@ -104,7 +103,6 @@ func (cp *CreateParser) OnIdentifier(ident string) {
 	if cp.err != nil {
 		return
 	}
-
 	if cp.activeSubParser != nil {
 		cp.activeSubParser.OnIdentifier(ident)
 		return
@@ -176,12 +174,10 @@ func (cp *CreateParser) OnString(value string) {
 	if cp.err != nil {
 		return
 	}
-
 	if cp.activeSubParser != nil {
 		cp.activeSubParser.OnString(value)
 		return
 	}
-
 	// CREATE 文では文字列リテラルは想定していない
 	cp.setError(errors.New("[parse error] unexpected string: " + value))
 }
@@ -190,12 +186,10 @@ func (cp *CreateParser) OnNumber(num string) {
 	if cp.err != nil {
 		return
 	}
-
 	if cp.activeSubParser != nil {
 		cp.activeSubParser.OnNumber(num)
 		return
 	}
-
 	// CREATE 文では数値リテラルは想定していない
 	cp.setError(errors.New("[parse error] unexpected number: " + num))
 }
@@ -204,12 +198,10 @@ func (cp *CreateParser) OnComment(text string) {
 	if cp.err != nil {
 		return
 	}
-
 	if cp.activeSubParser != nil {
 		cp.activeSubParser.OnComment(text)
 		return
 	}
-
 	// 何もしない
 }
 
@@ -217,12 +209,10 @@ func (cp *CreateParser) OnError(err error) {
 	if cp.err != nil {
 		return
 	}
-
 	if cp.activeSubParser != nil {
 		cp.activeSubParser.OnError(err)
 		return
 	}
-
 	cp.setError(err)
 }
 

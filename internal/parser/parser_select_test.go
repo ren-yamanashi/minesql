@@ -28,7 +28,8 @@ func TestParserSelect(t *testing.T) {
 		assert.Equal(t, statement.StmtTypeSelect, selectStmt.StmtType)
 		assert.Equal(t, "users", selectStmt.From.TableName)
 		assert.Equal(t, identifier.IdTypeTable, selectStmt.From.IdType)
-		assert.Nil(t, selectStmt.Where)
+		assert.NotNil(t, selectStmt.Where)
+		assert.False(t, selectStmt.Where.IsSet)
 	})
 
 	t.Run("WHERE 句付きの SELECT 文をパースできる", func(t *testing.T) {

@@ -68,6 +68,11 @@ func (p *Parser) OnKeyword(word string) {
 		p.currentHandler = NewCreateParser()
 		p.currentHandler.OnKeyword(word)
 		return
+
+	case "INSERT":
+		p.currentHandler = NewInsertParser()
+		p.currentHandler.OnKeyword(word)
+		return
 	}
 }
 
