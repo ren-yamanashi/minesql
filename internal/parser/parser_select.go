@@ -43,6 +43,53 @@ func (sp *SelectParser) getResult() node.ASTNode {
 	return sp.result
 }
 
+func (sp *SelectParser) getError() error {
+	return sp.err
+}
+
+// WHERE 句の構築を完了する
+func (sp *SelectParser) finalize() {
+	// FROM 句がない場合はエラー
+	if sp.state == StateSelectColumns {
+		sp.setError(errors.New("[parse error] missing FROM clause"))
+		return
+	}
+
+	// WHERE 句がない場合は何もしない
+	if sp.whereClause == nil {
+		return
+	}
+
+	// 残っている演算子をすべて処理
+	for len(sp.opStack) > 0 {
+		if err := sp.reduce(); err != nil {
+			sp.setError(err)
+			return
+		}
+	}
+
+	// WHERE 句があるのに式が一つもない場合はエラー
+	if len(sp.nodeStack) == 0 {
+		sp.setError(errors.New("[parse error] empty expression in WHERE clause"))
+		return
+	}
+
+	// スタックに複数の要素が残っている場合はエラー
+	if len(sp.nodeStack) != 1 {
+		sp.setError(errors.New("[parse error] incomplete expression in WHERE clause"))
+		return
+	}
+
+	// 最後に残った1つが、完成したルートの Expression
+	finalExpr, ok := sp.nodeStack[0].(expression.Expression)
+	if !ok {
+		sp.setError(errors.New("[parse error] invalid expression result"))
+		return
+	}
+
+	sp.whereClause.Condition = finalExpr
+}
+
 func (sp *SelectParser) OnKeyword(word string) {
 	if sp.err != nil {
 		return
@@ -96,6 +143,10 @@ func (sp *SelectParser) OnIdentifier(ident string) {
 	}
 
 	switch sp.state {
+	case StateSelectColumns:
+		sp.setError(errors.New("[parse error] currently only SELECT * is supported"))
+		return
+
 	case StateFrom:
 		if sp.stmt == nil {
 			sp.setError(ErrSelectStmtIsNil)
@@ -226,43 +277,6 @@ func (sp *SelectParser) reduce() error {
 	return nil
 }
 
-// WHERE 句の構築を完了する
-func (sp *SelectParser) finalize() {
-	// WHERE 句がない場合は何もしない
-	if sp.whereClause == nil {
-		return
-	}
-
-	// 残っている演算子をすべて処理
-	for len(sp.opStack) > 0 {
-		if err := sp.reduce(); err != nil {
-			sp.setError(err)
-			return
-		}
-	}
-
-	// WHERE 句があるのに式が一つもない場合はエラー
-	if len(sp.nodeStack) == 0 {
-		sp.setError(errors.New("[parse error] empty expression in WHERE clause"))
-		return
-	}
-
-	// スタックに複数の要素が残っている場合はエラー
-	if len(sp.nodeStack) != 1 {
-		sp.setError(errors.New("[parse error] incomplete expression in WHERE clause"))
-		return
-	}
-
-	// 最後に残った1つが、完成したルートの Expression
-	finalExpr, ok := sp.nodeStack[0].(expression.Expression)
-	if !ok {
-		sp.setError(errors.New("[parse error] invalid expression result"))
-		return
-	}
-
-	sp.whereClause.Condition = finalExpr
-}
-
 // 演算子の優先順位を定義 (数値が高いほど優先順位が高い)
 func (sp *SelectParser) precedence(op string) int {
 	switch strings.ToUpper(op) {
@@ -282,8 +296,4 @@ func (sp *SelectParser) setError(err error) {
 	if sp.err == nil {
 		sp.err = err
 	}
-}
-
-func (sp *SelectParser) getError() error {
-	return sp.err
 }

@@ -11,13 +11,6 @@ var (
 	ErrWhereClauseIsNil error = errors.New("[internal error] WhereClause is nil")
 )
 
-type StatementParser interface {
-	TokenHandler
-	getResult() node.ASTNode
-	finalize()
-	getError() error
-}
-
 // state
 type ParserState int
 
@@ -30,6 +23,13 @@ const (
 )
 
 // parser (implements TokenHandler)
+
+type StatementParser interface {
+	TokenHandler
+	getResult() node.ASTNode
+	getError() error
+	finalize()
+}
 
 type Parser struct {
 	// 現在のステートに対応するハンドラ
