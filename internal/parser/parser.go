@@ -13,7 +13,9 @@ const (
 	// 初期状態
 	StateInitial ParserState = iota
 
+	//
 	// -- SELECT Statement --
+	//
 
 	// SELECT 中
 	StateSelectColumns
@@ -22,7 +24,9 @@ const (
 	// WHERE 中
 	StateWhere
 
+	//
 	// -- INSERT Statement --
+	//
 
 	// INSERT 中
 	InsertStateStart
@@ -44,7 +48,33 @@ const (
 	// `INSERT INTO ... VALUES val1, val2, ...` の各値 (val1, val2, ...) 中
 	InsertStateValueList
 
+	//
 	// -- CREATE Statement --
+	//
+
+	// CREATE 中
+	CreateStateStart
+	// TABLE キーワード中
+	CreateStateTable
+	// CREATE TABLE のテーブル名中
+	CreateStateName
+	// CREATE TABLE の Body 部開始待ち
+	CreateStateBodyStart
+	// CREATE TABLE の Body 部中
+	CreateStateBody
+	// CREATE TABLE のカラムデータ型定義待ち
+	CreateStateColDataType
+	// CREATE TABLE のカラム定義修了待ち
+	CreateStateColDefEnd
+	// CREATE TABLE の KEY 制約中
+	CreateStateConstraint
+	// CREATE TABLE の KEY 制約の名前またはカラムリスト開始待ち (この時点ではどちらか不明)
+	// UNIQUE KEY index_name の "index_name" または PRIMARY KEY (...) の "(" 中
+	CreateStateConstraintNameOrBody
+	// CREATE TABLE の KEY 制約のカラム名中
+	CreateStateConstraintCol
+	// CREATE TABLE の KEY 制約のカラムリスト区切り文字 ("," または ")") 待ち
+	CreateStateConstraintSeparator
 )
 
 // parser (implements TokenHandler)
@@ -91,17 +121,17 @@ func (p *Parser) OnKeyword(word string) {
 	upper := strings.ToUpper(word)
 
 	switch upper {
-	case "SELECT":
+	case KSelect:
 		p.currentHandler = NewSelectParser()
 		p.currentHandler.OnKeyword(word)
 		return
 
-	case "CREATE":
+	case KCreate:
 		p.currentHandler = NewCreateParser()
 		p.currentHandler.OnKeyword(word)
 		return
 
-	case "INSERT":
+	case KInsert:
 		p.currentHandler = NewInsertParser()
 		p.currentHandler.OnKeyword(word)
 		return

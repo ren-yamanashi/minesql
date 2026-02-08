@@ -8,25 +8,12 @@ import (
 	"strings"
 )
 
-const (
-	// CREATE 文の開始
-	CreateStateStart ParserState = 200 + iota
-	// TABLE キーワード
-	CreateStateTable
-	// CREATE TABLE [this]
-	CreateStateName
-	// CREATE TABLE 文の Body 部 (カラム定義・制約定義)
-	CreateStateBodyStart
-	// id INT, ...
-	CreateStateBody
-)
-
 // -- sub parser --
 
 type CreateSubParser interface {
 	TokenHandler
 	finalize() error
-	GetDef() definition.Definition
+	getDef() definition.Definition
 }
 
 // -- main parser --
@@ -77,18 +64,18 @@ func (cp *CreateParser) OnKeyword(word string) {
 	upper := strings.ToUpper(word)
 	switch cp.state {
 	case CreateStateStart:
-		if upper == "CREATE" {
+		if upper == KCreate {
 			cp.state = CreateStateTable
 			return
 		}
 	case CreateStateTable:
-		if upper == "TABLE" {
+		if upper == KTable {
 			cp.stmt.Keyword = statement.KeywordTable
 			cp.state = CreateStateName
 			return
 		}
 	case CreateStateBody:
-		if upper == "PRIMARY" || upper == "UNIQUE" {
+		if upper == KPrimary || upper == KUnique {
 			cp.activeSubParser = NewConstraintParser()
 			cp.activeSubParser.OnKeyword(word)
 			return
@@ -130,18 +117,18 @@ func (cp *CreateParser) OnSymbol(symbol string) {
 	if cp.activeSubParser != nil {
 		if _, ok := cp.activeSubParser.(*ConstraintParser); ok {
 			// カンマ "," は制約定義内の列挙 (col1, col2) として委譲
-			if symbol == "," {
+			if symbol == string(SComma) {
 				cp.activeSubParser.OnSymbol(symbol)
 				return
 			}
 			// "(" も委譲
-			if symbol == "(" {
+			if symbol == string(SLeftParen) {
 				cp.activeSubParser.OnSymbol(symbol)
 				return
 			}
 			// ")" は制約定義の終わりかもしれないので、
 			// 一旦委譲してから、親としても flush する
-			if symbol == ")" {
+			if symbol == string(SRightParen) {
 				cp.activeSubParser.OnSymbol(symbol)
 				cp.flushActiveParser()
 				return
@@ -150,13 +137,13 @@ func (cp *CreateParser) OnSymbol(symbol string) {
 	}
 
 	// "," と ")" は区切りなので、親が SubParser を終了させる
-	if symbol == "," || symbol == ")" {
+	if symbol == string(SComma) || symbol == string(SRightParen) {
 		cp.flushActiveParser()
 		return
 	}
 
 	// Body 開始の "(" を処理
-	if cp.state == CreateStateBodyStart && symbol == "(" {
+	if cp.state == CreateStateBodyStart && symbol == string(SLeftParen) {
 		cp.state = CreateStateBody
 		return
 	}
@@ -230,7 +217,7 @@ func (cp *CreateParser) flushActiveParser() {
 			cp.setError(err)
 			return
 		}
-		cp.stmt.CreateDefinitions = append(cp.stmt.CreateDefinitions, cp.activeSubParser.GetDef())
+		cp.stmt.CreateDefinitions = append(cp.stmt.CreateDefinitions, cp.activeSubParser.getDef())
 		cp.activeSubParser = nil
 	}
 }

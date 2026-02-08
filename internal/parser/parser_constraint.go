@@ -7,14 +7,6 @@ import (
 	"strings"
 )
 
-// state
-const (
-	ConstraintStateKey        ParserState = 400 + iota // KEY
-	ConstraintStateNameOrBody                          // index_name or (
-	ConstraintStateCol                                 // col_name
-	ConstraintStateSeparator                           // , or )
-)
-
 type ConstraintParser struct {
 	// 現在のステート
 	state ParserState
@@ -30,7 +22,7 @@ type ConstraintParser struct {
 
 func NewConstraintParser() *ConstraintParser {
 	return &ConstraintParser{
-		state: ConstraintStateKey,
+		state: CreateStateConstraint,
 	}
 }
 
@@ -56,7 +48,7 @@ func (cp *ConstraintParser) finalize() error {
 	return nil
 }
 
-func (cp *ConstraintParser) GetDef() definition.Definition {
+func (cp *ConstraintParser) getDef() definition.Definition {
 	if cp.isPK {
 		return cp.pkDef
 	}
@@ -72,19 +64,19 @@ func (cp *ConstraintParser) OnKeyword(word string) {
 	// 開始時の PRIMARY / UNIQUE 判定
 	if cp.pkDef == nil && cp.ukDef == nil {
 		switch upper {
-		case "PRIMARY":
+		case KPrimary:
 			cp.isPK = true
 			cp.pkDef = &definition.ConstraintPrimaryKeyDef{
 				DefType: definition.DefTypeConstraintPrimaryKey,
 			}
-			cp.state = ConstraintStateKey
+			cp.state = CreateStateConstraint
 			return
-		case "UNIQUE":
+		case KUnique:
 			cp.isPK = false
 			cp.ukDef = &definition.ConstraintUniqueKeyDef{
 				DefType: definition.DefTypeConstraintUniqueKey,
 			}
-			cp.state = ConstraintStateKey
+			cp.state = CreateStateConstraint
 			return
 		default:
 			cp.setError(errors.New("[parse error] expected 'PRIMARY' or 'UNIQUE', got: " + word))
@@ -93,9 +85,9 @@ func (cp *ConstraintParser) OnKeyword(word string) {
 	}
 
 	// KEY キーワードの処理
-	if cp.state == ConstraintStateKey {
-		if upper == "KEY" {
-			cp.state = ConstraintStateNameOrBody
+	if cp.state == CreateStateConstraint {
+		if upper == KKey {
+			cp.state = CreateStateConstraintNameOrBody
 			return
 		}
 		cp.setError(errors.New("[parse error] expected 'KEY', got: " + word))
@@ -111,7 +103,7 @@ func (cp *ConstraintParser) OnIdentifier(ident string) {
 	}
 
 	switch cp.state {
-	case ConstraintStateNameOrBody:
+	case CreateStateConstraintNameOrBody:
 		// UNIQUE KEY index_name ( ... ) のパターン
 		if !cp.isPK {
 			if cp.ukDef.KeyName != "" {
@@ -125,15 +117,16 @@ func (cp *ConstraintParser) OnIdentifier(ident string) {
 		cp.setError(errors.New("[parse error] unexpected identifier (PRIMARY KEY name not supported): " + ident))
 		return
 
-	case ConstraintStateCol:
+	case CreateStateConstraintCol:
 		// カラム名の追加
+		// PK の場合は PK 定義のカラムリストに追加、UK の場合は UK 定義のカラムにセット
 		colId := *identifier.NewColumnId(ident)
 		if cp.isPK {
 			cp.pkDef.Columns = append(cp.pkDef.Columns, colId)
 		} else {
 			cp.ukDef.Column = colId
 		}
-		cp.state = ConstraintStateSeparator
+		cp.state = CreateStateConstraintSeparator
 		return
 	}
 
@@ -146,17 +139,20 @@ func (cp *ConstraintParser) OnSymbol(symbol string) {
 	}
 
 	switch cp.state {
-	case ConstraintStateNameOrBody:
-		if symbol == "(" {
-			cp.state = ConstraintStateCol
+	case CreateStateConstraintNameOrBody:
+		// "(" が来た場合はカラムリスト開始
+		if symbol == string(SLeftParen) {
+			cp.state = CreateStateConstraintCol
 			return
 		}
-	case ConstraintStateSeparator:
-		if symbol == "," {
-			cp.state = ConstraintStateCol
+	case CreateStateConstraintSeparator:
+		// カラムリストの区切り文字処理
+		// "," が来たら次のカラム待ち、")" が来たらカラムリスト終了
+		if symbol == string(SComma) {
+			cp.state = CreateStateConstraintCol
 			return
 		}
-		if symbol == ")" {
+		if symbol == string(SRightParen) {
 			return
 		}
 	}
