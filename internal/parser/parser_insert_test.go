@@ -123,6 +123,62 @@ func TestParserInsert(t *testing.T) {
 		assert.Equal(t, "25", insertStmt.Values[0][1].ToString())
 	})
 
+	t.Run("コメント付きの INSERT 文をパースできる", func(t *testing.T) {
+		t.Run("行コメント付き", func(t *testing.T) {
+			// GIVEN
+			sql := `
+-- これはコメント
+INSERT INTO users (id, name) -- カラムリスト
+VALUES ('1', 'John') -- 値リスト
+`
+			parser := NewParser()
+
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+
+			insertStmt, ok := result.(*statement.InsertStmt)
+			assert.True(t, ok)
+			assert.Equal(t, "users", insertStmt.Table.TableName)
+			assert.Equal(t, 2, len(insertStmt.Cols))
+			assert.Equal(t, "id", insertStmt.Cols[0].ColName)
+			assert.Equal(t, "name", insertStmt.Cols[1].ColName)
+			assert.Equal(t, 1, len(insertStmt.Values))
+			assert.Equal(t, "1", insertStmt.Values[0][0].ToString())
+			assert.Equal(t, "John", insertStmt.Values[0][1].ToString())
+		})
+
+		t.Run("ブロックコメント付き", func(t *testing.T) {
+			// GIVEN
+			sql := `
+/* これはコメント */
+INSERT INTO users (id, name) /* カラムリスト */
+VALUES ('1', 'John') /* 値リスト */
+`
+			parser := NewParser()
+
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+
+			insertStmt, ok := result.(*statement.InsertStmt)
+			assert.True(t, ok)
+			assert.Equal(t, "users", insertStmt.Table.TableName)
+			assert.Equal(t, 2, len(insertStmt.Cols))
+			assert.Equal(t, "id", insertStmt.Cols[0].ColName)
+			assert.Equal(t, "name", insertStmt.Cols[1].ColName)
+			assert.Equal(t, 1, len(insertStmt.Values))
+			assert.Equal(t, "1", insertStmt.Values[0][0].ToString())
+			assert.Equal(t, "John", insertStmt.Values[0][1].ToString())
+		})
+	})
+
 	t.Run("不正な INSERT 文でエラーになる", func(t *testing.T) {
 		t.Run("カラムリストなしの場合", func(t *testing.T) {
 			// GIVEN
