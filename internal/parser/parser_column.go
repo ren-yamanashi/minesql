@@ -17,7 +17,7 @@ type ColumnParser struct {
 
 func NewColumnParser(colName string) *ColumnParser {
 	return &ColumnParser{
-		state:  CreateStateColDataType,
+		state: CreateStateColDef,
 		colDef: &definition.ColumnDef{ColName: colName},
 	}
 }
@@ -43,17 +43,17 @@ func (cp *ColumnParser) OnKeyword(word string) {
 
 	upper := strings.ToUpper(word)
 	switch cp.state {
-	case CreateStateColDataType:
+	case CreateStateColDef:
 		// 現状、カラムのデータ型は VARCHAR のみ対応
 		if upper == KVarchar {
 			cp.colDef.DataType = definition.DataTypeVarchar
-			cp.state = CreateStateColDefEnd
+			cp.state = CreateStateColWaitDefEnd
 			return
 		}
 		cp.setError(errors.New("[parse error] only VARCHAR is supported, got: " + word))
 		return
 
-	case CreateStateColDefEnd:
+	case CreateStateColWaitDefEnd:
 		// 型が決まった後にさらにキーワードが来た場合 (e.g. "col1 VARCHAR INT")
 		cp.setError(errors.New("[parse error] unexpected keyword after data type"))
 		return

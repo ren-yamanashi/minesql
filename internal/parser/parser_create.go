@@ -65,13 +65,13 @@ func (cp *CreateParser) OnKeyword(word string) {
 	switch cp.state {
 	case CreateStateStart:
 		if upper == KCreate {
-			cp.state = CreateStateTable
+			cp.state = CreateStateCreate
 			return
 		}
-	case CreateStateTable:
+	case CreateStateCreate:
 		if upper == KTable {
 			cp.stmt.Keyword = statement.KeywordTable
-			cp.state = CreateStateName
+			cp.state = CreateStateTable
 			return
 		}
 	case CreateStateBody:
@@ -96,7 +96,7 @@ func (cp *CreateParser) OnIdentifier(ident string) {
 	}
 
 	switch cp.state {
-	case CreateStateName:
+	case CreateStateTable:
 		cp.stmt.TableName = ident
 		cp.state = CreateStateBodyStart
 		return

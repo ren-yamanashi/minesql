@@ -30,7 +30,7 @@ const (
 
 	// INSERT Statement の開始状態
 	InsertStateStart
-	// INSERT 中であり、INTO 待ちの状態
+	// INSERT 中であり、INTO キーワード待ちの状態
 	InsertStateInsert
 	// INSERT INTO 中であり、テーブル名待ちの状態
 	InsertStateInto
@@ -50,29 +50,30 @@ const (
 	// -- CREATE Statement --
 	//
 
-	// CREATE 中
+	// CREATE Statement の開始状態
 	CreateStateStart
-	// TABLE キーワード中
+	// CREATE 中であり、TABLE キーワード待ちの状態
+	CreateStateCreate
+	// CREATE TABLE 中であり、テーブル名待ちの状態
 	CreateStateTable
-	// CREATE TABLE のテーブル名中
-	CreateStateName
-	// CREATE TABLE の Body 部開始待ち
+	// CREATE TABLE の Body 部開始中 (CREATE TABLE <table_name> (...) の "(" 待ち) の状態
 	CreateStateBodyStart
 	// CREATE TABLE の Body 部中
 	CreateStateBody
-	// CREATE TABLE のカラムデータ型定義待ち
-	CreateStateColDataType
+	// CREATE TABLE のカラム指定中であり、データ型定義待ちの状態
+	CreateStateColDef
 	// CREATE TABLE のカラム定義修了待ち
-	CreateStateColDefEnd
+	CreateStateColWaitDefEnd
 	// CREATE TABLE の KEY 制約中
 	CreateStateConstraint
-	// CREATE TABLE の KEY 制約の名前またはカラムリスト開始待ち (この時点ではどちらか不明)
-	// UNIQUE KEY index_name の "index_name" または PRIMARY KEY (...) の "(" 中
-	CreateStateConstraintNameOrBody
-	// CREATE TABLE の KEY 制約のカラム名中
+	// CREATE TABLE の PRIMARY KEY または UNIQUE KEY (現在は KEY キーワードの直後) の状態
+	// `UNIQUE KEY index_name` の "index_name" または `PRIMARY KEY (...)` の "(" 待ち
+	CreateStateConstraintKey
+	// CREATE TABLE の KEY 制約のカラム名を指定中 (または指定待ち) の状態
+	// `PRIMARY KEY (col1, col2, ...)` または `UNIQUE KEY index_name (col1, col2, ...)` の "(" の直後か、"," の直後の状態
 	CreateStateConstraintCol
 	// CREATE TABLE の KEY 制約のカラムリスト区切り文字 ("," または ")") 待ち
-	CreateStateConstraintSeparator
+	CreateStateConstraintWaitSeparator
 )
 
 // parser (implements TokenHandler)

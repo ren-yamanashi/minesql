@@ -87,7 +87,7 @@ func (cp *ConstraintParser) OnKeyword(word string) {
 	// KEY キーワードの処理
 	if cp.state == CreateStateConstraint {
 		if upper == KKey {
-			cp.state = CreateStateConstraintNameOrBody
+			cp.state = CreateStateConstraintKey
 			return
 		}
 		cp.setError(errors.New("[parse error] expected 'KEY', got: " + word))
@@ -103,7 +103,7 @@ func (cp *ConstraintParser) OnIdentifier(ident string) {
 	}
 
 	switch cp.state {
-	case CreateStateConstraintNameOrBody:
+	case CreateStateConstraintKey:
 		// UNIQUE KEY index_name ( ... ) のパターン
 		if !cp.isPK {
 			if cp.ukDef.KeyName != "" {
@@ -126,7 +126,7 @@ func (cp *ConstraintParser) OnIdentifier(ident string) {
 		} else {
 			cp.ukDef.Column = colId
 		}
-		cp.state = CreateStateConstraintSeparator
+		cp.state = CreateStateConstraintWaitSeparator
 		return
 	}
 
@@ -139,13 +139,13 @@ func (cp *ConstraintParser) OnSymbol(symbol string) {
 	}
 
 	switch cp.state {
-	case CreateStateConstraintNameOrBody:
+	case CreateStateConstraintKey:
 		// "(" が来た場合はカラムリスト開始
 		if symbol == string(SLeftParen) {
 			cp.state = CreateStateConstraintCol
 			return
 		}
-	case CreateStateConstraintSeparator:
+	case CreateStateConstraintWaitSeparator:
 		// カラムリストの区切り文字処理
 		// "," が来たら次のカラム待ち、")" が来たらカラムリスト終了
 		if symbol == string(SComma) {
