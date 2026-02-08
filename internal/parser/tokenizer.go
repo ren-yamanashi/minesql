@@ -2,18 +2,24 @@ package parser
 
 import "strings"
 
-// State
+// -- state --
+
 type State int
 
 const (
-	StateData           State = iota
-	StateInSingleQuote        // '...'
-	StateInDoubleQuote        // "..."
-	StateInLineComment        // -- ...
-	StateInBlockComment       // /* ... */
+	// 通常状態
+	StateData State = iota
+	// シングルクォート内 ('...')
+	StateInSingleQuote
+	// ダブルクォート内 ("...")
+	StateInDoubleQuote
+	// 行コメント内 (-- ...)
+	StateInLineComment
+	// ブロックコメント内 (/* ... */)
+	StateInBlockComment
 )
 
-// CharCodes
+// -- char code -
 const (
 	CharCodeSingleQuote    rune = '\''
 	CharCodeDoubleQuote    rune = '"'
@@ -26,7 +32,7 @@ const (
 	CharCodeCarriageReturn rune = '\r'
 )
 
-// symbol
+// -- symbol --
 const (
 	SymbolLeftParen   rune = '('
 	SymbolRightParen  rune = ')'
@@ -39,14 +45,39 @@ const (
 	SymbolAsterisk    rune = '*'
 )
 
+// -- keyword --
+const (
+	KeywordSelect  = "SELECT"
+	KeywordFrom    = "FROM"
+	KeywordWhere   = "WHERE"
+	KeywordInsert  = "INSERT"
+	KeywordInto    = "INTO"
+	KeywordValues  = "VALUES"
+	KeywordCreate  = "CREATE"
+	KeywordTable   = "TABLE"
+	KeywordPrimary = "PRIMARY"
+	KeywordUnique  = "UNIQUE"
+	KeywordKey     = "KEY"
+	KeywordVarchar = "VARCHAR"
+	KeywordAnd     = "AND"
+	KeywordOr      = "OR"
+)
+
 type TokenHandler interface {
-	OnKeyword(word string)     // SELECT, FROM, WHERE ...
-	OnIdentifier(ident string) // users, id ...
-	OnString(value string)     // 'hello'
-	OnNumber(num string)       // 123
-	OnSymbol(symbol string)    // (, ), =, >=
-	OnComment(text string)     // -- ...
-	OnError(err error)         // エラー通知
+	// SELECT, FROM, INSERT, CREATE などのキーワード
+	OnKeyword(word string)
+	// 識別子 (テーブル名、カラム名など) (e.g. users, id, name)
+	OnIdentifier(ident string)
+	// 文字列リテラル
+	OnString(value string)
+	// 数値リテラル
+	OnNumber(num string)
+	// (, ), =, >= などの記号
+	OnSymbol(symbol string)
+	// 行コメント、ブロックコメント
+	OnComment(text string)
+	// エラー
+	OnError(err error)
 }
 
 type Tokenizer struct {
@@ -102,6 +133,7 @@ func (t *Tokenizer) shouldContinue() bool {
 	return t.pos < len(t.input)
 }
 
+// Data (Keyword / Identifier / Number) 状態の処理
 // 現在の文字 (char) を見て、以下の 3つの処理 (場合によってはそのうちのいずれか) を行う
 // - 状態遷移 (e.g. handleData の実行中にシングルクォートを見つけた場合、StateInSingleQuote に遷移)
 // - トークンの確定 & 通知 (e.g. handleData で S E L E C T と読み進めた後に、 (スペース) が来た場合、SELECT トークンを確定し、OnKeyword("SELECT") を呼び出す)
@@ -115,90 +147,78 @@ func (t *Tokenizer) handleData(char rune) {
 		t.state = StateInSingleQuote
 		t.start = currentPos + 1
 		return
+
 	case CharCodeDoubleQuote:
 		t.emitPendingToken()
 		t.state = StateInDoubleQuote
 		t.start = currentPos + 1
 		return
+
 	case CharCodeDash:
+		// `--` なら行コメントの開始
 		if t.peekChar() == CharCodeDash {
 			t.emitPendingToken()
 			t.pos++ // 2つ目の '-' を読み飛ばす
 			t.state = StateInLineComment
 			t.start = currentPos + 2
 			return
-		} else {
-			t.emitPendingToken()
-			t.callbacks.OnSymbol(string(char)) // マイナス記号として通知
-			t.start = currentPos + 1
-			return
 		}
+
 	case CharCodeSlash:
+		// `/*` ならブロックコメントの開始
 		if t.peekChar() == CharCodeAsterisk {
 			t.emitPendingToken()
 			t.pos++ // '*' を読み飛ばす
 			t.state = StateInBlockComment
 			t.start = currentPos + 2
 			return
-		} else {
-			t.emitPendingToken()
-			t.callbacks.OnSymbol(string(char)) // スラッシュ記号として通知
-			t.start = currentPos + 1
-			return
 		}
+
 	case CharCodeSpace, CharCodeTab, CharCodeNewLine, CharCodeCarriageReturn:
+		// 空白文字が来た場合、保留中のトークンを確定して通知する
 		t.emitPendingToken()
 		t.start = currentPos + 1
 		return
-	default:
-		switch char {
-		case SymbolEqual:
-			if t.peekChar() == SymbolLessThan || t.peekChar() == SymbolGreaterThan || t.peekChar() == SymbolExclamation {
-				// = の次に <, >, ! が来た場合、2文字の記号として扱う (e.g. =>, =<, =!)
-				t.emitPendingToken()
-				t.pos++ // 次の文字も消費する
-				symbol := string([]rune{char, t.input[t.pos]})
-				t.callbacks.OnSymbol(symbol)
-				t.start = currentPos + 2
-				return
-			}
-		case SymbolLessThan:
-			if t.peekChar() == SymbolEqual || t.peekChar() == SymbolGreaterThan {
-				// <=, <> の場合
-				t.emitPendingToken()
-				t.pos++ // 次の文字も消費する
-				symbol := string([]rune{char, t.input[t.pos]})
-				t.callbacks.OnSymbol(symbol)
-				t.start = currentPos + 2
-				return
-			}
-		case SymbolGreaterThan:
-			if t.peekChar() == SymbolEqual {
-				// >= の場合
-				t.emitPendingToken()
-				t.pos++ // 次の文字も消費する
-				symbol := string([]rune{char, t.input[t.pos]})
-				t.callbacks.OnSymbol(symbol)
-				t.start = currentPos + 2
-				return
-			}
-		case SymbolExclamation:
-			if t.peekChar() == SymbolEqual {
-				// != の場合
-				t.emitPendingToken()
-				t.pos++ // 次の文字も消費する
-				symbol := string([]rune{char, t.input[t.pos]})
-				t.callbacks.OnSymbol(symbol)
-				t.start = currentPos + 2
-				return
-			}
-		}
-		if t.isSymbol(char) {
+
+	case SymbolEqual:
+		// = の次に <, >, ! が来た場合、2文字の記号として扱う (=>, =<, =!)
+		if t.peekChar() == SymbolLessThan || t.peekChar() == SymbolGreaterThan || t.peekChar() == SymbolExclamation {
 			t.emitPendingToken()
-			t.callbacks.OnSymbol(string(char))
-			t.start = currentPos + 1
+			t.pos++ // 次の文字も消費する
+			symbol := string([]rune{char, t.input[t.pos]})
+			t.callbacks.OnSymbol(symbol)
+			t.start = currentPos + 2
+			return
 		}
-		return
+
+	case SymbolLessThan:
+		// < の次に =, > が来た場合、2文字の記号として扱う (<=, <>)
+		if t.peekChar() == SymbolEqual || t.peekChar() == SymbolGreaterThan {
+			t.emitPendingToken()
+			t.pos++ // 次の文字も消費する
+			symbol := string([]rune{char, t.input[t.pos]})
+			t.callbacks.OnSymbol(symbol)
+			t.start = currentPos + 2
+			return
+		}
+
+	case SymbolGreaterThan, SymbolExclamation:
+		// > の次に = が来た場合、2文字の記号として扱う (>=)
+		// ! の次に = が来た場合、2文字の記号として扱う (!=)
+		if t.peekChar() == SymbolEqual {
+			// >= の場合
+			t.emitPendingToken()
+			t.pos++ // 次の文字も消費する
+			symbol := string([]rune{char, t.input[t.pos]})
+			t.callbacks.OnSymbol(symbol)
+			t.start = currentPos + 2
+			return
+		}
+	}
+	if t.isSymbol(char) {
+		t.emitPendingToken()
+		t.callbacks.OnSymbol(string(char))
+		t.start = currentPos + 1
 	}
 }
 
@@ -274,11 +294,11 @@ func (t *Tokenizer) isDigit(word string) bool {
 // キーワードかどうか
 func (t *Tokenizer) isKeyword(word string) bool {
 	keywords := []string{
-		"SELECT", "FROM", "WHERE",
-		"INSERT", "INTO", "VALUES",
-		"CREATE", "TABLE", "PRIMARY", "UNIQUE", "KEY",
-		"VARCHAR",
-		"AND", "OR",
+		KeywordSelect, KeywordFrom, KeywordWhere,
+		KeywordInsert, KeywordInto, KeywordValues,
+		KeywordCreate, KeywordTable, KeywordPrimary, KeywordUnique, KeywordKey,
+		KeywordVarchar,
+		KeywordAnd, KeywordOr,
 	}
 
 	upperWord := strings.ToUpper(word)
@@ -292,7 +312,7 @@ func (t *Tokenizer) isKeyword(word string) bool {
 
 // 記号文字かどうか
 func (t *Tokenizer) isSymbol(ch rune) bool {
-	symbols := []rune{'(', ')', ',', ';', '=', '<', '>', '!', '*'}
+	symbols := []rune{SymbolLeftParen, SymbolRightParen, SymbolComma, SymbolSemicolon, SymbolEqual, SymbolLessThan, SymbolGreaterThan, SymbolExclamation, SymbolAsterisk}
 	for _, sym := range symbols {
 		if ch == sym {
 			return true
