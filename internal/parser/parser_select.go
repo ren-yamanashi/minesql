@@ -10,12 +10,6 @@ import (
 	"strings"
 )
 
-const (
-	StateSelectColumns ParserState = 100 + iota // SELECT
-	StateFrom                                   // FROM
-	StateWhere                                  // WHERE
-)
-
 var (
 	ErrSelectStmtIsNil  error = errors.New("[internal error] SelectStmt is nil")
 	ErrWhereClauseIsNil error = errors.New("[internal error] WhereClause is nil")
@@ -28,10 +22,10 @@ type SelectParser struct {
 	stmt *statement.SelectStmt
 	// 現在構築中の WHERE 句
 	whereClause *statement.WhereClause
-	// AST ノードが格納されるスタック (Where 句の式構築用)
-	nodeStack []node.ASTNode
-	// 演算子が格納されるスタック (Where 句の式構築用)
-	opStack []string
+	// WHERE 句の AST ノードが格納されるスタック
+	whereNodeStack []node.ASTNode
+	// WHERE 句の演算子が格納されるスタック
+	whereOpStack []string
 	// エラー情報
 	err error
 }
@@ -70,7 +64,7 @@ func (sp *SelectParser) finalize() {
 	}
 
 	// 残っている演算子をすべて処理
-	for len(sp.opStack) > 0 {
+	for len(sp.whereOpStack) > 0 {
 		if err := sp.reduce(); err != nil {
 			sp.setError(err)
 			return
@@ -78,24 +72,23 @@ func (sp *SelectParser) finalize() {
 	}
 
 	// WHERE 句があるのに式が一つもない場合はエラー
-	if len(sp.nodeStack) == 0 {
+	if len(sp.whereNodeStack) == 0 {
 		sp.setError(errors.New("[parse error] empty expression in WHERE clause"))
 		return
 	}
 
 	// スタックに複数の要素が残っている場合はエラー
-	if len(sp.nodeStack) != 1 {
+	if len(sp.whereNodeStack) != 1 {
 		sp.setError(errors.New("[parse error] incomplete expression in WHERE clause"))
 		return
 	}
 
-	// 最後に残った1つが、完成したルートの Expression
-	finalExpr, ok := sp.nodeStack[0].(expression.Expression)
+	// 最後に残った式を、WHERE 句のルートの式として設定
+	finalExpr, ok := sp.whereNodeStack[0].(expression.Expression)
 	if !ok {
 		sp.setError(errors.New("[parse error] invalid expression result"))
 		return
 	}
-
 	sp.whereClause.Condition = finalExpr
 }
 
@@ -106,12 +99,12 @@ func (sp *SelectParser) OnKeyword(word string) {
 	upperWord := strings.ToUpper(word)
 
 	switch upperWord {
-	case "SELECT":
+	case KeywordSelect:
 		sp.stmt = &statement.SelectStmt{StmtType: statement.StmtTypeSelect}
 		sp.state = StateSelectColumns
 		return
 
-	case "FROM":
+	case KeywordFrom:
 		if sp.state == StateSelectColumns {
 			sp.state = StateFrom
 			return
@@ -119,19 +112,19 @@ func (sp *SelectParser) OnKeyword(word string) {
 		sp.setError(errors.New("[parse error] FROM clause is in invalid position"))
 		return
 
-	case "WHERE":
+	case KeywordWhere:
 		if sp.state == StateFrom {
 			sp.whereClause = &statement.WhereClause{IsSet: true}
 			sp.stmt.Where = sp.whereClause
-			sp.nodeStack = []node.ASTNode{}
-			sp.opStack = []string{}
+			sp.whereNodeStack = []node.ASTNode{}
+			sp.whereOpStack = []string{}
 			sp.state = StateWhere
 			return
 		}
 		sp.setError(errors.New("[parse error] WHERE clause is in invalid position"))
 		return
 
-	case "AND", "OR":
+	case KeywordAnd, KeywordOr:
 		if sp.state == StateWhere {
 			sp.handleOperator(upperWord)
 			return
@@ -152,19 +145,15 @@ func (sp *SelectParser) OnIdentifier(ident string) {
 
 	switch sp.state {
 	case StateSelectColumns:
+		// 現状 SELECT 句では "*" のみサポートしているので、Identifier が来たらエラー
 		sp.setError(errors.New("[parse error] currently only SELECT * is supported"))
 		return
-
 	case StateFrom:
-		if sp.stmt == nil {
-			sp.setError(ErrSelectStmtIsNil)
-			return
-		}
 		sp.stmt.From = *identifier.NewTableId(ident)
-
 	case StateWhere:
+		// WHERE 句で扱う Identifier はカラム名のみのため、ColumnId として扱い、スタックに積む
 		colId := *identifier.NewColumnId(ident)
-		sp.nodeStack = append(sp.nodeStack, colId)
+		sp.whereNodeStack = append(sp.whereNodeStack, colId)
 	}
 }
 
@@ -175,14 +164,17 @@ func (sp *SelectParser) OnSymbol(symbol string) {
 
 	switch sp.state {
 	case StateSelectColumns:
-		if symbol != "*" {
+		// 現状 SELECT 句では "*" のみサポートしているので、"*" 以外のシンボルが来たらエラー
+		if symbol != string(CharCodeAsterisk) {
 			sp.setError(errors.New("[parse error] currently only SELECT * is supported"))
 			return
 		}
+	case StateFrom:
+		// FROM 句ではシンボルは来ないはずなのでエラー
+		sp.setError(errors.New("[parse error] unexpected symbol in FROM clause: " + symbol))
+		return
 	case StateWhere:
 		sp.handleOperator(symbol)
-	default:
-		sp.setError(errors.New("[parse error] unexpected symbol: " + symbol))
 	}
 }
 
@@ -202,12 +194,13 @@ func (sp *SelectParser) OnError(err error) {
 	sp.setError(err)
 }
 
+// リテラルを処理する
 func (sp *SelectParser) handleLiteral(lit literal.Literal) {
 	if sp.err != nil {
 		return
 	}
 	if sp.state == StateWhere {
-		sp.nodeStack = append(sp.nodeStack, lit)
+		sp.whereNodeStack = append(sp.whereNodeStack, lit)
 	}
 }
 
@@ -215,8 +208,8 @@ func (sp *SelectParser) handleLiteral(lit literal.Literal) {
 func (sp *SelectParser) handleOperator(op string) {
 	// 新しい演算子を積む前に、スタックにある「優先順位が高い or 同じ」演算子を処理する
 	// e.g. スタックに "=" があって、今 "AND" が来た場合 -> 先に "=" を reduce する
-	for len(sp.opStack) > 0 {
-		topOp := sp.opStack[len(sp.opStack)-1]
+	for len(sp.whereOpStack) > 0 {
+		topOp := sp.whereOpStack[len(sp.whereOpStack)-1]
 		if sp.precedence(topOp) >= sp.precedence(op) {
 			if err := sp.reduce(); err != nil {
 				sp.setError(err)
@@ -226,7 +219,7 @@ func (sp *SelectParser) handleOperator(op string) {
 			break
 		}
 	}
-	sp.opStack = append(sp.opStack, op)
+	sp.whereOpStack = append(sp.whereOpStack, op)
 }
 
 // スタックから要素を取り出し、1つの BinaryExpr を作って nodeStack に戻す
@@ -235,21 +228,21 @@ func (sp *SelectParser) handleOperator(op string) {
 // - nodeStack: [age, 30, BinaryExpr(name = "john")], opStack: [">", "AND"] -> nodeStack: [BinaryExpr(age > 30 AND name = "john")]
 func (sp *SelectParser) reduce() error {
 	// 必要な要素が足りているかチェック
-	if len(sp.nodeStack) < 2 || len(sp.opStack) < 1 {
+	if len(sp.whereNodeStack) < 2 || len(sp.whereOpStack) < 1 {
 		return errors.New("[parse error] invalid expression syntax")
 	}
 
 	// 右辺を Pop (スタックはLIFOなので先に右辺が出てくる)
-	rightRaw := sp.nodeStack[len(sp.nodeStack)-1]
-	sp.nodeStack = sp.nodeStack[:len(sp.nodeStack)-1]
+	rightRaw := sp.whereNodeStack[len(sp.whereNodeStack)-1]
+	sp.whereNodeStack = sp.whereNodeStack[:len(sp.whereNodeStack)-1]
 
 	// 演算子を Pop
-	op := sp.opStack[len(sp.opStack)-1]
-	sp.opStack = sp.opStack[:len(sp.opStack)-1]
+	op := sp.whereOpStack[len(sp.whereOpStack)-1]
+	sp.whereOpStack = sp.whereOpStack[:len(sp.whereOpStack)-1]
 
 	// 左辺を Pop
-	leftRaw := sp.nodeStack[len(sp.nodeStack)-1]
-	sp.nodeStack = sp.nodeStack[:len(sp.nodeStack)-1]
+	leftRaw := sp.whereNodeStack[len(sp.whereNodeStack)-1]
+	sp.whereNodeStack = sp.whereNodeStack[:len(sp.whereNodeStack)-1]
 
 	//
 	// --- 左辺・右辺の型判定と BinaryExpr 作成 ---
@@ -280,7 +273,7 @@ func (sp *SelectParser) reduce() error {
 
 	// BinaryExpr を作成してスタックに積む (これが次の演算の左辺や右辺になる)
 	expr := expression.NewBinaryExpr(op, lhs, rhs)
-	sp.nodeStack = append(sp.nodeStack, expr)
+	sp.whereNodeStack = append(sp.whereNodeStack, expr)
 
 	return nil
 }

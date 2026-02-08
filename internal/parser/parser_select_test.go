@@ -249,4 +249,8 @@ func TestParserSelect(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, "Jane", nameJaneLit.Literal.ToString())
 	})
+
+	t.Run("コメント付きの SELECT 文をパースできる", func(t *testing.T) {})
+
+	t.Run("不正な SELECT 文でエラーになる", func(t *testing.T) {})
 }

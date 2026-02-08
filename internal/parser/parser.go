@@ -10,9 +10,14 @@ import (
 type ParserState int
 
 const (
-	StateInitial      ParserState = iota
-	StateInsertTable              // INSERT INTO [this] (...)
-	StateInsertValues             // INSERT INTO ... VALUES [this] (...)
+	// 初期状態
+	StateInitial ParserState = iota
+	// SELECT 句中
+	StateSelectColumns
+	// FROM 句中
+	StateFrom
+	// WHERE 句中
+	StateWhere
 )
 
 // parser (implements TokenHandler)
@@ -56,9 +61,9 @@ func (p *Parser) OnKeyword(word string) {
 		return
 	}
 
-	upperWord := strings.ToUpper(word)
+	upper := strings.ToUpper(word)
 
-	switch upperWord {
+	switch upper {
 	case "SELECT":
 		p.currentHandler = NewSelectParser()
 		p.currentHandler.OnKeyword(word)

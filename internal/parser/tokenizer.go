@@ -103,11 +103,6 @@ func NewTokenizer(input string, callbacks TokenHandler) *Tokenizer {
 	}
 }
 
-func (t *Tokenizer) Write(chunk []rune) {
-	t.pos += len(chunk)
-	t.input = append(t.input, chunk...)
-}
-
 // input を走査し、現在の状態に対応する関数を呼び出す
 func (t *Tokenizer) Tokenize() {
 	for t.shouldContinue() {
