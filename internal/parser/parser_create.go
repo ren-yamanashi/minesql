@@ -50,6 +50,12 @@ func (cp *CreateParser) finalize() {
 		return
 	}
 	cp.flushActiveParser()
+
+	// カラム定義が空の場合はエラー
+	if len(cp.stmt.CreateDefinitions) == 0 {
+		cp.setError(errors.New("[parse error] at least one column definition is required"))
+		return
+	}
 }
 
 func (cp *CreateParser) OnKeyword(word string) {
