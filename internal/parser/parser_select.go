@@ -57,6 +57,12 @@ func (sp *SelectParser) finalize() {
 		return
 	}
 
+	// テーブル名が空の場合はエラー
+	if sp.stmt.From.TableName == "" {
+		sp.setError(errors.New("[parse error] table name is required"))
+		return
+	}
+
 	// WHERE 句がない場合は空の WhereClause を設定
 	if sp.whereClause == nil {
 		sp.stmt.Where = &statement.WhereClause{IsSet: false}
