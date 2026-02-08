@@ -18,6 +18,7 @@ const (
 )
 
 // -- char code -
+
 const (
 	CSingleQuote    rune = '\''
 	CDoubleQuote    rune = '"'
@@ -31,6 +32,7 @@ const (
 )
 
 // -- symbol --
+
 const (
 	SLeftParen   rune = '('
 	SRightParen  rune = ')'
@@ -44,6 +46,7 @@ const (
 )
 
 // -- keyword --
+
 const (
 	KSelect  = "SELECT"
 	KFrom    = "FROM"

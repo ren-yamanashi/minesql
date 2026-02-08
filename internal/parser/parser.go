@@ -28,24 +28,22 @@ const (
 	// -- INSERT Statement --
 	//
 
-	// INSERT 中
+	// INSERT Statement の開始状態
 	InsertStateStart
-	// INTO 中
+	// INSERT 中であり、INTO 待ちの状態
+	InsertStateInsert
+	// INSERT INTO 中であり、テーブル名待ちの状態
 	InsertStateInto
-	// INSERT INTO のテーブル名中
-	InsertStateTableName
-	// INSERT のカラムリスト開始待ち
-	// `INSERT INTO <table_name>` の後の "(" を待つ状態
-	InsertStateColumnListStart
+	// INSERT INTO <table_name> 中であり、カラムリスト開始 (`INSERT INTO <table_name>` の後の "(") 待ちの状態
+	InsertStateTbName
 	// INSERT のカラムリスト中
 	InsertStateColumns
-	// INSERT の VALUES キーワード待ち
+	// INSERT のカラムリストが修了し、VALUES キーワード待ちの状態
+	InsertStateEndCols
+	// INSERT の VALUES の値指定中 (`INSERT INTO ... VALUES ( ... )` の "(" 中) の状態
 	InsertStateValues
-	// INSERT の値リスト開始中
-	// `INSERT INTO ... VALUES ( ... )` の "(" 中
-	InsertStateValueListStart
 	// INSERT の値リスト中
-	// `INSERT INTO ... VALUES val1, val2, ...` の各値 (val1, val2, ...) 中
+	// `INSERT INTO ... VALUES (val1, val2, ...)` の各値 (val1, val2, ...) の指定中の状態
 	InsertStateValueList
 
 	//

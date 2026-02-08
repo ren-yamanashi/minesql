@@ -81,29 +81,29 @@ func (ip *InsertParser) OnKeyword(word string) {
 		// 最初のキーワードは INSERT である必要がある
 		if upper == KInsert {
 			ip.stmt.StmtType = statement.StmtTypeInsert
-			ip.state = InsertStateInto
+			ip.state = InsertStateInsert
 			return
 		}
 		ip.setError(errors.New("[parse error] expected INSERT, got: " + word))
 		return
 
-	case InsertStateInto:
+	case InsertStateInsert:
 		// INSERT の次のキーワードは INTO である必要がある
 		if upper == KInto {
-			ip.state = InsertStateTableName
+			ip.state = InsertStateInto
 			return
 		}
 		ip.setError(errors.New("[parse error] expected INTO, got: " + word))
 		return
 
-	case InsertStateColumnListStart:
+	case InsertStateTbName:
 		// カラムリスト開始前にキーワードが来た場合はエラー
 		ip.setError(errors.New("[parse error] column list is required"))
 		return
 
-	case InsertStateColumns, InsertStateValues:
+	case InsertStateColumns, InsertStateEndCols:
 		if upper == KValues {
-			ip.state = InsertStateValueListStart
+			ip.state = InsertStateValues
 			return
 		}
 		ip.setError(errors.New("[parse error] unexpected keyword: " + word))
@@ -121,9 +121,9 @@ func (ip *InsertParser) OnIdentifier(ident string) {
 	}
 
 	switch ip.state {
-	case InsertStateTableName:
+	case InsertStateInto:
 		ip.stmt.Table = *identifier.NewTableId(ident)
-		ip.state = InsertStateColumnListStart
+		ip.state = InsertStateTbName
 		return
 	case InsertStateColumns:
 		ip.cols = append(ip.cols, *identifier.NewColumnId(ident))
@@ -140,7 +140,7 @@ func (ip *InsertParser) OnSymbol(symbol string) {
 	}
 
 	switch ip.state {
-	case InsertStateColumnListStart:
+	case InsertStateTbName:
 		// テーブル名の後は必ずカラムリストの開始 "(" が来る
 		if symbol == string(SLeftParen) {
 			ip.state = InsertStateColumns
@@ -156,13 +156,13 @@ func (ip *InsertParser) OnSymbol(symbol string) {
 		}
 		if symbol == string(SRightParen) {
 			// カラムリストを修了して、VALUES キーワードを待つ
-			ip.state = InsertStateValues
+			ip.state = InsertStateEndCols
 			return
 		}
 		ip.setError(errors.New("[parse error] unexpected symbol in columns: " + symbol))
 		return
 
-	case InsertStateValueListStart:
+	case InsertStateValues:
 		if symbol == string(SLeftParen) {
 			// 新しい行の開始
 			ip.currentRow = []literal.Literal{}
@@ -184,7 +184,7 @@ func (ip *InsertParser) OnSymbol(symbol string) {
 		if symbol == string(SRightParen) {
 			// 現在の行を確定
 			ip.flushCurrentRow()
-			ip.state = InsertStateValueListStart
+			ip.state = InsertStateValues
 			return
 		}
 		ip.setError(errors.New("[parse error] unexpected symbol in values: " + symbol))
