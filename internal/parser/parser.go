@@ -10,9 +10,9 @@ import (
 type ParserState int
 
 const (
-	StateInitial           ParserState = iota
-	StateInsertTable                   // INSERT INTO [this] (...)
-	StateInsertValues                  // INSERT INTO ... VALUES [this] (...)
+	StateInitial      ParserState = iota
+	StateInsertTable              // INSERT INTO [this] (...)
+	StateInsertValues             // INSERT INTO ... VALUES [this] (...)
 )
 
 // parser (implements TokenHandler)

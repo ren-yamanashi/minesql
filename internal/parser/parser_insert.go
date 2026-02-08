@@ -11,14 +11,14 @@ import (
 
 // state
 const (
-	InsertStateStart      ParserState = 500 + iota // INSERT
-	InsertStateInto                                // INTO
-	InsertStateTableName                           // table_name
-	InsertStateColumnsOrValues                     // ( or VALUES
-	InsertStateColumns                             // col1, col2, ...
-	InsertStateValues                              // VALUES
-	InsertStateValueListStart                      // (
-	InsertStateValueList                           // val1, val2, ...
+	InsertStateStart           ParserState = 500 + iota // INSERT
+	InsertStateInto                                     // INTO
+	InsertStateTableName                                // table_name
+	InsertStateColumnsOrValues                          // ( or VALUES
+	InsertStateColumns                                  // col1, col2, ...
+	InsertStateValues                                   // VALUES
+	InsertStateValueListStart                           // (
+	InsertStateValueList                                // val1, val2, ...
 )
 
 type InsertParser struct {

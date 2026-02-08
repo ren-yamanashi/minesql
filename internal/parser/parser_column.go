@@ -66,11 +66,11 @@ func (cp *ColumnParser) OnKeyword(word string) {
 }
 
 func (cp *ColumnParser) OnIdentifier(ident string) { cp.setError(errors.New("unexpected identifier")) }
-func (cp *ColumnParser) OnSymbol(sym string)   { cp.setError(errors.New("unexpected symbol")) }
-func (cp *ColumnParser) OnString(value string) { cp.setError(errors.New("unexpected string")) }
-func (cp *ColumnParser) OnNumber(num string)   { cp.setError(errors.New("unexpected number")) }
-func (cp *ColumnParser) OnComment(text string) {}
-func (cp *ColumnParser) OnError(err error)     { cp.setError(err) }
+func (cp *ColumnParser) OnSymbol(sym string)       { cp.setError(errors.New("unexpected symbol")) }
+func (cp *ColumnParser) OnString(value string)     { cp.setError(errors.New("unexpected string")) }
+func (cp *ColumnParser) OnNumber(num string)       { cp.setError(errors.New("unexpected number")) }
+func (cp *ColumnParser) OnComment(text string)     {}
+func (cp *ColumnParser) OnError(err error)         { cp.setError(err) }
 
 func (cp *ColumnParser) setError(err error) {
 	if cp.err == nil {
