@@ -12,12 +12,39 @@ type ParserState int
 const (
 	// 初期状態
 	StateInitial ParserState = iota
-	// SELECT 句中
+
+	// -- SELECT Statement --
+
+	// SELECT 中
 	StateSelectColumns
-	// FROM 句中
+	// FROM 中
 	StateFrom
-	// WHERE 句中
+	// WHERE 中
 	StateWhere
+
+	// -- INSERT Statement --
+
+	// INSERT 中
+	InsertStateStart
+	// INTO 中
+	InsertStateInto
+	// INSERT INTO のテーブル名中
+	InsertStateTableName
+	// INSERT のカラムリスト開始待ち
+	// `INSERT INTO <table_name>` の後の "(" を待つ状態
+	InsertStateColumnListStart
+	// INSERT のカラムリスト中
+	InsertStateColumns
+	// INSERT の VALUES キーワード待ち
+	InsertStateValues
+	// INSERT の値リスト開始中
+	// `INSERT INTO ... VALUES ( ... )` の "(" 中
+	InsertStateValueListStart
+	// INSERT の値リスト中
+	// `INSERT INTO ... VALUES val1, val2, ...` の各値 (val1, val2, ...) 中
+	InsertStateValueList
+
+	// -- CREATE Statement --
 )
 
 // parser (implements TokenHandler)

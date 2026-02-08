@@ -123,26 +123,59 @@ func TestParserInsert(t *testing.T) {
 		assert.Equal(t, "25", insertStmt.Values[0][1].ToString())
 	})
 
-	t.Run("カラムリストなしの INSERT 文をパースできる", func(t *testing.T) {
-		// GIVEN
-		sql := "INSERT INTO users VALUES ('1', 'John')"
-		parser := NewParser()
+	t.Run("不正な INSERT 文でエラーになる", func(t *testing.T) {
+		t.Run("カラムリストなしの場合", func(t *testing.T) {
+			// GIVEN
+			sql := "INSERT INTO users VALUES ('1', 'John')"
+			parser := NewParser()
 
-		// WHEN
-		result, err := parser.Parse(sql)
+			// WHEN
+			result, err := parser.Parse(sql)
 
-		// THEN
-		assert.NoError(t, err)
-		assert.NotNil(t, result)
+			// THEN
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "column list is required")
+		})
 
-		insertStmt, ok := result.(*statement.InsertStmt)
-		assert.True(t, ok)
+		t.Run("カラムリストが空の場合", func(t *testing.T) {
+			// GIVEN
+			sql := "INSERT INTO users () VALUES ('1', 'John')"
+			parser := NewParser()
 
-		assert.Equal(t, "users", insertStmt.Table.TableName)
-		assert.Equal(t, 0, len(insertStmt.Cols))
-		assert.Equal(t, 1, len(insertStmt.Values))
-		assert.Equal(t, 2, len(insertStmt.Values[0]))
-		assert.Equal(t, "1", insertStmt.Values[0][0].ToString())
-		assert.Equal(t, "John", insertStmt.Values[0][1].ToString())
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "column list is required")
+		})
+
+		t.Run("VALUES がない場合", func(t *testing.T) {
+			// GIVEN
+			sql := "INSERT INTO users (id, name)"
+			parser := NewParser()
+
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.Error(t, err)
+			assert.Nil(t, result)
+		})
+
+		t.Run("値リストが空の場合", func(t *testing.T) {
+			// GIVEN
+			sql := "INSERT INTO users (id, name) VALUES"
+			parser := NewParser()
+
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.Error(t, err)
+			assert.Nil(t, result)
+		})
 	})
 }

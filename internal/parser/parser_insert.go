@@ -9,18 +9,6 @@ import (
 	"strings"
 )
 
-// state
-const (
-	InsertStateStart           ParserState = 500 + iota // INSERT
-	InsertStateInto                                     // INTO
-	InsertStateTableName                                // table_name
-	InsertStateColumnsOrValues                          // ( or VALUES
-	InsertStateColumns                                  // col1, col2, ...
-	InsertStateValues                                   // VALUES
-	InsertStateValueListStart                           // (
-	InsertStateValueList                                // val1, val2, ...
-)
-
 type InsertParser struct {
 	// 現在のステート
 	state ParserState
@@ -62,6 +50,12 @@ func (ip *InsertParser) finalize() {
 		return
 	}
 
+	// カラムリストが空の場合はエラー
+	if len(ip.cols) == 0 {
+		ip.setError(errors.New("[parse error] column list is required"))
+		return
+	}
+
 	// 現在の行が残っている場合はフラッシュ
 	ip.flushCurrentRow()
 
@@ -69,17 +63,6 @@ func (ip *InsertParser) finalize() {
 	if len(ip.allRows) == 0 {
 		ip.setError(errors.New("[parse error] at least one row of values is required"))
 		return
-	}
-
-	// カラム数と値数の整合性チェック
-	if len(ip.cols) > 0 {
-		expectedColCount := len(ip.cols)
-		for i, row := range ip.allRows {
-			if len(row) != expectedColCount {
-				ip.setError(errors.New("[parse error] column count mismatch in row " + string(rune(i))))
-				return
-			}
-		}
 	}
 
 	// stmt に設定
@@ -95,7 +78,8 @@ func (ip *InsertParser) OnKeyword(word string) {
 	upper := strings.ToUpper(word)
 	switch ip.state {
 	case InsertStateStart:
-		if upper == "INSERT" {
+		// 最初のキーワードは INSERT である必要がある
+		if upper == KInsert {
 			ip.stmt.StmtType = statement.StmtTypeInsert
 			ip.state = InsertStateInto
 			return
@@ -104,15 +88,21 @@ func (ip *InsertParser) OnKeyword(word string) {
 		return
 
 	case InsertStateInto:
-		if upper == "INTO" {
+		// INSERT の次のキーワードは INTO である必要がある
+		if upper == KInto {
 			ip.state = InsertStateTableName
 			return
 		}
 		ip.setError(errors.New("[parse error] expected INTO, got: " + word))
 		return
 
-	case InsertStateColumnsOrValues, InsertStateColumns, InsertStateValues:
-		if upper == "VALUES" {
+	case InsertStateColumnListStart:
+		// カラムリスト開始前にキーワードが来た場合はエラー
+		ip.setError(errors.New("[parse error] column list is required"))
+		return
+
+	case InsertStateColumns, InsertStateValues:
+		if upper == KValues {
 			ip.state = InsertStateValueListStart
 			return
 		}
@@ -133,14 +123,11 @@ func (ip *InsertParser) OnIdentifier(ident string) {
 	switch ip.state {
 	case InsertStateTableName:
 		ip.stmt.Table = *identifier.NewTableId(ident)
-		ip.state = InsertStateColumnsOrValues
+		ip.state = InsertStateColumnListStart
 		return
-
 	case InsertStateColumns:
-		// カラム名を追加
 		ip.cols = append(ip.cols, *identifier.NewColumnId(ident))
 		return
-
 	default:
 		ip.setError(errors.New("[parse error] unexpected identifier: " + ident))
 		return
@@ -153,42 +140,36 @@ func (ip *InsertParser) OnSymbol(symbol string) {
 	}
 
 	switch ip.state {
-	case InsertStateColumnsOrValues:
-		if symbol == "(" {
+	case InsertStateColumnListStart:
+		// テーブル名の後は必ずカラムリストの開始 "(" が来る
+		if symbol == string(SLeftParen) {
 			ip.state = InsertStateColumns
 			return
 		}
-		ip.setError(errors.New("[parse error] expected '(' or VALUES, got: " + symbol))
+		ip.setError(errors.New("[parse error] expected '(', got: " + symbol))
 		return
 
 	case InsertStateColumns:
-		if symbol == "," {
+		if symbol == string(SComma) {
 			// 次のカラム待ち
 			return
 		}
-		if symbol == ")" {
+		if symbol == string(SRightParen) {
+			// カラムリストを修了して、VALUES キーワードを待つ
 			ip.state = InsertStateValues
 			return
 		}
 		ip.setError(errors.New("[parse error] unexpected symbol in columns: " + symbol))
 		return
 
-	case InsertStateValues:
-		if symbol == "(" {
-			ip.state = InsertStateValueListStart
-			return
-		}
-		ip.setError(errors.New("[parse error] expected '(', got: " + symbol))
-		return
-
 	case InsertStateValueListStart:
-		if symbol == "(" {
+		if symbol == string(SLeftParen) {
 			// 新しい行の開始
 			ip.currentRow = []literal.Literal{}
 			ip.state = InsertStateValueList
 			return
 		}
-		if symbol == "," {
+		if symbol == string(SComma) {
 			// 次の行の開始待ち (e.g. VALUES (...), (...))
 			return
 		}
@@ -196,11 +177,11 @@ func (ip *InsertParser) OnSymbol(symbol string) {
 		return
 
 	case InsertStateValueList:
-		if symbol == "," {
+		if symbol == string(SComma) {
 			// 次の値待ち (同じ行内)
 			return
 		}
-		if symbol == ")" {
+		if symbol == string(SRightParen) {
 			// 現在の行を確定
 			ip.flushCurrentRow()
 			ip.state = InsertStateValueListStart
@@ -219,12 +200,10 @@ func (ip *InsertParser) OnString(value string) {
 	if ip.err != nil {
 		return
 	}
-
 	if ip.state == InsertStateValueList {
 		ip.currentRow = append(ip.currentRow, literal.NewStringLiteral(value, value))
 		return
 	}
-
 	ip.setError(errors.New("[parse error] unexpected string: " + value))
 }
 
@@ -232,12 +211,10 @@ func (ip *InsertParser) OnNumber(num string) {
 	if ip.err != nil {
 		return
 	}
-
 	if ip.state == InsertStateValueList {
 		ip.currentRow = append(ip.currentRow, literal.NewStringLiteral(num, num))
 		return
 	}
-
 	ip.setError(errors.New("[parse error] unexpected number: " + num))
 }
 

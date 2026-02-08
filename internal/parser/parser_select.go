@@ -105,12 +105,12 @@ func (sp *SelectParser) OnKeyword(word string) {
 	upperWord := strings.ToUpper(word)
 
 	switch upperWord {
-	case KeywordSelect:
+	case KSelect:
 		sp.stmt = &statement.SelectStmt{StmtType: statement.StmtTypeSelect}
 		sp.state = StateSelectColumns
 		return
 
-	case KeywordFrom:
+	case KFrom:
 		if sp.state == StateSelectColumns {
 			sp.state = StateFrom
 			return
@@ -118,7 +118,7 @@ func (sp *SelectParser) OnKeyword(word string) {
 		sp.setError(errors.New("[parse error] FROM clause is in invalid position"))
 		return
 
-	case KeywordWhere:
+	case KWhere:
 		if sp.state == StateFrom {
 			sp.whereClause = &statement.WhereClause{IsSet: true}
 			sp.stmt.Where = sp.whereClause
@@ -130,7 +130,7 @@ func (sp *SelectParser) OnKeyword(word string) {
 		sp.setError(errors.New("[parse error] WHERE clause is in invalid position"))
 		return
 
-	case KeywordAnd, KeywordOr:
+	case KAnd, KOr:
 		if sp.state == StateWhere {
 			sp.handleOperator(upperWord)
 			return
@@ -171,7 +171,7 @@ func (sp *SelectParser) OnSymbol(symbol string) {
 	switch sp.state {
 	case StateSelectColumns:
 		// 現状 SELECT 句では "*" のみサポートしているので、"*" 以外のシンボルが来たらエラー
-		if symbol != string(CharCodeAsterisk) {
+		if symbol != string(CAsterisk) {
 			sp.setError(errors.New("[parse error] currently only SELECT * is supported"))
 			return
 		}
