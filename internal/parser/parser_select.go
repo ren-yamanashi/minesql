@@ -287,11 +287,11 @@ func (sp *SelectParser) reduce() error {
 // 演算子の優先順位を定義 (数値が高いほど優先順位が高い)
 func (sp *SelectParser) precedence(op string) int {
 	switch strings.ToUpper(op) {
-	case "=", "<", ">", "<=", ">=", "!=":
+	case string(SEqual), string(SLessThan), string(SGreaterThan), "<=", ">=", "!=":
 		return 2 // 比較演算子
-	case "AND":
+	case KAnd:
 		return 1 // 論理演算子
-	case "OR":
+	case KOr:
 		return 0 // 論理演算子
 	default:
 		return 0
