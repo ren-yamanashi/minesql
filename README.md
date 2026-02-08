@@ -1,5 +1,14 @@
 # minesql
 
+## Implementation
+
+- [ ] CLI Client
+- [ ] TCP Server
+- [x] Parser
+- [x] Planner (Not optimized)
+- [x] Executor
+- [x] Storage Engine
+
 ## Feature
 
 | Statement | Implementation | Note |
