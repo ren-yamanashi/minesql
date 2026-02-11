@@ -56,7 +56,7 @@ func (s *Server) Start() error {
 }
 
 // クライアントからの接続を処理する
-// プロトコルの定義は ./protocol.md を参照
+// プロトコルの定義は ./docs/architecture/server.md#プロトコル を参照
 func (s *Server) handleConnection(conn *net.TCPConn) {
 	defer func() {
 		log.Printf("Closing connection from %s", conn.RemoteAddr().String())
