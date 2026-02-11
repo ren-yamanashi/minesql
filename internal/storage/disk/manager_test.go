@@ -14,14 +14,7 @@ func TestNewDiskManager(t *testing.T) {
 	t.Run("正常に DiskManager が生成される", func(t *testing.T) {
 		tmpFile, err := os.CreateTemp("", "test_disk.db")
 		assert.NoError(t, err)
-		defer func() {
-			if err := tmpFile.Close(); err != nil {
-				t.Logf("failed to close tmpFile: %v", err)
-			}
-			if err := os.Remove(tmpFile.Name()); err != nil {
-				t.Logf("failed to remove tmpFile: %v", err)
-			}
-		}()
+		defer removeTmpfile(t, tmpFile)
 
 		// GIVEN
 		filepath := tmpFile.Name()
@@ -109,14 +102,7 @@ func TestAllocatePage(t *testing.T) {
 	t.Run("新しいページを順次割り当てられる", func(t *testing.T) {
 		tmpFile, err := os.CreateTemp("", "test_disk_*.db")
 		assert.NoError(t, err)
-		defer func() {
-			if err := tmpFile.Close(); err != nil {
-				t.Logf("failed to close tmpFile: %v", err)
-			}
-			if err := os.Remove(tmpFile.Name()); err != nil {
-				t.Logf("failed to remove tmpFile: %v", err)
-			}
-		}()
+		defer removeTmpfile(t, tmpFile)
 
 		// GIVEN
 		filepath := tmpFile.Name()
@@ -154,4 +140,13 @@ func createDataBuffer() []byte {
 		writeData[i] = byte(i % 256)
 	}
 	return writeData
+}
+
+func removeTmpfile(t *testing.T, tmpfile *os.File) {
+	if err := tmpfile.Close(); err != nil {
+		t.Logf("failed to close tmpfile: %v", err)
+	}
+	if err := os.Remove(tmpfile.Name()); err != nil {
+		t.Logf("failed to remove tmpfile: %v", err)
+	}
 }
