@@ -3,5 +3,7 @@ coverage.*
 examples/**/*.db
 examples/**/*.jsonc
 .claude/.ai-output/*
+.claude/.sandbox/*
+.claude/settings.local.json
 bin/
 data/

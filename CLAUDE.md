@@ -35,10 +35,54 @@
 
 - **重要**: `/tmp` ディレクトリは絶対に使用しない
   - ビルド出力、テスト用の一時ファイル、その他すべての用途で `/tmp` ディレクトリの使用を禁止する
-  - 代わりにプロジェクトディレクトリ内の適切な場所を使用する
+  - 代わりに `.claude/.sandbox/` ディレクトリにファイルを作成し、そのファイルを使用する
 
 ## 設計メモ規則
 
 - ユーザーから設計に関する指示を受けたら、`.claude/.ai-output/memo.md` に記録する
   - 指示の内容、理由、実装方針を明確に記述する
   - 後で設計の意図を振り返れるようにする
+
+## 動作確認手順
+
+コードを変更した後は、必ず以下の手順で動作確認を行う:
+
+### 1. テストの実行
+
+変更したパッケージのテストを実行する:
+
+```bash
+# 例: btree パッケージのテスト
+cd internal/storage/access/btree
+go test -v
+
+# 例: bufferpool パッケージのテスト
+cd internal/storage/bufferpool
+go test -v
+```
+
+全体のテストを実行する:
+
+```bash
+# プロジェクトルートから全体のテストを実行
+make test
+```
+
+### 2. examples の実行
+
+プロジェクトルートから examples を実行する (相対パスを変更しないこと):
+
+```bash
+# btree の examples
+go run examples/btree/insert/main.go
+go run examples/btree/scan/main.go
+go run examples/btree/search_key/main.go
+
+# executor の examples
+go run examples/executor/*.go
+
+# planner の examples
+go run examples/planner/main.go
+```
+
+**注意**: examples は必ずプロジェクトルートから実行すること。examples 内の相対パス (例: `examples/btree/data`) はプロジェクトルートからの実行を前提としている。
