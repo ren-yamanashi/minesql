@@ -1,14 +1,11 @@
-DIFF_FILE := "$$(git diff --name-only --diff-filter=ACMRT | grep .go$ | xargs -I{} dirname {} | sort | uniq | xargs -I{} echo ./{})"
-
 .PHONY: lint lint_diff test test_cov clean doc build build-client build-server
 
 lint:
 	golangci-lint run
-lint_diff:
-	golangci-lint run $$(echo $(DIFF_FILE))
 
 test:
 	go test -v ./internal/...
+
 test_cov:
 	go test -v -cover ./internal/...
 
