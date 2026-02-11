@@ -16,15 +16,6 @@ make build-client
 ./bin/client -h localhost -p 8888 # -h = hostname, -p = port
 ```
 
-## Implementation
-
-- [ ] CLI Client
-- [ ] TCP Server
-- [x] Parser
-- [x] Planner (Not optimized)
-- [x] Executor
-- [x] Storage Engine
-
 ## Feature
 
 | Statement | Implementation | Note |
@@ -36,43 +27,3 @@ make build-client
 | DELETE | - | - |
 | JOIN | - | - |
 | Transaction | - | - |
-
-## Development
-
-### Build
-
-- output: `bin/`
-
-```sh
-make build
-
-# only client
-make build-client
-
-# only server
-make build-server
-```
-
-### Test
-
-```sh
-make test # or make test-cov
-```
-
-### Format
-
-```sh
-make fmt
-```
-
-### Clean up
-
-```sh
-make clean
-```
-
-### Documentation
-
-```sh
-make doc
-```
