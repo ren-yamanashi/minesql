@@ -17,7 +17,7 @@ type ColumnParser struct {
 
 func NewColumnParser(colName string) *ColumnParser {
 	return &ColumnParser{
-		state: CreateStateColDef,
+		state:  CreateStateColDef,
 		colDef: &definition.ColumnDef{ColName: colName},
 	}
 }

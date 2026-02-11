@@ -32,7 +32,7 @@ type SelectParser struct {
 
 func NewSelectParser() *SelectParser {
 	return &SelectParser{
-		state: StateSelectColumns,
+		state: SelectStateColumns,
 	}
 }
 
@@ -45,21 +45,25 @@ func (sp *SelectParser) getError() error {
 }
 
 func (sp *SelectParser) finalize() {
+	if sp.err != nil {
+		return
+	}
+
 	// SELECT 文がない場合はエラー
 	if sp.stmt == nil {
 		sp.setError(errors.New("[parse error] must have SELECT statement"))
 		return
 	}
 
-	// FROM 句がない場合はエラー
-	if sp.state == StateSelectColumns {
+	// テーブル名が空の場合はエラー (FROM 句がない場合を含む)
+	if sp.stmt.From.TableName == "" {
 		sp.setError(errors.New("[parse error] missing FROM clause"))
 		return
 	}
 
-	// テーブル名が空の場合はエラー
-	if sp.stmt.From.TableName == "" {
-		sp.setError(errors.New("[parse error] table name is required"))
+	// ステートが End でない場合はエラー
+	if sp.state != SelectStateEnd {
+		sp.setError(errors.New("[parse error] incomplete SELECT statement"))
 		return
 	}
 
@@ -107,31 +111,31 @@ func (sp *SelectParser) OnKeyword(word string) {
 	switch upperWord {
 	case KSelect:
 		sp.stmt = &statement.SelectStmt{StmtType: statement.StmtTypeSelect}
-		sp.state = StateSelectColumns
+		sp.state = SelectStateColumns
 		return
 
 	case KFrom:
-		if sp.state == StateSelectColumns {
-			sp.state = StateFrom
+		if sp.state == SelectStateColumns {
+			sp.state = SelectStateFrom
 			return
 		}
 		sp.setError(errors.New("[parse error] FROM clause is in invalid position"))
 		return
 
 	case KWhere:
-		if sp.state == StateFrom {
+		if sp.state == SelectStateFrom {
 			sp.whereClause = &statement.WhereClause{IsSet: true}
 			sp.stmt.Where = sp.whereClause
 			sp.whereNodeStack = []node.ASTNode{}
 			sp.whereOpStack = []string{}
-			sp.state = StateWhere
+			sp.state = SelectStateWhere
 			return
 		}
 		sp.setError(errors.New("[parse error] WHERE clause is in invalid position"))
 		return
 
 	case KAnd, KOr:
-		if sp.state == StateWhere {
+		if sp.state == SelectStateWhere {
 			sp.handleOperator(upperWord)
 			return
 		}
@@ -150,13 +154,13 @@ func (sp *SelectParser) OnIdentifier(ident string) {
 	}
 
 	switch sp.state {
-	case StateSelectColumns:
+	case SelectStateColumns:
 		// 現状 SELECT 句では "*" のみサポートしているので、Identifier が来たらエラー
 		sp.setError(errors.New("[parse error] currently only SELECT * is supported"))
 		return
-	case StateFrom:
+	case SelectStateFrom:
 		sp.stmt.From = *identifier.NewTableId(ident)
-	case StateWhere:
+	case SelectStateWhere:
 		// WHERE 句で扱う Identifier はカラム名のみのため、ColumnId として扱い、スタックに積む
 		colId := *identifier.NewColumnId(ident)
 		sp.whereNodeStack = append(sp.whereNodeStack, colId)
@@ -168,18 +172,24 @@ func (sp *SelectParser) OnSymbol(symbol string) {
 		return
 	}
 
+	// ";" が来たら state を End にする
+	if symbol == string(SSemicolon) {
+		sp.state = SelectStateEnd
+		return
+	}
+
 	switch sp.state {
-	case StateSelectColumns:
+	case SelectStateColumns:
 		// 現状 SELECT 句では "*" のみサポートしているので、"*" 以外のシンボルが来たらエラー
 		if symbol != string(CAsterisk) {
 			sp.setError(errors.New("[parse error] currently only SELECT * is supported"))
 			return
 		}
-	case StateFrom:
+	case SelectStateFrom:
 		// FROM 句ではシンボルは来ないはずなのでエラー
 		sp.setError(errors.New("[parse error] unexpected symbol in FROM clause: " + symbol))
 		return
-	case StateWhere:
+	case SelectStateWhere:
 		sp.handleOperator(symbol)
 	}
 }
@@ -205,7 +215,7 @@ func (sp *SelectParser) handleLiteral(lit literal.Literal) {
 	if sp.err != nil {
 		return
 	}
-	if sp.state == StateWhere {
+	if sp.state == SelectStateWhere {
 		sp.whereNodeStack = append(sp.whereNodeStack, lit)
 	}
 }

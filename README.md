@@ -1,13 +1,20 @@
 # minesql
 
-## Implementation
+## Usage
 
-- [ ] CLI Client
-- [ ] TCP Server
-- [x] Parser
-- [x] Planner (Not optimized)
-- [x] Executor
-- [x] Storage Engine
+### Start Server
+
+```sh
+make build-server
+./bin/server -h localhost -p 8888 # -h = hostname, -p = port
+```
+
+### Start Client
+
+```sh
+make build-client
+./bin/client -h localhost -p 8888 # -h = hostname, -p = port
+```
 
 ## Feature
 

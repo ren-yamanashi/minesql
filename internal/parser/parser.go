@@ -18,11 +18,13 @@ const (
 	//
 
 	// SELECT 中
-	StateSelectColumns
+	SelectStateColumns
 	// FROM 中
-	StateFrom
+	SelectStateFrom
 	// WHERE 中
-	StateWhere
+	SelectStateWhere
+	// SELECT Statement の終わり
+	SelectStateEnd
 
 	//
 	// -- INSERT Statement --
@@ -45,6 +47,8 @@ const (
 	// INSERT の値リスト中
 	// `INSERT INTO ... VALUES (val1, val2, ...)` の各値 (val1, val2, ...) の指定中の状態
 	InsertStateValueList
+	// INSERT Statement の終わり
+	InsertStateEnd
 
 	//
 	// -- CREATE Statement --
@@ -74,6 +78,8 @@ const (
 	CreateStateConstraintCol
 	// CREATE TABLE の KEY 制約のカラムリスト区切り文字 ("," または ")") 待ち
 	CreateStateConstraintWaitSeparator
+	// CREATE Statement の終わり
+	CreateStateEnd
 )
 
 // parser (implements TokenHandler)
