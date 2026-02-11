@@ -5,7 +5,6 @@ import (
 	"minesql/internal/executor"
 	"minesql/internal/parser"
 	"minesql/internal/planner"
-	"minesql/internal/planner/ast/statement"
 	"minesql/internal/storage"
 	"os"
 )
@@ -37,7 +36,7 @@ CREATE TABLE users (
 	username VARCHAR,
 	PRIMARY KEY (id),
 	UNIQUE KEY username_UNIQUE (username)
-)
+);
 `
 	p := parser.NewParser()
 	result, err := p.Parse(sql)
@@ -45,12 +44,7 @@ CREATE TABLE users (
 		panic(err)
 	}
 
-	stmt, ok := result.(*statement.CreateTableStmt)
-	if !ok {
-		panic("not CreateTableStmt")
-	}
-
-	exec, err := planner.PlanStart(stmt)
+	exec, err := planner.PlanStart(result)
 	if err != nil {
 		panic(err)
 	}
@@ -76,7 +70,7 @@ VALUES
 	('3', 'John', 'Doe3', 'male', 'johndoe3'),
 	('4', 'Jane', 'Doe2', 'female', 'janedoe'),
 	('5', 'Jonathan', 'Black', 'male', 'jonathanblack'),
-	('6', 'Tom', 'Brown', 'male', 'tombrown')
+	('6', 'Tom', 'Brown', 'male', 'tombrown');
 	`
 	p := parser.NewParser()
 	result, err := p.Parse(sql)
@@ -84,12 +78,7 @@ VALUES
 		panic(err)
 	}
 
-	stmt, ok := result.(*statement.InsertStmt)
-	if !ok {
-		panic("not InsertStmt")
-	}
-
-	exec, err := planner.PlanStart(stmt)
+	exec, err := planner.PlanStart(result)
 	if err != nil {
 		panic(err)
 	}
@@ -107,19 +96,14 @@ VALUES
 
 func scan() {
 	fmt.Println("=== scan all ===")
-	sql := `SELECT * FROM users`
+	sql := `SELECT * FROM users;`
 	p := parser.NewParser()
 	result, err := p.Parse(sql)
 	if err != nil {
 		panic(err)
 	}
 
-	stmt, ok := result.(*statement.SelectStmt)
-	if !ok {
-		panic("not SelectStmt")
-	}
-
-	exec, err := planner.PlanStart(stmt)
+	exec, err := planner.PlanStart(result)
 	if err != nil {
 		panic(err)
 	}
@@ -137,19 +121,14 @@ func scan() {
 
 func assertEqual() {
 	fmt.Println("=== assert equal ===")
-	sql := `SELECT * FROM users WHERE username = 'janedoe'`
+	sql := `SELECT * FROM users WHERE username = 'janedoe';`
 	p := parser.NewParser()
 	result, err := p.Parse(sql)
 	if err != nil {
 		panic(err)
 	}
 
-	stmt, ok := result.(*statement.SelectStmt)
-	if !ok {
-		panic("not SelectStmt")
-	}
-
-	exec, err := planner.PlanStart(stmt)
+	exec, err := planner.PlanStart(result)
 	if err != nil {
 		panic(err)
 	}
@@ -167,19 +146,14 @@ func assertEqual() {
 
 func filter() {
 	fmt.Println("=== filter ===")
-	sql := `SELECT * FROM users WHERE first_name < 'K' AND gender = 'male' AND last_name >= 'Doe'`
+	sql := `SELECT * FROM users WHERE first_name < 'K' AND gender = 'male' AND last_name >= 'Doe';`
 	p := parser.NewParser()
 	result, err := p.Parse(sql)
 	if err != nil {
 		panic(err)
 	}
 
-	stmt, ok := result.(*statement.SelectStmt)
-	if !ok {
-		panic("not SelectStmt")
-	}
-
-	exec, err := planner.PlanStart(stmt)
+	exec, err := planner.PlanStart(result)
 	if err != nil {
 		panic(err)
 	}

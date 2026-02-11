@@ -23,7 +23,8 @@
       "Bash(go mod tidy:*)",
       "Bash(go get:*)",
       "Bash(xargs:*)",
-      "Bash(go clean:*)"
+      "Bash(go clean:*)",
+      "Bash(make:*)"
     ]
   }
 }

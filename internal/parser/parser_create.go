@@ -45,6 +45,11 @@ func (cp *CreateParser) getError() error {
 }
 
 func (cp *CreateParser) finalize() {
+	if cp.err != nil {
+		return
+	}
+
+	// テーブル名が空の場合はエラー
 	if cp.stmt.TableName == "" {
 		cp.setError(errors.New("[parse error] table name is required"))
 		return
@@ -54,6 +59,12 @@ func (cp *CreateParser) finalize() {
 	// カラム定義が空の場合はエラー
 	if len(cp.stmt.CreateDefinitions) == 0 {
 		cp.setError(errors.New("[parse error] at least one column definition is required"))
+		return
+	}
+
+	// ステートが End でない場合はエラー
+	if cp.state != CreateStateEnd {
+		cp.setError(errors.New("[parse error] incomplete CREATE TABLE statement"))
 		return
 	}
 }
@@ -119,6 +130,15 @@ func (cp *CreateParser) OnSymbol(symbol string) {
 	if cp.err != nil {
 		return
 	}
+
+	// ";" が来たら state を End にする
+	if symbol == string(SSemicolon) {
+		// 文の終わりなので、親が SubParser を終了させる
+		cp.flushActiveParser()
+		cp.state = CreateStateEnd
+		return
+	}
+
 	// 区切り文字以外なら、子パーサーに委譲
 	if cp.activeSubParser != nil {
 		if _, ok := cp.activeSubParser.(*ConstraintParser); ok {

@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"io"
 	"minesql/internal/config"
 	"minesql/internal/storage/access/catalog"
 	"minesql/internal/storage/bufferpool"
@@ -89,6 +90,12 @@ func initCatalog(baseDir string, bpm *bufferpool.BufferPoolManager) (*catalog.Ca
 	if catalogExists {
 		// 既存のカタログを開く
 		cat, err = catalog.NewCatalog(bpm)
+		// カタログファイルが空の場合は古いファイルを削除して再度実行
+		if err == io.EOF {
+			os.Remove(path)
+			return initCatalog(baseDir, bpm)
+		}
+		// その他のエラーの場合はそのまま返す
 		if err != nil {
 			return nil, err
 		}

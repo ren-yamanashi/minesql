@@ -65,6 +65,12 @@ func (ip *InsertParser) finalize() {
 		return
 	}
 
+	// ステートが End でない場合はエラー
+	if ip.state != InsertStateEnd {
+		ip.setError(errors.New("[parse error] incomplete INSERT statement"))
+		return
+	}
+
 	// stmt に設定
 	ip.stmt.Cols = ip.cols
 	ip.stmt.Values = ip.allRows
@@ -136,6 +142,12 @@ func (ip *InsertParser) OnIdentifier(ident string) {
 
 func (ip *InsertParser) OnSymbol(symbol string) {
 	if ip.err != nil {
+		return
+	}
+
+	// ";" が来たら state を End にする
+	if symbol == string(SSemicolon) {
+		ip.state = InsertStateEnd
 		return
 	}
 

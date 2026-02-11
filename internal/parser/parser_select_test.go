@@ -12,7 +12,7 @@ import (
 func TestParserSelect(t *testing.T) {
 	t.Run("WHERE 句なしの SELECT 文をパースできる", func(t *testing.T) {
 		// GIVEN
-		sql := "SELECT * FROM users"
+		sql := "SELECT * FROM users;"
 		parser := NewParser()
 
 		// WHEN
@@ -34,7 +34,7 @@ func TestParserSelect(t *testing.T) {
 
 	t.Run("WHERE 句付きの SELECT 文をパースできる", func(t *testing.T) {
 		// GIVEN
-		sql := "SELECT * FROM users WHERE id = '1'"
+		sql := "SELECT * FROM users WHERE id = '1';"
 		parser := NewParser()
 
 		// WHEN
@@ -69,7 +69,7 @@ func TestParserSelect(t *testing.T) {
 
 	t.Run("WHERE 句に AND があるケースをパースできる", func(t *testing.T) {
 		// GIVEN
-		sql := "SELECT * FROM users WHERE id = '1' AND name = 'John'"
+		sql := "SELECT * FROM users WHERE id = '1' AND name = 'John';"
 		parser := NewParser()
 
 		// WHEN
@@ -122,7 +122,7 @@ func TestParserSelect(t *testing.T) {
 
 	t.Run("WHERE 句に OR があるケースをパースできる", func(t *testing.T) {
 		// GIVEN
-		sql := "SELECT * FROM users WHERE id = '1' OR id = '2'"
+		sql := "SELECT * FROM users WHERE id = '1' OR id = '2';"
 		parser := NewParser()
 
 		// WHEN
@@ -175,7 +175,7 @@ func TestParserSelect(t *testing.T) {
 
 	t.Run("WHERE 句に AND と OR の両方があるケースをパースできる", func(t *testing.T) {
 		// GIVEN
-		sql := "SELECT * FROM users WHERE id = '1' AND name = 'John' OR name = 'Jane'"
+		sql := "SELECT * FROM users WHERE id = '1' AND name = 'John' OR name = 'Jane';"
 		parser := NewParser()
 
 		// WHEN
@@ -257,6 +257,7 @@ func TestParserSelect(t *testing.T) {
 -- これはコメント
 SELECT * FROM users -- テーブル users を選択
 WHERE id = '1' -- id が 1 のレコード
+;
 `
 			parser := NewParser()
 
@@ -279,6 +280,7 @@ WHERE id = '1' -- id が 1 のレコード
 /* これはコメント */
 SELECT * FROM users /* テーブル users を選択 */
 WHERE id = '1' /* id が 1 のレコード */
+;
 `
 			parser := NewParser()
 
@@ -299,7 +301,7 @@ WHERE id = '1' /* id が 1 のレコード */
 	t.Run("不正な SELECT 文でエラーになる", func(t *testing.T) {
 		t.Run("FROM 句がない場合", func(t *testing.T) {
 			// GIVEN
-			sql := "SELECT *"
+			sql := "SELECT *;"
 			parser := NewParser()
 
 			// WHEN
@@ -313,7 +315,7 @@ WHERE id = '1' /* id が 1 のレコード */
 
 		t.Run("テーブル名がない場合", func(t *testing.T) {
 			// GIVEN
-			sql := "SELECT * FROM"
+			sql := "SELECT * FROM;"
 			parser := NewParser()
 
 			// WHEN
@@ -326,7 +328,7 @@ WHERE id = '1' /* id が 1 のレコード */
 
 		t.Run("WHERE 句の式が不完全な場合 (演算子のみ)", func(t *testing.T) {
 			// GIVEN
-			sql := "SELECT * FROM users WHERE id ="
+			sql := "SELECT * FROM users WHERE id =;"
 			parser := NewParser()
 
 			// WHEN
@@ -340,7 +342,7 @@ WHERE id = '1' /* id が 1 のレコード */
 
 		t.Run("WHERE 句の式が不完全な場合 (左辺のみ)", func(t *testing.T) {
 			// GIVEN
-			sql := "SELECT * FROM users WHERE id"
+			sql := "SELECT * FROM users WHERE id;"
 			parser := NewParser()
 
 			// WHEN
@@ -354,7 +356,7 @@ WHERE id = '1' /* id が 1 のレコード */
 
 		t.Run("WHERE 句が空の場合", func(t *testing.T) {
 			// GIVEN
-			sql := "SELECT * FROM users WHERE"
+			sql := "SELECT * FROM users WHERE;"
 			parser := NewParser()
 
 			// WHEN
@@ -368,7 +370,7 @@ WHERE id = '1' /* id が 1 のレコード */
 
 		t.Run("AND/OR の後に式がない場合", func(t *testing.T) {
 			// GIVEN
-			sql := "SELECT * FROM users WHERE id = '1' AND"
+			sql := "SELECT * FROM users WHERE id = '1' AND;"
 			parser := NewParser()
 
 			// WHEN
@@ -378,6 +380,20 @@ WHERE id = '1' /* id が 1 のレコード */
 			assert.Error(t, err)
 			assert.Nil(t, result)
 			assert.Contains(t, err.Error(), "expression")
+		})
+
+		t.Run("末尾にセミコロンがない場合", func(t *testing.T) {
+			// GIVEN
+			sql := "SELECT * FROM users"
+			parser := NewParser()
+
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "incomplete SELECT statement")
 		})
 	})
 }

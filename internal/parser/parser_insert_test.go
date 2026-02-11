@@ -10,7 +10,7 @@ import (
 func TestParserInsert(t *testing.T) {
 	t.Run("基本的な INSERT 文をパースできる", func(t *testing.T) {
 		// GIVEN
-		sql := "INSERT INTO users (id, name) VALUES ('1', 'John')"
+		sql := "INSERT INTO users (id, name) VALUES ('1', 'John');"
 		parser := NewParser()
 
 		// WHEN
@@ -40,7 +40,7 @@ func TestParserInsert(t *testing.T) {
 
 	t.Run("複数行の INSERT 文をパースできる", func(t *testing.T) {
 		// GIVEN
-		sql := "INSERT INTO users (id, name) VALUES ('1', 'John'), ('2', 'Jane')"
+		sql := "INSERT INTO users (id, name) VALUES ('1', 'John'), ('2', 'Jane');"
 		parser := NewParser()
 
 		// WHEN
@@ -72,7 +72,7 @@ func TestParserInsert(t *testing.T) {
 
 	t.Run("3行以上の INSERT 文をパースできる", func(t *testing.T) {
 		// GIVEN
-		sql := "INSERT INTO users (id, name, email) VALUES ('1', 'John', 'john@example.com'), ('2', 'Jane', 'jane@example.com'), ('3', 'Bob', 'bob@example.com')"
+		sql := "INSERT INTO users (id, name, email) VALUES ('1', 'John', 'john@example.com'), ('2', 'Jane', 'jane@example.com'), ('3', 'Bob', 'bob@example.com');"
 		parser := NewParser()
 
 		// WHEN
@@ -105,7 +105,7 @@ func TestParserInsert(t *testing.T) {
 
 	t.Run("数値を含む INSERT 文をパースできる", func(t *testing.T) {
 		// GIVEN
-		sql := "INSERT INTO users (id, age) VALUES ('1', 25)"
+		sql := "INSERT INTO users (id, age) VALUES ('1', 25);"
 		parser := NewParser()
 
 		// WHEN
@@ -129,7 +129,7 @@ func TestParserInsert(t *testing.T) {
 			sql := `
 -- これはコメント
 INSERT INTO users (id, name) -- カラムリスト
-VALUES ('1', 'John') -- 値リスト
+VALUES ('1', 'John'); -- 値リスト
 `
 			parser := NewParser()
 
@@ -157,6 +157,7 @@ VALUES ('1', 'John') -- 値リスト
 /* これはコメント */
 INSERT INTO users (id, name) /* カラムリスト */
 VALUES ('1', 'John') /* 値リスト */
+;
 `
 			parser := NewParser()
 
@@ -182,7 +183,7 @@ VALUES ('1', 'John') /* 値リスト */
 	t.Run("不正な INSERT 文でエラーになる", func(t *testing.T) {
 		t.Run("カラムリストなしの場合", func(t *testing.T) {
 			// GIVEN
-			sql := "INSERT INTO users VALUES ('1', 'John')"
+			sql := "INSERT INTO users VALUES ('1', 'John');"
 			parser := NewParser()
 
 			// WHEN
@@ -196,7 +197,7 @@ VALUES ('1', 'John') /* 値リスト */
 
 		t.Run("カラムリストが空の場合", func(t *testing.T) {
 			// GIVEN
-			sql := "INSERT INTO users () VALUES ('1', 'John')"
+			sql := "INSERT INTO users () VALUES ('1', 'John');"
 			parser := NewParser()
 
 			// WHEN
@@ -210,7 +211,7 @@ VALUES ('1', 'John') /* 値リスト */
 
 		t.Run("VALUES がない場合", func(t *testing.T) {
 			// GIVEN
-			sql := "INSERT INTO users (id, name)"
+			sql := "INSERT INTO users (id, name);"
 			parser := NewParser()
 
 			// WHEN
@@ -223,7 +224,7 @@ VALUES ('1', 'John') /* 値リスト */
 
 		t.Run("値リストが空の場合", func(t *testing.T) {
 			// GIVEN
-			sql := "INSERT INTO users (id, name) VALUES"
+			sql := "INSERT INTO users (id, name) VALUES;"
 			parser := NewParser()
 
 			// WHEN
@@ -232,6 +233,20 @@ VALUES ('1', 'John') /* 値リスト */
 			// THEN
 			assert.Error(t, err)
 			assert.Nil(t, result)
+		})
+
+		t.Run("末尾にセミコロンがない場合", func(t *testing.T) {
+			// GIVEN
+			sql := "INSERT INTO users (id, name) VALUES ('1', 'John')"
+			parser := NewParser()
+
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "incomplete INSERT statement")
 		})
 	})
 }

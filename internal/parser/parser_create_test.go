@@ -11,7 +11,7 @@ import (
 func TestParserCreateTable(t *testing.T) {
 	t.Run("基本的な CREATE TABLE 文をパースできる", func(t *testing.T) {
 		// GIVEN
-		sql := "CREATE TABLE users (id VARCHAR, name VARCHAR)"
+		sql := "CREATE TABLE users (id VARCHAR, name VARCHAR);"
 		parser := NewParser()
 
 		// WHEN
@@ -42,7 +42,7 @@ func TestParserCreateTable(t *testing.T) {
 
 	t.Run("PRIMARY KEY 制約を含む CREATE TABLE 文をパースできる", func(t *testing.T) {
 		// GIVEN
-		sql := "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id))"
+		sql := "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));"
 		parser := NewParser()
 
 		// WHEN
@@ -68,7 +68,7 @@ func TestParserCreateTable(t *testing.T) {
 
 	t.Run("複数カラムの PRIMARY KEY をパースできる", func(t *testing.T) {
 		// GIVEN
-		sql := "CREATE TABLE users (id VARCHAR, email VARCHAR, PRIMARY KEY (id, email))"
+		sql := "CREATE TABLE users (id VARCHAR, email VARCHAR, PRIMARY KEY (id, email));"
 		parser := NewParser()
 
 		// WHEN
@@ -90,7 +90,7 @@ func TestParserCreateTable(t *testing.T) {
 
 	t.Run("UNIQUE KEY 制約を含む CREATE TABLE 文をパースできる", func(t *testing.T) {
 		// GIVEN
-		sql := "CREATE TABLE users (id VARCHAR, email VARCHAR, UNIQUE KEY email_idx (email))"
+		sql := "CREATE TABLE users (id VARCHAR, email VARCHAR, UNIQUE KEY email_idx (email));"
 		parser := NewParser()
 
 		// WHEN
@@ -115,7 +115,7 @@ func TestParserCreateTable(t *testing.T) {
 
 	t.Run("複数の制約を含む CREATE TABLE 文をパースできる", func(t *testing.T) {
 		// GIVEN
-		sql := "CREATE TABLE users (id VARCHAR, name VARCHAR, email VARCHAR, PRIMARY KEY (id), UNIQUE KEY email_idx (email))"
+		sql := "CREATE TABLE users (id VARCHAR, name VARCHAR, email VARCHAR, PRIMARY KEY (id), UNIQUE KEY email_idx (email));"
 		parser := NewParser()
 
 		// WHEN
@@ -167,6 +167,7 @@ CREATE TABLE users ( -- テーブル定義開始
     name VARCHAR, -- 名前カラム
     PRIMARY KEY (id) -- 主キー制約
 ) -- テーブル定義終了
+;
 `
 			parser := NewParser()
 
@@ -206,6 +207,7 @@ CREATE TABLE users ( /* テーブル定義開始 */
     name VARCHAR, /* 名前カラム */
     PRIMARY KEY (id) /* 主キー制約 */
 ) /* テーブル定義終了 */
+;
 `
 			parser := NewParser()
 
@@ -240,7 +242,7 @@ CREATE TABLE users ( /* テーブル定義開始 */
 	t.Run("不正な CREATE TABLE 文でエラーになる", func(t *testing.T) {
 		t.Run("TABLE キーワードがない場合", func(t *testing.T) {
 			// GIVEN
-			sql := "CREATE users (id VARCHAR)"
+			sql := "CREATE users (id VARCHAR);"
 			parser := NewParser()
 
 			// WHEN
@@ -253,7 +255,7 @@ CREATE TABLE users ( /* テーブル定義開始 */
 
 		t.Run("テーブル名がない場合", func(t *testing.T) {
 			// GIVEN
-			sql := "CREATE TABLE (id VARCHAR)"
+			sql := "CREATE TABLE (id VARCHAR);"
 			parser := NewParser()
 
 			// WHEN
@@ -266,7 +268,7 @@ CREATE TABLE users ( /* テーブル定義開始 */
 
 		t.Run("カラム定義がない場合", func(t *testing.T) {
 			// GIVEN
-			sql := "CREATE TABLE users ()"
+			sql := "CREATE TABLE users ();"
 			parser := NewParser()
 
 			// WHEN
@@ -279,7 +281,7 @@ CREATE TABLE users ( /* テーブル定義開始 */
 
 		t.Run("データ型がない場合", func(t *testing.T) {
 			// GIVEN
-			sql := "CREATE TABLE users (id, name VARCHAR)"
+			sql := "CREATE TABLE users (id, name VARCHAR);"
 			parser := NewParser()
 
 			// WHEN
@@ -292,7 +294,7 @@ CREATE TABLE users ( /* テーブル定義開始 */
 
 		t.Run("PRIMARY KEY のカラムリストが空の場合", func(t *testing.T) {
 			// GIVEN
-			sql := "CREATE TABLE users (id VARCHAR, PRIMARY KEY ())"
+			sql := "CREATE TABLE users (id VARCHAR, PRIMARY KEY ());"
 			parser := NewParser()
 
 			// WHEN
@@ -305,7 +307,7 @@ CREATE TABLE users ( /* テーブル定義開始 */
 
 		t.Run("UNIQUE KEY のカラム指定がない場合", func(t *testing.T) {
 			// GIVEN
-			sql := "CREATE TABLE users (id VARCHAR, UNIQUE KEY idx_name ())"
+			sql := "CREATE TABLE users (id VARCHAR, UNIQUE KEY idx_name ());"
 			parser := NewParser()
 
 			// WHEN
@@ -314,6 +316,20 @@ CREATE TABLE users ( /* テーブル定義開始 */
 			// THEN
 			assert.Error(t, err)
 			assert.Nil(t, result)
+		})
+
+		t.Run("末尾にセミコロンがない場合", func(t *testing.T) {
+			// GIVEN
+			sql := "CREATE TABLE users (id VARCHAR, name VARCHAR)"
+			parser := NewParser()
+
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "incomplete CREATE TABLE statement")
 		})
 	})
 }

@@ -3,14 +3,11 @@ package planner
 import (
 	"fmt"
 	"minesql/internal/executor"
+	"minesql/internal/planner/ast/node"
 	"minesql/internal/planner/ast/statement"
 )
 
-type PlannerNode interface {
-	Start() executor.Executor
-}
-
-func PlanStart(stmt statement.Statement) (executor.Executor, error) {
+func PlanStart(stmt node.ASTNode) (executor.Executor, error) {
 	switch s := stmt.(type) {
 	case *statement.CreateTableStmt:
 		ctn := NewCreateTableNode(s)
