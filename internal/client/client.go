@@ -23,7 +23,7 @@ func NewClient(address string, port int) *Client {
 }
 
 func (c *Client) Start() error {
-	conn, err := net.Dial("tcp", net.JoinHostPort(c.Address, fmt.Sprintf("%d", c.Port)))
+	conn, err := net.DialTCP("tcp", nil, &net.TCPAddr{IP: net.ParseIP(c.Address), Port: c.Port})
 	if err != nil {
 		return fmt.Errorf("failed to connect to server: %w\n", err)
 	}
@@ -98,22 +98,31 @@ func (c *Client) readMultilineInput(reader *bufio.Reader) string {
 func (c *Client) writePacket(conn net.Conn, data string) error {
 	bytes := []byte(data)
 	length := uint32(len(bytes))
+
+	// ヘッダーの作成
 	header := make([]byte, 4)
 	binary.BigEndian.PutUint32(header, length)
-	_, err := conn.Write(append(header, bytes...))
+
+	// ヘッダーとボディの書き込み
+	packet := append(header, bytes...)
+	_, err := conn.Write(packet)
 	return err
 }
 
 // [Header 4 bytes][Body N bytes] 形式でパケットを送受信する
 func (c *Client) readPacket(conn net.Conn) (string, error) {
+	// ヘッダーの読み込み
 	header := make([]byte, 4)
 	if _, err := io.ReadFull(conn, header); err != nil {
 		return "", err
 	}
+
+	// ボディの読み込み
 	length := binary.BigEndian.Uint32(header)
 	body := make([]byte, length)
 	if _, err := io.ReadFull(conn, body); err != nil {
 		return "", err
 	}
+
 	return string(body), nil
 }

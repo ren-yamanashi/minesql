@@ -35,7 +35,8 @@ func (s *Server) Start() error {
 
 	// ソケットを接続待ちに設定
 	listenAddr := net.JoinHostPort(s.Address, fmt.Sprintf("%d", s.Port))
-	listener, err := net.Listen("tcp", listenAddr)
+	tcpAddr, err := net.ResolveTCPAddr("tcp", listenAddr)
+	listener, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
 		return fmt.Errorf("failed to listen on %s: %w", listenAddr, err)
 	}
@@ -44,7 +45,7 @@ func (s *Server) Start() error {
 	// 接続の受付
 	log.Printf("MineSQL Server started on %s", listenAddr)
 	for {
-		conn, err := listener.Accept() // 保留状態の接続を取り出す
+		conn, err := listener.AcceptTCP() // 保留状態の接続を取り出す
 		if err != nil {
 			log.Printf("Accept error: %v", err)
 			continue // 接続エラーになってもサーバーは落とさないので continue
@@ -56,7 +57,7 @@ func (s *Server) Start() error {
 
 // クライアントからの接続を処理する
 // プロトコルの定義は ./protocol.md を参照
-func (s *Server) handleConnection(conn net.Conn) {
+func (s *Server) handleConnection(conn *net.TCPConn) {
 	defer func() {
 		log.Printf("Closing connection from %s", conn.RemoteAddr().String())
 		conn.Close()
@@ -126,7 +127,7 @@ func (s *Server) executeQuery(sql string) (string, error) {
 }
 
 // [Header 4 byte][Body N byte] を読み込む
-func (s *Server) readPacket(conn net.Conn) (string, error) {
+func (s *Server) readPacket(conn *net.TCPConn) (string, error) {
 	// ヘッダーの読み込み
 	header := make([]byte, 4)
 	if _, err := io.ReadFull(conn, header); err != nil {
@@ -144,7 +145,7 @@ func (s *Server) readPacket(conn net.Conn) (string, error) {
 }
 
 // [Header 4 byte][Body N byte] を書き込む
-func (s *Server) writePacket(conn net.Conn, msg string) error {
+func (s *Server) writePacket(conn *net.TCPConn, msg string) error {
 	dataBytes := []byte(msg)
 	length := uint32(len(dataBytes))
 
