@@ -73,7 +73,10 @@ func (ct *CreateTable) execute() error {
 			return err
 		}
 		uniqueIndex := table.NewUniqueIndex(indexParam.Name, indexParam.ColName, indexParam.SecondaryKey)
-		uniqueIndex.Create(sm.BufferPoolManager, indexMetaPageId)
+		err = uniqueIndex.Create(sm.BufferPoolManager, indexMetaPageId)
+		if err != nil {
+			return err
+		}
 		uniqueIndexes[i] = uniqueIndex
 	}
 
@@ -106,7 +109,10 @@ func (ct *CreateTable) execute() error {
 	tblMeta := catalog.NewTableMetadata(tblId, ct.tableName, uint8(len(ct.columnParams)), ct.primaryKeyCount, colMeta, idxMeta, metaPageId)
 
 	// カタログにテーブルを登録
-	sm.Catalog.Insert(sm.BufferPoolManager, tblMeta)
+	err = sm.Catalog.Insert(sm.BufferPoolManager, tblMeta)
+	if err != nil {
+		return err
+	}
 
 	return nil
 }

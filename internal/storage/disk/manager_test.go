@@ -47,12 +47,12 @@ func TestReadPageData(t *testing.T) {
 		// GIVEN
 		disk, pageId := initDiskManager(t)
 		writeData := createDataBuffer()
-		disk.WritePageData(pageId, writeData)
+		err := disk.WritePageData(pageId, writeData)
+		assert.NoError(t, err)
 
 		// WHEN
 		readData := directio.AlignedBlock(directio.BlockSize)
-		err := disk.ReadPageData(pageId, readData)
-
+		err = disk.ReadPageData(pageId, readData)
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, writeData, readData)

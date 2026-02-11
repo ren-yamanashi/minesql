@@ -124,7 +124,9 @@ func TestAllocatePageId(t *testing.T) {
 
 		// WHEN
 		pageId1, err := bpm.AllocatePageId(fileId)
+		assert.NoError(t, err)
 		pageId2, err := bpm.AllocatePageId(fileId)
+		assert.NoError(t, err)
 
 		// THEN
 		assert.NoError(t, err)
@@ -268,9 +270,12 @@ func TestAddPage(t *testing.T) {
 		pageId2 := dm.AllocatePage()
 		pageId3 := dm.AllocatePage()
 
-		page1, _ := bpm.AddPage(pageId1)
-		bpm.AddPage(pageId2)
-		bpm.AddPage(pageId3)
+		page1, err := bpm.AddPage(pageId1)
+		assert.NoError(t, err)
+		_, err = bpm.AddPage(pageId2)
+		assert.NoError(t, err)
+		_, err = bpm.AddPage(pageId3)
+		assert.NoError(t, err)
 
 		// page1 にデータを書き込み、ダーティーにする
 		page1.Page[0] = 99
@@ -316,9 +321,12 @@ func TestAddPage(t *testing.T) {
 		pageId2 := dm.AllocatePage()
 		pageId3 := dm.AllocatePage()
 
-		bpm.AddPage(pageId1)
-		bpm.AddPage(pageId2)
-		bpm.AddPage(pageId3)
+		_, err := bpm.AddPage(pageId1)
+		assert.NoError(t, err)
+		_, err = bpm.AddPage(pageId2)
+		assert.NoError(t, err)
+		_, err = bpm.AddPage(pageId3)
+		assert.NoError(t, err)
 
 		// すべてのページの Referenced, IsDirty を false にする
 		bpm.bufpool.BufferPages[0].Referenced = false
@@ -408,9 +416,12 @@ func TestFlushPage(t *testing.T) {
 		pageId4 := dm.AllocatePage()
 		pageId5 := dm.AllocatePage()
 		pageId6 := dm.AllocatePage()
-		bpm.FetchPage(pageId4)
-		bpm.FetchPage(pageId5)
-		bpm.FetchPage(pageId6)
+		_, err = bpm.FetchPage(pageId4)
+		assert.NoError(t, err)
+		_, err = bpm.FetchPage(pageId5)
+		assert.NoError(t, err)
+		_, err = bpm.FetchPage(pageId6)
+		assert.NoError(t, err)
 
 		// page1 と page2 を再度フェッチして、データが正しく読み出せることを確認
 		reFetchedPage1, err := bpm.FetchPage(pageId1)

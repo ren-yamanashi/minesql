@@ -25,8 +25,11 @@ func TestUniqueIndex(t *testing.T) {
 
 		// WHEN: インデックスに値を挿入
 		err = uniqueIndex.Insert(bpm, []uint8{0}, [][]byte{[]byte("John")})
+		assert.NoError(t, err)
 		err = uniqueIndex.Insert(bpm, []uint8{1}, [][]byte{[]byte("Alice")})
+		assert.NoError(t, err)
 		err = uniqueIndex.Insert(bpm, []uint8{2}, [][]byte{[]byte("Eve")})
+		assert.NoError(t, err)
 		err = uniqueIndex.Insert(bpm, []uint8{3}, [][]byte{[]byte("Bob")})
 		assert.NoError(t, err)
 
@@ -63,7 +66,8 @@ func TestUniqueIndex(t *testing.T) {
 			assert.Equal(t, expected.value, pair.Value)
 
 			i++
-			iter.Next(bpm)
+			_, _, err := iter.Next(bpm)
+			assert.NoError(t, err)
 		}
 	})
 }

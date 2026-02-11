@@ -21,7 +21,6 @@ func NewCreateTableNode(stmt *statement.CreateTableStmt) *CreateTableNode {
 
 func (ctn *CreateTableNode) Next() (executor.Executor, error) {
 	colIndexMap := map[string]int{} // key: column name, value: column index
-	columnNames := []string{}
 	colParams := []*executor.ColumnParam{}
 
 	var pkDef *definition.ConstraintPrimaryKeyDef
@@ -35,7 +34,6 @@ func (ctn *CreateTableNode) Next() (executor.Executor, error) {
 				return nil, errors.New("duplicate column name: " + def.ColName)
 			}
 			colIndexMap[def.ColName] = currentColIdx
-			columnNames = append(columnNames, def.ColName)
 			currentColIdx++
 			colParams = append(colParams, &executor.ColumnParam{
 				Name: def.ColName,

@@ -45,11 +45,12 @@ func TestBinarySearch(t *testing.T) {
 }
 
 func compare(a, b int) int {
-	if a < b {
+	switch result := a - b; {
+	case result < 0:
 		return -1
-	} else if a > b {
+	case result > 0:
 		return 1
-	} else {
+	default:
 		return 0
 	}
 }

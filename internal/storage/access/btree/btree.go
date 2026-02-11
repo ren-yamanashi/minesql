@@ -167,7 +167,10 @@ func (bt *BTree) searchRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 		// 例えば、リーフノードに (1, ...), (3, ...), (5, ...) のペアが格納されている場合に、キー 6 を検索したいときなど
 		// この場合、次のリーフノードに進めてからイテレータを返す
 		if leafNode.NumPairs() == slotNum {
-			iter.Advance(bpm)
+			err := iter.Advance(bpm)
+			if err != nil {
+				return nil, err
+			}
 		}
 
 		return iter, nil

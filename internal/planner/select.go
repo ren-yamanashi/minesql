@@ -89,7 +89,7 @@ func (sp *SelectPlanner) planForBinaryExpr(tblMeta *catalog.TableMetadata, expr 
 				cond,
 			), nil
 		default:
-			return nil, errors.New("When LHS is a column, RHS must be a literal")
+			return nil, errors.New("when LHS is a column, RHS must be a literal")
 		}
 	case *expression.LhsExpr:
 		if expr.Operator != "AND" {
@@ -142,7 +142,7 @@ func (sp *SelectPlanner) extractConditions(tblMeta *catalog.TableMetadata, expr 
 			}
 			conditions = append(conditions, cond)
 		case *expression.RhsExpr:
-			return nil, errors.New("When LHS is a column, RHS must be a literal")
+			return nil, errors.New("when LHS is a column, RHS must be a literal")
 		default:
 			panic("unsupported RHS type in extractConditions") // 実際にはここには到達しないので errors.New ではなく panic で良い
 		}
@@ -165,7 +165,7 @@ func (sp *SelectPlanner) extractConditions(tblMeta *catalog.TableMetadata, expr 
 			}
 			conditions = append(conditions, rightConds...)
 		case *expression.RhsLiteral:
-			return nil, errors.New("When LHS is an expression, RHS cannot be a literal")
+			return nil, errors.New("when LHS is an expression, RHS cannot be a literal")
 		default:
 			panic("unsupported RHS type in extractConditions") // 実際にはここには到達しないので errors.New ではなく panic で良い
 		}

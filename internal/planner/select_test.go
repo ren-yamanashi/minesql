@@ -460,13 +460,13 @@ func TestOperatorToCondition(t *testing.T) {
 }
 
 // テスト用の storage manager を初期化
-func initStorageManager(t *testing.T, dataDir string) *storage.StorageManager {
+func initStorageManager(t *testing.T, dataDir string) {
 	t.Setenv("MINESQL_DATA_DIR", dataDir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "10")
 
 	storage.ResetStorageManager()
 	storage.InitStorageManager()
-	sm := storage.GetStorageManager()
+	storage.GetStorageManager()
 
 	// テーブルを作成
 	createTable := executor.NewCreateTable("users", 1, []*executor.IndexParam{
@@ -479,5 +479,4 @@ func initStorageManager(t *testing.T, dataDir string) *storage.StorageManager {
 	_, err := createTable.Next()
 	assert.NoError(t, err)
 
-	return sm
 }

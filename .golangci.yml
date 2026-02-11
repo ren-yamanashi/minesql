@@ -7,7 +7,6 @@ linters:
     - errname
     - errorlint
     - gocritic
-    - golint
     - gosec
     - govet
     - ineffassign

@@ -32,7 +32,7 @@ func (cp *ConstraintParser) finalize() error {
 	}
 
 	// カラムが1つも指定されていない場合はエラー
-	var colCount int = func() int {
+	var colCount = func() int {
 		if cp.isPK {
 			return len(cp.pkDef.Columns)
 		}
