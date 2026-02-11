@@ -16,11 +16,7 @@ func TestCreateCatalog(t *testing.T) {
 	t.Run("新しいカタログを作成できる", func(t *testing.T) {
 		// GIVEN
 		bpm, tmpdir := InitCatalogDiskManager(t)
-		defer func() {
-			if err := os.RemoveAll(tmpdir); err != nil {
-				t.Logf("failed to remove tmpdir: %v", err)
-			}
-		}()
+		defer removeFile(t, tmpdir)
 
 		// WHEN
 		cat, err := CreateCatalog(bpm)
@@ -38,11 +34,7 @@ func TestCreateCatalog(t *testing.T) {
 	t.Run("カタログのヘッダーページにマジックナンバーが設定される", func(t *testing.T) {
 		// GIVEN
 		bpm, tmpdir := InitCatalogDiskManager(t)
-		defer func() {
-			if err := os.RemoveAll(tmpdir); err != nil {
-				t.Logf("failed to remove tmpdir: %v", err)
-			}
-		}()
+		defer removeFile(t, tmpdir)
 
 		// WHEN
 		_, err := CreateCatalog(bpm)
@@ -63,11 +55,7 @@ func TestAllocateTableId(t *testing.T) {
 	t.Run("テーブルIDを順番に採番できる", func(t *testing.T) {
 		// GIVEN
 		bpm, tmpdir := InitCatalogDiskManager(t)
-		defer func() {
-			if err := os.RemoveAll(tmpdir); err != nil {
-				t.Logf("failed to remove tmpdir: %v", err)
-			}
-		}()
+		defer removeFile(t, tmpdir)
 
 		cat, err := CreateCatalog(bpm)
 		assert.NoError(t, err)
@@ -90,11 +78,7 @@ func TestAllocateTableId(t *testing.T) {
 	t.Run("採番後のテーブルIDがディスクに保存される", func(t *testing.T) {
 		// GIVEN
 		bpm, tmpdir := InitCatalogDiskManager(t)
-		defer func() {
-			if err := os.RemoveAll(tmpdir); err != nil {
-				t.Logf("failed to remove tmpdir: %v", err)
-			}
-		}()
+		defer removeFile(t, tmpdir)
 
 		cat, err := CreateCatalog(bpm)
 		assert.NoError(t, err)
@@ -119,11 +103,7 @@ func TestInsert(t *testing.T) {
 	t.Run("テーブルメタデータを挿入できる", func(t *testing.T) {
 		// GIVEN
 		bpm, tmpdir := InitCatalogDiskManager(t)
-		defer func() {
-			if err := os.RemoveAll(tmpdir); err != nil {
-				t.Logf("failed to remove tmpdir: %v", err)
-			}
-		}()
+		defer removeFile(t, tmpdir)
 
 		cat, err := CreateCatalog(bpm)
 		assert.NoError(t, err)
@@ -149,11 +129,7 @@ func TestInsert(t *testing.T) {
 	t.Run("カラムメタデータ付きのテーブルメタデータを挿入できる", func(t *testing.T) {
 		// GIVEN
 		bpm, tmpdir := InitCatalogDiskManager(t)
-		defer func() {
-			if err := os.RemoveAll(tmpdir); err != nil {
-				t.Logf("failed to remove tmpdir: %v", err)
-			}
-		}()
+		defer removeFile(t, tmpdir)
 
 		cat, err := CreateCatalog(bpm)
 		assert.NoError(t, err)
@@ -181,11 +157,7 @@ func TestInsert(t *testing.T) {
 	t.Run("インデックスメタデータ付きのテーブルメタデータを挿入できる", func(t *testing.T) {
 		// GIVEN
 		bpm, tmpdir := InitCatalogDiskManager(t)
-		defer func() {
-			if err := os.RemoveAll(tmpdir); err != nil {
-				t.Logf("failed to remove tmpdir: %v", err)
-			}
-		}()
+		defer removeFile(t, tmpdir)
 
 		cat, err := CreateCatalog(bpm)
 		assert.NoError(t, err)
@@ -217,11 +189,7 @@ func TestGetTableMetadataByName(t *testing.T) {
 	t.Run("テーブル名からテーブルメタデータを取得できる", func(t *testing.T) {
 		// GIVEN
 		bpm, tmpdir := InitCatalogDiskManager(t)
-		defer func() {
-			if err := os.RemoveAll(tmpdir); err != nil {
-				t.Logf("failed to remove tmpdir: %v", err)
-			}
-		}()
+		defer removeFile(t, tmpdir)
 
 		cat, err := CreateCatalog(bpm)
 		assert.NoError(t, err)
@@ -248,11 +216,7 @@ func TestGetTableMetadataByName(t *testing.T) {
 	t.Run("存在しないテーブル名を指定するとエラーを返す", func(t *testing.T) {
 		// GIVEN
 		bpm, tmpdir := InitCatalogDiskManager(t)
-		defer func() {
-			if err := os.RemoveAll(tmpdir); err != nil {
-				t.Logf("failed to remove tmpdir: %v", err)
-			}
-		}()
+		defer removeFile(t, tmpdir)
 
 		cat, err := CreateCatalog(bpm)
 		assert.NoError(t, err)
@@ -269,11 +233,7 @@ func TestGetTableMetadataByName(t *testing.T) {
 	t.Run("複数のテーブルから正しいテーブルを取得できる", func(t *testing.T) {
 		// GIVEN
 		bpm, tmpdir := InitCatalogDiskManager(t)
-		defer func() {
-			if err := os.RemoveAll(tmpdir); err != nil {
-				t.Logf("failed to remove tmpdir: %v", err)
-			}
-		}()
+		defer removeFile(t, tmpdir)
 
 		cat, err := CreateCatalog(bpm)
 		assert.NoError(t, err)
@@ -318,4 +278,10 @@ func InitCatalogDiskManager(t *testing.T) (bpm *bufferpool.BufferPoolManager, tm
 	bpm.RegisterDiskManager(fileId, dm)
 
 	return bpm, tmpdir
+}
+
+func removeFile(t *testing.T, tmpdir string) {
+	if err := os.RemoveAll(tmpdir); err != nil {
+		t.Logf("failed to remove tmpdir: %v", err)
+	}
 }

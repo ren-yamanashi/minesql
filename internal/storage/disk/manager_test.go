@@ -59,6 +59,7 @@ func TestReadPageData(t *testing.T) {
 		// WHEN
 		readData := directio.AlignedBlock(directio.BlockSize)
 		err = disk.ReadPageData(pageId, readData)
+
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, writeData, readData)
@@ -120,7 +121,6 @@ func TestAllocatePage(t *testing.T) {
 		// GIVEN
 		filepath := tmpFile.Name()
 		fileId := page.FileId(0)
-
 		dm, err := NewDiskManager(fileId, filepath)
 		assert.NoError(t, err)
 
