@@ -1,0 +1,25 @@
+version: "2"
+linters:
+  default: none
+  enable:
+  # see: https://golangci-lint.run/docs/linters/configuration/
+    - errcheck
+    - errname
+    - errorlint
+    - gocritic
+    - golint
+    - gosec
+    - govet
+    - ineffassign
+    - misspell
+    - nilerr
+    - nilnil
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+formatters:
+  enable:
+  # see: https://golangci-lint.run/docs/formatters/configuration/
+    - gofmt
+    - goimports

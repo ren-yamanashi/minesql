@@ -10,7 +10,7 @@
           },
           {
             "type": "command",
-            "command": "make fmt"
+            "command": "make lint"
           },
           {
             "type": "command",
