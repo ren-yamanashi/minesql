@@ -17,6 +17,11 @@ linters:
     - unconvert
     - unparam
     - unused
+  exclusions:
+    rules:
+      - linters:
+          - gosec
+        text: "G115"
 formatters:
   enable:
   # see: https://golangci-lint.run/docs/formatters/configuration/

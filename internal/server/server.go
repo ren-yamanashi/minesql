@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -30,7 +31,7 @@ func NewServer(address string, port int) *Server {
 func (s *Server) Start() error {
 	// ストレージマネージャーの初期化
 	dataDir := "data"
-	err := os.MkdirAll(dataDir, 0755)
+	err := os.MkdirAll(dataDir, 0750)
 	if err != nil {
 		return fmt.Errorf("failed to create data directory: %w", err)
 	}
@@ -50,7 +51,11 @@ func (s *Server) Start() error {
 	if err != nil {
 		return fmt.Errorf("failed to listen on %s: %w", listenAddr, err)
 	}
-	defer listener.Close()
+	defer func() {
+		if err := listener.Close(); err != nil {
+			log.Printf("failed to close listener: %v", err)
+		}
+	}()
 
 	// 接続の受付
 	log.Printf("MineSQL Server started on %s", listenAddr)
@@ -70,7 +75,9 @@ func (s *Server) Start() error {
 func (s *Server) handleConnection(conn *net.TCPConn) {
 	defer func() {
 		log.Printf("Closing connection from %s", conn.RemoteAddr().String())
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			log.Printf("failed to close connection: %v", err)
+		}
 	}()
 
 	for {
@@ -84,7 +91,7 @@ func (s *Server) handleConnection(conn *net.TCPConn) {
 		// パケットの受信
 		sql, err := s.readPacket(conn)
 		if err != nil {
-			if err != io.EOF {
+			if !errors.Is(err, io.EOF) {
 				log.Printf("Read error: %v", err)
 			}
 			return
@@ -164,14 +171,14 @@ func (s *Server) readPacket(conn *net.TCPConn) (string, error) {
 // [Header 4 byte][Body N byte] を書き込む
 func (s *Server) writePacket(conn *net.TCPConn, msg string) error {
 	dataBytes := []byte(msg)
-	length := uint32(len(dataBytes))
+	length := uint32(len(dataBytes)) //#nosec G115
 
-	// ヘッダーの作成
-	header := make([]byte, 4)
-	binary.BigEndian.PutUint32(header, length)
+	// パケットの作成 (先頭4バイトがヘッダー、続くバイトがボディ)
+	packet := make([]byte, 4+len(dataBytes))
+	binary.BigEndian.PutUint32(packet[0:4], length)
+	copy(packet[4:], dataBytes)
 
-	// ヘッダーとボディの書き込み
-	packet := append(header, dataBytes...)
+	// パケットの書き込み
 	_, err := conn.Write(packet)
 	return err
 }

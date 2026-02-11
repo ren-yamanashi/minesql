@@ -268,11 +268,12 @@ func (t *Tokenizer) emitPendingToken() {
 
 	value := string(t.input[t.start:t.pos])
 
-	if t.isKeyword(value) {
+	switch {
+	case t.isKeyword(value):
 		t.callbacks.OnKeyword(value)
-	} else if t.isDigit(value) {
+	case t.isDigit(value):
 		t.callbacks.OnNumber(value)
-	} else {
+	default:
 		t.callbacks.OnIdentifier(value)
 	}
 }

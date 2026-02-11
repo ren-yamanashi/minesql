@@ -390,9 +390,12 @@ func TestFlushPage(t *testing.T) {
 		pageId2 := dm.AllocatePage()
 		pageId3 := dm.AllocatePage()
 
-		page1, _ := bpm.AddPage(pageId1)
-		page2, _ := bpm.AddPage(pageId2)
-		bpm.AddPage(pageId3)
+		page1, err := bpm.AddPage(pageId1)
+		assert.NoError(t, err)
+		page2, err := bpm.AddPage(pageId2)
+		assert.NoError(t, err)
+		_, err = bpm.AddPage(pageId3)
+		assert.NoError(t, err)
 
 		// ページにデータを書き込み、ダーティーにする
 		page1.Page[0] = 11
@@ -401,7 +404,8 @@ func TestFlushPage(t *testing.T) {
 		page2.IsDirty = true
 
 		// WHEN
-		err := bpm.FlushPage()
+		err = bpm.FlushPage()
+		assert.NoError(t, err)
 
 		// THEN
 		assert.NoError(t, err)

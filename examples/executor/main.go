@@ -8,7 +8,7 @@ import (
 func main() {
 	dataDir := "examples/executor/data"
 	os.RemoveAll(dataDir) // 既存のデータディレクトリがあれば削除
-	os.MkdirAll(dataDir, 0755)
+	os.MkdirAll(dataDir, 0750)
 
 	// StorageManager を初期化
 	os.Setenv("MINESQL_DATA_DIR", dataDir)
