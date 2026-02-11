@@ -1,12 +1,12 @@
-.PHONY: fmt test test-cov clean doc build build-client build-server
+.PHONY: lint lint_diff test test_cov clean doc build build-client build-server
 
-fmt:
-	find . -name "*.go" -type f -exec goimports -w {} \;
+lint:
+	golangci-lint run
 
 test:
 	go test -v ./internal/...
 
-test-cov:
+test_cov:
 	go test -v -cover ./internal/...
 
 clean:

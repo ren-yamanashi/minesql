@@ -14,12 +14,12 @@ func binarySearch(size int, f func(int) int) (int, bool) {
 		mid := left + (right-left)/2
 		result := f(mid)
 
-		switch {
-		case result == 0:
+		switch result {
+		case 0:
 			return mid, true
-		case result == -1:
+		case -1:
 			left = mid + 1
-		case result == 1:
+		case 1:
 			right = mid
 		}
 	}

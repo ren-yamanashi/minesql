@@ -133,9 +133,13 @@ func InitStorageEngineForTest(t *testing.T, dataDir string) *storage.StorageMana
 
 	// 行を挿入
 	err = tbl.Insert(sm.BufferPoolManager, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+	assert.NoError(t, err)
 	err = tbl.Insert(sm.BufferPoolManager, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+	assert.NoError(t, err)
 	err = tbl.Insert(sm.BufferPoolManager, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
+	assert.NoError(t, err)
 	err = tbl.Insert(sm.BufferPoolManager, [][]byte{[]byte("d"), []byte("Eve"), []byte("Davis")})
+	assert.NoError(t, err)
 	err = tbl.Insert(sm.BufferPoolManager, [][]byte{[]byte("e"), []byte("Charlie"), []byte("Brown")})
 	assert.NoError(t, err)
 

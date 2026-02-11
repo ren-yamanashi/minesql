@@ -31,8 +31,11 @@ func TestCreateAndInsert(t *testing.T) {
 
 		// WHEN: 行を挿入
 		err = table.Insert(bpm, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		assert.NoError(t, err)
 		err = table.Insert(bpm, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		assert.NoError(t, err)
 		err = table.Insert(bpm, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
+		assert.NoError(t, err)
 		err = table.Insert(bpm, [][]byte{[]byte("d"), []byte("Eve"), []byte("Davis")})
 		assert.NoError(t, err)
 
@@ -71,7 +74,8 @@ func TestCreateAndInsert(t *testing.T) {
 			assert.Equal(t, expected.value, decodedValue)
 
 			i++
-			iter.Next(bpm)
+			_, _, err := iter.Next(bpm)
+			assert.NoError(t, err)
 		}
 		assert.Equal(t, len(expectedRecords), i)
 
@@ -115,7 +119,8 @@ func TestCreateAndInsert(t *testing.T) {
 			assert.Equal(t, expected.value, pair.Value)
 
 			j++
-			uniqueIndexIter.Next(bpm)
+			_, _, err := uniqueIndexIter.Next(bpm)
+			assert.NoError(t, err)
 		}
 		assert.Equal(t, len(expectedUniqueIndexRecords), j)
 	})
@@ -139,6 +144,7 @@ func TestCreateAndInsert(t *testing.T) {
 
 		// WHEN
 		err = table.Create(bpm)
+		assert.NoError(t, err)
 
 		// THEN: テーブルとすべてのインデックスが同じ FileId を持つ
 		assert.Equal(t, table.MetaPageId.FileId, uniqueIndex1.MetaPageId.FileId, "first_name インデックスはテーブルと同じ FileId を持つべき")

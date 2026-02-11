@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -28,19 +29,33 @@ func NewServer(address string, port int) *Server {
 }
 
 func (s *Server) Start() error {
+	// ストレージマネージャーの初期化
 	dataDir := "data"
-	os.MkdirAll(dataDir, 0755)
-	os.Setenv("MINESQL_DATA_DIR", dataDir)
+	err := os.MkdirAll(dataDir, 0750)
+	if err != nil {
+		return fmt.Errorf("failed to create data directory: %w", err)
+	}
+	err = os.Setenv("MINESQL_DATA_DIR", dataDir)
+	if err != nil {
+		return fmt.Errorf("failed to set environment variable MINESQL_DATA_DIR: %w", err)
+	}
 	storage.InitStorageManager()
 
 	// ソケットを接続待ちに設定
 	listenAddr := net.JoinHostPort(s.Address, fmt.Sprintf("%d", s.Port))
 	tcpAddr, err := net.ResolveTCPAddr("tcp", listenAddr)
+	if err != nil {
+		return fmt.Errorf("failed to resolve address %s: %w", listenAddr, err)
+	}
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
 		return fmt.Errorf("failed to listen on %s: %w", listenAddr, err)
 	}
-	defer listener.Close()
+	defer func() {
+		if err := listener.Close(); err != nil {
+			log.Printf("failed to close listener: %v", err)
+		}
+	}()
 
 	// 接続の受付
 	log.Printf("MineSQL Server started on %s", listenAddr)
@@ -60,17 +75,23 @@ func (s *Server) Start() error {
 func (s *Server) handleConnection(conn *net.TCPConn) {
 	defer func() {
 		log.Printf("Closing connection from %s", conn.RemoteAddr().String())
-		conn.Close()
+		if err := conn.Close(); err != nil {
+			log.Printf("failed to close connection: %v", err)
+		}
 	}()
 
 	for {
 		// タイムアウトの設定 (10 分間何も送ってこなければ切断)
-		conn.SetReadDeadline(time.Now().Add(10 * time.Minute))
+		err := conn.SetReadDeadline(time.Now().Add(10 * time.Minute))
+		if err != nil {
+			log.Printf("SetReadDeadline error: %v", err)
+			return
+		}
 
 		// パケットの受信
 		sql, err := s.readPacket(conn)
 		if err != nil {
-			if err != io.EOF {
+			if !errors.Is(err, io.EOF) {
 				log.Printf("Read error: %v", err)
 			}
 			return
@@ -84,7 +105,10 @@ func (s *Server) handleConnection(conn *net.TCPConn) {
 		// クエリの実行
 		result, err := s.executeQuery(sql)
 		if err != nil {
-			s.writePacket(conn, fmt.Sprintf("Error: %v", err))
+			err := s.writePacket(conn, fmt.Sprintf("Error: %v", err))
+			if err != nil {
+				log.Printf("Write error: %v", err)
+			}
 			continue
 		}
 
@@ -149,12 +173,12 @@ func (s *Server) writePacket(conn *net.TCPConn, msg string) error {
 	dataBytes := []byte(msg)
 	length := uint32(len(dataBytes))
 
-	// ヘッダーの作成
-	header := make([]byte, 4)
-	binary.BigEndian.PutUint32(header, length)
+	// パケットの作成 (先頭4バイトがヘッダー、続くバイトがボディ)
+	packet := make([]byte, 4+len(dataBytes))
+	binary.BigEndian.PutUint32(packet[0:4], length)
+	copy(packet[4:], dataBytes)
 
-	// ヘッダーとボディの書き込み
-	packet := append(header, dataBytes...)
+	// パケットの書き込み
 	_, err := conn.Write(packet)
 	return err
 }

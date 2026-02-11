@@ -25,9 +25,13 @@ func NewClient(address string, port int) *Client {
 func (c *Client) Start() error {
 	conn, err := net.DialTCP("tcp", nil, &net.TCPAddr{IP: net.ParseIP(c.Address), Port: c.Port})
 	if err != nil {
-		return fmt.Errorf("failed to connect to server: %w\n", err)
+		return fmt.Errorf("failed to connect to server: %w", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			fmt.Fprintf(os.Stderr, "failed to close connection: %v\n", err)
+		}
+	}()
 
 	fmt.Println("Connected to MineSQL Server!")
 	reader := bufio.NewReader(os.Stdin)
@@ -47,13 +51,14 @@ func (c *Client) Start() error {
 
 		// サーバーに送信
 		if err := c.writePacket(conn, text); err != nil {
-			return fmt.Errorf("write error: %w\n", err)
+			return fmt.Errorf("write error: %w", err)
 		}
 
 		// サーバーからの結果を受信
 		response, err := c.readPacket(conn)
 		if err != nil {
-			return fmt.Errorf("read error: %w\n", err)
+			return fmt.Errorf("read error: %w", err)
+
 		}
 		fmt.Println(response)
 	}
@@ -99,12 +104,12 @@ func (c *Client) writePacket(conn net.Conn, data string) error {
 	bytes := []byte(data)
 	length := uint32(len(bytes))
 
-	// ヘッダーの作成
-	header := make([]byte, 4)
-	binary.BigEndian.PutUint32(header, length)
+	// パケットの作成 (先頭4バイトがヘッダー、続くバイトがボディ)
+	packet := make([]byte, 4+len(bytes))
+	binary.BigEndian.PutUint32(packet[0:4], length)
+	copy(packet[4:], bytes)
 
-	// ヘッダーとボディの書き込み
-	packet := append(header, bytes...)
+	// パケットの書き込み
 	_, err := conn.Write(packet)
 	return err
 }

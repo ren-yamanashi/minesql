@@ -14,8 +14,7 @@ func TestNewDiskManager(t *testing.T) {
 	t.Run("正常に DiskManager が生成される", func(t *testing.T) {
 		tmpFile, err := os.CreateTemp("", "test_disk.db")
 		assert.NoError(t, err)
-		defer tmpFile.Close()
-		defer os.Remove(tmpFile.Name())
+		defer removeTmpfile(t, tmpFile)
 
 		// GIVEN
 		filepath := tmpFile.Name()
@@ -47,11 +46,12 @@ func TestReadPageData(t *testing.T) {
 		// GIVEN
 		disk, pageId := initDiskManager(t)
 		writeData := createDataBuffer()
-		disk.WritePageData(pageId, writeData)
+		err := disk.WritePageData(pageId, writeData)
+		assert.NoError(t, err)
 
 		// WHEN
 		readData := directio.AlignedBlock(directio.BlockSize)
-		err := disk.ReadPageData(pageId, readData)
+		err = disk.ReadPageData(pageId, readData)
 
 		// THEN
 		assert.NoError(t, err)
@@ -102,13 +102,11 @@ func TestAllocatePage(t *testing.T) {
 	t.Run("新しいページを順次割り当てられる", func(t *testing.T) {
 		tmpFile, err := os.CreateTemp("", "test_disk_*.db")
 		assert.NoError(t, err)
-		defer tmpFile.Close()
-		defer os.Remove(tmpFile.Name())
+		defer removeTmpfile(t, tmpFile)
 
 		// GIVEN
 		filepath := tmpFile.Name()
 		fileId := page.FileId(0)
-
 		dm, err := NewDiskManager(fileId, filepath)
 		assert.NoError(t, err)
 
@@ -142,4 +140,13 @@ func createDataBuffer() []byte {
 		writeData[i] = byte(i % 256)
 	}
 	return writeData
+}
+
+func removeTmpfile(t *testing.T, tmpfile *os.File) {
+	if err := tmpfile.Close(); err != nil {
+		t.Logf("failed to close tmpfile: %v", err)
+	}
+	if err := os.Remove(tmpfile.Name()); err != nil {
+		t.Logf("failed to remove tmpfile: %v", err)
+	}
 }

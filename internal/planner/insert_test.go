@@ -111,7 +111,7 @@ func TestNewInsert(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer storage.ResetStorageManager()
 
-		createTableForTest(t, "users", 1, nil, []*executor.ColumnParam{
+		createTableForTest(t, []*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "name", Type: catalog.ColumnTypeString},
 		})
@@ -145,7 +145,7 @@ func TestNewInsert(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer storage.ResetStorageManager()
 
-		createTableForTest(t, "users", 1, nil, []*executor.ColumnParam{
+		createTableForTest(t, []*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "name", Type: catalog.ColumnTypeString},
 		})
@@ -187,7 +187,7 @@ func TestNewInsert(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer storage.ResetStorageManager()
 
-		createTableForTest(t, "users", 1, nil, []*executor.ColumnParam{
+		createTableForTest(t, []*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "name", Type: catalog.ColumnTypeString},
 			{Name: "email", Type: catalog.ColumnTypeString},
@@ -227,7 +227,7 @@ func TestNewInsert(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer storage.ResetStorageManager()
 
-		createTableForTest(t, "users", 1, nil, []*executor.ColumnParam{
+		createTableForTest(t, []*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "name", Type: catalog.ColumnTypeString},
 			{Name: "email", Type: catalog.ColumnTypeString},
@@ -264,7 +264,7 @@ func TestNewInsert(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer storage.ResetStorageManager()
 
-		createTableForTest(t, "users", 1, nil, []*executor.ColumnParam{
+		createTableForTest(t, []*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "name", Type: catalog.ColumnTypeString},
 		})
@@ -310,8 +310,8 @@ func initStorageManagerForTest(t *testing.T) {
 }
 
 // テーブルを作成する
-func createTableForTest(t *testing.T, tableName string, primaryKeyCount uint8, indexes []*executor.IndexParam, columns []*executor.ColumnParam) {
-	createTable := executor.NewCreateTable(tableName, primaryKeyCount, indexes, columns)
+func createTableForTest(t *testing.T, columns []*executor.ColumnParam) {
+	createTable := executor.NewCreateTable("users", 1, nil, columns)
 	_, err := createTable.Next()
 	assert.NoError(t, err)
 }

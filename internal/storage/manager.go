@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"minesql/internal/config"
@@ -46,7 +47,10 @@ type StorageManager struct {
 
 func newStorageManager() (*StorageManager, error) {
 	dataDir := config.GetDataDirectory()
-	os.MkdirAll(dataDir, 0755)
+	err := os.MkdirAll(dataDir, 0750)
+	if err != nil {
+		return nil, err
+	}
 
 	bpm := bufferpool.NewBufferPoolManager(config.GetBufferPoolSize())
 	catalog, err := initCatalog(dataDir, bpm)
@@ -91,8 +95,11 @@ func initCatalog(baseDir string, bpm *bufferpool.BufferPoolManager) (*catalog.Ca
 		// 既存のカタログを開く
 		cat, err = catalog.NewCatalog(bpm)
 		// カタログファイルが空の場合は古いファイルを削除して再度実行
-		if err == io.EOF {
-			os.Remove(path)
+		if errors.Is(err, io.EOF) {
+			err := os.Remove(path)
+			if err != nil {
+				return nil, err
+			}
 			return initCatalog(baseDir, bpm)
 		}
 		// その他のエラーの場合はそのまま返す

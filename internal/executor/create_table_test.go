@@ -25,6 +25,7 @@ func TestCreateTable(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		tblMeta, err := sm.Catalog.GetTableMetadataByName("users")
+		assert.NoError(t, err)
 		assert.NotNil(t, tblMeta)
 		assert.Equal(t, "users", tblMeta.Name)
 		assert.Equal(t, uint8(1), tblMeta.PrimaryKeyCount)
@@ -79,6 +80,7 @@ func TestCreateTable(t *testing.T) {
 
 		// WHEN
 		_, err := createTable.Next()
+		assert.NoError(t, err)
 
 		// THEN
 		tblMeta, err := sm.Catalog.GetTableMetadataByName("users")
@@ -100,6 +102,7 @@ func TestCreateTable(t *testing.T) {
 
 		// WHEN
 		_, err := createTable.Next()
+		assert.NoError(t, err)
 
 		// THEN
 		tblMeta, err := sm.Catalog.GetTableMetadataByName("users")
