@@ -171,7 +171,7 @@ func (s *Server) readPacket(conn *net.TCPConn) (string, error) {
 // [Header 4 byte][Body N byte] を書き込む
 func (s *Server) writePacket(conn *net.TCPConn, msg string) error {
 	dataBytes := []byte(msg)
-	length := uint32(len(dataBytes)) //#nosec G115
+	length := uint32(len(dataBytes))
 
 	// パケットの作成 (先頭4バイトがヘッダー、続くバイトがボディ)
 	packet := make([]byte, 4+len(dataBytes))
