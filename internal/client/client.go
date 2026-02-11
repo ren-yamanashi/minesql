@@ -69,8 +69,6 @@ func (c *Client) readMultilineInput(reader *bufio.Reader) string {
 		if firstLine {
 			fmt.Print("minesql> ")
 			firstLine = false
-		} else {
-			fmt.Print("      -> ")
 		}
 
 		// 1行読み取る
