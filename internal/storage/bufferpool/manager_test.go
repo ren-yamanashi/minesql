@@ -420,11 +420,11 @@ func TestFlushPage(t *testing.T) {
 		pageId4 := dm.AllocatePage()
 		pageId5 := dm.AllocatePage()
 		pageId6 := dm.AllocatePage()
-		_, err = bpm.FetchPage(pageId4)
+		_, err = bpm.AddPage(pageId4)
 		assert.NoError(t, err)
-		_, err = bpm.FetchPage(pageId5)
+		_, err = bpm.AddPage(pageId5)
 		assert.NoError(t, err)
-		_, err = bpm.FetchPage(pageId6)
+		_, err = bpm.AddPage(pageId6)
 		assert.NoError(t, err)
 
 		// page1 と page2 を再度フェッチして、データが正しく読み出せることを確認
