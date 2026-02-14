@@ -17,8 +17,9 @@ import (
 )
 
 type Server struct {
-	Address string
-	Port    int
+	Address        string
+	Port           int
+	storageManager *storage.StorageManager
 }
 
 func NewServer(address string, port int) *Server {
@@ -28,37 +29,70 @@ func NewServer(address string, port int) *Server {
 	}
 }
 
+// サーバーを開始する
 func (s *Server) Start() error {
-	// ストレージマネージャーの初期化
-	dataDir := "data"
-	err := os.MkdirAll(dataDir, 0750)
+	err := s.init()
 	if err != nil {
-		return fmt.Errorf("failed to create data directory: %w", err)
+		return fmt.Errorf("failed to initialize storage manager: %w", err)
 	}
-	err = os.Setenv("MINESQL_DATA_DIR", dataDir)
-	if err != nil {
-		return fmt.Errorf("failed to set environment variable MINESQL_DATA_DIR: %w", err)
-	}
-	storage.InitStorageManager()
 
-	// ソケットを接続待ちに設定
-	listenAddr := net.JoinHostPort(s.Address, fmt.Sprintf("%d", s.Port))
-	tcpAddr, err := net.ResolveTCPAddr("tcp", listenAddr)
+	listener, err := s.listen()
 	if err != nil {
-		return fmt.Errorf("failed to resolve address %s: %w", listenAddr, err)
+		return fmt.Errorf("failed to listen on %s: %w", listener.Addr().String(), err)
 	}
-	listener, err := net.ListenTCP("tcp", tcpAddr)
-	if err != nil {
-		return fmt.Errorf("failed to listen on %s: %w", listenAddr, err)
-	}
+
 	defer func() {
 		if err := listener.Close(); err != nil {
 			log.Printf("failed to close listener: %v", err)
 		}
 	}()
 
-	// 接続の受付
-	log.Printf("MineSQL Server started on %s", listenAddr)
+	s.accept(listener)
+	return nil
+}
+
+// サーバーを停止する
+func (s *Server) Stop() error {
+	err := s.storageManager.BufferPoolManager.FlushPage()
+	if err != nil {
+		return err
+	}
+	log.Println("All pages flushed successfully.")
+	return nil
+}
+
+// サーバーの初期化
+func (s *Server) init() error {
+	dataDir := "data"
+	err := os.MkdirAll(dataDir, 0750)
+	if err != nil {
+		return err
+	}
+	err = os.Setenv("MINESQL_DATA_DIR", dataDir)
+	if err != nil {
+		return err
+	}
+	s.storageManager = storage.InitStorageManager()
+	return nil
+}
+
+// サーバーソケットを接続待ちに設定して返す
+func (s *Server) listen() (*net.TCPListener, error) {
+	listenAddr := net.JoinHostPort(s.Address, fmt.Sprintf("%d", s.Port))
+	tcpAddr, err := net.ResolveTCPAddr("tcp", listenAddr)
+	if err != nil {
+		return nil, err
+	}
+	listener, err := net.ListenTCP("tcp", tcpAddr)
+	if err != nil {
+		return nil, err
+	}
+	return listener, nil
+}
+
+// クライアントからの接続を受け付ける
+func (s *Server) accept(listener *net.TCPListener) {
+	log.Printf("MineSQL Server started on %s", listener.Addr().String())
 	for {
 		conn, err := listener.AcceptTCP() // 保留状態の接続を取り出す
 		if err != nil {

@@ -106,6 +106,11 @@ func initCatalog(baseDir string, bpm *bufferpool.BufferPoolManager) (*catalog.Ca
 		if err != nil {
 			return nil, err
 		}
+
+		// 既存のテーブルの DiskManager を登録
+		if err := registerTableDiskManagers(cat, baseDir, bpm); err != nil {
+			return nil, err
+		}
 	} else {
 		// 新しいカタログを作成
 		cat, err = catalog.CreateCatalog(bpm)
@@ -115,4 +120,22 @@ func initCatalog(baseDir string, bpm *bufferpool.BufferPoolManager) (*catalog.Ca
 	}
 
 	return cat, nil
+}
+
+// カタログに含まれるテーブルの DiskManager を登録する
+func registerTableDiskManagers(cat *catalog.Catalog, baseDir string, bpm *bufferpool.BufferPoolManager) error {
+	tables := cat.GetAllTables()
+	for _, tableMeta := range tables {
+		fileId := tableMeta.DataMetaPageId.FileId
+		tableName := tableMeta.Name
+		path := filepath.Join(baseDir, fmt.Sprintf("%s.db", tableName))
+
+		// DiskManager を作成して登録
+		dm, err := disk.NewDiskManager(fileId, path)
+		if err != nil {
+			return err
+		}
+		bpm.RegisterDiskManager(fileId, dm)
+	}
+	return nil
 }
