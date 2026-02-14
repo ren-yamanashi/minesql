@@ -267,6 +267,252 @@ func TestGetTableMetadataByName(t *testing.T) {
 	})
 }
 
+func TestNewCatalog(t *testing.T) {
+	t.Run("既存のカタログを開くと、保存されたメタデータが読み込まれる", func(t *testing.T) {
+		// GIVEN
+		bpm, tmpdir := InitCatalogDiskManager(t)
+		defer removeTmpdir(t, tmpdir)
+
+		cat, err := CreateCatalog(bpm)
+		assert.NoError(t, err)
+
+		tableId := uint64(1)
+		metaPageId := page.NewPageId(page.FileId(1), 0)
+		colMeta := []*ColumnMetadata{
+			NewColumnMetadata(tableId, "id", 0, ColumnTypeString),
+			NewColumnMetadata(tableId, "name", 1, ColumnTypeString),
+		}
+		tableMeta := NewTableMetadata(tableId, "users", 2, 1, colMeta, []*IndexMetadata{}, metaPageId)
+		err = cat.Insert(bpm, tableMeta)
+		assert.NoError(t, err)
+
+		// ページをフラッシュ
+		err = bpm.FlushPage()
+		assert.NoError(t, err)
+
+		// WHEN
+		bpm2 := bufferpool.NewBufferPoolManager(10)
+		filePath := filepath.Join(tmpdir, "minesql.db")
+		fileId := page.FileId(0)
+		dm2, err := disk.NewDiskManager(fileId, filePath)
+		assert.NoError(t, err)
+		bpm2.RegisterDiskManager(fileId, dm2)
+
+		cat2, err := NewCatalog(bpm2)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, cat2)
+		assert.Equal(t, 1, len(cat2.metadata))
+		assert.Equal(t, "users", cat2.metadata[0].Name)
+		assert.Equal(t, tableId, cat2.metadata[0].TableId)
+		assert.Equal(t, uint8(2), cat2.metadata[0].NCols)
+	})
+
+	t.Run("カラムメタデータも正しく読み込まれる", func(t *testing.T) {
+		// GIVEN
+		bpm, tmpdir := InitCatalogDiskManager(t)
+		defer removeTmpdir(t, tmpdir)
+
+		cat, err := CreateCatalog(bpm)
+		assert.NoError(t, err)
+
+		tableId := uint64(1)
+		metaPageId := page.NewPageId(page.FileId(1), 0)
+		colMeta := []*ColumnMetadata{
+			NewColumnMetadata(tableId, "id", 0, ColumnTypeString),
+			NewColumnMetadata(tableId, "name", 1, ColumnTypeString),
+			NewColumnMetadata(tableId, "email", 2, ColumnTypeString),
+		}
+		tableMeta := NewTableMetadata(tableId, "users", 3, 1, colMeta, []*IndexMetadata{}, metaPageId)
+		err = cat.Insert(bpm, tableMeta)
+		assert.NoError(t, err)
+
+		// ページをフラッシュ
+		err = bpm.FlushPage()
+		assert.NoError(t, err)
+
+		// WHEN
+		bpm2 := bufferpool.NewBufferPoolManager(10)
+		filePath := filepath.Join(tmpdir, "minesql.db")
+		fileId := page.FileId(0)
+		dm2, err := disk.NewDiskManager(fileId, filePath)
+		assert.NoError(t, err)
+		bpm2.RegisterDiskManager(fileId, dm2)
+
+		cat2, err := NewCatalog(bpm2)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(cat2.metadata))
+		assert.Equal(t, 3, len(cat2.metadata[0].Cols))
+		assert.Equal(t, "id", cat2.metadata[0].Cols[0].Name)
+		assert.Equal(t, uint16(0), cat2.metadata[0].Cols[0].Pos)
+		assert.Equal(t, "name", cat2.metadata[0].Cols[1].Name)
+		assert.Equal(t, uint16(1), cat2.metadata[0].Cols[1].Pos)
+		assert.Equal(t, "email", cat2.metadata[0].Cols[2].Name)
+		assert.Equal(t, uint16(2), cat2.metadata[0].Cols[2].Pos)
+	})
+
+	t.Run("インデックスメタデータも正しく読み込まれる", func(t *testing.T) {
+		// GIVEN
+		bpm, tmpdir := InitCatalogDiskManager(t)
+		defer removeTmpdir(t, tmpdir)
+
+		cat, err := CreateCatalog(bpm)
+		assert.NoError(t, err)
+
+		tableId := uint64(1)
+		metaPageId := page.NewPageId(page.FileId(1), 0)
+		indexMetaPageId := page.NewPageId(page.FileId(1), 1)
+		colMeta := []*ColumnMetadata{
+			NewColumnMetadata(tableId, "id", 0, ColumnTypeString),
+			NewColumnMetadata(tableId, "email", 1, ColumnTypeString),
+		}
+		idxMeta := []*IndexMetadata{
+			NewIndexMetadata(tableId, "idx_email", "email", IndexTypeUnique, indexMetaPageId),
+		}
+		tableMeta := NewTableMetadata(tableId, "users", 2, 1, colMeta, idxMeta, metaPageId)
+		err = cat.Insert(bpm, tableMeta)
+		assert.NoError(t, err)
+
+		// ページをフラッシュ
+		err = bpm.FlushPage()
+		assert.NoError(t, err)
+
+		// WHEN
+		bpm2 := bufferpool.NewBufferPoolManager(10)
+		filePath := filepath.Join(tmpdir, "minesql.db")
+		fileId := page.FileId(0)
+		dm2, err := disk.NewDiskManager(fileId, filePath)
+		assert.NoError(t, err)
+		bpm2.RegisterDiskManager(fileId, dm2)
+
+		cat2, err := NewCatalog(bpm2)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(cat2.metadata))
+		assert.Equal(t, 1, len(cat2.metadata[0].Indexes))
+		assert.Equal(t, "idx_email", cat2.metadata[0].Indexes[0].Name)
+		assert.Equal(t, "email", cat2.metadata[0].Indexes[0].ColName)
+		assert.Equal(t, IndexTypeUnique, cat2.metadata[0].Indexes[0].Type)
+		assert.Equal(t, indexMetaPageId, cat2.metadata[0].Indexes[0].DataMetaPageId)
+	})
+
+	t.Run("複数のテーブルが正しく読み込まれる", func(t *testing.T) {
+		// GIVEN
+		bpm, tmpdir := InitCatalogDiskManager(t)
+		defer removeTmpdir(t, tmpdir)
+
+		cat, err := CreateCatalog(bpm)
+		assert.NoError(t, err)
+
+		// テーブル 1: users
+		table1Meta := NewTableMetadata(1, "users", 2, 1, []*ColumnMetadata{
+			NewColumnMetadata(1, "id", 0, ColumnTypeString),
+			NewColumnMetadata(1, "name", 1, ColumnTypeString),
+		}, []*IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
+		err = cat.Insert(bpm, table1Meta)
+		assert.NoError(t, err)
+
+		// テーブル 2: posts
+		table2Meta := NewTableMetadata(2, "posts", 3, 1, []*ColumnMetadata{
+			NewColumnMetadata(2, "id", 0, ColumnTypeString),
+			NewColumnMetadata(2, "title", 1, ColumnTypeString),
+			NewColumnMetadata(2, "body", 2, ColumnTypeString),
+		}, []*IndexMetadata{}, page.NewPageId(page.FileId(2), 0))
+		err = cat.Insert(bpm, table2Meta)
+		assert.NoError(t, err)
+
+		// テーブル 3: comments
+		table3Meta := NewTableMetadata(3, "comments", 2, 1, []*ColumnMetadata{
+			NewColumnMetadata(3, "id", 0, ColumnTypeString),
+			NewColumnMetadata(3, "text", 1, ColumnTypeString),
+		}, []*IndexMetadata{}, page.NewPageId(page.FileId(3), 0))
+		err = cat.Insert(bpm, table3Meta)
+		assert.NoError(t, err)
+
+		// ページをフラッシュ
+		err = bpm.FlushPage()
+		assert.NoError(t, err)
+
+		// WHEN
+		bpm2 := bufferpool.NewBufferPoolManager(10)
+		filePath := filepath.Join(tmpdir, "minesql.db")
+		fileId := page.FileId(0)
+		dm2, err := disk.NewDiskManager(fileId, filePath)
+		assert.NoError(t, err)
+		bpm2.RegisterDiskManager(fileId, dm2)
+
+		cat2, err := NewCatalog(bpm2)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 3, len(cat2.metadata))
+
+		// テーブル名で検索して確認
+		usersTable, err := cat2.GetTableMetadataByName("users")
+		assert.NoError(t, err)
+		assert.Equal(t, "users", usersTable.Name)
+		assert.Equal(t, uint8(2), usersTable.NCols)
+		assert.Equal(t, 2, len(usersTable.Cols))
+
+		postsTable, err := cat2.GetTableMetadataByName("posts")
+		assert.NoError(t, err)
+		assert.Equal(t, "posts", postsTable.Name)
+		assert.Equal(t, uint8(3), postsTable.NCols)
+		assert.Equal(t, 3, len(postsTable.Cols))
+
+		commentsTable, err := cat2.GetTableMetadataByName("comments")
+		assert.NoError(t, err)
+		assert.Equal(t, "comments", commentsTable.Name)
+		assert.Equal(t, uint8(2), commentsTable.NCols)
+		assert.Equal(t, 2, len(commentsTable.Cols))
+	})
+
+	t.Run("NextTableId も正しく復元される", func(t *testing.T) {
+		// GIVEN
+		bpm, tmpdir := InitCatalogDiskManager(t)
+		defer removeTmpdir(t, tmpdir)
+
+		cat, err := CreateCatalog(bpm)
+		assert.NoError(t, err)
+
+		// テーブルIDを複数回採番
+		_, err = cat.AllocateTableId(bpm)
+		assert.NoError(t, err)
+		_, err = cat.AllocateTableId(bpm)
+		assert.NoError(t, err)
+		_, err = cat.AllocateTableId(bpm)
+		assert.NoError(t, err)
+
+		// ページをフラッシュ
+		err = bpm.FlushPage()
+		assert.NoError(t, err)
+
+		// WHEN
+		bpm2 := bufferpool.NewBufferPoolManager(10)
+		filePath := filepath.Join(tmpdir, "minesql.db")
+		fileId := page.FileId(0)
+		dm2, err := disk.NewDiskManager(fileId, filePath)
+		assert.NoError(t, err)
+		bpm2.RegisterDiskManager(fileId, dm2)
+
+		cat2, err := NewCatalog(bpm2)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(3), cat2.NextTableId)
+
+		// 次の採番が正しく動作することを確認
+		nextId, err := cat2.AllocateTableId(bpm2)
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(3), nextId)
+		assert.Equal(t, uint64(4), cat2.NextTableId)
+	})
+}
+
 func InitCatalogDiskManager(t *testing.T) (bpm *bufferpool.BufferPoolManager, tmpdir string) {
 	tmpdir = t.TempDir()
 	filePath := filepath.Join(tmpdir, "minesql.db")
