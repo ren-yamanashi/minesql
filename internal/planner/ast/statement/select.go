@@ -1,7 +1,6 @@
 package statement
 
 import (
-	"minesql/internal/planner/ast/expression"
 	"minesql/internal/planner/ast/identifier"
 )
 
@@ -25,15 +24,3 @@ func NewSelectStmt(from identifier.TableId, where *WhereClause) *SelectStmt {
 }
 
 func (ss *SelectStmt) statementNode() {}
-
-type WhereClause struct {
-	Condition expression.Expression
-	IsSet     bool
-}
-
-func NewWhereClause(condition expression.Expression) *WhereClause {
-	return &WhereClause{
-		Condition: condition,
-		IsSet:     true,
-	}
-}
