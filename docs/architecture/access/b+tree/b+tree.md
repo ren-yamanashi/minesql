@@ -37,16 +37,16 @@ _以下例: key = "grape" を検索_
 ```txt
 B+Tree の構造:
                     [Root: Branch Node]
-                    Pairs: [(key="dog", pageId=10), (key="monkey", pageId=20)]
+                    Pairs: [(key="fish", pageId=10), (key="monkey", pageId=20)]
                     RightChild: pageId=30
                            /            |              \
-                      (<dog)         (dog~monkey)    (>=monkey)
+                      (<fish)       (fish~monkey)    (>=monkey)
                       PageID=10       PageID=20       PageID=30
                         /                |                \
-         [Leaf: apple,cat,dog]  [Leaf: fish,grape,lion]  [Leaf: tiger,zebra]
+         [Leaf: apple,cat,dog]  [Leaf: fish,grape,human]  [Leaf: monkey,tiger,zebra]
 
 ステップ 1: ルートノード (ブランチノード) で二分探索
-  - "grape" と "dog" を比較 → dog < grape
+  - "grape" と "fish" を比較 → fish < grape
   - "grape" と "monkey" を比較 → grape < monkey
   - → インデックス 1 のペア (key="monkey", pageId=20) を取得
 
@@ -152,3 +152,127 @@ _以下例2: key = 6 をブランチノードに挿入 (ノード分割が発生
   - オーバーフローキー: 8 (新しいノードの最大キーの次のキー)
   - 新しいノードのページ ID
 ```
+
+## B+Tree から特定のペアを削除する
+
+### 基本的な流れ
+
+- メタページからルートページの ID を取得
+- 該当の key を持つペアを見つける
+- ペアを削除し、必要に応じてノードの再分割やマージを行う
+
+### リーフノードからの削除
+
+リーフノードからの削除は以下の手順で行う
+
+1. 二分探索により、削除すべきペアを特定
+2. ペアを削除
+3. ノードの空き容量が閾値 (ノードの最大容量の半分) を下回る場合、以下のいずれかを行う
+   - 兄弟ノードのペアを自分のノードに移動
+     - 基本的には右の (つまり自分より大きいキーを持つ) 兄弟ノードから借りるが、右端のノードの場合は左の兄弟ノードから借りる
+   - 兄弟ノードとマージする
+     - 兄弟のノードから移動すると、兄弟のノードの空き容量が閾値を下回る場合、兄弟ノードとマージする
+4. ブランチノードのキーを更新する
+   - 3 の処理でマージを行った場合はもちろんキーの更新が必要であるが、ノードの移動した場合も、兄弟との境界線が変わるため、ブランチノードのキーの更新が必要になる
+
+#### _以下例1: ノードの再分割が発生する場合_
+
+- 初期のB+Tree の構造:
+
+    ```txt
+                [Root: Branch Node]
+                Pairs: [(key="fish", pageId=10), (key="monkey", pageId=20)]
+                RightChild: pageId=30
+                       /            |              \
+                  (<fish)         (fish~monkey)    (>=monkey)
+                  PageID=10       PageID=20       PageID=30
+                    /                |                \
+     [Leaf: apple,cat,dog]  [Leaf: fish,grape,lion]  [Leaf: monkey,tiger,zebra]
+    ```
+
+- 仮定: `key = "cat"` を削除する。そして削除後にリーフノードの空き容量が閾値を下回ると仮定する
+- 流れ
+  - (ステップ1は省略)
+  - ステップ 2: ペアを削除
+    - "cat" と "apple" を比較 → apple < cat
+    - "cat" と "cat" を比較 → 一致
+    - → ペア (key="cat", value=xxx) を削除 (value は仮の値)
+  - ステップ 3: ノードの空き容量が閾値を下回るため、右の兄弟ノードからペアを移動
+    - 右の兄弟ノード (PageID=20) から最小のペア (key="fish", value=yyy) を移動 (value は仮の値)
+    - もともとは [apple, cat, dog] の順であったが、cat を削除して fish を移動したため、[apple, dog, fish] の順になる
+      - fish は dog より大きいため [apple, fish, dog] ではなく (つまり cat の代わりに fish を入れるのではなく) [apple, dog, fish] の順になる
+    - 移動後のリーフノード: [apple, dog, fish]
+    - 移動後の右の兄弟ノード: [grape, lion]
+  - ステップ 4: ブランチノードのキーを更新
+    - 移動前の境界線は "dog" と "fish" の間であったが、移動後の境界線は "fish" と "grape" の間になるため、ブランチノードのキーを "grape" に更新
+
+- 削除後のB+Tree の構造:
+
+    ```txt
+                [Root: Branch Node]
+                Pairs: [(key="grape", pageId=10), (key="monkey", pageId=20)]
+                RightChild: pageId=30
+                       /            |              \
+                  (<grape)       (grape~monkey)    (>=monkey)
+                  PageID=10       PageID=20       PageID=30
+                    /                |                \
+     [Leaf: apple,dog,fish]  [Leaf: grape,lion]  [Leaf: monkey,tiger,zebra]
+    ```
+
+#### _以下例2: ノードのマージが発生する場合(左端と真ん中のマージ)_
+
+- 初期のB+Tree の構造:
+
+    ```txt
+                [Root: Branch Node]
+                Pairs: [(key="fish", pageId=10), (key="monkey", pageId=20)]
+                RightChild: pageId=30
+                       /            |              \
+                  (<fish)         (fish~monkey)    (>=monkey)
+                  PageID=10       PageID=20       PageID=30
+                    /                |                \
+     [Leaf: apple,cat]  [Leaf: fish,grape]  [Leaf: monkey,tiger,zebra]
+    ```
+
+- 仮定: key = "cat" を削除する。そして削除後にリーフノードの空き容量が閾値を下回ると仮定する。また右の兄弟ノードからペアを移動しても、右の兄弟ノードの空き容量が閾値を下回ると仮定する
+
+- 流れ
+  - (ステップ1は省略)
+  - ステップ 2: ペアを削除
+    - "cat" と "apple" を比較 → apple < cat
+    - "cat" と "cat" を比較 → 一致
+    - → ペア (key="cat", value=xxx) を削除 (value は仮の値)
+  - ステップ 3: ノードの空き容量が閾値を下回るため、右の兄弟ノードからペアを移動したいが、そうすると右の兄弟ノードの空き容量も閾値を下回るため、右の兄弟ノードとマージする
+    - マージ後のリーフノード: [apple, fish, grape]
+    - マージ後の右の兄弟ノードは不要になるため、削除する
+  - ステップ 4: ブランチノードのキーを更新
+    - マージ前の境界線は "cat" と "fish" の間であったが、マージ後の境界線は "grape" と "monkey" の間になるため、ブランチノードのキーを "monkey" に更新
+    - ブランチノードに紐づくリーフノードの数が K から K-1 になるため、ブランチノードのペアも削除する
+
+- 削除後のB+Tree の構造:
+
+    ```txt
+                [Root: Branch Node]
+                Pairs: [(key="monkey", pageId=10)]
+                RightChild: pageId=30
+                       /            |          
+                  (<monkey)       (>=monkey)
+                  PageID=10       PageID=30
+                    /                |
+     [Leaf: apple,fish,grape]  [Leaf: monkey,tiger,zebra]
+    ```
+
+#### _以下例2: ノードのマージが発生する場合(真ん中と右端のマージ)_
+
+- 初期のB+Tree の構造:
+
+    ```txt
+                [Root: Branch Node]
+                Pairs: [(key="fish", pageId=10), (key="monkey", pageId=20)]
+                RightChild: pageId=30
+                       /            |              \
+                  (<fish)         (fish~monkey)    (>=monkey)
+                  PageID=10       PageID=20       PageID=30
+                    /                |                \
+     [Leaf: apple,cat]  [Leaf: fish,grape]  [Leaf: monkey,tiger]
+    ```
