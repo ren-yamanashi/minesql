@@ -121,7 +121,8 @@ func (sp *SlottedPage) Resize(index int, newSize int) bool {
 		}
 	}
 
-	// 対象のポインタのサイズを更新
+	// 対象のポインタのサイズを更新 (ループでオフセットが更新されているため再取得する)
+	pointer = sp.pointerAt(index)
 	pointer.size = uint16(newSize)
 	if newSize == 0 {
 		pointer.offset = uint16(newFreeSpaceOffset)
@@ -147,22 +148,6 @@ func (sp *SlottedPage) Remove(index int) {
 
 	// numSlots を減らす
 	binary.BigEndian.PutUint16(sp.data[0:2], uint16(numSlots-1))
-}
-
-// 指定されたインデックスのポインタを取得する
-func (sp *SlottedPage) pointerAt(index int) Pointer {
-	base := headerSize + index*pointerSize
-	return newPointer(
-		binary.BigEndian.Uint16(sp.data[base:base+2]),
-		binary.BigEndian.Uint16(sp.data[base+2:base+4]),
-	)
-}
-
-// 指定されたインデックスのポインタを設定する
-func (sp *SlottedPage) setPointer(index int, pointer Pointer) {
-	base := headerSize + index*pointerSize
-	binary.BigEndian.PutUint16(sp.data[base:base+2], pointer.offset) // offset
-	binary.BigEndian.PutUint16(sp.data[base+2:base+4], pointer.size) // size
 }
 
 // 自分のすべてのスロットを dest の末尾に転送する。(自身のスロットはすべて削除される)
@@ -208,4 +193,20 @@ func (sp *SlottedPage) TransferAllTo(dest *SlottedPage) bool {
 	sp.Initialize()
 
 	return true
+}
+
+// 指定されたインデックスのポインタを取得する
+func (sp *SlottedPage) pointerAt(index int) Pointer {
+	base := headerSize + index*pointerSize
+	return newPointer(
+		binary.BigEndian.Uint16(sp.data[base:base+2]),
+		binary.BigEndian.Uint16(sp.data[base+2:base+4]),
+	)
+}
+
+// 指定されたインデックスのポインタを設定する
+func (sp *SlottedPage) setPointer(index int, pointer Pointer) {
+	base := headerSize + index*pointerSize
+	binary.BigEndian.PutUint16(sp.data[base:base+2], pointer.offset) // offset
+	binary.BigEndian.PutUint16(sp.data[base+2:base+4], pointer.size) // size
 }
