@@ -7,3 +7,4 @@ examples/**/*.jsonc
 .claude/settings.local.json
 bin/
 data/
+sandbox/
