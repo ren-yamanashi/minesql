@@ -168,6 +168,116 @@ func TestCreateAndInsert(t *testing.T) {
 	})
 }
 
+func TestDelete(t *testing.T) {
+	t.Run("テーブルから行を削除でき、B+Tree とユニークインデックスの両方から削除される", func(t *testing.T) {
+		// GIVEN: テーブルを作成しデータを挿入
+		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", 2)
+		bpm, metaPageId, _ := InitDiskManager(t, "users.db")
+
+		indexMetaPageId, err := bpm.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex.MetaPageId = indexMetaPageId
+
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex})
+		err = table.Create(bpm)
+		assert.NoError(t, err)
+
+		records := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
+		err = table.Insert(bpm, records)
+		assert.NoError(t, err)
+		err = table.Insert(bpm, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		assert.NoError(t, err)
+		err = table.Insert(bpm, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
+		assert.NoError(t, err)
+
+		// WHEN: "a" の行を削除
+		err = table.Delete(bpm, records)
+
+		// THEN: B+Tree から削除されている
+		assert.NoError(t, err)
+		tree := btree.NewBTree(table.MetaPageId)
+		iter, err := tree.Search(bpm, btree.SearchModeStart{})
+		assert.NoError(t, err)
+
+		var keys []string
+		for {
+			pair, ok, err := iter.Next(bpm)
+			assert.NoError(t, err)
+			if !ok {
+				break
+			}
+			var decodedKey [][]byte
+			Decode(pair.Key, &decodedKey)
+			keys = append(keys, string(decodedKey[0]))
+		}
+		assert.Equal(t, []string{"b", "c"}, keys)
+
+		// THEN: ユニークインデックスからも削除されている
+		indexTree := btree.NewBTree(table.UniqueIndexes[0].MetaPageId)
+		indexIter, err := indexTree.Search(bpm, btree.SearchModeStart{})
+		assert.NoError(t, err)
+
+		var indexKeys []string
+		for {
+			pair, ok, err := indexIter.Next(bpm)
+			assert.NoError(t, err)
+			if !ok {
+				break
+			}
+			var decodedKey [][]byte
+			Decode(pair.Key, &decodedKey)
+			indexKeys = append(indexKeys, string(decodedKey[0]))
+		}
+		// "Doe" が削除されて "Johnson", "Smith" のみ残る
+		assert.Equal(t, []string{"Johnson", "Smith"}, indexKeys)
+	})
+
+	t.Run("存在しないキーを削除するとエラーが返る", func(t *testing.T) {
+		// GIVEN
+		bpm, metaPageId, _ := InitDiskManager(t, "users.db")
+		table := NewTable("users", metaPageId, 1, nil)
+		err := table.Create(bpm)
+		assert.NoError(t, err)
+
+		err = table.Insert(bpm, [][]byte{[]byte("a"), []byte("John")})
+		assert.NoError(t, err)
+
+		// WHEN: 存在しないキーで削除
+		err = table.Delete(bpm, [][]byte{[]byte("z"), []byte("Unknown")})
+
+		// THEN
+		assert.Error(t, err)
+	})
+
+	t.Run("全行を削除した後にテーブルが空になる", func(t *testing.T) {
+		// GIVEN
+		bpm, metaPageId, _ := InitDiskManager(t, "users.db")
+		table := NewTable("users", metaPageId, 1, nil)
+		err := table.Create(bpm)
+		assert.NoError(t, err)
+
+		record1 := [][]byte{[]byte("a"), []byte("John")}
+		record2 := [][]byte{[]byte("b"), []byte("Alice")}
+		err = table.Insert(bpm, record1)
+		assert.NoError(t, err)
+		err = table.Insert(bpm, record2)
+		assert.NoError(t, err)
+
+		// WHEN
+		err = table.Delete(bpm, record1)
+		assert.NoError(t, err)
+		err = table.Delete(bpm, record2)
+		assert.NoError(t, err)
+
+		// THEN
+		tree := btree.NewBTree(table.MetaPageId)
+		iter, err := tree.Search(bpm, btree.SearchModeStart{})
+		assert.NoError(t, err)
+		_, ok := iter.Get()
+		assert.False(t, ok)
+	})
+}
+
 func TestGetUniqueIndexByName(t *testing.T) {
 	t.Run("インデックス名からユニークインデックスを取得できる", func(t *testing.T) {
 		// GIVEN
