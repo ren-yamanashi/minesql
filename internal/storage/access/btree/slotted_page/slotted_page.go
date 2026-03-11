@@ -121,7 +121,8 @@ func (sp *SlottedPage) Resize(index int, newSize int) bool {
 		}
 	}
 
-	// 対象のポインタのサイズを更新
+	// 対象のポインタのサイズを更新 (ループでオフセットが更新されているため再取得する)
+	pointer = sp.pointerAt(index)
 	pointer.size = uint16(newSize)
 	if newSize == 0 {
 		pointer.offset = uint16(newFreeSpaceOffset)
@@ -147,6 +148,51 @@ func (sp *SlottedPage) Remove(index int) {
 
 	// numSlots を減らす
 	binary.BigEndian.PutUint16(sp.data[0:2], uint16(numSlots-1))
+}
+
+// 自分のすべてのスロットを dest の末尾に転送する。(自身のスロットはすべて削除される)
+// 空き容量が不足している場合は false を返す
+func (sp *SlottedPage) TransferAllTo(dest *SlottedPage) bool {
+	srcNumSlots := sp.NumSlots()
+	if srcNumSlots == 0 {
+		return true
+	}
+
+	// 必要な空き容量を計算 (ポインタ + データ)
+	totalDataSize := 0
+	for i := range srcNumSlots {
+		totalDataSize += len(sp.Data(i))
+	}
+	requiredSpace := srcNumSlots*pointerSize + totalDataSize
+
+	if dest.FreeSpace() < requiredSpace {
+		return false
+	}
+
+	// dest にスロットを追加
+	destNumSlots := dest.NumSlots()
+	destFreeOffset := int(binary.BigEndian.Uint16(dest.data[2:4]))
+
+	for i := range srcNumSlots {
+		srcData := sp.Data(i)
+		dataSize := len(srcData)
+
+		// データをコピー
+		destFreeOffset -= dataSize
+		copy(dest.data[destFreeOffset:destFreeOffset+dataSize], srcData)
+
+		// ポインタを設定
+		dest.setPointer(destNumSlots+i, newPointer(uint16(destFreeOffset), uint16(dataSize)))
+	}
+
+	// dest のヘッダーを更新
+	binary.BigEndian.PutUint16(dest.data[0:2], uint16(destNumSlots+srcNumSlots))
+	binary.BigEndian.PutUint16(dest.data[2:4], uint16(destFreeOffset))
+
+	// 自身のスロットをクリア
+	sp.Initialize()
+
+	return true
 }
 
 // 指定されたインデックスのポインタを取得する

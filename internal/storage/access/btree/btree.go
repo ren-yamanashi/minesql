@@ -11,6 +11,7 @@ import (
 
 var (
 	ErrDuplicateKey = errors.New("duplicate key")
+	ErrKeyNotFound  = errors.New("key not found")
 )
 
 type BTree struct {
@@ -58,50 +59,6 @@ func (bt *BTree) Search(bpm *bufferpool.BufferPoolManager, searchMode SearchMode
 		return nil, err
 	}
 	return bt.searchRecursively(bpm, rootPage, searchMode)
-}
-
-// B+Tree にペアを挿入する
-func (bt *BTree) Insert(bpm *bufferpool.BufferPoolManager, pair node.Pair) error {
-	metaBuf, err := bpm.FetchPage(bt.MetaPageId)
-	if err != nil {
-		return err
-	}
-	// メタページは使い終わったらすぐ不要になる (優先的に evict されたい) ので、UnRefPage する
-	defer bpm.UnRefPage(bt.MetaPageId)
-	meta := metapage.NewMetaPage(metaBuf.GetReadData())
-	rootPageId := meta.RootPageId()
-	rootPageBuf, err := bpm.FetchPage(rootPageId)
-	if err != nil {
-		return err
-	}
-	defer bpm.UnRefPage(rootPageId)
-
-	overflowKey, overflowChildPageId, err := bt.insertRecursively(bpm, rootPageBuf, pair)
-	if err != nil {
-		return err
-	}
-	if overflowChildPageId == nil {
-		return nil
-	}
-
-	// ルートノードが分割された場合、新しいルートノードを作成する
-	newRootPageId, err := bpm.AllocatePageId(bt.MetaPageId.FileId)
-	if err != nil {
-		return err
-	}
-	newRootBuf, err := bpm.AddPage(newRootPageId)
-	if err != nil {
-		return err
-	}
-	defer bpm.UnRefPage(newRootPageId)
-	newRootBranchNode := node.NewBranchNode(newRootBuf.GetWriteData())
-	err = newRootBranchNode.Initialize(overflowKey, *overflowChildPageId, rootPageId)
-	if err != nil {
-		return err
-	}
-	meta = metapage.NewMetaPage(metaBuf.GetWriteData())
-	meta.SetRootPageId(newRootBuf.PageId)
-	return nil
 }
 
 // ルートページを取得
@@ -177,6 +134,50 @@ func (bt *BTree) searchRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 	}
 
 	panic("unknown node type") // 実際にはここには到達しないので errors.New ではなく panic で良い
+}
+
+// B+Tree にペアを挿入する
+func (bt *BTree) Insert(bpm *bufferpool.BufferPoolManager, pair node.Pair) error {
+	metaBuf, err := bpm.FetchPage(bt.MetaPageId)
+	if err != nil {
+		return err
+	}
+	// メタページは使い終わったらすぐ不要になる (優先的に evict されたい) ので、UnRefPage する
+	defer bpm.UnRefPage(bt.MetaPageId)
+	meta := metapage.NewMetaPage(metaBuf.GetReadData())
+	rootPageId := meta.RootPageId()
+	rootPageBuf, err := bpm.FetchPage(rootPageId)
+	if err != nil {
+		return err
+	}
+	defer bpm.UnRefPage(rootPageId)
+
+	overflowKey, overflowChildPageId, err := bt.insertRecursively(bpm, rootPageBuf, pair)
+	if err != nil {
+		return err
+	}
+	if overflowChildPageId == nil {
+		return nil
+	}
+
+	// ルートノードが分割された場合、新しいルートノードを作成する
+	newRootPageId, err := bpm.AllocatePageId(bt.MetaPageId.FileId)
+	if err != nil {
+		return err
+	}
+	newRootBuf, err := bpm.AddPage(newRootPageId)
+	if err != nil {
+		return err
+	}
+	defer bpm.UnRefPage(newRootPageId)
+	newRootBranchNode := node.NewBranchNode(newRootBuf.GetWriteData())
+	err = newRootBranchNode.Initialize(overflowKey, *overflowChildPageId, rootPageId)
+	if err != nil {
+		return err
+	}
+	meta = metapage.NewMetaPage(metaBuf.GetWriteData())
+	meta.SetRootPageId(newRootBuf.PageId)
+	return nil
 }
 
 // 戻り値: (オーバーフローキー, 新しいページ ID, エラー)
@@ -288,4 +289,256 @@ func (bt *BTree) insertRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer
 	}
 
 	panic("unknown node type") // 実際にはここには到達しないので errors.New ではなく panic で良い
+}
+
+// B+Tree からペアを削除する
+func (bt *BTree) Delete(bpm *bufferpool.BufferPoolManager, key []byte) error {
+	metaBuf, err := bpm.FetchPage(bt.MetaPageId)
+	if err != nil {
+		return err
+	}
+	defer bpm.UnRefPage(bt.MetaPageId)
+	meta := metapage.NewMetaPage(metaBuf.GetReadData())
+	rootPageId := meta.RootPageId()
+	rootPageBuf, err := bpm.FetchPage(rootPageId)
+	if err != nil {
+		return err
+	}
+	defer bpm.UnRefPage(rootPageId)
+
+	_, err = bt.deleteRecursively(bpm, rootPageBuf, key)
+	if err != nil {
+		return err
+	}
+
+	// ルートノードがブランチノードで、子が 1 つになった場合、子をルートにする
+	nodeType := node.GetNodeType(rootPageBuf.GetReadData())
+	if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
+		branchNode := node.NewBranchNode(rootPageBuf.GetReadData())
+		if branchNode.NumPairs() == 0 {
+			// 子が 1 つになった場合、右端の子をルートにする
+			newRootPageId := branchNode.ChildPageIdAt(0)
+			meta = metapage.NewMetaPage(metaBuf.GetWriteData())
+			meta.SetRootPageId(newRootPageId)
+		}
+	}
+
+	return nil
+}
+
+// deleteResult は削除処理の結果を表す
+type deleteResult struct {
+	// 子ノードでアンダーフローが発生したかどうか
+	underflow bool
+}
+
+// 再帰的にノードを辿ってペアを削除する
+func (bt *BTree) deleteRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer *bufferpool.BufferPage, key []byte) (deleteResult, error) {
+	nodeType := node.GetNodeType(nodeBuffer.GetReadData())
+
+	if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
+		return bt.deleteFromLeaf(nodeBuffer, key)
+	} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
+		return bt.deleteFromBranch(bpm, nodeBuffer, key)
+	}
+	panic("unknown node type") // 実際にはここには到達しないので errors.New ではなく panic で良い
+}
+
+// リーフノードからペアを削除する
+func (bt *BTree) deleteFromLeaf(nodeBuffer *bufferpool.BufferPage, key []byte) (deleteResult, error) {
+	// 削除すべきペア (ペアが格納されているスロット番号) を特定
+	leafNode := node.NewLeafNode(nodeBuffer.GetWriteData())
+	slotNum, found := leafNode.SearchSlotNum(key)
+	if !found {
+		return deleteResult{}, ErrKeyNotFound
+	}
+
+	// ペアを削除
+	leafNode.Delete(slotNum)
+
+	// アンダーフローが発生したかどうかを判定
+	underflow := !leafNode.IsHalfFull()
+
+	return deleteResult{underflow: underflow}, nil
+}
+
+// 右の兄弟ノードが存在する場合、右の兄弟から借りるかマージする。存在しない場合は左の兄弟から借りるかマージする
+type siblingInfo struct {
+	pageId     page.PageId
+	bufferPage *bufferpool.BufferPage
+	// true: 兄弟ノードは左の兄弟ノード, false: 兄弟ノードは右の兄弟ノード
+	isLeft bool
+}
+
+// ブランチノードから再帰的にペアを削除する
+func (bt *BTree) deleteFromBranch(bpm *bufferpool.BufferPoolManager, nodeBuffer *bufferpool.BufferPage, key []byte) (deleteResult, error) {
+	branchNode := node.NewBranchNode(nodeBuffer.GetWriteData())
+	childIndex := branchNode.SearchChildSlotNum(key)
+	childPageId := branchNode.ChildPageIdAt(childIndex)
+	childNodeBuffer, err := bpm.FetchPage(childPageId)
+	if err != nil {
+		return deleteResult{}, err
+	}
+	defer bpm.UnRefPage(childPageId)
+
+	// 子ノードに対して削除処理を再帰的に実行
+	result, err := bt.deleteRecursively(bpm, childNodeBuffer, key)
+	if err != nil {
+		return deleteResult{}, err
+	}
+
+	// 子ノードでアンダーフローが発生しなかった場合、終了
+	if !result.underflow {
+		return deleteResult{underflow: false}, nil
+	}
+
+	// 子ノードでアンダーフローが発生した場合
+	sibling := func() siblingInfo {
+		if childIndex < branchNode.NumPairs() {
+			siblingPageId := branchNode.ChildPageIdAt(childIndex + 1)
+			return siblingInfo{pageId: siblingPageId, isLeft: false}
+		}
+		siblingPageId := branchNode.ChildPageIdAt(childIndex - 1)
+		return siblingInfo{pageId: siblingPageId, isLeft: true}
+	}()
+
+	siblingBuffer, err := bpm.FetchPage(sibling.pageId)
+	if err != nil {
+		return deleteResult{}, err
+	}
+	sibling.bufferPage = siblingBuffer
+	defer bpm.UnRefPage(sibling.pageId)
+
+	if bytes.Equal(node.GetNodeType(childNodeBuffer.GetReadData()), node.NODE_TYPE_LEAF) {
+		return bt.resolveLeafUnderflow(branchNode, childNodeBuffer, sibling, childIndex), nil
+	}
+	return bt.resolveBranchUnderflow(branchNode, childNodeBuffer, sibling, childIndex), nil
+}
+
+// リーフノードのアンダーフロー処理
+// parentBranchNode: 親のブランチノード
+// childBuffer: アンダーフローが発生した子ノードのバッファページ (リーフノードのバッファページ)
+// sibling: childBuffer と兄弟ノードの情報
+// childIndex: childBuffer が親のブランチノードの子ノードの中で何番目か
+func (bt *BTree) resolveLeafUnderflow(parentBranchNode *node.BranchNode, childBuffer *bufferpool.BufferPage, sibling siblingInfo, childIndex int) deleteResult {
+	childNode := node.NewLeafNode(childBuffer.GetWriteData())
+	siblingNode := node.NewLeafNode(sibling.bufferPage.GetWriteData())
+
+	// 兄弟から借りられる場合
+	if siblingNode.CanLendPair() {
+		// 借りる先の兄弟ノードが左に位置する場合、兄弟の末尾ペアを子の自分のノードの先頭に移動
+		if sibling.isLeft {
+			lastIndex := siblingNode.NumPairs() - 1
+			pair := siblingNode.PairAt(lastIndex)
+			childNode.Insert(0, pair)
+			siblingNode.Delete(lastIndex)
+			parentBranchNode.UpdateKeyAt(childIndex-1, childNode.PairAt(0).Key)
+		} else {
+			// 借りる先の兄弟ノードが右に位置する場合、兄弟の先頭ペアを子の自分のノードの末尾に移動
+			pair := siblingNode.PairAt(0)
+			childNode.Insert(childNode.NumPairs(), pair)
+			siblingNode.Delete(0)
+			parentBranchNode.UpdateKeyAt(childIndex, siblingNode.PairAt(0).Key)
+		}
+		return deleteResult{underflow: false}
+	}
+
+	// 借りられない場合はマージする (左のノードに右のノードをマージ = 左のノードが残る)
+	if sibling.isLeft {
+		// 左の兄弟とマージ: 子(RightChild)のペアをすべて兄弟(左)に移動、兄弟が残る
+		siblingNode.TransferAllFrom(childNode)
+		siblingNode.SetNextPageId(childNode.NextPageId())
+		// 親の右端のペアは不要になるので削除し、RightChild を兄弟ノードに更新
+		parentBranchNode.Delete(parentBranchNode.NumPairs() - 1)
+		parentBranchNode.SetRightChildPageId(sibling.bufferPage.PageId)
+	} else {
+		// 右の兄弟とマージ: 兄弟(右)のペアをすべて子(左)に移動、子が残る
+		childNode.TransferAllFrom(siblingNode)
+		childNode.SetNextPageId(siblingNode.NextPageId())
+
+		if childIndex+1 == parentBranchNode.NumPairs() {
+			// 兄弟が RightChild の場合、親の右端のペアを削除し、RightChild を子ノードに更新
+			parentBranchNode.Delete(parentBranchNode.NumPairs() - 1)
+			parentBranchNode.SetRightChildPageId(childBuffer.PageId)
+		} else {
+			// 兄弟が RightChild でない場合、キーを更新してから削除
+			nextKey := parentBranchNode.PairAt(childIndex + 1).Key
+			parentBranchNode.UpdateKeyAt(childIndex, nextKey)
+			parentBranchNode.Delete(childIndex + 1) // 右の兄弟を削除するので `childIndex + 1`
+		}
+	}
+
+	return deleteResult{underflow: !parentBranchNode.IsHalfFull()}
+}
+
+// ブランチノードのアンダーフロー処理
+// parentBranchNode: 親のブランチノード
+// childBuffer: アンダーフローが発生した子ノードのバッファページ (ブランチノードのバッファページ)
+// sibling: childBuffer の兄弟ノードの情報
+// childIndex: childBuffer が親のブランチノードの子ノードの中で何番目か
+func (bt *BTree) resolveBranchUnderflow(parentBranchNode *node.BranchNode, childBuffer *bufferpool.BufferPage, sibling siblingInfo, childIndex int) deleteResult {
+	childNode := node.NewBranchNode(childBuffer.GetWriteData())
+	siblingNode := node.NewBranchNode(sibling.bufferPage.GetWriteData())
+
+	// 兄弟から借りられる場合
+	if siblingNode.CanLendPair() {
+		if sibling.isLeft {
+			// 左の兄弟から借りる: 親の境界キーを子の先頭に下ろし、兄弟の末尾キーを親に上げる
+			parentPair := parentBranchNode.PairAt(childIndex - 1)
+			siblingRightChild := siblingNode.RightChildPageId()
+			childNode.Insert(0, node.NewPair(parentPair.Key, siblingRightChild.ToBytes()))
+
+			lastIndex := siblingNode.NumPairs() - 1
+			siblingLastPair := siblingNode.PairAt(lastIndex)
+			parentBranchNode.UpdateKeyAt(childIndex-1, siblingLastPair.Key)
+			siblingNode.SetRightChildPageId(page.PageIdFromBytes(siblingLastPair.Value))
+			siblingNode.Delete(lastIndex)
+		} else {
+			// 右の兄弟から借りる: 親の境界キーを子の末尾に下ろし、兄弟の先頭キーを親に上げる
+			parentPair := parentBranchNode.PairAt(childIndex)
+			childRightChild := childNode.RightChildPageId()
+			childNode.Insert(childNode.NumPairs(), node.NewPair(parentPair.Key, childRightChild.ToBytes()))
+
+			siblingFirstPair := siblingNode.PairAt(0)
+			childNode.SetRightChildPageId(page.PageIdFromBytes(siblingFirstPair.Value))
+			parentBranchNode.UpdateKeyAt(childIndex, siblingFirstPair.Key)
+			siblingNode.Delete(0)
+		}
+		return deleteResult{underflow: false}
+	}
+
+	// 借りられない場合はマージする (左のノードに右のノードをマージ = 左のノードが残る)
+	if sibling.isLeft {
+		// 左の兄弟とマージ: 子(RightChild)のペアをすべて兄弟(左)に移動、兄弟が残る
+		// 親の右端のペアのキーを下ろして兄弟の末尾に追加
+		parentPair := parentBranchNode.PairAt(parentBranchNode.NumPairs() - 1)
+		siblingRightChild := siblingNode.RightChildPageId()
+		siblingNode.Insert(siblingNode.NumPairs(), node.NewPair(parentPair.Key, siblingRightChild.ToBytes()))
+
+		siblingNode.TransferAllFrom(childNode)
+		siblingNode.SetRightChildPageId(childNode.RightChildPageId())
+		// 親の右端のペアは不要になるので削除し、RightChild を兄弟ノードに更新
+		parentBranchNode.Delete(parentBranchNode.NumPairs() - 1)
+		parentBranchNode.SetRightChildPageId(sibling.bufferPage.PageId)
+	} else {
+		parentPair := parentBranchNode.PairAt(childIndex)
+		childRightChild := childNode.RightChildPageId()
+		childNode.Insert(childNode.NumPairs(), node.NewPair(parentPair.Key, childRightChild.ToBytes()))
+
+		childNode.TransferAllFrom(siblingNode)
+		childNode.SetRightChildPageId(siblingNode.RightChildPageId())
+
+		if childIndex+1 == parentBranchNode.NumPairs() {
+			// 兄弟が RightChild の場合、親の右端のペアを削除し、RightChild を子ノードに更新
+			parentBranchNode.Delete(parentBranchNode.NumPairs() - 1)
+			parentBranchNode.SetRightChildPageId(childBuffer.PageId)
+		} else {
+			// 兄弟が RightChild でない場合、キーを更新してから削除
+			nextKey := parentBranchNode.PairAt(childIndex + 1).Key
+			parentBranchNode.UpdateKeyAt(childIndex, nextKey)
+			parentBranchNode.Delete(childIndex + 1)
+		}
+	}
+
+	return deleteResult{underflow: !parentBranchNode.IsHalfFull()}
 }

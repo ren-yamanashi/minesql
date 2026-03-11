@@ -71,3 +71,62 @@ func TestUniqueIndex(t *testing.T) {
 		}
 	})
 }
+
+func TestUniqueIndexDelete(t *testing.T) {
+	t.Run("ユニークインデックスから行を削除できる", func(t *testing.T) {
+		// GIVEN
+		uniqueIndex := NewUniqueIndex("test_index", "test", 0)
+		bpm, metaPageId, _ := InitDiskManager(t, "test.db")
+
+		indexMetapageId, err := bpm.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex.MetaPageId = indexMetapageId
+
+		err = uniqueIndex.Create(bpm, indexMetapageId)
+		assert.NoError(t, err)
+
+		err = uniqueIndex.Insert(bpm, []uint8{0}, [][]byte{[]byte("John")})
+		assert.NoError(t, err)
+		err = uniqueIndex.Insert(bpm, []uint8{1}, [][]byte{[]byte("Alice")})
+		assert.NoError(t, err)
+		err = uniqueIndex.Insert(bpm, []uint8{2}, [][]byte{[]byte("Eve")})
+		assert.NoError(t, err)
+
+		// WHEN: "Alice" を削除
+		err = uniqueIndex.Delete(bpm, [][]byte{[]byte("Alice")})
+
+		// THEN: "Alice" が削除され、残りが昇順で取得できる
+		assert.NoError(t, err)
+		tree := btree.NewBTree(uniqueIndex.MetaPageId)
+		iter, err := tree.Search(bpm, btree.SearchModeStart{})
+		assert.NoError(t, err)
+
+		expectedRecords := []struct {
+			key   [][]byte
+			value []uint8
+		}{
+			{[][]byte{[]byte("Eve")}, []uint8{2}},
+			{[][]byte{[]byte("John")}, []uint8{0}},
+		}
+
+		i := 0
+		for {
+			pair, ok := iter.Get()
+			if !ok {
+				break
+			}
+			expected := expectedRecords[i]
+
+			var decodedKey [][]byte
+			Decode(pair.Key, &decodedKey)
+
+			assert.Equal(t, expected.key, decodedKey)
+			assert.Equal(t, expected.value, pair.Value)
+
+			i++
+			_, _, err := iter.Next(bpm)
+			assert.NoError(t, err)
+		}
+		assert.Equal(t, len(expectedRecords), i)
+	})
+}

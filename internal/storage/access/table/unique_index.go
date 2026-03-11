@@ -51,3 +51,15 @@ func (ui *UniqueIndex) Insert(bpm *bufferpool.BufferPoolManager, primaryKey []ui
 	// B+Tree に挿入
 	return btr.Insert(bpm, node.NewPair(secondaryKey, primaryKey))
 }
+
+// ユニークインデックスから行を削除する
+func (ui *UniqueIndex) Delete(bpm *bufferpool.BufferPoolManager, record [][]byte) error {
+	btr := btree.NewBTree(ui.MetaPageId)
+	var secondaryKey []byte
+
+	// セカンダリキーをエンコード
+	Encode([][]byte{record[ui.SecondaryKeyIdx]}, &secondaryKey)
+
+	// B+Tree から削除
+	return btr.Delete(bpm, secondaryKey)
+}

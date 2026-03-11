@@ -77,6 +77,12 @@ func (ln *LeafNode) Insert(slotNum int, pair Pair) bool {
 	return false
 }
 
+// key-value ペアを削除する
+// slotNum: 削除するペアのスロット番号 (slotted page のスロット番号)
+func (ln *LeafNode) Delete(slotNum int) {
+	ln.body.Remove(slotNum)
+}
+
 // リーフノードを初期化する
 // 初期化時には、前後のリーフノードのポインタ (ページ ID) には無効値が設定される
 func (ln *LeafNode) Initialize() {
@@ -91,7 +97,7 @@ func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newPair Pair) ([]byte, er
 	newLeafNode.Initialize()
 
 	for {
-		if newLeafNode.isHalfFull() {
+		if newLeafNode.IsHalfFull() {
 			slotNum, _ := ln.SearchSlotNum(newPair.Key)
 			if !ln.Insert(slotNum, newPair) {
 				return nil, errors.New("old leaf must have space")
@@ -108,7 +114,7 @@ func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newPair Pair) ([]byte, er
 		} else {
 			// 新しいペアを新しいリーフノードに挿入し、残りのペアを新しいリーフノードに移動する
 			newLeafNode.Insert(newLeafNode.NumPairs(), newPair)
-			for !newLeafNode.isHalfFull() {
+			for !newLeafNode.IsHalfFull() {
 				err := ln.transfer(newLeafNode)
 				if err != nil {
 					return nil, err
@@ -157,14 +163,31 @@ func (ln *LeafNode) SetNextPageId(nextPageId *page.PageId) {
 	pageId.WriteTo(ln.Body(), 8)
 }
 
-// 最大ペアサイズを取得する
-func (ln *LeafNode) maxPairSize() int {
-	return ln.body.Capacity()/2 - 4 // Slotted Page の容量の半分 - キーサイズを格納する 4 バイト (2 で割るのは、 key と value の両方を格納するため)
+// src のすべてのペアを自分の末尾に転送する (src のペアはすべて削除される)
+func (ln *LeafNode) TransferAllFrom(src *LeafNode) {
+	src.body.TransferAllTo(ln.body)
 }
 
 // リーフノードが半分以上埋まっているかどうかを判定する
-func (ln *LeafNode) isHalfFull() bool {
+func (ln *LeafNode) IsHalfFull() bool {
 	return 2*ln.body.FreeSpace() < ln.body.Capacity()
+}
+
+// 兄弟ノードにペアを貸せるかどうかを判定する
+// 貸した後も半分以上埋まっている場合は true を返す
+func (ln *LeafNode) CanLendPair() bool {
+	if ln.NumPairs() <= 1 {
+		return false
+	}
+	// 先頭ペアを貸した後も半分以上埋まっているかを確認
+	firstPairSize := len(ln.body.Data(0))
+	freeSpaceAfterLend := ln.body.FreeSpace() + firstPairSize + 4 // 4 はポインタサイズ
+	return 2*freeSpaceAfterLend < ln.body.Capacity()
+}
+
+// 最大ペアサイズを取得する
+func (ln *LeafNode) maxPairSize() int {
+	return ln.body.Capacity()/2 - 4 // Slotted Page の容量の半分 - キーサイズを格納する 4 バイト (2 で割るのは、 key と value の両方を格納するため)
 }
 
 // 先頭のペアを別のリーフノードに移動する

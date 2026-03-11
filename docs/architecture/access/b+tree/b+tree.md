@@ -32,37 +32,38 @@
    - 完全に一致する key が見つかれば、その key に対応する value を返す
    - 見つからなければ、該当する key は存在しないと判断する
 
-_以下例: key = "grape" を検索_
+#### _以下例: key = "grape" を検索_
 
-```txt
-B+Tree の構造:
-                    [Root: Branch Node]
-                    Pairs: [(key="dog", pageId=10), (key="monkey", pageId=20)]
-                    RightChild: pageId=30
-                           /            |              \
-                      (<dog)         (dog~monkey)    (>=monkey)
-                      PageID=10       PageID=20       PageID=30
-                        /                |                \
-         [Leaf: apple,cat,dog]  [Leaf: fish,grape,lion]  [Leaf: tiger,zebra]
+- B+Tree の構造:
 
-ステップ 1: ルートノード (ブランチノード) で二分探索
-  - "grape" と "dog" を比較 → dog < grape
+    ```txt
+                [Root: Branch Node]
+                Pairs: [(key="fish", pageId=10), (key="monkey", pageId=20)]
+                RightChild: pageId=30
+                       /            |              \
+                  (<fish)       (fish~monkey)    (>=monkey)
+                  PageID=10       PageID=20       PageID=30
+                    /                |                \
+     [Leaf: apple,cat,dog]  [Leaf: fish,grape,human]  [Leaf: monkey,tiger,zebra]
+    ```
+
+- ステップ 1: ルートノード (ブランチノード) で二分探索
+  - "grape" と "fish" を比較 → fish < grape
   - "grape" と "monkey" を比較 → grape < monkey
   - → インデックス 1 のペア (key="monkey", pageId=20) を取得
 
-ステップ 2: 子ページ (PageID=20) を取得し、再帰的に探索
+- ステップ 2: 子ページ (PageID=20) を取得し、再帰的に探索
 
-ステップ 3: リーフノードで二分探索
+- ステップ 3: リーフノードで二分探索
   - "grape" と "fish" を比較 → fish < grape
   - "grape" と "grape" を比較 → 一致
   - → インデックス 1 のペア (key="grape", value=v2) を取得
 
-最終結果: value=v2 を返す
-```
+- 最終結果: value=v2 を返す
 
 ## B+Tree へのデータの挿入
 
-### 基本的な流れ
+### 基本的な挿入の流れ
 
 - メタページからルートページの ID を取得
 - ルートノードから再帰的に挿入処理を行う
@@ -104,51 +105,184 @@ B+Tree の構造:
   - 新しく作成されたノードのページ ID (右の子)
 - メタページのルートページ ID を新しいルートノードの ID に更新
 
-_以下例1: key = 4 をリーフノードに挿入 (ノード分割が発生する場合)_
+#### _以下例1: key = 4 をリーフノードに挿入 (ノード分割が発生する場合)_
 
-```txt
-初期状態: leafNode = [(1, v1), (3, v3), (5, v5), (7, v7), (9, v9)] (満杯)
-挿入するペア: (4, v4)
-
-ステップ 1: 挿入位置を二分探索
+- 初期状態: leafNode = [(1, v1), (3, v3), (5, v5), (7, v7), (9, v9)] (満杯)
+- 挿入するペア: (4, v4)
+- ステップ 1: 挿入位置を二分探索
   - 4 と 1 を比較 → 1 < 4
   - 4 と 5 を比較 → 4 < 5
   - → インデックス 2 が挿入位置
-
-ステップ 2: 空き容量がないため、ノード分割を実行
+- ステップ 2: 空き容量がないため、ノード分割を実行
   - 新しいリーフノードを作成
   - 既存のペアと新しいペアを 2 つに分割
-
-ステップ 3: 分割後の状態
+- ステップ 3: 分割後の状態
   - 新しいリーフノード: [(1, v1), (3, v3), (4, v4)]
   - 元のリーフノード: [(5, v5), (7, v7), (9, v9)]
   - リーフノード間の連結を更新
-
-ステップ 4: 親ノードに返す
+- ステップ 4: 親ノードに返す
   - オーバーフローキー: 5 (新しいノードの最大キーの次のキー)
   - 新しいノードのページ ID
-```
 
-_以下例2: key = 6 をブランチノードに挿入 (ノード分割が発生する場合)_
+#### _以下例2: key = 6 をブランチノードに挿入 (ノード分割が発生する場合)_
 
-```txt
-初期状態: branchNode = [(2, pageId=10), (4, pageId=20), (8, pageId=30), (10, pageId=40)], rightChild=pageId=50 (満杯)
-挿入するペア: (6, pageId=25) (子ノードの分割により返されたキーとページ ID)
-
-ステップ 1: 挿入位置を二分探索
+- 初期状態: branchNode = [(2, pageId=10), (4, pageId=20), (8, pageId=30), (10, pageId=40)], rightChild=pageId=50 (満杯)
+- 挿入するペア: (6, pageId=25) (子ノードの分割により返されたキーとページ ID)
+- ステップ 1: 挿入位置を二分探索
   - 6 と 2 を比較 → 2 < 6
   - 6 と 8 を比較 → 6 < 8
   - → インデックス 2 が挿入位置
-
-ステップ 2: 空き容量がないため、ノード分割を実行
+- ステップ 2: 空き容量がないため、ノード分割を実行
   - 新しいブランチノードを作成
   - 既存のペアと新しいペアを 2 つに分割
-
-ステップ 3: 分割後の状態
+- ステップ 3: 分割後の状態
   - 新しいブランチノード: [(2, pageId=10), (4, pageId=20), (6, pageId=25)], rightChild=pageId=30
   - 元のブランチノード: [(8, pageId=30), (10, pageId=40)], rightChild=pageId=50
-
-ステップ 4: 親ノードに返す
+- ステップ 4: 親ノードに返す
   - オーバーフローキー: 8 (新しいノードの最大キーの次のキー)
   - 新しいノードのページ ID
-```
+
+## B+Tree から特定のペアを削除する
+
+### 基本的な削除の流れ
+
+- メタページからルートページの ID を取得
+- 該当の key を持つペアを見つける
+- ペアを削除し、必要に応じてノードの再分割やマージを行う
+
+### リーフノードからの削除
+
+リーフノードからの削除は以下の手順で行う
+
+1. 二分探索により、削除すべきペアを特定
+2. ペアを削除
+3. ノードの空き容量が閾値 (ノードの最大容量の半分) を下回る場合、以下のいずれかを行う
+   - 兄弟ノードのペアを自分のノードに移動
+     - 基本的には右の (つまり自分より大きいキーを持つ) 兄弟ノードから借りるが、右端のノードの場合は左の兄弟ノードから借りる
+   - 兄弟ノードとマージする
+     - 兄弟のノードから移動すると、兄弟のノードの空き容量が閾値を下回る場合、兄弟ノードとマージする
+4. ブランチノードのキーを更新する
+   - 3 の処理でマージを行った場合はもちろんキーの更新が必要であるが、ノードの移動した場合も、兄弟との境界線が変わるため、ブランチノードのキーの更新が必要になる
+
+#### _以下例1: ノードの再分割が発生する場合_
+
+- 初期のB+Tree の構造:
+
+    ```txt
+                [Root: Branch Node]
+                Pairs: [(key="fish", pageId=10), (key="monkey", pageId=20)]
+                RightChild: pageId=30
+                       /            |              \
+                  (<fish)         (fish~monkey)    (>=monkey)
+                  PageID=10       PageID=20       PageID=30
+                    /                |                \
+     [Leaf: apple,cat,dog]  [Leaf: fish,grape,lion]  [Leaf: monkey,tiger,zebra]
+    ```
+
+- 仮定: `key = "cat"` を削除する。そして削除後にリーフノードの空き容量が閾値を下回ると仮定する
+- 流れ
+  - (ステップ1,2は省略)
+  - ステップ 3: ノードの空き容量が閾値を下回るため、右の兄弟ノード (PageID=20) からペアを移動
+    - 右の兄弟ノード (PageID=20) から最小のペア (key="fish"のペア) を移動
+    - もともとは [apple, cat, dog] の順であったが、cat を削除して fish を移動したため、[apple, dog, fish] の順になる
+      - fish は dog より大きいため [apple, fish, dog] ではなく (つまり cat の代わりに fish を入れるのではなく) [apple, dog, fish] の順になる
+    - 移動後のリーフノード (PageID=10): [apple, dog, fish]
+    - 移動後の右の兄弟ノード (PageID=20): [grape, lion]
+  - ステップ 4: ブランチノードのキーを更新
+    - 移動前の境界線は "dog" と "fish" の間であったが、移動後の境界線は "fish" と "grape" の間になるため、ブランチノードのキーを "grape" に更新
+
+- 削除後のB+Tree の構造:
+
+    ```txt
+                [Root: Branch Node]
+                Pairs: [(key="grape", pageId=10), (key="monkey", pageId=20)]
+                RightChild: pageId=30
+                       /            |              \
+                  (<grape)       (grape~monkey)    (>=monkey)
+                  PageID=10       PageID=20       PageID=30
+                    /                |                \
+     [Leaf: apple,dog,fish]  [Leaf: grape,lion]  [Leaf: monkey,tiger,zebra]
+    ```
+
+#### _以下例2: ノードのマージが発生する場合(左端と真ん中のマージ)_
+
+- 初期のB+Tree の構造:
+
+    ```txt
+                [Root: Branch Node]
+                Pairs: [(key="fish", pageId=10), (key="monkey", pageId=20)]
+                RightChild: pageId=30
+                       /            |              \
+                  (<fish)         (fish~monkey)    (>=monkey)
+                  PageID=10       PageID=20       PageID=30
+                    /                |                \
+     [Leaf: apple,cat]  [Leaf: fish,grape]  [Leaf: monkey,tiger,zebra]
+    ```
+
+- 仮定: key = "cat" を削除する。そして削除後にリーフノードの空き容量が閾値を下回ると仮定する。また右の兄弟ノード (PageID=20) からペアを移動しても、右の兄弟ノードの空き容量が閾値を下回ると仮定する
+
+- 流れ
+  - (ステップ1,2は省略)
+  - ステップ 3: ノードの空き容量が閾値を下回るため、右の兄弟ノード (PageID=20) からペアを移動したいが、そうすると右の兄弟ノードの空き容量も閾値を下回るため、右の兄弟ノードとマージする
+    - マージ後のリーフノード (PageID=10): [apple, fish, grape]
+    - マージ後の右の兄弟ノード (PageID=20) は不要になるため、削除する
+  - ステップ 4: ブランチノードのキーを更新
+    - マージ前の境界線は "cat" と "fish" の間であったが、マージ後の境界線は "grape" と "monkey" の間になるため、ブランチノードのキーを "monkey" に更新
+    - ブランチノードに紐づくリーフノードの数が K から K-1 になるため、ブランチノードのペアも削除する
+
+- 削除後のB+Tree の構造:
+
+    ```txt
+                [Root: Branch Node]
+                Pairs: [(key="monkey", pageId=10)]
+                RightChild: pageId=30
+                       /            |          
+                  (<monkey)       (>=monkey)
+                  PageID=10       PageID=30
+                    /                |
+     [Leaf: apple,fish,grape]  [Leaf: monkey,tiger,zebra]
+    ```
+
+#### _以下例3: ノードのマージが発生する場合(真ん中と右端のマージ)_
+
+- 初期のB+Tree の構造:
+
+    ```txt
+                [Root: Branch Node]
+                Pairs: [(key="fish", pageId=10), (key="monkey", pageId=20)]
+                RightChild: pageId=30
+                       /            |              \
+                  (<fish)         (fish~monkey)    (>=monkey)
+                  PageID=10       PageID=20       PageID=30
+                    /                |                \
+     [Leaf: apple,cat]  [Leaf: fish,grape]  [Leaf: monkey,tiger]
+    ```
+
+- 仮定: key = "monkey" を削除する。そして削除後にリーフノードの空き容量が閾値を下回ると仮定する。また左の兄弟ノード (PageID=20) からペアを移動しても、左の兄弟ノードの空き容量が閾値を下回ると仮定する
+
+- 流れ
+  - (ステップ1,2は省略)
+  - ステップ 3: ノードの空き容量が閾値を下回るため、左の兄弟ノードからペアを移動したいが、そうすると左の兄弟ノードの空き容量も閾値を下回るため、左の兄弟ノードとマージする
+    - マージ後のリーフノード (PageID=20): [fish,grape,tiger]
+    - 自分のノード（PageID=30）は空になり不要になるため、削除する
+  - ステップ 4: ブランチノードのキーを更新
+    - マージ前の境界線は "grape" と "monkey" の間であったが、マージ後の境界線は "cat" と "fish" の間になるため、ブランチノードのキーを "fish" に更新
+    - ブランチノードに紐づくリーフノードの数が K から K-1 になるため、ブランチノードのペアも削除する
+    - また PageId=20 がRightChild に昇格する
+
+- 削除後のB+Tree の構造:
+
+    ```txt
+                [Root: Branch Node]
+                Pairs: [(key="fish", pageId=10)]
+                RightChild: pageId=20
+                       /            |          
+                  (<fish)       (>=fish)
+                  PageID=10       PageID=20
+                    /                |
+     [Leaf: apple,cat]  [Leaf: fish,grape,tiger]
+    ```
+
+※ ポイントとして、マージの際は常に「左のノードに右のノードをマージする」というルールにしている (要するに、マージの際には常に左のノードが残る)  
+このようにしているのは、「右のノードに左のノードをマージする」と比較して高速であるためである。  
+(append のだとシフト操作が不要なので prepend よりも高速であるため)

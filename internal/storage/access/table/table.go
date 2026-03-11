@@ -78,6 +78,31 @@ func (t *Table) Insert(bpm *bufferpool.BufferPoolManager, record [][]byte) error
 	return nil
 }
 
+// テーブルから行を削除する
+func (t *Table) Delete(bpm *bufferpool.BufferPoolManager, record [][]byte) error {
+	btree := btree.NewBTree(t.MetaPageId)
+
+	// キーをエンコード
+	var encodedKey []byte
+	Encode(record[:t.PrimaryKeyCount], &encodedKey)
+
+	// B+Tree から削除
+	err := btree.Delete(bpm, encodedKey)
+	if err != nil {
+		return err
+	}
+
+	// ユニークインデックスから削除
+	for _, ui := range t.UniqueIndexes {
+		err := ui.Delete(bpm, record)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // インデックス名からユニークインデックスを取得する
 func (t *Table) GetUniqueIndexByName(indexName string) (*UniqueIndex, error) {
 	for _, ui := range t.UniqueIndexes {

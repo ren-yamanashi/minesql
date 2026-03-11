@@ -76,6 +76,12 @@ func (bn *BranchNode) Insert(slotNum int, pair Pair) bool {
 	return false
 }
 
+// key-value ペアを削除する
+// slotNum: 削除するペアのスロット番号 (slotted page のスロット番号)
+func (bn *BranchNode) Delete(slotNum int) {
+	bn.body.Remove(slotNum)
+}
+
 // ブランチノードを初期化する (初期化時には、ペア数は 1 つ)
 // key: 最初のペアのキー
 // leftChildPageId: 最初のペアの value (左の子ページのページ ID)
@@ -102,7 +108,7 @@ func (bn *BranchNode) SplitInsert(newBranchNode *BranchNode, newPair Pair) ([]by
 	newBranchNode.body.Initialize()
 
 	for {
-		if newBranchNode.isHalfFull() {
+		if newBranchNode.IsHalfFull() {
 			slotNum, _ := bn.SearchSlotNum(newPair.Key)
 			if !bn.Insert(slotNum, newPair) {
 				return nil, errors.New("old branch must have space")
@@ -119,7 +125,7 @@ func (bn *BranchNode) SplitInsert(newBranchNode *BranchNode, newPair Pair) ([]by
 		} else {
 			// 新しいペアを新しいブランチノードに挿入し、残りのペアを新しいブランチノードに移動する
 			newBranchNode.Insert(newBranchNode.NumPairs(), newPair)
-			for !newBranchNode.isHalfFull() {
+			for !newBranchNode.IsHalfFull() {
 				err := bn.transfer(newBranchNode)
 				if err != nil {
 					return nil, err
@@ -158,8 +164,45 @@ func (bn *BranchNode) maxPairSize() int {
 	return bn.body.Capacity()/2 - 4 // Slotted Page の容量の半分 - キーサイズを格納する 4 バイト (2 で割るのは、 key と value の両方を格納するため)
 }
 
-// リーフノードが半分以上埋まっているかどうかを判定する
-func (bn *BranchNode) isHalfFull() bool {
+// 兄弟ノードにペアを貸せるかどうかを判定する
+// 貸した後も半分以上埋まっている場合は true を返す
+func (bn *BranchNode) CanLendPair() bool {
+	if bn.NumPairs() <= 1 {
+		return false
+	}
+	// 先頭ペアを貸した後も半分以上埋まっているかを確認
+	firstPairSize := len(bn.body.Data(0))
+	freeSpaceAfterLend := bn.body.FreeSpace() + firstPairSize + 4 // 4 はポインタサイズ
+	return 2*freeSpaceAfterLend < bn.body.Capacity()
+}
+
+// 指定されたスロット番号のキーを更新する
+func (bn *BranchNode) UpdateKeyAt(slotNum int, newKey []byte) {
+	pair := bn.PairAt(slotNum)
+	newPair := NewPair(newKey, pair.Value)
+
+	// 古いペアを削除して新しいペアを挿入
+	bn.body.Remove(slotNum)
+	bn.Insert(slotNum, newPair)
+}
+
+// 右端の子ページ ID を取得する
+func (bn *BranchNode) RightChildPageId() page.PageId {
+	return page.ReadPageIdFrom(bn.Body(), 0)
+}
+
+// 右端の子ページ ID を設定する
+func (bn *BranchNode) SetRightChildPageId(pageId page.PageId) {
+	pageId.WriteTo(bn.Body(), 0)
+}
+
+// src のすべてのペアを自分の末尾に転送する (src のペアはすべて削除される)
+func (bn *BranchNode) TransferAllFrom(src *BranchNode) {
+	src.body.TransferAllTo(bn.body)
+}
+
+// ブランチノードが半分以上埋まっているかどうかを判定する
+func (bn *BranchNode) IsHalfFull() bool {
 	return 2*bn.body.FreeSpace() < bn.body.Capacity()
 }
 
@@ -181,7 +224,7 @@ func (bn *BranchNode) fillRightChild() []byte {
 	return key
 }
 
-// 先頭のペアを別のリーフノードに移動する
+// 先頭のペアを別のブランチノードに移動する
 func (bn *BranchNode) transfer(dest *BranchNode) error {
 	nextIndex := dest.NumPairs()
 	data := bn.body.Data(0)
