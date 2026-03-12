@@ -2,7 +2,6 @@ package parser
 
 import (
 	"errors"
-	"minesql/internal/planner/ast/expression"
 	"minesql/internal/planner/ast/identifier"
 	"minesql/internal/planner/ast/literal"
 	"minesql/internal/planner/ast/node"
@@ -19,12 +18,8 @@ type DeleteParser struct {
 	state ParserState
 	// 現在構築中の DELETE 文
 	stmt *statement.DeleteStmt
-	// 現在構築中の WHERE 句
-	whereClause *statement.WhereClause
-	// WHERE 句の AST ノードが格納されるスタック
-	whereNodeStack []node.ASTNode
-	// WHERE 句の演算子が格納されるスタック
-	whereOpStack []string
+	// WHERE 句パーサー
+	where WhereParser
 	// エラー情報
 	err error
 }
@@ -66,39 +61,13 @@ func (dp *DeleteParser) finalize() {
 		return
 	}
 
-	// WHERE 句がない場合は空の WhereClause を設定
-	if dp.whereClause == nil {
-		dp.stmt.Where = &statement.WhereClause{IsSet: false}
+	// WHERE 句を確定
+	whereClause, err := dp.where.finalizeWhere()
+	if err != nil {
+		dp.setError(err)
 		return
 	}
-
-	// 残っている演算子をすべて処理
-	for len(dp.whereOpStack) > 0 {
-		if err := dp.reduce(); err != nil {
-			dp.setError(err)
-			return
-		}
-	}
-
-	// WHERE 句があるのに式が一つもない場合はエラー
-	if len(dp.whereNodeStack) == 0 {
-		dp.setError(errors.New("[parse error] empty expression in WHERE clause"))
-		return
-	}
-
-	// スタックに複数の要素が残っている場合はエラー
-	if len(dp.whereNodeStack) != 1 {
-		dp.setError(errors.New("[parse error] incomplete expression in WHERE clause"))
-		return
-	}
-
-	// 最後に残った式を、WHERE 句のルートの式として設定
-	finalExpr, ok := dp.whereNodeStack[0].(expression.Expression)
-	if !ok {
-		dp.setError(errors.New("[parse error] invalid expression result"))
-		return
-	}
-	dp.whereClause.Condition = finalExpr
+	dp.stmt.Where = whereClause
 }
 
 func (dp *DeleteParser) OnKeyword(word string) {
@@ -123,10 +92,7 @@ func (dp *DeleteParser) OnKeyword(word string) {
 
 	case KWhere:
 		if dp.state == DeleteStateFrom {
-			dp.whereClause = &statement.WhereClause{IsSet: true}
-			dp.stmt.Where = dp.whereClause
-			dp.whereNodeStack = []node.ASTNode{}
-			dp.whereOpStack = []string{}
+			dp.stmt.Where = dp.where.initWhere()
 			dp.state = DeleteStateWhere
 			return
 		}
@@ -135,7 +101,9 @@ func (dp *DeleteParser) OnKeyword(word string) {
 
 	case KAnd, KOr:
 		if dp.state == DeleteStateWhere {
-			dp.handleOperator(upperWord)
+			if err := dp.where.handleOperator(upperWord); err != nil {
+				dp.setError(err)
+			}
 			return
 		}
 		dp.setError(errors.New("[parse error] AND operator is in invalid position"))
@@ -156,8 +124,7 @@ func (dp *DeleteParser) OnIdentifier(ident string) {
 	case DeleteStateFrom:
 		dp.stmt.From = *identifier.NewTableId(ident)
 	case DeleteStateWhere:
-		colId := *identifier.NewColumnId(ident)
-		dp.whereNodeStack = append(dp.whereNodeStack, colId)
+		dp.where.pushColumn(ident)
 	default:
 		dp.setError(errors.New("[parse error] unexpected identifier: " + ident))
 	}
@@ -176,18 +143,30 @@ func (dp *DeleteParser) OnSymbol(symbol string) {
 
 	switch dp.state {
 	case DeleteStateWhere:
-		dp.handleOperator(symbol)
+		if err := dp.where.handleOperator(symbol); err != nil {
+			dp.setError(err)
+		}
 	default:
 		dp.setError(errors.New("[parse error] unexpected symbol: " + symbol))
 	}
 }
 
 func (dp *DeleteParser) OnString(value string) {
-	dp.handleLiteral(literal.NewStringLiteral(value, value))
+	if dp.err != nil {
+		return
+	}
+	if dp.state == DeleteStateWhere {
+		dp.where.pushLiteral(literal.NewStringLiteral(value, value))
+	}
 }
 
 func (dp *DeleteParser) OnNumber(num string) {
-	dp.handleLiteral(literal.NewStringLiteral(num, num))
+	if dp.err != nil {
+		return
+	}
+	if dp.state == DeleteStateWhere {
+		dp.where.pushLiteral(literal.NewStringLiteral(num, num))
+	}
 }
 
 func (dp *DeleteParser) OnComment(text string) {
@@ -196,91 +175,6 @@ func (dp *DeleteParser) OnComment(text string) {
 
 func (dp *DeleteParser) OnError(err error) {
 	dp.setError(err)
-}
-
-// リテラルを処理する
-func (dp *DeleteParser) handleLiteral(lit literal.Literal) {
-	if dp.err != nil {
-		return
-	}
-	if dp.state == DeleteStateWhere {
-		dp.whereNodeStack = append(dp.whereNodeStack, lit)
-	}
-}
-
-// 演算子を処理する
-func (dp *DeleteParser) handleOperator(op string) {
-	for len(dp.whereOpStack) > 0 {
-		topOp := dp.whereOpStack[len(dp.whereOpStack)-1]
-		if dp.precedence(topOp) >= dp.precedence(op) {
-			if err := dp.reduce(); err != nil {
-				dp.setError(err)
-				return
-			}
-		} else {
-			break
-		}
-	}
-	dp.whereOpStack = append(dp.whereOpStack, op)
-}
-
-// スタックから要素を取り出し、1 つの BinaryExpr を作って nodeStack に戻す
-func (dp *DeleteParser) reduce() error {
-	if len(dp.whereNodeStack) < 2 || len(dp.whereOpStack) < 1 {
-		return errors.New("[parse error] invalid expression syntax")
-	}
-
-	// 右辺を Pop
-	rightRaw := dp.whereNodeStack[len(dp.whereNodeStack)-1]
-	dp.whereNodeStack = dp.whereNodeStack[:len(dp.whereNodeStack)-1]
-
-	// 演算子を Pop
-	op := dp.whereOpStack[len(dp.whereOpStack)-1]
-	dp.whereOpStack = dp.whereOpStack[:len(dp.whereOpStack)-1]
-
-	// 左辺を Pop
-	leftRaw := dp.whereNodeStack[len(dp.whereNodeStack)-1]
-	dp.whereNodeStack = dp.whereNodeStack[:len(dp.whereNodeStack)-1]
-
-	var lhs expression.LHS
-	var rhs expression.RHS
-
-	switch v := leftRaw.(type) {
-	case identifier.ColumnId:
-		lhs = expression.NewLhsColumn(v)
-	case expression.Expression:
-		lhs = expression.NewLhsExpr(v)
-	default:
-		return errors.New("[parse error] invalid left operand type")
-	}
-
-	switch v := rightRaw.(type) {
-	case literal.Literal:
-		rhs = expression.NewRhsLiteral(v)
-	case expression.Expression:
-		rhs = expression.NewRhsExpr(v)
-	default:
-		return errors.New("[parse error] invalid right operand type")
-	}
-
-	expr := expression.NewBinaryExpr(op, lhs, rhs)
-	dp.whereNodeStack = append(dp.whereNodeStack, expr)
-
-	return nil
-}
-
-// 演算子の優先順位を定義 (数値が高いほど優先順位が高い)
-func (dp *DeleteParser) precedence(op string) int {
-	switch strings.ToUpper(op) {
-	case string(SEqual), string(SLessThan), string(SGreaterThan), "<=", ">=", "!=":
-		return 2
-	case KAnd:
-		return 1
-	case KOr:
-		return 0
-	default:
-		return 0
-	}
 }
 
 // エラーを設定する (既にエラーが設定されている場合は無視する)
