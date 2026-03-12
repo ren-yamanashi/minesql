@@ -24,4 +24,5 @@ func main() {
 	fullIndexScanByLastName()
 	rangeIndexScan()
 	searchConstUniqueIndex()
+	deleteRecords()
 }
