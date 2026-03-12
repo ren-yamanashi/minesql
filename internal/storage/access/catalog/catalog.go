@@ -179,10 +179,11 @@ func (c *Catalog) insertTableMetadata(bpm *bufferpool.BufferPoolManager, tableMe
 	keyBuf := binary.BigEndian.AppendUint64(nil, tableMeta.TableId)
 	table.Encode([][]byte{keyBuf}, &encodedKey)
 
-	// 値をエンコード (Name, NCols, DataMetaPageId)
+	// 値をエンコード (Name, NCols, PrimaryKeyCount, DataMetaPageId)
 	var encodedValue []byte
-	valBuf := binary.BigEndian.AppendUint64(nil, uint64(tableMeta.NCols))
-	table.Encode([][]byte{[]byte(tableMeta.Name), valBuf, tableMeta.DataMetaPageId.ToBytes()}, &encodedValue)
+	nColsBuf := binary.BigEndian.AppendUint64(nil, uint64(tableMeta.NCols))
+	pkCountBuf := binary.BigEndian.AppendUint64(nil, uint64(tableMeta.PrimaryKeyCount))
+	table.Encode([][]byte{[]byte(tableMeta.Name), nColsBuf, pkCountBuf, tableMeta.DataMetaPageId.ToBytes()}, &encodedValue)
 
 	// B+Tree に挿入
 	return btr.Insert(bpm, node.NewPair(encodedKey, encodedValue))
@@ -285,18 +286,20 @@ func (c *Catalog) decodeTableMetadata(pair *node.Pair) TableMetadata {
 	table.Decode(pair.Key, &keyParts)
 	tableId := binary.BigEndian.Uint64(keyParts[0])
 
-	// 値をデコード (Name, NCols, DataMetaPageId)
+	// 値をデコード (Name, NCols, PrimaryKeyCount, DataMetaPageId)
 	var valueParts [][]byte
 	table.Decode(pair.Value, &valueParts)
 	name := string(valueParts[0])
 	nCols := uint8(binary.BigEndian.Uint64(valueParts[1]))
-	dataMetaPageId := page.PageIdFromBytes(valueParts[2])
+	pkCount := uint8(binary.BigEndian.Uint64(valueParts[2]))
+	dataMetaPageId := page.PageIdFromBytes(valueParts[3])
 
 	return TableMetadata{
-		TableId:        tableId,
-		Name:           name,
-		NCols:          nCols,
-		DataMetaPageId: dataMetaPageId,
+		TableId:         tableId,
+		Name:            name,
+		NCols:           nCols,
+		PrimaryKeyCount: pkCount,
+		DataMetaPageId:  dataMetaPageId,
 	}
 }
 
