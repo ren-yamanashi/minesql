@@ -80,6 +80,19 @@ const (
 	CreateStateConstraintWaitSeparator
 	// CREATE Statement の終わり
 	CreateStateEnd
+
+	//
+	// -- DELETE Statement --
+	//
+
+	// DELETE 中であり、FROM キーワード待ちの状態
+	DeleteStateDelete
+	// DELETE FROM 中であり、テーブル名待ちの状態
+	DeleteStateFrom
+	// DELETE の WHERE 中
+	DeleteStateWhere
+	// DELETE Statement の終わり
+	DeleteStateEnd
 )
 
 // parser (implements TokenHandler)
@@ -138,6 +151,11 @@ func (p *Parser) OnKeyword(word string) {
 
 	case KInsert:
 		p.currentHandler = NewInsertParser()
+		p.currentHandler.OnKeyword(word)
+		return
+
+	case KDelete:
+		p.currentHandler = NewDeleteParser()
 		p.currentHandler.OnKeyword(word)
 		return
 	}

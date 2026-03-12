@@ -60,6 +60,7 @@ const (
 	KUnique  = "UNIQUE"
 	KKey     = "KEY"
 	KVarchar = "VARCHAR"
+	KDelete  = "DELETE"
 	KAnd     = "AND"
 	KOr      = "OR"
 )
@@ -294,6 +295,7 @@ func (t *Tokenizer) isKeyword(word string) bool {
 		KSelect, KFrom, KWhere,
 		KInsert, KInto, KValues,
 		KCreate, KTable, KPrimary, KUnique, KKey,
+		KDelete,
 		KVarchar,
 		KAnd, KOr,
 	}
