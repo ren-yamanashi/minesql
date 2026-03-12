@@ -7,6 +7,7 @@ const (
 	StmtTypeInsert StmtType = "insert"
 	StmtTypeSelect StmtType = "select"
 	StmtTypeUpdate StmtType = "update"
+	StmtTypeDelete StmtType = "delete"
 )
 
 type StmtType string
