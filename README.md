@@ -18,12 +18,12 @@ make build-client
 
 ## Feature
 
-| Statement | Implementation | Note |
-| --------- | -------------- | ---- |
-| [CREATE TABLE](./docs/feature/create-table.md) | ✅ | - |
-| [INSERT](./docs/feature/insert.md) | ✅ | - |
-| [SELECT](./docs/feature/select.md) | ✅ | - |
-| UPDATE | - | - |
-| DELETE | - | - |
-| JOIN | - | - |
-| Transaction | - | - |
+| Statement | Implementation |
+| --------- | -------------- |
+| [CREATE TABLE](./docs/feature/create-table.md) | ✅ |
+| [SELECT](./docs/feature/select.md) | ✅ |
+| [INSERT](./docs/feature/insert.md) | ✅ |
+| [DELETE](./docs/feature/delete.md) | ✅ |
+| UPDATE | - |
+| JOIN | - |
+| Transaction | - |
