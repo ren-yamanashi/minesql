@@ -29,11 +29,6 @@ func (wp *WhereParser) initWhere() *statement.WhereClause {
 	return wp.whereClause
 }
 
-// WHERE 句が設定されているかどうか
-func (wp *WhereParser) hasWhere() bool {
-	return wp.whereClause != nil
-}
-
 // 識別子をカラム名としてスタックに積む
 func (wp *WhereParser) pushColumn(ident string) {
 	colId := *identifier.NewColumnId(ident)
