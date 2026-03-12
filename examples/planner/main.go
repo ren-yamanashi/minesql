@@ -28,6 +28,8 @@ func main() {
 	scan()
 	assertEqual()
 	filter()
+	deleteByCondition()
+	scanAfterDelete()
 }
 
 func createTable() {
@@ -161,6 +163,52 @@ func assertEqual() {
 				expression.NewRhsLiteral(literal.NewStringLiteral("janedoe", "janedoe")),
 			),
 		),
+	)
+	exec, err := planner.PlanStart(stmt)
+	if err != nil {
+		panic(err)
+	}
+	records, err := executor.ExecutePlan(exec)
+	if err != nil {
+		panic(err)
+	}
+	for _, record := range records {
+		for _, col := range record {
+			fmt.Print(string(col), " ")
+		}
+		fmt.Println()
+	}
+}
+
+func deleteByCondition() {
+	fmt.Println("=== delete WHERE username = 'johndoe2' ===")
+	// DELETE FROM users WHERE username = 'johndoe2'
+	stmt := statement.NewDeleteStmt(
+		*identifier.NewTableId("users"),
+		statement.NewWhereClause(
+			expression.NewBinaryExpr(
+				"=",
+				expression.NewLhsColumn(*identifier.NewColumnId("username")),
+				expression.NewRhsLiteral(literal.NewStringLiteral("johndoe2", "johndoe2")),
+			),
+		),
+	)
+	exec, err := planner.PlanStart(stmt)
+	if err != nil {
+		panic(err)
+	}
+	_, err = executor.ExecutePlan(exec)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("deleted.")
+}
+
+func scanAfterDelete() {
+	fmt.Println("=== scan after delete ===")
+	stmt := statement.NewSelectStmt(
+		*identifier.NewTableId("users"),
+		nil,
 	)
 	exec, err := planner.PlanStart(stmt)
 	if err != nil {
