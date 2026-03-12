@@ -24,6 +24,8 @@ func main() {
 	scan()
 	assertEqual()
 	filter()
+	deleteByCondition()
+	scanAfterDelete()
 }
 
 func createTable() {
@@ -147,6 +149,49 @@ func assertEqual() {
 func filter() {
 	fmt.Println("=== filter ===")
 	sql := `SELECT * FROM users WHERE first_name < 'K' AND gender = 'male' AND last_name >= 'Doe';`
+	p := parser.NewParser()
+	result, err := p.Parse(sql)
+	if err != nil {
+		panic(err)
+	}
+
+	exec, err := planner.PlanStart(result)
+	if err != nil {
+		panic(err)
+	}
+	records, err := executor.ExecutePlan(exec)
+	if err != nil {
+		panic(err)
+	}
+	for _, record := range records {
+		for _, col := range record {
+			fmt.Print(string(col), " ")
+		}
+		fmt.Println()
+	}
+}
+
+func deleteByCondition() {
+	sql := `DELETE FROM users WHERE first_name = 'John' AND last_name = 'Doe';`
+	p := parser.NewParser()
+	result, err := p.Parse(sql)
+	if err != nil {
+		panic(err)
+	}
+
+	exec, err := planner.PlanStart(result)
+	if err != nil {
+		panic(err)
+	}
+	_, err = executor.ExecutePlan(exec)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func scanAfterDelete() {
+	fmt.Println("=== scan after delete (`DELETE FROM users WHERE first_name = 'John' AND last_name = 'Doe';`) ===")
+	sql := `SELECT * FROM users;`
 	p := parser.NewParser()
 	result, err := p.Parse(sql)
 	if err != nil {
