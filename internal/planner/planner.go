@@ -7,6 +7,11 @@ import (
 	"minesql/internal/planner/ast/statement"
 )
 
+// Planner は Next() で Executor を返す共通インターフェース
+type Planner interface {
+	Next() (executor.Executor, error)
+}
+
 func PlanStart(stmt node.ASTNode) (executor.Executor, error) {
 	switch s := stmt.(type) {
 	case *statement.CreateTableStmt:
@@ -16,8 +21,21 @@ func PlanStart(stmt node.ASTNode) (executor.Executor, error) {
 		ip := NewInsertPlanner(s)
 		return ip.Next()
 	case *statement.SelectStmt:
-		sp := NewSelectPlanner(s)
+		search := NewSearchPlanner(s.From.TableName, s.Where)
+		searchExec, err := search.Next()
+		if err != nil {
+			return nil, err
+		}
+		sp := NewSelectPlanner(s, searchExec)
 		return sp.Next()
+	case *statement.DeleteStmt:
+		search := NewSearchPlanner(s.From.TableName, s.Where)
+		searchExec, err := search.Next()
+		if err != nil {
+			return nil, err
+		}
+		dp := NewDeletePlanner(s, searchExec)
+		return dp.Next()
 	default:
 		return nil, fmt.Errorf("unsupported statement: %T", s)
 	}
