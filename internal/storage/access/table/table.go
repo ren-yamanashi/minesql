@@ -103,6 +103,49 @@ func (t *Table) Delete(bpm *bufferpool.BufferPoolManager, record [][]byte) error
 	return nil
 }
 
+// テーブルから行を更新する
+func (t *Table) Update(bpm *bufferpool.BufferPoolManager, oldRecord [][]byte, newRecord [][]byte) error {
+	btree := btree.NewBTree(t.MetaPageId)
+
+	// キーをエンコード
+	var encodedOldKey []byte
+	Encode(oldRecord[:t.PrimaryKeyCount], &encodedOldKey)
+	var encodedNewKey []byte
+	Encode(newRecord[:t.PrimaryKeyCount], &encodedNewKey)
+
+	// 値をエンコード
+	var encodedNewValue []byte
+	Encode(newRecord[t.PrimaryKeyCount:], &encodedNewValue)
+
+	// キーが一致しない場合は、B+Tree から古いキーに該当するペアを削除し、新しいキーに該当するペアを挿入する
+	if string(encodedOldKey) != string(encodedNewKey) {
+		err := btree.Delete(bpm, encodedOldKey)
+		if err != nil {
+			return err
+		}
+		err = btree.Insert(bpm, node.NewPair(encodedNewKey, encodedNewValue))
+		if err != nil {
+			return err
+		}
+	} else {
+		// キーが一致する場合は、B+Tree のペアを更新する
+		err := btree.Update(bpm, node.NewPair(encodedOldKey, encodedNewValue))
+		if err != nil {
+			return err
+		}
+	}
+
+	// ユニークインデックスを更新
+	for _, ui := range t.UniqueIndexes {
+		err := ui.Update(bpm, oldRecord, newRecord, encodedNewKey)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 // インデックス名からユニークインデックスを取得する
 func (t *Table) GetUniqueIndexByName(indexName string) (*UniqueIndex, error) {
 	for _, ui := range t.UniqueIndexes {

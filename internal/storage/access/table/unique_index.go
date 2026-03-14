@@ -63,3 +63,33 @@ func (ui *UniqueIndex) Delete(bpm *bufferpool.BufferPoolManager, record [][]byte
 	// B+Tree から削除
 	return btr.Delete(bpm, secondaryKey)
 }
+
+// ユニークインデックスから行を更新する
+func (ui *UniqueIndex) Update(bpm *bufferpool.BufferPoolManager, oldRecord [][]byte, newRecord [][]byte, primaryKey []byte) error {
+	btr := btree.NewBTree(ui.MetaPageId)
+	var oldSecondaryKey []byte
+	var newSecondaryKey []byte
+
+	// セカンダリキーをエンコード
+	Encode([][]byte{oldRecord[ui.SecondaryKeyIdx]}, &oldSecondaryKey)
+	Encode([][]byte{newRecord[ui.SecondaryKeyIdx]}, &newSecondaryKey)
+
+	// キーが一致しない場合は、B+Tree から古いキーに該当するペアを削除し、新しいキーに該当するペアを挿入する
+	if string(oldSecondaryKey) != string(newSecondaryKey) {
+		err := btr.Delete(bpm, oldSecondaryKey)
+		if err != nil {
+			return err
+		}
+		err = btr.Insert(bpm, node.NewPair(newSecondaryKey, primaryKey))
+		if err != nil {
+			return err
+		}
+	} else {
+		// キーが一致する場合は、B+Tree のペアを更新する
+		err := btr.Update(bpm, node.NewPair(oldSecondaryKey, primaryKey))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
