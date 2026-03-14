@@ -145,14 +145,12 @@ func TestSearchPlanner(t *testing.T) {
 		assert.Contains(t, err.Error(), "unsupported WHERE condition type")
 	})
 
-	t.Run("複雑な WHERE 句 (複数の AND 条件) を処理できる", func(t *testing.T) {
+	t.Run("複数の AND 条件で Filter が生成される", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer storage.ResetStorageManager()
 
-		// GIVEN
-		// id = '1' AND first_name = 'john' AND last_name = 'doe' のような構造
-		// 構造: (id = '1') AND ((first_name = 'john') AND (last_name = 'doe'))
+		// GIVEN: (id = '1') AND ((first_name = 'john') AND (last_name = 'doe'))
 		where := statement.NewWhereClause(
 			expression.NewBinaryExpr(
 				"AND",
@@ -192,7 +190,54 @@ func TestSearchPlanner(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, exec)
-		// 複数条件の場合は Filter が使われる
+		assert.IsType(t, &executor.Filter{}, exec)
+	})
+
+	t.Run("AND と OR の混合条件で Filter が生成される", func(t *testing.T) {
+		tmpdir := t.TempDir()
+		initStorageManager(t, tmpdir)
+		defer storage.ResetStorageManager()
+
+		// GIVEN: (first_name = 'John') OR ((id = '1') AND (last_name = 'Doe'))
+		where := statement.NewWhereClause(
+			expression.NewBinaryExpr(
+				"OR",
+				expression.NewLhsExpr(
+					expression.NewBinaryExpr(
+						"=",
+						expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
+						expression.NewRhsLiteral(literal.NewStringLiteral("'John'", "John")),
+					),
+				),
+				expression.NewRhsExpr(
+					expression.NewBinaryExpr(
+						"AND",
+						expression.NewLhsExpr(
+							expression.NewBinaryExpr(
+								"=",
+								expression.NewLhsColumn(*identifier.NewColumnId("id")),
+								expression.NewRhsLiteral(literal.NewStringLiteral("'1'", "1")),
+							),
+						),
+						expression.NewRhsExpr(
+							expression.NewBinaryExpr(
+								"=",
+								expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
+								expression.NewRhsLiteral(literal.NewStringLiteral("'Doe'", "Doe")),
+							),
+						),
+					),
+				),
+			),
+		)
+		search := NewSearchPlanner("users", where)
+
+		// WHEN
+		exec, err := search.Next()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, exec)
 		assert.IsType(t, &executor.Filter{}, exec)
 	})
 
@@ -226,7 +271,7 @@ func TestSearchPlanner(t *testing.T) {
 		assert.Contains(t, err.Error(), "when LHS is a column, RHS must be a literal")
 	})
 
-	t.Run("AND 以外の論理演算子を使った場合、エラーを返す", func(t *testing.T) {
+	t.Run("OR 演算子を使った場合、Filter が生成される", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer storage.ResetStorageManager()
@@ -257,12 +302,12 @@ func TestSearchPlanner(t *testing.T) {
 		exec, err := search.Next()
 
 		// THEN
-		assert.Error(t, err)
-		assert.Nil(t, exec)
-		assert.Contains(t, err.Error(), "only AND operator is supported for combining multiple conditions")
+		assert.NoError(t, err)
+		assert.NotNil(t, exec)
+		assert.IsType(t, &executor.Filter{}, exec)
 	})
 
-	t.Run("AND 条件内で存在しないカラムを指定した場合、エラーを返す", func(t *testing.T) {
+	t.Run("条件内で存在しないカラムを指定した場合、エラーを返す", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer storage.ResetStorageManager()
@@ -298,7 +343,7 @@ func TestSearchPlanner(t *testing.T) {
 		assert.Contains(t, err.Error(), "does not exist in table")
 	})
 
-	t.Run("AND 条件内で LHS がカラム、RHS が式の場合、エラーを返す", func(t *testing.T) {
+	t.Run("条件内で LHS がカラム、RHS が式の場合、エラーを返す", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer storage.ResetStorageManager()
@@ -340,7 +385,7 @@ func TestSearchPlanner(t *testing.T) {
 		assert.Contains(t, err.Error(), "when LHS is a column, RHS must be a literal")
 	})
 
-	t.Run("AND 条件内で LHS が式、RHS がリテラルの場合、エラーを返す", func(t *testing.T) {
+	t.Run("条件内で LHS が式、RHS がリテラルの場合、エラーを返す", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer storage.ResetStorageManager()
@@ -384,12 +429,9 @@ func TestSearchPlanner(t *testing.T) {
 }
 
 func TestComplexWhereWithData(t *testing.T) {
-	t.Run("複数の AND 条件でデータをフィルタリングできる", func(t *testing.T) {
-		tmpdir := t.TempDir()
-		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
-
-		// GIVEN: テストデータを挿入
+	// テストデータを挿入するヘルパー
+	insertTestData := func(t *testing.T) {
+		t.Helper()
 		insertStmt := statement.NewInsertStmt(
 			*identifier.NewTableId("users"),
 			[]identifier.ColumnId{
@@ -420,9 +462,34 @@ func TestComplexWhereWithData(t *testing.T) {
 		assert.NoError(t, err)
 		_, err = insertExec.Next()
 		assert.NoError(t, err)
+	}
 
-		// WHEN: first_name = 'John' AND last_name = 'Johnson' で検索
-		// 構造: (first_name = 'John') AND (last_name = 'Johnson')
+	// 検索結果を収集するヘルパー
+	collectResults := func(t *testing.T, exec executor.Executor) []executor.Record {
+		t.Helper()
+		var results []executor.Record
+		for {
+			record, err := exec.Next()
+			if err != nil {
+				break
+			}
+			if len(record) == 0 {
+				break
+			}
+			results = append(results, record)
+		}
+		return results
+	}
+
+	t.Run("AND 条件でデータをフィルタリングできる", func(t *testing.T) {
+		tmpdir := t.TempDir()
+		initStorageManager(t, tmpdir)
+		defer storage.ResetStorageManager()
+
+		// GIVEN
+		insertTestData(t)
+
+		// WHEN: (first_name = 'John') AND (last_name = 'Johnson')
 		where := statement.NewWhereClause(
 			expression.NewBinaryExpr(
 				"AND",
@@ -447,22 +514,108 @@ func TestComplexWhereWithData(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: id=3 のレコードのみが返される
-		results := []executor.Record{}
-		for {
-			record, err := searchExec.Next()
-			if err != nil {
-				break
-			}
-			if len(record) == 0 {
-				break
-			}
-			results = append(results, record)
-		}
-
+		results := collectResults(t, searchExec)
 		assert.Equal(t, 1, len(results))
-		assert.Equal(t, "3", string(results[0][0]))       // id
-		assert.Equal(t, "John", string(results[0][1]))    // first_name
-		assert.Equal(t, "Johnson", string(results[0][2])) // last_name
+		assert.Equal(t, "3", string(results[0][0]))
+		assert.Equal(t, "John", string(results[0][1]))
+		assert.Equal(t, "Johnson", string(results[0][2]))
+	})
+
+	t.Run("OR 条件でデータをフィルタリングできる", func(t *testing.T) {
+		tmpdir := t.TempDir()
+		initStorageManager(t, tmpdir)
+		defer storage.ResetStorageManager()
+
+		// GIVEN
+		insertTestData(t)
+
+		// WHEN: (first_name = 'Jane') OR (last_name = 'Johnson')
+		where := statement.NewWhereClause(
+			expression.NewBinaryExpr(
+				"OR",
+				expression.NewLhsExpr(
+					expression.NewBinaryExpr(
+						"=",
+						expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
+						expression.NewRhsLiteral(literal.NewStringLiteral("'Jane'", "Jane")),
+					),
+				),
+				expression.NewRhsExpr(
+					expression.NewBinaryExpr(
+						"=",
+						expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
+						expression.NewRhsLiteral(literal.NewStringLiteral("'Johnson'", "Johnson")),
+					),
+				),
+			),
+		)
+		search := NewSearchPlanner("users", where)
+		searchExec, err := search.Next()
+		assert.NoError(t, err)
+
+		// THEN: id=2 (Jane/Smith) と id=3 (John/Johnson) が返される
+		results := collectResults(t, searchExec)
+		assert.Equal(t, 2, len(results))
+		assert.Equal(t, "2", string(results[0][0]))
+		assert.Equal(t, "Jane", string(results[0][1]))
+		assert.Equal(t, "3", string(results[1][0]))
+		assert.Equal(t, "John", string(results[1][1]))
+	})
+
+	t.Run("AND と OR の混合条件でデータをフィルタリングできる", func(t *testing.T) {
+		tmpdir := t.TempDir()
+		initStorageManager(t, tmpdir)
+		defer storage.ResetStorageManager()
+
+		// GIVEN
+		insertTestData(t)
+
+		// WHEN: (last_name = 'Smith') OR ((first_name = 'John') AND (last_name = 'Doe'))
+		// → id=1 (John/Doe) と id=2 (Jane/Smith) が該当
+		where := statement.NewWhereClause(
+			expression.NewBinaryExpr(
+				"OR",
+				expression.NewLhsExpr(
+					expression.NewBinaryExpr(
+						"=",
+						expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
+						expression.NewRhsLiteral(literal.NewStringLiteral("'Smith'", "Smith")),
+					),
+				),
+				expression.NewRhsExpr(
+					expression.NewBinaryExpr(
+						"AND",
+						expression.NewLhsExpr(
+							expression.NewBinaryExpr(
+								"=",
+								expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
+								expression.NewRhsLiteral(literal.NewStringLiteral("'John'", "John")),
+							),
+						),
+						expression.NewRhsExpr(
+							expression.NewBinaryExpr(
+								"=",
+								expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
+								expression.NewRhsLiteral(literal.NewStringLiteral("'Doe'", "Doe")),
+							),
+						),
+					),
+				),
+			),
+		)
+		search := NewSearchPlanner("users", where)
+		searchExec, err := search.Next()
+		assert.NoError(t, err)
+
+		// THEN: id=1 (John/Doe) と id=2 (Jane/Smith) が返される
+		results := collectResults(t, searchExec)
+		assert.Equal(t, 2, len(results))
+		assert.Equal(t, "1", string(results[0][0]))
+		assert.Equal(t, "John", string(results[0][1]))
+		assert.Equal(t, "Doe", string(results[0][2]))
+		assert.Equal(t, "2", string(results[1][0]))
+		assert.Equal(t, "Jane", string(results[1][1]))
+		assert.Equal(t, "Smith", string(results[1][2]))
 	})
 }
 
