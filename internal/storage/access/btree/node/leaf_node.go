@@ -83,6 +83,23 @@ func (ln *LeafNode) Delete(slotNum int) {
 	ln.body.Remove(slotNum)
 }
 
+// 指定されたスロットのペアの value を新しい値に更新する
+// slotNum: 更新するペアのスロット番号
+// pair: 新しい key-value ペア (key は変更されない前提)
+// 戻り値: 更新に成功したかどうか (空き容量不足の場合は false)
+func (ln *LeafNode) Update(slotNum int, pair Pair) bool {
+	pairBytes := pair.ToBytes()
+
+	// slotted page 内のペアのサイズをリサイズ
+	if !ln.body.Resize(slotNum, len(pairBytes)) {
+		return false
+	}
+
+	// ペアの値を新しい値に更新
+	copy(ln.body.Data(slotNum), pairBytes)
+	return true
+}
+
 // リーフノードを初期化する
 // 初期化時には、前後のリーフノードのポインタ (ページ ID) には無効値が設定される
 func (ln *LeafNode) Initialize() {
