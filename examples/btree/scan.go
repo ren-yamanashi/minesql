@@ -9,7 +9,7 @@ import (
 	"minesql/internal/storage/page"
 )
 
-func main() {
+func scan() {
 	dataDir := "examples/btree/data"
 	dbPath := dataDir + "/test.db"
 
@@ -26,21 +26,28 @@ func main() {
 	// 既存の B+Tree を開く (MetaPageId は 0 と仮定)
 	tree := btree.NewBTree(page.NewPageId(fileId, 0))
 
-	// キーで検索
-	searchKeys := []string{"grape", "lemon", "watermelon"}
-	for _, key := range searchKeys {
-		searchMode := btree.SearchModeKey{Key: []byte(key)}
-		iter, err := tree.Search(bpm, searchMode)
+	// 全データをスキャン
+	scanAll(bpm, tree)
+}
+
+// B+Tree の全データをスキャンして表示する
+func scanAll(bpm *bufferpool.BufferPoolManager, tree *btree.BTree) {
+	iter, err := tree.Search(bpm, btree.SearchModeStart{})
+	if err != nil {
+		panic(err)
+	}
+
+	count := 0
+	for {
+		pair, ok, err := iter.Next(bpm)
 		if err != nil {
 			panic(err)
 		}
-
-		pair, ok := iter.Get()
-		if ok && string(pair.Key) == key {
-			valuePreview := string(pair.Value[0]) + " x " + fmt.Sprint(len(pair.Value))
-			fmt.Printf("key=%s, value=%s\n", string(pair.Key), valuePreview)
-		} else {
-			fmt.Printf("key=%s not found\n", key)
+		if !ok {
+			break
 		}
+		fmt.Printf("  key=%-12s value=%s x %d\n", string(pair.Key), string(pair.Value[:1]), len(pair.Value))
+		count++
 	}
+	fmt.Printf("  合計: %d 件\n", count)
 }

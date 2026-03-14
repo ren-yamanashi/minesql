@@ -10,7 +10,7 @@ import (
 	"minesql/internal/storage/disk"
 )
 
-func main() {
+func delete() {
 	dataDir := "examples/btree/data"
 	dbPath := dataDir + "/delete_test.db"
 
@@ -77,26 +77,4 @@ func main() {
 		panic(err)
 	}
 	scanAll(bpm, tree)
-}
-
-// B+Tree の全データをスキャンして表示する
-func scanAll(bpm *bufferpool.BufferPoolManager, tree *btree.BTree) {
-	iter, err := tree.Search(bpm, btree.SearchModeStart{})
-	if err != nil {
-		panic(err)
-	}
-
-	count := 0
-	for {
-		pair, ok, err := iter.Next(bpm)
-		if err != nil {
-			panic(err)
-		}
-		if !ok {
-			break
-		}
-		fmt.Printf("  key=%-12s value=%s x %d\n", string(pair.Key), string(pair.Value[:1]), len(pair.Value))
-		count++
-	}
-	fmt.Printf("  合計: %d 件\n", count)
 }
