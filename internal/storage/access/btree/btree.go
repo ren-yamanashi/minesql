@@ -54,15 +54,6 @@ func NewBTree(metaPageId page.PageId) *BTree {
 // 指定された検索モードで B+Tree を検索し、イテレータを返す
 // 戻り値: リーフノードのイテレータ
 func (bt *BTree) Search(bpm *bufferpool.BufferPoolManager, searchMode SearchMode) (*Iterator, error) {
-	rootPage, err := bt.fetchRootPage(bpm)
-	if err != nil {
-		return nil, err
-	}
-	return bt.searchRecursively(bpm, rootPage, searchMode)
-}
-
-// ルートページを取得
-func (bt *BTree) fetchRootPage(bpm *bufferpool.BufferPoolManager) (*bufferpool.BufferPage, error) {
 	// メタページを取得
 	metaBuf, err := bpm.FetchPage(bt.MetaPageId)
 	if err != nil {
@@ -74,7 +65,13 @@ func (bt *BTree) fetchRootPage(bpm *bufferpool.BufferPoolManager) (*bufferpool.B
 
 	// ルートページを取得
 	rootPageId := meta.RootPageId()
-	return bpm.FetchPage(rootPageId)
+	rootPage, err := bpm.FetchPage(rootPageId)
+	if err != nil {
+		return nil, err
+	}
+
+	// 再起的にノードを辿って該当のリーフノードを見つける
+	return bt.searchRecursively(bpm, rootPage, searchMode)
 }
 
 // 再起的にノードを辿って該当のリーフノードを見つける
@@ -175,6 +172,8 @@ func (bt *BTree) Insert(bpm *bufferpool.BufferPoolManager, pair node.Pair) error
 	if err != nil {
 		return err
 	}
+
+	// メタページに新しいルートページIDを設定する
 	meta = metapage.NewMetaPage(metaBuf.GetWriteData())
 	meta.SetRootPageId(newRootBuf.PageId)
 	return nil
@@ -541,4 +540,62 @@ func (bt *BTree) resolveBranchUnderflow(parentBranchNode *node.BranchNode, child
 	}
 
 	return deleteResult{underflow: !parentBranchNode.IsHalfFull()}
+}
+
+// B+Tree の特定のノードの値 (value) を更新する
+// pair.Key で対象のリーフノードを特定し、pair.Value で値を上書きする
+func (bt *BTree) Update(bpm *bufferpool.BufferPoolManager, pair node.Pair) error {
+	metaBuf, err := bpm.FetchPage(bt.MetaPageId)
+	if err != nil {
+		return err
+	}
+	defer bpm.UnRefPage(bt.MetaPageId)
+	meta := metapage.NewMetaPage(metaBuf.GetReadData())
+	rootPageId := meta.RootPageId()
+	rootPageBuf, err := bpm.FetchPage(rootPageId)
+	if err != nil {
+		return err
+	}
+	defer bpm.UnRefPage(rootPageId)
+
+	return bt.updateRecursively(bpm, rootPageBuf, pair)
+}
+
+// 再帰的にノードを辿って該当のリーフノードを見つけ、ペアを更新する
+func (bt *BTree) updateRecursively(bpm *bufferpool.BufferPoolManager, nodeBuffer *bufferpool.BufferPage, pair node.Pair) error {
+	nodeType := node.GetNodeType(nodeBuffer.GetReadData())
+
+	if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
+		// ブランチノードの場合、再帰呼び出し後に UnRefPage を呼び出す
+		defer bpm.UnRefPage(nodeBuffer.PageId)
+
+		branchNode := node.NewBranchNode(nodeBuffer.GetReadData())
+
+		// pair.Key を使って子ノードを特定
+		searchMode := SearchModeKey{Key: pair.Key}
+		childPageId := searchMode.childPageId(branchNode)
+		childNodeBuffer, err := bpm.FetchPage(childPageId)
+		if err != nil {
+			return err
+		}
+
+		// 再帰呼び出し
+		return bt.updateRecursively(bpm, childNodeBuffer, pair)
+	} else if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
+		leafNode := node.NewLeafNode(nodeBuffer.GetWriteData())
+
+		// 該当のキーを持つペアを見つける
+		slotNum, found := leafNode.SearchSlotNum(pair.Key)
+		if !found {
+			return ErrKeyNotFound
+		}
+
+		// ペアの value を新しい値に更新
+		if !leafNode.Update(slotNum, pair) {
+			return errors.New("failed to update pair")
+		}
+		return nil
+	}
+
+	panic("unknown node type") // 実際にはここには到達しないので errors.New ではなく panic で良い
 }
