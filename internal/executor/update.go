@@ -4,7 +4,7 @@ import "minesql/internal/storage"
 
 type SetColumn struct {
 	// 更新対象のカラムの位置 (インデックス)
-	Pos int
+	Pos uint16
 	// 更新後の値
 	Value []byte
 }
