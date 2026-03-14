@@ -1,13 +1,19 @@
-.PHONY: lint lint_diff test test_cov clean doc build build-client build-server
+.PHONY: lint lint_diff test test_v test_run test_cov clean doc build build-client build-server
 
 lint:
 	golangci-lint run
 
 test:
+	go test ./internal/...
+
+test_v:
 	go test -v ./internal/...
 
+test_run:
+	go test -v -run $(RUN) ./internal/...
+
 test_cov:
-	go test -v -cover ./internal/...
+	go test -cover ./internal/...
 
 clean:
 	go clean -testcache
