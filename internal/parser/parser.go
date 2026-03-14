@@ -93,6 +93,27 @@ const (
 	DeleteStateWhere
 	// DELETE Statement の終わり
 	DeleteStateEnd
+
+	//
+	// -- UPDATE Statement --
+	//
+
+	// UPDATE 中であり、テーブル名待ちの状態
+	UpdateStateUpdate
+	// UPDATE <table_name> 中であり、SET キーワード待ちの状態
+	UpdateStateTable
+	// SET 句のカラム名待ちの状態
+	UpdateStateSet
+	// SET 句のカラム名の後、"=" 待ちの状態
+	UpdateStateSetCol
+	// SET 句の "=" の後、値待ちの状態
+	UpdateStateSetEq
+	// SET 句の値の後、"," or WHERE or ";" 待ちの状態
+	UpdateStateSetVal
+	// UPDATE の WHERE 中
+	UpdateStateWhere
+	// UPDATE Statement の終わり
+	UpdateStateEnd
 )
 
 // parser (implements TokenHandler)
@@ -156,6 +177,11 @@ func (p *Parser) OnKeyword(word string) {
 
 	case KDelete:
 		p.currentHandler = NewDeleteParser()
+		p.currentHandler.OnKeyword(word)
+		return
+
+	case KUpdate:
+		p.currentHandler = NewUpdateParser()
 		p.currentHandler.OnKeyword(word)
 		return
 	}
