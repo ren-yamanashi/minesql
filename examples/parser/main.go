@@ -149,8 +149,8 @@ func assertEqual() {
 }
 
 func filter() {
-	fmt.Println("=== filter ===")
-	sql := `SELECT * FROM users WHERE first_name < 'K' AND gender = 'male' AND last_name >= 'Doe';`
+	fmt.Println("=== filter (first_name < 'K' AND gender = 'male' AND last_name >= 'Doe') OR first_name = 'Tom' ===")
+	sql := `SELECT * FROM users WHERE first_name < 'K' AND gender = 'male' AND last_name >= 'Doe' OR first_name = 'Tom';`
 	p := parser.NewParser()
 	result, err := p.Parse(sql)
 	if err != nil {
