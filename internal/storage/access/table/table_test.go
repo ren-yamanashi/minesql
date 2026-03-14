@@ -278,6 +278,314 @@ func TestDelete(t *testing.T) {
 	})
 }
 
+func TestUpdate(t *testing.T) {
+	t.Run("プライマリキーが同じ場合、value のみが更新される", func(t *testing.T) {
+		// GIVEN
+		bpm, metaPageId, _ := InitDiskManager(t, "users.db")
+		table := NewTable("users", metaPageId, 1, nil)
+		err := table.Create(bpm)
+		assert.NoError(t, err)
+
+		err = table.Insert(bpm, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		assert.NoError(t, err)
+		err = table.Insert(bpm, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		assert.NoError(t, err)
+
+		// WHEN: プライマリキー "a" のレコードを更新 (キーは同じ、value のみ変更)
+		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
+		newRecord := [][]byte{[]byte("a"), []byte("Jane"), []byte("Doe-Updated")}
+		err = table.Update(bpm, oldRecord, newRecord)
+
+		// THEN
+		assert.NoError(t, err)
+		tree := btree.NewBTree(table.MetaPageId)
+		pairs := collectAllTablePairs(t, bpm, tree)
+		assert.Equal(t, 2, len(pairs))
+		// "a" の value が更新されている
+		assert.Equal(t, [][]byte{[]byte("a")}, pairs[0].key)
+		assert.Equal(t, [][]byte{[]byte("Jane"), []byte("Doe-Updated")}, pairs[0].value)
+		// "b" は変わらない
+		assert.Equal(t, [][]byte{[]byte("b")}, pairs[1].key)
+		assert.Equal(t, [][]byte{[]byte("Alice"), []byte("Smith")}, pairs[1].value)
+	})
+
+	t.Run("プライマリキーが変わる場合、Delete + Insert が行われる", func(t *testing.T) {
+		// GIVEN
+		bpm, metaPageId, _ := InitDiskManager(t, "users.db")
+		table := NewTable("users", metaPageId, 1, nil)
+		err := table.Create(bpm)
+		assert.NoError(t, err)
+
+		err = table.Insert(bpm, [][]byte{[]byte("a"), []byte("John")})
+		assert.NoError(t, err)
+		err = table.Insert(bpm, [][]byte{[]byte("c"), []byte("Bob")})
+		assert.NoError(t, err)
+
+		// WHEN: プライマリキーを "a" → "b" に変更
+		oldRecord := [][]byte{[]byte("a"), []byte("John")}
+		newRecord := [][]byte{[]byte("b"), []byte("John-Updated")}
+		err = table.Update(bpm, oldRecord, newRecord)
+
+		// THEN
+		assert.NoError(t, err)
+		tree := btree.NewBTree(table.MetaPageId)
+		pairs := collectAllTablePairs(t, bpm, tree)
+		assert.Equal(t, 2, len(pairs))
+		// "a" は削除され、"b" が挿入されている
+		assert.Equal(t, [][]byte{[]byte("b")}, pairs[0].key)
+		assert.Equal(t, [][]byte{[]byte("John-Updated")}, pairs[0].value)
+		assert.Equal(t, [][]byte{[]byte("c")}, pairs[1].key)
+		assert.Equal(t, [][]byte{[]byte("Bob")}, pairs[1].value)
+	})
+
+	t.Run("ユニークインデックスのセカンダリキーが変わる場合、インデックスも更新される", func(t *testing.T) {
+		// GIVEN
+		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", 2)
+		bpm, metaPageId, _ := InitDiskManager(t, "users.db")
+
+		indexMetaPageId, err := bpm.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex.MetaPageId = indexMetaPageId
+
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex})
+		err = table.Create(bpm)
+		assert.NoError(t, err)
+
+		err = table.Insert(bpm, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		assert.NoError(t, err)
+		err = table.Insert(bpm, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		assert.NoError(t, err)
+
+		// WHEN: セカンダリキー (last_name) を "Doe" → "Williams" に変更
+		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
+		newRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Williams")}
+		err = table.Update(bpm, oldRecord, newRecord)
+
+		// THEN: ユニークインデックスが更新されている
+		assert.NoError(t, err)
+		indexTree := btree.NewBTree(table.UniqueIndexes[0].MetaPageId)
+		indexIter, err := indexTree.Search(bpm, btree.SearchModeStart{})
+		assert.NoError(t, err)
+
+		var indexKeys []string
+		for {
+			pair, ok, err := indexIter.Next(bpm)
+			assert.NoError(t, err)
+			if !ok {
+				break
+			}
+			var decodedKey [][]byte
+			Decode(pair.Key, &decodedKey)
+			indexKeys = append(indexKeys, string(decodedKey[0]))
+		}
+		// "Doe" が削除され "Williams" が追加されている
+		assert.Equal(t, []string{"Smith", "Williams"}, indexKeys)
+	})
+
+	t.Run("セカンダリキーが同じでプライマリキーが変わる場合、インデックスの value が更新される", func(t *testing.T) {
+		// GIVEN
+		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", 2)
+		bpm, metaPageId, _ := InitDiskManager(t, "users.db")
+
+		indexMetaPageId, err := bpm.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex.MetaPageId = indexMetaPageId
+
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex})
+		err = table.Create(bpm)
+		assert.NoError(t, err)
+
+		err = table.Insert(bpm, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		assert.NoError(t, err)
+
+		// WHEN: プライマリキーを "a" → "x" に変更、セカンダリキー "Doe" は同じ
+		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
+		newRecord := [][]byte{[]byte("x"), []byte("John"), []byte("Doe")}
+		err = table.Update(bpm, oldRecord, newRecord)
+
+		// THEN: テーブルが更新されている
+		assert.NoError(t, err)
+		tree := btree.NewBTree(table.MetaPageId)
+		pairs := collectAllTablePairs(t, bpm, tree)
+		assert.Equal(t, 1, len(pairs))
+		assert.Equal(t, [][]byte{[]byte("x")}, pairs[0].key)
+
+		// THEN: ユニークインデックスの value (プライマリキー) が更新されている
+		indexTree := btree.NewBTree(table.UniqueIndexes[0].MetaPageId)
+		indexIter, err := indexTree.Search(bpm, btree.SearchModeStart{})
+		assert.NoError(t, err)
+		pair, ok, err := indexIter.Next(bpm)
+		assert.NoError(t, err)
+		assert.True(t, ok)
+
+		var decodedKey [][]byte
+		Decode(pair.Key, &decodedKey)
+		assert.Equal(t, "Doe", string(decodedKey[0]))
+
+		// value はエンコードされた新しいプライマリキー "x"
+		var encodedNewPK []byte
+		Encode([][]byte{[]byte("x")}, &encodedNewPK)
+		assert.Equal(t, encodedNewPK, pair.Value)
+	})
+
+	t.Run("プライマリキーを既存のキーに変更するとエラーが返る", func(t *testing.T) {
+		// GIVEN
+		bpm, metaPageId, _ := InitDiskManager(t, "users.db")
+		table := NewTable("users", metaPageId, 1, nil)
+		err := table.Create(bpm)
+		assert.NoError(t, err)
+
+		err = table.Insert(bpm, [][]byte{[]byte("a"), []byte("John")})
+		assert.NoError(t, err)
+		err = table.Insert(bpm, [][]byte{[]byte("b"), []byte("Alice")})
+		assert.NoError(t, err)
+
+		// WHEN: プライマリキーを "a" → "b" に変更 (既存のキーと衝突)
+		oldRecord := [][]byte{[]byte("a"), []byte("John")}
+		newRecord := [][]byte{[]byte("b"), []byte("John")}
+		err = table.Update(bpm, oldRecord, newRecord)
+
+		// THEN: Delete("a") は成功するが Insert("b") が重複キーエラーで失敗する
+		assert.Error(t, err)
+	})
+
+	t.Run("ユニークインデックスの更新が失敗した場合にエラーが返る", func(t *testing.T) {
+		// GIVEN: セカンダリキーが重複する状況を作る
+		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", 2)
+		bpm, metaPageId, _ := InitDiskManager(t, "users.db")
+
+		indexMetaPageId, err := bpm.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex.MetaPageId = indexMetaPageId
+
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex})
+		err = table.Create(bpm)
+		assert.NoError(t, err)
+
+		err = table.Insert(bpm, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		assert.NoError(t, err)
+		err = table.Insert(bpm, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		assert.NoError(t, err)
+
+		// WHEN: セカンダリキーを "Doe" → "Smith" に変更 (既存のインデックスキーと衝突)
+		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
+		newRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Smith")}
+		err = table.Update(bpm, oldRecord, newRecord)
+
+		// THEN: ユニークインデックスの更新でエラーが返る
+		assert.Error(t, err)
+	})
+
+	t.Run("複数のユニークインデックスがある場合、すべて更新される", func(t *testing.T) {
+		// GIVEN: 2 つのユニークインデックスを持つテーブル
+		uniqueIndex1 := NewUniqueIndex("idx_first_name", "first_name", 1)
+		uniqueIndex2 := NewUniqueIndex("idx_last_name", "last_name", 2)
+		bpm, metaPageId, _ := InitDiskManager(t, "users.db")
+
+		indexMetaPageId1, err := bpm.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex1.MetaPageId = indexMetaPageId1
+		indexMetaPageId2, err := bpm.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex2.MetaPageId = indexMetaPageId2
+
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex1, uniqueIndex2})
+		err = table.Create(bpm)
+		assert.NoError(t, err)
+
+		err = table.Insert(bpm, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		assert.NoError(t, err)
+		err = table.Insert(bpm, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		assert.NoError(t, err)
+
+		// WHEN: 両方のセカンダリキーが変わる更新
+		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
+		newRecord := [][]byte{[]byte("a"), []byte("Jane"), []byte("Williams")}
+		err = table.Update(bpm, oldRecord, newRecord)
+		assert.NoError(t, err)
+
+		// THEN: idx_first_name が更新されている
+		indexTree1 := btree.NewBTree(table.UniqueIndexes[0].MetaPageId)
+		iter1, err := indexTree1.Search(bpm, btree.SearchModeStart{})
+		assert.NoError(t, err)
+		var firstNameKeys []string
+		for {
+			pair, ok, err := iter1.Next(bpm)
+			assert.NoError(t, err)
+			if !ok {
+				break
+			}
+			var decodedKey [][]byte
+			Decode(pair.Key, &decodedKey)
+			firstNameKeys = append(firstNameKeys, string(decodedKey[0]))
+		}
+		assert.Equal(t, []string{"Alice", "Jane"}, firstNameKeys)
+
+		// THEN: idx_last_name が更新されている
+		indexTree2 := btree.NewBTree(table.UniqueIndexes[1].MetaPageId)
+		iter2, err := indexTree2.Search(bpm, btree.SearchModeStart{})
+		assert.NoError(t, err)
+		var lastNameKeys []string
+		for {
+			pair, ok, err := iter2.Next(bpm)
+			assert.NoError(t, err)
+			if !ok {
+				break
+			}
+			var decodedKey [][]byte
+			Decode(pair.Key, &decodedKey)
+			lastNameKeys = append(lastNameKeys, string(decodedKey[0]))
+		}
+		assert.Equal(t, []string{"Smith", "Williams"}, lastNameKeys)
+	})
+
+	t.Run("存在しないキーを更新するとエラーが返る", func(t *testing.T) {
+		// GIVEN
+		bpm, metaPageId, _ := InitDiskManager(t, "users.db")
+		table := NewTable("users", metaPageId, 1, nil)
+		err := table.Create(bpm)
+		assert.NoError(t, err)
+
+		err = table.Insert(bpm, [][]byte{[]byte("a"), []byte("John")})
+		assert.NoError(t, err)
+
+		// WHEN: 存在しないキー "z" で更新
+		oldRecord := [][]byte{[]byte("z"), []byte("Unknown")}
+		newRecord := [][]byte{[]byte("z"), []byte("Updated")}
+		err = table.Update(bpm, oldRecord, newRecord)
+
+		// THEN
+		assert.Error(t, err)
+	})
+}
+
+// テーブルの全ペアをデコードして収集するヘルパー
+type decodedPair struct {
+	key   [][]byte
+	value [][]byte
+}
+
+func collectAllTablePairs(t *testing.T, bpm *bufferpool.BufferPoolManager, tree *btree.BTree) []decodedPair {
+	t.Helper()
+	iter, err := tree.Search(bpm, btree.SearchModeStart{})
+	assert.NoError(t, err)
+
+	var pairs []decodedPair
+	for {
+		pair, ok, err := iter.Next(bpm)
+		assert.NoError(t, err)
+		if !ok {
+			break
+		}
+		var decodedKey [][]byte
+		var decodedValue [][]byte
+		Decode(pair.Key, &decodedKey)
+		Decode(pair.Value, &decodedValue)
+		pairs = append(pairs, decodedPair{key: decodedKey, value: decodedValue})
+	}
+	return pairs
+}
+
 func TestGetUniqueIndexByName(t *testing.T) {
 	t.Run("インデックス名からユニークインデックスを取得できる", func(t *testing.T) {
 		// GIVEN

@@ -599,6 +599,98 @@ func TestLeafNodeCanLendPair(t *testing.T) {
 	})
 }
 
+func TestLeafNodeUpdate(t *testing.T) {
+	t.Run("value を更新できる", func(t *testing.T) {
+		// GIVEN
+		ln := createTestLeafNode([]Pair{
+			NewPair([]byte("key1"), []byte("val1")),
+			NewPair([]byte("key2"), []byte("val2")),
+			NewPair([]byte("key3"), []byte("val3")),
+		})
+
+		// WHEN
+		ok := ln.Update(1, NewPair([]byte("key2"), []byte("updated")))
+
+		// THEN
+		assert.True(t, ok)
+		assert.Equal(t, 3, ln.NumPairs())
+		assert.Equal(t, []byte("key2"), ln.PairAt(1).Key)
+		assert.Equal(t, []byte("updated"), ln.PairAt(1).Value)
+	})
+
+	t.Run("value を短い値に更新できる", func(t *testing.T) {
+		// GIVEN
+		ln := createTestLeafNode([]Pair{
+			NewPair([]byte("key1"), []byte("long_value_here")),
+		})
+
+		// WHEN
+		ok := ln.Update(0, NewPair([]byte("key1"), []byte("short")))
+
+		// THEN
+		assert.True(t, ok)
+		assert.Equal(t, []byte("key1"), ln.PairAt(0).Key)
+		assert.Equal(t, []byte("short"), ln.PairAt(0).Value)
+	})
+
+	t.Run("value を長い値に更新できる", func(t *testing.T) {
+		// GIVEN
+		ln := createTestLeafNode([]Pair{
+			NewPair([]byte("key1"), []byte("short")),
+		})
+
+		// WHEN
+		ok := ln.Update(0, NewPair([]byte("key1"), []byte("much_longer_value")))
+
+		// THEN
+		assert.True(t, ok)
+		assert.Equal(t, []byte("key1"), ln.PairAt(0).Key)
+		assert.Equal(t, []byte("much_longer_value"), ln.PairAt(0).Value)
+	})
+
+	t.Run("更新後も他のペアが壊れない", func(t *testing.T) {
+		// GIVEN
+		ln := createTestLeafNode([]Pair{
+			NewPair([]byte("key1"), []byte("val1")),
+			NewPair([]byte("key2"), []byte("val2")),
+			NewPair([]byte("key3"), []byte("val3")),
+		})
+
+		// WHEN
+		ok := ln.Update(1, NewPair([]byte("key2"), []byte("new_longer_value")))
+
+		// THEN
+		assert.True(t, ok)
+		assert.Equal(t, []byte("key1"), ln.PairAt(0).Key)
+		assert.Equal(t, []byte("val1"), ln.PairAt(0).Value)
+		assert.Equal(t, []byte("key3"), ln.PairAt(2).Key)
+		assert.Equal(t, []byte("val3"), ln.PairAt(2).Value)
+	})
+
+	t.Run("空き容量が不足している場合、false を返す", func(t *testing.T) {
+		// GIVEN: ノードをほぼ満杯にする
+		ln := createTestLeafNode(nil)
+		value := make([]byte, 200)
+		inserted := 0
+		for {
+			key := fmt.Appendf(nil, "k%02d", inserted)
+			if !ln.Insert(inserted, NewPair(key, value)) {
+				break
+			}
+			inserted++
+		}
+		originalValue := make([]byte, len(ln.PairAt(0).Value))
+		copy(originalValue, ln.PairAt(0).Value)
+
+		// WHEN: 非常に大きな値に更新を試みる
+		hugeValue := make([]byte, 3000)
+		ok := ln.Update(0, NewPair(ln.PairAt(0).Key, hugeValue))
+
+		// THEN
+		assert.False(t, ok)
+	})
+}
+
 // テスト用のリーフノードを作成する
 func createTestLeafNode(pairs []Pair) *LeafNode {
 	data := directio.AlignedBlock(directio.BlockSize)

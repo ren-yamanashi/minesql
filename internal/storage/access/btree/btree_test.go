@@ -470,6 +470,161 @@ func TestDelete(t *testing.T) {
 	})
 }
 
+func TestUpdate(t *testing.T) {
+	t.Run("value を更新できる", func(t *testing.T) {
+		// GIVEN
+		bt, bpm := setupBTree(t)
+		bt.mustInsert(bpm, "key1", "val1")
+		bt.mustInsert(bpm, "key2", "val2")
+		bt.mustInsert(bpm, "key3", "val3")
+
+		// WHEN
+		err := bt.Update(bpm, node.NewPair([]byte("key2"), []byte("updated")))
+
+		// THEN
+		assert.NoError(t, err)
+		pairs := bt.collectAllPairs(bpm)
+		assert.Equal(t, 3, len(pairs))
+		assert.Equal(t, "key1", string(pairs[0].Key))
+		assert.Equal(t, "val1", string(pairs[0].Value))
+		assert.Equal(t, "key2", string(pairs[1].Key))
+		assert.Equal(t, "updated", string(pairs[1].Value))
+		assert.Equal(t, "key3", string(pairs[2].Key))
+		assert.Equal(t, "val3", string(pairs[2].Value))
+	})
+
+	t.Run("存在しないキーを更新するとエラーが返る", func(t *testing.T) {
+		// GIVEN
+		bt, bpm := setupBTree(t)
+		bt.mustInsert(bpm, "key1", "val1")
+
+		// WHEN
+		err := bt.Update(bpm, node.NewPair([]byte("nonexistent"), []byte("val")))
+
+		// THEN
+		assert.ErrorIs(t, err, ErrKeyNotFound)
+	})
+
+	t.Run("空のツリーで更新するとエラーが返る", func(t *testing.T) {
+		// GIVEN
+		bt, bpm := setupBTree(t)
+
+		// WHEN
+		err := bt.Update(bpm, node.NewPair([]byte("key1"), []byte("val1")))
+
+		// THEN
+		assert.ErrorIs(t, err, ErrKeyNotFound)
+	})
+
+	t.Run("分割が発生した B+Tree で value を更新できる", func(t *testing.T) {
+		// GIVEN: 多数のペアを挿入してノード分割を発生させる
+		bt, bpm := setupBTree(t)
+		numPairs := 100
+		for i := range numPairs {
+			key := fmt.Sprintf("key%03d", i)
+			val := fmt.Sprintf("val%03d", i)
+			bt.mustInsert(bpm, key, val)
+		}
+
+		// WHEN: 複数のペアを更新
+		err := bt.Update(bpm, node.NewPair([]byte("key000"), []byte("new000")))
+		assert.NoError(t, err)
+		err = bt.Update(bpm, node.NewPair([]byte("key050"), []byte("new050")))
+		assert.NoError(t, err)
+		err = bt.Update(bpm, node.NewPair([]byte("key099"), []byte("new099")))
+		assert.NoError(t, err)
+
+		// THEN: 更新されたペアが正しく取得でき、他のペアは変わらない
+		pairs := bt.collectAllPairs(bpm)
+		assert.Equal(t, numPairs, len(pairs))
+		assert.Equal(t, "new000", string(pairs[0].Value))
+		assert.Equal(t, "val001", string(pairs[1].Value))
+		assert.Equal(t, "new050", string(pairs[50].Value))
+		assert.Equal(t, "new099", string(pairs[99].Value))
+	})
+
+	t.Run("更新後に Search で正しい値が取得できる", func(t *testing.T) {
+		// GIVEN
+		bt, bpm := setupBTree(t)
+		bt.mustInsert(bpm, "aaa", "v1")
+		bt.mustInsert(bpm, "bbb", "v2")
+		bt.mustInsert(bpm, "ccc", "v3")
+
+		// WHEN
+		err := bt.Update(bpm, node.NewPair([]byte("bbb"), []byte("updated_v2")))
+		assert.NoError(t, err)
+
+		// THEN: SearchModeKey で更新後の値が取得できる
+		iter, err := bt.Search(bpm, SearchModeKey{Key: []byte("bbb")})
+		assert.NoError(t, err)
+		pair, ok := iter.Get()
+		assert.True(t, ok)
+		assert.Equal(t, "bbb", string(pair.Key))
+		assert.Equal(t, "updated_v2", string(pair.Value))
+	})
+
+	t.Run("value のサイズが大きく変わる更新ができる", func(t *testing.T) {
+		// GIVEN
+		bt, bpm := setupBTree(t)
+		bt.mustInsert(bpm, "key1", "v1")
+		bt.mustInsert(bpm, "key2", "v2")
+		bt.mustInsert(bpm, "key3", "v3")
+
+		// WHEN: 短い value を長い value に更新
+		longValue := make([]byte, 500)
+		for i := range longValue {
+			longValue[i] = 'x'
+		}
+		err := bt.Update(bpm, node.NewPair([]byte("key2"), longValue))
+
+		// THEN
+		assert.NoError(t, err)
+		pairs := bt.collectAllPairs(bpm)
+		assert.Equal(t, 3, len(pairs))
+		assert.Equal(t, "v1", string(pairs[0].Value))
+		assert.Equal(t, longValue, pairs[1].Value)
+		assert.Equal(t, "v3", string(pairs[2].Value))
+	})
+
+	t.Run("ページに収まらない大きな value への更新はエラーが返る", func(t *testing.T) {
+		// GIVEN: ノードをほぼ満杯にする
+		bt, bpm := setupBTree(t)
+		value := make([]byte, 200)
+		numPairs := 15
+		for i := range numPairs {
+			key := fmt.Sprintf("key%03d", i)
+			bt.mustInsert(bpm, key, string(value))
+		}
+
+		// WHEN: 非常に大きな value に更新を試みる
+		hugeValue := make([]byte, 3000)
+		err := bt.Update(bpm, node.NewPair([]byte("key000"), hugeValue))
+
+		// THEN
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to update pair")
+	})
+
+	t.Run("同じキーを複数回更新できる", func(t *testing.T) {
+		// GIVEN
+		bt, bpm := setupBTree(t)
+		bt.mustInsert(bpm, "key1", "val1")
+
+		// WHEN: 3 回連続で更新
+		err := bt.Update(bpm, node.NewPair([]byte("key1"), []byte("second")))
+		assert.NoError(t, err)
+		err = bt.Update(bpm, node.NewPair([]byte("key1"), []byte("third")))
+		assert.NoError(t, err)
+		err = bt.Update(bpm, node.NewPair([]byte("key1"), []byte("final")))
+		assert.NoError(t, err)
+
+		// THEN: 最後の値が反映されている
+		pairs := bt.collectAllPairs(bpm)
+		assert.Equal(t, 1, len(pairs))
+		assert.Equal(t, "final", string(pairs[0].Value))
+	})
+}
+
 func TestNewBTree(t *testing.T) {
 	t.Run("既存の B+Tree を NewBTree で開いてデータを読み取れる", func(t *testing.T) {
 		// GIVEN: CreateBTree でツリーを作成しペアを挿入する
