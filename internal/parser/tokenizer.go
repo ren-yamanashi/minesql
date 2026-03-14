@@ -61,6 +61,8 @@ const (
 	KKey     = "KEY"
 	KVarchar = "VARCHAR"
 	KDelete  = "DELETE"
+	KUpdate  = "UPDATE"
+	KSet     = "SET"
 	KAnd     = "AND"
 	KOr      = "OR"
 )
@@ -296,6 +298,7 @@ func (t *Tokenizer) isKeyword(word string) bool {
 		KInsert, KInto, KValues,
 		KCreate, KTable, KPrimary, KUnique, KKey,
 		KDelete,
+		KUpdate, KSet,
 		KVarchar,
 		KAnd, KOr,
 	}
