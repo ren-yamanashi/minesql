@@ -28,6 +28,8 @@ func main() {
 	scan()
 	assertEqual()
 	filter()
+	updateByCondition()
+	scanAfterUpdate()
 	deleteByCondition()
 	scanAfterDelete()
 }
@@ -163,6 +165,55 @@ func assertEqual() {
 				expression.NewRhsLiteral(literal.NewStringLiteral("janedoe", "janedoe")),
 			),
 		),
+	)
+	exec, err := planner.PlanStart(stmt)
+	if err != nil {
+		panic(err)
+	}
+	records, err := executor.ExecutePlan(exec)
+	if err != nil {
+		panic(err)
+	}
+	for _, record := range records {
+		for _, col := range record {
+			fmt.Print(string(col), " ")
+		}
+		fmt.Println()
+	}
+}
+
+func updateByCondition() {
+	fmt.Println("=== UPDATE users SET last_name = 'Smith' WHERE username = 'johndoe' ===")
+	// UPDATE users SET last_name = 'Smith' WHERE username = 'johndoe'
+	stmt := &statement.UpdateStmt{
+		Table: *identifier.NewTableId("users"),
+		SetClauses: []*statement.SetClause{
+			{Column: *identifier.NewColumnId("last_name"), Value: literal.NewStringLiteral("'Smith'", "Smith")},
+		},
+		Where: statement.NewWhereClause(
+			expression.NewBinaryExpr(
+				"=",
+				expression.NewLhsColumn(*identifier.NewColumnId("username")),
+				expression.NewRhsLiteral(literal.NewStringLiteral("johndoe", "johndoe")),
+			),
+		),
+	}
+	exec, err := planner.PlanStart(stmt)
+	if err != nil {
+		panic(err)
+	}
+	_, err = executor.ExecutePlan(exec)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("updated.")
+}
+
+func scanAfterUpdate() {
+	fmt.Println("=== scan after update ===")
+	stmt := statement.NewSelectStmt(
+		*identifier.NewTableId("users"),
+		nil,
 	)
 	exec, err := planner.PlanStart(stmt)
 	if err != nil {
