@@ -6,6 +6,7 @@ import (
 	"minesql/internal/storage/access/table"
 )
 
+// テーブル検索を行う Executor
 type SearchTable struct {
 	// 継続条件を満たすかどうかを判定する関数
 	whileCondition func(record Record) bool
