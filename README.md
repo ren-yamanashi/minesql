@@ -24,6 +24,6 @@ make build-client
 | [SELECT](./docs/feature/select.md) | ✅ |
 | [INSERT](./docs/feature/insert.md) | ✅ |
 | [DELETE](./docs/feature/delete.md) | ✅ |
-| UPDATE | - |
+| [UPDATE](./docs/feature/update.md) | ✅ |
 | JOIN | - |
 | Transaction | - |
