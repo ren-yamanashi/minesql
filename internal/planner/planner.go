@@ -36,6 +36,14 @@ func PlanStart(stmt node.ASTNode) (executor.Executor, error) {
 		}
 		dp := NewDeletePlanner(s, searchExec)
 		return dp.Next()
+	case *statement.UpdateStmt:
+		search := NewSearchPlanner(s.Table.TableName, s.Where)
+		searchExec, err := search.Next()
+		if err != nil {
+			return nil, err
+		}
+		up := NewUpdatePlanner(s, searchExec)
+		return up.Next()
 	default:
 		return nil, fmt.Errorf("unsupported statement: %T", s)
 	}
