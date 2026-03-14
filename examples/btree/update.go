@@ -10,7 +10,7 @@ import (
 	"minesql/internal/storage/disk"
 )
 
-func main() {
+func update() {
 	dataDir := "examples/btree/data"
 	dbPath := dataDir + "/update_test.db"
 
@@ -108,31 +108,4 @@ func main() {
 		}
 	}
 	scanAll(bpm, tree)
-}
-
-// B+Tree の全データをスキャンして表示する
-func scanAll(bpm *bufferpool.BufferPoolManager, tree *btree.BTree) {
-	iter, err := tree.Search(bpm, btree.SearchModeStart{})
-	if err != nil {
-		panic(err)
-	}
-
-	count := 0
-	for {
-		pair, ok, err := iter.Next(bpm)
-		if err != nil {
-			panic(err)
-		}
-		if !ok {
-			break
-		}
-		// value が長い場合は先頭部分のみ表示
-		valuePreview := string(pair.Value)
-		if len(valuePreview) > 30 {
-			valuePreview = valuePreview[:30] + "..."
-		}
-		fmt.Printf("  key=%-12s value=%s (%d bytes)\n", string(pair.Key), valuePreview, len(pair.Value))
-		count++
-	}
-	fmt.Printf("  合計: %d 件\n", count)
 }

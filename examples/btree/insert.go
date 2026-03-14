@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"strings"
 
 	"minesql/internal/storage/access/btree"
@@ -14,13 +13,7 @@ import (
 	"minesql/internal/storage/page"
 )
 
-func main() {
-	dataDir := "examples/btree/data"
-
-	// 既存のデータディレクトリがあれば削除
-	os.RemoveAll(dataDir)
-	os.MkdirAll(dataDir, 0750)
-
+func insert(dataDir string) {
 	bpm := bufferpool.NewBufferPoolManager(10)
 	fileId := bpm.AllocateFileId()
 
