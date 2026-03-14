@@ -278,36 +278,49 @@ func scanAfterDelete() {
 }
 
 func filter() {
-	fmt.Println("=== filter ===")
+	fmt.Println("=== filter (first_name < 'K' AND gender = 'male' AND last_name >= 'Doe') OR first_name = 'Tom' ===")
+	// SELECT * FROM users WHERE (first_name < 'K' AND gender = 'male' AND last_name >= 'Doe') OR first_name = 'Tom'
 	stmt := statement.NewSelectStmt(
 		*identifier.NewTableId("users"),
 		statement.NewWhereClause(
 			expression.NewBinaryExpr(
-				"AND",
+				"OR",
 				expression.NewLhsExpr(
-					expression.NewBinaryExpr(
-						"<",
-						expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
-						expression.NewRhsLiteral(literal.NewStringLiteral("K", "K")),
-					),
-				),
-				expression.NewRhsExpr(
 					expression.NewBinaryExpr(
 						"AND",
 						expression.NewLhsExpr(
 							expression.NewBinaryExpr(
-								"=",
-								expression.NewLhsColumn(*identifier.NewColumnId("gender")),
-								expression.NewRhsLiteral(literal.NewStringLiteral("male", "male")),
+								"<",
+								expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
+								expression.NewRhsLiteral(literal.NewStringLiteral("K", "K")),
 							),
 						),
 						expression.NewRhsExpr(
 							expression.NewBinaryExpr(
-								">=",
-								expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
-								expression.NewRhsLiteral(literal.NewStringLiteral("Doe", "Doe")),
+								"AND",
+								expression.NewLhsExpr(
+									expression.NewBinaryExpr(
+										"=",
+										expression.NewLhsColumn(*identifier.NewColumnId("gender")),
+										expression.NewRhsLiteral(literal.NewStringLiteral("male", "male")),
+									),
+								),
+								expression.NewRhsExpr(
+									expression.NewBinaryExpr(
+										">=",
+										expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
+										expression.NewRhsLiteral(literal.NewStringLiteral("Doe", "Doe")),
+									),
+								),
 							),
 						),
+					),
+				),
+				expression.NewRhsExpr(
+					expression.NewBinaryExpr(
+						"=",
+						expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
+						expression.NewRhsLiteral(literal.NewStringLiteral("Tom", "Tom")),
 					),
 				),
 			),
