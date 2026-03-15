@@ -12,8 +12,6 @@ type BufferPage struct {
 	PageId page.PageId
 	// ページデータ
 	Page []byte
-	// 最近アクセスされたかどうか
-	Referenced bool
 	// ページが変更されたかどうか
 	IsDirty bool
 }
@@ -21,22 +19,19 @@ type BufferPage struct {
 // NewBufferPage は指定されたページ ID を持つ新しい BufferPage を作成する
 func NewBufferPage(pageId page.PageId) *BufferPage {
 	return &BufferPage{
-		PageId:     pageId,
-		Page:       directio.AlignedBlock(page.PAGE_SIZE),
-		Referenced: false,
-		IsDirty:    false,
+		PageId:  pageId,
+		Page:    directio.AlignedBlock(page.PAGE_SIZE),
+		IsDirty: false,
 	}
 }
 
-// GetWriteData は書き込み用のデータを取得する (IsDirty と Referenced を true にセットする)
+// GetWriteData は書き込み用のデータを取得する (IsDirty を true にセットする)
 func (bp *BufferPage) GetWriteData() []byte {
 	bp.IsDirty = true
-	bp.Referenced = true
 	return bp.Page
 }
 
-// GetReadData は読み込み用のデータを取得する (Referenced のみを true にセットする)
+// GetReadData は読み込み用のデータを取得する
 func (bp *BufferPage) GetReadData() []byte {
-	bp.Referenced = true
 	return bp.Page
 }

@@ -12,17 +12,15 @@ type BufferPool struct {
 	BufferPages []BufferPage
 	// Clock sweep アルゴリズムで使用するポインタ
 	Pointer BufferId
-	// バッファプールの最大サイズ (MaxBufferSize * PAGE_SIZE がバッファプールの最大容量)
+	// バッファプールの最大サイズ (指定した数のバッファページを保持できるようになる)
+	// つまり `MaxBufferSize(=バッファページ数) * PAGE_SIZE` がバッファプールが使用するメモリ量になる
 	MaxBufferSize int
 }
 
 // NewBufferPool は指定されたサイズのバッファプールを生成する
+// size: バッファページの数 (例: 1000 を指定すると、1000 ページ分のバッファプールが生成される)
 func NewBufferPool(size int) *BufferPool {
-	// メモリ上に空のバッファページを size 個作成
-	pages := make([]BufferPage, size)
-	for i := range pages {
-		pages[i] = *NewBufferPage(page.INVALID_PAGE_ID) // 仮のページ ID で初期化 (実際にはバッファプールにページが追加されるときに設定される)
-	}
+	pages := allocateBufferPages(size)
 	return &BufferPool{
 		BufferPages:   pages,
 		Pointer:       BufferId(0),
@@ -49,4 +47,14 @@ func (bp *BufferPool) EvictPage() BufferPage {
 			return page
 		}
 	}
+}
+
+// allocateBufferPages はバッファプール用のメモリ領域を確保する
+func allocateBufferPages(size int) []BufferPage {
+	// NOTE: 現状は Go のヒープ上にバッファページ用の領域を確保しているが、将来的には OS レベルの共有メモリなどを使用する方針に切り替える可能性がある
+	pages := make([]BufferPage, size)
+	for i := range pages {
+		pages[i] = *NewBufferPage(page.INVALID_PAGE_ID) // 仮のページ ID で初期化 (実際にはバッファプールにページが追加されるときに設定される)
+	}
+	return pages
 }
