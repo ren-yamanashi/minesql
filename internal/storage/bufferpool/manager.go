@@ -16,7 +16,7 @@ type BufferPoolManager struct {
 func NewBufferPoolManager(size int) *BufferPoolManager {
 	return &BufferPoolManager{
 		diskManagers: make(map[page.FileId]*disk.DiskManager),
-		bufpool:      *newBufferPool(size),
+		bufpool:      *NewBufferPool(size),
 		pageTable:    make(pageTable),
 		nextFileId:   page.FileId(1), // FileId 1 から開始
 	}
