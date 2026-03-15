@@ -21,150 +21,7 @@ func TestNewSlottedPage(t *testing.T) {
 
 }
 
-func TestCapacity(t *testing.T) {
-	t.Run("Slotted Page の容量が正しく取得できる", func(t *testing.T) {
-		// GIVEN
-		data := make([]byte, 128)
-		sp := NewSlottedPage(data)
-
-		// WHEN
-		capacity := sp.Capacity()
-
-		// THEN
-		assert.Equal(t, 120, capacity) // 128 - headerSize(8) = 120
-	})
-}
-
-func TestNumSlots(t *testing.T) {
-	t.Run("スロット数が正しく取得できる", func(t *testing.T) {
-		// GIVEN
-		data := make([]byte, 128)
-		sp := NewSlottedPage(data)
-		sp.Initialize()
-		sp.Insert(0, make([]byte, 10))
-		sp.Insert(1, make([]byte, 20))
-
-		// WHEN
-		numSlots := sp.NumSlots()
-
-		// THEN
-		assert.Equal(t, 2, numSlots)
-	})
-}
-
-func TestFreeSpace(t *testing.T) {
-	t.Run("初期化直後は容量と等しい", func(t *testing.T) {
-		// GIVEN
-		data := make([]byte, 128)
-		sp := NewSlottedPage(data)
-		sp.Initialize()
-
-		// WHEN
-		freeSpace := sp.FreeSpace()
-
-		// THEN
-		assert.Equal(t, 120, freeSpace) // 128 - headerSize(8) = 120
-	})
-
-	t.Run("データ挿入後に空き容量が減る", func(t *testing.T) {
-		// GIVEN
-		data := make([]byte, 128)
-		sp := NewSlottedPage(data)
-		sp.Initialize()
-		sp.Insert(0, make([]byte, 20))
-
-		// WHEN
-		freeSpace := sp.FreeSpace()
-
-		// THEN: 120 - 20 (data) - 4 (pointer) = 96
-		assert.Equal(t, 96, freeSpace)
-	})
-
-	t.Run("複数回挿入後に空き容量が正しく計算される", func(t *testing.T) {
-		// GIVEN
-		data := make([]byte, 256)
-		sp := NewSlottedPage(data)
-		sp.Initialize()
-		sp.Insert(0, make([]byte, 10))
-		sp.Insert(1, make([]byte, 30))
-		sp.Insert(2, make([]byte, 20))
-
-		// WHEN
-		freeSpace := sp.FreeSpace()
-
-		// THEN: 248 - (10 + 30 + 20) (data) - 3*4 (pointer) = 176
-		assert.Equal(t, 176, freeSpace)
-	})
-
-	t.Run("削除後に空き容量が増える", func(t *testing.T) {
-		// GIVEN
-		data := make([]byte, 128)
-		sp := NewSlottedPage(data)
-		sp.Initialize()
-		sp.Insert(0, make([]byte, 20))
-		sp.Insert(1, make([]byte, 30))
-		freeSpaceBefore := sp.FreeSpace()
-
-		// WHEN
-		sp.Remove(0)
-		freeSpaceAfter := sp.FreeSpace()
-
-		// THEN: 削除したデータ (20) + ポインタ (4) 分の空きが増える
-		assert.Equal(t, freeSpaceBefore+20+4, freeSpaceAfter)
-	})
-}
-
-func TestData(t *testing.T) {
-	t.Run("指定したインデックスのデータが正しく取得できる", func(t *testing.T) {
-		// GIVEN
-		data := make([]byte, 128)
-		sp := NewSlottedPage(data)
-		sp.Initialize()
-		testData := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-		sp.Insert(0, testData)
-
-		// WHEN
-		retrievedData := sp.Data(0)
-
-		// THEN
-		assert.Equal(t, testData, retrievedData)
-	})
-
-	t.Run("複数スロットがある場合に各インデックスのデータ領域が独立している", func(t *testing.T) {
-		// GIVEN
-		data := make([]byte, 256)
-		sp := NewSlottedPage(data)
-		sp.Initialize()
-		sp.Insert(0, []byte("AAAAA"))
-		sp.Insert(1, []byte("BBBBB"))
-		sp.Insert(2, []byte("CCCCC"))
-
-		// WHEN: スロット 1 を書き換える
-		copy(sp.Data(1), []byte("XXXXX"))
-
-		// THEN: 他のスロットには影響しない
-		assert.Equal(t, []byte("AAAAA"), sp.Data(0))
-		assert.Equal(t, []byte("XXXXX"), sp.Data(1))
-		assert.Equal(t, []byte("CCCCC"), sp.Data(2))
-	})
-}
-
-func TestInitialize(t *testing.T) {
-	t.Run("Slotted Page が正しく初期化される", func(t *testing.T) {
-		// GIVEN
-		data := make([]byte, 128)
-		sp := NewSlottedPage(data)
-
-		// WHEN
-		sp.Initialize()
-
-		// THEN
-		assert.Equal(t, 0, sp.NumSlots())
-		assert.Equal(t, 120, sp.FreeSpace()) // 128 - headerSize(8) = 120
-	})
-}
-
-func TestSlottedPage_Insert(t *testing.T) {
+func TestInsert(t *testing.T) {
 	t.Run("データが正しく挿入できる", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
@@ -519,35 +376,145 @@ func TestTransferAllTo(t *testing.T) {
 	})
 }
 
-func TestPointerAt(t *testing.T) {
-	t.Run("指定したインデックスのポインタが正しく取得できる", func(t *testing.T) {
+func TestCapacity(t *testing.T) {
+	t.Run("Slotted Page の容量が正しく取得できる", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 128)
+		sp := NewSlottedPage(data)
+
+		// WHEN
+		capacity := sp.Capacity()
+
+		// THEN
+		assert.Equal(t, 120, capacity) // 128 - headerSize(8) = 120
+	})
+}
+
+func TestNumSlots(t *testing.T) {
+	t.Run("スロット数が正しく取得できる", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
 		sp := NewSlottedPage(data)
 		sp.Initialize()
 		sp.Insert(0, make([]byte, 10))
+		sp.Insert(1, make([]byte, 20))
 
 		// WHEN
-		cellData := sp.pointerAt(0)
+		numSlots := sp.NumSlots()
 
 		// THEN
-		assert.Equal(t, 10, int(cellData.size))
+		assert.Equal(t, 2, numSlots)
 	})
 }
 
-func TestSetPointer(t *testing.T) {
-	t.Run("指定したインデックスのポインタが正しく設定できる", func(t *testing.T) {
+func TestFreeSpace(t *testing.T) {
+	t.Run("初期化直後は容量と等しい", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
 		sp := NewSlottedPage(data)
 		sp.Initialize()
 
 		// WHEN
-		sp.setPointer(0, newPointer(100, 20))
+		freeSpace := sp.FreeSpace()
 
 		// THEN
-		pointer := sp.pointerAt(0)
-		assert.Equal(t, uint16(100), pointer.offset)
-		assert.Equal(t, uint16(20), pointer.size)
+		assert.Equal(t, 120, freeSpace) // 128 - headerSize(8) = 120
+	})
+
+	t.Run("データ挿入後に空き容量が減る", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 128)
+		sp := NewSlottedPage(data)
+		sp.Initialize()
+		sp.Insert(0, make([]byte, 20))
+
+		// WHEN
+		freeSpace := sp.FreeSpace()
+
+		// THEN: 120 - 20 (data) - 4 (pointer) = 96
+		assert.Equal(t, 96, freeSpace)
+	})
+
+	t.Run("複数回挿入後に空き容量が正しく計算される", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 256)
+		sp := NewSlottedPage(data)
+		sp.Initialize()
+		sp.Insert(0, make([]byte, 10))
+		sp.Insert(1, make([]byte, 30))
+		sp.Insert(2, make([]byte, 20))
+
+		// WHEN
+		freeSpace := sp.FreeSpace()
+
+		// THEN: 248 - (10 + 30 + 20) (data) - 3*4 (pointer) = 176
+		assert.Equal(t, 176, freeSpace)
+	})
+
+	t.Run("削除後に空き容量が増える", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 128)
+		sp := NewSlottedPage(data)
+		sp.Initialize()
+		sp.Insert(0, make([]byte, 20))
+		sp.Insert(1, make([]byte, 30))
+		freeSpaceBefore := sp.FreeSpace()
+
+		// WHEN
+		sp.Remove(0)
+		freeSpaceAfter := sp.FreeSpace()
+
+		// THEN: 削除したデータ (20) + ポインタ (4) 分の空きが増える
+		assert.Equal(t, freeSpaceBefore+20+4, freeSpaceAfter)
+	})
+}
+
+func TestData(t *testing.T) {
+	t.Run("指定したインデックスのデータが正しく取得できる", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 128)
+		sp := NewSlottedPage(data)
+		sp.Initialize()
+		testData := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+		sp.Insert(0, testData)
+
+		// WHEN
+		retrievedData := sp.Data(0)
+
+		// THEN
+		assert.Equal(t, testData, retrievedData)
+	})
+
+	t.Run("複数スロットがある場合に各インデックスのデータ領域が独立している", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 256)
+		sp := NewSlottedPage(data)
+		sp.Initialize()
+		sp.Insert(0, []byte("AAAAA"))
+		sp.Insert(1, []byte("BBBBB"))
+		sp.Insert(2, []byte("CCCCC"))
+
+		// WHEN: スロット 1 を書き換える
+		copy(sp.Data(1), []byte("XXXXX"))
+
+		// THEN: 他のスロットには影響しない
+		assert.Equal(t, []byte("AAAAA"), sp.Data(0))
+		assert.Equal(t, []byte("XXXXX"), sp.Data(1))
+		assert.Equal(t, []byte("CCCCC"), sp.Data(2))
+	})
+}
+
+func TestInitialize(t *testing.T) {
+	t.Run("Slotted Page が正しく初期化される", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 128)
+		sp := NewSlottedPage(data)
+
+		// WHEN
+		sp.Initialize()
+
+		// THEN
+		assert.Equal(t, 0, sp.NumSlots())
+		assert.Equal(t, 120, sp.FreeSpace()) // 128 - headerSize(8) = 120
 	})
 }

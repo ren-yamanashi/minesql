@@ -11,38 +11,6 @@ func NewSlottedPage(data []byte) *SlottedPage {
 	return &SlottedPage{data: data}
 }
 
-// Capacity は ヘッダー領域を除いた Slotted Page の容量を返す
-func (sp *SlottedPage) Capacity() int {
-	return len(sp.data) - headerSize
-}
-
-// NumSlots は Slotted Page のヘッダーから現在のスロット数を読み取る
-func (sp *SlottedPage) NumSlots() int {
-	return int(binary.BigEndian.Uint16(sp.data[0:2]))
-}
-
-// FreeSpace は Slotted Page の空き領域のサイズを返す
-// see: docs/architecture/access/b+tree/slotted-page.md#フリースペースのサイズの算出例
-func (sp *SlottedPage) FreeSpace() int {
-	freeSpaceOffset := int(binary.BigEndian.Uint16(sp.data[2:4])) // フリースペースの開始位置 (offset) はヘッダーの 2 バイト目から 2 バイト分に格納されている
-	pointersSize := pointerSize * sp.NumSlots()
-	return freeSpaceOffset - pointersSize - headerSize
-}
-
-// Data は指定されたインデックスのデータを取得する
-func (sp *SlottedPage) Data(index int) []byte {
-	pointer := sp.pointerAt(index)
-	start, end := pointer.Range()
-	return sp.data[start:end]
-}
-
-// Initialize は Slotted Page を初期化する
-func (sp *SlottedPage) Initialize() {
-	binary.BigEndian.PutUint16(sp.data[0:2], 0)                    // numSlots
-	binary.BigEndian.PutUint16(sp.data[2:4], uint16(len(sp.data))) // freeOffset = end of data
-	binary.BigEndian.PutUint32(sp.data[4:8], 0)                    // pad
-}
-
 // Insert は指定されたインデックスにサイズ分のデータを挿入する (領域の確保のみを行い、実際のデータの書き込みは行わない)
 // index: 挿入するスロットのインデックス
 // data: 挿入するデータ
@@ -167,6 +135,7 @@ func (sp *SlottedPage) TransferAllTo(dest *SlottedPage) bool {
 	}
 	requiredSpace := srcNumSlots*pointerSize + totalDataSize
 
+	// src のすべてのスロットを dest の末尾に転送するために必要な空き容量が dest にない場合は転送できないので false を返す
 	if dest.FreeSpace() < requiredSpace {
 		return false
 	}
@@ -195,6 +164,38 @@ func (sp *SlottedPage) TransferAllTo(dest *SlottedPage) bool {
 	sp.Initialize()
 
 	return true
+}
+
+// Capacity は ヘッダー領域を除いた Slotted Page の容量を返す
+func (sp *SlottedPage) Capacity() int {
+	return len(sp.data) - headerSize
+}
+
+// NumSlots は Slotted Page のヘッダーから現在のスロット数を読み取る
+func (sp *SlottedPage) NumSlots() int {
+	return int(binary.BigEndian.Uint16(sp.data[0:2]))
+}
+
+// FreeSpace は Slotted Page の空き領域のサイズを返す
+// see: docs/architecture/access/b+tree/slotted-page.md#フリースペースのサイズの算出例
+func (sp *SlottedPage) FreeSpace() int {
+	freeSpaceOffset := int(binary.BigEndian.Uint16(sp.data[2:4])) // フリースペースの開始位置 (offset) はヘッダーの 2 バイト目から 2 バイト分に格納されている
+	pointersSize := pointerSize * sp.NumSlots()
+	return freeSpaceOffset - pointersSize - headerSize
+}
+
+// Data は指定されたインデックスのデータを取得する
+func (sp *SlottedPage) Data(index int) []byte {
+	pointer := sp.pointerAt(index)
+	start, end := pointer.Range()
+	return sp.data[start:end]
+}
+
+// Initialize は Slotted Page を初期化する
+func (sp *SlottedPage) Initialize() {
+	binary.BigEndian.PutUint16(sp.data[0:2], 0)                    // numSlots
+	binary.BigEndian.PutUint16(sp.data[2:4], uint16(len(sp.data))) // freeOffset = end of data
+	binary.BigEndian.PutUint32(sp.data[4:8], 0)                    // pad
 }
 
 // 指定されたインデックスのポインタを取得する
