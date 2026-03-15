@@ -41,13 +41,13 @@ func (p *PageId) IsInvalid() bool {
 	return p.Equals(INVALID_PAGE_ID)
 }
 
-// PageId を指定位置に書き込む
+// WriteTo は PageId を指定位置に書き込む
 func (p *PageId) WriteTo(data []byte, offset int) {
 	binary.BigEndian.PutUint32(data[offset:offset+4], uint32(p.FileId))
 	binary.BigEndian.PutUint32(data[offset+4:offset+8], uint32(p.PageNumber))
 }
 
-// PageId をバイト列に変換
+// ToBytes は PageId をバイト列に変換する
 // 先頭4バイトに FileId、次の4バイトに PageNumber が格納される
 func (p *PageId) ToBytes() []byte {
 	buf := make([]byte, 8)
@@ -56,7 +56,7 @@ func (p *PageId) ToBytes() []byte {
 	return buf
 }
 
-// バイト列から PageId を復元
+// PageIdFromBytes はバイト列から PageId を復元する
 func PageIdFromBytes(data []byte) PageId {
 	if len(data) != 8 {
 		panic("data size must be 8 bytes to convert to PageId")
@@ -67,7 +67,9 @@ func PageIdFromBytes(data []byte) PageId {
 	}
 }
 
-// 指定位置から PageId を読み取る
+// ReadPageIdFrom はページデータから PageId を読み取る
+// data: ページデータ全体
+// offset: PageId が格納されている位置 (通常はページの先頭、つまり offset=0)
 func ReadPageIdFrom(data []byte, offset int) PageId {
 	return PageId{
 		FileId:     FileId(binary.BigEndian.Uint32(data[offset : offset+4])),
