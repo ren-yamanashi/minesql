@@ -6,7 +6,7 @@ import (
 	"github.com/ncw/directio"
 )
 
-// BufferPage は、バッファプール内のページ (バッファページ) を表す構造体
+// BufferPage はバッファプール内のページ (バッファページ) を表す
 type BufferPage struct {
 	// ページ ID
 	PageId page.PageId
