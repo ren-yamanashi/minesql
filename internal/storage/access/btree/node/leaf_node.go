@@ -145,7 +145,7 @@ func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newPair Pair) ([]byte, er
 }
 
 func (ln *LeafNode) PrevPageId() *page.PageId {
-	pageId := page.ReadPageIdFrom(ln.Body(), 0)
+	pageId := page.ReadPageIdFromPageData(ln.Body(), 0)
 	if pageId.IsInvalid() {
 		return nil
 	}
@@ -153,7 +153,7 @@ func (ln *LeafNode) PrevPageId() *page.PageId {
 }
 
 func (ln *LeafNode) NextPageId() *page.PageId {
-	pageId := page.ReadPageIdFrom(ln.Body(), 8)
+	pageId := page.ReadPageIdFromPageData(ln.Body(), 8)
 	if pageId.IsInvalid() {
 		return nil
 	}

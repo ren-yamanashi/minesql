@@ -153,10 +153,10 @@ func (bn *BranchNode) SearchChildSlotNum(key []byte) int {
 func (bn *BranchNode) ChildPageIdAt(slotNum int) page.PageId {
 	if slotNum == bn.NumPairs() {
 		// 右端の子ページ ID を返す
-		return page.ReadPageIdFrom(bn.Body(), 0)
+		return page.ReadPageIdFromPageData(bn.Body(), 0)
 	}
 	pair := bn.PairAt(slotNum)
-	return page.PageIdFromBytes(pair.Value)
+	return page.RestorePageIdFromBytes(pair.Value)
 }
 
 // 最大ペアサイズを取得する
@@ -188,7 +188,7 @@ func (bn *BranchNode) UpdateKeyAt(slotNum int, newKey []byte) {
 
 // 右端の子ページ ID を取得する
 func (bn *BranchNode) RightChildPageId() page.PageId {
-	return page.ReadPageIdFrom(bn.Body(), 0)
+	return page.ReadPageIdFromPageData(bn.Body(), 0)
 }
 
 // 右端の子ページ ID を設定する
@@ -211,7 +211,7 @@ func (bn *BranchNode) IsHalfFull() bool {
 func (bn *BranchNode) fillRightChild() []byte {
 	lastId := bn.NumPairs() - 1
 	pair := bn.PairAt(lastId)
-	rightChild := page.PageIdFromBytes(pair.Value)
+	rightChild := page.RestorePageIdFromBytes(pair.Value)
 	key := make([]byte, len(pair.Key))
 
 	// キーをコピー

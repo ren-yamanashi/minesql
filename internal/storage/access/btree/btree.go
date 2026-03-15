@@ -490,7 +490,7 @@ func (bt *BTree) resolveBranchUnderflow(parentBranchNode *node.BranchNode, child
 			lastIndex := siblingNode.NumPairs() - 1
 			siblingLastPair := siblingNode.PairAt(lastIndex)
 			parentBranchNode.UpdateKeyAt(childIndex-1, siblingLastPair.Key)
-			siblingNode.SetRightChildPageId(page.PageIdFromBytes(siblingLastPair.Value))
+			siblingNode.SetRightChildPageId(page.RestorePageIdFromBytes(siblingLastPair.Value))
 			siblingNode.Delete(lastIndex)
 		} else {
 			// 右の兄弟から借りる: 親の境界キーを子の末尾に下ろし、兄弟の先頭キーを親に上げる
@@ -499,7 +499,7 @@ func (bt *BTree) resolveBranchUnderflow(parentBranchNode *node.BranchNode, child
 			childNode.Insert(childNode.NumPairs(), node.NewPair(parentPair.Key, childRightChild.ToBytes()))
 
 			siblingFirstPair := siblingNode.PairAt(0)
-			childNode.SetRightChildPageId(page.PageIdFromBytes(siblingFirstPair.Value))
+			childNode.SetRightChildPageId(page.RestorePageIdFromBytes(siblingFirstPair.Value))
 			parentBranchNode.UpdateKeyAt(childIndex, siblingFirstPair.Key)
 			siblingNode.Delete(0)
 		}

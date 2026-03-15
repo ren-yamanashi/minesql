@@ -15,10 +15,13 @@ var (
 )
 
 type (
-	FileId     uint32
+	// FileId はディスクファイルの識別子
+	FileId uint32
+	// PageNumber はファイル内のページ番号
 	PageNumber uint32
 )
 
+// PageId はディスクファイルとファイル内のページを特定するための識別子
 type PageId struct {
 	// ディスクファイルの識別子
 	FileId FileId
@@ -26,6 +29,7 @@ type PageId struct {
 	PageNumber PageNumber
 }
 
+// NewPageId は FileId と PageNumber から PageId を生成する
 func NewPageId(fileId FileId, pageNumber PageNumber) PageId {
 	return PageId{
 		FileId:     fileId,
@@ -33,10 +37,12 @@ func NewPageId(fileId FileId, pageNumber PageNumber) PageId {
 	}
 }
 
+// Equals はこの PageId と引数に与えた PageId が等しいかどうかを判定する
 func (p *PageId) Equals(other PageId) bool {
 	return p.FileId == other.FileId && p.PageNumber == other.PageNumber
 }
 
+// IsInvalid はこの PageId が無効な PageID (INVALID_PAGE_ID) かどうかを判定する
 func (p *PageId) IsInvalid() bool {
 	return p.Equals(INVALID_PAGE_ID)
 }
@@ -56,8 +62,9 @@ func (p *PageId) ToBytes() []byte {
 	return buf
 }
 
-// PageIdFromBytes はバイト列から PageId を復元する
-func PageIdFromBytes(data []byte) PageId {
+// RestorePageIdFromBytes はバイト列から PageId を復元する
+// data: PageId を表す8バイトのバイト列 (先頭4バイトに FileId、次の4バイトに PageNumber が格納されている必要がある)
+func RestorePageIdFromBytes(data []byte) PageId {
 	if len(data) != 8 {
 		panic("data size must be 8 bytes to convert to PageId")
 	}
@@ -67,10 +74,10 @@ func PageIdFromBytes(data []byte) PageId {
 	}
 }
 
-// ReadPageIdFrom はページデータから PageId を読み取る
+// ReadPageIdFromPageData はページデータから PageId を読み取る
 // data: ページデータ全体
 // offset: PageId が格納されている位置 (通常はページの先頭、つまり offset=0)
-func ReadPageIdFrom(data []byte, offset int) PageId {
+func ReadPageIdFromPageData(data []byte, offset int) PageId {
 	return PageId{
 		FileId:     FileId(binary.BigEndian.Uint32(data[offset : offset+4])),
 		PageNumber: PageNumber(binary.BigEndian.Uint32(data[offset+4 : offset+8])),

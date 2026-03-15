@@ -292,7 +292,7 @@ func (c *Catalog) decodeTableMetadata(pair *node.Pair) TableMetadata {
 	name := string(valueParts[0])
 	nCols := uint8(binary.BigEndian.Uint64(valueParts[1]))
 	pkCount := uint8(binary.BigEndian.Uint64(valueParts[2]))
-	dataMetaPageId := page.PageIdFromBytes(valueParts[3])
+	dataMetaPageId := page.RestorePageIdFromBytes(valueParts[3])
 
 	return TableMetadata{
 		TableId:         tableId,
@@ -383,7 +383,7 @@ func (c *Catalog) loadIndexMetadata(bpm *bufferpool.BufferPoolManager, tableId u
 			table.Decode(pair.Value, &valueParts)
 			idxType := IndexType(string(valueParts[0]))
 			colName := string(valueParts[1])
-			dataMetaPageId := page.PageIdFromBytes(valueParts[2])
+			dataMetaPageId := page.RestorePageIdFromBytes(valueParts[2])
 
 			indexes = append(indexes, &IndexMetadata{
 				TableId:        tableId,

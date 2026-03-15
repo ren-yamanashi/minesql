@@ -15,7 +15,7 @@ func NewMetaPage(data []byte) *MetaPage {
 
 // メタページのヘッダーからルートページ ID を読み取る
 func (mp *MetaPage) RootPageId() page.PageId {
-	return page.ReadPageIdFrom(mp.data, 0)
+	return page.ReadPageIdFromPageData(mp.data, 0)
 }
 
 // メタページのヘッダーにルートページ ID を設定する
