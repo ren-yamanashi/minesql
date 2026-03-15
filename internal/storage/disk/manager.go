@@ -9,7 +9,7 @@ import (
 	"github.com/ncw/directio"
 )
 
-// ディスク上のヒープファイルを管理する
+// DiskManager はディスク上のヒープファイルを管理する
 type DiskManager struct {
 	// このディスクマネージャの FileId
 	fileId page.FileId
