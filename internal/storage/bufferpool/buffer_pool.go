@@ -4,14 +4,10 @@ import (
 	"minesql/internal/storage/page"
 )
 
-type BufferId uint64
-
 // BufferPool は、複数のバッファページを管理する (バッファプール)
 type BufferPool struct {
 	// バッファページのスライス
 	BufferPages []BufferPage
-	// Clock sweep アルゴリズムで使用するポインタ
-	Pointer BufferId
 	// バッファプールの最大サイズ (指定した数のバッファページを保持できるようになる)
 	// つまり `MaxBufferSize(=バッファページ数) * PAGE_SIZE` がバッファプールが使用するメモリ量になる
 	MaxBufferSize int
@@ -23,29 +19,7 @@ func NewBufferPool(size int) *BufferPool {
 	pages := allocateBufferPages(size)
 	return &BufferPool{
 		BufferPages:   pages,
-		Pointer:       BufferId(0),
 		MaxBufferSize: size,
-	}
-}
-
-// AdvancePointer はポインタを進める
-// ポインタがバッファプールの末尾に達した場合、先頭に戻る
-func (bp *BufferPool) AdvancePointer() {
-	bp.Pointer = (bp.Pointer + 1) % BufferId(bp.MaxBufferSize)
-}
-
-// EvictPage はバッファプールから追い出すバッファページを選択する (Clock sweep アルゴリズム)
-func (bp *BufferPool) EvictPage() BufferPage {
-	for {
-		page := bp.BufferPages[bp.Pointer]
-		if page.Referenced {
-			// 参照ビットをクリアし、次のページへ移動
-			bp.BufferPages[bp.Pointer].Referenced = false
-			bp.AdvancePointer()
-		} else {
-			// 参照ビットがクリアされているページを置換対象とする
-			return page
-		}
 	}
 }
 
