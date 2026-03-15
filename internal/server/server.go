@@ -53,7 +53,7 @@ func (s *Server) Start() error {
 
 // サーバーを停止する
 func (s *Server) Stop() error {
-	err := s.storageManager.BufferPoolManager.FlushPage()
+	err := s.storageManager.BufferPool.FlushPage()
 	if err != nil {
 		return err
 	}

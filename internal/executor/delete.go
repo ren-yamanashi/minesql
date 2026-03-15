@@ -43,7 +43,7 @@ func (del *Delete) Next() (Record, error) {
 
 	// 収集したレコードを削除
 	for _, record := range records {
-		err = tbl.Delete(sm.BufferPoolManager, record)
+		err = tbl.Delete(sm.BufferPool, record)
 		if err != nil {
 			return nil, err
 		}

@@ -64,7 +64,7 @@ func (upd *Update) Next() (Record, error) {
 
 	// 更新後のレコードで更新を実行
 	for i, record := range records {
-		err = tbl.Update(sm.BufferPoolManager, record, updatedRecords[i])
+		err = tbl.Update(sm.BufferPool, record, updatedRecords[i])
 		if err != nil {
 			return nil, err
 		}

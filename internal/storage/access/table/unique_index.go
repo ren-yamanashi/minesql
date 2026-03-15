@@ -29,9 +29,9 @@ func NewUniqueIndex(name string, colName string, secondaryKeyIdx uint16) *Unique
 
 // 空のユニークインデックスを新規作成する
 // 事前に MetaPageId が設定されている必要がある
-func (ui *UniqueIndex) Create(bpm *bufferpool.BufferPoolManager, metaPageId page.PageId) error {
+func (ui *UniqueIndex) Create(bp *bufferpool.BufferPool, metaPageId page.PageId) error {
 	ui.MetaPageId = metaPageId
-	btr, err := btree.CreateBTree(bpm, metaPageId)
+	btr, err := btree.CreateBTree(bp, metaPageId)
 	if err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func (ui *UniqueIndex) Create(bpm *bufferpool.BufferPoolManager, metaPageId page
 
 // ユニークインデックスに行を挿入する
 // value はプライマリキー (primaryKey に指定された値) になるため、エンコードせずそのまま格納する
-func (ui *UniqueIndex) Insert(bpm *bufferpool.BufferPoolManager, primaryKey []uint8, record [][]byte) error {
+func (ui *UniqueIndex) Insert(bp *bufferpool.BufferPool, primaryKey []uint8, record [][]byte) error {
 	btr := btree.NewBTree(ui.MetaPageId)
 	var secondaryKey []byte
 
@@ -49,11 +49,11 @@ func (ui *UniqueIndex) Insert(bpm *bufferpool.BufferPoolManager, primaryKey []ui
 	Encode([][]byte{record[ui.SecondaryKeyIdx]}, &secondaryKey)
 
 	// B+Tree に挿入
-	return btr.Insert(bpm, node.NewPair(secondaryKey, primaryKey))
+	return btr.Insert(bp, node.NewPair(secondaryKey, primaryKey))
 }
 
 // ユニークインデックスから行を削除する
-func (ui *UniqueIndex) Delete(bpm *bufferpool.BufferPoolManager, record [][]byte) error {
+func (ui *UniqueIndex) Delete(bp *bufferpool.BufferPool, record [][]byte) error {
 	btr := btree.NewBTree(ui.MetaPageId)
 	var secondaryKey []byte
 
@@ -61,11 +61,11 @@ func (ui *UniqueIndex) Delete(bpm *bufferpool.BufferPoolManager, record [][]byte
 	Encode([][]byte{record[ui.SecondaryKeyIdx]}, &secondaryKey)
 
 	// B+Tree から削除
-	return btr.Delete(bpm, secondaryKey)
+	return btr.Delete(bp, secondaryKey)
 }
 
 // ユニークインデックスから行を更新する
-func (ui *UniqueIndex) Update(bpm *bufferpool.BufferPoolManager, oldRecord [][]byte, newRecord [][]byte, primaryKey []byte) error {
+func (ui *UniqueIndex) Update(bp *bufferpool.BufferPool, oldRecord [][]byte, newRecord [][]byte, primaryKey []byte) error {
 	btr := btree.NewBTree(ui.MetaPageId)
 	var oldSecondaryKey []byte
 	var newSecondaryKey []byte
@@ -76,17 +76,17 @@ func (ui *UniqueIndex) Update(bpm *bufferpool.BufferPoolManager, oldRecord [][]b
 
 	// キーが一致しない場合は、B+Tree から古いキーに該当するペアを削除し、新しいキーに該当するペアを挿入する
 	if string(oldSecondaryKey) != string(newSecondaryKey) {
-		err := btr.Delete(bpm, oldSecondaryKey)
+		err := btr.Delete(bp, oldSecondaryKey)
 		if err != nil {
 			return err
 		}
-		err = btr.Insert(bpm, node.NewPair(newSecondaryKey, primaryKey))
+		err = btr.Insert(bp, node.NewPair(newSecondaryKey, primaryKey))
 		if err != nil {
 			return err
 		}
 	} else {
 		// キーが一致する場合は、B+Tree のペアを更新する
-		err := btr.Update(bpm, node.NewPair(oldSecondaryKey, primaryKey))
+		err := btr.Update(bp, node.NewPair(oldSecondaryKey, primaryKey))
 		if err != nil {
 			return err
 		}

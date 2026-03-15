@@ -32,8 +32,8 @@ func TestGet(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		dm := initDiskManagerForIterator(t, tmpdir)
-		bpm := bufferpool.NewBufferPoolManager(3)
-		bpm.RegisterDiskManager(page.FileId(0), dm)
+		bp := bufferpool.NewBufferPool(3)
+		bp.RegisterDiskManager(page.FileId(0), dm)
 
 		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
 		pair2 := node.NewPair([]byte("key2"), []byte("value2"))
@@ -57,8 +57,8 @@ func TestAdvance(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		dm := initDiskManagerForIterator(t, tmpdir)
-		bpm := bufferpool.NewBufferPoolManager(3)
-		bpm.RegisterDiskManager(page.FileId(0), dm)
+		bp := bufferpool.NewBufferPool(3)
+		bp.RegisterDiskManager(page.FileId(0), dm)
 
 		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
 		pair2 := node.NewPair([]byte("key2"), []byte("value2"))
@@ -68,7 +68,7 @@ func TestAdvance(t *testing.T) {
 		iterator := newIterator(bufferPage, 0)
 
 		// WHEN
-		err := iterator.Advance(bpm)
+		err := iterator.Advance(bp)
 
 		// THEN
 		assert.NoError(t, err)
@@ -79,8 +79,8 @@ func TestAdvance(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		dm := initDiskManagerForIterator(t, tmpdir)
-		bpm := bufferpool.NewBufferPoolManager(3)
-		bpm.RegisterDiskManager(page.FileId(0), dm)
+		bp := bufferpool.NewBufferPool(3)
+		bp.RegisterDiskManager(page.FileId(0), dm)
 
 		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
 		pair2 := node.NewPair([]byte("key2"), []byte("value2"))
@@ -89,7 +89,7 @@ func TestAdvance(t *testing.T) {
 		iterator := newIterator(bufferPage, 1) // 最後のペアを指している
 
 		// WHEN
-		err := iterator.Advance(bpm)
+		err := iterator.Advance(bp)
 
 		// THEN
 		assert.NoError(t, err)
@@ -100,8 +100,8 @@ func TestAdvance(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		dm := initDiskManagerForIterator(t, tmpdir)
-		bpm := bufferpool.NewBufferPoolManager(3)
-		bpm.RegisterDiskManager(page.FileId(0), dm)
+		bp := bufferpool.NewBufferPool(3)
+		bp.RegisterDiskManager(page.FileId(0), dm)
 
 		// 最初のページ
 		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
@@ -119,14 +119,14 @@ func TestAdvance(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ページ1をバッファプールに追加
-		addedPage1, err := bpm.AddPage(page.NewPageId(page.FileId(0), page.PageNumber(0)))
+		addedPage1, err := bp.AddPage(page.NewPageId(page.FileId(0), page.PageNumber(0)))
 		assert.NoError(t, err)
 		copy(addedPage1.GetWriteData(), bufferPage1.GetReadData())
 
 		iterator := newIterator(*addedPage1, 1) // 最後のペアを指している
 
 		// WHEN
-		err = iterator.Advance(bpm)
+		err = iterator.Advance(bp)
 
 		// THEN
 		assert.NoError(t, err)
@@ -140,8 +140,8 @@ func TestNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		dm := initDiskManagerForIterator(t, tmpdir)
-		bpm := bufferpool.NewBufferPoolManager(3)
-		bpm.RegisterDiskManager(page.FileId(0), dm)
+		bp := bufferpool.NewBufferPool(3)
+		bp.RegisterDiskManager(page.FileId(0), dm)
 
 		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
 		pair2 := node.NewPair([]byte("key2"), []byte("value2"))
@@ -152,9 +152,9 @@ func TestNext(t *testing.T) {
 		assert.Equal(t, 0, iterator.slotNum) // 最初のペアを指している
 
 		// WHEN
-		pair, ok, err := iterator.Next(bpm)
+		pair, ok, err := iterator.Next(bp)
 		bufferId1 := iterator.slotNum
-		pair2Result, ok2, err2 := iterator.Next(bpm)
+		pair2Result, ok2, err2 := iterator.Next(bp)
 		bufferId2 := iterator.slotNum
 
 		// THEN

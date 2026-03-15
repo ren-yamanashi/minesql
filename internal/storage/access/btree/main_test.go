@@ -18,14 +18,14 @@ import (
 // --- ログ出力ヘルパー ---
 
 // B+Tree の全データをスキャンし、key=..., value=... 形式でログに書き出す
-func writeScanLog(w *strings.Builder, bpm *bufferpool.BufferPoolManager, tree *BTree) {
-	iter, err := tree.Search(bpm, SearchModeStart{})
+func writeScanLog(w *strings.Builder, bp *bufferpool.BufferPool, tree *BTree) {
+	iter, err := tree.Search(bp, SearchModeStart{})
 	if err != nil {
 		panic(err)
 	}
 	count := 0
 	for {
-		pair, ok, err := iter.Next(bpm)
+		pair, ok, err := iter.Next(bp)
 		if err != nil {
 			panic(err)
 		}
@@ -39,25 +39,25 @@ func writeScanLog(w *strings.Builder, bpm *bufferpool.BufferPoolManager, tree *B
 }
 
 // ツリーのルートノード情報をログに書き出す (ノードタイプ, キー数, キー一覧)
-func writeRootInfo(w *strings.Builder, bpm *bufferpool.BufferPoolManager, tree *BTree) {
-	metaBuf, err := bpm.FetchPage(tree.MetaPageId)
+func writeRootInfo(w *strings.Builder, bp *bufferpool.BufferPool, tree *BTree) {
+	metaBuf, err := bp.FetchPage(tree.MetaPageId)
 	if err != nil {
 		panic(err)
 	}
-	defer bpm.UnRefPage(tree.MetaPageId)
+	defer bp.UnRefPage(tree.MetaPageId)
 
 	meta := metapage.NewMetaPage(metaBuf.GetReadData())
 	rootPageId := meta.RootPageId()
-	writeNodeInfo(w, bpm, rootPageId, 0)
+	writeNodeInfo(w, bp, rootPageId, 0)
 }
 
 // ノード情報を再帰的にログに書き出す
-func writeNodeInfo(w *strings.Builder, bpm *bufferpool.BufferPoolManager, pageId page.PageId, depth int) {
-	buf, err := bpm.FetchPage(pageId)
+func writeNodeInfo(w *strings.Builder, bp *bufferpool.BufferPool, pageId page.PageId, depth int) {
+	buf, err := bp.FetchPage(pageId)
 	if err != nil {
 		panic(err)
 	}
-	defer bpm.UnRefPage(pageId)
+	defer bp.UnRefPage(pageId)
 
 	indent := strings.Repeat("  ", depth)
 	nodeType := node.GetNodeType(buf.GetReadData())
@@ -79,20 +79,20 @@ func writeNodeInfo(w *strings.Builder, bpm *bufferpool.BufferPoolManager, pageId
 
 		for i := range branchNode.NumPairs() + 1 {
 			childPageId := branchNode.ChildPageIdAt(i)
-			writeNodeInfo(w, bpm, childPageId, depth+1)
+			writeNodeInfo(w, bp, childPageId, depth+1)
 		}
 	}
 }
 
 // ツリーの形状 (高さ、各深さのノードタイプ・ノード数・キー数) をコンパクトに出力する
-func writeTreeShape(w *strings.Builder, bpm *bufferpool.BufferPoolManager, tree *BTree) {
-	metaBuf, err := bpm.FetchPage(tree.MetaPageId)
+func writeTreeShape(w *strings.Builder, bp *bufferpool.BufferPool, tree *BTree) {
+	metaBuf, err := bp.FetchPage(tree.MetaPageId)
 	if err != nil {
 		panic(err)
 	}
 	meta := metapage.NewMetaPage(metaBuf.GetReadData())
 	rootPageId := meta.RootPageId()
-	bpm.UnRefPage(tree.MetaPageId)
+	bp.UnRefPage(tree.MetaPageId)
 
 	type depthInfo struct {
 		nodeType  string
@@ -103,11 +103,11 @@ func writeTreeShape(w *strings.Builder, bpm *bufferpool.BufferPoolManager, tree 
 
 	var collect func(pageId page.PageId, depth int)
 	collect = func(pageId page.PageId, depth int) {
-		buf, err := bpm.FetchPage(pageId)
+		buf, err := bp.FetchPage(pageId)
 		if err != nil {
 			panic(err)
 		}
-		defer bpm.UnRefPage(pageId)
+		defer bp.UnRefPage(pageId)
 
 		nodeType := node.GetNodeType(buf.GetReadData())
 		if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
@@ -144,7 +144,7 @@ func writeTreeShape(w *strings.Builder, bpm *bufferpool.BufferPoolManager, tree 
 func TestBTreeInsertAndScan(t *testing.T) {
 	t.Run("20 件のデータを挿入し、全件スキャンで昇順に取得できる", func(t *testing.T) {
 		// GIVEN
-		tree, bpm := setupBTree(t)
+		tree, bp := setupBTree(t)
 
 		fruits := []string{
 			"apple", "banana", "cherry", "date", "elderberry",
@@ -155,12 +155,12 @@ func TestBTreeInsertAndScan(t *testing.T) {
 
 		// WHEN
 		for _, fruit := range fruits {
-			tree.mustInsert(bpm, fruit, strings.Repeat(string(fruit[0]), 200))
+			tree.mustInsert(bp, fruit, strings.Repeat(string(fruit[0]), 200))
 		}
 
 		// THEN
 		var w strings.Builder
-		writeScanLog(&w, bpm, tree)
+		writeScanLog(&w, bp, tree)
 
 		expected := `  key=apple, value=a x 200
   key=banana, value=b x 200
@@ -189,18 +189,18 @@ func TestBTreeInsertAndScan(t *testing.T) {
 
 	t.Run("挿入後にディスクに書き出してから再度読み込める", func(t *testing.T) {
 		// GIVEN
-		tree, bpm := setupBTree(t)
+		tree, bp := setupBTree(t)
 		for _, fruit := range []string{"apple", "banana", "cherry"} {
-			tree.mustInsert(bpm, fruit, strings.Repeat(string(fruit[0]), 200))
+			tree.mustInsert(bp, fruit, strings.Repeat(string(fruit[0]), 200))
 		}
 
 		// WHEN
-		err := bpm.FlushPage()
+		err := bp.FlushPage()
 		require.NoError(t, err)
 
 		// THEN
 		var w strings.Builder
-		writeScanLog(&w, bpm, tree)
+		writeScanLog(&w, bp, tree)
 
 		expected := `  key=apple, value=a x 200
   key=banana, value=b x 200
@@ -214,15 +214,15 @@ func TestBTreeInsertAndScan(t *testing.T) {
 func TestBTreeSearchKey(t *testing.T) {
 	t.Run("存在するキーを検索できる", func(t *testing.T) {
 		// GIVEN
-		tree, bpm := setupBTree(t)
+		tree, bp := setupBTree(t)
 		for _, fruit := range []string{"apple", "banana", "cherry", "grape", "lemon"} {
-			tree.mustInsert(bpm, fruit, strings.Repeat(string(fruit[0]), 200))
+			tree.mustInsert(bp, fruit, strings.Repeat(string(fruit[0]), 200))
 		}
 
 		// WHEN & THEN
 		var w strings.Builder
 		for _, key := range []string{"grape", "lemon"} {
-			iter, err := tree.Search(bpm, SearchModeKey{Key: []byte(key)})
+			iter, err := tree.Search(bp, SearchModeKey{Key: []byte(key)})
 			require.NoError(t, err)
 			pair, ok := iter.Get()
 			if ok && string(pair.Key) == key {
@@ -240,15 +240,15 @@ key=lemon, value=l x 200
 
 	t.Run("存在しないキーを検索すると not found になる", func(t *testing.T) {
 		// GIVEN
-		tree, bpm := setupBTree(t)
+		tree, bp := setupBTree(t)
 		for _, fruit := range []string{"apple", "banana", "cherry", "grape", "lemon"} {
-			tree.mustInsert(bpm, fruit, strings.Repeat(string(fruit[0]), 200))
+			tree.mustInsert(bp, fruit, strings.Repeat(string(fruit[0]), 200))
 		}
 
 		// WHEN & THEN
 		var w strings.Builder
 		key := "watermelon"
-		iter, err := tree.Search(bpm, SearchModeKey{Key: []byte(key)})
+		iter, err := tree.Search(bp, SearchModeKey{Key: []byte(key)})
 		require.NoError(t, err)
 		pair, ok := iter.Get()
 		if ok && string(pair.Key) == key {
@@ -264,27 +264,27 @@ key=lemon, value=l x 200
 func TestBTreeDeleteIntegration(t *testing.T) {
 	t.Run("一部のキーを削除し、残りを確認できる", func(t *testing.T) {
 		// GIVEN
-		tree, bpm := setupBTree(t)
+		tree, bp := setupBTree(t)
 		for _, fruit := range []string{
 			"apple", "banana", "cherry", "date", "elderberry",
 			"fig", "grape", "honeydew", "kiwi", "lemon",
 		} {
-			tree.mustInsert(bpm, fruit, strings.Repeat(string(fruit[0]), 100))
+			tree.mustInsert(bp, fruit, strings.Repeat(string(fruit[0]), 100))
 		}
 
 		// WHEN
 		var w strings.Builder
 		fmt.Fprintln(&w, "=== 挿入後 ===")
-		writeScanLog(&w, bpm, tree)
+		writeScanLog(&w, bp, tree)
 
 		for _, key := range []string{"banana", "elderberry", "grape"} {
-			err := tree.Delete(bpm, []byte(key))
+			err := tree.Delete(bp, []byte(key))
 			require.NoError(t, err)
 			fmt.Fprintf(&w, "Delete: %s\n", key)
 		}
 
 		fmt.Fprintln(&w, "=== 削除後 ===")
-		writeScanLog(&w, bpm, tree)
+		writeScanLog(&w, bp, tree)
 
 		// THEN
 		expected := `=== 挿入後 ===
@@ -317,12 +317,12 @@ Delete: grape
 
 	t.Run("存在しないキーを削除するとエラーを返す", func(t *testing.T) {
 		// GIVEN
-		tree, bpm := setupBTree(t)
-		tree.mustInsert(bpm, "apple", "value")
+		tree, bp := setupBTree(t)
+		tree.mustInsert(bp, "apple", "value")
 
 		// WHEN
 		var w strings.Builder
-		err := tree.Delete(bpm, []byte("banana"))
+		err := tree.Delete(bp, []byte("banana"))
 		fmt.Fprintf(&w, "error: %v\n", err)
 
 		// THEN
@@ -331,19 +331,19 @@ Delete: grape
 
 	t.Run("削除後に新しいキーを挿入できる", func(t *testing.T) {
 		// GIVEN
-		tree, bpm := setupBTree(t)
+		tree, bp := setupBTree(t)
 		for _, fruit := range []string{"apple", "banana", "cherry"} {
-			tree.mustInsert(bpm, fruit, strings.Repeat(string(fruit[0]), 100))
+			tree.mustInsert(bp, fruit, strings.Repeat(string(fruit[0]), 100))
 		}
-		require.NoError(t, tree.Delete(bpm, []byte("banana")))
+		require.NoError(t, tree.Delete(bp, []byte("banana")))
 
 		// WHEN
-		err := tree.Insert(bpm, node.NewPair([]byte("blueberry"), []byte(strings.Repeat("b", 100))))
+		err := tree.Insert(bp, node.NewPair([]byte("blueberry"), []byte(strings.Repeat("b", 100))))
 		require.NoError(t, err)
 
 		// THEN
 		var w strings.Builder
-		writeScanLog(&w, bpm, tree)
+		writeScanLog(&w, bp, tree)
 
 		expected := `  key=apple, value=a x 100
   key=blueberry, value=b x 100
@@ -357,20 +357,20 @@ Delete: grape
 func TestBTreeUpdateIntegration(t *testing.T) {
 	t.Run("value のみ更新できる", func(t *testing.T) {
 		// GIVEN
-		tree, bpm := setupBTree(t)
+		tree, bp := setupBTree(t)
 		for _, fruit := range []string{"apple", "banana", "cherry"} {
-			tree.mustInsert(bpm, fruit, strings.Repeat(string(fruit[0]), 100))
+			tree.mustInsert(bp, fruit, strings.Repeat(string(fruit[0]), 100))
 		}
 
 		// WHEN
 		var w strings.Builder
 		fmt.Fprintln(&w, "=== 更新前 ===")
-		writeScanLog(&w, bpm, tree)
+		writeScanLog(&w, bp, tree)
 
-		require.NoError(t, tree.Update(bpm, node.NewPair([]byte("banana"), []byte(strings.Repeat("X", 50)))))
+		require.NoError(t, tree.Update(bp, node.NewPair([]byte("banana"), []byte(strings.Repeat("X", 50)))))
 
 		fmt.Fprintln(&w, "=== 更新後 ===")
-		writeScanLog(&w, bpm, tree)
+		writeScanLog(&w, bp, tree)
 
 		// THEN
 		expected := `=== 更新前 ===
@@ -389,18 +389,18 @@ func TestBTreeUpdateIntegration(t *testing.T) {
 
 	t.Run("キーの変更は Delete + Insert で実現できる", func(t *testing.T) {
 		// GIVEN
-		tree, bpm := setupBTree(t)
+		tree, bp := setupBTree(t)
 		for _, fruit := range []string{"apple", "banana", "cherry"} {
-			tree.mustInsert(bpm, fruit, strings.Repeat(string(fruit[0]), 100))
+			tree.mustInsert(bp, fruit, strings.Repeat(string(fruit[0]), 100))
 		}
 
 		// WHEN
-		require.NoError(t, tree.Delete(bpm, []byte("apple")))
-		require.NoError(t, tree.Insert(bpm, node.NewPair([]byte("avocado"), []byte(strings.Repeat("a", 100)))))
+		require.NoError(t, tree.Delete(bp, []byte("apple")))
+		require.NoError(t, tree.Insert(bp, node.NewPair([]byte("avocado"), []byte(strings.Repeat("a", 100)))))
 
 		// THEN
 		var w strings.Builder
-		writeScanLog(&w, bpm, tree)
+		writeScanLog(&w, bp, tree)
 
 		expected := `  key=avocado, value=a x 100
   key=banana, value=b x 100
@@ -412,12 +412,12 @@ func TestBTreeUpdateIntegration(t *testing.T) {
 
 	t.Run("存在しないキーの更新はエラーを返す", func(t *testing.T) {
 		// GIVEN
-		tree, bpm := setupBTree(t)
-		tree.mustInsert(bpm, "apple", "value")
+		tree, bp := setupBTree(t)
+		tree.mustInsert(bp, "apple", "value")
 
 		// WHEN
 		var w strings.Builder
-		err := tree.Update(bpm, node.NewPair([]byte("banana"), []byte("new_value")))
+		err := tree.Update(bp, node.NewPair([]byte("banana"), []byte("new_value")))
 		fmt.Fprintf(&w, "error: %v\n", err)
 
 		// THEN
@@ -426,19 +426,19 @@ func TestBTreeUpdateIntegration(t *testing.T) {
 
 	t.Run("同じキーを複数回更新できる", func(t *testing.T) {
 		// GIVEN
-		tree, bpm := setupBTree(t)
-		tree.mustInsert(bpm, "cherry", strings.Repeat("c", 100))
+		tree, bp := setupBTree(t)
+		tree.mustInsert(bp, "cherry", strings.Repeat("c", 100))
 
 		// WHEN
 		var w strings.Builder
 		for i := range 3 {
 			newValue := fmt.Sprintf("update_%d_%s", i+1, strings.Repeat("!", 50))
-			require.NoError(t, tree.Update(bpm, node.NewPair([]byte("cherry"), []byte(newValue))))
+			require.NoError(t, tree.Update(bp, node.NewPair([]byte("cherry"), []byte(newValue))))
 			fmt.Fprintf(&w, "Update #%d: len=%d\n", i+1, len(newValue))
 		}
 
 		fmt.Fprintln(&w, "=== 最終状態 ===")
-		writeScanLog(&w, bpm, tree)
+		writeScanLog(&w, bp, tree)
 
 		// THEN
 		expected := `Update #1: len=59
@@ -455,17 +455,17 @@ Update #3: len=59
 func TestBTreeNodeSplit(t *testing.T) {
 	t.Run("少数の挿入ではルートがリーフノードのまま", func(t *testing.T) {
 		// GIVEN
-		tree, bpm := setupBTree(t)
+		tree, bp := setupBTree(t)
 
 		// WHEN
 		for i := range 5 {
-			tree.mustInsert(bpm, fmt.Sprintf("key_%02d", i), "v")
+			tree.mustInsert(bp, fmt.Sprintf("key_%02d", i), "v")
 		}
 
 		// THEN
 		var w strings.Builder
 		fmt.Fprintln(&w, "=== ツリー構造 ===")
-		writeRootInfo(&w, bpm, tree)
+		writeRootInfo(&w, bp, tree)
 
 		expected := `=== ツリー構造 ===
 Leaf[keys=5]: [key_00, key_01, key_02, key_03, key_04]
@@ -475,23 +475,23 @@ Leaf[keys=5]: [key_00, key_01, key_02, key_03, key_04]
 
 	t.Run("リーフノードが分割されるとルートがブランチノードに昇格する", func(t *testing.T) {
 		// GIVEN
-		tree, bpm := setupBTree(t)
+		tree, bp := setupBTree(t)
 
 		// WHEN: 大きめの value でリーフノードを溢れさせる (18 件 → 19 件で分割発生)
 		for i := range 18 {
-			tree.mustInsert(bpm, fmt.Sprintf("key_%02d", i), strings.Repeat("x", 200))
+			tree.mustInsert(bp, fmt.Sprintf("key_%02d", i), strings.Repeat("x", 200))
 		}
 
 		var w strings.Builder
 
 		// 分割前: ルートが 1 つのリーフノード
 		fmt.Fprintln(&w, "=== 18 件挿入後 (分割前) ===")
-		writeRootInfo(&w, bpm, tree)
+		writeRootInfo(&w, bp, tree)
 
 		// 19 件目の挿入でリーフが溢れ、分割が発生
-		tree.mustInsert(bpm, "key_18", strings.Repeat("x", 200))
+		tree.mustInsert(bp, "key_18", strings.Repeat("x", 200))
 		fmt.Fprintln(&w, "=== 19 件挿入後 (リーフ分割発生) ===")
-		writeRootInfo(&w, bpm, tree)
+		writeRootInfo(&w, bp, tree)
 
 		// THEN: 分割前は単一リーフ、分割後はブランチ + 2 リーフに変化
 		expected := `=== 18 件挿入後 (分割前) ===
@@ -506,7 +506,7 @@ Branch[keys=1]: [key_10]
 
 	t.Run("ブランチノードも分割されツリーの高さが 3 になる", func(t *testing.T) {
 		// GIVEN
-		tree, bpm := setupBTree(t)
+		tree, bp := setupBTree(t)
 
 		// 長いキー (100 バイト) + 大きい value でブランチノードも溢れさせる
 		keyFn := func(i int) string {
@@ -515,19 +515,19 @@ Branch[keys=1]: [key_10]
 
 		// WHEN: 243 件 → 244 件でブランチ分割が発生
 		for i := range 243 {
-			tree.mustInsert(bpm, keyFn(i), strings.Repeat("x", 200))
+			tree.mustInsert(bp, keyFn(i), strings.Repeat("x", 200))
 		}
 
 		var w strings.Builder
 
 		// 分割前: 高さ 2 (ルート Branch 1 つ + Leaf 34 個)
 		fmt.Fprintln(&w, "=== 243 件挿入後 (分割前) ===")
-		writeTreeShape(&w, bpm, tree)
+		writeTreeShape(&w, bp, tree)
 
 		// 244 件目の挿入でブランチが溢れ、分割が発生
-		tree.mustInsert(bpm, keyFn(243), strings.Repeat("x", 200))
+		tree.mustInsert(bp, keyFn(243), strings.Repeat("x", 200))
 		fmt.Fprintln(&w, "=== 244 件挿入後 (ブランチ分割発生) ===")
-		writeTreeShape(&w, bpm, tree)
+		writeTreeShape(&w, bp, tree)
 
 		// THEN: 高さ 2 → 3 に変化し、ルートの子にもブランチノードが出現
 		expected := `=== 243 件挿入後 (分割前) ===
@@ -545,24 +545,24 @@ Branch[keys=1]: [key_10]
 
 	t.Run("リーフノード分割時にブランチの境界キーが子リーフのキー範囲と整合する", func(t *testing.T) {
 		// GIVEN
-		tree, bpm := setupBTree(t)
+		tree, bp := setupBTree(t)
 
 		// WHEN
 		for i := range 20 {
-			tree.mustInsert(bpm, fmt.Sprintf("key_%02d", i), strings.Repeat("x", 200))
+			tree.mustInsert(bp, fmt.Sprintf("key_%02d", i), strings.Repeat("x", 200))
 		}
 
 		// THEN: ブランチの境界キーと左右の子のキーの関係をログに出力
 		var w strings.Builder
-		metaBuf, err := bpm.FetchPage(tree.MetaPageId)
+		metaBuf, err := bp.FetchPage(tree.MetaPageId)
 		require.NoError(t, err)
-		defer bpm.UnRefPage(tree.MetaPageId)
+		defer bp.UnRefPage(tree.MetaPageId)
 		meta := metapage.NewMetaPage(metaBuf.GetReadData())
 		rootPageId := meta.RootPageId()
 
-		rootBuf, err := bpm.FetchPage(rootPageId)
+		rootBuf, err := bp.FetchPage(rootPageId)
 		require.NoError(t, err)
-		defer bpm.UnRefPage(rootPageId)
+		defer bp.UnRefPage(rootPageId)
 
 		nodeType := node.GetNodeType(rootBuf.GetReadData())
 		if !bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
@@ -575,19 +575,19 @@ Branch[keys=1]: [key_10]
 
 			// 左の子
 			leftPageId := branchNode.ChildPageIdAt(i)
-			leftBuf, err := bpm.FetchPage(leftPageId)
+			leftBuf, err := bp.FetchPage(leftPageId)
 			require.NoError(t, err)
 			leftLeaf := node.NewLeafNode(leftBuf.GetReadData())
 			lastLeftKey := string(leftLeaf.PairAt(leftLeaf.NumPairs() - 1).Key)
-			bpm.UnRefPage(leftPageId)
+			bp.UnRefPage(leftPageId)
 
 			// 右の子
 			rightPageId := branchNode.ChildPageIdAt(i + 1)
-			rightBuf, err := bpm.FetchPage(rightPageId)
+			rightBuf, err := bp.FetchPage(rightPageId)
 			require.NoError(t, err)
 			rightLeaf := node.NewLeafNode(rightBuf.GetReadData())
 			firstRightKey := string(rightLeaf.PairAt(0).Key)
-			bpm.UnRefPage(rightPageId)
+			bp.UnRefPage(rightPageId)
 
 			fmt.Fprintf(&w, "境界キー: %s\n", boundaryKey)
 			fmt.Fprintf(&w, "  左の子の末尾キー: %s (< 境界キー: %v)\n", lastLeftKey, lastLeftKey < boundaryKey)
@@ -603,7 +603,7 @@ Branch[keys=1]: [key_10]
 
 	t.Run("挿入ごとにツリーの状態遷移を追跡できる", func(t *testing.T) {
 		// GIVEN
-		tree, bpm := setupBTree(t)
+		tree, bp := setupBTree(t)
 
 		// WHEN: 挿入のたびにルートのノードタイプを記録
 		var w strings.Builder
@@ -611,18 +611,18 @@ Branch[keys=1]: [key_10]
 
 		for i := range 30 {
 			key := fmt.Sprintf("key_%02d", i)
-			tree.mustInsert(bpm, key, strings.Repeat("x", 200))
+			tree.mustInsert(bp, key, strings.Repeat("x", 200))
 
-			metaBuf, err := bpm.FetchPage(tree.MetaPageId)
+			metaBuf, err := bp.FetchPage(tree.MetaPageId)
 			require.NoError(t, err)
 			meta := metapage.NewMetaPage(metaBuf.GetReadData())
 			rootPageId := meta.RootPageId()
-			bpm.UnRefPage(tree.MetaPageId)
+			bp.UnRefPage(tree.MetaPageId)
 
-			rootBuf, err := bpm.FetchPage(rootPageId)
+			rootBuf, err := bp.FetchPage(rootPageId)
 			require.NoError(t, err)
 			nodeType := node.GetNodeType(rootBuf.GetReadData())
-			bpm.UnRefPage(rootPageId)
+			bp.UnRefPage(rootPageId)
 
 			var currentType string
 			if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
