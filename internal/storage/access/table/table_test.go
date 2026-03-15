@@ -16,7 +16,7 @@ func TestCreateAndInsert(t *testing.T) {
 	t.Run("テーブルの作成ができ、そのテーブルに値が挿入できる", func(t *testing.T) {
 		// GIVEN
 		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", 2)
-		bp, metaPageId, _ := InitDiskManager(t, "users.db")
+		bp, metaPageId, _ := InitDisk(t, "users.db")
 
 		// UniqueIndex の metaPageId を割り当て
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
@@ -130,7 +130,7 @@ func TestCreateAndInsert(t *testing.T) {
 		// 2つのインデックスを持つテーブルを作成
 		uniqueIndex1 := NewUniqueIndex("idx_first_name", "first_name", 1)
 		uniqueIndex2 := NewUniqueIndex("idx_last_name", "last_name", 2)
-		bp, metaPageId, tmpdir := InitDiskManager(t, "users.db")
+		bp, metaPageId, tmpdir := InitDisk(t, "users.db")
 
 		// UniqueIndex の metaPageId を割り当て
 		indexMetaPageId1, err := bp.AllocatePageId(metaPageId.FileId)
@@ -172,7 +172,7 @@ func TestDelete(t *testing.T) {
 	t.Run("テーブルから行を削除でき、B+Tree とユニークインデックスの両方から削除される", func(t *testing.T) {
 		// GIVEN: テーブルを作成しデータを挿入
 		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", 2)
-		bp, metaPageId, _ := InitDiskManager(t, "users.db")
+		bp, metaPageId, _ := InitDisk(t, "users.db")
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
@@ -234,7 +234,7 @@ func TestDelete(t *testing.T) {
 
 	t.Run("存在しないキーを削除するとエラーが返る", func(t *testing.T) {
 		// GIVEN
-		bp, metaPageId, _ := InitDiskManager(t, "users.db")
+		bp, metaPageId, _ := InitDisk(t, "users.db")
 		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
@@ -251,7 +251,7 @@ func TestDelete(t *testing.T) {
 
 	t.Run("全行を削除した後にテーブルが空になる", func(t *testing.T) {
 		// GIVEN
-		bp, metaPageId, _ := InitDiskManager(t, "users.db")
+		bp, metaPageId, _ := InitDisk(t, "users.db")
 		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
@@ -281,7 +281,7 @@ func TestDelete(t *testing.T) {
 func TestUpdate(t *testing.T) {
 	t.Run("プライマリキーが同じ場合、value のみが更新される", func(t *testing.T) {
 		// GIVEN
-		bp, metaPageId, _ := InitDiskManager(t, "users.db")
+		bp, metaPageId, _ := InitDisk(t, "users.db")
 		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
@@ -311,7 +311,7 @@ func TestUpdate(t *testing.T) {
 
 	t.Run("プライマリキーが変わる場合、Delete + Insert が行われる", func(t *testing.T) {
 		// GIVEN
-		bp, metaPageId, _ := InitDiskManager(t, "users.db")
+		bp, metaPageId, _ := InitDisk(t, "users.db")
 		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
@@ -341,7 +341,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("ユニークインデックスのセカンダリキーが変わる場合、インデックスも更新される", func(t *testing.T) {
 		// GIVEN
 		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", 2)
-		bp, metaPageId, _ := InitDiskManager(t, "users.db")
+		bp, metaPageId, _ := InitDisk(t, "users.db")
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
@@ -385,7 +385,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("セカンダリキーが同じでプライマリキーが変わる場合、インデックスの value が更新される", func(t *testing.T) {
 		// GIVEN
 		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", 2)
-		bp, metaPageId, _ := InitDiskManager(t, "users.db")
+		bp, metaPageId, _ := InitDisk(t, "users.db")
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
@@ -430,7 +430,7 @@ func TestUpdate(t *testing.T) {
 
 	t.Run("プライマリキーを既存のキーに変更するとエラーが返る", func(t *testing.T) {
 		// GIVEN
-		bp, metaPageId, _ := InitDiskManager(t, "users.db")
+		bp, metaPageId, _ := InitDisk(t, "users.db")
 		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
@@ -452,7 +452,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("ユニークインデックスの更新が失敗した場合にエラーが返る", func(t *testing.T) {
 		// GIVEN: セカンダリキーが重複する状況を作る
 		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", 2)
-		bp, metaPageId, _ := InitDiskManager(t, "users.db")
+		bp, metaPageId, _ := InitDisk(t, "users.db")
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
@@ -480,7 +480,7 @@ func TestUpdate(t *testing.T) {
 		// GIVEN: 2 つのユニークインデックスを持つテーブル
 		uniqueIndex1 := NewUniqueIndex("idx_first_name", "first_name", 1)
 		uniqueIndex2 := NewUniqueIndex("idx_last_name", "last_name", 2)
-		bp, metaPageId, _ := InitDiskManager(t, "users.db")
+		bp, metaPageId, _ := InitDisk(t, "users.db")
 
 		indexMetaPageId1, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
@@ -541,7 +541,7 @@ func TestUpdate(t *testing.T) {
 
 	t.Run("存在しないキーを更新するとエラーが返る", func(t *testing.T) {
 		// GIVEN
-		bp, metaPageId, _ := InitDiskManager(t, "users.db")
+		bp, metaPageId, _ := InitDisk(t, "users.db")
 		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
@@ -614,15 +614,15 @@ func TestGetUniqueIndexByName(t *testing.T) {
 	})
 }
 
-func InitDiskManager(t *testing.T, pathname string) (bufferPool *bufferpool.BufferPool, metaPageId page.PageId, tmpdir string) {
+func InitDisk(t *testing.T, pathname string) (bufferPool *bufferpool.BufferPool, metaPageId page.PageId, tmpdir string) {
 	tmpdir = t.TempDir()
 	filePath := filepath.Join(tmpdir, pathname)
 
 	bp := bufferpool.NewBufferPool(10)
 	fileId := bp.AllocateFileId()
-	dm, err := disk.NewDiskManager(fileId, filePath)
+	dm, err := disk.NewDisk(fileId, filePath)
 	assert.NoError(t, err)
-	bp.RegisterDiskManager(fileId, dm)
+	bp.RegisterDisk(fileId, dm)
 
 	// metaPageId を割り当て
 	metaPageId, err = bp.AllocatePageId(fileId)

@@ -110,7 +110,7 @@ func TestCreateTable(t *testing.T) {
 		// FileId が採番されていることを確認
 		assert.NotEqual(t, page.FileId(0), tblMeta.DataMetaPageId.FileId)
 		// ディスクマネージャが登録されていることを確認
-		dm, dmErr := sm.BufferPool.GetDiskManager(tblMeta.DataMetaPageId.FileId)
+		dm, dmErr := sm.BufferPool.GetDisk(tblMeta.DataMetaPageId.FileId)
 		assert.NoError(t, dmErr)
 		assert.NotNil(t, dm)
 	})

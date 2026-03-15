@@ -53,7 +53,7 @@ func (ct *CreateTable) execute() error {
 	// FileId を割り当て
 	fileId := sm.BufferPool.AllocateFileId()
 
-	// DiskManager を登録
+	// Disk を登録
 	err := sm.RegisterDmToBpm(fileId, ct.tableName)
 	if err != nil {
 		return err

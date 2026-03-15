@@ -651,14 +651,14 @@ func setupBTree(t *testing.T) (*BTree, *bufferpool.BufferPool) {
 	tmpdir := t.TempDir()
 	path := filepath.Join(tmpdir, "btree_test.db")
 	fileId := page.FileId(0)
-	dm, err := disk.NewDiskManager(fileId, path)
+	dm, err := disk.NewDisk(fileId, path)
 	if err != nil {
-		t.Fatalf("DiskManager の作成に失敗: %v", err)
+		t.Fatalf("Disk の作成に失敗: %v", err)
 	}
 	metaPageId := dm.AllocatePage()
 
 	bp := bufferpool.NewBufferPool(100)
-	bp.RegisterDiskManager(fileId, dm)
+	bp.RegisterDisk(fileId, dm)
 
 	bt, err := CreateBTree(bp, metaPageId)
 	if err != nil {

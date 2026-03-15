@@ -17,12 +17,12 @@ func delete() {
 	bp := bufferpool.NewBufferPool(10)
 	fileId := bp.AllocateFileId()
 
-	// DiskManager を作成して登録
-	dm, err := disk.NewDiskManager(fileId, dbPath)
+	// Disk を作成して登録
+	dm, err := disk.NewDisk(fileId, dbPath)
 	if err != nil {
 		panic(err)
 	}
-	bp.RegisterDiskManager(fileId, dm)
+	bp.RegisterDisk(fileId, dm)
 
 	// metaPageId を割り当て
 	metaPageId, err := bp.AllocatePageId(fileId)

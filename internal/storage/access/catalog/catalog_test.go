@@ -15,7 +15,7 @@ import (
 func TestCreateCatalog(t *testing.T) {
 	t.Run("新しいカタログを作成できる", func(t *testing.T) {
 		// GIVEN
-		bp, tmpdir := InitCatalogDiskManager(t)
+		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
 		// WHEN
@@ -33,7 +33,7 @@ func TestCreateCatalog(t *testing.T) {
 
 	t.Run("カタログのヘッダーページにマジックナンバーが設定される", func(t *testing.T) {
 		// GIVEN
-		bp, tmpdir := InitCatalogDiskManager(t)
+		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
 		// WHEN
@@ -54,7 +54,7 @@ func TestCreateCatalog(t *testing.T) {
 func TestAllocateTableId(t *testing.T) {
 	t.Run("テーブルIDを順番に採番できる", func(t *testing.T) {
 		// GIVEN
-		bp, tmpdir := InitCatalogDiskManager(t)
+		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
 		cat, err := CreateCatalog(bp)
@@ -77,7 +77,7 @@ func TestAllocateTableId(t *testing.T) {
 
 	t.Run("採番後のテーブルIDがディスクに保存される", func(t *testing.T) {
 		// GIVEN
-		bp, tmpdir := InitCatalogDiskManager(t)
+		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
 		cat, err := CreateCatalog(bp)
@@ -102,7 +102,7 @@ func TestAllocateTableId(t *testing.T) {
 func TestInsert(t *testing.T) {
 	t.Run("テーブルメタデータを挿入できる", func(t *testing.T) {
 		// GIVEN
-		bp, tmpdir := InitCatalogDiskManager(t)
+		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
 		cat, err := CreateCatalog(bp)
@@ -128,7 +128,7 @@ func TestInsert(t *testing.T) {
 
 	t.Run("カラムメタデータ付きのテーブルメタデータを挿入できる", func(t *testing.T) {
 		// GIVEN
-		bp, tmpdir := InitCatalogDiskManager(t)
+		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
 		cat, err := CreateCatalog(bp)
@@ -156,7 +156,7 @@ func TestInsert(t *testing.T) {
 
 	t.Run("インデックスメタデータ付きのテーブルメタデータを挿入できる", func(t *testing.T) {
 		// GIVEN
-		bp, tmpdir := InitCatalogDiskManager(t)
+		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
 		cat, err := CreateCatalog(bp)
@@ -188,7 +188,7 @@ func TestInsert(t *testing.T) {
 func TestGetTableMetadataByName(t *testing.T) {
 	t.Run("テーブル名からテーブルメタデータを取得できる", func(t *testing.T) {
 		// GIVEN
-		bp, tmpdir := InitCatalogDiskManager(t)
+		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
 		cat, err := CreateCatalog(bp)
@@ -215,7 +215,7 @@ func TestGetTableMetadataByName(t *testing.T) {
 
 	t.Run("存在しないテーブル名を指定するとエラーを返す", func(t *testing.T) {
 		// GIVEN
-		bp, tmpdir := InitCatalogDiskManager(t)
+		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
 		cat, err := CreateCatalog(bp)
@@ -232,7 +232,7 @@ func TestGetTableMetadataByName(t *testing.T) {
 
 	t.Run("複数のテーブルから正しいテーブルを取得できる", func(t *testing.T) {
 		// GIVEN
-		bp, tmpdir := InitCatalogDiskManager(t)
+		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
 		cat, err := CreateCatalog(bp)
@@ -270,7 +270,7 @@ func TestGetTableMetadataByName(t *testing.T) {
 func TestNewCatalog(t *testing.T) {
 	t.Run("既存のカタログを開くと、保存されたメタデータが読み込まれる", func(t *testing.T) {
 		// GIVEN
-		bp, tmpdir := InitCatalogDiskManager(t)
+		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
 		cat, err := CreateCatalog(bp)
@@ -294,9 +294,9 @@ func TestNewCatalog(t *testing.T) {
 		bpm2 := bufferpool.NewBufferPool(10)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		fileId := page.FileId(0)
-		dm2, err := disk.NewDiskManager(fileId, filePath)
+		dm2, err := disk.NewDisk(fileId, filePath)
 		assert.NoError(t, err)
-		bpm2.RegisterDiskManager(fileId, dm2)
+		bpm2.RegisterDisk(fileId, dm2)
 
 		cat2, err := NewCatalog(bpm2)
 
@@ -311,7 +311,7 @@ func TestNewCatalog(t *testing.T) {
 
 	t.Run("カラムメタデータも正しく読み込まれる", func(t *testing.T) {
 		// GIVEN
-		bp, tmpdir := InitCatalogDiskManager(t)
+		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
 		cat, err := CreateCatalog(bp)
@@ -336,9 +336,9 @@ func TestNewCatalog(t *testing.T) {
 		bpm2 := bufferpool.NewBufferPool(10)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		fileId := page.FileId(0)
-		dm2, err := disk.NewDiskManager(fileId, filePath)
+		dm2, err := disk.NewDisk(fileId, filePath)
 		assert.NoError(t, err)
-		bpm2.RegisterDiskManager(fileId, dm2)
+		bpm2.RegisterDisk(fileId, dm2)
 
 		cat2, err := NewCatalog(bpm2)
 
@@ -356,7 +356,7 @@ func TestNewCatalog(t *testing.T) {
 
 	t.Run("インデックスメタデータも正しく読み込まれる", func(t *testing.T) {
 		// GIVEN
-		bp, tmpdir := InitCatalogDiskManager(t)
+		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
 		cat, err := CreateCatalog(bp)
@@ -384,9 +384,9 @@ func TestNewCatalog(t *testing.T) {
 		bpm2 := bufferpool.NewBufferPool(10)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		fileId := page.FileId(0)
-		dm2, err := disk.NewDiskManager(fileId, filePath)
+		dm2, err := disk.NewDisk(fileId, filePath)
 		assert.NoError(t, err)
-		bpm2.RegisterDiskManager(fileId, dm2)
+		bpm2.RegisterDisk(fileId, dm2)
 
 		cat2, err := NewCatalog(bpm2)
 
@@ -402,7 +402,7 @@ func TestNewCatalog(t *testing.T) {
 
 	t.Run("複数のテーブルが正しく読み込まれる", func(t *testing.T) {
 		// GIVEN
-		bp, tmpdir := InitCatalogDiskManager(t)
+		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
 		cat, err := CreateCatalog(bp)
@@ -441,9 +441,9 @@ func TestNewCatalog(t *testing.T) {
 		bpm2 := bufferpool.NewBufferPool(10)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		fileId := page.FileId(0)
-		dm2, err := disk.NewDiskManager(fileId, filePath)
+		dm2, err := disk.NewDisk(fileId, filePath)
 		assert.NoError(t, err)
-		bpm2.RegisterDiskManager(fileId, dm2)
+		bpm2.RegisterDisk(fileId, dm2)
 
 		cat2, err := NewCatalog(bpm2)
 
@@ -473,7 +473,7 @@ func TestNewCatalog(t *testing.T) {
 
 	t.Run("NextTableId も正しく復元される", func(t *testing.T) {
 		// GIVEN
-		bp, tmpdir := InitCatalogDiskManager(t)
+		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
 		cat, err := CreateCatalog(bp)
@@ -495,9 +495,9 @@ func TestNewCatalog(t *testing.T) {
 		bpm2 := bufferpool.NewBufferPool(10)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		fileId := page.FileId(0)
-		dm2, err := disk.NewDiskManager(fileId, filePath)
+		dm2, err := disk.NewDisk(fileId, filePath)
 		assert.NoError(t, err)
-		bpm2.RegisterDiskManager(fileId, dm2)
+		bpm2.RegisterDisk(fileId, dm2)
 
 		cat2, err := NewCatalog(bpm2)
 
@@ -513,15 +513,15 @@ func TestNewCatalog(t *testing.T) {
 	})
 }
 
-func InitCatalogDiskManager(t *testing.T) (bp *bufferpool.BufferPool, tmpdir string) {
+func InitCatalogDisk(t *testing.T) (bp *bufferpool.BufferPool, tmpdir string) {
 	tmpdir = t.TempDir()
 	filePath := filepath.Join(tmpdir, "minesql.db")
 
 	bp = bufferpool.NewBufferPool(10)
 	fileId := page.FileId(0)
-	dm, err := disk.NewDiskManager(fileId, filePath)
+	dm, err := disk.NewDisk(fileId, filePath)
 	assert.NoError(t, err)
-	bp.RegisterDiskManager(fileId, dm)
+	bp.RegisterDisk(fileId, dm)
 
 	return bp, tmpdir
 }

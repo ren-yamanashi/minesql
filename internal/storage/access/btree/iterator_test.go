@@ -31,9 +31,9 @@ func TestGet(t *testing.T) {
 	t.Run("現在の key-value ペアが取得できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
-		dm := initDiskManagerForIterator(t, tmpdir)
+		dm := initDiskForIterator(t, tmpdir)
 		bp := bufferpool.NewBufferPool(3)
-		bp.RegisterDiskManager(page.FileId(0), dm)
+		bp.RegisterDisk(page.FileId(0), dm)
 
 		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
 		pair2 := node.NewPair([]byte("key2"), []byte("value2"))
@@ -56,9 +56,9 @@ func TestAdvance(t *testing.T) {
 	t.Run("現在のページ内に、まだ次の key-value ペアがある場合は何もしない", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
-		dm := initDiskManagerForIterator(t, tmpdir)
+		dm := initDiskForIterator(t, tmpdir)
 		bp := bufferpool.NewBufferPool(3)
-		bp.RegisterDiskManager(page.FileId(0), dm)
+		bp.RegisterDisk(page.FileId(0), dm)
 
 		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
 		pair2 := node.NewPair([]byte("key2"), []byte("value2"))
@@ -78,9 +78,9 @@ func TestAdvance(t *testing.T) {
 	t.Run("現在のページ内に、次の key-value ペアがないが、次のページも存在しない場合は何もしない", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
-		dm := initDiskManagerForIterator(t, tmpdir)
+		dm := initDiskForIterator(t, tmpdir)
 		bp := bufferpool.NewBufferPool(3)
-		bp.RegisterDiskManager(page.FileId(0), dm)
+		bp.RegisterDisk(page.FileId(0), dm)
 
 		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
 		pair2 := node.NewPair([]byte("key2"), []byte("value2"))
@@ -99,9 +99,9 @@ func TestAdvance(t *testing.T) {
 	t.Run("現在のページ内に次の key-value ペアがなく、次のページが存在する場合は、次のページに移動する (古いページの参照ビットがクリアされ、次のページの先頭にポインタが置かれる)", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
-		dm := initDiskManagerForIterator(t, tmpdir)
+		dm := initDiskForIterator(t, tmpdir)
 		bp := bufferpool.NewBufferPool(3)
-		bp.RegisterDiskManager(page.FileId(0), dm)
+		bp.RegisterDisk(page.FileId(0), dm)
 
 		// 最初のページ
 		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
@@ -139,9 +139,9 @@ func TestNext(t *testing.T) {
 	t.Run("次の key-value ペアの情報が取得できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
-		dm := initDiskManagerForIterator(t, tmpdir)
+		dm := initDiskForIterator(t, tmpdir)
 		bp := bufferpool.NewBufferPool(3)
-		bp.RegisterDiskManager(page.FileId(0), dm)
+		bp.RegisterDisk(page.FileId(0), dm)
 
 		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
 		pair2 := node.NewPair([]byte("key2"), []byte("value2"))
@@ -191,9 +191,9 @@ func createLeafBufferPage(pageId page.PageId, pairs []node.Pair, nextPageId *pag
 	return *bufpool
 }
 
-func initDiskManagerForIterator(t *testing.T, tmpdir string) *disk.DiskManager {
+func initDiskForIterator(t *testing.T, tmpdir string) *disk.Disk {
 	path := filepath.Join(tmpdir, "iterator_test.db")
-	dm, err := disk.NewDiskManager(page.FileId(0), path)
+	dm, err := disk.NewDisk(page.FileId(0), path)
 	if err != nil {
 		t.Fatalf("failed to create disk manager: %v", err)
 	}

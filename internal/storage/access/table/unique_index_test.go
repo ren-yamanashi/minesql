@@ -12,7 +12,7 @@ func TestUniqueIndex(t *testing.T) {
 	t.Run("ユニークインデックスの作成ができ、そのインデックスに値が挿入できる", func(t *testing.T) {
 		// GIVEN
 		uniqueIndex := NewUniqueIndex("test_index", "test", 0)
-		bp, metaPageId, _ := InitDiskManager(t, "test.db")
+		bp, metaPageId, _ := InitDisk(t, "test.db")
 
 		// UniqueIndex の metaPageId を割り当て
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
@@ -76,7 +76,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 	t.Run("ユニークインデックスから行を削除できる", func(t *testing.T) {
 		// GIVEN
 		uniqueIndex := NewUniqueIndex("test_index", "test", 0)
-		bp, metaPageId, _ := InitDiskManager(t, "test.db")
+		bp, metaPageId, _ := InitDisk(t, "test.db")
 
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
@@ -135,7 +135,7 @@ func TestUniqueIndexUpdate(t *testing.T) {
 	t.Run("セカンダリキーが変わる場合、Delete + Insert が行われる", func(t *testing.T) {
 		// GIVEN
 		uniqueIndex := NewUniqueIndex("test_index", "test", 0)
-		bp, metaPageId, _ := InitDiskManager(t, "test.db")
+		bp, metaPageId, _ := InitDisk(t, "test.db")
 
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
@@ -177,7 +177,7 @@ func TestUniqueIndexUpdate(t *testing.T) {
 	t.Run("セカンダリキーが同じでプライマリキーが変わる場合、value が更新される", func(t *testing.T) {
 		// GIVEN
 		uniqueIndex := NewUniqueIndex("test_index", "test", 0)
-		bp, metaPageId, _ := InitDiskManager(t, "test.db")
+		bp, metaPageId, _ := InitDisk(t, "test.db")
 
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
@@ -213,7 +213,7 @@ func TestUniqueIndexUpdate(t *testing.T) {
 	t.Run("セカンダリキーを既存の値に変更するとエラーが返る", func(t *testing.T) {
 		// GIVEN
 		uniqueIndex := NewUniqueIndex("test_index", "test", 0)
-		bp, metaPageId, _ := InitDiskManager(t, "test.db")
+		bp, metaPageId, _ := InitDisk(t, "test.db")
 
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
@@ -239,7 +239,7 @@ func TestUniqueIndexUpdate(t *testing.T) {
 	t.Run("存在しない旧セカンダリキーで更新するとエラーが返る", func(t *testing.T) {
 		// GIVEN
 		uniqueIndex := NewUniqueIndex("test_index", "test", 0)
-		bp, metaPageId, _ := InitDiskManager(t, "test.db")
+		bp, metaPageId, _ := InitDisk(t, "test.db")
 
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
@@ -263,7 +263,7 @@ func TestUniqueIndexUpdate(t *testing.T) {
 	t.Run("セカンダリキーもプライマリキーも同じ場合、データが変わらない", func(t *testing.T) {
 		// GIVEN
 		uniqueIndex := NewUniqueIndex("test_index", "test", 0)
-		bp, metaPageId, _ := InitDiskManager(t, "test.db")
+		bp, metaPageId, _ := InitDisk(t, "test.db")
 
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)

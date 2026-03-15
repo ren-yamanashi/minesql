@@ -9,19 +9,19 @@ import (
 )
 
 type BufferPool struct {
-	diskManagers      map[page.FileId]*disk.DiskManager // FileId → DiskManager のマップ
-	bufferPages       []BufferPage                      // バッファページのスライス
-	maxBufferSize     int                               // バッファプールの最大サイズ (バッファページ数)
-	pageTable         buftype.PageTable                 // ページテーブル (key: PageId, value: BufferId のマップ)
-	nextFileId        page.FileId                       // 次に割り当てる FileId
-	evictionAlgorithm evict.EvictAlgorithm              // ページ追い出しアルゴリズム
+	diskManagers      map[page.FileId]*disk.Disk // FileId → Disk のマップ
+	bufferPages       []BufferPage               // バッファページのスライス
+	maxBufferSize     int                        // バッファプールの最大サイズ (バッファページ数)
+	pageTable         buftype.PageTable          // ページテーブル (key: PageId, value: BufferId のマップ)
+	nextFileId        page.FileId                // 次に割り当てる FileId
+	evictionAlgorithm evict.EvictAlgorithm       // ページ追い出しアルゴリズム
 }
 
 // NewBufferPool は指定されたサイズの BufferPool を生成する
 // size: バッファページの数 (例: 1000 を指定すると、1000 ページ分のバッファプールが生成される)
 func NewBufferPool(size int) *BufferPool {
 	return &BufferPool{
-		diskManagers:      make(map[page.FileId]*disk.DiskManager),
+		diskManagers:      make(map[page.FileId]*disk.Disk),
 		bufferPages:       allocateBufferPages(size),
 		maxBufferSize:     size,
 		pageTable:         make(buftype.PageTable),
@@ -48,7 +48,7 @@ func (bp *BufferPool) FetchPage(pageId page.PageId) (*BufferPage, error) {
 	}
 
 	// ディスクからページを読み込む
-	dm, err := bp.GetDiskManager(pageId.FileId)
+	dm, err := bp.GetDisk(pageId.FileId)
 	if err != nil {
 		return nil, err
 	}
@@ -81,8 +81,8 @@ func (bp *BufferPool) AddPage(pageId page.PageId) (*BufferPage, error) {
 
 	// 追い出すページがダーティーページであれば、ディスクに書き出す
 	if victim.IsDirty {
-		// FileId から DiskManager を取得
-		dm, err := bp.GetDiskManager(victim.PageId.FileId)
+		// FileId から Disk を取得
+		dm, err := bp.GetDisk(victim.PageId.FileId)
 		if err != nil {
 			return nil, err
 		}
@@ -110,8 +110,8 @@ func (bp *BufferPool) FlushPage() error {
 			continue
 		}
 
-		// FileId から DiskManager を取得
-		dm, err := bp.GetDiskManager(pageId.FileId)
+		// FileId から Disk を取得
+		dm, err := bp.GetDisk(pageId.FileId)
 		if err != nil {
 			return err
 		}
@@ -134,18 +134,18 @@ func (bp *BufferPool) UnRefPage(pageId page.PageId) {
 	}
 }
 
-// RegisterDiskManager は BufferPool に DiskManager を登録する
-// fileId: 登録する DiskManager に対応する FileId
-// dm: 登録する DiskManager
-func (bp *BufferPool) RegisterDiskManager(fileId page.FileId, dm *disk.DiskManager) {
+// RegisterDisk は BufferPool に Disk を登録する
+// fileId: 登録する Disk に対応する FileId
+// dm: 登録する Disk
+func (bp *BufferPool) RegisterDisk(fileId page.FileId, dm *disk.Disk) {
 	bp.diskManagers[fileId] = dm
 }
 
-// GetDiskManager は指定された FileId に対応する DiskManager を取得する
-func (bp *BufferPool) GetDiskManager(fileId page.FileId) (*disk.DiskManager, error) {
+// GetDisk は指定された FileId に対応する Disk を取得する
+func (bp *BufferPool) GetDisk(fileId page.FileId) (*disk.Disk, error) {
 	dm, ok := bp.diskManagers[fileId]
 	if !ok {
-		return nil, fmt.Errorf("DiskManager for FileId %d not found", fileId)
+		return nil, fmt.Errorf("disk for FileId %d not found", fileId)
 	}
 	return dm, nil
 }
@@ -159,7 +159,7 @@ func (bp *BufferPool) AllocateFileId() page.FileId {
 
 // AllocatePageId は指定された FileId に対して新しい PageId を割り当てる
 func (bp *BufferPool) AllocatePageId(fileId page.FileId) (page.PageId, error) {
-	dm, err := bp.GetDiskManager(fileId)
+	dm, err := bp.GetDisk(fileId)
 	if err != nil {
 		return page.INVALID_PAGE_ID, err
 	}

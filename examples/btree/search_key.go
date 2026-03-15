@@ -16,12 +16,12 @@ func searchKey() {
 	bp := bufferpool.NewBufferPool(10)
 	fileId := page.FileId(1)
 
-	// DiskManager を作成して登録
-	dm, err := disk.NewDiskManager(fileId, dbPath)
+	// Disk を作成して登録
+	dm, err := disk.NewDisk(fileId, dbPath)
 	if err != nil {
 		panic(err)
 	}
-	bp.RegisterDiskManager(fileId, dm)
+	bp.RegisterDisk(fileId, dm)
 
 	// 既存の B+Tree を開く (MetaPageId は 0 と仮定)
 	tree := btree.NewBTree(page.NewPageId(fileId, 0))

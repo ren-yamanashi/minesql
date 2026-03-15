@@ -17,13 +17,13 @@ func insert(dataDir string) {
 	bp := bufferpool.NewBufferPool(10)
 	fileId := bp.AllocateFileId()
 
-	// DiskManager を作成して登録
+	// Disk を作成して登録
 	diskPath := dataDir + "/test.db"
-	dm, err := disk.NewDiskManager(fileId, diskPath)
+	dm, err := disk.NewDisk(fileId, diskPath)
 	if err != nil {
 		panic(err)
 	}
-	bp.RegisterDiskManager(fileId, dm)
+	bp.RegisterDisk(fileId, dm)
 
 	// metaPageId を割り当て
 	metaPageId, err := bp.AllocatePageId(fileId)

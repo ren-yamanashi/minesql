@@ -64,14 +64,14 @@ func newStorageManager() (*StorageManager, error) {
 	}, nil
 }
 
-// BufferPool に DiskManager を登録する
+// BufferPool に Disk を登録する
 func (sm *StorageManager) RegisterDmToBpm(fileId page.FileId, tableName string) error {
 	path := filepath.Join(sm.baseDirectory, fmt.Sprintf("%s.db", tableName))
-	dm, err := disk.NewDiskManager(fileId, path)
+	dm, err := disk.NewDisk(fileId, path)
 	if err != nil {
 		return err
 	}
-	sm.BufferPool.RegisterDiskManager(fileId, dm)
+	sm.BufferPool.RegisterDisk(fileId, dm)
 	return nil
 }
 
@@ -80,15 +80,15 @@ func initCatalog(baseDir string, bp *bufferpool.BufferPool) (*catalog.Catalog, e
 	fileId := page.FileId(0)
 	path := filepath.Join(baseDir, "minesql.db")
 
-	// カタログファイルが存在するかチェック (DiskManager 作成前に確認)
+	// カタログファイルが存在するかチェック (Disk 作成前に確認)
 	_, err := os.Stat(path)
 	catalogExists := !os.IsNotExist(err)
 
-	dm, err := disk.NewDiskManager(fileId, path)
+	dm, err := disk.NewDisk(fileId, path)
 	if err != nil {
 		return nil, err
 	}
-	bp.RegisterDiskManager(fileId, dm)
+	bp.RegisterDisk(fileId, dm)
 
 	var cat *catalog.Catalog
 	if catalogExists {
@@ -107,8 +107,8 @@ func initCatalog(baseDir string, bp *bufferpool.BufferPool) (*catalog.Catalog, e
 			return nil, err
 		}
 
-		// 既存のテーブルの DiskManager を登録
-		if err := registerTableDiskManagers(cat, baseDir, bp); err != nil {
+		// 既存のテーブルの Disk を登録
+		if err := registerTableDisks(cat, baseDir, bp); err != nil {
 			return nil, err
 		}
 	} else {
@@ -122,20 +122,20 @@ func initCatalog(baseDir string, bp *bufferpool.BufferPool) (*catalog.Catalog, e
 	return cat, nil
 }
 
-// カタログに含まれるテーブルの DiskManager を登録する
-func registerTableDiskManagers(cat *catalog.Catalog, baseDir string, bp *bufferpool.BufferPool) error {
+// カタログに含まれるテーブルの Disk を登録する
+func registerTableDisks(cat *catalog.Catalog, baseDir string, bp *bufferpool.BufferPool) error {
 	tables := cat.GetAllTables()
 	for _, tableMeta := range tables {
 		fileId := tableMeta.DataMetaPageId.FileId
 		tableName := tableMeta.Name
 		path := filepath.Join(baseDir, fmt.Sprintf("%s.db", tableName))
 
-		// DiskManager を作成して登録
-		dm, err := disk.NewDiskManager(fileId, path)
+		// Disk を作成して登録
+		dm, err := disk.NewDisk(fileId, path)
 		if err != nil {
 			return err
 		}
-		bp.RegisterDiskManager(fileId, dm)
+		bp.RegisterDisk(fileId, dm)
 	}
 	return nil
 }

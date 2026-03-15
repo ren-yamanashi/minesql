@@ -9,15 +9,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewDiskManager(t *testing.T) {
-	t.Run("正常に DiskManager が生成される", func(t *testing.T) {
+func TestNewDisk(t *testing.T) {
+	t.Run("正常に Disk が生成される", func(t *testing.T) {
 		// GIVEN
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "test.db")
 		fileId := page.FileId(0)
 
 		// WHEN
-		dm, err := NewDiskManager(fileId, dbPath)
+		dm, err := NewDisk(fileId, dbPath)
 
 		// THEN
 		assert.NoError(t, err)
@@ -30,7 +30,7 @@ func TestNewDiskManager(t *testing.T) {
 		fileId := page.FileId(0)
 
 		// WHEN
-		_, err := NewDiskManager(fileId, invalidPath)
+		_, err := NewDisk(fileId, invalidPath)
 
 		// THEN
 		assert.Error(t, err)
@@ -42,7 +42,7 @@ func TestNewDiskManager(t *testing.T) {
 		dbPath := filepath.Join(tmpDir, "test.db")
 		fileId := page.FileId(0)
 
-		dm1, err := NewDiskManager(fileId, dbPath)
+		dm1, err := NewDisk(fileId, dbPath)
 		assert.NoError(t, err)
 
 		pageId := dm1.AllocatePage()
@@ -50,8 +50,8 @@ func TestNewDiskManager(t *testing.T) {
 		err = dm1.WritePageData(pageId, writeData)
 		assert.NoError(t, err)
 
-		// WHEN: 同じパスで再度 DiskManager を生成
-		dm2, err := NewDiskManager(fileId, dbPath)
+		// WHEN: 同じパスで再度 Disk を生成
+		dm2, err := NewDisk(fileId, dbPath)
 
 		// THEN: nextPageId がファイルサイズから計算された値 (pageNumber=1) になる
 		assert.NoError(t, err)
@@ -65,7 +65,7 @@ func TestAllocatePage(t *testing.T) {
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "test.db")
 		fileId := page.FileId(0)
-		dm, err := NewDiskManager(fileId, dbPath)
+		dm, err := NewDisk(fileId, dbPath)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -84,7 +84,7 @@ func TestAllocatePage(t *testing.T) {
 func TestReadPageData(t *testing.T) {
 	t.Run("正常にデータを読み込める", func(t *testing.T) {
 		// GIVEN
-		dm, pageId := initDiskManager(t)
+		dm, pageId := initDisk(t)
 		writeData := createDataBuffer()
 		err := dm.WritePageData(pageId, writeData)
 		assert.NoError(t, err)
@@ -100,7 +100,7 @@ func TestReadPageData(t *testing.T) {
 
 	t.Run("読み込むバッファのサイズが PAGE_SIZE と異なる場合はエラー", func(t *testing.T) {
 		// GIVEN
-		dm, pageId := initDiskManager(t)
+		dm, pageId := initDisk(t)
 		invalidData := make([]byte, page.PAGE_SIZE-1)
 
 		// WHEN
@@ -111,8 +111,8 @@ func TestReadPageData(t *testing.T) {
 	})
 
 	t.Run("FileId が異なるページ ID で読み込むとエラーが返る", func(t *testing.T) {
-		// GIVEN: FileId(0) の DiskManager
-		dm, _ := initDiskManager(t)
+		// GIVEN: FileId(0) の Disk
+		dm, _ := initDisk(t)
 
 		// GIVEN: FileId(1) のページ ID を用意
 		wrongPageId := page.NewPageId(page.FileId(1), page.PageNumber(0))
@@ -130,7 +130,7 @@ func TestReadPageData(t *testing.T) {
 		// GIVEN: 3 ページ分のデータを書き込む
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "test.db")
-		dm, err := NewDiskManager(page.FileId(0), dbPath)
+		dm, err := NewDisk(page.FileId(0), dbPath)
 		assert.NoError(t, err)
 
 		pages := make([][]byte, 3)
@@ -158,7 +158,7 @@ func TestReadPageData(t *testing.T) {
 func TestWritePageData(t *testing.T) {
 	t.Run("正常にデータを書き込める", func(t *testing.T) {
 		// GIVEN
-		dm, pageId := initDiskManager(t)
+		dm, pageId := initDisk(t)
 		writeData := createDataBuffer()
 
 		// WHEN
@@ -170,7 +170,7 @@ func TestWritePageData(t *testing.T) {
 
 	t.Run("書き込むデータのサイズが PAGE_SIZE と異なる場合はエラー", func(t *testing.T) {
 		// GIVEN
-		dm, pageId := initDiskManager(t)
+		dm, pageId := initDisk(t)
 		invalidData := make([]byte, page.PAGE_SIZE+10)
 
 		// WHEN
@@ -181,8 +181,8 @@ func TestWritePageData(t *testing.T) {
 	})
 
 	t.Run("FileId が異なるページ ID で書き込むとエラーが返る", func(t *testing.T) {
-		// GIVEN: FileId(0) の DiskManager
-		dm, _ := initDiskManager(t)
+		// GIVEN: FileId(0) の Disk
+		dm, _ := initDisk(t)
 
 		// GIVEN: FileId(1) のページ ID を用意
 		wrongPageId := page.NewPageId(page.FileId(1), page.PageNumber(0))
@@ -198,7 +198,7 @@ func TestWritePageData(t *testing.T) {
 
 	t.Run("既に書き込んだページを上書きできる", func(t *testing.T) {
 		// GIVEN
-		dm, pageId := initDiskManager(t)
+		dm, pageId := initDisk(t)
 		firstData := directio.AlignedBlock(directio.BlockSize)
 		for i := range page.PAGE_SIZE {
 			firstData[i] = byte(0xAA)
@@ -225,7 +225,7 @@ func TestWritePageData(t *testing.T) {
 func TestSync(t *testing.T) {
 	t.Run("Sync が正常に実行できる", func(t *testing.T) {
 		// GIVEN
-		dm, pageId := initDiskManager(t)
+		dm, pageId := initDisk(t)
 		writeData := createDataBuffer()
 		err := dm.WritePageData(pageId, writeData)
 		assert.NoError(t, err)
@@ -238,12 +238,12 @@ func TestSync(t *testing.T) {
 	})
 }
 
-func initDiskManager(t *testing.T) (*DiskManager, page.PageId) {
+func initDisk(t *testing.T) (*Disk, page.PageId) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "sample.db")
-	dm, err := NewDiskManager(page.FileId(0), dbPath)
+	dm, err := NewDisk(page.FileId(0), dbPath)
 	if err != nil {
-		t.Fatalf("Failed to open DiskManager: %v", err)
+		t.Fatalf("Failed to open Disk: %v", err)
 	}
 	pageId := dm.AllocatePage()
 	return dm, pageId
