@@ -6,21 +6,22 @@ type SlottedPage struct {
 	data []byte
 }
 
+// NewSlottedPage は指定されたバイトスライスを基に Slotted Page を生成する
 func NewSlottedPage(data []byte) *SlottedPage {
 	return &SlottedPage{data: data}
 }
 
-// Slotted Page の容量 (ヘッダー領域を除く) を返す
+// Capacity は ヘッダー領域を除いた Slotted Page の容量を返す
 func (sp *SlottedPage) Capacity() int {
 	return len(sp.data) - headerSize
 }
 
-// Slotted Page のヘッダーから現在のスロット数を読み取る
+// NumSlots は Slotted Page のヘッダーから現在のスロット数を読み取る
 func (sp *SlottedPage) NumSlots() int {
 	return int(binary.BigEndian.Uint16(sp.data[0:2]))
 }
 
-// Slotted Page の空き領域のサイズを返す
+// FreeSpace は Slotted Page の空き領域のサイズを返す
 // see: docs/architecture/access/b+tree/slotted-page.md#フリースペースのサイズの算出例
 func (sp *SlottedPage) FreeSpace() int {
 	freeSpaceOffset := int(binary.BigEndian.Uint16(sp.data[2:4])) // フリースペースの開始位置 (offset) はヘッダーの 2 バイト目から 2 バイト分に格納されている
@@ -28,32 +29,27 @@ func (sp *SlottedPage) FreeSpace() int {
 	return freeSpaceOffset - pointersSize - headerSize
 }
 
-// 指定されたインデックスのデータを取得する
+// Data は指定されたインデックスのデータを取得する
 func (sp *SlottedPage) Data(index int) []byte {
 	pointer := sp.pointerAt(index)
 	start, end := pointer.Range()
 	return sp.data[start:end]
 }
 
-// Slotted Page を初期化する
+// Initialize は Slotted Page を初期化する
 func (sp *SlottedPage) Initialize() {
 	binary.BigEndian.PutUint16(sp.data[0:2], 0)                    // numSlots
 	binary.BigEndian.PutUint16(sp.data[2:4], uint16(len(sp.data))) // freeOffset = end of data
 	binary.BigEndian.PutUint32(sp.data[4:8], 0)                    // pad
 }
 
-// 指定されたインデックスにサイズ分のデータを挿入する (領域の確保のみを行い、実際のデータの書き込みは行わない)
-// size: 挿入するデータのサイズ
+// Insert は指定されたインデックスにサイズ分のデータを挿入する (領域の確保のみを行い、実際のデータの書き込みは行わない)
+// index: 挿入するスロットのインデックス
+// data: 挿入するデータ
 // 空き容量が不足している場合は false を返す
-// このメソッドを利用する場合、実行後に Data メソッドで取得したバイトスライスに対してデータを書き込む必要がある (以下実装例)
-// ```go
-//
-//	if sp.Insert(index, dataSize) {
-//	    copy(sp.Data(index), dataBytes)
-//	}
-//
-// ```
-func (sp *SlottedPage) Insert(index int, size int) bool {
+func (sp *SlottedPage) Insert(index int, data []byte) bool {
+	size := len(data)
+
 	if sp.FreeSpace() < pointerSize+size {
 		return false
 	}
@@ -62,13 +58,13 @@ func (sp *SlottedPage) Insert(index int, size int) bool {
 	freeSpaceOffset := int(binary.BigEndian.Uint16(sp.data[2:4]))
 
 	// freeSpaceOffset を減らす
-	newFreeSpaceOffset := freeSpaceOffset - size
-	binary.BigEndian.PutUint16(sp.data[2:4], uint16(newFreeSpaceOffset))
+	newFreeSpaceOffset := freeSpaceOffset - size                         // 追加するデータのサイズ分だけ freeSpaceOffset を減らす
+	binary.BigEndian.PutUint16(sp.data[2:4], uint16(newFreeSpaceOffset)) // ヘッダーのフリースペースの開始位置を更新
 
 	// numSlots を増やす
-	binary.BigEndian.PutUint16(sp.data[0:2], uint16(numSlots+1))
+	binary.BigEndian.PutUint16(sp.data[0:2], uint16(numSlots+1)) // ヘッダーのスロット数を更新
 
-	// ポインタ配列をシフト (index 以降を右にずらす)
+	// データを挿入するポインタの index がスロット数より小さい場合は、ポインタ配列をシフト (index 以降を右にずらす)
 	if index < numSlots {
 		src := headerSize + index*pointerSize // コピー元の開始位置
 		destination := src + pointerSize      // コピー先の開始位置
@@ -82,6 +78,8 @@ func (sp *SlottedPage) Insert(index int, size int) bool {
 		uint16(size),
 	))
 
+	// セル配列にデータを追加
+	copy(sp.Data(index), data) // sp.Data(index) は新しいポインタが指す位置を返すため、そこにデータを書き込む (Insert 時は常にセル配列の末尾が新しいデータの位置になる)
 	return true
 }
 
@@ -196,7 +194,7 @@ func (sp *SlottedPage) TransferAllTo(dest *SlottedPage) bool {
 }
 
 // 指定されたインデックスのポインタを取得する
-func (sp *SlottedPage) pointerAt(index int) Pointer {
+func (sp *SlottedPage) pointerAt(index int) pointer {
 	base := headerSize + index*pointerSize
 	return newPointer(
 		binary.BigEndian.Uint16(sp.data[base:base+2]),
@@ -205,7 +203,7 @@ func (sp *SlottedPage) pointerAt(index int) Pointer {
 }
 
 // 指定されたインデックスのポインタを設定する
-func (sp *SlottedPage) setPointer(index int, pointer Pointer) {
+func (sp *SlottedPage) setPointer(index int, pointer pointer) {
 	base := headerSize + index*pointerSize
 	binary.BigEndian.PutUint16(sp.data[base:base+2], pointer.offset) // offset
 	binary.BigEndian.PutUint16(sp.data[base+2:base+4], pointer.size) // size

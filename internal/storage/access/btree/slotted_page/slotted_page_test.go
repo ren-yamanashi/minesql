@@ -41,8 +41,8 @@ func TestNumSlots(t *testing.T) {
 		data := make([]byte, 128)
 		sp := NewSlottedPage(data)
 		sp.Initialize()
-		sp.Insert(0, 10)
-		sp.Insert(1, 20)
+		sp.Insert(0, make([]byte, 10))
+		sp.Insert(1, make([]byte, 20))
 
 		// WHEN
 		numSlots := sp.NumSlots()
@@ -71,7 +71,7 @@ func TestFreeSpace(t *testing.T) {
 		data := make([]byte, 128)
 		sp := NewSlottedPage(data)
 		sp.Initialize()
-		sp.Insert(0, 20)
+		sp.Insert(0, make([]byte, 20))
 
 		// WHEN
 		freeSpace := sp.FreeSpace()
@@ -85,9 +85,9 @@ func TestFreeSpace(t *testing.T) {
 		data := make([]byte, 256)
 		sp := NewSlottedPage(data)
 		sp.Initialize()
-		sp.Insert(0, 10)
-		sp.Insert(1, 30)
-		sp.Insert(2, 20)
+		sp.Insert(0, make([]byte, 10))
+		sp.Insert(1, make([]byte, 30))
+		sp.Insert(2, make([]byte, 20))
 
 		// WHEN
 		freeSpace := sp.FreeSpace()
@@ -101,8 +101,8 @@ func TestFreeSpace(t *testing.T) {
 		data := make([]byte, 128)
 		sp := NewSlottedPage(data)
 		sp.Initialize()
-		sp.Insert(0, 20)
-		sp.Insert(1, 30)
+		sp.Insert(0, make([]byte, 20))
+		sp.Insert(1, make([]byte, 30))
 		freeSpaceBefore := sp.FreeSpace()
 
 		// WHEN
@@ -120,10 +120,8 @@ func TestData(t *testing.T) {
 		data := make([]byte, 128)
 		sp := NewSlottedPage(data)
 		sp.Initialize()
-		sp.Insert(0, 10)
-		cellData := sp.Data(0)
 		testData := []byte{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
-		copy(cellData, testData)
+		sp.Insert(0, testData)
 
 		// WHEN
 		retrievedData := sp.Data(0)
@@ -137,12 +135,9 @@ func TestData(t *testing.T) {
 		data := make([]byte, 256)
 		sp := NewSlottedPage(data)
 		sp.Initialize()
-		sp.Insert(0, 5)
-		sp.Insert(1, 5)
-		sp.Insert(2, 5)
-		copy(sp.Data(0), []byte("AAAAA"))
-		copy(sp.Data(1), []byte("BBBBB"))
-		copy(sp.Data(2), []byte("CCCCC"))
+		sp.Insert(0, []byte("AAAAA"))
+		sp.Insert(1, []byte("BBBBB"))
+		sp.Insert(2, []byte("CCCCC"))
 
 		// WHEN: スロット 1 を書き換える
 		copy(sp.Data(1), []byte("XXXXX"))
@@ -169,15 +164,15 @@ func TestInitialize(t *testing.T) {
 	})
 }
 
-func TestInsert(t *testing.T) {
-	t.Run("データが正しく挿入できる (実際のデータ挿入ではなく、容量の確保が行われる)", func(t *testing.T) {
+func TestSlottedPage_Insert(t *testing.T) {
+	t.Run("データが正しく挿入できる", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
 		sp := NewSlottedPage(data)
 		sp.Initialize()
 
 		// WHEN
-		success := sp.Insert(0, 20)
+		success := sp.Insert(0, make([]byte, 20))
 
 		// THEN
 		assert.True(t, success)
@@ -192,7 +187,7 @@ func TestInsert(t *testing.T) {
 		sp.Initialize()
 
 		// WHEN
-		success := sp.Insert(0, 100) // 空き領域 (24 bytes) より大きいサイズを挿入
+		success := sp.Insert(0, make([]byte, 100)) // 空き領域 (24 bytes) より大きいサイズを挿入
 
 		// THEN
 		assert.False(t, success)
@@ -204,16 +199,12 @@ func TestInsert(t *testing.T) {
 		data := make([]byte, 256)
 		sp := NewSlottedPage(data)
 		sp.Initialize()
-		sp.Insert(0, 5)
-		copy(sp.Data(0), []byte("AAAAA"))
-		sp.Insert(1, 5)
-		copy(sp.Data(1), []byte("BBBBB"))
-		sp.Insert(2, 5)
-		copy(sp.Data(2), []byte("CCCCC"))
+		sp.Insert(0, []byte("AAAAA"))
+		sp.Insert(1, []byte("BBBBB"))
+		sp.Insert(2, []byte("CCCCC"))
 
 		// WHEN: index=1 に新しいスロットを挿入
-		success := sp.Insert(1, 5)
-		copy(sp.Data(1), []byte("XXXXX"))
+		success := sp.Insert(1, []byte("XXXXX"))
 
 		// THEN
 		assert.True(t, success)
@@ -231,12 +222,9 @@ func TestInsert(t *testing.T) {
 		sp.Initialize()
 
 		// WHEN
-		sp.Insert(0, 3)
-		copy(sp.Data(0), []byte("aaa"))
-		sp.Insert(1, 4)
-		copy(sp.Data(1), []byte("bbbb"))
-		sp.Insert(2, 5)
-		copy(sp.Data(2), []byte("ccccc"))
+		sp.Insert(0, []byte("aaa"))
+		sp.Insert(1, []byte("bbbb"))
+		sp.Insert(2, []byte("ccccc"))
 
 		// THEN
 		assert.Equal(t, 3, sp.NumSlots())
@@ -254,7 +242,7 @@ func TestInsert(t *testing.T) {
 		// 挿入に必要な容量: dataSize + pointerSize(4) = 24 → dataSize = 20
 
 		// WHEN
-		success := sp.Insert(0, 20)
+		success := sp.Insert(0, make([]byte, 20))
 
 		// THEN
 		assert.True(t, success)
@@ -269,7 +257,7 @@ func TestResize(t *testing.T) {
 		sp := NewSlottedPage(data)
 		sp.Initialize()
 
-		sp.Insert(0, 20)
+		sp.Insert(0, make([]byte, 20))
 		initialFreeSpace := sp.FreeSpace()
 		initialNumSlots := sp.NumSlots()
 
@@ -289,7 +277,7 @@ func TestResize(t *testing.T) {
 		sp := NewSlottedPage(data)
 		sp.Initialize()
 
-		sp.Insert(0, 20)
+		sp.Insert(0, make([]byte, 20))
 		initialFreeSpace := sp.FreeSpace()
 
 		// WHEN
@@ -305,7 +293,7 @@ func TestResize(t *testing.T) {
 		data := make([]byte, 256)
 		sp := NewSlottedPage(data)
 		sp.Initialize()
-		sp.Insert(0, 20)
+		sp.Insert(0, make([]byte, 20))
 		initialFreeSpace := sp.FreeSpace()
 
 		// WHEN
@@ -322,7 +310,7 @@ func TestResize(t *testing.T) {
 		data := make([]byte, 256)
 		sp := NewSlottedPage(data)
 		sp.Initialize()
-		sp.Insert(0, 20)
+		sp.Insert(0, make([]byte, 20))
 		initialFreeSpace := sp.FreeSpace()
 
 		// WHEN
@@ -338,8 +326,7 @@ func TestResize(t *testing.T) {
 		data := make([]byte, 256)
 		sp := NewSlottedPage(data)
 		sp.Initialize()
-		sp.Insert(0, 10)
-		copy(sp.Data(0), []byte("0123456789"))
+		sp.Insert(0, []byte("0123456789"))
 
 		// WHEN: 10 -> 20 に拡張
 		success := sp.Resize(0, 20)
@@ -355,12 +342,9 @@ func TestResize(t *testing.T) {
 		data := make([]byte, 256)
 		sp := NewSlottedPage(data)
 		sp.Initialize()
-		sp.Insert(0, 5)
-		copy(sp.Data(0), []byte("AAAAA"))
-		sp.Insert(1, 5)
-		copy(sp.Data(1), []byte("BBBBB"))
-		sp.Insert(2, 5)
-		copy(sp.Data(2), []byte("CCCCC"))
+		sp.Insert(0, []byte("AAAAA"))
+		sp.Insert(1, []byte("BBBBB"))
+		sp.Insert(2, []byte("CCCCC"))
 
 		// WHEN: 中間のスロット (index=1) を拡張
 		success := sp.Resize(1, 10)
@@ -380,12 +364,9 @@ func TestRemove(t *testing.T) {
 		data := make([]byte, 256)
 		sp := NewSlottedPage(data)
 		sp.Initialize()
-		sp.Insert(0, 5)
-		copy(sp.Data(0), []byte("AAAAA"))
-		sp.Insert(1, 5)
-		copy(sp.Data(1), []byte("BBBBB"))
-		sp.Insert(2, 5)
-		copy(sp.Data(2), []byte("CCCCC"))
+		sp.Insert(0, []byte("AAAAA"))
+		sp.Insert(1, []byte("BBBBB"))
+		sp.Insert(2, []byte("CCCCC"))
 
 		// WHEN
 		sp.Remove(1)
@@ -401,12 +382,9 @@ func TestRemove(t *testing.T) {
 		data := make([]byte, 256)
 		sp := NewSlottedPage(data)
 		sp.Initialize()
-		sp.Insert(0, 5)
-		copy(sp.Data(0), []byte("AAAAA"))
-		sp.Insert(1, 5)
-		copy(sp.Data(1), []byte("BBBBB"))
-		sp.Insert(2, 5)
-		copy(sp.Data(2), []byte("CCCCC"))
+		sp.Insert(0, []byte("AAAAA"))
+		sp.Insert(1, []byte("BBBBB"))
+		sp.Insert(2, []byte("CCCCC"))
 
 		// WHEN
 		sp.Remove(0)
@@ -422,12 +400,9 @@ func TestRemove(t *testing.T) {
 		data := make([]byte, 256)
 		sp := NewSlottedPage(data)
 		sp.Initialize()
-		sp.Insert(0, 5)
-		copy(sp.Data(0), []byte("AAAAA"))
-		sp.Insert(1, 5)
-		copy(sp.Data(1), []byte("BBBBB"))
-		sp.Insert(2, 5)
-		copy(sp.Data(2), []byte("CCCCC"))
+		sp.Insert(0, []byte("AAAAA"))
+		sp.Insert(1, []byte("BBBBB"))
+		sp.Insert(2, []byte("CCCCC"))
 
 		// WHEN
 		sp.Remove(2)
@@ -443,7 +418,7 @@ func TestRemove(t *testing.T) {
 		data := make([]byte, 128)
 		sp := NewSlottedPage(data)
 		sp.Initialize()
-		sp.Insert(0, 20)
+		sp.Insert(0, make([]byte, 20))
 
 		// WHEN
 		sp.Remove(0)
@@ -460,16 +435,13 @@ func TestTransferAllTo(t *testing.T) {
 		srcData := make([]byte, 256)
 		src := NewSlottedPage(srcData)
 		src.Initialize()
-		src.Insert(0, 10)
-		copy(src.Data(0), []byte("0123456789"))
-		src.Insert(1, 5)
-		copy(src.Data(1), []byte("abcde"))
+		src.Insert(0, []byte("0123456789"))
+		src.Insert(1, []byte("abcde"))
 
 		destData := make([]byte, 256)
 		dest := NewSlottedPage(destData)
 		dest.Initialize()
-		dest.Insert(0, 8)
-		copy(dest.Data(0), []byte("existing"))
+		dest.Insert(0, []byte("existing"))
 
 		// WHEN
 		result := src.TransferAllTo(dest)
@@ -492,7 +464,7 @@ func TestTransferAllTo(t *testing.T) {
 		destData := make([]byte, 128)
 		dest := NewSlottedPage(destData)
 		dest.Initialize()
-		dest.Insert(0, 10)
+		dest.Insert(0, make([]byte, 10))
 
 		// WHEN
 		result := src.TransferAllTo(dest)
@@ -508,8 +480,7 @@ func TestTransferAllTo(t *testing.T) {
 		srcData := make([]byte, 128)
 		src := NewSlottedPage(srcData)
 		src.Initialize()
-		src.Insert(0, 50)
-		copy(src.Data(0), make([]byte, 50)) // ゼロ埋め
+		src.Insert(0, make([]byte, 50))
 
 		destData := make([]byte, 32) // 小さいページ
 		dest := NewSlottedPage(destData)
@@ -529,10 +500,8 @@ func TestTransferAllTo(t *testing.T) {
 		srcData := make([]byte, 256)
 		src := NewSlottedPage(srcData)
 		src.Initialize()
-		src.Insert(0, 5)
-		copy(src.Data(0), []byte("AAAAA"))
-		src.Insert(1, 5)
-		copy(src.Data(1), []byte("BBBBB"))
+		src.Insert(0, []byte("AAAAA"))
+		src.Insert(1, []byte("BBBBB"))
 
 		destData := make([]byte, 256)
 		dest := NewSlottedPage(destData)
@@ -556,7 +525,7 @@ func TestPointerAt(t *testing.T) {
 		data := make([]byte, 128)
 		sp := NewSlottedPage(data)
 		sp.Initialize()
-		sp.Insert(0, 10)
+		sp.Insert(0, make([]byte, 10))
 
 		// WHEN
 		cellData := sp.pointerAt(0)

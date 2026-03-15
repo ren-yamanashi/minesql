@@ -34,3 +34,19 @@ func TestNewPointer(t *testing.T) {
 		assert.Equal(t, int(offset)+int(size), end)
 	})
 }
+
+func TestRange(t *testing.T) {
+	t.Run("正常にポインタの開始位置と終了位置が取得できる", func(t *testing.T) {
+		// GIVEN
+		offset := uint16(30)
+		size := uint16(40)
+		pointer := newPointer(offset, size)
+
+		// WHEN
+		start, end := pointer.Range()
+
+		// THEN
+		assert.Equal(t, int(offset), start)
+		assert.Equal(t, int(offset)+int(size), end)
+	})
+}

@@ -68,12 +68,7 @@ func (bn *BranchNode) Insert(slotNum int, pair Pair) bool {
 		return false
 	}
 
-	if bn.body.Insert(slotNum, len(pairBytes)) {
-		copy(bn.body.Data(slotNum), pairBytes)
-		return true
-	}
-
-	return false
+	return bn.body.Insert(slotNum, pairBytes)
 }
 
 // key-value ペアを削除する
@@ -229,11 +224,10 @@ func (bn *BranchNode) transfer(dest *BranchNode) error {
 	nextIndex := dest.NumPairs()
 	data := bn.body.Data(0)
 
-	if !dest.body.Insert(nextIndex, len(data)) {
+	if !dest.body.Insert(nextIndex, data) {
 		return errors.New("no space in dest branch")
 	}
 
-	copy(dest.body.Data(nextIndex), data)
 	bn.body.Remove(0)
 	return nil
 }
