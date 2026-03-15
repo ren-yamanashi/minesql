@@ -11,12 +11,9 @@ import (
 
 // DiskManager はディスク上のヒープファイルを管理する
 type DiskManager struct {
-	// このディスクマネージャの FileId
-	fileId page.FileId
-	// ヒープファイルのファイルディスクリプタ
-	heapFile *os.File
-	// 次に採番するページ ID
-	nextPageId page.PageId
+	fileId     page.FileId // このディスクマネージャの FileId
+	heapFile   *os.File    // ヒープファイルのファイルディスクリプタ
+	nextPageId page.PageId // 次に採番するページ ID
 }
 
 // NewDiskManager は指定されたパスにあるディスク上のヒープファイルを管理する DiskManager を生成する

@@ -15,18 +15,14 @@ var (
 )
 
 type (
-	// FileId はディスクファイルの識別子
-	FileId uint32
-	// PageNumber はファイル内のページ番号
-	PageNumber uint32
+	FileId     uint32 // ディスクファイルの識別子
+	PageNumber uint32 // ファイル内のページ番号
 )
 
 // PageId はディスクファイルとファイル内のページを特定するための識別子
 type PageId struct {
-	// ディスクファイルの識別子
-	FileId FileId
-	// ファイル内のページ番号
-	PageNumber PageNumber
+	FileId     FileId     // ディスクファイルの識別子
+	PageNumber PageNumber // ファイル内のページ番号
 }
 
 // NewPageId は FileId と PageNumber から PageId を生成する
