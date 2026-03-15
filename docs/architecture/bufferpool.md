@@ -44,6 +44,8 @@ graph TD
 
 - バッファページ
   - ページに `Referenced` や `IsDirty` フィールドなどを付加した構造体
+    - 書き込み時には `IsDirty`, `Referenced` を true にセットする
+    - 読み込み時には `Referenced` のみを true にセットする
 - バッファプール
   - 複数のバッファページを格納する
   - `Pointer` (Clock sweep アルゴリズムで使用するポインタ) や `MaxBufferSize` (バッファプールの最大サイズ) などのメタデータを持つ
