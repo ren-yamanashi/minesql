@@ -83,7 +83,7 @@ func (sp *SlottedPage) Insert(index int, data []byte) bool {
 	return true
 }
 
-// 指定されたインデックスのデータ領域のサイズを変更する
+// Resize は指定されたインデックスのデータ領域のサイズを変更する
 // 空き容量が不足している場合は false を返す
 func (sp *SlottedPage) Resize(index int, newSize int) bool {
 	pointer := sp.pointerAt(index)
@@ -101,7 +101,8 @@ func (sp *SlottedPage) Resize(index int, newSize int) bool {
 	freeSpaceOffset := int(binary.BigEndian.Uint16(sp.data[2:4]))
 	oldOffset := int(pointer.offset)
 
-	// データ領域をシフト (空き領域を拡張または縮小)
+	// データ領域 (セル配列) をシフトする
+	// 対象のデータの後ろにあるデータを、拡張・縮小に応じて左または右にシフトする (拡張の場合は左に、縮小の場合は右にシフトする)
 	shiftStart := freeSpaceOffset
 	shiftEnd := oldOffset
 	newFreeSpaceOffset := freeSpaceOffset - sizeIncrease
@@ -113,15 +114,17 @@ func (sp *SlottedPage) Resize(index int, newSize int) bool {
 	// 影響を受けるポインタのオフセットを更新
 	for i := 0; i < sp.NumSlots(); i++ {
 		p := sp.pointerAt(i)
+		// ポインタのオフセットが oldOffset 以下の場合 (つまりデータが oldOffset より左に位置する場合) は、サイズ変更によってデータ領域がシフトされるため、オフセットを更新する
 		if int(p.offset) <= oldOffset {
-			p.offset = uint16(int(p.offset) - sizeIncrease)
+			p.offset = uint16(int(p.offset) - sizeIncrease) // サイズ変更によってシフトされた分だけオフセットを更新
 			sp.setPointer(i, p)
 		}
 	}
 
-	// 対象のポインタのサイズを更新 (ループでオフセットが更新されているため再取得する)
-	pointer = sp.pointerAt(index)
+	// 対象のポインタのサイズを更新
+	pointer = sp.pointerAt(index) // ループでオフセットが更新されているため再取得する
 	pointer.size = uint16(newSize)
+	// データが縮小されてサイズが 0 になる場合 (=データが削除される場合) は、データが存在しないためオフセットをフリースペースの開始位置に更新する
 	if newSize == 0 {
 		pointer.offset = uint16(newFreeSpaceOffset)
 	}
@@ -130,8 +133,9 @@ func (sp *SlottedPage) Resize(index int, newSize int) bool {
 	return true
 }
 
-// 指定されたインデックスのデータを削除する
+// Remove は指定されたインデックスのデータを削除する
 func (sp *SlottedPage) Remove(index int) {
+	// データサイズを 0 にする
 	sp.Resize(index, 0)
 
 	numSlots := sp.NumSlots()
@@ -148,7 +152,7 @@ func (sp *SlottedPage) Remove(index int) {
 	binary.BigEndian.PutUint16(sp.data[0:2], uint16(numSlots-1))
 }
 
-// 自分のすべてのスロットを dest の末尾に転送する。(自身のスロットはすべて削除される)
+// TransferAllTo は自分のすべてのスロットを dest の末尾に転送する。(自身のスロットはすべて削除される)
 // 空き容量が不足している場合は false を返す
 func (sp *SlottedPage) TransferAllTo(dest *SlottedPage) bool {
 	srcNumSlots := sp.NumSlots()
