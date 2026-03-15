@@ -1,3 +1,5 @@
+// buftype は bufferpool パッケージと evict パッケージの間で共有される型を定義する
+// bufferpool と evict の循環参照を避けるために独立パッケージとして切り出している
 package buftype
 
 import (
