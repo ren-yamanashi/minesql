@@ -30,9 +30,9 @@ func NewTable(name string, metaPageId page.PageId, primaryKeyCount uint8, unique
 }
 
 // 空のテーブルを新規作成する
-func (t *Table) Create(bpm *bufferpool.BufferPoolManager) error {
+func (t *Table) Create(bp *bufferpool.BufferPool) error {
 	// テーブルの B+Tree を作成
-	tree, err := btree.CreateBTree(bpm, t.MetaPageId)
+	tree, err := btree.CreateBTree(bp, t.MetaPageId)
 	if err != nil {
 		return err
 	}
@@ -40,7 +40,7 @@ func (t *Table) Create(bpm *bufferpool.BufferPoolManager) error {
 
 	// ユニークインデックスを作成
 	for _, ui := range t.UniqueIndexes {
-		err = ui.Create(bpm, ui.MetaPageId)
+		err = ui.Create(bp, ui.MetaPageId)
 		if err != nil {
 			return err
 		}
@@ -50,7 +50,7 @@ func (t *Table) Create(bpm *bufferpool.BufferPoolManager) error {
 
 // テーブルに行を挿入する
 // プライマリキーを key, 他のカラム値を value としたペアを作成し、B+Tree に挿入する
-func (t *Table) Insert(bpm *bufferpool.BufferPoolManager, record [][]byte) error {
+func (t *Table) Insert(bp *bufferpool.BufferPool, record [][]byte) error {
 	btree := btree.NewBTree(t.MetaPageId)
 
 	// キーをエンコード
@@ -62,14 +62,14 @@ func (t *Table) Insert(bpm *bufferpool.BufferPoolManager, record [][]byte) error
 	Encode(record[t.PrimaryKeyCount:], &encodedValue)
 
 	// B+Tree に挿入
-	err := btree.Insert(bpm, node.NewPair(encodedKey, encodedValue))
+	err := btree.Insert(bp, node.NewPair(encodedKey, encodedValue))
 	if err != nil {
 		return err
 	}
 
 	// ユニークインデックスに挿入
 	for _, ui := range t.UniqueIndexes {
-		err := ui.Insert(bpm, encodedKey, record)
+		err := ui.Insert(bp, encodedKey, record)
 		if err != nil {
 			return err
 		}
@@ -79,7 +79,7 @@ func (t *Table) Insert(bpm *bufferpool.BufferPoolManager, record [][]byte) error
 }
 
 // テーブルから行を削除する
-func (t *Table) Delete(bpm *bufferpool.BufferPoolManager, record [][]byte) error {
+func (t *Table) Delete(bp *bufferpool.BufferPool, record [][]byte) error {
 	btree := btree.NewBTree(t.MetaPageId)
 
 	// キーをエンコード
@@ -87,14 +87,14 @@ func (t *Table) Delete(bpm *bufferpool.BufferPoolManager, record [][]byte) error
 	Encode(record[:t.PrimaryKeyCount], &encodedKey)
 
 	// B+Tree から削除
-	err := btree.Delete(bpm, encodedKey)
+	err := btree.Delete(bp, encodedKey)
 	if err != nil {
 		return err
 	}
 
 	// ユニークインデックスから削除
 	for _, ui := range t.UniqueIndexes {
-		err := ui.Delete(bpm, record)
+		err := ui.Delete(bp, record)
 		if err != nil {
 			return err
 		}
@@ -104,7 +104,7 @@ func (t *Table) Delete(bpm *bufferpool.BufferPoolManager, record [][]byte) error
 }
 
 // テーブルから行を更新する
-func (t *Table) Update(bpm *bufferpool.BufferPoolManager, oldRecord [][]byte, newRecord [][]byte) error {
+func (t *Table) Update(bp *bufferpool.BufferPool, oldRecord [][]byte, newRecord [][]byte) error {
 	btree := btree.NewBTree(t.MetaPageId)
 
 	// キーをエンコード
@@ -119,17 +119,17 @@ func (t *Table) Update(bpm *bufferpool.BufferPoolManager, oldRecord [][]byte, ne
 
 	// キーが一致しない場合は、B+Tree から古いキーに該当するペアを削除し、新しいキーに該当するペアを挿入する
 	if string(encodedOldKey) != string(encodedNewKey) {
-		err := btree.Delete(bpm, encodedOldKey)
+		err := btree.Delete(bp, encodedOldKey)
 		if err != nil {
 			return err
 		}
-		err = btree.Insert(bpm, node.NewPair(encodedNewKey, encodedNewValue))
+		err = btree.Insert(bp, node.NewPair(encodedNewKey, encodedNewValue))
 		if err != nil {
 			return err
 		}
 	} else {
 		// キーが一致する場合は、B+Tree のペアを更新する
-		err := btree.Update(bpm, node.NewPair(encodedOldKey, encodedNewValue))
+		err := btree.Update(bp, node.NewPair(encodedOldKey, encodedNewValue))
 		if err != nil {
 			return err
 		}
@@ -137,7 +137,7 @@ func (t *Table) Update(bpm *bufferpool.BufferPoolManager, oldRecord [][]byte, ne
 
 	// ユニークインデックスを更新
 	for _, ui := range t.UniqueIndexes {
-		err := ui.Update(bpm, oldRecord, newRecord, encodedNewKey)
+		err := ui.Update(bp, oldRecord, newRecord, encodedNewKey)
 		if err != nil {
 			return err
 		}

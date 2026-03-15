@@ -266,7 +266,7 @@ func TestBranchNodeInitialize(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 1, bn.NumPairs())
 		assert.Equal(t, []byte("key1"), bn.PairAt(0).Key)
-		assert.Equal(t, leftChild, page.PageIdFromBytes(bn.PairAt(0).Value))
+		assert.Equal(t, leftChild, page.RestorePageIdFromBytes(bn.PairAt(0).Value))
 		assert.Equal(t, rightChild, bn.RightChildPageId())
 	})
 }
@@ -770,7 +770,7 @@ func createTestBranchNode(pairs []Pair, rightChildPageId page.PageId) *BranchNod
 		panic("pairs must not be empty")
 	}
 
-	err := bn.Initialize(pairs[0].Key, page.PageIdFromBytes(pairs[0].Value), rightChildPageId)
+	err := bn.Initialize(pairs[0].Key, page.RestorePageIdFromBytes(pairs[0].Value), rightChildPageId)
 	if err != nil {
 		panic("failed to initialize branch node")
 	}

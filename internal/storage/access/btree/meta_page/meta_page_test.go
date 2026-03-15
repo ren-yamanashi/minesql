@@ -47,3 +47,34 @@ func TestNewMetaPage(t *testing.T) {
 		assert.Equal(t, expectedPageId, metaPage.RootPageId())
 	})
 }
+
+func TestRootPageId(t *testing.T) {
+	t.Run("ルートページ ID が正しく読み取れる", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 128)
+		metaPage := NewMetaPage(data)
+		expectedPageId := page.NewPageId(page.FileId(3), page.PageNumber(77))
+		metaPage.SetRootPageId(expectedPageId)
+
+		// WHEN
+		rootPageId := metaPage.RootPageId()
+
+		// THEN
+		assert.Equal(t, expectedPageId, rootPageId)
+	})
+}
+
+func TestSetRootPageId(t *testing.T) {
+	t.Run("ルートページ ID が正しく設定できる", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 128)
+		metaPage := NewMetaPage(data)
+		expectedPageId := page.NewPageId(page.FileId(4), page.PageNumber(123))
+
+		// WHEN
+		metaPage.SetRootPageId(expectedPageId)
+
+		// THEN
+		assert.Equal(t, expectedPageId, metaPage.RootPageId())
+	})
+}

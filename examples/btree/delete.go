@@ -14,24 +14,24 @@ func delete() {
 	dataDir := "examples/btree/data"
 	dbPath := dataDir + "/delete_test.db"
 
-	bpm := bufferpool.NewBufferPoolManager(10)
-	fileId := bpm.AllocateFileId()
+	bp := bufferpool.NewBufferPool(10)
+	fileId := bp.AllocateFileId()
 
-	// DiskManager を作成して登録
-	dm, err := disk.NewDiskManager(fileId, dbPath)
+	// Disk を作成して登録
+	dm, err := disk.NewDisk(fileId, dbPath)
 	if err != nil {
 		panic(err)
 	}
-	bpm.RegisterDiskManager(fileId, dm)
+	bp.RegisterDisk(fileId, dm)
 
 	// metaPageId を割り当て
-	metaPageId, err := bpm.AllocatePageId(fileId)
+	metaPageId, err := bp.AllocatePageId(fileId)
 	if err != nil {
 		panic(err)
 	}
 
 	// B+Tree を作成
-	tree, err := btree.CreateBTree(bpm, metaPageId)
+	tree, err := btree.CreateBTree(bp, metaPageId)
 	if err != nil {
 		panic(err)
 	}
@@ -43,29 +43,29 @@ func delete() {
 	}
 	for _, fruit := range fruits {
 		pair := node.NewPair([]byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
-		if err := tree.Insert(bpm, pair); err != nil {
+		if err := tree.Insert(bp, pair); err != nil {
 			panic(err)
 		}
 	}
 
 	fmt.Println("=== 挿入後 ===")
-	scanAll(bpm, tree)
+	scanAll(bp, tree)
 
 	// 一部のキーを削除
 	deleteKeys := []string{"banana", "elderberry", "grape"}
 	for _, key := range deleteKeys {
 		fmt.Printf("\nDelete: %s\n", key)
-		if err := tree.Delete(bpm, []byte(key)); err != nil {
+		if err := tree.Delete(bp, []byte(key)); err != nil {
 			panic(err)
 		}
 	}
 
 	fmt.Println("\n=== 削除後 ===")
-	scanAll(bpm, tree)
+	scanAll(bp, tree)
 
 	// 存在しないキーを削除してエラーを確認
 	fmt.Println("\n=== 存在しないキーの削除 ===")
-	err = tree.Delete(bpm, []byte("banana"))
+	err = tree.Delete(bp, []byte("banana"))
 	if err != nil {
 		fmt.Printf("期待通りのエラー: %v\n", err)
 	}
@@ -73,8 +73,8 @@ func delete() {
 	// 削除後に新しいキーを挿入できることを確認
 	fmt.Println("\n=== 削除後に新しいキーを挿入 ===")
 	pair := node.NewPair([]byte("blueberry"), []byte(strings.Repeat("b", 100)))
-	if err := tree.Insert(bpm, pair); err != nil {
+	if err := tree.Insert(bp, pair); err != nil {
 		panic(err)
 	}
-	scanAll(bpm, tree)
+	scanAll(bp, tree)
 }

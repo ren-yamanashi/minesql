@@ -69,12 +69,7 @@ func (ln *LeafNode) Insert(slotNum int, pair Pair) bool {
 		return false
 	}
 
-	if ln.body.Insert(slotNum, len(pairBytes)) {
-		copy(ln.body.Data(slotNum), pairBytes)
-		return true
-	}
-
-	return false
+	return ln.body.Insert(slotNum, pairBytes)
 }
 
 // key-value ペアを削除する
@@ -145,7 +140,7 @@ func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newPair Pair) ([]byte, er
 }
 
 func (ln *LeafNode) PrevPageId() *page.PageId {
-	pageId := page.ReadPageIdFrom(ln.Body(), 0)
+	pageId := page.ReadPageIdFromPageData(ln.Body(), 0)
 	if pageId.IsInvalid() {
 		return nil
 	}
@@ -153,7 +148,7 @@ func (ln *LeafNode) PrevPageId() *page.PageId {
 }
 
 func (ln *LeafNode) NextPageId() *page.PageId {
-	pageId := page.ReadPageIdFrom(ln.Body(), 8)
+	pageId := page.ReadPageIdFromPageData(ln.Body(), 8)
 	if pageId.IsInvalid() {
 		return nil
 	}
@@ -212,11 +207,10 @@ func (ln *LeafNode) transfer(dest *LeafNode) error {
 	nextIndex := dest.NumPairs()
 	data := ln.body.Data(0)
 
-	if !dest.body.Insert(nextIndex, len(data)) {
+	if !dest.body.Insert(nextIndex, data) {
 		return errors.New("no space in dest leaf")
 	}
 
-	copy(dest.body.Data(nextIndex), data)
 	ln.body.Remove(0)
 	return nil
 }

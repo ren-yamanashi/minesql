@@ -13,33 +13,33 @@ func scan() {
 	dataDir := "examples/btree/data"
 	dbPath := dataDir + "/test.db"
 
-	bpm := bufferpool.NewBufferPoolManager(10)
+	bp := bufferpool.NewBufferPool(10)
 	fileId := page.FileId(1)
 
-	// DiskManager を作成して登録
-	dm, err := disk.NewDiskManager(fileId, dbPath)
+	// Disk を作成して登録
+	dm, err := disk.NewDisk(fileId, dbPath)
 	if err != nil {
 		panic(err)
 	}
-	bpm.RegisterDiskManager(fileId, dm)
+	bp.RegisterDisk(fileId, dm)
 
 	// 既存の B+Tree を開く (MetaPageId は 0 と仮定)
 	tree := btree.NewBTree(page.NewPageId(fileId, 0))
 
 	// 全データをスキャン
-	scanAll(bpm, tree)
+	scanAll(bp, tree)
 }
 
 // B+Tree の全データをスキャンして表示する
-func scanAll(bpm *bufferpool.BufferPoolManager, tree *btree.BTree) {
-	iter, err := tree.Search(bpm, btree.SearchModeStart{})
+func scanAll(bp *bufferpool.BufferPool, tree *btree.BTree) {
+	iter, err := tree.Search(bp, btree.SearchModeStart{})
 	if err != nil {
 		panic(err)
 	}
 
 	count := 0
 	for {
-		pair, ok, err := iter.Next(bpm)
+		pair, ok, err := iter.Next(bp)
 		if err != nil {
 			panic(err)
 		}

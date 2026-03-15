@@ -45,7 +45,7 @@ func (ss *SearchTable) Next() (Record, error) {
 
 		// テーブルスキャン用のイテレータを作成
 		btr := btree.NewBTree(tbl.MetaPageId)
-		iterator, err := btr.Search(sm.BufferPoolManager, ss.searchMode.Encode())
+		iterator, err := btr.Search(sm.BufferPool, ss.searchMode.Encode())
 		if err != nil {
 			return nil, err
 		}
@@ -54,7 +54,7 @@ func (ss *SearchTable) Next() (Record, error) {
 	}
 
 	// レコード取得
-	pair, ok, err := ss.iterator.Next(sm.BufferPoolManager)
+	pair, ok, err := ss.iterator.Next(sm.BufferPool)
 	if !ok {
 		return nil, nil
 	}

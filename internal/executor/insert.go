@@ -40,7 +40,7 @@ func (ins *Insert) execute(records [][][]byte) error {
 	}
 
 	for _, record := range records {
-		err := tbl.Insert(sm.BufferPoolManager, record)
+		err := tbl.Insert(sm.BufferPool, record)
 		if err != nil {
 			return err
 		}

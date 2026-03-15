@@ -59,7 +59,7 @@ func (is *SearchIndex) Next() (Record, error) {
 		is.tableBTree = btree.NewBTree(tbl.MetaPageId)
 
 		// インデックス用のイテレータを作成
-		indexIter, err := indexBTree.Search(sm.BufferPoolManager, is.searchMode.Encode())
+		indexIter, err := indexBTree.Search(sm.BufferPool, is.searchMode.Encode())
 		if err != nil {
 			return nil, err
 		}
@@ -67,7 +67,7 @@ func (is *SearchIndex) Next() (Record, error) {
 	}
 
 	// セカンダリインデックスから次のペアを取得
-	secondaryIndexPair, ok, err := is.indexIterator.Next(sm.BufferPoolManager)
+	secondaryIndexPair, ok, err := is.indexIterator.Next(sm.BufferPool)
 	if !ok {
 		return nil, nil
 	}
@@ -85,11 +85,11 @@ func (is *SearchIndex) Next() (Record, error) {
 	}
 
 	// エンコードされたプライマリキーでテーブル本体を検索
-	is.tableIterator, err = is.tableBTree.Search(sm.BufferPoolManager, btree.SearchModeKey{Key: secondaryIndexPair.Value})
+	is.tableIterator, err = is.tableBTree.Search(sm.BufferPool, btree.SearchModeKey{Key: secondaryIndexPair.Value})
 	if err != nil {
 		return nil, err
 	}
-	tablePair, ok, err := is.tableIterator.Next(sm.BufferPoolManager)
+	tablePair, ok, err := is.tableIterator.Next(sm.BufferPool)
 	if err != nil {
 		return nil, err
 	}

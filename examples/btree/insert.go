@@ -14,25 +14,25 @@ import (
 )
 
 func insert(dataDir string) {
-	bpm := bufferpool.NewBufferPoolManager(10)
-	fileId := bpm.AllocateFileId()
+	bp := bufferpool.NewBufferPool(10)
+	fileId := bp.AllocateFileId()
 
-	// DiskManager を作成して登録
+	// Disk を作成して登録
 	diskPath := dataDir + "/test.db"
-	dm, err := disk.NewDiskManager(fileId, diskPath)
+	dm, err := disk.NewDisk(fileId, diskPath)
 	if err != nil {
 		panic(err)
 	}
-	bpm.RegisterDiskManager(fileId, dm)
+	bp.RegisterDisk(fileId, dm)
 
 	// metaPageId を割り当て
-	metaPageId, err := bpm.AllocatePageId(fileId)
+	metaPageId, err := bp.AllocatePageId(fileId)
 	if err != nil {
 		panic(err)
 	}
 
 	// B+Tree を作成
-	tree, err := btree.CreateBTree(bpm, metaPageId)
+	tree, err := btree.CreateBTree(bp, metaPageId)
 	if err != nil {
 		panic(err)
 	}
@@ -67,49 +67,49 @@ func insert(dataDir string) {
 	for _, data := range insertData {
 		fmt.Printf("\nInsert Key: %s, Insert Value: %s\n", data.key, string(data.value[0])+" x "+fmt.Sprint(len(data.value)))
 		pair := node.NewPair([]byte(data.key), []byte(data.value))
-		err := tree.Insert(bpm, pair)
+		err := tree.Insert(bp, pair)
 		if err != nil {
 			panic(err)
 		}
-		displayTreeStructure(bpm, tree)
+		displayTreeStructure(bp, tree)
 		fmt.Println()
 	}
 
 	// バッファプールの内容をディスクに書き出す
-	err = bpm.FlushPage()
+	err = bp.FlushPage()
 	if err != nil {
 		panic(err)
 	}
 }
 
 // B+Tree の構造を表示
-func displayTreeStructure(bpm *bufferpool.BufferPoolManager, tree *btree.BTree) {
+func displayTreeStructure(bp *bufferpool.BufferPool, tree *btree.BTree) {
 	fmt.Println("=== B+Tree の構造 ===")
 
 	// メタページからルートページIDを取得
-	metaBuf, err := bpm.FetchPage(tree.MetaPageId)
+	metaBuf, err := bp.FetchPage(tree.MetaPageId)
 	if err != nil {
 		panic(err)
 	}
-	defer bpm.UnRefPage(tree.MetaPageId)
+	defer bp.UnRefPage(tree.MetaPageId)
 
 	meta := metapage.NewMetaPage(metaBuf.GetReadData())
 	rootPageId := meta.RootPageId()
 
 	// ルートノードを表示
-	displayNode(bpm, rootPageId, 0, "Root")
+	displayNode(bp, rootPageId, 0, "Root")
 }
 
 // ノードを再帰的に表示
-func displayNode(bpm *bufferpool.BufferPoolManager, pageId page.PageId, depth int, label string) {
+func displayNode(bp *bufferpool.BufferPool, pageId page.PageId, depth int, label string) {
 	indent := strings.Repeat("  ", depth)
 
 	// ノードを取得
-	nodeBuf, err := bpm.FetchPage(pageId)
+	nodeBuf, err := bp.FetchPage(pageId)
 	if err != nil {
 		panic(err)
 	}
-	defer bpm.UnRefPage(pageId)
+	defer bp.UnRefPage(pageId)
 
 	nodeType := node.GetNodeType(nodeBuf.GetReadData())
 
@@ -145,13 +145,13 @@ func displayNode(bpm *bufferpool.BufferPoolManager, pageId page.PageId, depth in
 				prevPair := branchNode.PairAt(i - 1)
 				childLabel = fmt.Sprintf("%s ~ %s", string(prevPair.Key), string(pair.Key))
 			}
-			displayNode(bpm, childPageId, depth+1, childLabel)
+			displayNode(bp, childPageId, depth+1, childLabel)
 		}
 
 		// 右端の子ノード (ブランチノードのヘッダーから読み取る)
 		rightChildPageId := branchNode.ChildPageIdAt(branchNode.NumPairs())
 		lastPair := branchNode.PairAt(branchNode.NumPairs() - 1)
 		rightLabel := fmt.Sprintf(">= %s", string(lastPair.Key))
-		displayNode(bpm, rightChildPageId, depth+1, rightLabel)
+		displayNode(bp, rightChildPageId, depth+1, rightLabel)
 	}
 }

@@ -13,15 +13,15 @@ func searchKey() {
 	dataDir := "examples/btree/data"
 	dbPath := dataDir + "/test.db"
 
-	bpm := bufferpool.NewBufferPoolManager(10)
+	bp := bufferpool.NewBufferPool(10)
 	fileId := page.FileId(1)
 
-	// DiskManager を作成して登録
-	dm, err := disk.NewDiskManager(fileId, dbPath)
+	// Disk を作成して登録
+	dm, err := disk.NewDisk(fileId, dbPath)
 	if err != nil {
 		panic(err)
 	}
-	bpm.RegisterDiskManager(fileId, dm)
+	bp.RegisterDisk(fileId, dm)
 
 	// 既存の B+Tree を開く (MetaPageId は 0 と仮定)
 	tree := btree.NewBTree(page.NewPageId(fileId, 0))
@@ -30,7 +30,7 @@ func searchKey() {
 	searchKeys := []string{"grape", "lemon", "watermelon"}
 	for _, key := range searchKeys {
 		searchMode := btree.SearchModeKey{Key: []byte(key)}
-		iter, err := tree.Search(bpm, searchMode)
+		iter, err := tree.Search(bp, searchMode)
 		if err != nil {
 			panic(err)
 		}

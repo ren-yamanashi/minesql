@@ -169,9 +169,9 @@ func TestUpdatePlannerNext(t *testing.T) {
 		assert.NoError(t, err)
 
 		// データを挿入
-		err = tbl.Insert(sm.BufferPoolManager, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = tbl.Insert(sm.BufferPool, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
-		err = tbl.Insert(sm.BufferPoolManager, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		err = tbl.Insert(sm.BufferPool, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
 
 		// "a" の first_name を "Jane" に更新する UpdatePlanner を作成

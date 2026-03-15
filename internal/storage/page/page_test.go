@@ -117,76 +117,6 @@ func TestIsInvalid(t *testing.T) {
 	})
 }
 
-func TestToBytes(t *testing.T) {
-	t.Run("PageId をバイト列に変換できる", func(t *testing.T) {
-		// GIVEN
-		pageId := NewPageId(0x12345678, 0xABCDEF00)
-
-		// WHEN
-		bytes := pageId.ToBytes()
-
-		// THEN
-		assert.Equal(t, 8, len(bytes))
-		// Big Endian で格納されているか確認
-		assert.Equal(t, byte(0x12), bytes[0])
-		assert.Equal(t, byte(0x34), bytes[1])
-		assert.Equal(t, byte(0x56), bytes[2])
-		assert.Equal(t, byte(0x78), bytes[3])
-		assert.Equal(t, byte(0xAB), bytes[4])
-		assert.Equal(t, byte(0xCD), bytes[5])
-		assert.Equal(t, byte(0xEF), bytes[6])
-		assert.Equal(t, byte(0x00), bytes[7])
-	})
-
-	t.Run("FileId と PageNumber が 0 の PageId をバイト列に変換できる", func(t *testing.T) {
-		// GIVEN
-		pageId := NewPageId(0, 0)
-
-		// WHEN
-		bytes := pageId.ToBytes()
-
-		// THEN
-		assert.Equal(t, 8, len(bytes))
-		assert.Equal(t, []byte{0, 0, 0, 0, 0, 0, 0, 0}, bytes)
-	})
-}
-
-func TestPageIdFromBytes(t *testing.T) {
-	t.Run("バイト列から PageId を復元できる", func(t *testing.T) {
-		// GIVEN
-		bytes := []byte{0x12, 0x34, 0x56, 0x78, 0xAB, 0xCD, 0xEF, 0x00}
-
-		// WHEN
-		pageId := PageIdFromBytes(bytes)
-
-		// THEN
-		assert.Equal(t, FileId(0x12345678), pageId.FileId)
-		assert.Equal(t, PageNumber(0xABCDEF00), pageId.PageNumber)
-	})
-
-	t.Run("すべて 0 のバイト列から PageId を復元できる", func(t *testing.T) {
-		// GIVEN
-		bytes := []byte{0, 0, 0, 0, 0, 0, 0, 0}
-
-		// WHEN
-		pageId := PageIdFromBytes(bytes)
-
-		// THEN
-		assert.Equal(t, FileId(0), pageId.FileId)
-		assert.Equal(t, PageNumber(0), pageId.PageNumber)
-	})
-
-	t.Run("8 バイト以外のデータから復元しようとすると panic", func(t *testing.T) {
-		// GIVEN
-		bytes := []byte{0, 1, 2, 3, 4, 5, 6}
-
-		// WHEN & THEN
-		assert.Panics(t, func() {
-			PageIdFromBytes(bytes)
-		})
-	})
-}
-
 func TestWriteTo(t *testing.T) {
 	t.Run("PageId を指定位置に書き込める", func(t *testing.T) {
 		// GIVEN
@@ -234,13 +164,83 @@ func TestWriteTo(t *testing.T) {
 	})
 }
 
-func TestReadPageIdFrom(t *testing.T) {
+func TestToBytes(t *testing.T) {
+	t.Run("PageId をバイト列に変換できる", func(t *testing.T) {
+		// GIVEN
+		pageId := NewPageId(0x12345678, 0xABCDEF00)
+
+		// WHEN
+		bytes := pageId.ToBytes()
+
+		// THEN
+		assert.Equal(t, 8, len(bytes))
+		// Big Endian で格納されているか確認
+		assert.Equal(t, byte(0x12), bytes[0])
+		assert.Equal(t, byte(0x34), bytes[1])
+		assert.Equal(t, byte(0x56), bytes[2])
+		assert.Equal(t, byte(0x78), bytes[3])
+		assert.Equal(t, byte(0xAB), bytes[4])
+		assert.Equal(t, byte(0xCD), bytes[5])
+		assert.Equal(t, byte(0xEF), bytes[6])
+		assert.Equal(t, byte(0x00), bytes[7])
+	})
+
+	t.Run("FileId と PageNumber が 0 の PageId をバイト列に変換できる", func(t *testing.T) {
+		// GIVEN
+		pageId := NewPageId(0, 0)
+
+		// WHEN
+		bytes := pageId.ToBytes()
+
+		// THEN
+		assert.Equal(t, 8, len(bytes))
+		assert.Equal(t, []byte{0, 0, 0, 0, 0, 0, 0, 0}, bytes)
+	})
+}
+
+func TestRestorePageIdFromBytes(t *testing.T) {
+	t.Run("バイト列から PageId を復元できる", func(t *testing.T) {
+		// GIVEN
+		bytes := []byte{0x12, 0x34, 0x56, 0x78, 0xAB, 0xCD, 0xEF, 0x00}
+
+		// WHEN
+		pageId := RestorePageIdFromBytes(bytes)
+
+		// THEN
+		assert.Equal(t, FileId(0x12345678), pageId.FileId)
+		assert.Equal(t, PageNumber(0xABCDEF00), pageId.PageNumber)
+	})
+
+	t.Run("すべて 0 のバイト列から PageId を復元できる", func(t *testing.T) {
+		// GIVEN
+		bytes := []byte{0, 0, 0, 0, 0, 0, 0, 0}
+
+		// WHEN
+		pageId := RestorePageIdFromBytes(bytes)
+
+		// THEN
+		assert.Equal(t, FileId(0), pageId.FileId)
+		assert.Equal(t, PageNumber(0), pageId.PageNumber)
+	})
+
+	t.Run("8 バイト以外のデータから復元しようとすると panic", func(t *testing.T) {
+		// GIVEN
+		bytes := []byte{0, 1, 2, 3, 4, 5, 6}
+
+		// WHEN & THEN
+		assert.Panics(t, func() {
+			RestorePageIdFromBytes(bytes)
+		})
+	})
+}
+
+func TestReadPageIdFromPageData(t *testing.T) {
 	t.Run("指定位置から PageId を読み取れる", func(t *testing.T) {
 		// GIVEN
 		data := []byte{0, 0, 0, 0, 0x12, 0x34, 0x56, 0x78, 0xAB, 0xCD, 0xEF, 0x00, 0, 0, 0, 0}
 
 		// WHEN
-		pageId := ReadPageIdFrom(data, 4)
+		pageId := ReadPageIdFromPageData(data, 4)
 
 		// THEN
 		assert.Equal(t, FileId(0x12345678), pageId.FileId)
@@ -252,7 +252,7 @@ func TestReadPageIdFrom(t *testing.T) {
 		data := []byte{0, 0, 0, 1, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0}
 
 		// WHEN
-		pageId := ReadPageIdFrom(data, 0)
+		pageId := ReadPageIdFromPageData(data, 0)
 
 		// THEN
 		assert.Equal(t, FileId(1), pageId.FileId)

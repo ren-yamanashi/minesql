@@ -35,7 +35,7 @@ func (iter *Iterator) Get() (node.Pair, bool) {
 }
 
 // 次の key-value ペアに進む
-func (iter *Iterator) Advance(bpm *bufferpool.BufferPoolManager) error {
+func (iter *Iterator) Advance(bp *bufferpool.BufferPool) error {
 	iter.slotNum++
 
 	leafNode := node.NewLeafNode(iter.bufferPage.GetReadData())
@@ -55,10 +55,10 @@ func (iter *Iterator) Advance(bpm *bufferpool.BufferPoolManager) error {
 	// 現在のページ内に次の key-value ペアがなく、次のページが存在する場合は、次のページに移動する
 	// 古いページの参照ビットをクリア
 	oldPageId := iter.bufferPage.PageId
-	bpm.UnRefPage(oldPageId)
+	bp.UnRefPage(oldPageId)
 
 	// 次のページを取得
-	buffer, err := bpm.FetchPage(*nextPageId)
+	buffer, err := bp.FetchPage(*nextPageId)
 	if err != nil {
 		return err
 	}
@@ -71,12 +71,12 @@ func (iter *Iterator) Advance(bpm *bufferpool.BufferPoolManager) error {
 }
 
 // 次の key-value のペアを取得する
-func (iter *Iterator) Next(bpm *bufferpool.BufferPoolManager) (node.Pair, bool, error) {
+func (iter *Iterator) Next(bp *bufferpool.BufferPool) (node.Pair, bool, error) {
 	pair, ok := iter.Get()
 	if !ok {
 		return node.NewPair(nil, nil), false, nil
 	}
-	err := iter.Advance(bpm)
+	err := iter.Advance(bp)
 	if err != nil {
 		return node.NewPair(nil, nil), false, err
 	}

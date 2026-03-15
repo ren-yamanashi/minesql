@@ -31,9 +31,9 @@ func TestGet(t *testing.T) {
 	t.Run("現在の key-value ペアが取得できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
-		dm := initDiskManagerForIterator(t, tmpdir)
-		bpm := bufferpool.NewBufferPoolManager(3)
-		bpm.RegisterDiskManager(page.FileId(0), dm)
+		dm := initDiskForIterator(t, tmpdir)
+		bp := bufferpool.NewBufferPool(3)
+		bp.RegisterDisk(page.FileId(0), dm)
 
 		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
 		pair2 := node.NewPair([]byte("key2"), []byte("value2"))
@@ -56,9 +56,9 @@ func TestAdvance(t *testing.T) {
 	t.Run("現在のページ内に、まだ次の key-value ペアがある場合は何もしない", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
-		dm := initDiskManagerForIterator(t, tmpdir)
-		bpm := bufferpool.NewBufferPoolManager(3)
-		bpm.RegisterDiskManager(page.FileId(0), dm)
+		dm := initDiskForIterator(t, tmpdir)
+		bp := bufferpool.NewBufferPool(3)
+		bp.RegisterDisk(page.FileId(0), dm)
 
 		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
 		pair2 := node.NewPair([]byte("key2"), []byte("value2"))
@@ -68,7 +68,7 @@ func TestAdvance(t *testing.T) {
 		iterator := newIterator(bufferPage, 0)
 
 		// WHEN
-		err := iterator.Advance(bpm)
+		err := iterator.Advance(bp)
 
 		// THEN
 		assert.NoError(t, err)
@@ -78,9 +78,9 @@ func TestAdvance(t *testing.T) {
 	t.Run("現在のページ内に、次の key-value ペアがないが、次のページも存在しない場合は何もしない", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
-		dm := initDiskManagerForIterator(t, tmpdir)
-		bpm := bufferpool.NewBufferPoolManager(3)
-		bpm.RegisterDiskManager(page.FileId(0), dm)
+		dm := initDiskForIterator(t, tmpdir)
+		bp := bufferpool.NewBufferPool(3)
+		bp.RegisterDisk(page.FileId(0), dm)
 
 		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
 		pair2 := node.NewPair([]byte("key2"), []byte("value2"))
@@ -89,7 +89,7 @@ func TestAdvance(t *testing.T) {
 		iterator := newIterator(bufferPage, 1) // 最後のペアを指している
 
 		// WHEN
-		err := iterator.Advance(bpm)
+		err := iterator.Advance(bp)
 
 		// THEN
 		assert.NoError(t, err)
@@ -99,9 +99,9 @@ func TestAdvance(t *testing.T) {
 	t.Run("現在のページ内に次の key-value ペアがなく、次のページが存在する場合は、次のページに移動する (古いページの参照ビットがクリアされ、次のページの先頭にポインタが置かれる)", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
-		dm := initDiskManagerForIterator(t, tmpdir)
-		bpm := bufferpool.NewBufferPoolManager(3)
-		bpm.RegisterDiskManager(page.FileId(0), dm)
+		dm := initDiskForIterator(t, tmpdir)
+		bp := bufferpool.NewBufferPool(3)
+		bp.RegisterDisk(page.FileId(0), dm)
 
 		// 最初のページ
 		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
@@ -119,14 +119,14 @@ func TestAdvance(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ページ1をバッファプールに追加
-		addedPage1, err := bpm.AddPage(page.NewPageId(page.FileId(0), page.PageNumber(0)))
+		addedPage1, err := bp.AddPage(page.NewPageId(page.FileId(0), page.PageNumber(0)))
 		assert.NoError(t, err)
 		copy(addedPage1.GetWriteData(), bufferPage1.GetReadData())
 
 		iterator := newIterator(*addedPage1, 1) // 最後のペアを指している
 
 		// WHEN
-		err = iterator.Advance(bpm)
+		err = iterator.Advance(bp)
 
 		// THEN
 		assert.NoError(t, err)
@@ -139,9 +139,9 @@ func TestNext(t *testing.T) {
 	t.Run("次の key-value ペアの情報が取得できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
-		dm := initDiskManagerForIterator(t, tmpdir)
-		bpm := bufferpool.NewBufferPoolManager(3)
-		bpm.RegisterDiskManager(page.FileId(0), dm)
+		dm := initDiskForIterator(t, tmpdir)
+		bp := bufferpool.NewBufferPool(3)
+		bp.RegisterDisk(page.FileId(0), dm)
 
 		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
 		pair2 := node.NewPair([]byte("key2"), []byte("value2"))
@@ -152,9 +152,9 @@ func TestNext(t *testing.T) {
 		assert.Equal(t, 0, iterator.slotNum) // 最初のペアを指している
 
 		// WHEN
-		pair, ok, err := iterator.Next(bpm)
+		pair, ok, err := iterator.Next(bp)
 		bufferId1 := iterator.slotNum
-		pair2Result, ok2, err2 := iterator.Next(bpm)
+		pair2Result, ok2, err2 := iterator.Next(bp)
 		bufferId2 := iterator.slotNum
 
 		// THEN
@@ -191,9 +191,9 @@ func createLeafBufferPage(pageId page.PageId, pairs []node.Pair, nextPageId *pag
 	return *bufpool
 }
 
-func initDiskManagerForIterator(t *testing.T, tmpdir string) *disk.DiskManager {
+func initDiskForIterator(t *testing.T, tmpdir string) *disk.Disk {
 	path := filepath.Join(tmpdir, "iterator_test.db")
-	dm, err := disk.NewDiskManager(page.FileId(0), path)
+	dm, err := disk.NewDisk(page.FileId(0), path)
 	if err != nil {
 		t.Fatalf("failed to create disk manager: %v", err)
 	}
