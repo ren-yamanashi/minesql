@@ -107,6 +107,151 @@ func TestInsert(t *testing.T) {
 	})
 }
 
+func TestRemove(t *testing.T) {
+	t.Run("中間スロットの削除が正しく動作する", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 256)
+		sp := NewSlottedPage(data)
+		sp.Initialize()
+		sp.Insert(0, []byte("AAAAA"))
+		sp.Insert(1, []byte("BBBBB"))
+		sp.Insert(2, []byte("CCCCC"))
+
+		// WHEN
+		sp.Remove(1)
+
+		// THEN
+		assert.Equal(t, 2, sp.NumSlots())
+		assert.Equal(t, []byte("AAAAA"), sp.Data(0))
+		assert.Equal(t, []byte("CCCCC"), sp.Data(1))
+	})
+
+	t.Run("先頭スロットの削除が正しく動作する", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 256)
+		sp := NewSlottedPage(data)
+		sp.Initialize()
+		sp.Insert(0, []byte("AAAAA"))
+		sp.Insert(1, []byte("BBBBB"))
+		sp.Insert(2, []byte("CCCCC"))
+
+		// WHEN
+		sp.Remove(0)
+
+		// THEN
+		assert.Equal(t, 2, sp.NumSlots())
+		assert.Equal(t, []byte("BBBBB"), sp.Data(0))
+		assert.Equal(t, []byte("CCCCC"), sp.Data(1))
+	})
+
+	t.Run("末尾スロットの削除が正しく動作する", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 256)
+		sp := NewSlottedPage(data)
+		sp.Initialize()
+		sp.Insert(0, []byte("AAAAA"))
+		sp.Insert(1, []byte("BBBBB"))
+		sp.Insert(2, []byte("CCCCC"))
+
+		// WHEN
+		sp.Remove(2)
+
+		// THEN
+		assert.Equal(t, 2, sp.NumSlots())
+		assert.Equal(t, []byte("AAAAA"), sp.Data(0))
+		assert.Equal(t, []byte("BBBBB"), sp.Data(1))
+	})
+
+	t.Run("唯一のスロットを削除すると初期状態に戻る", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 128)
+		sp := NewSlottedPage(data)
+		sp.Initialize()
+		sp.Insert(0, make([]byte, 20))
+
+		// WHEN
+		sp.Remove(0)
+
+		// THEN
+		assert.Equal(t, 0, sp.NumSlots())
+		assert.Equal(t, sp.Capacity(), sp.FreeSpace())
+	})
+}
+
+func TestUpdate(t *testing.T) {
+	t.Run("データが正しく更新される", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 256)
+		sp := NewSlottedPage(data)
+		sp.Initialize()
+		sp.Insert(0, []byte("AAAAA"))
+		sp.Insert(1, []byte("BBBBB"))
+		sp.Insert(2, []byte("CCCCC"))
+
+		// WHEN: スロット 1 を同じサイズのデータに更新
+		success := sp.Update(1, []byte("XXXXX"))
+
+		// THEN
+		assert.True(t, success)
+		assert.Equal(t, []byte("AAAAA"), sp.Data(0))
+		assert.Equal(t, []byte("XXXXX"), sp.Data(1))
+		assert.Equal(t, []byte("CCCCC"), sp.Data(2))
+	})
+
+	t.Run("より大きいデータに更新できる", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 256)
+		sp := NewSlottedPage(data)
+		sp.Initialize()
+		sp.Insert(0, []byte("AAAAA"))
+		sp.Insert(1, []byte("BBBBB"))
+		initialFreeSpace := sp.FreeSpace()
+
+		// WHEN: 5 バイト → 10 バイトに拡張
+		success := sp.Update(1, []byte("XXXXXXXXXX"))
+
+		// THEN
+		assert.True(t, success)
+		assert.Equal(t, []byte("AAAAA"), sp.Data(0))
+		assert.Equal(t, []byte("XXXXXXXXXX"), sp.Data(1))
+		assert.Equal(t, initialFreeSpace-5, sp.FreeSpace())
+	})
+
+	t.Run("より小さいデータに更新できる", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 256)
+		sp := NewSlottedPage(data)
+		sp.Initialize()
+		sp.Insert(0, []byte("AAAAA"))
+		sp.Insert(1, []byte("BBBBBBBBB"))
+		initialFreeSpace := sp.FreeSpace()
+
+		// WHEN: 9 バイト → 3 バイトに縮小
+		success := sp.Update(1, []byte("XX"))
+
+		// THEN
+		assert.True(t, success)
+		assert.Equal(t, []byte("AAAAA"), sp.Data(0))
+		assert.Equal(t, []byte("XX"), sp.Data(1))
+		assert.Equal(t, initialFreeSpace+7, sp.FreeSpace())
+	})
+
+	t.Run("空き容量が不足している場合、更新に失敗する", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 32)
+		sp := NewSlottedPage(data)
+		sp.Initialize()
+		sp.Insert(0, []byte("AAAAA"))
+
+		// WHEN: 空き容量を超えるサイズに更新
+		success := sp.Update(0, make([]byte, 100))
+
+		// THEN
+		assert.False(t, success)
+		assert.Equal(t, []byte("AAAAA"), sp.Data(0))
+	})
+}
+
 func TestResize(t *testing.T) {
 	t.Run("拡張方向のリサイズが正しく動作する", func(t *testing.T) {
 		// GIVEN
@@ -212,77 +357,6 @@ func TestResize(t *testing.T) {
 		assert.Equal(t, 10, len(sp.Data(1)))
 		assert.Equal(t, []byte("BBBBB"), sp.Data(1)[5:]) // 元データは末尾側に残る
 		assert.Equal(t, []byte("CCCCC"), sp.Data(2))
-	})
-}
-
-func TestRemove(t *testing.T) {
-	t.Run("中間スロットの削除が正しく動作する", func(t *testing.T) {
-		// GIVEN
-		data := make([]byte, 256)
-		sp := NewSlottedPage(data)
-		sp.Initialize()
-		sp.Insert(0, []byte("AAAAA"))
-		sp.Insert(1, []byte("BBBBB"))
-		sp.Insert(2, []byte("CCCCC"))
-
-		// WHEN
-		sp.Remove(1)
-
-		// THEN
-		assert.Equal(t, 2, sp.NumSlots())
-		assert.Equal(t, []byte("AAAAA"), sp.Data(0))
-		assert.Equal(t, []byte("CCCCC"), sp.Data(1))
-	})
-
-	t.Run("先頭スロットの削除が正しく動作する", func(t *testing.T) {
-		// GIVEN
-		data := make([]byte, 256)
-		sp := NewSlottedPage(data)
-		sp.Initialize()
-		sp.Insert(0, []byte("AAAAA"))
-		sp.Insert(1, []byte("BBBBB"))
-		sp.Insert(2, []byte("CCCCC"))
-
-		// WHEN
-		sp.Remove(0)
-
-		// THEN
-		assert.Equal(t, 2, sp.NumSlots())
-		assert.Equal(t, []byte("BBBBB"), sp.Data(0))
-		assert.Equal(t, []byte("CCCCC"), sp.Data(1))
-	})
-
-	t.Run("末尾スロットの削除が正しく動作する", func(t *testing.T) {
-		// GIVEN
-		data := make([]byte, 256)
-		sp := NewSlottedPage(data)
-		sp.Initialize()
-		sp.Insert(0, []byte("AAAAA"))
-		sp.Insert(1, []byte("BBBBB"))
-		sp.Insert(2, []byte("CCCCC"))
-
-		// WHEN
-		sp.Remove(2)
-
-		// THEN
-		assert.Equal(t, 2, sp.NumSlots())
-		assert.Equal(t, []byte("AAAAA"), sp.Data(0))
-		assert.Equal(t, []byte("BBBBB"), sp.Data(1))
-	})
-
-	t.Run("唯一のスロットを削除すると初期状態に戻る", func(t *testing.T) {
-		// GIVEN
-		data := make([]byte, 128)
-		sp := NewSlottedPage(data)
-		sp.Initialize()
-		sp.Insert(0, make([]byte, 20))
-
-		// WHEN
-		sp.Remove(0)
-
-		// THEN
-		assert.Equal(t, 0, sp.NumSlots())
-		assert.Equal(t, sp.Capacity(), sp.FreeSpace())
 	})
 }
 

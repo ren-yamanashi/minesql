@@ -39,7 +39,7 @@ func NewLeafNode(data []byte) *LeafNode {
 	}
 }
 
-// リーフノードを初期化する
+// Initialize はリーフノードを初期化する
 //
 // 初期化時には、前後のリーフノードのポインタ (ページ ID) には無効値が設定される
 func (ln *LeafNode) Initialize() {
@@ -48,7 +48,7 @@ func (ln *LeafNode) Initialize() {
 	ln.body.Initialize()
 }
 
-// key-value ペアを挿入する
+// Insert は key-value ペアを挿入する
 //
 // slotNum: 挿入先のスロット番号 (slotted page のスロット番号)
 //
@@ -65,7 +65,7 @@ func (ln *LeafNode) Insert(slotNum int, pair Pair) bool {
 	return ln.body.Insert(slotNum, pairBytes)
 }
 
-// リーフノードを分割しながらペアを挿入する
+// SplitInsert はリーフノードを分割しながらペアを挿入する
 //
 // newLeafNode: 分割後の新しいリーフノード
 //
@@ -107,14 +107,14 @@ func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newPair Pair) ([]byte, er
 	return newLeafNode.PairAt(0).Key, nil
 }
 
-// key-value ペアを削除する
+// Delete は key-value ペアを削除する
 //
 // slotNum: 削除するペアのスロット番号 (slotted page のスロット番号)
 func (ln *LeafNode) Delete(slotNum int) {
 	ln.body.Remove(slotNum)
 }
 
-// 指定されたスロットのペアの value を新しい値に更新する
+// Update は指定されたスロットのペアの value を新しい値に更新する
 //
 // slotNum: 更新するペアのスロット番号
 //
@@ -122,29 +122,21 @@ func (ln *LeafNode) Delete(slotNum int) {
 //
 // 戻り値: 更新に成功したかどうか (空き容量不足の場合は false)
 func (ln *LeafNode) Update(slotNum int, pair Pair) bool {
-	pairBytes := pair.ToBytes()
-
-	// slotted page 内のペアのサイズをリサイズ
-	if !ln.body.Resize(slotNum, len(pairBytes)) {
-		return false
-	}
-
-	// ペアの値を新しい値に更新
-	copy(ln.body.Data(slotNum), pairBytes)
-	return true
+	// slotted page 内の slotNum が示す位置のデータを新しいデータに更新する
+	return ln.body.Update(slotNum, pair.ToBytes())
 }
 
-// ノードタイプヘッダーを除いたボディ部分を取得する (リーフノードヘッダー + Slotted Page のボディ)
+// Body はノードタイプヘッダーを除いたボディ部分を取得する (リーフノードヘッダー + Slotted Page のボディ)
 func (ln *LeafNode) Body() []byte {
 	return ln.data[nodeHeaderSize:]
 }
 
-// key-value ペア数を取得する
+// NumPairs は key-value ペア数を取得する
 func (ln *LeafNode) NumPairs() int {
 	return ln.body.NumSlots()
 }
 
-// 指定されたスロット番号の key-value ペアを取得する
+// PairAt は指定されたスロット番号の key-value ペアを取得する
 //
 // slotNum: slotted page のスロット番号
 func (ln *LeafNode) PairAt(slotNum int) Pair {
@@ -152,7 +144,7 @@ func (ln *LeafNode) PairAt(slotNum int) Pair {
 	return pairFromBytes(data)
 }
 
-// キーから、対応するスロット番号 (slotted page のスロット番号) を検索する (二分探索)
+// SearchSlotNum はキーから、対応するスロット番号 (slotted page のスロット番号) を検索する (二分探索)
 //
 // 見つかった場合: (スロット番号, true)
 //
@@ -161,6 +153,9 @@ func (ln *LeafNode) SearchSlotNum(key []byte) (int, bool) {
 	return binarySearch(ln, key)
 }
 
+// PrevPageId は前のリーフノードのページ ID を取得する
+//
+// 前のリーフノードが存在しない場合は nil を返す
 func (ln *LeafNode) PrevPageId() *page.PageId {
 	pageId := page.ReadPageIdFromPageData(ln.Body(), 0)
 	if pageId.IsInvalid() {
@@ -169,6 +164,9 @@ func (ln *LeafNode) PrevPageId() *page.PageId {
 	return &pageId
 }
 
+// NextPageId は次のリーフノードのページ ID を取得する
+//
+// 次のリーフノードが存在しない場合は nil を返す
 func (ln *LeafNode) NextPageId() *page.PageId {
 	pageId := page.ReadPageIdFromPageData(ln.Body(), 8)
 	if pageId.IsInvalid() {
@@ -177,6 +175,9 @@ func (ln *LeafNode) NextPageId() *page.PageId {
 	return &pageId
 }
 
+// SetPrevPageId は前のリーフノードのページ ID を設定する
+//
+// prevPageId: 前のリーフノードのページ ID (前のリーフノードが存在しない場合は nil を指定する)
 func (ln *LeafNode) SetPrevPageId(prevPageId *page.PageId) {
 	var pageId page.PageId
 	if prevPageId == nil {
@@ -187,6 +188,9 @@ func (ln *LeafNode) SetPrevPageId(prevPageId *page.PageId) {
 	pageId.WriteTo(ln.Body(), 0)
 }
 
+// SetNextPageId は次のリーフノードのページ ID を設定する
+//
+// nextPageId: 次のリーフノードのページ ID (次のリーフノードが存在しない場合は nil を指定する)
 func (ln *LeafNode) SetNextPageId(nextPageId *page.PageId) {
 	var pageId page.PageId
 	if nextPageId == nil {
@@ -197,17 +201,17 @@ func (ln *LeafNode) SetNextPageId(nextPageId *page.PageId) {
 	pageId.WriteTo(ln.Body(), 8)
 }
 
-// src のすべてのペアを自分の末尾に転送する (src のペアはすべて削除される)
+// TransferAllFrom は src のすべてのペアを自分の末尾に転送する (src のペアはすべて削除される)
 func (ln *LeafNode) TransferAllFrom(src *LeafNode) {
 	src.body.TransferAllTo(ln.body)
 }
 
-// リーフノードが半分以上埋まっているかどうかを判定する
+// IsHalfFull はリーフノードが半分以上埋まっているかどうかを判定する
 func (ln *LeafNode) IsHalfFull() bool {
 	return 2*ln.body.FreeSpace() < ln.body.Capacity()
 }
 
-// 兄弟ノードにペアを貸せるかどうかを判定する
+// CanLendPair は兄弟ノードにペアを貸せるかどうかを判定する
 //
 // 貸した後も半分以上埋まっている場合は true を返す
 func (ln *LeafNode) CanLendPair() bool {
@@ -220,12 +224,12 @@ func (ln *LeafNode) CanLendPair() bool {
 	return 2*freeSpaceAfterLend < ln.body.Capacity()
 }
 
-// 最大ペアサイズを取得する
+// maxPairSize はリーフノード内の最大ペアサイズを取得する
 func (ln *LeafNode) maxPairSize() int {
 	return ln.body.Capacity()/2 - 4 // Slotted Page の容量の半分 - キーサイズを格納する 4 バイト (2 で割るのは、 key と value の両方を格納するため)
 }
 
-// 先頭のペアを別のリーフノードに移動する
+// transfer は先頭のペアを別のリーフノードに移動する
 func (ln *LeafNode) transfer(dest *LeafNode) error {
 	nextIndex := dest.NumPairs()
 	data := ln.body.Data(0)

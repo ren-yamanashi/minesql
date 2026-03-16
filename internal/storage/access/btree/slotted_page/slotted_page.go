@@ -54,9 +54,50 @@ func (sp *SlottedPage) Insert(index int, data []byte) bool {
 	return true
 }
 
+// Remove は指定されたインデックスのデータを削除する
+func (sp *SlottedPage) Remove(index int) {
+	// データサイズを 0 にする
+	sp.Resize(index, 0)
+
+	numSlots := sp.NumSlots()
+
+	// ポインタ配列をシフト (index 以降を左にずらす)
+	if index < numSlots-1 {
+		src := headerSize + (index+1)*pointerSize     // コピー元の開始位置
+		destination := headerSize + index*pointerSize // コピー先の開始位置
+		copySize := (numSlots - index - 1) * pointerSize
+		copy(sp.data[destination:destination+copySize], sp.data[src:src+copySize])
+	}
+
+	// numSlots を減らす
+	binary.BigEndian.PutUint16(sp.data[0:2], uint16(numSlots-1))
+}
+
+// Update は指定されたインデックスのデータを新しいデータに更新する
+//
+// index: 更新対象のデータが格納されているスロットのインデックス
+//
+// data: 更新する新しいデータ
+//
+// 戻り値: 成功した場合は true, 空き容量が不足している場合は false を返す
+func (sp *SlottedPage) Update(index int, data []byte) bool {
+	// slotted page 内のペアのサイズをリサイズ
+	if !sp.Resize(index, len(data)) {
+		return false
+	}
+
+	// データを更新
+	copy(sp.Data(index), data)
+	return true
+}
+
 // Resize は指定されたインデックスのデータ領域のサイズを変更する
 //
-// 空き容量が不足している場合は false を返す
+// index: サイズを変更するスロットのインデックス
+//
+// newSize: 新しいサイズ
+//
+// 戻り値: 成功した場合は true, 空き容量が不足している場合は false を返す
 func (sp *SlottedPage) Resize(index int, newSize int) bool {
 	pointer := sp.pointerAt(index)
 	oldSize := int(pointer.size)
@@ -103,25 +144,6 @@ func (sp *SlottedPage) Resize(index int, newSize int) bool {
 	sp.setPointer(index, pointer)
 
 	return true
-}
-
-// Remove は指定されたインデックスのデータを削除する
-func (sp *SlottedPage) Remove(index int) {
-	// データサイズを 0 にする
-	sp.Resize(index, 0)
-
-	numSlots := sp.NumSlots()
-
-	// ポインタ配列をシフト (index 以降を左にずらす)
-	if index < numSlots-1 {
-		src := headerSize + (index+1)*pointerSize     // コピー元の開始位置
-		destination := headerSize + index*pointerSize // コピー先の開始位置
-		copySize := (numSlots - index - 1) * pointerSize
-		copy(sp.data[destination:destination+copySize], sp.data[src:src+copySize])
-	}
-
-	// numSlots を減らす
-	binary.BigEndian.PutUint16(sp.data[0:2], uint16(numSlots-1))
 }
 
 // TransferAllTo は自分のすべてのスロットを dest の末尾に転送する。(自身のスロットはすべて削除される)
