@@ -11,6 +11,7 @@ type Pair struct {
 	Value []byte
 }
 
+// NewPair は、指定されたキーと値から新しい key-value ペアを作成する
 func NewPair(key []byte, value []byte) Pair {
 	return Pair{
 		Key:   key,
@@ -18,7 +19,7 @@ func NewPair(key []byte, value []byte) Pair {
 	}
 }
 
-// key-value ペアをバイト列にシリアライズする
+// ToBytes は key-value ペアをバイト列にシリアライズする
 // フォーマット: [key_size(4 bytes][key][value]
 func (p *Pair) ToBytes() []byte {
 	keySize := uint32(len(p.Key))
@@ -32,16 +33,17 @@ func (p *Pair) ToBytes() []byte {
 	return data
 }
 
-// Pair のキーと、指定されたキーを比較する
+// CompareKey は Pair のキーと、指定されたキーを比較する
+// key: 比較対象のキー
 // 戻り値:
-// -1: p.Key < otherKey
-// 0:  p.Key == otherKey
-// 1:  p.Key > otherKey
+// -1: pair.Key < otherKey
+// 0:  pair.Key == otherKey
+// 1:  pair.Key > otherKey
 func (p Pair) CompareKey(otherKey []byte) int {
 	return bytes.Compare(p.Key, otherKey)
 }
 
-// バイト列から key-value ペアを復元する
+// pairFromBytes はバイト列から key-value ペアを復元する
 // フォーマット: [key_size(4 bytes][key][value]
 func pairFromBytes(data []byte) Pair {
 	if len(data) < 4 {

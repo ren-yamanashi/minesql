@@ -52,10 +52,7 @@ func (ln *LeafNode) PairAt(slotNum int) Pair {
 // 見つかった場合: (スロット番号, true)
 // 見つからなかった場合: (0, false)
 func (ln *LeafNode) SearchSlotNum(key []byte) (int, bool) {
-	return binarySearch(ln.NumPairs(), func(slotNum int) int {
-		pair := ln.PairAt(slotNum)
-		return pair.CompareKey(key)
-	})
+	return binarySearch(ln, key)
 }
 
 // key-value ペアを挿入する

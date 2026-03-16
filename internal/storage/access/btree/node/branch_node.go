@@ -51,10 +51,7 @@ func (bn *BranchNode) PairAt(slotNum int) Pair {
 // 見つかった場合: (スロット番号, true)
 // 見つからなかった場合: (0, false)
 func (bn *BranchNode) SearchSlotNum(key []byte) (int, bool) {
-	return binarySearch(bn.NumPairs(), func(slotNum int) int {
-		pair := bn.PairAt(slotNum)
-		return pair.CompareKey(key)
-	})
+	return binarySearch(bn, key)
 }
 
 // key-value ペアを挿入する (pageId は value に相当)

@@ -8,7 +8,7 @@ var (
 )
 
 type NodeHeader struct {
-	NodeType [8]byte
+	NodeType [nodeHeaderSize]byte // ノードタイプ (LEAF or BRANCH)
 }
 
 // Node は B+Tree のノードを表す interface
