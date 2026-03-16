@@ -126,6 +126,24 @@ func (ln *LeafNode) Update(slotNum int, pair Pair) bool {
 	return ln.body.Update(slotNum, pair.ToBytes())
 }
 
+// CanTransferPair は兄弟ノードにペアを転送できるかどうかを判定する
+//
+// 転送後も半分以上埋まっている場合は true を返す
+//
+// fromLast: true の場合は末尾ペア、false の場合は先頭ペアを転送対象とする
+func (ln *LeafNode) CanTransferPair(fromLast bool) bool {
+	if ln.NumPairs() <= 1 {
+		return false
+	}
+	targetIndex := 0
+	if fromLast {
+		targetIndex = ln.NumPairs() - 1
+	}
+	targetPairSize := len(ln.body.Data(targetIndex))
+	freeSpaceAfterTransfer := ln.body.FreeSpace() + targetPairSize + 4 // 4 はポインタサイズ
+	return 2*freeSpaceAfterTransfer < ln.body.Capacity()
+}
+
 // Body はノードタイプヘッダーを除いたボディ部分を取得する (リーフノードヘッダー + Slotted Page のボディ)
 func (ln *LeafNode) Body() []byte {
 	return ln.data[nodeHeaderSize:]
@@ -209,19 +227,6 @@ func (ln *LeafNode) TransferAllFrom(src *LeafNode) {
 // IsHalfFull はリーフノードが半分以上埋まっているかどうかを判定する
 func (ln *LeafNode) IsHalfFull() bool {
 	return 2*ln.body.FreeSpace() < ln.body.Capacity()
-}
-
-// CanLendPair は兄弟ノードにペアを貸せるかどうかを判定する
-//
-// 貸した後も半分以上埋まっている場合は true を返す
-func (ln *LeafNode) CanLendPair() bool {
-	if ln.NumPairs() <= 1 {
-		return false
-	}
-	// 先頭ペアを貸した後も半分以上埋まっているかを確認
-	firstPairSize := len(ln.body.Data(0))
-	freeSpaceAfterLend := ln.body.FreeSpace() + firstPairSize + 4 // 4 はポインタサイズ
-	return 2*freeSpaceAfterLend < ln.body.Capacity()
 }
 
 // maxPairSize はリーフノード内の最大ペアサイズを取得する

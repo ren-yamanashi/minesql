@@ -552,14 +552,14 @@ func TestBranchNodeIsHalfFull(t *testing.T) {
 	})
 }
 
-func TestBranchNodeCanLendPair(t *testing.T) {
+func TestBranchNodeCanTransferPair(t *testing.T) {
 	t.Run("ペアが 0 の場合、false を返す", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNodeEmpty()
 		bn.body.Initialize()
 
 		// WHEN
-		result := bn.CanLendPair()
+		result := bn.CanTransferPair(false)
 
 		// THEN
 		assert.False(t, result)
@@ -573,13 +573,13 @@ func TestBranchNodeCanLendPair(t *testing.T) {
 		)
 
 		// WHEN
-		result := bn.CanLendPair()
+		result := bn.CanTransferPair(false)
 
 		// THEN
 		assert.False(t, result)
 	})
 
-	t.Run("貸した後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
+	t.Run("先頭ペアを転送後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNodeEmpty()
 		bn.body.Initialize()
@@ -590,13 +590,30 @@ func TestBranchNodeCanLendPair(t *testing.T) {
 		}
 
 		// WHEN
-		result := bn.CanLendPair()
+		result := bn.CanTransferPair(false)
 
 		// THEN
 		assert.True(t, result)
 	})
 
-	t.Run("貸した後に半分を下回る場合、false を返す", func(t *testing.T) {
+	t.Run("末尾ペアを転送後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
+		// GIVEN
+		bn := createTestBranchNodeEmpty()
+		bn.body.Initialize()
+		bigKey := make([]byte, 500)
+		for i := range 6 {
+			copy(bigKey, fmt.Appendf(nil, "key%d", i))
+			bn.Insert(i, NewPair(bigKey, pageIdBytes(page.PageNumber(i*10))))
+		}
+
+		// WHEN
+		result := bn.CanTransferPair(true)
+
+		// THEN
+		assert.True(t, result)
+	})
+
+	t.Run("転送後に半分を下回る場合、false を返す", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNodeEmpty()
 		bn.body.Initialize()
@@ -607,7 +624,7 @@ func TestBranchNodeCanLendPair(t *testing.T) {
 		bn.Insert(1, NewPair(bigKey, pageIdBytes(20)))
 
 		// WHEN
-		result := bn.CanLendPair()
+		result := bn.CanTransferPair(false)
 
 		// THEN
 		assert.False(t, result)

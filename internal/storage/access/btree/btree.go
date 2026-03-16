@@ -422,17 +422,18 @@ func (bt *BTree) resolveLeafUnderflow(parentBranchNode *node.BranchNode, childBu
 	childNode := node.NewLeafNode(childBuffer.GetWriteData())
 	siblingNode := node.NewLeafNode(sibling.bufferPage.GetWriteData())
 
-	// 兄弟から借りられる場合
-	if siblingNode.CanLendPair() {
-		// 借りる先の兄弟ノードが左に位置する場合、兄弟の末尾ペアを子の自分のノードの先頭に移動
+	// 兄弟からペアを転送できる場合
+	// 左の兄弟 → 末尾ペアを転送、右の兄弟 → 先頭ペアを転送
+	if siblingNode.CanTransferPair(sibling.isLeft) {
 		if sibling.isLeft {
+			// 左の兄弟の末尾ペアを子の先頭に移動
 			lastIndex := siblingNode.NumPairs() - 1
 			pair := siblingNode.PairAt(lastIndex)
 			childNode.Insert(0, pair)
 			siblingNode.Delete(lastIndex)
 			parentBranchNode.UpdateKeyAt(childIndex-1, childNode.PairAt(0).Key)
 		} else {
-			// 借りる先の兄弟ノードが右に位置する場合、兄弟の先頭ペアを子の自分のノードの末尾に移動
+			// 右の兄弟の先頭ペアを子の末尾に移動
 			pair := siblingNode.PairAt(0)
 			childNode.Insert(childNode.NumPairs(), pair)
 			siblingNode.Delete(0)
@@ -441,7 +442,7 @@ func (bt *BTree) resolveLeafUnderflow(parentBranchNode *node.BranchNode, childBu
 		return deleteResult{underflow: false}
 	}
 
-	// 借りられない場合はマージする (左のノードに右のノードをマージ = 左のノードが残る)
+	// 転送できない場合はマージする (左のノードに右のノードをマージ = 左のノードが残る)
 	if sibling.isLeft {
 		// 左の兄弟とマージ: 子(RightChild)のペアをすべて兄弟(左)に移動、兄弟が残る
 		siblingNode.TransferAllFrom(childNode)
@@ -478,10 +479,11 @@ func (bt *BTree) resolveBranchUnderflow(parentBranchNode *node.BranchNode, child
 	childNode := node.NewBranchNode(childBuffer.GetWriteData())
 	siblingNode := node.NewBranchNode(sibling.bufferPage.GetWriteData())
 
-	// 兄弟から借りられる場合
-	if siblingNode.CanLendPair() {
+	// 兄弟からペアを転送できる場合
+	// 左の兄弟 → 末尾ペアを転送、右の兄弟 → 先頭ペアを転送
+	if siblingNode.CanTransferPair(sibling.isLeft) {
 		if sibling.isLeft {
-			// 左の兄弟から借りる: 親の境界キーを子の先頭に下ろし、兄弟の末尾キーを親に上げる
+			// 左の兄弟から転送: 親の境界キーを子の先頭に下ろし、兄弟の末尾キーを親に上げる
 			parentPair := parentBranchNode.PairAt(childIndex - 1)
 			siblingRightChild := siblingNode.RightChildPageId()
 			childNode.Insert(0, node.NewPair(parentPair.Key, siblingRightChild.ToBytes()))

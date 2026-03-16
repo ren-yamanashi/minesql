@@ -156,16 +156,22 @@ func (bn *BranchNode) maxPairSize() int {
 	return bn.body.Capacity()/2 - 4 // Slotted Page の容量の半分 - キーサイズを格納する 4 バイト (2 で割るのは、 key と value の両方を格納するため)
 }
 
-// 兄弟ノードにペアを貸せるかどうかを判定する
-// 貸した後も半分以上埋まっている場合は true を返す
-func (bn *BranchNode) CanLendPair() bool {
+// CanTransferPair は兄弟ノードにペアを転送できるかどうかを判定する
+//
+// 転送後も半分以上埋まっている場合は true を返す
+//
+// fromLast: true の場合は末尾ペア、false の場合は先頭ペアを転送対象とする
+func (bn *BranchNode) CanTransferPair(fromLast bool) bool {
 	if bn.NumPairs() <= 1 {
 		return false
 	}
-	// 先頭ペアを貸した後も半分以上埋まっているかを確認
-	firstPairSize := len(bn.body.Data(0))
-	freeSpaceAfterLend := bn.body.FreeSpace() + firstPairSize + 4 // 4 はポインタサイズ
-	return 2*freeSpaceAfterLend < bn.body.Capacity()
+	targetIndex := 0
+	if fromLast {
+		targetIndex = bn.NumPairs() - 1
+	}
+	targetPairSize := len(bn.body.Data(targetIndex))
+	freeSpaceAfterTransfer := bn.body.FreeSpace() + targetPairSize + 4 // 4 はポインタサイズ
+	return 2*freeSpaceAfterTransfer < bn.body.Capacity()
 }
 
 // 指定されたスロット番号のキーを更新する
