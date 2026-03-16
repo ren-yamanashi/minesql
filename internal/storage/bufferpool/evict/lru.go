@@ -3,9 +3,13 @@ package evict
 import "minesql/internal/storage/bufferpool/buftype"
 
 // LRU は MySQL InnoDB のバッファプールに基づく LRU アルゴリズムによりページ追い出しを行う
+//
 // リストを NewSublist (先頭側, 全体の 5/8) と OldSublist (末尾側, 全体の 3/8) に分割する
+//
 // 新しいページは midpoint (OldSublist の先頭) に挿入され、
+//
 // old サブリスト内のページが再アクセスされると new サブリストの先頭に昇格する
+//
 // これにより、フルテーブルスキャンなどの一時的な大量読み込みでホットページが追い出されるのを防ぐ
 type LRU struct {
 	head     *lruNode                      // リストの先頭 (NewSublist の先頭)

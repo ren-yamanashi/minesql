@@ -18,6 +18,7 @@ type BufferPool struct {
 }
 
 // NewBufferPool は指定されたサイズの BufferPool を生成する
+//
 // size: バッファページの数 (例: 1000 を指定すると、1000 ページ分のバッファプールが生成される)
 func NewBufferPool(size int) *BufferPool {
 	return &BufferPool{
@@ -31,7 +32,9 @@ func NewBufferPool(size int) *BufferPool {
 }
 
 // FetchPage は指定されたページ ID のバッファページをバッファプールから取得する
+//
 // ページがバッファプールに存在しない場合は、ディスクから読み込む
+//
 // 戻り値: 取得したバッファページ
 func (bp *BufferPool) FetchPage(pageId page.PageId) (*BufferPage, error) {
 	// ページテーブルにページがすでにある場合
@@ -63,7 +66,9 @@ func (bp *BufferPool) FetchPage(pageId page.PageId) (*BufferPage, error) {
 }
 
 // AddPage はバッファプールに新しいページを追加する
+//
 // バッファプールに空きがある場合は新しいページを追加し、空きがない場合は古いページを新しいページに置き換える
+//
 // 戻り値: 追加されたページのバッファページ
 func (bp *BufferPool) AddPage(pageId page.PageId) (*BufferPage, error) {
 	// バッファに空きがある場合、新しいバッファページを追加し、ページテーブルを更新
@@ -135,7 +140,9 @@ func (bp *BufferPool) UnRefPage(pageId page.PageId) {
 }
 
 // RegisterDisk は BufferPool に Disk を登録する
+//
 // fileId: 登録する Disk に対応する FileId
+//
 // dm: 登録する Disk
 func (bp *BufferPool) RegisterDisk(fileId page.FileId, dm *disk.Disk) {
 	bp.diskManagers[fileId] = dm
@@ -177,9 +184,13 @@ func allocateBufferPages(size int) []BufferPage {
 }
 
 // updatePageTable はページテーブルを更新する
+//
 // evictPageId で指定したページが現在のバッファに属している場合のみ削除
+//
 // evictPageId: 追い出されるページの PageId
+//
 // newPageId: 追加されるページの PageId
+//
 // bufferId: 追い出されるページと追加されるページが属するバッファの BufferId
 func (bp *BufferPool) updatePageTable(evictPageId page.PageId, newPageId page.PageId, bufferId buftype.BufferId) {
 	if oldBufferId, ok := bp.pageTable[evictPageId]; ok && oldBufferId == bufferId {

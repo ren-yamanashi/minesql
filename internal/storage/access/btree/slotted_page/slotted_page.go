@@ -12,8 +12,11 @@ func NewSlottedPage(data []byte) *SlottedPage {
 }
 
 // Insert は指定されたインデックスにサイズ分のデータを挿入する (領域の確保のみを行い、実際のデータの書き込みは行わない)
+//
 // index: 挿入するスロットのインデックス
+//
 // data: 挿入するデータ
+//
 // 空き容量が不足している場合は false を返す
 func (sp *SlottedPage) Insert(index int, data []byte) bool {
 	size := len(data)
@@ -52,6 +55,7 @@ func (sp *SlottedPage) Insert(index int, data []byte) bool {
 }
 
 // Resize は指定されたインデックスのデータ領域のサイズを変更する
+//
 // 空き容量が不足している場合は false を返す
 func (sp *SlottedPage) Resize(index int, newSize int) bool {
 	pointer := sp.pointerAt(index)
@@ -121,6 +125,7 @@ func (sp *SlottedPage) Remove(index int) {
 }
 
 // TransferAllTo は自分のすべてのスロットを dest の末尾に転送する。(自身のスロットはすべて削除される)
+//
 // 空き容量が不足している場合は false を返す
 func (sp *SlottedPage) TransferAllTo(dest *SlottedPage) bool {
 	srcNumSlots := sp.NumSlots()
@@ -177,6 +182,7 @@ func (sp *SlottedPage) NumSlots() int {
 }
 
 // FreeSpace は Slotted Page の空き領域のサイズを返す
+//
 // see: docs/architecture/access/b+tree/slotted-page.md#フリースペースのサイズの算出例
 func (sp *SlottedPage) FreeSpace() int {
 	freeSpaceOffset := int(binary.BigEndian.Uint16(sp.data[2:4])) // フリースペースの開始位置 (offset) はヘッダーの 2 バイト目から 2 バイト分に格納されている

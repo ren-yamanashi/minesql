@@ -3,12 +3,12 @@
 - 構造
 
   ```txt
-  |ノードタイプ |リーフノードヘッダー|Slotted Page  |
-  ↑__8 bytes__↑____16 bytes____↑__4072 bytes__↑
+  |ノードタイプヘッダー|リーフノードヘッダー|Slotted Page  |
+  ↑____8 bytes_____↑____16 bytes____↑__4072 bytes__↑
   ```
 
   - 合計 4096 byte (1 ページのサイズ)
-  - ノードタイプ: 8 byte (`"LEAF    "`)
+  - ノードタイプヘッダー: 8 byte (`"LEAF    "`)
   - リーフノードヘッダー: 16 byte (前 PageId + 次 PageId)
   - Slotted Page: 4072 byte
 
@@ -18,14 +18,16 @@
 ## リーフノードヘッダーの構成
 
 - サイズ: 16 byte
-  - 前のページへのポインタ (PageId): 8 byte (ノードタイプの次の 8 byte)
+  - 前のリーフノード (=前のページ) へのポインタ: 8 byte
     - 前のリーフノードの PageId を格納する
     - PageId は FileId (4 byte) + PageNumber (4 byte) で構成される
-  - 次のページへのポインタ (PageId): 8 byte (前のページへのポインタの次の 8 byte)
+  - 次のリーフノード (=次のページ) へのポインタ: 8 byte
     - 次のリーフノードの PageId を格納する
     - PageId は FileId (4 byte) + PageNumber (4 byte) で構成される
 
-前のページへのポインタを読み取る際には、ページデータの 8 byte 目から 8 byte を読み取る (次のページへのポインタは 16 byte 目から 8 byte を読み取る)  
+前のページへのポインタを読み取る際には、ページデータの 8 byte 目から 8 byte を読み取る  
+同様に、次のページへのポインタは 16 byte 目から 8 byte を読み取る
+
 書き込みの際も同様に、8 byte 目から 8 byte に前の PageId を、16 byte 目から 8 byte に次の PageId を書き込む
 
 ## リーフノードの分割

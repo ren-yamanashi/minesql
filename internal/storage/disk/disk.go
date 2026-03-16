@@ -48,6 +48,7 @@ func (disk *Disk) AllocatePage() page.PageId {
 }
 
 // ReadPageData は指定されたページ ID のページデータを data に読み込む (読み込んだデータは data に格納される)
+//
 // data の長さは PAGE_SIZE と等しい必要がある
 func (disk *Disk) ReadPageData(id page.PageId, data []byte) error {
 	if len(data) != page.PAGE_SIZE {
@@ -74,6 +75,7 @@ func (disk *Disk) ReadPageData(id page.PageId, data []byte) error {
 }
 
 // WritePageData は指定されたページ ID に対応するページに data の内容を書き込む
+//
 // data の長さは PAGE_SIZE と等しい必要がある
 func (disk *Disk) WritePageData(id page.PageId, data []byte) error {
 	if len(data) != page.PAGE_SIZE {
@@ -105,8 +107,11 @@ func (disk *Disk) WritePageData(id page.PageId, data []byte) error {
 }
 
 // Sync はファイルをディスクに同期する
+//
 // `file.Write(data)` は OS のキャッシュにデータを書き込むだけで、必ずしもディスクに書き込まれるとは限らないため、明示的に同期を行う必要がある
+//
 // 基本的にはプロセスの終了時に呼び出せば良い
+//
 // 参考: https://www.sobyte.net/post/2022-01/golang-defer-file-close/
 func (disk *Disk) Sync() error {
 	return disk.heapFile.Sync()

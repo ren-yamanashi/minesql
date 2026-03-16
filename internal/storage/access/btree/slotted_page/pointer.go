@@ -1,12 +1,16 @@
 package slottedpage
 
 // Slotted Page の各ポインタのサイズ
+//
 // offset: 2 byte (0, 1) -- データの開始位置
+//
 // size: 2 byte (2, 3) -- データのサイズ
 const pointerSize = 4
 
 // Slotted Page のポインタ情報
+//
 // offset: 2 byte (0, 1) -- データの開始位置
+//
 // size: 2 byte (2, 3) -- データのサイズ
 type pointer struct {
 	offset uint16 // ポインタが指すデータのオフセット

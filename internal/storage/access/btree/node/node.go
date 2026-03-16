@@ -18,30 +18,42 @@ type Node interface {
 	// key-value ペア数を取得する
 	NumPairs() int
 	// 指定されたスロット番号の key-value ペアを取得する
+	//
 	// slotNum: slotted page のスロット番号
 	PairAt(slotNum int) Pair
 	// キーから、対応するスロット番号 (slotted page のスロット番号) を検索する (二分探索)
+	//
 	// 見つかった場合: (スロット番号, true)
+	//
 	// 見つからなかった場合: (0, false)
 	SearchSlotNum(key []byte) (int, bool)
 	// key-value ペアを挿入する (pageId は value に相当)
+	//
 	// slotNum: 挿入先のスロット番号
+	//
 	// pair: 挿入する key-value ペア
+	//
 	// 戻り値: 挿入に成功したかどうか
 	Insert(slotNum int, pair Pair) bool
 }
 
 // ページデータからノードタイプを取得する
+//
 // 戻り値: NODE_TYPE_LEAF or NODE_TYPE_BRANCH
 func GetNodeType(data []byte) []byte {
 	return data[0:8]
 }
 
 // 二分探索を行う
+//
 // node: 探索対象のノード
+//
 // key: 探索するキー
+//
 // 戻り値:
+//
 // - 見つかった場合: (要素のインデックス, true)
+//
 // - 見つからなかった場合: (挿入すべき位置のインデックス, false)
 func binarySearch(node Node, key []byte) (int, bool) {
 	left := 0
