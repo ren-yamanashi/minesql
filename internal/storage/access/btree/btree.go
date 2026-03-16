@@ -228,7 +228,6 @@ func (bt *BTree) insertRecursively(bp *bufferpool.BufferPool, nodeBuffer *buffer
 
 		// 新しいリーフノードに分割挿入する
 		newLeafNode := node.NewLeafNode(newLeafBuffer.GetWriteData())
-		newLeafNode.Initialize()
 		_, err = leafNode.SplitInsert(newLeafNode, pair)
 		if err != nil {
 			return nil, nil, err

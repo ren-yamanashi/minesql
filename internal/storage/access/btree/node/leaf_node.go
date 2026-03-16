@@ -67,6 +67,10 @@ func (ln *LeafNode) Insert(slotNum int, pair Pair) bool {
 
 // リーフノードを分割しながらペアを挿入する
 //
+// newLeafNode: 分割後の新しいリーフノード
+//
+// newPair: 挿入する key-value ペア
+//
 // 戻り値: 新しいリーフノードの最小キー
 func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newPair Pair) ([]byte, error) {
 	newLeafNode.Initialize()
@@ -80,7 +84,8 @@ func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newPair Pair) ([]byte, er
 			break
 		}
 
-		// スロット番号 0 のペアの方が新しいペアのキーよりも小さい場合、ペアを新しいリーフノードに移動する
+		// "古いノードの先頭 (スロット番号=0) のペアのキー < 新しいペアのキー" の場合
+		// ペアを新しいリーフノードに移動する
 		if ln.PairAt(0).CompareKey(newPair.Key) < 0 {
 			err := ln.transfer(newLeafNode)
 			if err != nil {
