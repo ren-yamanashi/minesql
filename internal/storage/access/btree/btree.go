@@ -408,9 +408,9 @@ func (bt *BTree) deleteFromBranch(bp *bufferpool.BufferPool, nodeBuffer *bufferp
 	defer bp.UnRefPage(sibling.pageId)
 
 	if bytes.Equal(node.GetNodeType(childNodeBuffer.GetReadData()), node.NODE_TYPE_LEAF) {
-		return bt.resolveLeafUnderflow(branchNode, childNodeBuffer, sibling, childIndex), nil
+		return bt.resolveLeafUnderflow(branchNode, childNodeBuffer, sibling, childIndex)
 	}
-	return bt.resolveBranchUnderflow(branchNode, childNodeBuffer, sibling, childIndex), nil
+	return bt.resolveBranchUnderflow(branchNode, childNodeBuffer, sibling, childIndex)
 }
 
 // リーフノードのアンダーフロー処理
@@ -418,12 +418,12 @@ func (bt *BTree) deleteFromBranch(bp *bufferpool.BufferPool, nodeBuffer *bufferp
 // childBuffer: アンダーフローが発生した子ノードのバッファページ (リーフノードのバッファページ)
 // sibling: childBuffer と兄弟ノードの情報
 // childIndex: childBuffer が親のブランチノードの子ノードの中で何番目か
-func (bt *BTree) resolveLeafUnderflow(parentBranchNode *node.BranchNode, childBuffer *bufferpool.BufferPage, sibling siblingInfo, childIndex int) deleteResult {
+func (bt *BTree) resolveLeafUnderflow(parentBranchNode *node.BranchNode, childBuffer *bufferpool.BufferPage, sibling siblingInfo, childIndex int) (deleteResult, error) {
 	childNode := node.NewLeafNode(childBuffer.GetWriteData())
 	siblingNode := node.NewLeafNode(sibling.bufferPage.GetWriteData())
 
 	// 兄弟からペアを転送できる場合
-	// 左の兄弟 → 末尾ペアを転送、右の兄弟 → 先頭ペアを転送
+	// sibling.isLeft: 兄弟が左にいる → 右 (アンダーフロー側) に転送するので toRight=true
 	if siblingNode.CanTransferPair(sibling.isLeft) {
 		if sibling.isLeft {
 			// 左の兄弟の末尾ペアを子の先頭に移動
@@ -431,15 +431,19 @@ func (bt *BTree) resolveLeafUnderflow(parentBranchNode *node.BranchNode, childBu
 			pair := siblingNode.PairAt(lastIndex)
 			childNode.Insert(0, pair)
 			siblingNode.Delete(lastIndex)
-			parentBranchNode.UpdateKeyAt(childIndex-1, childNode.PairAt(0).Key)
+			if !parentBranchNode.Update(childIndex-1, childNode.PairAt(0).Key) {
+				return deleteResult{}, errors.New("failed to update parent branch node key")
+			}
 		} else {
 			// 右の兄弟の先頭ペアを子の末尾に移動
 			pair := siblingNode.PairAt(0)
 			childNode.Insert(childNode.NumPairs(), pair)
 			siblingNode.Delete(0)
-			parentBranchNode.UpdateKeyAt(childIndex, siblingNode.PairAt(0).Key)
+			if !parentBranchNode.Update(childIndex, siblingNode.PairAt(0).Key) {
+				return deleteResult{}, errors.New("failed to update parent branch node key")
+			}
 		}
-		return deleteResult{underflow: false}
+		return deleteResult{underflow: false}, nil
 	}
 
 	// 転送できない場合はマージする (左のノードに右のノードをマージ = 左のノードが残る)
@@ -462,12 +466,14 @@ func (bt *BTree) resolveLeafUnderflow(parentBranchNode *node.BranchNode, childBu
 		} else {
 			// 兄弟が RightChild でない場合、キーを更新してから削除
 			nextKey := parentBranchNode.PairAt(childIndex + 1).Key
-			parentBranchNode.UpdateKeyAt(childIndex, nextKey)
+			if !parentBranchNode.Update(childIndex, nextKey) {
+				return deleteResult{}, errors.New("failed to update parent branch node key")
+			}
 			parentBranchNode.Delete(childIndex + 1) // 右の兄弟を削除するので `childIndex + 1`
 		}
 	}
 
-	return deleteResult{underflow: !parentBranchNode.IsHalfFull()}
+	return deleteResult{underflow: !parentBranchNode.IsHalfFull()}, nil
 }
 
 // ブランチノードのアンダーフロー処理
@@ -475,12 +481,12 @@ func (bt *BTree) resolveLeafUnderflow(parentBranchNode *node.BranchNode, childBu
 // childBuffer: アンダーフローが発生した子ノードのバッファページ (ブランチノードのバッファページ)
 // sibling: childBuffer の兄弟ノードの情報
 // childIndex: childBuffer が親のブランチノードの子ノードの中で何番目か
-func (bt *BTree) resolveBranchUnderflow(parentBranchNode *node.BranchNode, childBuffer *bufferpool.BufferPage, sibling siblingInfo, childIndex int) deleteResult {
+func (bt *BTree) resolveBranchUnderflow(parentBranchNode *node.BranchNode, childBuffer *bufferpool.BufferPage, sibling siblingInfo, childIndex int) (deleteResult, error) {
 	childNode := node.NewBranchNode(childBuffer.GetWriteData())
 	siblingNode := node.NewBranchNode(sibling.bufferPage.GetWriteData())
 
 	// 兄弟からペアを転送できる場合
-	// 左の兄弟 → 末尾ペアを転送、右の兄弟 → 先頭ペアを転送
+	// sibling.isLeft: 兄弟が左にいる → 右 (アンダーフロー側) に転送するので toRight=true
 	if siblingNode.CanTransferPair(sibling.isLeft) {
 		if sibling.isLeft {
 			// 左の兄弟から転送: 親の境界キーを子の先頭に下ろし、兄弟の末尾キーを親に上げる
@@ -490,7 +496,9 @@ func (bt *BTree) resolveBranchUnderflow(parentBranchNode *node.BranchNode, child
 
 			lastIndex := siblingNode.NumPairs() - 1
 			siblingLastPair := siblingNode.PairAt(lastIndex)
-			parentBranchNode.UpdateKeyAt(childIndex-1, siblingLastPair.Key)
+			if !parentBranchNode.Update(childIndex-1, siblingLastPair.Key) {
+				return deleteResult{}, errors.New("failed to update parent branch node key")
+			}
 			siblingNode.SetRightChildPageId(page.RestorePageIdFromBytes(siblingLastPair.Value))
 			siblingNode.Delete(lastIndex)
 		} else {
@@ -501,10 +509,12 @@ func (bt *BTree) resolveBranchUnderflow(parentBranchNode *node.BranchNode, child
 
 			siblingFirstPair := siblingNode.PairAt(0)
 			childNode.SetRightChildPageId(page.RestorePageIdFromBytes(siblingFirstPair.Value))
-			parentBranchNode.UpdateKeyAt(childIndex, siblingFirstPair.Key)
+			if !parentBranchNode.Update(childIndex, siblingFirstPair.Key) {
+				return deleteResult{}, errors.New("failed to update parent branch node key")
+			}
 			siblingNode.Delete(0)
 		}
-		return deleteResult{underflow: false}
+		return deleteResult{underflow: false}, nil
 	}
 
 	// 借りられない場合はマージする (左のノードに右のノードをマージ = 左のノードが残る)
@@ -535,12 +545,14 @@ func (bt *BTree) resolveBranchUnderflow(parentBranchNode *node.BranchNode, child
 		} else {
 			// 兄弟が RightChild でない場合、キーを更新してから削除
 			nextKey := parentBranchNode.PairAt(childIndex + 1).Key
-			parentBranchNode.UpdateKeyAt(childIndex, nextKey)
+			if !parentBranchNode.Update(childIndex, nextKey) {
+				return deleteResult{}, errors.New("failed to update parent branch node key")
+			}
 			parentBranchNode.Delete(childIndex + 1)
 		}
 	}
 
-	return deleteResult{underflow: !parentBranchNode.IsHalfFull()}
+	return deleteResult{underflow: !parentBranchNode.IsHalfFull()}, nil
 }
 
 // B+Tree の特定のノードの値 (value) を更新する

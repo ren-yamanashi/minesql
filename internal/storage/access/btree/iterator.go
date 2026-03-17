@@ -7,8 +7,7 @@ import (
 
 type Iterator struct {
 	bufferPage bufferpool.BufferPage
-	// 現在参照されているスロット番号 (slotted page のスロット番号)
-	slotNum int
+	slotNum    int // 現在参照されているスロット番号 (slotted page のスロット番号)
 }
 
 func newIterator(bufferPage bufferpool.BufferPage, slotNum int) *Iterator {

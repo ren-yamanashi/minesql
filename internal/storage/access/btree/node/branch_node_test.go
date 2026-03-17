@@ -631,7 +631,7 @@ func TestBranchNodeCanTransferPair(t *testing.T) {
 	})
 }
 
-func TestBranchNodeUpdateKeyAt(t *testing.T) {
+func TestBranchNodeUpdate(t *testing.T) {
 	t.Run("指定したスロットのキーが更新される", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
@@ -644,9 +644,10 @@ func TestBranchNodeUpdateKeyAt(t *testing.T) {
 		)
 
 		// WHEN: key "bbb" を同じ長さの "ccc" に更新
-		bn.Update(1, []byte("ccc"))
+		ok := bn.Update(1, []byte("ccc"))
 
 		// THEN
+		assert.True(t, ok)
 		assert.Equal(t, 3, bn.NumPairs())
 		assert.Equal(t, []byte("ccc"), bn.PairAt(1).Key)
 	})
@@ -662,9 +663,10 @@ func TestBranchNodeUpdateKeyAt(t *testing.T) {
 		)
 
 		// WHEN
-		bn.Update(0, []byte("aab"))
+		ok := bn.Update(0, []byte("aab"))
 
 		// THEN
+		assert.True(t, ok)
 		assert.Equal(t, 2, bn.NumPairs())
 		assert.Equal(t, []byte("aab"), bn.PairAt(0).Key)
 		assert.Equal(t, []byte("bbb"), bn.PairAt(1).Key)
@@ -682,9 +684,10 @@ func TestBranchNodeUpdateKeyAt(t *testing.T) {
 		)
 
 		// WHEN: 3 バイトのキーを 6 バイトのキーに更新
-		bn.Update(1, []byte("bbbbbb"))
+		ok := bn.Update(1, []byte("bbbbbb"))
 
 		// THEN
+		assert.True(t, ok)
 		assert.Equal(t, 3, bn.NumPairs())
 		assert.Equal(t, []byte("aaa"), bn.PairAt(0).Key)
 		assert.Equal(t, []byte("bbbbbb"), bn.PairAt(1).Key)
