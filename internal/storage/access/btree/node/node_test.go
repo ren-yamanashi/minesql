@@ -11,13 +11,16 @@ type mockNode struct {
 	pairs []Pair
 }
 
-func (m *mockNode) Body() []byte            { return nil }
-func (m *mockNode) NumPairs() int           { return len(m.pairs) }
-func (m *mockNode) PairAt(slotNum int) Pair { return m.pairs[slotNum] }
+func (m *mockNode) Insert(_ int, _ Pair) bool   { return false }
+func (m *mockNode) Delete(_ int)                {}
+func (m *mockNode) CanTransferPair(_ bool) bool { return false }
+func (m *mockNode) Body() []byte                { return nil }
+func (m *mockNode) NumPairs() int               { return len(m.pairs) }
+func (m *mockNode) PairAt(slotNum int) Pair     { return m.pairs[slotNum] }
 func (m *mockNode) SearchSlotNum(key []byte) (int, bool) {
 	return binarySearch(m, key)
 }
-func (m *mockNode) Insert(_ int, _ Pair) bool { return false }
+func (m *mockNode) IsHalfFull() bool { return false }
 
 func newMockNode(keys ...[]byte) *mockNode {
 	pairs := make([]Pair, len(keys))

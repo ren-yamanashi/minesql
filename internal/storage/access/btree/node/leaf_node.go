@@ -48,13 +48,6 @@ func (ln *LeafNode) Initialize() {
 	ln.body.Initialize()
 }
 
-// Insert は key-value ペアを挿入する
-//
-// slotNum: 挿入先のスロット番号 (slotted page のスロット番号)
-//
-// pair: 挿入する key-value ペア
-//
-// 戻り値: 挿入に成功したかどうか
 func (ln *LeafNode) Insert(slotNum int, pair Pair) bool {
 	pairBytes := pair.ToBytes()
 
@@ -107,9 +100,6 @@ func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newPair Pair) ([]byte, er
 	return newLeafNode.PairAt(0).Key, nil
 }
 
-// Delete は key-value ペアを削除する
-//
-// slotNum: 削除するペアのスロット番号 (slotted page のスロット番号)
 func (ln *LeafNode) Delete(slotNum int) {
 	ln.body.Remove(slotNum)
 }
@@ -126,11 +116,6 @@ func (ln *LeafNode) Update(slotNum int, pair Pair) bool {
 	return ln.body.Update(slotNum, pair.ToBytes())
 }
 
-// CanTransferPair は兄弟ノードにペアを転送できるかどうかを判定する
-//
-// 転送後も半分以上埋まっている場合は true を返す
-//
-// toRight: true の場合は右の兄弟に転送 (末尾ペアを転送)、false の場合は左の兄弟に転送 (先頭ペアを転送)
 func (ln *LeafNode) CanTransferPair(toRight bool) bool {
 	if ln.NumPairs() <= 1 {
 		return false
@@ -151,29 +136,19 @@ func (ln *LeafNode) CanTransferPair(toRight bool) bool {
 	return 2*freeSpaceAfterTransfer < ln.body.Capacity()
 }
 
-// Body はノードタイプヘッダーを除いたボディ部分を取得する (リーフノードヘッダー + Slotted Page のボディ)
 func (ln *LeafNode) Body() []byte {
 	return ln.data[nodeHeaderSize:]
 }
 
-// NumPairs は key-value ペア数を取得する
 func (ln *LeafNode) NumPairs() int {
 	return ln.body.NumSlots()
 }
 
-// PairAt は指定されたスロット番号の key-value ペアを取得する
-//
-// slotNum: slotted page のスロット番号
 func (ln *LeafNode) PairAt(slotNum int) Pair {
 	data := ln.body.Data(slotNum)
 	return pairFromBytes(data)
 }
 
-// SearchSlotNum はキーから、対応するスロット番号 (slotted page のスロット番号) を検索する (二分探索)
-//
-// 見つかった場合: (スロット番号, true)
-//
-// 見つからなかった場合: (0, false)
 func (ln *LeafNode) SearchSlotNum(key []byte) (int, bool) {
 	return binarySearch(ln, key)
 }
@@ -231,7 +206,6 @@ func (ln *LeafNode) TransferAllFrom(src *LeafNode) {
 	src.body.TransferAllTo(ln.body)
 }
 
-// IsHalfFull はリーフノードが半分以上埋まっているかどうかを判定する
 func (ln *LeafNode) IsHalfFull() bool {
 	return 2*ln.body.FreeSpace() < ln.body.Capacity()
 }
