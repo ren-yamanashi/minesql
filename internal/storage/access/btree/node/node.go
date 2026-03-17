@@ -13,39 +13,13 @@ type NodeHeader struct {
 
 // Node は B+Tree のノードを表す interface
 type Node interface {
-	// Insert は key-value ペアを挿入する
-	//
-	// slotNum: 挿入先のスロット番号 (slotted page のスロット番号)
-	//
-	// pair: 挿入する key-value ペア
-	//
-	// 戻り値: 挿入に成功したかどうか
 	Insert(slotNum int, pair Pair) bool
-	// Delete は key-value ペアを削除する
-	//
-	// slotNum: 削除するペアのスロット番号 (slotted page のスロット番号)
 	Delete(slotNum int)
-	// CanTransferPair は兄弟ノードにペアを転送できるかどうかを判定する
-	//
-	// 転送後も半分以上埋まっている場合は true を返す
-	//
-	// toRight: true の場合は右の兄弟に転送 (末尾ペアを転送)、false の場合は左の兄弟に転送 (先頭ペアを転送)
 	CanTransferPair(toRight bool) bool
-	// Body はノードタイプヘッダーを除いたボディ部分を取得する (リーフ|ブランチノードヘッダー + Slotted Page のボディ)
 	Body() []byte
-	// NumPairs は key-value ペア数を取得する
 	NumPairs() int
-	// PairAt は指定されたスロット番号の key-value ペアを取得する
-	//
-	// slotNum: slotted page のスロット番号
 	PairAt(slotNum int) Pair
-	// SearchSlotNum はキーから、対応するスロット番号 (slotted page のスロット番号) を検索する (二分探索)
-	//
-	// 見つかった場合: (スロット番号, true)
-	//
-	// 見つからなかった場合: (0, false)
 	SearchSlotNum(key []byte) (int, bool)
-	// IsHalfFull はブランチノードが半分以上埋まっているかどうかを判定する
 	IsHalfFull() bool
 }
 

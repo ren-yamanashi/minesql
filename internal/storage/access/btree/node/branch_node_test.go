@@ -579,7 +579,7 @@ func TestBranchNodeCanTransferPair(t *testing.T) {
 		assert.False(t, result)
 	})
 
-	t.Run("先頭ペアを転送後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
+	t.Run("左の兄弟に転送 (先頭ペアを転送) 後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNodeEmpty()
 		bn.body.Initialize()
@@ -596,7 +596,7 @@ func TestBranchNodeCanTransferPair(t *testing.T) {
 		assert.True(t, result)
 	})
 
-	t.Run("末尾ペアを転送後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
+	t.Run("右の兄弟に転送 (末尾ペアを転送) 後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNodeEmpty()
 		bn.body.Initialize()
@@ -644,7 +644,7 @@ func TestBranchNodeUpdateKeyAt(t *testing.T) {
 		)
 
 		// WHEN: key "bbb" を同じ長さの "ccc" に更新
-		bn.UpdateKeyAt(1, []byte("ccc"))
+		bn.Update(1, []byte("ccc"))
 
 		// THEN
 		assert.Equal(t, 3, bn.NumPairs())
@@ -662,7 +662,7 @@ func TestBranchNodeUpdateKeyAt(t *testing.T) {
 		)
 
 		// WHEN
-		bn.UpdateKeyAt(0, []byte("aab"))
+		bn.Update(0, []byte("aab"))
 
 		// THEN
 		assert.Equal(t, 2, bn.NumPairs())
@@ -682,7 +682,7 @@ func TestBranchNodeUpdateKeyAt(t *testing.T) {
 		)
 
 		// WHEN: 3 バイトのキーを 6 バイトのキーに更新
-		bn.UpdateKeyAt(1, []byte("bbbbbb"))
+		bn.Update(1, []byte("bbbbbb"))
 
 		// THEN
 		assert.Equal(t, 3, bn.NumPairs())

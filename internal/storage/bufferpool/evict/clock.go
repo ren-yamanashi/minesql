@@ -18,10 +18,12 @@ func NewClockSweep(size int) *ClockSweep {
 	}
 }
 
+// Access はページがアクセスされたことを記録する
 func (c *ClockSweep) Access(bufferId buftype.BufferId) {
 	c.referenced[bufferId] = true
 }
 
+// Evict は追い出すページの BufferId を返す
 func (c *ClockSweep) Evict() buftype.BufferId {
 	for {
 		if c.referenced[c.pointer] {
@@ -37,6 +39,7 @@ func (c *ClockSweep) Evict() buftype.BufferId {
 	}
 }
 
+// Remove はページの参照を解除し、優先的に追い出されるようにする
 func (c *ClockSweep) Remove(bufferId buftype.BufferId) {
 	c.referenced[bufferId] = false
 }

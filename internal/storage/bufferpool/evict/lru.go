@@ -59,6 +59,7 @@ func NewLRU(size int) *LRU {
 	return policy
 }
 
+// Access はページがアクセスされたことを記録する
 func (l *LRU) Access(bufferId buftype.BufferId) {
 	node := l.nodeMap[bufferId]
 	if node.isUnused {
@@ -76,6 +77,7 @@ func (l *LRU) Access(bufferId buftype.BufferId) {
 	l.moveToNewHead(node)
 }
 
+// Evict は追い出すページの BufferId を返す
 func (l *LRU) Evict() buftype.BufferId {
 	// 末尾 (OldSublist の末尾) を追い出し対象とする
 	victim := l.tail
@@ -83,6 +85,7 @@ func (l *LRU) Evict() buftype.BufferId {
 	return victim.bufferId
 }
 
+// Remove はページの参照を解除し、優先的に追い出されるようにする
 func (l *LRU) Remove(bufferId buftype.BufferId) {
 	// OldSublist の末尾 (リスト末尾) に移動して、次の追い出しで優先的に選ばれるようにする
 	node := l.nodeMap[bufferId]
