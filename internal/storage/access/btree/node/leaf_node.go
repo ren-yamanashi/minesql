@@ -130,17 +130,24 @@ func (ln *LeafNode) Update(slotNum int, pair Pair) bool {
 //
 // 転送後も半分以上埋まっている場合は true を返す
 //
-// fromLast: true の場合は末尾ペア、false の場合は先頭ペアを転送対象とする
-func (ln *LeafNode) CanTransferPair(fromLast bool) bool {
+// toRight: true の場合は右の兄弟に転送 (末尾ペアを転送)、false の場合は左の兄弟に転送 (先頭ペアを転送)
+func (ln *LeafNode) CanTransferPair(toRight bool) bool {
 	if ln.NumPairs() <= 1 {
 		return false
 	}
+
+	// 右の兄弟に転送する場合は末尾ペア、左の兄弟に転送する場合は先頭ペアを転送対象とする
 	targetIndex := 0
-	if fromLast {
+	if toRight {
 		targetIndex = ln.NumPairs() - 1
 	}
-	targetPairSize := len(ln.body.Data(targetIndex))
+	targetPairData := ln.body.Data(targetIndex)
+	targetPairSize := len(targetPairData)
+
+	// 転送後の空き容量を計算
 	freeSpaceAfterTransfer := ln.body.FreeSpace() + targetPairSize + 4 // 4 はポインタサイズ
+
+	// 転送後の空き容量が、ノード全体の容量の半分未満であれば (転送後も半分以上埋まっていると判断できるので) 転送可能と判断する
 	return 2*freeSpaceAfterTransfer < ln.body.Capacity()
 }
 

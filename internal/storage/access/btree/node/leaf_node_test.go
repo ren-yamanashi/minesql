@@ -372,7 +372,7 @@ func TestLeafNodeCanTransferPair(t *testing.T) {
 		assert.False(t, result)
 	})
 
-	t.Run("先頭ペアを転送後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
+	t.Run("左の兄弟に転送 (先頭ペアを転送) 後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
 		// GIVEN
 		ln := createTestLeafNode(nil)
 		bigValue := make([]byte, 500)
@@ -390,7 +390,7 @@ func TestLeafNodeCanTransferPair(t *testing.T) {
 		assert.True(t, result)
 	})
 
-	t.Run("末尾ペアを転送後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
+	t.Run("右の兄弟に転送 (末尾ペアを転送) 後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
 		// GIVEN
 		ln := createTestLeafNode(nil)
 		bigValue := make([]byte, 500)
