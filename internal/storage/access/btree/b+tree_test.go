@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateBTree(t *testing.T) {
+func TestCreateBPlusTree(t *testing.T) {
 	t.Run("B+Tree が作成され、空の状態で検索できる", func(t *testing.T) {
 		// GIVEN & WHEN
 		bt, bp := setupBTree(t)
@@ -20,115 +20,6 @@ func TestCreateBTree(t *testing.T) {
 		// THEN
 		pairs := bt.collectAllPairs(bp)
 		assert.Equal(t, 0, len(pairs))
-	})
-}
-
-func TestInsert(t *testing.T) {
-	t.Run("1 つのペアを挿入して検索できる", func(t *testing.T) {
-		// GIVEN
-		bt, bp := setupBTree(t)
-
-		// WHEN
-		err := bt.Insert(bp, node.NewPair([]byte("key1"), []byte("val1")))
-
-		// THEN
-		assert.NoError(t, err)
-		pairs := bt.collectAllPairs(bp)
-		assert.Equal(t, 1, len(pairs))
-		assert.Equal(t, "key1", string(pairs[0].Key))
-		assert.Equal(t, "val1", string(pairs[0].Value))
-	})
-
-	t.Run("重複キーを挿入するとエラーが返る", func(t *testing.T) {
-		// GIVEN
-		bt, bp := setupBTree(t)
-		bt.mustInsert(bp, "key1", "val1")
-
-		// WHEN
-		err := bt.Insert(bp, node.NewPair([]byte("key1"), []byte("val2")))
-
-		// THEN
-		assert.ErrorIs(t, err, ErrDuplicateKey)
-	})
-
-	t.Run("挿入順に関わらずキーが昇順でソートされる", func(t *testing.T) {
-		// GIVEN
-		bt, bp := setupBTree(t)
-
-		// WHEN: 降順に挿入
-		bt.mustInsert(bp, "ccc", "v3")
-		bt.mustInsert(bp, "aaa", "v1")
-		bt.mustInsert(bp, "bbb", "v2")
-
-		// THEN: 昇順で取得できる
-		pairs := bt.collectAllPairs(bp)
-		assert.Equal(t, 3, len(pairs))
-		assert.Equal(t, "aaa", string(pairs[0].Key))
-		assert.Equal(t, "bbb", string(pairs[1].Key))
-		assert.Equal(t, "ccc", string(pairs[2].Key))
-	})
-
-	t.Run("降順に多数のペアを挿入してもすべて取得できる", func(t *testing.T) {
-		// GIVEN
-		bt, bp := setupBTree(t)
-
-		// WHEN: 降順に挿入
-		numPairs := 100
-		for i := numPairs - 1; i >= 0; i-- {
-			key := fmt.Sprintf("key%03d", i)
-			val := fmt.Sprintf("val%03d", i)
-			bt.mustInsert(bp, key, val)
-		}
-
-		// THEN: 全ペアが昇順で取得できる
-		pairs := bt.collectAllPairs(bp)
-		assert.Equal(t, numPairs, len(pairs))
-		for i, pair := range pairs {
-			expectedKey := fmt.Sprintf("key%03d", i)
-			expectedVal := fmt.Sprintf("val%03d", i)
-			assert.Equal(t, expectedKey, string(pair.Key))
-			assert.Equal(t, expectedVal, string(pair.Value))
-		}
-	})
-
-	t.Run("分割後に重複キーを挿入するとエラーが返る", func(t *testing.T) {
-		// GIVEN: 多数のペアを挿入してノード分割を発生させる
-		bt, bp := setupBTree(t)
-		numPairs := 100
-		for i := range numPairs {
-			key := fmt.Sprintf("key%03d", i)
-			val := fmt.Sprintf("val%03d", i)
-			bt.mustInsert(bp, key, val)
-		}
-
-		// WHEN: 既存のキーで挿入を試みる
-		err := bt.Insert(bp, node.NewPair([]byte("key050"), []byte("dup")))
-
-		// THEN
-		assert.ErrorIs(t, err, ErrDuplicateKey)
-	})
-
-	t.Run("多数のペアを挿入してルート分割が発生しても全ペアが取得できる", func(t *testing.T) {
-		// GIVEN
-		bt, bp := setupBTree(t)
-
-		// WHEN: 多数のペアを挿入してノード分割を発生させる
-		numPairs := 100
-		for i := range numPairs {
-			key := fmt.Sprintf("key%03d", i)
-			val := fmt.Sprintf("val%03d", i)
-			bt.mustInsert(bp, key, val)
-		}
-
-		// THEN: 全ペアが昇順で取得できる
-		pairs := bt.collectAllPairs(bp)
-		assert.Equal(t, numPairs, len(pairs))
-		for i, pair := range pairs {
-			expectedKey := fmt.Sprintf("key%03d", i)
-			expectedVal := fmt.Sprintf("val%03d", i)
-			assert.Equal(t, expectedKey, string(pair.Key))
-			assert.Equal(t, expectedVal, string(pair.Value))
-		}
 	})
 }
 
@@ -289,6 +180,115 @@ func TestSearch(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "key051", string(pair.Key))
+	})
+}
+
+func TestInsert(t *testing.T) {
+	t.Run("1 つのペアを挿入して検索できる", func(t *testing.T) {
+		// GIVEN
+		bt, bp := setupBTree(t)
+
+		// WHEN
+		err := bt.Insert(bp, node.NewPair([]byte("key1"), []byte("val1")))
+
+		// THEN
+		assert.NoError(t, err)
+		pairs := bt.collectAllPairs(bp)
+		assert.Equal(t, 1, len(pairs))
+		assert.Equal(t, "key1", string(pairs[0].Key))
+		assert.Equal(t, "val1", string(pairs[0].Value))
+	})
+
+	t.Run("重複キーを挿入するとエラーが返る", func(t *testing.T) {
+		// GIVEN
+		bt, bp := setupBTree(t)
+		bt.mustInsert(bp, "key1", "val1")
+
+		// WHEN
+		err := bt.Insert(bp, node.NewPair([]byte("key1"), []byte("val2")))
+
+		// THEN
+		assert.ErrorIs(t, err, ErrDuplicateKey)
+	})
+
+	t.Run("挿入順に関わらずキーが昇順でソートされる", func(t *testing.T) {
+		// GIVEN
+		bt, bp := setupBTree(t)
+
+		// WHEN: 降順に挿入
+		bt.mustInsert(bp, "ccc", "v3")
+		bt.mustInsert(bp, "aaa", "v1")
+		bt.mustInsert(bp, "bbb", "v2")
+
+		// THEN: 昇順で取得できる
+		pairs := bt.collectAllPairs(bp)
+		assert.Equal(t, 3, len(pairs))
+		assert.Equal(t, "aaa", string(pairs[0].Key))
+		assert.Equal(t, "bbb", string(pairs[1].Key))
+		assert.Equal(t, "ccc", string(pairs[2].Key))
+	})
+
+	t.Run("降順に多数のペアを挿入してもすべて取得できる", func(t *testing.T) {
+		// GIVEN
+		bt, bp := setupBTree(t)
+
+		// WHEN: 降順に挿入
+		numPairs := 100
+		for i := numPairs - 1; i >= 0; i-- {
+			key := fmt.Sprintf("key%03d", i)
+			val := fmt.Sprintf("val%03d", i)
+			bt.mustInsert(bp, key, val)
+		}
+
+		// THEN: 全ペアが昇順で取得できる
+		pairs := bt.collectAllPairs(bp)
+		assert.Equal(t, numPairs, len(pairs))
+		for i, pair := range pairs {
+			expectedKey := fmt.Sprintf("key%03d", i)
+			expectedVal := fmt.Sprintf("val%03d", i)
+			assert.Equal(t, expectedKey, string(pair.Key))
+			assert.Equal(t, expectedVal, string(pair.Value))
+		}
+	})
+
+	t.Run("分割後に重複キーを挿入するとエラーが返る", func(t *testing.T) {
+		// GIVEN: 多数のペアを挿入してノード分割を発生させる
+		bt, bp := setupBTree(t)
+		numPairs := 100
+		for i := range numPairs {
+			key := fmt.Sprintf("key%03d", i)
+			val := fmt.Sprintf("val%03d", i)
+			bt.mustInsert(bp, key, val)
+		}
+
+		// WHEN: 既存のキーで挿入を試みる
+		err := bt.Insert(bp, node.NewPair([]byte("key050"), []byte("dup")))
+
+		// THEN
+		assert.ErrorIs(t, err, ErrDuplicateKey)
+	})
+
+	t.Run("多数のペアを挿入してルート分割が発生しても全ペアが取得できる", func(t *testing.T) {
+		// GIVEN
+		bt, bp := setupBTree(t)
+
+		// WHEN: 多数のペアを挿入してノード分割を発生させる
+		numPairs := 100
+		for i := range numPairs {
+			key := fmt.Sprintf("key%03d", i)
+			val := fmt.Sprintf("val%03d", i)
+			bt.mustInsert(bp, key, val)
+		}
+
+		// THEN: 全ペアが昇順で取得できる
+		pairs := bt.collectAllPairs(bp)
+		assert.Equal(t, numPairs, len(pairs))
+		for i, pair := range pairs {
+			expectedKey := fmt.Sprintf("key%03d", i)
+			expectedVal := fmt.Sprintf("val%03d", i)
+			assert.Equal(t, expectedKey, string(pair.Key))
+			assert.Equal(t, expectedVal, string(pair.Value))
+		}
 	})
 }
 
