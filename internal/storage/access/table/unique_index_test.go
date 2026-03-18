@@ -34,7 +34,7 @@ func TestUniqueIndex(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: 挿入したデータが B+Tree に存在する
-		tree := btree.NewBTree(uniqueIndex.MetaPageId)
+		tree := btree.NewBPlusTree(uniqueIndex.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -97,7 +97,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 
 		// THEN: "Alice" が削除され、残りが昇順で取得できる
 		assert.NoError(t, err)
-		tree := btree.NewBTree(uniqueIndex.MetaPageId)
+		tree := btree.NewBPlusTree(uniqueIndex.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -156,7 +156,7 @@ func TestUniqueIndexUpdate(t *testing.T) {
 
 		// THEN: "John" が削除され "Zack" が追加されている
 		assert.NoError(t, err)
-		tree := btree.NewBTree(uniqueIndex.MetaPageId)
+		tree := btree.NewBPlusTree(uniqueIndex.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -196,7 +196,7 @@ func TestUniqueIndexUpdate(t *testing.T) {
 
 		// THEN: キーは同じで value (プライマリキー) が更新されている
 		assert.NoError(t, err)
-		tree := btree.NewBTree(uniqueIndex.MetaPageId)
+		tree := btree.NewBPlusTree(uniqueIndex.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -284,7 +284,7 @@ func TestUniqueIndexUpdate(t *testing.T) {
 
 		// THEN: データが変わらない
 		assert.NoError(t, err)
-		tree := btree.NewBTree(uniqueIndex.MetaPageId)
+		tree := btree.NewBPlusTree(uniqueIndex.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 

@@ -40,7 +40,7 @@ func TestCreateAndInsert(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: 挿入したデータが B+Tree に存在する
-		tree := btree.NewBTree(table.MetaPageId)
+		tree := btree.NewBPlusTree(table.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -80,7 +80,7 @@ func TestCreateAndInsert(t *testing.T) {
 		assert.Equal(t, len(expectedRecords), i)
 
 		// THEN: ユニークインデックスにもデータが挿入されている
-		uniqueIndexTree := btree.NewBTree(table.UniqueIndexes[0].MetaPageId)
+		uniqueIndexTree := btree.NewBPlusTree(table.UniqueIndexes[0].MetaPageId)
 		uniqueIndexIter, err := uniqueIndexTree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -195,7 +195,7 @@ func TestDelete(t *testing.T) {
 
 		// THEN: B+Tree から削除されている
 		assert.NoError(t, err)
-		tree := btree.NewBTree(table.MetaPageId)
+		tree := btree.NewBPlusTree(table.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -213,7 +213,7 @@ func TestDelete(t *testing.T) {
 		assert.Equal(t, []string{"b", "c"}, keys)
 
 		// THEN: ユニークインデックスからも削除されている
-		indexTree := btree.NewBTree(table.UniqueIndexes[0].MetaPageId)
+		indexTree := btree.NewBPlusTree(table.UniqueIndexes[0].MetaPageId)
 		indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -270,7 +270,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		tree := btree.NewBTree(table.MetaPageId)
+		tree := btree.NewBPlusTree(table.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 		_, ok := iter.Get()
@@ -298,7 +298,7 @@ func TestUpdate(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		tree := btree.NewBTree(table.MetaPageId)
+		tree := btree.NewBPlusTree(table.MetaPageId)
 		pairs := collectAllTablePairs(t, bp, tree)
 		assert.Equal(t, 2, len(pairs))
 		// "a" の value が更新されている
@@ -328,7 +328,7 @@ func TestUpdate(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		tree := btree.NewBTree(table.MetaPageId)
+		tree := btree.NewBPlusTree(table.MetaPageId)
 		pairs := collectAllTablePairs(t, bp, tree)
 		assert.Equal(t, 2, len(pairs))
 		// "a" は削除され、"b" が挿入されている
@@ -363,7 +363,7 @@ func TestUpdate(t *testing.T) {
 
 		// THEN: ユニークインデックスが更新されている
 		assert.NoError(t, err)
-		indexTree := btree.NewBTree(table.UniqueIndexes[0].MetaPageId)
+		indexTree := btree.NewBPlusTree(table.UniqueIndexes[0].MetaPageId)
 		indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -405,13 +405,13 @@ func TestUpdate(t *testing.T) {
 
 		// THEN: テーブルが更新されている
 		assert.NoError(t, err)
-		tree := btree.NewBTree(table.MetaPageId)
+		tree := btree.NewBPlusTree(table.MetaPageId)
 		pairs := collectAllTablePairs(t, bp, tree)
 		assert.Equal(t, 1, len(pairs))
 		assert.Equal(t, [][]byte{[]byte("x")}, pairs[0].key)
 
 		// THEN: ユニークインデックスの value (プライマリキー) が更新されている
-		indexTree := btree.NewBTree(table.UniqueIndexes[0].MetaPageId)
+		indexTree := btree.NewBPlusTree(table.UniqueIndexes[0].MetaPageId)
 		indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 		pair, ok, err := indexIter.Next(bp)
@@ -505,7 +505,7 @@ func TestUpdate(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: idx_first_name が更新されている
-		indexTree1 := btree.NewBTree(table.UniqueIndexes[0].MetaPageId)
+		indexTree1 := btree.NewBPlusTree(table.UniqueIndexes[0].MetaPageId)
 		iter1, err := indexTree1.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 		var firstNameKeys []string
@@ -522,7 +522,7 @@ func TestUpdate(t *testing.T) {
 		assert.Equal(t, []string{"Alice", "Jane"}, firstNameKeys)
 
 		// THEN: idx_last_name が更新されている
-		indexTree2 := btree.NewBTree(table.UniqueIndexes[1].MetaPageId)
+		indexTree2 := btree.NewBPlusTree(table.UniqueIndexes[1].MetaPageId)
 		iter2, err := indexTree2.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 		var lastNameKeys []string
@@ -565,7 +565,7 @@ type decodedPair struct {
 	value [][]byte
 }
 
-func collectAllTablePairs(t *testing.T, bp *bufferpool.BufferPool, tree *btree.BTree) []decodedPair {
+func collectAllTablePairs(t *testing.T, bp *bufferpool.BufferPool, tree *btree.BPlusTree) []decodedPair {
 	t.Helper()
 	iter, err := tree.Search(bp, btree.SearchModeStart{})
 	assert.NoError(t, err)

@@ -634,7 +634,7 @@ func TestNewBTree(t *testing.T) {
 		bt.mustInsert(bp, "ccc", "v3")
 
 		// WHEN: 同じ metaPageId で NewBTree を呼ぶ
-		bt2 := NewBTree(bt.MetaPageId)
+		bt2 := NewBPlusTree(bt.MetaPageId)
 
 		// THEN: 挿入したペアがすべて取得できる
 		pairs := bt2.collectAllPairs(bp)
@@ -646,7 +646,7 @@ func TestNewBTree(t *testing.T) {
 }
 
 // テスト用の B+Tree とバッファプールマネージャをセットアップする
-func setupBTree(t *testing.T) (*BTree, *bufferpool.BufferPool) {
+func setupBTree(t *testing.T) (*BPlusTree, *bufferpool.BufferPool) {
 	t.Helper()
 	tmpdir := t.TempDir()
 	path := filepath.Join(tmpdir, "btree_test.db")
@@ -660,7 +660,7 @@ func setupBTree(t *testing.T) (*BTree, *bufferpool.BufferPool) {
 	bp := bufferpool.NewBufferPool(100)
 	bp.RegisterDisk(fileId, dm)
 
-	bt, err := CreateBTree(bp, metaPageId)
+	bt, err := CreateBPlusTree(bp, metaPageId)
 	if err != nil {
 		t.Fatalf("B+Tree の作成に失敗: %v", err)
 	}
@@ -668,7 +668,7 @@ func setupBTree(t *testing.T) (*BTree, *bufferpool.BufferPool) {
 }
 
 // ペアを挿入するヘルパー (エラー時は panic)
-func (bt *BTree) mustInsert(bp *bufferpool.BufferPool, key, value string) {
+func (bt *BPlusTree) mustInsert(bp *bufferpool.BufferPool, key, value string) {
 	err := bt.Insert(bp, node.NewPair([]byte(key), []byte(value)))
 	if err != nil {
 		panic(fmt.Sprintf("Insert に失敗: %v", err))
@@ -676,7 +676,7 @@ func (bt *BTree) mustInsert(bp *bufferpool.BufferPool, key, value string) {
 }
 
 // B+Tree の全ペアをイテレータで収集する
-func (bt *BTree) collectAllPairs(bp *bufferpool.BufferPool) []node.Pair {
+func (bt *BPlusTree) collectAllPairs(bp *bufferpool.BufferPool) []node.Pair {
 	iter, err := bt.Search(bp, SearchModeStart{})
 	if err != nil {
 		panic(fmt.Sprintf("Search に失敗: %v", err))

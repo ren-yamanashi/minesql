@@ -14,13 +14,13 @@ var (
 	ErrKeyNotFound  = errors.New("key not found")
 )
 
-type BTree struct {
+type BPlusTree struct {
 	MetaPageId page.PageId
 }
 
-// 新しい B+Tree を作成
+// CreateBPlusTree は新しい B+Tree を作成
 // 指定された metaPageId を使ってメタページを初期化し、ルートノード (リーフノード) を作成する
-func CreateBTree(bp *bufferpool.BufferPool, metaPageId page.PageId) (*BTree, error) {
+func CreateBPlusTree(bp *bufferpool.BufferPool, metaPageId page.PageId) (*BPlusTree, error) {
 	// メタページを初期化
 	metaBuf, err := bp.AddPage(metaPageId)
 	if err != nil {
@@ -43,17 +43,22 @@ func CreateBTree(bp *bufferpool.BufferPool, metaPageId page.PageId) (*BTree, err
 	// メタページにルートページIDを設定
 	meta.SetRootPageId(rootNodePageId)
 
-	return NewBTree(metaPageId), nil
+	return NewBPlusTree(metaPageId), nil
 }
 
-// 既存の B+Tree を開く
-func NewBTree(metaPageId page.PageId) *BTree {
-	return &BTree{MetaPageId: metaPageId}
+// NewBPlusTree は既存の B+Tree を開く
+func NewBPlusTree(metaPageId page.PageId) *BPlusTree {
+	return &BPlusTree{MetaPageId: metaPageId}
 }
 
-// 指定された検索モードで B+Tree を検索し、イテレータを返す
+// ==================================
+// Search
+// ==================================
+
+// Search は指定された検索モードで B+Tree を検索し、イテレータを返す
+//
 // 戻り値: リーフノードのイテレータ
-func (bt *BTree) Search(bp *bufferpool.BufferPool, searchMode SearchMode) (*Iterator, error) {
+func (bt *BPlusTree) Search(bp *bufferpool.BufferPool, searchMode SearchMode) (*Iterator, error) {
 	// メタページを取得
 	metaBuf, err := bp.FetchPage(bt.MetaPageId)
 	if err != nil {
@@ -70,13 +75,13 @@ func (bt *BTree) Search(bp *bufferpool.BufferPool, searchMode SearchMode) (*Iter
 		return nil, err
 	}
 
-	// 再起的にノードを辿って該当のリーフノードを見つける
 	return bt.searchRecursively(bp, rootPage, searchMode)
 }
 
-// 再起的にノードを辿って該当のリーフノードを見つける
+// searchRecursively は再起的にノードを辿って該当のリーフノードを見つける
+//
 // 戻り値: リーフノードのイテレータ
-func (bt *BTree) searchRecursively(bp *bufferpool.BufferPool, nodeBuffer *bufferpool.BufferPage, searchMode SearchMode) (*Iterator, error) {
+func (bt *BPlusTree) searchRecursively(bp *bufferpool.BufferPool, nodeBuffer *bufferpool.BufferPage, searchMode SearchMode) (*Iterator, error) {
 	nodeType := node.GetNodeType(nodeBuffer.GetReadData())
 
 	if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
@@ -86,15 +91,7 @@ func (bt *BTree) searchRecursively(bp *bufferpool.BufferPool, nodeBuffer *buffer
 		branchNode := node.NewBranchNode(nodeBuffer.GetReadData())
 
 		// 子ノードのページを取得
-		childPageId := (func() page.PageId {
-			switch sm := searchMode.(type) {
-			case SearchModeStart:
-				return sm.childPageId(branchNode)
-			case SearchModeKey:
-				return sm.childPageId(branchNode)
-			}
-			panic("unreachable") // 実際にはここには到達しないので errors.New ではなく panic で良い
-		})()
+		childPageId := searchMode.childPageId(branchNode)
 		childNodePage, err := bp.FetchPage(childPageId)
 		if err != nil {
 			return nil, err
@@ -104,37 +101,37 @@ func (bt *BTree) searchRecursively(bp *bufferpool.BufferPool, nodeBuffer *buffer
 		return bt.searchRecursively(bp, childNodePage, searchMode)
 	} else if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
 		leafNode := node.NewLeafNode(nodeBuffer.GetReadData())
-		slotNum := (func() int {
-			switch sm := searchMode.(type) {
-			case SearchModeStart:
-				return 0
-			case SearchModeKey:
-				slotNum, _ := leafNode.SearchSlotNum(sm.Key)
-				return slotNum
-			}
-			panic("unreachable") // 実際にはここには到達しないので errors.New ではなく panic で良い
-		})()
 
-		iter := newIterator(*nodeBuffer, slotNum)
-
-		// 検索対象のキーが現在のリーフノードの末端のペアより大きい場合、次のリーフノードに進める
-		// 例えば、リーフノードに (1, ...), (3, ...), (5, ...) のペアが格納されている場合に、キー 6 を検索したいときなど
-		// この場合、次のリーフノードに進めてからイテレータを返す
-		if leafNode.NumPairs() == slotNum {
-			err := iter.Advance(bp)
-			if err != nil {
-				return nil, err
+		switch sm := searchMode.(type) {
+		case SearchModeStart:
+			return newIterator(*nodeBuffer, 0), nil
+		case SearchModeKey:
+			slotNum, _ := leafNode.SearchSlotNum(sm.Key)
+			iter := newIterator(*nodeBuffer, slotNum)
+			// 検索対象のキーが現在のリーフノードの末端のペアより大きい場合、次のリーフノードに進める
+			// 例: リーフノードに (1, ...), (3, ...), (5, ...) のペアが格納されている場合に、キー 6 を検索したいときなど
+			// (この場合 `leafNode.SearchSlotNum(sm.Key)` は `leafNode.NumPairs()` と等しい値を返す)
+			// この場合、次のリーフノードに進めてからイテレータを返す
+			if leafNode.NumPairs() == slotNum {
+				err := iter.Advance(bp)
+				if err != nil {
+					return nil, err
+				}
 			}
+			return iter, nil
 		}
-
-		return iter, nil
 	}
 
 	panic("unknown node type") // 実際にはここには到達しないので errors.New ではなく panic で良い
 }
 
-// B+Tree にペアを挿入する
-func (bt *BTree) Insert(bp *bufferpool.BufferPool, pair node.Pair) error {
+// ==================================
+// Insert
+// ==================================
+
+// Insert は B+Tree にペアを挿入する
+func (bt *BPlusTree) Insert(bp *bufferpool.BufferPool, pair node.Pair) error {
+	// メタページを取得
 	metaBuf, err := bp.FetchPage(bt.MetaPageId)
 	if err != nil {
 		return err
@@ -142,17 +139,20 @@ func (bt *BTree) Insert(bp *bufferpool.BufferPool, pair node.Pair) error {
 	// メタページは使い終わったらすぐ不要になる (優先的に evict されたい) ので、UnRefPage する
 	defer bp.UnRefPage(bt.MetaPageId)
 	meta := metapage.NewMetaPage(metaBuf.GetReadData())
+
+	// ルートページを取得
 	rootPageId := meta.RootPageId()
 	rootPageBuf, err := bp.FetchPage(rootPageId)
 	if err != nil {
 		return err
 	}
-	defer bp.UnRefPage(rootPageId)
 
 	overflowKey, overflowChildPageId, err := bt.insertRecursively(bp, rootPageBuf, pair)
 	if err != nil {
 		return err
 	}
+
+	// ルートノードの分割が発生しなかった場合、終了
 	if overflowChildPageId == nil {
 		return nil
 	}
@@ -166,7 +166,7 @@ func (bt *BTree) Insert(bp *bufferpool.BufferPool, pair node.Pair) error {
 	if err != nil {
 		return err
 	}
-	defer bp.UnRefPage(newRootPageId)
+
 	newRootBranchNode := node.NewBranchNode(newRootBuf.GetWriteData())
 	err = newRootBranchNode.Initialize(overflowKey, *overflowChildPageId, rootPageId)
 	if err != nil {
@@ -179,8 +179,14 @@ func (bt *BTree) Insert(bp *bufferpool.BufferPool, pair node.Pair) error {
 	return nil
 }
 
+// insertRecursively は再帰的にノードを辿ってペアを挿入する
+//
 // 戻り値: (オーバーフローキー, 新しいページ ID, エラー)
-func (bt *BTree) insertRecursively(bp *bufferpool.BufferPool, nodeBuffer *bufferpool.BufferPage, pair node.Pair) ([]byte, *page.PageId, error) {
+//
+// 挿入に際しノード分割が発生した場合、オーバーフローキーは分割後に親ノードに伝播させる境界キーになり、新しいページ ID は分割してできた新しいノードのページ ID になる
+//
+// ※分割挿入発生時にできる新しいノードは、分割元の前に位置するノードとして作られる
+func (bt *BPlusTree) insertRecursively(bp *bufferpool.BufferPool, nodeBuffer *bufferpool.BufferPage, pair node.Pair) ([]byte, *page.PageId, error) {
 	nodeType := node.GetNodeType(nodeBuffer.GetReadData())
 
 	if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
@@ -289,27 +295,34 @@ func (bt *BTree) insertRecursively(bp *bufferpool.BufferPool, nodeBuffer *buffer
 	panic("unknown node type") // 実際にはここには到達しないので errors.New ではなく panic で良い
 }
 
+// ==================================
+// Delete
+// =================================
+
 // B+Tree からペアを削除する
-func (bt *BTree) Delete(bp *bufferpool.BufferPool, key []byte) error {
+func (bt *BPlusTree) Delete(bp *bufferpool.BufferPool, key []byte) error {
+	// メタページを取得
 	metaBuf, err := bp.FetchPage(bt.MetaPageId)
 	if err != nil {
 		return err
 	}
+	// メタページは使い終わったらすぐ不要になる (優先的に evict されたい) ので、UnRefPage する
 	defer bp.UnRefPage(bt.MetaPageId)
 	meta := metapage.NewMetaPage(metaBuf.GetReadData())
+
+	// ルートページを取得
 	rootPageId := meta.RootPageId()
 	rootPageBuf, err := bp.FetchPage(rootPageId)
 	if err != nil {
 		return err
 	}
-	defer bp.UnRefPage(rootPageId)
 
 	_, err = bt.deleteRecursively(bp, rootPageBuf, key)
 	if err != nil {
 		return err
 	}
 
-	// ルートノードがブランチノードで、子が 1 つになった場合、子をルートにする
+	// ルートノードがブランチノードで、子が 1 つになった場合 (=ブランチノード1, リーフノード1 になった場合)、子をルートにする
 	nodeType := node.GetNodeType(rootPageBuf.GetReadData())
 	if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
 		branchNode := node.NewBranchNode(rootPageBuf.GetReadData())
@@ -331,7 +344,7 @@ type deleteResult struct {
 }
 
 // 再帰的にノードを辿ってペアを削除する
-func (bt *BTree) deleteRecursively(bp *bufferpool.BufferPool, nodeBuffer *bufferpool.BufferPage, key []byte) (deleteResult, error) {
+func (bt *BPlusTree) deleteRecursively(bp *bufferpool.BufferPool, nodeBuffer *bufferpool.BufferPage, key []byte) (deleteResult, error) {
 	nodeType := node.GetNodeType(nodeBuffer.GetReadData())
 
 	if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
@@ -343,7 +356,7 @@ func (bt *BTree) deleteRecursively(bp *bufferpool.BufferPool, nodeBuffer *buffer
 }
 
 // リーフノードからペアを削除する
-func (bt *BTree) deleteFromLeaf(nodeBuffer *bufferpool.BufferPage, key []byte) (deleteResult, error) {
+func (bt *BPlusTree) deleteFromLeaf(nodeBuffer *bufferpool.BufferPage, key []byte) (deleteResult, error) {
 	// 削除すべきペア (ペアが格納されているスロット番号) を特定
 	leafNode := node.NewLeafNode(nodeBuffer.GetWriteData())
 	slotNum, found := leafNode.SearchSlotNum(key)
@@ -369,7 +382,7 @@ type siblingInfo struct {
 }
 
 // ブランチノードから再帰的にペアを削除する
-func (bt *BTree) deleteFromBranch(bp *bufferpool.BufferPool, nodeBuffer *bufferpool.BufferPage, key []byte) (deleteResult, error) {
+func (bt *BPlusTree) deleteFromBranch(bp *bufferpool.BufferPool, nodeBuffer *bufferpool.BufferPage, key []byte) (deleteResult, error) {
 	branchNode := node.NewBranchNode(nodeBuffer.GetWriteData())
 	childIndex := branchNode.SearchChildSlotNum(key)
 	childPageId := branchNode.ChildPageIdAt(childIndex)
@@ -418,7 +431,7 @@ func (bt *BTree) deleteFromBranch(bp *bufferpool.BufferPool, nodeBuffer *bufferp
 // childBuffer: アンダーフローが発生した子ノードのバッファページ (リーフノードのバッファページ)
 // sibling: childBuffer と兄弟ノードの情報
 // childIndex: childBuffer が親のブランチノードの子ノードの中で何番目か
-func (bt *BTree) resolveLeafUnderflow(parentBranchNode *node.BranchNode, childBuffer *bufferpool.BufferPage, sibling siblingInfo, childIndex int) (deleteResult, error) {
+func (bt *BPlusTree) resolveLeafUnderflow(parentBranchNode *node.BranchNode, childBuffer *bufferpool.BufferPage, sibling siblingInfo, childIndex int) (deleteResult, error) {
 	childNode := node.NewLeafNode(childBuffer.GetWriteData())
 	siblingNode := node.NewLeafNode(sibling.bufferPage.GetWriteData())
 
@@ -481,7 +494,7 @@ func (bt *BTree) resolveLeafUnderflow(parentBranchNode *node.BranchNode, childBu
 // childBuffer: アンダーフローが発生した子ノードのバッファページ (ブランチノードのバッファページ)
 // sibling: childBuffer の兄弟ノードの情報
 // childIndex: childBuffer が親のブランチノードの子ノードの中で何番目か
-func (bt *BTree) resolveBranchUnderflow(parentBranchNode *node.BranchNode, childBuffer *bufferpool.BufferPage, sibling siblingInfo, childIndex int) (deleteResult, error) {
+func (bt *BPlusTree) resolveBranchUnderflow(parentBranchNode *node.BranchNode, childBuffer *bufferpool.BufferPage, sibling siblingInfo, childIndex int) (deleteResult, error) {
 	childNode := node.NewBranchNode(childBuffer.GetWriteData())
 	siblingNode := node.NewBranchNode(sibling.bufferPage.GetWriteData())
 
@@ -555,9 +568,13 @@ func (bt *BTree) resolveBranchUnderflow(parentBranchNode *node.BranchNode, child
 	return deleteResult{underflow: !parentBranchNode.IsHalfFull()}, nil
 }
 
+// ==================================
+// Update
+// ==================================
+
 // B+Tree の特定のノードの値 (value) を更新する
 // pair.Key で対象のリーフノードを特定し、pair.Value で値を上書きする
-func (bt *BTree) Update(bp *bufferpool.BufferPool, pair node.Pair) error {
+func (bt *BPlusTree) Update(bp *bufferpool.BufferPool, pair node.Pair) error {
 	metaBuf, err := bp.FetchPage(bt.MetaPageId)
 	if err != nil {
 		return err
@@ -569,13 +586,12 @@ func (bt *BTree) Update(bp *bufferpool.BufferPool, pair node.Pair) error {
 	if err != nil {
 		return err
 	}
-	defer bp.UnRefPage(rootPageId)
 
 	return bt.updateRecursively(bp, rootPageBuf, pair)
 }
 
 // 再帰的にノードを辿って該当のリーフノードを見つけ、ペアを更新する
-func (bt *BTree) updateRecursively(bp *bufferpool.BufferPool, nodeBuffer *bufferpool.BufferPage, pair node.Pair) error {
+func (bt *BPlusTree) updateRecursively(bp *bufferpool.BufferPool, nodeBuffer *bufferpool.BufferPage, pair node.Pair) error {
 	nodeType := node.GetNodeType(nodeBuffer.GetReadData())
 
 	if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {

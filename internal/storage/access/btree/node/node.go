@@ -21,6 +21,7 @@ type Node interface {
 	PairAt(slotNum int) Pair
 	SearchSlotNum(key []byte) (int, bool)
 	IsHalfFull() bool
+	maxPairSize() int
 }
 
 // ページデータからノードタイプを取得する

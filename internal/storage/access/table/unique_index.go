@@ -31,7 +31,7 @@ func NewUniqueIndex(name string, colName string, secondaryKeyIdx uint16) *Unique
 // 事前に MetaPageId が設定されている必要がある
 func (ui *UniqueIndex) Create(bp *bufferpool.BufferPool, metaPageId page.PageId) error {
 	ui.MetaPageId = metaPageId
-	btr, err := btree.CreateBTree(bp, metaPageId)
+	btr, err := btree.CreateBPlusTree(bp, metaPageId)
 	if err != nil {
 		return err
 	}
@@ -42,7 +42,7 @@ func (ui *UniqueIndex) Create(bp *bufferpool.BufferPool, metaPageId page.PageId)
 // ユニークインデックスに行を挿入する
 // value はプライマリキー (primaryKey に指定された値) になるため、エンコードせずそのまま格納する
 func (ui *UniqueIndex) Insert(bp *bufferpool.BufferPool, primaryKey []uint8, record [][]byte) error {
-	btr := btree.NewBTree(ui.MetaPageId)
+	btr := btree.NewBPlusTree(ui.MetaPageId)
 	var secondaryKey []byte
 
 	// セカンダリキーをエンコード
@@ -54,7 +54,7 @@ func (ui *UniqueIndex) Insert(bp *bufferpool.BufferPool, primaryKey []uint8, rec
 
 // ユニークインデックスから行を削除する
 func (ui *UniqueIndex) Delete(bp *bufferpool.BufferPool, record [][]byte) error {
-	btr := btree.NewBTree(ui.MetaPageId)
+	btr := btree.NewBPlusTree(ui.MetaPageId)
 	var secondaryKey []byte
 
 	// セカンダリキーをエンコード
@@ -66,7 +66,7 @@ func (ui *UniqueIndex) Delete(bp *bufferpool.BufferPool, record [][]byte) error 
 
 // ユニークインデックスから行を更新する
 func (ui *UniqueIndex) Update(bp *bufferpool.BufferPool, oldRecord [][]byte, newRecord [][]byte, primaryKey []byte) error {
-	btr := btree.NewBTree(ui.MetaPageId)
+	btr := btree.NewBPlusTree(ui.MetaPageId)
 	var oldSecondaryKey []byte
 	var newSecondaryKey []byte
 

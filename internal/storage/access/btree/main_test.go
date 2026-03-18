@@ -18,7 +18,7 @@ import (
 // --- ログ出力ヘルパー ---
 
 // B+Tree の全データをスキャンし、key=..., value=... 形式でログに書き出す
-func writeScanLog(w *strings.Builder, bp *bufferpool.BufferPool, tree *BTree) {
+func writeScanLog(w *strings.Builder, bp *bufferpool.BufferPool, tree *BPlusTree) {
 	iter, err := tree.Search(bp, SearchModeStart{})
 	if err != nil {
 		panic(err)
@@ -39,7 +39,7 @@ func writeScanLog(w *strings.Builder, bp *bufferpool.BufferPool, tree *BTree) {
 }
 
 // ツリーのルートノード情報をログに書き出す (ノードタイプ, キー数, キー一覧)
-func writeRootInfo(w *strings.Builder, bp *bufferpool.BufferPool, tree *BTree) {
+func writeRootInfo(w *strings.Builder, bp *bufferpool.BufferPool, tree *BPlusTree) {
 	metaBuf, err := bp.FetchPage(tree.MetaPageId)
 	if err != nil {
 		panic(err)
@@ -85,7 +85,7 @@ func writeNodeInfo(w *strings.Builder, bp *bufferpool.BufferPool, pageId page.Pa
 }
 
 // ツリーの形状 (高さ、各深さのノードタイプ・ノード数・キー数) をコンパクトに出力する
-func writeTreeShape(w *strings.Builder, bp *bufferpool.BufferPool, tree *BTree) {
+func writeTreeShape(w *strings.Builder, bp *bufferpool.BufferPool, tree *BPlusTree) {
 	metaBuf, err := bp.FetchPage(tree.MetaPageId)
 	if err != nil {
 		panic(err)

@@ -83,7 +83,7 @@ func CreateCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
 	if err != nil {
 		return nil, err
 	}
-	tblMetaTree, err := btree.CreateBTree(bp, tblMetaPageId)
+	tblMetaTree, err := btree.CreateBPlusTree(bp, tblMetaPageId)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func CreateCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
 	if err != nil {
 		return nil, err
 	}
-	colMetaTree, err := btree.CreateBTree(bp, colMetaPageId)
+	colMetaTree, err := btree.CreateBPlusTree(bp, colMetaPageId)
 	if err != nil {
 		return nil, err
 	}
@@ -103,7 +103,7 @@ func CreateCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
 	if err != nil {
 		return nil, err
 	}
-	idxMetaTree, err := btree.CreateBTree(bp, idxMetaPageId)
+	idxMetaTree, err := btree.CreateBPlusTree(bp, idxMetaPageId)
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +172,7 @@ func (c *Catalog) Insert(bp *bufferpool.BufferPool, tableMeta TableMetadata) err
 }
 
 func (c *Catalog) insertTableMetadata(bp *bufferpool.BufferPool, tableMeta TableMetadata) error {
-	btr := btree.NewBTree(c.TableMetaPageId)
+	btr := btree.NewBPlusTree(c.TableMetaPageId)
 
 	// キーをエンコード (TableId)
 	var encodedKey []byte
@@ -190,7 +190,7 @@ func (c *Catalog) insertTableMetadata(bp *bufferpool.BufferPool, tableMeta Table
 }
 
 func (c *Catalog) insertColumnMetadata(bp *bufferpool.BufferPool, columnMeta *ColumnMetadata) error {
-	btr := btree.NewBTree(c.ColumnMetaPageId)
+	btr := btree.NewBPlusTree(c.ColumnMetaPageId)
 
 	// キーをエンコード (TableId, ColName)
 	var encodedKey []byte
@@ -207,7 +207,7 @@ func (c *Catalog) insertColumnMetadata(bp *bufferpool.BufferPool, columnMeta *Co
 }
 
 func (c *Catalog) insertIndexMetadata(bp *bufferpool.BufferPool, indexMeta *IndexMetadata) error {
-	btr := btree.NewBTree(c.IndexMetaPageId)
+	btr := btree.NewBPlusTree(c.IndexMetaPageId)
 
 	// キーをエンコード (TableId, Name)
 	var encodedKey []byte
@@ -240,7 +240,7 @@ func (c *Catalog) GetAllTables() []TableMetadata {
 // ディスクから既存のメタデータを読み込む
 func (c *Catalog) loadMetadata(bp *bufferpool.BufferPool) error {
 	// テーブルメタデータを読み込む
-	tblMetaTree := btree.NewBTree(c.TableMetaPageId)
+	tblMetaTree := btree.NewBPlusTree(c.TableMetaPageId)
 	iter, err := tblMetaTree.Search(bp, btree.SearchModeStart{})
 	if err != nil {
 		return err
@@ -305,7 +305,7 @@ func (c *Catalog) decodeTableMetadata(pair *node.Pair) TableMetadata {
 
 // 指定されたテーブルのカラムメタデータを読み込む
 func (c *Catalog) loadColumnMetadata(bp *bufferpool.BufferPool, tableId uint64) ([]*ColumnMetadata, error) {
-	colMetaTree := btree.NewBTree(c.ColumnMetaPageId)
+	colMetaTree := btree.NewBPlusTree(c.ColumnMetaPageId)
 	iter, err := colMetaTree.Search(bp, btree.SearchModeStart{})
 	if err != nil {
 		return nil, err
@@ -356,7 +356,7 @@ func (c *Catalog) loadColumnMetadata(bp *bufferpool.BufferPool, tableId uint64) 
 
 // 指定されたテーブルのインデックスメタデータを読み込む
 func (c *Catalog) loadIndexMetadata(bp *bufferpool.BufferPool, tableId uint64) ([]*IndexMetadata, error) {
-	idxMetaTree := btree.NewBTree(c.IndexMetaPageId)
+	idxMetaTree := btree.NewBPlusTree(c.IndexMetaPageId)
 	iter, err := idxMetaTree.Search(bp, btree.SearchModeStart{})
 	if err != nil {
 		return nil, err

@@ -44,7 +44,7 @@ func (ss *SearchTable) Next() (Record, error) {
 		}
 
 		// テーブルスキャン用のイテレータを作成
-		btr := btree.NewBTree(tbl.MetaPageId)
+		btr := btree.NewBPlusTree(tbl.MetaPageId)
 		iterator, err := btr.Search(sm.BufferPool, ss.searchMode.Encode())
 		if err != nil {
 			return nil, err

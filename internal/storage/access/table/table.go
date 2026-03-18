@@ -32,7 +32,7 @@ func NewTable(name string, metaPageId page.PageId, primaryKeyCount uint8, unique
 // 空のテーブルを新規作成する
 func (t *Table) Create(bp *bufferpool.BufferPool) error {
 	// テーブルの B+Tree を作成
-	tree, err := btree.CreateBTree(bp, t.MetaPageId)
+	tree, err := btree.CreateBPlusTree(bp, t.MetaPageId)
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ func (t *Table) Create(bp *bufferpool.BufferPool) error {
 // テーブルに行を挿入する
 // プライマリキーを key, 他のカラム値を value としたペアを作成し、B+Tree に挿入する
 func (t *Table) Insert(bp *bufferpool.BufferPool, record [][]byte) error {
-	btree := btree.NewBTree(t.MetaPageId)
+	btree := btree.NewBPlusTree(t.MetaPageId)
 
 	// キーをエンコード
 	var encodedKey []byte
@@ -80,7 +80,7 @@ func (t *Table) Insert(bp *bufferpool.BufferPool, record [][]byte) error {
 
 // テーブルから行を削除する
 func (t *Table) Delete(bp *bufferpool.BufferPool, record [][]byte) error {
-	btree := btree.NewBTree(t.MetaPageId)
+	btree := btree.NewBPlusTree(t.MetaPageId)
 
 	// キーをエンコード
 	var encodedKey []byte
@@ -105,7 +105,7 @@ func (t *Table) Delete(bp *bufferpool.BufferPool, record [][]byte) error {
 
 // テーブルから行を更新する
 func (t *Table) Update(bp *bufferpool.BufferPool, oldRecord [][]byte, newRecord [][]byte) error {
-	btree := btree.NewBTree(t.MetaPageId)
+	btree := btree.NewBPlusTree(t.MetaPageId)
 
 	// キーをエンコード
 	var encodedOldKey []byte

@@ -15,7 +15,7 @@ type SearchIndex struct {
 	indexIterator  *btree.Iterator
 	tableIterator  *btree.Iterator
 	// テーブル本体の B+Tree (プライマリキーで検索するために使用)
-	tableBTree *btree.BTree
+	tableBTree *btree.BPlusTree
 }
 
 func NewSearchIndex(
@@ -53,10 +53,10 @@ func (is *SearchIndex) Next() (Record, error) {
 		}
 
 		// インデックスの B+Tree を取得
-		indexBTree := btree.NewBTree(index.MetaPageId)
+		indexBTree := btree.NewBPlusTree(index.MetaPageId)
 
 		// テーブル本体の B+Tree を保持
-		is.tableBTree = btree.NewBTree(tbl.MetaPageId)
+		is.tableBTree = btree.NewBPlusTree(tbl.MetaPageId)
 
 		// インデックス用のイテレータを作成
 		indexIter, err := indexBTree.Search(sm.BufferPool, is.searchMode.Encode())

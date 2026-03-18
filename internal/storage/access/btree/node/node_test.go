@@ -21,6 +21,7 @@ func (m *mockNode) SearchSlotNum(key []byte) (int, bool) {
 	return binarySearch(m, key)
 }
 func (m *mockNode) IsHalfFull() bool { return false }
+func (m *mockNode) maxPairSize() int { return 0 }
 
 func newMockNode(keys ...[]byte) *mockNode {
 	pairs := make([]Pair, len(keys))
