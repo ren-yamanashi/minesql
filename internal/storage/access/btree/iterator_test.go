@@ -52,6 +52,42 @@ func TestGet(t *testing.T) {
 	})
 }
 
+func TestNext(t *testing.T) {
+	t.Run("次の key-value ペアの情報が取得できる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		dm := initDiskForIterator(t, tmpdir)
+		bp := bufferpool.NewBufferPool(3)
+		bp.RegisterDisk(page.FileId(0), dm)
+
+		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
+		pair2 := node.NewPair([]byte("key2"), []byte("value2"))
+		pair3 := node.NewPair([]byte("key3"), []byte("value3"))
+
+		bufferPage := createLeafBufferPage(page.NewPageId(page.FileId(0), page.PageNumber(0)), []node.Pair{pair1, pair2, pair3}, nil)
+		iterator := newIterator(bufferPage, 0)
+		assert.Equal(t, 0, iterator.slotNum) // 最初のペアを指している
+
+		// WHEN
+		pair, ok, err := iterator.Next(bp)
+		bufferId1 := iterator.slotNum
+		pair2Result, ok2, err2 := iterator.Next(bp)
+		bufferId2 := iterator.slotNum
+
+		// THEN
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, []byte("key1"), pair.Key)
+		assert.Equal(t, []byte("value1"), pair.Value)
+		assert.Equal(t, 1, bufferId1) // 1回目のNext()後のbufferId
+		assert.NoError(t, err2)
+		assert.True(t, ok2)
+		assert.Equal(t, []byte("key2"), pair2Result.Key)
+		assert.Equal(t, []byte("value2"), pair2Result.Value)
+		assert.Equal(t, 2, bufferId2) // 2回目のNext()後のbufferId
+	})
+}
+
 func TestAdvance(t *testing.T) {
 	t.Run("現在のページ内に、まだ次の key-value ペアがある場合は何もしない", func(t *testing.T) {
 		// GIVEN
@@ -132,42 +168,6 @@ func TestAdvance(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, page.NewPageId(page.FileId(0), page.PageNumber(1)), iterator.bufferPage.PageId)
 		assert.Equal(t, 0, iterator.slotNum) // 次のページの先頭
-	})
-}
-
-func TestNext(t *testing.T) {
-	t.Run("次の key-value ペアの情報が取得できる", func(t *testing.T) {
-		// GIVEN
-		tmpdir := t.TempDir()
-		dm := initDiskForIterator(t, tmpdir)
-		bp := bufferpool.NewBufferPool(3)
-		bp.RegisterDisk(page.FileId(0), dm)
-
-		pair1 := node.NewPair([]byte("key1"), []byte("value1"))
-		pair2 := node.NewPair([]byte("key2"), []byte("value2"))
-		pair3 := node.NewPair([]byte("key3"), []byte("value3"))
-
-		bufferPage := createLeafBufferPage(page.NewPageId(page.FileId(0), page.PageNumber(0)), []node.Pair{pair1, pair2, pair3}, nil)
-		iterator := newIterator(bufferPage, 0)
-		assert.Equal(t, 0, iterator.slotNum) // 最初のペアを指している
-
-		// WHEN
-		pair, ok, err := iterator.Next(bp)
-		bufferId1 := iterator.slotNum
-		pair2Result, ok2, err2 := iterator.Next(bp)
-		bufferId2 := iterator.slotNum
-
-		// THEN
-		assert.NoError(t, err)
-		assert.True(t, ok)
-		assert.Equal(t, []byte("key1"), pair.Key)
-		assert.Equal(t, []byte("value1"), pair.Value)
-		assert.Equal(t, 1, bufferId1) // 1回目のNext()後のbufferId
-		assert.NoError(t, err2)
-		assert.True(t, ok2)
-		assert.Equal(t, []byte("key2"), pair2Result.Key)
-		assert.Equal(t, []byte("value2"), pair2Result.Value)
-		assert.Equal(t, 2, bufferId2) // 2回目のNext()後のbufferId
 	})
 }
 

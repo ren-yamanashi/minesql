@@ -60,14 +60,14 @@ func (iter *Iterator) Advance(bp *bufferpool.BufferPool) error {
 
 	leafNode := node.NewLeafNode(iter.bufferPage.GetReadData())
 
-	// 現在のページ内に、まだ次の key-value ペアがある場合は、何もせずに終了
+	// 現在のページ内に、まだ次の key-value ペアがある場合は、次のページに移動しない (スロット番号を進めるだけ)
 	if iter.slotNum < leafNode.NumPairs() {
 		return nil
 	}
 
 	nextPageId := leafNode.NextPageId()
 
-	// 現在のページ内に、次の key-value ペアがないが、次のページも存在しない場合は何もしない
+	// 現在のページ内に、次の key-value ペアがないが、次のページも存在しない場合は、次のページに移動しない
 	if nextPageId == nil {
 		return nil
 	}
