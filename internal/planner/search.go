@@ -7,7 +7,7 @@ import (
 	"minesql/internal/planner/ast/expression"
 	"minesql/internal/planner/ast/statement"
 	"minesql/internal/storage"
-	"minesql/internal/storage/access/catalog"
+	"minesql/internal/storage/catalog"
 )
 
 // SearchPlanner は WHERE 句に基づいてレコードを検索する Executor を構築する

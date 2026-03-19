@@ -2,7 +2,7 @@ package executor
 
 import (
 	"minesql/internal/storage"
-	"minesql/internal/storage/access/table"
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/btree"
 )
 
@@ -64,8 +64,8 @@ func (ss *SearchTable) Next() (Record, error) {
 
 	// レコード (プライマリキー + 値) をデコード
 	var record [][]byte
-	table.Decode(pair.Key, &record)
-	table.Decode(pair.Value, &record)
+	access.Decode(pair.Key, &record)
+	access.Decode(pair.Value, &record)
 
 	// 継続条件をチェック
 	if !ss.whileCondition(record) {

@@ -1,4 +1,4 @@
-package table
+package access
 
 import (
 	"minesql/internal/storage/btree"
@@ -7,31 +7,26 @@ import (
 	"minesql/internal/storage/page"
 )
 
-type UniqueIndex struct {
-	// インデックス名
-	Name string
-	// インデックスを構成するカラム名
-	ColName string
-	// インデックスの内容が入っている B+Tree のメタページの ID
-	MetaPageId page.PageId
-	// セカンダリキーに含めるカラムのインデックス (0 始まりの列番号)
-	SecondaryKeyIdx uint16
+// UniqueIndexAccessMethod はユニークインデックスへのアクセスを提供する
+type UniqueIndexAccessMethod struct {
+	Name            string      // インデックス名
+	ColName         string      // インデックスを構成するカラム名
+	MetaPageId      page.PageId // インデックスの内容が入っている B+Tree のメタページの ID
+	SecondaryKeyIdx uint16      // セカンダリキーに含めるカラムのインデックス (0 始まりの列番号)
 }
 
-func NewUniqueIndex(name string, colName string, secondaryKeyIdx uint16) *UniqueIndex {
-	return &UniqueIndex{
+func NewUniqueIndexAccessMethod(name string, colName string, metaPageId page.PageId, secondaryKeyIdx uint16) *UniqueIndexAccessMethod {
+	return &UniqueIndexAccessMethod{
 		Name:            name,
 		ColName:         colName,
-		MetaPageId:      page.INVALID_PAGE_ID, // 初期化時には無効なページIDを設定 (Create 時に設定される)
+		MetaPageId:      metaPageId,
 		SecondaryKeyIdx: secondaryKeyIdx,
 	}
 }
 
-// 空のユニークインデックスを新規作成する
-// 事前に MetaPageId が設定されている必要がある
-func (ui *UniqueIndex) Create(bp *bufferpool.BufferPool, metaPageId page.PageId) error {
-	ui.MetaPageId = metaPageId
-	btr, err := btree.CreateBPlusTree(bp, metaPageId)
+// Create は空のユニークインデックスを新規作成する
+func (ui *UniqueIndexAccessMethod) Create(bp *bufferpool.BufferPool) error {
+	btr, err := btree.CreateBPlusTree(bp, ui.MetaPageId)
 	if err != nil {
 		return err
 	}
@@ -39,9 +34,10 @@ func (ui *UniqueIndex) Create(bp *bufferpool.BufferPool, metaPageId page.PageId)
 	return nil
 }
 
-// ユニークインデックスに行を挿入する
+// Insert はユニークインデックスに行を挿入する
+//
 // value はプライマリキー (primaryKey に指定された値) になるため、エンコードせずそのまま格納する
-func (ui *UniqueIndex) Insert(bp *bufferpool.BufferPool, primaryKey []uint8, record [][]byte) error {
+func (ui *UniqueIndexAccessMethod) Insert(bp *bufferpool.BufferPool, primaryKey []uint8, record [][]byte) error {
 	btr := btree.NewBPlusTree(ui.MetaPageId)
 	var secondaryKey []byte
 
@@ -52,8 +48,8 @@ func (ui *UniqueIndex) Insert(bp *bufferpool.BufferPool, primaryKey []uint8, rec
 	return btr.Insert(bp, node.NewPair(secondaryKey, primaryKey))
 }
 
-// ユニークインデックスから行を削除する
-func (ui *UniqueIndex) Delete(bp *bufferpool.BufferPool, record [][]byte) error {
+// Delete はユニークインデックスから行を削除する
+func (ui *UniqueIndexAccessMethod) Delete(bp *bufferpool.BufferPool, record [][]byte) error {
 	btr := btree.NewBPlusTree(ui.MetaPageId)
 	var secondaryKey []byte
 
@@ -64,8 +60,8 @@ func (ui *UniqueIndex) Delete(bp *bufferpool.BufferPool, record [][]byte) error 
 	return btr.Delete(bp, secondaryKey)
 }
 
-// ユニークインデックスから行を更新する
-func (ui *UniqueIndex) Update(bp *bufferpool.BufferPool, oldRecord [][]byte, newRecord [][]byte, primaryKey []byte) error {
+// Update はユニークインデックスから行を更新する
+func (ui *UniqueIndexAccessMethod) Update(bp *bufferpool.BufferPool, oldRecord [][]byte, newRecord [][]byte, primaryKey []byte) error {
 	btr := btree.NewBPlusTree(ui.MetaPageId)
 	var oldSecondaryKey []byte
 	var newSecondaryKey []byte

@@ -1,4 +1,4 @@
-package table
+package access
 
 import (
 	"fmt"
@@ -8,15 +8,18 @@ import (
 	"minesql/internal/storage/page"
 )
 
-type Table struct {
-	Name            string         // テーブル名
-	MetaPageId      page.PageId    // テーブルの内容が入っている B+Tree のメタページの ID
-	PrimaryKeyCount uint8          // プライマリキーの列数 (プライマリキーは先頭から連続している想定) (例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる)
-	UniqueIndexes   []*UniqueIndex // テーブルに紐づくユニークインデックス群
+// TableAccessMethod はテーブルへのアクセスを提供する
+//
+// 1 つの AccessMethod は 1 つの *.db (= 1 テーブル) ファイルに対応する
+type TableAccessMethod struct {
+	Name            string                     // テーブル名
+	MetaPageId      page.PageId                // テーブルの内容が入っている B+Tree のメタページの ID
+	PrimaryKeyCount uint8                      // プライマリキーの列数 (プライマリキーは先頭から連続している想定) (例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる)
+	UniqueIndexes   []*UniqueIndexAccessMethod // テーブルに紐づくユニークインデックス群
 }
 
-func NewTable(name string, metaPageId page.PageId, primaryKeyCount uint8, uniqueIndexes []*UniqueIndex) Table {
-	return Table{
+func NewTableAccessMethod(name string, metaPageId page.PageId, primaryKeyCount uint8, uniqueIndexes []*UniqueIndexAccessMethod) TableAccessMethod {
+	return TableAccessMethod{
 		Name:            name,
 		MetaPageId:      metaPageId,
 		PrimaryKeyCount: primaryKeyCount,
@@ -24,8 +27,8 @@ func NewTable(name string, metaPageId page.PageId, primaryKeyCount uint8, unique
 	}
 }
 
-// 空のテーブルを新規作成する
-func (t *Table) Create(bp *bufferpool.BufferPool) error {
+// Create は空のテーブルを新規作成する
+func (t *TableAccessMethod) Create(bp *bufferpool.BufferPool) error {
 	// テーブルの B+Tree を作成
 	tree, err := btree.CreateBPlusTree(bp, t.MetaPageId)
 	if err != nil {
@@ -35,7 +38,7 @@ func (t *Table) Create(bp *bufferpool.BufferPool) error {
 
 	// ユニークインデックスを作成
 	for _, ui := range t.UniqueIndexes {
-		err = ui.Create(bp, ui.MetaPageId)
+		err = ui.Create(bp)
 		if err != nil {
 			return err
 		}
@@ -43,9 +46,10 @@ func (t *Table) Create(bp *bufferpool.BufferPool) error {
 	return nil
 }
 
-// テーブルに行を挿入する
+// Insert はテーブルに行を挿入する
+//
 // プライマリキーを key, 他のカラム値を value としたペアを作成し、B+Tree に挿入する
-func (t *Table) Insert(bp *bufferpool.BufferPool, record [][]byte) error {
+func (t *TableAccessMethod) Insert(bp *bufferpool.BufferPool, record [][]byte) error {
 	btree := btree.NewBPlusTree(t.MetaPageId)
 
 	// キーをエンコード
@@ -73,8 +77,8 @@ func (t *Table) Insert(bp *bufferpool.BufferPool, record [][]byte) error {
 	return nil
 }
 
-// テーブルから行を削除する
-func (t *Table) Delete(bp *bufferpool.BufferPool, record [][]byte) error {
+// Delete はテーブルから行を削除する
+func (t *TableAccessMethod) Delete(bp *bufferpool.BufferPool, record [][]byte) error {
 	btree := btree.NewBPlusTree(t.MetaPageId)
 
 	// キーをエンコード
@@ -98,8 +102,12 @@ func (t *Table) Delete(bp *bufferpool.BufferPool, record [][]byte) error {
 	return nil
 }
 
-// テーブルから行を更新する
-func (t *Table) Update(bp *bufferpool.BufferPool, oldRecord [][]byte, newRecord [][]byte) error {
+// Update はテーブルから行を更新する
+//
+// oldRecord: 更新前の行 (プライマリキーとその他のカラム値を含む)
+//
+// newRecord: 更新後の行 (プライマリキーとその他のカラム値を含む)
+func (t *TableAccessMethod) Update(bp *bufferpool.BufferPool, oldRecord [][]byte, newRecord [][]byte) error {
 	btree := btree.NewBPlusTree(t.MetaPageId)
 
 	// キーをエンコード
@@ -141,8 +149,8 @@ func (t *Table) Update(bp *bufferpool.BufferPool, oldRecord [][]byte, newRecord 
 	return nil
 }
 
-// インデックス名からユニークインデックスを取得する
-func (t *Table) GetUniqueIndexByName(indexName string) (*UniqueIndex, error) {
+// GetUniqueIndexByName はインデックス名からユニークインデックスを取得する
+func (t *TableAccessMethod) GetUniqueIndexByName(indexName string) (*UniqueIndexAccessMethod, error) {
 	for _, ui := range t.UniqueIndexes {
 		if ui.Name == indexName {
 			return ui, nil

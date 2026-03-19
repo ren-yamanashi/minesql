@@ -3,7 +3,7 @@ package catalog
 import (
 	"encoding/binary"
 	"fmt"
-	"minesql/internal/storage/access/table"
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
@@ -177,13 +177,13 @@ func (c *Catalog) insertTableMetadata(bp *bufferpool.BufferPool, tableMeta Table
 	// キーをエンコード (TableId)
 	var encodedKey []byte
 	keyBuf := binary.BigEndian.AppendUint64(nil, tableMeta.TableId)
-	table.Encode([][]byte{keyBuf}, &encodedKey)
+	access.Encode([][]byte{keyBuf}, &encodedKey)
 
 	// 値をエンコード (Name, NCols, PrimaryKeyCount, DataMetaPageId)
 	var encodedValue []byte
 	nColsBuf := binary.BigEndian.AppendUint64(nil, uint64(tableMeta.NCols))
 	pkCountBuf := binary.BigEndian.AppendUint64(nil, uint64(tableMeta.PrimaryKeyCount))
-	table.Encode([][]byte{[]byte(tableMeta.Name), nColsBuf, pkCountBuf, tableMeta.DataMetaPageId.ToBytes()}, &encodedValue)
+	access.Encode([][]byte{[]byte(tableMeta.Name), nColsBuf, pkCountBuf, tableMeta.DataMetaPageId.ToBytes()}, &encodedValue)
 
 	// B+Tree に挿入
 	return btr.Insert(bp, node.NewPair(encodedKey, encodedValue))
@@ -195,12 +195,12 @@ func (c *Catalog) insertColumnMetadata(bp *bufferpool.BufferPool, columnMeta *Co
 	// キーをエンコード (TableId, ColName)
 	var encodedKey []byte
 	keyBuf := binary.BigEndian.AppendUint64(nil, columnMeta.TableId)
-	table.Encode([][]byte{keyBuf, []byte(columnMeta.Name)}, &encodedKey)
+	access.Encode([][]byte{keyBuf, []byte(columnMeta.Name)}, &encodedKey)
 
 	// 値をエンコード (Pos, Type)
 	var encodedValue []byte
 	posBuf := binary.BigEndian.AppendUint16(nil, columnMeta.Pos)
-	table.Encode([][]byte{posBuf, []byte(columnMeta.Type)}, &encodedValue)
+	access.Encode([][]byte{posBuf, []byte(columnMeta.Type)}, &encodedValue)
 
 	// B+Tree に挿入
 	return btr.Insert(bp, node.NewPair(encodedKey, encodedValue))
@@ -212,11 +212,11 @@ func (c *Catalog) insertIndexMetadata(bp *bufferpool.BufferPool, indexMeta *Inde
 	// キーをエンコード (TableId, Name)
 	var encodedKey []byte
 	keyBuf := binary.BigEndian.AppendUint64(nil, indexMeta.TableId)
-	table.Encode([][]byte{keyBuf, []byte(indexMeta.Name)}, &encodedKey)
+	access.Encode([][]byte{keyBuf, []byte(indexMeta.Name)}, &encodedKey)
 
 	// 値をエンコード (Type, ColName, DataMetaPageId)
 	var encodedValue []byte
-	table.Encode([][]byte{[]byte(indexMeta.Type), []byte(indexMeta.ColName), indexMeta.DataMetaPageId.ToBytes()}, &encodedValue)
+	access.Encode([][]byte{[]byte(indexMeta.Type), []byte(indexMeta.ColName), indexMeta.DataMetaPageId.ToBytes()}, &encodedValue)
 
 	// B+Tree に挿入
 	return btr.Insert(bp, node.NewPair(encodedKey, encodedValue))
@@ -283,12 +283,12 @@ func (c *Catalog) loadMetadata(bp *bufferpool.BufferPool) error {
 func (c *Catalog) decodeTableMetadata(pair *node.Pair) TableMetadata {
 	// キーをデコード (TableId)
 	var keyParts [][]byte
-	table.Decode(pair.Key, &keyParts)
+	access.Decode(pair.Key, &keyParts)
 	tableId := binary.BigEndian.Uint64(keyParts[0])
 
 	// 値をデコード (Name, NCols, PrimaryKeyCount, DataMetaPageId)
 	var valueParts [][]byte
-	table.Decode(pair.Value, &valueParts)
+	access.Decode(pair.Value, &valueParts)
 	name := string(valueParts[0])
 	nCols := uint8(binary.BigEndian.Uint64(valueParts[1]))
 	pkCount := uint8(binary.BigEndian.Uint64(valueParts[2]))
@@ -320,7 +320,7 @@ func (c *Catalog) loadColumnMetadata(bp *bufferpool.BufferPool, tableId uint64) 
 
 		// キーをデコード (TableId, ColName)
 		var keyParts [][]byte
-		table.Decode(pair.Key, &keyParts)
+		access.Decode(pair.Key, &keyParts)
 		colTableId := binary.BigEndian.Uint64(keyParts[0])
 
 		// 指定されたテーブルのカラムのみを収集
@@ -329,7 +329,7 @@ func (c *Catalog) loadColumnMetadata(bp *bufferpool.BufferPool, tableId uint64) 
 
 			// 値をデコード (Pos, Type)
 			var valueParts [][]byte
-			table.Decode(pair.Value, &valueParts)
+			access.Decode(pair.Value, &valueParts)
 			pos := binary.BigEndian.Uint16(valueParts[0])
 			colType := ColumnType(string(valueParts[1]))
 
@@ -371,7 +371,7 @@ func (c *Catalog) loadIndexMetadata(bp *bufferpool.BufferPool, tableId uint64) (
 
 		// キーをデコード (TableId, Name)
 		var keyParts [][]byte
-		table.Decode(pair.Key, &keyParts)
+		access.Decode(pair.Key, &keyParts)
 		idxTableId := binary.BigEndian.Uint64(keyParts[0])
 
 		// 指定されたテーブルのインデックスのみを収集
@@ -380,7 +380,7 @@ func (c *Catalog) loadIndexMetadata(bp *bufferpool.BufferPool, tableId uint64) (
 
 			// 値をデコード (Type, ColName, DataMetaPageId)
 			var valueParts [][]byte
-			table.Decode(pair.Value, &valueParts)
+			access.Decode(pair.Value, &valueParts)
 			idxType := IndexType(string(valueParts[0]))
 			colName := string(valueParts[1])
 			dataMetaPageId := page.RestorePageIdFromBytes(valueParts[2])

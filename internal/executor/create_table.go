@@ -2,8 +2,8 @@ package executor
 
 import (
 	"minesql/internal/storage"
-	"minesql/internal/storage/access/catalog"
-	"minesql/internal/storage/access/table"
+	"minesql/internal/storage/access"
+	"minesql/internal/storage/catalog"
 )
 
 type ColumnParam struct {
@@ -66,14 +66,14 @@ func (ct *CreateTable) execute() error {
 	}
 
 	// 各 UniqueIndex の metaPageId を設定
-	uniqueIndexes := make([]*table.UniqueIndex, len(ct.indexParams))
+	uniqueIndexes := make([]*access.UniqueIndexAccessMethod, len(ct.indexParams))
 	for i, indexParam := range ct.indexParams {
 		indexMetaPageId, err := sm.BufferPool.AllocatePageId(fileId)
 		if err != nil {
 			return err
 		}
-		uniqueIndex := table.NewUniqueIndex(indexParam.Name, indexParam.ColName, indexParam.SecondaryKey)
-		err = uniqueIndex.Create(sm.BufferPool, indexMetaPageId)
+		uniqueIndex := access.NewUniqueIndexAccessMethod(indexParam.Name, indexParam.ColName, indexMetaPageId, indexParam.SecondaryKey)
+		err = uniqueIndex.Create(sm.BufferPool)
 		if err != nil {
 			return err
 		}
@@ -81,7 +81,7 @@ func (ct *CreateTable) execute() error {
 	}
 
 	// テーブルを作成
-	tbl := table.NewTable(ct.tableName, metaPageId, ct.primaryKeyCount, uniqueIndexes)
+	tbl := access.NewTableAccessMethod(ct.tableName, metaPageId, ct.primaryKeyCount, uniqueIndexes)
 	err = tbl.Create(sm.BufferPool)
 	if err != nil {
 		return err

@@ -1,8 +1,8 @@
 package storage
 
 import (
-	"minesql/internal/storage/access/catalog"
-	"minesql/internal/storage/access/table"
+	"minesql/internal/storage/access"
+	"minesql/internal/storage/catalog"
 	"minesql/internal/storage/page"
 	"os"
 	"path/filepath"
@@ -201,7 +201,7 @@ func TestInitCatalog(t *testing.T) {
 
 		metaPageId, err := bp.AllocatePageId(tableFileId)
 		assert.NoError(t, err)
-		tbl := table.NewTable("users", metaPageId, 1, nil)
+		tbl := access.NewTableAccessMethod("users", metaPageId, 1, nil)
 		err = tbl.Create(bp)
 		assert.NoError(t, err)
 

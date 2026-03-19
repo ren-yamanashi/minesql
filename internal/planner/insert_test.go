@@ -6,7 +6,7 @@ import (
 	"minesql/internal/planner/ast/literal"
 	"minesql/internal/planner/ast/statement"
 	"minesql/internal/storage"
-	"minesql/internal/storage/access/catalog"
+	"minesql/internal/storage/catalog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

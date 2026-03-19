@@ -2,11 +2,11 @@ package catalog
 
 import (
 	"fmt"
-	"minesql/internal/storage/access/table"
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/page"
 )
 
-// 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-tables-table.html
+// 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-tables-access.html
 type TableMetadata struct {
 	// テーブルのメタデータが格納される B+Tree のメタページID
 	MetaPageId page.PageId
@@ -59,23 +59,22 @@ func (tm *TableMetadata) GetIndexByColName(colName string) (*IndexMetadata, bool
 	return nil, false
 }
 
-// テーブル (table.Table) を取得する
-func (tm *TableMetadata) GetTable() (*table.Table, error) {
+// テーブル (access.Table) を取得する
+func (tm *TableMetadata) GetTable() (*access.TableAccessMethod, error) {
 	// ユニークインデックスを構築
-	var uniqueIndexes []*table.UniqueIndex
+	var uniqueIndexes []*access.UniqueIndexAccessMethod
 	for _, idxMeta := range tm.Indexes {
 		if idxMeta.Type == IndexTypeUnique {
 			colMeta, ok := tm.GetColByName(idxMeta.ColName)
 			if !ok {
 				return nil, fmt.Errorf("column %s not found in table %s", idxMeta.ColName, tm.Name)
 			}
-			ui := table.NewUniqueIndex(idxMeta.Name, idxMeta.ColName, colMeta.Pos)
-			ui.MetaPageId = idxMeta.DataMetaPageId
+			ui := access.NewUniqueIndexAccessMethod(idxMeta.Name, idxMeta.ColName, idxMeta.DataMetaPageId, colMeta.Pos)
 			uniqueIndexes = append(uniqueIndexes, ui)
 		}
 	}
 
 	// テーブルを構築
-	tbl := table.NewTable(tm.Name, tm.DataMetaPageId, tm.PrimaryKeyCount, uniqueIndexes)
+	tbl := access.NewTableAccessMethod(tm.Name, tm.DataMetaPageId, tm.PrimaryKeyCount, uniqueIndexes)
 	return &tbl, nil
 }

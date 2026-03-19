@@ -1,4 +1,4 @@
-package table
+package access
 
 import (
 	"bytes"

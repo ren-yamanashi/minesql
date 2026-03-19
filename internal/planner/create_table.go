@@ -6,7 +6,7 @@ import (
 	"minesql/internal/executor"
 	"minesql/internal/planner/ast/definition"
 	"minesql/internal/planner/ast/statement"
-	"minesql/internal/storage/access/catalog"
+	"minesql/internal/storage/catalog"
 )
 
 type CreateTableNode struct {

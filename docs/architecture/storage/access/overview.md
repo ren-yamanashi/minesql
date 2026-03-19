@@ -2,9 +2,8 @@
 
 ## 読む順序
 
-1. [B+Tree](./b+tree/b+tree.md)
-2. [Table](./table.md)
-3. [Catalog](./catalog.md)
+1. [Table](./table.md)
+2. [Catalog](./catalog.md)
 
 ## 概要
 
@@ -12,4 +11,9 @@
   - 実際のデータの読み書きはバッファプールに依頼する
   - つまりエグゼキュータとバッファプールの仲介を担う
 - アクセスメソッドのデータ構造とアルゴリズムには B+Tree を採用
-  - 詳細は [B+Tree](./b+tree/b+tree.md) を参照
+  - 詳細は [B+Tree](../b+tree/b+tree.md) を参照
+
+## TableAccessMethod
+
+- 1 つの `*.db` ファイル (= 1 テーブル) に対しては 1 つの `TableAccessMethod` が存在する
+- `TableAccessMethod` はテーブルへのアクセス手段を提供する (テーブル作成、行の挿入/削除/更新、など)

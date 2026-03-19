@@ -3,7 +3,7 @@ package executor
 import (
 	"fmt"
 	"minesql/internal/storage"
-	"minesql/internal/storage/access/catalog"
+	"minesql/internal/storage/catalog"
 	"strings"
 	"testing"
 

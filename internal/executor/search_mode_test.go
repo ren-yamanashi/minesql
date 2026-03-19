@@ -2,7 +2,7 @@ package executor
 
 import (
 	"bytes"
-	"minesql/internal/storage/access/table"
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/btree"
 	"testing"
 
@@ -45,14 +45,14 @@ func TestEncodeForRecordSearchModeKey(t *testing.T) {
 
 		// 期待値を手動でエンコード
 		var expectedKey []byte
-		table.Encode(key, &expectedKey)
+		access.Encode(key, &expectedKey)
 
 		// WHEN
 		encoded := searchMode.Encode()
 		result := encoded.(btree.SearchModeKey)
 
 		// THEN
-		assert.True(t, bytes.Equal(result.Key, expectedKey), "エンコードされたキーが table.Encode の結果と一致すること")
+		assert.True(t, bytes.Equal(result.Key, expectedKey), "エンコードされたキーが access.Encode の結果と一致すること")
 	})
 
 	t.Run("空のキーがエンコードされる", func(t *testing.T) {
@@ -61,7 +61,7 @@ func TestEncodeForRecordSearchModeKey(t *testing.T) {
 		searchMode := RecordSearchModeKey{Key: key}
 
 		var expectedKey []byte
-		table.Encode(key, &expectedKey)
+		access.Encode(key, &expectedKey)
 
 		// WHEN
 		encoded := searchMode.Encode()
@@ -78,7 +78,7 @@ func TestEncodeForRecordSearchModeKey(t *testing.T) {
 		searchMode := RecordSearchModeKey{Key: key}
 
 		var expectedKey []byte
-		table.Encode(key, &expectedKey)
+		access.Encode(key, &expectedKey)
 
 		// WHEN
 		encoded := searchMode.Encode()
