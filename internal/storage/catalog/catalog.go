@@ -22,7 +22,7 @@ type Catalog struct {
 	NextTableId      uint64
 }
 
-// 既存のカタログを開く
+// NewCatalog は既存のカタログを開く
 func NewCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
 	fileId := page.FileId(0) // カタログ専用の FileId を使用
 	headerPageId := page.NewPageId(fileId, page.PageNumber(0))
@@ -62,7 +62,7 @@ func NewCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
 	return catalog, nil
 }
 
-// カタログを新規作成する
+// CreateCatalog はカタログを新規作成する
 func CreateCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
 	fileId := page.FileId(0) // カタログ専用の FileId を使用
 
@@ -87,22 +87,22 @@ func CreateCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
 		return nil, err
 	}
 
-	// カラムメタデータ用の B+Tree を作成
-	colMetaPageId, err := bp.AllocatePageId(fileId)
-	if err != nil {
-		return nil, err
-	}
-	colMetaTree, err := btree.CreateBPlusTree(bp, colMetaPageId)
-	if err != nil {
-		return nil, err
-	}
-
 	// インデックスメタデータ用の B+Tree を作成
 	idxMetaPageId, err := bp.AllocatePageId(fileId)
 	if err != nil {
 		return nil, err
 	}
 	idxMetaTree, err := btree.CreateBPlusTree(bp, idxMetaPageId)
+	if err != nil {
+		return nil, err
+	}
+
+	// カラムメタデータ用の B+Tree を作成
+	colMetaPageId, err := bp.AllocatePageId(fileId)
+	if err != nil {
+		return nil, err
+	}
+	colMetaTree, err := btree.CreateBPlusTree(bp, colMetaPageId)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +125,7 @@ func CreateCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
 	}, nil
 }
 
-// 新しい TableID を採番し、ディスク上のカウンターを更新する
+// AllocateTableId は新しい TableID を採番し、ディスク上のカウンターを更新する
 func (c *Catalog) AllocateTableId(bp *bufferpool.BufferPool) (uint64, error) {
 	id := c.NextTableId
 	c.NextTableId++
@@ -145,7 +145,7 @@ func (c *Catalog) AllocateTableId(bp *bufferpool.BufferPool) (uint64, error) {
 	return id, nil
 }
 
-// カタログにメタデータを挿入する
+// Insert はカタログにメタデータを挿入する
 func (c *Catalog) Insert(bp *bufferpool.BufferPool, tableMeta TableMetadata) error {
 	// テーブルメタデータを挿入
 	if err := c.insertTableMetadata(bp, tableMeta); err != nil {
@@ -168,6 +168,21 @@ func (c *Catalog) Insert(bp *bufferpool.BufferPool, tableMeta TableMetadata) err
 
 	c.metadata = append(c.metadata, tableMeta)
 	return nil
+}
+
+// GetTableMetadataByName はテーブル名からテーブルメタデータを取得する
+func (c *Catalog) GetTableMetadataByName(tableName string) (*TableMetadata, error) {
+	for _, tblMeta := range c.metadata {
+		if tblMeta.Name == tableName {
+			return &tblMeta, nil
+		}
+	}
+	return nil, fmt.Errorf("table %s not found in catalog", tableName)
+}
+
+// GetAllTables はすべてのテーブルメタデータを取得する
+func (c *Catalog) GetAllTables() []TableMetadata {
+	return c.metadata
 }
 
 func (c *Catalog) insertTableMetadata(bp *bufferpool.BufferPool, tableMeta TableMetadata) error {
@@ -219,21 +234,6 @@ func (c *Catalog) insertIndexMetadata(bp *bufferpool.BufferPool, indexMeta *Inde
 
 	// B+Tree に挿入
 	return btr.Insert(bp, btree.NewPair(encodedKey, encodedValue))
-}
-
-// テーブル名からテーブルメタデータを取得する
-func (c *Catalog) GetTableMetadataByName(tableName string) (*TableMetadata, error) {
-	for _, tblMeta := range c.metadata {
-		if tblMeta.Name == tableName {
-			return &tblMeta, nil
-		}
-	}
-	return nil, fmt.Errorf("table %s not found in catalog", tableName)
-}
-
-// すべてのテーブルメタデータを取得する
-func (c *Catalog) GetAllTables() []TableMetadata {
-	return c.metadata
 }
 
 // ディスクから既存のメタデータを読み込む

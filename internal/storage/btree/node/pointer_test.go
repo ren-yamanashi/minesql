@@ -1,4 +1,4 @@
-package slottedpage
+package node
 
 import (
 	"testing"

@@ -1,4 +1,4 @@
-package slottedpage
+package node
 
 // Slotted Page の各ポインタのサイズ
 //

@@ -6,7 +6,6 @@ import (
 	"strings"
 	"testing"
 
-	metapage "minesql/internal/storage/btree/meta_page"
 	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/page"
@@ -46,8 +45,8 @@ func writeRootInfo(w *strings.Builder, bp *bufferpool.BufferPool, tree *BPlusTre
 	}
 	defer bp.UnRefPage(tree.MetaPageId)
 
-	meta := metapage.NewMetaPage(metaBuf.GetReadData())
-	rootPageId := meta.RootPageId()
+	meta := newMetaPage(metaBuf.GetReadData())
+	rootPageId := meta.rootPageId()
 	writeNodeInfo(w, bp, rootPageId, 0)
 }
 
@@ -90,8 +89,8 @@ func writeTreeShape(w *strings.Builder, bp *bufferpool.BufferPool, tree *BPlusTr
 	if err != nil {
 		panic(err)
 	}
-	meta := metapage.NewMetaPage(metaBuf.GetReadData())
-	rootPageId := meta.RootPageId()
+	meta := newMetaPage(metaBuf.GetReadData())
+	rootPageId := meta.rootPageId()
 	bp.UnRefPage(tree.MetaPageId)
 
 	type depthInfo struct {
@@ -557,8 +556,8 @@ Branch[keys=1]: [key_10]
 		metaBuf, err := bp.FetchPage(tree.MetaPageId)
 		require.NoError(t, err)
 		defer bp.UnRefPage(tree.MetaPageId)
-		meta := metapage.NewMetaPage(metaBuf.GetReadData())
-		rootPageId := meta.RootPageId()
+		meta := newMetaPage(metaBuf.GetReadData())
+		rootPageId := meta.rootPageId()
 
 		rootBuf, err := bp.FetchPage(rootPageId)
 		require.NoError(t, err)
@@ -615,8 +614,8 @@ Branch[keys=1]: [key_10]
 
 			metaBuf, err := bp.FetchPage(tree.MetaPageId)
 			require.NoError(t, err)
-			meta := metapage.NewMetaPage(metaBuf.GetReadData())
-			rootPageId := meta.RootPageId()
+			meta := newMetaPage(metaBuf.GetReadData())
+			rootPageId := meta.rootPageId()
 			bp.UnRefPage(tree.MetaPageId)
 
 			rootBuf, err := bp.FetchPage(rootPageId)

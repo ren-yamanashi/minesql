@@ -1,6 +1,17 @@
-package slottedpage
+package node
 
 import "encoding/binary"
+
+// Slotted Page のヘッダーサイズ
+//
+// ヘッダー情報の内訳は以下の通り
+//
+// numSlots: 2 byte (0, 1) -- スロット数
+//
+// freeOffset: 2 byte (2, 3) -- フリースペースの開始位置
+//
+// pad: 4 byte (4, 5, 6, 7) -- 予約領域
+const slottedPageHeaderSize = 8
 
 type SlottedPage struct {
 	data []byte
@@ -37,8 +48,8 @@ func (sp *SlottedPage) Insert(index int, data []byte) bool {
 
 	// データを挿入するポインタの index がスロット数より小さい場合は、ポインタ配列をシフト (index 以降を右にずらす)
 	if index < numSlots {
-		src := headerSize + index*pointerSize // コピー元の開始位置
-		destination := src + pointerSize      // コピー先の開始位置
+		src := slottedPageHeaderSize + index*pointerSize // コピー元の開始位置
+		destination := src + pointerSize                 // コピー先の開始位置
 		copySize := (numSlots - index) * pointerSize
 		copy(sp.data[destination:destination+copySize], sp.data[src:src+copySize])
 	}
@@ -63,8 +74,8 @@ func (sp *SlottedPage) Remove(index int) {
 
 	// ポインタ配列をシフト (index 以降を左にずらす)
 	if index < numSlots-1 {
-		src := headerSize + (index+1)*pointerSize     // コピー元の開始位置
-		destination := headerSize + index*pointerSize // コピー先の開始位置
+		src := slottedPageHeaderSize + (index+1)*pointerSize     // コピー元の開始位置
+		destination := slottedPageHeaderSize + index*pointerSize // コピー先の開始位置
 		copySize := (numSlots - index - 1) * pointerSize
 		copy(sp.data[destination:destination+copySize], sp.data[src:src+copySize])
 	}
@@ -195,7 +206,7 @@ func (sp *SlottedPage) TransferAllTo(dest *SlottedPage) bool {
 
 // Capacity は ヘッダー領域を除いた Slotted Page の容量を返す
 func (sp *SlottedPage) Capacity() int {
-	return len(sp.data) - headerSize
+	return len(sp.data) - slottedPageHeaderSize
 }
 
 // NumSlots は Slotted Page のヘッダーから現在のスロット数を読み取る
@@ -209,7 +220,7 @@ func (sp *SlottedPage) NumSlots() int {
 func (sp *SlottedPage) FreeSpace() int {
 	freeSpaceOffset := int(binary.BigEndian.Uint16(sp.data[2:4])) // フリースペースの開始位置 (offset) はヘッダーの 2 バイト目から 2 バイト分に格納されている
 	pointersSize := pointerSize * sp.NumSlots()
-	return freeSpaceOffset - pointersSize - headerSize
+	return freeSpaceOffset - pointersSize - slottedPageHeaderSize
 }
 
 // Data は指定されたインデックスのデータを取得する
@@ -228,7 +239,7 @@ func (sp *SlottedPage) Initialize() {
 
 // 指定されたインデックスのポインタを取得する
 func (sp *SlottedPage) pointerAt(index int) pointer {
-	base := headerSize + index*pointerSize
+	base := slottedPageHeaderSize + index*pointerSize
 	return newPointer(
 		binary.BigEndian.Uint16(sp.data[base:base+2]),
 		binary.BigEndian.Uint16(sp.data[base+2:base+4]),
@@ -237,7 +248,7 @@ func (sp *SlottedPage) pointerAt(index int) pointer {
 
 // 指定されたインデックスのポインタを設定する
 func (sp *SlottedPage) setPointer(index int, pointer pointer) {
-	base := headerSize + index*pointerSize
+	base := slottedPageHeaderSize + index*pointerSize
 	binary.BigEndian.PutUint16(sp.data[base:base+2], pointer.offset) // offset
 	binary.BigEndian.PutUint16(sp.data[base+2:base+4], pointer.size) // size
 }

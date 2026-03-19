@@ -2,15 +2,14 @@ package node
 
 import (
 	"errors"
-	slottedpage "minesql/internal/storage/btree/slotted_page"
 	"minesql/internal/storage/page"
 )
 
 const branchHeaderSize = 8
 
 type BranchNode struct {
-	data []byte                   // ページデータ全体 (ノードタイプヘッダー + ブランチノードヘッダー + Slotted Page のボディ)
-	body *slottedpage.SlottedPage // Slotted Page のボディ部分
+	data []byte       // ページデータ全体 (ノードタイプヘッダー + ブランチノードヘッダー + Slotted Page のボディ)
+	body *SlottedPage // Slotted Page のボディ部分
 }
 
 // NewBranchNode はページデータを受け取ってそのデータをブランチノードとして扱うための構造体を返す
@@ -29,7 +28,7 @@ func NewBranchNode(data []byte) *BranchNode {
 	copy(data[0:8], NODE_TYPE_BRANCH)
 
 	// data[16:] 以降を Slotted Page のボディとして扱う
-	body := slottedpage.NewSlottedPage(data[nodeHeaderSize+branchHeaderSize:])
+	body := NewSlottedPage(data[nodeHeaderSize+branchHeaderSize:])
 
 	return &BranchNode{
 		data: data,

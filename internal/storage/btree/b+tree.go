@@ -3,7 +3,6 @@ package btree
 import (
 	"bytes"
 	"errors"
-	metapage "minesql/internal/storage/btree/meta_page"
 	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/page"
@@ -26,7 +25,7 @@ func CreateBPlusTree(bp *bufferpool.BufferPool, metaPageId page.PageId) (*BPlusT
 	if err != nil {
 		return nil, err
 	}
-	meta := metapage.NewMetaPage(metaBuf.GetWriteData())
+	meta := newMetaPage(metaBuf.GetWriteData())
 
 	// ルートノード (リーフノード) を作成
 	rootNodePageId, err := bp.AllocatePageId(metaPageId.FileId)
@@ -41,7 +40,7 @@ func CreateBPlusTree(bp *bufferpool.BufferPool, metaPageId page.PageId) (*BPlusT
 	rootLeafNode.Initialize()
 
 	// メタページにルートページIDを設定
-	meta.SetRootPageId(rootNodePageId)
+	meta.setRootPageId(rootNodePageId)
 
 	return NewBPlusTree(metaPageId), nil
 }
@@ -66,10 +65,10 @@ func (bt *BPlusTree) Search(bp *bufferpool.BufferPool, searchMode SearchMode) (*
 	}
 	// メタページは使い終わったらすぐ不要になる (優先的に evict されたい) ので、 UnRefPage する
 	defer bp.UnRefPage(bt.MetaPageId)
-	meta := metapage.NewMetaPage(metaBuf.GetReadData())
+	meta := newMetaPage(metaBuf.GetReadData())
 
 	// ルートページを取得
-	rootPageId := meta.RootPageId()
+	rootPageId := meta.rootPageId()
 	rootPage, err := bp.FetchPage(rootPageId)
 	if err != nil {
 		return nil, err
@@ -138,10 +137,10 @@ func (bt *BPlusTree) Insert(bp *bufferpool.BufferPool, pair node.Pair) error {
 	}
 	// メタページは使い終わったらすぐ不要になる (優先的に evict されたい) ので、UnRefPage する
 	defer bp.UnRefPage(bt.MetaPageId)
-	meta := metapage.NewMetaPage(metaBuf.GetReadData())
+	meta := newMetaPage(metaBuf.GetReadData())
 
 	// ルートページを取得
-	rootPageId := meta.RootPageId()
+	rootPageId := meta.rootPageId()
 	rootPageBuf, err := bp.FetchPage(rootPageId)
 	if err != nil {
 		return err
@@ -174,8 +173,8 @@ func (bt *BPlusTree) Insert(bp *bufferpool.BufferPool, pair node.Pair) error {
 	}
 
 	// メタページに新しいルートページIDを設定する
-	meta = metapage.NewMetaPage(metaBuf.GetWriteData())
-	meta.SetRootPageId(newRootBuf.PageId)
+	meta = newMetaPage(metaBuf.GetWriteData())
+	meta.setRootPageId(newRootBuf.PageId)
 	return nil
 }
 
@@ -308,10 +307,10 @@ func (bt *BPlusTree) Delete(bp *bufferpool.BufferPool, key []byte) error {
 	}
 	// メタページは使い終わったらすぐ不要になる (優先的に evict されたい) ので、UnRefPage する
 	defer bp.UnRefPage(bt.MetaPageId)
-	meta := metapage.NewMetaPage(metaBuf.GetReadData())
+	meta := newMetaPage(metaBuf.GetReadData())
 
 	// ルートページを取得
-	rootPageId := meta.RootPageId()
+	rootPageId := meta.rootPageId()
 	rootPageBuf, err := bp.FetchPage(rootPageId)
 	if err != nil {
 		return err
@@ -329,8 +328,8 @@ func (bt *BPlusTree) Delete(bp *bufferpool.BufferPool, key []byte) error {
 		if branchNode.NumPairs() == 0 {
 			// 子が 1 つになった場合、右端の子をルートにする
 			newRootPageId := branchNode.ChildPageIdAt(0)
-			meta = metapage.NewMetaPage(metaBuf.GetWriteData())
-			meta.SetRootPageId(newRootPageId)
+			meta = newMetaPage(metaBuf.GetWriteData())
+			meta.setRootPageId(newRootPageId)
 		}
 	}
 
@@ -595,10 +594,10 @@ func (bt *BPlusTree) Update(bp *bufferpool.BufferPool, pair node.Pair) error {
 	}
 	// メタページは使い終わったらすぐ不要になる (優先的に evict されたい) ので、UnRefPage する
 	defer bp.UnRefPage(bt.MetaPageId)
-	meta := metapage.NewMetaPage(metaBuf.GetReadData())
+	meta := newMetaPage(metaBuf.GetReadData())
 
 	// ルートページを取得
-	rootPageId := meta.RootPageId()
+	rootPageId := meta.rootPageId()
 	rootPageBuf, err := bp.FetchPage(rootPageId)
 	if err != nil {
 		return err

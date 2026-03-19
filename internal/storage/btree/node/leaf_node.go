@@ -2,15 +2,14 @@ package node
 
 import (
 	"errors"
-	slottedpage "minesql/internal/storage/btree/slotted_page"
 	"minesql/internal/storage/page"
 )
 
 const leafHeaderSize = 16
 
 type LeafNode struct {
-	data []byte                   // ページデータ全体 (ノードタイプヘッダー + リーフノードヘッダー + Slotted Page のボディ)
-	body *slottedpage.SlottedPage // Slotted Page のボディ部分
+	data []byte       // ページデータ全体 (ノードタイプヘッダー + リーフノードヘッダー + Slotted Page のボディ)
+	body *SlottedPage // Slotted Page のボディ部分
 }
 
 // NewLeafNode はページデータを受け取ってそのデータをリーフノードとして扱うための構造体を返す
@@ -31,7 +30,7 @@ func NewLeafNode(data []byte) *LeafNode {
 	copy(data[0:8], NODE_TYPE_LEAF)
 
 	// data[24:] 以降を Slotted Page のボディとして扱う
-	body := slottedpage.NewSlottedPage(data[nodeHeaderSize+leafHeaderSize:])
+	body := NewSlottedPage(data[nodeHeaderSize+leafHeaderSize:])
 
 	return &LeafNode{
 		data: data,

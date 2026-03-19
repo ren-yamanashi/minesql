@@ -1,4 +1,4 @@
-package slottedpage
+package node
 
 import (
 	"testing"
@@ -460,7 +460,7 @@ func TestCapacity(t *testing.T) {
 		capacity := sp.Capacity()
 
 		// THEN
-		assert.Equal(t, 120, capacity) // 128 - headerSize(8) = 120
+		assert.Equal(t, 120, capacity) // 128 - slottedPageHeaderSize(8) = 120
 	})
 }
 
@@ -492,7 +492,7 @@ func TestFreeSpace(t *testing.T) {
 		freeSpace := sp.FreeSpace()
 
 		// THEN
-		assert.Equal(t, 120, freeSpace) // 128 - headerSize(8) = 120
+		assert.Equal(t, 120, freeSpace) // 128 - slottedPageHeaderSize(8) = 120
 	})
 
 	t.Run("データ挿入後に空き容量が減る", func(t *testing.T) {
@@ -589,6 +589,6 @@ func TestInitialize(t *testing.T) {
 
 		// THEN
 		assert.Equal(t, 0, sp.NumSlots())
-		assert.Equal(t, 120, sp.FreeSpace()) // 128 - headerSize(8) = 120
+		assert.Equal(t, 120, sp.FreeSpace()) // 128 - slottedPageHeaderSize(8) = 120
 	})
 }
