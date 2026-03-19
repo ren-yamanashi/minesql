@@ -6,6 +6,8 @@ import (
 	"minesql/internal/storage/page"
 )
 
+// TableMetadata はテーブルのメタデータを表す
+//
 // 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-tables-access.html
 type TableMetadata struct {
 	MetaPageId      page.PageId       // テーブルのメタデータが格納される B+Tree のメタページID

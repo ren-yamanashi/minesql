@@ -3,9 +3,9 @@ package access
 import (
 	"fmt"
 	"minesql/internal/storage/btree"
-	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
+	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/page"
 )
 

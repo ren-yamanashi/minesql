@@ -8,6 +8,8 @@ const (
 	IndexTypeUnique IndexType = "unique secondary"
 )
 
+// IndexMetadata はセカンダリインデックスのメタデータを表す
+//
 // 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-indexes-table.html
 type IndexMetadata struct {
 	MetaPageId     page.PageId // インデックスのメタデータが格納される B+Tree のメタページID

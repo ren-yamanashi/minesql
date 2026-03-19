@@ -3,8 +3,8 @@ package access
 import (
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/disk"
+	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/page"
 	"os"
 	"path/filepath"

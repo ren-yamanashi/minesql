@@ -8,6 +8,8 @@ const (
 	ColumnTypeString ColumnType = "string"
 )
 
+// ColumnMetadata はカラムのメタデータを表す
+//
 // 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-columns-table.html
 type ColumnMetadata struct {
 	MetaPageId page.PageId // カラムのメタデータが格納される B+Tree のメタページID

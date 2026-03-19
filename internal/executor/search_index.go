@@ -2,8 +2,8 @@ package executor
 
 import (
 	"minesql/internal/storage"
-	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/btree"
+	"minesql/internal/storage/memcomparable"
 )
 
 type SearchIndex struct {
