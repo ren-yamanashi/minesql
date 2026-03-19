@@ -337,11 +337,6 @@ func (bt *BPlusTree) Delete(bp *bufferpool.BufferPool, key []byte) error {
 	return nil
 }
 
-// deleteResult は削除処理の結果を表す
-type deleteResult struct {
-	underflow bool // 子ノードでアンダーフローが発生したかどうか
-}
-
 // deleteRecursively は再帰的にノードを辿ってペアを削除する
 //
 // 戻り値: (アンダーフローが発生したかどうか, エラー)
