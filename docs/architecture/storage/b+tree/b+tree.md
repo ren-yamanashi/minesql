@@ -2,8 +2,8 @@
 
 ## 読む順序
 
-1. [Slotted Page](./slotted-page.md)
-2. [Node](./node.md)
+1. [Slotted Page](./node/slotted-page.md)
+2. [Node](./node/node.md)
 3. [Meta Page](./meta-page.md)
 4. B+Tree 本体 (このドキュメント)
    - Iterator

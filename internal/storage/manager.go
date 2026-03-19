@@ -31,6 +31,12 @@ func InitStorageManager() *StorageManager {
 	return manager
 }
 
+// ResetStorageManager はグローバルな StorageManager の状態をリセットする (主にテストで使用)
+func ResetStorageManager() {
+	manager = nil
+	once = sync.Once{}
+}
+
 func GetStorageManager() *StorageManager {
 	if manager == nil {
 		panic("storage manager not initialized. call InitStorageManager() first")

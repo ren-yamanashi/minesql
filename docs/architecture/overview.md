@@ -5,10 +5,7 @@
 - [パーサー](./parser.md)
 - [プランナー](./planner.md)
 - [エグゼキュータ](./executor.md)
-- ストレージエンジン
-  - [アクセスメソッド](./access/overview.md)
-  - [バッファプール](./storage/bufferpool.md)
-  - [ディスク](./storage/disk.md)
+- [ストレージ](./storage/overview.md)
 
 - 基本的には下から順に (ディスク -> バッファープール -> アクセスメソッド -> エグゼキュータ -> プランナー -> パーサー の順で) 実装する
 
@@ -21,7 +18,7 @@ graph TD
     executor --1.定義要求--> manager[マネージャ]
     executor --2.Scan/Insert/Create/...etc--> accessMethod[アクセスメソッド]
 
-    subgraph storageEngine[ストレージエンジン]
+    subgraph storageEngine[ストレージ]
         direction TB
         subgraph accessMethod[アクセスメソッド]
             b-tree[B+Tree]
