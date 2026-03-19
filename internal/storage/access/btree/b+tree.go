@@ -349,9 +349,9 @@ func (bt *BPlusTree) deleteRecursively(bp *bufferpool.BufferPool, nodeBuffer *bu
 	nodeType := node.GetNodeType(nodeBuffer.GetReadData())
 
 	if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
-		return bt.deleteFromBranch(bp, nodeBuffer, key)
-	} else if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
 		return bt.deleteFromLeaf(nodeBuffer, key)
+	} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
+		return bt.deleteFromBranch(bp, nodeBuffer, key)
 	}
 	panic("unknown node type") // 実際にはここには到達しないので errors.New ではなく panic で良い
 }
