@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"minesql/internal/storage/access/btree"
+	"minesql/internal/storage/btree"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
 	"minesql/internal/storage/page"
@@ -24,14 +24,14 @@ func scan() {
 	bp.RegisterDisk(fileId, dm)
 
 	// 既存の B+Tree を開く (MetaPageId は 0 と仮定)
-	tree := btree.NewBTree(page.NewPageId(fileId, 0))
+	tree := btree.NewBPlusTree(page.NewPageId(fileId, 0))
 
 	// 全データをスキャン
 	scanAll(bp, tree)
 }
 
 // B+Tree の全データをスキャンして表示する
-func scanAll(bp *bufferpool.BufferPool, tree *btree.BTree) {
+func scanAll(bp *bufferpool.BufferPool, tree *btree.BPlusTree) {
 	iter, err := tree.Search(bp, btree.SearchModeStart{})
 	if err != nil {
 		panic(err)

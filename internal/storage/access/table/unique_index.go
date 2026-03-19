@@ -1,8 +1,8 @@
 package table
 
 import (
-	"minesql/internal/storage/access/btree"
-	"minesql/internal/storage/access/btree/node"
+	"minesql/internal/storage/btree"
+	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/page"
 )

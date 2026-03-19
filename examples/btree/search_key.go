@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"minesql/internal/storage/access/btree"
+	"minesql/internal/storage/btree"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
 	"minesql/internal/storage/page"
@@ -24,7 +24,7 @@ func searchKey() {
 	bp.RegisterDisk(fileId, dm)
 
 	// 既存の B+Tree を開く (MetaPageId は 0 と仮定)
-	tree := btree.NewBTree(page.NewPageId(fileId, 0))
+	tree := btree.NewBPlusTree(page.NewPageId(fileId, 0))
 
 	// キーで検索
 	searchKeys := []string{"grape", "lemon", "watermelon"}

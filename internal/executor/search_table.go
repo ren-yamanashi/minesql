@@ -2,8 +2,8 @@ package executor
 
 import (
 	"minesql/internal/storage"
-	"minesql/internal/storage/access/btree"
 	"minesql/internal/storage/access/table"
+	"minesql/internal/storage/btree"
 )
 
 // テーブル検索を行う Executor

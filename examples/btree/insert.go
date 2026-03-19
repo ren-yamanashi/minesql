@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"minesql/internal/storage/access/btree"
-	metapage "minesql/internal/storage/access/btree/meta_page"
-	"minesql/internal/storage/access/btree/node"
+	"minesql/internal/storage/btree"
+	metapage "minesql/internal/storage/btree/meta_page"
+	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
 	"minesql/internal/storage/page"
@@ -32,7 +32,7 @@ func insert(dataDir string) {
 	}
 
 	// B+Tree を作成
-	tree, err := btree.CreateBTree(bp, metaPageId)
+	tree, err := btree.CreateBPlusTree(bp, metaPageId)
 	if err != nil {
 		panic(err)
 	}
@@ -83,7 +83,7 @@ func insert(dataDir string) {
 }
 
 // B+Tree の構造を表示
-func displayTreeStructure(bp *bufferpool.BufferPool, tree *btree.BTree) {
+func displayTreeStructure(bp *bufferpool.BufferPool, tree *btree.BPlusTree) {
 	fmt.Println("=== B+Tree の構造 ===")
 
 	// メタページからルートページIDを取得

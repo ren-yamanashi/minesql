@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	metapage "minesql/internal/storage/access/btree/meta_page"
-	"minesql/internal/storage/access/btree/node"
+	metapage "minesql/internal/storage/btree/meta_page"
+	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/page"
 

@@ -2,7 +2,7 @@ package node
 
 import (
 	"errors"
-	slottedpage "minesql/internal/storage/access/btree/slotted_page"
+	slottedpage "minesql/internal/storage/btree/slotted_page"
 	"minesql/internal/storage/page"
 )
 

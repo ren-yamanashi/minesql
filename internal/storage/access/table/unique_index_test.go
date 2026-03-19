@@ -1,7 +1,7 @@
 package table
 
 import (
-	"minesql/internal/storage/access/btree"
+	"minesql/internal/storage/btree"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

@@ -1,7 +1,7 @@
 package table
 
 import (
-	"minesql/internal/storage/access/btree"
+	"minesql/internal/storage/btree"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
 	"minesql/internal/storage/page"

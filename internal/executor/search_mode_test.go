@@ -2,8 +2,8 @@ package executor
 
 import (
 	"bytes"
-	"minesql/internal/storage/access/btree"
 	"minesql/internal/storage/access/table"
+	"minesql/internal/storage/btree"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

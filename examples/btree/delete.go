@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"minesql/internal/storage/access/btree"
-	"minesql/internal/storage/access/btree/node"
+	"minesql/internal/storage/btree"
+	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
 )
@@ -31,7 +31,7 @@ func delete() {
 	}
 
 	// B+Tree を作成
-	tree, err := btree.CreateBTree(bp, metaPageId)
+	tree, err := btree.CreateBPlusTree(bp, metaPageId)
 	if err != nil {
 		panic(err)
 	}

@@ -1,7 +1,7 @@
 package btree
 
 import (
-	"minesql/internal/storage/access/btree/node"
+	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/page"
 	"testing"
 

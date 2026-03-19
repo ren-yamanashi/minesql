@@ -1,8 +1,8 @@
 package executor
 
 import (
-	"minesql/internal/storage/access/btree"
 	"minesql/internal/storage/access/table"
+	"minesql/internal/storage/btree"
 )
 
 type RecordSearchMode interface {

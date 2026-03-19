@@ -2,22 +2,17 @@ package table
 
 import (
 	"fmt"
-	"minesql/internal/storage/access/btree"
-	"minesql/internal/storage/access/btree/node"
+	"minesql/internal/storage/btree"
+	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/page"
 )
 
 type Table struct {
-	// テーブル名
-	Name string
-	// テーブルの内容が入っている B+Tree のメタページの ID
-	MetaPageId page.PageId
-	// プライマリキーの列数 (プライマリキーは先頭から連続している想定)
-	// 例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる
-	PrimaryKeyCount uint8
-	// テーブルに紐づくユニークインデックス群
-	UniqueIndexes []*UniqueIndex
+	Name            string         // テーブル名
+	MetaPageId      page.PageId    // テーブルの内容が入っている B+Tree のメタページの ID
+	PrimaryKeyCount uint8          // プライマリキーの列数 (プライマリキーは先頭から連続している想定) (例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる)
+	UniqueIndexes   []*UniqueIndex // テーブルに紐づくユニークインデックス群
 }
 
 func NewTable(name string, metaPageId page.PageId, primaryKeyCount uint8, uniqueIndexes []*UniqueIndex) Table {

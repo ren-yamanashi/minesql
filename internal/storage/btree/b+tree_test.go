@@ -2,7 +2,7 @@ package btree
 
 import (
 	"fmt"
-	"minesql/internal/storage/access/btree/node"
+	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
 	"minesql/internal/storage/page"
@@ -625,15 +625,15 @@ func TestUpdate(t *testing.T) {
 	})
 }
 
-func TestNewBTree(t *testing.T) {
-	t.Run("既存の B+Tree を NewBTree で開いてデータを読み取れる", func(t *testing.T) {
-		// GIVEN: CreateBTree でツリーを作成しペアを挿入する
+func TestNewBPlusTree(t *testing.T) {
+	t.Run("既存の B+Tree を NewBPlusTree で開いてデータを読み取れる", func(t *testing.T) {
+		// GIVEN: CreateBPlusTree でツリーを作成しペアを挿入する
 		bt, bp := setupBTree(t)
 		bt.mustInsert(bp, "aaa", "v1")
 		bt.mustInsert(bp, "bbb", "v2")
 		bt.mustInsert(bp, "ccc", "v3")
 
-		// WHEN: 同じ metaPageId で NewBTree を呼ぶ
+		// WHEN: 同じ metaPageId で NewBPlusTree を呼ぶ
 		bt2 := NewBPlusTree(bt.MetaPageId)
 
 		// THEN: 挿入したペアがすべて取得できる

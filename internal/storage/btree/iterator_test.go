@@ -1,7 +1,7 @@
 package btree
 
 import (
-	"minesql/internal/storage/access/btree/node"
+	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
 	"minesql/internal/storage/page"
