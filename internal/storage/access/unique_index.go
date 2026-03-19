@@ -4,6 +4,7 @@ import (
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
+	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/page"
 )
 
@@ -42,7 +43,7 @@ func (ui *UniqueIndexAccessMethod) Insert(bp *bufferpool.BufferPool, primaryKey 
 	var secondaryKey []byte
 
 	// セカンダリキーをエンコード
-	Encode([][]byte{record[ui.SecondaryKeyIdx]}, &secondaryKey)
+	memcomparable.Encode([][]byte{record[ui.SecondaryKeyIdx]}, &secondaryKey)
 
 	// B+Tree に挿入
 	return btr.Insert(bp, node.NewPair(secondaryKey, primaryKey))
@@ -54,7 +55,7 @@ func (ui *UniqueIndexAccessMethod) Delete(bp *bufferpool.BufferPool, record [][]
 	var secondaryKey []byte
 
 	// セカンダリキーをエンコード
-	Encode([][]byte{record[ui.SecondaryKeyIdx]}, &secondaryKey)
+	memcomparable.Encode([][]byte{record[ui.SecondaryKeyIdx]}, &secondaryKey)
 
 	// B+Tree から削除
 	return btr.Delete(bp, secondaryKey)
@@ -67,8 +68,8 @@ func (ui *UniqueIndexAccessMethod) Update(bp *bufferpool.BufferPool, oldRecord [
 	var newSecondaryKey []byte
 
 	// セカンダリキーをエンコード
-	Encode([][]byte{oldRecord[ui.SecondaryKeyIdx]}, &oldSecondaryKey)
-	Encode([][]byte{newRecord[ui.SecondaryKeyIdx]}, &newSecondaryKey)
+	memcomparable.Encode([][]byte{oldRecord[ui.SecondaryKeyIdx]}, &oldSecondaryKey)
+	memcomparable.Encode([][]byte{newRecord[ui.SecondaryKeyIdx]}, &newSecondaryKey)
 
 	// キーが一致しない場合は、B+Tree から古いキーに該当するペアを削除し、新しいキーに該当するペアを挿入する
 	if string(oldSecondaryKey) != string(newSecondaryKey) {

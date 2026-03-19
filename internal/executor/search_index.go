@@ -2,7 +2,7 @@ package executor
 
 import (
 	"minesql/internal/storage"
-	"minesql/internal/storage/access"
+	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/btree"
 )
 
@@ -77,7 +77,7 @@ func (is *SearchIndex) Next() (Record, error) {
 
 	// セカンダリキーをデコード
 	var secondaryKey [][]byte
-	access.Decode(secondaryIndexPair.Key, &secondaryKey)
+	memcomparable.Decode(secondaryIndexPair.Key, &secondaryKey)
 
 	// 継続条件をチェック
 	if !is.whileCondition(secondaryKey) {
@@ -99,7 +99,7 @@ func (is *SearchIndex) Next() (Record, error) {
 
 	// レコード (プライマリキー + 値) をデコード
 	var record [][]byte
-	access.Decode(tablePair.Key, &record)
-	access.Decode(tablePair.Value, &record)
+	memcomparable.Decode(tablePair.Key, &record)
+	memcomparable.Decode(tablePair.Value, &record)
 	return record, nil
 }

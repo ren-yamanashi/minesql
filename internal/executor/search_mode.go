@@ -1,7 +1,7 @@
 package executor
 
 import (
-	"minesql/internal/storage/access"
+	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/btree"
 )
 
@@ -27,6 +27,6 @@ type RecordSearchModeKey struct {
 
 func (k RecordSearchModeKey) Encode() btree.SearchMode {
 	var key []byte
-	access.Encode(k.Key, &key)
+	memcomparable.Encode(k.Key, &key)
 	return btree.SearchModeKey{Key: key}
 }

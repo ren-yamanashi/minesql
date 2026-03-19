@@ -1,4 +1,9 @@
-package access
+/*
+memcomparable パッケージは、複数のバイト列を memcomparable 形式でエンコード・デコードするためのメソッドを提供する
+
+see: docs/about/memcomparable-format.md
+*/
+package memcomparable
 
 // [8 バイトのデータ][1 バイトの長さ情報]
 //
@@ -19,7 +24,42 @@ func encodedSize(size int) int {
 	return ((size + DATA_SIZE - 1) / DATA_SIZE) * BLOCK_SIZE
 }
 
-// encodeToMemcomparable　はバイト列を memcomparable 形式にエンコードする
+// 複数のバイト列を連結してエンコードする
+//
+// elements: エンコード対象のバイト列のスライス
+//
+// dest: エンコード結果の格納先のポインタ
+func Encode(elements [][]byte, dest *[]byte) {
+	for _, element := range elements {
+		size := encodedSize(len(element))
+
+		// dest の容量が、必要なサイズを満たしていない場合は拡張
+		if cap(*dest)-len(*dest) < size {
+			newData := make([]byte, len(*dest), len(*dest)+size)
+			copy(newData, *dest)
+			*dest = newData
+		}
+
+		// エンコード
+		encodeToMemcomparable(element, dest)
+	}
+}
+
+// エンコードされたバイト列を複数のバイト列にデコードする
+//
+// src: エンコードされたバイト列
+//
+// elements: デコード結果の格納先のポインタ
+func Decode(src []byte, elements *[][]byte) {
+	rest := src
+	for len(rest) > 0 {
+		element := make([]byte, 0)
+		decodeFromMemcomparable(&rest, &element)
+		*elements = append(*elements, element)
+	}
+}
+
+// バイト列を memcomparable 形式にエンコードする
 //
 // エンコード形式: [8 バイトのデータ][1 バイトの長さ情報] のブロックを繰り返す
 //
@@ -55,7 +95,7 @@ func encodeToMemcomparable(src []byte, dest *[]byte) {
 	}
 }
 
-// decodeFromMemcomparable は memcomparable 形式からバイト列をデコードする
+// memcomparable 形式からバイト列をデコードする
 // src: デコード対象のバイト列のポインタ
 // dest: デコード結果の格納先のポインタ
 func decodeFromMemcomparable(src *[]byte, dest *[]byte) {

@@ -2,6 +2,7 @@ package access
 
 import (
 	"minesql/internal/storage/btree"
+	"minesql/internal/storage/memcomparable"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -58,7 +59,7 @@ func TestUniqueIndex(t *testing.T) {
 			// エンコードされたキーをデコード
 			var decodedKey [][]byte
 			keyBytes := pair.Key
-			Decode(keyBytes, &decodedKey)
+			memcomparable.Decode(keyBytes, &decodedKey)
 
 			assert.Equal(t, expected.key, decodedKey)
 			assert.Equal(t, expected.value, pair.Value)
@@ -115,7 +116,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 			expected := expectedRecords[i]
 
 			var decodedKey [][]byte
-			Decode(pair.Key, &decodedKey)
+			memcomparable.Decode(pair.Key, &decodedKey)
 
 			assert.Equal(t, expected.key, decodedKey)
 			assert.Equal(t, expected.value, pair.Value)
@@ -164,7 +165,7 @@ func TestUniqueIndexUpdate(t *testing.T) {
 				break
 			}
 			var decodedKey [][]byte
-			Decode(pair.Key, &decodedKey)
+			memcomparable.Decode(pair.Key, &decodedKey)
 			keys = append(keys, string(decodedKey[0]))
 		}
 		assert.Equal(t, []string{"Alice", "Zack"}, keys)
@@ -200,7 +201,7 @@ func TestUniqueIndexUpdate(t *testing.T) {
 		assert.True(t, ok)
 
 		var decodedKey [][]byte
-		Decode(pair.Key, &decodedKey)
+		memcomparable.Decode(pair.Key, &decodedKey)
 		assert.Equal(t, "John", string(decodedKey[0]))
 		assert.Equal(t, []uint8{99}, pair.Value)
 	})
@@ -296,7 +297,7 @@ func TestUniqueIndexUpdate(t *testing.T) {
 				break
 			}
 			var decodedKey [][]byte
-			Decode(pair.Key, &decodedKey)
+			memcomparable.Decode(pair.Key, &decodedKey)
 			assert.Equal(t, expectedRecords[i].key, string(decodedKey[0]))
 			assert.Equal(t, expectedRecords[i].value, pair.Value)
 			i++

@@ -8,23 +8,14 @@ import (
 
 // 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-tables-access.html
 type TableMetadata struct {
-	// テーブルのメタデータが格納される B+Tree のメタページID
-	MetaPageId page.PageId
-	// テーブルの識別子 (一意)
-	TableId uint64
-	// テーブルの名前
-	Name string
-	// テーブルの列数
-	NCols uint8
-	// プライマリキーの列数 (プライマリキーは先頭から連続している想定)
-	// 例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる
-	PrimaryKeyCount uint8
-	// 実データが格納される B+Tree のメタページID
-	DataMetaPageId page.PageId
-	// テーブルのカラム情報
-	Cols []*ColumnMetadata
-	// テーブルのインデックス情報
-	Indexes []*IndexMetadata
+	MetaPageId      page.PageId       // テーブルのメタデータが格納される B+Tree のメタページID
+	TableId         uint64            // テーブルの識別子 (一意)
+	Name            string            // テーブルの名前
+	NCols           uint8             // テーブルの列数
+	PrimaryKeyCount uint8             // プライマリキーの列数 (プライマリキーは先頭から連続している想定) (例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる)
+	DataMetaPageId  page.PageId       // 実データが格納される B+Tree のメタページID
+	Cols            []*ColumnMetadata // テーブルのカラム情報
+	Indexes         []*IndexMetadata  // テーブルのインデックス情報
 }
 
 func NewTableMetadata(tableId uint64, name string, nCols uint8, pkCount uint8, cols []*ColumnMetadata, indexes []*IndexMetadata, dataMetaPageId page.PageId) TableMetadata {
@@ -39,7 +30,7 @@ func NewTableMetadata(tableId uint64, name string, nCols uint8, pkCount uint8, c
 	}
 }
 
-// カラム名からカラムを取得
+// GetColByName はカラム名からカラムを取得する
 func (tm *TableMetadata) GetColByName(colName string) (*ColumnMetadata, bool) {
 	for _, col := range tm.Cols {
 		if col.Name == colName {
@@ -49,7 +40,7 @@ func (tm *TableMetadata) GetColByName(colName string) (*ColumnMetadata, bool) {
 	return nil, false
 }
 
-// 指定されたカラム名で構成されるインデックスを取得
+// GetIndexByColName は指定されたカラム名で構成されるインデックスを取得する
 func (tm *TableMetadata) GetIndexByColName(colName string) (*IndexMetadata, bool) {
 	for _, idx := range tm.Indexes {
 		if idx.ColName == colName {
@@ -59,7 +50,7 @@ func (tm *TableMetadata) GetIndexByColName(colName string) (*IndexMetadata, bool
 	return nil, false
 }
 
-// テーブル (access.Table) を取得する
+// GetTable はテーブル (access.Table) を取得する
 func (tm *TableMetadata) GetTable() (*access.TableAccessMethod, error) {
 	// ユニークインデックスを構築
 	var uniqueIndexes []*access.UniqueIndexAccessMethod

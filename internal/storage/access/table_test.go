@@ -3,6 +3,7 @@ package access
 import (
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/bufferpool"
+	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/disk"
 	"minesql/internal/storage/page"
 	"os"
@@ -65,8 +66,8 @@ func TestCreateAndInsert(t *testing.T) {
 			var decodedValue [][]byte
 			keyBytes := pair.Key
 			valueBytes := pair.Value
-			Decode(keyBytes, &decodedKey)
-			Decode(valueBytes, &decodedValue)
+			memcomparable.Decode(keyBytes, &decodedKey)
+			memcomparable.Decode(valueBytes, &decodedValue)
 
 			assert.Equal(t, expected.key, decodedKey)
 			assert.Equal(t, expected.value, decodedValue)
@@ -85,10 +86,10 @@ func TestCreateAndInsert(t *testing.T) {
 		// SecondaryKey = 2 なので、3 番目のカラム (姓) がキー、エンコードされたプライマリキーが値
 		// プライマリキーをエンコード
 		var encodedPrimaryKeyA, encodedPrimaryKeyB, encodedPrimaryKeyC, encodedPrimaryKeyD []byte
-		Encode([][]byte{[]byte("a")}, &encodedPrimaryKeyA)
-		Encode([][]byte{[]byte("b")}, &encodedPrimaryKeyB)
-		Encode([][]byte{[]byte("c")}, &encodedPrimaryKeyC)
-		Encode([][]byte{[]byte("d")}, &encodedPrimaryKeyD)
+		memcomparable.Encode([][]byte{[]byte("a")}, &encodedPrimaryKeyA)
+		memcomparable.Encode([][]byte{[]byte("b")}, &encodedPrimaryKeyB)
+		memcomparable.Encode([][]byte{[]byte("c")}, &encodedPrimaryKeyC)
+		memcomparable.Encode([][]byte{[]byte("d")}, &encodedPrimaryKeyD)
 
 		expectedUniqueIndexRecords := []struct {
 			key   [][]byte
@@ -111,7 +112,7 @@ func TestCreateAndInsert(t *testing.T) {
 
 			// エンコードされたキーをデコード
 			var decodedKey [][]byte
-			Decode(pair.Key, &decodedKey)
+			memcomparable.Decode(pair.Key, &decodedKey)
 
 			assert.Equal(t, expected.key, decodedKey)
 			assert.Equal(t, expected.value, pair.Value)
@@ -201,7 +202,7 @@ func TestDelete(t *testing.T) {
 				break
 			}
 			var decodedKey [][]byte
-			Decode(pair.Key, &decodedKey)
+			memcomparable.Decode(pair.Key, &decodedKey)
 			keys = append(keys, string(decodedKey[0]))
 		}
 		assert.Equal(t, []string{"b", "c"}, keys)
@@ -219,7 +220,7 @@ func TestDelete(t *testing.T) {
 				break
 			}
 			var decodedKey [][]byte
-			Decode(pair.Key, &decodedKey)
+			memcomparable.Decode(pair.Key, &decodedKey)
 			indexKeys = append(indexKeys, string(decodedKey[0]))
 		}
 		// "Doe" が削除されて "Johnson", "Smith" のみ残る
@@ -368,7 +369,7 @@ func TestUpdate(t *testing.T) {
 				break
 			}
 			var decodedKey [][]byte
-			Decode(pair.Key, &decodedKey)
+			memcomparable.Decode(pair.Key, &decodedKey)
 			indexKeys = append(indexKeys, string(decodedKey[0]))
 		}
 		// "Doe" が削除され "Williams" が追加されている
@@ -411,12 +412,12 @@ func TestUpdate(t *testing.T) {
 		assert.True(t, ok)
 
 		var decodedKey [][]byte
-		Decode(pair.Key, &decodedKey)
+		memcomparable.Decode(pair.Key, &decodedKey)
 		assert.Equal(t, "Doe", string(decodedKey[0]))
 
 		// value はエンコードされた新しいプライマリキー "x"
 		var encodedNewPK []byte
-		Encode([][]byte{[]byte("x")}, &encodedNewPK)
+		memcomparable.Encode([][]byte{[]byte("x")}, &encodedNewPK)
 		assert.Equal(t, encodedNewPK, pair.Value)
 	})
 
@@ -505,7 +506,7 @@ func TestUpdate(t *testing.T) {
 				break
 			}
 			var decodedKey [][]byte
-			Decode(pair.Key, &decodedKey)
+			memcomparable.Decode(pair.Key, &decodedKey)
 			firstNameKeys = append(firstNameKeys, string(decodedKey[0]))
 		}
 		assert.Equal(t, []string{"Alice", "Jane"}, firstNameKeys)
@@ -522,7 +523,7 @@ func TestUpdate(t *testing.T) {
 				break
 			}
 			var decodedKey [][]byte
-			Decode(pair.Key, &decodedKey)
+			memcomparable.Decode(pair.Key, &decodedKey)
 			lastNameKeys = append(lastNameKeys, string(decodedKey[0]))
 		}
 		assert.Equal(t, []string{"Smith", "Williams"}, lastNameKeys)
@@ -568,8 +569,8 @@ func collectAllTablePairs(t *testing.T, bp *bufferpool.BufferPool, tree *btree.B
 		}
 		var decodedKey [][]byte
 		var decodedValue [][]byte
-		Decode(pair.Key, &decodedKey)
-		Decode(pair.Value, &decodedValue)
+		memcomparable.Decode(pair.Key, &decodedKey)
+		memcomparable.Decode(pair.Value, &decodedValue)
 		pairs = append(pairs, decodedPair{key: decodedKey, value: decodedValue})
 	}
 	return pairs

@@ -3,6 +3,7 @@ package access
 import (
 	"fmt"
 	"minesql/internal/storage/btree"
+	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/page"
@@ -54,11 +55,11 @@ func (t *TableAccessMethod) Insert(bp *bufferpool.BufferPool, record [][]byte) e
 
 	// キーをエンコード
 	var encodedKey []byte
-	Encode(record[:t.PrimaryKeyCount], &encodedKey)
+	memcomparable.Encode(record[:t.PrimaryKeyCount], &encodedKey)
 
 	// 値をエンコード
 	var encodedValue []byte
-	Encode(record[t.PrimaryKeyCount:], &encodedValue)
+	memcomparable.Encode(record[t.PrimaryKeyCount:], &encodedValue)
 
 	// B+Tree に挿入
 	err := btree.Insert(bp, node.NewPair(encodedKey, encodedValue))
@@ -83,7 +84,7 @@ func (t *TableAccessMethod) Delete(bp *bufferpool.BufferPool, record [][]byte) e
 
 	// キーをエンコード
 	var encodedKey []byte
-	Encode(record[:t.PrimaryKeyCount], &encodedKey)
+	memcomparable.Encode(record[:t.PrimaryKeyCount], &encodedKey)
 
 	// B+Tree から削除
 	err := btree.Delete(bp, encodedKey)
@@ -112,13 +113,13 @@ func (t *TableAccessMethod) Update(bp *bufferpool.BufferPool, oldRecord [][]byte
 
 	// キーをエンコード
 	var encodedOldKey []byte
-	Encode(oldRecord[:t.PrimaryKeyCount], &encodedOldKey)
+	memcomparable.Encode(oldRecord[:t.PrimaryKeyCount], &encodedOldKey)
 	var encodedNewKey []byte
-	Encode(newRecord[:t.PrimaryKeyCount], &encodedNewKey)
+	memcomparable.Encode(newRecord[:t.PrimaryKeyCount], &encodedNewKey)
 
 	// 値をエンコード
 	var encodedNewValue []byte
-	Encode(newRecord[t.PrimaryKeyCount:], &encodedNewValue)
+	memcomparable.Encode(newRecord[t.PrimaryKeyCount:], &encodedNewValue)
 
 	// キーが一致しない場合は、B+Tree から古いキーに該当するペアを削除し、新しいキーに該当するペアを挿入する
 	if string(encodedOldKey) != string(encodedNewKey) {

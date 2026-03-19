@@ -2,7 +2,7 @@ package executor
 
 import (
 	"bytes"
-	"minesql/internal/storage/access"
+	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/btree"
 	"testing"
 
@@ -45,7 +45,7 @@ func TestEncodeForRecordSearchModeKey(t *testing.T) {
 
 		// 期待値を手動でエンコード
 		var expectedKey []byte
-		access.Encode(key, &expectedKey)
+		memcomparable.Encode(key, &expectedKey)
 
 		// WHEN
 		encoded := searchMode.Encode()
@@ -61,7 +61,7 @@ func TestEncodeForRecordSearchModeKey(t *testing.T) {
 		searchMode := RecordSearchModeKey{Key: key}
 
 		var expectedKey []byte
-		access.Encode(key, &expectedKey)
+		memcomparable.Encode(key, &expectedKey)
 
 		// WHEN
 		encoded := searchMode.Encode()
@@ -78,7 +78,7 @@ func TestEncodeForRecordSearchModeKey(t *testing.T) {
 		searchMode := RecordSearchModeKey{Key: key}
 
 		var expectedKey []byte
-		access.Encode(key, &expectedKey)
+		memcomparable.Encode(key, &expectedKey)
 
 		// WHEN
 		encoded := searchMode.Encode()
