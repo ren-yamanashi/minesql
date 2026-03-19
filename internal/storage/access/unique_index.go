@@ -2,7 +2,6 @@ package access
 
 import (
 	"minesql/internal/storage/btree"
-	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/page"
@@ -46,7 +45,7 @@ func (ui *UniqueIndexAccessMethod) Insert(bp *bufferpool.BufferPool, primaryKey 
 	memcomparable.Encode([][]byte{record[ui.SecondaryKeyIdx]}, &secondaryKey)
 
 	// B+Tree に挿入
-	return btr.Insert(bp, node.NewPair(secondaryKey, primaryKey))
+	return btr.Insert(bp, btree.NewPair(secondaryKey, primaryKey))
 }
 
 // Delete はユニークインデックスから行を削除する
@@ -77,13 +76,13 @@ func (ui *UniqueIndexAccessMethod) Update(bp *bufferpool.BufferPool, oldRecord [
 		if err != nil {
 			return err
 		}
-		err = btr.Insert(bp, node.NewPair(newSecondaryKey, primaryKey))
+		err = btr.Insert(bp, btree.NewPair(newSecondaryKey, primaryKey))
 		if err != nil {
 			return err
 		}
 	} else {
 		// キーが一致する場合は、B+Tree のペアを更新する
-		err := btr.Update(bp, node.NewPair(oldSecondaryKey, primaryKey))
+		err := btr.Update(bp, btree.NewPair(oldSecondaryKey, primaryKey))
 		if err != nil {
 			return err
 		}

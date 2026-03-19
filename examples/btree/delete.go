@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"minesql/internal/storage/btree"
-	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
 )
@@ -42,7 +41,7 @@ func delete() {
 		"fig", "grape", "honeydew", "kiwi", "lemon",
 	}
 	for _, fruit := range fruits {
-		pair := node.NewPair([]byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
+		pair := btree.NewPair([]byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
 		if err := tree.Insert(bp, pair); err != nil {
 			panic(err)
 		}
@@ -72,7 +71,7 @@ func delete() {
 
 	// 削除後に新しいキーを挿入できることを確認
 	fmt.Println("\n=== 削除後に新しいキーを挿入 ===")
-	pair := node.NewPair([]byte("blueberry"), []byte(strings.Repeat("b", 100)))
+	pair := btree.NewPair([]byte("blueberry"), []byte(strings.Repeat("b", 100)))
 	if err := tree.Insert(bp, pair); err != nil {
 		panic(err)
 	}

@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"minesql/internal/storage/btree"
-	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
 )
@@ -42,7 +41,7 @@ func update() {
 		"fig", "grape", "honeydew", "kiwi", "lemon",
 	}
 	for _, fruit := range fruits {
-		pair := node.NewPair([]byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
+		pair := btree.NewPair([]byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
 		if err := tree.Insert(bp, pair); err != nil {
 			panic(err)
 		}
@@ -63,7 +62,7 @@ func update() {
 	}
 	for _, u := range updateKeys {
 		fmt.Printf("Update: key=%s, newValue=%s x %d\n", u.key, string(u.newValue[0]), len(u.newValue))
-		err := tree.Update(bp, node.NewPair([]byte(u.key), []byte(u.newValue)))
+		err := tree.Update(bp, btree.NewPair([]byte(u.key), []byte(u.newValue)))
 		if err != nil {
 			panic(err)
 		}
@@ -85,7 +84,7 @@ func update() {
 		if err := tree.Delete(bp, []byte(kc.oldKey)); err != nil {
 			panic(err)
 		}
-		if err := tree.Insert(bp, node.NewPair([]byte(kc.newKey), []byte(kc.newValue))); err != nil {
+		if err := tree.Insert(bp, btree.NewPair([]byte(kc.newKey), []byte(kc.newValue))); err != nil {
 			panic(err)
 		}
 	}
@@ -93,7 +92,7 @@ func update() {
 
 	// 存在しないキーの更新でエラーを確認
 	fmt.Println("\n=== 存在しないキーの更新 ===")
-	err = tree.Update(bp, node.NewPair([]byte("apple"), []byte("should_fail")))
+	err = tree.Update(bp, btree.NewPair([]byte("apple"), []byte("should_fail")))
 	if err != nil {
 		fmt.Printf("期待通りのエラー: %v\n", err)
 	}
@@ -103,7 +102,7 @@ func update() {
 	for i := range 3 {
 		newValue := fmt.Sprintf("update_%d_%s", i+1, strings.Repeat("!", 50))
 		fmt.Printf("Update #%d: key=cherry, value=%s... (%d bytes)\n", i+1, newValue[:20], len(newValue))
-		if err := tree.Update(bp, node.NewPair([]byte("cherry"), []byte(newValue))); err != nil {
+		if err := tree.Update(bp, btree.NewPair([]byte("cherry"), []byte(newValue))); err != nil {
 			panic(err)
 		}
 	}

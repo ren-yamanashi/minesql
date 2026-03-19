@@ -3,7 +3,6 @@ package access
 import (
 	"fmt"
 	"minesql/internal/storage/btree"
-	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/page"
@@ -51,7 +50,7 @@ func (t *TableAccessMethod) Create(bp *bufferpool.BufferPool) error {
 //
 // プライマリキーを key, 他のカラム値を value としたペアを作成し、B+Tree に挿入する
 func (t *TableAccessMethod) Insert(bp *bufferpool.BufferPool, record [][]byte) error {
-	btree := btree.NewBPlusTree(t.MetaPageId)
+	btr := btree.NewBPlusTree(t.MetaPageId)
 
 	// キーをエンコード
 	var encodedKey []byte
@@ -62,7 +61,7 @@ func (t *TableAccessMethod) Insert(bp *bufferpool.BufferPool, record [][]byte) e
 	memcomparable.Encode(record[t.PrimaryKeyCount:], &encodedValue)
 
 	// B+Tree に挿入
-	err := btree.Insert(bp, node.NewPair(encodedKey, encodedValue))
+	err := btr.Insert(bp, btree.NewPair(encodedKey, encodedValue))
 	if err != nil {
 		return err
 	}
@@ -80,14 +79,14 @@ func (t *TableAccessMethod) Insert(bp *bufferpool.BufferPool, record [][]byte) e
 
 // Delete はテーブルから行を削除する
 func (t *TableAccessMethod) Delete(bp *bufferpool.BufferPool, record [][]byte) error {
-	btree := btree.NewBPlusTree(t.MetaPageId)
+	btr := btree.NewBPlusTree(t.MetaPageId)
 
 	// キーをエンコード
 	var encodedKey []byte
 	memcomparable.Encode(record[:t.PrimaryKeyCount], &encodedKey)
 
 	// B+Tree から削除
-	err := btree.Delete(bp, encodedKey)
+	err := btr.Delete(bp, encodedKey)
 	if err != nil {
 		return err
 	}
@@ -109,7 +108,7 @@ func (t *TableAccessMethod) Delete(bp *bufferpool.BufferPool, record [][]byte) e
 //
 // newRecord: 更新後の行 (プライマリキーとその他のカラム値を含む)
 func (t *TableAccessMethod) Update(bp *bufferpool.BufferPool, oldRecord [][]byte, newRecord [][]byte) error {
-	btree := btree.NewBPlusTree(t.MetaPageId)
+	btr := btree.NewBPlusTree(t.MetaPageId)
 
 	// キーをエンコード
 	var encodedOldKey []byte
@@ -123,17 +122,17 @@ func (t *TableAccessMethod) Update(bp *bufferpool.BufferPool, oldRecord [][]byte
 
 	// キーが一致しない場合は、B+Tree から古いキーに該当するペアを削除し、新しいキーに該当するペアを挿入する
 	if string(encodedOldKey) != string(encodedNewKey) {
-		err := btree.Delete(bp, encodedOldKey)
+		err := btr.Delete(bp, encodedOldKey)
 		if err != nil {
 			return err
 		}
-		err = btree.Insert(bp, node.NewPair(encodedNewKey, encodedNewValue))
+		err = btr.Insert(bp, btree.NewPair(encodedNewKey, encodedNewValue))
 		if err != nil {
 			return err
 		}
 	} else {
 		// キーが一致する場合は、B+Tree のペアを更新する
-		err := btree.Update(bp, node.NewPair(encodedOldKey, encodedNewValue))
+		err := btr.Update(bp, btree.NewPair(encodedOldKey, encodedNewValue))
 		if err != nil {
 			return err
 		}

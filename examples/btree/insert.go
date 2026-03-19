@@ -66,7 +66,7 @@ func insert(dataDir string) {
 
 	for _, data := range insertData {
 		fmt.Printf("\nInsert Key: %s, Insert Value: %s\n", data.key, string(data.value[0])+" x "+fmt.Sprint(len(data.value)))
-		pair := node.NewPair([]byte(data.key), []byte(data.value))
+		pair := btree.NewPair([]byte(data.key), []byte(data.value))
 		err := tree.Insert(bp, pair)
 		if err != nil {
 			panic(err)

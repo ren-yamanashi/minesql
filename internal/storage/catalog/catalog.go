@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"minesql/internal/storage/btree"
-	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/page"
@@ -186,7 +185,7 @@ func (c *Catalog) insertTableMetadata(bp *bufferpool.BufferPool, tableMeta Table
 	memcomparable.Encode([][]byte{[]byte(tableMeta.Name), nColsBuf, pkCountBuf, tableMeta.DataMetaPageId.ToBytes()}, &encodedValue)
 
 	// B+Tree に挿入
-	return btr.Insert(bp, node.NewPair(encodedKey, encodedValue))
+	return btr.Insert(bp, btree.NewPair(encodedKey, encodedValue))
 }
 
 func (c *Catalog) insertColumnMetadata(bp *bufferpool.BufferPool, columnMeta *ColumnMetadata) error {
@@ -203,7 +202,7 @@ func (c *Catalog) insertColumnMetadata(bp *bufferpool.BufferPool, columnMeta *Co
 	memcomparable.Encode([][]byte{posBuf, []byte(columnMeta.Type)}, &encodedValue)
 
 	// B+Tree に挿入
-	return btr.Insert(bp, node.NewPair(encodedKey, encodedValue))
+	return btr.Insert(bp, btree.NewPair(encodedKey, encodedValue))
 }
 
 func (c *Catalog) insertIndexMetadata(bp *bufferpool.BufferPool, indexMeta *IndexMetadata) error {
@@ -219,7 +218,7 @@ func (c *Catalog) insertIndexMetadata(bp *bufferpool.BufferPool, indexMeta *Inde
 	memcomparable.Encode([][]byte{[]byte(indexMeta.Type), []byte(indexMeta.ColName), indexMeta.DataMetaPageId.ToBytes()}, &encodedValue)
 
 	// B+Tree に挿入
-	return btr.Insert(bp, node.NewPair(encodedKey, encodedValue))
+	return btr.Insert(bp, btree.NewPair(encodedKey, encodedValue))
 }
 
 // テーブル名からテーブルメタデータを取得する
@@ -280,7 +279,7 @@ func (c *Catalog) loadMetadata(bp *bufferpool.BufferPool) error {
 }
 
 // テーブルメタデータをデコード
-func (c *Catalog) decodeTableMetadata(pair *node.Pair) TableMetadata {
+func (c *Catalog) decodeTableMetadata(pair *btree.Pair) TableMetadata {
 	// キーをデコード (TableId)
 	var keyParts [][]byte
 	memcomparable.Decode(pair.Key, &keyParts)
