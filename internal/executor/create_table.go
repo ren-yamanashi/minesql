@@ -89,9 +89,6 @@ func (ct *CreateTable) execute() error {
 	if err != nil {
 		return err
 	}
-	if err != nil {
-		return err
-	}
 
 	// カラムのメタデータを作成
 	colMeta := make([]*catalog.ColumnMetadata, len(ct.columnParams))
