@@ -16,24 +16,24 @@ func TestNewUpdate(t *testing.T) {
 		setColumns := []SetColumn{
 			{Pos: 1, Value: []byte("Jane")},
 		}
-		innerExecutor := NewSearchTable(
+		iterator := NewSearchTable(
 			tableName,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 
 		// WHEN
-		upd := NewUpdate(tableName, setColumns, innerExecutor)
+		upd := NewUpdate(tableName, setColumns, iterator)
 
 		// THEN
 		assert.NotNil(t, upd)
 		assert.Equal(t, tableName, upd.tableName)
 		assert.Equal(t, setColumns, upd.SetColumns)
-		assert.NotNil(t, upd.InnerExecutor)
+		assert.NotNil(t, upd.Iterator)
 	})
 }
 
-func TestUpdateNext(t *testing.T) {
+func TestUpdate_Execute(t *testing.T) {
 	t.Run("全レコードの value を更新できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
@@ -49,7 +49,7 @@ func TestUpdateNext(t *testing.T) {
 		))
 
 		// WHEN
-		_, err := upd.Next()
+		err := upd.Execute()
 
 		// THEN: 更新が成功する
 		assert.NoError(t, err)
@@ -60,7 +60,7 @@ func TestUpdateNext(t *testing.T) {
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
-		results, err := ExecutePlan(scan)
+		results, err := FetchAll(scan)
 		assert.NoError(t, err)
 		assert.Equal(t, 5, len(results))
 		for _, record := range results {
@@ -87,7 +87,7 @@ func TestUpdateNext(t *testing.T) {
 		))
 
 		// WHEN
-		_, err := upd.Next()
+		err := upd.Execute()
 
 		// THEN: 更新が成功する
 		assert.NoError(t, err)
@@ -98,7 +98,7 @@ func TestUpdateNext(t *testing.T) {
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
-		results, err := ExecutePlan(scan)
+		results, err := FetchAll(scan)
 		assert.NoError(t, err)
 		assert.Equal(t, 5, len(results))
 		assert.Equal(t, Record{[]byte("a"), []byte("Jane"), []byte("Updated")}, results[0])
@@ -126,7 +126,7 @@ func TestUpdateNext(t *testing.T) {
 		))
 
 		// WHEN
-		_, err := upd.Next()
+		err := upd.Execute()
 
 		// THEN: 更新が成功する
 		assert.NoError(t, err)
@@ -137,7 +137,7 @@ func TestUpdateNext(t *testing.T) {
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
-		results, err := ExecutePlan(scan)
+		results, err := FetchAll(scan)
 		assert.NoError(t, err)
 		assert.Equal(t, 5, len(results))
 		// "c" = Bob のレコード
@@ -167,7 +167,7 @@ func TestUpdateNext(t *testing.T) {
 		))
 
 		// WHEN
-		_, err := upd.Next()
+		err := upd.Execute()
 
 		// THEN: 更新が成功する
 		assert.NoError(t, err)
@@ -182,7 +182,7 @@ func TestUpdateNext(t *testing.T) {
 				return string(record[0]) == "Zebra"
 			},
 		)
-		results, err := ExecutePlan(indexScan)
+		results, err := FetchAll(indexScan)
 		assert.NoError(t, err)
 		assert.Equal(t, 1, len(results))
 		assert.Equal(t, Record{[]byte("a"), []byte("John"), []byte("Zebra")}, results[0])
@@ -196,7 +196,7 @@ func TestUpdateNext(t *testing.T) {
 				return string(record[0]) == "Doe"
 			},
 		)
-		resultsOld, err := ExecutePlan(indexScanOld)
+		resultsOld, err := FetchAll(indexScanOld)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, len(resultsOld))
 	})
@@ -216,7 +216,7 @@ func TestUpdateNext(t *testing.T) {
 		))
 
 		// WHEN
-		_, err := upd.Next()
+		err := upd.Execute()
 
 		// THEN
 		assert.Error(t, err)
@@ -240,7 +240,7 @@ func TestUpdateNext(t *testing.T) {
 		))
 
 		// WHEN
-		_, err := upd.Next()
+		err := upd.Execute()
 
 		// THEN: 更新が成功する
 		assert.NoError(t, err)
@@ -251,7 +251,7 @@ func TestUpdateNext(t *testing.T) {
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
-		results, err := ExecutePlan(scan)
+		results, err := FetchAll(scan)
 		assert.NoError(t, err)
 		assert.Equal(t, 5, len(results))
 		// "a" は存在しない
@@ -283,7 +283,7 @@ func TestUpdateNext(t *testing.T) {
 		))
 
 		// WHEN
-		_, err := upd.Next()
+		err := upd.Execute()
 
 		// THEN: エラーなしで正常終了
 		assert.NoError(t, err)
@@ -294,7 +294,7 @@ func TestUpdateNext(t *testing.T) {
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
-		results, err := ExecutePlan(scan)
+		results, err := FetchAll(scan)
 		assert.NoError(t, err)
 		assert.Equal(t, 5, len(results))
 		assert.Equal(t, []byte("Doe"), results[0][2])
@@ -325,7 +325,7 @@ func TestUpdateNext(t *testing.T) {
 		))
 
 		// WHEN
-		_, err := upd.Next()
+		err := upd.Execute()
 
 		// THEN
 		assert.NoError(t, err)

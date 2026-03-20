@@ -460,24 +460,15 @@ func TestComplexWhereWithData(t *testing.T) {
 		insertPlanner := NewInsertPlanner(insertStmt)
 		insertExec, err := insertPlanner.Next()
 		assert.NoError(t, err)
-		_, err = insertExec.Next()
+		err = insertExec.Execute()
 		assert.NoError(t, err)
 	}
 
 	// 検索結果を収集するヘルパー
-	collectResults := func(t *testing.T, exec executor.Executor) []executor.Record {
+	collectResults := func(t *testing.T, iter executor.RecordIterator) []executor.Record {
 		t.Helper()
-		var results []executor.Record
-		for {
-			record, err := exec.Next()
-			if err != nil {
-				break
-			}
-			if len(record) == 0 {
-				break
-			}
-			results = append(results, record)
-		}
+		results, err := executor.FetchAll(iter)
+		assert.NoError(t, err)
 		return results
 	}
 
@@ -759,6 +750,6 @@ func initStorageManager(t *testing.T, dataDir string) {
 		{Name: "first_name", Type: catalog.ColumnTypeString},
 		{Name: "last_name", Type: catalog.ColumnTypeString},
 	})
-	_, err := createTable.Next()
+	err := createTable.Execute()
 	assert.NoError(t, err)
 }

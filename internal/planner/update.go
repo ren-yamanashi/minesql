@@ -8,18 +8,18 @@ import (
 )
 
 type UpdatePlanner struct {
-	Stmt          *statement.UpdateStmt
-	InnerExecutor executor.Executor
+	Stmt     *statement.UpdateStmt
+	Iterator executor.RecordIterator
 }
 
-func NewUpdatePlanner(stmt *statement.UpdateStmt, innerExecutor executor.Executor) *UpdatePlanner {
+func NewUpdatePlanner(stmt *statement.UpdateStmt, iterator executor.RecordIterator) *UpdatePlanner {
 	return &UpdatePlanner{
-		Stmt:          stmt,
-		InnerExecutor: innerExecutor,
+		Stmt:     stmt,
+		Iterator: iterator,
 	}
 }
 
-func (up *UpdatePlanner) Next() (executor.Executor, error) {
+func (up *UpdatePlanner) Next() (executor.Mutator, error) {
 	sm := engine.Get()
 	tblMeta, err := sm.Catalog.GetTableMetadataByName(up.Stmt.Table.TableName)
 	if err != nil {
@@ -45,5 +45,5 @@ func (up *UpdatePlanner) Next() (executor.Executor, error) {
 		})
 	}
 
-	return executor.NewUpdate(up.Stmt.Table.TableName, setColumns, up.InnerExecutor), nil
+	return executor.NewUpdate(up.Stmt.Table.TableName, setColumns, up.Iterator), nil
 }

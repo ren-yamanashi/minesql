@@ -1,13 +1,13 @@
 package executor
 
 type Filter struct {
-	InnerExecutor Executor
+	InnerIterator RecordIterator // Filter 内部で使用する RecordIterator (この RecordIterator から取得したレコードに対してフィルタを適用する)
 	condition     func(Record) bool
 }
 
-func NewFilter(innerExecutor Executor, condition func(Record) bool) *Filter {
+func NewFilter(innerIterator RecordIterator, condition func(Record) bool) *Filter {
 	return &Filter{
-		InnerExecutor: innerExecutor,
+		InnerIterator: innerIterator,
 		condition:     condition,
 	}
 }
@@ -15,7 +15,7 @@ func NewFilter(innerExecutor Executor, condition func(Record) bool) *Filter {
 func (f *Filter) Next() (Record, error) {
 	// 条件を満たすレコードを探す
 	for {
-		record, err := f.InnerExecutor.Next()
+		record, err := f.InnerIterator.Next()
 		if err != nil {
 			return nil, err
 		}

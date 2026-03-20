@@ -14,23 +14,23 @@ func TestNewDelete(t *testing.T) {
 	t.Run("正常に Delete Executor を生成できる", func(t *testing.T) {
 		// GIVEN
 		tableName := "users"
-		innerExecutor := NewSearchTable(
+		iterator := NewSearchTable(
 			tableName,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 
 		// WHEN
-		del := NewDelete(tableName, innerExecutor)
+		del := NewDelete(tableName, iterator)
 
 		// THEN
 		assert.NotNil(t, del)
 		assert.Equal(t, tableName, del.tableName)
-		assert.NotNil(t, del.InnerExecutor)
+		assert.NotNil(t, del.Iterator)
 	})
 }
 
-func TestDeleteNext(t *testing.T) {
+func TestDelete_Execute(t *testing.T) {
 	t.Run("SearchTable を使って全レコードを削除できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
@@ -44,7 +44,7 @@ func TestDeleteNext(t *testing.T) {
 		))
 
 		// WHEN
-		_, err := del.Next()
+		err := del.Execute()
 
 		// THEN: 削除が成功する
 		assert.NoError(t, err)
@@ -55,7 +55,7 @@ func TestDeleteNext(t *testing.T) {
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
-		results, err := ExecutePlan(scan)
+		results, err := FetchAll(scan)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, len(results))
 	})
@@ -67,17 +67,17 @@ func TestDeleteNext(t *testing.T) {
 		defer engine.Reset()
 
 		// プライマリキーが "c" 未満のレコードを削除対象とする
-		innerExecutor := NewSearchTable(
+		iterator := NewSearchTable(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record Record) bool {
 				return string(record[0]) < "c"
 			},
 		)
-		del := NewDelete("users", innerExecutor)
+		del := NewDelete("users", iterator)
 
 		// WHEN
-		_, err := del.Next()
+		err := del.Execute()
 
 		// THEN: 削除が成功する
 		assert.NoError(t, err)
@@ -88,7 +88,7 @@ func TestDeleteNext(t *testing.T) {
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
-		results, err := ExecutePlan(scan)
+		results, err := FetchAll(scan)
 		assert.NoError(t, err)
 		assert.Equal(t, 3, len(results))
 		assert.Equal(t, []byte("c"), results[0][0])
@@ -103,7 +103,7 @@ func TestDeleteNext(t *testing.T) {
 		defer engine.Reset()
 
 		// first_name が "Bob" のレコードを削除
-		innerExecutor := NewFilter(
+		iterator := NewFilter(
 			NewSearchTable(
 				"users",
 				access.RecordSearchModeStart{},
@@ -113,10 +113,10 @@ func TestDeleteNext(t *testing.T) {
 				return string(record[1]) == "Bob"
 			},
 		)
-		del := NewDelete("users", innerExecutor)
+		del := NewDelete("users", iterator)
 
 		// WHEN
-		_, err := del.Next()
+		err := del.Execute()
 
 		// THEN: 削除が成功する
 		assert.NoError(t, err)
@@ -127,7 +127,7 @@ func TestDeleteNext(t *testing.T) {
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
-		results, err := ExecutePlan(scan)
+		results, err := FetchAll(scan)
 		assert.NoError(t, err)
 		assert.Equal(t, 4, len(results))
 		for _, record := range results {
@@ -142,17 +142,17 @@ func TestDeleteNext(t *testing.T) {
 		defer engine.Reset()
 
 		// プライマリキーが "a" のレコードを削除 (last_name = "Doe")
-		innerExecutor := NewSearchTable(
+		iterator := NewSearchTable(
 			"users",
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
 			},
 		)
-		del := NewDelete("users", innerExecutor)
+		del := NewDelete("users", iterator)
 
 		// WHEN
-		_, err := del.Next()
+		err := del.Execute()
 
 		// THEN: 削除が成功する
 		assert.NoError(t, err)
@@ -164,7 +164,7 @@ func TestDeleteNext(t *testing.T) {
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
-		results, err := ExecutePlan(indexScan)
+		results, err := FetchAll(indexScan)
 		assert.NoError(t, err)
 		assert.Equal(t, 4, len(results))
 		for _, record := range results {
@@ -191,7 +191,7 @@ func TestDeleteNext(t *testing.T) {
 		))
 
 		// WHEN
-		_, err := del.Next()
+		err := del.Execute()
 
 		// THEN
 		assert.NoError(t, err)

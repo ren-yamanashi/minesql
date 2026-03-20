@@ -30,7 +30,7 @@ func TestNewInsert(t *testing.T) {
 	})
 }
 
-func TestExecute(t *testing.T) {
+func TestInsert_Execute(t *testing.T) {
 	t.Run("正常にレコードを挿入できる", func(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
@@ -52,7 +52,7 @@ func TestExecute(t *testing.T) {
 
 		// WHEN
 		insert := NewInsert(tableName, cols, records)
-		_, err := insert.Next()
+		err := insert.Execute()
 
 		// THEN
 		assert.NoError(t, err)
@@ -64,7 +64,7 @@ func TestExecute(t *testing.T) {
 			access.RecordSearchModeStart{},
 			whileCondition,
 		)
-		res, err := ExecutePlan(seqScan)
+		res, err := FetchAll(seqScan)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(res))
 		for i, record := range res {
@@ -84,6 +84,6 @@ func initStorageManagerForTest(t *testing.T) {
 
 func createTableForTest(t *testing.T, tableName string, primaryKeyCount uint8, indexes []*IndexParam, columns []*ColumnParam) {
 	createTable := NewCreateTable(tableName, primaryKeyCount, indexes, columns)
-	_, err := createTable.Next()
+	err := createTable.Execute()
 	assert.NoError(t, err)
 }

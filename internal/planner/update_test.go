@@ -22,23 +22,23 @@ func TestNewUpdatePlanner(t *testing.T) {
 				{Column: *identifier.NewColumnId("first_name"), Value: literal.NewStringLiteral("'Jane'", "Jane")},
 			},
 		}
-		innerExec := executor.NewSearchTable(
+		iterator := executor.NewSearchTable(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
 
 		// WHEN
-		planner := NewUpdatePlanner(stmt, innerExec)
+		planner := NewUpdatePlanner(stmt, iterator)
 
 		// THEN
 		assert.NotNil(t, planner)
 		assert.Equal(t, stmt, planner.Stmt)
-		assert.NotNil(t, planner.InnerExecutor)
+		assert.NotNil(t, planner.Iterator)
 	})
 }
 
-func TestUpdatePlannerNext(t *testing.T) {
+func TestUpdatePlanner_Next(t *testing.T) {
 	t.Run("単一カラムの更新で Update Executor が生成される", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
@@ -51,12 +51,12 @@ func TestUpdatePlannerNext(t *testing.T) {
 				{Column: *identifier.NewColumnId("first_name"), Value: literal.NewStringLiteral("'Jane'", "Jane")},
 			},
 		}
-		innerExec := executor.NewSearchTable(
+		iterator := executor.NewSearchTable(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
-		planner := NewUpdatePlanner(stmt, innerExec)
+		planner := NewUpdatePlanner(stmt, iterator)
 
 		// WHEN
 		exec, err := planner.Next()
@@ -80,12 +80,12 @@ func TestUpdatePlannerNext(t *testing.T) {
 				{Column: *identifier.NewColumnId("last_name"), Value: literal.NewStringLiteral("'Doe'", "Doe")},
 			},
 		}
-		innerExec := executor.NewSearchTable(
+		iterator := executor.NewSearchTable(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
-		planner := NewUpdatePlanner(stmt, innerExec)
+		planner := NewUpdatePlanner(stmt, iterator)
 
 		// WHEN
 		exec, err := planner.Next()
@@ -114,12 +114,12 @@ func TestUpdatePlannerNext(t *testing.T) {
 				{Column: *identifier.NewColumnId("nonexistent"), Value: literal.NewStringLiteral("'val'", "val")},
 			},
 		}
-		innerExec := executor.NewSearchTable(
+		iterator := executor.NewSearchTable(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
-		planner := NewUpdatePlanner(stmt, innerExec)
+		planner := NewUpdatePlanner(stmt, iterator)
 
 		// WHEN
 		exec, err := planner.Next()
@@ -142,12 +142,12 @@ func TestUpdatePlannerNext(t *testing.T) {
 				{Column: *identifier.NewColumnId("id"), Value: literal.NewStringLiteral("'1'", "1")},
 			},
 		}
-		innerExec := executor.NewSearchTable(
+		iterator := executor.NewSearchTable(
 			"nonexistent",
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
-		planner := NewUpdatePlanner(stmt, innerExec)
+		planner := NewUpdatePlanner(stmt, iterator)
 
 		// WHEN
 		exec, err := planner.Next()
@@ -182,19 +182,19 @@ func TestUpdatePlannerNext(t *testing.T) {
 				{Column: *identifier.NewColumnId("first_name"), Value: literal.NewStringLiteral("'Jane'", "Jane")},
 			},
 		}
-		innerExec := executor.NewSearchTable(
+		iterator := executor.NewSearchTable(
 			"users",
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record executor.Record) bool {
 				return string(record[0]) == "a"
 			},
 		)
-		planner := NewUpdatePlanner(stmt, innerExec)
+		planner := NewUpdatePlanner(stmt, iterator)
 
 		// WHEN
 		exec, err := planner.Next()
 		assert.NoError(t, err)
-		_, err = executor.ExecutePlan(exec)
+		err = exec.Execute()
 		assert.NoError(t, err)
 
 		// THEN: "a" の first_name が "Jane" に更新されている
@@ -203,7 +203,7 @@ func TestUpdatePlannerNext(t *testing.T) {
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
-		results, err := executor.ExecutePlan(scan)
+		results, err := executor.FetchAll(scan)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(results))
 		assert.Equal(t, executor.Record{[]byte("a"), []byte("Jane"), []byte("Doe")}, results[0])
@@ -272,12 +272,12 @@ func TestUpdatePlannerNext(t *testing.T) {
 			Table:      *identifier.NewTableId("users"),
 			SetClauses: []*statement.SetClause{},
 		}
-		innerExec := executor.NewSearchTable(
+		iterator := executor.NewSearchTable(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
-		planner := NewUpdatePlanner(stmt, innerExec)
+		planner := NewUpdatePlanner(stmt, iterator)
 
 		// WHEN
 		exec, err := planner.Next()

@@ -18,27 +18,25 @@ func NewInsert(tableName string, colNames []string, records []Record) *Insert {
 	}
 }
 
-// Insert は iterable ではないので、Next() は一度だけ呼び出される
-//
-// 戻り値も (エラー以外は) 常に (nil, nil) を返す
-func (ins *Insert) Next() (Record, error) {
+// Execute はレコードをテーブルに挿入する
+func (ins *Insert) Execute() error {
 	sm := engine.Get()
 
 	tblMeta, err := sm.Catalog.GetTableMetadataByName(ins.tableName)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	tbl, err := tblMeta.GetTable()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	for _, record := range ins.records {
 		err := tbl.Insert(sm.BufferPool, record)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return nil, nil
+	return nil
 }

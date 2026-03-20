@@ -121,7 +121,7 @@ func InitStorageEngineForTest(t *testing.T, dataDir string) *engine.Engine {
 		{Name: "first_name", Type: catalog.ColumnTypeString},
 		{Name: "last_name", Type: catalog.ColumnTypeString},
 	})
-	_, err := createTable.Next()
+	err := createTable.Execute()
 	assert.NoError(t, err)
 
 	tblMeta, err := sm.Catalog.GetTableMetadataByName("users")

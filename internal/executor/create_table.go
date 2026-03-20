@@ -39,25 +39,26 @@ func NewCreateTable(tableName string, primaryKeyCount uint8, indexParams []*Inde
 	}
 }
 
-func (ct *CreateTable) Next() (Record, error) {
+// Execute はテーブルを作成する
+func (ct *CreateTable) Execute() error {
 	sm := engine.Get()
 
 	// FileId を採番
 	fileId, err := sm.Catalog.AllocateFileId(sm.BufferPool)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Disk を登録
 	err = sm.RegisterDmToBp(fileId, ct.tableName)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// テーブルの metaPageId を設定
 	metaPageId, err := sm.BufferPool.AllocatePageId(fileId)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// 各 UniqueIndex の metaPageId を設定
@@ -65,12 +66,12 @@ func (ct *CreateTable) Next() (Record, error) {
 	for i, indexParam := range ct.indexParams {
 		indexMetaPageId, err := sm.BufferPool.AllocatePageId(fileId)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		uniqueIndex := access.NewUniqueIndexAccessMethod(indexParam.Name, indexParam.ColName, indexMetaPageId, indexParam.SecondaryKey)
 		err = uniqueIndex.Create(sm.BufferPool)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		uniqueIndexes[i] = uniqueIndex
 	}
@@ -79,13 +80,7 @@ func (ct *CreateTable) Next() (Record, error) {
 	tbl := access.NewTableAccessMethod(ct.tableName, metaPageId, ct.primaryKeyCount, uniqueIndexes)
 	err = tbl.Create(sm.BufferPool)
 	if err != nil {
-		return nil, err
-	}
-
-	// カラムのメタデータを作成
-	colMeta := make([]*catalog.ColumnMetadata, len(ct.columnParams))
-	for i, colParam := range ct.columnParams {
-		colMeta[i] = catalog.NewColumnMetadata(fileId, colParam.Name, uint16(i), colParam.Type)
+		return err
 	}
 
 	// インデックスのメタデータを作成
@@ -94,14 +89,20 @@ func (ct *CreateTable) Next() (Record, error) {
 		idxMeta[i] = catalog.NewIndexMetadata(fileId, index.Name, index.ColName, catalog.IndexTypeUnique, index.MetaPageId)
 	}
 
+	// カラムのメタデータを作成
+	colMeta := make([]*catalog.ColumnMetadata, len(ct.columnParams))
+	for i, colParam := range ct.columnParams {
+		colMeta[i] = catalog.NewColumnMetadata(fileId, colParam.Name, uint16(i), colParam.Type)
+	}
+
 	// テーブルメタデータを作成
 	tblMeta := catalog.NewTableMetadata(fileId, ct.tableName, uint8(len(ct.columnParams)), ct.primaryKeyCount, colMeta, idxMeta, metaPageId)
 
 	// カタログにテーブルを登録
 	err = sm.Catalog.Insert(sm.BufferPool, tblMeta)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return nil, nil
+	return nil
 }

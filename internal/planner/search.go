@@ -24,12 +24,12 @@ func NewSearchPlanner(tableName string, where *statement.WhereClause) *SearchPla
 	}
 }
 
-func (sp *SearchPlanner) Next() (executor.Executor, error) {
+func (sp *SearchPlanner) Next() (executor.RecordIterator, error) {
 	return buildSearchExecutor(sp.TableName, sp.Where)
 }
 
 // WHERE 句を元に検索用の Executor を構築する
-func buildSearchExecutor(tableName string, where *statement.WhereClause) (executor.Executor, error) {
+func buildSearchExecutor(tableName string, where *statement.WhereClause) (executor.RecordIterator, error) {
 	sm := engine.Get()
 
 	if tableName == "" {
@@ -62,7 +62,7 @@ func buildSearchExecutor(tableName string, where *statement.WhereClause) (execut
 }
 
 // 二項演算式を解析して適切な検索用の Executor を構築する
-func planForBinaryExpr(tableName string, tblMeta *catalog.TableMetadata, expr expression.BinaryExpr) (executor.Executor, error) {
+func planForBinaryExpr(tableName string, tblMeta *catalog.TableMetadata, expr expression.BinaryExpr) (executor.RecordIterator, error) {
 	switch lhs := expr.Left.(type) {
 
 	// 左辺がカラムの場合 (例: WHERE col = 5)

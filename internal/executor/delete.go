@@ -3,37 +3,38 @@ package executor
 import "minesql/internal/engine"
 
 type Delete struct {
-	tableName     string
-	InnerExecutor Executor
+	tableName string
+	Iterator  RecordIterator
 }
 
-func NewDelete(tableName string, innerExecutor Executor) *Delete {
+func NewDelete(tableName string, iterator RecordIterator) *Delete {
 	return &Delete{
-		tableName:     tableName,
-		InnerExecutor: innerExecutor,
+		tableName: tableName,
+		Iterator:  iterator,
 	}
 }
 
-func (del *Delete) Next() (Record, error) {
+// Execute は Iterator を使用して検索条件に一致したレコードを削除する
+func (del *Delete) Execute() error {
 	sm := engine.Get()
 
 	tblMeta, err := sm.Catalog.GetTableMetadataByName(del.tableName)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	tbl, err := tblMeta.GetTable()
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	// 削除対象のレコードを先にすべて収集する
+	// 削除対象のレコードを先にすべて取得する
 	// (削除により Iterator が参照するページデータが破壊されるのを防ぐ)
 	var records []Record
 	for {
-		record, err := del.InnerExecutor.Next()
+		record, err := del.Iterator.Next()
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if record == nil {
 			break
@@ -41,13 +42,13 @@ func (del *Delete) Next() (Record, error) {
 		records = append(records, record)
 	}
 
-	// 収集したレコードを削除
+	// 取得したレコードを削除
 	for _, record := range records {
 		err = tbl.Delete(sm.BufferPool, record)
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 
-	return nil, nil
+	return nil
 }
