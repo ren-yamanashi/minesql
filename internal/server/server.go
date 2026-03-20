@@ -6,20 +6,21 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"minesql/internal/executor"
-	"minesql/internal/parser"
-	"minesql/internal/planner"
-	"minesql/internal/storage"
 	"net"
 	"os"
 	"strings"
 	"time"
+
+	"minesql/internal/engine"
+	"minesql/internal/executor"
+	"minesql/internal/parser"
+	"minesql/internal/planner"
 )
 
 type Server struct {
 	Address        string
 	Port           int
-	storageManager *storage.StorageManager
+	storageManager *engine.Engine
 }
 
 func NewServer(address string, port int) *Server {
@@ -53,7 +54,7 @@ func (s *Server) Start() error {
 
 // サーバーを停止する
 func (s *Server) Stop() error {
-	err := s.storageManager.BufferPoolManager.FlushPage()
+	err := s.storageManager.BufferPool.FlushPage()
 	if err != nil {
 		return err
 	}
@@ -72,7 +73,7 @@ func (s *Server) init() error {
 	if err != nil {
 		return err
 	}
-	s.storageManager = storage.InitStorageManager()
+	s.storageManager = engine.Init()
 	return nil
 }
 

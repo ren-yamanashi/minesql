@@ -1,7 +1,8 @@
 package executor
 
 import (
-	"minesql/internal/storage"
+	"minesql/internal/access"
+	"minesql/internal/engine"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,7 +13,7 @@ func TestNewFilter(t *testing.T) {
 		// GIVEN
 		dummyInnerExecutor := NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		condition := func(record Record) bool {
@@ -31,12 +32,12 @@ func TestNext(t *testing.T) {
 	t.Run("条件を満たすレコードを正しく返す", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// GIVEN
 		seqScan := NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		filter := NewFilter(seqScan, func(record Record) bool {
@@ -56,12 +57,12 @@ func TestNext(t *testing.T) {
 	t.Run("条件を満たすレコードがない場合、nil を返す", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// GIVEN
 		seqScan := NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		filter := NewFilter(seqScan, func(record Record) bool {

@@ -1,23 +1,22 @@
 package executor
 
 import (
-	"minesql/internal/storage"
-	"minesql/internal/storage/access/btree"
-	"minesql/internal/storage/access/table"
+	"minesql/internal/access"
+	"minesql/internal/engine"
 )
 
 // テーブル検索を行う Executor
 type SearchTable struct {
 	// 継続条件を満たすかどうかを判定する関数
 	whileCondition func(record Record) bool
-	iterator       *btree.Iterator
+	iterator       *access.ClusteredIndexIterator
 	tableName      string
-	searchMode     RecordSearchMode
+	searchMode     access.RecordSearchMode
 }
 
 func NewSearchTable(
 	tableName string,
-	searchMode RecordSearchMode,
+	searchMode access.RecordSearchMode,
 	whileCondition func(record Record) bool,
 ) *SearchTable {
 	return &SearchTable{
@@ -30,7 +29,7 @@ func NewSearchTable(
 // 次の Record を取得する
 // データがない場合、継続条件を満たさない場合は (nil, nil) を返す
 func (ss *SearchTable) Next() (Record, error) {
-	sm := storage.GetStorageManager()
+	sm := engine.Get()
 
 	// 初回実行時はイテレータを作成
 	if ss.iterator == nil {
@@ -43,9 +42,7 @@ func (ss *SearchTable) Next() (Record, error) {
 			return nil, err
 		}
 
-		// テーブルスキャン用のイテレータを作成
-		btr := btree.NewBTree(tbl.MetaPageId)
-		iterator, err := btr.Search(sm.BufferPoolManager, ss.searchMode.Encode())
+		iterator, err := tbl.Search(sm.BufferPool, ss.searchMode)
 		if err != nil {
 			return nil, err
 		}
@@ -54,18 +51,13 @@ func (ss *SearchTable) Next() (Record, error) {
 	}
 
 	// レコード取得
-	pair, ok, err := ss.iterator.Next(sm.BufferPoolManager)
+	record, ok, err := ss.iterator.Next()
 	if !ok {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-
-	// レコード (プライマリキー + 値) をデコード
-	var record [][]byte
-	table.Decode(pair.Key, &record)
-	table.Decode(pair.Value, &record)
 
 	// 継続条件をチェック
 	if !ss.whileCondition(record) {

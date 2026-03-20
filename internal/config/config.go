@@ -5,13 +5,15 @@ import (
 	"strconv"
 )
 
-// データディレクトリのパスを取得
+// GetDataDirectory はデータディレクトリのパスを取得する
+//
 // 環境変数 MINESQL_DATA_DIR が設定されていればその値を、なければデフォルト値を返す
 func GetDataDirectory() string {
 	return getEnv("MINESQL_DATA_DIR", "./data")
 }
 
-// バッファプールのサイズを取得
+// GetBufferPoolSize はバッファプールのサイズを取得する
+//
 // 環境変数 MINESQL_BUFFER_SIZE が設定されていればその値を、なければデフォルト値を返す
 func GetBufferPoolSize() int {
 	return getEnvInt("MINESQL_BUFFER_SIZE", 100)

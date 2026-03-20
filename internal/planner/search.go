@@ -3,11 +3,12 @@ package planner
 import (
 	"errors"
 	"fmt"
+	"minesql/internal/access"
+	"minesql/internal/catalog"
+	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/planner/ast/expression"
 	"minesql/internal/planner/ast/statement"
-	"minesql/internal/storage"
-	"minesql/internal/storage/access/catalog"
 )
 
 // SearchPlanner は WHERE 句に基づいてレコードを検索する Executor を構築する
@@ -29,7 +30,7 @@ func (sp *SearchPlanner) Next() (executor.Executor, error) {
 
 // WHERE 句を元に検索用の Executor を構築する
 func buildSearchExecutor(tableName string, where *statement.WhereClause) (executor.Executor, error) {
-	sm := storage.GetStorageManager()
+	sm := engine.Get()
 
 	if tableName == "" {
 		return nil, errors.New("table name cannot be empty")
@@ -44,7 +45,7 @@ func buildSearchExecutor(tableName string, where *statement.WhereClause) (execut
 	if where == nil || !where.IsSet {
 		return executor.NewSearchTable(
 			tableName,
-			executor.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record executor.Record) bool {
 				return true // フルテーブルスキャンなので常に true を返す
 			},
@@ -83,7 +84,7 @@ func planForBinaryExpr(tableName string, tblMeta *catalog.TableMetadata, expr ex
 				return executor.NewSearchIndex(
 					tableName,
 					idxMeta.Name,
-					executor.RecordSearchModeKey{Key: [][]byte{rhs.Literal.ToBytes()}},
+					access.RecordSearchModeKey{Key: [][]byte{rhs.Literal.ToBytes()}},
 					cond,
 				), nil
 			}
@@ -99,7 +100,7 @@ func planForBinaryExpr(tableName string, tblMeta *catalog.TableMetadata, expr ex
 			}
 			return executor.NewSearchTable(
 				tableName,
-				executor.RecordSearchModeKey{Key: [][]byte{rhs.Literal.ToBytes()}},
+				access.RecordSearchModeKey{Key: [][]byte{rhs.Literal.ToBytes()}},
 				cond,
 			), nil
 		default:
@@ -118,7 +119,7 @@ func planForBinaryExpr(tableName string, tblMeta *catalog.TableMetadata, expr ex
 		return executor.NewFilter(
 			executor.NewSearchTable( // innerExecutor としてテーブルスキャン用の executor を渡す
 				tableName,
-				executor.RecordSearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record executor.Record) bool {
 					return true
 				},

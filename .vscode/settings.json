@@ -10,6 +10,7 @@
   },
   "cSpell.words": [
     "bufpool",
+    "buftype",
     "Inno",
     "memcmp",
     "memcmpable",
@@ -17,6 +18,7 @@
     "minesql",
     "RDBMS",
     "slottedpage",
+    "Sublist",
     "Varchar"
   ],
   "go.lintTool": "golangci-lint-v2",

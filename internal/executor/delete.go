@@ -1,6 +1,6 @@
 package executor
 
-import "minesql/internal/storage"
+import "minesql/internal/engine"
 
 type Delete struct {
 	tableName     string
@@ -15,7 +15,7 @@ func NewDelete(tableName string, innerExecutor Executor) *Delete {
 }
 
 func (del *Delete) Next() (Record, error) {
-	sm := storage.GetStorageManager()
+	sm := engine.Get()
 
 	tblMeta, err := sm.Catalog.GetTableMetadataByName(del.tableName)
 	if err != nil {
@@ -43,7 +43,7 @@ func (del *Delete) Next() (Record, error) {
 
 	// 収集したレコードを削除
 	for _, record := range records {
-		err = tbl.Delete(sm.BufferPoolManager, record)
+		err = tbl.Delete(sm.BufferPool, record)
 		if err != nil {
 			return nil, err
 		}

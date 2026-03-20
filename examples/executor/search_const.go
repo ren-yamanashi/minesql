@@ -1,6 +1,7 @@
 package main
 
 import (
+	"minesql/internal/access"
 	"minesql/internal/executor"
 )
 
@@ -9,7 +10,7 @@ func searchConstPrimary() {
 	println("=== 定数検索 (プライマリキーが 'y') ===")
 	seqScan := executor.NewSearchTable(
 		"users",
-		executor.RecordSearchModeKey{Key: [][]byte{[]byte("y")}},
+		access.RecordSearchModeKey{Key: [][]byte{[]byte("y")}},
 		func(record executor.Record) bool {
 			return string(record[0]) == "y"
 		},
@@ -23,7 +24,7 @@ func searchConstUniqueIndex() {
 	indexScan := executor.NewSearchIndex(
 		"users",
 		"idx_last_name",
-		executor.RecordSearchModeKey{Key: [][]byte{[]byte("Miller")}},
+		access.RecordSearchModeKey{Key: [][]byte{[]byte("Miller")}},
 		func(secondaryKey executor.Record) bool {
 			return string(secondaryKey[0]) == "Miller"
 		},

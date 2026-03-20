@@ -1,6 +1,7 @@
 package main
 
 import (
+	"minesql/internal/access"
 	"minesql/internal/executor"
 )
 
@@ -9,7 +10,7 @@ func fullTableScan() {
 	println("=== フルテーブルスキャン ===")
 	seqScan := executor.NewSearchTable(
 		"users",
-		executor.RecordSearchModeStart{},
+		access.RecordSearchModeStart{},
 		func(record executor.Record) bool { // フルテーブルスキャンなので常に true を返す継続条件
 			return true
 		},
@@ -23,7 +24,7 @@ func fullIndexScanByFirstName() {
 	indexScan := executor.NewSearchIndex(
 		"users",
 		"idx_first_name",
-		executor.RecordSearchModeStart{},
+		access.RecordSearchModeStart{},
 		func(secondaryKey executor.Record) bool { // フルインデックススキャンなので常に true を返す継続条件
 			return true
 		},
@@ -37,7 +38,7 @@ func fullIndexScanByLastName() {
 	indexScan := executor.NewSearchIndex(
 		"users",
 		"idx_last_name",
-		executor.RecordSearchModeStart{},
+		access.RecordSearchModeStart{},
 		func(secondaryKey executor.Record) bool {
 			return true
 		},

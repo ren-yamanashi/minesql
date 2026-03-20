@@ -1,12 +1,12 @@
 package planner
 
 import (
+	"minesql/internal/catalog"
+	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/planner/ast/identifier"
 	"minesql/internal/planner/ast/literal"
 	"minesql/internal/planner/ast/statement"
-	"minesql/internal/storage"
-	"minesql/internal/storage/access/catalog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -109,7 +109,7 @@ func TestNewInsert(t *testing.T) {
 	t.Run("単一レコードの挿入で Executor が生成される", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		createTableForTest(t, []*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
@@ -143,7 +143,7 @@ func TestNewInsert(t *testing.T) {
 	t.Run("複数レコードの挿入で Executor が生成される", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		createTableForTest(t, []*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
@@ -185,7 +185,7 @@ func TestNewInsert(t *testing.T) {
 	t.Run("複数カラムの挿入で Executor が生成される", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		createTableForTest(t, []*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
@@ -225,7 +225,7 @@ func TestNewInsert(t *testing.T) {
 	t.Run("カラム順序が異なる挿入で Executor が生成される", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		createTableForTest(t, []*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
@@ -262,7 +262,7 @@ func TestNewInsert(t *testing.T) {
 	t.Run("サポートされていない literal タイプの場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		createTableForTest(t, []*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
@@ -305,8 +305,8 @@ func initStorageManagerForTest(t *testing.T) {
 	tmpdir := t.TempDir()
 	t.Setenv("MINESQL_DATA_DIR", tmpdir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "10")
-	storage.ResetStorageManager()
-	storage.InitStorageManager()
+	engine.Reset()
+	engine.Init()
 }
 
 // テーブルを作成する

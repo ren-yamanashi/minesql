@@ -1,27 +1,23 @@
 package executor
 
 import (
-	"minesql/internal/storage"
-	"minesql/internal/storage/access/btree"
-	"minesql/internal/storage/access/table"
+	"minesql/internal/access"
+	"minesql/internal/engine"
 )
 
 type SearchIndex struct {
 	tableName  string
 	indexName  string
-	searchMode RecordSearchMode
+	searchMode access.RecordSearchMode
 	// 継続条件を満たすかどうかを判定する関数
 	whileCondition func(record Record) bool
-	indexIterator  *btree.Iterator
-	tableIterator  *btree.Iterator
-	// テーブル本体の B+Tree (プライマリキーで検索するために使用)
-	tableBTree *btree.BTree
+	iterator       *access.SecondaryIndexIterator
 }
 
 func NewSearchIndex(
 	tableName string,
 	indexName string,
-	searchMode RecordSearchMode,
+	searchMode access.RecordSearchMode,
 	whileCondition func(record Record) bool,
 ) *SearchIndex {
 	return &SearchIndex{
@@ -35,10 +31,10 @@ func NewSearchIndex(
 // 次の Record を取得する
 // データがない場合、継続条件を満たさない場合は (nil, nil) を返す
 func (is *SearchIndex) Next() (Record, error) {
-	sm := storage.GetStorageManager()
+	sm := engine.Get()
 
-	// 初回実行時に B+Tree とイテレータを作成
-	if is.indexIterator == nil {
+	// 初回実行時にイテレータを作成
+	if is.iterator == nil {
 		tblMeta, err := sm.Catalog.GetTableMetadataByName(is.tableName)
 		if err != nil {
 			return nil, err
@@ -52,22 +48,15 @@ func (is *SearchIndex) Next() (Record, error) {
 			return nil, err
 		}
 
-		// インデックスの B+Tree を取得
-		indexBTree := btree.NewBTree(index.MetaPageId)
-
-		// テーブル本体の B+Tree を保持
-		is.tableBTree = btree.NewBTree(tbl.MetaPageId)
-
-		// インデックス用のイテレータを作成
-		indexIter, err := indexBTree.Search(sm.BufferPoolManager, is.searchMode.Encode())
+		iter, err := index.Search(sm.BufferPool, tbl, is.searchMode)
 		if err != nil {
 			return nil, err
 		}
-		is.indexIterator = indexIter
+		is.iterator = iter
 	}
 
-	// セカンダリインデックスから次のペアを取得
-	secondaryIndexPair, ok, err := is.indexIterator.Next(sm.BufferPoolManager)
+	// インデックスから次の結果を取得
+	result, ok, err := is.iterator.Next()
 	if !ok {
 		return nil, nil
 	}
@@ -75,31 +64,10 @@ func (is *SearchIndex) Next() (Record, error) {
 		return nil, err
 	}
 
-	// セカンダリキーをデコード
-	var secondaryKey [][]byte
-	table.Decode(secondaryIndexPair.Key, &secondaryKey)
-
-	// 継続条件をチェック
-	if !is.whileCondition(secondaryKey) {
+	// 継続条件をチェック (セカンダリキーで判定)
+	if !is.whileCondition(result.SecondaryKey) {
 		return nil, nil
 	}
 
-	// エンコードされたプライマリキーでテーブル本体を検索
-	is.tableIterator, err = is.tableBTree.Search(sm.BufferPoolManager, btree.SearchModeKey{Key: secondaryIndexPair.Value})
-	if err != nil {
-		return nil, err
-	}
-	tablePair, ok, err := is.tableIterator.Next(sm.BufferPoolManager)
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
-		return nil, nil
-	}
-
-	// レコード (プライマリキー + 値) をデコード
-	var record [][]byte
-	table.Decode(tablePair.Key, &record)
-	table.Decode(tablePair.Value, &record)
-	return record, nil
+	return result.Record, nil
 }

@@ -2,8 +2,9 @@ package executor
 
 import (
 	"fmt"
-	"minesql/internal/storage"
-	"minesql/internal/storage/access/catalog"
+	"minesql/internal/access"
+	"minesql/internal/catalog"
+	"minesql/internal/engine"
 	"strings"
 	"testing"
 
@@ -17,8 +18,8 @@ func setupExecutorTestTable(t *testing.T) {
 	tmpdir := t.TempDir()
 	t.Setenv("MINESQL_DATA_DIR", tmpdir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "100")
-	storage.ResetStorageManager()
-	storage.InitStorageManager()
+	engine.Reset()
+	engine.Init()
 
 	createTable := NewCreateTable(
 		"users",
@@ -73,12 +74,12 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("フルテーブルスキャンで全レコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		setupExecutorTestTable(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// WHEN
 		records := collectAll(t, NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -101,12 +102,12 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("範囲スキャンで指定範囲のレコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		setupExecutorTestTable(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// WHEN: プライマリキーが "w" 以上 "y" 以下
 		records := collectAll(t, NewSearchTable(
 			"users",
-			RecordSearchModeKey{Key: [][]byte{[]byte("w")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("w")}},
 			func(record Record) bool {
 				return string(record[0]) <= "y"
 			},
@@ -129,12 +130,12 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("定数検索で特定のレコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		setupExecutorTestTable(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// WHEN
 		records := collectAll(t, NewSearchTable(
 			"users",
-			RecordSearchModeKey{Key: [][]byte{[]byte("y")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("y")}},
 			func(record Record) bool {
 				return string(record[0]) == "y"
 			},
@@ -155,13 +156,13 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("フィルタースキャンで条件に合うレコードのみ取得できる", func(t *testing.T) {
 		// GIVEN
 		setupExecutorTestTable(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// WHEN: first_name が "Charlie" のレコード
 		records := collectAll(t, NewFilter(
 			NewSearchTable(
 				"users",
-				RecordSearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -184,13 +185,13 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("インデックススキャンで名前順に全レコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		setupExecutorTestTable(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// WHEN
 		records := collectAll(t, NewSearchIndex(
 			"users",
 			"idx_first_name",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -213,13 +214,13 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("インデックス範囲スキャンで姓の範囲を取得できる", func(t *testing.T) {
 		// GIVEN
 		setupExecutorTestTable(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// WHEN: 姓が "J" 以上 "N" 未満
 		records := collectAll(t, NewSearchIndex(
 			"users",
 			"idx_last_name",
-			RecordSearchModeKey{Key: [][]byte{[]byte("J")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("J")}},
 			func(secondaryKey Record) bool {
 				lastName := string(secondaryKey[0])
 				return lastName >= "J" && lastName < "N"
@@ -242,13 +243,13 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("ユニークインデックス検索で特定の姓を取得できる", func(t *testing.T) {
 		// GIVEN
 		setupExecutorTestTable(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// WHEN
 		records := collectAll(t, NewSearchIndex(
 			"users",
 			"idx_last_name",
-			RecordSearchModeKey{Key: [][]byte{[]byte("Miller")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("Miller")}},
 			func(secondaryKey Record) bool {
 				return string(secondaryKey[0]) == "Miller"
 			},
@@ -269,7 +270,7 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("UPDATE で値を更新し、インデックスも更新される", func(t *testing.T) {
 		// GIVEN
 		setupExecutorTestTable(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// WHEN: Alice の last_name を Anderson に更新
 		upd := NewUpdate("users", []SetColumn{
@@ -277,7 +278,7 @@ func TestExecutorIntegration(t *testing.T) {
 		}, NewFilter(
 			NewSearchTable(
 				"users",
-				RecordSearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -289,13 +290,13 @@ func TestExecutorIntegration(t *testing.T) {
 		// THEN: テーブルスキャンとインデックススキャンの両方で確認
 		tableRecords := collectAll(t, NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 		idxRecords := collectAll(t, NewSearchIndex(
 			"users",
 			"idx_last_name",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -326,14 +327,14 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("UPDATE でプライマリキーを変更できる", func(t *testing.T) {
 		// GIVEN
 		setupExecutorTestTable(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// WHEN: プライマリキー "v" (Eve) を "a" に変更
 		upd := NewUpdate("users", []SetColumn{
 			{Pos: 0, Value: []byte("a")},
 		}, NewSearchTable(
 			"users",
-			RecordSearchModeKey{Key: [][]byte{[]byte("v")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("v")}},
 			func(record Record) bool {
 				return string(record[0]) == "v"
 			},
@@ -343,7 +344,7 @@ func TestExecutorIntegration(t *testing.T) {
 		// THEN
 		records := collectAll(t, NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -365,13 +366,13 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("DELETE でレコードを削除し、インデックスからも削除される", func(t *testing.T) {
 		// GIVEN
 		setupExecutorTestTable(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// WHEN: Bob を削除
 		del := NewDelete("users", NewFilter(
 			NewSearchTable(
 				"users",
-				RecordSearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -383,13 +384,13 @@ func TestExecutorIntegration(t *testing.T) {
 		// THEN: テーブルスキャンとインデックススキャンの両方で確認
 		tableRecords := collectAll(t, NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 		idxRecords := collectAll(t, NewSearchIndex(
 			"users",
 			"idx_last_name",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 

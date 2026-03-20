@@ -1,7 +1,8 @@
 package executor
 
 import (
-	"minesql/internal/storage"
+	"minesql/internal/access"
+	"minesql/internal/engine"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,7 +21,7 @@ func TestNewSearchIndex(t *testing.T) {
 		indexScan := NewSearchIndex(
 			tableName,
 			indexName,
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			whileCondition,
 		)
 
@@ -33,13 +34,13 @@ func TestSearchIndex(t *testing.T) {
 	t.Run("SearchModeStart を使用して Index 検索できる", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// GIVEN
 		indexScan := NewSearchIndex(
 			"users",
 			"last_name",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool {
 				return string(record[0]) < "J" // セカンダリキー (姓) が "J" 未満の間、継続
 			},
@@ -68,13 +69,13 @@ func TestSearchIndex(t *testing.T) {
 	t.Run("SearchModeKey を使用して Index 検索できる", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// GIVEN
 		indexScan := NewSearchIndex(
 			"users",
 			"last_name",
-			RecordSearchModeKey{Key: [][]byte{[]byte("Doe")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("Doe")}},
 			func(record Record) bool {
 				return string(record[0]) <= "Smith" // セカンダリキー (姓) が "Smith" 以下の間、継続
 			},

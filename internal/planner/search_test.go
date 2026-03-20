@@ -1,13 +1,13 @@
 package planner
 
 import (
+	"minesql/internal/catalog"
+	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/planner/ast/expression"
 	"minesql/internal/planner/ast/identifier"
 	"minesql/internal/planner/ast/literal"
 	"minesql/internal/planner/ast/statement"
-	"minesql/internal/storage"
-	"minesql/internal/storage/access/catalog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,7 +17,7 @@ func TestSearchPlanner(t *testing.T) {
 	t.Run("テーブル名が空の場合、エラーを返す", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// GIVEN
 		search := NewSearchPlanner("", nil)
@@ -34,7 +34,7 @@ func TestSearchPlanner(t *testing.T) {
 	t.Run("WHERE 句なしの場合、SequentialScan が生成される", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// GIVEN
 		search := NewSearchPlanner("users", nil)
@@ -51,7 +51,7 @@ func TestSearchPlanner(t *testing.T) {
 	t.Run("WHERE 句でインデックス付きカラムを指定した場合、IndexScan が生成される", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// GIVEN
 		where := statement.NewWhereClause(
@@ -75,7 +75,7 @@ func TestSearchPlanner(t *testing.T) {
 	t.Run("WHERE 句でインデックスなしカラムを指定した場合、SequentialScan が生成される", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// GIVEN
 		where := statement.NewWhereClause(
@@ -99,7 +99,7 @@ func TestSearchPlanner(t *testing.T) {
 	t.Run("WHERE 句で存在しないカラムを指定した場合、エラーを返す", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// GIVEN
 		where := statement.NewWhereClause(
@@ -123,7 +123,7 @@ func TestSearchPlanner(t *testing.T) {
 	t.Run("WHERE 句でサポートされていない型を指定した場合、エラーを返す", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// GIVEN
 		type UnsupportedExpr struct {
@@ -148,7 +148,7 @@ func TestSearchPlanner(t *testing.T) {
 	t.Run("複数の AND 条件で Filter が生成される", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// GIVEN: (id = '1') AND ((first_name = 'john') AND (last_name = 'doe'))
 		where := statement.NewWhereClause(
@@ -196,7 +196,7 @@ func TestSearchPlanner(t *testing.T) {
 	t.Run("AND と OR の混合条件で Filter が生成される", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// GIVEN: (first_name = 'John') OR ((id = '1') AND (last_name = 'Doe'))
 		where := statement.NewWhereClause(
@@ -244,7 +244,7 @@ func TestSearchPlanner(t *testing.T) {
 	t.Run("LHS がカラム、RHS が式の場合、エラーを返す", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// GIVEN: WHERE last_name = (first_name = 'John') のような不正な構造
 		where := statement.NewWhereClause(
@@ -274,7 +274,7 @@ func TestSearchPlanner(t *testing.T) {
 	t.Run("OR 演算子を使った場合、Filter が生成される", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// GIVEN: WHERE (first_name = 'John') OR (last_name = 'Doe') のような構造
 		where := statement.NewWhereClause(
@@ -310,7 +310,7 @@ func TestSearchPlanner(t *testing.T) {
 	t.Run("条件内で存在しないカラムを指定した場合、エラーを返す", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// GIVEN: WHERE (non_existent = 'value') AND (last_name = 'Doe')
 		where := statement.NewWhereClause(
@@ -346,7 +346,7 @@ func TestSearchPlanner(t *testing.T) {
 	t.Run("条件内で LHS がカラム、RHS が式の場合、エラーを返す", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// GIVEN: WHERE (first_name = (last_name = 'Doe')) AND (id = '1')
 		where := statement.NewWhereClause(
@@ -388,7 +388,7 @@ func TestSearchPlanner(t *testing.T) {
 	t.Run("条件内で LHS が式、RHS がリテラルの場合、エラーを返す", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// GIVEN: WHERE ((first_name = 'John') AND 'literal') のような不正な構造
 		where := statement.NewWhereClause(
@@ -484,7 +484,7 @@ func TestComplexWhereWithData(t *testing.T) {
 	t.Run("AND 条件でデータをフィルタリングできる", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// GIVEN
 		insertTestData(t)
@@ -524,7 +524,7 @@ func TestComplexWhereWithData(t *testing.T) {
 	t.Run("OR 条件でデータをフィルタリングできる", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// GIVEN
 		insertTestData(t)
@@ -565,7 +565,7 @@ func TestComplexWhereWithData(t *testing.T) {
 	t.Run("AND と OR の混合条件でデータをフィルタリングできる", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// GIVEN
 		insertTestData(t)
@@ -747,9 +747,9 @@ func initStorageManager(t *testing.T, dataDir string) {
 	t.Setenv("MINESQL_DATA_DIR", dataDir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "10")
 
-	storage.ResetStorageManager()
-	storage.InitStorageManager()
-	storage.GetStorageManager()
+	engine.Reset()
+	engine.Init()
+	engine.Get()
 
 	// テーブルを作成
 	createTable := executor.NewCreateTable("users", 1, []*executor.IndexParam{

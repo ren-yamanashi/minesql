@@ -1,6 +1,7 @@
 package main
 
 import (
+	"minesql/internal/access"
 	"minesql/internal/executor"
 )
 
@@ -9,7 +10,7 @@ func rangeTableScan() {
 	println("=== 範囲スキャン (プライマリキーが 'w' 以上 'y' 以下) ===")
 	seqScan := executor.NewSearchTable(
 		"users",
-		executor.RecordSearchModeKey{Key: [][]byte{[]byte("w")}},
+		access.RecordSearchModeKey{Key: [][]byte{[]byte("w")}},
 		func(record executor.Record) bool {
 			return string(record[0]) <= "y"
 		},
@@ -23,7 +24,7 @@ func rangeIndexScan() {
 	indexScan := executor.NewSearchIndex(
 		"users",
 		"idx_last_name",
-		executor.RecordSearchModeKey{Key: [][]byte{[]byte("J")}},
+		access.RecordSearchModeKey{Key: [][]byte{[]byte("J")}},
 		func(secondaryKey executor.Record) bool {
 			lastName := string(secondaryKey[0])
 			return lastName >= "J" && lastName < "N"

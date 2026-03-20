@@ -1,4 +1,8 @@
 {
+  "sandbox": {
+    "enabled": true,
+    "autoAllowBashIfSandboxed": true
+  },
   "hooks": {
     "PostToolUse": [
       {
@@ -11,10 +15,6 @@
           {
             "type": "command",
             "command": "make lint"
-          },
-          {
-            "type": "command",
-            "command": "make build"
           }
         ]
       }

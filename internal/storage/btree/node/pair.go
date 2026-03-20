@@ -1,0 +1,68 @@
+package node
+
+import (
+	"bytes"
+	"encoding/binary"
+)
+
+// B+Tree のリーフノードに格納されるキーと値のペア
+type Pair struct {
+	Key   []byte
+	Value []byte
+}
+
+// NewPair は、指定されたキーと値から新しい key-value ペアを作成する
+func NewPair(key []byte, value []byte) Pair {
+	return Pair{
+		Key:   key,
+		Value: value,
+	}
+}
+
+// ToBytes は key-value ペアをバイト列にシリアライズする
+//
+// フォーマット: [key_size(4 bytes][key][value]
+func (p *Pair) ToBytes() []byte {
+	keySize := uint32(len(p.Key))
+	valueSize := uint32(len(p.Value))
+	data := make([]byte, 4+keySize+valueSize)
+
+	binary.BigEndian.PutUint32(data[0:4], keySize)
+	copy(data[4:4+len(p.Key)], p.Key)
+	copy(data[4+len(p.Key):], p.Value)
+
+	return data
+}
+
+// CompareKey は Pair のキーと、指定されたキーを比較する
+//
+// key: 比較対象のキー
+//
+// 戻り値:
+//
+// -1: pair.Key < otherKey
+//
+// 0:  pair.Key == otherKey
+//
+// 1:  pair.Key > otherKey
+func (p Pair) CompareKey(otherKey []byte) int {
+	return bytes.Compare(p.Key, otherKey)
+}
+
+// pairFromBytes はバイト列から key-value ペアを復元する
+//
+// フォーマット: [key_size(4 bytes][key][value]
+func pairFromBytes(data []byte) Pair {
+	if len(data) < 4 {
+		return NewPair(nil, nil)
+	}
+
+	keySize := binary.BigEndian.Uint32(data[0:4])
+
+	// キー部分がデータ長を超えている場合は不正なデータなので、空のペアを返す
+	if len(data) < int(4+keySize) {
+		return NewPair(nil, nil)
+	}
+
+	return NewPair(data[4:4+keySize], data[4+keySize:])
+}

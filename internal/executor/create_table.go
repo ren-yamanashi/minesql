@@ -1,9 +1,9 @@
 package executor
 
 import (
-	"minesql/internal/storage"
-	"minesql/internal/storage/access/catalog"
-	"minesql/internal/storage/access/table"
+	"minesql/internal/access"
+	"minesql/internal/catalog"
+	"minesql/internal/engine"
 )
 
 type ColumnParam struct {
@@ -48,32 +48,32 @@ func (ct *CreateTable) Next() (Record, error) {
 }
 
 func (ct *CreateTable) execute() error {
-	sm := storage.GetStorageManager()
+	sm := engine.Get()
 
 	// FileId を割り当て
-	fileId := sm.BufferPoolManager.AllocateFileId()
+	fileId := sm.BufferPool.AllocateFileId()
 
-	// DiskManager を登録
+	// Disk を登録
 	err := sm.RegisterDmToBpm(fileId, ct.tableName)
 	if err != nil {
 		return err
 	}
 
 	// テーブルの metaPageId を設定
-	metaPageId, err := sm.BufferPoolManager.AllocatePageId(fileId)
+	metaPageId, err := sm.BufferPool.AllocatePageId(fileId)
 	if err != nil {
 		return err
 	}
 
 	// 各 UniqueIndex の metaPageId を設定
-	uniqueIndexes := make([]*table.UniqueIndex, len(ct.indexParams))
+	uniqueIndexes := make([]*access.UniqueIndexAccessMethod, len(ct.indexParams))
 	for i, indexParam := range ct.indexParams {
-		indexMetaPageId, err := sm.BufferPoolManager.AllocatePageId(fileId)
+		indexMetaPageId, err := sm.BufferPool.AllocatePageId(fileId)
 		if err != nil {
 			return err
 		}
-		uniqueIndex := table.NewUniqueIndex(indexParam.Name, indexParam.ColName, indexParam.SecondaryKey)
-		err = uniqueIndex.Create(sm.BufferPoolManager, indexMetaPageId)
+		uniqueIndex := access.NewUniqueIndexAccessMethod(indexParam.Name, indexParam.ColName, indexMetaPageId, indexParam.SecondaryKey)
+		err = uniqueIndex.Create(sm.BufferPool)
 		if err != nil {
 			return err
 		}
@@ -81,14 +81,14 @@ func (ct *CreateTable) execute() error {
 	}
 
 	// テーブルを作成
-	tbl := table.NewTable(ct.tableName, metaPageId, ct.primaryKeyCount, uniqueIndexes)
-	err = tbl.Create(sm.BufferPoolManager)
+	tbl := access.NewTableAccessMethod(ct.tableName, metaPageId, ct.primaryKeyCount, uniqueIndexes)
+	err = tbl.Create(sm.BufferPool)
 	if err != nil {
 		return err
 	}
 
 	// テーブルIDを採番
-	tblId, err := sm.Catalog.AllocateTableId(sm.BufferPoolManager)
+	tblId, err := sm.Catalog.AllocateTableId(sm.BufferPool)
 	if err != nil {
 		return err
 	}
@@ -109,7 +109,7 @@ func (ct *CreateTable) execute() error {
 	tblMeta := catalog.NewTableMetadata(tblId, ct.tableName, uint8(len(ct.columnParams)), ct.primaryKeyCount, colMeta, idxMeta, metaPageId)
 
 	// カタログにテーブルを登録
-	err = sm.Catalog.Insert(sm.BufferPoolManager, tblMeta)
+	err = sm.Catalog.Insert(sm.BufferPool, tblMeta)
 	if err != nil {
 		return err
 	}

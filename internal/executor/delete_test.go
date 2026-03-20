@@ -1,9 +1,11 @@
 package executor
 
 import (
-	"minesql/internal/storage"
-	"minesql/internal/storage/access/catalog"
 	"testing"
+
+	"minesql/internal/access"
+	"minesql/internal/catalog"
+	"minesql/internal/engine"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -14,7 +16,7 @@ func TestNewDelete(t *testing.T) {
 		tableName := "users"
 		innerExecutor := NewSearchTable(
 			tableName,
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 
@@ -33,11 +35,11 @@ func TestDeleteNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		del := NewDelete("users", NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -50,7 +52,7 @@ func TestDeleteNext(t *testing.T) {
 		// THEN: テーブルが空になっている
 		scan := NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := ExecutePlan(scan)
@@ -62,12 +64,12 @@ func TestDeleteNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// プライマリキーが "c" 未満のレコードを削除対象とする
 		innerExecutor := NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool {
 				return string(record[0]) < "c"
 			},
@@ -83,7 +85,7 @@ func TestDeleteNext(t *testing.T) {
 		// THEN: "c" 以降のレコードが残っている
 		scan := NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := ExecutePlan(scan)
@@ -98,13 +100,13 @@ func TestDeleteNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// first_name が "Bob" のレコードを削除
 		innerExecutor := NewFilter(
 			NewSearchTable(
 				"users",
-				RecordSearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -122,7 +124,7 @@ func TestDeleteNext(t *testing.T) {
 		// THEN: "Bob" 以外のレコードが残っている
 		scan := NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := ExecutePlan(scan)
@@ -137,12 +139,12 @@ func TestDeleteNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// プライマリキーが "a" のレコードを削除 (last_name = "Doe")
 		innerExecutor := NewSearchTable(
 			"users",
-			RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
 			},
@@ -159,7 +161,7 @@ func TestDeleteNext(t *testing.T) {
 		indexScan := NewSearchIndex(
 			"users",
 			"last_name",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := ExecutePlan(indexScan)
@@ -174,7 +176,7 @@ func TestDeleteNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManagerForTest(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 		_ = tmpdir
 
 		createTableForTest(t, "empty_table", 1, nil, []*ColumnParam{
@@ -184,7 +186,7 @@ func TestDeleteNext(t *testing.T) {
 
 		del := NewDelete("empty_table", NewSearchTable(
 			"empty_table",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 

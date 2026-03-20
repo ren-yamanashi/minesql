@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"minesql/internal/access"
 	"minesql/internal/executor"
 )
 
@@ -10,7 +11,7 @@ func updateRecords() {
 	fmt.Println("\n=== 更新前のテーブル ===")
 	printRecords(executor.NewSearchTable(
 		"users",
-		executor.RecordSearchModeStart{},
+		access.RecordSearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 
@@ -20,7 +21,7 @@ func updateRecords() {
 	}, executor.NewFilter(
 		executor.NewSearchTable(
 			"users",
-			executor.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		),
 		func(record executor.Record) bool {
@@ -32,7 +33,7 @@ func updateRecords() {
 	fmt.Println("\n=== 更新後のテーブル (first_name が 'Alice' のレコードの last_name を 'Anderson' に更新) ===")
 	printRecords(executor.NewSearchTable(
 		"users",
-		executor.RecordSearchModeStart{},
+		access.RecordSearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 
@@ -40,7 +41,7 @@ func updateRecords() {
 	printRecords(executor.NewSearchIndex(
 		"users",
 		"idx_last_name",
-		executor.RecordSearchModeStart{},
+		access.RecordSearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 
@@ -50,7 +51,7 @@ func updateRecords() {
 		{Pos: 0, Value: []byte("a")},
 	}, executor.NewSearchTable(
 		"users",
-		executor.RecordSearchModeKey{Key: [][]byte{[]byte("v")}},
+		access.RecordSearchModeKey{Key: [][]byte{[]byte("v")}},
 		func(record executor.Record) bool {
 			return string(record[0]) == "v"
 		},
@@ -60,7 +61,7 @@ func updateRecords() {
 	fmt.Println("\n=== プライマリキー変更後のテーブル (プライマリキー 'v' を 'a' に変更) ===")
 	printRecords(executor.NewSearchTable(
 		"users",
-		executor.RecordSearchModeStart{},
+		access.RecordSearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 }

@@ -1,8 +1,9 @@
 package executor
 
 import (
-	"minesql/internal/storage"
-	"minesql/internal/storage/access/catalog"
+	"minesql/internal/access"
+	"minesql/internal/catalog"
+	"minesql/internal/engine"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,11 +14,11 @@ func TestExecutePlan(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		seqScan := NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool {
 				return true
 			},
@@ -37,11 +38,11 @@ func TestExecutePlan(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		seqScan := NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool {
 				return string(record[0]) < "c"
 			},
@@ -61,9 +62,9 @@ func TestExecutePlan(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		storage.ResetStorageManager()
-		storage.InitStorageManager()
-		defer storage.ResetStorageManager()
+		engine.Reset()
+		engine.Init()
+		defer engine.Reset()
 
 		tableName := "users"
 		createTable := NewCreateTable(
