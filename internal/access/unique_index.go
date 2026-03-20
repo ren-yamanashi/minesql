@@ -24,6 +24,17 @@ func NewUniqueIndexAccessMethod(name string, colName string, metaPageId page.Pag
 	}
 }
 
+// Search は指定した検索モードでインデックスを検索し、SecondaryIndexIterator を返す
+func (ui *UniqueIndexAccessMethod) Search(bp *bufferpool.BufferPool, table *TableAccessMethod, mode RecordSearchMode) (*SecondaryIndexIterator, error) {
+	indexBTree := btree.NewBPlusTree(ui.MetaPageId)
+	indexIter, err := indexBTree.Search(bp, mode.encode())
+	if err != nil {
+		return nil, err
+	}
+	tableBTree := btree.NewBPlusTree(table.MetaPageId)
+	return newSecondaryIndexIterator(indexIter, tableBTree, bp), nil
+}
+
 // Create は空のユニークインデックスを新規作成する
 func (ui *UniqueIndexAccessMethod) Create(bp *bufferpool.BufferPool) error {
 	btr, err := btree.CreateBPlusTree(bp, ui.MetaPageId)

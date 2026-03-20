@@ -1,8 +1,8 @@
-package storage
+package engine
 
 import (
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/catalog"
+	"minesql/internal/access"
+	"minesql/internal/catalog"
 	"minesql/internal/storage/page"
 	"os"
 	"path/filepath"
@@ -11,19 +11,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestInitStorageManager(t *testing.T) {
-	t.Run("グローバル StorageManager を初期化できる", func(t *testing.T) {
+func TestInit(t *testing.T) {
+	t.Run("グローバル Engine を初期化できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		ResetStorageManager()
+		Reset()
 
 		// WHEN
-		InitStorageManager()
+		Init()
 
 		// THEN
-		assert.NotNil(t, manager)
+		assert.NotNil(t, eng)
 	})
 
 	t.Run("複数回初期化しても同じインスタンスが返される", func(t *testing.T) {
@@ -31,28 +31,28 @@ func TestInitStorageManager(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		ResetStorageManager()
+		Reset()
 
 		// WHEN
-		engine1 := InitStorageManager()
-		engine2 := InitStorageManager()
+		engine1 := Init()
+		engine2 := Init()
 
 		// THEN
 		assert.Same(t, engine1, engine2)
 	})
 }
 
-func TestGetStorageManager(t *testing.T) {
-	t.Run("初期化後にグローバル StorageManager を取得できる", func(t *testing.T) {
+func TestGet(t *testing.T) {
+	t.Run("初期化後にグローバル Engine を取得できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		ResetStorageManager()
-		InitStorageManager()
+		Reset()
+		Init()
 
 		// WHEN
-		sm := GetStorageManager()
+		sm := Get()
 
 		// THEN
 		assert.NotNil(t, sm)
@@ -61,11 +61,11 @@ func TestGetStorageManager(t *testing.T) {
 
 	t.Run("初期化前に取得しようとすると panic", func(t *testing.T) {
 		// GIVEN
-		ResetStorageManager()
+		Reset()
 
 		// WHEN & THEN
 		assert.Panics(t, func() {
-			GetStorageManager()
+			Get()
 		})
 	})
 }
@@ -76,9 +76,9 @@ func TestRegisterDmToBpm(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		ResetStorageManager()
-		InitStorageManager()
-		sm := GetStorageManager()
+		Reset()
+		Init()
+		sm := Get()
 
 		fileId := page.FileId(1)
 		tableName := "users"
@@ -99,9 +99,9 @@ func TestRegisterDmToBpm(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		ResetStorageManager()
-		InitStorageManager()
-		sm := GetStorageManager()
+		Reset()
+		Init()
+		sm := Get()
 
 		fileId := page.FileId(1)
 		tableName := "users"
@@ -126,10 +126,10 @@ func TestInitCatalog(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		ResetStorageManager()
+		Reset()
 
 		// WHEN
-		sm := InitStorageManager()
+		sm := Init()
 
 		// THEN
 		assert.NotNil(t, sm)
@@ -142,10 +142,10 @@ func TestInitCatalog(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		ResetStorageManager()
+		Reset()
 
 		// 最初の初期化でカタログを作成
-		engine1 := InitStorageManager()
+		engine1 := Init()
 
 		// テーブルIDを採番してディスクに保存
 		_, err := engine1.Catalog.AllocateTableId(engine1.BufferPool)
@@ -157,11 +157,11 @@ func TestInitCatalog(t *testing.T) {
 		err = engine1.BufferPool.FlushPage()
 		assert.NoError(t, err)
 
-		// StorageManager をリセット
-		ResetStorageManager()
+		// Engine をリセット
+		Reset()
 
 		// WHEN: 同じディレクトリで再初期化
-		engine2 := InitStorageManager()
+		engine2 := Init()
 
 		// THEN: NextTableId が保存された値 (2) になっている
 		assert.NotNil(t, engine2.Catalog)
@@ -173,10 +173,10 @@ func TestInitCatalog(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		ResetStorageManager()
+		Reset()
 
 		// WHEN
-		sm := InitStorageManager()
+		sm := Init()
 
 		// THEN
 		dm, err := sm.BufferPool.GetDisk(page.FileId(0))
@@ -189,10 +189,10 @@ func TestInitCatalog(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "100")
-		ResetStorageManager()
+		Reset()
 
 		// テーブルを作成してカタログに登録
-		sm1 := InitStorageManager()
+		sm1 := Init()
 		bp := sm1.BufferPool
 
 		tableFileId := bp.AllocateFileId()
@@ -218,10 +218,10 @@ func TestInitCatalog(t *testing.T) {
 		err = bp.FlushPage()
 		assert.NoError(t, err)
 
-		ResetStorageManager()
+		Reset()
 
 		// WHEN: 同じディレクトリで再初期化
-		sm2 := InitStorageManager()
+		sm2 := Init()
 
 		// THEN: テーブルの Disk が登録されている
 		dm, err := sm2.BufferPool.GetDisk(tableFileId)
@@ -239,7 +239,7 @@ func TestInitCatalog(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		ResetStorageManager()
+		Reset()
 
 		// 空のカタログファイルを作成
 		catalogPath := filepath.Join(tmpdir, "minesql.db")
@@ -247,7 +247,7 @@ func TestInitCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		sm := InitStorageManager()
+		sm := Init()
 
 		// THEN: 新しいカタログが作成され、NextTableId は 0
 		assert.NotNil(t, sm)
@@ -261,10 +261,10 @@ func TestInitCatalog(t *testing.T) {
 		nestedDir := filepath.Join(tmpdir, "nested", "data")
 		t.Setenv("MINESQL_DATA_DIR", nestedDir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		ResetStorageManager()
+		Reset()
 
 		// WHEN
-		sm := InitStorageManager()
+		sm := Init()
 
 		// THEN: ディレクトリが作成され、初期化が完了している
 		assert.NotNil(t, sm)

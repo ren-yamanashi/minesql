@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"minesql/internal/access"
 	"minesql/internal/executor"
 )
 
@@ -10,7 +11,7 @@ func deleteRecords() {
 	fmt.Println("\n=== 削除前のテーブル ===")
 	printRecords(executor.NewSearchTable(
 		"users",
-		executor.RecordSearchModeStart{},
+		access.RecordSearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 
@@ -18,7 +19,7 @@ func deleteRecords() {
 	del := executor.NewDelete("users", executor.NewFilter(
 		executor.NewSearchTable(
 			"users",
-			executor.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		),
 		func(record executor.Record) bool {
@@ -30,7 +31,7 @@ func deleteRecords() {
 	fmt.Println("\n=== 削除後のテーブル (first_name が \"Bob\" のレコードを削除) ===")
 	printRecords(executor.NewSearchTable(
 		"users",
-		executor.RecordSearchModeStart{},
+		access.RecordSearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 
@@ -38,7 +39,7 @@ func deleteRecords() {
 	printRecords(executor.NewSearchIndex(
 		"users",
 		"idx_last_name",
-		executor.RecordSearchModeStart{},
+		access.RecordSearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 }

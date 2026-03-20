@@ -1,8 +1,9 @@
 package executor
 
 import (
-	"minesql/internal/storage"
-	"minesql/internal/storage/catalog"
+	"minesql/internal/access"
+	"minesql/internal/catalog"
+	"minesql/internal/engine"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -32,7 +33,7 @@ func TestNewInsert(t *testing.T) {
 func TestExecute(t *testing.T) {
 	t.Run("正常にレコードを挿入できる", func(t *testing.T) {
 		initStorageManagerForTest(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		tableName := "users"
 		createTableForTest(t, tableName, 1, []*IndexParam{
@@ -60,7 +61,7 @@ func TestExecute(t *testing.T) {
 		}
 		seqScan := NewSearchTable(
 			tableName,
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			whileCondition,
 		)
 		res, err := ExecutePlan(seqScan)
@@ -77,8 +78,8 @@ func initStorageManagerForTest(t *testing.T) {
 	tmpdir := t.TempDir()
 	t.Setenv("MINESQL_DATA_DIR", tmpdir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "10")
-	storage.ResetStorageManager()
-	storage.InitStorageManager()
+	engine.Reset()
+	engine.Init()
 }
 
 func createTableForTest(t *testing.T, tableName string, primaryKeyCount uint8, indexes []*IndexParam, columns []*ColumnParam) {

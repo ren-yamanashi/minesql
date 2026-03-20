@@ -3,7 +3,7 @@ package catalog
 import (
 	"encoding/binary"
 	"fmt"
-	"minesql/internal/storage/access"
+	"minesql/internal/access"
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/memcomparable"

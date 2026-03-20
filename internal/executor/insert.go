@@ -1,7 +1,7 @@
 package executor
 
 import (
-	"minesql/internal/storage"
+	"minesql/internal/engine"
 )
 
 type Insert struct {
@@ -27,7 +27,7 @@ func (ins *Insert) Next() (Record, error) {
 }
 
 func (ins *Insert) execute(records [][][]byte) error {
-	sm := storage.GetStorageManager()
+	sm := engine.Get()
 
 	tblMeta, err := sm.Catalog.GetTableMetadataByName(ins.tableName)
 	if err != nil {

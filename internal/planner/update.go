@@ -2,9 +2,9 @@ package planner
 
 import (
 	"errors"
+	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/planner/ast/statement"
-	"minesql/internal/storage"
 )
 
 type UpdatePlanner struct {
@@ -20,7 +20,7 @@ func NewUpdatePlanner(stmt *statement.UpdateStmt, innerExecutor executor.Executo
 }
 
 func (up *UpdatePlanner) Next() (executor.Executor, error) {
-	sm := storage.GetStorageManager()
+	sm := engine.Get()
 	tblMeta, err := sm.Catalog.GetTableMetadataByName(up.Stmt.Table.TableName)
 	if err != nil {
 		return nil, err

@@ -1,8 +1,8 @@
 package main
 
 import (
+	"minesql/internal/catalog"
 	"minesql/internal/executor"
-	"minesql/internal/storage/catalog"
 )
 
 // テーブルを作成し、サンプルデータを挿入する

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"minesql/internal/storage"
+	"minesql/internal/engine"
 	"os"
 )
 
@@ -13,7 +13,7 @@ func main() {
 	// StorageManager を初期化
 	os.Setenv("MINESQL_DATA_DIR", dataDir)
 	os.Setenv("MINESQL_BUFFER_SIZE", "100")
-	storage.InitStorageManager()
+	engine.Init()
 
 	createTable()
 	fullTableScan()

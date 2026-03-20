@@ -1,9 +1,9 @@
 package executor
 
 import (
-	"minesql/internal/storage"
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/catalog"
+	"minesql/internal/access"
+	"minesql/internal/catalog"
+	"minesql/internal/engine"
 )
 
 type ColumnParam struct {
@@ -48,7 +48,7 @@ func (ct *CreateTable) Next() (Record, error) {
 }
 
 func (ct *CreateTable) execute() error {
-	sm := storage.GetStorageManager()
+	sm := engine.Get()
 
 	// FileId を割り当て
 	fileId := sm.BufferPool.AllocateFileId()

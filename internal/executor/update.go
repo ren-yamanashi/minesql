@@ -1,6 +1,6 @@
 package executor
 
-import "minesql/internal/storage"
+import "minesql/internal/engine"
 
 type SetColumn struct {
 	// 更新対象のカラムの位置 (インデックス)
@@ -24,7 +24,7 @@ func NewUpdate(tableName string, setColumns []SetColumn, innerExecutor Executor)
 }
 
 func (upd *Update) Next() (Record, error) {
-	sm := storage.GetStorageManager()
+	sm := engine.Get()
 
 	tblMeta, err := sm.Catalog.GetTableMetadataByName(upd.tableName)
 	if err != nil {

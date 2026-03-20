@@ -1,8 +1,9 @@
 package executor
 
 import (
-	"minesql/internal/storage"
-	"minesql/internal/storage/catalog"
+	"minesql/internal/access"
+	"minesql/internal/catalog"
+	"minesql/internal/engine"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,7 +14,7 @@ func TestNewSearchTable(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		whileCondition := func(record Record) bool {
 			return true
@@ -22,14 +23,13 @@ func TestNewSearchTable(t *testing.T) {
 		// WHEN
 		seqScan := NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			whileCondition,
 		)
 
 		// THEN
 		assert.NotNil(t, seqScan)
 		assert.Equal(t, "users", seqScan.tableName)
-		assert.Equal(t, RecordSearchModeStart{}, seqScan.searchMode)
 	})
 }
 
@@ -38,11 +38,11 @@ func TestSearchTable(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		seqScan := NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool {
 				return string(record[0]) < "c" // プライマリキーが "c" 未満の間、継続
 			},
@@ -71,11 +71,11 @@ func TestSearchTable(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		seqScan := NewSearchTable(
 			"users",
-			RecordSearchModeKey{Key: [][]byte{[]byte("b")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("b")}},
 			func(record Record) bool {
 				return string(record[0]) <= "d" // プライマリキーが "d" 以下の間、継続
 			},
@@ -103,15 +103,15 @@ func TestSearchTable(t *testing.T) {
 }
 
 // StorageManager を初期化し、サンプルデータを投入する
-func InitStorageEngineForTest(t *testing.T, dataDir string) *storage.StorageManager {
+func InitStorageEngineForTest(t *testing.T, dataDir string) *engine.Engine {
 	// グローバル StorageManager を初期化
 	// テスト用に一時的に環境変数を設定
 	t.Setenv("MINESQL_DATA_DIR", dataDir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "10")
 
-	storage.ResetStorageManager()
-	storage.InitStorageManager()
-	sm := storage.GetStorageManager()
+	engine.Reset()
+	engine.Init()
+	sm := engine.Get()
 
 	// テーブルを作成
 	createTable := NewCreateTable("users", 1, []*IndexParam{

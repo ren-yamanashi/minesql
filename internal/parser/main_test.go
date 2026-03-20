@@ -2,10 +2,10 @@ package parser_test
 
 import (
 	"fmt"
+	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/parser"
 	"minesql/internal/planner"
-	"minesql/internal/storage"
 	"strings"
 	"testing"
 
@@ -45,9 +45,9 @@ func TestParserIntegration(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "100")
-		storage.ResetStorageManager()
-		storage.InitStorageManager()
-		defer storage.ResetStorageManager()
+		engine.Reset()
+		engine.Init()
+		defer engine.Reset()
 
 		executeSql(t, `
 CREATE TABLE users (
@@ -96,9 +96,9 @@ VALUES
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "100")
-		storage.ResetStorageManager()
-		storage.InitStorageManager()
-		defer storage.ResetStorageManager()
+		engine.Reset()
+		engine.Init()
+		defer engine.Reset()
 
 		executeSql(t, `
 CREATE TABLE users (
@@ -135,9 +135,9 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "100")
-		storage.ResetStorageManager()
-		storage.InitStorageManager()
-		defer storage.ResetStorageManager()
+		engine.Reset()
+		engine.Init()
+		defer engine.Reset()
 
 		executeSql(t, `
 CREATE TABLE users (
@@ -177,9 +177,9 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "100")
-		storage.ResetStorageManager()
-		storage.InitStorageManager()
-		defer storage.ResetStorageManager()
+		engine.Reset()
+		engine.Init()
+		defer engine.Reset()
 
 		executeSql(t, `
 CREATE TABLE users (
@@ -223,9 +223,9 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "100")
-		storage.ResetStorageManager()
-		storage.InitStorageManager()
-		defer storage.ResetStorageManager()
+		engine.Reset()
+		engine.Init()
+		defer engine.Reset()
 
 		executeSql(t, `
 CREATE TABLE users (

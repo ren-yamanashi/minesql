@@ -1,12 +1,13 @@
 package planner
 
 import (
+	"minesql/internal/access"
+	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/planner/ast/expression"
 	"minesql/internal/planner/ast/identifier"
 	"minesql/internal/planner/ast/literal"
 	"minesql/internal/planner/ast/statement"
-	"minesql/internal/storage"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,7 +24,7 @@ func TestNewUpdatePlanner(t *testing.T) {
 		}
 		innerExec := executor.NewSearchTable(
 			"users",
-			executor.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
 
@@ -42,7 +43,7 @@ func TestUpdatePlannerNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		stmt := &statement.UpdateStmt{
 			Table: *identifier.NewTableId("users"),
@@ -52,7 +53,7 @@ func TestUpdatePlannerNext(t *testing.T) {
 		}
 		innerExec := executor.NewSearchTable(
 			"users",
-			executor.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
 		planner := NewUpdatePlanner(stmt, innerExec)
@@ -70,7 +71,7 @@ func TestUpdatePlannerNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		stmt := &statement.UpdateStmt{
 			Table: *identifier.NewTableId("users"),
@@ -81,7 +82,7 @@ func TestUpdatePlannerNext(t *testing.T) {
 		}
 		innerExec := executor.NewSearchTable(
 			"users",
-			executor.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
 		planner := NewUpdatePlanner(stmt, innerExec)
@@ -105,7 +106,7 @@ func TestUpdatePlannerNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		stmt := &statement.UpdateStmt{
 			Table: *identifier.NewTableId("users"),
@@ -115,7 +116,7 @@ func TestUpdatePlannerNext(t *testing.T) {
 		}
 		innerExec := executor.NewSearchTable(
 			"users",
-			executor.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
 		planner := NewUpdatePlanner(stmt, innerExec)
@@ -133,7 +134,7 @@ func TestUpdatePlannerNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		stmt := &statement.UpdateStmt{
 			Table: *identifier.NewTableId("nonexistent"),
@@ -143,7 +144,7 @@ func TestUpdatePlannerNext(t *testing.T) {
 		}
 		innerExec := executor.NewSearchTable(
 			"nonexistent",
-			executor.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
 		planner := NewUpdatePlanner(stmt, innerExec)
@@ -160,9 +161,9 @@ func TestUpdatePlannerNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
-		sm := storage.GetStorageManager()
+		sm := engine.Get()
 		tblMeta, err := sm.Catalog.GetTableMetadataByName("users")
 		assert.NoError(t, err)
 		tbl, err := tblMeta.GetTable()
@@ -183,7 +184,7 @@ func TestUpdatePlannerNext(t *testing.T) {
 		}
 		innerExec := executor.NewSearchTable(
 			"users",
-			executor.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record executor.Record) bool {
 				return string(record[0]) == "a"
 			},
@@ -199,7 +200,7 @@ func TestUpdatePlannerNext(t *testing.T) {
 		// THEN: "a" の first_name が "Jane" に更新されている
 		scan := executor.NewSearchTable(
 			"users",
-			executor.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
 		results, err := executor.ExecutePlan(scan)
@@ -213,7 +214,7 @@ func TestUpdatePlannerNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		stmt := &statement.UpdateStmt{
 			Table: *identifier.NewTableId("users"),
@@ -236,7 +237,7 @@ func TestUpdatePlannerNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		stmt := &statement.UpdateStmt{
 			Table: *identifier.NewTableId("users"),
@@ -265,7 +266,7 @@ func TestUpdatePlannerNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		stmt := &statement.UpdateStmt{
 			Table:      *identifier.NewTableId("users"),
@@ -273,7 +274,7 @@ func TestUpdatePlannerNext(t *testing.T) {
 		}
 		innerExec := executor.NewSearchTable(
 			"users",
-			executor.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
 		planner := NewUpdatePlanner(stmt, innerExec)

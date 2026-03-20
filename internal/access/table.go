@@ -149,6 +149,16 @@ func (t *TableAccessMethod) Update(bp *bufferpool.BufferPool, oldRecord [][]byte
 	return nil
 }
 
+// Search は指定した検索モードでテーブルを検索し、ClusteredIndexIterator を返す
+func (t *TableAccessMethod) Search(bp *bufferpool.BufferPool, mode RecordSearchMode) (*ClusteredIndexIterator, error) {
+	btr := btree.NewBPlusTree(t.MetaPageId)
+	iterator, err := btr.Search(bp, mode.encode())
+	if err != nil {
+		return nil, err
+	}
+	return newClusteredIndexIterator(iterator, bp), nil
+}
+
 // GetUniqueIndexByName はインデックス名からユニークインデックスを取得する
 func (t *TableAccessMethod) GetUniqueIndexByName(indexName string) (*UniqueIndexAccessMethod, error) {
 	for _, ui := range t.UniqueIndexes {

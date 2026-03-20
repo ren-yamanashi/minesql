@@ -1,6 +1,7 @@
 package main
 
 import (
+	"minesql/internal/access"
 	"minesql/internal/executor"
 )
 
@@ -11,7 +12,7 @@ func filterScan() {
 	// フルテーブルスキャン
 	seqScan := executor.NewSearchTable(
 		"users",
-		executor.RecordSearchModeStart{},
+		access.RecordSearchModeStart{},
 		func(record executor.Record) bool {
 			return true
 		},

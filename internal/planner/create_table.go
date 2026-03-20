@@ -3,10 +3,10 @@ package planner
 import (
 	"errors"
 	"fmt"
+	"minesql/internal/catalog"
 	"minesql/internal/executor"
 	"minesql/internal/planner/ast/definition"
 	"minesql/internal/planner/ast/statement"
-	"minesql/internal/storage/catalog"
 )
 
 type CreateTableNode struct {

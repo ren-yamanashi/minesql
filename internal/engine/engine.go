@@ -1,57 +1,71 @@
-package storage
+package engine
 
 import (
 	"errors"
 	"fmt"
 	"io"
-	"minesql/internal/config"
-	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/catalog"
-	"minesql/internal/storage/disk"
-	"minesql/internal/storage/page"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"minesql/internal/catalog"
+	"minesql/internal/config"
+	"minesql/internal/storage/bufferpool"
+	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 )
 
 var (
-	manager *StorageManager
-	once    sync.Once
+	eng  *Engine
+	once sync.Once
 )
 
-// グローバルな StorageManager を初期化する
-func InitStorageManager() *StorageManager {
-	once.Do(func() {
-		mng, err := newStorageManager()
-		if err != nil {
-			panic(fmt.Sprintf("failed to initialize storage manager: %v", err))
-		}
-		manager = mng
-	})
-	return manager
-}
-
-// ResetStorageManager はグローバルな StorageManager の状態をリセットする (主にテストで使用)
-func ResetStorageManager() {
-	manager = nil
-	once = sync.Once{}
-}
-
-func GetStorageManager() *StorageManager {
-	if manager == nil {
-		panic("storage manager not initialized. call InitStorageManager() first")
-	}
-	return manager
-}
-
-// ストレージエンジン層のリソースの管理を行う
-type StorageManager struct {
+// Engine はストレージ層のリソースの管理を行う
+type Engine struct {
 	BufferPool    *bufferpool.BufferPool
 	Catalog       *catalog.Catalog
 	baseDirectory string
 }
 
-func newStorageManager() (*StorageManager, error) {
+// グローバルな Engine を初期化する
+func Init() *Engine {
+	once.Do(func() {
+		e, err := newEngine()
+		if err != nil {
+			panic(fmt.Sprintf("failed to initialize engine: %v", err))
+		}
+		eng = e
+	})
+	return eng
+}
+
+// Reset はグローバルな Engine の状態をリセットする (主にテストで使用)
+func Reset() {
+	eng = nil
+	once = sync.Once{}
+}
+
+// Get はグローバルな Engine を取得する
+func Get() *Engine {
+	if eng == nil {
+		panic("engine not initialized. call engine.Init() first")
+	}
+	return eng
+}
+
+// RegisterDmToBpm は BufferPool に Disk を登録する
+func (e *Engine) RegisterDmToBpm(fileId page.FileId, tableName string) error {
+	path := filepath.Join(e.baseDirectory, fmt.Sprintf("%s.db", tableName))
+	dm, err := disk.NewDisk(fileId, path)
+	if err != nil {
+		return err
+	}
+	e.BufferPool.RegisterDisk(fileId, dm)
+	return nil
+}
+
+// newEngine は Engine を初期化する
+func newEngine() (*Engine, error) {
 	dataDir := config.GetDataDirectory()
 	err := os.MkdirAll(dataDir, 0750)
 	if err != nil {
@@ -63,25 +77,15 @@ func newStorageManager() (*StorageManager, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &StorageManager{
+
+	return &Engine{
 		BufferPool:    bp,
 		Catalog:       catalog,
 		baseDirectory: dataDir,
 	}, nil
 }
 
-// BufferPool に Disk を登録する
-func (sm *StorageManager) RegisterDmToBpm(fileId page.FileId, tableName string) error {
-	path := filepath.Join(sm.baseDirectory, fmt.Sprintf("%s.db", tableName))
-	dm, err := disk.NewDisk(fileId, path)
-	if err != nil {
-		return err
-	}
-	sm.BufferPool.RegisterDisk(fileId, dm)
-	return nil
-}
-
-// カタログを初期化する
+// initCatalog はカタログを初期化する
 func initCatalog(baseDir string, bp *bufferpool.BufferPool) (*catalog.Catalog, error) {
 	fileId := page.FileId(0)
 	path := filepath.Join(baseDir, "minesql.db")
@@ -128,7 +132,7 @@ func initCatalog(baseDir string, bp *bufferpool.BufferPool) (*catalog.Catalog, e
 	return cat, nil
 }
 
-// カタログに含まれるテーブルの Disk を登録する
+// registerTableDisks はカタログに含まれるテーブルの Disk を登録する
 func registerTableDisks(cat *catalog.Catalog, baseDir string, bp *bufferpool.BufferPool) error {
 	tables := cat.GetAllTables()
 	for _, tableMeta := range tables {

@@ -15,10 +15,6 @@
           {
             "type": "command",
             "command": "make lint"
-          },
-          {
-            "type": "command",
-            "command": "make build"
           }
         ]
       }

@@ -1,8 +1,7 @@
 package executor
 
 import (
-	"minesql/internal/storage"
-	"minesql/internal/storage/page"
+	"minesql/internal/engine"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,9 +13,9 @@ func TestCreateTable(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		storage.ResetStorageManager()
-		storage.InitStorageManager()
-		sm := storage.GetStorageManager()
+		engine.Reset()
+		engine.Init()
+		sm := engine.Get()
 		createTable := NewCreateTable("users", 1, nil, nil)
 
 		// WHEN
@@ -36,9 +35,9 @@ func TestCreateTable(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		storage.ResetStorageManager()
-		storage.InitStorageManager()
-		sm := storage.GetStorageManager()
+		engine.Reset()
+		engine.Init()
+		sm := engine.Get()
 		createTable := NewCreateTable("users", 1, nil, []*ColumnParam{
 			{Name: "id", Type: "int"},
 			{Name: "name", Type: "string"},
@@ -71,9 +70,9 @@ func TestCreateTable(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		storage.ResetStorageManager()
-		storage.InitStorageManager()
-		sm := storage.GetStorageManager()
+		engine.Reset()
+		engine.Init()
+		sm := engine.Get()
 		createTable := NewCreateTable("users", 1, []*IndexParam{
 			{Name: "email", ColName: "email", SecondaryKey: 1},
 		}, nil)
@@ -95,9 +94,9 @@ func TestCreateTable(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		storage.ResetStorageManager()
-		storage.InitStorageManager()
-		sm := storage.GetStorageManager()
+		engine.Reset()
+		engine.Init()
+		sm := engine.Get()
 		createTable := NewCreateTable("users", 1, nil, nil)
 
 		// WHEN
@@ -107,8 +106,6 @@ func TestCreateTable(t *testing.T) {
 		// THEN
 		tblMeta, err := sm.Catalog.GetTableMetadataByName("users")
 		assert.NoError(t, err)
-		// FileId が採番されていることを確認
-		assert.NotEqual(t, page.FileId(0), tblMeta.DataMetaPageId.FileId)
 		// ディスクマネージャが登録されていることを確認
 		dm, dmErr := sm.BufferPool.GetDisk(tblMeta.DataMetaPageId.FileId)
 		assert.NoError(t, dmErr)

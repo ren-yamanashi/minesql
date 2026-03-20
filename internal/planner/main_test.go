@@ -2,13 +2,13 @@ package planner
 
 import (
 	"fmt"
+	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/planner/ast/definition"
 	"minesql/internal/planner/ast/expression"
 	"minesql/internal/planner/ast/identifier"
 	"minesql/internal/planner/ast/literal"
 	"minesql/internal/planner/ast/statement"
-	"minesql/internal/storage"
 	"strings"
 	"testing"
 
@@ -32,8 +32,8 @@ func setupUsersTable(t *testing.T) {
 	tmpdir := t.TempDir()
 	t.Setenv("MINESQL_DATA_DIR", tmpdir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "100")
-	storage.ResetStorageManager()
-	storage.InitStorageManager()
+	engine.Reset()
+	engine.Init()
 
 	// CREATE TABLE
 	executePlan(t, statement.NewCreateTableStmt(
@@ -124,7 +124,7 @@ func TestPlannerIntegration(t *testing.T) {
 	t.Run("SELECT でフルテーブルスキャンできる", func(t *testing.T) {
 		// GIVEN
 		setupUsersTable(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// WHEN
 		records := executePlan(t, statement.NewSelectStmt(
@@ -152,7 +152,7 @@ func TestPlannerIntegration(t *testing.T) {
 	t.Run("WHERE 句で等値検索できる", func(t *testing.T) {
 		// GIVEN
 		setupUsersTable(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// WHEN
 		records := executePlan(t, statement.NewSelectStmt(
@@ -181,7 +181,7 @@ func TestPlannerIntegration(t *testing.T) {
 	t.Run("AND と OR の複合条件でフィルタリングできる", func(t *testing.T) {
 		// GIVEN
 		setupUsersTable(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// WHEN: (first_name < 'K' AND gender = 'male' AND last_name >= 'Doe') OR first_name = 'Tom'
 		records := executePlan(t, statement.NewSelectStmt(
@@ -249,7 +249,7 @@ func TestPlannerIntegration(t *testing.T) {
 	t.Run("UPDATE でレコードを更新できる", func(t *testing.T) {
 		// GIVEN
 		setupUsersTable(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// WHEN (UPDATE users SET last_name = 'Smith' WHERE username = 'johndoe')
 		executePlan(t, &statement.UpdateStmt{
@@ -291,7 +291,7 @@ func TestPlannerIntegration(t *testing.T) {
 	t.Run("DELETE でレコードを削除できる", func(t *testing.T) {
 		// GIVEN
 		setupUsersTable(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// WHEN
 		executePlan(t, statement.NewDeleteStmt(

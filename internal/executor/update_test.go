@@ -1,8 +1,9 @@
 package executor
 
 import (
-	"minesql/internal/storage"
-	"minesql/internal/storage/catalog"
+	"minesql/internal/access"
+	"minesql/internal/catalog"
+	"minesql/internal/engine"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,7 @@ func TestNewUpdate(t *testing.T) {
 		}
 		innerExecutor := NewSearchTable(
 			tableName,
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 
@@ -37,13 +38,13 @@ func TestUpdateNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		upd := NewUpdate("users", []SetColumn{
 			{Pos: 1, Value: []byte("Updated")},
 		}, NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -56,7 +57,7 @@ func TestUpdateNext(t *testing.T) {
 		// THEN: 全レコードの first_name が "Updated" になっている
 		scan := NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := ExecutePlan(scan)
@@ -71,7 +72,7 @@ func TestUpdateNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// プライマリキーが "a" のレコードのみ更新
 		upd := NewUpdate("users", []SetColumn{
@@ -79,7 +80,7 @@ func TestUpdateNext(t *testing.T) {
 			{Pos: 2, Value: []byte("Updated")},
 		}, NewSearchTable(
 			"users",
-			RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
 			},
@@ -94,7 +95,7 @@ func TestUpdateNext(t *testing.T) {
 		// THEN: "a" のレコードが更新され、他は変わらない
 		scan := NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := ExecutePlan(scan)
@@ -108,7 +109,7 @@ func TestUpdateNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// first_name が "Bob" のレコードの last_name を更新
 		upd := NewUpdate("users", []SetColumn{
@@ -116,7 +117,7 @@ func TestUpdateNext(t *testing.T) {
 		}, NewFilter(
 			NewSearchTable(
 				"users",
-				RecordSearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -133,7 +134,7 @@ func TestUpdateNext(t *testing.T) {
 		// THEN: "Bob" の last_name が "Williams" に更新され、他は変わらない
 		scan := NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := ExecutePlan(scan)
@@ -152,14 +153,14 @@ func TestUpdateNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// "a" (last_name = "Doe") の last_name を "Zebra" に更新
 		upd := NewUpdate("users", []SetColumn{
 			{Pos: 2, Value: []byte("Zebra")},
 		}, NewSearchTable(
 			"users",
-			RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
 			},
@@ -176,7 +177,7 @@ func TestUpdateNext(t *testing.T) {
 		indexScan := NewSearchIndex(
 			"users",
 			"last_name",
-			RecordSearchModeKey{Key: [][]byte{[]byte("Zebra")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("Zebra")}},
 			func(record Record) bool {
 				return string(record[0]) == "Zebra"
 			},
@@ -190,7 +191,7 @@ func TestUpdateNext(t *testing.T) {
 		indexScanOld := NewSearchIndex(
 			"users",
 			"last_name",
-			RecordSearchModeKey{Key: [][]byte{[]byte("Doe")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("Doe")}},
 			func(record Record) bool {
 				return string(record[0]) == "Doe"
 			},
@@ -204,13 +205,13 @@ func TestUpdateNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		upd := NewUpdate("nonexistent", []SetColumn{
 			{Pos: 1, Value: []byte("val")},
 		}, NewSearchTable(
 			"nonexistent",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -225,14 +226,14 @@ func TestUpdateNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// プライマリキーを "a" → "z" に変更
 		upd := NewUpdate("users", []SetColumn{
 			{Pos: 0, Value: []byte("z")},
 		}, NewSearchTable(
 			"users",
-			RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
 			},
@@ -247,7 +248,7 @@ func TestUpdateNext(t *testing.T) {
 		// THEN: "a" が消え "z" が追加されている
 		scan := NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := ExecutePlan(scan)
@@ -265,7 +266,7 @@ func TestUpdateNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 
 		// 存在しない first_name でフィルタ
 		upd := NewUpdate("users", []SetColumn{
@@ -273,7 +274,7 @@ func TestUpdateNext(t *testing.T) {
 		}, NewFilter(
 			NewSearchTable(
 				"users",
-				RecordSearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -290,7 +291,7 @@ func TestUpdateNext(t *testing.T) {
 		// THEN: 全レコードが変更されていない
 		scan := NewSearchTable(
 			"users",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := ExecutePlan(scan)
@@ -307,7 +308,7 @@ func TestUpdateNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManagerForTest(t)
-		defer storage.ResetStorageManager()
+		defer engine.Reset()
 		_ = tmpdir
 
 		createTableForTest(t, "empty_table", 1, nil, []*ColumnParam{
@@ -319,7 +320,7 @@ func TestUpdateNext(t *testing.T) {
 			{Pos: 1, Value: []byte("new_value")},
 		}, NewSearchTable(
 			"empty_table",
-			RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 

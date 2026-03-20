@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/planner"
 	"minesql/internal/planner/ast/definition"
@@ -9,7 +10,6 @@ import (
 	"minesql/internal/planner/ast/identifier"
 	"minesql/internal/planner/ast/literal"
 	"minesql/internal/planner/ast/statement"
-	"minesql/internal/storage"
 	"os"
 )
 
@@ -21,7 +21,7 @@ func main() {
 	// StorageManager を初期化
 	os.Setenv("MINESQL_DATA_DIR", dataDir)
 	os.Setenv("MINESQL_BUFFER_SIZE", "100")
-	storage.InitStorageManager()
+	engine.Init()
 
 	createTable()
 	insert()

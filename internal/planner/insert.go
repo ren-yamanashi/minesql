@@ -2,10 +2,10 @@ package planner
 
 import (
 	"errors"
+	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/planner/ast/literal"
 	"minesql/internal/planner/ast/statement"
-	"minesql/internal/storage"
 )
 
 type InsertPlanner struct {
@@ -34,7 +34,7 @@ func (ip *InsertPlanner) Next() (executor.Executor, error) {
 		}
 	}
 
-	sm := storage.GetStorageManager()
+	sm := engine.Get()
 	tblMeta, err := sm.Catalog.GetTableMetadataByName(ip.Stmt.Table.TableName)
 	if err != nil {
 		return nil, err
