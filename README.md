@@ -16,6 +16,13 @@ make build-client
 ./bin/client -h localhost -p 8888 # -h = hostname, -p = port
 ```
 
+## Settings
+
+| Environment Variable | Description | Default Value |
+| -------------------- | ----------- | ------------- |
+| `MINESQL_DATA_DIR` | データファイルの保存先ディレクトリ | `./data` |
+| `MINESQL_BUFFER__SIZE` | バッファプールのサイズ (ページ数) | `100` |
+
 ## Feature
 
 | Statement | Implementation |
