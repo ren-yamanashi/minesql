@@ -1,31 +1,44 @@
 # アーキテクチャ
 
-## 概要
+## 概要 (minesql server)
 
+- [サーバー](./server.md)
 - [パーサー](./parser.md)
 - [プランナー](./planner.md)
 - [エグゼキュータ](./executor.md)
-- [ストレージ](./storage/overview.md)
-
-- 基本的には下から順に (ディスク -> バッファープール -> アクセスメソッド -> エグゼキュータ -> プランナー -> パーサー の順で) 実装する
+- [エンジン](./engine.md)
+- [カタログ](./catalog.md)
+- [アクセスメソッド](./access.md)
+- [ストレージ](./storage)
 
 ## アーキテクチャ図
 
 ```mermaid
 graph TD
-    parser[パーサー] --AST--> planner[プランナー]
-    planner --実行計画-->executor[エグゼキュータ]
-    executor --1.定義要求--> manager[マネージャ]
-    executor --2.Scan/Insert/Create/...etc--> accessMethod[アクセスメソッド]
+    server[サーバー]
+    parser[パーサー]
+    planner[プランナー]
+    executor[エグゼキュータ]
 
-    subgraph storageEngine[ストレージ]
-        direction TB
-        subgraph accessMethod[アクセスメソッド]
-            b-tree[B+Tree]
-            table[テーブル]
+    server --1.クエリ実行--> parser
+    parser --2.AST 生成--> planner
+    planner --3.実行計画作成--> executor
+    executor --4.定義要求--> catalog
+    executor --5.データ要求--> access
+    access --6.バッファプール経由で--> bufferpool
+
+    subgraph storageEngine[ストレージエンジン]
+        catalog[カタログ]
+        access[アクセスメソッド]
+
+        subgraph storage[ストレージ]
+            bufferpool[バッファプール]
+            disk[ディスク]
+
+            bufferpool --7.必要に応じて--> disk
         end
-        manager[マネージャ<br/> （ストレージエンジン内のリソースを管理）]
-        accessMethod[アクセスメソッド] --データ要求-->bufferPool[バッファプール]
-        bufferPool --ディスクI/O要求-->diskManager[ディスク]
     end
 ```
+
+※エンジン (`internal/engine`) はサーバー起動時にバッファプールとカタログを初期化するパッケージ  
+図ではクエリ処理の流れを優先し省略している
