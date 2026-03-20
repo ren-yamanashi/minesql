@@ -5,20 +5,19 @@ import (
 	"fmt"
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/page"
-	"sort"
 )
 
 var (
 	ErrInvalidCatalogFile = fmt.Errorf("invalid database catalog file: magic number mismatch")
 )
 
+// Catalog はテーブルのメタデータ (テーブル情報、インデックス情報、カラム情報) を管理する
 type Catalog struct {
 	TableMetaPageId  page.PageId
 	IndexMetaPageId  page.PageId
 	ColumnMetaPageId page.PageId
-	metadata         []TableMetadata
+	metadata         []*TableMetadata
 	NextTableId      uint64
 }
 
@@ -50,14 +49,16 @@ func NewCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
 		TableMetaPageId:  page.NewPageId(fileId, page.PageNumber(tblMetaPageNum)),
 		IndexMetaPageId:  page.NewPageId(fileId, page.PageNumber(idxMetaPageNum)),
 		ColumnMetaPageId: page.NewPageId(fileId, page.PageNumber(colMetaPageNum)),
-		metadata:         []TableMetadata{},
+		metadata:         nil,
 		NextTableId:      initTableId,
 	}
 
 	// ディスクから既存のメタデータを読み込む
-	if err := catalog.loadMetadata(bp); err != nil {
+	tableMeta, err := loadTableMetadata(bp, catalog.TableMetaPageId, catalog.IndexMetaPageId, catalog.ColumnMetaPageId)
+	if err != nil {
 		return nil, err
 	}
+	catalog.metadata = tableMeta
 
 	return catalog, nil
 }
@@ -121,7 +122,7 @@ func CreateCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
 		ColumnMetaPageId: colMetaTree.MetaPageId,
 		IndexMetaPageId:  idxMetaTree.MetaPageId,
 		NextTableId:      initPageId,
-		metadata:         []TableMetadata{},
+		metadata:         nil,
 	}, nil
 }
 
@@ -139,6 +140,7 @@ func (c *Catalog) AllocateTableId(bp *bufferpool.BufferPool) (uint64, error) {
 	}
 	defer bp.UnRefPage(headerPageId)
 
+	// 次に割り当てる TableId をヘッダーページの指定オフセットに書き込む
 	data := headerPage.GetWriteData()
 	binary.BigEndian.PutUint64(data[16:24], c.NextTableId)
 
@@ -147,26 +149,35 @@ func (c *Catalog) AllocateTableId(bp *bufferpool.BufferPool) (uint64, error) {
 
 // Insert はカタログにメタデータを挿入する
 func (c *Catalog) Insert(bp *bufferpool.BufferPool, tableMeta TableMetadata) error {
-	// テーブルメタデータを挿入
-	if err := c.insertTableMetadata(bp, tableMeta); err != nil {
-		return err
+	// 各メタデータに MetaPageId を設定する
+	tableMeta.MetaPageId = c.TableMetaPageId
+	for _, indexMeta := range tableMeta.Indexes {
+		indexMeta.MetaPageId = c.IndexMetaPageId
+	}
+	for _, colMeta := range tableMeta.Cols {
+		colMeta.MetaPageId = c.ColumnMetaPageId
 	}
 
-	// カラムメタデータを挿入
-	for _, colMeta := range tableMeta.Cols {
-		if err := c.insertColumnMetadata(bp, colMeta); err != nil {
-			return err
-		}
+	// テーブルメタデータを挿入
+	if err := tableMeta.Insert(bp); err != nil {
+		return err
 	}
 
 	// インデックスメタデータを挿入
 	for _, indexMeta := range tableMeta.Indexes {
-		if err := c.insertIndexMetadata(bp, indexMeta); err != nil {
+		if err := indexMeta.Insert(bp); err != nil {
 			return err
 		}
 	}
 
-	c.metadata = append(c.metadata, tableMeta)
+	// カラムメタデータを挿入
+	for _, colMeta := range tableMeta.Cols {
+		if err := colMeta.Insert(bp); err != nil {
+			return err
+		}
+	}
+
+	c.metadata = append(c.metadata, &tableMeta)
 	return nil
 }
 
@@ -174,229 +185,13 @@ func (c *Catalog) Insert(bp *bufferpool.BufferPool, tableMeta TableMetadata) err
 func (c *Catalog) GetTableMetadataByName(tableName string) (*TableMetadata, error) {
 	for _, tblMeta := range c.metadata {
 		if tblMeta.Name == tableName {
-			return &tblMeta, nil
+			return tblMeta, nil
 		}
 	}
 	return nil, fmt.Errorf("table %s not found in catalog", tableName)
 }
 
 // GetAllTables はすべてのテーブルメタデータを取得する
-func (c *Catalog) GetAllTables() []TableMetadata {
+func (c *Catalog) GetAllTables() []*TableMetadata {
 	return c.metadata
-}
-
-func (c *Catalog) insertTableMetadata(bp *bufferpool.BufferPool, tableMeta TableMetadata) error {
-	btr := btree.NewBPlusTree(c.TableMetaPageId)
-
-	// キーをエンコード (TableId)
-	var encodedKey []byte
-	keyBuf := binary.BigEndian.AppendUint64(nil, tableMeta.TableId)
-	memcomparable.Encode([][]byte{keyBuf}, &encodedKey)
-
-	// 値をエンコード (Name, NCols, PrimaryKeyCount, DataMetaPageId)
-	var encodedValue []byte
-	nColsBuf := binary.BigEndian.AppendUint64(nil, uint64(tableMeta.NCols))
-	pkCountBuf := binary.BigEndian.AppendUint64(nil, uint64(tableMeta.PrimaryKeyCount))
-	memcomparable.Encode([][]byte{[]byte(tableMeta.Name), nColsBuf, pkCountBuf, tableMeta.DataMetaPageId.ToBytes()}, &encodedValue)
-
-	// B+Tree に挿入
-	return btr.Insert(bp, btree.NewPair(encodedKey, encodedValue))
-}
-
-func (c *Catalog) insertColumnMetadata(bp *bufferpool.BufferPool, columnMeta *ColumnMetadata) error {
-	btr := btree.NewBPlusTree(c.ColumnMetaPageId)
-
-	// キーをエンコード (TableId, ColName)
-	var encodedKey []byte
-	keyBuf := binary.BigEndian.AppendUint64(nil, columnMeta.TableId)
-	memcomparable.Encode([][]byte{keyBuf, []byte(columnMeta.Name)}, &encodedKey)
-
-	// 値をエンコード (Pos, Type)
-	var encodedValue []byte
-	posBuf := binary.BigEndian.AppendUint16(nil, columnMeta.Pos)
-	memcomparable.Encode([][]byte{posBuf, []byte(columnMeta.Type)}, &encodedValue)
-
-	// B+Tree に挿入
-	return btr.Insert(bp, btree.NewPair(encodedKey, encodedValue))
-}
-
-func (c *Catalog) insertIndexMetadata(bp *bufferpool.BufferPool, indexMeta *IndexMetadata) error {
-	btr := btree.NewBPlusTree(c.IndexMetaPageId)
-
-	// キーをエンコード (TableId, Name)
-	var encodedKey []byte
-	keyBuf := binary.BigEndian.AppendUint64(nil, indexMeta.TableId)
-	memcomparable.Encode([][]byte{keyBuf, []byte(indexMeta.Name)}, &encodedKey)
-
-	// 値をエンコード (Type, ColName, DataMetaPageId)
-	var encodedValue []byte
-	memcomparable.Encode([][]byte{[]byte(indexMeta.Type), []byte(indexMeta.ColName), indexMeta.DataMetaPageId.ToBytes()}, &encodedValue)
-
-	// B+Tree に挿入
-	return btr.Insert(bp, btree.NewPair(encodedKey, encodedValue))
-}
-
-// ディスクから既存のメタデータを読み込む
-func (c *Catalog) loadMetadata(bp *bufferpool.BufferPool) error {
-	// テーブルメタデータを読み込む
-	tblMetaTree := btree.NewBPlusTree(c.TableMetaPageId)
-	iter, err := tblMetaTree.Search(bp, btree.SearchModeStart{})
-	if err != nil {
-		return err
-	}
-
-	for {
-		pair, ok := iter.Get()
-		if !ok {
-			break
-		}
-
-		// テーブルメタデータをデコード
-		tableMeta := c.decodeTableMetadata(&pair)
-
-		// カラムメタデータを読み込む
-		cols, err := c.loadColumnMetadata(bp, tableMeta.TableId)
-		if err != nil {
-			return err
-		}
-		tableMeta.Cols = cols
-
-		// インデックスメタデータを読み込む
-		indexes, err := c.loadIndexMetadata(bp, tableMeta.TableId)
-		if err != nil {
-			return err
-		}
-		tableMeta.Indexes = indexes
-
-		c.metadata = append(c.metadata, tableMeta)
-
-		if err := iter.Advance(bp); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// テーブルメタデータをデコード
-func (c *Catalog) decodeTableMetadata(pair *btree.Pair) TableMetadata {
-	// キーをデコード (TableId)
-	var keyParts [][]byte
-	memcomparable.Decode(pair.Key, &keyParts)
-	tableId := binary.BigEndian.Uint64(keyParts[0])
-
-	// 値をデコード (Name, NCols, PrimaryKeyCount, DataMetaPageId)
-	var valueParts [][]byte
-	memcomparable.Decode(pair.Value, &valueParts)
-	name := string(valueParts[0])
-	nCols := uint8(binary.BigEndian.Uint64(valueParts[1]))
-	pkCount := uint8(binary.BigEndian.Uint64(valueParts[2]))
-	dataMetaPageId := page.RestorePageIdFromBytes(valueParts[3])
-
-	return TableMetadata{
-		TableId:         tableId,
-		Name:            name,
-		NCols:           nCols,
-		PrimaryKeyCount: pkCount,
-		DataMetaPageId:  dataMetaPageId,
-	}
-}
-
-// 指定されたテーブルのカラムメタデータを読み込む
-func (c *Catalog) loadColumnMetadata(bp *bufferpool.BufferPool, tableId uint64) ([]*ColumnMetadata, error) {
-	colMetaTree := btree.NewBPlusTree(c.ColumnMetaPageId)
-	iter, err := colMetaTree.Search(bp, btree.SearchModeStart{})
-	if err != nil {
-		return nil, err
-	}
-
-	var cols []*ColumnMetadata
-	for {
-		pair, ok := iter.Get()
-		if !ok {
-			break
-		}
-
-		// キーをデコード (TableId, ColName)
-		var keyParts [][]byte
-		memcomparable.Decode(pair.Key, &keyParts)
-		colTableId := binary.BigEndian.Uint64(keyParts[0])
-
-		// 指定されたテーブルのカラムのみを収集
-		if colTableId == tableId {
-			colName := string(keyParts[1])
-
-			// 値をデコード (Pos, Type)
-			var valueParts [][]byte
-			memcomparable.Decode(pair.Value, &valueParts)
-			pos := binary.BigEndian.Uint16(valueParts[0])
-			colType := ColumnType(string(valueParts[1]))
-
-			cols = append(cols, &ColumnMetadata{
-				TableId: tableId,
-				Name:    colName,
-				Pos:     pos,
-				Type:    colType,
-			})
-		}
-
-		if err := iter.Advance(bp); err != nil {
-			return nil, err
-		}
-	}
-
-	// Pos でソート (B+Tree はカラム名でソートされているため)
-	sort.Slice(cols, func(i, j int) bool {
-		return cols[i].Pos < cols[j].Pos
-	})
-
-	return cols, nil
-}
-
-// 指定されたテーブルのインデックスメタデータを読み込む
-func (c *Catalog) loadIndexMetadata(bp *bufferpool.BufferPool, tableId uint64) ([]*IndexMetadata, error) {
-	idxMetaTree := btree.NewBPlusTree(c.IndexMetaPageId)
-	iter, err := idxMetaTree.Search(bp, btree.SearchModeStart{})
-	if err != nil {
-		return nil, err
-	}
-
-	var indexes []*IndexMetadata
-	for {
-		pair, ok := iter.Get()
-		if !ok {
-			break
-		}
-
-		// キーをデコード (TableId, Name)
-		var keyParts [][]byte
-		memcomparable.Decode(pair.Key, &keyParts)
-		idxTableId := binary.BigEndian.Uint64(keyParts[0])
-
-		// 指定されたテーブルのインデックスのみを収集
-		if idxTableId == tableId {
-			idxName := string(keyParts[1])
-
-			// 値をデコード (Type, ColName, DataMetaPageId)
-			var valueParts [][]byte
-			memcomparable.Decode(pair.Value, &valueParts)
-			idxType := IndexType(string(valueParts[0]))
-			colName := string(valueParts[1])
-			dataMetaPageId := page.RestorePageIdFromBytes(valueParts[2])
-
-			indexes = append(indexes, &IndexMetadata{
-				TableId:        tableId,
-				Name:           idxName,
-				ColName:        colName,
-				Type:           idxType,
-				DataMetaPageId: dataMetaPageId,
-			})
-		}
-
-		if err := iter.Advance(bp); err != nil {
-			return nil, err
-		}
-	}
-
-	return indexes, nil
 }

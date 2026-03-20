@@ -1,8 +1,12 @@
 package catalog
 
 import (
+	"encoding/binary"
 	"fmt"
 	"minesql/internal/storage/access"
+	"minesql/internal/storage/btree"
+	"minesql/internal/storage/bufferpool"
+	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/page"
 )
 
@@ -70,4 +74,93 @@ func (tm *TableMetadata) GetTable() (*access.TableAccessMethod, error) {
 	// テーブルを構築
 	tbl := access.NewTableAccessMethod(tm.Name, tm.DataMetaPageId, tm.PrimaryKeyCount, uniqueIndexes)
 	return &tbl, nil
+}
+
+// Insert はテーブルメタデータを B+Tree に挿入する
+func (tm *TableMetadata) Insert(bp *bufferpool.BufferPool) error {
+	btr := btree.NewBPlusTree(tm.MetaPageId)
+
+	// key (TableId) をエンコード
+	var encodedKey []byte
+	keyBuf := binary.BigEndian.AppendUint64(nil, tm.TableId)
+	memcomparable.Encode([][]byte{keyBuf}, &encodedKey)
+
+	// value (Name, NCols, PrimaryKeyCount, DataMetaPageId) をエンコード
+	var encodedValue []byte
+	nColsBuf := binary.BigEndian.AppendUint64(nil, uint64(tm.NCols))
+	pkCountBuf := binary.BigEndian.AppendUint64(nil, uint64(tm.PrimaryKeyCount))
+	memcomparable.Encode([][]byte{[]byte(tm.Name), nColsBuf, pkCountBuf, tm.DataMetaPageId.ToBytes()}, &encodedValue)
+
+	// B+Tree に挿入
+	return btr.Insert(bp, btree.NewPair(encodedKey, encodedValue))
+}
+
+// loadTableMetadata は指定されたテーブルのメタデータを読み込む
+//
+// テーブルメタデータの B+Tree を走査して、指定されたテーブルのメタデータを読み込む
+//
+// bp: BufferPool
+//
+// tableMetaPageId: テーブルメタデータが格納されている B+Tree のメタページID
+//
+// indexMetaPageId: インデックスメタデータが格納されている B+Tree のメタページID
+//
+// columnMetaPageId: カラムメタデータが格納されている B+Tree のメタページID
+func loadTableMetadata(bp *bufferpool.BufferPool, tableMetaPageId page.PageId, indexMetaPageId page.PageId, columnMetaPageId page.PageId) ([]*TableMetadata, error) {
+	// B+Tree を開く
+	tableMetaTree := btree.NewBPlusTree(tableMetaPageId)
+	iter, err := tableMetaTree.Search(bp, btree.SearchModeStart{})
+	if err != nil {
+		return nil, err
+	}
+
+	var tables []*TableMetadata
+
+	for {
+		pair, ok := iter.Get()
+		if !ok {
+			break
+		}
+
+		// キーをデコード (TableId)
+		var keyParts [][]byte
+		memcomparable.Decode(pair.Key, &keyParts)
+		tableId := binary.BigEndian.Uint64(keyParts[0])
+
+		// 値をデコード (Name, NCols, PrimaryKeyCount, DataMetaPageId)
+		var valueParts [][]byte
+		memcomparable.Decode(pair.Value, &valueParts)
+		name := string(valueParts[0])
+		nCols := uint8(binary.BigEndian.Uint64(valueParts[1]))
+		pkCount := uint8(binary.BigEndian.Uint64(valueParts[2]))
+		dataMetaPageId := page.RestorePageIdFromBytes(valueParts[3])
+
+		// インデックスメタデータを読み込む
+		indexes, err := loadIndexMetadata(bp, tableId, indexMetaPageId)
+		if err != nil {
+			return nil, err
+		}
+
+		// カラムメタデータを読み込む
+		cols, err := loadColumnMetadata(bp, tableId, columnMetaPageId)
+		if err != nil {
+			return nil, err
+		}
+
+		tables = append(tables, &TableMetadata{
+			TableId:         tableId,
+			Name:            name,
+			NCols:           nCols,
+			PrimaryKeyCount: pkCount,
+			DataMetaPageId:  dataMetaPageId,
+			Indexes:         indexes,
+			Cols:            cols,
+		})
+
+		if err := iter.Advance(bp); err != nil {
+			return nil, err
+		}
+	}
+
+	return tables, nil
 }

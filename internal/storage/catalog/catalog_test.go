@@ -123,7 +123,9 @@ func TestInsert(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, 1, len(cat.metadata))
-		assert.Equal(t, tableMeta, cat.metadata[0])
+		assert.Equal(t, "users", cat.metadata[0].Name)
+		assert.Equal(t, tableId, cat.metadata[0].TableId)
+		assert.Equal(t, uint8(2), cat.metadata[0].NCols)
 	})
 
 	t.Run("カラムメタデータ付きのテーブルメタデータを挿入できる", func(t *testing.T) {
