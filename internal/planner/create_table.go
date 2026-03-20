@@ -19,7 +19,7 @@ func NewCreateTableNode(stmt *statement.CreateTableStmt) *CreateTableNode {
 	}
 }
 
-func (ctn *CreateTableNode) Next() (executor.Executor, error) {
+func (ctn *CreateTableNode) Next() (executor.Mutator, error) {
 	colIndexMap := map[string]int{} // key: column name, value: column index
 	colParams := []*executor.ColumnParam{}
 

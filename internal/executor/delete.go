@@ -3,6 +3,7 @@ package executor
 import "minesql/internal/engine"
 
 type Delete struct {
+	executor
 	tableName string
 	Iterator  RecordIterator
 }

@@ -1,6 +1,7 @@
 package executor
 
 type Filter struct {
+	executor
 	InnerIterator RecordIterator // Filter 内部で使用する RecordIterator (この RecordIterator から取得したレコードに対してフィルタを適用する)
 	condition     func(Record) bool
 }

@@ -7,11 +7,6 @@ import (
 	"minesql/internal/planner/ast/statement"
 )
 
-// Planner は Next() で Executor を返す共通インターフェース
-type Planner interface {
-	Next() (executor.Executor, error)
-}
-
 func PlanStart(stmt node.ASTNode) (executor.Executor, error) {
 	switch s := stmt.(type) {
 	case *statement.CreateTableStmt:

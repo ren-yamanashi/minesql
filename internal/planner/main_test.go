@@ -20,9 +20,20 @@ func executePlan(t *testing.T, stmt statement.Statement) []executor.Record {
 	t.Helper()
 	exec, err := PlanStart(stmt)
 	assert.NoError(t, err)
-	records, err := executor.ExecutePlan(exec)
-	assert.NoError(t, err)
-	return records
+
+	switch e := exec.(type) {
+	case executor.RecordIterator:
+		records, err := executor.FetchAll(e)
+		assert.NoError(t, err)
+		return records
+	case executor.Mutator:
+		err := e.Execute()
+		assert.NoError(t, err)
+		return nil
+	default:
+		t.Fatalf("unsupported executor type: %T", exec)
+		return nil
+	}
 }
 
 // ストレージを初期化し、5 カラムの users テーブルを作成してデータを投入する

@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestExecutePlan(t *testing.T) {
-	t.Run("複数のレコードを返す executor の場合、全てのレコードを取得できる", func(t *testing.T) {
+func TestFetchAll(t *testing.T) {
+	t.Run("複数のレコードを返す RecordIterator の場合、全てのレコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
@@ -25,7 +25,7 @@ func TestExecutePlan(t *testing.T) {
 		)
 
 		// WHEN
-		results, err := ExecutePlan(seqScan)
+		results, err := FetchAll(seqScan)
 
 		// THEN
 		assert.NoError(t, err)
@@ -49,7 +49,7 @@ func TestExecutePlan(t *testing.T) {
 		)
 
 		// WHEN
-		results, err := ExecutePlan(seqScan)
+		results, err := FetchAll(seqScan)
 
 		// THEN
 		assert.NoError(t, err)
@@ -58,7 +58,7 @@ func TestExecutePlan(t *testing.T) {
 		assert.Equal(t, []byte("b"), results[1][0])
 	})
 
-	t.Run("レコードを返さない executor (Insert) の場合", func(t *testing.T) {
+	t.Run("Mutator (Insert) は FetchAll ではなく Execute で実行する", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
@@ -77,7 +77,7 @@ func TestExecutePlan(t *testing.T) {
 				{Name: "id", Type: catalog.ColumnTypeString},
 				{Name: "name", Type: catalog.ColumnTypeString},
 			})
-		_, err := createTable.Next()
+		err := createTable.Execute()
 		assert.NoError(t, err)
 
 		// GIVEN
@@ -88,10 +88,15 @@ func TestExecutePlan(t *testing.T) {
 
 		// WHEN
 		insert := NewInsert(tableName, cols, records)
-		results, err := ExecutePlan(insert)
+		err = insert.Execute()
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Empty(t, results)
+
+		// 挿入されたレコードを確認
+		scan := NewSearchTable(tableName, access.RecordSearchModeStart{}, func(record Record) bool { return true })
+		results, err := FetchAll(scan)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(results))
 	})
 }

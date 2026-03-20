@@ -18,7 +18,7 @@ func NewInsertPlanner(stmt *statement.InsertStmt) *InsertPlanner {
 	}
 }
 
-func (ip *InsertPlanner) Next() (executor.Executor, error) {
+func (ip *InsertPlanner) Next() (executor.Mutator, error) {
 	if len(ip.Stmt.Cols) == 0 {
 		return nil, errors.New("column names cannot be empty")
 	}

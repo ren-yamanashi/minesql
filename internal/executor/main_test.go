@@ -33,7 +33,7 @@ func setupExecutorTestTable(t *testing.T) {
 			{Name: "first_name", Type: catalog.ColumnTypeString},
 			{Name: "last_name", Type: catalog.ColumnTypeString},
 		})
-	_, err := createTable.Next()
+	err := createTable.Execute()
 	assert.NoError(t, err)
 
 	insert := NewInsert(
@@ -46,14 +46,14 @@ func setupExecutorTestTable(t *testing.T) {
 			{[]byte("w"), []byte("Dave"), []byte("Miller")},
 			{[]byte("v"), []byte("Eve"), []byte("Brown")},
 		})
-	_, err = ExecutePlan(insert)
+	err = insert.Execute()
 	assert.NoError(t, err)
 }
 
 // Executor から全レコードを取得する
-func collectAll(t *testing.T, exec Executor) []Record {
+func collectAll(t *testing.T, iter RecordIterator) []Record {
 	t.Helper()
-	records, err := ExecutePlan(exec)
+	records, err := FetchAll(iter)
 	assert.NoError(t, err)
 	return records
 }
@@ -285,7 +285,8 @@ func TestExecutorIntegration(t *testing.T) {
 				return string(record[1]) == "Alice"
 			},
 		))
-		collectAll(t, upd)
+		err := upd.Execute()
+		assert.NoError(t, err)
 
 		// THEN: テーブルスキャンとインデックススキャンの両方で確認
 		tableRecords := collectAll(t, NewSearchTable(
@@ -339,7 +340,8 @@ func TestExecutorIntegration(t *testing.T) {
 				return string(record[0]) == "v"
 			},
 		))
-		collectAll(t, upd)
+		err := upd.Execute()
+		assert.NoError(t, err)
 
 		// THEN
 		records := collectAll(t, NewSearchTable(
@@ -379,7 +381,8 @@ func TestExecutorIntegration(t *testing.T) {
 				return string(record[1]) == "Bob"
 			},
 		))
-		collectAll(t, del)
+		err := del.Execute()
+		assert.NoError(t, err)
 
 		// THEN: テーブルスキャンとインデックススキャンの両方で確認
 		tableRecords := collectAll(t, NewSearchTable(

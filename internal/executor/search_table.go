@@ -6,6 +6,7 @@ import (
 )
 
 type SearchTable struct {
+	executor
 	whileCondition func(record Record) bool // 継続条件を満たすかどうかを判定する関数
 	iterator       *access.ClusteredIndexIterator
 	tableName      string

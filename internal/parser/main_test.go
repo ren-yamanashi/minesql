@@ -22,9 +22,19 @@ func executeSql(t *testing.T, sql string) []executor.Record {
 	exec, err := planner.PlanStart(result)
 	assert.NoError(t, err)
 
-	records, err := executor.ExecutePlan(exec)
-	assert.NoError(t, err)
-	return records
+	switch e := exec.(type) {
+	case executor.RecordIterator:
+		records, err := executor.FetchAll(e)
+		assert.NoError(t, err)
+		return records
+	case executor.Mutator:
+		err := e.Execute()
+		assert.NoError(t, err)
+		return nil
+	default:
+		t.Fatalf("unsupported executor type: %T", exec)
+		return nil
+	}
 }
 
 // レコード一覧を strings.Builder に書き出す

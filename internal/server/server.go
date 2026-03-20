@@ -186,11 +186,7 @@ func (s *Server) executeQuery(sql string) (string, error) {
 		}
 		return msg.String(), nil
 	case executor.Mutator:
-		err := e.Execute()
-		if err != nil {
-			return "", err
-		}
-		return "", nil
+		return "", e.Execute()
 	default:
 		return "", fmt.Errorf("unsupported executor type: %T", exec)
 	}

@@ -312,6 +312,6 @@ func initStorageManagerForTest(t *testing.T) {
 // テーブルを作成する
 func createTableForTest(t *testing.T, columns []*executor.ColumnParam) {
 	createTable := executor.NewCreateTable("users", 1, nil, columns)
-	_, err := createTable.Next()
+	err := createTable.Execute()
 	assert.NoError(t, err)
 }

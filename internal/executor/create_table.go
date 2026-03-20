@@ -18,6 +18,7 @@ type IndexParam struct {
 }
 
 type CreateTable struct {
+	executor
 	tableName       string
 	primaryKeyCount uint8
 	indexParams     []*IndexParam

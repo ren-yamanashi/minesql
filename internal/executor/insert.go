@@ -5,6 +5,7 @@ import (
 )
 
 type Insert struct {
+	executor
 	tableName string
 	colNames  []string
 	records   []Record

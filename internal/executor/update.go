@@ -8,6 +8,7 @@ type SetColumn struct {
 }
 
 type Update struct {
+	executor
 	tableName  string
 	SetColumns []SetColumn
 	Iterator   RecordIterator

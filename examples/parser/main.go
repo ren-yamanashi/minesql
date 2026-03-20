@@ -9,6 +9,18 @@ import (
 	"os"
 )
 
+// Executor を実行し、レコードを返すヘルパー
+func executePlan(exec executor.Executor) ([]executor.Record, error) {
+	switch e := exec.(type) {
+	case executor.RecordIterator:
+		return executor.FetchAll(e)
+	case executor.Mutator:
+		return nil, e.Execute()
+	default:
+		return nil, fmt.Errorf("unsupported executor type: %T", exec)
+	}
+}
+
 func main() {
 	dataDir := "examples/parser/data"
 	os.RemoveAll(dataDir)
@@ -52,7 +64,7 @@ CREATE TABLE users (
 	if err != nil {
 		panic(err)
 	}
-	records, err := executor.ExecutePlan(exec)
+	records, err := executePlan(exec)
 	if err != nil {
 		panic(err)
 	}
@@ -86,7 +98,7 @@ VALUES
 	if err != nil {
 		panic(err)
 	}
-	records, err := executor.ExecutePlan(exec)
+	records, err := executePlan(exec)
 	if err != nil {
 		panic(err)
 	}
@@ -111,7 +123,7 @@ func scan() {
 	if err != nil {
 		panic(err)
 	}
-	records, err := executor.ExecutePlan(exec)
+	records, err := executePlan(exec)
 	if err != nil {
 		panic(err)
 	}
@@ -136,7 +148,7 @@ func assertEqual() {
 	if err != nil {
 		panic(err)
 	}
-	records, err := executor.ExecutePlan(exec)
+	records, err := executePlan(exec)
 	if err != nil {
 		panic(err)
 	}
@@ -161,7 +173,7 @@ func filter() {
 	if err != nil {
 		panic(err)
 	}
-	records, err := executor.ExecutePlan(exec)
+	records, err := executePlan(exec)
 	if err != nil {
 		panic(err)
 	}
@@ -185,7 +197,7 @@ func updateByCondition() {
 	if err != nil {
 		panic(err)
 	}
-	_, err = executor.ExecutePlan(exec)
+	_, err = executePlan(exec)
 	if err != nil {
 		panic(err)
 	}
@@ -205,7 +217,7 @@ func scanAfterUpdate() {
 	if err != nil {
 		panic(err)
 	}
-	records, err := executor.ExecutePlan(exec)
+	records, err := executePlan(exec)
 	if err != nil {
 		panic(err)
 	}
@@ -229,7 +241,7 @@ func deleteByCondition() {
 	if err != nil {
 		panic(err)
 	}
-	_, err = executor.ExecutePlan(exec)
+	_, err = executePlan(exec)
 	if err != nil {
 		panic(err)
 	}
@@ -248,7 +260,7 @@ func scanAfterDelete() {
 	if err != nil {
 		panic(err)
 	}
-	records, err := executor.ExecutePlan(exec)
+	records, err := executePlan(exec)
 	if err != nil {
 		panic(err)
 	}

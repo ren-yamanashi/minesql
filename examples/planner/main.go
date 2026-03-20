@@ -13,6 +13,18 @@ import (
 	"os"
 )
 
+// Executor を実行し、レコードを返すヘルパー
+func executePlan(exec executor.Executor) ([]executor.Record, error) {
+	switch e := exec.(type) {
+	case executor.RecordIterator:
+		return executor.FetchAll(e)
+	case executor.Mutator:
+		return nil, e.Execute()
+	default:
+		return nil, fmt.Errorf("unsupported executor type: %T", exec)
+	}
+}
+
 func main() {
 	dataDir := "examples/planner/data"
 	os.RemoveAll(dataDir) // 既存のデータディレクトリがあれば削除
@@ -54,7 +66,7 @@ func createTable() {
 	if err != nil {
 		panic(err)
 	}
-	records, err := executor.ExecutePlan(exec)
+	records, err := executePlan(exec)
 	if err != nil {
 		panic(err)
 	}
@@ -123,7 +135,7 @@ func insert() {
 	if err != nil {
 		panic(err)
 	}
-	records, err := executor.ExecutePlan(exec)
+	records, err := executePlan(exec)
 	if err != nil {
 		panic(err)
 	}
@@ -142,7 +154,7 @@ func scan() {
 	if err != nil {
 		panic(err)
 	}
-	records, err := executor.ExecutePlan(exec)
+	records, err := executePlan(exec)
 	if err != nil {
 		panic(err)
 	}
@@ -170,7 +182,7 @@ func assertEqual() {
 	if err != nil {
 		panic(err)
 	}
-	records, err := executor.ExecutePlan(exec)
+	records, err := executePlan(exec)
 	if err != nil {
 		panic(err)
 	}
@@ -202,7 +214,7 @@ func updateByCondition() {
 	if err != nil {
 		panic(err)
 	}
-	_, err = executor.ExecutePlan(exec)
+	_, err = executePlan(exec)
 	if err != nil {
 		panic(err)
 	}
@@ -219,53 +231,7 @@ func scanAfterUpdate() {
 	if err != nil {
 		panic(err)
 	}
-	records, err := executor.ExecutePlan(exec)
-	if err != nil {
-		panic(err)
-	}
-	for _, record := range records {
-		for _, col := range record {
-			fmt.Print(string(col), " ")
-		}
-		fmt.Println()
-	}
-}
-
-func deleteByCondition() {
-	fmt.Println("=== delete WHERE username = 'johndoe2' ===")
-	// DELETE FROM users WHERE username = 'johndoe2'
-	stmt := statement.NewDeleteStmt(
-		*identifier.NewTableId("users"),
-		statement.NewWhereClause(
-			expression.NewBinaryExpr(
-				"=",
-				expression.NewLhsColumn(*identifier.NewColumnId("username")),
-				expression.NewRhsLiteral(literal.NewStringLiteral("johndoe2", "johndoe2")),
-			),
-		),
-	)
-	exec, err := planner.PlanStart(stmt)
-	if err != nil {
-		panic(err)
-	}
-	_, err = executor.ExecutePlan(exec)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("deleted.")
-}
-
-func scanAfterDelete() {
-	fmt.Println("=== scan after delete ===")
-	stmt := statement.NewSelectStmt(
-		*identifier.NewTableId("users"),
-		nil,
-	)
-	exec, err := planner.PlanStart(stmt)
-	if err != nil {
-		panic(err)
-	}
-	records, err := executor.ExecutePlan(exec)
+	records, err := executePlan(exec)
 	if err != nil {
 		panic(err)
 	}
@@ -330,7 +296,53 @@ func filter() {
 	if err != nil {
 		panic(err)
 	}
-	records, err := executor.ExecutePlan(exec)
+	records, err := executePlan(exec)
+	if err != nil {
+		panic(err)
+	}
+	for _, record := range records {
+		for _, col := range record {
+			fmt.Print(string(col), " ")
+		}
+		fmt.Println()
+	}
+}
+
+func deleteByCondition() {
+	fmt.Println("=== delete WHERE username = 'johndoe2' ===")
+	// DELETE FROM users WHERE username = 'johndoe2'
+	stmt := statement.NewDeleteStmt(
+		*identifier.NewTableId("users"),
+		statement.NewWhereClause(
+			expression.NewBinaryExpr(
+				"=",
+				expression.NewLhsColumn(*identifier.NewColumnId("username")),
+				expression.NewRhsLiteral(literal.NewStringLiteral("johndoe2", "johndoe2")),
+			),
+		),
+	)
+	exec, err := planner.PlanStart(stmt)
+	if err != nil {
+		panic(err)
+	}
+	_, err = executePlan(exec)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("deleted.")
+}
+
+func scanAfterDelete() {
+	fmt.Println("=== scan after delete ===")
+	stmt := statement.NewSelectStmt(
+		*identifier.NewTableId("users"),
+		nil,
+	)
+	exec, err := planner.PlanStart(stmt)
+	if err != nil {
+		panic(err)
+	}
+	records, err := executePlan(exec)
 	if err != nil {
 		panic(err)
 	}

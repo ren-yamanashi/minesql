@@ -6,17 +6,17 @@ import (
 )
 
 type DeletePlanner struct {
-	Stmt          *statement.DeleteStmt
-	InnerExecutor executor.Executor
+	Stmt     *statement.DeleteStmt
+	Iterator executor.RecordIterator
 }
 
-func NewDeletePlanner(stmt *statement.DeleteStmt, innerExecutor executor.Executor) *DeletePlanner {
+func NewDeletePlanner(stmt *statement.DeleteStmt, iterator executor.RecordIterator) *DeletePlanner {
 	return &DeletePlanner{
-		Stmt:          stmt,
-		InnerExecutor: innerExecutor,
+		Stmt:     stmt,
+		Iterator: iterator,
 	}
 }
 
-func (dp *DeletePlanner) Next() (executor.Executor, error) {
-	return executor.NewDelete(dp.Stmt.From.TableName, dp.InnerExecutor), nil
+func (dp *DeletePlanner) Next() (executor.Mutator, error) {
+	return executor.NewDelete(dp.Stmt.From.TableName, dp.Iterator), nil
 }

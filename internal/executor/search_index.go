@@ -6,6 +6,7 @@ import (
 )
 
 type SearchIndex struct {
+	executor
 	tableName      string
 	indexName      string
 	searchMode     access.RecordSearchMode
