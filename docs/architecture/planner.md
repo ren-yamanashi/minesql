@@ -1,5 +1,9 @@
 # プランナー
 
+## 参考文献
+
+- Database Design and Implementation - Chapter 10: Query Planning
+
 ## 概要
 
 - AST を元に実行計画を作る
@@ -17,10 +21,77 @@
     - そのため、考えられるクエリツリーごとに、クエリコストを計算し、最もコストの低いクエリツリーを選択する
       - コスト: クエリのスキャンを完全に完了するまでに必要なディスクアクセス数
 
-### コストの算出
+## クエリツリー
+
+- クエリツリーは、クエリの実行計画を表す木構造
+
+例として
+
+```sql
+CREATE TABLE users (
+ id VARCHAR,
+ first_name VARCHAR,
+ last_name VARCHAR,
+ gender VARCHAR,
+ username VARCHAR,
+ PRIMARY KEY (id),
+ UNIQUE KEY username_UNIQUE (username)
+);
+```
+
+というテーブルに対してクエリを投げたときを考える
+
+### 前提
+
+- クエリツリーを構成するノードの種類は以下の通り
+  - SearchTable: テーブルに対して検索をかける
+  - SearchIndex: インデックスに対して検索をかける
+  - Filter: 条件に合う行だけを返す (WHERE 句の条件を処理する)
+  - Project: 検索結果から特定のカラムだけを取り出す (SELECT 句のカラム指定を処理する)
+
+### 例1
+
+```sql
+SELECT first_name, last_name FROM users WHERE id = 1;
+```
+
+この場合、PRIMARY KEY のインデックスを使って検索できるため、Filter を経由せずに SearchTable 自体が条件を処理できる。そのためクエリツリーは以下のようになる
+
+- SearchTable: テーブルに対して検索をかける
+  - 条件: `id = 1`
+- Project: 検索結果から特定のカラムだけを取り出す
+  - 対象カラム: `first_name`, `last_name`
+
+```txt
+Project (first_name, last_name)
+  └── SearchTable (id = 1)
+```
+
+### 例2
+
+```sql
+SELECT * FROM users WHERE gender = 'male';
+```
+
+この場合、gender にインデックスがないため、SearchTable はフルスキャンしか行えず、フィルタリングは上位の Filter ノードが担当するクエリツリーは以下のようになる
+
+- Filter: テーブルに対して検索をかける
+  - 条件: `gender = 'male'`
+- SearchTable: テーブルに対して検索をかける
+  - 条件: フルテーブルスキャン
+- Project: 検索結果から特定のカラムだけを取り出す
+  - 対象カラム: `*` (全てのカラム)
+
+```txt
+Project (*)
+  └── Filter (gender = 'male')
+        └── SearchTable (フルスキャン)
+```
+
+## コストの算出
 
 | 種類 | B(s) | R(s) | V(s,F) |
-|---|------|------|--------|
+|-----|------|------|--------|
 | テーブルスキャン | B(T) | R(T) | V(T,F) |
 | 選択スキャン(s1, A=c) | B(s1) | R(s1)/V(s1,A) | if F = A then 1 else V(s1,F) |
 | 選択スキャン(s1, A!=c) | B(s1) | R(s1) * (V(s1,A)-1)/V(s1,A) | if F = A then V(s1,A)-1 else V(s1,F) |
