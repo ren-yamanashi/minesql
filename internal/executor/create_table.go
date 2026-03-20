@@ -4,7 +4,6 @@ import (
 	"minesql/internal/access"
 	"minesql/internal/catalog"
 	"minesql/internal/engine"
-	"minesql/internal/storage/page"
 )
 
 type ColumnParam struct {
@@ -51,12 +50,11 @@ func (ct *CreateTable) Next() (Record, error) {
 func (ct *CreateTable) execute() error {
 	sm := engine.Get()
 
-	// テーブル ID を採番
-	tblId, err := sm.Catalog.AllocateTableId(sm.BufferPool)
+	// FileId を採番
+	fileId, err := sm.Catalog.AllocateFileId(sm.BufferPool)
 	if err != nil {
 		return err
 	}
-	fileId := page.FileId(tblId)
 
 	// Disk を登録
 	err = sm.RegisterDmToBpm(fileId, ct.tableName)
@@ -98,17 +96,17 @@ func (ct *CreateTable) execute() error {
 	// カラムのメタデータを作成
 	colMeta := make([]*catalog.ColumnMetadata, len(ct.columnParams))
 	for i, colParam := range ct.columnParams {
-		colMeta[i] = catalog.NewColumnMetadata(tblId, colParam.Name, uint16(i), colParam.Type)
+		colMeta[i] = catalog.NewColumnMetadata(fileId, colParam.Name, uint16(i), colParam.Type)
 	}
 
 	// インデックスのメタデータを作成
 	idxMeta := make([]*catalog.IndexMetadata, len(ct.indexParams))
 	for i, index := range uniqueIndexes {
-		idxMeta[i] = catalog.NewIndexMetadata(tblId, index.Name, index.ColName, catalog.IndexTypeUnique, index.MetaPageId)
+		idxMeta[i] = catalog.NewIndexMetadata(fileId, index.Name, index.ColName, catalog.IndexTypeUnique, index.MetaPageId)
 	}
 
 	// テーブルメタデータを作成
-	tblMeta := catalog.NewTableMetadata(tblId, ct.tableName, uint8(len(ct.columnParams)), ct.primaryKeyCount, colMeta, idxMeta, metaPageId)
+	tblMeta := catalog.NewTableMetadata(fileId, ct.tableName, uint8(len(ct.columnParams)), ct.primaryKeyCount, colMeta, idxMeta, metaPageId)
 
 	// カタログにテーブルを登録
 	err = sm.Catalog.Insert(sm.BufferPool, tblMeta)

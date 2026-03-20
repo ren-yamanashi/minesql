@@ -134,7 +134,7 @@ func TestInitCatalog(t *testing.T) {
 		// THEN
 		assert.NotNil(t, sm)
 		assert.NotNil(t, sm.Catalog)
-		assert.Equal(t, uint32(1), sm.Catalog.NextTableId)
+		assert.Equal(t, page.FileId(1), sm.Catalog.NextFileId)
 	})
 
 	t.Run("カタログファイルが既に存在する場合、既存のカタログが開かれる", func(t *testing.T) {
@@ -147,10 +147,10 @@ func TestInitCatalog(t *testing.T) {
 		// 最初の初期化でカタログを作成
 		engine1 := Init()
 
-		// テーブルIDを採番してディスクに保存
-		_, err := engine1.Catalog.AllocateTableId(engine1.BufferPool)
+		// FileId を採番してディスクに保存
+		_, err := engine1.Catalog.AllocateFileId(engine1.BufferPool)
 		assert.NoError(t, err)
-		_, err = engine1.Catalog.AllocateTableId(engine1.BufferPool)
+		_, err = engine1.Catalog.AllocateFileId(engine1.BufferPool)
 		assert.NoError(t, err)
 
 		// ダーティーページをディスクにフラッシュ
@@ -165,7 +165,7 @@ func TestInitCatalog(t *testing.T) {
 
 		// THEN
 		assert.NotNil(t, engine2.Catalog)
-		assert.Equal(t, uint32(3), engine2.Catalog.NextTableId)
+		assert.Equal(t, page.FileId(3), engine2.Catalog.NextFileId)
 	})
 
 	t.Run("カタログの Disk が BufferPool に登録される", func(t *testing.T) {
@@ -195,22 +195,21 @@ func TestInitCatalog(t *testing.T) {
 		sm1 := Init()
 		bp := sm1.BufferPool
 
-		tblId, err := sm1.Catalog.AllocateTableId(bp)
+		fileId, err := sm1.Catalog.AllocateFileId(bp)
 		assert.NoError(t, err)
-		tableFileId := page.FileId(tblId)
-		err = sm1.RegisterDmToBpm(tableFileId, "users")
+		err = sm1.RegisterDmToBpm(fileId, "users")
 		assert.NoError(t, err)
 
-		metaPageId, err := bp.AllocatePageId(tableFileId)
+		metaPageId, err := bp.AllocatePageId(fileId)
 		assert.NoError(t, err)
 		tbl := access.NewTableAccessMethod("users", metaPageId, 1, nil)
 		err = tbl.Create(bp)
 		assert.NoError(t, err)
 
 		cols := []*catalog.ColumnMetadata{
-			catalog.NewColumnMetadata(tblId, "id", 0, catalog.ColumnTypeString),
+			catalog.NewColumnMetadata(fileId, "id", 0, catalog.ColumnTypeString),
 		}
-		tblMeta := catalog.NewTableMetadata(tblId, "users", 1, 1, cols, nil, metaPageId)
+		tblMeta := catalog.NewTableMetadata(fileId, "users", 1, 1, cols, nil, metaPageId)
 		err = sm1.Catalog.Insert(bp, tblMeta)
 		assert.NoError(t, err)
 
@@ -223,7 +222,7 @@ func TestInitCatalog(t *testing.T) {
 		sm2 := Init()
 
 		// THEN: テーブルの Disk が登録されている
-		dm, err := sm2.BufferPool.GetDisk(tableFileId)
+		dm, err := sm2.BufferPool.GetDisk(fileId)
 		assert.NoError(t, err)
 		assert.NotNil(t, dm)
 
@@ -248,10 +247,10 @@ func TestInitCatalog(t *testing.T) {
 		// WHEN
 		sm := Init()
 
-		// THEN: 新しいカタログが作成され、NextTableId は 1
+		// THEN: 新しいカタログが作成され、NextFileId は 1
 		assert.NotNil(t, sm)
 		assert.NotNil(t, sm.Catalog)
-		assert.Equal(t, uint32(1), sm.Catalog.NextTableId)
+		assert.Equal(t, page.FileId(1), sm.Catalog.NextFileId)
 	})
 
 	t.Run("データディレクトリが存在しない場合、自動作成される", func(t *testing.T) {

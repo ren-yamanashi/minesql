@@ -18,7 +18,7 @@ type Catalog struct {
 	IndexMetaPageId  page.PageId
 	ColumnMetaPageId page.PageId
 	metadata         []*TableMetadata
-	NextTableId      uint32
+	NextFileId       page.FileId
 }
 
 // NewCatalog は既存のカタログを開く
@@ -43,14 +43,14 @@ func NewCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
 	tblMetaPageNum := binary.BigEndian.Uint32(data[4:8])
 	idxMetaPageNum := binary.BigEndian.Uint32(data[8:12])
 	colMetaPageNum := binary.BigEndian.Uint32(data[12:16])
-	initTableId := binary.BigEndian.Uint32(data[16:20])
+	nextFileId := page.FileId(binary.BigEndian.Uint32(data[16:20]))
 
 	catalog := &Catalog{
 		TableMetaPageId:  page.NewPageId(fileId, page.PageNumber(tblMetaPageNum)),
 		IndexMetaPageId:  page.NewPageId(fileId, page.PageNumber(idxMetaPageNum)),
 		ColumnMetaPageId: page.NewPageId(fileId, page.PageNumber(colMetaPageNum)),
 		metadata:         nil,
-		NextTableId:      initTableId,
+		NextFileId:       nextFileId,
 	}
 
 	// ディスクから既存のメタデータを読み込む
@@ -110,39 +110,39 @@ func CreateCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
 
 	// ヘッダーページに各メタデータのメタページIDを保存
 	data := bufferPage.GetWriteData()
-	initTableId := uint32(1)        // FileId(0) はカタログ用に予約されているため、1 から開始
+	initFileId := page.FileId(1)    // FileId(0) はカタログ用に予約されているため、1 から開始
 	copy(data[0:4], []byte("MINE")) // ファイルシグネチャとしてマジックナンバーを設定 (minesql なので MINE)
 	binary.BigEndian.PutUint32(data[4:8], uint32(tblMetaTree.MetaPageId.PageNumber))
 	binary.BigEndian.PutUint32(data[8:12], uint32(idxMetaTree.MetaPageId.PageNumber))
 	binary.BigEndian.PutUint32(data[12:16], uint32(colMetaTree.MetaPageId.PageNumber))
-	binary.BigEndian.PutUint32(data[16:20], initTableId)
+	binary.BigEndian.PutUint32(data[16:20], uint32(initFileId))
 
 	return &Catalog{
 		TableMetaPageId:  tblMetaTree.MetaPageId,
 		ColumnMetaPageId: colMetaTree.MetaPageId,
 		IndexMetaPageId:  idxMetaTree.MetaPageId,
-		NextTableId:      initTableId,
+		NextFileId:       initFileId,
 		metadata:         nil,
 	}, nil
 }
 
-// AllocateTableId は新しい TableID を採番し、ディスク上のカウンターを更新する
-func (c *Catalog) AllocateTableId(bp *bufferpool.BufferPool) (uint32, error) {
-	id := c.NextTableId
-	c.NextTableId++
+// AllocateFileId は新しい FileId を採番し、ディスク上のカウンターを更新する
+func (c *Catalog) AllocateFileId(bp *bufferpool.BufferPool) (page.FileId, error) {
+	id := c.NextFileId
+	c.NextFileId++
 
 	// Header Page (Page 0) を更新する
-	fileId := page.FileId(0)
-	headerPageId := page.NewPageId(fileId, 0)
+	catalogFileId := page.FileId(0)
+	headerPageId := page.NewPageId(catalogFileId, 0)
 	headerPage, err := bp.FetchPage(headerPageId)
 	if err != nil {
 		return 0, err
 	}
 	defer bp.UnRefPage(headerPageId)
 
-	// 次に割り当てる TableId をヘッダーページの指定オフセットに書き込む
+	// 次に割り当てる FileId をヘッダーページの指定オフセットに書き込む
 	data := headerPage.GetWriteData()
-	binary.BigEndian.PutUint32(data[16:20], c.NextTableId)
+	binary.BigEndian.PutUint32(data[16:20], uint32(c.NextFileId))
 
 	return id, nil
 }

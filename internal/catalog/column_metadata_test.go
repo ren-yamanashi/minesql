@@ -37,7 +37,7 @@ func TestColumnMetadata_Insert(t *testing.T) {
 		pair, ok := iter.Get()
 		assert.True(t, ok)
 
-		// key (TableId, ColName) をデコード
+		// key (FileId, ColName) をデコード
 		var keyParts [][]byte
 		memcomparable.Decode(pair.Key, &keyParts)
 		tableId := binary.BigEndian.Uint32(keyParts[0])
@@ -190,8 +190,8 @@ func TestLoadColumnMetadata(t *testing.T) {
 		assert.Equal(t, 2, len(result))
 		assert.Equal(t, "id", result[0].Name)
 		assert.Equal(t, "name", result[1].Name)
-		assert.Equal(t, uint32(1), result[0].TableId)
-		assert.Equal(t, uint32(1), result[1].TableId)
+		assert.Equal(t, page.FileId(1), result[0].FileId)
+		assert.Equal(t, page.FileId(1), result[1].FileId)
 	})
 
 	t.Run("該当するカラムがない場合は空のスライスを返す", func(t *testing.T) {

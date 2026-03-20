@@ -19,16 +19,16 @@ const (
 // 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-indexes-table.html
 type IndexMetadata struct {
 	MetaPageId     page.PageId // インデックスのメタデータが格納される B+Tree のメタページID
-	TableId        uint32      // インデックスが関連付けられたテーブルの識別子
+	FileId         page.FileId // インデックスが属するテーブルの FileId
 	Name           string      // インデックスの名前
 	ColName        string      // インデックスを構成するカラム名
 	Type           IndexType   // インデックスの種類
 	DataMetaPageId page.PageId // 実データが格納される B+Tree のメタページID
 }
 
-func NewIndexMetadata(tableId uint32, name string, colName string, indexType IndexType, dataMetaPageId page.PageId) *IndexMetadata {
+func NewIndexMetadata(fileId page.FileId, name string, colName string, indexType IndexType, dataMetaPageId page.PageId) *IndexMetadata {
 	return &IndexMetadata{
-		TableId:        tableId,
+		FileId:         fileId,
 		Name:           name,
 		ColName:        colName,
 		Type:           indexType,
@@ -40,9 +40,9 @@ func NewIndexMetadata(tableId uint32, name string, colName string, indexType Ind
 func (im *IndexMetadata) Insert(bp *bufferpool.BufferPool) error {
 	btr := btree.NewBPlusTree(im.MetaPageId)
 
-	// key (TableId + Name) をエンコード
+	// key (FileId + Name) をエンコード
 	var encodedKey []byte
-	keyBuf := binary.BigEndian.AppendUint32(nil, im.TableId)
+	keyBuf := binary.BigEndian.AppendUint32(nil, uint32(im.FileId))
 	memcomparable.Encode([][]byte{keyBuf, []byte(im.Name)}, &encodedKey)
 
 	// value (ColName, Type, DataMetaPageId) をエンコード
@@ -59,10 +59,10 @@ func (im *IndexMetadata) Insert(bp *bufferpool.BufferPool) error {
 //
 // bp: BufferPool
 //
-// tableId: テーブルの識別子
+// fileId: インデックスメタデータを読み込む対象のテーブルの FileId
 //
 // metaPageId: インデックスメタデータが格納されている B+Tree のメタページID
-func loadIndexMetadata(bp *bufferpool.BufferPool, tableId uint32, metaPageId page.PageId) ([]*IndexMetadata, error) {
+func loadIndexMetadata(bp *bufferpool.BufferPool, fileId page.FileId, metaPageId page.PageId) ([]*IndexMetadata, error) {
 	// B+Tree を開く
 	idxMetaTree := btree.NewBPlusTree(metaPageId)
 	iter, err := idxMetaTree.Search(bp, btree.SearchModeStart{})
@@ -77,13 +77,13 @@ func loadIndexMetadata(bp *bufferpool.BufferPool, tableId uint32, metaPageId pag
 			break
 		}
 
-		// キーをデコード (TableId, Name)
+		// キーをデコード (FileId, Name)
 		var keyParts [][]byte
 		memcomparable.Decode(pair.Key, &keyParts)
-		idxTableId := binary.BigEndian.Uint32(keyParts[0])
+		idxFileId := page.FileId(binary.BigEndian.Uint32(keyParts[0]))
 
 		// 指定されたテーブルのインデックスのみを収集
-		if idxTableId == tableId {
+		if idxFileId == fileId {
 			idxName := string(keyParts[1])
 
 			// 値をデコード (Type, ColName, DataMetaPageId)
@@ -94,7 +94,7 @@ func loadIndexMetadata(bp *bufferpool.BufferPool, tableId uint32, metaPageId pag
 			dataMetaPageId := page.RestorePageIdFromBytes(valueParts[2])
 
 			indexes = append(indexes, &IndexMetadata{
-				TableId:        tableId,
+				FileId:         fileId,
 				Name:           idxName,
 				ColName:        colName,
 				Type:           idxType,
