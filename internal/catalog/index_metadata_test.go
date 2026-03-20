@@ -39,11 +39,11 @@ func TestIndexMetadata_Insert(t *testing.T) {
 		pair, ok := iter.Get()
 		assert.True(t, ok)
 
-		// key (TableId, Name) をデコード
+		// key (FileId, Name) をデコード
 		var keyParts [][]byte
 		memcomparable.Decode(pair.Key, &keyParts)
-		tableId := binary.BigEndian.Uint64(keyParts[0])
-		assert.Equal(t, uint64(1), tableId)
+		tableId := binary.BigEndian.Uint32(keyParts[0])
+		assert.Equal(t, uint32(1), tableId)
 		assert.Equal(t, "idx_email", string(keyParts[1]))
 
 		// value (Type, ColName, DataMetaPageId) をデコード
@@ -195,8 +195,8 @@ func TestLoadIndexMetadata(t *testing.T) {
 		// THEN: テーブル 1 のインデックスのみ取得される
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(result))
-		assert.Equal(t, uint64(1), result[0].TableId)
-		assert.Equal(t, uint64(1), result[1].TableId)
+		assert.Equal(t, page.FileId(1), result[0].FileId)
+		assert.Equal(t, page.FileId(1), result[1].FileId)
 	})
 
 	t.Run("該当するインデックスがない場合は空のスライスを返す", func(t *testing.T) {

@@ -50,11 +50,14 @@ func (ct *CreateTable) Next() (Record, error) {
 func (ct *CreateTable) execute() error {
 	sm := engine.Get()
 
-	// FileId を割り当て
-	fileId := sm.BufferPool.AllocateFileId()
+	// FileId を採番
+	fileId, err := sm.Catalog.AllocateFileId(sm.BufferPool)
+	if err != nil {
+		return err
+	}
 
 	// Disk を登録
-	err := sm.RegisterDmToBpm(fileId, ct.tableName)
+	err = sm.RegisterDmToBpm(fileId, ct.tableName)
 	if err != nil {
 		return err
 	}
@@ -87,26 +90,20 @@ func (ct *CreateTable) execute() error {
 		return err
 	}
 
-	// テーブルIDを採番
-	tblId, err := sm.Catalog.AllocateTableId(sm.BufferPool)
-	if err != nil {
-		return err
-	}
-
 	// カラムのメタデータを作成
 	colMeta := make([]*catalog.ColumnMetadata, len(ct.columnParams))
 	for i, colParam := range ct.columnParams {
-		colMeta[i] = catalog.NewColumnMetadata(tblId, colParam.Name, uint16(i), colParam.Type)
+		colMeta[i] = catalog.NewColumnMetadata(fileId, colParam.Name, uint16(i), colParam.Type)
 	}
 
 	// インデックスのメタデータを作成
 	idxMeta := make([]*catalog.IndexMetadata, len(ct.indexParams))
 	for i, index := range uniqueIndexes {
-		idxMeta[i] = catalog.NewIndexMetadata(tblId, index.Name, index.ColName, catalog.IndexTypeUnique, index.MetaPageId)
+		idxMeta[i] = catalog.NewIndexMetadata(fileId, index.Name, index.ColName, catalog.IndexTypeUnique, index.MetaPageId)
 	}
 
 	// テーブルメタデータを作成
-	tblMeta := catalog.NewTableMetadata(tblId, ct.tableName, uint8(len(ct.columnParams)), ct.primaryKeyCount, colMeta, idxMeta, metaPageId)
+	tblMeta := catalog.NewTableMetadata(fileId, ct.tableName, uint8(len(ct.columnParams)), ct.primaryKeyCount, colMeta, idxMeta, metaPageId)
 
 	// カタログにテーブルを登録
 	err = sm.Catalog.Insert(sm.BufferPool, tblMeta)

@@ -15,7 +15,7 @@ import (
 // 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-tables-access.html
 type TableMetadata struct {
 	MetaPageId      page.PageId       // テーブルのメタデータが格納される B+Tree のメタページID
-	TableId         uint64            // テーブルの識別子 (一意)
+	FileId          page.FileId       // テーブルの識別子 (一意)
 	Name            string            // テーブルの名前
 	NCols           uint8             // テーブルの列数
 	PrimaryKeyCount uint8             // プライマリキーの列数 (プライマリキーは先頭から連続している想定) (例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる)
@@ -24,9 +24,9 @@ type TableMetadata struct {
 	Indexes         []*IndexMetadata  // テーブルのインデックス情報
 }
 
-func NewTableMetadata(tableId uint64, name string, nCols uint8, pkCount uint8, cols []*ColumnMetadata, indexes []*IndexMetadata, dataMetaPageId page.PageId) TableMetadata {
+func NewTableMetadata(fileId page.FileId, name string, nCols uint8, pkCount uint8, cols []*ColumnMetadata, indexes []*IndexMetadata, dataMetaPageId page.PageId) TableMetadata {
 	return TableMetadata{
-		TableId:         tableId,
+		FileId:          fileId,
 		Name:            name,
 		NCols:           nCols,
 		PrimaryKeyCount: pkCount,
@@ -80,9 +80,9 @@ func (tm *TableMetadata) GetTable() (*access.TableAccessMethod, error) {
 func (tm *TableMetadata) Insert(bp *bufferpool.BufferPool) error {
 	btr := btree.NewBPlusTree(tm.MetaPageId)
 
-	// key (TableId) をエンコード
+	// key (FileId) をエンコード
 	var encodedKey []byte
-	keyBuf := binary.BigEndian.AppendUint64(nil, tm.TableId)
+	keyBuf := binary.BigEndian.AppendUint32(nil, uint32(tm.FileId))
 	memcomparable.Encode([][]byte{keyBuf}, &encodedKey)
 
 	// value (Name, NCols, PrimaryKeyCount, DataMetaPageId) をエンコード
@@ -122,10 +122,10 @@ func loadTableMetadata(bp *bufferpool.BufferPool, tableMetaPageId page.PageId, i
 			break
 		}
 
-		// キーをデコード (TableId)
+		// キーをデコード (FileId)
 		var keyParts [][]byte
 		memcomparable.Decode(pair.Key, &keyParts)
-		tableId := binary.BigEndian.Uint64(keyParts[0])
+		fileId := page.FileId(binary.BigEndian.Uint32(keyParts[0]))
 
 		// 値をデコード (Name, NCols, PrimaryKeyCount, DataMetaPageId)
 		var valueParts [][]byte
@@ -136,19 +136,19 @@ func loadTableMetadata(bp *bufferpool.BufferPool, tableMetaPageId page.PageId, i
 		dataMetaPageId := page.RestorePageIdFromBytes(valueParts[3])
 
 		// インデックスメタデータを読み込む
-		indexes, err := loadIndexMetadata(bp, tableId, indexMetaPageId)
+		indexes, err := loadIndexMetadata(bp, fileId, indexMetaPageId)
 		if err != nil {
 			return nil, err
 		}
 
 		// カラムメタデータを読み込む
-		cols, err := loadColumnMetadata(bp, tableId, columnMetaPageId)
+		cols, err := loadColumnMetadata(bp, fileId, columnMetaPageId)
 		if err != nil {
 			return nil, err
 		}
 
 		tables = append(tables, &TableMetadata{
-			TableId:         tableId,
+			FileId:          fileId,
 			Name:            name,
 			NCols:           nCols,
 			PrimaryKeyCount: pkCount,

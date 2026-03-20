@@ -609,7 +609,7 @@ func InitDisk(t *testing.T, pathname string) (bufferPool *bufferpool.BufferPool,
 	filePath := filepath.Join(tmpdir, pathname)
 
 	bp := bufferpool.NewBufferPool(10)
-	fileId := bp.AllocateFileId()
+	fileId := page.FileId(1)
 	dm, err := disk.NewDisk(fileId, filePath)
 	assert.NoError(t, err)
 	bp.RegisterDisk(fileId, dm)

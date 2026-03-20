@@ -9,6 +9,7 @@ import (
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
+	"minesql/internal/storage/page"
 )
 
 // セットアップヘルパー: B+Tree とバッファプールを作成する
@@ -20,7 +21,7 @@ func setupExample() (*btree.BPlusTree, *bufferpool.BufferPool, func()) {
 	cleanup := func() { _ = os.RemoveAll(tmpDir) }
 
 	bp := bufferpool.NewBufferPool(10)
-	fileId := bp.AllocateFileId()
+	fileId := page.FileId(1)
 
 	dm, err := disk.NewDisk(fileId, filepath.Join(tmpDir, "example.db"))
 	if err != nil {

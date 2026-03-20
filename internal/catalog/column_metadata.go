@@ -20,18 +20,18 @@ const (
 // 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-columns-table.html
 type ColumnMetadata struct {
 	MetaPageId page.PageId // カラムのメタデータが格納される B+Tree のメタページID
-	TableId    uint64      // カラムに関連付けられたテーブルを表す識別子
+	FileId     page.FileId // カラムが属するテーブルの FileId
 	Name       string      // カラムの名前
 	Pos        uint16      // 0 から始まり連続的に増加する、テーブル内のカラムの順序位置
 	Type       ColumnType  // カラムのデータ型
 }
 
-func NewColumnMetadata(tableId uint64, name string, pos uint16, columnType ColumnType) *ColumnMetadata {
+func NewColumnMetadata(fileId page.FileId, name string, pos uint16, columnType ColumnType) *ColumnMetadata {
 	return &ColumnMetadata{
-		TableId: tableId,
-		Name:    name,
-		Pos:     pos,
-		Type:    columnType,
+		FileId: fileId,
+		Name:   name,
+		Pos:    pos,
+		Type:   columnType,
 	}
 }
 
@@ -39,9 +39,9 @@ func NewColumnMetadata(tableId uint64, name string, pos uint16, columnType Colum
 func (cm *ColumnMetadata) Insert(bp *bufferpool.BufferPool) error {
 	btr := btree.NewBPlusTree(cm.MetaPageId)
 
-	// key (TableId + ColName) をエンコード
+	// key (FileId + ColName) をエンコード
 	var encodedKey []byte
-	keyBuf := binary.BigEndian.AppendUint64(nil, cm.TableId)
+	keyBuf := binary.BigEndian.AppendUint32(nil, uint32(cm.FileId))
 	memcomparable.Encode([][]byte{keyBuf, []byte(cm.Name)}, &encodedKey)
 
 	// value (Pos, Type) をエンコード
@@ -59,10 +59,10 @@ func (cm *ColumnMetadata) Insert(bp *bufferpool.BufferPool) error {
 //
 // bp: BufferPool
 //
-// tableId: カラムメタデータを読み込む対象のテーブルの識別子
+// fileId: カラムメタデータを読み込む対象のテーブルの FileId
 //
 // metaPageId: カラムメタデータが格納されている B+Tree のメタページID
-func loadColumnMetadata(bp *bufferpool.BufferPool, tableId uint64, metaPageId page.PageId) ([]*ColumnMetadata, error) {
+func loadColumnMetadata(bp *bufferpool.BufferPool, fileId page.FileId, metaPageId page.PageId) ([]*ColumnMetadata, error) {
 	// B+Tree を開く
 	colMetaTree := btree.NewBPlusTree(metaPageId)
 	iter, err := colMetaTree.Search(bp, btree.SearchModeStart{})
@@ -77,13 +77,13 @@ func loadColumnMetadata(bp *bufferpool.BufferPool, tableId uint64, metaPageId pa
 			break
 		}
 
-		// キーをデコード (TableId, ColName)
+		// キーをデコード (FileId, ColName)
 		var keyParts [][]byte
 		memcomparable.Decode(pair.Key, &keyParts)
-		colTableId := binary.BigEndian.Uint64(keyParts[0])
+		colFileId := page.FileId(binary.BigEndian.Uint32(keyParts[0]))
 
 		// 指定されたテーブルのカラムのみを収集
-		if colTableId == tableId {
+		if colFileId == fileId {
 			colName := string(keyParts[1])
 
 			// 値をデコード (Pos, Type)
@@ -93,10 +93,10 @@ func loadColumnMetadata(bp *bufferpool.BufferPool, tableId uint64, metaPageId pa
 			colType := ColumnType(string(valueParts[1]))
 
 			cols = append(cols, &ColumnMetadata{
-				TableId: tableId,
-				Name:    colName,
-				Pos:     pos,
-				Type:    colType,
+				FileId: fileId,
+				Name:   colName,
+				Pos:    pos,
+				Type:   colType,
 			})
 		}
 
