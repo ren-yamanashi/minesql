@@ -1,8 +1,7 @@
 package parser
 
 import (
-	"minesql/internal/planner/ast/definition"
-	"minesql/internal/planner/ast/statement"
+	"minesql/internal/ast"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,23 +20,23 @@ func TestParserCreateTable(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		createStmt, ok := result.(*statement.CreateTableStmt)
+		createStmt, ok := result.(*ast.CreateTableStmt)
 		assert.True(t, ok)
 
 		assert.Equal(t, "users", createStmt.TableName)
-		assert.Equal(t, statement.KeywordTable, createStmt.Keyword)
+		assert.Equal(t, ast.KeywordTable, createStmt.Keyword)
 		assert.Equal(t, 2, len(createStmt.CreateDefinitions))
 
 		// カラム定義の検証
-		colDef1, ok := createStmt.CreateDefinitions[0].(*definition.ColumnDef)
+		colDef1, ok := createStmt.CreateDefinitions[0].(*ast.ColumnDef)
 		assert.True(t, ok)
 		assert.Equal(t, "id", colDef1.ColName)
-		assert.Equal(t, definition.DataTypeVarchar, colDef1.DataType)
+		assert.Equal(t, ast.DataTypeVarchar, colDef1.DataType)
 
-		colDef2, ok := createStmt.CreateDefinitions[1].(*definition.ColumnDef)
+		colDef2, ok := createStmt.CreateDefinitions[1].(*ast.ColumnDef)
 		assert.True(t, ok)
 		assert.Equal(t, "name", colDef2.ColName)
-		assert.Equal(t, definition.DataTypeVarchar, colDef2.DataType)
+		assert.Equal(t, ast.DataTypeVarchar, colDef2.DataType)
 	})
 
 	t.Run("PRIMARY KEY 制約を含む CREATE TABLE 文をパースできる", func(t *testing.T) {
@@ -52,16 +51,16 @@ func TestParserCreateTable(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		createStmt, ok := result.(*statement.CreateTableStmt)
+		createStmt, ok := result.(*ast.CreateTableStmt)
 		assert.True(t, ok)
 
 		assert.Equal(t, "users", createStmt.TableName)
 		assert.Equal(t, 3, len(createStmt.CreateDefinitions))
 
 		// PRIMARY KEY 制約の検証
-		pkDef, ok := createStmt.CreateDefinitions[2].(*definition.ConstraintPrimaryKeyDef)
+		pkDef, ok := createStmt.CreateDefinitions[2].(*ast.ConstraintPrimaryKeyDef)
 		assert.True(t, ok)
-		assert.Equal(t, definition.DefTypeConstraintPrimaryKey, pkDef.DefType)
+		assert.Equal(t, ast.DefTypeConstraintPrimaryKey, pkDef.DefType)
 		assert.Equal(t, 1, len(pkDef.Columns))
 		assert.Equal(t, "id", pkDef.Columns[0].ColName)
 	})
@@ -78,10 +77,10 @@ func TestParserCreateTable(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		createStmt, ok := result.(*statement.CreateTableStmt)
+		createStmt, ok := result.(*ast.CreateTableStmt)
 		assert.True(t, ok)
 
-		pkDef, ok := createStmt.CreateDefinitions[2].(*definition.ConstraintPrimaryKeyDef)
+		pkDef, ok := createStmt.CreateDefinitions[2].(*ast.ConstraintPrimaryKeyDef)
 		assert.True(t, ok)
 		assert.Equal(t, 2, len(pkDef.Columns))
 		assert.Equal(t, "id", pkDef.Columns[0].ColName)
@@ -100,15 +99,15 @@ func TestParserCreateTable(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		createStmt, ok := result.(*statement.CreateTableStmt)
+		createStmt, ok := result.(*ast.CreateTableStmt)
 		assert.True(t, ok)
 
 		assert.Equal(t, 3, len(createStmt.CreateDefinitions))
 
 		// UNIQUE KEY 制約の検証
-		ukDef, ok := createStmt.CreateDefinitions[2].(*definition.ConstraintUniqueKeyDef)
+		ukDef, ok := createStmt.CreateDefinitions[2].(*ast.ConstraintUniqueKeyDef)
 		assert.True(t, ok)
-		assert.Equal(t, definition.DefTypeConstraintUniqueKey, ukDef.DefType)
+		assert.Equal(t, ast.DefTypeConstraintUniqueKey, ukDef.DefType)
 		assert.Equal(t, "email_idx", ukDef.KeyName)
 		assert.Equal(t, "email", ukDef.Column.ColName)
 	})
@@ -125,33 +124,33 @@ func TestParserCreateTable(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		createStmt, ok := result.(*statement.CreateTableStmt)
+		createStmt, ok := result.(*ast.CreateTableStmt)
 		assert.True(t, ok)
 
 		assert.Equal(t, "users", createStmt.TableName)
 		assert.Equal(t, 5, len(createStmt.CreateDefinitions))
 
 		// カラム定義
-		colDef1, ok := createStmt.CreateDefinitions[0].(*definition.ColumnDef)
+		colDef1, ok := createStmt.CreateDefinitions[0].(*ast.ColumnDef)
 		assert.True(t, ok)
 		assert.Equal(t, "id", colDef1.ColName)
 
-		colDef2, ok := createStmt.CreateDefinitions[1].(*definition.ColumnDef)
+		colDef2, ok := createStmt.CreateDefinitions[1].(*ast.ColumnDef)
 		assert.True(t, ok)
 		assert.Equal(t, "name", colDef2.ColName)
 
-		colDef3, ok := createStmt.CreateDefinitions[2].(*definition.ColumnDef)
+		colDef3, ok := createStmt.CreateDefinitions[2].(*ast.ColumnDef)
 		assert.True(t, ok)
 		assert.Equal(t, "email", colDef3.ColName)
 
 		// PRIMARY KEY
-		pkDef, ok := createStmt.CreateDefinitions[3].(*definition.ConstraintPrimaryKeyDef)
+		pkDef, ok := createStmt.CreateDefinitions[3].(*ast.ConstraintPrimaryKeyDef)
 		assert.True(t, ok)
 		assert.Equal(t, 1, len(pkDef.Columns))
 		assert.Equal(t, "id", pkDef.Columns[0].ColName)
 
 		// UNIQUE KEY
-		ukDef, ok := createStmt.CreateDefinitions[4].(*definition.ConstraintUniqueKeyDef)
+		ukDef, ok := createStmt.CreateDefinitions[4].(*ast.ConstraintUniqueKeyDef)
 		assert.True(t, ok)
 		assert.Equal(t, "email_idx", ukDef.KeyName)
 		assert.Equal(t, "email", ukDef.Column.ColName)
@@ -178,22 +177,22 @@ CREATE TABLE users ( -- テーブル定義開始
 			assert.NoError(t, err)
 			assert.NotNil(t, result)
 
-			createStmt, ok := result.(*statement.CreateTableStmt)
+			createStmt, ok := result.(*ast.CreateTableStmt)
 			assert.True(t, ok)
 			assert.Equal(t, "users", createStmt.TableName)
 			assert.Equal(t, 3, len(createStmt.CreateDefinitions))
 
 			// カラム定義の検証
-			colDef1, ok := createStmt.CreateDefinitions[0].(*definition.ColumnDef)
+			colDef1, ok := createStmt.CreateDefinitions[0].(*ast.ColumnDef)
 			assert.True(t, ok)
 			assert.Equal(t, "id", colDef1.ColName)
 
-			colDef2, ok := createStmt.CreateDefinitions[1].(*definition.ColumnDef)
+			colDef2, ok := createStmt.CreateDefinitions[1].(*ast.ColumnDef)
 			assert.True(t, ok)
 			assert.Equal(t, "name", colDef2.ColName)
 
 			// PRIMARY KEY 制約の検証
-			pkDef, ok := createStmt.CreateDefinitions[2].(*definition.ConstraintPrimaryKeyDef)
+			pkDef, ok := createStmt.CreateDefinitions[2].(*ast.ConstraintPrimaryKeyDef)
 			assert.True(t, ok)
 			assert.Equal(t, "id", pkDef.Columns[0].ColName)
 		})
@@ -218,22 +217,22 @@ CREATE TABLE users ( /* テーブル定義開始 */
 			assert.NoError(t, err)
 			assert.NotNil(t, result)
 
-			createStmt, ok := result.(*statement.CreateTableStmt)
+			createStmt, ok := result.(*ast.CreateTableStmt)
 			assert.True(t, ok)
 			assert.Equal(t, "users", createStmt.TableName)
 			assert.Equal(t, 3, len(createStmt.CreateDefinitions))
 
 			// カラム定義の検証
-			colDef1, ok := createStmt.CreateDefinitions[0].(*definition.ColumnDef)
+			colDef1, ok := createStmt.CreateDefinitions[0].(*ast.ColumnDef)
 			assert.True(t, ok)
 			assert.Equal(t, "id", colDef1.ColName)
 
-			colDef2, ok := createStmt.CreateDefinitions[1].(*definition.ColumnDef)
+			colDef2, ok := createStmt.CreateDefinitions[1].(*ast.ColumnDef)
 			assert.True(t, ok)
 			assert.Equal(t, "name", colDef2.ColName)
 
 			// PRIMARY KEY 制約の検証
-			pkDef, ok := createStmt.CreateDefinitions[2].(*definition.ConstraintPrimaryKeyDef)
+			pkDef, ok := createStmt.CreateDefinitions[2].(*ast.ConstraintPrimaryKeyDef)
 			assert.True(t, ok)
 			assert.Equal(t, "id", pkDef.Columns[0].ColName)
 		})

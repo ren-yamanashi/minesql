@@ -1,22 +1,22 @@
 package planner
 
 import (
+	"minesql/internal/ast"
 	"minesql/internal/executor"
-	"minesql/internal/planner/ast/statement"
 )
 
-type DeletePlanner struct {
-	Stmt     *statement.DeleteStmt
+type Delete struct {
+	Stmt     *ast.DeleteStmt
 	Iterator executor.RecordIterator
 }
 
-func NewDeletePlanner(stmt *statement.DeleteStmt, iterator executor.RecordIterator) *DeletePlanner {
-	return &DeletePlanner{
+func NewDelete(stmt *ast.DeleteStmt, iterator executor.RecordIterator) *Delete {
+	return &Delete{
 		Stmt:     stmt,
 		Iterator: iterator,
 	}
 }
 
-func (dp *DeletePlanner) Next() (executor.Mutator, error) {
+func (dp *Delete) Build() (executor.Mutator, error) {
 	return executor.NewDelete(dp.Stmt.From.TableName, dp.Iterator), nil
 }

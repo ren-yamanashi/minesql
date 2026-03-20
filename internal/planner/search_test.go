@@ -1,29 +1,26 @@
 package planner
 
 import (
+	"minesql/internal/ast"
 	"minesql/internal/catalog"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/planner/ast/expression"
-	"minesql/internal/planner/ast/identifier"
-	"minesql/internal/planner/ast/literal"
-	"minesql/internal/planner/ast/statement"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSearchPlanner(t *testing.T) {
+func TestSearch(t *testing.T) {
 	t.Run("テーブル名が空の場合、エラーを返す", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
 		// GIVEN
-		search := NewSearchPlanner("", nil)
+		search := NewSearch("", nil)
 
 		// WHEN
-		exec, err := search.Next()
+		exec, err := search.Build()
 
 		// THEN
 		assert.Error(t, err)
@@ -37,10 +34,10 @@ func TestSearchPlanner(t *testing.T) {
 		defer engine.Reset()
 
 		// GIVEN
-		search := NewSearchPlanner("users", nil)
+		search := NewSearch("users", nil)
 
 		// WHEN
-		exec, err := search.Next()
+		exec, err := search.Build()
 
 		// THEN
 		assert.NoError(t, err)
@@ -54,17 +51,18 @@ func TestSearchPlanner(t *testing.T) {
 		defer engine.Reset()
 
 		// GIVEN
-		where := statement.NewWhereClause(
-			expression.NewBinaryExpr(
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
 				"=",
-				expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
-				expression.NewRhsLiteral(literal.NewStringLiteral("'Doe'", "Doe")),
+				ast.NewLhsColumn(*ast.NewColumnId("last_name")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("'Doe'", "Doe")),
 			),
-		)
-		search := NewSearchPlanner("users", where)
+			IsSet: true,
+		}
+		search := NewSearch("users", where)
 
 		// WHEN
-		exec, err := search.Next()
+		exec, err := search.Build()
 
 		// THEN
 		assert.NoError(t, err)
@@ -78,17 +76,18 @@ func TestSearchPlanner(t *testing.T) {
 		defer engine.Reset()
 
 		// GIVEN
-		where := statement.NewWhereClause(
-			expression.NewBinaryExpr(
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
 				"=",
-				expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
-				expression.NewRhsLiteral(literal.NewStringLiteral("'John'", "John")),
+				ast.NewLhsColumn(*ast.NewColumnId("first_name")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("'John'", "John")),
 			),
-		)
-		search := NewSearchPlanner("users", where)
+			IsSet: true,
+		}
+		search := NewSearch("users", where)
 
 		// WHEN
-		exec, err := search.Next()
+		exec, err := search.Build()
 
 		// THEN
 		assert.NoError(t, err)
@@ -102,17 +101,18 @@ func TestSearchPlanner(t *testing.T) {
 		defer engine.Reset()
 
 		// GIVEN
-		where := statement.NewWhereClause(
-			expression.NewBinaryExpr(
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
 				"=",
-				expression.NewLhsColumn(*identifier.NewColumnId("non_existent_column")),
-				expression.NewRhsLiteral(literal.NewStringLiteral("'value'", "value")),
+				ast.NewLhsColumn(*ast.NewColumnId("non_existent_column")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("'value'", "value")),
 			),
-		)
-		search := NewSearchPlanner("users", where)
+			IsSet: true,
+		}
+		search := NewSearch("users", where)
 
 		// WHEN
-		exec, err := search.Next()
+		exec, err := search.Build()
 
 		// THEN
 		assert.Error(t, err)
@@ -127,17 +127,17 @@ func TestSearchPlanner(t *testing.T) {
 
 		// GIVEN
 		type UnsupportedExpr struct {
-			expression.Expression
+			ast.Expression
 		}
 		unsupported := &UnsupportedExpr{}
-		where := &statement.WhereClause{
+		where := &ast.WhereClause{
 			Condition: unsupported,
 			IsSet:     true,
 		}
-		search := NewSearchPlanner("users", where)
+		search := NewSearch("users", where)
 
 		// WHEN
-		exec, err := search.Next()
+		exec, err := search.Build()
 
 		// THEN
 		assert.Error(t, err)
@@ -151,41 +151,42 @@ func TestSearchPlanner(t *testing.T) {
 		defer engine.Reset()
 
 		// GIVEN: (id = '1') AND ((first_name = 'john') AND (last_name = 'doe'))
-		where := statement.NewWhereClause(
-			expression.NewBinaryExpr(
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
 				"AND",
-				expression.NewLhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewLhsExpr(
+					ast.NewBinaryExpr(
 						"=",
-						expression.NewLhsColumn(*identifier.NewColumnId("id")),
-						expression.NewRhsLiteral(literal.NewStringLiteral("'1'", "1")),
+						ast.NewLhsColumn(*ast.NewColumnId("id")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("'1'", "1")),
 					),
 				),
-				expression.NewRhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewRhsExpr(
+					ast.NewBinaryExpr(
 						"AND",
-						expression.NewLhsExpr(
-							expression.NewBinaryExpr(
+						ast.NewLhsExpr(
+							ast.NewBinaryExpr(
 								"=",
-								expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
-								expression.NewRhsLiteral(literal.NewStringLiteral("'john'", "john")),
+								ast.NewLhsColumn(*ast.NewColumnId("first_name")),
+								ast.NewRhsLiteral(ast.NewStringLiteral("'john'", "john")),
 							),
 						),
-						expression.NewRhsExpr(
-							expression.NewBinaryExpr(
+						ast.NewRhsExpr(
+							ast.NewBinaryExpr(
 								"=",
-								expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
-								expression.NewRhsLiteral(literal.NewStringLiteral("'doe'", "doe")),
+								ast.NewLhsColumn(*ast.NewColumnId("last_name")),
+								ast.NewRhsLiteral(ast.NewStringLiteral("'doe'", "doe")),
 							),
 						),
 					),
 				),
 			),
-		)
-		search := NewSearchPlanner("users", where)
+			IsSet: true,
+		}
+		search := NewSearch("users", where)
 
 		// WHEN
-		exec, err := search.Next()
+		exec, err := search.Build()
 
 		// THEN
 		assert.NoError(t, err)
@@ -199,41 +200,42 @@ func TestSearchPlanner(t *testing.T) {
 		defer engine.Reset()
 
 		// GIVEN: (first_name = 'John') OR ((id = '1') AND (last_name = 'Doe'))
-		where := statement.NewWhereClause(
-			expression.NewBinaryExpr(
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
 				"OR",
-				expression.NewLhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewLhsExpr(
+					ast.NewBinaryExpr(
 						"=",
-						expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
-						expression.NewRhsLiteral(literal.NewStringLiteral("'John'", "John")),
+						ast.NewLhsColumn(*ast.NewColumnId("first_name")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("'John'", "John")),
 					),
 				),
-				expression.NewRhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewRhsExpr(
+					ast.NewBinaryExpr(
 						"AND",
-						expression.NewLhsExpr(
-							expression.NewBinaryExpr(
+						ast.NewLhsExpr(
+							ast.NewBinaryExpr(
 								"=",
-								expression.NewLhsColumn(*identifier.NewColumnId("id")),
-								expression.NewRhsLiteral(literal.NewStringLiteral("'1'", "1")),
+								ast.NewLhsColumn(*ast.NewColumnId("id")),
+								ast.NewRhsLiteral(ast.NewStringLiteral("'1'", "1")),
 							),
 						),
-						expression.NewRhsExpr(
-							expression.NewBinaryExpr(
+						ast.NewRhsExpr(
+							ast.NewBinaryExpr(
 								"=",
-								expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
-								expression.NewRhsLiteral(literal.NewStringLiteral("'Doe'", "Doe")),
+								ast.NewLhsColumn(*ast.NewColumnId("last_name")),
+								ast.NewRhsLiteral(ast.NewStringLiteral("'Doe'", "Doe")),
 							),
 						),
 					),
 				),
 			),
-		)
-		search := NewSearchPlanner("users", where)
+			IsSet: true,
+		}
+		search := NewSearch("users", where)
 
 		// WHEN
-		exec, err := search.Next()
+		exec, err := search.Build()
 
 		// THEN
 		assert.NoError(t, err)
@@ -247,23 +249,24 @@ func TestSearchPlanner(t *testing.T) {
 		defer engine.Reset()
 
 		// GIVEN: WHERE last_name = (first_name = 'John') のような不正な構造
-		where := statement.NewWhereClause(
-			expression.NewBinaryExpr(
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
 				"=",
-				expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
-				expression.NewRhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewLhsColumn(*ast.NewColumnId("last_name")),
+				ast.NewRhsExpr(
+					ast.NewBinaryExpr(
 						"=",
-						expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
-						expression.NewRhsLiteral(literal.NewStringLiteral("'John'", "John")),
+						ast.NewLhsColumn(*ast.NewColumnId("first_name")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("'John'", "John")),
 					),
 				),
 			),
-		)
-		search := NewSearchPlanner("users", where)
+			IsSet: true,
+		}
+		search := NewSearch("users", where)
 
 		// WHEN
-		exec, err := search.Next()
+		exec, err := search.Build()
 
 		// THEN
 		assert.Error(t, err)
@@ -277,29 +280,30 @@ func TestSearchPlanner(t *testing.T) {
 		defer engine.Reset()
 
 		// GIVEN: WHERE (first_name = 'John') OR (last_name = 'Doe') のような構造
-		where := statement.NewWhereClause(
-			expression.NewBinaryExpr(
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
 				"OR",
-				expression.NewLhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewLhsExpr(
+					ast.NewBinaryExpr(
 						"=",
-						expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
-						expression.NewRhsLiteral(literal.NewStringLiteral("'John'", "John")),
+						ast.NewLhsColumn(*ast.NewColumnId("first_name")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("'John'", "John")),
 					),
 				),
-				expression.NewRhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewRhsExpr(
+					ast.NewBinaryExpr(
 						"=",
-						expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
-						expression.NewRhsLiteral(literal.NewStringLiteral("'Doe'", "Doe")),
+						ast.NewLhsColumn(*ast.NewColumnId("last_name")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("'Doe'", "Doe")),
 					),
 				),
 			),
-		)
-		search := NewSearchPlanner("users", where)
+			IsSet: true,
+		}
+		search := NewSearch("users", where)
 
 		// WHEN
-		exec, err := search.Next()
+		exec, err := search.Build()
 
 		// THEN
 		assert.NoError(t, err)
@@ -313,29 +317,30 @@ func TestSearchPlanner(t *testing.T) {
 		defer engine.Reset()
 
 		// GIVEN: WHERE (non_existent = 'value') AND (last_name = 'Doe')
-		where := statement.NewWhereClause(
-			expression.NewBinaryExpr(
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
 				"AND",
-				expression.NewLhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewLhsExpr(
+					ast.NewBinaryExpr(
 						"=",
-						expression.NewLhsColumn(*identifier.NewColumnId("non_existent")),
-						expression.NewRhsLiteral(literal.NewStringLiteral("'value'", "value")),
+						ast.NewLhsColumn(*ast.NewColumnId("non_existent")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("'value'", "value")),
 					),
 				),
-				expression.NewRhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewRhsExpr(
+					ast.NewBinaryExpr(
 						"=",
-						expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
-						expression.NewRhsLiteral(literal.NewStringLiteral("'Doe'", "Doe")),
+						ast.NewLhsColumn(*ast.NewColumnId("last_name")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("'Doe'", "Doe")),
 					),
 				),
 			),
-		)
-		search := NewSearchPlanner("users", where)
+			IsSet: true,
+		}
+		search := NewSearch("users", where)
 
 		// WHEN
-		exec, err := search.Next()
+		exec, err := search.Build()
 
 		// THEN
 		assert.Error(t, err)
@@ -349,35 +354,36 @@ func TestSearchPlanner(t *testing.T) {
 		defer engine.Reset()
 
 		// GIVEN: WHERE (first_name = (last_name = 'Doe')) AND (id = '1')
-		where := statement.NewWhereClause(
-			expression.NewBinaryExpr(
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
 				"AND",
-				expression.NewLhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewLhsExpr(
+					ast.NewBinaryExpr(
 						"=",
-						expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
-						expression.NewRhsExpr(
-							expression.NewBinaryExpr(
+						ast.NewLhsColumn(*ast.NewColumnId("first_name")),
+						ast.NewRhsExpr(
+							ast.NewBinaryExpr(
 								"=",
-								expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
-								expression.NewRhsLiteral(literal.NewStringLiteral("'Doe'", "Doe")),
+								ast.NewLhsColumn(*ast.NewColumnId("last_name")),
+								ast.NewRhsLiteral(ast.NewStringLiteral("'Doe'", "Doe")),
 							),
 						),
 					),
 				),
-				expression.NewRhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewRhsExpr(
+					ast.NewBinaryExpr(
 						"=",
-						expression.NewLhsColumn(*identifier.NewColumnId("id")),
-						expression.NewRhsLiteral(literal.NewStringLiteral("'1'", "1")),
+						ast.NewLhsColumn(*ast.NewColumnId("id")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("'1'", "1")),
 					),
 				),
 			),
-		)
-		search := NewSearchPlanner("users", where)
+			IsSet: true,
+		}
+		search := NewSearch("users", where)
 
 		// WHEN
-		exec, err := search.Next()
+		exec, err := search.Build()
 
 		// THEN
 		assert.Error(t, err)
@@ -391,35 +397,36 @@ func TestSearchPlanner(t *testing.T) {
 		defer engine.Reset()
 
 		// GIVEN: WHERE ((first_name = 'John') AND 'literal') のような不正な構造
-		where := statement.NewWhereClause(
-			expression.NewBinaryExpr(
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
 				"AND",
-				expression.NewLhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewLhsExpr(
+					ast.NewBinaryExpr(
 						"AND",
-						expression.NewLhsExpr(
-							expression.NewBinaryExpr(
+						ast.NewLhsExpr(
+							ast.NewBinaryExpr(
 								"=",
-								expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
-								expression.NewRhsLiteral(literal.NewStringLiteral("'John'", "John")),
+								ast.NewLhsColumn(*ast.NewColumnId("first_name")),
+								ast.NewRhsLiteral(ast.NewStringLiteral("'John'", "John")),
 							),
 						),
-						expression.NewRhsLiteral(literal.NewStringLiteral("'invalid'", "invalid")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("'invalid'", "invalid")),
 					),
 				),
-				expression.NewRhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewRhsExpr(
+					ast.NewBinaryExpr(
 						"=",
-						expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
-						expression.NewRhsLiteral(literal.NewStringLiteral("'Doe'", "Doe")),
+						ast.NewLhsColumn(*ast.NewColumnId("last_name")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("'Doe'", "Doe")),
 					),
 				),
 			),
-		)
-		search := NewSearchPlanner("users", where)
+			IsSet: true,
+		}
+		search := NewSearch("users", where)
 
 		// WHEN
-		exec, err := search.Next()
+		exec, err := search.Build()
 
 		// THEN
 		assert.Error(t, err)
@@ -432,33 +439,34 @@ func TestComplexWhereWithData(t *testing.T) {
 	// テストデータを挿入するヘルパー
 	insertTestData := func(t *testing.T) {
 		t.Helper()
-		insertStmt := statement.NewInsertStmt(
-			*identifier.NewTableId("users"),
-			[]identifier.ColumnId{
-				*identifier.NewColumnId("id"),
-				*identifier.NewColumnId("first_name"),
-				*identifier.NewColumnId("last_name"),
+		insertStmt := &ast.InsertStmt{
+			StmtType: ast.StmtTypeInsert,
+			Table:    *ast.NewTableId("users"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+				*ast.NewColumnId("first_name"),
+				*ast.NewColumnId("last_name"),
 			},
-			[][]literal.Literal{
+			Values: [][]ast.Literal{
 				{
-					literal.NewStringLiteral("'1'", "1"),
-					literal.NewStringLiteral("'John'", "John"),
-					literal.NewStringLiteral("'Doe'", "Doe"),
+					ast.NewStringLiteral("'1'", "1"),
+					ast.NewStringLiteral("'John'", "John"),
+					ast.NewStringLiteral("'Doe'", "Doe"),
 				},
 				{
-					literal.NewStringLiteral("'2'", "2"),
-					literal.NewStringLiteral("'Jane'", "Jane"),
-					literal.NewStringLiteral("'Smith'", "Smith"),
+					ast.NewStringLiteral("'2'", "2"),
+					ast.NewStringLiteral("'Jane'", "Jane"),
+					ast.NewStringLiteral("'Smith'", "Smith"),
 				},
 				{
-					literal.NewStringLiteral("'3'", "3"),
-					literal.NewStringLiteral("'John'", "John"),
-					literal.NewStringLiteral("'Johnson'", "Johnson"),
+					ast.NewStringLiteral("'3'", "3"),
+					ast.NewStringLiteral("'John'", "John"),
+					ast.NewStringLiteral("'Johnson'", "Johnson"),
 				},
 			},
-		)
-		insertPlanner := NewInsertPlanner(insertStmt)
-		insertExec, err := insertPlanner.Next()
+		}
+		insertPlanner := NewInsert(insertStmt)
+		insertExec, err := insertPlanner.Build()
 		assert.NoError(t, err)
 		err = insertExec.Execute()
 		assert.NoError(t, err)
@@ -481,27 +489,28 @@ func TestComplexWhereWithData(t *testing.T) {
 		insertTestData(t)
 
 		// WHEN: (first_name = 'John') AND (last_name = 'Johnson')
-		where := statement.NewWhereClause(
-			expression.NewBinaryExpr(
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
 				"AND",
-				expression.NewLhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewLhsExpr(
+					ast.NewBinaryExpr(
 						"=",
-						expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
-						expression.NewRhsLiteral(literal.NewStringLiteral("'John'", "John")),
+						ast.NewLhsColumn(*ast.NewColumnId("first_name")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("'John'", "John")),
 					),
 				),
-				expression.NewRhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewRhsExpr(
+					ast.NewBinaryExpr(
 						"=",
-						expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
-						expression.NewRhsLiteral(literal.NewStringLiteral("'Johnson'", "Johnson")),
+						ast.NewLhsColumn(*ast.NewColumnId("last_name")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("'Johnson'", "Johnson")),
 					),
 				),
 			),
-		)
-		search := NewSearchPlanner("users", where)
-		searchExec, err := search.Next()
+			IsSet: true,
+		}
+		search := NewSearch("users", where)
+		searchExec, err := search.Build()
 		assert.NoError(t, err)
 
 		// THEN: id=3 のレコードのみが返される
@@ -521,27 +530,28 @@ func TestComplexWhereWithData(t *testing.T) {
 		insertTestData(t)
 
 		// WHEN: (first_name = 'Jane') OR (last_name = 'Johnson')
-		where := statement.NewWhereClause(
-			expression.NewBinaryExpr(
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
 				"OR",
-				expression.NewLhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewLhsExpr(
+					ast.NewBinaryExpr(
 						"=",
-						expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
-						expression.NewRhsLiteral(literal.NewStringLiteral("'Jane'", "Jane")),
+						ast.NewLhsColumn(*ast.NewColumnId("first_name")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("'Jane'", "Jane")),
 					),
 				),
-				expression.NewRhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewRhsExpr(
+					ast.NewBinaryExpr(
 						"=",
-						expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
-						expression.NewRhsLiteral(literal.NewStringLiteral("'Johnson'", "Johnson")),
+						ast.NewLhsColumn(*ast.NewColumnId("last_name")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("'Johnson'", "Johnson")),
 					),
 				),
 			),
-		)
-		search := NewSearchPlanner("users", where)
-		searchExec, err := search.Next()
+			IsSet: true,
+		}
+		search := NewSearch("users", where)
+		searchExec, err := search.Build()
 		assert.NoError(t, err)
 
 		// THEN: id=2 (Jane/Smith) と id=3 (John/Johnson) が返される
@@ -563,39 +573,40 @@ func TestComplexWhereWithData(t *testing.T) {
 
 		// WHEN: (last_name = 'Smith') OR ((first_name = 'John') AND (last_name = 'Doe'))
 		// → id=1 (John/Doe) と id=2 (Jane/Smith) が該当
-		where := statement.NewWhereClause(
-			expression.NewBinaryExpr(
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
 				"OR",
-				expression.NewLhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewLhsExpr(
+					ast.NewBinaryExpr(
 						"=",
-						expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
-						expression.NewRhsLiteral(literal.NewStringLiteral("'Smith'", "Smith")),
+						ast.NewLhsColumn(*ast.NewColumnId("last_name")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("'Smith'", "Smith")),
 					),
 				),
-				expression.NewRhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewRhsExpr(
+					ast.NewBinaryExpr(
 						"AND",
-						expression.NewLhsExpr(
-							expression.NewBinaryExpr(
+						ast.NewLhsExpr(
+							ast.NewBinaryExpr(
 								"=",
-								expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
-								expression.NewRhsLiteral(literal.NewStringLiteral("'John'", "John")),
+								ast.NewLhsColumn(*ast.NewColumnId("first_name")),
+								ast.NewRhsLiteral(ast.NewStringLiteral("'John'", "John")),
 							),
 						),
-						expression.NewRhsExpr(
-							expression.NewBinaryExpr(
+						ast.NewRhsExpr(
+							ast.NewBinaryExpr(
 								"=",
-								expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
-								expression.NewRhsLiteral(literal.NewStringLiteral("'Doe'", "Doe")),
+								ast.NewLhsColumn(*ast.NewColumnId("last_name")),
+								ast.NewRhsLiteral(ast.NewStringLiteral("'Doe'", "Doe")),
 							),
 						),
 					),
 				),
 			),
-		)
-		search := NewSearchPlanner("users", where)
-		searchExec, err := search.Next()
+			IsSet: true,
+		}
+		search := NewSearch("users", where)
+		searchExec, err := search.Build()
 		assert.NoError(t, err)
 
 		// THEN: id=1 (John/Doe) と id=2 (Jane/Smith) が返される

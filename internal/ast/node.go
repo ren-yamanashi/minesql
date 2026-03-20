@@ -1,3 +1,3 @@
-package node
+package ast
 
 type ASTNode interface{}

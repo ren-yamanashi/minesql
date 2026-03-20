@@ -2,7 +2,7 @@ package parser
 
 import (
 	"errors"
-	"minesql/internal/planner/ast/definition"
+	"minesql/internal/ast"
 	"strings"
 )
 
@@ -10,7 +10,7 @@ type ColumnParser struct {
 	// 現在のステート
 	state ParserState
 	// 構築中のカラム定義
-	colDef *definition.ColumnDef
+	colDef *ast.ColumnDef
 	// エラー情報
 	err error
 }
@@ -18,7 +18,7 @@ type ColumnParser struct {
 func NewColumnParser(colName string) *ColumnParser {
 	return &ColumnParser{
 		state:  CreateStateColDef,
-		colDef: &definition.ColumnDef{ColName: colName},
+		colDef: &ast.ColumnDef{ColName: colName},
 	}
 }
 
@@ -32,7 +32,7 @@ func (cp *ColumnParser) finalize() error {
 	return nil
 }
 
-func (cp *ColumnParser) getDef() definition.Definition {
+func (cp *ColumnParser) getDef() ast.Definition {
 	return cp.colDef
 }
 
@@ -46,7 +46,7 @@ func (cp *ColumnParser) OnKeyword(word string) {
 	case CreateStateColDef:
 		// 現状、カラムのデータ型は VARCHAR のみ対応
 		if upper == KVarchar {
-			cp.colDef.DataType = definition.DataTypeVarchar
+			cp.colDef.DataType = ast.DataTypeVarchar
 			cp.state = CreateStateColWaitDefEnd
 			return
 		}

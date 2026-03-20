@@ -2,11 +2,7 @@ package parser
 
 import (
 	"errors"
-	"minesql/internal/planner/ast/expression"
-	"minesql/internal/planner/ast/identifier"
-	"minesql/internal/planner/ast/literal"
-	"minesql/internal/planner/ast/node"
-	"minesql/internal/planner/ast/statement"
+	"minesql/internal/ast"
 	"strings"
 )
 
@@ -14,29 +10,29 @@ import (
 // SelectParser, DeleteParser などから利用する。
 type WhereParser struct {
 	// 現在構築中の WHERE 句
-	whereClause *statement.WhereClause
+	whereClause *ast.WhereClause
 	// WHERE 句の AST ノードが格納されるスタック
-	nodeStack []node.ASTNode
+	nodeStack []ast.ASTNode
 	// WHERE 句の演算子が格納されるスタック
 	opStack []string
 }
 
 // WHERE 句のパースを開始する (WHERE キーワードを検出した時点で呼ぶ)
-func (wp *WhereParser) initWhere() *statement.WhereClause {
-	wp.whereClause = &statement.WhereClause{IsSet: true}
-	wp.nodeStack = []node.ASTNode{}
+func (wp *WhereParser) initWhere() *ast.WhereClause {
+	wp.whereClause = &ast.WhereClause{IsSet: true}
+	wp.nodeStack = []ast.ASTNode{}
 	wp.opStack = []string{}
 	return wp.whereClause
 }
 
 // 識別子をカラム名としてスタックに積む
 func (wp *WhereParser) pushColumn(ident string) {
-	colId := *identifier.NewColumnId(ident)
+	colId := *ast.NewColumnId(ident)
 	wp.nodeStack = append(wp.nodeStack, colId)
 }
 
 // リテラルをスタックに積む
-func (wp *WhereParser) pushLiteral(lit literal.Literal) {
+func (wp *WhereParser) pushLiteral(lit ast.Literal) {
 	wp.nodeStack = append(wp.nodeStack, lit)
 }
 
@@ -59,10 +55,10 @@ func (wp *WhereParser) handleOperator(op string) error {
 
 // WHERE 句を確定する (finalize 時に呼ぶ)。
 // WHERE 句が未設定の場合は IsSet=false の WhereClause を返す。
-func (wp *WhereParser) finalizeWhere() (*statement.WhereClause, error) {
+func (wp *WhereParser) finalizeWhere() (*ast.WhereClause, error) {
 	// WHERE 句がない場合は空の WhereClause を返す
 	if wp.whereClause == nil {
-		return &statement.WhereClause{IsSet: false}, nil
+		return &ast.WhereClause{IsSet: false}, nil
 	}
 
 	// 残っている演算子をすべて処理
@@ -83,7 +79,7 @@ func (wp *WhereParser) finalizeWhere() (*statement.WhereClause, error) {
 	}
 
 	// 最後に残った式を、WHERE 句のルートの式として設定
-	finalExpr, ok := wp.nodeStack[0].(expression.Expression)
+	finalExpr, ok := wp.nodeStack[0].(*ast.BinaryExpr)
 	if !ok {
 		return nil, errors.New("[parse error] invalid expression result")
 	}
@@ -113,31 +109,31 @@ func (wp *WhereParser) reduce() error {
 	leftRaw := wp.nodeStack[len(wp.nodeStack)-1]
 	wp.nodeStack = wp.nodeStack[:len(wp.nodeStack)-1]
 
-	var lhs expression.LHS
-	var rhs expression.RHS
+	var lhs ast.LHS
+	var rhs ast.RHS
 
 	// 左辺の型判定
 	switch v := leftRaw.(type) {
-	case identifier.ColumnId:
-		lhs = expression.NewLhsColumn(v)
-	case expression.Expression:
-		lhs = expression.NewLhsExpr(v)
+	case ast.ColumnId:
+		lhs = ast.NewLhsColumn(v)
+	case ast.Expression:
+		lhs = ast.NewLhsExpr(v)
 	default:
 		return errors.New("[parse error] invalid left operand type")
 	}
 
 	// 右辺の型判定
 	switch v := rightRaw.(type) {
-	case literal.Literal:
-		rhs = expression.NewRhsLiteral(v)
-	case expression.Expression:
-		rhs = expression.NewRhsExpr(v)
+	case ast.Literal:
+		rhs = ast.NewRhsLiteral(v)
+	case ast.Expression:
+		rhs = ast.NewRhsExpr(v)
 	default:
 		return errors.New("[parse error] invalid right operand type")
 	}
 
 	// BinaryExpr を作成してスタックに積む (これが次の演算の左辺や右辺になる)
-	expr := expression.NewBinaryExpr(op, lhs, rhs)
+	expr := ast.NewBinaryExpr(op, lhs, rhs)
 	wp.nodeStack = append(wp.nodeStack, expr)
 
 	return nil

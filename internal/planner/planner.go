@@ -2,43 +2,42 @@ package planner
 
 import (
 	"fmt"
+	"minesql/internal/ast"
 	"minesql/internal/executor"
-	"minesql/internal/planner/ast/node"
-	"minesql/internal/planner/ast/statement"
 )
 
-func PlanStart(stmt node.ASTNode) (executor.Executor, error) {
+func PlanStart(stmt ast.Statement) (executor.Executor, error) {
 	switch s := stmt.(type) {
-	case *statement.CreateTableStmt:
-		ctn := NewCreateTableNode(s)
-		return ctn.Next()
-	case *statement.InsertStmt:
-		ip := NewInsertPlanner(s)
-		return ip.Next()
-	case *statement.SelectStmt:
-		search := NewSearchPlanner(s.From.TableName, s.Where)
-		searchExec, err := search.Next()
+	case *ast.CreateTableStmt:
+		ctn := NewCreateTable(s)
+		return ctn.Build()
+	case *ast.InsertStmt:
+		ip := NewInsert(s)
+		return ip.Build()
+	case *ast.SelectStmt:
+		search := NewSearch(s.From.TableName, s.Where)
+		searchExec, err := search.Build()
 		if err != nil {
 			return nil, err
 		}
-		sp := NewSelectPlanner(s, searchExec)
-		return sp.Next()
-	case *statement.DeleteStmt:
-		search := NewSearchPlanner(s.From.TableName, s.Where)
-		searchExec, err := search.Next()
+		sp := NewSelect(s, searchExec)
+		return sp.Build()
+	case *ast.DeleteStmt:
+		search := NewSearch(s.From.TableName, s.Where)
+		searchExec, err := search.Build()
 		if err != nil {
 			return nil, err
 		}
-		dp := NewDeletePlanner(s, searchExec)
-		return dp.Next()
-	case *statement.UpdateStmt:
-		search := NewSearchPlanner(s.Table.TableName, s.Where)
-		searchExec, err := search.Next()
+		dp := NewDelete(s, searchExec)
+		return dp.Build()
+	case *ast.UpdateStmt:
+		search := NewSearch(s.Table.TableName, s.Where)
+		searchExec, err := search.Build()
 		if err != nil {
 			return nil, err
 		}
-		up := NewUpdatePlanner(s, searchExec)
-		return up.Next()
+		up := NewUpdate(s, searchExec)
+		return up.Build()
 	default:
 		return nil, fmt.Errorf("unsupported statement: %T", s)
 	}

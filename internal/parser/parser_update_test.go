@@ -1,8 +1,7 @@
 package parser
 
 import (
-	"minesql/internal/planner/ast/expression"
-	"minesql/internal/planner/ast/statement"
+	"minesql/internal/ast"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,10 +20,10 @@ func TestParserUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		updateStmt, ok := result.(*statement.UpdateStmt)
+		updateStmt, ok := result.(*ast.UpdateStmt)
 		assert.True(t, ok)
 
-		assert.Equal(t, statement.StmtTypeUpdate, updateStmt.StmtType)
+		assert.Equal(t, ast.StmtTypeUpdate, updateStmt.StmtType)
 		assert.Equal(t, "users", updateStmt.Table.TableName)
 		assert.Equal(t, 1, len(updateStmt.SetClauses))
 		assert.Equal(t, "first_name", updateStmt.SetClauses[0].Column.ColName)
@@ -45,7 +44,7 @@ func TestParserUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		updateStmt, ok := result.(*statement.UpdateStmt)
+		updateStmt, ok := result.(*ast.UpdateStmt)
 		assert.True(t, ok)
 
 		assert.Equal(t, "users", updateStmt.Table.TableName)
@@ -68,7 +67,7 @@ func TestParserUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		updateStmt, ok := result.(*statement.UpdateStmt)
+		updateStmt, ok := result.(*ast.UpdateStmt)
 		assert.True(t, ok)
 
 		assert.Equal(t, "users", updateStmt.Table.TableName)
@@ -79,15 +78,15 @@ func TestParserUpdate(t *testing.T) {
 		assert.NotNil(t, updateStmt.Where)
 		assert.True(t, updateStmt.Where.IsSet)
 
-		binaryExpr, ok := updateStmt.Where.Condition.(*expression.BinaryExpr)
+		binaryExpr, ok := updateStmt.Where.Condition.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "=", binaryExpr.Operator)
 
-		lhsCol, ok := binaryExpr.Left.(*expression.LhsColumn)
+		lhsCol, ok := binaryExpr.Left.(*ast.LhsColumn)
 		assert.True(t, ok)
 		assert.Equal(t, "id", lhsCol.Column.ColName)
 
-		rhsLit, ok := binaryExpr.Right.(*expression.RhsLiteral)
+		rhsLit, ok := binaryExpr.Right.(*ast.RhsLiteral)
 		assert.True(t, ok)
 		assert.Equal(t, "1", rhsLit.Literal.ToString())
 	})
@@ -104,7 +103,7 @@ func TestParserUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		updateStmt, ok := result.(*statement.UpdateStmt)
+		updateStmt, ok := result.(*ast.UpdateStmt)
 		assert.True(t, ok)
 
 		assert.Equal(t, 2, len(updateStmt.SetClauses))
@@ -115,7 +114,7 @@ func TestParserUpdate(t *testing.T) {
 		assert.NotNil(t, updateStmt.Where.Condition)
 
 		// AND で結合された式
-		andExpr, ok := updateStmt.Where.Condition.(*expression.BinaryExpr)
+		andExpr, ok := updateStmt.Where.Condition.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "AND", andExpr.Operator)
 	})
@@ -132,7 +131,7 @@ func TestParserUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		updateStmt, ok := result.(*statement.UpdateStmt)
+		updateStmt, ok := result.(*ast.UpdateStmt)
 		assert.True(t, ok)
 
 		assert.Equal(t, 1, len(updateStmt.SetClauses))
@@ -152,12 +151,12 @@ func TestParserUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		updateStmt, ok := result.(*statement.UpdateStmt)
+		updateStmt, ok := result.(*ast.UpdateStmt)
 		assert.True(t, ok)
 
 		assert.True(t, updateStmt.Where.IsSet)
 
-		orExpr, ok := updateStmt.Where.Condition.(*expression.BinaryExpr)
+		orExpr, ok := updateStmt.Where.Condition.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "OR", orExpr.Operator)
 	})
@@ -174,25 +173,25 @@ func TestParserUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		updateStmt, ok := result.(*statement.UpdateStmt)
+		updateStmt, ok := result.(*ast.UpdateStmt)
 		assert.True(t, ok)
 
 		// ルートは OR
-		orExpr, ok := updateStmt.Where.Condition.(*expression.BinaryExpr)
+		orExpr, ok := updateStmt.Where.Condition.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "OR", orExpr.Operator)
 
 		// OR の左辺は a = '1'
-		leftExpr, ok := orExpr.Left.(*expression.LhsExpr)
+		leftExpr, ok := orExpr.Left.(*ast.LhsExpr)
 		assert.True(t, ok)
-		leftBinary, ok := leftExpr.Expr.(*expression.BinaryExpr)
+		leftBinary, ok := leftExpr.Expr.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "=", leftBinary.Operator)
 
 		// OR の右辺は AND 式
-		rightExpr, ok := orExpr.Right.(*expression.RhsExpr)
+		rightExpr, ok := orExpr.Right.(*ast.RhsExpr)
 		assert.True(t, ok)
-		rightBinary, ok := rightExpr.Expr.(*expression.BinaryExpr)
+		rightBinary, ok := rightExpr.Expr.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "AND", rightBinary.Operator)
 	})
@@ -209,15 +208,15 @@ func TestParserUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		updateStmt, ok := result.(*statement.UpdateStmt)
+		updateStmt, ok := result.(*ast.UpdateStmt)
 		assert.True(t, ok)
 
 		assert.True(t, updateStmt.Where.IsSet)
 
-		binaryExpr, ok := updateStmt.Where.Condition.(*expression.BinaryExpr)
+		binaryExpr, ok := updateStmt.Where.Condition.(*ast.BinaryExpr)
 		assert.True(t, ok)
 
-		rhsLit, ok := binaryExpr.Right.(*expression.RhsLiteral)
+		rhsLit, ok := binaryExpr.Right.(*ast.RhsLiteral)
 		assert.True(t, ok)
 		assert.Equal(t, "30", rhsLit.Literal.ToString())
 	})

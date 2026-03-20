@@ -2,14 +2,10 @@ package main
 
 import (
 	"fmt"
+	"minesql/internal/ast"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/planner"
-	"minesql/internal/planner/ast/definition"
-	"minesql/internal/planner/ast/expression"
-	"minesql/internal/planner/ast/identifier"
-	"minesql/internal/planner/ast/literal"
-	"minesql/internal/planner/ast/statement"
 	"os"
 )
 
@@ -47,20 +43,22 @@ func main() {
 }
 
 func createTable() {
-	stmt := statement.NewCreateTableStmt(
-		"users",
-		[]definition.Definition{
-			definition.NewColumnDef("id", definition.DataTypeVarchar),
-			definition.NewColumnDef("first_name", definition.DataTypeVarchar),
-			definition.NewColumnDef("last_name", definition.DataTypeVarchar),
-			definition.NewColumnDef("gender", definition.DataTypeVarchar),
-			definition.NewColumnDef("username", definition.DataTypeVarchar),
-			definition.NewConstraintPrimaryKeyDef([]identifier.ColumnId{
-				*identifier.NewColumnId("id"),
-			}),
-			definition.NewConstraintUniqueKeyDef(*identifier.NewColumnId("username")),
+	stmt := &ast.CreateTableStmt{
+		StmtType: ast.StmtTypeCreate,
+		Keyword:  ast.KeywordTable,
+		TableName: "users",
+		CreateDefinitions: []ast.Definition{
+			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "first_name", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "last_name", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "gender", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "username", DataType: ast.DataTypeVarchar},
+			&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+			}},
+			&ast.ConstraintUniqueKeyDef{DefType: ast.DefTypeConstraintUniqueKey, Column: *ast.NewColumnId("username")},
 		},
-	)
+	}
 
 	exec, err := planner.PlanStart(stmt)
 	if err != nil {
@@ -76,60 +74,61 @@ func createTable() {
 }
 
 func insert() {
-	stmt := statement.NewInsertStmt(
-		*identifier.NewTableId("users"),
-		[]identifier.ColumnId{
-			*identifier.NewColumnId("id"),
-			*identifier.NewColumnId("first_name"),
-			*identifier.NewColumnId("last_name"),
-			*identifier.NewColumnId("gender"),
-			*identifier.NewColumnId("username"),
+	stmt := &ast.InsertStmt{
+		StmtType: ast.StmtTypeInsert,
+		Table: *ast.NewTableId("users"),
+		Cols: []ast.ColumnId{
+			*ast.NewColumnId("id"),
+			*ast.NewColumnId("first_name"),
+			*ast.NewColumnId("last_name"),
+			*ast.NewColumnId("gender"),
+			*ast.NewColumnId("username"),
 		},
-		[][]literal.Literal{
+		Values: [][]ast.Literal{
 			{
-				literal.NewStringLiteral("1", "1"),
-				literal.NewStringLiteral("John", "John"),
-				literal.NewStringLiteral("Doe", "Doe"),
-				literal.NewStringLiteral("male", "male"),
-				literal.NewStringLiteral("johndoe", "johndoe"),
+				ast.NewStringLiteral("1", "1"),
+				ast.NewStringLiteral("John", "John"),
+				ast.NewStringLiteral("Doe", "Doe"),
+				ast.NewStringLiteral("male", "male"),
+				ast.NewStringLiteral("johndoe", "johndoe"),
 			},
 			{
-				literal.NewStringLiteral("2", "2"),
-				literal.NewStringLiteral("John", "John"),
-				literal.NewStringLiteral("Doe2", "Doe2"),
-				literal.NewStringLiteral("male", "male"),
-				literal.NewStringLiteral("johndoe2", "johndoe2"),
+				ast.NewStringLiteral("2", "2"),
+				ast.NewStringLiteral("John", "John"),
+				ast.NewStringLiteral("Doe2", "Doe2"),
+				ast.NewStringLiteral("male", "male"),
+				ast.NewStringLiteral("johndoe2", "johndoe2"),
 			},
 			{
-				literal.NewStringLiteral("3", "3"),
-				literal.NewStringLiteral("John", "John"),
-				literal.NewStringLiteral("Doe3", "Doe3"),
-				literal.NewStringLiteral("male", "male"),
-				literal.NewStringLiteral("johndoe3", "johndoe3"),
+				ast.NewStringLiteral("3", "3"),
+				ast.NewStringLiteral("John", "John"),
+				ast.NewStringLiteral("Doe3", "Doe3"),
+				ast.NewStringLiteral("male", "male"),
+				ast.NewStringLiteral("johndoe3", "johndoe3"),
 			},
 			{
-				literal.NewStringLiteral("4", "4"),
-				literal.NewStringLiteral("Jane", "Jane"),
-				literal.NewStringLiteral("Doe2", "Doe2"),
-				literal.NewStringLiteral("female", "female"),
-				literal.NewStringLiteral("janedoe", "janedoe"),
+				ast.NewStringLiteral("4", "4"),
+				ast.NewStringLiteral("Jane", "Jane"),
+				ast.NewStringLiteral("Doe2", "Doe2"),
+				ast.NewStringLiteral("female", "female"),
+				ast.NewStringLiteral("janedoe", "janedoe"),
 			},
 			{
-				literal.NewStringLiteral("5", "5"),
-				literal.NewStringLiteral("Jonathan", "Jonathan"),
-				literal.NewStringLiteral("Black", "Black"),
-				literal.NewStringLiteral("male", "male"),
-				literal.NewStringLiteral("jonathanblack", "jonathanblack"),
+				ast.NewStringLiteral("5", "5"),
+				ast.NewStringLiteral("Jonathan", "Jonathan"),
+				ast.NewStringLiteral("Black", "Black"),
+				ast.NewStringLiteral("male", "male"),
+				ast.NewStringLiteral("jonathanblack", "jonathanblack"),
 			},
 			{
-				literal.NewStringLiteral("6", "6"),
-				literal.NewStringLiteral("Tom", "Tom"),
-				literal.NewStringLiteral("Brown", "Brown"),
-				literal.NewStringLiteral("male", "male"),
-				literal.NewStringLiteral("tombrown", "tombrown"),
+				ast.NewStringLiteral("6", "6"),
+				ast.NewStringLiteral("Tom", "Tom"),
+				ast.NewStringLiteral("Brown", "Brown"),
+				ast.NewStringLiteral("male", "male"),
+				ast.NewStringLiteral("tombrown", "tombrown"),
 			},
 		},
-	)
+	}
 
 	exec, err := planner.PlanStart(stmt)
 	if err != nil {
@@ -146,10 +145,11 @@ func insert() {
 
 func scan() {
 	fmt.Println("=== scan all ===")
-	stmt := statement.NewSelectStmt(
-		*identifier.NewTableId("users"),
-		nil,
-	)
+	stmt := &ast.SelectStmt{
+		StmtType: ast.StmtTypeSelect,
+		From:     *ast.NewTableId("users"),
+		Where:    &ast.WhereClause{IsSet: false},
+	}
 	exec, err := planner.PlanStart(stmt)
 	if err != nil {
 		panic(err)
@@ -168,16 +168,18 @@ func scan() {
 
 func assertEqual() {
 	fmt.Println("=== assert equal ===")
-	stmt := statement.NewSelectStmt(
-		*identifier.NewTableId("users"),
-		statement.NewWhereClause(
-			expression.NewBinaryExpr(
+	stmt := &ast.SelectStmt{
+		StmtType: ast.StmtTypeSelect,
+		From:     *ast.NewTableId("users"),
+		Where: &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
 				"=",
-				expression.NewLhsColumn(*identifier.NewColumnId("username")),
-				expression.NewRhsLiteral(literal.NewStringLiteral("janedoe", "janedoe")),
+				ast.NewLhsColumn(*ast.NewColumnId("username")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("janedoe", "janedoe")),
 			),
-		),
-	)
+			IsSet: true,
+		},
+	}
 	exec, err := planner.PlanStart(stmt)
 	if err != nil {
 		panic(err)
@@ -197,18 +199,19 @@ func assertEqual() {
 func updateByCondition() {
 	fmt.Println("=== UPDATE users SET last_name = 'Smith' WHERE username = 'johndoe' ===")
 	// UPDATE users SET last_name = 'Smith' WHERE username = 'johndoe'
-	stmt := &statement.UpdateStmt{
-		Table: *identifier.NewTableId("users"),
-		SetClauses: []*statement.SetClause{
-			{Column: *identifier.NewColumnId("last_name"), Value: literal.NewStringLiteral("'Smith'", "Smith")},
+	stmt := &ast.UpdateStmt{
+		Table: *ast.NewTableId("users"),
+		SetClauses: []*ast.SetClause{
+			{Column: *ast.NewColumnId("last_name"), Value: ast.NewStringLiteral("'Smith'", "Smith")},
 		},
-		Where: statement.NewWhereClause(
-			expression.NewBinaryExpr(
+		Where: &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
 				"=",
-				expression.NewLhsColumn(*identifier.NewColumnId("username")),
-				expression.NewRhsLiteral(literal.NewStringLiteral("johndoe", "johndoe")),
+				ast.NewLhsColumn(*ast.NewColumnId("username")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("johndoe", "johndoe")),
 			),
-		),
+			IsSet: true,
+		},
 	}
 	exec, err := planner.PlanStart(stmt)
 	if err != nil {
@@ -223,10 +226,11 @@ func updateByCondition() {
 
 func scanAfterUpdate() {
 	fmt.Println("=== scan after update ===")
-	stmt := statement.NewSelectStmt(
-		*identifier.NewTableId("users"),
-		nil,
-	)
+	stmt := &ast.SelectStmt{
+		StmtType: ast.StmtTypeSelect,
+		From:     *ast.NewTableId("users"),
+		Where:    &ast.WhereClause{IsSet: false},
+	}
 	exec, err := planner.PlanStart(stmt)
 	if err != nil {
 		panic(err)
@@ -246,52 +250,54 @@ func scanAfterUpdate() {
 func filter() {
 	fmt.Println("=== filter (first_name < 'K' AND gender = 'male' AND last_name >= 'Doe') OR first_name = 'Tom' ===")
 	// SELECT * FROM users WHERE (first_name < 'K' AND gender = 'male' AND last_name >= 'Doe') OR first_name = 'Tom'
-	stmt := statement.NewSelectStmt(
-		*identifier.NewTableId("users"),
-		statement.NewWhereClause(
-			expression.NewBinaryExpr(
+	stmt := &ast.SelectStmt{
+		StmtType: ast.StmtTypeSelect,
+		From:     *ast.NewTableId("users"),
+		Where: &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
 				"OR",
-				expression.NewLhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewLhsExpr(
+					ast.NewBinaryExpr(
 						"AND",
-						expression.NewLhsExpr(
-							expression.NewBinaryExpr(
+						ast.NewLhsExpr(
+							ast.NewBinaryExpr(
 								"<",
-								expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
-								expression.NewRhsLiteral(literal.NewStringLiteral("K", "K")),
+								ast.NewLhsColumn(*ast.NewColumnId("first_name")),
+								ast.NewRhsLiteral(ast.NewStringLiteral("K", "K")),
 							),
 						),
-						expression.NewRhsExpr(
-							expression.NewBinaryExpr(
+						ast.NewRhsExpr(
+							ast.NewBinaryExpr(
 								"AND",
-								expression.NewLhsExpr(
-									expression.NewBinaryExpr(
+								ast.NewLhsExpr(
+									ast.NewBinaryExpr(
 										"=",
-										expression.NewLhsColumn(*identifier.NewColumnId("gender")),
-										expression.NewRhsLiteral(literal.NewStringLiteral("male", "male")),
+										ast.NewLhsColumn(*ast.NewColumnId("gender")),
+										ast.NewRhsLiteral(ast.NewStringLiteral("male", "male")),
 									),
 								),
-								expression.NewRhsExpr(
-									expression.NewBinaryExpr(
+								ast.NewRhsExpr(
+									ast.NewBinaryExpr(
 										">=",
-										expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
-										expression.NewRhsLiteral(literal.NewStringLiteral("Doe", "Doe")),
+										ast.NewLhsColumn(*ast.NewColumnId("last_name")),
+										ast.NewRhsLiteral(ast.NewStringLiteral("Doe", "Doe")),
 									),
 								),
 							),
 						),
 					),
 				),
-				expression.NewRhsExpr(
-					expression.NewBinaryExpr(
+				ast.NewRhsExpr(
+					ast.NewBinaryExpr(
 						"=",
-						expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
-						expression.NewRhsLiteral(literal.NewStringLiteral("Tom", "Tom")),
+						ast.NewLhsColumn(*ast.NewColumnId("first_name")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("Tom", "Tom")),
 					),
 				),
 			),
-		),
-	)
+			IsSet: true,
+		},
+	}
 	exec, err := planner.PlanStart(stmt)
 	if err != nil {
 		panic(err)
@@ -311,16 +317,18 @@ func filter() {
 func deleteByCondition() {
 	fmt.Println("=== delete WHERE username = 'johndoe2' ===")
 	// DELETE FROM users WHERE username = 'johndoe2'
-	stmt := statement.NewDeleteStmt(
-		*identifier.NewTableId("users"),
-		statement.NewWhereClause(
-			expression.NewBinaryExpr(
+	stmt := &ast.DeleteStmt{
+		StmtType: ast.StmtTypeDelete,
+		From:     *ast.NewTableId("users"),
+		Where: &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
 				"=",
-				expression.NewLhsColumn(*identifier.NewColumnId("username")),
-				expression.NewRhsLiteral(literal.NewStringLiteral("johndoe2", "johndoe2")),
+				ast.NewLhsColumn(*ast.NewColumnId("username")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("johndoe2", "johndoe2")),
 			),
-		),
-	)
+			IsSet: true,
+		},
+	}
 	exec, err := planner.PlanStart(stmt)
 	if err != nil {
 		panic(err)
@@ -334,10 +342,11 @@ func deleteByCondition() {
 
 func scanAfterDelete() {
 	fmt.Println("=== scan after delete ===")
-	stmt := statement.NewSelectStmt(
-		*identifier.NewTableId("users"),
-		nil,
-	)
+	stmt := &ast.SelectStmt{
+		StmtType: ast.StmtTypeSelect,
+		From:     *ast.NewTableId("users"),
+		Where:    &ast.WhereClause{IsSet: false},
+	}
 	exec, err := planner.PlanStart(stmt)
 	if err != nil {
 		panic(err)

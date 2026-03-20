@@ -1,24 +1,24 @@
 package planner
 
 import (
+	"minesql/internal/ast"
 	"minesql/internal/executor"
-	"minesql/internal/planner/ast/statement"
 )
 
-type SelectPlanner struct {
-	Stmt          *statement.SelectStmt
-	InnerExecutor executor.RecordIterator
+type Select struct {
+	Stmt     *ast.SelectStmt
+	iterator executor.RecordIterator
 }
 
-func NewSelectPlanner(stmt *statement.SelectStmt, innerExecutor executor.RecordIterator) *SelectPlanner {
-	return &SelectPlanner{
-		Stmt:          stmt,
-		InnerExecutor: innerExecutor,
+func NewSelect(stmt *ast.SelectStmt, iterator executor.RecordIterator) *Select {
+	return &Select{
+		Stmt:     stmt,
+		iterator: iterator,
 	}
 }
 
-func (sp *SelectPlanner) Next() (executor.RecordIterator, error) {
-	// 現時点では検索 Executor をそのまま返す
+func (sp *Select) Build() (executor.RecordIterator, error) {
+	// 現時点では検索 RecordIterator をそのまま返す
 	// 将来的にカラム射影などを追加する場合はここに処理を追加する
-	return sp.InnerExecutor, nil
+	return sp.iterator, nil
 }

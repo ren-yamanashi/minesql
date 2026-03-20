@@ -1,4 +1,19 @@
-package literal
+package ast
+
+type LiteralType string
+
+const (
+	LiteralTypeString LiteralType = "string"
+)
+
+type Literal interface {
+	ToString() string
+	ToBytes() []byte
+}
+
+// ===========================
+// String
+// ===========================
 
 type StringLiteral struct {
 	LiteralType LiteralType
@@ -21,5 +36,3 @@ func (sl *StringLiteral) ToBytes() []byte {
 func (sl *StringLiteral) ToString() string {
 	return sl.Value
 }
-
-func (sl *StringLiteral) literalNode() {}

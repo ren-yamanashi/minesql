@@ -3,33 +3,32 @@ package planner
 import (
 	"errors"
 	"fmt"
+	"minesql/internal/ast"
 	"minesql/internal/catalog"
 	"minesql/internal/executor"
-	"minesql/internal/planner/ast/definition"
-	"minesql/internal/planner/ast/statement"
 )
 
-type CreateTableNode struct {
-	Stmt *statement.CreateTableStmt
+type CreateTable struct {
+	Stmt *ast.CreateTableStmt
 }
 
-func NewCreateTableNode(stmt *statement.CreateTableStmt) *CreateTableNode {
-	return &CreateTableNode{
+func NewCreateTable(stmt *ast.CreateTableStmt) *CreateTable {
+	return &CreateTable{
 		Stmt: stmt,
 	}
 }
 
-func (ctn *CreateTableNode) Next() (executor.Mutator, error) {
+func (ctn *CreateTable) Build() (executor.Mutator, error) {
 	colIndexMap := map[string]int{} // key: column name, value: column index
 	colParams := []*executor.ColumnParam{}
 
-	var pkDef *definition.ConstraintPrimaryKeyDef
-	var ukDefs []*definition.ConstraintUniqueKeyDef
+	var pkDef *ast.ConstraintPrimaryKeyDef
+	var ukDefs []*ast.ConstraintUniqueKeyDef
 
 	currentColIdx := 0
 	for _, def := range ctn.Stmt.CreateDefinitions {
 		switch def := def.(type) {
-		case *definition.ColumnDef:
+		case *ast.ColumnDef:
 			if _, exists := colIndexMap[def.ColName]; exists {
 				return nil, errors.New("duplicate column name: " + def.ColName)
 			}
@@ -40,13 +39,13 @@ func (ctn *CreateTableNode) Next() (executor.Mutator, error) {
 				Type: catalog.ColumnType(def.DataType),
 			})
 
-		case *definition.ConstraintPrimaryKeyDef:
+		case *ast.ConstraintPrimaryKeyDef:
 			if pkDef != nil {
 				return nil, fmt.Errorf("multiple primary keys defined")
 			}
 			pkDef = def
 
-		case *definition.ConstraintUniqueKeyDef:
+		case *ast.ConstraintUniqueKeyDef:
 			ukDefs = append(ukDefs, def)
 		}
 	}
@@ -66,7 +65,7 @@ func (ctn *CreateTableNode) Next() (executor.Mutator, error) {
 
 // プライマリキーのカラム定義を検証し、プライマリキーのカラム数を返す
 // エラーの場合は、`-1, error` を返し、正常な場合は `pkCount, nil` を返す
-func getPkCount(pkDef *definition.ConstraintPrimaryKeyDef, colIndexMap map[string]int) (int, error) {
+func getPkCount(pkDef *ast.ConstraintPrimaryKeyDef, colIndexMap map[string]int) (int, error) {
 	if pkDef == nil {
 		return -1, errors.New("primary key is required")
 	}
@@ -89,7 +88,7 @@ func getPkCount(pkDef *definition.ConstraintPrimaryKeyDef, colIndexMap map[strin
 	return len(pkDef.Columns), nil
 }
 
-func getUkParams(ukDefs []*definition.ConstraintUniqueKeyDef, colIndexMap map[string]int) ([]*executor.IndexParam, error) {
+func getUkParams(ukDefs []*ast.ConstraintUniqueKeyDef, colIndexMap map[string]int) ([]*executor.IndexParam, error) {
 	uniqueKeyParams := make([]*executor.IndexParam, 0, len(ukDefs))
 	for _, ukDef := range ukDefs {
 		idx, exists := colIndexMap[ukDef.Column.ColName]

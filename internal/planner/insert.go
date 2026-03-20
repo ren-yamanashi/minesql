@@ -2,23 +2,22 @@ package planner
 
 import (
 	"errors"
+	"minesql/internal/ast"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/planner/ast/literal"
-	"minesql/internal/planner/ast/statement"
 )
 
-type InsertPlanner struct {
-	Stmt *statement.InsertStmt
+type Insert struct {
+	Stmt *ast.InsertStmt
 }
 
-func NewInsertPlanner(stmt *statement.InsertStmt) *InsertPlanner {
-	return &InsertPlanner{
+func NewInsert(stmt *ast.InsertStmt) *Insert {
+	return &Insert{
 		Stmt: stmt,
 	}
 }
 
-func (ip *InsertPlanner) Next() (executor.Mutator, error) {
+func (ip *Insert) Build() (executor.Mutator, error) {
 	if len(ip.Stmt.Cols) == 0 {
 		return nil, errors.New("column names cannot be empty")
 	}
@@ -58,7 +57,7 @@ func (ip *InsertPlanner) Next() (executor.Mutator, error) {
 				return nil, errors.New("column does not exist: " + colName)
 			}
 			switch v := val.(type) {
-			case *literal.StringLiteral:
+			case *ast.StringLiteral:
 				record[pos] = []byte(v.Value)
 			default:
 				return nil, errors.New("unsupported literal type in insert values")

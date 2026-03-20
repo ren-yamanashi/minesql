@@ -1,8 +1,7 @@
 package parser
 
 import (
-	"minesql/internal/planner/ast/expression"
-	"minesql/internal/planner/ast/statement"
+	"minesql/internal/ast"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,43 +23,43 @@ func TestParserWhere(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		selectStmt, ok := result.(*statement.SelectStmt)
+		selectStmt, ok := result.(*ast.SelectStmt)
 		assert.True(t, ok)
 
 		assert.NotNil(t, selectStmt.Where)
 		assert.True(t, selectStmt.Where.IsSet)
 
-		binaryExpr, ok := selectStmt.Where.Condition.(*expression.BinaryExpr)
+		binaryExpr, ok := selectStmt.Where.Condition.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "AND", binaryExpr.Operator)
 
 		// 左辺: id = '1'
-		leftExpr, ok := binaryExpr.Left.(*expression.LhsExpr)
+		leftExpr, ok := binaryExpr.Left.(*ast.LhsExpr)
 		assert.True(t, ok)
-		leftBinary, ok := leftExpr.Expr.(*expression.BinaryExpr)
+		leftBinary, ok := leftExpr.Expr.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "=", leftBinary.Operator)
 
-		leftCol, ok := leftBinary.Left.(*expression.LhsColumn)
+		leftCol, ok := leftBinary.Left.(*ast.LhsColumn)
 		assert.True(t, ok)
 		assert.Equal(t, "id", leftCol.Column.ColName)
 
-		leftLit, ok := leftBinary.Right.(*expression.RhsLiteral)
+		leftLit, ok := leftBinary.Right.(*ast.RhsLiteral)
 		assert.True(t, ok)
 		assert.Equal(t, "1", leftLit.Literal.ToString())
 
 		// 右辺: name = 'John'
-		rightExpr, ok := binaryExpr.Right.(*expression.RhsExpr)
+		rightExpr, ok := binaryExpr.Right.(*ast.RhsExpr)
 		assert.True(t, ok)
-		rightBinary, ok := rightExpr.Expr.(*expression.BinaryExpr)
+		rightBinary, ok := rightExpr.Expr.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "=", rightBinary.Operator)
 
-		rightCol, ok := rightBinary.Left.(*expression.LhsColumn)
+		rightCol, ok := rightBinary.Left.(*ast.LhsColumn)
 		assert.True(t, ok)
 		assert.Equal(t, "name", rightCol.Column.ColName)
 
-		rightLit, ok := rightBinary.Right.(*expression.RhsLiteral)
+		rightLit, ok := rightBinary.Right.(*ast.RhsLiteral)
 		assert.True(t, ok)
 		assert.Equal(t, "John", rightLit.Literal.ToString())
 	})
@@ -77,40 +76,40 @@ func TestParserWhere(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		selectStmt, ok := result.(*statement.SelectStmt)
+		selectStmt, ok := result.(*ast.SelectStmt)
 		assert.True(t, ok)
 
-		binaryExpr, ok := selectStmt.Where.Condition.(*expression.BinaryExpr)
+		binaryExpr, ok := selectStmt.Where.Condition.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "OR", binaryExpr.Operator)
 
 		// 左辺: id = '1'
-		leftExpr, ok := binaryExpr.Left.(*expression.LhsExpr)
+		leftExpr, ok := binaryExpr.Left.(*ast.LhsExpr)
 		assert.True(t, ok)
-		leftBinary, ok := leftExpr.Expr.(*expression.BinaryExpr)
+		leftBinary, ok := leftExpr.Expr.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "=", leftBinary.Operator)
 
-		leftCol, ok := leftBinary.Left.(*expression.LhsColumn)
+		leftCol, ok := leftBinary.Left.(*ast.LhsColumn)
 		assert.True(t, ok)
 		assert.Equal(t, "id", leftCol.Column.ColName)
 
-		leftLit, ok := leftBinary.Right.(*expression.RhsLiteral)
+		leftLit, ok := leftBinary.Right.(*ast.RhsLiteral)
 		assert.True(t, ok)
 		assert.Equal(t, "1", leftLit.Literal.ToString())
 
 		// 右辺: id = '2'
-		rightExpr, ok := binaryExpr.Right.(*expression.RhsExpr)
+		rightExpr, ok := binaryExpr.Right.(*ast.RhsExpr)
 		assert.True(t, ok)
-		rightBinary, ok := rightExpr.Expr.(*expression.BinaryExpr)
+		rightBinary, ok := rightExpr.Expr.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "=", rightBinary.Operator)
 
-		rightCol, ok := rightBinary.Left.(*expression.LhsColumn)
+		rightCol, ok := rightBinary.Left.(*ast.LhsColumn)
 		assert.True(t, ok)
 		assert.Equal(t, "id", rightCol.Column.ColName)
 
-		rightLit, ok := rightBinary.Right.(*expression.RhsLiteral)
+		rightLit, ok := rightBinary.Right.(*ast.RhsLiteral)
 		assert.True(t, ok)
 		assert.Equal(t, "2", rightLit.Literal.ToString())
 	})
@@ -128,51 +127,51 @@ func TestParserWhere(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		selectStmt, ok := result.(*statement.SelectStmt)
+		selectStmt, ok := result.(*ast.SelectStmt)
 		assert.True(t, ok)
 
 		// ルートは OR
-		orExpr, ok := selectStmt.Where.Condition.(*expression.BinaryExpr)
+		orExpr, ok := selectStmt.Where.Condition.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "OR", orExpr.Operator)
 
 		// OR の左辺: a = '1'
-		orLeftExpr, ok := orExpr.Left.(*expression.LhsExpr)
+		orLeftExpr, ok := orExpr.Left.(*ast.LhsExpr)
 		assert.True(t, ok)
-		aEqExpr, ok := orLeftExpr.Expr.(*expression.BinaryExpr)
+		aEqExpr, ok := orLeftExpr.Expr.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "=", aEqExpr.Operator)
-		aCol, ok := aEqExpr.Left.(*expression.LhsColumn)
+		aCol, ok := aEqExpr.Left.(*ast.LhsColumn)
 		assert.True(t, ok)
 		assert.Equal(t, "a", aCol.Column.ColName)
-		aLit, ok := aEqExpr.Right.(*expression.RhsLiteral)
+		aLit, ok := aEqExpr.Right.(*ast.RhsLiteral)
 		assert.True(t, ok)
 		assert.Equal(t, "1", aLit.Literal.ToString())
 
 		// OR の右辺: (b = '2') AND (c = '3')
-		orRightExpr, ok := orExpr.Right.(*expression.RhsExpr)
+		orRightExpr, ok := orExpr.Right.(*ast.RhsExpr)
 		assert.True(t, ok)
-		andExpr, ok := orRightExpr.Expr.(*expression.BinaryExpr)
+		andExpr, ok := orRightExpr.Expr.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "AND", andExpr.Operator)
 
 		// AND の左辺: b = '2'
-		andLeftExpr, ok := andExpr.Left.(*expression.LhsExpr)
+		andLeftExpr, ok := andExpr.Left.(*ast.LhsExpr)
 		assert.True(t, ok)
-		bEqExpr, ok := andLeftExpr.Expr.(*expression.BinaryExpr)
+		bEqExpr, ok := andLeftExpr.Expr.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "=", bEqExpr.Operator)
-		bCol, ok := bEqExpr.Left.(*expression.LhsColumn)
+		bCol, ok := bEqExpr.Left.(*ast.LhsColumn)
 		assert.True(t, ok)
 		assert.Equal(t, "b", bCol.Column.ColName)
 
 		// AND の右辺: c = '3'
-		andRightExpr, ok := andExpr.Right.(*expression.RhsExpr)
+		andRightExpr, ok := andExpr.Right.(*ast.RhsExpr)
 		assert.True(t, ok)
-		cEqExpr, ok := andRightExpr.Expr.(*expression.BinaryExpr)
+		cEqExpr, ok := andRightExpr.Expr.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "=", cEqExpr.Operator)
-		cCol, ok := cEqExpr.Left.(*expression.LhsColumn)
+		cCol, ok := cEqExpr.Left.(*ast.LhsColumn)
 		assert.True(t, ok)
 		assert.Equal(t, "c", cCol.Column.ColName)
 	})
@@ -189,45 +188,45 @@ func TestParserWhere(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		selectStmt, ok := result.(*statement.SelectStmt)
+		selectStmt, ok := result.(*ast.SelectStmt)
 		assert.True(t, ok)
 
 		// ルートは AND (右側の AND)
-		rootExpr, ok := selectStmt.Where.Condition.(*expression.BinaryExpr)
+		rootExpr, ok := selectStmt.Where.Condition.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "AND", rootExpr.Operator)
 
 		// 左辺: (a = '1') AND (b = '2')
-		leftExpr, ok := rootExpr.Left.(*expression.LhsExpr)
+		leftExpr, ok := rootExpr.Left.(*ast.LhsExpr)
 		assert.True(t, ok)
-		innerAndExpr, ok := leftExpr.Expr.(*expression.BinaryExpr)
+		innerAndExpr, ok := leftExpr.Expr.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "AND", innerAndExpr.Operator)
 
 		// 内側 AND の左辺: a = '1'
-		innerLeftExpr, ok := innerAndExpr.Left.(*expression.LhsExpr)
+		innerLeftExpr, ok := innerAndExpr.Left.(*ast.LhsExpr)
 		assert.True(t, ok)
-		aEqExpr, ok := innerLeftExpr.Expr.(*expression.BinaryExpr)
+		aEqExpr, ok := innerLeftExpr.Expr.(*ast.BinaryExpr)
 		assert.True(t, ok)
-		aCol, ok := aEqExpr.Left.(*expression.LhsColumn)
+		aCol, ok := aEqExpr.Left.(*ast.LhsColumn)
 		assert.True(t, ok)
 		assert.Equal(t, "a", aCol.Column.ColName)
 
 		// 内側 AND の右辺: b = '2'
-		innerRightExpr, ok := innerAndExpr.Right.(*expression.RhsExpr)
+		innerRightExpr, ok := innerAndExpr.Right.(*ast.RhsExpr)
 		assert.True(t, ok)
-		bEqExpr, ok := innerRightExpr.Expr.(*expression.BinaryExpr)
+		bEqExpr, ok := innerRightExpr.Expr.(*ast.BinaryExpr)
 		assert.True(t, ok)
-		bCol, ok := bEqExpr.Left.(*expression.LhsColumn)
+		bCol, ok := bEqExpr.Left.(*ast.LhsColumn)
 		assert.True(t, ok)
 		assert.Equal(t, "b", bCol.Column.ColName)
 
 		// ルートの右辺: c = '3'
-		rightExpr, ok := rootExpr.Right.(*expression.RhsExpr)
+		rightExpr, ok := rootExpr.Right.(*ast.RhsExpr)
 		assert.True(t, ok)
-		cEqExpr, ok := rightExpr.Expr.(*expression.BinaryExpr)
+		cEqExpr, ok := rightExpr.Expr.(*ast.BinaryExpr)
 		assert.True(t, ok)
-		cCol, ok := cEqExpr.Left.(*expression.LhsColumn)
+		cCol, ok := cEqExpr.Left.(*ast.LhsColumn)
 		assert.True(t, ok)
 		assert.Equal(t, "c", cCol.Column.ColName)
 	})
@@ -244,10 +243,10 @@ func TestParserWhere(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		selectStmt, ok := result.(*statement.SelectStmt)
+		selectStmt, ok := result.(*ast.SelectStmt)
 		assert.True(t, ok)
 
-		binaryExpr, ok := selectStmt.Where.Condition.(*expression.BinaryExpr)
+		binaryExpr, ok := selectStmt.Where.Condition.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, ">", binaryExpr.Operator)
 	})
@@ -264,14 +263,14 @@ func TestParserWhere(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		selectStmt, ok := result.(*statement.SelectStmt)
+		selectStmt, ok := result.(*ast.SelectStmt)
 		assert.True(t, ok)
 
-		binaryExpr, ok := selectStmt.Where.Condition.(*expression.BinaryExpr)
+		binaryExpr, ok := selectStmt.Where.Condition.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "=", binaryExpr.Operator)
 
-		rhsLit, ok := binaryExpr.Right.(*expression.RhsLiteral)
+		rhsLit, ok := binaryExpr.Right.(*ast.RhsLiteral)
 		assert.True(t, ok)
 		assert.Equal(t, "42", rhsLit.Literal.ToString())
 	})

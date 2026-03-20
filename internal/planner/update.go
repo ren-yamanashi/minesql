@@ -2,24 +2,24 @@ package planner
 
 import (
 	"errors"
+	"minesql/internal/ast"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/planner/ast/statement"
 )
 
-type UpdatePlanner struct {
-	Stmt     *statement.UpdateStmt
+type Update struct {
+	Stmt     *ast.UpdateStmt
 	Iterator executor.RecordIterator
 }
 
-func NewUpdatePlanner(stmt *statement.UpdateStmt, iterator executor.RecordIterator) *UpdatePlanner {
-	return &UpdatePlanner{
+func NewUpdate(stmt *ast.UpdateStmt, iterator executor.RecordIterator) *Update {
+	return &Update{
 		Stmt:     stmt,
 		Iterator: iterator,
 	}
 }
 
-func (up *UpdatePlanner) Next() (executor.Mutator, error) {
+func (up *Update) Build() (executor.Mutator, error) {
 	sm := engine.Get()
 	tblMeta, err := sm.Catalog.GetTableMetadataByName(up.Stmt.Table.TableName)
 	if err != nil {
