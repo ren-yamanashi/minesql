@@ -6,11 +6,10 @@ import (
 )
 
 type SearchIndex struct {
-	tableName  string
-	indexName  string
-	searchMode access.RecordSearchMode
-	// 継続条件を満たすかどうかを判定する関数
-	whileCondition func(record Record) bool
+	tableName      string
+	indexName      string
+	searchMode     access.RecordSearchMode
+	whileCondition func(record Record) bool // 継続条件を満たすかどうかを判定する関数
 	iterator       *access.SecondaryIndexIterator
 }
 
