@@ -5,10 +5,8 @@ import (
 	"minesql/internal/engine"
 )
 
-// テーブル検索を行う Executor
 type SearchTable struct {
-	// 継続条件を満たすかどうかを判定する関数
-	whileCondition func(record Record) bool
+	whileCondition func(record Record) bool // 継続条件を満たすかどうかを判定する関数
 	iterator       *access.ClusteredIndexIterator
 	tableName      string
 	searchMode     access.RecordSearchMode
@@ -26,8 +24,6 @@ func NewSearchTable(
 	}
 }
 
-// 次の Record を取得する
-// データがない場合、継続条件を満たさない場合は (nil, nil) を返す
 func (ss *SearchTable) Next() (Record, error) {
 	sm := engine.Get()
 

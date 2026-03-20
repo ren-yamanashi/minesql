@@ -36,14 +36,14 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bpm2 := bufferpool.NewBufferPool(10)
+		bp2 := bufferpool.NewBufferPool(10)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		catalogFileId := page.FileId(0)
 		dm2, err := disk.NewDisk(catalogFileId, filePath)
 		assert.NoError(t, err)
-		bpm2.RegisterDisk(catalogFileId, dm2)
+		bp2.RegisterDisk(catalogFileId, dm2)
 
-		cat2, err := NewCatalog(bpm2)
+		cat2, err := NewCatalog(bp2)
 
 		// THEN
 		assert.NoError(t, err)
@@ -78,14 +78,14 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bpm2 := bufferpool.NewBufferPool(10)
+		bp2 := bufferpool.NewBufferPool(10)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		catalogFileId := page.FileId(0)
 		dm2, err := disk.NewDisk(catalogFileId, filePath)
 		assert.NoError(t, err)
-		bpm2.RegisterDisk(catalogFileId, dm2)
+		bp2.RegisterDisk(catalogFileId, dm2)
 
-		cat2, err := NewCatalog(bpm2)
+		cat2, err := NewCatalog(bp2)
 
 		// THEN
 		assert.NoError(t, err)
@@ -126,14 +126,14 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bpm2 := bufferpool.NewBufferPool(10)
+		bp2 := bufferpool.NewBufferPool(10)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		catalogFileId := page.FileId(0)
 		dm2, err := disk.NewDisk(catalogFileId, filePath)
 		assert.NoError(t, err)
-		bpm2.RegisterDisk(catalogFileId, dm2)
+		bp2.RegisterDisk(catalogFileId, dm2)
 
-		cat2, err := NewCatalog(bpm2)
+		cat2, err := NewCatalog(bp2)
 
 		// THEN
 		assert.NoError(t, err)
@@ -183,14 +183,14 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bpm2 := bufferpool.NewBufferPool(10)
+		bp2 := bufferpool.NewBufferPool(10)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		catalogFileId := page.FileId(0)
 		dm2, err := disk.NewDisk(catalogFileId, filePath)
 		assert.NoError(t, err)
-		bpm2.RegisterDisk(catalogFileId, dm2)
+		bp2.RegisterDisk(catalogFileId, dm2)
 
-		cat2, err := NewCatalog(bpm2)
+		cat2, err := NewCatalog(bp2)
 
 		// THEN
 		assert.NoError(t, err)
@@ -237,21 +237,21 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bpm2 := bufferpool.NewBufferPool(10)
+		bp2 := bufferpool.NewBufferPool(10)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		catalogFileId := page.FileId(0)
 		dm2, err := disk.NewDisk(catalogFileId, filePath)
 		assert.NoError(t, err)
-		bpm2.RegisterDisk(catalogFileId, dm2)
+		bp2.RegisterDisk(catalogFileId, dm2)
 
-		cat2, err := NewCatalog(bpm2)
+		cat2, err := NewCatalog(bp2)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, page.FileId(4), cat2.NextFileId)
 
 		// 次の採番が正しく動作することを確認
-		nextId, err := cat2.AllocateFileId(bpm2)
+		nextId, err := cat2.AllocateFileId(bp2)
 		assert.NoError(t, err)
 		assert.Equal(t, page.FileId(4), nextId)
 		assert.Equal(t, page.FileId(5), cat2.NextFileId)

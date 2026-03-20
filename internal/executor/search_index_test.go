@@ -30,7 +30,7 @@ func TestNewSearchIndex(t *testing.T) {
 	})
 }
 
-func TestSearchIndex(t *testing.T) {
+func TestSearchIndex_Next(t *testing.T) {
 	t.Run("SearchModeStart を使用して Index 検索できる", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)

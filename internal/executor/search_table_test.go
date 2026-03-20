@@ -33,7 +33,7 @@ func TestNewSearchTable(t *testing.T) {
 	})
 }
 
-func TestSearchTable(t *testing.T) {
+func TestSearchTable_Next(t *testing.T) {
 	t.Run("SearchModeStart を使用してテーブルを検索できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()

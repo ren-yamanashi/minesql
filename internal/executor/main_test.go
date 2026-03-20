@@ -39,7 +39,7 @@ func setupExecutorTestTable(t *testing.T) {
 	insert := NewInsert(
 		"users",
 		[]string{"id", "first_name", "last_name"},
-		[][][]byte{
+		[]Record{
 			{[]byte("z"), []byte("Alice"), []byte("Smith")},
 			{[]byte("x"), []byte("Bob"), []byte("Johnson")},
 			{[]byte("y"), []byte("Charlie"), []byte("Williams")},

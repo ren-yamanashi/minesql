@@ -28,8 +28,6 @@ func NewSearchIndex(
 	}
 }
 
-// 次の Record を取得する
-// データがない場合、継続条件を満たさない場合は (nil, nil) を返す
 func (is *SearchIndex) Next() (Record, error) {
 	sm := engine.Get()
 

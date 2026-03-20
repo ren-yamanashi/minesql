@@ -48,7 +48,7 @@ func (ip *InsertPlanner) Next() (executor.Executor, error) {
 	}
 
 	// レコードをテーブルのカラム順序に並び替える
-	records := [][][]byte{}
+	records := []executor.Record{}
 	for _, valList := range ip.Stmt.Values {
 		record := make([][]byte, len(tblMeta.Cols))
 		for i, val := range valList {

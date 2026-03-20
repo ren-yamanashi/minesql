@@ -82,7 +82,7 @@ func TestExecutePlan(t *testing.T) {
 
 		// GIVEN
 		cols := []string{"id", "name"}
-		records := [][][]byte{
+		records := []Record{
 			{[]byte("1"), []byte("Alice")},
 		}
 

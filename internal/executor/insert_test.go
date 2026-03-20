@@ -14,7 +14,7 @@ func TestNewInsert(t *testing.T) {
 		// GIVEN
 		tableName := "users"
 		cols := []string{"id", "name"}
-		records := [][][]byte{
+		records := []Record{
 			{[]byte("1"), []byte("Alice")},
 			{[]byte("2"), []byte("Bob")},
 		}
@@ -45,7 +45,7 @@ func TestExecute(t *testing.T) {
 
 		// GIVEN
 		cols := []string{"id", "name"}
-		records := [][][]byte{
+		records := []Record{
 			{[]byte("1"), []byte("Alice")},
 			{[]byte("2"), []byte("Bob")},
 		}

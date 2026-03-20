@@ -70,7 +70,7 @@ func TestGet(t *testing.T) {
 	})
 }
 
-func TestRegisterDmToBpm(t *testing.T) {
+func TestRegisterDmToBp(t *testing.T) {
 	t.Run("Disk を BufferPool に登録できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
@@ -84,7 +84,7 @@ func TestRegisterDmToBpm(t *testing.T) {
 		tableName := "users"
 
 		// WHEN
-		err := sm.RegisterDmToBpm(fileId, tableName)
+		err := sm.RegisterDmToBp(fileId, tableName)
 
 		// THEN
 		assert.NoError(t, err)
@@ -107,8 +107,8 @@ func TestRegisterDmToBpm(t *testing.T) {
 		tableName := "users"
 
 		// WHEN
-		err1 := sm.RegisterDmToBpm(fileId, tableName)
-		err2 := sm.RegisterDmToBpm(fileId, tableName)
+		err1 := sm.RegisterDmToBp(fileId, tableName)
+		err2 := sm.RegisterDmToBp(fileId, tableName)
 
 		// THEN
 		assert.NoError(t, err1)
@@ -197,7 +197,7 @@ func TestInitCatalog(t *testing.T) {
 
 		fileId, err := sm1.Catalog.AllocateFileId(bp)
 		assert.NoError(t, err)
-		err = sm1.RegisterDmToBpm(fileId, "users")
+		err = sm1.RegisterDmToBp(fileId, "users")
 		assert.NoError(t, err)
 
 		metaPageId, err := bp.AllocatePageId(fileId)

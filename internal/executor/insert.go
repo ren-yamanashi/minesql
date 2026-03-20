@@ -7,10 +7,10 @@ import (
 type Insert struct {
 	tableName string
 	colNames  []string
-	records   [][][]byte
+	records   []Record
 }
 
-func NewInsert(tableName string, colNames []string, records [][][]byte) *Insert {
+func NewInsert(tableName string, colNames []string, records []Record) *Insert {
 	return &Insert{
 		tableName: tableName,
 		colNames:  colNames,
@@ -18,32 +18,27 @@ func NewInsert(tableName string, colNames []string, records [][][]byte) *Insert 
 	}
 }
 
+// Insert は iterable ではないので、Next() は一度だけ呼び出される
+//
+// 戻り値も (エラー以外は) 常に (nil, nil) を返す
 func (ins *Insert) Next() (Record, error) {
-	err := ins.execute(ins.records)
-	if err != nil {
-		return nil, err
-	}
-	return nil, nil
-}
-
-func (ins *Insert) execute(records [][][]byte) error {
 	sm := engine.Get()
 
 	tblMeta, err := sm.Catalog.GetTableMetadataByName(ins.tableName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	tbl, err := tblMeta.GetTable()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	for _, record := range records {
+	for _, record := range ins.records {
 		err := tbl.Insert(sm.BufferPool, record)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return nil, nil
 }

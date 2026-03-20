@@ -3,10 +3,8 @@ package executor
 import "minesql/internal/engine"
 
 type SetColumn struct {
-	// 更新対象のカラムの位置 (インデックス)
-	Pos uint16
-	// 更新後の値
-	Value []byte
+	Pos   uint16 // 更新対象のカラムの位置 (インデックス)
+	Value []byte // 更新後の値
 }
 
 type Update struct {
