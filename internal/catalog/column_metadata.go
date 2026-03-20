@@ -20,13 +20,13 @@ const (
 // 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-columns-table.html
 type ColumnMetadata struct {
 	MetaPageId page.PageId // カラムのメタデータが格納される B+Tree のメタページID
-	TableId    uint64      // カラムに関連付けられたテーブルを表す識別子
+	TableId    uint32      // カラムに関連付けられたテーブルを表す識別子
 	Name       string      // カラムの名前
 	Pos        uint16      // 0 から始まり連続的に増加する、テーブル内のカラムの順序位置
 	Type       ColumnType  // カラムのデータ型
 }
 
-func NewColumnMetadata(tableId uint64, name string, pos uint16, columnType ColumnType) *ColumnMetadata {
+func NewColumnMetadata(tableId uint32, name string, pos uint16, columnType ColumnType) *ColumnMetadata {
 	return &ColumnMetadata{
 		TableId: tableId,
 		Name:    name,
@@ -41,7 +41,7 @@ func (cm *ColumnMetadata) Insert(bp *bufferpool.BufferPool) error {
 
 	// key (TableId + ColName) をエンコード
 	var encodedKey []byte
-	keyBuf := binary.BigEndian.AppendUint64(nil, cm.TableId)
+	keyBuf := binary.BigEndian.AppendUint32(nil, cm.TableId)
 	memcomparable.Encode([][]byte{keyBuf, []byte(cm.Name)}, &encodedKey)
 
 	// value (Pos, Type) をエンコード
@@ -62,7 +62,7 @@ func (cm *ColumnMetadata) Insert(bp *bufferpool.BufferPool) error {
 // tableId: カラムメタデータを読み込む対象のテーブルの識別子
 //
 // metaPageId: カラムメタデータが格納されている B+Tree のメタページID
-func loadColumnMetadata(bp *bufferpool.BufferPool, tableId uint64, metaPageId page.PageId) ([]*ColumnMetadata, error) {
+func loadColumnMetadata(bp *bufferpool.BufferPool, tableId uint32, metaPageId page.PageId) ([]*ColumnMetadata, error) {
 	// B+Tree を開く
 	colMetaTree := btree.NewBPlusTree(metaPageId)
 	iter, err := colMetaTree.Search(bp, btree.SearchModeStart{})
@@ -80,7 +80,7 @@ func loadColumnMetadata(bp *bufferpool.BufferPool, tableId uint64, metaPageId pa
 		// キーをデコード (TableId, ColName)
 		var keyParts [][]byte
 		memcomparable.Decode(pair.Key, &keyParts)
-		colTableId := binary.BigEndian.Uint64(keyParts[0])
+		colTableId := binary.BigEndian.Uint32(keyParts[0])
 
 		// 指定されたテーブルのカラムのみを収集
 		if colTableId == tableId {

@@ -40,8 +40,8 @@ func TestColumnMetadata_Insert(t *testing.T) {
 		// key (TableId, ColName) をデコード
 		var keyParts [][]byte
 		memcomparable.Decode(pair.Key, &keyParts)
-		tableId := binary.BigEndian.Uint64(keyParts[0])
-		assert.Equal(t, uint64(1), tableId)
+		tableId := binary.BigEndian.Uint32(keyParts[0])
+		assert.Equal(t, uint32(1), tableId)
 		assert.Equal(t, "email", string(keyParts[1]))
 
 		// value (Pos, Type) をデコード
@@ -190,8 +190,8 @@ func TestLoadColumnMetadata(t *testing.T) {
 		assert.Equal(t, 2, len(result))
 		assert.Equal(t, "id", result[0].Name)
 		assert.Equal(t, "name", result[1].Name)
-		assert.Equal(t, uint64(1), result[0].TableId)
-		assert.Equal(t, uint64(1), result[1].TableId)
+		assert.Equal(t, uint32(1), result[0].TableId)
+		assert.Equal(t, uint32(1), result[1].TableId)
 	})
 
 	t.Run("該当するカラムがない場合は空のスライスを返す", func(t *testing.T) {

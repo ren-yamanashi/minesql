@@ -134,7 +134,7 @@ func TestInitCatalog(t *testing.T) {
 		// THEN
 		assert.NotNil(t, sm)
 		assert.NotNil(t, sm.Catalog)
-		assert.Equal(t, uint64(0), sm.Catalog.NextTableId)
+		assert.Equal(t, uint32(1), sm.Catalog.NextTableId)
 	})
 
 	t.Run("カタログファイルが既に存在する場合、既存のカタログが開かれる", func(t *testing.T) {
@@ -163,9 +163,9 @@ func TestInitCatalog(t *testing.T) {
 		// WHEN: 同じディレクトリで再初期化
 		engine2 := Init()
 
-		// THEN: NextTableId が保存された値 (2) になっている
+		// THEN
 		assert.NotNil(t, engine2.Catalog)
-		assert.Equal(t, uint64(2), engine2.Catalog.NextTableId)
+		assert.Equal(t, uint32(3), engine2.Catalog.NextTableId)
 	})
 
 	t.Run("カタログの Disk が BufferPool に登録される", func(t *testing.T) {
@@ -195,17 +195,16 @@ func TestInitCatalog(t *testing.T) {
 		sm1 := Init()
 		bp := sm1.BufferPool
 
-		tableFileId := bp.AllocateFileId()
-		err := sm1.RegisterDmToBpm(tableFileId, "users")
+		tblId, err := sm1.Catalog.AllocateTableId(bp)
+		assert.NoError(t, err)
+		tableFileId := page.FileId(tblId)
+		err = sm1.RegisterDmToBpm(tableFileId, "users")
 		assert.NoError(t, err)
 
 		metaPageId, err := bp.AllocatePageId(tableFileId)
 		assert.NoError(t, err)
 		tbl := access.NewTableAccessMethod("users", metaPageId, 1, nil)
 		err = tbl.Create(bp)
-		assert.NoError(t, err)
-
-		tblId, err := sm1.Catalog.AllocateTableId(bp)
 		assert.NoError(t, err)
 
 		cols := []*catalog.ColumnMetadata{
@@ -249,10 +248,10 @@ func TestInitCatalog(t *testing.T) {
 		// WHEN
 		sm := Init()
 
-		// THEN: 新しいカタログが作成され、NextTableId は 0
+		// THEN: 新しいカタログが作成され、NextTableId は 1
 		assert.NotNil(t, sm)
 		assert.NotNil(t, sm.Catalog)
-		assert.Equal(t, uint64(0), sm.Catalog.NextTableId)
+		assert.Equal(t, uint32(1), sm.Catalog.NextTableId)
 	})
 
 	t.Run("データディレクトリが存在しない場合、自動作成される", func(t *testing.T) {

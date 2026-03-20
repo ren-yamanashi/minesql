@@ -27,7 +27,7 @@ func TestCreateCatalog(t *testing.T) {
 		assert.Equal(t, page.FileId(0), cat.TableMetaPageId.FileId)
 		assert.Equal(t, page.FileId(0), cat.IndexMetaPageId.FileId)
 		assert.Equal(t, page.FileId(0), cat.ColumnMetaPageId.FileId)
-		assert.Equal(t, uint64(0), cat.NextTableId)
+		assert.Equal(t, uint32(1), cat.NextTableId)
 		assert.Empty(t, cat.metadata)
 	})
 
@@ -68,11 +68,11 @@ func TestAllocateTableId(t *testing.T) {
 		id3, err := cat.AllocateTableId(bp)
 		assert.NoError(t, err)
 
-		// THEN: 順番に採番される
-		assert.Equal(t, uint64(0), id1)
-		assert.Equal(t, uint64(1), id2)
-		assert.Equal(t, uint64(2), id3)
-		assert.Equal(t, uint64(3), cat.NextTableId)
+		// THEN: 順番に採番される (FileId(0) はカタログ用に予約されているため 1 から開始)
+		assert.Equal(t, uint32(1), id1)
+		assert.Equal(t, uint32(2), id2)
+		assert.Equal(t, uint32(3), id3)
+		assert.Equal(t, uint32(4), cat.NextTableId)
 	})
 
 	t.Run("採番後のテーブルIDがディスクに保存される", func(t *testing.T) {
@@ -94,8 +94,8 @@ func TestAllocateTableId(t *testing.T) {
 		defer bp.UnRefPage(headerPageId)
 
 		data := headerPage.GetReadData()
-		savedNextTableId := binary.BigEndian.Uint64(data[16:24])
-		assert.Equal(t, uint64(1), savedNextTableId)
+		savedNextTableId := binary.BigEndian.Uint32(data[16:20])
+		assert.Equal(t, uint32(2), savedNextTableId)
 	})
 }
 
@@ -108,7 +108,7 @@ func TestInsert(t *testing.T) {
 		cat, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		tableId := uint64(1)
+		tableId := uint32(1)
 		metaPageId := page.NewPageId(page.FileId(1), 0)
 		colMeta := []*ColumnMetadata{
 			NewColumnMetadata(tableId, "id", 0, ColumnTypeString),
@@ -136,7 +136,7 @@ func TestInsert(t *testing.T) {
 		cat, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		tableId := uint64(1)
+		tableId := uint32(1)
 		metaPageId := page.NewPageId(page.FileId(1), 0)
 		colMeta := []*ColumnMetadata{
 			NewColumnMetadata(tableId, "id", 0, ColumnTypeString),
@@ -164,7 +164,7 @@ func TestInsert(t *testing.T) {
 		cat, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		tableId := uint64(1)
+		tableId := uint32(1)
 		metaPageId := page.NewPageId(page.FileId(1), 0)
 		indexMetaPageId := page.NewPageId(page.FileId(1), 1)
 		colMeta := []*ColumnMetadata{
@@ -196,7 +196,7 @@ func TestGetTableMetadataByName(t *testing.T) {
 		cat, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		tableId := uint64(1)
+		tableId := uint32(1)
 		metaPageId := page.NewPageId(page.FileId(1), 0)
 		colMeta := []*ColumnMetadata{
 			NewColumnMetadata(tableId, "id", 0, ColumnTypeString),
@@ -265,7 +265,7 @@ func TestGetTableMetadataByName(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Equal(t, "posts", result.Name)
-		assert.Equal(t, uint64(2), result.TableId)
+		assert.Equal(t, uint32(2), result.TableId)
 	})
 }
 
@@ -278,7 +278,7 @@ func TestNewCatalog(t *testing.T) {
 		cat, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		tableId := uint64(1)
+		tableId := uint32(1)
 		metaPageId := page.NewPageId(page.FileId(1), 0)
 		colMeta := []*ColumnMetadata{
 			NewColumnMetadata(tableId, "id", 0, ColumnTypeString),
@@ -319,7 +319,7 @@ func TestNewCatalog(t *testing.T) {
 		cat, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		tableId := uint64(1)
+		tableId := uint32(1)
 		metaPageId := page.NewPageId(page.FileId(1), 0)
 		colMeta := []*ColumnMetadata{
 			NewColumnMetadata(tableId, "id", 0, ColumnTypeString),
@@ -364,7 +364,7 @@ func TestNewCatalog(t *testing.T) {
 		cat, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		tableId := uint64(1)
+		tableId := uint32(1)
 		metaPageId := page.NewPageId(page.FileId(1), 0)
 		indexMetaPageId := page.NewPageId(page.FileId(1), 1)
 		colMeta := []*ColumnMetadata{
@@ -505,13 +505,13 @@ func TestNewCatalog(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, uint64(3), cat2.NextTableId)
+		assert.Equal(t, uint32(4), cat2.NextTableId)
 
 		// 次の採番が正しく動作することを確認
 		nextId, err := cat2.AllocateTableId(bpm2)
 		assert.NoError(t, err)
-		assert.Equal(t, uint64(3), nextId)
-		assert.Equal(t, uint64(4), cat2.NextTableId)
+		assert.Equal(t, uint32(4), nextId)
+		assert.Equal(t, uint32(5), cat2.NextTableId)
 	})
 }
 

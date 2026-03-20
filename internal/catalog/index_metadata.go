@@ -19,14 +19,14 @@ const (
 // 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-indexes-table.html
 type IndexMetadata struct {
 	MetaPageId     page.PageId // インデックスのメタデータが格納される B+Tree のメタページID
-	TableId        uint64      // インデックスが関連付けられたテーブルの識別子
+	TableId        uint32      // インデックスが関連付けられたテーブルの識別子
 	Name           string      // インデックスの名前
 	ColName        string      // インデックスを構成するカラム名
 	Type           IndexType   // インデックスの種類
 	DataMetaPageId page.PageId // 実データが格納される B+Tree のメタページID
 }
 
-func NewIndexMetadata(tableId uint64, name string, colName string, indexType IndexType, dataMetaPageId page.PageId) *IndexMetadata {
+func NewIndexMetadata(tableId uint32, name string, colName string, indexType IndexType, dataMetaPageId page.PageId) *IndexMetadata {
 	return &IndexMetadata{
 		TableId:        tableId,
 		Name:           name,
@@ -42,7 +42,7 @@ func (im *IndexMetadata) Insert(bp *bufferpool.BufferPool) error {
 
 	// key (TableId + Name) をエンコード
 	var encodedKey []byte
-	keyBuf := binary.BigEndian.AppendUint64(nil, im.TableId)
+	keyBuf := binary.BigEndian.AppendUint32(nil, im.TableId)
 	memcomparable.Encode([][]byte{keyBuf, []byte(im.Name)}, &encodedKey)
 
 	// value (ColName, Type, DataMetaPageId) をエンコード
@@ -62,7 +62,7 @@ func (im *IndexMetadata) Insert(bp *bufferpool.BufferPool) error {
 // tableId: テーブルの識別子
 //
 // metaPageId: インデックスメタデータが格納されている B+Tree のメタページID
-func loadIndexMetadata(bp *bufferpool.BufferPool, tableId uint64, metaPageId page.PageId) ([]*IndexMetadata, error) {
+func loadIndexMetadata(bp *bufferpool.BufferPool, tableId uint32, metaPageId page.PageId) ([]*IndexMetadata, error) {
 	// B+Tree を開く
 	idxMetaTree := btree.NewBPlusTree(metaPageId)
 	iter, err := idxMetaTree.Search(bp, btree.SearchModeStart{})
@@ -80,7 +80,7 @@ func loadIndexMetadata(bp *bufferpool.BufferPool, tableId uint64, metaPageId pag
 		// キーをデコード (TableId, Name)
 		var keyParts [][]byte
 		memcomparable.Decode(pair.Key, &keyParts)
-		idxTableId := binary.BigEndian.Uint64(keyParts[0])
+		idxTableId := binary.BigEndian.Uint32(keyParts[0])
 
 		// 指定されたテーブルのインデックスのみを収集
 		if idxTableId == tableId {

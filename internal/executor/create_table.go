@@ -4,6 +4,7 @@ import (
 	"minesql/internal/access"
 	"minesql/internal/catalog"
 	"minesql/internal/engine"
+	"minesql/internal/storage/page"
 )
 
 type ColumnParam struct {
@@ -50,11 +51,15 @@ func (ct *CreateTable) Next() (Record, error) {
 func (ct *CreateTable) execute() error {
 	sm := engine.Get()
 
-	// FileId を割り当て
-	fileId := sm.BufferPool.AllocateFileId()
+	// テーブル ID を採番
+	tblId, err := sm.Catalog.AllocateTableId(sm.BufferPool)
+	if err != nil {
+		return err
+	}
+	fileId := page.FileId(tblId)
 
 	// Disk を登録
-	err := sm.RegisterDmToBpm(fileId, ct.tableName)
+	err = sm.RegisterDmToBpm(fileId, ct.tableName)
 	if err != nil {
 		return err
 	}
@@ -86,9 +91,6 @@ func (ct *CreateTable) execute() error {
 	if err != nil {
 		return err
 	}
-
-	// テーブルIDを採番
-	tblId, err := sm.Catalog.AllocateTableId(sm.BufferPool)
 	if err != nil {
 		return err
 	}

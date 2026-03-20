@@ -95,23 +95,6 @@ func TestGetDisk(t *testing.T) {
 	})
 }
 
-func TestAllocateFileId(t *testing.T) {
-	t.Run("FileId が順番に割り当てられる", func(t *testing.T) {
-		// GIVEN
-		bp := NewBufferPool(10)
-
-		// WHEN
-		fileId1 := bp.AllocateFileId()
-		fileId2 := bp.AllocateFileId()
-		fileId3 := bp.AllocateFileId()
-
-		// THEN
-		assert.Equal(t, page.FileId(1), fileId1)
-		assert.Equal(t, page.FileId(2), fileId2)
-		assert.Equal(t, page.FileId(3), fileId3)
-	})
-}
-
 func TestAllocatePageId(t *testing.T) {
 	t.Run("登録された FileId に対して PageId が正しく割り当てられる", func(t *testing.T) {
 		// GIVEN

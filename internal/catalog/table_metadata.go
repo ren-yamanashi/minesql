@@ -15,7 +15,7 @@ import (
 // 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-tables-access.html
 type TableMetadata struct {
 	MetaPageId      page.PageId       // テーブルのメタデータが格納される B+Tree のメタページID
-	TableId         uint64            // テーブルの識別子 (一意)
+	TableId         uint32            // テーブルの識別子 (一意)
 	Name            string            // テーブルの名前
 	NCols           uint8             // テーブルの列数
 	PrimaryKeyCount uint8             // プライマリキーの列数 (プライマリキーは先頭から連続している想定) (例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる)
@@ -24,7 +24,7 @@ type TableMetadata struct {
 	Indexes         []*IndexMetadata  // テーブルのインデックス情報
 }
 
-func NewTableMetadata(tableId uint64, name string, nCols uint8, pkCount uint8, cols []*ColumnMetadata, indexes []*IndexMetadata, dataMetaPageId page.PageId) TableMetadata {
+func NewTableMetadata(tableId uint32, name string, nCols uint8, pkCount uint8, cols []*ColumnMetadata, indexes []*IndexMetadata, dataMetaPageId page.PageId) TableMetadata {
 	return TableMetadata{
 		TableId:         tableId,
 		Name:            name,
@@ -82,7 +82,7 @@ func (tm *TableMetadata) Insert(bp *bufferpool.BufferPool) error {
 
 	// key (TableId) をエンコード
 	var encodedKey []byte
-	keyBuf := binary.BigEndian.AppendUint64(nil, tm.TableId)
+	keyBuf := binary.BigEndian.AppendUint32(nil, tm.TableId)
 	memcomparable.Encode([][]byte{keyBuf}, &encodedKey)
 
 	// value (Name, NCols, PrimaryKeyCount, DataMetaPageId) をエンコード
@@ -125,7 +125,7 @@ func loadTableMetadata(bp *bufferpool.BufferPool, tableMetaPageId page.PageId, i
 		// キーをデコード (TableId)
 		var keyParts [][]byte
 		memcomparable.Decode(pair.Key, &keyParts)
-		tableId := binary.BigEndian.Uint64(keyParts[0])
+		tableId := binary.BigEndian.Uint32(keyParts[0])
 
 		// 値をデコード (Name, NCols, PrimaryKeyCount, DataMetaPageId)
 		var valueParts [][]byte

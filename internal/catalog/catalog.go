@@ -18,7 +18,7 @@ type Catalog struct {
 	IndexMetaPageId  page.PageId
 	ColumnMetaPageId page.PageId
 	metadata         []*TableMetadata
-	NextTableId      uint64
+	NextTableId      uint32
 }
 
 // NewCatalog は既存のカタログを開く
@@ -43,7 +43,7 @@ func NewCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
 	tblMetaPageNum := binary.BigEndian.Uint32(data[4:8])
 	idxMetaPageNum := binary.BigEndian.Uint32(data[8:12])
 	colMetaPageNum := binary.BigEndian.Uint32(data[12:16])
-	initTableId := binary.BigEndian.Uint64(data[16:24])
+	initTableId := binary.BigEndian.Uint32(data[16:20])
 
 	catalog := &Catalog{
 		TableMetaPageId:  page.NewPageId(fileId, page.PageNumber(tblMetaPageNum)),
@@ -110,24 +110,24 @@ func CreateCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
 
 	// ヘッダーページに各メタデータのメタページIDを保存
 	data := bufferPage.GetWriteData()
-	initPageId := uint64(0)
+	initTableId := uint32(1)        // FileId(0) はカタログ用に予約されているため、1 から開始
 	copy(data[0:4], []byte("MINE")) // ファイルシグネチャとしてマジックナンバーを設定 (minesql なので MINE)
 	binary.BigEndian.PutUint32(data[4:8], uint32(tblMetaTree.MetaPageId.PageNumber))
 	binary.BigEndian.PutUint32(data[8:12], uint32(idxMetaTree.MetaPageId.PageNumber))
 	binary.BigEndian.PutUint32(data[12:16], uint32(colMetaTree.MetaPageId.PageNumber))
-	binary.BigEndian.PutUint64(data[16:24], initPageId)
+	binary.BigEndian.PutUint32(data[16:20], initTableId)
 
 	return &Catalog{
 		TableMetaPageId:  tblMetaTree.MetaPageId,
 		ColumnMetaPageId: colMetaTree.MetaPageId,
 		IndexMetaPageId:  idxMetaTree.MetaPageId,
-		NextTableId:      initPageId,
+		NextTableId:      initTableId,
 		metadata:         nil,
 	}, nil
 }
 
 // AllocateTableId は新しい TableID を採番し、ディスク上のカウンターを更新する
-func (c *Catalog) AllocateTableId(bp *bufferpool.BufferPool) (uint64, error) {
+func (c *Catalog) AllocateTableId(bp *bufferpool.BufferPool) (uint32, error) {
 	id := c.NextTableId
 	c.NextTableId++
 
@@ -142,7 +142,7 @@ func (c *Catalog) AllocateTableId(bp *bufferpool.BufferPool) (uint64, error) {
 
 	// 次に割り当てる TableId をヘッダーページの指定オフセットに書き込む
 	data := headerPage.GetWriteData()
-	binary.BigEndian.PutUint64(data[16:24], c.NextTableId)
+	binary.BigEndian.PutUint32(data[16:20], c.NextTableId)
 
 	return id, nil
 }

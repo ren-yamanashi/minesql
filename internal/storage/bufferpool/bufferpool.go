@@ -13,7 +13,6 @@ type BufferPool struct {
 	bufferPages       []BufferPage               // バッファページのスライス
 	maxBufferSize     int                        // バッファプールの最大サイズ (バッファページ数)
 	pageTable         buftype.PageTable          // ページテーブル (key: PageId, value: BufferId のマップ)
-	nextFileId        page.FileId                // 次に割り当てる FileId
 	evictionAlgorithm evict.EvictAlgorithm       // ページ追い出しアルゴリズム
 }
 
@@ -26,7 +25,6 @@ func NewBufferPool(size int) *BufferPool {
 		bufferPages:       allocateBufferPages(size),
 		maxBufferSize:     size,
 		pageTable:         make(buftype.PageTable),
-		nextFileId:        page.FileId(1), // FileId 1 から開始
 		evictionAlgorithm: evict.NewClockSweep(size),
 	}
 }
@@ -155,13 +153,6 @@ func (bp *BufferPool) GetDisk(fileId page.FileId) (*disk.Disk, error) {
 		return nil, fmt.Errorf("disk for FileId %d not found", fileId)
 	}
 	return dm, nil
-}
-
-// AllocateFileId は新しい FileId を割り当てる
-func (bp *BufferPool) AllocateFileId() page.FileId {
-	fileId := bp.nextFileId
-	bp.nextFileId++
-	return fileId
 }
 
 // AllocatePageId は指定された FileId に対して新しい PageId を割り当てる
