@@ -126,27 +126,6 @@ func CreateCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
 	}, nil
 }
 
-// AllocateFileId は新しい FileId を採番し、ディスク上のカウンターを更新する
-func (c *Catalog) AllocateFileId(bp *bufferpool.BufferPool) (page.FileId, error) {
-	id := c.NextFileId
-	c.NextFileId++
-
-	// Header Page (Page 0) を更新する
-	catalogFileId := page.FileId(0)
-	headerPageId := page.NewPageId(catalogFileId, 0)
-	headerPage, err := bp.FetchPage(headerPageId)
-	if err != nil {
-		return 0, err
-	}
-	defer bp.UnRefPage(headerPageId)
-
-	// 次に割り当てる FileId をヘッダーページの指定オフセットに書き込む
-	data := headerPage.GetWriteData()
-	binary.BigEndian.PutUint32(data[16:20], uint32(c.NextFileId))
-
-	return id, nil
-}
-
 // Insert はカタログにメタデータを挿入する
 func (c *Catalog) Insert(bp *bufferpool.BufferPool, tableMeta TableMetadata) error {
 	// 各メタデータに MetaPageId を設定する
@@ -194,4 +173,24 @@ func (c *Catalog) GetTableMetadataByName(tableName string) (*TableMetadata, erro
 // GetAllTables はすべてのテーブルメタデータを取得する
 func (c *Catalog) GetAllTables() []*TableMetadata {
 	return c.metadata
+}
+
+// AllocateFileId は新しい FileId を採番し、ディスク上のカウンターを更新する
+func (c *Catalog) AllocateFileId(bp *bufferpool.BufferPool) (page.FileId, error) {
+	id := c.NextFileId
+	c.NextFileId++
+
+	// Header Page (Page 0) を更新する
+	headerPageId := page.NewPageId(page.FileId(0), 0)
+	headerPage, err := bp.FetchPage(headerPageId)
+	if err != nil {
+		return 0, err
+	}
+	defer bp.UnRefPage(headerPageId)
+
+	// 次に割り当てる FileId をヘッダーページの指定オフセットに書き込む
+	data := headerPage.GetWriteData()
+	binary.BigEndian.PutUint32(data[16:20], uint32(c.NextFileId))
+
+	return id, nil
 }
