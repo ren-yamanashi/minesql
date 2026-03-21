@@ -27,6 +27,15 @@ func (ip *Insert) Build() (executor.Executor, error) {
 		return nil, errors.New("records cannot be empty")
 	}
 
+	// カラム名の重複チェック
+	seenCols := map[string]bool{}
+	for _, col := range ip.Stmt.Cols {
+		if seenCols[col.ColName] {
+			return nil, errors.New("duplicate column name: " + col.ColName)
+		}
+		seenCols[col.ColName] = true
+	}
+
 	// 値の数がカラム数と一致することを確認
 	for _, valList := range ip.Stmt.Values {
 		if len(valList) != len(ip.Stmt.Cols) {

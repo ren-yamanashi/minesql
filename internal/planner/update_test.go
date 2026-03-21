@@ -317,6 +317,7 @@ func TestUpdate_Build(t *testing.T) {
 	})
 }
 
+//nolint:unparam // テーブル名は将来的に変わりうる
 func getPlannerTableAccessMethod(t *testing.T, tableName string) *access.TableAccessMethod {
 	t.Helper()
 	e := engine.Get()

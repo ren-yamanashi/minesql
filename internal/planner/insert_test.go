@@ -86,6 +86,35 @@ func TestNewInsert(t *testing.T) {
 		assert.Contains(t, err.Error(), "number of values does not match number of columns")
 	})
 
+	t.Run("カラム名が重複している場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		stmt := &ast.InsertStmt{
+			StmtType: ast.StmtTypeInsert,
+			Table:    *ast.NewTableId("users"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+				*ast.NewColumnId("name"),
+				*ast.NewColumnId("id"),
+			},
+			Values: [][]ast.Literal{
+				{
+					ast.NewStringLiteral("'1'", "1"),
+					ast.NewStringLiteral("'Alice'", "Alice"),
+					ast.NewStringLiteral("'2'", "2"),
+				},
+			},
+		}
+		planner := NewInsert(stmt)
+
+		// WHEN
+		exec, err := planner.Build()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "duplicate column name: id")
+	})
+
 	t.Run("挿入するレコードが空の場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		stmt := &ast.InsertStmt{

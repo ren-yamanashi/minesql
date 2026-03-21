@@ -24,6 +24,8 @@ func (ctn *CreateTable) Build() (executor.Executor, error) {
 
 	var pkDef *ast.ConstraintPrimaryKeyDef
 	var ukDefs []*ast.ConstraintUniqueKeyDef
+	ukKeyNames := map[string]bool{} // 登録済みのユニークキー名
+	ukColNames := map[string]bool{} // 登録済みのユニークキーカラム名
 
 	currentColIdx := 0
 	for _, def := range ctn.Stmt.CreateDefinitions {
@@ -41,13 +43,25 @@ func (ctn *CreateTable) Build() (executor.Executor, error) {
 
 		case *ast.ConstraintPrimaryKeyDef:
 			if pkDef != nil {
-				return nil, fmt.Errorf("multiple primary keys defined")
+				return nil, errors.New("multiple primary keys defined")
 			}
 			pkDef = def
 
 		case *ast.ConstraintUniqueKeyDef:
+			if _, exists := ukKeyNames[def.KeyName]; exists {
+				return nil, errors.New("duplicate unique key name: " + def.KeyName)
+			}
+			if _, exists := ukColNames[def.Column.ColName]; exists {
+				return nil, errors.New("column '" + def.Column.ColName + "' cannot be part of multiple unique keys")
+			}
+			ukKeyNames[def.KeyName] = true
+			ukColNames[def.Column.ColName] = true
 			ukDefs = append(ukDefs, def)
 		}
+	}
+
+	if len(colParams) == 0 {
+		return nil, errors.New("table must have at least one column")
 	}
 
 	pkCount, err := getPkCount(pkDef, colIndexMap)
@@ -63,7 +77,8 @@ func (ctn *CreateTable) Build() (executor.Executor, error) {
 	return executor.NewCreateTable(ctn.Stmt.TableName, uint8(pkCount), uniqueKeyParams, colParams), nil
 }
 
-// プライマリキーのカラム定義を検証し、プライマリキーのカラム数を返す
+// getPkCount はプライマリキーのカラム定義を検証し、プライマリキーのカラム数を返す
+//
 // エラーの場合は、`-1, error` を返し、正常な場合は `pkCount, nil` を返す
 func getPkCount(pkDef *ast.ConstraintPrimaryKeyDef, colIndexMap map[string]int) (int, error) {
 	if pkDef == nil {

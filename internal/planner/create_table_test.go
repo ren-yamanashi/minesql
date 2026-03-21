@@ -297,6 +297,96 @@ func TestCreateTable_Build(t *testing.T) {
 		assert.Contains(t, err.Error(), "primary key columns exceed total columns")
 	})
 
+	t.Run("カラム定義がない場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		stmt := &ast.CreateTableStmt{
+			StmtType:  ast.StmtTypeCreate,
+			Keyword:   ast.KeywordTable,
+			TableName: "users",
+			CreateDefinitions: []ast.Definition{
+				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+					*ast.NewColumnId("id"),
+				}},
+			},
+		}
+		node := NewCreateTable(stmt)
+
+		// WHEN
+		exec, err := node.Build()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "table must have at least one column")
+	})
+
+	t.Run("重複したユニークキー名がある場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		ukDef1 := &ast.ConstraintUniqueKeyDef{DefType: ast.DefTypeConstraintUniqueKey, Column: *ast.NewColumnId("email")}
+		ukDef1.KeyName = "uk_same"
+
+		ukDef2 := &ast.ConstraintUniqueKeyDef{DefType: ast.DefTypeConstraintUniqueKey, Column: *ast.NewColumnId("username")}
+		ukDef2.KeyName = "uk_same"
+
+		stmt := &ast.CreateTableStmt{
+			StmtType:  ast.StmtTypeCreate,
+			Keyword:   ast.KeywordTable,
+			TableName: "users",
+			CreateDefinitions: []ast.Definition{
+				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "email", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "username", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+					*ast.NewColumnId("id"),
+				}},
+				ukDef1,
+				ukDef2,
+			},
+		}
+		node := NewCreateTable(stmt)
+
+		// WHEN
+		exec, err := node.Build()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "duplicate unique key name: uk_same")
+	})
+
+	t.Run("同一カラムが複数のユニークキーに指定されている場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		ukDef1 := &ast.ConstraintUniqueKeyDef{DefType: ast.DefTypeConstraintUniqueKey, Column: *ast.NewColumnId("email")}
+		ukDef1.KeyName = "uk_email1"
+
+		ukDef2 := &ast.ConstraintUniqueKeyDef{DefType: ast.DefTypeConstraintUniqueKey, Column: *ast.NewColumnId("email")}
+		ukDef2.KeyName = "uk_email2"
+
+		stmt := &ast.CreateTableStmt{
+			StmtType:  ast.StmtTypeCreate,
+			Keyword:   ast.KeywordTable,
+			TableName: "users",
+			CreateDefinitions: []ast.Definition{
+				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "email", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+					*ast.NewColumnId("id"),
+				}},
+				ukDef1,
+				ukDef2,
+			},
+		}
+		node := NewCreateTable(stmt)
+
+		// WHEN
+		exec, err := node.Build()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "column 'email' cannot be part of multiple unique keys")
+	})
+
 	t.Run("ユニークインデックスに指定されたカラムが存在しない場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		ukDef := &ast.ConstraintUniqueKeyDef{DefType: ast.DefTypeConstraintUniqueKey, Column: *ast.NewColumnId("non_existent_column")}
