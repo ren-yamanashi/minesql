@@ -1,40 +1,32 @@
 package executor
 
-import "minesql/internal/engine"
+import (
+	"minesql/internal/access"
+	"minesql/internal/engine"
+)
 
 type SetColumn struct {
-	// 更新対象のカラムの位置 (インデックス)
-	Pos uint16
-	// 更新後の値
-	Value []byte
+	Pos   uint16 // 更新対象のカラムの位置 (インデックス)
+	Value []byte // 更新後の値
 }
 
+// Update は InnerExecutor の結果を元にレコードを更新する
 type Update struct {
-	tableName     string
+	table         *access.TableAccessMethod
 	SetColumns    []SetColumn
 	InnerExecutor Executor
 }
 
-func NewUpdate(tableName string, setColumns []SetColumn, innerExecutor Executor) *Update {
+func NewUpdate(table *access.TableAccessMethod, setColumns []SetColumn, innerExecutor Executor) *Update {
 	return &Update{
-		tableName:     tableName,
+		table:         table,
 		SetColumns:    setColumns,
 		InnerExecutor: innerExecutor,
 	}
 }
 
 func (upd *Update) Next() (Record, error) {
-	sm := engine.Get()
-
-	tblMeta, err := sm.Catalog.GetTableMetadataByName(upd.tableName)
-	if err != nil {
-		return nil, err
-	}
-
-	tbl, err := tblMeta.GetTable()
-	if err != nil {
-		return nil, err
-	}
+	e := engine.Get()
 
 	// 更新対象のレコードを先にすべて収集する
 	// (更新により Iterator が参照するページデータが破壊されるのを防ぐ)
@@ -64,7 +56,7 @@ func (upd *Update) Next() (Record, error) {
 
 	// 更新後のレコードで更新を実行
 	for i, record := range records {
-		err = tbl.Update(sm.BufferPool, record, updatedRecords[i])
+		err := upd.table.Update(e.BufferPool, record, updatedRecords[i])
 		if err != nil {
 			return nil, err
 		}

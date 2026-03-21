@@ -1,43 +1,15 @@
-package parser_test
+package parser
 
 import (
 	"fmt"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/parser"
 	"minesql/internal/planner"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
-
-// SQL をパース → プラン → 実行して結果を返す
-func executeSql(t *testing.T, sql string) []executor.Record {
-	t.Helper()
-	p := parser.NewParser()
-	result, err := p.Parse(sql)
-	assert.NoError(t, err)
-
-	exec, err := planner.PlanStart(result)
-	assert.NoError(t, err)
-
-	records, err := executor.ExecutePlan(exec)
-	assert.NoError(t, err)
-	return records
-}
-
-// レコード一覧を strings.Builder に書き出す
-func writeRecords(sb *strings.Builder, records []executor.Record) {
-	for _, rec := range records {
-		cols := make([]string, len(rec))
-		for i, col := range rec {
-			cols[i] = string(col)
-		}
-		fmt.Fprintf(sb, "  (%s)\n", strings.Join(cols, ", "))
-	}
-	fmt.Fprintf(sb, "  合計: %d 件\n", len(records))
-}
 
 func TestParserIntegration(t *testing.T) {
 	t.Run("CREATE TABLE → INSERT → SELECT でレコードを取得できる", func(t *testing.T) {
@@ -262,4 +234,43 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 `
 		assert.Equal(t, expected, sb.String())
 	})
+}
+
+// Executor から全レコードを取得する
+func fetchAll(t *testing.T, iter executor.Executor) []executor.Record {
+	t.Helper()
+	var records []executor.Record
+	for {
+		record, err := iter.Next()
+		assert.NoError(t, err)
+		if record == nil {
+			return records
+		}
+		records = append(records, record)
+	}
+}
+
+// SQL をパース → プラン → 実行して結果を返す
+func executeSql(t *testing.T, sql string) []executor.Record {
+	t.Helper()
+	p := NewParser()
+	result, err := p.Parse(sql)
+	assert.NoError(t, err)
+
+	exec, err := planner.Start(result)
+	assert.NoError(t, err)
+
+	return fetchAll(t, exec)
+}
+
+// レコード一覧を strings.Builder に書き出す
+func writeRecords(sb *strings.Builder, records []executor.Record) {
+	for _, rec := range records {
+		cols := make([]string, len(rec))
+		for i, col := range rec {
+			cols[i] = string(col)
+		}
+		fmt.Fprintf(sb, "  (%s)\n", strings.Join(cols, ", "))
+	}
+	fmt.Fprintf(sb, "  合計: %d 件\n", len(records))
 }

@@ -1,7 +1,7 @@
 package parser
 
 import (
-	"minesql/internal/planner/ast/statement"
+	"minesql/internal/ast"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,10 +20,10 @@ func TestParserInsert(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		insertStmt, ok := result.(*statement.InsertStmt)
+		insertStmt, ok := result.(*ast.InsertStmt)
 		assert.True(t, ok)
 
-		assert.Equal(t, statement.StmtTypeInsert, insertStmt.StmtType)
+		assert.Equal(t, ast.StmtTypeInsert, insertStmt.StmtType)
 		assert.Equal(t, "users", insertStmt.Table.TableName)
 
 		// カラム数の確認
@@ -50,7 +50,7 @@ func TestParserInsert(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		insertStmt, ok := result.(*statement.InsertStmt)
+		insertStmt, ok := result.(*ast.InsertStmt)
 		assert.True(t, ok)
 
 		assert.Equal(t, "users", insertStmt.Table.TableName)
@@ -82,7 +82,7 @@ func TestParserInsert(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		insertStmt, ok := result.(*statement.InsertStmt)
+		insertStmt, ok := result.(*ast.InsertStmt)
 		assert.True(t, ok)
 
 		assert.Equal(t, "users", insertStmt.Table.TableName)
@@ -115,7 +115,7 @@ func TestParserInsert(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		insertStmt, ok := result.(*statement.InsertStmt)
+		insertStmt, ok := result.(*ast.InsertStmt)
 		assert.True(t, ok)
 
 		assert.Equal(t, 1, len(insertStmt.Values))
@@ -140,7 +140,7 @@ VALUES ('1', 'John'); -- 値リスト
 			assert.NoError(t, err)
 			assert.NotNil(t, result)
 
-			insertStmt, ok := result.(*statement.InsertStmt)
+			insertStmt, ok := result.(*ast.InsertStmt)
 			assert.True(t, ok)
 			assert.Equal(t, "users", insertStmt.Table.TableName)
 			assert.Equal(t, 2, len(insertStmt.Cols))
@@ -168,7 +168,7 @@ VALUES ('1', 'John') /* 値リスト */
 			assert.NoError(t, err)
 			assert.NotNil(t, result)
 
-			insertStmt, ok := result.(*statement.InsertStmt)
+			insertStmt, ok := result.(*ast.InsertStmt)
 			assert.True(t, ok)
 			assert.Equal(t, "users", insertStmt.Table.TableName)
 			assert.Equal(t, 2, len(insertStmt.Cols))

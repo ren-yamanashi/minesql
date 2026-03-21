@@ -1,36 +1,35 @@
 package planner
 
 import (
+	"minesql/internal/ast"
 	"minesql/internal/catalog"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/planner/ast/identifier"
-	"minesql/internal/planner/ast/literal"
-	"minesql/internal/planner/ast/statement"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewInsert(t *testing.T) {
-	t.Run("正常に InsertPlanner が生成される", func(t *testing.T) {
+	t.Run("正常に Insert が生成される", func(t *testing.T) {
 		// GIVEN
-		stmt := statement.NewInsertStmt(
-			*identifier.NewTableId("users"),
-			[]identifier.ColumnId{
-				*identifier.NewColumnId("id"),
-				*identifier.NewColumnId("name"),
+		stmt := &ast.InsertStmt{
+			StmtType: ast.StmtTypeInsert,
+			Table:    *ast.NewTableId("users"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+				*ast.NewColumnId("name"),
 			},
-			[][]literal.Literal{
+			Values: [][]ast.Literal{
 				{
-					literal.NewStringLiteral("'1'", "1"),
-					literal.NewStringLiteral("'Alice'", "Alice"),
+					ast.NewStringLiteral("'1'", "1"),
+					ast.NewStringLiteral("'Alice'", "Alice"),
 				},
 			},
-		)
+		}
 
 		// WHEN
-		planner := NewInsertPlanner(stmt)
+		planner := NewInsert(stmt)
 
 		// THEN
 		assert.NotNil(t, planner)
@@ -39,20 +38,21 @@ func TestNewInsert(t *testing.T) {
 
 	t.Run("カラム名が空の場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
-		stmt := statement.NewInsertStmt(
-			*identifier.NewTableId("users"),
-			[]identifier.ColumnId{},
-			[][]literal.Literal{
+		stmt := &ast.InsertStmt{
+			StmtType: ast.StmtTypeInsert,
+			Table:    *ast.NewTableId("users"),
+			Cols:     []ast.ColumnId{},
+			Values: [][]ast.Literal{
 				{
-					literal.NewStringLiteral("'1'", "1"),
-					literal.NewStringLiteral("'Alice'", "Alice"),
+					ast.NewStringLiteral("'1'", "1"),
+					ast.NewStringLiteral("'Alice'", "Alice"),
 				},
 			},
-		)
-		planner := NewInsertPlanner(stmt)
+		}
+		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Next()
+		exec, err := planner.Build()
 
 		// THEN
 		assert.Error(t, err)
@@ -62,22 +62,23 @@ func TestNewInsert(t *testing.T) {
 
 	t.Run("値の数がカラム数と一致しない場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
-		stmt := statement.NewInsertStmt(
-			*identifier.NewTableId("users"),
-			[]identifier.ColumnId{
-				*identifier.NewColumnId("id"),
-				*identifier.NewColumnId("name"),
+		stmt := &ast.InsertStmt{
+			StmtType: ast.StmtTypeInsert,
+			Table:    *ast.NewTableId("users"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+				*ast.NewColumnId("name"),
 			},
-			[][]literal.Literal{
+			Values: [][]ast.Literal{
 				{
-					literal.NewStringLiteral("'1'", "1"),
+					ast.NewStringLiteral("'1'", "1"),
 				},
 			},
-		)
-		planner := NewInsertPlanner(stmt)
+		}
+		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Next()
+		exec, err := planner.Build()
 
 		// THEN
 		assert.Error(t, err)
@@ -85,25 +86,83 @@ func TestNewInsert(t *testing.T) {
 		assert.Contains(t, err.Error(), "number of values does not match number of columns")
 	})
 
-	t.Run("挿入するレコードが空の場合、エラーを返す", func(t *testing.T) {
+	t.Run("カラム名が重複している場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
-		stmt := statement.NewInsertStmt(
-			*identifier.NewTableId("users"),
-			[]identifier.ColumnId{
-				*identifier.NewColumnId("id"),
-				*identifier.NewColumnId("name"),
+		stmt := &ast.InsertStmt{
+			StmtType: ast.StmtTypeInsert,
+			Table:    *ast.NewTableId("users"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+				*ast.NewColumnId("name"),
+				*ast.NewColumnId("id"),
 			},
-			[][]literal.Literal{},
-		)
-		planner := NewInsertPlanner(stmt)
+			Values: [][]ast.Literal{
+				{
+					ast.NewStringLiteral("'1'", "1"),
+					ast.NewStringLiteral("'Alice'", "Alice"),
+					ast.NewStringLiteral("'2'", "2"),
+				},
+			},
+		}
+		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Next()
+		exec, err := planner.Build()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "duplicate column name: id")
+	})
+
+	t.Run("挿入するレコードが空の場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		stmt := &ast.InsertStmt{
+			StmtType: ast.StmtTypeInsert,
+			Table:    *ast.NewTableId("users"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+				*ast.NewColumnId("name"),
+			},
+			Values: [][]ast.Literal{},
+		}
+		planner := NewInsert(stmt)
+
+		// WHEN
+		exec, err := planner.Build()
 
 		// THEN
 		assert.Error(t, err)
 		assert.Nil(t, exec)
 		assert.Contains(t, err.Error(), "records cannot be empty")
+	})
+
+	t.Run("存在しないテーブル名の場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		initStorageManagerForTest(t)
+		defer engine.Reset()
+
+		stmt := &ast.InsertStmt{
+			StmtType: ast.StmtTypeInsert,
+			Table:    *ast.NewTableId("nonexistent"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+			},
+			Values: [][]ast.Literal{
+				{
+					ast.NewStringLiteral("'1'", "1"),
+				},
+			},
+		}
+		planner := NewInsert(stmt)
+
+		// WHEN
+		exec, err := planner.Build()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "table nonexistent not found")
 	})
 
 	t.Run("単一レコードの挿入で Executor が生成される", func(t *testing.T) {
@@ -116,23 +175,24 @@ func TestNewInsert(t *testing.T) {
 			{Name: "name", Type: catalog.ColumnTypeString},
 		})
 
-		stmt := statement.NewInsertStmt(
-			*identifier.NewTableId("users"),
-			[]identifier.ColumnId{
-				*identifier.NewColumnId("id"),
-				*identifier.NewColumnId("name"),
+		stmt := &ast.InsertStmt{
+			StmtType: ast.StmtTypeInsert,
+			Table:    *ast.NewTableId("users"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+				*ast.NewColumnId("name"),
 			},
-			[][]literal.Literal{
+			Values: [][]ast.Literal{
 				{
-					literal.NewStringLiteral("'1'", "1"),
-					literal.NewStringLiteral("'Alice'", "Alice"),
+					ast.NewStringLiteral("'1'", "1"),
+					ast.NewStringLiteral("'Alice'", "Alice"),
 				},
 			},
-		)
-		planner := NewInsertPlanner(stmt)
+		}
+		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Next()
+		exec, err := planner.Build()
 
 		// THEN
 		assert.NoError(t, err)
@@ -150,31 +210,32 @@ func TestNewInsert(t *testing.T) {
 			{Name: "name", Type: catalog.ColumnTypeString},
 		})
 
-		stmt := statement.NewInsertStmt(
-			*identifier.NewTableId("users"),
-			[]identifier.ColumnId{
-				*identifier.NewColumnId("id"),
-				*identifier.NewColumnId("name"),
+		stmt := &ast.InsertStmt{
+			StmtType: ast.StmtTypeInsert,
+			Table:    *ast.NewTableId("users"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+				*ast.NewColumnId("name"),
 			},
-			[][]literal.Literal{
+			Values: [][]ast.Literal{
 				{
-					literal.NewStringLiteral("'1'", "1"),
-					literal.NewStringLiteral("'Alice'", "Alice"),
+					ast.NewStringLiteral("'1'", "1"),
+					ast.NewStringLiteral("'Alice'", "Alice"),
 				},
 				{
-					literal.NewStringLiteral("'2'", "2"),
-					literal.NewStringLiteral("'Bob'", "Bob"),
+					ast.NewStringLiteral("'2'", "2"),
+					ast.NewStringLiteral("'Bob'", "Bob"),
 				},
 				{
-					literal.NewStringLiteral("'3'", "3"),
-					literal.NewStringLiteral("'Charlie'", "Charlie"),
+					ast.NewStringLiteral("'3'", "3"),
+					ast.NewStringLiteral("'Charlie'", "Charlie"),
 				},
 			},
-		)
-		planner := NewInsertPlanner(stmt)
+		}
+		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Next()
+		exec, err := planner.Build()
 
 		// THEN
 		assert.NoError(t, err)
@@ -194,27 +255,28 @@ func TestNewInsert(t *testing.T) {
 			{Name: "age", Type: catalog.ColumnTypeString},
 		})
 
-		stmt := statement.NewInsertStmt(
-			*identifier.NewTableId("users"),
-			[]identifier.ColumnId{
-				*identifier.NewColumnId("id"),
-				*identifier.NewColumnId("name"),
-				*identifier.NewColumnId("email"),
-				*identifier.NewColumnId("age"),
+		stmt := &ast.InsertStmt{
+			StmtType: ast.StmtTypeInsert,
+			Table:    *ast.NewTableId("users"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+				*ast.NewColumnId("name"),
+				*ast.NewColumnId("email"),
+				*ast.NewColumnId("age"),
 			},
-			[][]literal.Literal{
+			Values: [][]ast.Literal{
 				{
-					literal.NewStringLiteral("'1'", "1"),
-					literal.NewStringLiteral("'Alice'", "Alice"),
-					literal.NewStringLiteral("'alice@example.com'", "alice@example.com"),
-					literal.NewStringLiteral("'25'", "25"),
+					ast.NewStringLiteral("'1'", "1"),
+					ast.NewStringLiteral("'Alice'", "Alice"),
+					ast.NewStringLiteral("'alice@example.com'", "alice@example.com"),
+					ast.NewStringLiteral("'25'", "25"),
 				},
 			},
-		)
-		planner := NewInsertPlanner(stmt)
+		}
+		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Next()
+		exec, err := planner.Build()
 
 		// THEN
 		assert.NoError(t, err)
@@ -233,25 +295,26 @@ func TestNewInsert(t *testing.T) {
 			{Name: "email", Type: catalog.ColumnTypeString},
 		})
 
-		stmt := statement.NewInsertStmt(
-			*identifier.NewTableId("users"),
-			[]identifier.ColumnId{
-				*identifier.NewColumnId("name"),
-				*identifier.NewColumnId("email"),
-				*identifier.NewColumnId("id"),
+		stmt := &ast.InsertStmt{
+			StmtType: ast.StmtTypeInsert,
+			Table:    *ast.NewTableId("users"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("name"),
+				*ast.NewColumnId("email"),
+				*ast.NewColumnId("id"),
 			},
-			[][]literal.Literal{
+			Values: [][]ast.Literal{
 				{
-					literal.NewStringLiteral("'Alice'", "Alice"),
-					literal.NewStringLiteral("'alice@example.com'", "alice@example.com"),
-					literal.NewStringLiteral("'1'", "1"),
+					ast.NewStringLiteral("'Alice'", "Alice"),
+					ast.NewStringLiteral("'alice@example.com'", "alice@example.com"),
+					ast.NewStringLiteral("'1'", "1"),
 				},
 			},
-		)
-		planner := NewInsertPlanner(stmt)
+		}
+		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Next()
+		exec, err := planner.Build()
 
 		// THEN
 		assert.NoError(t, err)
@@ -271,27 +334,28 @@ func TestNewInsert(t *testing.T) {
 
 		// StringLiteral 以外の literal を作成するために、カスタム literal を使用
 		type UnsupportedLiteral struct {
-			literal.Literal
+			ast.Literal
 		}
 		unsupported := &UnsupportedLiteral{}
 
-		stmt := statement.NewInsertStmt(
-			*identifier.NewTableId("users"),
-			[]identifier.ColumnId{
-				*identifier.NewColumnId("id"),
-				*identifier.NewColumnId("name"),
+		stmt := &ast.InsertStmt{
+			StmtType: ast.StmtTypeInsert,
+			Table:    *ast.NewTableId("users"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+				*ast.NewColumnId("name"),
 			},
-			[][]literal.Literal{
+			Values: [][]ast.Literal{
 				{
-					literal.NewStringLiteral("'1'", "1"),
+					ast.NewStringLiteral("'1'", "1"),
 					unsupported,
 				},
 			},
-		)
-		planner := NewInsertPlanner(stmt)
+		}
+		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Next()
+		exec, err := planner.Build()
 
 		// THEN
 		assert.Error(t, err)

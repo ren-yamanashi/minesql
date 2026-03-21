@@ -17,6 +17,7 @@ type IndexParam struct {
 	SecondaryKey uint16
 }
 
+// CreateTable はテーブルを作成する
 type CreateTable struct {
 	tableName       string
 	primaryKeyCount uint8
@@ -40,60 +41,46 @@ func NewCreateTable(tableName string, primaryKeyCount uint8, indexParams []*Inde
 }
 
 func (ct *CreateTable) Next() (Record, error) {
-	err := ct.execute()
+	e := engine.Get()
+
+	// FileId を採番
+	fileId, err := e.Catalog.AllocateFileId(e.BufferPool)
 	if err != nil {
 		return nil, err
 	}
-	return nil, nil
-}
-
-func (ct *CreateTable) execute() error {
-	sm := engine.Get()
-
-	// FileId を採番
-	fileId, err := sm.Catalog.AllocateFileId(sm.BufferPool)
-	if err != nil {
-		return err
-	}
 
 	// Disk を登録
-	err = sm.RegisterDmToBpm(fileId, ct.tableName)
+	err = e.RegisterDmToBp(fileId, ct.tableName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// テーブルの metaPageId を設定
-	metaPageId, err := sm.BufferPool.AllocatePageId(fileId)
+	metaPageId, err := e.BufferPool.AllocatePageId(fileId)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// 各 UniqueIndex の metaPageId を設定
 	uniqueIndexes := make([]*access.UniqueIndexAccessMethod, len(ct.indexParams))
 	for i, indexParam := range ct.indexParams {
-		indexMetaPageId, err := sm.BufferPool.AllocatePageId(fileId)
+		indexMetaPageId, err := e.BufferPool.AllocatePageId(fileId)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		uniqueIndex := access.NewUniqueIndexAccessMethod(indexParam.Name, indexParam.ColName, indexMetaPageId, indexParam.SecondaryKey)
-		err = uniqueIndex.Create(sm.BufferPool)
+		err = uniqueIndex.Create(e.BufferPool)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		uniqueIndexes[i] = uniqueIndex
 	}
 
 	// テーブルを作成
 	tbl := access.NewTableAccessMethod(ct.tableName, metaPageId, ct.primaryKeyCount, uniqueIndexes)
-	err = tbl.Create(sm.BufferPool)
+	err = tbl.Create(e.BufferPool)
 	if err != nil {
-		return err
-	}
-
-	// カラムのメタデータを作成
-	colMeta := make([]*catalog.ColumnMetadata, len(ct.columnParams))
-	for i, colParam := range ct.columnParams {
-		colMeta[i] = catalog.NewColumnMetadata(fileId, colParam.Name, uint16(i), colParam.Type)
+		return nil, err
 	}
 
 	// インデックスのメタデータを作成
@@ -102,14 +89,20 @@ func (ct *CreateTable) execute() error {
 		idxMeta[i] = catalog.NewIndexMetadata(fileId, index.Name, index.ColName, catalog.IndexTypeUnique, index.MetaPageId)
 	}
 
+	// カラムのメタデータを作成
+	colMeta := make([]*catalog.ColumnMetadata, len(ct.columnParams))
+	for i, colParam := range ct.columnParams {
+		colMeta[i] = catalog.NewColumnMetadata(fileId, colParam.Name, uint16(i), colParam.Type)
+	}
+
 	// テーブルメタデータを作成
 	tblMeta := catalog.NewTableMetadata(fileId, ct.tableName, uint8(len(ct.columnParams)), ct.primaryKeyCount, colMeta, idxMeta, metaPageId)
 
 	// カタログにテーブルを登録
-	err = sm.Catalog.Insert(sm.BufferPool, tblMeta)
+	err = e.Catalog.Insert(e.BufferPool, tblMeta)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return nil, nil
 }

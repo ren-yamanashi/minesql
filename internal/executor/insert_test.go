@@ -12,25 +12,24 @@ import (
 func TestNewInsert(t *testing.T) {
 	t.Run("正常に Insert Executor を生成できる", func(t *testing.T) {
 		// GIVEN
-		tableName := "users"
 		cols := []string{"id", "name"}
-		records := [][][]byte{
+		records := []Record{
 			{[]byte("1"), []byte("Alice")},
 			{[]byte("2"), []byte("Bob")},
 		}
 
 		// WHEN
-		insert := NewInsert(tableName, cols, records)
+		insert := NewInsert(nil, cols, records)
 
 		// THEN
 		assert.NotNil(t, insert)
-		assert.Equal(t, tableName, insert.tableName)
+		assert.Nil(t, insert.table)
 		assert.Equal(t, cols, insert.colNames)
 		assert.Equal(t, records, insert.records)
 	})
 }
 
-func TestExecute(t *testing.T) {
+func TestInsert_Next(t *testing.T) {
 	t.Run("正常にレコードを挿入できる", func(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
@@ -45,26 +44,30 @@ func TestExecute(t *testing.T) {
 
 		// GIVEN
 		cols := []string{"id", "name"}
-		records := [][][]byte{
+		records := []Record{
 			{[]byte("1"), []byte("Alice")},
 			{[]byte("2"), []byte("Bob")},
 		}
 
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod(tableName)
+		assert.NoError(t, err)
+
 		// WHEN
-		insert := NewInsert(tableName, cols, records)
-		_, err := insert.Next()
+		insert := NewInsert(tbl, cols, records)
+		_, err = insert.Next()
 
 		// THEN
 		assert.NoError(t, err)
 		whileCondition := func(record Record) bool {
 			return true
 		}
-		seqScan := NewSearchTable(
-			tableName,
+		seqScan := NewTableScan(
+			tbl,
 			access.RecordSearchModeStart{},
 			whileCondition,
 		)
-		res, err := ExecutePlan(seqScan)
+		res, err := fetchAll(seqScan)
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(res))
 		for i, record := range res {

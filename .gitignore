@@ -1,10 +1,10 @@
-.DS_Store
-coverage.*
-examples/**/*.db
-examples/**/*.jsonc
-.claude/.ai-output/*
-.claude/.sandbox/*
-.claude/settings.local.json
 bin/
 data/
 sandbox/
+examples/
+.vscode/
+.claude/.ai-output/*
+.claude/.sandbox/*
+.claude/settings.local.json
+coverage.*
+.DS_Store

@@ -161,13 +161,13 @@ func (c *Catalog) Insert(bp *bufferpool.BufferPool, tableMeta TableMetadata) err
 }
 
 // GetTableMetadataByName はテーブル名からテーブルメタデータを取得する
-func (c *Catalog) GetTableMetadataByName(tableName string) (*TableMetadata, error) {
+func (c *Catalog) GetTableMetadataByName(tableName string) (*TableMetadata, bool) {
 	for _, tblMeta := range c.metadata {
 		if tblMeta.Name == tableName {
-			return tblMeta, nil
+			return tblMeta, true
 		}
 	}
-	return nil, fmt.Errorf("table %s not found in catalog", tableName)
+	return nil, false
 }
 
 // GetAllTables はすべてのテーブルメタデータを取得する

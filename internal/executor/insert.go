@@ -1,49 +1,33 @@
 package executor
 
 import (
+	"minesql/internal/access"
 	"minesql/internal/engine"
 )
 
+// Insert はレコードを追加する
 type Insert struct {
-	tableName string
-	colNames  []string
-	records   [][][]byte
+	table    *access.TableAccessMethod
+	colNames []string
+	records  []Record
 }
 
-func NewInsert(tableName string, colNames []string, records [][][]byte) *Insert {
+func NewInsert(table *access.TableAccessMethod, colNames []string, records []Record) *Insert {
 	return &Insert{
-		tableName: tableName,
-		colNames:  colNames,
-		records:   records,
+		table:    table,
+		colNames: colNames,
+		records:  records,
 	}
 }
 
 func (ins *Insert) Next() (Record, error) {
-	err := ins.execute(ins.records)
-	if err != nil {
-		return nil, err
-	}
-	return nil, nil
-}
+	e := engine.Get()
 
-func (ins *Insert) execute(records [][][]byte) error {
-	sm := engine.Get()
-
-	tblMeta, err := sm.Catalog.GetTableMetadataByName(ins.tableName)
-	if err != nil {
-		return err
-	}
-
-	tbl, err := tblMeta.GetTable()
-	if err != nil {
-		return err
-	}
-
-	for _, record := range records {
-		err := tbl.Insert(sm.BufferPool, record)
+	for _, record := range ins.records {
+		err := ins.table.Insert(e.BufferPool, record)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return nil, nil
 }

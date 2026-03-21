@@ -2,10 +2,7 @@ package parser
 
 import (
 	"errors"
-	"minesql/internal/planner/ast/identifier"
-	"minesql/internal/planner/ast/literal"
-	"minesql/internal/planner/ast/node"
-	"minesql/internal/planner/ast/statement"
+	"minesql/internal/ast"
 	"strings"
 )
 
@@ -17,7 +14,7 @@ type DeleteParser struct {
 	// 現在のステート
 	state ParserState
 	// 現在構築中の DELETE 文
-	stmt *statement.DeleteStmt
+	stmt *ast.DeleteStmt
 	// WHERE 句パーサー
 	where WhereParser
 	// エラー情報
@@ -30,7 +27,7 @@ func NewDeleteParser() *DeleteParser {
 	}
 }
 
-func (dp *DeleteParser) getResult() node.ASTNode {
+func (dp *DeleteParser) getResult() ast.Statement {
 	return dp.stmt
 }
 
@@ -78,7 +75,7 @@ func (dp *DeleteParser) OnKeyword(word string) {
 
 	switch upperWord {
 	case KDelete:
-		dp.stmt = &statement.DeleteStmt{StmtType: statement.StmtTypeDelete}
+		dp.stmt = &ast.DeleteStmt{StmtType: ast.StmtTypeDelete}
 		dp.state = DeleteStateDelete
 		return
 
@@ -122,7 +119,7 @@ func (dp *DeleteParser) OnIdentifier(ident string) {
 
 	switch dp.state {
 	case DeleteStateFrom:
-		dp.stmt.From = *identifier.NewTableId(ident)
+		dp.stmt.From = *ast.NewTableId(ident)
 	case DeleteStateWhere:
 		dp.where.pushColumn(ident)
 	default:
@@ -156,7 +153,7 @@ func (dp *DeleteParser) OnString(value string) {
 		return
 	}
 	if dp.state == DeleteStateWhere {
-		dp.where.pushLiteral(literal.NewStringLiteral(value, value))
+		dp.where.pushLiteral(ast.NewStringLiteral(value, value))
 	}
 }
 
@@ -165,7 +162,7 @@ func (dp *DeleteParser) OnNumber(num string) {
 		return
 	}
 	if dp.state == DeleteStateWhere {
-		dp.where.pushLiteral(literal.NewStringLiteral(num, num))
+		dp.where.pushLiteral(ast.NewStringLiteral(num, num))
 	}
 }
 

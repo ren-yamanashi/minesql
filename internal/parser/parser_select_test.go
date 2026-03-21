@@ -1,9 +1,7 @@
 package parser
 
 import (
-	"minesql/internal/planner/ast/expression"
-	"minesql/internal/planner/ast/identifier"
-	"minesql/internal/planner/ast/statement"
+	"minesql/internal/ast"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,12 +20,12 @@ func TestParserSelect(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		selectStmt, ok := result.(*statement.SelectStmt)
+		selectStmt, ok := result.(*ast.SelectStmt)
 		assert.True(t, ok)
 
-		assert.Equal(t, statement.StmtTypeSelect, selectStmt.StmtType)
+		assert.Equal(t, ast.StmtTypeSelect, selectStmt.StmtType)
 		assert.Equal(t, "users", selectStmt.From.TableName)
-		assert.Equal(t, identifier.IdTypeTable, selectStmt.From.IdType)
+		assert.Equal(t, ast.IdTypeTable, selectStmt.From.IdType)
 		assert.NotNil(t, selectStmt.Where)
 		assert.False(t, selectStmt.Where.IsSet)
 	})
@@ -44,25 +42,25 @@ func TestParserSelect(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		selectStmt, ok := result.(*statement.SelectStmt)
+		selectStmt, ok := result.(*ast.SelectStmt)
 		assert.True(t, ok)
 
-		assert.Equal(t, statement.StmtTypeSelect, selectStmt.StmtType)
+		assert.Equal(t, ast.StmtTypeSelect, selectStmt.StmtType)
 		assert.Equal(t, "users", selectStmt.From.TableName)
 
 		assert.NotNil(t, selectStmt.Where)
 		assert.True(t, selectStmt.Where.IsSet)
 		assert.NotNil(t, selectStmt.Where.Condition)
 
-		binaryExpr, ok := selectStmt.Where.Condition.(*expression.BinaryExpr)
+		binaryExpr, ok := selectStmt.Where.Condition.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "=", binaryExpr.Operator)
 
-		lhsCol, ok := binaryExpr.Left.(*expression.LhsColumn)
+		lhsCol, ok := binaryExpr.Left.(*ast.LhsColumn)
 		assert.True(t, ok)
 		assert.Equal(t, "id", lhsCol.Column.ColName)
 
-		rhsLit, ok := binaryExpr.Right.(*expression.RhsLiteral)
+		rhsLit, ok := binaryExpr.Right.(*ast.RhsLiteral)
 		assert.True(t, ok)
 		assert.Equal(t, "1", rhsLit.Literal.ToString())
 	})
@@ -85,7 +83,7 @@ WHERE id = '1' -- id が 1 のレコード
 			assert.NoError(t, err)
 			assert.NotNil(t, result)
 
-			selectStmt, ok := result.(*statement.SelectStmt)
+			selectStmt, ok := result.(*ast.SelectStmt)
 			assert.True(t, ok)
 			assert.Equal(t, "users", selectStmt.From.TableName)
 			assert.True(t, selectStmt.Where.IsSet)
@@ -108,7 +106,7 @@ WHERE id = '1' /* id が 1 のレコード */
 			assert.NoError(t, err)
 			assert.NotNil(t, result)
 
-			selectStmt, ok := result.(*statement.SelectStmt)
+			selectStmt, ok := result.(*ast.SelectStmt)
 			assert.True(t, ok)
 			assert.Equal(t, "users", selectStmt.From.TableName)
 			assert.True(t, selectStmt.Where.IsSet)

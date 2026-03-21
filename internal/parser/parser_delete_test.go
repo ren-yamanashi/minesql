@@ -1,8 +1,7 @@
 package parser
 
 import (
-	"minesql/internal/planner/ast/expression"
-	"minesql/internal/planner/ast/statement"
+	"minesql/internal/ast"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,10 +20,10 @@ func TestParserDelete(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		deleteStmt, ok := result.(*statement.DeleteStmt)
+		deleteStmt, ok := result.(*ast.DeleteStmt)
 		assert.True(t, ok)
 
-		assert.Equal(t, statement.StmtTypeDelete, deleteStmt.StmtType)
+		assert.Equal(t, ast.StmtTypeDelete, deleteStmt.StmtType)
 		assert.Equal(t, "users", deleteStmt.From.TableName)
 		assert.NotNil(t, deleteStmt.Where)
 		assert.False(t, deleteStmt.Where.IsSet)
@@ -42,25 +41,25 @@ func TestParserDelete(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		deleteStmt, ok := result.(*statement.DeleteStmt)
+		deleteStmt, ok := result.(*ast.DeleteStmt)
 		assert.True(t, ok)
 
-		assert.Equal(t, statement.StmtTypeDelete, deleteStmt.StmtType)
+		assert.Equal(t, ast.StmtTypeDelete, deleteStmt.StmtType)
 		assert.Equal(t, "users", deleteStmt.From.TableName)
 
 		assert.NotNil(t, deleteStmt.Where)
 		assert.True(t, deleteStmt.Where.IsSet)
 		assert.NotNil(t, deleteStmt.Where.Condition)
 
-		binaryExpr, ok := deleteStmt.Where.Condition.(*expression.BinaryExpr)
+		binaryExpr, ok := deleteStmt.Where.Condition.(*ast.BinaryExpr)
 		assert.True(t, ok)
 		assert.Equal(t, "=", binaryExpr.Operator)
 
-		lhsCol, ok := binaryExpr.Left.(*expression.LhsColumn)
+		lhsCol, ok := binaryExpr.Left.(*ast.LhsColumn)
 		assert.True(t, ok)
 		assert.Equal(t, "username", lhsCol.Column.ColName)
 
-		rhsLit, ok := binaryExpr.Right.(*expression.RhsLiteral)
+		rhsLit, ok := binaryExpr.Right.(*ast.RhsLiteral)
 		assert.True(t, ok)
 		assert.Equal(t, "hoge", rhsLit.Literal.ToString())
 	})

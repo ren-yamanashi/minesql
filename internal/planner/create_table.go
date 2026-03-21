@@ -3,33 +3,34 @@ package planner
 import (
 	"errors"
 	"fmt"
+	"minesql/internal/ast"
 	"minesql/internal/catalog"
 	"minesql/internal/executor"
-	"minesql/internal/planner/ast/definition"
-	"minesql/internal/planner/ast/statement"
 )
 
-type CreateTableNode struct {
-	Stmt *statement.CreateTableStmt
+type CreateTable struct {
+	Stmt *ast.CreateTableStmt
 }
 
-func NewCreateTableNode(stmt *statement.CreateTableStmt) *CreateTableNode {
-	return &CreateTableNode{
+func NewCreateTable(stmt *ast.CreateTableStmt) *CreateTable {
+	return &CreateTable{
 		Stmt: stmt,
 	}
 }
 
-func (ctn *CreateTableNode) Next() (executor.Executor, error) {
+func (ctn *CreateTable) Build() (executor.Executor, error) {
 	colIndexMap := map[string]int{} // key: column name, value: column index
 	colParams := []*executor.ColumnParam{}
 
-	var pkDef *definition.ConstraintPrimaryKeyDef
-	var ukDefs []*definition.ConstraintUniqueKeyDef
+	var pkDef *ast.ConstraintPrimaryKeyDef
+	var ukDefs []*ast.ConstraintUniqueKeyDef
+	ukKeyNames := map[string]bool{} // 登録済みのユニークキー名
+	ukColNames := map[string]bool{} // 登録済みのユニークキーカラム名
 
 	currentColIdx := 0
 	for _, def := range ctn.Stmt.CreateDefinitions {
 		switch def := def.(type) {
-		case *definition.ColumnDef:
+		case *ast.ColumnDef:
 			if _, exists := colIndexMap[def.ColName]; exists {
 				return nil, errors.New("duplicate column name: " + def.ColName)
 			}
@@ -40,15 +41,27 @@ func (ctn *CreateTableNode) Next() (executor.Executor, error) {
 				Type: catalog.ColumnType(def.DataType),
 			})
 
-		case *definition.ConstraintPrimaryKeyDef:
+		case *ast.ConstraintPrimaryKeyDef:
 			if pkDef != nil {
-				return nil, fmt.Errorf("multiple primary keys defined")
+				return nil, errors.New("multiple primary keys defined")
 			}
 			pkDef = def
 
-		case *definition.ConstraintUniqueKeyDef:
+		case *ast.ConstraintUniqueKeyDef:
+			if _, exists := ukKeyNames[def.KeyName]; exists {
+				return nil, errors.New("duplicate unique key name: " + def.KeyName)
+			}
+			if _, exists := ukColNames[def.Column.ColName]; exists {
+				return nil, errors.New("column '" + def.Column.ColName + "' cannot be part of multiple unique keys")
+			}
+			ukKeyNames[def.KeyName] = true
+			ukColNames[def.Column.ColName] = true
 			ukDefs = append(ukDefs, def)
 		}
+	}
+
+	if len(colParams) == 0 {
+		return nil, errors.New("table must have at least one column")
 	}
 
 	pkCount, err := getPkCount(pkDef, colIndexMap)
@@ -64,9 +77,10 @@ func (ctn *CreateTableNode) Next() (executor.Executor, error) {
 	return executor.NewCreateTable(ctn.Stmt.TableName, uint8(pkCount), uniqueKeyParams, colParams), nil
 }
 
-// プライマリキーのカラム定義を検証し、プライマリキーのカラム数を返す
+// getPkCount はプライマリキーのカラム定義を検証し、プライマリキーのカラム数を返す
+//
 // エラーの場合は、`-1, error` を返し、正常な場合は `pkCount, nil` を返す
-func getPkCount(pkDef *definition.ConstraintPrimaryKeyDef, colIndexMap map[string]int) (int, error) {
+func getPkCount(pkDef *ast.ConstraintPrimaryKeyDef, colIndexMap map[string]int) (int, error) {
 	if pkDef == nil {
 		return -1, errors.New("primary key is required")
 	}
@@ -89,7 +103,7 @@ func getPkCount(pkDef *definition.ConstraintPrimaryKeyDef, colIndexMap map[strin
 	return len(pkDef.Columns), nil
 }
 
-func getUkParams(ukDefs []*definition.ConstraintUniqueKeyDef, colIndexMap map[string]int) ([]*executor.IndexParam, error) {
+func getUkParams(ukDefs []*ast.ConstraintUniqueKeyDef, colIndexMap map[string]int) ([]*executor.IndexParam, error) {
 	uniqueKeyParams := make([]*executor.IndexParam, 0, len(ukDefs))
 	for _, ukDef := range ukDefs {
 		idx, exists := colIndexMap[ukDef.Column.ColName]

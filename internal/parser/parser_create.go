@@ -2,9 +2,7 @@ package parser
 
 import (
 	"errors"
-	"minesql/internal/planner/ast/definition"
-	"minesql/internal/planner/ast/node"
-	"minesql/internal/planner/ast/statement"
+	"minesql/internal/ast"
 	"strings"
 )
 
@@ -13,7 +11,7 @@ import (
 type CreateSubParser interface {
 	TokenHandler
 	finalize() error
-	getDef() definition.Definition
+	getDef() ast.Definition
 }
 
 // -- main parser --
@@ -22,7 +20,7 @@ type CreateParser struct {
 	// 現在のステート
 	state ParserState
 	// 現在構築中の CREATE TABLE 文
-	stmt *statement.CreateTableStmt
+	stmt *ast.CreateTableStmt
 	// エラー情報
 	err error
 	// サブパーサー
@@ -32,11 +30,11 @@ type CreateParser struct {
 func NewCreateParser() *CreateParser {
 	return &CreateParser{
 		state: CreateStateStart,
-		stmt:  &statement.CreateTableStmt{},
+		stmt:  &ast.CreateTableStmt{},
 	}
 }
 
-func (cp *CreateParser) getResult() node.ASTNode {
+func (cp *CreateParser) getResult() ast.Statement {
 	return cp.stmt
 }
 
@@ -87,7 +85,7 @@ func (cp *CreateParser) OnKeyword(word string) {
 		}
 	case CreateStateCreate:
 		if upper == KTable {
-			cp.stmt.Keyword = statement.KeywordTable
+			cp.stmt.Keyword = ast.KeywordTable
 			cp.state = CreateStateTable
 			return
 		}

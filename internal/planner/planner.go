@@ -2,48 +2,27 @@ package planner
 
 import (
 	"fmt"
+	"minesql/internal/ast"
 	"minesql/internal/executor"
-	"minesql/internal/planner/ast/node"
-	"minesql/internal/planner/ast/statement"
 )
 
-// Planner は Next() で Executor を返す共通インターフェース
-type Planner interface {
-	Next() (executor.Executor, error)
-}
-
-func PlanStart(stmt node.ASTNode) (executor.Executor, error) {
+func Start(stmt ast.Statement) (executor.Executor, error) {
 	switch s := stmt.(type) {
-	case *statement.CreateTableStmt:
-		ctn := NewCreateTableNode(s)
-		return ctn.Next()
-	case *statement.InsertStmt:
-		ip := NewInsertPlanner(s)
-		return ip.Next()
-	case *statement.SelectStmt:
-		search := NewSearchPlanner(s.From.TableName, s.Where)
-		searchExec, err := search.Next()
-		if err != nil {
-			return nil, err
-		}
-		sp := NewSelectPlanner(s, searchExec)
-		return sp.Next()
-	case *statement.DeleteStmt:
-		search := NewSearchPlanner(s.From.TableName, s.Where)
-		searchExec, err := search.Next()
-		if err != nil {
-			return nil, err
-		}
-		dp := NewDeletePlanner(s, searchExec)
-		return dp.Next()
-	case *statement.UpdateStmt:
-		search := NewSearchPlanner(s.Table.TableName, s.Where)
-		searchExec, err := search.Next()
-		if err != nil {
-			return nil, err
-		}
-		up := NewUpdatePlanner(s, searchExec)
-		return up.Next()
+	case *ast.CreateTableStmt:
+		ctn := NewCreateTable(s)
+		return ctn.Build()
+	case *ast.InsertStmt:
+		ip := NewInsert(s)
+		return ip.Build()
+	case *ast.SelectStmt:
+		sp := NewSelect(s)
+		return sp.Build()
+	case *ast.DeleteStmt:
+		dp := NewDelete(s)
+		return dp.Build()
+	case *ast.UpdateStmt:
+		up := NewUpdate(s)
+		return up.Build()
 	default:
 		return nil, fmt.Errorf("unsupported statement: %T", s)
 	}

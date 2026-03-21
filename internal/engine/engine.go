@@ -53,8 +53,8 @@ func Get() *Engine {
 	return eng
 }
 
-// RegisterDmToBpm は BufferPool に Disk を登録する
-func (e *Engine) RegisterDmToBpm(fileId page.FileId, tableName string) error {
+// RegisterDmToBp は BufferPool に Disk を登録する
+func (e *Engine) RegisterDmToBp(fileId page.FileId, tableName string) error {
 	path := filepath.Join(e.baseDirectory, fmt.Sprintf("%s.db", tableName))
 	dm, err := disk.NewDisk(fileId, path)
 	if err != nil {

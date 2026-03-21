@@ -2,29 +2,38 @@ package planner
 
 import (
 	"errors"
+	"fmt"
+	"minesql/internal/ast"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/planner/ast/literal"
-	"minesql/internal/planner/ast/statement"
 )
 
-type InsertPlanner struct {
-	Stmt *statement.InsertStmt
+type Insert struct {
+	Stmt *ast.InsertStmt
 }
 
-func NewInsertPlanner(stmt *statement.InsertStmt) *InsertPlanner {
-	return &InsertPlanner{
+func NewInsert(stmt *ast.InsertStmt) *Insert {
+	return &Insert{
 		Stmt: stmt,
 	}
 }
 
-func (ip *InsertPlanner) Next() (executor.Executor, error) {
+func (ip *Insert) Build() (executor.Executor, error) {
 	if len(ip.Stmt.Cols) == 0 {
 		return nil, errors.New("column names cannot be empty")
 	}
 
 	if len(ip.Stmt.Values) == 0 {
 		return nil, errors.New("records cannot be empty")
+	}
+
+	// カラム名の重複チェック
+	seenCols := map[string]bool{}
+	for _, col := range ip.Stmt.Cols {
+		if seenCols[col.ColName] {
+			return nil, errors.New("duplicate column name: " + col.ColName)
+		}
+		seenCols[col.ColName] = true
 	}
 
 	// 値の数がカラム数と一致することを確認
@@ -34,8 +43,12 @@ func (ip *InsertPlanner) Next() (executor.Executor, error) {
 		}
 	}
 
-	sm := engine.Get()
-	tblMeta, err := sm.Catalog.GetTableMetadataByName(ip.Stmt.Table.TableName)
+	e := engine.Get()
+	tblMeta, ok := e.Catalog.GetTableMetadataByName(ip.Stmt.Table.TableName)
+	if !ok {
+		return nil, fmt.Errorf("table %s not found", ip.Stmt.Table.TableName)
+	}
+	tbl, err := tblMeta.GetTable()
 	if err != nil {
 		return nil, err
 	}
@@ -48,7 +61,7 @@ func (ip *InsertPlanner) Next() (executor.Executor, error) {
 	}
 
 	// レコードをテーブルのカラム順序に並び替える
-	records := [][][]byte{}
+	records := []executor.Record{}
 	for _, valList := range ip.Stmt.Values {
 		record := make([][]byte, len(tblMeta.Cols))
 		for i, val := range valList {
@@ -58,7 +71,7 @@ func (ip *InsertPlanner) Next() (executor.Executor, error) {
 				return nil, errors.New("column does not exist: " + colName)
 			}
 			switch v := val.(type) {
-			case *literal.StringLiteral:
+			case *ast.StringLiteral:
 				record[pos] = []byte(v.Value)
 			default:
 				return nil, errors.New("unsupported literal type in insert values")
@@ -67,5 +80,5 @@ func (ip *InsertPlanner) Next() (executor.Executor, error) {
 		records = append(records, record)
 	}
 
-	return executor.NewInsert(ip.Stmt.Table.TableName, colNames, records), nil
+	return executor.NewInsert(tbl, colNames, records), nil
 }

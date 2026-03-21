@@ -36,14 +36,14 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bpm2 := bufferpool.NewBufferPool(10)
+		bp2 := bufferpool.NewBufferPool(10)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		catalogFileId := page.FileId(0)
 		dm2, err := disk.NewDisk(catalogFileId, filePath)
 		assert.NoError(t, err)
-		bpm2.RegisterDisk(catalogFileId, dm2)
+		bp2.RegisterDisk(catalogFileId, dm2)
 
-		cat2, err := NewCatalog(bpm2)
+		cat2, err := NewCatalog(bp2)
 
 		// THEN
 		assert.NoError(t, err)
@@ -78,14 +78,14 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bpm2 := bufferpool.NewBufferPool(10)
+		bp2 := bufferpool.NewBufferPool(10)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		catalogFileId := page.FileId(0)
 		dm2, err := disk.NewDisk(catalogFileId, filePath)
 		assert.NoError(t, err)
-		bpm2.RegisterDisk(catalogFileId, dm2)
+		bp2.RegisterDisk(catalogFileId, dm2)
 
-		cat2, err := NewCatalog(bpm2)
+		cat2, err := NewCatalog(bp2)
 
 		// THEN
 		assert.NoError(t, err)
@@ -126,14 +126,14 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bpm2 := bufferpool.NewBufferPool(10)
+		bp2 := bufferpool.NewBufferPool(10)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		catalogFileId := page.FileId(0)
 		dm2, err := disk.NewDisk(catalogFileId, filePath)
 		assert.NoError(t, err)
-		bpm2.RegisterDisk(catalogFileId, dm2)
+		bp2.RegisterDisk(catalogFileId, dm2)
 
-		cat2, err := NewCatalog(bpm2)
+		cat2, err := NewCatalog(bp2)
 
 		// THEN
 		assert.NoError(t, err)
@@ -183,34 +183,37 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bpm2 := bufferpool.NewBufferPool(10)
+		bp2 := bufferpool.NewBufferPool(10)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		catalogFileId := page.FileId(0)
 		dm2, err := disk.NewDisk(catalogFileId, filePath)
 		assert.NoError(t, err)
-		bpm2.RegisterDisk(catalogFileId, dm2)
+		bp2.RegisterDisk(catalogFileId, dm2)
 
-		cat2, err := NewCatalog(bpm2)
+		cat2, err := NewCatalog(bp2)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, 3, len(cat2.metadata))
 
 		// テーブル名で検索して確認
-		usersTable, err := cat2.GetTableMetadataByName("users")
-		assert.NoError(t, err)
+		usersTable, ok := cat2.GetTableMetadataByName("users")
+		assert.True(t, ok)
+		assert.NotNil(t, usersTable)
 		assert.Equal(t, "users", usersTable.Name)
 		assert.Equal(t, uint8(2), usersTable.NCols)
 		assert.Equal(t, 2, len(usersTable.Cols))
 
-		postsTable, err := cat2.GetTableMetadataByName("posts")
-		assert.NoError(t, err)
+		postsTable, ok := cat2.GetTableMetadataByName("posts")
+		assert.True(t, ok)
+		assert.NotNil(t, postsTable)
 		assert.Equal(t, "posts", postsTable.Name)
 		assert.Equal(t, uint8(3), postsTable.NCols)
 		assert.Equal(t, 3, len(postsTable.Cols))
 
-		commentsTable, err := cat2.GetTableMetadataByName("comments")
-		assert.NoError(t, err)
+		commentsTable, ok := cat2.GetTableMetadataByName("comments")
+		assert.True(t, ok)
+		assert.NotNil(t, commentsTable)
 		assert.Equal(t, "comments", commentsTable.Name)
 		assert.Equal(t, uint8(2), commentsTable.NCols)
 		assert.Equal(t, 2, len(commentsTable.Cols))
@@ -237,21 +240,21 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bpm2 := bufferpool.NewBufferPool(10)
+		bp2 := bufferpool.NewBufferPool(10)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		catalogFileId := page.FileId(0)
 		dm2, err := disk.NewDisk(catalogFileId, filePath)
 		assert.NoError(t, err)
-		bpm2.RegisterDisk(catalogFileId, dm2)
+		bp2.RegisterDisk(catalogFileId, dm2)
 
-		cat2, err := NewCatalog(bpm2)
+		cat2, err := NewCatalog(bp2)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, page.FileId(4), cat2.NextFileId)
 
 		// 次の採番が正しく動作することを確認
-		nextId, err := cat2.AllocateFileId(bpm2)
+		nextId, err := cat2.AllocateFileId(bp2)
 		assert.NoError(t, err)
 		assert.Equal(t, page.FileId(4), nextId)
 		assert.Equal(t, page.FileId(5), cat2.NextFileId)
@@ -404,16 +407,16 @@ func TestGetTableMetadataByName(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		result, err := cat.GetTableMetadataByName("users")
+		result, ok := cat.GetTableMetadataByName("users")
 
 		// THEN
-		assert.NoError(t, err)
+		assert.True(t, ok)
 		assert.NotNil(t, result)
 		assert.Equal(t, "users", result.Name)
 		assert.Equal(t, fileId, result.FileId)
 	})
 
-	t.Run("存在しないテーブル名を指定するとエラーを返す", func(t *testing.T) {
+	t.Run("存在しないテーブル名を指定すると nil を返す", func(t *testing.T) {
 		// GIVEN
 		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
@@ -422,12 +425,11 @@ func TestGetTableMetadataByName(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		result, err := cat.GetTableMetadataByName("non_existent")
+		result, ok := cat.GetTableMetadataByName("non_existent")
 
 		// THEN
-		assert.Error(t, err)
+		assert.False(t, ok)
 		assert.Nil(t, result)
-		assert.Contains(t, err.Error(), "not found")
 	})
 
 	t.Run("複数のテーブルから正しいテーブルを取得できる", func(t *testing.T) {
@@ -457,10 +459,10 @@ func TestGetTableMetadataByName(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		result, err := cat.GetTableMetadataByName("posts")
+		result, ok := cat.GetTableMetadataByName("posts")
 
 		// THEN
-		assert.NoError(t, err)
+		assert.True(t, ok)
 		assert.NotNil(t, result)
 		assert.Equal(t, "posts", result.Name)
 		assert.Equal(t, page.FileId(2), result.FileId)

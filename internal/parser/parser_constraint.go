@@ -2,8 +2,7 @@ package parser
 
 import (
 	"errors"
-	"minesql/internal/planner/ast/definition"
-	"minesql/internal/planner/ast/identifier"
+	"minesql/internal/ast"
 	"strings"
 )
 
@@ -13,9 +12,9 @@ type ConstraintParser struct {
 	// PK か UK かのフラグ
 	isPK bool
 	// 生成される PK 定義
-	pkDef *definition.ConstraintPrimaryKeyDef
+	pkDef *ast.ConstraintPrimaryKeyDef
 	// 生成される UK 定義
-	ukDef *definition.ConstraintUniqueKeyDef
+	ukDef *ast.ConstraintUniqueKeyDef
 	// エラー情報
 	err error
 }
@@ -48,7 +47,7 @@ func (cp *ConstraintParser) finalize() error {
 	return nil
 }
 
-func (cp *ConstraintParser) getDef() definition.Definition {
+func (cp *ConstraintParser) getDef() ast.Definition {
 	if cp.isPK {
 		return cp.pkDef
 	}
@@ -66,15 +65,15 @@ func (cp *ConstraintParser) OnKeyword(word string) {
 		switch upper {
 		case KPrimary:
 			cp.isPK = true
-			cp.pkDef = &definition.ConstraintPrimaryKeyDef{
-				DefType: definition.DefTypeConstraintPrimaryKey,
+			cp.pkDef = &ast.ConstraintPrimaryKeyDef{
+				DefType: ast.DefTypeConstraintPrimaryKey,
 			}
 			cp.state = CreateStateConstraint
 			return
 		case KUnique:
 			cp.isPK = false
-			cp.ukDef = &definition.ConstraintUniqueKeyDef{
-				DefType: definition.DefTypeConstraintUniqueKey,
+			cp.ukDef = &ast.ConstraintUniqueKeyDef{
+				DefType: ast.DefTypeConstraintUniqueKey,
 			}
 			cp.state = CreateStateConstraint
 			return
@@ -120,7 +119,7 @@ func (cp *ConstraintParser) OnIdentifier(ident string) {
 	case CreateStateConstraintCol:
 		// カラム名の追加
 		// PK の場合は PK 定義のカラムリストに追加、UK の場合は UK 定義のカラムにセット
-		colId := *identifier.NewColumnId(ident)
+		colId := *ast.NewColumnId(ident)
 		if cp.isPK {
 			cp.pkDef.Columns = append(cp.pkDef.Columns, colId)
 		} else {

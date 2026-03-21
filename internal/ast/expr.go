@@ -1,9 +1,16 @@
-package expression
+package ast
 
-import (
-	"minesql/internal/planner/ast/identifier"
-	"minesql/internal/planner/ast/literal"
+type ExprType string
+
+const (
+	ExprTypeBinary ExprType = "BINARY"
 )
+
+type Expression interface{}
+
+// ===========================
+// BinaryExpr
+// ===========================
 
 type BinaryExpr struct {
 	ExprType ExprType
@@ -21,26 +28,19 @@ func NewBinaryExpr(operator string, left LHS, right RHS) *BinaryExpr {
 	}
 }
 
-func (be *BinaryExpr) expressionNode() {}
+// -- LHS --
 
-// ===========================
-// LHS
-// ===========================
-type LHS interface {
-	lhsNode()
-}
+type LHS interface{}
 
 type LhsColumn struct {
-	Column identifier.ColumnId
+	Column ColumnId
 }
 
-func NewLhsColumn(col identifier.ColumnId) *LhsColumn {
+func NewLhsColumn(col ColumnId) *LhsColumn {
 	return &LhsColumn{
 		Column: col,
 	}
 }
-
-func (lc *LhsColumn) lhsNode() {}
 
 type LhsExpr struct {
 	Expr Expression
@@ -52,27 +52,19 @@ func NewLhsExpr(expr Expression) *LhsExpr {
 	}
 }
 
-func (le *LhsExpr) lhsNode() {}
+// -- RHS --
 
-// ===========================
-// RHS
-// ===========================
-
-type RHS interface {
-	rhsNode()
-}
+type RHS interface{}
 
 type RhsLiteral struct {
-	Literal literal.Literal
+	Literal Literal
 }
 
-func NewRhsLiteral(lit literal.Literal) *RhsLiteral {
+func NewRhsLiteral(lit Literal) *RhsLiteral {
 	return &RhsLiteral{
 		Literal: lit,
 	}
 }
-
-func (rl *RhsLiteral) rhsNode() {}
 
 type RhsExpr struct {
 	Expr Expression
@@ -83,5 +75,3 @@ func NewRhsExpr(expr Expression) *RhsExpr {
 		Expr: expr,
 	}
 }
-
-func (re *RhsExpr) rhsNode() {}

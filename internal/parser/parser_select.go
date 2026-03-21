@@ -2,10 +2,7 @@ package parser
 
 import (
 	"errors"
-	"minesql/internal/planner/ast/identifier"
-	"minesql/internal/planner/ast/literal"
-	"minesql/internal/planner/ast/node"
-	"minesql/internal/planner/ast/statement"
+	"minesql/internal/ast"
 	"strings"
 )
 
@@ -18,7 +15,7 @@ type SelectParser struct {
 	// 現在のステート
 	state ParserState
 	// 現在構築中の SELECT 文
-	stmt *statement.SelectStmt
+	stmt *ast.SelectStmt
 	// WHERE 句パーサー
 	where WhereParser
 	// エラー情報
@@ -31,7 +28,7 @@ func NewSelectParser() *SelectParser {
 	}
 }
 
-func (sp *SelectParser) getResult() node.ASTNode {
+func (sp *SelectParser) getResult() ast.Statement {
 	return sp.stmt
 }
 
@@ -79,7 +76,7 @@ func (sp *SelectParser) OnKeyword(word string) {
 
 	switch upperWord {
 	case KSelect:
-		sp.stmt = &statement.SelectStmt{StmtType: statement.StmtTypeSelect}
+		sp.stmt = &ast.SelectStmt{StmtType: ast.StmtTypeSelect}
 		sp.state = SelectStateColumns
 		return
 
@@ -127,7 +124,7 @@ func (sp *SelectParser) OnIdentifier(ident string) {
 		sp.setError(errors.New("[parse error] currently only SELECT * is supported"))
 		return
 	case SelectStateFrom:
-		sp.stmt.From = *identifier.NewTableId(ident)
+		sp.stmt.From = *ast.NewTableId(ident)
 	case SelectStateWhere:
 		sp.where.pushColumn(ident)
 	}
@@ -167,7 +164,7 @@ func (sp *SelectParser) OnString(value string) {
 		return
 	}
 	if sp.state == SelectStateWhere {
-		sp.where.pushLiteral(literal.NewStringLiteral(value, value))
+		sp.where.pushLiteral(ast.NewStringLiteral(value, value))
 	}
 }
 
@@ -176,7 +173,7 @@ func (sp *SelectParser) OnNumber(num string) {
 		return
 	}
 	if sp.state == SelectStateWhere {
-		sp.where.pushLiteral(literal.NewStringLiteral(num, num))
+		sp.where.pushLiteral(ast.NewStringLiteral(num, num))
 	}
 }
 

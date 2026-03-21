@@ -2,28 +2,29 @@ package planner
 
 import (
 	"errors"
+	"fmt"
+	"minesql/internal/ast"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/planner/ast/statement"
 )
 
-type UpdatePlanner struct {
-	Stmt          *statement.UpdateStmt
-	InnerExecutor executor.Executor
+type Update struct {
+	Stmt *ast.UpdateStmt
 }
 
-func NewUpdatePlanner(stmt *statement.UpdateStmt, innerExecutor executor.Executor) *UpdatePlanner {
-	return &UpdatePlanner{
-		Stmt:          stmt,
-		InnerExecutor: innerExecutor,
+func NewUpdate(stmt *ast.UpdateStmt) *Update {
+	return &Update{
+		Stmt: stmt,
 	}
 }
 
-func (up *UpdatePlanner) Next() (executor.Executor, error) {
-	sm := engine.Get()
-	tblMeta, err := sm.Catalog.GetTableMetadataByName(up.Stmt.Table.TableName)
-	if err != nil {
-		return nil, err
+func (up *Update) Build() (executor.Executor, error) {
+	e := engine.Get()
+
+	// 対象テーブルのメタデータを取得
+	tblMeta, ok := e.Catalog.GetTableMetadataByName(up.Stmt.Table.TableName)
+	if !ok {
+		return nil, fmt.Errorf("table %s not found", up.Stmt.Table.TableName)
 	}
 
 	// カラム名からカラム位置へのマッピングを作成
@@ -45,5 +46,18 @@ func (up *UpdatePlanner) Next() (executor.Executor, error) {
 		})
 	}
 
-	return executor.NewUpdate(up.Stmt.Table.TableName, setColumns, up.InnerExecutor), nil
+	// WHERE 句を元に検索用の Executor を構築
+	search := NewSearch(tblMeta, up.Stmt.Where)
+	iterator, err := search.Build()
+	if err != nil {
+		return nil, err
+	}
+
+	// テーブルを取得
+	tbl, err := tblMeta.GetTable()
+	if err != nil {
+		return nil, err
+	}
+
+	return executor.NewUpdate(tbl, setColumns, iterator), nil
 }

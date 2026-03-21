@@ -2,7 +2,7 @@ package parser
 
 import (
 	"errors"
-	"minesql/internal/planner/ast/node"
+	"minesql/internal/ast"
 	"strings"
 )
 
@@ -120,7 +120,7 @@ const (
 
 type StatementParser interface {
 	TokenHandler
-	getResult() node.ASTNode
+	getResult() ast.Statement
 	getError() error
 	finalize()
 }
@@ -134,7 +134,7 @@ func NewParser() *Parser {
 	return &Parser{}
 }
 
-func (p *Parser) Parse(sql string) (node.ASTNode, error) {
+func (p *Parser) Parse(sql string) (ast.Statement, error) {
 	tokenizer := NewTokenizer(sql, p)
 	tokenizer.Tokenize()
 

@@ -2,10 +2,7 @@ package parser
 
 import (
 	"errors"
-	"minesql/internal/planner/ast/identifier"
-	"minesql/internal/planner/ast/literal"
-	"minesql/internal/planner/ast/node"
-	"minesql/internal/planner/ast/statement"
+	"minesql/internal/ast"
 	"strings"
 )
 
@@ -13,13 +10,13 @@ type InsertParser struct {
 	// 現在のステート
 	state ParserState
 	// 現在構築中の INSERT 文
-	stmt *statement.InsertStmt
+	stmt *ast.InsertStmt
 	// カラムリスト
-	cols []identifier.ColumnId
+	cols []ast.ColumnId
 	// 値リスト (現在構築中の行)
-	currentRow []literal.Literal
+	currentRow []ast.Literal
 	// 全ての値リスト
-	allRows [][]literal.Literal
+	allRows [][]ast.Literal
 	// エラー情報
 	err error
 }
@@ -27,11 +24,11 @@ type InsertParser struct {
 func NewInsertParser() *InsertParser {
 	return &InsertParser{
 		state: InsertStateStart,
-		stmt:  &statement.InsertStmt{},
+		stmt:  &ast.InsertStmt{},
 	}
 }
 
-func (ip *InsertParser) getResult() node.ASTNode {
+func (ip *InsertParser) getResult() ast.Statement {
 	return ip.stmt
 }
 
@@ -86,7 +83,7 @@ func (ip *InsertParser) OnKeyword(word string) {
 	case InsertStateStart:
 		// 最初のキーワードは INSERT である必要がある
 		if upper == KInsert {
-			ip.stmt.StmtType = statement.StmtTypeInsert
+			ip.stmt.StmtType = ast.StmtTypeInsert
 			ip.state = InsertStateInsert
 			return
 		}
@@ -128,11 +125,11 @@ func (ip *InsertParser) OnIdentifier(ident string) {
 
 	switch ip.state {
 	case InsertStateInto:
-		ip.stmt.Table = *identifier.NewTableId(ident)
+		ip.stmt.Table = *ast.NewTableId(ident)
 		ip.state = InsertStateTbName
 		return
 	case InsertStateColumns:
-		ip.cols = append(ip.cols, *identifier.NewColumnId(ident))
+		ip.cols = append(ip.cols, *ast.NewColumnId(ident))
 		return
 	default:
 		ip.setError(errors.New("[parse error] unexpected identifier: " + ident))
@@ -177,7 +174,7 @@ func (ip *InsertParser) OnSymbol(symbol string) {
 	case InsertStateValues:
 		if symbol == string(SLeftParen) {
 			// 新しい行の開始
-			ip.currentRow = []literal.Literal{}
+			ip.currentRow = []ast.Literal{}
 			ip.state = InsertStateValueList
 			return
 		}
@@ -213,7 +210,7 @@ func (ip *InsertParser) OnString(value string) {
 		return
 	}
 	if ip.state == InsertStateValueList {
-		ip.currentRow = append(ip.currentRow, literal.NewStringLiteral(value, value))
+		ip.currentRow = append(ip.currentRow, ast.NewStringLiteral(value, value))
 		return
 	}
 	ip.setError(errors.New("[parse error] unexpected string: " + value))
@@ -224,7 +221,7 @@ func (ip *InsertParser) OnNumber(num string) {
 		return
 	}
 	if ip.state == InsertStateValueList {
-		ip.currentRow = append(ip.currentRow, literal.NewStringLiteral(num, num))
+		ip.currentRow = append(ip.currentRow, ast.NewStringLiteral(num, num))
 		return
 	}
 	ip.setError(errors.New("[parse error] unexpected number: " + num))

@@ -2,64 +2,51 @@ package planner
 
 import (
 	"minesql/internal/access"
+	"minesql/internal/ast"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/planner/ast/expression"
-	"minesql/internal/planner/ast/identifier"
-	"minesql/internal/planner/ast/literal"
-	"minesql/internal/planner/ast/statement"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewUpdatePlanner(t *testing.T) {
-	t.Run("正常に UpdatePlanner が生成される", func(t *testing.T) {
+func TestNewUpdate(t *testing.T) {
+	t.Run("正常に Update が生成される", func(t *testing.T) {
 		// GIVEN
-		stmt := &statement.UpdateStmt{
-			Table: *identifier.NewTableId("users"),
-			SetClauses: []*statement.SetClause{
-				{Column: *identifier.NewColumnId("first_name"), Value: literal.NewStringLiteral("'Jane'", "Jane")},
+		stmt := &ast.UpdateStmt{
+			Table: *ast.NewTableId("users"),
+			SetClauses: []*ast.SetClause{
+				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
 			},
 		}
-		innerExec := executor.NewSearchTable(
-			"users",
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool { return true },
-		)
 
 		// WHEN
-		planner := NewUpdatePlanner(stmt, innerExec)
+		planner := NewUpdate(stmt)
 
 		// THEN
 		assert.NotNil(t, planner)
 		assert.Equal(t, stmt, planner.Stmt)
-		assert.NotNil(t, planner.InnerExecutor)
 	})
 }
 
-func TestUpdatePlannerNext(t *testing.T) {
+func TestUpdate_Build(t *testing.T) {
 	t.Run("単一カラムの更新で Update Executor が生成される", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		stmt := &statement.UpdateStmt{
-			Table: *identifier.NewTableId("users"),
-			SetClauses: []*statement.SetClause{
-				{Column: *identifier.NewColumnId("first_name"), Value: literal.NewStringLiteral("'Jane'", "Jane")},
+		stmt := &ast.UpdateStmt{
+			Table: *ast.NewTableId("users"),
+			SetClauses: []*ast.SetClause{
+				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
 			},
+			Where: &ast.WhereClause{IsSet: false},
 		}
-		innerExec := executor.NewSearchTable(
-			"users",
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool { return true },
-		)
-		planner := NewUpdatePlanner(stmt, innerExec)
+		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Next()
+		exec, err := planner.Build()
 
 		// THEN
 		assert.NoError(t, err)
@@ -73,22 +60,18 @@ func TestUpdatePlannerNext(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		stmt := &statement.UpdateStmt{
-			Table: *identifier.NewTableId("users"),
-			SetClauses: []*statement.SetClause{
-				{Column: *identifier.NewColumnId("first_name"), Value: literal.NewStringLiteral("'Jane'", "Jane")},
-				{Column: *identifier.NewColumnId("last_name"), Value: literal.NewStringLiteral("'Doe'", "Doe")},
+		stmt := &ast.UpdateStmt{
+			Table: *ast.NewTableId("users"),
+			SetClauses: []*ast.SetClause{
+				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
+				{Column: *ast.NewColumnId("last_name"), Value: ast.NewStringLiteral("'Doe'", "Doe")},
 			},
+			Where: &ast.WhereClause{IsSet: false},
 		}
-		innerExec := executor.NewSearchTable(
-			"users",
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool { return true },
-		)
-		planner := NewUpdatePlanner(stmt, innerExec)
+		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Next()
+		exec, err := planner.Build()
 
 		// THEN
 		assert.NoError(t, err)
@@ -102,59 +85,50 @@ func TestUpdatePlannerNext(t *testing.T) {
 		assert.Equal(t, []byte("Doe"), upd.SetColumns[1].Value)
 	})
 
-	t.Run("存在しないカラム名の場合、エラーが返る", func(t *testing.T) {
-		// GIVEN
-		tmpdir := t.TempDir()
-		initStorageManager(t, tmpdir)
-		defer engine.Reset()
-
-		stmt := &statement.UpdateStmt{
-			Table: *identifier.NewTableId("users"),
-			SetClauses: []*statement.SetClause{
-				{Column: *identifier.NewColumnId("nonexistent"), Value: literal.NewStringLiteral("'val'", "val")},
-			},
-		}
-		innerExec := executor.NewSearchTable(
-			"users",
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool { return true },
-		)
-		planner := NewUpdatePlanner(stmt, innerExec)
-
-		// WHEN
-		exec, err := planner.Next()
-
-		// THEN
-		assert.Error(t, err)
-		assert.Nil(t, exec)
-		assert.Contains(t, err.Error(), "column does not exist: nonexistent")
-	})
-
 	t.Run("存在しないテーブル名の場合、エラーが返る", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		stmt := &statement.UpdateStmt{
-			Table: *identifier.NewTableId("nonexistent"),
-			SetClauses: []*statement.SetClause{
-				{Column: *identifier.NewColumnId("id"), Value: literal.NewStringLiteral("'1'", "1")},
+		stmt := &ast.UpdateStmt{
+			Table: *ast.NewTableId("nonexistent"),
+			SetClauses: []*ast.SetClause{
+				{Column: *ast.NewColumnId("id"), Value: ast.NewStringLiteral("'1'", "1")},
 			},
 		}
-		innerExec := executor.NewSearchTable(
-			"nonexistent",
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool { return true },
-		)
-		planner := NewUpdatePlanner(stmt, innerExec)
+		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Next()
+		exec, err := planner.Build()
 
 		// THEN
 		assert.Error(t, err)
 		assert.Nil(t, exec)
+	})
+
+	t.Run("存在しないカラム名の場合、エラーが返る", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		initStorageManager(t, tmpdir)
+		defer engine.Reset()
+
+		stmt := &ast.UpdateStmt{
+			Table: *ast.NewTableId("users"),
+			SetClauses: []*ast.SetClause{
+				{Column: *ast.NewColumnId("nonexistent"), Value: ast.NewStringLiteral("'val'", "val")},
+			},
+			Where: &ast.WhereClause{IsSet: false},
+		}
+		planner := NewUpdate(stmt)
+
+		// WHEN
+		exec, err := planner.Build()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "column does not exist: nonexistent")
 	})
 
 	t.Run("生成された Executor でレコードが正しく更新される", func(t *testing.T) {
@@ -163,48 +137,45 @@ func TestUpdatePlannerNext(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		sm := engine.Get()
-		tblMeta, err := sm.Catalog.GetTableMetadataByName("users")
-		assert.NoError(t, err)
-		tbl, err := tblMeta.GetTable()
-		assert.NoError(t, err)
+		e := engine.Get()
+		tbl := getPlannerTableAccessMethod(t, "users")
 
 		// データを挿入
-		err = tbl.Insert(sm.BufferPool, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err := tbl.Insert(e.BufferPool, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
-		err = tbl.Insert(sm.BufferPool, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		err = tbl.Insert(e.BufferPool, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
 
-		// "a" の first_name を "Jane" に更新する UpdatePlanner を作成
-		stmt := &statement.UpdateStmt{
-			Table: *identifier.NewTableId("users"),
-			SetClauses: []*statement.SetClause{
-				{Column: *identifier.NewColumnId("first_name"), Value: literal.NewStringLiteral("'Jane'", "Jane")},
+		// "a" の first_name を "Jane" に更新する
+		stmt := &ast.UpdateStmt{
+			Table: *ast.NewTableId("users"),
+			SetClauses: []*ast.SetClause{
+				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
+			},
+			Where: &ast.WhereClause{
+				Condition: ast.NewBinaryExpr(
+					"=",
+					ast.NewLhsColumn(*ast.NewColumnId("id")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("a", "a")),
+				),
+				IsSet: true,
 			},
 		}
-		innerExec := executor.NewSearchTable(
-			"users",
-			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
-			func(record executor.Record) bool {
-				return string(record[0]) == "a"
-			},
-		)
-		planner := NewUpdatePlanner(stmt, innerExec)
+		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Next()
+		exec, err := planner.Build()
 		assert.NoError(t, err)
-		_, err = executor.ExecutePlan(exec)
+		_, err = exec.Next()
 		assert.NoError(t, err)
 
 		// THEN: "a" の first_name が "Jane" に更新されている
-		scan := executor.NewSearchTable(
-			"users",
+		scan := executor.NewTableScan(
+			tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
-		results, err := executor.ExecutePlan(scan)
-		assert.NoError(t, err)
+		results := fetchAll(t, scan)
 		assert.Equal(t, 2, len(results))
 		assert.Equal(t, executor.Record{[]byte("a"), []byte("Jane"), []byte("Doe")}, results[0])
 		assert.Equal(t, executor.Record{[]byte("b"), []byte("Alice"), []byte("Smith")}, results[1])
@@ -216,16 +187,16 @@ func TestUpdatePlannerNext(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		stmt := &statement.UpdateStmt{
-			Table: *identifier.NewTableId("users"),
-			SetClauses: []*statement.SetClause{
-				{Column: *identifier.NewColumnId("first_name"), Value: literal.NewStringLiteral("'Jane'", "Jane")},
+		stmt := &ast.UpdateStmt{
+			Table: *ast.NewTableId("users"),
+			SetClauses: []*ast.SetClause{
+				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
 			},
 			Where: nil,
 		}
 
 		// WHEN
-		exec, err := PlanStart(stmt)
+		exec, err := Start(stmt)
 
 		// THEN
 		assert.NoError(t, err)
@@ -239,22 +210,20 @@ func TestUpdatePlannerNext(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		stmt := &statement.UpdateStmt{
-			Table: *identifier.NewTableId("users"),
-			SetClauses: []*statement.SetClause{
-				{Column: *identifier.NewColumnId("first_name"), Value: literal.NewStringLiteral("'Jane'", "Jane")},
+		stmt := &ast.UpdateStmt{
+			Table: *ast.NewTableId("users"),
+			SetClauses: []*ast.SetClause{
+				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
 			},
-			Where: statement.NewWhereClause(
-				expression.NewBinaryExpr(
-					"=",
-					expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
-					expression.NewRhsLiteral(literal.NewStringLiteral("'Doe'", "Doe")),
-				),
-			),
+			Where: &ast.WhereClause{Condition: ast.NewBinaryExpr(
+				"=",
+				ast.NewLhsColumn(*ast.NewColumnId("last_name")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("'Doe'", "Doe")),
+			), IsSet: true},
 		}
 
 		// WHEN
-		exec, err := PlanStart(stmt)
+		exec, err := Start(stmt)
 
 		// THEN
 		assert.NoError(t, err)
@@ -268,19 +237,15 @@ func TestUpdatePlannerNext(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		stmt := &statement.UpdateStmt{
-			Table:      *identifier.NewTableId("users"),
-			SetClauses: []*statement.SetClause{},
+		stmt := &ast.UpdateStmt{
+			Table:      *ast.NewTableId("users"),
+			SetClauses: []*ast.SetClause{},
+			Where:      &ast.WhereClause{IsSet: false},
 		}
-		innerExec := executor.NewSearchTable(
-			"users",
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool { return true },
-		)
-		planner := NewUpdatePlanner(stmt, innerExec)
+		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Next()
+		exec, err := planner.Build()
 
 		// THEN
 		assert.NoError(t, err)
@@ -289,4 +254,17 @@ func TestUpdatePlannerNext(t *testing.T) {
 		assert.True(t, ok)
 		assert.Empty(t, upd.SetColumns)
 	})
+}
+
+//nolint:unparam // テーブル名は将来的に変わりうる
+func getPlannerTableAccessMethod(t *testing.T, tableName string) *access.TableAccessMethod {
+	t.Helper()
+	e := engine.Get()
+	tblMeta, ok := e.Catalog.GetTableMetadataByName(tableName)
+	if !ok {
+		t.Fatalf("table %s not found in catalog", tableName)
+	}
+	tbl, err := tblMeta.GetTable()
+	assert.NoError(t, err)
+	return tbl
 }

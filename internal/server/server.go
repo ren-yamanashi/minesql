@@ -163,14 +163,21 @@ func (s *Server) executeQuery(sql string) (string, error) {
 		return "", err
 	}
 
-	exec, err := planner.PlanStart(node)
+	exec, err := planner.Start(node)
 	if err != nil {
 		return "", err
 	}
 
-	records, err := executor.ExecutePlan(exec)
-	if err != nil {
-		return "", err
+	var records []executor.Record
+	for {
+		record, err := exec.Next()
+		if err != nil {
+			return "", err
+		}
+		if record == nil {
+			break
+		}
+		records = append(records, record)
 	}
 
 	// 一旦、レスポンスは csv 形式で返す

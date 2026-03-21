@@ -2,27 +2,36 @@ package planner
 
 import (
 	"fmt"
+	"minesql/internal/ast"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/planner/ast/definition"
-	"minesql/internal/planner/ast/expression"
-	"minesql/internal/planner/ast/identifier"
-	"minesql/internal/planner/ast/literal"
-	"minesql/internal/planner/ast/statement"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-// AST を直接構築 → PlanStart → ExecutePlan で実行する
-func executePlan(t *testing.T, stmt statement.Statement) []executor.Record {
+// Executor から全レコードを取得する
+func fetchAll(t *testing.T, iter executor.Executor) []executor.Record {
 	t.Helper()
-	exec, err := PlanStart(stmt)
+	var records []executor.Record
+	for {
+		record, err := iter.Next()
+		assert.NoError(t, err)
+		if record == nil {
+			return records
+		}
+		records = append(records, record)
+	}
+}
+
+// AST を直接構築 → PlanStart → ExecutePlan で実行する
+func executePlan(t *testing.T, stmt ast.Statement) []executor.Record {
+	t.Helper()
+	exec, err := Start(stmt)
 	assert.NoError(t, err)
-	records, err := executor.ExecutePlan(exec)
-	assert.NoError(t, err)
-	return records
+
+	return fetchAll(t, exec)
 }
 
 // ストレージを初期化し、5 カラムの users テーブルを作成してデータを投入する
@@ -36,76 +45,79 @@ func setupUsersTable(t *testing.T) {
 	engine.Init()
 
 	// CREATE TABLE
-	executePlan(t, statement.NewCreateTableStmt(
-		"users",
-		[]definition.Definition{
-			definition.NewColumnDef("id", definition.DataTypeVarchar),
-			definition.NewColumnDef("first_name", definition.DataTypeVarchar),
-			definition.NewColumnDef("last_name", definition.DataTypeVarchar),
-			definition.NewColumnDef("gender", definition.DataTypeVarchar),
-			definition.NewColumnDef("username", definition.DataTypeVarchar),
-			definition.NewConstraintPrimaryKeyDef([]identifier.ColumnId{
-				*identifier.NewColumnId("id"),
-			}),
-			definition.NewConstraintUniqueKeyDef(*identifier.NewColumnId("username")),
+	executePlan(t, &ast.CreateTableStmt{
+		StmtType:  ast.StmtTypeCreate,
+		Keyword:   ast.KeywordTable,
+		TableName: "users",
+		CreateDefinitions: []ast.Definition{
+			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "first_name", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "last_name", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "gender", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "username", DataType: ast.DataTypeVarchar},
+			&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+			}},
+			&ast.ConstraintUniqueKeyDef{DefType: ast.DefTypeConstraintUniqueKey, Column: *ast.NewColumnId("username")},
 		},
-	))
+	})
 
 	// INSERT
-	executePlan(t, statement.NewInsertStmt(
-		*identifier.NewTableId("users"),
-		[]identifier.ColumnId{
-			*identifier.NewColumnId("id"),
-			*identifier.NewColumnId("first_name"),
-			*identifier.NewColumnId("last_name"),
-			*identifier.NewColumnId("gender"),
-			*identifier.NewColumnId("username"),
+	executePlan(t, &ast.InsertStmt{
+		StmtType: ast.StmtTypeInsert,
+		Table:    *ast.NewTableId("users"),
+		Cols: []ast.ColumnId{
+			*ast.NewColumnId("id"),
+			*ast.NewColumnId("first_name"),
+			*ast.NewColumnId("last_name"),
+			*ast.NewColumnId("gender"),
+			*ast.NewColumnId("username"),
 		},
-		[][]literal.Literal{
+		Values: [][]ast.Literal{
 			{
-				literal.NewStringLiteral("1", "1"),
-				literal.NewStringLiteral("John", "John"),
-				literal.NewStringLiteral("Doe", "Doe"),
-				literal.NewStringLiteral("male", "male"),
-				literal.NewStringLiteral("johndoe", "johndoe"),
+				ast.NewStringLiteral("1", "1"),
+				ast.NewStringLiteral("John", "John"),
+				ast.NewStringLiteral("Doe", "Doe"),
+				ast.NewStringLiteral("male", "male"),
+				ast.NewStringLiteral("johndoe", "johndoe"),
 			},
 			{
-				literal.NewStringLiteral("2", "2"),
-				literal.NewStringLiteral("John", "John"),
-				literal.NewStringLiteral("Doe2", "Doe2"),
-				literal.NewStringLiteral("male", "male"),
-				literal.NewStringLiteral("johndoe2", "johndoe2"),
+				ast.NewStringLiteral("2", "2"),
+				ast.NewStringLiteral("John", "John"),
+				ast.NewStringLiteral("Doe2", "Doe2"),
+				ast.NewStringLiteral("male", "male"),
+				ast.NewStringLiteral("johndoe2", "johndoe2"),
 			},
 			{
-				literal.NewStringLiteral("3", "3"),
-				literal.NewStringLiteral("John", "John"),
-				literal.NewStringLiteral("Doe3", "Doe3"),
-				literal.NewStringLiteral("male", "male"),
-				literal.NewStringLiteral("johndoe3", "johndoe3"),
+				ast.NewStringLiteral("3", "3"),
+				ast.NewStringLiteral("John", "John"),
+				ast.NewStringLiteral("Doe3", "Doe3"),
+				ast.NewStringLiteral("male", "male"),
+				ast.NewStringLiteral("johndoe3", "johndoe3"),
 			},
 			{
-				literal.NewStringLiteral("4", "4"),
-				literal.NewStringLiteral("Jane", "Jane"),
-				literal.NewStringLiteral("Doe2", "Doe2"),
-				literal.NewStringLiteral("female", "female"),
-				literal.NewStringLiteral("janedoe", "janedoe"),
+				ast.NewStringLiteral("4", "4"),
+				ast.NewStringLiteral("Jane", "Jane"),
+				ast.NewStringLiteral("Doe2", "Doe2"),
+				ast.NewStringLiteral("female", "female"),
+				ast.NewStringLiteral("janedoe", "janedoe"),
 			},
 			{
-				literal.NewStringLiteral("5", "5"),
-				literal.NewStringLiteral("Jonathan", "Jonathan"),
-				literal.NewStringLiteral("Black", "Black"),
-				literal.NewStringLiteral("male", "male"),
-				literal.NewStringLiteral("jonathanblack", "jonathanblack"),
+				ast.NewStringLiteral("5", "5"),
+				ast.NewStringLiteral("Jonathan", "Jonathan"),
+				ast.NewStringLiteral("Black", "Black"),
+				ast.NewStringLiteral("male", "male"),
+				ast.NewStringLiteral("jonathanblack", "jonathanblack"),
 			},
 			{
-				literal.NewStringLiteral("6", "6"),
-				literal.NewStringLiteral("Tom", "Tom"),
-				literal.NewStringLiteral("Brown", "Brown"),
-				literal.NewStringLiteral("male", "male"),
-				literal.NewStringLiteral("tombrown", "tombrown"),
+				ast.NewStringLiteral("6", "6"),
+				ast.NewStringLiteral("Tom", "Tom"),
+				ast.NewStringLiteral("Brown", "Brown"),
+				ast.NewStringLiteral("male", "male"),
+				ast.NewStringLiteral("tombrown", "tombrown"),
 			},
 		},
-	))
+	})
 }
 
 // レコードを strings.Builder に書き出す
@@ -127,10 +139,11 @@ func TestPlannerIntegration(t *testing.T) {
 		defer engine.Reset()
 
 		// WHEN
-		records := executePlan(t, statement.NewSelectStmt(
-			*identifier.NewTableId("users"),
-			nil,
-		))
+		records := executePlan(t, &ast.SelectStmt{
+			StmtType: ast.StmtTypeSelect,
+			From:     *ast.NewTableId("users"),
+			Where:    &ast.WhereClause{IsSet: false},
+		})
 
 		// THEN
 		var sb strings.Builder
@@ -155,16 +168,18 @@ func TestPlannerIntegration(t *testing.T) {
 		defer engine.Reset()
 
 		// WHEN
-		records := executePlan(t, statement.NewSelectStmt(
-			*identifier.NewTableId("users"),
-			statement.NewWhereClause(
-				expression.NewBinaryExpr(
+		records := executePlan(t, &ast.SelectStmt{
+			StmtType: ast.StmtTypeSelect,
+			From:     *ast.NewTableId("users"),
+			Where: &ast.WhereClause{
+				Condition: ast.NewBinaryExpr(
 					"=",
-					expression.NewLhsColumn(*identifier.NewColumnId("username")),
-					expression.NewRhsLiteral(literal.NewStringLiteral("janedoe", "janedoe")),
+					ast.NewLhsColumn(*ast.NewColumnId("username")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("janedoe", "janedoe")),
 				),
-			),
-		))
+				IsSet: true,
+			},
+		})
 
 		// THEN
 		var sb strings.Builder
@@ -184,52 +199,54 @@ func TestPlannerIntegration(t *testing.T) {
 		defer engine.Reset()
 
 		// WHEN: (first_name < 'K' AND gender = 'male' AND last_name >= 'Doe') OR first_name = 'Tom'
-		records := executePlan(t, statement.NewSelectStmt(
-			*identifier.NewTableId("users"),
-			statement.NewWhereClause(
-				expression.NewBinaryExpr(
+		records := executePlan(t, &ast.SelectStmt{
+			StmtType: ast.StmtTypeSelect,
+			From:     *ast.NewTableId("users"),
+			Where: &ast.WhereClause{
+				Condition: ast.NewBinaryExpr(
 					"OR",
-					expression.NewLhsExpr(
-						expression.NewBinaryExpr(
+					ast.NewLhsExpr(
+						ast.NewBinaryExpr(
 							"AND",
-							expression.NewLhsExpr(
-								expression.NewBinaryExpr(
+							ast.NewLhsExpr(
+								ast.NewBinaryExpr(
 									"<",
-									expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
-									expression.NewRhsLiteral(literal.NewStringLiteral("K", "K")),
+									ast.NewLhsColumn(*ast.NewColumnId("first_name")),
+									ast.NewRhsLiteral(ast.NewStringLiteral("K", "K")),
 								),
 							),
-							expression.NewRhsExpr(
-								expression.NewBinaryExpr(
+							ast.NewRhsExpr(
+								ast.NewBinaryExpr(
 									"AND",
-									expression.NewLhsExpr(
-										expression.NewBinaryExpr(
+									ast.NewLhsExpr(
+										ast.NewBinaryExpr(
 											"=",
-											expression.NewLhsColumn(*identifier.NewColumnId("gender")),
-											expression.NewRhsLiteral(literal.NewStringLiteral("male", "male")),
+											ast.NewLhsColumn(*ast.NewColumnId("gender")),
+											ast.NewRhsLiteral(ast.NewStringLiteral("male", "male")),
 										),
 									),
-									expression.NewRhsExpr(
-										expression.NewBinaryExpr(
+									ast.NewRhsExpr(
+										ast.NewBinaryExpr(
 											">=",
-											expression.NewLhsColumn(*identifier.NewColumnId("last_name")),
-											expression.NewRhsLiteral(literal.NewStringLiteral("Doe", "Doe")),
+											ast.NewLhsColumn(*ast.NewColumnId("last_name")),
+											ast.NewRhsLiteral(ast.NewStringLiteral("Doe", "Doe")),
 										),
 									),
 								),
 							),
 						),
 					),
-					expression.NewRhsExpr(
-						expression.NewBinaryExpr(
+					ast.NewRhsExpr(
+						ast.NewBinaryExpr(
 							"=",
-							expression.NewLhsColumn(*identifier.NewColumnId("first_name")),
-							expression.NewRhsLiteral(literal.NewStringLiteral("Tom", "Tom")),
+							ast.NewLhsColumn(*ast.NewColumnId("first_name")),
+							ast.NewRhsLiteral(ast.NewStringLiteral("Tom", "Tom")),
 						),
 					),
 				),
-			),
-		))
+				IsSet: true,
+			},
+		})
 
 		// THEN
 		var sb strings.Builder
@@ -252,25 +269,27 @@ func TestPlannerIntegration(t *testing.T) {
 		defer engine.Reset()
 
 		// WHEN (UPDATE users SET last_name = 'Smith' WHERE username = 'johndoe')
-		executePlan(t, &statement.UpdateStmt{
-			Table: *identifier.NewTableId("users"),
-			SetClauses: []*statement.SetClause{
-				{Column: *identifier.NewColumnId("last_name"), Value: literal.NewStringLiteral("'Smith'", "Smith")},
+		executePlan(t, &ast.UpdateStmt{
+			Table: *ast.NewTableId("users"),
+			SetClauses: []*ast.SetClause{
+				{Column: *ast.NewColumnId("last_name"), Value: ast.NewStringLiteral("'Smith'", "Smith")},
 			},
-			Where: statement.NewWhereClause(
-				expression.NewBinaryExpr(
+			Where: &ast.WhereClause{
+				Condition: ast.NewBinaryExpr(
 					"=",
-					expression.NewLhsColumn(*identifier.NewColumnId("username")),
-					expression.NewRhsLiteral(literal.NewStringLiteral("johndoe", "johndoe")),
+					ast.NewLhsColumn(*ast.NewColumnId("username")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("johndoe", "johndoe")),
 				),
-			),
+				IsSet: true,
+			},
 		})
 
 		// THEN
-		records := executePlan(t, statement.NewSelectStmt(
-			*identifier.NewTableId("users"),
-			nil,
-		))
+		records := executePlan(t, &ast.SelectStmt{
+			StmtType: ast.StmtTypeSelect,
+			From:     *ast.NewTableId("users"),
+			Where:    &ast.WhereClause{IsSet: false},
+		})
 
 		var sb strings.Builder
 		sb.WriteString("=== UPDATE 後の全件 ===\n")
@@ -294,22 +313,25 @@ func TestPlannerIntegration(t *testing.T) {
 		defer engine.Reset()
 
 		// WHEN
-		executePlan(t, statement.NewDeleteStmt(
-			*identifier.NewTableId("users"),
-			statement.NewWhereClause(
-				expression.NewBinaryExpr(
+		executePlan(t, &ast.DeleteStmt{
+			StmtType: ast.StmtTypeDelete,
+			From:     *ast.NewTableId("users"),
+			Where: &ast.WhereClause{
+				Condition: ast.NewBinaryExpr(
 					"=",
-					expression.NewLhsColumn(*identifier.NewColumnId("username")),
-					expression.NewRhsLiteral(literal.NewStringLiteral("johndoe2", "johndoe2")),
+					ast.NewLhsColumn(*ast.NewColumnId("username")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("johndoe2", "johndoe2")),
 				),
-			),
-		))
+				IsSet: true,
+			},
+		})
 
 		// THEN
-		records := executePlan(t, statement.NewSelectStmt(
-			*identifier.NewTableId("users"),
-			nil,
-		))
+		records := executePlan(t, &ast.SelectStmt{
+			StmtType: ast.StmtTypeSelect,
+			From:     *ast.NewTableId("users"),
+			Where:    &ast.WhereClause{IsSet: false},
+		})
 
 		var sb strings.Builder
 		sb.WriteString("=== DELETE 後の全件 ===\n")

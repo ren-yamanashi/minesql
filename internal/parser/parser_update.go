@@ -2,10 +2,7 @@ package parser
 
 import (
 	"errors"
-	"minesql/internal/planner/ast/identifier"
-	"minesql/internal/planner/ast/literal"
-	"minesql/internal/planner/ast/node"
-	"minesql/internal/planner/ast/statement"
+	"minesql/internal/ast"
 	"strings"
 )
 
@@ -13,7 +10,7 @@ type UpdateParser struct {
 	// 現在のステート
 	state ParserState
 	// 現在構築中の UPDATE 文
-	stmt *statement.UpdateStmt
+	stmt *ast.UpdateStmt
 	// WHERE 句パーサー
 	where WhereParser
 	// 現在構築中の SetClause のカラム名
@@ -28,7 +25,7 @@ func NewUpdateParser() *UpdateParser {
 	}
 }
 
-func (up *UpdateParser) getResult() node.ASTNode {
+func (up *UpdateParser) getResult() ast.Statement {
 	return up.stmt
 }
 
@@ -81,7 +78,7 @@ func (up *UpdateParser) OnKeyword(word string) {
 
 	switch upperWord {
 	case KUpdate:
-		up.stmt = &statement.UpdateStmt{StmtType: statement.StmtTypeUpdate}
+		up.stmt = &ast.UpdateStmt{StmtType: ast.StmtTypeUpdate}
 		up.state = UpdateStateUpdate
 		return
 
@@ -126,7 +123,7 @@ func (up *UpdateParser) OnIdentifier(ident string) {
 	switch up.state {
 	case UpdateStateUpdate:
 		// テーブル名
-		up.stmt.Table = *identifier.NewTableId(ident)
+		up.stmt.Table = *ast.NewTableId(ident)
 		up.state = UpdateStateTable
 	case UpdateStateSet:
 		// SET 句のカラム名
@@ -185,14 +182,14 @@ func (up *UpdateParser) OnString(value string) {
 	switch up.state {
 	case UpdateStateSetEq:
 		// SET 句の値
-		up.stmt.SetClauses = append(up.stmt.SetClauses, &statement.SetClause{
-			Column: *identifier.NewColumnId(up.currentSetCol),
-			Value:  literal.NewStringLiteral(value, value),
+		up.stmt.SetClauses = append(up.stmt.SetClauses, &ast.SetClause{
+			Column: *ast.NewColumnId(up.currentSetCol),
+			Value:  ast.NewStringLiteral(value, value),
 		})
 		up.currentSetCol = ""
 		up.state = UpdateStateSetVal
 	case UpdateStateWhere:
-		up.where.pushLiteral(literal.NewStringLiteral(value, value))
+		up.where.pushLiteral(ast.NewStringLiteral(value, value))
 	default:
 		up.setError(errors.New("[parse error] unexpected string: " + value))
 	}
@@ -206,14 +203,14 @@ func (up *UpdateParser) OnNumber(num string) {
 	switch up.state {
 	case UpdateStateSetEq:
 		// SET 句の値 (数値)
-		up.stmt.SetClauses = append(up.stmt.SetClauses, &statement.SetClause{
-			Column: *identifier.NewColumnId(up.currentSetCol),
-			Value:  literal.NewStringLiteral(num, num),
+		up.stmt.SetClauses = append(up.stmt.SetClauses, &ast.SetClause{
+			Column: *ast.NewColumnId(up.currentSetCol),
+			Value:  ast.NewStringLiteral(num, num),
 		})
 		up.currentSetCol = ""
 		up.state = UpdateStateSetVal
 	case UpdateStateWhere:
-		up.where.pushLiteral(literal.NewStringLiteral(num, num))
+		up.where.pushLiteral(ast.NewStringLiteral(num, num))
 	default:
 		up.setError(errors.New("[parse error] unexpected number: " + num))
 	}
