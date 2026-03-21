@@ -245,6 +245,55 @@ func ExampleIndexScan_constSearch() {
 	//   合計: 1 件
 }
 
+func ExampleProject() {
+	cleanup := setupExample()
+	defer cleanup()
+
+	// フルテーブルスキャンから first_name と last_name のみ取得
+	iter := NewProject(
+		NewTableScan(
+			"users",
+			access.RecordSearchModeStart{},
+			func(record Record) bool { return true },
+		),
+		[]uint16{1, 2},
+	)
+	printExampleRecords(iter)
+
+	// Output:
+	//   (Eve, Brown)
+	//   (Dave, Miller)
+	//   (Bob, Johnson)
+	//   (Charlie, Williams)
+	//   (Alice, Smith)
+	//   合計: 5 件
+}
+
+func ExampleProject_withFilter() {
+	cleanup := setupExample()
+	defer cleanup()
+
+	// first_name が "Charlie" のレコードから first_name と last_name を取得
+	iter := NewProject(
+		NewFilter(
+			NewTableScan(
+				"users",
+				access.RecordSearchModeStart{},
+				func(record Record) bool { return true },
+			),
+			func(record Record) bool {
+				return string(record[1]) == "Charlie"
+			},
+		),
+		[]uint16{1, 2},
+	)
+	printExampleRecords(iter)
+
+	// Output:
+	//   (Charlie, Williams)
+	//   合計: 1 件
+}
+
 func ExampleUpdate() {
 	cleanup := setupExample()
 	defer cleanup()
