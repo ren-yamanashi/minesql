@@ -8,41 +8,39 @@ type SetColumn struct {
 }
 
 type Update struct {
-	executor
-	tableName  string
-	SetColumns []SetColumn
-	Iterator   RecordIterator
+	tableName     string
+	SetColumns    []SetColumn
+	InnerExecutor Executor
 }
 
-func NewUpdate(tableName string, setColumns []SetColumn, iterator RecordIterator) *Update {
+func NewUpdate(tableName string, setColumns []SetColumn, innerExecutor Executor) *Update {
 	return &Update{
-		tableName:  tableName,
-		SetColumns: setColumns,
-		Iterator:   iterator,
+		tableName:     tableName,
+		SetColumns:    setColumns,
+		InnerExecutor: innerExecutor,
 	}
 }
 
-// Execute は Iterator を使用して検索条件に一致したレコードを更新する
-func (upd *Update) Execute() error {
+func (upd *Update) Next() (Record, error) {
 	sm := engine.Get()
 
 	tblMeta, err := sm.Catalog.GetTableMetadataByName(upd.tableName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	tbl, err := tblMeta.GetTable()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// 更新対象のレコードを先にすべて収集する
 	// (更新により Iterator が参照するページデータが破壊されるのを防ぐ)
 	var records []Record
 	for {
-		record, err := upd.Iterator.Next()
+		record, err := upd.InnerExecutor.Next()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if record == nil {
 			break
@@ -66,9 +64,9 @@ func (upd *Update) Execute() error {
 	for i, record := range records {
 		err = tbl.Update(sm.BufferPool, record, updatedRecords[i])
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return nil, nil
 }

@@ -3,39 +3,37 @@ package executor
 import "minesql/internal/engine"
 
 type Delete struct {
-	executor
-	tableName string
-	Iterator  RecordIterator
+	tableName     string
+	InnerExecutor Executor
 }
 
-func NewDelete(tableName string, iterator RecordIterator) *Delete {
+func NewDelete(tableName string, innerExecutor Executor) *Delete {
 	return &Delete{
-		tableName: tableName,
-		Iterator:  iterator,
+		tableName:     tableName,
+		InnerExecutor: innerExecutor,
 	}
 }
 
-// Execute は Iterator を使用して検索条件に一致したレコードを削除する
-func (del *Delete) Execute() error {
+func (del *Delete) Next() (Record, error) {
 	sm := engine.Get()
 
 	tblMeta, err := sm.Catalog.GetTableMetadataByName(del.tableName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	tbl, err := tblMeta.GetTable()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// 削除対象のレコードを先にすべて取得する
 	// (削除により Iterator が参照するページデータが破壊されるのを防ぐ)
 	var records []Record
 	for {
-		record, err := del.Iterator.Next()
+		record, err := del.InnerExecutor.Next()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		if record == nil {
 			break
@@ -47,9 +45,9 @@ func (del *Delete) Execute() error {
 	for _, record := range records {
 		err = tbl.Delete(sm.BufferPool, record)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
 
-	return nil
+	return nil, nil
 }

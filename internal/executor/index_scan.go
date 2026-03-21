@@ -5,8 +5,7 @@ import (
 	"minesql/internal/engine"
 )
 
-type SearchIndex struct {
-	executor
+type IndexScan struct {
 	tableName      string
 	indexName      string
 	searchMode     access.RecordSearchMode
@@ -14,13 +13,13 @@ type SearchIndex struct {
 	iterator       *access.SecondaryIndexIterator
 }
 
-func NewSearchIndex(
+func NewIndexScan(
 	tableName string,
 	indexName string,
 	searchMode access.RecordSearchMode,
 	whileCondition func(record Record) bool,
-) *SearchIndex {
-	return &SearchIndex{
+) *IndexScan {
+	return &IndexScan{
 		tableName:      tableName,
 		indexName:      indexName,
 		searchMode:     searchMode,
@@ -28,7 +27,7 @@ func NewSearchIndex(
 	}
 }
 
-func (is *SearchIndex) Next() (Record, error) {
+func (is *IndexScan) Next() (Record, error) {
 	sm := engine.Get()
 
 	// 初回実行時にイテレータを作成

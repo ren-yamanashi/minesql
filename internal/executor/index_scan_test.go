@@ -8,8 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewSearchIndex(t *testing.T) {
-	t.Run("正常に SearchIndex を作成できる", func(t *testing.T) {
+func TestNewIndexScan(t *testing.T) {
+	t.Run("正常に IndexScan を作成できる", func(t *testing.T) {
 		// GIVEN
 		tableName := "users"
 		indexName := "last_name"
@@ -18,7 +18,7 @@ func TestNewSearchIndex(t *testing.T) {
 		}
 
 		// WHEN
-		indexScan := NewSearchIndex(
+		indexScan := NewIndexScan(
 			tableName,
 			indexName,
 			access.RecordSearchModeStart{},
@@ -30,14 +30,14 @@ func TestNewSearchIndex(t *testing.T) {
 	})
 }
 
-func TestSearchIndex_Next(t *testing.T) {
+func TestIndexScan_Next(t *testing.T) {
 	t.Run("SearchModeStart を使用して Index 検索できる", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
 		// GIVEN
-		indexScan := NewSearchIndex(
+		indexScan := NewIndexScan(
 			"users",
 			"last_name",
 			access.RecordSearchModeStart{},
@@ -72,7 +72,7 @@ func TestSearchIndex_Next(t *testing.T) {
 		defer engine.Reset()
 
 		// GIVEN
-		indexScan := NewSearchIndex(
+		indexScan := NewIndexScan(
 			"users",
 			"last_name",
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("Doe")}},

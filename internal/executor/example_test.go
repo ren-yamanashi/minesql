@@ -43,7 +43,7 @@ func setupExample() func() {
 			{Name: "first_name", Type: catalog.ColumnTypeString},
 			{Name: "last_name", Type: catalog.ColumnTypeString},
 		})
-	if err := ct.Execute(); err != nil {
+	if _, err := ct.Next(); err != nil {
 		panic(err)
 	}
 
@@ -58,7 +58,7 @@ func setupExample() func() {
 			{[]byte("w"), []byte("Dave"), []byte("Miller")},
 			{[]byte("v"), []byte("Eve"), []byte("Brown")},
 		})
-	if err := ins.Execute(); err != nil {
+	if _, err := ins.Next(); err != nil {
 		panic(err)
 	}
 
@@ -66,8 +66,8 @@ func setupExample() func() {
 }
 
 // レコードを表示するヘルパー
-func printExampleRecords(iter RecordIterator) {
-	records, err := FetchAll(iter)
+func printExampleRecords(executor Executor) {
+	records, err := fetchAll(executor)
 	if err != nil {
 		panic(err)
 	}
@@ -81,12 +81,12 @@ func printExampleRecords(iter RecordIterator) {
 	fmt.Printf("  合計: %d 件\n", len(records))
 }
 
-func ExampleSearchTable_fullScan() {
+func ExampleTableScan_fullScan() {
 	cleanup := setupExample()
 	defer cleanup()
 
 	// フルテーブルスキャン (プライマリキー昇順)
-	iter := NewSearchTable(
+	iter := NewTableScan(
 		"users",
 		access.RecordSearchModeStart{},
 		func(record Record) bool { return true },
@@ -102,12 +102,12 @@ func ExampleSearchTable_fullScan() {
 	//   合計: 5 件
 }
 
-func ExampleSearchTable_rangeScan() {
+func ExampleTableScan_rangeScan() {
 	cleanup := setupExample()
 	defer cleanup()
 
 	// プライマリキーが "w" 以上 "y" 以下の範囲スキャン
-	iter := NewSearchTable(
+	iter := NewTableScan(
 		"users",
 		access.RecordSearchModeKey{Key: [][]byte{[]byte("w")}},
 		func(record Record) bool {
@@ -123,12 +123,12 @@ func ExampleSearchTable_rangeScan() {
 	//   合計: 3 件
 }
 
-func ExampleSearchTable_constSearch() {
+func ExampleTableScan_constSearch() {
 	cleanup := setupExample()
 	defer cleanup()
 
 	// プライマリキーが "y" のレコードを検索
-	iter := NewSearchTable(
+	iter := NewTableScan(
 		"users",
 		access.RecordSearchModeKey{Key: [][]byte{[]byte("y")}},
 		func(record Record) bool {
@@ -148,7 +148,7 @@ func ExampleFilter() {
 
 	// フルテーブルスキャン + first_name が "Charlie" のレコードのみフィルタ
 	iter := NewFilter(
-		NewSearchTable(
+		NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
@@ -164,13 +164,13 @@ func ExampleFilter() {
 	//   合計: 1 件
 }
 
-func ExampleSearchIndex_fullScan() {
+func ExampleIndexScan_fullScan() {
 	cleanup := setupExample()
 	defer cleanup()
 
 	// first_name のインデックスで全件スキャン (名前のアルファベット順)
 	fmt.Println("=== idx_first_name ===")
-	printExampleRecords(NewSearchIndex(
+	printExampleRecords(NewIndexScan(
 		"users",
 		"idx_first_name",
 		access.RecordSearchModeStart{},
@@ -179,7 +179,7 @@ func ExampleSearchIndex_fullScan() {
 
 	// last_name のインデックスで全件スキャン (姓のアルファベット順)
 	fmt.Println("=== idx_last_name ===")
-	printExampleRecords(NewSearchIndex(
+	printExampleRecords(NewIndexScan(
 		"users",
 		"idx_last_name",
 		access.RecordSearchModeStart{},
@@ -203,12 +203,12 @@ func ExampleSearchIndex_fullScan() {
 	//   合計: 5 件
 }
 
-func ExampleSearchIndex_rangeScan() {
+func ExampleIndexScan_rangeScan() {
 	cleanup := setupExample()
 	defer cleanup()
 
 	// 姓が "J" 以上 "N" 未満の範囲をインデックスで検索
-	iter := NewSearchIndex(
+	iter := NewIndexScan(
 		"users",
 		"idx_last_name",
 		access.RecordSearchModeKey{Key: [][]byte{[]byte("J")}},
@@ -225,12 +225,12 @@ func ExampleSearchIndex_rangeScan() {
 	//   合計: 2 件
 }
 
-func ExampleSearchIndex_constSearch() {
+func ExampleIndexScan_constSearch() {
 	cleanup := setupExample()
 	defer cleanup()
 
 	// 姓が "Miller" のレコードをインデックスで検索
-	iter := NewSearchIndex(
+	iter := NewIndexScan(
 		"users",
 		"idx_last_name",
 		access.RecordSearchModeKey{Key: [][]byte{[]byte("Miller")}},
@@ -253,7 +253,7 @@ func ExampleUpdate() {
 	upd := NewUpdate("users", []SetColumn{
 		{Pos: 2, Value: []byte("Anderson")},
 	}, NewFilter(
-		NewSearchTable(
+		NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
@@ -262,19 +262,19 @@ func ExampleUpdate() {
 			return string(record[1]) == "Alice"
 		},
 	))
-	if err := upd.Execute(); err != nil {
+	if _, err := upd.Next(); err != nil {
 		panic(err)
 	}
 
 	fmt.Println("=== テーブルスキャン ===")
-	printExampleRecords(NewSearchTable(
+	printExampleRecords(NewTableScan(
 		"users",
 		access.RecordSearchModeStart{},
 		func(record Record) bool { return true },
 	))
 
 	fmt.Println("=== インデックススキャン (idx_last_name) ===")
-	printExampleRecords(NewSearchIndex(
+	printExampleRecords(NewIndexScan(
 		"users",
 		"idx_last_name",
 		access.RecordSearchModeStart{},
@@ -305,18 +305,18 @@ func ExampleUpdate_primaryKey() {
 	// プライマリキー "v" (Eve) を "a" に変更
 	upd := NewUpdate("users", []SetColumn{
 		{Pos: 0, Value: []byte("a")},
-	}, NewSearchTable(
+	}, NewTableScan(
 		"users",
 		access.RecordSearchModeKey{Key: [][]byte{[]byte("v")}},
 		func(record Record) bool {
 			return string(record[0]) == "v"
 		},
 	))
-	if err := upd.Execute(); err != nil {
+	if _, err := upd.Next(); err != nil {
 		panic(err)
 	}
 
-	printExampleRecords(NewSearchTable(
+	printExampleRecords(NewTableScan(
 		"users",
 		access.RecordSearchModeStart{},
 		func(record Record) bool { return true },
@@ -337,7 +337,7 @@ func ExampleDelete() {
 
 	// first_name が "Bob" のレコードを削除
 	del := NewDelete("users", NewFilter(
-		NewSearchTable(
+		NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
@@ -346,19 +346,19 @@ func ExampleDelete() {
 			return string(record[1]) == "Bob"
 		},
 	))
-	if err := del.Execute(); err != nil {
+	if _, err := del.Next(); err != nil {
 		panic(err)
 	}
 
 	fmt.Println("=== テーブルスキャン ===")
-	printExampleRecords(NewSearchTable(
+	printExampleRecords(NewTableScan(
 		"users",
 		access.RecordSearchModeStart{},
 		func(record Record) bool { return true },
 	))
 
 	fmt.Println("=== インデックススキャン (idx_last_name) ===")
-	printExampleRecords(NewSearchIndex(
+	printExampleRecords(NewIndexScan(
 		"users",
 		"idx_last_name",
 		access.RecordSearchModeStart{},

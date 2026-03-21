@@ -16,7 +16,7 @@ func TestNewUpdate(t *testing.T) {
 		setColumns := []SetColumn{
 			{Pos: 1, Value: []byte("Jane")},
 		}
-		iterator := NewSearchTable(
+		iterator := NewTableScan(
 			tableName,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
@@ -29,11 +29,11 @@ func TestNewUpdate(t *testing.T) {
 		assert.NotNil(t, upd)
 		assert.Equal(t, tableName, upd.tableName)
 		assert.Equal(t, setColumns, upd.SetColumns)
-		assert.NotNil(t, upd.Iterator)
+		assert.NotNil(t, upd.InnerExecutor)
 	})
 }
 
-func TestUpdate_Execute(t *testing.T) {
+func TestUpdate_Next(t *testing.T) {
 	t.Run("全レコードの value を更新できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
@@ -42,25 +42,25 @@ func TestUpdate_Execute(t *testing.T) {
 
 		upd := NewUpdate("users", []SetColumn{
 			{Pos: 1, Value: []byte("Updated")},
-		}, NewSearchTable(
+		}, NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
 		// WHEN
-		err := upd.Execute()
+		_, err := upd.Next()
 
 		// THEN: 更新が成功する
 		assert.NoError(t, err)
 
 		// THEN: 全レコードの first_name が "Updated" になっている
-		scan := NewSearchTable(
+		scan := NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
-		results, err := FetchAll(scan)
+		results, err := fetchAll(scan)
 		assert.NoError(t, err)
 		assert.Equal(t, 5, len(results))
 		for _, record := range results {
@@ -78,7 +78,7 @@ func TestUpdate_Execute(t *testing.T) {
 		upd := NewUpdate("users", []SetColumn{
 			{Pos: 1, Value: []byte("Jane")},
 			{Pos: 2, Value: []byte("Updated")},
-		}, NewSearchTable(
+		}, NewTableScan(
 			"users",
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
@@ -87,18 +87,18 @@ func TestUpdate_Execute(t *testing.T) {
 		))
 
 		// WHEN
-		err := upd.Execute()
+		_, err := upd.Next()
 
 		// THEN: 更新が成功する
 		assert.NoError(t, err)
 
 		// THEN: "a" のレコードが更新され、他は変わらない
-		scan := NewSearchTable(
+		scan := NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
-		results, err := FetchAll(scan)
+		results, err := fetchAll(scan)
 		assert.NoError(t, err)
 		assert.Equal(t, 5, len(results))
 		assert.Equal(t, Record{[]byte("a"), []byte("Jane"), []byte("Updated")}, results[0])
@@ -115,7 +115,7 @@ func TestUpdate_Execute(t *testing.T) {
 		upd := NewUpdate("users", []SetColumn{
 			{Pos: 2, Value: []byte("Williams")},
 		}, NewFilter(
-			NewSearchTable(
+			NewTableScan(
 				"users",
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
@@ -126,18 +126,18 @@ func TestUpdate_Execute(t *testing.T) {
 		))
 
 		// WHEN
-		err := upd.Execute()
+		_, err := upd.Next()
 
 		// THEN: 更新が成功する
 		assert.NoError(t, err)
 
 		// THEN: "Bob" の last_name が "Williams" に更新され、他は変わらない
-		scan := NewSearchTable(
+		scan := NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
-		results, err := FetchAll(scan)
+		results, err := fetchAll(scan)
 		assert.NoError(t, err)
 		assert.Equal(t, 5, len(results))
 		// "c" = Bob のレコード
@@ -158,7 +158,7 @@ func TestUpdate_Execute(t *testing.T) {
 		// "a" (last_name = "Doe") の last_name を "Zebra" に更新
 		upd := NewUpdate("users", []SetColumn{
 			{Pos: 2, Value: []byte("Zebra")},
-		}, NewSearchTable(
+		}, NewTableScan(
 			"users",
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
@@ -167,14 +167,14 @@ func TestUpdate_Execute(t *testing.T) {
 		))
 
 		// WHEN
-		err := upd.Execute()
+		_, err := upd.Next()
 
 		// THEN: 更新が成功する
 		assert.NoError(t, err)
 
 		// THEN: ユニークインデックスで "Zebra" が検索できる
 		// SearchIndex の whileCondition にはデコードされたセカンダリキーのみ渡される
-		indexScan := NewSearchIndex(
+		indexScan := NewIndexScan(
 			"users",
 			"last_name",
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("Zebra")}},
@@ -182,13 +182,13 @@ func TestUpdate_Execute(t *testing.T) {
 				return string(record[0]) == "Zebra"
 			},
 		)
-		results, err := FetchAll(indexScan)
+		results, err := fetchAll(indexScan)
 		assert.NoError(t, err)
 		assert.Equal(t, 1, len(results))
 		assert.Equal(t, Record{[]byte("a"), []byte("John"), []byte("Zebra")}, results[0])
 
 		// THEN: ユニークインデックスで旧値 "Doe" が検索できない
-		indexScanOld := NewSearchIndex(
+		indexScanOld := NewIndexScan(
 			"users",
 			"last_name",
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("Doe")}},
@@ -196,7 +196,7 @@ func TestUpdate_Execute(t *testing.T) {
 				return string(record[0]) == "Doe"
 			},
 		)
-		resultsOld, err := FetchAll(indexScanOld)
+		resultsOld, err := fetchAll(indexScanOld)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, len(resultsOld))
 	})
@@ -209,14 +209,14 @@ func TestUpdate_Execute(t *testing.T) {
 
 		upd := NewUpdate("nonexistent", []SetColumn{
 			{Pos: 1, Value: []byte("val")},
-		}, NewSearchTable(
+		}, NewTableScan(
 			"nonexistent",
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
 		// WHEN
-		err := upd.Execute()
+		_, err := upd.Next()
 
 		// THEN
 		assert.Error(t, err)
@@ -231,7 +231,7 @@ func TestUpdate_Execute(t *testing.T) {
 		// プライマリキーを "a" → "z" に変更
 		upd := NewUpdate("users", []SetColumn{
 			{Pos: 0, Value: []byte("z")},
-		}, NewSearchTable(
+		}, NewTableScan(
 			"users",
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
@@ -240,18 +240,18 @@ func TestUpdate_Execute(t *testing.T) {
 		))
 
 		// WHEN
-		err := upd.Execute()
+		_, err := upd.Next()
 
 		// THEN: 更新が成功する
 		assert.NoError(t, err)
 
 		// THEN: "a" が消え "z" が追加されている
-		scan := NewSearchTable(
+		scan := NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
-		results, err := FetchAll(scan)
+		results, err := fetchAll(scan)
 		assert.NoError(t, err)
 		assert.Equal(t, 5, len(results))
 		// "a" は存在しない
@@ -272,7 +272,7 @@ func TestUpdate_Execute(t *testing.T) {
 		upd := NewUpdate("users", []SetColumn{
 			{Pos: 2, Value: []byte("Changed")},
 		}, NewFilter(
-			NewSearchTable(
+			NewTableScan(
 				"users",
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
@@ -283,18 +283,18 @@ func TestUpdate_Execute(t *testing.T) {
 		))
 
 		// WHEN
-		err := upd.Execute()
+		_, err := upd.Next()
 
 		// THEN: エラーなしで正常終了
 		assert.NoError(t, err)
 
 		// THEN: 全レコードが変更されていない
-		scan := NewSearchTable(
+		scan := NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
-		results, err := FetchAll(scan)
+		results, err := fetchAll(scan)
 		assert.NoError(t, err)
 		assert.Equal(t, 5, len(results))
 		assert.Equal(t, []byte("Doe"), results[0][2])
@@ -318,14 +318,14 @@ func TestUpdate_Execute(t *testing.T) {
 
 		upd := NewUpdate("empty_table", []SetColumn{
 			{Pos: 1, Value: []byte("new_value")},
-		}, NewSearchTable(
+		}, NewTableScan(
 			"empty_table",
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
 		// WHEN
-		err := upd.Execute()
+		_, err := upd.Next()
 
 		// THEN
 		assert.NoError(t, err)

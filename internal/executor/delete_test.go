@@ -14,7 +14,7 @@ func TestNewDelete(t *testing.T) {
 	t.Run("正常に Delete Executor を生成できる", func(t *testing.T) {
 		// GIVEN
 		tableName := "users"
-		iterator := NewSearchTable(
+		iterator := NewTableScan(
 			tableName,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
@@ -26,36 +26,36 @@ func TestNewDelete(t *testing.T) {
 		// THEN
 		assert.NotNil(t, del)
 		assert.Equal(t, tableName, del.tableName)
-		assert.NotNil(t, del.Iterator)
+		assert.NotNil(t, del.InnerExecutor)
 	})
 }
 
-func TestDelete_Execute(t *testing.T) {
+func TestDelete_Next(t *testing.T) {
 	t.Run("SearchTable を使って全レコードを削除できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
-		del := NewDelete("users", NewSearchTable(
+		del := NewDelete("users", NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
 		// WHEN
-		err := del.Execute()
+		_, err := del.Next()
 
 		// THEN: 削除が成功する
 		assert.NoError(t, err)
 
 		// THEN: テーブルが空になっている
-		scan := NewSearchTable(
+		scan := NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
-		results, err := FetchAll(scan)
+		results, err := fetchAll(scan)
 		assert.NoError(t, err)
 		assert.Equal(t, 0, len(results))
 	})
@@ -67,7 +67,7 @@ func TestDelete_Execute(t *testing.T) {
 		defer engine.Reset()
 
 		// プライマリキーが "c" 未満のレコードを削除対象とする
-		iterator := NewSearchTable(
+		iterator := NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record Record) bool {
@@ -77,18 +77,18 @@ func TestDelete_Execute(t *testing.T) {
 		del := NewDelete("users", iterator)
 
 		// WHEN
-		err := del.Execute()
+		_, err := del.Next()
 
 		// THEN: 削除が成功する
 		assert.NoError(t, err)
 
 		// THEN: "c" 以降のレコードが残っている
-		scan := NewSearchTable(
+		scan := NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
-		results, err := FetchAll(scan)
+		results, err := fetchAll(scan)
 		assert.NoError(t, err)
 		assert.Equal(t, 3, len(results))
 		assert.Equal(t, []byte("c"), results[0][0])
@@ -104,7 +104,7 @@ func TestDelete_Execute(t *testing.T) {
 
 		// first_name が "Bob" のレコードを削除
 		iterator := NewFilter(
-			NewSearchTable(
+			NewTableScan(
 				"users",
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
@@ -116,18 +116,18 @@ func TestDelete_Execute(t *testing.T) {
 		del := NewDelete("users", iterator)
 
 		// WHEN
-		err := del.Execute()
+		_, err := del.Next()
 
 		// THEN: 削除が成功する
 		assert.NoError(t, err)
 
 		// THEN: "Bob" 以外のレコードが残っている
-		scan := NewSearchTable(
+		scan := NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
-		results, err := FetchAll(scan)
+		results, err := fetchAll(scan)
 		assert.NoError(t, err)
 		assert.Equal(t, 4, len(results))
 		for _, record := range results {
@@ -142,7 +142,7 @@ func TestDelete_Execute(t *testing.T) {
 		defer engine.Reset()
 
 		// プライマリキーが "a" のレコードを削除 (last_name = "Doe")
-		iterator := NewSearchTable(
+		iterator := NewTableScan(
 			"users",
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
@@ -152,19 +152,19 @@ func TestDelete_Execute(t *testing.T) {
 		del := NewDelete("users", iterator)
 
 		// WHEN
-		err := del.Execute()
+		_, err := del.Next()
 
 		// THEN: 削除が成功する
 		assert.NoError(t, err)
 
 		// THEN: ユニークインデックスからも "Doe" が削除されている
-		indexScan := NewSearchIndex(
+		indexScan := NewIndexScan(
 			"users",
 			"last_name",
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
-		results, err := FetchAll(indexScan)
+		results, err := fetchAll(indexScan)
 		assert.NoError(t, err)
 		assert.Equal(t, 4, len(results))
 		for _, record := range results {
@@ -184,14 +184,14 @@ func TestDelete_Execute(t *testing.T) {
 			{Name: "value", Type: catalog.ColumnTypeString},
 		})
 
-		del := NewDelete("empty_table", NewSearchTable(
+		del := NewDelete("empty_table", NewTableScan(
 			"empty_table",
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
 		// WHEN
-		err := del.Execute()
+		_, err := del.Next()
 
 		// THEN
 		assert.NoError(t, err)

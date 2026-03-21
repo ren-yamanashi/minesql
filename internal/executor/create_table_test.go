@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateTable_Execute(t *testing.T) {
+func TestCreateTable_Next(t *testing.T) {
 	t.Run("テーブルを作成できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
@@ -19,7 +19,7 @@ func TestCreateTable_Execute(t *testing.T) {
 		createTable := NewCreateTable("users", 1, nil, nil)
 
 		// WHEN
-		err := createTable.Execute()
+		_, err := createTable.Next()
 
 		// THEN
 		assert.NoError(t, err)
@@ -45,7 +45,7 @@ func TestCreateTable_Execute(t *testing.T) {
 		})
 
 		// WHEN
-		err := createTable.Execute()
+		_, err := createTable.Next()
 
 		// THEN
 		assert.NoError(t, err)
@@ -78,7 +78,7 @@ func TestCreateTable_Execute(t *testing.T) {
 		}, nil)
 
 		// WHEN
-		err := createTable.Execute()
+		_, err := createTable.Next()
 		assert.NoError(t, err)
 
 		// THEN
@@ -100,7 +100,7 @@ func TestCreateTable_Execute(t *testing.T) {
 		createTable := NewCreateTable("users", 1, nil, nil)
 
 		// WHEN
-		err := createTable.Execute()
+		_, err := createTable.Next()
 		assert.NoError(t, err)
 
 		// THEN

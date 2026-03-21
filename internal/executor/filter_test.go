@@ -11,7 +11,7 @@ import (
 func TestNewFilter(t *testing.T) {
 	t.Run("正常に Filter を作成できる", func(t *testing.T) {
 		// GIVEN
-		dummyInnerExecutor := NewSearchTable(
+		dummyInnerExecutor := NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
@@ -35,7 +35,7 @@ func TestNext(t *testing.T) {
 		defer engine.Reset()
 
 		// GIVEN
-		seqScan := NewSearchTable(
+		seqScan := NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
@@ -60,7 +60,7 @@ func TestNext(t *testing.T) {
 		defer engine.Reset()
 
 		// GIVEN
-		seqScan := NewSearchTable(
+		seqScan := NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },

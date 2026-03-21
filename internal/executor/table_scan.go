@@ -5,27 +5,26 @@ import (
 	"minesql/internal/engine"
 )
 
-type SearchTable struct {
-	executor
+type TableScan struct {
 	whileCondition func(record Record) bool // 継続条件を満たすかどうかを判定する関数
 	iterator       *access.ClusteredIndexIterator
 	tableName      string
 	searchMode     access.RecordSearchMode
 }
 
-func NewSearchTable(
+func NewTableScan(
 	tableName string,
 	searchMode access.RecordSearchMode,
 	whileCondition func(record Record) bool,
-) *SearchTable {
-	return &SearchTable{
+) *TableScan {
+	return &TableScan{
 		tableName:      tableName,
 		searchMode:     searchMode,
 		whileCondition: whileCondition,
 	}
 }
 
-func (ss *SearchTable) Next() (Record, error) {
+func (ss *TableScan) Next() (Record, error) {
 	sm := engine.Get()
 
 	// 初回実行時はイテレータを作成

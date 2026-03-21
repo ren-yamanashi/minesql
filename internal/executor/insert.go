@@ -5,7 +5,6 @@ import (
 )
 
 type Insert struct {
-	executor
 	tableName string
 	colNames  []string
 	records   []Record
@@ -19,25 +18,24 @@ func NewInsert(tableName string, colNames []string, records []Record) *Insert {
 	}
 }
 
-// Execute はレコードをテーブルに挿入する
-func (ins *Insert) Execute() error {
+func (ins *Insert) Next() (Record, error) {
 	sm := engine.Get()
 
 	tblMeta, err := sm.Catalog.GetTableMetadataByName(ins.tableName)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	tbl, err := tblMeta.GetTable()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	for _, record := range ins.records {
 		err := tbl.Insert(sm.BufferPool, record)
 		if err != nil {
-			return err
+			return nil, err
 		}
 	}
-	return nil
+	return nil, nil
 }

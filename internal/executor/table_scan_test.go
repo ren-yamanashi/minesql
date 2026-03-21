@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewSearchTable(t *testing.T) {
-	t.Run("正常に SearchTable を作成できる", func(t *testing.T) {
+func TestNewTableScan(t *testing.T) {
+	t.Run("正常に TableScan を作成できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
@@ -21,7 +21,7 @@ func TestNewSearchTable(t *testing.T) {
 		}
 
 		// WHEN
-		seqScan := NewSearchTable(
+		seqScan := NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			whileCondition,
@@ -33,14 +33,14 @@ func TestNewSearchTable(t *testing.T) {
 	})
 }
 
-func TestSearchTable_Next(t *testing.T) {
+func TestTableScan_Next(t *testing.T) {
 	t.Run("SearchModeStart を使用してテーブルを検索できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
-		seqScan := NewSearchTable(
+		seqScan := NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record Record) bool {
@@ -73,7 +73,7 @@ func TestSearchTable_Next(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
-		seqScan := NewSearchTable(
+		seqScan := NewTableScan(
 			"users",
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("b")}},
 			func(record Record) bool {
@@ -121,7 +121,7 @@ func InitStorageEngineForTest(t *testing.T, dataDir string) *engine.Engine {
 		{Name: "first_name", Type: catalog.ColumnTypeString},
 		{Name: "last_name", Type: catalog.ColumnTypeString},
 	})
-	err := createTable.Execute()
+	_, err := createTable.Next()
 	assert.NoError(t, err)
 
 	tblMeta, err := sm.Catalog.GetTableMetadataByName("users")
