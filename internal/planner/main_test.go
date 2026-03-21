@@ -11,25 +11,27 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// Executor から全レコードを取得する
+func fetchAll(t *testing.T, iter executor.Executor) []executor.Record {
+	t.Helper()
+	var records []executor.Record
+	for {
+		record, err := iter.Next()
+		assert.NoError(t, err)
+		if record == nil {
+			return records
+		}
+		records = append(records, record)
+	}
+}
+
 // AST を直接構築 → PlanStart → ExecutePlan で実行する
 func executePlan(t *testing.T, stmt ast.Statement) []executor.Record {
 	t.Helper()
 	exec, err := PlanStart(stmt)
 	assert.NoError(t, err)
 
-	switch e := exec.(type) {
-	case executor.RecordIterator:
-		records, err := executor.FetchAll(e)
-		assert.NoError(t, err)
-		return records
-	case executor.Mutator:
-		err := e.Execute()
-		assert.NoError(t, err)
-		return nil
-	default:
-		t.Fatalf("unsupported executor type: %T", exec)
-		return nil
-	}
+	return fetchAll(t, exec)
 }
 
 // ストレージを初期化し、5 カラムの users テーブルを作成してデータを投入する

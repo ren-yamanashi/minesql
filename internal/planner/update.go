@@ -9,17 +9,17 @@ import (
 
 type Update struct {
 	Stmt     *ast.UpdateStmt
-	Iterator executor.RecordIterator
+	Iterator executor.Executor
 }
 
-func NewUpdate(stmt *ast.UpdateStmt, iterator executor.RecordIterator) *Update {
+func NewUpdate(stmt *ast.UpdateStmt, iterator executor.Executor) *Update {
 	return &Update{
 		Stmt:     stmt,
 		Iterator: iterator,
 	}
 }
 
-func (up *Update) Build() (executor.Mutator, error) {
+func (up *Update) Build() (executor.Executor, error) {
 	sm := engine.Get()
 	tblMeta, err := sm.Catalog.GetTableMetadataByName(up.Stmt.Table.TableName)
 	if err != nil {

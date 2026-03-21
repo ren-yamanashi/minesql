@@ -9,15 +9,18 @@ import (
 	"os"
 )
 
-// Executor を実行し、レコードを返すヘルパー
+// Executor から全レコードを取得する
 func executePlan(exec executor.Executor) ([]executor.Record, error) {
-	switch e := exec.(type) {
-	case executor.RecordIterator:
-		return executor.FetchAll(e)
-	case executor.Mutator:
-		return nil, e.Execute()
-	default:
-		return nil, fmt.Errorf("unsupported executor type: %T", exec)
+	var records []executor.Record
+	for {
+		record, err := exec.Next()
+		if err != nil {
+			return nil, err
+		}
+		if record == nil {
+			return records, nil
+		}
+		records = append(records, record)
 	}
 }
 

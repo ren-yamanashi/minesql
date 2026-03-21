@@ -11,65 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// 5 人のユーザーを持つテーブルを作成する (executor example と同じデータ)
-func setupExecutorTestTable(t *testing.T) {
-	t.Helper()
-
-	tmpdir := t.TempDir()
-	t.Setenv("MINESQL_DATA_DIR", tmpdir)
-	t.Setenv("MINESQL_BUFFER_SIZE", "100")
-	engine.Reset()
-	engine.Init()
-
-	createTable := NewCreateTable(
-		"users",
-		1,
-		[]*IndexParam{
-			{Name: "idx_first_name", ColName: "first_name", SecondaryKey: 1},
-			{Name: "idx_last_name", ColName: "last_name", SecondaryKey: 2},
-		},
-		[]*ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "first_name", Type: catalog.ColumnTypeString},
-			{Name: "last_name", Type: catalog.ColumnTypeString},
-		})
-	_, err := createTable.Next()
-	assert.NoError(t, err)
-
-	insert := NewInsert(
-		"users",
-		[]string{"id", "first_name", "last_name"},
-		[]Record{
-			{[]byte("z"), []byte("Alice"), []byte("Smith")},
-			{[]byte("x"), []byte("Bob"), []byte("Johnson")},
-			{[]byte("y"), []byte("Charlie"), []byte("Williams")},
-			{[]byte("w"), []byte("Dave"), []byte("Miller")},
-			{[]byte("v"), []byte("Eve"), []byte("Brown")},
-		})
-	_, err = insert.Next()
-	assert.NoError(t, err)
-}
-
-// Executor から全レコードを取得する
-func collectAll(t *testing.T, executor Executor) []Record {
-	t.Helper()
-	records, err := fetchAll(executor)
-	assert.NoError(t, err)
-	return records
-}
-
-// レコード一覧を strings.Builder に書き込む
-func writeRecords(sb *strings.Builder, records []Record) {
-	for _, r := range records {
-		vals := make([]string, len(r))
-		for i, col := range r {
-			vals[i] = string(col)
-		}
-		fmt.Fprintf(sb, "  (%s)\n", strings.Join(vals, ", "))
-	}
-	fmt.Fprintf(sb, "  合計: %d 件\n", len(records))
-}
-
 func TestExecutorIntegration(t *testing.T) {
 	t.Run("フルテーブルスキャンで全レコードを取得できる", func(t *testing.T) {
 		// GIVEN
@@ -420,6 +361,53 @@ func TestExecutorIntegration(t *testing.T) {
 	})
 }
 
+// 5 人のユーザーを持つテーブルを作成する (executor example と同じデータ)
+func setupExecutorTestTable(t *testing.T) {
+	t.Helper()
+
+	tmpdir := t.TempDir()
+	t.Setenv("MINESQL_DATA_DIR", tmpdir)
+	t.Setenv("MINESQL_BUFFER_SIZE", "100")
+	engine.Reset()
+	engine.Init()
+
+	createTable := NewCreateTable(
+		"users",
+		1,
+		[]*IndexParam{
+			{Name: "idx_first_name", ColName: "first_name", SecondaryKey: 1},
+			{Name: "idx_last_name", ColName: "last_name", SecondaryKey: 2},
+		},
+		[]*ColumnParam{
+			{Name: "id", Type: catalog.ColumnTypeString},
+			{Name: "first_name", Type: catalog.ColumnTypeString},
+			{Name: "last_name", Type: catalog.ColumnTypeString},
+		})
+	_, err := createTable.Next()
+	assert.NoError(t, err)
+
+	insert := NewInsert(
+		"users",
+		[]string{"id", "first_name", "last_name"},
+		[]Record{
+			{[]byte("z"), []byte("Alice"), []byte("Smith")},
+			{[]byte("x"), []byte("Bob"), []byte("Johnson")},
+			{[]byte("y"), []byte("Charlie"), []byte("Williams")},
+			{[]byte("w"), []byte("Dave"), []byte("Miller")},
+			{[]byte("v"), []byte("Eve"), []byte("Brown")},
+		})
+	_, err = insert.Next()
+	assert.NoError(t, err)
+}
+
+// Executor から全レコードを取得する
+func collectAll(t *testing.T, executor Executor) []Record {
+	t.Helper()
+	records, err := fetchAll(executor)
+	assert.NoError(t, err)
+	return records
+}
+
 func fetchAll(iter Executor) ([]Record, error) {
 	var results []Record
 	for {
@@ -433,4 +421,16 @@ func fetchAll(iter Executor) ([]Record, error) {
 		results = append(results, record)
 	}
 	return results, nil
+}
+
+// レコード一覧を strings.Builder に書き込む
+func writeRecords(sb *strings.Builder, records []Record) {
+	for _, r := range records {
+		vals := make([]string, len(r))
+		for i, col := range r {
+			vals[i] = string(col)
+		}
+		fmt.Fprintf(sb, "  (%s)\n", strings.Join(vals, ", "))
+	}
+	fmt.Fprintf(sb, "  合計: %d 件\n", len(records))
 }

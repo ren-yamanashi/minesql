@@ -24,7 +24,7 @@ func NewSearch(tableName string, where *ast.WhereClause) *Search {
 }
 
 // Build は WHERE 句を元に検索用の Executor を構築する
-func (sp *Search) Build() (executor.RecordIterator, error) {
+func (sp *Search) Build() (executor.Executor, error) {
 	sm := engine.Get()
 
 	if sp.TableName == "" {
@@ -38,7 +38,7 @@ func (sp *Search) Build() (executor.RecordIterator, error) {
 
 	// WHERE 句が設定されていない場合フルテーブルスキャンを実行
 	if sp.Where == nil || !sp.Where.IsSet {
-		return executor.NewSearchTable(
+		return executor.NewTableScan(
 			sp.TableName,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool {
@@ -57,7 +57,7 @@ func (sp *Search) Build() (executor.RecordIterator, error) {
 }
 
 // planForBinaryExpr は二項演算式を解析して適切な検索用の Executor を構築する
-func planForBinaryExpr(tableName string, tblMeta *catalog.TableMetadata, expr ast.BinaryExpr) (executor.RecordIterator, error) {
+func planForBinaryExpr(tableName string, tblMeta *catalog.TableMetadata, expr ast.BinaryExpr) (executor.Executor, error) {
 	switch lhs := expr.Left.(type) {
 
 	// 左辺がカラムの場合 (例: WHERE col = 5)
@@ -76,7 +76,7 @@ func planForBinaryExpr(tableName string, tblMeta *catalog.TableMetadata, expr as
 				if err != nil {
 					return nil, err
 				}
-				return executor.NewSearchIndex(
+				return executor.NewIndexScan(
 					tableName,
 					idxMeta.Name,
 					access.RecordSearchModeKey{Key: [][]byte{rhs.Literal.ToBytes()}},
@@ -93,7 +93,7 @@ func planForBinaryExpr(tableName string, tblMeta *catalog.TableMetadata, expr as
 			if err != nil {
 				return nil, err
 			}
-			return executor.NewSearchTable(
+			return executor.NewTableScan(
 				tableName,
 				access.RecordSearchModeKey{Key: [][]byte{rhs.Literal.ToBytes()}},
 				cond,
@@ -112,7 +112,7 @@ func planForBinaryExpr(tableName string, tblMeta *catalog.TableMetadata, expr as
 
 		// 全件スキャン -> 条件の適用 の流れで実行する (フィルタリング用の executor の innerExecutor としてテーブルスキャン用の executor を渡す)
 		return executor.NewFilter(
-			executor.NewSearchTable( // innerExecutor としてテーブルスキャン用の executor を渡す
+			executor.NewTableScan( // innerExecutor としてテーブルスキャン用の executor を渡す
 				tableName,
 				access.RecordSearchModeStart{},
 				func(record executor.Record) bool {

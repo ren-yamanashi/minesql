@@ -42,7 +42,7 @@ func TestSearch(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, exec)
-		assert.IsType(t, &executor.SearchTable{}, exec)
+		assert.IsType(t, &executor.TableScan{}, exec)
 	})
 
 	t.Run("WHERE 句でインデックス付きカラムを指定した場合、IndexScan が生成される", func(t *testing.T) {
@@ -67,7 +67,7 @@ func TestSearch(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, exec)
-		assert.IsType(t, &executor.SearchIndex{}, exec)
+		assert.IsType(t, &executor.IndexScan{}, exec)
 	})
 
 	t.Run("WHERE 句でインデックスなしカラムを指定した場合、SequentialScan が生成される", func(t *testing.T) {
@@ -92,7 +92,7 @@ func TestSearch(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, exec)
-		assert.IsType(t, &executor.SearchTable{}, exec)
+		assert.IsType(t, &executor.TableScan{}, exec)
 	})
 
 	t.Run("WHERE 句で存在しないカラムを指定した場合、エラーを返す", func(t *testing.T) {
@@ -468,16 +468,14 @@ func TestComplexWhereWithData(t *testing.T) {
 		insertPlanner := NewInsert(insertStmt)
 		insertExec, err := insertPlanner.Build()
 		assert.NoError(t, err)
-		err = insertExec.Execute()
+		_, err = insertExec.Next()
 		assert.NoError(t, err)
 	}
 
 	// 検索結果を収集するヘルパー
-	collectResults := func(t *testing.T, iter executor.RecordIterator) []executor.Record {
+	collectResults := func(t *testing.T, iter executor.Executor) []executor.Record {
 		t.Helper()
-		results, err := executor.FetchAll(iter)
-		assert.NoError(t, err)
-		return results
+		return fetchAll(t, iter)
 	}
 
 	t.Run("AND 条件でデータをフィルタリングできる", func(t *testing.T) {
@@ -761,6 +759,6 @@ func initStorageManager(t *testing.T, dataDir string) {
 		{Name: "first_name", Type: catalog.ColumnTypeString},
 		{Name: "last_name", Type: catalog.ColumnTypeString},
 	})
-	err := createTable.Execute()
+	_, err := createTable.Next()
 	assert.NoError(t, err)
 }

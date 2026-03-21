@@ -17,7 +17,7 @@ func NewInsert(stmt *ast.InsertStmt) *Insert {
 	}
 }
 
-func (ip *Insert) Build() (executor.Mutator, error) {
+func (ip *Insert) Build() (executor.Executor, error) {
 	if len(ip.Stmt.Cols) == 0 {
 		return nil, errors.New("column names cannot be empty")
 	}

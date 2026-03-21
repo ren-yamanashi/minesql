@@ -168,28 +168,28 @@ func (s *Server) executeQuery(sql string) (string, error) {
 		return "", err
 	}
 
-	switch e := exec.(type) {
-	case executor.RecordIterator:
-		records, err := executor.FetchAll(e)
+	var records []executor.Record
+	for {
+		record, err := exec.Next()
 		if err != nil {
 			return "", err
 		}
-
-		// 一旦、レスポンスは csv 形式で返す
-		var msg strings.Builder
-		for _, record := range records {
-			line := make([]string, len(record))
-			for i, col := range record {
-				line[i] = string(col)
-			}
-			msg.WriteString(strings.Join(line, ",") + "\n")
+		if record == nil {
+			break
 		}
-		return msg.String(), nil
-	case executor.Mutator:
-		return "", e.Execute()
-	default:
-		return "", fmt.Errorf("unsupported executor type: %T", exec)
+		records = append(records, record)
 	}
+
+	// 一旦、レスポンスは csv 形式で返す
+	var msg strings.Builder
+	for _, record := range records {
+		line := make([]string, len(record))
+		for i, col := range record {
+			line[i] = string(col)
+		}
+		msg.WriteString(strings.Join(line, ",") + "\n")
+	}
+	return msg.String(), nil
 }
 
 // [Header 4 byte][Body N byte] を読み込む

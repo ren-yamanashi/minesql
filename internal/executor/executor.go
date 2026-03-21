@@ -1,5 +1,7 @@
 package executor
 
+type Record [][]byte
+
 type Executor interface {
 	// 次の Record を取得する
 	//

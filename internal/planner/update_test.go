@@ -19,7 +19,7 @@ func TestNewUpdate(t *testing.T) {
 				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
 			},
 		}
-		iterator := executor.NewSearchTable(
+		iterator := executor.NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
@@ -48,7 +48,7 @@ func TestUpdate_Build(t *testing.T) {
 				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
 			},
 		}
-		iterator := executor.NewSearchTable(
+		iterator := executor.NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
@@ -77,7 +77,7 @@ func TestUpdate_Build(t *testing.T) {
 				{Column: *ast.NewColumnId("last_name"), Value: ast.NewStringLiteral("'Doe'", "Doe")},
 			},
 		}
-		iterator := executor.NewSearchTable(
+		iterator := executor.NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
@@ -111,7 +111,7 @@ func TestUpdate_Build(t *testing.T) {
 				{Column: *ast.NewColumnId("nonexistent"), Value: ast.NewStringLiteral("'val'", "val")},
 			},
 		}
-		iterator := executor.NewSearchTable(
+		iterator := executor.NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
@@ -139,7 +139,7 @@ func TestUpdate_Build(t *testing.T) {
 				{Column: *ast.NewColumnId("id"), Value: ast.NewStringLiteral("'1'", "1")},
 			},
 		}
-		iterator := executor.NewSearchTable(
+		iterator := executor.NewTableScan(
 			"nonexistent",
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
@@ -179,7 +179,7 @@ func TestUpdate_Build(t *testing.T) {
 				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
 			},
 		}
-		iterator := executor.NewSearchTable(
+		iterator := executor.NewTableScan(
 			"users",
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record executor.Record) bool {
@@ -191,17 +191,16 @@ func TestUpdate_Build(t *testing.T) {
 		// WHEN
 		exec, err := planner.Build()
 		assert.NoError(t, err)
-		err = exec.Execute()
+		_, err = exec.Next()
 		assert.NoError(t, err)
 
 		// THEN: "a" の first_name が "Jane" に更新されている
-		scan := executor.NewSearchTable(
+		scan := executor.NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
-		results, err := executor.FetchAll(scan)
-		assert.NoError(t, err)
+		results := fetchAll(t, scan)
 		assert.Equal(t, 2, len(results))
 		assert.Equal(t, executor.Record{[]byte("a"), []byte("Jane"), []byte("Doe")}, results[0])
 		assert.Equal(t, executor.Record{[]byte("b"), []byte("Alice"), []byte("Smith")}, results[1])
@@ -267,7 +266,7 @@ func TestUpdate_Build(t *testing.T) {
 			Table:      *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{},
 		}
-		iterator := executor.NewSearchTable(
+		iterator := executor.NewTableScan(
 			"users",
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },

@@ -18,7 +18,7 @@ func NewCreateTable(stmt *ast.CreateTableStmt) *CreateTable {
 	}
 }
 
-func (ctn *CreateTable) Build() (executor.Mutator, error) {
+func (ctn *CreateTable) Build() (executor.Executor, error) {
 	colIndexMap := map[string]int{} // key: column name, value: column index
 	colParams := []*executor.ColumnParam{}
 
