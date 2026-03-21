@@ -19,19 +19,13 @@ func TestNewUpdate(t *testing.T) {
 				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
 			},
 		}
-		iterator := executor.NewTableScan(
-			nil,
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool { return true },
-		)
 
 		// WHEN
-		planner := NewUpdate(stmt, iterator)
+		planner := NewUpdate(stmt)
 
 		// THEN
 		assert.NotNil(t, planner)
 		assert.Equal(t, stmt, planner.Stmt)
-		assert.NotNil(t, planner.Iterator)
 	})
 }
 
@@ -42,20 +36,14 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		tbl := getPlannerTableAccessMethod(t, "users")
-
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
 				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
 			},
+			Where: &ast.WhereClause{IsSet: false},
 		}
-		iterator := executor.NewTableScan(
-			tbl,
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool { return true },
-		)
-		planner := NewUpdate(stmt, iterator)
+		planner := NewUpdate(stmt)
 
 		// WHEN
 		exec, err := planner.Build()
@@ -72,21 +60,15 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		tbl := getPlannerTableAccessMethod(t, "users")
-
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
 				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
 				{Column: *ast.NewColumnId("last_name"), Value: ast.NewStringLiteral("'Doe'", "Doe")},
 			},
+			Where: &ast.WhereClause{IsSet: false},
 		}
-		iterator := executor.NewTableScan(
-			tbl,
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool { return true },
-		)
-		planner := NewUpdate(stmt, iterator)
+		planner := NewUpdate(stmt)
 
 		// WHEN
 		exec, err := planner.Build()
@@ -115,12 +97,7 @@ func TestUpdate_Build(t *testing.T) {
 				{Column: *ast.NewColumnId("id"), Value: ast.NewStringLiteral("'1'", "1")},
 			},
 		}
-		iterator := executor.NewTableScan(
-			nil,
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool { return true },
-		)
-		planner := NewUpdate(stmt, iterator)
+		planner := NewUpdate(stmt)
 
 		// WHEN
 		exec, err := planner.Build()
@@ -136,20 +113,14 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		tbl := getPlannerTableAccessMethod(t, "users")
-
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
 				{Column: *ast.NewColumnId("nonexistent"), Value: ast.NewStringLiteral("'val'", "val")},
 			},
+			Where: &ast.WhereClause{IsSet: false},
 		}
-		iterator := executor.NewTableScan(
-			tbl,
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool { return true },
-		)
-		planner := NewUpdate(stmt, iterator)
+		planner := NewUpdate(stmt)
 
 		// WHEN
 		exec, err := planner.Build()
@@ -158,33 +129,6 @@ func TestUpdate_Build(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, exec)
 		assert.Contains(t, err.Error(), "column does not exist: nonexistent")
-	})
-
-	t.Run("存在しないテーブル名の場合、エラーが返る", func(t *testing.T) {
-		// GIVEN
-		tmpdir := t.TempDir()
-		initStorageManager(t, tmpdir)
-		defer engine.Reset()
-
-		stmt := &ast.UpdateStmt{
-			Table: *ast.NewTableId("nonexistent"),
-			SetClauses: []*ast.SetClause{
-				{Column: *ast.NewColumnId("id"), Value: ast.NewStringLiteral("'1'", "1")},
-			},
-		}
-		iterator := executor.NewTableScan(
-			nil,
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool { return true },
-		)
-		planner := NewUpdate(stmt, iterator)
-
-		// WHEN
-		exec, err := planner.Build()
-
-		// THEN
-		assert.Error(t, err)
-		assert.Nil(t, exec)
 	})
 
 	t.Run("生成された Executor でレコードが正しく更新される", func(t *testing.T) {
@@ -202,21 +146,22 @@ func TestUpdate_Build(t *testing.T) {
 		err = tbl.Insert(e.BufferPool, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
 
-		// "a" の first_name を "Jane" に更新する UpdatePlanner を作成
+		// "a" の first_name を "Jane" に更新する
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
 				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
 			},
-		}
-		iterator := executor.NewTableScan(
-			tbl,
-			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
-			func(record executor.Record) bool {
-				return string(record[0]) == "a"
+			Where: &ast.WhereClause{
+				Condition: ast.NewBinaryExpr(
+					"=",
+					ast.NewLhsColumn(*ast.NewColumnId("id")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("a", "a")),
+				),
+				IsSet: true,
 			},
-		)
-		planner := NewUpdate(stmt, iterator)
+		}
+		planner := NewUpdate(stmt)
 
 		// WHEN
 		exec, err := planner.Build()
@@ -251,7 +196,7 @@ func TestUpdate_Build(t *testing.T) {
 		}
 
 		// WHEN
-		exec, err := PlanStart(stmt)
+		exec, err := Start(stmt)
 
 		// THEN
 		assert.NoError(t, err)
@@ -278,7 +223,7 @@ func TestUpdate_Build(t *testing.T) {
 		}
 
 		// WHEN
-		exec, err := PlanStart(stmt)
+		exec, err := Start(stmt)
 
 		// THEN
 		assert.NoError(t, err)
@@ -292,18 +237,12 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		tbl := getPlannerTableAccessMethod(t, "users")
-
 		stmt := &ast.UpdateStmt{
 			Table:      *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{},
+			Where:      &ast.WhereClause{IsSet: false},
 		}
-		iterator := executor.NewTableScan(
-			tbl,
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool { return true },
-		)
-		planner := NewUpdate(stmt, iterator)
+		planner := NewUpdate(stmt)
 
 		// WHEN
 		exec, err := planner.Build()

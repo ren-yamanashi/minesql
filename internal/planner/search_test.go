@@ -11,47 +11,14 @@ import (
 )
 
 func TestSearch(t *testing.T) {
-	t.Run("テーブル名が空の場合、エラーを返す", func(t *testing.T) {
-		tmpdir := t.TempDir()
-		initStorageManager(t, tmpdir)
-		defer engine.Reset()
-
-		// GIVEN
-		search := NewSearch("", nil)
-
-		// WHEN
-		exec, err := search.Build()
-
-		// THEN
-		assert.Error(t, err)
-		assert.Nil(t, exec)
-		assert.Contains(t, err.Error(), "table name cannot be empty")
-	})
-
-	t.Run("存在しないテーブル名の場合、エラーを返す", func(t *testing.T) {
-		tmpdir := t.TempDir()
-		initStorageManager(t, tmpdir)
-		defer engine.Reset()
-
-		// GIVEN
-		search := NewSearch("nonexistent", nil)
-
-		// WHEN
-		exec, err := search.Build()
-
-		// THEN
-		assert.Error(t, err)
-		assert.Nil(t, exec)
-		assert.Contains(t, err.Error(), "table nonexistent not found")
-	})
-
 	t.Run("WHERE 句なしの場合、SequentialScan が生成される", func(t *testing.T) {
+		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		// GIVEN
-		search := NewSearch("users", nil)
+		tblMeta := getTableMetadata(t, "users")
+		search := NewSearch(tblMeta, nil)
 
 		// WHEN
 		exec, err := search.Build()
@@ -63,11 +30,12 @@ func TestSearch(t *testing.T) {
 	})
 
 	t.Run("WHERE 句でインデックス付きカラムを指定した場合、IndexScan が生成される", func(t *testing.T) {
+		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		// GIVEN
+		tblMeta := getTableMetadata(t, "users")
 		where := &ast.WhereClause{
 			Condition: ast.NewBinaryExpr(
 				"=",
@@ -76,7 +44,7 @@ func TestSearch(t *testing.T) {
 			),
 			IsSet: true,
 		}
-		search := NewSearch("users", where)
+		search := NewSearch(tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -88,11 +56,12 @@ func TestSearch(t *testing.T) {
 	})
 
 	t.Run("WHERE 句でインデックスなしカラムを指定した場合、SequentialScan が生成される", func(t *testing.T) {
+		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		// GIVEN
+		tblMeta := getTableMetadata(t, "users")
 		where := &ast.WhereClause{
 			Condition: ast.NewBinaryExpr(
 				"=",
@@ -101,7 +70,7 @@ func TestSearch(t *testing.T) {
 			),
 			IsSet: true,
 		}
-		search := NewSearch("users", where)
+		search := NewSearch(tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -113,11 +82,12 @@ func TestSearch(t *testing.T) {
 	})
 
 	t.Run("WHERE 句で存在しないカラムを指定した場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		// GIVEN
+		tblMeta := getTableMetadata(t, "users")
 		where := &ast.WhereClause{
 			Condition: ast.NewBinaryExpr(
 				"=",
@@ -126,7 +96,7 @@ func TestSearch(t *testing.T) {
 			),
 			IsSet: true,
 		}
-		search := NewSearch("users", where)
+		search := NewSearch(tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -138,11 +108,12 @@ func TestSearch(t *testing.T) {
 	})
 
 	t.Run("WHERE 句でサポートされていない型を指定した場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		// GIVEN
+		tblMeta := getTableMetadata(t, "users")
 		type UnsupportedExpr struct {
 			ast.Expression
 		}
@@ -151,7 +122,7 @@ func TestSearch(t *testing.T) {
 			Condition: unsupported,
 			IsSet:     true,
 		}
-		search := NewSearch("users", where)
+		search := NewSearch(tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -163,11 +134,13 @@ func TestSearch(t *testing.T) {
 	})
 
 	t.Run("複数の AND 条件で Filter が生成される", func(t *testing.T) {
+		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		// GIVEN: (id = '1') AND ((first_name = 'john') AND (last_name = 'doe'))
+		tblMeta := getTableMetadata(t, "users")
+		// (id = '1') AND ((first_name = 'john') AND (last_name = 'doe'))
 		where := &ast.WhereClause{
 			Condition: ast.NewBinaryExpr(
 				"AND",
@@ -200,7 +173,7 @@ func TestSearch(t *testing.T) {
 			),
 			IsSet: true,
 		}
-		search := NewSearch("users", where)
+		search := NewSearch(tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -212,11 +185,13 @@ func TestSearch(t *testing.T) {
 	})
 
 	t.Run("AND と OR の混合条件で Filter が生成される", func(t *testing.T) {
+		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		// GIVEN: (first_name = 'John') OR ((id = '1') AND (last_name = 'Doe'))
+		tblMeta := getTableMetadata(t, "users")
+		// (first_name = 'John') OR ((id = '1') AND (last_name = 'Doe'))
 		where := &ast.WhereClause{
 			Condition: ast.NewBinaryExpr(
 				"OR",
@@ -249,7 +224,7 @@ func TestSearch(t *testing.T) {
 			),
 			IsSet: true,
 		}
-		search := NewSearch("users", where)
+		search := NewSearch(tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -261,11 +236,13 @@ func TestSearch(t *testing.T) {
 	})
 
 	t.Run("LHS がカラム、RHS が式の場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		// GIVEN: WHERE last_name = (first_name = 'John') のような不正な構造
+		tblMeta := getTableMetadata(t, "users")
+		// WHERE last_name = (first_name = 'John') のような不正な構造
 		where := &ast.WhereClause{
 			Condition: ast.NewBinaryExpr(
 				"=",
@@ -280,7 +257,7 @@ func TestSearch(t *testing.T) {
 			),
 			IsSet: true,
 		}
-		search := NewSearch("users", where)
+		search := NewSearch(tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -292,11 +269,13 @@ func TestSearch(t *testing.T) {
 	})
 
 	t.Run("OR 演算子を使った場合、Filter が生成される", func(t *testing.T) {
+		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		// GIVEN: WHERE (first_name = 'John') OR (last_name = 'Doe') のような構造
+		tblMeta := getTableMetadata(t, "users")
+		// WHERE (first_name = 'John') OR (last_name = 'Doe')
 		where := &ast.WhereClause{
 			Condition: ast.NewBinaryExpr(
 				"OR",
@@ -317,7 +296,7 @@ func TestSearch(t *testing.T) {
 			),
 			IsSet: true,
 		}
-		search := NewSearch("users", where)
+		search := NewSearch(tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -329,11 +308,13 @@ func TestSearch(t *testing.T) {
 	})
 
 	t.Run("条件内で存在しないカラムを指定した場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		// GIVEN: WHERE (non_existent = 'value') AND (last_name = 'Doe')
+		tblMeta := getTableMetadata(t, "users")
+		// WHERE (non_existent = 'value') AND (last_name = 'Doe')
 		where := &ast.WhereClause{
 			Condition: ast.NewBinaryExpr(
 				"AND",
@@ -354,7 +335,7 @@ func TestSearch(t *testing.T) {
 			),
 			IsSet: true,
 		}
-		search := NewSearch("users", where)
+		search := NewSearch(tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -366,11 +347,13 @@ func TestSearch(t *testing.T) {
 	})
 
 	t.Run("条件内で LHS がカラム、RHS が式の場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		// GIVEN: WHERE (first_name = (last_name = 'Doe')) AND (id = '1')
+		tblMeta := getTableMetadata(t, "users")
+		// WHERE (first_name = (last_name = 'Doe')) AND (id = '1')
 		where := &ast.WhereClause{
 			Condition: ast.NewBinaryExpr(
 				"AND",
@@ -397,7 +380,7 @@ func TestSearch(t *testing.T) {
 			),
 			IsSet: true,
 		}
-		search := NewSearch("users", where)
+		search := NewSearch(tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -409,11 +392,13 @@ func TestSearch(t *testing.T) {
 	})
 
 	t.Run("条件内で LHS が式、RHS がリテラルの場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		// GIVEN: WHERE ((first_name = 'John') AND 'literal') のような不正な構造
+		tblMeta := getTableMetadata(t, "users")
+		// WHERE ((first_name = 'John') AND 'literal') のような不正な構造
 		where := &ast.WhereClause{
 			Condition: ast.NewBinaryExpr(
 				"AND",
@@ -440,7 +425,7 @@ func TestSearch(t *testing.T) {
 			),
 			IsSet: true,
 		}
-		search := NewSearch("users", where)
+		search := NewSearch(tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -496,14 +481,15 @@ func TestComplexWhereWithData(t *testing.T) {
 	}
 
 	t.Run("AND 条件でデータをフィルタリングできる", func(t *testing.T) {
+		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		// GIVEN
 		insertTestData(t)
 
-		// WHEN: (first_name = 'John') AND (last_name = 'Johnson')
+		tblMeta := getTableMetadata(t, "users")
+		// (first_name = 'John') AND (last_name = 'Johnson')
 		where := &ast.WhereClause{
 			Condition: ast.NewBinaryExpr(
 				"AND",
@@ -524,12 +510,14 @@ func TestComplexWhereWithData(t *testing.T) {
 			),
 			IsSet: true,
 		}
-		search := NewSearch("users", where)
+		search := NewSearch(tblMeta, where)
 		searchExec, err := search.Build()
 		assert.NoError(t, err)
 
-		// THEN: id=3 のレコードのみが返される
+		// WHEN
 		results := collectResults(t, searchExec)
+
+		// THEN: id=3 のレコードのみが返される
 		assert.Equal(t, 1, len(results))
 		assert.Equal(t, "3", string(results[0][0]))
 		assert.Equal(t, "John", string(results[0][1]))
@@ -537,14 +525,15 @@ func TestComplexWhereWithData(t *testing.T) {
 	})
 
 	t.Run("OR 条件でデータをフィルタリングできる", func(t *testing.T) {
+		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		// GIVEN
 		insertTestData(t)
 
-		// WHEN: (first_name = 'Jane') OR (last_name = 'Johnson')
+		tblMeta := getTableMetadata(t, "users")
+		// (first_name = 'Jane') OR (last_name = 'Johnson')
 		where := &ast.WhereClause{
 			Condition: ast.NewBinaryExpr(
 				"OR",
@@ -565,12 +554,14 @@ func TestComplexWhereWithData(t *testing.T) {
 			),
 			IsSet: true,
 		}
-		search := NewSearch("users", where)
+		search := NewSearch(tblMeta, where)
 		searchExec, err := search.Build()
 		assert.NoError(t, err)
 
-		// THEN: id=2 (Jane/Smith) と id=3 (John/Johnson) が返される
+		// WHEN
 		results := collectResults(t, searchExec)
+
+		// THEN: id=2 (Jane/Smith) と id=3 (John/Johnson) が返される
 		assert.Equal(t, 2, len(results))
 		assert.Equal(t, "2", string(results[0][0]))
 		assert.Equal(t, "Jane", string(results[0][1]))
@@ -579,15 +570,15 @@ func TestComplexWhereWithData(t *testing.T) {
 	})
 
 	t.Run("AND と OR の混合条件でデータをフィルタリングできる", func(t *testing.T) {
+		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		// GIVEN
 		insertTestData(t)
 
-		// WHEN: (last_name = 'Smith') OR ((first_name = 'John') AND (last_name = 'Doe'))
-		// → id=1 (John/Doe) と id=2 (Jane/Smith) が該当
+		tblMeta := getTableMetadata(t, "users")
+		// (last_name = 'Smith') OR ((first_name = 'John') AND (last_name = 'Doe'))
 		where := &ast.WhereClause{
 			Condition: ast.NewBinaryExpr(
 				"OR",
@@ -620,12 +611,14 @@ func TestComplexWhereWithData(t *testing.T) {
 			),
 			IsSet: true,
 		}
-		search := NewSearch("users", where)
+		search := NewSearch(tblMeta, where)
 		searchExec, err := search.Build()
 		assert.NoError(t, err)
 
-		// THEN: id=1 (John/Doe) と id=2 (Jane/Smith) が返される
+		// WHEN
 		results := collectResults(t, searchExec)
+
+		// THEN: id=1 (John/Doe) と id=2 (Jane/Smith) が返される
 		assert.Equal(t, 2, len(results))
 		assert.Equal(t, "1", string(results[0][0]))
 		assert.Equal(t, "John", string(results[0][1]))
@@ -637,12 +630,15 @@ func TestComplexWhereWithData(t *testing.T) {
 }
 
 func TestOperatorToCondition(t *testing.T) {
+	// operatorToCondition は Search のメソッドなので、ダミーの Search を使用する
+	s := &Search{}
+
 	t.Run("= 演算子が正しく動作する", func(t *testing.T) {
 		// GIVEN
 		record := executor.Record{[]byte("apple"), []byte("banana"), []byte("cherry")}
 
 		// WHEN
-		cond, err := operatorToCondition("=", 1, "banana")
+		cond, err := s.operatorToCondition("=", 1, "banana")
 
 		// THEN
 		assert.NoError(t, err)
@@ -656,7 +652,7 @@ func TestOperatorToCondition(t *testing.T) {
 		record := executor.Record{[]byte("apple"), []byte("banana"), []byte("cherry")}
 
 		// WHEN
-		cond, err := operatorToCondition("!=", 1, "banana")
+		cond, err := s.operatorToCondition("!=", 1, "banana")
 
 		// THEN
 		assert.NoError(t, err)
@@ -668,7 +664,7 @@ func TestOperatorToCondition(t *testing.T) {
 	t.Run("< 演算子が正しく動作する", func(t *testing.T) {
 		// GIVEN
 		// WHEN
-		cond, err := operatorToCondition("<", 0, "c")
+		cond, err := s.operatorToCondition("<", 0, "c")
 
 		// THEN
 		assert.NoError(t, err)
@@ -682,7 +678,7 @@ func TestOperatorToCondition(t *testing.T) {
 	t.Run("<= 演算子が正しく動作する", func(t *testing.T) {
 		// GIVEN
 		// WHEN
-		cond, err := operatorToCondition("<=", 0, "c")
+		cond, err := s.operatorToCondition("<=", 0, "c")
 
 		// THEN
 		assert.NoError(t, err)
@@ -696,7 +692,7 @@ func TestOperatorToCondition(t *testing.T) {
 	t.Run("> 演算子が正しく動作する", func(t *testing.T) {
 		// GIVEN
 		// WHEN
-		cond, err := operatorToCondition(">", 0, "c")
+		cond, err := s.operatorToCondition(">", 0, "c")
 
 		// THEN
 		assert.NoError(t, err)
@@ -710,7 +706,7 @@ func TestOperatorToCondition(t *testing.T) {
 	t.Run(">= 演算子が正しく動作する", func(t *testing.T) {
 		// GIVEN
 		// WHEN
-		cond, err := operatorToCondition(">=", 0, "c")
+		cond, err := s.operatorToCondition(">=", 0, "c")
 
 		// THEN
 		assert.NoError(t, err)
@@ -724,7 +720,7 @@ func TestOperatorToCondition(t *testing.T) {
 	t.Run("サポートされていない演算子の場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		// WHEN
-		cond, err := operatorToCondition("LIKE", 0, "pattern")
+		cond, err := s.operatorToCondition("LIKE", 0, "pattern")
 
 		// THEN
 		assert.Error(t, err)
@@ -738,11 +734,11 @@ func TestOperatorToCondition(t *testing.T) {
 		record := executor.Record{[]byte("1"), []byte("John"), []byte("Doe")}
 
 		// WHEN: position 0 (id)
-		cond0, err0 := operatorToCondition("=", 0, "1")
+		cond0, err0 := s.operatorToCondition("=", 0, "1")
 		// WHEN: position 1 (first_name)
-		cond1, err1 := operatorToCondition("=", 1, "John")
+		cond1, err1 := s.operatorToCondition("=", 1, "John")
 		// WHEN: position 2 (last_name)
-		cond2, err2 := operatorToCondition("=", 2, "Doe")
+		cond2, err2 := s.operatorToCondition("=", 2, "Doe")
 
 		// THEN
 		assert.NoError(t, err0)
@@ -778,4 +774,17 @@ func initStorageManager(t *testing.T, dataDir string) {
 	})
 	_, err := createTable.Next()
 	assert.NoError(t, err)
+}
+
+// テスト用にテーブルメタデータを取得する
+//
+//nolint:unparam // テーブル名は将来的に変わりうる
+func getTableMetadata(t *testing.T, tableName string) *catalog.TableMetadata {
+	t.Helper()
+	e := engine.Get()
+	tblMeta, ok := e.Catalog.GetTableMetadataByName(tableName)
+	if !ok {
+		t.Fatalf("table %s not found in catalog", tableName)
+	}
+	return tblMeta
 }

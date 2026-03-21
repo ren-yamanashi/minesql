@@ -6,43 +6,30 @@ import (
 	"minesql/internal/access"
 	"minesql/internal/ast"
 	"minesql/internal/catalog"
-	"minesql/internal/engine"
 	"minesql/internal/executor"
 )
 
 // Search は WHERE 句に基づいてレコードを検索する Executor を構築する
 type Search struct {
-	TableName string
-	Where     *ast.WhereClause
+	tblMeta *catalog.TableMetadata
+	where   *ast.WhereClause
 }
 
-func NewSearch(tableName string, where *ast.WhereClause) *Search {
+func NewSearch(tblMeta *catalog.TableMetadata, where *ast.WhereClause) *Search {
 	return &Search{
-		TableName: tableName,
-		Where:     where,
+		tblMeta: tblMeta,
+		where:   where,
 	}
 }
 
-// Build は WHERE 句を元に検索用の Executor を構築する
 func (sp *Search) Build() (executor.Executor, error) {
-	e := engine.Get()
-
-	if sp.TableName == "" {
-		return nil, errors.New("table name cannot be empty")
-	}
-
-	tblMeta, ok := e.Catalog.GetTableMetadataByName(sp.TableName)
-	if !ok {
-		return nil, fmt.Errorf("table %s not found", sp.TableName)
-	}
-
-	tbl, err := tblMeta.GetTable()
+	tbl, err := sp.tblMeta.GetTable()
 	if err != nil {
 		return nil, err
 	}
 
 	// WHERE 句が設定されていない場合フルテーブルスキャンを実行
-	if sp.Where == nil || !sp.Where.IsSet {
+	if sp.where == nil || !sp.where.IsSet {
 		return executor.NewTableScan(
 			tbl,
 			access.RecordSearchModeStart{},
@@ -53,16 +40,16 @@ func (sp *Search) Build() (executor.Executor, error) {
 	}
 
 	// WHERE 句が設定されている場合
-	switch expr := sp.Where.Condition.(type) {
+	switch expr := sp.where.Condition.(type) {
 	case *ast.BinaryExpr:
-		return planForBinaryExpr(tbl, tblMeta, *expr)
+		return sp.planForBinaryExpr(tbl, *expr)
 	default:
 		return nil, errors.New("unsupported WHERE condition type")
 	}
 }
 
 // planForBinaryExpr は二項演算式を解析して適切な検索用の Executor を構築する
-func planForBinaryExpr(tbl *access.TableAccessMethod, tblMeta *catalog.TableMetadata, expr ast.BinaryExpr) (executor.Executor, error) {
+func (s *Search) planForBinaryExpr(tbl *access.TableAccessMethod, expr ast.BinaryExpr) (executor.Executor, error) {
 	switch lhs := expr.Left.(type) {
 
 	// 左辺がカラムの場合 (例: WHERE col = 5)
@@ -71,13 +58,13 @@ func planForBinaryExpr(tbl *access.TableAccessMethod, tblMeta *catalog.TableMeta
 		switch rhs := expr.Right.(type) {
 		// 左辺がカラムの場合、右辺はリテラルでなければならない (例: WHERE col = 5)
 		case *ast.RhsLiteral:
-			if _, ok := tblMeta.GetColByName(colName); !ok {
-				return nil, errors.New("column " + colName + " does not exist in table " + tblMeta.Name)
+			if _, ok := s.tblMeta.GetColByName(colName); !ok {
+				return nil, errors.New("column " + colName + " does not exist in table " + s.tblMeta.Name)
 			}
 
 			// カラムがインデックスの場合 (該当のカラムをキーとしたインデックスが存在する場合)、インデックス検索を行う
-			if idxMeta, ok := tblMeta.GetIndexByColName(colName); ok {
-				cond, err := operatorToCondition(expr.Operator, 0, rhs.Literal.ToString())
+			if idxMeta, ok := s.tblMeta.GetIndexByColName(colName); ok {
+				cond, err := s.operatorToCondition(expr.Operator, 0, rhs.Literal.ToString())
 				if err != nil {
 					return nil, err
 				}
@@ -94,11 +81,11 @@ func planForBinaryExpr(tbl *access.TableAccessMethod, tblMeta *catalog.TableMeta
 			}
 
 			// カラムがインデックスでない場合、テーブル検索を行う
-			colMeta, ok := tblMeta.GetColByName(colName)
+			colMeta, ok := s.tblMeta.GetColByName(colName)
 			if !ok {
-				return nil, errors.New("column " + colName + " does not exist in table " + tblMeta.Name)
+				return nil, errors.New("column " + colName + " does not exist in table " + s.tblMeta.Name)
 			}
-			cond, err := operatorToCondition(expr.Operator, int(colMeta.Pos), rhs.Literal.ToString())
+			cond, err := s.operatorToCondition(expr.Operator, int(colMeta.Pos), rhs.Literal.ToString())
 			if err != nil {
 				return nil, err
 			}
@@ -114,7 +101,7 @@ func planForBinaryExpr(tbl *access.TableAccessMethod, tblMeta *catalog.TableMeta
 	// 左辺が式の場合 (例: WHERE col1 = 5 AND col2 > 10)
 	case *ast.LhsExpr:
 		// 式の木構造から単一の条件関数を再帰的に構築する
-		cond, err := buildConditionFunc(tblMeta, expr)
+		cond, err := s.buildConditionFunc(expr)
 		if err != nil {
 			return nil, err
 		}
@@ -137,21 +124,21 @@ func planForBinaryExpr(tbl *access.TableAccessMethod, tblMeta *catalog.TableMeta
 }
 
 // buildConditionFunc は式の木構造から単一の条件関数を再帰的に構築する
-func buildConditionFunc(tblMeta *catalog.TableMetadata, expr ast.BinaryExpr) (func(executor.Record) bool, error) {
+func (s *Search) buildConditionFunc(expr ast.BinaryExpr) (func(executor.Record) bool, error) {
 	switch lhs := expr.Left.(type) {
 
 	// リーフノード: col of literal のような単純な条件 (例: col1 = 5)
 	case *ast.LhsColumn:
 		colName := lhs.Column.ColName
-		colMeta, ok := tblMeta.GetColByName(colName)
+		colMeta, ok := s.tblMeta.GetColByName(colName)
 		if !ok {
-			return nil, errors.New("column " + colName + " does not exist in table " + tblMeta.Name)
+			return nil, errors.New("column " + colName + " does not exist in table " + s.tblMeta.Name)
 		}
 
 		switch rhs := expr.Right.(type) {
 		// 左辺がカラムで右辺がリテラルの場合 (例: col1 = 5)
 		case *ast.RhsLiteral:
-			return operatorToCondition(expr.Operator, int(colMeta.Pos), rhs.Literal.ToString())
+			return s.operatorToCondition(expr.Operator, int(colMeta.Pos), rhs.Literal.ToString())
 		// 左辺がカラムの場合は右辺はリテラルでなければならない (`col1 = col2` のような条件は現状サポートしていない)
 		default:
 			return nil, errors.New("when LHS is a column, RHS must be a literal")
@@ -160,7 +147,7 @@ func buildConditionFunc(tblMeta *catalog.TableMetadata, expr ast.BinaryExpr) (fu
 	// ブランチノード: expr AND/OR expr (例: col1 = 5 AND col2 > 10 のような複合条件)
 	case *ast.LhsExpr:
 		// 左辺の式から条件関数を再帰的に構築
-		leftCond, err := buildConditionFunc(tblMeta, *lhs.Expr.(*ast.BinaryExpr))
+		leftCond, err := s.buildConditionFunc(*lhs.Expr.(*ast.BinaryExpr))
 		if err != nil {
 			return nil, err
 		}
@@ -168,7 +155,7 @@ func buildConditionFunc(tblMeta *catalog.TableMetadata, expr ast.BinaryExpr) (fu
 		switch rhs := expr.Right.(type) {
 		// 右辺が式の場合、右辺の式から条件関数を再帰的に構築し、論理演算子 (AND/OR) に応じて条件関数を組み合わせる
 		case *ast.RhsExpr:
-			rightCond, err := buildConditionFunc(tblMeta, *rhs.Expr.(*ast.BinaryExpr))
+			rightCond, err := s.buildConditionFunc(*rhs.Expr.(*ast.BinaryExpr))
 			if err != nil {
 				return nil, err
 			}
@@ -193,7 +180,7 @@ func buildConditionFunc(tblMeta *catalog.TableMetadata, expr ast.BinaryExpr) (fu
 // operatorToCondition は二項演算子を条件関数に変換する
 //
 // 条件関数: レコードを受け取り、条件を満たすかどうか (bool) を返す関数
-func operatorToCondition(operator string, pos int, value string) (func(executor.Record) bool, error) {
+func (s *Search) operatorToCondition(operator string, pos int, value string) (func(executor.Record) bool, error) {
 	switch operator {
 	case "=":
 		return func(record executor.Record) bool {

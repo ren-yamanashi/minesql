@@ -258,7 +258,7 @@ func executeSql(t *testing.T, sql string) []executor.Record {
 	result, err := p.Parse(sql)
 	assert.NoError(t, err)
 
-	exec, err := planner.PlanStart(result)
+	exec, err := planner.Start(result)
 	assert.NoError(t, err)
 
 	return fetchAll(t, exec)

@@ -9,27 +9,22 @@ import (
 )
 
 type Update struct {
-	Stmt     *ast.UpdateStmt
-	Iterator executor.Executor
+	Stmt *ast.UpdateStmt
 }
 
-func NewUpdate(stmt *ast.UpdateStmt, iterator executor.Executor) *Update {
+func NewUpdate(stmt *ast.UpdateStmt) *Update {
 	return &Update{
-		Stmt:     stmt,
-		Iterator: iterator,
+		Stmt: stmt,
 	}
 }
 
 func (up *Update) Build() (executor.Executor, error) {
 	e := engine.Get()
+
+	// 対象テーブルのメタデータを取得
 	tblMeta, ok := e.Catalog.GetTableMetadataByName(up.Stmt.Table.TableName)
 	if !ok {
 		return nil, fmt.Errorf("table %s not found", up.Stmt.Table.TableName)
-	}
-
-	tbl, err := tblMeta.GetTable()
-	if err != nil {
-		return nil, err
 	}
 
 	// カラム名からカラム位置へのマッピングを作成
@@ -51,5 +46,18 @@ func (up *Update) Build() (executor.Executor, error) {
 		})
 	}
 
-	return executor.NewUpdate(tbl, setColumns, up.Iterator), nil
+	// WHERE 句を元に検索用の Executor を構築
+	search := NewSearch(tblMeta, up.Stmt.Where)
+	iterator, err := search.Build()
+	if err != nil {
+		return nil, err
+	}
+
+	// テーブルを取得
+	tbl, err := tblMeta.GetTable()
+	if err != nil {
+		return nil, err
+	}
+
+	return executor.NewUpdate(tbl, setColumns, iterator), nil
 }

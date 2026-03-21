@@ -163,7 +163,7 @@ func (s *Server) executeQuery(sql string) (string, error) {
 		return "", err
 	}
 
-	exec, err := planner.PlanStart(node)
+	exec, err := planner.Start(node)
 	if err != nil {
 		return "", err
 	}

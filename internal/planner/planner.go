@@ -6,7 +6,7 @@ import (
 	"minesql/internal/executor"
 )
 
-func PlanStart(stmt ast.Statement) (executor.Executor, error) {
+func Start(stmt ast.Statement) (executor.Executor, error) {
 	switch s := stmt.(type) {
 	case *ast.CreateTableStmt:
 		ctn := NewCreateTable(s)
@@ -15,28 +15,13 @@ func PlanStart(stmt ast.Statement) (executor.Executor, error) {
 		ip := NewInsert(s)
 		return ip.Build()
 	case *ast.SelectStmt:
-		search := NewSearch(s.From.TableName, s.Where)
-		searchExec, err := search.Build()
-		if err != nil {
-			return nil, err
-		}
-		sp := NewSelect(s, searchExec)
+		sp := NewSelect(s)
 		return sp.Build()
 	case *ast.DeleteStmt:
-		search := NewSearch(s.From.TableName, s.Where)
-		searchExec, err := search.Build()
-		if err != nil {
-			return nil, err
-		}
-		dp := NewDelete(s, searchExec)
+		dp := NewDelete(s)
 		return dp.Build()
 	case *ast.UpdateStmt:
-		search := NewSearch(s.Table.TableName, s.Where)
-		searchExec, err := search.Build()
-		if err != nil {
-			return nil, err
-		}
-		up := NewUpdate(s, searchExec)
+		up := NewUpdate(s)
 		return up.Build()
 	default:
 		return nil, fmt.Errorf("unsupported statement: %T", s)

@@ -28,7 +28,7 @@ func fetchAll(t *testing.T, iter executor.Executor) []executor.Record {
 // AST を直接構築 → PlanStart → ExecutePlan で実行する
 func executePlan(t *testing.T, stmt ast.Statement) []executor.Record {
 	t.Helper()
-	exec, err := PlanStart(stmt)
+	exec, err := Start(stmt)
 	assert.NoError(t, err)
 
 	return fetchAll(t, exec)

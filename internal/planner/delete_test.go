@@ -12,20 +12,14 @@ import (
 func TestDelete_Build(t *testing.T) {
 	t.Run("存在しないテーブル名の場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
-		tmpdir := t.TempDir()
-		initStorageManager(t, tmpdir)
+		initStorageManagerForTest(t)
 		defer engine.Reset()
 
 		stmt := &ast.DeleteStmt{
 			StmtType: ast.StmtTypeDelete,
 			From:     *ast.NewTableId("nonexistent"),
 		}
-		iterator := executor.NewTableScan(
-			nil,
-			nil,
-			func(record executor.Record) bool { return true },
-		)
-		planner := NewDelete(stmt, iterator)
+		planner := NewDelete(stmt)
 
 		// WHEN
 		exec, err := planner.Build()
@@ -33,27 +27,22 @@ func TestDelete_Build(t *testing.T) {
 		// THEN
 		assert.Error(t, err)
 		assert.Nil(t, exec)
-		assert.Contains(t, err.Error(), "table nonexistent not found")
+		assert.Contains(t, err.Error(), "nonexistent")
 	})
 
 	t.Run("存在するテーブル名の場合、Delete Executor が生成される", func(t *testing.T) {
 		// GIVEN
-		tmpdir := t.TempDir()
-		initStorageManager(t, tmpdir)
+		initStorageManagerForTest(t)
 		defer engine.Reset()
 
-		tbl := getPlannerTableAccessMethod(t, "users")
+		createTableForTest(t, nil)
 
 		stmt := &ast.DeleteStmt{
 			StmtType: ast.StmtTypeDelete,
 			From:     *ast.NewTableId("users"),
+			Where:    &ast.WhereClause{IsSet: false},
 		}
-		iterator := executor.NewTableScan(
-			tbl,
-			nil,
-			func(record executor.Record) bool { return true },
-		)
-		planner := NewDelete(stmt, iterator)
+		planner := NewDelete(stmt)
 
 		// WHEN
 		exec, err := planner.Build()
