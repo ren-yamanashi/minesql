@@ -32,6 +32,10 @@ CREATE TABLE users (
   - IndexScan: インデックスを利用して検索する
   - Filter: 不要な行をフィルタする
   - Project: 検索結果から特定のカラムだけを取り出す
+  - CreateTable: テーブルを作成する
+  - Insert: レコードを追加する
+  - Update: レコードを更新する
+  - Delete: レコードを削除する
 
 ※それぞれのノードの命名はオレオレだが、少し https://dev.mysql.com/doc/dev/mysql-server/latest/classRowIterator.html を参考にしている
 
@@ -93,3 +97,31 @@ SELECT * FROM users WHERE username = 'alice';
 Project (*)
   └── IndexScan (username = 'alice')
 ```
+
+### ツリー図
+
+全ての Executor は共通の `Executor` interface (`Next() (Record, error)`) を実装する。
+一部の Executor は `InnerExecutor` を持ち、子ノードから `Next()` でデータを受け取って処理する。
+
+```txt
+Executor (interface)
+  │
+  ├── TableScan          (リーフノード: テーブルをプライマリキーで範囲検索する)
+  ├── IndexScan          (リーフノード: セカンダリインデックスを利用して検索する)
+  │
+  ├── Filter             (ブランチノード: InnerExecutor の結果から条件に合う行だけを返す)
+  │     └── InnerExecutor
+  ├── Project            (ブランチノード: InnerExecutor の結果から特定のカラムだけを取り出す) ※未実装
+  │     └── InnerExecutor
+  │
+  ├── Delete             (ブランチノード: InnerExecutor の結果を元にレコードを削除する)
+  │     └── InnerExecutor
+  ├── Update             (ブランチノード: InnerExecutor の結果を元にレコードを更新する)
+  │     └── InnerExecutor
+  │
+  ├── Insert             (リーフノード: レコードを追加する)
+  └── CreateTable        (リーフノード: テーブルを作成する)
+```
+
+- リーフノード: 子を持たず、自身でストレージにアクセスしてデータを取得・操作する
+- ブランチノード: `InnerExecutor` を通じて子ノードからデータを受け取り、加工・操作する
