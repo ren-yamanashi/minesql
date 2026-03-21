@@ -21,7 +21,7 @@ make build-client
 | Environment Variable | Description | Default Value |
 | -------------------- | ----------- | ------------- |
 | `MINESQL_DATA_DIR` | データファイルの保存先ディレクトリ | `./data` |
-| `MINESQL_BUFFER__SIZE` | バッファプールのサイズ (ページ数) | `100` |
+| `MINESQL_BUFFER_SIZE` | バッファプールのサイズ (ページ数) | `100` |
 
 ## Feature
 
