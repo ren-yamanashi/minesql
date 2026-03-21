@@ -17,6 +17,7 @@ type IndexParam struct {
 	SecondaryKey uint16
 }
 
+// CreateTable はテーブルを作成する
 type CreateTable struct {
 	tableName       string
 	primaryKeyCount uint8

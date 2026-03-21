@@ -5,6 +5,7 @@ import (
 	"minesql/internal/engine"
 )
 
+// IndexScan はセカンダリインデックスを利用して検索する
 type IndexScan struct {
 	tableName      string
 	indexName      string

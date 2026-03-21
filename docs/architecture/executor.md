@@ -106,12 +106,12 @@ Project (*)
 ```txt
 Executor (interface)
   │
-  ├── TableScan          (リーフノード: テーブルをプライマリキーで範囲検索する)
+  ├── TableScan          (リーフノード: テーブル全体を走査する)
   ├── IndexScan          (リーフノード: セカンダリインデックスを利用して検索する)
   │
   ├── Filter             (ブランチノード: InnerExecutor の結果から条件に合う行だけを返す)
   │     └── InnerExecutor
-  ├── Project            (ブランチノード: InnerExecutor の結果から特定のカラムだけを取り出す) ※未実装
+  ├── Project            (ブランチノード: InnerExecutor の結果から特定のカラムだけを取り出す)
   │     └── InnerExecutor
   │
   ├── Delete             (ブランチノード: InnerExecutor の結果を元にレコードを削除する)

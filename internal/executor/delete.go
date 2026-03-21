@@ -2,6 +2,7 @@ package executor
 
 import "minesql/internal/engine"
 
+// Delete は InnerExecutor の結果を元にレコードを削除する
 type Delete struct {
 	tableName     string
 	InnerExecutor Executor

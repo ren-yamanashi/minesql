@@ -1,5 +1,6 @@
 package executor
 
+// Filter は InnerExecutor の結果から条件に合う行だけを返す
 type Filter struct {
 	InnerExecutor Executor
 	condition     func(Record) bool

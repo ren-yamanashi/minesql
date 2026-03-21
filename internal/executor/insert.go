@@ -4,6 +4,7 @@ import (
 	"minesql/internal/engine"
 )
 
+// Insert はレコードを追加する
 type Insert struct {
 	tableName string
 	colNames  []string

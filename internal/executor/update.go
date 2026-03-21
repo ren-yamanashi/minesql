@@ -7,6 +7,7 @@ type SetColumn struct {
 	Value []byte // 更新後の値
 }
 
+// Update は InnerExecutor の結果を元にレコードを更新する
 type Update struct {
 	tableName     string
 	SetColumns    []SetColumn

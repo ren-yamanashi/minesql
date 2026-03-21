@@ -5,6 +5,7 @@ import (
 	"minesql/internal/engine"
 )
 
+// TableScan はテーブル全体を走査する
 type TableScan struct {
 	whileCondition func(record Record) bool // 継続条件を満たすかどうかを判定する関数
 	iterator       *access.ClusteredIndexIterator

@@ -306,6 +306,69 @@ func TestExecutorIntegration(t *testing.T) {
 		assert.Equal(t, expected, sb.String())
 	})
 
+	t.Run("Project で特定のカラムだけ取得できる", func(t *testing.T) {
+		// GIVEN
+		setupExecutorTestTable(t)
+		defer engine.Reset()
+
+		// WHEN: first_name (pos=1) と last_name (pos=2) のみ取得
+		records := collectAll(t, NewProject(
+			NewTableScan(
+				"users",
+				access.RecordSearchModeStart{},
+				func(record Record) bool { return true },
+			),
+			[]uint16{1, 2},
+		))
+
+		// THEN
+		var sb strings.Builder
+		sb.WriteString("=== 射影 (first_name, last_name) ===\n")
+		writeRecords(&sb, records)
+
+		expected := "" +
+			"=== 射影 (first_name, last_name) ===\n" +
+			"  (Eve, Brown)\n" +
+			"  (Dave, Miller)\n" +
+			"  (Bob, Johnson)\n" +
+			"  (Charlie, Williams)\n" +
+			"  (Alice, Smith)\n" +
+			"  合計: 5 件\n"
+		assert.Equal(t, expected, sb.String())
+	})
+
+	t.Run("Filter + Project で条件に合うレコードの特定カラムを取得できる", func(t *testing.T) {
+		// GIVEN
+		setupExecutorTestTable(t)
+		defer engine.Reset()
+
+		// WHEN: first_name が "Charlie" のレコードから first_name と last_name を取得
+		records := collectAll(t, NewProject(
+			NewFilter(
+				NewTableScan(
+					"users",
+					access.RecordSearchModeStart{},
+					func(record Record) bool { return true },
+				),
+				func(record Record) bool {
+					return string(record[1]) == "Charlie"
+				},
+			),
+			[]uint16{1, 2},
+		))
+
+		// THEN
+		var sb strings.Builder
+		sb.WriteString("=== Filter + Project ===\n")
+		writeRecords(&sb, records)
+
+		expected := "" +
+			"=== Filter + Project ===\n" +
+			"  (Charlie, Williams)\n" +
+			"  合計: 1 件\n"
+		assert.Equal(t, expected, sb.String())
+	})
+
 	t.Run("DELETE でレコードを削除し、インデックスからも削除される", func(t *testing.T) {
 		// GIVEN
 		setupExecutorTestTable(t)
