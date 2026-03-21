@@ -8,19 +8,18 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewIndexScan(t *testing.T) {
+func TestIndexScan(t *testing.T) {
+
 	t.Run("正常に IndexScan を作成できる", func(t *testing.T) {
 		// GIVEN
-		tableName := "users"
-		indexName := "last_name"
 		whileCondition := func(record Record) bool {
 			return true
 		}
 
 		// WHEN
 		indexScan := NewIndexScan(
-			tableName,
-			indexName,
+			nil,
+			nil,
 			access.RecordSearchModeStart{},
 			whileCondition,
 		)
@@ -28,18 +27,25 @@ func TestNewIndexScan(t *testing.T) {
 		// THEN
 		assert.NotNil(t, indexScan)
 	})
-}
 
-func TestIndexScan_Next(t *testing.T) {
 	t.Run("SearchModeStart を使用して Index 検索できる", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
 		// GIVEN
+
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod("users")
+		assert.NoError(t, err)
+
+		// インデックスアクセスメソッドを取得
+		idx, err := tbl.GetUniqueIndexByName("last_name")
+		assert.NoError(t, err)
+
 		indexScan := NewIndexScan(
-			"users",
-			"last_name",
+			tbl,
+			idx,
 			access.RecordSearchModeStart{},
 			func(record Record) bool {
 				return string(record[0]) < "J" // セカンダリキー (姓) が "J" 未満の間、継続
@@ -72,9 +78,17 @@ func TestIndexScan_Next(t *testing.T) {
 		defer engine.Reset()
 
 		// GIVEN
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod("users")
+		assert.NoError(t, err)
+
+		// インデックスアクセスメソッドを取得
+		idx, err := tbl.GetUniqueIndexByName("last_name")
+		assert.NoError(t, err)
+
 		indexScan := NewIndexScan(
-			"users",
-			"last_name",
+			tbl,
+			idx,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("Doe")}},
 			func(record Record) bool {
 				return string(record[0]) <= "Smith" // セカンダリキー (姓) が "Smith" 以下の間、継続

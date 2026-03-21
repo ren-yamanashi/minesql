@@ -41,22 +41,22 @@ func NewCreateTable(tableName string, primaryKeyCount uint8, indexParams []*Inde
 }
 
 func (ct *CreateTable) Next() (Record, error) {
-	sm := engine.Get()
+	e := engine.Get()
 
 	// FileId を採番
-	fileId, err := sm.Catalog.AllocateFileId(sm.BufferPool)
+	fileId, err := e.Catalog.AllocateFileId(e.BufferPool)
 	if err != nil {
 		return nil, err
 	}
 
 	// Disk を登録
-	err = sm.RegisterDmToBp(fileId, ct.tableName)
+	err = e.RegisterDmToBp(fileId, ct.tableName)
 	if err != nil {
 		return nil, err
 	}
 
 	// テーブルの metaPageId を設定
-	metaPageId, err := sm.BufferPool.AllocatePageId(fileId)
+	metaPageId, err := e.BufferPool.AllocatePageId(fileId)
 	if err != nil {
 		return nil, err
 	}
@@ -64,12 +64,12 @@ func (ct *CreateTable) Next() (Record, error) {
 	// 各 UniqueIndex の metaPageId を設定
 	uniqueIndexes := make([]*access.UniqueIndexAccessMethod, len(ct.indexParams))
 	for i, indexParam := range ct.indexParams {
-		indexMetaPageId, err := sm.BufferPool.AllocatePageId(fileId)
+		indexMetaPageId, err := e.BufferPool.AllocatePageId(fileId)
 		if err != nil {
 			return nil, err
 		}
 		uniqueIndex := access.NewUniqueIndexAccessMethod(indexParam.Name, indexParam.ColName, indexMetaPageId, indexParam.SecondaryKey)
-		err = uniqueIndex.Create(sm.BufferPool)
+		err = uniqueIndex.Create(e.BufferPool)
 		if err != nil {
 			return nil, err
 		}
@@ -78,7 +78,7 @@ func (ct *CreateTable) Next() (Record, error) {
 
 	// テーブルを作成
 	tbl := access.NewTableAccessMethod(ct.tableName, metaPageId, ct.primaryKeyCount, uniqueIndexes)
-	err = tbl.Create(sm.BufferPool)
+	err = tbl.Create(e.BufferPool)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +99,7 @@ func (ct *CreateTable) Next() (Record, error) {
 	tblMeta := catalog.NewTableMetadata(fileId, ct.tableName, uint8(len(ct.columnParams)), ct.primaryKeyCount, colMeta, idxMeta, metaPageId)
 
 	// カタログにテーブルを登録
-	err = sm.Catalog.Insert(sm.BufferPool, tblMeta)
+	err = e.Catalog.Insert(e.BufferPool, tblMeta)
 	if err != nil {
 		return nil, err
 	}

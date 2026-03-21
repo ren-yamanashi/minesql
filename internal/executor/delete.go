@@ -1,32 +1,25 @@
 package executor
 
-import "minesql/internal/engine"
+import (
+	"minesql/internal/access"
+	"minesql/internal/engine"
+)
 
 // Delete は InnerExecutor の結果を元にレコードを削除する
 type Delete struct {
-	tableName     string
+	table         *access.TableAccessMethod
 	InnerExecutor Executor
 }
 
-func NewDelete(tableName string, innerExecutor Executor) *Delete {
+func NewDelete(table *access.TableAccessMethod, innerExecutor Executor) *Delete {
 	return &Delete{
-		tableName:     tableName,
+		table:         table,
 		InnerExecutor: innerExecutor,
 	}
 }
 
 func (del *Delete) Next() (Record, error) {
-	sm := engine.Get()
-
-	tblMeta, err := sm.Catalog.GetTableMetadataByName(del.tableName)
-	if err != nil {
-		return nil, err
-	}
-
-	tbl, err := tblMeta.GetTable()
-	if err != nil {
-		return nil, err
-	}
+	e := engine.Get()
 
 	// 削除対象のレコードを先にすべて取得する
 	// (削除により Iterator が参照するページデータが破壊されるのを防ぐ)
@@ -44,7 +37,7 @@ func (del *Delete) Next() (Record, error) {
 
 	// 取得したレコードを削除
 	for _, record := range records {
-		err = tbl.Delete(sm.BufferPool, record)
+		err := del.table.Delete(e.BufferPool, record)
 		if err != nil {
 			return nil, err
 		}

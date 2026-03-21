@@ -15,7 +15,7 @@ func TestCreateTable_Next(t *testing.T) {
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
 		engine.Reset()
 		engine.Init()
-		sm := engine.Get()
+		e := engine.Get()
 		createTable := NewCreateTable("users", 1, nil, nil)
 
 		// WHEN
@@ -23,8 +23,8 @@ func TestCreateTable_Next(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		tblMeta, err := sm.Catalog.GetTableMetadataByName("users")
-		assert.NoError(t, err)
+		tblMeta, ok := e.Catalog.GetTableMetadataByName("users")
+		assert.True(t, ok)
 		assert.NotNil(t, tblMeta)
 		assert.Equal(t, "users", tblMeta.Name)
 		assert.Equal(t, uint8(1), tblMeta.PrimaryKeyCount)
@@ -37,7 +37,7 @@ func TestCreateTable_Next(t *testing.T) {
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
 		engine.Reset()
 		engine.Init()
-		sm := engine.Get()
+		e := engine.Get()
 		createTable := NewCreateTable("users", 1, nil, []*ColumnParam{
 			{Name: "id", Type: "int"},
 			{Name: "name", Type: "string"},
@@ -49,8 +49,8 @@ func TestCreateTable_Next(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		tblMeta, err := sm.Catalog.GetTableMetadataByName("users")
-		assert.NoError(t, err)
+		tblMeta, ok := e.Catalog.GetTableMetadataByName("users")
+		assert.True(t, ok)
 		assert.NotNil(t, tblMeta)
 		assert.Equal(t, uint8(3), tblMeta.NCols)
 		assert.Equal(t, 3, len(tblMeta.Cols))
@@ -72,7 +72,7 @@ func TestCreateTable_Next(t *testing.T) {
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
 		engine.Reset()
 		engine.Init()
-		sm := engine.Get()
+		e := engine.Get()
 		createTable := NewCreateTable("users", 1, []*IndexParam{
 			{Name: "email", ColName: "email", SecondaryKey: 1},
 		}, nil)
@@ -82,8 +82,8 @@ func TestCreateTable_Next(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		tblMeta, err := sm.Catalog.GetTableMetadataByName("users")
-		assert.NoError(t, err)
+		tblMeta, ok := e.Catalog.GetTableMetadataByName("users")
+		assert.True(t, ok)
 		assert.NotNil(t, tblMeta)
 		assert.Equal(t, 1, len(tblMeta.Indexes))
 		assert.Equal(t, "email", tblMeta.Indexes[0].ColName)
@@ -96,7 +96,7 @@ func TestCreateTable_Next(t *testing.T) {
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
 		engine.Reset()
 		engine.Init()
-		sm := engine.Get()
+		e := engine.Get()
 		createTable := NewCreateTable("users", 1, nil, nil)
 
 		// WHEN
@@ -104,10 +104,11 @@ func TestCreateTable_Next(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		tblMeta, err := sm.Catalog.GetTableMetadataByName("users")
-		assert.NoError(t, err)
+		tblMeta, ok := e.Catalog.GetTableMetadataByName("users")
+		assert.True(t, ok)
+		assert.NotNil(t, tblMeta)
 		// ディスクマネージャが登録されていることを確認
-		dm, dmErr := sm.BufferPool.GetDisk(tblMeta.DataMetaPageId.FileId)
+		dm, dmErr := e.BufferPool.GetDisk(tblMeta.DataMetaPageId.FileId)
 		assert.NoError(t, dmErr)
 		assert.NotNil(t, dm)
 	})

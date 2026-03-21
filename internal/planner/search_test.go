@@ -28,6 +28,23 @@ func TestSearch(t *testing.T) {
 		assert.Contains(t, err.Error(), "table name cannot be empty")
 	})
 
+	t.Run("存在しないテーブル名の場合、エラーを返す", func(t *testing.T) {
+		tmpdir := t.TempDir()
+		initStorageManager(t, tmpdir)
+		defer engine.Reset()
+
+		// GIVEN
+		search := NewSearch("nonexistent", nil)
+
+		// WHEN
+		exec, err := search.Build()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "table nonexistent not found")
+	})
+
 	t.Run("WHERE 句なしの場合、SequentialScan が生成される", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)

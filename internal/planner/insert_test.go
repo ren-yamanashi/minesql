@@ -108,6 +108,34 @@ func TestNewInsert(t *testing.T) {
 		assert.Contains(t, err.Error(), "records cannot be empty")
 	})
 
+	t.Run("存在しないテーブル名の場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		initStorageManagerForTest(t)
+		defer engine.Reset()
+
+		stmt := &ast.InsertStmt{
+			StmtType: ast.StmtTypeInsert,
+			Table:    *ast.NewTableId("nonexistent"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+			},
+			Values: [][]ast.Literal{
+				{
+					ast.NewStringLiteral("'1'", "1"),
+				},
+			},
+		}
+		planner := NewInsert(stmt)
+
+		// WHEN
+		exec, err := planner.Build()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "table nonexistent not found")
+	})
+
 	t.Run("単一レコードの挿入で Executor が生成される", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)

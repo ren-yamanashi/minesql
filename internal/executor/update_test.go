@@ -12,22 +12,22 @@ import (
 func TestNewUpdate(t *testing.T) {
 	t.Run("正常に Update Executor を生成できる", func(t *testing.T) {
 		// GIVEN
-		tableName := "users"
 		setColumns := []SetColumn{
 			{Pos: 1, Value: []byte("Jane")},
 		}
+
 		iterator := NewTableScan(
-			tableName,
+			nil,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 
 		// WHEN
-		upd := NewUpdate(tableName, setColumns, iterator)
+		upd := NewUpdate(nil, setColumns, iterator)
 
 		// THEN
 		assert.NotNil(t, upd)
-		assert.Equal(t, tableName, upd.tableName)
+		assert.Nil(t, upd.table)
 		assert.Equal(t, setColumns, upd.SetColumns)
 		assert.NotNil(t, upd.InnerExecutor)
 	})
@@ -40,23 +40,27 @@ func TestUpdate_Next(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
-		upd := NewUpdate("users", []SetColumn{
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod("users")
+		assert.NoError(t, err)
+
+		upd := NewUpdate(tbl, []SetColumn{
 			{Pos: 1, Value: []byte("Updated")},
 		}, NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
 		// WHEN
-		_, err := upd.Next()
+		_, err = upd.Next()
 
 		// THEN: 更新が成功する
 		assert.NoError(t, err)
 
 		// THEN: 全レコードの first_name が "Updated" になっている
 		scan := NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -74,12 +78,16 @@ func TestUpdate_Next(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod("users")
+		assert.NoError(t, err)
+
 		// プライマリキーが "a" のレコードのみ更新
-		upd := NewUpdate("users", []SetColumn{
+		upd := NewUpdate(tbl, []SetColumn{
 			{Pos: 1, Value: []byte("Jane")},
 			{Pos: 2, Value: []byte("Updated")},
 		}, NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
@@ -87,14 +95,14 @@ func TestUpdate_Next(t *testing.T) {
 		))
 
 		// WHEN
-		_, err := upd.Next()
+		_, err = upd.Next()
 
 		// THEN: 更新が成功する
 		assert.NoError(t, err)
 
 		// THEN: "a" のレコードが更新され、他は変わらない
 		scan := NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -111,12 +119,16 @@ func TestUpdate_Next(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod("users")
+		assert.NoError(t, err)
+
 		// first_name が "Bob" のレコードの last_name を更新
-		upd := NewUpdate("users", []SetColumn{
+		upd := NewUpdate(tbl, []SetColumn{
 			{Pos: 2, Value: []byte("Williams")},
 		}, NewFilter(
 			NewTableScan(
-				"users",
+				tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -126,14 +138,14 @@ func TestUpdate_Next(t *testing.T) {
 		))
 
 		// WHEN
-		_, err := upd.Next()
+		_, err = upd.Next()
 
 		// THEN: 更新が成功する
 		assert.NoError(t, err)
 
 		// THEN: "Bob" の last_name が "Williams" に更新され、他は変わらない
 		scan := NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -155,11 +167,19 @@ func TestUpdate_Next(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod("users")
+		assert.NoError(t, err)
+
+		// インデックスアクセスメソッドを取得
+		idx, err := tbl.GetUniqueIndexByName("last_name")
+		assert.NoError(t, err)
+
 		// "a" (last_name = "Doe") の last_name を "Zebra" に更新
-		upd := NewUpdate("users", []SetColumn{
+		upd := NewUpdate(tbl, []SetColumn{
 			{Pos: 2, Value: []byte("Zebra")},
 		}, NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
@@ -167,7 +187,7 @@ func TestUpdate_Next(t *testing.T) {
 		))
 
 		// WHEN
-		_, err := upd.Next()
+		_, err = upd.Next()
 
 		// THEN: 更新が成功する
 		assert.NoError(t, err)
@@ -175,8 +195,8 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: ユニークインデックスで "Zebra" が検索できる
 		// SearchIndex の whileCondition にはデコードされたセカンダリキーのみ渡される
 		indexScan := NewIndexScan(
-			"users",
-			"last_name",
+			tbl,
+			idx,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("Zebra")}},
 			func(record Record) bool {
 				return string(record[0]) == "Zebra"
@@ -189,8 +209,8 @@ func TestUpdate_Next(t *testing.T) {
 
 		// THEN: ユニークインデックスで旧値 "Doe" が検索できない
 		indexScanOld := NewIndexScan(
-			"users",
-			"last_name",
+			tbl,
+			idx,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("Doe")}},
 			func(record Record) bool {
 				return string(record[0]) == "Doe"
@@ -201,38 +221,21 @@ func TestUpdate_Next(t *testing.T) {
 		assert.Equal(t, 0, len(resultsOld))
 	})
 
-	t.Run("存在しないテーブルを更新するとエラーが返る", func(t *testing.T) {
-		// GIVEN
-		tmpdir := t.TempDir()
-		InitStorageEngineForTest(t, tmpdir)
-		defer engine.Reset()
-
-		upd := NewUpdate("nonexistent", []SetColumn{
-			{Pos: 1, Value: []byte("val")},
-		}, NewTableScan(
-			"nonexistent",
-			access.RecordSearchModeStart{},
-			func(record Record) bool { return true },
-		))
-
-		// WHEN
-		_, err := upd.Next()
-
-		// THEN
-		assert.Error(t, err)
-	})
-
 	t.Run("プライマリキーカラムを更新できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod("users")
+		assert.NoError(t, err)
+
 		// プライマリキーを "a" → "z" に変更
-		upd := NewUpdate("users", []SetColumn{
+		upd := NewUpdate(tbl, []SetColumn{
 			{Pos: 0, Value: []byte("z")},
 		}, NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
@@ -240,14 +243,14 @@ func TestUpdate_Next(t *testing.T) {
 		))
 
 		// WHEN
-		_, err := upd.Next()
+		_, err = upd.Next()
 
 		// THEN: 更新が成功する
 		assert.NoError(t, err)
 
 		// THEN: "a" が消え "z" が追加されている
 		scan := NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -268,12 +271,16 @@ func TestUpdate_Next(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod("users")
+		assert.NoError(t, err)
+
 		// 存在しない first_name でフィルタ
-		upd := NewUpdate("users", []SetColumn{
+		upd := NewUpdate(tbl, []SetColumn{
 			{Pos: 2, Value: []byte("Changed")},
 		}, NewFilter(
 			NewTableScan(
-				"users",
+				tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -283,14 +290,14 @@ func TestUpdate_Next(t *testing.T) {
 		))
 
 		// WHEN
-		_, err := upd.Next()
+		_, err = upd.Next()
 
 		// THEN: エラーなしで正常終了
 		assert.NoError(t, err)
 
 		// THEN: 全レコードが変更されていない
 		scan := NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -316,16 +323,20 @@ func TestUpdate_Next(t *testing.T) {
 			{Name: "value", Type: catalog.ColumnTypeString},
 		})
 
-		upd := NewUpdate("empty_table", []SetColumn{
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod("empty_table")
+		assert.NoError(t, err)
+
+		upd := NewUpdate(tbl, []SetColumn{
 			{Pos: 1, Value: []byte("new_value")},
 		}, NewTableScan(
-			"empty_table",
+			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
 		// WHEN
-		_, err := upd.Next()
+		_, err = upd.Next()
 
 		// THEN
 		assert.NoError(t, err)

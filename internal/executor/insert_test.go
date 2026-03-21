@@ -12,7 +12,6 @@ import (
 func TestNewInsert(t *testing.T) {
 	t.Run("正常に Insert Executor を生成できる", func(t *testing.T) {
 		// GIVEN
-		tableName := "users"
 		cols := []string{"id", "name"}
 		records := []Record{
 			{[]byte("1"), []byte("Alice")},
@@ -20,11 +19,11 @@ func TestNewInsert(t *testing.T) {
 		}
 
 		// WHEN
-		insert := NewInsert(tableName, cols, records)
+		insert := NewInsert(nil, cols, records)
 
 		// THEN
 		assert.NotNil(t, insert)
-		assert.Equal(t, tableName, insert.tableName)
+		assert.Nil(t, insert.table)
 		assert.Equal(t, cols, insert.colNames)
 		assert.Equal(t, records, insert.records)
 	})
@@ -50,9 +49,13 @@ func TestInsert_Next(t *testing.T) {
 			{[]byte("2"), []byte("Bob")},
 		}
 
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod(tableName)
+		assert.NoError(t, err)
+
 		// WHEN
-		insert := NewInsert(tableName, cols, records)
-		_, err := insert.Next()
+		insert := NewInsert(tbl, cols, records)
+		_, err = insert.Next()
 
 		// THEN
 		assert.NoError(t, err)
@@ -60,7 +63,7 @@ func TestInsert_Next(t *testing.T) {
 			return true
 		}
 		seqScan := NewTableScan(
-			tableName,
+			tbl,
 			access.RecordSearchModeStart{},
 			whileCondition,
 		)

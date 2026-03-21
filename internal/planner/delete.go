@@ -1,7 +1,9 @@
 package planner
 
 import (
+	"fmt"
 	"minesql/internal/ast"
+	"minesql/internal/engine"
 	"minesql/internal/executor"
 )
 
@@ -18,5 +20,17 @@ func NewDelete(stmt *ast.DeleteStmt, iterator executor.Executor) *Delete {
 }
 
 func (dp *Delete) Build() (executor.Executor, error) {
-	return executor.NewDelete(dp.Stmt.From.TableName, dp.Iterator), nil
+	e := engine.Get()
+
+	tblMeta, ok := e.Catalog.GetTableMetadataByName(dp.Stmt.From.TableName)
+	if !ok {
+		return nil, fmt.Errorf("table %s not found", dp.Stmt.From.TableName)
+	}
+
+	tbl, err := tblMeta.GetTable()
+	if err != nil {
+		return nil, err
+	}
+
+	return executor.NewDelete(tbl, dp.Iterator), nil
 }

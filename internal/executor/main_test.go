@@ -14,12 +14,12 @@ import (
 func TestExecutorIntegration(t *testing.T) {
 	t.Run("フルテーブルスキャンで全レコードを取得できる", func(t *testing.T) {
 		// GIVEN
-		setupExecutorTestTable(t)
+		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
 
 		// WHEN
 		records := collectAll(t, NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
@@ -42,12 +42,12 @@ func TestExecutorIntegration(t *testing.T) {
 
 	t.Run("範囲スキャンで指定範囲のレコードを取得できる", func(t *testing.T) {
 		// GIVEN
-		setupExecutorTestTable(t)
+		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
 
 		// WHEN: プライマリキーが "w" 以上 "y" 以下
 		records := collectAll(t, NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("w")}},
 			func(record Record) bool {
 				return string(record[0]) <= "y"
@@ -70,12 +70,12 @@ func TestExecutorIntegration(t *testing.T) {
 
 	t.Run("定数検索で特定のレコードを取得できる", func(t *testing.T) {
 		// GIVEN
-		setupExecutorTestTable(t)
+		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
 
 		// WHEN
 		records := collectAll(t, NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("y")}},
 			func(record Record) bool {
 				return string(record[0]) == "y"
@@ -96,13 +96,13 @@ func TestExecutorIntegration(t *testing.T) {
 
 	t.Run("フィルタースキャンで条件に合うレコードのみ取得できる", func(t *testing.T) {
 		// GIVEN
-		setupExecutorTestTable(t)
+		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
 
 		// WHEN: first_name が "Charlie" のレコード
 		records := collectAll(t, NewFilter(
 			NewTableScan(
-				"users",
+				tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -125,13 +125,16 @@ func TestExecutorIntegration(t *testing.T) {
 
 	t.Run("インデックススキャンで名前順に全レコードを取得できる", func(t *testing.T) {
 		// GIVEN
-		setupExecutorTestTable(t)
+		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
+
+		idx, err := tbl.GetUniqueIndexByName("idx_first_name")
+		assert.NoError(t, err)
 
 		// WHEN
 		records := collectAll(t, NewIndexScan(
-			"users",
-			"idx_first_name",
+			tbl,
+			idx,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
@@ -154,13 +157,16 @@ func TestExecutorIntegration(t *testing.T) {
 
 	t.Run("インデックス範囲スキャンで姓の範囲を取得できる", func(t *testing.T) {
 		// GIVEN
-		setupExecutorTestTable(t)
+		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
+
+		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
+		assert.NoError(t, err)
 
 		// WHEN: 姓が "J" 以上 "N" 未満
 		records := collectAll(t, NewIndexScan(
-			"users",
-			"idx_last_name",
+			tbl,
+			idx,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("J")}},
 			func(secondaryKey Record) bool {
 				lastName := string(secondaryKey[0])
@@ -183,13 +189,16 @@ func TestExecutorIntegration(t *testing.T) {
 
 	t.Run("ユニークインデックス検索で特定の姓を取得できる", func(t *testing.T) {
 		// GIVEN
-		setupExecutorTestTable(t)
+		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
+
+		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
+		assert.NoError(t, err)
 
 		// WHEN
 		records := collectAll(t, NewIndexScan(
-			"users",
-			"idx_last_name",
+			tbl,
+			idx,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("Miller")}},
 			func(secondaryKey Record) bool {
 				return string(secondaryKey[0]) == "Miller"
@@ -210,15 +219,18 @@ func TestExecutorIntegration(t *testing.T) {
 
 	t.Run("UPDATE で値を更新し、インデックスも更新される", func(t *testing.T) {
 		// GIVEN
-		setupExecutorTestTable(t)
+		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
 
+		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
+		assert.NoError(t, err)
+
 		// WHEN: Alice の last_name を Anderson に更新
-		upd := NewUpdate("users", []SetColumn{
+		upd := NewUpdate(tbl, []SetColumn{
 			{Pos: 2, Value: []byte("Anderson")},
 		}, NewFilter(
 			NewTableScan(
-				"users",
+				tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -226,18 +238,18 @@ func TestExecutorIntegration(t *testing.T) {
 				return string(record[1]) == "Alice"
 			},
 		))
-		_, err := upd.Next()
+		_, err = upd.Next()
 		assert.NoError(t, err)
 
 		// THEN: テーブルスキャンとインデックススキャンの両方で確認
 		tableRecords := collectAll(t, NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 		idxRecords := collectAll(t, NewIndexScan(
-			"users",
-			"idx_last_name",
+			tbl,
+			idx,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
@@ -268,14 +280,14 @@ func TestExecutorIntegration(t *testing.T) {
 
 	t.Run("UPDATE でプライマリキーを変更できる", func(t *testing.T) {
 		// GIVEN
-		setupExecutorTestTable(t)
+		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
 
 		// WHEN: プライマリキー "v" (Eve) を "a" に変更
-		upd := NewUpdate("users", []SetColumn{
+		upd := NewUpdate(tbl, []SetColumn{
 			{Pos: 0, Value: []byte("a")},
 		}, NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("v")}},
 			func(record Record) bool {
 				return string(record[0]) == "v"
@@ -286,7 +298,7 @@ func TestExecutorIntegration(t *testing.T) {
 
 		// THEN
 		records := collectAll(t, NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
@@ -308,13 +320,13 @@ func TestExecutorIntegration(t *testing.T) {
 
 	t.Run("Project で特定のカラムだけ取得できる", func(t *testing.T) {
 		// GIVEN
-		setupExecutorTestTable(t)
+		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
 
 		// WHEN: first_name (pos=1) と last_name (pos=2) のみ取得
 		records := collectAll(t, NewProject(
 			NewTableScan(
-				"users",
+				tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -339,14 +351,14 @@ func TestExecutorIntegration(t *testing.T) {
 
 	t.Run("Filter + Project で条件に合うレコードの特定カラムを取得できる", func(t *testing.T) {
 		// GIVEN
-		setupExecutorTestTable(t)
+		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
 
 		// WHEN: first_name が "Charlie" のレコードから first_name と last_name を取得
 		records := collectAll(t, NewProject(
 			NewFilter(
 				NewTableScan(
-					"users",
+					tbl,
 					access.RecordSearchModeStart{},
 					func(record Record) bool { return true },
 				),
@@ -371,13 +383,16 @@ func TestExecutorIntegration(t *testing.T) {
 
 	t.Run("DELETE でレコードを削除し、インデックスからも削除される", func(t *testing.T) {
 		// GIVEN
-		setupExecutorTestTable(t)
+		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
 
+		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
+		assert.NoError(t, err)
+
 		// WHEN: Bob を削除
-		del := NewDelete("users", NewFilter(
+		del := NewDelete(tbl, NewFilter(
 			NewTableScan(
-				"users",
+				tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -385,18 +400,18 @@ func TestExecutorIntegration(t *testing.T) {
 				return string(record[1]) == "Bob"
 			},
 		))
-		_, err := del.Next()
+		_, err = del.Next()
 		assert.NoError(t, err)
 
 		// THEN: テーブルスキャンとインデックススキャンの両方で確認
 		tableRecords := collectAll(t, NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 		idxRecords := collectAll(t, NewIndexScan(
-			"users",
-			"idx_last_name",
+			tbl,
+			idx,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
@@ -424,8 +439,8 @@ func TestExecutorIntegration(t *testing.T) {
 	})
 }
 
-// 5 人のユーザーを持つテーブルを作成する (executor example と同じデータ)
-func setupExecutorTestTable(t *testing.T) {
+// 5 人のユーザーを持つテーブルを作成し、テーブルアクセスメソッドを返す
+func setupExecutorTestTable(t *testing.T) *access.TableAccessMethod {
 	t.Helper()
 
 	tmpdir := t.TempDir()
@@ -449,8 +464,11 @@ func setupExecutorTestTable(t *testing.T) {
 	_, err := createTable.Next()
 	assert.NoError(t, err)
 
+	tbl, err := getTableAccessMethod("users")
+	assert.NoError(t, err)
+
 	insert := NewInsert(
-		"users",
+		tbl,
 		[]string{"id", "first_name", "last_name"},
 		[]Record{
 			{[]byte("z"), []byte("Alice"), []byte("Smith")},
@@ -461,6 +479,8 @@ func setupExecutorTestTable(t *testing.T) {
 		})
 	_, err = insert.Next()
 	assert.NoError(t, err)
+
+	return tbl
 }
 
 // Executor から全レコードを取得する
@@ -496,4 +516,18 @@ func writeRecords(sb *strings.Builder, records []Record) {
 		fmt.Fprintf(sb, "  (%s)\n", strings.Join(vals, ", "))
 	}
 	fmt.Fprintf(sb, "  合計: %d 件\n", len(records))
+}
+
+func getTableAccessMethod(tableName string) (*access.TableAccessMethod, error) {
+	e := engine.Get()
+	tblMeta, ok := e.Catalog.GetTableMetadataByName(tableName)
+	if !ok {
+		return nil, fmt.Errorf("table %s not found in catalog", tableName)
+	}
+
+	tbl, err := tblMeta.GetTable()
+	if err != nil {
+		return nil, err
+	}
+	return tbl, nil
 }

@@ -2,6 +2,7 @@ package planner
 
 import (
 	"errors"
+	"fmt"
 	"minesql/internal/ast"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
@@ -33,8 +34,12 @@ func (ip *Insert) Build() (executor.Executor, error) {
 		}
 	}
 
-	sm := engine.Get()
-	tblMeta, err := sm.Catalog.GetTableMetadataByName(ip.Stmt.Table.TableName)
+	e := engine.Get()
+	tblMeta, ok := e.Catalog.GetTableMetadataByName(ip.Stmt.Table.TableName)
+	if !ok {
+		return nil, fmt.Errorf("table %s not found", ip.Stmt.Table.TableName)
+	}
+	tbl, err := tblMeta.GetTable()
 	if err != nil {
 		return nil, err
 	}
@@ -66,5 +71,5 @@ func (ip *Insert) Build() (executor.Executor, error) {
 		records = append(records, record)
 	}
 
-	return executor.NewInsert(ip.Stmt.Table.TableName, colNames, records), nil
+	return executor.NewInsert(tbl, colNames, records), nil
 }

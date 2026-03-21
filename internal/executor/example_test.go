@@ -11,7 +11,8 @@ import (
 )
 
 // セットアップヘルパー: テーブルを作成し、サンプルデータを挿入する
-func setupExample() func() {
+// テーブルアクセスメソッドとクリーンアップ関数を返す
+func setupExample() (*access.TableAccessMethod, func()) {
 	tmpDir, err := os.MkdirTemp("", "executor_example")
 	if err != nil {
 		panic(err)
@@ -47,9 +48,15 @@ func setupExample() func() {
 		panic(err)
 	}
 
+	// テーブルアクセスメソッドを取得
+	tbl, err := getTableAccessMethod("users")
+	if err != nil {
+		panic(err)
+	}
+
 	// サンプルデータを挿入
 	ins := NewInsert(
-		"users",
+		tbl,
 		[]string{"id", "first_name", "last_name"},
 		[]Record{
 			{[]byte("z"), []byte("Alice"), []byte("Smith")},
@@ -62,7 +69,7 @@ func setupExample() func() {
 		panic(err)
 	}
 
-	return cleanup
+	return tbl, cleanup
 }
 
 // レコードを表示するヘルパー
@@ -82,12 +89,12 @@ func printExampleRecords(executor Executor) {
 }
 
 func ExampleTableScan_fullScan() {
-	cleanup := setupExample()
+	tbl, cleanup := setupExample()
 	defer cleanup()
 
 	// フルテーブルスキャン (プライマリキー昇順)
 	iter := NewTableScan(
-		"users",
+		tbl,
 		access.RecordSearchModeStart{},
 		func(record Record) bool { return true },
 	)
@@ -103,12 +110,12 @@ func ExampleTableScan_fullScan() {
 }
 
 func ExampleTableScan_rangeScan() {
-	cleanup := setupExample()
+	tbl, cleanup := setupExample()
 	defer cleanup()
 
 	// プライマリキーが "w" 以上 "y" 以下の範囲スキャン
 	iter := NewTableScan(
-		"users",
+		tbl,
 		access.RecordSearchModeKey{Key: [][]byte{[]byte("w")}},
 		func(record Record) bool {
 			return string(record[0]) <= "y"
@@ -124,12 +131,12 @@ func ExampleTableScan_rangeScan() {
 }
 
 func ExampleTableScan_constSearch() {
-	cleanup := setupExample()
+	tbl, cleanup := setupExample()
 	defer cleanup()
 
 	// プライマリキーが "y" のレコードを検索
 	iter := NewTableScan(
-		"users",
+		tbl,
 		access.RecordSearchModeKey{Key: [][]byte{[]byte("y")}},
 		func(record Record) bool {
 			return string(record[0]) == "y"
@@ -143,13 +150,13 @@ func ExampleTableScan_constSearch() {
 }
 
 func ExampleFilter() {
-	cleanup := setupExample()
+	tbl, cleanup := setupExample()
 	defer cleanup()
 
 	// フルテーブルスキャン + first_name が "Charlie" のレコードのみフィルタ
 	iter := NewFilter(
 		NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		),
@@ -165,14 +172,23 @@ func ExampleFilter() {
 }
 
 func ExampleIndexScan_fullScan() {
-	cleanup := setupExample()
+	tbl, cleanup := setupExample()
 	defer cleanup()
+
+	idxFirstName, err := tbl.GetUniqueIndexByName("idx_first_name")
+	if err != nil {
+		panic(err)
+	}
+	idxLastName, err := tbl.GetUniqueIndexByName("idx_last_name")
+	if err != nil {
+		panic(err)
+	}
 
 	// first_name のインデックスで全件スキャン (名前のアルファベット順)
 	fmt.Println("=== idx_first_name ===")
 	printExampleRecords(NewIndexScan(
-		"users",
-		"idx_first_name",
+		tbl,
+		idxFirstName,
 		access.RecordSearchModeStart{},
 		func(record Record) bool { return true },
 	))
@@ -180,8 +196,8 @@ func ExampleIndexScan_fullScan() {
 	// last_name のインデックスで全件スキャン (姓のアルファベット順)
 	fmt.Println("=== idx_last_name ===")
 	printExampleRecords(NewIndexScan(
-		"users",
-		"idx_last_name",
+		tbl,
+		idxLastName,
 		access.RecordSearchModeStart{},
 		func(record Record) bool { return true },
 	))
@@ -204,13 +220,18 @@ func ExampleIndexScan_fullScan() {
 }
 
 func ExampleIndexScan_rangeScan() {
-	cleanup := setupExample()
+	tbl, cleanup := setupExample()
 	defer cleanup()
+
+	idxLastName, err := tbl.GetUniqueIndexByName("idx_last_name")
+	if err != nil {
+		panic(err)
+	}
 
 	// 姓が "J" 以上 "N" 未満の範囲をインデックスで検索
 	iter := NewIndexScan(
-		"users",
-		"idx_last_name",
+		tbl,
+		idxLastName,
 		access.RecordSearchModeKey{Key: [][]byte{[]byte("J")}},
 		func(secondaryKey Record) bool {
 			lastName := string(secondaryKey[0])
@@ -226,13 +247,18 @@ func ExampleIndexScan_rangeScan() {
 }
 
 func ExampleIndexScan_constSearch() {
-	cleanup := setupExample()
+	tbl, cleanup := setupExample()
 	defer cleanup()
+
+	idxLastName, err := tbl.GetUniqueIndexByName("idx_last_name")
+	if err != nil {
+		panic(err)
+	}
 
 	// 姓が "Miller" のレコードをインデックスで検索
 	iter := NewIndexScan(
-		"users",
-		"idx_last_name",
+		tbl,
+		idxLastName,
 		access.RecordSearchModeKey{Key: [][]byte{[]byte("Miller")}},
 		func(secondaryKey Record) bool {
 			return string(secondaryKey[0]) == "Miller"
@@ -246,13 +272,13 @@ func ExampleIndexScan_constSearch() {
 }
 
 func ExampleProject() {
-	cleanup := setupExample()
+	tbl, cleanup := setupExample()
 	defer cleanup()
 
 	// フルテーブルスキャンから first_name と last_name のみ取得
 	iter := NewProject(
 		NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		),
@@ -270,14 +296,14 @@ func ExampleProject() {
 }
 
 func ExampleProject_withFilter() {
-	cleanup := setupExample()
+	tbl, cleanup := setupExample()
 	defer cleanup()
 
 	// first_name が "Charlie" のレコードから first_name と last_name を取得
 	iter := NewProject(
 		NewFilter(
 			NewTableScan(
-				"users",
+				tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -295,15 +321,20 @@ func ExampleProject_withFilter() {
 }
 
 func ExampleUpdate() {
-	cleanup := setupExample()
+	tbl, cleanup := setupExample()
 	defer cleanup()
 
+	idxLastName, err := tbl.GetUniqueIndexByName("idx_last_name")
+	if err != nil {
+		panic(err)
+	}
+
 	// Alice の last_name を "Anderson" に更新
-	upd := NewUpdate("users", []SetColumn{
+	upd := NewUpdate(tbl, []SetColumn{
 		{Pos: 2, Value: []byte("Anderson")},
 	}, NewFilter(
 		NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		),
@@ -317,15 +348,15 @@ func ExampleUpdate() {
 
 	fmt.Println("=== テーブルスキャン ===")
 	printExampleRecords(NewTableScan(
-		"users",
+		tbl,
 		access.RecordSearchModeStart{},
 		func(record Record) bool { return true },
 	))
 
 	fmt.Println("=== インデックススキャン (idx_last_name) ===")
 	printExampleRecords(NewIndexScan(
-		"users",
-		"idx_last_name",
+		tbl,
+		idxLastName,
 		access.RecordSearchModeStart{},
 		func(record Record) bool { return true },
 	))
@@ -348,14 +379,14 @@ func ExampleUpdate() {
 }
 
 func ExampleUpdate_primaryKey() {
-	cleanup := setupExample()
+	tbl, cleanup := setupExample()
 	defer cleanup()
 
 	// プライマリキー "v" (Eve) を "a" に変更
-	upd := NewUpdate("users", []SetColumn{
+	upd := NewUpdate(tbl, []SetColumn{
 		{Pos: 0, Value: []byte("a")},
 	}, NewTableScan(
-		"users",
+		tbl,
 		access.RecordSearchModeKey{Key: [][]byte{[]byte("v")}},
 		func(record Record) bool {
 			return string(record[0]) == "v"
@@ -366,7 +397,7 @@ func ExampleUpdate_primaryKey() {
 	}
 
 	printExampleRecords(NewTableScan(
-		"users",
+		tbl,
 		access.RecordSearchModeStart{},
 		func(record Record) bool { return true },
 	))
@@ -381,13 +412,18 @@ func ExampleUpdate_primaryKey() {
 }
 
 func ExampleDelete() {
-	cleanup := setupExample()
+	tbl, cleanup := setupExample()
 	defer cleanup()
 
+	idxLastName, err := tbl.GetUniqueIndexByName("idx_last_name")
+	if err != nil {
+		panic(err)
+	}
+
 	// first_name が "Bob" のレコードを削除
-	del := NewDelete("users", NewFilter(
+	del := NewDelete(tbl, NewFilter(
 		NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		),
@@ -401,15 +437,15 @@ func ExampleDelete() {
 
 	fmt.Println("=== テーブルスキャン ===")
 	printExampleRecords(NewTableScan(
-		"users",
+		tbl,
 		access.RecordSearchModeStart{},
 		func(record Record) bool { return true },
 	))
 
 	fmt.Println("=== インデックススキャン (idx_last_name) ===")
 	printExampleRecords(NewIndexScan(
-		"users",
-		"idx_last_name",
+		tbl,
+		idxLastName,
 		access.RecordSearchModeStart{},
 		func(record Record) bool { return true },
 	))

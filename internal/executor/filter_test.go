@@ -12,7 +12,7 @@ func TestNewFilter(t *testing.T) {
 	t.Run("正常に Filter を作成できる", func(t *testing.T) {
 		// GIVEN
 		dummyInnerExecutor := NewTableScan(
-			"users",
+			nil,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -35,8 +35,12 @@ func TestNext(t *testing.T) {
 		defer engine.Reset()
 
 		// GIVEN
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod("users")
+		assert.NoError(t, err)
+
 		seqScan := NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -60,8 +64,11 @@ func TestNext(t *testing.T) {
 		defer engine.Reset()
 
 		// GIVEN
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod("users")
+		assert.NoError(t, err)
 		seqScan := NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)

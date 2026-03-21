@@ -7,39 +7,30 @@ import (
 
 // TableScan はテーブル全体を走査する
 type TableScan struct {
+	table          *access.TableAccessMethod
 	whileCondition func(record Record) bool // 継続条件を満たすかどうかを判定する関数
-	iterator       *access.ClusteredIndexIterator
-	tableName      string
 	searchMode     access.RecordSearchMode
+	iterator       *access.ClusteredIndexIterator
 }
 
 func NewTableScan(
-	tableName string,
+	table *access.TableAccessMethod,
 	searchMode access.RecordSearchMode,
 	whileCondition func(record Record) bool,
 ) *TableScan {
 	return &TableScan{
-		tableName:      tableName,
+		table:          table,
 		searchMode:     searchMode,
 		whileCondition: whileCondition,
 	}
 }
 
 func (ss *TableScan) Next() (Record, error) {
-	sm := engine.Get()
+	e := engine.Get()
 
 	// 初回実行時はイテレータを作成
 	if ss.iterator == nil {
-		tblMeta, err := sm.Catalog.GetTableMetadataByName(ss.tableName)
-		if err != nil {
-			return nil, err
-		}
-		tbl, err := tblMeta.GetTable()
-		if err != nil {
-			return nil, err
-		}
-
-		iterator, err := tbl.Search(sm.BufferPool, ss.searchMode)
+		iterator, err := ss.table.Search(e.BufferPool, ss.searchMode)
 		if err != nil {
 			return nil, err
 		}

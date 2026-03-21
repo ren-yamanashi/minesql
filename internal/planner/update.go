@@ -2,6 +2,7 @@ package planner
 
 import (
 	"errors"
+	"fmt"
 	"minesql/internal/ast"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
@@ -20,8 +21,13 @@ func NewUpdate(stmt *ast.UpdateStmt, iterator executor.Executor) *Update {
 }
 
 func (up *Update) Build() (executor.Executor, error) {
-	sm := engine.Get()
-	tblMeta, err := sm.Catalog.GetTableMetadataByName(up.Stmt.Table.TableName)
+	e := engine.Get()
+	tblMeta, ok := e.Catalog.GetTableMetadataByName(up.Stmt.Table.TableName)
+	if !ok {
+		return nil, fmt.Errorf("table %s not found", up.Stmt.Table.TableName)
+	}
+
+	tbl, err := tblMeta.GetTable()
 	if err != nil {
 		return nil, err
 	}
@@ -45,5 +51,5 @@ func (up *Update) Build() (executor.Executor, error) {
 		})
 	}
 
-	return executor.NewUpdate(up.Stmt.Table.TableName, setColumns, up.Iterator), nil
+	return executor.NewUpdate(tbl, setColumns, up.Iterator), nil
 }

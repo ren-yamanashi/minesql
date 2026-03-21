@@ -7,46 +7,33 @@ import (
 
 // IndexScan はセカンダリインデックスを利用して検索する
 type IndexScan struct {
-	tableName      string
-	indexName      string
+	table          *access.TableAccessMethod
+	index          *access.UniqueIndexAccessMethod
 	searchMode     access.RecordSearchMode
 	whileCondition func(record Record) bool // 継続条件を満たすかどうかを判定する関数
 	iterator       *access.SecondaryIndexIterator
 }
 
 func NewIndexScan(
-	tableName string,
-	indexName string,
+	table *access.TableAccessMethod,
+	index *access.UniqueIndexAccessMethod,
 	searchMode access.RecordSearchMode,
 	whileCondition func(record Record) bool,
 ) *IndexScan {
 	return &IndexScan{
-		tableName:      tableName,
-		indexName:      indexName,
+		table:          table,
+		index:          index,
 		searchMode:     searchMode,
 		whileCondition: whileCondition,
 	}
 }
 
 func (is *IndexScan) Next() (Record, error) {
-	sm := engine.Get()
+	e := engine.Get()
 
 	// 初回実行時にイテレータを作成
 	if is.iterator == nil {
-		tblMeta, err := sm.Catalog.GetTableMetadataByName(is.tableName)
-		if err != nil {
-			return nil, err
-		}
-		tbl, err := tblMeta.GetTable()
-		if err != nil {
-			return nil, err
-		}
-		index, err := tbl.GetUniqueIndexByName(is.indexName)
-		if err != nil {
-			return nil, err
-		}
-
-		iter, err := index.Search(sm.BufferPool, tbl, is.searchMode)
+		iter, err := is.index.Search(e.BufferPool, is.table, is.searchMode)
 		if err != nil {
 			return nil, err
 		}

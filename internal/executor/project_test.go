@@ -14,10 +14,14 @@ func TestProject(t *testing.T) {
 		setupExecutorTestTable(t)
 		defer engine.Reset()
 
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod("users")
+		assert.NoError(t, err)
+
 		// WHEN: first_name (pos=1) と last_name (pos=2) のみ取得
 		records := collectAll(t, NewProject(
 			NewTableScan(
-				"users",
+				tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -38,10 +42,14 @@ func TestProject(t *testing.T) {
 		setupExecutorTestTable(t)
 		defer engine.Reset()
 
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod("users")
+		assert.NoError(t, err)
+
 		// WHEN: first_name (pos=1) のみ取得
 		records := collectAll(t, NewProject(
 			NewTableScan(
-				"users",
+				tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -62,10 +70,14 @@ func TestProject(t *testing.T) {
 		setupExecutorTestTable(t)
 		defer engine.Reset()
 
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod("users")
+		assert.NoError(t, err)
+
 		// WHEN: last_name (pos=2), id (pos=0) の順で取得
 		records := collectAll(t, NewProject(
 			NewTableScan(
-				"users",
+				tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -83,11 +95,15 @@ func TestProject(t *testing.T) {
 		setupExecutorTestTable(t)
 		defer engine.Reset()
 
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod("users")
+		assert.NoError(t, err)
+
 		// WHEN: first_name が "Alice" のレコードから first_name と last_name を取得
 		records := collectAll(t, NewProject(
 			NewFilter(
 				NewTableScan(
-					"users",
+					tbl,
 					access.RecordSearchModeStart{},
 					func(record Record) bool { return true },
 				),
@@ -108,11 +124,15 @@ func TestProject(t *testing.T) {
 		setupExecutorTestTable(t)
 		defer engine.Reset()
 
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod("users")
+		assert.NoError(t, err)
+
 		// WHEN: 存在しない条件でフィルタした結果を射影
 		records := collectAll(t, NewProject(
 			NewFilter(
 				NewTableScan(
-					"users",
+					tbl,
 					access.RecordSearchModeStart{},
 					func(record Record) bool { return true },
 				),

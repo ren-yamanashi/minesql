@@ -20,16 +20,20 @@ func TestNewTableScan(t *testing.T) {
 			return true
 		}
 
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod("users")
+		assert.NoError(t, err)
+
 		// WHEN
 		seqScan := NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeStart{},
 			whileCondition,
 		)
 
 		// THEN
 		assert.NotNil(t, seqScan)
-		assert.Equal(t, "users", seqScan.tableName)
+		assert.Equal(t, tbl, seqScan.table)
 	})
 }
 
@@ -40,8 +44,12 @@ func TestTableScan_Next(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod("users")
+		assert.NoError(t, err)
+
 		seqScan := NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool {
 				return string(record[0]) < "c" // プライマリキーが "c" 未満の間、継続
@@ -73,8 +81,12 @@ func TestTableScan_Next(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
+		// テーブルアクセスメソッドを取得
+		tbl, err := getTableAccessMethod("users")
+		assert.NoError(t, err)
+
 		seqScan := NewTableScan(
-			"users",
+			tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("b")}},
 			func(record Record) bool {
 				return string(record[0]) <= "d" // プライマリキーが "d" 以下の間、継続
@@ -111,7 +123,7 @@ func InitStorageEngineForTest(t *testing.T, dataDir string) *engine.Engine {
 
 	engine.Reset()
 	engine.Init()
-	sm := engine.Get()
+	e := engine.Get()
 
 	// テーブルを作成
 	createTable := NewCreateTable("users", 1, []*IndexParam{
@@ -124,24 +136,21 @@ func InitStorageEngineForTest(t *testing.T, dataDir string) *engine.Engine {
 	_, err := createTable.Next()
 	assert.NoError(t, err)
 
-	tblMeta, err := sm.Catalog.GetTableMetadataByName("users")
-	assert.NoError(t, err)
-	assert.NotNil(t, tblMeta)
-
-	tbl, err := tblMeta.GetTable()
+	// テーブルアクセスメソッドを取得
+	tbl, err := getTableAccessMethod("users")
 	assert.NoError(t, err)
 
 	// 行を挿入
-	err = tbl.Insert(sm.BufferPool, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+	err = tbl.Insert(e.BufferPool, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 	assert.NoError(t, err)
-	err = tbl.Insert(sm.BufferPool, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+	err = tbl.Insert(e.BufferPool, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 	assert.NoError(t, err)
-	err = tbl.Insert(sm.BufferPool, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
+	err = tbl.Insert(e.BufferPool, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
 	assert.NoError(t, err)
-	err = tbl.Insert(sm.BufferPool, [][]byte{[]byte("d"), []byte("Eve"), []byte("Davis")})
+	err = tbl.Insert(e.BufferPool, [][]byte{[]byte("d"), []byte("Eve"), []byte("Davis")})
 	assert.NoError(t, err)
-	err = tbl.Insert(sm.BufferPool, [][]byte{[]byte("e"), []byte("Charlie"), []byte("Brown")})
+	err = tbl.Insert(e.BufferPool, [][]byte{[]byte("e"), []byte("Charlie"), []byte("Brown")})
 	assert.NoError(t, err)
 
-	return sm
+	return e
 }

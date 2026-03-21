@@ -25,13 +25,18 @@ func NewSearch(tableName string, where *ast.WhereClause) *Search {
 
 // Build は WHERE 句を元に検索用の Executor を構築する
 func (sp *Search) Build() (executor.Executor, error) {
-	sm := engine.Get()
+	e := engine.Get()
 
 	if sp.TableName == "" {
 		return nil, errors.New("table name cannot be empty")
 	}
 
-	tblMeta, err := sm.Catalog.GetTableMetadataByName(sp.TableName)
+	tblMeta, ok := e.Catalog.GetTableMetadataByName(sp.TableName)
+	if !ok {
+		return nil, fmt.Errorf("table %s not found", sp.TableName)
+	}
+
+	tbl, err := tblMeta.GetTable()
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +44,7 @@ func (sp *Search) Build() (executor.Executor, error) {
 	// WHERE 句が設定されていない場合フルテーブルスキャンを実行
 	if sp.Where == nil || !sp.Where.IsSet {
 		return executor.NewTableScan(
-			sp.TableName,
+			tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool {
 				return true // フルテーブルスキャンなので常に true を返す
@@ -48,16 +53,16 @@ func (sp *Search) Build() (executor.Executor, error) {
 	}
 
 	// WHERE 句が設定されている場合
-	switch e := sp.Where.Condition.(type) {
+	switch expr := sp.Where.Condition.(type) {
 	case *ast.BinaryExpr:
-		return planForBinaryExpr(sp.TableName, tblMeta, *e)
+		return planForBinaryExpr(tbl, tblMeta, *expr)
 	default:
 		return nil, errors.New("unsupported WHERE condition type")
 	}
 }
 
 // planForBinaryExpr は二項演算式を解析して適切な検索用の Executor を構築する
-func planForBinaryExpr(tableName string, tblMeta *catalog.TableMetadata, expr ast.BinaryExpr) (executor.Executor, error) {
+func planForBinaryExpr(tbl *access.TableAccessMethod, tblMeta *catalog.TableMetadata, expr ast.BinaryExpr) (executor.Executor, error) {
 	switch lhs := expr.Left.(type) {
 
 	// 左辺がカラムの場合 (例: WHERE col = 5)
@@ -67,7 +72,7 @@ func planForBinaryExpr(tableName string, tblMeta *catalog.TableMetadata, expr as
 		// 左辺がカラムの場合、右辺はリテラルでなければならない (例: WHERE col = 5)
 		case *ast.RhsLiteral:
 			if _, ok := tblMeta.GetColByName(colName); !ok {
-				return nil, errors.New("column " + colName + " does not exist in table " + tableName)
+				return nil, errors.New("column " + colName + " does not exist in table " + tblMeta.Name)
 			}
 
 			// カラムがインデックスの場合 (該当のカラムをキーとしたインデックスが存在する場合)、インデックス検索を行う
@@ -76,9 +81,13 @@ func planForBinaryExpr(tableName string, tblMeta *catalog.TableMetadata, expr as
 				if err != nil {
 					return nil, err
 				}
+				index, err := tbl.GetUniqueIndexByName(idxMeta.Name)
+				if err != nil {
+					return nil, err
+				}
 				return executor.NewIndexScan(
-					tableName,
-					idxMeta.Name,
+					tbl,
+					index,
 					access.RecordSearchModeKey{Key: [][]byte{rhs.Literal.ToBytes()}},
 					cond,
 				), nil
@@ -87,14 +96,14 @@ func planForBinaryExpr(tableName string, tblMeta *catalog.TableMetadata, expr as
 			// カラムがインデックスでない場合、テーブル検索を行う
 			colMeta, ok := tblMeta.GetColByName(colName)
 			if !ok {
-				return nil, errors.New("column " + colName + " does not exist in table " + tableName)
+				return nil, errors.New("column " + colName + " does not exist in table " + tblMeta.Name)
 			}
 			cond, err := operatorToCondition(expr.Operator, int(colMeta.Pos), rhs.Literal.ToString())
 			if err != nil {
 				return nil, err
 			}
 			return executor.NewTableScan(
-				tableName,
+				tbl,
 				access.RecordSearchModeKey{Key: [][]byte{rhs.Literal.ToBytes()}},
 				cond,
 			), nil
@@ -105,7 +114,7 @@ func planForBinaryExpr(tableName string, tblMeta *catalog.TableMetadata, expr as
 	// 左辺が式の場合 (例: WHERE col1 = 5 AND col2 > 10)
 	case *ast.LhsExpr:
 		// 式の木構造から単一の条件関数を再帰的に構築する
-		cond, err := buildConditionFunc(tableName, tblMeta, expr)
+		cond, err := buildConditionFunc(tblMeta, expr)
 		if err != nil {
 			return nil, err
 		}
@@ -113,7 +122,7 @@ func planForBinaryExpr(tableName string, tblMeta *catalog.TableMetadata, expr as
 		// 全件スキャン -> 条件の適用 の流れで実行する (フィルタリング用の executor の innerExecutor としてテーブルスキャン用の executor を渡す)
 		return executor.NewFilter(
 			executor.NewTableScan( // innerExecutor としてテーブルスキャン用の executor を渡す
-				tableName,
+				tbl,
 				access.RecordSearchModeStart{},
 				func(record executor.Record) bool {
 					return true
@@ -128,7 +137,7 @@ func planForBinaryExpr(tableName string, tblMeta *catalog.TableMetadata, expr as
 }
 
 // buildConditionFunc は式の木構造から単一の条件関数を再帰的に構築する
-func buildConditionFunc(tableName string, tblMeta *catalog.TableMetadata, expr ast.BinaryExpr) (func(executor.Record) bool, error) {
+func buildConditionFunc(tblMeta *catalog.TableMetadata, expr ast.BinaryExpr) (func(executor.Record) bool, error) {
 	switch lhs := expr.Left.(type) {
 
 	// リーフノード: col of literal のような単純な条件 (例: col1 = 5)
@@ -136,7 +145,7 @@ func buildConditionFunc(tableName string, tblMeta *catalog.TableMetadata, expr a
 		colName := lhs.Column.ColName
 		colMeta, ok := tblMeta.GetColByName(colName)
 		if !ok {
-			return nil, errors.New("column " + colName + " does not exist in table " + tableName)
+			return nil, errors.New("column " + colName + " does not exist in table " + tblMeta.Name)
 		}
 
 		switch rhs := expr.Right.(type) {
@@ -151,7 +160,7 @@ func buildConditionFunc(tableName string, tblMeta *catalog.TableMetadata, expr a
 	// ブランチノード: expr AND/OR expr (例: col1 = 5 AND col2 > 10 のような複合条件)
 	case *ast.LhsExpr:
 		// 左辺の式から条件関数を再帰的に構築
-		leftCond, err := buildConditionFunc(tableName, tblMeta, *lhs.Expr.(*ast.BinaryExpr))
+		leftCond, err := buildConditionFunc(tblMeta, *lhs.Expr.(*ast.BinaryExpr))
 		if err != nil {
 			return nil, err
 		}
@@ -159,7 +168,7 @@ func buildConditionFunc(tableName string, tblMeta *catalog.TableMetadata, expr a
 		switch rhs := expr.Right.(type) {
 		// 右辺が式の場合、右辺の式から条件関数を再帰的に構築し、論理演算子 (AND/OR) に応じて条件関数を組み合わせる
 		case *ast.RhsExpr:
-			rightCond, err := buildConditionFunc(tableName, tblMeta, *rhs.Expr.(*ast.BinaryExpr))
+			rightCond, err := buildConditionFunc(tblMeta, *rhs.Expr.(*ast.BinaryExpr))
 			if err != nil {
 				return nil, err
 			}

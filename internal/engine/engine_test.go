@@ -52,11 +52,11 @@ func TestGet(t *testing.T) {
 		Init()
 
 		// WHEN
-		sm := Get()
+		e := Get()
 
 		// THEN
-		assert.NotNil(t, sm)
-		assert.NotNil(t, sm.BufferPool)
+		assert.NotNil(t, e)
+		assert.NotNil(t, e.BufferPool)
 	})
 
 	t.Run("初期化前に取得しようとすると panic", func(t *testing.T) {
@@ -78,18 +78,18 @@ func TestRegisterDmToBp(t *testing.T) {
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
 		Reset()
 		Init()
-		sm := Get()
+		e := Get()
 
 		fileId := page.FileId(1)
 		tableName := "users"
 
 		// WHEN
-		err := sm.RegisterDmToBp(fileId, tableName)
+		err := e.RegisterDmToBp(fileId, tableName)
 
 		// THEN
 		assert.NoError(t, err)
 
-		dm, err := sm.BufferPool.GetDisk(fileId)
+		dm, err := e.BufferPool.GetDisk(fileId)
 		assert.NoError(t, err)
 		assert.NotNil(t, dm)
 	})
@@ -101,20 +101,20 @@ func TestRegisterDmToBp(t *testing.T) {
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
 		Reset()
 		Init()
-		sm := Get()
+		e := Get()
 
 		fileId := page.FileId(1)
 		tableName := "users"
 
 		// WHEN
-		err1 := sm.RegisterDmToBp(fileId, tableName)
-		err2 := sm.RegisterDmToBp(fileId, tableName)
+		err1 := e.RegisterDmToBp(fileId, tableName)
+		err2 := e.RegisterDmToBp(fileId, tableName)
 
 		// THEN
 		assert.NoError(t, err1)
 		assert.NoError(t, err2)
 
-		dm, err := sm.BufferPool.GetDisk(fileId)
+		dm, err := e.BufferPool.GetDisk(fileId)
 		assert.NoError(t, err)
 		assert.NotNil(t, dm)
 	})
@@ -129,12 +129,12 @@ func TestInitCatalog(t *testing.T) {
 		Reset()
 
 		// WHEN
-		sm := Init()
+		e := Init()
 
 		// THEN
-		assert.NotNil(t, sm)
-		assert.NotNil(t, sm.Catalog)
-		assert.Equal(t, page.FileId(1), sm.Catalog.NextFileId)
+		assert.NotNil(t, e)
+		assert.NotNil(t, e.Catalog)
+		assert.Equal(t, page.FileId(1), e.Catalog.NextFileId)
 	})
 
 	t.Run("カタログファイルが既に存在する場合、既存のカタログが開かれる", func(t *testing.T) {
@@ -176,10 +176,10 @@ func TestInitCatalog(t *testing.T) {
 		Reset()
 
 		// WHEN
-		sm := Init()
+		e := Init()
 
 		// THEN
-		dm, err := sm.BufferPool.GetDisk(page.FileId(0))
+		dm, err := e.BufferPool.GetDisk(page.FileId(0))
 		assert.NoError(t, err)
 		assert.NotNil(t, dm)
 	})
@@ -227,8 +227,9 @@ func TestInitCatalog(t *testing.T) {
 		assert.NotNil(t, dm)
 
 		// カタログからテーブル情報も取得できる
-		tableMeta, err := sm2.Catalog.GetTableMetadataByName("users")
-		assert.NoError(t, err)
+		tableMeta, ok := sm2.Catalog.GetTableMetadataByName("users")
+		assert.True(t, ok)
+		assert.NotNil(t, tableMeta)
 		assert.Equal(t, "users", tableMeta.Name)
 	})
 
@@ -245,12 +246,12 @@ func TestInitCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		sm := Init()
+		e := Init()
 
 		// THEN: 新しいカタログが作成され、NextFileId は 1
-		assert.NotNil(t, sm)
-		assert.NotNil(t, sm.Catalog)
-		assert.Equal(t, page.FileId(1), sm.Catalog.NextFileId)
+		assert.NotNil(t, e)
+		assert.NotNil(t, e.Catalog)
+		assert.Equal(t, page.FileId(1), e.Catalog.NextFileId)
 	})
 
 	t.Run("データディレクトリが存在しない場合、自動作成される", func(t *testing.T) {
@@ -262,10 +263,10 @@ func TestInitCatalog(t *testing.T) {
 		Reset()
 
 		// WHEN
-		sm := Init()
+		e := Init()
 
 		// THEN: ディレクトリが作成され、初期化が完了している
-		assert.NotNil(t, sm)
+		assert.NotNil(t, e)
 		_, err := os.Stat(nestedDir)
 		assert.NoError(t, err)
 	})
