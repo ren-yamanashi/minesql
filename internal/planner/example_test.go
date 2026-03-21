@@ -1,54 +1,40 @@
-package main
+package planner_test
 
 import (
 	"fmt"
+	"os"
+	"strings"
+
 	"minesql/internal/ast"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/planner"
-	"os"
 )
 
-// Executor から全レコードを取得する
-func executePlan(exec executor.Executor) ([]executor.Record, error) {
-	var records []executor.Record
-	for {
-		record, err := exec.Next()
-		if err != nil {
-			return nil, err
-		}
-		if record == nil {
-			return records, nil
-		}
-		records = append(records, record)
+// セットアップヘルパー: テーブルを作成し、サンプルデータを挿入する
+func setupPlannerExample() func() {
+	tmpDir, err := os.MkdirTemp("", "planner_example")
+	if err != nil {
+		panic(err)
 	}
-}
+	cleanup := func() {
+		engine.Reset()
+		_ = os.RemoveAll(tmpDir)
+	}
 
-func main() {
-	dataDir := "examples/planner/data"
-	os.RemoveAll(dataDir) // 既存のデータディレクトリがあれば削除
-	os.MkdirAll(dataDir, 0750)
-
-	// StorageManager を初期化
-	os.Setenv("MINESQL_DATA_DIR", dataDir)
-	os.Setenv("MINESQL_BUFFER_SIZE", "100")
+	if err = os.Setenv("MINESQL_DATA_DIR", tmpDir); err != nil {
+		panic(err)
+	}
+	if err = os.Setenv("MINESQL_BUFFER_SIZE", "100"); err != nil {
+		panic(err)
+	}
+	engine.Reset()
 	engine.Init()
 
-	createTable()
-	insert()
-	scan()
-	assertEqual()
-	filter()
-	updateByCondition()
-	scanAfterUpdate()
-	deleteByCondition()
-	scanAfterDelete()
-}
-
-func createTable() {
-	stmt := &ast.CreateTableStmt{
-		StmtType: ast.StmtTypeCreate,
-		Keyword:  ast.KeywordTable,
+	// CREATE TABLE
+	runPlan(&ast.CreateTableStmt{
+		StmtType:  ast.StmtTypeCreate,
+		Keyword:   ast.KeywordTable,
 		TableName: "users",
 		CreateDefinitions: []ast.Definition{
 			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
@@ -61,25 +47,12 @@ func createTable() {
 			}},
 			&ast.ConstraintUniqueKeyDef{DefType: ast.DefTypeConstraintUniqueKey, Column: *ast.NewColumnId("username")},
 		},
-	}
+	})
 
-	exec, err := planner.PlanStart(stmt)
-	if err != nil {
-		panic(err)
-	}
-	records, err := executePlan(exec)
-	if err != nil {
-		panic(err)
-	}
-	for _, record := range records {
-		println(string(record[0]), string(record[1]), string(record[2]), string(record[3]), string(record[4]))
-	}
-}
-
-func insert() {
-	stmt := &ast.InsertStmt{
+	// INSERT
+	runPlan(&ast.InsertStmt{
 		StmtType: ast.StmtTypeInsert,
-		Table: *ast.NewTableId("users"),
+		Table:    *ast.NewTableId("users"),
 		Cols: []ast.ColumnId{
 			*ast.NewColumnId("id"),
 			*ast.NewColumnId("first_name"),
@@ -131,47 +104,69 @@ func insert() {
 				ast.NewStringLiteral("tombrown", "tombrown"),
 			},
 		},
+	})
+
+	return cleanup
+}
+
+// AST を直接構築 → planner.Start → 実行して結果を返す
+func runPlan(stmt ast.Statement) []executor.Record {
+	exec, err := planner.Start(stmt)
+	if err != nil {
+		panic(err)
 	}
 
-	exec, err := planner.PlanStart(stmt)
-	if err != nil {
-		panic(err)
-	}
-	records, err := executePlan(exec)
-	if err != nil {
-		panic(err)
-	}
-	for _, record := range records {
-		println(string(record[0]), string(record[1]), string(record[2]), string(record[3]), string(record[4]))
+	var records []executor.Record
+	for {
+		record, err := exec.Next()
+		if err != nil {
+			panic(err)
+		}
+		if record == nil {
+			return records
+		}
+		records = append(records, record)
 	}
 }
 
-func scan() {
-	fmt.Println("=== scan all ===")
-	stmt := &ast.SelectStmt{
+// レコードを表示するヘルパー
+func printPlanRecords(records []executor.Record) {
+	for _, record := range records {
+		cols := make([]string, len(record))
+		for i, col := range record {
+			cols[i] = string(col)
+		}
+		fmt.Printf("  (%s)\n", strings.Join(cols, ", "))
+	}
+	fmt.Printf("  合計: %d 件\n", len(records))
+}
+
+func Example_scanAll() {
+	cleanup := setupPlannerExample()
+	defer cleanup()
+
+	records := runPlan(&ast.SelectStmt{
 		StmtType: ast.StmtTypeSelect,
 		From:     *ast.NewTableId("users"),
 		Where:    &ast.WhereClause{IsSet: false},
-	}
-	exec, err := planner.PlanStart(stmt)
-	if err != nil {
-		panic(err)
-	}
-	records, err := executePlan(exec)
-	if err != nil {
-		panic(err)
-	}
-	for _, record := range records {
-		for _, col := range record {
-			fmt.Print(string(col), " ")
-		}
-		fmt.Println()
-	}
+	})
+	printPlanRecords(records)
+
+	// Output:
+	//   (1, John, Doe, male, johndoe)
+	//   (2, John, Doe2, male, johndoe2)
+	//   (3, John, Doe3, male, johndoe3)
+	//   (4, Jane, Doe2, female, janedoe)
+	//   (5, Jonathan, Black, male, jonathanblack)
+	//   (6, Tom, Brown, male, tombrown)
+	//   合計: 6 件
 }
 
-func assertEqual() {
-	fmt.Println("=== assert equal ===")
-	stmt := &ast.SelectStmt{
+func Example_assertEqual() {
+	cleanup := setupPlannerExample()
+	defer cleanup()
+
+	records := runPlan(&ast.SelectStmt{
 		StmtType: ast.StmtTypeSelect,
 		From:     *ast.NewTableId("users"),
 		Where: &ast.WhereClause{
@@ -182,78 +177,20 @@ func assertEqual() {
 			),
 			IsSet: true,
 		},
-	}
-	exec, err := planner.PlanStart(stmt)
-	if err != nil {
-		panic(err)
-	}
-	records, err := executePlan(exec)
-	if err != nil {
-		panic(err)
-	}
-	for _, record := range records {
-		for _, col := range record {
-			fmt.Print(string(col), " ")
-		}
-		fmt.Println()
-	}
+	})
+	printPlanRecords(records)
+
+	// Output:
+	//   (4, Jane, Doe2, female, janedoe)
+	//   合計: 1 件
 }
 
-func updateByCondition() {
-	fmt.Println("=== UPDATE users SET last_name = 'Smith' WHERE username = 'johndoe' ===")
-	// UPDATE users SET last_name = 'Smith' WHERE username = 'johndoe'
-	stmt := &ast.UpdateStmt{
-		Table: *ast.NewTableId("users"),
-		SetClauses: []*ast.SetClause{
-			{Column: *ast.NewColumnId("last_name"), Value: ast.NewStringLiteral("'Smith'", "Smith")},
-		},
-		Where: &ast.WhereClause{
-			Condition: ast.NewBinaryExpr(
-				"=",
-				ast.NewLhsColumn(*ast.NewColumnId("username")),
-				ast.NewRhsLiteral(ast.NewStringLiteral("johndoe", "johndoe")),
-			),
-			IsSet: true,
-		},
-	}
-	exec, err := planner.PlanStart(stmt)
-	if err != nil {
-		panic(err)
-	}
-	_, err = executePlan(exec)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("updated.")
-}
+func Example_filter() {
+	cleanup := setupPlannerExample()
+	defer cleanup()
 
-func scanAfterUpdate() {
-	fmt.Println("=== scan after update ===")
-	stmt := &ast.SelectStmt{
-		StmtType: ast.StmtTypeSelect,
-		From:     *ast.NewTableId("users"),
-		Where:    &ast.WhereClause{IsSet: false},
-	}
-	exec, err := planner.PlanStart(stmt)
-	if err != nil {
-		panic(err)
-	}
-	records, err := executePlan(exec)
-	if err != nil {
-		panic(err)
-	}
-	for _, record := range records {
-		for _, col := range record {
-			fmt.Print(string(col), " ")
-		}
-		fmt.Println()
-	}
-}
-
-func filter() {
-	fmt.Println("=== filter (first_name < 'K' AND gender = 'male' AND last_name >= 'Doe') OR first_name = 'Tom' ===")
 	// SELECT * FROM users WHERE (first_name < 'K' AND gender = 'male' AND last_name >= 'Doe') OR first_name = 'Tom'
-	stmt := &ast.SelectStmt{
+	records := runPlan(&ast.SelectStmt{
 		StmtType: ast.StmtTypeSelect,
 		From:     *ast.NewTableId("users"),
 		Where: &ast.WhereClause{
@@ -300,27 +237,60 @@ func filter() {
 			),
 			IsSet: true,
 		},
-	}
-	exec, err := planner.PlanStart(stmt)
-	if err != nil {
-		panic(err)
-	}
-	records, err := executePlan(exec)
-	if err != nil {
-		panic(err)
-	}
-	for _, record := range records {
-		for _, col := range record {
-			fmt.Print(string(col), " ")
-		}
-		fmt.Println()
-	}
+	})
+	printPlanRecords(records)
+
+	// Output:
+	//   (1, John, Doe, male, johndoe)
+	//   (2, John, Doe2, male, johndoe2)
+	//   (3, John, Doe3, male, johndoe3)
+	//   (6, Tom, Brown, male, tombrown)
+	//   合計: 4 件
 }
 
-func deleteByCondition() {
-	fmt.Println("=== delete WHERE username = 'johndoe2' ===")
+func Example_update() {
+	cleanup := setupPlannerExample()
+	defer cleanup()
+
+	// UPDATE users SET last_name = 'Smith' WHERE username = 'johndoe'
+	runPlan(&ast.UpdateStmt{
+		Table: *ast.NewTableId("users"),
+		SetClauses: []*ast.SetClause{
+			{Column: *ast.NewColumnId("last_name"), Value: ast.NewStringLiteral("'Smith'", "Smith")},
+		},
+		Where: &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
+				"=",
+				ast.NewLhsColumn(*ast.NewColumnId("username")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("johndoe", "johndoe")),
+			),
+			IsSet: true,
+		},
+	})
+
+	records := runPlan(&ast.SelectStmt{
+		StmtType: ast.StmtTypeSelect,
+		From:     *ast.NewTableId("users"),
+		Where:    &ast.WhereClause{IsSet: false},
+	})
+	printPlanRecords(records)
+
+	// Output:
+	//   (1, John, Smith, male, johndoe)
+	//   (2, John, Doe2, male, johndoe2)
+	//   (3, John, Doe3, male, johndoe3)
+	//   (4, Jane, Doe2, female, janedoe)
+	//   (5, Jonathan, Black, male, jonathanblack)
+	//   (6, Tom, Brown, male, tombrown)
+	//   合計: 6 件
+}
+
+func Example_delete() {
+	cleanup := setupPlannerExample()
+	defer cleanup()
+
 	// DELETE FROM users WHERE username = 'johndoe2'
-	stmt := &ast.DeleteStmt{
+	runPlan(&ast.DeleteStmt{
 		StmtType: ast.StmtTypeDelete,
 		From:     *ast.NewTableId("users"),
 		Where: &ast.WhereClause{
@@ -331,37 +301,20 @@ func deleteByCondition() {
 			),
 			IsSet: true,
 		},
-	}
-	exec, err := planner.PlanStart(stmt)
-	if err != nil {
-		panic(err)
-	}
-	_, err = executePlan(exec)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Println("deleted.")
-}
+	})
 
-func scanAfterDelete() {
-	fmt.Println("=== scan after delete ===")
-	stmt := &ast.SelectStmt{
+	records := runPlan(&ast.SelectStmt{
 		StmtType: ast.StmtTypeSelect,
 		From:     *ast.NewTableId("users"),
 		Where:    &ast.WhereClause{IsSet: false},
-	}
-	exec, err := planner.PlanStart(stmt)
-	if err != nil {
-		panic(err)
-	}
-	records, err := executePlan(exec)
-	if err != nil {
-		panic(err)
-	}
-	for _, record := range records {
-		for _, col := range record {
-			fmt.Print(string(col), " ")
-		}
-		fmt.Println()
-	}
+	})
+	printPlanRecords(records)
+
+	// Output:
+	//   (1, John, Doe, male, johndoe)
+	//   (3, John, Doe3, male, johndoe3)
+	//   (4, Jane, Doe2, female, janedoe)
+	//   (5, Jonathan, Black, male, jonathanblack)
+	//   (6, Tom, Brown, male, tombrown)
+	//   合計: 5 件
 }

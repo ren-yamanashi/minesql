@@ -1,10 +1,9 @@
-package parser_test
+package parser
 
 import (
 	"fmt"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/parser"
 	"minesql/internal/planner"
 	"strings"
 	"testing"
@@ -254,7 +253,7 @@ func fetchAll(t *testing.T, iter executor.Executor) []executor.Record {
 // SQL をパース → プラン → 実行して結果を返す
 func executeSql(t *testing.T, sql string) []executor.Record {
 	t.Helper()
-	p := parser.NewParser()
+	p := NewParser()
 	result, err := p.Parse(sql)
 	assert.NoError(t, err)
 
