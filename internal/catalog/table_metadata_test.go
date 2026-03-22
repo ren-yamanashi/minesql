@@ -10,6 +10,73 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestGetSortedCols(t *testing.T) {
+	t.Run("Pos の順序でソートされたカラムメタデータを返す", func(t *testing.T) {
+		// GIVEN
+		colMeta := []*ColumnMetadata{
+			NewColumnMetadata(1, "email", 2, ColumnTypeString),
+			NewColumnMetadata(1, "id", 0, ColumnTypeString),
+			NewColumnMetadata(1, "name", 1, ColumnTypeString),
+		}
+		tableMeta := NewTableMetadata(1, "users", 3, 1, colMeta, []*IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
+
+		// WHEN
+		sorted := tableMeta.GetSortedCols()
+
+		// THEN
+		assert.Equal(t, 3, len(sorted))
+		assert.Equal(t, "id", sorted[0].Name)
+		assert.Equal(t, uint16(0), sorted[0].Pos)
+		assert.Equal(t, "name", sorted[1].Name)
+		assert.Equal(t, uint16(1), sorted[1].Pos)
+		assert.Equal(t, "email", sorted[2].Name)
+		assert.Equal(t, uint16(2), sorted[2].Pos)
+	})
+
+	t.Run("元々 Pos の順序通りのカラムメタデータでも正しく返す", func(t *testing.T) {
+		// GIVEN
+		colMeta := []*ColumnMetadata{
+			NewColumnMetadata(1, "id", 0, ColumnTypeString),
+			NewColumnMetadata(1, "name", 1, ColumnTypeString),
+		}
+		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, []*IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
+
+		// WHEN
+		sorted := tableMeta.GetSortedCols()
+
+		// THEN
+		assert.Equal(t, 2, len(sorted))
+		assert.Equal(t, "id", sorted[0].Name)
+		assert.Equal(t, "name", sorted[1].Name)
+	})
+
+	t.Run("カラムが 1 つだけの場合", func(t *testing.T) {
+		// GIVEN
+		colMeta := []*ColumnMetadata{
+			NewColumnMetadata(1, "id", 0, ColumnTypeString),
+		}
+		tableMeta := NewTableMetadata(1, "users", 1, 1, colMeta, []*IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
+
+		// WHEN
+		sorted := tableMeta.GetSortedCols()
+
+		// THEN
+		assert.Equal(t, 1, len(sorted))
+		assert.Equal(t, "id", sorted[0].Name)
+	})
+
+	t.Run("カラムが空の場合", func(t *testing.T) {
+		// GIVEN
+		tableMeta := NewTableMetadata(1, "users", 0, 0, []*ColumnMetadata{}, []*IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
+
+		// WHEN
+		sorted := tableMeta.GetSortedCols()
+
+		// THEN
+		assert.Equal(t, 0, len(sorted))
+	})
+}
+
 func TestGetColByName(t *testing.T) {
 	t.Run("指定したカラム名のインデックスを取得できる", func(t *testing.T) {
 		// GIVEN

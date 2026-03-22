@@ -36,6 +36,15 @@ func NewTableMetadata(fileId page.FileId, name string, nCols uint8, pkCount uint
 	}
 }
 
+// GetSortedCols はカラムの位置 (Pos) でソートされたカラムメタデータを取得する
+func (tm *TableMetadata) GetSortedCols() []*ColumnMetadata {
+	sortedColMeta := make([]*ColumnMetadata, len(tm.Cols))
+	for _, colMeta := range tm.Cols {
+		sortedColMeta[colMeta.Pos] = colMeta
+	}
+	return sortedColMeta
+}
+
 // GetColByName はカラム名からカラムを取得する
 func (tm *TableMetadata) GetColByName(colName string) (*ColumnMetadata, bool) {
 	for _, col := range tm.Cols {
