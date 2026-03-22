@@ -25,6 +25,7 @@ type TableStatistics struct {
 	SecondaryIndexStats map[string]IndexStatistics  // セカンダリインデックス名 -> インデックス統計情報
 }
 
+// Statistics はテーブルの統計情報を収集する
 type Statistics struct {
 	metadata   *catalog.TableMetadata
 	bufferPool *bufferpool.BufferPool
