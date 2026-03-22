@@ -287,6 +287,50 @@ func TestCalcRangeSelectivity(t *testing.T) {
 	})
 }
 
+func TestTotalCost(t *testing.T) {
+	t.Run("I/O コストと CPU コストが重み付けされる", func(t *testing.T) {
+		// GIVEN: B(s) = 50, R(s) = 1000
+		cost := ScanCost{
+			DiskAccesses: 50,
+			RecordCount:  1000,
+		}
+
+		// WHEN
+		total := cost.TotalCost()
+
+		// THEN: 50 * 1.0 + 1000 * 0.1 = 150
+		assert.Equal(t, float64(150), total)
+	})
+
+	t.Run("R(s) が小さい場合は B(s) が支配的になる", func(t *testing.T) {
+		// GIVEN: B(s) = 50, R(s) = 1
+		cost := ScanCost{
+			DiskAccesses: 50,
+			RecordCount:  1,
+		}
+
+		// WHEN
+		total := cost.TotalCost()
+
+		// THEN: 50 * 1.0 + 1 * 0.1 = 50.1
+		assert.Equal(t, float64(50.1), total)
+	})
+
+	t.Run("B(s) が小さく R(s) が大きい場合は CPU コストが影響する", func(t *testing.T) {
+		// GIVEN: B(s) = 4, R(s) = 10000
+		cost := ScanCost{
+			DiskAccesses: 4,
+			RecordCount:  10000,
+		}
+
+		// WHEN
+		total := cost.TotalCost()
+
+		// THEN: 4 * 1.0 + 10000 * 0.1 = 1004
+		assert.Equal(t, float64(1004), total)
+	})
+}
+
 // newTestStats はテスト用の TableStatistics を生成する
 //
 // products テーブル: R(T) = 1000, B(T) = 50, H(T) = 4
