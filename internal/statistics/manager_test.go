@@ -1,0 +1,166 @@
+package statistics_test
+
+import (
+	"minesql/internal/ast"
+	"minesql/internal/engine"
+	"minesql/internal/statistics"
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
+
+func TestGetOrAnalyze(t *testing.T) {
+	t.Run("初回呼び出しで Analyze が実行されキャッシュされる", func(t *testing.T) {
+		// GIVEN: 3 レコード挿入済み
+		setupStatisticsTable(t)
+		defer engine.Reset()
+		defer statistics.Reset()
+
+		eng := engine.Get()
+		statistics.Init(eng.BufferPool)
+		mgr := statistics.Get()
+
+		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		assert.True(t, ok)
+
+		// WHEN: 初回 GetOrAnalyze
+		result, err := mgr.GetOrAnalyze(meta)
+
+		// THEN: Analyze が実行され統計値が返る
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(3), result.RecordCount)
+	})
+
+	t.Run("dirty_count が閾値以下ならキャッシュが返る", func(t *testing.T) {
+		// GIVEN: 3 レコードで GetOrAnalyze 済み
+		setupStatisticsTable(t)
+		defer engine.Reset()
+		defer statistics.Reset()
+
+		eng := engine.Get()
+		statistics.Init(eng.BufferPool)
+		mgr := statistics.Get()
+
+		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		assert.True(t, ok)
+
+		_, err := mgr.GetOrAnalyze(meta)
+		assert.NoError(t, err)
+
+		// WHEN: 1 レコード追加して GetOrAnalyze を呼ぶ (閾値 = 3 * 0.1 = 0.3 なので 1 > 0.3 で超える可能性がある)
+		// ただし実際にレコードを INSERT せず IncrementDirtyCount のみ呼ぶことで
+		// キャッシュが返るかどうかを検証する
+		// dirty_count=0 のまま GetOrAnalyze を呼ぶ
+		result, err := mgr.GetOrAnalyze(meta)
+
+		// THEN: キャッシュされた統計値が返る (RecordCount は 3 のまま)
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(3), result.RecordCount)
+	})
+
+	t.Run("dirty_count が閾値を超えると再 Analyze が実行される", func(t *testing.T) {
+		// GIVEN: 3 レコードで GetOrAnalyze 済み
+		setupStatisticsTable(t)
+		defer engine.Reset()
+		defer statistics.Reset()
+
+		eng := engine.Get()
+		statistics.Init(eng.BufferPool)
+		mgr := statistics.Get()
+
+		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		assert.True(t, ok)
+
+		_, err := mgr.GetOrAnalyze(meta)
+		assert.NoError(t, err)
+
+		// WHEN: 1 レコード追加して dirty_count を加算 (閾値 = 3 * 0.1 = 0.3, dirty_count = 1 > 0.3)
+		executePlan(t, &ast.InsertStmt{
+			StmtType: ast.StmtTypeInsert,
+			Table:    *ast.NewTableId("products"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+				*ast.NewColumnId("name"),
+				*ast.NewColumnId("category"),
+			},
+			Values: [][]ast.Literal{
+				{
+					ast.NewStringLiteral("4", "4"),
+					ast.NewStringLiteral("Donut", "Donut"),
+					ast.NewStringLiteral("Snack", "Snack"),
+				},
+			},
+		})
+		mgr.IncrementDirtyCount("products", 1)
+
+		result, err := mgr.GetOrAnalyze(meta)
+
+		// THEN: 再 Analyze が実行され、最新の統計値が返る
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(4), result.RecordCount)
+	})
+
+	t.Run("再 Analyze 後に dirty_count がリセットされる", func(t *testing.T) {
+		// GIVEN: 3 レコードで GetOrAnalyze 済み → dirty_count 加算 → 再 Analyze 済み
+		setupStatisticsTable(t)
+		defer engine.Reset()
+		defer statistics.Reset()
+
+		eng := engine.Get()
+		statistics.Init(eng.BufferPool)
+		mgr := statistics.Get()
+
+		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		assert.True(t, ok)
+
+		_, err := mgr.GetOrAnalyze(meta)
+		assert.NoError(t, err)
+
+		// 1 レコード追加して再 Analyze を発火させる
+		executePlan(t, &ast.InsertStmt{
+			StmtType: ast.StmtTypeInsert,
+			Table:    *ast.NewTableId("products"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+				*ast.NewColumnId("name"),
+				*ast.NewColumnId("category"),
+			},
+			Values: [][]ast.Literal{
+				{
+					ast.NewStringLiteral("4", "4"),
+					ast.NewStringLiteral("Donut", "Donut"),
+					ast.NewStringLiteral("Snack", "Snack"),
+				},
+			},
+		})
+		mgr.IncrementDirtyCount("products", 1)
+		_, err = mgr.GetOrAnalyze(meta)
+		assert.NoError(t, err)
+
+		// WHEN: さらに 1 レコード追加するが、dirty_count はリセット済みなので
+		// 再 Analyze は走らず、キャッシュから RecordCount=4 が返る
+		executePlan(t, &ast.InsertStmt{
+			StmtType: ast.StmtTypeInsert,
+			Table:    *ast.NewTableId("products"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+				*ast.NewColumnId("name"),
+				*ast.NewColumnId("category"),
+			},
+			Values: [][]ast.Literal{
+				{
+					ast.NewStringLiteral("5", "5"),
+					ast.NewStringLiteral("Egg", "Egg"),
+					ast.NewStringLiteral("Dairy", "Dairy"),
+				},
+			},
+		})
+		// dirty_count を加算しない → 閾値以下のまま
+
+		result, err := mgr.GetOrAnalyze(meta)
+
+		// THEN: キャッシュが返る (RecordCount は再 Analyze 時の 4 のまま)
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(4), result.RecordCount)
+	})
+}
