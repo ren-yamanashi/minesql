@@ -8,3 +8,5 @@ examples/
 .claude/settings.local.json
 coverage.*
 .DS_Store
+.claude/
+CLAUDE.md

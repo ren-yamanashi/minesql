@@ -367,18 +367,18 @@ func TestDelete(t *testing.T) {
 	})
 
 	t.Run("すべてのペアを順次削除しても B+Tree が壊れない", func(t *testing.T) {
-		// GIVEN: 多数のペアを挿入
+		// GIVEN: 多数のペアを挿入 (200 件でリーフマージが発生する)
 		bt, bp := setupBTree(t)
-		numPairs := 50
+		numPairs := 200
 		for i := range numPairs {
-			key := fmt.Sprintf("key%03d", i)
-			val := fmt.Sprintf("val%03d", i)
+			key := fmt.Sprintf("key%04d", i)
+			val := fmt.Sprintf("val%04d", i)
 			bt.mustInsert(bp, key, val)
 		}
 
 		// WHEN: 全ペアを先頭から順に削除
 		for i := range numPairs {
-			key := fmt.Sprintf("key%03d", i)
+			key := fmt.Sprintf("key%04d", i)
 			err := bt.Delete(bp, []byte(key))
 			assert.NoError(t, err)
 		}
@@ -391,16 +391,16 @@ func TestDelete(t *testing.T) {
 	t.Run("末尾から逆順に全ペアを削除しても B+Tree が壊れない", func(t *testing.T) {
 		// GIVEN: 多数のペアを挿入
 		bt, bp := setupBTree(t)
-		numPairs := 50
+		numPairs := 200
 		for i := range numPairs {
-			key := fmt.Sprintf("key%03d", i)
-			val := fmt.Sprintf("val%03d", i)
+			key := fmt.Sprintf("key%04d", i)
+			val := fmt.Sprintf("val%04d", i)
 			bt.mustInsert(bp, key, val)
 		}
 
 		// WHEN: 全ペアを末尾から逆順に削除
 		for i := numPairs - 1; i >= 0; i-- {
-			key := fmt.Sprintf("key%03d", i)
+			key := fmt.Sprintf("key%04d", i)
 			err := bt.Delete(bp, []byte(key))
 			assert.NoError(t, err)
 		}
@@ -413,11 +413,11 @@ func TestDelete(t *testing.T) {
 	t.Run("不規則な順序で全ペアを削除しても B+Tree が壊れない", func(t *testing.T) {
 		// GIVEN: 多数のペアを挿入
 		bt, bp := setupBTree(t)
-		numPairs := 50
+		numPairs := 200
 		keys := make([]string, numPairs)
 		for i := range numPairs {
-			keys[i] = fmt.Sprintf("key%03d", i)
-			val := fmt.Sprintf("val%03d", i)
+			keys[i] = fmt.Sprintf("key%04d", i)
+			val := fmt.Sprintf("val%04d", i)
 			bt.mustInsert(bp, keys[i], val)
 		}
 
@@ -437,6 +437,56 @@ func TestDelete(t *testing.T) {
 		// THEN: B+Tree が空になる
 		pairs := bt.collectAllPairs(bp)
 		assert.Equal(t, 0, len(pairs))
+	})
+
+	for _, n := range []int{200, 300, 500} {
+		t.Run(fmt.Sprintf("%d件の順次削除でデータが失われない", n), func(t *testing.T) {
+			// GIVEN
+			bt, bp := setupBTree(t)
+			for i := range n {
+				key := fmt.Sprintf("key%04d", i)
+				val := fmt.Sprintf("val%04d", i)
+				bt.mustInsert(bp, key, val)
+			}
+
+			// WHEN: 全件を順次削除
+			for i := range n {
+				key := fmt.Sprintf("key%04d", i)
+				err := bt.Delete(bp, []byte(key))
+				if err != nil {
+					t.Fatalf("i=%d key=%s でエラー: %v", i, key, err)
+				}
+			}
+
+			// THEN
+			pairs := bt.collectAllPairs(bp)
+			assert.Equal(t, 0, len(pairs))
+		})
+	}
+
+	t.Run("削除ごとにペア数が正しい", func(t *testing.T) {
+		// GIVEN
+		bt, bp := setupBTree(t)
+		numPairs := 200
+		for i := range numPairs {
+			key := fmt.Sprintf("key%04d", i)
+			val := fmt.Sprintf("val%04d", i)
+			bt.mustInsert(bp, key, val)
+		}
+
+		// WHEN/THEN: 1 件削除するたびに残りのペア数が正しい
+		for i := range numPairs {
+			key := fmt.Sprintf("key%04d", i)
+			err := bt.Delete(bp, []byte(key))
+			if err != nil {
+				t.Fatalf("i=%d key=%s でエラー: %v", i, key, err)
+			}
+			remaining := bt.collectAllPairs(bp)
+			expected := numPairs - i - 1
+			if len(remaining) != expected {
+				t.Fatalf("i=%d 削除後: ペア数=%d (期待=%d)", i, len(remaining), expected)
+			}
+		}
 	})
 
 	t.Run("空のツリーから削除するとエラーが返る", func(t *testing.T) {
@@ -642,6 +692,143 @@ func TestNewBPlusTree(t *testing.T) {
 		assert.Equal(t, "aaa", string(pairs[0].Key))
 		assert.Equal(t, "bbb", string(pairs[1].Key))
 		assert.Equal(t, "ccc", string(pairs[2].Key))
+	})
+}
+
+func TestLeafPageCount(t *testing.T) {
+	t.Run("作成直後のリーフページ数は 1", func(t *testing.T) {
+		// GIVEN & WHEN
+		bt, bp := setupBTree(t)
+
+		// THEN
+		count, err := bt.LeafPageCount(bp)
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(1), count)
+	})
+
+	t.Run("リーフ分割が発生するとリーフページ数が増加する", func(t *testing.T) {
+		// GIVEN
+		bt, bp := setupBTree(t)
+
+		// WHEN: 多数のペアを挿入してリーフ分割を発生させる
+		numPairs := 500
+		for i := range numPairs {
+			key := fmt.Sprintf("key%04d", i)
+			val := fmt.Sprintf("val%04d", i)
+			bt.mustInsert(bp, key, val)
+		}
+
+		// THEN: リーフページ数が 1 より大きい
+		count, err := bt.LeafPageCount(bp)
+		assert.NoError(t, err)
+		assert.Greater(t, count, uint64(1))
+	})
+
+	t.Run("削除するとリーフページ数が減少する", func(t *testing.T) {
+		// GIVEN: 多数のペアを挿入してリーフ分割を発生させる
+		bt, bp := setupBTree(t)
+		numPairs := 500
+		for i := range numPairs {
+			key := fmt.Sprintf("key%04d", i)
+			val := fmt.Sprintf("val%04d", i)
+			bt.mustInsert(bp, key, val)
+		}
+		countBefore, err := bt.LeafPageCount(bp)
+		assert.NoError(t, err)
+		assert.Greater(t, countBefore, uint64(1))
+
+		// WHEN: 半分のペアを削除
+		for i := 0; i < numPairs; i += 2 {
+			key := fmt.Sprintf("key%04d", i)
+			err := bt.Delete(bp, []byte(key))
+			assert.NoError(t, err)
+		}
+
+		// THEN: リーフページ数が減少している
+		countAfter, err := bt.LeafPageCount(bp)
+		assert.NoError(t, err)
+		assert.Less(t, countAfter, countBefore)
+	})
+
+	t.Run("Insert と Delete を繰り返してもリーフページ数が 1 以上", func(t *testing.T) {
+		// GIVEN
+		bt, bp := setupBTree(t)
+
+		// WHEN: 500 件挿入 → 250 件削除
+		numPairs := 500
+		for i := range numPairs {
+			key := fmt.Sprintf("key%04d", i)
+			val := fmt.Sprintf("val%04d", i)
+			bt.mustInsert(bp, key, val)
+		}
+		for i := 0; i < numPairs; i += 2 {
+			key := fmt.Sprintf("key%04d", i)
+			err := bt.Delete(bp, []byte(key))
+			assert.NoError(t, err)
+		}
+
+		// THEN: リーフページ数が 1 以上で、全ペアが正しく取得できる
+		count, err := bt.LeafPageCount(bp)
+		assert.NoError(t, err)
+		assert.GreaterOrEqual(t, count, uint64(1))
+		pairs := bt.collectAllPairs(bp)
+		assert.Equal(t, numPairs/2, len(pairs))
+	})
+}
+
+func TestHeight(t *testing.T) {
+	t.Run("作成直後の高さは 1", func(t *testing.T) {
+		// GIVEN & WHEN
+		bt, bp := setupBTree(t)
+
+		// THEN
+		h, err := bt.Height(bp)
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(1), h)
+	})
+
+	t.Run("ルート分割が発生すると高さが増加する", func(t *testing.T) {
+		// GIVEN
+		bt, bp := setupBTree(t)
+
+		// WHEN: 多数のペアを挿入してルート分割を発生させる
+		numPairs := 500
+		for i := range numPairs {
+			key := fmt.Sprintf("key%04d", i)
+			val := fmt.Sprintf("val%04d", i)
+			bt.mustInsert(bp, key, val)
+		}
+
+		// THEN: 高さが 1 より大きい
+		h, err := bt.Height(bp)
+		assert.NoError(t, err)
+		assert.Greater(t, h, uint64(1))
+	})
+
+	t.Run("削除しても高さは増加しない", func(t *testing.T) {
+		// GIVEN: 多数のペアを挿入してルート分割を発生させる
+		bt, bp := setupBTree(t)
+		numPairs := 500
+		for i := range numPairs {
+			key := fmt.Sprintf("key%04d", i)
+			val := fmt.Sprintf("val%04d", i)
+			bt.mustInsert(bp, key, val)
+		}
+		hBefore, err := bt.Height(bp)
+		assert.NoError(t, err)
+		assert.Greater(t, hBefore, uint64(1))
+
+		// WHEN: 半分のペアを削除
+		for i := 0; i < numPairs; i += 2 {
+			key := fmt.Sprintf("key%04d", i)
+			err := bt.Delete(bp, []byte(key))
+			assert.NoError(t, err)
+		}
+
+		// THEN: 高さが増加していない
+		hAfter, err := bt.Height(bp)
+		assert.NoError(t, err)
+		assert.LessOrEqual(t, hAfter, hBefore)
 	})
 }
 

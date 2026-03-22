@@ -31,6 +31,7 @@ CREATE TABLE users (
   - TableScan: テーブルをプライマリキーで範囲検索する
   - IndexScan: インデックスを利用して検索する
   - Filter: 不要な行をフィルタする
+  - Union: 複数のスキャン結果を結合し、重複を除去する
   - Project: 検索結果から特定のカラムだけを取り出す
   - CreateTable: テーブルを作成する
   - Insert: レコードを追加する
@@ -98,6 +99,26 @@ Project (*)
   └── IndexScan (username = 'alice')
 ```
 
+### 例4
+
+```sql
+SELECT * FROM users WHERE id = 1 OR username = 'alice';
+```
+
+この場合、id は PRIMARY KEY、username にはユニークインデックスがあるため、それぞれのスキャン結果を Union で結合できる。
+
+- TableScan: PK を利用して `id = 1` を検索
+- IndexScan: ユニークインデックスを利用して `username = 'alice'` を検索
+- Union: 両方の結果を結合し、重複を除去
+- Project: 検索結果から全カラムを取り出す
+
+```txt
+Project (*)
+  └── Union
+        ├── TableScan (id = 1)
+        └── IndexScan (username = 'alice')
+```
+
 ### ツリー図
 
 全ての Executor は共通の `Executor` interface (`Next() (Record, error)`) を実装する。
@@ -111,6 +132,10 @@ Executor (interface)
   │
   ├── Filter             (ブランチノード: InnerExecutor の結果から条件に合う行だけを返す)
   │     └── InnerExecutor
+  ├── Union              (ブランチノード: 複数の InnerExecutor の結果を結合し、重複を除去する)
+  │     ├── InnerExecutor1
+  │     ├── InnerExecutor2
+  │     └── ...
   ├── Project            (ブランチノード: InnerExecutor の結果から特定のカラムだけを取り出す)
   │     └── InnerExecutor
   │
