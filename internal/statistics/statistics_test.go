@@ -1,27 +1,57 @@
 package statistics
 
 import (
-	"minesql/internal/ast"
+	"minesql/internal/access"
+	"minesql/internal/catalog"
 	"minesql/internal/engine"
-	"minesql/internal/planner"
+	"minesql/internal/executor"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-// executePlan は AST を planner に渡して実行し、全レコードを返す
-func executePlan(t *testing.T, stmt ast.Statement) {
+// createTable はテスト用にテーブルを作成する
+func createTable(t *testing.T, tableName string, primaryKeyCount uint8, indexes []*executor.IndexParam, columns []*executor.ColumnParam) {
 	t.Helper()
-	exec, err := planner.Start(stmt)
+	ct := executor.NewCreateTable(tableName, primaryKeyCount, indexes, columns)
+	_, err := ct.Next()
 	assert.NoError(t, err)
+}
 
-	for {
-		record, err := exec.Next()
-		assert.NoError(t, err)
-		if record == nil {
-			return
-		}
-	}
+// getTable はテスト用にテーブルのアクセスメソッドを取得する
+func getTable(t *testing.T, tableName string) *access.TableAccessMethod {
+	t.Helper()
+	eng := engine.Get()
+	meta, ok := eng.Catalog.GetTableMetadataByName(tableName)
+	assert.True(t, ok)
+	tbl, err := meta.GetTable()
+	assert.NoError(t, err)
+	return tbl
+}
+
+// insertRecords はテスト用にレコードを挿入する
+func insertRecords(t *testing.T, tableName string, colNames []string, records []executor.Record) { //nolint:unparam
+	t.Helper()
+	tbl := getTable(t, tableName)
+	ins := executor.NewInsert(tbl, colNames, records)
+	_, err := ins.Next()
+	assert.NoError(t, err)
+}
+
+// deleteByCondition はテスト用に条件に合致するレコードを削除する
+func deleteByCondition(t *testing.T, tableName string, cond func(executor.Record) bool) {
+	t.Helper()
+	tbl := getTable(t, tableName)
+	del := executor.NewDelete(tbl, executor.NewFilter(
+		executor.NewTableScan(
+			tbl,
+			access.RecordSearchModeStart{},
+			func(record executor.Record) bool { return true },
+		),
+		cond,
+	))
+	_, err := del.Next()
+	assert.NoError(t, err)
 }
 
 // setupStatisticsTable はストレージを初期化し、統計情報テスト用のテーブルを作成する
@@ -53,47 +83,25 @@ func setupStatisticsTable(t *testing.T) {
 	engine.Reset()
 	engine.Init()
 
-	executePlan(t, &ast.CreateTableStmt{
-		StmtType:  ast.StmtTypeCreate,
-		Keyword:   ast.KeywordTable,
-		TableName: "products",
-		CreateDefinitions: []ast.Definition{
-			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
-			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "name", DataType: ast.DataTypeVarchar},
-			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "category", DataType: ast.DataTypeVarchar},
-			&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
-				*ast.NewColumnId("id"),
-			}},
-			&ast.ConstraintUniqueKeyDef{DefType: ast.DefTypeConstraintUniqueKey, Column: *ast.NewColumnId("name")},
+	createTable(t, "products", 1,
+		[]*executor.IndexParam{
+			{Name: "idx_name", ColName: "name", SecondaryKey: 1},
 		},
-	})
+		[]*executor.ColumnParam{
+			{Name: "id", Type: catalog.ColumnTypeString},
+			{Name: "name", Type: catalog.ColumnTypeString},
+			{Name: "category", Type: catalog.ColumnTypeString},
+		},
+	)
 
-	executePlan(t, &ast.InsertStmt{
-		StmtType: ast.StmtTypeInsert,
-		Table:    *ast.NewTableId("products"),
-		Cols: []ast.ColumnId{
-			*ast.NewColumnId("id"),
-			*ast.NewColumnId("name"),
-			*ast.NewColumnId("category"),
+	insertRecords(t, "products",
+		[]string{"id", "name", "category"},
+		[]executor.Record{
+			{[]byte("1"), []byte("Apple"), []byte("Fruit")},
+			{[]byte("2"), []byte("Banana"), []byte("Fruit")},
+			{[]byte("3"), []byte("Carrot"), []byte("Veggie")},
 		},
-		Values: [][]ast.Literal{
-			{
-				ast.NewStringLiteral("1", "1"),
-				ast.NewStringLiteral("Apple", "Apple"),
-				ast.NewStringLiteral("Fruit", "Fruit"),
-			},
-			{
-				ast.NewStringLiteral("2", "2"),
-				ast.NewStringLiteral("Banana", "Banana"),
-				ast.NewStringLiteral("Fruit", "Fruit"),
-			},
-			{
-				ast.NewStringLiteral("3", "3"),
-				ast.NewStringLiteral("Carrot", "Carrot"),
-				ast.NewStringLiteral("Veggie", "Veggie"),
-			},
-		},
-	})
+	)
 }
 
 // setupEmptyTable はストレージを初期化し、データなしの空テーブルを作成する
@@ -106,18 +114,13 @@ func setupEmptyTable(t *testing.T) {
 	engine.Reset()
 	engine.Init()
 
-	executePlan(t, &ast.CreateTableStmt{
-		StmtType:  ast.StmtTypeCreate,
-		Keyword:   ast.KeywordTable,
-		TableName: "items",
-		CreateDefinitions: []ast.Definition{
-			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
-			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "name", DataType: ast.DataTypeVarchar},
-			&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
-				*ast.NewColumnId("id"),
-			}},
+	createTable(t, "items", 1,
+		nil,
+		[]*executor.ColumnParam{
+			{Name: "id", Type: catalog.ColumnTypeString},
+			{Name: "name", Type: catalog.ColumnTypeString},
 		},
-	})
+	)
 }
 
 func TestAnalyze(t *testing.T) {
@@ -240,22 +243,12 @@ func TestAnalyze(t *testing.T) {
 		assert.Equal(t, uint64(2), before.ColumnStats["category"].UniqueValues)
 
 		// WHEN: 新しいカテゴリを持つレコードを追加
-		executePlan(t, &ast.InsertStmt{
-			StmtType: ast.StmtTypeInsert,
-			Table:    *ast.NewTableId("products"),
-			Cols: []ast.ColumnId{
-				*ast.NewColumnId("id"),
-				*ast.NewColumnId("name"),
-				*ast.NewColumnId("category"),
+		insertRecords(t, "products",
+			[]string{"id", "name", "category"},
+			[]executor.Record{
+				{[]byte("4"), []byte("Donut"), []byte("Snack")},
 			},
-			Values: [][]ast.Literal{
-				{
-					ast.NewStringLiteral("4", "4"),
-					ast.NewStringLiteral("Donut", "Donut"),
-					ast.NewStringLiteral("Snack", "Snack"),
-				},
-			},
-		})
+		)
 
 		after, err := stats.Analyze()
 
@@ -286,17 +279,8 @@ func TestAnalyze(t *testing.T) {
 		assert.Equal(t, uint64(3), before.ColumnStats["name"].UniqueValues)
 
 		// WHEN: "Carrot" (唯一の "Veggie") を削除
-		executePlan(t, &ast.DeleteStmt{
-			StmtType: ast.StmtTypeDelete,
-			From:     *ast.NewTableId("products"),
-			Where: &ast.WhereClause{
-				Condition: ast.NewBinaryExpr(
-					"=",
-					ast.NewLhsColumn(*ast.NewColumnId("id")),
-					ast.NewRhsLiteral(ast.NewStringLiteral("3", "3")),
-				),
-				IsSet: true,
-			},
+		deleteByCondition(t, "products", func(record executor.Record) bool {
+			return string(record[0]) == "3" // id = "3"
 		})
 
 		after, err := stats.Analyze()

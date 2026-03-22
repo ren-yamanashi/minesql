@@ -1,8 +1,8 @@
 package statistics
 
 import (
-	"minesql/internal/ast"
 	"minesql/internal/engine"
+	"minesql/internal/executor"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -71,22 +71,12 @@ func TestGetOrAnalyze(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: 1 レコード追加して dirty_count を加算 (閾値 = 3 * 0.1 = 0.3, dirty_count = 1 > 0.3)
-		executePlan(t, &ast.InsertStmt{
-			StmtType: ast.StmtTypeInsert,
-			Table:    *ast.NewTableId("products"),
-			Cols: []ast.ColumnId{
-				*ast.NewColumnId("id"),
-				*ast.NewColumnId("name"),
-				*ast.NewColumnId("category"),
+		insertRecords(t, "products",
+			[]string{"id", "name", "category"},
+			[]executor.Record{
+				{[]byte("4"), []byte("Donut"), []byte("Snack")},
 			},
-			Values: [][]ast.Literal{
-				{
-					ast.NewStringLiteral("4", "4"),
-					ast.NewStringLiteral("Donut", "Donut"),
-					ast.NewStringLiteral("Snack", "Snack"),
-				},
-			},
-		})
+		)
 		m.IncrementDirtyCount("products", 1)
 
 		result, err := m.GetOrAnalyze(meta)
@@ -113,44 +103,24 @@ func TestGetOrAnalyze(t *testing.T) {
 		assert.NoError(t, err)
 
 		// 1 レコード追加して再 Analyze を発火させる
-		executePlan(t, &ast.InsertStmt{
-			StmtType: ast.StmtTypeInsert,
-			Table:    *ast.NewTableId("products"),
-			Cols: []ast.ColumnId{
-				*ast.NewColumnId("id"),
-				*ast.NewColumnId("name"),
-				*ast.NewColumnId("category"),
+		insertRecords(t, "products",
+			[]string{"id", "name", "category"},
+			[]executor.Record{
+				{[]byte("4"), []byte("Donut"), []byte("Snack")},
 			},
-			Values: [][]ast.Literal{
-				{
-					ast.NewStringLiteral("4", "4"),
-					ast.NewStringLiteral("Donut", "Donut"),
-					ast.NewStringLiteral("Snack", "Snack"),
-				},
-			},
-		})
+		)
 		m.IncrementDirtyCount("products", 1)
 		_, err = m.GetOrAnalyze(meta)
 		assert.NoError(t, err)
 
 		// WHEN: さらに 1 レコード追加するが、dirty_count はリセット済みなので
 		// 再 Analyze は走らず、キャッシュから RecordCount=4 が返る
-		executePlan(t, &ast.InsertStmt{
-			StmtType: ast.StmtTypeInsert,
-			Table:    *ast.NewTableId("products"),
-			Cols: []ast.ColumnId{
-				*ast.NewColumnId("id"),
-				*ast.NewColumnId("name"),
-				*ast.NewColumnId("category"),
+		insertRecords(t, "products",
+			[]string{"id", "name", "category"},
+			[]executor.Record{
+				{[]byte("5"), []byte("Egg"), []byte("Dairy")},
 			},
-			Values: [][]ast.Literal{
-				{
-					ast.NewStringLiteral("5", "5"),
-					ast.NewStringLiteral("Egg", "Egg"),
-					ast.NewStringLiteral("Dairy", "Dairy"),
-				},
-			},
-		})
+		)
 		// dirty_count を加算しない → 閾値以下のまま
 
 		result, err := m.GetOrAnalyze(meta)
