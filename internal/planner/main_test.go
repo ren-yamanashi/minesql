@@ -132,6 +132,31 @@ func writeRecords(sb *strings.Builder, records []executor.Record) {
 	fmt.Fprintf(sb, "  合計: %d 件\n", len(records))
 }
 
+// ストレージを初期化し、インデックスなしの空テーブルを作成する
+func setupEmptyTable(t *testing.T) {
+	t.Helper()
+
+	tmpdir := t.TempDir()
+	t.Setenv("MINESQL_DATA_DIR", tmpdir)
+	t.Setenv("MINESQL_BUFFER_SIZE", "100")
+	engine.Reset()
+	engine.Init()
+
+	// CREATE TABLE
+	executePlan(t, &ast.CreateTableStmt{
+		StmtType:  ast.StmtTypeCreate,
+		Keyword:   ast.KeywordTable,
+		TableName: "items",
+		CreateDefinitions: []ast.Definition{
+			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "name", DataType: ast.DataTypeVarchar},
+			&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+			}},
+		},
+	})
+}
+
 func TestPlannerIntegration(t *testing.T) {
 	t.Run("SELECT でフルテーブルスキャンできる", func(t *testing.T) {
 		// GIVEN
