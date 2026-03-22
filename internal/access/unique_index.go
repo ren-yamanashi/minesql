@@ -101,6 +101,12 @@ func (ui *UniqueIndexAccessMethod) Update(bp *bufferpool.BufferPool, oldRecord [
 	return nil
 }
 
+// LeafPageCount は B+Tree のメタページからリーフページ数を取得する
+func (ui *UniqueIndexAccessMethod) LeafPageCount(bp *bufferpool.BufferPool) (uint64, error) {
+	btr := btree.NewBPlusTree(ui.MetaPageId)
+	return btr.LeafPageCount(bp)
+}
+
 // Height は B+Tree のメタページからツリーの高さを取得する
 func (ui *UniqueIndexAccessMethod) Height(bp *bufferpool.BufferPool) (uint64, error) {
 	btr := btree.NewBPlusTree(ui.MetaPageId)

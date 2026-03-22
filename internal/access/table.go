@@ -174,3 +174,9 @@ func (t *TableAccessMethod) LeafPageCount(bp *bufferpool.BufferPool) (uint64, er
 	btr := btree.NewBPlusTree(t.MetaPageId)
 	return btr.LeafPageCount(bp)
 }
+
+// Height は B+Tree のメタページからツリーの高さを取得する
+func (t *TableAccessMethod) Height(bp *bufferpool.BufferPool) (uint64, error) {
+	btr := btree.NewBPlusTree(t.MetaPageId)
+	return btr.Height(bp)
+}

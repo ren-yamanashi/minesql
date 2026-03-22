@@ -659,3 +659,41 @@ func TestLeafPageCount(t *testing.T) {
 		assert.Greater(t, count, uint64(1))
 	})
 }
+
+func TestHeight(t *testing.T) {
+	t.Run("作成直後のテーブルの高さは1", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		// WHEN
+		height, err := table.Height(bp)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(1), height)
+	})
+
+	t.Run("データ挿入によりリーフページが分割されるとテーブルの高さが増加する", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		// WHEN: 十分な量のデータを挿入してリーフページ分割を発生させる
+		for i := range 200 {
+			key := fmt.Sprintf("key_%04d", i)
+			value := fmt.Sprintf("value_%04d", i)
+			err := table.Insert(bp, [][]byte{[]byte(key), []byte(value)})
+			assert.NoError(t, err)
+		}
+
+		// THEN
+		height, err := table.Height(bp)
+		assert.NoError(t, err)
+		assert.Greater(t, height, uint64(1))
+	})
+}

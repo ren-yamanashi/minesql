@@ -307,6 +307,50 @@ func TestUniqueIndexUpdate(t *testing.T) {
 	})
 }
 
+func TestUniqueIndexLeafPageCount(t *testing.T) {
+	t.Run("作成直後のテーブルのリーフページ数は1", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "test.db")
+		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetaPageId, 0)
+
+		err = uniqueIndex.Create(bp)
+		assert.NoError(t, err)
+
+		// WHEN
+		leafPageCount, err := uniqueIndex.LeafPageCount(bp)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(1), leafPageCount)
+	})
+
+	t.Run("データ挿入によりリーフページが分割されるとリーフページ数が増加する", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "test.db")
+		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetaPageId, 0)
+
+		err = uniqueIndex.Create(bp)
+		assert.NoError(t, err)
+
+		// WHEN: 十分な量のデータを挿入してリーフページ分割を発生させる
+		for i := range 500 {
+			key := fmt.Sprintf("key_%04d", i)
+			primaryKey := []byte(fmt.Sprintf("pk_%04d", i))
+			err := uniqueIndex.Insert(bp, primaryKey, [][]byte{[]byte(key)})
+			assert.NoError(t, err)
+		}
+
+		// THEN
+		leafPageCount, err := uniqueIndex.LeafPageCount(bp)
+		assert.NoError(t, err)
+		assert.Greater(t, leafPageCount, uint64(1))
+	})
+}
+
 func TestUniqueIndexHeight(t *testing.T) {
 	t.Run("作成直後のインデックスの高さは1", func(t *testing.T) {
 		// GIVEN
