@@ -7,30 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// newTestStats はテスト用の TableStatistics を生成する
-//
-// products テーブル: R(T) = 1000, B(T) = 50
-//
-//   - id: V = 1000, min = "1", max = "1000"
-//   - name: V = 1000, min = "A", max = "Z"
-//   - category: V = 10, min = "Cat1", max = "Cat10"
-//
-// セカンダリインデックス: name (H = 3)
-func newTestStats() statistics.TableStatistics {
-	return statistics.TableStatistics{
-		RecordCount:   1000,
-		LeafPageCount: 50,
-		ColumnStats: map[string]statistics.ColumnStatistics{
-			"id":       {UniqueValues: 1000, MinValue: []byte("1"), MaxValue: []byte("1000")},
-			"name":     {UniqueValues: 1000, MinValue: []byte("A"), MaxValue: []byte("Z")},
-			"category": {UniqueValues: 10, MinValue: []byte("Cat1"), MaxValue: []byte("Cat10")},
-		},
-		SecondaryIndexStats: map[string]statistics.IndexStatistics{
-			"name": {Height: 3},
-		},
-	}
-}
-
 func TestCalcTableScanCost(t *testing.T) {
 	t.Run("テーブルスキャンのコストが統計値と一致する", func(t *testing.T) {
 		// GIVEN
@@ -95,6 +71,57 @@ func TestCalcSelectRangeCost(t *testing.T) {
 	})
 }
 
+func TestCalcPKSelectEqualCost(t *testing.T) {
+	t.Run("PK 等価比較で B(s) が H(T) になる", func(t *testing.T) {
+		// GIVEN: テーブルスキャンを下位スキャンとする (H(T) = 4)
+		stats := newTestStats()
+		inner := calcTableScanCost(stats)
+
+		// WHEN: WHERE id = 42
+		cost := calcPKSelectEqualCost(inner, "id", stats.PrimaryHeight)
+
+		// THEN: B(s) = H(T) = 4, R(s) = 1000/1000 = 1, V(s, id) = 1
+		assert.Equal(t, float64(4), cost.DiskAccesses)
+		assert.Equal(t, float64(1), cost.RecordCount)
+		assert.Equal(t, float64(1), cost.UniqueValues["id"])
+		assert.Equal(t, float64(10), cost.UniqueValues["category"]) // 他カラムは変化なし
+	})
+}
+
+func TestCalcPKSelectRangeGTCost(t *testing.T) {
+	t.Run("PK 範囲比較 (>) で B(s) が H(T) + sel * B(T) になる", func(t *testing.T) {
+		// GIVEN: H(T) = 4, B(T) = 50, selectivity = 0.3
+		stats := newTestStats()
+		inner := calcTableScanCost(stats)
+
+		// WHEN: WHERE id > 700
+		cost := calcPKSelectRangeGTCost(inner, "id", 0.3, stats.PrimaryHeight)
+
+		// THEN: B(s) = 4 + 0.3 * 50 = 19, R(s) = 1000 * 0.3 = 300
+		assert.Equal(t, float64(19), cost.DiskAccesses)
+		assert.Equal(t, float64(300), cost.RecordCount)
+		assert.Equal(t, float64(300), cost.UniqueValues["id"]) // 1000 * 0.3
+		assert.Equal(t, float64(10), cost.UniqueValues["category"])
+	})
+}
+
+func TestCalcPKSelectRangeLTCost(t *testing.T) {
+	t.Run("PK 範囲比較 (<) で B(s) が sel * B(T) になる", func(t *testing.T) {
+		// GIVEN: B(T) = 50, selectivity = 0.3
+		stats := newTestStats()
+		inner := calcTableScanCost(stats)
+
+		// WHEN: WHERE id < 300
+		cost := calcPKSelectRangeLTCost(inner, "id", 0.3)
+
+		// THEN: B(s) = 0.3 * 50 = 15, R(s) = 1000 * 0.3 = 300
+		assert.Equal(t, float64(15), cost.DiskAccesses)
+		assert.Equal(t, float64(300), cost.RecordCount)
+		assert.Equal(t, float64(300), cost.UniqueValues["id"]) // 1000 * 0.3
+		assert.Equal(t, float64(10), cost.UniqueValues["category"])
+	})
+}
+
 func TestCalcProjectCost(t *testing.T) {
 	t.Run("射影スキャンのコストが下位スキャンと同一", func(t *testing.T) {
 		// GIVEN
@@ -141,22 +168,6 @@ func TestCalcIndexSelectEqualCost(t *testing.T) {
 	})
 }
 
-func TestCalcIndexSelectRangeCost(t *testing.T) {
-	t.Run("インデックス範囲比較のコストが正しく算出される", func(t *testing.T) {
-		// GIVEN: indexLeafPages = 20, selectivity = 0.3
-		stats := newTestStats()
-
-		// WHEN
-		cost := calcIndexSelectRangeCost(stats, "name", 3, 20, 0.3)
-
-		// THEN: B(s) = 3 + 20*0.3 = 9, R(s) = 1000*0.3 = 300
-		assert.Equal(t, float64(9), cost.DiskAccesses)
-		assert.Equal(t, float64(300), cost.RecordCount)
-		assert.Equal(t, float64(300), cost.UniqueValues["name"]) // 1000 * 0.3
-		assert.Equal(t, float64(10), cost.UniqueValues["category"])
-	})
-}
-
 func TestCalcIndexSelectNotEqualCost(t *testing.T) {
 	t.Run("インデックス非等価比較のコストが正しく算出される", func(t *testing.T) {
 		// GIVEN: indexLeafPages = 20
@@ -172,6 +183,22 @@ func TestCalcIndexSelectNotEqualCost(t *testing.T) {
 		assert.Equal(t, float64(900), cost.RecordCount)
 		assert.Equal(t, float64(9), cost.UniqueValues["category"])
 		assert.Equal(t, float64(1000), cost.UniqueValues["id"])
+	})
+}
+
+func TestCalcIndexSelectRangeCost(t *testing.T) {
+	t.Run("インデックス範囲比較のコストが正しく算出される", func(t *testing.T) {
+		// GIVEN: indexLeafPages = 20, selectivity = 0.3
+		stats := newTestStats()
+
+		// WHEN
+		cost := calcIndexSelectRangeCost(stats, "name", 3, 20, 0.3)
+
+		// THEN: B(s) = 3 + 20*0.3 = 9, R(s) = 1000*0.3 = 300
+		assert.Equal(t, float64(9), cost.DiskAccesses)
+		assert.Equal(t, float64(300), cost.RecordCount)
+		assert.Equal(t, float64(300), cost.UniqueValues["name"]) // 1000 * 0.3
+		assert.Equal(t, float64(10), cost.UniqueValues["category"])
 	})
 }
 
@@ -258,4 +285,29 @@ func TestCalcRangeSelectivity(t *testing.T) {
 		// THEN: 0 にクランプ
 		assert.Equal(t, float64(0), sel)
 	})
+}
+
+// newTestStats はテスト用の TableStatistics を生成する
+//
+// products テーブル: R(T) = 1000, B(T) = 50, H(T) = 4
+//
+//   - id: V = 1000, min = "1", max = "1000"
+//   - name: V = 1000, min = "A", max = "Z"
+//   - category: V = 10, min = "Cat1", max = "Cat10"
+//
+// セカンダリインデックス: name (H = 3)
+func newTestStats() statistics.TableStatistics {
+	return statistics.TableStatistics{
+		RecordCount:   1000,
+		LeafPageCount: 50,
+		PrimaryHeight: 4,
+		ColumnStats: map[string]statistics.ColumnStatistics{
+			"id":       {UniqueValues: 1000, MinValue: []byte("1"), MaxValue: []byte("1000")},
+			"name":     {UniqueValues: 1000, MinValue: []byte("A"), MaxValue: []byte("Z")},
+			"category": {UniqueValues: 10, MinValue: []byte("Cat1"), MaxValue: []byte("Cat10")},
+		},
+		SecondaryIndexStats: map[string]statistics.IndexStatistics{
+			"name": {Height: 3},
+		},
+	}
 }

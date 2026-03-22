@@ -136,9 +136,9 @@ func calcPKSelectEqualCost(inner ScanCost, colName string, primaryHeight uint64)
 	return cost
 }
 
-// calcPKSelectRangeSeekCost は PK の範囲比較 (>, >=) の選択スキャンのコストを算出する
+// calcPKSelectRangeGTCost は PK の範囲比較 (>, >=) の選択スキャンのコストを算出する
 //
-// B+Tree の二分探索で開始位置にシークし、そこからリーフを走査する
+// B+Tree の二分探索で開始位置にシークし、そこから末尾方向へリーフを走査する
 //
 // colName: 条件カラム A (PK の先頭カラム)
 //
@@ -151,13 +151,13 @@ func calcPKSelectEqualCost(inner ScanCost, colName string, primaryHeight uint64)
 // R(s) = R(s1) * sel
 //
 // V(s,F) = if F=A then V(s1,A) * sel else V(s1,F)
-func calcPKSelectRangeSeekCost(inner ScanCost, colName string, selectivity float64, primaryHeight uint64) ScanCost {
+func calcPKSelectRangeGTCost(inner ScanCost, colName string, selectivity float64, primaryHeight uint64) ScanCost {
 	cost := calcSelectRangeCost(inner, colName, selectivity)
 	cost.DiskAccesses = float64(primaryHeight) + selectivity*inner.DiskAccesses
 	return cost
 }
 
-// calcPKSelectRangeScanCost は PK の範囲比較 (<, <=) の選択スキャンのコストを算出する
+// calcPKSelectRangeLTCost は PK の範囲比較 (<, <=) の選択スキャンのコストを算出する
 //
 // 先頭から走査して条件を満たさなくなった時点で終了する
 //
@@ -170,7 +170,7 @@ func calcPKSelectRangeSeekCost(inner ScanCost, colName string, selectivity float
 // R(s) = R(s1) * sel
 //
 // V(s,F) = if F=A then V(s1,A) * sel else V(s1,F)
-func calcPKSelectRangeScanCost(inner ScanCost, colName string, selectivity float64) ScanCost {
+func calcPKSelectRangeLTCost(inner ScanCost, colName string, selectivity float64) ScanCost {
 	cost := calcSelectRangeCost(inner, colName, selectivity)
 	cost.DiskAccesses = selectivity * inner.DiskAccesses
 	return cost
