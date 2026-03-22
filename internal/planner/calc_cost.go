@@ -32,7 +32,7 @@ func calcTableScanCost(stats statistics.TableStatistics) ScanCost {
 }
 
 // ============================================================
-// 選択スキャン (テーブル)
+// 選択スキャン (PK・インデックスなし)
 // ============================================================
 
 // calcSelectEqualCost は等価比較 (A = c) の選択スキャンのコストを算出する
@@ -111,6 +111,69 @@ func calcSelectRangeCost(inner ScanCost, colName string, selectivity float64) Sc
 		RecordCount:  inner.RecordCount * selectivity,
 		UniqueValues: uv,
 	}
+}
+
+// ============================================================
+// 選択スキャン (PK)
+// ============================================================
+
+// calcPKSelectEqualCost は PK の等価比較 (pk = c) の選択スキャンのコストを算出する
+//
+// B+Tree の二分探索で直接到達できるため B(s) = H(T)
+//
+// colName: 条件カラム A (PK の先頭カラム)
+//
+// primaryHeight: プライマリ B+Tree の高さ = H(T)
+//
+// B(s) = H(T)
+//
+// R(s) = R(s1) / V(s1,A)
+//
+// V(s,F) = if F=A then 1 else V(s1,F)
+func calcPKSelectEqualCost(inner ScanCost, colName string, primaryHeight uint64) ScanCost {
+	cost := calcSelectEqualCost(inner, colName)
+	cost.DiskAccesses = float64(primaryHeight)
+	return cost
+}
+
+// calcPKSelectRangeSeekCost は PK の範囲比較 (>, >=) の選択スキャンのコストを算出する
+//
+// B+Tree の二分探索で開始位置にシークし、そこからリーフを走査する
+//
+// colName: 条件カラム A (PK の先頭カラム)
+//
+// selectivity: 条件に該当する値域の割合 (0.0〜1.0)
+//
+// primaryHeight: プライマリ B+Tree の高さ = H(T)
+//
+// B(s) = H(T) + sel * B(T)
+//
+// R(s) = R(s1) * sel
+//
+// V(s,F) = if F=A then V(s1,A) * sel else V(s1,F)
+func calcPKSelectRangeSeekCost(inner ScanCost, colName string, selectivity float64, primaryHeight uint64) ScanCost {
+	cost := calcSelectRangeCost(inner, colName, selectivity)
+	cost.DiskAccesses = float64(primaryHeight) + selectivity*inner.DiskAccesses
+	return cost
+}
+
+// calcPKSelectRangeScanCost は PK の範囲比較 (<, <=) の選択スキャンのコストを算出する
+//
+// 先頭から走査して条件を満たさなくなった時点で終了する
+//
+// colName: 条件カラム A (PK の先頭カラム)
+//
+// selectivity: 条件に該当する値域の割合 (0.0〜1.0)
+//
+// B(s) = sel * B(T)
+//
+// R(s) = R(s1) * sel
+//
+// V(s,F) = if F=A then V(s1,A) * sel else V(s1,F)
+func calcPKSelectRangeScanCost(inner ScanCost, colName string, selectivity float64) ScanCost {
+	cost := calcSelectRangeCost(inner, colName, selectivity)
+	cost.DiskAccesses = selectivity * inner.DiskAccesses
+	return cost
 }
 
 // ============================================================

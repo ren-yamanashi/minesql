@@ -15,12 +15,14 @@ type ColumnStatistics struct {
 }
 
 type IndexStatistics struct {
-	Height uint64 // B+Tree の高さ (ルートからリーフまでのページ数) = H(T)
+	Height        uint64 // B+Tree の高さ (ルートからリーフまでのページ数) = H(I)
+	LeafPageCount uint64 // B+Tree のリーフページ数 = Bl(I)
 }
 
 type TableStatistics struct {
 	RecordCount         uint64                      // テーブルのレコード数 = R(T)
-	LeafPageCount       uint64                      // テーブルのリーフページ数 (=リーフノード数) = P(T)
+	LeafPageCount       uint64                      // テーブルのリーフページ数 (=リーフノード数) = B(T)
+	PrimaryHeight       uint64                      // プライマリキー B+Tree の高さ = H(T)
 	ColumnStats         map[string]ColumnStatistics // カラム名 -> カラム統計情報
 	SecondaryIndexStats map[string]IndexStatistics  // セカンダリインデックス名 -> インデックス統計情報
 }
@@ -94,6 +96,12 @@ func (s *Statistics) analyzeTable(table *access.TableAccessMethod) (*TableStatis
 		return nil, err
 	}
 
+	// プライマリキー B+Tree の高さを取得
+	primaryHeight, err := table.Height(s.bufferPool)
+	if err != nil {
+		return nil, err
+	}
+
 	// ユニークインデックスの統計情報を収集
 	secondaryIndexStats, err := s.analyzeIndex(table)
 	if err != nil {
@@ -103,6 +111,7 @@ func (s *Statistics) analyzeTable(table *access.TableAccessMethod) (*TableStatis
 	return &TableStatistics{
 		RecordCount:         recordCount,
 		LeafPageCount:       leafPageCount,
+		PrimaryHeight:       primaryHeight,
 		ColumnStats:         columnStats,
 		SecondaryIndexStats: secondaryIndexStats,
 	}, nil
@@ -161,7 +170,14 @@ func (s *Statistics) analyzeIndex(tbl *access.TableAccessMethod) (map[string]Ind
 		if err != nil {
 			return nil, err
 		}
-		secondaryIndexStats[uIdx.Name] = IndexStatistics{Height: height}
+		leafPageCount, err := uIdx.LeafPageCount(s.bufferPool)
+		if err != nil {
+			return nil, err
+		}
+		secondaryIndexStats[uIdx.Name] = IndexStatistics{
+			Height:        height,
+			LeafPageCount: leafPageCount,
+		}
 	}
 	return secondaryIndexStats, nil
 }

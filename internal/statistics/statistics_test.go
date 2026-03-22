@@ -11,7 +11,7 @@ import (
 )
 
 // createTable はテスト用にテーブルを作成する
-func createTable(t *testing.T, tableName string, primaryKeyCount uint8, indexes []*executor.IndexParam, columns []*executor.ColumnParam) {
+func createTable(t *testing.T, tableName string, primaryKeyCount uint8, indexes []*executor.IndexParam, columns []*executor.ColumnParam) { //nolint:unparam
 	t.Helper()
 	ct := executor.NewCreateTable(tableName, primaryKeyCount, indexes, columns)
 	_, err := ct.Next()
@@ -123,6 +123,116 @@ func setupEmptyTable(t *testing.T) {
 	)
 }
 
+// setupSameValueTable はストレージを初期化し、全レコードの category が同一のテーブルを作成する
+//
+// テーブル: same_values (id, category)
+//
+//	| id  | category |
+//	| --- | -------- |
+//	| 1   | Fruit    |
+//	| 2   | Fruit    |
+//	| 3   | Fruit    |
+func setupSameValueTable(t *testing.T) {
+	t.Helper()
+
+	tmpdir := t.TempDir()
+	t.Setenv("MINESQL_DATA_DIR", tmpdir)
+	t.Setenv("MINESQL_BUFFER_SIZE", "100")
+	engine.Reset()
+	engine.Init()
+
+	createTable(t, "same_values", 1,
+		nil,
+		[]*executor.ColumnParam{
+			{Name: "id", Type: catalog.ColumnTypeString},
+			{Name: "category", Type: catalog.ColumnTypeString},
+		},
+	)
+
+	insertRecords(t, "same_values",
+		[]string{"id", "category"},
+		[]executor.Record{
+			{[]byte("1"), []byte("Fruit")},
+			{[]byte("2"), []byte("Fruit")},
+			{[]byte("3"), []byte("Fruit")},
+		},
+	)
+}
+
+// setupSingleRecordTable はストレージを初期化し、1 レコードのみのテーブルを作成する
+//
+// テーブル: single (id, name)
+//
+//	| id  | name  |
+//	| --- | ----- |
+//	| 1   | Alice |
+func setupSingleRecordTable(t *testing.T) {
+	t.Helper()
+
+	tmpdir := t.TempDir()
+	t.Setenv("MINESQL_DATA_DIR", tmpdir)
+	t.Setenv("MINESQL_BUFFER_SIZE", "100")
+	engine.Reset()
+	engine.Init()
+
+	createTable(t, "single", 1,
+		nil,
+		[]*executor.ColumnParam{
+			{Name: "id", Type: catalog.ColumnTypeString},
+			{Name: "name", Type: catalog.ColumnTypeString},
+		},
+	)
+
+	insertRecords(t, "single",
+		[]string{"id", "name"},
+		[]executor.Record{
+			{[]byte("1"), []byte("Alice")},
+		},
+	)
+}
+
+// setupMultiIndexTable はストレージを初期化し、2 つのセカンダリインデックスを持つテーブルを作成する
+//
+// テーブル: multi_idx (id, name, email)
+//
+//   - プライマリキー: id
+//
+//   - ユニークインデックス: name, email
+//
+//     | id  | name   | email         |
+//     | --- | ------ | ------------- |
+//     | 1   | Alice  | alice@test    |
+//     | 2   | Bob    | bob@test      |
+func setupMultiIndexTable(t *testing.T) {
+	t.Helper()
+
+	tmpdir := t.TempDir()
+	t.Setenv("MINESQL_DATA_DIR", tmpdir)
+	t.Setenv("MINESQL_BUFFER_SIZE", "100")
+	engine.Reset()
+	engine.Init()
+
+	createTable(t, "multi_idx", 1,
+		[]*executor.IndexParam{
+			{Name: "idx_name", ColName: "name", SecondaryKey: 1},
+			{Name: "idx_email", ColName: "email", SecondaryKey: 2},
+		},
+		[]*executor.ColumnParam{
+			{Name: "id", Type: catalog.ColumnTypeString},
+			{Name: "name", Type: catalog.ColumnTypeString},
+			{Name: "email", Type: catalog.ColumnTypeString},
+		},
+	)
+
+	insertRecords(t, "multi_idx",
+		[]string{"id", "name", "email"},
+		[]executor.Record{
+			{[]byte("1"), []byte("Alice"), []byte("alice@test")},
+			{[]byte("2"), []byte("Bob"), []byte("bob@test")},
+		},
+	)
+}
+
 func TestAnalyze(t *testing.T) {
 	t.Run("レコード数が正しく算出される", func(t *testing.T) {
 		// GIVEN: 3 レコード挿入済み
@@ -206,6 +316,24 @@ func TestAnalyze(t *testing.T) {
 		assert.Equal(t, []byte("Veggie"), result.ColumnStats["category"].MaxValue)
 	})
 
+	t.Run("プライマリキー B+Tree の高さが正しく算出される", func(t *testing.T) {
+		// GIVEN: 3 レコードは 1 ページに収まるので高さ 1
+		setupStatisticsTable(t)
+		defer engine.Reset()
+
+		eng := engine.Get()
+		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		assert.True(t, ok)
+		stats := NewStatistics(meta, eng.BufferPool)
+
+		// WHEN
+		result, err := stats.Analyze()
+
+		// THEN: H(T) = 1 (ルートリーフのみ)
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(1), result.PrimaryHeight)
+	})
+
 	t.Run("セカンダリインデックスの高さが正しく算出される", func(t *testing.T) {
 		// GIVEN: 3 レコードでは B+Tree の高さは 1 (ルートリーフのみ)
 		setupStatisticsTable(t)
@@ -224,6 +352,27 @@ func TestAnalyze(t *testing.T) {
 		assert.Len(t, result.SecondaryIndexStats, 1)
 		for _, idxStat := range result.SecondaryIndexStats {
 			assert.Equal(t, uint64(1), idxStat.Height)
+		}
+	})
+
+	t.Run("セカンダリインデックスのリーフページ数が正しく算出される", func(t *testing.T) {
+		// GIVEN: 3 レコードは 1 リーフページに収まる
+		setupStatisticsTable(t)
+		defer engine.Reset()
+
+		eng := engine.Get()
+		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		assert.True(t, ok)
+		stats := NewStatistics(meta, eng.BufferPool)
+
+		// WHEN
+		result, err := stats.Analyze()
+
+		// THEN: Bl(I) = 1
+		assert.NoError(t, err)
+		assert.Len(t, result.SecondaryIndexStats, 1)
+		for _, idxStat := range result.SecondaryIndexStats {
+			assert.Equal(t, uint64(1), idxStat.LeafPageCount)
 		}
 	})
 
@@ -296,6 +445,102 @@ func TestAnalyze(t *testing.T) {
 		assert.Equal(t, []byte("Banana"), after.ColumnStats["name"].MaxValue)
 	})
 
+	t.Run("DELETE で最小値のレコードを削除すると min が更新される", func(t *testing.T) {
+		// GIVEN: 3 レコード挿入済み (id: "1", "2", "3")
+		setupStatisticsTable(t)
+		defer engine.Reset()
+
+		eng := engine.Get()
+		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		assert.True(t, ok)
+		stats := NewStatistics(meta, eng.BufferPool)
+
+		before, err := stats.Analyze()
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("1"), before.ColumnStats["id"].MinValue)
+
+		// WHEN: id = "1" (最小値) のレコードを削除
+		deleteByCondition(t, "products", func(record executor.Record) bool {
+			return string(record[0]) == "1"
+		})
+
+		after, err := stats.Analyze()
+
+		// THEN: min(id) が "1" -> "2" に変化
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(2), after.RecordCount)
+		assert.Equal(t, []byte("2"), after.ColumnStats["id"].MinValue)
+		assert.Equal(t, []byte("3"), after.ColumnStats["id"].MaxValue)
+	})
+
+	t.Run("全レコードの値が同一のカラムではユニーク値数が 1 になる", func(t *testing.T) {
+		// GIVEN: category がすべて "Fruit" のレコード
+		setupSameValueTable(t)
+		defer engine.Reset()
+
+		eng := engine.Get()
+		meta, ok := eng.Catalog.GetTableMetadataByName("same_values")
+		assert.True(t, ok)
+		stats := NewStatistics(meta, eng.BufferPool)
+
+		// WHEN
+		result, err := stats.Analyze()
+
+		// THEN: V(T, category) = 1, min = max = "Fruit"
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(3), result.RecordCount)
+		assert.Equal(t, uint64(1), result.ColumnStats["category"].UniqueValues)
+		assert.Equal(t, []byte("Fruit"), result.ColumnStats["category"].MinValue)
+		assert.Equal(t, []byte("Fruit"), result.ColumnStats["category"].MaxValue)
+	})
+
+	t.Run("レコードが 1 件のみの場合の統計値が正しい", func(t *testing.T) {
+		// GIVEN: 1 レコードのみのテーブル
+		setupSingleRecordTable(t)
+		defer engine.Reset()
+
+		eng := engine.Get()
+		meta, ok := eng.Catalog.GetTableMetadataByName("single")
+		assert.True(t, ok)
+		stats := NewStatistics(meta, eng.BufferPool)
+
+		// WHEN
+		result, err := stats.Analyze()
+
+		// THEN: R(T) = 1, V(T, F) = 1, min = max
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(1), result.RecordCount)
+		assert.Equal(t, uint64(1), result.ColumnStats["id"].UniqueValues)
+		assert.Equal(t, uint64(1), result.ColumnStats["name"].UniqueValues)
+		assert.Equal(t, []byte("1"), result.ColumnStats["id"].MinValue)
+		assert.Equal(t, []byte("1"), result.ColumnStats["id"].MaxValue)
+		assert.Equal(t, []byte("Alice"), result.ColumnStats["name"].MinValue)
+		assert.Equal(t, []byte("Alice"), result.ColumnStats["name"].MaxValue)
+	})
+
+	t.Run("複数のセカンダリインデックスがそれぞれ統計を持つ", func(t *testing.T) {
+		// GIVEN: 2 つのセカンダリインデックスを持つテーブル
+		setupMultiIndexTable(t)
+		defer engine.Reset()
+
+		eng := engine.Get()
+		meta, ok := eng.Catalog.GetTableMetadataByName("multi_idx")
+		assert.True(t, ok)
+		stats := NewStatistics(meta, eng.BufferPool)
+
+		// WHEN
+		result, err := stats.Analyze()
+
+		// THEN: セカンダリインデックスが 2 つ
+		assert.NoError(t, err)
+		assert.Len(t, result.SecondaryIndexStats, 2)
+
+		for idxName, idxStat := range result.SecondaryIndexStats {
+			assert.Equal(t, uint64(1), idxStat.Height, "index %s: H(I) should be 1", idxName)
+			assert.Equal(t, uint64(1), idxStat.LeafPageCount, "index %s: Bl(I) should be 1", idxName)
+		}
+	})
+
 	t.Run("空テーブルではレコード数 0 でカラム統計も空になる", func(t *testing.T) {
 		// GIVEN: テーブルを作成するがデータは挿入しない
 		setupEmptyTable(t)
@@ -318,6 +563,45 @@ func TestAnalyze(t *testing.T) {
 		// カラム統計は存在するがユニーク値数は 0
 		for _, colStat := range result.ColumnStats {
 			assert.Equal(t, uint64(0), colStat.UniqueValues)
+		}
+	})
+
+	t.Run("空テーブルのプライマリキー高さが 1 になる", func(t *testing.T) {
+		// GIVEN: データなしの空テーブル
+		setupEmptyTable(t)
+		defer engine.Reset()
+
+		eng := engine.Get()
+		meta, ok := eng.Catalog.GetTableMetadataByName("items")
+		assert.True(t, ok)
+		stats := NewStatistics(meta, eng.BufferPool)
+
+		// WHEN
+		result, err := stats.Analyze()
+
+		// THEN: 空でもルートリーフは存在するので H(T) = 1
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(1), result.PrimaryHeight)
+	})
+
+	t.Run("空テーブルのカラム min/max は nil になる", func(t *testing.T) {
+		// GIVEN: データなしの空テーブル
+		setupEmptyTable(t)
+		defer engine.Reset()
+
+		eng := engine.Get()
+		meta, ok := eng.Catalog.GetTableMetadataByName("items")
+		assert.True(t, ok)
+		stats := NewStatistics(meta, eng.BufferPool)
+
+		// WHEN
+		result, err := stats.Analyze()
+
+		// THEN: レコードがないので min/max は nil
+		assert.NoError(t, err)
+		for _, colStat := range result.ColumnStats {
+			assert.Nil(t, colStat.MinValue)
+			assert.Nil(t, colStat.MaxValue)
 		}
 	})
 }
