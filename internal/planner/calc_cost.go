@@ -5,11 +5,24 @@ import "minesql/internal/statistics"
 // defaultRangeSelectivity は min/max が不明な場合の範囲比較の推定選択率
 const defaultRangeSelectivity = 1.0 / 3.0
 
+// コストモデルの重み定数
+//
+// ref: https://dev.mysql.com/doc/refman/8.0/en/cost-model.html
+const (
+	weightIOBlockRead = 1.0 // ディスクからのブロック読み取り 1 回あたりのコスト
+	weightRowEvaluate = 0.1 // レコード 1 件の条件評価 (CPU) あたりのコスト
+)
+
 // ScanCost はスキャンのコスト見積もり
 type ScanCost struct {
 	DiskAccesses float64            // B(s): ディスクアクセス数
 	RecordCount  float64            // R(s): 結果レコード数
 	UniqueValues map[string]float64 // V(s, F): 各カラムの異なる値の数
+}
+
+// TotalCost は I/O コストと CPU コストを重み付けした総合コストを返す
+func (c ScanCost) TotalCost() float64 {
+	return c.DiskAccesses*weightIOBlockRead + c.RecordCount*weightRowEvaluate
 }
 
 // ============================================================
