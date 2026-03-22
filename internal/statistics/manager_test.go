@@ -1,9 +1,8 @@
-package statistics_test
+package statistics
 
 import (
 	"minesql/internal/ast"
 	"minesql/internal/engine"
-	"minesql/internal/statistics"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,17 +13,17 @@ func TestGetOrAnalyze(t *testing.T) {
 		// GIVEN: 3 レコード挿入済み
 		setupStatisticsTable(t)
 		defer engine.Reset()
-		defer statistics.Reset()
+		defer Reset()
 
 		eng := engine.Get()
-		statistics.Init(eng.BufferPool)
-		mgr := statistics.Get()
+		Init(eng.BufferPool)
+		m := Get()
 
 		meta, ok := eng.Catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
 
 		// WHEN: 初回 GetOrAnalyze
-		result, err := mgr.GetOrAnalyze(meta)
+		result, err := m.GetOrAnalyze(meta)
 
 		// THEN: Analyze が実行され統計値が返る
 		assert.NoError(t, err)
@@ -35,23 +34,20 @@ func TestGetOrAnalyze(t *testing.T) {
 		// GIVEN: 3 レコードで GetOrAnalyze 済み
 		setupStatisticsTable(t)
 		defer engine.Reset()
-		defer statistics.Reset()
+		defer Reset()
 
 		eng := engine.Get()
-		statistics.Init(eng.BufferPool)
-		mgr := statistics.Get()
+		Init(eng.BufferPool)
+		m := Get()
 
 		meta, ok := eng.Catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
 
-		_, err := mgr.GetOrAnalyze(meta)
+		_, err := m.GetOrAnalyze(meta)
 		assert.NoError(t, err)
 
-		// WHEN: 1 レコード追加して GetOrAnalyze を呼ぶ (閾値 = 3 * 0.1 = 0.3 なので 1 > 0.3 で超える可能性がある)
-		// ただし実際にレコードを INSERT せず IncrementDirtyCount のみ呼ぶことで
-		// キャッシュが返るかどうかを検証する
-		// dirty_count=0 のまま GetOrAnalyze を呼ぶ
-		result, err := mgr.GetOrAnalyze(meta)
+		// WHEN: dirty_count=0 のまま GetOrAnalyze を呼ぶ
+		result, err := m.GetOrAnalyze(meta)
 
 		// THEN: キャッシュされた統計値が返る (RecordCount は 3 のまま)
 		assert.NoError(t, err)
@@ -62,16 +58,16 @@ func TestGetOrAnalyze(t *testing.T) {
 		// GIVEN: 3 レコードで GetOrAnalyze 済み
 		setupStatisticsTable(t)
 		defer engine.Reset()
-		defer statistics.Reset()
+		defer Reset()
 
 		eng := engine.Get()
-		statistics.Init(eng.BufferPool)
-		mgr := statistics.Get()
+		Init(eng.BufferPool)
+		m := Get()
 
 		meta, ok := eng.Catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
 
-		_, err := mgr.GetOrAnalyze(meta)
+		_, err := m.GetOrAnalyze(meta)
 		assert.NoError(t, err)
 
 		// WHEN: 1 レコード追加して dirty_count を加算 (閾値 = 3 * 0.1 = 0.3, dirty_count = 1 > 0.3)
@@ -91,9 +87,9 @@ func TestGetOrAnalyze(t *testing.T) {
 				},
 			},
 		})
-		mgr.IncrementDirtyCount("products", 1)
+		m.IncrementDirtyCount("products", 1)
 
-		result, err := mgr.GetOrAnalyze(meta)
+		result, err := m.GetOrAnalyze(meta)
 
 		// THEN: 再 Analyze が実行され、最新の統計値が返る
 		assert.NoError(t, err)
@@ -104,16 +100,16 @@ func TestGetOrAnalyze(t *testing.T) {
 		// GIVEN: 3 レコードで GetOrAnalyze 済み → dirty_count 加算 → 再 Analyze 済み
 		setupStatisticsTable(t)
 		defer engine.Reset()
-		defer statistics.Reset()
+		defer Reset()
 
 		eng := engine.Get()
-		statistics.Init(eng.BufferPool)
-		mgr := statistics.Get()
+		Init(eng.BufferPool)
+		m := Get()
 
 		meta, ok := eng.Catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
 
-		_, err := mgr.GetOrAnalyze(meta)
+		_, err := m.GetOrAnalyze(meta)
 		assert.NoError(t, err)
 
 		// 1 レコード追加して再 Analyze を発火させる
@@ -133,8 +129,8 @@ func TestGetOrAnalyze(t *testing.T) {
 				},
 			},
 		})
-		mgr.IncrementDirtyCount("products", 1)
-		_, err = mgr.GetOrAnalyze(meta)
+		m.IncrementDirtyCount("products", 1)
+		_, err = m.GetOrAnalyze(meta)
 		assert.NoError(t, err)
 
 		// WHEN: さらに 1 レコード追加するが、dirty_count はリセット済みなので
@@ -157,7 +153,7 @@ func TestGetOrAnalyze(t *testing.T) {
 		})
 		// dirty_count を加算しない → 閾値以下のまま
 
-		result, err := mgr.GetOrAnalyze(meta)
+		result, err := m.GetOrAnalyze(meta)
 
 		// THEN: キャッシュが返る (RecordCount は再 Analyze 時の 4 のまま)
 		assert.NoError(t, err)

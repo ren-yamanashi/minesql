@@ -1,10 +1,9 @@
-package statistics_test
+package statistics
 
 import (
 	"minesql/internal/ast"
 	"minesql/internal/engine"
 	"minesql/internal/planner"
-	"minesql/internal/statistics"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -130,7 +129,7 @@ func TestAnalyze(t *testing.T) {
 		eng := engine.Get()
 		meta, ok := eng.Catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
-		stats := statistics.NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, eng.BufferPool)
 
 		// WHEN
 		result, err := stats.Analyze()
@@ -148,7 +147,7 @@ func TestAnalyze(t *testing.T) {
 		eng := engine.Get()
 		meta, ok := eng.Catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
-		stats := statistics.NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, eng.BufferPool)
 
 		// WHEN
 		result, err := stats.Analyze()
@@ -166,7 +165,7 @@ func TestAnalyze(t *testing.T) {
 		eng := engine.Get()
 		meta, ok := eng.Catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
-		stats := statistics.NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, eng.BufferPool)
 
 		// WHEN
 		result, err := stats.Analyze()
@@ -186,7 +185,7 @@ func TestAnalyze(t *testing.T) {
 		eng := engine.Get()
 		meta, ok := eng.Catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
-		stats := statistics.NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, eng.BufferPool)
 
 		// WHEN
 		result, err := stats.Analyze()
@@ -212,7 +211,7 @@ func TestAnalyze(t *testing.T) {
 		eng := engine.Get()
 		meta, ok := eng.Catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
-		stats := statistics.NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, eng.BufferPool)
 
 		// WHEN
 		result, err := stats.Analyze()
@@ -233,7 +232,7 @@ func TestAnalyze(t *testing.T) {
 		eng := engine.Get()
 		meta, ok := eng.Catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
-		stats := statistics.NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, eng.BufferPool)
 
 		before, err := stats.Analyze()
 		assert.NoError(t, err)
@@ -279,7 +278,7 @@ func TestAnalyze(t *testing.T) {
 		eng := engine.Get()
 		meta, ok := eng.Catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
-		stats := statistics.NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, eng.BufferPool)
 
 		before, err := stats.Analyze()
 		assert.NoError(t, err)
@@ -321,7 +320,7 @@ func TestAnalyze(t *testing.T) {
 		eng := engine.Get()
 		meta, ok := eng.Catalog.GetTableMetadataByName("items")
 		assert.True(t, ok)
-		stats := statistics.NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, eng.BufferPool)
 
 		// WHEN
 		result, err := stats.Analyze()
