@@ -100,3 +100,9 @@ func (ui *UniqueIndexAccessMethod) Update(bp *bufferpool.BufferPool, oldRecord [
 	}
 	return nil
 }
+
+// Height は B+Tree のメタページからツリーの高さを取得する
+func (ui *UniqueIndexAccessMethod) Height(bp *bufferpool.BufferPool) (uint64, error) {
+	btr := btree.NewBPlusTree(ui.MetaPageId)
+	return btr.Height(bp)
+}

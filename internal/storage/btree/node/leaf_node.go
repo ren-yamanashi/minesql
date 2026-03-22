@@ -226,8 +226,10 @@ func (ln *LeafNode) SetNextPageId(nextPageId *page.PageId) {
 }
 
 // TransferAllFrom は src のすべてのペアを自分の末尾に転送する (src のペアはすべて削除される)
-func (ln *LeafNode) TransferAllFrom(src *LeafNode) {
-	src.body.TransferAllTo(ln.body)
+//
+// 空き容量不足で転送できない場合は false を返す (src のデータはそのまま保持される)
+func (ln *LeafNode) TransferAllFrom(src *LeafNode) bool {
+	return src.body.TransferAllTo(ln.body)
 }
 
 // IsHalfFull はブランチノードが半分以上埋まっているかどうかを判定する

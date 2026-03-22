@@ -168,3 +168,9 @@ func (t *TableAccessMethod) GetUniqueIndexByName(indexName string) (*UniqueIndex
 	}
 	return nil, fmt.Errorf("unique index %s not found in table %s", indexName, t.Name)
 }
+
+// LeafPageCount は B+Tree のメタページからリーフページ数を取得する
+func (t *TableAccessMethod) LeafPageCount(bp *bufferpool.BufferPool) (uint64, error) {
+	btr := btree.NewBPlusTree(t.MetaPageId)
+	return btr.LeafPageCount(bp)
+}

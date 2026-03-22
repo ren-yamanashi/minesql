@@ -1,6 +1,7 @@
 package access
 
 import (
+	"fmt"
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/memcomparable"
 	"testing"
@@ -303,5 +304,47 @@ func TestUniqueIndexUpdate(t *testing.T) {
 			i++
 		}
 		assert.Equal(t, len(expectedRecords), i)
+	})
+}
+
+func TestUniqueIndexHeight(t *testing.T) {
+	t.Run("作成直後のインデックスの高さは1", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "test.db")
+		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetaPageId, 0)
+		err = uniqueIndex.Create(bp)
+		assert.NoError(t, err)
+
+		// WHEN
+		height, err := uniqueIndex.Height(bp)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(1), height)
+	})
+
+	t.Run("データ挿入によりルート分割が発生すると高さが増加する", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "test.db")
+		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetaPageId, 0)
+		err = uniqueIndex.Create(bp)
+		assert.NoError(t, err)
+
+		// WHEN: 十分な量のデータを挿入してルート分割を発生させる
+		for i := range 500 {
+			key := fmt.Sprintf("key_%04d", i)
+			primaryKey := []byte(fmt.Sprintf("pk_%04d", i))
+			err := uniqueIndex.Insert(bp, primaryKey, [][]byte{[]byte(key)})
+			assert.NoError(t, err)
+		}
+
+		// THEN
+		height, err := uniqueIndex.Height(bp)
+		assert.NoError(t, err)
+		assert.Greater(t, height, uint64(1))
 	})
 }

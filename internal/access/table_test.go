@@ -1,6 +1,7 @@
 package access
 
 import (
+	"fmt"
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
@@ -619,4 +620,42 @@ func InitDisk(t *testing.T, pathname string) (bufferPool *bufferpool.BufferPool,
 	assert.NoError(t, err)
 
 	return bp, metaPageId, tmpdir
+}
+
+func TestLeafPageCount(t *testing.T) {
+	t.Run("作成直後のテーブルのリーフページ数は1", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		// WHEN
+		count, err := table.LeafPageCount(bp)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(1), count)
+	})
+
+	t.Run("データ挿入によりリーフページが分割されるとリーフページ数が増加する", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		// WHEN: 十分な量のデータを挿入してリーフページ分割を発生させる
+		for i := range 200 {
+			key := fmt.Sprintf("key_%04d", i)
+			value := fmt.Sprintf("value_%04d", i)
+			err := table.Insert(bp, [][]byte{[]byte(key), []byte(value)})
+			assert.NoError(t, err)
+		}
+
+		// THEN
+		count, err := table.LeafPageCount(bp)
+		assert.NoError(t, err)
+		assert.Greater(t, count, uint64(1))
+	})
 }
