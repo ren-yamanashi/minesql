@@ -263,6 +263,136 @@ func TestPlannerIntegration(t *testing.T) {
 		assert.Equal(t, expected, sb.String())
 	})
 
+	t.Run("PK に対する >= 条件で複数行が返される", func(t *testing.T) {
+		// GIVEN
+		setupUsersTable(t)
+		defer engine.Reset()
+
+		// WHEN: WHERE id >= '4' → id=4, 5, 6 の 3 件が返されるべき
+		records := executePlan(t, &ast.SelectStmt{
+			StmtType: ast.StmtTypeSelect,
+			From:     *ast.NewTableId("users"),
+			Where: &ast.WhereClause{
+				Condition: ast.NewBinaryExpr(
+					">=",
+					ast.NewLhsColumn(*ast.NewColumnId("id")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("4", "4")),
+				),
+				IsSet: true,
+			},
+		})
+
+		// THEN
+		var sb strings.Builder
+		sb.WriteString("=== WHERE id >= '4' ===\n")
+		writeRecords(&sb, records)
+
+		expected := "" +
+			"=== WHERE id >= '4' ===\n" +
+			"  (4, Jane, Doe2, female, janedoe)\n" +
+			"  (5, Jonathan, Black, male, jonathanblack)\n" +
+			"  (6, Tom, Brown, male, tombrown)\n" +
+			"  合計: 3 件\n"
+		assert.Equal(t, expected, sb.String())
+	})
+
+	t.Run("PK に対する > 条件で複数行が返される", func(t *testing.T) {
+		// GIVEN
+		setupUsersTable(t)
+		defer engine.Reset()
+
+		// WHEN: WHERE id > '4' → id=5, 6 の 2 件が返されるべき
+		records := executePlan(t, &ast.SelectStmt{
+			StmtType: ast.StmtTypeSelect,
+			From:     *ast.NewTableId("users"),
+			Where: &ast.WhereClause{
+				Condition: ast.NewBinaryExpr(
+					">",
+					ast.NewLhsColumn(*ast.NewColumnId("id")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("4", "4")),
+				),
+				IsSet: true,
+			},
+		})
+
+		// THEN
+		var sb strings.Builder
+		sb.WriteString("=== WHERE id > '4' ===\n")
+		writeRecords(&sb, records)
+
+		expected := "" +
+			"=== WHERE id > '4' ===\n" +
+			"  (5, Jonathan, Black, male, jonathanblack)\n" +
+			"  (6, Tom, Brown, male, tombrown)\n" +
+			"  合計: 2 件\n"
+		assert.Equal(t, expected, sb.String())
+	})
+
+	t.Run("PK に対する <= 条件で複数行が返される", func(t *testing.T) {
+		// GIVEN
+		setupUsersTable(t)
+		defer engine.Reset()
+
+		// WHEN: WHERE id <= '3' → id=1, 2, 3 の 3 件が返されるべき
+		records := executePlan(t, &ast.SelectStmt{
+			StmtType: ast.StmtTypeSelect,
+			From:     *ast.NewTableId("users"),
+			Where: &ast.WhereClause{
+				Condition: ast.NewBinaryExpr(
+					"<=",
+					ast.NewLhsColumn(*ast.NewColumnId("id")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("3", "3")),
+				),
+				IsSet: true,
+			},
+		})
+
+		// THEN
+		var sb strings.Builder
+		sb.WriteString("=== WHERE id <= '3' ===\n")
+		writeRecords(&sb, records)
+
+		expected := "" +
+			"=== WHERE id <= '3' ===\n" +
+			"  (1, John, Doe, male, johndoe)\n" +
+			"  (2, John, Doe2, male, johndoe2)\n" +
+			"  (3, John, Doe3, male, johndoe3)\n" +
+			"  合計: 3 件\n"
+		assert.Equal(t, expected, sb.String())
+	})
+
+	t.Run("PK に対する < 条件で複数行が返される", func(t *testing.T) {
+		// GIVEN
+		setupUsersTable(t)
+		defer engine.Reset()
+
+		// WHEN: WHERE id < '3' → id=1, 2 の 2 件が返されるべき
+		records := executePlan(t, &ast.SelectStmt{
+			StmtType: ast.StmtTypeSelect,
+			From:     *ast.NewTableId("users"),
+			Where: &ast.WhereClause{
+				Condition: ast.NewBinaryExpr(
+					"<",
+					ast.NewLhsColumn(*ast.NewColumnId("id")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("3", "3")),
+				),
+				IsSet: true,
+			},
+		})
+
+		// THEN
+		var sb strings.Builder
+		sb.WriteString("=== WHERE id < '3' ===\n")
+		writeRecords(&sb, records)
+
+		expected := "" +
+			"=== WHERE id < '3' ===\n" +
+			"  (1, John, Doe, male, johndoe)\n" +
+			"  (2, John, Doe2, male, johndoe2)\n" +
+			"  合計: 2 件\n"
+		assert.Equal(t, expected, sb.String())
+	})
+
 	t.Run("UPDATE でレコードを更新できる", func(t *testing.T) {
 		// GIVEN
 		setupUsersTable(t)
