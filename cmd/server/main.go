@@ -4,7 +4,6 @@ import (
 	"flag"
 	"log"
 	"minesql/internal/server"
-	"minesql/internal/shared"
 	"os"
 )
 
@@ -15,7 +14,7 @@ func main() {
 	)
 	flag.Parse()
 	sv := server.NewServer(*h, *p)
-	sd := shared.NewShutdown()
+	sd := server.NewShutdown()
 
 	// register shutdown hook
 	err := sd.Add("server_shutdown", func(sig os.Signal) {
