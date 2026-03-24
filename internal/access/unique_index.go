@@ -71,36 +71,6 @@ func (ui *UniqueIndexAccessMethod) Delete(bp *bufferpool.BufferPool, record [][]
 	return btr.Delete(bp, secondaryKey)
 }
 
-// Update はユニークインデックスから行を更新する
-func (ui *UniqueIndexAccessMethod) Update(bp *bufferpool.BufferPool, oldRecord [][]byte, newRecord [][]byte, primaryKey []byte) error {
-	btr := btree.NewBPlusTree(ui.MetaPageId)
-	var oldSecondaryKey []byte
-	var newSecondaryKey []byte
-
-	// セカンダリキーをエンコード
-	memcomparable.Encode([][]byte{oldRecord[ui.SecondaryKeyIdx]}, &oldSecondaryKey)
-	memcomparable.Encode([][]byte{newRecord[ui.SecondaryKeyIdx]}, &newSecondaryKey)
-
-	// キーが一致しない場合は、B+Tree から古いキーに該当するペアを削除し、新しいキーに該当するペアを挿入する
-	if string(oldSecondaryKey) != string(newSecondaryKey) {
-		err := btr.Delete(bp, oldSecondaryKey)
-		if err != nil {
-			return err
-		}
-		err = btr.Insert(bp, btree.NewPair(newSecondaryKey, primaryKey))
-		if err != nil {
-			return err
-		}
-	} else {
-		// キーが一致する場合は、B+Tree のペアを更新する
-		err := btr.Update(bp, btree.NewPair(oldSecondaryKey, primaryKey))
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
 // LeafPageCount は B+Tree のメタページからリーフページ数を取得する
 func (ui *UniqueIndexAccessMethod) LeafPageCount(bp *bufferpool.BufferPool) (uint64, error) {
 	btr := btree.NewBPlusTree(ui.MetaPageId)

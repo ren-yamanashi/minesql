@@ -104,9 +104,14 @@ func (t *TableAccessMethod) Delete(bp *bufferpool.BufferPool, record [][]byte) e
 
 // Update はテーブルから行を更新する
 //
-// oldRecord: 更新前の行 (プライマリキーとその他のカラム値を含む)
+// プライマリキーが変わらない場合は B+Tree のインプレース更新を行う
 //
-// newRecord: 更新後の行 (プライマリキーとその他のカラム値を含む)
+// プライマリキーが変わる場合は Delete + Insert で実現する
+//
+// ユニークインデックスは常に Delete + Insert で更新する (セカンダリインデックスはインプレース更新をサポートしない)
+//
+//   - oldRecord: 更新前の行 (プライマリキーとその他のカラム値を含む)
+//   - newRecord: 更新後の行 (プライマリキーとその他のカラム値を含む)
 func (t *TableAccessMethod) Update(bp *bufferpool.BufferPool, oldRecord [][]byte, newRecord [][]byte) error {
 	btr := btree.NewBPlusTree(t.MetaPageId)
 
@@ -120,8 +125,8 @@ func (t *TableAccessMethod) Update(bp *bufferpool.BufferPool, oldRecord [][]byte
 	var encodedNewValue []byte
 	memcomparable.Encode(newRecord[t.PrimaryKeyCount:], &encodedNewValue)
 
-	// キーが一致しない場合は、B+Tree から古いキーに該当するペアを削除し、新しいキーに該当するペアを挿入する
 	if string(encodedOldKey) != string(encodedNewKey) {
+		// プライマリキーが変わる場合は Delete + Insert
 		err := btr.Delete(bp, encodedOldKey)
 		if err != nil {
 			return err
@@ -131,16 +136,20 @@ func (t *TableAccessMethod) Update(bp *bufferpool.BufferPool, oldRecord [][]byte
 			return err
 		}
 	} else {
-		// キーが一致する場合は、B+Tree のペアを更新する
+		// プライマリキーが変わらない場合はインプレース更新
 		err := btr.Update(bp, btree.NewPair(encodedOldKey, encodedNewValue))
 		if err != nil {
 			return err
 		}
 	}
 
-	// ユニークインデックスを更新
+	// ユニークインデックスを更新 (セカンダリインデックスは常に Delete + Insert)
 	for _, ui := range t.UniqueIndexes {
-		err := ui.Update(bp, oldRecord, newRecord, encodedNewKey)
+		err := ui.Delete(bp, oldRecord)
+		if err != nil {
+			return err
+		}
+		err = ui.Insert(bp, encodedNewKey, newRecord)
 		if err != nil {
 			return err
 		}
