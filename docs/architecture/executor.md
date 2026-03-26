@@ -7,6 +7,13 @@
   - それらの種類のエグゼキュータを組み合わせて、一つの大きなエグゼキュータを構成する
   - 組み合わさったエグゼキュータは、ツリー構造をしている
 
+## Record
+
+- エグゼキュータの Record は `[][]byte` (全カラム値のフラット配列)
+  - プランナーから受け取るカラム値はこの形式のまま扱う
+- アクセスメソッドにレコードを渡す際は、エグゼキュータが `[][]byte` を [access.Record](./access.md#record) に変換する
+  - `TableAccessMethod` の `PrimaryKeyCount` を使って Key / NonKeyFields に分離し、`DeleteMark` 等をセットする
+
 ## エグゼキュータのツリー構造
 
 例として
