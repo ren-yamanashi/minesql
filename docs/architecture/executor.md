@@ -12,7 +12,7 @@
 - エグゼキュータの Record は `[][]byte` (全カラム値のフラット配列)
   - プランナーから受け取るカラム値はこの形式のまま扱う
 - アクセスメソッドにレコードを渡す際は、エグゼキュータが `[][]byte` を [access.Record](./access.md#record) に変換する
-  - `TableAccessMethod` の `PrimaryKeyCount` を使って Key / NonKeyFields に分離し、`DeleteMark` 等をセットする
+  - `TableAccessMethod` の `PrimaryKeyCount` を使って Key / NonKeyColumns に分離し、`DeleteMark` 等をセットする
 
 ## エグゼキュータのツリー構造
 
