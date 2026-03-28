@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"minesql/internal/storage/btree"
+	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/page"
 )
@@ -56,7 +57,7 @@ func (t *TableAccessMethod) Insert(bp *bufferpool.BufferPool, columns [][]byte) 
 	btr := btree.NewBPlusTree(t.MetaPageId)
 
 	rec := NewRecord(columns, t.PrimaryKeyCount)
-	btrRecord := btree.NewRecord(rec.EncodeHeader(), rec.EncodeKey(), rec.EncodeNonKey())
+	btrRecord := node.NewRecord(rec.EncodeHeader(), rec.EncodeKey(), rec.EncodeNonKey())
 
 	err := btr.Insert(bp, btrRecord)
 	if err != nil {
@@ -103,7 +104,7 @@ func (t *TableAccessMethod) Delete(bp *bufferpool.BufferPool, columns [][]byte) 
 	rec.Header.DeleteMark = 1
 
 	// DeleteMark を 1 にしてインプレース更新
-	err := btr.Update(bp, btree.NewRecord(rec.EncodeHeader(), rec.EncodeKey(), rec.EncodeNonKey()))
+	err := btr.Update(bp, node.NewRecord(rec.EncodeHeader(), rec.EncodeKey(), rec.EncodeNonKey()))
 	if err != nil {
 		return err
 	}
@@ -141,17 +142,17 @@ func (t *TableAccessMethod) Update(bp *bufferpool.BufferPool, oldColumns [][]byt
 	if !bytes.Equal(encodedOldKey, encodedNewKey) {
 		// プライマリキーが変わる場合はソフトデリート + Insert
 		oldRec.Header.DeleteMark = 1
-		err := btr.Update(bp, btree.NewRecord(oldRec.EncodeHeader(), oldRec.EncodeKey(), oldRec.EncodeNonKey()))
+		err := btr.Update(bp, node.NewRecord(oldRec.EncodeHeader(), oldRec.EncodeKey(), oldRec.EncodeNonKey()))
 		if err != nil {
 			return err
 		}
-		err = btr.Insert(bp, btree.NewRecord(newRec.EncodeHeader(), newRec.EncodeKey(), newRec.EncodeNonKey()))
+		err = btr.Insert(bp, node.NewRecord(newRec.EncodeHeader(), newRec.EncodeKey(), newRec.EncodeNonKey()))
 		if err != nil {
 			return err
 		}
 	} else {
 		// プライマリキーが変わらない場合はインプレース更新
-		err := btr.Update(bp, btree.NewRecord(newRec.EncodeHeader(), newRec.EncodeKey(), newRec.EncodeNonKey()))
+		err := btr.Update(bp, node.NewRecord(newRec.EncodeHeader(), newRec.EncodeKey(), newRec.EncodeNonKey()))
 		if err != nil {
 			return err
 		}

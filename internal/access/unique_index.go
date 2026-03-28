@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"minesql/internal/storage/btree"
+	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/page"
@@ -70,7 +71,7 @@ func (ui *UniqueIndexAccessMethod) Insert(bp *bufferpool.BufferPool, encodedPK [
 	fullKey = append(fullKey, encodedSecondaryKey...)
 	fullKey = append(fullKey, encodedPK...)
 
-	btrRecord := btree.NewRecord([]byte{0}, fullKey, nil)
+	btrRecord := node.NewRecord([]byte{0}, fullKey, nil)
 	err := btr.Insert(bp, btrRecord)
 	if err != nil {
 		if !errors.Is(err, btree.ErrDuplicateKey) {
@@ -113,7 +114,7 @@ func (ui *UniqueIndexAccessMethod) Delete(bp *bufferpool.BufferPool, encodedPK [
 	fullKey = append(fullKey, encodedPK...)
 
 	// DeleteMark を 1 にしてインプレース更新
-	btrRecord := btree.NewRecord([]byte{1}, fullKey, nil)
+	btrRecord := node.NewRecord([]byte{1}, fullKey, nil)
 	return btr.Update(bp, btrRecord)
 }
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"minesql/internal/access"
 	"minesql/internal/storage/btree"
+	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/page"
@@ -101,7 +102,7 @@ func (tm *TableMetadata) Insert(bp *bufferpool.BufferPool) error {
 	memcomparable.Encode([][]byte{[]byte(tm.Name), nColsBuf, pkCountBuf, tm.DataMetaPageId.ToBytes()}, &encodedValue)
 
 	// B+Tree に挿入
-	return btr.Insert(bp, btree.NewRecord(nil, encodedKey, encodedValue))
+	return btr.Insert(bp, node.NewRecord(nil, encodedKey, encodedValue))
 }
 
 // loadTableMetadata は指定されたテーブルのメタデータを読み込む

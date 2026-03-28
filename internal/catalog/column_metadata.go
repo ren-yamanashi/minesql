@@ -3,6 +3,7 @@ package catalog
 import (
 	"encoding/binary"
 	"minesql/internal/storage/btree"
+	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/page"
@@ -50,7 +51,7 @@ func (cm *ColumnMetadata) Insert(bp *bufferpool.BufferPool) error {
 	memcomparable.Encode([][]byte{posBuf, []byte(cm.Type)}, &encodedValue)
 
 	// B+Tree に挿入
-	return btr.Insert(bp, btree.NewRecord(nil, encodedKey, encodedValue))
+	return btr.Insert(bp, node.NewRecord(nil, encodedKey, encodedValue))
 }
 
 // loadColumnMetadata は指定されたテーブルのカラムメタデータを読み込む

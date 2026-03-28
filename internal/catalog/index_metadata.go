@@ -3,6 +3,7 @@ package catalog
 import (
 	"encoding/binary"
 	"minesql/internal/storage/btree"
+	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/page"
@@ -50,7 +51,7 @@ func (im *IndexMetadata) Insert(bp *bufferpool.BufferPool) error {
 	memcomparable.Encode([][]byte{[]byte(im.Type), []byte(im.ColName), im.DataMetaPageId.ToBytes()}, &encodedValue)
 
 	// B+Tree に挿入
-	return btr.Insert(bp, btree.NewRecord(nil, encodedKey, encodedValue))
+	return btr.Insert(bp, node.NewRecord(nil, encodedKey, encodedValue))
 }
 
 // loadIndexMetadata は指定されたテーブルのインデックスメタデータを読み込む

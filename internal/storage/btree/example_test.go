@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"minesql/internal/storage/btree"
+	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
 	"minesql/internal/storage/page"
@@ -71,7 +72,7 @@ func ExampleBPlusTree_Insert() {
 	// データを挿入
 	fruits := []string{"cherry", "apple", "banana", "date", "elderberry"}
 	for _, fruit := range fruits {
-		record := btree.NewRecord(nil, []byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
+		record := node.NewRecord(nil, []byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
 		if err := tree.Insert(bp, record); err != nil {
 			panic(err)
 		}
@@ -95,7 +96,7 @@ func ExampleBPlusTree_Search() {
 
 	// データを挿入
 	for _, fruit := range []string{"apple", "banana", "cherry", "grape", "lemon"} {
-		record := btree.NewRecord(nil, []byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
+		record := node.NewRecord(nil, []byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
 		if err := tree.Insert(bp, record); err != nil {
 			panic(err)
 		}
@@ -128,7 +129,7 @@ func ExampleBPlusTree_Delete() {
 
 	// データを挿入
 	for _, fruit := range []string{"apple", "banana", "cherry", "date", "elderberry"} {
-		record := btree.NewRecord(nil, []byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
+		record := node.NewRecord(nil, []byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
 		if err := tree.Insert(bp, record); err != nil {
 			panic(err)
 		}
@@ -173,7 +174,7 @@ func ExampleBPlusTree_Update() {
 
 	// データを挿入
 	for _, fruit := range []string{"apple", "banana", "cherry"} {
-		record := btree.NewRecord(nil, []byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
+		record := node.NewRecord(nil, []byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
 		if err := tree.Insert(bp, record); err != nil {
 			panic(err)
 		}
@@ -183,7 +184,7 @@ func ExampleBPlusTree_Update() {
 	printAll(bp, tree)
 
 	// value を更新
-	if err := tree.Update(bp, btree.NewRecord(nil, []byte("banana"), []byte(strings.Repeat("X", 50)))); err != nil {
+	if err := tree.Update(bp, node.NewRecord(nil, []byte("banana"), []byte(strings.Repeat("X", 50)))); err != nil {
 		panic(err)
 	}
 
@@ -191,7 +192,7 @@ func ExampleBPlusTree_Update() {
 	printAll(bp, tree)
 
 	// 存在しないキーを更新するとエラー
-	err := tree.Update(bp, btree.NewRecord(nil, []byte("mango"), []byte("value")))
+	err := tree.Update(bp, node.NewRecord(nil, []byte("mango"), []byte("value")))
 	fmt.Printf("存在しないキーの更新: %v\n", err)
 
 	// Output:

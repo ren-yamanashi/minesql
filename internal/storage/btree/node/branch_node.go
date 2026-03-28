@@ -251,7 +251,9 @@ func (bn *BranchNode) fillRightChild() []byte {
 
 // maxRecordSize は最大レコードサイズを取得する
 func (bn *BranchNode) maxRecordSize() int {
-	return bn.body.Capacity()/2 - 4 // Slotted Page の容量の半分 - ヘッダーサイズ + キーサイズを格納する 4 バイト
+	// /2: ノード分割時に各ノードが半分以上埋まることを保証するため、1 レコードは容量の半分以下でなければならない
+	// -4: Slotted Page ではレコードごとに 4 バイトのスロットポインタ (offset 2B + size 2B) が必要なため、その分を差し引く
+	return bn.body.Capacity()/2 - 4
 }
 
 // transfer は先頭のレコードを別のブランチノードに移動する
