@@ -63,7 +63,6 @@ func setupExample() (*access.TableAccessMethod, func()) {
 	// サンプルデータを挿入
 	ins := executor.NewInsert(
 		tbl,
-		[]string{"id", "first_name", "last_name"},
 		[]executor.Record{
 			{[]byte("z"), []byte("Alice"), []byte("Smith")},
 			{[]byte("x"), []byte("Bob"), []byte("Johnson")},

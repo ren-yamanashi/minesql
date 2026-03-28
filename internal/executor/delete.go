@@ -37,7 +37,7 @@ func (del *Delete) Next() (Record, error) {
 
 	// 取得したレコードを削除
 	for _, record := range records {
-		err := del.table.Delete(e.BufferPool, record)
+		err := del.table.SoftDelete(e.BufferPool, record)
 		if err != nil {
 			return nil, err
 		}

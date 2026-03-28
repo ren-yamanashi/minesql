@@ -189,7 +189,7 @@ func TestCreateAndInsert(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ソフトデリート
-		err = table.Delete(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.SoftDelete(bp, [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
 
 		// WHEN: 同じ PK で再 Insert (値は異なる)
@@ -223,7 +223,7 @@ func TestCreateAndInsert(t *testing.T) {
 	})
 }
 
-func TestDelete(t *testing.T) {
+func TestSoftDelete(t *testing.T) {
 	t.Run("テーブルから行を削除でき、B+Tree とユニークインデックスの両方から削除される", func(t *testing.T) {
 		// GIVEN: テーブルを作成しデータを挿入
 		bp, metaPageId, _ := InitDisk(t, "users.db")
@@ -245,7 +245,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: "a" の行を削除
-		err = table.Delete(bp, records)
+		err = table.SoftDelete(bp, records)
 
 		// THEN: ソフトデリートされている (ClusteredIndexIterator で走査すると削除済みレコードはスキップされる)
 		assert.NoError(t, err)
@@ -294,7 +294,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: "a" をソフトデリート
-		err = table.Delete(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.SoftDelete(bp, [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
 
 		// THEN: B+Tree を直接走査すると 2 件存在し、"a" は DeleteMark=1
@@ -340,7 +340,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: 存在しないキーで削除
-		err = table.Delete(bp, [][]byte{[]byte("z"), []byte("Unknown")})
+		err = table.SoftDelete(bp, [][]byte{[]byte("z"), []byte("Unknown")})
 
 		// THEN
 		assert.Error(t, err)
@@ -361,9 +361,9 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		err = table.Delete(bp, record1)
+		err = table.SoftDelete(bp, record1)
 		assert.NoError(t, err)
-		err = table.Delete(bp, record2)
+		err = table.SoftDelete(bp, record2)
 		assert.NoError(t, err)
 
 		// THEN: ClusteredIndexIterator で走査すると active なレコードがない

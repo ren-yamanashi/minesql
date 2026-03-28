@@ -469,7 +469,6 @@ func setupExecutorTestTable(t *testing.T) *access.TableAccessMethod {
 
 	insert := NewInsert(
 		tbl,
-		[]string{"id", "first_name", "last_name"},
 		[]Record{
 			{[]byte("z"), []byte("Alice"), []byte("Smith")},
 			{[]byte("x"), []byte("Bob"), []byte("Johnson")},

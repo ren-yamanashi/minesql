@@ -7,16 +7,14 @@ import (
 
 // Insert はレコードを追加する
 type Insert struct {
-	table    *access.TableAccessMethod
-	colNames []string
-	records  []Record
+	table   *access.TableAccessMethod
+	records []Record
 }
 
-func NewInsert(table *access.TableAccessMethod, colNames []string, records []Record) *Insert {
+func NewInsert(table *access.TableAccessMethod, records []Record) *Insert {
 	return &Insert{
-		table:    table,
-		colNames: colNames,
-		records:  records,
+		table:   table,
+		records: records,
 	}
 }
 

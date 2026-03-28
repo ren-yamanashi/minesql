@@ -53,10 +53,8 @@ func (ip *Insert) Build() (executor.Executor, error) {
 		return nil, err
 	}
 
-	colNames := make([]string, len(tblMeta.Cols))
 	colPosMap := make(map[string]uint16)
 	for _, colMeta := range tblMeta.Cols {
-		colNames[colMeta.Pos] = colMeta.Name
 		colPosMap[colMeta.Name] = colMeta.Pos
 	}
 
@@ -80,5 +78,5 @@ func (ip *Insert) Build() (executor.Executor, error) {
 		records = append(records, record)
 	}
 
-	return executor.NewInsert(tbl, colNames, records), nil
+	return executor.NewInsert(tbl, records), nil
 }

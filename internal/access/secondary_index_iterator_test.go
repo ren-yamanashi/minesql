@@ -130,7 +130,7 @@ func TestSecondaryIndexIterator(t *testing.T) {
 		assert.NoError(t, err)
 
 		// "Doe" を持つ行をソフトデリート
-		err = table.Delete(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.SoftDelete(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
 
 		// WHEN: インデックスを先頭から検索

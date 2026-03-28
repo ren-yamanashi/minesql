@@ -12,19 +12,17 @@ import (
 func TestNewInsert(t *testing.T) {
 	t.Run("正常に Insert Executor を生成できる", func(t *testing.T) {
 		// GIVEN
-		cols := []string{"id", "name"}
 		records := []Record{
 			{[]byte("1"), []byte("Alice")},
 			{[]byte("2"), []byte("Bob")},
 		}
 
 		// WHEN
-		insert := NewInsert(nil, cols, records)
+		insert := NewInsert(nil, records)
 
 		// THEN
 		assert.NotNil(t, insert)
 		assert.Nil(t, insert.table)
-		assert.Equal(t, cols, insert.colNames)
 		assert.Equal(t, records, insert.records)
 	})
 }
@@ -43,7 +41,6 @@ func TestInsert_Next(t *testing.T) {
 		})
 
 		// GIVEN
-		cols := []string{"id", "name"}
 		records := []Record{
 			{[]byte("1"), []byte("Alice")},
 			{[]byte("2"), []byte("Bob")},
@@ -54,7 +51,7 @@ func TestInsert_Next(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		insert := NewInsert(tbl, cols, records)
+		insert := NewInsert(tbl, records)
 		_, err = insert.Next()
 
 		// THEN

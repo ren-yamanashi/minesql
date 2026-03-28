@@ -92,7 +92,7 @@ func (sp *SlottedPage) Remove(index int) {
 //
 // 戻り値: 成功した場合は true, 空き容量が不足している場合は false を返す
 func (sp *SlottedPage) Update(index int, data []byte) bool {
-	// slotted page 内のペアのサイズをリサイズ
+	// slotted page 内のサイズをリサイズ
 	if !sp.Resize(index, len(data)) {
 		return false
 	}
