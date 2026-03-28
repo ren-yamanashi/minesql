@@ -30,10 +30,10 @@ func getTable(t *testing.T, tableName string) *access.TableAccessMethod {
 }
 
 // insertRecords はテスト用にレコードを挿入する
-func insertRecords(t *testing.T, tableName string, colNames []string, records []executor.Record) { //nolint:unparam
+func insertRecords(t *testing.T, tableName string, records []executor.Record) { //nolint:unparam
 	t.Helper()
 	tbl := getTable(t, tableName)
-	ins := executor.NewInsert(tbl, colNames, records)
+	ins := executor.NewInsert(tbl, records)
 	_, err := ins.Next()
 	assert.NoError(t, err)
 }
@@ -95,7 +95,6 @@ func setupStatisticsTable(t *testing.T) {
 	)
 
 	insertRecords(t, "products",
-		[]string{"id", "name", "category"},
 		[]executor.Record{
 			{[]byte("1"), []byte("Apple"), []byte("Fruit")},
 			{[]byte("2"), []byte("Banana"), []byte("Fruit")},
@@ -150,7 +149,6 @@ func setupSameValueTable(t *testing.T) {
 	)
 
 	insertRecords(t, "same_values",
-		[]string{"id", "category"},
 		[]executor.Record{
 			{[]byte("1"), []byte("Fruit")},
 			{[]byte("2"), []byte("Fruit")},
@@ -184,7 +182,6 @@ func setupSingleRecordTable(t *testing.T) {
 	)
 
 	insertRecords(t, "single",
-		[]string{"id", "name"},
 		[]executor.Record{
 			{[]byte("1"), []byte("Alice")},
 		},
@@ -225,7 +222,6 @@ func setupMultiIndexTable(t *testing.T) {
 	)
 
 	insertRecords(t, "multi_idx",
-		[]string{"id", "name", "email"},
 		[]executor.Record{
 			{[]byte("1"), []byte("Alice"), []byte("alice@test")},
 			{[]byte("2"), []byte("Bob"), []byte("bob@test")},
@@ -393,7 +389,6 @@ func TestAnalyze(t *testing.T) {
 
 		// WHEN: 新しいカテゴリを持つレコードを追加
 		insertRecords(t, "products",
-			[]string{"id", "name", "category"},
 			[]executor.Record{
 				{[]byte("4"), []byte("Donut"), []byte("Snack")},
 			},

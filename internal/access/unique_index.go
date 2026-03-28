@@ -96,26 +96,22 @@ func (ui *UniqueIndexAccessMethod) Insert(bp *bufferpool.BufferPool, encodedPK [
 	return nil
 }
 
-// Delete はユニークインデックスからソフトデリートする
-//
-// encodedPK: エンコード済みプライマリキー
-//
-// columns: 行の全カラム値
+// Delete はユニークインデックスから行を物理削除する
+//   - encodedPK: エンコード済みプライマリキー
+//   - columns: 行の全カラム値
 func (ui *UniqueIndexAccessMethod) Delete(bp *bufferpool.BufferPool, encodedPK []byte, columns [][]byte) error {
 	btr := btree.NewBPlusTree(ui.MetaPageId)
+	fullKey := ui.getFullKey(encodedPK, columns)
+	return btr.Delete(bp, fullKey)
+}
 
-	// セカンダリキーをエンコード
-	var encodedSecondaryKey []byte
-	memcomparable.Encode([][]byte{columns[ui.SecondaryKeyIdx]}, &encodedSecondaryKey)
-
-	// fullKey = concat(encodedSecondaryKey, encodedPK)
-	fullKey := make([]byte, 0, len(encodedSecondaryKey)+len(encodedPK))
-	fullKey = append(fullKey, encodedSecondaryKey...)
-	fullKey = append(fullKey, encodedPK...)
-
-	// DeleteMark を 1 にしてインプレース更新
-	btrRecord := node.NewRecord([]byte{1}, fullKey, nil)
-	return btr.Update(bp, btrRecord)
+// SoftDelete はユニークインデックスから行をソフトデリートする
+//   - encodedPK: エンコード済みプライマリキー
+//   - columns: 行の全カラム値
+func (ui *UniqueIndexAccessMethod) SoftDelete(bp *bufferpool.BufferPool, encodedPK []byte, columns [][]byte) error {
+	btr := btree.NewBPlusTree(ui.MetaPageId)
+	fullKey := ui.getFullKey(encodedPK, columns)
+	return btr.Update(bp, node.NewRecord([]byte{1}, fullKey, nil))
 }
 
 // LeafPageCount は B+Tree のメタページからリーフページ数を取得する
@@ -128,6 +124,19 @@ func (ui *UniqueIndexAccessMethod) LeafPageCount(bp *bufferpool.BufferPool) (uin
 func (ui *UniqueIndexAccessMethod) Height(bp *bufferpool.BufferPool) (uint64, error) {
 	btr := btree.NewBPlusTree(ui.MetaPageId)
 	return btr.Height(bp)
+}
+
+func (ui *UniqueIndexAccessMethod) getFullKey(encodedPK []byte, columns [][]byte) []byte {
+	// セカンダリキーをエンコード
+	var encodedSecondaryKey []byte
+	memcomparable.Encode([][]byte{columns[ui.SecondaryKeyIdx]}, &encodedSecondaryKey)
+
+	// fullKey = concat(encodedSecondaryKey, encodedPK)
+	fullKey := make([]byte, 0, len(encodedSecondaryKey)+len(encodedPK))
+	fullKey = append(fullKey, encodedSecondaryKey...)
+	fullKey = append(fullKey, encodedPK...)
+
+	return fullKey
 }
 
 // checkUniqueConstraint は encodedSecondaryKey に対して active なレコードが存在するか確認する

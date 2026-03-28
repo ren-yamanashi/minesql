@@ -72,7 +72,6 @@ func TestGetOrAnalyze(t *testing.T) {
 
 		// WHEN: 1 レコード追加して dirty_count を加算 (閾値 = 3 * 0.1 = 0.3, dirty_count = 1 > 0.3)
 		insertRecords(t, "products",
-			[]string{"id", "name", "category"},
 			[]executor.Record{
 				{[]byte("4"), []byte("Donut"), []byte("Snack")},
 			},
@@ -104,7 +103,6 @@ func TestGetOrAnalyze(t *testing.T) {
 
 		// 1 レコード追加して再 Analyze を発火させる
 		insertRecords(t, "products",
-			[]string{"id", "name", "category"},
 			[]executor.Record{
 				{[]byte("4"), []byte("Donut"), []byte("Snack")},
 			},
@@ -116,7 +114,6 @@ func TestGetOrAnalyze(t *testing.T) {
 		// WHEN: さらに 1 レコード追加するが、dirty_count はリセット済みなので
 		// 再 Analyze は走らず、キャッシュから RecordCount=4 が返る
 		insertRecords(t, "products",
-			[]string{"id", "name", "category"},
 			[]executor.Record{
 				{[]byte("5"), []byte("Egg"), []byte("Dairy")},
 			},
