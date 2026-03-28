@@ -1,8 +1,17 @@
 package undo
 
+import "minesql/internal/access"
+
 type UpdateOutofplaceLogRecord struct {
 	InsertLogRecord InsertLogRecord
 	DeleteLogRecord DeleteLogRecord
+}
+
+func NewUpdateOutofplaceLogRecord(table *access.TableAccessMethod, prevRecord, newRecord [][]byte) UpdateOutofplaceLogRecord {
+	return UpdateOutofplaceLogRecord{
+		InsertLogRecord: NewInsertLogRecord(table, newRecord),
+		DeleteLogRecord: NewDeleteLogRecord(table, prevRecord),
+	}
 }
 
 // Undo は UpdateOutofplace したレコードを元の値に戻す

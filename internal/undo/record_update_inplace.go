@@ -11,6 +11,14 @@ type UpdateInplaceLogRecord struct {
 	NewRecord  [][]byte // 更新後のレコード
 }
 
+func NewUpdateInplaceLogRecord(table *access.TableAccessMethod, prevRecord, newRecord [][]byte) UpdateInplaceLogRecord {
+	return UpdateInplaceLogRecord{
+		table:      table,
+		PrevRecord: prevRecord,
+		NewRecord:  newRecord,
+	}
+}
+
 // Undo は UpdateInplace したレコードを元の値に戻す
 func (r UpdateInplaceLogRecord) Undo() error {
 	// 元に戻すので、PrevRecord を新しい値、NewRecord を古い値として UpdateInplace を呼び出す

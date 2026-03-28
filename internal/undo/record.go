@@ -1,5 +1,5 @@
 package undo
 
-type UndoLogRecord interface {
+type LogRecord interface {
 	Undo() error
 }
