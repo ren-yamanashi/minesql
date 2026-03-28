@@ -47,52 +47,52 @@ func (ln *LeafNode) Initialize() {
 	ln.body.Initialize()
 }
 
-// Insert は key-value ペアを挿入する
+// Insert はレコードを挿入する
 //
 // slotNum: 挿入先のスロット番号 (slotted page のスロット番号)
 //
-// pair: 挿入する key-value ペア
+// record: 挿入するレコード
 //
 // 戻り値: 挿入に成功したかどうか
-func (ln *LeafNode) Insert(slotNum int, pair Pair) bool {
-	pairBytes := pair.ToBytes()
+func (ln *LeafNode) Insert(slotNum int, record Record) bool {
+	recordBytes := record.ToBytes()
 
-	if len(pairBytes) > ln.maxPairSize() {
+	if len(recordBytes) > ln.maxRecordSize() {
 		return false
 	}
 
-	return ln.body.Insert(slotNum, pairBytes)
+	return ln.body.Insert(slotNum, recordBytes)
 }
 
-// SplitInsert はリーフノードを分割しながらペアを挿入する
+// SplitInsert はリーフノードを分割しながらレコードを挿入する
 //
 // newLeafNode: 分割後の新しいリーフノード
 //
-// newPair: 挿入する key-value ペア
+// newRecord: 挿入するレコード
 //
 // 戻り値: 新しいリーフノードの最小キー
-func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newPair Pair) ([]byte, error) {
+func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newRecord Record) ([]byte, error) {
 	newLeafNode.Initialize()
 
 	for {
 		if newLeafNode.IsHalfFull() {
-			slotNum, _ := ln.SearchSlotNum(newPair.Key)
-			if !ln.Insert(slotNum, newPair) {
+			slotNum, _ := ln.SearchSlotNum(newRecord.KeyBytes())
+			if !ln.Insert(slotNum, newRecord) {
 				return nil, errors.New("old leaf must have space")
 			}
 			break
 		}
 
-		// "古いノードの先頭 (スロット番号=0) のペアのキー < 新しいペアのキー" の場合
-		// ペアを新しいリーフノードに移動する
-		if ln.PairAt(0).CompareKey(newPair.Key) < 0 {
+		// "古いノードの先頭 (スロット番号=0) のレコードのキー < 新しいレコードのキー" の場合
+		// レコードを新しいリーフノードに移動する
+		if ln.RecordAt(0).CompareKey(newRecord.KeyBytes()) < 0 {
 			err := ln.transfer(newLeafNode)
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			// 新しいペアを新しいリーフノードに挿入し、残りのペアを新しいリーフノードに移動する
-			newLeafNode.Insert(newLeafNode.NumPairs(), newPair)
+			// 新しいレコードを新しいリーフノードに挿入し、残りのレコードを新しいリーフノードに移動する
+			newLeafNode.Insert(newLeafNode.NumRecords(), newRecord)
 			for !newLeafNode.IsHalfFull() {
 				err := ln.transfer(newLeafNode)
 				if err != nil {
@@ -103,48 +103,47 @@ func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newPair Pair) ([]byte, er
 		}
 	}
 
-	return newLeafNode.PairAt(0).Key, nil
+	return newLeafNode.RecordAt(0).KeyBytes(), nil
 }
 
-// Delete は key-value ペアを削除する
+// Delete はレコードを削除する
 //
-// slotNum: 削除するペアのスロット番号 (slotted page のスロット番号)
+// slotNum: 削除するレコードのスロット番号 (slotted page のスロット番号)
 func (ln *LeafNode) Delete(slotNum int) {
 	ln.body.Remove(slotNum)
 }
 
-// Update は指定されたスロットのペアの value を新しい値に更新する
+// Update は指定されたスロットのレコードを更新する
 //
-// slotNum: 更新するペアのスロット番号
+// slotNum: 更新するレコードのスロット番号
 //
-// pair: 新しい key-value ペア (key は変更されない前提)
+// record: 新しいレコード (key は変更されない前提)
 //
 // 戻り値: 更新に成功したかどうか (空き容量不足の場合は false)
-func (ln *LeafNode) Update(slotNum int, pair Pair) bool {
-	// slotted page 内の slotNum が示す位置のデータを新しいデータに更新する
-	return ln.body.Update(slotNum, pair.ToBytes())
+func (ln *LeafNode) Update(slotNum int, record Record) bool {
+	return ln.body.Update(slotNum, record.ToBytes())
 }
 
-// CanTransferPair は兄弟ノードにペアを転送できるかどうかを判定する
+// CanTransferRecord は兄弟ノードにレコードを転送できるかどうかを判定する
 //
 // 転送後も半分以上埋まっている場合は true を返す
 //
-// toRight: true の場合は右の兄弟に転送 (末尾ペアを転送)、false の場合は左の兄弟に転送 (先頭ペアを転送)
-func (ln *LeafNode) CanTransferPair(toRight bool) bool {
-	if ln.NumPairs() <= 1 {
+// toRight: true の場合は右の兄弟に転送 (末尾レコードを転送)、false の場合は左の兄弟に転送 (先頭レコードを転送)
+func (ln *LeafNode) CanTransferRecord(toRight bool) bool {
+	if ln.NumRecords() <= 1 {
 		return false
 	}
 
-	// 右の兄弟に転送する場合は末尾ペア、左の兄弟に転送する場合は先頭ペアを転送対象とする
+	// 右の兄弟に転送する場合は末尾レコード、左の兄弟に転送する場合は先頭レコードを転送対象とする
 	targetIndex := 0
 	if toRight {
-		targetIndex = ln.NumPairs() - 1
+		targetIndex = ln.NumRecords() - 1
 	}
-	targetPairData := ln.body.Data(targetIndex)
-	targetPairSize := len(targetPairData)
+	targetRecordData := ln.body.Data(targetIndex)
+	targetRecordSize := len(targetRecordData)
 
 	// 転送後の空き容量を計算
-	freeSpaceAfterTransfer := ln.body.FreeSpace() + targetPairSize + 4 // 4 はポインタサイズ
+	freeSpaceAfterTransfer := ln.body.FreeSpace() + targetRecordSize + 4 // 4 はポインタサイズ
 
 	// 転送後の空き容量が、ノード全体の容量の半分未満であれば (転送後も半分以上埋まっていると判断できるので) 転送可能と判断する
 	return 2*freeSpaceAfterTransfer < ln.body.Capacity()
@@ -155,17 +154,17 @@ func (ln *LeafNode) Body() []byte {
 	return ln.data[nodeHeaderSize:]
 }
 
-// NumPairs は key-value ペア数を取得する
-func (ln *LeafNode) NumPairs() int {
+// NumRecords はレコード数を取得する
+func (ln *LeafNode) NumRecords() int {
 	return ln.body.NumSlots()
 }
 
-// PairAt は指定されたスロット番号の key-value ペアを取得する
+// RecordAt は指定されたスロット番号のレコードを取得する
 //
 // slotNum: slotted page のスロット番号
-func (ln *LeafNode) PairAt(slotNum int) Pair {
+func (ln *LeafNode) RecordAt(slotNum int) Record {
 	data := ln.body.Data(slotNum)
-	return pairFromBytes(data)
+	return recordFromBytes(data)
 }
 
 // SearchSlotNum はキーから、対応するスロット番号 (slotted page のスロット番号) を検索する (二分探索)
@@ -225,26 +224,28 @@ func (ln *LeafNode) SetNextPageId(nextPageId *page.PageId) {
 	pageId.WriteTo(ln.Body(), 8)
 }
 
-// TransferAllFrom は src のすべてのペアを自分の末尾に転送する (src のペアはすべて削除される)
+// TransferAllFrom は src のすべてのレコードを自分の末尾に転送する (src のレコードはすべて削除される)
 //
 // 空き容量不足で転送できない場合は false を返す (src のデータはそのまま保持される)
 func (ln *LeafNode) TransferAllFrom(src *LeafNode) bool {
 	return src.body.TransferAllTo(ln.body)
 }
 
-// IsHalfFull はブランチノードが半分以上埋まっているかどうかを判定する
+// IsHalfFull はリーフノードが半分以上埋まっているかどうかを判定する
 func (ln *LeafNode) IsHalfFull() bool {
 	return 2*ln.body.FreeSpace() < ln.body.Capacity()
 }
 
-// maxPairSize はリーフノード内の最大ペアサイズを取得する
-func (ln *LeafNode) maxPairSize() int {
-	return ln.body.Capacity()/2 - 4 // Slotted Page の容量の半分 - キーサイズを格納する 4 バイト (2 で割るのは、 key と value の両方を格納するため)
+// maxRecordSize はリーフノード内の最大レコードサイズを取得する
+func (ln *LeafNode) maxRecordSize() int {
+	// /2: ノード分割時に各ノードが半分以上埋まることを保証するため、1 レコードは容量の半分以下でなければならない
+	// -4: Slotted Page ではレコードごとに 4 バイトのスロットポインタ (offset 2B + size 2B) が必要なため、その分を差し引く
+	return ln.body.Capacity()/2 - 4
 }
 
-// transfer は先頭のペアを別のリーフノードに移動する
+// transfer は先頭のレコードを別のリーフノードに移動する
 func (ln *LeafNode) transfer(dest *LeafNode) error {
-	nextIndex := dest.NumPairs()
+	nextIndex := dest.NumRecords()
 	data := ln.body.Data(0)
 
 	if !dest.body.Insert(nextIndex, data) {

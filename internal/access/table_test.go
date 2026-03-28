@@ -56,7 +56,7 @@ func TestCreateAndInsert(t *testing.T) {
 
 		i := 0
 		for {
-			pair, ok := iter.Get()
+			record, ok := iter.Get()
 			if !ok {
 				break
 			}
@@ -65,8 +65,8 @@ func TestCreateAndInsert(t *testing.T) {
 			// エンコードされたキーと値をデコード
 			var decodedKey [][]byte
 			var decodedValue [][]byte
-			keyBytes := pair.Key
-			valueBytes := pair.Value
+			keyBytes := record.KeyBytes()
+			valueBytes := record.NonKeyBytes()
 			memcomparable.Decode(keyBytes, &decodedKey)
 			memcomparable.Decode(valueBytes, &decodedValue)
 
@@ -84,39 +84,36 @@ func TestCreateAndInsert(t *testing.T) {
 		uniqueIndexIter, err := uniqueIndexTree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
-		// SecondaryKey = 2 なので、3 番目のカラム (姓) がキー、エンコードされたプライマリキーが値
-		// プライマリキーをエンコード
-		var encodedPrimaryKeyA, encodedPrimaryKeyB, encodedPrimaryKeyC, encodedPrimaryKeyD []byte
-		memcomparable.Encode([][]byte{[]byte("a")}, &encodedPrimaryKeyA)
-		memcomparable.Encode([][]byte{[]byte("b")}, &encodedPrimaryKeyB)
-		memcomparable.Encode([][]byte{[]byte("c")}, &encodedPrimaryKeyC)
-		memcomparable.Encode([][]byte{[]byte("d")}, &encodedPrimaryKeyD)
-
+		// Key = concat(encodedSecondaryKey, encodedPK) で、NonKey は空
+		// セカンダリキーでソートされ、同一セカンダリキー内では PK でソートされる
 		expectedUniqueIndexRecords := []struct {
-			key   [][]byte
-			value []uint8
+			secondaryKey string
+			pk           string
 		}{
-			// キーの順序でソートされる
-			{[][]byte{[]byte("Davis")}, encodedPrimaryKeyD},
-			{[][]byte{[]byte("Doe")}, encodedPrimaryKeyA},
-			{[][]byte{[]byte("Johnson")}, encodedPrimaryKeyC},
-			{[][]byte{[]byte("Smith")}, encodedPrimaryKeyB},
+			{"Davis", "d"},
+			{"Doe", "a"},
+			{"Johnson", "c"},
+			{"Smith", "b"},
 		}
 
 		j := 0
 		for {
-			pair, ok := uniqueIndexIter.Get()
+			record, ok := uniqueIndexIter.Get()
 			if !ok {
 				break
 			}
 			expected := expectedUniqueIndexRecords[j]
 
-			// エンコードされたキーをデコード
-			var decodedKey [][]byte
-			memcomparable.Decode(pair.Key, &decodedKey)
+			// Key をデコードしてセカンダリキーと PK を分離
+			var keyColumns [][]byte
+			memcomparable.Decode(record.KeyBytes(), &keyColumns)
 
-			assert.Equal(t, expected.key, decodedKey)
-			assert.Equal(t, expected.value, pair.Value)
+			assert.Equal(t, expected.secondaryKey, string(keyColumns[0]))
+			assert.Equal(t, expected.pk, string(keyColumns[1]))
+			// Header は DeleteMark=0
+			assert.Equal(t, uint8(0), record.HeaderBytes()[0])
+			// NonKey は nil (空)
+			assert.Equal(t, 0, len(record.NonKeyBytes()))
 
 			j++
 			_, _, err := uniqueIndexIter.Next(bp)
@@ -163,6 +160,67 @@ func TestCreateAndInsert(t *testing.T) {
 		_, err = os.Stat(expectedFilePath)
 		assert.NoError(t, err, "users.db ファイルが存在するべき")
 	})
+
+	t.Run("active なレコードが存在する PK で Insert すると重複キーエラーが返る", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		assert.NoError(t, err)
+
+		// WHEN: 同じ PK で Insert
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Jane")})
+
+		// THEN
+		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
+	})
+
+	t.Run("ソフトデリート済みの同一 PK を持つレコードが存在する場合、Insert で上書きされる", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		assert.NoError(t, err)
+
+		// ソフトデリート
+		err = table.Delete(bp, [][]byte{[]byte("a"), []byte("John")})
+		assert.NoError(t, err)
+
+		// WHEN: 同じ PK で再 Insert (値は異なる)
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Jane")})
+
+		// THEN: エラーなく挿入できる
+		assert.NoError(t, err)
+
+		// THEN: B+Tree を直接走査するとレコードは 1 件で、DeleteMark=0 に更新されている
+		tree := btree.NewBPlusTree(table.MetaPageId)
+		iter, err := tree.Search(bp, btree.SearchModeStart{})
+		assert.NoError(t, err)
+
+		record, ok := iter.Get()
+		assert.True(t, ok)
+		assert.Equal(t, uint8(0), record.HeaderBytes()[0]) // active
+
+		var decodedKey [][]byte
+		memcomparable.Decode(record.KeyBytes(), &decodedKey)
+		assert.Equal(t, "a", string(decodedKey[0]))
+
+		var decodedValue [][]byte
+		memcomparable.Decode(record.NonKeyBytes(), &decodedValue)
+		assert.Equal(t, "Jane", string(decodedValue[0])) // 新しい値で上書きされている
+
+		// 2 件目は存在しない (物理的にレコードが増えていない)
+		err = iter.Advance(bp)
+		assert.NoError(t, err)
+		_, ok = iter.Get()
+		assert.False(t, ok)
+	})
 }
 
 func TestDelete(t *testing.T) {
@@ -189,43 +247,86 @@ func TestDelete(t *testing.T) {
 		// WHEN: "a" の行を削除
 		err = table.Delete(bp, records)
 
-		// THEN: B+Tree から削除されている
+		// THEN: ソフトデリートされている (ClusteredIndexIterator で走査すると削除済みレコードはスキップされる)
 		assert.NoError(t, err)
-		tree := btree.NewBPlusTree(table.MetaPageId)
-		iter, err := tree.Search(bp, btree.SearchModeStart{})
-		assert.NoError(t, err)
-
+		recs := collectAllTablePairs(t, bp, &table)
 		var keys []string
-		for {
-			pair, ok, err := iter.Next(bp)
-			assert.NoError(t, err)
-			if !ok {
-				break
-			}
-			var decodedKey [][]byte
-			memcomparable.Decode(pair.Key, &decodedKey)
-			keys = append(keys, string(decodedKey[0]))
+		for _, rec := range recs {
+			keys = append(keys, string(rec.key[0]))
 		}
 		assert.Equal(t, []string{"b", "c"}, keys)
 
-		// THEN: ユニークインデックスからも削除されている
+		// THEN: ユニークインデックスもソフトデリートされている
+		// B+Tree を直接走査し、active なエントリのみ確認する
 		indexTree := btree.NewBPlusTree(table.UniqueIndexes[0].MetaPageId)
 		indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
 		var indexKeys []string
 		for {
-			pair, ok, err := indexIter.Next(bp)
+			record, ok := indexIter.Get()
+			if !ok {
+				break
+			}
+			// ソフトデリート済みはスキップ
+			if record.HeaderBytes()[0] != 1 {
+				var decodedKey [][]byte
+				memcomparable.Decode(record.KeyBytes(), &decodedKey)
+				indexKeys = append(indexKeys, string(decodedKey[0]))
+			}
+			_, _, err := indexIter.Next(bp)
 			assert.NoError(t, err)
+		}
+		// "Doe" がソフトデリートされ、active なのは "Johnson", "Smith" のみ
+		assert.Equal(t, []string{"Johnson", "Smith"}, indexKeys)
+	})
+
+	t.Run("Delete はレコードを物理削除せず DeleteMark を 1 にするソフトデリートである", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		assert.NoError(t, err)
+		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice")})
+		assert.NoError(t, err)
+
+		// WHEN: "a" をソフトデリート
+		err = table.Delete(bp, [][]byte{[]byte("a"), []byte("John")})
+		assert.NoError(t, err)
+
+		// THEN: B+Tree を直接走査すると 2 件存在し、"a" は DeleteMark=1
+		tree := btree.NewBPlusTree(table.MetaPageId)
+		iter, err := tree.Search(bp, btree.SearchModeStart{})
+		assert.NoError(t, err)
+
+		type entry struct {
+			pk         string
+			deleteMark uint8
+		}
+		var entries []entry
+		for {
+			record, ok := iter.Get()
 			if !ok {
 				break
 			}
 			var decodedKey [][]byte
-			memcomparable.Decode(pair.Key, &decodedKey)
-			indexKeys = append(indexKeys, string(decodedKey[0]))
+			memcomparable.Decode(record.KeyBytes(), &decodedKey)
+			entries = append(entries, entry{
+				pk:         string(decodedKey[0]),
+				deleteMark: record.HeaderBytes()[0],
+			})
+			_, _, err := iter.Next(bp)
+			assert.NoError(t, err)
 		}
-		// "Doe" が削除されて "Johnson", "Smith" のみ残る
-		assert.Equal(t, []string{"Johnson", "Smith"}, indexKeys)
+
+		assert.Equal(t, 2, len(entries))
+		assert.Equal(t, "a", entries[0].pk)
+		assert.Equal(t, uint8(1), entries[0].deleteMark) // ソフトデリート済み
+		assert.Equal(t, "b", entries[1].pk)
+		assert.Equal(t, uint8(0), entries[1].deleteMark) // active
 	})
 
 	t.Run("存在しないキーを削除するとエラーが返る", func(t *testing.T) {
@@ -265,12 +366,9 @@ func TestDelete(t *testing.T) {
 		err = table.Delete(bp, record2)
 		assert.NoError(t, err)
 
-		// THEN
-		tree := btree.NewBPlusTree(table.MetaPageId)
-		iter, err := tree.Search(bp, btree.SearchModeStart{})
-		assert.NoError(t, err)
-		_, ok := iter.Get()
-		assert.False(t, ok)
+		// THEN: ClusteredIndexIterator で走査すると active なレコードがない
+		recs := collectAllTablePairs(t, bp, &table)
+		assert.Equal(t, 0, len(recs))
 	})
 }
 
@@ -294,15 +392,102 @@ func TestUpdate(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		tree := btree.NewBPlusTree(table.MetaPageId)
-		pairs := collectAllTablePairs(t, bp, tree)
-		assert.Equal(t, 2, len(pairs))
+		recs := collectAllTablePairs(t, bp, &table)
+		assert.Equal(t, 2, len(recs))
 		// "a" の value が更新されている
-		assert.Equal(t, [][]byte{[]byte("a")}, pairs[0].key)
-		assert.Equal(t, [][]byte{[]byte("Jane"), []byte("Doe-Updated")}, pairs[0].value)
+		assert.Equal(t, [][]byte{[]byte("a")}, recs[0].key)
+		assert.Equal(t, [][]byte{[]byte("Jane"), []byte("Doe-Updated")}, recs[0].value)
 		// "b" は変わらない
-		assert.Equal(t, [][]byte{[]byte("b")}, pairs[1].key)
-		assert.Equal(t, [][]byte{[]byte("Alice"), []byte("Smith")}, pairs[1].value)
+		assert.Equal(t, [][]byte{[]byte("b")}, recs[1].key)
+		assert.Equal(t, [][]byte{[]byte("Alice"), []byte("Smith")}, recs[1].value)
+	})
+
+	t.Run("プライマリキーが同じ場合、B+Tree レベルでインプレース更新される", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		assert.NoError(t, err)
+
+		// WHEN: PK を変えずに value を更新
+		oldRecord := [][]byte{[]byte("a"), []byte("John")}
+		newRecord := [][]byte{[]byte("a"), []byte("Jane")}
+		err = table.Update(bp, oldRecord, newRecord)
+		assert.NoError(t, err)
+
+		// THEN: B+Tree を直接走査するとレコードは 1 件で DeleteMark=0 のまま
+		tree := btree.NewBPlusTree(table.MetaPageId)
+		iter, err := tree.Search(bp, btree.SearchModeStart{})
+		assert.NoError(t, err)
+
+		record, ok := iter.Get()
+		assert.True(t, ok)
+		assert.Equal(t, uint8(0), record.HeaderBytes()[0]) // active のまま
+
+		var decodedKey [][]byte
+		memcomparable.Decode(record.KeyBytes(), &decodedKey)
+		assert.Equal(t, "a", string(decodedKey[0]))
+
+		var decodedValue [][]byte
+		memcomparable.Decode(record.NonKeyBytes(), &decodedValue)
+		assert.Equal(t, "Jane", string(decodedValue[0]))
+
+		// 2 件目は存在しない (ソフトデリートされたレコードが残っていない)
+		err = iter.Advance(bp)
+		assert.NoError(t, err)
+		_, ok = iter.Get()
+		assert.False(t, ok)
+	})
+
+	t.Run("プライマリキーが変わる場合、B+Tree レベルでソフトデリート + Insert になる", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		assert.NoError(t, err)
+
+		// WHEN: PK を "a" → "b" に変更
+		oldRecord := [][]byte{[]byte("a"), []byte("John")}
+		newRecord := [][]byte{[]byte("b"), []byte("Jane")}
+		err = table.Update(bp, oldRecord, newRecord)
+		assert.NoError(t, err)
+
+		// THEN: B+Tree を直接走査すると 2 件存在し、"a" は DeleteMark=1、"b" は DeleteMark=0
+		tree := btree.NewBPlusTree(table.MetaPageId)
+		iter, err := tree.Search(bp, btree.SearchModeStart{})
+		assert.NoError(t, err)
+
+		type entry struct {
+			pk         string
+			deleteMark uint8
+		}
+		var entries []entry
+		for {
+			record, ok := iter.Get()
+			if !ok {
+				break
+			}
+			var decodedKey [][]byte
+			memcomparable.Decode(record.KeyBytes(), &decodedKey)
+			entries = append(entries, entry{
+				pk:         string(decodedKey[0]),
+				deleteMark: record.HeaderBytes()[0],
+			})
+			_, _, err := iter.Next(bp)
+			assert.NoError(t, err)
+		}
+
+		assert.Equal(t, 2, len(entries))
+		assert.Equal(t, "a", entries[0].pk)
+		assert.Equal(t, uint8(1), entries[0].deleteMark) // ソフトデリート済み
+		assert.Equal(t, "b", entries[1].pk)
+		assert.Equal(t, uint8(0), entries[1].deleteMark) // active
 	})
 
 	t.Run("プライマリキーが変わる場合、Delete + Insert が行われる", func(t *testing.T) {
@@ -324,14 +509,13 @@ func TestUpdate(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		tree := btree.NewBPlusTree(table.MetaPageId)
-		pairs := collectAllTablePairs(t, bp, tree)
-		assert.Equal(t, 2, len(pairs))
+		recs := collectAllTablePairs(t, bp, &table)
+		assert.Equal(t, 2, len(recs))
 		// "a" は削除され、"b" が挿入されている
-		assert.Equal(t, [][]byte{[]byte("b")}, pairs[0].key)
-		assert.Equal(t, [][]byte{[]byte("John-Updated")}, pairs[0].value)
-		assert.Equal(t, [][]byte{[]byte("c")}, pairs[1].key)
-		assert.Equal(t, [][]byte{[]byte("Bob")}, pairs[1].value)
+		assert.Equal(t, [][]byte{[]byte("b")}, recs[0].key)
+		assert.Equal(t, [][]byte{[]byte("John-Updated")}, recs[0].value)
+		assert.Equal(t, [][]byte{[]byte("c")}, recs[1].key)
+		assert.Equal(t, [][]byte{[]byte("Bob")}, recs[1].value)
 	})
 
 	t.Run("ユニークインデックスのセカンダリキーが変わる場合、インデックスも更新される", func(t *testing.T) {
@@ -356,24 +540,10 @@ func TestUpdate(t *testing.T) {
 		newRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Williams")}
 		err = table.Update(bp, oldRecord, newRecord)
 
-		// THEN: ユニークインデックスが更新されている
+		// THEN: ユニークインデックスが更新されている (active なエントリのみ確認)
 		assert.NoError(t, err)
-		indexTree := btree.NewBPlusTree(table.UniqueIndexes[0].MetaPageId)
-		indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})
-		assert.NoError(t, err)
-
-		var indexKeys []string
-		for {
-			pair, ok, err := indexIter.Next(bp)
-			assert.NoError(t, err)
-			if !ok {
-				break
-			}
-			var decodedKey [][]byte
-			memcomparable.Decode(pair.Key, &decodedKey)
-			indexKeys = append(indexKeys, string(decodedKey[0]))
-		}
-		// "Doe" が削除され "Williams" が追加されている
+		indexKeys := collectActiveUniqueIndexKeys(t, bp, table.UniqueIndexes[0])
+		// "Doe" がソフトデリートされ "Williams" が追加されている
 		assert.Equal(t, []string{"Smith", "Williams"}, indexKeys)
 	})
 
@@ -399,27 +569,35 @@ func TestUpdate(t *testing.T) {
 
 		// THEN: テーブルが更新されている
 		assert.NoError(t, err)
-		tree := btree.NewBPlusTree(table.MetaPageId)
-		pairs := collectAllTablePairs(t, bp, tree)
-		assert.Equal(t, 1, len(pairs))
-		assert.Equal(t, [][]byte{[]byte("x")}, pairs[0].key)
+		recs := collectAllTablePairs(t, bp, &table)
+		assert.Equal(t, 1, len(recs))
+		assert.Equal(t, [][]byte{[]byte("x")}, recs[0].key)
 
-		// THEN: ユニークインデックスの value (プライマリキー) が更新されている
+		// THEN: ユニークインデックスが更新されている
+		// active なエントリのみ確認し、Key にセカンダリキーと新しい PK が含まれる
 		indexTree := btree.NewBPlusTree(table.UniqueIndexes[0].MetaPageId)
 		indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
-		pair, ok, err := indexIter.Next(bp)
-		assert.NoError(t, err)
-		assert.True(t, ok)
 
-		var decodedKey [][]byte
-		memcomparable.Decode(pair.Key, &decodedKey)
-		assert.Equal(t, "Doe", string(decodedKey[0]))
-
-		// value はエンコードされた新しいプライマリキー "x"
-		var encodedNewPK []byte
-		memcomparable.Encode([][]byte{[]byte("x")}, &encodedNewPK)
-		assert.Equal(t, encodedNewPK, pair.Value)
+		// active なエントリを探す
+		var foundActive bool
+		for {
+			record, ok := indexIter.Get()
+			if !ok {
+				break
+			}
+			if record.HeaderBytes()[0] != 1 {
+				var keyColumns [][]byte
+				memcomparable.Decode(record.KeyBytes(), &keyColumns)
+				assert.Equal(t, "Doe", string(keyColumns[0]))
+				assert.Equal(t, "x", string(keyColumns[1]))
+				assert.Equal(t, 0, len(record.NonKeyBytes()))
+				foundActive = true
+			}
+			_, _, err := indexIter.Next(bp)
+			assert.NoError(t, err)
+		}
+		assert.True(t, foundActive, "active なインデックスエントリが存在するべき")
 	})
 
 	t.Run("プライマリキーを既存のキーに変更するとエラーが返る", func(t *testing.T) {
@@ -495,38 +673,12 @@ func TestUpdate(t *testing.T) {
 		err = table.Update(bp, oldRecord, newRecord)
 		assert.NoError(t, err)
 
-		// THEN: idx_first_name が更新されている
-		indexTree1 := btree.NewBPlusTree(table.UniqueIndexes[0].MetaPageId)
-		iter1, err := indexTree1.Search(bp, btree.SearchModeStart{})
-		assert.NoError(t, err)
-		var firstNameKeys []string
-		for {
-			pair, ok, err := iter1.Next(bp)
-			assert.NoError(t, err)
-			if !ok {
-				break
-			}
-			var decodedKey [][]byte
-			memcomparable.Decode(pair.Key, &decodedKey)
-			firstNameKeys = append(firstNameKeys, string(decodedKey[0]))
-		}
+		// THEN: idx_first_name が更新されている (active なエントリのみ)
+		firstNameKeys := collectActiveUniqueIndexKeys(t, bp, table.UniqueIndexes[0])
 		assert.Equal(t, []string{"Alice", "Jane"}, firstNameKeys)
 
-		// THEN: idx_last_name が更新されている
-		indexTree2 := btree.NewBPlusTree(table.UniqueIndexes[1].MetaPageId)
-		iter2, err := indexTree2.Search(bp, btree.SearchModeStart{})
-		assert.NoError(t, err)
-		var lastNameKeys []string
-		for {
-			pair, ok, err := iter2.Next(bp)
-			assert.NoError(t, err)
-			if !ok {
-				break
-			}
-			var decodedKey [][]byte
-			memcomparable.Decode(pair.Key, &decodedKey)
-			lastNameKeys = append(lastNameKeys, string(decodedKey[0]))
-		}
+		// THEN: idx_last_name が更新されている (active なエントリのみ)
+		lastNameKeys := collectActiveUniqueIndexKeys(t, bp, table.UniqueIndexes[1])
 		assert.Equal(t, []string{"Smith", "Williams"}, lastNameKeys)
 	})
 
@@ -550,31 +702,96 @@ func TestUpdate(t *testing.T) {
 	})
 }
 
-// テーブルの全ペアをデコードして収集するヘルパー
-type decodedPair struct {
+func TestSearch(t *testing.T) {
+	t.Run("RecordSearchModeStart で全 active レコードを取得できる", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		assert.NoError(t, err)
+		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice")})
+		assert.NoError(t, err)
+
+		// WHEN
+		recs := collectAllTablePairs(t, bp, &table)
+
+		// THEN
+		assert.Equal(t, 2, len(recs))
+		assert.Equal(t, [][]byte{[]byte("a")}, recs[0].key)
+		assert.Equal(t, [][]byte{[]byte("b")}, recs[1].key)
+	})
+
+	t.Run("RecordSearchModeKey で指定したキーから検索できる", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		assert.NoError(t, err)
+		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice")})
+		assert.NoError(t, err)
+		err = table.Insert(bp, [][]byte{[]byte("c"), []byte("Bob")})
+		assert.NoError(t, err)
+
+		// WHEN: "b" から検索
+		iter, err := table.Search(bp, RecordSearchModeKey{Key: [][]byte{[]byte("b")}})
+		assert.NoError(t, err)
+
+		columns, ok, err := iter.Next()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, "b", string(columns[0]))
+		assert.Equal(t, "Alice", string(columns[1]))
+	})
+
+	t.Run("空のテーブルを検索すると結果が空になる", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		// WHEN
+		recs := collectAllTablePairs(t, bp, &table)
+
+		// THEN
+		assert.Equal(t, 0, len(recs))
+	})
+}
+
+// テーブルの全 active レコードをデコードして収集するヘルパー
+//
+// ClusteredIndexIterator を使用するため、ソフトデリート済みレコードはスキップされる
+type decodedRecord struct {
 	key   [][]byte
 	value [][]byte
 }
 
-func collectAllTablePairs(t *testing.T, bp *bufferpool.BufferPool, tree *btree.BPlusTree) []decodedPair {
+func collectAllTablePairs(t *testing.T, bp *bufferpool.BufferPool, table *TableAccessMethod) []decodedRecord {
 	t.Helper()
-	iter, err := tree.Search(bp, btree.SearchModeStart{})
+	iter, err := table.Search(bp, RecordSearchModeStart{})
 	assert.NoError(t, err)
 
-	var pairs []decodedPair
+	var records []decodedRecord
 	for {
-		pair, ok, err := iter.Next(bp)
+		columns, ok, err := iter.Next()
 		assert.NoError(t, err)
 		if !ok {
 			break
 		}
-		var decodedKey [][]byte
-		var decodedValue [][]byte
-		memcomparable.Decode(pair.Key, &decodedKey)
-		memcomparable.Decode(pair.Value, &decodedValue)
-		pairs = append(pairs, decodedPair{key: decodedKey, value: decodedValue})
+		// columns は [PK..., NonKey...] のフラット配列
+		key := columns[:table.PrimaryKeyCount]
+		value := columns[table.PrimaryKeyCount:]
+		records = append(records, decodedRecord{key: key, value: value})
 	}
-	return pairs
+	return records
 }
 
 func TestGetUniqueIndexByName(t *testing.T) {
@@ -696,4 +913,30 @@ func TestHeight(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Greater(t, height, uint64(1))
 	})
+}
+
+// ユニークインデックスの active なエントリのセカンダリキーを収集するヘルパー
+//
+// ソフトデリート済み (DeleteMark=1) のエントリはスキップする
+func collectActiveUniqueIndexKeys(t *testing.T, bp *bufferpool.BufferPool, ui *UniqueIndexAccessMethod) []string {
+	t.Helper()
+	indexTree := btree.NewBPlusTree(ui.MetaPageId)
+	indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})
+	assert.NoError(t, err)
+
+	var keys []string
+	for {
+		record, ok := indexIter.Get()
+		if !ok {
+			break
+		}
+		if record.HeaderBytes()[0] != 1 {
+			var keyColumns [][]byte
+			memcomparable.Decode(record.KeyBytes(), &keyColumns)
+			keys = append(keys, string(keyColumns[0]))
+		}
+		_, _, err := indexIter.Next(bp)
+		assert.NoError(t, err)
+	}
+	return keys
 }

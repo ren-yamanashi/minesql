@@ -24,14 +24,14 @@ func writeScanLog(w *strings.Builder, bp *bufferpool.BufferPool, tree *BPlusTree
 	}
 	count := 0
 	for {
-		pair, ok, err := iter.Next(bp)
+		record, ok, err := iter.Next(bp)
 		if err != nil {
 			panic(err)
 		}
 		if !ok {
 			break
 		}
-		fmt.Fprintf(w, "  key=%s, value=%s x %d\n", string(pair.Key), string(pair.Value[:1]), len(pair.Value))
+		fmt.Fprintf(w, "  key=%s, value=%s x %d\n", string(record.KeyBytes()), string(record.NonKeyBytes()[:1]), len(record.NonKeyBytes()))
 		count++
 	}
 	fmt.Fprintf(w, "  合計: %d 件\n", count)
@@ -63,20 +63,20 @@ func writeNodeInfo(w *strings.Builder, bp *bufferpool.BufferPool, pageId page.Pa
 
 	if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
 		leafNode := node.NewLeafNode(buf.GetReadData())
-		keys := make([]string, leafNode.NumPairs())
-		for i := range leafNode.NumPairs() {
-			keys[i] = string(leafNode.PairAt(i).Key)
+		keys := make([]string, leafNode.NumRecords())
+		for i := range leafNode.NumRecords() {
+			keys[i] = string(leafNode.RecordAt(i).KeyBytes())
 		}
-		fmt.Fprintf(w, "%sLeaf[keys=%d]: [%s]\n", indent, leafNode.NumPairs(), strings.Join(keys, ", "))
+		fmt.Fprintf(w, "%sLeaf[keys=%d]: [%s]\n", indent, leafNode.NumRecords(), strings.Join(keys, ", "))
 	} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
 		branchNode := node.NewBranchNode(buf.GetReadData())
-		keys := make([]string, branchNode.NumPairs())
-		for i := range branchNode.NumPairs() {
-			keys[i] = string(branchNode.PairAt(i).Key)
+		keys := make([]string, branchNode.NumRecords())
+		for i := range branchNode.NumRecords() {
+			keys[i] = string(branchNode.RecordAt(i).KeyBytes())
 		}
-		fmt.Fprintf(w, "%sBranch[keys=%d]: [%s]\n", indent, branchNode.NumPairs(), strings.Join(keys, ", "))
+		fmt.Fprintf(w, "%sBranch[keys=%d]: [%s]\n", indent, branchNode.NumRecords(), strings.Join(keys, ", "))
 
-		for i := range branchNode.NumPairs() + 1 {
+		for i := range branchNode.NumRecords() + 1 {
 			childPageId := branchNode.ChildPageIdAt(i)
 			writeNodeInfo(w, bp, childPageId, depth+1)
 		}
@@ -115,15 +115,15 @@ func writeTreeShape(w *strings.Builder, bp *bufferpool.BufferPool, tree *BPlusTr
 			}
 			leafNode := node.NewLeafNode(buf.GetReadData())
 			result[depth].count++
-			result[depth].totalKeys += leafNode.NumPairs()
+			result[depth].totalKeys += leafNode.NumRecords()
 		} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
 			if _, ok := result[depth]; !ok {
 				result[depth] = &depthInfo{nodeType: "Branch"}
 			}
 			branchNode := node.NewBranchNode(buf.GetReadData())
 			result[depth].count++
-			result[depth].totalKeys += branchNode.NumPairs()
-			for i := range branchNode.NumPairs() + 1 {
+			result[depth].totalKeys += branchNode.NumRecords()
+			for i := range branchNode.NumRecords() + 1 {
 				collect(branchNode.ChildPageIdAt(i), depth+1)
 			}
 		}
@@ -223,9 +223,9 @@ func TestBTreeSearchKey(t *testing.T) {
 		for _, key := range []string{"grape", "lemon"} {
 			iter, err := tree.Search(bp, SearchModeKey{Key: []byte(key)})
 			require.NoError(t, err)
-			pair, ok := iter.Get()
-			if ok && string(pair.Key) == key {
-				fmt.Fprintf(&w, "key=%s, value=%s x %d\n", string(pair.Key), string(pair.Value[:1]), len(pair.Value))
+			record, ok := iter.Get()
+			if ok && string(record.KeyBytes()) == key {
+				fmt.Fprintf(&w, "key=%s, value=%s x %d\n", string(record.KeyBytes()), string(record.NonKeyBytes()[:1]), len(record.NonKeyBytes()))
 			} else {
 				fmt.Fprintf(&w, "key=%s not found\n", key)
 			}
@@ -249,8 +249,8 @@ key=lemon, value=l x 200
 		key := "watermelon"
 		iter, err := tree.Search(bp, SearchModeKey{Key: []byte(key)})
 		require.NoError(t, err)
-		pair, ok := iter.Get()
-		if ok && string(pair.Key) == key {
+		record, ok := iter.Get()
+		if ok && string(record.KeyBytes()) == key {
 			fmt.Fprintf(&w, "key=%s found\n", key)
 		} else {
 			fmt.Fprintf(&w, "key=%s not found\n", key)
@@ -337,7 +337,7 @@ Delete: grape
 		require.NoError(t, tree.Delete(bp, []byte("banana")))
 
 		// WHEN
-		err := tree.Insert(bp, node.NewPair([]byte("blueberry"), []byte(strings.Repeat("b", 100))))
+		err := tree.Insert(bp, node.NewRecord(nil, []byte("blueberry"), []byte(strings.Repeat("b", 100))))
 		require.NoError(t, err)
 
 		// THEN
@@ -366,7 +366,7 @@ func TestBTreeUpdateIntegration(t *testing.T) {
 		fmt.Fprintln(&w, "=== 更新前 ===")
 		writeScanLog(&w, bp, tree)
 
-		require.NoError(t, tree.Update(bp, node.NewPair([]byte("banana"), []byte(strings.Repeat("X", 50)))))
+		require.NoError(t, tree.Update(bp, node.NewRecord(nil, []byte("banana"), []byte(strings.Repeat("X", 50)))))
 
 		fmt.Fprintln(&w, "=== 更新後 ===")
 		writeScanLog(&w, bp, tree)
@@ -395,7 +395,7 @@ func TestBTreeUpdateIntegration(t *testing.T) {
 
 		// WHEN
 		require.NoError(t, tree.Delete(bp, []byte("apple")))
-		require.NoError(t, tree.Insert(bp, node.NewPair([]byte("avocado"), []byte(strings.Repeat("a", 100)))))
+		require.NoError(t, tree.Insert(bp, node.NewRecord(nil, []byte("avocado"), []byte(strings.Repeat("a", 100)))))
 
 		// THEN
 		var w strings.Builder
@@ -416,7 +416,7 @@ func TestBTreeUpdateIntegration(t *testing.T) {
 
 		// WHEN
 		var w strings.Builder
-		err := tree.Update(bp, node.NewPair([]byte("banana"), []byte("new_value")))
+		err := tree.Update(bp, node.NewRecord(nil, []byte("banana"), []byte("new_value")))
 		fmt.Fprintf(&w, "error: %v\n", err)
 
 		// THEN
@@ -432,7 +432,7 @@ func TestBTreeUpdateIntegration(t *testing.T) {
 		var w strings.Builder
 		for i := range 3 {
 			newValue := fmt.Sprintf("update_%d_%s", i+1, strings.Repeat("!", 50))
-			require.NoError(t, tree.Update(bp, node.NewPair([]byte("cherry"), []byte(newValue))))
+			require.NoError(t, tree.Update(bp, node.NewRecord(nil, []byte("cherry"), []byte(newValue))))
 			fmt.Fprintf(&w, "Update #%d: len=%d\n", i+1, len(newValue))
 		}
 
@@ -569,15 +569,15 @@ Branch[keys=1]: [key_10]
 		}
 
 		branchNode := node.NewBranchNode(rootBuf.GetReadData())
-		for i := range branchNode.NumPairs() {
-			boundaryKey := string(branchNode.PairAt(i).Key)
+		for i := range branchNode.NumRecords() {
+			boundaryKey := string(branchNode.RecordAt(i).KeyBytes())
 
 			// 左の子
 			leftPageId := branchNode.ChildPageIdAt(i)
 			leftBuf, err := bp.FetchPage(leftPageId)
 			require.NoError(t, err)
 			leftLeaf := node.NewLeafNode(leftBuf.GetReadData())
-			lastLeftKey := string(leftLeaf.PairAt(leftLeaf.NumPairs() - 1).Key)
+			lastLeftKey := string(leftLeaf.RecordAt(leftLeaf.NumRecords() - 1).KeyBytes())
 			bp.UnRefPage(leftPageId)
 
 			// 右の子
@@ -585,7 +585,7 @@ Branch[keys=1]: [key_10]
 			rightBuf, err := bp.FetchPage(rightPageId)
 			require.NoError(t, err)
 			rightLeaf := node.NewLeafNode(rightBuf.GetReadData())
-			firstRightKey := string(rightLeaf.PairAt(0).Key)
+			firstRightKey := string(rightLeaf.RecordAt(0).KeyBytes())
 			bp.UnRefPage(rightPageId)
 
 			fmt.Fprintf(&w, "境界キー: %s\n", boundaryKey)

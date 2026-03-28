@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"minesql/internal/storage/btree"
+	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/disk"
 	"minesql/internal/storage/page"
@@ -51,14 +52,14 @@ func printAll(bp *bufferpool.BufferPool, tree *btree.BPlusTree) {
 
 	count := 0
 	for {
-		pair, ok, err := iter.Next(bp)
+		record, ok, err := iter.Next(bp)
 		if err != nil {
 			panic(err)
 		}
 		if !ok {
 			break
 		}
-		fmt.Printf("  key=%-12s value=%s x %d\n", string(pair.Key), string(pair.Value[:1]), len(pair.Value))
+		fmt.Printf("  key=%-12s value=%s x %d\n", string(record.KeyBytes()), string(record.NonKeyBytes()[:1]), len(record.NonKeyBytes()))
 		count++
 	}
 	fmt.Printf("  合計: %d 件\n", count)
@@ -71,8 +72,8 @@ func ExampleBPlusTree_Insert() {
 	// データを挿入
 	fruits := []string{"cherry", "apple", "banana", "date", "elderberry"}
 	for _, fruit := range fruits {
-		pair := btree.NewPair([]byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
-		if err := tree.Insert(bp, pair); err != nil {
+		record := node.NewRecord(nil, []byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
+		if err := tree.Insert(bp, record); err != nil {
 			panic(err)
 		}
 	}
@@ -95,8 +96,8 @@ func ExampleBPlusTree_Search() {
 
 	// データを挿入
 	for _, fruit := range []string{"apple", "banana", "cherry", "grape", "lemon"} {
-		pair := btree.NewPair([]byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
-		if err := tree.Insert(bp, pair); err != nil {
+		record := node.NewRecord(nil, []byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
+		if err := tree.Insert(bp, record); err != nil {
 			panic(err)
 		}
 	}
@@ -108,9 +109,9 @@ func ExampleBPlusTree_Search() {
 			panic(err)
 		}
 
-		pair, ok := iter.Get()
-		if ok && string(pair.Key) == key {
-			fmt.Printf("key=%s, value=%s x %d\n", string(pair.Key), string(pair.Value[:1]), len(pair.Value))
+		record, ok := iter.Get()
+		if ok && string(record.KeyBytes()) == key {
+			fmt.Printf("key=%s, value=%s x %d\n", string(record.KeyBytes()), string(record.NonKeyBytes()[:1]), len(record.NonKeyBytes()))
 		} else {
 			fmt.Printf("key=%s not found\n", key)
 		}
@@ -128,8 +129,8 @@ func ExampleBPlusTree_Delete() {
 
 	// データを挿入
 	for _, fruit := range []string{"apple", "banana", "cherry", "date", "elderberry"} {
-		pair := btree.NewPair([]byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
-		if err := tree.Insert(bp, pair); err != nil {
+		record := node.NewRecord(nil, []byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
+		if err := tree.Insert(bp, record); err != nil {
 			panic(err)
 		}
 	}
@@ -173,8 +174,8 @@ func ExampleBPlusTree_Update() {
 
 	// データを挿入
 	for _, fruit := range []string{"apple", "banana", "cherry"} {
-		pair := btree.NewPair([]byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
-		if err := tree.Insert(bp, pair); err != nil {
+		record := node.NewRecord(nil, []byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
+		if err := tree.Insert(bp, record); err != nil {
 			panic(err)
 		}
 	}
@@ -183,7 +184,7 @@ func ExampleBPlusTree_Update() {
 	printAll(bp, tree)
 
 	// value を更新
-	if err := tree.Update(bp, btree.NewPair([]byte("banana"), []byte(strings.Repeat("X", 50)))); err != nil {
+	if err := tree.Update(bp, node.NewRecord(nil, []byte("banana"), []byte(strings.Repeat("X", 50)))); err != nil {
 		panic(err)
 	}
 
@@ -191,7 +192,7 @@ func ExampleBPlusTree_Update() {
 	printAll(bp, tree)
 
 	// 存在しないキーを更新するとエラー
-	err := tree.Update(bp, btree.NewPair([]byte("mango"), []byte("value")))
+	err := tree.Update(bp, node.NewRecord(nil, []byte("mango"), []byte("value")))
 	fmt.Printf("存在しないキーの更新: %v\n", err)
 
 	// Output:

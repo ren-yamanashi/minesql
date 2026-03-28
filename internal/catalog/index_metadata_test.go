@@ -36,19 +36,19 @@ func TestIndexMetadata_Insert(t *testing.T) {
 		iter, err := btr.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
-		pair, ok := iter.Get()
+		record, ok := iter.Get()
 		assert.True(t, ok)
 
 		// key (FileId, Name) をデコード
 		var keyParts [][]byte
-		memcomparable.Decode(pair.Key, &keyParts)
+		memcomparable.Decode(record.KeyBytes(), &keyParts)
 		tableId := binary.BigEndian.Uint32(keyParts[0])
 		assert.Equal(t, uint32(1), tableId)
 		assert.Equal(t, "idx_email", string(keyParts[1]))
 
 		// value (Type, ColName, DataMetaPageId) をデコード
 		var valueParts [][]byte
-		memcomparable.Decode(pair.Value, &valueParts)
+		memcomparable.Decode(record.NonKeyBytes(), &valueParts)
 		assert.Equal(t, string(IndexTypeUnique), string(valueParts[0]))
 		assert.Equal(t, "email", string(valueParts[1]))
 		assert.Equal(t, dataMetaPageId, page.RestorePageIdFromBytes(valueParts[2]))

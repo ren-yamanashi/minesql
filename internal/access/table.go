@@ -1,10 +1,12 @@
 package access
 
 import (
+	"bytes"
+	"errors"
 	"fmt"
 	"minesql/internal/storage/btree"
+	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/page"
 )
 
@@ -48,27 +50,42 @@ func (t *TableAccessMethod) Create(bp *bufferpool.BufferPool) error {
 
 // Insert はテーブルに行を挿入する
 //
-// プライマリキーを key, 他のカラム値を value としたペアを作成し、B+Tree に挿入する
-func (t *TableAccessMethod) Insert(bp *bufferpool.BufferPool, record [][]byte) error {
+// access.Record を経由して B+Tree レコードを構築し、B+Tree に挿入する
+//
+// ソフトデリート済みの同一キーが存在する場合は Update で上書きする
+func (t *TableAccessMethod) Insert(bp *bufferpool.BufferPool, columns [][]byte) error {
 	btr := btree.NewBPlusTree(t.MetaPageId)
 
-	// キーをエンコード
-	var encodedKey []byte
-	memcomparable.Encode(record[:t.PrimaryKeyCount], &encodedKey)
+	rec := NewRecord(columns, t.PrimaryKeyCount)
+	btrRecord := node.NewRecord(rec.EncodeHeader(), rec.EncodeKey(), rec.EncodeNonKey())
 
-	// 値をエンコード
-	var encodedValue []byte
-	memcomparable.Encode(record[t.PrimaryKeyCount:], &encodedValue)
-
-	// B+Tree に挿入
-	err := btr.Insert(bp, btree.NewPair(encodedKey, encodedValue))
+	err := btr.Insert(bp, btrRecord)
 	if err != nil {
-		return err
+		if !errors.Is(err, btree.ErrDuplicateKey) {
+			return err
+		}
+
+		// 重複キーの場合、既存レコードがソフトデリート済みか確認する
+		existing, findErr := btr.FindByKey(bp, rec.EncodeKey())
+		if findErr != nil {
+			return findErr
+		}
+		if existing.HeaderBytes()[0] != 1 {
+			// active なレコードが存在する場合は重複キーエラーを返す
+			return btree.ErrDuplicateKey
+		}
+
+		// ソフトデリート済みなので Update で上書き
+		err = btr.Update(bp, btrRecord)
+		if err != nil {
+			return err
+		}
 	}
 
 	// ユニークインデックスに挿入
+	encodedKey := rec.EncodeKey()
 	for _, ui := range t.UniqueIndexes {
-		err := ui.Insert(bp, encodedKey, record)
+		err := ui.Insert(bp, encodedKey, columns)
 		if err != nil {
 			return err
 		}
@@ -77,23 +94,24 @@ func (t *TableAccessMethod) Insert(bp *bufferpool.BufferPool, record [][]byte) e
 	return nil
 }
 
-// Delete はテーブルから行を削除する
-func (t *TableAccessMethod) Delete(bp *bufferpool.BufferPool, record [][]byte) error {
+// Delete はテーブルから行をソフトデリートする
+//
+// B+Tree からレコードを物理削除せず、DeleteMark を 1 に設定する
+func (t *TableAccessMethod) Delete(bp *bufferpool.BufferPool, columns [][]byte) error {
 	btr := btree.NewBPlusTree(t.MetaPageId)
 
-	// キーをエンコード
-	var encodedKey []byte
-	memcomparable.Encode(record[:t.PrimaryKeyCount], &encodedKey)
+	rec := NewRecord(columns, t.PrimaryKeyCount)
+	rec.Header.DeleteMark = 1
 
-	// B+Tree から削除
-	err := btr.Delete(bp, encodedKey)
+	// DeleteMark を 1 にしてインプレース更新
+	err := btr.Update(bp, node.NewRecord(rec.EncodeHeader(), rec.EncodeKey(), rec.EncodeNonKey()))
 	if err != nil {
 		return err
 	}
 
-	// ユニークインデックスから削除
+	// ユニークインデックスをソフトデリート
 	for _, ui := range t.UniqueIndexes {
-		err := ui.Delete(bp, record)
+		err := ui.Delete(bp, rec.EncodeKey(), columns)
 		if err != nil {
 			return err
 		}
@@ -102,45 +120,51 @@ func (t *TableAccessMethod) Delete(bp *bufferpool.BufferPool, record [][]byte) e
 	return nil
 }
 
-// Update はテーブルから行を更新する
+// Update はテーブルの行を更新する
 //
-// oldRecord: 更新前の行 (プライマリキーとその他のカラム値を含む)
+// プライマリキーが変わらない場合は B+Tree のインプレース更新を行う
 //
-// newRecord: 更新後の行 (プライマリキーとその他のカラム値を含む)
-func (t *TableAccessMethod) Update(bp *bufferpool.BufferPool, oldRecord [][]byte, newRecord [][]byte) error {
+// プライマリキーが変わる場合はソフトデリート (旧レコード) + Insert (新レコード) で実現する
+//
+// ユニークインデックスは常にソフトデリート + Insert で更新する
+//
+//   - oldColumns: 更新前の行 (プライマリキーとその他のカラム値を含む)
+//   - newColumns: 更新後の行 (プライマリキーとその他のカラム値を含む)
+func (t *TableAccessMethod) Update(bp *bufferpool.BufferPool, oldColumns [][]byte, newColumns [][]byte) error {
 	btr := btree.NewBPlusTree(t.MetaPageId)
 
-	// キーをエンコード
-	var encodedOldKey []byte
-	memcomparable.Encode(oldRecord[:t.PrimaryKeyCount], &encodedOldKey)
-	var encodedNewKey []byte
-	memcomparable.Encode(newRecord[:t.PrimaryKeyCount], &encodedNewKey)
+	oldRec := NewRecord(oldColumns, t.PrimaryKeyCount)
+	newRec := NewRecord(newColumns, t.PrimaryKeyCount)
 
-	// 値をエンコード
-	var encodedNewValue []byte
-	memcomparable.Encode(newRecord[t.PrimaryKeyCount:], &encodedNewValue)
+	encodedOldKey := oldRec.EncodeKey()
+	encodedNewKey := newRec.EncodeKey()
 
-	// キーが一致しない場合は、B+Tree から古いキーに該当するペアを削除し、新しいキーに該当するペアを挿入する
-	if string(encodedOldKey) != string(encodedNewKey) {
-		err := btr.Delete(bp, encodedOldKey)
+	if !bytes.Equal(encodedOldKey, encodedNewKey) {
+		// プライマリキーが変わる場合はソフトデリート + Insert
+		oldRec.Header.DeleteMark = 1
+		err := btr.Update(bp, node.NewRecord(oldRec.EncodeHeader(), oldRec.EncodeKey(), oldRec.EncodeNonKey()))
 		if err != nil {
 			return err
 		}
-		err = btr.Insert(bp, btree.NewPair(encodedNewKey, encodedNewValue))
+		err = btr.Insert(bp, node.NewRecord(newRec.EncodeHeader(), newRec.EncodeKey(), newRec.EncodeNonKey()))
 		if err != nil {
 			return err
 		}
 	} else {
-		// キーが一致する場合は、B+Tree のペアを更新する
-		err := btr.Update(bp, btree.NewPair(encodedOldKey, encodedNewValue))
+		// プライマリキーが変わらない場合はインプレース更新
+		err := btr.Update(bp, node.NewRecord(newRec.EncodeHeader(), newRec.EncodeKey(), newRec.EncodeNonKey()))
 		if err != nil {
 			return err
 		}
 	}
 
-	// ユニークインデックスを更新
+	// ユニークインデックスを更新 (常にソフトデリート + Insert)
 	for _, ui := range t.UniqueIndexes {
-		err := ui.Update(bp, oldRecord, newRecord, encodedNewKey)
+		err := ui.Delete(bp, encodedOldKey, oldColumns)
+		if err != nil {
+			return err
+		}
+		err = ui.Insert(bp, encodedNewKey, newColumns)
 		if err != nil {
 			return err
 		}

@@ -3,6 +3,7 @@ package catalog
 import (
 	"encoding/binary"
 	"minesql/internal/storage/btree"
+	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/bufferpool"
 	"minesql/internal/storage/memcomparable"
 	"minesql/internal/storage/page"
@@ -50,7 +51,7 @@ func (im *IndexMetadata) Insert(bp *bufferpool.BufferPool) error {
 	memcomparable.Encode([][]byte{[]byte(im.Type), []byte(im.ColName), im.DataMetaPageId.ToBytes()}, &encodedValue)
 
 	// B+Tree に挿入
-	return btr.Insert(bp, btree.NewPair(encodedKey, encodedValue))
+	return btr.Insert(bp, node.NewRecord(nil, encodedKey, encodedValue))
 }
 
 // loadIndexMetadata は指定されたテーブルのインデックスメタデータを読み込む
@@ -72,14 +73,14 @@ func loadIndexMetadata(bp *bufferpool.BufferPool, fileId page.FileId, metaPageId
 
 	var indexes []*IndexMetadata
 	for {
-		pair, ok := iter.Get()
+		record, ok := iter.Get()
 		if !ok {
 			break
 		}
 
 		// キーをデコード (FileId, Name)
 		var keyParts [][]byte
-		memcomparable.Decode(pair.Key, &keyParts)
+		memcomparable.Decode(record.KeyBytes(), &keyParts)
 		idxFileId := page.FileId(binary.BigEndian.Uint32(keyParts[0]))
 
 		// 指定されたテーブルのインデックスのみを収集
@@ -88,7 +89,7 @@ func loadIndexMetadata(bp *bufferpool.BufferPool, fileId page.FileId, metaPageId
 
 			// 値をデコード (Type, ColName, DataMetaPageId)
 			var valueParts [][]byte
-			memcomparable.Decode(pair.Value, &valueParts)
+			memcomparable.Decode(record.NonKeyBytes(), &valueParts)
 			idxType := IndexType(string(valueParts[0]))
 			colName := string(valueParts[1])
 			dataMetaPageId := page.RestorePageIdFromBytes(valueParts[2])

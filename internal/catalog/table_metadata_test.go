@@ -337,18 +337,18 @@ func TestTableMetadata_Insert(t *testing.T) {
 		iter, err := btr.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
-		pair, ok := iter.Get()
+		record, ok := iter.Get()
 		assert.True(t, ok)
 
 		// key (FileId) をデコード
 		var keyParts [][]byte
-		memcomparable.Decode(pair.Key, &keyParts)
+		memcomparable.Decode(record.KeyBytes(), &keyParts)
 		tableId := binary.BigEndian.Uint32(keyParts[0])
 		assert.Equal(t, uint32(42), tableId)
 
 		// value (Name, NCols, PrimaryKeyCount, DataMetaPageId) をデコード
 		var valueParts [][]byte
-		memcomparable.Decode(pair.Value, &valueParts)
+		memcomparable.Decode(record.NonKeyBytes(), &valueParts)
 		assert.Equal(t, "users", string(valueParts[0]))
 		assert.Equal(t, uint64(3), binary.BigEndian.Uint64(valueParts[1]))
 		assert.Equal(t, uint64(1), binary.BigEndian.Uint64(valueParts[2]))

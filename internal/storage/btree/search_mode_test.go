@@ -14,10 +14,10 @@ func TestChildPageId_Start(t *testing.T) {
 		// GIVEN
 		searchMode := SearchModeStart{}
 		branchNode := createBranchNode(
-			[]node.Pair{
-				createPair([]byte("key1"), page.NewPageId(page.FileId(0), page.PageNumber(100))),
-				createPair([]byte("key2"), page.NewPageId(page.FileId(0), page.PageNumber(200))),
-				createPair([]byte("key3"), page.NewPageId(page.FileId(0), page.PageNumber(300))),
+			[]node.Record{
+				createRecord([]byte("key1"), page.NewPageId(page.FileId(0), page.PageNumber(100))),
+				createRecord([]byte("key2"), page.NewPageId(page.FileId(0), page.PageNumber(200))),
+				createRecord([]byte("key3"), page.NewPageId(page.FileId(0), page.PageNumber(300))),
 			},
 			page.NewPageId(page.FileId(0), page.PageNumber(400)),
 		)
@@ -35,10 +35,10 @@ func TestChildPageId_Key(t *testing.T) {
 		// GIVEN
 		searchMode := SearchModeKey{Key: []byte("key1.5")}
 		branchNode := createBranchNode(
-			[]node.Pair{
-				createPair([]byte("key1"), page.NewPageId(page.FileId(0), page.PageNumber(100))),
-				createPair([]byte("key2"), page.NewPageId(page.FileId(0), page.PageNumber(200))),
-				createPair([]byte("key3"), page.NewPageId(page.FileId(0), page.PageNumber(300))),
+			[]node.Record{
+				createRecord([]byte("key1"), page.NewPageId(page.FileId(0), page.PageNumber(100))),
+				createRecord([]byte("key2"), page.NewPageId(page.FileId(0), page.PageNumber(200))),
+				createRecord([]byte("key3"), page.NewPageId(page.FileId(0), page.PageNumber(300))),
 			},
 			page.NewPageId(page.FileId(0), page.PageNumber(400)),
 		)
@@ -53,10 +53,10 @@ func TestChildPageId_Key(t *testing.T) {
 	t.Run("検索キーが最小キーより小さい場合、先頭の子ページIDが取得できる", func(t *testing.T) {
 		// GIVEN
 		branchNode := createBranchNode(
-			[]node.Pair{
-				createPair([]byte("key1"), page.NewPageId(page.FileId(0), page.PageNumber(100))),
-				createPair([]byte("key2"), page.NewPageId(page.FileId(0), page.PageNumber(200))),
-				createPair([]byte("key3"), page.NewPageId(page.FileId(0), page.PageNumber(300))),
+			[]node.Record{
+				createRecord([]byte("key1"), page.NewPageId(page.FileId(0), page.PageNumber(100))),
+				createRecord([]byte("key2"), page.NewPageId(page.FileId(0), page.PageNumber(200))),
+				createRecord([]byte("key3"), page.NewPageId(page.FileId(0), page.PageNumber(300))),
 			},
 			page.NewPageId(page.FileId(0), page.PageNumber(400)),
 		)
@@ -74,10 +74,10 @@ func TestChildPageId_Key(t *testing.T) {
 	t.Run("検索キーが最大キーより大きい場合、右端の子ページIDが取得できる", func(t *testing.T) {
 		// GIVEN
 		branchNode := createBranchNode(
-			[]node.Pair{
-				createPair([]byte("key1"), page.NewPageId(page.FileId(0), page.PageNumber(100))),
-				createPair([]byte("key2"), page.NewPageId(page.FileId(0), page.PageNumber(200))),
-				createPair([]byte("key3"), page.NewPageId(page.FileId(0), page.PageNumber(300))),
+			[]node.Record{
+				createRecord([]byte("key1"), page.NewPageId(page.FileId(0), page.PageNumber(100))),
+				createRecord([]byte("key2"), page.NewPageId(page.FileId(0), page.PageNumber(200))),
+				createRecord([]byte("key3"), page.NewPageId(page.FileId(0), page.PageNumber(300))),
 			},
 			page.NewPageId(page.FileId(0), page.PageNumber(400)),
 		)
@@ -96,10 +96,10 @@ func TestChildPageId_Key(t *testing.T) {
 		// GIVEN
 		searchMode := SearchModeKey{Key: []byte("key2")}
 		branchNode := createBranchNode(
-			[]node.Pair{
-				createPair([]byte("key1"), page.NewPageId(page.FileId(0), page.PageNumber(100))),
-				createPair([]byte("key2"), page.NewPageId(page.FileId(0), page.PageNumber(200))),
-				createPair([]byte("key3"), page.NewPageId(page.FileId(0), page.PageNumber(300))),
+			[]node.Record{
+				createRecord([]byte("key1"), page.NewPageId(page.FileId(0), page.PageNumber(100))),
+				createRecord([]byte("key2"), page.NewPageId(page.FileId(0), page.PageNumber(200))),
+				createRecord([]byte("key3"), page.NewPageId(page.FileId(0), page.PageNumber(300))),
 			},
 			page.NewPageId(page.FileId(0), page.PageNumber(400)),
 		)
@@ -112,30 +112,30 @@ func TestChildPageId_Key(t *testing.T) {
 	})
 }
 
-func createBranchNode(pairs []node.Pair, rightChildPageId page.PageId) *node.BranchNode {
+func createBranchNode(records []node.Record, rightChildPageId page.PageId) *node.BranchNode {
 	p := directio.AlignedBlock(directio.BlockSize)
 	branchNode := node.NewBranchNode(p)
 
-	if len(pairs) == 0 {
-		panic("pairs must not be empty")
+	if len(records) == 0 {
+		panic("records must not be empty")
 	}
 
-	// 最初のペアを使って初期化
-	err := branchNode.Initialize(pairs[0].Key, page.RestorePageIdFromBytes(pairs[0].Value), rightChildPageId)
+	// 最初のレコードを使って初期化
+	err := branchNode.Initialize(records[0].KeyBytes(), page.RestorePageIdFromBytes(records[0].NonKeyBytes()), rightChildPageId)
 	if err != nil {
 		panic("failed to initialize branch node")
 	}
 
-	// 残りのペアを挿入
-	for i := 1; i < len(pairs); i++ {
-		if !branchNode.Insert(i, pairs[i]) {
-			panic("failed to insert pair")
+	// 残りのレコードを挿入
+	for i := 1; i < len(records); i++ {
+		if !branchNode.Insert(i, records[i]) {
+			panic("failed to insert record")
 		}
 	}
 
 	return branchNode
 }
 
-func createPair(key []byte, pageId page.PageId) node.Pair {
-	return node.NewPair(key, pageId.ToBytes())
+func createRecord(key []byte, pageId page.PageId) node.Record {
+	return node.NewRecord(nil, key, pageId.ToBytes())
 }

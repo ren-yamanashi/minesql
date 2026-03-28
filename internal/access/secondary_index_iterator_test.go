@@ -110,6 +110,51 @@ func TestSecondaryIndexIterator(t *testing.T) {
 		assert.Nil(t, result)
 	})
 
+	t.Run("ソフトデリート済みのインデックスエントリはスキップされる", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "idx_iter_test.db")
+
+		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2)
+
+		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
+		err = table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		assert.NoError(t, err)
+		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		assert.NoError(t, err)
+		err = table.Insert(bp, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
+		assert.NoError(t, err)
+
+		// "Doe" を持つ行をソフトデリート
+		err = table.Delete(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		assert.NoError(t, err)
+
+		// WHEN: インデックスを先頭から検索
+		iter, err := uniqueIndex.Search(bp, &table, RecordSearchModeStart{})
+		assert.NoError(t, err)
+
+		var results []*SecondaryIndexSearchResult
+		for {
+			result, ok, err := iter.Next()
+			assert.NoError(t, err)
+			if !ok {
+				break
+			}
+			results = append(results, result)
+		}
+
+		// THEN: ソフトデリート済みの "Doe" はスキップされ、2 件のみ返される
+		assert.Equal(t, 2, len(results))
+		assert.Equal(t, [][]byte{[]byte("Johnson")}, results[0].SecondaryKey)
+		assert.Equal(t, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")}, results[0].Record)
+		assert.Equal(t, [][]byte{[]byte("Smith")}, results[1].SecondaryKey)
+		assert.Equal(t, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")}, results[1].Record)
+	})
+
 	t.Run("更新後のインデックスから正しいレコードが返される", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "idx_iter_test.db")

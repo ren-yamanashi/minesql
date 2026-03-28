@@ -25,54 +25,56 @@ func newIterator(bufferPage bufferpool.BufferPage, slotNum int) *Iterator {
 	}
 }
 
-// Get は現在参照しているリーフノード (=バッファページ) の key-value のペアを取得
-func (iter *Iterator) Get() (node.Pair, bool) {
+// Get は現在参照しているリーフノード (=バッファページ) のレコードを取得
+func (iter *Iterator) Get() (node.Record, bool) {
 	leafNode := node.NewLeafNode(iter.bufferPage.GetReadData())
 
-	if iter.slotNum < leafNode.NumPairs() {
-		pair := leafNode.PairAt(iter.slotNum)
-		key := make([]byte, len(pair.Key))
-		copy(key, pair.Key)
-		value := make([]byte, len(pair.Value))
-		copy(value, pair.Value)
-		return node.NewPair(key, value), true
+	if iter.slotNum < leafNode.NumRecords() {
+		record := leafNode.RecordAt(iter.slotNum)
+		header := make([]byte, len(record.HeaderBytes()))
+		copy(header, record.HeaderBytes())
+		key := make([]byte, len(record.KeyBytes()))
+		copy(key, record.KeyBytes())
+		nonKey := make([]byte, len(record.NonKeyBytes()))
+		copy(nonKey, record.NonKeyBytes())
+		return node.NewRecord(header, key, nonKey), true
 	}
 
-	return node.NewPair(nil, nil), false
+	return node.NewRecord(nil, nil, nil), false
 }
 
-// Next は次の key-value のペアを取得する
-func (iter *Iterator) Next(bp *bufferpool.BufferPool) (node.Pair, bool, error) {
-	pair, ok := iter.Get()
+// Next は次のレコードを取得する
+func (iter *Iterator) Next(bp *bufferpool.BufferPool) (node.Record, bool, error) {
+	record, ok := iter.Get()
 	if !ok {
-		return node.NewPair(nil, nil), false, nil
+		return node.NewRecord(nil, nil, nil), false, nil
 	}
 	err := iter.Advance(bp)
 	if err != nil {
-		return node.NewPair(nil, nil), false, err
+		return node.NewRecord(nil, nil, nil), false, err
 	}
-	return pair, true, nil
+	return record, true, nil
 }
 
-// Advance は次の key-value ペアに進む
+// Advance は次のレコードに進む
 func (iter *Iterator) Advance(bp *bufferpool.BufferPool) error {
 	iter.slotNum++
 
 	leafNode := node.NewLeafNode(iter.bufferPage.GetReadData())
 
-	// 現在のページ内に、まだ次の key-value ペアがある場合は、次のページに移動しない (スロット番号を進めるだけ)
-	if iter.slotNum < leafNode.NumPairs() {
+	// 現在のページ内に、まだ次のレコードがある場合は、次のページに移動しない (スロット番号を進めるだけ)
+	if iter.slotNum < leafNode.NumRecords() {
 		return nil
 	}
 
 	nextPageId := leafNode.NextPageId()
 
-	// 現在のページ内に、次の key-value ペアがないが、次のページも存在しない場合は、次のページに移動しない
+	// 現在のページ内に、次のレコードがないが、次のページも存在しない場合は、次のページに移動しない
 	if nextPageId == nil {
 		return nil
 	}
 
-	// 現在のページ内に次の key-value ペアがなく、次のページが存在する場合は、次のページに移動する
+	// 現在のページ内に次のレコードがなく、次のページが存在する場合は、次のページに移動する
 	// 古いページの参照ビットをクリア
 	oldPageId := iter.bufferPage.PageId
 	bp.UnRefPage(oldPageId)
