@@ -34,19 +34,19 @@ func TestColumnMetadata_Insert(t *testing.T) {
 		iter, err := btr.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
-		pair, ok := iter.Get()
+		record, ok := iter.Get()
 		assert.True(t, ok)
 
 		// key (FileId, ColName) をデコード
 		var keyParts [][]byte
-		memcomparable.Decode(pair.Key, &keyParts)
+		memcomparable.Decode(record.KeyBytes(), &keyParts)
 		tableId := binary.BigEndian.Uint32(keyParts[0])
 		assert.Equal(t, uint32(1), tableId)
 		assert.Equal(t, "email", string(keyParts[1]))
 
 		// value (Pos, Type) をデコード
 		var valueParts [][]byte
-		memcomparable.Decode(pair.Value, &valueParts)
+		memcomparable.Decode(record.NonKeyBytes(), &valueParts)
 		pos := binary.BigEndian.Uint16(valueParts[0])
 		assert.Equal(t, uint16(2), pos)
 		assert.Equal(t, string(ColumnTypeString), string(valueParts[1]))

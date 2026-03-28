@@ -101,7 +101,7 @@ func (tm *TableMetadata) Insert(bp *bufferpool.BufferPool) error {
 	memcomparable.Encode([][]byte{[]byte(tm.Name), nColsBuf, pkCountBuf, tm.DataMetaPageId.ToBytes()}, &encodedValue)
 
 	// B+Tree に挿入
-	return btr.Insert(bp, btree.NewPair(encodedKey, encodedValue))
+	return btr.Insert(bp, btree.NewRecord(nil, encodedKey, encodedValue))
 }
 
 // loadTableMetadata は指定されたテーブルのメタデータを読み込む
@@ -126,19 +126,19 @@ func loadTableMetadata(bp *bufferpool.BufferPool, tableMetaPageId page.PageId, i
 	var tables []*TableMetadata
 
 	for {
-		pair, ok := iter.Get()
+		record, ok := iter.Get()
 		if !ok {
 			break
 		}
 
 		// キーをデコード (FileId)
 		var keyParts [][]byte
-		memcomparable.Decode(pair.Key, &keyParts)
+		memcomparable.Decode(record.KeyBytes(), &keyParts)
 		fileId := page.FileId(binary.BigEndian.Uint32(keyParts[0]))
 
 		// 値をデコード (Name, NCols, PrimaryKeyCount, DataMetaPageId)
 		var valueParts [][]byte
-		memcomparable.Decode(pair.Value, &valueParts)
+		memcomparable.Decode(record.NonKeyBytes(), &valueParts)
 		name := string(valueParts[0])
 		nCols := uint8(binary.BigEndian.Uint64(valueParts[1]))
 		pkCount := uint8(binary.BigEndian.Uint64(valueParts[2]))

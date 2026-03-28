@@ -50,7 +50,7 @@ func (cm *ColumnMetadata) Insert(bp *bufferpool.BufferPool) error {
 	memcomparable.Encode([][]byte{posBuf, []byte(cm.Type)}, &encodedValue)
 
 	// B+Tree に挿入
-	return btr.Insert(bp, btree.NewPair(encodedKey, encodedValue))
+	return btr.Insert(bp, btree.NewRecord(nil, encodedKey, encodedValue))
 }
 
 // loadColumnMetadata は指定されたテーブルのカラムメタデータを読み込む
@@ -72,14 +72,14 @@ func loadColumnMetadata(bp *bufferpool.BufferPool, fileId page.FileId, metaPageI
 
 	var cols []*ColumnMetadata
 	for {
-		pair, ok := iter.Get()
+		record, ok := iter.Get()
 		if !ok {
 			break
 		}
 
 		// キーをデコード (FileId, ColName)
 		var keyParts [][]byte
-		memcomparable.Decode(pair.Key, &keyParts)
+		memcomparable.Decode(record.KeyBytes(), &keyParts)
 		colFileId := page.FileId(binary.BigEndian.Uint32(keyParts[0]))
 
 		// 指定されたテーブルのカラムのみを収集
@@ -88,7 +88,7 @@ func loadColumnMetadata(bp *bufferpool.BufferPool, fileId page.FileId, metaPageI
 
 			// 値をデコード (Pos, Type)
 			var valueParts [][]byte
-			memcomparable.Decode(pair.Value, &valueParts)
+			memcomparable.Decode(record.NonKeyBytes(), &valueParts)
 			pos := binary.BigEndian.Uint16(valueParts[0])
 			colType := ColumnType(string(valueParts[1]))
 

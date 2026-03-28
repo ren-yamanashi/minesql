@@ -36,20 +36,20 @@ func NewBranchNode(data []byte) *BranchNode {
 	}
 }
 
-// Initialize はブランチノードを初期化する (初期化時には、ペア数は 1 つ)
+// Initialize はブランチノードを初期化する (初期化時には、レコード数は 1 つ)
 //
-// key: 最初のペアのキー
+// key: 最初のレコードのキー
 //
-// leftChildPageId: 最初のペアの value (左の子ページのページ ID)
+// leftChildPageId: 最初のレコードの非キーフィールド (左の子ページのページ ID)
 //
 // rightChildPageId: ヘッダー部分に設定する右の子ページのページ ID
 func (bn *BranchNode) Initialize(key []byte, leftChildPageId page.PageId, rightChildPageId page.PageId) error {
 	bn.body.Initialize()
 
-	// 左の子ページのポインタ (ページ ID) を value とした Pair を作成
-	pair := NewPair(key, leftChildPageId.ToBytes())
+	// 左の子ページのポインタ (ページ ID) を非キーフィールドとした Record を作成
+	record := NewRecord(nil, key, leftChildPageId.ToBytes())
 
-	if !bn.Insert(0, pair) {
+	if !bn.Insert(0, record) {
 		return errors.New("new branch must have space")
 	}
 
@@ -59,52 +59,52 @@ func (bn *BranchNode) Initialize(key []byte, leftChildPageId page.PageId, rightC
 	return nil
 }
 
-// Insert は key-value ペアを挿入する
+// Insert はレコードを挿入する
 //
 // slotNum: 挿入先のスロット番号 (slotted page のスロット番号)
 //
-// pair: 挿入する key-value ペア
+// record: 挿入するレコード
 //
 // 戻り値: 挿入に成功したかどうか
-func (bn *BranchNode) Insert(slotNum int, pair Pair) bool {
-	pairBytes := pair.ToBytes()
+func (bn *BranchNode) Insert(slotNum int, record Record) bool {
+	recordBytes := record.ToBytes()
 
-	if len(pairBytes) > bn.maxPairSize() {
+	if len(recordBytes) > bn.maxRecordSize() {
 		return false
 	}
 
-	return bn.body.Insert(slotNum, pairBytes)
+	return bn.body.Insert(slotNum, recordBytes)
 }
 
-// SplitInsert はブランチノードを分割しながらペアを挿入する
+// SplitInsert はブランチノードを分割しながらレコードを挿入する
 //
 // newBranchNode: 分割後の新しいブランチノード
 //
-// newPair: 挿入する key-value ペア
+// newRecord: 挿入するレコード
 //
 // 戻り値: 新しいブランチノードの最小キー
-func (bn *BranchNode) SplitInsert(newBranchNode *BranchNode, newPair Pair) ([]byte, error) {
+func (bn *BranchNode) SplitInsert(newBranchNode *BranchNode, newRecord Record) ([]byte, error) {
 	newBranchNode.body.Initialize()
 
 	for {
 		if newBranchNode.IsHalfFull() {
-			slotNum, _ := bn.SearchSlotNum(newPair.Key)
-			if !bn.Insert(slotNum, newPair) {
+			slotNum, _ := bn.SearchSlotNum(newRecord.KeyBytes())
+			if !bn.Insert(slotNum, newRecord) {
 				return nil, errors.New("old branch must have space")
 			}
 			break
 		}
 
-		// "古いノードの先頭 (スロット番号=0) のペアのキー < 新しいペアのキー" の場合
-		// ペアを新しいブランチノードに移動する
-		if bn.PairAt(0).CompareKey(newPair.Key) < 0 {
+		// "古いノードの先頭 (スロット番号=0) のレコードのキー < 新しいレコードのキー" の場合
+		// レコードを新しいブランチノードに移動する
+		if bn.RecordAt(0).CompareKey(newRecord.KeyBytes()) < 0 {
 			err := bn.transfer(newBranchNode)
 			if err != nil {
 				return nil, err
 			}
 		} else {
-			// 新しいペアを新しいブランチノードに挿入し、残りのペアを新しいブランチノードに移動する
-			newBranchNode.Insert(newBranchNode.NumPairs(), newPair)
+			// 新しいレコードを新しいブランチノードに挿入し、残りのレコードを新しいブランチノードに移動する
+			newBranchNode.Insert(newBranchNode.NumRecords(), newRecord)
 			for !newBranchNode.IsHalfFull() {
 				err := bn.transfer(newBranchNode)
 				if err != nil {
@@ -118,44 +118,44 @@ func (bn *BranchNode) SplitInsert(newBranchNode *BranchNode, newPair Pair) ([]by
 	return newBranchNode.fillRightChild(), nil
 }
 
-// Delete は key-value ペアを削除する
+// Delete はレコードを削除する
 //
-// slotNum: 削除するペアのスロット番号 (slotted page のスロット番号)
+// slotNum: 削除するレコードのスロット番号 (slotted page のスロット番号)
 func (bn *BranchNode) Delete(slotNum int) {
 	bn.body.Remove(slotNum)
 }
 
 // Update は指定されたスロット番号のキーを更新する
 //
-// 子ノード側でペアの追加・削除が起きて境界値 (最小キー) が変わった場合に、ブランチノード側のキーも更新する (ページ ID は変わらないので value はそのまま)
+// 子ノード側でレコードの追加・削除が起きて境界値 (最小キー) が変わった場合に、ブランチノード側のキーも更新する (ページ ID は変わらないので非キーフィールドはそのまま)
 //
 // 戻り値: 更新に成功したかどうか (空き容量不足の場合は false)
 func (bn *BranchNode) Update(slotNum int, newKey []byte) bool {
-	pair := bn.PairAt(slotNum)
-	newPair := NewPair(newKey, pair.Value)
-	return bn.body.Update(slotNum, newPair.ToBytes())
+	record := bn.RecordAt(slotNum)
+	newRecord := NewRecord(record.HeaderBytes(), newKey, record.NonKeyBytes())
+	return bn.body.Update(slotNum, newRecord.ToBytes())
 }
 
-// CanTransferPair は兄弟ノードにペアを転送できるかどうかを判定する
+// CanTransferRecord は兄弟ノードにレコードを転送できるかどうかを判定する
 //
 // 転送後も半分以上埋まっている場合は true を返す
 //
-// toRight: true の場合は右の兄弟に転送 (末尾ペアを転送)、false の場合は左の兄弟に転送 (先頭ペアを転送)
-func (bn *BranchNode) CanTransferPair(toRight bool) bool {
-	if bn.NumPairs() <= 1 {
+// toRight: true の場合は右の兄弟に転送 (末尾レコードを転送)、false の場合は左の兄弟に転送 (先頭レコードを転送)
+func (bn *BranchNode) CanTransferRecord(toRight bool) bool {
+	if bn.NumRecords() <= 1 {
 		return false
 	}
 
-	// 右の兄弟に転送する場合は末尾ペア、左の兄弟に転送する場合は先頭ペアを転送対象とする
+	// 右の兄弟に転送する場合は末尾レコード、左の兄弟に転送する場合は先頭レコードを転送対象とする
 	targetIndex := 0
 	if toRight {
-		targetIndex = bn.NumPairs() - 1
+		targetIndex = bn.NumRecords() - 1
 	}
-	targetPairData := bn.body.Data(targetIndex)
-	targetPairSize := len(targetPairData)
+	targetRecordData := bn.body.Data(targetIndex)
+	targetRecordSize := len(targetRecordData)
 
 	// 転送後の空き容量を計算
-	freeSpaceAfterTransfer := bn.body.FreeSpace() + targetPairSize + 4 // 4 はポインタサイズ
+	freeSpaceAfterTransfer := bn.body.FreeSpace() + targetRecordSize + 4 // 4 はポインタサイズ
 
 	// 転送後の空き容量が、ノード全体の容量の半分未満であれば (転送後も半分以上埋まっていると判断できるので) 転送可能と判断する
 	return 2*freeSpaceAfterTransfer < bn.body.Capacity()
@@ -166,17 +166,17 @@ func (bn *BranchNode) Body() []byte {
 	return bn.data[nodeHeaderSize:]
 }
 
-// NumPairs は key-value ペア数を取得する
-func (bn *BranchNode) NumPairs() int {
+// NumRecords はレコード数を取得する
+func (bn *BranchNode) NumRecords() int {
 	return bn.body.NumSlots()
 }
 
-// PairAt は指定されたスロット番号の key-value ペアを取得する
+// RecordAt は指定されたスロット番号のレコードを取得する
 //
 // slotNum: slotted page のスロット番号
-func (bn *BranchNode) PairAt(slotNum int) Pair {
+func (bn *BranchNode) RecordAt(slotNum int) Record {
 	data := bn.body.Data(slotNum)
-	return pairFromBytes(data)
+	return recordFromBytes(data)
 }
 
 // SearchSlotNum はキーから、対応するスロット番号 (slotted page のスロット番号) を検索する (二分探索)
@@ -203,12 +203,12 @@ func (bn *BranchNode) SearchChildSlotNum(key []byte) int {
 
 // ChildPageIdAt は指定されたスロット番号の、子ページのページ ID を取得する
 func (bn *BranchNode) ChildPageIdAt(slotNum int) page.PageId {
-	if slotNum == bn.NumPairs() {
+	if slotNum == bn.NumRecords() {
 		// 右端の子ページ ID を返す
 		return page.ReadPageIdFromPageData(bn.Body(), 0)
 	}
-	pair := bn.PairAt(slotNum)
-	return page.RestorePageIdFromBytes(pair.Value)
+	record := bn.RecordAt(slotNum)
+	return page.RestorePageIdFromBytes(record.NonKeyBytes())
 }
 
 // RightChildPageId は右端の子ページ ID を取得する
@@ -221,7 +221,7 @@ func (bn *BranchNode) SetRightChildPageId(pageId page.PageId) {
 	pageId.WriteTo(bn.Body(), 0)
 }
 
-// TransferAllFrom は src のすべてのペアを自分の末尾に転送する (src のペアはすべて削除される)
+// TransferAllFrom は src のすべてのレコードを自分の末尾に転送する (src のレコードはすべて削除される)
 func (bn *BranchNode) TransferAllFrom(src *BranchNode) {
 	src.body.TransferAllTo(bn.body)
 }
@@ -231,16 +231,16 @@ func (bn *BranchNode) IsHalfFull() bool {
 	return 2*bn.body.FreeSpace() < bn.body.Capacity()
 }
 
-// fillRightChild は右端の子ページ ID を設定し、最後のペアのキーを返す (右端のペアは削除される)
+// fillRightChild は右端の子ページ ID を設定し、最後のレコードのキーを返す (右端のレコードは削除される)
 // 戻り値: 取り出したキー
 func (bn *BranchNode) fillRightChild() []byte {
-	lastId := bn.NumPairs() - 1
-	pair := bn.PairAt(lastId)
-	rightChild := page.RestorePageIdFromBytes(pair.Value)
-	key := make([]byte, len(pair.Key))
+	lastId := bn.NumRecords() - 1
+	record := bn.RecordAt(lastId)
+	rightChild := page.RestorePageIdFromBytes(record.NonKeyBytes())
+	key := make([]byte, len(record.KeyBytes()))
 
 	// キーをコピー
-	copy(key, pair.Key)
+	copy(key, record.KeyBytes())
 	bn.body.Remove(lastId)
 
 	// ブランチノードのヘッダー部分に右子ページ ID を設定
@@ -249,14 +249,14 @@ func (bn *BranchNode) fillRightChild() []byte {
 	return key
 }
 
-// maxPairSize は最大ペアサイズを取得する
-func (bn *BranchNode) maxPairSize() int {
-	return bn.body.Capacity()/2 - 4 // Slotted Page の容量の半分 - キーサイズを格納する 4 バイト (2 で割るのは、 key と value の両方を格納するため)
+// maxRecordSize は最大レコードサイズを取得する
+func (bn *BranchNode) maxRecordSize() int {
+	return bn.body.Capacity()/2 - 4 // Slotted Page の容量の半分 - ヘッダーサイズ + キーサイズを格納する 4 バイト
 }
 
-// transfer は先頭のペアを別のブランチノードに移動する
+// transfer は先頭のレコードを別のブランチノードに移動する
 func (bn *BranchNode) transfer(dest *BranchNode) error {
-	nextIndex := dest.NumPairs()
+	nextIndex := dest.NumRecords()
 	data := bn.body.Data(0)
 
 	if !dest.body.Insert(nextIndex, data) {

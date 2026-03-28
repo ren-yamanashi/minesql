@@ -19,21 +19,29 @@ func newClusteredIndexIterator(iterator *btree.Iterator, bp *bufferpool.BufferPo
 }
 
 // Next はデコード済みの次のレコードを返す
+// (DeleteMark が設定されているレコードはスキップする)
 //
 // 戻り値: レコード (プライマリキー + 値), データがあるかどうか, エラー
 func (ri *ClusteredIndexIterator) Next() ([][]byte, bool, error) {
-	pair, ok, err := ri.iterator.Next(ri.bp)
-	if !ok {
-		return nil, false, nil
-	}
-	if err != nil {
-		return nil, false, err
-	}
+	for {
+		btrRecord, ok, err := ri.iterator.Next(ri.bp)
+		if !ok {
+			return nil, false, nil
+		}
+		if err != nil {
+			return nil, false, err
+		}
 
-	// レコード (プライマリキー + 値) をデコード
-	var record [][]byte
-	memcomparable.Decode(pair.Key, &record)
-	memcomparable.Decode(pair.Value, &record)
+		// DeleteMark チェック: ソフトデリート済みならスキップ
+		if len(btrRecord.HeaderBytes()) > 0 && btrRecord.HeaderBytes()[0] == 1 {
+			continue
+		}
 
-	return record, true, nil
+		// レコード (プライマリキー + NonKey) をデコード
+		var record [][]byte
+		memcomparable.Decode(btrRecord.KeyBytes(), &record)
+		memcomparable.Decode(btrRecord.NonKeyBytes(), &record)
+
+		return record, true, nil
+	}
 }

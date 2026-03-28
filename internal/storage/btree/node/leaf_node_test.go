@@ -25,7 +25,7 @@ func TestNewLeafNode(t *testing.T) {
 }
 
 func TestLeafNodeInitialize(t *testing.T) {
-	t.Run("初期化後にペア数が 0、前後ページ ID が nil になる", func(t *testing.T) {
+	t.Run("初期化後にレコード数が 0、前後ページ ID が nil になる", func(t *testing.T) {
 		// GIVEN
 		data := directio.AlignedBlock(directio.BlockSize)
 		ln := NewLeafNode(data)
@@ -34,58 +34,58 @@ func TestLeafNodeInitialize(t *testing.T) {
 		ln.Initialize()
 
 		// THEN
-		assert.Equal(t, 0, ln.NumPairs())
+		assert.Equal(t, 0, ln.NumRecords())
 		assert.Nil(t, ln.PrevPageId())
 		assert.Nil(t, ln.NextPageId())
 	})
 }
 
 func TestLeafNodeInsert(t *testing.T) {
-	t.Run("ペアが正しく挿入できる", func(t *testing.T) {
+	t.Run("レコードが正しく挿入できる", func(t *testing.T) {
 		// GIVEN
 		ln := createTestLeafNode(nil)
 
 		// WHEN
-		ok := ln.Insert(0, NewPair([]byte("key1"), []byte("val1")))
+		ok := ln.Insert(0, NewRecord(nil, []byte("key1"), []byte("val1")))
 
 		// THEN
 		assert.True(t, ok)
-		assert.Equal(t, 1, ln.NumPairs())
-		assert.Equal(t, []byte("key1"), ln.PairAt(0).Key)
-		assert.Equal(t, []byte("val1"), ln.PairAt(0).Value)
+		assert.Equal(t, 1, ln.NumRecords())
+		assert.Equal(t, []byte("key1"), ln.RecordAt(0).KeyBytes())
+		assert.Equal(t, []byte("val1"), ln.RecordAt(0).NonKeyBytes())
 	})
 
-	t.Run("中間位置へのペア挿入でスロットが正しくシフトされる", func(t *testing.T) {
+	t.Run("中間位置へのレコード挿入でスロットが正しくシフトされる", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Pair{
-			NewPair([]byte("aaa"), []byte("v1")),
-			NewPair([]byte("ccc"), []byte("v3")),
-			NewPair([]byte("ddd"), []byte("v4")),
+		ln := createTestLeafNode([]Record{
+			NewRecord(nil, []byte("aaa"), []byte("v1")),
+			NewRecord(nil, []byte("ccc"), []byte("v3")),
+			NewRecord(nil, []byte("ddd"), []byte("v4")),
 		})
 
 		// WHEN
-		ok := ln.Insert(1, NewPair([]byte("bbb"), []byte("v2")))
+		ok := ln.Insert(1, NewRecord(nil, []byte("bbb"), []byte("v2")))
 
 		// THEN
 		assert.True(t, ok)
-		assert.Equal(t, 4, ln.NumPairs())
-		assert.Equal(t, []byte("aaa"), ln.PairAt(0).Key)
-		assert.Equal(t, []byte("bbb"), ln.PairAt(1).Key)
-		assert.Equal(t, []byte("ccc"), ln.PairAt(2).Key)
-		assert.Equal(t, []byte("ddd"), ln.PairAt(3).Key)
+		assert.Equal(t, 4, ln.NumRecords())
+		assert.Equal(t, []byte("aaa"), ln.RecordAt(0).KeyBytes())
+		assert.Equal(t, []byte("bbb"), ln.RecordAt(1).KeyBytes())
+		assert.Equal(t, []byte("ccc"), ln.RecordAt(2).KeyBytes())
+		assert.Equal(t, []byte("ddd"), ln.RecordAt(3).KeyBytes())
 	})
 
-	t.Run("最大ペアサイズを超える場合、挿入に失敗する", func(t *testing.T) {
+	t.Run("最大レコードサイズを超える場合、挿入に失敗する", func(t *testing.T) {
 		// GIVEN
 		ln := createTestLeafNode(nil)
 		hugeValue := make([]byte, 4000)
 
 		// WHEN
-		ok := ln.Insert(0, NewPair([]byte("key"), hugeValue))
+		ok := ln.Insert(0, NewRecord(nil, []byte("key"), hugeValue))
 
 		// THEN
 		assert.False(t, ok)
-		assert.Equal(t, 0, ln.NumPairs())
+		assert.Equal(t, 0, ln.NumRecords())
 	})
 
 	t.Run("ページが満杯の場合、挿入に失敗し既存データが壊れない", func(t *testing.T) {
@@ -95,22 +95,22 @@ func TestLeafNodeInsert(t *testing.T) {
 		inserted := 0
 		for {
 			key := fmt.Appendf(nil, "k%02d", inserted)
-			if !ln.Insert(inserted, NewPair(key, value)) {
+			if !ln.Insert(inserted, NewRecord(nil, key, value)) {
 				break
 			}
 			inserted++
 		}
-		numBefore := ln.NumPairs()
-		firstKeyBefore := make([]byte, len(ln.PairAt(0).Key))
-		copy(firstKeyBefore, ln.PairAt(0).Key)
+		numBefore := ln.NumRecords()
+		firstKeyBefore := make([]byte, len(ln.RecordAt(0).KeyBytes()))
+		copy(firstKeyBefore, ln.RecordAt(0).KeyBytes())
 
-		// WHEN: もう 1 つ挿入を試みる (小さいペアだが容量不足)
-		ok := ln.Insert(0, NewPair([]byte("new"), value))
+		// WHEN: もう 1 つ挿入を試みる (小さいレコードだが容量不足)
+		ok := ln.Insert(0, NewRecord(nil, []byte("new"), value))
 
 		// THEN
 		assert.False(t, ok)
-		assert.Equal(t, numBefore, ln.NumPairs())
-		assert.Equal(t, firstKeyBefore, ln.PairAt(0).Key)
+		assert.Equal(t, numBefore, ln.NumRecords())
+		assert.Equal(t, firstKeyBefore, ln.RecordAt(0).KeyBytes())
 	})
 }
 
@@ -122,7 +122,7 @@ func TestLeafNodeSplitInsert(t *testing.T) {
 		numInserted := 0
 		for {
 			key := fmt.Appendf(nil, "k%02d", numInserted)
-			if !ln.Insert(numInserted, NewPair(key, value)) {
+			if !ln.Insert(numInserted, NewRecord(nil, key, value)) {
 				break
 			}
 			numInserted++
@@ -131,20 +131,20 @@ func TestLeafNodeSplitInsert(t *testing.T) {
 		newLn := createTestLeafNode(nil)
 
 		// WHEN
-		minKey, err := ln.SplitInsert(newLn, NewPair(overflowKey, value))
+		minKey, err := ln.SplitInsert(newLn, NewRecord(nil, overflowKey, value))
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Greater(t, ln.NumPairs(), 0)
-		assert.Greater(t, newLn.NumPairs(), 0)
-		assert.Equal(t, numInserted+1, ln.NumPairs()+newLn.NumPairs())
+		assert.Greater(t, ln.NumRecords(), 0)
+		assert.Greater(t, newLn.NumRecords(), 0)
+		assert.Equal(t, numInserted+1, ln.NumRecords()+newLn.NumRecords())
 
 		// minKey が新ノードの先頭キーと一致する
-		assert.Equal(t, newLn.PairAt(0).Key, minKey)
+		assert.Equal(t, newLn.RecordAt(0).KeyBytes(), minKey)
 
 		// 新ノードの全キー < 旧ノードの全キー
-		newLastKey := newLn.PairAt(newLn.NumPairs() - 1).Key
-		oldFirstKey := ln.PairAt(0).Key
+		newLastKey := newLn.RecordAt(newLn.NumRecords() - 1).KeyBytes()
+		oldFirstKey := ln.RecordAt(0).KeyBytes()
 		assert.True(t, bytes.Compare(newLastKey, oldFirstKey) < 0)
 
 		// 各ノード内のキーが昇順
@@ -159,7 +159,7 @@ func TestLeafNodeSplitInsert(t *testing.T) {
 		numInserted := 0
 		for {
 			key := fmt.Appendf(nil, "b%02d", numInserted)
-			if !ln.Insert(numInserted, NewPair(key, value)) {
+			if !ln.Insert(numInserted, NewRecord(nil, key, value)) {
 				break
 			}
 			numInserted++
@@ -169,158 +169,158 @@ func TestLeafNodeSplitInsert(t *testing.T) {
 		newLn := createTestLeafNode(nil)
 
 		// WHEN
-		minKey, err := ln.SplitInsert(newLn, NewPair(smallKey, value))
+		minKey, err := ln.SplitInsert(newLn, NewRecord(nil, smallKey, value))
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Greater(t, ln.NumPairs(), 0)
-		assert.Greater(t, newLn.NumPairs(), 0)
+		assert.Greater(t, ln.NumRecords(), 0)
+		assert.Greater(t, newLn.NumRecords(), 0)
 		assert.NotNil(t, minKey)
-		assert.Equal(t, newLn.PairAt(0).Key, minKey)
+		assert.Equal(t, newLn.RecordAt(0).KeyBytes(), minKey)
 
 		// 各ノード内のキーが昇順
 		assertKeysSorted(t, ln)
 		assertKeysSorted(t, newLn)
 
 		// 新ノードの全キー < 旧ノードの全キー
-		newLastKey := newLn.PairAt(newLn.NumPairs() - 1).Key
-		oldFirstKey := ln.PairAt(0).Key
+		newLastKey := newLn.RecordAt(newLn.NumRecords() - 1).KeyBytes()
+		oldFirstKey := ln.RecordAt(0).KeyBytes()
 		assert.True(t, bytes.Compare(newLastKey, oldFirstKey) < 0)
 	})
 }
 
 func TestLeafNodeDelete(t *testing.T) {
-	t.Run("中間ペアの削除が正しく動作する", func(t *testing.T) {
+	t.Run("中間レコードの削除が正しく動作する", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Pair{
-			NewPair([]byte("key1"), []byte("val1")),
-			NewPair([]byte("key2"), []byte("val2")),
-			NewPair([]byte("key3"), []byte("val3")),
+		ln := createTestLeafNode([]Record{
+			NewRecord(nil, []byte("key1"), []byte("val1")),
+			NewRecord(nil, []byte("key2"), []byte("val2")),
+			NewRecord(nil, []byte("key3"), []byte("val3")),
 		})
 
 		// WHEN
 		ln.Delete(1)
 
 		// THEN
-		assert.Equal(t, 2, ln.NumPairs())
-		assert.Equal(t, []byte("key1"), ln.PairAt(0).Key)
-		assert.Equal(t, []byte("key3"), ln.PairAt(1).Key)
+		assert.Equal(t, 2, ln.NumRecords())
+		assert.Equal(t, []byte("key1"), ln.RecordAt(0).KeyBytes())
+		assert.Equal(t, []byte("key3"), ln.RecordAt(1).KeyBytes())
 	})
 
-	t.Run("先頭ペアの削除が正しく動作する", func(t *testing.T) {
+	t.Run("先頭レコードの削除が正しく動作する", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Pair{
-			NewPair([]byte("key1"), []byte("val1")),
-			NewPair([]byte("key2"), []byte("val2")),
-			NewPair([]byte("key3"), []byte("val3")),
+		ln := createTestLeafNode([]Record{
+			NewRecord(nil, []byte("key1"), []byte("val1")),
+			NewRecord(nil, []byte("key2"), []byte("val2")),
+			NewRecord(nil, []byte("key3"), []byte("val3")),
 		})
 
 		// WHEN
 		ln.Delete(0)
 
 		// THEN
-		assert.Equal(t, 2, ln.NumPairs())
-		assert.Equal(t, []byte("key2"), ln.PairAt(0).Key)
-		assert.Equal(t, []byte("key3"), ln.PairAt(1).Key)
+		assert.Equal(t, 2, ln.NumRecords())
+		assert.Equal(t, []byte("key2"), ln.RecordAt(0).KeyBytes())
+		assert.Equal(t, []byte("key3"), ln.RecordAt(1).KeyBytes())
 	})
 
-	t.Run("末尾ペアの削除が正しく動作する", func(t *testing.T) {
+	t.Run("末尾レコードの削除が正しく動作する", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Pair{
-			NewPair([]byte("key1"), []byte("val1")),
-			NewPair([]byte("key2"), []byte("val2")),
-			NewPair([]byte("key3"), []byte("val3")),
+		ln := createTestLeafNode([]Record{
+			NewRecord(nil, []byte("key1"), []byte("val1")),
+			NewRecord(nil, []byte("key2"), []byte("val2")),
+			NewRecord(nil, []byte("key3"), []byte("val3")),
 		})
 
 		// WHEN
 		ln.Delete(2)
 
 		// THEN
-		assert.Equal(t, 2, ln.NumPairs())
-		assert.Equal(t, []byte("key1"), ln.PairAt(0).Key)
-		assert.Equal(t, []byte("key2"), ln.PairAt(1).Key)
+		assert.Equal(t, 2, ln.NumRecords())
+		assert.Equal(t, []byte("key1"), ln.RecordAt(0).KeyBytes())
+		assert.Equal(t, []byte("key2"), ln.RecordAt(1).KeyBytes())
 	})
 
-	t.Run("唯一のペアを削除するとペア数が 0 になる", func(t *testing.T) {
+	t.Run("唯一のレコードを削除するとレコード数が 0 になる", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Pair{
-			NewPair([]byte("key1"), []byte("val1")),
+		ln := createTestLeafNode([]Record{
+			NewRecord(nil, []byte("key1"), []byte("val1")),
 		})
 
 		// WHEN
 		ln.Delete(0)
 
 		// THEN
-		assert.Equal(t, 0, ln.NumPairs())
+		assert.Equal(t, 0, ln.NumRecords())
 	})
 }
 
 func TestLeafNodeUpdate(t *testing.T) {
-	t.Run("value を更新できる", func(t *testing.T) {
+	t.Run("非キーフィールドを更新できる", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Pair{
-			NewPair([]byte("key1"), []byte("val1")),
-			NewPair([]byte("key2"), []byte("val2")),
-			NewPair([]byte("key3"), []byte("val3")),
+		ln := createTestLeafNode([]Record{
+			NewRecord(nil, []byte("key1"), []byte("val1")),
+			NewRecord(nil, []byte("key2"), []byte("val2")),
+			NewRecord(nil, []byte("key3"), []byte("val3")),
 		})
 
 		// WHEN
-		ok := ln.Update(1, NewPair([]byte("key2"), []byte("updated")))
+		ok := ln.Update(1, NewRecord(nil, []byte("key2"), []byte("updated")))
 
 		// THEN
 		assert.True(t, ok)
-		assert.Equal(t, 3, ln.NumPairs())
-		assert.Equal(t, []byte("key2"), ln.PairAt(1).Key)
-		assert.Equal(t, []byte("updated"), ln.PairAt(1).Value)
+		assert.Equal(t, 3, ln.NumRecords())
+		assert.Equal(t, []byte("key2"), ln.RecordAt(1).KeyBytes())
+		assert.Equal(t, []byte("updated"), ln.RecordAt(1).NonKeyBytes())
 	})
 
-	t.Run("value を短い値に更新できる", func(t *testing.T) {
+	t.Run("非キーフィールドを短い値に更新できる", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Pair{
-			NewPair([]byte("key1"), []byte("long_value_here")),
+		ln := createTestLeafNode([]Record{
+			NewRecord(nil, []byte("key1"), []byte("long_value_here")),
 		})
 
 		// WHEN
-		ok := ln.Update(0, NewPair([]byte("key1"), []byte("short")))
+		ok := ln.Update(0, NewRecord(nil, []byte("key1"), []byte("short")))
 
 		// THEN
 		assert.True(t, ok)
-		assert.Equal(t, []byte("key1"), ln.PairAt(0).Key)
-		assert.Equal(t, []byte("short"), ln.PairAt(0).Value)
+		assert.Equal(t, []byte("key1"), ln.RecordAt(0).KeyBytes())
+		assert.Equal(t, []byte("short"), ln.RecordAt(0).NonKeyBytes())
 	})
 
-	t.Run("value を長い値に更新できる", func(t *testing.T) {
+	t.Run("非キーフィールドを長い値に更新できる", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Pair{
-			NewPair([]byte("key1"), []byte("short")),
+		ln := createTestLeafNode([]Record{
+			NewRecord(nil, []byte("key1"), []byte("short")),
 		})
 
 		// WHEN
-		ok := ln.Update(0, NewPair([]byte("key1"), []byte("much_longer_value")))
+		ok := ln.Update(0, NewRecord(nil, []byte("key1"), []byte("much_longer_value")))
 
 		// THEN
 		assert.True(t, ok)
-		assert.Equal(t, []byte("key1"), ln.PairAt(0).Key)
-		assert.Equal(t, []byte("much_longer_value"), ln.PairAt(0).Value)
+		assert.Equal(t, []byte("key1"), ln.RecordAt(0).KeyBytes())
+		assert.Equal(t, []byte("much_longer_value"), ln.RecordAt(0).NonKeyBytes())
 	})
 
-	t.Run("更新後も他のペアが壊れない", func(t *testing.T) {
+	t.Run("更新後も他のレコードが壊れない", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Pair{
-			NewPair([]byte("key1"), []byte("val1")),
-			NewPair([]byte("key2"), []byte("val2")),
-			NewPair([]byte("key3"), []byte("val3")),
+		ln := createTestLeafNode([]Record{
+			NewRecord(nil, []byte("key1"), []byte("val1")),
+			NewRecord(nil, []byte("key2"), []byte("val2")),
+			NewRecord(nil, []byte("key3"), []byte("val3")),
 		})
 
 		// WHEN
-		ok := ln.Update(1, NewPair([]byte("key2"), []byte("new_longer_value")))
+		ok := ln.Update(1, NewRecord(nil, []byte("key2"), []byte("new_longer_value")))
 
 		// THEN
 		assert.True(t, ok)
-		assert.Equal(t, []byte("key1"), ln.PairAt(0).Key)
-		assert.Equal(t, []byte("val1"), ln.PairAt(0).Value)
-		assert.Equal(t, []byte("key3"), ln.PairAt(2).Key)
-		assert.Equal(t, []byte("val3"), ln.PairAt(2).Value)
+		assert.Equal(t, []byte("key1"), ln.RecordAt(0).KeyBytes())
+		assert.Equal(t, []byte("val1"), ln.RecordAt(0).NonKeyBytes())
+		assert.Equal(t, []byte("key3"), ln.RecordAt(2).KeyBytes())
+		assert.Equal(t, []byte("val3"), ln.RecordAt(2).NonKeyBytes())
 	})
 
 	t.Run("空き容量が不足している場合、false を返す", func(t *testing.T) {
@@ -330,79 +330,79 @@ func TestLeafNodeUpdate(t *testing.T) {
 		inserted := 0
 		for {
 			key := fmt.Appendf(nil, "k%02d", inserted)
-			if !ln.Insert(inserted, NewPair(key, value)) {
+			if !ln.Insert(inserted, NewRecord(nil, key, value)) {
 				break
 			}
 			inserted++
 		}
-		originalValue := make([]byte, len(ln.PairAt(0).Value))
-		copy(originalValue, ln.PairAt(0).Value)
+		originalValue := make([]byte, len(ln.RecordAt(0).NonKeyBytes()))
+		copy(originalValue, ln.RecordAt(0).NonKeyBytes())
 
 		// WHEN: 非常に大きな値に更新を試みる
 		hugeValue := make([]byte, 3000)
-		ok := ln.Update(0, NewPair(ln.PairAt(0).Key, hugeValue))
+		ok := ln.Update(0, NewRecord(nil, ln.RecordAt(0).KeyBytes(), hugeValue))
 
 		// THEN
 		assert.False(t, ok)
 	})
 }
 
-func TestLeafNodeCanTransferPair(t *testing.T) {
-	t.Run("ペアが 0 の場合、false を返す", func(t *testing.T) {
+func TestLeafNodeCanTransferRecord(t *testing.T) {
+	t.Run("レコードが 0 の場合、false を返す", func(t *testing.T) {
 		// GIVEN
 		ln := createTestLeafNode(nil)
 
 		// WHEN
-		result := ln.CanTransferPair(false)
+		result := ln.CanTransferRecord(false)
 
 		// THEN
 		assert.False(t, result)
 	})
 
-	t.Run("ペアが 1 つしかない場合、false を返す", func(t *testing.T) {
+	t.Run("レコードが 1 つしかない場合、false を返す", func(t *testing.T) {
 		// GIVEN
 		ln := createTestLeafNode(nil)
 		bigValue := make([]byte, 1000)
-		ln.Insert(0, NewPair([]byte("key1"), bigValue))
+		ln.Insert(0, NewRecord(nil, []byte("key1"), bigValue))
 
 		// WHEN
-		result := ln.CanTransferPair(false)
+		result := ln.CanTransferRecord(false)
 
 		// THEN
 		assert.False(t, result)
 	})
 
-	t.Run("左の兄弟に転送 (先頭ペアを転送) 後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
+	t.Run("左の兄弟に転送 (先頭レコードを転送) 後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
 		// GIVEN
 		ln := createTestLeafNode(nil)
 		bigValue := make([]byte, 500)
-		ln.Insert(0, NewPair([]byte("key1"), bigValue))
-		ln.Insert(1, NewPair([]byte("key2"), bigValue))
-		ln.Insert(2, NewPair([]byte("key3"), bigValue))
-		ln.Insert(3, NewPair([]byte("key4"), bigValue))
-		ln.Insert(4, NewPair([]byte("key5"), bigValue))
-		ln.Insert(5, NewPair([]byte("key6"), bigValue))
+		ln.Insert(0, NewRecord(nil, []byte("key1"), bigValue))
+		ln.Insert(1, NewRecord(nil, []byte("key2"), bigValue))
+		ln.Insert(2, NewRecord(nil, []byte("key3"), bigValue))
+		ln.Insert(3, NewRecord(nil, []byte("key4"), bigValue))
+		ln.Insert(4, NewRecord(nil, []byte("key5"), bigValue))
+		ln.Insert(5, NewRecord(nil, []byte("key6"), bigValue))
 
 		// WHEN
-		result := ln.CanTransferPair(false)
+		result := ln.CanTransferRecord(false)
 
 		// THEN
 		assert.True(t, result)
 	})
 
-	t.Run("右の兄弟に転送 (末尾ペアを転送) 後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
+	t.Run("右の兄弟に転送 (末尾レコードを転送) 後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
 		// GIVEN
 		ln := createTestLeafNode(nil)
 		bigValue := make([]byte, 500)
-		ln.Insert(0, NewPair([]byte("key1"), bigValue))
-		ln.Insert(1, NewPair([]byte("key2"), bigValue))
-		ln.Insert(2, NewPair([]byte("key3"), bigValue))
-		ln.Insert(3, NewPair([]byte("key4"), bigValue))
-		ln.Insert(4, NewPair([]byte("key5"), bigValue))
-		ln.Insert(5, NewPair([]byte("key6"), bigValue))
+		ln.Insert(0, NewRecord(nil, []byte("key1"), bigValue))
+		ln.Insert(1, NewRecord(nil, []byte("key2"), bigValue))
+		ln.Insert(2, NewRecord(nil, []byte("key3"), bigValue))
+		ln.Insert(3, NewRecord(nil, []byte("key4"), bigValue))
+		ln.Insert(4, NewRecord(nil, []byte("key5"), bigValue))
+		ln.Insert(5, NewRecord(nil, []byte("key6"), bigValue))
 
 		// WHEN
-		result := ln.CanTransferPair(true)
+		result := ln.CanTransferRecord(true)
 
 		// THEN
 		assert.True(t, result)
@@ -412,11 +412,11 @@ func TestLeafNodeCanTransferPair(t *testing.T) {
 		// GIVEN
 		ln := createTestLeafNode(nil)
 		bigValue := make([]byte, 500)
-		ln.Insert(0, NewPair([]byte("key1"), bigValue))
-		ln.Insert(1, NewPair([]byte("key2"), bigValue))
+		ln.Insert(0, NewRecord(nil, []byte("key1"), bigValue))
+		ln.Insert(1, NewRecord(nil, []byte("key2"), bigValue))
 
 		// WHEN
-		result := ln.CanTransferPair(false)
+		result := ln.CanTransferRecord(false)
 
 		// THEN
 		assert.False(t, result)
@@ -437,57 +437,57 @@ func TestLeafNodeBody(t *testing.T) {
 	})
 }
 
-func TestLeafNodeNumPairs(t *testing.T) {
-	t.Run("初期化直後はペア数が 0", func(t *testing.T) {
+func TestLeafNodeNumRecords(t *testing.T) {
+	t.Run("初期化直後はレコード数が 0", func(t *testing.T) {
 		// GIVEN
 		ln := createTestLeafNode(nil)
 
 		// WHEN
-		numPairs := ln.NumPairs()
+		numRecords := ln.NumRecords()
 
 		// THEN
-		assert.Equal(t, 0, numPairs)
+		assert.Equal(t, 0, numRecords)
 	})
 
-	t.Run("挿入後のペア数が正しく取得できる", func(t *testing.T) {
+	t.Run("挿入後のレコード数が正しく取得できる", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Pair{
-			NewPair([]byte("key1"), []byte("val1")),
-			NewPair([]byte("key2"), []byte("val2")),
+		ln := createTestLeafNode([]Record{
+			NewRecord(nil, []byte("key1"), []byte("val1")),
+			NewRecord(nil, []byte("key2"), []byte("val2")),
 		})
 
 		// WHEN
-		numPairs := ln.NumPairs()
+		numRecords := ln.NumRecords()
 
 		// THEN
-		assert.Equal(t, 2, numPairs)
+		assert.Equal(t, 2, numRecords)
 	})
 }
 
-func TestLeafNodePairAt(t *testing.T) {
-	t.Run("指定したスロット番号のペアが取得できる", func(t *testing.T) {
+func TestLeafNodeRecordAt(t *testing.T) {
+	t.Run("指定したスロット番号のレコードが取得できる", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Pair{
-			NewPair([]byte("key1"), []byte("val1")),
-			NewPair([]byte("key2"), []byte("val2")),
+		ln := createTestLeafNode([]Record{
+			NewRecord(nil, []byte("key1"), []byte("val1")),
+			NewRecord(nil, []byte("key2"), []byte("val2")),
 		})
 
 		// WHEN
-		pair := ln.PairAt(1)
+		record := ln.RecordAt(1)
 
 		// THEN
-		assert.Equal(t, []byte("key2"), pair.Key)
-		assert.Equal(t, []byte("val2"), pair.Value)
+		assert.Equal(t, []byte("key2"), record.KeyBytes())
+		assert.Equal(t, []byte("val2"), record.NonKeyBytes())
 	})
 }
 
 func TestLeafNodeSearchSlotNum(t *testing.T) {
 	t.Run("存在するキーの場合、スロット番号と true を返す", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Pair{
-			NewPair([]byte("aaa"), []byte("v1")),
-			NewPair([]byte("bbb"), []byte("v2")),
-			NewPair([]byte("ccc"), []byte("v3")),
+		ln := createTestLeafNode([]Record{
+			NewRecord(nil, []byte("aaa"), []byte("v1")),
+			NewRecord(nil, []byte("bbb"), []byte("v2")),
+			NewRecord(nil, []byte("ccc"), []byte("v3")),
 		})
 
 		// WHEN
@@ -500,9 +500,9 @@ func TestLeafNodeSearchSlotNum(t *testing.T) {
 
 	t.Run("存在しないキーの場合、挿入位置と false を返す", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Pair{
-			NewPair([]byte("aaa"), []byte("v1")),
-			NewPair([]byte("ccc"), []byte("v2")),
+		ln := createTestLeafNode([]Record{
+			NewRecord(nil, []byte("aaa"), []byte("v1")),
+			NewRecord(nil, []byte("ccc"), []byte("v2")),
 		})
 
 		// WHEN
@@ -527,10 +527,10 @@ func TestLeafNodeSearchSlotNum(t *testing.T) {
 
 	t.Run("先頭より小さいキーの場合、挿入位置 0 と false を返す", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Pair{
-			NewPair([]byte("bbb"), []byte("v1")),
-			NewPair([]byte("ccc"), []byte("v2")),
-			NewPair([]byte("ddd"), []byte("v3")),
+		ln := createTestLeafNode([]Record{
+			NewRecord(nil, []byte("bbb"), []byte("v1")),
+			NewRecord(nil, []byte("ccc"), []byte("v2")),
+			NewRecord(nil, []byte("ddd"), []byte("v3")),
 		})
 
 		// WHEN
@@ -543,10 +543,10 @@ func TestLeafNodeSearchSlotNum(t *testing.T) {
 
 	t.Run("末尾より大きいキーの場合、末尾の挿入位置と false を返す", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Pair{
-			NewPair([]byte("aaa"), []byte("v1")),
-			NewPair([]byte("bbb"), []byte("v2")),
-			NewPair([]byte("ccc"), []byte("v3")),
+		ln := createTestLeafNode([]Record{
+			NewRecord(nil, []byte("aaa"), []byte("v1")),
+			NewRecord(nil, []byte("bbb"), []byte("v2")),
+			NewRecord(nil, []byte("ccc"), []byte("v3")),
 		})
 
 		// WHEN
@@ -643,51 +643,51 @@ func TestLeafNodeSetNextPageId(t *testing.T) {
 }
 
 func TestLeafNodeTransferAllFrom(t *testing.T) {
-	t.Run("すべてのペアが転送元から自分に移動する", func(t *testing.T) {
+	t.Run("すべてのレコードが転送元から自分に移動する", func(t *testing.T) {
 		// GIVEN
-		src := createTestLeafNode([]Pair{
-			NewPair([]byte("key1"), []byte("val1")),
-			NewPair([]byte("key2"), []byte("val2")),
+		src := createTestLeafNode([]Record{
+			NewRecord(nil, []byte("key1"), []byte("val1")),
+			NewRecord(nil, []byte("key2"), []byte("val2")),
 		})
-		dest := createTestLeafNode([]Pair{
-			NewPair([]byte("key0"), []byte("val0")),
+		dest := createTestLeafNode([]Record{
+			NewRecord(nil, []byte("key0"), []byte("val0")),
 		})
 
 		// WHEN
 		dest.TransferAllFrom(src)
 
 		// THEN
-		assert.Equal(t, 0, src.NumPairs())
-		assert.Equal(t, 3, dest.NumPairs())
-		assert.Equal(t, []byte("key0"), dest.PairAt(0).Key)
-		assert.Equal(t, []byte("key1"), dest.PairAt(1).Key)
-		assert.Equal(t, []byte("key2"), dest.PairAt(2).Key)
+		assert.Equal(t, 0, src.NumRecords())
+		assert.Equal(t, 3, dest.NumRecords())
+		assert.Equal(t, []byte("key0"), dest.RecordAt(0).KeyBytes())
+		assert.Equal(t, []byte("key1"), dest.RecordAt(1).KeyBytes())
+		assert.Equal(t, []byte("key2"), dest.RecordAt(2).KeyBytes())
 	})
 
 	t.Run("転送元が空の場合、転送先のデータが変わらない", func(t *testing.T) {
 		// GIVEN
 		src := createTestLeafNode(nil)
-		dest := createTestLeafNode([]Pair{
-			NewPair([]byte("key1"), []byte("val1")),
+		dest := createTestLeafNode([]Record{
+			NewRecord(nil, []byte("key1"), []byte("val1")),
 		})
 
 		// WHEN
 		dest.TransferAllFrom(src)
 
 		// THEN
-		assert.Equal(t, 0, src.NumPairs())
-		assert.Equal(t, 1, dest.NumPairs())
-		assert.Equal(t, []byte("key1"), dest.PairAt(0).Key)
+		assert.Equal(t, 0, src.NumRecords())
+		assert.Equal(t, 1, dest.NumRecords())
+		assert.Equal(t, []byte("key1"), dest.RecordAt(0).KeyBytes())
 	})
 }
 
 func TestLeafNodeIsHalfFull(t *testing.T) {
-	t.Run("ペアが十分にある場合、true を返す", func(t *testing.T) {
+	t.Run("レコードが十分にある場合、true を返す", func(t *testing.T) {
 		// GIVEN
 		ln := createTestLeafNode(nil)
 		bigValue := make([]byte, 1500)
-		ln.Insert(0, NewPair([]byte("key1"), bigValue))
-		ln.Insert(1, NewPair([]byte("key2"), bigValue))
+		ln.Insert(0, NewRecord(nil, []byte("key1"), bigValue))
+		ln.Insert(1, NewRecord(nil, []byte("key2"), bigValue))
 
 		// WHEN
 		result := ln.IsHalfFull()
@@ -696,10 +696,10 @@ func TestLeafNodeIsHalfFull(t *testing.T) {
 		assert.True(t, result)
 	})
 
-	t.Run("ペアが少ない場合、false を返す", func(t *testing.T) {
+	t.Run("レコードが少ない場合、false を返す", func(t *testing.T) {
 		// GIVEN
 		ln := createTestLeafNode(nil)
-		ln.Insert(0, NewPair([]byte("k"), []byte("v")))
+		ln.Insert(0, NewRecord(nil, []byte("k"), []byte("v")))
 
 		// WHEN
 		result := ln.IsHalfFull()
@@ -710,13 +710,13 @@ func TestLeafNodeIsHalfFull(t *testing.T) {
 }
 
 // テスト用のリーフノードを作成する
-func createTestLeafNode(pairs []Pair) *LeafNode {
+func createTestLeafNode(records []Record) *LeafNode {
 	data := directio.AlignedBlock(directio.BlockSize)
 	ln := NewLeafNode(data)
 	ln.Initialize()
-	for i, pair := range pairs {
-		if !ln.Insert(i, pair) {
-			panic("failed to insert pair into leaf node")
+	for i, record := range records {
+		if !ln.Insert(i, record) {
+			panic("failed to insert record into leaf node")
 		}
 	}
 	return ln
@@ -725,9 +725,9 @@ func createTestLeafNode(pairs []Pair) *LeafNode {
 // リーフノード内のキーが昇順であることを検証するヘルパー
 func assertKeysSorted(t *testing.T, ln *LeafNode) {
 	t.Helper()
-	for i := 1; i < ln.NumPairs(); i++ {
-		prev := ln.PairAt(i - 1).Key
-		curr := ln.PairAt(i).Key
+	for i := 1; i < ln.NumRecords(); i++ {
+		prev := ln.RecordAt(i - 1).KeyBytes()
+		curr := ln.RecordAt(i).KeyBytes()
 		assert.True(t, bytes.Compare(prev, curr) < 0,
 			"キーが昇順でない: index %d (%s) >= index %d (%s)", i-1, prev, i, curr)
 	}

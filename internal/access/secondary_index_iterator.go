@@ -13,57 +13,76 @@ type SecondaryIndexSearchResult struct {
 }
 
 type SecondaryIndexIterator struct {
-	indexIterator *btree.Iterator
-	tableBTree    *btree.BPlusTree
-	bp            *bufferpool.BufferPool
+	indexIterator   *btree.Iterator
+	tableBTree      *btree.BPlusTree
+	bp              *bufferpool.BufferPool
+	primaryKeyCount uint8 // PK のカラム数 (Key からセカンダリキーと PK を分離するために必要)
 }
 
-func newSecondaryIndexIterator(indexIterator *btree.Iterator, tableBTree *btree.BPlusTree, bp *bufferpool.BufferPool) *SecondaryIndexIterator {
+func newSecondaryIndexIterator(indexIterator *btree.Iterator, tableBTree *btree.BPlusTree, bp *bufferpool.BufferPool, primaryKeyCount uint8) *SecondaryIndexIterator {
 	return &SecondaryIndexIterator{
-		indexIterator: indexIterator,
-		tableBTree:    tableBTree,
-		bp:            bp,
+		indexIterator:   indexIterator,
+		tableBTree:      tableBTree,
+		bp:              bp,
+		primaryKeyCount: primaryKeyCount,
 	}
 }
 
 // Next はインデックスから次の結果を返す
 //
-// インデックスから次のペアを取得し、セカンダリキーをデコードした後、
-// エンコード済みプライマリキーでテーブル本体を検索してレコードをデコードする
+// インデックスから次のレコードを取得し、Key = concat(encodedSecondaryKey, encodedPK) を分離した後、
+// PK でテーブル本体を検索してレコードをデコードする
+//
+// DeleteMark が設定されているレコードはスキップする
 func (iri *SecondaryIndexIterator) Next() (*SecondaryIndexSearchResult, bool, error) {
-	// セカンダリインデックスから次のペアを取得
-	secondaryIndexPair, ok, err := iri.indexIterator.Next(iri.bp)
-	if !ok {
-		return nil, false, nil
-	}
-	if err != nil {
-		return nil, false, err
-	}
+	for {
+		// セカンダリインデックスから次のレコードを取得
+		indexRecord, ok, err := iri.indexIterator.Next(iri.bp)
+		if !ok {
+			return nil, false, nil
+		}
+		if err != nil {
+			return nil, false, err
+		}
 
-	// セカンダリキーをデコード
-	var secondaryKey [][]byte
-	memcomparable.Decode(secondaryIndexPair.Key, &secondaryKey)
+		// DeleteMark チェック: ソフトデリート済みならスキップ
+		if len(indexRecord.HeaderBytes()) > 0 && indexRecord.HeaderBytes()[0] == 1 {
+			continue
+		}
 
-	// エンコード済みプライマリキーでテーブル本体を検索
-	tableIterator, err := iri.tableBTree.Search(iri.bp, btree.SearchModeKey{Key: secondaryIndexPair.Value})
-	if err != nil {
-		return nil, false, err
-	}
-	tablePair, ok, err := tableIterator.Next(iri.bp)
-	if err != nil {
-		return nil, false, err
-	}
-	if !ok {
-		return nil, false, nil
-	}
+		// Key = concat(encodedSecondaryKey, encodedPK) を分離
+		// memcomparable.Decode で全カラムに分離する
+		var keyColumns [][]byte
+		memcomparable.Decode(indexRecord.KeyBytes(), &keyColumns)
 
-	// レコード (プライマリキー + 値) をデコード
-	var record [][]byte
-	memcomparable.Decode(tablePair.Key, &record)
-	memcomparable.Decode(tablePair.Value, &record)
+		// セカンダリキー = 先頭カラム、PK = 残りのカラム
+		secondaryKey := keyColumns[:1]
+		pkColumns := keyColumns[1:]
 
-	return &SecondaryIndexSearchResult{
-		SecondaryKey: secondaryKey,
-		Record:       record,
-	}, true, nil
+		// PK カラムを再エンコードしてテーブル本体を検索
+		var encodedPK []byte
+		memcomparable.Encode(pkColumns, &encodedPK)
+
+		tableIterator, err := iri.tableBTree.Search(iri.bp, btree.SearchModeKey{Key: encodedPK})
+		if err != nil {
+			return nil, false, err
+		}
+		tableRecord, ok, err := tableIterator.Next(iri.bp)
+		if err != nil {
+			return nil, false, err
+		}
+		if !ok {
+			return nil, false, nil
+		}
+
+		// テーブルレコード (プライマリキー + NonKey) をデコード
+		var record [][]byte
+		memcomparable.Decode(tableRecord.KeyBytes(), &record)
+		memcomparable.Decode(tableRecord.NonKeyBytes(), &record)
+
+		return &SecondaryIndexSearchResult{
+			SecondaryKey: secondaryKey,
+			Record:       record,
+		}, true, nil
+	}
 }

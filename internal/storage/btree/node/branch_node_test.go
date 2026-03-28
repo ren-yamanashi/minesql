@@ -38,57 +38,57 @@ func TestBranchNodeBody(t *testing.T) {
 	})
 }
 
-func TestBranchNodeNumPairs(t *testing.T) {
-	t.Run("Initialize 直後はペア数が 1", func(t *testing.T) {
+func TestBranchNodeNumRecords(t *testing.T) {
+	t.Run("Initialize 直後はレコード数が 1", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{NewPair([]byte("key1"), pageIdBytes(10))},
+			[]Record{NewRecord(nil, []byte("key1"), pageIdBytes(10))},
 			page.NewPageId(0, 20),
 		)
 
 		// WHEN
-		numPairs := bn.NumPairs()
+		numRecords := bn.NumRecords()
 
 		// THEN
-		assert.Equal(t, 1, numPairs)
+		assert.Equal(t, 1, numRecords)
 	})
 
-	t.Run("挿入後のペア数が正しく取得できる", func(t *testing.T) {
+	t.Run("挿入後のレコード数が正しく取得できる", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("key1"), pageIdBytes(10)),
-				NewPair([]byte("key2"), pageIdBytes(20)),
-				NewPair([]byte("key3"), pageIdBytes(30)),
+			[]Record{
+				NewRecord(nil, []byte("key1"), pageIdBytes(10)),
+				NewRecord(nil, []byte("key2"), pageIdBytes(20)),
+				NewRecord(nil, []byte("key3"), pageIdBytes(30)),
 			},
 			page.NewPageId(0, 40),
 		)
 
 		// WHEN
-		numPairs := bn.NumPairs()
+		numRecords := bn.NumRecords()
 
 		// THEN
-		assert.Equal(t, 3, numPairs)
+		assert.Equal(t, 3, numRecords)
 	})
 }
 
-func TestBranchNodePairAt(t *testing.T) {
-	t.Run("指定したスロット番号のペアが取得できる", func(t *testing.T) {
+func TestBranchNodeRecordAt(t *testing.T) {
+	t.Run("指定したスロット番号のレコードが取得できる", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("key1"), pageIdBytes(10)),
-				NewPair([]byte("key2"), pageIdBytes(20)),
+			[]Record{
+				NewRecord(nil, []byte("key1"), pageIdBytes(10)),
+				NewRecord(nil, []byte("key2"), pageIdBytes(20)),
 			},
 			page.NewPageId(0, 30),
 		)
 
 		// WHEN
-		pair := bn.PairAt(1)
+		record := bn.RecordAt(1)
 
 		// THEN
-		assert.Equal(t, []byte("key2"), pair.Key)
-		assert.Equal(t, pageIdBytes(20), pair.Value)
+		assert.Equal(t, []byte("key2"), record.KeyBytes())
+		assert.Equal(t, pageIdBytes(20), record.NonKeyBytes())
 	})
 }
 
@@ -96,10 +96,10 @@ func TestBranchNodeSearchSlotNum(t *testing.T) {
 	t.Run("存在するキーの場合、スロット番号と true を返す", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("aaa"), pageIdBytes(10)),
-				NewPair([]byte("bbb"), pageIdBytes(20)),
-				NewPair([]byte("ccc"), pageIdBytes(30)),
+			[]Record{
+				NewRecord(nil, []byte("aaa"), pageIdBytes(10)),
+				NewRecord(nil, []byte("bbb"), pageIdBytes(20)),
+				NewRecord(nil, []byte("ccc"), pageIdBytes(30)),
 			},
 			page.NewPageId(0, 40),
 		)
@@ -115,9 +115,9 @@ func TestBranchNodeSearchSlotNum(t *testing.T) {
 	t.Run("存在しないキーの場合、挿入位置と false を返す", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("aaa"), pageIdBytes(10)),
-				NewPair([]byte("ccc"), pageIdBytes(30)),
+			[]Record{
+				NewRecord(nil, []byte("aaa"), pageIdBytes(10)),
+				NewRecord(nil, []byte("ccc"), pageIdBytes(30)),
 			},
 			page.NewPageId(0, 40),
 		)
@@ -133,9 +133,9 @@ func TestBranchNodeSearchSlotNum(t *testing.T) {
 	t.Run("先頭より小さいキーの場合、挿入位置 0 と false を返す", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("bbb"), pageIdBytes(10)),
-				NewPair([]byte("ccc"), pageIdBytes(20)),
+			[]Record{
+				NewRecord(nil, []byte("bbb"), pageIdBytes(10)),
+				NewRecord(nil, []byte("ccc"), pageIdBytes(20)),
 			},
 			page.NewPageId(0, 30),
 		)
@@ -151,9 +151,9 @@ func TestBranchNodeSearchSlotNum(t *testing.T) {
 	t.Run("末尾より大きいキーの場合、末尾の挿入位置と false を返す", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("aaa"), pageIdBytes(10)),
-				NewPair([]byte("bbb"), pageIdBytes(20)),
+			[]Record{
+				NewRecord(nil, []byte("aaa"), pageIdBytes(10)),
+				NewRecord(nil, []byte("bbb"), pageIdBytes(20)),
 			},
 			page.NewPageId(0, 30),
 		)
@@ -168,59 +168,59 @@ func TestBranchNodeSearchSlotNum(t *testing.T) {
 }
 
 func TestBranchNodeInsert(t *testing.T) {
-	t.Run("ペアが正しく挿入できる", func(t *testing.T) {
+	t.Run("レコードが正しく挿入できる", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{NewPair([]byte("aaa"), pageIdBytes(10))},
+			[]Record{NewRecord(nil, []byte("aaa"), pageIdBytes(10))},
 			page.NewPageId(0, 20),
 		)
 
 		// WHEN
-		ok := bn.Insert(1, NewPair([]byte("bbb"), pageIdBytes(30)))
+		ok := bn.Insert(1, NewRecord(nil, []byte("bbb"), pageIdBytes(30)))
 
 		// THEN
 		assert.True(t, ok)
-		assert.Equal(t, 2, bn.NumPairs())
-		assert.Equal(t, []byte("bbb"), bn.PairAt(1).Key)
+		assert.Equal(t, 2, bn.NumRecords())
+		assert.Equal(t, []byte("bbb"), bn.RecordAt(1).KeyBytes())
 	})
 
-	t.Run("中間位置へのペア挿入でスロットが正しくシフトされる", func(t *testing.T) {
+	t.Run("中間位置へのレコード挿入でスロットが正しくシフトされる", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("aaa"), pageIdBytes(10)),
-				NewPair([]byte("ccc"), pageIdBytes(30)),
-				NewPair([]byte("ddd"), pageIdBytes(40)),
+			[]Record{
+				NewRecord(nil, []byte("aaa"), pageIdBytes(10)),
+				NewRecord(nil, []byte("ccc"), pageIdBytes(30)),
+				NewRecord(nil, []byte("ddd"), pageIdBytes(40)),
 			},
 			page.NewPageId(0, 50),
 		)
 
 		// WHEN
-		ok := bn.Insert(1, NewPair([]byte("bbb"), pageIdBytes(20)))
+		ok := bn.Insert(1, NewRecord(nil, []byte("bbb"), pageIdBytes(20)))
 
 		// THEN
 		assert.True(t, ok)
-		assert.Equal(t, 4, bn.NumPairs())
-		assert.Equal(t, []byte("aaa"), bn.PairAt(0).Key)
-		assert.Equal(t, []byte("bbb"), bn.PairAt(1).Key)
-		assert.Equal(t, []byte("ccc"), bn.PairAt(2).Key)
-		assert.Equal(t, []byte("ddd"), bn.PairAt(3).Key)
+		assert.Equal(t, 4, bn.NumRecords())
+		assert.Equal(t, []byte("aaa"), bn.RecordAt(0).KeyBytes())
+		assert.Equal(t, []byte("bbb"), bn.RecordAt(1).KeyBytes())
+		assert.Equal(t, []byte("ccc"), bn.RecordAt(2).KeyBytes())
+		assert.Equal(t, []byte("ddd"), bn.RecordAt(3).KeyBytes())
 	})
 
-	t.Run("最大ペアサイズを超える場合、挿入に失敗する", func(t *testing.T) {
+	t.Run("最大レコードサイズを超える場合、挿入に失敗する", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{NewPair([]byte("aaa"), pageIdBytes(10))},
+			[]Record{NewRecord(nil, []byte("aaa"), pageIdBytes(10))},
 			page.NewPageId(0, 20),
 		)
 		hugeKey := make([]byte, 4000)
 
 		// WHEN
-		ok := bn.Insert(1, NewPair(hugeKey, pageIdBytes(30)))
+		ok := bn.Insert(1, NewRecord(nil, hugeKey, pageIdBytes(30)))
 
 		// THEN
 		assert.False(t, ok)
-		assert.Equal(t, 1, bn.NumPairs())
+		assert.Equal(t, 1, bn.NumRecords())
 	})
 
 	t.Run("ページが満杯の場合、挿入に失敗し既存データが壊れない", func(t *testing.T) {
@@ -231,28 +231,28 @@ func TestBranchNodeInsert(t *testing.T) {
 		inserted := 0
 		for {
 			key := fmt.Appendf(nil, "k%04d", inserted)
-			if !bn.Insert(inserted, NewPair(key, value)) {
+			if !bn.Insert(inserted, NewRecord(nil, key, value)) {
 				break
 			}
 			inserted++
 		}
-		numBefore := bn.NumPairs()
-		firstKeyBefore := make([]byte, len(bn.PairAt(0).Key))
-		copy(firstKeyBefore, bn.PairAt(0).Key)
+		numBefore := bn.NumRecords()
+		firstKeyBefore := make([]byte, len(bn.RecordAt(0).KeyBytes()))
+		copy(firstKeyBefore, bn.RecordAt(0).KeyBytes())
 
 		// WHEN: もう 1 つ挿入を試みる (満杯で入らなかったキーと同サイズ)
 		overflowKey := fmt.Appendf(nil, "k%04d", inserted)
-		ok := bn.Insert(0, NewPair(overflowKey, value))
+		ok := bn.Insert(0, NewRecord(nil, overflowKey, value))
 
 		// THEN
 		assert.False(t, ok)
-		assert.Equal(t, numBefore, bn.NumPairs())
-		assert.Equal(t, firstKeyBefore, bn.PairAt(0).Key)
+		assert.Equal(t, numBefore, bn.NumRecords())
+		assert.Equal(t, firstKeyBefore, bn.RecordAt(0).KeyBytes())
 	})
 }
 
 func TestBranchNodeInitialize(t *testing.T) {
-	t.Run("初期化後にペア数が 1 で正しいキーと子ページ ID が設定される", func(t *testing.T) {
+	t.Run("初期化後にレコード数が 1 で正しいキーと子ページ ID が設定される", func(t *testing.T) {
 		// GIVEN
 		data := directio.AlignedBlock(directio.BlockSize)
 		bn := NewBranchNode(data)
@@ -264,9 +264,9 @@ func TestBranchNodeInitialize(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, 1, bn.NumPairs())
-		assert.Equal(t, []byte("key1"), bn.PairAt(0).Key)
-		assert.Equal(t, leftChild, page.RestorePageIdFromBytes(bn.PairAt(0).Value))
+		assert.Equal(t, 1, bn.NumRecords())
+		assert.Equal(t, []byte("key1"), bn.RecordAt(0).KeyBytes())
+		assert.Equal(t, leftChild, page.RestorePageIdFromBytes(bn.RecordAt(0).NonKeyBytes()))
 		assert.Equal(t, rightChild, bn.RightChildPageId())
 	})
 }
@@ -275,10 +275,10 @@ func TestBranchNodeSearchChildSlotNum(t *testing.T) {
 	t.Run("キーが見つかった場合、slotNum + 1 を返す", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("aaa"), pageIdBytes(10)),
-				NewPair([]byte("bbb"), pageIdBytes(20)),
-				NewPair([]byte("ccc"), pageIdBytes(30)),
+			[]Record{
+				NewRecord(nil, []byte("aaa"), pageIdBytes(10)),
+				NewRecord(nil, []byte("bbb"), pageIdBytes(20)),
+				NewRecord(nil, []byte("ccc"), pageIdBytes(30)),
 			},
 			page.NewPageId(0, 40),
 		)
@@ -293,9 +293,9 @@ func TestBranchNodeSearchChildSlotNum(t *testing.T) {
 	t.Run("キーが見つからない場合、挿入位置をそのまま返す", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("aaa"), pageIdBytes(10)),
-				NewPair([]byte("ccc"), pageIdBytes(30)),
+			[]Record{
+				NewRecord(nil, []byte("aaa"), pageIdBytes(10)),
+				NewRecord(nil, []byte("ccc"), pageIdBytes(30)),
 			},
 			page.NewPageId(0, 40),
 		)
@@ -310,9 +310,9 @@ func TestBranchNodeSearchChildSlotNum(t *testing.T) {
 	t.Run("すべてのキーより小さい場合、0 を返す", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("bbb"), pageIdBytes(10)),
-				NewPair([]byte("ccc"), pageIdBytes(20)),
+			[]Record{
+				NewRecord(nil, []byte("bbb"), pageIdBytes(10)),
+				NewRecord(nil, []byte("ccc"), pageIdBytes(20)),
 			},
 			page.NewPageId(0, 30),
 		)
@@ -324,12 +324,12 @@ func TestBranchNodeSearchChildSlotNum(t *testing.T) {
 		assert.Equal(t, 0, childSlotNum)
 	})
 
-	t.Run("すべてのキーより大きい場合、NumPairs を返す", func(t *testing.T) {
+	t.Run("すべてのキーより大きい場合、NumRecords を返す", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("aaa"), pageIdBytes(10)),
-				NewPair([]byte("bbb"), pageIdBytes(20)),
+			[]Record{
+				NewRecord(nil, []byte("aaa"), pageIdBytes(10)),
+				NewRecord(nil, []byte("bbb"), pageIdBytes(20)),
 			},
 			page.NewPageId(0, 30),
 		)
@@ -343,12 +343,12 @@ func TestBranchNodeSearchChildSlotNum(t *testing.T) {
 }
 
 func TestBranchNodeChildPageIdAt(t *testing.T) {
-	t.Run("通常のスロット番号の場合、ペアの value からページ ID を返す", func(t *testing.T) {
+	t.Run("通常のスロット番号の場合、レコードの非キーフィールドからページ ID を返す", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("key1"), pageIdBytes(10)),
-				NewPair([]byte("key2"), pageIdBytes(20)),
+			[]Record{
+				NewRecord(nil, []byte("key1"), pageIdBytes(10)),
+				NewRecord(nil, []byte("key2"), pageIdBytes(20)),
 			},
 			page.NewPageId(0, 30),
 		)
@@ -360,13 +360,13 @@ func TestBranchNodeChildPageIdAt(t *testing.T) {
 		assert.Equal(t, page.NewPageId(0, 10), childPageId)
 	})
 
-	t.Run("スロット番号が NumPairs と等しい場合、右端の子ページ ID を返す", func(t *testing.T) {
+	t.Run("スロット番号が NumRecords と等しい場合、右端の子ページ ID を返す", func(t *testing.T) {
 		// GIVEN
 		rightChild := page.NewPageId(0, 99)
 		bn := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("key1"), pageIdBytes(10)),
-				NewPair([]byte("key2"), pageIdBytes(20)),
+			[]Record{
+				NewRecord(nil, []byte("key1"), pageIdBytes(10)),
+				NewRecord(nil, []byte("key2"), pageIdBytes(20)),
 			},
 			rightChild,
 		)
@@ -388,7 +388,7 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 		numInserted := 0
 		for {
 			key := fmt.Appendf(nil, "k%04d", numInserted)
-			if !bn.Insert(numInserted, NewPair(key, value)) {
+			if !bn.Insert(numInserted, NewRecord(nil, key, value)) {
 				break
 			}
 			numInserted++
@@ -397,17 +397,17 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 		newBn := createTestBranchNodeEmpty()
 
 		// WHEN
-		minKey, err := bn.SplitInsert(newBn, NewPair(overflowKey, value))
+		minKey, err := bn.SplitInsert(newBn, NewRecord(nil, overflowKey, value))
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Greater(t, bn.NumPairs(), 0)
-		assert.Greater(t, newBn.NumPairs(), 0)
+		assert.Greater(t, bn.NumRecords(), 0)
+		assert.Greater(t, newBn.NumRecords(), 0)
 		assert.NotNil(t, minKey)
 
 		// 新ノードの全キー < 旧ノードの全キー
-		newLastKey := newBn.PairAt(newBn.NumPairs() - 1).Key
-		oldFirstKey := bn.PairAt(0).Key
+		newLastKey := newBn.RecordAt(newBn.NumRecords() - 1).KeyBytes()
+		oldFirstKey := bn.RecordAt(0).KeyBytes()
 		assert.True(t, bytes.Compare(newLastKey, oldFirstKey) < 0)
 
 		// 各ノード内のキーが昇順
@@ -427,7 +427,7 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 		numInserted := 0
 		for {
 			key := fmt.Appendf(nil, "b%04d", numInserted)
-			if !bn.Insert(numInserted, NewPair(key, value)) {
+			if !bn.Insert(numInserted, NewRecord(nil, key, value)) {
 				break
 			}
 			numInserted++
@@ -436,12 +436,12 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 		newBn := createTestBranchNodeEmpty()
 
 		// WHEN
-		minKey, err := bn.SplitInsert(newBn, NewPair(smallKey, value))
+		minKey, err := bn.SplitInsert(newBn, NewRecord(nil, smallKey, value))
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Greater(t, bn.NumPairs(), 0)
-		assert.Greater(t, newBn.NumPairs(), 0)
+		assert.Greater(t, bn.NumRecords(), 0)
+		assert.Greater(t, newBn.NumRecords(), 0)
 		assert.NotNil(t, minKey)
 
 		// 各ノード内のキーが昇順
@@ -449,8 +449,8 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 		assertBranchKeysSorted(t, newBn)
 
 		// 新ノードの全キー < 旧ノードの全キー
-		newLastKey := newBn.PairAt(newBn.NumPairs() - 1).Key
-		oldFirstKey := bn.PairAt(0).Key
+		newLastKey := newBn.RecordAt(newBn.NumRecords() - 1).KeyBytes()
+		oldFirstKey := bn.RecordAt(0).KeyBytes()
 		assert.True(t, bytes.Compare(newLastKey, oldFirstKey) < 0)
 
 		// 新ノードの RightChildPageId が有効なページ ID である
@@ -460,13 +460,13 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 }
 
 func TestBranchNodeDelete(t *testing.T) {
-	t.Run("中間ペアの削除が正しく動作する", func(t *testing.T) {
+	t.Run("中間レコードの削除が正しく動作する", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("key1"), pageIdBytes(10)),
-				NewPair([]byte("key2"), pageIdBytes(20)),
-				NewPair([]byte("key3"), pageIdBytes(30)),
+			[]Record{
+				NewRecord(nil, []byte("key1"), pageIdBytes(10)),
+				NewRecord(nil, []byte("key2"), pageIdBytes(20)),
+				NewRecord(nil, []byte("key3"), pageIdBytes(30)),
 			},
 			page.NewPageId(0, 40),
 		)
@@ -475,18 +475,18 @@ func TestBranchNodeDelete(t *testing.T) {
 		bn.Delete(1)
 
 		// THEN
-		assert.Equal(t, 2, bn.NumPairs())
-		assert.Equal(t, []byte("key1"), bn.PairAt(0).Key)
-		assert.Equal(t, []byte("key3"), bn.PairAt(1).Key)
+		assert.Equal(t, 2, bn.NumRecords())
+		assert.Equal(t, []byte("key1"), bn.RecordAt(0).KeyBytes())
+		assert.Equal(t, []byte("key3"), bn.RecordAt(1).KeyBytes())
 	})
 
-	t.Run("先頭ペアの削除が正しく動作する", func(t *testing.T) {
+	t.Run("先頭レコードの削除が正しく動作する", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("key1"), pageIdBytes(10)),
-				NewPair([]byte("key2"), pageIdBytes(20)),
-				NewPair([]byte("key3"), pageIdBytes(30)),
+			[]Record{
+				NewRecord(nil, []byte("key1"), pageIdBytes(10)),
+				NewRecord(nil, []byte("key2"), pageIdBytes(20)),
+				NewRecord(nil, []byte("key3"), pageIdBytes(30)),
 			},
 			page.NewPageId(0, 40),
 		)
@@ -495,18 +495,18 @@ func TestBranchNodeDelete(t *testing.T) {
 		bn.Delete(0)
 
 		// THEN
-		assert.Equal(t, 2, bn.NumPairs())
-		assert.Equal(t, []byte("key2"), bn.PairAt(0).Key)
-		assert.Equal(t, []byte("key3"), bn.PairAt(1).Key)
+		assert.Equal(t, 2, bn.NumRecords())
+		assert.Equal(t, []byte("key2"), bn.RecordAt(0).KeyBytes())
+		assert.Equal(t, []byte("key3"), bn.RecordAt(1).KeyBytes())
 	})
 
-	t.Run("末尾ペアの削除が正しく動作する", func(t *testing.T) {
+	t.Run("末尾レコードの削除が正しく動作する", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("key1"), pageIdBytes(10)),
-				NewPair([]byte("key2"), pageIdBytes(20)),
-				NewPair([]byte("key3"), pageIdBytes(30)),
+			[]Record{
+				NewRecord(nil, []byte("key1"), pageIdBytes(10)),
+				NewRecord(nil, []byte("key2"), pageIdBytes(20)),
+				NewRecord(nil, []byte("key3"), pageIdBytes(30)),
 			},
 			page.NewPageId(0, 40),
 		)
@@ -515,21 +515,21 @@ func TestBranchNodeDelete(t *testing.T) {
 		bn.Delete(2)
 
 		// THEN
-		assert.Equal(t, 2, bn.NumPairs())
-		assert.Equal(t, []byte("key1"), bn.PairAt(0).Key)
-		assert.Equal(t, []byte("key2"), bn.PairAt(1).Key)
+		assert.Equal(t, 2, bn.NumRecords())
+		assert.Equal(t, []byte("key1"), bn.RecordAt(0).KeyBytes())
+		assert.Equal(t, []byte("key2"), bn.RecordAt(1).KeyBytes())
 	})
 }
 
 func TestBranchNodeIsHalfFull(t *testing.T) {
-	t.Run("ペアが十分にある場合、true を返す", func(t *testing.T) {
+	t.Run("レコードが十分にある場合、true を返す", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNodeEmpty()
 		bigKey := make([]byte, 1500)
 		bn.body.Initialize()
-		bn.Insert(0, NewPair(bigKey, pageIdBytes(10)))
+		bn.Insert(0, NewRecord(nil, bigKey, pageIdBytes(10)))
 		copy(bigKey, []byte("key2"))
-		bn.Insert(1, NewPair(bigKey, pageIdBytes(20)))
+		bn.Insert(1, NewRecord(nil, bigKey, pageIdBytes(20)))
 
 		// WHEN
 		result := bn.IsHalfFull()
@@ -538,11 +538,11 @@ func TestBranchNodeIsHalfFull(t *testing.T) {
 		assert.True(t, result)
 	})
 
-	t.Run("ペアが少ない場合、false を返す", func(t *testing.T) {
+	t.Run("レコードが少ない場合、false を返す", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNodeEmpty()
 		bn.body.Initialize()
-		bn.Insert(0, NewPair([]byte("k"), pageIdBytes(10)))
+		bn.Insert(0, NewRecord(nil, []byte("k"), pageIdBytes(10)))
 
 		// WHEN
 		result := bn.IsHalfFull()
@@ -552,62 +552,62 @@ func TestBranchNodeIsHalfFull(t *testing.T) {
 	})
 }
 
-func TestBranchNodeCanTransferPair(t *testing.T) {
-	t.Run("ペアが 0 の場合、false を返す", func(t *testing.T) {
+func TestBranchNodeCanTransferRecord(t *testing.T) {
+	t.Run("レコードが 0 の場合、false を返す", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNodeEmpty()
 		bn.body.Initialize()
 
 		// WHEN
-		result := bn.CanTransferPair(false)
+		result := bn.CanTransferRecord(false)
 
 		// THEN
 		assert.False(t, result)
 	})
 
-	t.Run("ペアが 1 つしかない場合、false を返す", func(t *testing.T) {
+	t.Run("レコードが 1 つしかない場合、false を返す", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{NewPair([]byte("key1"), pageIdBytes(10))},
+			[]Record{NewRecord(nil, []byte("key1"), pageIdBytes(10))},
 			page.NewPageId(0, 20),
 		)
 
 		// WHEN
-		result := bn.CanTransferPair(false)
+		result := bn.CanTransferRecord(false)
 
 		// THEN
 		assert.False(t, result)
 	})
 
-	t.Run("左の兄弟に転送 (先頭ペアを転送) 後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
+	t.Run("左の兄弟に転送 (先頭レコードを転送) 後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNodeEmpty()
 		bn.body.Initialize()
 		bigKey := make([]byte, 500)
 		for i := range 6 {
 			copy(bigKey, fmt.Appendf(nil, "key%d", i))
-			bn.Insert(i, NewPair(bigKey, pageIdBytes(page.PageNumber(i*10))))
+			bn.Insert(i, NewRecord(nil, bigKey, pageIdBytes(page.PageNumber(i*10))))
 		}
 
 		// WHEN
-		result := bn.CanTransferPair(false)
+		result := bn.CanTransferRecord(false)
 
 		// THEN
 		assert.True(t, result)
 	})
 
-	t.Run("右の兄弟に転送 (末尾ペアを転送) 後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
+	t.Run("右の兄弟に転送 (末尾レコードを転送) 後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNodeEmpty()
 		bn.body.Initialize()
 		bigKey := make([]byte, 500)
 		for i := range 6 {
 			copy(bigKey, fmt.Appendf(nil, "key%d", i))
-			bn.Insert(i, NewPair(bigKey, pageIdBytes(page.PageNumber(i*10))))
+			bn.Insert(i, NewRecord(nil, bigKey, pageIdBytes(page.PageNumber(i*10))))
 		}
 
 		// WHEN
-		result := bn.CanTransferPair(true)
+		result := bn.CanTransferRecord(true)
 
 		// THEN
 		assert.True(t, result)
@@ -619,12 +619,12 @@ func TestBranchNodeCanTransferPair(t *testing.T) {
 		bn.body.Initialize()
 		bigKey := make([]byte, 500)
 		copy(bigKey, []byte("key1"))
-		bn.Insert(0, NewPair(bigKey, pageIdBytes(10)))
+		bn.Insert(0, NewRecord(nil, bigKey, pageIdBytes(10)))
 		copy(bigKey, []byte("key2"))
-		bn.Insert(1, NewPair(bigKey, pageIdBytes(20)))
+		bn.Insert(1, NewRecord(nil, bigKey, pageIdBytes(20)))
 
 		// WHEN
-		result := bn.CanTransferPair(false)
+		result := bn.CanTransferRecord(false)
 
 		// THEN
 		assert.False(t, result)
@@ -635,10 +635,10 @@ func TestBranchNodeUpdate(t *testing.T) {
 	t.Run("指定したスロットのキーが更新される", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("aaa"), pageIdBytes(10)),
-				NewPair([]byte("bbb"), pageIdBytes(20)),
-				NewPair([]byte("ddd"), pageIdBytes(30)),
+			[]Record{
+				NewRecord(nil, []byte("aaa"), pageIdBytes(10)),
+				NewRecord(nil, []byte("bbb"), pageIdBytes(20)),
+				NewRecord(nil, []byte("ddd"), pageIdBytes(30)),
 			},
 			page.NewPageId(0, 40),
 		)
@@ -648,16 +648,16 @@ func TestBranchNodeUpdate(t *testing.T) {
 
 		// THEN
 		assert.True(t, ok)
-		assert.Equal(t, 3, bn.NumPairs())
-		assert.Equal(t, []byte("ccc"), bn.PairAt(1).Key)
+		assert.Equal(t, 3, bn.NumRecords())
+		assert.Equal(t, []byte("ccc"), bn.RecordAt(1).KeyBytes())
 	})
 
-	t.Run("更新後もペア数や他のキーに影響がない", func(t *testing.T) {
+	t.Run("更新後もレコード数や他のキーに影響がない", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("aaa"), pageIdBytes(10)),
-				NewPair([]byte("bbb"), pageIdBytes(20)),
+			[]Record{
+				NewRecord(nil, []byte("aaa"), pageIdBytes(10)),
+				NewRecord(nil, []byte("bbb"), pageIdBytes(20)),
 			},
 			page.NewPageId(0, 30),
 		)
@@ -667,18 +667,18 @@ func TestBranchNodeUpdate(t *testing.T) {
 
 		// THEN
 		assert.True(t, ok)
-		assert.Equal(t, 2, bn.NumPairs())
-		assert.Equal(t, []byte("aab"), bn.PairAt(0).Key)
-		assert.Equal(t, []byte("bbb"), bn.PairAt(1).Key)
+		assert.Equal(t, 2, bn.NumRecords())
+		assert.Equal(t, []byte("aab"), bn.RecordAt(0).KeyBytes())
+		assert.Equal(t, []byte("bbb"), bn.RecordAt(1).KeyBytes())
 	})
 
 	t.Run("異なる長さのキーで更新しても正しく動作する", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("aaa"), pageIdBytes(10)),
-				NewPair([]byte("bbb"), pageIdBytes(20)),
-				NewPair([]byte("ccc"), pageIdBytes(30)),
+			[]Record{
+				NewRecord(nil, []byte("aaa"), pageIdBytes(10)),
+				NewRecord(nil, []byte("bbb"), pageIdBytes(20)),
+				NewRecord(nil, []byte("ccc"), pageIdBytes(30)),
 			},
 			page.NewPageId(0, 40),
 		)
@@ -688,13 +688,13 @@ func TestBranchNodeUpdate(t *testing.T) {
 
 		// THEN
 		assert.True(t, ok)
-		assert.Equal(t, 3, bn.NumPairs())
-		assert.Equal(t, []byte("aaa"), bn.PairAt(0).Key)
-		assert.Equal(t, []byte("bbbbbb"), bn.PairAt(1).Key)
-		assert.Equal(t, []byte("ccc"), bn.PairAt(2).Key)
-		// value も壊れていないことを確認
-		assert.Equal(t, pageIdBytes(10), bn.PairAt(0).Value)
-		assert.Equal(t, pageIdBytes(30), bn.PairAt(2).Value)
+		assert.Equal(t, 3, bn.NumRecords())
+		assert.Equal(t, []byte("aaa"), bn.RecordAt(0).KeyBytes())
+		assert.Equal(t, []byte("bbbbbb"), bn.RecordAt(1).KeyBytes())
+		assert.Equal(t, []byte("ccc"), bn.RecordAt(2).KeyBytes())
+		// 非キーフィールドも壊れていないことを確認
+		assert.Equal(t, pageIdBytes(10), bn.RecordAt(0).NonKeyBytes())
+		assert.Equal(t, pageIdBytes(30), bn.RecordAt(2).NonKeyBytes())
 	})
 }
 
@@ -703,7 +703,7 @@ func TestBranchNodeRightChildPageId(t *testing.T) {
 		// GIVEN
 		rightChild := page.NewPageId(0, 99)
 		bn := createTestBranchNode(
-			[]Pair{NewPair([]byte("key1"), pageIdBytes(10))},
+			[]Record{NewRecord(nil, []byte("key1"), pageIdBytes(10))},
 			rightChild,
 		)
 
@@ -719,7 +719,7 @@ func TestBranchNodeSetRightChildPageId(t *testing.T) {
 	t.Run("右端の子ページ ID が正しく設定できる", func(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
-			[]Pair{NewPair([]byte("key1"), pageIdBytes(10))},
+			[]Record{NewRecord(nil, []byte("key1"), pageIdBytes(10))},
 			page.NewPageId(0, 40),
 		)
 		newRightChild := page.NewPageId(0, 200)
@@ -733,18 +733,18 @@ func TestBranchNodeSetRightChildPageId(t *testing.T) {
 }
 
 func TestBranchNodeTransferAllFrom(t *testing.T) {
-	t.Run("すべてのペアが転送元から自分に移動する", func(t *testing.T) {
+	t.Run("すべてのレコードが転送元から自分に移動する", func(t *testing.T) {
 		// GIVEN
 		src := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("key3"), pageIdBytes(30)),
-				NewPair([]byte("key4"), pageIdBytes(40)),
+			[]Record{
+				NewRecord(nil, []byte("key3"), pageIdBytes(30)),
+				NewRecord(nil, []byte("key4"), pageIdBytes(40)),
 			},
 			page.NewPageId(0, 50),
 		)
 		dest := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("key1"), pageIdBytes(10)),
+			[]Record{
+				NewRecord(nil, []byte("key1"), pageIdBytes(10)),
 			},
 			page.NewPageId(0, 20),
 		)
@@ -753,11 +753,11 @@ func TestBranchNodeTransferAllFrom(t *testing.T) {
 		dest.TransferAllFrom(src)
 
 		// THEN
-		assert.Equal(t, 0, src.NumPairs())
-		assert.Equal(t, 3, dest.NumPairs())
-		assert.Equal(t, []byte("key1"), dest.PairAt(0).Key)
-		assert.Equal(t, []byte("key3"), dest.PairAt(1).Key)
-		assert.Equal(t, []byte("key4"), dest.PairAt(2).Key)
+		assert.Equal(t, 0, src.NumRecords())
+		assert.Equal(t, 3, dest.NumRecords())
+		assert.Equal(t, []byte("key1"), dest.RecordAt(0).KeyBytes())
+		assert.Equal(t, []byte("key3"), dest.RecordAt(1).KeyBytes())
+		assert.Equal(t, []byte("key4"), dest.RecordAt(2).KeyBytes())
 	})
 
 	t.Run("転送元が空の場合、転送先のデータが変わらない", func(t *testing.T) {
@@ -765,8 +765,8 @@ func TestBranchNodeTransferAllFrom(t *testing.T) {
 		src := createTestBranchNodeEmpty()
 		src.body.Initialize()
 		dest := createTestBranchNode(
-			[]Pair{
-				NewPair([]byte("key1"), pageIdBytes(10)),
+			[]Record{
+				NewRecord(nil, []byte("key1"), pageIdBytes(10)),
 			},
 			page.NewPageId(0, 20),
 		)
@@ -775,29 +775,29 @@ func TestBranchNodeTransferAllFrom(t *testing.T) {
 		dest.TransferAllFrom(src)
 
 		// THEN
-		assert.Equal(t, 0, src.NumPairs())
-		assert.Equal(t, 1, dest.NumPairs())
-		assert.Equal(t, []byte("key1"), dest.PairAt(0).Key)
+		assert.Equal(t, 0, src.NumRecords())
+		assert.Equal(t, 1, dest.NumRecords())
+		assert.Equal(t, []byte("key1"), dest.RecordAt(0).KeyBytes())
 	})
 }
 
-// テスト用のブランチノードを作成する (ペアあり)
-func createTestBranchNode(pairs []Pair, rightChildPageId page.PageId) *BranchNode {
+// テスト用のブランチノードを作成する (レコードあり)
+func createTestBranchNode(records []Record, rightChildPageId page.PageId) *BranchNode {
 	data := directio.AlignedBlock(directio.BlockSize)
 	bn := NewBranchNode(data)
 
-	if len(pairs) == 0 {
-		panic("pairs must not be empty")
+	if len(records) == 0 {
+		panic("records must not be empty")
 	}
 
-	err := bn.Initialize(pairs[0].Key, page.RestorePageIdFromBytes(pairs[0].Value), rightChildPageId)
+	err := bn.Initialize(records[0].KeyBytes(), page.RestorePageIdFromBytes(records[0].NonKeyBytes()), rightChildPageId)
 	if err != nil {
 		panic("failed to initialize branch node")
 	}
 
-	for i, pair := range pairs[1:] {
-		if !bn.Insert(i+1, pair) {
-			panic("failed to insert pair into branch node")
+	for i, record := range records[1:] {
+		if !bn.Insert(i+1, record) {
+			panic("failed to insert record into branch node")
 		}
 	}
 
@@ -813,9 +813,9 @@ func createTestBranchNodeEmpty() *BranchNode {
 // ブランチノード内のキーが昇順であることを検証するヘルパー
 func assertBranchKeysSorted(t *testing.T, bn *BranchNode) {
 	t.Helper()
-	for i := 1; i < bn.NumPairs(); i++ {
-		prev := bn.PairAt(i - 1).Key
-		curr := bn.PairAt(i).Key
+	for i := 1; i < bn.NumRecords(); i++ {
+		prev := bn.RecordAt(i - 1).KeyBytes()
+		curr := bn.RecordAt(i).KeyBytes()
 		assert.True(t, bytes.Compare(prev, curr) < 0,
 			"キーが昇順でない: index %d (%s) >= index %d (%s)", i-1, prev, i, curr)
 	}

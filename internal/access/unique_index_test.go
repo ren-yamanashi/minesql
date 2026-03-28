@@ -23,14 +23,21 @@ func TestUniqueIndex(t *testing.T) {
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
 
-		// WHEN: インデックスに値を挿入
-		err = uniqueIndex.Insert(bp, []uint8{0}, [][]byte{[]byte("John")})
+		// WHEN: インデックスに値を挿入 (Key = concat(encodedSecondaryKey, encodedPK), NonKey = nil)
+		// encodedPK は memcomparable エンコード済みのバイト列を渡す
+		var encodedPK0, encodedPK1, encodedPK2, encodedPK3 []byte
+		memcomparable.Encode([][]byte{[]byte("pk0")}, &encodedPK0)
+		memcomparable.Encode([][]byte{[]byte("pk1")}, &encodedPK1)
+		memcomparable.Encode([][]byte{[]byte("pk2")}, &encodedPK2)
+		memcomparable.Encode([][]byte{[]byte("pk3")}, &encodedPK3)
+
+		err = uniqueIndex.Insert(bp, encodedPK0, [][]byte{[]byte("John")})
 		assert.NoError(t, err)
-		err = uniqueIndex.Insert(bp, []uint8{1}, [][]byte{[]byte("Alice")})
+		err = uniqueIndex.Insert(bp, encodedPK1, [][]byte{[]byte("Alice")})
 		assert.NoError(t, err)
-		err = uniqueIndex.Insert(bp, []uint8{2}, [][]byte{[]byte("Eve")})
+		err = uniqueIndex.Insert(bp, encodedPK2, [][]byte{[]byte("Eve")})
 		assert.NoError(t, err)
-		err = uniqueIndex.Insert(bp, []uint8{3}, [][]byte{[]byte("Bob")})
+		err = uniqueIndex.Insert(bp, encodedPK3, [][]byte{[]byte("Bob")})
 		assert.NoError(t, err)
 
 		// THEN: 挿入したデータが B+Tree に存在する
@@ -38,42 +45,47 @@ func TestUniqueIndex(t *testing.T) {
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
+		// Key = concat(encodedSecondaryKey, encodedPK) なのでセカンダリキーでソートされる
 		expectedRecords := []struct {
-			key   [][]byte
-			value []uint8
+			secondaryKey string
+			pk           string
 		}{
-			// キーの順序でソートされる (プライマリキーの順序ではない)
-			{[][]byte{[]byte("Alice")}, []uint8{1}},
-			{[][]byte{[]byte("Bob")}, []uint8{3}},
-			{[][]byte{[]byte("Eve")}, []uint8{2}},
-			{[][]byte{[]byte("John")}, []uint8{0}},
+			{"Alice", "pk1"},
+			{"Bob", "pk3"},
+			{"Eve", "pk2"},
+			{"John", "pk0"},
 		}
 
 		i := 0
 		for {
-			pair, ok := iter.Get()
+			record, ok := iter.Get()
 			if !ok {
 				break
 			}
 			expected := expectedRecords[i]
 
-			// エンコードされたキーをデコード
-			var decodedKey [][]byte
-			keyBytes := pair.Key
-			memcomparable.Decode(keyBytes, &decodedKey)
+			// Key をデコードしてセカンダリキーと PK を分離
+			var keyColumns [][]byte
+			memcomparable.Decode(record.KeyBytes(), &keyColumns)
 
-			assert.Equal(t, expected.key, decodedKey)
-			assert.Equal(t, expected.value, pair.Value)
+			assert.Equal(t, expected.secondaryKey, string(keyColumns[0]))
+			assert.Equal(t, expected.pk, string(keyColumns[1]))
+
+			// Header は DeleteMark=0
+			assert.Equal(t, uint8(0), record.HeaderBytes()[0])
+			// NonKey は nil (空)
+			assert.Equal(t, 0, len(record.NonKeyBytes()))
 
 			i++
 			_, _, err := iter.Next(bp)
 			assert.NoError(t, err)
 		}
+		assert.Equal(t, len(expectedRecords), i)
 	})
 }
 
 func TestUniqueIndexDelete(t *testing.T) {
-	t.Run("ユニークインデックスから行を削除できる", func(t *testing.T) {
+	t.Run("ユニークインデックスからソフトデリートできる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "test.db")
 
@@ -84,55 +96,150 @@ func TestUniqueIndexDelete(t *testing.T) {
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
 
-		err = uniqueIndex.Insert(bp, []uint8{0}, [][]byte{[]byte("John")})
+		var encodedPK0, encodedPK1, encodedPK2 []byte
+		memcomparable.Encode([][]byte{[]byte("pk0")}, &encodedPK0)
+		memcomparable.Encode([][]byte{[]byte("pk1")}, &encodedPK1)
+		memcomparable.Encode([][]byte{[]byte("pk2")}, &encodedPK2)
+
+		err = uniqueIndex.Insert(bp, encodedPK0, [][]byte{[]byte("John")})
 		assert.NoError(t, err)
-		err = uniqueIndex.Insert(bp, []uint8{1}, [][]byte{[]byte("Alice")})
+		err = uniqueIndex.Insert(bp, encodedPK1, [][]byte{[]byte("Alice")})
 		assert.NoError(t, err)
-		err = uniqueIndex.Insert(bp, []uint8{2}, [][]byte{[]byte("Eve")})
+		err = uniqueIndex.Insert(bp, encodedPK2, [][]byte{[]byte("Eve")})
 		assert.NoError(t, err)
 
-		// WHEN: "Alice" を削除
-		err = uniqueIndex.Delete(bp, [][]byte{[]byte("Alice")})
+		// WHEN: "Alice" をソフトデリート
+		err = uniqueIndex.Delete(bp, encodedPK1, [][]byte{[]byte("Alice")})
 
-		// THEN: "Alice" が削除され、残りが昇順で取得できる
+		// THEN: ソフトデリートが成功する
 		assert.NoError(t, err)
+
+		// B+Tree を直接走査すると、3 件すべて存在するが "Alice" の DeleteMark が 1
 		tree := btree.NewBPlusTree(uniqueIndex.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
-		expectedRecords := []struct {
-			key   [][]byte
-			value []uint8
-		}{
-			{[][]byte{[]byte("Eve")}, []uint8{2}},
-			{[][]byte{[]byte("John")}, []uint8{0}},
+		type indexEntry struct {
+			secondaryKey string
+			deleteMark   uint8
 		}
-
-		i := 0
+		var entries []indexEntry
 		for {
-			pair, ok := iter.Get()
+			record, ok := iter.Get()
 			if !ok {
 				break
 			}
-			expected := expectedRecords[i]
-
-			var decodedKey [][]byte
-			memcomparable.Decode(pair.Key, &decodedKey)
-
-			assert.Equal(t, expected.key, decodedKey)
-			assert.Equal(t, expected.value, pair.Value)
-
-			i++
+			var keyColumns [][]byte
+			memcomparable.Decode(record.KeyBytes(), &keyColumns)
+			entries = append(entries, indexEntry{
+				secondaryKey: string(keyColumns[0]),
+				deleteMark:   record.HeaderBytes()[0],
+			})
 			_, _, err := iter.Next(bp)
 			assert.NoError(t, err)
 		}
-		assert.Equal(t, len(expectedRecords), i)
+
+		assert.Equal(t, 3, len(entries))
+		assert.Equal(t, "Alice", entries[0].secondaryKey)
+		assert.Equal(t, uint8(1), entries[0].deleteMark) // ソフトデリート済み
+		assert.Equal(t, "Eve", entries[1].secondaryKey)
+		assert.Equal(t, uint8(0), entries[1].deleteMark)
+		assert.Equal(t, "John", entries[2].secondaryKey)
+		assert.Equal(t, uint8(0), entries[2].deleteMark)
+	})
+
+	t.Run("ソフトデリート後に同じセカンダリキーで再挿入できる", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "test.db")
+
+		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetapageId, 0)
+
+		err = uniqueIndex.Create(bp)
+		assert.NoError(t, err)
+
+		var encodedPK0 []byte
+		memcomparable.Encode([][]byte{[]byte("pk0")}, &encodedPK0)
+
+		err = uniqueIndex.Insert(bp, encodedPK0, [][]byte{[]byte("John")})
+		assert.NoError(t, err)
+
+		// WHEN: ソフトデリート後に同じセカンダリキー + 同じ PK で再挿入
+		err = uniqueIndex.Delete(bp, encodedPK0, [][]byte{[]byte("John")})
+		assert.NoError(t, err)
+		err = uniqueIndex.Insert(bp, encodedPK0, [][]byte{[]byte("John")})
+		assert.NoError(t, err)
+
+		// THEN: active なレコードとして存在する
+		tree := btree.NewBPlusTree(uniqueIndex.MetaPageId)
+		iter, err := tree.Search(bp, btree.SearchModeStart{})
+		assert.NoError(t, err)
+
+		record, ok := iter.Get()
+		assert.True(t, ok)
+		assert.Equal(t, uint8(0), record.HeaderBytes()[0]) // active
 	})
 }
 
+func TestUniqueIndexConstraint(t *testing.T) {
+	t.Run("active なレコードが存在する場合にユニーク制約違反エラーが返る", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "test.db")
+
+		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetapageId, 0)
+
+		err = uniqueIndex.Create(bp)
+		assert.NoError(t, err)
+
+		var encodedPK0, encodedPK1 []byte
+		memcomparable.Encode([][]byte{[]byte("pk0")}, &encodedPK0)
+		memcomparable.Encode([][]byte{[]byte("pk1")}, &encodedPK1)
+
+		err = uniqueIndex.Insert(bp, encodedPK0, [][]byte{[]byte("John")})
+		assert.NoError(t, err)
+
+		// WHEN: 同じセカンダリキーで別の PK を挿入 (ユニーク制約違反)
+		err = uniqueIndex.Insert(bp, encodedPK1, [][]byte{[]byte("John")})
+
+		// THEN
+		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
+	})
+
+	t.Run("ソフトデリート済みの場合はユニーク制約違反にならない", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "test.db")
+
+		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetapageId, 0)
+
+		err = uniqueIndex.Create(bp)
+		assert.NoError(t, err)
+
+		var encodedPK0, encodedPK1 []byte
+		memcomparable.Encode([][]byte{[]byte("pk0")}, &encodedPK0)
+		memcomparable.Encode([][]byte{[]byte("pk1")}, &encodedPK1)
+
+		err = uniqueIndex.Insert(bp, encodedPK0, [][]byte{[]byte("John")})
+		assert.NoError(t, err)
+
+		// ソフトデリート
+		err = uniqueIndex.Delete(bp, encodedPK0, [][]byte{[]byte("John")})
+		assert.NoError(t, err)
+
+		// WHEN: 同じセカンダリキーで別の PK を挿入
+		err = uniqueIndex.Insert(bp, encodedPK1, [][]byte{[]byte("John")})
+
+		// THEN: ユニーク制約違反にならない
+		assert.NoError(t, err)
+	})
+}
 
 func TestUniqueIndexLeafPageCount(t *testing.T) {
-	t.Run("作成直後のテーブルのリーフページ数は1", func(t *testing.T) {
+	t.Run("作成直後のテーブルのリーフページ数は 1", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "test.db")
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
@@ -176,7 +283,7 @@ func TestUniqueIndexLeafPageCount(t *testing.T) {
 }
 
 func TestUniqueIndexHeight(t *testing.T) {
-	t.Run("作成直後のインデックスの高さは1", func(t *testing.T) {
+	t.Run("作成直後のインデックスの高さは 1", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "test.db")
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
