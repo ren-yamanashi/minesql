@@ -518,8 +518,9 @@ func TestUpdate(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: プライマリキー "a" のレコードを更新 (キーは同じ、value のみ変更)
+		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
 		newRecord := [][]byte{[]byte("a"), []byte("Jane"), []byte("Doe-Updated")}
-		err = table.UpdateInplace(bp, newRecord)
+		err = table.UpdateInplace(bp, oldRecord, newRecord)
 
 		// THEN
 		assert.NoError(t, err)
@@ -544,8 +545,9 @@ func TestUpdate(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: PK を変えずに value を更新
+		oldRecord := [][]byte{[]byte("a"), []byte("John")}
 		newRecord := [][]byte{[]byte("a"), []byte("Jane")}
-		err = table.UpdateInplace(bp, newRecord)
+		err = table.UpdateInplace(bp, oldRecord, newRecord)
 		assert.NoError(t, err)
 
 		// THEN: B+Tree を直接走査するとレコードは 1 件で DeleteMark=0 のまま
@@ -672,18 +674,10 @@ func TestUpdate(t *testing.T) {
 		// WHEN: セカンダリキー (last_name) を "Doe" → "Williams" に変更
 		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
 		newRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Williams")}
-		err = table.UpdateInplace(bp, newRecord)
-		assert.NoError(t, err)
-		oldRec := NewRecord(oldRecord, table.PrimaryKeyCount)
-		encodedPK := oldRec.EncodeKey()
-		for _, ui := range table.UniqueIndexes {
-			err = ui.Delete(bp, encodedPK, oldRecord)
-			assert.NoError(t, err)
-			err = ui.Insert(bp, encodedPK, newRecord)
-			assert.NoError(t, err)
-		}
+		err = table.UpdateInplace(bp, oldRecord, newRecord)
 
 		// THEN: ユニークインデックスが更新されている (active なエントリのみ確認)
+		assert.NoError(t, err)
 		indexKeys := collectActiveUniqueIndexKeys(t, bp, table.UniqueIndexes[0])
 		// "Doe" がソフトデリートされ "Williams" が追加されている
 		assert.Equal(t, []string{"Smith", "Williams"}, indexKeys)
@@ -787,20 +781,7 @@ func TestUpdate(t *testing.T) {
 		// WHEN: セカンダリキーを "Doe" → "Smith" に変更 (既存のインデックスキーと衝突)
 		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
 		newRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Smith")}
-		err = table.UpdateInplace(bp, newRecord)
-		assert.NoError(t, err)
-		oldRec := NewRecord(oldRecord, table.PrimaryKeyCount)
-		encodedPK := oldRec.EncodeKey()
-		for _, ui := range table.UniqueIndexes {
-			err = ui.Delete(bp, encodedPK, oldRecord)
-			if err != nil {
-				break
-			}
-			err = ui.Insert(bp, encodedPK, newRecord)
-			if err != nil {
-				break
-			}
-		}
+		err = table.UpdateInplace(bp, oldRecord, newRecord)
 
 		// THEN: ユニークインデックスの更新でエラーが返る
 		assert.Error(t, err)
@@ -829,16 +810,8 @@ func TestUpdate(t *testing.T) {
 		// WHEN: 両方のセカンダリキーが変わる更新
 		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
 		newRecord := [][]byte{[]byte("a"), []byte("Jane"), []byte("Williams")}
-		err = table.UpdateInplace(bp, newRecord)
+		err = table.UpdateInplace(bp, oldRecord, newRecord)
 		assert.NoError(t, err)
-		oldRec := NewRecord(oldRecord, table.PrimaryKeyCount)
-		encodedPK := oldRec.EncodeKey()
-		for _, ui := range table.UniqueIndexes {
-			err = ui.Delete(bp, encodedPK, oldRecord)
-			assert.NoError(t, err)
-			err = ui.Insert(bp, encodedPK, newRecord)
-			assert.NoError(t, err)
-		}
 
 		// THEN: idx_first_name が更新されている (active なエントリのみ)
 		firstNameKeys := collectActiveUniqueIndexKeys(t, bp, table.UniqueIndexes[0])
@@ -860,8 +833,9 @@ func TestUpdate(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: 存在しないキー "z" で更新
+		oldRecord := [][]byte{[]byte("z"), []byte("Unknown")}
 		newRecord := [][]byte{[]byte("z"), []byte("Updated")}
-		err = table.UpdateInplace(bp, newRecord)
+		err = table.UpdateInplace(bp, oldRecord, newRecord)
 
 		// THEN
 		assert.Error(t, err)

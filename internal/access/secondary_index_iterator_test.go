@@ -173,16 +173,8 @@ func TestSecondaryIndexIterator(t *testing.T) {
 		// テーブルとインデックスを更新
 		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
 		newRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Williams")}
-		err = table.UpdateInplace(bp, newRecord)
+		err = table.UpdateInplace(bp, oldRecord, newRecord)
 		assert.NoError(t, err)
-		oldRec := NewRecord(oldRecord, table.PrimaryKeyCount)
-		encodedPK := oldRec.EncodeKey()
-		for _, ui := range table.UniqueIndexes {
-			err = ui.Delete(bp, encodedPK, oldRecord)
-			assert.NoError(t, err)
-			err = ui.Insert(bp, encodedPK, newRecord)
-			assert.NoError(t, err)
-		}
 
 		// WHEN: 更新後のインデックスを検索
 		iter, err := uniqueIndex.Search(bp, &table, RecordSearchModeKey{Key: [][]byte{[]byte("Williams")}})

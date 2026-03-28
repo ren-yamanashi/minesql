@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"bytes"
 	"minesql/internal/access"
 	"minesql/internal/engine"
 )
@@ -56,9 +57,24 @@ func (upd *Update) Next() (Record, error) {
 
 	// 更新後のレコードで更新を実行
 	for i, record := range records {
-		err := upd.table.Update(e.BufferPool, record, updatedRecords[i])
-		if err != nil {
-			return nil, err
+		oldRec := access.NewRecord(record, upd.table.PrimaryKeyCount)
+		newRec := access.NewRecord(updatedRecords[i], upd.table.PrimaryKeyCount)
+		encodedOldKey := oldRec.EncodeKey()
+		encodedNewKey := newRec.EncodeKey()
+
+		if bytes.Equal(encodedOldKey, encodedNewKey) {
+			// プライマリキーが変わらない場合はインプレース更新
+			if err := upd.table.UpdateInplace(e.BufferPool, record, updatedRecords[i]); err != nil {
+				return nil, err
+			}
+		} else {
+			// プライマリキーが変わる場合はソフトデリート + Insert
+			if err := upd.table.SoftDelete(e.BufferPool, record); err != nil {
+				return nil, err
+			}
+			if err := upd.table.Insert(e.BufferPool, updatedRecords[i]); err != nil {
+				return nil, err
+			}
 		}
 	}
 

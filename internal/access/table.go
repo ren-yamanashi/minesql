@@ -1,7 +1,6 @@
 package access
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"minesql/internal/storage/btree"
@@ -52,7 +51,7 @@ func (t *TableAccessMethod) Create(bp *bufferpool.BufferPool) error {
 //
 // access.Record を経由して B+Tree レコードを構築し、B+Tree に挿入する
 //
-// ソフトデリート済みの同一キーが存在する場合は Update で上書きする
+// ソフトデリート済みの同一キーが存在する場合は、Update で上書きする
 func (t *TableAccessMethod) Insert(bp *bufferpool.BufferPool, columns [][]byte) error {
 	btr := btree.NewBPlusTree(t.MetaPageId)
 
@@ -75,7 +74,7 @@ func (t *TableAccessMethod) Insert(bp *bufferpool.BufferPool, columns [][]byte) 
 			return btree.ErrDuplicateKey
 		}
 
-		// ソフトデリート済みなので Update で上書き
+		// ソフトデリート済みなので Update で上書き (DeleteMark は 0 に戻る)
 		err = btr.Update(bp, btrRecord)
 		if err != nil {
 			return err
@@ -94,10 +93,30 @@ func (t *TableAccessMethod) Insert(bp *bufferpool.BufferPool, columns [][]byte) 
 	return nil
 }
 
-// Delete はテーブルから行をソフトデリートする
+// Delete はテーブルから行を物理削除する
+func (t *TableAccessMethod) Delete(bp *bufferpool.BufferPool, prevRecord [][]byte) error {
+	btr := btree.NewBPlusTree(t.MetaPageId)
+
+	rec := NewRecord(prevRecord, t.PrimaryKeyCount)
+	if err := btr.Delete(bp, rec.EncodeKey()); err != nil {
+		return err
+	}
+
+	// ユニークインデックスを物理削除
+	for _, ui := range t.UniqueIndexes {
+		err := ui.Delete(bp, rec.EncodeKey(), prevRecord)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// SoftDelete はテーブルから行をソフトデリートする
 //
 // B+Tree からレコードを物理削除せず、DeleteMark を 1 に設定する
-func (t *TableAccessMethod) Delete(bp *bufferpool.BufferPool, columns [][]byte) error {
+func (t *TableAccessMethod) SoftDelete(bp *bufferpool.BufferPool, columns [][]byte) error {
 	btr := btree.NewBPlusTree(t.MetaPageId)
 
 	rec := NewRecord(columns, t.PrimaryKeyCount)
@@ -120,45 +139,23 @@ func (t *TableAccessMethod) Delete(bp *bufferpool.BufferPool, columns [][]byte) 
 	return nil
 }
 
-// Update はテーブルの行を更新する
+// UpdateInplace はテーブルの行をインプレース更新する
 //
-// プライマリキーが変わらない場合は B+Tree のインプレース更新を行う
+// プライマリキーが変わらないことを前提とする (プライマリキーが変わる場合は呼び出し側で SoftDelete + Insert を行う)
 //
-// プライマリキーが変わる場合はソフトデリート (旧レコード) + Insert (新レコード) で実現する
-//
-// ユニークインデックスは常にソフトデリート + Insert で更新する
-//
-//   - oldColumns: 更新前の行 (プライマリキーとその他のカラム値を含む)
-//   - newColumns: 更新後の行 (プライマリキーとその他のカラム値を含む)
-func (t *TableAccessMethod) Update(bp *bufferpool.BufferPool, oldColumns [][]byte, newColumns [][]byte) error {
+// ユニークインデックスは物理削除 (old) + 挿入 (new) で更新する
+func (t *TableAccessMethod) UpdateInplace(bp *bufferpool.BufferPool, oldColumns [][]byte, newColumns [][]byte) error {
 	btr := btree.NewBPlusTree(t.MetaPageId)
-
-	oldRec := NewRecord(oldColumns, t.PrimaryKeyCount)
 	newRec := NewRecord(newColumns, t.PrimaryKeyCount)
-
-	encodedOldKey := oldRec.EncodeKey()
-	encodedNewKey := newRec.EncodeKey()
-
-	if !bytes.Equal(encodedOldKey, encodedNewKey) {
-		// プライマリキーが変わる場合はソフトデリート + Insert
-		oldRec.Header.DeleteMark = 1
-		err := btr.Update(bp, node.NewRecord(oldRec.EncodeHeader(), oldRec.EncodeKey(), oldRec.EncodeNonKey()))
-		if err != nil {
-			return err
-		}
-		err = btr.Insert(bp, node.NewRecord(newRec.EncodeHeader(), newRec.EncodeKey(), newRec.EncodeNonKey()))
-		if err != nil {
-			return err
-		}
-	} else {
-		// プライマリキーが変わらない場合はインプレース更新
-		err := btr.Update(bp, node.NewRecord(newRec.EncodeHeader(), newRec.EncodeKey(), newRec.EncodeNonKey()))
-		if err != nil {
-			return err
-		}
+	err := btr.Update(bp, node.NewRecord(newRec.EncodeHeader(), newRec.EncodeKey(), newRec.EncodeNonKey()))
+	if err != nil {
+		return err
 	}
 
-	// ユニークインデックスを更新 (常にソフトデリート + Insert)
+	// ユニークインデックスを更新 (物理削除 + Insert)
+	oldRec := NewRecord(oldColumns, t.PrimaryKeyCount)
+	encodedOldKey := oldRec.EncodeKey()
+	encodedNewKey := newRec.EncodeKey()
 	for _, ui := range t.UniqueIndexes {
 		err := ui.Delete(bp, encodedOldKey, oldColumns)
 		if err != nil {
