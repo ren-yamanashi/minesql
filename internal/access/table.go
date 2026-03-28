@@ -94,17 +94,18 @@ func (t *TableAccessMethod) Insert(bp *bufferpool.BufferPool, columns [][]byte) 
 }
 
 // Delete はテーブルから行を物理削除する
-func (t *TableAccessMethod) Delete(bp *bufferpool.BufferPool, prevRecord [][]byte) error {
+//   - columns: 削除する行のカラム値 (プライマリキーを含む全カラム)
+func (t *TableAccessMethod) Delete(bp *bufferpool.BufferPool, columns [][]byte) error {
 	btr := btree.NewBPlusTree(t.MetaPageId)
 
-	rec := NewRecord(prevRecord, t.PrimaryKeyCount)
+	rec := NewRecord(columns, t.PrimaryKeyCount)
 	if err := btr.Delete(bp, rec.EncodeKey()); err != nil {
 		return err
 	}
 
 	// ユニークインデックスを物理削除
 	for _, ui := range t.UniqueIndexes {
-		err := ui.Delete(bp, rec.EncodeKey(), prevRecord)
+		err := ui.Delete(bp, rec.EncodeKey(), columns)
 		if err != nil {
 			return err
 		}
