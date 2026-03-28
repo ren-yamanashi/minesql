@@ -18,9 +18,11 @@
 - レコードのバイト列は以下のように構成される
 
   ```txt
-  |header (可変長)         |key fields (可変長)    |non-key fields (可変長)    |
-  ↑___headerSize bytes____↑___keySize bytes______↑___nonKeySize bytes_______↑
+  [headerSize (2B)][keySize (2B)][header (可変長)][key (可変長)][nonKey (可変長)]
   ```
+
+  - 先頭 4 バイトのサイズフィールドにより、可変長の 3 領域を分離できる
+  - nonKey のサイズは `全体の長さ - 4 - headerSize - keySize` で算出する
 
 ## 指定したキーを持つレコードを見つける方法
 
