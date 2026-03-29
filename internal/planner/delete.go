@@ -17,7 +17,7 @@ func NewDelete(stmt *ast.DeleteStmt) *Delete {
 	}
 }
 
-func (dp *Delete) Build() (executor.Executor, error) {
+func (dp *Delete) Build(trx *executor.Transaction) (executor.Executor, error) {
 	e := engine.Get()
 
 	// 対象テーブルのメタデータを取得
@@ -39,5 +39,5 @@ func (dp *Delete) Build() (executor.Executor, error) {
 		return nil, err
 	}
 
-	return executor.NewDelete(tbl, iterator), nil
+	return executor.NewDelete(trx, tbl, iterator), nil
 }

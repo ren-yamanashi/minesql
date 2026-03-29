@@ -222,11 +222,12 @@ func TestExecutorIntegration(t *testing.T) {
 		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
 
+		trx := Begin(0)
 		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
 		assert.NoError(t, err)
 
 		// WHEN: Alice の last_name を Anderson に更新
-		upd := NewUpdate(tbl, []SetColumn{
+		upd := NewUpdate(trx, tbl, []SetColumn{
 			{Pos: 2, Value: []byte("Anderson")},
 		}, NewFilter(
 			NewTableScan(
@@ -240,6 +241,7 @@ func TestExecutorIntegration(t *testing.T) {
 		))
 		_, err = upd.Next()
 		assert.NoError(t, err)
+		trx.Commit()
 
 		// THEN: テーブルスキャンとインデックススキャンの両方で確認
 		tableRecords := collectAll(t, NewTableScan(
@@ -283,8 +285,10 @@ func TestExecutorIntegration(t *testing.T) {
 		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
 
+		trx := Begin(0)
+
 		// WHEN: プライマリキー "v" (Eve) を "a" に変更
-		upd := NewUpdate(tbl, []SetColumn{
+		upd := NewUpdate(trx, tbl, []SetColumn{
 			{Pos: 0, Value: []byte("a")},
 		}, NewTableScan(
 			tbl,
@@ -295,6 +299,7 @@ func TestExecutorIntegration(t *testing.T) {
 		))
 		_, err := upd.Next()
 		assert.NoError(t, err)
+		trx.Commit()
 
 		// THEN
 		records := collectAll(t, NewTableScan(
@@ -386,11 +391,12 @@ func TestExecutorIntegration(t *testing.T) {
 		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
 
+		trx := Begin(0)
 		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
 		assert.NoError(t, err)
 
 		// WHEN: Bob を削除
-		del := NewDelete(tbl, NewFilter(
+		del := NewDelete(trx, tbl, NewFilter(
 			NewTableScan(
 				tbl,
 				access.RecordSearchModeStart{},
@@ -402,6 +408,7 @@ func TestExecutorIntegration(t *testing.T) {
 		))
 		_, err = del.Next()
 		assert.NoError(t, err)
+		trx.Commit()
 
 		// THEN: テーブルスキャンとインデックススキャンの両方で確認
 		tableRecords := collectAll(t, NewTableScan(
@@ -467,7 +474,9 @@ func setupExecutorTestTable(t *testing.T) *access.TableAccessMethod {
 	tbl, err := getTableAccessMethod("users")
 	assert.NoError(t, err)
 
+	trx := Begin(0)
 	insert := NewInsert(
+		trx,
 		tbl,
 		[]Record{
 			{[]byte("z"), []byte("Alice"), []byte("Smith")},
@@ -478,6 +487,7 @@ func setupExecutorTestTable(t *testing.T) *access.TableAccessMethod {
 		})
 	_, err = insert.Next()
 	assert.NoError(t, err)
+	trx.Commit()
 
 	return tbl
 }

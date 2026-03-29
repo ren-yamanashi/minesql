@@ -32,7 +32,8 @@ func setupPlannerExample() func() {
 	engine.Init()
 
 	// CREATE TABLE
-	runPlan(&ast.CreateTableStmt{
+	trx := executor.Begin(0)
+	runPlan(trx, &ast.CreateTableStmt{
 		StmtType:  ast.StmtTypeCreate,
 		Keyword:   ast.KeywordTable,
 		TableName: "users",
@@ -50,7 +51,7 @@ func setupPlannerExample() func() {
 	})
 
 	// INSERT
-	runPlan(&ast.InsertStmt{
+	runPlan(trx, &ast.InsertStmt{
 		StmtType: ast.StmtTypeInsert,
 		Table:    *ast.NewTableId("users"),
 		Cols: []ast.ColumnId{
@@ -105,13 +106,14 @@ func setupPlannerExample() func() {
 			},
 		},
 	})
+	trx.Commit()
 
 	return cleanup
 }
 
 // AST を直接構築 → planner.Start → 実行して結果を返す
-func runPlan(stmt ast.Statement) []executor.Record {
-	exec, err := planner.Start(stmt)
+func runPlan(trx *executor.Transaction, stmt ast.Statement) []executor.Record {
+	exec, err := planner.Start(trx, stmt)
 	if err != nil {
 		panic(err)
 	}
@@ -145,11 +147,13 @@ func Example_scanAll() {
 	cleanup := setupPlannerExample()
 	defer cleanup()
 
-	records := runPlan(&ast.SelectStmt{
+	trx := executor.Begin(0)
+	records := runPlan(trx, &ast.SelectStmt{
 		StmtType: ast.StmtTypeSelect,
 		From:     *ast.NewTableId("users"),
 		Where:    &ast.WhereClause{IsSet: false},
 	})
+	trx.Commit()
 	printPlanRecords(records)
 
 	// Output:
@@ -166,7 +170,8 @@ func Example_assertEqual() {
 	cleanup := setupPlannerExample()
 	defer cleanup()
 
-	records := runPlan(&ast.SelectStmt{
+	trx := executor.Begin(0)
+	records := runPlan(trx, &ast.SelectStmt{
 		StmtType: ast.StmtTypeSelect,
 		From:     *ast.NewTableId("users"),
 		Where: &ast.WhereClause{
@@ -178,6 +183,7 @@ func Example_assertEqual() {
 			IsSet: true,
 		},
 	})
+	trx.Commit()
 	printPlanRecords(records)
 
 	// Output:
@@ -190,7 +196,8 @@ func Example_filter() {
 	defer cleanup()
 
 	// SELECT * FROM users WHERE (first_name < 'K' AND gender = 'male' AND last_name >= 'Doe') OR first_name = 'Tom'
-	records := runPlan(&ast.SelectStmt{
+	trx := executor.Begin(0)
+	records := runPlan(trx, &ast.SelectStmt{
 		StmtType: ast.StmtTypeSelect,
 		From:     *ast.NewTableId("users"),
 		Where: &ast.WhereClause{
@@ -238,6 +245,7 @@ func Example_filter() {
 			IsSet: true,
 		},
 	})
+	trx.Commit()
 	printPlanRecords(records)
 
 	// Output:
@@ -252,8 +260,9 @@ func Example_update() {
 	cleanup := setupPlannerExample()
 	defer cleanup()
 
+	trx := executor.Begin(0)
 	// UPDATE users SET last_name = 'Smith' WHERE username = 'johndoe'
-	runPlan(&ast.UpdateStmt{
+	runPlan(trx, &ast.UpdateStmt{
 		Table: *ast.NewTableId("users"),
 		SetClauses: []*ast.SetClause{
 			{Column: *ast.NewColumnId("last_name"), Value: ast.NewStringLiteral("'Smith'", "Smith")},
@@ -268,11 +277,12 @@ func Example_update() {
 		},
 	})
 
-	records := runPlan(&ast.SelectStmt{
+	records := runPlan(trx, &ast.SelectStmt{
 		StmtType: ast.StmtTypeSelect,
 		From:     *ast.NewTableId("users"),
 		Where:    &ast.WhereClause{IsSet: false},
 	})
+	trx.Commit()
 	printPlanRecords(records)
 
 	// Output:
@@ -289,8 +299,9 @@ func Example_delete() {
 	cleanup := setupPlannerExample()
 	defer cleanup()
 
+	trx := executor.Begin(0)
 	// DELETE FROM users WHERE username = 'johndoe2'
-	runPlan(&ast.DeleteStmt{
+	runPlan(trx, &ast.DeleteStmt{
 		StmtType: ast.StmtTypeDelete,
 		From:     *ast.NewTableId("users"),
 		Where: &ast.WhereClause{
@@ -303,11 +314,12 @@ func Example_delete() {
 		},
 	})
 
-	records := runPlan(&ast.SelectStmt{
+	records := runPlan(trx, &ast.SelectStmt{
 		StmtType: ast.StmtTypeSelect,
 		From:     *ast.NewTableId("users"),
 		Where:    &ast.WhereClause{IsSet: false},
 	})
+	trx.Commit()
 	printPlanRecords(records)
 
 	// Output:

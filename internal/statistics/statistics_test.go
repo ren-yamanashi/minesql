@@ -30,19 +30,19 @@ func getTable(t *testing.T, tableName string) *access.TableAccessMethod {
 }
 
 // insertRecords はテスト用にレコードを挿入する
-func insertRecords(t *testing.T, tableName string, records []executor.Record) { //nolint:unparam
+func insertRecords(t *testing.T, trx *executor.Transaction, tableName string, records []executor.Record) { //nolint:unparam
 	t.Helper()
 	tbl := getTable(t, tableName)
-	ins := executor.NewInsert(tbl, records)
+	ins := executor.NewInsert(trx, tbl, records)
 	_, err := ins.Next()
 	assert.NoError(t, err)
 }
 
 // deleteByCondition はテスト用に条件に合致するレコードを削除する
-func deleteByCondition(t *testing.T, tableName string, cond func(executor.Record) bool) {
+func deleteByCondition(t *testing.T, trx *executor.Transaction, tableName string, cond func(executor.Record) bool) {
 	t.Helper()
 	tbl := getTable(t, tableName)
-	del := executor.NewDelete(tbl, executor.NewFilter(
+	del := executor.NewDelete(trx, tbl, executor.NewFilter(
 		executor.NewTableScan(
 			tbl,
 			access.RecordSearchModeStart{},
@@ -83,6 +83,8 @@ func setupStatisticsTable(t *testing.T) {
 	engine.Reset()
 	engine.Init()
 
+	trx := executor.Begin(0)
+
 	createTable(t, "products", 1,
 		[]*executor.IndexParam{
 			{Name: "idx_name", ColName: "name", SecondaryKey: 1},
@@ -94,13 +96,14 @@ func setupStatisticsTable(t *testing.T) {
 		},
 	)
 
-	insertRecords(t, "products",
+	insertRecords(t, trx, "products",
 		[]executor.Record{
 			{[]byte("1"), []byte("Apple"), []byte("Fruit")},
 			{[]byte("2"), []byte("Banana"), []byte("Fruit")},
 			{[]byte("3"), []byte("Carrot"), []byte("Veggie")},
 		},
 	)
+	trx.Commit()
 }
 
 // setupEmptyTable はストレージを初期化し、データなしの空テーブルを作成する
@@ -140,6 +143,8 @@ func setupSameValueTable(t *testing.T) {
 	engine.Reset()
 	engine.Init()
 
+	trx := executor.Begin(0)
+
 	createTable(t, "same_values", 1,
 		nil,
 		[]*executor.ColumnParam{
@@ -148,13 +153,14 @@ func setupSameValueTable(t *testing.T) {
 		},
 	)
 
-	insertRecords(t, "same_values",
+	insertRecords(t, trx, "same_values",
 		[]executor.Record{
 			{[]byte("1"), []byte("Fruit")},
 			{[]byte("2"), []byte("Fruit")},
 			{[]byte("3"), []byte("Fruit")},
 		},
 	)
+	trx.Commit()
 }
 
 // setupSingleRecordTable はストレージを初期化し、1 レコードのみのテーブルを作成する
@@ -173,6 +179,8 @@ func setupSingleRecordTable(t *testing.T) {
 	engine.Reset()
 	engine.Init()
 
+	trx := executor.Begin(0)
+
 	createTable(t, "single", 1,
 		nil,
 		[]*executor.ColumnParam{
@@ -181,11 +189,12 @@ func setupSingleRecordTable(t *testing.T) {
 		},
 	)
 
-	insertRecords(t, "single",
+	insertRecords(t, trx, "single",
 		[]executor.Record{
 			{[]byte("1"), []byte("Alice")},
 		},
 	)
+	trx.Commit()
 }
 
 // setupMultiIndexTable はストレージを初期化し、2 つのセカンダリインデックスを持つテーブルを作成する
@@ -209,6 +218,8 @@ func setupMultiIndexTable(t *testing.T) {
 	engine.Reset()
 	engine.Init()
 
+	trx := executor.Begin(0)
+
 	createTable(t, "multi_idx", 1,
 		[]*executor.IndexParam{
 			{Name: "idx_name", ColName: "name", SecondaryKey: 1},
@@ -221,12 +232,13 @@ func setupMultiIndexTable(t *testing.T) {
 		},
 	)
 
-	insertRecords(t, "multi_idx",
+	insertRecords(t, trx, "multi_idx",
 		[]executor.Record{
 			{[]byte("1"), []byte("Alice"), []byte("alice@test")},
 			{[]byte("2"), []byte("Bob"), []byte("bob@test")},
 		},
 	)
+	trx.Commit()
 }
 
 func TestAnalyze(t *testing.T) {
@@ -388,11 +400,13 @@ func TestAnalyze(t *testing.T) {
 		assert.Equal(t, uint64(2), before.ColumnStats["category"].UniqueValues)
 
 		// WHEN: 新しいカテゴリを持つレコードを追加
-		insertRecords(t, "products",
+		trx := executor.Begin(0)
+		insertRecords(t, trx, "products",
 			[]executor.Record{
 				{[]byte("4"), []byte("Donut"), []byte("Snack")},
 			},
 		)
+		trx.Commit()
 
 		after, err := stats.Analyze()
 
@@ -423,9 +437,11 @@ func TestAnalyze(t *testing.T) {
 		assert.Equal(t, uint64(3), before.ColumnStats["name"].UniqueValues)
 
 		// WHEN: "Carrot" (唯一の "Veggie") を削除
-		deleteByCondition(t, "products", func(record executor.Record) bool {
+		trx := executor.Begin(0)
+		deleteByCondition(t, trx, "products", func(record executor.Record) bool {
 			return string(record[0]) == "3" // id = "3"
 		})
+		trx.Commit()
 
 		after, err := stats.Analyze()
 
@@ -455,9 +471,11 @@ func TestAnalyze(t *testing.T) {
 		assert.Equal(t, []byte("1"), before.ColumnStats["id"].MinValue)
 
 		// WHEN: id = "1" (最小値) のレコードを削除
-		deleteByCondition(t, "products", func(record executor.Record) bool {
+		trx := executor.Begin(0)
+		deleteByCondition(t, trx, "products", func(record executor.Record) bool {
 			return string(record[0]) == "1"
 		})
+		trx.Commit()
 
 		after, err := stats.Analyze()
 

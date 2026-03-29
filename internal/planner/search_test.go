@@ -446,6 +446,7 @@ func TestComplexWhereWithData(t *testing.T) {
 	// テストデータを挿入するヘルパー
 	insertTestData := func(t *testing.T) {
 		t.Helper()
+		trx := executor.Begin(0)
 		insertStmt := &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("users"),
@@ -473,10 +474,11 @@ func TestComplexWhereWithData(t *testing.T) {
 			},
 		}
 		insertPlanner := NewInsert(insertStmt)
-		insertExec, err := insertPlanner.Build()
+		insertExec, err := insertPlanner.Build(trx)
 		assert.NoError(t, err)
 		_, err = insertExec.Next()
 		assert.NoError(t, err)
+		trx.Commit()
 	}
 
 	// 検索結果を収集するヘルパー

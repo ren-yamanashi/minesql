@@ -15,6 +15,7 @@ func TestDelete_Build(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
+		trx := executor.Begin(0)
 		stmt := &ast.DeleteStmt{
 			StmtType: ast.StmtTypeDelete,
 			From:     *ast.NewTableId("nonexistent"),
@@ -22,12 +23,13 @@ func TestDelete_Build(t *testing.T) {
 		planner := NewDelete(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := planner.Build(trx)
 
 		// THEN
 		assert.Error(t, err)
 		assert.Nil(t, exec)
 		assert.Contains(t, err.Error(), "nonexistent")
+		trx.Commit()
 	})
 
 	t.Run("存在するテーブル名の場合、Delete Executor が生成される", func(t *testing.T) {
@@ -35,6 +37,7 @@ func TestDelete_Build(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
+		trx := executor.Begin(0)
 		createTableForTest(t, nil)
 
 		stmt := &ast.DeleteStmt{
@@ -45,11 +48,12 @@ func TestDelete_Build(t *testing.T) {
 		planner := NewDelete(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := planner.Build(trx)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, exec)
 		assert.IsType(t, &executor.Delete{}, exec)
+		trx.Commit()
 	})
 }

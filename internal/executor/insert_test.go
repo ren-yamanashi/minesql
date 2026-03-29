@@ -12,18 +12,20 @@ import (
 func TestNewInsert(t *testing.T) {
 	t.Run("正常に Insert Executor を生成できる", func(t *testing.T) {
 		// GIVEN
+		trx := Begin(0)
 		records := []Record{
 			{[]byte("1"), []byte("Alice")},
 			{[]byte("2"), []byte("Bob")},
 		}
 
 		// WHEN
-		insert := NewInsert(nil, records)
+		insert := NewInsert(trx, nil, records)
 
 		// THEN
 		assert.NotNil(t, insert)
 		assert.Nil(t, insert.table)
 		assert.Equal(t, records, insert.records)
+		trx.Commit()
 	})
 }
 
@@ -33,7 +35,7 @@ func TestInsert_Next(t *testing.T) {
 		defer engine.Reset()
 
 		tableName := "users"
-		createTableForTest(t, tableName, 1, []*IndexParam{
+		createTableForTest(t, tableName, []*IndexParam{
 			{Name: "name", ColName: "name", SecondaryKey: 1},
 		}, []*ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
@@ -41,6 +43,7 @@ func TestInsert_Next(t *testing.T) {
 		})
 
 		// GIVEN
+		trx := Begin(0)
 		records := []Record{
 			{[]byte("1"), []byte("Alice")},
 			{[]byte("2"), []byte("Bob")},
@@ -51,11 +54,12 @@ func TestInsert_Next(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		insert := NewInsert(tbl, records)
+		insert := NewInsert(trx, tbl, records)
 		_, err = insert.Next()
 
 		// THEN
 		assert.NoError(t, err)
+		trx.Commit()
 		whileCondition := func(record Record) bool {
 			return true
 		}
@@ -82,8 +86,8 @@ func initStorageManagerForTest(t *testing.T) {
 	engine.Init()
 }
 
-func createTableForTest(t *testing.T, tableName string, primaryKeyCount uint8, indexes []*IndexParam, columns []*ColumnParam) {
-	createTable := NewCreateTable(tableName, primaryKeyCount, indexes, columns)
+func createTableForTest(t *testing.T, tableName string, indexes []*IndexParam, columns []*ColumnParam) {
+	createTable := NewCreateTable(tableName, 1, indexes, columns)
 	_, err := createTable.Next()
 	assert.NoError(t, err)
 }

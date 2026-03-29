@@ -13,6 +13,7 @@ import (
 func TestDelete(t *testing.T) {
 	t.Run("正常に Delete Executor を生成できる", func(t *testing.T) {
 		// GIVEN
+		trx := Begin(0)
 		iterator := NewTableScan(
 			nil,
 			access.RecordSearchModeStart{},
@@ -20,12 +21,13 @@ func TestDelete(t *testing.T) {
 		)
 
 		// WHEN
-		del := NewDelete(nil, iterator)
+		del := NewDelete(trx, nil, iterator)
 
 		// THEN
 		assert.NotNil(t, del)
 		assert.Nil(t, del.table)
 		assert.NotNil(t, del.InnerExecutor)
+		trx.Commit()
 	})
 
 	t.Run("SearchTable を使って全レコードを削除できる", func(t *testing.T) {
@@ -34,10 +36,11 @@ func TestDelete(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
+		trx := Begin(0)
 		tbl, err := getTableAccessMethod("users")
 		assert.NoError(t, err)
 
-		del := NewDelete(tbl, NewTableScan(
+		del := NewDelete(trx, tbl, NewTableScan(
 			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
@@ -46,6 +49,7 @@ func TestDelete(t *testing.T) {
 		// WHEN
 		_, err = del.Next()
 		assert.NoError(t, err)
+		trx.Commit()
 
 		// THEN: 削除が成功する
 		assert.NoError(t, err)
@@ -67,6 +71,8 @@ func TestDelete(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
+		trx := Begin(0)
+
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
 		assert.NoError(t, err)
@@ -80,11 +86,12 @@ func TestDelete(t *testing.T) {
 			},
 		)
 
-		del := NewDelete(tbl, iterator)
+		del := NewDelete(trx, tbl, iterator)
 
 		// WHEN
 		_, err = del.Next()
 		assert.NoError(t, err)
+		trx.Commit()
 
 		// THEN: 削除が成功する
 		assert.NoError(t, err)
@@ -109,6 +116,7 @@ func TestDelete(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
+		trx := Begin(0)
 		tbl, err := getTableAccessMethod("users")
 		assert.NoError(t, err)
 
@@ -123,13 +131,14 @@ func TestDelete(t *testing.T) {
 				return string(record[1]) == "Bob"
 			},
 		)
-		del := NewDelete(tbl, iterator)
+		del := NewDelete(trx, tbl, iterator)
 
 		// WHEN
 		_, err = del.Next()
 
 		// THEN: 削除が成功する
 		assert.NoError(t, err)
+		trx.Commit()
 
 		// THEN: "Bob" 以外のレコードが残っている
 		scan := NewTableScan(
@@ -169,13 +178,15 @@ func TestDelete(t *testing.T) {
 		)
 
 		// Delete Executor を作成
-		del := NewDelete(tbl, iterator)
+		trx := Begin(0)
+		del := NewDelete(trx, tbl, iterator)
 
 		// WHEN
 		_, err = del.Next()
 
 		// THEN: 削除が成功する
 		assert.NoError(t, err)
+		trx.Commit()
 
 		// THEN: ユニークインデックスからも "Doe" が削除されている
 		indexScan := NewIndexScan(
@@ -199,14 +210,15 @@ func TestDelete(t *testing.T) {
 		defer engine.Reset()
 		_ = tmpdir
 
-		createTableForTest(t, "empty_table", 1, nil, []*ColumnParam{
+		trx := Begin(0)
+		createTableForTest(t, "empty_table", nil, []*ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "value", Type: catalog.ColumnTypeString},
 		})
 
 		tbl, err := getTableAccessMethod("empty_table")
 		assert.NoError(t, err)
-		del := NewDelete(tbl, NewTableScan(
+		del := NewDelete(trx, tbl, NewTableScan(
 			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
@@ -217,5 +229,6 @@ func TestDelete(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
+		trx.Commit()
 	})
 }

@@ -38,6 +38,7 @@ func TestNewInsert(t *testing.T) {
 
 	t.Run("カラム名が空の場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
+		trx := executor.Begin(0)
 		stmt := &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("users"),
@@ -52,16 +53,18 @@ func TestNewInsert(t *testing.T) {
 		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := planner.Build(trx)
 
 		// THEN
 		assert.Error(t, err)
 		assert.Nil(t, exec)
 		assert.Contains(t, err.Error(), "column names cannot be empty")
+		trx.Commit()
 	})
 
 	t.Run("値の数がカラム数と一致しない場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
+		trx := executor.Begin(0)
 		stmt := &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("users"),
@@ -78,16 +81,18 @@ func TestNewInsert(t *testing.T) {
 		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := planner.Build(trx)
 
 		// THEN
 		assert.Error(t, err)
 		assert.Nil(t, exec)
 		assert.Contains(t, err.Error(), "number of values does not match number of columns")
+		trx.Commit()
 	})
 
 	t.Run("カラム名が重複している場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
+		trx := executor.Begin(0)
 		stmt := &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("users"),
@@ -107,16 +112,18 @@ func TestNewInsert(t *testing.T) {
 		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := planner.Build(trx)
 
 		// THEN
 		assert.Error(t, err)
 		assert.Nil(t, exec)
 		assert.Contains(t, err.Error(), "duplicate column name: id")
+		trx.Commit()
 	})
 
 	t.Run("挿入するレコードが空の場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
+		trx := executor.Begin(0)
 		stmt := &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("users"),
@@ -129,12 +136,13 @@ func TestNewInsert(t *testing.T) {
 		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := planner.Build(trx)
 
 		// THEN
 		assert.Error(t, err)
 		assert.Nil(t, exec)
 		assert.Contains(t, err.Error(), "records cannot be empty")
+		trx.Commit()
 	})
 
 	t.Run("存在しないテーブル名の場合、エラーを返す", func(t *testing.T) {
@@ -142,6 +150,7 @@ func TestNewInsert(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
+		trx := executor.Begin(0)
 		stmt := &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("nonexistent"),
@@ -157,12 +166,13 @@ func TestNewInsert(t *testing.T) {
 		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := planner.Build(trx)
 
 		// THEN
 		assert.Error(t, err)
 		assert.Nil(t, exec)
 		assert.Contains(t, err.Error(), "table nonexistent not found")
+		trx.Commit()
 	})
 
 	t.Run("単一レコードの挿入で Executor が生成される", func(t *testing.T) {
@@ -170,6 +180,7 @@ func TestNewInsert(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
+		trx := executor.Begin(0)
 		createTableForTest(t, []*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "name", Type: catalog.ColumnTypeString},
@@ -192,12 +203,13 @@ func TestNewInsert(t *testing.T) {
 		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := planner.Build(trx)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, exec)
 		assert.IsType(t, &executor.Insert{}, exec)
+		trx.Commit()
 	})
 
 	t.Run("複数レコードの挿入で Executor が生成される", func(t *testing.T) {
@@ -205,6 +217,7 @@ func TestNewInsert(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
+		trx := executor.Begin(0)
 		createTableForTest(t, []*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "name", Type: catalog.ColumnTypeString},
@@ -235,12 +248,13 @@ func TestNewInsert(t *testing.T) {
 		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := planner.Build(trx)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, exec)
 		assert.IsType(t, &executor.Insert{}, exec)
+		trx.Commit()
 	})
 
 	t.Run("複数カラムの挿入で Executor が生成される", func(t *testing.T) {
@@ -248,6 +262,7 @@ func TestNewInsert(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
+		trx := executor.Begin(0)
 		createTableForTest(t, []*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "name", Type: catalog.ColumnTypeString},
@@ -276,12 +291,13 @@ func TestNewInsert(t *testing.T) {
 		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := planner.Build(trx)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, exec)
 		assert.IsType(t, &executor.Insert{}, exec)
+		trx.Commit()
 	})
 
 	t.Run("カラム順序が異なる挿入で Executor が生成される", func(t *testing.T) {
@@ -289,6 +305,7 @@ func TestNewInsert(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
+		trx := executor.Begin(0)
 		createTableForTest(t, []*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "name", Type: catalog.ColumnTypeString},
@@ -314,12 +331,13 @@ func TestNewInsert(t *testing.T) {
 		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := planner.Build(trx)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, exec)
 		assert.IsType(t, &executor.Insert{}, exec)
+		trx.Commit()
 	})
 
 	t.Run("サポートされていない literal タイプの場合、エラーを返す", func(t *testing.T) {
@@ -327,6 +345,7 @@ func TestNewInsert(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
+		trx := executor.Begin(0)
 		createTableForTest(t, []*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "name", Type: catalog.ColumnTypeString},
@@ -355,12 +374,13 @@ func TestNewInsert(t *testing.T) {
 		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := planner.Build(trx)
 
 		// THEN
 		assert.Error(t, err)
 		assert.Nil(t, exec)
 		assert.Contains(t, err.Error(), "unsupported literal type")
+		trx.Commit()
 	})
 }
 

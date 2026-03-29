@@ -12,7 +12,7 @@ import (
 )
 
 // セットアップヘルパー: テーブルを作成し、サンプルデータを挿入する
-func setupParserExample() func() {
+func setupParserExample(trx *executor.Transaction) func() {
 	tmpDir, err := os.MkdirTemp("", "parser_example")
 	if err != nil {
 		panic(err)
@@ -31,7 +31,7 @@ func setupParserExample() func() {
 	engine.Reset()
 	engine.Init()
 
-	runSQL(`
+	runSQL(trx, `
 CREATE TABLE users (
 	id VARCHAR,
 	first_name VARCHAR,
@@ -42,7 +42,7 @@ CREATE TABLE users (
 	UNIQUE KEY username_UNIQUE (username)
 );`)
 
-	runSQL(`
+	runSQL(trx, `
 INSERT INTO
 	users (id, first_name, last_name, gender, username)
 VALUES
@@ -57,14 +57,14 @@ VALUES
 }
 
 // SQL をパース → プラン → 実行して結果を返す
-func runSQL(sql string) []executor.Record {
+func runSQL(trx *executor.Transaction, sql string) []executor.Record {
 	p := parser.NewParser()
 	result, err := p.Parse(sql)
 	if err != nil {
 		panic(err)
 	}
 
-	exec, err := planner.Start(result)
+	exec, err := planner.Start(trx, result)
 	if err != nil {
 		panic(err)
 	}
@@ -95,10 +95,12 @@ func printRecords(records []executor.Record) {
 }
 
 func Example_scanAll() {
-	cleanup := setupParserExample()
+	trx := executor.Begin(0)
+	cleanup := setupParserExample(trx)
 	defer cleanup()
 
-	records := runSQL(`SELECT * FROM users;`)
+	records := runSQL(trx, `SELECT * FROM users;`)
+	trx.Commit()
 	printRecords(records)
 
 	// Output:
@@ -112,10 +114,12 @@ func Example_scanAll() {
 }
 
 func Example_assertEqual() {
-	cleanup := setupParserExample()
+	trx := executor.Begin(0)
+	cleanup := setupParserExample(trx)
 	defer cleanup()
 
-	records := runSQL(`SELECT * FROM users WHERE username = 'janedoe';`)
+	records := runSQL(trx, `SELECT * FROM users WHERE username = 'janedoe';`)
+	trx.Commit()
 	printRecords(records)
 
 	// Output:
@@ -124,10 +128,11 @@ func Example_assertEqual() {
 }
 
 func Example_filter() {
-	cleanup := setupParserExample()
+	trx := executor.Begin(0)
+	cleanup := setupParserExample(trx)
 	defer cleanup()
-
-	records := runSQL(`SELECT * FROM users WHERE first_name < 'K' AND gender = 'male' AND last_name >= 'Doe' OR first_name = 'Tom';`)
+	records := runSQL(trx, `SELECT * FROM users WHERE first_name < 'K' AND gender = 'male' AND last_name >= 'Doe' OR first_name = 'Tom';`)
+	trx.Commit()
 	printRecords(records)
 
 	// Output:
@@ -139,11 +144,12 @@ func Example_filter() {
 }
 
 func Example_update() {
-	cleanup := setupParserExample()
+	trx := executor.Begin(0)
+	cleanup := setupParserExample(trx)
 	defer cleanup()
-
-	runSQL(`UPDATE users SET last_name = 'Anderson' WHERE username = 'janedoe';`)
-	records := runSQL(`SELECT * FROM users;`)
+	runSQL(trx, `UPDATE users SET last_name = 'Anderson' WHERE username = 'janedoe';`)
+	records := runSQL(trx, `SELECT * FROM users;`)
+	trx.Commit()
 	printRecords(records)
 
 	// Output:
@@ -157,11 +163,12 @@ func Example_update() {
 }
 
 func Example_delete() {
-	cleanup := setupParserExample()
+	trx := executor.Begin(0)
+	cleanup := setupParserExample(trx)
 	defer cleanup()
-
-	runSQL(`DELETE FROM users WHERE first_name = 'John' AND last_name = 'Doe';`)
-	records := runSQL(`SELECT * FROM users;`)
+	runSQL(trx, `DELETE FROM users WHERE first_name = 'John' AND last_name = 'Doe';`)
+	records := runSQL(trx, `SELECT * FROM users;`)
+	trx.Commit()
 	printRecords(records)
 
 	// Output:

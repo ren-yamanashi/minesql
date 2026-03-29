@@ -18,7 +18,7 @@ func NewInsert(stmt *ast.InsertStmt) *Insert {
 	}
 }
 
-func (ip *Insert) Build() (executor.Executor, error) {
+func (ip *Insert) Build(trx *executor.Transaction) (executor.Executor, error) {
 	if len(ip.Stmt.Cols) == 0 {
 		return nil, errors.New("column names cannot be empty")
 	}
@@ -78,5 +78,5 @@ func (ip *Insert) Build() (executor.Executor, error) {
 		records = append(records, record)
 	}
 
-	return executor.NewInsert(tbl, records), nil
+	return executor.NewInsert(trx, tbl, records), nil
 }

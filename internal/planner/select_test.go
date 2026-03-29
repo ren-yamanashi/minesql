@@ -104,8 +104,10 @@ func TestSelect(t *testing.T) {
 			{Name: "name", Type: catalog.ColumnTypeString},
 		})
 
+		trx := executor.Begin(0)
+
 		// データを挿入
-		executePlan(t, &ast.InsertStmt{
+		executePlan(t, trx, &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("users"),
 			Cols: []ast.ColumnId{
@@ -123,6 +125,7 @@ func TestSelect(t *testing.T) {
 				},
 			},
 		})
+		trx.Commit()
 
 		stmt := &ast.SelectStmt{
 			StmtType: ast.StmtTypeSelect,

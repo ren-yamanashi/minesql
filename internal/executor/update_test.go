@@ -12,6 +12,7 @@ import (
 func TestNewUpdate(t *testing.T) {
 	t.Run("正常に Update Executor を生成できる", func(t *testing.T) {
 		// GIVEN
+		trx := Begin(0)
 		setColumns := []SetColumn{
 			{Pos: 1, Value: []byte("Jane")},
 		}
@@ -23,13 +24,14 @@ func TestNewUpdate(t *testing.T) {
 		)
 
 		// WHEN
-		upd := NewUpdate(nil, setColumns, iterator)
+		upd := NewUpdate(trx, nil, setColumns, iterator)
 
 		// THEN
 		assert.NotNil(t, upd)
 		assert.Nil(t, upd.table)
 		assert.Equal(t, setColumns, upd.SetColumns)
 		assert.NotNil(t, upd.InnerExecutor)
+		trx.Commit()
 	})
 }
 
@@ -40,11 +42,13 @@ func TestUpdate_Next(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
+		trx := Begin(0)
+
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
 		assert.NoError(t, err)
 
-		upd := NewUpdate(tbl, []SetColumn{
+		upd := NewUpdate(trx, tbl, []SetColumn{
 			{Pos: 1, Value: []byte("Updated")},
 		}, NewTableScan(
 			tbl,
@@ -57,6 +61,7 @@ func TestUpdate_Next(t *testing.T) {
 
 		// THEN: 更新が成功する
 		assert.NoError(t, err)
+		trx.Commit()
 
 		// THEN: 全レコードの first_name が "Updated" になっている
 		scan := NewTableScan(
@@ -78,12 +83,14 @@ func TestUpdate_Next(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
+		trx := Begin(0)
+
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
 		assert.NoError(t, err)
 
 		// プライマリキーが "a" のレコードのみ更新
-		upd := NewUpdate(tbl, []SetColumn{
+		upd := NewUpdate(trx, tbl, []SetColumn{
 			{Pos: 1, Value: []byte("Jane")},
 			{Pos: 2, Value: []byte("Updated")},
 		}, NewTableScan(
@@ -99,6 +106,7 @@ func TestUpdate_Next(t *testing.T) {
 
 		// THEN: 更新が成功する
 		assert.NoError(t, err)
+		trx.Commit()
 
 		// THEN: "a" のレコードが更新され、他は変わらない
 		scan := NewTableScan(
@@ -119,12 +127,14 @@ func TestUpdate_Next(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
+		trx := Begin(0)
+
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
 		assert.NoError(t, err)
 
 		// first_name が "Bob" のレコードの last_name を更新
-		upd := NewUpdate(tbl, []SetColumn{
+		upd := NewUpdate(trx, tbl, []SetColumn{
 			{Pos: 2, Value: []byte("Williams")},
 		}, NewFilter(
 			NewTableScan(
@@ -142,6 +152,7 @@ func TestUpdate_Next(t *testing.T) {
 
 		// THEN: 更新が成功する
 		assert.NoError(t, err)
+		trx.Commit()
 
 		// THEN: "Bob" の last_name が "Williams" に更新され、他は変わらない
 		scan := NewTableScan(
@@ -167,6 +178,8 @@ func TestUpdate_Next(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
+		trx := Begin(0)
+
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
 		assert.NoError(t, err)
@@ -176,7 +189,7 @@ func TestUpdate_Next(t *testing.T) {
 		assert.NoError(t, err)
 
 		// "a" (last_name = "Doe") の last_name を "Zebra" に更新
-		upd := NewUpdate(tbl, []SetColumn{
+		upd := NewUpdate(trx, tbl, []SetColumn{
 			{Pos: 2, Value: []byte("Zebra")},
 		}, NewTableScan(
 			tbl,
@@ -191,6 +204,7 @@ func TestUpdate_Next(t *testing.T) {
 
 		// THEN: 更新が成功する
 		assert.NoError(t, err)
+		trx.Commit()
 
 		// THEN: ユニークインデックスで "Zebra" が検索できる
 		// SearchIndex の whileCondition にはデコードされたセカンダリキーのみ渡される
@@ -227,12 +241,14 @@ func TestUpdate_Next(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
+		trx := Begin(0)
+
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
 		assert.NoError(t, err)
 
 		// プライマリキーを "a" → "z" に変更
-		upd := NewUpdate(tbl, []SetColumn{
+		upd := NewUpdate(trx, tbl, []SetColumn{
 			{Pos: 0, Value: []byte("z")},
 		}, NewTableScan(
 			tbl,
@@ -247,6 +263,7 @@ func TestUpdate_Next(t *testing.T) {
 
 		// THEN: 更新が成功する
 		assert.NoError(t, err)
+		trx.Commit()
 
 		// THEN: "a" が消え "z" が追加されている
 		scan := NewTableScan(
@@ -271,12 +288,14 @@ func TestUpdate_Next(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
+		trx := Begin(0)
+
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
 		assert.NoError(t, err)
 
 		// 存在しない first_name でフィルタ
-		upd := NewUpdate(tbl, []SetColumn{
+		upd := NewUpdate(trx, tbl, []SetColumn{
 			{Pos: 2, Value: []byte("Changed")},
 		}, NewFilter(
 			NewTableScan(
@@ -294,6 +313,7 @@ func TestUpdate_Next(t *testing.T) {
 
 		// THEN: エラーなしで正常終了
 		assert.NoError(t, err)
+		trx.Commit()
 
 		// THEN: 全レコードが変更されていない
 		scan := NewTableScan(
@@ -318,7 +338,8 @@ func TestUpdate_Next(t *testing.T) {
 		defer engine.Reset()
 		_ = tmpdir
 
-		createTableForTest(t, "empty_table", 1, nil, []*ColumnParam{
+		trx := Begin(0)
+		createTableForTest(t, "empty_table", nil, []*ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "value", Type: catalog.ColumnTypeString},
 		})
@@ -327,7 +348,7 @@ func TestUpdate_Next(t *testing.T) {
 		tbl, err := getTableAccessMethod("empty_table")
 		assert.NoError(t, err)
 
-		upd := NewUpdate(tbl, []SetColumn{
+		upd := NewUpdate(trx, tbl, []SetColumn{
 			{Pos: 1, Value: []byte("new_value")},
 		}, NewTableScan(
 			tbl,
@@ -340,5 +361,6 @@ func TestUpdate_Next(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
+		trx.Commit()
 	})
 }
