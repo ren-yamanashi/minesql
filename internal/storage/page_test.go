@@ -21,55 +21,6 @@ func TestNewPageId(t *testing.T) {
 	})
 }
 
-func TestEquals(t *testing.T) {
-	t.Run("同じ FileId と PageNumber を持つ PageId は等しい", func(t *testing.T) {
-		// GIVEN
-		pageId1 := NewPageId(1, 2)
-		pageId2 := NewPageId(1, 2)
-
-		// WHEN
-		result := pageId1.Equals(pageId2)
-
-		// THEN
-		assert.True(t, result)
-	})
-
-	t.Run("FileId が異なる PageId は等しくない", func(t *testing.T) {
-		// GIVEN
-		pageId1 := NewPageId(1, 2)
-		pageId2 := NewPageId(2, 2)
-
-		// WHEN
-		result := pageId1.Equals(pageId2)
-
-		// THEN
-		assert.False(t, result)
-	})
-
-	t.Run("PageNumber が異なる PageId は等しくない", func(t *testing.T) {
-		// GIVEN
-		pageId1 := NewPageId(1, 2)
-		pageId2 := NewPageId(1, 3)
-
-		// WHEN
-		result := pageId1.Equals(pageId2)
-
-		// THEN
-		assert.False(t, result)
-	})
-
-	t.Run("FileId と PageNumber の両方が異なる PageId は等しくない", func(t *testing.T) {
-		// GIVEN
-		pageId1 := NewPageId(1, 2)
-		pageId2 := NewPageId(3, 4)
-
-		// WHEN
-		result := pageId1.Equals(pageId2)
-
-		// THEN
-		assert.False(t, result)
-	})
-}
 
 func TestIsInvalid(t *testing.T) {
 	t.Run("INVALID_PAGE_ID は無効と判定される", func(t *testing.T) {

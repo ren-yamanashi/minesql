@@ -33,14 +33,9 @@ func NewPageId(fileId FileId, pageNumber PageNumber) PageId {
 	}
 }
 
-// Equals はこの PageId と引数に与えた PageId が等しいかどうかを判定する
-func (p *PageId) Equals(other PageId) bool {
-	return p.FileId == other.FileId && p.PageNumber == other.PageNumber
-}
-
 // IsInvalid はこの PageId が無効な PageID (INVALID_PAGE_ID) かどうかを判定する
 func (p *PageId) IsInvalid() bool {
-	return p.Equals(INVALID_PAGE_ID)
+	return *p == INVALID_PAGE_ID
 }
 
 // WriteTo は PageId を指定位置に書き込む
@@ -54,8 +49,7 @@ func (p *PageId) WriteTo(data []byte, offset int) {
 //   - 次の4バイト: PageNumber
 func (p *PageId) ToBytes() []byte {
 	buf := make([]byte, 8)
-	binary.BigEndian.PutUint32(buf[0:4], uint32(p.FileId))
-	binary.BigEndian.PutUint32(buf[4:8], uint32(p.PageNumber))
+	p.WriteTo(buf, 0)
 	return buf
 }
 

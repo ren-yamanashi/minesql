@@ -53,24 +53,14 @@ func (d *Disk) ReadPageData(id PageId, data []byte) error {
 	if len(data) != PAGE_SIZE {
 		return ErrInvalidDataSize
 	}
-
-	if id.FileId != d.fileId {
-		return fmt.Errorf("invalid FileId: expected %d, got %d", d.fileId, id.FileId)
-	}
-
-	// 指定されたページ番号に対応するページの先頭にシークする
-	err := d.seek(id.PageNumber)
-	if err != nil {
+	if err := d.seekToPage(id); err != nil {
 		return err
 	}
 
 	// シークした位置から PAGE_SIZE バイト読み込む
 	// 読み込んだデータは `data` に格納される
-	_, err = io.ReadFull(d.heapFile, data) // data に PAGE_SIZE バイト読み込む (data の長さは PAGE_SIZE と等しいので ReadFull を使用すると PAGE_SIZE バイト読み込まれる)
-	if err != nil {
-		return err
-	}
-	return nil
+	_, err := io.ReadFull(d.heapFile, data) // data に PAGE_SIZE バイト読み込む (data の長さは PAGE_SIZE と等しいので ReadFull を使用すると PAGE_SIZE バイト読み込まれる)
+	return err
 }
 
 // WritePageData は指定されたページ ID に対応するページに data の内容を書き込む
@@ -80,14 +70,7 @@ func (d *Disk) WritePageData(id PageId, data []byte) error {
 	if len(data) != PAGE_SIZE {
 		return ErrInvalidDataSize
 	}
-
-	if id.FileId != d.fileId {
-		return fmt.Errorf("invalid FileId: expected %d, got %d", d.fileId, id.FileId)
-	}
-
-	// 指定されたページ番号に対応するページの先頭にシークする
-	err := d.seek(id.PageNumber)
-	if err != nil {
+	if err := d.seekToPage(id); err != nil {
 		return err
 	}
 
@@ -116,12 +99,12 @@ func (d *Disk) Sync() error {
 	return d.heapFile.Sync()
 }
 
-// seek は指定されたページ番号に対応するページの先頭にシークする
-func (d *Disk) seek(pageNumber PageNumber) error {
-	offset := PAGE_SIZE * uint64(pageNumber)               // 開始位置を計算
-	_, err := d.heapFile.Seek(int64(offset), io.SeekStart) // ファイルの先頭から offset バイト移動
-	if err != nil {
-		return err
+// seekToPage はページ ID で指定されたページの先頭にシークする
+func (d *Disk) seekToPage(id PageId) error {
+	if id.FileId != d.fileId {
+		return fmt.Errorf("invalid FileId: expected %d, got %d", d.fileId, id.FileId)
 	}
-	return nil
+	offset := PAGE_SIZE * uint64(id.PageNumber)
+	_, err := d.heapFile.Seek(int64(offset), io.SeekStart)
+	return err
 }

@@ -71,11 +71,11 @@ func (bp *BufferPool) FetchPage(pageId PageId) (*BufferPage, error) {
 //
 // バッファプールに空きがある場合は新しいページを追加し、空きがない場合は古いページを新しいページに置き換える
 func (bp *BufferPool) AddPage(pageId PageId) (*BufferPage, error) {
-	// バッファに空きがある場合、新しいバッファページを追加し、ページテーブルを更新
+	// バッファに空きがある場合、新しいバッファページを追加し、ページテーブルを更新 (エントリを追加)
 	if len(bp.bufferPages) < bp.maxBufferSize {
 		bp.bufferPages = append(bp.bufferPages, *NewBufferPage(pageId))
 		bufferId := BufferId(len(bp.bufferPages) - 1)
-		bp.addPageToTable(pageId, bufferId)
+		bp.pageTable[pageId] = bufferId
 		bp.evictionAlgorithm.Access(bufferId)
 		return &bp.bufferPages[bufferId], nil
 	}
@@ -186,9 +186,4 @@ func (bp *BufferPool) updatePageTable(evictPageId PageId, newPageId PageId, buff
 		delete(bp.pageTable, evictPageId)
 	}
 	bp.pageTable[newPageId] = bufferId
-}
-
-// addPageToTable はページテーブルに新しいエントリを追加する
-func (bp *BufferPool) addPageToTable(pageId PageId, bufferId BufferId) {
-	bp.pageTable[pageId] = bufferId
 }
