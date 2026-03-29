@@ -129,6 +129,55 @@ func TestExecuteQuery(t *testing.T) {
 		assert.Contains(t, result, "2,Bob")
 	})
 
+	t.Run("BEGIN なしの DML は autocommit される", func(t *testing.T) {
+		// GIVEN
+		s := setupTestServer(t)
+		defer engine.Reset()
+		sess := newSession()
+
+		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		assert.NoError(t, err)
+
+		// WHEN: BEGIN なしで INSERT
+		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
+		assert.NoError(t, err)
+
+		// THEN: trxId は 0 のまま (autocommit 済み)
+		assert.Equal(t, undo.TrxId(0), sess.trxId)
+
+		// THEN: Undo ログが残っていない (Commit で破棄済み)
+		// データは永続化されている
+		result, err := s.executeQuery(sess, "SELECT * FROM users;")
+		assert.NoError(t, err)
+		assert.Contains(t, result, "1,Alice")
+	})
+
+	t.Run("autocommit のデータは ROLLBACK で取り消せない", func(t *testing.T) {
+		// GIVEN: BEGIN なしで INSERT (autocommit)
+		s := setupTestServer(t)
+		defer engine.Reset()
+		sess := newSession()
+
+		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		assert.NoError(t, err)
+		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
+		assert.NoError(t, err)
+
+		// WHEN: その後 BEGIN → ROLLBACK しても autocommit 済みのデータは残る
+		_, err = s.executeQuery(sess, "BEGIN;")
+		assert.NoError(t, err)
+		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('2', 'Bob');")
+		assert.NoError(t, err)
+		_, err = s.executeQuery(sess, "ROLLBACK;")
+		assert.NoError(t, err)
+
+		// THEN: autocommit の Alice は残り、トランザクション内の Bob は消える
+		result, err := s.executeQuery(sess, "SELECT * FROM users;")
+		assert.NoError(t, err)
+		assert.Contains(t, result, "1,Alice")
+		assert.NotContains(t, result, "Bob")
+	})
+
 	t.Run("不正な SQL はエラーを返す", func(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
@@ -376,6 +425,53 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		assert.NoError(t, err)
 
 		result, err := s.executeQuery(sessA, "SELECT * FROM users;")
+		assert.NoError(t, err)
+		assert.Contains(t, result, "1,Alice")
+	})
+
+	t.Run("接続切断時にアクティブなトランザクションが自動ロールバックされる", func(t *testing.T) {
+		// GIVEN: BEGIN → INSERT したが COMMIT していない
+		s := setupTestServer(t)
+		defer engine.Reset()
+		sess := newSession()
+
+		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		assert.NoError(t, err)
+
+		_, err = s.executeQuery(sess, "BEGIN;")
+		assert.NoError(t, err)
+
+		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
+		assert.NoError(t, err)
+
+		// WHEN: 接続切断をシミュレート (handleConnection の defer と同じロジック)
+		assert.NotEqual(t, undo.TrxId(0), sess.trxId)
+		err = s.trxManager.Rollback(sess.trxId)
+		assert.NoError(t, err)
+		sess.trxId = 0
+
+		// THEN: INSERT がロールバックされてテーブルが空
+		result, err := s.executeQuery(sess, "SELECT * FROM users;")
+		assert.NoError(t, err)
+		assert.Equal(t, "", result)
+	})
+
+	t.Run("トランザクションなしの接続切断では何も起きない", func(t *testing.T) {
+		// GIVEN: BEGIN していない
+		s := setupTestServer(t)
+		defer engine.Reset()
+		sess := newSession()
+
+		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		assert.NoError(t, err)
+		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
+		assert.NoError(t, err)
+
+		// WHEN: 接続切断をシミュレート (trxId == 0 なのでロールバックは走らない)
+		assert.Equal(t, undo.TrxId(0), sess.trxId)
+
+		// THEN: データはそのまま残る
+		result, err := s.executeQuery(sess, "SELECT * FROM users;")
 		assert.NoError(t, err)
 		assert.Contains(t, result, "1,Alice")
 	})

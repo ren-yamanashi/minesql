@@ -116,14 +116,21 @@ func (s *Server) accept(listener *net.TCPListener) {
 // クライアントからの接続を処理する
 // プロトコルの定義は ./docs/architecture/server.md#プロトコル を参照
 func (s *Server) handleConnection(conn *net.TCPConn) {
+	sess := newSession()
+
 	defer func() {
+		// アクティブなトランザクションがあれば自動ロールバック
+		if sess.trxId != 0 {
+			if err := s.trxManager.Rollback(sess.trxId); err != nil {
+				log.Printf("Auto rollback error: %v", err)
+			}
+			sess.trxId = 0
+		}
 		log.Printf("Closing connection from %s", conn.RemoteAddr().String())
 		if err := conn.Close(); err != nil {
 			log.Printf("failed to close connection: %v", err)
 		}
 	}()
-
-	sess := newSession()
 
 	for {
 		// タイムアウトの設定 (10 分間何も送ってこなければ切断)
@@ -199,8 +206,18 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 		return "", nil
 	}
 
-	exec, err := planner.Start(s.undoLog, sess.trxId, node)
+	// トランザクション外の DML は autocommit (一時的な trxId を発行して即 Commit)
+	autocommit := sess.trxId == 0
+	trxId := sess.trxId
+	if autocommit {
+		trxId = s.trxManager.Begin()
+	}
+
+	exec, err := planner.Start(s.undoLog, trxId, node)
 	if err != nil {
+		if autocommit {
+			_ = s.trxManager.Rollback(trxId)
+		}
 		return "", err
 	}
 
@@ -208,12 +225,19 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 	for {
 		record, err := exec.Next()
 		if err != nil {
+			if autocommit {
+				_ = s.trxManager.Rollback(trxId)
+			}
 			return "", err
 		}
 		if record == nil {
 			break
 		}
 		records = append(records, record)
+	}
+
+	if autocommit {
+		s.trxManager.Commit(trxId)
 	}
 
 	// 一旦、レスポンスは csv 形式で返す
