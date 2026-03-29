@@ -11,22 +11,30 @@ import (
 	"strings"
 	"time"
 
+	"minesql/internal/ast"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/parser"
 	"minesql/internal/planner"
+	"minesql/internal/transaction"
+	"minesql/internal/undo"
 )
 
 type Server struct {
 	Address        string
 	Port           int
 	storageManager *engine.Engine
+	undoLog        *undo.UndoLog
+	trxManager     *transaction.Manager
 }
 
 func NewServer(address string, port int) *Server {
+	undoLog := undo.NewUndoLog()
 	return &Server{
-		Address: address,
-		Port:    port,
+		Address:    address,
+		Port:       port,
+		undoLog:    undoLog,
+		trxManager: transaction.NewManager(undoLog),
 	}
 }
 
@@ -115,6 +123,8 @@ func (s *Server) handleConnection(conn *net.TCPConn) {
 		}
 	}()
 
+	sess := newSession()
+
 	for {
 		// タイムアウトの設定 (10 分間何も送ってこなければ切断)
 		err := conn.SetReadDeadline(time.Now().Add(10 * time.Minute))
@@ -138,7 +148,7 @@ func (s *Server) handleConnection(conn *net.TCPConn) {
 		}
 
 		// クエリの実行
-		result, err := s.executeQuery(sql)
+		result, err := s.executeQuery(sess, sql)
 		if err != nil {
 			err := s.writePacket(conn, fmt.Sprintf("Error: %v", err))
 			if err != nil {
@@ -156,14 +166,29 @@ func (s *Server) handleConnection(conn *net.TCPConn) {
 }
 
 // クエリを実行して結果を文字列で返す
-func (s *Server) executeQuery(sql string) (string, error) {
+func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 	p := parser.NewParser()
 	node, err := p.Parse(sql)
 	if err != nil {
 		return "", err
 	}
 
-	exec, err := planner.Start(node)
+	// トランザクション制御は planner を通さず直接処理する
+	switch node.(type) {
+	case *ast.BeginStmt:
+		sess.trxId = s.trxManager.Begin()
+		return "", nil
+	case *ast.CommitStmt:
+		s.trxManager.Commit(sess.trxId)
+		return "", nil
+	case *ast.RollbackStmt:
+		if err := s.trxManager.Rollback(sess.trxId); err != nil {
+			return "", err
+		}
+		return "", nil
+	}
+
+	exec, err := planner.Start(s.undoLog, sess.trxId, node)
 	if err != nil {
 		return "", err
 	}

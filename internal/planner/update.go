@@ -6,6 +6,7 @@ import (
 	"minesql/internal/ast"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
+	"minesql/internal/undo"
 )
 
 type Update struct {
@@ -18,7 +19,7 @@ func NewUpdate(stmt *ast.UpdateStmt) *Update {
 	}
 }
 
-func (up *Update) Build(trx *executor.Transaction) (executor.Executor, error) {
+func (up *Update) Build(undoLog *undo.UndoLog, trxId undo.TrxId) (executor.Executor, error) {
 	e := engine.Get()
 
 	// 対象テーブルのメタデータを取得
@@ -59,5 +60,5 @@ func (up *Update) Build(trx *executor.Transaction) (executor.Executor, error) {
 		return nil, err
 	}
 
-	return executor.NewUpdate(trx, tbl, setColumns, iterator), nil
+	return executor.NewUpdate(undoLog, trxId, tbl, setColumns, iterator), nil
 }

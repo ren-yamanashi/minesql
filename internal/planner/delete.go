@@ -5,6 +5,7 @@ import (
 	"minesql/internal/ast"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
+	"minesql/internal/undo"
 )
 
 type Delete struct {
@@ -17,7 +18,7 @@ func NewDelete(stmt *ast.DeleteStmt) *Delete {
 	}
 }
 
-func (dp *Delete) Build(trx *executor.Transaction) (executor.Executor, error) {
+func (dp *Delete) Build(undoLog *undo.UndoLog, trxId undo.TrxId) (executor.Executor, error) {
 	e := engine.Get()
 
 	// 対象テーブルのメタデータを取得
@@ -39,5 +40,5 @@ func (dp *Delete) Build(trx *executor.Transaction) (executor.Executor, error) {
 		return nil, err
 	}
 
-	return executor.NewDelete(trx, tbl, iterator), nil
+	return executor.NewDelete(undoLog, trxId, tbl, iterator), nil
 }

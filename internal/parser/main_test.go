@@ -5,6 +5,8 @@ import (
 	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/planner"
+	"minesql/internal/transaction"
+	"minesql/internal/undo"
 	"strings"
 	"testing"
 
@@ -21,9 +23,11 @@ func TestParserIntegration(t *testing.T) {
 		engine.Init()
 		defer engine.Reset()
 
-		trx := executor.Begin(0)
+		undoLog := undo.NewUndoLog()
+		trxMgr := transaction.NewManager(undoLog)
+		trxId := trxMgr.Begin()
 
-		executeSql(t, trx, `
+		executeSql(t, undoLog, trxId, `
 CREATE TABLE users (
 	id VARCHAR,
 	first_name VARCHAR,
@@ -34,7 +38,7 @@ CREATE TABLE users (
 	UNIQUE KEY username_UNIQUE (username)
 );`)
 
-		executeSql(t, trx, `
+		executeSql(t, undoLog, trxId, `
 INSERT INTO
 	users (id, first_name, last_name, gender, username)
 VALUES
@@ -45,8 +49,8 @@ VALUES
 	('5', 'Jonathan', 'Black', 'male', 'jonathanblack'),
 	('6', 'Tom', 'Brown', 'male', 'tombrown');`)
 		// WHEN
-		records := executeSql(t, trx, `SELECT * FROM users;`)
-		trx.Commit()
+		records := executeSql(t, undoLog, trxId, `SELECT * FROM users;`)
+		trxMgr.Commit(trxId)
 
 		// THEN
 		var sb strings.Builder
@@ -74,15 +78,17 @@ VALUES
 		engine.Init()
 		defer engine.Reset()
 
-		trx := executor.Begin(0)
+		undoLog := undo.NewUndoLog()
+		trxMgr := transaction.NewManager(undoLog)
+		trxId := trxMgr.Begin()
 
-		executeSql(t, trx, `
+		executeSql(t, undoLog, trxId, `
 CREATE TABLE users (
 	id VARCHAR, first_name VARCHAR, last_name VARCHAR, gender VARCHAR, username VARCHAR,
 	PRIMARY KEY (id), UNIQUE KEY username_UNIQUE (username)
 );`)
 
-		executeSql(t, trx, `
+		executeSql(t, undoLog, trxId, `
 INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 	('1', 'John', 'Doe', 'male', 'johndoe'),
 	('2', 'John', 'Doe2', 'male', 'johndoe2'),
@@ -91,8 +97,8 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 	('5', 'Jonathan', 'Black', 'male', 'jonathanblack'),
 	('6', 'Tom', 'Brown', 'male', 'tombrown');`)
 		// WHEN
-		records := executeSql(t, trx, `SELECT * FROM users WHERE username = 'janedoe';`)
-		trx.Commit()
+		records := executeSql(t, undoLog, trxId, `SELECT * FROM users WHERE username = 'janedoe';`)
+		trxMgr.Commit(trxId)
 
 		// THEN
 		var sb strings.Builder
@@ -115,15 +121,17 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 		engine.Init()
 		defer engine.Reset()
 
-		trx := executor.Begin(0)
+		undoLog := undo.NewUndoLog()
+		trxMgr := transaction.NewManager(undoLog)
+		trxId := trxMgr.Begin()
 
-		executeSql(t, trx, `
+		executeSql(t, undoLog, trxId, `
 CREATE TABLE users (
 	id VARCHAR, first_name VARCHAR, last_name VARCHAR, gender VARCHAR, username VARCHAR,
 	PRIMARY KEY (id), UNIQUE KEY username_UNIQUE (username)
 );`)
 
-		executeSql(t, trx, `
+		executeSql(t, undoLog, trxId, `
 INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 	('1', 'John', 'Doe', 'male', 'johndoe'),
 	('2', 'John', 'Doe2', 'male', 'johndoe2'),
@@ -131,12 +139,10 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 	('4', 'Jane', 'Doe2', 'female', 'janedoe'),
 	('5', 'Jonathan', 'Black', 'male', 'jonathanblack'),
 	('6', 'Tom', 'Brown', 'male', 'tombrown');`)
-		trx.Commit()
 
 		// WHEN: (first_name < 'K' AND gender = 'male' AND last_name >= 'Doe') OR first_name = 'Tom'
-		trx = executor.Begin(0)
-		records := executeSql(t, trx, `SELECT * FROM users WHERE first_name < 'K' AND gender = 'male' AND last_name >= 'Doe' OR first_name = 'Tom';`)
-		trx.Commit()
+		records := executeSql(t, undoLog, trxId, `SELECT * FROM users WHERE first_name < 'K' AND gender = 'male' AND last_name >= 'Doe' OR first_name = 'Tom';`)
+		trxMgr.Commit(trxId)
 
 		// THEN
 		var sb strings.Builder
@@ -162,15 +168,17 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 		engine.Init()
 		defer engine.Reset()
 
-		trx := executor.Begin(0)
+		undoLog := undo.NewUndoLog()
+		trxMgr := transaction.NewManager(undoLog)
+		trxId := trxMgr.Begin()
 
-		executeSql(t, trx, `
+		executeSql(t, undoLog, trxId, `
 CREATE TABLE users (
 	id VARCHAR, first_name VARCHAR, last_name VARCHAR, gender VARCHAR, username VARCHAR,
 	PRIMARY KEY (id), UNIQUE KEY username_UNIQUE (username)
 );`)
 
-		executeSql(t, trx, `
+		executeSql(t, undoLog, trxId, `
 INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 	('1', 'John', 'Doe', 'male', 'johndoe'),
 	('2', 'John', 'Doe2', 'male', 'johndoe2'),
@@ -180,10 +188,10 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 	('6', 'Tom', 'Brown', 'male', 'tombrown');`)
 
 		// WHEN
-		executeSql(t, trx, `UPDATE users SET last_name = 'Anderson' WHERE username = 'janedoe';`)
+		executeSql(t, undoLog, trxId, `UPDATE users SET last_name = 'Anderson' WHERE username = 'janedoe';`)
 		// THEN: UPDATE 後の全レコードを確認する
-		records := executeSql(t, trx, `SELECT * FROM users;`)
-		trx.Commit()
+		records := executeSql(t, undoLog, trxId, `SELECT * FROM users;`)
+		trxMgr.Commit(trxId)
 
 		var sb strings.Builder
 		sb.WriteString("=== UPDATE 後の全件 ===\n")
@@ -210,15 +218,17 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 		engine.Init()
 		defer engine.Reset()
 
-		trx := executor.Begin(0)
+		undoLog := undo.NewUndoLog()
+		trxMgr := transaction.NewManager(undoLog)
+		trxId := trxMgr.Begin()
 
-		executeSql(t, trx, `
+		executeSql(t, undoLog, trxId, `
 CREATE TABLE users (
 	id VARCHAR, first_name VARCHAR, last_name VARCHAR, gender VARCHAR, username VARCHAR,
 	PRIMARY KEY (id), UNIQUE KEY username_UNIQUE (username)
 );`)
 
-		executeSql(t, trx, `
+		executeSql(t, undoLog, trxId, `
 INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 	('1', 'John', 'Doe', 'male', 'johndoe'),
 	('2', 'John', 'Doe2', 'male', 'johndoe2'),
@@ -228,10 +238,10 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 	('6', 'Tom', 'Brown', 'male', 'tombrown');`)
 
 		// WHEN
-		executeSql(t, trx, `DELETE FROM users WHERE first_name = 'John' AND last_name = 'Doe';`)
+		executeSql(t, undoLog, trxId, `DELETE FROM users WHERE first_name = 'John' AND last_name = 'Doe';`)
 		// THEN: DELETE 後の全レコードを確認する
-		records := executeSql(t, trx, `SELECT * FROM users;`)
-		trx.Commit()
+		records := executeSql(t, undoLog, trxId, `SELECT * FROM users;`)
+		trxMgr.Commit(trxId)
 
 		var sb strings.Builder
 		sb.WriteString("=== DELETE 後の全件 ===\n")
@@ -264,13 +274,13 @@ func fetchAll(t *testing.T, iter executor.Executor) []executor.Record {
 }
 
 // SQL をパース → プラン → 実行して結果を返す
-func executeSql(t *testing.T, trx *executor.Transaction, sql string) []executor.Record {
+func executeSql(t *testing.T, undoLog *undo.UndoLog, trxId undo.TrxId, sql string) []executor.Record {
 	t.Helper()
 	p := NewParser()
 	result, err := p.Parse(sql)
 	assert.NoError(t, err)
 
-	exec, err := planner.Start(trx, result)
+	exec, err := planner.Start(undoLog, trxId, result)
 	assert.NoError(t, err)
 
 	return fetchAll(t, exec)

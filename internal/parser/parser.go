@@ -184,6 +184,18 @@ func (p *Parser) OnKeyword(word string) {
 		p.currentHandler = NewUpdateParser()
 		p.currentHandler.OnKeyword(word)
 		return
+
+	case KBegin:
+		p.currentHandler = NewTransactionParser(ast.StmtTypeBegin)
+		return
+
+	case KCommit:
+		p.currentHandler = NewTransactionParser(ast.StmtTypeCommit)
+		return
+
+	case KRollback:
+		p.currentHandler = NewTransactionParser(ast.StmtTypeRollback)
+		return
 	}
 }
 

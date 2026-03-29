@@ -9,10 +9,12 @@ import (
 	"minesql/internal/executor"
 	"minesql/internal/parser"
 	"minesql/internal/planner"
+	"minesql/internal/transaction"
+	"minesql/internal/undo"
 )
 
 // セットアップヘルパー: テーブルを作成し、サンプルデータを挿入する
-func setupParserExample(trx *executor.Transaction) func() {
+func setupParserExample(undoLog *undo.UndoLog, trxId undo.TrxId) func() {
 	tmpDir, err := os.MkdirTemp("", "parser_example")
 	if err != nil {
 		panic(err)
@@ -31,7 +33,7 @@ func setupParserExample(trx *executor.Transaction) func() {
 	engine.Reset()
 	engine.Init()
 
-	runSQL(trx, `
+	runSQL(undoLog, trxId, `
 CREATE TABLE users (
 	id VARCHAR,
 	first_name VARCHAR,
@@ -42,7 +44,7 @@ CREATE TABLE users (
 	UNIQUE KEY username_UNIQUE (username)
 );`)
 
-	runSQL(trx, `
+	runSQL(undoLog, trxId, `
 INSERT INTO
 	users (id, first_name, last_name, gender, username)
 VALUES
@@ -57,14 +59,14 @@ VALUES
 }
 
 // SQL をパース → プラン → 実行して結果を返す
-func runSQL(trx *executor.Transaction, sql string) []executor.Record {
+func runSQL(undoLog *undo.UndoLog, trxId undo.TrxId, sql string) []executor.Record {
 	p := parser.NewParser()
 	result, err := p.Parse(sql)
 	if err != nil {
 		panic(err)
 	}
 
-	exec, err := planner.Start(trx, result)
+	exec, err := planner.Start(undoLog, trxId, result)
 	if err != nil {
 		panic(err)
 	}
@@ -95,12 +97,14 @@ func printRecords(records []executor.Record) {
 }
 
 func Example_scanAll() {
-	trx := executor.Begin(0)
-	cleanup := setupParserExample(trx)
+	undoLog := undo.NewUndoLog()
+	trxMgr := transaction.NewManager(undoLog)
+	trxId := trxMgr.Begin()
+	cleanup := setupParserExample(undoLog, trxId)
 	defer cleanup()
 
-	records := runSQL(trx, `SELECT * FROM users;`)
-	trx.Commit()
+	records := runSQL(undoLog, trxId, `SELECT * FROM users;`)
+	trxMgr.Commit(trxId)
 	printRecords(records)
 
 	// Output:
@@ -114,12 +118,14 @@ func Example_scanAll() {
 }
 
 func Example_assertEqual() {
-	trx := executor.Begin(0)
-	cleanup := setupParserExample(trx)
+	undoLog := undo.NewUndoLog()
+	trxMgr := transaction.NewManager(undoLog)
+	trxId := trxMgr.Begin()
+	cleanup := setupParserExample(undoLog, trxId)
 	defer cleanup()
 
-	records := runSQL(trx, `SELECT * FROM users WHERE username = 'janedoe';`)
-	trx.Commit()
+	records := runSQL(undoLog, trxId, `SELECT * FROM users WHERE username = 'janedoe';`)
+	trxMgr.Commit(trxId)
 	printRecords(records)
 
 	// Output:
@@ -128,11 +134,13 @@ func Example_assertEqual() {
 }
 
 func Example_filter() {
-	trx := executor.Begin(0)
-	cleanup := setupParserExample(trx)
+	undoLog := undo.NewUndoLog()
+	trxMgr := transaction.NewManager(undoLog)
+	trxId := trxMgr.Begin()
+	cleanup := setupParserExample(undoLog, trxId)
 	defer cleanup()
-	records := runSQL(trx, `SELECT * FROM users WHERE first_name < 'K' AND gender = 'male' AND last_name >= 'Doe' OR first_name = 'Tom';`)
-	trx.Commit()
+	records := runSQL(undoLog, trxId, `SELECT * FROM users WHERE first_name < 'K' AND gender = 'male' AND last_name >= 'Doe' OR first_name = 'Tom';`)
+	trxMgr.Commit(trxId)
 	printRecords(records)
 
 	// Output:
@@ -144,12 +152,14 @@ func Example_filter() {
 }
 
 func Example_update() {
-	trx := executor.Begin(0)
-	cleanup := setupParserExample(trx)
+	undoLog := undo.NewUndoLog()
+	trxMgr := transaction.NewManager(undoLog)
+	trxId := trxMgr.Begin()
+	cleanup := setupParserExample(undoLog, trxId)
 	defer cleanup()
-	runSQL(trx, `UPDATE users SET last_name = 'Anderson' WHERE username = 'janedoe';`)
-	records := runSQL(trx, `SELECT * FROM users;`)
-	trx.Commit()
+	runSQL(undoLog, trxId, `UPDATE users SET last_name = 'Anderson' WHERE username = 'janedoe';`)
+	records := runSQL(undoLog, trxId, `SELECT * FROM users;`)
+	trxMgr.Commit(trxId)
 	printRecords(records)
 
 	// Output:
@@ -163,12 +173,14 @@ func Example_update() {
 }
 
 func Example_delete() {
-	trx := executor.Begin(0)
-	cleanup := setupParserExample(trx)
+	undoLog := undo.NewUndoLog()
+	trxMgr := transaction.NewManager(undoLog)
+	trxId := trxMgr.Begin()
+	cleanup := setupParserExample(undoLog, trxId)
 	defer cleanup()
-	runSQL(trx, `DELETE FROM users WHERE first_name = 'John' AND last_name = 'Doe';`)
-	records := runSQL(trx, `SELECT * FROM users;`)
-	trx.Commit()
+	runSQL(undoLog, trxId, `DELETE FROM users WHERE first_name = 'John' AND last_name = 'Doe';`)
+	records := runSQL(undoLog, trxId, `SELECT * FROM users;`)
+	trxMgr.Commit(trxId)
 	printRecords(records)
 
 	// Output:

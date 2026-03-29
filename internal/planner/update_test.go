@@ -5,6 +5,7 @@ import (
 	"minesql/internal/ast"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
+	"minesql/internal/undo"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,7 +37,8 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		trx := executor.Begin(0)
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
@@ -47,13 +49,12 @@ func TestUpdate_Build(t *testing.T) {
 		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trx)
+		exec, err := planner.Build(undoLog, trxId)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, exec)
 		assert.IsType(t, &executor.Update{}, exec)
-		trx.Commit()
 	})
 
 	t.Run("複数カラムの更新で SetColumns のカラム位置と値が正しく変換される", func(t *testing.T) {
@@ -62,7 +63,8 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		trx := executor.Begin(0)
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
@@ -74,7 +76,7 @@ func TestUpdate_Build(t *testing.T) {
 		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trx)
+		exec, err := planner.Build(undoLog, trxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -86,7 +88,6 @@ func TestUpdate_Build(t *testing.T) {
 		assert.Equal(t, []byte("Jane"), upd.SetColumns[0].Value)
 		assert.Equal(t, uint16(2), upd.SetColumns[1].Pos) // last_name の位置
 		assert.Equal(t, []byte("Doe"), upd.SetColumns[1].Value)
-		trx.Commit()
 	})
 
 	t.Run("存在しないテーブル名の場合、エラーが返る", func(t *testing.T) {
@@ -95,7 +96,8 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		trx := executor.Begin(0)
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("nonexistent"),
 			SetClauses: []*ast.SetClause{
@@ -105,12 +107,11 @@ func TestUpdate_Build(t *testing.T) {
 		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trx)
+		exec, err := planner.Build(undoLog, trxId)
 
 		// THEN
 		assert.Error(t, err)
 		assert.Nil(t, exec)
-		trx.Commit()
 	})
 
 	t.Run("存在しないカラム名の場合、エラーが返る", func(t *testing.T) {
@@ -119,7 +120,8 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		trx := executor.Begin(0)
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
@@ -130,13 +132,12 @@ func TestUpdate_Build(t *testing.T) {
 		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trx)
+		exec, err := planner.Build(undoLog, trxId)
 
 		// THEN
 		assert.Error(t, err)
 		assert.Nil(t, exec)
 		assert.Contains(t, err.Error(), "column does not exist: nonexistent")
-		trx.Commit()
 	})
 
 	t.Run("生成された Executor でレコードが正しく更新される", func(t *testing.T) {
@@ -145,7 +146,8 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		trx := executor.Begin(0)
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		e := engine.Get()
 		tbl := getPlannerTableAccessMethod(t, "users")
 
@@ -173,11 +175,10 @@ func TestUpdate_Build(t *testing.T) {
 		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trx)
+		exec, err := planner.Build(undoLog, trxId)
 		assert.NoError(t, err)
 		_, err = exec.Next()
 		assert.NoError(t, err)
-		trx.Commit()
 
 		// THEN: "a" の first_name が "Jane" に更新されている
 		scan := executor.NewTableScan(
@@ -197,7 +198,8 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		trx := executor.Begin(0)
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
@@ -207,13 +209,12 @@ func TestUpdate_Build(t *testing.T) {
 		}
 
 		// WHEN
-		exec, err := Start(trx, stmt)
+		exec, err := Start(undoLog, trxId, stmt)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, exec)
 		assert.IsType(t, &executor.Update{}, exec)
-		trx.Commit()
 	})
 
 	t.Run("PlanStart 経由で WHERE 句付きの Update Executor が生成される", func(t *testing.T) {
@@ -222,7 +223,8 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		trx := executor.Begin(0)
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
@@ -236,13 +238,12 @@ func TestUpdate_Build(t *testing.T) {
 		}
 
 		// WHEN
-		exec, err := Start(trx, stmt)
+		exec, err := Start(undoLog, trxId, stmt)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, exec)
 		assert.IsType(t, &executor.Update{}, exec)
-		trx.Commit()
 	})
 
 	t.Run("SetClauses が空の場合、空の SetColumns で Executor が生成される", func(t *testing.T) {
@@ -251,7 +252,8 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
-		trx := executor.Begin(0)
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table:      *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{},
@@ -260,7 +262,7 @@ func TestUpdate_Build(t *testing.T) {
 		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trx)
+		exec, err := planner.Build(undoLog, trxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -268,7 +270,6 @@ func TestUpdate_Build(t *testing.T) {
 		upd, ok := exec.(*executor.Update)
 		assert.True(t, ok)
 		assert.Empty(t, upd.SetColumns)
-		trx.Commit()
 	})
 }
 
