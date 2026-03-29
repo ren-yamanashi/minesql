@@ -223,7 +223,7 @@ func TestRestorePageIdFromBytes(t *testing.T) {
 		assert.Equal(t, PageNumber(0), pageId.PageNumber)
 	})
 
-	t.Run("8 バイト以外のデータから復元しようとすると panic", func(t *testing.T) {
+	t.Run("8 バイト未満のデータから復元しようとすると panic", func(t *testing.T) {
 		// GIVEN
 		bytes := []byte{0, 1, 2, 3, 4, 5, 6}
 
@@ -231,6 +231,55 @@ func TestRestorePageIdFromBytes(t *testing.T) {
 		assert.Panics(t, func() {
 			RestorePageIdFromBytes(bytes)
 		})
+	})
+
+	t.Run("8 バイト超過のデータから復元しようとすると panic", func(t *testing.T) {
+		// GIVEN
+		bytes := []byte{0, 1, 2, 3, 4, 5, 6, 7, 8}
+
+		// WHEN & THEN
+		assert.Panics(t, func() {
+			RestorePageIdFromBytes(bytes)
+		})
+	})
+
+	t.Run("空のデータから復元しようとすると panic", func(t *testing.T) {
+		// GIVEN
+		bytes := []byte{}
+
+		// WHEN & THEN
+		assert.Panics(t, func() {
+			RestorePageIdFromBytes(bytes)
+		})
+	})
+}
+
+func TestToBytesAndRestoreRoundTrip(t *testing.T) {
+	t.Run("ToBytes で変換したバイト列から RestorePageIdFromBytes で復元できる", func(t *testing.T) {
+		// GIVEN
+		pageId := NewPageId(0x12345678, 0xABCDEF00)
+
+		// WHEN
+		bytes := pageId.ToBytes()
+		restored := RestorePageIdFromBytes(bytes)
+
+		// THEN
+		assert.Equal(t, pageId, restored)
+	})
+}
+
+func TestWriteToAndReadPageIdRoundTrip(t *testing.T) {
+	t.Run("WriteTo で書き込んだデータを ReadPageIdFromPageData で読み取れる", func(t *testing.T) {
+		// GIVEN
+		pageId := NewPageId(0x12345678, 0xABCDEF00)
+		data := make([]byte, 16)
+
+		// WHEN
+		pageId.WriteTo(data, 4)
+		restored := ReadPageIdFromPageData(data, 4)
+
+		// THEN
+		assert.Equal(t, pageId, restored)
 	})
 }
 

@@ -50,8 +50,8 @@ func (p *PageId) WriteTo(data []byte, offset int) {
 }
 
 // ToBytes は PageId をバイト列に変換する
-//
-// 先頭4バイトに FileId、次の4バイトに PageNumber が格納される
+//   - 先頭4バイト: FileId
+//   - 次の4バイト: PageNumber
 func (p *PageId) ToBytes() []byte {
 	buf := make([]byte, 8)
 	binary.BigEndian.PutUint32(buf[0:4], uint32(p.FileId))
@@ -60,8 +60,7 @@ func (p *PageId) ToBytes() []byte {
 }
 
 // RestorePageIdFromBytes はバイト列から PageId を復元する
-//
-// data: PageId を表す8バイトのバイト列 (先頭4バイトに FileId、次の4バイトに PageNumber が格納されている必要がある)
+//   - data: PageId を表す8バイトのバイト列 (先頭4バイトに FileId、次の4バイトに PageNumber が格納されている必要がある)
 func RestorePageIdFromBytes(data []byte) PageId {
 	if len(data) != 8 {
 		panic("data size must be 8 bytes to convert to PageId")
@@ -73,10 +72,8 @@ func RestorePageIdFromBytes(data []byte) PageId {
 }
 
 // ReadPageIdFromPageData はページデータから PageId を読み取る
-//
-// data: ページデータ全体
-//
-// offset: PageId が格納されている位置 (通常はページの先頭、つまり offset=0)
+//   - data: ページデータ全体
+//   - offset: PageId が格納されている位置 (通常はページの先頭、つまり offset=0)
 func ReadPageIdFromPageData(data []byte, offset int) PageId {
 	return PageId{
 		FileId:     FileId(binary.BigEndian.Uint32(data[offset : offset+4])),
