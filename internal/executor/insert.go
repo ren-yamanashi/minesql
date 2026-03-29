@@ -8,14 +8,16 @@ import (
 
 // Insert はレコードを追加する
 type Insert struct {
-	trx     *Transaction
+	undoLog *undo.UndoLog
+	trxId   undo.TrxId
 	table   *access.TableAccessMethod
 	records []Record
 }
 
-func NewInsert(trx *Transaction, table *access.TableAccessMethod, records []Record) *Insert {
+func NewInsert(undoLog *undo.UndoLog, trxId undo.TrxId, table *access.TableAccessMethod, records []Record) *Insert {
 	return &Insert{
-		trx:     trx,
+		undoLog: undoLog,
+		trxId:   trxId,
 		table:   table,
 		records: records,
 	}
@@ -25,7 +27,7 @@ func (ins *Insert) Next() (Record, error) {
 	e := engine.Get()
 
 	for _, record := range ins.records {
-		ins.trx.AddUndoLogRecord(undo.NewInsertLogRecord(ins.table, record))
+		ins.undoLog.Append(ins.trxId, undo.NewInsertLogRecord(ins.table, record))
 		if err := ins.table.Insert(e.BufferPool, record); err != nil {
 			return nil, err
 		}

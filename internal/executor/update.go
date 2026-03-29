@@ -14,15 +14,17 @@ type SetColumn struct {
 
 // Update は InnerExecutor の結果を元にレコードを更新する
 type Update struct {
-	trx           *Transaction
+	undoLog       *undo.UndoLog
+	trxId         undo.TrxId
 	table         *access.TableAccessMethod
 	SetColumns    []SetColumn
 	InnerExecutor Executor
 }
 
-func NewUpdate(trx *Transaction, table *access.TableAccessMethod, setColumns []SetColumn, innerExecutor Executor) *Update {
+func NewUpdate(undoLog *undo.UndoLog, trxId undo.TrxId, table *access.TableAccessMethod, setColumns []SetColumn, innerExecutor Executor) *Update {
 	return &Update{
-		trx:           trx,
+		undoLog:       undoLog,
+		trxId:         trxId,
 		table:         table,
 		SetColumns:    setColumns,
 		InnerExecutor: innerExecutor,
@@ -67,17 +69,17 @@ func (upd *Update) Next() (Record, error) {
 
 		if bytes.Equal(encodedOldKey, encodedNewKey) {
 			// プライマリキーが変わらない場合はインプレース更新
-			upd.trx.AddUndoLogRecord(undo.NewUpdateInplaceLogRecord(upd.table, record, updatedRecords[i]))
+			upd.undoLog.Append(upd.trxId, undo.NewUpdateInplaceLogRecord(upd.table, record, updatedRecords[i]))
 			if err := upd.table.UpdateInplace(e.BufferPool, record, updatedRecords[i]); err != nil {
 				return nil, err
 			}
 		} else {
 			// プライマリキーが変わる場合はソフトデリート + Insert
-			upd.trx.AddUndoLogRecord(undo.NewDeleteLogRecord(upd.table, record))
+			upd.undoLog.Append(upd.trxId, undo.NewDeleteLogRecord(upd.table, record))
 			if err := upd.table.SoftDelete(e.BufferPool, record); err != nil {
 				return nil, err
 			}
-			upd.trx.AddUndoLogRecord(undo.NewInsertLogRecord(upd.table, updatedRecords[i]))
+			upd.undoLog.Append(upd.trxId, undo.NewInsertLogRecord(upd.table, updatedRecords[i]))
 			if err := upd.table.Insert(e.BufferPool, updatedRecords[i]); err != nil {
 				return nil, err
 			}

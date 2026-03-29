@@ -5,6 +5,7 @@ import (
 	"minesql/internal/access"
 	"minesql/internal/catalog"
 	"minesql/internal/engine"
+	"minesql/internal/undo"
 	"strings"
 	"testing"
 
@@ -222,12 +223,13 @@ func TestExecutorIntegration(t *testing.T) {
 		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
 
-		trx := Begin(0)
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
 		assert.NoError(t, err)
 
 		// WHEN: Alice の last_name を Anderson に更新
-		upd := NewUpdate(trx, tbl, []SetColumn{
+		upd := NewUpdate(undoLog, trxId, tbl, []SetColumn{
 			{Pos: 2, Value: []byte("Anderson")},
 		}, NewFilter(
 			NewTableScan(
@@ -241,7 +243,6 @@ func TestExecutorIntegration(t *testing.T) {
 		))
 		_, err = upd.Next()
 		assert.NoError(t, err)
-		trx.Commit()
 
 		// THEN: テーブルスキャンとインデックススキャンの両方で確認
 		tableRecords := collectAll(t, NewTableScan(
@@ -285,10 +286,11 @@ func TestExecutorIntegration(t *testing.T) {
 		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
 
-		trx := Begin(0)
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 
 		// WHEN: プライマリキー "v" (Eve) を "a" に変更
-		upd := NewUpdate(trx, tbl, []SetColumn{
+		upd := NewUpdate(undoLog, trxId, tbl, []SetColumn{
 			{Pos: 0, Value: []byte("a")},
 		}, NewTableScan(
 			tbl,
@@ -299,7 +301,6 @@ func TestExecutorIntegration(t *testing.T) {
 		))
 		_, err := upd.Next()
 		assert.NoError(t, err)
-		trx.Commit()
 
 		// THEN
 		records := collectAll(t, NewTableScan(
@@ -391,12 +392,13 @@ func TestExecutorIntegration(t *testing.T) {
 		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
 
-		trx := Begin(0)
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
 		assert.NoError(t, err)
 
 		// WHEN: Bob を削除
-		del := NewDelete(trx, tbl, NewFilter(
+		del := NewDelete(undoLog, trxId, tbl, NewFilter(
 			NewTableScan(
 				tbl,
 				access.RecordSearchModeStart{},
@@ -408,7 +410,6 @@ func TestExecutorIntegration(t *testing.T) {
 		))
 		_, err = del.Next()
 		assert.NoError(t, err)
-		trx.Commit()
 
 		// THEN: テーブルスキャンとインデックススキャンの両方で確認
 		tableRecords := collectAll(t, NewTableScan(
@@ -474,9 +475,11 @@ func setupExecutorTestTable(t *testing.T) *access.TableAccessMethod {
 	tbl, err := getTableAccessMethod("users")
 	assert.NoError(t, err)
 
-	trx := Begin(0)
+	undoLog := undo.NewUndoLog()
+	var trxId undo.TrxId = 1
 	insert := NewInsert(
-		trx,
+		undoLog,
+		trxId,
 		tbl,
 		[]Record{
 			{[]byte("z"), []byte("Alice"), []byte("Smith")},
@@ -487,7 +490,6 @@ func setupExecutorTestTable(t *testing.T) *access.TableAccessMethod {
 		})
 	_, err = insert.Next()
 	assert.NoError(t, err)
-	trx.Commit()
 
 	return tbl
 }

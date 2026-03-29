@@ -9,6 +9,7 @@ import (
 	"minesql/internal/catalog"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
+	"minesql/internal/undo"
 )
 
 // セットアップヘルパー: テーブルを作成し、サンプルデータを挿入する
@@ -61,9 +62,11 @@ func setupExample() (*access.TableAccessMethod, func()) {
 	}
 
 	// サンプルデータを挿入
-	trx := executor.Begin(0)
+	undoLog := undo.NewUndoLog()
+	var trxId undo.TrxId = 1
 	ins := executor.NewInsert(
-		trx,
+		undoLog,
+		trxId,
 		tbl,
 		[]executor.Record{
 			{[]byte("z"), []byte("Alice"), []byte("Smith")},
@@ -75,7 +78,6 @@ func setupExample() (*access.TableAccessMethod, func()) {
 	if _, err := ins.Next(); err != nil {
 		panic(err)
 	}
-	trx.Commit()
 
 	return tbl, cleanup
 }
@@ -345,8 +347,9 @@ func ExampleUpdate() {
 	}
 
 	// Alice の last_name を "Anderson" に更新
-	trx := executor.Begin(0)
-	upd := executor.NewUpdate(trx, tbl, []executor.SetColumn{
+	undoLog := undo.NewUndoLog()
+	var trxId undo.TrxId = 1
+	upd := executor.NewUpdate(undoLog, trxId, tbl, []executor.SetColumn{
 		{Pos: 2, Value: []byte("Anderson")},
 	}, executor.NewFilter(
 		executor.NewTableScan(
@@ -361,7 +364,6 @@ func ExampleUpdate() {
 	if _, err := upd.Next(); err != nil {
 		panic(err)
 	}
-	trx.Commit()
 
 	fmt.Println("=== テーブルスキャン ===")
 	printExampleRecords(executor.NewTableScan(
@@ -400,8 +402,9 @@ func ExampleUpdate_primaryKey() {
 	defer cleanup()
 
 	// プライマリキー "v" (Eve) を "a" に変更
-	trx := executor.Begin(0)
-	upd := executor.NewUpdate(trx, tbl, []executor.SetColumn{
+	undoLog := undo.NewUndoLog()
+	var trxId undo.TrxId = 1
+	upd := executor.NewUpdate(undoLog, trxId, tbl, []executor.SetColumn{
 		{Pos: 0, Value: []byte("a")},
 	}, executor.NewTableScan(
 		tbl,
@@ -413,7 +416,6 @@ func ExampleUpdate_primaryKey() {
 	if _, err := upd.Next(); err != nil {
 		panic(err)
 	}
-	trx.Commit()
 
 	printExampleRecords(executor.NewTableScan(
 		tbl,
@@ -440,8 +442,9 @@ func ExampleDelete() {
 	}
 
 	// first_name が "Bob" のレコードを削除
-	trx := executor.Begin(0)
-	del := executor.NewDelete(trx, tbl, executor.NewFilter(
+	undoLog := undo.NewUndoLog()
+	var trxId undo.TrxId = 1
+	del := executor.NewDelete(undoLog, trxId, tbl, executor.NewFilter(
 		executor.NewTableScan(
 			tbl,
 			access.RecordSearchModeStart{},
@@ -454,7 +457,6 @@ func ExampleDelete() {
 	if _, err := del.Next(); err != nil {
 		panic(err)
 	}
-	trx.Commit()
 
 	fmt.Println("=== テーブルスキャン ===")
 	printExampleRecords(executor.NewTableScan(

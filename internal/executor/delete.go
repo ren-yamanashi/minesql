@@ -8,14 +8,16 @@ import (
 
 // Delete は InnerExecutor の結果を元にレコードを削除する
 type Delete struct {
-	trx           *Transaction
+	undoLog       *undo.UndoLog
+	trxId         undo.TrxId
 	table         *access.TableAccessMethod
 	InnerExecutor Executor
 }
 
-func NewDelete(trx *Transaction, table *access.TableAccessMethod, innerExecutor Executor) *Delete {
+func NewDelete(undoLog *undo.UndoLog, trxId undo.TrxId, table *access.TableAccessMethod, innerExecutor Executor) *Delete {
 	return &Delete{
-		trx:           trx,
+		undoLog:       undoLog,
+		trxId:         trxId,
 		table:         table,
 		InnerExecutor: innerExecutor,
 	}
@@ -40,7 +42,7 @@ func (del *Delete) Next() (Record, error) {
 
 	// 取得したレコードを削除
 	for _, record := range records {
-		del.trx.AddUndoLogRecord(undo.NewDeleteLogRecord(del.table, record))
+		del.undoLog.Append(del.trxId, undo.NewDeleteLogRecord(del.table, record))
 		if err := del.table.SoftDelete(e.BufferPool, record); err != nil {
 			return nil, err
 		}

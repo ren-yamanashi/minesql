@@ -4,6 +4,7 @@ import (
 	"minesql/internal/access"
 	"minesql/internal/catalog"
 	"minesql/internal/engine"
+	"minesql/internal/undo"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,20 +13,20 @@ import (
 func TestNewInsert(t *testing.T) {
 	t.Run("正常に Insert Executor を生成できる", func(t *testing.T) {
 		// GIVEN
-		trx := Begin(0)
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		records := []Record{
 			{[]byte("1"), []byte("Alice")},
 			{[]byte("2"), []byte("Bob")},
 		}
 
 		// WHEN
-		insert := NewInsert(trx, nil, records)
+		insert := NewInsert(undoLog, trxId, nil, records)
 
 		// THEN
 		assert.NotNil(t, insert)
 		assert.Nil(t, insert.table)
 		assert.Equal(t, records, insert.records)
-		trx.Commit()
 	})
 }
 
@@ -43,7 +44,8 @@ func TestInsert_Next(t *testing.T) {
 		})
 
 		// GIVEN
-		trx := Begin(0)
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		records := []Record{
 			{[]byte("1"), []byte("Alice")},
 			{[]byte("2"), []byte("Bob")},
@@ -54,12 +56,11 @@ func TestInsert_Next(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		insert := NewInsert(trx, tbl, records)
+		insert := NewInsert(undoLog, trxId, tbl, records)
 		_, err = insert.Next()
 
 		// THEN
 		assert.NoError(t, err)
-		trx.Commit()
 		whileCondition := func(record Record) bool {
 			return true
 		}
