@@ -13,6 +13,10 @@
   - ファイル名は `{table_name}.db`
   - 各テーブルは FileId を持ち、対応するディスクファイルに格納される
   - テーブル本体とそのインデックスは同じディスクファイル (同じ FileId) を共有する
+    - これは MySQL の設計 (File-Per-Table の場合) に従っている
+    - 参考: [17.6.3.2 File-Per-Table Tablespaces](https://dev.mysql.com/doc/refman/8.4/en/innodb-file-per-table-tablespaces.html)  
+      > A file-per-table tablespace contains data and indexes for a single InnoDB table, and is stored on the file system in a single data file.
+
 - OS のキャッシュではなく、独自のバッファプールによりデータバッファリングを行うため、ディスクへの書き込みには O_DIRECT を使用する
   - そのためのライブラリとして [github.com/ncw/directio](https://github.com/ncw/directio) を使用している
 

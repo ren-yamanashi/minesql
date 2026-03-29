@@ -7,13 +7,12 @@ import (
 // BufferId は、バッファプール内のバッファページを識別するための ID (index)
 type BufferId uint64
 
-// PageTable は、PageId と BufferId の対応関係を管理するテーブル
+// PageTable は PageId と BufferId の対応関係を管理するテーブル
 //
-// `PageId` に対応する BufferId を格納することで、該当のページがバッファプールのどの位置に格納されているかを特定できる
+// PageId に対応する BufferId を格納することで、該当のページがバッファプールのどの位置に格納されているかを特定できる
 //
-// - key: PageId (ページ ID)
-//
-// - value: BufferId (バッファ ID)
+//   - key: PageId (ページ ID)
+//   - value: BufferId (バッファ ID)
 type PageTable map[PageId]BufferId
 
 type BufferPool struct {
@@ -25,8 +24,7 @@ type BufferPool struct {
 }
 
 // NewBufferPool は指定されたサイズの BufferPool を生成する
-//
-// size: バッファページの数 (例: 1000 を指定すると、1000 ページ分のバッファプールが生成される)
+//   - size: バッファページの数 (例: 1000 を指定すると、1000 ページ分のバッファプールが生成される)
 func NewBufferPool(size int) *BufferPool {
 	return &BufferPool{
 		diskManagers:      make(map[FileId]*Disk),
@@ -40,8 +38,6 @@ func NewBufferPool(size int) *BufferPool {
 // FetchPage は指定されたページ ID のバッファページをバッファプールから取得する
 //
 // ページがバッファプールに存在しない場合は、ディスクから読み込む
-//
-// 戻り値: 取得したバッファページ
 func (bp *BufferPool) FetchPage(pageId PageId) (*BufferPage, error) {
 	// ページテーブルにページがすでにある場合
 	if bufferId, ok := bp.pageTable[pageId]; ok {
@@ -71,11 +67,9 @@ func (bp *BufferPool) FetchPage(pageId PageId) (*BufferPage, error) {
 	return bufferPage, nil
 }
 
-// AddPage はバッファプールに新しいページを追加する
+// AddPage はバッファプールに新しいページを追加する (追加されたページのバッファページを返す)
 //
 // バッファプールに空きがある場合は新しいページを追加し、空きがない場合は古いページを新しいページに置き換える
-//
-// 戻り値: 追加されたページのバッファページ
 func (bp *BufferPool) AddPage(pageId PageId) (*BufferPage, error) {
 	// バッファに空きがある場合、新しいバッファページを追加し、ページテーブルを更新
 	if len(bp.bufferPages) < bp.maxBufferSize {
@@ -146,10 +140,8 @@ func (bp *BufferPool) UnRefPage(pageId PageId) {
 }
 
 // RegisterDisk は BufferPool に Disk を登録する
-//
-// fileId: 登録する Disk に対応する FileId
-//
-// dm: 登録する Disk
+//   - fileId: 登録する Disk に対応する FileId
+//   - dm: 登録する Disk
 func (bp *BufferPool) RegisterDisk(fileId FileId, dm *Disk) {
 	bp.diskManagers[fileId] = dm
 }
@@ -186,11 +178,9 @@ func allocateBufferPages(size int) []BufferPage {
 //
 // evictPageId で指定したページが現在のバッファに属している場合のみ削除
 //
-// evictPageId: 追い出されるページの PageId
-//
-// newPageId: 追加されるページの PageId
-//
-// bufferId: 追い出されるページと追加されるページが属するバッファの BufferId
+//   - evictPageId: 追い出されるページの PageId
+//   - newPageId: 追加されるページの PageId
+//   - bufferId: 追い出されるページと追加されるページが属するバッファの BufferId
 func (bp *BufferPool) updatePageTable(evictPageId PageId, newPageId PageId, bufferId BufferId) {
 	if oldBufferId, ok := bp.pageTable[evictPageId]; ok && oldBufferId == bufferId {
 		delete(bp.pageTable, evictPageId)
