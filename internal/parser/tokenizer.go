@@ -267,6 +267,10 @@ func (t *Tokenizer) handleBlockComment(char rune) {
 
 // 保留中のトークンを確定して通知する
 func (t *Tokenizer) emitPendingToken() {
+	// StateData 以外の場合は emit しない (未終端のクォートやコメントの内容が漏れるのを防ぐ)
+	if t.state != StateData {
+		return
+	}
 	// start と pos が同じ (空文字) なら何もしない (e.g. 空文字が2つ続いた場合など)
 	if t.start >= t.pos {
 		return

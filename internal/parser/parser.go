@@ -135,6 +135,7 @@ func NewParser() *Parser {
 }
 
 func (p *Parser) Parse(sql string) (ast.Statement, error) {
+	p.currentHandler = nil
 	tokenizer := NewTokenizer(sql, p)
 	tokenizer.Tokenize()
 
@@ -185,6 +186,7 @@ func (p *Parser) OnKeyword(word string) {
 		p.currentHandler.OnKeyword(word)
 		return
 
+	// トランザクション系はコンストラクタ引数で StmtType を受け取るため OnKeyword のデリゲートは不要
 	case KBegin:
 		p.currentHandler = NewTransactionParser(ast.StmtTypeBegin)
 		return
