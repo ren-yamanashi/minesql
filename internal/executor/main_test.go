@@ -5,6 +5,7 @@ import (
 	"minesql/internal/access"
 	"minesql/internal/catalog"
 	"minesql/internal/engine"
+	"minesql/internal/undo"
 	"strings"
 	"testing"
 
@@ -222,11 +223,13 @@ func TestExecutorIntegration(t *testing.T) {
 		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
 
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
 		assert.NoError(t, err)
 
 		// WHEN: Alice の last_name を Anderson に更新
-		upd := NewUpdate(tbl, []SetColumn{
+		upd := NewUpdate(undoLog, trxId, tbl, []SetColumn{
 			{Pos: 2, Value: []byte("Anderson")},
 		}, NewFilter(
 			NewTableScan(
@@ -283,8 +286,11 @@ func TestExecutorIntegration(t *testing.T) {
 		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
 
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
+
 		// WHEN: プライマリキー "v" (Eve) を "a" に変更
-		upd := NewUpdate(tbl, []SetColumn{
+		upd := NewUpdate(undoLog, trxId, tbl, []SetColumn{
 			{Pos: 0, Value: []byte("a")},
 		}, NewTableScan(
 			tbl,
@@ -386,11 +392,13 @@ func TestExecutorIntegration(t *testing.T) {
 		tbl := setupExecutorTestTable(t)
 		defer engine.Reset()
 
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
 		assert.NoError(t, err)
 
 		// WHEN: Bob を削除
-		del := NewDelete(tbl, NewFilter(
+		del := NewDelete(undoLog, trxId, tbl, NewFilter(
 			NewTableScan(
 				tbl,
 				access.RecordSearchModeStart{},
@@ -467,9 +475,12 @@ func setupExecutorTestTable(t *testing.T) *access.TableAccessMethod {
 	tbl, err := getTableAccessMethod("users")
 	assert.NoError(t, err)
 
+	undoLog := undo.NewUndoLog()
+	var trxId undo.TrxId = 1
 	insert := NewInsert(
+		undoLog,
+		trxId,
 		tbl,
-		[]string{"id", "first_name", "last_name"},
 		[]Record{
 			{[]byte("z"), []byte("Alice"), []byte("Smith")},
 			{[]byte("x"), []byte("Bob"), []byte("Johnson")},

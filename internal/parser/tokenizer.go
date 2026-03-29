@@ -48,23 +48,26 @@ const (
 // -- keyword --
 
 const (
-	KSelect  = "SELECT"
-	KFrom    = "FROM"
-	KWhere   = "WHERE"
-	KInsert  = "INSERT"
-	KInto    = "INTO"
-	KValues  = "VALUES"
-	KCreate  = "CREATE"
-	KTable   = "TABLE"
-	KPrimary = "PRIMARY"
-	KUnique  = "UNIQUE"
-	KKey     = "KEY"
-	KVarchar = "VARCHAR"
-	KDelete  = "DELETE"
-	KUpdate  = "UPDATE"
-	KSet     = "SET"
-	KAnd     = "AND"
-	KOr      = "OR"
+	KSelect   = "SELECT"
+	KFrom     = "FROM"
+	KWhere    = "WHERE"
+	KInsert   = "INSERT"
+	KInto     = "INTO"
+	KValues   = "VALUES"
+	KCreate   = "CREATE"
+	KTable    = "TABLE"
+	KPrimary  = "PRIMARY"
+	KUnique   = "UNIQUE"
+	KKey      = "KEY"
+	KVarchar  = "VARCHAR"
+	KDelete   = "DELETE"
+	KUpdate   = "UPDATE"
+	KSet      = "SET"
+	KAnd      = "AND"
+	KOr       = "OR"
+	KBegin    = "BEGIN"
+	KCommit   = "COMMIT"
+	KRollback = "ROLLBACK"
 )
 
 type TokenHandler interface {
@@ -264,6 +267,10 @@ func (t *Tokenizer) handleBlockComment(char rune) {
 
 // 保留中のトークンを確定して通知する
 func (t *Tokenizer) emitPendingToken() {
+	// StateData 以外の場合は emit しない (未終端のクォートやコメントの内容が漏れるのを防ぐ)
+	if t.state != StateData {
+		return
+	}
 	// start と pos が同じ (空文字) なら何もしない (e.g. 空文字が2つ続いた場合など)
 	if t.start >= t.pos {
 		return
@@ -301,6 +308,7 @@ func (t *Tokenizer) isKeyword(word string) bool {
 		KUpdate, KSet,
 		KVarchar,
 		KAnd, KOr,
+		KBegin, KCommit, KRollback,
 	}
 
 	upperWord := strings.ToUpper(word)

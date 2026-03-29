@@ -4,6 +4,7 @@ import (
 	"minesql/internal/ast"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
+	"minesql/internal/undo"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,6 +16,8 @@ func TestDelete_Build(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		stmt := &ast.DeleteStmt{
 			StmtType: ast.StmtTypeDelete,
 			From:     *ast.NewTableId("nonexistent"),
@@ -22,7 +25,7 @@ func TestDelete_Build(t *testing.T) {
 		planner := NewDelete(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := planner.Build(undoLog, trxId)
 
 		// THEN
 		assert.Error(t, err)
@@ -35,6 +38,8 @@ func TestDelete_Build(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		createTableForTest(t, nil)
 
 		stmt := &ast.DeleteStmt{
@@ -45,7 +50,7 @@ func TestDelete_Build(t *testing.T) {
 		planner := NewDelete(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := planner.Build(undoLog, trxId)
 
 		// THEN
 		assert.NoError(t, err)

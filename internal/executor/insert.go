@@ -3,20 +3,23 @@ package executor
 import (
 	"minesql/internal/access"
 	"minesql/internal/engine"
+	"minesql/internal/undo"
 )
 
 // Insert はレコードを追加する
 type Insert struct {
-	table    *access.TableAccessMethod
-	colNames []string
-	records  []Record
+	undoLog *undo.UndoLog
+	trxId   undo.TrxId
+	table   *access.TableAccessMethod
+	records []Record
 }
 
-func NewInsert(table *access.TableAccessMethod, colNames []string, records []Record) *Insert {
+func NewInsert(undoLog *undo.UndoLog, trxId undo.TrxId, table *access.TableAccessMethod, records []Record) *Insert {
 	return &Insert{
-		table:    table,
-		colNames: colNames,
-		records:  records,
+		undoLog: undoLog,
+		trxId:   trxId,
+		table:   table,
+		records: records,
 	}
 }
 
@@ -24,8 +27,8 @@ func (ins *Insert) Next() (Record, error) {
 	e := engine.Get()
 
 	for _, record := range ins.records {
-		err := ins.table.Insert(e.BufferPool, record)
-		if err != nil {
+		ins.undoLog.Append(ins.trxId, undo.NewInsertLogRecord(ins.table, record))
+		if err := ins.table.Insert(e.BufferPool, record); err != nil {
 			return nil, err
 		}
 	}

@@ -1,11 +1,14 @@
 package ast
 
 const (
-	StmtTypeCreate StmtType = "create"
-	StmtTypeInsert StmtType = "insert"
-	StmtTypeSelect StmtType = "select"
-	StmtTypeUpdate StmtType = "update"
-	StmtTypeDelete StmtType = "delete"
+	StmtTypeCreate   StmtType = "create"
+	StmtTypeInsert   StmtType = "insert"
+	StmtTypeSelect   StmtType = "select"
+	StmtTypeUpdate   StmtType = "update"
+	StmtTypeDelete   StmtType = "delete"
+	StmtTypeBegin    StmtType = "begin"
+	StmtTypeCommit   StmtType = "commit"
+	StmtTypeRollback StmtType = "rollback"
 )
 
 type StmtType string
@@ -79,4 +82,20 @@ type UpdateStmt struct {
 type SetClause struct {
 	Column ColumnId
 	Value  Literal
+}
+
+// ===========================
+// Transaction
+// ===========================
+
+type BeginStmt struct {
+	StmtType StmtType
+}
+
+type CommitStmt struct {
+	StmtType StmtType
+}
+
+type RollbackStmt struct {
+	StmtType StmtType
 }

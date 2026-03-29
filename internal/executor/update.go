@@ -1,8 +1,10 @@
 package executor
 
 import (
+	"bytes"
 	"minesql/internal/access"
 	"minesql/internal/engine"
+	"minesql/internal/undo"
 )
 
 type SetColumn struct {
@@ -12,13 +14,17 @@ type SetColumn struct {
 
 // Update は InnerExecutor の結果を元にレコードを更新する
 type Update struct {
+	undoLog       *undo.UndoLog
+	trxId         undo.TrxId
 	table         *access.TableAccessMethod
 	SetColumns    []SetColumn
 	InnerExecutor Executor
 }
 
-func NewUpdate(table *access.TableAccessMethod, setColumns []SetColumn, innerExecutor Executor) *Update {
+func NewUpdate(undoLog *undo.UndoLog, trxId undo.TrxId, table *access.TableAccessMethod, setColumns []SetColumn, innerExecutor Executor) *Update {
 	return &Update{
+		undoLog:       undoLog,
+		trxId:         trxId,
 		table:         table,
 		SetColumns:    setColumns,
 		InnerExecutor: innerExecutor,
@@ -56,9 +62,27 @@ func (upd *Update) Next() (Record, error) {
 
 	// 更新後のレコードで更新を実行
 	for i, record := range records {
-		err := upd.table.Update(e.BufferPool, record, updatedRecords[i])
-		if err != nil {
-			return nil, err
+		oldRec := access.NewRecord(record, upd.table.PrimaryKeyCount)
+		newRec := access.NewRecord(updatedRecords[i], upd.table.PrimaryKeyCount)
+		encodedOldKey := oldRec.EncodeKey()
+		encodedNewKey := newRec.EncodeKey()
+
+		if bytes.Equal(encodedOldKey, encodedNewKey) {
+			// プライマリキーが変わらない場合はインプレース更新
+			upd.undoLog.Append(upd.trxId, undo.NewUpdateInplaceLogRecord(upd.table, record, updatedRecords[i]))
+			if err := upd.table.UpdateInplace(e.BufferPool, record, updatedRecords[i]); err != nil {
+				return nil, err
+			}
+		} else {
+			// プライマリキーが変わる場合はソフトデリート + Insert
+			upd.undoLog.Append(upd.trxId, undo.NewDeleteLogRecord(upd.table, record))
+			if err := upd.table.SoftDelete(e.BufferPool, record); err != nil {
+				return nil, err
+			}
+			upd.undoLog.Append(upd.trxId, undo.NewInsertLogRecord(upd.table, updatedRecords[i]))
+			if err := upd.table.Insert(e.BufferPool, updatedRecords[i]); err != nil {
+				return nil, err
+			}
 		}
 	}
 

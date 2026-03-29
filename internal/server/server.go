@@ -11,22 +11,30 @@ import (
 	"strings"
 	"time"
 
+	"minesql/internal/ast"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/parser"
 	"minesql/internal/planner"
+	"minesql/internal/transaction"
+	"minesql/internal/undo"
 )
 
 type Server struct {
 	Address        string
 	Port           int
 	storageManager *engine.Engine
+	undoLog        *undo.UndoLog
+	trxManager     *transaction.Manager
 }
 
 func NewServer(address string, port int) *Server {
+	undoLog := undo.NewUndoLog()
 	return &Server{
-		Address: address,
-		Port:    port,
+		Address:    address,
+		Port:       port,
+		undoLog:    undoLog,
+		trxManager: transaction.NewManager(undoLog),
 	}
 }
 
@@ -108,7 +116,16 @@ func (s *Server) accept(listener *net.TCPListener) {
 // クライアントからの接続を処理する
 // プロトコルの定義は ./docs/architecture/server.md#プロトコル を参照
 func (s *Server) handleConnection(conn *net.TCPConn) {
+	sess := newSession()
+
 	defer func() {
+		// アクティブなトランザクションがあれば自動ロールバック
+		if sess.trxId != 0 {
+			if err := s.trxManager.Rollback(sess.trxId); err != nil {
+				log.Printf("Auto rollback error: %v", err)
+			}
+			sess.trxId = 0
+		}
 		log.Printf("Closing connection from %s", conn.RemoteAddr().String())
 		if err := conn.Close(); err != nil {
 			log.Printf("failed to close connection: %v", err)
@@ -138,7 +155,7 @@ func (s *Server) handleConnection(conn *net.TCPConn) {
 		}
 
 		// クエリの実行
-		result, err := s.executeQuery(sql)
+		result, err := s.executeQuery(sess, sql)
 		if err != nil {
 			err := s.writePacket(conn, fmt.Sprintf("Error: %v", err))
 			if err != nil {
@@ -156,15 +173,51 @@ func (s *Server) handleConnection(conn *net.TCPConn) {
 }
 
 // クエリを実行して結果を文字列で返す
-func (s *Server) executeQuery(sql string) (string, error) {
+func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 	p := parser.NewParser()
 	node, err := p.Parse(sql)
 	if err != nil {
 		return "", err
 	}
 
-	exec, err := planner.Start(node)
+	// トランザクション制御は planner を通さず直接処理する
+	switch node.(type) {
+	case *ast.BeginStmt:
+		if sess.trxId != 0 {
+			return "", fmt.Errorf("transaction already started")
+		}
+		sess.trxId = s.trxManager.Begin()
+		return "", nil
+	case *ast.CommitStmt:
+		if sess.trxId == 0 {
+			return "", fmt.Errorf("no active transaction")
+		}
+		s.trxManager.Commit(sess.trxId)
+		sess.trxId = 0
+		return "", nil
+	case *ast.RollbackStmt:
+		if sess.trxId == 0 {
+			return "", fmt.Errorf("no active transaction")
+		}
+		if err := s.trxManager.Rollback(sess.trxId); err != nil {
+			return "", err
+		}
+		sess.trxId = 0
+		return "", nil
+	}
+
+	// トランザクション外の DML は autocommit (一時的な trxId を発行して即 Commit)
+	autocommit := sess.trxId == 0
+	trxId := sess.trxId
+	if autocommit {
+		trxId = s.trxManager.Begin()
+	}
+
+	exec, err := planner.Start(s.undoLog, trxId, node)
 	if err != nil {
+		if autocommit {
+			_ = s.trxManager.Rollback(trxId)
+		}
 		return "", err
 	}
 
@@ -172,12 +225,19 @@ func (s *Server) executeQuery(sql string) (string, error) {
 	for {
 		record, err := exec.Next()
 		if err != nil {
+			if autocommit {
+				_ = s.trxManager.Rollback(trxId)
+			}
 			return "", err
 		}
 		if record == nil {
 			break
 		}
 		records = append(records, record)
+	}
+
+	if autocommit {
+		s.trxManager.Commit(trxId)
 	}
 
 	// 一旦、レスポンスは csv 形式で返す

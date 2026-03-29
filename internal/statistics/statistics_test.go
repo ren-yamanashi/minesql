@@ -5,233 +5,11 @@ import (
 	"minesql/internal/catalog"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
+	"minesql/internal/undo"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
-
-// createTable はテスト用にテーブルを作成する
-func createTable(t *testing.T, tableName string, primaryKeyCount uint8, indexes []*executor.IndexParam, columns []*executor.ColumnParam) { //nolint:unparam
-	t.Helper()
-	ct := executor.NewCreateTable(tableName, primaryKeyCount, indexes, columns)
-	_, err := ct.Next()
-	assert.NoError(t, err)
-}
-
-// getTable はテスト用にテーブルのアクセスメソッドを取得する
-func getTable(t *testing.T, tableName string) *access.TableAccessMethod {
-	t.Helper()
-	eng := engine.Get()
-	meta, ok := eng.Catalog.GetTableMetadataByName(tableName)
-	assert.True(t, ok)
-	tbl, err := meta.GetTable()
-	assert.NoError(t, err)
-	return tbl
-}
-
-// insertRecords はテスト用にレコードを挿入する
-func insertRecords(t *testing.T, tableName string, colNames []string, records []executor.Record) { //nolint:unparam
-	t.Helper()
-	tbl := getTable(t, tableName)
-	ins := executor.NewInsert(tbl, colNames, records)
-	_, err := ins.Next()
-	assert.NoError(t, err)
-}
-
-// deleteByCondition はテスト用に条件に合致するレコードを削除する
-func deleteByCondition(t *testing.T, tableName string, cond func(executor.Record) bool) {
-	t.Helper()
-	tbl := getTable(t, tableName)
-	del := executor.NewDelete(tbl, executor.NewFilter(
-		executor.NewTableScan(
-			tbl,
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool { return true },
-		),
-		cond,
-	))
-	_, err := del.Next()
-	assert.NoError(t, err)
-}
-
-// setupStatisticsTable はストレージを初期化し、統計情報テスト用のテーブルを作成する
-//
-// テーブル: products (id, name, category)
-//   - プライマリキー: id
-//   - ユニークインデックス: name
-//
-// 3 レコードを挿入する:
-//
-//	| id  | name   | category |
-//	| --- | ------ | -------- |
-//	| 1   | Apple  | Fruit    |
-//	| 2   | Banana | Fruit    |
-//	| 3   | Carrot | Veggie   |
-//
-// 期待される統計値:
-//   - R(T) = 3
-//   - V(T, id) = 3, V(T, name) = 3, V(T, category) = 2
-//   - min(id) = "1", max(id) = "3"
-//   - min(name) = "Apple", max(name) = "Carrot"
-//   - min(category) = "Fruit", max(category) = "Veggie"
-func setupStatisticsTable(t *testing.T) {
-	t.Helper()
-
-	tmpdir := t.TempDir()
-	t.Setenv("MINESQL_DATA_DIR", tmpdir)
-	t.Setenv("MINESQL_BUFFER_SIZE", "100")
-	engine.Reset()
-	engine.Init()
-
-	createTable(t, "products", 1,
-		[]*executor.IndexParam{
-			{Name: "idx_name", ColName: "name", SecondaryKey: 1},
-		},
-		[]*executor.ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "name", Type: catalog.ColumnTypeString},
-			{Name: "category", Type: catalog.ColumnTypeString},
-		},
-	)
-
-	insertRecords(t, "products",
-		[]string{"id", "name", "category"},
-		[]executor.Record{
-			{[]byte("1"), []byte("Apple"), []byte("Fruit")},
-			{[]byte("2"), []byte("Banana"), []byte("Fruit")},
-			{[]byte("3"), []byte("Carrot"), []byte("Veggie")},
-		},
-	)
-}
-
-// setupEmptyTable はストレージを初期化し、データなしの空テーブルを作成する
-func setupEmptyTable(t *testing.T) {
-	t.Helper()
-
-	tmpdir := t.TempDir()
-	t.Setenv("MINESQL_DATA_DIR", tmpdir)
-	t.Setenv("MINESQL_BUFFER_SIZE", "100")
-	engine.Reset()
-	engine.Init()
-
-	createTable(t, "items", 1,
-		nil,
-		[]*executor.ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "name", Type: catalog.ColumnTypeString},
-		},
-	)
-}
-
-// setupSameValueTable はストレージを初期化し、全レコードの category が同一のテーブルを作成する
-//
-// テーブル: same_values (id, category)
-//
-//	| id  | category |
-//	| --- | -------- |
-//	| 1   | Fruit    |
-//	| 2   | Fruit    |
-//	| 3   | Fruit    |
-func setupSameValueTable(t *testing.T) {
-	t.Helper()
-
-	tmpdir := t.TempDir()
-	t.Setenv("MINESQL_DATA_DIR", tmpdir)
-	t.Setenv("MINESQL_BUFFER_SIZE", "100")
-	engine.Reset()
-	engine.Init()
-
-	createTable(t, "same_values", 1,
-		nil,
-		[]*executor.ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "category", Type: catalog.ColumnTypeString},
-		},
-	)
-
-	insertRecords(t, "same_values",
-		[]string{"id", "category"},
-		[]executor.Record{
-			{[]byte("1"), []byte("Fruit")},
-			{[]byte("2"), []byte("Fruit")},
-			{[]byte("3"), []byte("Fruit")},
-		},
-	)
-}
-
-// setupSingleRecordTable はストレージを初期化し、1 レコードのみのテーブルを作成する
-//
-// テーブル: single (id, name)
-//
-//	| id  | name  |
-//	| --- | ----- |
-//	| 1   | Alice |
-func setupSingleRecordTable(t *testing.T) {
-	t.Helper()
-
-	tmpdir := t.TempDir()
-	t.Setenv("MINESQL_DATA_DIR", tmpdir)
-	t.Setenv("MINESQL_BUFFER_SIZE", "100")
-	engine.Reset()
-	engine.Init()
-
-	createTable(t, "single", 1,
-		nil,
-		[]*executor.ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "name", Type: catalog.ColumnTypeString},
-		},
-	)
-
-	insertRecords(t, "single",
-		[]string{"id", "name"},
-		[]executor.Record{
-			{[]byte("1"), []byte("Alice")},
-		},
-	)
-}
-
-// setupMultiIndexTable はストレージを初期化し、2 つのセカンダリインデックスを持つテーブルを作成する
-//
-// テーブル: multi_idx (id, name, email)
-//
-//   - プライマリキー: id
-//
-//   - ユニークインデックス: name, email
-//
-//     | id  | name   | email         |
-//     | --- | ------ | ------------- |
-//     | 1   | Alice  | alice@test    |
-//     | 2   | Bob    | bob@test      |
-func setupMultiIndexTable(t *testing.T) {
-	t.Helper()
-
-	tmpdir := t.TempDir()
-	t.Setenv("MINESQL_DATA_DIR", tmpdir)
-	t.Setenv("MINESQL_BUFFER_SIZE", "100")
-	engine.Reset()
-	engine.Init()
-
-	createTable(t, "multi_idx", 1,
-		[]*executor.IndexParam{
-			{Name: "idx_name", ColName: "name", SecondaryKey: 1},
-			{Name: "idx_email", ColName: "email", SecondaryKey: 2},
-		},
-		[]*executor.ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "name", Type: catalog.ColumnTypeString},
-			{Name: "email", Type: catalog.ColumnTypeString},
-		},
-	)
-
-	insertRecords(t, "multi_idx",
-		[]string{"id", "name", "email"},
-		[]executor.Record{
-			{[]byte("1"), []byte("Alice"), []byte("alice@test")},
-			{[]byte("2"), []byte("Bob"), []byte("bob@test")},
-		},
-	)
-}
 
 func TestAnalyze(t *testing.T) {
 	t.Run("レコード数が正しく算出される", func(t *testing.T) {
@@ -392,8 +170,9 @@ func TestAnalyze(t *testing.T) {
 		assert.Equal(t, uint64(2), before.ColumnStats["category"].UniqueValues)
 
 		// WHEN: 新しいカテゴリを持つレコードを追加
-		insertRecords(t, "products",
-			[]string{"id", "name", "category"},
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
+		insertRecords(t, undoLog, trxId, "products",
 			[]executor.Record{
 				{[]byte("4"), []byte("Donut"), []byte("Snack")},
 			},
@@ -428,7 +207,9 @@ func TestAnalyze(t *testing.T) {
 		assert.Equal(t, uint64(3), before.ColumnStats["name"].UniqueValues)
 
 		// WHEN: "Carrot" (唯一の "Veggie") を削除
-		deleteByCondition(t, "products", func(record executor.Record) bool {
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
+		deleteByCondition(t, undoLog, trxId, "products", func(record executor.Record) bool {
 			return string(record[0]) == "3" // id = "3"
 		})
 
@@ -460,7 +241,9 @@ func TestAnalyze(t *testing.T) {
 		assert.Equal(t, []byte("1"), before.ColumnStats["id"].MinValue)
 
 		// WHEN: id = "1" (最小値) のレコードを削除
-		deleteByCondition(t, "products", func(record executor.Record) bool {
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
+		deleteByCondition(t, undoLog, trxId, "products", func(record executor.Record) bool {
 			return string(record[0]) == "1"
 		})
 
@@ -604,4 +387,235 @@ func TestAnalyze(t *testing.T) {
 			assert.Nil(t, colStat.MaxValue)
 		}
 	})
+}
+
+// createTable はテスト用にテーブルを作成する
+func createTable(t *testing.T, tableName string, primaryKeyCount uint8, indexes []*executor.IndexParam, columns []*executor.ColumnParam) { //nolint:unparam
+	t.Helper()
+	ct := executor.NewCreateTable(tableName, primaryKeyCount, indexes, columns)
+	_, err := ct.Next()
+	assert.NoError(t, err)
+}
+
+// getTable はテスト用にテーブルのアクセスメソッドを取得する
+func getTable(t *testing.T, tableName string) *access.TableAccessMethod {
+	t.Helper()
+	eng := engine.Get()
+	meta, ok := eng.Catalog.GetTableMetadataByName(tableName)
+	assert.True(t, ok)
+	tbl, err := meta.GetTable()
+	assert.NoError(t, err)
+	return tbl
+}
+
+// insertRecords はテスト用にレコードを挿入する
+func insertRecords(t *testing.T, undoLog *undo.UndoLog, trxId undo.TrxId, tableName string, records []executor.Record) { //nolint:unparam
+	t.Helper()
+	tbl := getTable(t, tableName)
+	ins := executor.NewInsert(undoLog, trxId, tbl, records)
+	_, err := ins.Next()
+	assert.NoError(t, err)
+}
+
+// deleteByCondition はテスト用に条件に合致するレコードを削除する
+func deleteByCondition(t *testing.T, undoLog *undo.UndoLog, trxId undo.TrxId, tableName string, cond func(executor.Record) bool) {
+	t.Helper()
+	tbl := getTable(t, tableName)
+	del := executor.NewDelete(undoLog, trxId, tbl, executor.NewFilter(
+		executor.NewTableScan(
+			tbl,
+			access.RecordSearchModeStart{},
+			func(record executor.Record) bool { return true },
+		),
+		cond,
+	))
+	_, err := del.Next()
+	assert.NoError(t, err)
+}
+
+// setupStatisticsTable はストレージを初期化し、統計情報テスト用のテーブルを作成する
+//
+// テーブル: products (id, name, category)
+//   - プライマリキー: id
+//   - ユニークインデックス: name
+//
+// 3 レコードを挿入する:
+//
+//	| id  | name   | category |
+//	| --- | ------ | -------- |
+//	| 1   | Apple  | Fruit    |
+//	| 2   | Banana | Fruit    |
+//	| 3   | Carrot | Veggie   |
+//
+// 期待される統計値:
+//   - R(T) = 3
+//   - V(T, id) = 3, V(T, name) = 3, V(T, category) = 2
+//   - min(id) = "1", max(id) = "3"
+//   - min(name) = "Apple", max(name) = "Carrot"
+//   - min(category) = "Fruit", max(category) = "Veggie"
+func setupStatisticsTable(t *testing.T) {
+	t.Helper()
+
+	tmpdir := t.TempDir()
+	t.Setenv("MINESQL_DATA_DIR", tmpdir)
+	t.Setenv("MINESQL_BUFFER_SIZE", "100")
+	engine.Reset()
+	engine.Init()
+
+	undoLog := undo.NewUndoLog()
+	var trxId undo.TrxId = 1
+
+	createTable(t, "products", 1,
+		[]*executor.IndexParam{
+			{Name: "idx_name", ColName: "name", SecondaryKey: 1},
+		},
+		[]*executor.ColumnParam{
+			{Name: "id", Type: catalog.ColumnTypeString},
+			{Name: "name", Type: catalog.ColumnTypeString},
+			{Name: "category", Type: catalog.ColumnTypeString},
+		},
+	)
+
+	insertRecords(t, undoLog, trxId, "products",
+		[]executor.Record{
+			{[]byte("1"), []byte("Apple"), []byte("Fruit")},
+			{[]byte("2"), []byte("Banana"), []byte("Fruit")},
+			{[]byte("3"), []byte("Carrot"), []byte("Veggie")},
+		},
+	)
+}
+
+// setupEmptyTable はストレージを初期化し、データなしの空テーブルを作成する
+func setupEmptyTable(t *testing.T) {
+	t.Helper()
+
+	tmpdir := t.TempDir()
+	t.Setenv("MINESQL_DATA_DIR", tmpdir)
+	t.Setenv("MINESQL_BUFFER_SIZE", "100")
+	engine.Reset()
+	engine.Init()
+
+	createTable(t, "items", 1,
+		nil,
+		[]*executor.ColumnParam{
+			{Name: "id", Type: catalog.ColumnTypeString},
+			{Name: "name", Type: catalog.ColumnTypeString},
+		},
+	)
+}
+
+// setupSameValueTable はストレージを初期化し、全レコードの category が同一のテーブルを作成する
+//
+// テーブル: same_values (id, category)
+//
+//	| id  | category |
+//	| --- | -------- |
+//	| 1   | Fruit    |
+//	| 2   | Fruit    |
+//	| 3   | Fruit    |
+func setupSameValueTable(t *testing.T) {
+	t.Helper()
+
+	tmpdir := t.TempDir()
+	t.Setenv("MINESQL_DATA_DIR", tmpdir)
+	t.Setenv("MINESQL_BUFFER_SIZE", "100")
+	engine.Reset()
+	engine.Init()
+
+	undoLog := undo.NewUndoLog()
+	var trxId undo.TrxId = 1
+
+	createTable(t, "same_values", 1,
+		nil,
+		[]*executor.ColumnParam{
+			{Name: "id", Type: catalog.ColumnTypeString},
+			{Name: "category", Type: catalog.ColumnTypeString},
+		},
+	)
+
+	insertRecords(t, undoLog, trxId, "same_values",
+		[]executor.Record{
+			{[]byte("1"), []byte("Fruit")},
+			{[]byte("2"), []byte("Fruit")},
+			{[]byte("3"), []byte("Fruit")},
+		},
+	)
+}
+
+// setupSingleRecordTable はストレージを初期化し、1 レコードのみのテーブルを作成する
+//
+// テーブル: single (id, name)
+//
+//	| id  | name  |
+//	| --- | ----- |
+//	| 1   | Alice |
+func setupSingleRecordTable(t *testing.T) {
+	t.Helper()
+
+	tmpdir := t.TempDir()
+	t.Setenv("MINESQL_DATA_DIR", tmpdir)
+	t.Setenv("MINESQL_BUFFER_SIZE", "100")
+	engine.Reset()
+	engine.Init()
+
+	undoLog := undo.NewUndoLog()
+	var trxId undo.TrxId = 1
+
+	createTable(t, "single", 1,
+		nil,
+		[]*executor.ColumnParam{
+			{Name: "id", Type: catalog.ColumnTypeString},
+			{Name: "name", Type: catalog.ColumnTypeString},
+		},
+	)
+
+	insertRecords(t, undoLog, trxId, "single",
+		[]executor.Record{
+			{[]byte("1"), []byte("Alice")},
+		},
+	)
+}
+
+// setupMultiIndexTable はストレージを初期化し、2 つのセカンダリインデックスを持つテーブルを作成する
+//
+// テーブル: multi_idx (id, name, email)
+//
+//   - プライマリキー: id
+//
+//   - ユニークインデックス: name, email
+//
+//     | id  | name   | email         |
+//     | --- | ------ | ------------- |
+//     | 1   | Alice  | alice@test    |
+//     | 2   | Bob    | bob@test      |
+func setupMultiIndexTable(t *testing.T) {
+	t.Helper()
+
+	tmpdir := t.TempDir()
+	t.Setenv("MINESQL_DATA_DIR", tmpdir)
+	t.Setenv("MINESQL_BUFFER_SIZE", "100")
+	engine.Reset()
+	engine.Init()
+
+	undoLog := undo.NewUndoLog()
+	var trxId undo.TrxId = 1
+
+	createTable(t, "multi_idx", 1,
+		[]*executor.IndexParam{
+			{Name: "idx_name", ColName: "name", SecondaryKey: 1},
+			{Name: "idx_email", ColName: "email", SecondaryKey: 2},
+		},
+		[]*executor.ColumnParam{
+			{Name: "id", Type: catalog.ColumnTypeString},
+			{Name: "name", Type: catalog.ColumnTypeString},
+			{Name: "email", Type: catalog.ColumnTypeString},
+		},
+	)
+
+	insertRecords(t, undoLog, trxId, "multi_idx",
+		[]executor.Record{
+			{[]byte("1"), []byte("Alice"), []byte("alice@test")},
+			{[]byte("2"), []byte("Bob"), []byte("bob@test")},
+		},
+	)
 }

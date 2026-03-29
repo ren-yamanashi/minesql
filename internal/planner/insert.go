@@ -6,6 +6,7 @@ import (
 	"minesql/internal/ast"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
+	"minesql/internal/undo"
 )
 
 type Insert struct {
@@ -18,7 +19,7 @@ func NewInsert(stmt *ast.InsertStmt) *Insert {
 	}
 }
 
-func (ip *Insert) Build() (executor.Executor, error) {
+func (ip *Insert) Build(undoLog *undo.UndoLog, trxId undo.TrxId) (executor.Executor, error) {
 	if len(ip.Stmt.Cols) == 0 {
 		return nil, errors.New("column names cannot be empty")
 	}
@@ -53,10 +54,8 @@ func (ip *Insert) Build() (executor.Executor, error) {
 		return nil, err
 	}
 
-	colNames := make([]string, len(tblMeta.Cols))
 	colPosMap := make(map[string]uint16)
 	for _, colMeta := range tblMeta.Cols {
-		colNames[colMeta.Pos] = colMeta.Name
 		colPosMap[colMeta.Name] = colMeta.Pos
 	}
 
@@ -80,5 +79,5 @@ func (ip *Insert) Build() (executor.Executor, error) {
 		records = append(records, record)
 	}
 
-	return executor.NewInsert(tbl, colNames, records), nil
+	return executor.NewInsert(undoLog, trxId, tbl, records), nil
 }

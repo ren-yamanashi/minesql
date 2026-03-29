@@ -189,7 +189,7 @@ func TestCreateAndInsert(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ソフトデリート
-		err = table.Delete(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.SoftDelete(bp, [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
 
 		// WHEN: 同じ PK で再 Insert (値は異なる)
@@ -223,7 +223,7 @@ func TestCreateAndInsert(t *testing.T) {
 	})
 }
 
-func TestDelete(t *testing.T) {
+func TestSoftDelete(t *testing.T) {
 	t.Run("テーブルから行を削除でき、B+Tree とユニークインデックスの両方から削除される", func(t *testing.T) {
 		// GIVEN: テーブルを作成しデータを挿入
 		bp, metaPageId, _ := InitDisk(t, "users.db")
@@ -245,7 +245,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: "a" の行を削除
-		err = table.Delete(bp, records)
+		err = table.SoftDelete(bp, records)
 
 		// THEN: ソフトデリートされている (ClusteredIndexIterator で走査すると削除済みレコードはスキップされる)
 		assert.NoError(t, err)
@@ -294,7 +294,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: "a" をソフトデリート
-		err = table.Delete(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.SoftDelete(bp, [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
 
 		// THEN: B+Tree を直接走査すると 2 件存在し、"a" は DeleteMark=1
@@ -340,7 +340,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: 存在しないキーで削除
-		err = table.Delete(bp, [][]byte{[]byte("z"), []byte("Unknown")})
+		err = table.SoftDelete(bp, [][]byte{[]byte("z"), []byte("Unknown")})
 
 		// THEN
 		assert.Error(t, err)
@@ -361,14 +361,146 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		err = table.Delete(bp, record1)
+		err = table.SoftDelete(bp, record1)
 		assert.NoError(t, err)
-		err = table.Delete(bp, record2)
+		err = table.SoftDelete(bp, record2)
 		assert.NoError(t, err)
 
 		// THEN: ClusteredIndexIterator で走査すると active なレコードがない
 		recs := collectAllTablePairs(t, bp, &table)
 		assert.Equal(t, 0, len(recs))
+	})
+}
+
+func TestDelete(t *testing.T) {
+	t.Run("テーブルから行を物理削除できる", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		assert.NoError(t, err)
+		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice")})
+		assert.NoError(t, err)
+
+		// WHEN: "a" を物理削除
+		err = table.Delete(bp, [][]byte{[]byte("a"), []byte("John")})
+		assert.NoError(t, err)
+
+		// THEN: B+Tree を直接走査すると 1 件のみ存在 (物理的に消えている)
+		tree := btree.NewBPlusTree(table.MetaPageId)
+		iter, err := tree.Search(bp, btree.SearchModeStart{})
+		assert.NoError(t, err)
+
+		record, ok := iter.Get()
+		assert.True(t, ok)
+		var decodedKey [][]byte
+		memcomparable.Decode(record.KeyBytes(), &decodedKey)
+		assert.Equal(t, "b", string(decodedKey[0]))
+
+		err = iter.Advance(bp)
+		assert.NoError(t, err)
+		_, ok = iter.Get()
+		assert.False(t, ok)
+	})
+
+	t.Run("物理削除するとユニークインデックスからも物理削除される", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+
+		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2)
+
+		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
+		err = table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		assert.NoError(t, err)
+		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		assert.NoError(t, err)
+
+		// WHEN: "a" を物理削除
+		err = table.Delete(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		assert.NoError(t, err)
+
+		// THEN: クラスタ化インデックスから物理削除されている
+		recs := collectAllTablePairs(t, bp, &table)
+		assert.Equal(t, 1, len(recs))
+		assert.Equal(t, [][]byte{[]byte("b")}, recs[0].key)
+
+		// THEN: ユニークインデックスからも物理削除されている (全エントリを走査)
+		indexTree := btree.NewBPlusTree(table.UniqueIndexes[0].MetaPageId)
+		indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})
+		assert.NoError(t, err)
+
+		var indexKeys []string
+		for {
+			record, ok := indexIter.Get()
+			if !ok {
+				break
+			}
+			var keyColumns [][]byte
+			memcomparable.Decode(record.KeyBytes(), &keyColumns)
+			indexKeys = append(indexKeys, string(keyColumns[0]))
+			_, _, err := indexIter.Next(bp)
+			assert.NoError(t, err)
+		}
+		assert.Equal(t, []string{"Smith"}, indexKeys)
+	})
+
+	t.Run("物理削除した後に同じ PK で再挿入できる", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		assert.NoError(t, err)
+
+		// WHEN: 物理削除してから同じ PK で再挿入
+		err = table.Delete(bp, [][]byte{[]byte("a"), []byte("John")})
+		assert.NoError(t, err)
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Jane")})
+		assert.NoError(t, err)
+
+		// THEN
+		recs := collectAllTablePairs(t, bp, &table)
+		assert.Equal(t, 1, len(recs))
+		assert.Equal(t, [][]byte{[]byte("a")}, recs[0].key)
+		assert.Equal(t, [][]byte{[]byte("Jane")}, recs[0].value)
+	})
+
+	t.Run("全行を物理削除した後にテーブルが空になる", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		record1 := [][]byte{[]byte("a"), []byte("John")}
+		record2 := [][]byte{[]byte("b"), []byte("Alice")}
+		err = table.Insert(bp, record1)
+		assert.NoError(t, err)
+		err = table.Insert(bp, record2)
+		assert.NoError(t, err)
+
+		// WHEN
+		err = table.Delete(bp, record1)
+		assert.NoError(t, err)
+		err = table.Delete(bp, record2)
+		assert.NoError(t, err)
+
+		// THEN: B+Tree を直接走査してもレコードが存在しない
+		tree := btree.NewBPlusTree(table.MetaPageId)
+		iter, err := tree.Search(bp, btree.SearchModeStart{})
+		assert.NoError(t, err)
+		_, ok := iter.Get()
+		assert.False(t, ok)
 	})
 }
 
@@ -388,7 +520,7 @@ func TestUpdate(t *testing.T) {
 		// WHEN: プライマリキー "a" のレコードを更新 (キーは同じ、value のみ変更)
 		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
 		newRecord := [][]byte{[]byte("a"), []byte("Jane"), []byte("Doe-Updated")}
-		err = table.Update(bp, oldRecord, newRecord)
+		err = table.UpdateInplace(bp, oldRecord, newRecord)
 
 		// THEN
 		assert.NoError(t, err)
@@ -415,7 +547,7 @@ func TestUpdate(t *testing.T) {
 		// WHEN: PK を変えずに value を更新
 		oldRecord := [][]byte{[]byte("a"), []byte("John")}
 		newRecord := [][]byte{[]byte("a"), []byte("Jane")}
-		err = table.Update(bp, oldRecord, newRecord)
+		err = table.UpdateInplace(bp, oldRecord, newRecord)
 		assert.NoError(t, err)
 
 		// THEN: B+Tree を直接走査するとレコードは 1 件で DeleteMark=0 のまま
@@ -455,7 +587,9 @@ func TestUpdate(t *testing.T) {
 		// WHEN: PK を "a" → "b" に変更
 		oldRecord := [][]byte{[]byte("a"), []byte("John")}
 		newRecord := [][]byte{[]byte("b"), []byte("Jane")}
-		err = table.Update(bp, oldRecord, newRecord)
+		err = table.SoftDelete(bp, oldRecord)
+		assert.NoError(t, err)
+		err = table.Insert(bp, newRecord)
 		assert.NoError(t, err)
 
 		// THEN: B+Tree を直接走査すると 2 件存在し、"a" は DeleteMark=1、"b" は DeleteMark=0
@@ -505,7 +639,9 @@ func TestUpdate(t *testing.T) {
 		// WHEN: プライマリキーを "a" → "b" に変更
 		oldRecord := [][]byte{[]byte("a"), []byte("John")}
 		newRecord := [][]byte{[]byte("b"), []byte("John-Updated")}
-		err = table.Update(bp, oldRecord, newRecord)
+		err = table.SoftDelete(bp, oldRecord)
+		assert.NoError(t, err)
+		err = table.Insert(bp, newRecord)
 
 		// THEN
 		assert.NoError(t, err)
@@ -538,7 +674,7 @@ func TestUpdate(t *testing.T) {
 		// WHEN: セカンダリキー (last_name) を "Doe" → "Williams" に変更
 		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
 		newRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Williams")}
-		err = table.Update(bp, oldRecord, newRecord)
+		err = table.UpdateInplace(bp, oldRecord, newRecord)
 
 		// THEN: ユニークインデックスが更新されている (active なエントリのみ確認)
 		assert.NoError(t, err)
@@ -565,7 +701,9 @@ func TestUpdate(t *testing.T) {
 		// WHEN: プライマリキーを "a" → "x" に変更、セカンダリキー "Doe" は同じ
 		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
 		newRecord := [][]byte{[]byte("x"), []byte("John"), []byte("Doe")}
-		err = table.Update(bp, oldRecord, newRecord)
+		err = table.SoftDelete(bp, oldRecord)
+		assert.NoError(t, err)
+		err = table.Insert(bp, newRecord)
 
 		// THEN: テーブルが更新されている
 		assert.NoError(t, err)
@@ -615,9 +753,11 @@ func TestUpdate(t *testing.T) {
 		// WHEN: プライマリキーを "a" → "b" に変更 (既存のキーと衝突)
 		oldRecord := [][]byte{[]byte("a"), []byte("John")}
 		newRecord := [][]byte{[]byte("b"), []byte("John")}
-		err = table.Update(bp, oldRecord, newRecord)
+		err = table.SoftDelete(bp, oldRecord)
+		assert.NoError(t, err)
+		err = table.Insert(bp, newRecord)
 
-		// THEN: Delete("a") は成功するが Insert("b") が重複キーエラーで失敗する
+		// THEN: SoftDelete("a") は成功するが Insert("b") が重複キーエラーで失敗する
 		assert.Error(t, err)
 	})
 
@@ -641,7 +781,7 @@ func TestUpdate(t *testing.T) {
 		// WHEN: セカンダリキーを "Doe" → "Smith" に変更 (既存のインデックスキーと衝突)
 		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
 		newRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Smith")}
-		err = table.Update(bp, oldRecord, newRecord)
+		err = table.UpdateInplace(bp, oldRecord, newRecord)
 
 		// THEN: ユニークインデックスの更新でエラーが返る
 		assert.Error(t, err)
@@ -670,7 +810,7 @@ func TestUpdate(t *testing.T) {
 		// WHEN: 両方のセカンダリキーが変わる更新
 		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
 		newRecord := [][]byte{[]byte("a"), []byte("Jane"), []byte("Williams")}
-		err = table.Update(bp, oldRecord, newRecord)
+		err = table.UpdateInplace(bp, oldRecord, newRecord)
 		assert.NoError(t, err)
 
 		// THEN: idx_first_name が更新されている (active なエントリのみ)
@@ -695,7 +835,7 @@ func TestUpdate(t *testing.T) {
 		// WHEN: 存在しないキー "z" で更新
 		oldRecord := [][]byte{[]byte("z"), []byte("Unknown")}
 		newRecord := [][]byte{[]byte("z"), []byte("Updated")}
-		err = table.Update(bp, oldRecord, newRecord)
+		err = table.UpdateInplace(bp, oldRecord, newRecord)
 
 		// THEN
 		assert.Error(t, err)

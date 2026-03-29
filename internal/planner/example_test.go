@@ -9,6 +9,7 @@ import (
 	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/planner"
+	"minesql/internal/undo"
 )
 
 // セットアップヘルパー: テーブルを作成し、サンプルデータを挿入する
@@ -32,7 +33,8 @@ func setupPlannerExample() func() {
 	engine.Init()
 
 	// CREATE TABLE
-	runPlan(&ast.CreateTableStmt{
+	undoLog := undo.NewUndoLog()
+	runPlan(undoLog, &ast.CreateTableStmt{
 		StmtType:  ast.StmtTypeCreate,
 		Keyword:   ast.KeywordTable,
 		TableName: "users",
@@ -50,7 +52,7 @@ func setupPlannerExample() func() {
 	})
 
 	// INSERT
-	runPlan(&ast.InsertStmt{
+	runPlan(undoLog, &ast.InsertStmt{
 		StmtType: ast.StmtTypeInsert,
 		Table:    *ast.NewTableId("users"),
 		Cols: []ast.ColumnId{
@@ -110,8 +112,9 @@ func setupPlannerExample() func() {
 }
 
 // AST を直接構築 → planner.Start → 実行して結果を返す
-func runPlan(stmt ast.Statement) []executor.Record {
-	exec, err := planner.Start(stmt)
+func runPlan(undoLog *undo.UndoLog, stmt ast.Statement) []executor.Record {
+	var trxId undo.TrxId = 1
+	exec, err := planner.Start(undoLog, trxId, stmt)
 	if err != nil {
 		panic(err)
 	}
@@ -145,7 +148,8 @@ func Example_scanAll() {
 	cleanup := setupPlannerExample()
 	defer cleanup()
 
-	records := runPlan(&ast.SelectStmt{
+	undoLog := undo.NewUndoLog()
+	records := runPlan(undoLog, &ast.SelectStmt{
 		StmtType: ast.StmtTypeSelect,
 		From:     *ast.NewTableId("users"),
 		Where:    &ast.WhereClause{IsSet: false},
@@ -166,7 +170,8 @@ func Example_assertEqual() {
 	cleanup := setupPlannerExample()
 	defer cleanup()
 
-	records := runPlan(&ast.SelectStmt{
+	undoLog := undo.NewUndoLog()
+	records := runPlan(undoLog, &ast.SelectStmt{
 		StmtType: ast.StmtTypeSelect,
 		From:     *ast.NewTableId("users"),
 		Where: &ast.WhereClause{
@@ -190,7 +195,8 @@ func Example_filter() {
 	defer cleanup()
 
 	// SELECT * FROM users WHERE (first_name < 'K' AND gender = 'male' AND last_name >= 'Doe') OR first_name = 'Tom'
-	records := runPlan(&ast.SelectStmt{
+	undoLog := undo.NewUndoLog()
+	records := runPlan(undoLog, &ast.SelectStmt{
 		StmtType: ast.StmtTypeSelect,
 		From:     *ast.NewTableId("users"),
 		Where: &ast.WhereClause{
@@ -252,8 +258,9 @@ func Example_update() {
 	cleanup := setupPlannerExample()
 	defer cleanup()
 
+	undoLog := undo.NewUndoLog()
 	// UPDATE users SET last_name = 'Smith' WHERE username = 'johndoe'
-	runPlan(&ast.UpdateStmt{
+	runPlan(undoLog, &ast.UpdateStmt{
 		Table: *ast.NewTableId("users"),
 		SetClauses: []*ast.SetClause{
 			{Column: *ast.NewColumnId("last_name"), Value: ast.NewStringLiteral("'Smith'", "Smith")},
@@ -268,7 +275,7 @@ func Example_update() {
 		},
 	})
 
-	records := runPlan(&ast.SelectStmt{
+	records := runPlan(undoLog, &ast.SelectStmt{
 		StmtType: ast.StmtTypeSelect,
 		From:     *ast.NewTableId("users"),
 		Where:    &ast.WhereClause{IsSet: false},
@@ -289,8 +296,9 @@ func Example_delete() {
 	cleanup := setupPlannerExample()
 	defer cleanup()
 
+	undoLog := undo.NewUndoLog()
 	// DELETE FROM users WHERE username = 'johndoe2'
-	runPlan(&ast.DeleteStmt{
+	runPlan(undoLog, &ast.DeleteStmt{
 		StmtType: ast.StmtTypeDelete,
 		From:     *ast.NewTableId("users"),
 		Where: &ast.WhereClause{
@@ -303,7 +311,7 @@ func Example_delete() {
 		},
 	})
 
-	records := runPlan(&ast.SelectStmt{
+	records := runPlan(undoLog, &ast.SelectStmt{
 		StmtType: ast.StmtTypeSelect,
 		From:     *ast.NewTableId("users"),
 		Where:    &ast.WhereClause{IsSet: false},

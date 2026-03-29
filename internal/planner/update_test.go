@@ -5,6 +5,7 @@ import (
 	"minesql/internal/ast"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
+	"minesql/internal/undo"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,6 +37,8 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
@@ -46,7 +49,7 @@ func TestUpdate_Build(t *testing.T) {
 		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := planner.Build(undoLog, trxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -60,6 +63,8 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
@@ -71,7 +76,7 @@ func TestUpdate_Build(t *testing.T) {
 		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := planner.Build(undoLog, trxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -91,6 +96,8 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("nonexistent"),
 			SetClauses: []*ast.SetClause{
@@ -100,7 +107,7 @@ func TestUpdate_Build(t *testing.T) {
 		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := planner.Build(undoLog, trxId)
 
 		// THEN
 		assert.Error(t, err)
@@ -113,6 +120,8 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
@@ -123,7 +132,7 @@ func TestUpdate_Build(t *testing.T) {
 		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := planner.Build(undoLog, trxId)
 
 		// THEN
 		assert.Error(t, err)
@@ -137,6 +146,8 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		e := engine.Get()
 		tbl := getPlannerTableAccessMethod(t, "users")
 
@@ -164,7 +175,7 @@ func TestUpdate_Build(t *testing.T) {
 		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := planner.Build(undoLog, trxId)
 		assert.NoError(t, err)
 		_, err = exec.Next()
 		assert.NoError(t, err)
@@ -187,6 +198,8 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
@@ -196,7 +209,7 @@ func TestUpdate_Build(t *testing.T) {
 		}
 
 		// WHEN
-		exec, err := Start(stmt)
+		exec, err := Start(undoLog, trxId, stmt)
 
 		// THEN
 		assert.NoError(t, err)
@@ -210,6 +223,8 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
@@ -223,7 +238,7 @@ func TestUpdate_Build(t *testing.T) {
 		}
 
 		// WHEN
-		exec, err := Start(stmt)
+		exec, err := Start(undoLog, trxId, stmt)
 
 		// THEN
 		assert.NoError(t, err)
@@ -237,6 +252,8 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer engine.Reset()
 
+		undoLog := undo.NewUndoLog()
+		var trxId undo.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table:      *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{},
@@ -245,7 +262,7 @@ func TestUpdate_Build(t *testing.T) {
 		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := planner.Build(undoLog, trxId)
 
 		// THEN
 		assert.NoError(t, err)
