@@ -21,7 +21,6 @@ func TestNewPageId(t *testing.T) {
 	})
 }
 
-
 func TestIsInvalid(t *testing.T) {
 	t.Run("INVALID_PAGE_ID は無効と判定される", func(t *testing.T) {
 		// GIVEN
