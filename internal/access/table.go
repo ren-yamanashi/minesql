@@ -51,7 +51,7 @@ func (t *TableAccessMethod) Create(bp *bufferpool.BufferPool) error {
 //
 // access.Record を経由して B+Tree レコードを構築し、B+Tree に挿入する
 //
-// ソフトデリート済みの同一キーが存在する場合は、Update で上書きする
+// ソフトデリート済みの同一キーが存在する場合は Update で上書きする
 func (t *TableAccessMethod) Insert(bp *bufferpool.BufferPool, columns [][]byte) error {
 	btr := btree.NewBPlusTree(t.MetaPageId)
 
