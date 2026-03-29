@@ -3,7 +3,7 @@ package undo
 import (
 	"minesql/internal/access"
 	"minesql/internal/engine"
-	"minesql/internal/storage/page"
+	"minesql/internal/storage"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -36,7 +36,7 @@ func TestDeleteLogRecord_Undo(t *testing.T) {
 
 	t.Run("SoftDelete した行のユニークインデックスも復元される", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex := access.NewUniqueIndexAccessMethod("idx_name", "name", page.PageId{}, 1)
+		uniqueIndex := access.NewUniqueIndexAccessMethod("idx_name", "name", storage.PageId{}, 1)
 		table := setupTestTable(t, []*access.UniqueIndexAccessMethod{uniqueIndex})
 		defer engine.Reset()
 		bp := engine.Get().BufferPool

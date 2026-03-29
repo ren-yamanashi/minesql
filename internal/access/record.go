@@ -1,8 +1,6 @@
 package access
 
-import (
-	"minesql/internal/storage/memcomparable"
-)
+import "minesql/internal/encode"
 
 type RecordHeader struct {
 	DeleteMark uint8
@@ -41,7 +39,7 @@ func (r *Record) Columns() [][]byte {
 // EncodeKey は Key を Memcomparable format でエンコードする
 func (r *Record) EncodeKey() []byte {
 	var encoded []byte
-	memcomparable.Encode(r.Key, &encoded)
+	encode.Encode(r.Key, &encoded)
 	return encoded
 }
 
@@ -53,6 +51,6 @@ func (r *Record) EncodeHeader() []byte {
 // EncodeNonKey は NonKeyColumns を Memcomparable format でエンコードする
 func (r *Record) EncodeNonKey() []byte {
 	var encoded []byte
-	memcomparable.Encode(r.NonKey.NonKeyColumns, &encoded)
+	encode.Encode(r.NonKey.NonKeyColumns, &encoded)
 	return encoded
 }

@@ -5,7 +5,7 @@ import (
 	"minesql/internal/access"
 	"minesql/internal/catalog"
 	"minesql/internal/executor"
-	"minesql/internal/storage/bufferpool"
+	"minesql/internal/storage"
 )
 
 type ColumnStatistics struct {
@@ -30,10 +30,10 @@ type TableStatistics struct {
 // Statistics はテーブルの統計情報を収集する
 type Statistics struct {
 	metadata   *catalog.TableMetadata
-	bufferPool *bufferpool.BufferPool
+	bufferPool *storage.BufferPool
 }
 
-func NewStatistics(meta *catalog.TableMetadata, bp *bufferpool.BufferPool) *Statistics {
+func NewStatistics(meta *catalog.TableMetadata, bp *storage.BufferPool) *Statistics {
 	return &Statistics{
 		metadata:   meta,
 		bufferPool: bp,

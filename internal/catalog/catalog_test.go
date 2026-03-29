@@ -2,9 +2,7 @@ package catalog
 
 import (
 	"encoding/binary"
-	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/disk"
-	"minesql/internal/storage/page"
+	"minesql/internal/storage"
 	"os"
 	"path/filepath"
 	"testing"
@@ -21,8 +19,8 @@ func TestNewCatalog(t *testing.T) {
 		cat, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		fileId := page.FileId(1)
-		metaPageId := page.NewPageId(page.FileId(1), 0)
+		fileId := storage.FileId(1)
+		metaPageId := storage.NewPageId(storage.FileId(1), 0)
 		colMeta := []*ColumnMetadata{
 			NewColumnMetadata(fileId, "id", 0, ColumnTypeString),
 			NewColumnMetadata(fileId, "name", 1, ColumnTypeString),
@@ -36,10 +34,10 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bp2 := bufferpool.NewBufferPool(10)
+		bp2 := storage.NewBufferPool(10)
 		filePath := filepath.Join(tmpdir, "minesql.db")
-		catalogFileId := page.FileId(0)
-		dm2, err := disk.NewDisk(catalogFileId, filePath)
+		catalogFileId := storage.FileId(0)
+		dm2, err := storage.NewDisk(catalogFileId, filePath)
 		assert.NoError(t, err)
 		bp2.RegisterDisk(catalogFileId, dm2)
 
@@ -62,8 +60,8 @@ func TestNewCatalog(t *testing.T) {
 		cat, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		fileId := page.FileId(1)
-		metaPageId := page.NewPageId(page.FileId(1), 0)
+		fileId := storage.FileId(1)
+		metaPageId := storage.NewPageId(storage.FileId(1), 0)
 		colMeta := []*ColumnMetadata{
 			NewColumnMetadata(fileId, "id", 0, ColumnTypeString),
 			NewColumnMetadata(fileId, "name", 1, ColumnTypeString),
@@ -78,10 +76,10 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bp2 := bufferpool.NewBufferPool(10)
+		bp2 := storage.NewBufferPool(10)
 		filePath := filepath.Join(tmpdir, "minesql.db")
-		catalogFileId := page.FileId(0)
-		dm2, err := disk.NewDisk(catalogFileId, filePath)
+		catalogFileId := storage.FileId(0)
+		dm2, err := storage.NewDisk(catalogFileId, filePath)
 		assert.NoError(t, err)
 		bp2.RegisterDisk(catalogFileId, dm2)
 
@@ -107,9 +105,9 @@ func TestNewCatalog(t *testing.T) {
 		cat, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		fileId := page.FileId(1)
-		metaPageId := page.NewPageId(page.FileId(1), 0)
-		indexMetaPageId := page.NewPageId(page.FileId(1), 1)
+		fileId := storage.FileId(1)
+		metaPageId := storage.NewPageId(storage.FileId(1), 0)
+		indexMetaPageId := storage.NewPageId(storage.FileId(1), 1)
 		colMeta := []*ColumnMetadata{
 			NewColumnMetadata(fileId, "id", 0, ColumnTypeString),
 			NewColumnMetadata(fileId, "email", 1, ColumnTypeString),
@@ -126,10 +124,10 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bp2 := bufferpool.NewBufferPool(10)
+		bp2 := storage.NewBufferPool(10)
 		filePath := filepath.Join(tmpdir, "minesql.db")
-		catalogFileId := page.FileId(0)
-		dm2, err := disk.NewDisk(catalogFileId, filePath)
+		catalogFileId := storage.FileId(0)
+		dm2, err := storage.NewDisk(catalogFileId, filePath)
 		assert.NoError(t, err)
 		bp2.RegisterDisk(catalogFileId, dm2)
 
@@ -154,27 +152,27 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// テーブル 1: users
-		table1Meta := NewTableMetadata(page.FileId(1), "users", 2, 1, []*ColumnMetadata{
-			NewColumnMetadata(page.FileId(1), "id", 0, ColumnTypeString),
-			NewColumnMetadata(page.FileId(1), "name", 1, ColumnTypeString),
-		}, []*IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
+		table1Meta := NewTableMetadata(storage.FileId(1), "users", 2, 1, []*ColumnMetadata{
+			NewColumnMetadata(storage.FileId(1), "id", 0, ColumnTypeString),
+			NewColumnMetadata(storage.FileId(1), "name", 1, ColumnTypeString),
+		}, []*IndexMetadata{}, storage.NewPageId(storage.FileId(1), 0))
 		err = cat.Insert(bp, table1Meta)
 		assert.NoError(t, err)
 
 		// テーブル 2: posts
-		table2Meta := NewTableMetadata(page.FileId(2), "posts", 3, 1, []*ColumnMetadata{
-			NewColumnMetadata(page.FileId(2), "id", 0, ColumnTypeString),
-			NewColumnMetadata(page.FileId(2), "title", 1, ColumnTypeString),
-			NewColumnMetadata(page.FileId(2), "body", 2, ColumnTypeString),
-		}, []*IndexMetadata{}, page.NewPageId(page.FileId(2), 0))
+		table2Meta := NewTableMetadata(storage.FileId(2), "posts", 3, 1, []*ColumnMetadata{
+			NewColumnMetadata(storage.FileId(2), "id", 0, ColumnTypeString),
+			NewColumnMetadata(storage.FileId(2), "title", 1, ColumnTypeString),
+			NewColumnMetadata(storage.FileId(2), "body", 2, ColumnTypeString),
+		}, []*IndexMetadata{}, storage.NewPageId(storage.FileId(2), 0))
 		err = cat.Insert(bp, table2Meta)
 		assert.NoError(t, err)
 
 		// テーブル 3: comments
-		table3Meta := NewTableMetadata(page.FileId(3), "comments", 2, 1, []*ColumnMetadata{
-			NewColumnMetadata(page.FileId(3), "id", 0, ColumnTypeString),
-			NewColumnMetadata(page.FileId(3), "text", 1, ColumnTypeString),
-		}, []*IndexMetadata{}, page.NewPageId(page.FileId(3), 0))
+		table3Meta := NewTableMetadata(storage.FileId(3), "comments", 2, 1, []*ColumnMetadata{
+			NewColumnMetadata(storage.FileId(3), "id", 0, ColumnTypeString),
+			NewColumnMetadata(storage.FileId(3), "text", 1, ColumnTypeString),
+		}, []*IndexMetadata{}, storage.NewPageId(storage.FileId(3), 0))
 		err = cat.Insert(bp, table3Meta)
 		assert.NoError(t, err)
 
@@ -183,10 +181,10 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bp2 := bufferpool.NewBufferPool(10)
+		bp2 := storage.NewBufferPool(10)
 		filePath := filepath.Join(tmpdir, "minesql.db")
-		catalogFileId := page.FileId(0)
-		dm2, err := disk.NewDisk(catalogFileId, filePath)
+		catalogFileId := storage.FileId(0)
+		dm2, err := storage.NewDisk(catalogFileId, filePath)
 		assert.NoError(t, err)
 		bp2.RegisterDisk(catalogFileId, dm2)
 
@@ -240,10 +238,10 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bp2 := bufferpool.NewBufferPool(10)
+		bp2 := storage.NewBufferPool(10)
 		filePath := filepath.Join(tmpdir, "minesql.db")
-		catalogFileId := page.FileId(0)
-		dm2, err := disk.NewDisk(catalogFileId, filePath)
+		catalogFileId := storage.FileId(0)
+		dm2, err := storage.NewDisk(catalogFileId, filePath)
 		assert.NoError(t, err)
 		bp2.RegisterDisk(catalogFileId, dm2)
 
@@ -251,13 +249,13 @@ func TestNewCatalog(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, page.FileId(4), cat2.NextFileId)
+		assert.Equal(t, storage.FileId(4), cat2.NextFileId)
 
 		// 次の採番が正しく動作することを確認
 		nextId, err := cat2.AllocateFileId(bp2)
 		assert.NoError(t, err)
-		assert.Equal(t, page.FileId(4), nextId)
-		assert.Equal(t, page.FileId(5), cat2.NextFileId)
+		assert.Equal(t, storage.FileId(4), nextId)
+		assert.Equal(t, storage.FileId(5), cat2.NextFileId)
 	})
 }
 
@@ -273,10 +271,10 @@ func TestCreateCatalog(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, cat)
-		assert.Equal(t, page.FileId(0), cat.TableMetaPageId.FileId)
-		assert.Equal(t, page.FileId(0), cat.IndexMetaPageId.FileId)
-		assert.Equal(t, page.FileId(0), cat.ColumnMetaPageId.FileId)
-		assert.Equal(t, page.FileId(1), cat.NextFileId)
+		assert.Equal(t, storage.FileId(0), cat.TableMetaPageId.FileId)
+		assert.Equal(t, storage.FileId(0), cat.IndexMetaPageId.FileId)
+		assert.Equal(t, storage.FileId(0), cat.ColumnMetaPageId.FileId)
+		assert.Equal(t, storage.FileId(1), cat.NextFileId)
 		assert.Empty(t, cat.metadata)
 	})
 
@@ -290,7 +288,7 @@ func TestCreateCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: ヘッダーページを読み込んでマジックナンバーを確認
-		headerPageId := page.NewPageId(page.FileId(0), 0)
+		headerPageId := storage.NewPageId(storage.FileId(0), 0)
 		headerPage, err := bp.FetchPage(headerPageId)
 		assert.NoError(t, err)
 		defer bp.UnRefPage(headerPageId)
@@ -309,8 +307,8 @@ func TestInsert(t *testing.T) {
 		cat, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		fileId := page.FileId(1)
-		metaPageId := page.NewPageId(page.FileId(1), 0)
+		fileId := storage.FileId(1)
+		metaPageId := storage.NewPageId(storage.FileId(1), 0)
 		colMeta := []*ColumnMetadata{
 			NewColumnMetadata(fileId, "id", 0, ColumnTypeString),
 			NewColumnMetadata(fileId, "name", 1, ColumnTypeString),
@@ -337,8 +335,8 @@ func TestInsert(t *testing.T) {
 		cat, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		fileId := page.FileId(1)
-		metaPageId := page.NewPageId(page.FileId(1), 0)
+		fileId := storage.FileId(1)
+		metaPageId := storage.NewPageId(storage.FileId(1), 0)
 		colMeta := []*ColumnMetadata{
 			NewColumnMetadata(fileId, "id", 0, ColumnTypeString),
 			NewColumnMetadata(fileId, "name", 1, ColumnTypeString),
@@ -365,9 +363,9 @@ func TestInsert(t *testing.T) {
 		cat, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		fileId := page.FileId(1)
-		metaPageId := page.NewPageId(page.FileId(1), 0)
-		indexMetaPageId := page.NewPageId(page.FileId(1), 1)
+		fileId := storage.FileId(1)
+		metaPageId := storage.NewPageId(storage.FileId(1), 0)
+		indexMetaPageId := storage.NewPageId(storage.FileId(1), 1)
 		colMeta := []*ColumnMetadata{
 			NewColumnMetadata(fileId, "id", 0, ColumnTypeString),
 			NewColumnMetadata(fileId, "email", 1, ColumnTypeString),
@@ -397,8 +395,8 @@ func TestGetTableMetadataByName(t *testing.T) {
 		cat, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		fileId := page.FileId(1)
-		metaPageId := page.NewPageId(page.FileId(1), 0)
+		fileId := storage.FileId(1)
+		metaPageId := storage.NewPageId(storage.FileId(1), 0)
 		colMeta := []*ColumnMetadata{
 			NewColumnMetadata(fileId, "id", 0, ColumnTypeString),
 		}
@@ -441,15 +439,15 @@ func TestGetTableMetadataByName(t *testing.T) {
 		assert.NoError(t, err)
 
 		// 複数のテーブルを挿入
-		table1Meta := NewTableMetadata(page.FileId(1), "users", 1, 1, []*ColumnMetadata{
-			NewColumnMetadata(page.FileId(1), "id", 0, ColumnTypeString),
-		}, []*IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
-		table2Meta := NewTableMetadata(page.FileId(2), "posts", 1, 1, []*ColumnMetadata{
-			NewColumnMetadata(page.FileId(2), "id", 0, ColumnTypeString),
-		}, []*IndexMetadata{}, page.NewPageId(page.FileId(2), 0))
-		table3Meta := NewTableMetadata(page.FileId(3), "comments", 1, 1, []*ColumnMetadata{
-			NewColumnMetadata(page.FileId(3), "id", 0, ColumnTypeString),
-		}, []*IndexMetadata{}, page.NewPageId(page.FileId(3), 0))
+		table1Meta := NewTableMetadata(storage.FileId(1), "users", 1, 1, []*ColumnMetadata{
+			NewColumnMetadata(storage.FileId(1), "id", 0, ColumnTypeString),
+		}, []*IndexMetadata{}, storage.NewPageId(storage.FileId(1), 0))
+		table2Meta := NewTableMetadata(storage.FileId(2), "posts", 1, 1, []*ColumnMetadata{
+			NewColumnMetadata(storage.FileId(2), "id", 0, ColumnTypeString),
+		}, []*IndexMetadata{}, storage.NewPageId(storage.FileId(2), 0))
+		table3Meta := NewTableMetadata(storage.FileId(3), "comments", 1, 1, []*ColumnMetadata{
+			NewColumnMetadata(storage.FileId(3), "id", 0, ColumnTypeString),
+		}, []*IndexMetadata{}, storage.NewPageId(storage.FileId(3), 0))
 
 		err = cat.Insert(bp, table1Meta)
 		assert.NoError(t, err)
@@ -465,7 +463,7 @@ func TestGetTableMetadataByName(t *testing.T) {
 		assert.True(t, ok)
 		assert.NotNil(t, result)
 		assert.Equal(t, "posts", result.Name)
-		assert.Equal(t, page.FileId(2), result.FileId)
+		assert.Equal(t, storage.FileId(2), result.FileId)
 	})
 }
 
@@ -487,10 +485,10 @@ func TestAllocateFileId(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: 順番に採番される (FileId(0) はカタログ用に予約されているため 1 から開始)
-		assert.Equal(t, page.FileId(1), id1)
-		assert.Equal(t, page.FileId(2), id2)
-		assert.Equal(t, page.FileId(3), id3)
-		assert.Equal(t, page.FileId(4), cat.NextFileId)
+		assert.Equal(t, storage.FileId(1), id1)
+		assert.Equal(t, storage.FileId(2), id2)
+		assert.Equal(t, storage.FileId(3), id3)
+		assert.Equal(t, storage.FileId(4), cat.NextFileId)
 	})
 
 	t.Run("採番後の FileId がディスクに保存される", func(t *testing.T) {
@@ -506,7 +504,7 @@ func TestAllocateFileId(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: ヘッダーページから NextFileId が読み取れる
-		headerPageId := page.NewPageId(page.FileId(0), 0)
+		headerPageId := storage.NewPageId(storage.FileId(0), 0)
 		headerPage, err := bp.FetchPage(headerPageId)
 		assert.NoError(t, err)
 		defer bp.UnRefPage(headerPageId)
@@ -517,13 +515,13 @@ func TestAllocateFileId(t *testing.T) {
 	})
 }
 
-func InitCatalogDisk(t *testing.T) (bp *bufferpool.BufferPool, tmpdir string) {
+func InitCatalogDisk(t *testing.T) (bp *storage.BufferPool, tmpdir string) {
 	tmpdir = t.TempDir()
 	filePath := filepath.Join(tmpdir, "minesql.db")
 
-	bp = bufferpool.NewBufferPool(10)
-	fileId := page.FileId(0)
-	dm, err := disk.NewDisk(fileId, filePath)
+	bp = storage.NewBufferPool(10)
+	fileId := storage.FileId(0)
+	dm, err := storage.NewDisk(fileId, filePath)
 	assert.NoError(t, err)
 	bp.RegisterDisk(fileId, dm)
 

@@ -2,11 +2,10 @@ package catalog
 
 import (
 	"encoding/binary"
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/btree/node"
-	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/memcomparable"
-	"minesql/internal/storage/page"
+	"minesql/internal/btree"
+	"minesql/internal/btree/node"
+	"minesql/internal/encode"
+	"minesql/internal/storage"
 )
 
 type IndexType string
@@ -19,15 +18,15 @@ const (
 //
 // 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-indexes-table.html
 type IndexMetadata struct {
-	MetaPageId     page.PageId // インデックスのメタデータが格納される B+Tree のメタページID
-	FileId         page.FileId // インデックスが属するテーブルの FileId
-	Name           string      // インデックスの名前
-	ColName        string      // インデックスを構成するカラム名
-	Type           IndexType   // インデックスの種類
-	DataMetaPageId page.PageId // 実データが格納される B+Tree のメタページID
+	MetaPageId     storage.PageId // インデックスのメタデータが格納される B+Tree のメタページID
+	FileId         storage.FileId // インデックスが属するテーブルの FileId
+	Name           string         // インデックスの名前
+	ColName        string         // インデックスを構成するカラム名
+	Type           IndexType      // インデックスの種類
+	DataMetaPageId storage.PageId // 実データが格納される B+Tree のメタページID
 }
 
-func NewIndexMetadata(fileId page.FileId, name string, colName string, indexType IndexType, dataMetaPageId page.PageId) *IndexMetadata {
+func NewIndexMetadata(fileId storage.FileId, name string, colName string, indexType IndexType, dataMetaPageId storage.PageId) *IndexMetadata {
 	return &IndexMetadata{
 		FileId:         fileId,
 		Name:           name,
@@ -38,17 +37,17 @@ func NewIndexMetadata(fileId page.FileId, name string, colName string, indexType
 }
 
 // Insert はインデックスメタデータを B+Tree に挿入する
-func (im *IndexMetadata) Insert(bp *bufferpool.BufferPool) error {
+func (im *IndexMetadata) Insert(bp *storage.BufferPool) error {
 	btr := btree.NewBPlusTree(im.MetaPageId)
 
 	// key (FileId + Name) をエンコード
 	var encodedKey []byte
 	keyBuf := binary.BigEndian.AppendUint32(nil, uint32(im.FileId))
-	memcomparable.Encode([][]byte{keyBuf, []byte(im.Name)}, &encodedKey)
+	encode.Encode([][]byte{keyBuf, []byte(im.Name)}, &encodedKey)
 
 	// value (ColName, Type, DataMetaPageId) をエンコード
 	var encodedValue []byte
-	memcomparable.Encode([][]byte{[]byte(im.Type), []byte(im.ColName), im.DataMetaPageId.ToBytes()}, &encodedValue)
+	encode.Encode([][]byte{[]byte(im.Type), []byte(im.ColName), im.DataMetaPageId.ToBytes()}, &encodedValue)
 
 	// B+Tree に挿入
 	return btr.Insert(bp, node.NewRecord(nil, encodedKey, encodedValue))
@@ -63,7 +62,7 @@ func (im *IndexMetadata) Insert(bp *bufferpool.BufferPool) error {
 // fileId: インデックスメタデータを読み込む対象のテーブルの FileId
 //
 // metaPageId: インデックスメタデータが格納されている B+Tree のメタページID
-func loadIndexMetadata(bp *bufferpool.BufferPool, fileId page.FileId, metaPageId page.PageId) ([]*IndexMetadata, error) {
+func loadIndexMetadata(bp *storage.BufferPool, fileId storage.FileId, metaPageId storage.PageId) ([]*IndexMetadata, error) {
 	// B+Tree を開く
 	idxMetaTree := btree.NewBPlusTree(metaPageId)
 	iter, err := idxMetaTree.Search(bp, btree.SearchModeStart{})
@@ -80,8 +79,8 @@ func loadIndexMetadata(bp *bufferpool.BufferPool, fileId page.FileId, metaPageId
 
 		// キーをデコード (FileId, Name)
 		var keyParts [][]byte
-		memcomparable.Decode(record.KeyBytes(), &keyParts)
-		idxFileId := page.FileId(binary.BigEndian.Uint32(keyParts[0]))
+		encode.Decode(record.KeyBytes(), &keyParts)
+		idxFileId := storage.FileId(binary.BigEndian.Uint32(keyParts[0]))
 
 		// 指定されたテーブルのインデックスのみを収集
 		if idxFileId == fileId {
@@ -89,10 +88,10 @@ func loadIndexMetadata(bp *bufferpool.BufferPool, fileId page.FileId, metaPageId
 
 			// 値をデコード (Type, ColName, DataMetaPageId)
 			var valueParts [][]byte
-			memcomparable.Decode(record.NonKeyBytes(), &valueParts)
+			encode.Decode(record.NonKeyBytes(), &valueParts)
 			idxType := IndexType(string(valueParts[0]))
 			colName := string(valueParts[1])
-			dataMetaPageId := page.RestorePageIdFromBytes(valueParts[2])
+			dataMetaPageId := storage.RestorePageIdFromBytes(valueParts[2])
 
 			indexes = append(indexes, &IndexMetadata{
 				FileId:         fileId,

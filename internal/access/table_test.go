@@ -2,11 +2,9 @@ package access
 
 import (
 	"fmt"
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/disk"
-	"minesql/internal/storage/memcomparable"
-	"minesql/internal/storage/page"
+	"minesql/internal/btree"
+	"minesql/internal/encode"
+	"minesql/internal/storage"
 	"os"
 	"path/filepath"
 	"testing"
@@ -67,8 +65,8 @@ func TestCreateAndInsert(t *testing.T) {
 			var decodedValue [][]byte
 			keyBytes := record.KeyBytes()
 			valueBytes := record.NonKeyBytes()
-			memcomparable.Decode(keyBytes, &decodedKey)
-			memcomparable.Decode(valueBytes, &decodedValue)
+			encode.Decode(keyBytes, &decodedKey)
+			encode.Decode(valueBytes, &decodedValue)
 
 			assert.Equal(t, expected.key, decodedKey)
 			assert.Equal(t, expected.value, decodedValue)
@@ -106,7 +104,7 @@ func TestCreateAndInsert(t *testing.T) {
 
 			// Key をデコードしてセカンダリキーと PK を分離
 			var keyColumns [][]byte
-			memcomparable.Decode(record.KeyBytes(), &keyColumns)
+			encode.Decode(record.KeyBytes(), &keyColumns)
 
 			assert.Equal(t, expected.secondaryKey, string(keyColumns[0]))
 			assert.Equal(t, expected.pk, string(keyColumns[1]))
@@ -208,11 +206,11 @@ func TestCreateAndInsert(t *testing.T) {
 		assert.Equal(t, uint8(0), record.HeaderBytes()[0]) // active
 
 		var decodedKey [][]byte
-		memcomparable.Decode(record.KeyBytes(), &decodedKey)
+		encode.Decode(record.KeyBytes(), &decodedKey)
 		assert.Equal(t, "a", string(decodedKey[0]))
 
 		var decodedValue [][]byte
-		memcomparable.Decode(record.NonKeyBytes(), &decodedValue)
+		encode.Decode(record.NonKeyBytes(), &decodedValue)
 		assert.Equal(t, "Jane", string(decodedValue[0])) // 新しい値で上書きされている
 
 		// 2 件目は存在しない (物理的にレコードが増えていない)
@@ -271,7 +269,7 @@ func TestSoftDelete(t *testing.T) {
 			// ソフトデリート済みはスキップ
 			if record.HeaderBytes()[0] != 1 {
 				var decodedKey [][]byte
-				memcomparable.Decode(record.KeyBytes(), &decodedKey)
+				encode.Decode(record.KeyBytes(), &decodedKey)
 				indexKeys = append(indexKeys, string(decodedKey[0]))
 			}
 			_, _, err := indexIter.Next(bp)
@@ -313,7 +311,7 @@ func TestSoftDelete(t *testing.T) {
 				break
 			}
 			var decodedKey [][]byte
-			memcomparable.Decode(record.KeyBytes(), &decodedKey)
+			encode.Decode(record.KeyBytes(), &decodedKey)
 			entries = append(entries, entry{
 				pk:         string(decodedKey[0]),
 				deleteMark: record.HeaderBytes()[0],
@@ -397,7 +395,7 @@ func TestDelete(t *testing.T) {
 		record, ok := iter.Get()
 		assert.True(t, ok)
 		var decodedKey [][]byte
-		memcomparable.Decode(record.KeyBytes(), &decodedKey)
+		encode.Decode(record.KeyBytes(), &decodedKey)
 		assert.Equal(t, "b", string(decodedKey[0]))
 
 		err = iter.Advance(bp)
@@ -444,7 +442,7 @@ func TestDelete(t *testing.T) {
 				break
 			}
 			var keyColumns [][]byte
-			memcomparable.Decode(record.KeyBytes(), &keyColumns)
+			encode.Decode(record.KeyBytes(), &keyColumns)
 			indexKeys = append(indexKeys, string(keyColumns[0]))
 			_, _, err := indexIter.Next(bp)
 			assert.NoError(t, err)
@@ -560,11 +558,11 @@ func TestUpdate(t *testing.T) {
 		assert.Equal(t, uint8(0), record.HeaderBytes()[0]) // active のまま
 
 		var decodedKey [][]byte
-		memcomparable.Decode(record.KeyBytes(), &decodedKey)
+		encode.Decode(record.KeyBytes(), &decodedKey)
 		assert.Equal(t, "a", string(decodedKey[0]))
 
 		var decodedValue [][]byte
-		memcomparable.Decode(record.NonKeyBytes(), &decodedValue)
+		encode.Decode(record.NonKeyBytes(), &decodedValue)
 		assert.Equal(t, "Jane", string(decodedValue[0]))
 
 		// 2 件目は存在しない (ソフトデリートされたレコードが残っていない)
@@ -608,7 +606,7 @@ func TestUpdate(t *testing.T) {
 				break
 			}
 			var decodedKey [][]byte
-			memcomparable.Decode(record.KeyBytes(), &decodedKey)
+			encode.Decode(record.KeyBytes(), &decodedKey)
 			entries = append(entries, entry{
 				pk:         string(decodedKey[0]),
 				deleteMark: record.HeaderBytes()[0],
@@ -726,7 +724,7 @@ func TestUpdate(t *testing.T) {
 			}
 			if record.HeaderBytes()[0] != 1 {
 				var keyColumns [][]byte
-				memcomparable.Decode(record.KeyBytes(), &keyColumns)
+				encode.Decode(record.KeyBytes(), &keyColumns)
 				assert.Equal(t, "Doe", string(keyColumns[0]))
 				assert.Equal(t, "x", string(keyColumns[1]))
 				assert.Equal(t, 0, len(record.NonKeyBytes()))
@@ -914,7 +912,7 @@ type decodedRecord struct {
 	value [][]byte
 }
 
-func collectAllTablePairs(t *testing.T, bp *bufferpool.BufferPool, table *TableAccessMethod) []decodedRecord {
+func collectAllTablePairs(t *testing.T, bp *storage.BufferPool, table *TableAccessMethod) []decodedRecord {
 	t.Helper()
 	iter, err := table.Search(bp, RecordSearchModeStart{})
 	assert.NoError(t, err)
@@ -937,9 +935,9 @@ func collectAllTablePairs(t *testing.T, bp *bufferpool.BufferPool, table *TableA
 func TestGetUniqueIndexByName(t *testing.T) {
 	t.Run("インデックス名からユニークインデックスを取得できる", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex1 := NewUniqueIndexAccessMethod("idx_first_name", "first_name", page.PageId{}, 1)
-		uniqueIndex2 := NewUniqueIndexAccessMethod("idx_last_name", "last_name", page.PageId{}, 2)
-		table := NewTableAccessMethod("users", page.PageId{}, 1, []*UniqueIndexAccessMethod{uniqueIndex1, uniqueIndex2})
+		uniqueIndex1 := NewUniqueIndexAccessMethod("idx_first_name", "first_name", storage.PageId{}, 1)
+		uniqueIndex2 := NewUniqueIndexAccessMethod("idx_last_name", "last_name", storage.PageId{}, 2)
+		table := NewTableAccessMethod("users", storage.PageId{}, 1, []*UniqueIndexAccessMethod{uniqueIndex1, uniqueIndex2})
 
 		// WHEN
 		ui, err := table.GetUniqueIndexByName("idx_last_name")
@@ -951,8 +949,8 @@ func TestGetUniqueIndexByName(t *testing.T) {
 
 	t.Run("存在しないインデックス名を指定するとエラーになる", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_first_name", "first_name", page.PageId{}, 1)
-		table := NewTableAccessMethod("users", page.PageId{}, 1, []*UniqueIndexAccessMethod{uniqueIndex})
+		uniqueIndex := NewUniqueIndexAccessMethod("idx_first_name", "first_name", storage.PageId{}, 1)
+		table := NewTableAccessMethod("users", storage.PageId{}, 1, []*UniqueIndexAccessMethod{uniqueIndex})
 
 		// WHEN
 		ui, err := table.GetUniqueIndexByName("idx_last_name")
@@ -962,13 +960,13 @@ func TestGetUniqueIndexByName(t *testing.T) {
 	})
 }
 
-func InitDisk(t *testing.T, pathname string) (bufferPool *bufferpool.BufferPool, metaPageId page.PageId, tmpdir string) {
+func InitDisk(t *testing.T, pathname string) (bufferPool *storage.BufferPool, metaPageId storage.PageId, tmpdir string) {
 	tmpdir = t.TempDir()
 	filePath := filepath.Join(tmpdir, pathname)
 
-	bp := bufferpool.NewBufferPool(10)
-	fileId := page.FileId(1)
-	dm, err := disk.NewDisk(fileId, filePath)
+	bp := storage.NewBufferPool(10)
+	fileId := storage.FileId(1)
+	dm, err := storage.NewDisk(fileId, filePath)
 	assert.NoError(t, err)
 	bp.RegisterDisk(fileId, dm)
 
@@ -1058,7 +1056,7 @@ func TestHeight(t *testing.T) {
 // ユニークインデックスの active なエントリのセカンダリキーを収集するヘルパー
 //
 // ソフトデリート済み (DeleteMark=1) のエントリはスキップする
-func collectActiveUniqueIndexKeys(t *testing.T, bp *bufferpool.BufferPool, ui *UniqueIndexAccessMethod) []string {
+func collectActiveUniqueIndexKeys(t *testing.T, bp *storage.BufferPool, ui *UniqueIndexAccessMethod) []string {
 	t.Helper()
 	indexTree := btree.NewBPlusTree(ui.MetaPageId)
 	indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})
@@ -1072,7 +1070,7 @@ func collectActiveUniqueIndexKeys(t *testing.T, bp *bufferpool.BufferPool, ui *U
 		}
 		if record.HeaderBytes()[0] != 1 {
 			var keyColumns [][]byte
-			memcomparable.Decode(record.KeyBytes(), &keyColumns)
+			encode.Decode(record.KeyBytes(), &keyColumns)
 			keys = append(keys, string(keyColumns[0]))
 		}
 		_, _, err := indexIter.Next(bp)

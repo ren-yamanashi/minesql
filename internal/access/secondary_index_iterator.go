@@ -1,9 +1,9 @@
 package access
 
 import (
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/memcomparable"
+	"minesql/internal/btree"
+	"minesql/internal/encode"
+	"minesql/internal/storage"
 )
 
 // SecondaryIndexSearchResult はインデックス検索の結果を表す
@@ -15,11 +15,11 @@ type SecondaryIndexSearchResult struct {
 type SecondaryIndexIterator struct {
 	indexIterator   *btree.Iterator
 	tableBTree      *btree.BPlusTree
-	bp              *bufferpool.BufferPool
+	bp              *storage.BufferPool
 	primaryKeyCount uint8 // PK のカラム数 (Key からセカンダリキーと PK を分離するために必要)
 }
 
-func newSecondaryIndexIterator(indexIterator *btree.Iterator, tableBTree *btree.BPlusTree, bp *bufferpool.BufferPool, primaryKeyCount uint8) *SecondaryIndexIterator {
+func newSecondaryIndexIterator(indexIterator *btree.Iterator, tableBTree *btree.BPlusTree, bp *storage.BufferPool, primaryKeyCount uint8) *SecondaryIndexIterator {
 	return &SecondaryIndexIterator{
 		indexIterator:   indexIterator,
 		tableBTree:      tableBTree,
@@ -51,9 +51,9 @@ func (iri *SecondaryIndexIterator) Next() (*SecondaryIndexSearchResult, bool, er
 		}
 
 		// Key = concat(encodedSecondaryKey, encodedPK) を分離
-		// memcomparable.Decode で全カラムに分離する
+		// encode.Decode で全カラムに分離する
 		var keyColumns [][]byte
-		memcomparable.Decode(indexRecord.KeyBytes(), &keyColumns)
+		encode.Decode(indexRecord.KeyBytes(), &keyColumns)
 
 		// セカンダリキー = 先頭カラム、PK = 残りのカラム
 		secondaryKey := keyColumns[:1]
@@ -61,7 +61,7 @@ func (iri *SecondaryIndexIterator) Next() (*SecondaryIndexSearchResult, bool, er
 
 		// PK カラムを再エンコードしてテーブル本体を検索
 		var encodedPK []byte
-		memcomparable.Encode(pkColumns, &encodedPK)
+		encode.Encode(pkColumns, &encodedPK)
 
 		tableIterator, err := iri.tableBTree.Search(iri.bp, btree.SearchModeKey{Key: encodedPK})
 		if err != nil {
@@ -77,8 +77,8 @@ func (iri *SecondaryIndexIterator) Next() (*SecondaryIndexSearchResult, bool, er
 
 		// テーブルレコード (プライマリキー + NonKey) をデコード
 		var record [][]byte
-		memcomparable.Decode(tableRecord.KeyBytes(), &record)
-		memcomparable.Decode(tableRecord.NonKeyBytes(), &record)
+		encode.Decode(tableRecord.KeyBytes(), &record)
+		encode.Decode(tableRecord.NonKeyBytes(), &record)
 
 		return &SecondaryIndexSearchResult{
 			SecondaryKey: secondaryKey,

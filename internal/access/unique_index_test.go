@@ -2,8 +2,8 @@ package access
 
 import (
 	"fmt"
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/memcomparable"
+	"minesql/internal/btree"
+	"minesql/internal/encode"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -26,10 +26,10 @@ func TestUniqueIndex(t *testing.T) {
 		// WHEN: インデックスに値を挿入 (Key = concat(encodedSecondaryKey, encodedPK), NonKey = nil)
 		// encodedPK は memcomparable エンコード済みのバイト列を渡す
 		var encodedPK0, encodedPK1, encodedPK2, encodedPK3 []byte
-		memcomparable.Encode([][]byte{[]byte("pk0")}, &encodedPK0)
-		memcomparable.Encode([][]byte{[]byte("pk1")}, &encodedPK1)
-		memcomparable.Encode([][]byte{[]byte("pk2")}, &encodedPK2)
-		memcomparable.Encode([][]byte{[]byte("pk3")}, &encodedPK3)
+		encode.Encode([][]byte{[]byte("pk0")}, &encodedPK0)
+		encode.Encode([][]byte{[]byte("pk1")}, &encodedPK1)
+		encode.Encode([][]byte{[]byte("pk2")}, &encodedPK2)
+		encode.Encode([][]byte{[]byte("pk3")}, &encodedPK3)
 
 		err = uniqueIndex.Insert(bp, encodedPK0, [][]byte{[]byte("John")})
 		assert.NoError(t, err)
@@ -66,7 +66,7 @@ func TestUniqueIndex(t *testing.T) {
 
 			// Key をデコードしてセカンダリキーと PK を分離
 			var keyColumns [][]byte
-			memcomparable.Decode(record.KeyBytes(), &keyColumns)
+			encode.Decode(record.KeyBytes(), &keyColumns)
 
 			assert.Equal(t, expected.secondaryKey, string(keyColumns[0]))
 			assert.Equal(t, expected.pk, string(keyColumns[1]))
@@ -97,9 +97,9 @@ func TestUniqueIndexDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		var encodedPK0, encodedPK1, encodedPK2 []byte
-		memcomparable.Encode([][]byte{[]byte("pk0")}, &encodedPK0)
-		memcomparable.Encode([][]byte{[]byte("pk1")}, &encodedPK1)
-		memcomparable.Encode([][]byte{[]byte("pk2")}, &encodedPK2)
+		encode.Encode([][]byte{[]byte("pk0")}, &encodedPK0)
+		encode.Encode([][]byte{[]byte("pk1")}, &encodedPK1)
+		encode.Encode([][]byte{[]byte("pk2")}, &encodedPK2)
 
 		err = uniqueIndex.Insert(bp, encodedPK0, [][]byte{[]byte("John")})
 		assert.NoError(t, err)
@@ -130,7 +130,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 				break
 			}
 			var keyColumns [][]byte
-			memcomparable.Decode(record.KeyBytes(), &keyColumns)
+			encode.Decode(record.KeyBytes(), &keyColumns)
 			entries = append(entries, indexEntry{
 				secondaryKey: string(keyColumns[0]),
 				deleteMark:   record.HeaderBytes()[0],
@@ -160,7 +160,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		var encodedPK0 []byte
-		memcomparable.Encode([][]byte{[]byte("pk0")}, &encodedPK0)
+		encode.Encode([][]byte{[]byte("pk0")}, &encodedPK0)
 
 		err = uniqueIndex.Insert(bp, encodedPK0, [][]byte{[]byte("John")})
 		assert.NoError(t, err)
@@ -193,9 +193,9 @@ func TestUniqueIndexDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		var encodedPK0, encodedPK1, encodedPK2 []byte
-		memcomparable.Encode([][]byte{[]byte("pk0")}, &encodedPK0)
-		memcomparable.Encode([][]byte{[]byte("pk1")}, &encodedPK1)
-		memcomparable.Encode([][]byte{[]byte("pk2")}, &encodedPK2)
+		encode.Encode([][]byte{[]byte("pk0")}, &encodedPK0)
+		encode.Encode([][]byte{[]byte("pk1")}, &encodedPK1)
+		encode.Encode([][]byte{[]byte("pk2")}, &encodedPK2)
 
 		err = uniqueIndex.Insert(bp, encodedPK0, [][]byte{[]byte("John")})
 		assert.NoError(t, err)
@@ -226,7 +226,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 				break
 			}
 			var keyColumns [][]byte
-			memcomparable.Decode(record.KeyBytes(), &keyColumns)
+			encode.Decode(record.KeyBytes(), &keyColumns)
 			entries = append(entries, indexEntry{
 				secondaryKey: string(keyColumns[0]),
 				deleteMark:   record.HeaderBytes()[0],
@@ -254,7 +254,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		var encodedPK0 []byte
-		memcomparable.Encode([][]byte{[]byte("pk0")}, &encodedPK0)
+		encode.Encode([][]byte{[]byte("pk0")}, &encodedPK0)
 
 		err = uniqueIndex.Insert(bp, encodedPK0, [][]byte{[]byte("John")})
 		assert.NoError(t, err)
@@ -289,8 +289,8 @@ func TestUniqueIndexConstraint(t *testing.T) {
 		assert.NoError(t, err)
 
 		var encodedPK0, encodedPK1 []byte
-		memcomparable.Encode([][]byte{[]byte("pk0")}, &encodedPK0)
-		memcomparable.Encode([][]byte{[]byte("pk1")}, &encodedPK1)
+		encode.Encode([][]byte{[]byte("pk0")}, &encodedPK0)
+		encode.Encode([][]byte{[]byte("pk1")}, &encodedPK1)
 
 		err = uniqueIndex.Insert(bp, encodedPK0, [][]byte{[]byte("John")})
 		assert.NoError(t, err)
@@ -314,8 +314,8 @@ func TestUniqueIndexConstraint(t *testing.T) {
 		assert.NoError(t, err)
 
 		var encodedPK0, encodedPK1 []byte
-		memcomparable.Encode([][]byte{[]byte("pk0")}, &encodedPK0)
-		memcomparable.Encode([][]byte{[]byte("pk1")}, &encodedPK1)
+		encode.Encode([][]byte{[]byte("pk0")}, &encodedPK0)
+		encode.Encode([][]byte{[]byte("pk1")}, &encodedPK1)
 
 		err = uniqueIndex.Insert(bp, encodedPK0, [][]byte{[]byte("John")})
 		assert.NoError(t, err)

@@ -1,17 +1,17 @@
 package access
 
 import (
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/memcomparable"
+	"minesql/internal/btree"
+	"minesql/internal/encode"
+	"minesql/internal/storage"
 )
 
 type ClusteredIndexIterator struct {
 	iterator *btree.Iterator
-	bp       *bufferpool.BufferPool
+	bp       *storage.BufferPool
 }
 
-func newClusteredIndexIterator(iterator *btree.Iterator, bp *bufferpool.BufferPool) *ClusteredIndexIterator {
+func newClusteredIndexIterator(iterator *btree.Iterator, bp *storage.BufferPool) *ClusteredIndexIterator {
 	return &ClusteredIndexIterator{
 		iterator: iterator,
 		bp:       bp,
@@ -39,8 +39,8 @@ func (ri *ClusteredIndexIterator) Next() ([][]byte, bool, error) {
 
 		// レコード (プライマリキー + NonKey) をデコード
 		var record [][]byte
-		memcomparable.Decode(btrRecord.KeyBytes(), &record)
-		memcomparable.Decode(btrRecord.NonKeyBytes(), &record)
+		encode.Decode(btrRecord.KeyBytes(), &record)
+		encode.Decode(btrRecord.NonKeyBytes(), &record)
 
 		return record, true, nil
 	}

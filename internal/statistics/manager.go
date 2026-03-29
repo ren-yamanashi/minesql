@@ -2,7 +2,7 @@ package statistics
 
 import (
 	"minesql/internal/catalog"
-	"minesql/internal/storage/bufferpool"
+	"minesql/internal/storage"
 	"sync"
 )
 
@@ -18,7 +18,7 @@ type tableState struct {
 
 // Manager は統計情報の収集とステート管理を行うシングルトン
 type Manager struct {
-	bufferPool *bufferpool.BufferPool
+	bufferPool *storage.BufferPool
 	mu         sync.Mutex
 	states     map[string]*tableState // テーブル名 -> 状態
 }
@@ -29,7 +29,7 @@ var (
 )
 
 // Init はグローバルな Manager を初期化する
-func Init(bp *bufferpool.BufferPool) *Manager {
+func Init(bp *storage.BufferPool) *Manager {
 	once.Do(func() {
 		mgr = &Manager{
 			bufferPool: bp,

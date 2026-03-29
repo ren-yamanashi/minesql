@@ -3,9 +3,8 @@ package catalog
 import (
 	"encoding/binary"
 	"fmt"
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/page"
+	"minesql/internal/btree"
+	"minesql/internal/storage"
 )
 
 var (
@@ -14,17 +13,17 @@ var (
 
 // Catalog はテーブルのメタデータ (テーブル情報、インデックス情報、カラム情報) を管理する
 type Catalog struct {
-	TableMetaPageId  page.PageId
-	IndexMetaPageId  page.PageId
-	ColumnMetaPageId page.PageId
+	TableMetaPageId  storage.PageId
+	IndexMetaPageId  storage.PageId
+	ColumnMetaPageId storage.PageId
 	metadata         []*TableMetadata
-	NextFileId       page.FileId
+	NextFileId       storage.FileId
 }
 
 // NewCatalog は既存のカタログを開く
-func NewCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
-	fileId := page.FileId(0) // カタログ専用の FileId を使用
-	headerPageId := page.NewPageId(fileId, page.PageNumber(0))
+func NewCatalog(bp *storage.BufferPool) (*Catalog, error) {
+	fileId := storage.FileId(0) // カタログ専用の FileId を使用
+	headerPageId := storage.NewPageId(fileId, storage.PageNumber(0))
 
 	// ヘッダーページを読み込む
 	bufPage, err := bp.FetchPage(headerPageId)
@@ -43,12 +42,12 @@ func NewCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
 	tblMetaPageNum := binary.BigEndian.Uint32(data[4:8])
 	idxMetaPageNum := binary.BigEndian.Uint32(data[8:12])
 	colMetaPageNum := binary.BigEndian.Uint32(data[12:16])
-	nextFileId := page.FileId(binary.BigEndian.Uint32(data[16:20]))
+	nextFileId := storage.FileId(binary.BigEndian.Uint32(data[16:20]))
 
 	catalog := &Catalog{
-		TableMetaPageId:  page.NewPageId(fileId, page.PageNumber(tblMetaPageNum)),
-		IndexMetaPageId:  page.NewPageId(fileId, page.PageNumber(idxMetaPageNum)),
-		ColumnMetaPageId: page.NewPageId(fileId, page.PageNumber(colMetaPageNum)),
+		TableMetaPageId:  storage.NewPageId(fileId, storage.PageNumber(tblMetaPageNum)),
+		IndexMetaPageId:  storage.NewPageId(fileId, storage.PageNumber(idxMetaPageNum)),
+		ColumnMetaPageId: storage.NewPageId(fileId, storage.PageNumber(colMetaPageNum)),
 		metadata:         nil,
 		NextFileId:       nextFileId,
 	}
@@ -64,8 +63,8 @@ func NewCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
 }
 
 // CreateCatalog はカタログを新規作成する
-func CreateCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
-	fileId := page.FileId(0) // カタログ専用の FileId を使用
+func CreateCatalog(bp *storage.BufferPool) (*Catalog, error) {
+	fileId := storage.FileId(0) // カタログ専用の FileId を使用
 
 	// ヘッダーページを作成
 	headerPageId, err := bp.AllocatePageId(fileId)
@@ -110,7 +109,7 @@ func CreateCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
 
 	// ヘッダーページに各メタデータのメタページIDを保存
 	data := bufferPage.GetWriteData()
-	initFileId := page.FileId(1)    // FileId(0) はカタログ用に予約されているため、1 から開始
+	initFileId := storage.FileId(1) // FileId(0) はカタログ用に予約されているため、1 から開始
 	copy(data[0:4], []byte("MINE")) // ファイルシグネチャとしてマジックナンバーを設定 (minesql なので MINE)
 	binary.BigEndian.PutUint32(data[4:8], uint32(tblMetaTree.MetaPageId.PageNumber))
 	binary.BigEndian.PutUint32(data[8:12], uint32(idxMetaTree.MetaPageId.PageNumber))
@@ -127,7 +126,7 @@ func CreateCatalog(bp *bufferpool.BufferPool) (*Catalog, error) {
 }
 
 // Insert はカタログにメタデータを挿入する
-func (c *Catalog) Insert(bp *bufferpool.BufferPool, tableMeta TableMetadata) error {
+func (c *Catalog) Insert(bp *storage.BufferPool, tableMeta TableMetadata) error {
 	// 各メタデータに MetaPageId を設定する
 	tableMeta.MetaPageId = c.TableMetaPageId
 	for _, indexMeta := range tableMeta.Indexes {
@@ -176,12 +175,12 @@ func (c *Catalog) GetAllTables() []*TableMetadata {
 }
 
 // AllocateFileId は新しい FileId を採番し、ディスク上のカウンターを更新する
-func (c *Catalog) AllocateFileId(bp *bufferpool.BufferPool) (page.FileId, error) {
+func (c *Catalog) AllocateFileId(bp *storage.BufferPool) (storage.FileId, error) {
 	id := c.NextFileId
 	c.NextFileId++
 
 	// Header Page (Page 0) を更新する
-	headerPageId := page.NewPageId(page.FileId(0), 0)
+	headerPageId := storage.NewPageId(storage.FileId(0), 0)
 	headerPage, err := bp.FetchPage(headerPageId)
 	if err != nil {
 		return 0, err

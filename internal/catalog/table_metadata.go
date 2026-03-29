@@ -4,28 +4,27 @@ import (
 	"encoding/binary"
 	"fmt"
 	"minesql/internal/access"
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/btree/node"
-	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/memcomparable"
-	"minesql/internal/storage/page"
+	"minesql/internal/btree"
+	"minesql/internal/btree/node"
+	"minesql/internal/encode"
+	"minesql/internal/storage"
 )
 
 // TableMetadata はテーブルのメタデータを表す
 //
 // 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-tables-access.html
 type TableMetadata struct {
-	MetaPageId      page.PageId       // テーブルのメタデータが格納される B+Tree のメタページID
-	FileId          page.FileId       // テーブルの識別子 (一意)
+	MetaPageId      storage.PageId    // テーブルのメタデータが格納される B+Tree のメタページID
+	FileId          storage.FileId    // テーブルの識別子 (一意)
 	Name            string            // テーブルの名前
 	NCols           uint8             // テーブルの列数
 	PrimaryKeyCount uint8             // プライマリキーの列数 (プライマリキーは先頭から連続している想定) (例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる)
-	DataMetaPageId  page.PageId       // 実データが格納される B+Tree のメタページID
+	DataMetaPageId  storage.PageId    // 実データが格納される B+Tree のメタページID
 	Cols            []*ColumnMetadata // テーブルのカラム情報
 	Indexes         []*IndexMetadata  // テーブルのインデックス情報
 }
 
-func NewTableMetadata(fileId page.FileId, name string, nCols uint8, pkCount uint8, cols []*ColumnMetadata, indexes []*IndexMetadata, dataMetaPageId page.PageId) TableMetadata {
+func NewTableMetadata(fileId storage.FileId, name string, nCols uint8, pkCount uint8, cols []*ColumnMetadata, indexes []*IndexMetadata, dataMetaPageId storage.PageId) TableMetadata {
 	return TableMetadata{
 		FileId:          fileId,
 		Name:            name,
@@ -87,19 +86,19 @@ func (tm *TableMetadata) GetTable() (*access.TableAccessMethod, error) {
 }
 
 // Insert はテーブルメタデータを B+Tree に挿入する
-func (tm *TableMetadata) Insert(bp *bufferpool.BufferPool) error {
+func (tm *TableMetadata) Insert(bp *storage.BufferPool) error {
 	btr := btree.NewBPlusTree(tm.MetaPageId)
 
 	// key (FileId) をエンコード
 	var encodedKey []byte
 	keyBuf := binary.BigEndian.AppendUint32(nil, uint32(tm.FileId))
-	memcomparable.Encode([][]byte{keyBuf}, &encodedKey)
+	encode.Encode([][]byte{keyBuf}, &encodedKey)
 
 	// value (Name, NCols, PrimaryKeyCount, DataMetaPageId) をエンコード
 	var encodedValue []byte
 	nColsBuf := binary.BigEndian.AppendUint64(nil, uint64(tm.NCols))
 	pkCountBuf := binary.BigEndian.AppendUint64(nil, uint64(tm.PrimaryKeyCount))
-	memcomparable.Encode([][]byte{[]byte(tm.Name), nColsBuf, pkCountBuf, tm.DataMetaPageId.ToBytes()}, &encodedValue)
+	encode.Encode([][]byte{[]byte(tm.Name), nColsBuf, pkCountBuf, tm.DataMetaPageId.ToBytes()}, &encodedValue)
 
 	// B+Tree に挿入
 	return btr.Insert(bp, node.NewRecord(nil, encodedKey, encodedValue))
@@ -116,7 +115,7 @@ func (tm *TableMetadata) Insert(bp *bufferpool.BufferPool) error {
 // indexMetaPageId: インデックスメタデータが格納されている B+Tree のメタページID
 //
 // columnMetaPageId: カラムメタデータが格納されている B+Tree のメタページID
-func loadTableMetadata(bp *bufferpool.BufferPool, tableMetaPageId page.PageId, indexMetaPageId page.PageId, columnMetaPageId page.PageId) ([]*TableMetadata, error) {
+func loadTableMetadata(bp *storage.BufferPool, tableMetaPageId storage.PageId, indexMetaPageId storage.PageId, columnMetaPageId storage.PageId) ([]*TableMetadata, error) {
 	// B+Tree を開く
 	tableMetaTree := btree.NewBPlusTree(tableMetaPageId)
 	iter, err := tableMetaTree.Search(bp, btree.SearchModeStart{})
@@ -134,16 +133,16 @@ func loadTableMetadata(bp *bufferpool.BufferPool, tableMetaPageId page.PageId, i
 
 		// キーをデコード (FileId)
 		var keyParts [][]byte
-		memcomparable.Decode(record.KeyBytes(), &keyParts)
-		fileId := page.FileId(binary.BigEndian.Uint32(keyParts[0]))
+		encode.Decode(record.KeyBytes(), &keyParts)
+		fileId := storage.FileId(binary.BigEndian.Uint32(keyParts[0]))
 
 		// 値をデコード (Name, NCols, PrimaryKeyCount, DataMetaPageId)
 		var valueParts [][]byte
-		memcomparable.Decode(record.NonKeyBytes(), &valueParts)
+		encode.Decode(record.NonKeyBytes(), &valueParts)
 		name := string(valueParts[0])
 		nCols := uint8(binary.BigEndian.Uint64(valueParts[1]))
 		pkCount := uint8(binary.BigEndian.Uint64(valueParts[2]))
-		dataMetaPageId := page.RestorePageIdFromBytes(valueParts[3])
+		dataMetaPageId := storage.RestorePageIdFromBytes(valueParts[3])
 
 		// インデックスメタデータを読み込む
 		indexes, err := loadIndexMetadata(bp, fileId, indexMetaPageId)

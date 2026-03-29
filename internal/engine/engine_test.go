@@ -3,7 +3,7 @@ package engine
 import (
 	"minesql/internal/access"
 	"minesql/internal/catalog"
-	"minesql/internal/storage/page"
+	"minesql/internal/storage"
 	"os"
 	"path/filepath"
 	"testing"
@@ -80,7 +80,7 @@ func TestRegisterDmToBp(t *testing.T) {
 		Init()
 		e := Get()
 
-		fileId := page.FileId(1)
+		fileId := storage.FileId(1)
 		tableName := "users"
 
 		// WHEN
@@ -103,7 +103,7 @@ func TestRegisterDmToBp(t *testing.T) {
 		Init()
 		e := Get()
 
-		fileId := page.FileId(1)
+		fileId := storage.FileId(1)
 		tableName := "users"
 
 		// WHEN
@@ -134,7 +134,7 @@ func TestInitCatalog(t *testing.T) {
 		// THEN
 		assert.NotNil(t, e)
 		assert.NotNil(t, e.Catalog)
-		assert.Equal(t, page.FileId(1), e.Catalog.NextFileId)
+		assert.Equal(t, storage.FileId(1), e.Catalog.NextFileId)
 	})
 
 	t.Run("カタログファイルが既に存在する場合、既存のカタログが開かれる", func(t *testing.T) {
@@ -165,7 +165,7 @@ func TestInitCatalog(t *testing.T) {
 
 		// THEN
 		assert.NotNil(t, engine2.Catalog)
-		assert.Equal(t, page.FileId(3), engine2.Catalog.NextFileId)
+		assert.Equal(t, storage.FileId(3), engine2.Catalog.NextFileId)
 	})
 
 	t.Run("カタログの Disk が BufferPool に登録される", func(t *testing.T) {
@@ -179,7 +179,7 @@ func TestInitCatalog(t *testing.T) {
 		e := Init()
 
 		// THEN
-		dm, err := e.BufferPool.GetDisk(page.FileId(0))
+		dm, err := e.BufferPool.GetDisk(storage.FileId(0))
 		assert.NoError(t, err)
 		assert.NotNil(t, dm)
 	})
@@ -251,7 +251,7 @@ func TestInitCatalog(t *testing.T) {
 		// THEN: 新しいカタログが作成され、NextFileId は 1
 		assert.NotNil(t, e)
 		assert.NotNil(t, e.Catalog)
-		assert.Equal(t, page.FileId(1), e.Catalog.NextFileId)
+		assert.Equal(t, storage.FileId(1), e.Catalog.NextFileId)
 	})
 
 	t.Run("データディレクトリが存在しない場合、自動作成される", func(t *testing.T) {

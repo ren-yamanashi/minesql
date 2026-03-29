@@ -2,9 +2,9 @@ package catalog
 
 import (
 	"encoding/binary"
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/memcomparable"
-	"minesql/internal/storage/page"
+	"minesql/internal/btree"
+	"minesql/internal/encode"
+	"minesql/internal/storage"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +16,7 @@ func TestColumnMetadata_Insert(t *testing.T) {
 		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
-		metaPageId, err := bp.AllocatePageId(page.FileId(0))
+		metaPageId, err := bp.AllocatePageId(storage.FileId(0))
 		assert.NoError(t, err)
 		_, err = btree.CreateBPlusTree(bp, metaPageId)
 		assert.NoError(t, err)
@@ -39,14 +39,14 @@ func TestColumnMetadata_Insert(t *testing.T) {
 
 		// key (FileId, ColName) をデコード
 		var keyParts [][]byte
-		memcomparable.Decode(record.KeyBytes(), &keyParts)
+		encode.Decode(record.KeyBytes(), &keyParts)
 		tableId := binary.BigEndian.Uint32(keyParts[0])
 		assert.Equal(t, uint32(1), tableId)
 		assert.Equal(t, "email", string(keyParts[1]))
 
 		// value (Pos, Type) をデコード
 		var valueParts [][]byte
-		memcomparable.Decode(record.NonKeyBytes(), &valueParts)
+		encode.Decode(record.NonKeyBytes(), &valueParts)
 		pos := binary.BigEndian.Uint16(valueParts[0])
 		assert.Equal(t, uint16(2), pos)
 		assert.Equal(t, string(ColumnTypeString), string(valueParts[1]))
@@ -57,7 +57,7 @@ func TestColumnMetadata_Insert(t *testing.T) {
 		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
-		metaPageId, err := bp.AllocatePageId(page.FileId(0))
+		metaPageId, err := bp.AllocatePageId(storage.FileId(0))
 		assert.NoError(t, err)
 		_, err = btree.CreateBPlusTree(bp, metaPageId)
 		assert.NoError(t, err)
@@ -190,8 +190,8 @@ func TestLoadColumnMetadata(t *testing.T) {
 		assert.Equal(t, 2, len(result))
 		assert.Equal(t, "id", result[0].Name)
 		assert.Equal(t, "name", result[1].Name)
-		assert.Equal(t, page.FileId(1), result[0].FileId)
-		assert.Equal(t, page.FileId(1), result[1].FileId)
+		assert.Equal(t, storage.FileId(1), result[0].FileId)
+		assert.Equal(t, storage.FileId(1), result[1].FileId)
 	})
 
 	t.Run("該当するカラムがない場合は空のスライスを返す", func(t *testing.T) {

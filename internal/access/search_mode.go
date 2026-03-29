@@ -1,8 +1,8 @@
 package access
 
 import (
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/memcomparable"
+	"minesql/internal/btree"
+	"minesql/internal/encode"
 )
 
 // RecordSearchMode は検索方法を表すインターフェース
@@ -24,6 +24,6 @@ type RecordSearchModeKey struct {
 
 func (k RecordSearchModeKey) encode() btree.SearchMode {
 	var key []byte
-	memcomparable.Encode(k.Key, &key)
+	encode.Encode(k.Key, &key)
 	return btree.SearchModeKey{Key: key}
 }

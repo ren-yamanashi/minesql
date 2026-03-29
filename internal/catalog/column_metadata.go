@@ -2,11 +2,10 @@ package catalog
 
 import (
 	"encoding/binary"
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/btree/node"
-	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/memcomparable"
-	"minesql/internal/storage/page"
+	"minesql/internal/btree"
+	"minesql/internal/btree/node"
+	"minesql/internal/encode"
+	"minesql/internal/storage"
 	"sort"
 )
 
@@ -20,14 +19,14 @@ const (
 //
 // 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-columns-table.html
 type ColumnMetadata struct {
-	MetaPageId page.PageId // カラムのメタデータが格納される B+Tree のメタページID
-	FileId     page.FileId // カラムが属するテーブルの FileId
-	Name       string      // カラムの名前
-	Pos        uint16      // 0 から始まり連続的に増加する、テーブル内のカラムの順序位置
-	Type       ColumnType  // カラムのデータ型
+	MetaPageId storage.PageId // カラムのメタデータが格納される B+Tree のメタページID
+	FileId     storage.FileId // カラムが属するテーブルの FileId
+	Name       string         // カラムの名前
+	Pos        uint16         // 0 から始まり連続的に増加する、テーブル内のカラムの順序位置
+	Type       ColumnType     // カラムのデータ型
 }
 
-func NewColumnMetadata(fileId page.FileId, name string, pos uint16, columnType ColumnType) *ColumnMetadata {
+func NewColumnMetadata(fileId storage.FileId, name string, pos uint16, columnType ColumnType) *ColumnMetadata {
 	return &ColumnMetadata{
 		FileId: fileId,
 		Name:   name,
@@ -37,18 +36,18 @@ func NewColumnMetadata(fileId page.FileId, name string, pos uint16, columnType C
 }
 
 // Insert はカラムメタデータを B+Tree に挿入する
-func (cm *ColumnMetadata) Insert(bp *bufferpool.BufferPool) error {
+func (cm *ColumnMetadata) Insert(bp *storage.BufferPool) error {
 	btr := btree.NewBPlusTree(cm.MetaPageId)
 
 	// key (FileId + ColName) をエンコード
 	var encodedKey []byte
 	keyBuf := binary.BigEndian.AppendUint32(nil, uint32(cm.FileId))
-	memcomparable.Encode([][]byte{keyBuf, []byte(cm.Name)}, &encodedKey)
+	encode.Encode([][]byte{keyBuf, []byte(cm.Name)}, &encodedKey)
 
 	// value (Pos, Type) をエンコード
 	var encodedValue []byte
 	posBuf := binary.BigEndian.AppendUint16(nil, cm.Pos)
-	memcomparable.Encode([][]byte{posBuf, []byte(cm.Type)}, &encodedValue)
+	encode.Encode([][]byte{posBuf, []byte(cm.Type)}, &encodedValue)
 
 	// B+Tree に挿入
 	return btr.Insert(bp, node.NewRecord(nil, encodedKey, encodedValue))
@@ -63,7 +62,7 @@ func (cm *ColumnMetadata) Insert(bp *bufferpool.BufferPool) error {
 // fileId: カラムメタデータを読み込む対象のテーブルの FileId
 //
 // metaPageId: カラムメタデータが格納されている B+Tree のメタページID
-func loadColumnMetadata(bp *bufferpool.BufferPool, fileId page.FileId, metaPageId page.PageId) ([]*ColumnMetadata, error) {
+func loadColumnMetadata(bp *storage.BufferPool, fileId storage.FileId, metaPageId storage.PageId) ([]*ColumnMetadata, error) {
 	// B+Tree を開く
 	colMetaTree := btree.NewBPlusTree(metaPageId)
 	iter, err := colMetaTree.Search(bp, btree.SearchModeStart{})
@@ -80,8 +79,8 @@ func loadColumnMetadata(bp *bufferpool.BufferPool, fileId page.FileId, metaPageI
 
 		// キーをデコード (FileId, ColName)
 		var keyParts [][]byte
-		memcomparable.Decode(record.KeyBytes(), &keyParts)
-		colFileId := page.FileId(binary.BigEndian.Uint32(keyParts[0]))
+		encode.Decode(record.KeyBytes(), &keyParts)
+		colFileId := storage.FileId(binary.BigEndian.Uint32(keyParts[0]))
 
 		// 指定されたテーブルのカラムのみを収集
 		if colFileId == fileId {
@@ -89,7 +88,7 @@ func loadColumnMetadata(bp *bufferpool.BufferPool, fileId page.FileId, metaPageI
 
 			// 値をデコード (Pos, Type)
 			var valueParts [][]byte
-			memcomparable.Decode(record.NonKeyBytes(), &valueParts)
+			encode.Decode(record.NonKeyBytes(), &valueParts)
 			pos := binary.BigEndian.Uint16(valueParts[0])
 			colType := ColumnType(string(valueParts[1]))
 

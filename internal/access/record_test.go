@@ -1,7 +1,7 @@
 package access
 
 import (
-	"minesql/internal/storage/memcomparable"
+	"minesql/internal/encode"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -76,9 +76,9 @@ func TestEncodeKey(t *testing.T) {
 		// WHEN
 		encoded := rec.EncodeKey()
 
-		// THEN: memcomparable.Encode と同じ結果になる
+		// THEN: encode.Encode と同じ結果になる
 		var expected []byte
-		memcomparable.Encode([][]byte{[]byte("pk1")}, &expected)
+		encode.Encode([][]byte{[]byte("pk1")}, &expected)
 		assert.Equal(t, expected, encoded)
 	})
 
@@ -91,7 +91,7 @@ func TestEncodeKey(t *testing.T) {
 
 		// THEN
 		var expected []byte
-		memcomparable.Encode([][]byte{[]byte("pk1"), []byte("pk2")}, &expected)
+		encode.Encode([][]byte{[]byte("pk1"), []byte("pk2")}, &expected)
 		assert.Equal(t, expected, encoded)
 	})
 }
@@ -131,7 +131,7 @@ func TestEncodeNonKey(t *testing.T) {
 
 		// THEN
 		var expected []byte
-		memcomparable.Encode([][]byte{[]byte("v1"), []byte("v2")}, &expected)
+		encode.Encode([][]byte{[]byte("v1"), []byte("v2")}, &expected)
 		assert.Equal(t, expected, encoded)
 	})
 
@@ -144,7 +144,7 @@ func TestEncodeNonKey(t *testing.T) {
 
 		// THEN
 		var expected []byte
-		memcomparable.Encode([][]byte{}, &expected)
+		encode.Encode([][]byte{}, &expected)
 		assert.Equal(t, expected, encoded)
 	})
 }

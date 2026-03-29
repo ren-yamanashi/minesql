@@ -1,8 +1,8 @@
 package access
 
 import (
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/memcomparable"
+	"minesql/internal/btree"
+	"minesql/internal/encode"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,7 +35,7 @@ func TestRecordSearchModeKey(t *testing.T) {
 
 		// 期待されるエンコード結果と一致する
 		var expected []byte
-		memcomparable.Encode([][]byte{[]byte("hello")}, &expected)
+		encode.Encode([][]byte{[]byte("hello")}, &expected)
 		assert.Equal(t, expected, smKey.Key)
 	})
 
@@ -51,7 +51,7 @@ func TestRecordSearchModeKey(t *testing.T) {
 		assert.True(t, ok)
 
 		var expected []byte
-		memcomparable.Encode([][]byte{[]byte("a"), []byte("b")}, &expected)
+		encode.Encode([][]byte{[]byte("a"), []byte("b")}, &expected)
 		assert.Equal(t, expected, smKey.Key)
 	})
 
