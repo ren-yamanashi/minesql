@@ -6,12 +6,9 @@ import (
 
 // BufferPage はバッファプール内のページ (バッファページ) を表す
 type BufferPage struct {
-	// ページ ID
-	PageId PageId
-	// ページデータ
-	Page []byte
-	// ページが変更されたかどうか
-	IsDirty bool
+	PageId  PageId // ページ ID
+	Page    []byte // ページデータ
+	IsDirty bool   // ページが変更されたかどうか
 }
 
 // NewBufferPage は指定されたページ ID を持つ新しい BufferPage を作成する

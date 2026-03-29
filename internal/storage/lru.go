@@ -1,14 +1,5 @@
 package storage
 
-// LRU は MySQL InnoDB のバッファプールに基づく LRU アルゴリズムによりページ追い出しを行う
-//
-// リストを NewSublist (先頭側, 全体の 5/8) と OldSublist (末尾側, 全体の 3/8) に分割する
-//
-// 新しいページは midpoint (OldSublist の先頭) に挿入され、
-//
-// old サブリスト内のページが再アクセスされると new サブリストの先頭に昇格する
-//
-// これにより、フルテーブルスキャンなどの一時的な大量読み込みでホットページが追い出されるのを防ぐ
 type LRU struct {
 	head     *lruNode              // リストの先頭 (NewSublist の先頭)
 	tail     *lruNode              // リストの末尾 (OldSublist の末尾 = 追い出し候補)
@@ -20,7 +11,7 @@ type LRU struct {
 }
 
 type lruNode struct {
-	bufferId BufferId
+	bufferId BufferId // バッファ ID
 	prev     *lruNode // リスト内で自分の前に位置するノードのポインタ
 	next     *lruNode // リスト内で自分の後に位置するノードのポインタ
 	isOld    bool     // OldSublist に属しているか
@@ -29,7 +20,7 @@ type lruNode struct {
 
 // NewLRU は size をバッファプールの最大サイズとして LRU を初期化する
 func NewLRU(size int) *LRU {
-	policy := &LRU{
+	lru := &LRU{
 		nodeMap: make(map[BufferId]*lruNode, size),
 		maxNew:  size * 5 / 8,
 	}
@@ -40,21 +31,12 @@ func NewLRU(size int) *LRU {
 			isOld:    true,
 			isUnused: true,
 		}
-		policy.nodeMap[BufferId(i)] = node
-
-		// リストが空の状態であれば head と tail を初期化、そうでなければ末尾に追加
-		if policy.head == nil {
-			policy.head = node
-			policy.tail = node
-		} else {
-			node.prev = policy.tail // 自分の前のノードは、元々末尾に位置したノードになる
-			policy.tail.next = node // 元々末尾に位置したノードの次のノードは、自分になる
-			policy.tail = node      // 自分が新しい末尾になるので、tail を更新
-		}
+		lru.nodeMap[BufferId(i)] = node
+		lru.appendToTail(node)
 	}
-	policy.midpoint = policy.head // 初期化時点では全て OldSublist に属しているため、midpoint はリストの先頭を指す
-	policy.oldLen = size
-	return policy
+	lru.midpoint = lru.head // 初期化時点では全て OldSublist に属しているため、midpoint はリストの先頭を指す
+	lru.oldLen = size
+	return lru
 }
 
 // Access はページがアクセスされたことを記録する
@@ -90,18 +72,12 @@ func (l *LRU) Remove(bufferId BufferId) {
 	l.moveToOldTail(node)
 }
 
-// ノードを midpoint (OldSublist の先頭) に配置する
+// moveToMidpoint はノードを midpoint (OldSublist の先頭) に配置する
 func (l *LRU) moveToMidpoint(node *lruNode) {
 	if node == l.midpoint {
 		return
 	}
-	wasOld := node.isOld
-	l.detach(node)
-	if wasOld {
-		l.oldLen--
-	} else {
-		l.newLen--
-	}
+	l.detachAndUpdateCount(node)
 
 	if l.midpoint != nil {
 		l.insertBefore(l.midpoint, node)
@@ -114,10 +90,9 @@ func (l *LRU) moveToMidpoint(node *lruNode) {
 	l.midpoint = node
 }
 
-// OldSublist のノードを NewSublist の先頭に昇格する
+// promoteToNew は OldSublist のノードを NewSublist の先頭に昇格する
 func (l *LRU) promoteToNew(node *lruNode) {
-	l.detach(node)
-	l.oldLen--
+	l.detachAndUpdateCount(node)
 
 	l.prependToHead(node)
 	node.isOld = false
@@ -126,7 +101,7 @@ func (l *LRU) promoteToNew(node *lruNode) {
 	l.rebalance()
 }
 
-// NewSublist 内のノードを先頭に移動する
+// moveToNewHead は NewSublist 内のノードを先頭に移動する
 func (l *LRU) moveToNewHead(node *lruNode) {
 	if l.head == node {
 		return
@@ -135,26 +110,20 @@ func (l *LRU) moveToNewHead(node *lruNode) {
 	l.prependToHead(node)
 }
 
-// ノードを OldSublist の末尾 (リスト末尾) に移動する
+// moveToOldTail はノードを OldSublist の末尾 (リスト末尾) に移動する
 func (l *LRU) moveToOldTail(node *lruNode) {
 	if l.tail == node {
 		node.isOld = true
 		return
 	}
-	wasOld := node.isOld
-	l.detach(node)
-	if wasOld {
-		l.oldLen--
-	} else {
-		l.newLen--
-	}
+	l.detachAndUpdateCount(node)
 
 	l.appendToTail(node)
 	node.isOld = true
 	l.oldLen++
 }
 
-// NewSublist が最大長を超えた場合、midpoint を前方に移動して NewSublist の末尾ノードを OldSublist に降格する
+// rebalance は NewSublist が最大長を超えた場合、midpoint を前方に移動して NewSublist の末尾ノードを OldSublist に降格する
 func (l *LRU) rebalance() {
 	for l.newLen > l.maxNew {
 		switch {
@@ -172,7 +141,17 @@ func (l *LRU) rebalance() {
 	}
 }
 
-// ノードをリストから切り離す
+// detachAndUpdateCount はノードをリストから切り離し、所属するサブリストのカウントを更新する
+func (l *LRU) detachAndUpdateCount(node *lruNode) {
+	l.detach(node)
+	if node.isOld {
+		l.oldLen--
+	} else {
+		l.newLen--
+	}
+}
+
+// detach はノードをリストから切り離す
 func (l *LRU) detach(node *lruNode) {
 	if node == l.midpoint {
 		l.midpoint = node.next
@@ -191,7 +170,7 @@ func (l *LRU) detach(node *lruNode) {
 	node.next = nil
 }
 
-// target の直前にノードを挿入する
+// insertBefore は target の直前にノードを挿入する
 func (l *LRU) insertBefore(target, node *lruNode) {
 	node.next = target
 	node.prev = target.prev
@@ -203,7 +182,7 @@ func (l *LRU) insertBefore(target, node *lruNode) {
 	target.prev = node
 }
 
-// リストの先頭にノードを追加する
+// prependToHead　はリストの先頭にノードを追加する
 func (l *LRU) prependToHead(node *lruNode) {
 	node.prev = nil
 	node.next = l.head
@@ -215,7 +194,7 @@ func (l *LRU) prependToHead(node *lruNode) {
 	l.head = node
 }
 
-// リストの末尾にノードを追加する
+// appendToTail はリストの末尾にノードを追加する
 func (l *LRU) appendToTail(node *lruNode) {
 	node.next = nil
 	node.prev = l.tail

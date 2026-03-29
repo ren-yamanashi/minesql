@@ -1,4 +1,4 @@
-# MySQL InnoDB の LRU アルゴリズム
+# LRU アルゴリズム
 
 ## 参考文献
 
@@ -8,9 +8,10 @@
 
 ## 概要
 
-- MySQL InnoDB のバッファプールで採用されている LRU の改良版アルゴリズム
+- MySQL InnoDB のバッファプールで採用されている LRU は、通常の LRU の改良版
 - 通常の LRU では、新しく読み込んだページがリストの先頭に配置されるため、フルテーブルスキャンなどの一時的な大量読み込みでホットページが追い出されてしまう問題がある
 - InnoDB では、新しいページをリストの途中 (midpoint) に挿入することで、この問題を解決する
+- minesql ではこの InnoDB の LRU アルゴリズムを参考にしている
 
 ## 通常の LRU との違い
 
@@ -30,7 +31,7 @@
 ## リストの構造
 
 <figure>
-  <img src="./innodb-buffer-pool-list.png" alt="InnoDB Buffer Pool List" />
+  <img src="innodb-buffer-pool-list.png" alt="InnoDB Buffer Pool List" />
   <figcaption>https://dev.mysql.com/doc/refman/8.0/ja/innodb-buffer-pool.html</figcaption>
 </figure>
 
@@ -61,27 +62,25 @@
 
 ## 例
 
-_8 スロットで、スロット A〜E が New (ホット)、F〜H が Old の場合_
+### ディスクから新しいページ X を読み込む場合
 
 ```txt
+変更前:
 New Sublist (5/8)       Old Sublist (3/8)
 [A, B, C, D, E]         [F, G, H]
                         ↑ midpoint
-```
 
-**新しいページ X を読み込む場合:**
-
-```txt
+変更後:
 New Sublist (5/8)       Old Sublist (3/8)
 [A, B, C, D, E]         [X, F, G, H]
                         ↑ midpoint (X が Old の先頭に挿入)
 ```
 
 - X は midpoint に配置される
-- A〜E のホットページは影響を受けない
+- A〜E の New Sublist (ホットページ) は影響を受けない
 - H が末尾に押し出され、次の追い出し候補になる
 
-**Old のページ F が再アクセスされた場合:**
+### Old のページ F が再アクセスされた場合
 
 ```txt
 変更前:
@@ -95,7 +94,7 @@ New Sublist (5/8)       Old Sublist (3/8)
 ```
 
 - F が New の先頭に昇格
-- New Sublist が最大長を超えるため、末尾 E が Old に降格 (リバランス)
+- New Sublist が最大長を超えるため、末尾 E が Old に降格
 
 ## フルテーブルスキャンでの効果
 
