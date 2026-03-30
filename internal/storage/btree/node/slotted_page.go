@@ -216,7 +216,7 @@ func (sp *SlottedPage) NumSlots() int {
 
 // FreeSpace は Slotted Page の空き領域のサイズを返す
 //
-// see: docs/architecture/storage/access/b+tree/slotted-page.md#フリースペースのサイズの算出例
+// see: docs/architecture/storage/btree/node/slotted-page.md#フリースペースのサイズの算出例
 func (sp *SlottedPage) FreeSpace() int {
 	freeSpaceOffset := int(binary.BigEndian.Uint16(sp.data[2:4])) // フリースペースの開始位置 (offset) はヘッダーの 2 バイト目から 2 バイト分に格納されている
 	pointersSize := pointerSize * sp.NumSlots()

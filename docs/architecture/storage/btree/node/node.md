@@ -2,8 +2,8 @@
 
 ## ノードの種類
 
-- [リーフノード](./leaf_node.md)
-- [ブランチノード](./branch_node.md)
+- [リーフノード](./leaf-node.md)
+- [ブランチノード](./branch-node.md)
 
 ## ノード構造
 
