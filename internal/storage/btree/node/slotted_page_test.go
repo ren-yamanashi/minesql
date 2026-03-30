@@ -72,6 +72,25 @@ func TestInsert(t *testing.T) {
 		assert.Equal(t, []byte("CCCCC"), sp.Data(3))
 	})
 
+	t.Run("先頭位置への挿入でポインタ配列が正しくシフトされる", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 256)
+		sp := NewSlottedPage(data)
+		sp.Initialize()
+		sp.Insert(0, []byte("AAAAA"))
+		sp.Insert(1, []byte("BBBBB"))
+
+		// WHEN: index=0 に新しいスロットを挿入
+		success := sp.Insert(0, []byte("XXXXX"))
+
+		// THEN
+		assert.True(t, success)
+		assert.Equal(t, 3, sp.NumSlots())
+		assert.Equal(t, []byte("XXXXX"), sp.Data(0))
+		assert.Equal(t, []byte("AAAAA"), sp.Data(1))
+		assert.Equal(t, []byte("BBBBB"), sp.Data(2))
+	})
+
 	t.Run("複数回挿入後に各スロットのデータが正しく読み書きできる", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 256)
@@ -176,6 +195,45 @@ func TestRemove(t *testing.T) {
 		assert.Equal(t, 0, sp.NumSlots())
 		assert.Equal(t, sp.Capacity(), sp.FreeSpace())
 	})
+
+	t.Run("削除後に新しいデータを挿入できる", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 128)
+		sp := NewSlottedPage(data)
+		sp.Initialize()
+		sp.Insert(0, []byte("AAAAA"))
+		sp.Insert(1, []byte("BBBBB"))
+		sp.Remove(0)
+
+		// WHEN
+		success := sp.Insert(0, []byte("XXXXX"))
+
+		// THEN
+		assert.True(t, success)
+		assert.Equal(t, 2, sp.NumSlots())
+		assert.Equal(t, []byte("XXXXX"), sp.Data(0))
+		assert.Equal(t, []byte("BBBBB"), sp.Data(1))
+	})
+
+	t.Run("複数回の連続削除後もページの整合性が保たれる", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 256)
+		sp := NewSlottedPage(data)
+		sp.Initialize()
+		sp.Insert(0, []byte("AAAAA"))
+		sp.Insert(1, []byte("BBBBB"))
+		sp.Insert(2, []byte("CCCCC"))
+		sp.Insert(3, []byte("DDDDD"))
+
+		// WHEN: 中間から順に削除
+		sp.Remove(1) // BBBBB を削除
+		sp.Remove(1) // CCCCC を削除 (index がずれる)
+
+		// THEN
+		assert.Equal(t, 2, sp.NumSlots())
+		assert.Equal(t, []byte("AAAAA"), sp.Data(0))
+		assert.Equal(t, []byte("DDDDD"), sp.Data(1))
+	})
 }
 
 func TestUpdate(t *testing.T) {
@@ -198,22 +256,24 @@ func TestUpdate(t *testing.T) {
 		assert.Equal(t, []byte("CCCCC"), sp.Data(2))
 	})
 
-	t.Run("より大きいデータに更新できる", func(t *testing.T) {
+	t.Run("より大きいデータに更新しても他のスロットのデータが壊れない", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 256)
 		sp := NewSlottedPage(data)
 		sp.Initialize()
 		sp.Insert(0, []byte("AAAAA"))
 		sp.Insert(1, []byte("BBBBB"))
+		sp.Insert(2, []byte("CCCCC"))
 		initialFreeSpace := sp.FreeSpace()
 
-		// WHEN: 5 バイト → 10 バイトに拡張
+		// WHEN: 中間スロットを 5 バイト → 10 バイトに拡張
 		success := sp.Update(1, []byte("XXXXXXXXXX"))
 
 		// THEN
 		assert.True(t, success)
 		assert.Equal(t, []byte("AAAAA"), sp.Data(0))
 		assert.Equal(t, []byte("XXXXXXXXXX"), sp.Data(1))
+		assert.Equal(t, []byte("CCCCC"), sp.Data(2))
 		assert.Equal(t, initialFreeSpace-5, sp.FreeSpace())
 	})
 
@@ -226,7 +286,7 @@ func TestUpdate(t *testing.T) {
 		sp.Insert(1, []byte("BBBBBBBBB"))
 		initialFreeSpace := sp.FreeSpace()
 
-		// WHEN: 9 バイト → 3 バイトに縮小
+		// WHEN: 9 バイト → 2 バイトに縮小
 		success := sp.Update(1, []byte("XX"))
 
 		// THEN
@@ -321,6 +381,26 @@ func TestResize(t *testing.T) {
 		// THEN
 		assert.True(t, success)
 		assert.Equal(t, initialFreeSpace, sp.FreeSpace())
+	})
+
+	t.Run("サイズ 0 へのリサイズが正しく動作する", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 256)
+		sp := NewSlottedPage(data)
+		sp.Initialize()
+		sp.Insert(0, []byte("AAAAA"))
+		sp.Insert(1, []byte("BBBBB"))
+		sp.Insert(2, []byte("CCCCC"))
+
+		// WHEN: index=1 のデータをサイズ 0 にリサイズ
+		success := sp.Resize(1, 0)
+
+		// THEN
+		assert.True(t, success)
+		assert.Equal(t, 3, sp.NumSlots())   // スロット数は変わらない (Remove と異なりポインタは残る)
+		assert.Equal(t, 0, len(sp.Data(1))) // データサイズは 0
+		assert.Equal(t, []byte("AAAAA"), sp.Data(0))
+		assert.Equal(t, []byte("CCCCC"), sp.Data(2))
 	})
 
 	t.Run("リサイズ後もデータ内容が保持される", func(t *testing.T) {
