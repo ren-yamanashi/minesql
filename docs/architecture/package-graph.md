@@ -10,35 +10,35 @@ graph TD
     server --> executor
     server --> parser
     server --> planner
-    server --> storage/engine
+    server --> storage/handler
 
     planner --> ast
     planner --> executor
-    planner --> storage/engine
+    planner --> storage/handler
 
-    executor --> storage/engine
+    executor --> storage/handler
 
     parser --> ast
 
-    storage/engine --> config
-    storage/engine --> storage/access
-    storage/engine --> storage/buffer
-    storage/engine --> storage/dictionary
-    storage/engine --> storage/file
-    storage/engine --> storage/page
-    storage/engine --> storage/transaction
+    storage/handler --> config
+    storage/handler --> storage/access
+    storage/handler --> storage/buffer
+    storage/handler --> storage/dictionary
+    storage/handler --> storage/file
+    storage/handler --> storage/page
+    storage/handler --> storage/transaction
 
-    storage/dictionary --> encode
     storage/dictionary --> storage/access
     storage/dictionary --> storage/btree
     storage/dictionary --> storage/btree/node
     storage/dictionary --> storage/buffer
+    storage/dictionary --> storage/encode
     storage/dictionary --> storage/page
 
-    storage/access --> encode
     storage/access --> storage/btree
     storage/access --> storage/btree/node
     storage/access --> storage/buffer
+    storage/access --> storage/encode
     storage/access --> storage/page
 
     storage/transaction --> storage/buffer
@@ -70,10 +70,11 @@ graph TD
     end
 
     subgraph "Layer 1: ストレージエンジン (= storage/)"
-        storage/engine["storage/engine (handler)"]
+        storage/handler["storage/handler (エントリポイント)"]
         storage/dictionary
         storage/transaction
         storage/access
+        storage/encode
         storage/btree
         storage/btree/node
         storage/buffer
@@ -84,18 +85,17 @@ graph TD
     subgraph "共通"
         ast
         config
-        encode
         client
     end
 
-    server --> planner & parser & executor & storage/engine & ast
-    planner --> executor & storage/engine & ast
-    executor --> storage/engine
+    server --> planner & parser & executor & storage/handler & ast
+    planner --> executor & storage/handler & ast
+    executor --> storage/handler
 
-    storage/engine --> storage/access & storage/dictionary & storage/transaction & storage/buffer & storage/file & storage/page & config
-    storage/dictionary --> storage/access & storage/btree & storage/btree/node & storage/buffer & storage/page & encode
+    storage/handler --> storage/access & storage/dictionary & storage/transaction & storage/buffer & storage/file & storage/page & config
+    storage/dictionary --> storage/access & storage/btree & storage/btree/node & storage/buffer & storage/encode & storage/page
+    storage/access --> storage/btree & storage/btree/node & storage/buffer & storage/encode & storage/page
     storage/transaction --> storage/buffer
-    storage/access --> storage/btree & storage/btree/node & storage/buffer & storage/page & encode
     storage/btree --> storage/btree/node & storage/buffer & storage/page
     storage/btree/node --> storage/page
     storage/buffer --> storage/file & storage/page
@@ -106,31 +106,12 @@ graph TD
 
 | MySQL InnoDB (`storage/innobase/`) | minesql (`internal/storage/`) |
 |---|---|
-| `handler/` (ha_innodb.cc) | `engine/` |
+| `handler/` (ha_innodb.cc) | `handler/` |
 | `row/` | `access/` |
 | `btr/` | `btree/` |
 | `buf/` | `buffer/` |
 | `dict/` | `dictionary/` |
+| `rem/` | `encode/` |
 | `fil/` | `file/` |
 | `page/` | `page/` |
 | `trx/` | `transaction/` |
-
-## 依存の少ないパッケージ (リーフ)
-
-依存先がないパッケージ:
-
-- `ast`
-- `client`
-- `config`
-- `encode`
-- `storage/page`
-
-## storage 外からのアクセスルール
-
-`storage/` 外のパッケージ (`server`, `planner`, `executor`) は `storage/engine` のみを参照する。`storage/` 内の他のパッケージ (`access`, `dictionary`, `btree` 等) を直接参照しない。
-
-```
-server  ──→ storage/engine ──→ storage/* 内部
-planner ──→ storage/engine ──→ storage/* 内部
-executor ──→ storage/engine ──→ storage/* 内部
-```
