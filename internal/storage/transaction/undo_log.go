@@ -1,4 +1,4 @@
-package undo
+package transaction
 
 // TrxId はトランザクション ID
 type TrxId uint64

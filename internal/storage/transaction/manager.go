@@ -2,7 +2,6 @@ package transaction
 
 import (
 	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/undo"
 )
 
 type State string
@@ -13,32 +12,32 @@ const (
 )
 
 type Manager struct {
-	undoLog      *undo.UndoLog
-	Transactions map[undo.TrxId]State
+	undoLog      *UndoLog
+	Transactions map[TrxId]State
 }
 
-func NewManager(undoLog *undo.UndoLog) *Manager {
+func NewManager(undoLog *UndoLog) *Manager {
 	return &Manager{
 		undoLog:      undoLog,
-		Transactions: make(map[undo.TrxId]State),
+		Transactions: make(map[TrxId]State),
 	}
 }
 
 // Begin は新しいトランザクションを開始し、トランザクション ID を返す
-func (m *Manager) Begin() undo.TrxId {
+func (m *Manager) Begin() TrxId {
 	trxId := m.allocateTrxId()
 	m.Transactions[trxId] = StateActive
 	return trxId
 }
 
 // Commit はトランザクションをコミットし、Undo ログを破棄する
-func (m *Manager) Commit(trxId undo.TrxId) {
+func (m *Manager) Commit(trxId TrxId) {
 	m.undoLog.Discard(trxId)
 	m.Transactions[trxId] = StateInactive
 }
 
 // Rollback は Undo ログを逆順に適用してトランザクションをロールバックする
-func (m *Manager) Rollback(bp *buffer.BufferPool, trxId undo.TrxId) error {
+func (m *Manager) Rollback(bp *buffer.BufferPool, trxId TrxId) error {
 	records := m.undoLog.GetRecords(trxId)
 	for i := len(records) - 1; i >= 0; i-- {
 		if err := records[i].Undo(bp); err != nil {
@@ -50,8 +49,8 @@ func (m *Manager) Rollback(bp *buffer.BufferPool, trxId undo.TrxId) error {
 	return nil
 }
 
-func (m *Manager) allocateTrxId() undo.TrxId {
-	var maxTrxId undo.TrxId
+func (m *Manager) allocateTrxId() TrxId {
+	var maxTrxId TrxId
 	for trxId := range m.Transactions {
 		if trxId > maxTrxId {
 			maxTrxId = trxId

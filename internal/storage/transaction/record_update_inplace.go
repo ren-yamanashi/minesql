@@ -1,4 +1,4 @@
-package undo
+package transaction
 
 import (
 	"minesql/internal/storage/access"

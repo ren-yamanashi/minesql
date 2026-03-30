@@ -5,7 +5,6 @@ import (
 	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/storage/catalog"
-	"minesql/internal/storage/undo"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -105,10 +104,8 @@ func TestSelect(t *testing.T) {
 			{Name: "name", Type: catalog.ColumnTypeString},
 		})
 
-		undoLog := undo.NewUndoLog()
-
 		// データを挿入
-		executePlan(t, undoLog, &ast.InsertStmt{
+		executePlan(t, &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("users"),
 			Cols: []ast.ColumnId{

@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"minesql/internal/engine"
 	"minesql/internal/storage/access"
-	"minesql/internal/storage/undo"
+	"minesql/internal/storage/transaction"
 )
 
 type SetColumn struct {
@@ -14,16 +14,14 @@ type SetColumn struct {
 
 // Update は InnerExecutor の結果を元にレコードを更新する
 type Update struct {
-	undoLog       *undo.UndoLog
-	trxId         undo.TrxId
+	trxId         engine.TrxId
 	table         *access.TableAccessMethod
 	SetColumns    []SetColumn
 	InnerExecutor Executor
 }
 
-func NewUpdate(undoLog *undo.UndoLog, trxId undo.TrxId, table *access.TableAccessMethod, setColumns []SetColumn, innerExecutor Executor) *Update {
+func NewUpdate(trxId engine.TrxId, table *access.TableAccessMethod, setColumns []SetColumn, innerExecutor Executor) *Update {
 	return &Update{
-		undoLog:       undoLog,
 		trxId:         trxId,
 		table:         table,
 		SetColumns:    setColumns,
@@ -69,17 +67,17 @@ func (upd *Update) Next() (Record, error) {
 
 		if bytes.Equal(encodedOldKey, encodedNewKey) {
 			// プライマリキーが変わらない場合はインプレース更新
-			upd.undoLog.Append(upd.trxId, undo.NewUpdateInplaceLogRecord(upd.table, record, updatedRecords[i]))
+			e.UndoLog().Append(upd.trxId, transaction.NewUpdateInplaceLogRecord(upd.table, record, updatedRecords[i]))
 			if err := upd.table.UpdateInplace(e.BufferPool, record, updatedRecords[i]); err != nil {
 				return nil, err
 			}
 		} else {
 			// プライマリキーが変わる場合はソフトデリート + Insert
-			upd.undoLog.Append(upd.trxId, undo.NewDeleteLogRecord(upd.table, record))
+			e.UndoLog().Append(upd.trxId, transaction.NewDeleteLogRecord(upd.table, record))
 			if err := upd.table.SoftDelete(e.BufferPool, record); err != nil {
 				return nil, err
 			}
-			upd.undoLog.Append(upd.trxId, undo.NewInsertLogRecord(upd.table, updatedRecords[i]))
+			e.UndoLog().Append(upd.trxId, transaction.NewInsertLogRecord(upd.table, updatedRecords[i]))
 			if err := upd.table.Insert(e.BufferPool, updatedRecords[i]); err != nil {
 				return nil, err
 			}

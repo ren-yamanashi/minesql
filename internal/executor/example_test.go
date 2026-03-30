@@ -9,7 +9,6 @@ import (
 	"minesql/internal/executor"
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/catalog"
-	"minesql/internal/storage/undo"
 )
 
 // セットアップヘルパー: テーブルを作成し、サンプルデータを挿入する
@@ -62,10 +61,8 @@ func setupExample() (*access.TableAccessMethod, func()) {
 	}
 
 	// サンプルデータを挿入
-	undoLog := undo.NewUndoLog()
-	var trxId undo.TrxId = 1
+	var trxId engine.TrxId = 1
 	ins := executor.NewInsert(
-		undoLog,
 		trxId,
 		tbl,
 		[]executor.Record{
@@ -347,9 +344,8 @@ func ExampleUpdate() {
 	}
 
 	// Alice の last_name を "Anderson" に更新
-	undoLog := undo.NewUndoLog()
-	var trxId undo.TrxId = 1
-	upd := executor.NewUpdate(undoLog, trxId, tbl, []executor.SetColumn{
+	var trxId engine.TrxId = 1
+	upd := executor.NewUpdate(trxId, tbl, []executor.SetColumn{
 		{Pos: 2, Value: []byte("Anderson")},
 	}, executor.NewFilter(
 		executor.NewTableScan(
@@ -402,9 +398,8 @@ func ExampleUpdate_primaryKey() {
 	defer cleanup()
 
 	// プライマリキー "v" (Eve) を "a" に変更
-	undoLog := undo.NewUndoLog()
-	var trxId undo.TrxId = 1
-	upd := executor.NewUpdate(undoLog, trxId, tbl, []executor.SetColumn{
+	var trxId engine.TrxId = 1
+	upd := executor.NewUpdate(trxId, tbl, []executor.SetColumn{
 		{Pos: 0, Value: []byte("a")},
 	}, executor.NewTableScan(
 		tbl,
@@ -442,9 +437,8 @@ func ExampleDelete() {
 	}
 
 	// first_name が "Bob" のレコードを削除
-	undoLog := undo.NewUndoLog()
-	var trxId undo.TrxId = 1
-	del := executor.NewDelete(undoLog, trxId, tbl, executor.NewFilter(
+	var trxId engine.TrxId = 1
+	del := executor.NewDelete(trxId, tbl, executor.NewFilter(
 		executor.NewTableScan(
 			tbl,
 			access.RecordSearchModeStart{},

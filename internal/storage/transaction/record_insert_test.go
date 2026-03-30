@@ -1,7 +1,6 @@
-package undo
+package transaction
 
 import (
-	"minesql/internal/engine"
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/page"
@@ -13,9 +12,7 @@ import (
 func TestInsertLogRecord_Undo(t *testing.T) {
 	t.Run("Insert した行が物理削除される", func(t *testing.T) {
 		// GIVEN
-		table := setupTestTable(t, nil)
-		defer engine.Reset()
-		bp := engine.Get().BufferPool
+		table, bp := setupTestTableForUndo(t, nil)
 
 		record := [][]byte{[]byte("a"), []byte("John")}
 		err := table.Insert(bp, record)
@@ -38,9 +35,7 @@ func TestInsertLogRecord_Undo(t *testing.T) {
 	t.Run("Insert した行のユニークインデックスも物理削除される", func(t *testing.T) {
 		// GIVEN
 		uniqueIndex := access.NewUniqueIndexAccessMethod("idx_name", "name", page.PageId{}, 1)
-		table := setupTestTable(t, []*access.UniqueIndexAccessMethod{uniqueIndex})
-		defer engine.Reset()
-		bp := engine.Get().BufferPool
+		table, bp := setupTestTableForUndo(t, []*access.UniqueIndexAccessMethod{uniqueIndex})
 
 		record := [][]byte{[]byte("a"), []byte("John")}
 		err := table.Insert(bp, record)
@@ -53,7 +48,7 @@ func TestInsertLogRecord_Undo(t *testing.T) {
 
 		// THEN: ユニークインデックスからも物理削除されている
 		assert.NoError(t, err)
-		keys := collectActiveUniqueIndexKeys(t, table.UniqueIndexes[0])
+		keys := collectActiveUniqueIndexKeys(t, table.UniqueIndexes[0], bp)
 		assert.Equal(t, 0, len(keys))
 	})
 }

@@ -5,7 +5,6 @@ import (
 	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/storage/catalog"
-	"minesql/internal/storage/undo"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -39,8 +38,7 @@ func TestNewInsert(t *testing.T) {
 
 	t.Run("カラム名が空の場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId engine.TrxId = 1
 		stmt := &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("users"),
@@ -55,7 +53,7 @@ func TestNewInsert(t *testing.T) {
 		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build(undoLog, trxId)
+		exec, err := planner.Build(trxId)
 
 		// THEN
 		assert.Error(t, err)
@@ -65,8 +63,7 @@ func TestNewInsert(t *testing.T) {
 
 	t.Run("値の数がカラム数と一致しない場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId engine.TrxId = 1
 		stmt := &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("users"),
@@ -83,7 +80,7 @@ func TestNewInsert(t *testing.T) {
 		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build(undoLog, trxId)
+		exec, err := planner.Build(trxId)
 
 		// THEN
 		assert.Error(t, err)
@@ -93,8 +90,7 @@ func TestNewInsert(t *testing.T) {
 
 	t.Run("カラム名が重複している場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId engine.TrxId = 1
 		stmt := &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("users"),
@@ -114,7 +110,7 @@ func TestNewInsert(t *testing.T) {
 		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build(undoLog, trxId)
+		exec, err := planner.Build(trxId)
 
 		// THEN
 		assert.Error(t, err)
@@ -124,8 +120,7 @@ func TestNewInsert(t *testing.T) {
 
 	t.Run("挿入するレコードが空の場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId engine.TrxId = 1
 		stmt := &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("users"),
@@ -138,7 +133,7 @@ func TestNewInsert(t *testing.T) {
 		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build(undoLog, trxId)
+		exec, err := planner.Build(trxId)
 
 		// THEN
 		assert.Error(t, err)
@@ -151,8 +146,7 @@ func TestNewInsert(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId engine.TrxId = 1
 		stmt := &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("nonexistent"),
@@ -168,7 +162,7 @@ func TestNewInsert(t *testing.T) {
 		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build(undoLog, trxId)
+		exec, err := planner.Build(trxId)
 
 		// THEN
 		assert.Error(t, err)
@@ -181,8 +175,7 @@ func TestNewInsert(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId engine.TrxId = 1
 		createTableForTest(t, []*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "name", Type: catalog.ColumnTypeString},
@@ -205,7 +198,7 @@ func TestNewInsert(t *testing.T) {
 		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build(undoLog, trxId)
+		exec, err := planner.Build(trxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -218,8 +211,7 @@ func TestNewInsert(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId engine.TrxId = 1
 		createTableForTest(t, []*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "name", Type: catalog.ColumnTypeString},
@@ -250,7 +242,7 @@ func TestNewInsert(t *testing.T) {
 		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build(undoLog, trxId)
+		exec, err := planner.Build(trxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -263,8 +255,7 @@ func TestNewInsert(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId engine.TrxId = 1
 		createTableForTest(t, []*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "name", Type: catalog.ColumnTypeString},
@@ -293,7 +284,7 @@ func TestNewInsert(t *testing.T) {
 		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build(undoLog, trxId)
+		exec, err := planner.Build(trxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -306,8 +297,7 @@ func TestNewInsert(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId engine.TrxId = 1
 		createTableForTest(t, []*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "name", Type: catalog.ColumnTypeString},
@@ -333,7 +323,7 @@ func TestNewInsert(t *testing.T) {
 		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build(undoLog, trxId)
+		exec, err := planner.Build(trxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -346,8 +336,7 @@ func TestNewInsert(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId engine.TrxId = 1
 		createTableForTest(t, []*executor.ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "name", Type: catalog.ColumnTypeString},
@@ -376,7 +365,7 @@ func TestNewInsert(t *testing.T) {
 		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build(undoLog, trxId)
+		exec, err := planner.Build(trxId)
 
 		// THEN
 		assert.Error(t, err)

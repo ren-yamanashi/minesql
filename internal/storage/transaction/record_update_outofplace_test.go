@@ -1,7 +1,6 @@
-package undo
+package transaction
 
 import (
-	"minesql/internal/engine"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,9 +9,7 @@ import (
 func TestUpdateOutofplaceLogRecord_Undo(t *testing.T) {
 	t.Run("Outofplace 更新した行が元の状態に戻る", func(t *testing.T) {
 		// GIVEN: PK を "a" → "b" に変更 (SoftDelete + Insert)
-		table := setupTestTable(t, nil)
-		defer engine.Reset()
-		bp := engine.Get().BufferPool
+		table, bp := setupTestTableForUndo(t, nil)
 
 		oldRecord := [][]byte{[]byte("a"), []byte("John")}
 		newRecord := [][]byte{[]byte("b"), []byte("Jane")}
@@ -33,7 +30,7 @@ func TestUpdateOutofplaceLogRecord_Undo(t *testing.T) {
 
 		// THEN: "b" が物理削除され、"a" が active に戻っている
 		assert.NoError(t, err)
-		records := collectActiveRecords(t, table)
+		records := collectActiveRecords(t, table, bp)
 		assert.Equal(t, 1, len(records))
 		assert.Equal(t, []string{"a", "John"}, records[0])
 	})

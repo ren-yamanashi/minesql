@@ -1,22 +1,10 @@
-package undo
+package transaction
 
 import (
-	"minesql/internal/storage/buffer"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
-
-// mockLogRecord はテスト用の LogRecord 実装
-type mockLogRecord struct {
-	id     int
-	undone bool
-}
-
-func (m *mockLogRecord) Undo(bp *buffer.BufferPool) error {
-	m.undone = true
-	return nil
-}
 
 func TestNewUndoLog(t *testing.T) {
 	t.Run("空の UndoLog が生成される", func(t *testing.T) {

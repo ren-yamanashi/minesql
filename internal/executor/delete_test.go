@@ -6,7 +6,6 @@ import (
 	"minesql/internal/engine"
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/catalog"
-	"minesql/internal/storage/undo"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -14,8 +13,7 @@ import (
 func TestDelete(t *testing.T) {
 	t.Run("正常に Delete Executor を生成できる", func(t *testing.T) {
 		// GIVEN
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId engine.TrxId = 1
 		iterator := NewTableScan(
 			nil,
 			access.RecordSearchModeStart{},
@@ -23,7 +21,7 @@ func TestDelete(t *testing.T) {
 		)
 
 		// WHEN
-		del := NewDelete(undoLog, trxId, nil, iterator)
+		del := NewDelete(trxId, nil, iterator)
 
 		// THEN
 		assert.NotNil(t, del)
@@ -37,12 +35,11 @@ func TestDelete(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId engine.TrxId = 1
 		tbl, err := getTableAccessMethod("users")
 		assert.NoError(t, err)
 
-		del := NewDelete(undoLog, trxId, tbl, NewTableScan(
+		del := NewDelete(trxId, tbl, NewTableScan(
 			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
@@ -72,8 +69,7 @@ func TestDelete(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId engine.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
@@ -88,7 +84,7 @@ func TestDelete(t *testing.T) {
 			},
 		)
 
-		del := NewDelete(undoLog, trxId, tbl, iterator)
+		del := NewDelete(trxId, tbl, iterator)
 
 		// WHEN
 		_, err = del.Next()
@@ -117,8 +113,7 @@ func TestDelete(t *testing.T) {
 		InitStorageEngineForTest(t, tmpdir)
 		defer engine.Reset()
 
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId engine.TrxId = 1
 		tbl, err := getTableAccessMethod("users")
 		assert.NoError(t, err)
 
@@ -133,7 +128,7 @@ func TestDelete(t *testing.T) {
 				return string(record[1]) == "Bob"
 			},
 		)
-		del := NewDelete(undoLog, trxId, tbl, iterator)
+		del := NewDelete(trxId, tbl, iterator)
 
 		// WHEN
 		_, err = del.Next()
@@ -179,9 +174,8 @@ func TestDelete(t *testing.T) {
 		)
 
 		// Delete Executor を作成
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
-		del := NewDelete(undoLog, trxId, tbl, iterator)
+		var trxId engine.TrxId = 1
+		del := NewDelete(trxId, tbl, iterator)
 
 		// WHEN
 		_, err = del.Next()
@@ -211,8 +205,7 @@ func TestDelete(t *testing.T) {
 		defer engine.Reset()
 		_ = tmpdir
 
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId engine.TrxId = 1
 		createTableForTest(t, "empty_table", nil, []*ColumnParam{
 			{Name: "id", Type: catalog.ColumnTypeString},
 			{Name: "value", Type: catalog.ColumnTypeString},
@@ -220,7 +213,7 @@ func TestDelete(t *testing.T) {
 
 		tbl, err := getTableAccessMethod("empty_table")
 		assert.NoError(t, err)
-		del := NewDelete(undoLog, trxId, tbl, NewTableScan(
+		del := NewDelete(trxId, tbl, NewTableScan(
 			tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },

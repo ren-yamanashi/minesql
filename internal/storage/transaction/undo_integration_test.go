@@ -1,10 +1,10 @@
-package undo
+package transaction
 
 import (
 	"minesql/internal/encode"
-	"minesql/internal/engine"
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/btree"
+	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/file"
 	"minesql/internal/storage/page"
 	"path/filepath"
@@ -17,9 +17,7 @@ func TestUndoIntegration(t *testing.T) {
 	t.Run("複数操作を逆順に Undo すると元の状態に戻る", func(t *testing.T) {
 		// GIVEN: ユニークインデックス付きテーブルにデータを投入
 		uniqueIndex := access.NewUniqueIndexAccessMethod("idx_name", "name", page.PageId{}, 1)
-		table := setupTestTable(t, []*access.UniqueIndexAccessMethod{uniqueIndex})
-		defer engine.Reset()
-		bp := engine.Get().BufferPool
+		table, bp := setupTestTableForUndo(t, []*access.UniqueIndexAccessMethod{uniqueIndex})
 
 		// 初期データ: ("a", "Alice"), ("b", "Bob")
 		recordA := [][]byte{[]byte("a"), []byte("Alice")}
@@ -47,7 +45,7 @@ func TestUndoIntegration(t *testing.T) {
 		undo3 := InsertLogRecord{table: table, Record: recordC}
 
 		// 操作後の状態: ("a", "Carol"), ("c", "Dave") が active
-		records := collectActiveRecords(t, table)
+		records := collectActiveRecords(t, table, bp)
 		assert.Equal(t, 2, len(records))
 		assert.Equal(t, []string{"a", "Carol"}, records[0])
 		assert.Equal(t, []string{"c", "Dave"}, records[1])
@@ -61,21 +59,19 @@ func TestUndoIntegration(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: 初期状態に戻っている
-		records = collectActiveRecords(t, table)
+		records = collectActiveRecords(t, table, bp)
 		assert.Equal(t, 2, len(records))
 		assert.Equal(t, []string{"a", "Alice"}, records[0])
 		assert.Equal(t, []string{"b", "Bob"}, records[1])
 
 		// THEN: ユニークインデックスも初期状態に戻っている
-		keys := collectActiveUniqueIndexKeys(t, table.UniqueIndexes[0])
+		keys := collectActiveUniqueIndexKeys(t, table.UniqueIndexes[0], bp)
 		assert.Equal(t, []string{"Alice", "Bob"}, keys)
 	})
 
 	t.Run("Outofplace 更新を含む複数操作の Undo", func(t *testing.T) {
 		// GIVEN
-		table := setupTestTable(t, nil)
-		defer engine.Reset()
-		bp := engine.Get().BufferPool
+		table, bp := setupTestTableForUndo(t, nil)
 
 		// 初期データ: ("a", "Alice")
 		recordA := [][]byte{[]byte("a"), []byte("Alice")}
@@ -100,7 +96,7 @@ func TestUndoIntegration(t *testing.T) {
 		undo2 := UpdateInplaceLogRecord{table: table, PrevRecord: newRecordX, NewRecord: updatedX}
 
 		// 操作後の状態: ("x", "Bob") のみ active
-		records := collectActiveRecords(t, table)
+		records := collectActiveRecords(t, table, bp)
 		assert.Equal(t, 1, len(records))
 		assert.Equal(t, []string{"x", "Bob"}, records[0])
 
@@ -111,45 +107,40 @@ func TestUndoIntegration(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: 初期状態に戻っている
-		records = collectActiveRecords(t, table)
+		records = collectActiveRecords(t, table, bp)
 		assert.Equal(t, 1, len(records))
 		assert.Equal(t, []string{"a", "Alice"}, records[0])
 	})
 }
 
-func setupTestTable(t *testing.T, uniqueIndexes []*access.UniqueIndexAccessMethod) *access.TableAccessMethod {
+func setupTestTableForUndo(t *testing.T, uniqueIndexes []*access.UniqueIndexAccessMethod) (*access.TableAccessMethod, *buffer.BufferPool) {
 	t.Helper()
 	tmpdir := t.TempDir()
-	t.Setenv("MINESQL_DATA_DIR", tmpdir)
-	t.Setenv("MINESQL_BUFFER_SIZE", "100")
-	engine.Reset()
-	engine.Init()
 
-	e := engine.Get()
+	bp := buffer.NewBufferPool(100)
 	fileId := page.FileId(1)
 	dm, err := file.NewDisk(fileId, filepath.Join(tmpdir, "test.db"))
 	assert.NoError(t, err)
-	e.BufferPool.RegisterDisk(fileId, dm)
+	bp.RegisterDisk(fileId, dm)
 
-	metaPageId, err := e.BufferPool.AllocatePageId(fileId)
+	metaPageId, err := bp.AllocatePageId(fileId)
 	assert.NoError(t, err)
 
 	for _, ui := range uniqueIndexes {
-		indexMetaPageId, err := e.BufferPool.AllocatePageId(fileId)
+		indexMetaPageId, err := bp.AllocatePageId(fileId)
 		assert.NoError(t, err)
 		ui.MetaPageId = indexMetaPageId
 	}
 
 	table := access.NewTableAccessMethod("test", metaPageId, 1, uniqueIndexes)
-	err = table.Create(e.BufferPool)
+	err = table.Create(bp)
 	assert.NoError(t, err)
 
-	return &table
+	return &table, bp
 }
 
-func collectActiveRecords(t *testing.T, table *access.TableAccessMethod) [][]string {
+func collectActiveRecords(t *testing.T, table *access.TableAccessMethod, bp *buffer.BufferPool) [][]string {
 	t.Helper()
-	bp := engine.Get().BufferPool
 	iter, err := table.Search(bp, access.RecordSearchModeStart{})
 	assert.NoError(t, err)
 
@@ -169,9 +160,8 @@ func collectActiveRecords(t *testing.T, table *access.TableAccessMethod) [][]str
 	return records
 }
 
-func collectActiveUniqueIndexKeys(t *testing.T, ui *access.UniqueIndexAccessMethod) []string {
+func collectActiveUniqueIndexKeys(t *testing.T, ui *access.UniqueIndexAccessMethod, bp *buffer.BufferPool) []string {
 	t.Helper()
-	bp := engine.Get().BufferPool
 	indexTree := btree.NewBTree(ui.MetaPageId)
 	indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})
 	assert.NoError(t, err)

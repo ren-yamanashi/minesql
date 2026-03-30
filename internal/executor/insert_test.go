@@ -4,7 +4,6 @@ import (
 	"minesql/internal/engine"
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/catalog"
-	"minesql/internal/storage/undo"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,15 +12,14 @@ import (
 func TestNewInsert(t *testing.T) {
 	t.Run("正常に Insert Executor を生成できる", func(t *testing.T) {
 		// GIVEN
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId engine.TrxId = 1
 		records := []Record{
 			{[]byte("1"), []byte("Alice")},
 			{[]byte("2"), []byte("Bob")},
 		}
 
 		// WHEN
-		insert := NewInsert(undoLog, trxId, nil, records)
+		insert := NewInsert(trxId, nil, records)
 
 		// THEN
 		assert.NotNil(t, insert)
@@ -44,8 +42,7 @@ func TestInsert_Next(t *testing.T) {
 		})
 
 		// GIVEN
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId engine.TrxId = 1
 		records := []Record{
 			{[]byte("1"), []byte("Alice")},
 			{[]byte("2"), []byte("Bob")},
@@ -56,7 +53,7 @@ func TestInsert_Next(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		insert := NewInsert(undoLog, trxId, tbl, records)
+		insert := NewInsert(trxId, tbl, records)
 		_, err = insert.Next()
 
 		// THEN

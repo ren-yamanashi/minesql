@@ -5,7 +5,6 @@ import (
 	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/storage/catalog"
-	"minesql/internal/storage/undo"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -447,8 +446,7 @@ func TestComplexWhereWithData(t *testing.T) {
 	// テストデータを挿入するヘルパー
 	insertTestData := func(t *testing.T) {
 		t.Helper()
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId engine.TrxId = 1
 		insertStmt := &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("users"),
@@ -476,7 +474,7 @@ func TestComplexWhereWithData(t *testing.T) {
 			},
 		}
 		insertPlanner := NewInsert(insertStmt)
-		insertExec, err := insertPlanner.Build(undoLog, trxId)
+		insertExec, err := insertPlanner.Build(trxId)
 		assert.NoError(t, err)
 		_, err = insertExec.Next()
 		assert.NoError(t, err)
