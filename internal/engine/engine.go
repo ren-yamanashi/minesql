@@ -13,17 +13,31 @@ import (
 	"minesql/internal/storage/catalog"
 	"minesql/internal/storage/file"
 	"minesql/internal/storage/page"
+	"minesql/internal/storage/transaction"
 )
+
+// TrxId はトランザクション ID の型 (storage/transaction.TrxId のエイリアス)
+type TrxId = transaction.TrxId
+
+// UndoLog は Undo ログの型 (storage/transaction.UndoLog のエイリアス)
+type UndoLog = transaction.UndoLog
+
+// NewUndoLog は新しい UndoLog を生成する
+func NewUndoLog() *UndoLog {
+	return transaction.NewUndoLog()
+}
 
 var (
 	eng  *Engine
 	once sync.Once
 )
 
-// Engine はストレージ層のリソースの管理を行う
+// Engine はストレージ層のリソースの管理を行う (MySQL の handler に相当)
 type Engine struct {
 	BufferPool    *buffer.BufferPool
 	Catalog       *catalog.Catalog
+	undoLog       *transaction.UndoLog
+	trxManager    *transaction.Manager
 	baseDirectory string
 }
 
@@ -110,11 +124,39 @@ func newEngine() (*Engine, error) {
 		return nil, err
 	}
 
+	undoLog := transaction.NewUndoLog()
+
 	return &Engine{
 		BufferPool:    bp,
 		Catalog:       catalog,
+		undoLog:       undoLog,
+		trxManager:    transaction.NewManager(undoLog),
 		baseDirectory: dataDir,
 	}, nil
+}
+
+// ==================================
+// Transaction (handler facade)
+// ==================================
+
+// BeginTrx は新しいトランザクションを開始し、トランザクション ID を返す
+func (e *Engine) BeginTrx() TrxId {
+	return e.trxManager.Begin()
+}
+
+// CommitTrx はトランザクションをコミットする
+func (e *Engine) CommitTrx(trxId TrxId) {
+	e.trxManager.Commit(trxId)
+}
+
+// RollbackTrx はトランザクションをロールバックする
+func (e *Engine) RollbackTrx(trxId TrxId) error {
+	return e.trxManager.Rollback(e.BufferPool, trxId)
+}
+
+// UndoLog は Undo ログを返す
+func (e *Engine) UndoLog() *transaction.UndoLog {
+	return e.undoLog
 }
 
 // initCatalog はカタログを初期化する

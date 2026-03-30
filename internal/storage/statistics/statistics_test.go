@@ -5,7 +5,6 @@ import (
 	"minesql/internal/executor"
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/catalog"
-	"minesql/internal/storage/undo"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -170,9 +169,7 @@ func TestAnalyze(t *testing.T) {
 		assert.Equal(t, uint64(2), before.ColumnStats["category"].UniqueValues)
 
 		// WHEN: 新しいカテゴリを持つレコードを追加
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
-		insertRecords(t, undoLog, trxId, "products",
+		insertRecords(t, "products",
 			[]executor.Record{
 				{[]byte("4"), []byte("Donut"), []byte("Snack")},
 			},
@@ -207,9 +204,7 @@ func TestAnalyze(t *testing.T) {
 		assert.Equal(t, uint64(3), before.ColumnStats["name"].UniqueValues)
 
 		// WHEN: "Carrot" (唯一の "Veggie") を削除
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
-		deleteByCondition(t, undoLog, trxId, "products", func(record executor.Record) bool {
+		deleteByCondition(t, "products", func(record executor.Record) bool {
 			return string(record[0]) == "3" // id = "3"
 		})
 
@@ -241,9 +236,7 @@ func TestAnalyze(t *testing.T) {
 		assert.Equal(t, []byte("1"), before.ColumnStats["id"].MinValue)
 
 		// WHEN: id = "1" (最小値) のレコードを削除
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
-		deleteByCondition(t, undoLog, trxId, "products", func(record executor.Record) bool {
+		deleteByCondition(t, "products", func(record executor.Record) bool {
 			return string(record[0]) == "1"
 		})
 
@@ -409,19 +402,21 @@ func getTable(t *testing.T, tableName string) *access.TableAccessMethod {
 }
 
 // insertRecords はテスト用にレコードを挿入する
-func insertRecords(t *testing.T, undoLog *undo.UndoLog, trxId undo.TrxId, tableName string, records []executor.Record) { //nolint:unparam
+func insertRecords(t *testing.T, tableName string, records []executor.Record) { //nolint:unparam
 	t.Helper()
+	var trxId engine.TrxId = 1
 	tbl := getTable(t, tableName)
-	ins := executor.NewInsert(undoLog, trxId, tbl, records)
+	ins := executor.NewInsert(trxId, tbl, records)
 	_, err := ins.Next()
 	assert.NoError(t, err)
 }
 
 // deleteByCondition はテスト用に条件に合致するレコードを削除する
-func deleteByCondition(t *testing.T, undoLog *undo.UndoLog, trxId undo.TrxId, tableName string, cond func(executor.Record) bool) {
+func deleteByCondition(t *testing.T, tableName string, cond func(executor.Record) bool) {
 	t.Helper()
+	var trxId engine.TrxId = 1
 	tbl := getTable(t, tableName)
-	del := executor.NewDelete(undoLog, trxId, tbl, executor.NewFilter(
+	del := executor.NewDelete(trxId, tbl, executor.NewFilter(
 		executor.NewTableScan(
 			tbl,
 			access.RecordSearchModeStart{},
@@ -462,9 +457,6 @@ func setupStatisticsTable(t *testing.T) {
 	engine.Reset()
 	engine.Init()
 
-	undoLog := undo.NewUndoLog()
-	var trxId undo.TrxId = 1
-
 	createTable(t, "products", 1,
 		[]*executor.IndexParam{
 			{Name: "idx_name", ColName: "name", SecondaryKey: 1},
@@ -476,7 +468,7 @@ func setupStatisticsTable(t *testing.T) {
 		},
 	)
 
-	insertRecords(t, undoLog, trxId, "products",
+	insertRecords(t, "products",
 		[]executor.Record{
 			{[]byte("1"), []byte("Apple"), []byte("Fruit")},
 			{[]byte("2"), []byte("Banana"), []byte("Fruit")},
@@ -522,9 +514,6 @@ func setupSameValueTable(t *testing.T) {
 	engine.Reset()
 	engine.Init()
 
-	undoLog := undo.NewUndoLog()
-	var trxId undo.TrxId = 1
-
 	createTable(t, "same_values", 1,
 		nil,
 		[]*executor.ColumnParam{
@@ -533,7 +522,7 @@ func setupSameValueTable(t *testing.T) {
 		},
 	)
 
-	insertRecords(t, undoLog, trxId, "same_values",
+	insertRecords(t, "same_values",
 		[]executor.Record{
 			{[]byte("1"), []byte("Fruit")},
 			{[]byte("2"), []byte("Fruit")},
@@ -558,9 +547,6 @@ func setupSingleRecordTable(t *testing.T) {
 	engine.Reset()
 	engine.Init()
 
-	undoLog := undo.NewUndoLog()
-	var trxId undo.TrxId = 1
-
 	createTable(t, "single", 1,
 		nil,
 		[]*executor.ColumnParam{
@@ -569,7 +555,7 @@ func setupSingleRecordTable(t *testing.T) {
 		},
 	)
 
-	insertRecords(t, undoLog, trxId, "single",
+	insertRecords(t, "single",
 		[]executor.Record{
 			{[]byte("1"), []byte("Alice")},
 		},
@@ -597,9 +583,6 @@ func setupMultiIndexTable(t *testing.T) {
 	engine.Reset()
 	engine.Init()
 
-	undoLog := undo.NewUndoLog()
-	var trxId undo.TrxId = 1
-
 	createTable(t, "multi_idx", 1,
 		[]*executor.IndexParam{
 			{Name: "idx_name", ColName: "name", SecondaryKey: 1},
@@ -612,7 +595,7 @@ func setupMultiIndexTable(t *testing.T) {
 		},
 	)
 
-	insertRecords(t, undoLog, trxId, "multi_idx",
+	insertRecords(t, "multi_idx",
 		[]executor.Record{
 			{[]byte("1"), []byte("Alice"), []byte("alice@test")},
 			{[]byte("2"), []byte("Bob"), []byte("bob@test")},

@@ -6,7 +6,6 @@ import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/catalog"
 	"minesql/internal/storage/transaction"
-	"minesql/internal/storage/undo"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -18,12 +17,13 @@ func TestCommit(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
-		undoLog := undo.NewUndoLog()
+		e := engine.Get()
+		undoLog := e.UndoLog()
 		trxMgr := transaction.NewManager(undoLog)
 		trxId := trxMgr.Begin()
 		tbl := setupTestTable(t)
 
-		ins := executor.NewInsert(undoLog, trxId, tbl, []executor.Record{
+		ins := executor.NewInsert(trxId, tbl, []executor.Record{
 			{[]byte("a"), []byte("Alice")},
 		})
 		_, err := ins.Next()
@@ -49,12 +49,13 @@ func TestRollback(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
-		undoLog := undo.NewUndoLog()
+		e := engine.Get()
+		undoLog := e.UndoLog()
 		trxMgr := transaction.NewManager(undoLog)
 		trxId := trxMgr.Begin()
 		tbl := setupTestTable(t)
 
-		ins := executor.NewInsert(undoLog, trxId, tbl, []executor.Record{
+		ins := executor.NewInsert(trxId, tbl, []executor.Record{
 			{[]byte("a"), []byte("Alice")},
 			{[]byte("b"), []byte("Bob")},
 		})
@@ -62,7 +63,7 @@ func TestRollback(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		err = trxMgr.Rollback(engine.Get().BufferPool, trxId)
+		err = trxMgr.Rollback(e.BufferPool, trxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -77,12 +78,13 @@ func TestRollback(t *testing.T) {
 		defer engine.Reset()
 
 		tbl := setupTestTable(t)
-		undoLog := undo.NewUndoLog()
+		e := engine.Get()
+		undoLog := e.UndoLog()
 		trxMgr := transaction.NewManager(undoLog)
 
 		// 先にデータを挿入して Commit
 		insertTrxId := trxMgr.Begin()
-		ins := executor.NewInsert(undoLog, insertTrxId, tbl, []executor.Record{
+		ins := executor.NewInsert(insertTrxId, tbl, []executor.Record{
 			{[]byte("a"), []byte("Alice")},
 			{[]byte("b"), []byte("Bob")},
 		})
@@ -92,7 +94,7 @@ func TestRollback(t *testing.T) {
 
 		// Delete トランザクション
 		deleteTrxId := trxMgr.Begin()
-		del := executor.NewDelete(undoLog, deleteTrxId, tbl, executor.NewTableScan(
+		del := executor.NewDelete(deleteTrxId, tbl, executor.NewTableScan(
 			tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
@@ -101,7 +103,7 @@ func TestRollback(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		err = trxMgr.Rollback(engine.Get().BufferPool, deleteTrxId)
+		err = trxMgr.Rollback(e.BufferPool, deleteTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -115,12 +117,13 @@ func TestRollback(t *testing.T) {
 		defer engine.Reset()
 
 		tbl := setupTestTable(t)
-		undoLog := undo.NewUndoLog()
+		e := engine.Get()
+		undoLog := e.UndoLog()
 		trxMgr := transaction.NewManager(undoLog)
 
 		// 先にデータを挿入して Commit
 		insertTrxId := trxMgr.Begin()
-		ins := executor.NewInsert(undoLog, insertTrxId, tbl, []executor.Record{
+		ins := executor.NewInsert(insertTrxId, tbl, []executor.Record{
 			{[]byte("a"), []byte("Alice")},
 		})
 		_, err := ins.Next()
@@ -129,7 +132,7 @@ func TestRollback(t *testing.T) {
 
 		// Update トランザクション
 		updateTrxId := trxMgr.Begin()
-		upd := executor.NewUpdate(undoLog, updateTrxId, tbl, []executor.SetColumn{
+		upd := executor.NewUpdate(updateTrxId, tbl, []executor.SetColumn{
 			{Pos: 1, Value: []byte("Carol")},
 		}, executor.NewTableScan(
 			tbl,
@@ -144,7 +147,7 @@ func TestRollback(t *testing.T) {
 		assert.Equal(t, "Carol", string(recs[0][1]))
 
 		// WHEN
-		err = trxMgr.Rollback(engine.Get().BufferPool, updateTrxId)
+		err = trxMgr.Rollback(e.BufferPool, updateTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -159,12 +162,13 @@ func TestRollback(t *testing.T) {
 		defer engine.Reset()
 
 		tbl := setupTestTable(t)
-		undoLog := undo.NewUndoLog()
+		e := engine.Get()
+		undoLog := e.UndoLog()
 		trxMgr := transaction.NewManager(undoLog)
 
 		// 先にデータを挿入して Commit
 		insertTrxId := trxMgr.Begin()
-		ins := executor.NewInsert(undoLog, insertTrxId, tbl, []executor.Record{
+		ins := executor.NewInsert(insertTrxId, tbl, []executor.Record{
 			{[]byte("a"), []byte("Alice")},
 			{[]byte("b"), []byte("Bob")},
 		})
@@ -175,13 +179,13 @@ func TestRollback(t *testing.T) {
 		// 1 つのトランザクション内で Insert + Update + Delete
 		trxId := trxMgr.Begin()
 
-		ins2 := executor.NewInsert(undoLog, trxId, tbl, []executor.Record{
+		ins2 := executor.NewInsert(trxId, tbl, []executor.Record{
 			{[]byte("c"), []byte("Carol")},
 		})
 		_, err = ins2.Next()
 		assert.NoError(t, err)
 
-		upd := executor.NewUpdate(undoLog, trxId, tbl, []executor.SetColumn{
+		upd := executor.NewUpdate(trxId, tbl, []executor.SetColumn{
 			{Pos: 1, Value: []byte("Dave")},
 		}, executor.NewTableScan(
 			tbl,
@@ -191,7 +195,7 @@ func TestRollback(t *testing.T) {
 		_, err = upd.Next()
 		assert.NoError(t, err)
 
-		del := executor.NewDelete(undoLog, trxId, tbl, executor.NewFilter(
+		del := executor.NewDelete(trxId, tbl, executor.NewFilter(
 			executor.NewTableScan(
 				tbl,
 				access.RecordSearchModeStart{},
@@ -203,7 +207,7 @@ func TestRollback(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		err = trxMgr.Rollback(engine.Get().BufferPool, trxId)
+		err = trxMgr.Rollback(e.BufferPool, trxId)
 
 		// THEN: 初期状態に戻る
 		assert.NoError(t, err)

@@ -16,25 +16,18 @@ import (
 	"minesql/internal/executor"
 	"minesql/internal/parser"
 	"minesql/internal/planner"
-	"minesql/internal/storage/transaction"
-	"minesql/internal/storage/undo"
 )
 
 type Server struct {
 	Address        string
 	Port           int
 	storageManager *engine.Engine
-	undoLog        *undo.UndoLog
-	trxManager     *transaction.Manager
 }
 
 func NewServer(address string, port int) *Server {
-	undoLog := undo.NewUndoLog()
 	return &Server{
-		Address:    address,
-		Port:       port,
-		undoLog:    undoLog,
-		trxManager: transaction.NewManager(undoLog),
+		Address: address,
+		Port:    port,
 	}
 }
 
@@ -120,7 +113,7 @@ func (s *Server) handleConnection(conn *net.TCPConn) {
 	defer func() {
 		// アクティブなトランザクションがあれば自動ロールバック
 		if sess.trxId != 0 {
-			if err := s.trxManager.Rollback(engine.Get().BufferPool, sess.trxId); err != nil {
+			if err := engine.Get().RollbackTrx(sess.trxId); err != nil {
 				log.Printf("Auto rollback error: %v", err)
 			}
 			sess.trxId = 0
@@ -185,20 +178,20 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 		if sess.trxId != 0 {
 			return "", fmt.Errorf("transaction already started")
 		}
-		sess.trxId = s.trxManager.Begin()
+		sess.trxId = engine.Get().BeginTrx()
 		return "", nil
 	case *ast.CommitStmt:
 		if sess.trxId == 0 {
 			return "", fmt.Errorf("no active transaction")
 		}
-		s.trxManager.Commit(sess.trxId)
+		engine.Get().CommitTrx(sess.trxId)
 		sess.trxId = 0
 		return "", nil
 	case *ast.RollbackStmt:
 		if sess.trxId == 0 {
 			return "", fmt.Errorf("no active transaction")
 		}
-		if err := s.trxManager.Rollback(engine.Get().BufferPool, sess.trxId); err != nil {
+		if err := engine.Get().RollbackTrx(sess.trxId); err != nil {
 			return "", err
 		}
 		sess.trxId = 0
@@ -206,16 +199,17 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 	}
 
 	// トランザクション外の DML は autocommit (一時的な trxId を発行して即 Commit)
+	e := engine.Get()
 	autocommit := sess.trxId == 0
 	trxId := sess.trxId
 	if autocommit {
-		trxId = s.trxManager.Begin()
+		trxId = e.BeginTrx()
 	}
 
-	exec, err := planner.Start(s.undoLog, trxId, node)
+	exec, err := planner.Start(trxId, node)
 	if err != nil {
 		if autocommit {
-			_ = s.trxManager.Rollback(engine.Get().BufferPool, trxId)
+			_ = e.RollbackTrx(trxId)
 		}
 		return "", err
 	}
@@ -225,7 +219,7 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 		record, err := exec.Next()
 		if err != nil {
 			if autocommit {
-				_ = s.trxManager.Rollback(engine.Get().BufferPool, trxId)
+				_ = e.RollbackTrx(trxId)
 			}
 			return "", err
 		}
@@ -236,7 +230,7 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 	}
 
 	if autocommit {
-		s.trxManager.Commit(trxId)
+		e.CommitTrx(trxId)
 	}
 
 	// 一旦、レスポンスは csv 形式で返す

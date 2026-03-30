@@ -1,10 +1,10 @@
 package server
 
-import "minesql/internal/storage/undo"
+import "minesql/internal/engine"
 
 // session はクライアントごとの接続状態を管理する
 type session struct {
-	trxId undo.TrxId
+	trxId engine.TrxId
 }
 
 func newSession() *session {

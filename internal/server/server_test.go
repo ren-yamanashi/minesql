@@ -2,8 +2,6 @@ package server
 
 import (
 	"minesql/internal/engine"
-	"minesql/internal/storage/transaction"
-	"minesql/internal/storage/undo"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,11 +15,7 @@ func setupTestServer(t *testing.T) *Server {
 	engine.Reset()
 	engine.Init()
 
-	undoLog := undo.NewUndoLog()
-	return &Server{
-		undoLog:    undoLog,
-		trxManager: transaction.NewManager(undoLog),
-	}
+	return &Server{}
 }
 
 func TestNewServer(t *testing.T) {
@@ -32,8 +26,6 @@ func TestNewServer(t *testing.T) {
 		// THEN
 		assert.Equal(t, "localhost", s.Address)
 		assert.Equal(t, 3307, s.Port)
-		assert.NotNil(t, s.undoLog)
-		assert.NotNil(t, s.trxManager)
 	})
 }
 
@@ -44,7 +36,7 @@ func TestNewSession(t *testing.T) {
 
 		// THEN
 		assert.NotNil(t, sess)
-		assert.Equal(t, undo.TrxId(0), sess.trxId)
+		assert.Equal(t, engine.TrxId(0), sess.trxId)
 	})
 }
 
@@ -143,10 +135,9 @@ func TestExecuteQuery(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: trxId は 0 のまま (autocommit 済み)
-		assert.Equal(t, undo.TrxId(0), sess.trxId)
+		assert.Equal(t, engine.TrxId(0), sess.trxId)
 
-		// THEN: Undo ログが残っていない (Commit で破棄済み)
-		// データは永続化されている
+		// THEN: データは永続化されている
 		result, err := s.executeQuery(sess, "SELECT * FROM users;")
 		assert.NoError(t, err)
 		assert.Contains(t, result, "1,Alice")
@@ -198,7 +189,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		s := setupTestServer(t)
 		defer engine.Reset()
 		sess := newSession()
-		assert.Equal(t, undo.TrxId(0), sess.trxId)
+		assert.Equal(t, engine.TrxId(0), sess.trxId)
 
 		// WHEN
 		result, err := s.executeQuery(sess, "BEGIN;")
@@ -206,10 +197,10 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, "", result)
-		assert.NotEqual(t, undo.TrxId(0), sess.trxId)
+		assert.NotEqual(t, engine.TrxId(0), sess.trxId)
 	})
 
-	t.Run("COMMIT で Undo ログが破棄され trxId がリセットされる", func(t *testing.T) {
+	t.Run("COMMIT で trxId がリセットされる", func(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
 		defer engine.Reset()
@@ -217,14 +208,12 @@ func TestExecuteQueryTransaction(t *testing.T) {
 
 		_, err := s.executeQuery(sess, "BEGIN;")
 		assert.NoError(t, err)
-		committedTrxId := sess.trxId
 
 		_, err = s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
 
 		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
 		assert.NoError(t, err)
-		assert.Equal(t, 1, len(s.undoLog.GetRecords(committedTrxId)))
 
 		// WHEN
 		result, err := s.executeQuery(sess, "COMMIT;")
@@ -232,8 +221,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, "", result)
-		assert.Nil(t, s.undoLog.GetRecords(committedTrxId))
-		assert.Equal(t, undo.TrxId(0), sess.trxId)
+		assert.Equal(t, engine.TrxId(0), sess.trxId)
 	})
 
 	t.Run("ROLLBACK で INSERT が取り消される", func(t *testing.T) {
@@ -445,8 +433,8 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: 接続切断をシミュレート (handleConnection の defer と同じロジック)
-		assert.NotEqual(t, undo.TrxId(0), sess.trxId)
-		err = s.trxManager.Rollback(engine.Get().BufferPool, sess.trxId)
+		assert.NotEqual(t, engine.TrxId(0), sess.trxId)
+		err = engine.Get().RollbackTrx(sess.trxId)
 		assert.NoError(t, err)
 		sess.trxId = 0
 
@@ -468,7 +456,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: 接続切断をシミュレート (trxId == 0 なのでロールバックは走らない)
-		assert.Equal(t, undo.TrxId(0), sess.trxId)
+		assert.Equal(t, engine.TrxId(0), sess.trxId)
 
 		// THEN: データはそのまま残る
 		result, err := s.executeQuery(sess, "SELECT * FROM users;")

@@ -3,7 +3,6 @@ package statistics
 import (
 	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/storage/undo"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -72,9 +71,7 @@ func TestGetOrAnalyze(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: 1 レコード追加して dirty_count を加算 (閾値 = 3 * 0.1 = 0.3, dirty_count = 1 > 0.3)
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
-		insertRecords(t, undoLog, trxId, "products",
+		insertRecords(t, "products",
 			[]executor.Record{
 				{[]byte("4"), []byte("Donut"), []byte("Snack")},
 			},
@@ -105,9 +102,7 @@ func TestGetOrAnalyze(t *testing.T) {
 		assert.NoError(t, err)
 
 		// 1 レコード追加して再 Analyze を発火させる
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
-		insertRecords(t, undoLog, trxId, "products",
+		insertRecords(t, "products",
 			[]executor.Record{
 				{[]byte("4"), []byte("Donut"), []byte("Snack")},
 			},
@@ -118,7 +113,7 @@ func TestGetOrAnalyze(t *testing.T) {
 
 		// WHEN: さらに 1 レコード追加するが、dirty_count はリセット済みなので
 		// 再 Analyze は走らず、キャッシュから RecordCount=4 が返る
-		insertRecords(t, undoLog, trxId, "products",
+		insertRecords(t, "products",
 			[]executor.Record{
 				{[]byte("5"), []byte("Egg"), []byte("Dairy")},
 			},
