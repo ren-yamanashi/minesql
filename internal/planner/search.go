@@ -3,12 +3,12 @@ package planner
 import (
 	"errors"
 	"fmt"
-	"minesql/internal/access"
 	"minesql/internal/ast"
 	"minesql/internal/catalog"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/statistics"
+	"minesql/internal/storage/access"
 	"strconv"
 )
 

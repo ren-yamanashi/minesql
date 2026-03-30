@@ -1,9 +1,9 @@
 package executor
 
 import (
-	"minesql/internal/access"
 	"minesql/internal/catalog"
 	"minesql/internal/engine"
+	"minesql/internal/storage/access"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

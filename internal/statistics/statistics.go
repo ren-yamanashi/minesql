@@ -2,9 +2,9 @@ package statistics
 
 import (
 	"bytes"
-	"minesql/internal/access"
 	"minesql/internal/catalog"
 	"minesql/internal/executor"
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/buffer"
 )
 

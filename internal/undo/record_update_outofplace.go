@@ -1,6 +1,6 @@
 package undo
 
-import "minesql/internal/access"
+import "minesql/internal/storage/access"
 
 type UpdateOutofplaceLogRecord struct {
 	InsertLogRecord InsertLogRecord

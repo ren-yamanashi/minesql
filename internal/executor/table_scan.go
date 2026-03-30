@@ -1,8 +1,8 @@
 package executor
 
 import (
-	"minesql/internal/access"
 	"minesql/internal/engine"
+	"minesql/internal/storage/access"
 )
 
 // TableScan はテーブル全体を走査する

@@ -3,8 +3,8 @@ package catalog
 import (
 	"encoding/binary"
 	"fmt"
-	"minesql/internal/access"
 	"minesql/internal/encode"
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/buffer"
