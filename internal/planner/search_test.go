@@ -2,9 +2,8 @@ package planner
 
 import (
 	"minesql/internal/ast"
-	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/storage/catalog"
+	"minesql/internal/storage/engine"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -771,12 +770,12 @@ func initStorageManager(t *testing.T, dataDir string) {
 	engine.Get()
 
 	// テーブルを作成
-	createTable := executor.NewCreateTable("users", 1, []*executor.IndexParam{
+	createTable := executor.NewCreateTable("users", 1, []engine.IndexParam{
 		{Name: "last_name", ColName: "last_name", SecondaryKey: 2},
-	}, []*executor.ColumnParam{
-		{Name: "id", Type: catalog.ColumnTypeString},
-		{Name: "first_name", Type: catalog.ColumnTypeString},
-		{Name: "last_name", Type: catalog.ColumnTypeString},
+	}, []engine.ColumnParam{
+		{Name: "id", Type: engine.ColumnTypeString},
+		{Name: "first_name", Type: engine.ColumnTypeString},
+		{Name: "last_name", Type: engine.ColumnTypeString},
 	})
 	_, err := createTable.Next()
 	assert.NoError(t, err)
@@ -785,7 +784,7 @@ func initStorageManager(t *testing.T, dataDir string) {
 // テスト用にテーブルメタデータを取得する
 //
 //nolint:unparam // テーブル名は将来的に変わりうる
-func getTableMetadata(t *testing.T, tableName string) *catalog.TableMetadata {
+func getTableMetadata(t *testing.T, tableName string) *engine.TableMetadata {
 	t.Helper()
 	e := engine.Get()
 	tblMeta, ok := e.Catalog.GetTableMetadataByName(tableName)

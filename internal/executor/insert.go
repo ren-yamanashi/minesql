@@ -1,19 +1,15 @@
 package executor
 
-import (
-	"minesql/internal/engine"
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/transaction"
-)
+import "minesql/internal/storage/engine"
 
 // Insert はレコードを追加する
 type Insert struct {
 	trxId   engine.TrxId
-	table   *access.TableAccessMethod
+	table   *engine.TableHandler
 	records []Record
 }
 
-func NewInsert(trxId engine.TrxId, table *access.TableAccessMethod, records []Record) *Insert {
+func NewInsert(trxId engine.TrxId, table *engine.TableHandler, records []Record) *Insert {
 	return &Insert{
 		trxId:   trxId,
 		table:   table,
@@ -25,7 +21,7 @@ func (ins *Insert) Next() (Record, error) {
 	e := engine.Get()
 
 	for _, record := range ins.records {
-		e.UndoLog().Append(ins.trxId, transaction.NewInsertLogRecord(ins.table, record))
+		e.AppendInsertUndo(ins.trxId, ins.table, record)
 		if err := ins.table.Insert(e.BufferPool, record); err != nil {
 			return nil, err
 		}

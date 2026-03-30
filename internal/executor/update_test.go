@@ -1,9 +1,7 @@
 package executor
 
 import (
-	"minesql/internal/engine"
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/catalog"
+	"minesql/internal/storage/engine"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,7 +17,7 @@ func TestNewUpdate(t *testing.T) {
 
 		iterator := NewTableScan(
 			nil,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 
@@ -51,7 +49,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 1, Value: []byte("Updated")},
 		}, NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -64,7 +62,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: 全レコードの first_name が "Updated" になっている
 		scan := NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -93,7 +91,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 2, Value: []byte("Updated")},
 		}, NewTableScan(
 			tbl,
-			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
+			engine.SearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
 			},
@@ -108,7 +106,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: "a" のレコードが更新され、他は変わらない
 		scan := NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -136,7 +134,7 @@ func TestUpdate_Next(t *testing.T) {
 		}, NewFilter(
 			NewTableScan(
 				tbl,
-				access.RecordSearchModeStart{},
+				engine.SearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -153,7 +151,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: "Bob" の last_name が "Williams" に更新され、他は変わらない
 		scan := NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -189,7 +187,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 2, Value: []byte("Zebra")},
 		}, NewTableScan(
 			tbl,
-			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
+			engine.SearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
 			},
@@ -206,7 +204,7 @@ func TestUpdate_Next(t *testing.T) {
 		indexScan := NewIndexScan(
 			tbl,
 			idx,
-			access.RecordSearchModeKey{Key: [][]byte{[]byte("Zebra")}},
+			engine.SearchModeKey{Key: [][]byte{[]byte("Zebra")}},
 			func(record Record) bool {
 				return string(record[0]) == "Zebra"
 			},
@@ -220,7 +218,7 @@ func TestUpdate_Next(t *testing.T) {
 		indexScanOld := NewIndexScan(
 			tbl,
 			idx,
-			access.RecordSearchModeKey{Key: [][]byte{[]byte("Doe")}},
+			engine.SearchModeKey{Key: [][]byte{[]byte("Doe")}},
 			func(record Record) bool {
 				return string(record[0]) == "Doe"
 			},
@@ -247,7 +245,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 0, Value: []byte("z")},
 		}, NewTableScan(
 			tbl,
-			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
+			engine.SearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
 			},
@@ -262,7 +260,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: "a" が消え "z" が追加されている
 		scan := NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -294,7 +292,7 @@ func TestUpdate_Next(t *testing.T) {
 		}, NewFilter(
 			NewTableScan(
 				tbl,
-				access.RecordSearchModeStart{},
+				engine.SearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -311,7 +309,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: 全レコードが変更されていない
 		scan := NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -332,9 +330,9 @@ func TestUpdate_Next(t *testing.T) {
 		_ = tmpdir
 
 		var trxId engine.TrxId = 1
-		createTableForTest(t, "empty_table", nil, []*ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "value", Type: catalog.ColumnTypeString},
+		createTableForTest(t, "empty_table", nil, []engine.ColumnParam{
+			{Name: "id", Type: engine.ColumnTypeString},
+			{Name: "value", Type: engine.ColumnTypeString},
 		})
 
 		// テーブルアクセスメソッドを取得
@@ -345,7 +343,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 1, Value: []byte("new_value")},
 		}, NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record Record) bool { return true },
 		))
 

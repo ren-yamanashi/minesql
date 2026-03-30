@@ -1,23 +1,22 @@
 package executor
 
 import (
-	"minesql/internal/engine"
-	"minesql/internal/storage/access"
+	"minesql/internal/storage/engine"
 )
 
 // IndexScan はセカンダリインデックスを利用して検索する
 type IndexScan struct {
-	table          *access.TableAccessMethod
-	index          *access.UniqueIndexAccessMethod
-	searchMode     access.RecordSearchMode
+	table          *engine.TableHandler
+	index          *engine.IndexHandler
+	searchMode     engine.SearchMode
 	whileCondition func(record Record) bool // 継続条件を満たすかどうかを判定する関数
-	iterator       *access.SecondaryIndexIterator
+	iterator       engine.IndexIterator
 }
 
 func NewIndexScan(
-	table *access.TableAccessMethod,
-	index *access.UniqueIndexAccessMethod,
-	searchMode access.RecordSearchMode,
+	table *engine.TableHandler,
+	index *engine.IndexHandler,
+	searchMode engine.SearchMode,
 	whileCondition func(record Record) bool,
 ) *IndexScan {
 	return &IndexScan{
@@ -33,7 +32,7 @@ func (is *IndexScan) Next() (Record, error) {
 
 	// 初回実行時にイテレータを作成
 	if is.iterator == nil {
-		iter, err := is.index.Search(e.BufferPool, is.table, is.searchMode)
+		iter, err := is.index.Search(e.BufferPool, is.searchMode)
 		if err != nil {
 			return nil, err
 		}

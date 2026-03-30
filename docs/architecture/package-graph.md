@@ -7,56 +7,46 @@
 ```mermaid
 graph TD
     server --> ast
-    server --> engine
     server --> executor
     server --> parser
     server --> planner
-    server --> transaction
-    server --> undo
+    server --> storage/engine
 
-    planner --> access
     planner --> ast
-    planner --> catalog
-    planner --> engine
     planner --> executor
-    planner --> statistics
-    planner --> undo
+    planner --> storage/engine
 
-    executor --> access
-    executor --> catalog
-    executor --> engine
-    executor --> undo
-
-    statistics --> access
-    statistics --> catalog
-    statistics --> executor
-    statistics --> storage/buffer
-
-    catalog --> access
-    catalog --> encode
-    catalog --> storage/btree
-    catalog --> storage/btree/node
-    catalog --> storage/buffer
-    catalog --> storage/page
+    executor --> storage/engine
 
     parser --> ast
 
-    transaction --> undo
+    storage/engine --> config
+    storage/engine --> storage/access
+    storage/engine --> storage/buffer
+    storage/engine --> storage/catalog
+    storage/engine --> storage/file
+    storage/engine --> storage/page
+    storage/engine --> storage/statistics
+    storage/engine --> storage/transaction
 
-    undo --> access
-    undo --> engine
+    storage/statistics --> storage/access
+    storage/statistics --> storage/buffer
+    storage/statistics --> storage/catalog
 
-    access --> encode
-    access --> storage/btree
-    access --> storage/btree/node
-    access --> storage/buffer
-    access --> storage/page
+    storage/catalog --> encode
+    storage/catalog --> storage/access
+    storage/catalog --> storage/btree
+    storage/catalog --> storage/btree/node
+    storage/catalog --> storage/buffer
+    storage/catalog --> storage/page
 
-    engine --> catalog
-    engine --> config
-    engine --> storage/buffer
-    engine --> storage/file
-    engine --> storage/page
+    storage/access --> encode
+    storage/access --> storage/btree
+    storage/access --> storage/btree/node
+    storage/access --> storage/buffer
+    storage/access --> storage/page
+
+    storage/transaction --> storage/buffer
 
     storage/btree --> storage/btree/node
     storage/btree --> storage/buffer
@@ -74,32 +64,22 @@ graph TD
 
 ```mermaid
 graph TD
-    subgraph "Layer 5: エントリポイント"
+    subgraph "Layer 3: サーバー"
         server
     end
 
-    subgraph "Layer 4: クエリ処理"
+    subgraph "Layer 2: クエリ処理"
         planner
         parser
-        transaction
-    end
-
-    subgraph "Layer 3: 実行・統計"
         executor
-        statistics
     end
 
-    subgraph "Layer 2: メタデータ・Undo"
-        catalog
-        undo
-    end
-
-    subgraph "Layer 1: アクセスメソッド・エンジン"
-        access
-        engine
-    end
-
-    subgraph "Layer 0: ストレージ"
+    subgraph "Layer 1: ストレージエンジン (= storage/)"
+        storage/engine["storage/engine (handler)"]
+        storage/statistics
+        storage/catalog
+        storage/transaction
+        storage/access
         storage/btree
         storage/btree/node
         storage/buffer
@@ -114,21 +94,34 @@ graph TD
         client
     end
 
-    server --> planner & parser & executor & transaction & undo & engine & ast
-    planner --> executor & statistics & catalog & access & undo & ast & engine
-    executor --> catalog & access & engine & undo
-    statistics --> catalog & access & executor & storage/buffer
-    catalog --> access & encode & storage/btree & storage/btree/node & storage/buffer & storage/page
-    parser --> ast
-    transaction --> undo
-    undo --> access & engine
-    access --> encode & storage/btree & storage/btree/node & storage/buffer & storage/page
-    engine --> catalog & config & storage/buffer & storage/file & storage/page
+    server --> planner & parser & executor & storage/engine & ast
+    planner --> executor & storage/engine & ast
+    executor --> storage/engine
+
+    storage/engine --> storage/access & storage/catalog & storage/statistics & storage/transaction & storage/buffer & storage/file & storage/page & config
+    storage/statistics --> storage/access & storage/catalog & storage/buffer
+    storage/catalog --> storage/access & storage/btree & storage/btree/node & storage/buffer & storage/page & encode
+    storage/transaction --> storage/buffer
+    storage/access --> storage/btree & storage/btree/node & storage/buffer & storage/page & encode
     storage/btree --> storage/btree/node & storage/buffer & storage/page
     storage/btree/node --> storage/page
     storage/buffer --> storage/file & storage/page
     storage/file --> storage/page
 ```
+
+## MySQL InnoDB との対応
+
+| MySQL InnoDB (`storage/innobase/`) | minesql (`internal/storage/`) |
+|---|---|
+| `handler/` (ha_innodb.cc) | `engine/` |
+| `row/` | `access/` |
+| `btr/` | `btree/` |
+| `buf/` | `buffer/` |
+| `dict/` | `catalog/` |
+| `dict/dict0stats.cc` | `statistics/` |
+| `fil/` | `file/` |
+| `page/` | `page/` |
+| `trx/` | `transaction/` |
 
 ## 依存の少ないパッケージ (リーフ)
 
@@ -139,3 +132,13 @@ graph TD
 - `config`
 - `encode`
 - `storage/page`
+
+## storage 外からのアクセスルール
+
+`storage/` 外のパッケージ (`server`, `planner`, `executor`) は `storage/engine` のみを参照する。`storage/` 内の他のパッケージ (`access`, `catalog`, `btree` 等) を直接参照しない。
+
+```
+server  ──→ storage/engine ──→ storage/* 内部
+planner ──→ storage/engine ──→ storage/* 内部
+executor ──→ storage/engine ──→ storage/* 内部
+```

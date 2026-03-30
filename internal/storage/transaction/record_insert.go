@@ -1,16 +1,15 @@
 package transaction
 
 import (
-	"minesql/internal/storage/access"
 	"minesql/internal/storage/buffer"
 )
 
 type InsertLogRecord struct {
-	table  *access.TableAccessMethod
+	table  TableOperator
 	Record [][]byte
 }
 
-func NewInsertLogRecord(table *access.TableAccessMethod, record [][]byte) InsertLogRecord {
+func NewInsertLogRecord(table TableOperator, record [][]byte) InsertLogRecord {
 	return InsertLogRecord{
 		table:  table,
 		Record: record,

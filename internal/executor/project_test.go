@@ -1,8 +1,7 @@
 package executor
 
 import (
-	"minesql/internal/engine"
-	"minesql/internal/storage/access"
+	"minesql/internal/storage/engine"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,7 +21,7 @@ func TestProject(t *testing.T) {
 		records := collectAll(t, NewProject(
 			NewTableScan(
 				tbl,
-				access.RecordSearchModeStart{},
+				engine.SearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			[]uint16{1, 2},
@@ -50,7 +49,7 @@ func TestProject(t *testing.T) {
 		records := collectAll(t, NewProject(
 			NewTableScan(
 				tbl,
-				access.RecordSearchModeStart{},
+				engine.SearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			[]uint16{1},
@@ -78,7 +77,7 @@ func TestProject(t *testing.T) {
 		records := collectAll(t, NewProject(
 			NewTableScan(
 				tbl,
-				access.RecordSearchModeStart{},
+				engine.SearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			[]uint16{2, 0},
@@ -104,7 +103,7 @@ func TestProject(t *testing.T) {
 			NewFilter(
 				NewTableScan(
 					tbl,
-					access.RecordSearchModeStart{},
+					engine.SearchModeStart{},
 					func(record Record) bool { return true },
 				),
 				func(record Record) bool {
@@ -133,7 +132,7 @@ func TestProject(t *testing.T) {
 			NewFilter(
 				NewTableScan(
 					tbl,
-					access.RecordSearchModeStart{},
+					engine.SearchModeStart{},
 					func(record Record) bool { return true },
 				),
 				func(record Record) bool {

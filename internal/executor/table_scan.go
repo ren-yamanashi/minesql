@@ -1,21 +1,20 @@
 package executor
 
 import (
-	"minesql/internal/engine"
-	"minesql/internal/storage/access"
+	"minesql/internal/storage/engine"
 )
 
 // TableScan はテーブル全体を走査する
 type TableScan struct {
-	table          *access.TableAccessMethod
+	table          *engine.TableHandler
 	whileCondition func(record Record) bool // 継続条件を満たすかどうかを判定する関数
-	searchMode     access.RecordSearchMode
-	iterator       *access.ClusteredIndexIterator
+	searchMode     engine.SearchMode
+	iterator       engine.TableIterator
 }
 
 func NewTableScan(
-	table *access.TableAccessMethod,
-	searchMode access.RecordSearchMode,
+	table *engine.TableHandler,
+	searchMode engine.SearchMode,
 	whileCondition func(record Record) bool,
 ) *TableScan {
 	return &TableScan{

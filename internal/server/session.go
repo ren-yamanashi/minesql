@@ -1,6 +1,6 @@
 package server
 
-import "minesql/internal/engine"
+import "minesql/internal/storage/engine"
 
 // session はクライアントごとの接続状態を管理する
 type session struct {

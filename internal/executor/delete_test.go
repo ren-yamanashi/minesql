@@ -3,9 +3,7 @@ package executor
 import (
 	"testing"
 
-	"minesql/internal/engine"
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/catalog"
+	"minesql/internal/storage/engine"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -16,7 +14,7 @@ func TestDelete(t *testing.T) {
 		var trxId engine.TrxId = 1
 		iterator := NewTableScan(
 			nil,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 
@@ -41,7 +39,7 @@ func TestDelete(t *testing.T) {
 
 		del := NewDelete(trxId, tbl, NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -55,7 +53,7 @@ func TestDelete(t *testing.T) {
 		// THEN: テーブルが空になっている
 		scan := NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -78,7 +76,7 @@ func TestDelete(t *testing.T) {
 		// プライマリキーが "c" 未満のレコードを削除対象とする
 		iterator := NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record Record) bool {
 				return string(record[0]) < "c"
 			},
@@ -96,7 +94,7 @@ func TestDelete(t *testing.T) {
 		// THEN: "c" 以降のレコードが残っている
 		scan := NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -121,7 +119,7 @@ func TestDelete(t *testing.T) {
 		iterator := NewFilter(
 			NewTableScan(
 				tbl,
-				access.RecordSearchModeStart{},
+				engine.SearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -139,7 +137,7 @@ func TestDelete(t *testing.T) {
 		// THEN: "Bob" 以外のレコードが残っている
 		scan := NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -167,7 +165,7 @@ func TestDelete(t *testing.T) {
 		// プライマリキーが "a" のレコードを削除 (last_name = "Doe")
 		iterator := NewTableScan(
 			tbl,
-			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
+			engine.SearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
 			},
@@ -187,7 +185,7 @@ func TestDelete(t *testing.T) {
 		indexScan := NewIndexScan(
 			tbl,
 			idx,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(indexScan)
@@ -206,16 +204,16 @@ func TestDelete(t *testing.T) {
 		_ = tmpdir
 
 		var trxId engine.TrxId = 1
-		createTableForTest(t, "empty_table", nil, []*ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "value", Type: catalog.ColumnTypeString},
+		createTableForTest(t, "empty_table", nil, []engine.ColumnParam{
+			{Name: "id", Type: engine.ColumnTypeString},
+			{Name: "value", Type: engine.ColumnTypeString},
 		})
 
 		tbl, err := getTableAccessMethod("empty_table")
 		assert.NoError(t, err)
 		del := NewDelete(trxId, tbl, NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record Record) bool { return true },
 		))
 

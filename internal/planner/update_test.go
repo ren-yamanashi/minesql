@@ -2,9 +2,8 @@ package planner
 
 import (
 	"minesql/internal/ast"
-	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/storage/access"
+	"minesql/internal/storage/engine"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -177,7 +176,7 @@ func TestUpdate_Build(t *testing.T) {
 		// THEN: "a" の first_name が "Jane" に更新されている
 		scan := executor.NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
 		results := fetchAll(t, scan)
@@ -265,14 +264,14 @@ func TestUpdate_Build(t *testing.T) {
 }
 
 //nolint:unparam // テーブル名は将来的に変わりうる
-func getPlannerTableAccessMethod(t *testing.T, tableName string) *access.TableAccessMethod {
+func getPlannerTableAccessMethod(t *testing.T, tableName string) *engine.TableHandler {
 	t.Helper()
 	e := engine.Get()
 	tblMeta, ok := e.Catalog.GetTableMetadataByName(tableName)
 	if !ok {
 		t.Fatalf("table %s not found in catalog", tableName)
 	}
-	tbl, err := tblMeta.GetTable()
+	rawTbl, err := tblMeta.GetTable()
 	assert.NoError(t, err)
-	return tbl
+	return engine.NewTableHandler(rawTbl)
 }

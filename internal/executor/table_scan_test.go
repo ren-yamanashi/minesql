@@ -1,9 +1,7 @@
 package executor
 
 import (
-	"minesql/internal/engine"
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/catalog"
+	"minesql/internal/storage/engine"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,7 +25,7 @@ func TestNewTableScan(t *testing.T) {
 		// WHEN
 		seqScan := NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			whileCondition,
 		)
 
@@ -50,7 +48,7 @@ func TestTableScan_Next(t *testing.T) {
 
 		seqScan := NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record Record) bool {
 				return string(record[0]) < "c" // プライマリキーが "c" 未満の間、継続
 			},
@@ -87,7 +85,7 @@ func TestTableScan_Next(t *testing.T) {
 
 		seqScan := NewTableScan(
 			tbl,
-			access.RecordSearchModeKey{Key: [][]byte{[]byte("b")}},
+			engine.SearchModeKey{Key: [][]byte{[]byte("b")}},
 			func(record Record) bool {
 				return string(record[0]) <= "d" // プライマリキーが "d" 以下の間、継続
 			},
@@ -126,12 +124,12 @@ func InitStorageEngineForTest(t *testing.T, dataDir string) *engine.Engine {
 	e := engine.Get()
 
 	// テーブルを作成
-	createTable := NewCreateTable("users", 1, []*IndexParam{
+	createTable := NewCreateTable("users", 1, []engine.IndexParam{
 		{Name: "last_name", ColName: "last_name", SecondaryKey: 2},
-	}, []*ColumnParam{
-		{Name: "id", Type: catalog.ColumnTypeString},
-		{Name: "first_name", Type: catalog.ColumnTypeString},
-		{Name: "last_name", Type: catalog.ColumnTypeString},
+	}, []engine.ColumnParam{
+		{Name: "id", Type: engine.ColumnTypeString},
+		{Name: "first_name", Type: engine.ColumnTypeString},
+		{Name: "last_name", Type: engine.ColumnTypeString},
 	})
 	_, err := createTable.Next()
 	assert.NoError(t, err)

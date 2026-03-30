@@ -2,9 +2,8 @@ package planner
 
 import (
 	"minesql/internal/ast"
-	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/storage/catalog"
+	"minesql/internal/storage/engine"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -176,9 +175,9 @@ func TestNewInsert(t *testing.T) {
 		defer engine.Reset()
 
 		var trxId engine.TrxId = 1
-		createTableForTest(t, []*executor.ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "name", Type: catalog.ColumnTypeString},
+		createTableForTest(t, []engine.ColumnParam{
+			{Name: "id", Type: engine.ColumnTypeString},
+			{Name: "name", Type: engine.ColumnTypeString},
 		})
 
 		stmt := &ast.InsertStmt{
@@ -212,9 +211,9 @@ func TestNewInsert(t *testing.T) {
 		defer engine.Reset()
 
 		var trxId engine.TrxId = 1
-		createTableForTest(t, []*executor.ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "name", Type: catalog.ColumnTypeString},
+		createTableForTest(t, []engine.ColumnParam{
+			{Name: "id", Type: engine.ColumnTypeString},
+			{Name: "name", Type: engine.ColumnTypeString},
 		})
 
 		stmt := &ast.InsertStmt{
@@ -256,11 +255,11 @@ func TestNewInsert(t *testing.T) {
 		defer engine.Reset()
 
 		var trxId engine.TrxId = 1
-		createTableForTest(t, []*executor.ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "name", Type: catalog.ColumnTypeString},
-			{Name: "email", Type: catalog.ColumnTypeString},
-			{Name: "age", Type: catalog.ColumnTypeString},
+		createTableForTest(t, []engine.ColumnParam{
+			{Name: "id", Type: engine.ColumnTypeString},
+			{Name: "name", Type: engine.ColumnTypeString},
+			{Name: "email", Type: engine.ColumnTypeString},
+			{Name: "age", Type: engine.ColumnTypeString},
 		})
 
 		stmt := &ast.InsertStmt{
@@ -298,10 +297,10 @@ func TestNewInsert(t *testing.T) {
 		defer engine.Reset()
 
 		var trxId engine.TrxId = 1
-		createTableForTest(t, []*executor.ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "name", Type: catalog.ColumnTypeString},
-			{Name: "email", Type: catalog.ColumnTypeString},
+		createTableForTest(t, []engine.ColumnParam{
+			{Name: "id", Type: engine.ColumnTypeString},
+			{Name: "name", Type: engine.ColumnTypeString},
+			{Name: "email", Type: engine.ColumnTypeString},
 		})
 
 		stmt := &ast.InsertStmt{
@@ -337,9 +336,9 @@ func TestNewInsert(t *testing.T) {
 		defer engine.Reset()
 
 		var trxId engine.TrxId = 1
-		createTableForTest(t, []*executor.ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "name", Type: catalog.ColumnTypeString},
+		createTableForTest(t, []engine.ColumnParam{
+			{Name: "id", Type: engine.ColumnTypeString},
+			{Name: "name", Type: engine.ColumnTypeString},
 		})
 
 		// StringLiteral 以外の literal を作成するために、カスタム literal を使用
@@ -384,7 +383,7 @@ func initStorageManagerForTest(t *testing.T) {
 }
 
 // テーブルを作成する
-func createTableForTest(t *testing.T, columns []*executor.ColumnParam) {
+func createTableForTest(t *testing.T, columns []engine.ColumnParam) {
 	createTable := executor.NewCreateTable("users", 1, nil, columns)
 	_, err := createTable.Next()
 	assert.NoError(t, err)

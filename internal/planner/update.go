@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"minesql/internal/ast"
-	"minesql/internal/engine"
 	"minesql/internal/executor"
+	"minesql/internal/storage/engine"
 )
 
 type Update struct {
@@ -54,10 +54,11 @@ func (up *Update) Build(trxId engine.TrxId) (executor.Executor, error) {
 	}
 
 	// テーブルを取得
-	tbl, err := tblMeta.GetTable()
+	rawTbl, err := tblMeta.GetTable()
 	if err != nil {
 		return nil, err
 	}
+	tbl := engine.NewTableHandler(rawTbl)
 
 	return executor.NewUpdate(trxId, tbl, setColumns, iterator), nil
 }

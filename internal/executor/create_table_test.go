@@ -1,7 +1,7 @@
 package executor
 
 import (
-	"minesql/internal/engine"
+	"minesql/internal/storage/engine"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -38,7 +38,7 @@ func TestCreateTable_Next(t *testing.T) {
 		engine.Reset()
 		engine.Init()
 		e := engine.Get()
-		createTable := NewCreateTable("users", 1, nil, []*ColumnParam{
+		createTable := NewCreateTable("users", 1, nil, []engine.ColumnParam{
 			{Name: "id", Type: "int"},
 			{Name: "name", Type: "string"},
 			{Name: "email", Type: "string"},
@@ -73,7 +73,7 @@ func TestCreateTable_Next(t *testing.T) {
 		engine.Reset()
 		engine.Init()
 		e := engine.Get()
-		createTable := NewCreateTable("users", 1, []*IndexParam{
+		createTable := NewCreateTable("users", 1, []engine.IndexParam{
 			{Name: "email", ColName: "email", SecondaryKey: 1},
 		}, nil)
 

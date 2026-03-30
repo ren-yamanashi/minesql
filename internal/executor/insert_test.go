@@ -1,9 +1,7 @@
 package executor
 
 import (
-	"minesql/internal/engine"
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/catalog"
+	"minesql/internal/storage/engine"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -34,11 +32,11 @@ func TestInsert_Next(t *testing.T) {
 		defer engine.Reset()
 
 		tableName := "users"
-		createTableForTest(t, tableName, []*IndexParam{
+		createTableForTest(t, tableName, []engine.IndexParam{
 			{Name: "name", ColName: "name", SecondaryKey: 1},
-		}, []*ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "name", Type: catalog.ColumnTypeString},
+		}, []engine.ColumnParam{
+			{Name: "id", Type: engine.ColumnTypeString},
+			{Name: "name", Type: engine.ColumnTypeString},
 		})
 
 		// GIVEN
@@ -63,7 +61,7 @@ func TestInsert_Next(t *testing.T) {
 		}
 		seqScan := NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			whileCondition,
 		)
 		res, err := fetchAll(seqScan)
@@ -84,7 +82,7 @@ func initStorageManagerForTest(t *testing.T) {
 	engine.Init()
 }
 
-func createTableForTest(t *testing.T, tableName string, indexes []*IndexParam, columns []*ColumnParam) {
+func createTableForTest(t *testing.T, tableName string, indexes []engine.IndexParam, columns []engine.ColumnParam) {
 	createTable := NewCreateTable(tableName, 1, indexes, columns)
 	_, err := createTable.Next()
 	assert.NoError(t, err)

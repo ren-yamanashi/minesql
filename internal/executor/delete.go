@@ -1,19 +1,15 @@
 package executor
 
-import (
-	"minesql/internal/engine"
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/transaction"
-)
+import "minesql/internal/storage/engine"
 
 // Delete は InnerExecutor の結果を元にレコードを削除する
 type Delete struct {
 	trxId         engine.TrxId
-	table         *access.TableAccessMethod
+	table         *engine.TableHandler
 	InnerExecutor Executor
 }
 
-func NewDelete(trxId engine.TrxId, table *access.TableAccessMethod, innerExecutor Executor) *Delete {
+func NewDelete(trxId engine.TrxId, table *engine.TableHandler, innerExecutor Executor) *Delete {
 	return &Delete{
 		trxId:         trxId,
 		table:         table,
@@ -40,7 +36,7 @@ func (del *Delete) Next() (Record, error) {
 
 	// 取得したレコードを削除
 	for _, record := range records {
-		e.UndoLog().Append(del.trxId, transaction.NewDeleteLogRecord(del.table, record))
+		e.AppendDeleteUndo(del.trxId, del.table, record)
 		if err := del.table.SoftDelete(e.BufferPool, record); err != nil {
 			return nil, err
 		}

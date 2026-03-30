@@ -1,7 +1,6 @@
 package transaction
 
 import (
-	"minesql/internal/storage/access"
 	"minesql/internal/storage/buffer"
 )
 
@@ -10,7 +9,7 @@ type UpdateOutofplaceLogRecord struct {
 	DeleteLogRecord DeleteLogRecord
 }
 
-func NewUpdateOutofplaceLogRecord(table *access.TableAccessMethod, prevRecord, newRecord [][]byte) UpdateOutofplaceLogRecord {
+func NewUpdateOutofplaceLogRecord(table TableOperator, prevRecord, newRecord [][]byte) UpdateOutofplaceLogRecord {
 	return UpdateOutofplaceLogRecord{
 		InsertLogRecord: NewInsertLogRecord(table, newRecord),
 		DeleteLogRecord: NewDeleteLogRecord(table, prevRecord),

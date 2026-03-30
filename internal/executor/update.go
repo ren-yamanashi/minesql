@@ -2,9 +2,7 @@ package executor
 
 import (
 	"bytes"
-	"minesql/internal/engine"
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/transaction"
+	"minesql/internal/storage/engine"
 )
 
 type SetColumn struct {
@@ -15,12 +13,12 @@ type SetColumn struct {
 // Update は InnerExecutor の結果を元にレコードを更新する
 type Update struct {
 	trxId         engine.TrxId
-	table         *access.TableAccessMethod
+	table         *engine.TableHandler
 	SetColumns    []SetColumn
 	InnerExecutor Executor
 }
 
-func NewUpdate(trxId engine.TrxId, table *access.TableAccessMethod, setColumns []SetColumn, innerExecutor Executor) *Update {
+func NewUpdate(trxId engine.TrxId, table *engine.TableHandler, setColumns []SetColumn, innerExecutor Executor) *Update {
 	return &Update{
 		trxId:         trxId,
 		table:         table,
@@ -60,24 +58,22 @@ func (upd *Update) Next() (Record, error) {
 
 	// 更新後のレコードで更新を実行
 	for i, record := range records {
-		oldRec := access.NewRecord(record, upd.table.PrimaryKeyCount)
-		newRec := access.NewRecord(updatedRecords[i], upd.table.PrimaryKeyCount)
-		encodedOldKey := oldRec.EncodeKey()
-		encodedNewKey := newRec.EncodeKey()
+		encodedOldKey := upd.table.EncodeKey(record)
+		encodedNewKey := upd.table.EncodeKey(updatedRecords[i])
 
 		if bytes.Equal(encodedOldKey, encodedNewKey) {
 			// プライマリキーが変わらない場合はインプレース更新
-			e.UndoLog().Append(upd.trxId, transaction.NewUpdateInplaceLogRecord(upd.table, record, updatedRecords[i]))
+			e.AppendUpdateInplaceUndo(upd.trxId, upd.table, record, updatedRecords[i])
 			if err := upd.table.UpdateInplace(e.BufferPool, record, updatedRecords[i]); err != nil {
 				return nil, err
 			}
 		} else {
 			// プライマリキーが変わる場合はソフトデリート + Insert
-			e.UndoLog().Append(upd.trxId, transaction.NewDeleteLogRecord(upd.table, record))
+			e.AppendDeleteUndo(upd.trxId, upd.table, record)
 			if err := upd.table.SoftDelete(e.BufferPool, record); err != nil {
 				return nil, err
 			}
-			e.UndoLog().Append(upd.trxId, transaction.NewInsertLogRecord(upd.table, updatedRecords[i]))
+			e.AppendInsertUndo(upd.trxId, upd.table, updatedRecords[i])
 			if err := upd.table.Insert(e.BufferPool, updatedRecords[i]); err != nil {
 				return nil, err
 			}

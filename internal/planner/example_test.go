@@ -6,9 +6,9 @@ import (
 	"strings"
 
 	"minesql/internal/ast"
-	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/planner"
+	"minesql/internal/storage/engine"
 )
 
 // セットアップヘルパー: テーブルを作成し、サンプルデータを挿入する

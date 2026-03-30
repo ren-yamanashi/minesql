@@ -1,7 +1,7 @@
 package server
 
 import (
-	"minesql/internal/engine"
+	"minesql/internal/storage/engine"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

@@ -1,17 +1,16 @@
 package transaction
 
 import (
-	"minesql/internal/storage/access"
 	"minesql/internal/storage/buffer"
 )
 
 type UpdateInplaceLogRecord struct {
-	table      *access.TableAccessMethod
+	table      TableOperator
 	PrevRecord [][]byte // 更新前のレコード
 	NewRecord  [][]byte // 更新後のレコード
 }
 
-func NewUpdateInplaceLogRecord(table *access.TableAccessMethod, prevRecord, newRecord [][]byte) UpdateInplaceLogRecord {
+func NewUpdateInplaceLogRecord(table TableOperator, prevRecord, newRecord [][]byte) UpdateInplaceLogRecord {
 	return UpdateInplaceLogRecord{
 		table:      table,
 		PrevRecord: prevRecord,

@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"minesql/internal/ast"
-	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/parser"
 	"minesql/internal/planner"
+	"minesql/internal/storage/engine"
 )
 
 type Server struct {

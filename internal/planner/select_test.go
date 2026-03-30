@@ -2,9 +2,8 @@ package planner
 
 import (
 	"minesql/internal/ast"
-	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/storage/catalog"
+	"minesql/internal/storage/engine"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -45,9 +44,9 @@ func TestSelect(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
-		createTableForTest(t, []*executor.ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "name", Type: catalog.ColumnTypeString},
+		createTableForTest(t, []engine.ColumnParam{
+			{Name: "id", Type: engine.ColumnTypeString},
+			{Name: "name", Type: engine.ColumnTypeString},
 		})
 
 		stmt := &ast.SelectStmt{
@@ -71,10 +70,10 @@ func TestSelect(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
-		createTableForTest(t, []*executor.ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "name", Type: catalog.ColumnTypeString},
-			{Name: "email", Type: catalog.ColumnTypeString},
+		createTableForTest(t, []engine.ColumnParam{
+			{Name: "id", Type: engine.ColumnTypeString},
+			{Name: "name", Type: engine.ColumnTypeString},
+			{Name: "email", Type: engine.ColumnTypeString},
 		})
 
 		stmt := &ast.SelectStmt{
@@ -99,9 +98,9 @@ func TestSelect(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer engine.Reset()
 
-		createTableForTest(t, []*executor.ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "name", Type: catalog.ColumnTypeString},
+		createTableForTest(t, []engine.ColumnParam{
+			{Name: "id", Type: engine.ColumnTypeString},
+			{Name: "name", Type: engine.ColumnTypeString},
 		})
 
 		// データを挿入

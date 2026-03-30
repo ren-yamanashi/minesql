@@ -1,10 +1,8 @@
 package transaction_test
 
 import (
-	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/catalog"
+	"minesql/internal/storage/engine"
 	"minesql/internal/storage/transaction"
 	"testing"
 
@@ -96,7 +94,7 @@ func TestRollback(t *testing.T) {
 		deleteTrxId := trxMgr.Begin()
 		del := executor.NewDelete(deleteTrxId, tbl, executor.NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record executor.Record) bool { return true },
 		))
 		_, err = del.Next()
@@ -136,7 +134,7 @@ func TestRollback(t *testing.T) {
 			{Pos: 1, Value: []byte("Carol")},
 		}, executor.NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record executor.Record) bool { return true },
 		))
 		_, err = upd.Next()
@@ -189,7 +187,7 @@ func TestRollback(t *testing.T) {
 			{Pos: 1, Value: []byte("Dave")},
 		}, executor.NewTableScan(
 			tbl,
-			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
+			engine.SearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record executor.Record) bool { return string(record[0]) == "a" },
 		))
 		_, err = upd.Next()
@@ -198,7 +196,7 @@ func TestRollback(t *testing.T) {
 		del := executor.NewDelete(trxId, tbl, executor.NewFilter(
 			executor.NewTableScan(
 				tbl,
-				access.RecordSearchModeStart{},
+				engine.SearchModeStart{},
 				func(record executor.Record) bool { return true },
 			),
 			func(record executor.Record) bool { return string(record[0]) == "b" },
@@ -227,11 +225,11 @@ func initStorageManagerForTest(t *testing.T) {
 	engine.Init()
 }
 
-func setupTestTable(t *testing.T) *access.TableAccessMethod {
+func setupTestTable(t *testing.T) *engine.TableHandler {
 	t.Helper()
-	createTable := executor.NewCreateTable("test_trx", 1, nil, []*executor.ColumnParam{
-		{Name: "id", Type: catalog.ColumnTypeString},
-		{Name: "name", Type: catalog.ColumnTypeString},
+	createTable := executor.NewCreateTable("test_trx", 1, nil, []engine.ColumnParam{
+		{Name: "id", Type: engine.ColumnTypeString},
+		{Name: "name", Type: engine.ColumnTypeString},
 	})
 	_, err := createTable.Next()
 	assert.NoError(t, err)
@@ -239,16 +237,16 @@ func setupTestTable(t *testing.T) *access.TableAccessMethod {
 	e := engine.Get()
 	tblMeta, ok := e.Catalog.GetTableMetadataByName("test_trx")
 	assert.True(t, ok)
-	tbl, err := tblMeta.GetTable()
+	rawTbl, err := tblMeta.GetTable()
 	assert.NoError(t, err)
-	return tbl
+	return engine.NewTableHandler(rawTbl)
 }
 
-func collectAllRecords(t *testing.T, tbl *access.TableAccessMethod) []executor.Record {
+func collectAllRecords(t *testing.T, tbl *engine.TableHandler) []executor.Record {
 	t.Helper()
 	scan := executor.NewTableScan(
 		tbl,
-		access.RecordSearchModeStart{},
+		engine.SearchModeStart{},
 		func(record executor.Record) bool { return true },
 	)
 	var recs []executor.Record

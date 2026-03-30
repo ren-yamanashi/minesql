@@ -1,10 +1,12 @@
 package statistics
 
 import (
-	"minesql/internal/engine"
-	"minesql/internal/executor"
 	"minesql/internal/storage/access"
+	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/catalog"
+	"minesql/internal/storage/file"
+	"minesql/internal/storage/page"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,13 +15,11 @@ import (
 func TestAnalyze(t *testing.T) {
 	t.Run("レコード数が正しく算出される", func(t *testing.T) {
 		// GIVEN: 3 レコード挿入済み
-		setupStatisticsTable(t)
-		defer engine.Reset()
+		env := setupStatisticsTable(t)
 
-		eng := engine.Get()
-		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
 		result, err := stats.Analyze()
@@ -31,13 +31,11 @@ func TestAnalyze(t *testing.T) {
 
 	t.Run("リーフページ数が正しく算出される", func(t *testing.T) {
 		// GIVEN: 3 レコードは 1 ページに収まる
-		setupStatisticsTable(t)
-		defer engine.Reset()
+		env := setupStatisticsTable(t)
 
-		eng := engine.Get()
-		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
 		result, err := stats.Analyze()
@@ -49,13 +47,11 @@ func TestAnalyze(t *testing.T) {
 
 	t.Run("各カラムのユニーク値数が正しく算出される", func(t *testing.T) {
 		// GIVEN: id は全件異なる、name は全件異なる、category は "Fruit" が重複
-		setupStatisticsTable(t)
-		defer engine.Reset()
+		env := setupStatisticsTable(t)
 
-		eng := engine.Get()
-		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
 		result, err := stats.Analyze()
@@ -69,13 +65,11 @@ func TestAnalyze(t *testing.T) {
 
 	t.Run("各カラムの min/max が正しく算出される", func(t *testing.T) {
 		// GIVEN
-		setupStatisticsTable(t)
-		defer engine.Reset()
+		env := setupStatisticsTable(t)
 
-		eng := engine.Get()
-		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
 		result, err := stats.Analyze()
@@ -95,13 +89,11 @@ func TestAnalyze(t *testing.T) {
 
 	t.Run("プライマリキー B+Tree の高さが正しく算出される", func(t *testing.T) {
 		// GIVEN: 3 レコードは 1 ページに収まるので高さ 1
-		setupStatisticsTable(t)
-		defer engine.Reset()
+		env := setupStatisticsTable(t)
 
-		eng := engine.Get()
-		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
 		result, err := stats.Analyze()
@@ -113,13 +105,11 @@ func TestAnalyze(t *testing.T) {
 
 	t.Run("セカンダリインデックスの高さが正しく算出される", func(t *testing.T) {
 		// GIVEN: 3 レコードでは B+Tree の高さは 1 (ルートリーフのみ)
-		setupStatisticsTable(t)
-		defer engine.Reset()
+		env := setupStatisticsTable(t)
 
-		eng := engine.Get()
-		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
 		result, err := stats.Analyze()
@@ -134,13 +124,11 @@ func TestAnalyze(t *testing.T) {
 
 	t.Run("セカンダリインデックスのリーフページ数が正しく算出される", func(t *testing.T) {
 		// GIVEN: 3 レコードは 1 リーフページに収まる
-		setupStatisticsTable(t)
-		defer engine.Reset()
+		env := setupStatisticsTable(t)
 
-		eng := engine.Get()
-		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
 		result, err := stats.Analyze()
@@ -155,13 +143,11 @@ func TestAnalyze(t *testing.T) {
 
 	t.Run("INSERT 後に再 Analyze するとレコード数やユニーク値数が増加する", func(t *testing.T) {
 		// GIVEN: 3 レコード挿入済み
-		setupStatisticsTable(t)
-		defer engine.Reset()
+		env := setupStatisticsTable(t)
 
-		eng := engine.Get()
-		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, env.bp)
 
 		before, err := stats.Analyze()
 		assert.NoError(t, err)
@@ -169,11 +155,9 @@ func TestAnalyze(t *testing.T) {
 		assert.Equal(t, uint64(2), before.ColumnStats["category"].UniqueValues)
 
 		// WHEN: 新しいカテゴリを持つレコードを追加
-		insertRecords(t, "products",
-			[]executor.Record{
-				{[]byte("4"), []byte("Donut"), []byte("Snack")},
-			},
-		)
+		tbl := env.tables["products"]
+		err = tbl.Insert(env.bp, [][]byte{[]byte("4"), []byte("Donut"), []byte("Snack")})
+		assert.NoError(t, err)
 
 		after, err := stats.Analyze()
 
@@ -190,13 +174,11 @@ func TestAnalyze(t *testing.T) {
 
 	t.Run("DELETE 後に再 Analyze するとレコード数やユニーク値数が減少する", func(t *testing.T) {
 		// GIVEN: 3 レコード挿入済み
-		setupStatisticsTable(t)
-		defer engine.Reset()
+		env := setupStatisticsTable(t)
 
-		eng := engine.Get()
-		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, env.bp)
 
 		before, err := stats.Analyze()
 		assert.NoError(t, err)
@@ -204,7 +186,7 @@ func TestAnalyze(t *testing.T) {
 		assert.Equal(t, uint64(3), before.ColumnStats["name"].UniqueValues)
 
 		// WHEN: "Carrot" (唯一の "Veggie") を削除
-		deleteByCondition(t, "products", func(record executor.Record) bool {
+		deleteByCondition(t, env, "products", func(record [][]byte) bool {
 			return string(record[0]) == "3" // id = "3"
 		})
 
@@ -223,20 +205,18 @@ func TestAnalyze(t *testing.T) {
 
 	t.Run("DELETE で最小値のレコードを削除すると min が更新される", func(t *testing.T) {
 		// GIVEN: 3 レコード挿入済み (id: "1", "2", "3")
-		setupStatisticsTable(t)
-		defer engine.Reset()
+		env := setupStatisticsTable(t)
 
-		eng := engine.Get()
-		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, env.bp)
 
 		before, err := stats.Analyze()
 		assert.NoError(t, err)
 		assert.Equal(t, []byte("1"), before.ColumnStats["id"].MinValue)
 
 		// WHEN: id = "1" (最小値) のレコードを削除
-		deleteByCondition(t, "products", func(record executor.Record) bool {
+		deleteByCondition(t, env, "products", func(record [][]byte) bool {
 			return string(record[0]) == "1"
 		})
 
@@ -251,13 +231,11 @@ func TestAnalyze(t *testing.T) {
 
 	t.Run("全レコードの値が同一のカラムではユニーク値数が 1 になる", func(t *testing.T) {
 		// GIVEN: category がすべて "Fruit" のレコード
-		setupSameValueTable(t)
-		defer engine.Reset()
+		env := setupSameValueTable(t)
 
-		eng := engine.Get()
-		meta, ok := eng.Catalog.GetTableMetadataByName("same_values")
+		meta, ok := env.catalog.GetTableMetadataByName("same_values")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
 		result, err := stats.Analyze()
@@ -272,13 +250,11 @@ func TestAnalyze(t *testing.T) {
 
 	t.Run("レコードが 1 件のみの場合の統計値が正しい", func(t *testing.T) {
 		// GIVEN: 1 レコードのみのテーブル
-		setupSingleRecordTable(t)
-		defer engine.Reset()
+		env := setupSingleRecordTable(t)
 
-		eng := engine.Get()
-		meta, ok := eng.Catalog.GetTableMetadataByName("single")
+		meta, ok := env.catalog.GetTableMetadataByName("single")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
 		result, err := stats.Analyze()
@@ -296,13 +272,11 @@ func TestAnalyze(t *testing.T) {
 
 	t.Run("複数のセカンダリインデックスがそれぞれ統計を持つ", func(t *testing.T) {
 		// GIVEN: 2 つのセカンダリインデックスを持つテーブル
-		setupMultiIndexTable(t)
-		defer engine.Reset()
+		env := setupMultiIndexTable(t)
 
-		eng := engine.Get()
-		meta, ok := eng.Catalog.GetTableMetadataByName("multi_idx")
+		meta, ok := env.catalog.GetTableMetadataByName("multi_idx")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
 		result, err := stats.Analyze()
@@ -319,13 +293,11 @@ func TestAnalyze(t *testing.T) {
 
 	t.Run("空テーブルではレコード数 0 でカラム統計も空になる", func(t *testing.T) {
 		// GIVEN: テーブルを作成するがデータは挿入しない
-		setupEmptyTable(t)
-		defer engine.Reset()
+		env := setupEmptyTable(t)
 
-		eng := engine.Get()
-		meta, ok := eng.Catalog.GetTableMetadataByName("items")
+		meta, ok := env.catalog.GetTableMetadataByName("items")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
 		result, err := stats.Analyze()
@@ -344,13 +316,11 @@ func TestAnalyze(t *testing.T) {
 
 	t.Run("空テーブルのプライマリキー高さが 1 になる", func(t *testing.T) {
 		// GIVEN: データなしの空テーブル
-		setupEmptyTable(t)
-		defer engine.Reset()
+		env := setupEmptyTable(t)
 
-		eng := engine.Get()
-		meta, ok := eng.Catalog.GetTableMetadataByName("items")
+		meta, ok := env.catalog.GetTableMetadataByName("items")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
 		result, err := stats.Analyze()
@@ -362,13 +332,11 @@ func TestAnalyze(t *testing.T) {
 
 	t.Run("空テーブルのカラム min/max は nil になる", func(t *testing.T) {
 		// GIVEN: データなしの空テーブル
-		setupEmptyTable(t)
-		defer engine.Reset()
+		env := setupEmptyTable(t)
 
-		eng := engine.Get()
-		meta, ok := eng.Catalog.GetTableMetadataByName("items")
+		meta, ok := env.catalog.GetTableMetadataByName("items")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, eng.BufferPool)
+		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
 		result, err := stats.Analyze()
@@ -382,50 +350,139 @@ func TestAnalyze(t *testing.T) {
 	})
 }
 
-// createTable はテスト用にテーブルを作成する
-func createTable(t *testing.T, tableName string, primaryKeyCount uint8, indexes []*executor.IndexParam, columns []*executor.ColumnParam) { //nolint:unparam
-	t.Helper()
-	ct := executor.NewCreateTable(tableName, primaryKeyCount, indexes, columns)
-	_, err := ct.Next()
-	assert.NoError(t, err)
+// testEnv はテスト用の環境を保持する
+type testEnv struct {
+	bp      *buffer.BufferPool
+	catalog *catalog.Catalog
+	tables  map[string]*access.TableAccessMethod
 }
 
-// getTable はテスト用にテーブルのアクセスメソッドを取得する
-func getTable(t *testing.T, tableName string) *access.TableAccessMethod {
+// setupTestEnv はテスト用に BufferPool とカタログを初期化する
+func setupTestEnv(t *testing.T) *testEnv {
 	t.Helper()
-	eng := engine.Get()
-	meta, ok := eng.Catalog.GetTableMetadataByName(tableName)
-	assert.True(t, ok)
-	tbl, err := meta.GetTable()
+	tmpdir := t.TempDir()
+
+	bp := buffer.NewBufferPool(100)
+
+	// カタログ用の Disk を登録
+	catalogFileId := page.FileId(0)
+	catalogDm, err := file.NewDisk(catalogFileId, filepath.Join(tmpdir, "minesql.db"))
 	assert.NoError(t, err)
-	return tbl
+	bp.RegisterDisk(catalogFileId, catalogDm)
+
+	cat, err := catalog.CreateCatalog(bp)
+	assert.NoError(t, err)
+
+	return &testEnv{
+		bp:      bp,
+		catalog: cat,
+		tables:  make(map[string]*access.TableAccessMethod),
+	}
+}
+
+// indexParam はテスト用のインデックスパラメータ
+type indexParam struct {
+	name         string
+	colName      string
+	secondaryKey uint16
+}
+
+// columnParam はテスト用のカラムパラメータ
+type columnParam struct {
+	name       string
+	columnType catalog.ColumnType
+}
+
+// createTable はテスト用にテーブルを作成し、カタログに登録する
+func createTable(t *testing.T, env *testEnv, tableName string, primaryKeyCount uint8, indexes []indexParam, columns []columnParam) { //nolint:unparam
+	t.Helper()
+
+	// FileId を採番
+	fileId, err := env.catalog.AllocateFileId(env.bp)
+	assert.NoError(t, err)
+
+	// テーブル用の Disk を登録
+	tmpdir := t.TempDir()
+	dm, err := file.NewDisk(fileId, filepath.Join(tmpdir, tableName+".db"))
+	assert.NoError(t, err)
+	env.bp.RegisterDisk(fileId, dm)
+
+	// テーブルの metaPageId を設定
+	metaPageId, err := env.bp.AllocatePageId(fileId)
+	assert.NoError(t, err)
+
+	// 各 UniqueIndex の metaPageId を設定
+	uniqueIndexes := make([]*access.UniqueIndexAccessMethod, len(indexes))
+	for i, idx := range indexes {
+		indexMetaPageId, err := env.bp.AllocatePageId(fileId)
+		assert.NoError(t, err)
+		uniqueIndex := access.NewUniqueIndexAccessMethod(idx.name, idx.colName, indexMetaPageId, idx.secondaryKey)
+		err = uniqueIndex.Create(env.bp)
+		assert.NoError(t, err)
+		uniqueIndexes[i] = uniqueIndex
+	}
+
+	// テーブルを作成
+	tbl := access.NewTableAccessMethod(tableName, metaPageId, primaryKeyCount, uniqueIndexes)
+	err = tbl.Create(env.bp)
+	assert.NoError(t, err)
+
+	// インデックスのメタデータを作成
+	idxMeta := make([]*catalog.IndexMetadata, len(indexes))
+	for i, ui := range uniqueIndexes {
+		idxMeta[i] = catalog.NewIndexMetadata(fileId, ui.Name, ui.ColName, catalog.IndexTypeUnique, ui.MetaPageId)
+	}
+
+	// カラムのメタデータを作成
+	colMeta := make([]*catalog.ColumnMetadata, len(columns))
+	for i, col := range columns {
+		colMeta[i] = catalog.NewColumnMetadata(fileId, col.name, uint16(i), col.columnType)
+	}
+
+	// テーブルメタデータを作成してカタログに登録
+	tblMeta := catalog.NewTableMetadata(fileId, tableName, uint8(len(columns)), primaryKeyCount, colMeta, idxMeta, metaPageId)
+	err = env.catalog.Insert(env.bp, tblMeta)
+	assert.NoError(t, err)
+
+	env.tables[tableName] = &tbl
 }
 
 // insertRecords はテスト用にレコードを挿入する
-func insertRecords(t *testing.T, tableName string, records []executor.Record) { //nolint:unparam
+func insertRecords(t *testing.T, env *testEnv, tableName string, records [][][]byte) {
 	t.Helper()
-	var trxId engine.TrxId = 1
-	tbl := getTable(t, tableName)
-	ins := executor.NewInsert(trxId, tbl, records)
-	_, err := ins.Next()
-	assert.NoError(t, err)
+	tbl := env.tables[tableName]
+	for _, record := range records {
+		err := tbl.Insert(env.bp, record)
+		assert.NoError(t, err)
+	}
 }
 
-// deleteByCondition はテスト用に条件に合致するレコードを削除する
-func deleteByCondition(t *testing.T, tableName string, cond func(executor.Record) bool) {
+// deleteByCondition はテスト用に条件に合致するレコードをソフトデリートする
+func deleteByCondition(t *testing.T, env *testEnv, tableName string, cond func([][]byte) bool) {
 	t.Helper()
-	var trxId engine.TrxId = 1
-	tbl := getTable(t, tableName)
-	del := executor.NewDelete(trxId, tbl, executor.NewFilter(
-		executor.NewTableScan(
-			tbl,
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool { return true },
-		),
-		cond,
-	))
-	_, err := del.Next()
+	tbl := env.tables[tableName]
+
+	// 削除対象のレコードを先にすべて取得する
+	iter, err := tbl.Search(env.bp, access.RecordSearchModeStart{})
 	assert.NoError(t, err)
+
+	var targets [][][]byte
+	for {
+		record, ok, err := iter.Next()
+		assert.NoError(t, err)
+		if !ok {
+			break
+		}
+		if cond(record) {
+			targets = append(targets, record)
+		}
+	}
+
+	// 取得したレコードを削除
+	for _, record := range targets {
+		err := tbl.SoftDelete(env.bp, record)
+		assert.NoError(t, err)
+	}
 }
 
 // setupStatisticsTable はストレージを初期化し、統計情報テスト用のテーブルを作成する
@@ -448,52 +505,48 @@ func deleteByCondition(t *testing.T, tableName string, cond func(executor.Record
 //   - min(id) = "1", max(id) = "3"
 //   - min(name) = "Apple", max(name) = "Carrot"
 //   - min(category) = "Fruit", max(category) = "Veggie"
-func setupStatisticsTable(t *testing.T) {
+func setupStatisticsTable(t *testing.T) *testEnv {
 	t.Helper()
 
-	tmpdir := t.TempDir()
-	t.Setenv("MINESQL_DATA_DIR", tmpdir)
-	t.Setenv("MINESQL_BUFFER_SIZE", "100")
-	engine.Reset()
-	engine.Init()
+	env := setupTestEnv(t)
 
-	createTable(t, "products", 1,
-		[]*executor.IndexParam{
-			{Name: "idx_name", ColName: "name", SecondaryKey: 1},
+	createTable(t, env, "products", 1,
+		[]indexParam{
+			{name: "idx_name", colName: "name", secondaryKey: 1},
 		},
-		[]*executor.ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "name", Type: catalog.ColumnTypeString},
-			{Name: "category", Type: catalog.ColumnTypeString},
+		[]columnParam{
+			{name: "id", columnType: catalog.ColumnTypeString},
+			{name: "name", columnType: catalog.ColumnTypeString},
+			{name: "category", columnType: catalog.ColumnTypeString},
 		},
 	)
 
-	insertRecords(t, "products",
-		[]executor.Record{
+	insertRecords(t, env, "products",
+		[][][]byte{
 			{[]byte("1"), []byte("Apple"), []byte("Fruit")},
 			{[]byte("2"), []byte("Banana"), []byte("Fruit")},
 			{[]byte("3"), []byte("Carrot"), []byte("Veggie")},
 		},
 	)
+
+	return env
 }
 
 // setupEmptyTable はストレージを初期化し、データなしの空テーブルを作成する
-func setupEmptyTable(t *testing.T) {
+func setupEmptyTable(t *testing.T) *testEnv {
 	t.Helper()
 
-	tmpdir := t.TempDir()
-	t.Setenv("MINESQL_DATA_DIR", tmpdir)
-	t.Setenv("MINESQL_BUFFER_SIZE", "100")
-	engine.Reset()
-	engine.Init()
+	env := setupTestEnv(t)
 
-	createTable(t, "items", 1,
+	createTable(t, env, "items", 1,
 		nil,
-		[]*executor.ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "name", Type: catalog.ColumnTypeString},
+		[]columnParam{
+			{name: "id", columnType: catalog.ColumnTypeString},
+			{name: "name", columnType: catalog.ColumnTypeString},
 		},
 	)
+
+	return env
 }
 
 // setupSameValueTable はストレージを初期化し、全レコードの category が同一のテーブルを作成する
@@ -505,30 +558,28 @@ func setupEmptyTable(t *testing.T) {
 //	| 1   | Fruit    |
 //	| 2   | Fruit    |
 //	| 3   | Fruit    |
-func setupSameValueTable(t *testing.T) {
+func setupSameValueTable(t *testing.T) *testEnv {
 	t.Helper()
 
-	tmpdir := t.TempDir()
-	t.Setenv("MINESQL_DATA_DIR", tmpdir)
-	t.Setenv("MINESQL_BUFFER_SIZE", "100")
-	engine.Reset()
-	engine.Init()
+	env := setupTestEnv(t)
 
-	createTable(t, "same_values", 1,
+	createTable(t, env, "same_values", 1,
 		nil,
-		[]*executor.ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "category", Type: catalog.ColumnTypeString},
+		[]columnParam{
+			{name: "id", columnType: catalog.ColumnTypeString},
+			{name: "category", columnType: catalog.ColumnTypeString},
 		},
 	)
 
-	insertRecords(t, "same_values",
-		[]executor.Record{
+	insertRecords(t, env, "same_values",
+		[][][]byte{
 			{[]byte("1"), []byte("Fruit")},
 			{[]byte("2"), []byte("Fruit")},
 			{[]byte("3"), []byte("Fruit")},
 		},
 	)
+
+	return env
 }
 
 // setupSingleRecordTable はストレージを初期化し、1 レコードのみのテーブルを作成する
@@ -538,28 +589,26 @@ func setupSameValueTable(t *testing.T) {
 //	| id  | name  |
 //	| --- | ----- |
 //	| 1   | Alice |
-func setupSingleRecordTable(t *testing.T) {
+func setupSingleRecordTable(t *testing.T) *testEnv {
 	t.Helper()
 
-	tmpdir := t.TempDir()
-	t.Setenv("MINESQL_DATA_DIR", tmpdir)
-	t.Setenv("MINESQL_BUFFER_SIZE", "100")
-	engine.Reset()
-	engine.Init()
+	env := setupTestEnv(t)
 
-	createTable(t, "single", 1,
+	createTable(t, env, "single", 1,
 		nil,
-		[]*executor.ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "name", Type: catalog.ColumnTypeString},
+		[]columnParam{
+			{name: "id", columnType: catalog.ColumnTypeString},
+			{name: "name", columnType: catalog.ColumnTypeString},
 		},
 	)
 
-	insertRecords(t, "single",
-		[]executor.Record{
+	insertRecords(t, env, "single",
+		[][][]byte{
 			{[]byte("1"), []byte("Alice")},
 		},
 	)
+
+	return env
 }
 
 // setupMultiIndexTable はストレージを初期化し、2 つのセカンダリインデックスを持つテーブルを作成する
@@ -574,31 +623,29 @@ func setupSingleRecordTable(t *testing.T) {
 //     | --- | ------ | ------------- |
 //     | 1   | Alice  | alice@test    |
 //     | 2   | Bob    | bob@test      |
-func setupMultiIndexTable(t *testing.T) {
+func setupMultiIndexTable(t *testing.T) *testEnv {
 	t.Helper()
 
-	tmpdir := t.TempDir()
-	t.Setenv("MINESQL_DATA_DIR", tmpdir)
-	t.Setenv("MINESQL_BUFFER_SIZE", "100")
-	engine.Reset()
-	engine.Init()
+	env := setupTestEnv(t)
 
-	createTable(t, "multi_idx", 1,
-		[]*executor.IndexParam{
-			{Name: "idx_name", ColName: "name", SecondaryKey: 1},
-			{Name: "idx_email", ColName: "email", SecondaryKey: 2},
+	createTable(t, env, "multi_idx", 1,
+		[]indexParam{
+			{name: "idx_name", colName: "name", secondaryKey: 1},
+			{name: "idx_email", colName: "email", secondaryKey: 2},
 		},
-		[]*executor.ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "name", Type: catalog.ColumnTypeString},
-			{Name: "email", Type: catalog.ColumnTypeString},
+		[]columnParam{
+			{name: "id", columnType: catalog.ColumnTypeString},
+			{name: "name", columnType: catalog.ColumnTypeString},
+			{name: "email", columnType: catalog.ColumnTypeString},
 		},
 	)
 
-	insertRecords(t, "multi_idx",
-		[]executor.Record{
+	insertRecords(t, env, "multi_idx",
+		[][][]byte{
 			{[]byte("1"), []byte("Alice"), []byte("alice@test")},
 			{[]byte("2"), []byte("Bob"), []byte("bob@test")},
 		},
 	)
+
+	return env
 }

@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"minesql/internal/ast"
-	"minesql/internal/engine"
 	"minesql/internal/executor"
+	"minesql/internal/storage/engine"
 )
 
 type Insert struct {
@@ -48,10 +48,11 @@ func (ip *Insert) Build(trxId engine.TrxId) (executor.Executor, error) {
 	if !ok {
 		return nil, fmt.Errorf("table %s not found", ip.Stmt.Table.TableName)
 	}
-	tbl, err := tblMeta.GetTable()
+	rawTbl, err := tblMeta.GetTable()
 	if err != nil {
 		return nil, err
 	}
+	tbl := engine.NewTableHandler(rawTbl)
 
 	colPosMap := make(map[string]uint16)
 	for _, colMeta := range tblMeta.Cols {

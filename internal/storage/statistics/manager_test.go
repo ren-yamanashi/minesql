@@ -1,8 +1,6 @@
 package statistics
 
 import (
-	"minesql/internal/engine"
-	"minesql/internal/executor"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,15 +9,13 @@ import (
 func TestGetOrAnalyze(t *testing.T) {
 	t.Run("初回呼び出しで Analyze が実行されキャッシュされる", func(t *testing.T) {
 		// GIVEN: 3 レコード挿入済み
-		setupStatisticsTable(t)
-		defer engine.Reset()
+		env := setupStatisticsTable(t)
 		defer Reset()
 
-		eng := engine.Get()
-		Init(eng.BufferPool)
+		Init(env.bp)
 		m := Get()
 
-		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
 
 		// WHEN: 初回 GetOrAnalyze
@@ -32,15 +28,13 @@ func TestGetOrAnalyze(t *testing.T) {
 
 	t.Run("dirty_count が閾値以下ならキャッシュが返る", func(t *testing.T) {
 		// GIVEN: 3 レコードで GetOrAnalyze 済み
-		setupStatisticsTable(t)
-		defer engine.Reset()
+		env := setupStatisticsTable(t)
 		defer Reset()
 
-		eng := engine.Get()
-		Init(eng.BufferPool)
+		Init(env.bp)
 		m := Get()
 
-		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
 
 		_, err := m.GetOrAnalyze(meta)
@@ -56,26 +50,22 @@ func TestGetOrAnalyze(t *testing.T) {
 
 	t.Run("dirty_count が閾値を超えると再 Analyze が実行される", func(t *testing.T) {
 		// GIVEN: 3 レコードで GetOrAnalyze 済み
-		setupStatisticsTable(t)
-		defer engine.Reset()
+		env := setupStatisticsTable(t)
 		defer Reset()
 
-		eng := engine.Get()
-		Init(eng.BufferPool)
+		Init(env.bp)
 		m := Get()
 
-		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
 
 		_, err := m.GetOrAnalyze(meta)
 		assert.NoError(t, err)
 
 		// WHEN: 1 レコード追加して dirty_count を加算 (閾値 = 3 * 0.1 = 0.3, dirty_count = 1 > 0.3)
-		insertRecords(t, "products",
-			[]executor.Record{
-				{[]byte("4"), []byte("Donut"), []byte("Snack")},
-			},
-		)
+		tbl := env.tables["products"]
+		err = tbl.Insert(env.bp, [][]byte{[]byte("4"), []byte("Donut"), []byte("Snack")})
+		assert.NoError(t, err)
 		m.IncrementDirtyCount("products", 1)
 
 		result, err := m.GetOrAnalyze(meta)
@@ -87,37 +77,30 @@ func TestGetOrAnalyze(t *testing.T) {
 
 	t.Run("再 Analyze 後に dirty_count がリセットされる", func(t *testing.T) {
 		// GIVEN: 3 レコードで GetOrAnalyze 済み → dirty_count 加算 → 再 Analyze 済み
-		setupStatisticsTable(t)
-		defer engine.Reset()
+		env := setupStatisticsTable(t)
 		defer Reset()
 
-		eng := engine.Get()
-		Init(eng.BufferPool)
+		Init(env.bp)
 		m := Get()
 
-		meta, ok := eng.Catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetadataByName("products")
 		assert.True(t, ok)
 
 		_, err := m.GetOrAnalyze(meta)
 		assert.NoError(t, err)
 
 		// 1 レコード追加して再 Analyze を発火させる
-		insertRecords(t, "products",
-			[]executor.Record{
-				{[]byte("4"), []byte("Donut"), []byte("Snack")},
-			},
-		)
+		tbl := env.tables["products"]
+		err = tbl.Insert(env.bp, [][]byte{[]byte("4"), []byte("Donut"), []byte("Snack")})
+		assert.NoError(t, err)
 		m.IncrementDirtyCount("products", 1)
 		_, err = m.GetOrAnalyze(meta)
 		assert.NoError(t, err)
 
 		// WHEN: さらに 1 レコード追加するが、dirty_count はリセット済みなので
 		// 再 Analyze は走らず、キャッシュから RecordCount=4 が返る
-		insertRecords(t, "products",
-			[]executor.Record{
-				{[]byte("5"), []byte("Egg"), []byte("Dairy")},
-			},
-		)
+		err = tbl.Insert(env.bp, [][]byte{[]byte("5"), []byte("Egg"), []byte("Dairy")})
+		assert.NoError(t, err)
 		// dirty_count を加算しない → 閾値以下のまま
 
 		result, err := m.GetOrAnalyze(meta)

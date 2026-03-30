@@ -2,8 +2,8 @@ package planner
 
 import (
 	"minesql/internal/ast"
-	"minesql/internal/engine"
 	"minesql/internal/executor"
+	"minesql/internal/storage/engine"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

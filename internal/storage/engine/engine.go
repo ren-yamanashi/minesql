@@ -13,6 +13,7 @@ import (
 	"minesql/internal/storage/catalog"
 	"minesql/internal/storage/file"
 	"minesql/internal/storage/page"
+	"minesql/internal/storage/statistics"
 	"minesql/internal/storage/transaction"
 )
 
@@ -22,10 +23,26 @@ type TrxId = transaction.TrxId
 // UndoLog は Undo ログの型 (storage/transaction.UndoLog のエイリアス)
 type UndoLog = transaction.UndoLog
 
-// NewUndoLog は新しい UndoLog を生成する
-func NewUndoLog() *UndoLog {
-	return transaction.NewUndoLog()
-}
+// TableMetadata はテーブルメタデータの型 (storage/catalog.TableMetadata のエイリアス)
+type TableMetadata = catalog.TableMetadata
+
+// IndexMetadata はインデックスメタデータの型 (storage/catalog.IndexMetadata のエイリアス)
+type IndexMetadata = catalog.IndexMetadata
+
+// ColumnType はカラムの型 (storage/catalog.ColumnType のエイリアス)
+type ColumnType = catalog.ColumnType
+
+// ColumnTypeString は文字列型を表す ColumnType 定数
+const ColumnTypeString = catalog.ColumnTypeString
+
+// TableStatistics はテーブル統計情報の型 (storage/statistics.TableStatistics のエイリアス)
+type TableStatistics = statistics.TableStatistics
+
+// IndexStatistics はインデックス統計情報の型 (storage/statistics.IndexStatistics のエイリアス)
+type IndexStatistics = statistics.IndexStatistics
+
+// ColumnStatistics はカラム統計情報の型 (storage/statistics.ColumnStatistics のエイリアス)
+type ColumnStatistics = statistics.ColumnStatistics
 
 var (
 	eng  *Engine
@@ -133,30 +150,6 @@ func newEngine() (*Engine, error) {
 		trxManager:    transaction.NewManager(undoLog),
 		baseDirectory: dataDir,
 	}, nil
-}
-
-// ==================================
-// Transaction (handler facade)
-// ==================================
-
-// BeginTrx は新しいトランザクションを開始し、トランザクション ID を返す
-func (e *Engine) BeginTrx() TrxId {
-	return e.trxManager.Begin()
-}
-
-// CommitTrx はトランザクションをコミットする
-func (e *Engine) CommitTrx(trxId TrxId) {
-	e.trxManager.Commit(trxId)
-}
-
-// RollbackTrx はトランザクションをロールバックする
-func (e *Engine) RollbackTrx(trxId TrxId) error {
-	return e.trxManager.Rollback(e.BufferPool, trxId)
-}
-
-// UndoLog は Undo ログを返す
-func (e *Engine) UndoLog() *transaction.UndoLog {
-	return e.undoLog
 }
 
 // initCatalog はカタログを初期化する

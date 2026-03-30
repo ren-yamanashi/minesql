@@ -1,16 +1,15 @@
 package transaction
 
 import (
-	"minesql/internal/storage/access"
 	"minesql/internal/storage/buffer"
 )
 
 type DeleteLogRecord struct {
-	table  *access.TableAccessMethod
+	table  TableOperator
 	Record [][]byte
 }
 
-func NewDeleteLogRecord(table *access.TableAccessMethod, record [][]byte) DeleteLogRecord {
+func NewDeleteLogRecord(table TableOperator, record [][]byte) DeleteLogRecord {
 	return DeleteLogRecord{
 		table:  table,
 		Record: record,

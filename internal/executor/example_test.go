@@ -5,15 +5,13 @@ import (
 	"os"
 	"strings"
 
-	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/catalog"
+	"minesql/internal/storage/engine"
 )
 
 // セットアップヘルパー: テーブルを作成し、サンプルデータを挿入する
 // テーブルアクセスメソッドとクリーンアップ関数を返す
-func setupExample() (*access.TableAccessMethod, func()) {
+func setupExample() (*engine.TableHandler, func()) {
 	tmpDir, err := os.MkdirTemp("", "executor_example")
 	if err != nil {
 		panic(err)
@@ -36,14 +34,14 @@ func setupExample() (*access.TableAccessMethod, func()) {
 	ct := executor.NewCreateTable(
 		"users",
 		1,
-		[]*executor.IndexParam{
+		[]engine.IndexParam{
 			{Name: "idx_first_name", ColName: "first_name", SecondaryKey: 1},
 			{Name: "idx_last_name", ColName: "last_name", SecondaryKey: 2},
 		},
-		[]*executor.ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "first_name", Type: catalog.ColumnTypeString},
-			{Name: "last_name", Type: catalog.ColumnTypeString},
+		[]engine.ColumnParam{
+			{Name: "id", Type: engine.ColumnTypeString},
+			{Name: "first_name", Type: engine.ColumnTypeString},
+			{Name: "last_name", Type: engine.ColumnTypeString},
 		})
 	if _, err := ct.Next(); err != nil {
 		panic(err)
@@ -55,10 +53,11 @@ func setupExample() (*access.TableAccessMethod, func()) {
 	if !ok {
 		panic("table users not found in catalog")
 	}
-	tbl, err := tblMeta.GetTable()
+	rawTbl, err := tblMeta.GetTable()
 	if err != nil {
 		panic(err)
 	}
+	tbl := engine.NewTableHandler(rawTbl)
 
 	// サンプルデータを挿入
 	var trxId engine.TrxId = 1
@@ -109,7 +108,7 @@ func ExampleTableScan_fullScan() {
 	// フルテーブルスキャン (プライマリキー昇順)
 	iter := executor.NewTableScan(
 		tbl,
-		access.RecordSearchModeStart{},
+		engine.SearchModeStart{},
 		func(record executor.Record) bool { return true },
 	)
 	printExampleRecords(iter)
@@ -130,7 +129,7 @@ func ExampleTableScan_rangeScan() {
 	// プライマリキーが "w" 以上 "y" 以下の範囲スキャン
 	iter := executor.NewTableScan(
 		tbl,
-		access.RecordSearchModeKey{Key: [][]byte{[]byte("w")}},
+		engine.SearchModeKey{Key: [][]byte{[]byte("w")}},
 		func(record executor.Record) bool {
 			return string(record[0]) <= "y"
 		},
@@ -151,7 +150,7 @@ func ExampleTableScan_constSearch() {
 	// プライマリキーが "y" のレコードを検索
 	iter := executor.NewTableScan(
 		tbl,
-		access.RecordSearchModeKey{Key: [][]byte{[]byte("y")}},
+		engine.SearchModeKey{Key: [][]byte{[]byte("y")}},
 		func(record executor.Record) bool {
 			return string(record[0]) == "y"
 		},
@@ -171,7 +170,7 @@ func ExampleFilter() {
 	iter := executor.NewFilter(
 		executor.NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record executor.Record) bool { return true },
 		),
 		func(record executor.Record) bool {
@@ -203,7 +202,7 @@ func ExampleIndexScan_fullScan() {
 	printExampleRecords(executor.NewIndexScan(
 		tbl,
 		idxFirstName,
-		access.RecordSearchModeStart{},
+		engine.SearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 
@@ -212,7 +211,7 @@ func ExampleIndexScan_fullScan() {
 	printExampleRecords(executor.NewIndexScan(
 		tbl,
 		idxLastName,
-		access.RecordSearchModeStart{},
+		engine.SearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 
@@ -246,7 +245,7 @@ func ExampleIndexScan_rangeScan() {
 	iter := executor.NewIndexScan(
 		tbl,
 		idxLastName,
-		access.RecordSearchModeKey{Key: [][]byte{[]byte("J")}},
+		engine.SearchModeKey{Key: [][]byte{[]byte("J")}},
 		func(secondaryKey executor.Record) bool {
 			lastName := string(secondaryKey[0])
 			return lastName >= "J" && lastName < "N"
@@ -273,7 +272,7 @@ func ExampleIndexScan_constSearch() {
 	iter := executor.NewIndexScan(
 		tbl,
 		idxLastName,
-		access.RecordSearchModeKey{Key: [][]byte{[]byte("Miller")}},
+		engine.SearchModeKey{Key: [][]byte{[]byte("Miller")}},
 		func(secondaryKey executor.Record) bool {
 			return string(secondaryKey[0]) == "Miller"
 		},
@@ -293,7 +292,7 @@ func ExampleProject() {
 	iter := executor.NewProject(
 		executor.NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record executor.Record) bool { return true },
 		),
 		[]uint16{1, 2},
@@ -318,7 +317,7 @@ func ExampleProject_withFilter() {
 		executor.NewFilter(
 			executor.NewTableScan(
 				tbl,
-				access.RecordSearchModeStart{},
+				engine.SearchModeStart{},
 				func(record executor.Record) bool { return true },
 			),
 			func(record executor.Record) bool {
@@ -350,7 +349,7 @@ func ExampleUpdate() {
 	}, executor.NewFilter(
 		executor.NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record executor.Record) bool { return true },
 		),
 		func(record executor.Record) bool {
@@ -364,7 +363,7 @@ func ExampleUpdate() {
 	fmt.Println("=== テーブルスキャン ===")
 	printExampleRecords(executor.NewTableScan(
 		tbl,
-		access.RecordSearchModeStart{},
+		engine.SearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 
@@ -372,7 +371,7 @@ func ExampleUpdate() {
 	printExampleRecords(executor.NewIndexScan(
 		tbl,
 		idxLastName,
-		access.RecordSearchModeStart{},
+		engine.SearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 
@@ -403,7 +402,7 @@ func ExampleUpdate_primaryKey() {
 		{Pos: 0, Value: []byte("a")},
 	}, executor.NewTableScan(
 		tbl,
-		access.RecordSearchModeKey{Key: [][]byte{[]byte("v")}},
+		engine.SearchModeKey{Key: [][]byte{[]byte("v")}},
 		func(record executor.Record) bool {
 			return string(record[0]) == "v"
 		},
@@ -414,7 +413,7 @@ func ExampleUpdate_primaryKey() {
 
 	printExampleRecords(executor.NewTableScan(
 		tbl,
-		access.RecordSearchModeStart{},
+		engine.SearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 
@@ -441,7 +440,7 @@ func ExampleDelete() {
 	del := executor.NewDelete(trxId, tbl, executor.NewFilter(
 		executor.NewTableScan(
 			tbl,
-			access.RecordSearchModeStart{},
+			engine.SearchModeStart{},
 			func(record executor.Record) bool { return true },
 		),
 		func(record executor.Record) bool {
@@ -455,7 +454,7 @@ func ExampleDelete() {
 	fmt.Println("=== テーブルスキャン ===")
 	printExampleRecords(executor.NewTableScan(
 		tbl,
-		access.RecordSearchModeStart{},
+		engine.SearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 
@@ -463,7 +462,7 @@ func ExampleDelete() {
 	printExampleRecords(executor.NewIndexScan(
 		tbl,
 		idxLastName,
-		access.RecordSearchModeStart{},
+		engine.SearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 
