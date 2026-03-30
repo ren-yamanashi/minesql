@@ -3,7 +3,7 @@ package planner
 import (
 	"minesql/internal/ast"
 	"minesql/internal/executor"
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -37,7 +37,7 @@ func TestNewInsert(t *testing.T) {
 
 	t.Run("カラム名が空の場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		stmt := &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("users"),
@@ -62,7 +62,7 @@ func TestNewInsert(t *testing.T) {
 
 	t.Run("値の数がカラム数と一致しない場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		stmt := &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("users"),
@@ -89,7 +89,7 @@ func TestNewInsert(t *testing.T) {
 
 	t.Run("カラム名が重複している場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		stmt := &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("users"),
@@ -119,7 +119,7 @@ func TestNewInsert(t *testing.T) {
 
 	t.Run("挿入するレコードが空の場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		stmt := &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("users"),
@@ -143,9 +143,9 @@ func TestNewInsert(t *testing.T) {
 	t.Run("存在しないテーブル名の場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		stmt := &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("nonexistent"),
@@ -172,12 +172,12 @@ func TestNewInsert(t *testing.T) {
 	t.Run("単一レコードの挿入で Executor が生成される", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
-		createTableForTest(t, []engine.ColumnParam{
-			{Name: "id", Type: engine.ColumnTypeString},
-			{Name: "name", Type: engine.ColumnTypeString},
+		var trxId handler.TrxId = 1
+		createTableForTest(t, []handler.ColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "name", Type: handler.ColumnTypeString},
 		})
 
 		stmt := &ast.InsertStmt{
@@ -208,12 +208,12 @@ func TestNewInsert(t *testing.T) {
 	t.Run("複数レコードの挿入で Executor が生成される", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
-		createTableForTest(t, []engine.ColumnParam{
-			{Name: "id", Type: engine.ColumnTypeString},
-			{Name: "name", Type: engine.ColumnTypeString},
+		var trxId handler.TrxId = 1
+		createTableForTest(t, []handler.ColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "name", Type: handler.ColumnTypeString},
 		})
 
 		stmt := &ast.InsertStmt{
@@ -252,14 +252,14 @@ func TestNewInsert(t *testing.T) {
 	t.Run("複数カラムの挿入で Executor が生成される", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
-		createTableForTest(t, []engine.ColumnParam{
-			{Name: "id", Type: engine.ColumnTypeString},
-			{Name: "name", Type: engine.ColumnTypeString},
-			{Name: "email", Type: engine.ColumnTypeString},
-			{Name: "age", Type: engine.ColumnTypeString},
+		var trxId handler.TrxId = 1
+		createTableForTest(t, []handler.ColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "name", Type: handler.ColumnTypeString},
+			{Name: "email", Type: handler.ColumnTypeString},
+			{Name: "age", Type: handler.ColumnTypeString},
 		})
 
 		stmt := &ast.InsertStmt{
@@ -294,13 +294,13 @@ func TestNewInsert(t *testing.T) {
 	t.Run("カラム順序が異なる挿入で Executor が生成される", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
-		createTableForTest(t, []engine.ColumnParam{
-			{Name: "id", Type: engine.ColumnTypeString},
-			{Name: "name", Type: engine.ColumnTypeString},
-			{Name: "email", Type: engine.ColumnTypeString},
+		var trxId handler.TrxId = 1
+		createTableForTest(t, []handler.ColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "name", Type: handler.ColumnTypeString},
+			{Name: "email", Type: handler.ColumnTypeString},
 		})
 
 		stmt := &ast.InsertStmt{
@@ -333,12 +333,12 @@ func TestNewInsert(t *testing.T) {
 	t.Run("サポートされていない literal タイプの場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
-		createTableForTest(t, []engine.ColumnParam{
-			{Name: "id", Type: engine.ColumnTypeString},
-			{Name: "name", Type: engine.ColumnTypeString},
+		var trxId handler.TrxId = 1
+		createTableForTest(t, []handler.ColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "name", Type: handler.ColumnTypeString},
 		})
 
 		// StringLiteral 以外の literal を作成するために、カスタム literal を使用
@@ -378,12 +378,12 @@ func initStorageManagerForTest(t *testing.T) {
 	tmpdir := t.TempDir()
 	t.Setenv("MINESQL_DATA_DIR", tmpdir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "10")
-	engine.Reset()
-	engine.Init()
+	handler.Reset()
+	handler.Init()
 }
 
 // テーブルを作成する
-func createTableForTest(t *testing.T, columns []engine.ColumnParam) {
+func createTableForTest(t *testing.T, columns []handler.ColumnParam) {
 	createTable := executor.NewCreateTable("users", 1, nil, columns)
 	_, err := createTable.Next()
 	assert.NoError(t, err)

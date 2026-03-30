@@ -1,7 +1,7 @@
 package server
 
 import (
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,8 +12,8 @@ func setupTestServer(t *testing.T) *Server {
 	tmpdir := t.TempDir()
 	t.Setenv("MINESQL_DATA_DIR", tmpdir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "100")
-	engine.Reset()
-	engine.Init()
+	handler.Reset()
+	handler.Init()
 
 	return &Server{}
 }
@@ -36,7 +36,7 @@ func TestNewSession(t *testing.T) {
 
 		// THEN
 		assert.NotNil(t, sess)
-		assert.Equal(t, engine.TrxId(0), sess.trxId)
+		assert.Equal(t, handler.TrxId(0), sess.trxId)
 	})
 }
 
@@ -44,7 +44,7 @@ func TestExecuteQuery(t *testing.T) {
 	t.Run("CREATE TABLE を実行できる", func(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		sess := newSession()
 
 		// WHEN
@@ -58,7 +58,7 @@ func TestExecuteQuery(t *testing.T) {
 	t.Run("INSERT と SELECT を実行できる", func(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		sess := newSession()
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
@@ -79,7 +79,7 @@ func TestExecuteQuery(t *testing.T) {
 	t.Run("UPDATE を実行できる", func(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		sess := newSession()
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
@@ -101,7 +101,7 @@ func TestExecuteQuery(t *testing.T) {
 	t.Run("DELETE を実行できる", func(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		sess := newSession()
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
@@ -124,7 +124,7 @@ func TestExecuteQuery(t *testing.T) {
 	t.Run("BEGIN なしの DML は autocommit される", func(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		sess := newSession()
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
@@ -135,7 +135,7 @@ func TestExecuteQuery(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: trxId は 0 のまま (autocommit 済み)
-		assert.Equal(t, engine.TrxId(0), sess.trxId)
+		assert.Equal(t, handler.TrxId(0), sess.trxId)
 
 		// THEN: データは永続化されている
 		result, err := s.executeQuery(sess, "SELECT * FROM users;")
@@ -146,7 +146,7 @@ func TestExecuteQuery(t *testing.T) {
 	t.Run("autocommit のデータは ROLLBACK で取り消せない", func(t *testing.T) {
 		// GIVEN: BEGIN なしで INSERT (autocommit)
 		s := setupTestServer(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		sess := newSession()
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
@@ -172,7 +172,7 @@ func TestExecuteQuery(t *testing.T) {
 	t.Run("不正な SQL はエラーを返す", func(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		sess := newSession()
 
 		// WHEN
@@ -187,9 +187,9 @@ func TestExecuteQueryTransaction(t *testing.T) {
 	t.Run("BEGIN で trxId が設定される", func(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		sess := newSession()
-		assert.Equal(t, engine.TrxId(0), sess.trxId)
+		assert.Equal(t, handler.TrxId(0), sess.trxId)
 
 		// WHEN
 		result, err := s.executeQuery(sess, "BEGIN;")
@@ -197,13 +197,13 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, "", result)
-		assert.NotEqual(t, engine.TrxId(0), sess.trxId)
+		assert.NotEqual(t, handler.TrxId(0), sess.trxId)
 	})
 
 	t.Run("COMMIT で trxId がリセットされる", func(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		sess := newSession()
 
 		_, err := s.executeQuery(sess, "BEGIN;")
@@ -221,13 +221,13 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, "", result)
-		assert.Equal(t, engine.TrxId(0), sess.trxId)
+		assert.Equal(t, handler.TrxId(0), sess.trxId)
 	})
 
 	t.Run("ROLLBACK で INSERT が取り消される", func(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		sess := newSession()
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
@@ -252,7 +252,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 	t.Run("ROLLBACK で UPDATE が取り消される", func(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		sess := newSession()
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
@@ -282,7 +282,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 	t.Run("ROLLBACK で DELETE が取り消される", func(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		sess := newSession()
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
@@ -312,7 +312,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 	t.Run("COMMIT 後に新しいトランザクションを開始できる", func(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		sess := newSession()
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
@@ -344,7 +344,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 	t.Run("トランザクション中に BEGIN を呼ぶとエラーになる", func(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		sess := newSession()
 
 		_, err := s.executeQuery(sess, "BEGIN;")
@@ -361,7 +361,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 	t.Run("BEGIN なしで COMMIT を呼ぶとエラーになる", func(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		sess := newSession()
 
 		// WHEN
@@ -375,7 +375,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 	t.Run("BEGIN なしで ROLLBACK を呼ぶとエラーになる", func(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		sess := newSession()
 
 		// WHEN
@@ -389,7 +389,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 	t.Run("異なるセッションのトランザクションは独立している", func(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		sessA := newSession()
 		sessB := newSession()
 
@@ -420,7 +420,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 	t.Run("接続切断時にアクティブなトランザクションが自動ロールバックされる", func(t *testing.T) {
 		// GIVEN: BEGIN → INSERT したが COMMIT していない
 		s := setupTestServer(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		sess := newSession()
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
@@ -433,8 +433,8 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: 接続切断をシミュレート (handleConnection の defer と同じロジック)
-		assert.NotEqual(t, engine.TrxId(0), sess.trxId)
-		err = engine.Get().RollbackTrx(sess.trxId)
+		assert.NotEqual(t, handler.TrxId(0), sess.trxId)
+		err = handler.Get().RollbackTrx(sess.trxId)
 		assert.NoError(t, err)
 		sess.trxId = 0
 
@@ -447,7 +447,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 	t.Run("トランザクションなしの接続切断では何も起きない", func(t *testing.T) {
 		// GIVEN: BEGIN していない
 		s := setupTestServer(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		sess := newSession()
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
@@ -456,7 +456,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: 接続切断をシミュレート (trxId == 0 なのでロールバックは走らない)
-		assert.Equal(t, engine.TrxId(0), sess.trxId)
+		assert.Equal(t, handler.TrxId(0), sess.trxId)
 
 		// THEN: データはそのまま残る
 		result, err := s.executeQuery(sess, "SELECT * FROM users;")

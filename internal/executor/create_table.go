@@ -1,21 +1,21 @@
 package executor
 
-import "minesql/internal/storage/engine"
+import "minesql/internal/storage/handler"
 
 // CreateTable はテーブルを作成する
 type CreateTable struct {
 	tableName       string
 	primaryKeyCount uint8
-	indexParams     []engine.IndexParam
-	columnParams    []engine.ColumnParam
+	indexParams     []handler.IndexParam
+	columnParams    []handler.ColumnParam
 }
 
-func NewCreateTable(tableName string, primaryKeyCount uint8, indexParams []engine.IndexParam, columnParams []engine.ColumnParam) *CreateTable {
+func NewCreateTable(tableName string, primaryKeyCount uint8, indexParams []handler.IndexParam, columnParams []handler.ColumnParam) *CreateTable {
 	if indexParams == nil {
-		indexParams = []engine.IndexParam{}
+		indexParams = []handler.IndexParam{}
 	}
 	if columnParams == nil {
-		columnParams = []engine.ColumnParam{}
+		columnParams = []handler.ColumnParam{}
 	}
 	return &CreateTable{
 		tableName:       tableName,
@@ -26,7 +26,7 @@ func NewCreateTable(tableName string, primaryKeyCount uint8, indexParams []engin
 }
 
 func (ct *CreateTable) Next() (Record, error) {
-	e := engine.Get()
+	e := handler.Get()
 	if err := e.CreateTable(ct.tableName, ct.primaryKeyCount, ct.indexParams, ct.columnParams); err != nil {
 		return nil, err
 	}

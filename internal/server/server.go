@@ -15,13 +15,13 @@ import (
 	"minesql/internal/executor"
 	"minesql/internal/parser"
 	"minesql/internal/planner"
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 )
 
 type Server struct {
 	Address        string
 	Port           int
-	storageManager *engine.Engine
+	storageManager *handler.Handler
 }
 
 func NewServer(address string, port int) *Server {
@@ -73,7 +73,7 @@ func (s *Server) init() error {
 	if err != nil {
 		return err
 	}
-	s.storageManager = engine.Init()
+	s.storageManager = handler.Init()
 	return nil
 }
 
@@ -113,7 +113,7 @@ func (s *Server) handleConnection(conn *net.TCPConn) {
 	defer func() {
 		// アクティブなトランザクションがあれば自動ロールバック
 		if sess.trxId != 0 {
-			if err := engine.Get().RollbackTrx(sess.trxId); err != nil {
+			if err := handler.Get().RollbackTrx(sess.trxId); err != nil {
 				log.Printf("Auto rollback error: %v", err)
 			}
 			sess.trxId = 0
@@ -178,20 +178,20 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 		if sess.trxId != 0 {
 			return "", fmt.Errorf("transaction already started")
 		}
-		sess.trxId = engine.Get().BeginTrx()
+		sess.trxId = handler.Get().BeginTrx()
 		return "", nil
 	case *ast.CommitStmt:
 		if sess.trxId == 0 {
 			return "", fmt.Errorf("no active transaction")
 		}
-		engine.Get().CommitTrx(sess.trxId)
+		handler.Get().CommitTrx(sess.trxId)
 		sess.trxId = 0
 		return "", nil
 	case *ast.RollbackStmt:
 		if sess.trxId == 0 {
 			return "", fmt.Errorf("no active transaction")
 		}
-		if err := engine.Get().RollbackTrx(sess.trxId); err != nil {
+		if err := handler.Get().RollbackTrx(sess.trxId); err != nil {
 			return "", err
 		}
 		sess.trxId = 0
@@ -199,7 +199,7 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 	}
 
 	// トランザクション外の DML は autocommit (一時的な trxId を発行して即 Commit)
-	e := engine.Get()
+	e := handler.Get()
 	autocommit := sess.trxId == 0
 	trxId := sess.trxId
 	if autocommit {

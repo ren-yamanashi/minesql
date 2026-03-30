@@ -1,20 +1,20 @@
 package executor
 
 import (
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 )
 
 // TableScan はテーブル全体を走査する
 type TableScan struct {
-	table          *engine.TableHandler
+	table          *handler.TableHandler
 	whileCondition func(record Record) bool // 継続条件を満たすかどうかを判定する関数
-	searchMode     engine.SearchMode
-	iterator       engine.TableIterator
+	searchMode     handler.SearchMode
+	iterator       handler.TableIterator
 }
 
 func NewTableScan(
-	table *engine.TableHandler,
-	searchMode engine.SearchMode,
+	table *handler.TableHandler,
+	searchMode handler.SearchMode,
 	whileCondition func(record Record) bool,
 ) *TableScan {
 	return &TableScan{
@@ -25,7 +25,7 @@ func NewTableScan(
 }
 
 func (ss *TableScan) Next() (Record, error) {
-	e := engine.Get()
+	e := handler.Get()
 
 	// 初回実行時はイテレータを作成
 	if ss.iterator == nil {

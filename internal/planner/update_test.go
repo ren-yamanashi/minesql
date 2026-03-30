@@ -3,7 +3,7 @@ package planner
 import (
 	"minesql/internal/ast"
 	"minesql/internal/executor"
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -33,9 +33,9 @@ func TestUpdate_Build(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
@@ -58,9 +58,9 @@ func TestUpdate_Build(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
@@ -90,9 +90,9 @@ func TestUpdate_Build(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("nonexistent"),
 			SetClauses: []*ast.SetClause{
@@ -113,9 +113,9 @@ func TestUpdate_Build(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
@@ -138,10 +138,10 @@ func TestUpdate_Build(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
-		e := engine.Get()
+		var trxId handler.TrxId = 1
+		e := handler.Get()
 		tbl := getPlannerTableAccessMethod(t, "users")
 
 		// データを挿入
@@ -176,7 +176,7 @@ func TestUpdate_Build(t *testing.T) {
 		// THEN: "a" の first_name が "Jane" に更新されている
 		scan := executor.NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
 		results := fetchAll(t, scan)
@@ -189,9 +189,9 @@ func TestUpdate_Build(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
@@ -213,9 +213,9 @@ func TestUpdate_Build(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
@@ -241,9 +241,9 @@ func TestUpdate_Build(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		stmt := &ast.UpdateStmt{
 			Table:      *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{},
@@ -264,14 +264,14 @@ func TestUpdate_Build(t *testing.T) {
 }
 
 //nolint:unparam // テーブル名は将来的に変わりうる
-func getPlannerTableAccessMethod(t *testing.T, tableName string) *engine.TableHandler {
+func getPlannerTableAccessMethod(t *testing.T, tableName string) *handler.TableHandler {
 	t.Helper()
-	e := engine.Get()
+	e := handler.Get()
 	tblMeta, ok := e.Catalog.GetTableMetadataByName(tableName)
 	if !ok {
 		t.Fatalf("table %s not found in catalog", tableName)
 	}
 	rawTbl, err := tblMeta.GetTable()
 	assert.NoError(t, err)
-	return engine.NewTableHandler(rawTbl)
+	return handler.NewTableHandler(rawTbl)
 }

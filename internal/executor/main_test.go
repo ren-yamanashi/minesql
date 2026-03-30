@@ -2,7 +2,7 @@ package executor
 
 import (
 	"fmt"
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 	"strings"
 	"testing"
 
@@ -13,12 +13,12 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("フルテーブルスキャンで全レコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// WHEN
 		records := collectAll(t, NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -41,12 +41,12 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("範囲スキャンで指定範囲のレコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// WHEN: プライマリキーが "w" 以上 "y" 以下
 		records := collectAll(t, NewTableScan(
 			tbl,
-			engine.SearchModeKey{Key: [][]byte{[]byte("w")}},
+			handler.SearchModeKey{Key: [][]byte{[]byte("w")}},
 			func(record Record) bool {
 				return string(record[0]) <= "y"
 			},
@@ -69,12 +69,12 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("定数検索で特定のレコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// WHEN
 		records := collectAll(t, NewTableScan(
 			tbl,
-			engine.SearchModeKey{Key: [][]byte{[]byte("y")}},
+			handler.SearchModeKey{Key: [][]byte{[]byte("y")}},
 			func(record Record) bool {
 				return string(record[0]) == "y"
 			},
@@ -95,13 +95,13 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("フィルタースキャンで条件に合うレコードのみ取得できる", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// WHEN: first_name が "Charlie" のレコード
 		records := collectAll(t, NewFilter(
 			NewTableScan(
 				tbl,
-				engine.SearchModeStart{},
+				handler.SearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -124,7 +124,7 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("インデックススキャンで名前順に全レコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		idx, err := tbl.GetUniqueIndexByName("idx_first_name")
 		assert.NoError(t, err)
@@ -133,7 +133,7 @@ func TestExecutorIntegration(t *testing.T) {
 		records := collectAll(t, NewIndexScan(
 			tbl,
 			idx,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -156,7 +156,7 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("インデックス範囲スキャンで姓の範囲を取得できる", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
 		assert.NoError(t, err)
@@ -165,7 +165,7 @@ func TestExecutorIntegration(t *testing.T) {
 		records := collectAll(t, NewIndexScan(
 			tbl,
 			idx,
-			engine.SearchModeKey{Key: [][]byte{[]byte("J")}},
+			handler.SearchModeKey{Key: [][]byte{[]byte("J")}},
 			func(secondaryKey Record) bool {
 				lastName := string(secondaryKey[0])
 				return lastName >= "J" && lastName < "N"
@@ -188,7 +188,7 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("ユニークインデックス検索で特定の姓を取得できる", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
 		assert.NoError(t, err)
@@ -197,7 +197,7 @@ func TestExecutorIntegration(t *testing.T) {
 		records := collectAll(t, NewIndexScan(
 			tbl,
 			idx,
-			engine.SearchModeKey{Key: [][]byte{[]byte("Miller")}},
+			handler.SearchModeKey{Key: [][]byte{[]byte("Miller")}},
 			func(secondaryKey Record) bool {
 				return string(secondaryKey[0]) == "Miller"
 			},
@@ -218,9 +218,9 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("UPDATE で値を更新し、インデックスも更新される", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
 		assert.NoError(t, err)
 
@@ -230,7 +230,7 @@ func TestExecutorIntegration(t *testing.T) {
 		}, NewFilter(
 			NewTableScan(
 				tbl,
-				engine.SearchModeStart{},
+				handler.SearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -243,13 +243,13 @@ func TestExecutorIntegration(t *testing.T) {
 		// THEN: テーブルスキャンとインデックススキャンの両方で確認
 		tableRecords := collectAll(t, NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		))
 		idxRecords := collectAll(t, NewIndexScan(
 			tbl,
 			idx,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -280,16 +280,16 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("UPDATE でプライマリキーを変更できる", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 
 		// WHEN: プライマリキー "v" (Eve) を "a" に変更
 		upd := NewUpdate(trxId, tbl, []SetColumn{
 			{Pos: 0, Value: []byte("a")},
 		}, NewTableScan(
 			tbl,
-			engine.SearchModeKey{Key: [][]byte{[]byte("v")}},
+			handler.SearchModeKey{Key: [][]byte{[]byte("v")}},
 			func(record Record) bool {
 				return string(record[0]) == "v"
 			},
@@ -300,7 +300,7 @@ func TestExecutorIntegration(t *testing.T) {
 		// THEN
 		records := collectAll(t, NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -322,13 +322,13 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("Project で特定のカラムだけ取得できる", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// WHEN: first_name (pos=1) と last_name (pos=2) のみ取得
 		records := collectAll(t, NewProject(
 			NewTableScan(
 				tbl,
-				engine.SearchModeStart{},
+				handler.SearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			[]uint16{1, 2},
@@ -353,14 +353,14 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("Filter + Project で条件に合うレコードの特定カラムを取得できる", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// WHEN: first_name が "Charlie" のレコードから first_name と last_name を取得
 		records := collectAll(t, NewProject(
 			NewFilter(
 				NewTableScan(
 					tbl,
-					engine.SearchModeStart{},
+					handler.SearchModeStart{},
 					func(record Record) bool { return true },
 				),
 				func(record Record) bool {
@@ -385,9 +385,9 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("DELETE でレコードを削除し、インデックスからも削除される", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
 		assert.NoError(t, err)
 
@@ -395,7 +395,7 @@ func TestExecutorIntegration(t *testing.T) {
 		del := NewDelete(trxId, tbl, NewFilter(
 			NewTableScan(
 				tbl,
-				engine.SearchModeStart{},
+				handler.SearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -408,13 +408,13 @@ func TestExecutorIntegration(t *testing.T) {
 		// THEN: テーブルスキャンとインデックススキャンの両方で確認
 		tableRecords := collectAll(t, NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		))
 		idxRecords := collectAll(t, NewIndexScan(
 			tbl,
 			idx,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -442,26 +442,26 @@ func TestExecutorIntegration(t *testing.T) {
 }
 
 // 5 人のユーザーを持つテーブルを作成し、テーブルアクセスメソッドを返す
-func setupExecutorTestTable(t *testing.T) *engine.TableHandler {
+func setupExecutorTestTable(t *testing.T) *handler.TableHandler {
 	t.Helper()
 
 	tmpdir := t.TempDir()
 	t.Setenv("MINESQL_DATA_DIR", tmpdir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "100")
-	engine.Reset()
-	engine.Init()
+	handler.Reset()
+	handler.Init()
 
 	createTable := NewCreateTable(
 		"users",
 		1,
-		[]engine.IndexParam{
+		[]handler.IndexParam{
 			{Name: "idx_first_name", ColName: "first_name", SecondaryKey: 1},
 			{Name: "idx_last_name", ColName: "last_name", SecondaryKey: 2},
 		},
-		[]engine.ColumnParam{
-			{Name: "id", Type: engine.ColumnTypeString},
-			{Name: "first_name", Type: engine.ColumnTypeString},
-			{Name: "last_name", Type: engine.ColumnTypeString},
+		[]handler.ColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "first_name", Type: handler.ColumnTypeString},
+			{Name: "last_name", Type: handler.ColumnTypeString},
 		})
 	_, err := createTable.Next()
 	assert.NoError(t, err)
@@ -469,7 +469,7 @@ func setupExecutorTestTable(t *testing.T) *engine.TableHandler {
 	tbl, err := getTableAccessMethod("users")
 	assert.NoError(t, err)
 
-	var trxId engine.TrxId = 1
+	var trxId handler.TrxId = 1
 	insert := NewInsert(
 		trxId,
 		tbl,
@@ -521,8 +521,8 @@ func writeRecords(sb *strings.Builder, records []Record) {
 	fmt.Fprintf(sb, "  合計: %d 件\n", len(records))
 }
 
-func getTableAccessMethod(tableName string) (*engine.TableHandler, error) {
-	e := engine.Get()
+func getTableAccessMethod(tableName string) (*handler.TableHandler, error) {
+	e := handler.Get()
 	tblMeta, ok := e.Catalog.GetTableMetadataByName(tableName)
 	if !ok {
 		return nil, fmt.Errorf("table %s not found in catalog", tableName)
@@ -532,5 +532,5 @@ func getTableAccessMethod(tableName string) (*engine.TableHandler, error) {
 	if err != nil {
 		return nil, err
 	}
-	return engine.NewTableHandler(tbl), nil
+	return handler.NewTableHandler(tbl), nil
 }

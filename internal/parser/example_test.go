@@ -8,17 +8,17 @@ import (
 	"minesql/internal/executor"
 	"minesql/internal/parser"
 	"minesql/internal/planner"
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 )
 
 // セットアップヘルパー: テーブルを作成し、サンプルデータを挿入する
-func setupParserExample(trxId engine.TrxId) func() { //nolint:unparam
+func setupParserExample(trxId handler.TrxId) func() { //nolint:unparam
 	tmpDir, err := os.MkdirTemp("", "parser_example")
 	if err != nil {
 		panic(err)
 	}
 	cleanup := func() {
-		engine.Reset()
+		handler.Reset()
 		_ = os.RemoveAll(tmpDir)
 	}
 
@@ -28,8 +28,8 @@ func setupParserExample(trxId engine.TrxId) func() { //nolint:unparam
 	if err = os.Setenv("MINESQL_BUFFER_SIZE", "100"); err != nil {
 		panic(err)
 	}
-	engine.Reset()
-	engine.Init()
+	handler.Reset()
+	handler.Init()
 
 	runSQL(trxId, `
 CREATE TABLE users (
@@ -57,7 +57,7 @@ VALUES
 }
 
 // SQL をパース → プラン → 実行して結果を返す
-func runSQL(trxId engine.TrxId, sql string) []executor.Record {
+func runSQL(trxId handler.TrxId, sql string) []executor.Record {
 	p := parser.NewParser()
 	result, err := p.Parse(sql)
 	if err != nil {
@@ -95,7 +95,7 @@ func printRecords(records []executor.Record) {
 }
 
 func Example_scanAll() {
-	var trxId engine.TrxId = 1
+	var trxId handler.TrxId = 1
 	cleanup := setupParserExample(trxId)
 	defer cleanup()
 
@@ -113,7 +113,7 @@ func Example_scanAll() {
 }
 
 func Example_assertEqual() {
-	var trxId engine.TrxId = 1
+	var trxId handler.TrxId = 1
 	cleanup := setupParserExample(trxId)
 	defer cleanup()
 
@@ -126,7 +126,7 @@ func Example_assertEqual() {
 }
 
 func Example_filter() {
-	var trxId engine.TrxId = 1
+	var trxId handler.TrxId = 1
 	cleanup := setupParserExample(trxId)
 	defer cleanup()
 	records := runSQL(trxId, `SELECT * FROM users WHERE first_name < 'K' AND gender = 'male' AND last_name >= 'Doe' OR first_name = 'Tom';`)
@@ -141,7 +141,7 @@ func Example_filter() {
 }
 
 func Example_update() {
-	var trxId engine.TrxId = 1
+	var trxId handler.TrxId = 1
 	cleanup := setupParserExample(trxId)
 	defer cleanup()
 	runSQL(trxId, `UPDATE users SET last_name = 'Anderson' WHERE username = 'janedoe';`)
@@ -159,7 +159,7 @@ func Example_update() {
 }
 
 func Example_delete() {
-	var trxId engine.TrxId = 1
+	var trxId handler.TrxId = 1
 	cleanup := setupParserExample(trxId)
 	defer cleanup()
 	runSQL(trxId, `DELETE FROM users WHERE first_name = 'John' AND last_name = 'Doe';`)

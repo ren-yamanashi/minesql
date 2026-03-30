@@ -23,22 +23,17 @@ graph TD
     storage/engine --> config
     storage/engine --> storage/access
     storage/engine --> storage/buffer
-    storage/engine --> storage/catalog
+    storage/engine --> storage/dictionary
     storage/engine --> storage/file
     storage/engine --> storage/page
-    storage/engine --> storage/statistics
     storage/engine --> storage/transaction
 
-    storage/statistics --> storage/access
-    storage/statistics --> storage/buffer
-    storage/statistics --> storage/catalog
-
-    storage/catalog --> encode
-    storage/catalog --> storage/access
-    storage/catalog --> storage/btree
-    storage/catalog --> storage/btree/node
-    storage/catalog --> storage/buffer
-    storage/catalog --> storage/page
+    storage/dictionary --> encode
+    storage/dictionary --> storage/access
+    storage/dictionary --> storage/btree
+    storage/dictionary --> storage/btree/node
+    storage/dictionary --> storage/buffer
+    storage/dictionary --> storage/page
 
     storage/access --> encode
     storage/access --> storage/btree
@@ -76,8 +71,7 @@ graph TD
 
     subgraph "Layer 1: ストレージエンジン (= storage/)"
         storage/engine["storage/engine (handler)"]
-        storage/statistics
-        storage/catalog
+        storage/dictionary
         storage/transaction
         storage/access
         storage/btree
@@ -98,9 +92,8 @@ graph TD
     planner --> executor & storage/engine & ast
     executor --> storage/engine
 
-    storage/engine --> storage/access & storage/catalog & storage/statistics & storage/transaction & storage/buffer & storage/file & storage/page & config
-    storage/statistics --> storage/access & storage/catalog & storage/buffer
-    storage/catalog --> storage/access & storage/btree & storage/btree/node & storage/buffer & storage/page & encode
+    storage/engine --> storage/access & storage/dictionary & storage/transaction & storage/buffer & storage/file & storage/page & config
+    storage/dictionary --> storage/access & storage/btree & storage/btree/node & storage/buffer & storage/page & encode
     storage/transaction --> storage/buffer
     storage/access --> storage/btree & storage/btree/node & storage/buffer & storage/page & encode
     storage/btree --> storage/btree/node & storage/buffer & storage/page
@@ -117,8 +110,7 @@ graph TD
 | `row/` | `access/` |
 | `btr/` | `btree/` |
 | `buf/` | `buffer/` |
-| `dict/` | `catalog/` |
-| `dict/dict0stats.cc` | `statistics/` |
+| `dict/` | `dictionary/` |
 | `fil/` | `file/` |
 | `page/` | `page/` |
 | `trx/` | `transaction/` |
@@ -135,7 +127,7 @@ graph TD
 
 ## storage 外からのアクセスルール
 
-`storage/` 外のパッケージ (`server`, `planner`, `executor`) は `storage/engine` のみを参照する。`storage/` 内の他のパッケージ (`access`, `catalog`, `btree` 等) を直接参照しない。
+`storage/` 外のパッケージ (`server`, `planner`, `executor`) は `storage/engine` のみを参照する。`storage/` 内の他のパッケージ (`access`, `dictionary`, `btree` 等) を直接参照しない。
 
 ```
 server  ──→ storage/engine ──→ storage/* 内部

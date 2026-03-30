@@ -1,9 +1,9 @@
 package access
 
 import (
-	"minesql/internal/encode"
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/encode"
 )
 
 type ClusteredIndexIterator struct {

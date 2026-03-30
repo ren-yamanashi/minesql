@@ -1,7 +1,7 @@
 package executor
 
 import (
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,7 +12,7 @@ func TestNewTableScan(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		whileCondition := func(record Record) bool {
 			return true
@@ -25,7 +25,7 @@ func TestNewTableScan(t *testing.T) {
 		// WHEN
 		seqScan := NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			whileCondition,
 		)
 
@@ -40,7 +40,7 @@ func TestTableScan_Next(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
@@ -48,7 +48,7 @@ func TestTableScan_Next(t *testing.T) {
 
 		seqScan := NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool {
 				return string(record[0]) < "c" // プライマリキーが "c" 未満の間、継続
 			},
@@ -77,7 +77,7 @@ func TestTableScan_Next(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
@@ -85,7 +85,7 @@ func TestTableScan_Next(t *testing.T) {
 
 		seqScan := NewTableScan(
 			tbl,
-			engine.SearchModeKey{Key: [][]byte{[]byte("b")}},
+			handler.SearchModeKey{Key: [][]byte{[]byte("b")}},
 			func(record Record) bool {
 				return string(record[0]) <= "d" // プライマリキーが "d" 以下の間、継続
 			},
@@ -113,23 +113,23 @@ func TestTableScan_Next(t *testing.T) {
 }
 
 // StorageManager を初期化し、サンプルデータを投入する
-func InitStorageEngineForTest(t *testing.T, dataDir string) *engine.Engine {
+func InitStorageEngineForTest(t *testing.T, dataDir string) *handler.Handler {
 	// グローバル StorageManager を初期化
 	// テスト用に一時的に環境変数を設定
 	t.Setenv("MINESQL_DATA_DIR", dataDir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "10")
 
-	engine.Reset()
-	engine.Init()
-	e := engine.Get()
+	handler.Reset()
+	handler.Init()
+	e := handler.Get()
 
 	// テーブルを作成
-	createTable := NewCreateTable("users", 1, []engine.IndexParam{
+	createTable := NewCreateTable("users", 1, []handler.IndexParam{
 		{Name: "last_name", ColName: "last_name", SecondaryKey: 2},
-	}, []engine.ColumnParam{
-		{Name: "id", Type: engine.ColumnTypeString},
-		{Name: "first_name", Type: engine.ColumnTypeString},
-		{Name: "last_name", Type: engine.ColumnTypeString},
+	}, []handler.ColumnParam{
+		{Name: "id", Type: handler.ColumnTypeString},
+		{Name: "first_name", Type: handler.ColumnTypeString},
+		{Name: "last_name", Type: handler.ColumnTypeString},
 	})
 	_, err := createTable.Next()
 	assert.NoError(t, err)

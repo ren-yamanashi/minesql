@@ -1,9 +1,8 @@
-package statistics
+package dictionary
 
 import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/catalog"
 	"minesql/internal/storage/file"
 	"minesql/internal/storage/page"
 	"path/filepath"
@@ -353,7 +352,7 @@ func TestAnalyze(t *testing.T) {
 // testEnv はテスト用の環境を保持する
 type testEnv struct {
 	bp      *buffer.BufferPool
-	catalog *catalog.Catalog
+	catalog *Catalog
 	tables  map[string]*access.TableAccessMethod
 }
 
@@ -370,7 +369,7 @@ func setupTestEnv(t *testing.T) *testEnv {
 	assert.NoError(t, err)
 	bp.RegisterDisk(catalogFileId, catalogDm)
 
-	cat, err := catalog.CreateCatalog(bp)
+	cat, err := CreateCatalog(bp)
 	assert.NoError(t, err)
 
 	return &testEnv{
@@ -390,7 +389,7 @@ type indexParam struct {
 // columnParam はテスト用のカラムパラメータ
 type columnParam struct {
 	name       string
-	columnType catalog.ColumnType
+	columnType ColumnType
 }
 
 // createTable はテスト用にテーブルを作成し、カタログに登録する
@@ -428,19 +427,19 @@ func createTable(t *testing.T, env *testEnv, tableName string, primaryKeyCount u
 	assert.NoError(t, err)
 
 	// インデックスのメタデータを作成
-	idxMeta := make([]*catalog.IndexMetadata, len(indexes))
+	idxMeta := make([]*IndexMetadata, len(indexes))
 	for i, ui := range uniqueIndexes {
-		idxMeta[i] = catalog.NewIndexMetadata(fileId, ui.Name, ui.ColName, catalog.IndexTypeUnique, ui.MetaPageId)
+		idxMeta[i] = NewIndexMetadata(fileId, ui.Name, ui.ColName, IndexTypeUnique, ui.MetaPageId)
 	}
 
 	// カラムのメタデータを作成
-	colMeta := make([]*catalog.ColumnMetadata, len(columns))
+	colMeta := make([]*ColumnMetadata, len(columns))
 	for i, col := range columns {
-		colMeta[i] = catalog.NewColumnMetadata(fileId, col.name, uint16(i), col.columnType)
+		colMeta[i] = NewColumnMetadata(fileId, col.name, uint16(i), col.columnType)
 	}
 
 	// テーブルメタデータを作成してカタログに登録
-	tblMeta := catalog.NewTableMetadata(fileId, tableName, uint8(len(columns)), primaryKeyCount, colMeta, idxMeta, metaPageId)
+	tblMeta := NewTableMetadata(fileId, tableName, uint8(len(columns)), primaryKeyCount, colMeta, idxMeta, metaPageId)
 	err = env.catalog.Insert(env.bp, tblMeta)
 	assert.NoError(t, err)
 
@@ -515,9 +514,9 @@ func setupStatisticsTable(t *testing.T) *testEnv {
 			{name: "idx_name", colName: "name", secondaryKey: 1},
 		},
 		[]columnParam{
-			{name: "id", columnType: catalog.ColumnTypeString},
-			{name: "name", columnType: catalog.ColumnTypeString},
-			{name: "category", columnType: catalog.ColumnTypeString},
+			{name: "id", columnType: ColumnTypeString},
+			{name: "name", columnType: ColumnTypeString},
+			{name: "category", columnType: ColumnTypeString},
 		},
 	)
 
@@ -541,8 +540,8 @@ func setupEmptyTable(t *testing.T) *testEnv {
 	createTable(t, env, "items", 1,
 		nil,
 		[]columnParam{
-			{name: "id", columnType: catalog.ColumnTypeString},
-			{name: "name", columnType: catalog.ColumnTypeString},
+			{name: "id", columnType: ColumnTypeString},
+			{name: "name", columnType: ColumnTypeString},
 		},
 	)
 
@@ -566,8 +565,8 @@ func setupSameValueTable(t *testing.T) *testEnv {
 	createTable(t, env, "same_values", 1,
 		nil,
 		[]columnParam{
-			{name: "id", columnType: catalog.ColumnTypeString},
-			{name: "category", columnType: catalog.ColumnTypeString},
+			{name: "id", columnType: ColumnTypeString},
+			{name: "category", columnType: ColumnTypeString},
 		},
 	)
 
@@ -597,8 +596,8 @@ func setupSingleRecordTable(t *testing.T) *testEnv {
 	createTable(t, env, "single", 1,
 		nil,
 		[]columnParam{
-			{name: "id", columnType: catalog.ColumnTypeString},
-			{name: "name", columnType: catalog.ColumnTypeString},
+			{name: "id", columnType: ColumnTypeString},
+			{name: "name", columnType: ColumnTypeString},
 		},
 	)
 
@@ -634,9 +633,9 @@ func setupMultiIndexTable(t *testing.T) *testEnv {
 			{name: "idx_email", colName: "email", secondaryKey: 2},
 		},
 		[]columnParam{
-			{name: "id", columnType: catalog.ColumnTypeString},
-			{name: "name", columnType: catalog.ColumnTypeString},
-			{name: "email", columnType: catalog.ColumnTypeString},
+			{name: "id", columnType: ColumnTypeString},
+			{name: "name", columnType: ColumnTypeString},
+			{name: "email", columnType: ColumnTypeString},
 		},
 	)
 

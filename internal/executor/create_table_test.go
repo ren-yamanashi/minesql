@@ -1,7 +1,7 @@
 package executor
 
 import (
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,9 +13,9 @@ func TestCreateTable_Next(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		engine.Reset()
-		engine.Init()
-		e := engine.Get()
+		handler.Reset()
+		handler.Init()
+		e := handler.Get()
 		createTable := NewCreateTable("users", 1, nil, nil)
 
 		// WHEN
@@ -35,10 +35,10 @@ func TestCreateTable_Next(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		engine.Reset()
-		engine.Init()
-		e := engine.Get()
-		createTable := NewCreateTable("users", 1, nil, []engine.ColumnParam{
+		handler.Reset()
+		handler.Init()
+		e := handler.Get()
+		createTable := NewCreateTable("users", 1, nil, []handler.ColumnParam{
 			{Name: "id", Type: "int"},
 			{Name: "name", Type: "string"},
 			{Name: "email", Type: "string"},
@@ -70,10 +70,10 @@ func TestCreateTable_Next(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		engine.Reset()
-		engine.Init()
-		e := engine.Get()
-		createTable := NewCreateTable("users", 1, []engine.IndexParam{
+		handler.Reset()
+		handler.Init()
+		e := handler.Get()
+		createTable := NewCreateTable("users", 1, []handler.IndexParam{
 			{Name: "email", ColName: "email", SecondaryKey: 1},
 		}, nil)
 
@@ -94,9 +94,9 @@ func TestCreateTable_Next(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
-		engine.Reset()
-		engine.Init()
-		e := engine.Get()
+		handler.Reset()
+		handler.Init()
+		e := handler.Get()
 		createTable := NewCreateTable("users", 1, nil, nil)
 
 		// WHEN

@@ -1,7 +1,7 @@
 package executor
 
 import (
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,7 +11,7 @@ func TestProject(t *testing.T) {
 	t.Run("特定のカラムだけを取得できる", func(t *testing.T) {
 		// GIVEN
 		setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
@@ -21,7 +21,7 @@ func TestProject(t *testing.T) {
 		records := collectAll(t, NewProject(
 			NewTableScan(
 				tbl,
-				engine.SearchModeStart{},
+				handler.SearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			[]uint16{1, 2},
@@ -39,7 +39,7 @@ func TestProject(t *testing.T) {
 	t.Run("1 カラムだけを取得できる", func(t *testing.T) {
 		// GIVEN
 		setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
@@ -49,7 +49,7 @@ func TestProject(t *testing.T) {
 		records := collectAll(t, NewProject(
 			NewTableScan(
 				tbl,
-				engine.SearchModeStart{},
+				handler.SearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			[]uint16{1},
@@ -67,7 +67,7 @@ func TestProject(t *testing.T) {
 	t.Run("カラムの順序を入れ替えて取得できる", func(t *testing.T) {
 		// GIVEN
 		setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
@@ -77,7 +77,7 @@ func TestProject(t *testing.T) {
 		records := collectAll(t, NewProject(
 			NewTableScan(
 				tbl,
-				engine.SearchModeStart{},
+				handler.SearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			[]uint16{2, 0},
@@ -92,7 +92,7 @@ func TestProject(t *testing.T) {
 	t.Run("Filter と組み合わせて使用できる", func(t *testing.T) {
 		// GIVEN
 		setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
@@ -103,7 +103,7 @@ func TestProject(t *testing.T) {
 			NewFilter(
 				NewTableScan(
 					tbl,
-					engine.SearchModeStart{},
+					handler.SearchModeStart{},
 					func(record Record) bool { return true },
 				),
 				func(record Record) bool {
@@ -121,7 +121,7 @@ func TestProject(t *testing.T) {
 	t.Run("InnerExecutor が空の場合は空のレコードを返す", func(t *testing.T) {
 		// GIVEN
 		setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
@@ -132,7 +132,7 @@ func TestProject(t *testing.T) {
 			NewFilter(
 				NewTableScan(
 					tbl,
-					engine.SearchModeStart{},
+					handler.SearchModeStart{},
 					func(record Record) bool { return true },
 				),
 				func(record Record) bool {

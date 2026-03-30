@@ -3,7 +3,7 @@ package executor
 import (
 	"testing"
 
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -11,10 +11,10 @@ import (
 func TestDelete(t *testing.T) {
 	t.Run("正常に Delete Executor を生成できる", func(t *testing.T) {
 		// GIVEN
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		iterator := NewTableScan(
 			nil,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 
@@ -31,15 +31,15 @@ func TestDelete(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		tbl, err := getTableAccessMethod("users")
 		assert.NoError(t, err)
 
 		del := NewDelete(trxId, tbl, NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -53,7 +53,7 @@ func TestDelete(t *testing.T) {
 		// THEN: テーブルが空になっている
 		scan := NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -65,9 +65,9 @@ func TestDelete(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
@@ -76,7 +76,7 @@ func TestDelete(t *testing.T) {
 		// プライマリキーが "c" 未満のレコードを削除対象とする
 		iterator := NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool {
 				return string(record[0]) < "c"
 			},
@@ -94,7 +94,7 @@ func TestDelete(t *testing.T) {
 		// THEN: "c" 以降のレコードが残っている
 		scan := NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -109,9 +109,9 @@ func TestDelete(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		tbl, err := getTableAccessMethod("users")
 		assert.NoError(t, err)
 
@@ -119,7 +119,7 @@ func TestDelete(t *testing.T) {
 		iterator := NewFilter(
 			NewTableScan(
 				tbl,
-				engine.SearchModeStart{},
+				handler.SearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -137,7 +137,7 @@ func TestDelete(t *testing.T) {
 		// THEN: "Bob" 以外のレコードが残っている
 		scan := NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -152,7 +152,7 @@ func TestDelete(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
@@ -165,14 +165,14 @@ func TestDelete(t *testing.T) {
 		// プライマリキーが "a" のレコードを削除 (last_name = "Doe")
 		iterator := NewTableScan(
 			tbl,
-			engine.SearchModeKey{Key: [][]byte{[]byte("a")}},
+			handler.SearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
 			},
 		)
 
 		// Delete Executor を作成
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		del := NewDelete(trxId, tbl, iterator)
 
 		// WHEN
@@ -185,7 +185,7 @@ func TestDelete(t *testing.T) {
 		indexScan := NewIndexScan(
 			tbl,
 			idx,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(indexScan)
@@ -200,20 +200,20 @@ func TestDelete(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManagerForTest(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		_ = tmpdir
 
-		var trxId engine.TrxId = 1
-		createTableForTest(t, "empty_table", nil, []engine.ColumnParam{
-			{Name: "id", Type: engine.ColumnTypeString},
-			{Name: "value", Type: engine.ColumnTypeString},
+		var trxId handler.TrxId = 1
+		createTableForTest(t, "empty_table", nil, []handler.ColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "value", Type: handler.ColumnTypeString},
 		})
 
 		tbl, err := getTableAccessMethod("empty_table")
 		assert.NoError(t, err)
 		del := NewDelete(trxId, tbl, NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		))
 

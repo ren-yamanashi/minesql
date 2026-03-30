@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"minesql/internal/ast"
 	"minesql/internal/executor"
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 )
 
 type CreateTable struct {
@@ -20,7 +20,7 @@ func NewCreateTable(stmt *ast.CreateTableStmt) *CreateTable {
 
 func (ctn *CreateTable) Build() (executor.Executor, error) {
 	colIndexMap := map[string]int{} // key: column name, value: column index
-	colParams := []engine.ColumnParam{}
+	colParams := []handler.ColumnParam{}
 
 	var pkDef *ast.ConstraintPrimaryKeyDef
 	var ukDefs []*ast.ConstraintUniqueKeyDef
@@ -36,9 +36,9 @@ func (ctn *CreateTable) Build() (executor.Executor, error) {
 			}
 			colIndexMap[def.ColName] = currentColIdx
 			currentColIdx++
-			colParams = append(colParams, engine.ColumnParam{
+			colParams = append(colParams, handler.ColumnParam{
 				Name: def.ColName,
-				Type: engine.ColumnType(def.DataType),
+				Type: handler.ColumnType(def.DataType),
 			})
 
 		case *ast.ConstraintPrimaryKeyDef:
@@ -103,14 +103,14 @@ func getPkCount(pkDef *ast.ConstraintPrimaryKeyDef, colIndexMap map[string]int) 
 	return len(pkDef.Columns), nil
 }
 
-func getUkParams(ukDefs []*ast.ConstraintUniqueKeyDef, colIndexMap map[string]int) ([]engine.IndexParam, error) {
-	uniqueKeyParams := make([]engine.IndexParam, 0, len(ukDefs))
+func getUkParams(ukDefs []*ast.ConstraintUniqueKeyDef, colIndexMap map[string]int) ([]handler.IndexParam, error) {
+	uniqueKeyParams := make([]handler.IndexParam, 0, len(ukDefs))
 	for _, ukDef := range ukDefs {
 		idx, exists := colIndexMap[ukDef.Column.ColName]
 		if !exists {
 			return nil, fmt.Errorf("unique key column '%s' does not exist", ukDef.Column.ColName)
 		}
-		uniqueKeyParams = append(uniqueKeyParams, engine.IndexParam{
+		uniqueKeyParams = append(uniqueKeyParams, handler.IndexParam{
 			Name:         ukDef.KeyName,
 			ColName:      ukDef.Column.ColName,
 			SecondaryKey: uint16(idx),

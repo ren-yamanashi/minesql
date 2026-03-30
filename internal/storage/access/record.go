@@ -1,6 +1,6 @@
 package access
 
-import "minesql/internal/encode"
+import "minesql/internal/storage/encode"
 
 type RecordHeader struct {
 	DeleteMark uint8

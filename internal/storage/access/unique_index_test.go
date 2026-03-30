@@ -2,8 +2,8 @@ package access
 
 import (
 	"fmt"
-	"minesql/internal/encode"
 	"minesql/internal/storage/btree"
+	"minesql/internal/storage/encode"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

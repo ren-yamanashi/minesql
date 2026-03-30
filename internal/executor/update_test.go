@@ -1,7 +1,7 @@
 package executor
 
 import (
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,14 +10,14 @@ import (
 func TestNewUpdate(t *testing.T) {
 	t.Run("正常に Update Executor を生成できる", func(t *testing.T) {
 		// GIVEN
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		setColumns := []SetColumn{
 			{Pos: 1, Value: []byte("Jane")},
 		}
 
 		iterator := NewTableScan(
 			nil,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 
@@ -37,9 +37,9 @@ func TestUpdate_Next(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
@@ -49,7 +49,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 1, Value: []byte("Updated")},
 		}, NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -62,7 +62,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: 全レコードの first_name が "Updated" になっている
 		scan := NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -77,9 +77,9 @@ func TestUpdate_Next(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
@@ -91,7 +91,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 2, Value: []byte("Updated")},
 		}, NewTableScan(
 			tbl,
-			engine.SearchModeKey{Key: [][]byte{[]byte("a")}},
+			handler.SearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
 			},
@@ -106,7 +106,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: "a" のレコードが更新され、他は変わらない
 		scan := NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -120,9 +120,9 @@ func TestUpdate_Next(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
@@ -134,7 +134,7 @@ func TestUpdate_Next(t *testing.T) {
 		}, NewFilter(
 			NewTableScan(
 				tbl,
-				engine.SearchModeStart{},
+				handler.SearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -151,7 +151,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: "Bob" の last_name が "Williams" に更新され、他は変わらない
 		scan := NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -170,9 +170,9 @@ func TestUpdate_Next(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
@@ -187,7 +187,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 2, Value: []byte("Zebra")},
 		}, NewTableScan(
 			tbl,
-			engine.SearchModeKey{Key: [][]byte{[]byte("a")}},
+			handler.SearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
 			},
@@ -204,7 +204,7 @@ func TestUpdate_Next(t *testing.T) {
 		indexScan := NewIndexScan(
 			tbl,
 			idx,
-			engine.SearchModeKey{Key: [][]byte{[]byte("Zebra")}},
+			handler.SearchModeKey{Key: [][]byte{[]byte("Zebra")}},
 			func(record Record) bool {
 				return string(record[0]) == "Zebra"
 			},
@@ -218,7 +218,7 @@ func TestUpdate_Next(t *testing.T) {
 		indexScanOld := NewIndexScan(
 			tbl,
 			idx,
-			engine.SearchModeKey{Key: [][]byte{[]byte("Doe")}},
+			handler.SearchModeKey{Key: [][]byte{[]byte("Doe")}},
 			func(record Record) bool {
 				return string(record[0]) == "Doe"
 			},
@@ -232,9 +232,9 @@ func TestUpdate_Next(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
@@ -245,7 +245,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 0, Value: []byte("z")},
 		}, NewTableScan(
 			tbl,
-			engine.SearchModeKey{Key: [][]byte{[]byte("a")}},
+			handler.SearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
 			},
@@ -260,7 +260,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: "a" が消え "z" が追加されている
 		scan := NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -278,9 +278,9 @@ func TestUpdate_Next(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
 		tbl, err := getTableAccessMethod("users")
@@ -292,7 +292,7 @@ func TestUpdate_Next(t *testing.T) {
 		}, NewFilter(
 			NewTableScan(
 				tbl,
-				engine.SearchModeStart{},
+				handler.SearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -309,7 +309,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: 全レコードが変更されていない
 		scan := NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -326,13 +326,13 @@ func TestUpdate_Next(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManagerForTest(t)
-		defer engine.Reset()
+		defer handler.Reset()
 		_ = tmpdir
 
-		var trxId engine.TrxId = 1
-		createTableForTest(t, "empty_table", nil, []engine.ColumnParam{
-			{Name: "id", Type: engine.ColumnTypeString},
-			{Name: "value", Type: engine.ColumnTypeString},
+		var trxId handler.TrxId = 1
+		createTableForTest(t, "empty_table", nil, []handler.ColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "value", Type: handler.ColumnTypeString},
 		})
 
 		// テーブルアクセスメソッドを取得
@@ -343,7 +343,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 1, Value: []byte("new_value")},
 		}, NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool { return true },
 		))
 

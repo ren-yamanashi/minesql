@@ -8,7 +8,7 @@ type LogRecord interface {
 
 // TableOperator はトランザクションログの Undo に必要なテーブル操作を抽象化するインターフェース
 //
-// engine.TableHandler と互換性がある (engine パッケージの循環参照を避けるため別途定義)
+// handler.TableHandler と互換性がある (handler パッケージの循環参照を避けるため別途定義)
 type TableOperator interface {
 	Insert(bp *buffer.BufferPool, columns [][]byte) error
 	Delete(bp *buffer.BufferPool, columns [][]byte) error

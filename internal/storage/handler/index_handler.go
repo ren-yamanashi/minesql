@@ -1,4 +1,4 @@
-package engine
+package handler
 
 import (
 	"minesql/internal/storage/access"
@@ -45,7 +45,7 @@ type IndexIterator interface {
 }
 
 // indexIteratorAdapter は access.SecondaryIndexIterator を IndexIterator に適合させる
-// (SecondaryIndexSearchResult -> engine.IndexSearchResult の変換)
+// (SecondaryIndexSearchResult -> handler.IndexSearchResult の変換)
 type indexIteratorAdapter struct {
 	inner *access.SecondaryIndexIterator
 }

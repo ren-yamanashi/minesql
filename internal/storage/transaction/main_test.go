@@ -2,7 +2,7 @@ package transaction_test
 
 import (
 	"minesql/internal/executor"
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 	"minesql/internal/storage/transaction"
 	"testing"
 
@@ -13,9 +13,9 @@ func TestCommit(t *testing.T) {
 	t.Run("Commit するとトランザクションが INACTIVE になり Undo ログがクリアされる", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		e := engine.Get()
+		e := handler.Get()
 		undoLog := e.UndoLog()
 		trxMgr := transaction.NewManager(undoLog)
 		trxId := trxMgr.Begin()
@@ -45,9 +45,9 @@ func TestRollback(t *testing.T) {
 	t.Run("Insert を Rollback すると行が物理削除される", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		e := engine.Get()
+		e := handler.Get()
 		undoLog := e.UndoLog()
 		trxMgr := transaction.NewManager(undoLog)
 		trxId := trxMgr.Begin()
@@ -73,10 +73,10 @@ func TestRollback(t *testing.T) {
 	t.Run("Delete を Rollback すると行が復元される", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tbl := setupTestTable(t)
-		e := engine.Get()
+		e := handler.Get()
 		undoLog := e.UndoLog()
 		trxMgr := transaction.NewManager(undoLog)
 
@@ -94,7 +94,7 @@ func TestRollback(t *testing.T) {
 		deleteTrxId := trxMgr.Begin()
 		del := executor.NewDelete(deleteTrxId, tbl, executor.NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record executor.Record) bool { return true },
 		))
 		_, err = del.Next()
@@ -112,10 +112,10 @@ func TestRollback(t *testing.T) {
 	t.Run("Update を Rollback すると行が元の値に戻る", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tbl := setupTestTable(t)
-		e := engine.Get()
+		e := handler.Get()
 		undoLog := e.UndoLog()
 		trxMgr := transaction.NewManager(undoLog)
 
@@ -134,7 +134,7 @@ func TestRollback(t *testing.T) {
 			{Pos: 1, Value: []byte("Carol")},
 		}, executor.NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record executor.Record) bool { return true },
 		))
 		_, err = upd.Next()
@@ -157,10 +157,10 @@ func TestRollback(t *testing.T) {
 	t.Run("複数操作を含むトランザクションの Rollback", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tbl := setupTestTable(t)
-		e := engine.Get()
+		e := handler.Get()
 		undoLog := e.UndoLog()
 		trxMgr := transaction.NewManager(undoLog)
 
@@ -187,7 +187,7 @@ func TestRollback(t *testing.T) {
 			{Pos: 1, Value: []byte("Dave")},
 		}, executor.NewTableScan(
 			tbl,
-			engine.SearchModeKey{Key: [][]byte{[]byte("a")}},
+			handler.SearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record executor.Record) bool { return string(record[0]) == "a" },
 		))
 		_, err = upd.Next()
@@ -196,7 +196,7 @@ func TestRollback(t *testing.T) {
 		del := executor.NewDelete(trxId, tbl, executor.NewFilter(
 			executor.NewTableScan(
 				tbl,
-				engine.SearchModeStart{},
+				handler.SearchModeStart{},
 				func(record executor.Record) bool { return true },
 			),
 			func(record executor.Record) bool { return string(record[0]) == "b" },
@@ -221,32 +221,32 @@ func initStorageManagerForTest(t *testing.T) {
 	tmpdir := t.TempDir()
 	t.Setenv("MINESQL_DATA_DIR", tmpdir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "10")
-	engine.Reset()
-	engine.Init()
+	handler.Reset()
+	handler.Init()
 }
 
-func setupTestTable(t *testing.T) *engine.TableHandler {
+func setupTestTable(t *testing.T) *handler.TableHandler {
 	t.Helper()
-	createTable := executor.NewCreateTable("test_trx", 1, nil, []engine.ColumnParam{
-		{Name: "id", Type: engine.ColumnTypeString},
-		{Name: "name", Type: engine.ColumnTypeString},
+	createTable := executor.NewCreateTable("test_trx", 1, nil, []handler.ColumnParam{
+		{Name: "id", Type: handler.ColumnTypeString},
+		{Name: "name", Type: handler.ColumnTypeString},
 	})
 	_, err := createTable.Next()
 	assert.NoError(t, err)
 
-	e := engine.Get()
+	e := handler.Get()
 	tblMeta, ok := e.Catalog.GetTableMetadataByName("test_trx")
 	assert.True(t, ok)
 	rawTbl, err := tblMeta.GetTable()
 	assert.NoError(t, err)
-	return engine.NewTableHandler(rawTbl)
+	return handler.NewTableHandler(rawTbl)
 }
 
-func collectAllRecords(t *testing.T, tbl *engine.TableHandler) []executor.Record {
+func collectAllRecords(t *testing.T, tbl *handler.TableHandler) []executor.Record {
 	t.Helper()
 	scan := executor.NewTableScan(
 		tbl,
-		engine.SearchModeStart{},
+		handler.SearchModeStart{},
 		func(record executor.Record) bool { return true },
 	)
 	var recs []executor.Record

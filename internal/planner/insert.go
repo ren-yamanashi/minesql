@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"minesql/internal/ast"
 	"minesql/internal/executor"
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 )
 
 type Insert struct {
@@ -18,7 +18,7 @@ func NewInsert(stmt *ast.InsertStmt) *Insert {
 	}
 }
 
-func (ip *Insert) Build(trxId engine.TrxId) (executor.Executor, error) {
+func (ip *Insert) Build(trxId handler.TrxId) (executor.Executor, error) {
 	if len(ip.Stmt.Cols) == 0 {
 		return nil, errors.New("column names cannot be empty")
 	}
@@ -43,7 +43,7 @@ func (ip *Insert) Build(trxId engine.TrxId) (executor.Executor, error) {
 		}
 	}
 
-	e := engine.Get()
+	e := handler.Get()
 	tblMeta, ok := e.Catalog.GetTableMetadataByName(ip.Stmt.Table.TableName)
 	if !ok {
 		return nil, fmt.Errorf("table %s not found", ip.Stmt.Table.TableName)
@@ -52,7 +52,7 @@ func (ip *Insert) Build(trxId engine.TrxId) (executor.Executor, error) {
 	if err != nil {
 		return nil, err
 	}
-	tbl := engine.NewTableHandler(rawTbl)
+	tbl := handler.NewTableHandler(rawTbl)
 
 	colPosMap := make(map[string]uint16)
 	for _, colMeta := range tblMeta.Cols {

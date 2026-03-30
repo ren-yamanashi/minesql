@@ -2,7 +2,7 @@ package executor
 
 import (
 	"bytes"
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 )
 
 type SetColumn struct {
@@ -12,13 +12,13 @@ type SetColumn struct {
 
 // Update は InnerExecutor の結果を元にレコードを更新する
 type Update struct {
-	trxId         engine.TrxId
-	table         *engine.TableHandler
+	trxId         handler.TrxId
+	table         *handler.TableHandler
 	SetColumns    []SetColumn
 	InnerExecutor Executor
 }
 
-func NewUpdate(trxId engine.TrxId, table *engine.TableHandler, setColumns []SetColumn, innerExecutor Executor) *Update {
+func NewUpdate(trxId handler.TrxId, table *handler.TableHandler, setColumns []SetColumn, innerExecutor Executor) *Update {
 	return &Update{
 		trxId:         trxId,
 		table:         table,
@@ -28,7 +28,7 @@ func NewUpdate(trxId engine.TrxId, table *engine.TableHandler, setColumns []SetC
 }
 
 func (upd *Update) Next() (Record, error) {
-	e := engine.Get()
+	e := handler.Get()
 
 	// 更新対象のレコードを先にすべて収集する
 	// (更新により Iterator が参照するページデータが破壊されるのを防ぐ)

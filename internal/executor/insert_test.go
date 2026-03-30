@@ -1,7 +1,7 @@
 package executor
 
 import (
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,7 +10,7 @@ import (
 func TestNewInsert(t *testing.T) {
 	t.Run("正常に Insert Executor を生成できる", func(t *testing.T) {
 		// GIVEN
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		records := []Record{
 			{[]byte("1"), []byte("Alice")},
 			{[]byte("2"), []byte("Bob")},
@@ -29,18 +29,18 @@ func TestNewInsert(t *testing.T) {
 func TestInsert_Next(t *testing.T) {
 	t.Run("正常にレコードを挿入できる", func(t *testing.T) {
 		initStorageManagerForTest(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tableName := "users"
-		createTableForTest(t, tableName, []engine.IndexParam{
+		createTableForTest(t, tableName, []handler.IndexParam{
 			{Name: "name", ColName: "name", SecondaryKey: 1},
-		}, []engine.ColumnParam{
-			{Name: "id", Type: engine.ColumnTypeString},
-			{Name: "name", Type: engine.ColumnTypeString},
+		}, []handler.ColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "name", Type: handler.ColumnTypeString},
 		})
 
 		// GIVEN
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		records := []Record{
 			{[]byte("1"), []byte("Alice")},
 			{[]byte("2"), []byte("Bob")},
@@ -61,7 +61,7 @@ func TestInsert_Next(t *testing.T) {
 		}
 		seqScan := NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			whileCondition,
 		)
 		res, err := fetchAll(seqScan)
@@ -78,11 +78,11 @@ func initStorageManagerForTest(t *testing.T) {
 	tmpdir := t.TempDir()
 	t.Setenv("MINESQL_DATA_DIR", tmpdir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "10")
-	engine.Reset()
-	engine.Init()
+	handler.Reset()
+	handler.Init()
 }
 
-func createTableForTest(t *testing.T, tableName string, indexes []engine.IndexParam, columns []engine.ColumnParam) {
+func createTableForTest(t *testing.T, tableName string, indexes []handler.IndexParam, columns []handler.ColumnParam) {
 	createTable := NewCreateTable(tableName, 1, indexes, columns)
 	_, err := createTable.Next()
 	assert.NoError(t, err)

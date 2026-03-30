@@ -1,11 +1,11 @@
-package catalog
+package dictionary
 
 import (
 	"encoding/binary"
-	"minesql/internal/encode"
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/encode"
 	"minesql/internal/storage/page"
 )
 

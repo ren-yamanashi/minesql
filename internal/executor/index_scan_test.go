@@ -1,7 +1,7 @@
 package executor
 
 import (
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,7 +19,7 @@ func TestIndexScan(t *testing.T) {
 		indexScan := NewIndexScan(
 			nil,
 			nil,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			whileCondition,
 		)
 
@@ -30,7 +30,7 @@ func TestIndexScan(t *testing.T) {
 	t.Run("SearchModeStart を使用して Index 検索できる", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// GIVEN
 
@@ -45,7 +45,7 @@ func TestIndexScan(t *testing.T) {
 		indexScan := NewIndexScan(
 			tbl,
 			idx,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record Record) bool {
 				return string(record[0]) < "J" // セカンダリキー (姓) が "J" 未満の間、継続
 			},
@@ -74,7 +74,7 @@ func TestIndexScan(t *testing.T) {
 	t.Run("SearchModeKey を使用して Index 検索できる", func(t *testing.T) {
 		tmpdir := t.TempDir()
 		InitStorageEngineForTest(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// GIVEN
 		// テーブルアクセスメソッドを取得
@@ -88,7 +88,7 @@ func TestIndexScan(t *testing.T) {
 		indexScan := NewIndexScan(
 			tbl,
 			idx,
-			engine.SearchModeKey{Key: [][]byte{[]byte("Doe")}},
+			handler.SearchModeKey{Key: [][]byte{[]byte("Doe")}},
 			func(record Record) bool {
 				return string(record[0]) <= "Smith" // セカンダリキー (姓) が "Smith" 以下の間、継続
 			},

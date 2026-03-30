@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"minesql/internal/ast"
 	"minesql/internal/executor"
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 )
 
 type Select struct {
@@ -18,7 +18,7 @@ func NewSelect(stmt *ast.SelectStmt) *Select {
 }
 
 func (sp *Select) Build() (executor.Executor, error) {
-	e := engine.Get()
+	e := handler.Get()
 
 	// 対象テーブルのメタデータを取得
 	tblMeta, ok := e.Catalog.GetTableMetadataByName(sp.Stmt.From.TableName)

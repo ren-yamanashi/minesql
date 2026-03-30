@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"minesql/internal/ast"
 	"minesql/internal/executor"
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 )
 
 type Delete struct {
@@ -17,8 +17,8 @@ func NewDelete(stmt *ast.DeleteStmt) *Delete {
 	}
 }
 
-func (dp *Delete) Build(trxId engine.TrxId) (executor.Executor, error) {
-	e := engine.Get()
+func (dp *Delete) Build(trxId handler.TrxId) (executor.Executor, error) {
+	e := handler.Get()
 
 	// 対象テーブルのメタデータを取得
 	tblMeta, ok := e.Catalog.GetTableMetadataByName(dp.Stmt.From.TableName)
@@ -38,7 +38,7 @@ func (dp *Delete) Build(trxId engine.TrxId) (executor.Executor, error) {
 	if err != nil {
 		return nil, err
 	}
-	tbl := engine.NewTableHandler(rawTbl)
+	tbl := handler.NewTableHandler(rawTbl)
 
 	return executor.NewDelete(trxId, tbl, iterator), nil
 }

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"minesql/internal/ast"
 	"minesql/internal/executor"
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 )
 
 type Update struct {
@@ -18,8 +18,8 @@ func NewUpdate(stmt *ast.UpdateStmt) *Update {
 	}
 }
 
-func (up *Update) Build(trxId engine.TrxId) (executor.Executor, error) {
-	e := engine.Get()
+func (up *Update) Build(trxId handler.TrxId) (executor.Executor, error) {
+	e := handler.Get()
 
 	// 対象テーブルのメタデータを取得
 	tblMeta, ok := e.Catalog.GetTableMetadataByName(up.Stmt.Table.TableName)
@@ -58,7 +58,7 @@ func (up *Update) Build(trxId engine.TrxId) (executor.Executor, error) {
 	if err != nil {
 		return nil, err
 	}
-	tbl := engine.NewTableHandler(rawTbl)
+	tbl := handler.NewTableHandler(rawTbl)
 
 	return executor.NewUpdate(trxId, tbl, setColumns, iterator), nil
 }

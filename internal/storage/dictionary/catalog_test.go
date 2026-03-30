@@ -1,4 +1,4 @@
-package catalog
+package dictionary
 
 import (
 	"encoding/binary"

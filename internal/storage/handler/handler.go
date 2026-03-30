@@ -1,4 +1,4 @@
-package engine
+package handler
 
 import (
 	"errors"
@@ -10,10 +10,9 @@ import (
 
 	"minesql/internal/config"
 	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/catalog"
+	"minesql/internal/storage/dictionary"
 	"minesql/internal/storage/file"
 	"minesql/internal/storage/page"
-	"minesql/internal/storage/statistics"
 	"minesql/internal/storage/transaction"
 )
 
@@ -23,79 +22,79 @@ type TrxId = transaction.TrxId
 // UndoLog は Undo ログの型 (storage/transaction.UndoLog のエイリアス)
 type UndoLog = transaction.UndoLog
 
-// TableMetadata はテーブルメタデータの型 (storage/catalog.TableMetadata のエイリアス)
-type TableMetadata = catalog.TableMetadata
+// TableMetadata はテーブルメタデータの型 (storage/dictionary.TableMetadata のエイリアス)
+type TableMetadata = dictionary.TableMetadata
 
-// IndexMetadata はインデックスメタデータの型 (storage/catalog.IndexMetadata のエイリアス)
-type IndexMetadata = catalog.IndexMetadata
+// IndexMetadata はインデックスメタデータの型 (storage/dictionary.IndexMetadata のエイリアス)
+type IndexMetadata = dictionary.IndexMetadata
 
-// ColumnType はカラムの型 (storage/catalog.ColumnType のエイリアス)
-type ColumnType = catalog.ColumnType
+// ColumnType はカラムの型 (storage/dictionary.ColumnType のエイリアス)
+type ColumnType = dictionary.ColumnType
 
 // ColumnTypeString は文字列型を表す ColumnType 定数
-const ColumnTypeString = catalog.ColumnTypeString
+const ColumnTypeString = dictionary.ColumnTypeString
 
-// TableStatistics はテーブル統計情報の型 (storage/statistics.TableStatistics のエイリアス)
-type TableStatistics = statistics.TableStatistics
+// TableStatistics はテーブル統計情報の型 (storage/dictionary.TableStatistics のエイリアス)
+type TableStatistics = dictionary.TableStatistics
 
-// IndexStatistics はインデックス統計情報の型 (storage/statistics.IndexStatistics のエイリアス)
-type IndexStatistics = statistics.IndexStatistics
+// IndexStatistics はインデックス統計情報の型 (storage/dictionary.IndexStatistics のエイリアス)
+type IndexStatistics = dictionary.IndexStatistics
 
-// ColumnStatistics はカラム統計情報の型 (storage/statistics.ColumnStatistics のエイリアス)
-type ColumnStatistics = statistics.ColumnStatistics
+// ColumnStatistics はカラム統計情報の型 (storage/dictionary.ColumnStatistics のエイリアス)
+type ColumnStatistics = dictionary.ColumnStatistics
 
 var (
-	eng  *Engine
+	hdl  *Handler
 	once sync.Once
 )
 
-// Engine はストレージ層のリソースの管理を行う (MySQL の handler に相当)
-type Engine struct {
+// Handler はストレージ層のリソースの管理を行う (MySQL の handler に相当)
+type Handler struct {
 	BufferPool    *buffer.BufferPool
-	Catalog       *catalog.Catalog
+	Catalog       *dictionary.Catalog
 	undoLog       *transaction.UndoLog
 	trxManager    *transaction.Manager
 	baseDirectory string
 }
 
-// グローバルな Engine を初期化する
-func Init() *Engine {
+// グローバルな Handler を初期化する
+func Init() *Handler {
 	once.Do(func() {
-		e, err := newEngine()
+		h, err := newHandler()
 		if err != nil {
-			panic(fmt.Sprintf("failed to initialize engine: %v", err))
+			panic(fmt.Sprintf("failed to initialize handler: %v", err))
 		}
-		eng = e
+		hdl = h
 	})
-	return eng
+	return hdl
 }
 
-// Reset はグローバルな Engine の状態をリセットする (主にテストで使用)
+// Reset はグローバルな Handler の状態をリセットする (主にテストで使用)
 func Reset() {
-	eng = nil
+	hdl = nil
 	once = sync.Once{}
 }
 
-// Get はグローバルな Engine を取得する
-func Get() *Engine {
-	if eng == nil {
-		panic("engine not initialized. call engine.Init() first")
+// Get はグローバルな Handler を取得する
+func Get() *Handler {
+	if hdl == nil {
+		panic("handler not initialized. call handler.Init() first")
 	}
-	return eng
+	return hdl
 }
 
 // Shutdown はダーティーページをディスクに書き出し、すべての Disk を同期する
-func (e *Engine) Shutdown() error {
-	if err := e.BufferPool.FlushPage(); err != nil {
+func (h *Handler) Shutdown() error {
+	if err := h.BufferPool.FlushPage(); err != nil {
 		return err
 	}
-	return e.syncAllDisks()
+	return h.syncAllDisks()
 }
 
 // syncAllDisks はカタログと全テーブルの Disk を同期する
-func (e *Engine) syncAllDisks() error {
+func (h *Handler) syncAllDisks() error {
 	// カタログの Disk を同期
-	catalogDisk, err := e.BufferPool.GetDisk(page.FileId(0))
+	catalogDisk, err := h.BufferPool.GetDisk(page.FileId(0))
 	if err != nil {
 		return err
 	}
@@ -104,8 +103,8 @@ func (e *Engine) syncAllDisks() error {
 	}
 
 	// 各テーブルの Disk を同期
-	for _, table := range e.Catalog.GetAllTables() {
-		dm, err := e.BufferPool.GetDisk(table.FileId)
+	for _, table := range h.Catalog.GetAllTables() {
+		dm, err := h.BufferPool.GetDisk(table.FileId)
 		if err != nil {
 			return err
 		}
@@ -117,18 +116,18 @@ func (e *Engine) syncAllDisks() error {
 }
 
 // RegisterDmToBp は BufferPool に Disk を登録する
-func (e *Engine) RegisterDmToBp(fileId page.FileId, tableName string) error {
-	path := filepath.Join(e.baseDirectory, fmt.Sprintf("%s.db", tableName))
+func (h *Handler) RegisterDmToBp(fileId page.FileId, tableName string) error {
+	path := filepath.Join(h.baseDirectory, fmt.Sprintf("%s.db", tableName))
 	dm, err := file.NewDisk(fileId, path)
 	if err != nil {
 		return err
 	}
-	e.BufferPool.RegisterDisk(fileId, dm)
+	h.BufferPool.RegisterDisk(fileId, dm)
 	return nil
 }
 
-// newEngine は Engine を初期化する
-func newEngine() (*Engine, error) {
+// newHandler は Handler を初期化する
+func newHandler() (*Handler, error) {
 	dataDir := config.GetDataDirectory()
 	err := os.MkdirAll(dataDir, 0750)
 	if err != nil {
@@ -143,7 +142,7 @@ func newEngine() (*Engine, error) {
 
 	undoLog := transaction.NewUndoLog()
 
-	return &Engine{
+	return &Handler{
 		BufferPool:    bp,
 		Catalog:       catalog,
 		undoLog:       undoLog,
@@ -153,7 +152,7 @@ func newEngine() (*Engine, error) {
 }
 
 // initCatalog はカタログを初期化する
-func initCatalog(baseDir string, bp *buffer.BufferPool) (*catalog.Catalog, error) {
+func initCatalog(baseDir string, bp *buffer.BufferPool) (*dictionary.Catalog, error) {
 	fileId := page.FileId(0)
 	path := filepath.Join(baseDir, "minesql.db")
 
@@ -167,10 +166,10 @@ func initCatalog(baseDir string, bp *buffer.BufferPool) (*catalog.Catalog, error
 	}
 	bp.RegisterDisk(fileId, dm)
 
-	var cat *catalog.Catalog
+	var cat *dictionary.Catalog
 	if catalogExists {
 		// 既存のカタログを開く
-		cat, err = catalog.NewCatalog(bp)
+		cat, err = dictionary.NewCatalog(bp)
 		// カタログファイルが空の場合は古いファイルを削除して再度実行
 		if errors.Is(err, io.EOF) {
 			err := os.Remove(path)
@@ -190,7 +189,7 @@ func initCatalog(baseDir string, bp *buffer.BufferPool) (*catalog.Catalog, error
 		}
 	} else {
 		// 新しいカタログを作成
-		cat, err = catalog.CreateCatalog(bp)
+		cat, err = dictionary.CreateCatalog(bp)
 		if err != nil {
 			return nil, err
 		}
@@ -200,7 +199,7 @@ func initCatalog(baseDir string, bp *buffer.BufferPool) (*catalog.Catalog, error
 }
 
 // registerTableDisks はカタログに含まれるテーブルの Disk を登録する
-func registerTableDisks(cat *catalog.Catalog, baseDir string, bp *buffer.BufferPool) error {
+func registerTableDisks(cat *dictionary.Catalog, baseDir string, bp *buffer.BufferPool) error {
 	tables := cat.GetAllTables()
 	for _, tableMeta := range tables {
 		fileId := tableMeta.DataMetaPageId.FileId

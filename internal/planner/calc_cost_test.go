@@ -1,7 +1,7 @@
 package planner
 
 import (
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -340,17 +340,17 @@ func TestTotalCost(t *testing.T) {
 //   - category: V = 10, min = "Cat1", max = "Cat10"
 //
 // セカンダリインデックス: name (H = 3)
-func newTestStats() engine.TableStatistics {
-	return engine.TableStatistics{
+func newTestStats() handler.TableStatistics {
+	return handler.TableStatistics{
 		RecordCount:   1000,
 		LeafPageCount: 50,
 		PrimaryHeight: 4,
-		ColumnStats: map[string]engine.ColumnStatistics{
+		ColumnStats: map[string]handler.ColumnStatistics{
 			"id":       {UniqueValues: 1000, MinValue: []byte("1"), MaxValue: []byte("1000")},
 			"name":     {UniqueValues: 1000, MinValue: []byte("A"), MaxValue: []byte("Z")},
 			"category": {UniqueValues: 10, MinValue: []byte("Cat1"), MaxValue: []byte("Cat10")},
 		},
-		SecondaryIndexStats: map[string]engine.IndexStatistics{
+		SecondaryIndexStats: map[string]handler.IndexStatistics{
 			"name": {Height: 3},
 		},
 	}

@@ -6,18 +6,18 @@ import (
 	"strings"
 
 	"minesql/internal/executor"
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 )
 
 // セットアップヘルパー: テーブルを作成し、サンプルデータを挿入する
 // テーブルアクセスメソッドとクリーンアップ関数を返す
-func setupExample() (*engine.TableHandler, func()) {
+func setupExample() (*handler.TableHandler, func()) {
 	tmpDir, err := os.MkdirTemp("", "executor_example")
 	if err != nil {
 		panic(err)
 	}
 	cleanup := func() {
-		engine.Reset()
+		handler.Reset()
 		_ = os.RemoveAll(tmpDir)
 	}
 
@@ -27,28 +27,28 @@ func setupExample() (*engine.TableHandler, func()) {
 	if err = os.Setenv("MINESQL_BUFFER_SIZE", "100"); err != nil {
 		panic(err)
 	}
-	engine.Reset()
-	engine.Init()
+	handler.Reset()
+	handler.Init()
 
 	// テーブルを作成
 	ct := executor.NewCreateTable(
 		"users",
 		1,
-		[]engine.IndexParam{
+		[]handler.IndexParam{
 			{Name: "idx_first_name", ColName: "first_name", SecondaryKey: 1},
 			{Name: "idx_last_name", ColName: "last_name", SecondaryKey: 2},
 		},
-		[]engine.ColumnParam{
-			{Name: "id", Type: engine.ColumnTypeString},
-			{Name: "first_name", Type: engine.ColumnTypeString},
-			{Name: "last_name", Type: engine.ColumnTypeString},
+		[]handler.ColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "first_name", Type: handler.ColumnTypeString},
+			{Name: "last_name", Type: handler.ColumnTypeString},
 		})
 	if _, err := ct.Next(); err != nil {
 		panic(err)
 	}
 
 	// テーブルアクセスメソッドを取得
-	e := engine.Get()
+	e := handler.Get()
 	tblMeta, ok := e.Catalog.GetTableMetadataByName("users")
 	if !ok {
 		panic("table users not found in catalog")
@@ -57,10 +57,10 @@ func setupExample() (*engine.TableHandler, func()) {
 	if err != nil {
 		panic(err)
 	}
-	tbl := engine.NewTableHandler(rawTbl)
+	tbl := handler.NewTableHandler(rawTbl)
 
 	// サンプルデータを挿入
-	var trxId engine.TrxId = 1
+	var trxId handler.TrxId = 1
 	ins := executor.NewInsert(
 		trxId,
 		tbl,
@@ -108,7 +108,7 @@ func ExampleTableScan_fullScan() {
 	// フルテーブルスキャン (プライマリキー昇順)
 	iter := executor.NewTableScan(
 		tbl,
-		engine.SearchModeStart{},
+		handler.SearchModeStart{},
 		func(record executor.Record) bool { return true },
 	)
 	printExampleRecords(iter)
@@ -129,7 +129,7 @@ func ExampleTableScan_rangeScan() {
 	// プライマリキーが "w" 以上 "y" 以下の範囲スキャン
 	iter := executor.NewTableScan(
 		tbl,
-		engine.SearchModeKey{Key: [][]byte{[]byte("w")}},
+		handler.SearchModeKey{Key: [][]byte{[]byte("w")}},
 		func(record executor.Record) bool {
 			return string(record[0]) <= "y"
 		},
@@ -150,7 +150,7 @@ func ExampleTableScan_constSearch() {
 	// プライマリキーが "y" のレコードを検索
 	iter := executor.NewTableScan(
 		tbl,
-		engine.SearchModeKey{Key: [][]byte{[]byte("y")}},
+		handler.SearchModeKey{Key: [][]byte{[]byte("y")}},
 		func(record executor.Record) bool {
 			return string(record[0]) == "y"
 		},
@@ -170,7 +170,7 @@ func ExampleFilter() {
 	iter := executor.NewFilter(
 		executor.NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record executor.Record) bool { return true },
 		),
 		func(record executor.Record) bool {
@@ -202,7 +202,7 @@ func ExampleIndexScan_fullScan() {
 	printExampleRecords(executor.NewIndexScan(
 		tbl,
 		idxFirstName,
-		engine.SearchModeStart{},
+		handler.SearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 
@@ -211,7 +211,7 @@ func ExampleIndexScan_fullScan() {
 	printExampleRecords(executor.NewIndexScan(
 		tbl,
 		idxLastName,
-		engine.SearchModeStart{},
+		handler.SearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 
@@ -245,7 +245,7 @@ func ExampleIndexScan_rangeScan() {
 	iter := executor.NewIndexScan(
 		tbl,
 		idxLastName,
-		engine.SearchModeKey{Key: [][]byte{[]byte("J")}},
+		handler.SearchModeKey{Key: [][]byte{[]byte("J")}},
 		func(secondaryKey executor.Record) bool {
 			lastName := string(secondaryKey[0])
 			return lastName >= "J" && lastName < "N"
@@ -272,7 +272,7 @@ func ExampleIndexScan_constSearch() {
 	iter := executor.NewIndexScan(
 		tbl,
 		idxLastName,
-		engine.SearchModeKey{Key: [][]byte{[]byte("Miller")}},
+		handler.SearchModeKey{Key: [][]byte{[]byte("Miller")}},
 		func(secondaryKey executor.Record) bool {
 			return string(secondaryKey[0]) == "Miller"
 		},
@@ -292,7 +292,7 @@ func ExampleProject() {
 	iter := executor.NewProject(
 		executor.NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record executor.Record) bool { return true },
 		),
 		[]uint16{1, 2},
@@ -317,7 +317,7 @@ func ExampleProject_withFilter() {
 		executor.NewFilter(
 			executor.NewTableScan(
 				tbl,
-				engine.SearchModeStart{},
+				handler.SearchModeStart{},
 				func(record executor.Record) bool { return true },
 			),
 			func(record executor.Record) bool {
@@ -343,13 +343,13 @@ func ExampleUpdate() {
 	}
 
 	// Alice の last_name を "Anderson" に更新
-	var trxId engine.TrxId = 1
+	var trxId handler.TrxId = 1
 	upd := executor.NewUpdate(trxId, tbl, []executor.SetColumn{
 		{Pos: 2, Value: []byte("Anderson")},
 	}, executor.NewFilter(
 		executor.NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record executor.Record) bool { return true },
 		),
 		func(record executor.Record) bool {
@@ -363,7 +363,7 @@ func ExampleUpdate() {
 	fmt.Println("=== テーブルスキャン ===")
 	printExampleRecords(executor.NewTableScan(
 		tbl,
-		engine.SearchModeStart{},
+		handler.SearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 
@@ -371,7 +371,7 @@ func ExampleUpdate() {
 	printExampleRecords(executor.NewIndexScan(
 		tbl,
 		idxLastName,
-		engine.SearchModeStart{},
+		handler.SearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 
@@ -397,12 +397,12 @@ func ExampleUpdate_primaryKey() {
 	defer cleanup()
 
 	// プライマリキー "v" (Eve) を "a" に変更
-	var trxId engine.TrxId = 1
+	var trxId handler.TrxId = 1
 	upd := executor.NewUpdate(trxId, tbl, []executor.SetColumn{
 		{Pos: 0, Value: []byte("a")},
 	}, executor.NewTableScan(
 		tbl,
-		engine.SearchModeKey{Key: [][]byte{[]byte("v")}},
+		handler.SearchModeKey{Key: [][]byte{[]byte("v")}},
 		func(record executor.Record) bool {
 			return string(record[0]) == "v"
 		},
@@ -413,7 +413,7 @@ func ExampleUpdate_primaryKey() {
 
 	printExampleRecords(executor.NewTableScan(
 		tbl,
-		engine.SearchModeStart{},
+		handler.SearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 
@@ -436,11 +436,11 @@ func ExampleDelete() {
 	}
 
 	// first_name が "Bob" のレコードを削除
-	var trxId engine.TrxId = 1
+	var trxId handler.TrxId = 1
 	del := executor.NewDelete(trxId, tbl, executor.NewFilter(
 		executor.NewTableScan(
 			tbl,
-			engine.SearchModeStart{},
+			handler.SearchModeStart{},
 			func(record executor.Record) bool { return true },
 		),
 		func(record executor.Record) bool {
@@ -454,7 +454,7 @@ func ExampleDelete() {
 	fmt.Println("=== テーブルスキャン ===")
 	printExampleRecords(executor.NewTableScan(
 		tbl,
-		engine.SearchModeStart{},
+		handler.SearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 
@@ -462,7 +462,7 @@ func ExampleDelete() {
 	printExampleRecords(executor.NewIndexScan(
 		tbl,
 		idxLastName,
-		engine.SearchModeStart{},
+		handler.SearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
 

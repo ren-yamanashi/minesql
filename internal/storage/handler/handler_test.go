@@ -1,8 +1,8 @@
-package engine
+package handler
 
 import (
 	"minesql/internal/storage/access"
-	"minesql/internal/storage/catalog"
+	"minesql/internal/storage/dictionary"
 	"minesql/internal/storage/page"
 	"os"
 	"path/filepath"
@@ -12,7 +12,7 @@ import (
 )
 
 func TestInit(t *testing.T) {
-	t.Run("グローバル Engine を初期化できる", func(t *testing.T) {
+	t.Run("グローバル Handler を初期化できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
@@ -23,7 +23,7 @@ func TestInit(t *testing.T) {
 		Init()
 
 		// THEN
-		assert.NotNil(t, eng)
+		assert.NotNil(t, hdl)
 	})
 
 	t.Run("複数回初期化しても同じインスタンスが返される", func(t *testing.T) {
@@ -34,16 +34,16 @@ func TestInit(t *testing.T) {
 		Reset()
 
 		// WHEN
-		engine1 := Init()
-		engine2 := Init()
+		handler1 := Init()
+		handler2 := Init()
 
 		// THEN
-		assert.Same(t, engine1, engine2)
+		assert.Same(t, handler1, handler2)
 	})
 }
 
 func TestGet(t *testing.T) {
-	t.Run("初期化後にグローバル Engine を取得できる", func(t *testing.T) {
+	t.Run("初期化後にグローバル Handler を取得できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
@@ -52,11 +52,11 @@ func TestGet(t *testing.T) {
 		Init()
 
 		// WHEN
-		e := Get()
+		h := Get()
 
 		// THEN
-		assert.NotNil(t, e)
-		assert.NotNil(t, e.BufferPool)
+		assert.NotNil(t, h)
+		assert.NotNil(t, h.BufferPool)
 	})
 
 	t.Run("初期化前に取得しようとすると panic", func(t *testing.T) {
@@ -78,18 +78,18 @@ func TestRegisterDmToBp(t *testing.T) {
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
 		Reset()
 		Init()
-		e := Get()
+		h := Get()
 
 		fileId := page.FileId(1)
 		tableName := "users"
 
 		// WHEN
-		err := e.RegisterDmToBp(fileId, tableName)
+		err := h.RegisterDmToBp(fileId, tableName)
 
 		// THEN
 		assert.NoError(t, err)
 
-		dm, err := e.BufferPool.GetDisk(fileId)
+		dm, err := h.BufferPool.GetDisk(fileId)
 		assert.NoError(t, err)
 		assert.NotNil(t, dm)
 	})
@@ -101,20 +101,20 @@ func TestRegisterDmToBp(t *testing.T) {
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
 		Reset()
 		Init()
-		e := Get()
+		h := Get()
 
 		fileId := page.FileId(1)
 		tableName := "users"
 
 		// WHEN
-		err1 := e.RegisterDmToBp(fileId, tableName)
-		err2 := e.RegisterDmToBp(fileId, tableName)
+		err1 := h.RegisterDmToBp(fileId, tableName)
+		err2 := h.RegisterDmToBp(fileId, tableName)
 
 		// THEN
 		assert.NoError(t, err1)
 		assert.NoError(t, err2)
 
-		dm, err := e.BufferPool.GetDisk(fileId)
+		dm, err := h.BufferPool.GetDisk(fileId)
 		assert.NoError(t, err)
 		assert.NotNil(t, dm)
 	})
@@ -129,12 +129,12 @@ func TestInitCatalog(t *testing.T) {
 		Reset()
 
 		// WHEN
-		e := Init()
+		h := Init()
 
 		// THEN
-		assert.NotNil(t, e)
-		assert.NotNil(t, e.Catalog)
-		assert.Equal(t, page.FileId(1), e.Catalog.NextFileId)
+		assert.NotNil(t, h)
+		assert.NotNil(t, h.Catalog)
+		assert.Equal(t, page.FileId(1), h.Catalog.NextFileId)
 	})
 
 	t.Run("カタログファイルが既に存在する場合、既存のカタログが開かれる", func(t *testing.T) {
@@ -145,27 +145,27 @@ func TestInitCatalog(t *testing.T) {
 		Reset()
 
 		// 最初の初期化でカタログを作成
-		engine1 := Init()
+		handler1 := Init()
 
 		// FileId を採番してディスクに保存
-		_, err := engine1.Catalog.AllocateFileId(engine1.BufferPool)
+		_, err := handler1.Catalog.AllocateFileId(handler1.BufferPool)
 		assert.NoError(t, err)
-		_, err = engine1.Catalog.AllocateFileId(engine1.BufferPool)
+		_, err = handler1.Catalog.AllocateFileId(handler1.BufferPool)
 		assert.NoError(t, err)
 
 		// ダーティーページをディスクにフラッシュ
-		err = engine1.BufferPool.FlushPage()
+		err = handler1.BufferPool.FlushPage()
 		assert.NoError(t, err)
 
-		// Engine をリセット
+		// Handler をリセット
 		Reset()
 
 		// WHEN: 同じディレクトリで再初期化
-		engine2 := Init()
+		handler2 := Init()
 
 		// THEN
-		assert.NotNil(t, engine2.Catalog)
-		assert.Equal(t, page.FileId(3), engine2.Catalog.NextFileId)
+		assert.NotNil(t, handler2.Catalog)
+		assert.Equal(t, page.FileId(3), handler2.Catalog.NextFileId)
 	})
 
 	t.Run("カタログの Disk が BufferPool に登録される", func(t *testing.T) {
@@ -176,10 +176,10 @@ func TestInitCatalog(t *testing.T) {
 		Reset()
 
 		// WHEN
-		e := Init()
+		h := Init()
 
 		// THEN
-		dm, err := e.BufferPool.GetDisk(page.FileId(0))
+		dm, err := h.BufferPool.GetDisk(page.FileId(0))
 		assert.NoError(t, err)
 		assert.NotNil(t, dm)
 	})
@@ -206,10 +206,10 @@ func TestInitCatalog(t *testing.T) {
 		err = tbl.Create(bp)
 		assert.NoError(t, err)
 
-		cols := []*catalog.ColumnMetadata{
-			catalog.NewColumnMetadata(fileId, "id", 0, catalog.ColumnTypeString),
+		cols := []*dictionary.ColumnMetadata{
+			dictionary.NewColumnMetadata(fileId, "id", 0, dictionary.ColumnTypeString),
 		}
-		tblMeta := catalog.NewTableMetadata(fileId, "users", 1, 1, cols, nil, metaPageId)
+		tblMeta := dictionary.NewTableMetadata(fileId, "users", 1, 1, cols, nil, metaPageId)
 		err = sm1.Catalog.Insert(bp, tblMeta)
 		assert.NoError(t, err)
 
@@ -246,12 +246,12 @@ func TestInitCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		e := Init()
+		h := Init()
 
 		// THEN: 新しいカタログが作成され、NextFileId は 1
-		assert.NotNil(t, e)
-		assert.NotNil(t, e.Catalog)
-		assert.Equal(t, page.FileId(1), e.Catalog.NextFileId)
+		assert.NotNil(t, h)
+		assert.NotNil(t, h.Catalog)
+		assert.Equal(t, page.FileId(1), h.Catalog.NextFileId)
 	})
 
 	t.Run("データディレクトリが存在しない場合、自動作成される", func(t *testing.T) {
@@ -263,10 +263,10 @@ func TestInitCatalog(t *testing.T) {
 		Reset()
 
 		// WHEN
-		e := Init()
+		h := Init()
 
 		// THEN: ディレクトリが作成され、初期化が完了している
-		assert.NotNil(t, e)
+		assert.NotNil(t, h)
 		_, err := os.Stat(nestedDir)
 		assert.NoError(t, err)
 	})

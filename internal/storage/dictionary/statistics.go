@@ -1,10 +1,9 @@
-package statistics
+package dictionary
 
 import (
 	"bytes"
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/catalog"
 )
 
 type ColumnStatistics struct {
@@ -28,11 +27,11 @@ type TableStatistics struct {
 
 // Statistics はテーブルの統計情報を収集する
 type Statistics struct {
-	metadata   *catalog.TableMetadata
+	metadata   *TableMetadata
 	bufferPool *buffer.BufferPool
 }
 
-func NewStatistics(meta *catalog.TableMetadata, bp *buffer.BufferPool) *Statistics {
+func NewStatistics(meta *TableMetadata, bp *buffer.BufferPool) *Statistics {
 	return &Statistics{
 		metadata:   meta,
 		bufferPool: bp,
@@ -125,7 +124,7 @@ func (s *Statistics) analyzeTable(table *access.TableAccessMethod) (*TableStatis
 //
 // uniqueValues: カラム名 -> 値の Set (結果が代入される)
 func updateColumnStats(
-	colMetadata []*catalog.ColumnMetadata,
+	colMetadata []*ColumnMetadata,
 	record [][]byte,
 	recordCount uint64,
 	columnStats map[string]ColumnStatistics,

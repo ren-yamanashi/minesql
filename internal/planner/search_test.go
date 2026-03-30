@@ -3,7 +3,7 @@ package planner
 import (
 	"minesql/internal/ast"
 	"minesql/internal/executor"
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,7 +14,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		search := NewSearch(tblMeta, nil)
@@ -32,7 +32,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN: レコードが少ないテーブル → テーブルスキャンの方が安い → Filter が返る
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		where := &ast.WhereClause{
@@ -63,7 +63,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		where := &ast.WhereClause{
@@ -89,7 +89,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		where := &ast.WhereClause{
@@ -115,7 +115,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		type UnsupportedExpr struct {
@@ -141,7 +141,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		// (id = '1') AND ((first_name = 'john') AND (last_name = 'doe'))
@@ -192,7 +192,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		// (first_name = 'John') OR ((id = '1') AND (last_name = 'Doe'))
@@ -243,7 +243,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		// WHERE last_name = (first_name = 'John') のような不正な構造
@@ -276,7 +276,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		// WHERE (first_name = 'John') OR (last_name = 'Doe')
@@ -315,7 +315,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		// WHERE (non_existent = 'value') AND (last_name = 'Doe')
@@ -354,7 +354,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		// WHERE (first_name = (last_name = 'Doe')) AND (id = '1')
@@ -399,7 +399,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		// WHERE ((first_name = 'John') AND 'literal') のような不正な構造
@@ -445,7 +445,7 @@ func TestComplexWhereWithData(t *testing.T) {
 	// テストデータを挿入するヘルパー
 	insertTestData := func(t *testing.T) {
 		t.Helper()
-		var trxId engine.TrxId = 1
+		var trxId handler.TrxId = 1
 		insertStmt := &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("users"),
@@ -489,7 +489,7 @@ func TestComplexWhereWithData(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		insertTestData(t)
 
@@ -533,7 +533,7 @@ func TestComplexWhereWithData(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		insertTestData(t)
 
@@ -578,7 +578,7 @@ func TestComplexWhereWithData(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		insertTestData(t)
 
@@ -765,17 +765,17 @@ func initStorageManager(t *testing.T, dataDir string) {
 	t.Setenv("MINESQL_DATA_DIR", dataDir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "10")
 
-	engine.Reset()
-	engine.Init()
-	engine.Get()
+	handler.Reset()
+	handler.Init()
+	handler.Get()
 
 	// テーブルを作成
-	createTable := executor.NewCreateTable("users", 1, []engine.IndexParam{
+	createTable := executor.NewCreateTable("users", 1, []handler.IndexParam{
 		{Name: "last_name", ColName: "last_name", SecondaryKey: 2},
-	}, []engine.ColumnParam{
-		{Name: "id", Type: engine.ColumnTypeString},
-		{Name: "first_name", Type: engine.ColumnTypeString},
-		{Name: "last_name", Type: engine.ColumnTypeString},
+	}, []handler.ColumnParam{
+		{Name: "id", Type: handler.ColumnTypeString},
+		{Name: "first_name", Type: handler.ColumnTypeString},
+		{Name: "last_name", Type: handler.ColumnTypeString},
 	})
 	_, err := createTable.Next()
 	assert.NoError(t, err)
@@ -784,9 +784,9 @@ func initStorageManager(t *testing.T, dataDir string) {
 // テスト用にテーブルメタデータを取得する
 //
 //nolint:unparam // テーブル名は将来的に変わりうる
-func getTableMetadata(t *testing.T, tableName string) *engine.TableMetadata {
+func getTableMetadata(t *testing.T, tableName string) *handler.TableMetadata {
 	t.Helper()
-	e := engine.Get()
+	e := handler.Get()
 	tblMeta, ok := e.Catalog.GetTableMetadataByName(tableName)
 	if !ok {
 		t.Fatalf("table %s not found in catalog", tableName)

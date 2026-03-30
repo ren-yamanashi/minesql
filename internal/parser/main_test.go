@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"minesql/internal/executor"
 	"minesql/internal/planner"
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 	"strings"
 	"testing"
 
@@ -17,11 +17,11 @@ func TestParserIntegration(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "100")
-		engine.Reset()
-		engine.Init()
-		defer engine.Reset()
+		handler.Reset()
+		handler.Init()
+		defer handler.Reset()
 
-		e := engine.Get()
+		e := handler.Get()
 		trxId := e.BeginTrx()
 
 		executeSql(t, trxId, `
@@ -71,11 +71,11 @@ VALUES
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "100")
-		engine.Reset()
-		engine.Init()
-		defer engine.Reset()
+		handler.Reset()
+		handler.Init()
+		defer handler.Reset()
 
-		e := engine.Get()
+		e := handler.Get()
 		trxId := e.BeginTrx()
 
 		executeSql(t, trxId, `
@@ -113,11 +113,11 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "100")
-		engine.Reset()
-		engine.Init()
-		defer engine.Reset()
+		handler.Reset()
+		handler.Init()
+		defer handler.Reset()
 
-		e := engine.Get()
+		e := handler.Get()
 		trxId := e.BeginTrx()
 
 		executeSql(t, trxId, `
@@ -159,11 +159,11 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "100")
-		engine.Reset()
-		engine.Init()
-		defer engine.Reset()
+		handler.Reset()
+		handler.Init()
+		defer handler.Reset()
 
-		e := engine.Get()
+		e := handler.Get()
 		trxId := e.BeginTrx()
 
 		executeSql(t, trxId, `
@@ -208,11 +208,11 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "100")
-		engine.Reset()
-		engine.Init()
-		defer engine.Reset()
+		handler.Reset()
+		handler.Init()
+		defer handler.Reset()
 
-		e := engine.Get()
+		e := handler.Get()
 		trxId := e.BeginTrx()
 
 		executeSql(t, trxId, `
@@ -267,7 +267,7 @@ func fetchAll(t *testing.T, iter executor.Executor) []executor.Record {
 }
 
 // SQL をパース → プラン → 実行して結果を返す
-func executeSql(t *testing.T, trxId engine.TrxId, sql string) []executor.Record {
+func executeSql(t *testing.T, trxId handler.TrxId, sql string) []executor.Record {
 	t.Helper()
 	p := NewParser()
 	result, err := p.Parse(sql)

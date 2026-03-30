@@ -8,7 +8,7 @@ import (
 	"minesql/internal/ast"
 	"minesql/internal/executor"
 	"minesql/internal/planner"
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 )
 
 // セットアップヘルパー: テーブルを作成し、サンプルデータを挿入する
@@ -18,7 +18,7 @@ func setupPlannerExample() func() {
 		panic(err)
 	}
 	cleanup := func() {
-		engine.Reset()
+		handler.Reset()
 		_ = os.RemoveAll(tmpDir)
 	}
 
@@ -28,8 +28,8 @@ func setupPlannerExample() func() {
 	if err = os.Setenv("MINESQL_BUFFER_SIZE", "100"); err != nil {
 		panic(err)
 	}
-	engine.Reset()
-	engine.Init()
+	handler.Reset()
+	handler.Init()
 
 	// CREATE TABLE
 	runPlan(&ast.CreateTableStmt{
@@ -111,7 +111,7 @@ func setupPlannerExample() func() {
 
 // AST を直接構築 → planner.Start → 実行して結果を返す
 func runPlan(stmt ast.Statement) []executor.Record {
-	var trxId engine.TrxId = 1
+	var trxId handler.TrxId = 1
 	exec, err := planner.Start(trxId, stmt)
 	if err != nil {
 		panic(err)

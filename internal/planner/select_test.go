@@ -3,7 +3,7 @@ package planner
 import (
 	"minesql/internal/ast"
 	"minesql/internal/executor"
-	"minesql/internal/storage/engine"
+	"minesql/internal/storage/handler"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -25,7 +25,7 @@ func TestSelect(t *testing.T) {
 	t.Run("指定したテーブルが存在しない場合にエラーになる", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		stmt := &ast.SelectStmt{StmtType: ast.StmtTypeSelect, From: *ast.NewTableId("non_existent_table"), Where: &ast.WhereClause{IsSet: false}}
 		planner := NewSelect(stmt)
@@ -42,11 +42,11 @@ func TestSelect(t *testing.T) {
 	t.Run("Build で Project Executor が生成される", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		createTableForTest(t, []engine.ColumnParam{
-			{Name: "id", Type: engine.ColumnTypeString},
-			{Name: "name", Type: engine.ColumnTypeString},
+		createTableForTest(t, []handler.ColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "name", Type: handler.ColumnTypeString},
 		})
 
 		stmt := &ast.SelectStmt{
@@ -68,12 +68,12 @@ func TestSelect(t *testing.T) {
 	t.Run("Project が全カラムの位置を保持する", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		createTableForTest(t, []engine.ColumnParam{
-			{Name: "id", Type: engine.ColumnTypeString},
-			{Name: "name", Type: engine.ColumnTypeString},
-			{Name: "email", Type: engine.ColumnTypeString},
+		createTableForTest(t, []handler.ColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "name", Type: handler.ColumnTypeString},
+			{Name: "email", Type: handler.ColumnTypeString},
 		})
 
 		stmt := &ast.SelectStmt{
@@ -96,11 +96,11 @@ func TestSelect(t *testing.T) {
 	t.Run("Project 経由でレコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		createTableForTest(t, []engine.ColumnParam{
-			{Name: "id", Type: engine.ColumnTypeString},
-			{Name: "name", Type: engine.ColumnTypeString},
+		createTableForTest(t, []handler.ColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "name", Type: handler.ColumnTypeString},
 		})
 
 		// データを挿入
