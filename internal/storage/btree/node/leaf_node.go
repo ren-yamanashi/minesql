@@ -13,18 +13,13 @@ type LeafNode struct {
 }
 
 // NewLeafNode はページデータを受け取ってそのデータをリーフノードとして扱うための構造体を返す
-//
-// data: ページデータ全体
+//   - data: ページデータ全体
 //
 // 引数の data はリーフノードとして以下の構成で扱われる
-//
-// data[0:8]: ノードタイプ
-//
-// data[8:16]: 前ページ ID
-//
-// data[16:24]: 次ページ ID
-//
-// data[24:]: Slotted Page (24 = nodeHeaderSize + leafHeaderSize)
+//   - data[0:8]: ノードタイプ
+//   - data[8:16]: 前ページ ID
+//   - data[16:24]: 次ページ ID
+//   - data[24:]: Slotted Page (24 = nodeHeaderSize + leafHeaderSize)
 func NewLeafNode(data []byte) *LeafNode {
 	// ノードタイプを設定
 	copy(data[0:8], NODE_TYPE_LEAF)
@@ -48,12 +43,9 @@ func (ln *LeafNode) Initialize() {
 }
 
 // Insert はレコードを挿入する
-//
-// slotNum: 挿入先のスロット番号 (slotted page のスロット番号)
-//
-// record: 挿入するレコード
-//
-// 戻り値: 挿入に成功したかどうか
+//   - slotNum: 挿入先のスロット番号 (slotted page のスロット番号)
+//   - record: 挿入するレコード
+//   - 戻り値: 挿入に成功したかどうか
 func (ln *LeafNode) Insert(slotNum int, record Record) bool {
 	recordBytes := record.ToBytes()
 
@@ -65,12 +57,9 @@ func (ln *LeafNode) Insert(slotNum int, record Record) bool {
 }
 
 // SplitInsert はリーフノードを分割しながらレコードを挿入する
-//
-// newLeafNode: 分割後の新しいリーフノード
-//
-// newRecord: 挿入するレコード
-//
-// 戻り値: 新しいリーフノードの最小キー
+//   - newLeafNode: 分割後の新しいリーフノード
+//   - newRecord: 挿入するレコード
+//   - 戻り値: 新しいリーフノードの最小キー
 func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newRecord Record) ([]byte, error) {
 	newLeafNode.Initialize()
 
@@ -107,19 +96,15 @@ func (ln *LeafNode) SplitInsert(newLeafNode *LeafNode, newRecord Record) ([]byte
 }
 
 // Delete はレコードを削除する
-//
-// slotNum: 削除するレコードのスロット番号 (slotted page のスロット番号)
+//   - slotNum: 削除するレコードのスロット番号 (slotted page のスロット番号)
 func (ln *LeafNode) Delete(slotNum int) {
 	ln.body.Remove(slotNum)
 }
 
 // Update は指定されたスロットのレコードを更新する
-//
-// slotNum: 更新するレコードのスロット番号
-//
-// record: 新しいレコード (key は変更されない前提)
-//
-// 戻り値: 更新に成功したかどうか (空き容量不足の場合は false)
+//   - slotNum: 更新するレコードのスロット番号
+//   - record: 新しいレコード (key は変更されない前提)
+//   - 戻り値: 更新に成功したかどうか (空き容量不足の場合は false)
 func (ln *LeafNode) Update(slotNum int, record Record) bool {
 	return ln.body.Update(slotNum, record.ToBytes())
 }
@@ -128,7 +113,7 @@ func (ln *LeafNode) Update(slotNum int, record Record) bool {
 //
 // 転送後も半分以上埋まっている場合は true を返す
 //
-// toRight: true の場合は右の兄弟に転送 (末尾レコードを転送)、false の場合は左の兄弟に転送 (先頭レコードを転送)
+//   - toRight: true の場合は右の兄弟に転送 (末尾レコードを転送)、false の場合は左の兄弟に転送 (先頭レコードを転送)
 func (ln *LeafNode) CanTransferRecord(toRight bool) bool {
 	if ln.NumRecords() <= 1 {
 		return false
@@ -160,18 +145,15 @@ func (ln *LeafNode) NumRecords() int {
 }
 
 // RecordAt は指定されたスロット番号のレコードを取得する
-//
-// slotNum: slotted page のスロット番号
+//   - slotNum: slotted page のスロット番号
 func (ln *LeafNode) RecordAt(slotNum int) Record {
 	data := ln.body.Data(slotNum)
 	return recordFromBytes(data)
 }
 
 // SearchSlotNum はキーから、対応するスロット番号 (slotted page のスロット番号) を検索する (二分探索)
-//
-// 見つかった場合: (スロット番号, true)
-//
-// 見つからなかった場合: (0, false)
+//   - 見つかった場合: (スロット番号, true)
+//   - 見つからなかった場合: (0, false)
 func (ln *LeafNode) SearchSlotNum(key []byte) (int, bool) {
 	return binarySearch(ln, key)
 }
@@ -199,8 +181,7 @@ func (ln *LeafNode) NextPageId() *page.PageId {
 }
 
 // SetPrevPageId は前のリーフノードのページ ID を設定する
-//
-// prevPageId: 前のリーフノードのページ ID (前のリーフノードが存在しない場合は nil を指定する)
+//   - prevPageId: 前のリーフノードのページ ID (前のリーフノードが存在しない場合は nil を指定する)
 func (ln *LeafNode) SetPrevPageId(prevPageId *page.PageId) {
 	var pageId page.PageId
 	if prevPageId == nil {
@@ -212,8 +193,7 @@ func (ln *LeafNode) SetPrevPageId(prevPageId *page.PageId) {
 }
 
 // SetNextPageId は次のリーフノードのページ ID を設定する
-//
-// nextPageId: 次のリーフノードのページ ID (次のリーフノードが存在しない場合は nil を指定する)
+//   - nextPageId: 次のリーフノードのページ ID (次のリーフノードが存在しない場合は nil を指定する)
 func (ln *LeafNode) SetNextPageId(nextPageId *page.PageId) {
 	var pageId page.PageId
 	if nextPageId == nil {

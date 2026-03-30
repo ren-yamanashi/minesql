@@ -32,16 +32,12 @@ func GetNodeType(data []byte) []byte {
 }
 
 // 二分探索を行う
-//
-// node: 探索対象のノード
-//
-// key: 探索するキー
+//   - node: 探索対象のノード
+//   - key: 探索するキー
 //
 // 戻り値:
-//
-// - 見つかった場合: (要素のインデックス, true)
-//
-// - 見つからなかった場合: (挿入すべき位置のインデックス, false)
+//   - 見つかった場合: (要素のインデックス, true)
+//   - 見つからなかった場合: (挿入すべき位置のインデックス, false)
 func binarySearch(node Node, key []byte) (int, bool) {
 	left := 0
 	right := node.NumRecords()

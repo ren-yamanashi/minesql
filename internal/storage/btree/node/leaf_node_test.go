@@ -147,6 +147,9 @@ func TestLeafNodeSplitInsert(t *testing.T) {
 		oldFirstKey := ln.RecordAt(0).KeyBytes()
 		assert.True(t, bytes.Compare(newLastKey, oldFirstKey) < 0)
 
+		// 新ノードが半分以上埋まっている
+		assert.True(t, newLn.IsHalfFull())
+
 		// 各ノード内のキーが昇順
 		assertKeysSorted(t, ln)
 		assertKeysSorted(t, newLn)
@@ -178,6 +181,9 @@ func TestLeafNodeSplitInsert(t *testing.T) {
 		assert.NotNil(t, minKey)
 		assert.Equal(t, newLn.RecordAt(0).KeyBytes(), minKey)
 
+		// 新ノードが半分以上埋まっている
+		assert.True(t, newLn.IsHalfFull())
+
 		// 各ノード内のキーが昇順
 		assertKeysSorted(t, ln)
 		assertKeysSorted(t, newLn)
@@ -186,6 +192,42 @@ func TestLeafNodeSplitInsert(t *testing.T) {
 		newLastKey := newLn.RecordAt(newLn.NumRecords() - 1).KeyBytes()
 		oldFirstKey := ln.RecordAt(0).KeyBytes()
 		assert.True(t, bytes.Compare(newLastKey, oldFirstKey) < 0)
+	})
+
+	t.Run("中間キーで分割される場合、キー順序が正しい", func(t *testing.T) {
+		// GIVEN: リーフノードを偶数キーで満杯にする
+		ln := createTestLeafNode(nil)
+		value := make([]byte, 200)
+		numInserted := 0
+		for {
+			key := fmt.Appendf(nil, "a%04d", numInserted*2) // 偶数キー (a0000, a0002, a0004, ...)
+			if !ln.Insert(numInserted, NewRecord(nil, key, value)) {
+				break
+			}
+			numInserted++
+		}
+		// 中間付近に位置する奇数キーを挿入
+		middleKey := fmt.Appendf(nil, "a%04d", numInserted)
+		newLn := createTestLeafNode(nil)
+
+		// WHEN
+		minKey, err := ln.SplitInsert(newLn, NewRecord(nil, middleKey, value))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Greater(t, ln.NumRecords(), 0)
+		assert.Greater(t, newLn.NumRecords(), 0)
+		assert.Equal(t, numInserted+1, ln.NumRecords()+newLn.NumRecords())
+		assert.Equal(t, newLn.RecordAt(0).KeyBytes(), minKey)
+
+		// 新ノードの全キー < 旧ノードの全キー
+		newLastKey := newLn.RecordAt(newLn.NumRecords() - 1).KeyBytes()
+		oldFirstKey := ln.RecordAt(0).KeyBytes()
+		assert.True(t, bytes.Compare(newLastKey, oldFirstKey) < 0)
+
+		// 各ノード内のキーが昇順
+		assertKeysSorted(t, ln)
+		assertKeysSorted(t, newLn)
 	})
 }
 
@@ -612,6 +654,38 @@ func TestLeafNodeNextPageId(t *testing.T) {
 	})
 }
 
+func TestLeafNodePageIdIndependence(t *testing.T) {
+	t.Run("SetPrevPageId は NextPageId に影響を与えない", func(t *testing.T) {
+		// GIVEN
+		ln := createTestLeafNode(nil)
+		nextPid := page.NewPageId(0, 99)
+		ln.SetNextPageId(&nextPid)
+
+		// WHEN
+		prevPid := page.NewPageId(0, 42)
+		ln.SetPrevPageId(&prevPid)
+
+		// THEN
+		assert.Equal(t, nextPid, *ln.NextPageId())
+		assert.Equal(t, prevPid, *ln.PrevPageId())
+	})
+
+	t.Run("SetNextPageId は PrevPageId に影響を与えない", func(t *testing.T) {
+		// GIVEN
+		ln := createTestLeafNode(nil)
+		prevPid := page.NewPageId(0, 42)
+		ln.SetPrevPageId(&prevPid)
+
+		// WHEN
+		nextPid := page.NewPageId(0, 99)
+		ln.SetNextPageId(&nextPid)
+
+		// THEN
+		assert.Equal(t, prevPid, *ln.PrevPageId())
+		assert.Equal(t, nextPid, *ln.NextPageId())
+	})
+}
+
 func TestLeafNodeSetPrevPageId(t *testing.T) {
 	t.Run("nil を設定すると PrevPageId が nil に戻る", func(t *testing.T) {
 		// GIVEN
@@ -654,9 +728,10 @@ func TestLeafNodeTransferAllFrom(t *testing.T) {
 		})
 
 		// WHEN
-		dest.TransferAllFrom(src)
+		ok := dest.TransferAllFrom(src)
 
 		// THEN
+		assert.True(t, ok)
 		assert.Equal(t, 0, src.NumRecords())
 		assert.Equal(t, 3, dest.NumRecords())
 		assert.Equal(t, []byte("key0"), dest.RecordAt(0).KeyBytes())
@@ -672,12 +747,40 @@ func TestLeafNodeTransferAllFrom(t *testing.T) {
 		})
 
 		// WHEN
-		dest.TransferAllFrom(src)
+		ok := dest.TransferAllFrom(src)
 
 		// THEN
+		assert.True(t, ok)
 		assert.Equal(t, 0, src.NumRecords())
 		assert.Equal(t, 1, dest.NumRecords())
 		assert.Equal(t, []byte("key1"), dest.RecordAt(0).KeyBytes())
+	})
+
+	t.Run("転送先の空き容量が不足している場合、false を返す", func(t *testing.T) {
+		// GIVEN: 転送元と転送先をそれぞれほぼ満杯にする
+		src := createTestLeafNode(nil)
+		dest := createTestLeafNode(nil)
+		bigValue := make([]byte, 500)
+		for i := 0; ; i++ {
+			key := fmt.Appendf(nil, "s%02d", i)
+			if !src.Insert(i, NewRecord(nil, key, bigValue)) {
+				break
+			}
+		}
+		for i := 0; ; i++ {
+			key := fmt.Appendf(nil, "d%02d", i)
+			if !dest.Insert(i, NewRecord(nil, key, bigValue)) {
+				break
+			}
+		}
+		srcNumBefore := src.NumRecords()
+
+		// WHEN
+		ok := dest.TransferAllFrom(src)
+
+		// THEN
+		assert.False(t, ok)
+		assert.Equal(t, srcNumBefore, src.NumRecords())
 	})
 }
 

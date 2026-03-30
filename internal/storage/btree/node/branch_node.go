@@ -13,16 +13,12 @@ type BranchNode struct {
 }
 
 // NewBranchNode はページデータを受け取ってそのデータをブランチノードとして扱うための構造体を返す
-//
-// data: ページデータ全体
+//   - data: ページデータ全体
 //
 // 引数の data はブランチノードとして以下の構成で扱われる
-//
-// data[0:8]: ノードタイプ
-//
-// data[8:16]: 右子ページ ID
-//
-// data[16:]: Slotted Page (16 = nodeHeaderSize + branchHeaderSize)
+//   - data[0:8]: ノードタイプ
+//   - data[8:16]: 右子ページ ID
+//   - data[16:]: Slotted Page (16 = nodeHeaderSize + branchHeaderSize)
 func NewBranchNode(data []byte) *BranchNode {
 	// ノードタイプを設定
 	copy(data[0:8], NODE_TYPE_BRANCH)
@@ -37,12 +33,9 @@ func NewBranchNode(data []byte) *BranchNode {
 }
 
 // Initialize はブランチノードを初期化する (初期化時には、レコード数は 1 つ)
-//
-// key: 最初のレコードのキー
-//
-// leftChildPageId: 最初のレコードの非キーフィールド (左の子ページのページ ID)
-//
-// rightChildPageId: ヘッダー部分に設定する右の子ページのページ ID
+//   - key: 最初のレコードのキー
+//   - leftChildPageId: 最初のレコードの非キーフィールド (左の子ページのページ ID)
+//   - rightChildPageId: ヘッダー部分に設定する右の子ページのページ ID
 func (bn *BranchNode) Initialize(key []byte, leftChildPageId page.PageId, rightChildPageId page.PageId) error {
 	bn.body.Initialize()
 
@@ -60,12 +53,9 @@ func (bn *BranchNode) Initialize(key []byte, leftChildPageId page.PageId, rightC
 }
 
 // Insert はレコードを挿入する
-//
-// slotNum: 挿入先のスロット番号 (slotted page のスロット番号)
-//
-// record: 挿入するレコード
-//
-// 戻り値: 挿入に成功したかどうか
+//   - slotNum: 挿入先のスロット番号 (slotted page のスロット番号)
+//   - record: 挿入するレコード
+//   - 戻り値: 挿入に成功したかどうか
 func (bn *BranchNode) Insert(slotNum int, record Record) bool {
 	recordBytes := record.ToBytes()
 
@@ -77,12 +67,9 @@ func (bn *BranchNode) Insert(slotNum int, record Record) bool {
 }
 
 // SplitInsert はブランチノードを分割しながらレコードを挿入する
-//
-// newBranchNode: 分割後の新しいブランチノード
-//
-// newRecord: 挿入するレコード
-//
-// 戻り値: 新しいブランチノードの最小キー
+//   - newBranchNode: 分割後の新しいブランチノード
+//   - newRecord: 挿入するレコード
+//   - 戻り値: 新しいブランチノードの最小キー
 func (bn *BranchNode) SplitInsert(newBranchNode *BranchNode, newRecord Record) ([]byte, error) {
 	newBranchNode.body.Initialize()
 
@@ -119,8 +106,7 @@ func (bn *BranchNode) SplitInsert(newBranchNode *BranchNode, newRecord Record) (
 }
 
 // Delete はレコードを削除する
-//
-// slotNum: 削除するレコードのスロット番号 (slotted page のスロット番号)
+//   - slotNum: 削除するレコードのスロット番号 (slotted page のスロット番号)
 func (bn *BranchNode) Delete(slotNum int) {
 	bn.body.Remove(slotNum)
 }
