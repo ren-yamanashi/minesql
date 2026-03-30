@@ -3,7 +3,7 @@ package executor
 import (
 	"minesql/internal/engine"
 	"minesql/internal/storage/access"
-	"minesql/internal/undo"
+	"minesql/internal/storage/undo"
 )
 
 // Insert はレコードを追加する

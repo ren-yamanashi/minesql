@@ -9,8 +9,8 @@ import (
 	"minesql/internal/executor"
 	"minesql/internal/parser"
 	"minesql/internal/planner"
-	"minesql/internal/transaction"
-	"minesql/internal/undo"
+	"minesql/internal/storage/transaction"
+	"minesql/internal/storage/undo"
 )
 
 // セットアップヘルパー: テーブルを作成し、サンプルデータを挿入する

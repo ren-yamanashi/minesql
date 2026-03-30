@@ -9,7 +9,7 @@ import (
 	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/planner"
-	"minesql/internal/undo"
+	"minesql/internal/storage/undo"
 )
 
 // セットアップヘルパー: テーブルを作成し、サンプルデータを挿入する

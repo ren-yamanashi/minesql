@@ -1,8 +1,8 @@
 package undo
 
 import (
-	"minesql/internal/engine"
 	"minesql/internal/storage/access"
+	"minesql/internal/storage/buffer"
 )
 
 type UpdateInplaceLogRecord struct {
@@ -20,7 +20,7 @@ func NewUpdateInplaceLogRecord(table *access.TableAccessMethod, prevRecord, newR
 }
 
 // Undo は UpdateInplace したレコードを元の値に戻す
-func (r UpdateInplaceLogRecord) Undo() error {
+func (r UpdateInplaceLogRecord) Undo(bp *buffer.BufferPool) error {
 	// 元に戻すので、PrevRecord を新しい値、NewRecord を古い値として UpdateInplace を呼び出す
-	return r.table.UpdateInplace(engine.Get().BufferPool, r.NewRecord, r.PrevRecord)
+	return r.table.UpdateInplace(bp, r.NewRecord, r.PrevRecord)
 }

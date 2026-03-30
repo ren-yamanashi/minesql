@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"minesql/internal/engine"
 	"minesql/internal/storage/access"
-	"minesql/internal/undo"
+	"minesql/internal/storage/undo"
 )
 
 type SetColumn struct {

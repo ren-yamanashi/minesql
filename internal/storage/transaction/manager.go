@@ -1,6 +1,9 @@
 package transaction
 
-import "minesql/internal/undo"
+import (
+	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/undo"
+)
 
 type State string
 
@@ -35,10 +38,10 @@ func (m *Manager) Commit(trxId undo.TrxId) {
 }
 
 // Rollback は Undo ログを逆順に適用してトランザクションをロールバックする
-func (m *Manager) Rollback(trxId undo.TrxId) error {
+func (m *Manager) Rollback(bp *buffer.BufferPool, trxId undo.TrxId) error {
 	records := m.undoLog.GetRecords(trxId)
 	for i := len(records) - 1; i >= 0; i-- {
-		if err := records[i].Undo(); err != nil {
+		if err := records[i].Undo(bp); err != nil {
 			return err
 		}
 	}

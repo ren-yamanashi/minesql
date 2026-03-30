@@ -2,10 +2,9 @@ package statistics
 
 import (
 	"bytes"
-	"minesql/internal/catalog"
-	"minesql/internal/executor"
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/catalog"
 )
 
 type ColumnStatistics struct {
@@ -57,26 +56,23 @@ func (s *Statistics) Analyze() (TableStatistics, error) {
 
 // analyzeTable はテーブルおよびそのテーブル内の全カラムの統計情報を収集する
 func (s *Statistics) analyzeTable(table *access.TableAccessMethod) (*TableStatistics, error) {
-	scan := executor.NewTableScan(
-		table,
-		access.RecordSearchModeStart{},
-		func(record executor.Record) bool {
-			return true
-		},
-	)
+	iter, err := table.Search(s.bufferPool, access.RecordSearchModeStart{})
+	if err != nil {
+		return nil, err
+	}
 
 	var recordCount uint64
 	columnStats := make(map[string]ColumnStatistics)
 	uniqueValues := make(map[string]map[string]struct{}) // カラム名 -> 値の Set
 	colMetadata := s.metadata.GetSortedCols()            // カラムの位置 (Pos) でソートされたカラムメタデータ
 
-	// テーブルをスキャンして統計情報を収集
+	// テーブルを直接スキャンして統計情報を収集 (executor を経由せず access 層の B-tree イテレータを使用)
 	for {
-		record, err := scan.Next()
+		record, ok, err := iter.Next()
 		if err != nil {
 			return nil, err
 		}
-		if record == nil {
+		if !ok {
 			break
 		}
 		recordCount++
@@ -130,7 +126,7 @@ func (s *Statistics) analyzeTable(table *access.TableAccessMethod) (*TableStatis
 // uniqueValues: カラム名 -> 値の Set (結果が代入される)
 func updateColumnStats(
 	colMetadata []*catalog.ColumnMetadata,
-	record executor.Record,
+	record [][]byte,
 	recordCount uint64,
 	columnStats map[string]ColumnStatistics,
 	uniqueValues map[string]map[string]struct{},

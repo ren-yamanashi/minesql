@@ -25,7 +25,7 @@ func TestDeleteLogRecord_Undo(t *testing.T) {
 		undoRecord := DeleteLogRecord{table: table, Record: record}
 
 		// WHEN
-		err = undoRecord.Undo()
+		err = undoRecord.Undo(bp)
 
 		// THEN: レコードが active に戻っている
 		assert.NoError(t, err)
@@ -50,7 +50,7 @@ func TestDeleteLogRecord_Undo(t *testing.T) {
 		undoRecord := DeleteLogRecord{table: table, Record: record}
 
 		// WHEN
-		err = undoRecord.Undo()
+		err = undoRecord.Undo(bp)
 
 		// THEN: ユニークインデックスも復元されている
 		assert.NoError(t, err)
@@ -73,7 +73,7 @@ func TestDeleteLogRecord_Undo(t *testing.T) {
 		undoRecord := DeleteLogRecord{table: table, Record: record}
 
 		// WHEN
-		err = undoRecord.Undo()
+		err = undoRecord.Undo(bp)
 
 		// THEN: レコードが再挿入されている
 		assert.NoError(t, err)

@@ -2,10 +2,10 @@ package planner
 
 import (
 	"minesql/internal/ast"
-	"minesql/internal/catalog"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/undo"
+	"minesql/internal/storage/catalog"
+	"minesql/internal/storage/undo"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

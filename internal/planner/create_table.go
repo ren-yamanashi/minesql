@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"minesql/internal/ast"
-	"minesql/internal/catalog"
 	"minesql/internal/executor"
+	"minesql/internal/storage/catalog"
 )
 
 type CreateTable struct {

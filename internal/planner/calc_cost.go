@@ -1,6 +1,6 @@
 package planner
 
-import "minesql/internal/statistics"
+import "minesql/internal/storage/statistics"
 
 // defaultRangeSelectivity は min/max が不明な場合の範囲比較の推定選択率
 const defaultRangeSelectivity = 1.0 / 3.0

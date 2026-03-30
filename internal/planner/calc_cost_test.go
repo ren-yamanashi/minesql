@@ -1,7 +1,7 @@
 package planner
 
 import (
-	"minesql/internal/statistics"
+	"minesql/internal/storage/statistics"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

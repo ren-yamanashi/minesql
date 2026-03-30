@@ -53,11 +53,11 @@ func TestUndoIntegration(t *testing.T) {
 		assert.Equal(t, []string{"c", "Dave"}, records[1])
 
 		// WHEN: 逆順に Undo
-		err = undo3.Undo()
+		err = undo3.Undo(bp)
 		assert.NoError(t, err)
-		err = undo2.Undo()
+		err = undo2.Undo(bp)
 		assert.NoError(t, err)
-		err = undo1.Undo()
+		err = undo1.Undo(bp)
 		assert.NoError(t, err)
 
 		// THEN: 初期状態に戻っている
@@ -105,9 +105,9 @@ func TestUndoIntegration(t *testing.T) {
 		assert.Equal(t, []string{"x", "Bob"}, records[0])
 
 		// WHEN: 逆順に Undo
-		err = undo2.Undo()
+		err = undo2.Undo(bp)
 		assert.NoError(t, err)
-		err = undo1.Undo()
+		err = undo1.Undo(bp)
 		assert.NoError(t, err)
 
 		// THEN: 初期状態に戻っている

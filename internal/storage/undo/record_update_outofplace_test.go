@@ -29,7 +29,7 @@ func TestUpdateOutofplaceLogRecord_Undo(t *testing.T) {
 		}
 
 		// WHEN
-		err = undoRecord.Undo()
+		err = undoRecord.Undo(bp)
 
 		// THEN: "b" が物理削除され、"a" が active に戻っている
 		assert.NoError(t, err)

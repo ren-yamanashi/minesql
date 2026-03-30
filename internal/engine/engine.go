@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"sync"
 
-	"minesql/internal/catalog"
 	"minesql/internal/config"
 	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/catalog"
 	"minesql/internal/storage/file"
 	"minesql/internal/storage/page"
 )

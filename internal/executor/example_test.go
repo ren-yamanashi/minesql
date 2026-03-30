@@ -5,11 +5,11 @@ import (
 	"os"
 	"strings"
 
-	"minesql/internal/catalog"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/storage/access"
-	"minesql/internal/undo"
+	"minesql/internal/storage/catalog"
+	"minesql/internal/storage/undo"
 )
 
 // セットアップヘルパー: テーブルを作成し、サンプルデータを挿入する

@@ -1,6 +1,6 @@
 package server
 
-import "minesql/internal/undo"
+import "minesql/internal/storage/undo"
 
 // session はクライアントごとの接続状態を管理する
 type session struct {

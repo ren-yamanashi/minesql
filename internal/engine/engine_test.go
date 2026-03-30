@@ -1,8 +1,8 @@
 package engine
 
 import (
-	"minesql/internal/catalog"
 	"minesql/internal/storage/access"
+	"minesql/internal/storage/catalog"
 	"minesql/internal/storage/page"
 	"os"
 	"path/filepath"

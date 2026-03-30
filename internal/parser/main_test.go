@@ -5,8 +5,8 @@ import (
 	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/planner"
-	"minesql/internal/transaction"
-	"minesql/internal/undo"
+	"minesql/internal/storage/transaction"
+	"minesql/internal/storage/undo"
 	"strings"
 	"testing"
 

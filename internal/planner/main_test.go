@@ -5,7 +5,7 @@ import (
 	"minesql/internal/ast"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/undo"
+	"minesql/internal/storage/undo"
 	"strings"
 	"testing"
 

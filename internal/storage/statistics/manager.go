@@ -1,8 +1,8 @@
 package statistics
 
 import (
-	"minesql/internal/catalog"
 	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/catalog"
 	"sync"
 )
 

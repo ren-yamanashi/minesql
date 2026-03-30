@@ -3,7 +3,7 @@ package executor
 import (
 	"minesql/internal/engine"
 	"minesql/internal/storage/access"
-	"minesql/internal/undo"
+	"minesql/internal/storage/undo"
 )
 
 // Delete は InnerExecutor の結果を元にレコードを削除する

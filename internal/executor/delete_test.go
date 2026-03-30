@@ -3,10 +3,10 @@ package executor
 import (
 	"testing"
 
-	"minesql/internal/catalog"
 	"minesql/internal/engine"
 	"minesql/internal/storage/access"
-	"minesql/internal/undo"
+	"minesql/internal/storage/catalog"
+	"minesql/internal/storage/undo"
 
 	"github.com/stretchr/testify/assert"
 )

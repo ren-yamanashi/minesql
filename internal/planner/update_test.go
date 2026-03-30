@@ -5,7 +5,7 @@ import (
 	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/storage/access"
-	"minesql/internal/undo"
+	"minesql/internal/storage/undo"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

@@ -28,7 +28,7 @@ func TestUpdateInplaceLogRecord_Undo(t *testing.T) {
 		}
 
 		// WHEN
-		err = undoRecord.Undo()
+		err = undoRecord.Undo(bp)
 
 		// THEN: 元の値に戻っている
 		assert.NoError(t, err)
@@ -56,7 +56,7 @@ func TestUpdateInplaceLogRecord_Undo(t *testing.T) {
 		}
 
 		// WHEN
-		err = undoRecord.Undo()
+		err = undoRecord.Undo(bp)
 
 		// THEN: ユニークインデックスも元の値に戻っている
 		assert.NoError(t, err)

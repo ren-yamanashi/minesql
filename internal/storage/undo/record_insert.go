@@ -1,8 +1,8 @@
 package undo
 
 import (
-	"minesql/internal/engine"
 	"minesql/internal/storage/access"
+	"minesql/internal/storage/buffer"
 )
 
 type InsertLogRecord struct {
@@ -18,6 +18,6 @@ func NewInsertLogRecord(table *access.TableAccessMethod, record [][]byte) Insert
 }
 
 // Undo は Insert したレコードを物理削除する
-func (r InsertLogRecord) Undo() error {
-	return r.table.Delete(engine.Get().BufferPool, r.Record)
+func (r InsertLogRecord) Undo(bp *buffer.BufferPool) error {
+	return r.table.Delete(bp, r.Record)
 }

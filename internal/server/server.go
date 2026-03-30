@@ -16,8 +16,8 @@ import (
 	"minesql/internal/executor"
 	"minesql/internal/parser"
 	"minesql/internal/planner"
-	"minesql/internal/transaction"
-	"minesql/internal/undo"
+	"minesql/internal/storage/transaction"
+	"minesql/internal/storage/undo"
 )
 
 type Server struct {
@@ -120,7 +120,7 @@ func (s *Server) handleConnection(conn *net.TCPConn) {
 	defer func() {
 		// アクティブなトランザクションがあれば自動ロールバック
 		if sess.trxId != 0 {
-			if err := s.trxManager.Rollback(sess.trxId); err != nil {
+			if err := s.trxManager.Rollback(engine.Get().BufferPool, sess.trxId); err != nil {
 				log.Printf("Auto rollback error: %v", err)
 			}
 			sess.trxId = 0
@@ -198,7 +198,7 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 		if sess.trxId == 0 {
 			return "", fmt.Errorf("no active transaction")
 		}
-		if err := s.trxManager.Rollback(sess.trxId); err != nil {
+		if err := s.trxManager.Rollback(engine.Get().BufferPool, sess.trxId); err != nil {
 			return "", err
 		}
 		sess.trxId = 0
@@ -215,7 +215,7 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 	exec, err := planner.Start(s.undoLog, trxId, node)
 	if err != nil {
 		if autocommit {
-			_ = s.trxManager.Rollback(trxId)
+			_ = s.trxManager.Rollback(engine.Get().BufferPool, trxId)
 		}
 		return "", err
 	}
@@ -225,7 +225,7 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 		record, err := exec.Next()
 		if err != nil {
 			if autocommit {
-				_ = s.trxManager.Rollback(trxId)
+				_ = s.trxManager.Rollback(engine.Get().BufferPool, trxId)
 			}
 			return "", err
 		}

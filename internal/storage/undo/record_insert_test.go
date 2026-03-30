@@ -24,7 +24,7 @@ func TestInsertLogRecord_Undo(t *testing.T) {
 		undoRecord := InsertLogRecord{table: table, Record: record}
 
 		// WHEN
-		err = undoRecord.Undo()
+		err = undoRecord.Undo(bp)
 
 		// THEN: レコードが物理削除されている (B+Tree にも残らない)
 		assert.NoError(t, err)
@@ -49,7 +49,7 @@ func TestInsertLogRecord_Undo(t *testing.T) {
 		undoRecord := InsertLogRecord{table: table, Record: record}
 
 		// WHEN
-		err = undoRecord.Undo()
+		err = undoRecord.Undo(bp)
 
 		// THEN: ユニークインデックスからも物理削除されている
 		assert.NoError(t, err)

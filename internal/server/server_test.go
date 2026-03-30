@@ -2,8 +2,8 @@ package server
 
 import (
 	"minesql/internal/engine"
-	"minesql/internal/transaction"
-	"minesql/internal/undo"
+	"minesql/internal/storage/transaction"
+	"minesql/internal/storage/undo"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -446,7 +446,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 
 		// WHEN: 接続切断をシミュレート (handleConnection の defer と同じロジック)
 		assert.NotEqual(t, undo.TrxId(0), sess.trxId)
-		err = s.trxManager.Rollback(sess.trxId)
+		err = s.trxManager.Rollback(engine.Get().BufferPool, sess.trxId)
 		assert.NoError(t, err)
 		sess.trxId = 0
 

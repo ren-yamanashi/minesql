@@ -1,12 +1,12 @@
 package transaction_test
 
 import (
-	"minesql/internal/catalog"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/storage/access"
-	"minesql/internal/transaction"
-	"minesql/internal/undo"
+	"minesql/internal/storage/catalog"
+	"minesql/internal/storage/transaction"
+	"minesql/internal/storage/undo"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -62,7 +62,7 @@ func TestRollback(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		err = trxMgr.Rollback(trxId)
+		err = trxMgr.Rollback(engine.Get().BufferPool, trxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -101,7 +101,7 @@ func TestRollback(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		err = trxMgr.Rollback(deleteTrxId)
+		err = trxMgr.Rollback(engine.Get().BufferPool, deleteTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -144,7 +144,7 @@ func TestRollback(t *testing.T) {
 		assert.Equal(t, "Carol", string(recs[0][1]))
 
 		// WHEN
-		err = trxMgr.Rollback(updateTrxId)
+		err = trxMgr.Rollback(engine.Get().BufferPool, updateTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -203,7 +203,7 @@ func TestRollback(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		err = trxMgr.Rollback(trxId)
+		err = trxMgr.Rollback(engine.Get().BufferPool, trxId)
 
 		// THEN: 初期状態に戻る
 		assert.NoError(t, err)

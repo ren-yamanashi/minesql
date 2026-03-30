@@ -4,11 +4,11 @@ import (
 	"errors"
 	"fmt"
 	"minesql/internal/ast"
-	"minesql/internal/catalog"
 	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/statistics"
 	"minesql/internal/storage/access"
+	"minesql/internal/storage/catalog"
+	"minesql/internal/storage/statistics"
 	"strconv"
 )
 

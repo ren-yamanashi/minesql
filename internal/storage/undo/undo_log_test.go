@@ -1,6 +1,7 @@
 package undo
 
 import (
+	"minesql/internal/storage/buffer"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,7 +13,7 @@ type mockLogRecord struct {
 	undone bool
 }
 
-func (m *mockLogRecord) Undo() error {
+func (m *mockLogRecord) Undo(bp *buffer.BufferPool) error {
 	m.undone = true
 	return nil
 }

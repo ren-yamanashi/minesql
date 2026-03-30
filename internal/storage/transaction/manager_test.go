@@ -2,7 +2,8 @@ package transaction
 
 import (
 	"errors"
-	"minesql/internal/undo"
+	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/undo"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,14 +14,14 @@ type mockLogRecord struct {
 	undone bool
 }
 
-func (m *mockLogRecord) Undo() error {
+func (m *mockLogRecord) Undo(bp *buffer.BufferPool) error {
 	m.undone = true
 	return nil
 }
 
 type failingLogRecord struct{}
 
-func (f *failingLogRecord) Undo() error {
+func (f *failingLogRecord) Undo(bp *buffer.BufferPool) error {
 	return errors.New("undo failed")
 }
 
@@ -112,7 +113,7 @@ func TestManagerRollback(t *testing.T) {
 		undoLog.Append(trxId, r3)
 
 		// WHEN
-		err := manager.Rollback(trxId)
+		err := manager.Rollback(nil, trxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -129,7 +130,7 @@ func TestManagerRollback(t *testing.T) {
 		undoLog.Append(trxId, &mockLogRecord{})
 
 		// WHEN
-		err := manager.Rollback(trxId)
+		err := manager.Rollback(nil, trxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -145,7 +146,7 @@ func TestManagerRollback(t *testing.T) {
 		undoLog.Append(trxId, &failingLogRecord{})
 
 		// WHEN
-		err := manager.Rollback(trxId)
+		err := manager.Rollback(nil, trxId)
 
 		// THEN
 		assert.Error(t, err)
@@ -162,7 +163,7 @@ func TestManagerRollback(t *testing.T) {
 		undoLog.Append(trx2, r2)
 
 		// WHEN
-		err := manager.Rollback(trx1)
+		err := manager.Rollback(nil, trx1)
 
 		// THEN
 		assert.NoError(t, err)
