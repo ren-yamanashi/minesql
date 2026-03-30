@@ -518,6 +518,24 @@ func TestDelete(t *testing.T) {
 		assert.Equal(t, "key2", string(records[0].KeyBytes()))
 		assert.Equal(t, "key3", string(records[1].KeyBytes()))
 	})
+
+	t.Run("削除したキーを再挿入できる", func(t *testing.T) {
+		// GIVEN
+		bt, bp := setupBTree(t)
+		bt.mustInsert(bp, "key1", "val1")
+		bt.mustInsert(bp, "key2", "val2")
+		err := bt.Delete(bp, []byte("key1"))
+		assert.NoError(t, err)
+
+		// WHEN: 削除したキーを再挿入
+		err = bt.Insert(bp, node.NewRecord(nil, []byte("key1"), []byte("new_val1")))
+
+		// THEN
+		assert.NoError(t, err)
+		record, err := bt.FindByKey(bp, []byte("key1"))
+		assert.NoError(t, err)
+		assert.Equal(t, "new_val1", string(record.NonKeyBytes()))
+	})
 }
 
 func TestUpdate(t *testing.T) {
@@ -975,6 +993,32 @@ func TestHeight(t *testing.T) {
 		hAfter, err := bt.Height(bp)
 		assert.NoError(t, err)
 		assert.LessOrEqual(t, hAfter, hBefore)
+	})
+
+	t.Run("全レコード削除後に高さが 1 に戻る", func(t *testing.T) {
+		// GIVEN: 多数のレコードを挿入して高さを 2 以上にする
+		bt, bp := setupBTree(t)
+		numRecords := 500
+		for i := range numRecords {
+			key := fmt.Sprintf("key%04d", i)
+			val := fmt.Sprintf("val%04d", i)
+			bt.mustInsert(bp, key, val)
+		}
+		h, err := bt.Height(bp)
+		assert.NoError(t, err)
+		assert.Greater(t, h, uint64(1))
+
+		// WHEN: 全レコードを削除
+		for i := range numRecords {
+			key := fmt.Sprintf("key%04d", i)
+			err := bt.Delete(bp, []byte(key))
+			assert.NoError(t, err)
+		}
+
+		// THEN: 高さが 1 に戻る
+		h, err = bt.Height(bp)
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(1), h)
 	})
 }
 

@@ -82,6 +82,29 @@ func TestBTreeInsertAndScan(t *testing.T) {
 `
 		assert.Equal(t, expected, w.String())
 	})
+
+	t.Run("削除後にディスクに書き出してから再度読み込める", func(t *testing.T) {
+		// GIVEN
+		tree, bp := setupBTree(t)
+		for _, fruit := range []string{"apple", "banana", "cherry"} {
+			tree.mustInsert(bp, fruit, strings.Repeat(string(fruit[0]), 200))
+		}
+		require.NoError(t, tree.Delete(bp, []byte("banana")))
+
+		// WHEN
+		err := bp.FlushPage()
+		require.NoError(t, err)
+
+		// THEN
+		var w strings.Builder
+		writeScanLog(&w, bp, tree)
+
+		expected := `  key=apple, value=a x 200
+  key=cherry, value=c x 200
+  合計: 2 件
+`
+		assert.Equal(t, expected, w.String())
+	})
 }
 
 func TestBTreeSearchKey(t *testing.T) {
@@ -512,6 +535,60 @@ Branch[keys=1]: [key_10]
 
 		expected := `1 件目: ルートが Leaf に変化
 19 件目: ルートが Branch に変化
+`
+		assert.Equal(t, expected, w.String())
+	})
+}
+
+func TestBTreeCRUDLifecycle(t *testing.T) {
+	t.Run("レコードのライフサイクルを通しで追跡できる", func(t *testing.T) {
+		// GIVEN
+		tree, bp := setupBTree(t)
+
+		var w strings.Builder
+
+		// Insert
+		tree.mustInsert(bp, "apple", strings.Repeat("a", 100))
+		tree.mustInsert(bp, "banana", strings.Repeat("b", 100))
+		tree.mustInsert(bp, "cherry", strings.Repeat("c", 100))
+		fmt.Fprintln(&w, "=== Insert 後 ===")
+		writeScanLog(&w, bp, tree)
+
+		// Search (FindByKey)
+		record, err := tree.FindByKey(bp, []byte("banana"))
+		require.NoError(t, err)
+		fmt.Fprintf(&w, "FindByKey(banana): value=%s x %d\n", string(record.NonKeyBytes()[:1]), len(record.NonKeyBytes()))
+
+		// Update
+		require.NoError(t, tree.Update(bp, node.NewRecord(nil, []byte("banana"), []byte(strings.Repeat("X", 50)))))
+		fmt.Fprintln(&w, "=== Update 後 ===")
+		writeScanLog(&w, bp, tree)
+
+		// Delete
+		require.NoError(t, tree.Delete(bp, []byte("banana")))
+		fmt.Fprintln(&w, "=== Delete 後 ===")
+		writeScanLog(&w, bp, tree)
+
+		// FindByKey で削除済みキーが見つからない
+		_, err = tree.FindByKey(bp, []byte("banana"))
+		fmt.Fprintf(&w, "FindByKey(banana): %v\n", err)
+
+		expected := `=== Insert 後 ===
+  key=apple, value=a x 100
+  key=banana, value=b x 100
+  key=cherry, value=c x 100
+  合計: 3 件
+FindByKey(banana): value=b x 100
+=== Update 後 ===
+  key=apple, value=a x 100
+  key=banana, value=X x 50
+  key=cherry, value=c x 100
+  合計: 3 件
+=== Delete 後 ===
+  key=apple, value=a x 100
+  key=cherry, value=c x 100
+  合計: 2 件
+FindByKey(banana): key not found
 `
 		assert.Equal(t, expected, w.String())
 	})
