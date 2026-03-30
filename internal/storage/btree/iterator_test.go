@@ -1,8 +1,10 @@
 package btree
 
 import (
-	"minesql/internal/btree/node"
-	"minesql/internal/storage"
+	"minesql/internal/storage/btree/node"
+	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/file"
+	"minesql/internal/storage/page"
 	"path/filepath"
 	"testing"
 
@@ -12,7 +14,7 @@ import (
 func TestNewIterator(t *testing.T) {
 	t.Run("正常にイテレータを生成できる", func(t *testing.T) {
 		// GIVEN
-		var bufferPageMock storage.BufferPage
+		var bufferPageMock buffer.BufferPage
 		slotNum := 0
 
 		// WHEN
@@ -30,14 +32,14 @@ func TestGet(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		dm := initDiskForIterator(t, tmpdir)
-		bp := storage.NewBufferPool(3)
-		bp.RegisterDisk(storage.FileId(0), dm)
+		bp := buffer.NewBufferPool(3)
+		bp.RegisterDisk(page.FileId(0), dm)
 
 		record1 := node.NewRecord(nil, []byte("key1"), []byte("value1"))
 		record2 := node.NewRecord(nil, []byte("key2"), []byte("value2"))
 		record3 := node.NewRecord(nil, []byte("key3"), []byte("value3"))
 
-		bufferPage := createLeafBufferPage(storage.NewPageId(storage.FileId(0), storage.PageNumber(0)), []node.Record{record1, record2, record3}, nil)
+		bufferPage := createLeafBufferPage(page.NewPageId(page.FileId(0), page.PageNumber(0)), []node.Record{record1, record2, record3}, nil)
 		iterator := newIterator(bufferPage, 1) // 2 番目のレコードを指している
 
 		// WHEN
@@ -55,14 +57,14 @@ func TestNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		dm := initDiskForIterator(t, tmpdir)
-		bp := storage.NewBufferPool(3)
-		bp.RegisterDisk(storage.FileId(0), dm)
+		bp := buffer.NewBufferPool(3)
+		bp.RegisterDisk(page.FileId(0), dm)
 
 		record1 := node.NewRecord(nil, []byte("key1"), []byte("value1"))
 		record2 := node.NewRecord(nil, []byte("key2"), []byte("value2"))
 		record3 := node.NewRecord(nil, []byte("key3"), []byte("value3"))
 
-		bufferPage := createLeafBufferPage(storage.NewPageId(storage.FileId(0), storage.PageNumber(0)), []node.Record{record1, record2, record3}, nil)
+		bufferPage := createLeafBufferPage(page.NewPageId(page.FileId(0), page.PageNumber(0)), []node.Record{record1, record2, record3}, nil)
 		iterator := newIterator(bufferPage, 0)
 		assert.Equal(t, 0, iterator.slotNum) // 最初のレコードを指している
 
@@ -91,14 +93,14 @@ func TestAdvance(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		dm := initDiskForIterator(t, tmpdir)
-		bp := storage.NewBufferPool(3)
-		bp.RegisterDisk(storage.FileId(0), dm)
+		bp := buffer.NewBufferPool(3)
+		bp.RegisterDisk(page.FileId(0), dm)
 
 		record1 := node.NewRecord(nil, []byte("key1"), []byte("value1"))
 		record2 := node.NewRecord(nil, []byte("key2"), []byte("value2"))
 		record3 := node.NewRecord(nil, []byte("key3"), []byte("value3"))
 
-		bufferPage := createLeafBufferPage(storage.NewPageId(storage.FileId(0), storage.PageNumber(0)), []node.Record{record1, record2, record3}, nil)
+		bufferPage := createLeafBufferPage(page.NewPageId(page.FileId(0), page.PageNumber(0)), []node.Record{record1, record2, record3}, nil)
 		iterator := newIterator(bufferPage, 0)
 
 		// WHEN
@@ -106,20 +108,20 @@ func TestAdvance(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, storage.NewPageId(storage.FileId(0), storage.PageNumber(0)), iterator.bufferPage.PageId) // ページは変わらない
+		assert.Equal(t, page.NewPageId(page.FileId(0), page.PageNumber(0)), iterator.bufferPage.PageId) // ページは変わらない
 	})
 
 	t.Run("現在のページ内に、次の key-value レコードがないが、次のページも存在しない場合は何もしない", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		dm := initDiskForIterator(t, tmpdir)
-		bp := storage.NewBufferPool(3)
-		bp.RegisterDisk(storage.FileId(0), dm)
+		bp := buffer.NewBufferPool(3)
+		bp.RegisterDisk(page.FileId(0), dm)
 
 		record1 := node.NewRecord(nil, []byte("key1"), []byte("value1"))
 		record2 := node.NewRecord(nil, []byte("key2"), []byte("value2"))
 
-		bufferPage := createLeafBufferPage(storage.NewPageId(storage.FileId(0), storage.PageNumber(0)), []node.Record{record1, record2}, nil)
+		bufferPage := createLeafBufferPage(page.NewPageId(page.FileId(0), page.PageNumber(0)), []node.Record{record1, record2}, nil)
 		iterator := newIterator(bufferPage, 1) // 最後のレコードを指している
 
 		// WHEN
@@ -127,33 +129,33 @@ func TestAdvance(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, storage.NewPageId(storage.FileId(0), storage.PageNumber(0)), iterator.bufferPage.PageId) // ページは変わらない
+		assert.Equal(t, page.NewPageId(page.FileId(0), page.PageNumber(0)), iterator.bufferPage.PageId) // ページは変わらない
 	})
 
 	t.Run("現在のページ内に次の key-value レコードがなく、次のページが存在する場合は、次のページに移動する (古いページの参照ビットがクリアされ、次のページの先頭にポインタが置かれる)", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		dm := initDiskForIterator(t, tmpdir)
-		bp := storage.NewBufferPool(3)
-		bp.RegisterDisk(storage.FileId(0), dm)
+		bp := buffer.NewBufferPool(3)
+		bp.RegisterDisk(page.FileId(0), dm)
 
 		// 最初のページ
 		record1 := node.NewRecord(nil, []byte("key1"), []byte("value1"))
 		record2 := node.NewRecord(nil, []byte("key2"), []byte("value2"))
-		nextPageId := storage.NewPageId(storage.FileId(0), storage.PageNumber(1))
-		bufferPage1 := createLeafBufferPage(storage.NewPageId(storage.FileId(0), storage.PageNumber(0)), []node.Record{record1, record2}, &nextPageId)
+		nextPageId := page.NewPageId(page.FileId(0), page.PageNumber(1))
+		bufferPage1 := createLeafBufferPage(page.NewPageId(page.FileId(0), page.PageNumber(0)), []node.Record{record1, record2}, &nextPageId)
 
 		// 次のページ
 		record3 := node.NewRecord(nil, []byte("key3"), []byte("value3"))
 		record4 := node.NewRecord(nil, []byte("key4"), []byte("value4"))
-		bufferPage2 := createLeafBufferPage(storage.NewPageId(storage.FileId(0), storage.PageNumber(1)), []node.Record{record3, record4}, nil)
+		bufferPage2 := createLeafBufferPage(page.NewPageId(page.FileId(0), page.PageNumber(1)), []node.Record{record3, record4}, nil)
 
 		// 次のページをディスクに書き込む
-		err := dm.WritePageData(storage.NewPageId(storage.FileId(0), storage.PageNumber(1)), bufferPage2.GetReadData())
+		err := dm.WritePageData(page.NewPageId(page.FileId(0), page.PageNumber(1)), bufferPage2.GetReadData())
 		assert.NoError(t, err)
 
 		// ページ 1 をバッファプールに追加
-		addedPage1, err := bp.AddPage(storage.NewPageId(storage.FileId(0), storage.PageNumber(0)))
+		addedPage1, err := bp.AddPage(page.NewPageId(page.FileId(0), page.PageNumber(0)))
 		assert.NoError(t, err)
 		copy(addedPage1.GetWriteData(), bufferPage1.GetReadData())
 
@@ -164,14 +166,14 @@ func TestAdvance(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, storage.NewPageId(storage.FileId(0), storage.PageNumber(1)), iterator.bufferPage.PageId)
+		assert.Equal(t, page.NewPageId(page.FileId(0), page.PageNumber(1)), iterator.bufferPage.PageId)
 		assert.Equal(t, 0, iterator.slotNum) // 次のページの先頭
 	})
 }
 
 // リーフノードを含む BufferPage を作成する
-func createLeafBufferPage(pageId storage.PageId, records []node.Record, nextPageId *storage.PageId) storage.BufferPage {
-	bufpool := storage.NewBufferPage(pageId)
+func createLeafBufferPage(pageId page.PageId, records []node.Record, nextPageId *page.PageId) buffer.BufferPage {
+	bufpool := buffer.NewBufferPage(pageId)
 
 	leafNode := node.NewLeafNode(bufpool.GetWriteData())
 	leafNode.Initialize()
@@ -189,9 +191,9 @@ func createLeafBufferPage(pageId storage.PageId, records []node.Record, nextPage
 	return *bufpool
 }
 
-func initDiskForIterator(t *testing.T, tmpdir string) *storage.Disk {
+func initDiskForIterator(t *testing.T, tmpdir string) *file.Disk {
 	path := filepath.Join(tmpdir, "iterator_test.db")
-	dm, err := storage.NewDisk(storage.FileId(0), path)
+	dm, err := file.NewDisk(page.FileId(0), path)
 	if err != nil {
 		t.Fatalf("failed to create disk manager: %v", err)
 	}

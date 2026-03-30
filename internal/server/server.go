@@ -62,11 +62,10 @@ func (s *Server) Start() error {
 
 // サーバーを停止する
 func (s *Server) Stop() error {
-	err := s.storageManager.BufferPool.FlushPage()
-	if err != nil {
+	if err := s.storageManager.Shutdown(); err != nil {
 		return err
 	}
-	log.Println("All pages flushed successfully.")
+	log.Println("All pages flushed and synced successfully.")
 	return nil
 }
 

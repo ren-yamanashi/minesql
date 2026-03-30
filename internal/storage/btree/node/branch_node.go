@@ -2,7 +2,7 @@ package node
 
 import (
 	"errors"
-	"minesql/internal/storage"
+	"minesql/internal/storage/page"
 )
 
 const branchHeaderSize = 8
@@ -43,7 +43,7 @@ func NewBranchNode(data []byte) *BranchNode {
 // leftChildPageId: 最初のレコードの非キーフィールド (左の子ページのページ ID)
 //
 // rightChildPageId: ヘッダー部分に設定する右の子ページのページ ID
-func (bn *BranchNode) Initialize(key []byte, leftChildPageId storage.PageId, rightChildPageId storage.PageId) error {
+func (bn *BranchNode) Initialize(key []byte, leftChildPageId page.PageId, rightChildPageId page.PageId) error {
 	bn.body.Initialize()
 
 	// 左の子ページのポインタ (ページ ID) を非キーフィールドとした Record を作成
@@ -202,22 +202,22 @@ func (bn *BranchNode) SearchChildSlotNum(key []byte) int {
 }
 
 // ChildPageIdAt は指定されたスロット番号の、子ページのページ ID を取得する
-func (bn *BranchNode) ChildPageIdAt(slotNum int) storage.PageId {
+func (bn *BranchNode) ChildPageIdAt(slotNum int) page.PageId {
 	if slotNum == bn.NumRecords() {
 		// 右端の子ページ ID を返す
-		return storage.ReadPageIdFromPageData(bn.Body(), 0)
+		return page.ReadPageIdFromPageData(bn.Body(), 0)
 	}
 	record := bn.RecordAt(slotNum)
-	return storage.RestorePageIdFromBytes(record.NonKeyBytes())
+	return page.RestorePageIdFromBytes(record.NonKeyBytes())
 }
 
 // RightChildPageId は右端の子ページ ID を取得する
-func (bn *BranchNode) RightChildPageId() storage.PageId {
-	return storage.ReadPageIdFromPageData(bn.Body(), 0)
+func (bn *BranchNode) RightChildPageId() page.PageId {
+	return page.ReadPageIdFromPageData(bn.Body(), 0)
 }
 
 // SetRightChildPageId は右端の子ページ ID を設定する
-func (bn *BranchNode) SetRightChildPageId(pageId storage.PageId) {
+func (bn *BranchNode) SetRightChildPageId(pageId page.PageId) {
 	pageId.WriteTo(bn.Body(), 0)
 }
 
@@ -236,7 +236,7 @@ func (bn *BranchNode) IsHalfFull() bool {
 func (bn *BranchNode) fillRightChild() []byte {
 	lastId := bn.NumRecords() - 1
 	record := bn.RecordAt(lastId)
-	rightChild := storage.RestorePageIdFromBytes(record.NonKeyBytes())
+	rightChild := page.RestorePageIdFromBytes(record.NonKeyBytes())
 	key := make([]byte, len(record.KeyBytes()))
 
 	// キーをコピー

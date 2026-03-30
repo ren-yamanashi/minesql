@@ -1,7 +1,7 @@
 package btree
 
 import (
-	"minesql/internal/storage"
+	"minesql/internal/storage/page"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,7 +24,7 @@ func TestNewMetaPage(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
 		mp := newMetaPage(data)
-		expectedPageId := storage.NewPageId(storage.FileId(1), storage.PageNumber(42))
+		expectedPageId := page.NewPageId(page.FileId(1), page.PageNumber(42))
 		mp.setRootPageId(expectedPageId)
 
 		// WHEN
@@ -38,7 +38,7 @@ func TestNewMetaPage(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
 		mp := newMetaPage(data)
-		expectedPageId := storage.NewPageId(storage.FileId(2), storage.PageNumber(99))
+		expectedPageId := page.NewPageId(page.FileId(2), page.PageNumber(99))
 
 		// WHEN
 		mp.setRootPageId(expectedPageId)
@@ -99,7 +99,7 @@ func TestNewMetaPage(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
 		mp := newMetaPage(data)
-		expectedPageId := storage.NewPageId(storage.FileId(1), storage.PageNumber(10))
+		expectedPageId := page.NewPageId(page.FileId(1), page.PageNumber(10))
 
 		// WHEN: 全フィールドを設定
 		mp.setRootPageId(expectedPageId)

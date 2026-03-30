@@ -2,9 +2,9 @@ package catalog
 
 import (
 	"encoding/binary"
-	"minesql/internal/btree"
 	"minesql/internal/encode"
-	"minesql/internal/storage"
+	"minesql/internal/storage/btree"
+	"minesql/internal/storage/page"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -18,7 +18,7 @@ func TestGetSortedCols(t *testing.T) {
 			NewColumnMetadata(1, "id", 0, ColumnTypeString),
 			NewColumnMetadata(1, "name", 1, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(1, "users", 3, 1, colMeta, []*IndexMetadata{}, storage.NewPageId(storage.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 3, 1, colMeta, []*IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		sorted := tableMeta.GetSortedCols()
@@ -39,7 +39,7 @@ func TestGetSortedCols(t *testing.T) {
 			NewColumnMetadata(1, "id", 0, ColumnTypeString),
 			NewColumnMetadata(1, "name", 1, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, []*IndexMetadata{}, storage.NewPageId(storage.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, []*IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		sorted := tableMeta.GetSortedCols()
@@ -55,7 +55,7 @@ func TestGetSortedCols(t *testing.T) {
 		colMeta := []*ColumnMetadata{
 			NewColumnMetadata(1, "id", 0, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(1, "users", 1, 1, colMeta, []*IndexMetadata{}, storage.NewPageId(storage.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 1, 1, colMeta, []*IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		sorted := tableMeta.GetSortedCols()
@@ -67,7 +67,7 @@ func TestGetSortedCols(t *testing.T) {
 
 	t.Run("カラムが空の場合", func(t *testing.T) {
 		// GIVEN
-		tableMeta := NewTableMetadata(1, "users", 0, 0, []*ColumnMetadata{}, []*IndexMetadata{}, storage.NewPageId(storage.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 0, 0, []*ColumnMetadata{}, []*IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		sorted := tableMeta.GetSortedCols()
@@ -85,7 +85,7 @@ func TestGetColByName(t *testing.T) {
 			NewColumnMetadata(1, "name", 1, ColumnTypeString),
 			NewColumnMetadata(1, "email", 2, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(1, "users", 3, 1, colMeta, []*IndexMetadata{}, storage.NewPageId(storage.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 3, 1, colMeta, []*IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		col, found := tableMeta.GetColByName("name")
@@ -103,7 +103,7 @@ func TestGetColByName(t *testing.T) {
 			NewColumnMetadata(1, "id", 0, ColumnTypeString),
 			NewColumnMetadata(1, "name", 1, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, []*IndexMetadata{}, storage.NewPageId(storage.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, []*IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 		// WHEN
 		col, found := tableMeta.GetColByName("non_existent_column")
 
@@ -121,9 +121,9 @@ func TestGetIndexByColName(t *testing.T) {
 			NewColumnMetadata(1, "email", 1, ColumnTypeString),
 		}
 		idxMeta := []*IndexMetadata{
-			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, storage.NewPageId(storage.FileId(1), 1)),
+			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
 		}
-		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, idxMeta, storage.NewPageId(storage.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		idx, found := tableMeta.GetIndexByColName("email")
@@ -144,10 +144,10 @@ func TestGetIndexByColName(t *testing.T) {
 			NewColumnMetadata(1, "username", 2, ColumnTypeString),
 		}
 		idxMeta := []*IndexMetadata{
-			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, storage.NewPageId(storage.FileId(1), 1)),
-			NewIndexMetadata(1, "idx_username", "username", IndexTypeUnique, storage.NewPageId(storage.FileId(1), 2)),
+			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
+			NewIndexMetadata(1, "idx_username", "username", IndexTypeUnique, page.NewPageId(page.FileId(1), 2)),
 		}
-		tableMeta := NewTableMetadata(1, "users", 3, 1, colMeta, idxMeta, storage.NewPageId(storage.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 3, 1, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		idx, found := tableMeta.GetIndexByColName("username")
@@ -167,9 +167,9 @@ func TestGetIndexByColName(t *testing.T) {
 			NewColumnMetadata(1, "email", 2, ColumnTypeString),
 		}
 		idxMeta := []*IndexMetadata{
-			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, storage.NewPageId(storage.FileId(1), 1)),
+			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
 		}
-		tableMeta := NewTableMetadata(1, "users", 3, 1, colMeta, idxMeta, storage.NewPageId(storage.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 3, 1, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		idx, found := tableMeta.GetIndexByColName("name")
@@ -185,9 +185,9 @@ func TestGetIndexByColName(t *testing.T) {
 			NewColumnMetadata(1, "id", 0, ColumnTypeString),
 		}
 		idxMeta := []*IndexMetadata{
-			NewIndexMetadata(1, "idx_id", "id", IndexTypeUnique, storage.NewPageId(storage.FileId(1), 1)),
+			NewIndexMetadata(1, "idx_id", "id", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
 		}
-		tableMeta := NewTableMetadata(1, "users", 1, 1, colMeta, idxMeta, storage.NewPageId(storage.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 1, 1, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		idx, found := tableMeta.GetIndexByColName("non_existent_column")
@@ -203,7 +203,7 @@ func TestGetIndexByColName(t *testing.T) {
 			NewColumnMetadata(1, "id", 0, ColumnTypeString),
 			NewColumnMetadata(1, "name", 1, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, []*IndexMetadata{}, storage.NewPageId(storage.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, []*IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 		// WHEN
 		idx, found := tableMeta.GetIndexByColName("name")
 
@@ -220,7 +220,7 @@ func TestGetTable(t *testing.T) {
 			NewColumnMetadata(1, "id", 0, ColumnTypeString),
 			NewColumnMetadata(1, "name", 1, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, []*IndexMetadata{}, storage.NewPageId(storage.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, []*IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 		// WHEN
 		tbl, err := tableMeta.GetTable()
 
@@ -230,7 +230,7 @@ func TestGetTable(t *testing.T) {
 		assert.Equal(t, "users", tbl.Name)
 		assert.Equal(t, uint8(1), tbl.PrimaryKeyCount)
 		assert.Equal(t, 0, len(tbl.UniqueIndexes))
-		assert.Equal(t, storage.NewPageId(storage.FileId(1), 0), tbl.MetaPageId)
+		assert.Equal(t, page.NewPageId(page.FileId(1), 0), tbl.MetaPageId)
 	})
 
 	t.Run("ユニークインデックス付きのテーブルを取得できる", func(t *testing.T) {
@@ -240,9 +240,9 @@ func TestGetTable(t *testing.T) {
 			NewColumnMetadata(1, "email", 1, ColumnTypeString),
 		}
 		idxMeta := []*IndexMetadata{
-			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, storage.NewPageId(storage.FileId(1), 1)),
+			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
 		}
-		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, idxMeta, storage.NewPageId(storage.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		tbl, err := tableMeta.GetTable()
@@ -255,7 +255,7 @@ func TestGetTable(t *testing.T) {
 		assert.Equal(t, "idx_email", tbl.UniqueIndexes[0].Name)
 		assert.Equal(t, "email", tbl.UniqueIndexes[0].ColName)
 		assert.Equal(t, uint16(1), tbl.UniqueIndexes[0].SecondaryKeyIdx)
-		assert.Equal(t, storage.NewPageId(storage.FileId(1), 1), tbl.UniqueIndexes[0].MetaPageId)
+		assert.Equal(t, page.NewPageId(page.FileId(1), 1), tbl.UniqueIndexes[0].MetaPageId)
 	})
 
 	t.Run("複数のユニークインデックス付きのテーブルを取得できる", func(t *testing.T) {
@@ -266,10 +266,10 @@ func TestGetTable(t *testing.T) {
 			NewColumnMetadata(1, "username", 2, ColumnTypeString),
 		}
 		idxMeta := []*IndexMetadata{
-			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, storage.NewPageId(storage.FileId(1), 1)),
-			NewIndexMetadata(1, "idx_username", "username", IndexTypeUnique, storage.NewPageId(storage.FileId(1), 2)),
+			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
+			NewIndexMetadata(1, "idx_username", "username", IndexTypeUnique, page.NewPageId(page.FileId(1), 2)),
 		}
-		tableMeta := NewTableMetadata(1, "users", 3, 1, colMeta, idxMeta, storage.NewPageId(storage.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 3, 1, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		tbl, err := tableMeta.GetTable()
@@ -293,9 +293,9 @@ func TestGetTable(t *testing.T) {
 			NewColumnMetadata(1, "name", 1, ColumnTypeString),
 		}
 		idxMeta := []*IndexMetadata{
-			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, storage.NewPageId(storage.FileId(1), 1)),
+			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
 		}
-		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, idxMeta, storage.NewPageId(storage.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		tbl, err := tableMeta.GetTable()
@@ -314,12 +314,12 @@ func TestTableMetadata_Insert(t *testing.T) {
 		defer removeTmpdir(t, tmpdir)
 
 		// テーブルメタデータ用の B+Tree を作成
-		metaPageId, err := bp.AllocatePageId(storage.FileId(0))
+		metaPageId, err := bp.AllocatePageId(page.FileId(0))
 		assert.NoError(t, err)
-		_, err = btree.CreateBPlusTree(bp, metaPageId)
+		_, err = btree.CreateBTree(bp, metaPageId)
 		assert.NoError(t, err)
 
-		dataMetaPageId := storage.NewPageId(storage.FileId(1), 0)
+		dataMetaPageId := page.NewPageId(page.FileId(1), 0)
 		tableMeta := NewTableMetadata(42, "users", 3, 1, []*ColumnMetadata{
 			NewColumnMetadata(42, "id", 0, ColumnTypeString),
 			NewColumnMetadata(42, "name", 1, ColumnTypeString),
@@ -333,7 +333,7 @@ func TestTableMetadata_Insert(t *testing.T) {
 		// THEN: B+Tree から挿入したデータを検索して確認
 		assert.NoError(t, err)
 
-		btr := btree.NewBPlusTree(metaPageId)
+		btr := btree.NewBTree(metaPageId)
 		iter, err := btr.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -352,7 +352,7 @@ func TestTableMetadata_Insert(t *testing.T) {
 		assert.Equal(t, "users", string(valueParts[0]))
 		assert.Equal(t, uint64(3), binary.BigEndian.Uint64(valueParts[1]))
 		assert.Equal(t, uint64(1), binary.BigEndian.Uint64(valueParts[2]))
-		assert.Equal(t, dataMetaPageId, storage.RestorePageIdFromBytes(valueParts[3]))
+		assert.Equal(t, dataMetaPageId, page.RestorePageIdFromBytes(valueParts[3]))
 	})
 }
 
@@ -365,7 +365,7 @@ func TestLoadTableMetadata(t *testing.T) {
 		cat, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		dataMetaPageId := storage.NewPageId(storage.FileId(1), 0)
+		dataMetaPageId := page.NewPageId(page.FileId(1), 0)
 		colMeta := []*ColumnMetadata{
 			NewColumnMetadata(1, "id", 0, ColumnTypeString),
 			NewColumnMetadata(1, "name", 1, ColumnTypeString),
@@ -380,7 +380,7 @@ func TestLoadTableMetadata(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, 1, len(result))
-		assert.Equal(t, storage.FileId(1), result[0].FileId)
+		assert.Equal(t, page.FileId(1), result[0].FileId)
 		assert.Equal(t, "users", result[0].Name)
 		assert.Equal(t, uint8(2), result[0].NCols)
 		assert.Equal(t, uint8(1), result[0].PrimaryKeyCount)
@@ -400,7 +400,7 @@ func TestLoadTableMetadata(t *testing.T) {
 			NewColumnMetadata(1, "name", 1, ColumnTypeString),
 			NewColumnMetadata(1, "email", 2, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(1, "users", 3, 1, colMeta, []*IndexMetadata{}, storage.NewPageId(storage.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 3, 1, colMeta, []*IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 		err = cat.Insert(bp, tableMeta)
 		assert.NoError(t, err)
 
@@ -428,11 +428,11 @@ func TestLoadTableMetadata(t *testing.T) {
 			NewColumnMetadata(1, "id", 0, ColumnTypeString),
 			NewColumnMetadata(1, "email", 1, ColumnTypeString),
 		}
-		idxDataPageId := storage.NewPageId(storage.FileId(1), 5)
+		idxDataPageId := page.NewPageId(page.FileId(1), 5)
 		idxMeta := []*IndexMetadata{
 			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, idxDataPageId),
 		}
-		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, idxMeta, storage.NewPageId(storage.FileId(1), 0))
+		tableMeta := NewTableMetadata(1, "users", 2, 1, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
 		err = cat.Insert(bp, tableMeta)
 		assert.NoError(t, err)
 
@@ -460,7 +460,7 @@ func TestLoadTableMetadata(t *testing.T) {
 		table1 := NewTableMetadata(1, "users", 2, 1, []*ColumnMetadata{
 			NewColumnMetadata(1, "id", 0, ColumnTypeString),
 			NewColumnMetadata(1, "name", 1, ColumnTypeString),
-		}, []*IndexMetadata{}, storage.NewPageId(storage.FileId(1), 0))
+		}, []*IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
 		err = cat.Insert(bp, table1)
 		assert.NoError(t, err)
 
@@ -468,7 +468,7 @@ func TestLoadTableMetadata(t *testing.T) {
 			NewColumnMetadata(2, "id", 0, ColumnTypeString),
 			NewColumnMetadata(2, "title", 1, ColumnTypeString),
 			NewColumnMetadata(2, "body", 2, ColumnTypeString),
-		}, []*IndexMetadata{}, storage.NewPageId(storage.FileId(2), 0))
+		}, []*IndexMetadata{}, page.NewPageId(page.FileId(2), 0))
 		err = cat.Insert(bp, table2)
 		assert.NoError(t, err)
 

@@ -2,9 +2,11 @@ package access
 
 import (
 	"fmt"
-	"minesql/internal/btree"
 	"minesql/internal/encode"
-	"minesql/internal/storage"
+	"minesql/internal/storage/btree"
+	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/file"
+	"minesql/internal/storage/page"
 	"os"
 	"path/filepath"
 	"testing"
@@ -38,7 +40,7 @@ func TestCreateAndInsert(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: 挿入したデータが B+Tree に存在する
-		tree := btree.NewBPlusTree(table.MetaPageId)
+		tree := btree.NewBTree(table.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -78,7 +80,7 @@ func TestCreateAndInsert(t *testing.T) {
 		assert.Equal(t, len(expectedRecords), i)
 
 		// THEN: ユニークインデックスにもデータが挿入されている
-		uniqueIndexTree := btree.NewBPlusTree(table.UniqueIndexes[0].MetaPageId)
+		uniqueIndexTree := btree.NewBTree(table.UniqueIndexes[0].MetaPageId)
 		uniqueIndexIter, err := uniqueIndexTree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -197,7 +199,7 @@ func TestCreateAndInsert(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: B+Tree を直接走査するとレコードは 1 件で、DeleteMark=0 に更新されている
-		tree := btree.NewBPlusTree(table.MetaPageId)
+		tree := btree.NewBTree(table.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -256,7 +258,7 @@ func TestSoftDelete(t *testing.T) {
 
 		// THEN: ユニークインデックスもソフトデリートされている
 		// B+Tree を直接走査し、active なエントリのみ確認する
-		indexTree := btree.NewBPlusTree(table.UniqueIndexes[0].MetaPageId)
+		indexTree := btree.NewBTree(table.UniqueIndexes[0].MetaPageId)
 		indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -296,7 +298,7 @@ func TestSoftDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: B+Tree を直接走査すると 2 件存在し、"a" は DeleteMark=1
-		tree := btree.NewBPlusTree(table.MetaPageId)
+		tree := btree.NewBTree(table.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -388,7 +390,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: B+Tree を直接走査すると 1 件のみ存在 (物理的に消えている)
-		tree := btree.NewBPlusTree(table.MetaPageId)
+		tree := btree.NewBTree(table.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -431,7 +433,7 @@ func TestDelete(t *testing.T) {
 		assert.Equal(t, [][]byte{[]byte("b")}, recs[0].key)
 
 		// THEN: ユニークインデックスからも物理削除されている (全エントリを走査)
-		indexTree := btree.NewBPlusTree(table.UniqueIndexes[0].MetaPageId)
+		indexTree := btree.NewBTree(table.UniqueIndexes[0].MetaPageId)
 		indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -494,7 +496,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: B+Tree を直接走査してもレコードが存在しない
-		tree := btree.NewBPlusTree(table.MetaPageId)
+		tree := btree.NewBTree(table.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 		_, ok := iter.Get()
@@ -549,7 +551,7 @@ func TestUpdate(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: B+Tree を直接走査するとレコードは 1 件で DeleteMark=0 のまま
-		tree := btree.NewBPlusTree(table.MetaPageId)
+		tree := btree.NewBTree(table.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -591,7 +593,7 @@ func TestUpdate(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: B+Tree を直接走査すると 2 件存在し、"a" は DeleteMark=1、"b" は DeleteMark=0
-		tree := btree.NewBPlusTree(table.MetaPageId)
+		tree := btree.NewBTree(table.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -711,7 +713,7 @@ func TestUpdate(t *testing.T) {
 
 		// THEN: ユニークインデックスが更新されている
 		// active なエントリのみ確認し、Key にセカンダリキーと新しい PK が含まれる
-		indexTree := btree.NewBPlusTree(table.UniqueIndexes[0].MetaPageId)
+		indexTree := btree.NewBTree(table.UniqueIndexes[0].MetaPageId)
 		indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -912,7 +914,7 @@ type decodedRecord struct {
 	value [][]byte
 }
 
-func collectAllTablePairs(t *testing.T, bp *storage.BufferPool, table *TableAccessMethod) []decodedRecord {
+func collectAllTablePairs(t *testing.T, bp *buffer.BufferPool, table *TableAccessMethod) []decodedRecord {
 	t.Helper()
 	iter, err := table.Search(bp, RecordSearchModeStart{})
 	assert.NoError(t, err)
@@ -935,9 +937,9 @@ func collectAllTablePairs(t *testing.T, bp *storage.BufferPool, table *TableAcce
 func TestGetUniqueIndexByName(t *testing.T) {
 	t.Run("インデックス名からユニークインデックスを取得できる", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex1 := NewUniqueIndexAccessMethod("idx_first_name", "first_name", storage.PageId{}, 1)
-		uniqueIndex2 := NewUniqueIndexAccessMethod("idx_last_name", "last_name", storage.PageId{}, 2)
-		table := NewTableAccessMethod("users", storage.PageId{}, 1, []*UniqueIndexAccessMethod{uniqueIndex1, uniqueIndex2})
+		uniqueIndex1 := NewUniqueIndexAccessMethod("idx_first_name", "first_name", page.PageId{}, 1)
+		uniqueIndex2 := NewUniqueIndexAccessMethod("idx_last_name", "last_name", page.PageId{}, 2)
+		table := NewTableAccessMethod("users", page.PageId{}, 1, []*UniqueIndexAccessMethod{uniqueIndex1, uniqueIndex2})
 
 		// WHEN
 		ui, err := table.GetUniqueIndexByName("idx_last_name")
@@ -949,8 +951,8 @@ func TestGetUniqueIndexByName(t *testing.T) {
 
 	t.Run("存在しないインデックス名を指定するとエラーになる", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_first_name", "first_name", storage.PageId{}, 1)
-		table := NewTableAccessMethod("users", storage.PageId{}, 1, []*UniqueIndexAccessMethod{uniqueIndex})
+		uniqueIndex := NewUniqueIndexAccessMethod("idx_first_name", "first_name", page.PageId{}, 1)
+		table := NewTableAccessMethod("users", page.PageId{}, 1, []*UniqueIndexAccessMethod{uniqueIndex})
 
 		// WHEN
 		ui, err := table.GetUniqueIndexByName("idx_last_name")
@@ -960,13 +962,13 @@ func TestGetUniqueIndexByName(t *testing.T) {
 	})
 }
 
-func InitDisk(t *testing.T, pathname string) (bufferPool *storage.BufferPool, metaPageId storage.PageId, tmpdir string) {
+func InitDisk(t *testing.T, pathname string) (bufferPool *buffer.BufferPool, metaPageId page.PageId, tmpdir string) {
 	tmpdir = t.TempDir()
 	filePath := filepath.Join(tmpdir, pathname)
 
-	bp := storage.NewBufferPool(10)
-	fileId := storage.FileId(1)
-	dm, err := storage.NewDisk(fileId, filePath)
+	bp := buffer.NewBufferPool(10)
+	fileId := page.FileId(1)
+	dm, err := file.NewDisk(fileId, filePath)
 	assert.NoError(t, err)
 	bp.RegisterDisk(fileId, dm)
 
@@ -1056,9 +1058,9 @@ func TestHeight(t *testing.T) {
 // ユニークインデックスの active なエントリのセカンダリキーを収集するヘルパー
 //
 // ソフトデリート済み (DeleteMark=1) のエントリはスキップする
-func collectActiveUniqueIndexKeys(t *testing.T, bp *storage.BufferPool, ui *UniqueIndexAccessMethod) []string {
+func collectActiveUniqueIndexKeys(t *testing.T, bp *buffer.BufferPool, ui *UniqueIndexAccessMethod) []string {
 	t.Helper()
-	indexTree := btree.NewBPlusTree(ui.MetaPageId)
+	indexTree := btree.NewBTree(ui.MetaPageId)
 	indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})
 	assert.NoError(t, err)
 

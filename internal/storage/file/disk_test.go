@@ -1,8 +1,10 @@
-package storage
+package file
 
 import (
 	"path/filepath"
 	"testing"
+
+	"minesql/internal/storage/page"
 
 	"github.com/ncw/directio"
 	"github.com/stretchr/testify/assert"
@@ -13,20 +15,20 @@ func TestNewDisk(t *testing.T) {
 		// GIVEN
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "test.db")
-		fileId := FileId(0)
+		fileId := page.FileId(0)
 
 		// WHEN
 		dm, err := NewDisk(fileId, dbPath)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, NewPageId(fileId, PageNumber(0)), dm.nextPageId)
+		assert.Equal(t, page.NewPageId(fileId, page.PageNumber(0)), dm.nextPageId)
 	})
 
 	t.Run("無効なファイルが指定された場合はエラー", func(t *testing.T) {
 		// GIVEN
 		invalidPath := "/nonexistent/directory/file.db"
-		fileId := FileId(0)
+		fileId := page.FileId(0)
 
 		// WHEN
 		_, err := NewDisk(fileId, invalidPath)
@@ -39,7 +41,7 @@ func TestNewDisk(t *testing.T) {
 		// GIVEN: 1 ページ分のデータを書き込んだファイルを用意
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "test.db")
-		fileId := FileId(0)
+		fileId := page.FileId(0)
 
 		dm1, err := NewDisk(fileId, dbPath)
 		assert.NoError(t, err)
@@ -54,7 +56,7 @@ func TestNewDisk(t *testing.T) {
 
 		// THEN: nextPageId がファイルサイズから計算された値 (pageNumber=1) になる
 		assert.NoError(t, err)
-		assert.Equal(t, NewPageId(fileId, PageNumber(1)), dm2.nextPageId)
+		assert.Equal(t, page.NewPageId(fileId, page.PageNumber(1)), dm2.nextPageId)
 	})
 }
 
@@ -63,7 +65,7 @@ func TestAllocatePage(t *testing.T) {
 		// GIVEN
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "test.db")
-		fileId := FileId(0)
+		fileId := page.FileId(0)
 		dm, err := NewDisk(fileId, dbPath)
 		assert.NoError(t, err)
 
@@ -73,10 +75,10 @@ func TestAllocatePage(t *testing.T) {
 		pageId3 := dm.AllocatePage()
 
 		// THEN
-		assert.Equal(t, NewPageId(fileId, PageNumber(0)), pageId1)
-		assert.Equal(t, NewPageId(fileId, PageNumber(1)), pageId2)
-		assert.Equal(t, NewPageId(fileId, PageNumber(2)), pageId3)
-		assert.Equal(t, NewPageId(fileId, PageNumber(3)), dm.nextPageId)
+		assert.Equal(t, page.NewPageId(fileId, page.PageNumber(0)), pageId1)
+		assert.Equal(t, page.NewPageId(fileId, page.PageNumber(1)), pageId2)
+		assert.Equal(t, page.NewPageId(fileId, page.PageNumber(2)), pageId3)
+		assert.Equal(t, page.NewPageId(fileId, page.PageNumber(3)), dm.nextPageId)
 	})
 }
 
@@ -100,7 +102,7 @@ func TestReadPageData(t *testing.T) {
 	t.Run("読み込むバッファのサイズが PAGE_SIZE と異なる場合はエラー", func(t *testing.T) {
 		// GIVEN
 		dm, pageId := initDisk(t)
-		invalidData := make([]byte, PAGE_SIZE-1)
+		invalidData := make([]byte, page.PAGE_SIZE-1)
 
 		// WHEN
 		err := dm.ReadPageData(pageId, invalidData)
@@ -114,7 +116,7 @@ func TestReadPageData(t *testing.T) {
 		dm, _ := initDisk(t)
 
 		// GIVEN: FileId(1) のページ ID を用意
-		wrongPageId := NewPageId(FileId(1), PageNumber(0))
+		wrongPageId := page.NewPageId(page.FileId(1), page.PageNumber(0))
 		readData := directio.AlignedBlock(directio.BlockSize)
 
 		// WHEN
@@ -129,15 +131,15 @@ func TestReadPageData(t *testing.T) {
 		// GIVEN: 3 ページ分のデータを書き込む
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "test.db")
-		dm, err := NewDisk(FileId(0), dbPath)
+		dm, err := NewDisk(page.FileId(0), dbPath)
 		assert.NoError(t, err)
 
 		pages := make([][]byte, 3)
-		pageIds := make([]PageId, 3)
+		pageIds := make([]page.PageId, 3)
 		for i := range 3 {
 			pageIds[i] = dm.AllocatePage()
 			pages[i] = directio.AlignedBlock(directio.BlockSize)
-			for j := range PAGE_SIZE {
+			for j := range page.PAGE_SIZE {
 				pages[i][j] = byte((i*100 + j) % 256)
 			}
 			err := dm.WritePageData(pageIds[i], pages[i])
@@ -170,7 +172,7 @@ func TestWritePageData(t *testing.T) {
 	t.Run("書き込むデータのサイズが PAGE_SIZE と異なる場合はエラー", func(t *testing.T) {
 		// GIVEN
 		dm, pageId := initDisk(t)
-		invalidData := make([]byte, PAGE_SIZE+10)
+		invalidData := make([]byte, page.PAGE_SIZE+10)
 
 		// WHEN
 		err := dm.WritePageData(pageId, invalidData)
@@ -184,7 +186,7 @@ func TestWritePageData(t *testing.T) {
 		dm, _ := initDisk(t)
 
 		// GIVEN: FileId(1) のページ ID を用意
-		wrongPageId := NewPageId(FileId(1), PageNumber(0))
+		wrongPageId := page.NewPageId(page.FileId(1), page.PageNumber(0))
 		writeData := createDataBuffer()
 
 		// WHEN
@@ -199,7 +201,7 @@ func TestWritePageData(t *testing.T) {
 		// GIVEN
 		dm, pageId := initDisk(t)
 		firstData := directio.AlignedBlock(directio.BlockSize)
-		for i := range PAGE_SIZE {
+		for i := range page.PAGE_SIZE {
 			firstData[i] = byte(0xAA)
 		}
 		err := dm.WritePageData(pageId, firstData)
@@ -207,7 +209,7 @@ func TestWritePageData(t *testing.T) {
 
 		// WHEN: 同じページに異なるデータを上書き
 		secondData := directio.AlignedBlock(directio.BlockSize)
-		for i := range PAGE_SIZE {
+		for i := range page.PAGE_SIZE {
 			secondData[i] = byte(0xBB)
 		}
 		err = dm.WritePageData(pageId, secondData)
@@ -237,10 +239,10 @@ func TestSync(t *testing.T) {
 	})
 }
 
-func initDisk(t *testing.T) (*Disk, PageId) {
+func initDisk(t *testing.T) (*Disk, page.PageId) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "sample.db")
-	dm, err := NewDisk(FileId(0), dbPath)
+	dm, err := NewDisk(page.FileId(0), dbPath)
 	if err != nil {
 		t.Fatalf("Failed to open Disk: %v", err)
 	}
@@ -250,7 +252,7 @@ func initDisk(t *testing.T) (*Disk, PageId) {
 
 func createDataBuffer() []byte {
 	writeData := directio.AlignedBlock(directio.BlockSize)
-	for i := range PAGE_SIZE {
+	for i := range page.PAGE_SIZE {
 		writeData[i] = byte(i % 256)
 	}
 	return writeData

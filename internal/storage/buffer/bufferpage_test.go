@@ -1,6 +1,7 @@
-package storage
+package buffer
 
 import (
+	"minesql/internal/storage/page"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,7 +10,7 @@ import (
 func TestNewBufferPage(t *testing.T) {
 	t.Run("正常にバッファページが生成される", func(t *testing.T) {
 		// GIVEN
-		pageId := NewPageId(FileId(0), PageNumber(0))
+		pageId := page.NewPageId(page.FileId(0), page.PageNumber(0))
 
 		// WHEN
 		bufferPage := NewBufferPage(pageId)
@@ -24,7 +25,7 @@ func TestNewBufferPage(t *testing.T) {
 func TestGetWriteData(t *testing.T) {
 	t.Run("IsDirty が true に設定される", func(t *testing.T) {
 		// GIVEN
-		pageId := NewPageId(FileId(0), PageNumber(0))
+		pageId := page.NewPageId(page.FileId(0), page.PageNumber(0))
 		bufferPage := NewBufferPage(pageId)
 
 		// WHEN
@@ -33,12 +34,12 @@ func TestGetWriteData(t *testing.T) {
 		// THEN
 		assert.True(t, bufferPage.IsDirty)
 		assert.NotNil(t, data)
-		assert.Equal(t, PAGE_SIZE, len(data))
+		assert.Equal(t, page.PAGE_SIZE, len(data))
 	})
 
 	t.Run("データを書き込むと Page の内容が更新される", func(t *testing.T) {
 		// GIVEN
-		pageId := NewPageId(FileId(0), PageNumber(0))
+		pageId := page.NewPageId(page.FileId(0), page.PageNumber(0))
 		bufferPage := NewBufferPage(pageId)
 
 		// WHEN
@@ -53,7 +54,7 @@ func TestGetWriteData(t *testing.T) {
 
 	t.Run("複数回呼び出しても IsDirty が true のまま", func(t *testing.T) {
 		// GIVEN
-		pageId := NewPageId(FileId(0), PageNumber(0))
+		pageId := page.NewPageId(page.FileId(0), page.PageNumber(0))
 		bufferPage := NewBufferPage(pageId)
 
 		// WHEN
@@ -68,7 +69,7 @@ func TestGetWriteData(t *testing.T) {
 func TestGetReadData(t *testing.T) {
 	t.Run("IsDirty は false のまま維持される", func(t *testing.T) {
 		// GIVEN
-		pageId := NewPageId(FileId(0), PageNumber(0))
+		pageId := page.NewPageId(page.FileId(0), page.PageNumber(0))
 		bufferPage := NewBufferPage(pageId)
 
 		// WHEN
@@ -77,12 +78,12 @@ func TestGetReadData(t *testing.T) {
 		// THEN
 		assert.False(t, bufferPage.IsDirty)
 		assert.NotNil(t, data)
-		assert.Equal(t, PAGE_SIZE, len(data))
+		assert.Equal(t, page.PAGE_SIZE, len(data))
 	})
 
 	t.Run("データを読み取ると Page の内容にアクセスできる", func(t *testing.T) {
 		// GIVEN
-		pageId := NewPageId(FileId(0), PageNumber(0))
+		pageId := page.NewPageId(page.FileId(0), page.PageNumber(0))
 		bufferPage := NewBufferPage(pageId)
 		testData := []byte("test data")
 		copy(bufferPage.Page[0:len(testData)], testData)
@@ -99,7 +100,7 @@ func TestGetReadData(t *testing.T) {
 func TestGetWriteDataAndGetReadData(t *testing.T) {
 	t.Run("GetWriteData の後に GetReadData を呼んでも IsDirty は true のまま", func(t *testing.T) {
 		// GIVEN
-		pageId := NewPageId(FileId(0), PageNumber(0))
+		pageId := page.NewPageId(page.FileId(0), page.PageNumber(0))
 		bufferPage := NewBufferPage(pageId)
 
 		// WHEN
@@ -112,7 +113,7 @@ func TestGetWriteDataAndGetReadData(t *testing.T) {
 
 	t.Run("GetReadData の後に GetWriteData を呼ぶと IsDirty が true になる", func(t *testing.T) {
 		// GIVEN
-		pageId := NewPageId(FileId(0), PageNumber(0))
+		pageId := page.NewPageId(page.FileId(0), page.PageNumber(0))
 		bufferPage := NewBufferPage(pageId)
 
 		// WHEN

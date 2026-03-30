@@ -1,16 +1,16 @@
 package btree
 
 import (
-	"minesql/internal/btree/node"
-	"minesql/internal/storage"
+	"minesql/internal/storage/btree/node"
+	"minesql/internal/storage/buffer"
 )
 
 // Iterator は B+Tree のリーフノード (双方向連結リスト) を走査する
 //
 // 全件スキャンや範囲検索などで、リーフノードを順番に走査するために使用する
 type Iterator struct {
-	bufferPage storage.BufferPage // 現在参照しているバッファページ
-	slotNum    int                // 現在参照されているスロット番号 (slotted page のスロット番号)
+	bufferPage buffer.BufferPage // 現在参照しているバッファページ
+	slotNum    int               // 現在参照されているスロット番号 (slotted page のスロット番号)
 }
 
 // newIterator は指定されたバッファページとスロット番号を持つイテレータを生成する
@@ -18,7 +18,7 @@ type Iterator struct {
 // bufferPage: イテレータが参照するバッファページ
 //
 // slotNum: イテレータが参照するスロット番号 (slotted page のスロット番号)
-func newIterator(bufferPage storage.BufferPage, slotNum int) *Iterator {
+func newIterator(bufferPage buffer.BufferPage, slotNum int) *Iterator {
 	return &Iterator{
 		bufferPage: bufferPage,
 		slotNum:    slotNum,
@@ -44,7 +44,7 @@ func (iter *Iterator) Get() (node.Record, bool) {
 }
 
 // Next は次のレコードを取得する
-func (iter *Iterator) Next(bp *storage.BufferPool) (node.Record, bool, error) {
+func (iter *Iterator) Next(bp *buffer.BufferPool) (node.Record, bool, error) {
 	record, ok := iter.Get()
 	if !ok {
 		return node.NewRecord(nil, nil, nil), false, nil
@@ -57,7 +57,7 @@ func (iter *Iterator) Next(bp *storage.BufferPool) (node.Record, bool, error) {
 }
 
 // Advance は次のレコードに進む
-func (iter *Iterator) Advance(bp *storage.BufferPool) error {
+func (iter *Iterator) Advance(bp *buffer.BufferPool) error {
 	iter.slotNum++
 
 	leafNode := node.NewLeafNode(iter.bufferPage.GetReadData())

@@ -2,9 +2,9 @@ package catalog
 
 import (
 	"encoding/binary"
-	"minesql/internal/btree"
 	"minesql/internal/encode"
-	"minesql/internal/storage"
+	"minesql/internal/storage/btree"
+	"minesql/internal/storage/page"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,9 +16,9 @@ func TestColumnMetadata_Insert(t *testing.T) {
 		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
-		metaPageId, err := bp.AllocatePageId(storage.FileId(0))
+		metaPageId, err := bp.AllocatePageId(page.FileId(0))
 		assert.NoError(t, err)
-		_, err = btree.CreateBPlusTree(bp, metaPageId)
+		_, err = btree.CreateBTree(bp, metaPageId)
 		assert.NoError(t, err)
 
 		colMeta := NewColumnMetadata(1, "email", 2, ColumnTypeString)
@@ -30,7 +30,7 @@ func TestColumnMetadata_Insert(t *testing.T) {
 		// THEN: B+Tree から挿入したデータを検索して確認
 		assert.NoError(t, err)
 
-		btr := btree.NewBPlusTree(metaPageId)
+		btr := btree.NewBTree(metaPageId)
 		iter, err := btr.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -57,9 +57,9 @@ func TestColumnMetadata_Insert(t *testing.T) {
 		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
-		metaPageId, err := bp.AllocatePageId(storage.FileId(0))
+		metaPageId, err := bp.AllocatePageId(page.FileId(0))
 		assert.NoError(t, err)
-		_, err = btree.CreateBPlusTree(bp, metaPageId)
+		_, err = btree.CreateBTree(bp, metaPageId)
 		assert.NoError(t, err)
 
 		cols := []*ColumnMetadata{
@@ -76,7 +76,7 @@ func TestColumnMetadata_Insert(t *testing.T) {
 		}
 
 		// THEN: 3 件挿入されている
-		btr := btree.NewBPlusTree(metaPageId)
+		btr := btree.NewBTree(metaPageId)
 		iter, err := btr.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -190,8 +190,8 @@ func TestLoadColumnMetadata(t *testing.T) {
 		assert.Equal(t, 2, len(result))
 		assert.Equal(t, "id", result[0].Name)
 		assert.Equal(t, "name", result[1].Name)
-		assert.Equal(t, storage.FileId(1), result[0].FileId)
-		assert.Equal(t, storage.FileId(1), result[1].FileId)
+		assert.Equal(t, page.FileId(1), result[0].FileId)
+		assert.Equal(t, page.FileId(1), result[1].FileId)
 	})
 
 	t.Run("該当するカラムがない場合は空のスライスを返す", func(t *testing.T) {

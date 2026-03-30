@@ -10,7 +10,9 @@ import (
 
 	"minesql/internal/catalog"
 	"minesql/internal/config"
-	"minesql/internal/storage"
+	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/file"
+	"minesql/internal/storage/page"
 )
 
 var (
@@ -20,7 +22,7 @@ var (
 
 // Engine はストレージ層のリソースの管理を行う
 type Engine struct {
-	BufferPool    *storage.BufferPool
+	BufferPool    *buffer.BufferPool
 	Catalog       *catalog.Catalog
 	baseDirectory string
 }
@@ -51,10 +53,42 @@ func Get() *Engine {
 	return eng
 }
 
+// Shutdown はダーティーページをディスクに書き出し、すべての Disk を同期する
+func (e *Engine) Shutdown() error {
+	if err := e.BufferPool.FlushPage(); err != nil {
+		return err
+	}
+	return e.syncAllDisks()
+}
+
+// syncAllDisks はカタログと全テーブルの Disk を同期する
+func (e *Engine) syncAllDisks() error {
+	// カタログの Disk を同期
+	catalogDisk, err := e.BufferPool.GetDisk(page.FileId(0))
+	if err != nil {
+		return err
+	}
+	if err := catalogDisk.Sync(); err != nil {
+		return err
+	}
+
+	// 各テーブルの Disk を同期
+	for _, table := range e.Catalog.GetAllTables() {
+		dm, err := e.BufferPool.GetDisk(table.FileId)
+		if err != nil {
+			return err
+		}
+		if err := dm.Sync(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // RegisterDmToBp は BufferPool に Disk を登録する
-func (e *Engine) RegisterDmToBp(fileId storage.FileId, tableName string) error {
+func (e *Engine) RegisterDmToBp(fileId page.FileId, tableName string) error {
 	path := filepath.Join(e.baseDirectory, fmt.Sprintf("%s.db", tableName))
-	dm, err := storage.NewDisk(fileId, path)
+	dm, err := file.NewDisk(fileId, path)
 	if err != nil {
 		return err
 	}
@@ -70,7 +104,7 @@ func newEngine() (*Engine, error) {
 		return nil, err
 	}
 
-	bp := storage.NewBufferPool(config.GetBufferPoolSize())
+	bp := buffer.NewBufferPool(config.GetBufferPoolSize())
 	catalog, err := initCatalog(dataDir, bp)
 	if err != nil {
 		return nil, err
@@ -84,15 +118,15 @@ func newEngine() (*Engine, error) {
 }
 
 // initCatalog はカタログを初期化する
-func initCatalog(baseDir string, bp *storage.BufferPool) (*catalog.Catalog, error) {
-	fileId := storage.FileId(0)
+func initCatalog(baseDir string, bp *buffer.BufferPool) (*catalog.Catalog, error) {
+	fileId := page.FileId(0)
 	path := filepath.Join(baseDir, "minesql.db")
 
 	// カタログファイルが存在するかチェック (Disk 作成前に確認)
 	_, err := os.Stat(path)
 	catalogExists := !os.IsNotExist(err)
 
-	dm, err := storage.NewDisk(fileId, path)
+	dm, err := file.NewDisk(fileId, path)
 	if err != nil {
 		return nil, err
 	}
@@ -131,7 +165,7 @@ func initCatalog(baseDir string, bp *storage.BufferPool) (*catalog.Catalog, erro
 }
 
 // registerTableDisks はカタログに含まれるテーブルの Disk を登録する
-func registerTableDisks(cat *catalog.Catalog, baseDir string, bp *storage.BufferPool) error {
+func registerTableDisks(cat *catalog.Catalog, baseDir string, bp *buffer.BufferPool) error {
 	tables := cat.GetAllTables()
 	for _, tableMeta := range tables {
 		fileId := tableMeta.DataMetaPageId.FileId
@@ -139,7 +173,7 @@ func registerTableDisks(cat *catalog.Catalog, baseDir string, bp *storage.Buffer
 		path := filepath.Join(baseDir, fmt.Sprintf("%s.db", tableName))
 
 		// Disk を作成して登録
-		dm, err := storage.NewDisk(fileId, path)
+		dm, err := file.NewDisk(fileId, path)
 		if err != nil {
 			return err
 		}

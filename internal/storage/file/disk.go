@@ -1,22 +1,24 @@
-package storage
+package file
 
 import (
 	"fmt"
 	"io"
 	"os"
 
+	"minesql/internal/storage/page"
+
 	"github.com/ncw/directio"
 )
 
 // Disk はディスク上のヒープファイルを管理する
 type Disk struct {
-	fileId     FileId   // このディスクマネージャの FileId
-	heapFile   *os.File // ヒープファイルのファイルディスクリプタ
-	nextPageId PageId   // 次に採番するページ ID
+	fileId     page.FileId // このディスクマネージャの FileId
+	heapFile   *os.File    // ヒープファイルのファイルディスクリプタ
+	nextPageId page.PageId // 次に採番するページ ID
 }
 
 // NewDisk は指定されたパスにあるヒープファイルを管理する Disk を生成する
-func NewDisk(fileId FileId, path string) (*Disk, error) {
+func NewDisk(fileId page.FileId, path string) (*Disk, error) {
 	file, err := directio.OpenFile(
 		path,
 		os.O_RDWR|os.O_CREATE, // read-write モードで開き、存在しない場合は作成する (※ os.O_DIRECT は directio.OpenFile 内で設定される)
@@ -34,24 +36,24 @@ func NewDisk(fileId FileId, path string) (*Disk, error) {
 	return &Disk{
 		fileId:     fileId,
 		heapFile:   file,
-		nextPageId: NewPageId(fileId, PageNumber(fileInfo.Size()/PAGE_SIZE)),
+		nextPageId: page.NewPageId(fileId, page.PageNumber(fileInfo.Size()/page.PAGE_SIZE)),
 	}, nil
 }
 
 // AllocatePage は新しいページ ID を採番する
-func (d *Disk) AllocatePage() PageId {
+func (d *Disk) AllocatePage() page.PageId {
 	id := d.nextPageId
 	// 次のページ番号をインクリメント
-	d.nextPageId = NewPageId(d.fileId, d.nextPageId.PageNumber+1)
+	d.nextPageId = page.NewPageId(d.fileId, d.nextPageId.PageNumber+1)
 	return id
 }
 
 // ReadPageData は指定されたページ ID のページデータを data に読み込む (読み込んだデータは data に格納される)
 //
 // data の長さは PAGE_SIZE と等しい必要がある
-func (d *Disk) ReadPageData(id PageId, data []byte) error {
-	if len(data) != PAGE_SIZE {
-		return ErrInvalidDataSize
+func (d *Disk) ReadPageData(id page.PageId, data []byte) error {
+	if len(data) != page.PAGE_SIZE {
+		return page.ErrInvalidDataSize
 	}
 	if err := d.seekToPage(id); err != nil {
 		return err
@@ -66,9 +68,9 @@ func (d *Disk) ReadPageData(id PageId, data []byte) error {
 // WritePageData は指定されたページ ID に対応するページに data の内容を書き込む
 //
 // data の長さは PAGE_SIZE と等しい必要がある
-func (d *Disk) WritePageData(id PageId, data []byte) error {
-	if len(data) != PAGE_SIZE {
-		return ErrInvalidDataSize
+func (d *Disk) WritePageData(id page.PageId, data []byte) error {
+	if len(data) != page.PAGE_SIZE {
+		return page.ErrInvalidDataSize
 	}
 	if err := d.seekToPage(id); err != nil {
 		return err
@@ -81,7 +83,7 @@ func (d *Disk) WritePageData(id PageId, data []byte) error {
 	}
 
 	// 書き込んだバイト数が PAGE_SIZE と等しいことを確認
-	if n != PAGE_SIZE {
+	if n != page.PAGE_SIZE {
 		return io.ErrShortWrite
 	}
 
@@ -100,11 +102,11 @@ func (d *Disk) Sync() error {
 }
 
 // seekToPage はページ ID で指定されたページの先頭にシークする
-func (d *Disk) seekToPage(id PageId) error {
+func (d *Disk) seekToPage(id page.PageId) error {
 	if id.FileId != d.fileId {
 		return fmt.Errorf("invalid FileId: expected %d, got %d", d.fileId, id.FileId)
 	}
-	offset := PAGE_SIZE * uint64(id.PageNumber)
+	offset := page.PAGE_SIZE * uint64(id.PageNumber)
 	_, err := d.heapFile.Seek(int64(offset), io.SeekStart)
 	return err
 }

@@ -2,10 +2,11 @@ package undo
 
 import (
 	"minesql/internal/access"
-	"minesql/internal/btree"
 	"minesql/internal/encode"
 	"minesql/internal/engine"
-	"minesql/internal/storage"
+	"minesql/internal/storage/btree"
+	"minesql/internal/storage/file"
+	"minesql/internal/storage/page"
 	"path/filepath"
 	"testing"
 
@@ -15,7 +16,7 @@ import (
 func TestUndoIntegration(t *testing.T) {
 	t.Run("複数操作を逆順に Undo すると元の状態に戻る", func(t *testing.T) {
 		// GIVEN: ユニークインデックス付きテーブルにデータを投入
-		uniqueIndex := access.NewUniqueIndexAccessMethod("idx_name", "name", storage.PageId{}, 1)
+		uniqueIndex := access.NewUniqueIndexAccessMethod("idx_name", "name", page.PageId{}, 1)
 		table := setupTestTable(t, []*access.UniqueIndexAccessMethod{uniqueIndex})
 		defer engine.Reset()
 		bp := engine.Get().BufferPool
@@ -125,8 +126,8 @@ func setupTestTable(t *testing.T, uniqueIndexes []*access.UniqueIndexAccessMetho
 	engine.Init()
 
 	e := engine.Get()
-	fileId := storage.FileId(1)
-	dm, err := storage.NewDisk(fileId, filepath.Join(tmpdir, "test.db"))
+	fileId := page.FileId(1)
+	dm, err := file.NewDisk(fileId, filepath.Join(tmpdir, "test.db"))
 	assert.NoError(t, err)
 	e.BufferPool.RegisterDisk(fileId, dm)
 
@@ -171,7 +172,7 @@ func collectActiveRecords(t *testing.T, table *access.TableAccessMethod) [][]str
 func collectActiveUniqueIndexKeys(t *testing.T, ui *access.UniqueIndexAccessMethod) []string {
 	t.Helper()
 	bp := engine.Get().BufferPool
-	indexTree := btree.NewBPlusTree(ui.MetaPageId)
+	indexTree := btree.NewBTree(ui.MetaPageId)
 	indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})
 	assert.NoError(t, err)
 

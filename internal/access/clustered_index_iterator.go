@@ -1,17 +1,17 @@
 package access
 
 import (
-	"minesql/internal/btree"
 	"minesql/internal/encode"
-	"minesql/internal/storage"
+	"minesql/internal/storage/btree"
+	"minesql/internal/storage/buffer"
 )
 
 type ClusteredIndexIterator struct {
 	iterator *btree.Iterator
-	bp       *storage.BufferPool
+	bp       *buffer.BufferPool
 }
 
-func newClusteredIndexIterator(iterator *btree.Iterator, bp *storage.BufferPool) *ClusteredIndexIterator {
+func newClusteredIndexIterator(iterator *btree.Iterator, bp *buffer.BufferPool) *ClusteredIndexIterator {
 	return &ClusteredIndexIterator{
 		iterator: iterator,
 		bp:       bp,

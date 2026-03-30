@@ -3,7 +3,7 @@ package node
 import (
 	"bytes"
 	"fmt"
-	"minesql/internal/storage"
+	"minesql/internal/storage/page"
 	"testing"
 
 	"github.com/ncw/directio"
@@ -573,7 +573,7 @@ func TestLeafNodePrevPageId(t *testing.T) {
 	t.Run("設定されたページ ID が取得できる", func(t *testing.T) {
 		// GIVEN
 		ln := createTestLeafNode(nil)
-		pid := storage.NewPageId(0, 42)
+		pid := page.NewPageId(0, 42)
 		ln.SetPrevPageId(&pid)
 
 		// WHEN
@@ -600,7 +600,7 @@ func TestLeafNodeNextPageId(t *testing.T) {
 	t.Run("設定されたページ ID が取得できる", func(t *testing.T) {
 		// GIVEN
 		ln := createTestLeafNode(nil)
-		pid := storage.NewPageId(0, 99)
+		pid := page.NewPageId(0, 99)
 		ln.SetNextPageId(&pid)
 
 		// WHEN
@@ -616,7 +616,7 @@ func TestLeafNodeSetPrevPageId(t *testing.T) {
 	t.Run("nil を設定すると PrevPageId が nil に戻る", func(t *testing.T) {
 		// GIVEN
 		ln := createTestLeafNode(nil)
-		pid := storage.NewPageId(0, 10)
+		pid := page.NewPageId(0, 10)
 		ln.SetPrevPageId(&pid)
 
 		// WHEN
@@ -631,7 +631,7 @@ func TestLeafNodeSetNextPageId(t *testing.T) {
 	t.Run("nil を設定すると NextPageId が nil に戻る", func(t *testing.T) {
 		// GIVEN
 		ln := createTestLeafNode(nil)
-		pid := storage.NewPageId(0, 10)
+		pid := page.NewPageId(0, 10)
 		ln.SetNextPageId(&pid)
 
 		// WHEN

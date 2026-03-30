@@ -3,7 +3,7 @@ package undo
 import (
 	"minesql/internal/access"
 	"minesql/internal/engine"
-	"minesql/internal/storage"
+	"minesql/internal/storage/page"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -39,7 +39,7 @@ func TestUpdateInplaceLogRecord_Undo(t *testing.T) {
 
 	t.Run("ユニークインデックスも元の値に戻る", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex := access.NewUniqueIndexAccessMethod("idx_name", "name", storage.PageId{}, 1)
+		uniqueIndex := access.NewUniqueIndexAccessMethod("idx_name", "name", page.PageId{}, 1)
 		table := setupTestTable(t, []*access.UniqueIndexAccessMethod{uniqueIndex})
 		defer engine.Reset()
 		bp := engine.Get().BufferPool

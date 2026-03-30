@@ -1,12 +1,12 @@
 package btree
 
 import (
-	"minesql/internal/btree/node"
-	"minesql/internal/storage"
+	"minesql/internal/storage/btree/node"
+	"minesql/internal/storage/page"
 )
 
 type SearchMode interface {
-	childPageId(bn *node.BranchNode) storage.PageId
+	childPageId(bn *node.BranchNode) page.PageId
 	slotNum(ln *node.LeafNode) int
 }
 
@@ -14,7 +14,7 @@ type SearchMode interface {
 type SearchModeStart struct{}
 
 // 先頭の子ページIDを取得
-func (sm SearchModeStart) childPageId(bn *node.BranchNode) storage.PageId {
+func (sm SearchModeStart) childPageId(bn *node.BranchNode) page.PageId {
 	return bn.ChildPageIdAt(0)
 }
 
@@ -29,7 +29,7 @@ type SearchModeKey struct {
 }
 
 // 指定したキーに基づいて子ページIDを取得
-func (sm SearchModeKey) childPageId(bn *node.BranchNode) storage.PageId {
+func (sm SearchModeKey) childPageId(bn *node.BranchNode) page.PageId {
 	childIndex := bn.SearchChildSlotNum(sm.Key)
 	return bn.ChildPageIdAt(childIndex)
 }

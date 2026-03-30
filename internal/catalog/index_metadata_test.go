@@ -2,9 +2,9 @@ package catalog
 
 import (
 	"encoding/binary"
-	"minesql/internal/btree"
 	"minesql/internal/encode"
-	"minesql/internal/storage"
+	"minesql/internal/storage/btree"
+	"minesql/internal/storage/page"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,12 +17,12 @@ func TestIndexMetadata_Insert(t *testing.T) {
 		defer removeTmpdir(t, tmpdir)
 
 		// インデックスメタデータ用の B+Tree を作成
-		metaPageId, err := bp.AllocatePageId(storage.FileId(0))
+		metaPageId, err := bp.AllocatePageId(page.FileId(0))
 		assert.NoError(t, err)
-		_, err = btree.CreateBPlusTree(bp, metaPageId)
+		_, err = btree.CreateBTree(bp, metaPageId)
 		assert.NoError(t, err)
 
-		dataMetaPageId := storage.NewPageId(storage.FileId(1), 5)
+		dataMetaPageId := page.NewPageId(page.FileId(1), 5)
 		idxMeta := NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, dataMetaPageId)
 		idxMeta.MetaPageId = metaPageId
 
@@ -32,7 +32,7 @@ func TestIndexMetadata_Insert(t *testing.T) {
 		// THEN: B+Tree から挿入したデータを検索して確認
 		assert.NoError(t, err)
 
-		btr := btree.NewBPlusTree(metaPageId)
+		btr := btree.NewBTree(metaPageId)
 		iter, err := btr.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -51,7 +51,7 @@ func TestIndexMetadata_Insert(t *testing.T) {
 		encode.Decode(record.NonKeyBytes(), &valueParts)
 		assert.Equal(t, string(IndexTypeUnique), string(valueParts[0]))
 		assert.Equal(t, "email", string(valueParts[1]))
-		assert.Equal(t, dataMetaPageId, storage.RestorePageIdFromBytes(valueParts[2]))
+		assert.Equal(t, dataMetaPageId, page.RestorePageIdFromBytes(valueParts[2]))
 	})
 
 	t.Run("異なるテーブルのインデックスを挿入できる", func(t *testing.T) {
@@ -59,14 +59,14 @@ func TestIndexMetadata_Insert(t *testing.T) {
 		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
-		metaPageId, err := bp.AllocatePageId(storage.FileId(0))
+		metaPageId, err := bp.AllocatePageId(page.FileId(0))
 		assert.NoError(t, err)
-		_, err = btree.CreateBPlusTree(bp, metaPageId)
+		_, err = btree.CreateBTree(bp, metaPageId)
 		assert.NoError(t, err)
 
-		idx1 := NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, storage.NewPageId(storage.FileId(1), 5))
+		idx1 := NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 5))
 		idx1.MetaPageId = metaPageId
-		idx2 := NewIndexMetadata(2, "idx_title", "title", IndexTypeUnique, storage.NewPageId(storage.FileId(2), 6))
+		idx2 := NewIndexMetadata(2, "idx_title", "title", IndexTypeUnique, page.NewPageId(page.FileId(2), 6))
 		idx2.MetaPageId = metaPageId
 
 		// WHEN
@@ -76,7 +76,7 @@ func TestIndexMetadata_Insert(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: 2 件挿入されている
-		btr := btree.NewBPlusTree(metaPageId)
+		btr := btree.NewBTree(metaPageId)
 		iter, err := btr.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -98,14 +98,14 @@ func TestIndexMetadata_Insert(t *testing.T) {
 		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
 
-		metaPageId, err := bp.AllocatePageId(storage.FileId(0))
+		metaPageId, err := bp.AllocatePageId(page.FileId(0))
 		assert.NoError(t, err)
-		_, err = btree.CreateBPlusTree(bp, metaPageId)
+		_, err = btree.CreateBTree(bp, metaPageId)
 		assert.NoError(t, err)
 
-		idx1 := NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, storage.NewPageId(storage.FileId(1), 5))
+		idx1 := NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 5))
 		idx1.MetaPageId = metaPageId
-		idx2 := NewIndexMetadata(1, "idx_username", "username", IndexTypeUnique, storage.NewPageId(storage.FileId(1), 6))
+		idx2 := NewIndexMetadata(1, "idx_username", "username", IndexTypeUnique, page.NewPageId(page.FileId(1), 6))
 		idx2.MetaPageId = metaPageId
 
 		// WHEN
@@ -115,7 +115,7 @@ func TestIndexMetadata_Insert(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: 2 件挿入されている
-		btr := btree.NewBPlusTree(metaPageId)
+		btr := btree.NewBTree(metaPageId)
 		iter, err := btr.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -142,8 +142,8 @@ func TestLoadIndexMetadata(t *testing.T) {
 		cat, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		dataMetaPageId1 := storage.NewPageId(storage.FileId(1), 5)
-		dataMetaPageId2 := storage.NewPageId(storage.FileId(1), 6)
+		dataMetaPageId1 := page.NewPageId(page.FileId(1), 5)
+		dataMetaPageId2 := page.NewPageId(page.FileId(1), 6)
 		indexes := []*IndexMetadata{
 			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, dataMetaPageId1),
 			NewIndexMetadata(1, "idx_username", "username", IndexTypeUnique, dataMetaPageId2),
@@ -179,9 +179,9 @@ func TestLoadIndexMetadata(t *testing.T) {
 
 		// テーブル 1 と テーブル 2 のインデックスを混在させて挿入
 		indexes := []*IndexMetadata{
-			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, storage.NewPageId(storage.FileId(1), 5)),
-			NewIndexMetadata(2, "idx_title", "title", IndexTypeUnique, storage.NewPageId(storage.FileId(2), 6)),
-			NewIndexMetadata(1, "idx_username", "username", IndexTypeUnique, storage.NewPageId(storage.FileId(1), 7)),
+			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 5)),
+			NewIndexMetadata(2, "idx_title", "title", IndexTypeUnique, page.NewPageId(page.FileId(2), 6)),
+			NewIndexMetadata(1, "idx_username", "username", IndexTypeUnique, page.NewPageId(page.FileId(1), 7)),
 		}
 		for _, idx := range indexes {
 			idx.MetaPageId = cat.IndexMetaPageId
@@ -195,8 +195,8 @@ func TestLoadIndexMetadata(t *testing.T) {
 		// THEN: テーブル 1 のインデックスのみ取得される
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(result))
-		assert.Equal(t, storage.FileId(1), result[0].FileId)
-		assert.Equal(t, storage.FileId(1), result[1].FileId)
+		assert.Equal(t, page.FileId(1), result[0].FileId)
+		assert.Equal(t, page.FileId(1), result[1].FileId)
 	})
 
 	t.Run("該当するインデックスがない場合は空のスライスを返す", func(t *testing.T) {

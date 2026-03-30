@@ -2,7 +2,7 @@ package node
 
 import (
 	"errors"
-	"minesql/internal/storage"
+	"minesql/internal/storage/page"
 )
 
 const leafHeaderSize = 16
@@ -42,8 +42,8 @@ func NewLeafNode(data []byte) *LeafNode {
 //
 // 初期化時には、前後のリーフノードのポインタ (ページ ID) には無効値が設定される
 func (ln *LeafNode) Initialize() {
-	storage.INVALID_PAGE_ID.WriteTo(ln.Body(), 0) // 初期化時には、前のページ ID を無効値に設定
-	storage.INVALID_PAGE_ID.WriteTo(ln.Body(), 8) // 初期化時には、次のページ ID を無効値に設定
+	page.INVALID_PAGE_ID.WriteTo(ln.Body(), 0) // 初期化時には、前のページ ID を無効値に設定
+	page.INVALID_PAGE_ID.WriteTo(ln.Body(), 8) // 初期化時には、次のページ ID を無効値に設定
 	ln.body.Initialize()
 }
 
@@ -179,8 +179,8 @@ func (ln *LeafNode) SearchSlotNum(key []byte) (int, bool) {
 // PrevPageId は前のリーフノードのページ ID を取得する
 //
 // 前のリーフノードが存在しない場合は nil を返す
-func (ln *LeafNode) PrevPageId() *storage.PageId {
-	pageId := storage.ReadPageIdFromPageData(ln.Body(), 0)
+func (ln *LeafNode) PrevPageId() *page.PageId {
+	pageId := page.ReadPageIdFromPageData(ln.Body(), 0)
 	if pageId.IsInvalid() {
 		return nil
 	}
@@ -190,8 +190,8 @@ func (ln *LeafNode) PrevPageId() *storage.PageId {
 // NextPageId は次のリーフノードのページ ID を取得する
 //
 // 次のリーフノードが存在しない場合は nil を返す
-func (ln *LeafNode) NextPageId() *storage.PageId {
-	pageId := storage.ReadPageIdFromPageData(ln.Body(), 8)
+func (ln *LeafNode) NextPageId() *page.PageId {
+	pageId := page.ReadPageIdFromPageData(ln.Body(), 8)
 	if pageId.IsInvalid() {
 		return nil
 	}
@@ -201,10 +201,10 @@ func (ln *LeafNode) NextPageId() *storage.PageId {
 // SetPrevPageId は前のリーフノードのページ ID を設定する
 //
 // prevPageId: 前のリーフノードのページ ID (前のリーフノードが存在しない場合は nil を指定する)
-func (ln *LeafNode) SetPrevPageId(prevPageId *storage.PageId) {
-	var pageId storage.PageId
+func (ln *LeafNode) SetPrevPageId(prevPageId *page.PageId) {
+	var pageId page.PageId
 	if prevPageId == nil {
-		pageId = storage.INVALID_PAGE_ID
+		pageId = page.INVALID_PAGE_ID
 	} else {
 		pageId = *prevPageId
 	}
@@ -214,10 +214,10 @@ func (ln *LeafNode) SetPrevPageId(prevPageId *storage.PageId) {
 // SetNextPageId は次のリーフノードのページ ID を設定する
 //
 // nextPageId: 次のリーフノードのページ ID (次のリーフノードが存在しない場合は nil を指定する)
-func (ln *LeafNode) SetNextPageId(nextPageId *storage.PageId) {
-	var pageId storage.PageId
+func (ln *LeafNode) SetNextPageId(nextPageId *page.PageId) {
+	var pageId page.PageId
 	if nextPageId == nil {
-		pageId = storage.INVALID_PAGE_ID
+		pageId = page.INVALID_PAGE_ID
 	} else {
 		pageId = *nextPageId
 	}

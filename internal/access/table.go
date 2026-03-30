@@ -3,9 +3,10 @@ package access
 import (
 	"errors"
 	"fmt"
-	"minesql/internal/btree"
-	"minesql/internal/btree/node"
-	"minesql/internal/storage"
+	"minesql/internal/storage/btree"
+	"minesql/internal/storage/btree/node"
+	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/page"
 )
 
 // TableAccessMethod はテーブルへのアクセスを提供する
@@ -13,12 +14,12 @@ import (
 // 1 つの AccessMethod は 1 つの *.db (= 1 テーブル) ファイルに対応する
 type TableAccessMethod struct {
 	Name            string                     // テーブル名
-	MetaPageId      storage.PageId             // テーブルの内容が入っている B+Tree のメタページの ID
+	MetaPageId      page.PageId                // テーブルの内容が入っている B+Tree のメタページの ID
 	PrimaryKeyCount uint8                      // プライマリキーの列数 (プライマリキーは先頭から連続している想定) (例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる)
 	UniqueIndexes   []*UniqueIndexAccessMethod // テーブルに紐づくユニークインデックス群
 }
 
-func NewTableAccessMethod(name string, metaPageId storage.PageId, primaryKeyCount uint8, uniqueIndexes []*UniqueIndexAccessMethod) TableAccessMethod {
+func NewTableAccessMethod(name string, metaPageId page.PageId, primaryKeyCount uint8, uniqueIndexes []*UniqueIndexAccessMethod) TableAccessMethod {
 	return TableAccessMethod{
 		Name:            name,
 		MetaPageId:      metaPageId,
@@ -28,9 +29,9 @@ func NewTableAccessMethod(name string, metaPageId storage.PageId, primaryKeyCoun
 }
 
 // Create は空のテーブルを新規作成する
-func (t *TableAccessMethod) Create(bp *storage.BufferPool) error {
+func (t *TableAccessMethod) Create(bp *buffer.BufferPool) error {
 	// テーブルの B+Tree を作成
-	tree, err := btree.CreateBPlusTree(bp, t.MetaPageId)
+	tree, err := btree.CreateBTree(bp, t.MetaPageId)
 	if err != nil {
 		return err
 	}
@@ -51,8 +52,8 @@ func (t *TableAccessMethod) Create(bp *storage.BufferPool) error {
 // access.Record を経由して B+Tree レコードを構築し、B+Tree に挿入する
 //
 // ソフトデリート済みの同一キーが存在する場合は Update で上書きする
-func (t *TableAccessMethod) Insert(bp *storage.BufferPool, columns [][]byte) error {
-	btr := btree.NewBPlusTree(t.MetaPageId)
+func (t *TableAccessMethod) Insert(bp *buffer.BufferPool, columns [][]byte) error {
+	btr := btree.NewBTree(t.MetaPageId)
 
 	rec := NewRecord(columns, t.PrimaryKeyCount)
 	btrRecord := node.NewRecord(rec.EncodeHeader(), rec.EncodeKey(), rec.EncodeNonKey())
@@ -94,8 +95,8 @@ func (t *TableAccessMethod) Insert(bp *storage.BufferPool, columns [][]byte) err
 
 // Delete はテーブルから行を物理削除する
 //   - columns: 削除する行のカラム値 (プライマリキーを含む全カラム)
-func (t *TableAccessMethod) Delete(bp *storage.BufferPool, columns [][]byte) error {
-	btr := btree.NewBPlusTree(t.MetaPageId)
+func (t *TableAccessMethod) Delete(bp *buffer.BufferPool, columns [][]byte) error {
+	btr := btree.NewBTree(t.MetaPageId)
 
 	rec := NewRecord(columns, t.PrimaryKeyCount)
 	if err := btr.Delete(bp, rec.EncodeKey()); err != nil {
@@ -116,8 +117,8 @@ func (t *TableAccessMethod) Delete(bp *storage.BufferPool, columns [][]byte) err
 // SoftDelete はテーブルから行をソフトデリートする
 //
 // B+Tree からレコードを物理削除せず、DeleteMark を 1 に設定する
-func (t *TableAccessMethod) SoftDelete(bp *storage.BufferPool, columns [][]byte) error {
-	btr := btree.NewBPlusTree(t.MetaPageId)
+func (t *TableAccessMethod) SoftDelete(bp *buffer.BufferPool, columns [][]byte) error {
+	btr := btree.NewBTree(t.MetaPageId)
 
 	rec := NewRecord(columns, t.PrimaryKeyCount)
 	rec.Header.DeleteMark = 1
@@ -144,8 +145,8 @@ func (t *TableAccessMethod) SoftDelete(bp *storage.BufferPool, columns [][]byte)
 // プライマリキーが変わらないことを前提とする (プライマリキーが変わる場合は呼び出し側で SoftDelete + Insert を行う)
 //
 // ユニークインデックスは物理削除 (old) + 挿入 (new) で更新する
-func (t *TableAccessMethod) UpdateInplace(bp *storage.BufferPool, oldColumns [][]byte, newColumns [][]byte) error {
-	btr := btree.NewBPlusTree(t.MetaPageId)
+func (t *TableAccessMethod) UpdateInplace(bp *buffer.BufferPool, oldColumns [][]byte, newColumns [][]byte) error {
+	btr := btree.NewBTree(t.MetaPageId)
 	newRec := NewRecord(newColumns, t.PrimaryKeyCount)
 	err := btr.Update(bp, node.NewRecord(newRec.EncodeHeader(), newRec.EncodeKey(), newRec.EncodeNonKey()))
 	if err != nil {
@@ -171,8 +172,8 @@ func (t *TableAccessMethod) UpdateInplace(bp *storage.BufferPool, oldColumns [][
 }
 
 // Search は指定した検索モードでテーブルを検索し、ClusteredIndexIterator を返す
-func (t *TableAccessMethod) Search(bp *storage.BufferPool, mode RecordSearchMode) (*ClusteredIndexIterator, error) {
-	btr := btree.NewBPlusTree(t.MetaPageId)
+func (t *TableAccessMethod) Search(bp *buffer.BufferPool, mode RecordSearchMode) (*ClusteredIndexIterator, error) {
+	btr := btree.NewBTree(t.MetaPageId)
 	iterator, err := btr.Search(bp, mode.encode())
 	if err != nil {
 		return nil, err
@@ -191,13 +192,13 @@ func (t *TableAccessMethod) GetUniqueIndexByName(indexName string) (*UniqueIndex
 }
 
 // LeafPageCount は B+Tree のメタページからリーフページ数を取得する
-func (t *TableAccessMethod) LeafPageCount(bp *storage.BufferPool) (uint64, error) {
-	btr := btree.NewBPlusTree(t.MetaPageId)
+func (t *TableAccessMethod) LeafPageCount(bp *buffer.BufferPool) (uint64, error) {
+	btr := btree.NewBTree(t.MetaPageId)
 	return btr.LeafPageCount(bp)
 }
 
 // Height は B+Tree のメタページからツリーの高さを取得する
-func (t *TableAccessMethod) Height(bp *storage.BufferPool) (uint64, error) {
-	btr := btree.NewBPlusTree(t.MetaPageId)
+func (t *TableAccessMethod) Height(bp *buffer.BufferPool) (uint64, error) {
+	btr := btree.NewBTree(t.MetaPageId)
 	return btr.Height(bp)
 }

@@ -1,4 +1,4 @@
-package storage
+package buffer
 
 type LRU struct {
 	head     *lruNode              // リストの先頭 (NewSublist の先頭)

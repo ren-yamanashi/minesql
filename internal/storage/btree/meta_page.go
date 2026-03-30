@@ -2,7 +2,7 @@ package btree
 
 import (
 	"encoding/binary"
-	"minesql/internal/storage"
+	"minesql/internal/storage/page"
 )
 
 // メタページのレイアウト:
@@ -20,12 +20,12 @@ func newMetaPage(data []byte) *metaPage {
 }
 
 // rootPageId はルートページ ID を読み取る
-func (mp *metaPage) rootPageId() storage.PageId {
-	return storage.ReadPageIdFromPageData(mp.data, 0)
+func (mp *metaPage) rootPageId() page.PageId {
+	return page.ReadPageIdFromPageData(mp.data, 0)
 }
 
 // setRootPageId はルートページ ID を設定する
-func (mp *metaPage) setRootPageId(rootPageId storage.PageId) {
+func (mp *metaPage) setRootPageId(rootPageId page.PageId) {
 	rootPageId.WriteTo(mp.data, 0)
 }
 

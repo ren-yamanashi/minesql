@@ -4,27 +4,28 @@ import (
 	"encoding/binary"
 	"fmt"
 	"minesql/internal/access"
-	"minesql/internal/btree"
-	"minesql/internal/btree/node"
 	"minesql/internal/encode"
-	"minesql/internal/storage"
+	"minesql/internal/storage/btree"
+	"minesql/internal/storage/btree/node"
+	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/page"
 )
 
 // TableMetadata はテーブルのメタデータを表す
 //
 // 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-tables-access.html
 type TableMetadata struct {
-	MetaPageId      storage.PageId    // テーブルのメタデータが格納される B+Tree のメタページID
-	FileId          storage.FileId    // テーブルの識別子 (一意)
+	MetaPageId      page.PageId       // テーブルのメタデータが格納される B+Tree のメタページID
+	FileId          page.FileId       // テーブルの識別子 (一意)
 	Name            string            // テーブルの名前
 	NCols           uint8             // テーブルの列数
 	PrimaryKeyCount uint8             // プライマリキーの列数 (プライマリキーは先頭から連続している想定) (例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる)
-	DataMetaPageId  storage.PageId    // 実データが格納される B+Tree のメタページID
+	DataMetaPageId  page.PageId       // 実データが格納される B+Tree のメタページID
 	Cols            []*ColumnMetadata // テーブルのカラム情報
 	Indexes         []*IndexMetadata  // テーブルのインデックス情報
 }
 
-func NewTableMetadata(fileId storage.FileId, name string, nCols uint8, pkCount uint8, cols []*ColumnMetadata, indexes []*IndexMetadata, dataMetaPageId storage.PageId) TableMetadata {
+func NewTableMetadata(fileId page.FileId, name string, nCols uint8, pkCount uint8, cols []*ColumnMetadata, indexes []*IndexMetadata, dataMetaPageId page.PageId) TableMetadata {
 	return TableMetadata{
 		FileId:          fileId,
 		Name:            name,
@@ -86,8 +87,8 @@ func (tm *TableMetadata) GetTable() (*access.TableAccessMethod, error) {
 }
 
 // Insert はテーブルメタデータを B+Tree に挿入する
-func (tm *TableMetadata) Insert(bp *storage.BufferPool) error {
-	btr := btree.NewBPlusTree(tm.MetaPageId)
+func (tm *TableMetadata) Insert(bp *buffer.BufferPool) error {
+	btr := btree.NewBTree(tm.MetaPageId)
 
 	// key (FileId) をエンコード
 	var encodedKey []byte
@@ -115,9 +116,9 @@ func (tm *TableMetadata) Insert(bp *storage.BufferPool) error {
 // indexMetaPageId: インデックスメタデータが格納されている B+Tree のメタページID
 //
 // columnMetaPageId: カラムメタデータが格納されている B+Tree のメタページID
-func loadTableMetadata(bp *storage.BufferPool, tableMetaPageId storage.PageId, indexMetaPageId storage.PageId, columnMetaPageId storage.PageId) ([]*TableMetadata, error) {
+func loadTableMetadata(bp *buffer.BufferPool, tableMetaPageId page.PageId, indexMetaPageId page.PageId, columnMetaPageId page.PageId) ([]*TableMetadata, error) {
 	// B+Tree を開く
-	tableMetaTree := btree.NewBPlusTree(tableMetaPageId)
+	tableMetaTree := btree.NewBTree(tableMetaPageId)
 	iter, err := tableMetaTree.Search(bp, btree.SearchModeStart{})
 	if err != nil {
 		return nil, err
@@ -134,7 +135,7 @@ func loadTableMetadata(bp *storage.BufferPool, tableMetaPageId storage.PageId, i
 		// キーをデコード (FileId)
 		var keyParts [][]byte
 		encode.Decode(record.KeyBytes(), &keyParts)
-		fileId := storage.FileId(binary.BigEndian.Uint32(keyParts[0]))
+		fileId := page.FileId(binary.BigEndian.Uint32(keyParts[0]))
 
 		// 値をデコード (Name, NCols, PrimaryKeyCount, DataMetaPageId)
 		var valueParts [][]byte
@@ -142,7 +143,7 @@ func loadTableMetadata(bp *storage.BufferPool, tableMetaPageId storage.PageId, i
 		name := string(valueParts[0])
 		nCols := uint8(binary.BigEndian.Uint64(valueParts[1]))
 		pkCount := uint8(binary.BigEndian.Uint64(valueParts[2]))
-		dataMetaPageId := storage.RestorePageIdFromBytes(valueParts[3])
+		dataMetaPageId := page.RestorePageIdFromBytes(valueParts[3])
 
 		// インデックスメタデータを読み込む
 		indexes, err := loadIndexMetadata(bp, fileId, indexMetaPageId)

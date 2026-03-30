@@ -6,8 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"minesql/internal/btree/node"
-	"minesql/internal/storage"
+	"minesql/internal/storage/btree/node"
+	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/page"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -16,7 +17,7 @@ import (
 // --- ログ出力ヘルパー ---
 
 // B+Tree の全データをスキャンし、key=..., value=... 形式でログに書き出す
-func writeScanLog(w *strings.Builder, bp *storage.BufferPool, tree *BPlusTree) {
+func writeScanLog(w *strings.Builder, bp *buffer.BufferPool, tree *BTree) {
 	iter, err := tree.Search(bp, SearchModeStart{})
 	if err != nil {
 		panic(err)
@@ -37,7 +38,7 @@ func writeScanLog(w *strings.Builder, bp *storage.BufferPool, tree *BPlusTree) {
 }
 
 // ツリーのルートノード情報をログに書き出す (ノードタイプ, キー数, キー一覧)
-func writeRootInfo(w *strings.Builder, bp *storage.BufferPool, tree *BPlusTree) {
+func writeRootInfo(w *strings.Builder, bp *buffer.BufferPool, tree *BTree) {
 	metaBuf, err := bp.FetchPage(tree.MetaPageId)
 	if err != nil {
 		panic(err)
@@ -50,7 +51,7 @@ func writeRootInfo(w *strings.Builder, bp *storage.BufferPool, tree *BPlusTree) 
 }
 
 // ノード情報を再帰的にログに書き出す
-func writeNodeInfo(w *strings.Builder, bp *storage.BufferPool, pageId storage.PageId, depth int) {
+func writeNodeInfo(w *strings.Builder, bp *buffer.BufferPool, pageId page.PageId, depth int) {
 	buf, err := bp.FetchPage(pageId)
 	if err != nil {
 		panic(err)
@@ -83,7 +84,7 @@ func writeNodeInfo(w *strings.Builder, bp *storage.BufferPool, pageId storage.Pa
 }
 
 // ツリーの形状 (高さ、各深さのノードタイプ・ノード数・キー数) をコンパクトに出力する
-func writeTreeShape(w *strings.Builder, bp *storage.BufferPool, tree *BPlusTree) {
+func writeTreeShape(w *strings.Builder, bp *buffer.BufferPool, tree *BTree) {
 	metaBuf, err := bp.FetchPage(tree.MetaPageId)
 	if err != nil {
 		panic(err)
@@ -99,8 +100,8 @@ func writeTreeShape(w *strings.Builder, bp *storage.BufferPool, tree *BPlusTree)
 	}
 	result := make(map[int]*depthInfo)
 
-	var collect func(pageId storage.PageId, depth int)
-	collect = func(pageId storage.PageId, depth int) {
+	var collect func(pageId page.PageId, depth int)
+	collect = func(pageId page.PageId, depth int) {
 		buf, err := bp.FetchPage(pageId)
 		if err != nil {
 			panic(err)

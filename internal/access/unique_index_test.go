@@ -2,8 +2,8 @@ package access
 
 import (
 	"fmt"
-	"minesql/internal/btree"
 	"minesql/internal/encode"
+	"minesql/internal/storage/btree"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -41,7 +41,7 @@ func TestUniqueIndex(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: 挿入したデータが B+Tree に存在する
-		tree := btree.NewBPlusTree(uniqueIndex.MetaPageId)
+		tree := btree.NewBTree(uniqueIndex.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -115,7 +115,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// B+Tree を直接走査すると、3 件すべて存在するが "Alice" の DeleteMark が 1
-		tree := btree.NewBPlusTree(uniqueIndex.MetaPageId)
+		tree := btree.NewBTree(uniqueIndex.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -172,7 +172,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: active なレコードとして存在する
-		tree := btree.NewBPlusTree(uniqueIndex.MetaPageId)
+		tree := btree.NewBTree(uniqueIndex.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -211,7 +211,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// B+Tree を直接走査すると 2 件のみ存在する (物理的に消えている)
-		tree := btree.NewBPlusTree(uniqueIndex.MetaPageId)
+		tree := btree.NewBTree(uniqueIndex.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -266,7 +266,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: active なレコードとして存在する
-		tree := btree.NewBPlusTree(uniqueIndex.MetaPageId)
+		tree := btree.NewBTree(uniqueIndex.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 

@@ -6,23 +6,25 @@ import (
 	"path/filepath"
 	"strings"
 
-	"minesql/internal/btree"
-	"minesql/internal/btree/node"
-	"minesql/internal/storage"
+	"minesql/internal/storage/btree"
+	"minesql/internal/storage/btree/node"
+	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/file"
+	"minesql/internal/storage/page"
 )
 
 // セットアップヘルパー: B+Tree とバッファプールを作成する
-func setupExample() (*btree.BPlusTree, *storage.BufferPool, func()) {
+func setupExample() (*btree.BTree, *buffer.BufferPool, func()) {
 	tmpDir, err := os.MkdirTemp("", "btree_example")
 	if err != nil {
 		panic(err)
 	}
 	cleanup := func() { _ = os.RemoveAll(tmpDir) }
 
-	bp := storage.NewBufferPool(10)
-	fileId := storage.FileId(1)
+	bp := buffer.NewBufferPool(10)
+	fileId := page.FileId(1)
 
-	dm, err := storage.NewDisk(fileId, filepath.Join(tmpDir, "example.db"))
+	dm, err := file.NewDisk(fileId, filepath.Join(tmpDir, "example.db"))
 	if err != nil {
 		panic(err)
 	}
@@ -33,7 +35,7 @@ func setupExample() (*btree.BPlusTree, *storage.BufferPool, func()) {
 		panic(err)
 	}
 
-	tree, err := btree.CreateBPlusTree(bp, metaPageId)
+	tree, err := btree.CreateBTree(bp, metaPageId)
 	if err != nil {
 		panic(err)
 	}
@@ -42,7 +44,7 @@ func setupExample() (*btree.BPlusTree, *storage.BufferPool, func()) {
 }
 
 // スキャンヘルパー: B+Tree の全データを表示する
-func printAll(bp *storage.BufferPool, tree *btree.BPlusTree) {
+func printAll(bp *buffer.BufferPool, tree *btree.BTree) {
 	iter, err := tree.Search(bp, btree.SearchModeStart{})
 	if err != nil {
 		panic(err)
@@ -63,7 +65,7 @@ func printAll(bp *storage.BufferPool, tree *btree.BPlusTree) {
 	fmt.Printf("  合計: %d 件\n", count)
 }
 
-func ExampleBPlusTree_Insert() {
+func ExampleBTree_Insert() {
 	tree, bp, cleanup := setupExample()
 	defer cleanup()
 
@@ -88,7 +90,7 @@ func ExampleBPlusTree_Insert() {
 	//   合計: 5 件
 }
 
-func ExampleBPlusTree_Search() {
+func ExampleBTree_Search() {
 	tree, bp, cleanup := setupExample()
 	defer cleanup()
 
@@ -121,7 +123,7 @@ func ExampleBPlusTree_Search() {
 	// key=watermelon not found
 }
 
-func ExampleBPlusTree_Delete() {
+func ExampleBTree_Delete() {
 	tree, bp, cleanup := setupExample()
 	defer cleanup()
 
@@ -166,7 +168,7 @@ func ExampleBPlusTree_Delete() {
 	// 存在しないキーの削除: key not found
 }
 
-func ExampleBPlusTree_Update() {
+func ExampleBTree_Update() {
 	tree, bp, cleanup := setupExample()
 	defer cleanup()
 

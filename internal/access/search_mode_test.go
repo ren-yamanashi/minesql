@@ -1,8 +1,8 @@
 package access
 
 import (
-	"minesql/internal/btree"
 	"minesql/internal/encode"
+	"minesql/internal/storage/btree"
 	"testing"
 
 	"github.com/stretchr/testify/assert"

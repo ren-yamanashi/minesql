@@ -1,9 +1,9 @@
 package access
 
 import (
-	"minesql/internal/btree"
 	"minesql/internal/encode"
-	"minesql/internal/storage"
+	"minesql/internal/storage/btree"
+	"minesql/internal/storage/buffer"
 )
 
 // SecondaryIndexSearchResult はインデックス検索の結果を表す
@@ -14,12 +14,12 @@ type SecondaryIndexSearchResult struct {
 
 type SecondaryIndexIterator struct {
 	indexIterator   *btree.Iterator
-	tableBTree      *btree.BPlusTree
-	bp              *storage.BufferPool
+	tableBTree      *btree.BTree
+	bp              *buffer.BufferPool
 	primaryKeyCount uint8 // PK のカラム数 (Key からセカンダリキーと PK を分離するために必要)
 }
 
-func newSecondaryIndexIterator(indexIterator *btree.Iterator, tableBTree *btree.BPlusTree, bp *storage.BufferPool, primaryKeyCount uint8) *SecondaryIndexIterator {
+func newSecondaryIndexIterator(indexIterator *btree.Iterator, tableBTree *btree.BTree, bp *buffer.BufferPool, primaryKeyCount uint8) *SecondaryIndexIterator {
 	return &SecondaryIndexIterator{
 		indexIterator:   indexIterator,
 		tableBTree:      tableBTree,

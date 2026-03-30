@@ -3,7 +3,7 @@ package node
 import (
 	"bytes"
 	"fmt"
-	"minesql/internal/storage"
+	"minesql/internal/storage/page"
 	"testing"
 
 	"github.com/ncw/directio"
@@ -43,7 +43,7 @@ func TestBranchNodeNumRecords(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
 			[]Record{NewRecord(nil, []byte("key1"), pageIdBytes(10))},
-			storage.NewPageId(0, 20),
+			page.NewPageId(0, 20),
 		)
 
 		// WHEN
@@ -61,7 +61,7 @@ func TestBranchNodeNumRecords(t *testing.T) {
 				NewRecord(nil, []byte("key2"), pageIdBytes(20)),
 				NewRecord(nil, []byte("key3"), pageIdBytes(30)),
 			},
-			storage.NewPageId(0, 40),
+			page.NewPageId(0, 40),
 		)
 
 		// WHEN
@@ -80,7 +80,7 @@ func TestBranchNodeRecordAt(t *testing.T) {
 				NewRecord(nil, []byte("key1"), pageIdBytes(10)),
 				NewRecord(nil, []byte("key2"), pageIdBytes(20)),
 			},
-			storage.NewPageId(0, 30),
+			page.NewPageId(0, 30),
 		)
 
 		// WHEN
@@ -101,7 +101,7 @@ func TestBranchNodeSearchSlotNum(t *testing.T) {
 				NewRecord(nil, []byte("bbb"), pageIdBytes(20)),
 				NewRecord(nil, []byte("ccc"), pageIdBytes(30)),
 			},
-			storage.NewPageId(0, 40),
+			page.NewPageId(0, 40),
 		)
 
 		// WHEN
@@ -119,7 +119,7 @@ func TestBranchNodeSearchSlotNum(t *testing.T) {
 				NewRecord(nil, []byte("aaa"), pageIdBytes(10)),
 				NewRecord(nil, []byte("ccc"), pageIdBytes(30)),
 			},
-			storage.NewPageId(0, 40),
+			page.NewPageId(0, 40),
 		)
 
 		// WHEN
@@ -137,7 +137,7 @@ func TestBranchNodeSearchSlotNum(t *testing.T) {
 				NewRecord(nil, []byte("bbb"), pageIdBytes(10)),
 				NewRecord(nil, []byte("ccc"), pageIdBytes(20)),
 			},
-			storage.NewPageId(0, 30),
+			page.NewPageId(0, 30),
 		)
 
 		// WHEN
@@ -155,7 +155,7 @@ func TestBranchNodeSearchSlotNum(t *testing.T) {
 				NewRecord(nil, []byte("aaa"), pageIdBytes(10)),
 				NewRecord(nil, []byte("bbb"), pageIdBytes(20)),
 			},
-			storage.NewPageId(0, 30),
+			page.NewPageId(0, 30),
 		)
 
 		// WHEN
@@ -172,7 +172,7 @@ func TestBranchNodeInsert(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
 			[]Record{NewRecord(nil, []byte("aaa"), pageIdBytes(10))},
-			storage.NewPageId(0, 20),
+			page.NewPageId(0, 20),
 		)
 
 		// WHEN
@@ -192,7 +192,7 @@ func TestBranchNodeInsert(t *testing.T) {
 				NewRecord(nil, []byte("ccc"), pageIdBytes(30)),
 				NewRecord(nil, []byte("ddd"), pageIdBytes(40)),
 			},
-			storage.NewPageId(0, 50),
+			page.NewPageId(0, 50),
 		)
 
 		// WHEN
@@ -211,7 +211,7 @@ func TestBranchNodeInsert(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
 			[]Record{NewRecord(nil, []byte("aaa"), pageIdBytes(10))},
-			storage.NewPageId(0, 20),
+			page.NewPageId(0, 20),
 		)
 		hugeKey := make([]byte, 4000)
 
@@ -256,8 +256,8 @@ func TestBranchNodeInitialize(t *testing.T) {
 		// GIVEN
 		data := directio.AlignedBlock(directio.BlockSize)
 		bn := NewBranchNode(data)
-		leftChild := storage.NewPageId(0, 10)
-		rightChild := storage.NewPageId(0, 20)
+		leftChild := page.NewPageId(0, 10)
+		rightChild := page.NewPageId(0, 20)
 
 		// WHEN
 		err := bn.Initialize([]byte("key1"), leftChild, rightChild)
@@ -266,7 +266,7 @@ func TestBranchNodeInitialize(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 1, bn.NumRecords())
 		assert.Equal(t, []byte("key1"), bn.RecordAt(0).KeyBytes())
-		assert.Equal(t, leftChild, storage.RestorePageIdFromBytes(bn.RecordAt(0).NonKeyBytes()))
+		assert.Equal(t, leftChild, page.RestorePageIdFromBytes(bn.RecordAt(0).NonKeyBytes()))
 		assert.Equal(t, rightChild, bn.RightChildPageId())
 	})
 }
@@ -280,7 +280,7 @@ func TestBranchNodeSearchChildSlotNum(t *testing.T) {
 				NewRecord(nil, []byte("bbb"), pageIdBytes(20)),
 				NewRecord(nil, []byte("ccc"), pageIdBytes(30)),
 			},
-			storage.NewPageId(0, 40),
+			page.NewPageId(0, 40),
 		)
 
 		// WHEN
@@ -297,7 +297,7 @@ func TestBranchNodeSearchChildSlotNum(t *testing.T) {
 				NewRecord(nil, []byte("aaa"), pageIdBytes(10)),
 				NewRecord(nil, []byte("ccc"), pageIdBytes(30)),
 			},
-			storage.NewPageId(0, 40),
+			page.NewPageId(0, 40),
 		)
 
 		// WHEN
@@ -314,7 +314,7 @@ func TestBranchNodeSearchChildSlotNum(t *testing.T) {
 				NewRecord(nil, []byte("bbb"), pageIdBytes(10)),
 				NewRecord(nil, []byte("ccc"), pageIdBytes(20)),
 			},
-			storage.NewPageId(0, 30),
+			page.NewPageId(0, 30),
 		)
 
 		// WHEN
@@ -331,7 +331,7 @@ func TestBranchNodeSearchChildSlotNum(t *testing.T) {
 				NewRecord(nil, []byte("aaa"), pageIdBytes(10)),
 				NewRecord(nil, []byte("bbb"), pageIdBytes(20)),
 			},
-			storage.NewPageId(0, 30),
+			page.NewPageId(0, 30),
 		)
 
 		// WHEN
@@ -350,19 +350,19 @@ func TestBranchNodeChildPageIdAt(t *testing.T) {
 				NewRecord(nil, []byte("key1"), pageIdBytes(10)),
 				NewRecord(nil, []byte("key2"), pageIdBytes(20)),
 			},
-			storage.NewPageId(0, 30),
+			page.NewPageId(0, 30),
 		)
 
 		// WHEN
 		childPageId := bn.ChildPageIdAt(0)
 
 		// THEN
-		assert.Equal(t, storage.NewPageId(0, 10), childPageId)
+		assert.Equal(t, page.NewPageId(0, 10), childPageId)
 	})
 
 	t.Run("スロット番号が NumRecords と等しい場合、右端の子ページ ID を返す", func(t *testing.T) {
 		// GIVEN
-		rightChild := storage.NewPageId(0, 99)
+		rightChild := page.NewPageId(0, 99)
 		bn := createTestBranchNode(
 			[]Record{
 				NewRecord(nil, []byte("key1"), pageIdBytes(10)),
@@ -416,7 +416,7 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 
 		// 新ノードの RightChildPageId が有効なページ ID である
 		newRightChild := newBn.RightChildPageId()
-		assert.NotEqual(t, storage.PageId{}, newRightChild)
+		assert.NotEqual(t, page.PageId{}, newRightChild)
 	})
 
 	t.Run("既存の最小キーより小さいキーで分割できる", func(t *testing.T) {
@@ -455,7 +455,7 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 
 		// 新ノードの RightChildPageId が有効なページ ID である
 		newRightChild := newBn.RightChildPageId()
-		assert.NotEqual(t, storage.PageId{}, newRightChild)
+		assert.NotEqual(t, page.PageId{}, newRightChild)
 	})
 }
 
@@ -468,7 +468,7 @@ func TestBranchNodeDelete(t *testing.T) {
 				NewRecord(nil, []byte("key2"), pageIdBytes(20)),
 				NewRecord(nil, []byte("key3"), pageIdBytes(30)),
 			},
-			storage.NewPageId(0, 40),
+			page.NewPageId(0, 40),
 		)
 
 		// WHEN
@@ -488,7 +488,7 @@ func TestBranchNodeDelete(t *testing.T) {
 				NewRecord(nil, []byte("key2"), pageIdBytes(20)),
 				NewRecord(nil, []byte("key3"), pageIdBytes(30)),
 			},
-			storage.NewPageId(0, 40),
+			page.NewPageId(0, 40),
 		)
 
 		// WHEN
@@ -508,7 +508,7 @@ func TestBranchNodeDelete(t *testing.T) {
 				NewRecord(nil, []byte("key2"), pageIdBytes(20)),
 				NewRecord(nil, []byte("key3"), pageIdBytes(30)),
 			},
-			storage.NewPageId(0, 40),
+			page.NewPageId(0, 40),
 		)
 
 		// WHEN
@@ -569,7 +569,7 @@ func TestBranchNodeCanTransferRecord(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
 			[]Record{NewRecord(nil, []byte("key1"), pageIdBytes(10))},
-			storage.NewPageId(0, 20),
+			page.NewPageId(0, 20),
 		)
 
 		// WHEN
@@ -586,7 +586,7 @@ func TestBranchNodeCanTransferRecord(t *testing.T) {
 		bigKey := make([]byte, 500)
 		for i := range 6 {
 			copy(bigKey, fmt.Appendf(nil, "key%d", i))
-			bn.Insert(i, NewRecord(nil, bigKey, pageIdBytes(storage.PageNumber(i*10))))
+			bn.Insert(i, NewRecord(nil, bigKey, pageIdBytes(page.PageNumber(i*10))))
 		}
 
 		// WHEN
@@ -603,7 +603,7 @@ func TestBranchNodeCanTransferRecord(t *testing.T) {
 		bigKey := make([]byte, 500)
 		for i := range 6 {
 			copy(bigKey, fmt.Appendf(nil, "key%d", i))
-			bn.Insert(i, NewRecord(nil, bigKey, pageIdBytes(storage.PageNumber(i*10))))
+			bn.Insert(i, NewRecord(nil, bigKey, pageIdBytes(page.PageNumber(i*10))))
 		}
 
 		// WHEN
@@ -640,7 +640,7 @@ func TestBranchNodeUpdate(t *testing.T) {
 				NewRecord(nil, []byte("bbb"), pageIdBytes(20)),
 				NewRecord(nil, []byte("ddd"), pageIdBytes(30)),
 			},
-			storage.NewPageId(0, 40),
+			page.NewPageId(0, 40),
 		)
 
 		// WHEN: key "bbb" を同じ長さの "ccc" に更新
@@ -659,7 +659,7 @@ func TestBranchNodeUpdate(t *testing.T) {
 				NewRecord(nil, []byte("aaa"), pageIdBytes(10)),
 				NewRecord(nil, []byte("bbb"), pageIdBytes(20)),
 			},
-			storage.NewPageId(0, 30),
+			page.NewPageId(0, 30),
 		)
 
 		// WHEN
@@ -680,7 +680,7 @@ func TestBranchNodeUpdate(t *testing.T) {
 				NewRecord(nil, []byte("bbb"), pageIdBytes(20)),
 				NewRecord(nil, []byte("ccc"), pageIdBytes(30)),
 			},
-			storage.NewPageId(0, 40),
+			page.NewPageId(0, 40),
 		)
 
 		// WHEN: 3 バイトのキーを 6 バイトのキーに更新
@@ -701,7 +701,7 @@ func TestBranchNodeUpdate(t *testing.T) {
 func TestBranchNodeRightChildPageId(t *testing.T) {
 	t.Run("右端の子ページ ID が正しく取得できる", func(t *testing.T) {
 		// GIVEN
-		rightChild := storage.NewPageId(0, 99)
+		rightChild := page.NewPageId(0, 99)
 		bn := createTestBranchNode(
 			[]Record{NewRecord(nil, []byte("key1"), pageIdBytes(10))},
 			rightChild,
@@ -720,9 +720,9 @@ func TestBranchNodeSetRightChildPageId(t *testing.T) {
 		// GIVEN
 		bn := createTestBranchNode(
 			[]Record{NewRecord(nil, []byte("key1"), pageIdBytes(10))},
-			storage.NewPageId(0, 40),
+			page.NewPageId(0, 40),
 		)
-		newRightChild := storage.NewPageId(0, 200)
+		newRightChild := page.NewPageId(0, 200)
 
 		// WHEN
 		bn.SetRightChildPageId(newRightChild)
@@ -740,13 +740,13 @@ func TestBranchNodeTransferAllFrom(t *testing.T) {
 				NewRecord(nil, []byte("key3"), pageIdBytes(30)),
 				NewRecord(nil, []byte("key4"), pageIdBytes(40)),
 			},
-			storage.NewPageId(0, 50),
+			page.NewPageId(0, 50),
 		)
 		dest := createTestBranchNode(
 			[]Record{
 				NewRecord(nil, []byte("key1"), pageIdBytes(10)),
 			},
-			storage.NewPageId(0, 20),
+			page.NewPageId(0, 20),
 		)
 
 		// WHEN
@@ -768,7 +768,7 @@ func TestBranchNodeTransferAllFrom(t *testing.T) {
 			[]Record{
 				NewRecord(nil, []byte("key1"), pageIdBytes(10)),
 			},
-			storage.NewPageId(0, 20),
+			page.NewPageId(0, 20),
 		)
 
 		// WHEN
@@ -782,7 +782,7 @@ func TestBranchNodeTransferAllFrom(t *testing.T) {
 }
 
 // テスト用のブランチノードを作成する (レコードあり)
-func createTestBranchNode(records []Record, rightChildPageId storage.PageId) *BranchNode {
+func createTestBranchNode(records []Record, rightChildPageId page.PageId) *BranchNode {
 	data := directio.AlignedBlock(directio.BlockSize)
 	bn := NewBranchNode(data)
 
@@ -790,7 +790,7 @@ func createTestBranchNode(records []Record, rightChildPageId storage.PageId) *Br
 		panic("records must not be empty")
 	}
 
-	err := bn.Initialize(records[0].KeyBytes(), storage.RestorePageIdFromBytes(records[0].NonKeyBytes()), rightChildPageId)
+	err := bn.Initialize(records[0].KeyBytes(), page.RestorePageIdFromBytes(records[0].NonKeyBytes()), rightChildPageId)
 	if err != nil {
 		panic("failed to initialize branch node")
 	}
@@ -821,8 +821,8 @@ func assertBranchKeysSorted(t *testing.T, bn *BranchNode) {
 	}
 }
 
-// storage.PageId を ToBytes() するヘルパー
-func pageIdBytes(pageNum storage.PageNumber) []byte {
-	pid := storage.NewPageId(0, pageNum)
+// page.PageId を ToBytes() するヘルパー
+func pageIdBytes(pageNum page.PageNumber) []byte {
+	pid := page.NewPageId(0, pageNum)
 	return pid.ToBytes()
 }

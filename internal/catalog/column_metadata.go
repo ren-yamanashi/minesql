@@ -2,10 +2,11 @@ package catalog
 
 import (
 	"encoding/binary"
-	"minesql/internal/btree"
-	"minesql/internal/btree/node"
 	"minesql/internal/encode"
-	"minesql/internal/storage"
+	"minesql/internal/storage/btree"
+	"minesql/internal/storage/btree/node"
+	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/page"
 	"sort"
 )
 
@@ -19,14 +20,14 @@ const (
 //
 // 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-columns-table.html
 type ColumnMetadata struct {
-	MetaPageId storage.PageId // カラムのメタデータが格納される B+Tree のメタページID
-	FileId     storage.FileId // カラムが属するテーブルの FileId
-	Name       string         // カラムの名前
-	Pos        uint16         // 0 から始まり連続的に増加する、テーブル内のカラムの順序位置
-	Type       ColumnType     // カラムのデータ型
+	MetaPageId page.PageId // カラムのメタデータが格納される B+Tree のメタページID
+	FileId     page.FileId // カラムが属するテーブルの FileId
+	Name       string      // カラムの名前
+	Pos        uint16      // 0 から始まり連続的に増加する、テーブル内のカラムの順序位置
+	Type       ColumnType  // カラムのデータ型
 }
 
-func NewColumnMetadata(fileId storage.FileId, name string, pos uint16, columnType ColumnType) *ColumnMetadata {
+func NewColumnMetadata(fileId page.FileId, name string, pos uint16, columnType ColumnType) *ColumnMetadata {
 	return &ColumnMetadata{
 		FileId: fileId,
 		Name:   name,
@@ -36,8 +37,8 @@ func NewColumnMetadata(fileId storage.FileId, name string, pos uint16, columnTyp
 }
 
 // Insert はカラムメタデータを B+Tree に挿入する
-func (cm *ColumnMetadata) Insert(bp *storage.BufferPool) error {
-	btr := btree.NewBPlusTree(cm.MetaPageId)
+func (cm *ColumnMetadata) Insert(bp *buffer.BufferPool) error {
+	btr := btree.NewBTree(cm.MetaPageId)
 
 	// key (FileId + ColName) をエンコード
 	var encodedKey []byte
@@ -62,9 +63,9 @@ func (cm *ColumnMetadata) Insert(bp *storage.BufferPool) error {
 // fileId: カラムメタデータを読み込む対象のテーブルの FileId
 //
 // metaPageId: カラムメタデータが格納されている B+Tree のメタページID
-func loadColumnMetadata(bp *storage.BufferPool, fileId storage.FileId, metaPageId storage.PageId) ([]*ColumnMetadata, error) {
+func loadColumnMetadata(bp *buffer.BufferPool, fileId page.FileId, metaPageId page.PageId) ([]*ColumnMetadata, error) {
 	// B+Tree を開く
-	colMetaTree := btree.NewBPlusTree(metaPageId)
+	colMetaTree := btree.NewBTree(metaPageId)
 	iter, err := colMetaTree.Search(bp, btree.SearchModeStart{})
 	if err != nil {
 		return nil, err
@@ -80,7 +81,7 @@ func loadColumnMetadata(bp *storage.BufferPool, fileId storage.FileId, metaPageI
 		// キーをデコード (FileId, ColName)
 		var keyParts [][]byte
 		encode.Decode(record.KeyBytes(), &keyParts)
-		colFileId := storage.FileId(binary.BigEndian.Uint32(keyParts[0]))
+		colFileId := page.FileId(binary.BigEndian.Uint32(keyParts[0]))
 
 		// 指定されたテーブルのカラムのみを収集
 		if colFileId == fileId {
