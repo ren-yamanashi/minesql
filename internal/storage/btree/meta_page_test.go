@@ -47,6 +47,18 @@ func TestNewMetaPage(t *testing.T) {
 		assert.Equal(t, expectedPageId, mp.rootPageId())
 	})
 
+	t.Run("ルートページ ID の初期値はゼロ値", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 128)
+		mp := newMetaPage(data)
+
+		// WHEN
+		rootPageId := mp.rootPageId()
+
+		// THEN
+		assert.Equal(t, page.PageId{}, rootPageId)
+	})
+
 	t.Run("リーフページ数の初期値は 0", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)

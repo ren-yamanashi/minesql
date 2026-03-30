@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestChildPageId_Start(t *testing.T) {
+func TestSearchModeStart(t *testing.T) {
 	t.Run("先頭の子ページIDを正しく取得できる", func(t *testing.T) {
 		// GIVEN
 		searchMode := SearchModeStart{}
@@ -30,7 +30,7 @@ func TestChildPageId_Start(t *testing.T) {
 	})
 }
 
-func TestChildPageId_Key(t *testing.T) {
+func TestSearchModeKey(t *testing.T) {
 	t.Run("指定したキーに基づいて子ページIDを正しく取得できる", func(t *testing.T) {
 		// GIVEN
 		searchMode := SearchModeKey{Key: []byte("key1.5")}

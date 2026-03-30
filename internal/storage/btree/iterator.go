@@ -14,10 +14,8 @@ type Iterator struct {
 }
 
 // newIterator は指定されたバッファページとスロット番号を持つイテレータを生成する
-//
-// bufferPage: イテレータが参照するバッファページ
-//
-// slotNum: イテレータが参照するスロット番号 (slotted page のスロット番号)
+//   - bufferPage: イテレータが参照するバッファページ
+//   - slotNum: イテレータが参照するスロット番号 (slotted page のスロット番号)
 func newIterator(bufferPage buffer.BufferPage, slotNum int) *Iterator {
 	return &Iterator{
 		bufferPage: bufferPage,

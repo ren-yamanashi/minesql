@@ -73,8 +73,10 @@ func (bn *BranchNode) Insert(slotNum int, record Record) bool {
 func (bn *BranchNode) SplitInsert(newBranchNode *BranchNode, newRecord Record) ([]byte, error) {
 	newBranchNode.body.Initialize()
 
+	// NOTE: fillRightChild で末尾レコードがセパレータとして取り出されるため、
+	// ループの終了条件は「取り出し後も半分以上を維持できるか」で判定する
 	for {
-		if newBranchNode.IsHalfFull() {
+		if newBranchNode.isHalfFullAfterFillRightChild() {
 			slotNum, _ := bn.SearchSlotNum(newRecord.KeyBytes())
 			if !bn.Insert(slotNum, newRecord) {
 				return nil, errors.New("old branch must have space")
@@ -92,7 +94,7 @@ func (bn *BranchNode) SplitInsert(newBranchNode *BranchNode, newRecord Record) (
 		} else {
 			// 新しいレコードを新しいブランチノードに挿入し、残りのレコードを新しいブランチノードに移動する
 			newBranchNode.Insert(newBranchNode.NumRecords(), newRecord)
-			for !newBranchNode.IsHalfFull() {
+			for !newBranchNode.isHalfFullAfterFillRightChild() {
 				err := bn.transfer(newBranchNode)
 				if err != nil {
 					return nil, err
@@ -103,6 +105,16 @@ func (bn *BranchNode) SplitInsert(newBranchNode *BranchNode, newRecord Record) (
 	}
 
 	return newBranchNode.fillRightChild(), nil
+}
+
+// isHalfFullAfterFillRightChild は fillRightChild で末尾レコードを取り出した後も半分以上埋まっているかを判定する
+func (bn *BranchNode) isHalfFullAfterFillRightChild() bool {
+	if bn.NumRecords() < 2 {
+		return false
+	}
+	lastRecordSize := len(bn.body.Data(bn.NumRecords() - 1))
+	freeSpaceAfter := bn.body.FreeSpace() + lastRecordSize + 4 // 4 はポインタサイズ
+	return 2*freeSpaceAfter < bn.body.Capacity()
 }
 
 // Delete はレコードを削除する

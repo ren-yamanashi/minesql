@@ -55,6 +55,22 @@ func TestRecordSearchModeKey(t *testing.T) {
 		assert.Equal(t, expected, smKey.Key)
 	})
 
+	t.Run("空のキーでもパニックせずにエンコードできる", func(t *testing.T) {
+		// GIVEN
+		mode := RecordSearchModeKey{Key: [][]byte{}}
+
+		// WHEN
+		encoded := mode.encode()
+
+		// THEN
+		smKey, ok := encoded.(btree.SearchModeKey)
+		assert.True(t, ok)
+
+		var expected []byte
+		encode.Encode([][]byte{}, &expected)
+		assert.Equal(t, expected, smKey.Key)
+	})
+
 	t.Run("RecordSearchMode インターフェースを満たす", func(t *testing.T) {
 		// GIVEN & WHEN & THEN
 		var _ RecordSearchMode = RecordSearchModeStart{}

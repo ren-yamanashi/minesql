@@ -404,11 +404,15 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 		assert.Greater(t, bn.NumRecords(), 0)
 		assert.Greater(t, newBn.NumRecords(), 0)
 		assert.NotNil(t, minKey)
+		assert.True(t, newBn.IsHalfFull())
+		// fillRightChild で 1 レコードがセパレータとして昇格するため、合計は numInserted
+		assert.Equal(t, numInserted, bn.NumRecords()+newBn.NumRecords())
 
-		// 新ノードの全キー < 旧ノードの全キー
+		// minKey が新ノードの最大キーより大きく、旧ノードの最小キーより小さい
 		newLastKey := newBn.RecordAt(newBn.NumRecords() - 1).KeyBytes()
 		oldFirstKey := bn.RecordAt(0).KeyBytes()
-		assert.True(t, bytes.Compare(newLastKey, oldFirstKey) < 0)
+		assert.True(t, bytes.Compare(newLastKey, minKey) < 0)
+		assert.True(t, bytes.Compare(minKey, oldFirstKey) < 0)
 
 		// 各ノード内のキーが昇順
 		assertBranchKeysSorted(t, bn)
@@ -443,15 +447,61 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 		assert.Greater(t, bn.NumRecords(), 0)
 		assert.Greater(t, newBn.NumRecords(), 0)
 		assert.NotNil(t, minKey)
+		assert.True(t, newBn.IsHalfFull())
+		assert.Equal(t, numInserted, bn.NumRecords()+newBn.NumRecords())
 
 		// 各ノード内のキーが昇順
 		assertBranchKeysSorted(t, bn)
 		assertBranchKeysSorted(t, newBn)
 
-		// 新ノードの全キー < 旧ノードの全キー
+		// minKey が新ノードの最大キーより大きく、旧ノードの最小キーより小さい
 		newLastKey := newBn.RecordAt(newBn.NumRecords() - 1).KeyBytes()
 		oldFirstKey := bn.RecordAt(0).KeyBytes()
-		assert.True(t, bytes.Compare(newLastKey, oldFirstKey) < 0)
+		assert.True(t, bytes.Compare(newLastKey, minKey) < 0)
+		assert.True(t, bytes.Compare(minKey, oldFirstKey) < 0)
+
+		// 新ノードの RightChildPageId が有効なページ ID である
+		newRightChild := newBn.RightChildPageId()
+		assert.NotEqual(t, page.PageId{}, newRightChild)
+	})
+
+	t.Run("中間キーで分割される場合、キー順序が正しい", func(t *testing.T) {
+		// GIVEN: ブランチノードを偶数キーで満杯にする
+		bn := createTestBranchNodeEmpty()
+		bn.body.Initialize()
+		value := pageIdBytes(1)
+		numInserted := 0
+		for {
+			key := fmt.Appendf(nil, "a%04d", numInserted*2) // 偶数キー
+			if !bn.Insert(numInserted, NewRecord(nil, key, value)) {
+				break
+			}
+			numInserted++
+		}
+		// 中間付近に位置する奇数キーを挿入
+		middleKey := fmt.Appendf(nil, "a%04d", numInserted)
+		newBn := createTestBranchNodeEmpty()
+
+		// WHEN
+		minKey, err := bn.SplitInsert(newBn, NewRecord(nil, middleKey, value))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Greater(t, bn.NumRecords(), 0)
+		assert.Greater(t, newBn.NumRecords(), 0)
+		assert.NotNil(t, minKey)
+		assert.True(t, newBn.IsHalfFull())
+		assert.Equal(t, numInserted, bn.NumRecords()+newBn.NumRecords())
+
+		// minKey が新ノードの最大キーより大きく、旧ノードの最小キーより小さい
+		newLastKey := newBn.RecordAt(newBn.NumRecords() - 1).KeyBytes()
+		oldFirstKey := bn.RecordAt(0).KeyBytes()
+		assert.True(t, bytes.Compare(newLastKey, minKey) < 0)
+		assert.True(t, bytes.Compare(minKey, oldFirstKey) < 0)
+
+		// 各ノード内のキーが昇順
+		assertBranchKeysSorted(t, bn)
+		assertBranchKeysSorted(t, newBn)
 
 		// 新ノードの RightChildPageId が有効なページ ID である
 		newRightChild := newBn.RightChildPageId()
@@ -695,6 +745,31 @@ func TestBranchNodeUpdate(t *testing.T) {
 		// 非キーフィールドも壊れていないことを確認
 		assert.Equal(t, pageIdBytes(10), bn.RecordAt(0).NonKeyBytes())
 		assert.Equal(t, pageIdBytes(30), bn.RecordAt(2).NonKeyBytes())
+	})
+
+	t.Run("空き容量が不足している場合、false を返す", func(t *testing.T) {
+		// GIVEN: ノードをほぼ満杯にする
+		bn := createTestBranchNodeEmpty()
+		bn.body.Initialize()
+		value := pageIdBytes(1)
+		inserted := 0
+		for {
+			key := fmt.Appendf(nil, "k%04d", inserted)
+			if !bn.Insert(inserted, NewRecord(nil, key, value)) {
+				break
+			}
+			inserted++
+		}
+		originalKey := make([]byte, len(bn.RecordAt(0).KeyBytes()))
+		copy(originalKey, bn.RecordAt(0).KeyBytes())
+
+		// WHEN: 非常に長いキーに更新を試みる
+		hugeKey := make([]byte, 3000)
+		ok := bn.Update(0, hugeKey)
+
+		// THEN
+		assert.False(t, ok)
+		assert.Equal(t, originalKey, bn.RecordAt(0).KeyBytes())
 	})
 }
 

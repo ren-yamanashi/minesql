@@ -50,6 +50,19 @@ func TestGet(t *testing.T) {
 		assert.Equal(t, []byte("key2"), record.KeyBytes())
 		assert.Equal(t, []byte("value2"), record.NonKeyBytes())
 	})
+
+	t.Run("slotNum がレコード数以上の場合、false を返す", func(t *testing.T) {
+		// GIVEN
+		record1 := node.NewRecord(nil, []byte("key1"), []byte("value1"))
+		bufferPage := createLeafBufferPage(page.NewPageId(page.FileId(0), page.PageNumber(0)), []node.Record{record1}, nil)
+		iterator := newIterator(bufferPage, 1) // レコード数 (1) と同じ slotNum
+
+		// WHEN
+		_, ok := iterator.Get()
+
+		// THEN
+		assert.False(t, ok)
+	})
 }
 
 func TestNext(t *testing.T) {
@@ -70,21 +83,80 @@ func TestNext(t *testing.T) {
 
 		// WHEN
 		record, ok, err := iterator.Next(bp)
-		bufferId1 := iterator.slotNum
+		slotNum1 := iterator.slotNum
 		record2Result, ok2, err2 := iterator.Next(bp)
-		bufferId2 := iterator.slotNum
+		slotNum2 := iterator.slotNum
 
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, []byte("key1"), record.KeyBytes())
 		assert.Equal(t, []byte("value1"), record.NonKeyBytes())
-		assert.Equal(t, 1, bufferId1) // 1 回目の Next() 後の bufferId
+		assert.Equal(t, 1, slotNum1) // 1 回目の Next() 後の slotNum
 		assert.NoError(t, err2)
 		assert.True(t, ok2)
 		assert.Equal(t, []byte("key2"), record2Result.KeyBytes())
 		assert.Equal(t, []byte("value2"), record2Result.NonKeyBytes())
-		assert.Equal(t, 2, bufferId2) // 2 回目の Next() 後の bufferId
+		assert.Equal(t, 2, slotNum2) // 2 回目の Next() 後の slotNum
+	})
+
+	t.Run("レコードが残っていない場合、false を返す", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		dm := initDiskForIterator(t, tmpdir)
+		bp := buffer.NewBufferPool(3)
+		bp.RegisterDisk(page.FileId(0), dm)
+
+		record1 := node.NewRecord(nil, []byte("key1"), []byte("value1"))
+		bufferPage := createLeafBufferPage(page.NewPageId(page.FileId(0), page.PageNumber(0)), []node.Record{record1}, nil)
+		iterator := newIterator(bufferPage, 1) // レコード数を超えた位置
+
+		// WHEN
+		_, ok, err := iterator.Next(bp)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.False(t, ok)
+	})
+
+	t.Run("ページをまたいで Next を呼ぶと次のページのレコードが取得できる", func(t *testing.T) {
+		// GIVEN: 2 ページ構成 (各 1 レコード)
+		tmpdir := t.TempDir()
+		dm := initDiskForIterator(t, tmpdir)
+		bp := buffer.NewBufferPool(3)
+		bp.RegisterDisk(page.FileId(0), dm)
+
+		record1 := node.NewRecord(nil, []byte("key1"), []byte("value1"))
+		nextPageId := page.NewPageId(page.FileId(0), page.PageNumber(1))
+		bufferPage1 := createLeafBufferPage(page.NewPageId(page.FileId(0), page.PageNumber(0)), []node.Record{record1}, &nextPageId)
+
+		record2 := node.NewRecord(nil, []byte("key2"), []byte("value2"))
+		bufferPage2 := createLeafBufferPage(page.NewPageId(page.FileId(0), page.PageNumber(1)), []node.Record{record2}, nil)
+
+		// 次のページをディスクに書き込む
+		dm.AllocatePage() // page 1 を採番
+		err := dm.WritePageData(page.NewPageId(page.FileId(0), page.PageNumber(1)), bufferPage2.GetReadData())
+		assert.NoError(t, err)
+
+		// ページ 1 をバッファプールに追加
+		addedPage1, err := bp.AddPage(page.NewPageId(page.FileId(0), page.PageNumber(0)))
+		assert.NoError(t, err)
+		copy(addedPage1.GetWriteData(), bufferPage1.GetReadData())
+
+		iterator := newIterator(*addedPage1, 0)
+
+		// WHEN: 2 回 Next を呼ぶ (1 回目でページ遷移が発生)
+		rec1, ok1, err1 := iterator.Next(bp)
+		rec2, ok2, err2 := iterator.Next(bp)
+
+		// THEN
+		assert.NoError(t, err1)
+		assert.True(t, ok1)
+		assert.Equal(t, []byte("key1"), rec1.KeyBytes())
+
+		assert.NoError(t, err2)
+		assert.True(t, ok2)
+		assert.Equal(t, []byte("key2"), rec2.KeyBytes())
 	})
 }
 
