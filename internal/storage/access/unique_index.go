@@ -29,14 +29,14 @@ func NewUniqueIndexAccessMethod(name string, colName string, metaPageId page.Pag
 }
 
 // Search は指定した検索モードでインデックスを検索し、SecondaryIndexIterator を返す
-func (ui *UniqueIndexAccessMethod) Search(bp *buffer.BufferPool, table *TableAccessMethod, mode RecordSearchMode) (*SecondaryIndexIterator, error) {
+func (ui *UniqueIndexAccessMethod) Search(bp *buffer.BufferPool, table *TableAccessMethod, mode RecordSearchMode) (*UniqueIndexIterator, error) {
 	indexBTree := btree.NewBTree(ui.MetaPageId)
 	indexIter, err := indexBTree.Search(bp, mode.encode())
 	if err != nil {
 		return nil, err
 	}
 	tableBTree := btree.NewBTree(table.MetaPageId)
-	return newSecondaryIndexIterator(indexIter, tableBTree, bp, ui.PrimaryKeyCount), nil
+	return newUniqueIndexIterator(indexIter, tableBTree, bp, ui.PrimaryKeyCount), nil
 }
 
 // Create は空のユニークインデックスを新規作成する
@@ -57,18 +57,18 @@ func (ui *UniqueIndexAccessMethod) Create(bp *buffer.BufferPool) error {
 func (ui *UniqueIndexAccessMethod) Insert(bp *buffer.BufferPool, encodedPK []byte, columns [][]byte) error {
 	btr := btree.NewBTree(ui.MetaPageId)
 
-	// セカンダリキーをエンコード
-	var encodedSecondaryKey []byte
-	encode.Encode([][]byte{columns[ui.SecondaryKeyIdx]}, &encodedSecondaryKey)
+	// ユニークキーをエンコード
+	var encodedUk []byte
+	encode.Encode([][]byte{columns[ui.SecondaryKeyIdx]}, &encodedUk)
 
-	// ユニーク制約チェック: active なレコード (同一セカンダリキー) が存在するか確認
-	if err := ui.checkUniqueConstraint(bp, btr, encodedSecondaryKey); err != nil {
+	// 同一セカンダリキー を持つ active なレコードが存在するか確認 (ユニーク制約チェック)
+	if err := ui.checkUniqueConstraint(bp, btr, encodedUk); err != nil {
 		return err
 	}
 
-	// fullKey = concat(encodedSecondaryKey, encodedPK)
-	fullKey := make([]byte, 0, len(encodedSecondaryKey)+len(encodedPK))
-	fullKey = append(fullKey, encodedSecondaryKey...)
+	// fullKey = concat(encodedUk, encodedPK)
+	fullKey := make([]byte, 0, len(encodedUk)+len(encodedPK))
+	fullKey = append(fullKey, encodedUk...)
 	fullKey = append(fullKey, encodedPK...)
 
 	btrRecord := node.NewRecord([]byte{0}, fullKey, nil)
@@ -127,35 +127,35 @@ func (ui *UniqueIndexAccessMethod) Height(bp *buffer.BufferPool) (uint64, error)
 }
 
 func (ui *UniqueIndexAccessMethod) getFullKey(encodedPK []byte, columns [][]byte) []byte {
-	// セカンダリキーをエンコード
-	var encodedSecondaryKey []byte
-	encode.Encode([][]byte{columns[ui.SecondaryKeyIdx]}, &encodedSecondaryKey)
+	// ユニークキーをエンコード
+	var encodedUk []byte
+	encode.Encode([][]byte{columns[ui.SecondaryKeyIdx]}, &encodedUk)
 
-	// fullKey = concat(encodedSecondaryKey, encodedPK)
-	fullKey := make([]byte, 0, len(encodedSecondaryKey)+len(encodedPK))
-	fullKey = append(fullKey, encodedSecondaryKey...)
+	// fullKey = concat(encodedUk, encodedPK)
+	fullKey := make([]byte, 0, len(encodedUk)+len(encodedPK))
+	fullKey = append(fullKey, encodedUk...)
 	fullKey = append(fullKey, encodedPK...)
 
 	return fullKey
 }
 
-// checkUniqueConstraint は encodedSecondaryKey に対して active なレコードが存在するか確認する
+// checkUniqueConstraint は encodedUk に対して active なレコードが存在するか確認する
 //
 // 存在する場合は ErrDuplicateKey を返す
-func (ui *UniqueIndexAccessMethod) checkUniqueConstraint(bp *buffer.BufferPool, btr *btree.BTree, encodedSecondaryKey []byte) error {
-	iter, err := btr.Search(bp, btree.SearchModeKey{Key: encodedSecondaryKey})
+func (ui *UniqueIndexAccessMethod) checkUniqueConstraint(bp *buffer.BufferPool, btr *btree.BTree, encodedUk []byte) error {
+	iter, err := btr.Search(bp, btree.SearchModeKey{Key: encodedUk})
 	if err != nil {
 		return err
 	}
 
-	// encodedSecondaryKey をプレフィックスとして持つレコードを走査する
+	// encodedUk をプレフィックスとして持つレコードを走査する
 	for {
 		record, ok := iter.Get()
 		if !ok {
 			break
 		}
 
-		// レコードのキーからセカンダリキー部分を取り出して比較
+		// レコードのキーからユニークキー部分を取り出して比較
 		// encode.Decode でカラムを分離する
 		var keyColumns [][]byte
 		encode.Decode(record.KeyBytes(), &keyColumns)
@@ -163,11 +163,11 @@ func (ui *UniqueIndexAccessMethod) checkUniqueConstraint(bp *buffer.BufferPool, 
 			break
 		}
 
-		// セカンダリキーカラムだけ再エンコードして比較
-		var existingSecondaryKey []byte
-		encode.Encode(keyColumns[:1], &existingSecondaryKey)
-		if !bytes.Equal(existingSecondaryKey, encodedSecondaryKey) {
-			// セカンダリキーが異なる → これ以上のレコードは一致しない
+		// ユニークキーカラムだけ再エンコードして比較
+		var existingUk []byte
+		encode.Encode(keyColumns[:1], &existingUk)
+		if !bytes.Equal(existingUk, encodedUk) {
+			// ユニークキーが異なる → これ以上のレコードは一致しない
 			break
 		}
 

@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSecondaryIndexIterator(t *testing.T) {
+func TestUniqueIndexIterator(t *testing.T) {
 	t.Run("インデックス経由でテーブルレコードをデコード済みで取得できる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "idx_iter_test.db")
@@ -30,7 +30,7 @@ func TestSecondaryIndexIterator(t *testing.T) {
 		iter, err := uniqueIndex.Search(bp, &table, RecordSearchModeStart{})
 		assert.NoError(t, err)
 
-		var results []*SecondaryIndexSearchResult
+		var results []*searchResult
 		for {
 			result, ok, err := iter.Next()
 			assert.NoError(t, err)
@@ -44,15 +44,15 @@ func TestSecondaryIndexIterator(t *testing.T) {
 		assert.Equal(t, 3, len(results))
 
 		// "Doe" → record "a"
-		assert.Equal(t, [][]byte{[]byte("Doe")}, results[0].SecondaryKey)
+		assert.Equal(t, [][]byte{[]byte("Doe")}, results[0].UniqueKey)
 		assert.Equal(t, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}, results[0].Record)
 
 		// "Johnson" → record "c"
-		assert.Equal(t, [][]byte{[]byte("Johnson")}, results[1].SecondaryKey)
+		assert.Equal(t, [][]byte{[]byte("Johnson")}, results[1].UniqueKey)
 		assert.Equal(t, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")}, results[1].Record)
 
 		// "Smith" → record "b"
-		assert.Equal(t, [][]byte{[]byte("Smith")}, results[2].SecondaryKey)
+		assert.Equal(t, [][]byte{[]byte("Smith")}, results[2].UniqueKey)
 		assert.Equal(t, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")}, results[2].Record)
 	})
 
@@ -82,7 +82,7 @@ func TestSecondaryIndexIterator(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, [][]byte{[]byte("Smith")}, result.SecondaryKey)
+		assert.Equal(t, [][]byte{[]byte("Smith")}, result.UniqueKey)
 		assert.Equal(t, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")}, result.Record)
 	})
 
@@ -137,7 +137,7 @@ func TestSecondaryIndexIterator(t *testing.T) {
 		iter, err := uniqueIndex.Search(bp, &table, RecordSearchModeStart{})
 		assert.NoError(t, err)
 
-		var results []*SecondaryIndexSearchResult
+		var results []*searchResult
 		for {
 			result, ok, err := iter.Next()
 			assert.NoError(t, err)
@@ -149,9 +149,9 @@ func TestSecondaryIndexIterator(t *testing.T) {
 
 		// THEN: ソフトデリート済みの "Doe" はスキップされ、2 件のみ返される
 		assert.Equal(t, 2, len(results))
-		assert.Equal(t, [][]byte{[]byte("Johnson")}, results[0].SecondaryKey)
+		assert.Equal(t, [][]byte{[]byte("Johnson")}, results[0].UniqueKey)
 		assert.Equal(t, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")}, results[0].Record)
-		assert.Equal(t, [][]byte{[]byte("Smith")}, results[1].SecondaryKey)
+		assert.Equal(t, [][]byte{[]byte("Smith")}, results[1].UniqueKey)
 		assert.Equal(t, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")}, results[1].Record)
 	})
 
@@ -185,7 +185,7 @@ func TestSecondaryIndexIterator(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, [][]byte{[]byte("Williams")}, result.SecondaryKey)
+		assert.Equal(t, [][]byte{[]byte("Williams")}, result.UniqueKey)
 		assert.Equal(t, [][]byte{[]byte("a"), []byte("John"), []byte("Williams")}, result.Record)
 	})
 }

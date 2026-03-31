@@ -172,13 +172,13 @@ func (t *TableAccessMethod) UpdateInplace(bp *buffer.BufferPool, oldColumns [][]
 }
 
 // Search は指定した検索モードでテーブルを検索し、ClusteredIndexIterator を返す
-func (t *TableAccessMethod) Search(bp *buffer.BufferPool, mode RecordSearchMode) (*ClusteredIndexIterator, error) {
+func (t *TableAccessMethod) Search(bp *buffer.BufferPool, mode RecordSearchMode) (*TableIterator, error) {
 	btr := btree.NewBTree(t.MetaPageId)
 	iterator, err := btr.Search(bp, mode.encode())
 	if err != nil {
 		return nil, err
 	}
-	return newClusteredIndexIterator(iterator, bp), nil
+	return newTableIterator(iterator, bp), nil
 }
 
 // GetUniqueIndexByName はインデックス名からユニークインデックスを取得する

@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestClusteredIndexIterator(t *testing.T) {
+func TestTableIterator(t *testing.T) {
 	t.Run("先頭から全レコードをデコード済みで取得できる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "iter_test.db")

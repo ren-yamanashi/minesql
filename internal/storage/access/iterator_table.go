@@ -6,13 +6,13 @@ import (
 	"minesql/internal/storage/encode"
 )
 
-type ClusteredIndexIterator struct {
+type TableIterator struct {
 	iterator *btree.Iterator
 	bp       *buffer.BufferPool
 }
 
-func newClusteredIndexIterator(iterator *btree.Iterator, bp *buffer.BufferPool) *ClusteredIndexIterator {
-	return &ClusteredIndexIterator{
+func newTableIterator(iterator *btree.Iterator, bp *buffer.BufferPool) *TableIterator {
+	return &TableIterator{
 		iterator: iterator,
 		bp:       bp,
 	}
@@ -22,7 +22,7 @@ func newClusteredIndexIterator(iterator *btree.Iterator, bp *buffer.BufferPool) 
 // (DeleteMark が設定されているレコードはスキップする)
 //
 // 戻り値: レコード (プライマリキー + 値), データがあるかどうか, エラー
-func (ri *ClusteredIndexIterator) Next() ([][]byte, bool, error) {
+func (ri *TableIterator) Next() ([][]byte, bool, error) {
 	for {
 		btrRecord, ok, err := ri.iterator.Next(ri.bp)
 		if !ok {
@@ -32,7 +32,7 @@ func (ri *ClusteredIndexIterator) Next() ([][]byte, bool, error) {
 			return nil, false, err
 		}
 
-		// DeleteMark チェック: ソフトデリート済みならスキップ
+		// DeleteMark が 1 のレコードはスキップ
 		if len(btrRecord.HeaderBytes()) > 0 && btrRecord.HeaderBytes()[0] == 1 {
 			continue
 		}
