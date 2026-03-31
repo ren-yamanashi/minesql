@@ -2,7 +2,7 @@
 
 ## 概要
 
-- RDBMS はデータを永続化するためにデータをファイルに書き込む必要がある
+- RDBMS はデータを永続化するために、データをファイルに書き込む必要がある
 - ディスクはファイルへの読み書きを担当する
 - 読み書きするファイルはヒープファイル構造
   - ヒープファイル: ファイルをページという固定の長さごとに区切ったファイル
@@ -12,6 +12,8 @@
 - テーブルごとに個別のディスクファイルを持つ
   - ファイル名は `{table_name}.db`
   - 各テーブルは FileId を持ち、対応するディスクファイルに格納される
+    - どのファイル (`${table_name}.db`) がどの FileId に対応するかという情報は、[カタログ](../dictionary/catalog.md) が管理する
+    - つまりファイル内に FileId (ないしは PageId) が格納されるわけではない
   - テーブル本体とそのインデックスは同じディスクファイル (同じ FileId) を共有する
     - これは MySQL の設計 (File-Per-Table の場合) に従っている
     - 参考: [17.6.3.2 File-Per-Table Tablespaces](https://dev.mysql.com/doc/refman/8.4/en/innodb-file-per-table-tablespaces.html)  
@@ -22,12 +24,18 @@
 
 ## PageId の構造
 
-- PageId はディスクファイルとファイル内のページを特定するための識別子
-- 複数のディスクファイル内で一意にページを特定できるようにする
-  - FileId: ディスクファイルの識別子 (先頭4バイト)
-  - PageNumber: ファイル内のページ番号 (次の4バイト)
+- 該当のページが、どのファイル (`{table_name}.db`) のどの位置にあるかを特定するための識別子として、PageId を使用する
+- PageId の構造は以下の通り
 
-※ ディスクは PageId を使用してページを特定し、4096 バイト単位のデータを読み書きする。ページの中身が何であるか (ページ内にどのようなデータが格納されているのかどうか) という点は一切関知しない (ページデータの中身に意味を持たせるのはディスクよりも上のレイヤーの責任)
+| フィールド | バイト数 | 説明 |
+| --- | --- | --- |
+| FileId | 4 | ディスクファイルの識別子 (先頭4バイト) <br/> 全体で一意 |
+| PageNumber | 4 | ファイル内のページ番号 (次の4バイト) <br/> ファイル内で一意 |
+
+## ディスクの責務
+
+ディスクは PageId を使用してページを特定し、4096 バイト単位のデータを読み書きする。\
+ページの中身が何であるか (ページ内にどのようなデータが格納されているのかどうか) という点は一切関知しない (ページデータの中身に意味を持たせるのはディスクよりも上のレイヤーの責任)
 
 ## 最小の I/O 単位をページにする理由
 
@@ -64,3 +72,12 @@
 - 書き込みの前に、ファイルディスクリプタをページの先頭へシークし、指定されたデータを書き込む
   - 例: PageNumber が 2 の場合、ファイルディスクリプタを、ファイルの先頭位置から 8192 バイト (2 * 4096) へ移動してからデータを書き込む
   - 書き込むデータのサイズはページサイズ (4096 バイト) となる
+
+### ページの Sync
+
+- 前述の通り、minesql では OS のキャッシュを使用せずに独自のバッファプールを使用しているため、ディスクへの書き込みには O_DIRECT (`directio`) を使用している
+- そのため、基本的にディスクが行うファイルの書き込みは、OS のキャッシュを経由せず直接ディスク (HDD/SSD) に書き込まれる
+- ただし、ストレージ自体がデータをライトバックキャッシュに保持している可能性があり、それを考慮すると確実に書き込みを行うためには `fsync()` を呼び出す必要がある
+  - 参考: https://lwn.net/Articles/457667/
+  > I/O operations performed against files opened with O_DIRECT bypass the kernel's page cache, writing directly to the storage. Recall that the storage may itself store the data in a write-back cache, so fsync() is still required for files opened with O_DIRECT in order to save the data to stable storage. The O_DIRECT flag is only relevant for the system I/O API.
+  - そのため、サーバーのプロセス停止時には `Sync()` を呼び出す方針としている

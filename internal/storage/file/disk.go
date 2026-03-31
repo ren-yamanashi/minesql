@@ -12,7 +12,7 @@ import (
 
 // Disk はディスク上のヒープファイルを管理する
 type Disk struct {
-	fileId     page.FileId // このディスクマネージャの FileId
+	fileId     page.FileId // このディスクの FileId
 	heapFile   *os.File    // ヒープファイルのファイルディスクリプタ
 	nextPageId page.PageId // 次に採番するページ ID
 }
@@ -43,7 +43,6 @@ func NewDisk(fileId page.FileId, path string) (*Disk, error) {
 // AllocatePage は新しいページ ID を採番する
 func (d *Disk) AllocatePage() page.PageId {
 	id := d.nextPageId
-	// 次のページ番号をインクリメント
 	d.nextPageId = page.NewPageId(d.fileId, d.nextPageId.PageNumber+1)
 	return id
 }
@@ -58,7 +57,6 @@ func (d *Disk) ReadPageData(id page.PageId, data []byte) error {
 	if err := d.seekToPage(id); err != nil {
 		return err
 	}
-
 	// シークした位置から PAGE_SIZE バイト読み込む
 	// 読み込んだデータは `data` に格納される
 	_, err := io.ReadFull(d.heapFile, data) // data に PAGE_SIZE バイト読み込む (data の長さは PAGE_SIZE と等しいので ReadFull を使用すると PAGE_SIZE バイト読み込まれる)
@@ -75,28 +73,19 @@ func (d *Disk) WritePageData(id page.PageId, data []byte) error {
 	if err := d.seekToPage(id); err != nil {
 		return err
 	}
-
 	// シークした位置から PAGE_SIZE バイト書き込む
 	n, err := d.heapFile.Write(data)
 	if err != nil {
 		return err
 	}
-
 	// 書き込んだバイト数が PAGE_SIZE と等しいことを確認
 	if n != page.PAGE_SIZE {
 		return io.ErrShortWrite
 	}
-
 	return nil
 }
 
-// Sync はファイルをディスクに同期する
-//
-// `file.Write(data)` は OS のキャッシュにデータを書き込むだけで、必ずしもディスクに書き込まれるとは限らないため、明示的に同期を行う必要がある
-//
-// 基本的にはプロセスの終了時に呼び出せば良い
-//
-// 参考: https://www.sobyte.net/post/2022-01/golang-defer-file-close/
+// Sync はファイルをディスクに同期する (基本的にはプロセスの終了時に呼び出せば良い)
 func (d *Disk) Sync() error {
 	return d.heapFile.Sync()
 }
