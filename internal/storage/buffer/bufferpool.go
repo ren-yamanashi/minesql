@@ -18,7 +18,7 @@ type BufferId uint64
 type PageTable map[page.PageId]BufferId
 
 type BufferPool struct {
-	diskManagers      map[page.FileId]*file.Disk // FileId → Disk のマップ
+	disks             map[page.FileId]*file.Disk // FileId → Disk のマップ
 	bufferPages       []BufferPage               // バッファページのスライス
 	maxBufferSize     int                        // バッファプールの最大サイズ (バッファページ数)
 	pageTable         PageTable                  // ページテーブル (key: PageId, value: BufferId のマップ)
@@ -33,7 +33,7 @@ func NewBufferPool(size int) *BufferPool {
 		bufPages[i] = *NewBufferPage(page.INVALID_PAGE_ID) // 仮のページ ID で初期化 (実際にはバッファプールにページが追加されるときに設定される)
 	}
 	return &BufferPool{
-		diskManagers:      make(map[page.FileId]*file.Disk),
+		disks:             make(map[page.FileId]*file.Disk),
 		bufferPages:       bufPages,
 		maxBufferSize:     size,
 		pageTable:         make(PageTable),
@@ -115,6 +115,7 @@ func (bp *BufferPool) AddPage(pageId page.PageId) (*BufferPage, error) {
 
 // FlushPage はバッファプール内のすべてのダーティーページをディスクに書き出す
 func (bp *BufferPool) FlushPage() error {
+	// 全ダーティーページをディスクに書き出す
 	for pageId, bufferId := range bp.pageTable {
 		bufferPage := &bp.bufferPages[bufferId]
 		if !bufferPage.IsDirty {
@@ -135,6 +136,13 @@ func (bp *BufferPool) FlushPage() error {
 		bufferPage.IsDirty = false
 	}
 
+	// 全ディスクを Sync してストレージデバイスへの書き込みを保証
+	for _, disk := range bp.disks {
+		if err := disk.Sync(); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
@@ -149,12 +157,12 @@ func (bp *BufferPool) UnRefPage(pageId page.PageId) {
 //   - fileId: 登録する Disk に対応する FileId
 //   - disk: 登録する Disk
 func (bp *BufferPool) RegisterDisk(fileId page.FileId, disk *file.Disk) {
-	bp.diskManagers[fileId] = disk
+	bp.disks[fileId] = disk
 }
 
 // GetDisk は指定された FileId に対応する Disk を取得する
 func (bp *BufferPool) GetDisk(fileId page.FileId) (*file.Disk, error) {
-	disk, ok := bp.diskManagers[fileId]
+	disk, ok := bp.disks[fileId]
 	if !ok {
 		return nil, fmt.Errorf("disk for FileId %d not found", fileId)
 	}

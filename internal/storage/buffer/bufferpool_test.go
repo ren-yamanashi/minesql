@@ -17,18 +17,18 @@ func TestNewBufferPool(t *testing.T) {
 		tmpdir := t.TempDir()
 		path := filepath.Join(tmpdir, "test.db")
 		fileId := page.FileId(0)
-		dm, err := file.NewDisk(fileId, path)
+		disk, err := file.NewDisk(fileId, path)
 		assert.NoError(t, err)
 
 		// WHEN
 		bp := NewBufferPool(size)
-		bp.RegisterDisk(fileId, dm)
+		bp.RegisterDisk(fileId, disk)
 
 		// THEN
 		assert.NotNil(t, bp)
 		registeredDm, err := bp.GetDisk(fileId)
 		assert.NoError(t, err)
-		assert.Equal(t, dm, registeredDm)
+		assert.Equal(t, disk, registeredDm)
 		assert.Equal(t, size, bp.maxBufferSize)
 		assert.Equal(t, size, len(bp.bufferPages))
 		assert.Equal(t, 0, len(bp.pageTable))
@@ -42,18 +42,18 @@ func TestRegisterDisk(t *testing.T) {
 		tmpdir := t.TempDir()
 		path := filepath.Join(tmpdir, "test.db")
 		fileId := page.FileId(0)
-		dm, err := file.NewDisk(fileId, path)
+		disk, err := file.NewDisk(fileId, path)
 		assert.NoError(t, err)
 
 		bp := NewBufferPool(size)
 
 		// WHEN
-		bp.RegisterDisk(fileId, dm)
+		bp.RegisterDisk(fileId, disk)
 
 		// THEN
 		retrievedDm, err := bp.GetDisk(fileId)
 		assert.NoError(t, err)
-		assert.Equal(t, dm, retrievedDm)
+		assert.Equal(t, disk, retrievedDm)
 	})
 }
 
@@ -64,18 +64,18 @@ func TestGetDisk(t *testing.T) {
 		tmpdir := t.TempDir()
 		path := filepath.Join(tmpdir, "test.db")
 		fileId := page.FileId(0)
-		dm, err := file.NewDisk(fileId, path)
+		disk, err := file.NewDisk(fileId, path)
 		assert.NoError(t, err)
 
 		bp := NewBufferPool(size)
-		bp.RegisterDisk(fileId, dm)
+		bp.RegisterDisk(fileId, disk)
 
 		// WHEN
 		retrievedDm, err := bp.GetDisk(fileId)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, dm, retrievedDm)
+		assert.Equal(t, disk, retrievedDm)
 	})
 
 	t.Run("登録されていない FileId を指定するとエラーが発生する", func(t *testing.T) {
@@ -101,9 +101,9 @@ func TestAllocatePageId(t *testing.T) {
 		bp := NewBufferPool(10)
 		fileId := page.FileId(1)
 		path := filepath.Join(tmpdir, "test.db")
-		dm, err := file.NewDisk(fileId, path)
+		disk, err := file.NewDisk(fileId, path)
 		assert.NoError(t, err)
-		bp.RegisterDisk(fileId, dm)
+		bp.RegisterDisk(fileId, disk)
 
 		// WHEN
 		pageId1, err := bp.AllocatePageId(fileId)
@@ -180,9 +180,9 @@ func TestFetchPage(t *testing.T) {
 		// GIVEN
 		size := 3
 		tmpdir := t.TempDir()
-		dm, pageId := createEmptyDisk(t, tmpdir)
+		disk, pageId := createEmptyDisk(t, tmpdir)
 		bp := NewBufferPool(size)
-		bp.RegisterDisk(page.FileId(0), dm)
+		bp.RegisterDisk(page.FileId(0), disk)
 
 		bufferPage, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -200,9 +200,9 @@ func TestFetchPage(t *testing.T) {
 		// GIVEN
 		size := 3
 		tmpdir := t.TempDir()
-		dm, pageId := createEmptyDisk(t, tmpdir)
+		disk, pageId := createEmptyDisk(t, tmpdir)
 		bp := NewBufferPool(size)
-		bp.RegisterDisk(page.FileId(0), dm)
+		bp.RegisterDisk(page.FileId(0), disk)
 
 		// WHEN
 		fetchedPage, err := bp.FetchPage(pageId)
@@ -221,10 +221,10 @@ func TestAddPage(t *testing.T) {
 		// GIVEN
 		size := 3
 		tmpdir := t.TempDir()
-		dm, _ := createEmptyDisk(t, tmpdir)
+		disk, _ := createEmptyDisk(t, tmpdir)
 		bp := NewBufferPool(size)
-		bp.RegisterDisk(page.FileId(0), dm)
-		pageId := dm.AllocatePage()
+		bp.RegisterDisk(page.FileId(0), disk)
+		pageId := disk.AllocatePage()
 
 		// WHEN
 		bufferPage, err := bp.AddPage(pageId)
@@ -242,14 +242,14 @@ func TestAddPage(t *testing.T) {
 		// GIVEN
 		size := 3
 		tmpdir := t.TempDir()
-		dm, _ := createEmptyDisk(t, tmpdir)
+		disk, _ := createEmptyDisk(t, tmpdir)
 		bp := NewBufferPool(size)
-		bp.RegisterDisk(page.FileId(0), dm)
+		bp.RegisterDisk(page.FileId(0), disk)
 
 		// バッファプールを満杯にする
-		pageId1 := dm.AllocatePage()
-		pageId2 := dm.AllocatePage()
-		pageId3 := dm.AllocatePage()
+		pageId1 := disk.AllocatePage()
+		pageId2 := disk.AllocatePage()
+		pageId3 := disk.AllocatePage()
 
 		page1, err := bp.AddPage(pageId1)
 		assert.NoError(t, err)
@@ -268,7 +268,7 @@ func TestAddPage(t *testing.T) {
 		bp.UnRefPage(pageId1)
 
 		// WHEN
-		pageId4 := dm.AllocatePage()
+		pageId4 := disk.AllocatePage()
 		newPage, err := bp.AddPage(pageId4)
 
 		// THEN
@@ -293,14 +293,14 @@ func TestAddPage(t *testing.T) {
 		// GIVEN
 		size := 3
 		tmpdir := t.TempDir()
-		dm, _ := createEmptyDisk(t, tmpdir)
+		disk, _ := createEmptyDisk(t, tmpdir)
 		bp := NewBufferPool(size)
-		bp.RegisterDisk(page.FileId(0), dm)
+		bp.RegisterDisk(page.FileId(0), disk)
 
 		// バッファプールを満杯にする
-		pageId1 := dm.AllocatePage()
-		pageId2 := dm.AllocatePage()
-		pageId3 := dm.AllocatePage()
+		pageId1 := disk.AllocatePage()
+		pageId2 := disk.AllocatePage()
+		pageId3 := disk.AllocatePage()
 
 		_, err := bp.AddPage(pageId1)
 		assert.NoError(t, err)
@@ -319,7 +319,7 @@ func TestAddPage(t *testing.T) {
 		bp.bufferPages[2].IsDirty = false
 
 		// WHEN
-		pageId4 := dm.AllocatePage()
+		pageId4 := disk.AllocatePage()
 		newPage, err := bp.AddPage(pageId4)
 
 		// THEN
@@ -340,13 +340,13 @@ func TestUnRefPage(t *testing.T) {
 		// GIVEN: 3 ページを読み込み、page2 のみ参照を解除
 		size := 3
 		tmpdir := t.TempDir()
-		dm, _ := createEmptyDisk(t, tmpdir)
+		disk, _ := createEmptyDisk(t, tmpdir)
 		bp := NewBufferPool(size)
-		bp.RegisterDisk(page.FileId(0), dm)
+		bp.RegisterDisk(page.FileId(0), disk)
 
-		pageId1 := dm.AllocatePage()
-		pageId2 := dm.AllocatePage()
-		pageId3 := dm.AllocatePage()
+		pageId1 := disk.AllocatePage()
+		pageId2 := disk.AllocatePage()
+		pageId3 := disk.AllocatePage()
 
 		_, err := bp.AddPage(pageId1)
 		assert.NoError(t, err)
@@ -359,7 +359,7 @@ func TestUnRefPage(t *testing.T) {
 		bp.UnRefPage(pageId2)
 
 		// WHEN: 新しいページを追加 (追い出しが発生)
-		pageId4 := dm.AllocatePage()
+		pageId4 := disk.AllocatePage()
 		_, err = bp.AddPage(pageId4)
 		assert.NoError(t, err)
 
@@ -380,13 +380,13 @@ func TestFlushPage(t *testing.T) {
 		// GIVEN
 		size := 3
 		tmpdir := t.TempDir()
-		dm, _ := createEmptyDisk(t, tmpdir)
+		disk, _ := createEmptyDisk(t, tmpdir)
 		bp := NewBufferPool(size)
-		bp.RegisterDisk(page.FileId(0), dm)
+		bp.RegisterDisk(page.FileId(0), disk)
 
-		pageId1 := dm.AllocatePage()
-		pageId2 := dm.AllocatePage()
-		pageId3 := dm.AllocatePage()
+		pageId1 := disk.AllocatePage()
+		pageId2 := disk.AllocatePage()
+		pageId3 := disk.AllocatePage()
 
 		page1, err := bp.AddPage(pageId1)
 		assert.NoError(t, err)
@@ -415,9 +415,9 @@ func TestFlushPage(t *testing.T) {
 		bp.UnRefPage(pageId1)
 		bp.UnRefPage(pageId2)
 		bp.UnRefPage(pageId3)
-		pageId4 := dm.AllocatePage()
-		pageId5 := dm.AllocatePage()
-		pageId6 := dm.AllocatePage()
+		pageId4 := disk.AllocatePage()
+		pageId5 := disk.AllocatePage()
+		pageId6 := disk.AllocatePage()
 		_, err = bp.AddPage(pageId4)
 		assert.NoError(t, err)
 		_, err = bp.AddPage(pageId5)
@@ -439,13 +439,13 @@ func TestFlushPage(t *testing.T) {
 		// GIVEN
 		size := 3
 		tmpdir := t.TempDir()
-		dm, _ := createEmptyDisk(t, tmpdir)
+		disk, _ := createEmptyDisk(t, tmpdir)
 		bp := NewBufferPool(size)
-		bp.RegisterDisk(page.FileId(0), dm)
+		bp.RegisterDisk(page.FileId(0), disk)
 
-		pageId1 := dm.AllocatePage()
-		pageId2 := dm.AllocatePage()
-		pageId3 := dm.AllocatePage()
+		pageId1 := disk.AllocatePage()
+		pageId2 := disk.AllocatePage()
+		pageId3 := disk.AllocatePage()
 
 		page1, _ := bp.AddPage(pageId1)
 		page2, _ := bp.AddPage(pageId2)
@@ -472,17 +472,17 @@ func TestBufferPoolIntegration(t *testing.T) {
 		tmpdir := t.TempDir()
 		path := filepath.Join(tmpdir, "test.db")
 		fileId := page.FileId(0)
-		dm, err := file.NewDisk(fileId, path)
+		disk, err := file.NewDisk(fileId, path)
 		assert.NoError(t, err)
 		bp := NewBufferPool(3)
-		bp.RegisterDisk(fileId, dm)
+		bp.RegisterDisk(fileId, disk)
 
 		// ページを作成
-		page1 := dm.AllocatePage()
-		page2 := dm.AllocatePage()
-		page3 := dm.AllocatePage()
-		page4 := dm.AllocatePage()
-		page5 := dm.AllocatePage()
+		page1 := disk.AllocatePage()
+		page2 := disk.AllocatePage()
+		page3 := disk.AllocatePage()
+		page4 := disk.AllocatePage()
+		page5 := disk.AllocatePage()
 
 		// 各ページにデータを書き込む (PageID と同じ値を書き込む)
 		writeTestData := func(pageId page.PageId, value byte) {
@@ -490,7 +490,7 @@ func TestBufferPoolIntegration(t *testing.T) {
 			for i := range data {
 				data[i] = value
 			}
-			err := dm.WritePageData(pageId, data)
+			err := disk.WritePageData(pageId, data)
 			assert.NoError(t, err)
 		}
 
@@ -572,14 +572,14 @@ func TestBufferPoolIntegration(t *testing.T) {
 
 func createEmptyDisk(t *testing.T, tmpdir string) (*file.Disk, page.PageId) {
 	path := filepath.Join(tmpdir, "test.db")
-	dm, err := file.NewDisk(page.FileId(0), path)
+	disk, err := file.NewDisk(page.FileId(0), path)
 	assert.NoError(t, err)
-	pageId := dm.AllocatePage()
+	pageId := disk.AllocatePage()
 
 	// ページをディスクに書き込む (空のページ)
 	emptyPage := directio.AlignedBlock(directio.BlockSize)
-	err = dm.WritePageData(pageId, emptyPage)
+	err = disk.WritePageData(pageId, emptyPage)
 	assert.NoError(t, err)
 
-	return dm, pageId
+	return disk, pageId
 }
