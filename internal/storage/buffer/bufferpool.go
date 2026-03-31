@@ -28,9 +28,13 @@ type BufferPool struct {
 // NewBufferPool は指定されたサイズの BufferPool を生成する
 //   - size: バッファページの数 (例: 1000 を指定すると、1000 ページ分のバッファプールが生成される)
 func NewBufferPool(size int) *BufferPool {
+	bufPages := make([]BufferPage, size)
+	for i := range bufPages {
+		bufPages[i] = *NewBufferPage(page.INVALID_PAGE_ID) // 仮のページ ID で初期化 (実際にはバッファプールにページが追加されるときに設定される)
+	}
 	return &BufferPool{
 		diskManagers:      make(map[page.FileId]*file.Disk),
-		bufferPages:       allocateBufferPages(size),
+		bufferPages:       bufPages,
 		maxBufferSize:     size,
 		pageTable:         make(PageTable),
 		evictionAlgorithm: NewLRU(size),
@@ -41,7 +45,7 @@ func NewBufferPool(size int) *BufferPool {
 //
 // ページがバッファプールに存在しない場合は、ディスクから読み込む
 func (bp *BufferPool) FetchPage(pageId page.PageId) (*BufferPage, error) {
-	// ページテーブルにページがすでにある場合
+	// ページがバッファプールにある場合
 	if bufferId, ok := bp.pageTable[pageId]; ok {
 		bufferPage := &bp.bufferPages[bufferId]
 		bp.evictionAlgorithm.Access(bufferId)
@@ -55,11 +59,11 @@ func (bp *BufferPool) FetchPage(pageId page.PageId) (*BufferPage, error) {
 	}
 
 	// ディスクからページを読み込む
-	dm, err := bp.GetDisk(pageId.FileId)
+	disk, err := bp.GetDisk(pageId.FileId)
 	if err != nil {
 		return nil, err
 	}
-	err = dm.ReadPageData(pageId, bufferPage.GetReadData())
+	err = disk.ReadPageData(pageId, bufferPage.GetReadData())
 	if err != nil {
 		return nil, err
 	}
@@ -89,12 +93,12 @@ func (bp *BufferPool) AddPage(pageId page.PageId) (*BufferPage, error) {
 	// 追い出すページがダーティーページであれば、ディスクに書き出す
 	if victim.IsDirty {
 		// FileId から Disk を取得
-		dm, err := bp.GetDisk(victim.PageId.FileId)
+		disk, err := bp.GetDisk(victim.PageId.FileId)
 		if err != nil {
 			return nil, err
 		}
 		// ディスクに書き出す
-		err = dm.WritePageData(victim.PageId, victim.Page)
+		err = disk.WritePageData(victim.PageId, victim.Page)
 		if err != nil {
 			return nil, err
 		}
@@ -118,13 +122,13 @@ func (bp *BufferPool) FlushPage() error {
 		}
 
 		// FileId から Disk を取得
-		dm, err := bp.GetDisk(pageId.FileId)
+		disk, err := bp.GetDisk(pageId.FileId)
 		if err != nil {
 			return err
 		}
 
 		// ダーティーページをディスクに書き出す
-		err = dm.WritePageData(pageId, bufferPage.Page)
+		err = disk.WritePageData(pageId, bufferPage.Page)
 		if err != nil {
 			return err
 		}
@@ -143,37 +147,27 @@ func (bp *BufferPool) UnRefPage(pageId page.PageId) {
 
 // RegisterDisk は BufferPool に Disk を登録する
 //   - fileId: 登録する Disk に対応する FileId
-//   - dm: 登録する Disk
-func (bp *BufferPool) RegisterDisk(fileId page.FileId, dm *file.Disk) {
-	bp.diskManagers[fileId] = dm
+//   - disk: 登録する Disk
+func (bp *BufferPool) RegisterDisk(fileId page.FileId, disk *file.Disk) {
+	bp.diskManagers[fileId] = disk
 }
 
 // GetDisk は指定された FileId に対応する Disk を取得する
 func (bp *BufferPool) GetDisk(fileId page.FileId) (*file.Disk, error) {
-	dm, ok := bp.diskManagers[fileId]
+	disk, ok := bp.diskManagers[fileId]
 	if !ok {
 		return nil, fmt.Errorf("disk for FileId %d not found", fileId)
 	}
-	return dm, nil
+	return disk, nil
 }
 
 // AllocatePageId は指定された FileId に対して新しい PageId を割り当てる
 func (bp *BufferPool) AllocatePageId(fileId page.FileId) (page.PageId, error) {
-	dm, err := bp.GetDisk(fileId)
+	disk, err := bp.GetDisk(fileId)
 	if err != nil {
 		return page.INVALID_PAGE_ID, err
 	}
-	return dm.AllocatePage(), nil
-}
-
-// allocateBufferPages はバッファプール用のメモリ領域を確保する
-func allocateBufferPages(size int) []BufferPage {
-	// NOTE: 現状は Go のヒープ上にバッファページ用の領域を確保しているが、将来的には OS レベルの共有メモリなどを使用する方針に切り替える可能性がある
-	pages := make([]BufferPage, size)
-	for i := range pages {
-		pages[i] = *NewBufferPage(page.INVALID_PAGE_ID) // 仮のページ ID で初期化 (実際にはバッファプールにページが追加されるときに設定される)
-	}
-	return pages
+	return disk.AllocatePage(), nil
 }
 
 // updatePageTable はページテーブルを更新する

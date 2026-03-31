@@ -18,11 +18,11 @@ func TestNewDisk(t *testing.T) {
 		fileId := page.FileId(0)
 
 		// WHEN
-		dm, err := NewDisk(fileId, dbPath)
+		disk, err := NewDisk(fileId, dbPath)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, page.NewPageId(fileId, page.PageNumber(0)), dm.nextPageId)
+		assert.Equal(t, page.NewPageId(fileId, page.PageNumber(0)), disk.nextPageId)
 	})
 
 	t.Run("無効なファイルが指定された場合はエラー", func(t *testing.T) {
@@ -66,33 +66,33 @@ func TestAllocatePage(t *testing.T) {
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "test.db")
 		fileId := page.FileId(0)
-		dm, err := NewDisk(fileId, dbPath)
+		disk, err := NewDisk(fileId, dbPath)
 		assert.NoError(t, err)
 
 		// WHEN
-		pageId1 := dm.AllocatePage()
-		pageId2 := dm.AllocatePage()
-		pageId3 := dm.AllocatePage()
+		pageId1 := disk.AllocatePage()
+		pageId2 := disk.AllocatePage()
+		pageId3 := disk.AllocatePage()
 
 		// THEN
 		assert.Equal(t, page.NewPageId(fileId, page.PageNumber(0)), pageId1)
 		assert.Equal(t, page.NewPageId(fileId, page.PageNumber(1)), pageId2)
 		assert.Equal(t, page.NewPageId(fileId, page.PageNumber(2)), pageId3)
-		assert.Equal(t, page.NewPageId(fileId, page.PageNumber(3)), dm.nextPageId)
+		assert.Equal(t, page.NewPageId(fileId, page.PageNumber(3)), disk.nextPageId)
 	})
 }
 
 func TestReadPageData(t *testing.T) {
 	t.Run("正常にデータを読み込める", func(t *testing.T) {
 		// GIVEN
-		dm, pageId := initDisk(t)
+		disk, pageId := initDisk(t)
 		writeData := createDataBuffer()
-		err := dm.WritePageData(pageId, writeData)
+		err := disk.WritePageData(pageId, writeData)
 		assert.NoError(t, err)
 
 		// WHEN
 		readData := directio.AlignedBlock(directio.BlockSize)
-		err = dm.ReadPageData(pageId, readData)
+		err = disk.ReadPageData(pageId, readData)
 
 		// THEN
 		assert.NoError(t, err)
@@ -101,11 +101,11 @@ func TestReadPageData(t *testing.T) {
 
 	t.Run("読み込むバッファのサイズが PAGE_SIZE と異なる場合はエラー", func(t *testing.T) {
 		// GIVEN
-		dm, pageId := initDisk(t)
+		disk, pageId := initDisk(t)
 		invalidData := make([]byte, page.PAGE_SIZE-1)
 
 		// WHEN
-		err := dm.ReadPageData(pageId, invalidData)
+		err := disk.ReadPageData(pageId, invalidData)
 
 		// THEN
 		assert.Error(t, err)
@@ -113,14 +113,14 @@ func TestReadPageData(t *testing.T) {
 
 	t.Run("FileId が異なるページ ID で読み込むとエラーが返る", func(t *testing.T) {
 		// GIVEN: FileId(0) の Disk
-		dm, _ := initDisk(t)
+		disk, _ := initDisk(t)
 
 		// GIVEN: FileId(1) のページ ID を用意
 		wrongPageId := page.NewPageId(page.FileId(1), page.PageNumber(0))
 		readData := directio.AlignedBlock(directio.BlockSize)
 
 		// WHEN
-		err := dm.ReadPageData(wrongPageId, readData)
+		err := disk.ReadPageData(wrongPageId, readData)
 
 		// THEN
 		assert.Error(t, err)
@@ -131,24 +131,24 @@ func TestReadPageData(t *testing.T) {
 		// GIVEN: 3 ページ分のデータを書き込む
 		tmpDir := t.TempDir()
 		dbPath := filepath.Join(tmpDir, "test.db")
-		dm, err := NewDisk(page.FileId(0), dbPath)
+		disk, err := NewDisk(page.FileId(0), dbPath)
 		assert.NoError(t, err)
 
 		pages := make([][]byte, 3)
 		pageIds := make([]page.PageId, 3)
 		for i := range 3 {
-			pageIds[i] = dm.AllocatePage()
+			pageIds[i] = disk.AllocatePage()
 			pages[i] = directio.AlignedBlock(directio.BlockSize)
 			for j := range page.PAGE_SIZE {
 				pages[i][j] = byte((i*100 + j) % 256)
 			}
-			err := dm.WritePageData(pageIds[i], pages[i])
+			err := disk.WritePageData(pageIds[i], pages[i])
 			assert.NoError(t, err)
 		}
 
 		// WHEN: 2 番目のページを読み込む
 		readData := directio.AlignedBlock(directio.BlockSize)
-		err = dm.ReadPageData(pageIds[1], readData)
+		err = disk.ReadPageData(pageIds[1], readData)
 
 		// THEN
 		assert.NoError(t, err)
@@ -159,11 +159,11 @@ func TestReadPageData(t *testing.T) {
 func TestWritePageData(t *testing.T) {
 	t.Run("正常にデータを書き込める", func(t *testing.T) {
 		// GIVEN
-		dm, pageId := initDisk(t)
+		disk, pageId := initDisk(t)
 		writeData := createDataBuffer()
 
 		// WHEN
-		err := dm.WritePageData(pageId, writeData)
+		err := disk.WritePageData(pageId, writeData)
 
 		// THEN
 		assert.NoError(t, err)
@@ -171,11 +171,11 @@ func TestWritePageData(t *testing.T) {
 
 	t.Run("書き込むデータのサイズが PAGE_SIZE と異なる場合はエラー", func(t *testing.T) {
 		// GIVEN
-		dm, pageId := initDisk(t)
+		disk, pageId := initDisk(t)
 		invalidData := make([]byte, page.PAGE_SIZE+10)
 
 		// WHEN
-		err := dm.WritePageData(pageId, invalidData)
+		err := disk.WritePageData(pageId, invalidData)
 
 		// THEN
 		assert.Error(t, err)
@@ -183,14 +183,14 @@ func TestWritePageData(t *testing.T) {
 
 	t.Run("FileId が異なるページ ID で書き込むとエラーが返る", func(t *testing.T) {
 		// GIVEN: FileId(0) の Disk
-		dm, _ := initDisk(t)
+		disk, _ := initDisk(t)
 
 		// GIVEN: FileId(1) のページ ID を用意
 		wrongPageId := page.NewPageId(page.FileId(1), page.PageNumber(0))
 		writeData := createDataBuffer()
 
 		// WHEN
-		err := dm.WritePageData(wrongPageId, writeData)
+		err := disk.WritePageData(wrongPageId, writeData)
 
 		// THEN
 		assert.Error(t, err)
@@ -199,12 +199,12 @@ func TestWritePageData(t *testing.T) {
 
 	t.Run("既に書き込んだページを上書きできる", func(t *testing.T) {
 		// GIVEN
-		dm, pageId := initDisk(t)
+		disk, pageId := initDisk(t)
 		firstData := directio.AlignedBlock(directio.BlockSize)
 		for i := range page.PAGE_SIZE {
 			firstData[i] = byte(0xAA)
 		}
-		err := dm.WritePageData(pageId, firstData)
+		err := disk.WritePageData(pageId, firstData)
 		assert.NoError(t, err)
 
 		// WHEN: 同じページに異なるデータを上書き
@@ -212,12 +212,12 @@ func TestWritePageData(t *testing.T) {
 		for i := range page.PAGE_SIZE {
 			secondData[i] = byte(0xBB)
 		}
-		err = dm.WritePageData(pageId, secondData)
+		err = disk.WritePageData(pageId, secondData)
 		assert.NoError(t, err)
 
 		// THEN: 2 回目のデータが読み込める
 		readData := directio.AlignedBlock(directio.BlockSize)
-		err = dm.ReadPageData(pageId, readData)
+		err = disk.ReadPageData(pageId, readData)
 		assert.NoError(t, err)
 		assert.Equal(t, secondData, readData)
 	})
@@ -226,13 +226,13 @@ func TestWritePageData(t *testing.T) {
 func TestSync(t *testing.T) {
 	t.Run("Sync が正常に実行できる", func(t *testing.T) {
 		// GIVEN
-		dm, pageId := initDisk(t)
+		disk, pageId := initDisk(t)
 		writeData := createDataBuffer()
-		err := dm.WritePageData(pageId, writeData)
+		err := disk.WritePageData(pageId, writeData)
 		assert.NoError(t, err)
 
 		// WHEN
-		err = dm.Sync()
+		err = disk.Sync()
 
 		// THEN
 		assert.NoError(t, err)
@@ -242,12 +242,12 @@ func TestSync(t *testing.T) {
 func initDisk(t *testing.T) (*Disk, page.PageId) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "sample.db")
-	dm, err := NewDisk(page.FileId(0), dbPath)
+	disk, err := NewDisk(page.FileId(0), dbPath)
 	if err != nil {
 		t.Fatalf("Failed to open Disk: %v", err)
 	}
-	pageId := dm.AllocatePage()
-	return dm, pageId
+	pageId := disk.AllocatePage()
+	return disk, pageId
 }
 
 func createDataBuffer() []byte {
