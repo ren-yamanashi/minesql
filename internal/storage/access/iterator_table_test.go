@@ -93,6 +93,73 @@ func TestTableIterator(t *testing.T) {
 		assert.Nil(t, record)
 	})
 
+	t.Run("DeleteMark が設定されたレコードはスキップされる", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "iter_test.db")
+		table := NewTableAccessMethod("test", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Alice")})
+		assert.NoError(t, err)
+		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Bob")})
+		assert.NoError(t, err)
+		err = table.Insert(bp, [][]byte{[]byte("c"), []byte("Charlie")})
+		assert.NoError(t, err)
+
+		// "b" をソフトデリート
+		err = table.SoftDelete(bp, [][]byte{[]byte("b"), []byte("Bob")})
+		assert.NoError(t, err)
+
+		// WHEN
+		iter, err := table.Search(bp, RecordSearchModeStart{})
+		assert.NoError(t, err)
+
+		var records [][][]byte
+		for {
+			record, ok, err := iter.Next()
+			assert.NoError(t, err)
+			if !ok {
+				break
+			}
+			records = append(records, record)
+		}
+
+		// THEN: ソフトデリートされた "b" はスキップされ、2 件のみ
+		assert.Equal(t, 2, len(records))
+		assert.Equal(t, "a", string(records[0][0]))
+		assert.Equal(t, "c", string(records[1][0]))
+	})
+
+	t.Run("全レコードがソフトデリートされている場合、ok が false を返す", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "iter_test.db")
+		table := NewTableAccessMethod("test", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Alice")})
+		assert.NoError(t, err)
+		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Bob")})
+		assert.NoError(t, err)
+
+		err = table.SoftDelete(bp, [][]byte{[]byte("a"), []byte("Alice")})
+		assert.NoError(t, err)
+		err = table.SoftDelete(bp, [][]byte{[]byte("b"), []byte("Bob")})
+		assert.NoError(t, err)
+
+		// WHEN
+		iter, err := table.Search(bp, RecordSearchModeStart{})
+		assert.NoError(t, err)
+
+		record, ok, err := iter.Next()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.False(t, ok)
+		assert.Nil(t, record)
+	})
+
 	t.Run("複合プライマリキーのレコードをデコードできる", func(t *testing.T) {
 		// GIVEN: PrimaryKeyCount = 2
 		bp, metaPageId, _ := InitDisk(t, "iter_test.db")
