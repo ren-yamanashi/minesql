@@ -155,6 +155,40 @@ func TestUniqueIndexIterator(t *testing.T) {
 		assert.Equal(t, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")}, results[1].Record)
 	})
 
+	t.Run("全インデックスエントリがソフトデリート済みの場合、ok が false を返す", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "idx_iter_test.db")
+
+		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2)
+
+		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
+		err = table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		assert.NoError(t, err)
+		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		assert.NoError(t, err)
+
+		err = table.SoftDelete(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		assert.NoError(t, err)
+		err = table.SoftDelete(bp, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		assert.NoError(t, err)
+
+		// WHEN
+		iter, err := uniqueIndex.Search(bp, &table, RecordSearchModeStart{})
+		assert.NoError(t, err)
+
+		result, ok, err := iter.Next()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.False(t, ok)
+		assert.Nil(t, result)
+	})
+
 	t.Run("更新後のインデックスから正しいレコードが返される", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "idx_iter_test.db")

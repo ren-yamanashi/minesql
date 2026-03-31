@@ -6,6 +6,7 @@ import (
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/encode"
 	"minesql/internal/storage/page"
 )
 
@@ -26,6 +27,16 @@ func NewTableAccessMethod(name string, metaPageId page.PageId, primaryKeyCount u
 		PrimaryKeyCount: primaryKeyCount,
 		UniqueIndexes:   uniqueIndexes,
 	}
+}
+
+// Search は指定した検索モードでテーブルを検索し、ClusteredIndexIterator を返す
+func (t *TableAccessMethod) Search(bp *buffer.BufferPool, mode RecordSearchMode) (*TableIterator, error) {
+	btr := btree.NewBTree(t.MetaPageId)
+	iterator, err := btr.Search(bp, mode.encode())
+	if err != nil {
+		return nil, err
+	}
+	return newTableIterator(iterator, bp), nil
 }
 
 // Create は空のテーブルを新規作成する
@@ -49,14 +60,12 @@ func (t *TableAccessMethod) Create(bp *buffer.BufferPool) error {
 
 // Insert はテーブルに行を挿入する
 //
-// access.Record を経由して B+Tree レコードを構築し、B+Tree に挿入する
-//
 // ソフトデリート済みの同一キーが存在する場合は Update で上書きする
 func (t *TableAccessMethod) Insert(bp *buffer.BufferPool, columns [][]byte) error {
 	btr := btree.NewBTree(t.MetaPageId)
 
-	rec := NewRecord(columns, t.PrimaryKeyCount)
-	btrRecord := node.NewRecord(rec.EncodeHeader(), rec.EncodeKey(), rec.EncodeNonKey())
+	btrRecord := t.encodeBTreeRecord(columns, 0)
+	encodedKey := t.encodeKey(columns)
 
 	err := btr.Insert(bp, btrRecord)
 	if err != nil {
@@ -65,12 +74,11 @@ func (t *TableAccessMethod) Insert(bp *buffer.BufferPool, columns [][]byte) erro
 		}
 
 		// 重複キーの場合、既存レコードがソフトデリート済みか確認する
-		existing, findErr := btr.FindByKey(bp, rec.EncodeKey())
+		existing, findErr := btr.FindByKey(bp, encodedKey)
 		if findErr != nil {
 			return findErr
 		}
 		if existing.HeaderBytes()[0] != 1 {
-			// active なレコードが存在する場合は重複キーエラーを返す
 			return btree.ErrDuplicateKey
 		}
 
@@ -82,7 +90,6 @@ func (t *TableAccessMethod) Insert(bp *buffer.BufferPool, columns [][]byte) erro
 	}
 
 	// ユニークインデックスに挿入
-	encodedKey := rec.EncodeKey()
 	for _, ui := range t.UniqueIndexes {
 		err := ui.Insert(bp, encodedKey, columns)
 		if err != nil {
@@ -98,14 +105,14 @@ func (t *TableAccessMethod) Insert(bp *buffer.BufferPool, columns [][]byte) erro
 func (t *TableAccessMethod) Delete(bp *buffer.BufferPool, columns [][]byte) error {
 	btr := btree.NewBTree(t.MetaPageId)
 
-	rec := NewRecord(columns, t.PrimaryKeyCount)
-	if err := btr.Delete(bp, rec.EncodeKey()); err != nil {
+	encodedKey := t.encodeKey(columns)
+	if err := btr.Delete(bp, encodedKey); err != nil {
 		return err
 	}
 
 	// ユニークインデックスを物理削除
 	for _, ui := range t.UniqueIndexes {
-		err := ui.Delete(bp, rec.EncodeKey(), columns)
+		err := ui.Delete(bp, encodedKey, columns)
 		if err != nil {
 			return err
 		}
@@ -120,18 +127,15 @@ func (t *TableAccessMethod) Delete(bp *buffer.BufferPool, columns [][]byte) erro
 func (t *TableAccessMethod) SoftDelete(bp *buffer.BufferPool, columns [][]byte) error {
 	btr := btree.NewBTree(t.MetaPageId)
 
-	rec := NewRecord(columns, t.PrimaryKeyCount)
-	rec.Header.DeleteMark = 1
-
-	// DeleteMark を 1 にしてインプレース更新
-	err := btr.Update(bp, node.NewRecord(rec.EncodeHeader(), rec.EncodeKey(), rec.EncodeNonKey()))
-	if err != nil {
+	btrRecord := t.encodeBTreeRecord(columns, 1)
+	if err := btr.Update(bp, btrRecord); err != nil {
 		return err
 	}
 
 	// ユニークインデックスをソフトデリート
+	encodedKey := t.encodeKey(columns)
 	for _, ui := range t.UniqueIndexes {
-		err := ui.Delete(bp, rec.EncodeKey(), columns)
+		err := ui.Delete(bp, encodedKey, columns)
 		if err != nil {
 			return err
 		}
@@ -147,16 +151,14 @@ func (t *TableAccessMethod) SoftDelete(bp *buffer.BufferPool, columns [][]byte) 
 // ユニークインデックスは物理削除 (old) + 挿入 (new) で更新する
 func (t *TableAccessMethod) UpdateInplace(bp *buffer.BufferPool, oldColumns [][]byte, newColumns [][]byte) error {
 	btr := btree.NewBTree(t.MetaPageId)
-	newRec := NewRecord(newColumns, t.PrimaryKeyCount)
-	err := btr.Update(bp, node.NewRecord(newRec.EncodeHeader(), newRec.EncodeKey(), newRec.EncodeNonKey()))
-	if err != nil {
+	btrRecord := t.encodeBTreeRecord(newColumns, 0)
+	if err := btr.Update(bp, btrRecord); err != nil {
 		return err
 	}
 
 	// ユニークインデックスを更新 (物理削除 + Insert)
-	oldRec := NewRecord(oldColumns, t.PrimaryKeyCount)
-	encodedOldKey := oldRec.EncodeKey()
-	encodedNewKey := newRec.EncodeKey()
+	encodedOldKey := t.encodeKey(oldColumns)
+	encodedNewKey := t.encodeKey(newColumns)
 	for _, ui := range t.UniqueIndexes {
 		err := ui.Delete(bp, encodedOldKey, oldColumns)
 		if err != nil {
@@ -169,16 +171,6 @@ func (t *TableAccessMethod) UpdateInplace(bp *buffer.BufferPool, oldColumns [][]
 	}
 
 	return nil
-}
-
-// Search は指定した検索モードでテーブルを検索し、ClusteredIndexIterator を返す
-func (t *TableAccessMethod) Search(bp *buffer.BufferPool, mode RecordSearchMode) (*TableIterator, error) {
-	btr := btree.NewBTree(t.MetaPageId)
-	iterator, err := btr.Search(bp, mode.encode())
-	if err != nil {
-		return nil, err
-	}
-	return newTableIterator(iterator, bp), nil
 }
 
 // GetUniqueIndexByName はインデックス名からユニークインデックスを取得する
@@ -201,4 +193,19 @@ func (t *TableAccessMethod) LeafPageCount(bp *buffer.BufferPool) (uint64, error)
 func (t *TableAccessMethod) Height(bp *buffer.BufferPool) (uint64, error) {
 	btr := btree.NewBTree(t.MetaPageId)
 	return btr.Height(bp)
+}
+
+// encodeKey はカラム値からプライマリキー部分を Memcomparable format でエンコードする
+func (t *TableAccessMethod) encodeKey(columns [][]byte) []byte {
+	var encoded []byte
+	encode.Encode(columns[:t.PrimaryKeyCount], &encoded)
+	return encoded
+}
+
+// encodeBTreeRecord はカラム値を B+Tree レコードに変換する
+func (t *TableAccessMethod) encodeBTreeRecord(columns [][]byte, deleteMark byte) node.Record {
+	var key, nonKey []byte
+	encode.Encode(columns[:t.PrimaryKeyCount], &key)
+	encode.Encode(columns[t.PrimaryKeyCount:], &nonKey)
+	return node.NewRecord([]byte{deleteMark}, key, nonKey)
 }

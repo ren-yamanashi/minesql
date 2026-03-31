@@ -8,7 +8,7 @@ import (
 
 type searchResult struct {
 	UniqueKey [][]byte // デコード済みユニークキー
-	Record    [][]byte // デコード済みテーブルレコード (プライマリキー + 値)
+	Record    [][]byte // デコード済みカラム値 (プライマリキー + 値)
 }
 
 type UniqueIndexIterator struct {

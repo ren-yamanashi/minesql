@@ -3,6 +3,7 @@ package handler
 import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/encode"
 )
 
 // TableHandler は access.TableAccessMethod をラップし、テーブルへの操作を提供する (MySQL の handler に相当)
@@ -49,8 +50,9 @@ func (t *TableHandler) PrimaryKeyCount() uint8 {
 }
 
 func (t *TableHandler) EncodeKey(columns [][]byte) []byte {
-	rec := access.NewRecord(columns, t.inner.PrimaryKeyCount)
-	return rec.EncodeKey()
+	var encoded []byte
+	encode.Encode(columns[:t.inner.PrimaryKeyCount], &encoded)
+	return encoded
 }
 
 func (t *TableHandler) Create(bp *buffer.BufferPool) error {

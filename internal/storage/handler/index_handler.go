@@ -35,7 +35,7 @@ func (i *IndexHandler) GetColName() string {
 // IndexSearchResult はインデックス検索の結果
 type IndexSearchResult struct {
 	SecondaryKey [][]byte // デコード済みセカンダリキー
-	Record       [][]byte // デコード済みテーブルレコード (プライマリキー + 値)
+	Record       [][]byte // デコード済みカラム値 (プライマリキー + 値)
 }
 
 // IndexIterator はインデックスの検索結果を走査するイテレータ
