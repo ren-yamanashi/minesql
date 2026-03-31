@@ -73,48 +73,35 @@ func (bn *BranchNode) Insert(slotNum int, record Record) bool {
 func (bn *BranchNode) SplitInsert(newBranchNode *BranchNode, newRecord Record) ([]byte, error) {
 	newBranchNode.body.Initialize()
 
-	// NOTE: fillRightChild で末尾レコードがセパレータとして取り出されるため、
-	// ループの終了条件は「取り出し後も半分以上を維持できるか」で判定する
 	for {
-		if newBranchNode.isHalfFullAfterFillRightChild() {
+		// newBranchNode が十分に埋まったら、末尾レコードを境界キーとして取り出す
+		if boundaryKey, ok := newBranchNode.tryExtractBoundaryKey(); ok {
 			slotNum, _ := bn.SearchSlotNum(newRecord.KeyBytes())
 			if !bn.Insert(slotNum, newRecord) {
 				return nil, errors.New("old branch must have space")
 			}
-			break
+			return boundaryKey, nil
 		}
 
 		// "古いノードの先頭 (スロット番号=0) のレコードのキー < 新しいレコードのキー" の場合
 		// レコードを新しいブランチノードに移動する
 		if bn.RecordAt(0).CompareKey(newRecord.KeyBytes()) < 0 {
-			err := bn.transfer(newBranchNode)
-			if err != nil {
+			if err := bn.transfer(newBranchNode); err != nil {
 				return nil, err
 			}
 		} else {
 			// 新しいレコードを新しいブランチノードに挿入し、残りのレコードを新しいブランチノードに移動する
 			newBranchNode.Insert(newBranchNode.NumRecords(), newRecord)
-			for !newBranchNode.isHalfFullAfterFillRightChild() {
-				err := bn.transfer(newBranchNode)
-				if err != nil {
+			for {
+				if boundaryKey, ok := newBranchNode.tryExtractBoundaryKey(); ok {
+					return boundaryKey, nil
+				}
+				if err := bn.transfer(newBranchNode); err != nil {
 					return nil, err
 				}
 			}
-			break
 		}
 	}
-
-	return newBranchNode.fillRightChild(), nil
-}
-
-// isHalfFullAfterFillRightChild は fillRightChild で末尾レコードを取り出した後も半分以上埋まっているかを判定する
-func (bn *BranchNode) isHalfFullAfterFillRightChild() bool {
-	if bn.NumRecords() < 2 {
-		return false
-	}
-	lastRecordSize := len(bn.body.Data(bn.NumRecords() - 1))
-	freeSpaceAfter := bn.body.FreeSpace() + lastRecordSize + 4 // 4 はポインタサイズ
-	return 2*freeSpaceAfter < bn.body.Capacity()
 }
 
 // Delete はレコードを削除する
@@ -247,7 +234,24 @@ func (bn *BranchNode) fillRightChild() []byte {
 	return key
 }
 
-// maxRecordSize は最大レコードサイズを取得する
+// tryExtractBoundaryKey は末尾レコードを親ノードに伝播させる境界キーとして取り出せるか判定し、可能なら取り出す
+//
+// ブランチノードの分割では末尾レコードのキーが親ノードの境界値になる。
+// 取り出し後も半分以上の充填率を維持できる場合のみ実行し、境界キーと true を返す。
+// 維持できない場合は何もせず nil, false を返す。
+func (bn *BranchNode) tryExtractBoundaryKey() ([]byte, bool) {
+	if bn.NumRecords() < 2 {
+		return nil, false
+	}
+	lastRecordSize := len(bn.body.Data(bn.NumRecords() - 1))
+	freeSpaceAfter := bn.body.FreeSpace() + lastRecordSize + pointerSize
+	if 2*freeSpaceAfter >= bn.body.Capacity() {
+		return nil, false
+	}
+	return bn.fillRightChild(), true
+}
+
+// maxRecordSize は自身のノードに格納できる最大のレコードサイズを返す
 func (bn *BranchNode) maxRecordSize() int {
 	// /2: ノード分割時に各ノードが半分以上埋まることを保証するため、1 レコードは容量の半分以下でなければならない
 	// -4: Slotted Page ではレコードごとに 4 バイトのスロットポインタ (offset 2B + size 2B) が必要なため、その分を差し引く
