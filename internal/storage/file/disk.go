@@ -54,7 +54,7 @@ func (d *Disk) ReadPageData(id page.PageId, data []byte) error {
 	if len(data) != page.PAGE_SIZE {
 		return page.ErrInvalidDataSize
 	}
-	if err := d.seekToPage(id); err != nil {
+	if err := d.seek(id); err != nil {
 		return err
 	}
 	// シークした位置から PAGE_SIZE バイト読み込む
@@ -70,7 +70,7 @@ func (d *Disk) WritePageData(id page.PageId, data []byte) error {
 	if len(data) != page.PAGE_SIZE {
 		return page.ErrInvalidDataSize
 	}
-	if err := d.seekToPage(id); err != nil {
+	if err := d.seek(id); err != nil {
 		return err
 	}
 	// シークした位置から PAGE_SIZE バイト書き込む
@@ -90,8 +90,8 @@ func (d *Disk) Sync() error {
 	return d.heapFile.Sync()
 }
 
-// seekToPage はページ ID で指定されたページの先頭にシークする
-func (d *Disk) seekToPage(id page.PageId) error {
+// seek はページ ID で指定されたページの先頭にシークする
+func (d *Disk) seek(id page.PageId) error {
 	if id.FileId != d.fileId {
 		return fmt.Errorf("invalid FileId: expected %d, got %d", d.fileId, id.FileId)
 	}
