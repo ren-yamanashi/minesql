@@ -47,7 +47,7 @@ type IndexIterator interface {
 // indexIteratorAdapter は access.SecondaryIndexIterator を IndexIterator に適合させる
 // (SecondaryIndexSearchResult -> handler.IndexSearchResult の変換)
 type indexIteratorAdapter struct {
-	inner *access.SecondaryIndexIterator
+	inner *access.UniqueIndexIterator
 }
 
 func (it *indexIteratorAdapter) Next() (*IndexSearchResult, bool, error) {
@@ -56,7 +56,7 @@ func (it *indexIteratorAdapter) Next() (*IndexSearchResult, bool, error) {
 		return nil, ok, err
 	}
 	return &IndexSearchResult{
-		SecondaryKey: result.SecondaryKey,
+		SecondaryKey: result.UniqueKey,
 		Record:       result.Record,
 	}, true, nil
 }

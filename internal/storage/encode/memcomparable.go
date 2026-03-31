@@ -6,8 +6,7 @@ see: docs/about/memcomparable-format.md
 package encode
 
 // [8 バイトのデータ][1 バイトの長さ情報]
-//
-// 長さ情報: 次のブロックがある場合は 9、最後のブロックは実データ長 (0-8)
+//   - 長さ情報: 次のブロックがある場合は 9、最後のブロックは実データ長 (0-8)
 const BLOCK_SIZE = 9
 
 // memcomparable のデータ部分のサイズ
@@ -15,20 +14,9 @@ const BLOCK_SIZE = 9
 // memcomparable のデータから長さ情報を取得する際には (*src)[DATA_SIZE] のように index アクセスする
 const DATA_SIZE = BLOCK_SIZE - 1
 
-// encodedSize はエンコード後のサイズを計測する
-//
-// size: エンコード前のバイト列のサイズ
-//
-// 計測方法: size を 8 バイトずつに分割し、各ブロックに対して 9 バイトを割り当てる
-func encodedSize(size int) int {
-	return ((size + DATA_SIZE - 1) / DATA_SIZE) * BLOCK_SIZE
-}
-
 // 複数のバイト列を連結してエンコードする
-//
-// elements: エンコード対象のバイト列のスライス
-//
-// dest: エンコード結果の格納先のポインタ
+//   - elements: エンコード対象のバイト列のスライス
+//   - dest: エンコード結果の格納先のポインタ
 func Encode(elements [][]byte, dest *[]byte) {
 	for _, element := range elements {
 		size := encodedSize(len(element))
@@ -46,10 +34,8 @@ func Encode(elements [][]byte, dest *[]byte) {
 }
 
 // エンコードされたバイト列を複数のバイト列にデコードする
-//
-// src: エンコードされたバイト列
-//
-// elements: デコード結果の格納先のポインタ
+//   - src: エンコードされたバイト列
+//   - elements: デコード結果の格納先のポインタ
 func Decode(src []byte, elements *[][]byte) {
 	rest := src
 	for len(rest) > 0 {
@@ -59,13 +45,34 @@ func Decode(src []byte, elements *[][]byte) {
 	}
 }
 
+// DecodeFirstN は先頭 n カラムをデコードし、残りのエンコード済みバイト列を返す
+//
+// 全カラムをデコードして再エンコードする round-trip を避けるために使用する
+func DecodeFirstN(src []byte, n int) (decoded [][]byte, rest []byte) {
+	rest = src
+	for i := 0; i < n && len(rest) > 0; i++ {
+		element := make([]byte, 0)
+		decodeFromMemcomparable(&rest, &element)
+		decoded = append(decoded, element)
+	}
+	return decoded, rest
+}
+
+// encodedSize はエンコード後のサイズを計測する
+//
+// size: エンコード前のバイト列のサイズ
+//
+// 計測方法: size を 8 バイトずつに分割し、各ブロックに対して 9 バイトを割り当てる
+func encodedSize(size int) int {
+	return ((size + DATA_SIZE - 1) / DATA_SIZE) * BLOCK_SIZE
+}
+
 // バイト列を memcomparable 形式にエンコードする
 //
 // エンコード形式: [8 バイトのデータ][1 バイトの長さ情報] のブロックを繰り返す
 //
-// src: エンコード対象のバイト列
-//
-// dest: エンコード結果の格納先のポインタ
+//   - src: エンコード対象のバイト列
+//   - dest: エンコード結果の格納先のポインタ
 func encodeToMemcomparable(src []byte, dest *[]byte) {
 	for len(src) > 0 {
 		// コピーサイズを決定 (最大 8 バイト, src が 8 バイト未満の場合はその長さ)
@@ -96,8 +103,8 @@ func encodeToMemcomparable(src []byte, dest *[]byte) {
 }
 
 // memcomparable 形式からバイト列をデコードする
-// src: デコード対象のバイト列のポインタ
-// dest: デコード結果の格納先のポインタ
+//   - src: デコード対象のバイト列のポインタ
+//   - dest: デコード結果の格納先のポインタ
 func decodeFromMemcomparable(src *[]byte, dest *[]byte) {
 	for {
 		// 長さ情報を取得

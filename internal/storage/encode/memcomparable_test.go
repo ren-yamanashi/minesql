@@ -7,6 +7,166 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestEncode(t *testing.T) {
+	t.Run("複数のバイト列が正しくエンコードされる", func(t *testing.T) {
+		// GIVEN
+		elements1 := [][]byte{
+			[]byte("Hello"),
+			[]byte("World!"),
+		}
+		var destination1 []byte
+
+		elements2 := [][]byte{
+			[]byte("A very long byte slice that exceeds eight bytes."),
+			[]byte("Short"),
+		}
+		var destination2 []byte
+
+		// WHEN
+		Encode(elements1, &destination1)
+		Encode(elements2, &destination2)
+
+		// THEN
+		assert.Equal(t, []byte{
+			'H', 'e', 'l', 'l', 'o', 0, 0, 0, 5,
+			'W', 'o', 'r', 'l', 'd', '!', 0, 0, 6,
+		}, destination1)
+		assert.Equal(t, []byte{
+			'A', ' ', 'v', 'e', 'r', 'y', ' ', 'l', 9,
+			'o', 'n', 'g', ' ', 'b', 'y', 't', 'e', 9,
+			' ', 's', 'l', 'i', 'c', 'e', ' ', 't', 9,
+			'h', 'a', 't', ' ', 'e', 'x', 'c', 'e', 9,
+			'e', 'd', 's', ' ', 'e', 'i', 'g', 'h', 9,
+			't', ' ', 'b', 'y', 't', 'e', 's', '.', 8,
+			'S', 'h', 'o', 'r', 't', 0, 0, 0, 5,
+		}, destination2)
+	})
+}
+
+func TestDecode(t *testing.T) {
+	t.Run("エンコードされたバイト列が正しくデコードされる", func(t *testing.T) {
+		// GIVEN
+		src1 := []byte{
+			'H', 'e', 'l', 'l', 'o', 0, 0, 0, 5,
+			'W', 'o', 'r', 'l', 'd', '!', 0, 0, 6,
+		}
+
+		src2 := []byte{
+			'A', ' ', 'v', 'e', 'r', 'y', ' ', 'l', 9,
+			'o', 'n', 'g', ' ', 'b', 'y', 't', 'e', 9,
+			' ', 's', 'l', 'i', 'c', 'e', ' ', 't', 9,
+			'h', 'a', 't', ' ', 'e', 'x', 'c', 'e', 9,
+			'e', 'd', 's', ' ', 'e', 'i', 'g', 'h', 9,
+			't', ' ', 'b', 'y', 't', 'e', 's', '.', 8,
+			'S', 'h', 'o', 'r', 't', 0, 0, 0, 5,
+		}
+
+		// WHEN
+		var elements1 [][]byte
+		var elements2 [][]byte
+		Decode(src1, &elements1)
+		Decode(src2, &elements2)
+
+		// THEN
+		assert.Equal(t, [][]byte{
+			[]byte("Hello"),
+			[]byte("World!"),
+		}, elements1)
+
+		assert.Equal(t, [][]byte{
+			[]byte("A very long byte slice that exceeds eight bytes."),
+			[]byte("Short"),
+		}, elements2)
+	})
+}
+
+func TestDecodeFirstN(t *testing.T) {
+	t.Run("先頭 1 カラムだけデコードし、残りのエンコード済みバイト列が返る", func(t *testing.T) {
+		// GIVEN: 3 カラムをエンコード
+		var encoded []byte
+		Encode([][]byte{[]byte("aaa"), []byte("bbb"), []byte("ccc")}, &encoded)
+
+		// WHEN
+		decoded, rest := DecodeFirstN(encoded, 1)
+
+		// THEN
+		assert.Equal(t, [][]byte{[]byte("aaa")}, decoded)
+
+		// rest は残り 2 カラムのエンコード済みバイト列
+		var restDecoded [][]byte
+		Decode(rest, &restDecoded)
+		assert.Equal(t, [][]byte{[]byte("bbb"), []byte("ccc")}, restDecoded)
+	})
+
+	t.Run("先頭 2 カラムをデコードし、残りが返る", func(t *testing.T) {
+		// GIVEN
+		var encoded []byte
+		Encode([][]byte{[]byte("aaa"), []byte("bbb"), []byte("ccc")}, &encoded)
+
+		// WHEN
+		decoded, rest := DecodeFirstN(encoded, 2)
+
+		// THEN
+		assert.Equal(t, [][]byte{[]byte("aaa"), []byte("bbb")}, decoded)
+
+		var restDecoded [][]byte
+		Decode(rest, &restDecoded)
+		assert.Equal(t, [][]byte{[]byte("ccc")}, restDecoded)
+	})
+
+	t.Run("全カラムをデコードすると残りが空になる", func(t *testing.T) {
+		// GIVEN
+		var encoded []byte
+		Encode([][]byte{[]byte("aaa"), []byte("bbb")}, &encoded)
+
+		// WHEN
+		decoded, rest := DecodeFirstN(encoded, 2)
+
+		// THEN
+		assert.Equal(t, [][]byte{[]byte("aaa"), []byte("bbb")}, decoded)
+		assert.Equal(t, 0, len(rest))
+	})
+
+	t.Run("n がカラム数より大きい場合、全カラムがデコードされ残りが空になる", func(t *testing.T) {
+		// GIVEN
+		var encoded []byte
+		Encode([][]byte{[]byte("aaa")}, &encoded)
+
+		// WHEN
+		decoded, rest := DecodeFirstN(encoded, 5)
+
+		// THEN
+		assert.Equal(t, [][]byte{[]byte("aaa")}, decoded)
+		assert.Equal(t, 0, len(rest))
+	})
+
+	t.Run("空のバイト列に対しては空のスライスが返る", func(t *testing.T) {
+		// GIVEN & WHEN
+		decoded, rest := DecodeFirstN([]byte{}, 1)
+
+		// THEN
+		assert.Nil(t, decoded)
+		assert.Equal(t, 0, len(rest))
+	})
+
+	t.Run("残りのバイト列を再エンコードせずにそのまま btree 検索に使える", func(t *testing.T) {
+		// GIVEN: (uniqueKey, pk1, pk2) をエンコード
+		var encoded []byte
+		Encode([][]byte{[]byte("unique"), []byte("pk1"), []byte("pk2")}, &encoded)
+
+		// WHEN: 先頭 1 カラム (uniqueKey) をデコードし、残り (encodedPK) を取得
+		decoded, encodedPK := DecodeFirstN(encoded, 1)
+
+		// THEN: デコードされたユニークキーが正しい
+		assert.Equal(t, [][]byte{[]byte("unique")}, decoded)
+
+		// 残りのバイト列は pk1, pk2 を直接 Encode したものと一致する
+		var expectedEncodedPK []byte
+		Encode([][]byte{[]byte("pk1"), []byte("pk2")}, &expectedEncodedPK)
+		assert.Equal(t, expectedEncodedPK, encodedPK)
+	})
+}
+
 func TestEncodedSize(t *testing.T) {
 	t.Run("エンコード後のサイズが正しく計算できる", func(t *testing.T) {
 		// GIVEN
@@ -114,79 +274,6 @@ func TestDecodeFromMemcomparable(t *testing.T) {
 		// THEN
 		expected := []byte("Hello, World!")
 		assert.Equal(t, expected, destination)
-	})
-}
-
-func TestEncode(t *testing.T) {
-	t.Run("複数のバイト列が正しくエンコードされる", func(t *testing.T) {
-		// GIVEN
-		elements1 := [][]byte{
-			[]byte("Hello"),
-			[]byte("World!"),
-		}
-		var destination1 []byte
-
-		elements2 := [][]byte{
-			[]byte("A very long byte slice that exceeds eight bytes."),
-			[]byte("Short"),
-		}
-		var destination2 []byte
-
-		// WHEN
-		Encode(elements1, &destination1)
-		Encode(elements2, &destination2)
-
-		// THEN
-		assert.Equal(t, []byte{
-			'H', 'e', 'l', 'l', 'o', 0, 0, 0, 5,
-			'W', 'o', 'r', 'l', 'd', '!', 0, 0, 6,
-		}, destination1)
-		assert.Equal(t, []byte{
-			'A', ' ', 'v', 'e', 'r', 'y', ' ', 'l', 9,
-			'o', 'n', 'g', ' ', 'b', 'y', 't', 'e', 9,
-			' ', 's', 'l', 'i', 'c', 'e', ' ', 't', 9,
-			'h', 'a', 't', ' ', 'e', 'x', 'c', 'e', 9,
-			'e', 'd', 's', ' ', 'e', 'i', 'g', 'h', 9,
-			't', ' ', 'b', 'y', 't', 'e', 's', '.', 8,
-			'S', 'h', 'o', 'r', 't', 0, 0, 0, 5,
-		}, destination2)
-	})
-}
-
-func TestDecode(t *testing.T) {
-	t.Run("エンコードされたバイト列が正しくデコードされる", func(t *testing.T) {
-		// GIVEN
-		src1 := []byte{
-			'H', 'e', 'l', 'l', 'o', 0, 0, 0, 5,
-			'W', 'o', 'r', 'l', 'd', '!', 0, 0, 6,
-		}
-
-		src2 := []byte{
-			'A', ' ', 'v', 'e', 'r', 'y', ' ', 'l', 9,
-			'o', 'n', 'g', ' ', 'b', 'y', 't', 'e', 9,
-			' ', 's', 'l', 'i', 'c', 'e', ' ', 't', 9,
-			'h', 'a', 't', ' ', 'e', 'x', 'c', 'e', 9,
-			'e', 'd', 's', ' ', 'e', 'i', 'g', 'h', 9,
-			't', ' ', 'b', 'y', 't', 'e', 's', '.', 8,
-			'S', 'h', 'o', 'r', 't', 0, 0, 0, 5,
-		}
-
-		// WHEN
-		var elements1 [][]byte
-		var elements2 [][]byte
-		Decode(src1, &elements1)
-		Decode(src2, &elements2)
-
-		// THEN
-		assert.Equal(t, [][]byte{
-			[]byte("Hello"),
-			[]byte("World!"),
-		}, elements1)
-
-		assert.Equal(t, [][]byte{
-			[]byte("A very long byte slice that exceeds eight bytes."),
-			[]byte("Short"),
-		}, elements2)
 	})
 }
 
