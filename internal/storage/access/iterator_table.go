@@ -18,10 +18,10 @@ func newTableIterator(iterator *btree.Iterator, bp *buffer.BufferPool) *TableIte
 	}
 }
 
-// Next はデコード済みの次のカラム値を返す
+// Next はデコード済みの次のレコードを返す
 // (DeleteMark が設定されているレコードはスキップする)
 //
-// 戻り値: カラム値 (プライマリキー + 値), データがあるかどうか, エラー
+// 戻り値: レコード (プライマリキー + 値), データがあるかどうか, エラー
 func (ri *TableIterator) Next() ([][]byte, bool, error) {
 	for {
 		btrRecord, ok, err := ri.iterator.Next(ri.bp)
