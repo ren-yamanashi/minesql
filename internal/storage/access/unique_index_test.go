@@ -330,6 +330,38 @@ func TestUniqueIndexConstraint(t *testing.T) {
 		// THEN: ユニーク制約違反にならない
 		assert.NoError(t, err)
 	})
+
+	t.Run("複数のソフトデリート済みエントリがある場合でもユニーク制約に違反しない", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "test.db")
+		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetapageId, 0)
+		err = uniqueIndex.Create(bp)
+		assert.NoError(t, err)
+
+		var encodedPK0, encodedPK1, encodedPK2 []byte
+		encode.Encode([][]byte{[]byte("pk0")}, &encodedPK0)
+		encode.Encode([][]byte{[]byte("pk1")}, &encodedPK1)
+		encode.Encode([][]byte{[]byte("pk2")}, &encodedPK2)
+
+		// 同じセカンダリキーで挿入 → ソフトデリートを 2 回繰り返す
+		err = uniqueIndex.Insert(bp, encodedPK0, [][]byte{[]byte("John")})
+		assert.NoError(t, err)
+		err = uniqueIndex.SoftDelete(bp, encodedPK0, [][]byte{[]byte("John")})
+		assert.NoError(t, err)
+
+		err = uniqueIndex.Insert(bp, encodedPK1, [][]byte{[]byte("John")})
+		assert.NoError(t, err)
+		err = uniqueIndex.SoftDelete(bp, encodedPK1, [][]byte{[]byte("John")})
+		assert.NoError(t, err)
+
+		// WHEN: 3 回目の挿入
+		err = uniqueIndex.Insert(bp, encodedPK2, [][]byte{[]byte("John")})
+
+		// THEN: ソフトデリート済みのみなのでユニーク制約違反にならない
+		assert.NoError(t, err)
+	})
 }
 
 func TestUniqueIndexLeafPageCount(t *testing.T) {
