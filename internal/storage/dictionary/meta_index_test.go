@@ -10,7 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIndexMetadata_Insert(t *testing.T) {
+func TestIndexMeta_Insert(t *testing.T) {
 	t.Run("インデックスメタデータを B+Tree に挿入できる", func(t *testing.T) {
 		// GIVEN
 		bp, tmpdir := InitCatalogDisk(t)
@@ -23,7 +23,7 @@ func TestIndexMetadata_Insert(t *testing.T) {
 		assert.NoError(t, err)
 
 		dataMetaPageId := page.NewPageId(page.FileId(1), 5)
-		idxMeta := NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, dataMetaPageId)
+		idxMeta := NewIndexMeta(1, "idx_email", "email", IndexTypeUnique, dataMetaPageId)
 		idxMeta.MetaPageId = metaPageId
 
 		// WHEN
@@ -64,9 +64,9 @@ func TestIndexMetadata_Insert(t *testing.T) {
 		_, err = btree.CreateBTree(bp, metaPageId)
 		assert.NoError(t, err)
 
-		idx1 := NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 5))
+		idx1 := NewIndexMeta(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 5))
 		idx1.MetaPageId = metaPageId
-		idx2 := NewIndexMetadata(2, "idx_title", "title", IndexTypeUnique, page.NewPageId(page.FileId(2), 6))
+		idx2 := NewIndexMeta(2, "idx_title", "title", IndexTypeUnique, page.NewPageId(page.FileId(2), 6))
 		idx2.MetaPageId = metaPageId
 
 		// WHEN
@@ -103,9 +103,9 @@ func TestIndexMetadata_Insert(t *testing.T) {
 		_, err = btree.CreateBTree(bp, metaPageId)
 		assert.NoError(t, err)
 
-		idx1 := NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 5))
+		idx1 := NewIndexMeta(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 5))
 		idx1.MetaPageId = metaPageId
-		idx2 := NewIndexMetadata(1, "idx_username", "username", IndexTypeUnique, page.NewPageId(page.FileId(1), 6))
+		idx2 := NewIndexMeta(1, "idx_username", "username", IndexTypeUnique, page.NewPageId(page.FileId(1), 6))
 		idx2.MetaPageId = metaPageId
 
 		// WHEN
@@ -133,7 +133,7 @@ func TestIndexMetadata_Insert(t *testing.T) {
 	})
 }
 
-func TestLoadIndexMetadata(t *testing.T) {
+func TestLoadIndexMeta(t *testing.T) {
 	t.Run("指定したテーブルのインデックスメタデータを読み込める", func(t *testing.T) {
 		// GIVEN
 		bp, tmpdir := InitCatalogDisk(t)
@@ -144,9 +144,9 @@ func TestLoadIndexMetadata(t *testing.T) {
 
 		dataMetaPageId1 := page.NewPageId(page.FileId(1), 5)
 		dataMetaPageId2 := page.NewPageId(page.FileId(1), 6)
-		indexes := []*IndexMetadata{
-			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, dataMetaPageId1),
-			NewIndexMetadata(1, "idx_username", "username", IndexTypeUnique, dataMetaPageId2),
+		indexes := []*IndexMeta{
+			NewIndexMeta(1, "idx_email", "email", IndexTypeUnique, dataMetaPageId1),
+			NewIndexMeta(1, "idx_username", "username", IndexTypeUnique, dataMetaPageId2),
 		}
 		for _, idx := range indexes {
 			idx.MetaPageId = cat.IndexMetaPageId
@@ -155,7 +155,7 @@ func TestLoadIndexMetadata(t *testing.T) {
 		}
 
 		// WHEN
-		result, err := loadIndexMetadata(bp, 1, cat.IndexMetaPageId)
+		result, err := loadIndexMeta(bp, 1, cat.IndexMetaPageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -178,10 +178,10 @@ func TestLoadIndexMetadata(t *testing.T) {
 		assert.NoError(t, err)
 
 		// テーブル 1 と テーブル 2 のインデックスを混在させて挿入
-		indexes := []*IndexMetadata{
-			NewIndexMetadata(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 5)),
-			NewIndexMetadata(2, "idx_title", "title", IndexTypeUnique, page.NewPageId(page.FileId(2), 6)),
-			NewIndexMetadata(1, "idx_username", "username", IndexTypeUnique, page.NewPageId(page.FileId(1), 7)),
+		indexes := []*IndexMeta{
+			NewIndexMeta(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 5)),
+			NewIndexMeta(2, "idx_title", "title", IndexTypeUnique, page.NewPageId(page.FileId(2), 6)),
+			NewIndexMeta(1, "idx_username", "username", IndexTypeUnique, page.NewPageId(page.FileId(1), 7)),
 		}
 		for _, idx := range indexes {
 			idx.MetaPageId = cat.IndexMetaPageId
@@ -190,7 +190,7 @@ func TestLoadIndexMetadata(t *testing.T) {
 		}
 
 		// WHEN
-		result, err := loadIndexMetadata(bp, 1, cat.IndexMetaPageId)
+		result, err := loadIndexMeta(bp, 1, cat.IndexMetaPageId)
 
 		// THEN: テーブル 1 のインデックスのみ取得される
 		assert.NoError(t, err)
@@ -208,7 +208,7 @@ func TestLoadIndexMetadata(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		result, err := loadIndexMetadata(bp, 999, cat.IndexMetaPageId)
+		result, err := loadIndexMeta(bp, 999, cat.IndexMetaPageId)
 
 		// THEN
 		assert.NoError(t, err)

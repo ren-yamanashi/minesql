@@ -21,7 +21,7 @@ func TestColumnMetadata_Insert(t *testing.T) {
 		_, err = btree.CreateBTree(bp, metaPageId)
 		assert.NoError(t, err)
 
-		colMeta := NewColumnMetadata(1, "email", 2, ColumnTypeString)
+		colMeta := NewColumnMeta(1, "email", 2, ColumnTypeString)
 		colMeta.MetaPageId = metaPageId
 
 		// WHEN
@@ -62,10 +62,10 @@ func TestColumnMetadata_Insert(t *testing.T) {
 		_, err = btree.CreateBTree(bp, metaPageId)
 		assert.NoError(t, err)
 
-		cols := []*ColumnMetadata{
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
-			NewColumnMetadata(1, "name", 1, ColumnTypeString),
-			NewColumnMetadata(1, "email", 2, ColumnTypeString),
+		cols := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "name", 1, ColumnTypeString),
+			NewColumnMeta(1, "email", 2, ColumnTypeString),
 		}
 
 		// WHEN
@@ -104,10 +104,10 @@ func TestLoadColumnMetadata(t *testing.T) {
 		assert.NoError(t, err)
 
 		// カラムメタデータを B+Tree に挿入
-		cols := []*ColumnMetadata{
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
-			NewColumnMetadata(1, "name", 1, ColumnTypeString),
-			NewColumnMetadata(1, "email", 2, ColumnTypeString),
+		cols := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "name", 1, ColumnTypeString),
+			NewColumnMeta(1, "email", 2, ColumnTypeString),
 		}
 		for _, col := range cols {
 			col.MetaPageId = cat.ColumnMetaPageId
@@ -116,7 +116,7 @@ func TestLoadColumnMetadata(t *testing.T) {
 		}
 
 		// WHEN
-		result, err := loadColumnMetadata(bp, 1, cat.ColumnMetaPageId)
+		result, err := loadColumnMeta(bp, 1, cat.ColumnMetaPageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -139,10 +139,10 @@ func TestLoadColumnMetadata(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Pos が逆順になるようなカラム名で挿入 (B+Tree は "z_col" < "a_col" の順にはならない)
-		cols := []*ColumnMetadata{
-			NewColumnMetadata(1, "z_col", 0, ColumnTypeString),
-			NewColumnMetadata(1, "a_col", 1, ColumnTypeString),
-			NewColumnMetadata(1, "m_col", 2, ColumnTypeString),
+		cols := []*ColumnMeta{
+			NewColumnMeta(1, "z_col", 0, ColumnTypeString),
+			NewColumnMeta(1, "a_col", 1, ColumnTypeString),
+			NewColumnMeta(1, "m_col", 2, ColumnTypeString),
 		}
 		for _, col := range cols {
 			col.MetaPageId = cat.ColumnMetaPageId
@@ -151,7 +151,7 @@ func TestLoadColumnMetadata(t *testing.T) {
 		}
 
 		// WHEN
-		result, err := loadColumnMetadata(bp, 1, cat.ColumnMetaPageId)
+		result, err := loadColumnMeta(bp, 1, cat.ColumnMetaPageId)
 
 		// THEN: B+Tree のキー順 (a_col, m_col, z_col) ではなく Pos 順 (z_col, a_col, m_col)
 		assert.NoError(t, err)
@@ -170,11 +170,11 @@ func TestLoadColumnMetadata(t *testing.T) {
 		assert.NoError(t, err)
 
 		// テーブル 1 と テーブル 2 のカラムを混在させて挿入
-		cols := []*ColumnMetadata{
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
-			NewColumnMetadata(2, "id", 0, ColumnTypeString),
-			NewColumnMetadata(1, "name", 1, ColumnTypeString),
-			NewColumnMetadata(2, "title", 1, ColumnTypeString),
+		cols := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(2, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "name", 1, ColumnTypeString),
+			NewColumnMeta(2, "title", 1, ColumnTypeString),
 		}
 		for _, col := range cols {
 			col.MetaPageId = cat.ColumnMetaPageId
@@ -183,7 +183,7 @@ func TestLoadColumnMetadata(t *testing.T) {
 		}
 
 		// WHEN
-		result, err := loadColumnMetadata(bp, 1, cat.ColumnMetaPageId)
+		result, err := loadColumnMeta(bp, 1, cat.ColumnMetaPageId)
 
 		// THEN: テーブル 1 のカラムのみ取得される
 		assert.NoError(t, err)
@@ -203,7 +203,7 @@ func TestLoadColumnMetadata(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		result, err := loadColumnMetadata(bp, 999, cat.ColumnMetaPageId)
+		result, err := loadColumnMeta(bp, 999, cat.ColumnMetaPageId)
 
 		// THEN
 		assert.NoError(t, err)
