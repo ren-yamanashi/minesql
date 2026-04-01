@@ -340,8 +340,8 @@ func TestTotalCost(t *testing.T) {
 //   - category: V = 10, min = "Cat1", max = "Cat10"
 //
 // セカンダリインデックス: name (H = 3)
-func newTestStats() handler.TableStatistics {
-	return handler.TableStatistics{
+func newTestStats() *handler.TableStatistics {
+	return &handler.TableStatistics{
 		RecordCount:   1000,
 		LeafPageCount: 50,
 		TreeHeight:    4,

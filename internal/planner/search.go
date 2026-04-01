@@ -151,7 +151,7 @@ func (s *Search) chooseBestPlan(tbl *handler.TableHandler, leaves []leafConditio
 		// セカンダリインデックスのコストを算出
 		idxMeta, hasIndex := s.tblMeta.GetIndexByColName(leaf.colName)
 		if hasIndex {
-			idxStats, ok := stats.SecondaryIndexStats[idxMeta.Name]
+			idxStats, ok := stats.IdxStats[idxMeta.Name]
 			if ok {
 				cost := s.calcIndexPlanCost(stats, leaf.colName, leaf.operator, leaf.literal, idxStats)
 				if bestIdxLeaf == nil || cost.TotalCost() < bestIdxCost.TotalCost() {
@@ -332,7 +332,7 @@ type orBranch struct {
 // 残りの条件は Filter で適用する
 //
 // PK/インデックスが利用できない場合は ok=false を返す
-func (s *Search) planORBranch(tbl *handler.TableHandler, branch orBranch, stats handler.TableStatistics) (executor.Executor, float64, bool) {
+func (s *Search) planORBranch(tbl *handler.TableHandler, branch orBranch, stats *handler.TableStatistics) (executor.Executor, float64, bool) {
 	// ブランチ全体の条件関数を構築 (複合 AND 条件時に Filter で使用)
 	branchCond, err := s.buildConditionFunc(branch.expr)
 	if err != nil {
@@ -368,7 +368,7 @@ func (s *Search) planORBranch(tbl *handler.TableHandler, branch orBranch, stats 
 		// セカンダリインデックススキャンのコストを算出
 		idxMeta, hasIndex := s.tblMeta.GetIndexByColName(leaf.colName)
 		if hasIndex {
-			idxStats, ok := stats.SecondaryIndexStats[idxMeta.Name]
+			idxStats, ok := stats.IdxStats[idxMeta.Name]
 			if ok {
 				cost := s.calcIndexPlanCost(stats, leaf.colName, leaf.operator, leaf.literal, idxStats)
 				if bestLeaf == nil || cost.TotalCost() < bestCost {
@@ -496,14 +496,14 @@ func extractORBranches(expr ast.BinaryExpr) []orBranch {
 // =================================================
 
 // calcPKPlanCost は PK スキャンのコストを算出する
-func (s *Search) calcPKPlanCost(stats handler.TableStatistics, colName string, operator string, literal ast.Literal) ScanCost {
+func (s *Search) calcPKPlanCost(stats *handler.TableStatistics, colName string, operator string, literal ast.Literal) ScanCost {
 	inner := calcTableScanCost(stats)
 	switch operator {
 	case "=":
-		return calcPKSelectEqualCost(inner, colName, stats.PrimaryHeight)
+		return calcPKSelectEqualCost(inner, colName, stats.TreeHeight)
 	case ">", ">=":
 		sel := s.calcSelectivity(colName, operator, literal, stats)
-		return calcPKSelectRangeGTCost(inner, colName, sel, stats.PrimaryHeight)
+		return calcPKSelectRangeGTCost(inner, colName, sel, stats.TreeHeight)
 	case "<", "<=":
 		sel := s.calcSelectivity(colName, operator, literal, stats)
 		return calcPKSelectRangeLTCost(inner, colName, sel)
@@ -514,7 +514,7 @@ func (s *Search) calcPKPlanCost(stats handler.TableStatistics, colName string, o
 }
 
 // applySelectionCost はテーブルスキャンコストに WHERE 条件の選択コストを適用する
-func (s *Search) applySelectionCost(baseCost ScanCost, colName string, operator string, literal ast.Literal, stats handler.TableStatistics) ScanCost {
+func (s *Search) applySelectionCost(baseCost ScanCost, colName string, operator string, literal ast.Literal, stats *handler.TableStatistics) ScanCost {
 	switch operator {
 	case "=":
 		return calcSelectEqualCost(baseCost, colName)
@@ -529,15 +529,15 @@ func (s *Search) applySelectionCost(baseCost ScanCost, colName string, operator 
 }
 
 // calcIndexPlanCost はインデックス+テーブルプランのコストを算出する
-func (s *Search) calcIndexPlanCost(stats handler.TableStatistics, colName string, operator string, literal ast.Literal, idxStats handler.IndexStatistics) ScanCost {
+func (s *Search) calcIndexPlanCost(stats *handler.TableStatistics, colName string, operator string, literal ast.Literal, idxStats handler.IndexStatistics) ScanCost {
 	switch operator {
 	case "=":
-		return calcIndexTableEqualCost(stats, colName, idxStats.Height, stats.PrimaryHeight)
+		return calcIndexTableEqualCost(stats, colName, idxStats.Height, stats.TreeHeight)
 	case "!=":
-		return calcIndexTableNotEqualCost(stats, colName, idxStats.Height, idxStats.LeafPageCount, stats.PrimaryHeight)
+		return calcIndexTableNotEqualCost(stats, colName, idxStats.Height, idxStats.LeafPageCount, stats.TreeHeight)
 	case ">", ">=", "<", "<=":
 		sel := s.calcSelectivity(colName, operator, literal, stats)
-		return calcIndexTableRangeCost(stats, colName, idxStats.Height, idxStats.LeafPageCount, sel, stats.PrimaryHeight)
+		return calcIndexTableRangeCost(stats, colName, idxStats.Height, idxStats.LeafPageCount, sel, stats.TreeHeight)
 	default:
 		// サポートされていない演算子の場合は高コストを返してテーブルスキャンを選ばせる
 		return ScanCost{DiskAccesses: float64(stats.LeafPageCount) * 2}
@@ -545,8 +545,8 @@ func (s *Search) calcIndexPlanCost(stats handler.TableStatistics, colName string
 }
 
 // calcSelectivity は範囲比較の選択率を算出する
-func (s *Search) calcSelectivity(colName string, operator string, literal ast.Literal, stats handler.TableStatistics) float64 {
-	colStats, ok := stats.ColumnStats[colName]
+func (s *Search) calcSelectivity(colName string, operator string, literal ast.Literal, stats *handler.TableStatistics) float64 {
+	colStats, ok := stats.ColStats[colName]
 	if !ok {
 		return defaultRangeSelectivity
 	}
