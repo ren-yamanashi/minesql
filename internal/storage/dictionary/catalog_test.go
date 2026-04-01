@@ -259,6 +259,33 @@ func TestNewCatalog(t *testing.T) {
 		assert.Equal(t, page.FileId(4), nextId)
 		assert.Equal(t, page.FileId(5), cat2.NextFileId)
 	})
+
+	t.Run("マジックナンバーが不正な場合、ErrInvalidCatalogFile を返す", func(t *testing.T) {
+		// GIVEN: ヘッダーページにマジックナンバー以外のデータが書き込まれたカタログ
+		bp, tmpdir := InitCatalogDisk(t)
+		defer removeTmpdir(t, tmpdir)
+
+		headerPageId := page.NewPageId(page.FileId(0), 0)
+		headerPage, err := bp.AddPage(headerPageId)
+		assert.NoError(t, err)
+		copy(headerPage.GetWriteData()[0:4], []byte("XXXX"))
+
+		err = bp.FlushPage()
+		assert.NoError(t, err)
+
+		// WHEN: 新しい BufferPool でカタログを開き直す
+		bp2 := buffer.NewBufferPool(10)
+		filePath := filepath.Join(tmpdir, "minesql.db")
+		dm2, err := file.NewDisk(page.FileId(0), filePath)
+		assert.NoError(t, err)
+		bp2.RegisterDisk(page.FileId(0), dm2)
+
+		cat, err := NewCatalog(bp2)
+
+		// THEN
+		assert.ErrorIs(t, err, ErrInvalidCatalogFile)
+		assert.Nil(t, cat)
+	})
 }
 
 func TestCreateCatalog(t *testing.T) {

@@ -35,13 +35,13 @@ type ColumnType = dictionary.ColumnType
 const ColumnTypeString = dictionary.ColumnTypeString
 
 // TableStatistics はテーブル統計情報の型 (storage/dictionary.TableStatistics のエイリアス)
-type TableStatistics = dictionary.TableStatistics
+type TableStatistics = dictionary.TableStats
 
 // IndexStatistics はインデックス統計情報の型 (storage/dictionary.IndexStatistics のエイリアス)
-type IndexStatistics = dictionary.IndexStatistics
+type IndexStatistics = dictionary.IndexStats
 
 // ColumnStatistics はカラム統計情報の型 (storage/dictionary.ColumnStatistics のエイリアス)
-type ColumnStatistics = dictionary.ColumnStatistics
+type ColumnStatistics = dictionary.ColumnStats
 
 var (
 	hdl  *Handler
@@ -50,11 +50,12 @@ var (
 
 // Handler はストレージ層のリソースの管理を行う (MySQL の handler に相当)
 type Handler struct {
-	BufferPool    *buffer.BufferPool
-	Catalog       *dictionary.Catalog
-	undoLog       *transaction.UndoLog
-	trxManager    *transaction.Manager
-	baseDirectory string
+	BufferPool     *buffer.BufferPool
+	Catalog        *dictionary.Catalog
+	StatsCollector *dictionary.StatsCollector
+	undoLog        *transaction.UndoLog
+	trxManager     *transaction.Manager
+	baseDirectory  string
 }
 
 // グローバルな Handler を初期化する
@@ -73,6 +74,7 @@ func Init() *Handler {
 func Reset() {
 	hdl = nil
 	once = sync.Once{}
+	dictionary.ResetStatsCollector()
 }
 
 // Get はグローバルな Handler を取得する
@@ -143,11 +145,12 @@ func newHandler() (*Handler, error) {
 	undoLog := transaction.NewUndoLog()
 
 	return &Handler{
-		BufferPool:    bp,
-		Catalog:       catalog,
-		undoLog:       undoLog,
-		trxManager:    transaction.NewManager(undoLog),
-		baseDirectory: dataDir,
+		BufferPool:     bp,
+		Catalog:        catalog,
+		StatsCollector: dictionary.InitStatsCollector(bp),
+		undoLog:        undoLog,
+		trxManager:     transaction.NewManager(undoLog),
+		baseDirectory:  dataDir,
 	}, nil
 }
 

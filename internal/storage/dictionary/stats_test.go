@@ -14,14 +14,13 @@ import (
 func TestAnalyze(t *testing.T) {
 	t.Run("レコード数が正しく算出される", func(t *testing.T) {
 		// GIVEN: 3 レコード挿入済み
-		env := setupStatisticsTable(t)
+		env := setupStatsTable(t)
 
-		meta, ok := env.catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetaByName("products")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
-		result, err := stats.Analyze()
+		result, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
 
 		// THEN: R(T) = 3
 		assert.NoError(t, err)
@@ -30,14 +29,13 @@ func TestAnalyze(t *testing.T) {
 
 	t.Run("リーフページ数が正しく算出される", func(t *testing.T) {
 		// GIVEN: 3 レコードは 1 ページに収まる
-		env := setupStatisticsTable(t)
+		env := setupStatsTable(t)
 
-		meta, ok := env.catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetaByName("products")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
-		result, err := stats.Analyze()
+		result, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
 
 		// THEN: P(T) = 1
 		assert.NoError(t, err)
@@ -46,245 +44,234 @@ func TestAnalyze(t *testing.T) {
 
 	t.Run("各カラムのユニーク値数が正しく算出される", func(t *testing.T) {
 		// GIVEN: id は全件異なる、name は全件異なる、category は "Fruit" が重複
-		env := setupStatisticsTable(t)
+		env := setupStatsTable(t)
 
-		meta, ok := env.catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetaByName("products")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
-		result, err := stats.Analyze()
+		result, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, uint64(3), result.ColumnStats["id"].UniqueValues)       // V(T, id) = 3
-		assert.Equal(t, uint64(3), result.ColumnStats["name"].UniqueValues)     // V(T, name) = 3
-		assert.Equal(t, uint64(2), result.ColumnStats["category"].UniqueValues) // V(T, category) = 2
+		assert.Equal(t, uint64(3), result.ColStats["id"].UniqueValues)       // V(T, id) = 3
+		assert.Equal(t, uint64(3), result.ColStats["name"].UniqueValues)     // V(T, name) = 3
+		assert.Equal(t, uint64(2), result.ColStats["category"].UniqueValues) // V(T, category) = 2
 	})
 
 	t.Run("各カラムの min/max が正しく算出される", func(t *testing.T) {
 		// GIVEN
-		env := setupStatisticsTable(t)
+		env := setupStatsTable(t)
 
-		meta, ok := env.catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetaByName("products")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
-		result, err := stats.Analyze()
+		result, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
 
 		// THEN
 		assert.NoError(t, err)
 
-		assert.Equal(t, []byte("1"), result.ColumnStats["id"].MinValue)
-		assert.Equal(t, []byte("3"), result.ColumnStats["id"].MaxValue)
+		assert.Equal(t, []byte("1"), result.ColStats["id"].MinValue)
+		assert.Equal(t, []byte("3"), result.ColStats["id"].MaxValue)
 
-		assert.Equal(t, []byte("Apple"), result.ColumnStats["name"].MinValue)
-		assert.Equal(t, []byte("Carrot"), result.ColumnStats["name"].MaxValue)
+		assert.Equal(t, []byte("Apple"), result.ColStats["name"].MinValue)
+		assert.Equal(t, []byte("Carrot"), result.ColStats["name"].MaxValue)
 
-		assert.Equal(t, []byte("Fruit"), result.ColumnStats["category"].MinValue)
-		assert.Equal(t, []byte("Veggie"), result.ColumnStats["category"].MaxValue)
+		assert.Equal(t, []byte("Fruit"), result.ColStats["category"].MinValue)
+		assert.Equal(t, []byte("Veggie"), result.ColStats["category"].MaxValue)
 	})
 
 	t.Run("プライマリキー B+Tree の高さが正しく算出される", func(t *testing.T) {
 		// GIVEN: 3 レコードは 1 ページに収まるので高さ 1
-		env := setupStatisticsTable(t)
+		env := setupStatsTable(t)
 
-		meta, ok := env.catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetaByName("products")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
-		result, err := stats.Analyze()
+		result, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
 
 		// THEN: H(T) = 1 (ルートリーフのみ)
 		assert.NoError(t, err)
-		assert.Equal(t, uint64(1), result.PrimaryHeight)
+		assert.Equal(t, uint64(1), result.TreeHeight)
 	})
 
 	t.Run("セカンダリインデックスの高さが正しく算出される", func(t *testing.T) {
 		// GIVEN: 3 レコードでは B+Tree の高さは 1 (ルートリーフのみ)
-		env := setupStatisticsTable(t)
+		env := setupStatsTable(t)
 
-		meta, ok := env.catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetaByName("products")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
-		result, err := stats.Analyze()
+		result, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
 
 		// THEN: ユニークインデックスが 1 つ、高さ 1
 		assert.NoError(t, err)
-		assert.Len(t, result.SecondaryIndexStats, 1)
-		for _, idxStat := range result.SecondaryIndexStats {
+		assert.Len(t, result.IdxStats, 1)
+		for _, idxStat := range result.IdxStats {
 			assert.Equal(t, uint64(1), idxStat.Height)
 		}
 	})
 
 	t.Run("セカンダリインデックスのリーフページ数が正しく算出される", func(t *testing.T) {
 		// GIVEN: 3 レコードは 1 リーフページに収まる
-		env := setupStatisticsTable(t)
+		env := setupStatsTable(t)
 
-		meta, ok := env.catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetaByName("products")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
-		result, err := stats.Analyze()
+		result, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
 
 		// THEN: Bl(I) = 1
 		assert.NoError(t, err)
-		assert.Len(t, result.SecondaryIndexStats, 1)
-		for _, idxStat := range result.SecondaryIndexStats {
+		assert.Len(t, result.IdxStats, 1)
+		for _, idxStat := range result.IdxStats {
 			assert.Equal(t, uint64(1), idxStat.LeafPageCount)
 		}
 	})
 
 	t.Run("INSERT 後に再 Analyze するとレコード数やユニーク値数が増加する", func(t *testing.T) {
 		// GIVEN: 3 レコード挿入済み
-		env := setupStatisticsTable(t)
+		env := setupStatsTable(t)
 
-		meta, ok := env.catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetaByName("products")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, env.bp)
 
-		before, err := stats.Analyze()
+		before, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(3), before.RecordCount)
-		assert.Equal(t, uint64(2), before.ColumnStats["category"].UniqueValues)
+		assert.Equal(t, uint64(2), before.ColStats["category"].UniqueValues)
 
 		// WHEN: 新しいカテゴリを持つレコードを追加
 		tbl := env.tables["products"]
 		err = tbl.Insert(env.bp, [][]byte{[]byte("4"), []byte("Donut"), []byte("Snack")})
 		assert.NoError(t, err)
 
-		after, err := stats.Analyze()
+		after, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
 
 		// THEN: R(T) が 3 -> 4 に増加
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(4), after.RecordCount)
 		// V(T, category) が 2 -> 3 に増加 ("Snack" が追加)
-		assert.Equal(t, uint64(3), after.ColumnStats["category"].UniqueValues)
+		assert.Equal(t, uint64(3), after.ColStats["category"].UniqueValues)
 		// V(T, name) が 3 -> 4 に増加
-		assert.Equal(t, uint64(4), after.ColumnStats["name"].UniqueValues)
+		assert.Equal(t, uint64(4), after.ColStats["name"].UniqueValues)
 		// max(name) が "Carrot" -> "Donut" に変化
-		assert.Equal(t, []byte("Donut"), after.ColumnStats["name"].MaxValue)
+		assert.Equal(t, []byte("Donut"), after.ColStats["name"].MaxValue)
 	})
 
 	t.Run("DELETE 後に再 Analyze するとレコード数やユニーク値数が減少する", func(t *testing.T) {
 		// GIVEN: 3 レコード挿入済み
-		env := setupStatisticsTable(t)
+		env := setupStatsTable(t)
 
-		meta, ok := env.catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetaByName("products")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, env.bp)
 
-		before, err := stats.Analyze()
+		before, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(3), before.RecordCount)
-		assert.Equal(t, uint64(3), before.ColumnStats["name"].UniqueValues)
+		assert.Equal(t, uint64(3), before.ColStats["name"].UniqueValues)
 
 		// WHEN: "Carrot" (唯一の "Veggie") を削除
 		deleteByCondition(t, env, "products", func(record [][]byte) bool {
 			return string(record[0]) == "3" // id = "3"
 		})
 
-		after, err := stats.Analyze()
+		after, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
 
 		// THEN: R(T) が 3 -> 2 に減少
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(2), after.RecordCount)
 		// V(T, name) が 3 -> 2 に減少
-		assert.Equal(t, uint64(2), after.ColumnStats["name"].UniqueValues)
+		assert.Equal(t, uint64(2), after.ColStats["name"].UniqueValues)
 		// V(T, category) が 2 -> 1 に減少 ("Veggie" がなくなる)
-		assert.Equal(t, uint64(1), after.ColumnStats["category"].UniqueValues)
+		assert.Equal(t, uint64(1), after.ColStats["category"].UniqueValues)
 		// max(name) が "Carrot" -> "Banana" に変化
-		assert.Equal(t, []byte("Banana"), after.ColumnStats["name"].MaxValue)
+		assert.Equal(t, []byte("Banana"), after.ColStats["name"].MaxValue)
 	})
 
 	t.Run("DELETE で最小値のレコードを削除すると min が更新される", func(t *testing.T) {
 		// GIVEN: 3 レコード挿入済み (id: "1", "2", "3")
-		env := setupStatisticsTable(t)
+		env := setupStatsTable(t)
 
-		meta, ok := env.catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetaByName("products")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, env.bp)
 
-		before, err := stats.Analyze()
+		before, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
 		assert.NoError(t, err)
-		assert.Equal(t, []byte("1"), before.ColumnStats["id"].MinValue)
+		assert.Equal(t, []byte("1"), before.ColStats["id"].MinValue)
 
 		// WHEN: id = "1" (最小値) のレコードを削除
 		deleteByCondition(t, env, "products", func(record [][]byte) bool {
 			return string(record[0]) == "1"
 		})
 
-		after, err := stats.Analyze()
+		after, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
 
 		// THEN: min(id) が "1" -> "2" に変化
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(2), after.RecordCount)
-		assert.Equal(t, []byte("2"), after.ColumnStats["id"].MinValue)
-		assert.Equal(t, []byte("3"), after.ColumnStats["id"].MaxValue)
+		assert.Equal(t, []byte("2"), after.ColStats["id"].MinValue)
+		assert.Equal(t, []byte("3"), after.ColStats["id"].MaxValue)
 	})
 
 	t.Run("全レコードの値が同一のカラムではユニーク値数が 1 になる", func(t *testing.T) {
 		// GIVEN: category がすべて "Fruit" のレコード
 		env := setupSameValueTable(t)
 
-		meta, ok := env.catalog.GetTableMetadataByName("same_values")
+		meta, ok := env.catalog.GetTableMetaByName("same_values")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
-		result, err := stats.Analyze()
+		result, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
 
 		// THEN: V(T, category) = 1, min = max = "Fruit"
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(3), result.RecordCount)
-		assert.Equal(t, uint64(1), result.ColumnStats["category"].UniqueValues)
-		assert.Equal(t, []byte("Fruit"), result.ColumnStats["category"].MinValue)
-		assert.Equal(t, []byte("Fruit"), result.ColumnStats["category"].MaxValue)
+		assert.Equal(t, uint64(1), result.ColStats["category"].UniqueValues)
+		assert.Equal(t, []byte("Fruit"), result.ColStats["category"].MinValue)
+		assert.Equal(t, []byte("Fruit"), result.ColStats["category"].MaxValue)
 	})
 
 	t.Run("レコードが 1 件のみの場合の統計値が正しい", func(t *testing.T) {
 		// GIVEN: 1 レコードのみのテーブル
 		env := setupSingleRecordTable(t)
 
-		meta, ok := env.catalog.GetTableMetadataByName("single")
+		meta, ok := env.catalog.GetTableMetaByName("single")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
-		result, err := stats.Analyze()
+		result, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
 
 		// THEN: R(T) = 1, V(T, F) = 1, min = max
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(1), result.RecordCount)
-		assert.Equal(t, uint64(1), result.ColumnStats["id"].UniqueValues)
-		assert.Equal(t, uint64(1), result.ColumnStats["name"].UniqueValues)
-		assert.Equal(t, []byte("1"), result.ColumnStats["id"].MinValue)
-		assert.Equal(t, []byte("1"), result.ColumnStats["id"].MaxValue)
-		assert.Equal(t, []byte("Alice"), result.ColumnStats["name"].MinValue)
-		assert.Equal(t, []byte("Alice"), result.ColumnStats["name"].MaxValue)
+		assert.Equal(t, uint64(1), result.ColStats["id"].UniqueValues)
+		assert.Equal(t, uint64(1), result.ColStats["name"].UniqueValues)
+		assert.Equal(t, []byte("1"), result.ColStats["id"].MinValue)
+		assert.Equal(t, []byte("1"), result.ColStats["id"].MaxValue)
+		assert.Equal(t, []byte("Alice"), result.ColStats["name"].MinValue)
+		assert.Equal(t, []byte("Alice"), result.ColStats["name"].MaxValue)
 	})
 
 	t.Run("複数のセカンダリインデックスがそれぞれ統計を持つ", func(t *testing.T) {
 		// GIVEN: 2 つのセカンダリインデックスを持つテーブル
 		env := setupMultiIndexTable(t)
 
-		meta, ok := env.catalog.GetTableMetadataByName("multi_idx")
+		meta, ok := env.catalog.GetTableMetaByName("multi_idx")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
-		result, err := stats.Analyze()
+		result, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
 
 		// THEN: セカンダリインデックスが 2 つ
 		assert.NoError(t, err)
-		assert.Len(t, result.SecondaryIndexStats, 2)
+		assert.Len(t, result.IdxStats, 2)
 
-		for idxName, idxStat := range result.SecondaryIndexStats {
+		for idxName, idxStat := range result.IdxStats {
 			assert.Equal(t, uint64(1), idxStat.Height, "index %s: H(I) should be 1", idxName)
 			assert.Equal(t, uint64(1), idxStat.LeafPageCount, "index %s: Bl(I) should be 1", idxName)
 		}
@@ -294,21 +281,20 @@ func TestAnalyze(t *testing.T) {
 		// GIVEN: テーブルを作成するがデータは挿入しない
 		env := setupEmptyTable(t)
 
-		meta, ok := env.catalog.GetTableMetadataByName("items")
+		meta, ok := env.catalog.GetTableMetaByName("items")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
-		result, err := stats.Analyze()
+		result, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(0), result.RecordCount)
 		assert.Equal(t, uint64(1), result.LeafPageCount)
-		assert.Empty(t, result.SecondaryIndexStats)
+		assert.Empty(t, result.IdxStats)
 
 		// カラム統計は存在するがユニーク値数は 0
-		for _, colStat := range result.ColumnStats {
+		for _, colStat := range result.ColStats {
 			assert.Equal(t, uint64(0), colStat.UniqueValues)
 		}
 	})
@@ -317,35 +303,117 @@ func TestAnalyze(t *testing.T) {
 		// GIVEN: データなしの空テーブル
 		env := setupEmptyTable(t)
 
-		meta, ok := env.catalog.GetTableMetadataByName("items")
+		meta, ok := env.catalog.GetTableMetaByName("items")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
-		result, err := stats.Analyze()
+		result, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
 
 		// THEN: 空でもルートリーフは存在するので H(T) = 1
 		assert.NoError(t, err)
-		assert.Equal(t, uint64(1), result.PrimaryHeight)
+		assert.Equal(t, uint64(1), result.TreeHeight)
 	})
 
 	t.Run("空テーブルのカラム min/max は nil になる", func(t *testing.T) {
 		// GIVEN: データなしの空テーブル
 		env := setupEmptyTable(t)
 
-		meta, ok := env.catalog.GetTableMetadataByName("items")
+		meta, ok := env.catalog.GetTableMetaByName("items")
 		assert.True(t, ok)
-		stats := NewStatistics(meta, env.bp)
 
 		// WHEN
-		result, err := stats.Analyze()
+		result, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
 
 		// THEN: レコードがないので min/max は nil
 		assert.NoError(t, err)
-		for _, colStat := range result.ColumnStats {
+		for _, colStat := range result.ColStats {
 			assert.Nil(t, colStat.MinValue)
 			assert.Nil(t, colStat.MaxValue)
 		}
+	})
+}
+
+func TestGetOrAnalyze(t *testing.T) {
+	t.Run("初回呼び出しで Analyze が実行されキャッシュされる", func(t *testing.T) {
+		// GIVEN: 3 レコード挿入済み
+		env := setupStatsTable(t)
+		defer ResetStatsCollector()
+		sc := InitStatsCollector(env.bp)
+		meta, ok := env.catalog.GetTableMetaByName("products")
+		assert.True(t, ok)
+
+		// WHEN
+		result, err := sc.GetOrAnalyze(meta)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(3), result.RecordCount)
+	})
+
+	t.Run("dirty_count が閾値以下ならキャッシュが返る", func(t *testing.T) {
+		// GIVEN: 3 レコードで GetOrAnalyze 済み
+		env := setupStatsTable(t)
+		defer ResetStatsCollector()
+		sc := InitStatsCollector(env.bp)
+		meta, ok := env.catalog.GetTableMetaByName("products")
+		assert.True(t, ok)
+		_, err := sc.GetOrAnalyze(meta)
+		assert.NoError(t, err)
+
+		// WHEN: dirty_count=0 のまま GetOrAnalyze を呼ぶ
+		result, err := sc.GetOrAnalyze(meta)
+
+		// THEN: キャッシュされた統計値が返る
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(3), result.RecordCount)
+	})
+
+	t.Run("dirty_count が閾値を超えると再 Analyze が実行される", func(t *testing.T) {
+		// GIVEN: 3 レコードで GetOrAnalyze 済み
+		env := setupStatsTable(t)
+		defer ResetStatsCollector()
+		sc := InitStatsCollector(env.bp)
+		meta, ok := env.catalog.GetTableMetaByName("products")
+		assert.True(t, ok)
+		_, err := sc.GetOrAnalyze(meta)
+		assert.NoError(t, err)
+
+		// WHEN: 1 レコード追加して dirty_count を加算
+		tbl := env.tables["products"]
+		err = tbl.Insert(env.bp, [][]byte{[]byte("4"), []byte("Donut"), []byte("Snack")})
+		assert.NoError(t, err)
+		sc.IncrementDirtyCount("products", 1)
+		result, err := sc.GetOrAnalyze(meta)
+
+		// THEN: 再 Analyze が実行され、最新の統計値が返る
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(4), result.RecordCount)
+	})
+
+	t.Run("再 Analyze 後に dirty_count がリセットされる", func(t *testing.T) {
+		// GIVEN: dirty_count 加算 → 再 Analyze 済み
+		env := setupStatsTable(t)
+		defer ResetStatsCollector()
+		sc := InitStatsCollector(env.bp)
+		meta, ok := env.catalog.GetTableMetaByName("products")
+		assert.True(t, ok)
+		_, err := sc.GetOrAnalyze(meta)
+		assert.NoError(t, err)
+		tbl := env.tables["products"]
+		err = tbl.Insert(env.bp, [][]byte{[]byte("4"), []byte("Donut"), []byte("Snack")})
+		assert.NoError(t, err)
+		sc.IncrementDirtyCount("products", 1)
+		_, err = sc.GetOrAnalyze(meta)
+		assert.NoError(t, err)
+
+		// WHEN: さらに 1 レコード追加するが dirty_count は加算しない
+		err = tbl.Insert(env.bp, [][]byte{[]byte("5"), []byte("Egg"), []byte("Dairy")})
+		assert.NoError(t, err)
+		result, err := sc.GetOrAnalyze(meta)
+
+		// THEN: キャッシュが返る (RecordCount は再 Analyze 時の 4 のまま)
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(4), result.RecordCount)
 	})
 }
 
@@ -427,19 +495,19 @@ func createTable(t *testing.T, env *testEnv, tableName string, primaryKeyCount u
 	assert.NoError(t, err)
 
 	// インデックスのメタデータを作成
-	idxMeta := make([]*IndexMetadata, len(indexes))
+	idxMeta := make([]*IndexMeta, len(indexes))
 	for i, ui := range uniqueIndexes {
-		idxMeta[i] = NewIndexMetadata(fileId, ui.Name, ui.ColName, IndexTypeUnique, ui.MetaPageId)
+		idxMeta[i] = NewIndexMeta(fileId, ui.Name, ui.ColName, IndexTypeUnique, ui.MetaPageId)
 	}
 
 	// カラムのメタデータを作成
-	colMeta := make([]*ColumnMetadata, len(columns))
+	colMeta := make([]*ColumnMeta, len(columns))
 	for i, col := range columns {
-		colMeta[i] = NewColumnMetadata(fileId, col.name, uint16(i), col.columnType)
+		colMeta[i] = NewColumnMeta(fileId, col.name, uint16(i), col.columnType)
 	}
 
 	// テーブルメタデータを作成してカタログに登録
-	tblMeta := NewTableMetadata(fileId, tableName, uint8(len(columns)), primaryKeyCount, colMeta, idxMeta, metaPageId)
+	tblMeta := NewTableMeta(fileId, tableName, uint8(len(columns)), primaryKeyCount, colMeta, idxMeta, metaPageId)
 	err = env.catalog.Insert(env.bp, tblMeta)
 	assert.NoError(t, err)
 
@@ -484,7 +552,7 @@ func deleteByCondition(t *testing.T, env *testEnv, tableName string, cond func([
 	}
 }
 
-// setupStatisticsTable はストレージを初期化し、統計情報テスト用のテーブルを作成する
+// setupStatsTable はストレージを初期化し、統計情報テスト用のテーブルを作成する
 //
 // テーブル: products (id, name, category)
 //   - プライマリキー: id
@@ -504,7 +572,7 @@ func deleteByCondition(t *testing.T, env *testEnv, tableName string, cond func([
 //   - min(id) = "1", max(id) = "3"
 //   - min(name) = "Apple", max(name) = "Carrot"
 //   - min(category) = "Fruit", max(category) = "Veggie"
-func setupStatisticsTable(t *testing.T) *testEnv {
+func setupStatsTable(t *testing.T) *testEnv {
 	t.Helper()
 
 	env := setupTestEnv(t)
