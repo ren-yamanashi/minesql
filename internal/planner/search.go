@@ -667,7 +667,7 @@ func (s *Search) operatorToCondition(operator string, pos int, value string) (fu
 
 // isPKLeadingColumn は指定カラムがプライマリキーの先頭カラムかどうかを判定する
 func (s *Search) isPKLeadingColumn(colName string) bool {
-	if s.tblMeta.PrimaryKeyCount == 0 {
+	if s.tblMeta.PKCount == 0 {
 		return false
 	}
 	colMeta, ok := s.tblMeta.GetColByName(colName)

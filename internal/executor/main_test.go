@@ -523,7 +523,7 @@ func writeRecords(sb *strings.Builder, records []Record) {
 
 func getTableAccessMethod(tableName string) (*handler.TableHandler, error) {
 	e := handler.Get()
-	tblMeta, ok := e.Catalog.GetTableMetadataByName(tableName)
+	tblMeta, ok := e.Catalog.GetTableMetaByName(tableName)
 	if !ok {
 		return nil, fmt.Errorf("table %s not found in catalog", tableName)
 	}

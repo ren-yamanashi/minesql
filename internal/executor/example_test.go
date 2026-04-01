@@ -49,7 +49,7 @@ func setupExample() (*handler.TableHandler, func()) {
 
 	// テーブルアクセスメソッドを取得
 	e := handler.Get()
-	tblMeta, ok := e.Catalog.GetTableMetadataByName("users")
+	tblMeta, ok := e.Catalog.GetTableMetaByName("users")
 	if !ok {
 		panic("table users not found in catalog")
 	}

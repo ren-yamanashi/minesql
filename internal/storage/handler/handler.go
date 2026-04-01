@@ -23,10 +23,10 @@ type TrxId = transaction.TrxId
 type UndoLog = transaction.UndoLog
 
 // TableMetadata はテーブルメタデータの型 (storage/dictionary.TableMetadata のエイリアス)
-type TableMetadata = dictionary.TableMetadata
+type TableMetadata = dictionary.TableMeta
 
 // IndexMetadata はインデックスメタデータの型 (storage/dictionary.IndexMetadata のエイリアス)
-type IndexMetadata = dictionary.IndexMetadata
+type IndexMetadata = dictionary.IndexMeta
 
 // ColumnType はカラムの型 (storage/dictionary.ColumnType のエイリアス)
 type ColumnType = dictionary.ColumnType

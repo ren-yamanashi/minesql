@@ -787,7 +787,7 @@ func initStorageManager(t *testing.T, dataDir string) {
 func getTableMetadata(t *testing.T, tableName string) *handler.TableMetadata {
 	t.Helper()
 	e := handler.Get()
-	tblMeta, ok := e.Catalog.GetTableMetadataByName(tableName)
+	tblMeta, ok := e.Catalog.GetTableMetaByName(tableName)
 	if !ok {
 		t.Fatalf("table %s not found in catalog", tableName)
 	}

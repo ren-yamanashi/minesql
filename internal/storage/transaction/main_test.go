@@ -235,7 +235,7 @@ func setupTestTable(t *testing.T) *handler.TableHandler {
 	assert.NoError(t, err)
 
 	e := handler.Get()
-	tblMeta, ok := e.Catalog.GetTableMetadataByName("test_trx")
+	tblMeta, ok := e.Catalog.GetTableMetaByName("test_trx")
 	assert.True(t, ok)
 	rawTbl, err := tblMeta.GetTable()
 	assert.NoError(t, err)

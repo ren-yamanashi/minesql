@@ -15,7 +15,7 @@ func TestGetOrAnalyze(t *testing.T) {
 		Init(env.bp)
 		m := Get()
 
-		meta, ok := env.catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetaByName("products")
 		assert.True(t, ok)
 
 		// WHEN: 初回 GetOrAnalyze
@@ -34,7 +34,7 @@ func TestGetOrAnalyze(t *testing.T) {
 		Init(env.bp)
 		m := Get()
 
-		meta, ok := env.catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetaByName("products")
 		assert.True(t, ok)
 
 		_, err := m.GetOrAnalyze(meta)
@@ -56,7 +56,7 @@ func TestGetOrAnalyze(t *testing.T) {
 		Init(env.bp)
 		m := Get()
 
-		meta, ok := env.catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetaByName("products")
 		assert.True(t, ok)
 
 		_, err := m.GetOrAnalyze(meta)
@@ -83,7 +83,7 @@ func TestGetOrAnalyze(t *testing.T) {
 		Init(env.bp)
 		m := Get()
 
-		meta, ok := env.catalog.GetTableMetadataByName("products")
+		meta, ok := env.catalog.GetTableMetaByName("products")
 		assert.True(t, ok)
 
 		_, err := m.GetOrAnalyze(meta)

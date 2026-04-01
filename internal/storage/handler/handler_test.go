@@ -206,10 +206,10 @@ func TestInitCatalog(t *testing.T) {
 		err = tbl.Create(bp)
 		assert.NoError(t, err)
 
-		cols := []*dictionary.ColumnMetadata{
-			dictionary.NewColumnMetadata(fileId, "id", 0, dictionary.ColumnTypeString),
+		cols := []*dictionary.ColumnMeta{
+			dictionary.NewColumnMeta(fileId, "id", 0, dictionary.ColumnTypeString),
 		}
-		tblMeta := dictionary.NewTableMetadata(fileId, "users", 1, 1, cols, nil, metaPageId)
+		tblMeta := dictionary.NewTableMeta(fileId, "users", 1, 1, cols, nil, metaPageId)
 		err = sm1.Catalog.Insert(bp, tblMeta)
 		assert.NoError(t, err)
 
@@ -227,7 +227,7 @@ func TestInitCatalog(t *testing.T) {
 		assert.NotNil(t, dm)
 
 		// カタログからテーブル情報も取得できる
-		tableMeta, ok := sm2.Catalog.GetTableMetadataByName("users")
+		tableMeta, ok := sm2.Catalog.GetTableMetaByName("users")
 		assert.True(t, ok)
 		assert.NotNil(t, tableMeta)
 		assert.Equal(t, "users", tableMeta.Name)

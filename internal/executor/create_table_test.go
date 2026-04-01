@@ -23,11 +23,11 @@ func TestCreateTable_Next(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		tblMeta, ok := e.Catalog.GetTableMetadataByName("users")
+		tblMeta, ok := e.Catalog.GetTableMetaByName("users")
 		assert.True(t, ok)
 		assert.NotNil(t, tblMeta)
 		assert.Equal(t, "users", tblMeta.Name)
-		assert.Equal(t, uint8(1), tblMeta.PrimaryKeyCount)
+		assert.Equal(t, uint8(1), tblMeta.PKCount)
 	})
 
 	t.Run("カラムを指定してテーブルを作成できる", func(t *testing.T) {
@@ -49,7 +49,7 @@ func TestCreateTable_Next(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		tblMeta, ok := e.Catalog.GetTableMetadataByName("users")
+		tblMeta, ok := e.Catalog.GetTableMetaByName("users")
 		assert.True(t, ok)
 		assert.NotNil(t, tblMeta)
 		assert.Equal(t, uint8(3), tblMeta.NCols)
@@ -82,7 +82,7 @@ func TestCreateTable_Next(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		tblMeta, ok := e.Catalog.GetTableMetadataByName("users")
+		tblMeta, ok := e.Catalog.GetTableMetaByName("users")
 		assert.True(t, ok)
 		assert.NotNil(t, tblMeta)
 		assert.Equal(t, 1, len(tblMeta.Indexes))
@@ -104,7 +104,7 @@ func TestCreateTable_Next(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		tblMeta, ok := e.Catalog.GetTableMetadataByName("users")
+		tblMeta, ok := e.Catalog.GetTableMetaByName("users")
 		assert.True(t, ok)
 		assert.NotNil(t, tblMeta)
 		// ディスクマネージャが登録されていることを確認

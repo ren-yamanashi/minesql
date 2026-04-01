@@ -22,7 +22,7 @@ func (up *Update) Build(trxId handler.TrxId) (executor.Executor, error) {
 	e := handler.Get()
 
 	// 対象テーブルのメタデータを取得
-	tblMeta, ok := e.Catalog.GetTableMetadataByName(up.Stmt.Table.TableName)
+	tblMeta, ok := e.Catalog.GetTableMetaByName(up.Stmt.Table.TableName)
 	if !ok {
 		return nil, fmt.Errorf("table %s not found", up.Stmt.Table.TableName)
 	}

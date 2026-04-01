@@ -21,7 +21,7 @@ func (dp *Delete) Build(trxId handler.TrxId) (executor.Executor, error) {
 	e := handler.Get()
 
 	// 対象テーブルのメタデータを取得
-	tblMeta, ok := e.Catalog.GetTableMetadataByName(dp.Stmt.From.TableName)
+	tblMeta, ok := e.Catalog.GetTableMetaByName(dp.Stmt.From.TableName)
 	if !ok {
 		return nil, fmt.Errorf("table %s not found", dp.Stmt.From.TableName)
 	}

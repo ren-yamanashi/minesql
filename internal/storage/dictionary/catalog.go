@@ -17,8 +17,8 @@ type Catalog struct {
 	TableMetaPageId  page.PageId
 	IndexMetaPageId  page.PageId
 	ColumnMetaPageId page.PageId
-	metadata         []*TableMetadata
 	NextFileId       page.FileId
+	metadata         []*TableMeta
 }
 
 // NewCatalog は既存のカタログを開く
@@ -54,7 +54,7 @@ func NewCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 	}
 
 	// ディスクから既存のメタデータを読み込む
-	tableMeta, err := loadTableMetadata(bp, catalog.TableMetaPageId, catalog.IndexMetaPageId, catalog.ColumnMetaPageId)
+	tableMeta, err := loadTableMeta(bp, catalog.TableMetaPageId, catalog.IndexMetaPageId, catalog.ColumnMetaPageId)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +127,7 @@ func CreateCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 }
 
 // Insert はカタログにメタデータを挿入する
-func (c *Catalog) Insert(bp *buffer.BufferPool, tableMeta TableMetadata) error {
+func (c *Catalog) Insert(bp *buffer.BufferPool, tableMeta TableMeta) error {
 	// 各メタデータに MetaPageId を設定する
 	tableMeta.MetaPageId = c.TableMetaPageId
 	for _, indexMeta := range tableMeta.Indexes {
@@ -160,8 +160,8 @@ func (c *Catalog) Insert(bp *buffer.BufferPool, tableMeta TableMetadata) error {
 	return nil
 }
 
-// GetTableMetadataByName はテーブル名からテーブルメタデータを取得する
-func (c *Catalog) GetTableMetadataByName(tableName string) (*TableMetadata, bool) {
+// GetTableMetaByName はテーブル名からテーブルメタデータを取得する
+func (c *Catalog) GetTableMetaByName(tableName string) (*TableMeta, bool) {
 	for _, tblMeta := range c.metadata {
 		if tblMeta.Name == tableName {
 			return tblMeta, true
@@ -171,7 +171,7 @@ func (c *Catalog) GetTableMetadataByName(tableName string) (*TableMetadata, bool
 }
 
 // GetAllTables はすべてのテーブルメタデータを取得する
-func (c *Catalog) GetAllTables() []*TableMetadata {
+func (c *Catalog) GetAllTables() []*TableMeta {
 	return c.metadata
 }
 

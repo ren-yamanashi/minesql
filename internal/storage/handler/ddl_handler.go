@@ -58,18 +58,18 @@ func (h *Handler) CreateTable(tableName string, primaryKeyCount uint8, indexPara
 	}
 
 	// インデックスメタデータを作成
-	idxMeta := make([]*dictionary.IndexMetadata, len(indexParams))
+	idxMeta := make([]*dictionary.IndexMeta, len(indexParams))
 	for i, idx := range uniqueIndexes {
-		idxMeta[i] = dictionary.NewIndexMetadata(fileId, idx.Name, idx.ColName, dictionary.IndexTypeUnique, idx.MetaPageId)
+		idxMeta[i] = dictionary.NewIndexMeta(fileId, idx.Name, idx.ColName, dictionary.IndexTypeUnique, idx.MetaPageId)
 	}
 
 	// カラムメタデータを作成
-	colMeta := make([]*dictionary.ColumnMetadata, len(columnParams))
+	colMeta := make([]*dictionary.ColumnMeta, len(columnParams))
 	for i, col := range columnParams {
-		colMeta[i] = dictionary.NewColumnMetadata(fileId, col.Name, uint16(i), col.Type)
+		colMeta[i] = dictionary.NewColumnMeta(fileId, col.Name, uint16(i), col.Type)
 	}
 
 	// テーブルメタデータを作成してカタログに登録
-	tblMeta := dictionary.NewTableMetadata(fileId, tableName, uint8(len(columnParams)), primaryKeyCount, colMeta, idxMeta, metaPageId)
+	tblMeta := dictionary.NewTableMeta(fileId, tableName, uint8(len(columnParams)), primaryKeyCount, colMeta, idxMeta, metaPageId)
 	return h.Catalog.Insert(h.BufferPool, tblMeta)
 }

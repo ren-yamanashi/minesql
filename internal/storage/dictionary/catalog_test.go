@@ -23,11 +23,11 @@ func TestNewCatalog(t *testing.T) {
 
 		fileId := page.FileId(1)
 		metaPageId := page.NewPageId(page.FileId(1), 0)
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(fileId, "id", 0, ColumnTypeString),
-			NewColumnMetadata(fileId, "name", 1, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(fileId, "id", 0, ColumnTypeString),
+			NewColumnMeta(fileId, "name", 1, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(fileId, "users", 2, 1, colMeta, []*IndexMetadata{}, metaPageId)
+		tableMeta := NewTableMeta(fileId, "users", 2, 1, colMeta, []*IndexMeta{}, metaPageId)
 		err = cat.Insert(bp, tableMeta)
 		assert.NoError(t, err)
 
@@ -64,12 +64,12 @@ func TestNewCatalog(t *testing.T) {
 
 		fileId := page.FileId(1)
 		metaPageId := page.NewPageId(page.FileId(1), 0)
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(fileId, "id", 0, ColumnTypeString),
-			NewColumnMetadata(fileId, "name", 1, ColumnTypeString),
-			NewColumnMetadata(fileId, "email", 2, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(fileId, "id", 0, ColumnTypeString),
+			NewColumnMeta(fileId, "name", 1, ColumnTypeString),
+			NewColumnMeta(fileId, "email", 2, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(fileId, "users", 3, 1, colMeta, []*IndexMetadata{}, metaPageId)
+		tableMeta := NewTableMeta(fileId, "users", 3, 1, colMeta, []*IndexMeta{}, metaPageId)
 		err = cat.Insert(bp, tableMeta)
 		assert.NoError(t, err)
 
@@ -110,14 +110,14 @@ func TestNewCatalog(t *testing.T) {
 		fileId := page.FileId(1)
 		metaPageId := page.NewPageId(page.FileId(1), 0)
 		indexMetaPageId := page.NewPageId(page.FileId(1), 1)
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(fileId, "id", 0, ColumnTypeString),
-			NewColumnMetadata(fileId, "email", 1, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(fileId, "id", 0, ColumnTypeString),
+			NewColumnMeta(fileId, "email", 1, ColumnTypeString),
 		}
-		idxMeta := []*IndexMetadata{
-			NewIndexMetadata(fileId, "idx_email", "email", IndexTypeUnique, indexMetaPageId),
+		idxMeta := []*IndexMeta{
+			NewIndexMeta(fileId, "idx_email", "email", IndexTypeUnique, indexMetaPageId),
 		}
-		tableMeta := NewTableMetadata(fileId, "users", 2, 1, colMeta, idxMeta, metaPageId)
+		tableMeta := NewTableMeta(fileId, "users", 2, 1, colMeta, idxMeta, metaPageId)
 		err = cat.Insert(bp, tableMeta)
 		assert.NoError(t, err)
 
@@ -154,27 +154,27 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// テーブル 1: users
-		table1Meta := NewTableMetadata(page.FileId(1), "users", 2, 1, []*ColumnMetadata{
-			NewColumnMetadata(page.FileId(1), "id", 0, ColumnTypeString),
-			NewColumnMetadata(page.FileId(1), "name", 1, ColumnTypeString),
-		}, []*IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
+		table1Meta := NewTableMeta(page.FileId(1), "users", 2, 1, []*ColumnMeta{
+			NewColumnMeta(page.FileId(1), "id", 0, ColumnTypeString),
+			NewColumnMeta(page.FileId(1), "name", 1, ColumnTypeString),
+		}, []*IndexMeta{}, page.NewPageId(page.FileId(1), 0))
 		err = cat.Insert(bp, table1Meta)
 		assert.NoError(t, err)
 
 		// テーブル 2: posts
-		table2Meta := NewTableMetadata(page.FileId(2), "posts", 3, 1, []*ColumnMetadata{
-			NewColumnMetadata(page.FileId(2), "id", 0, ColumnTypeString),
-			NewColumnMetadata(page.FileId(2), "title", 1, ColumnTypeString),
-			NewColumnMetadata(page.FileId(2), "body", 2, ColumnTypeString),
-		}, []*IndexMetadata{}, page.NewPageId(page.FileId(2), 0))
+		table2Meta := NewTableMeta(page.FileId(2), "posts", 3, 1, []*ColumnMeta{
+			NewColumnMeta(page.FileId(2), "id", 0, ColumnTypeString),
+			NewColumnMeta(page.FileId(2), "title", 1, ColumnTypeString),
+			NewColumnMeta(page.FileId(2), "body", 2, ColumnTypeString),
+		}, []*IndexMeta{}, page.NewPageId(page.FileId(2), 0))
 		err = cat.Insert(bp, table2Meta)
 		assert.NoError(t, err)
 
 		// テーブル 3: comments
-		table3Meta := NewTableMetadata(page.FileId(3), "comments", 2, 1, []*ColumnMetadata{
-			NewColumnMetadata(page.FileId(3), "id", 0, ColumnTypeString),
-			NewColumnMetadata(page.FileId(3), "text", 1, ColumnTypeString),
-		}, []*IndexMetadata{}, page.NewPageId(page.FileId(3), 0))
+		table3Meta := NewTableMeta(page.FileId(3), "comments", 2, 1, []*ColumnMeta{
+			NewColumnMeta(page.FileId(3), "id", 0, ColumnTypeString),
+			NewColumnMeta(page.FileId(3), "text", 1, ColumnTypeString),
+		}, []*IndexMeta{}, page.NewPageId(page.FileId(3), 0))
 		err = cat.Insert(bp, table3Meta)
 		assert.NoError(t, err)
 
@@ -197,21 +197,21 @@ func TestNewCatalog(t *testing.T) {
 		assert.Equal(t, 3, len(cat2.metadata))
 
 		// テーブル名で検索して確認
-		usersTable, ok := cat2.GetTableMetadataByName("users")
+		usersTable, ok := cat2.GetTableMetaByName("users")
 		assert.True(t, ok)
 		assert.NotNil(t, usersTable)
 		assert.Equal(t, "users", usersTable.Name)
 		assert.Equal(t, uint8(2), usersTable.NCols)
 		assert.Equal(t, 2, len(usersTable.Cols))
 
-		postsTable, ok := cat2.GetTableMetadataByName("posts")
+		postsTable, ok := cat2.GetTableMetaByName("posts")
 		assert.True(t, ok)
 		assert.NotNil(t, postsTable)
 		assert.Equal(t, "posts", postsTable.Name)
 		assert.Equal(t, uint8(3), postsTable.NCols)
 		assert.Equal(t, 3, len(postsTable.Cols))
 
-		commentsTable, ok := cat2.GetTableMetadataByName("comments")
+		commentsTable, ok := cat2.GetTableMetaByName("comments")
 		assert.True(t, ok)
 		assert.NotNil(t, commentsTable)
 		assert.Equal(t, "comments", commentsTable.Name)
@@ -311,12 +311,12 @@ func TestInsert(t *testing.T) {
 
 		fileId := page.FileId(1)
 		metaPageId := page.NewPageId(page.FileId(1), 0)
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(fileId, "id", 0, ColumnTypeString),
-			NewColumnMetadata(fileId, "name", 1, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(fileId, "id", 0, ColumnTypeString),
+			NewColumnMeta(fileId, "name", 1, ColumnTypeString),
 		}
-		idxMeta := []*IndexMetadata{}
-		tableMeta := NewTableMetadata(fileId, "users", 2, 1, colMeta, idxMeta, metaPageId)
+		idxMeta := []*IndexMeta{}
+		tableMeta := NewTableMeta(fileId, "users", 2, 1, colMeta, idxMeta, metaPageId)
 
 		// WHEN
 		err = cat.Insert(bp, tableMeta)
@@ -339,13 +339,13 @@ func TestInsert(t *testing.T) {
 
 		fileId := page.FileId(1)
 		metaPageId := page.NewPageId(page.FileId(1), 0)
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(fileId, "id", 0, ColumnTypeString),
-			NewColumnMetadata(fileId, "name", 1, ColumnTypeString),
-			NewColumnMetadata(fileId, "email", 2, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(fileId, "id", 0, ColumnTypeString),
+			NewColumnMeta(fileId, "name", 1, ColumnTypeString),
+			NewColumnMeta(fileId, "email", 2, ColumnTypeString),
 		}
-		idxMeta := []*IndexMetadata{}
-		tableMeta := NewTableMetadata(fileId, "users", 3, 1, colMeta, idxMeta, metaPageId)
+		idxMeta := []*IndexMeta{}
+		tableMeta := NewTableMeta(fileId, "users", 3, 1, colMeta, idxMeta, metaPageId)
 
 		// WHEN
 		err = cat.Insert(bp, tableMeta)
@@ -368,14 +368,14 @@ func TestInsert(t *testing.T) {
 		fileId := page.FileId(1)
 		metaPageId := page.NewPageId(page.FileId(1), 0)
 		indexMetaPageId := page.NewPageId(page.FileId(1), 1)
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(fileId, "id", 0, ColumnTypeString),
-			NewColumnMetadata(fileId, "email", 1, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(fileId, "id", 0, ColumnTypeString),
+			NewColumnMeta(fileId, "email", 1, ColumnTypeString),
 		}
-		idxMeta := []*IndexMetadata{
-			NewIndexMetadata(fileId, "idx_email", "email", IndexTypeUnique, indexMetaPageId),
+		idxMeta := []*IndexMeta{
+			NewIndexMeta(fileId, "idx_email", "email", IndexTypeUnique, indexMetaPageId),
 		}
-		tableMeta := NewTableMetadata(fileId, "users", 2, 1, colMeta, idxMeta, metaPageId)
+		tableMeta := NewTableMeta(fileId, "users", 2, 1, colMeta, idxMeta, metaPageId)
 
 		// WHEN
 		err = cat.Insert(bp, tableMeta)
@@ -399,15 +399,15 @@ func TestGetTableMetadataByName(t *testing.T) {
 
 		fileId := page.FileId(1)
 		metaPageId := page.NewPageId(page.FileId(1), 0)
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(fileId, "id", 0, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(fileId, "id", 0, ColumnTypeString),
 		}
-		tableMeta := NewTableMetadata(fileId, "users", 1, 1, colMeta, []*IndexMetadata{}, metaPageId)
+		tableMeta := NewTableMeta(fileId, "users", 1, 1, colMeta, []*IndexMeta{}, metaPageId)
 		err = cat.Insert(bp, tableMeta)
 		assert.NoError(t, err)
 
 		// WHEN
-		result, ok := cat.GetTableMetadataByName("users")
+		result, ok := cat.GetTableMetaByName("users")
 
 		// THEN
 		assert.True(t, ok)
@@ -425,7 +425,7 @@ func TestGetTableMetadataByName(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		result, ok := cat.GetTableMetadataByName("non_existent")
+		result, ok := cat.GetTableMetaByName("non_existent")
 
 		// THEN
 		assert.False(t, ok)
@@ -441,15 +441,15 @@ func TestGetTableMetadataByName(t *testing.T) {
 		assert.NoError(t, err)
 
 		// 複数のテーブルを挿入
-		table1Meta := NewTableMetadata(page.FileId(1), "users", 1, 1, []*ColumnMetadata{
-			NewColumnMetadata(page.FileId(1), "id", 0, ColumnTypeString),
-		}, []*IndexMetadata{}, page.NewPageId(page.FileId(1), 0))
-		table2Meta := NewTableMetadata(page.FileId(2), "posts", 1, 1, []*ColumnMetadata{
-			NewColumnMetadata(page.FileId(2), "id", 0, ColumnTypeString),
-		}, []*IndexMetadata{}, page.NewPageId(page.FileId(2), 0))
-		table3Meta := NewTableMetadata(page.FileId(3), "comments", 1, 1, []*ColumnMetadata{
-			NewColumnMetadata(page.FileId(3), "id", 0, ColumnTypeString),
-		}, []*IndexMetadata{}, page.NewPageId(page.FileId(3), 0))
+		table1Meta := NewTableMeta(page.FileId(1), "users", 1, 1, []*ColumnMeta{
+			NewColumnMeta(page.FileId(1), "id", 0, ColumnTypeString),
+		}, []*IndexMeta{}, page.NewPageId(page.FileId(1), 0))
+		table2Meta := NewTableMeta(page.FileId(2), "posts", 1, 1, []*ColumnMeta{
+			NewColumnMeta(page.FileId(2), "id", 0, ColumnTypeString),
+		}, []*IndexMeta{}, page.NewPageId(page.FileId(2), 0))
+		table3Meta := NewTableMeta(page.FileId(3), "comments", 1, 1, []*ColumnMeta{
+			NewColumnMeta(page.FileId(3), "id", 0, ColumnTypeString),
+		}, []*IndexMeta{}, page.NewPageId(page.FileId(3), 0))
 
 		err = cat.Insert(bp, table1Meta)
 		assert.NoError(t, err)
@@ -459,7 +459,7 @@ func TestGetTableMetadataByName(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		result, ok := cat.GetTableMetadataByName("posts")
+		result, ok := cat.GetTableMetaByName("posts")
 
 		// THEN
 		assert.True(t, ok)

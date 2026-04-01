@@ -13,7 +13,7 @@ import (
 
 // TableMeta はテーブルのメタデータを表す
 //
-// 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-tables-access.html
+// 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-tables-table.html
 type TableMeta struct {
 	MetaPageId     page.PageId   // テーブルのメタデータが格納される B+Tree のメタページID
 	FileId         page.FileId   // テーブルの実データが格納されるディスクファイルの識別子

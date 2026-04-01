@@ -69,7 +69,7 @@ func (m *Manager) IncrementDirtyCount(tableName string, count uint64) {
 // dirty_count が閾値を超えている場合、またはキャッシュがない場合は Analyze を実行する
 //
 // meta: 対象テーブルのメタデータ
-func (m *Manager) GetOrAnalyze(meta *TableMetadata) (TableStatistics, error) {
+func (m *Manager) GetOrAnalyze(meta *TableMeta) (TableStatistics, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 

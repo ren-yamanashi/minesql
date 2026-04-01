@@ -44,7 +44,7 @@ func (ip *Insert) Build(trxId handler.TrxId) (executor.Executor, error) {
 	}
 
 	e := handler.Get()
-	tblMeta, ok := e.Catalog.GetTableMetadataByName(ip.Stmt.Table.TableName)
+	tblMeta, ok := e.Catalog.GetTableMetaByName(ip.Stmt.Table.TableName)
 	if !ok {
 		return nil, fmt.Errorf("table %s not found", ip.Stmt.Table.TableName)
 	}

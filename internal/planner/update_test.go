@@ -267,7 +267,7 @@ func TestUpdate_Build(t *testing.T) {
 func getPlannerTableAccessMethod(t *testing.T, tableName string) *handler.TableHandler {
 	t.Helper()
 	e := handler.Get()
-	tblMeta, ok := e.Catalog.GetTableMetadataByName(tableName)
+	tblMeta, ok := e.Catalog.GetTableMetaByName(tableName)
 	if !ok {
 		t.Fatalf("table %s not found in catalog", tableName)
 	}
