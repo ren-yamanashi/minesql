@@ -1,22 +1,23 @@
 package transaction
 
 import (
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/buffer"
 )
 
-type DeleteLogRecord struct {
-	table  TableOperator
+type UndoDeleteRecord struct {
+	table  *access.TableAccessMethod
 	Record [][]byte
 }
 
-func NewDeleteLogRecord(table TableOperator, record [][]byte) DeleteLogRecord {
-	return DeleteLogRecord{
+func NewUndoDeleteRecord(table *access.TableAccessMethod, record [][]byte) UndoDeleteRecord {
+	return UndoDeleteRecord{
 		table:  table,
 		Record: record,
 	}
 }
 
 // Undo は Delete したレコードを挿入する
-func (r DeleteLogRecord) Undo(bp *buffer.BufferPool) error {
+func (r UndoDeleteRecord) Undo(bp *buffer.BufferPool) error {
 	return r.table.Insert(bp, r.Record)
 }

@@ -24,15 +24,15 @@ func (h *Handler) UndoLog() *transaction.UndoLog {
 
 // AppendInsertUndo は Insert 操作の Undo レコードを記録する
 func (h *Handler) AppendInsertUndo(trxId TrxId, table *TableHandler, record [][]byte) {
-	h.undoLog.Append(trxId, transaction.NewInsertLogRecord(table, record))
+	h.undoLog.Append(trxId, transaction.NewUndoInsertRecord(table.inner, record))
 }
 
 // AppendDeleteUndo は Delete 操作の Undo レコードを記録する
 func (h *Handler) AppendDeleteUndo(trxId TrxId, table *TableHandler, record [][]byte) {
-	h.undoLog.Append(trxId, transaction.NewDeleteLogRecord(table, record))
+	h.undoLog.Append(trxId, transaction.NewUndoDeleteRecord(table.inner, record))
 }
 
 // AppendUpdateInplaceUndo は UpdateInplace 操作の Undo レコードを記録する
 func (h *Handler) AppendUpdateInplaceUndo(trxId TrxId, table *TableHandler, prevRecord, newRecord [][]byte) {
-	h.undoLog.Append(trxId, transaction.NewUpdateInplaceLogRecord(table, prevRecord, newRecord))
+	h.undoLog.Append(trxId, transaction.NewUndoUpdateInplaceRecord(table.inner, prevRecord, newRecord))
 }

@@ -20,7 +20,7 @@ func TestUpdateInplaceLogRecord_Undo(t *testing.T) {
 		err = table.UpdateInplace(bp, prevRecord, newRecord)
 		assert.NoError(t, err)
 
-		undoRecord := UpdateInplaceLogRecord{
+		undoRecord := UndoUpdateInplaceRecord{
 			table: table, PrevRecord: prevRecord, NewRecord: newRecord,
 		}
 
@@ -46,7 +46,7 @@ func TestUpdateInplaceLogRecord_Undo(t *testing.T) {
 		err = table.UpdateInplace(bp, prevRecord, newRecord)
 		assert.NoError(t, err)
 
-		undoRecord := UpdateInplaceLogRecord{
+		undoRecord := UndoUpdateInplaceRecord{
 			table: table, PrevRecord: prevRecord, NewRecord: newRecord,
 		}
 

@@ -18,7 +18,7 @@ func TestInsertLogRecord_Undo(t *testing.T) {
 		err := table.Insert(bp, record)
 		assert.NoError(t, err)
 
-		undoRecord := InsertLogRecord{table: table, Record: record}
+		undoRecord := UndoInsertRecord{table: table, Record: record}
 
 		// WHEN
 		err = undoRecord.Undo(bp)
@@ -41,7 +41,7 @@ func TestInsertLogRecord_Undo(t *testing.T) {
 		err := table.Insert(bp, record)
 		assert.NoError(t, err)
 
-		undoRecord := InsertLogRecord{table: table, Record: record}
+		undoRecord := UndoInsertRecord{table: table, Record: record}
 
 		// WHEN
 		err = undoRecord.Undo(bp)

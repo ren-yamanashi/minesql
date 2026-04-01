@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDeleteLogRecord_Undo(t *testing.T) {
+func TestUndoDeleteRecord_Undo(t *testing.T) {
 	t.Run("SoftDelete した行が復元される", func(t *testing.T) {
 		// GIVEN
 		table, bp := setupTestTableForUndo(t, nil)
@@ -19,7 +19,7 @@ func TestDeleteLogRecord_Undo(t *testing.T) {
 		err = table.SoftDelete(bp, record)
 		assert.NoError(t, err)
 
-		undoRecord := DeleteLogRecord{table: table, Record: record}
+		undoRecord := UndoDeleteRecord{table: table, Record: record}
 
 		// WHEN
 		err = undoRecord.Undo(bp)
@@ -42,7 +42,7 @@ func TestDeleteLogRecord_Undo(t *testing.T) {
 		err = table.SoftDelete(bp, record)
 		assert.NoError(t, err)
 
-		undoRecord := DeleteLogRecord{table: table, Record: record}
+		undoRecord := UndoDeleteRecord{table: table, Record: record}
 
 		// WHEN
 		err = undoRecord.Undo(bp)
@@ -63,7 +63,7 @@ func TestDeleteLogRecord_Undo(t *testing.T) {
 		err = table.Delete(bp, record)
 		assert.NoError(t, err)
 
-		undoRecord := DeleteLogRecord{table: table, Record: record}
+		undoRecord := UndoDeleteRecord{table: table, Record: record}
 
 		// WHEN
 		err = undoRecord.Undo(bp)

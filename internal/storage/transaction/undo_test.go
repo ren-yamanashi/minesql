@@ -31,18 +31,18 @@ func TestUndoIntegration(t *testing.T) {
 		updatedA := [][]byte{[]byte("a"), []byte("Carol")}
 		err = table.UpdateInplace(bp, recordA, updatedA)
 		assert.NoError(t, err)
-		undo1 := UpdateInplaceLogRecord{table: table, PrevRecord: recordA, NewRecord: updatedA}
+		undo1 := UndoUpdateInplaceRecord{table: table, PrevRecord: recordA, NewRecord: updatedA}
 
 		// 操作2: ("b", "Bob") を SoftDelete
 		err = table.SoftDelete(bp, recordB)
 		assert.NoError(t, err)
-		undo2 := DeleteLogRecord{table: table, Record: recordB}
+		undo2 := UndoDeleteRecord{table: table, Record: recordB}
 
 		// 操作3: ("c", "Dave") を Insert
 		recordC := [][]byte{[]byte("c"), []byte("Dave")}
 		err = table.Insert(bp, recordC)
 		assert.NoError(t, err)
-		undo3 := InsertLogRecord{table: table, Record: recordC}
+		undo3 := UndoInsertRecord{table: table, Record: recordC}
 
 		// 操作後の状態: ("a", "Carol"), ("c", "Dave") が active
 		records := collectActiveRecords(t, table, bp)
@@ -78,32 +78,32 @@ func TestUndoIntegration(t *testing.T) {
 		err := table.Insert(bp, recordA)
 		assert.NoError(t, err)
 
-		// 操作1: PK を "a" → "x" に変更 (Outofplace)
+		// 操作1: PK を "a" → "x" に変更 (Outofplace = SoftDelete + Insert)
 		newRecordX := [][]byte{[]byte("x"), []byte("Alice")}
 		err = table.SoftDelete(bp, recordA)
 		assert.NoError(t, err)
 		err = table.Insert(bp, newRecordX)
 		assert.NoError(t, err)
-		undo1 := UpdateOutofplaceLogRecord{
-			InsertLogRecord: InsertLogRecord{table: table, Record: newRecordX},
-			DeleteLogRecord: DeleteLogRecord{table: table, Record: recordA},
-		}
+		undo1Delete := UndoDeleteRecord{table: table, Record: recordA}
+		undo1Insert := UndoInsertRecord{table: table, Record: newRecordX}
 
 		// 操作2: ("x", "Alice") を ("x", "Bob") に UpdateInplace
 		updatedX := [][]byte{[]byte("x"), []byte("Bob")}
 		err = table.UpdateInplace(bp, newRecordX, updatedX)
 		assert.NoError(t, err)
-		undo2 := UpdateInplaceLogRecord{table: table, PrevRecord: newRecordX, NewRecord: updatedX}
+		undo2 := UndoUpdateInplaceRecord{table: table, PrevRecord: newRecordX, NewRecord: updatedX}
 
 		// 操作後の状態: ("x", "Bob") のみ active
 		records := collectActiveRecords(t, table, bp)
 		assert.Equal(t, 1, len(records))
 		assert.Equal(t, []string{"x", "Bob"}, records[0])
 
-		// WHEN: 逆順に Undo
+		// WHEN: 逆順に Undo (操作2 → 操作1 の Insert → 操作1 の Delete)
 		err = undo2.Undo(bp)
 		assert.NoError(t, err)
-		err = undo1.Undo(bp)
+		err = undo1Insert.Undo(bp)
+		assert.NoError(t, err)
+		err = undo1Delete.Undo(bp)
 		assert.NoError(t, err)
 
 		// THEN: 初期状態に戻っている
