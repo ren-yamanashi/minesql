@@ -15,17 +15,17 @@ import (
 //
 // 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-tables-access.html
 type TableMeta struct {
-	MetaPageId     page.PageId       // テーブルのメタデータが格納される B+Tree のメタページID
-	FileId         page.FileId       // テーブルの実データが格納されるディスクファイルの識別子
-	Name           string            // テーブル名
-	NCols          uint8             // カラム数
-	PKCount        uint8             // プライマリキーのカラム数 (プライマリキーは先頭から連続している想定) (例: PK が (id, name) の場合、PKCount は 2)
-	DataMetaPageId page.PageId       // 実データが格納される B+Tree のメタページID
-	Cols           []*ColumnMetadata // テーブルのカラム情報
-	Indexes        []*IndexMeta      // テーブルのインデックス情報
+	MetaPageId     page.PageId   // テーブルのメタデータが格納される B+Tree のメタページID
+	FileId         page.FileId   // テーブルの実データが格納されるディスクファイルの識別子
+	Name           string        // テーブル名
+	NCols          uint8         // カラム数
+	PKCount        uint8         // プライマリキーのカラム数 (プライマリキーは先頭から連続している想定) (例: PK が (id, name) の場合、PKCount は 2)
+	DataMetaPageId page.PageId   // 実データが格納される B+Tree のメタページID
+	Cols           []*ColumnMeta // テーブルのカラム情報
+	Indexes        []*IndexMeta  // テーブルのインデックス情報
 }
 
-func NewTableMeta(fileId page.FileId, name string, nCols uint8, pkCount uint8, cols []*ColumnMetadata, indexes []*IndexMeta, dataMetaPageId page.PageId) TableMeta {
+func NewTableMeta(fileId page.FileId, name string, nCols uint8, pkCount uint8, cols []*ColumnMeta, indexes []*IndexMeta, dataMetaPageId page.PageId) TableMeta {
 	return TableMeta{
 		FileId:         fileId,
 		Name:           name,
@@ -38,8 +38,8 @@ func NewTableMeta(fileId page.FileId, name string, nCols uint8, pkCount uint8, c
 }
 
 // GetSortedCols はカラムの位置 (Pos) でソートされたカラムメタデータを取得する
-func (tm *TableMeta) GetSortedCols() []*ColumnMetadata {
-	sortedColMeta := make([]*ColumnMetadata, len(tm.Cols))
+func (tm *TableMeta) GetSortedCols() []*ColumnMeta {
+	sortedColMeta := make([]*ColumnMeta, len(tm.Cols))
 	for _, colMeta := range tm.Cols {
 		sortedColMeta[colMeta.Pos] = colMeta
 	}
@@ -47,7 +47,7 @@ func (tm *TableMeta) GetSortedCols() []*ColumnMetadata {
 }
 
 // GetColByName はカラム名からカラムを取得する
-func (tm *TableMeta) GetColByName(colName string) (*ColumnMetadata, bool) {
+func (tm *TableMeta) GetColByName(colName string) (*ColumnMeta, bool) {
 	for _, col := range tm.Cols {
 		if col.Name == colName {
 			return col, true
@@ -148,7 +148,7 @@ func loadTableMeta(bp *buffer.BufferPool, tableMetaPageId page.PageId, indexMeta
 		}
 
 		// カラムメタデータを読み込む
-		cols, err := loadColumnMetadata(bp, fileId, columnMetaPageId)
+		cols, err := loadColumnMeta(bp, fileId, columnMetaPageId)
 		if err != nil {
 			return nil, err
 		}

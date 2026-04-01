@@ -13,10 +13,10 @@ import (
 func TestGetSortedCols(t *testing.T) {
 	t.Run("Pos の順序でソートされたカラムメタデータを返す", func(t *testing.T) {
 		// GIVEN
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(1, "email", 2, ColumnTypeString),
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
-			NewColumnMetadata(1, "name", 1, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "email", 2, ColumnTypeString),
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "name", 1, ColumnTypeString),
 		}
 		tableMeta := NewTableMeta(1, "users", 3, 1, colMeta, []*IndexMeta{}, page.NewPageId(page.FileId(1), 0))
 
@@ -35,9 +35,9 @@ func TestGetSortedCols(t *testing.T) {
 
 	t.Run("元々 Pos の順序通りのカラムメタデータでも正しく返す", func(t *testing.T) {
 		// GIVEN
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
-			NewColumnMetadata(1, "name", 1, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "name", 1, ColumnTypeString),
 		}
 		tableMeta := NewTableMeta(1, "users", 2, 1, colMeta, []*IndexMeta{}, page.NewPageId(page.FileId(1), 0))
 
@@ -52,8 +52,8 @@ func TestGetSortedCols(t *testing.T) {
 
 	t.Run("カラムが 1 つだけの場合", func(t *testing.T) {
 		// GIVEN
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
 		}
 		tableMeta := NewTableMeta(1, "users", 1, 1, colMeta, []*IndexMeta{}, page.NewPageId(page.FileId(1), 0))
 
@@ -67,7 +67,7 @@ func TestGetSortedCols(t *testing.T) {
 
 	t.Run("カラムが空の場合", func(t *testing.T) {
 		// GIVEN
-		tableMeta := NewTableMeta(1, "users", 0, 0, []*ColumnMetadata{}, []*IndexMeta{}, page.NewPageId(page.FileId(1), 0))
+		tableMeta := NewTableMeta(1, "users", 0, 0, []*ColumnMeta{}, []*IndexMeta{}, page.NewPageId(page.FileId(1), 0))
 
 		// WHEN
 		sorted := tableMeta.GetSortedCols()
@@ -80,10 +80,10 @@ func TestGetSortedCols(t *testing.T) {
 func TestGetColByName(t *testing.T) {
 	t.Run("指定したカラム名のインデックスを取得できる", func(t *testing.T) {
 		// GIVEN
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
-			NewColumnMetadata(1, "name", 1, ColumnTypeString),
-			NewColumnMetadata(1, "email", 2, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "name", 1, ColumnTypeString),
+			NewColumnMeta(1, "email", 2, ColumnTypeString),
 		}
 		tableMeta := NewTableMeta(1, "users", 3, 1, colMeta, []*IndexMeta{}, page.NewPageId(page.FileId(1), 0))
 
@@ -99,9 +99,9 @@ func TestGetColByName(t *testing.T) {
 
 	t.Run("存在しないカラム名を指定した場合、false を返す", func(t *testing.T) {
 		// GIVEN
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
-			NewColumnMetadata(1, "name", 1, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "name", 1, ColumnTypeString),
 		}
 		tableMeta := NewTableMeta(1, "users", 2, 1, colMeta, []*IndexMeta{}, page.NewPageId(page.FileId(1), 0))
 		// WHEN
@@ -116,9 +116,9 @@ func TestGetColByName(t *testing.T) {
 func TestGetIndexByColName(t *testing.T) {
 	t.Run("指定したカラム名のインデックスメタデータを取得できる", func(t *testing.T) {
 		// GIVEN
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
-			NewColumnMetadata(1, "email", 1, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "email", 1, ColumnTypeString),
 		}
 		idxMeta := []*IndexMeta{
 			NewIndexMeta(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
@@ -138,10 +138,10 @@ func TestGetIndexByColName(t *testing.T) {
 
 	t.Run("複数のインデックスから指定したカラムのインデックスを取得できる", func(t *testing.T) {
 		// GIVEN
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
-			NewColumnMetadata(1, "email", 1, ColumnTypeString),
-			NewColumnMetadata(1, "username", 2, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "email", 1, ColumnTypeString),
+			NewColumnMeta(1, "username", 2, ColumnTypeString),
 		}
 		idxMeta := []*IndexMeta{
 			NewIndexMeta(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
@@ -161,10 +161,10 @@ func TestGetIndexByColName(t *testing.T) {
 
 	t.Run("インデックスが設定されていないカラムを指定した場合、false を返す", func(t *testing.T) {
 		// GIVEN
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
-			NewColumnMetadata(1, "name", 1, ColumnTypeString),
-			NewColumnMetadata(1, "email", 2, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "name", 1, ColumnTypeString),
+			NewColumnMeta(1, "email", 2, ColumnTypeString),
 		}
 		idxMeta := []*IndexMeta{
 			NewIndexMeta(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
@@ -181,8 +181,8 @@ func TestGetIndexByColName(t *testing.T) {
 
 	t.Run("存在しないカラムを指定した場合、false を返す", func(t *testing.T) {
 		// GIVEN
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
 		}
 		idxMeta := []*IndexMeta{
 			NewIndexMeta(1, "idx_id", "id", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
@@ -199,9 +199,9 @@ func TestGetIndexByColName(t *testing.T) {
 
 	t.Run("インデックスが空のテーブルの場合、false を返す", func(t *testing.T) {
 		// GIVEN
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
-			NewColumnMetadata(1, "name", 1, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "name", 1, ColumnTypeString),
 		}
 		tableMeta := NewTableMeta(1, "users", 2, 1, colMeta, []*IndexMeta{}, page.NewPageId(page.FileId(1), 0))
 		// WHEN
@@ -216,9 +216,9 @@ func TestGetIndexByColName(t *testing.T) {
 func TestGetTable(t *testing.T) {
 	t.Run("インデックスなしのテーブルを取得できる", func(t *testing.T) {
 		// GIVEN
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
-			NewColumnMetadata(1, "name", 1, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "name", 1, ColumnTypeString),
 		}
 		tableMeta := NewTableMeta(1, "users", 2, 1, colMeta, []*IndexMeta{}, page.NewPageId(page.FileId(1), 0))
 		// WHEN
@@ -235,9 +235,9 @@ func TestGetTable(t *testing.T) {
 
 	t.Run("ユニークインデックス付きのテーブルを取得できる", func(t *testing.T) {
 		// GIVEN
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
-			NewColumnMetadata(1, "email", 1, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "email", 1, ColumnTypeString),
 		}
 		idxMeta := []*IndexMeta{
 			NewIndexMeta(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
@@ -260,10 +260,10 @@ func TestGetTable(t *testing.T) {
 
 	t.Run("複数のユニークインデックス付きのテーブルを取得できる", func(t *testing.T) {
 		// GIVEN
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
-			NewColumnMetadata(1, "email", 1, ColumnTypeString),
-			NewColumnMetadata(1, "username", 2, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "email", 1, ColumnTypeString),
+			NewColumnMeta(1, "username", 2, ColumnTypeString),
 		}
 		idxMeta := []*IndexMeta{
 			NewIndexMeta(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
@@ -288,9 +288,9 @@ func TestGetTable(t *testing.T) {
 
 	t.Run("存在しないカラム名を指定したインデックスがある場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
-			NewColumnMetadata(1, "name", 1, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "name", 1, ColumnTypeString),
 		}
 		idxMeta := []*IndexMeta{
 			NewIndexMeta(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
@@ -320,10 +320,10 @@ func TestTableMeta_Insert(t *testing.T) {
 		assert.NoError(t, err)
 
 		dataMetaPageId := page.NewPageId(page.FileId(1), 0)
-		tableMeta := NewTableMeta(42, "users", 3, 1, []*ColumnMetadata{
-			NewColumnMetadata(42, "id", 0, ColumnTypeString),
-			NewColumnMetadata(42, "name", 1, ColumnTypeString),
-			NewColumnMetadata(42, "email", 2, ColumnTypeString),
+		tableMeta := NewTableMeta(42, "users", 3, 1, []*ColumnMeta{
+			NewColumnMeta(42, "id", 0, ColumnTypeString),
+			NewColumnMeta(42, "name", 1, ColumnTypeString),
+			NewColumnMeta(42, "email", 2, ColumnTypeString),
 		}, []*IndexMeta{}, dataMetaPageId)
 		tableMeta.MetaPageId = metaPageId
 
@@ -366,9 +366,9 @@ func TestLoadTableMeta(t *testing.T) {
 		assert.NoError(t, err)
 
 		dataMetaPageId := page.NewPageId(page.FileId(1), 0)
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
-			NewColumnMetadata(1, "name", 1, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "name", 1, ColumnTypeString),
 		}
 		tableMeta := NewTableMeta(1, "users", 2, 1, colMeta, []*IndexMeta{}, dataMetaPageId)
 		err = cat.Insert(bp, tableMeta)
@@ -395,10 +395,10 @@ func TestLoadTableMeta(t *testing.T) {
 		cat, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
-			NewColumnMetadata(1, "name", 1, ColumnTypeString),
-			NewColumnMetadata(1, "email", 2, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "name", 1, ColumnTypeString),
+			NewColumnMeta(1, "email", 2, ColumnTypeString),
 		}
 		tableMeta := NewTableMeta(1, "users", 3, 1, colMeta, []*IndexMeta{}, page.NewPageId(page.FileId(1), 0))
 		err = cat.Insert(bp, tableMeta)
@@ -424,9 +424,9 @@ func TestLoadTableMeta(t *testing.T) {
 		cat, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		colMeta := []*ColumnMetadata{
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
-			NewColumnMetadata(1, "email", 1, ColumnTypeString),
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "email", 1, ColumnTypeString),
 		}
 		idxDataPageId := page.NewPageId(page.FileId(1), 5)
 		idxMeta := []*IndexMeta{
@@ -457,17 +457,17 @@ func TestLoadTableMeta(t *testing.T) {
 		cat, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		table1 := NewTableMeta(1, "users", 2, 1, []*ColumnMetadata{
-			NewColumnMetadata(1, "id", 0, ColumnTypeString),
-			NewColumnMetadata(1, "name", 1, ColumnTypeString),
+		table1 := NewTableMeta(1, "users", 2, 1, []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "name", 1, ColumnTypeString),
 		}, []*IndexMeta{}, page.NewPageId(page.FileId(1), 0))
 		err = cat.Insert(bp, table1)
 		assert.NoError(t, err)
 
-		table2 := NewTableMeta(2, "posts", 3, 1, []*ColumnMetadata{
-			NewColumnMetadata(2, "id", 0, ColumnTypeString),
-			NewColumnMetadata(2, "title", 1, ColumnTypeString),
-			NewColumnMetadata(2, "body", 2, ColumnTypeString),
+		table2 := NewTableMeta(2, "posts", 3, 1, []*ColumnMeta{
+			NewColumnMeta(2, "id", 0, ColumnTypeString),
+			NewColumnMeta(2, "title", 1, ColumnTypeString),
+			NewColumnMeta(2, "body", 2, ColumnTypeString),
 		}, []*IndexMeta{}, page.NewPageId(page.FileId(2), 0))
 		err = cat.Insert(bp, table2)
 		assert.NoError(t, err)
