@@ -61,7 +61,7 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer handler.Reset()
 
-		tbl := getPlannerTableAccessMethod(t, "users")
+		tbl := getPlannerTable(t, "users")
 		e := handler.Get()
 		err := tbl.Insert(e.BufferPool, [][]byte{[]byte("1"), []byte("John"), []byte("Smith")})
 		assert.NoError(t, err)
@@ -150,7 +150,7 @@ func TestUpdate_Build(t *testing.T) {
 
 		var trxId handler.TrxId = 1
 		e := handler.Get()
-		tbl := getPlannerTableAccessMethod(t, "users")
+		tbl := getPlannerTable(t, "users")
 
 		// データを挿入
 		err := tbl.Insert(e.BufferPool, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
@@ -251,7 +251,7 @@ func TestUpdate_Build(t *testing.T) {
 		initStorageManager(t, tmpdir)
 		defer handler.Reset()
 
-		tbl := getPlannerTableAccessMethod(t, "users")
+		tbl := getPlannerTable(t, "users")
 		e := handler.Get()
 		err := tbl.Insert(e.BufferPool, [][]byte{[]byte("1"), []byte("John"), []byte("Smith")})
 		assert.NoError(t, err)
@@ -283,7 +283,7 @@ func TestUpdate_Build(t *testing.T) {
 }
 
 //nolint:unparam // テーブル名は将来的に変わりうる
-func getPlannerTableAccessMethod(t *testing.T, tableName string) *access.TableAccessMethod {
+func getPlannerTable(t *testing.T, tableName string) *access.Table {
 	t.Helper()
 	e := handler.Get()
 	tblMeta, ok := e.Catalog.GetTableMetaByName(tableName)

@@ -16,8 +16,8 @@ import (
 func TestUndoIntegration(t *testing.T) {
 	t.Run("複数操作を逆順に Undo すると元の状態に戻る", func(t *testing.T) {
 		// GIVEN: ユニークインデックス付きテーブルにデータを投入
-		uniqueIndex := access.NewUniqueIndexAccessMethod("idx_name", "name", page.PageId{}, 1, 1)
-		table, bp := setupTestTableForUndo(t, []*access.UniqueIndexAccessMethod{uniqueIndex})
+		uniqueIndex := access.NewUniqueIndex("idx_name", "name", page.PageId{}, 1, 1)
+		table, bp := setupTestTableForUndo(t, []*access.UniqueIndex{uniqueIndex})
 
 		// 初期データ: ("a", "Alice"), ("b", "Bob")
 		recordA := [][]byte{[]byte("a"), []byte("Alice")}
@@ -113,7 +113,7 @@ func TestUndoIntegration(t *testing.T) {
 	})
 }
 
-func setupTestTableForUndo(t *testing.T, uniqueIndexes []*access.UniqueIndexAccessMethod) (*access.TableAccessMethod, *buffer.BufferPool) {
+func setupTestTableForUndo(t *testing.T, uniqueIndexes []*access.UniqueIndex) (*access.Table, *buffer.BufferPool) {
 	t.Helper()
 	tmpdir := t.TempDir()
 
@@ -132,14 +132,14 @@ func setupTestTableForUndo(t *testing.T, uniqueIndexes []*access.UniqueIndexAcce
 		ui.MetaPageId = indexMetaPageId
 	}
 
-	table := access.NewTableAccessMethod("test", metaPageId, 1, uniqueIndexes)
+	table := access.NewTable("test", metaPageId, 1, uniqueIndexes)
 	err = table.Create(bp)
 	assert.NoError(t, err)
 
 	return &table, bp
 }
 
-func collectActiveRecords(t *testing.T, table *access.TableAccessMethod, bp *buffer.BufferPool) [][]string {
+func collectActiveRecords(t *testing.T, table *access.Table, bp *buffer.BufferPool) [][]string {
 	t.Helper()
 	iter, err := table.Search(bp, access.RecordSearchModeStart{})
 	assert.NoError(t, err)
@@ -160,7 +160,7 @@ func collectActiveRecords(t *testing.T, table *access.TableAccessMethod, bp *buf
 	return records
 }
 
-func collectActiveUniqueIndexKeys(t *testing.T, ui *access.UniqueIndexAccessMethod, bp *buffer.BufferPool) []string {
+func collectActiveUniqueIndexKeys(t *testing.T, ui *access.UniqueIndex, bp *buffer.BufferPool) []string {
 	t.Helper()
 	indexTree := btree.NewBTree(ui.MetaPageId)
 	indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})

@@ -15,7 +15,7 @@ func TestProject(t *testing.T) {
 		defer handler.Reset()
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTableAccessMethod("users")
+		tbl, err := getTable("users")
 		assert.NoError(t, err)
 
 		// WHEN: first_name (pos=1) と last_name (pos=2) のみ取得
@@ -43,7 +43,7 @@ func TestProject(t *testing.T) {
 		defer handler.Reset()
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTableAccessMethod("users")
+		tbl, err := getTable("users")
 		assert.NoError(t, err)
 
 		// WHEN: first_name (pos=1) のみ取得
@@ -71,7 +71,7 @@ func TestProject(t *testing.T) {
 		defer handler.Reset()
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTableAccessMethod("users")
+		tbl, err := getTable("users")
 		assert.NoError(t, err)
 
 		// WHEN: last_name (pos=2), id (pos=0) の順で取得
@@ -96,7 +96,7 @@ func TestProject(t *testing.T) {
 		defer handler.Reset()
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTableAccessMethod("users")
+		tbl, err := getTable("users")
 		assert.NoError(t, err)
 
 		// WHEN: first_name が "Alice" のレコードから first_name と last_name を取得
@@ -125,7 +125,7 @@ func TestProject(t *testing.T) {
 		defer handler.Reset()
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTableAccessMethod("users")
+		tbl, err := getTable("users")
 		assert.NoError(t, err)
 
 		// WHEN: 存在しない条件でフィルタした結果を射影

@@ -226,7 +226,7 @@ func initStorageManagerForTest(t *testing.T) {
 	handler.Init()
 }
 
-func setupTestTable(t *testing.T) *access.TableAccessMethod {
+func setupTestTable(t *testing.T) *access.Table {
 	t.Helper()
 	createTable := executor.NewCreateTable("test_trx", 1, nil, []handler.ColumnParam{
 		{Name: "id", Type: handler.ColumnTypeString},
@@ -243,7 +243,7 @@ func setupTestTable(t *testing.T) *access.TableAccessMethod {
 	return tbl
 }
 
-func collectAllRecords(t *testing.T, tbl *access.TableAccessMethod) []executor.Record {
+func collectAllRecords(t *testing.T, tbl *access.Table) []executor.Record {
 	t.Helper()
 	scan := executor.NewTableScan(
 		tbl,

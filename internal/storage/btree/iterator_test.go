@@ -247,18 +247,18 @@ func TestAdvance(t *testing.T) {
 func createLeafBufferPage(pageId page.PageId, records []node.Record, nextPageId *page.PageId) buffer.BufferPage {
 	bufpool := buffer.NewBufferPage(pageId)
 
-	leafNode := node.NewLeafNode(bufpool.GetWriteData())
-	leafNode.Initialize()
+	leaf := node.NewLeaf(bufpool.GetWriteData())
+	leaf.Initialize()
 
 	// レコードを挿入
 	for i, record := range records {
-		if !leafNode.Insert(i, record) {
+		if !leaf.Insert(i, record) {
 			panic("failed to insert record")
 		}
 	}
 
 	// nextPageId を設定
-	leafNode.SetNextPageId(nextPageId)
+	leaf.SetNextPageId(nextPageId)
 
 	return *bufpool
 }

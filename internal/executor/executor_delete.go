@@ -8,11 +8,11 @@ import (
 // Delete は InnerExecutor の結果を元にレコードを削除する
 type Delete struct {
 	trxId         handler.TrxId
-	table         *access.TableAccessMethod
+	table         *access.Table
 	innerExecutor Executor
 }
 
-func NewDelete(trxId handler.TrxId, table *access.TableAccessMethod, innerExecutor Executor) *Delete {
+func NewDelete(trxId handler.TrxId, table *access.Table, innerExecutor Executor) *Delete {
 	return &Delete{
 		trxId:         trxId,
 		table:         table,

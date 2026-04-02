@@ -67,22 +67,22 @@ func (tm *TableMeta) GetIndexByColName(colName string) (*IndexMeta, bool) {
 }
 
 // GetTable はテーブル を取得する
-func (tm *TableMeta) GetTable() (*access.TableAccessMethod, error) {
+func (tm *TableMeta) GetTable() (*access.Table, error) {
 	// ユニークインデックスを構築
-	var uniqueIndexes []*access.UniqueIndexAccessMethod
+	var uniqueIndexes []*access.UniqueIndex
 	for _, idxMeta := range tm.Indexes {
 		if idxMeta.Type == IndexTypeUnique {
 			colMeta, ok := tm.GetColByName(idxMeta.ColName)
 			if !ok {
 				return nil, fmt.Errorf("column %s not found in table %s", idxMeta.ColName, tm.Name)
 			}
-			ui := access.NewUniqueIndexAccessMethod(idxMeta.Name, idxMeta.ColName, idxMeta.DataMetaPageId, colMeta.Pos, tm.PKCount)
+			ui := access.NewUniqueIndex(idxMeta.Name, idxMeta.ColName, idxMeta.DataMetaPageId, colMeta.Pos, tm.PKCount)
 			uniqueIndexes = append(uniqueIndexes, ui)
 		}
 	}
 
 	// テーブルを構築
-	tbl := access.NewTableAccessMethod(tm.Name, tm.DataMetaPageId, tm.PKCount, uniqueIndexes)
+	tbl := access.NewTable(tm.Name, tm.DataMetaPageId, tm.PKCount, uniqueIndexes)
 	return &tbl, nil
 }
 

@@ -10,7 +10,7 @@ func TestTableIterator(t *testing.T) {
 	t.Run("先頭から全レコードをデコード済みで取得できる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "iter_test.db")
-		table := NewTableAccessMethod("test", metaPageId, 1, nil)
+		table := NewTable("test", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -51,7 +51,7 @@ func TestTableIterator(t *testing.T) {
 	t.Run("指定キーからレコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "iter_test.db")
-		table := NewTableAccessMethod("test", metaPageId, 1, nil)
+		table := NewTable("test", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -77,7 +77,7 @@ func TestTableIterator(t *testing.T) {
 	t.Run("空のテーブルでは ok が false を返す", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "iter_test.db")
-		table := NewTableAccessMethod("test", metaPageId, 1, nil)
+		table := NewTable("test", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -96,7 +96,7 @@ func TestTableIterator(t *testing.T) {
 	t.Run("DeleteMark が設定されたレコードはスキップされる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "iter_test.db")
-		table := NewTableAccessMethod("test", metaPageId, 1, nil)
+		table := NewTable("test", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -134,7 +134,7 @@ func TestTableIterator(t *testing.T) {
 	t.Run("全レコードがソフトデリートされている場合、ok が false を返す", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "iter_test.db")
-		table := NewTableAccessMethod("test", metaPageId, 1, nil)
+		table := NewTable("test", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -163,7 +163,7 @@ func TestTableIterator(t *testing.T) {
 	t.Run("複合プライマリキーのレコードをデコードできる", func(t *testing.T) {
 		// GIVEN: PrimaryKeyCount = 2
 		bp, metaPageId, _ := InitDisk(t, "iter_test.db")
-		table := NewTableAccessMethod("test", metaPageId, 2, nil)
+		table := NewTable("test", metaPageId, 2, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 

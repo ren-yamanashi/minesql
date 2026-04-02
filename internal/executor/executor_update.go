@@ -14,12 +14,12 @@ type SetColumn struct {
 // Update は InnerExecutor の結果を元にレコードを更新する
 type Update struct {
 	trxId         handler.TrxId
-	table         *access.TableAccessMethod
+	table         *access.Table
 	setColumns    []SetColumn
 	innerExecutor Executor
 }
 
-func NewUpdate(trxId handler.TrxId, table *access.TableAccessMethod, setColumns []SetColumn, innerExecutor Executor) *Update {
+func NewUpdate(trxId handler.TrxId, table *access.Table, setColumns []SetColumn, innerExecutor Executor) *Update {
 	return &Update{
 		trxId:         trxId,
 		table:         table,

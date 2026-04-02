@@ -7,14 +7,14 @@ import (
 
 // TableScan はテーブル全体を走査する
 type TableScan struct {
-	table          *access.TableAccessMethod
+	table          *access.Table
 	searchMode     access.RecordSearchMode
 	whileCondition func(Record) bool
 	iterator       *access.TableIterator
 }
 
 func NewTableScan(
-	table *access.TableAccessMethod,
+	table *access.Table,
 	searchMode access.RecordSearchMode,
 	whileCondition func(Record) bool,
 ) *TableScan {

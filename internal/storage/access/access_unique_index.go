@@ -10,8 +10,8 @@ import (
 	"minesql/internal/storage/page"
 )
 
-// UniqueIndexAccessMethod はユニークインデックスへのアクセスを提供する
-type UniqueIndexAccessMethod struct {
+// UniqueIndex はユニークインデックスへのアクセスを提供する
+type UniqueIndex struct {
 	Name       string      // インデックス名
 	ColName    string      // インデックスを構成するカラム名
 	MetaPageId page.PageId // インデックスの内容が入っている B+Tree のメタページの ID
@@ -19,8 +19,8 @@ type UniqueIndexAccessMethod struct {
 	PkCount    uint8       // PK のカラム数 (key からユニークキーと PK を分離するために必要)
 }
 
-func NewUniqueIndexAccessMethod(name string, colName string, metaPageId page.PageId, ukIdx uint16, pkCount uint8) *UniqueIndexAccessMethod {
-	return &UniqueIndexAccessMethod{
+func NewUniqueIndex(name string, colName string, metaPageId page.PageId, ukIdx uint16, pkCount uint8) *UniqueIndex {
+	return &UniqueIndex{
 		Name:       name,
 		ColName:    colName,
 		MetaPageId: metaPageId,
@@ -30,7 +30,7 @@ func NewUniqueIndexAccessMethod(name string, colName string, metaPageId page.Pag
 }
 
 // Search は指定した検索モードでインデックスを検索し、SecondaryIndexIterator を返す
-func (ui *UniqueIndexAccessMethod) Search(bp *buffer.BufferPool, table *TableAccessMethod, mode RecordSearchMode) (*UniqueIndexIterator, error) {
+func (ui *UniqueIndex) Search(bp *buffer.BufferPool, table *Table, mode RecordSearchMode) (*UniqueIndexIterator, error) {
 	indexBTree := btree.NewBTree(ui.MetaPageId)
 	indexIter, err := indexBTree.Search(bp, mode.encode())
 	if err != nil {
@@ -41,7 +41,7 @@ func (ui *UniqueIndexAccessMethod) Search(bp *buffer.BufferPool, table *TableAcc
 }
 
 // Create は空のユニークインデックスを新規作成する
-func (ui *UniqueIndexAccessMethod) Create(bp *buffer.BufferPool) error {
+func (ui *UniqueIndex) Create(bp *buffer.BufferPool) error {
 	btr, err := btree.CreateBTree(bp, ui.MetaPageId)
 	if err != nil {
 		return err
@@ -55,7 +55,7 @@ func (ui *UniqueIndexAccessMethod) Create(bp *buffer.BufferPool) error {
 // Key = concat(encodedSecondaryKey, encodedPK), NonKey = nil, Header = []byte{0}
 //
 // ソフトデリート済みの同一キーが存在する場合は Update で上書きする
-func (ui *UniqueIndexAccessMethod) Insert(bp *buffer.BufferPool, encodedPK []byte, columns [][]byte) error {
+func (ui *UniqueIndex) Insert(bp *buffer.BufferPool, encodedPK []byte, columns [][]byte) error {
 	btr := btree.NewBTree(ui.MetaPageId)
 
 	// ユニークキーをエンコード
@@ -100,7 +100,7 @@ func (ui *UniqueIndexAccessMethod) Insert(bp *buffer.BufferPool, encodedPK []byt
 // Delete はユニークインデックスから行を物理削除する
 //   - encodedPK: エンコード済みプライマリキー
 //   - columns: 行の全カラム値
-func (ui *UniqueIndexAccessMethod) Delete(bp *buffer.BufferPool, encodedPK []byte, columns [][]byte) error {
+func (ui *UniqueIndex) Delete(bp *buffer.BufferPool, encodedPK []byte, columns [][]byte) error {
 	btr := btree.NewBTree(ui.MetaPageId)
 	fullKey := ui.getFullKey(encodedPK, columns)
 	return btr.Delete(bp, fullKey)
@@ -109,25 +109,25 @@ func (ui *UniqueIndexAccessMethod) Delete(bp *buffer.BufferPool, encodedPK []byt
 // SoftDelete はユニークインデックスから行をソフトデリートする
 //   - encodedPK: エンコード済みプライマリキー
 //   - columns: 行の全カラム値
-func (ui *UniqueIndexAccessMethod) SoftDelete(bp *buffer.BufferPool, encodedPK []byte, columns [][]byte) error {
+func (ui *UniqueIndex) SoftDelete(bp *buffer.BufferPool, encodedPK []byte, columns [][]byte) error {
 	btr := btree.NewBTree(ui.MetaPageId)
 	fullKey := ui.getFullKey(encodedPK, columns)
 	return btr.Update(bp, node.NewRecord([]byte{1}, fullKey, nil))
 }
 
 // LeafPageCount は B+Tree のメタページからリーフページ数を取得する
-func (ui *UniqueIndexAccessMethod) LeafPageCount(bp *buffer.BufferPool) (uint64, error) {
+func (ui *UniqueIndex) LeafPageCount(bp *buffer.BufferPool) (uint64, error) {
 	btr := btree.NewBTree(ui.MetaPageId)
 	return btr.LeafPageCount(bp)
 }
 
 // Height は B+Tree のメタページからツリーの高さを取得する
-func (ui *UniqueIndexAccessMethod) Height(bp *buffer.BufferPool) (uint64, error) {
+func (ui *UniqueIndex) Height(bp *buffer.BufferPool) (uint64, error) {
 	btr := btree.NewBTree(ui.MetaPageId)
 	return btr.Height(bp)
 }
 
-func (ui *UniqueIndexAccessMethod) getFullKey(encodedPK []byte, columns [][]byte) []byte {
+func (ui *UniqueIndex) getFullKey(encodedPK []byte, columns [][]byte) []byte {
 	// ユニークキーをエンコード
 	var encodedUk []byte
 	encode.Encode([][]byte{columns[ui.UkIdx]}, &encodedUk)
@@ -143,7 +143,7 @@ func (ui *UniqueIndexAccessMethod) getFullKey(encodedPK []byte, columns [][]byte
 // checkUniqueConstraint は encodedUk に対して active なレコードが存在するか確認する
 //
 // 存在する場合は ErrDuplicateKey を返す
-func (ui *UniqueIndexAccessMethod) checkUniqueConstraint(bp *buffer.BufferPool, btr *btree.BTree, encodedUk []byte) error {
+func (ui *UniqueIndex) checkUniqueConstraint(bp *buffer.BufferPool, btr *btree.BTree, encodedUk []byte) error {
 	iter, err := btr.Search(bp, btree.SearchModeKey{Key: encodedUk})
 	if err != nil {
 		return err

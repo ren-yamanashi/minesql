@@ -26,16 +26,16 @@ func (h *Handler) UndoLog() *transaction.UndoLog {
 }
 
 // AppendInsertUndo は Insert 操作の Undo レコードを記録する
-func (h *Handler) AppendInsertUndo(trxId TrxId, table *access.TableAccessMethod, record [][]byte) {
+func (h *Handler) AppendInsertUndo(trxId TrxId, table *access.Table, record [][]byte) {
 	h.undoLog.Append(trxId, transaction.NewUndoInsertRecord(table, record))
 }
 
 // AppendDeleteUndo は Delete 操作の Undo レコードを記録する
-func (h *Handler) AppendDeleteUndo(trxId TrxId, table *access.TableAccessMethod, record [][]byte) {
+func (h *Handler) AppendDeleteUndo(trxId TrxId, table *access.Table, record [][]byte) {
 	h.undoLog.Append(trxId, transaction.NewUndoDeleteRecord(table, record))
 }
 
 // AppendUpdateInplaceUndo は UpdateInplace 操作の Undo レコードを記録する
-func (h *Handler) AppendUpdateInplaceUndo(trxId TrxId, table *access.TableAccessMethod, prevRecord, newRecord [][]byte) {
+func (h *Handler) AppendUpdateInplaceUndo(trxId TrxId, table *access.Table, prevRecord, newRecord [][]byte) {
 	h.undoLog.Append(trxId, transaction.NewUndoUpdateInplaceRecord(table, prevRecord, newRecord))
 }

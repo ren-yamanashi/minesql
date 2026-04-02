@@ -40,7 +40,7 @@ func TestUpdate_Next(t *testing.T) {
 		var trxId handler.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTableAccessMethod("users")
+		tbl, err := getTable("users")
 		assert.NoError(t, err)
 
 		upd := NewUpdate(trxId, tbl, []SetColumn{
@@ -80,7 +80,7 @@ func TestUpdate_Next(t *testing.T) {
 		var trxId handler.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTableAccessMethod("users")
+		tbl, err := getTable("users")
 		assert.NoError(t, err)
 
 		// プライマリキーが "a" のレコードのみ更新
@@ -123,7 +123,7 @@ func TestUpdate_Next(t *testing.T) {
 		var trxId handler.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTableAccessMethod("users")
+		tbl, err := getTable("users")
 		assert.NoError(t, err)
 
 		// first_name が "Bob" のレコードの last_name を更新
@@ -173,7 +173,7 @@ func TestUpdate_Next(t *testing.T) {
 		var trxId handler.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTableAccessMethod("users")
+		tbl, err := getTable("users")
 		assert.NoError(t, err)
 
 		// インデックスアクセスメソッドを取得
@@ -235,7 +235,7 @@ func TestUpdate_Next(t *testing.T) {
 		var trxId handler.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTableAccessMethod("users")
+		tbl, err := getTable("users")
 		assert.NoError(t, err)
 
 		// プライマリキーを "a" → "z" に変更
@@ -281,7 +281,7 @@ func TestUpdate_Next(t *testing.T) {
 		var trxId handler.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTableAccessMethod("users")
+		tbl, err := getTable("users")
 		assert.NoError(t, err)
 
 		// 存在しない first_name でフィルタ
@@ -334,7 +334,7 @@ func TestUpdate_Next(t *testing.T) {
 		})
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTableAccessMethod("empty_table")
+		tbl, err := getTable("empty_table")
 		assert.NoError(t, err)
 
 		upd := NewUpdate(trxId, tbl, []SetColumn{

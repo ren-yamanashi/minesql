@@ -35,7 +35,7 @@ func TestDelete(t *testing.T) {
 		defer handler.Reset()
 
 		var trxId handler.TrxId = 1
-		tbl, err := getTableAccessMethod("users")
+		tbl, err := getTable("users")
 		assert.NoError(t, err)
 
 		del := NewDelete(trxId, tbl, NewTableScan(
@@ -71,7 +71,7 @@ func TestDelete(t *testing.T) {
 		var trxId handler.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTableAccessMethod("users")
+		tbl, err := getTable("users")
 		assert.NoError(t, err)
 
 		// プライマリキーが "c" 未満のレコードを削除対象とする
@@ -113,7 +113,7 @@ func TestDelete(t *testing.T) {
 		defer handler.Reset()
 
 		var trxId handler.TrxId = 1
-		tbl, err := getTableAccessMethod("users")
+		tbl, err := getTable("users")
 		assert.NoError(t, err)
 
 		// first_name が "Bob" のレコードを削除
@@ -156,7 +156,7 @@ func TestDelete(t *testing.T) {
 		defer handler.Reset()
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTableAccessMethod("users")
+		tbl, err := getTable("users")
 		assert.NoError(t, err)
 
 		// インデックスアクセスメソッドを取得
@@ -210,7 +210,7 @@ func TestDelete(t *testing.T) {
 			{Name: "value", Type: handler.ColumnTypeString},
 		})
 
-		tbl, err := getTableAccessMethod("empty_table")
+		tbl, err := getTable("empty_table")
 		assert.NoError(t, err)
 		del := NewDelete(trxId, tbl, NewTableScan(
 			tbl,

@@ -25,10 +25,10 @@ func newIterator(bufferPage buffer.BufferPage, slotNum int) *Iterator {
 
 // Get は現在参照しているリーフノード (=バッファページ) のレコードを取得
 func (iter *Iterator) Get() (node.Record, bool) {
-	leafNode := node.NewLeafNode(iter.bufferPage.GetReadData())
+	leaf := node.NewLeaf(iter.bufferPage.GetReadData())
 
-	if iter.slotNum < leafNode.NumRecords() {
-		record := leafNode.RecordAt(iter.slotNum)
+	if iter.slotNum < leaf.NumRecords() {
+		record := leaf.RecordAt(iter.slotNum)
 		header := make([]byte, len(record.HeaderBytes()))
 		copy(header, record.HeaderBytes())
 		key := make([]byte, len(record.KeyBytes()))
@@ -58,14 +58,14 @@ func (iter *Iterator) Next(bp *buffer.BufferPool) (node.Record, bool, error) {
 func (iter *Iterator) Advance(bp *buffer.BufferPool) error {
 	iter.slotNum++
 
-	leafNode := node.NewLeafNode(iter.bufferPage.GetReadData())
+	leaf := node.NewLeaf(iter.bufferPage.GetReadData())
 
 	// 現在のページ内に、まだ次のレコードがある場合は、次のページに移動しない (スロット番号を進めるだけ)
-	if iter.slotNum < leafNode.NumRecords() {
+	if iter.slotNum < leaf.NumRecords() {
 		return nil
 	}
 
-	nextPageId := leafNode.NextPageId()
+	nextPageId := leaf.NextPageId()
 
 	// 現在のページ内に、次のレコードがないが、次のページも存在しない場合は、次のページに移動しない
 	if nextPageId == nil {

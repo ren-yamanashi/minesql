@@ -182,7 +182,7 @@ func updateColumnStats(
 }
 
 // analyzeIndex はテーブルのユニークインデックスの統計情報を収集する
-func (sc *StatsCollector) analyzeIndex(tbl *access.TableAccessMethod) (map[string]IndexStats, error) {
+func (sc *StatsCollector) analyzeIndex(tbl *access.Table) (map[string]IndexStats, error) {
 	idxStats := make(map[string]IndexStats)
 	for _, uIdx := range tbl.UniqueIndexes {
 		height, err := uIdx.Height(sc.bufferPool)

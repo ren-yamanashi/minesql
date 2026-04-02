@@ -6,11 +6,11 @@ import (
 )
 
 type UndoInsertRecord struct {
-	table  *access.TableAccessMethod
+	table  *access.Table
 	Record [][]byte
 }
 
-func NewUndoInsertRecord(table *access.TableAccessMethod, record [][]byte) UndoInsertRecord {
+func NewUndoInsertRecord(table *access.Table, record [][]byte) UndoInsertRecord {
 	return UndoInsertRecord{
 		table:  table,
 		Record: record,

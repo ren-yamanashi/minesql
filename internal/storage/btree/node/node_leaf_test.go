@@ -10,13 +10,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewLeafNode(t *testing.T) {
+func TestNewLeaf(t *testing.T) {
 	t.Run("ノードタイプが LEAF に設定される", func(t *testing.T) {
 		// GIVEN
 		data := directio.AlignedBlock(directio.BlockSize)
 
 		// WHEN
-		ln := NewLeafNode(data)
+		ln := NewLeaf(data)
 
 		// THEN
 		assert.NotNil(t, ln)
@@ -24,11 +24,11 @@ func TestNewLeafNode(t *testing.T) {
 	})
 }
 
-func TestLeafNodeInitialize(t *testing.T) {
+func TestLeafInitialize(t *testing.T) {
 	t.Run("初期化後にレコード数が 0、前後ページ ID が nil になる", func(t *testing.T) {
 		// GIVEN
 		data := directio.AlignedBlock(directio.BlockSize)
-		ln := NewLeafNode(data)
+		ln := NewLeaf(data)
 
 		// WHEN
 		ln.Initialize()
@@ -40,10 +40,10 @@ func TestLeafNodeInitialize(t *testing.T) {
 	})
 }
 
-func TestLeafNodeInsert(t *testing.T) {
+func TestLeafInsert(t *testing.T) {
 	t.Run("レコードが正しく挿入できる", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 
 		// WHEN
 		ok := ln.Insert(0, NewRecord(nil, []byte("key1"), []byte("val1")))
@@ -57,7 +57,7 @@ func TestLeafNodeInsert(t *testing.T) {
 
 	t.Run("中間位置へのレコード挿入でスロットが正しくシフトされる", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Record{
+		ln := createTestLeaf([]Record{
 			NewRecord(nil, []byte("aaa"), []byte("v1")),
 			NewRecord(nil, []byte("ccc"), []byte("v3")),
 			NewRecord(nil, []byte("ddd"), []byte("v4")),
@@ -77,7 +77,7 @@ func TestLeafNodeInsert(t *testing.T) {
 
 	t.Run("最大レコードサイズを超える場合、挿入に失敗する", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 		hugeValue := make([]byte, 4000)
 
 		// WHEN
@@ -90,7 +90,7 @@ func TestLeafNodeInsert(t *testing.T) {
 
 	t.Run("ページが満杯の場合、挿入に失敗し既存データが壊れない", func(t *testing.T) {
 		// GIVEN: ノードをほぼ満杯にする
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 		value := make([]byte, 200)
 		inserted := 0
 		for {
@@ -114,10 +114,10 @@ func TestLeafNodeInsert(t *testing.T) {
 	})
 }
 
-func TestLeafNodeSplitInsert(t *testing.T) {
+func TestLeafSplitInsert(t *testing.T) {
 	t.Run("昇順挿入で分割され、キー順序と minKey が正しい", func(t *testing.T) {
 		// GIVEN: リーフノードを昇順キーで満杯にする
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 		value := make([]byte, 200)
 		numInserted := 0
 		for {
@@ -128,7 +128,7 @@ func TestLeafNodeSplitInsert(t *testing.T) {
 			numInserted++
 		}
 		overflowKey := fmt.Appendf(nil, "k%02d", numInserted)
-		newLn := createTestLeafNode(nil)
+		newLn := createTestLeaf(nil)
 
 		// WHEN
 		minKey, err := ln.SplitInsert(newLn, NewRecord(nil, overflowKey, value))
@@ -157,7 +157,7 @@ func TestLeafNodeSplitInsert(t *testing.T) {
 
 	t.Run("既存の最小キーより小さいキーで分割できる", func(t *testing.T) {
 		// GIVEN: リーフノードを "b" 始まりのキーで満杯にする
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 		value := make([]byte, 200)
 		numInserted := 0
 		for {
@@ -169,7 +169,7 @@ func TestLeafNodeSplitInsert(t *testing.T) {
 		}
 		// 既存の最小キーより小さいキーで SplitInsert
 		smallKey := []byte("a00")
-		newLn := createTestLeafNode(nil)
+		newLn := createTestLeaf(nil)
 
 		// WHEN
 		minKey, err := ln.SplitInsert(newLn, NewRecord(nil, smallKey, value))
@@ -196,7 +196,7 @@ func TestLeafNodeSplitInsert(t *testing.T) {
 
 	t.Run("中間キーで分割される場合、キー順序が正しい", func(t *testing.T) {
 		// GIVEN: リーフノードを偶数キーで満杯にする
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 		value := make([]byte, 200)
 		numInserted := 0
 		for {
@@ -208,7 +208,7 @@ func TestLeafNodeSplitInsert(t *testing.T) {
 		}
 		// 中間付近に位置する奇数キーを挿入
 		middleKey := fmt.Appendf(nil, "a%04d", numInserted)
-		newLn := createTestLeafNode(nil)
+		newLn := createTestLeaf(nil)
 
 		// WHEN
 		minKey, err := ln.SplitInsert(newLn, NewRecord(nil, middleKey, value))
@@ -231,10 +231,10 @@ func TestLeafNodeSplitInsert(t *testing.T) {
 	})
 }
 
-func TestLeafNodeDelete(t *testing.T) {
+func TestLeafDelete(t *testing.T) {
 	t.Run("中間レコードの削除が正しく動作する", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Record{
+		ln := createTestLeaf([]Record{
 			NewRecord(nil, []byte("key1"), []byte("val1")),
 			NewRecord(nil, []byte("key2"), []byte("val2")),
 			NewRecord(nil, []byte("key3"), []byte("val3")),
@@ -251,7 +251,7 @@ func TestLeafNodeDelete(t *testing.T) {
 
 	t.Run("先頭レコードの削除が正しく動作する", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Record{
+		ln := createTestLeaf([]Record{
 			NewRecord(nil, []byte("key1"), []byte("val1")),
 			NewRecord(nil, []byte("key2"), []byte("val2")),
 			NewRecord(nil, []byte("key3"), []byte("val3")),
@@ -268,7 +268,7 @@ func TestLeafNodeDelete(t *testing.T) {
 
 	t.Run("末尾レコードの削除が正しく動作する", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Record{
+		ln := createTestLeaf([]Record{
 			NewRecord(nil, []byte("key1"), []byte("val1")),
 			NewRecord(nil, []byte("key2"), []byte("val2")),
 			NewRecord(nil, []byte("key3"), []byte("val3")),
@@ -285,7 +285,7 @@ func TestLeafNodeDelete(t *testing.T) {
 
 	t.Run("唯一のレコードを削除するとレコード数が 0 になる", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Record{
+		ln := createTestLeaf([]Record{
 			NewRecord(nil, []byte("key1"), []byte("val1")),
 		})
 
@@ -297,10 +297,10 @@ func TestLeafNodeDelete(t *testing.T) {
 	})
 }
 
-func TestLeafNodeUpdate(t *testing.T) {
+func TestLeafUpdate(t *testing.T) {
 	t.Run("非キーフィールドを更新できる", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Record{
+		ln := createTestLeaf([]Record{
 			NewRecord(nil, []byte("key1"), []byte("val1")),
 			NewRecord(nil, []byte("key2"), []byte("val2")),
 			NewRecord(nil, []byte("key3"), []byte("val3")),
@@ -318,7 +318,7 @@ func TestLeafNodeUpdate(t *testing.T) {
 
 	t.Run("非キーフィールドを短い値に更新できる", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Record{
+		ln := createTestLeaf([]Record{
 			NewRecord(nil, []byte("key1"), []byte("long_value_here")),
 		})
 
@@ -333,7 +333,7 @@ func TestLeafNodeUpdate(t *testing.T) {
 
 	t.Run("非キーフィールドを長い値に更新できる", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Record{
+		ln := createTestLeaf([]Record{
 			NewRecord(nil, []byte("key1"), []byte("short")),
 		})
 
@@ -348,7 +348,7 @@ func TestLeafNodeUpdate(t *testing.T) {
 
 	t.Run("更新後も他のレコードが壊れない", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Record{
+		ln := createTestLeaf([]Record{
 			NewRecord(nil, []byte("key1"), []byte("val1")),
 			NewRecord(nil, []byte("key2"), []byte("val2")),
 			NewRecord(nil, []byte("key3"), []byte("val3")),
@@ -367,7 +367,7 @@ func TestLeafNodeUpdate(t *testing.T) {
 
 	t.Run("空き容量が不足している場合、false を返す", func(t *testing.T) {
 		// GIVEN: ノードをほぼ満杯にする
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 		value := make([]byte, 200)
 		inserted := 0
 		for {
@@ -389,10 +389,10 @@ func TestLeafNodeUpdate(t *testing.T) {
 	})
 }
 
-func TestLeafNodeCanTransferRecord(t *testing.T) {
+func TestLeafCanTransferRecord(t *testing.T) {
 	t.Run("レコードが 0 の場合、false を返す", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 
 		// WHEN
 		result := ln.CanTransferRecord(false)
@@ -403,7 +403,7 @@ func TestLeafNodeCanTransferRecord(t *testing.T) {
 
 	t.Run("レコードが 1 つしかない場合、false を返す", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 		bigValue := make([]byte, 1000)
 		ln.Insert(0, NewRecord(nil, []byte("key1"), bigValue))
 
@@ -416,7 +416,7 @@ func TestLeafNodeCanTransferRecord(t *testing.T) {
 
 	t.Run("左の兄弟に転送 (先頭レコードを転送) 後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 		bigValue := make([]byte, 500)
 		ln.Insert(0, NewRecord(nil, []byte("key1"), bigValue))
 		ln.Insert(1, NewRecord(nil, []byte("key2"), bigValue))
@@ -434,7 +434,7 @@ func TestLeafNodeCanTransferRecord(t *testing.T) {
 
 	t.Run("右の兄弟に転送 (末尾レコードを転送) 後も半分以上埋まっている場合、true を返す", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 		bigValue := make([]byte, 500)
 		ln.Insert(0, NewRecord(nil, []byte("key1"), bigValue))
 		ln.Insert(1, NewRecord(nil, []byte("key2"), bigValue))
@@ -452,7 +452,7 @@ func TestLeafNodeCanTransferRecord(t *testing.T) {
 
 	t.Run("転送後に半分を下回る場合、false を返す", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 		bigValue := make([]byte, 500)
 		ln.Insert(0, NewRecord(nil, []byte("key1"), bigValue))
 		ln.Insert(1, NewRecord(nil, []byte("key2"), bigValue))
@@ -465,24 +465,24 @@ func TestLeafNodeCanTransferRecord(t *testing.T) {
 	})
 }
 
-func TestLeafNodeBody(t *testing.T) {
+func TestLeafBody(t *testing.T) {
 	t.Run("ノードタイプヘッダーを除いたボディ部分が取得できる", func(t *testing.T) {
 		// GIVEN
 		data := directio.AlignedBlock(directio.BlockSize)
-		ln := NewLeafNode(data)
+		ln := NewLeaf(data)
 
 		// WHEN
 		body := ln.Body()
 
 		// THEN: data[8:] と同じスライスが返る
-		assert.Equal(t, len(data)-nodeHeaderSize, len(body))
+		assert.Equal(t, len(data)-headerSize, len(body))
 	})
 }
 
-func TestLeafNodeNumRecords(t *testing.T) {
+func TestLeafNumRecords(t *testing.T) {
 	t.Run("初期化直後はレコード数が 0", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 
 		// WHEN
 		numRecords := ln.NumRecords()
@@ -493,7 +493,7 @@ func TestLeafNodeNumRecords(t *testing.T) {
 
 	t.Run("挿入後のレコード数が正しく取得できる", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Record{
+		ln := createTestLeaf([]Record{
 			NewRecord(nil, []byte("key1"), []byte("val1")),
 			NewRecord(nil, []byte("key2"), []byte("val2")),
 		})
@@ -506,10 +506,10 @@ func TestLeafNodeNumRecords(t *testing.T) {
 	})
 }
 
-func TestLeafNodeRecordAt(t *testing.T) {
+func TestLeafRecordAt(t *testing.T) {
 	t.Run("指定したスロット番号のレコードが取得できる", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Record{
+		ln := createTestLeaf([]Record{
 			NewRecord(nil, []byte("key1"), []byte("val1")),
 			NewRecord(nil, []byte("key2"), []byte("val2")),
 		})
@@ -523,10 +523,10 @@ func TestLeafNodeRecordAt(t *testing.T) {
 	})
 }
 
-func TestLeafNodeSearchSlotNum(t *testing.T) {
+func TestLeafSearchSlotNum(t *testing.T) {
 	t.Run("存在するキーの場合、スロット番号と true を返す", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Record{
+		ln := createTestLeaf([]Record{
 			NewRecord(nil, []byte("aaa"), []byte("v1")),
 			NewRecord(nil, []byte("bbb"), []byte("v2")),
 			NewRecord(nil, []byte("ccc"), []byte("v3")),
@@ -542,7 +542,7 @@ func TestLeafNodeSearchSlotNum(t *testing.T) {
 
 	t.Run("存在しないキーの場合、挿入位置と false を返す", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Record{
+		ln := createTestLeaf([]Record{
 			NewRecord(nil, []byte("aaa"), []byte("v1")),
 			NewRecord(nil, []byte("ccc"), []byte("v2")),
 		})
@@ -557,7 +557,7 @@ func TestLeafNodeSearchSlotNum(t *testing.T) {
 
 	t.Run("空のノードで検索した場合、(0, false) を返す", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 
 		// WHEN
 		slotNum, found := ln.SearchSlotNum([]byte("aaa"))
@@ -569,7 +569,7 @@ func TestLeafNodeSearchSlotNum(t *testing.T) {
 
 	t.Run("先頭より小さいキーの場合、挿入位置 0 と false を返す", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Record{
+		ln := createTestLeaf([]Record{
 			NewRecord(nil, []byte("bbb"), []byte("v1")),
 			NewRecord(nil, []byte("ccc"), []byte("v2")),
 			NewRecord(nil, []byte("ddd"), []byte("v3")),
@@ -585,7 +585,7 @@ func TestLeafNodeSearchSlotNum(t *testing.T) {
 
 	t.Run("末尾より大きいキーの場合、末尾の挿入位置と false を返す", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode([]Record{
+		ln := createTestLeaf([]Record{
 			NewRecord(nil, []byte("aaa"), []byte("v1")),
 			NewRecord(nil, []byte("bbb"), []byte("v2")),
 			NewRecord(nil, []byte("ccc"), []byte("v3")),
@@ -600,10 +600,10 @@ func TestLeafNodeSearchSlotNum(t *testing.T) {
 	})
 }
 
-func TestLeafNodePrevPageId(t *testing.T) {
+func TestLeafPrevPageId(t *testing.T) {
 	t.Run("初期化直後は nil を返す", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 
 		// WHEN
 		prevPageId := ln.PrevPageId()
@@ -614,7 +614,7 @@ func TestLeafNodePrevPageId(t *testing.T) {
 
 	t.Run("設定されたページ ID が取得できる", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 		pid := page.NewPageId(0, 42)
 		ln.SetPrevPageId(&pid)
 
@@ -627,10 +627,10 @@ func TestLeafNodePrevPageId(t *testing.T) {
 	})
 }
 
-func TestLeafNodeNextPageId(t *testing.T) {
+func TestLeafNextPageId(t *testing.T) {
 	t.Run("初期化直後は nil を返す", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 
 		// WHEN
 		nextPageId := ln.NextPageId()
@@ -641,7 +641,7 @@ func TestLeafNodeNextPageId(t *testing.T) {
 
 	t.Run("設定されたページ ID が取得できる", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 		pid := page.NewPageId(0, 99)
 		ln.SetNextPageId(&pid)
 
@@ -654,10 +654,10 @@ func TestLeafNodeNextPageId(t *testing.T) {
 	})
 }
 
-func TestLeafNodePageIdIndependence(t *testing.T) {
+func TestLeafPageIdIndependence(t *testing.T) {
 	t.Run("SetPrevPageId は NextPageId に影響を与えない", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 		nextPid := page.NewPageId(0, 99)
 		ln.SetNextPageId(&nextPid)
 
@@ -672,7 +672,7 @@ func TestLeafNodePageIdIndependence(t *testing.T) {
 
 	t.Run("SetNextPageId は PrevPageId に影響を与えない", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 		prevPid := page.NewPageId(0, 42)
 		ln.SetPrevPageId(&prevPid)
 
@@ -686,10 +686,10 @@ func TestLeafNodePageIdIndependence(t *testing.T) {
 	})
 }
 
-func TestLeafNodeSetPrevPageId(t *testing.T) {
+func TestLeafSetPrevPageId(t *testing.T) {
 	t.Run("nil を設定すると PrevPageId が nil に戻る", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 		pid := page.NewPageId(0, 10)
 		ln.SetPrevPageId(&pid)
 
@@ -701,10 +701,10 @@ func TestLeafNodeSetPrevPageId(t *testing.T) {
 	})
 }
 
-func TestLeafNodeSetNextPageId(t *testing.T) {
+func TestLeafSetNextPageId(t *testing.T) {
 	t.Run("nil を設定すると NextPageId が nil に戻る", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 		pid := page.NewPageId(0, 10)
 		ln.SetNextPageId(&pid)
 
@@ -716,14 +716,14 @@ func TestLeafNodeSetNextPageId(t *testing.T) {
 	})
 }
 
-func TestLeafNodeTransferAllFrom(t *testing.T) {
+func TestLeafTransferAllFrom(t *testing.T) {
 	t.Run("すべてのレコードが転送元から自分に移動する", func(t *testing.T) {
 		// GIVEN
-		src := createTestLeafNode([]Record{
+		src := createTestLeaf([]Record{
 			NewRecord(nil, []byte("key1"), []byte("val1")),
 			NewRecord(nil, []byte("key2"), []byte("val2")),
 		})
-		dest := createTestLeafNode([]Record{
+		dest := createTestLeaf([]Record{
 			NewRecord(nil, []byte("key0"), []byte("val0")),
 		})
 
@@ -741,8 +741,8 @@ func TestLeafNodeTransferAllFrom(t *testing.T) {
 
 	t.Run("転送元が空の場合、転送先のデータが変わらない", func(t *testing.T) {
 		// GIVEN
-		src := createTestLeafNode(nil)
-		dest := createTestLeafNode([]Record{
+		src := createTestLeaf(nil)
+		dest := createTestLeaf([]Record{
 			NewRecord(nil, []byte("key1"), []byte("val1")),
 		})
 
@@ -758,8 +758,8 @@ func TestLeafNodeTransferAllFrom(t *testing.T) {
 
 	t.Run("転送先の空き容量が不足している場合、false を返す", func(t *testing.T) {
 		// GIVEN: 転送元と転送先をそれぞれほぼ満杯にする
-		src := createTestLeafNode(nil)
-		dest := createTestLeafNode(nil)
+		src := createTestLeaf(nil)
+		dest := createTestLeaf(nil)
 		bigValue := make([]byte, 500)
 		for i := 0; ; i++ {
 			key := fmt.Appendf(nil, "s%02d", i)
@@ -784,10 +784,10 @@ func TestLeafNodeTransferAllFrom(t *testing.T) {
 	})
 }
 
-func TestLeafNodeIsHalfFull(t *testing.T) {
+func TestLeafIsHalfFull(t *testing.T) {
 	t.Run("レコードが十分にある場合、true を返す", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 		bigValue := make([]byte, 1500)
 		ln.Insert(0, NewRecord(nil, []byte("key1"), bigValue))
 		ln.Insert(1, NewRecord(nil, []byte("key2"), bigValue))
@@ -801,7 +801,7 @@ func TestLeafNodeIsHalfFull(t *testing.T) {
 
 	t.Run("レコードが少ない場合、false を返す", func(t *testing.T) {
 		// GIVEN
-		ln := createTestLeafNode(nil)
+		ln := createTestLeaf(nil)
 		ln.Insert(0, NewRecord(nil, []byte("k"), []byte("v")))
 
 		// WHEN
@@ -813,9 +813,9 @@ func TestLeafNodeIsHalfFull(t *testing.T) {
 }
 
 // テスト用のリーフノードを作成する
-func createTestLeafNode(records []Record) *LeafNode {
+func createTestLeaf(records []Record) *Leaf {
 	data := directio.AlignedBlock(directio.BlockSize)
-	ln := NewLeafNode(data)
+	ln := NewLeaf(data)
 	ln.Initialize()
 	for i, record := range records {
 		if !ln.Insert(i, record) {
@@ -826,7 +826,7 @@ func createTestLeafNode(records []Record) *LeafNode {
 }
 
 // リーフノード内のキーが昇順であることを検証するヘルパー
-func assertKeysSorted(t *testing.T, ln *LeafNode) {
+func assertKeysSorted(t *testing.T, ln *Leaf) {
 	t.Helper()
 	for i := 1; i < ln.NumRecords(); i++ {
 		prev := ln.RecordAt(i - 1).KeyBytes()

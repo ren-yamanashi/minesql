@@ -7,16 +7,16 @@ import (
 
 // IndexScan はセカンダリインデックスを利用して検索する
 type IndexScan struct {
-	table          *access.TableAccessMethod
-	index          *access.UniqueIndexAccessMethod
+	table          *access.Table
+	index          *access.UniqueIndex
 	searchMode     access.RecordSearchMode
 	whileCondition func(Record) bool
 	iterator       *access.UniqueIndexIterator
 }
 
 func NewIndexScan(
-	table *access.TableAccessMethod,
-	index *access.UniqueIndexAccessMethod,
+	table *access.Table,
+	index *access.UniqueIndex,
 	searchMode access.RecordSearchMode,
 	whileCondition func(record Record) bool,
 ) *IndexScan {

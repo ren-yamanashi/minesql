@@ -417,7 +417,7 @@ func TestGetOrAnalyze(t *testing.T) {
 type testEnv struct {
 	bp      *buffer.BufferPool
 	catalog *Catalog
-	tables  map[string]*access.TableAccessMethod
+	tables  map[string]*access.Table
 }
 
 // setupTestEnv はテスト用に BufferPool とカタログを初期化する
@@ -439,7 +439,7 @@ func setupTestEnv(t *testing.T) *testEnv {
 	return &testEnv{
 		bp:      bp,
 		catalog: cat,
-		tables:  make(map[string]*access.TableAccessMethod),
+		tables:  make(map[string]*access.Table),
 	}
 }
 
@@ -475,18 +475,18 @@ func createTable(t *testing.T, env *testEnv, tableName string, pkCount uint8, in
 	assert.NoError(t, err)
 
 	// 各 UniqueIndex の metaPageId を設定
-	uniqueIndexes := make([]*access.UniqueIndexAccessMethod, len(indexes))
+	uniqueIndexes := make([]*access.UniqueIndex, len(indexes))
 	for i, idx := range indexes {
 		indexMetaPageId, err := env.bp.AllocatePageId(fileId)
 		assert.NoError(t, err)
-		uniqueIndex := access.NewUniqueIndexAccessMethod(idx.name, idx.colName, indexMetaPageId, idx.secondaryKey, pkCount)
+		uniqueIndex := access.NewUniqueIndex(idx.name, idx.colName, indexMetaPageId, idx.secondaryKey, pkCount)
 		err = uniqueIndex.Create(env.bp)
 		assert.NoError(t, err)
 		uniqueIndexes[i] = uniqueIndex
 	}
 
 	// テーブルを作成
-	tbl := access.NewTableAccessMethod(tableName, metaPageId, pkCount, uniqueIndexes)
+	tbl := access.NewTable(tableName, metaPageId, pkCount, uniqueIndexes)
 	err = tbl.Create(env.bp)
 	assert.NoError(t, err)
 

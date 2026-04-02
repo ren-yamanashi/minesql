@@ -62,7 +62,7 @@ type leafCondition struct {
 //   - 単一条件 (col op literal): chooseBestPlan でテーブルスキャン / PK / インデックスを比較
 //   - 純粋な AND 条件: extractANDLeaves でリーフを抽出 → chooseBestPlan
 //   - OR を含む条件: planForORCondition で Union 最適化を試みる
-func (s *Search) planForBinaryExpr(tbl *access.TableAccessMethod, expr ast.BinaryExpr) (executor.Executor, error) {
+func (s *Search) planForBinaryExpr(tbl *access.Table, expr ast.BinaryExpr) (executor.Executor, error) {
 	switch lhs := expr.Left.(type) {
 
 	// 単一条件: LhsColumn op RhsLiteral (例: WHERE col = 5)
@@ -115,7 +115,7 @@ func (s *Search) planForBinaryExpr(tbl *access.TableAccessMethod, expr ast.Binar
 //  1. テーブルスキャン + Filter (全条件をフィルタで適用)
 //  2. PK スキャン (+ Filter で残条件を適用)
 //  3. セカンダリインデックススキャン (+ Filter で残条件を適用)
-func (s *Search) chooseBestPlan(tbl *access.TableAccessMethod, leaves []leafCondition, cond func(executor.Record) bool) (executor.Executor, error) {
+func (s *Search) chooseBestPlan(tbl *access.Table, leaves []leafCondition, cond func(executor.Record) bool) (executor.Executor, error) {
 	tableScanPlan := executor.NewFilter(
 		executor.NewTableScan(
 			tbl,
@@ -196,7 +196,7 @@ func (s *Search) chooseBestPlan(tbl *access.TableAccessMethod, leaves []leafCond
 // buildIndexPlan はインデックスを使った Executor を構築する
 //
 // needsFilter が true の場合、IndexScan の上に Filter を重ねる (複合条件時)
-func (s *Search) buildIndexPlan(tbl *access.TableAccessMethod, leaf leafCondition, idxMeta *handler.IndexMetadata, cond func(executor.Record) bool, needsFilter bool) (executor.Executor, error) {
+func (s *Search) buildIndexPlan(tbl *access.Table, leaf leafCondition, idxMeta *handler.IndexMetadata, cond func(executor.Record) bool, needsFilter bool) (executor.Executor, error) {
 	index, err := tbl.GetUniqueIndexByName(idxMeta.Name)
 	if err != nil {
 		return nil, err
@@ -222,7 +222,7 @@ func (s *Search) buildIndexPlan(tbl *access.TableAccessMethod, leaf leafConditio
 // buildPKScanPlan は PK カラムの条件を使った TableScan を構築する
 //
 // needsFilter が true の場合、TableScan の上に Filter を重ねる (複合条件時や > 演算子時)
-func (s *Search) buildPKScanPlan(tbl *access.TableAccessMethod, leaf leafCondition, cond func(executor.Record) bool, needsFilter bool) executor.Executor {
+func (s *Search) buildPKScanPlan(tbl *access.Table, leaf leafCondition, cond func(executor.Record) bool, needsFilter bool) executor.Executor {
 	colMeta, _ := s.tblMeta.GetColByName(leaf.colName)
 	pos := int(colMeta.Pos)
 	value := leaf.literal.ToString()
@@ -274,7 +274,7 @@ func (s *Search) buildPKScanPlan(tbl *access.TableAccessMethod, leaf leafConditi
 // 各 OR ブランチが PK またはセカンダリインデックスを利用できる場合、各ブランチを個別にスキャンし Union で結合する
 //
 // 最適化できない場合はテーブルスキャン + Filter にフォールバックする
-func (s *Search) planForORCondition(tbl *access.TableAccessMethod, expr ast.BinaryExpr, cond func(executor.Record) bool) (executor.Executor, error) {
+func (s *Search) planForORCondition(tbl *access.Table, expr ast.BinaryExpr, cond func(executor.Record) bool) (executor.Executor, error) {
 	tableScanPlan := executor.NewFilter(
 		executor.NewTableScan(
 			tbl,
@@ -332,7 +332,7 @@ type orBranch struct {
 // 残りの条件は Filter で適用する
 //
 // PK/インデックスが利用できない場合は ok=false を返す
-func (s *Search) planORBranch(tbl *access.TableAccessMethod, branch orBranch, stats *handler.TableStatistics) (executor.Executor, float64, bool) {
+func (s *Search) planORBranch(tbl *access.Table, branch orBranch, stats *handler.TableStatistics) (executor.Executor, float64, bool) {
 	// ブランチ全体の条件関数を構築 (複合 AND 条件時に Filter で使用)
 	branchCond, err := s.buildConditionFunc(branch.expr)
 	if err != nil {

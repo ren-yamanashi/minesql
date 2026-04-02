@@ -1,14 +1,14 @@
 package node
 
-const nodeHeaderSize = 8
+const headerSize = 8
 
 var (
 	NODE_TYPE_LEAF   = []byte("LEAF    ")
 	NODE_TYPE_BRANCH = []byte("BRANCH  ")
 )
 
-type NodeHeader struct {
-	NodeType [nodeHeaderSize]byte // ノードタイプ (LEAF or BRANCH)
+type Header struct {
+	NodeType [headerSize]byte // ノードタイプ (LEAF or BRANCH)
 }
 
 // Node は B+Tree のノードを表す interface

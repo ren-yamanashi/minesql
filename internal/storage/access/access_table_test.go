@@ -21,9 +21,9 @@ func TestCreateAndInsert(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
-		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex})
 
 		// WHEN: テーブルを作成
 		err = table.Create(bp)
@@ -129,12 +129,12 @@ func TestCreateAndInsert(t *testing.T) {
 
 		indexMetaPageId1, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex1 := NewUniqueIndexAccessMethod("idx_first_name", "first_name", indexMetaPageId1, 1, 1)
+		uniqueIndex1 := NewUniqueIndex("idx_first_name", "first_name", indexMetaPageId1, 1, 1)
 		indexMetaPageId2, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex2 := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId2, 2, 1)
+		uniqueIndex2 := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId2, 2, 1)
 
-		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex1, uniqueIndex2})
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex1, uniqueIndex2})
 
 		// WHEN
 		err = table.Create(bp)
@@ -164,7 +164,7 @@ func TestCreateAndInsert(t *testing.T) {
 	t.Run("active なレコードが存在する PK で Insert すると重複キーエラーが返る", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -181,7 +181,7 @@ func TestCreateAndInsert(t *testing.T) {
 	t.Run("ソフトデリート済みの同一 PK を持つレコードが存在する場合、Insert で上書きされる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -230,9 +230,9 @@ func TestSoftDelete(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
-		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex})
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -284,7 +284,7 @@ func TestSoftDelete(t *testing.T) {
 	t.Run("Delete はレコードを物理削除せず DeleteMark を 1 にするソフトデリートである", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -332,7 +332,7 @@ func TestSoftDelete(t *testing.T) {
 	t.Run("存在しないキーを削除するとエラーが返る", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -349,7 +349,7 @@ func TestSoftDelete(t *testing.T) {
 	t.Run("全行を削除した後にテーブルが空になる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -376,7 +376,7 @@ func TestDelete(t *testing.T) {
 	t.Run("テーブルから行を物理削除できる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -412,9 +412,9 @@ func TestDelete(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
-		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex})
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -455,7 +455,7 @@ func TestDelete(t *testing.T) {
 	t.Run("物理削除した後に同じ PK で再挿入できる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -478,7 +478,7 @@ func TestDelete(t *testing.T) {
 	t.Run("全行を物理削除した後にテーブルが空になる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -508,7 +508,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("プライマリキーが同じ場合、value のみが更新される", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -537,7 +537,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("プライマリキーが同じ場合、B+Tree レベルでインプレース更新される", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -577,7 +577,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("プライマリキーが変わる場合、B+Tree レベルでソフトデリート + Insert になる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -627,7 +627,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("プライマリキーが変わる場合、Delete + Insert が行われる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -660,9 +660,9 @@ func TestUpdate(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
-		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex})
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -689,9 +689,9 @@ func TestUpdate(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
-		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex})
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -741,7 +741,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("プライマリキーを既存のキーに変更するとエラーが返る", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -767,9 +767,9 @@ func TestUpdate(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
-		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex})
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -793,12 +793,12 @@ func TestUpdate(t *testing.T) {
 
 		indexMetaPageId1, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex1 := NewUniqueIndexAccessMethod("idx_first_name", "first_name", indexMetaPageId1, 1, 1)
+		uniqueIndex1 := NewUniqueIndex("idx_first_name", "first_name", indexMetaPageId1, 1, 1)
 		indexMetaPageId2, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex2 := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId2, 2, 1)
+		uniqueIndex2 := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId2, 2, 1)
 
-		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex1, uniqueIndex2})
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex1, uniqueIndex2})
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -825,7 +825,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("存在しないキーを更新するとエラーが返る", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -846,7 +846,7 @@ func TestSearch(t *testing.T) {
 	t.Run("RecordSearchModeStart で全 active レコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -867,7 +867,7 @@ func TestSearch(t *testing.T) {
 	t.Run("RecordSearchModeKey で指定したキーから検索できる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -894,7 +894,7 @@ func TestSearch(t *testing.T) {
 	t.Run("空のテーブルを検索すると結果が空になる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -914,7 +914,7 @@ type decodedRecord struct {
 	value [][]byte
 }
 
-func collectAllTablePairs(t *testing.T, bp *buffer.BufferPool, table *TableAccessMethod) []decodedRecord {
+func collectAllTablePairs(t *testing.T, bp *buffer.BufferPool, table *Table) []decodedRecord {
 	t.Helper()
 	iter, err := table.Search(bp, RecordSearchModeStart{})
 	assert.NoError(t, err)
@@ -937,9 +937,9 @@ func collectAllTablePairs(t *testing.T, bp *buffer.BufferPool, table *TableAcces
 func TestGetUniqueIndexByName(t *testing.T) {
 	t.Run("インデックス名からユニークインデックスを取得できる", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex1 := NewUniqueIndexAccessMethod("idx_first_name", "first_name", page.PageId{}, 1, 1)
-		uniqueIndex2 := NewUniqueIndexAccessMethod("idx_last_name", "last_name", page.PageId{}, 2, 1)
-		table := NewTableAccessMethod("users", page.PageId{}, 1, []*UniqueIndexAccessMethod{uniqueIndex1, uniqueIndex2})
+		uniqueIndex1 := NewUniqueIndex("idx_first_name", "first_name", page.PageId{}, 1, 1)
+		uniqueIndex2 := NewUniqueIndex("idx_last_name", "last_name", page.PageId{}, 2, 1)
+		table := NewTable("users", page.PageId{}, 1, []*UniqueIndex{uniqueIndex1, uniqueIndex2})
 
 		// WHEN
 		ui, err := table.GetUniqueIndexByName("idx_last_name")
@@ -951,8 +951,8 @@ func TestGetUniqueIndexByName(t *testing.T) {
 
 	t.Run("存在しないインデックス名を指定するとエラーになる", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_first_name", "first_name", page.PageId{}, 1, 1)
-		table := NewTableAccessMethod("users", page.PageId{}, 1, []*UniqueIndexAccessMethod{uniqueIndex})
+		uniqueIndex := NewUniqueIndex("idx_first_name", "first_name", page.PageId{}, 1, 1)
+		table := NewTable("users", page.PageId{}, 1, []*UniqueIndex{uniqueIndex})
 
 		// WHEN
 		ui, err := table.GetUniqueIndexByName("idx_last_name")
@@ -983,7 +983,7 @@ func TestLeafPageCount(t *testing.T) {
 	t.Run("作成直後のテーブルのリーフページ数は1", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -998,7 +998,7 @@ func TestLeafPageCount(t *testing.T) {
 	t.Run("データ挿入によりリーフページが分割されるとリーフページ数が増加する", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -1021,7 +1021,7 @@ func TestHeight(t *testing.T) {
 	t.Run("作成直後のテーブルの高さは1", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -1036,7 +1036,7 @@ func TestHeight(t *testing.T) {
 	t.Run("データ挿入によりリーフページが分割されるとテーブルの高さが増加する", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTableAccessMethod("users", metaPageId, 1, nil)
+		table := NewTable("users", metaPageId, 1, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -1058,7 +1058,7 @@ func TestHeight(t *testing.T) {
 // ユニークインデックスの active なエントリのセカンダリキーを収集するヘルパー
 //
 // ソフトデリート済み (DeleteMark=1) のエントリはスキップする
-func collectActiveUniqueIndexKeys(t *testing.T, bp *buffer.BufferPool, ui *UniqueIndexAccessMethod) []string {
+func collectActiveUniqueIndexKeys(t *testing.T, bp *buffer.BufferPool, ui *UniqueIndex) []string {
 	t.Helper()
 	indexTree := btree.NewBTree(ui.MetaPageId)
 	indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})

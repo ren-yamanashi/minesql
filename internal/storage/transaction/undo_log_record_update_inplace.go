@@ -6,12 +6,12 @@ import (
 )
 
 type UndoUpdateInplaceRecord struct {
-	table      *access.TableAccessMethod
+	table      *access.Table
 	PrevRecord [][]byte // 更新前のレコード
 	NewRecord  [][]byte // 更新後のレコード
 }
 
-func NewUndoUpdateInplaceRecord(table *access.TableAccessMethod, prevRecord, newRecord [][]byte) UndoUpdateInplaceRecord {
+func NewUndoUpdateInplaceRecord(table *access.Table, prevRecord, newRecord [][]byte) UndoUpdateInplaceRecord {
 	return UndoUpdateInplaceRecord{
 		table:      table,
 		PrevRecord: prevRecord,

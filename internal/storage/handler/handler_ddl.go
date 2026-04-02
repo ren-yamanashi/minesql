@@ -38,13 +38,13 @@ func (h *Handler) CreateTable(tableName string, pkCount uint8, idxParams []Index
 	}
 
 	// 各 UniqueIndex を作成
-	uniqueIndexes := make([]*access.UniqueIndexAccessMethod, len(idxParams))
+	uniqueIndexes := make([]*access.UniqueIndex, len(idxParams))
 	for i, param := range idxParams {
 		indexMetaPageId, err := h.BufferPool.AllocatePageId(fileId)
 		if err != nil {
 			return err
 		}
-		uniqueIndex := access.NewUniqueIndexAccessMethod(param.Name, param.ColName, indexMetaPageId, param.UkIdx, pkCount)
+		uniqueIndex := access.NewUniqueIndex(param.Name, param.ColName, indexMetaPageId, param.UkIdx, pkCount)
 		if err := uniqueIndex.Create(h.BufferPool); err != nil {
 			return err
 		}
@@ -52,7 +52,7 @@ func (h *Handler) CreateTable(tableName string, pkCount uint8, idxParams []Index
 	}
 
 	// テーブルを作成
-	tbl := access.NewTableAccessMethod(tableName, metaPageId, pkCount, uniqueIndexes)
+	tbl := access.NewTable(tableName, metaPageId, pkCount, uniqueIndexes)
 	if err := tbl.Create(h.BufferPool); err != nil {
 		return err
 	}

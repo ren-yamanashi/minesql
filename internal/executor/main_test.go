@@ -443,7 +443,7 @@ func TestExecutorIntegration(t *testing.T) {
 }
 
 // 5 人のユーザーを持つテーブルを作成し、テーブルアクセスメソッドを返す
-func setupExecutorTestTable(t *testing.T) *access.TableAccessMethod {
+func setupExecutorTestTable(t *testing.T) *access.Table {
 	t.Helper()
 
 	tmpdir := t.TempDir()
@@ -467,7 +467,7 @@ func setupExecutorTestTable(t *testing.T) *access.TableAccessMethod {
 	_, err := createTable.Next()
 	assert.NoError(t, err)
 
-	tbl, err := getTableAccessMethod("users")
+	tbl, err := getTable("users")
 	assert.NoError(t, err)
 
 	var trxId handler.TrxId = 1
@@ -522,7 +522,7 @@ func writeRecords(sb *strings.Builder, records []Record) {
 	fmt.Fprintf(sb, "  合計: %d 件\n", len(records))
 }
 
-func getTableAccessMethod(tableName string) (*access.TableAccessMethod, error) {
+func getTable(tableName string) (*access.Table, error) {
 	e := handler.Get()
 	tblMeta, ok := e.Catalog.GetTableMetaByName(tableName)
 	if !ok {

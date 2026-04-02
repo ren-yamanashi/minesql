@@ -8,11 +8,11 @@ import (
 // Insert はレコードを追加する
 type Insert struct {
 	trxId   handler.TrxId
-	table   *access.TableAccessMethod
+	table   *access.Table
 	records []Record
 }
 
-func NewInsert(trxId handler.TrxId, table *access.TableAccessMethod, records []Record) *Insert {
+func NewInsert(trxId handler.TrxId, table *access.Table, records []Record) *Insert {
 	return &Insert{
 		trxId:   trxId,
 		table:   table,
