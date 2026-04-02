@@ -125,7 +125,7 @@ func InitStorageEngineForTest(t *testing.T, dataDir string) *handler.Handler {
 
 	// テーブルを作成
 	createTable := NewCreateTable("users", 1, []handler.IndexParam{
-		{Name: "last_name", ColName: "last_name", SecondaryKey: 2},
+		{Name: "last_name", ColName: "last_name", UkIdx: 2},
 	}, []handler.ColumnParam{
 		{Name: "id", Type: handler.ColumnTypeString},
 		{Name: "first_name", Type: handler.ColumnTypeString},

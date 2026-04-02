@@ -36,7 +36,7 @@ func TestUpdateInplaceLogRecord_Undo(t *testing.T) {
 
 	t.Run("ユニークインデックスも元の値に戻る", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex := access.NewUniqueIndexAccessMethod("idx_name", "name", page.PageId{}, 1)
+		uniqueIndex := access.NewUniqueIndexAccessMethod("idx_name", "name", page.PageId{}, 1, 1)
 		table, bp := setupTestTableForUndo(t, []*access.UniqueIndexAccessMethod{uniqueIndex})
 
 		prevRecord := [][]byte{[]byte("a"), []byte("John")}

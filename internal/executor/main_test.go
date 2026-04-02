@@ -455,8 +455,8 @@ func setupExecutorTestTable(t *testing.T) *handler.TableHandler {
 		"users",
 		1,
 		[]handler.IndexParam{
-			{Name: "idx_first_name", ColName: "first_name", SecondaryKey: 1},
-			{Name: "idx_last_name", ColName: "last_name", SecondaryKey: 2},
+			{Name: "idx_first_name", ColName: "first_name", UkIdx: 1},
+			{Name: "idx_last_name", ColName: "last_name", UkIdx: 2},
 		},
 		[]handler.ColumnParam{
 			{Name: "id", Type: handler.ColumnTypeString},

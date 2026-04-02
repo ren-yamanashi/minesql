@@ -13,7 +13,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2)
+		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
 		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
 		err = table.Create(bp)
@@ -62,7 +62,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2)
+		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
 		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
 		err = table.Create(bp)
@@ -92,7 +92,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_col", "col", indexMetaPageId, 0)
+		uniqueIndex := NewUniqueIndexAccessMethod("idx_col", "col", indexMetaPageId, 0, 1)
 
 		table := NewTableAccessMethod("test", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
 		err = table.Create(bp)
@@ -116,7 +116,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2)
+		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
 		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
 		err = table.Create(bp)
@@ -161,7 +161,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2)
+		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
 		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
 		err = table.Create(bp)
@@ -195,7 +195,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2)
+		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
 		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
 		err = table.Create(bp)

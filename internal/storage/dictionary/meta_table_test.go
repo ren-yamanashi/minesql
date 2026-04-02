@@ -254,7 +254,8 @@ func TestGetTable(t *testing.T) {
 		assert.Equal(t, 1, len(tbl.UniqueIndexes))
 		assert.Equal(t, "idx_email", tbl.UniqueIndexes[0].Name)
 		assert.Equal(t, "email", tbl.UniqueIndexes[0].ColName)
-		assert.Equal(t, uint16(1), tbl.UniqueIndexes[0].SecondaryKeyIdx)
+		assert.Equal(t, uint16(1), tbl.UniqueIndexes[0].UkIdx)
+		assert.Equal(t, uint8(1), tbl.UniqueIndexes[0].PkCount)
 		assert.Equal(t, page.NewPageId(page.FileId(1), 1), tbl.UniqueIndexes[0].MetaPageId)
 	})
 
@@ -280,10 +281,12 @@ func TestGetTable(t *testing.T) {
 		assert.Equal(t, 2, len(tbl.UniqueIndexes))
 		assert.Equal(t, "idx_email", tbl.UniqueIndexes[0].Name)
 		assert.Equal(t, "email", tbl.UniqueIndexes[0].ColName)
-		assert.Equal(t, uint16(1), tbl.UniqueIndexes[0].SecondaryKeyIdx)
+		assert.Equal(t, uint16(1), tbl.UniqueIndexes[0].UkIdx)
+		assert.Equal(t, uint8(1), tbl.UniqueIndexes[0].PkCount)
 		assert.Equal(t, "idx_username", tbl.UniqueIndexes[1].Name)
 		assert.Equal(t, "username", tbl.UniqueIndexes[1].ColName)
-		assert.Equal(t, uint16(2), tbl.UniqueIndexes[1].SecondaryKeyIdx)
+		assert.Equal(t, uint16(2), tbl.UniqueIndexes[1].UkIdx)
+		assert.Equal(t, uint8(1), tbl.UniqueIndexes[1].PkCount)
 	})
 
 	t.Run("存在しないカラム名を指定したインデックスがある場合、エラーを返す", func(t *testing.T) {

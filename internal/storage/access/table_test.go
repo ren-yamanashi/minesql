@@ -21,7 +21,7 @@ func TestCreateAndInsert(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2)
+		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
 		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
 
@@ -129,10 +129,10 @@ func TestCreateAndInsert(t *testing.T) {
 
 		indexMetaPageId1, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex1 := NewUniqueIndexAccessMethod("idx_first_name", "first_name", indexMetaPageId1, 1)
+		uniqueIndex1 := NewUniqueIndexAccessMethod("idx_first_name", "first_name", indexMetaPageId1, 1, 1)
 		indexMetaPageId2, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex2 := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId2, 2)
+		uniqueIndex2 := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId2, 2, 1)
 
 		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex1, uniqueIndex2})
 
@@ -230,7 +230,7 @@ func TestSoftDelete(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2)
+		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
 		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
 		err = table.Create(bp)
@@ -412,7 +412,7 @@ func TestDelete(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2)
+		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
 		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
 		err = table.Create(bp)
@@ -660,7 +660,7 @@ func TestUpdate(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2)
+		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
 		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
 		err = table.Create(bp)
@@ -689,7 +689,7 @@ func TestUpdate(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2)
+		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
 		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
 		err = table.Create(bp)
@@ -767,7 +767,7 @@ func TestUpdate(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2)
+		uniqueIndex := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
 		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex})
 		err = table.Create(bp)
@@ -793,10 +793,10 @@ func TestUpdate(t *testing.T) {
 
 		indexMetaPageId1, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex1 := NewUniqueIndexAccessMethod("idx_first_name", "first_name", indexMetaPageId1, 1)
+		uniqueIndex1 := NewUniqueIndexAccessMethod("idx_first_name", "first_name", indexMetaPageId1, 1, 1)
 		indexMetaPageId2, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex2 := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId2, 2)
+		uniqueIndex2 := NewUniqueIndexAccessMethod("idx_last_name", "last_name", indexMetaPageId2, 2, 1)
 
 		table := NewTableAccessMethod("users", metaPageId, 1, []*UniqueIndexAccessMethod{uniqueIndex1, uniqueIndex2})
 		err = table.Create(bp)
@@ -937,8 +937,8 @@ func collectAllTablePairs(t *testing.T, bp *buffer.BufferPool, table *TableAcces
 func TestGetUniqueIndexByName(t *testing.T) {
 	t.Run("インデックス名からユニークインデックスを取得できる", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex1 := NewUniqueIndexAccessMethod("idx_first_name", "first_name", page.PageId{}, 1)
-		uniqueIndex2 := NewUniqueIndexAccessMethod("idx_last_name", "last_name", page.PageId{}, 2)
+		uniqueIndex1 := NewUniqueIndexAccessMethod("idx_first_name", "first_name", page.PageId{}, 1, 1)
+		uniqueIndex2 := NewUniqueIndexAccessMethod("idx_last_name", "last_name", page.PageId{}, 2, 1)
 		table := NewTableAccessMethod("users", page.PageId{}, 1, []*UniqueIndexAccessMethod{uniqueIndex1, uniqueIndex2})
 
 		// WHEN
@@ -951,7 +951,7 @@ func TestGetUniqueIndexByName(t *testing.T) {
 
 	t.Run("存在しないインデックス名を指定するとエラーになる", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex := NewUniqueIndexAccessMethod("idx_first_name", "first_name", page.PageId{}, 1)
+		uniqueIndex := NewUniqueIndexAccessMethod("idx_first_name", "first_name", page.PageId{}, 1, 1)
 		table := NewTableAccessMethod("users", page.PageId{}, 1, []*UniqueIndexAccessMethod{uniqueIndex})
 
 		// WHEN

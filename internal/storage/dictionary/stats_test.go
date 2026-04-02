@@ -461,7 +461,7 @@ type columnParam struct {
 }
 
 // createTable はテスト用にテーブルを作成し、カタログに登録する
-func createTable(t *testing.T, env *testEnv, tableName string, primaryKeyCount uint8, indexes []indexParam, columns []columnParam) { //nolint:unparam
+func createTable(t *testing.T, env *testEnv, tableName string, pkCount uint8, indexes []indexParam, columns []columnParam) { //nolint:unparam
 	t.Helper()
 
 	// FileId を採番
@@ -483,14 +483,14 @@ func createTable(t *testing.T, env *testEnv, tableName string, primaryKeyCount u
 	for i, idx := range indexes {
 		indexMetaPageId, err := env.bp.AllocatePageId(fileId)
 		assert.NoError(t, err)
-		uniqueIndex := access.NewUniqueIndexAccessMethod(idx.name, idx.colName, indexMetaPageId, idx.secondaryKey)
+		uniqueIndex := access.NewUniqueIndexAccessMethod(idx.name, idx.colName, indexMetaPageId, idx.secondaryKey, pkCount)
 		err = uniqueIndex.Create(env.bp)
 		assert.NoError(t, err)
 		uniqueIndexes[i] = uniqueIndex
 	}
 
 	// テーブルを作成
-	tbl := access.NewTableAccessMethod(tableName, metaPageId, primaryKeyCount, uniqueIndexes)
+	tbl := access.NewTableAccessMethod(tableName, metaPageId, pkCount, uniqueIndexes)
 	err = tbl.Create(env.bp)
 	assert.NoError(t, err)
 
@@ -507,7 +507,7 @@ func createTable(t *testing.T, env *testEnv, tableName string, primaryKeyCount u
 	}
 
 	// テーブルメタデータを作成してカタログに登録
-	tblMeta := NewTableMeta(fileId, tableName, uint8(len(columns)), primaryKeyCount, colMeta, idxMeta, metaPageId)
+	tblMeta := NewTableMeta(fileId, tableName, uint8(len(columns)), pkCount, colMeta, idxMeta, metaPageId)
 	err = env.catalog.Insert(env.bp, tblMeta)
 	assert.NoError(t, err)
 

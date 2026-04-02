@@ -74,7 +74,7 @@ func TestCreateTable_Next(t *testing.T) {
 		handler.Init()
 		e := handler.Get()
 		createTable := NewCreateTable("users", 1, []handler.IndexParam{
-			{Name: "email", ColName: "email", SecondaryKey: 1},
+			{Name: "email", ColName: "email", UkIdx: 1},
 		}, nil)
 
 		// WHEN

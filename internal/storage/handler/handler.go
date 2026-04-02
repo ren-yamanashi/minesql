@@ -16,31 +16,15 @@ import (
 	"minesql/internal/storage/transaction"
 )
 
-// TrxId はトランザクション ID の型 (storage/transaction.TrxId のエイリアス)
-type TrxId = transaction.TrxId
-
-// UndoLog は Undo ログの型 (storage/transaction.UndoLog のエイリアス)
-type UndoLog = transaction.UndoLog
-
-// TableMetadata はテーブルメタデータの型 (storage/dictionary.TableMetadata のエイリアス)
-type TableMetadata = dictionary.TableMeta
-
-// IndexMetadata はインデックスメタデータの型 (storage/dictionary.IndexMetadata のエイリアス)
-type IndexMetadata = dictionary.IndexMeta
-
-// ColumnType はカラムの型 (storage/dictionary.ColumnType のエイリアス)
-type ColumnType = dictionary.ColumnType
-
-// ColumnTypeString は文字列型を表す ColumnType 定数
 const ColumnTypeString = dictionary.ColumnTypeString
 
-// TableStatistics はテーブル統計情報の型 (storage/dictionary.TableStatistics のエイリアス)
+type TrxId = transaction.TrxId
+type UndoLog = transaction.UndoLog
+type TableMetadata = dictionary.TableMeta
+type IndexMetadata = dictionary.IndexMeta
+type ColumnType = dictionary.ColumnType
 type TableStatistics = dictionary.TableStats
-
-// IndexStatistics はインデックス統計情報の型 (storage/dictionary.IndexStatistics のエイリアス)
 type IndexStatistics = dictionary.IndexStats
-
-// ColumnStatistics はカラム統計情報の型 (storage/dictionary.ColumnStatistics のエイリアス)
 type ColumnStatistics = dictionary.ColumnStats
 
 var (
@@ -48,7 +32,7 @@ var (
 	once sync.Once
 )
 
-// Handler はストレージ層のリソースの管理を行う (MySQL の handler に相当)
+// Handler はストレージ層のリソースの管理を行う
 type Handler struct {
 	BufferPool     *buffer.BufferPool
 	Catalog        *dictionary.Catalog
@@ -70,7 +54,7 @@ func Init() *Handler {
 	return hdl
 }
 
-// Reset はグローバルな Handler の状態をリセットする (主にテストで使用)
+// Reset はグローバルな Handler の状態をリセットする
 func Reset() {
 	hdl = nil
 	once = sync.Once{}

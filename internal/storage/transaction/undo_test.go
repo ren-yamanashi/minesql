@@ -16,7 +16,7 @@ import (
 func TestUndoIntegration(t *testing.T) {
 	t.Run("複数操作を逆順に Undo すると元の状態に戻る", func(t *testing.T) {
 		// GIVEN: ユニークインデックス付きテーブルにデータを投入
-		uniqueIndex := access.NewUniqueIndexAccessMethod("idx_name", "name", page.PageId{}, 1)
+		uniqueIndex := access.NewUniqueIndexAccessMethod("idx_name", "name", page.PageId{}, 1, 1)
 		table, bp := setupTestTableForUndo(t, []*access.UniqueIndexAccessMethod{uniqueIndex})
 
 		// 初期データ: ("a", "Alice"), ("b", "Bob")

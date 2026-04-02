@@ -33,7 +33,7 @@ func TestUndoDeleteRecord_Undo(t *testing.T) {
 
 	t.Run("SoftDelete した行のユニークインデックスも復元される", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex := access.NewUniqueIndexAccessMethod("idx_name", "name", page.PageId{}, 1)
+		uniqueIndex := access.NewUniqueIndexAccessMethod("idx_name", "name", page.PageId{}, 1, 1)
 		table, bp := setupTestTableForUndo(t, []*access.UniqueIndexAccessMethod{uniqueIndex})
 
 		record := [][]byte{[]byte("a"), []byte("John")}

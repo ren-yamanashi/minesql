@@ -76,7 +76,7 @@ func (tm *TableMeta) GetTable() (*access.TableAccessMethod, error) {
 			if !ok {
 				return nil, fmt.Errorf("column %s not found in table %s", idxMeta.ColName, tm.Name)
 			}
-			ui := access.NewUniqueIndexAccessMethod(idxMeta.Name, idxMeta.ColName, idxMeta.DataMetaPageId, colMeta.Pos)
+			ui := access.NewUniqueIndexAccessMethod(idxMeta.Name, idxMeta.ColName, idxMeta.DataMetaPageId, colMeta.Pos, tm.PKCount)
 			uniqueIndexes = append(uniqueIndexes, ui)
 		}
 	}

@@ -771,7 +771,7 @@ func initStorageManager(t *testing.T, dataDir string) {
 
 	// テーブルを作成
 	createTable := executor.NewCreateTable("users", 1, []handler.IndexParam{
-		{Name: "last_name", ColName: "last_name", SecondaryKey: 2},
+		{Name: "last_name", ColName: "last_name", UkIdx: 2},
 	}, []handler.ColumnParam{
 		{Name: "id", Type: handler.ColumnTypeString},
 		{Name: "first_name", Type: handler.ColumnTypeString},

@@ -7,9 +7,9 @@ import (
 
 // IndexParam はインデックス作成パラメータ
 type IndexParam struct {
-	Name         string
-	ColName      string
-	SecondaryKey uint16
+	Name    string // インデックス名
+	ColName string // インデックスを構成するカラム名
+	UkIdx   uint16 // ユニークキーに含めるカラムのインデックス (0 始まりの列番号)
 }
 
 // ColumnParam はカラム作成パラメータ
@@ -19,7 +19,7 @@ type ColumnParam struct {
 }
 
 // CreateTable はテーブルを新規作成し、カタログに登録する
-func (h *Handler) CreateTable(tableName string, primaryKeyCount uint8, indexParams []IndexParam, columnParams []ColumnParam) error {
+func (h *Handler) CreateTable(tableName string, pkCount uint8, idxParams []IndexParam, colParams []ColumnParam) error {
 	// FileId を採番
 	fileId, err := h.Catalog.AllocateFileId(h.BufferPool)
 	if err != nil {
@@ -38,13 +38,13 @@ func (h *Handler) CreateTable(tableName string, primaryKeyCount uint8, indexPara
 	}
 
 	// 各 UniqueIndex を作成
-	uniqueIndexes := make([]*access.UniqueIndexAccessMethod, len(indexParams))
-	for i, param := range indexParams {
+	uniqueIndexes := make([]*access.UniqueIndexAccessMethod, len(idxParams))
+	for i, param := range idxParams {
 		indexMetaPageId, err := h.BufferPool.AllocatePageId(fileId)
 		if err != nil {
 			return err
 		}
-		uniqueIndex := access.NewUniqueIndexAccessMethod(param.Name, param.ColName, indexMetaPageId, param.SecondaryKey)
+		uniqueIndex := access.NewUniqueIndexAccessMethod(param.Name, param.ColName, indexMetaPageId, param.UkIdx, pkCount)
 		if err := uniqueIndex.Create(h.BufferPool); err != nil {
 			return err
 		}
@@ -52,24 +52,24 @@ func (h *Handler) CreateTable(tableName string, primaryKeyCount uint8, indexPara
 	}
 
 	// テーブルを作成
-	tbl := access.NewTableAccessMethod(tableName, metaPageId, primaryKeyCount, uniqueIndexes)
+	tbl := access.NewTableAccessMethod(tableName, metaPageId, pkCount, uniqueIndexes)
 	if err := tbl.Create(h.BufferPool); err != nil {
 		return err
 	}
 
 	// インデックスメタデータを作成
-	idxMeta := make([]*dictionary.IndexMeta, len(indexParams))
+	idxMeta := make([]*dictionary.IndexMeta, len(idxParams))
 	for i, idx := range uniqueIndexes {
 		idxMeta[i] = dictionary.NewIndexMeta(fileId, idx.Name, idx.ColName, dictionary.IndexTypeUnique, idx.MetaPageId)
 	}
 
 	// カラムメタデータを作成
-	colMeta := make([]*dictionary.ColumnMeta, len(columnParams))
-	for i, col := range columnParams {
+	colMeta := make([]*dictionary.ColumnMeta, len(colParams))
+	for i, col := range colParams {
 		colMeta[i] = dictionary.NewColumnMeta(fileId, col.Name, uint16(i), col.Type)
 	}
 
 	// テーブルメタデータを作成してカタログに登録
-	tblMeta := dictionary.NewTableMeta(fileId, tableName, uint8(len(columnParams)), primaryKeyCount, colMeta, idxMeta, metaPageId)
+	tblMeta := dictionary.NewTableMeta(fileId, tableName, uint8(len(colParams)), pkCount, colMeta, idxMeta, metaPageId)
 	return h.Catalog.Insert(h.BufferPool, tblMeta)
 }

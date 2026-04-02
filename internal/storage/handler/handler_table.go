@@ -6,7 +6,7 @@ import (
 	"minesql/internal/storage/encode"
 )
 
-// TableHandler は access.TableAccessMethod をラップし、テーブルへの操作を提供する (MySQL の handler に相当)
+// TableHandler はテーブルへの操作を提供する
 type TableHandler struct {
 	inner *access.TableAccessMethod
 }

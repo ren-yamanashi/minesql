@@ -17,7 +17,7 @@ func TestUniqueIndex(t *testing.T) {
 
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetapageId, 0)
+		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetapageId, 0, 1)
 
 		// WHEN: ユニークインデックスを作成
 		err = uniqueIndex.Create(bp)
@@ -91,7 +91,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetapageId, 0)
+		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetapageId, 0, 1)
 
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
@@ -154,7 +154,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetapageId, 0)
+		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetapageId, 0, 1)
 
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
@@ -187,7 +187,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetapageId, 0)
+		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetapageId, 0, 1)
 
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
@@ -248,7 +248,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetapageId, 0)
+		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetapageId, 0, 1)
 
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
@@ -283,7 +283,7 @@ func TestUniqueIndexConstraint(t *testing.T) {
 
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetapageId, 0)
+		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetapageId, 0, 1)
 
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
@@ -308,7 +308,7 @@ func TestUniqueIndexConstraint(t *testing.T) {
 
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetapageId, 0)
+		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetapageId, 0, 1)
 
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
@@ -336,7 +336,7 @@ func TestUniqueIndexConstraint(t *testing.T) {
 		bp, metaPageId, _ := InitDisk(t, "test.db")
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetapageId, 0)
+		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetapageId, 0, 1)
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
 
@@ -370,7 +370,7 @@ func TestUniqueIndexLeafPageCount(t *testing.T) {
 		bp, metaPageId, _ := InitDisk(t, "test.db")
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetaPageId, 0)
+		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetaPageId, 0, 1)
 
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
@@ -388,7 +388,7 @@ func TestUniqueIndexLeafPageCount(t *testing.T) {
 		bp, metaPageId, _ := InitDisk(t, "test.db")
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetaPageId, 0)
+		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetaPageId, 0, 1)
 
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
@@ -414,7 +414,7 @@ func TestUniqueIndexHeight(t *testing.T) {
 		bp, metaPageId, _ := InitDisk(t, "test.db")
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetaPageId, 0)
+		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetaPageId, 0, 1)
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
 
@@ -431,7 +431,7 @@ func TestUniqueIndexHeight(t *testing.T) {
 		bp, metaPageId, _ := InitDisk(t, "test.db")
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetaPageId, 0)
+		uniqueIndex := NewUniqueIndexAccessMethod("test_index", "test", indexMetaPageId, 0, 1)
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
 

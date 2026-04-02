@@ -12,19 +12,20 @@ import (
 
 // UniqueIndexAccessMethod はユニークインデックスへのアクセスを提供する
 type UniqueIndexAccessMethod struct {
-	Name            string      // インデックス名
-	ColName         string      // インデックスを構成するカラム名
-	MetaPageId      page.PageId // インデックスの内容が入っている B+Tree のメタページの ID
-	SecondaryKeyIdx uint16      // セカンダリキーに含めるカラムのインデックス (0 始まりの列番号)
-	PrimaryKeyCount uint8       // PK のカラム数 (key からセカンダリキーと PK を分離するために必要)
+	Name       string      // インデックス名
+	ColName    string      // インデックスを構成するカラム名
+	MetaPageId page.PageId // インデックスの内容が入っている B+Tree のメタページの ID
+	UkIdx      uint16      // ユニークキーに含めるカラムのインデックス (0 始まりの列番号)
+	PkCount    uint8       // PK のカラム数 (key からユニークキーと PK を分離するために必要)
 }
 
-func NewUniqueIndexAccessMethod(name string, colName string, metaPageId page.PageId, secondaryKeyIdx uint16) *UniqueIndexAccessMethod {
+func NewUniqueIndexAccessMethod(name string, colName string, metaPageId page.PageId, ukIdx uint16, pkCount uint8) *UniqueIndexAccessMethod {
 	return &UniqueIndexAccessMethod{
-		Name:            name,
-		ColName:         colName,
-		MetaPageId:      metaPageId,
-		SecondaryKeyIdx: secondaryKeyIdx,
+		Name:       name,
+		ColName:    colName,
+		MetaPageId: metaPageId,
+		UkIdx:      ukIdx,
+		PkCount:    pkCount,
 	}
 }
 
@@ -36,7 +37,7 @@ func (ui *UniqueIndexAccessMethod) Search(bp *buffer.BufferPool, table *TableAcc
 		return nil, err
 	}
 	tableBTree := btree.NewBTree(table.MetaPageId)
-	return newUniqueIndexIterator(indexIter, tableBTree, bp, ui.PrimaryKeyCount), nil
+	return newUniqueIndexIterator(indexIter, tableBTree, bp, ui.PkCount), nil
 }
 
 // Create は空のユニークインデックスを新規作成する
@@ -59,9 +60,9 @@ func (ui *UniqueIndexAccessMethod) Insert(bp *buffer.BufferPool, encodedPK []byt
 
 	// ユニークキーをエンコード
 	var encodedUk []byte
-	encode.Encode([][]byte{columns[ui.SecondaryKeyIdx]}, &encodedUk)
+	encode.Encode([][]byte{columns[ui.UkIdx]}, &encodedUk)
 
-	// 同一セカンダリキー を持つ active なレコードが存在するか確認 (ユニーク制約チェック)
+	// 同一ユニークキー を持つ active なレコードが存在するか確認 (ユニーク制約チェック)
 	if err := ui.checkUniqueConstraint(bp, btr, encodedUk); err != nil {
 		return err
 	}
@@ -129,7 +130,7 @@ func (ui *UniqueIndexAccessMethod) Height(bp *buffer.BufferPool) (uint64, error)
 func (ui *UniqueIndexAccessMethod) getFullKey(encodedPK []byte, columns [][]byte) []byte {
 	// ユニークキーをエンコード
 	var encodedUk []byte
-	encode.Encode([][]byte{columns[ui.SecondaryKeyIdx]}, &encodedUk)
+	encode.Encode([][]byte{columns[ui.UkIdx]}, &encodedUk)
 
 	// fullKey = concat(encodedUk, encodedPK)
 	fullKey := make([]byte, 0, len(encodedUk)+len(encodedPK))

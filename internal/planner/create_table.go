@@ -111,9 +111,9 @@ func getUkParams(ukDefs []*ast.ConstraintUniqueKeyDef, colIndexMap map[string]in
 			return nil, fmt.Errorf("unique key column '%s' does not exist", ukDef.Column.ColName)
 		}
 		uniqueKeyParams = append(uniqueKeyParams, handler.IndexParam{
-			Name:         ukDef.KeyName,
-			ColName:      ukDef.Column.ColName,
-			SecondaryKey: uint16(idx),
+			Name:    ukDef.KeyName,
+			ColName: ukDef.Column.ColName,
+			UkIdx:   uint16(idx),
 		})
 	}
 	return uniqueKeyParams, nil
