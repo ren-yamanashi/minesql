@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestDelete_Build(t *testing.T) {
+func TestPlanDelete(t *testing.T) {
 	t.Run("存在しないテーブル名の場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
@@ -20,10 +20,9 @@ func TestDelete_Build(t *testing.T) {
 			StmtType: ast.StmtTypeDelete,
 			From:     *ast.NewTableId("nonexistent"),
 		}
-		planner := NewDelete(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trxId)
+		exec, err := PlanDelete(trxId, stmt)
 
 		// THEN
 		assert.Error(t, err)
@@ -44,10 +43,9 @@ func TestDelete_Build(t *testing.T) {
 			From:     *ast.NewTableId("users"),
 			Where:    &ast.WhereClause{IsSet: false},
 		}
-		planner := NewDelete(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trxId)
+		exec, err := PlanDelete(trxId, stmt)
 
 		// THEN
 		assert.NoError(t, err)

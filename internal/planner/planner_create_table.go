@@ -8,6 +8,7 @@ import (
 	"minesql/internal/storage/handler"
 )
 
+// PlanCreateTable は CREATE TABLE 文の実行計画を構築する
 func PlanCreateTable(stmt *ast.CreateTableStmt) (executor.Executor, error) {
 	colIndexMap := map[string]int{} // key: column name, value: column index
 	colParams := []handler.CreateColumnParam{}
