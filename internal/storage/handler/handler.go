@@ -8,8 +8,8 @@ import (
 	"path/filepath"
 	"sync"
 
-	"minesql/internal/config"
 	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/config"
 	"minesql/internal/storage/dictionary"
 	"minesql/internal/storage/file"
 	"minesql/internal/storage/page"
