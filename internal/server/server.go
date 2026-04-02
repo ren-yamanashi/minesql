@@ -106,7 +106,7 @@ func (s *Server) accept(listener *net.TCPListener) {
 }
 
 // クライアントからの接続を処理する
-// プロトコルの定義は docs/architecture/server.md#プロトコル を参照
+// プロトコルの定義は docs/architecture/server/server.md#プロトコル を参照
 func (s *Server) handleConnection(conn *net.TCPConn) {
 	sess := newSession()
 

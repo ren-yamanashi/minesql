@@ -350,6 +350,29 @@ func TestPlanCreateTable(t *testing.T) {
 		assert.Contains(t, err.Error(), "column 'email' cannot be part of multiple unique keys")
 	})
 
+	t.Run("カラムが1つだけのテーブルを作成できる", func(t *testing.T) {
+		// GIVEN
+		stmt := &ast.CreateTableStmt{
+			StmtType:  ast.StmtTypeCreate,
+			Keyword:   ast.KeywordTable,
+			TableName: "counters",
+			CreateDefinitions: []ast.Definition{
+				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+					*ast.NewColumnId("id"),
+				}},
+			},
+		}
+
+		// WHEN
+		exec, err := PlanCreateTable(stmt)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, exec)
+		assert.IsType(t, &executor.CreateTable{}, exec)
+	})
+
 	t.Run("ユニークインデックスに指定されたカラムが存在しない場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		ukDef := &ast.ConstraintUniqueKeyDef{DefType: ast.DefTypeConstraintUniqueKey, Column: *ast.NewColumnId("non_existent_column")}

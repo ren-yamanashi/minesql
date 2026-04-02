@@ -1,7 +1,7 @@
 /*
 memcomparable パッケージは、複数のバイト列を memcomparable 形式でエンコード・デコードするためのメソッドを提供する
 
-see: docs/about/memcomparable-format.md
+see: docs/architecture/storage/encode/memcomparable-format.md
 */
 package encode
 
