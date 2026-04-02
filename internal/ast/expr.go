@@ -1,19 +1,6 @@
 package ast
 
-type ExprType string
-
-const (
-	ExprTypeBinary ExprType = "BINARY"
-)
-
-type Expression interface{}
-
-// ===========================
-// BinaryExpr
-// ===========================
-
 type BinaryExpr struct {
-	ExprType ExprType
 	Operator string
 	Left     LHS
 	Right    RHS
@@ -21,7 +8,6 @@ type BinaryExpr struct {
 
 func NewBinaryExpr(operator string, left LHS, right RHS) *BinaryExpr {
 	return &BinaryExpr{
-		ExprType: ExprTypeBinary,
 		Operator: operator,
 		Left:     left,
 		Right:    right,
@@ -30,11 +16,15 @@ func NewBinaryExpr(operator string, left LHS, right RHS) *BinaryExpr {
 
 // -- LHS --
 
-type LHS interface{}
+type LHS interface {
+	isLHS()
+}
 
 type LhsColumn struct {
 	Column ColumnId
 }
+
+func (*LhsColumn) isLHS() {}
 
 func NewLhsColumn(col ColumnId) *LhsColumn {
 	return &LhsColumn{
@@ -43,10 +33,12 @@ func NewLhsColumn(col ColumnId) *LhsColumn {
 }
 
 type LhsExpr struct {
-	Expr Expression
+	Expr *BinaryExpr
 }
 
-func NewLhsExpr(expr Expression) *LhsExpr {
+func (*LhsExpr) isLHS() {}
+
+func NewLhsExpr(expr *BinaryExpr) *LhsExpr {
 	return &LhsExpr{
 		Expr: expr,
 	}
@@ -54,11 +46,15 @@ func NewLhsExpr(expr Expression) *LhsExpr {
 
 // -- RHS --
 
-type RHS interface{}
+type RHS interface {
+	isRHS()
+}
 
 type RhsLiteral struct {
 	Literal Literal
 }
+
+func (*RhsLiteral) isRHS() {}
 
 func NewRhsLiteral(lit Literal) *RhsLiteral {
 	return &RhsLiteral{
@@ -67,10 +63,12 @@ func NewRhsLiteral(lit Literal) *RhsLiteral {
 }
 
 type RhsExpr struct {
-	Expr Expression
+	Expr *BinaryExpr
 }
 
-func NewRhsExpr(expr Expression) *RhsExpr {
+func (*RhsExpr) isRHS() {}
+
+func NewRhsExpr(expr *BinaryExpr) *RhsExpr {
 	return &RhsExpr{
 		Expr: expr,
 	}

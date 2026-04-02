@@ -47,8 +47,7 @@ func TestParserSelect(t *testing.T) {
 		assert.NotNil(t, selectStmt.Where)
 		assert.NotNil(t, selectStmt.Where.Condition)
 
-		binaryExpr, ok := selectStmt.Where.Condition.(*ast.BinaryExpr)
-		assert.True(t, ok)
+		binaryExpr := selectStmt.Where.Condition
 		assert.Equal(t, "=", binaryExpr.Operator)
 
 		lhsCol, ok := binaryExpr.Left.(*ast.LhsColumn)

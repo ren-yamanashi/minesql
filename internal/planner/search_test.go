@@ -108,31 +108,6 @@ func TestSearch(t *testing.T) {
 		assert.Contains(t, err.Error(), "does not exist in table")
 	})
 
-	t.Run("WHERE 句でサポートされていない型を指定した場合、エラーを返す", func(t *testing.T) {
-		// GIVEN
-		tmpdir := t.TempDir()
-		initStorageManager(t, tmpdir)
-		defer handler.Reset()
-
-		tblMeta := getTableMetadata(t, "users")
-		type UnsupportedExpr struct {
-			ast.Expression
-		}
-		unsupported := &UnsupportedExpr{}
-		where := &ast.WhereClause{
-			Condition: unsupported,
-		}
-		search := NewSearch(tblMeta, where)
-
-		// WHEN
-		exec, err := search.Build()
-
-		// THEN
-		assert.Error(t, err)
-		assert.Nil(t, exec)
-		assert.Contains(t, err.Error(), "unsupported WHERE condition type")
-	})
-
 	t.Run("複数の AND 条件で Filter が生成される", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()

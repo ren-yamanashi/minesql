@@ -47,8 +47,7 @@ func TestParserDelete(t *testing.T) {
 		assert.NotNil(t, deleteStmt.Where)
 		assert.NotNil(t, deleteStmt.Where.Condition)
 
-		binaryExpr, ok := deleteStmt.Where.Condition.(*ast.BinaryExpr)
-		assert.True(t, ok)
+		binaryExpr := deleteStmt.Where.Condition
 		assert.Equal(t, "=", binaryExpr.Operator)
 
 		lhsCol, ok := binaryExpr.Left.(*ast.LhsColumn)

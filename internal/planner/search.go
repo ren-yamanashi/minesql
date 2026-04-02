@@ -41,12 +41,7 @@ func (sp *Search) Build() (executor.Executor, error) {
 	}
 
 	// WHERE 句が設定されている場合
-	switch expr := sp.where.Condition.(type) {
-	case *ast.BinaryExpr:
-		return sp.planForBinaryExpr(tbl, *expr)
-	default:
-		return nil, errors.New("unsupported WHERE condition type")
-	}
+	return sp.planForBinaryExpr(tbl, *sp.where.Condition)
 }
 
 // leafCondition は複合条件中の単一リーフ条件 (col op literal) を表す
@@ -432,11 +427,11 @@ func extractANDLeaves(expr ast.BinaryExpr) []leafCondition {
 		return nil
 	}
 
-	leftLeaves := extractANDLeaves(*lhsExpr.Expr.(*ast.BinaryExpr))
+	leftLeaves := extractANDLeaves(*lhsExpr.Expr)
 	if leftLeaves == nil {
 		return nil
 	}
-	rightLeaves := extractANDLeaves(*rhsExpr.Expr.(*ast.BinaryExpr))
+	rightLeaves := extractANDLeaves(*rhsExpr.Expr)
 	if rightLeaves == nil {
 		return nil
 	}
@@ -472,11 +467,11 @@ func extractORBranches(expr ast.BinaryExpr) []orBranch {
 
 	if expr.Operator == "OR" {
 		// OR ノード: 左右を再帰して連結
-		leftBranches := extractORBranches(*lhsExpr.Expr.(*ast.BinaryExpr))
+		leftBranches := extractORBranches(*lhsExpr.Expr)
 		if leftBranches == nil {
 			return nil
 		}
-		rightBranches := extractORBranches(*rhsExpr.Expr.(*ast.BinaryExpr))
+		rightBranches := extractORBranches(*rhsExpr.Expr)
 		if rightBranches == nil {
 			return nil
 		}
@@ -597,7 +592,7 @@ func (s *Search) buildConditionFunc(expr ast.BinaryExpr) (func(executor.Record) 
 	// ブランチノード: expr AND/OR expr (例: col1 = 5 AND col2 > 10 のような複合条件)
 	case *ast.LhsExpr:
 		// 左辺の式から条件関数を再帰的に構築
-		leftCond, err := s.buildConditionFunc(*lhs.Expr.(*ast.BinaryExpr))
+		leftCond, err := s.buildConditionFunc(*lhs.Expr)
 		if err != nil {
 			return nil, err
 		}
@@ -605,7 +600,7 @@ func (s *Search) buildConditionFunc(expr ast.BinaryExpr) (func(executor.Record) 
 		switch rhs := expr.Right.(type) {
 		// 右辺が式の場合、右辺の式から条件関数を再帰的に構築し、論理演算子 (AND/OR) に応じて条件関数を組み合わせる
 		case *ast.RhsExpr:
-			rightCond, err := s.buildConditionFunc(*rhs.Expr.(*ast.BinaryExpr))
+			rightCond, err := s.buildConditionFunc(*rhs.Expr)
 			if err != nil {
 				return nil, err
 			}

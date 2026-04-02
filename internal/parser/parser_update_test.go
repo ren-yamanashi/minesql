@@ -75,8 +75,7 @@ func TestParserUpdate(t *testing.T) {
 
 		assert.NotNil(t, updateStmt.Where)
 
-		binaryExpr, ok := updateStmt.Where.Condition.(*ast.BinaryExpr)
-		assert.True(t, ok)
+		binaryExpr := updateStmt.Where.Condition
 		assert.Equal(t, "=", binaryExpr.Operator)
 
 		lhsCol, ok := binaryExpr.Left.(*ast.LhsColumn)
@@ -111,8 +110,7 @@ func TestParserUpdate(t *testing.T) {
 		assert.NotNil(t, updateStmt.Where.Condition)
 
 		// AND で結合された式
-		andExpr, ok := updateStmt.Where.Condition.(*ast.BinaryExpr)
-		assert.True(t, ok)
+		andExpr := updateStmt.Where.Condition
 		assert.Equal(t, "AND", andExpr.Operator)
 	})
 
@@ -153,8 +151,7 @@ func TestParserUpdate(t *testing.T) {
 
 		assert.NotNil(t, updateStmt.Where)
 
-		orExpr, ok := updateStmt.Where.Condition.(*ast.BinaryExpr)
-		assert.True(t, ok)
+		orExpr := updateStmt.Where.Condition
 		assert.Equal(t, "OR", orExpr.Operator)
 	})
 
@@ -174,22 +171,19 @@ func TestParserUpdate(t *testing.T) {
 		assert.True(t, ok)
 
 		// ルートは OR
-		orExpr, ok := updateStmt.Where.Condition.(*ast.BinaryExpr)
-		assert.True(t, ok)
+		orExpr := updateStmt.Where.Condition
 		assert.Equal(t, "OR", orExpr.Operator)
 
 		// OR の左辺は a = '1'
 		leftExpr, ok := orExpr.Left.(*ast.LhsExpr)
 		assert.True(t, ok)
-		leftBinary, ok := leftExpr.Expr.(*ast.BinaryExpr)
-		assert.True(t, ok)
+		leftBinary := leftExpr.Expr
 		assert.Equal(t, "=", leftBinary.Operator)
 
 		// OR の右辺は AND 式
 		rightExpr, ok := orExpr.Right.(*ast.RhsExpr)
 		assert.True(t, ok)
-		rightBinary, ok := rightExpr.Expr.(*ast.BinaryExpr)
-		assert.True(t, ok)
+		rightBinary := rightExpr.Expr
 		assert.Equal(t, "AND", rightBinary.Operator)
 	})
 
@@ -210,8 +204,7 @@ func TestParserUpdate(t *testing.T) {
 
 		assert.NotNil(t, updateStmt.Where)
 
-		binaryExpr, ok := updateStmt.Where.Condition.(*ast.BinaryExpr)
-		assert.True(t, ok)
+		binaryExpr := updateStmt.Where.Condition
 
 		rhsLit, ok := binaryExpr.Right.(*ast.RhsLiteral)
 		assert.True(t, ok)

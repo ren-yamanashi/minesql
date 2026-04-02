@@ -116,7 +116,7 @@ func (wp *WhereParser) reduce() error {
 	switch v := leftRaw.(type) {
 	case ast.ColumnId:
 		lhs = ast.NewLhsColumn(v)
-	case ast.Expression:
+	case *ast.BinaryExpr:
 		lhs = ast.NewLhsExpr(v)
 	default:
 		return errors.New("[parse error] invalid left operand type")
@@ -126,7 +126,7 @@ func (wp *WhereParser) reduce() error {
 	switch v := rightRaw.(type) {
 	case ast.Literal:
 		rhs = ast.NewRhsLiteral(v)
-	case ast.Expression:
+	case *ast.BinaryExpr:
 		rhs = ast.NewRhsExpr(v)
 	default:
 		return errors.New("[parse error] invalid right operand type")
