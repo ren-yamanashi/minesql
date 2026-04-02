@@ -395,6 +395,75 @@ func TestSearch(t *testing.T) {
 		assert.Contains(t, err.Error(), "when LHS is a column, RHS must be a literal")
 	})
 
+	t.Run("条件内でサポートされていない論理演算子の場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		initStorageManager(t, tmpdir)
+		defer handler.Reset()
+
+		tblMeta := getTableMetadata(t, "users")
+		// WHERE (first_name = 'John') XOR (last_name = 'Doe')
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
+				"XOR",
+				ast.NewLhsExpr(
+					ast.NewBinaryExpr(
+						"=",
+						ast.NewLhsColumn(*ast.NewColumnId("first_name")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("'John'", "John")),
+					),
+				),
+				ast.NewRhsExpr(
+					ast.NewBinaryExpr(
+						"=",
+						ast.NewLhsColumn(*ast.NewColumnId("last_name")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("'Doe'", "Doe")),
+					),
+				),
+			),
+			IsSet: true,
+		}
+		search := NewSearch(tblMeta, where)
+
+		// WHEN
+		exec, err := search.Build()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "unsupported logical operator")
+	})
+
+	t.Run("BinaryExpr で LHS がサポートされていない型の場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		initStorageManager(t, tmpdir)
+		defer handler.Reset()
+
+		tblMeta := getTableMetadata(t, "users")
+
+		type UnsupportedLHS struct {
+			ast.LHS
+		}
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
+				"=",
+				&UnsupportedLHS{},
+				ast.NewRhsLiteral(ast.NewStringLiteral("'value'", "value")),
+			),
+			IsSet: true,
+		}
+		search := NewSearch(tblMeta, where)
+
+		// WHEN
+		exec, err := search.Build()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "unsupported LHS type")
+	})
+
 	t.Run("条件内で LHS が式、RHS がリテラルの場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
@@ -571,6 +640,37 @@ func TestComplexWhereWithData(t *testing.T) {
 		assert.Equal(t, "Jane", string(results[0][1]))
 		assert.Equal(t, "3", string(results[1][0]))
 		assert.Equal(t, "John", string(results[1][1]))
+	})
+
+	t.Run("範囲演算子でデータをフィルタリングできる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		initStorageManager(t, tmpdir)
+		defer handler.Reset()
+
+		insertTestData(t)
+
+		tblMeta := getTableMetadata(t, "users")
+		// WHERE id > '1'
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
+				">",
+				ast.NewLhsColumn(*ast.NewColumnId("id")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("'1'", "1")),
+			),
+			IsSet: true,
+		}
+		search := NewSearch(tblMeta, where)
+		searchExec, err := search.Build()
+		assert.NoError(t, err)
+
+		// WHEN
+		results := collectResults(t, searchExec)
+
+		// THEN: id=2 と id=3 が返される (id > '1')
+		assert.Equal(t, 2, len(results))
+		assert.Equal(t, "2", string(results[0][0]))
+		assert.Equal(t, "3", string(results[1][0]))
 	})
 
 	t.Run("AND と OR の混合条件でデータをフィルタリングできる", func(t *testing.T) {
