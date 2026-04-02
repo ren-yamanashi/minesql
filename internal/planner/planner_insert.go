@@ -8,28 +8,19 @@ import (
 	"minesql/internal/storage/handler"
 )
 
-type Insert struct {
-	Stmt *ast.InsertStmt
-}
-
-func NewInsert(stmt *ast.InsertStmt) *Insert {
-	return &Insert{
-		Stmt: stmt,
-	}
-}
-
-func (ip *Insert) Build(trxId handler.TrxId) (executor.Executor, error) {
-	if len(ip.Stmt.Cols) == 0 {
+// PlanInsert は INSERT 文の実行計画を構築する
+func PlanInsert(trxId handler.TrxId, stmt *ast.InsertStmt) (executor.Executor, error) {
+	if len(stmt.Cols) == 0 {
 		return nil, errors.New("column names cannot be empty")
 	}
 
-	if len(ip.Stmt.Values) == 0 {
+	if len(stmt.Values) == 0 {
 		return nil, errors.New("records cannot be empty")
 	}
 
 	// カラム名の重複チェック
 	seenCols := map[string]bool{}
-	for _, col := range ip.Stmt.Cols {
+	for _, col := range stmt.Cols {
 		if seenCols[col.ColName] {
 			return nil, errors.New("duplicate column name: " + col.ColName)
 		}
@@ -37,16 +28,16 @@ func (ip *Insert) Build(trxId handler.TrxId) (executor.Executor, error) {
 	}
 
 	// 値の数がカラム数と一致することを確認
-	for _, valList := range ip.Stmt.Values {
-		if len(valList) != len(ip.Stmt.Cols) {
+	for _, valList := range stmt.Values {
+		if len(valList) != len(stmt.Cols) {
 			return nil, errors.New("number of values does not match number of columns")
 		}
 	}
 
-	e := handler.Get()
-	tblMeta, ok := e.Catalog.GetTableMetaByName(ip.Stmt.Table.TableName)
+	hdl := handler.Get()
+	tblMeta, ok := hdl.Catalog.GetTableMetaByName(stmt.Table.TableName)
 	if !ok {
-		return nil, fmt.Errorf("table %s not found", ip.Stmt.Table.TableName)
+		return nil, fmt.Errorf("table %s not found", stmt.Table.TableName)
 	}
 	tbl, err := tblMeta.GetTable()
 	if err != nil {
@@ -60,10 +51,10 @@ func (ip *Insert) Build(trxId handler.TrxId) (executor.Executor, error) {
 
 	// レコードをテーブルのカラム順序に並び替える
 	records := []executor.Record{}
-	for _, valList := range ip.Stmt.Values {
+	for _, valList := range stmt.Values {
 		record := make([][]byte, len(tblMeta.Cols))
 		for i, val := range valList {
-			colName := ip.Stmt.Cols[i].ColName
+			colName := stmt.Cols[i].ColName
 			pos, ok := colPosMap[colName]
 			if !ok {
 				return nil, errors.New("column does not exist: " + colName)

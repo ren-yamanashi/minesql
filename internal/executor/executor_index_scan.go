@@ -29,11 +29,11 @@ func NewIndexScan(
 }
 
 func (is *IndexScan) Next() (Record, error) {
-	e := handler.Get()
+	hdl := handler.Get()
 
 	// 初回実行時にイテレータを作成
 	if is.iterator == nil {
-		iter, err := is.index.Search(e.BufferPool, is.table, is.searchMode)
+		iter, err := is.index.Search(hdl.BufferPool, is.table, is.searchMode)
 		if err != nil {
 			return nil, err
 		}

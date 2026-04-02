@@ -199,17 +199,17 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 	}
 
 	// トランザクション外の DML は autocommit (一時的な trxId を発行して即 Commit)
-	e := handler.Get()
+	hdl := handler.Get()
 	autocommit := sess.trxId == 0
 	trxId := sess.trxId
 	if autocommit {
-		trxId = e.BeginTrx()
+		trxId = hdl.BeginTrx()
 	}
 
 	exec, err := planner.Start(trxId, node)
 	if err != nil {
 		if autocommit {
-			_ = e.RollbackTrx(trxId)
+			_ = hdl.RollbackTrx(trxId)
 		}
 		return "", err
 	}
@@ -219,7 +219,7 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 		record, err := exec.Next()
 		if err != nil {
 			if autocommit {
-				_ = e.RollbackTrx(trxId)
+				_ = hdl.RollbackTrx(trxId)
 			}
 			return "", err
 		}
@@ -230,7 +230,7 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 	}
 
 	if autocommit {
-		e.CommitTrx(trxId)
+		hdl.CommitTrx(trxId)
 	}
 
 	// 一旦、レスポンスは csv 形式で返す

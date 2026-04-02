@@ -9,32 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewInsert(t *testing.T) {
-	t.Run("正常に Insert が生成される", func(t *testing.T) {
-		// GIVEN
-		stmt := &ast.InsertStmt{
-			StmtType: ast.StmtTypeInsert,
-			Table:    *ast.NewTableId("users"),
-			Cols: []ast.ColumnId{
-				*ast.NewColumnId("id"),
-				*ast.NewColumnId("name"),
-			},
-			Values: [][]ast.Literal{
-				{
-					ast.NewStringLiteral("'1'", "1"),
-					ast.NewStringLiteral("'Alice'", "Alice"),
-				},
-			},
-		}
-
-		// WHEN
-		planner := NewInsert(stmt)
-
-		// THEN
-		assert.NotNil(t, planner)
-		assert.Equal(t, stmt, planner.Stmt)
-	})
-
+func TestPlanInsert(t *testing.T) {
 	t.Run("カラム名が空の場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		var trxId handler.TrxId = 1
@@ -49,10 +24,9 @@ func TestNewInsert(t *testing.T) {
 				},
 			},
 		}
-		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trxId)
+		exec, err := PlanInsert(trxId, stmt)
 
 		// THEN
 		assert.Error(t, err)
@@ -76,10 +50,9 @@ func TestNewInsert(t *testing.T) {
 				},
 			},
 		}
-		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trxId)
+		exec, err := PlanInsert(trxId, stmt)
 
 		// THEN
 		assert.Error(t, err)
@@ -106,10 +79,9 @@ func TestNewInsert(t *testing.T) {
 				},
 			},
 		}
-		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trxId)
+		exec, err := PlanInsert(trxId, stmt)
 
 		// THEN
 		assert.Error(t, err)
@@ -129,10 +101,9 @@ func TestNewInsert(t *testing.T) {
 			},
 			Values: [][]ast.Literal{},
 		}
-		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trxId)
+		exec, err := PlanInsert(trxId, stmt)
 
 		// THEN
 		assert.Error(t, err)
@@ -158,10 +129,9 @@ func TestNewInsert(t *testing.T) {
 				},
 			},
 		}
-		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trxId)
+		exec, err := PlanInsert(trxId, stmt)
 
 		// THEN
 		assert.Error(t, err)
@@ -175,7 +145,7 @@ func TestNewInsert(t *testing.T) {
 		defer handler.Reset()
 
 		var trxId handler.TrxId = 1
-		createTableForTest(t, []handler.ColumnParam{
+		createTableForTest(t, []handler.CreateColumnParam{
 			{Name: "id", Type: handler.ColumnTypeString},
 			{Name: "name", Type: handler.ColumnTypeString},
 		})
@@ -194,10 +164,9 @@ func TestNewInsert(t *testing.T) {
 				},
 			},
 		}
-		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trxId)
+		exec, err := PlanInsert(trxId, stmt)
 
 		// THEN
 		assert.NoError(t, err)
@@ -211,7 +180,7 @@ func TestNewInsert(t *testing.T) {
 		defer handler.Reset()
 
 		var trxId handler.TrxId = 1
-		createTableForTest(t, []handler.ColumnParam{
+		createTableForTest(t, []handler.CreateColumnParam{
 			{Name: "id", Type: handler.ColumnTypeString},
 			{Name: "name", Type: handler.ColumnTypeString},
 		})
@@ -238,10 +207,9 @@ func TestNewInsert(t *testing.T) {
 				},
 			},
 		}
-		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trxId)
+		exec, err := PlanInsert(trxId, stmt)
 
 		// THEN
 		assert.NoError(t, err)
@@ -255,7 +223,7 @@ func TestNewInsert(t *testing.T) {
 		defer handler.Reset()
 
 		var trxId handler.TrxId = 1
-		createTableForTest(t, []handler.ColumnParam{
+		createTableForTest(t, []handler.CreateColumnParam{
 			{Name: "id", Type: handler.ColumnTypeString},
 			{Name: "name", Type: handler.ColumnTypeString},
 			{Name: "email", Type: handler.ColumnTypeString},
@@ -280,10 +248,9 @@ func TestNewInsert(t *testing.T) {
 				},
 			},
 		}
-		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trxId)
+		exec, err := PlanInsert(trxId, stmt)
 
 		// THEN
 		assert.NoError(t, err)
@@ -297,7 +264,7 @@ func TestNewInsert(t *testing.T) {
 		defer handler.Reset()
 
 		var trxId handler.TrxId = 1
-		createTableForTest(t, []handler.ColumnParam{
+		createTableForTest(t, []handler.CreateColumnParam{
 			{Name: "id", Type: handler.ColumnTypeString},
 			{Name: "name", Type: handler.ColumnTypeString},
 			{Name: "email", Type: handler.ColumnTypeString},
@@ -319,15 +286,49 @@ func TestNewInsert(t *testing.T) {
 				},
 			},
 		}
-		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trxId)
+		exec, err := PlanInsert(trxId, stmt)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, exec)
 		assert.IsType(t, &executor.Insert{}, exec)
+	})
+
+	t.Run("テーブルに存在しないカラムを指定した場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		initStorageManagerForTest(t)
+		defer handler.Reset()
+
+		var trxId handler.TrxId = 1
+		createTableForTest(t, []handler.CreateColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "name", Type: handler.ColumnTypeString},
+		})
+
+		stmt := &ast.InsertStmt{
+			StmtType: ast.StmtTypeInsert,
+			Table:    *ast.NewTableId("users"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+				*ast.NewColumnId("non_existent"),
+			},
+			Values: [][]ast.Literal{
+				{
+					ast.NewStringLiteral("'1'", "1"),
+					ast.NewStringLiteral("'Alice'", "Alice"),
+				},
+			},
+		}
+
+		// WHEN
+		exec, err := PlanInsert(trxId, stmt)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "column does not exist")
 	})
 
 	t.Run("サポートされていない literal タイプの場合、エラーを返す", func(t *testing.T) {
@@ -336,7 +337,7 @@ func TestNewInsert(t *testing.T) {
 		defer handler.Reset()
 
 		var trxId handler.TrxId = 1
-		createTableForTest(t, []handler.ColumnParam{
+		createTableForTest(t, []handler.CreateColumnParam{
 			{Name: "id", Type: handler.ColumnTypeString},
 			{Name: "name", Type: handler.ColumnTypeString},
 		})
@@ -361,10 +362,9 @@ func TestNewInsert(t *testing.T) {
 				},
 			},
 		}
-		planner := NewInsert(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trxId)
+		exec, err := PlanInsert(trxId, stmt)
 
 		// THEN
 		assert.Error(t, err)
@@ -383,7 +383,7 @@ func initStorageManagerForTest(t *testing.T) {
 }
 
 // テーブルを作成する
-func createTableForTest(t *testing.T, columns []handler.ColumnParam) {
+func createTableForTest(t *testing.T, columns []handler.CreateColumnParam) {
 	createTable := executor.NewCreateTable("users", 1, nil, columns)
 	_, err := createTable.Next()
 	assert.NoError(t, err)

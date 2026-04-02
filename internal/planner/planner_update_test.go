@@ -10,26 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewUpdate(t *testing.T) {
-	t.Run("正常に Update が生成される", func(t *testing.T) {
-		// GIVEN
-		stmt := &ast.UpdateStmt{
-			Table: *ast.NewTableId("users"),
-			SetClauses: []*ast.SetClause{
-				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
-			},
-		}
-
-		// WHEN
-		planner := NewUpdate(stmt)
-
-		// THEN
-		assert.NotNil(t, planner)
-		assert.Equal(t, stmt, planner.Stmt)
-	})
-}
-
-func TestUpdate_Build(t *testing.T) {
+func TestPlanUpdate(t *testing.T) {
 	t.Run("単一カラムの更新で Update Executor が生成される", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
@@ -44,10 +25,9 @@ func TestUpdate_Build(t *testing.T) {
 			},
 			Where: &ast.WhereClause{IsSet: false},
 		}
-		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trxId)
+		exec, err := PlanUpdate(trxId, stmt)
 
 		// THEN
 		assert.NoError(t, err)
@@ -62,8 +42,8 @@ func TestUpdate_Build(t *testing.T) {
 		defer handler.Reset()
 
 		tbl := getPlannerTable(t, "users")
-		e := handler.Get()
-		err := tbl.Insert(e.BufferPool, [][]byte{[]byte("1"), []byte("John"), []byte("Smith")})
+		hdl := handler.Get()
+		err := tbl.Insert(hdl.BufferPool, [][]byte{[]byte("1"), []byte("John"), []byte("Smith")})
 		assert.NoError(t, err)
 
 		var trxId handler.TrxId = 1
@@ -75,8 +55,7 @@ func TestUpdate_Build(t *testing.T) {
 			},
 			Where: &ast.WhereClause{IsSet: false},
 		}
-		planner := NewUpdate(stmt)
-		exec, err := planner.Build(trxId)
+		exec, err := PlanUpdate(trxId, stmt)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -84,7 +63,7 @@ func TestUpdate_Build(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: 更新後のレコードが正しい
-		iter, err := tbl.Search(e.BufferPool, access.RecordSearchModeStart{})
+		iter, err := tbl.Search(hdl.BufferPool, access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -107,10 +86,9 @@ func TestUpdate_Build(t *testing.T) {
 				{Column: *ast.NewColumnId("id"), Value: ast.NewStringLiteral("'1'", "1")},
 			},
 		}
-		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trxId)
+		exec, err := PlanUpdate(trxId, stmt)
 
 		// THEN
 		assert.Error(t, err)
@@ -131,15 +109,45 @@ func TestUpdate_Build(t *testing.T) {
 			},
 			Where: &ast.WhereClause{IsSet: false},
 		}
-		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trxId)
+		exec, err := PlanUpdate(trxId, stmt)
 
 		// THEN
 		assert.Error(t, err)
 		assert.Nil(t, exec)
 		assert.Contains(t, err.Error(), "column does not exist: nonexistent")
+	})
+
+	t.Run("WHERE句に存在しないカラムが指定された場合、エラーが返る", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		initStorageManager(t, tmpdir)
+		defer handler.Reset()
+
+		var trxId handler.TrxId = 1
+		stmt := &ast.UpdateStmt{
+			Table: *ast.NewTableId("users"),
+			SetClauses: []*ast.SetClause{
+				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
+			},
+			Where: &ast.WhereClause{
+				IsSet: true,
+				Condition: ast.NewBinaryExpr(
+					"=",
+					ast.NewLhsColumn(*ast.NewColumnId("non_existent")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("test", "test")),
+				),
+			},
+		}
+
+		// WHEN
+		exec, err := PlanUpdate(trxId, stmt)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "non_existent")
 	})
 
 	t.Run("生成された Executor でレコードが正しく更新される", func(t *testing.T) {
@@ -149,13 +157,13 @@ func TestUpdate_Build(t *testing.T) {
 		defer handler.Reset()
 
 		var trxId handler.TrxId = 1
-		e := handler.Get()
+		hdl := handler.Get()
 		tbl := getPlannerTable(t, "users")
 
 		// データを挿入
-		err := tbl.Insert(e.BufferPool, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err := tbl.Insert(hdl.BufferPool, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
-		err = tbl.Insert(e.BufferPool, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		err = tbl.Insert(hdl.BufferPool, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
 
 		// "a" の first_name を "Jane" に更新する
@@ -173,10 +181,9 @@ func TestUpdate_Build(t *testing.T) {
 				IsSet: true,
 			},
 		}
-		planner := NewUpdate(stmt)
 
 		// WHEN
-		exec, err := planner.Build(trxId)
+		exec, err := PlanUpdate(trxId, stmt)
 		assert.NoError(t, err)
 		_, err = exec.Next()
 		assert.NoError(t, err)
@@ -252,8 +259,8 @@ func TestUpdate_Build(t *testing.T) {
 		defer handler.Reset()
 
 		tbl := getPlannerTable(t, "users")
-		e := handler.Get()
-		err := tbl.Insert(e.BufferPool, [][]byte{[]byte("1"), []byte("John"), []byte("Smith")})
+		hdl := handler.Get()
+		err := tbl.Insert(hdl.BufferPool, [][]byte{[]byte("1"), []byte("John"), []byte("Smith")})
 		assert.NoError(t, err)
 
 		var trxId handler.TrxId = 1
@@ -262,8 +269,7 @@ func TestUpdate_Build(t *testing.T) {
 			SetClauses: []*ast.SetClause{},
 			Where:      &ast.WhereClause{IsSet: false},
 		}
-		planner := NewUpdate(stmt)
-		exec, err := planner.Build(trxId)
+		exec, err := PlanUpdate(trxId, stmt)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -271,7 +277,7 @@ func TestUpdate_Build(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: レコードは変更されていない
-		iter, err := tbl.Search(e.BufferPool, access.RecordSearchModeStart{})
+		iter, err := tbl.Search(hdl.BufferPool, access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -285,8 +291,8 @@ func TestUpdate_Build(t *testing.T) {
 //nolint:unparam // テーブル名は将来的に変わりうる
 func getPlannerTable(t *testing.T, tableName string) *access.Table {
 	t.Helper()
-	e := handler.Get()
-	tblMeta, ok := e.Catalog.GetTableMetaByName(tableName)
+	hdl := handler.Get()
+	tblMeta, ok := hdl.Catalog.GetTableMetaByName(tableName)
 	if !ok {
 		t.Fatalf("table %s not found in catalog", tableName)
 	}

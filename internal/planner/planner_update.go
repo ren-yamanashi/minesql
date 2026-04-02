@@ -8,23 +8,13 @@ import (
 	"minesql/internal/storage/handler"
 )
 
-type Update struct {
-	Stmt *ast.UpdateStmt
-}
-
-func NewUpdate(stmt *ast.UpdateStmt) *Update {
-	return &Update{
-		Stmt: stmt,
-	}
-}
-
-func (up *Update) Build(trxId handler.TrxId) (executor.Executor, error) {
-	e := handler.Get()
+func PlanUpdate(trxId handler.TrxId, stmt *ast.UpdateStmt) (executor.Executor, error) {
+	hdl := handler.Get()
 
 	// 対象テーブルのメタデータを取得
-	tblMeta, ok := e.Catalog.GetTableMetaByName(up.Stmt.Table.TableName)
+	tblMeta, ok := hdl.Catalog.GetTableMetaByName(stmt.Table.TableName)
 	if !ok {
-		return nil, fmt.Errorf("table %s not found", up.Stmt.Table.TableName)
+		return nil, fmt.Errorf("table %s not found", stmt.Table.TableName)
 	}
 
 	// カラム名からカラム位置へのマッピングを作成
@@ -35,7 +25,7 @@ func (up *Update) Build(trxId handler.TrxId) (executor.Executor, error) {
 
 	// SetClause を Executor の SetColumn に変換
 	var setColumns []executor.SetColumn
-	for _, setClause := range up.Stmt.SetClauses {
+	for _, setClause := range stmt.SetClauses {
 		pos, ok := colPosMap[setClause.Column.ColName]
 		if !ok {
 			return nil, errors.New("column does not exist: " + setClause.Column.ColName)
@@ -47,7 +37,7 @@ func (up *Update) Build(trxId handler.TrxId) (executor.Executor, error) {
 	}
 
 	// WHERE 句を元に検索用の Executor を構築
-	search := NewSearch(tblMeta, up.Stmt.Where)
+	search := NewSearch(tblMeta, stmt.Where)
 	iterator, err := search.Build()
 	if err != nil {
 		return nil, err

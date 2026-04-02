@@ -9,10 +9,10 @@ import (
 
 // PlanDelete は DELETE 文の実行計画を構築する
 func PlanDelete(trxId handler.TrxId, stmt *ast.DeleteStmt) (executor.Executor, error) {
-	e := handler.Get()
+	hdl := handler.Get()
 
 	// 対象テーブルのメタデータを取得
-	tblMeta, ok := e.Catalog.GetTableMetaByName(stmt.From.TableName)
+	tblMeta, ok := hdl.Catalog.GetTableMetaByName(stmt.From.TableName)
 	if !ok {
 		return nil, fmt.Errorf("table %s not found", stmt.From.TableName)
 	}

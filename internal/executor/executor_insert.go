@@ -21,11 +21,11 @@ func NewInsert(trxId handler.TrxId, table *access.Table, records []Record) *Inse
 }
 
 func (ins *Insert) Next() (Record, error) {
-	e := handler.Get()
+	hdl := handler.Get()
 
 	for _, record := range ins.records {
-		e.AppendInsertUndo(ins.trxId, ins.table, record)
-		if err := ins.table.Insert(e.BufferPool, record); err != nil {
+		hdl.AppendInsertUndo(ins.trxId, ins.table, record)
+		if err := ins.table.Insert(hdl.BufferPool, record); err != nil {
 			return nil, err
 		}
 	}

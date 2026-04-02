@@ -16,8 +16,8 @@ func TestCommit(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer handler.Reset()
 
-		e := handler.Get()
-		undoLog := e.UndoLog()
+		hdl := handler.Get()
+		undoLog := hdl.UndoLog()
 		trxMgr := transaction.NewManager(undoLog)
 		trxId := trxMgr.Begin()
 		tbl := setupTestTable(t)
@@ -48,8 +48,8 @@ func TestRollback(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer handler.Reset()
 
-		e := handler.Get()
-		undoLog := e.UndoLog()
+		hdl := handler.Get()
+		undoLog := hdl.UndoLog()
 		trxMgr := transaction.NewManager(undoLog)
 		trxId := trxMgr.Begin()
 		tbl := setupTestTable(t)
@@ -62,7 +62,7 @@ func TestRollback(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		err = trxMgr.Rollback(e.BufferPool, trxId)
+		err = trxMgr.Rollback(hdl.BufferPool, trxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -77,8 +77,8 @@ func TestRollback(t *testing.T) {
 		defer handler.Reset()
 
 		tbl := setupTestTable(t)
-		e := handler.Get()
-		undoLog := e.UndoLog()
+		hdl := handler.Get()
+		undoLog := hdl.UndoLog()
 		trxMgr := transaction.NewManager(undoLog)
 
 		// 先にデータを挿入して Commit
@@ -102,7 +102,7 @@ func TestRollback(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		err = trxMgr.Rollback(e.BufferPool, deleteTrxId)
+		err = trxMgr.Rollback(hdl.BufferPool, deleteTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -116,8 +116,8 @@ func TestRollback(t *testing.T) {
 		defer handler.Reset()
 
 		tbl := setupTestTable(t)
-		e := handler.Get()
-		undoLog := e.UndoLog()
+		hdl := handler.Get()
+		undoLog := hdl.UndoLog()
 		trxMgr := transaction.NewManager(undoLog)
 
 		// 先にデータを挿入して Commit
@@ -146,7 +146,7 @@ func TestRollback(t *testing.T) {
 		assert.Equal(t, "Carol", string(recs[0][1]))
 
 		// WHEN
-		err = trxMgr.Rollback(e.BufferPool, updateTrxId)
+		err = trxMgr.Rollback(hdl.BufferPool, updateTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -161,8 +161,8 @@ func TestRollback(t *testing.T) {
 		defer handler.Reset()
 
 		tbl := setupTestTable(t)
-		e := handler.Get()
-		undoLog := e.UndoLog()
+		hdl := handler.Get()
+		undoLog := hdl.UndoLog()
 		trxMgr := transaction.NewManager(undoLog)
 
 		// 先にデータを挿入して Commit
@@ -206,7 +206,7 @@ func TestRollback(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		err = trxMgr.Rollback(e.BufferPool, trxId)
+		err = trxMgr.Rollback(hdl.BufferPool, trxId)
 
 		// THEN: 初期状態に戻る
 		assert.NoError(t, err)
@@ -235,8 +235,8 @@ func setupTestTable(t *testing.T) *access.Table {
 	_, err := createTable.Next()
 	assert.NoError(t, err)
 
-	e := handler.Get()
-	tblMeta, ok := e.Catalog.GetTableMetaByName("test_trx")
+	hdl := handler.Get()
+	tblMeta, ok := hdl.Catalog.GetTableMetaByName("test_trx")
 	assert.True(t, ok)
 	tbl, err := tblMeta.GetTable()
 	assert.NoError(t, err)

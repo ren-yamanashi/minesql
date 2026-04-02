@@ -472,8 +472,7 @@ func TestComplexWhereWithData(t *testing.T) {
 				},
 			},
 		}
-		insertPlanner := NewInsert(insertStmt)
-		insertExec, err := insertPlanner.Build(trxId)
+		insertExec, err := PlanInsert(trxId, insertStmt)
 		assert.NoError(t, err)
 		_, err = insertExec.Next()
 		assert.NoError(t, err)
@@ -770,9 +769,9 @@ func initStorageManager(t *testing.T, dataDir string) {
 	handler.Get()
 
 	// テーブルを作成
-	createTable := executor.NewCreateTable("users", 1, []handler.IndexParam{
+	createTable := executor.NewCreateTable("users", 1, []handler.CreateIndexParam{
 		{Name: "last_name", ColName: "last_name", UkIdx: 2},
-	}, []handler.ColumnParam{
+	}, []handler.CreateColumnParam{
 		{Name: "id", Type: handler.ColumnTypeString},
 		{Name: "first_name", Type: handler.ColumnTypeString},
 		{Name: "last_name", Type: handler.ColumnTypeString},
@@ -786,8 +785,8 @@ func initStorageManager(t *testing.T, dataDir string) {
 //nolint:unparam // テーブル名は将来的に変わりうる
 func getTableMetadata(t *testing.T, tableName string) *handler.TableMetadata {
 	t.Helper()
-	e := handler.Get()
-	tblMeta, ok := e.Catalog.GetTableMetaByName(tableName)
+	hdl := handler.Get()
+	tblMeta, ok := hdl.Catalog.GetTableMetaByName(tableName)
 	if !ok {
 		t.Fatalf("table %s not found in catalog", tableName)
 	}

@@ -26,8 +26,8 @@ func NewCreateTable(tableName string, pkCount uint8, indexParams []handler.Creat
 }
 
 func (ct *CreateTable) Next() (Record, error) {
-	e := handler.Get()
-	if err := e.CreateTable(ct.tableName, ct.pkCount, ct.indexParams, ct.columnParams); err != nil {
+	hdl := handler.Get()
+	if err := hdl.CreateTable(ct.tableName, ct.pkCount, ct.indexParams, ct.columnParams); err != nil {
 		return nil, err
 	}
 	return nil, nil

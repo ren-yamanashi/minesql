@@ -9,29 +9,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSelect(t *testing.T) {
-	t.Run("正常に Select が生成される", func(t *testing.T) {
-		// GIVEN
-		stmt := &ast.SelectStmt{StmtType: ast.StmtTypeSelect, From: *ast.NewTableId("users"), Where: &ast.WhereClause{IsSet: false}}
-
-		// WHEN
-		planner := NewSelect(stmt)
-
-		// THEN
-		assert.NotNil(t, planner)
-		assert.Equal(t, stmt, planner.Stmt)
-	})
-
+func TestPlanSelect(t *testing.T) {
 	t.Run("指定したテーブルが存在しない場合にエラーになる", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
 		defer handler.Reset()
 
 		stmt := &ast.SelectStmt{StmtType: ast.StmtTypeSelect, From: *ast.NewTableId("non_existent_table"), Where: &ast.WhereClause{IsSet: false}}
-		planner := NewSelect(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := PlanSelect(stmt)
 
 		// THEN
 		assert.Nil(t, exec)
@@ -44,7 +31,7 @@ func TestSelect(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer handler.Reset()
 
-		createTableForTest(t, []handler.ColumnParam{
+		createTableForTest(t, []handler.CreateColumnParam{
 			{Name: "id", Type: handler.ColumnTypeString},
 			{Name: "name", Type: handler.ColumnTypeString},
 		})
@@ -54,10 +41,9 @@ func TestSelect(t *testing.T) {
 			From:     *ast.NewTableId("users"),
 			Where:    &ast.WhereClause{IsSet: false},
 		}
-		planner := NewSelect(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := PlanSelect(stmt)
 
 		// THEN
 		assert.NoError(t, err)
@@ -70,7 +56,7 @@ func TestSelect(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer handler.Reset()
 
-		createTableForTest(t, []handler.ColumnParam{
+		createTableForTest(t, []handler.CreateColumnParam{
 			{Name: "id", Type: handler.ColumnTypeString},
 			{Name: "name", Type: handler.ColumnTypeString},
 			{Name: "email", Type: handler.ColumnTypeString},
@@ -81,10 +67,9 @@ func TestSelect(t *testing.T) {
 			From:     *ast.NewTableId("users"),
 			Where:    &ast.WhereClause{IsSet: false},
 		}
-		planner := NewSelect(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := PlanSelect(stmt)
 
 		// THEN
 		assert.NoError(t, err)
@@ -93,12 +78,75 @@ func TestSelect(t *testing.T) {
 		assert.Equal(t, []uint16{0, 1, 2}, proj.ColPos)
 	})
 
+	t.Run("WHERE句に条件が指定されている場合、Project Executorが生成される", func(t *testing.T) {
+		// GIVEN
+		initStorageManagerForTest(t)
+		defer handler.Reset()
+
+		createTableForTest(t, []handler.CreateColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "name", Type: handler.ColumnTypeString},
+		})
+
+		stmt := &ast.SelectStmt{
+			StmtType: ast.StmtTypeSelect,
+			From:     *ast.NewTableId("users"),
+			Where: &ast.WhereClause{
+				IsSet: true,
+				Condition: ast.NewBinaryExpr(
+					"=",
+					ast.NewLhsColumn(*ast.NewColumnId("id")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("1", "1")),
+				),
+			},
+		}
+
+		// WHEN
+		exec, err := PlanSelect(stmt)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, exec)
+		assert.IsType(t, &executor.Project{}, exec)
+	})
+
+	t.Run("WHERE句に存在しないカラムが指定された場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		initStorageManagerForTest(t)
+		defer handler.Reset()
+
+		createTableForTest(t, []handler.CreateColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+		})
+
+		stmt := &ast.SelectStmt{
+			StmtType: ast.StmtTypeSelect,
+			From:     *ast.NewTableId("users"),
+			Where: &ast.WhereClause{
+				IsSet: true,
+				Condition: ast.NewBinaryExpr(
+					"=",
+					ast.NewLhsColumn(*ast.NewColumnId("non_existent")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("test", "test")),
+				),
+			},
+		}
+
+		// WHEN
+		exec, err := PlanSelect(stmt)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "non_existent")
+	})
+
 	t.Run("Project 経由でレコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
 		defer handler.Reset()
 
-		createTableForTest(t, []handler.ColumnParam{
+		createTableForTest(t, []handler.CreateColumnParam{
 			{Name: "id", Type: handler.ColumnTypeString},
 			{Name: "name", Type: handler.ColumnTypeString},
 		})
@@ -128,10 +176,9 @@ func TestSelect(t *testing.T) {
 			From:     *ast.NewTableId("users"),
 			Where:    &ast.WhereClause{IsSet: false},
 		}
-		planner := NewSelect(stmt)
 
 		// WHEN
-		exec, err := planner.Build()
+		exec, err := PlanSelect(stmt)
 		assert.NoError(t, err)
 		results := fetchAll(t, exec)
 

@@ -29,7 +29,7 @@ func NewUpdate(trxId handler.TrxId, table *access.Table, setColumns []SetColumn,
 }
 
 func (upd *Update) Next() (Record, error) {
-	e := handler.Get()
+	hdl := handler.Get()
 
 	// 更新対象のレコードを先にすべて収集する
 	// (更新により Iterator が参照するページデータが破壊されるのを防ぐ)
@@ -64,18 +64,18 @@ func (upd *Update) Next() (Record, error) {
 
 		if bytes.Equal(encodedOldKey, encodedNewKey) {
 			// プライマリキーが変わらない場合はインプレース更新
-			e.AppendUpdateInplaceUndo(upd.trxId, upd.table, record, updatedRecords[i])
-			if err := upd.table.UpdateInplace(e.BufferPool, record, updatedRecords[i]); err != nil {
+			hdl.AppendUpdateInplaceUndo(upd.trxId, upd.table, record, updatedRecords[i])
+			if err := upd.table.UpdateInplace(hdl.BufferPool, record, updatedRecords[i]); err != nil {
 				return nil, err
 			}
 		} else {
 			// プライマリキーが変わる場合はソフトデリート + Insert
-			e.AppendDeleteUndo(upd.trxId, upd.table, record)
-			if err := upd.table.SoftDelete(e.BufferPool, record); err != nil {
+			hdl.AppendDeleteUndo(upd.trxId, upd.table, record)
+			if err := upd.table.SoftDelete(hdl.BufferPool, record); err != nil {
 				return nil, err
 			}
-			e.AppendInsertUndo(upd.trxId, upd.table, updatedRecords[i])
-			if err := upd.table.Insert(e.BufferPool, updatedRecords[i]); err != nil {
+			hdl.AppendInsertUndo(upd.trxId, upd.table, updatedRecords[i])
+			if err := upd.table.Insert(hdl.BufferPool, updatedRecords[i]); err != nil {
 				return nil, err
 			}
 		}

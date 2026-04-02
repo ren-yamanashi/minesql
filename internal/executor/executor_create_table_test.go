@@ -28,7 +28,7 @@ func TestCreateTable_Next(t *testing.T) {
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
 		handler.Reset()
 		handler.Init()
-		e := handler.Get()
+		hdl := handler.Get()
 		createTable := NewCreateTable("users", 1, nil, nil)
 
 		// WHEN
@@ -36,7 +36,7 @@ func TestCreateTable_Next(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		tblMeta, ok := e.Catalog.GetTableMetaByName("users")
+		tblMeta, ok := hdl.Catalog.GetTableMetaByName("users")
 		assert.True(t, ok)
 		assert.NotNil(t, tblMeta)
 		assert.Equal(t, "users", tblMeta.Name)
@@ -50,7 +50,7 @@ func TestCreateTable_Next(t *testing.T) {
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
 		handler.Reset()
 		handler.Init()
-		e := handler.Get()
+		hdl := handler.Get()
 		createTable := NewCreateTable("users", 1, nil, []handler.CreateColumnParam{
 			{Name: "id", Type: "int"},
 			{Name: "name", Type: "string"},
@@ -62,7 +62,7 @@ func TestCreateTable_Next(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		tblMeta, ok := e.Catalog.GetTableMetaByName("users")
+		tblMeta, ok := hdl.Catalog.GetTableMetaByName("users")
 		assert.True(t, ok)
 		assert.NotNil(t, tblMeta)
 		assert.Equal(t, uint8(3), tblMeta.NCols)
@@ -85,7 +85,7 @@ func TestCreateTable_Next(t *testing.T) {
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
 		handler.Reset()
 		handler.Init()
-		e := handler.Get()
+		hdl := handler.Get()
 		createTable := NewCreateTable("users", 1, []handler.CreateIndexParam{
 			{Name: "email", ColName: "email", UkIdx: 1},
 		}, nil)
@@ -95,7 +95,7 @@ func TestCreateTable_Next(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		tblMeta, ok := e.Catalog.GetTableMetaByName("users")
+		tblMeta, ok := hdl.Catalog.GetTableMetaByName("users")
 		assert.True(t, ok)
 		assert.NotNil(t, tblMeta)
 		assert.Equal(t, 1, len(tblMeta.Indexes))
@@ -109,7 +109,7 @@ func TestCreateTable_Next(t *testing.T) {
 		t.Setenv("MINESQL_BUFFER_SIZE", "10")
 		handler.Reset()
 		handler.Init()
-		e := handler.Get()
+		hdl := handler.Get()
 		createTable := NewCreateTable("users", 1, nil, nil)
 
 		// WHEN
@@ -117,11 +117,11 @@ func TestCreateTable_Next(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		tblMeta, ok := e.Catalog.GetTableMetaByName("users")
+		tblMeta, ok := hdl.Catalog.GetTableMetaByName("users")
 		assert.True(t, ok)
 		assert.NotNil(t, tblMeta)
 		// ディスクマネージャが登録されていることを確認
-		dm, dmErr := e.BufferPool.GetDisk(tblMeta.DataMetaPageId.FileId)
+		dm, dmErr := hdl.BufferPool.GetDisk(tblMeta.DataMetaPageId.FileId)
 		assert.NoError(t, dmErr)
 		assert.NotNil(t, dm)
 	})

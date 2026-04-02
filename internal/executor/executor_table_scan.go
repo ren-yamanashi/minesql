@@ -26,11 +26,11 @@ func NewTableScan(
 }
 
 func (ss *TableScan) Next() (Record, error) {
-	e := handler.Get()
+	hdl := handler.Get()
 
 	// 初回実行時はイテレータを作成
 	if ss.iterator == nil {
-		iterator, err := ss.table.Search(e.BufferPool, ss.searchMode)
+		iterator, err := ss.table.Search(hdl.BufferPool, ss.searchMode)
 		if err != nil {
 			return nil, err
 		}
