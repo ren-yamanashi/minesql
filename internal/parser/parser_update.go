@@ -78,7 +78,7 @@ func (up *UpdateParser) OnKeyword(word string) {
 
 	switch upperWord {
 	case KUpdate:
-		up.stmt = &ast.UpdateStmt{StmtType: ast.StmtTypeUpdate}
+		up.stmt = &ast.UpdateStmt{}
 		up.state = UpdateStateUpdate
 		return
 
@@ -184,12 +184,12 @@ func (up *UpdateParser) OnString(value string) {
 		// SET 句の値
 		up.stmt.SetClauses = append(up.stmt.SetClauses, &ast.SetClause{
 			Column: *ast.NewColumnId(up.currentSetCol),
-			Value:  ast.NewStringLiteral(value, value),
+			Value:  ast.NewStringLiteral(value),
 		})
 		up.currentSetCol = ""
 		up.state = UpdateStateSetVal
 	case UpdateStateWhere:
-		up.where.pushLiteral(ast.NewStringLiteral(value, value))
+		up.where.pushLiteral(ast.NewStringLiteral(value))
 	default:
 		up.setError(errors.New("[parse error] unexpected string: " + value))
 	}
@@ -205,12 +205,12 @@ func (up *UpdateParser) OnNumber(num string) {
 		// SET 句の値 (数値)
 		up.stmt.SetClauses = append(up.stmt.SetClauses, &ast.SetClause{
 			Column: *ast.NewColumnId(up.currentSetCol),
-			Value:  ast.NewStringLiteral(num, num),
+			Value:  ast.NewStringLiteral(num),
 		})
 		up.currentSetCol = ""
 		up.state = UpdateStateSetVal
 	case UpdateStateWhere:
-		up.where.pushLiteral(ast.NewStringLiteral(num, num))
+		up.where.pushLiteral(ast.NewStringLiteral(num))
 	default:
 		up.setError(errors.New("[parse error] unexpected number: " + num))
 	}

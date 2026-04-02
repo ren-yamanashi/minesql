@@ -24,7 +24,6 @@ func TestParserCreateTable(t *testing.T) {
 		assert.True(t, ok)
 
 		assert.Equal(t, "users", createStmt.TableName)
-		assert.Equal(t, ast.KeywordTable, createStmt.Keyword)
 		assert.Equal(t, 2, len(createStmt.CreateDefinitions))
 
 		// カラム定義の検証
@@ -60,7 +59,6 @@ func TestParserCreateTable(t *testing.T) {
 		// PRIMARY KEY 制約の検証
 		pkDef, ok := createStmt.CreateDefinitions[2].(*ast.ConstraintPrimaryKeyDef)
 		assert.True(t, ok)
-		assert.Equal(t, ast.DefTypeConstraintPrimaryKey, pkDef.DefType)
 		assert.Equal(t, 1, len(pkDef.Columns))
 		assert.Equal(t, "id", pkDef.Columns[0].ColName)
 	})
@@ -107,7 +105,6 @@ func TestParserCreateTable(t *testing.T) {
 		// UNIQUE KEY 制約の検証
 		ukDef, ok := createStmt.CreateDefinitions[2].(*ast.ConstraintUniqueKeyDef)
 		assert.True(t, ok)
-		assert.Equal(t, ast.DefTypeConstraintUniqueKey, ukDef.DefType)
 		assert.Equal(t, "email_idx", ukDef.KeyName)
 		assert.Equal(t, "email", ukDef.Column.ColName)
 	})

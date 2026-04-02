@@ -6,12 +6,12 @@ import "minesql/internal/ast"
 //
 // これらのステートメントはキーワードのみで構成されるため、状態遷移は不要
 type TransactionParser struct {
-	stmtType ast.StmtType
-	err      error
+	kind ast.TransactionKind
+	err  error
 }
 
-func NewTransactionParser(stmtType ast.StmtType) *TransactionParser {
-	return &TransactionParser{stmtType: stmtType}
+func NewTransactionParser(kind ast.TransactionKind) *TransactionParser {
+	return &TransactionParser{kind: kind}
 }
 
 func (p *TransactionParser) OnKeyword(_ string)    {}
@@ -23,16 +23,7 @@ func (p *TransactionParser) OnComment(_ string)    {}
 func (p *TransactionParser) OnError(err error)     { p.err = err }
 
 func (p *TransactionParser) getResult() ast.Statement {
-	switch p.stmtType {
-	case ast.StmtTypeBegin:
-		return &ast.BeginStmt{StmtType: ast.StmtTypeBegin}
-	case ast.StmtTypeCommit:
-		return &ast.CommitStmt{StmtType: ast.StmtTypeCommit}
-	case ast.StmtTypeRollback:
-		return &ast.RollbackStmt{StmtType: ast.StmtTypeRollback}
-	default:
-		return nil
-	}
+	return &ast.TransactionStmt{Kind: p.kind}
 }
 
 func (p *TransactionParser) getError() error { return p.err }

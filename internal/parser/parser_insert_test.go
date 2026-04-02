@@ -23,7 +23,6 @@ func TestParserInsert(t *testing.T) {
 		insertStmt, ok := result.(*ast.InsertStmt)
 		assert.True(t, ok)
 
-		assert.Equal(t, ast.StmtTypeInsert, insertStmt.StmtType)
 		assert.Equal(t, "users", insertStmt.Table.TableName)
 
 		// カラム数の確認

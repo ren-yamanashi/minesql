@@ -19,7 +19,7 @@ type WhereParser struct {
 
 // WHERE 句のパースを開始する (WHERE キーワードを検出した時点で呼ぶ)
 func (wp *WhereParser) initWhere() *ast.WhereClause {
-	wp.whereClause = &ast.WhereClause{IsSet: true}
+	wp.whereClause = &ast.WhereClause{}
 	wp.nodeStack = []ast.ASTNode{}
 	wp.opStack = []string{}
 	return wp.whereClause
@@ -54,11 +54,11 @@ func (wp *WhereParser) handleOperator(op string) error {
 }
 
 // WHERE 句を確定する (finalize 時に呼ぶ)。
-// WHERE 句が未設定の場合は IsSet=false の WhereClause を返す。
+// WHERE 句が未設定の場合は nil を返す。
 func (wp *WhereParser) finalizeWhere() (*ast.WhereClause, error) {
-	// WHERE 句がない場合は空の WhereClause を返す
+	// WHERE 句がない場合は nil を返す
 	if wp.whereClause == nil {
-		return &ast.WhereClause{IsSet: false}, nil
+		return nil, nil
 	}
 
 	// 残っている演算子をすべて処理

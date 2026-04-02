@@ -75,7 +75,7 @@ func (dp *DeleteParser) OnKeyword(word string) {
 
 	switch upperWord {
 	case KDelete:
-		dp.stmt = &ast.DeleteStmt{StmtType: ast.StmtTypeDelete}
+		dp.stmt = &ast.DeleteStmt{}
 		dp.state = DeleteStateDelete
 		return
 
@@ -153,7 +153,7 @@ func (dp *DeleteParser) OnString(value string) {
 		return
 	}
 	if dp.state == DeleteStateWhere {
-		dp.where.pushLiteral(ast.NewStringLiteral(value, value))
+		dp.where.pushLiteral(ast.NewStringLiteral(value))
 	}
 }
 
@@ -162,7 +162,7 @@ func (dp *DeleteParser) OnNumber(num string) {
 		return
 	}
 	if dp.state == DeleteStateWhere {
-		dp.where.pushLiteral(ast.NewStringLiteral(num, num))
+		dp.where.pushLiteral(ast.NewStringLiteral(num))
 	}
 }
 

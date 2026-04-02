@@ -21,9 +21,9 @@ func TestPlanUpdate(t *testing.T) {
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
-				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
+				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("Jane")},
 			},
-			Where: &ast.WhereClause{IsSet: false},
+			Where: nil,
 		}
 
 		// WHEN
@@ -50,10 +50,10 @@ func TestPlanUpdate(t *testing.T) {
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
-				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
-				{Column: *ast.NewColumnId("last_name"), Value: ast.NewStringLiteral("'Doe'", "Doe")},
+				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("Jane")},
+				{Column: *ast.NewColumnId("last_name"), Value: ast.NewStringLiteral("Doe")},
 			},
-			Where: &ast.WhereClause{IsSet: false},
+			Where: nil,
 		}
 		exec, err := PlanUpdate(trxId, stmt)
 		assert.NoError(t, err)
@@ -83,7 +83,7 @@ func TestPlanUpdate(t *testing.T) {
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("nonexistent"),
 			SetClauses: []*ast.SetClause{
-				{Column: *ast.NewColumnId("id"), Value: ast.NewStringLiteral("'1'", "1")},
+				{Column: *ast.NewColumnId("id"), Value: ast.NewStringLiteral("1")},
 			},
 		}
 
@@ -105,9 +105,9 @@ func TestPlanUpdate(t *testing.T) {
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
-				{Column: *ast.NewColumnId("nonexistent"), Value: ast.NewStringLiteral("'val'", "val")},
+				{Column: *ast.NewColumnId("nonexistent"), Value: ast.NewStringLiteral("val")},
 			},
-			Where: &ast.WhereClause{IsSet: false},
+			Where: nil,
 		}
 
 		// WHEN
@@ -129,14 +129,13 @@ func TestPlanUpdate(t *testing.T) {
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
-				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
+				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("Jane")},
 			},
 			Where: &ast.WhereClause{
-				IsSet: true,
 				Condition: ast.NewBinaryExpr(
 					"=",
 					ast.NewLhsColumn(*ast.NewColumnId("non_existent")),
-					ast.NewRhsLiteral(ast.NewStringLiteral("test", "test")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("test")),
 				),
 			},
 		}
@@ -170,15 +169,14 @@ func TestPlanUpdate(t *testing.T) {
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
-				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
+				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("Jane")},
 			},
 			Where: &ast.WhereClause{
 				Condition: ast.NewBinaryExpr(
 					"=",
 					ast.NewLhsColumn(*ast.NewColumnId("id")),
-					ast.NewRhsLiteral(ast.NewStringLiteral("a", "a")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("a")),
 				),
-				IsSet: true,
 			},
 		}
 
@@ -210,7 +208,7 @@ func TestPlanUpdate(t *testing.T) {
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
-				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
+				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("Jane")},
 			},
 			Where: nil,
 		}
@@ -234,13 +232,13 @@ func TestPlanUpdate(t *testing.T) {
 		stmt := &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
-				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("'Jane'", "Jane")},
+				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("Jane")},
 			},
 			Where: &ast.WhereClause{Condition: ast.NewBinaryExpr(
 				"=",
 				ast.NewLhsColumn(*ast.NewColumnId("last_name")),
-				ast.NewRhsLiteral(ast.NewStringLiteral("'Doe'", "Doe")),
-			), IsSet: true},
+				ast.NewRhsLiteral(ast.NewStringLiteral("Doe")),
+			)},
 		}
 
 		// WHEN
@@ -267,7 +265,7 @@ func TestPlanUpdate(t *testing.T) {
 		stmt := &ast.UpdateStmt{
 			Table:      *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{},
-			Where:      &ast.WhereClause{IsSet: false},
+			Where:      nil,
 		}
 		exec, err := PlanUpdate(trxId, stmt)
 		assert.NoError(t, err)

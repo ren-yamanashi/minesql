@@ -173,29 +173,31 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 	}
 
 	// トランザクション制御は planner を通さず直接処理する
-	switch node.(type) {
-	case *ast.BeginStmt:
-		if sess.trxId != 0 {
-			return "", fmt.Errorf("transaction already started")
+	if txStmt, ok := node.(*ast.TransactionStmt); ok {
+		switch txStmt.Kind {
+		case ast.TxBegin:
+			if sess.trxId != 0 {
+				return "", fmt.Errorf("transaction already started")
+			}
+			sess.trxId = handler.Get().BeginTrx()
+			return "", nil
+		case ast.TxCommit:
+			if sess.trxId == 0 {
+				return "", fmt.Errorf("no active transaction")
+			}
+			handler.Get().CommitTrx(sess.trxId)
+			sess.trxId = 0
+			return "", nil
+		case ast.TxRollback:
+			if sess.trxId == 0 {
+				return "", fmt.Errorf("no active transaction")
+			}
+			if err := handler.Get().RollbackTrx(sess.trxId); err != nil {
+				return "", err
+			}
+			sess.trxId = 0
+			return "", nil
 		}
-		sess.trxId = handler.Get().BeginTrx()
-		return "", nil
-	case *ast.CommitStmt:
-		if sess.trxId == 0 {
-			return "", fmt.Errorf("no active transaction")
-		}
-		handler.Get().CommitTrx(sess.trxId)
-		sess.trxId = 0
-		return "", nil
-	case *ast.RollbackStmt:
-		if sess.trxId == 0 {
-			return "", fmt.Errorf("no active transaction")
-		}
-		if err := handler.Get().RollbackTrx(sess.trxId); err != nil {
-			return "", err
-		}
-		sess.trxId = 0
-		return "", nil
 	}
 
 	// トランザクション外の DML は autocommit (一時的な trxId を発行して即 Commit)

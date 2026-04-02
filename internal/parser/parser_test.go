@@ -100,8 +100,9 @@ func TestParse(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		_, ok := result.(*ast.BeginStmt)
+		stmt, ok := result.(*ast.TransactionStmt)
 		assert.True(t, ok)
+		assert.Equal(t, ast.TxBegin, stmt.Kind)
 	})
 
 	t.Run("COMMIT 文をパースできる", func(t *testing.T) {
@@ -113,8 +114,9 @@ func TestParse(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		_, ok := result.(*ast.CommitStmt)
+		stmt, ok := result.(*ast.TransactionStmt)
 		assert.True(t, ok)
+		assert.Equal(t, ast.TxCommit, stmt.Kind)
 	})
 
 	t.Run("ROLLBACK 文をパースできる", func(t *testing.T) {
@@ -126,8 +128,9 @@ func TestParse(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		_, ok := result.(*ast.RollbackStmt)
+		stmt, ok := result.(*ast.TransactionStmt)
 		assert.True(t, ok)
+		assert.Equal(t, ast.TxRollback, stmt.Kind)
 	})
 
 	t.Run("コメント付き SQL をパースできる", func(t *testing.T) {
@@ -278,7 +281,7 @@ func TestOnKeyword(t *testing.T) {
 		assert.True(t, ok)
 	})
 
-	t.Run("BEGIN で TransactionParser (StmtTypeBegin) がセットされる", func(t *testing.T) {
+	t.Run("BEGIN で TransactionParser (TxBegin) がセットされる", func(t *testing.T) {
 		// GIVEN
 		p := NewParser()
 
@@ -288,10 +291,10 @@ func TestOnKeyword(t *testing.T) {
 		// THEN
 		tp, ok := p.currentHandler.(*TransactionParser)
 		assert.True(t, ok)
-		assert.Equal(t, ast.StmtTypeBegin, tp.stmtType)
+		assert.Equal(t, ast.TxBegin, tp.kind)
 	})
 
-	t.Run("COMMIT で TransactionParser (StmtTypeCommit) がセットされる", func(t *testing.T) {
+	t.Run("COMMIT で TransactionParser (TxCommit) がセットされる", func(t *testing.T) {
 		// GIVEN
 		p := NewParser()
 
@@ -301,10 +304,10 @@ func TestOnKeyword(t *testing.T) {
 		// THEN
 		tp, ok := p.currentHandler.(*TransactionParser)
 		assert.True(t, ok)
-		assert.Equal(t, ast.StmtTypeCommit, tp.stmtType)
+		assert.Equal(t, ast.TxCommit, tp.kind)
 	})
 
-	t.Run("ROLLBACK で TransactionParser (StmtTypeRollback) がセットされる", func(t *testing.T) {
+	t.Run("ROLLBACK で TransactionParser (TxRollback) がセットされる", func(t *testing.T) {
 		// GIVEN
 		p := NewParser()
 
@@ -314,7 +317,7 @@ func TestOnKeyword(t *testing.T) {
 		// THEN
 		tp, ok := p.currentHandler.(*TransactionParser)
 		assert.True(t, ok)
-		assert.Equal(t, ast.StmtTypeRollback, tp.stmtType)
+		assert.Equal(t, ast.TxRollback, tp.kind)
 	})
 
 	t.Run("小文字でもディスパッチされる", func(t *testing.T) {

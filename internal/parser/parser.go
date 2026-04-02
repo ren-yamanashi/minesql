@@ -186,17 +186,17 @@ func (p *Parser) OnKeyword(word string) {
 		p.currentHandler.OnKeyword(word)
 		return
 
-	// トランザクション系はコンストラクタ引数で StmtType を受け取るため OnKeyword のデリゲートは不要
+	// トランザクション系はキーワードのみで構成されるため OnKeyword のデリゲートは不要
 	case KBegin:
-		p.currentHandler = NewTransactionParser(ast.StmtTypeBegin)
+		p.currentHandler = NewTransactionParser(ast.TxBegin)
 		return
 
 	case KCommit:
-		p.currentHandler = NewTransactionParser(ast.StmtTypeCommit)
+		p.currentHandler = NewTransactionParser(ast.TxCommit)
 		return
 
 	case KRollback:
-		p.currentHandler = NewTransactionParser(ast.StmtTypeRollback)
+		p.currentHandler = NewTransactionParser(ast.TxRollback)
 		return
 	}
 }

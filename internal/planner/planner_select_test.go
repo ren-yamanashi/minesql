@@ -15,7 +15,7 @@ func TestPlanSelect(t *testing.T) {
 		initStorageManagerForTest(t)
 		defer handler.Reset()
 
-		stmt := &ast.SelectStmt{StmtType: ast.StmtTypeSelect, From: *ast.NewTableId("non_existent_table"), Where: &ast.WhereClause{IsSet: false}}
+		stmt := &ast.SelectStmt{From: *ast.NewTableId("non_existent_table"), Where: nil}
 
 		// WHEN
 		exec, err := PlanSelect(stmt)
@@ -37,9 +37,8 @@ func TestPlanSelect(t *testing.T) {
 		})
 
 		stmt := &ast.SelectStmt{
-			StmtType: ast.StmtTypeSelect,
-			From:     *ast.NewTableId("users"),
-			Where:    &ast.WhereClause{IsSet: false},
+			From:  *ast.NewTableId("users"),
+			Where: nil,
 		}
 
 		// WHEN
@@ -63,9 +62,8 @@ func TestPlanSelect(t *testing.T) {
 		})
 
 		stmt := &ast.SelectStmt{
-			StmtType: ast.StmtTypeSelect,
-			From:     *ast.NewTableId("users"),
-			Where:    &ast.WhereClause{IsSet: false},
+			From:  *ast.NewTableId("users"),
+			Where: nil,
 		}
 
 		// WHEN
@@ -89,14 +87,12 @@ func TestPlanSelect(t *testing.T) {
 		})
 
 		stmt := &ast.SelectStmt{
-			StmtType: ast.StmtTypeSelect,
-			From:     *ast.NewTableId("users"),
+			From: *ast.NewTableId("users"),
 			Where: &ast.WhereClause{
-				IsSet: true,
 				Condition: ast.NewBinaryExpr(
 					"=",
 					ast.NewLhsColumn(*ast.NewColumnId("id")),
-					ast.NewRhsLiteral(ast.NewStringLiteral("1", "1")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("1")),
 				),
 			},
 		}
@@ -120,14 +116,12 @@ func TestPlanSelect(t *testing.T) {
 		})
 
 		stmt := &ast.SelectStmt{
-			StmtType: ast.StmtTypeSelect,
-			From:     *ast.NewTableId("users"),
+			From: *ast.NewTableId("users"),
 			Where: &ast.WhereClause{
-				IsSet: true,
 				Condition: ast.NewBinaryExpr(
 					"=",
 					ast.NewLhsColumn(*ast.NewColumnId("non_existent")),
-					ast.NewRhsLiteral(ast.NewStringLiteral("test", "test")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("test")),
 				),
 			},
 		}
@@ -153,28 +147,26 @@ func TestPlanSelect(t *testing.T) {
 
 		// データを挿入
 		executePlan(t, &ast.InsertStmt{
-			StmtType: ast.StmtTypeInsert,
-			Table:    *ast.NewTableId("users"),
+			Table: *ast.NewTableId("users"),
 			Cols: []ast.ColumnId{
 				*ast.NewColumnId("id"),
 				*ast.NewColumnId("name"),
 			},
 			Values: [][]ast.Literal{
 				{
-					ast.NewStringLiteral("'1'", "1"),
-					ast.NewStringLiteral("'Alice'", "Alice"),
+					ast.NewStringLiteral("1"),
+					ast.NewStringLiteral("Alice"),
 				},
 				{
-					ast.NewStringLiteral("'2'", "2"),
-					ast.NewStringLiteral("'Bob'", "Bob"),
+					ast.NewStringLiteral("2"),
+					ast.NewStringLiteral("Bob"),
 				},
 			},
 		})
 
 		stmt := &ast.SelectStmt{
-			StmtType: ast.StmtTypeSelect,
-			From:     *ast.NewTableId("users"),
-			Where:    &ast.WhereClause{IsSet: false},
+			From:  *ast.NewTableId("users"),
+			Where: nil,
 		}
 
 		// WHEN

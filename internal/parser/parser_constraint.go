@@ -65,16 +65,12 @@ func (cp *ConstraintParser) OnKeyword(word string) {
 		switch upper {
 		case KPrimary:
 			cp.isPK = true
-			cp.pkDef = &ast.ConstraintPrimaryKeyDef{
-				DefType: ast.DefTypeConstraintPrimaryKey,
-			}
+			cp.pkDef = &ast.ConstraintPrimaryKeyDef{}
 			cp.state = CreateStateConstraint
 			return
 		case KUnique:
 			cp.isPK = false
-			cp.ukDef = &ast.ConstraintUniqueKeyDef{
-				DefType: ast.DefTypeConstraintUniqueKey,
-			}
+			cp.ukDef = &ast.ConstraintUniqueKeyDef{}
 			cp.state = CreateStateConstraint
 			return
 		default:

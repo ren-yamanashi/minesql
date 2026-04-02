@@ -23,10 +23,8 @@ func TestParserDelete(t *testing.T) {
 		deleteStmt, ok := result.(*ast.DeleteStmt)
 		assert.True(t, ok)
 
-		assert.Equal(t, ast.StmtTypeDelete, deleteStmt.StmtType)
 		assert.Equal(t, "users", deleteStmt.From.TableName)
-		assert.NotNil(t, deleteStmt.Where)
-		assert.False(t, deleteStmt.Where.IsSet)
+		assert.Nil(t, deleteStmt.Where)
 	})
 
 	t.Run("WHERE 句付きの DELETE 文をパースできる", func(t *testing.T) {
@@ -44,11 +42,9 @@ func TestParserDelete(t *testing.T) {
 		deleteStmt, ok := result.(*ast.DeleteStmt)
 		assert.True(t, ok)
 
-		assert.Equal(t, ast.StmtTypeDelete, deleteStmt.StmtType)
 		assert.Equal(t, "users", deleteStmt.From.TableName)
 
 		assert.NotNil(t, deleteStmt.Where)
-		assert.True(t, deleteStmt.Where.IsSet)
 		assert.NotNil(t, deleteStmt.Where.Condition)
 
 		binaryExpr, ok := deleteStmt.Where.Condition.(*ast.BinaryExpr)

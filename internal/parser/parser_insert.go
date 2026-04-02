@@ -83,7 +83,6 @@ func (ip *InsertParser) OnKeyword(word string) {
 	case InsertStateStart:
 		// 最初のキーワードは INSERT である必要がある
 		if upper == KInsert {
-			ip.stmt.StmtType = ast.StmtTypeInsert
 			ip.state = InsertStateInsert
 			return
 		}
@@ -210,7 +209,7 @@ func (ip *InsertParser) OnString(value string) {
 		return
 	}
 	if ip.state == InsertStateValueList {
-		ip.currentRow = append(ip.currentRow, ast.NewStringLiteral(value, value))
+		ip.currentRow = append(ip.currentRow, ast.NewStringLiteral(value))
 		return
 	}
 	ip.setError(errors.New("[parse error] unexpected string: " + value))
@@ -221,7 +220,7 @@ func (ip *InsertParser) OnNumber(num string) {
 		return
 	}
 	if ip.state == InsertStateValueList {
-		ip.currentRow = append(ip.currentRow, ast.NewStringLiteral(num, num))
+		ip.currentRow = append(ip.currentRow, ast.NewStringLiteral(num))
 		return
 	}
 	ip.setError(errors.New("[parse error] unexpected number: " + num))

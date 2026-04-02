@@ -30,7 +30,7 @@ func (sp *Search) Build() (executor.Executor, error) {
 	}
 
 	// WHERE 句が設定されていない場合フルテーブルスキャンを実行
-	if sp.where == nil || !sp.where.IsSet {
+	if sp.where == nil {
 		return executor.NewTableScan(
 			tbl,
 			access.RecordSearchModeStart{},

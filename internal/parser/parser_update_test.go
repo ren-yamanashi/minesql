@@ -23,13 +23,11 @@ func TestParserUpdate(t *testing.T) {
 		updateStmt, ok := result.(*ast.UpdateStmt)
 		assert.True(t, ok)
 
-		assert.Equal(t, ast.StmtTypeUpdate, updateStmt.StmtType)
 		assert.Equal(t, "users", updateStmt.Table.TableName)
 		assert.Equal(t, 1, len(updateStmt.SetClauses))
 		assert.Equal(t, "first_name", updateStmt.SetClauses[0].Column.ColName)
 		assert.Equal(t, "Jane", updateStmt.SetClauses[0].Value.ToString())
-		assert.NotNil(t, updateStmt.Where)
-		assert.False(t, updateStmt.Where.IsSet)
+		assert.Nil(t, updateStmt.Where)
 	})
 
 	t.Run("複数カラムの UPDATE 文をパースできる", func(t *testing.T) {
@@ -76,7 +74,6 @@ func TestParserUpdate(t *testing.T) {
 		assert.Equal(t, "Jane", updateStmt.SetClauses[0].Value.ToString())
 
 		assert.NotNil(t, updateStmt.Where)
-		assert.True(t, updateStmt.Where.IsSet)
 
 		binaryExpr, ok := updateStmt.Where.Condition.(*ast.BinaryExpr)
 		assert.True(t, ok)
@@ -110,7 +107,7 @@ func TestParserUpdate(t *testing.T) {
 		assert.Equal(t, "first_name", updateStmt.SetClauses[0].Column.ColName)
 		assert.Equal(t, "last_name", updateStmt.SetClauses[1].Column.ColName)
 
-		assert.True(t, updateStmt.Where.IsSet)
+		assert.NotNil(t, updateStmt.Where)
 		assert.NotNil(t, updateStmt.Where.Condition)
 
 		// AND で結合された式
@@ -154,7 +151,7 @@ func TestParserUpdate(t *testing.T) {
 		updateStmt, ok := result.(*ast.UpdateStmt)
 		assert.True(t, ok)
 
-		assert.True(t, updateStmt.Where.IsSet)
+		assert.NotNil(t, updateStmt.Where)
 
 		orExpr, ok := updateStmt.Where.Condition.(*ast.BinaryExpr)
 		assert.True(t, ok)
@@ -211,7 +208,7 @@ func TestParserUpdate(t *testing.T) {
 		updateStmt, ok := result.(*ast.UpdateStmt)
 		assert.True(t, ok)
 
-		assert.True(t, updateStmt.Where.IsSet)
+		assert.NotNil(t, updateStmt.Where)
 
 		binaryExpr, ok := updateStmt.Where.Condition.(*ast.BinaryExpr)
 		assert.True(t, ok)

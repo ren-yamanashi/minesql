@@ -33,26 +33,23 @@ func setupPlannerExample() func() {
 
 	// CREATE TABLE
 	runPlan(&ast.CreateTableStmt{
-		StmtType:  ast.StmtTypeCreate,
-		Keyword:   ast.KeywordTable,
 		TableName: "users",
 		CreateDefinitions: []ast.Definition{
-			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
-			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "first_name", DataType: ast.DataTypeVarchar},
-			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "last_name", DataType: ast.DataTypeVarchar},
-			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "gender", DataType: ast.DataTypeVarchar},
-			&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "username", DataType: ast.DataTypeVarchar},
-			&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+			&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{ColName: "first_name", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{ColName: "last_name", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{ColName: "gender", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{ColName: "username", DataType: ast.DataTypeVarchar},
+			&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{
 				*ast.NewColumnId("id"),
 			}},
-			&ast.ConstraintUniqueKeyDef{DefType: ast.DefTypeConstraintUniqueKey, Column: *ast.NewColumnId("username")},
+			&ast.ConstraintUniqueKeyDef{Column: *ast.NewColumnId("username")},
 		},
 	})
 
 	// INSERT
 	runPlan(&ast.InsertStmt{
-		StmtType: ast.StmtTypeInsert,
-		Table:    *ast.NewTableId("users"),
+		Table: *ast.NewTableId("users"),
 		Cols: []ast.ColumnId{
 			*ast.NewColumnId("id"),
 			*ast.NewColumnId("first_name"),
@@ -62,46 +59,46 @@ func setupPlannerExample() func() {
 		},
 		Values: [][]ast.Literal{
 			{
-				ast.NewStringLiteral("1", "1"),
-				ast.NewStringLiteral("John", "John"),
-				ast.NewStringLiteral("Doe", "Doe"),
-				ast.NewStringLiteral("male", "male"),
-				ast.NewStringLiteral("johndoe", "johndoe"),
+				ast.NewStringLiteral("1"),
+				ast.NewStringLiteral("John"),
+				ast.NewStringLiteral("Doe"),
+				ast.NewStringLiteral("male"),
+				ast.NewStringLiteral("johndoe"),
 			},
 			{
-				ast.NewStringLiteral("2", "2"),
-				ast.NewStringLiteral("John", "John"),
-				ast.NewStringLiteral("Doe2", "Doe2"),
-				ast.NewStringLiteral("male", "male"),
-				ast.NewStringLiteral("johndoe2", "johndoe2"),
+				ast.NewStringLiteral("2"),
+				ast.NewStringLiteral("John"),
+				ast.NewStringLiteral("Doe2"),
+				ast.NewStringLiteral("male"),
+				ast.NewStringLiteral("johndoe2"),
 			},
 			{
-				ast.NewStringLiteral("3", "3"),
-				ast.NewStringLiteral("John", "John"),
-				ast.NewStringLiteral("Doe3", "Doe3"),
-				ast.NewStringLiteral("male", "male"),
-				ast.NewStringLiteral("johndoe3", "johndoe3"),
+				ast.NewStringLiteral("3"),
+				ast.NewStringLiteral("John"),
+				ast.NewStringLiteral("Doe3"),
+				ast.NewStringLiteral("male"),
+				ast.NewStringLiteral("johndoe3"),
 			},
 			{
-				ast.NewStringLiteral("4", "4"),
-				ast.NewStringLiteral("Jane", "Jane"),
-				ast.NewStringLiteral("Doe2", "Doe2"),
-				ast.NewStringLiteral("female", "female"),
-				ast.NewStringLiteral("janedoe", "janedoe"),
+				ast.NewStringLiteral("4"),
+				ast.NewStringLiteral("Jane"),
+				ast.NewStringLiteral("Doe2"),
+				ast.NewStringLiteral("female"),
+				ast.NewStringLiteral("janedoe"),
 			},
 			{
-				ast.NewStringLiteral("5", "5"),
-				ast.NewStringLiteral("Jonathan", "Jonathan"),
-				ast.NewStringLiteral("Black", "Black"),
-				ast.NewStringLiteral("male", "male"),
-				ast.NewStringLiteral("jonathanblack", "jonathanblack"),
+				ast.NewStringLiteral("5"),
+				ast.NewStringLiteral("Jonathan"),
+				ast.NewStringLiteral("Black"),
+				ast.NewStringLiteral("male"),
+				ast.NewStringLiteral("jonathanblack"),
 			},
 			{
-				ast.NewStringLiteral("6", "6"),
-				ast.NewStringLiteral("Tom", "Tom"),
-				ast.NewStringLiteral("Brown", "Brown"),
-				ast.NewStringLiteral("male", "male"),
-				ast.NewStringLiteral("tombrown", "tombrown"),
+				ast.NewStringLiteral("6"),
+				ast.NewStringLiteral("Tom"),
+				ast.NewStringLiteral("Brown"),
+				ast.NewStringLiteral("male"),
+				ast.NewStringLiteral("tombrown"),
 			},
 		},
 	})
@@ -147,9 +144,8 @@ func Example_scanAll() {
 	defer cleanup()
 
 	records := runPlan(&ast.SelectStmt{
-		StmtType: ast.StmtTypeSelect,
-		From:     *ast.NewTableId("users"),
-		Where:    &ast.WhereClause{IsSet: false},
+		From:  *ast.NewTableId("users"),
+		Where: nil,
 	})
 	printPlanRecords(records)
 
@@ -168,15 +164,13 @@ func Example_assertEqual() {
 	defer cleanup()
 
 	records := runPlan(&ast.SelectStmt{
-		StmtType: ast.StmtTypeSelect,
-		From:     *ast.NewTableId("users"),
+		From: *ast.NewTableId("users"),
 		Where: &ast.WhereClause{
 			Condition: ast.NewBinaryExpr(
 				"=",
 				ast.NewLhsColumn(*ast.NewColumnId("username")),
-				ast.NewRhsLiteral(ast.NewStringLiteral("janedoe", "janedoe")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("janedoe")),
 			),
-			IsSet: true,
 		},
 	})
 	printPlanRecords(records)
@@ -192,8 +186,7 @@ func Example_filter() {
 
 	// SELECT * FROM users WHERE (first_name < 'K' AND gender = 'male' AND last_name >= 'Doe') OR first_name = 'Tom'
 	records := runPlan(&ast.SelectStmt{
-		StmtType: ast.StmtTypeSelect,
-		From:     *ast.NewTableId("users"),
+		From: *ast.NewTableId("users"),
 		Where: &ast.WhereClause{
 			Condition: ast.NewBinaryExpr(
 				"OR",
@@ -204,7 +197,7 @@ func Example_filter() {
 							ast.NewBinaryExpr(
 								"<",
 								ast.NewLhsColumn(*ast.NewColumnId("first_name")),
-								ast.NewRhsLiteral(ast.NewStringLiteral("K", "K")),
+								ast.NewRhsLiteral(ast.NewStringLiteral("K")),
 							),
 						),
 						ast.NewRhsExpr(
@@ -214,14 +207,14 @@ func Example_filter() {
 									ast.NewBinaryExpr(
 										"=",
 										ast.NewLhsColumn(*ast.NewColumnId("gender")),
-										ast.NewRhsLiteral(ast.NewStringLiteral("male", "male")),
+										ast.NewRhsLiteral(ast.NewStringLiteral("male")),
 									),
 								),
 								ast.NewRhsExpr(
 									ast.NewBinaryExpr(
 										">=",
 										ast.NewLhsColumn(*ast.NewColumnId("last_name")),
-										ast.NewRhsLiteral(ast.NewStringLiteral("Doe", "Doe")),
+										ast.NewRhsLiteral(ast.NewStringLiteral("Doe")),
 									),
 								),
 							),
@@ -232,11 +225,10 @@ func Example_filter() {
 					ast.NewBinaryExpr(
 						"=",
 						ast.NewLhsColumn(*ast.NewColumnId("first_name")),
-						ast.NewRhsLiteral(ast.NewStringLiteral("Tom", "Tom")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("Tom")),
 					),
 				),
 			),
-			IsSet: true,
 		},
 	})
 	printPlanRecords(records)
@@ -257,22 +249,20 @@ func Example_update() {
 	runPlan(&ast.UpdateStmt{
 		Table: *ast.NewTableId("users"),
 		SetClauses: []*ast.SetClause{
-			{Column: *ast.NewColumnId("last_name"), Value: ast.NewStringLiteral("'Smith'", "Smith")},
+			{Column: *ast.NewColumnId("last_name"), Value: ast.NewStringLiteral("Smith")},
 		},
 		Where: &ast.WhereClause{
 			Condition: ast.NewBinaryExpr(
 				"=",
 				ast.NewLhsColumn(*ast.NewColumnId("username")),
-				ast.NewRhsLiteral(ast.NewStringLiteral("johndoe", "johndoe")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("johndoe")),
 			),
-			IsSet: true,
 		},
 	})
 
 	records := runPlan(&ast.SelectStmt{
-		StmtType: ast.StmtTypeSelect,
-		From:     *ast.NewTableId("users"),
-		Where:    &ast.WhereClause{IsSet: false},
+		From:  *ast.NewTableId("users"),
+		Where: nil,
 	})
 	printPlanRecords(records)
 
@@ -292,22 +282,19 @@ func Example_delete() {
 
 	// DELETE FROM users WHERE username = 'johndoe2'
 	runPlan(&ast.DeleteStmt{
-		StmtType: ast.StmtTypeDelete,
-		From:     *ast.NewTableId("users"),
+		From: *ast.NewTableId("users"),
 		Where: &ast.WhereClause{
 			Condition: ast.NewBinaryExpr(
 				"=",
 				ast.NewLhsColumn(*ast.NewColumnId("username")),
-				ast.NewRhsLiteral(ast.NewStringLiteral("johndoe2", "johndoe2")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("johndoe2")),
 			),
-			IsSet: true,
 		},
 	})
 
 	records := runPlan(&ast.SelectStmt{
-		StmtType: ast.StmtTypeSelect,
-		From:     *ast.NewTableId("users"),
-		Where:    &ast.WhereClause{IsSet: false},
+		From:  *ast.NewTableId("users"),
+		Where: nil,
 	})
 	printPlanRecords(records)
 

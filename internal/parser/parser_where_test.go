@@ -27,7 +27,6 @@ func TestParserWhere(t *testing.T) {
 		assert.True(t, ok)
 
 		assert.NotNil(t, selectStmt.Where)
-		assert.True(t, selectStmt.Where.IsSet)
 
 		binaryExpr, ok := selectStmt.Where.Condition.(*ast.BinaryExpr)
 		assert.True(t, ok)

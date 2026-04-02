@@ -23,11 +23,8 @@ func TestParserSelect(t *testing.T) {
 		selectStmt, ok := result.(*ast.SelectStmt)
 		assert.True(t, ok)
 
-		assert.Equal(t, ast.StmtTypeSelect, selectStmt.StmtType)
 		assert.Equal(t, "users", selectStmt.From.TableName)
-		assert.Equal(t, ast.IdTypeTable, selectStmt.From.IdType)
-		assert.NotNil(t, selectStmt.Where)
-		assert.False(t, selectStmt.Where.IsSet)
+		assert.Nil(t, selectStmt.Where)
 	})
 
 	t.Run("WHERE 句付きの SELECT 文をパースできる", func(t *testing.T) {
@@ -45,11 +42,9 @@ func TestParserSelect(t *testing.T) {
 		selectStmt, ok := result.(*ast.SelectStmt)
 		assert.True(t, ok)
 
-		assert.Equal(t, ast.StmtTypeSelect, selectStmt.StmtType)
 		assert.Equal(t, "users", selectStmt.From.TableName)
 
 		assert.NotNil(t, selectStmt.Where)
-		assert.True(t, selectStmt.Where.IsSet)
 		assert.NotNil(t, selectStmt.Where.Condition)
 
 		binaryExpr, ok := selectStmt.Where.Condition.(*ast.BinaryExpr)
@@ -86,7 +81,7 @@ WHERE id = '1' -- id が 1 のレコード
 			selectStmt, ok := result.(*ast.SelectStmt)
 			assert.True(t, ok)
 			assert.Equal(t, "users", selectStmt.From.TableName)
-			assert.True(t, selectStmt.Where.IsSet)
+			assert.NotNil(t, selectStmt.Where)
 		})
 
 		t.Run("ブロックコメント付き", func(t *testing.T) {
@@ -109,7 +104,7 @@ WHERE id = '1' /* id が 1 のレコード */
 			selectStmt, ok := result.(*ast.SelectStmt)
 			assert.True(t, ok)
 			assert.Equal(t, "users", selectStmt.From.TableName)
-			assert.True(t, selectStmt.Where.IsSet)
+			assert.NotNil(t, selectStmt.Where)
 		})
 	})
 

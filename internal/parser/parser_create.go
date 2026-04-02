@@ -85,7 +85,6 @@ func (cp *CreateParser) OnKeyword(word string) {
 		}
 	case CreateStateCreate:
 		if upper == KTable {
-			cp.stmt.Keyword = ast.KeywordTable
 			cp.state = CreateStateTable
 			return
 		}

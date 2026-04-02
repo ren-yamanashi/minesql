@@ -76,7 +76,7 @@ func (sp *SelectParser) OnKeyword(word string) {
 
 	switch upperWord {
 	case KSelect:
-		sp.stmt = &ast.SelectStmt{StmtType: ast.StmtTypeSelect}
+		sp.stmt = &ast.SelectStmt{}
 		sp.state = SelectStateColumns
 		return
 
@@ -164,7 +164,7 @@ func (sp *SelectParser) OnString(value string) {
 		return
 	}
 	if sp.state == SelectStateWhere {
-		sp.where.pushLiteral(ast.NewStringLiteral(value, value))
+		sp.where.pushLiteral(ast.NewStringLiteral(value))
 	}
 }
 
@@ -173,7 +173,7 @@ func (sp *SelectParser) OnNumber(num string) {
 		return
 	}
 	if sp.state == SelectStateWhere {
-		sp.where.pushLiteral(ast.NewStringLiteral(num, num))
+		sp.where.pushLiteral(ast.NewStringLiteral(num))
 	}
 }
 

@@ -17,8 +17,7 @@ func TestPlanDelete(t *testing.T) {
 
 		var trxId handler.TrxId = 1
 		stmt := &ast.DeleteStmt{
-			StmtType: ast.StmtTypeDelete,
-			From:     *ast.NewTableId("nonexistent"),
+			From: *ast.NewTableId("nonexistent"),
 		}
 
 		// WHEN
@@ -39,9 +38,8 @@ func TestPlanDelete(t *testing.T) {
 		createTableForTest(t, nil)
 
 		stmt := &ast.DeleteStmt{
-			StmtType: ast.StmtTypeDelete,
-			From:     *ast.NewTableId("users"),
-			Where:    &ast.WhereClause{IsSet: false},
+			From:  *ast.NewTableId("users"),
+			Where: nil,
 		}
 
 		// WHEN
@@ -65,14 +63,12 @@ func TestPlanDelete(t *testing.T) {
 		})
 
 		stmt := &ast.DeleteStmt{
-			StmtType: ast.StmtTypeDelete,
-			From:     *ast.NewTableId("users"),
+			From: *ast.NewTableId("users"),
 			Where: &ast.WhereClause{
-				IsSet: true,
 				Condition: ast.NewBinaryExpr(
 					"=",
 					ast.NewLhsColumn(*ast.NewColumnId("id")),
-					ast.NewRhsLiteral(ast.NewStringLiteral("1", "1")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("1")),
 				),
 			},
 		}
@@ -97,14 +93,12 @@ func TestPlanDelete(t *testing.T) {
 		})
 
 		stmt := &ast.DeleteStmt{
-			StmtType: ast.StmtTypeDelete,
-			From:     *ast.NewTableId("users"),
+			From: *ast.NewTableId("users"),
 			Where: &ast.WhereClause{
-				IsSet: true,
 				Condition: ast.NewBinaryExpr(
 					"=",
 					ast.NewLhsColumn(*ast.NewColumnId("non_existent")),
-					ast.NewRhsLiteral(ast.NewStringLiteral("test", "test")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("test")),
 				),
 			},
 		}
