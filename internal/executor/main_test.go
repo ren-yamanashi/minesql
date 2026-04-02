@@ -2,10 +2,8 @@ package executor
 
 import (
 	"fmt"
-	"minesql/internal/access"
-	"minesql/internal/catalog"
-	"minesql/internal/engine"
-	"minesql/internal/undo"
+	"minesql/internal/storage/access"
+	"minesql/internal/storage/handler"
 	"strings"
 	"testing"
 
@@ -16,7 +14,7 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("フルテーブルスキャンで全レコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// WHEN
 		records := collectAll(t, NewTableScan(
@@ -44,7 +42,7 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("範囲スキャンで指定範囲のレコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// WHEN: プライマリキーが "w" 以上 "y" 以下
 		records := collectAll(t, NewTableScan(
@@ -72,7 +70,7 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("定数検索で特定のレコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// WHEN
 		records := collectAll(t, NewTableScan(
@@ -98,7 +96,7 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("フィルタースキャンで条件に合うレコードのみ取得できる", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// WHEN: first_name が "Charlie" のレコード
 		records := collectAll(t, NewFilter(
@@ -127,7 +125,7 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("インデックススキャンで名前順に全レコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		idx, err := tbl.GetUniqueIndexByName("idx_first_name")
 		assert.NoError(t, err)
@@ -159,7 +157,7 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("インデックス範囲スキャンで姓の範囲を取得できる", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
 		assert.NoError(t, err)
@@ -191,7 +189,7 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("ユニークインデックス検索で特定の姓を取得できる", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
 		assert.NoError(t, err)
@@ -221,15 +219,14 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("UPDATE で値を更新し、インデックスも更新される", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId handler.TrxId = 1
 		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
 		assert.NoError(t, err)
 
 		// WHEN: Alice の last_name を Anderson に更新
-		upd := NewUpdate(undoLog, trxId, tbl, []SetColumn{
+		upd := NewUpdate(trxId, tbl, []SetColumn{
 			{Pos: 2, Value: []byte("Anderson")},
 		}, NewFilter(
 			NewTableScan(
@@ -284,13 +281,12 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("UPDATE でプライマリキーを変更できる", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId handler.TrxId = 1
 
 		// WHEN: プライマリキー "v" (Eve) を "a" に変更
-		upd := NewUpdate(undoLog, trxId, tbl, []SetColumn{
+		upd := NewUpdate(trxId, tbl, []SetColumn{
 			{Pos: 0, Value: []byte("a")},
 		}, NewTableScan(
 			tbl,
@@ -327,7 +323,7 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("Project で特定のカラムだけ取得できる", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// WHEN: first_name (pos=1) と last_name (pos=2) のみ取得
 		records := collectAll(t, NewProject(
@@ -358,7 +354,7 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("Filter + Project で条件に合うレコードの特定カラムを取得できる", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		// WHEN: first_name が "Charlie" のレコードから first_name と last_name を取得
 		records := collectAll(t, NewProject(
@@ -390,15 +386,14 @@ func TestExecutorIntegration(t *testing.T) {
 	t.Run("DELETE でレコードを削除し、インデックスからも削除される", func(t *testing.T) {
 		// GIVEN
 		tbl := setupExecutorTestTable(t)
-		defer engine.Reset()
+		defer handler.Reset()
 
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId handler.TrxId = 1
 		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
 		assert.NoError(t, err)
 
 		// WHEN: Bob を削除
-		del := NewDelete(undoLog, trxId, tbl, NewFilter(
+		del := NewDelete(trxId, tbl, NewFilter(
 			NewTableScan(
 				tbl,
 				access.RecordSearchModeStart{},
@@ -448,37 +443,35 @@ func TestExecutorIntegration(t *testing.T) {
 }
 
 // 5 人のユーザーを持つテーブルを作成し、テーブルアクセスメソッドを返す
-func setupExecutorTestTable(t *testing.T) *access.TableAccessMethod {
+func setupExecutorTestTable(t *testing.T) *access.Table {
 	t.Helper()
 
 	tmpdir := t.TempDir()
 	t.Setenv("MINESQL_DATA_DIR", tmpdir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "100")
-	engine.Reset()
-	engine.Init()
+	handler.Reset()
+	handler.Init()
 
 	createTable := NewCreateTable(
 		"users",
 		1,
-		[]*IndexParam{
-			{Name: "idx_first_name", ColName: "first_name", SecondaryKey: 1},
-			{Name: "idx_last_name", ColName: "last_name", SecondaryKey: 2},
+		[]handler.CreateIndexParam{
+			{Name: "idx_first_name", ColName: "first_name", UkIdx: 1},
+			{Name: "idx_last_name", ColName: "last_name", UkIdx: 2},
 		},
-		[]*ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "first_name", Type: catalog.ColumnTypeString},
-			{Name: "last_name", Type: catalog.ColumnTypeString},
+		[]handler.CreateColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "first_name", Type: handler.ColumnTypeString},
+			{Name: "last_name", Type: handler.ColumnTypeString},
 		})
 	_, err := createTable.Next()
 	assert.NoError(t, err)
 
-	tbl, err := getTableAccessMethod("users")
+	tbl, err := getTable("users")
 	assert.NoError(t, err)
 
-	undoLog := undo.NewUndoLog()
-	var trxId undo.TrxId = 1
+	var trxId handler.TrxId = 1
 	insert := NewInsert(
-		undoLog,
 		trxId,
 		tbl,
 		[]Record{
@@ -529,16 +522,12 @@ func writeRecords(sb *strings.Builder, records []Record) {
 	fmt.Fprintf(sb, "  合計: %d 件\n", len(records))
 }
 
-func getTableAccessMethod(tableName string) (*access.TableAccessMethod, error) {
-	e := engine.Get()
-	tblMeta, ok := e.Catalog.GetTableMetadataByName(tableName)
+func getTable(tableName string) (*access.Table, error) {
+	hdl := handler.Get()
+	tblMeta, ok := hdl.Catalog.GetTableMetaByName(tableName)
 	if !ok {
 		return nil, fmt.Errorf("table %s not found in catalog", tableName)
 	}
 
-	tbl, err := tblMeta.GetTable()
-	if err != nil {
-		return nil, err
-	}
-	return tbl, nil
+	return tblMeta.GetTable()
 }

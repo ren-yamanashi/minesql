@@ -12,29 +12,22 @@ import (
 	"time"
 
 	"minesql/internal/ast"
-	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/parser"
 	"minesql/internal/planner"
-	"minesql/internal/transaction"
-	"minesql/internal/undo"
+	"minesql/internal/storage/handler"
 )
 
 type Server struct {
 	Address        string
 	Port           int
-	storageManager *engine.Engine
-	undoLog        *undo.UndoLog
-	trxManager     *transaction.Manager
+	storageManager *handler.Handler
 }
 
 func NewServer(address string, port int) *Server {
-	undoLog := undo.NewUndoLog()
 	return &Server{
-		Address:    address,
-		Port:       port,
-		undoLog:    undoLog,
-		trxManager: transaction.NewManager(undoLog),
+		Address: address,
+		Port:    port,
 	}
 }
 
@@ -62,11 +55,10 @@ func (s *Server) Start() error {
 
 // サーバーを停止する
 func (s *Server) Stop() error {
-	err := s.storageManager.BufferPool.FlushPage()
-	if err != nil {
+	if err := s.storageManager.Shutdown(); err != nil {
 		return err
 	}
-	log.Println("All pages flushed successfully.")
+	log.Println("All pages flushed and synced successfully.")
 	return nil
 }
 
@@ -81,7 +73,7 @@ func (s *Server) init() error {
 	if err != nil {
 		return err
 	}
-	s.storageManager = engine.Init()
+	s.storageManager = handler.Init()
 	return nil
 }
 
@@ -114,14 +106,14 @@ func (s *Server) accept(listener *net.TCPListener) {
 }
 
 // クライアントからの接続を処理する
-// プロトコルの定義は ./docs/architecture/server.md#プロトコル を参照
+// プロトコルの定義は docs/architecture/server/server.md#プロトコル を参照
 func (s *Server) handleConnection(conn *net.TCPConn) {
 	sess := newSession()
 
 	defer func() {
 		// アクティブなトランザクションがあれば自動ロールバック
 		if sess.trxId != 0 {
-			if err := s.trxManager.Rollback(sess.trxId); err != nil {
+			if err := handler.Get().RollbackTrx(sess.trxId); err != nil {
 				log.Printf("Auto rollback error: %v", err)
 			}
 			sess.trxId = 0
@@ -186,20 +178,20 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 		if sess.trxId != 0 {
 			return "", fmt.Errorf("transaction already started")
 		}
-		sess.trxId = s.trxManager.Begin()
+		sess.trxId = handler.Get().BeginTrx()
 		return "", nil
 	case *ast.CommitStmt:
 		if sess.trxId == 0 {
 			return "", fmt.Errorf("no active transaction")
 		}
-		s.trxManager.Commit(sess.trxId)
+		handler.Get().CommitTrx(sess.trxId)
 		sess.trxId = 0
 		return "", nil
 	case *ast.RollbackStmt:
 		if sess.trxId == 0 {
 			return "", fmt.Errorf("no active transaction")
 		}
-		if err := s.trxManager.Rollback(sess.trxId); err != nil {
+		if err := handler.Get().RollbackTrx(sess.trxId); err != nil {
 			return "", err
 		}
 		sess.trxId = 0
@@ -207,16 +199,17 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 	}
 
 	// トランザクション外の DML は autocommit (一時的な trxId を発行して即 Commit)
+	hdl := handler.Get()
 	autocommit := sess.trxId == 0
 	trxId := sess.trxId
 	if autocommit {
-		trxId = s.trxManager.Begin()
+		trxId = hdl.BeginTrx()
 	}
 
-	exec, err := planner.Start(s.undoLog, trxId, node)
+	exec, err := planner.Start(trxId, node)
 	if err != nil {
 		if autocommit {
-			_ = s.trxManager.Rollback(trxId)
+			_ = hdl.RollbackTrx(trxId)
 		}
 		return "", err
 	}
@@ -226,7 +219,7 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 		record, err := exec.Next()
 		if err != nil {
 			if autocommit {
-				_ = s.trxManager.Rollback(trxId)
+				_ = hdl.RollbackTrx(trxId)
 			}
 			return "", err
 		}
@@ -237,7 +230,7 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 	}
 
 	if autocommit {
-		s.trxManager.Commit(trxId)
+		hdl.CommitTrx(trxId)
 	}
 
 	// 一旦、レスポンスは csv 形式で返す

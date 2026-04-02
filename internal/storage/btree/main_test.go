@@ -7,138 +7,12 @@ import (
 	"testing"
 
 	"minesql/internal/storage/btree/node"
-	"minesql/internal/storage/bufferpool"
+	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/page"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-// --- ログ出力ヘルパー ---
-
-// B+Tree の全データをスキャンし、key=..., value=... 形式でログに書き出す
-func writeScanLog(w *strings.Builder, bp *bufferpool.BufferPool, tree *BPlusTree) {
-	iter, err := tree.Search(bp, SearchModeStart{})
-	if err != nil {
-		panic(err)
-	}
-	count := 0
-	for {
-		record, ok, err := iter.Next(bp)
-		if err != nil {
-			panic(err)
-		}
-		if !ok {
-			break
-		}
-		fmt.Fprintf(w, "  key=%s, value=%s x %d\n", string(record.KeyBytes()), string(record.NonKeyBytes()[:1]), len(record.NonKeyBytes()))
-		count++
-	}
-	fmt.Fprintf(w, "  合計: %d 件\n", count)
-}
-
-// ツリーのルートノード情報をログに書き出す (ノードタイプ, キー数, キー一覧)
-func writeRootInfo(w *strings.Builder, bp *bufferpool.BufferPool, tree *BPlusTree) {
-	metaBuf, err := bp.FetchPage(tree.MetaPageId)
-	if err != nil {
-		panic(err)
-	}
-	defer bp.UnRefPage(tree.MetaPageId)
-
-	meta := newMetaPage(metaBuf.GetReadData())
-	rootPageId := meta.rootPageId()
-	writeNodeInfo(w, bp, rootPageId, 0)
-}
-
-// ノード情報を再帰的にログに書き出す
-func writeNodeInfo(w *strings.Builder, bp *bufferpool.BufferPool, pageId page.PageId, depth int) {
-	buf, err := bp.FetchPage(pageId)
-	if err != nil {
-		panic(err)
-	}
-	defer bp.UnRefPage(pageId)
-
-	indent := strings.Repeat("  ", depth)
-	nodeType := node.GetNodeType(buf.GetReadData())
-
-	if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
-		leafNode := node.NewLeafNode(buf.GetReadData())
-		keys := make([]string, leafNode.NumRecords())
-		for i := range leafNode.NumRecords() {
-			keys[i] = string(leafNode.RecordAt(i).KeyBytes())
-		}
-		fmt.Fprintf(w, "%sLeaf[keys=%d]: [%s]\n", indent, leafNode.NumRecords(), strings.Join(keys, ", "))
-	} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
-		branchNode := node.NewBranchNode(buf.GetReadData())
-		keys := make([]string, branchNode.NumRecords())
-		for i := range branchNode.NumRecords() {
-			keys[i] = string(branchNode.RecordAt(i).KeyBytes())
-		}
-		fmt.Fprintf(w, "%sBranch[keys=%d]: [%s]\n", indent, branchNode.NumRecords(), strings.Join(keys, ", "))
-
-		for i := range branchNode.NumRecords() + 1 {
-			childPageId := branchNode.ChildPageIdAt(i)
-			writeNodeInfo(w, bp, childPageId, depth+1)
-		}
-	}
-}
-
-// ツリーの形状 (高さ、各深さのノードタイプ・ノード数・キー数) をコンパクトに出力する
-func writeTreeShape(w *strings.Builder, bp *bufferpool.BufferPool, tree *BPlusTree) {
-	metaBuf, err := bp.FetchPage(tree.MetaPageId)
-	if err != nil {
-		panic(err)
-	}
-	meta := newMetaPage(metaBuf.GetReadData())
-	rootPageId := meta.rootPageId()
-	bp.UnRefPage(tree.MetaPageId)
-
-	type depthInfo struct {
-		nodeType  string
-		count     int
-		totalKeys int
-	}
-	result := make(map[int]*depthInfo)
-
-	var collect func(pageId page.PageId, depth int)
-	collect = func(pageId page.PageId, depth int) {
-		buf, err := bp.FetchPage(pageId)
-		if err != nil {
-			panic(err)
-		}
-		defer bp.UnRefPage(pageId)
-
-		nodeType := node.GetNodeType(buf.GetReadData())
-		if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
-			if _, ok := result[depth]; !ok {
-				result[depth] = &depthInfo{nodeType: "Leaf"}
-			}
-			leafNode := node.NewLeafNode(buf.GetReadData())
-			result[depth].count++
-			result[depth].totalKeys += leafNode.NumRecords()
-		} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
-			if _, ok := result[depth]; !ok {
-				result[depth] = &depthInfo{nodeType: "Branch"}
-			}
-			branchNode := node.NewBranchNode(buf.GetReadData())
-			result[depth].count++
-			result[depth].totalKeys += branchNode.NumRecords()
-			for i := range branchNode.NumRecords() + 1 {
-				collect(branchNode.ChildPageIdAt(i), depth+1)
-			}
-		}
-	}
-	collect(rootPageId, 0)
-
-	height := len(result)
-	fmt.Fprintf(w, "高さ: %d\n", height)
-	for d := 0; d < height; d++ {
-		info := result[d]
-		fmt.Fprintf(w, "  depth=%d: %s x %d (keys=%d)\n", d, info.nodeType, info.count, info.totalKeys)
-	}
-}
-
-// --- テスト ---
 
 func TestBTreeInsertAndScan(t *testing.T) {
 	t.Run("20 件のデータを挿入し、全件スキャンで昇順に取得できる", func(t *testing.T) {
@@ -205,6 +79,29 @@ func TestBTreeInsertAndScan(t *testing.T) {
   key=banana, value=b x 200
   key=cherry, value=c x 200
   合計: 3 件
+`
+		assert.Equal(t, expected, w.String())
+	})
+
+	t.Run("削除後にディスクに書き出してから再度読み込める", func(t *testing.T) {
+		// GIVEN
+		tree, bp := setupBTree(t)
+		for _, fruit := range []string{"apple", "banana", "cherry"} {
+			tree.mustInsert(bp, fruit, strings.Repeat(string(fruit[0]), 200))
+		}
+		require.NoError(t, tree.Delete(bp, []byte("banana")))
+
+		// WHEN
+		err := bp.FlushPage()
+		require.NoError(t, err)
+
+		// THEN
+		var w strings.Builder
+		writeScanLog(&w, bp, tree)
+
+		expected := `  key=apple, value=a x 200
+  key=cherry, value=c x 200
+  合計: 2 件
 `
 		assert.Equal(t, expected, w.String())
 	})
@@ -568,23 +465,23 @@ Branch[keys=1]: [key_10]
 			t.Skip("ルートがブランチではないためスキップ")
 		}
 
-		branchNode := node.NewBranchNode(rootBuf.GetReadData())
-		for i := range branchNode.NumRecords() {
-			boundaryKey := string(branchNode.RecordAt(i).KeyBytes())
+		branch := node.NewBranch(rootBuf.GetReadData())
+		for i := range branch.NumRecords() {
+			boundaryKey := string(branch.RecordAt(i).KeyBytes())
 
 			// 左の子
-			leftPageId := branchNode.ChildPageIdAt(i)
+			leftPageId := branch.ChildPageIdAt(i)
 			leftBuf, err := bp.FetchPage(leftPageId)
 			require.NoError(t, err)
-			leftLeaf := node.NewLeafNode(leftBuf.GetReadData())
+			leftLeaf := node.NewLeaf(leftBuf.GetReadData())
 			lastLeftKey := string(leftLeaf.RecordAt(leftLeaf.NumRecords() - 1).KeyBytes())
 			bp.UnRefPage(leftPageId)
 
 			// 右の子
-			rightPageId := branchNode.ChildPageIdAt(i + 1)
+			rightPageId := branch.ChildPageIdAt(i + 1)
 			rightBuf, err := bp.FetchPage(rightPageId)
 			require.NoError(t, err)
-			rightLeaf := node.NewLeafNode(rightBuf.GetReadData())
+			rightLeaf := node.NewLeaf(rightBuf.GetReadData())
 			firstRightKey := string(rightLeaf.RecordAt(0).KeyBytes())
 			bp.UnRefPage(rightPageId)
 
@@ -641,4 +538,182 @@ Branch[keys=1]: [key_10]
 `
 		assert.Equal(t, expected, w.String())
 	})
+}
+
+func TestBTreeCRUDLifecycle(t *testing.T) {
+	t.Run("レコードのライフサイクルを通しで追跡できる", func(t *testing.T) {
+		// GIVEN
+		tree, bp := setupBTree(t)
+
+		var w strings.Builder
+
+		// Insert
+		tree.mustInsert(bp, "apple", strings.Repeat("a", 100))
+		tree.mustInsert(bp, "banana", strings.Repeat("b", 100))
+		tree.mustInsert(bp, "cherry", strings.Repeat("c", 100))
+		fmt.Fprintln(&w, "=== Insert 後 ===")
+		writeScanLog(&w, bp, tree)
+
+		// Search (FindByKey)
+		record, err := tree.FindByKey(bp, []byte("banana"))
+		require.NoError(t, err)
+		fmt.Fprintf(&w, "FindByKey(banana): value=%s x %d\n", string(record.NonKeyBytes()[:1]), len(record.NonKeyBytes()))
+
+		// Update
+		require.NoError(t, tree.Update(bp, node.NewRecord(nil, []byte("banana"), []byte(strings.Repeat("X", 50)))))
+		fmt.Fprintln(&w, "=== Update 後 ===")
+		writeScanLog(&w, bp, tree)
+
+		// Delete
+		require.NoError(t, tree.Delete(bp, []byte("banana")))
+		fmt.Fprintln(&w, "=== Delete 後 ===")
+		writeScanLog(&w, bp, tree)
+
+		// FindByKey で削除済みキーが見つからない
+		_, err = tree.FindByKey(bp, []byte("banana"))
+		fmt.Fprintf(&w, "FindByKey(banana): %v\n", err)
+
+		expected := `=== Insert 後 ===
+  key=apple, value=a x 100
+  key=banana, value=b x 100
+  key=cherry, value=c x 100
+  合計: 3 件
+FindByKey(banana): value=b x 100
+=== Update 後 ===
+  key=apple, value=a x 100
+  key=banana, value=X x 50
+  key=cherry, value=c x 100
+  合計: 3 件
+=== Delete 後 ===
+  key=apple, value=a x 100
+  key=cherry, value=c x 100
+  合計: 2 件
+FindByKey(banana): key not found
+`
+		assert.Equal(t, expected, w.String())
+	})
+}
+
+// --- ログ出力ヘルパー ---
+
+// B+Tree の全データをスキャンし、key=..., value=... 形式でログに書き出す
+func writeScanLog(w *strings.Builder, bp *buffer.BufferPool, tree *BTree) {
+	iter, err := tree.Search(bp, SearchModeStart{})
+	if err != nil {
+		panic(err)
+	}
+	count := 0
+	for {
+		record, ok, err := iter.Next(bp)
+		if err != nil {
+			panic(err)
+		}
+		if !ok {
+			break
+		}
+		fmt.Fprintf(w, "  key=%s, value=%s x %d\n", string(record.KeyBytes()), string(record.NonKeyBytes()[:1]), len(record.NonKeyBytes()))
+		count++
+	}
+	fmt.Fprintf(w, "  合計: %d 件\n", count)
+}
+
+// ツリーのルートノード情報をログに書き出す (ノードタイプ, キー数, キー一覧)
+func writeRootInfo(w *strings.Builder, bp *buffer.BufferPool, tree *BTree) {
+	metaBuf, err := bp.FetchPage(tree.MetaPageId)
+	if err != nil {
+		panic(err)
+	}
+	defer bp.UnRefPage(tree.MetaPageId)
+
+	meta := newMetaPage(metaBuf.GetReadData())
+	rootPageId := meta.rootPageId()
+	writeNodeInfo(w, bp, rootPageId, 0)
+}
+
+// ノード情報を再帰的にログに書き出す
+func writeNodeInfo(w *strings.Builder, bp *buffer.BufferPool, pageId page.PageId, depth int) {
+	buf, err := bp.FetchPage(pageId)
+	if err != nil {
+		panic(err)
+	}
+	defer bp.UnRefPage(pageId)
+
+	indent := strings.Repeat("  ", depth)
+	nodeType := node.GetNodeType(buf.GetReadData())
+
+	if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
+		leaf := node.NewLeaf(buf.GetReadData())
+		keys := make([]string, leaf.NumRecords())
+		for i := range leaf.NumRecords() {
+			keys[i] = string(leaf.RecordAt(i).KeyBytes())
+		}
+		fmt.Fprintf(w, "%sLeaf[keys=%d]: [%s]\n", indent, leaf.NumRecords(), strings.Join(keys, ", "))
+	} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
+		branch := node.NewBranch(buf.GetReadData())
+		keys := make([]string, branch.NumRecords())
+		for i := range branch.NumRecords() {
+			keys[i] = string(branch.RecordAt(i).KeyBytes())
+		}
+		fmt.Fprintf(w, "%sBranch[keys=%d]: [%s]\n", indent, branch.NumRecords(), strings.Join(keys, ", "))
+
+		for i := range branch.NumRecords() + 1 {
+			childPageId := branch.ChildPageIdAt(i)
+			writeNodeInfo(w, bp, childPageId, depth+1)
+		}
+	}
+}
+
+// ツリーの形状 (高さ、各深さのノードタイプ・ノード数・キー数) をコンパクトに出力する
+func writeTreeShape(w *strings.Builder, bp *buffer.BufferPool, tree *BTree) {
+	metaBuf, err := bp.FetchPage(tree.MetaPageId)
+	if err != nil {
+		panic(err)
+	}
+	meta := newMetaPage(metaBuf.GetReadData())
+	rootPageId := meta.rootPageId()
+	bp.UnRefPage(tree.MetaPageId)
+
+	type depthInfo struct {
+		nodeType  string
+		count     int
+		totalKeys int
+	}
+	result := make(map[int]*depthInfo)
+
+	var collect func(pageId page.PageId, depth int)
+	collect = func(pageId page.PageId, depth int) {
+		buf, err := bp.FetchPage(pageId)
+		if err != nil {
+			panic(err)
+		}
+		defer bp.UnRefPage(pageId)
+
+		nodeType := node.GetNodeType(buf.GetReadData())
+		if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
+			if _, ok := result[depth]; !ok {
+				result[depth] = &depthInfo{nodeType: "Leaf"}
+			}
+			leaf := node.NewLeaf(buf.GetReadData())
+			result[depth].count++
+			result[depth].totalKeys += leaf.NumRecords()
+		} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
+			if _, ok := result[depth]; !ok {
+				result[depth] = &depthInfo{nodeType: "Branch"}
+			}
+			branch := node.NewBranch(buf.GetReadData())
+			result[depth].count++
+			result[depth].totalKeys += branch.NumRecords()
+			for i := range branch.NumRecords() + 1 {
+				collect(branch.ChildPageIdAt(i), depth+1)
+			}
+		}
+	}
+	collect(rootPageId, 0)
+
+	height := len(result)
+	fmt.Fprintf(w, "高さ: %d\n", height)
+	for d := 0; d < height; d++ {
+		info := result[d]
+		fmt.Fprintf(w, "  depth=%d: %s x %d (keys=%d)\n", d, info.nodeType, info.count, info.totalKeys)
+	}
 }

@@ -3,9 +3,8 @@ package planner
 import (
 	"fmt"
 	"minesql/internal/ast"
-	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/undo"
+	"minesql/internal/storage/handler"
 	"strings"
 	"testing"
 
@@ -27,10 +26,10 @@ func fetchAll(t *testing.T, iter executor.Executor) []executor.Record {
 }
 
 // AST を直接構築 → PlanStart → ExecutePlan で実行する
-func executePlan(t *testing.T, undoLog *undo.UndoLog, stmt ast.Statement) []executor.Record {
+func executePlan(t *testing.T, stmt ast.Statement) []executor.Record {
 	t.Helper()
-	var trxId undo.TrxId = 1
-	exec, err := Start(undoLog, trxId, stmt)
+	var trxId handler.TrxId = 1
+	exec, err := Start(trxId, stmt)
 	assert.NoError(t, err)
 
 	return fetchAll(t, exec)
@@ -43,13 +42,11 @@ func setupUsersTable(t *testing.T) {
 	tmpdir := t.TempDir()
 	t.Setenv("MINESQL_DATA_DIR", tmpdir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "100")
-	engine.Reset()
-	engine.Init()
-
-	undoLog := undo.NewUndoLog()
+	handler.Reset()
+	handler.Init()
 
 	// CREATE TABLE
-	executePlan(t, undoLog, &ast.CreateTableStmt{
+	executePlan(t, &ast.CreateTableStmt{
 		StmtType:  ast.StmtTypeCreate,
 		Keyword:   ast.KeywordTable,
 		TableName: "users",
@@ -67,7 +64,7 @@ func setupUsersTable(t *testing.T) {
 	})
 
 	// INSERT
-	executePlan(t, undoLog, &ast.InsertStmt{
+	executePlan(t, &ast.InsertStmt{
 		StmtType: ast.StmtTypeInsert,
 		Table:    *ast.NewTableId("users"),
 		Cols: []ast.ColumnId{
@@ -140,12 +137,10 @@ func TestPlannerIntegration(t *testing.T) {
 	t.Run("SELECT でフルテーブルスキャンできる", func(t *testing.T) {
 		// GIVEN
 		setupUsersTable(t)
-		defer engine.Reset()
-
-		undoLog := undo.NewUndoLog()
+		defer handler.Reset()
 
 		// WHEN
-		records := executePlan(t, undoLog, &ast.SelectStmt{
+		records := executePlan(t, &ast.SelectStmt{
 			StmtType: ast.StmtTypeSelect,
 			From:     *ast.NewTableId("users"),
 			Where:    &ast.WhereClause{IsSet: false},
@@ -171,12 +166,10 @@ func TestPlannerIntegration(t *testing.T) {
 	t.Run("WHERE 句で等値検索できる", func(t *testing.T) {
 		// GIVEN
 		setupUsersTable(t)
-		defer engine.Reset()
-
-		undoLog := undo.NewUndoLog()
+		defer handler.Reset()
 
 		// WHEN
-		records := executePlan(t, undoLog, &ast.SelectStmt{
+		records := executePlan(t, &ast.SelectStmt{
 			StmtType: ast.StmtTypeSelect,
 			From:     *ast.NewTableId("users"),
 			Where: &ast.WhereClause{
@@ -204,12 +197,10 @@ func TestPlannerIntegration(t *testing.T) {
 	t.Run("AND と OR の複合条件でフィルタリングできる", func(t *testing.T) {
 		// GIVEN
 		setupUsersTable(t)
-		defer engine.Reset()
-
-		undoLog := undo.NewUndoLog()
+		defer handler.Reset()
 
 		// WHEN: (first_name < 'K' AND gender = 'male' AND last_name >= 'Doe') OR first_name = 'Tom'
-		records := executePlan(t, undoLog, &ast.SelectStmt{
+		records := executePlan(t, &ast.SelectStmt{
 			StmtType: ast.StmtTypeSelect,
 			From:     *ast.NewTableId("users"),
 			Where: &ast.WhereClause{
@@ -276,12 +267,10 @@ func TestPlannerIntegration(t *testing.T) {
 	t.Run("PK に対する >= 条件で複数行が返される", func(t *testing.T) {
 		// GIVEN
 		setupUsersTable(t)
-		defer engine.Reset()
-
-		undoLog := undo.NewUndoLog()
+		defer handler.Reset()
 
 		// WHEN: WHERE id >= '4' → id=4, 5, 6 の 3 件が返されるべき
-		records := executePlan(t, undoLog, &ast.SelectStmt{
+		records := executePlan(t, &ast.SelectStmt{
 			StmtType: ast.StmtTypeSelect,
 			From:     *ast.NewTableId("users"),
 			Where: &ast.WhereClause{
@@ -311,12 +300,10 @@ func TestPlannerIntegration(t *testing.T) {
 	t.Run("PK に対する > 条件で複数行が返される", func(t *testing.T) {
 		// GIVEN
 		setupUsersTable(t)
-		defer engine.Reset()
-
-		undoLog := undo.NewUndoLog()
+		defer handler.Reset()
 
 		// WHEN: WHERE id > '4' → id=5, 6 の 2 件が返されるべき
-		records := executePlan(t, undoLog, &ast.SelectStmt{
+		records := executePlan(t, &ast.SelectStmt{
 			StmtType: ast.StmtTypeSelect,
 			From:     *ast.NewTableId("users"),
 			Where: &ast.WhereClause{
@@ -345,12 +332,10 @@ func TestPlannerIntegration(t *testing.T) {
 	t.Run("PK に対する <= 条件で複数行が返される", func(t *testing.T) {
 		// GIVEN
 		setupUsersTable(t)
-		defer engine.Reset()
-
-		undoLog := undo.NewUndoLog()
+		defer handler.Reset()
 
 		// WHEN: WHERE id <= '3' → id=1, 2, 3 の 3 件が返されるべき
-		records := executePlan(t, undoLog, &ast.SelectStmt{
+		records := executePlan(t, &ast.SelectStmt{
 			StmtType: ast.StmtTypeSelect,
 			From:     *ast.NewTableId("users"),
 			Where: &ast.WhereClause{
@@ -380,12 +365,10 @@ func TestPlannerIntegration(t *testing.T) {
 	t.Run("PK に対する < 条件で複数行が返される", func(t *testing.T) {
 		// GIVEN
 		setupUsersTable(t)
-		defer engine.Reset()
-
-		undoLog := undo.NewUndoLog()
+		defer handler.Reset()
 
 		// WHEN: WHERE id < '3' → id=1, 2 の 2 件が返されるべき
-		records := executePlan(t, undoLog, &ast.SelectStmt{
+		records := executePlan(t, &ast.SelectStmt{
 			StmtType: ast.StmtTypeSelect,
 			From:     *ast.NewTableId("users"),
 			Where: &ast.WhereClause{
@@ -414,12 +397,10 @@ func TestPlannerIntegration(t *testing.T) {
 	t.Run("UPDATE でレコードを更新できる", func(t *testing.T) {
 		// GIVEN
 		setupUsersTable(t)
-		defer engine.Reset()
-
-		undoLog := undo.NewUndoLog()
+		defer handler.Reset()
 
 		// WHEN (UPDATE users SET last_name = 'Smith' WHERE username = 'johndoe')
-		executePlan(t, undoLog, &ast.UpdateStmt{
+		executePlan(t, &ast.UpdateStmt{
 			Table: *ast.NewTableId("users"),
 			SetClauses: []*ast.SetClause{
 				{Column: *ast.NewColumnId("last_name"), Value: ast.NewStringLiteral("'Smith'", "Smith")},
@@ -435,7 +416,7 @@ func TestPlannerIntegration(t *testing.T) {
 		})
 
 		// THEN
-		records := executePlan(t, undoLog, &ast.SelectStmt{
+		records := executePlan(t, &ast.SelectStmt{
 			StmtType: ast.StmtTypeSelect,
 			From:     *ast.NewTableId("users"),
 			Where:    &ast.WhereClause{IsSet: false},
@@ -460,12 +441,10 @@ func TestPlannerIntegration(t *testing.T) {
 	t.Run("DELETE でレコードを削除できる", func(t *testing.T) {
 		// GIVEN
 		setupUsersTable(t)
-		defer engine.Reset()
-
-		undoLog := undo.NewUndoLog()
+		defer handler.Reset()
 
 		// WHEN
-		executePlan(t, undoLog, &ast.DeleteStmt{
+		executePlan(t, &ast.DeleteStmt{
 			StmtType: ast.StmtTypeDelete,
 			From:     *ast.NewTableId("users"),
 			Where: &ast.WhereClause{
@@ -479,7 +458,7 @@ func TestPlannerIntegration(t *testing.T) {
 		})
 
 		// THEN
-		records := executePlan(t, undoLog, &ast.SelectStmt{
+		records := executePlan(t, &ast.SelectStmt{
 			StmtType: ast.StmtTypeSelect,
 			From:     *ast.NewTableId("users"),
 			Where:    &ast.WhereClause{IsSet: false},

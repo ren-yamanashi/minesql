@@ -3,8 +3,8 @@ package btree
 import (
 	"fmt"
 	"minesql/internal/storage/btree/node"
-	"minesql/internal/storage/bufferpool"
-	"minesql/internal/storage/disk"
+	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/file"
 	"minesql/internal/storage/page"
 	"path/filepath"
 	"testing"
@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateBPlusTree(t *testing.T) {
+func TestCreateBTree(t *testing.T) {
 	t.Run("B+Tree が作成され、空の状態で検索できる", func(t *testing.T) {
 		// GIVEN & WHEN
 		bt, bp := setupBTree(t)
@@ -518,6 +518,24 @@ func TestDelete(t *testing.T) {
 		assert.Equal(t, "key2", string(records[0].KeyBytes()))
 		assert.Equal(t, "key3", string(records[1].KeyBytes()))
 	})
+
+	t.Run("削除したキーを再挿入できる", func(t *testing.T) {
+		// GIVEN
+		bt, bp := setupBTree(t)
+		bt.mustInsert(bp, "key1", "val1")
+		bt.mustInsert(bp, "key2", "val2")
+		err := bt.Delete(bp, []byte("key1"))
+		assert.NoError(t, err)
+
+		// WHEN: 削除したキーを再挿入
+		err = bt.Insert(bp, node.NewRecord(nil, []byte("key1"), []byte("new_val1")))
+
+		// THEN
+		assert.NoError(t, err)
+		record, err := bt.FindByKey(bp, []byte("key1"))
+		assert.NoError(t, err)
+		assert.Equal(t, "new_val1", string(record.NonKeyBytes()))
+	})
 }
 
 func TestUpdate(t *testing.T) {
@@ -821,16 +839,16 @@ func TestFindByKey(t *testing.T) {
 	})
 }
 
-func TestNewBPlusTree(t *testing.T) {
-	t.Run("既存の B+Tree を NewBPlusTree で開いてデータを読み取れる", func(t *testing.T) {
-		// GIVEN: CreateBPlusTree でツリーを作成しレコードを挿入する
+func TestNewBTree(t *testing.T) {
+	t.Run("既存の B+Tree を NewBTree で開いてデータを読み取れる", func(t *testing.T) {
+		// GIVEN: CreateBTree でツリーを作成しレコードを挿入する
 		bt, bp := setupBTree(t)
 		bt.mustInsert(bp, "aaa", "v1")
 		bt.mustInsert(bp, "bbb", "v2")
 		bt.mustInsert(bp, "ccc", "v3")
 
-		// WHEN: 同じ metaPageId で NewBPlusTree を呼ぶ
-		bt2 := NewBPlusTree(bt.MetaPageId)
+		// WHEN: 同じ metaPageId で NewBTree を呼ぶ
+		bt2 := NewBTree(bt.MetaPageId)
 
 		// THEN: 挿入したレコードがすべて取得できる
 		records := bt2.collectAllRecords(bp)
@@ -976,24 +994,50 @@ func TestHeight(t *testing.T) {
 		assert.NoError(t, err)
 		assert.LessOrEqual(t, hAfter, hBefore)
 	})
+
+	t.Run("全レコード削除後に高さが 1 に戻る", func(t *testing.T) {
+		// GIVEN: 多数のレコードを挿入して高さを 2 以上にする
+		bt, bp := setupBTree(t)
+		numRecords := 500
+		for i := range numRecords {
+			key := fmt.Sprintf("key%04d", i)
+			val := fmt.Sprintf("val%04d", i)
+			bt.mustInsert(bp, key, val)
+		}
+		h, err := bt.Height(bp)
+		assert.NoError(t, err)
+		assert.Greater(t, h, uint64(1))
+
+		// WHEN: 全レコードを削除
+		for i := range numRecords {
+			key := fmt.Sprintf("key%04d", i)
+			err := bt.Delete(bp, []byte(key))
+			assert.NoError(t, err)
+		}
+
+		// THEN: 高さが 1 に戻る
+		h, err = bt.Height(bp)
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(1), h)
+	})
 }
 
 // テスト用の B+Tree とバッファプールマネージャをセットアップする
-func setupBTree(t *testing.T) (*BPlusTree, *bufferpool.BufferPool) {
+func setupBTree(t *testing.T) (*BTree, *buffer.BufferPool) {
 	t.Helper()
 	tmpdir := t.TempDir()
 	path := filepath.Join(tmpdir, "btree_test.db")
 	fileId := page.FileId(0)
-	dm, err := disk.NewDisk(fileId, path)
+	dm, err := file.NewDisk(fileId, path)
 	if err != nil {
 		t.Fatalf("Disk の作成に失敗: %v", err)
 	}
 	metaPageId := dm.AllocatePage()
 
-	bp := bufferpool.NewBufferPool(100)
+	bp := buffer.NewBufferPool(100)
 	bp.RegisterDisk(fileId, dm)
 
-	bt, err := CreateBPlusTree(bp, metaPageId)
+	bt, err := CreateBTree(bp, metaPageId)
 	if err != nil {
 		t.Fatalf("B+Tree の作成に失敗: %v", err)
 	}
@@ -1001,7 +1045,7 @@ func setupBTree(t *testing.T) (*BPlusTree, *bufferpool.BufferPool) {
 }
 
 // レコードを挿入するヘルパー (エラー時は panic)
-func (bt *BPlusTree) mustInsert(bp *bufferpool.BufferPool, key, value string) {
+func (bt *BTree) mustInsert(bp *buffer.BufferPool, key, value string) {
 	err := bt.Insert(bp, node.NewRecord(nil, []byte(key), []byte(value)))
 	if err != nil {
 		panic(fmt.Sprintf("Insert に失敗: %v", err))
@@ -1009,7 +1053,7 @@ func (bt *BPlusTree) mustInsert(bp *bufferpool.BufferPool, key, value string) {
 }
 
 // B+Tree の全レコードをイテレータで収集する
-func (bt *BPlusTree) collectAllRecords(bp *bufferpool.BufferPool) []node.Record {
+func (bt *BTree) collectAllRecords(bp *buffer.BufferPool) []node.Record {
 	iter, err := bt.Search(bp, SearchModeStart{})
 	if err != nil {
 		panic(fmt.Sprintf("Search に失敗: %v", err))

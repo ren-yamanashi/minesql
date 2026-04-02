@@ -2,23 +2,21 @@ package btree
 
 import (
 	"minesql/internal/storage/btree/node"
-	"minesql/internal/storage/bufferpool"
+	"minesql/internal/storage/buffer"
 )
 
 // Iterator は B+Tree のリーフノード (双方向連結リスト) を走査する
 //
 // 全件スキャンや範囲検索などで、リーフノードを順番に走査するために使用する
 type Iterator struct {
-	bufferPage bufferpool.BufferPage // 現在参照しているバッファページ
-	slotNum    int                   // 現在参照されているスロット番号 (slotted page のスロット番号)
+	bufferPage buffer.BufferPage // 現在参照しているバッファページ
+	slotNum    int               // 現在参照されているスロット番号 (slotted page のスロット番号)
 }
 
 // newIterator は指定されたバッファページとスロット番号を持つイテレータを生成する
-//
-// bufferPage: イテレータが参照するバッファページ
-//
-// slotNum: イテレータが参照するスロット番号 (slotted page のスロット番号)
-func newIterator(bufferPage bufferpool.BufferPage, slotNum int) *Iterator {
+//   - bufferPage: イテレータが参照するバッファページ
+//   - slotNum: イテレータが参照するスロット番号 (slotted page のスロット番号)
+func newIterator(bufferPage buffer.BufferPage, slotNum int) *Iterator {
 	return &Iterator{
 		bufferPage: bufferPage,
 		slotNum:    slotNum,
@@ -27,10 +25,10 @@ func newIterator(bufferPage bufferpool.BufferPage, slotNum int) *Iterator {
 
 // Get は現在参照しているリーフノード (=バッファページ) のレコードを取得
 func (iter *Iterator) Get() (node.Record, bool) {
-	leafNode := node.NewLeafNode(iter.bufferPage.GetReadData())
+	leaf := node.NewLeaf(iter.bufferPage.GetReadData())
 
-	if iter.slotNum < leafNode.NumRecords() {
-		record := leafNode.RecordAt(iter.slotNum)
+	if iter.slotNum < leaf.NumRecords() {
+		record := leaf.RecordAt(iter.slotNum)
 		header := make([]byte, len(record.HeaderBytes()))
 		copy(header, record.HeaderBytes())
 		key := make([]byte, len(record.KeyBytes()))
@@ -44,7 +42,7 @@ func (iter *Iterator) Get() (node.Record, bool) {
 }
 
 // Next は次のレコードを取得する
-func (iter *Iterator) Next(bp *bufferpool.BufferPool) (node.Record, bool, error) {
+func (iter *Iterator) Next(bp *buffer.BufferPool) (node.Record, bool, error) {
 	record, ok := iter.Get()
 	if !ok {
 		return node.NewRecord(nil, nil, nil), false, nil
@@ -57,17 +55,17 @@ func (iter *Iterator) Next(bp *bufferpool.BufferPool) (node.Record, bool, error)
 }
 
 // Advance は次のレコードに進む
-func (iter *Iterator) Advance(bp *bufferpool.BufferPool) error {
+func (iter *Iterator) Advance(bp *buffer.BufferPool) error {
 	iter.slotNum++
 
-	leafNode := node.NewLeafNode(iter.bufferPage.GetReadData())
+	leaf := node.NewLeaf(iter.bufferPage.GetReadData())
 
 	// 現在のページ内に、まだ次のレコードがある場合は、次のページに移動しない (スロット番号を進めるだけ)
-	if iter.slotNum < leafNode.NumRecords() {
+	if iter.slotNum < leaf.NumRecords() {
 		return nil
 	}
 
-	nextPageId := leafNode.NextPageId()
+	nextPageId := leaf.NextPageId()
 
 	// 現在のページ内に、次のレコードがないが、次のページも存在しない場合は、次のページに移動しない
 	if nextPageId == nil {

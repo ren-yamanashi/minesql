@@ -5,22 +5,20 @@ import (
 	"os"
 	"strings"
 
-	"minesql/internal/access"
-	"minesql/internal/catalog"
-	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/undo"
+	"minesql/internal/storage/access"
+	"minesql/internal/storage/handler"
 )
 
 // セットアップヘルパー: テーブルを作成し、サンプルデータを挿入する
 // テーブルアクセスメソッドとクリーンアップ関数を返す
-func setupExample() (*access.TableAccessMethod, func()) {
+func setupExample() (*access.Table, func()) {
 	tmpDir, err := os.MkdirTemp("", "executor_example")
 	if err != nil {
 		panic(err)
 	}
 	cleanup := func() {
-		engine.Reset()
+		handler.Reset()
 		_ = os.RemoveAll(tmpDir)
 	}
 
@@ -30,29 +28,29 @@ func setupExample() (*access.TableAccessMethod, func()) {
 	if err = os.Setenv("MINESQL_BUFFER_SIZE", "100"); err != nil {
 		panic(err)
 	}
-	engine.Reset()
-	engine.Init()
+	handler.Reset()
+	handler.Init()
 
 	// テーブルを作成
 	ct := executor.NewCreateTable(
 		"users",
 		1,
-		[]*executor.IndexParam{
-			{Name: "idx_first_name", ColName: "first_name", SecondaryKey: 1},
-			{Name: "idx_last_name", ColName: "last_name", SecondaryKey: 2},
+		[]handler.CreateIndexParam{
+			{Name: "idx_first_name", ColName: "first_name", UkIdx: 1},
+			{Name: "idx_last_name", ColName: "last_name", UkIdx: 2},
 		},
-		[]*executor.ColumnParam{
-			{Name: "id", Type: catalog.ColumnTypeString},
-			{Name: "first_name", Type: catalog.ColumnTypeString},
-			{Name: "last_name", Type: catalog.ColumnTypeString},
+		[]handler.CreateColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "first_name", Type: handler.ColumnTypeString},
+			{Name: "last_name", Type: handler.ColumnTypeString},
 		})
 	if _, err := ct.Next(); err != nil {
 		panic(err)
 	}
 
 	// テーブルアクセスメソッドを取得
-	e := engine.Get()
-	tblMeta, ok := e.Catalog.GetTableMetadataByName("users")
+	hdl := handler.Get()
+	tblMeta, ok := hdl.Catalog.GetTableMetaByName("users")
 	if !ok {
 		panic("table users not found in catalog")
 	}
@@ -62,10 +60,8 @@ func setupExample() (*access.TableAccessMethod, func()) {
 	}
 
 	// サンプルデータを挿入
-	undoLog := undo.NewUndoLog()
-	var trxId undo.TrxId = 1
+	var trxId handler.TrxId = 1
 	ins := executor.NewInsert(
-		undoLog,
 		trxId,
 		tbl,
 		[]executor.Record{
@@ -347,9 +343,8 @@ func ExampleUpdate() {
 	}
 
 	// Alice の last_name を "Anderson" に更新
-	undoLog := undo.NewUndoLog()
-	var trxId undo.TrxId = 1
-	upd := executor.NewUpdate(undoLog, trxId, tbl, []executor.SetColumn{
+	var trxId handler.TrxId = 1
+	upd := executor.NewUpdate(trxId, tbl, []executor.SetColumn{
 		{Pos: 2, Value: []byte("Anderson")},
 	}, executor.NewFilter(
 		executor.NewTableScan(
@@ -402,9 +397,8 @@ func ExampleUpdate_primaryKey() {
 	defer cleanup()
 
 	// プライマリキー "v" (Eve) を "a" に変更
-	undoLog := undo.NewUndoLog()
-	var trxId undo.TrxId = 1
-	upd := executor.NewUpdate(undoLog, trxId, tbl, []executor.SetColumn{
+	var trxId handler.TrxId = 1
+	upd := executor.NewUpdate(trxId, tbl, []executor.SetColumn{
 		{Pos: 0, Value: []byte("a")},
 	}, executor.NewTableScan(
 		tbl,
@@ -442,9 +436,8 @@ func ExampleDelete() {
 	}
 
 	// first_name が "Bob" のレコードを削除
-	undoLog := undo.NewUndoLog()
-	var trxId undo.TrxId = 1
-	del := executor.NewDelete(undoLog, trxId, tbl, executor.NewFilter(
+	var trxId handler.TrxId = 1
+	del := executor.NewDelete(trxId, tbl, executor.NewFilter(
 		executor.NewTableScan(
 			tbl,
 			access.RecordSearchModeStart{},

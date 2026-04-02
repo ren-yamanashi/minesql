@@ -1,6 +1,6 @@
 package planner
 
-import "minesql/internal/statistics"
+import "minesql/internal/storage/handler"
 
 // defaultRangeSelectivity は min/max が不明な場合の範囲比較の推定選択率
 const defaultRangeSelectivity = 1.0 / 3.0
@@ -32,9 +32,9 @@ func (c ScanCost) TotalCost() float64 {
 // calcTableScanCost はテーブルスキャンのコストを算出する
 //
 // B(s) = B(T), R(s) = R(T), V(s,F) = V(T,F)
-func calcTableScanCost(stats statistics.TableStatistics) ScanCost {
-	uv := make(map[string]float64, len(stats.ColumnStats))
-	for col, cs := range stats.ColumnStats {
+func calcTableScanCost(stats *handler.TableStatistics) ScanCost {
+	uv := make(map[string]float64, len(stats.ColStats))
+	for col, cs := range stats.ColStats {
 		uv[col] = float64(cs.UniqueValues)
 	}
 	return ScanCost{
@@ -221,9 +221,9 @@ func calcProjectCost(inner ScanCost) ScanCost {
 // R(s) = R(T)
 //
 // V(s,F) = V(T,F)
-func calcIndexScanCost(stats statistics.TableStatistics, indexHeight uint64) ScanCost {
-	uv := make(map[string]float64, len(stats.ColumnStats))
-	for col, cs := range stats.ColumnStats {
+func calcIndexScanCost(stats *handler.TableStatistics, indexHeight uint64) ScanCost {
+	uv := make(map[string]float64, len(stats.ColStats))
+	for col, cs := range stats.ColStats {
 		uv[col] = float64(cs.UniqueValues)
 	}
 	return ScanCost{
@@ -248,9 +248,9 @@ func calcIndexScanCost(stats statistics.TableStatistics, indexHeight uint64) Sca
 // R(s) = R(T) / V(T,A)
 //
 // V(s,F) = if F=A then 1 else V(T,F)
-func calcIndexSelectEqualCost(stats statistics.TableStatistics, colName string, indexHeight uint64) ScanCost {
-	uv := make(map[string]float64, len(stats.ColumnStats))
-	for col, cs := range stats.ColumnStats {
+func calcIndexSelectEqualCost(stats *handler.TableStatistics, colName string, indexHeight uint64) ScanCost {
+	uv := make(map[string]float64, len(stats.ColStats))
+	for col, cs := range stats.ColStats {
 		if col == colName {
 			uv[col] = 1
 		} else {
@@ -258,7 +258,7 @@ func calcIndexSelectEqualCost(stats statistics.TableStatistics, colName string, 
 		}
 	}
 
-	vA := float64(stats.ColumnStats[colName].UniqueValues)
+	vA := float64(stats.ColStats[colName].UniqueValues)
 	recordCount := float64(stats.RecordCount)
 	if vA > 0 {
 		recordCount /= vA
@@ -284,9 +284,9 @@ func calcIndexSelectEqualCost(stats statistics.TableStatistics, colName string, 
 // R(s) = R(T) * (V(T,A)-1) / V(T,A)
 //
 // V(s,F) = if F=A then V(T,A)-1 else V(T,F)
-func calcIndexSelectNotEqualCost(stats statistics.TableStatistics, colName string, indexHeight uint64, indexLeafPages uint64) ScanCost {
-	uv := make(map[string]float64, len(stats.ColumnStats))
-	for col, cs := range stats.ColumnStats {
+func calcIndexSelectNotEqualCost(stats *handler.TableStatistics, colName string, indexHeight uint64, indexLeafPages uint64) ScanCost {
+	uv := make(map[string]float64, len(stats.ColStats))
+	for col, cs := range stats.ColStats {
 		if col == colName {
 			v := float64(cs.UniqueValues)
 			if v > 1 {
@@ -299,7 +299,7 @@ func calcIndexSelectNotEqualCost(stats statistics.TableStatistics, colName strin
 		}
 	}
 
-	vA := float64(stats.ColumnStats[colName].UniqueValues)
+	vA := float64(stats.ColStats[colName].UniqueValues)
 	recordCount := float64(stats.RecordCount)
 	if vA > 0 {
 		recordCount = float64(stats.RecordCount) * (vA - 1) / vA
@@ -327,9 +327,9 @@ func calcIndexSelectNotEqualCost(stats statistics.TableStatistics, colName strin
 // R(s) = R(T) * selectivity
 //
 // V(s,F) = if F=A then V(T,A) * selectivity else V(T,F)
-func calcIndexSelectRangeCost(stats statistics.TableStatistics, colName string, indexHeight uint64, indexLeafPages uint64, selectivity float64) ScanCost {
-	uv := make(map[string]float64, len(stats.ColumnStats))
-	for col, cs := range stats.ColumnStats {
+func calcIndexSelectRangeCost(stats *handler.TableStatistics, colName string, indexHeight uint64, indexLeafPages uint64, selectivity float64) ScanCost {
+	uv := make(map[string]float64, len(stats.ColStats))
+	for col, cs := range stats.ColStats {
 		if col == colName {
 			uv[col] = float64(cs.UniqueValues) * selectivity
 		} else {
@@ -361,9 +361,9 @@ func calcIndexSelectRangeCost(stats statistics.TableStatistics, colName string, 
 // R(s) = R(T) / V(T,A)
 //
 // V(s,F) = if F=A then 1 else V(T,F)
-func calcIndexTableEqualCost(stats statistics.TableStatistics, colName string, indexHeight uint64, primaryHeight uint64) ScanCost {
-	uv := make(map[string]float64, len(stats.ColumnStats))
-	for col, cs := range stats.ColumnStats {
+func calcIndexTableEqualCost(stats *handler.TableStatistics, colName string, indexHeight uint64, primaryHeight uint64) ScanCost {
+	uv := make(map[string]float64, len(stats.ColStats))
+	for col, cs := range stats.ColStats {
 		if col == colName {
 			uv[col] = 1
 		} else {
@@ -371,7 +371,7 @@ func calcIndexTableEqualCost(stats statistics.TableStatistics, colName string, i
 		}
 	}
 
-	vA := float64(stats.ColumnStats[colName].UniqueValues)
+	vA := float64(stats.ColStats[colName].UniqueValues)
 	recordCount := float64(stats.RecordCount)
 	if vA > 0 {
 		recordCount /= vA
@@ -399,9 +399,9 @@ func calcIndexTableEqualCost(stats statistics.TableStatistics, colName string, i
 // R(s) = R(T) * (V(T,A)-1) / V(T,A)
 //
 // V(s,F) = if F=A then V(T,A)-1 else V(T,F)
-func calcIndexTableNotEqualCost(stats statistics.TableStatistics, colName string, indexHeight uint64, indexLeafPages uint64, primaryHeight uint64) ScanCost {
-	uv := make(map[string]float64, len(stats.ColumnStats))
-	for col, cs := range stats.ColumnStats {
+func calcIndexTableNotEqualCost(stats *handler.TableStatistics, colName string, indexHeight uint64, indexLeafPages uint64, primaryHeight uint64) ScanCost {
+	uv := make(map[string]float64, len(stats.ColStats))
+	for col, cs := range stats.ColStats {
 		if col == colName {
 			v := float64(cs.UniqueValues)
 			if v > 1 {
@@ -414,7 +414,7 @@ func calcIndexTableNotEqualCost(stats statistics.TableStatistics, colName string
 		}
 	}
 
-	vA := float64(stats.ColumnStats[colName].UniqueValues)
+	vA := float64(stats.ColStats[colName].UniqueValues)
 	recordCount := float64(stats.RecordCount)
 	if vA > 0 {
 		recordCount = float64(stats.RecordCount) * (vA - 1) / vA
@@ -444,9 +444,9 @@ func calcIndexTableNotEqualCost(stats statistics.TableStatistics, colName string
 // R(s) = R(T) * selectivity
 //
 // V(s,F) = if F=A then V(T,A) * selectivity else V(T,F)
-func calcIndexTableRangeCost(stats statistics.TableStatistics, colName string, indexHeight uint64, indexLeafPages uint64, selectivity float64, primaryHeight uint64) ScanCost {
-	uv := make(map[string]float64, len(stats.ColumnStats))
-	for col, cs := range stats.ColumnStats {
+func calcIndexTableRangeCost(stats *handler.TableStatistics, colName string, indexHeight uint64, indexLeafPages uint64, selectivity float64, primaryHeight uint64) ScanCost {
+	uv := make(map[string]float64, len(stats.ColStats))
+	for col, cs := range stats.ColStats {
 		if col == colName {
 			uv[col] = float64(cs.UniqueValues) * selectivity
 		} else {

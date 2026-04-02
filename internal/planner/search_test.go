@@ -2,10 +2,8 @@ package planner
 
 import (
 	"minesql/internal/ast"
-	"minesql/internal/catalog"
-	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/undo"
+	"minesql/internal/storage/handler"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +14,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		search := NewSearch(tblMeta, nil)
@@ -34,7 +32,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN: レコードが少ないテーブル → テーブルスキャンの方が安い → Filter が返る
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		where := &ast.WhereClause{
@@ -65,7 +63,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		where := &ast.WhereClause{
@@ -91,7 +89,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		where := &ast.WhereClause{
@@ -117,7 +115,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		type UnsupportedExpr struct {
@@ -143,7 +141,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		// (id = '1') AND ((first_name = 'john') AND (last_name = 'doe'))
@@ -194,7 +192,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		// (first_name = 'John') OR ((id = '1') AND (last_name = 'Doe'))
@@ -245,7 +243,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		// WHERE last_name = (first_name = 'John') のような不正な構造
@@ -278,7 +276,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		// WHERE (first_name = 'John') OR (last_name = 'Doe')
@@ -317,7 +315,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		// WHERE (non_existent = 'value') AND (last_name = 'Doe')
@@ -356,7 +354,7 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		// WHERE (first_name = (last_name = 'Doe')) AND (id = '1')
@@ -397,11 +395,80 @@ func TestSearch(t *testing.T) {
 		assert.Contains(t, err.Error(), "when LHS is a column, RHS must be a literal")
 	})
 
+	t.Run("条件内でサポートされていない論理演算子の場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		initStorageManager(t, tmpdir)
+		defer handler.Reset()
+
+		tblMeta := getTableMetadata(t, "users")
+		// WHERE (first_name = 'John') XOR (last_name = 'Doe')
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
+				"XOR",
+				ast.NewLhsExpr(
+					ast.NewBinaryExpr(
+						"=",
+						ast.NewLhsColumn(*ast.NewColumnId("first_name")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("'John'", "John")),
+					),
+				),
+				ast.NewRhsExpr(
+					ast.NewBinaryExpr(
+						"=",
+						ast.NewLhsColumn(*ast.NewColumnId("last_name")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("'Doe'", "Doe")),
+					),
+				),
+			),
+			IsSet: true,
+		}
+		search := NewSearch(tblMeta, where)
+
+		// WHEN
+		exec, err := search.Build()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "unsupported logical operator")
+	})
+
+	t.Run("BinaryExpr で LHS がサポートされていない型の場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		initStorageManager(t, tmpdir)
+		defer handler.Reset()
+
+		tblMeta := getTableMetadata(t, "users")
+
+		type UnsupportedLHS struct {
+			ast.LHS
+		}
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
+				"=",
+				&UnsupportedLHS{},
+				ast.NewRhsLiteral(ast.NewStringLiteral("'value'", "value")),
+			),
+			IsSet: true,
+		}
+		search := NewSearch(tblMeta, where)
+
+		// WHEN
+		exec, err := search.Build()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "unsupported LHS type")
+	})
+
 	t.Run("条件内で LHS が式、RHS がリテラルの場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
 		// WHERE ((first_name = 'John') AND 'literal') のような不正な構造
@@ -447,8 +514,7 @@ func TestComplexWhereWithData(t *testing.T) {
 	// テストデータを挿入するヘルパー
 	insertTestData := func(t *testing.T) {
 		t.Helper()
-		undoLog := undo.NewUndoLog()
-		var trxId undo.TrxId = 1
+		var trxId handler.TrxId = 1
 		insertStmt := &ast.InsertStmt{
 			StmtType: ast.StmtTypeInsert,
 			Table:    *ast.NewTableId("users"),
@@ -475,8 +541,7 @@ func TestComplexWhereWithData(t *testing.T) {
 				},
 			},
 		}
-		insertPlanner := NewInsert(insertStmt)
-		insertExec, err := insertPlanner.Build(undoLog, trxId)
+		insertExec, err := PlanInsert(trxId, insertStmt)
 		assert.NoError(t, err)
 		_, err = insertExec.Next()
 		assert.NoError(t, err)
@@ -492,7 +557,7 @@ func TestComplexWhereWithData(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		insertTestData(t)
 
@@ -536,7 +601,7 @@ func TestComplexWhereWithData(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		insertTestData(t)
 
@@ -577,11 +642,42 @@ func TestComplexWhereWithData(t *testing.T) {
 		assert.Equal(t, "John", string(results[1][1]))
 	})
 
+	t.Run("範囲演算子でデータをフィルタリングできる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		initStorageManager(t, tmpdir)
+		defer handler.Reset()
+
+		insertTestData(t)
+
+		tblMeta := getTableMetadata(t, "users")
+		// WHERE id > '1'
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
+				">",
+				ast.NewLhsColumn(*ast.NewColumnId("id")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("'1'", "1")),
+			),
+			IsSet: true,
+		}
+		search := NewSearch(tblMeta, where)
+		searchExec, err := search.Build()
+		assert.NoError(t, err)
+
+		// WHEN
+		results := collectResults(t, searchExec)
+
+		// THEN: id=2 と id=3 が返される (id > '1')
+		assert.Equal(t, 2, len(results))
+		assert.Equal(t, "2", string(results[0][0]))
+		assert.Equal(t, "3", string(results[1][0]))
+	})
+
 	t.Run("AND と OR の混合条件でデータをフィルタリングできる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
-		defer engine.Reset()
+		defer handler.Reset()
 
 		insertTestData(t)
 
@@ -768,17 +864,17 @@ func initStorageManager(t *testing.T, dataDir string) {
 	t.Setenv("MINESQL_DATA_DIR", dataDir)
 	t.Setenv("MINESQL_BUFFER_SIZE", "10")
 
-	engine.Reset()
-	engine.Init()
-	engine.Get()
+	handler.Reset()
+	handler.Init()
+	handler.Get()
 
 	// テーブルを作成
-	createTable := executor.NewCreateTable("users", 1, []*executor.IndexParam{
-		{Name: "last_name", ColName: "last_name", SecondaryKey: 2},
-	}, []*executor.ColumnParam{
-		{Name: "id", Type: catalog.ColumnTypeString},
-		{Name: "first_name", Type: catalog.ColumnTypeString},
-		{Name: "last_name", Type: catalog.ColumnTypeString},
+	createTable := executor.NewCreateTable("users", 1, []handler.CreateIndexParam{
+		{Name: "last_name", ColName: "last_name", UkIdx: 2},
+	}, []handler.CreateColumnParam{
+		{Name: "id", Type: handler.ColumnTypeString},
+		{Name: "first_name", Type: handler.ColumnTypeString},
+		{Name: "last_name", Type: handler.ColumnTypeString},
 	})
 	_, err := createTable.Next()
 	assert.NoError(t, err)
@@ -787,10 +883,10 @@ func initStorageManager(t *testing.T, dataDir string) {
 // テスト用にテーブルメタデータを取得する
 //
 //nolint:unparam // テーブル名は将来的に変わりうる
-func getTableMetadata(t *testing.T, tableName string) *catalog.TableMetadata {
+func getTableMetadata(t *testing.T, tableName string) *handler.TableMetadata {
 	t.Helper()
-	e := engine.Get()
-	tblMeta, ok := e.Catalog.GetTableMetadataByName(tableName)
+	hdl := handler.Get()
+	tblMeta, ok := hdl.Catalog.GetTableMetaByName(tableName)
 	if !ok {
 		t.Fatalf("table %s not found in catalog", tableName)
 	}

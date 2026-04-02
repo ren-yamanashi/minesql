@@ -6,10 +6,9 @@ import (
 )
 
 // メタページのレイアウト:
-//
-//	offset 0-7:   ルートページ ID (8 バイト)
-//	offset 8-15:  リーフページ数 (8 バイト)
-//	offset 16-23: B+Tree の高さ (8 バイト)
+//   - offset 0-7:   ルートページ ID (8 バイト)
+//   - offset 8-15:  リーフページ数 (8 バイト)
+//   - offset 16-23: B+Tree の高さ (8 バイト)
 type metaPage struct {
 	data []byte
 }

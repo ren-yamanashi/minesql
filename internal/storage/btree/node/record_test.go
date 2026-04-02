@@ -28,6 +28,44 @@ func TestNewRecord(t *testing.T) {
 	})
 }
 
+func TestHeaderBytes(t *testing.T) {
+	t.Run("ヘッダー領域を返す", func(t *testing.T) {
+		// GIVEN
+		record := NewRecord([]byte{1, 2, 3}, []byte("key"), []byte("value"))
+
+		// THEN
+		assert.Equal(t, []byte{1, 2, 3}, record.HeaderBytes())
+	})
+}
+
+func TestKeyBytes(t *testing.T) {
+	t.Run("キーフィールド領域を返す", func(t *testing.T) {
+		// GIVEN
+		record := NewRecord([]byte{0}, []byte("mykey"), []byte("myvalue"))
+
+		// THEN
+		assert.Equal(t, []byte("mykey"), record.KeyBytes())
+	})
+}
+
+func TestNonKeyBytes(t *testing.T) {
+	t.Run("非キーフィールド領域を返す", func(t *testing.T) {
+		// GIVEN
+		record := NewRecord([]byte{0}, []byte("key"), []byte("nonkey"))
+
+		// THEN
+		assert.Equal(t, []byte("nonkey"), record.NonKeyBytes())
+	})
+
+	t.Run("非キーフィールドが nil の場合 nil を返す", func(t *testing.T) {
+		// GIVEN
+		record := NewRecord([]byte{0}, []byte("key"), nil)
+
+		// THEN
+		assert.Nil(t, record.NonKeyBytes())
+	})
+}
+
 func TestCompareKey(t *testing.T) {
 	t.Run("キーが一致する場合 0 を返す", func(t *testing.T) {
 		record := NewRecord(nil, []byte("bbb"), nil)
@@ -45,7 +83,7 @@ func TestCompareKey(t *testing.T) {
 	})
 }
 
-func TestToBytesAndRecordFromBytes(t *testing.T) {
+func TestToBytes(t *testing.T) {
 	t.Run("全フィールドが存在するレコードをシリアライズ・デシリアライズできる", func(t *testing.T) {
 		// GIVEN
 		original := NewRecord([]byte{1}, []byte("mykey"), []byte("myvalue"))
@@ -116,9 +154,21 @@ func TestToBytesAndRecordFromBytes(t *testing.T) {
 		assert.Equal(t, []byte("key"), restored.KeyBytes())
 		assert.Equal(t, []byte("val"), restored.NonKeyBytes())
 	})
+
+	t.Run("ToBytes の出力サイズが 4 + header + key + nonKey と一致する", func(t *testing.T) {
+		header := []byte{1, 2}
+		key := []byte("hello")
+		nonKey := []byte("world")
+		record := NewRecord(header, key, nonKey)
+
+		data := record.ToBytes()
+
+		expectedSize := 4 + len(header) + len(key) + len(nonKey)
+		assert.Equal(t, expectedSize, len(data))
+	})
 }
 
-func TestRecordFromBytesEdgeCases(t *testing.T) {
+func TestRecordFromBytes(t *testing.T) {
 	t.Run("4 バイト未満のデータは nil レコードを返す", func(t *testing.T) {
 		// WHEN
 		restored := recordFromBytes([]byte{0, 1})
@@ -140,19 +190,5 @@ func TestRecordFromBytesEdgeCases(t *testing.T) {
 		assert.Nil(t, restored.HeaderBytes())
 		assert.Nil(t, restored.KeyBytes())
 		assert.Nil(t, restored.NonKeyBytes())
-	})
-}
-
-func TestToBytesSizeConsistency(t *testing.T) {
-	t.Run("ToBytes の出力サイズが 4 + header + key + nonKey と一致する", func(t *testing.T) {
-		header := []byte{1, 2}
-		key := []byte("hello")
-		nonKey := []byte("world")
-		record := NewRecord(header, key, nonKey)
-
-		data := record.ToBytes()
-
-		expectedSize := 4 + len(header) + len(key) + len(nonKey)
-		assert.Equal(t, expectedSize, len(data))
 	})
 }

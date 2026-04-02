@@ -2,11 +2,9 @@ package parser
 
 import (
 	"fmt"
-	"minesql/internal/engine"
 	"minesql/internal/executor"
 	"minesql/internal/planner"
-	"minesql/internal/transaction"
-	"minesql/internal/undo"
+	"minesql/internal/storage/handler"
 	"strings"
 	"testing"
 
@@ -19,15 +17,14 @@ func TestParserIntegration(t *testing.T) {
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "100")
-		engine.Reset()
-		engine.Init()
-		defer engine.Reset()
+		handler.Reset()
+		handler.Init()
+		defer handler.Reset()
 
-		undoLog := undo.NewUndoLog()
-		trxMgr := transaction.NewManager(undoLog)
-		trxId := trxMgr.Begin()
+		hdl := handler.Get()
+		trxId := hdl.BeginTrx()
 
-		executeSql(t, undoLog, trxId, `
+		executeSql(t, trxId, `
 CREATE TABLE users (
 	id VARCHAR,
 	first_name VARCHAR,
@@ -38,7 +35,7 @@ CREATE TABLE users (
 	UNIQUE KEY username_UNIQUE (username)
 );`)
 
-		executeSql(t, undoLog, trxId, `
+		executeSql(t, trxId, `
 INSERT INTO
 	users (id, first_name, last_name, gender, username)
 VALUES
@@ -49,8 +46,8 @@ VALUES
 	('5', 'Jonathan', 'Black', 'male', 'jonathanblack'),
 	('6', 'Tom', 'Brown', 'male', 'tombrown');`)
 		// WHEN
-		records := executeSql(t, undoLog, trxId, `SELECT * FROM users;`)
-		trxMgr.Commit(trxId)
+		records := executeSql(t, trxId, `SELECT * FROM users;`)
+		hdl.CommitTrx(trxId)
 
 		// THEN
 		var sb strings.Builder
@@ -74,21 +71,20 @@ VALUES
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "100")
-		engine.Reset()
-		engine.Init()
-		defer engine.Reset()
+		handler.Reset()
+		handler.Init()
+		defer handler.Reset()
 
-		undoLog := undo.NewUndoLog()
-		trxMgr := transaction.NewManager(undoLog)
-		trxId := trxMgr.Begin()
+		hdl := handler.Get()
+		trxId := hdl.BeginTrx()
 
-		executeSql(t, undoLog, trxId, `
+		executeSql(t, trxId, `
 CREATE TABLE users (
 	id VARCHAR, first_name VARCHAR, last_name VARCHAR, gender VARCHAR, username VARCHAR,
 	PRIMARY KEY (id), UNIQUE KEY username_UNIQUE (username)
 );`)
 
-		executeSql(t, undoLog, trxId, `
+		executeSql(t, trxId, `
 INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 	('1', 'John', 'Doe', 'male', 'johndoe'),
 	('2', 'John', 'Doe2', 'male', 'johndoe2'),
@@ -97,8 +93,8 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 	('5', 'Jonathan', 'Black', 'male', 'jonathanblack'),
 	('6', 'Tom', 'Brown', 'male', 'tombrown');`)
 		// WHEN
-		records := executeSql(t, undoLog, trxId, `SELECT * FROM users WHERE username = 'janedoe';`)
-		trxMgr.Commit(trxId)
+		records := executeSql(t, trxId, `SELECT * FROM users WHERE username = 'janedoe';`)
+		hdl.CommitTrx(trxId)
 
 		// THEN
 		var sb strings.Builder
@@ -117,21 +113,20 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "100")
-		engine.Reset()
-		engine.Init()
-		defer engine.Reset()
+		handler.Reset()
+		handler.Init()
+		defer handler.Reset()
 
-		undoLog := undo.NewUndoLog()
-		trxMgr := transaction.NewManager(undoLog)
-		trxId := trxMgr.Begin()
+		hdl := handler.Get()
+		trxId := hdl.BeginTrx()
 
-		executeSql(t, undoLog, trxId, `
+		executeSql(t, trxId, `
 CREATE TABLE users (
 	id VARCHAR, first_name VARCHAR, last_name VARCHAR, gender VARCHAR, username VARCHAR,
 	PRIMARY KEY (id), UNIQUE KEY username_UNIQUE (username)
 );`)
 
-		executeSql(t, undoLog, trxId, `
+		executeSql(t, trxId, `
 INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 	('1', 'John', 'Doe', 'male', 'johndoe'),
 	('2', 'John', 'Doe2', 'male', 'johndoe2'),
@@ -141,8 +136,8 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 	('6', 'Tom', 'Brown', 'male', 'tombrown');`)
 
 		// WHEN: (first_name < 'K' AND gender = 'male' AND last_name >= 'Doe') OR first_name = 'Tom'
-		records := executeSql(t, undoLog, trxId, `SELECT * FROM users WHERE first_name < 'K' AND gender = 'male' AND last_name >= 'Doe' OR first_name = 'Tom';`)
-		trxMgr.Commit(trxId)
+		records := executeSql(t, trxId, `SELECT * FROM users WHERE first_name < 'K' AND gender = 'male' AND last_name >= 'Doe' OR first_name = 'Tom';`)
+		hdl.CommitTrx(trxId)
 
 		// THEN
 		var sb strings.Builder
@@ -164,21 +159,20 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "100")
-		engine.Reset()
-		engine.Init()
-		defer engine.Reset()
+		handler.Reset()
+		handler.Init()
+		defer handler.Reset()
 
-		undoLog := undo.NewUndoLog()
-		trxMgr := transaction.NewManager(undoLog)
-		trxId := trxMgr.Begin()
+		hdl := handler.Get()
+		trxId := hdl.BeginTrx()
 
-		executeSql(t, undoLog, trxId, `
+		executeSql(t, trxId, `
 CREATE TABLE users (
 	id VARCHAR, first_name VARCHAR, last_name VARCHAR, gender VARCHAR, username VARCHAR,
 	PRIMARY KEY (id), UNIQUE KEY username_UNIQUE (username)
 );`)
 
-		executeSql(t, undoLog, trxId, `
+		executeSql(t, trxId, `
 INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 	('1', 'John', 'Doe', 'male', 'johndoe'),
 	('2', 'John', 'Doe2', 'male', 'johndoe2'),
@@ -188,10 +182,10 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 	('6', 'Tom', 'Brown', 'male', 'tombrown');`)
 
 		// WHEN
-		executeSql(t, undoLog, trxId, `UPDATE users SET last_name = 'Anderson' WHERE username = 'janedoe';`)
+		executeSql(t, trxId, `UPDATE users SET last_name = 'Anderson' WHERE username = 'janedoe';`)
 		// THEN: UPDATE 後の全レコードを確認する
-		records := executeSql(t, undoLog, trxId, `SELECT * FROM users;`)
-		trxMgr.Commit(trxId)
+		records := executeSql(t, trxId, `SELECT * FROM users;`)
+		hdl.CommitTrx(trxId)
 
 		var sb strings.Builder
 		sb.WriteString("=== UPDATE 後の全件 ===\n")
@@ -214,21 +208,20 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "100")
-		engine.Reset()
-		engine.Init()
-		defer engine.Reset()
+		handler.Reset()
+		handler.Init()
+		defer handler.Reset()
 
-		undoLog := undo.NewUndoLog()
-		trxMgr := transaction.NewManager(undoLog)
-		trxId := trxMgr.Begin()
+		hdl := handler.Get()
+		trxId := hdl.BeginTrx()
 
-		executeSql(t, undoLog, trxId, `
+		executeSql(t, trxId, `
 CREATE TABLE users (
 	id VARCHAR, first_name VARCHAR, last_name VARCHAR, gender VARCHAR, username VARCHAR,
 	PRIMARY KEY (id), UNIQUE KEY username_UNIQUE (username)
 );`)
 
-		executeSql(t, undoLog, trxId, `
+		executeSql(t, trxId, `
 INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 	('1', 'John', 'Doe', 'male', 'johndoe'),
 	('2', 'John', 'Doe2', 'male', 'johndoe2'),
@@ -238,10 +231,10 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 	('6', 'Tom', 'Brown', 'male', 'tombrown');`)
 
 		// WHEN
-		executeSql(t, undoLog, trxId, `DELETE FROM users WHERE first_name = 'John' AND last_name = 'Doe';`)
+		executeSql(t, trxId, `DELETE FROM users WHERE first_name = 'John' AND last_name = 'Doe';`)
 		// THEN: DELETE 後の全レコードを確認する
-		records := executeSql(t, undoLog, trxId, `SELECT * FROM users;`)
-		trxMgr.Commit(trxId)
+		records := executeSql(t, trxId, `SELECT * FROM users;`)
+		hdl.CommitTrx(trxId)
 
 		var sb strings.Builder
 		sb.WriteString("=== DELETE 後の全件 ===\n")
@@ -274,13 +267,13 @@ func fetchAll(t *testing.T, iter executor.Executor) []executor.Record {
 }
 
 // SQL をパース → プラン → 実行して結果を返す
-func executeSql(t *testing.T, undoLog *undo.UndoLog, trxId undo.TrxId, sql string) []executor.Record {
+func executeSql(t *testing.T, trxId handler.TrxId, sql string) []executor.Record {
 	t.Helper()
 	p := NewParser()
 	result, err := p.Parse(sql)
 	assert.NoError(t, err)
 
-	exec, err := planner.Start(undoLog, trxId, result)
+	exec, err := planner.Start(trxId, result)
 	assert.NoError(t, err)
 
 	return fetchAll(t, exec)

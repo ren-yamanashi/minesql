@@ -4,13 +4,10 @@ import "encoding/binary"
 
 // Slotted Page のヘッダーサイズ
 //
-// ヘッダー情報の内訳は以下の通り
-//
-// numSlots: 2 byte (0, 1) -- スロット数
-//
-// freeOffset: 2 byte (2, 3) -- フリースペースの開始位置
-//
-// pad: 4 byte (4, 5, 6, 7) -- 予約領域
+// ヘッダー情報の内訳:
+//   - numSlots: 2 byte (0, 1) -- スロット数
+//   - freeOffset: 2 byte (2, 3) -- フリースペースの開始位置
+//   - pad: 4 byte (4, 5, 6, 7) -- 予約領域
 const slottedPageHeaderSize = 8
 
 type SlottedPage struct {
@@ -24,11 +21,10 @@ func NewSlottedPage(data []byte) *SlottedPage {
 
 // Insert は指定されたインデックスにサイズ分のデータを挿入する (領域の確保のみを行い、実際のデータの書き込みは行わない)
 //
-// index: 挿入するスロットのインデックス
-//
-// data: 挿入するデータ
-//
 // 空き容量が不足している場合は false を返す
+//
+//   - index: 挿入するスロットのインデックス
+//   - data: 挿入するデータ
 func (sp *SlottedPage) Insert(index int, data []byte) bool {
 	size := len(data)
 
@@ -85,12 +81,9 @@ func (sp *SlottedPage) Remove(index int) {
 }
 
 // Update は指定されたインデックスのデータを新しいデータに更新する
-//
-// index: 更新対象のデータが格納されているスロットのインデックス
-//
-// data: 更新する新しいデータ
-//
-// 戻り値: 成功した場合は true, 空き容量が不足している場合は false を返す
+//   - index: 更新対象のデータが格納されているスロットのインデックス
+//   - data: 更新する新しいデータ
+//   - 戻り値: 成功した場合は true, 空き容量が不足している場合は false を返す
 func (sp *SlottedPage) Update(index int, data []byte) bool {
 	// slotted page 内のサイズをリサイズ
 	if !sp.Resize(index, len(data)) {
@@ -103,12 +96,9 @@ func (sp *SlottedPage) Update(index int, data []byte) bool {
 }
 
 // Resize は指定されたインデックスのデータ領域のサイズを変更する
-//
-// index: サイズを変更するスロットのインデックス
-//
-// newSize: 新しいサイズ
-//
-// 戻り値: 成功した場合は true, 空き容量が不足している場合は false を返す
+//   - index: サイズを変更するスロットのインデックス
+//   - newSize: 新しいサイズ
+//   - 戻り値: 成功した場合は true, 空き容量が不足している場合は false を返す
 func (sp *SlottedPage) Resize(index int, newSize int) bool {
 	pointer := sp.pointerAt(index)
 	oldSize := int(pointer.size)
@@ -216,7 +206,7 @@ func (sp *SlottedPage) NumSlots() int {
 
 // FreeSpace は Slotted Page の空き領域のサイズを返す
 //
-// see: docs/architecture/storage/access/b+tree/slotted-page.md#フリースペースのサイズの算出例
+// see: docs/architecture/storage/btree/node/slotted-page.md#フリースペースのサイズの算出例
 func (sp *SlottedPage) FreeSpace() int {
 	freeSpaceOffset := int(binary.BigEndian.Uint16(sp.data[2:4])) // フリースペースの開始位置 (offset) はヘッダーの 2 バイト目から 2 バイト分に格納されている
 	pointersSize := pointerSize * sp.NumSlots()

@@ -6,20 +6,20 @@ import (
 )
 
 type SearchMode interface {
-	childPageId(bn *node.BranchNode) page.PageId
-	slotNum(ln *node.LeafNode) int
+	childPageId(bn *node.Branch) page.PageId
+	slotNum(ln *node.Leaf) int
 }
 
 // 先頭から検索
 type SearchModeStart struct{}
 
 // 先頭の子ページIDを取得
-func (sm SearchModeStart) childPageId(bn *node.BranchNode) page.PageId {
+func (sm SearchModeStart) childPageId(bn *node.Branch) page.PageId {
 	return bn.ChildPageIdAt(0)
 }
 
 // 先頭のスロット番号を取得
-func (sm SearchModeStart) slotNum(ln *node.LeafNode) int {
+func (sm SearchModeStart) slotNum(ln *node.Leaf) int {
 	return 0
 }
 
@@ -29,13 +29,13 @@ type SearchModeKey struct {
 }
 
 // 指定したキーに基づいて子ページIDを取得
-func (sm SearchModeKey) childPageId(bn *node.BranchNode) page.PageId {
+func (sm SearchModeKey) childPageId(bn *node.Branch) page.PageId {
 	childIndex := bn.SearchChildSlotNum(sm.Key)
 	return bn.ChildPageIdAt(childIndex)
 }
 
 // 指定したキーに基づいてスロット番号を取得
-func (sm SearchModeKey) slotNum(ln *node.LeafNode) int {
+func (sm SearchModeKey) slotNum(ln *node.Leaf) int {
 	slotNum, _ := ln.SearchSlotNum(sm.Key)
 	return slotNum
 }

@@ -3,22 +3,20 @@ package planner
 import (
 	"errors"
 	"fmt"
-	"minesql/internal/access"
 	"minesql/internal/ast"
-	"minesql/internal/catalog"
-	"minesql/internal/engine"
 	"minesql/internal/executor"
-	"minesql/internal/statistics"
+	"minesql/internal/storage/access"
+	"minesql/internal/storage/handler"
 	"strconv"
 )
 
 // Search は WHERE 句に基づいてレコードを検索する Executor を構築する
 type Search struct {
-	tblMeta *catalog.TableMetadata
+	tblMeta *handler.TableMetadata
 	where   *ast.WhereClause
 }
 
-func NewSearch(tblMeta *catalog.TableMetadata, where *ast.WhereClause) *Search {
+func NewSearch(tblMeta *handler.TableMetadata, where *ast.WhereClause) *Search {
 	return &Search{
 		tblMeta: tblMeta,
 		where:   where,
@@ -64,7 +62,7 @@ type leafCondition struct {
 //   - 単一条件 (col op literal): chooseBestPlan でテーブルスキャン / PK / インデックスを比較
 //   - 純粋な AND 条件: extractANDLeaves でリーフを抽出 → chooseBestPlan
 //   - OR を含む条件: planForORCondition で Union 最適化を試みる
-func (s *Search) planForBinaryExpr(tbl *access.TableAccessMethod, expr ast.BinaryExpr) (executor.Executor, error) {
+func (s *Search) planForBinaryExpr(tbl *access.Table, expr ast.BinaryExpr) (executor.Executor, error) {
 	switch lhs := expr.Left.(type) {
 
 	// 単一条件: LhsColumn op RhsLiteral (例: WHERE col = 5)
@@ -117,7 +115,7 @@ func (s *Search) planForBinaryExpr(tbl *access.TableAccessMethod, expr ast.Binar
 //  1. テーブルスキャン + Filter (全条件をフィルタで適用)
 //  2. PK スキャン (+ Filter で残条件を適用)
 //  3. セカンダリインデックススキャン (+ Filter で残条件を適用)
-func (s *Search) chooseBestPlan(tbl *access.TableAccessMethod, leaves []leafCondition, cond func(executor.Record) bool) (executor.Executor, error) {
+func (s *Search) chooseBestPlan(tbl *access.Table, leaves []leafCondition, cond func(executor.Record) bool) (executor.Executor, error) {
 	tableScanPlan := executor.NewFilter(
 		executor.NewTableScan(
 			tbl,
@@ -128,9 +126,8 @@ func (s *Search) chooseBestPlan(tbl *access.TableAccessMethod, leaves []leafCond
 	)
 
 	// 統計情報を取得
-	eng := engine.Get()
-	st := statistics.NewStatistics(s.tblMeta, eng.BufferPool)
-	stats, err := st.Analyze()
+	eng := handler.Get()
+	stats, err := eng.AnalyzeTable(s.tblMeta)
 	if err != nil {
 		return nil, err
 	}
@@ -154,7 +151,7 @@ func (s *Search) chooseBestPlan(tbl *access.TableAccessMethod, leaves []leafCond
 		// セカンダリインデックスのコストを算出
 		idxMeta, hasIndex := s.tblMeta.GetIndexByColName(leaf.colName)
 		if hasIndex {
-			idxStats, ok := stats.SecondaryIndexStats[idxMeta.Name]
+			idxStats, ok := stats.IdxStats[idxMeta.Name]
 			if ok {
 				cost := s.calcIndexPlanCost(stats, leaf.colName, leaf.operator, leaf.literal, idxStats)
 				if bestIdxLeaf == nil || cost.TotalCost() < bestIdxCost.TotalCost() {
@@ -199,7 +196,7 @@ func (s *Search) chooseBestPlan(tbl *access.TableAccessMethod, leaves []leafCond
 // buildIndexPlan はインデックスを使った Executor を構築する
 //
 // needsFilter が true の場合、IndexScan の上に Filter を重ねる (複合条件時)
-func (s *Search) buildIndexPlan(tbl *access.TableAccessMethod, leaf leafCondition, idxMeta *catalog.IndexMetadata, cond func(executor.Record) bool, needsFilter bool) (executor.Executor, error) {
+func (s *Search) buildIndexPlan(tbl *access.Table, leaf leafCondition, idxMeta *handler.IndexMetadata, cond func(executor.Record) bool, needsFilter bool) (executor.Executor, error) {
 	index, err := tbl.GetUniqueIndexByName(idxMeta.Name)
 	if err != nil {
 		return nil, err
@@ -225,7 +222,7 @@ func (s *Search) buildIndexPlan(tbl *access.TableAccessMethod, leaf leafConditio
 // buildPKScanPlan は PK カラムの条件を使った TableScan を構築する
 //
 // needsFilter が true の場合、TableScan の上に Filter を重ねる (複合条件時や > 演算子時)
-func (s *Search) buildPKScanPlan(tbl *access.TableAccessMethod, leaf leafCondition, cond func(executor.Record) bool, needsFilter bool) executor.Executor {
+func (s *Search) buildPKScanPlan(tbl *access.Table, leaf leafCondition, cond func(executor.Record) bool, needsFilter bool) executor.Executor {
 	colMeta, _ := s.tblMeta.GetColByName(leaf.colName)
 	pos := int(colMeta.Pos)
 	value := leaf.literal.ToString()
@@ -277,7 +274,7 @@ func (s *Search) buildPKScanPlan(tbl *access.TableAccessMethod, leaf leafConditi
 // 各 OR ブランチが PK またはセカンダリインデックスを利用できる場合、各ブランチを個別にスキャンし Union で結合する
 //
 // 最適化できない場合はテーブルスキャン + Filter にフォールバックする
-func (s *Search) planForORCondition(tbl *access.TableAccessMethod, expr ast.BinaryExpr, cond func(executor.Record) bool) (executor.Executor, error) {
+func (s *Search) planForORCondition(tbl *access.Table, expr ast.BinaryExpr, cond func(executor.Record) bool) (executor.Executor, error) {
 	tableScanPlan := executor.NewFilter(
 		executor.NewTableScan(
 			tbl,
@@ -293,9 +290,8 @@ func (s *Search) planForORCondition(tbl *access.TableAccessMethod, expr ast.Bina
 	}
 
 	// 統計情報を取得
-	eng := engine.Get()
-	st := statistics.NewStatistics(s.tblMeta, eng.BufferPool)
-	stats, err := st.Analyze()
+	eng := handler.Get()
+	stats, err := eng.AnalyzeTable(s.tblMeta)
 	if err != nil {
 		return nil, err
 	}
@@ -336,7 +332,7 @@ type orBranch struct {
 // 残りの条件は Filter で適用する
 //
 // PK/インデックスが利用できない場合は ok=false を返す
-func (s *Search) planORBranch(tbl *access.TableAccessMethod, branch orBranch, stats statistics.TableStatistics) (executor.Executor, float64, bool) {
+func (s *Search) planORBranch(tbl *access.Table, branch orBranch, stats *handler.TableStatistics) (executor.Executor, float64, bool) {
 	// ブランチ全体の条件関数を構築 (複合 AND 条件時に Filter で使用)
 	branchCond, err := s.buildConditionFunc(branch.expr)
 	if err != nil {
@@ -372,7 +368,7 @@ func (s *Search) planORBranch(tbl *access.TableAccessMethod, branch orBranch, st
 		// セカンダリインデックススキャンのコストを算出
 		idxMeta, hasIndex := s.tblMeta.GetIndexByColName(leaf.colName)
 		if hasIndex {
-			idxStats, ok := stats.SecondaryIndexStats[idxMeta.Name]
+			idxStats, ok := stats.IdxStats[idxMeta.Name]
 			if ok {
 				cost := s.calcIndexPlanCost(stats, leaf.colName, leaf.operator, leaf.literal, idxStats)
 				if bestLeaf == nil || cost.TotalCost() < bestCost {
@@ -500,14 +496,14 @@ func extractORBranches(expr ast.BinaryExpr) []orBranch {
 // =================================================
 
 // calcPKPlanCost は PK スキャンのコストを算出する
-func (s *Search) calcPKPlanCost(stats statistics.TableStatistics, colName string, operator string, literal ast.Literal) ScanCost {
+func (s *Search) calcPKPlanCost(stats *handler.TableStatistics, colName string, operator string, literal ast.Literal) ScanCost {
 	inner := calcTableScanCost(stats)
 	switch operator {
 	case "=":
-		return calcPKSelectEqualCost(inner, colName, stats.PrimaryHeight)
+		return calcPKSelectEqualCost(inner, colName, stats.TreeHeight)
 	case ">", ">=":
 		sel := s.calcSelectivity(colName, operator, literal, stats)
-		return calcPKSelectRangeGTCost(inner, colName, sel, stats.PrimaryHeight)
+		return calcPKSelectRangeGTCost(inner, colName, sel, stats.TreeHeight)
 	case "<", "<=":
 		sel := s.calcSelectivity(colName, operator, literal, stats)
 		return calcPKSelectRangeLTCost(inner, colName, sel)
@@ -518,7 +514,7 @@ func (s *Search) calcPKPlanCost(stats statistics.TableStatistics, colName string
 }
 
 // applySelectionCost はテーブルスキャンコストに WHERE 条件の選択コストを適用する
-func (s *Search) applySelectionCost(baseCost ScanCost, colName string, operator string, literal ast.Literal, stats statistics.TableStatistics) ScanCost {
+func (s *Search) applySelectionCost(baseCost ScanCost, colName string, operator string, literal ast.Literal, stats *handler.TableStatistics) ScanCost {
 	switch operator {
 	case "=":
 		return calcSelectEqualCost(baseCost, colName)
@@ -533,15 +529,15 @@ func (s *Search) applySelectionCost(baseCost ScanCost, colName string, operator 
 }
 
 // calcIndexPlanCost はインデックス+テーブルプランのコストを算出する
-func (s *Search) calcIndexPlanCost(stats statistics.TableStatistics, colName string, operator string, literal ast.Literal, idxStats statistics.IndexStatistics) ScanCost {
+func (s *Search) calcIndexPlanCost(stats *handler.TableStatistics, colName string, operator string, literal ast.Literal, idxStats handler.IndexStatistics) ScanCost {
 	switch operator {
 	case "=":
-		return calcIndexTableEqualCost(stats, colName, idxStats.Height, stats.PrimaryHeight)
+		return calcIndexTableEqualCost(stats, colName, idxStats.Height, stats.TreeHeight)
 	case "!=":
-		return calcIndexTableNotEqualCost(stats, colName, idxStats.Height, idxStats.LeafPageCount, stats.PrimaryHeight)
+		return calcIndexTableNotEqualCost(stats, colName, idxStats.Height, idxStats.LeafPageCount, stats.TreeHeight)
 	case ">", ">=", "<", "<=":
 		sel := s.calcSelectivity(colName, operator, literal, stats)
-		return calcIndexTableRangeCost(stats, colName, idxStats.Height, idxStats.LeafPageCount, sel, stats.PrimaryHeight)
+		return calcIndexTableRangeCost(stats, colName, idxStats.Height, idxStats.LeafPageCount, sel, stats.TreeHeight)
 	default:
 		// サポートされていない演算子の場合は高コストを返してテーブルスキャンを選ばせる
 		return ScanCost{DiskAccesses: float64(stats.LeafPageCount) * 2}
@@ -549,8 +545,8 @@ func (s *Search) calcIndexPlanCost(stats statistics.TableStatistics, colName str
 }
 
 // calcSelectivity は範囲比較の選択率を算出する
-func (s *Search) calcSelectivity(colName string, operator string, literal ast.Literal, stats statistics.TableStatistics) float64 {
-	colStats, ok := stats.ColumnStats[colName]
+func (s *Search) calcSelectivity(colName string, operator string, literal ast.Literal, stats *handler.TableStatistics) float64 {
+	colStats, ok := stats.ColStats[colName]
 	if !ok {
 		return defaultRangeSelectivity
 	}
@@ -671,7 +667,7 @@ func (s *Search) operatorToCondition(operator string, pos int, value string) (fu
 
 // isPKLeadingColumn は指定カラムがプライマリキーの先頭カラムかどうかを判定する
 func (s *Search) isPKLeadingColumn(colName string) bool {
-	if s.tblMeta.PrimaryKeyCount == 0 {
+	if s.tblMeta.PKCount == 0 {
 		return false
 	}
 	colMeta, ok := s.tblMeta.GetColByName(colName)

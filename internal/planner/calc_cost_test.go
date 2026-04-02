@@ -1,7 +1,7 @@
 package planner
 
 import (
-	"minesql/internal/statistics"
+	"minesql/internal/storage/handler"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -78,7 +78,7 @@ func TestCalcPKSelectEqualCost(t *testing.T) {
 		inner := calcTableScanCost(stats)
 
 		// WHEN: WHERE id = 42
-		cost := calcPKSelectEqualCost(inner, "id", stats.PrimaryHeight)
+		cost := calcPKSelectEqualCost(inner, "id", stats.TreeHeight)
 
 		// THEN: B(s) = H(T) = 4, R(s) = 1000/1000 = 1, V(s, id) = 1
 		assert.Equal(t, float64(4), cost.DiskAccesses)
@@ -95,7 +95,7 @@ func TestCalcPKSelectRangeGTCost(t *testing.T) {
 		inner := calcTableScanCost(stats)
 
 		// WHEN: WHERE id > 700
-		cost := calcPKSelectRangeGTCost(inner, "id", 0.3, stats.PrimaryHeight)
+		cost := calcPKSelectRangeGTCost(inner, "id", 0.3, stats.TreeHeight)
 
 		// THEN: B(s) = 4 + 0.3 * 50 = 19, R(s) = 1000 * 0.3 = 300
 		assert.Equal(t, float64(19), cost.DiskAccesses)
@@ -340,17 +340,17 @@ func TestTotalCost(t *testing.T) {
 //   - category: V = 10, min = "Cat1", max = "Cat10"
 //
 // セカンダリインデックス: name (H = 3)
-func newTestStats() statistics.TableStatistics {
-	return statistics.TableStatistics{
+func newTestStats() *handler.TableStatistics {
+	return &handler.TableStatistics{
 		RecordCount:   1000,
 		LeafPageCount: 50,
-		PrimaryHeight: 4,
-		ColumnStats: map[string]statistics.ColumnStatistics{
+		TreeHeight:    4,
+		ColStats: map[string]handler.ColumnStatistics{
 			"id":       {UniqueValues: 1000, MinValue: []byte("1"), MaxValue: []byte("1000")},
 			"name":     {UniqueValues: 1000, MinValue: []byte("A"), MaxValue: []byte("Z")},
 			"category": {UniqueValues: 10, MinValue: []byte("Cat1"), MaxValue: []byte("Cat10")},
 		},
-		SecondaryIndexStats: map[string]statistics.IndexStatistics{
+		IdxStats: map[string]handler.IndexStatistics{
 			"name": {Height: 3},
 		},
 	}

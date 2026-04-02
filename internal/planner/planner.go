@@ -4,26 +4,21 @@ import (
 	"fmt"
 	"minesql/internal/ast"
 	"minesql/internal/executor"
-	"minesql/internal/undo"
+	"minesql/internal/storage/handler"
 )
 
-func Start(undoLog *undo.UndoLog, trxId undo.TrxId, stmt ast.Statement) (executor.Executor, error) {
+func Start(trxId handler.TrxId, stmt ast.Statement) (executor.Executor, error) {
 	switch s := stmt.(type) {
 	case *ast.CreateTableStmt:
-		ctn := NewCreateTable(s)
-		return ctn.Build()
+		return PlanCreateTable(s)
 	case *ast.InsertStmt:
-		ip := NewInsert(s)
-		return ip.Build(undoLog, trxId)
+		return PlanInsert(trxId, s)
 	case *ast.SelectStmt:
-		sp := NewSelect(s)
-		return sp.Build()
+		return PlanSelect(s)
 	case *ast.DeleteStmt:
-		dp := NewDelete(s)
-		return dp.Build(undoLog, trxId)
+		return PlanDelete(trxId, s)
 	case *ast.UpdateStmt:
-		up := NewUpdate(s)
-		return up.Build(undoLog, trxId)
+		return PlanUpdate(trxId, s)
 	default:
 		return nil, fmt.Errorf("unsupported statement: %T", s)
 	}
