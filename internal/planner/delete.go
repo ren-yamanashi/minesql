@@ -34,11 +34,10 @@ func (dp *Delete) Build(trxId handler.TrxId) (executor.Executor, error) {
 	}
 
 	// テーブルを取得
-	rawTbl, err := tblMeta.GetTable()
+	tbl, err := tblMeta.GetTable()
 	if err != nil {
 		return nil, err
 	}
-	tbl := handler.NewTableHandler(rawTbl)
 
 	return executor.NewDelete(trxId, tbl, iterator), nil
 }

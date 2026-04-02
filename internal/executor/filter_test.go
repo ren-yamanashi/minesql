@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
 	"testing"
 
@@ -12,7 +13,7 @@ func TestNewFilter(t *testing.T) {
 		// GIVEN
 		dummyInnerExecutor := NewTableScan(
 			nil,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		condition := func(record Record) bool {
@@ -40,7 +41,7 @@ func TestNext(t *testing.T) {
 
 		seqScan := NewTableScan(
 			tbl,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		filter := NewFilter(seqScan, func(record Record) bool {
@@ -68,7 +69,7 @@ func TestNext(t *testing.T) {
 		assert.NoError(t, err)
 		seqScan := NewTableScan(
 			tbl,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		filter := NewFilter(seqScan, func(record Record) bool {

@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
 	"testing"
 
@@ -21,7 +22,7 @@ func TestProject(t *testing.T) {
 		records := collectAll(t, NewProject(
 			NewTableScan(
 				tbl,
-				handler.SearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			[]uint16{1, 2},
@@ -49,7 +50,7 @@ func TestProject(t *testing.T) {
 		records := collectAll(t, NewProject(
 			NewTableScan(
 				tbl,
-				handler.SearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			[]uint16{1},
@@ -77,7 +78,7 @@ func TestProject(t *testing.T) {
 		records := collectAll(t, NewProject(
 			NewTableScan(
 				tbl,
-				handler.SearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			[]uint16{2, 0},
@@ -103,7 +104,7 @@ func TestProject(t *testing.T) {
 			NewFilter(
 				NewTableScan(
 					tbl,
-					handler.SearchModeStart{},
+					access.RecordSearchModeStart{},
 					func(record Record) bool { return true },
 				),
 				func(record Record) bool {
@@ -132,7 +133,7 @@ func TestProject(t *testing.T) {
 			NewFilter(
 				NewTableScan(
 					tbl,
-					handler.SearchModeStart{},
+					access.RecordSearchModeStart{},
 					func(record Record) bool { return true },
 				),
 				func(record Record) bool {

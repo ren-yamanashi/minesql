@@ -24,34 +24,12 @@ type StatsCollector struct {
 	states     map[string]*tableState // テーブル名 -> 状態
 }
 
-var (
-	collector     *StatsCollector
-	collectorOnce sync.Once
-)
-
-// InitStatsCollector はグローバルな StatsCollector を初期化する
-func InitStatsCollector(bp *buffer.BufferPool) *StatsCollector {
-	collectorOnce.Do(func() {
-		collector = &StatsCollector{
-			bufferPool: bp,
-			states:     make(map[string]*tableState),
-		}
-	})
-	return collector
-}
-
-// GetStatsCollector はグローバルな StatsCollector を取得する
-func GetStatsCollector() *StatsCollector {
-	if collector == nil {
-		panic("StatsCollector not initialized. call InitStatsCollector() first")
+// NewStatsCollector は StatsCollector を生成する
+func NewStatsCollector(bp *buffer.BufferPool) *StatsCollector {
+	return &StatsCollector{
+		bufferPool: bp,
+		states:     make(map[string]*tableState),
 	}
-	return collector
-}
-
-// ResetStatsCollector はグローバルな StatsCollector の状態をリセットする
-func ResetStatsCollector() {
-	collector = nil
-	collectorOnce = sync.Once{}
 }
 
 // Analyze はテーブルの統計情報を収集する

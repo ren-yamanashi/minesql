@@ -1,6 +1,9 @@
 package handler
 
-import "minesql/internal/storage/transaction"
+import (
+	"minesql/internal/storage/access"
+	"minesql/internal/storage/transaction"
+)
 
 // BeginTrx は新しいトランザクションを開始し、トランザクション ID を返す
 func (h *Handler) BeginTrx() TrxId {
@@ -23,16 +26,16 @@ func (h *Handler) UndoLog() *transaction.UndoLog {
 }
 
 // AppendInsertUndo は Insert 操作の Undo レコードを記録する
-func (h *Handler) AppendInsertUndo(trxId TrxId, table *TableHandler, record [][]byte) {
-	h.undoLog.Append(trxId, transaction.NewUndoInsertRecord(table.inner, record))
+func (h *Handler) AppendInsertUndo(trxId TrxId, table *access.TableAccessMethod, record [][]byte) {
+	h.undoLog.Append(trxId, transaction.NewUndoInsertRecord(table, record))
 }
 
 // AppendDeleteUndo は Delete 操作の Undo レコードを記録する
-func (h *Handler) AppendDeleteUndo(trxId TrxId, table *TableHandler, record [][]byte) {
-	h.undoLog.Append(trxId, transaction.NewUndoDeleteRecord(table.inner, record))
+func (h *Handler) AppendDeleteUndo(trxId TrxId, table *access.TableAccessMethod, record [][]byte) {
+	h.undoLog.Append(trxId, transaction.NewUndoDeleteRecord(table, record))
 }
 
 // AppendUpdateInplaceUndo は UpdateInplace 操作の Undo レコードを記録する
-func (h *Handler) AppendUpdateInplaceUndo(trxId TrxId, table *TableHandler, prevRecord, newRecord [][]byte) {
-	h.undoLog.Append(trxId, transaction.NewUndoUpdateInplaceRecord(table.inner, prevRecord, newRecord))
+func (h *Handler) AppendUpdateInplaceUndo(trxId TrxId, table *access.TableAccessMethod, prevRecord, newRecord [][]byte) {
+	h.undoLog.Append(trxId, transaction.NewUndoUpdateInplaceRecord(table, prevRecord, newRecord))
 }

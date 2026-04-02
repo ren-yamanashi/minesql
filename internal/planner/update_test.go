@@ -3,6 +3,7 @@ package planner
 import (
 	"minesql/internal/ast"
 	"minesql/internal/executor"
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
 	"testing"
 
@@ -176,7 +177,7 @@ func TestUpdate_Build(t *testing.T) {
 		// THEN: "a" の first_name が "Jane" に更新されている
 		scan := executor.NewTableScan(
 			tbl,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
 		results := fetchAll(t, scan)
@@ -264,14 +265,14 @@ func TestUpdate_Build(t *testing.T) {
 }
 
 //nolint:unparam // テーブル名は将来的に変わりうる
-func getPlannerTableAccessMethod(t *testing.T, tableName string) *handler.TableHandler {
+func getPlannerTableAccessMethod(t *testing.T, tableName string) *access.TableAccessMethod {
 	t.Helper()
 	e := handler.Get()
 	tblMeta, ok := e.Catalog.GetTableMetaByName(tableName)
 	if !ok {
 		t.Fatalf("table %s not found in catalog", tableName)
 	}
-	rawTbl, err := tblMeta.GetTable()
+	tbl, err := tblMeta.GetTable()
 	assert.NoError(t, err)
-	return handler.NewTableHandler(rawTbl)
+	return tbl
 }

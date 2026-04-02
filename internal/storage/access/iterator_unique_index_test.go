@@ -30,7 +30,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 		iter, err := uniqueIndex.Search(bp, &table, RecordSearchModeStart{})
 		assert.NoError(t, err)
 
-		var results []*searchResult
+		var results []*SearchResult
 		for {
 			result, ok, err := iter.Next()
 			assert.NoError(t, err)
@@ -137,7 +137,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 		iter, err := uniqueIndex.Search(bp, &table, RecordSearchModeStart{})
 		assert.NoError(t, err)
 
-		var results []*searchResult
+		var results []*SearchResult
 		for {
 			result, ok, err := iter.Next()
 			assert.NoError(t, err)

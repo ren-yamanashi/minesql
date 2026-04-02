@@ -58,7 +58,6 @@ func Init() *Handler {
 func Reset() {
 	hdl = nil
 	once = sync.Once{}
-	dictionary.ResetStatsCollector()
 }
 
 // Get はグローバルな Handler を取得する
@@ -74,11 +73,6 @@ func (h *Handler) Shutdown() error {
 	if err := h.BufferPool.FlushPage(); err != nil {
 		return err
 	}
-	return h.syncAllDisks()
-}
-
-// syncAllDisks はカタログと全テーブルの Disk を同期する
-func (h *Handler) syncAllDisks() error {
 	// カタログの Disk を同期
 	catalogDisk, err := h.BufferPool.GetDisk(page.FileId(0))
 	if err != nil {
@@ -131,7 +125,7 @@ func newHandler() (*Handler, error) {
 	return &Handler{
 		BufferPool:     bp,
 		Catalog:        catalog,
-		StatsCollector: dictionary.InitStatsCollector(bp),
+		StatsCollector: dictionary.NewStatsCollector(bp),
 		undoLog:        undoLog,
 		trxManager:     transaction.NewManager(undoLog),
 		baseDirectory:  dataDir,
@@ -185,7 +179,7 @@ func initCatalog(baseDir string, bp *buffer.BufferPool) (*dictionary.Catalog, er
 	return cat, nil
 }
 
-// registerTableDisks はカタログに含まれるテーブルの Disk を登録する
+// registerTableDisks はカタログに含まれるテーブルの Disk を BufferPool に登録する
 func registerTableDisks(cat *dictionary.Catalog, baseDir string, bp *buffer.BufferPool) error {
 	tables := cat.GetAllTables()
 	for _, tableMeta := range tables {

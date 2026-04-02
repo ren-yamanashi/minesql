@@ -48,11 +48,10 @@ func (ip *Insert) Build(trxId handler.TrxId) (executor.Executor, error) {
 	if !ok {
 		return nil, fmt.Errorf("table %s not found", ip.Stmt.Table.TableName)
 	}
-	rawTbl, err := tblMeta.GetTable()
+	tbl, err := tblMeta.GetTable()
 	if err != nil {
 		return nil, err
 	}
-	tbl := handler.NewTableHandler(rawTbl)
 
 	colPosMap := make(map[string]uint16)
 	for _, colMeta := range tblMeta.Cols {

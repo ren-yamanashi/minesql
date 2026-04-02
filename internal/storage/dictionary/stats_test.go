@@ -337,8 +337,7 @@ func TestGetOrAnalyze(t *testing.T) {
 	t.Run("初回呼び出しで Analyze が実行されキャッシュされる", func(t *testing.T) {
 		// GIVEN: 3 レコード挿入済み
 		env := setupStatsTable(t)
-		defer ResetStatsCollector()
-		sc := InitStatsCollector(env.bp)
+		sc := NewStatsCollector(env.bp)
 		meta, ok := env.catalog.GetTableMetaByName("products")
 		assert.True(t, ok)
 
@@ -353,8 +352,7 @@ func TestGetOrAnalyze(t *testing.T) {
 	t.Run("dirty_count が閾値以下ならキャッシュが返る", func(t *testing.T) {
 		// GIVEN: 3 レコードで GetOrAnalyze 済み
 		env := setupStatsTable(t)
-		defer ResetStatsCollector()
-		sc := InitStatsCollector(env.bp)
+		sc := NewStatsCollector(env.bp)
 		meta, ok := env.catalog.GetTableMetaByName("products")
 		assert.True(t, ok)
 		_, err := sc.GetOrAnalyze(meta)
@@ -371,8 +369,7 @@ func TestGetOrAnalyze(t *testing.T) {
 	t.Run("dirty_count が閾値を超えると再 Analyze が実行される", func(t *testing.T) {
 		// GIVEN: 3 レコードで GetOrAnalyze 済み
 		env := setupStatsTable(t)
-		defer ResetStatsCollector()
-		sc := InitStatsCollector(env.bp)
+		sc := NewStatsCollector(env.bp)
 		meta, ok := env.catalog.GetTableMetaByName("products")
 		assert.True(t, ok)
 		_, err := sc.GetOrAnalyze(meta)
@@ -393,8 +390,7 @@ func TestGetOrAnalyze(t *testing.T) {
 	t.Run("再 Analyze 後に dirty_count がリセットされる", func(t *testing.T) {
 		// GIVEN: dirty_count 加算 → 再 Analyze 済み
 		env := setupStatsTable(t)
-		defer ResetStatsCollector()
-		sc := InitStatsCollector(env.bp)
+		sc := NewStatsCollector(env.bp)
 		meta, ok := env.catalog.GetTableMetaByName("products")
 		assert.True(t, ok)
 		_, err := sc.GetOrAnalyze(meta)

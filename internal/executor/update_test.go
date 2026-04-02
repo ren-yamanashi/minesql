@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
 	"testing"
 
@@ -17,7 +18,7 @@ func TestNewUpdate(t *testing.T) {
 
 		iterator := NewTableScan(
 			nil,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 
@@ -49,7 +50,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 1, Value: []byte("Updated")},
 		}, NewTableScan(
 			tbl,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -62,7 +63,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: 全レコードの first_name が "Updated" になっている
 		scan := NewTableScan(
 			tbl,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -91,7 +92,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 2, Value: []byte("Updated")},
 		}, NewTableScan(
 			tbl,
-			handler.SearchModeKey{Key: [][]byte{[]byte("a")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
 			},
@@ -106,7 +107,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: "a" のレコードが更新され、他は変わらない
 		scan := NewTableScan(
 			tbl,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -134,7 +135,7 @@ func TestUpdate_Next(t *testing.T) {
 		}, NewFilter(
 			NewTableScan(
 				tbl,
-				handler.SearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -151,7 +152,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: "Bob" の last_name が "Williams" に更新され、他は変わらない
 		scan := NewTableScan(
 			tbl,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -187,7 +188,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 2, Value: []byte("Zebra")},
 		}, NewTableScan(
 			tbl,
-			handler.SearchModeKey{Key: [][]byte{[]byte("a")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
 			},
@@ -204,7 +205,7 @@ func TestUpdate_Next(t *testing.T) {
 		indexScan := NewIndexScan(
 			tbl,
 			idx,
-			handler.SearchModeKey{Key: [][]byte{[]byte("Zebra")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("Zebra")}},
 			func(record Record) bool {
 				return string(record[0]) == "Zebra"
 			},
@@ -218,7 +219,7 @@ func TestUpdate_Next(t *testing.T) {
 		indexScanOld := NewIndexScan(
 			tbl,
 			idx,
-			handler.SearchModeKey{Key: [][]byte{[]byte("Doe")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("Doe")}},
 			func(record Record) bool {
 				return string(record[0]) == "Doe"
 			},
@@ -245,7 +246,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 0, Value: []byte("z")},
 		}, NewTableScan(
 			tbl,
-			handler.SearchModeKey{Key: [][]byte{[]byte("a")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
 			},
@@ -260,7 +261,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: "a" が消え "z" が追加されている
 		scan := NewTableScan(
 			tbl,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -292,7 +293,7 @@ func TestUpdate_Next(t *testing.T) {
 		}, NewFilter(
 			NewTableScan(
 				tbl,
-				handler.SearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -309,7 +310,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: 全レコードが変更されていない
 		scan := NewTableScan(
 			tbl,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -343,7 +344,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 1, Value: []byte("new_value")},
 		}, NewTableScan(
 			tbl,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 

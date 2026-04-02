@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
 	"testing"
 
@@ -19,7 +20,7 @@ func TestIndexScan(t *testing.T) {
 		indexScan := NewIndexScan(
 			nil,
 			nil,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			whileCondition,
 		)
 
@@ -45,7 +46,7 @@ func TestIndexScan(t *testing.T) {
 		indexScan := NewIndexScan(
 			tbl,
 			idx,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool {
 				return string(record[0]) < "J" // セカンダリキー (姓) が "J" 未満の間、継続
 			},
@@ -88,7 +89,7 @@ func TestIndexScan(t *testing.T) {
 		indexScan := NewIndexScan(
 			tbl,
 			idx,
-			handler.SearchModeKey{Key: [][]byte{[]byte("Doe")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("Doe")}},
 			func(record Record) bool {
 				return string(record[0]) <= "Smith" // セカンダリキー (姓) が "Smith" 以下の間、継続
 			},

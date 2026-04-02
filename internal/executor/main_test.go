@@ -2,6 +2,7 @@ package executor
 
 import (
 	"fmt"
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
 	"strings"
 	"testing"
@@ -18,7 +19,7 @@ func TestExecutorIntegration(t *testing.T) {
 		// WHEN
 		records := collectAll(t, NewTableScan(
 			tbl,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -46,7 +47,7 @@ func TestExecutorIntegration(t *testing.T) {
 		// WHEN: プライマリキーが "w" 以上 "y" 以下
 		records := collectAll(t, NewTableScan(
 			tbl,
-			handler.SearchModeKey{Key: [][]byte{[]byte("w")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("w")}},
 			func(record Record) bool {
 				return string(record[0]) <= "y"
 			},
@@ -74,7 +75,7 @@ func TestExecutorIntegration(t *testing.T) {
 		// WHEN
 		records := collectAll(t, NewTableScan(
 			tbl,
-			handler.SearchModeKey{Key: [][]byte{[]byte("y")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("y")}},
 			func(record Record) bool {
 				return string(record[0]) == "y"
 			},
@@ -101,7 +102,7 @@ func TestExecutorIntegration(t *testing.T) {
 		records := collectAll(t, NewFilter(
 			NewTableScan(
 				tbl,
-				handler.SearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -133,7 +134,7 @@ func TestExecutorIntegration(t *testing.T) {
 		records := collectAll(t, NewIndexScan(
 			tbl,
 			idx,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -165,7 +166,7 @@ func TestExecutorIntegration(t *testing.T) {
 		records := collectAll(t, NewIndexScan(
 			tbl,
 			idx,
-			handler.SearchModeKey{Key: [][]byte{[]byte("J")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("J")}},
 			func(secondaryKey Record) bool {
 				lastName := string(secondaryKey[0])
 				return lastName >= "J" && lastName < "N"
@@ -197,7 +198,7 @@ func TestExecutorIntegration(t *testing.T) {
 		records := collectAll(t, NewIndexScan(
 			tbl,
 			idx,
-			handler.SearchModeKey{Key: [][]byte{[]byte("Miller")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("Miller")}},
 			func(secondaryKey Record) bool {
 				return string(secondaryKey[0]) == "Miller"
 			},
@@ -230,7 +231,7 @@ func TestExecutorIntegration(t *testing.T) {
 		}, NewFilter(
 			NewTableScan(
 				tbl,
-				handler.SearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -243,13 +244,13 @@ func TestExecutorIntegration(t *testing.T) {
 		// THEN: テーブルスキャンとインデックススキャンの両方で確認
 		tableRecords := collectAll(t, NewTableScan(
 			tbl,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 		idxRecords := collectAll(t, NewIndexScan(
 			tbl,
 			idx,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -289,7 +290,7 @@ func TestExecutorIntegration(t *testing.T) {
 			{Pos: 0, Value: []byte("a")},
 		}, NewTableScan(
 			tbl,
-			handler.SearchModeKey{Key: [][]byte{[]byte("v")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("v")}},
 			func(record Record) bool {
 				return string(record[0]) == "v"
 			},
@@ -300,7 +301,7 @@ func TestExecutorIntegration(t *testing.T) {
 		// THEN
 		records := collectAll(t, NewTableScan(
 			tbl,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -328,7 +329,7 @@ func TestExecutorIntegration(t *testing.T) {
 		records := collectAll(t, NewProject(
 			NewTableScan(
 				tbl,
-				handler.SearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			[]uint16{1, 2},
@@ -360,7 +361,7 @@ func TestExecutorIntegration(t *testing.T) {
 			NewFilter(
 				NewTableScan(
 					tbl,
-					handler.SearchModeStart{},
+					access.RecordSearchModeStart{},
 					func(record Record) bool { return true },
 				),
 				func(record Record) bool {
@@ -395,7 +396,7 @@ func TestExecutorIntegration(t *testing.T) {
 		del := NewDelete(trxId, tbl, NewFilter(
 			NewTableScan(
 				tbl,
-				handler.SearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -408,13 +409,13 @@ func TestExecutorIntegration(t *testing.T) {
 		// THEN: テーブルスキャンとインデックススキャンの両方で確認
 		tableRecords := collectAll(t, NewTableScan(
 			tbl,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 		idxRecords := collectAll(t, NewIndexScan(
 			tbl,
 			idx,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -442,7 +443,7 @@ func TestExecutorIntegration(t *testing.T) {
 }
 
 // 5 人のユーザーを持つテーブルを作成し、テーブルアクセスメソッドを返す
-func setupExecutorTestTable(t *testing.T) *handler.TableHandler {
+func setupExecutorTestTable(t *testing.T) *access.TableAccessMethod {
 	t.Helper()
 
 	tmpdir := t.TempDir()
@@ -521,16 +522,12 @@ func writeRecords(sb *strings.Builder, records []Record) {
 	fmt.Fprintf(sb, "  合計: %d 件\n", len(records))
 }
 
-func getTableAccessMethod(tableName string) (*handler.TableHandler, error) {
+func getTableAccessMethod(tableName string) (*access.TableAccessMethod, error) {
 	e := handler.Get()
 	tblMeta, ok := e.Catalog.GetTableMetaByName(tableName)
 	if !ok {
 		return nil, fmt.Errorf("table %s not found in catalog", tableName)
 	}
 
-	tbl, err := tblMeta.GetTable()
-	if err != nil {
-		return nil, err
-	}
-	return handler.NewTableHandler(tbl), nil
+	return tblMeta.GetTable()
 }

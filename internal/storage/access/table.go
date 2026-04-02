@@ -65,7 +65,7 @@ func (t *TableAccessMethod) Insert(bp *buffer.BufferPool, columns [][]byte) erro
 	btr := btree.NewBTree(t.MetaPageId)
 
 	btrRecord := t.encodeBTreeRecord(columns, 0)
-	encodedKey := t.encodeKey(columns)
+	encodedKey := t.EncodeKey(columns)
 
 	err := btr.Insert(bp, btrRecord)
 	if err != nil {
@@ -105,7 +105,7 @@ func (t *TableAccessMethod) Insert(bp *buffer.BufferPool, columns [][]byte) erro
 func (t *TableAccessMethod) Delete(bp *buffer.BufferPool, columns [][]byte) error {
 	btr := btree.NewBTree(t.MetaPageId)
 
-	encodedKey := t.encodeKey(columns)
+	encodedKey := t.EncodeKey(columns)
 	if err := btr.Delete(bp, encodedKey); err != nil {
 		return err
 	}
@@ -133,7 +133,7 @@ func (t *TableAccessMethod) SoftDelete(bp *buffer.BufferPool, columns [][]byte) 
 	}
 
 	// ユニークインデックスをソフトデリート
-	encodedKey := t.encodeKey(columns)
+	encodedKey := t.EncodeKey(columns)
 	for _, ui := range t.UniqueIndexes {
 		err := ui.Delete(bp, encodedKey, columns)
 		if err != nil {
@@ -157,8 +157,8 @@ func (t *TableAccessMethod) UpdateInplace(bp *buffer.BufferPool, oldColumns [][]
 	}
 
 	// ユニークインデックスを更新 (物理削除 + Insert)
-	encodedOldKey := t.encodeKey(oldColumns)
-	encodedNewKey := t.encodeKey(newColumns)
+	encodedOldKey := t.EncodeKey(oldColumns)
+	encodedNewKey := t.EncodeKey(newColumns)
 	for _, ui := range t.UniqueIndexes {
 		err := ui.Delete(bp, encodedOldKey, oldColumns)
 		if err != nil {
@@ -195,8 +195,8 @@ func (t *TableAccessMethod) Height(bp *buffer.BufferPool) (uint64, error) {
 	return btr.Height(bp)
 }
 
-// encodeKey はカラム値からプライマリキー部分を Memcomparable format でエンコードする
-func (t *TableAccessMethod) encodeKey(columns [][]byte) []byte {
+// EncodeKey はカラム値からプライマリキー部分を Memcomparable format でエンコードする
+func (t *TableAccessMethod) EncodeKey(columns [][]byte) []byte {
 	var encoded []byte
 	encode.Encode(columns[:t.PrimaryKeyCount], &encoded)
 	return encoded

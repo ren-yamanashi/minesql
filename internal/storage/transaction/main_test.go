@@ -2,6 +2,7 @@ package transaction_test
 
 import (
 	"minesql/internal/executor"
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
 	"minesql/internal/storage/transaction"
 	"testing"
@@ -94,7 +95,7 @@ func TestRollback(t *testing.T) {
 		deleteTrxId := trxMgr.Begin()
 		del := executor.NewDelete(deleteTrxId, tbl, executor.NewTableScan(
 			tbl,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		))
 		_, err = del.Next()
@@ -134,7 +135,7 @@ func TestRollback(t *testing.T) {
 			{Pos: 1, Value: []byte("Carol")},
 		}, executor.NewTableScan(
 			tbl,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		))
 		_, err = upd.Next()
@@ -187,7 +188,7 @@ func TestRollback(t *testing.T) {
 			{Pos: 1, Value: []byte("Dave")},
 		}, executor.NewTableScan(
 			tbl,
-			handler.SearchModeKey{Key: [][]byte{[]byte("a")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record executor.Record) bool { return string(record[0]) == "a" },
 		))
 		_, err = upd.Next()
@@ -196,7 +197,7 @@ func TestRollback(t *testing.T) {
 		del := executor.NewDelete(trxId, tbl, executor.NewFilter(
 			executor.NewTableScan(
 				tbl,
-				handler.SearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record executor.Record) bool { return true },
 			),
 			func(record executor.Record) bool { return string(record[0]) == "b" },
@@ -225,7 +226,7 @@ func initStorageManagerForTest(t *testing.T) {
 	handler.Init()
 }
 
-func setupTestTable(t *testing.T) *handler.TableHandler {
+func setupTestTable(t *testing.T) *access.TableAccessMethod {
 	t.Helper()
 	createTable := executor.NewCreateTable("test_trx", 1, nil, []handler.ColumnParam{
 		{Name: "id", Type: handler.ColumnTypeString},
@@ -237,16 +238,16 @@ func setupTestTable(t *testing.T) *handler.TableHandler {
 	e := handler.Get()
 	tblMeta, ok := e.Catalog.GetTableMetaByName("test_trx")
 	assert.True(t, ok)
-	rawTbl, err := tblMeta.GetTable()
+	tbl, err := tblMeta.GetTable()
 	assert.NoError(t, err)
-	return handler.NewTableHandler(rawTbl)
+	return tbl
 }
 
-func collectAllRecords(t *testing.T, tbl *handler.TableHandler) []executor.Record {
+func collectAllRecords(t *testing.T, tbl *access.TableAccessMethod) []executor.Record {
 	t.Helper()
 	scan := executor.NewTableScan(
 		tbl,
-		handler.SearchModeStart{},
+		access.RecordSearchModeStart{},
 		func(record executor.Record) bool { return true },
 	)
 	var recs []executor.Record

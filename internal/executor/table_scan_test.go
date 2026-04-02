@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
 	"testing"
 
@@ -25,7 +26,7 @@ func TestNewTableScan(t *testing.T) {
 		// WHEN
 		seqScan := NewTableScan(
 			tbl,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			whileCondition,
 		)
 
@@ -48,7 +49,7 @@ func TestTableScan_Next(t *testing.T) {
 
 		seqScan := NewTableScan(
 			tbl,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool {
 				return string(record[0]) < "c" // プライマリキーが "c" 未満の間、継続
 			},
@@ -85,7 +86,7 @@ func TestTableScan_Next(t *testing.T) {
 
 		seqScan := NewTableScan(
 			tbl,
-			handler.SearchModeKey{Key: [][]byte{[]byte("b")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("b")}},
 			func(record Record) bool {
 				return string(record[0]) <= "d" // プライマリキーが "d" 以下の間、継続
 			},

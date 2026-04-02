@@ -17,7 +17,7 @@ type Disk struct {
 	nextPageId page.PageId // 次に採番するページ ID
 }
 
-// NewDisk は指定されたパスにあるヒープファイルを管理する Disk を生成する
+// NewDisk は指定されたパスのヒープファイルを開き、Disk を生成する (ファイルが存在しない場合は新規作成する)
 func NewDisk(fileId page.FileId, path string) (*Disk, error) {
 	file, err := directio.OpenFile(
 		path,

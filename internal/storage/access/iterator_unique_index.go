@@ -6,7 +6,8 @@ import (
 	"minesql/internal/storage/encode"
 )
 
-type searchResult struct {
+// SearchResult はインデックス検索の結果
+type SearchResult struct {
 	UniqueKey [][]byte // デコード済みユニークキー
 	Record    [][]byte // デコード済みレコード (プライマリキー + 値)
 }
@@ -31,7 +32,7 @@ func newUniqueIndexIterator(iterator *btree.Iterator, tableBTree *btree.BTree, b
 // (DeleteMark が設定されているレコードはスキップする)
 //
 // インデックスから次のレコードを取得し、PK でテーブル本体を検索してレコードをデコードする
-func (uii *UniqueIndexIterator) Next() (*searchResult, bool, error) {
+func (uii *UniqueIndexIterator) Next() (*SearchResult, bool, error) {
 	for {
 		// ユニークインデックスから次のレコードを取得
 		indexRecord, ok, err := uii.iterator.Next(uii.bp)
@@ -69,7 +70,7 @@ func (uii *UniqueIndexIterator) Next() (*searchResult, bool, error) {
 		encode.Decode(tableRecord.KeyBytes(), &record)
 		encode.Decode(tableRecord.NonKeyBytes(), &record)
 
-		return &searchResult{
+		return &SearchResult{
 			UniqueKey: uniqueKey,
 			Record:    record,
 		}, true, nil

@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
 	"testing"
 
@@ -61,7 +62,7 @@ func TestInsert_Next(t *testing.T) {
 		}
 		seqScan := NewTableScan(
 			tbl,
-			handler.SearchModeStart{},
+			access.RecordSearchModeStart{},
 			whileCondition,
 		)
 		res, err := fetchAll(seqScan)
