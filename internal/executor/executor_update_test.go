@@ -328,7 +328,7 @@ func TestUpdate_Next(t *testing.T) {
 		_ = tmpdir
 
 		var trxId handler.TrxId = 1
-		createTableForTest(t, "empty_table", nil, []handler.ColumnParam{
+		createTableForTest(t, "empty_table", nil, []handler.CreateColumnParam{
 			{Name: "id", Type: handler.ColumnTypeString},
 			{Name: "value", Type: handler.ColumnTypeString},
 		})

@@ -15,7 +15,7 @@ func TestAnalyzeTable(t *testing.T) {
 		Reset()
 		h := Init()
 
-		err := h.CreateTable("users", 1, nil, []ColumnParam{
+		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
 			{Name: "name", Type: ColumnTypeString},
 		})
@@ -47,7 +47,7 @@ func TestAnalyzeTable(t *testing.T) {
 		Reset()
 		h := Init()
 
-		err := h.CreateTable("empty", 1, nil, []ColumnParam{
+		err := h.CreateTable("empty", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
 		})
 		assert.NoError(t, err)

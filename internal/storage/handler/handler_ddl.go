@@ -5,21 +5,21 @@ import (
 	"minesql/internal/storage/dictionary"
 )
 
-// IndexParam はインデックス作成パラメータ
-type IndexParam struct {
+// CreateIndexParam はインデックス作成パラメータ
+type CreateIndexParam struct {
 	Name    string // インデックス名
 	ColName string // インデックスを構成するカラム名
 	UkIdx   uint16 // ユニークキーに含めるカラムのインデックス (0 始まりの列番号)
 }
 
-// ColumnParam はカラム作成パラメータ
-type ColumnParam struct {
+// CreateColumnParam はカラム作成パラメータ
+type CreateColumnParam struct {
 	Name string
 	Type ColumnType
 }
 
 // CreateTable はテーブルを新規作成し、カタログに登録する
-func (h *Handler) CreateTable(tableName string, pkCount uint8, idxParams []IndexParam, colParams []ColumnParam) error {
+func (h *Handler) CreateTable(tableName string, pkCount uint8, idxParams []CreateIndexParam, colParams []CreateColumnParam) error {
 	// FileId を採番
 	fileId, err := h.Catalog.AllocateFileId(h.BufferPool)
 	if err != nil {

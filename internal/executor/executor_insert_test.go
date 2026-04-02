@@ -33,9 +33,9 @@ func TestInsert_Next(t *testing.T) {
 		defer handler.Reset()
 
 		tableName := "users"
-		createTableForTest(t, tableName, []handler.IndexParam{
+		createTableForTest(t, tableName, []handler.CreateIndexParam{
 			{Name: "name", ColName: "name", UkIdx: 1},
-		}, []handler.ColumnParam{
+		}, []handler.CreateColumnParam{
 			{Name: "id", Type: handler.ColumnTypeString},
 			{Name: "name", Type: handler.ColumnTypeString},
 		})
@@ -83,7 +83,7 @@ func initStorageManagerForTest(t *testing.T) {
 	handler.Init()
 }
 
-func createTableForTest(t *testing.T, tableName string, indexes []handler.IndexParam, columns []handler.ColumnParam) {
+func createTableForTest(t *testing.T, tableName string, indexes []handler.CreateIndexParam, columns []handler.CreateColumnParam) {
 	createTable := NewCreateTable(tableName, 1, indexes, columns)
 	_, err := createTable.Next()
 	assert.NoError(t, err)

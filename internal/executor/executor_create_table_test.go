@@ -51,7 +51,7 @@ func TestCreateTable_Next(t *testing.T) {
 		handler.Reset()
 		handler.Init()
 		e := handler.Get()
-		createTable := NewCreateTable("users", 1, nil, []handler.ColumnParam{
+		createTable := NewCreateTable("users", 1, nil, []handler.CreateColumnParam{
 			{Name: "id", Type: "int"},
 			{Name: "name", Type: "string"},
 			{Name: "email", Type: "string"},
@@ -86,7 +86,7 @@ func TestCreateTable_Next(t *testing.T) {
 		handler.Reset()
 		handler.Init()
 		e := handler.Get()
-		createTable := NewCreateTable("users", 1, []handler.IndexParam{
+		createTable := NewCreateTable("users", 1, []handler.CreateIndexParam{
 			{Name: "email", ColName: "email", UkIdx: 1},
 		}, nil)
 

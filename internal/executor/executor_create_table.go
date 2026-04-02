@@ -4,18 +4,18 @@ import "minesql/internal/storage/handler"
 
 // CreateTable はテーブルを作成する
 type CreateTable struct {
-	tableName    string                // 作成するテーブル名
-	pkCount      uint8                 // 主キーのカラム数
-	indexParams  []handler.IndexParam  // 作成するインデックスの情報
-	columnParams []handler.ColumnParam // 作成するカラムの情報
+	tableName    string                      // 作成するテーブル名
+	pkCount      uint8                       // 主キーのカラム数
+	indexParams  []handler.CreateIndexParam  // 作成するインデックスの情報
+	columnParams []handler.CreateColumnParam // 作成するカラムの情報
 }
 
-func NewCreateTable(tableName string, pkCount uint8, indexParams []handler.IndexParam, columnParams []handler.ColumnParam) *CreateTable {
+func NewCreateTable(tableName string, pkCount uint8, indexParams []handler.CreateIndexParam, columnParams []handler.CreateColumnParam) *CreateTable {
 	if indexParams == nil {
-		indexParams = []handler.IndexParam{}
+		indexParams = []handler.CreateIndexParam{}
 	}
 	if columnParams == nil {
-		columnParams = []handler.ColumnParam{}
+		columnParams = []handler.CreateColumnParam{}
 	}
 	return &CreateTable{
 		tableName:    tableName,

@@ -35,11 +35,11 @@ func setupExample() (*access.Table, func()) {
 	ct := executor.NewCreateTable(
 		"users",
 		1,
-		[]handler.IndexParam{
+		[]handler.CreateIndexParam{
 			{Name: "idx_first_name", ColName: "first_name", UkIdx: 1},
 			{Name: "idx_last_name", ColName: "last_name", UkIdx: 2},
 		},
-		[]handler.ColumnParam{
+		[]handler.CreateColumnParam{
 			{Name: "id", Type: handler.ColumnTypeString},
 			{Name: "first_name", Type: handler.ColumnTypeString},
 			{Name: "last_name", Type: handler.ColumnTypeString},

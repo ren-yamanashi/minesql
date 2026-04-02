@@ -16,7 +16,7 @@ func TestCreateTable(t *testing.T) {
 		h := Init()
 
 		// WHEN
-		err := h.CreateTable("users", 1, nil, []ColumnParam{
+		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
 			{Name: "name", Type: ColumnTypeString},
 		})
@@ -40,10 +40,10 @@ func TestCreateTable(t *testing.T) {
 
 		// WHEN
 		err := h.CreateTable("users", 1,
-			[]IndexParam{
+			[]CreateIndexParam{
 				{Name: "idx_email", ColName: "email", UkIdx: 1},
 			},
-			[]ColumnParam{
+			[]CreateColumnParam{
 				{Name: "id", Type: ColumnTypeString},
 				{Name: "email", Type: ColumnTypeString},
 			},
@@ -65,7 +65,7 @@ func TestCreateTable(t *testing.T) {
 		Reset()
 		h := Init()
 
-		err := h.CreateTable("users", 1, nil, []ColumnParam{
+		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
 			{Name: "name", Type: ColumnTypeString},
 		})

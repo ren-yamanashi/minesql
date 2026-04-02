@@ -228,7 +228,7 @@ func initStorageManagerForTest(t *testing.T) {
 
 func setupTestTable(t *testing.T) *access.Table {
 	t.Helper()
-	createTable := executor.NewCreateTable("test_trx", 1, nil, []handler.ColumnParam{
+	createTable := executor.NewCreateTable("test_trx", 1, nil, []handler.CreateColumnParam{
 		{Name: "id", Type: handler.ColumnTypeString},
 		{Name: "name", Type: handler.ColumnTypeString},
 	})

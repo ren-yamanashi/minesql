@@ -8,31 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewCreateTable(t *testing.T) {
-	t.Run("正常に CreateTable が生成される", func(t *testing.T) {
-		// GIVEN
-		stmt := &ast.CreateTableStmt{
-			StmtType:  ast.StmtTypeCreate,
-			Keyword:   ast.KeywordTable,
-			TableName: "users",
-			CreateDefinitions: []ast.Definition{
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
-				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
-					*ast.NewColumnId("id"),
-				}},
-			},
-		}
-
-		// WHEN
-		node := NewCreateTable(stmt)
-
-		// THEN
-		assert.NotNil(t, node)
-		assert.Equal(t, stmt, node.Stmt)
-	})
-}
-
-func TestCreateTable_Build(t *testing.T) {
+func TestPlanCreateTable(t *testing.T) {
 	t.Run("ユニークキーなしのテーブルを作成できる", func(t *testing.T) {
 		// GIVEN
 		stmt := &ast.CreateTableStmt{
@@ -47,10 +23,9 @@ func TestCreateTable_Build(t *testing.T) {
 				}},
 			},
 		}
-		node := NewCreateTable(stmt)
 
 		// WHEN
-		exec, err := node.Build()
+		exec, err := PlanCreateTable(stmt)
 
 		// THEN
 		assert.NoError(t, err)
@@ -76,10 +51,9 @@ func TestCreateTable_Build(t *testing.T) {
 				ukDef,
 			},
 		}
-		node := NewCreateTable(stmt)
 
 		// WHEN
-		exec, err := node.Build()
+		exec, err := PlanCreateTable(stmt)
 
 		// THEN
 		assert.NoError(t, err)
@@ -112,10 +86,9 @@ func TestCreateTable_Build(t *testing.T) {
 				ukDef2,
 			},
 		}
-		node := NewCreateTable(stmt)
 
 		// WHEN
-		exec, err := node.Build()
+		exec, err := PlanCreateTable(stmt)
 
 		// THEN
 		assert.NoError(t, err)
@@ -137,10 +110,9 @@ func TestCreateTable_Build(t *testing.T) {
 				}},
 			},
 		}
-		node := NewCreateTable(stmt)
 
 		// WHEN
-		exec, err := node.Build()
+		exec, err := PlanCreateTable(stmt)
 
 		// THEN
 		assert.Error(t, err)
@@ -159,10 +131,9 @@ func TestCreateTable_Build(t *testing.T) {
 				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "name", DataType: ast.DataTypeVarchar},
 			},
 		}
-		node := NewCreateTable(stmt)
 
 		// WHEN
-		exec, err := node.Build()
+		exec, err := PlanCreateTable(stmt)
 
 		// THEN
 		assert.Error(t, err)
@@ -187,10 +158,9 @@ func TestCreateTable_Build(t *testing.T) {
 				}},
 			},
 		}
-		node := NewCreateTable(stmt)
 
 		// WHEN
-		exec, err := node.Build()
+		exec, err := PlanCreateTable(stmt)
 
 		// THEN
 		assert.Error(t, err)
@@ -209,10 +179,9 @@ func TestCreateTable_Build(t *testing.T) {
 				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{}},
 			},
 		}
-		node := NewCreateTable(stmt)
 
 		// WHEN
-		exec, err := node.Build()
+		exec, err := PlanCreateTable(stmt)
 
 		// THEN
 		assert.Error(t, err)
@@ -233,10 +202,9 @@ func TestCreateTable_Build(t *testing.T) {
 				}},
 			},
 		}
-		node := NewCreateTable(stmt)
 
 		// WHEN
-		exec, err := node.Build()
+		exec, err := PlanCreateTable(stmt)
 
 		// THEN
 		assert.Error(t, err)
@@ -260,10 +228,9 @@ func TestCreateTable_Build(t *testing.T) {
 				}},
 			},
 		}
-		node := NewCreateTable(stmt)
 
 		// WHEN
-		exec, err := node.Build()
+		exec, err := PlanCreateTable(stmt)
 
 		// THEN
 		assert.Error(t, err)
@@ -286,10 +253,9 @@ func TestCreateTable_Build(t *testing.T) {
 				}},
 			},
 		}
-		node := NewCreateTable(stmt)
 
 		// WHEN
-		exec, err := node.Build()
+		exec, err := PlanCreateTable(stmt)
 
 		// THEN
 		assert.Error(t, err)
@@ -309,10 +275,9 @@ func TestCreateTable_Build(t *testing.T) {
 				}},
 			},
 		}
-		node := NewCreateTable(stmt)
 
 		// WHEN
-		exec, err := node.Build()
+		exec, err := PlanCreateTable(stmt)
 
 		// THEN
 		assert.Error(t, err)
@@ -343,10 +308,9 @@ func TestCreateTable_Build(t *testing.T) {
 				ukDef2,
 			},
 		}
-		node := NewCreateTable(stmt)
 
 		// WHEN
-		exec, err := node.Build()
+		exec, err := PlanCreateTable(stmt)
 
 		// THEN
 		assert.Error(t, err)
@@ -376,10 +340,9 @@ func TestCreateTable_Build(t *testing.T) {
 				ukDef2,
 			},
 		}
-		node := NewCreateTable(stmt)
 
 		// WHEN
-		exec, err := node.Build()
+		exec, err := PlanCreateTable(stmt)
 
 		// THEN
 		assert.Error(t, err)
@@ -404,10 +367,9 @@ func TestCreateTable_Build(t *testing.T) {
 				ukDef,
 			},
 		}
-		node := NewCreateTable(stmt)
 
 		// WHEN
-		exec, err := node.Build()
+		exec, err := PlanCreateTable(stmt)
 
 		// THEN
 		assert.Error(t, err)
