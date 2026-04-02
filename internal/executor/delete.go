@@ -9,14 +9,14 @@ import (
 type Delete struct {
 	trxId         handler.TrxId
 	table         *access.TableAccessMethod
-	InnerExecutor Executor
+	innerExecutor Executor
 }
 
 func NewDelete(trxId handler.TrxId, table *access.TableAccessMethod, innerExecutor Executor) *Delete {
 	return &Delete{
 		trxId:         trxId,
 		table:         table,
-		InnerExecutor: innerExecutor,
+		innerExecutor: innerExecutor,
 	}
 }
 
@@ -27,7 +27,7 @@ func (del *Delete) Next() (Record, error) {
 	// (削除により Iterator が参照するページデータが破壊されるのを防ぐ)
 	var records []Record
 	for {
-		record, err := del.InnerExecutor.Next()
+		record, err := del.innerExecutor.Next()
 		if err != nil {
 			return nil, err
 		}

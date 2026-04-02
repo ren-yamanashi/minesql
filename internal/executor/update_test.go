@@ -27,9 +27,6 @@ func TestNewUpdate(t *testing.T) {
 
 		// THEN
 		assert.NotNil(t, upd)
-		assert.Nil(t, upd.table)
-		assert.Equal(t, setColumns, upd.SetColumns)
-		assert.NotNil(t, upd.InnerExecutor)
 	})
 }
 

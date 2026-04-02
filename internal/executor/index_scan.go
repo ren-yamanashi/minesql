@@ -10,7 +10,7 @@ type IndexScan struct {
 	table          *access.TableAccessMethod
 	index          *access.UniqueIndexAccessMethod
 	searchMode     access.RecordSearchMode
-	whileCondition func(record Record) bool // 継続条件を満たすかどうかを判定する関数
+	whileCondition func(Record) bool
 	iterator       *access.UniqueIndexIterator
 }
 

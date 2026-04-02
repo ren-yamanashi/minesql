@@ -55,11 +55,16 @@ func TestUpdate_Build(t *testing.T) {
 		assert.IsType(t, &executor.Update{}, exec)
 	})
 
-	t.Run("複数カラムの更新で SetColumns のカラム位置と値が正しく変換される", func(t *testing.T) {
+	t.Run("複数カラムの更新が正しく実行される", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer handler.Reset()
+
+		tbl := getPlannerTableAccessMethod(t, "users")
+		e := handler.Get()
+		err := tbl.Insert(e.BufferPool, [][]byte{[]byte("1"), []byte("John"), []byte("Smith")})
+		assert.NoError(t, err)
 
 		var trxId handler.TrxId = 1
 		stmt := &ast.UpdateStmt{
@@ -71,20 +76,22 @@ func TestUpdate_Build(t *testing.T) {
 			Where: &ast.WhereClause{IsSet: false},
 		}
 		planner := NewUpdate(stmt)
+		exec, err := planner.Build(trxId)
+		assert.NoError(t, err)
 
 		// WHEN
-		exec, err := planner.Build(trxId)
-
-		// THEN
+		_, err = exec.Next()
 		assert.NoError(t, err)
-		assert.NotNil(t, exec)
-		upd, ok := exec.(*executor.Update)
+
+		// THEN: 更新後のレコードが正しい
+		iter, err := tbl.Search(e.BufferPool, access.RecordSearchModeStart{})
+		assert.NoError(t, err)
+		record, ok, err := iter.Next()
+		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, 2, len(upd.SetColumns))
-		assert.Equal(t, uint16(1), upd.SetColumns[0].Pos) // first_name の位置
-		assert.Equal(t, []byte("Jane"), upd.SetColumns[0].Value)
-		assert.Equal(t, uint16(2), upd.SetColumns[1].Pos) // last_name の位置
-		assert.Equal(t, []byte("Doe"), upd.SetColumns[1].Value)
+		assert.Equal(t, "1", string(record[0]))
+		assert.Equal(t, "Jane", string(record[1]))
+		assert.Equal(t, "Doe", string(record[2]))
 	})
 
 	t.Run("存在しないテーブル名の場合、エラーが返る", func(t *testing.T) {
@@ -238,11 +245,16 @@ func TestUpdate_Build(t *testing.T) {
 		assert.IsType(t, &executor.Update{}, exec)
 	})
 
-	t.Run("SetClauses が空の場合、空の SetColumns で Executor が生成される", func(t *testing.T) {
+	t.Run("SetClauses が空の場合でも Executor が生成され、レコードは変更されない", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		initStorageManager(t, tmpdir)
 		defer handler.Reset()
+
+		tbl := getPlannerTableAccessMethod(t, "users")
+		e := handler.Get()
+		err := tbl.Insert(e.BufferPool, [][]byte{[]byte("1"), []byte("John"), []byte("Smith")})
+		assert.NoError(t, err)
 
 		var trxId handler.TrxId = 1
 		stmt := &ast.UpdateStmt{
@@ -251,16 +263,22 @@ func TestUpdate_Build(t *testing.T) {
 			Where:      &ast.WhereClause{IsSet: false},
 		}
 		planner := NewUpdate(stmt)
+		exec, err := planner.Build(trxId)
+		assert.NoError(t, err)
 
 		// WHEN
-		exec, err := planner.Build(trxId)
-
-		// THEN
+		_, err = exec.Next()
 		assert.NoError(t, err)
-		assert.NotNil(t, exec)
-		upd, ok := exec.(*executor.Update)
+
+		// THEN: レコードは変更されていない
+		iter, err := tbl.Search(e.BufferPool, access.RecordSearchModeStart{})
+		assert.NoError(t, err)
+		record, ok, err := iter.Next()
+		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Empty(t, upd.SetColumns)
+		assert.Equal(t, "1", string(record[0]))
+		assert.Equal(t, "John", string(record[1]))
+		assert.Equal(t, "Smith", string(record[2]))
 	})
 }
 

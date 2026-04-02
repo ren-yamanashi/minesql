@@ -70,6 +70,45 @@ func TestGet(t *testing.T) {
 	})
 }
 
+func TestShutdown(t *testing.T) {
+	t.Run("テーブルが存在する状態で Shutdown がエラーなく完了する", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		// テーブルを作成してデータを挿入
+		fileId, err := h.Catalog.AllocateFileId(h.BufferPool)
+		assert.NoError(t, err)
+		err = h.RegisterDmToBp(fileId, "users")
+		assert.NoError(t, err)
+
+		metaPageId, err := h.BufferPool.AllocatePageId(fileId)
+		assert.NoError(t, err)
+		tbl := access.NewTableAccessMethod("users", metaPageId, 1, nil)
+		err = tbl.Create(h.BufferPool)
+		assert.NoError(t, err)
+
+		cols := []*dictionary.ColumnMeta{
+			dictionary.NewColumnMeta(fileId, "id", 0, dictionary.ColumnTypeString),
+		}
+		tblMeta := dictionary.NewTableMeta(fileId, "users", 1, 1, cols, nil, metaPageId)
+		err = h.Catalog.Insert(h.BufferPool, tblMeta)
+		assert.NoError(t, err)
+
+		err = tbl.Insert(h.BufferPool, [][]byte{[]byte("1")})
+		assert.NoError(t, err)
+
+		// WHEN
+		err = h.Shutdown()
+
+		// THEN
+		assert.NoError(t, err)
+	})
+}
+
 func TestRegisterDmToBp(t *testing.T) {
 	t.Run("Disk を BufferPool に登録できる", func(t *testing.T) {
 		// GIVEN

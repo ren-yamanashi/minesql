@@ -25,7 +25,7 @@ func TestDelete(t *testing.T) {
 		// THEN
 		assert.NotNil(t, del)
 		assert.Nil(t, del.table)
-		assert.NotNil(t, del.InnerExecutor)
+		assert.NotNil(t, del.innerExecutor)
 	})
 
 	t.Run("SearchTable を使って全レコードを削除できる", func(t *testing.T) {

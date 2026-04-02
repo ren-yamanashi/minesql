@@ -7,6 +7,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestNewCreateTable(t *testing.T) {
+	t.Run("インデックスとカラムのパラメータが nil の場合に空のスライスに変換される", func(t *testing.T) {
+		// WHEN
+		createTable := NewCreateTable("users", 1, nil, nil)
+
+		// THEN
+		assert.NotNil(t, createTable.indexParams)
+		assert.NotNil(t, createTable.columnParams)
+		assert.Equal(t, 0, len(createTable.indexParams))
+		assert.Equal(t, 0, len(createTable.columnParams))
+	})
+}
+
 func TestCreateTable_Next(t *testing.T) {
 	t.Run("テーブルを作成できる", func(t *testing.T) {
 		// GIVEN

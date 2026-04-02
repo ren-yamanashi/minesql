@@ -15,16 +15,16 @@ type SetColumn struct {
 type Update struct {
 	trxId         handler.TrxId
 	table         *access.TableAccessMethod
-	SetColumns    []SetColumn
-	InnerExecutor Executor
+	setColumns    []SetColumn
+	innerExecutor Executor
 }
 
 func NewUpdate(trxId handler.TrxId, table *access.TableAccessMethod, setColumns []SetColumn, innerExecutor Executor) *Update {
 	return &Update{
 		trxId:         trxId,
 		table:         table,
-		SetColumns:    setColumns,
-		InnerExecutor: innerExecutor,
+		setColumns:    setColumns,
+		innerExecutor: innerExecutor,
 	}
 }
 
@@ -35,7 +35,7 @@ func (upd *Update) Next() (Record, error) {
 	// (更新により Iterator が参照するページデータが破壊されるのを防ぐ)
 	var records []Record
 	for {
-		record, err := upd.InnerExecutor.Next()
+		record, err := upd.innerExecutor.Next()
 		if err != nil {
 			return nil, err
 		}
@@ -51,7 +51,7 @@ func (upd *Update) Next() (Record, error) {
 		updatedRecord := make(Record, len(record))
 		copy(updatedRecord, record)
 
-		for _, setCol := range upd.SetColumns {
+		for _, setCol := range upd.setColumns {
 			updatedRecord[setCol.Pos] = setCol.Value
 		}
 		updatedRecords = append(updatedRecords, updatedRecord)

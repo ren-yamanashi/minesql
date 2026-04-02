@@ -9,14 +9,14 @@ import (
 type TableScan struct {
 	table          *access.TableAccessMethod
 	searchMode     access.RecordSearchMode
-	whileCondition func(record Record) bool // 継続条件を満たすかどうかを判定する関数
+	whileCondition func(Record) bool
 	iterator       *access.TableIterator
 }
 
 func NewTableScan(
 	table *access.TableAccessMethod,
 	searchMode access.RecordSearchMode,
-	whileCondition func(record Record) bool,
+	whileCondition func(Record) bool,
 ) *TableScan {
 	return &TableScan{
 		table:          table,

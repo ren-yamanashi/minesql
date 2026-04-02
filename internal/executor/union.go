@@ -4,21 +4,21 @@ import "encoding/binary"
 
 // Union は複数の Executor の結果を結合し、重複を除去する
 type Union struct {
-	executors []Executor
-	current   int
-	seen      map[string]struct{}
+	current        int
+	seen           map[string]struct{}
+	innerExecutors []Executor
 }
 
-func NewUnion(executors []Executor) *Union {
+func NewUnion(innerExecutors []Executor) *Union {
 	return &Union{
-		executors: executors,
-		seen:      make(map[string]struct{}),
+		innerExecutors: innerExecutors,
+		seen:           make(map[string]struct{}),
 	}
 }
 
 func (u *Union) Next() (Record, error) {
-	for u.current < len(u.executors) {
-		record, err := u.executors[u.current].Next()
+	for u.current < len(u.innerExecutors) {
+		record, err := u.innerExecutors[u.current].Next()
 		if err != nil {
 			return nil, err
 		}
@@ -39,7 +39,7 @@ func (u *Union) Next() (Record, error) {
 
 // recordKey はレコードから重複判定用のキーを生成する
 //
-// 各カラムの長さとデータを連結した文字列を返す (衝突しないエンコーディング)
+// 各カラムの長さとデータを連結した文字列を返す
 func recordKey(record Record) string {
 	var buf []byte
 	for _, col := range record {
