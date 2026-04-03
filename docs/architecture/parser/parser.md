@@ -33,47 +33,78 @@ flowchart
 
 ```mermaid
 classDiagram
-   %% Tokenizer
+    %% Tokenizer
     class Tokenizer {
-      +Tokenize()
-      handler Handler (call handler methods)
+        +Tokenize()
     }
-    %% Parser
-    class Handler {
+    class TokenHandler {
         <<interface>>
-        +OnKeyword(keyword string)
-        +OnIdentifier(name string)
-        +OnSymbol(symbol string)
-        +OnStringLiteral(value string)
-        +OnNumberLiteral(value string)
+        +onKeyword(word string)
+        +onIdentifier(ident string)
+        +onSymbol(symbol string)
+        +onString(value string)
+        +onNumber(num string)
+        +onComment(text string)
+        +onError(err error)
     }
+
+    %% Parser
     class Parser {
-      ...
-      +currentStatementParser StatementParser
+        -stmtParser StatementParser
     }
     class StatementParser {
         <<interface>>
-        +OnKeyword(keyword string)
-        +OnIdentifier(name string)
-        +OnSymbol(symbol string)
-        +OnStringLiteral(value string)
-        +OnNumberLiteral(value string)
+        TokenHandler
+        +getResult() Statement
+        +getError() error
+        +finalize()
     }
-    class SelectParser {
-      ...
+    class SelectParser
+    class InsertParser
+    class DeleteParser
+    class UpdateParser
+    class TransactionParser
+
+    %% CreateParser とサブパーサー
+    class CreateParser {
+        -colParser *ColumnDefParser
+        -conParser *ConstraintDefParser
     }
-    class InsertParser {
-      ...
+    class ColumnDefParser {
+        +onKeyword(word string)
+        +finalize() error
+        +getDef() Definition
     }
-    class CreateTableParser {
-      ...
+    class ConstraintDefParser {
+        +onKeyword(word string)
+        +onIdentifier(ident string)
+        +onSymbol(symbol string)
+        +finalize() error
+        +getDef() Definition
+    }
+
+    %% WhereParser (SelectParser, DeleteParser, UpdateParser が利用)
+    class WhereParser {
+        +initWhere()
+        +pushColumn(ident string)
+        +pushLiteral(lit Literal)
+        +handleOperator(op string)
+        +finalizeWhere() *WhereClause
     }
 
     %% 関係性
-    Tokenizer --> Handler
-    Handler <|-- Parser
+    Tokenizer --> TokenHandler
+    TokenHandler <|-- Parser
     Parser o-- StatementParser
-    StatementParser <|-- SelectParser
-    StatementParser <|-- InsertParser
-    StatementParser <|-- CreateTableParser
+    StatementParser <|.. SelectParser
+    StatementParser <|.. InsertParser
+    StatementParser <|.. DeleteParser
+    StatementParser <|.. UpdateParser
+    StatementParser <|.. TransactionParser
+    StatementParser <|.. CreateParser
+    CreateParser o-- ColumnDefParser
+    CreateParser o-- ConstraintDefParser
+    SelectParser o-- WhereParser
+    DeleteParser o-- WhereParser
+    UpdateParser o-- WhereParser
 ```
