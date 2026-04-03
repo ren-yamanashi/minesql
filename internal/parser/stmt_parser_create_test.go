@@ -24,7 +24,6 @@ func TestParserCreateTable(t *testing.T) {
 		assert.True(t, ok)
 
 		assert.Equal(t, "users", createStmt.TableName)
-		assert.Equal(t, ast.KeywordTable, createStmt.Keyword)
 		assert.Equal(t, 2, len(createStmt.CreateDefinitions))
 
 		// カラム定義の検証
@@ -60,7 +59,6 @@ func TestParserCreateTable(t *testing.T) {
 		// PRIMARY KEY 制約の検証
 		pkDef, ok := createStmt.CreateDefinitions[2].(*ast.ConstraintPrimaryKeyDef)
 		assert.True(t, ok)
-		assert.Equal(t, ast.DefTypeConstraintPrimaryKey, pkDef.DefType)
 		assert.Equal(t, 1, len(pkDef.Columns))
 		assert.Equal(t, "id", pkDef.Columns[0].ColName)
 	})
@@ -107,7 +105,6 @@ func TestParserCreateTable(t *testing.T) {
 		// UNIQUE KEY 制約の検証
 		ukDef, ok := createStmt.CreateDefinitions[2].(*ast.ConstraintUniqueKeyDef)
 		assert.True(t, ok)
-		assert.Equal(t, ast.DefTypeConstraintUniqueKey, ukDef.DefType)
 		assert.Equal(t, "email_idx", ukDef.KeyName)
 		assert.Equal(t, "email", ukDef.Column.ColName)
 	})
@@ -238,6 +235,30 @@ CREATE TABLE users ( /* テーブル定義開始 */
 		})
 	})
 
+	t.Run("カラムが 1 つだけの CREATE TABLE 文をパースできる", func(t *testing.T) {
+		// GIVEN
+		sql := "CREATE TABLE users (id VARCHAR);"
+		parser := NewParser()
+
+		// WHEN
+		result, err := parser.Parse(sql)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+
+		createStmt, ok := result.(*ast.CreateTableStmt)
+		assert.True(t, ok)
+
+		assert.Equal(t, "users", createStmt.TableName)
+		assert.Equal(t, 1, len(createStmt.CreateDefinitions))
+
+		colDef, ok := createStmt.CreateDefinitions[0].(*ast.ColumnDef)
+		assert.True(t, ok)
+		assert.Equal(t, "id", colDef.ColName)
+		assert.Equal(t, ast.DataTypeVarchar, colDef.DataType)
+	})
+
 	t.Run("不正な CREATE TABLE 文でエラーになる", func(t *testing.T) {
 		t.Run("TABLE キーワードがない場合", func(t *testing.T) {
 			// GIVEN
@@ -250,6 +271,7 @@ CREATE TABLE users ( /* テーブル定義開始 */
 			// THEN
 			assert.Error(t, err)
 			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "unexpected identifier")
 		})
 
 		t.Run("テーブル名がない場合", func(t *testing.T) {
@@ -263,6 +285,7 @@ CREATE TABLE users ( /* テーブル定義開始 */
 			// THEN
 			assert.Error(t, err)
 			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "unexpected symbol")
 		})
 
 		t.Run("カラム定義がない場合", func(t *testing.T) {
@@ -276,6 +299,7 @@ CREATE TABLE users ( /* テーブル定義開始 */
 			// THEN
 			assert.Error(t, err)
 			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "at least one column definition is required")
 		})
 
 		t.Run("データ型がない場合", func(t *testing.T) {
@@ -289,6 +313,7 @@ CREATE TABLE users ( /* テーブル定義開始 */
 			// THEN
 			assert.Error(t, err)
 			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "data type is required")
 		})
 
 		t.Run("PRIMARY KEY のカラムリストが空の場合", func(t *testing.T) {
@@ -302,6 +327,7 @@ CREATE TABLE users ( /* テーブル定義開始 */
 			// THEN
 			assert.Error(t, err)
 			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "unexpected symbol in constraint")
 		})
 
 		t.Run("UNIQUE KEY のカラム指定がない場合", func(t *testing.T) {
@@ -315,6 +341,7 @@ CREATE TABLE users ( /* テーブル定義開始 */
 			// THEN
 			assert.Error(t, err)
 			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "unexpected symbol in constraint")
 		})
 
 		t.Run("末尾にセミコロンがない場合", func(t *testing.T) {
@@ -329,6 +356,33 @@ CREATE TABLE users ( /* テーブル定義開始 */
 			assert.Error(t, err)
 			assert.Nil(t, result)
 			assert.Contains(t, err.Error(), "incomplete CREATE TABLE statement")
+		})
+
+		t.Run("Body 内でサポートされていないキーワードがある場合", func(t *testing.T) {
+			// GIVEN
+			sql := "CREATE TABLE users (id VARCHAR, WHERE name VARCHAR);"
+			parser := NewParser()
+
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.Error(t, err)
+			assert.Nil(t, result)
+		})
+
+		t.Run("文字列リテラルが含まれる場合", func(t *testing.T) {
+			// GIVEN
+			sql := "CREATE TABLE users (id 'VARCHAR');"
+			parser := NewParser()
+
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "unexpected string")
 		})
 	})
 }

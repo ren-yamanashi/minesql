@@ -39,9 +39,8 @@ func TestSearch(t *testing.T) {
 			Condition: ast.NewBinaryExpr(
 				"=",
 				ast.NewLhsColumn(*ast.NewColumnId("last_name")),
-				ast.NewRhsLiteral(ast.NewStringLiteral("'Doe'", "Doe")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("Doe")),
 			),
-			IsSet: true,
 		}
 		search := NewSearch(tblMeta, where)
 
@@ -70,9 +69,8 @@ func TestSearch(t *testing.T) {
 			Condition: ast.NewBinaryExpr(
 				"=",
 				ast.NewLhsColumn(*ast.NewColumnId("first_name")),
-				ast.NewRhsLiteral(ast.NewStringLiteral("'John'", "John")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("John")),
 			),
-			IsSet: true,
 		}
 		search := NewSearch(tblMeta, where)
 
@@ -96,9 +94,8 @@ func TestSearch(t *testing.T) {
 			Condition: ast.NewBinaryExpr(
 				"=",
 				ast.NewLhsColumn(*ast.NewColumnId("non_existent_column")),
-				ast.NewRhsLiteral(ast.NewStringLiteral("'value'", "value")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("value")),
 			),
-			IsSet: true,
 		}
 		search := NewSearch(tblMeta, where)
 
@@ -109,32 +106,6 @@ func TestSearch(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, exec)
 		assert.Contains(t, err.Error(), "does not exist in table")
-	})
-
-	t.Run("WHERE 句でサポートされていない型を指定した場合、エラーを返す", func(t *testing.T) {
-		// GIVEN
-		tmpdir := t.TempDir()
-		initStorageManager(t, tmpdir)
-		defer handler.Reset()
-
-		tblMeta := getTableMetadata(t, "users")
-		type UnsupportedExpr struct {
-			ast.Expression
-		}
-		unsupported := &UnsupportedExpr{}
-		where := &ast.WhereClause{
-			Condition: unsupported,
-			IsSet:     true,
-		}
-		search := NewSearch(tblMeta, where)
-
-		// WHEN
-		exec, err := search.Build()
-
-		// THEN
-		assert.Error(t, err)
-		assert.Nil(t, exec)
-		assert.Contains(t, err.Error(), "unsupported WHERE condition type")
 	})
 
 	t.Run("複数の AND 条件で Filter が生成される", func(t *testing.T) {
@@ -152,7 +123,7 @@ func TestSearch(t *testing.T) {
 					ast.NewBinaryExpr(
 						"=",
 						ast.NewLhsColumn(*ast.NewColumnId("id")),
-						ast.NewRhsLiteral(ast.NewStringLiteral("'1'", "1")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("1")),
 					),
 				),
 				ast.NewRhsExpr(
@@ -162,20 +133,19 @@ func TestSearch(t *testing.T) {
 							ast.NewBinaryExpr(
 								"=",
 								ast.NewLhsColumn(*ast.NewColumnId("first_name")),
-								ast.NewRhsLiteral(ast.NewStringLiteral("'john'", "john")),
+								ast.NewRhsLiteral(ast.NewStringLiteral("john")),
 							),
 						),
 						ast.NewRhsExpr(
 							ast.NewBinaryExpr(
 								"=",
 								ast.NewLhsColumn(*ast.NewColumnId("last_name")),
-								ast.NewRhsLiteral(ast.NewStringLiteral("'doe'", "doe")),
+								ast.NewRhsLiteral(ast.NewStringLiteral("doe")),
 							),
 						),
 					),
 				),
 			),
-			IsSet: true,
 		}
 		search := NewSearch(tblMeta, where)
 
@@ -203,7 +173,7 @@ func TestSearch(t *testing.T) {
 					ast.NewBinaryExpr(
 						"=",
 						ast.NewLhsColumn(*ast.NewColumnId("first_name")),
-						ast.NewRhsLiteral(ast.NewStringLiteral("'John'", "John")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("John")),
 					),
 				),
 				ast.NewRhsExpr(
@@ -213,20 +183,19 @@ func TestSearch(t *testing.T) {
 							ast.NewBinaryExpr(
 								"=",
 								ast.NewLhsColumn(*ast.NewColumnId("id")),
-								ast.NewRhsLiteral(ast.NewStringLiteral("'1'", "1")),
+								ast.NewRhsLiteral(ast.NewStringLiteral("1")),
 							),
 						),
 						ast.NewRhsExpr(
 							ast.NewBinaryExpr(
 								"=",
 								ast.NewLhsColumn(*ast.NewColumnId("last_name")),
-								ast.NewRhsLiteral(ast.NewStringLiteral("'Doe'", "Doe")),
+								ast.NewRhsLiteral(ast.NewStringLiteral("Doe")),
 							),
 						),
 					),
 				),
 			),
-			IsSet: true,
 		}
 		search := NewSearch(tblMeta, where)
 
@@ -255,11 +224,10 @@ func TestSearch(t *testing.T) {
 					ast.NewBinaryExpr(
 						"=",
 						ast.NewLhsColumn(*ast.NewColumnId("first_name")),
-						ast.NewRhsLiteral(ast.NewStringLiteral("'John'", "John")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("John")),
 					),
 				),
 			),
-			IsSet: true,
 		}
 		search := NewSearch(tblMeta, where)
 
@@ -287,18 +255,17 @@ func TestSearch(t *testing.T) {
 					ast.NewBinaryExpr(
 						"=",
 						ast.NewLhsColumn(*ast.NewColumnId("first_name")),
-						ast.NewRhsLiteral(ast.NewStringLiteral("'John'", "John")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("John")),
 					),
 				),
 				ast.NewRhsExpr(
 					ast.NewBinaryExpr(
 						"=",
 						ast.NewLhsColumn(*ast.NewColumnId("last_name")),
-						ast.NewRhsLiteral(ast.NewStringLiteral("'Doe'", "Doe")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("Doe")),
 					),
 				),
 			),
-			IsSet: true,
 		}
 		search := NewSearch(tblMeta, where)
 
@@ -326,18 +293,17 @@ func TestSearch(t *testing.T) {
 					ast.NewBinaryExpr(
 						"=",
 						ast.NewLhsColumn(*ast.NewColumnId("non_existent")),
-						ast.NewRhsLiteral(ast.NewStringLiteral("'value'", "value")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("value")),
 					),
 				),
 				ast.NewRhsExpr(
 					ast.NewBinaryExpr(
 						"=",
 						ast.NewLhsColumn(*ast.NewColumnId("last_name")),
-						ast.NewRhsLiteral(ast.NewStringLiteral("'Doe'", "Doe")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("Doe")),
 					),
 				),
 			),
-			IsSet: true,
 		}
 		search := NewSearch(tblMeta, where)
 
@@ -369,7 +335,7 @@ func TestSearch(t *testing.T) {
 							ast.NewBinaryExpr(
 								"=",
 								ast.NewLhsColumn(*ast.NewColumnId("last_name")),
-								ast.NewRhsLiteral(ast.NewStringLiteral("'Doe'", "Doe")),
+								ast.NewRhsLiteral(ast.NewStringLiteral("Doe")),
 							),
 						),
 					),
@@ -378,11 +344,10 @@ func TestSearch(t *testing.T) {
 					ast.NewBinaryExpr(
 						"=",
 						ast.NewLhsColumn(*ast.NewColumnId("id")),
-						ast.NewRhsLiteral(ast.NewStringLiteral("'1'", "1")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("1")),
 					),
 				),
 			),
-			IsSet: true,
 		}
 		search := NewSearch(tblMeta, where)
 
@@ -410,18 +375,17 @@ func TestSearch(t *testing.T) {
 					ast.NewBinaryExpr(
 						"=",
 						ast.NewLhsColumn(*ast.NewColumnId("first_name")),
-						ast.NewRhsLiteral(ast.NewStringLiteral("'John'", "John")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("John")),
 					),
 				),
 				ast.NewRhsExpr(
 					ast.NewBinaryExpr(
 						"=",
 						ast.NewLhsColumn(*ast.NewColumnId("last_name")),
-						ast.NewRhsLiteral(ast.NewStringLiteral("'Doe'", "Doe")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("Doe")),
 					),
 				),
 			),
-			IsSet: true,
 		}
 		search := NewSearch(tblMeta, where)
 
@@ -449,9 +413,8 @@ func TestSearch(t *testing.T) {
 			Condition: ast.NewBinaryExpr(
 				"=",
 				&UnsupportedLHS{},
-				ast.NewRhsLiteral(ast.NewStringLiteral("'value'", "value")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("value")),
 			),
-			IsSet: true,
 		}
 		search := NewSearch(tblMeta, where)
 
@@ -482,21 +445,20 @@ func TestSearch(t *testing.T) {
 							ast.NewBinaryExpr(
 								"=",
 								ast.NewLhsColumn(*ast.NewColumnId("first_name")),
-								ast.NewRhsLiteral(ast.NewStringLiteral("'John'", "John")),
+								ast.NewRhsLiteral(ast.NewStringLiteral("John")),
 							),
 						),
-						ast.NewRhsLiteral(ast.NewStringLiteral("'invalid'", "invalid")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("invalid")),
 					),
 				),
 				ast.NewRhsExpr(
 					ast.NewBinaryExpr(
 						"=",
 						ast.NewLhsColumn(*ast.NewColumnId("last_name")),
-						ast.NewRhsLiteral(ast.NewStringLiteral("'Doe'", "Doe")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("Doe")),
 					),
 				),
 			),
-			IsSet: true,
 		}
 		search := NewSearch(tblMeta, where)
 
@@ -516,8 +478,7 @@ func TestComplexWhereWithData(t *testing.T) {
 		t.Helper()
 		var trxId handler.TrxId = 1
 		insertStmt := &ast.InsertStmt{
-			StmtType: ast.StmtTypeInsert,
-			Table:    *ast.NewTableId("users"),
+			Table: *ast.NewTableId("users"),
 			Cols: []ast.ColumnId{
 				*ast.NewColumnId("id"),
 				*ast.NewColumnId("first_name"),
@@ -525,19 +486,19 @@ func TestComplexWhereWithData(t *testing.T) {
 			},
 			Values: [][]ast.Literal{
 				{
-					ast.NewStringLiteral("'1'", "1"),
-					ast.NewStringLiteral("'John'", "John"),
-					ast.NewStringLiteral("'Doe'", "Doe"),
+					ast.NewStringLiteral("1"),
+					ast.NewStringLiteral("John"),
+					ast.NewStringLiteral("Doe"),
 				},
 				{
-					ast.NewStringLiteral("'2'", "2"),
-					ast.NewStringLiteral("'Jane'", "Jane"),
-					ast.NewStringLiteral("'Smith'", "Smith"),
+					ast.NewStringLiteral("2"),
+					ast.NewStringLiteral("Jane"),
+					ast.NewStringLiteral("Smith"),
 				},
 				{
-					ast.NewStringLiteral("'3'", "3"),
-					ast.NewStringLiteral("'John'", "John"),
-					ast.NewStringLiteral("'Johnson'", "Johnson"),
+					ast.NewStringLiteral("3"),
+					ast.NewStringLiteral("John"),
+					ast.NewStringLiteral("Johnson"),
 				},
 			},
 		}
@@ -570,18 +531,17 @@ func TestComplexWhereWithData(t *testing.T) {
 					ast.NewBinaryExpr(
 						"=",
 						ast.NewLhsColumn(*ast.NewColumnId("first_name")),
-						ast.NewRhsLiteral(ast.NewStringLiteral("'John'", "John")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("John")),
 					),
 				),
 				ast.NewRhsExpr(
 					ast.NewBinaryExpr(
 						"=",
 						ast.NewLhsColumn(*ast.NewColumnId("last_name")),
-						ast.NewRhsLiteral(ast.NewStringLiteral("'Johnson'", "Johnson")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("Johnson")),
 					),
 				),
 			),
-			IsSet: true,
 		}
 		search := NewSearch(tblMeta, where)
 		searchExec, err := search.Build()
@@ -614,18 +574,17 @@ func TestComplexWhereWithData(t *testing.T) {
 					ast.NewBinaryExpr(
 						"=",
 						ast.NewLhsColumn(*ast.NewColumnId("first_name")),
-						ast.NewRhsLiteral(ast.NewStringLiteral("'Jane'", "Jane")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("Jane")),
 					),
 				),
 				ast.NewRhsExpr(
 					ast.NewBinaryExpr(
 						"=",
 						ast.NewLhsColumn(*ast.NewColumnId("last_name")),
-						ast.NewRhsLiteral(ast.NewStringLiteral("'Johnson'", "Johnson")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("Johnson")),
 					),
 				),
 			),
-			IsSet: true,
 		}
 		search := NewSearch(tblMeta, where)
 		searchExec, err := search.Build()
@@ -656,9 +615,8 @@ func TestComplexWhereWithData(t *testing.T) {
 			Condition: ast.NewBinaryExpr(
 				">",
 				ast.NewLhsColumn(*ast.NewColumnId("id")),
-				ast.NewRhsLiteral(ast.NewStringLiteral("'1'", "1")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("1")),
 			),
-			IsSet: true,
 		}
 		search := NewSearch(tblMeta, where)
 		searchExec, err := search.Build()
@@ -690,7 +648,7 @@ func TestComplexWhereWithData(t *testing.T) {
 					ast.NewBinaryExpr(
 						"=",
 						ast.NewLhsColumn(*ast.NewColumnId("last_name")),
-						ast.NewRhsLiteral(ast.NewStringLiteral("'Smith'", "Smith")),
+						ast.NewRhsLiteral(ast.NewStringLiteral("Smith")),
 					),
 				),
 				ast.NewRhsExpr(
@@ -700,20 +658,19 @@ func TestComplexWhereWithData(t *testing.T) {
 							ast.NewBinaryExpr(
 								"=",
 								ast.NewLhsColumn(*ast.NewColumnId("first_name")),
-								ast.NewRhsLiteral(ast.NewStringLiteral("'John'", "John")),
+								ast.NewRhsLiteral(ast.NewStringLiteral("John")),
 							),
 						),
 						ast.NewRhsExpr(
 							ast.NewBinaryExpr(
 								"=",
 								ast.NewLhsColumn(*ast.NewColumnId("last_name")),
-								ast.NewRhsLiteral(ast.NewStringLiteral("'Doe'", "Doe")),
+								ast.NewRhsLiteral(ast.NewStringLiteral("Doe")),
 							),
 						),
 					),
 				),
 			),
-			IsSet: true,
 		}
 		search := NewSearch(tblMeta, where)
 		searchExec, err := search.Build()

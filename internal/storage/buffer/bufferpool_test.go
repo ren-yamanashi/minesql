@@ -500,9 +500,9 @@ func TestBufferPoolIntegration(t *testing.T) {
 		writeTestData(page4, byte(page4.PageNumber))
 		writeTestData(page5, byte(page5.PageNumber))
 
-		// ===============================
+		// ---------------------------------------
 		// ページアクセスのシミュレーション
-		// ===============================
+		// ---------------------------------------
 
 		// ### 1. page1, page2, page3 をフェッチ (バッファプールに読み込まれる)
 		fetchedPage1, err := bp.FetchPage(page1)

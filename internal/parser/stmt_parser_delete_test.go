@@ -23,10 +23,8 @@ func TestParserDelete(t *testing.T) {
 		deleteStmt, ok := result.(*ast.DeleteStmt)
 		assert.True(t, ok)
 
-		assert.Equal(t, ast.StmtTypeDelete, deleteStmt.StmtType)
 		assert.Equal(t, "users", deleteStmt.From.TableName)
-		assert.NotNil(t, deleteStmt.Where)
-		assert.False(t, deleteStmt.Where.IsSet)
+		assert.Nil(t, deleteStmt.Where)
 	})
 
 	t.Run("WHERE 句付きの DELETE 文をパースできる", func(t *testing.T) {
@@ -44,15 +42,12 @@ func TestParserDelete(t *testing.T) {
 		deleteStmt, ok := result.(*ast.DeleteStmt)
 		assert.True(t, ok)
 
-		assert.Equal(t, ast.StmtTypeDelete, deleteStmt.StmtType)
 		assert.Equal(t, "users", deleteStmt.From.TableName)
 
 		assert.NotNil(t, deleteStmt.Where)
-		assert.True(t, deleteStmt.Where.IsSet)
 		assert.NotNil(t, deleteStmt.Where.Condition)
 
-		binaryExpr, ok := deleteStmt.Where.Condition.(*ast.BinaryExpr)
-		assert.True(t, ok)
+		binaryExpr := deleteStmt.Where.Condition
 		assert.Equal(t, "=", binaryExpr.Operator)
 
 		lhsCol, ok := binaryExpr.Left.(*ast.LhsColumn)
@@ -176,5 +171,39 @@ func TestParserDelete(t *testing.T) {
 			assert.Nil(t, result)
 			assert.Contains(t, err.Error(), "unexpected identifier")
 		})
+
+		t.Run("AND/OR が WHERE 以外の状態で来た場合", func(t *testing.T) {
+			// GIVEN
+			sql := "DELETE OR FROM users;"
+			parser := NewParser()
+
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "OR operator is in invalid position")
+		})
+	})
+
+	t.Run("AND を使った WHERE 句付きの DELETE 文をパースできる", func(t *testing.T) {
+		// GIVEN
+		sql := "DELETE FROM users WHERE id = '1' AND name = 'John';"
+		parser := NewParser()
+
+		// WHEN
+		result, err := parser.Parse(sql)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+
+		deleteStmt, ok := result.(*ast.DeleteStmt)
+		assert.True(t, ok)
+
+		assert.NotNil(t, deleteStmt.Where)
+		andExpr := deleteStmt.Where.Condition
+		assert.Equal(t, "AND", andExpr.Operator)
 	})
 }

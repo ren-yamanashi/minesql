@@ -30,7 +30,7 @@ func (sp *Search) Build() (executor.Executor, error) {
 	}
 
 	// WHERE 句が設定されていない場合フルテーブルスキャンを実行
-	if sp.where == nil || !sp.where.IsSet {
+	if sp.where == nil {
 		return executor.NewTableScan(
 			tbl,
 			access.RecordSearchModeStart{},
@@ -41,12 +41,7 @@ func (sp *Search) Build() (executor.Executor, error) {
 	}
 
 	// WHERE 句が設定されている場合
-	switch expr := sp.where.Condition.(type) {
-	case *ast.BinaryExpr:
-		return sp.planForBinaryExpr(tbl, *expr)
-	default:
-		return nil, errors.New("unsupported WHERE condition type")
-	}
+	return sp.planForBinaryExpr(tbl, *sp.where.Condition)
 }
 
 // leafCondition は複合条件中の単一リーフ条件 (col op literal) を表す
@@ -106,9 +101,9 @@ func (s *Search) planForBinaryExpr(tbl *access.Table, expr ast.BinaryExpr) (exec
 	}
 }
 
-// =================================================
+// -------------------------------------------------
 // プラン選択
-// =================================================
+// -------------------------------------------------
 
 // chooseBestPlan は AND 条件に対して、以下の 3 種類のプランからコスト最安を選択する
 //
@@ -265,9 +260,9 @@ func (s *Search) buildPKScanPlan(tbl *access.Table, leaf leafCondition, cond fun
 	return scan
 }
 
-// =================================================
+// -------------------------------------------------
 // OR 条件の最適化
-// =================================================
+// -------------------------------------------------
 
 // planForORCondition は OR 条件に対して Union による最適化を試みる
 //
@@ -400,9 +395,9 @@ func (s *Search) planORBranch(tbl *access.Table, branch orBranch, stats *handler
 	return nil, 0, false
 }
 
-// =================================================
+// -------------------------------------------------
 // リーフ条件の抽出
-// =================================================
+// -------------------------------------------------
 
 // extractANDLeaves は純粋な AND ツリーからリーフ条件を抽出する
 //
@@ -432,11 +427,11 @@ func extractANDLeaves(expr ast.BinaryExpr) []leafCondition {
 		return nil
 	}
 
-	leftLeaves := extractANDLeaves(*lhsExpr.Expr.(*ast.BinaryExpr))
+	leftLeaves := extractANDLeaves(*lhsExpr.Expr)
 	if leftLeaves == nil {
 		return nil
 	}
-	rightLeaves := extractANDLeaves(*rhsExpr.Expr.(*ast.BinaryExpr))
+	rightLeaves := extractANDLeaves(*rhsExpr.Expr)
 	if rightLeaves == nil {
 		return nil
 	}
@@ -472,11 +467,11 @@ func extractORBranches(expr ast.BinaryExpr) []orBranch {
 
 	if expr.Operator == "OR" {
 		// OR ノード: 左右を再帰して連結
-		leftBranches := extractORBranches(*lhsExpr.Expr.(*ast.BinaryExpr))
+		leftBranches := extractORBranches(*lhsExpr.Expr)
 		if leftBranches == nil {
 			return nil
 		}
-		rightBranches := extractORBranches(*rhsExpr.Expr.(*ast.BinaryExpr))
+		rightBranches := extractORBranches(*rhsExpr.Expr)
 		if rightBranches == nil {
 			return nil
 		}
@@ -491,9 +486,9 @@ func extractORBranches(expr ast.BinaryExpr) []orBranch {
 	return []orBranch{{leaves: leaves, expr: expr}}
 }
 
-// =================================================
+// -------------------------------------------------
 // コスト計算
-// =================================================
+// -------------------------------------------------
 
 // calcPKPlanCost は PK スキャンのコストを算出する
 func (s *Search) calcPKPlanCost(stats *handler.TableStatistics, colName string, operator string, literal ast.Literal) ScanCost {
@@ -569,9 +564,9 @@ func (s *Search) calcSelectivity(colName string, operator string, literal ast.Li
 	return calcRangeSelectivity(operator, c, minVal, maxVal)
 }
 
-// =================================================
+// -------------------------------------------------
 // 条件関数の構築
-// =================================================
+// -------------------------------------------------
 
 // buildConditionFunc は式の木構造から単一の条件関数を再帰的に構築する
 func (s *Search) buildConditionFunc(expr ast.BinaryExpr) (func(executor.Record) bool, error) {
@@ -597,7 +592,7 @@ func (s *Search) buildConditionFunc(expr ast.BinaryExpr) (func(executor.Record) 
 	// ブランチノード: expr AND/OR expr (例: col1 = 5 AND col2 > 10 のような複合条件)
 	case *ast.LhsExpr:
 		// 左辺の式から条件関数を再帰的に構築
-		leftCond, err := s.buildConditionFunc(*lhs.Expr.(*ast.BinaryExpr))
+		leftCond, err := s.buildConditionFunc(*lhs.Expr)
 		if err != nil {
 			return nil, err
 		}
@@ -605,7 +600,7 @@ func (s *Search) buildConditionFunc(expr ast.BinaryExpr) (func(executor.Record) 
 		switch rhs := expr.Right.(type) {
 		// 右辺が式の場合、右辺の式から条件関数を再帰的に構築し、論理演算子 (AND/OR) に応じて条件関数を組み合わせる
 		case *ast.RhsExpr:
-			rightCond, err := s.buildConditionFunc(*rhs.Expr.(*ast.BinaryExpr))
+			rightCond, err := s.buildConditionFunc(*rhs.Expr)
 			if err != nil {
 				return nil, err
 			}
@@ -661,9 +656,9 @@ func (s *Search) operatorToCondition(operator string, pos int, value string) (fu
 	}
 }
 
-// =================================================
+// -------------------------------------------------
 // その他
-// =================================================
+// -------------------------------------------------
 
 // isPKLeadingColumn は指定カラムがプライマリキーの先頭カラムかどうかを判定する
 func (s *Search) isPKLeadingColumn(colName string) bool {

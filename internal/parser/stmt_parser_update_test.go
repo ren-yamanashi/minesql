@@ -23,13 +23,11 @@ func TestParserUpdate(t *testing.T) {
 		updateStmt, ok := result.(*ast.UpdateStmt)
 		assert.True(t, ok)
 
-		assert.Equal(t, ast.StmtTypeUpdate, updateStmt.StmtType)
 		assert.Equal(t, "users", updateStmt.Table.TableName)
 		assert.Equal(t, 1, len(updateStmt.SetClauses))
 		assert.Equal(t, "first_name", updateStmt.SetClauses[0].Column.ColName)
 		assert.Equal(t, "Jane", updateStmt.SetClauses[0].Value.ToString())
-		assert.NotNil(t, updateStmt.Where)
-		assert.False(t, updateStmt.Where.IsSet)
+		assert.Nil(t, updateStmt.Where)
 	})
 
 	t.Run("複数カラムの UPDATE 文をパースできる", func(t *testing.T) {
@@ -76,10 +74,8 @@ func TestParserUpdate(t *testing.T) {
 		assert.Equal(t, "Jane", updateStmt.SetClauses[0].Value.ToString())
 
 		assert.NotNil(t, updateStmt.Where)
-		assert.True(t, updateStmt.Where.IsSet)
 
-		binaryExpr, ok := updateStmt.Where.Condition.(*ast.BinaryExpr)
-		assert.True(t, ok)
+		binaryExpr := updateStmt.Where.Condition
 		assert.Equal(t, "=", binaryExpr.Operator)
 
 		lhsCol, ok := binaryExpr.Left.(*ast.LhsColumn)
@@ -110,12 +106,11 @@ func TestParserUpdate(t *testing.T) {
 		assert.Equal(t, "first_name", updateStmt.SetClauses[0].Column.ColName)
 		assert.Equal(t, "last_name", updateStmt.SetClauses[1].Column.ColName)
 
-		assert.True(t, updateStmt.Where.IsSet)
+		assert.NotNil(t, updateStmt.Where)
 		assert.NotNil(t, updateStmt.Where.Condition)
 
 		// AND で結合された式
-		andExpr, ok := updateStmt.Where.Condition.(*ast.BinaryExpr)
-		assert.True(t, ok)
+		andExpr := updateStmt.Where.Condition
 		assert.Equal(t, "AND", andExpr.Operator)
 	})
 
@@ -154,10 +149,9 @@ func TestParserUpdate(t *testing.T) {
 		updateStmt, ok := result.(*ast.UpdateStmt)
 		assert.True(t, ok)
 
-		assert.True(t, updateStmt.Where.IsSet)
+		assert.NotNil(t, updateStmt.Where)
 
-		orExpr, ok := updateStmt.Where.Condition.(*ast.BinaryExpr)
-		assert.True(t, ok)
+		orExpr := updateStmt.Where.Condition
 		assert.Equal(t, "OR", orExpr.Operator)
 	})
 
@@ -177,22 +171,19 @@ func TestParserUpdate(t *testing.T) {
 		assert.True(t, ok)
 
 		// ルートは OR
-		orExpr, ok := updateStmt.Where.Condition.(*ast.BinaryExpr)
-		assert.True(t, ok)
+		orExpr := updateStmt.Where.Condition
 		assert.Equal(t, "OR", orExpr.Operator)
 
 		// OR の左辺は a = '1'
 		leftExpr, ok := orExpr.Left.(*ast.LhsExpr)
 		assert.True(t, ok)
-		leftBinary, ok := leftExpr.Expr.(*ast.BinaryExpr)
-		assert.True(t, ok)
+		leftBinary := leftExpr.Expr
 		assert.Equal(t, "=", leftBinary.Operator)
 
 		// OR の右辺は AND 式
 		rightExpr, ok := orExpr.Right.(*ast.RhsExpr)
 		assert.True(t, ok)
-		rightBinary, ok := rightExpr.Expr.(*ast.BinaryExpr)
-		assert.True(t, ok)
+		rightBinary := rightExpr.Expr
 		assert.Equal(t, "AND", rightBinary.Operator)
 	})
 
@@ -211,10 +202,9 @@ func TestParserUpdate(t *testing.T) {
 		updateStmt, ok := result.(*ast.UpdateStmt)
 		assert.True(t, ok)
 
-		assert.True(t, updateStmt.Where.IsSet)
+		assert.NotNil(t, updateStmt.Where)
 
-		binaryExpr, ok := updateStmt.Where.Condition.(*ast.BinaryExpr)
-		assert.True(t, ok)
+		binaryExpr := updateStmt.Where.Condition
 
 		rhsLit, ok := binaryExpr.Right.(*ast.RhsLiteral)
 		assert.True(t, ok)
@@ -402,6 +392,20 @@ func TestParserUpdate(t *testing.T) {
 			assert.Error(t, err)
 			assert.Nil(t, result)
 			assert.Contains(t, err.Error(), "unexpected number")
+		})
+
+		t.Run("UPDATE の後に直接セミコロンが来た場合", func(t *testing.T) {
+			// GIVEN: テーブル名なしで即座に文が終了
+			sql := "UPDATE;"
+			parser := NewParser()
+
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "missing table name")
 		})
 	})
 }

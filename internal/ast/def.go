@@ -1,18 +1,12 @@
 package ast
 
-type DefType string
+type Definition interface {
+	isDefinition()
+}
 
-const (
-	DefTypeConstraintPrimaryKey DefType = "constraint primary key"
-	DefTypeConstraintUniqueKey  DefType = "constraint unique key"
-	DefTypeColumn               DefType = "column"
-)
-
-type Definition interface{}
-
-// ========================
+// --------------------------------
 // Column
-// ========================
+// --------------------------------
 
 type DataType string
 
@@ -21,22 +15,25 @@ const (
 )
 
 type ColumnDef struct {
-	DefType  DefType
 	ColName  string
 	DataType DataType
 }
 
-// ========================
+func (*ColumnDef) isDefinition() {}
+
+// --------------------------------
 // Constraint
-// ========================
+// --------------------------------
 
 type ConstraintPrimaryKeyDef struct {
-	DefType DefType
 	Columns []ColumnId
 }
 
+func (*ConstraintPrimaryKeyDef) isDefinition() {}
+
 type ConstraintUniqueKeyDef struct {
-	DefType DefType
 	KeyName string
 	Column  ColumnId
 }
+
+func (*ConstraintUniqueKeyDef) isDefinition() {}

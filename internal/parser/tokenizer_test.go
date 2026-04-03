@@ -17,13 +17,13 @@ type tokenCollector struct {
 	errors      []error
 }
 
-func (c *tokenCollector) OnKeyword(word string)     { c.keywords = append(c.keywords, word) }
-func (c *tokenCollector) OnIdentifier(ident string) { c.identifiers = append(c.identifiers, ident) }
-func (c *tokenCollector) OnNumber(num string)       { c.numbers = append(c.numbers, num) }
-func (c *tokenCollector) OnString(str string)       { c.strings = append(c.strings, str) }
-func (c *tokenCollector) OnSymbol(sym string)       { c.symbols = append(c.symbols, sym) }
-func (c *tokenCollector) OnComment(text string)     { c.comments = append(c.comments, text) }
-func (c *tokenCollector) OnError(err error)         { c.errors = append(c.errors, err) }
+func (c *tokenCollector) onKeyword(word string)     { c.keywords = append(c.keywords, word) }
+func (c *tokenCollector) onIdentifier(ident string) { c.identifiers = append(c.identifiers, ident) }
+func (c *tokenCollector) onNumber(num string)       { c.numbers = append(c.numbers, num) }
+func (c *tokenCollector) onString(str string)       { c.strings = append(c.strings, str) }
+func (c *tokenCollector) onSymbol(sym string)       { c.symbols = append(c.symbols, sym) }
+func (c *tokenCollector) onComment(text string)     { c.comments = append(c.comments, text) }
+func (c *tokenCollector) onError(err error)         { c.errors = append(c.errors, err) }
 
 func tokenize(sql string) *tokenCollector {
 	c := &tokenCollector{}
@@ -455,6 +455,17 @@ func TestTokenizerEdgeCases(t *testing.T) {
 
 		// THEN: - は isSymbol に含まれないため、独立した識別子として扱われる
 		assert.Equal(t, []string{"a", "-", "b"}, c.identifiers)
+	})
+
+	t.Run("スラッシュが単独で出現した場合は識別子として扱われる", func(t *testing.T) {
+		// GIVEN: / が単独で出現 (ブロックコメント開始ではない)
+		sql := "a / b"
+
+		// WHEN
+		c := tokenize(sql)
+
+		// THEN: / は isSymbol に含まれないため、独立した識別子として扱われる
+		assert.Equal(t, []string{"a", "/", "b"}, c.identifiers)
 	})
 }
 

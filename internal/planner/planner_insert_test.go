@@ -14,13 +14,12 @@ func TestPlanInsert(t *testing.T) {
 		// GIVEN
 		var trxId handler.TrxId = 1
 		stmt := &ast.InsertStmt{
-			StmtType: ast.StmtTypeInsert,
-			Table:    *ast.NewTableId("users"),
-			Cols:     []ast.ColumnId{},
+			Table: *ast.NewTableId("users"),
+			Cols:  []ast.ColumnId{},
 			Values: [][]ast.Literal{
 				{
-					ast.NewStringLiteral("'1'", "1"),
-					ast.NewStringLiteral("'Alice'", "Alice"),
+					ast.NewStringLiteral("1"),
+					ast.NewStringLiteral("Alice"),
 				},
 			},
 		}
@@ -38,15 +37,14 @@ func TestPlanInsert(t *testing.T) {
 		// GIVEN
 		var trxId handler.TrxId = 1
 		stmt := &ast.InsertStmt{
-			StmtType: ast.StmtTypeInsert,
-			Table:    *ast.NewTableId("users"),
+			Table: *ast.NewTableId("users"),
 			Cols: []ast.ColumnId{
 				*ast.NewColumnId("id"),
 				*ast.NewColumnId("name"),
 			},
 			Values: [][]ast.Literal{
 				{
-					ast.NewStringLiteral("'1'", "1"),
+					ast.NewStringLiteral("1"),
 				},
 			},
 		}
@@ -64,8 +62,7 @@ func TestPlanInsert(t *testing.T) {
 		// GIVEN
 		var trxId handler.TrxId = 1
 		stmt := &ast.InsertStmt{
-			StmtType: ast.StmtTypeInsert,
-			Table:    *ast.NewTableId("users"),
+			Table: *ast.NewTableId("users"),
 			Cols: []ast.ColumnId{
 				*ast.NewColumnId("id"),
 				*ast.NewColumnId("name"),
@@ -73,9 +70,9 @@ func TestPlanInsert(t *testing.T) {
 			},
 			Values: [][]ast.Literal{
 				{
-					ast.NewStringLiteral("'1'", "1"),
-					ast.NewStringLiteral("'Alice'", "Alice"),
-					ast.NewStringLiteral("'2'", "2"),
+					ast.NewStringLiteral("1"),
+					ast.NewStringLiteral("Alice"),
+					ast.NewStringLiteral("2"),
 				},
 			},
 		}
@@ -93,8 +90,7 @@ func TestPlanInsert(t *testing.T) {
 		// GIVEN
 		var trxId handler.TrxId = 1
 		stmt := &ast.InsertStmt{
-			StmtType: ast.StmtTypeInsert,
-			Table:    *ast.NewTableId("users"),
+			Table: *ast.NewTableId("users"),
 			Cols: []ast.ColumnId{
 				*ast.NewColumnId("id"),
 				*ast.NewColumnId("name"),
@@ -118,14 +114,13 @@ func TestPlanInsert(t *testing.T) {
 
 		var trxId handler.TrxId = 1
 		stmt := &ast.InsertStmt{
-			StmtType: ast.StmtTypeInsert,
-			Table:    *ast.NewTableId("nonexistent"),
+			Table: *ast.NewTableId("nonexistent"),
 			Cols: []ast.ColumnId{
 				*ast.NewColumnId("id"),
 			},
 			Values: [][]ast.Literal{
 				{
-					ast.NewStringLiteral("'1'", "1"),
+					ast.NewStringLiteral("1"),
 				},
 			},
 		}
@@ -151,16 +146,15 @@ func TestPlanInsert(t *testing.T) {
 		})
 
 		stmt := &ast.InsertStmt{
-			StmtType: ast.StmtTypeInsert,
-			Table:    *ast.NewTableId("users"),
+			Table: *ast.NewTableId("users"),
 			Cols: []ast.ColumnId{
 				*ast.NewColumnId("id"),
 				*ast.NewColumnId("name"),
 			},
 			Values: [][]ast.Literal{
 				{
-					ast.NewStringLiteral("'1'", "1"),
-					ast.NewStringLiteral("'Alice'", "Alice"),
+					ast.NewStringLiteral("1"),
+					ast.NewStringLiteral("Alice"),
 				},
 			},
 		}
@@ -186,24 +180,23 @@ func TestPlanInsert(t *testing.T) {
 		})
 
 		stmt := &ast.InsertStmt{
-			StmtType: ast.StmtTypeInsert,
-			Table:    *ast.NewTableId("users"),
+			Table: *ast.NewTableId("users"),
 			Cols: []ast.ColumnId{
 				*ast.NewColumnId("id"),
 				*ast.NewColumnId("name"),
 			},
 			Values: [][]ast.Literal{
 				{
-					ast.NewStringLiteral("'1'", "1"),
-					ast.NewStringLiteral("'Alice'", "Alice"),
+					ast.NewStringLiteral("1"),
+					ast.NewStringLiteral("Alice"),
 				},
 				{
-					ast.NewStringLiteral("'2'", "2"),
-					ast.NewStringLiteral("'Bob'", "Bob"),
+					ast.NewStringLiteral("2"),
+					ast.NewStringLiteral("Bob"),
 				},
 				{
-					ast.NewStringLiteral("'3'", "3"),
-					ast.NewStringLiteral("'Charlie'", "Charlie"),
+					ast.NewStringLiteral("3"),
+					ast.NewStringLiteral("Charlie"),
 				},
 			},
 		}
@@ -231,8 +224,7 @@ func TestPlanInsert(t *testing.T) {
 		})
 
 		stmt := &ast.InsertStmt{
-			StmtType: ast.StmtTypeInsert,
-			Table:    *ast.NewTableId("users"),
+			Table: *ast.NewTableId("users"),
 			Cols: []ast.ColumnId{
 				*ast.NewColumnId("id"),
 				*ast.NewColumnId("name"),
@@ -241,10 +233,10 @@ func TestPlanInsert(t *testing.T) {
 			},
 			Values: [][]ast.Literal{
 				{
-					ast.NewStringLiteral("'1'", "1"),
-					ast.NewStringLiteral("'Alice'", "Alice"),
-					ast.NewStringLiteral("'alice@example.com'", "alice@example.com"),
-					ast.NewStringLiteral("'25'", "25"),
+					ast.NewStringLiteral("1"),
+					ast.NewStringLiteral("Alice"),
+					ast.NewStringLiteral("alice@example.com"),
+					ast.NewStringLiteral("25"),
 				},
 			},
 		}
@@ -271,8 +263,7 @@ func TestPlanInsert(t *testing.T) {
 		})
 
 		stmt := &ast.InsertStmt{
-			StmtType: ast.StmtTypeInsert,
-			Table:    *ast.NewTableId("users"),
+			Table: *ast.NewTableId("users"),
 			Cols: []ast.ColumnId{
 				*ast.NewColumnId("name"),
 				*ast.NewColumnId("email"),
@@ -280,9 +271,9 @@ func TestPlanInsert(t *testing.T) {
 			},
 			Values: [][]ast.Literal{
 				{
-					ast.NewStringLiteral("'Alice'", "Alice"),
-					ast.NewStringLiteral("'alice@example.com'", "alice@example.com"),
-					ast.NewStringLiteral("'1'", "1"),
+					ast.NewStringLiteral("Alice"),
+					ast.NewStringLiteral("alice@example.com"),
+					ast.NewStringLiteral("1"),
 				},
 			},
 		}
@@ -308,16 +299,15 @@ func TestPlanInsert(t *testing.T) {
 		})
 
 		stmt := &ast.InsertStmt{
-			StmtType: ast.StmtTypeInsert,
-			Table:    *ast.NewTableId("users"),
+			Table: *ast.NewTableId("users"),
 			Cols: []ast.ColumnId{
 				*ast.NewColumnId("id"),
 				*ast.NewColumnId("non_existent"),
 			},
 			Values: [][]ast.Literal{
 				{
-					ast.NewStringLiteral("'1'", "1"),
-					ast.NewStringLiteral("'Alice'", "Alice"),
+					ast.NewStringLiteral("1"),
+					ast.NewStringLiteral("Alice"),
 				},
 			},
 		}
@@ -349,15 +339,14 @@ func TestPlanInsert(t *testing.T) {
 		unsupported := &UnsupportedLiteral{}
 
 		stmt := &ast.InsertStmt{
-			StmtType: ast.StmtTypeInsert,
-			Table:    *ast.NewTableId("users"),
+			Table: *ast.NewTableId("users"),
 			Cols: []ast.ColumnId{
 				*ast.NewColumnId("id"),
 				*ast.NewColumnId("name"),
 			},
 			Values: [][]ast.Literal{
 				{
-					ast.NewStringLiteral("'1'", "1"),
+					ast.NewStringLiteral("1"),
 					unsupported,
 				},
 			},

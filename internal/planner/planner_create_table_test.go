@@ -12,13 +12,11 @@ func TestPlanCreateTable(t *testing.T) {
 	t.Run("ユニークキーなしのテーブルを作成できる", func(t *testing.T) {
 		// GIVEN
 		stmt := &ast.CreateTableStmt{
-			StmtType:  ast.StmtTypeCreate,
-			Keyword:   ast.KeywordTable,
 			TableName: "users",
 			CreateDefinitions: []ast.Definition{
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "name", DataType: ast.DataTypeVarchar},
-				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "name", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{
 					*ast.NewColumnId("id"),
 				}},
 			},
@@ -35,17 +33,15 @@ func TestPlanCreateTable(t *testing.T) {
 
 	t.Run("ユニークキーインデックスがあるテーブルを作成できる", func(t *testing.T) {
 		// GIVEN
-		ukDef := &ast.ConstraintUniqueKeyDef{DefType: ast.DefTypeConstraintUniqueKey, Column: *ast.NewColumnId("email")}
+		ukDef := &ast.ConstraintUniqueKeyDef{Column: *ast.NewColumnId("email")}
 		ukDef.KeyName = "uk_email"
 
 		stmt := &ast.CreateTableStmt{
-			StmtType:  ast.StmtTypeCreate,
-			Keyword:   ast.KeywordTable,
 			TableName: "users",
 			CreateDefinitions: []ast.Definition{
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "email", DataType: ast.DataTypeVarchar},
-				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "email", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{
 					*ast.NewColumnId("id"),
 				}},
 				ukDef,
@@ -63,22 +59,20 @@ func TestPlanCreateTable(t *testing.T) {
 
 	t.Run("プライマリキー複数、ユニークインデックス複数のテーブルを作成できる", func(t *testing.T) {
 		// GIVEN
-		ukDef1 := &ast.ConstraintUniqueKeyDef{DefType: ast.DefTypeConstraintUniqueKey, Column: *ast.NewColumnId("email")}
+		ukDef1 := &ast.ConstraintUniqueKeyDef{Column: *ast.NewColumnId("email")}
 		ukDef1.KeyName = "uk_email"
 
-		ukDef2 := &ast.ConstraintUniqueKeyDef{DefType: ast.DefTypeConstraintUniqueKey, Column: *ast.NewColumnId("username")}
+		ukDef2 := &ast.ConstraintUniqueKeyDef{Column: *ast.NewColumnId("username")}
 		ukDef2.KeyName = "uk_username"
 
 		stmt := &ast.CreateTableStmt{
-			StmtType:  ast.StmtTypeCreate,
-			Keyword:   ast.KeywordTable,
 			TableName: "users",
 			CreateDefinitions: []ast.Definition{
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "tenant_id", DataType: ast.DataTypeVarchar},
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "email", DataType: ast.DataTypeVarchar},
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "username", DataType: ast.DataTypeVarchar},
-				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "tenant_id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "email", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "username", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{
 					*ast.NewColumnId("id"),
 					*ast.NewColumnId("tenant_id"),
 				}},
@@ -99,13 +93,11 @@ func TestPlanCreateTable(t *testing.T) {
 	t.Run("重複したカラム名がある場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		stmt := &ast.CreateTableStmt{
-			StmtType:  ast.StmtTypeCreate,
-			Keyword:   ast.KeywordTable,
 			TableName: "users",
 			CreateDefinitions: []ast.Definition{
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
-				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{
 					*ast.NewColumnId("id"),
 				}},
 			},
@@ -123,12 +115,10 @@ func TestPlanCreateTable(t *testing.T) {
 	t.Run("プライマリキーが定義されていない場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		stmt := &ast.CreateTableStmt{
-			StmtType:  ast.StmtTypeCreate,
-			Keyword:   ast.KeywordTable,
 			TableName: "users",
 			CreateDefinitions: []ast.Definition{
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "name", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "name", DataType: ast.DataTypeVarchar},
 			},
 		}
 
@@ -144,16 +134,14 @@ func TestPlanCreateTable(t *testing.T) {
 	t.Run("複数のプライマリキーが定義されている場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		stmt := &ast.CreateTableStmt{
-			StmtType:  ast.StmtTypeCreate,
-			Keyword:   ast.KeywordTable,
 			TableName: "users",
 			CreateDefinitions: []ast.Definition{
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "name", DataType: ast.DataTypeVarchar},
-				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "name", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{
 					*ast.NewColumnId("id"),
 				}},
-				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{
 					*ast.NewColumnId("name"),
 				}},
 			},
@@ -171,12 +159,10 @@ func TestPlanCreateTable(t *testing.T) {
 	t.Run("プライマリキーにカラムが指定されていない場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		stmt := &ast.CreateTableStmt{
-			StmtType:  ast.StmtTypeCreate,
-			Keyword:   ast.KeywordTable,
 			TableName: "users",
 			CreateDefinitions: []ast.Definition{
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
-				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{}},
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{}},
 			},
 		}
 
@@ -192,12 +178,10 @@ func TestPlanCreateTable(t *testing.T) {
 	t.Run("プライマリキーに指定されたカラムが存在しない場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		stmt := &ast.CreateTableStmt{
-			StmtType:  ast.StmtTypeCreate,
-			Keyword:   ast.KeywordTable,
 			TableName: "users",
 			CreateDefinitions: []ast.Definition{
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
-				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{
 					*ast.NewColumnId("non_existent_column"),
 				}},
 			},
@@ -215,14 +199,12 @@ func TestPlanCreateTable(t *testing.T) {
 	t.Run("プライマリキーに指定されたカラムが先頭から順番でない場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		stmt := &ast.CreateTableStmt{
-			StmtType:  ast.StmtTypeCreate,
-			Keyword:   ast.KeywordTable,
 			TableName: "users",
 			CreateDefinitions: []ast.Definition{
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "name", DataType: ast.DataTypeVarchar},
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "email", DataType: ast.DataTypeVarchar},
-				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "name", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "email", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{
 					*ast.NewColumnId("id"),
 					*ast.NewColumnId("email"), // name をスキップしている
 				}},
@@ -241,12 +223,10 @@ func TestPlanCreateTable(t *testing.T) {
 	t.Run("プライマリキーに指定されたカラム数が全カラム数を超える場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		stmt := &ast.CreateTableStmt{
-			StmtType:  ast.StmtTypeCreate,
-			Keyword:   ast.KeywordTable,
 			TableName: "users",
 			CreateDefinitions: []ast.Definition{
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
-				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{
 					*ast.NewColumnId("id"),
 					*ast.NewColumnId("name"),
 					*ast.NewColumnId("email"),
@@ -266,11 +246,9 @@ func TestPlanCreateTable(t *testing.T) {
 	t.Run("カラム定義がない場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		stmt := &ast.CreateTableStmt{
-			StmtType:  ast.StmtTypeCreate,
-			Keyword:   ast.KeywordTable,
 			TableName: "users",
 			CreateDefinitions: []ast.Definition{
-				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{
 					*ast.NewColumnId("id"),
 				}},
 			},
@@ -287,21 +265,19 @@ func TestPlanCreateTable(t *testing.T) {
 
 	t.Run("重複したユニークキー名がある場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
-		ukDef1 := &ast.ConstraintUniqueKeyDef{DefType: ast.DefTypeConstraintUniqueKey, Column: *ast.NewColumnId("email")}
+		ukDef1 := &ast.ConstraintUniqueKeyDef{Column: *ast.NewColumnId("email")}
 		ukDef1.KeyName = "uk_same"
 
-		ukDef2 := &ast.ConstraintUniqueKeyDef{DefType: ast.DefTypeConstraintUniqueKey, Column: *ast.NewColumnId("username")}
+		ukDef2 := &ast.ConstraintUniqueKeyDef{Column: *ast.NewColumnId("username")}
 		ukDef2.KeyName = "uk_same"
 
 		stmt := &ast.CreateTableStmt{
-			StmtType:  ast.StmtTypeCreate,
-			Keyword:   ast.KeywordTable,
 			TableName: "users",
 			CreateDefinitions: []ast.Definition{
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "email", DataType: ast.DataTypeVarchar},
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "username", DataType: ast.DataTypeVarchar},
-				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "email", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "username", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{
 					*ast.NewColumnId("id"),
 				}},
 				ukDef1,
@@ -320,20 +296,18 @@ func TestPlanCreateTable(t *testing.T) {
 
 	t.Run("同一カラムが複数のユニークキーに指定されている場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
-		ukDef1 := &ast.ConstraintUniqueKeyDef{DefType: ast.DefTypeConstraintUniqueKey, Column: *ast.NewColumnId("email")}
+		ukDef1 := &ast.ConstraintUniqueKeyDef{Column: *ast.NewColumnId("email")}
 		ukDef1.KeyName = "uk_email1"
 
-		ukDef2 := &ast.ConstraintUniqueKeyDef{DefType: ast.DefTypeConstraintUniqueKey, Column: *ast.NewColumnId("email")}
+		ukDef2 := &ast.ConstraintUniqueKeyDef{Column: *ast.NewColumnId("email")}
 		ukDef2.KeyName = "uk_email2"
 
 		stmt := &ast.CreateTableStmt{
-			StmtType:  ast.StmtTypeCreate,
-			Keyword:   ast.KeywordTable,
 			TableName: "users",
 			CreateDefinitions: []ast.Definition{
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "email", DataType: ast.DataTypeVarchar},
-				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "email", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{
 					*ast.NewColumnId("id"),
 				}},
 				ukDef1,
@@ -353,12 +327,10 @@ func TestPlanCreateTable(t *testing.T) {
 	t.Run("カラムが1つだけのテーブルを作成できる", func(t *testing.T) {
 		// GIVEN
 		stmt := &ast.CreateTableStmt{
-			StmtType:  ast.StmtTypeCreate,
-			Keyword:   ast.KeywordTable,
 			TableName: "counters",
 			CreateDefinitions: []ast.Definition{
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
-				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{
 					*ast.NewColumnId("id"),
 				}},
 			},
@@ -375,16 +347,14 @@ func TestPlanCreateTable(t *testing.T) {
 
 	t.Run("ユニークインデックスに指定されたカラムが存在しない場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
-		ukDef := &ast.ConstraintUniqueKeyDef{DefType: ast.DefTypeConstraintUniqueKey, Column: *ast.NewColumnId("non_existent_column")}
+		ukDef := &ast.ConstraintUniqueKeyDef{Column: *ast.NewColumnId("non_existent_column")}
 		ukDef.KeyName = "uk_test"
 
 		stmt := &ast.CreateTableStmt{
-			StmtType:  ast.StmtTypeCreate,
-			Keyword:   ast.KeywordTable,
 			TableName: "users",
 			CreateDefinitions: []ast.Definition{
-				&ast.ColumnDef{DefType: ast.DefTypeColumn, ColName: "id", DataType: ast.DataTypeVarchar},
-				&ast.ConstraintPrimaryKeyDef{DefType: ast.DefTypeConstraintPrimaryKey, Columns: []ast.ColumnId{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{
 					*ast.NewColumnId("id"),
 				}},
 				ukDef,

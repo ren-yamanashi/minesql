@@ -20,9 +20,9 @@ func TestParserTransaction(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		stmt, ok := result.(*ast.BeginStmt)
+		stmt, ok := result.(*ast.TransactionStmt)
 		assert.True(t, ok)
-		assert.Equal(t, ast.StmtTypeBegin, stmt.StmtType)
+		assert.Equal(t, ast.TxBegin, stmt.Kind)
 	})
 
 	t.Run("COMMIT をパースできる", func(t *testing.T) {
@@ -37,9 +37,9 @@ func TestParserTransaction(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		stmt, ok := result.(*ast.CommitStmt)
+		stmt, ok := result.(*ast.TransactionStmt)
 		assert.True(t, ok)
-		assert.Equal(t, ast.StmtTypeCommit, stmt.StmtType)
+		assert.Equal(t, ast.TxCommit, stmt.Kind)
 	})
 
 	t.Run("ROLLBACK をパースできる", func(t *testing.T) {
@@ -54,9 +54,9 @@ func TestParserTransaction(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 
-		stmt, ok := result.(*ast.RollbackStmt)
+		stmt, ok := result.(*ast.TransactionStmt)
 		assert.True(t, ok)
-		assert.Equal(t, ast.StmtTypeRollback, stmt.StmtType)
+		assert.Equal(t, ast.TxRollback, stmt.Kind)
 	})
 
 	t.Run("小文字の begin をパースできる", func(t *testing.T) {
@@ -69,9 +69,9 @@ func TestParserTransaction(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		stmt, ok := result.(*ast.BeginStmt)
+		stmt, ok := result.(*ast.TransactionStmt)
 		assert.True(t, ok)
-		assert.Equal(t, ast.StmtTypeBegin, stmt.StmtType)
+		assert.Equal(t, ast.TxBegin, stmt.Kind)
 	})
 }
 

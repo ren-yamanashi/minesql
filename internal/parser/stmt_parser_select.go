@@ -12,14 +12,10 @@ var (
 )
 
 type SelectParser struct {
-	// 現在のステート
-	state ParserState
-	// 現在構築中の SELECT 文
-	stmt *ast.SelectStmt
-	// WHERE 句パーサー
-	where WhereParser
-	// エラー情報
-	err error
+	state parserState     // 現在のステート
+	stmt  *ast.SelectStmt // 現在構築中の SELECT 文
+	where WhereParser     // WHERE 句パーサー
+	err   error           // エラー情報
 }
 
 func NewSelectParser() *SelectParser {
@@ -28,14 +24,8 @@ func NewSelectParser() *SelectParser {
 	}
 }
 
-func (sp *SelectParser) getResult() ast.Statement {
-	return sp.stmt
-}
-
-func (sp *SelectParser) getError() error {
-	return sp.err
-}
-
+func (sp *SelectParser) getResult() ast.Statement { return sp.stmt }
+func (sp *SelectParser) getError() error          { return sp.err }
 func (sp *SelectParser) finalize() {
 	if sp.err != nil {
 		return
@@ -68,7 +58,7 @@ func (sp *SelectParser) finalize() {
 	sp.stmt.Where = whereClause
 }
 
-func (sp *SelectParser) OnKeyword(word string) {
+func (sp *SelectParser) onKeyword(word string) {
 	if sp.err != nil {
 		return
 	}
@@ -76,7 +66,7 @@ func (sp *SelectParser) OnKeyword(word string) {
 
 	switch upperWord {
 	case KSelect:
-		sp.stmt = &ast.SelectStmt{StmtType: ast.StmtTypeSelect}
+		sp.stmt = &ast.SelectStmt{}
 		sp.state = SelectStateColumns
 		return
 
@@ -85,6 +75,7 @@ func (sp *SelectParser) OnKeyword(word string) {
 			sp.state = SelectStateFrom
 			return
 		}
+		// FROM 句が予期しない位置に来た場合はエラー
 		sp.setError(errors.New("[parse error] FROM clause is in invalid position"))
 		return
 
@@ -94,6 +85,7 @@ func (sp *SelectParser) OnKeyword(word string) {
 			sp.state = SelectStateWhere
 			return
 		}
+		// WHERE 句が予期しない位置に来た場合はエラー
 		sp.setError(errors.New("[parse error] WHERE clause is in invalid position"))
 		return
 
@@ -104,7 +96,8 @@ func (sp *SelectParser) OnKeyword(word string) {
 			}
 			return
 		}
-		sp.setError(errors.New("[parse error] AND operator is in invalid position"))
+		// AND/OR が予期しない位置に来た場合はエラー
+		sp.setError(errors.New("[parse error] " + upperWord + " operator is in invalid position"))
 		return
 
 	default:
@@ -113,7 +106,7 @@ func (sp *SelectParser) OnKeyword(word string) {
 	}
 }
 
-func (sp *SelectParser) OnIdentifier(ident string) {
+func (sp *SelectParser) onIdentifier(ident string) {
 	if sp.err != nil {
 		return
 	}
@@ -130,7 +123,7 @@ func (sp *SelectParser) OnIdentifier(ident string) {
 	}
 }
 
-func (sp *SelectParser) OnSymbol(symbol string) {
+func (sp *SelectParser) onSymbol(symbol string) {
 	if sp.err != nil {
 		return
 	}
@@ -159,33 +152,28 @@ func (sp *SelectParser) OnSymbol(symbol string) {
 	}
 }
 
-func (sp *SelectParser) OnString(value string) {
+func (sp *SelectParser) onString(value string) {
 	if sp.err != nil {
 		return
 	}
 	if sp.state == SelectStateWhere {
-		sp.where.pushLiteral(ast.NewStringLiteral(value, value))
+		sp.where.pushLiteral(ast.NewStringLiteral(value))
 	}
 }
 
-func (sp *SelectParser) OnNumber(num string) {
+func (sp *SelectParser) onNumber(num string) {
 	if sp.err != nil {
 		return
 	}
 	if sp.state == SelectStateWhere {
-		sp.where.pushLiteral(ast.NewStringLiteral(num, num))
+		sp.where.pushLiteral(ast.NewStringLiteral(num))
 	}
 }
 
-func (sp *SelectParser) OnComment(text string) {
-	// 何もしない
-}
+func (sp *SelectParser) onComment(text string) {}
+func (sp *SelectParser) onError(err error)     { sp.setError(err) }
 
-func (sp *SelectParser) OnError(err error) {
-	sp.setError(err)
-}
-
-// エラーを設定する (既にエラーが設定されている場合は無視する)
+// setError はエラーを設定する (既にエラーが設定されている場合は無視する)
 func (sp *SelectParser) setError(err error) {
 	if sp.err == nil {
 		sp.err = err

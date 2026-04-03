@@ -1,101 +1,89 @@
 package ast
 
-const (
-	StmtTypeCreate   StmtType = "create"
-	StmtTypeInsert   StmtType = "insert"
-	StmtTypeSelect   StmtType = "select"
-	StmtTypeUpdate   StmtType = "update"
-	StmtTypeDelete   StmtType = "delete"
-	StmtTypeBegin    StmtType = "begin"
-	StmtTypeCommit   StmtType = "commit"
-	StmtTypeRollback StmtType = "rollback"
-)
+type Statement interface {
+	isStatement()
+}
 
-type StmtType string
-
-type Statement interface{}
-
-// ===========================
+// ---------------------------------------
 // Create Table
-// ===========================
+// ---------------------------------------
 
 type CreateTableStmt struct {
-	StmtType          StmtType
-	Keyword           KeywordType
 	TableName         string
 	CreateDefinitions []Definition
 }
 
-type KeywordType string
+func (*CreateTableStmt) isStatement() {}
 
-const (
-	KeywordTable KeywordType = "table"
-)
-
-// ===========================
+// ---------------------------------------
 // Select
-// ===========================
+// ---------------------------------------
 
 type SelectStmt struct {
-	StmtType StmtType
-	From     TableId
-	Where    *WhereClause
+	From  TableId
+	Where *WhereClause
 }
+
+func (*SelectStmt) isStatement() {}
 
 type WhereClause struct {
-	Condition Expression
-	IsSet     bool
+	Condition *BinaryExpr
 }
 
-// ===========================
+// ---------------------------------------
 // Insert
-// ===========================
+// ---------------------------------------
 
 type InsertStmt struct {
-	StmtType StmtType
-	Table    TableId
-	Cols     []ColumnId
-	Values   [][]Literal
+	Table  TableId
+	Cols   []ColumnId
+	Values [][]Literal
 }
 
-// ===========================
+func (*InsertStmt) isStatement() {}
+
+// ---------------------------------------
 // Delete
-// ===========================
+// ---------------------------------------
 
 type DeleteStmt struct {
-	StmtType StmtType
-	From     TableId
-	Where    *WhereClause
+	From  TableId
+	Where *WhereClause
 }
 
-// ===========================
+func (*DeleteStmt) isStatement() {}
+
+// ---------------------------------------
 // Update
-// ===========================
+// ---------------------------------------
 
 type UpdateStmt struct {
-	StmtType   StmtType
 	Table      TableId
 	SetClauses []*SetClause
 	Where      *WhereClause
 }
+
+func (*UpdateStmt) isStatement() {}
 
 type SetClause struct {
 	Column ColumnId
 	Value  Literal
 }
 
-// ===========================
+// ---------------------------------------
 // Transaction
-// ===========================
+// ---------------------------------------
 
-type BeginStmt struct {
-	StmtType StmtType
+type TransactionKind int
+
+const (
+	TxBegin TransactionKind = iota
+	TxCommit
+	TxRollback
+)
+
+type TransactionStmt struct {
+	Kind TransactionKind
 }
 
-type CommitStmt struct {
-	StmtType StmtType
-}
-
-type RollbackStmt struct {
-	StmtType StmtType
-}
+func (*TransactionStmt) isStatement() {}

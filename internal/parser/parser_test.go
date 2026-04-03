@@ -15,7 +15,7 @@ func TestNewParser(t *testing.T) {
 
 		// THEN
 		assert.NotNil(t, p)
-		assert.Nil(t, p.currentHandler)
+		assert.Nil(t, p.currentParser)
 	})
 }
 
@@ -100,8 +100,9 @@ func TestParse(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		_, ok := result.(*ast.BeginStmt)
+		stmt, ok := result.(*ast.TransactionStmt)
 		assert.True(t, ok)
+		assert.Equal(t, ast.TxBegin, stmt.Kind)
 	})
 
 	t.Run("COMMIT 文をパースできる", func(t *testing.T) {
@@ -113,8 +114,9 @@ func TestParse(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		_, ok := result.(*ast.CommitStmt)
+		stmt, ok := result.(*ast.TransactionStmt)
 		assert.True(t, ok)
+		assert.Equal(t, ast.TxCommit, stmt.Kind)
 	})
 
 	t.Run("ROLLBACK 文をパースできる", func(t *testing.T) {
@@ -126,8 +128,9 @@ func TestParse(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		_, ok := result.(*ast.RollbackStmt)
+		stmt, ok := result.(*ast.TransactionStmt)
 		assert.True(t, ok)
+		assert.Equal(t, ast.TxRollback, stmt.Kind)
 	})
 
 	t.Run("コメント付き SQL をパースできる", func(t *testing.T) {
@@ -222,11 +225,11 @@ func TestOnKeyword(t *testing.T) {
 		p := NewParser()
 
 		// WHEN
-		p.OnKeyword("SELECT")
+		p.onKeyword("SELECT")
 
 		// THEN
-		assert.NotNil(t, p.currentHandler)
-		_, ok := p.currentHandler.(*SelectParser)
+		assert.NotNil(t, p.currentParser)
+		_, ok := p.currentParser.(*SelectParser)
 		assert.True(t, ok)
 	})
 
@@ -235,10 +238,10 @@ func TestOnKeyword(t *testing.T) {
 		p := NewParser()
 
 		// WHEN
-		p.OnKeyword("CREATE")
+		p.onKeyword("CREATE")
 
 		// THEN
-		_, ok := p.currentHandler.(*CreateParser)
+		_, ok := p.currentParser.(*CreateParser)
 		assert.True(t, ok)
 	})
 
@@ -247,10 +250,10 @@ func TestOnKeyword(t *testing.T) {
 		p := NewParser()
 
 		// WHEN
-		p.OnKeyword("INSERT")
+		p.onKeyword("INSERT")
 
 		// THEN
-		_, ok := p.currentHandler.(*InsertParser)
+		_, ok := p.currentParser.(*InsertParser)
 		assert.True(t, ok)
 	})
 
@@ -259,10 +262,10 @@ func TestOnKeyword(t *testing.T) {
 		p := NewParser()
 
 		// WHEN
-		p.OnKeyword("DELETE")
+		p.onKeyword("DELETE")
 
 		// THEN
-		_, ok := p.currentHandler.(*DeleteParser)
+		_, ok := p.currentParser.(*DeleteParser)
 		assert.True(t, ok)
 	})
 
@@ -271,50 +274,50 @@ func TestOnKeyword(t *testing.T) {
 		p := NewParser()
 
 		// WHEN
-		p.OnKeyword("UPDATE")
+		p.onKeyword("UPDATE")
 
 		// THEN
-		_, ok := p.currentHandler.(*UpdateParser)
+		_, ok := p.currentParser.(*UpdateParser)
 		assert.True(t, ok)
 	})
 
-	t.Run("BEGIN で TransactionParser (StmtTypeBegin) がセットされる", func(t *testing.T) {
+	t.Run("BEGIN で TransactionParser (TxBegin) がセットされる", func(t *testing.T) {
 		// GIVEN
 		p := NewParser()
 
 		// WHEN
-		p.OnKeyword("BEGIN")
+		p.onKeyword("BEGIN")
 
 		// THEN
-		tp, ok := p.currentHandler.(*TransactionParser)
+		tp, ok := p.currentParser.(*TransactionParser)
 		assert.True(t, ok)
-		assert.Equal(t, ast.StmtTypeBegin, tp.stmtType)
+		assert.Equal(t, ast.TxBegin, tp.kind)
 	})
 
-	t.Run("COMMIT で TransactionParser (StmtTypeCommit) がセットされる", func(t *testing.T) {
+	t.Run("COMMIT で TransactionParser (TxCommit) がセットされる", func(t *testing.T) {
 		// GIVEN
 		p := NewParser()
 
 		// WHEN
-		p.OnKeyword("COMMIT")
+		p.onKeyword("COMMIT")
 
 		// THEN
-		tp, ok := p.currentHandler.(*TransactionParser)
+		tp, ok := p.currentParser.(*TransactionParser)
 		assert.True(t, ok)
-		assert.Equal(t, ast.StmtTypeCommit, tp.stmtType)
+		assert.Equal(t, ast.TxCommit, tp.kind)
 	})
 
-	t.Run("ROLLBACK で TransactionParser (StmtTypeRollback) がセットされる", func(t *testing.T) {
+	t.Run("ROLLBACK で TransactionParser (TxRollback) がセットされる", func(t *testing.T) {
 		// GIVEN
 		p := NewParser()
 
 		// WHEN
-		p.OnKeyword("ROLLBACK")
+		p.onKeyword("ROLLBACK")
 
 		// THEN
-		tp, ok := p.currentHandler.(*TransactionParser)
+		tp, ok := p.currentParser.(*TransactionParser)
 		assert.True(t, ok)
-		assert.Equal(t, ast.StmtTypeRollback, tp.stmtType)
+		assert.Equal(t, ast.TxRollback, tp.kind)
 	})
 
 	t.Run("小文字でもディスパッチされる", func(t *testing.T) {
@@ -322,10 +325,10 @@ func TestOnKeyword(t *testing.T) {
 		p := NewParser()
 
 		// WHEN
-		p.OnKeyword("select")
+		p.onKeyword("select")
 
 		// THEN
-		_, ok := p.currentHandler.(*SelectParser)
+		_, ok := p.currentParser.(*SelectParser)
 		assert.True(t, ok)
 	})
 
@@ -334,23 +337,23 @@ func TestOnKeyword(t *testing.T) {
 		p := NewParser()
 
 		// WHEN
-		p.OnKeyword("SeLeCt")
+		p.onKeyword("SeLeCt")
 
 		// THEN
-		_, ok := p.currentHandler.(*SelectParser)
+		_, ok := p.currentParser.(*SelectParser)
 		assert.True(t, ok)
 	})
 
 	t.Run("currentHandler がある場合はデリゲートされる", func(t *testing.T) {
 		// GIVEN: SELECT パース中に FROM キーワードが来る
 		p := NewParser()
-		p.OnKeyword("SELECT")
+		p.onKeyword("SELECT")
 
 		// WHEN
-		p.OnKeyword("FROM")
+		p.onKeyword("FROM")
 
 		// THEN: currentHandler は SelectParser のまま (上書きされない)
-		_, ok := p.currentHandler.(*SelectParser)
+		_, ok := p.currentParser.(*SelectParser)
 		assert.True(t, ok)
 	})
 }
@@ -359,15 +362,15 @@ func TestOnIdentifier(t *testing.T) {
 	t.Run("currentHandler がある場合はデリゲートされる", func(t *testing.T) {
 		// GIVEN: SELECT * FROM の後にテーブル名が来る
 		p := NewParser()
-		p.OnKeyword("SELECT")
-		p.OnSymbol("*")
-		p.OnKeyword("FROM")
+		p.onKeyword("SELECT")
+		p.onSymbol("*")
+		p.onKeyword("FROM")
 
 		// WHEN
-		p.OnIdentifier("users")
+		p.onIdentifier("users")
 
 		// THEN: SelectParser がテーブル名を受け取っている
-		result := p.currentHandler.getResult()
+		result := p.currentParser.getResult()
 		stmt, ok := result.(*ast.SelectStmt)
 		assert.True(t, ok)
 		assert.Equal(t, "users", stmt.From.TableName)
@@ -378,7 +381,7 @@ func TestOnIdentifier(t *testing.T) {
 		p := NewParser()
 
 		// WHEN / THEN: パニックしない
-		p.OnIdentifier("users")
+		p.onIdentifier("users")
 	})
 }
 
@@ -386,13 +389,13 @@ func TestOnSymbol(t *testing.T) {
 	t.Run("currentHandler がある場合はデリゲートされる", func(t *testing.T) {
 		// GIVEN
 		p := NewParser()
-		p.OnKeyword("SELECT")
+		p.onKeyword("SELECT")
 
 		// WHEN
-		p.OnSymbol("*")
+		p.onSymbol("*")
 
 		// THEN: SelectParser の状態が進んでいる (エラーなし)
-		assert.Nil(t, p.currentHandler.getError())
+		assert.Nil(t, p.currentParser.getError())
 	})
 
 	t.Run("currentHandler がない場合は何も起きない", func(t *testing.T) {
@@ -400,7 +403,7 @@ func TestOnSymbol(t *testing.T) {
 		p := NewParser()
 
 		// WHEN / THEN: パニックしない
-		p.OnSymbol("*")
+		p.onSymbol("*")
 	})
 }
 
@@ -408,19 +411,19 @@ func TestOnString(t *testing.T) {
 	t.Run("currentHandler がある場合はデリゲートされる", func(t *testing.T) {
 		// GIVEN: WHERE name = の後に文字列が来る
 		p := NewParser()
-		p.OnKeyword("SELECT")
-		p.OnSymbol("*")
-		p.OnKeyword("FROM")
-		p.OnIdentifier("users")
-		p.OnKeyword("WHERE")
-		p.OnIdentifier("name")
-		p.OnSymbol("=")
+		p.onKeyword("SELECT")
+		p.onSymbol("*")
+		p.onKeyword("FROM")
+		p.onIdentifier("users")
+		p.onKeyword("WHERE")
+		p.onIdentifier("name")
+		p.onSymbol("=")
 
 		// WHEN
-		p.OnString("Alice")
+		p.onString("Alice")
 
 		// THEN: エラーなく処理される
-		assert.Nil(t, p.currentHandler.getError())
+		assert.Nil(t, p.currentParser.getError())
 	})
 
 	t.Run("currentHandler がない場合は何も起きない", func(t *testing.T) {
@@ -428,7 +431,7 @@ func TestOnString(t *testing.T) {
 		p := NewParser()
 
 		// WHEN / THEN: パニックしない
-		p.OnString("hello")
+		p.onString("hello")
 	})
 }
 
@@ -436,19 +439,19 @@ func TestOnNumber(t *testing.T) {
 	t.Run("currentHandler がある場合はデリゲートされる", func(t *testing.T) {
 		// GIVEN: WHERE id = の後に数値が来る
 		p := NewParser()
-		p.OnKeyword("SELECT")
-		p.OnSymbol("*")
-		p.OnKeyword("FROM")
-		p.OnIdentifier("users")
-		p.OnKeyword("WHERE")
-		p.OnIdentifier("id")
-		p.OnSymbol("=")
+		p.onKeyword("SELECT")
+		p.onSymbol("*")
+		p.onKeyword("FROM")
+		p.onIdentifier("users")
+		p.onKeyword("WHERE")
+		p.onIdentifier("id")
+		p.onSymbol("=")
 
 		// WHEN
-		p.OnNumber("42")
+		p.onNumber("42")
 
 		// THEN: エラーなく処理される
-		assert.Nil(t, p.currentHandler.getError())
+		assert.Nil(t, p.currentParser.getError())
 	})
 
 	t.Run("currentHandler がない場合は何も起きない", func(t *testing.T) {
@@ -456,7 +459,7 @@ func TestOnNumber(t *testing.T) {
 		p := NewParser()
 
 		// WHEN / THEN: パニックしない
-		p.OnNumber("42")
+		p.onNumber("42")
 	})
 }
 
@@ -464,13 +467,13 @@ func TestOnComment(t *testing.T) {
 	t.Run("currentHandler がある場合はデリゲートされる", func(t *testing.T) {
 		// GIVEN
 		p := NewParser()
-		p.OnKeyword("SELECT")
+		p.onKeyword("SELECT")
 
 		// WHEN
-		p.OnComment("this is a comment")
+		p.onComment("this is a comment")
 
 		// THEN: コメントは無視され、エラーにならない
-		assert.Nil(t, p.currentHandler.getError())
+		assert.Nil(t, p.currentParser.getError())
 	})
 
 	t.Run("currentHandler がない場合は何も起きない", func(t *testing.T) {
@@ -478,7 +481,7 @@ func TestOnComment(t *testing.T) {
 		p := NewParser()
 
 		// WHEN / THEN: パニックしない
-		p.OnComment("comment")
+		p.onComment("comment")
 	})
 }
 
@@ -486,14 +489,14 @@ func TestOnError(t *testing.T) {
 	t.Run("currentHandler がある場合はエラーがデリゲートされる", func(t *testing.T) {
 		// GIVEN
 		p := NewParser()
-		p.OnKeyword("SELECT")
+		p.onKeyword("SELECT")
 
 		// WHEN
-		p.OnError(errors.New("test error"))
+		p.onError(errors.New("test error"))
 
 		// THEN
-		assert.Error(t, p.currentHandler.getError())
-		assert.Equal(t, "test error", p.currentHandler.getError().Error())
+		assert.Error(t, p.currentParser.getError())
+		assert.Equal(t, "test error", p.currentParser.getError().Error())
 	})
 
 	t.Run("currentHandler がない場合は何も起きない", func(t *testing.T) {
@@ -501,6 +504,6 @@ func TestOnError(t *testing.T) {
 		p := NewParser()
 
 		// WHEN / THEN: パニックしない
-		p.OnError(errors.New("test error"))
+		p.onError(errors.New("test error"))
 	})
 }
