@@ -393,5 +393,19 @@ func TestParserUpdate(t *testing.T) {
 			assert.Nil(t, result)
 			assert.Contains(t, err.Error(), "unexpected number")
 		})
+
+		t.Run("UPDATE の後に直接セミコロンが来た場合", func(t *testing.T) {
+			// GIVEN: テーブル名なしで即座に文が終了
+			sql := "UPDATE;"
+			parser := NewParser()
+
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "missing table name")
+		})
 	})
 }

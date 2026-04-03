@@ -93,7 +93,7 @@ func (dp *DeleteParser) onKeyword(word string) {
 			}
 			return
 		}
-		dp.setError(errors.New("[parse error] AND operator is in invalid position"))
+		dp.setError(errors.New("[parse error] " + upperWord + " operator is in invalid position"))
 		return
 
 	default:

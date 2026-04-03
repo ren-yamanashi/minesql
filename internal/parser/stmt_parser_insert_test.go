@@ -247,5 +247,47 @@ VALUES ('1', 'John') /* 値リスト */
 			assert.Nil(t, result)
 			assert.Contains(t, err.Error(), "incomplete INSERT statement")
 		})
+
+		t.Run("INTO キーワードがない場合", func(t *testing.T) {
+			// GIVEN: INTO の代わりに SELECT が来る
+			sql := "INSERT SELECT users (id) VALUES ('1');"
+			parser := NewParser()
+
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "expected INTO")
+		})
+
+		t.Run("テーブル名の後にカラムリスト開始の ( がない場合", func(t *testing.T) {
+			// GIVEN
+			sql := "INSERT INTO users = 'Jane';"
+			parser := NewParser()
+
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "expected '('")
+		})
+
+		t.Run("不正な位置で文字列リテラルが来た場合", func(t *testing.T) {
+			// GIVEN: テーブル名の位置に文字列リテラル
+			sql := "INSERT INTO 'users' (id) VALUES ('1');"
+			parser := NewParser()
+
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "unexpected string")
+		})
 	})
 }
