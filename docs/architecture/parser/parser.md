@@ -10,7 +10,7 @@
 以下ざっくりフロー
 
 ```mermaid
-flowchart LR
+flowchart
     %% ノード定義
     Input[SQL]
     Tokenizer

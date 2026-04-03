@@ -11,14 +11,10 @@ var (
 )
 
 type DeleteParser struct {
-	// 現在のステート
-	state ParserState
-	// 現在構築中の DELETE 文
-	stmt *ast.DeleteStmt
-	// WHERE 句パーサー
-	where WhereParser
-	// エラー情報
-	err error
+	state parserState     // 現在のステート
+	stmt  *ast.DeleteStmt // 現在構築中の DELETE 文
+	where WhereParser     // WHERE 句パーサー
+	err   error           // エラー情報
 }
 
 func NewDeleteParser() *DeleteParser {
@@ -27,14 +23,8 @@ func NewDeleteParser() *DeleteParser {
 	}
 }
 
-func (dp *DeleteParser) getResult() ast.Statement {
-	return dp.stmt
-}
-
-func (dp *DeleteParser) getError() error {
-	return dp.err
-}
-
+func (dp *DeleteParser) getResult() ast.Statement { return dp.stmt }
+func (dp *DeleteParser) getError() error          { return dp.err }
 func (dp *DeleteParser) finalize() {
 	if dp.err != nil {
 		return
@@ -67,7 +57,7 @@ func (dp *DeleteParser) finalize() {
 	dp.stmt.Where = whereClause
 }
 
-func (dp *DeleteParser) OnKeyword(word string) {
+func (dp *DeleteParser) onKeyword(word string) {
 	if dp.err != nil {
 		return
 	}
@@ -112,7 +102,7 @@ func (dp *DeleteParser) OnKeyword(word string) {
 	}
 }
 
-func (dp *DeleteParser) OnIdentifier(ident string) {
+func (dp *DeleteParser) onIdentifier(ident string) {
 	if dp.err != nil {
 		return
 	}
@@ -127,7 +117,7 @@ func (dp *DeleteParser) OnIdentifier(ident string) {
 	}
 }
 
-func (dp *DeleteParser) OnSymbol(symbol string) {
+func (dp *DeleteParser) onSymbol(symbol string) {
 	if dp.err != nil {
 		return
 	}
@@ -148,7 +138,7 @@ func (dp *DeleteParser) OnSymbol(symbol string) {
 	}
 }
 
-func (dp *DeleteParser) OnString(value string) {
+func (dp *DeleteParser) onString(value string) {
 	if dp.err != nil {
 		return
 	}
@@ -157,7 +147,7 @@ func (dp *DeleteParser) OnString(value string) {
 	}
 }
 
-func (dp *DeleteParser) OnNumber(num string) {
+func (dp *DeleteParser) onNumber(num string) {
 	if dp.err != nil {
 		return
 	}
@@ -166,15 +156,10 @@ func (dp *DeleteParser) OnNumber(num string) {
 	}
 }
 
-func (dp *DeleteParser) OnComment(text string) {
-	// 何もしない
-}
+func (dp *DeleteParser) onComment(text string) {}
+func (dp *DeleteParser) onError(err error)     { dp.setError(err) }
 
-func (dp *DeleteParser) OnError(err error) {
-	dp.setError(err)
-}
-
-// エラーを設定する (既にエラーが設定されている場合は無視する)
+// setError はエラーを設定する (既にエラーが設定されている場合は無視する)
 func (dp *DeleteParser) setError(err error) {
 	if dp.err == nil {
 		dp.err = err

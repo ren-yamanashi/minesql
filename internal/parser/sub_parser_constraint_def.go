@@ -6,26 +6,21 @@ import (
 	"strings"
 )
 
-type ConstraintParser struct {
-	// 現在のステート
-	state ParserState
-	// PK か UK かのフラグ
-	isPK bool
-	// 生成される PK 定義
-	pkDef *ast.ConstraintPrimaryKeyDef
-	// 生成される UK 定義
-	ukDef *ast.ConstraintUniqueKeyDef
-	// エラー情報
-	err error
+type ConstraintDefParser struct {
+	state parserState                  // 現在のステート
+	isPK  bool                         // PK か UK かのフラグ
+	pkDef *ast.ConstraintPrimaryKeyDef // 生成される PK 定義
+	ukDef *ast.ConstraintUniqueKeyDef  // 生成される UK 定義
+	err   error                        // エラー情報
 }
 
-func NewConstraintParser() *ConstraintParser {
-	return &ConstraintParser{
+func NewConstraintDefParser() *ConstraintDefParser {
+	return &ConstraintDefParser{
 		state: CreateStateConstraint,
 	}
 }
 
-func (cp *ConstraintParser) finalize() error {
+func (cp *ConstraintDefParser) finalize() error {
 	if cp.err != nil {
 		return cp.err
 	}
@@ -47,14 +42,14 @@ func (cp *ConstraintParser) finalize() error {
 	return nil
 }
 
-func (cp *ConstraintParser) getDef() ast.Definition {
+func (cp *ConstraintDefParser) getDef() ast.Definition {
 	if cp.isPK {
 		return cp.pkDef
 	}
 	return cp.ukDef
 }
 
-func (cp *ConstraintParser) OnKeyword(word string) {
+func (cp *ConstraintDefParser) onKeyword(word string) {
 	if cp.err != nil {
 		return
 	}
@@ -92,7 +87,7 @@ func (cp *ConstraintParser) OnKeyword(word string) {
 	cp.setError(errors.New("[parse error] unexpected keyword in constraint: " + word))
 }
 
-func (cp *ConstraintParser) OnIdentifier(ident string) {
+func (cp *ConstraintDefParser) onIdentifier(ident string) {
 	if cp.err != nil {
 		return
 	}
@@ -128,7 +123,7 @@ func (cp *ConstraintParser) OnIdentifier(ident string) {
 	cp.setError(errors.New("[parse error] unexpected identifier: " + ident))
 }
 
-func (cp *ConstraintParser) OnSymbol(symbol string) {
+func (cp *ConstraintDefParser) onSymbol(symbol string) {
 	if cp.err != nil {
 		return
 	}
@@ -154,12 +149,7 @@ func (cp *ConstraintParser) OnSymbol(symbol string) {
 	cp.setError(errors.New("[parse error] unexpected symbol in constraint: " + symbol))
 }
 
-func (cp *ConstraintParser) OnString(s string)  { cp.setError(errors.New("unexpected string")) }
-func (cp *ConstraintParser) OnNumber(n string)  { cp.setError(errors.New("unexpected number")) }
-func (cp *ConstraintParser) OnComment(c string) {}
-func (cp *ConstraintParser) OnError(err error)  { cp.setError(err) }
-
-func (cp *ConstraintParser) setError(err error) {
+func (cp *ConstraintDefParser) setError(err error) {
 	if cp.err == nil {
 		cp.err = err
 	}

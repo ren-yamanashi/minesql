@@ -7,18 +7,12 @@ import (
 )
 
 type InsertParser struct {
-	// 現在のステート
-	state ParserState
-	// 現在構築中の INSERT 文
-	stmt *ast.InsertStmt
-	// カラムリスト
-	cols []ast.ColumnId
-	// 値リスト (現在構築中の行)
-	currentRow []ast.Literal
-	// 全ての値リスト
-	allRows [][]ast.Literal
-	// エラー情報
-	err error
+	state      parserState     // 現在のステート
+	stmt       *ast.InsertStmt // 現在構築中の INSERT 文
+	cols       []ast.ColumnId  // カラムリスト
+	currentRow []ast.Literal   // 値リスト (現在構築中の行)
+	allRows    [][]ast.Literal // 全ての値リスト
+	err        error           // エラー情報
 }
 
 func NewInsertParser() *InsertParser {
@@ -28,14 +22,8 @@ func NewInsertParser() *InsertParser {
 	}
 }
 
-func (ip *InsertParser) getResult() ast.Statement {
-	return ip.stmt
-}
-
-func (ip *InsertParser) getError() error {
-	return ip.err
-}
-
+func (ip *InsertParser) getResult() ast.Statement { return ip.stmt }
+func (ip *InsertParser) getError() error          { return ip.err }
 func (ip *InsertParser) finalize() {
 	if ip.err != nil {
 		return
@@ -73,7 +61,7 @@ func (ip *InsertParser) finalize() {
 	ip.stmt.Values = ip.allRows
 }
 
-func (ip *InsertParser) OnKeyword(word string) {
+func (ip *InsertParser) onKeyword(word string) {
 	if ip.err != nil {
 		return
 	}
@@ -86,6 +74,7 @@ func (ip *InsertParser) OnKeyword(word string) {
 			ip.state = InsertStateInsert
 			return
 		}
+		// 最初のキーワードが INSERT でない場合はエラー
 		ip.setError(errors.New("[parse error] expected INSERT, got: " + word))
 		return
 
@@ -95,6 +84,7 @@ func (ip *InsertParser) OnKeyword(word string) {
 			ip.state = InsertStateInto
 			return
 		}
+		// INTO が来ない場合はエラー
 		ip.setError(errors.New("[parse error] expected INTO, got: " + word))
 		return
 
@@ -108,6 +98,7 @@ func (ip *InsertParser) OnKeyword(word string) {
 			ip.state = InsertStateValues
 			return
 		}
+		// VALUES が来ない場合はエラー
 		ip.setError(errors.New("[parse error] unexpected keyword: " + word))
 		return
 
@@ -117,7 +108,7 @@ func (ip *InsertParser) OnKeyword(word string) {
 	}
 }
 
-func (ip *InsertParser) OnIdentifier(ident string) {
+func (ip *InsertParser) onIdentifier(ident string) {
 	if ip.err != nil {
 		return
 	}
@@ -136,7 +127,7 @@ func (ip *InsertParser) OnIdentifier(ident string) {
 	}
 }
 
-func (ip *InsertParser) OnSymbol(symbol string) {
+func (ip *InsertParser) onSymbol(symbol string) {
 	if ip.err != nil {
 		return
 	}
@@ -204,7 +195,7 @@ func (ip *InsertParser) OnSymbol(symbol string) {
 	}
 }
 
-func (ip *InsertParser) OnString(value string) {
+func (ip *InsertParser) onString(value string) {
 	if ip.err != nil {
 		return
 	}
@@ -215,7 +206,7 @@ func (ip *InsertParser) OnString(value string) {
 	ip.setError(errors.New("[parse error] unexpected string: " + value))
 }
 
-func (ip *InsertParser) OnNumber(num string) {
+func (ip *InsertParser) onNumber(num string) {
 	if ip.err != nil {
 		return
 	}
@@ -226,15 +217,10 @@ func (ip *InsertParser) OnNumber(num string) {
 	ip.setError(errors.New("[parse error] unexpected number: " + num))
 }
 
-func (ip *InsertParser) OnComment(text string) {
-	// 何もしない
-}
+func (ip *InsertParser) onComment(text string) {}
+func (ip *InsertParser) onError(err error)     { ip.setError(err) }
 
-func (ip *InsertParser) OnError(err error) {
-	ip.setError(err)
-}
-
-// エラーを設定する (既にエラーが設定されている場合は無視する)
+// setError はエラーを設定する (既にエラーが設定されている場合は無視する)
 func (ip *InsertParser) setError(err error) {
 	if ip.err == nil {
 		ip.err = err

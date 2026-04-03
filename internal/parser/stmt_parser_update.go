@@ -7,16 +7,11 @@ import (
 )
 
 type UpdateParser struct {
-	// 現在のステート
-	state ParserState
-	// 現在構築中の UPDATE 文
-	stmt *ast.UpdateStmt
-	// WHERE 句パーサー
-	where WhereParser
-	// 現在構築中の SetClause のカラム名
-	currentSetCol string
-	// エラー情報
-	err error
+	state         parserState     // 現在のステート
+	stmt          *ast.UpdateStmt // 現在構築中の UPDATE 文
+	where         WhereParser     // WHERE 句パーサー
+	currentSetCol string          // 現在構築中の SetClause のカラム名
+	err           error           // エラー情報
 }
 
 func NewUpdateParser() *UpdateParser {
@@ -25,19 +20,14 @@ func NewUpdateParser() *UpdateParser {
 	}
 }
 
-func (up *UpdateParser) getResult() ast.Statement {
-	return up.stmt
-}
-
-func (up *UpdateParser) getError() error {
-	return up.err
-}
-
+func (up *UpdateParser) getResult() ast.Statement { return up.stmt }
+func (up *UpdateParser) getError() error          { return up.err }
 func (up *UpdateParser) finalize() {
 	if up.err != nil {
 		return
 	}
 
+	// UPDATE 文が構築されていない場合はエラー
 	if up.stmt == nil {
 		up.setError(errors.New("[parse error] must have UPDATE statement"))
 		return
@@ -70,7 +60,7 @@ func (up *UpdateParser) finalize() {
 	up.stmt.Where = whereClause
 }
 
-func (up *UpdateParser) OnKeyword(word string) {
+func (up *UpdateParser) onKeyword(word string) {
 	if up.err != nil {
 		return
 	}
@@ -87,6 +77,7 @@ func (up *UpdateParser) OnKeyword(word string) {
 			up.state = UpdateStateSet
 			return
 		}
+		// SET 句が不適切な位置にある場合はエラー
 		up.setError(errors.New("[parse error] SET clause is in invalid position"))
 		return
 
@@ -96,6 +87,7 @@ func (up *UpdateParser) OnKeyword(word string) {
 			up.state = UpdateStateWhere
 			return
 		}
+		// WHERE 句が不適切な位置にある場合はエラー
 		up.setError(errors.New("[parse error] WHERE clause is in invalid position"))
 		return
 
@@ -106,6 +98,7 @@ func (up *UpdateParser) OnKeyword(word string) {
 			}
 			return
 		}
+		// AND/OR が不適切な位置にある場合はエラー
 		up.setError(errors.New("[parse error] " + upperWord + " operator is in invalid position"))
 		return
 
@@ -115,7 +108,7 @@ func (up *UpdateParser) OnKeyword(word string) {
 	}
 }
 
-func (up *UpdateParser) OnIdentifier(ident string) {
+func (up *UpdateParser) onIdentifier(ident string) {
 	if up.err != nil {
 		return
 	}
@@ -136,7 +129,7 @@ func (up *UpdateParser) OnIdentifier(ident string) {
 	}
 }
 
-func (up *UpdateParser) OnSymbol(symbol string) {
+func (up *UpdateParser) onSymbol(symbol string) {
 	if up.err != nil {
 		return
 	}
@@ -174,7 +167,7 @@ func (up *UpdateParser) OnSymbol(symbol string) {
 	}
 }
 
-func (up *UpdateParser) OnString(value string) {
+func (up *UpdateParser) onString(value string) {
 	if up.err != nil {
 		return
 	}
@@ -195,7 +188,7 @@ func (up *UpdateParser) OnString(value string) {
 	}
 }
 
-func (up *UpdateParser) OnNumber(num string) {
+func (up *UpdateParser) onNumber(num string) {
 	if up.err != nil {
 		return
 	}
@@ -216,15 +209,10 @@ func (up *UpdateParser) OnNumber(num string) {
 	}
 }
 
-func (up *UpdateParser) OnComment(text string) {
-	// 何もしない
-}
+func (up *UpdateParser) onComment(text string) {}
+func (up *UpdateParser) onError(err error)     { up.setError(err) }
 
-func (up *UpdateParser) OnError(err error) {
-	up.setError(err)
-}
-
-// エラーを設定する (既にエラーが設定されている場合は無視する)
+// setError はエラーを設定する (既にエラーが設定されている場合は無視する)
 func (up *UpdateParser) setError(err error) {
 	if up.err == nil {
 		up.err = err

@@ -6,37 +6,33 @@ import (
 	"strings"
 )
 
-// WhereParser は WHERE 句のパース処理を共通化する構造体。
-// SelectParser, DeleteParser などから利用する。
+// WhereParser は WHERE 句のパース処理を行う
 type WhereParser struct {
-	// 現在構築中の WHERE 句
-	whereClause *ast.WhereClause
-	// WHERE 句の AST ノードが格納されるスタック
-	nodeStack []ast.ASTNode
-	// WHERE 句の演算子が格納されるスタック
-	opStack []string
+	whereClause *ast.WhereClause // 現在構築中の WHERE 句
+	nodeStack   []any            // WHERE 句の AST ノードが格納されるスタック
+	opStack     []string         // WHERE 句の演算子が格納されるスタック
 }
 
-// WHERE 句のパースを開始する (WHERE キーワードを検出した時点で呼ぶ)
+// initWhere は WHERE 句のパースを開始する (WHERE キーワードを検出した時点で呼ぶ)
 func (wp *WhereParser) initWhere() *ast.WhereClause {
 	wp.whereClause = &ast.WhereClause{}
-	wp.nodeStack = []ast.ASTNode{}
+	wp.nodeStack = []any{}
 	wp.opStack = []string{}
 	return wp.whereClause
 }
 
-// 識別子をカラム名としてスタックに積む
+// pushColumn は識別子をカラム名としてスタックに積む
 func (wp *WhereParser) pushColumn(ident string) {
 	colId := *ast.NewColumnId(ident)
 	wp.nodeStack = append(wp.nodeStack, colId)
 }
 
-// リテラルをスタックに積む
+// pushLiteral はリテラルをスタックに積む
 func (wp *WhereParser) pushLiteral(lit ast.Literal) {
 	wp.nodeStack = append(wp.nodeStack, lit)
 }
 
-// 演算子を処理する (Shunting Yard アルゴリズム)
+// handleOperator は演算子を処理する
 func (wp *WhereParser) handleOperator(op string) error {
 	// 新しい演算子を積む前に、スタックにある「優先順位が高い or 同じ」演算子を処理する
 	for len(wp.opStack) > 0 {
@@ -53,12 +49,13 @@ func (wp *WhereParser) handleOperator(op string) error {
 	return nil
 }
 
-// WHERE 句を確定する (finalize 時に呼ぶ)。
-// WHERE 句が未設定の場合は nil を返す。
+// finalizeWhere は WHERE 句を確定する (finalize 時に呼ぶ)
+//
+// WHERE 句が未設定の場合は nil を返す
 func (wp *WhereParser) finalizeWhere() (*ast.WhereClause, error) {
 	// WHERE 句がない場合は nil を返す
 	if wp.whereClause == nil {
-		return nil, nil
+		return nil, nil //nolint:nilnil // WHERE 句なしは nil で表現する
 	}
 
 	// 残っている演算子をすべて処理
@@ -89,9 +86,10 @@ func (wp *WhereParser) finalizeWhere() (*ast.WhereClause, error) {
 }
 
 // スタックから要素を取り出し、1 つの BinaryExpr を作って nodeStack に戻す
+//
 // e.g.
-// - nodeStack: [name, "john"], opStack: ["="] -> nodeStack: [BinaryExpr(name = "john")]
-// - nodeStack: [age, 30, BinaryExpr(name = "john")], opStack: [">", "AND"] -> nodeStack: [BinaryExpr(age > 30 AND name = "john")]
+//   - nodeStack: [name, "john"], opStack: ["="] -> nodeStack: [BinaryExpr(name = "john")]
+//   - nodeStack: [age, 30, BinaryExpr(name = "john")], opStack: [">", "AND"] -> nodeStack: [BinaryExpr(age > 30 AND name = "john")]
 func (wp *WhereParser) reduce() error {
 	if len(wp.nodeStack) < 2 || len(wp.opStack) < 1 {
 		return errors.New("[parse error] invalid expression syntax")
@@ -139,7 +137,7 @@ func (wp *WhereParser) reduce() error {
 	return nil
 }
 
-// 演算子の優先順位を定義 (数値が高いほど優先順位が高い)
+// precedence は演算子の優先順位を定義 (数値が高いほど優先順位が高い)
 func (wp *WhereParser) precedence(op string) int {
 	switch strings.ToUpper(op) {
 	case string(SEqual), string(SLessThan), string(SGreaterThan), "<=", ">=", "!=":

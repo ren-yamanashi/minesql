@@ -6,23 +6,20 @@ import (
 	"strings"
 )
 
-type ColumnParser struct {
-	// 現在のステート
-	state ParserState
-	// 構築中のカラム定義
-	colDef *ast.ColumnDef
-	// エラー情報
-	err error
+type ColumnDefParser struct {
+	state  parserState    // 現在のステート
+	colDef *ast.ColumnDef // 構築中のカラム定義
+	err    error          // エラー情報
 }
 
-func NewColumnParser(colName string) *ColumnParser {
-	return &ColumnParser{
+func NewColumnDefParser(colName string) *ColumnDefParser {
+	return &ColumnDefParser{
 		state:  CreateStateColDef,
 		colDef: &ast.ColumnDef{ColName: colName},
 	}
 }
 
-func (cp *ColumnParser) finalize() error {
+func (cp *ColumnDefParser) finalize() error {
 	if cp.err != nil {
 		return cp.err
 	}
@@ -32,11 +29,11 @@ func (cp *ColumnParser) finalize() error {
 	return nil
 }
 
-func (cp *ColumnParser) getDef() ast.Definition {
+func (cp *ColumnDefParser) getDef() ast.Definition {
 	return cp.colDef
 }
 
-func (cp *ColumnParser) OnKeyword(word string) {
+func (cp *ColumnDefParser) onKeyword(word string) {
 	if cp.err != nil {
 		return
 	}
@@ -60,14 +57,7 @@ func (cp *ColumnParser) OnKeyword(word string) {
 	}
 }
 
-func (cp *ColumnParser) OnIdentifier(ident string) { cp.setError(errors.New("unexpected identifier")) }
-func (cp *ColumnParser) OnSymbol(sym string)       { cp.setError(errors.New("unexpected symbol")) }
-func (cp *ColumnParser) OnString(value string)     { cp.setError(errors.New("unexpected string")) }
-func (cp *ColumnParser) OnNumber(num string)       { cp.setError(errors.New("unexpected number")) }
-func (cp *ColumnParser) OnComment(text string)     {}
-func (cp *ColumnParser) OnError(err error)         { cp.setError(err) }
-
-func (cp *ColumnParser) setError(err error) {
+func (cp *ColumnDefParser) setError(err error) {
 	if cp.err == nil {
 		cp.err = err
 	}

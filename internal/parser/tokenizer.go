@@ -2,23 +2,17 @@ package parser
 
 import "strings"
 
-type State int
+type state int
 
 const (
-	// 通常状態
-	StateData State = iota
-	// シングルクォート内 ('...')
-	StateInSingleQuote
-	// ダブルクォート内 ("...")
-	StateInDoubleQuote
-	// 行コメント内 (-- ...)
-	StateInLineComment
-	// ブロックコメント内 (/* ... */)
-	StateInBlockComment
+	StateData           state = iota // 通常状態
+	StateInSingleQuote               // シングルクォート内 ('...')
+	StateInDoubleQuote               // ダブルクォート内 ("...")
+	StateInLineComment               // 行コメント内 (-- ...)
+	StateInBlockComment              // ブロックコメント内 (/* ... */)
 )
 
-// -- char code -
-
+// Char Code
 const (
 	CSingleQuote    rune = '\''
 	CDoubleQuote    rune = '"'
@@ -31,8 +25,7 @@ const (
 	CCarriageReturn rune = '\r'
 )
 
-// -- symbol --
-
+// Symbol
 const (
 	SLeftParen   rune = '('
 	SRightParen  rune = ')'
@@ -45,8 +38,7 @@ const (
 	SAsterisk    rune = '*'
 )
 
-// -- keyword --
-
+// Keyword
 const (
 	KSelect   = "SELECT"
 	KFrom     = "FROM"
@@ -72,32 +64,27 @@ const (
 
 type TokenHandler interface {
 	// SELECT, FROM, INSERT, CREATE などのキーワード
-	OnKeyword(word string)
+	onKeyword(word string)
 	// 識別子 (テーブル名、カラム名など) (e.g. users, id, name)
-	OnIdentifier(ident string)
+	onIdentifier(ident string)
 	// 文字列リテラル
-	OnString(value string)
+	onString(value string)
 	// 数値リテラル
-	OnNumber(num string)
+	onNumber(num string)
 	// (, ), =, >= などの記号
-	OnSymbol(symbol string)
+	onSymbol(symbol string)
 	// 行コメント、ブロックコメント
-	OnComment(text string)
+	onComment(text string)
 	// エラー
-	OnError(err error)
+	onError(err error)
 }
 
 type Tokenizer struct {
-	// イベントの通知先
-	callbacks TokenHandler
-	// 現在のステート
-	state State
-	// 解析対象の入力文字列
-	input []rune
-	// 現在の読み取り位置
-	pos int
-	// 現在のトークン開始位置
-	start int
+	callbacks TokenHandler // イベントの通知先
+	state     state        // 現在のステート
+	input     []rune       // 解析対象の入力文字列
+	pos       int          // 現在の読み取り位置
+	start     int          // 現在のトークン開始位置
 }
 
 func NewTokenizer(input string, callbacks TokenHandler) *Tokenizer {
@@ -110,7 +97,7 @@ func NewTokenizer(input string, callbacks TokenHandler) *Tokenizer {
 	}
 }
 
-// input を走査し、現在の状態に対応する関数を呼び出す
+// Tokenize は input を走査し、現在の状態に対応する関数を呼び出す
 func (t *Tokenizer) Tokenize() {
 	for t.shouldContinue() {
 		switch t.state {
@@ -131,15 +118,15 @@ func (t *Tokenizer) Tokenize() {
 	t.emitPendingToken()
 }
 
+// shouldContinue は、現在の読み取り位置が入力文字列の長さを超えていないかをチェックする
 func (t *Tokenizer) shouldContinue() bool {
 	return t.pos < len(t.input)
 }
 
-// Data (Keyword / Identifier / Number) 状態の処理
-// 現在の文字 (char) を見て、以下の 3つの処理 (場合によってはそのうちのいずれか) を行う
-// - 状態遷移 (e.g. handleData の実行中にシングルクォートを見つけた場合、StateInSingleQuote に遷移)
-// - トークンの確定 & 通知 (e.g. handleData で S E L E C T と読み進めた後に、 (スペース) が来た場合、SELECT トークンを確定し、OnKeyword("SELECT") を呼び出す)
-// - 文字の消費 (特にトークン確定や状態遷移が発生しない場合。 S の次に E を読む、など)
+// handleData は現在の文字 (char) を見て、以下の 3つの処理 (場合によってはそのうちのいずれか) を行う
+//   - 状態遷移 (e.g. handleData の実行中にシングルクォートを見つけた場合、StateInSingleQuote に遷移)
+//   - トークンの確定 & 通知 (e.g. handleData で S E L E C T と読み進めた後に、 (スペース) が来た場合、SELECT トークンを確定し、OnKeyword("SELECT") を呼び出す)
+//   - 文字の消費 (特にトークン確定や状態遷移が発生しない場合。 S の次に E を読む、など)
 func (t *Tokenizer) handleData(char rune) {
 	currentPos := t.pos
 
@@ -188,7 +175,7 @@ func (t *Tokenizer) handleData(char rune) {
 			t.emitPendingToken()
 			t.pos++ // 次の文字も消費する
 			symbol := string([]rune{char, t.input[t.pos]})
-			t.callbacks.OnSymbol(symbol)
+			t.callbacks.onSymbol(symbol)
 			t.start = currentPos + 2
 			return
 		}
@@ -199,7 +186,7 @@ func (t *Tokenizer) handleData(char rune) {
 			t.emitPendingToken()
 			t.pos++ // 次の文字も消費する
 			symbol := string([]rune{char, t.input[t.pos]})
-			t.callbacks.OnSymbol(symbol)
+			t.callbacks.onSymbol(symbol)
 			t.start = currentPos + 2
 			return
 		}
@@ -212,60 +199,61 @@ func (t *Tokenizer) handleData(char rune) {
 			t.emitPendingToken()
 			t.pos++ // 次の文字も消費する
 			symbol := string([]rune{char, t.input[t.pos]})
-			t.callbacks.OnSymbol(symbol)
+			t.callbacks.onSymbol(symbol)
 			t.start = currentPos + 2
 			return
 		}
 	}
+	// 上記のいずれにも当てはまらない場合、記号文字かどうかをチェックする
 	if t.isSymbol(char) {
 		t.emitPendingToken()
-		t.callbacks.OnSymbol(string(char))
+		t.callbacks.onSymbol(string(char))
 		t.start = currentPos + 1
 	}
 }
 
-// シングルクォートで囲まれた文字列の終了を検出する
+// handleSingleQuote はシングルクォートで囲まれた文字列の終了を検出する
 func (t *Tokenizer) handleSingleQuote(char rune) {
 	if char == CSingleQuote {
 		value := string(t.input[t.start:t.pos])
-		t.callbacks.OnString(value)
+		t.callbacks.onString(value)
 		t.state = StateData
 		t.start = t.pos + 1
 	}
 }
 
-// ダブルクォートの終了を検出する
+// handleDoubleQuote はダブルクォートで囲まれた文字列の終了を検出する
 func (t *Tokenizer) handleDoubleQuote(char rune) {
 	if char == CDoubleQuote {
 		value := string(t.input[t.start:t.pos])
-		t.callbacks.OnIdentifier(value)
+		t.callbacks.onIdentifier(value)
 		t.state = StateData
 		t.start = t.pos + 1
 	}
 }
 
-// 行コメントの終了を検出する
+// handleLineComment は行コメントの終了を検出する
 func (t *Tokenizer) handleLineComment(char rune) {
 	if char == CNewLine {
 		value := string(t.input[t.start:t.pos])
-		t.callbacks.OnComment(value)
+		t.callbacks.onComment(value)
 		t.state = StateData
 		t.start = t.pos + 1
 	}
 }
 
-// ブロックコメントの終了を検出する
+// handleBlockComment はブロックコメントの終了を検出する
 func (t *Tokenizer) handleBlockComment(char rune) {
 	if char == CAsterisk && t.peekChar() == CSlash {
 		value := string(t.input[t.start:t.pos])
-		t.callbacks.OnComment(value)
+		t.callbacks.onComment(value)
 		t.pos++ // 次の '/' も消費する
 		t.state = StateData
 		t.start = t.pos + 1
 	}
 }
 
-// 保留中のトークンを確定して通知する
+// emitPendingToken は保留中のトークンを確定して通知する
 func (t *Tokenizer) emitPendingToken() {
 	// StateData 以外の場合は emit しない (未終端のクォートやコメントの内容が漏れるのを防ぐ)
 	if t.state != StateData {
@@ -280,15 +268,15 @@ func (t *Tokenizer) emitPendingToken() {
 
 	switch {
 	case t.isKeyword(value):
-		t.callbacks.OnKeyword(value)
+		t.callbacks.onKeyword(value)
 	case t.isDigit(value):
-		t.callbacks.OnNumber(value)
+		t.callbacks.onNumber(value)
 	default:
-		t.callbacks.OnIdentifier(value)
+		t.callbacks.onIdentifier(value)
 	}
 }
 
-// 数字かどうか
+// isDigit は文字列が数字かどうかを判定する
 func (t *Tokenizer) isDigit(word string) bool {
 	for _, ch := range word {
 		if ch < '0' || ch > '9' {
@@ -298,7 +286,7 @@ func (t *Tokenizer) isDigit(word string) bool {
 	return true
 }
 
-// キーワードかどうか
+// isKeyword は文字列がキーワードかどうかを判定する
 func (t *Tokenizer) isKeyword(word string) bool {
 	keywords := []string{
 		KSelect, KFrom, KWhere,
@@ -320,7 +308,7 @@ func (t *Tokenizer) isKeyword(word string) bool {
 	return false
 }
 
-// 記号文字かどうか
+// isSymbol は文字が記号かどうかを判定する
 func (t *Tokenizer) isSymbol(ch rune) bool {
 	symbols := []rune{SLeftParen, SRightParen, SComma, SSemicolon, SEqual, SLessThan, SGreaterThan, SExclamation, SAsterisk}
 	for _, sym := range symbols {
@@ -331,7 +319,7 @@ func (t *Tokenizer) isSymbol(ch rune) bool {
 	return false
 }
 
-// 次の文字を覗き見る
+// peekChar は次の文字を覗き見る
 func (t *Tokenizer) peekChar() rune {
 	if t.pos+1 >= len(t.input) {
 		return 0
