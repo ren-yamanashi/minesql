@@ -7,36 +7,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func setupTestServer(t *testing.T) *Server {
-	t.Helper()
-	tmpdir := t.TempDir()
-	t.Setenv("MINESQL_DATA_DIR", tmpdir)
-	t.Setenv("MINESQL_BUFFER_SIZE", "100")
-	handler.Reset()
-	handler.Init()
-
-	return &Server{}
-}
-
 func TestNewServer(t *testing.T) {
 	t.Run("Server が正しく初期化される", func(t *testing.T) {
 		// WHEN
 		s := NewServer("localhost", 3307)
 
 		// THEN
-		assert.Equal(t, "localhost", s.Address)
-		assert.Equal(t, 3307, s.Port)
-	})
-}
-
-func TestNewSession(t *testing.T) {
-	t.Run("session が初期状態で生成される", func(t *testing.T) {
-		// WHEN
-		sess := newSession()
-
-		// THEN
-		assert.NotNil(t, sess)
-		assert.Equal(t, handler.TrxId(0), sess.trxId)
+		assert.Equal(t, "localhost", s.address)
+		assert.Equal(t, 3307, s.port)
 	})
 }
 
@@ -463,4 +441,15 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Contains(t, result, "1,Alice")
 	})
+}
+
+func setupTestServer(t *testing.T) *Server {
+	t.Helper()
+	tmpdir := t.TempDir()
+	t.Setenv("MINESQL_DATA_DIR", tmpdir)
+	t.Setenv("MINESQL_BUFFER_SIZE", "100")
+	handler.Reset()
+	handler.Init()
+
+	return &Server{}
 }
