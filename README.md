@@ -1,4 +1,10 @@
-# minesql
+# MineSQL
+
+MineSQL is a simple RDB inspired by MySQL.
+
+## Documentation
+
+See [docs](./docs) for more details.
 
 ## Usage
 
@@ -20,17 +26,17 @@ make build-client
 
 | Environment Variable | Description | Default Value |
 | -------------------- | ----------- | ------------- |
-| `MINESQL_DATA_DIR` | データファイルの保存先ディレクトリ | `./data` |
-| `MINESQL_BUFFER_SIZE` | バッファプールのサイズ (ページ数) | `100` |
+| `MINESQL_DATA_DIR` | Data file storage directory | `./data` |
+| `MINESQL_BUFFER_SIZE` | Buffer pool size (number of pages) | `100` |
 
 ## Feature
 
-| Statement | Implementation |
-| --------- | -------------- |
-| [CREATE TABLE](./docs/feature/create-table.md) | ✅ |
-| [SELECT](./docs/feature/select.md) | ✅ |
-| [INSERT](./docs/feature/insert.md) | ✅ |
-| [DELETE](./docs/feature/delete.md) | ✅ |
-| [UPDATE](./docs/feature/update.md) | ✅ |
-| JOIN | - |
-| Transaction | - |
+| Statement | Implementation | Details |
+| --------- | -------------- | ------- |
+| [CREATE TABLE](./docs/feature/create-table.md) | ✅ | |
+| [SELECT](./docs/feature/select.md) | ✅ | |
+| [INSERT](./docs/feature/insert.md) | ✅ | |
+| [DELETE](./docs/feature/delete.md) | ✅ | |
+| [UPDATE](./docs/feature/update.md) | ✅ | |
+| JOIN | - | |
+| Transaction | - | Just "Atomicity" |
