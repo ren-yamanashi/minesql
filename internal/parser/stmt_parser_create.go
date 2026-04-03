@@ -79,6 +79,8 @@ func (cp *CreateParser) onKeyword(word string) {
 			cp.conParser.onKeyword(word)
 			return
 		}
+		cp.setError(errors.New("[parse error] unexpected keyword: " + word))
+		return
 	default:
 		cp.setError(errors.New("[parse error] unexpected keyword: " + word))
 		return
