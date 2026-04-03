@@ -19,19 +19,19 @@ import (
 )
 
 type Server struct {
-	Address        string
-	Port           int
+	address        string // IPアドレスまたはホスト名
+	port           int    // ポート番号
 	storageManager *handler.Handler
 }
 
 func NewServer(address string, port int) *Server {
 	return &Server{
-		Address: address,
-		Port:    port,
+		address: address,
+		port:    port,
 	}
 }
 
-// サーバーを開始する
+// Start はサーバーを開始する
 func (s *Server) Start() error {
 	err := s.init()
 	if err != nil {
@@ -53,7 +53,7 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// サーバーを停止する
+// Stop はサーバーを停止する
 func (s *Server) Stop() error {
 	if err := s.storageManager.Shutdown(); err != nil {
 		return err
@@ -62,7 +62,7 @@ func (s *Server) Stop() error {
 	return nil
 }
 
-// サーバーの初期化
+// init はサーバーの初期化を行う
 func (s *Server) init() error {
 	dataDir := "data"
 	err := os.MkdirAll(dataDir, 0750)
@@ -77,9 +77,9 @@ func (s *Server) init() error {
 	return nil
 }
 
-// サーバーソケットを接続待ちに設定して返す
+// listen はサーバーソケットを接続待ちに設定して返す
 func (s *Server) listen() (*net.TCPListener, error) {
-	listenAddr := net.JoinHostPort(s.Address, fmt.Sprintf("%d", s.Port))
+	listenAddr := net.JoinHostPort(s.address, fmt.Sprintf("%d", s.port))
 	tcpAddr, err := net.ResolveTCPAddr("tcp", listenAddr)
 	if err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func (s *Server) listen() (*net.TCPListener, error) {
 	return listener, nil
 }
 
-// クライアントからの接続を受け付ける
+// accept はクライアントからの接続を受け付ける
 func (s *Server) accept(listener *net.TCPListener) {
 	log.Printf("MineSQL Server started on %s", listener.Addr().String())
 	for {
@@ -101,22 +101,23 @@ func (s *Server) accept(listener *net.TCPListener) {
 			continue // 接続エラーになってもサーバーは落とさないので continue
 		}
 		log.Printf("New connection from %s", conn.RemoteAddr().String())
-		go s.handleConnection(conn)
+		go s.onConnection(conn)
 	}
 }
 
-// クライアントからの接続を処理する
+// onConnection はクライアントからの接続を処理する
+//
 // プロトコルの定義は docs/architecture/server/server.md#プロトコル を参照
-func (s *Server) handleConnection(conn *net.TCPConn) {
-	sess := newSession()
+func (s *Server) onConnection(conn *net.TCPConn) {
+	session := newSession()
 
 	defer func() {
 		// アクティブなトランザクションがあれば自動ロールバック
-		if sess.trxId != 0 {
-			if err := handler.Get().RollbackTrx(sess.trxId); err != nil {
+		if session.trxId != 0 {
+			if err := handler.Get().RollbackTrx(session.trxId); err != nil {
 				log.Printf("Auto rollback error: %v", err)
 			}
-			sess.trxId = 0
+			session.trxId = 0
 		}
 		log.Printf("Closing connection from %s", conn.RemoteAddr().String())
 		if err := conn.Close(); err != nil {
@@ -125,8 +126,8 @@ func (s *Server) handleConnection(conn *net.TCPConn) {
 	}()
 
 	for {
-		// タイムアウトの設定 (10 分間何も送ってこなければ切断)
-		err := conn.SetReadDeadline(time.Now().Add(10 * time.Minute))
+		// タイムアウトの設定 (60 秒間何も送ってこなければ切断)
+		err := conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 		if err != nil {
 			log.Printf("SetReadDeadline error: %v", err)
 			return
@@ -147,7 +148,7 @@ func (s *Server) handleConnection(conn *net.TCPConn) {
 		}
 
 		// クエリの実行
-		result, err := s.executeQuery(sess, sql)
+		result, err := s.executeQuery(session, sql)
 		if err != nil {
 			err := s.writePacket(conn, fmt.Sprintf("Error: %v", err))
 			if err != nil {
@@ -164,7 +165,7 @@ func (s *Server) handleConnection(conn *net.TCPConn) {
 	}
 }
 
-// クエリを実行して結果を文字列で返す
+// executeQuery はクエリを実行して結果を文字列で返す
 func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 	p := parser.NewParser()
 	node, err := p.Parse(sql)
@@ -208,6 +209,7 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 		trxId = hdl.BeginTrx()
 	}
 
+	// 実行計画の作成
 	exec, err := planner.Start(trxId, node)
 	if err != nil {
 		if autocommit {
@@ -216,6 +218,7 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 		return "", err
 	}
 
+	// クエリの実行
 	var records []executor.Record
 	for {
 		record, err := exec.Next()
@@ -235,7 +238,7 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 		hdl.CommitTrx(trxId)
 	}
 
-	// 一旦、レスポンスは csv 形式で返す
+	// レスポンスは csv 形式で返す
 	var msg strings.Builder
 	for _, record := range records {
 		line := make([]string, len(record))
@@ -247,7 +250,7 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 	return msg.String(), nil
 }
 
-// [Header 4 byte][Body N byte] を読み込む
+// readPacket は [Header 4 byte][Body N byte] を読み込む
 func (s *Server) readPacket(conn *net.TCPConn) (string, error) {
 	// ヘッダーの読み込み
 	header := make([]byte, 4)
@@ -265,7 +268,7 @@ func (s *Server) readPacket(conn *net.TCPConn) (string, error) {
 	return string(body), nil
 }
 
-// [Header 4 byte][Body N byte] を書き込む
+// writePacket は [Header 4 byte][Body N byte] を書き込む
 func (s *Server) writePacket(conn *net.TCPConn, msg string) error {
 	dataBytes := []byte(msg)
 	length := uint32(len(dataBytes))

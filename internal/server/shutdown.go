@@ -10,10 +10,8 @@ import (
 
 // Shutdown は Ctl + C などでの終了シグナルを受け取った際に実行されるフックを管理する
 type Shutdown struct {
-	// シグナル受信時に実行されるフックのマップ
-	hooks map[string]func(os.Signal)
-	// hooks のマップへの同時アクセスを防ぐための mutex
-	mutex *sync.Mutex
+	hooks map[string]func(os.Signal) // シグナル受信時に実行されるフックのマップ
+	mutex *sync.Mutex                // hooks のマップへの同時アクセスを防ぐための mutex
 }
 
 func NewShutdown() *Shutdown {
@@ -23,7 +21,7 @@ func NewShutdown() *Shutdown {
 	}
 }
 
-// フックを追加する
+// Add はフックを追加する
 func (s *Shutdown) Add(key string, fn func(os.Signal)) error {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()
@@ -34,7 +32,7 @@ func (s *Shutdown) Add(key string, fn func(os.Signal)) error {
 	return nil
 }
 
-// 指定された OS シグナルを待ち受け、受信したら登録されたフックをすべて実行する
+// Listen は指定された OS シグナルを待ち受け、受信したら登録されたフックをすべて実行する
 func (s *Shutdown) Listen() {
 	trap := make(chan os.Signal, 1)
 	signal.Notify(trap, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGINT)
@@ -51,7 +49,7 @@ func (s *Shutdown) Listen() {
 	wg.Wait()
 }
 
-// 登録されているフックをすべて取得する
+// getHooks は登録されているフックをすべて取得する
 func (s *Shutdown) getHooks() map[string]func(os.Signal) {
 	s.mutex.Lock()
 	defer s.mutex.Unlock()

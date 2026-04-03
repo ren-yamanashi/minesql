@@ -17,8 +17,8 @@ func TestNewClient(t *testing.T) {
 		c := NewClient("127.0.0.1", 3307)
 
 		// THEN
-		assert.Equal(t, "127.0.0.1", c.Address)
-		assert.Equal(t, 3307, c.Port)
+		assert.Equal(t, "127.0.0.1", c.address)
+		assert.Equal(t, 3307, c.port)
 	})
 }
 

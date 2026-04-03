@@ -11,19 +11,20 @@ import (
 )
 
 type Client struct {
-	Address string
-	Port    int
+	address string // IPアドレスまたはホスト名
+	port    int    // ポート番号
 }
 
 func NewClient(address string, port int) *Client {
 	return &Client{
-		Address: address,
-		Port:    port,
+		address: address,
+		port:    port,
 	}
 }
 
 func (c *Client) Start() error {
-	conn, err := net.DialTCP("tcp", nil, &net.TCPAddr{IP: net.ParseIP(c.Address), Port: c.Port})
+	// サーバーへの接続
+	conn, err := net.DialTCP("tcp", nil, &net.TCPAddr{IP: net.ParseIP(c.address), Port: c.port})
 	if err != nil {
 		return fmt.Errorf("failed to connect to server: %w", err)
 	}
@@ -58,13 +59,13 @@ func (c *Client) Start() error {
 		response, err := c.readPacket(conn)
 		if err != nil {
 			return fmt.Errorf("read error: %w", err)
-
 		}
+
 		fmt.Println(response)
 	}
 }
 
-// `;` が来るまで複数行の入力を受け付ける
+// readMultilineInput は `;` が来るまで複数行の入力を受け付ける
 func (c *Client) readMultilineInput(reader *bufio.Reader) string {
 	var lines []string
 	firstLine := true
@@ -99,7 +100,7 @@ func (c *Client) readMultilineInput(reader *bufio.Reader) string {
 	return strings.Join(lines, "\n")
 }
 
-// [Header 4 bytes][Body N bytes] 形式でパケットを送受信する
+// writePacket は [Header 4 bytes][Body N bytes] 形式でパケットを送信する
 func (c *Client) writePacket(conn net.Conn, data string) error {
 	bytes := []byte(data)
 	length := uint32(len(bytes))
@@ -114,7 +115,7 @@ func (c *Client) writePacket(conn net.Conn, data string) error {
 	return err
 }
 
-// [Header 4 bytes][Body N bytes] 形式でパケットを送受信する
+// readPacket は [Header 4 bytes][Body N bytes] 形式でパケットを受信する
 func (c *Client) readPacket(conn net.Conn) (string, error) {
 	// ヘッダーの読み込み
 	header := make([]byte, 4)
