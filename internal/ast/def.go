@@ -4,9 +4,9 @@ type Definition interface {
 	isDefinition()
 }
 
-// ========================
+// --------------------------------
 // Column
-// ========================
+// --------------------------------
 
 type DataType string
 
@@ -21,9 +21,9 @@ type ColumnDef struct {
 
 func (*ColumnDef) isDefinition() {}
 
-// ========================
+// --------------------------------
 // Constraint
-// ========================
+// --------------------------------
 
 type ConstraintPrimaryKeyDef struct {
 	Columns []ColumnId

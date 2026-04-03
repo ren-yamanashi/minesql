@@ -52,9 +52,9 @@ func NewBTree(metaPageId page.PageId) *BTree {
 	return &BTree{MetaPageId: metaPageId}
 }
 
-// ==================================
+// ----------------------------------------------
 // Search
-// ==================================
+// ----------------------------------------------
 
 // Search は指定された検索モードで B+Tree を検索し、イテレータを返す
 //
@@ -144,9 +144,9 @@ func (bt *BTree) FindByKey(bp *buffer.BufferPool, key []byte) (node.Record, erro
 	return record, nil
 }
 
-// ==================================
+// ----------------------------------------------
 // Insert
-// ==================================
+// ----------------------------------------------
 
 // Insert は B+Tree にレコードを挿入する
 func (bt *BTree) Insert(bp *buffer.BufferPool, record node.Record) error {
@@ -327,9 +327,9 @@ func (bt *BTree) insertRecursively(bp *buffer.BufferPool, nodeBuffer *buffer.Buf
 	panic("unknown node type") // 実際にはここには到達しないので errors.New ではなく panic で良い
 }
 
-// ==================================
+// ----------------------------------------------
 // Delete
-// =================================
+// ----------------------------------------------
 
 // Delete は B+Tree からレコードを削除する
 func (bt *BTree) Delete(bp *buffer.BufferPool, key []byte) error {
@@ -664,9 +664,9 @@ func (bt *BTree) resolveBranchUnderflow(parentBranch *node.Branch, childBuffer *
 	return !parentBranch.IsHalfFull(), nil
 }
 
-// ==================================
+// ----------------------------------------------
 // Update
-// ==================================
+// ----------------------------------------------
 
 // Update は B+Tree の特定のノードの値を更新する
 //
@@ -730,9 +730,9 @@ func (bt *BTree) updateRecursively(bp *buffer.BufferPool, nodeBuffer *buffer.Buf
 	panic("unknown node type") // 実際にはここには到達しないので errors.New ではなく panic で良い
 }
 
-// ==================================
+// ----------------------------------------------
 // Other
-// ==================================
+// ----------------------------------------------
 
 // LeafPageCount はメタページからリーフページ数を取得する
 func (bt *BTree) LeafPageCount(bp *buffer.BufferPool) (uint64, error) {

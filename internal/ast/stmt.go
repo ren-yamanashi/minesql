@@ -4,9 +4,9 @@ type Statement interface {
 	isStatement()
 }
 
-// ===========================
+// ---------------------------------------
 // Create Table
-// ===========================
+// ---------------------------------------
 
 type CreateTableStmt struct {
 	TableName         string
@@ -15,9 +15,9 @@ type CreateTableStmt struct {
 
 func (*CreateTableStmt) isStatement() {}
 
-// ===========================
+// ---------------------------------------
 // Select
-// ===========================
+// ---------------------------------------
 
 type SelectStmt struct {
 	From  TableId
@@ -30,9 +30,9 @@ type WhereClause struct {
 	Condition *BinaryExpr
 }
 
-// ===========================
+// ---------------------------------------
 // Insert
-// ===========================
+// ---------------------------------------
 
 type InsertStmt struct {
 	Table  TableId
@@ -42,9 +42,9 @@ type InsertStmt struct {
 
 func (*InsertStmt) isStatement() {}
 
-// ===========================
+// ---------------------------------------
 // Delete
-// ===========================
+// ---------------------------------------
 
 type DeleteStmt struct {
 	From  TableId
@@ -53,9 +53,9 @@ type DeleteStmt struct {
 
 func (*DeleteStmt) isStatement() {}
 
-// ===========================
+// ---------------------------------------
 // Update
-// ===========================
+// ---------------------------------------
 
 type UpdateStmt struct {
 	Table      TableId
@@ -70,9 +70,9 @@ type SetClause struct {
 	Value  Literal
 }
 
-// ===========================
+// ---------------------------------------
 // Transaction
-// ===========================
+// ---------------------------------------
 
 type TransactionKind int
 

@@ -101,9 +101,9 @@ func (s *Search) planForBinaryExpr(tbl *access.Table, expr ast.BinaryExpr) (exec
 	}
 }
 
-// =================================================
+// -------------------------------------------------
 // プラン選択
-// =================================================
+// -------------------------------------------------
 
 // chooseBestPlan は AND 条件に対して、以下の 3 種類のプランからコスト最安を選択する
 //
@@ -260,9 +260,9 @@ func (s *Search) buildPKScanPlan(tbl *access.Table, leaf leafCondition, cond fun
 	return scan
 }
 
-// =================================================
+// -------------------------------------------------
 // OR 条件の最適化
-// =================================================
+// -------------------------------------------------
 
 // planForORCondition は OR 条件に対して Union による最適化を試みる
 //
@@ -395,9 +395,9 @@ func (s *Search) planORBranch(tbl *access.Table, branch orBranch, stats *handler
 	return nil, 0, false
 }
 
-// =================================================
+// -------------------------------------------------
 // リーフ条件の抽出
-// =================================================
+// -------------------------------------------------
 
 // extractANDLeaves は純粋な AND ツリーからリーフ条件を抽出する
 //
@@ -486,9 +486,9 @@ func extractORBranches(expr ast.BinaryExpr) []orBranch {
 	return []orBranch{{leaves: leaves, expr: expr}}
 }
 
-// =================================================
+// -------------------------------------------------
 // コスト計算
-// =================================================
+// -------------------------------------------------
 
 // calcPKPlanCost は PK スキャンのコストを算出する
 func (s *Search) calcPKPlanCost(stats *handler.TableStatistics, colName string, operator string, literal ast.Literal) ScanCost {
@@ -564,9 +564,9 @@ func (s *Search) calcSelectivity(colName string, operator string, literal ast.Li
 	return calcRangeSelectivity(operator, c, minVal, maxVal)
 }
 
-// =================================================
+// -------------------------------------------------
 // 条件関数の構築
-// =================================================
+// -------------------------------------------------
 
 // buildConditionFunc は式の木構造から単一の条件関数を再帰的に構築する
 func (s *Search) buildConditionFunc(expr ast.BinaryExpr) (func(executor.Record) bool, error) {
@@ -656,9 +656,9 @@ func (s *Search) operatorToCondition(operator string, pos int, value string) (fu
 	}
 }
 
-// =================================================
+// -------------------------------------------------
 // その他
-// =================================================
+// -------------------------------------------------
 
 // isPKLeadingColumn は指定カラムがプライマリキーの先頭カラムかどうかを判定する
 func (s *Search) isPKLeadingColumn(colName string) bool {
