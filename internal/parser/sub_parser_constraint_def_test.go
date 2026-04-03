@@ -215,4 +215,35 @@ func TestConstraintDefParser_Error(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "expected 'PRIMARY' or 'UNIQUE'")
 	})
+
+	t.Run("カラムリストが開かれたまま finalize された場合、エラーを返す", func(t *testing.T) {
+		// GIVEN: "(" の後にカラム名も ")" もなく finalize が呼ばれる
+		cp := NewConstraintDefParser()
+
+		// WHEN
+		cp.onKeyword("PRIMARY")
+		cp.onKeyword("KEY")
+		cp.onSymbol("(")
+		err := cp.finalize()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "requires at least one column")
+	})
+
+	t.Run("カラムリスト内にキーワードが来た場合、エラーを返す", func(t *testing.T) {
+		// GIVEN: カラム名の位置にキーワードが来る
+		cp := NewConstraintDefParser()
+
+		// WHEN
+		cp.onKeyword("PRIMARY")
+		cp.onKeyword("KEY")
+		cp.onSymbol("(")
+		cp.onKeyword("SELECT") // カラム名ではなくキーワード
+		err := cp.finalize()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unexpected keyword in constraint")
+	})
 }

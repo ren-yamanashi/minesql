@@ -256,6 +256,59 @@ func TestParserWhere(t *testing.T) {
 		assert.Equal(t, "42", rhsLit.Literal.ToString())
 	})
 
+	t.Run("<> 演算子を AND と組み合わせてパースできる", func(t *testing.T) {
+		// GIVEN
+		sql := "SELECT * FROM users WHERE a <> '1' AND b = '2';"
+		parser := NewParser()
+
+		// WHEN
+		result, err := parser.Parse(sql)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+
+		selectStmt, ok := result.(*ast.SelectStmt)
+		assert.True(t, ok)
+
+		// ルートは AND
+		andExpr := selectStmt.Where.Condition
+		assert.Equal(t, "AND", andExpr.Operator)
+
+		// AND の左辺: a <> '1'
+		leftExpr, ok := andExpr.Left.(*ast.LhsExpr)
+		assert.True(t, ok)
+		neqExpr := leftExpr.Expr
+		assert.Equal(t, "<>", neqExpr.Operator)
+
+		leftCol, ok := neqExpr.Left.(*ast.LhsColumn)
+		assert.True(t, ok)
+		assert.Equal(t, "a", leftCol.Column.ColName)
+
+		leftLit, ok := neqExpr.Right.(*ast.RhsLiteral)
+		assert.True(t, ok)
+		assert.Equal(t, "1", leftLit.Literal.ToString())
+	})
+
+	t.Run("2 文字比較演算子を使った WHERE 句をパースできる", func(t *testing.T) {
+		// GIVEN
+		sql := "SELECT * FROM users WHERE id >= '10';"
+		parser := NewParser()
+
+		// WHEN
+		result, err := parser.Parse(sql)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+
+		selectStmt, ok := result.(*ast.SelectStmt)
+		assert.True(t, ok)
+
+		binaryExpr := selectStmt.Where.Condition
+		assert.Equal(t, ">=", binaryExpr.Operator)
+	})
+
 	t.Run("不正な WHERE 句でエラーになる", func(t *testing.T) {
 		t.Run("WHERE 句の式が不完全な場合 (演算子のみ)", func(t *testing.T) {
 			// GIVEN

@@ -140,7 +140,7 @@ func (wp *WhereParser) reduce() error {
 // precedence は演算子の優先順位を定義 (数値が高いほど優先順位が高い)
 func (wp *WhereParser) precedence(op string) int {
 	switch strings.ToUpper(op) {
-	case string(SEqual), string(SLessThan), string(SGreaterThan), "<=", ">=", "!=":
+	case string(SEqual), string(SLessThan), string(SGreaterThan), "<=", ">=", "!=", "<>":
 		return 2 // 比較演算子
 	case KAnd:
 		return 1 // 論理演算子
