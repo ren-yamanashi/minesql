@@ -4,7 +4,7 @@ MineSQL is a simple RDB inspired by MySQL.
 
 ## Documentation
 
-See [docs](./docs) for more details.
+See [docs](./docs) for more details. (Sorry, now only japanese)
 
 ## Usage
 
