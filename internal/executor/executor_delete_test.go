@@ -225,4 +225,41 @@ func TestDelete(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 	})
+
+	t.Run("DELETE 済みの行は他のトランザクションの scan でスキップされる", func(t *testing.T) {
+		// GIVEN
+		initLockTestHandler(t)
+		defer handler.Reset()
+
+		hdl := handler.Get()
+		tbl := createLockTestTable(t)
+		insertLockTestData(t, tbl)
+
+		trx1 := hdl.BeginTrx()
+
+		// trx1 が row "a" を DELETE (排他ロック取得 + DeleteMark 設定)
+		del1 := NewDelete(trx1, tbl, NewTableScan(
+			trx1, hdl.LockMgr, tbl,
+			access.RecordSearchModeStart{},
+			func(record Record) bool { return string(record[0]) == "a" },
+		))
+		_, err := del1.Next()
+		assert.NoError(t, err)
+
+		// WHEN: trx2 が同じ行を DELETE しようとする
+		// DeleteMark=1 の行は scan でスキップされるため、削除対象が 0 件で正常終了する
+		trx2 := hdl.BeginTrx()
+		del2 := NewDelete(trx2, tbl, NewTableScan(
+			trx2, hdl.LockMgr, tbl,
+			access.RecordSearchModeStart{},
+			func(record Record) bool { return string(record[0]) == "a" },
+		))
+		_, err = del2.Next()
+
+		// THEN: エラーなし (削除対象がないので何もしない)
+		assert.NoError(t, err)
+
+		hdl.CommitTrx(trx1)
+		hdl.CommitTrx(trx2)
+	})
 }
