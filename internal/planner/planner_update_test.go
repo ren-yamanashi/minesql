@@ -5,6 +5,7 @@ import (
 	"minesql/internal/executor"
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
+	"minesql/internal/storage/lock"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -63,7 +64,7 @@ func TestPlanUpdate(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: 更新後のレコードが正しい
-		iter, err := tbl.Search(hdl.BufferPool, 0, nil, access.RecordSearchModeStart{})
+		iter, err := tbl.Search(hdl.BufferPool, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -188,7 +189,7 @@ func TestPlanUpdate(t *testing.T) {
 
 		// THEN: "a" の first_name が "Jane" に更新されている
 		scan := executor.NewTableScan(
-			0, nil, tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
@@ -275,7 +276,7 @@ func TestPlanUpdate(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: レコードは変更されていない
-		iter, err := tbl.Search(hdl.BufferPool, 0, nil, access.RecordSearchModeStart{})
+		iter, err := tbl.Search(hdl.BufferPool, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)

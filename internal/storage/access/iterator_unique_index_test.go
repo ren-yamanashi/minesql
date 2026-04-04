@@ -1,6 +1,7 @@
 package access
 
 import (
+	"minesql/internal/storage/lock"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -130,7 +131,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 		assert.NoError(t, err)
 
 		// "Doe" を持つ行をソフトデリート
-		err = table.SoftDelete(bp, 0, nil, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
 
 		// WHEN: インデックスを先頭から検索
@@ -172,9 +173,9 @@ func TestUniqueIndexIterator(t *testing.T) {
 		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
 
-		err = table.SoftDelete(bp, 0, nil, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
-		err = table.SoftDelete(bp, 0, nil, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
 
 		// WHEN
@@ -207,7 +208,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 		// テーブルとインデックスを更新
 		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
 		newRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Williams")}
-		err = table.UpdateInplace(bp, 0, nil, oldRecord, newRecord)
+		err = table.UpdateInplace(bp, 0, lock.NewManager(5000), oldRecord, newRecord)
 		assert.NoError(t, err)
 
 		// WHEN: 更新後のインデックスを検索

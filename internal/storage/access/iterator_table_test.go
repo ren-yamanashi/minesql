@@ -1,6 +1,7 @@
 package access
 
 import (
+	"minesql/internal/storage/lock"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -22,7 +23,7 @@ func TestTableIterator(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		iter, err := table.Search(bp, 0, nil, RecordSearchModeStart{})
+		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
 		assert.NoError(t, err)
 
 		var records [][]byte
@@ -63,7 +64,7 @@ func TestTableIterator(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: キー "b" から検索
-		iter, err := table.Search(bp, 0, nil, RecordSearchModeKey{Key: [][]byte{[]byte("b")}})
+		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeKey{Key: [][]byte{[]byte("b")}})
 		assert.NoError(t, err)
 
 		record, ok, err := iter.Next()
@@ -82,7 +83,7 @@ func TestTableIterator(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		iter, err := table.Search(bp, 0, nil, RecordSearchModeStart{})
+		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
 		assert.NoError(t, err)
 
 		record, ok, err := iter.Next()
@@ -108,11 +109,11 @@ func TestTableIterator(t *testing.T) {
 		assert.NoError(t, err)
 
 		// "b" をソフトデリート
-		err = table.SoftDelete(bp, 0, nil, [][]byte{[]byte("b"), []byte("Bob")})
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Bob")})
 		assert.NoError(t, err)
 
 		// WHEN
-		iter, err := table.Search(bp, 0, nil, RecordSearchModeStart{})
+		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
 		assert.NoError(t, err)
 
 		var records [][][]byte
@@ -143,13 +144,13 @@ func TestTableIterator(t *testing.T) {
 		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Bob")})
 		assert.NoError(t, err)
 
-		err = table.SoftDelete(bp, 0, nil, [][]byte{[]byte("a"), []byte("Alice")})
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Alice")})
 		assert.NoError(t, err)
-		err = table.SoftDelete(bp, 0, nil, [][]byte{[]byte("b"), []byte("Bob")})
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Bob")})
 		assert.NoError(t, err)
 
 		// WHEN
-		iter, err := table.Search(bp, 0, nil, RecordSearchModeStart{})
+		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
 		assert.NoError(t, err)
 
 		record, ok, err := iter.Next()
@@ -173,7 +174,7 @@ func TestTableIterator(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		iter, err := table.Search(bp, 0, nil, RecordSearchModeStart{})
+		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
 		assert.NoError(t, err)
 
 		record1, ok, err := iter.Next()

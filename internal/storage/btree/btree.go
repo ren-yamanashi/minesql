@@ -126,22 +126,26 @@ func (bt *BTree) searchRecursively(bp *buffer.BufferPool, nodeBuffer *buffer.Buf
 	panic("unknown node type") // 実際にはここには到達しないので errors.New ではなく panic で良い
 }
 
-// FindByKey は指定されたキーで B+Tree を検索し、完全一致するレコードを返す
+// FindByKey は指定されたキーで B+Tree を検索し、完全一致するレコードとその物理的な位置を返す
 //
 // キーが見つからない場合は ErrKeyNotFound を返す
-func (bt *BTree) FindByKey(bp *buffer.BufferPool, key []byte) (node.Record, error) {
+func (bt *BTree) FindByKey(bp *buffer.BufferPool, key []byte) (node.Record, page.SlotPosition, error) {
 	iter, err := bt.Search(bp, SearchModeKey{Key: key})
 	if err != nil {
-		return nil, err
+		return nil, page.SlotPosition{}, err
+	}
+	pos := page.SlotPosition{
+		PageId:  iter.bufferPage.PageId,
+		SlotNum: iter.slotNum,
 	}
 	record, ok := iter.Get()
 	if !ok {
-		return nil, ErrKeyNotFound
+		return nil, page.SlotPosition{}, ErrKeyNotFound
 	}
 	if !bytes.Equal(record.KeyBytes(), key) {
-		return nil, ErrKeyNotFound
+		return nil, page.SlotPosition{}, ErrKeyNotFound
 	}
-	return record, nil
+	return record, pos, nil
 }
 
 // ----------------------------------------------

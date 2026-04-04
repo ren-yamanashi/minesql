@@ -3,6 +3,7 @@ package executor
 import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
+	"minesql/internal/storage/lock"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,7 +18,7 @@ func TestNewUpdate(t *testing.T) {
 		}
 
 		iterator := NewTableScan(
-			0, nil, nil,
+			0, lock.NewManager(5000), nil,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -46,7 +47,7 @@ func TestUpdate_Next(t *testing.T) {
 		upd := NewUpdate(trxId, tbl, []SetColumn{
 			{Pos: 1, Value: []byte("Updated")},
 		}, NewTableScan(
-			0, nil, tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
@@ -59,7 +60,7 @@ func TestUpdate_Next(t *testing.T) {
 
 		// THEN: 全レコードの first_name が "Updated" になっている
 		scan := NewTableScan(
-			0, nil, tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -88,7 +89,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 1, Value: []byte("Jane")},
 			{Pos: 2, Value: []byte("Updated")},
 		}, NewTableScan(
-			0, nil, tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
@@ -103,7 +104,7 @@ func TestUpdate_Next(t *testing.T) {
 
 		// THEN: "a" のレコードが更新され、他は変わらない
 		scan := NewTableScan(
-			0, nil, tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -131,7 +132,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 2, Value: []byte("Williams")},
 		}, NewFilter(
 			NewTableScan(
-				0, nil, tbl,
+				0, lock.NewManager(5000), tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -148,7 +149,7 @@ func TestUpdate_Next(t *testing.T) {
 
 		// THEN: "Bob" の last_name が "Williams" に更新され、他は変わらない
 		scan := NewTableScan(
-			0, nil, tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -184,7 +185,7 @@ func TestUpdate_Next(t *testing.T) {
 		upd := NewUpdate(trxId, tbl, []SetColumn{
 			{Pos: 2, Value: []byte("Zebra")},
 		}, NewTableScan(
-			0, nil, tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
@@ -242,7 +243,7 @@ func TestUpdate_Next(t *testing.T) {
 		upd := NewUpdate(trxId, tbl, []SetColumn{
 			{Pos: 0, Value: []byte("z")},
 		}, NewTableScan(
-			0, nil, tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
@@ -257,7 +258,7 @@ func TestUpdate_Next(t *testing.T) {
 
 		// THEN: "a" が消え "z" が追加されている
 		scan := NewTableScan(
-			0, nil, tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -289,7 +290,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 2, Value: []byte("Changed")},
 		}, NewFilter(
 			NewTableScan(
-				0, nil, tbl,
+				0, lock.NewManager(5000), tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -306,7 +307,7 @@ func TestUpdate_Next(t *testing.T) {
 
 		// THEN: 全レコードが変更されていない
 		scan := NewTableScan(
-			0, nil, tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -340,7 +341,7 @@ func TestUpdate_Next(t *testing.T) {
 		upd := NewUpdate(trxId, tbl, []SetColumn{
 			{Pos: 1, Value: []byte("new_value")},
 		}, NewTableScan(
-			0, nil, tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))

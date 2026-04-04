@@ -3,6 +3,7 @@ package transaction
 import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/lock"
 )
 
 type UndoUpdateInplaceRecord struct {
@@ -22,5 +23,5 @@ func NewUndoUpdateInplaceRecord(table *access.Table, prevRecord, newRecord [][]b
 // Undo は UpdateInplace したレコードを元の値に戻す
 func (r UndoUpdateInplaceRecord) Undo(bp *buffer.BufferPool) error {
 	// 元に戻すので、PrevRecord を新しい値、NewRecord を古い値として UpdateInplace を呼び出す
-	return r.table.UpdateInplace(bp, 0, nil, r.NewRecord, r.PrevRecord)
+	return r.table.UpdateInplace(bp, 0, lock.NewManager(5000), r.NewRecord, r.PrevRecord)
 }

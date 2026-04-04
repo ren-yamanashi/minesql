@@ -3,6 +3,7 @@ package executor
 import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
+	"minesql/internal/storage/lock"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -61,7 +62,7 @@ func TestInsert_Next(t *testing.T) {
 			return true
 		}
 		seqScan := NewTableScan(
-			0, nil, tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			whileCondition,
 		)

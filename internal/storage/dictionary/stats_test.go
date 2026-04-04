@@ -4,6 +4,7 @@ import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/file"
+	"minesql/internal/storage/lock"
 	"minesql/internal/storage/page"
 	"path/filepath"
 	"testing"
@@ -526,7 +527,7 @@ func deleteByCondition(t *testing.T, env *testEnv, tableName string, cond func([
 	tbl := env.tables[tableName]
 
 	// 削除対象のレコードを先にすべて取得する
-	iter, err := tbl.Search(env.bp, 0, nil, access.RecordSearchModeStart{})
+	iter, err := tbl.Search(env.bp, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
 	assert.NoError(t, err)
 
 	var targets [][][]byte
@@ -543,7 +544,7 @@ func deleteByCondition(t *testing.T, env *testEnv, tableName string, cond func([
 
 	// 取得したレコードを削除
 	for _, record := range targets {
-		err := tbl.SoftDelete(env.bp, 0, nil, record)
+		err := tbl.SoftDelete(env.bp, 0, lock.NewManager(5000), record)
 		assert.NoError(t, err)
 	}
 }

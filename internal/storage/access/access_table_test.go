@@ -6,6 +6,7 @@ import (
 	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/encode"
 	"minesql/internal/storage/file"
+	"minesql/internal/storage/lock"
 	"minesql/internal/storage/page"
 	"os"
 	"path/filepath"
@@ -189,7 +190,7 @@ func TestCreateAndInsert(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ソフトデリート
-		err = table.SoftDelete(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
 
 		// WHEN: 同じ PK で再 Insert (値は異なる)
@@ -245,7 +246,7 @@ func TestSoftDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: "a" の行を削除
-		err = table.SoftDelete(bp, records)
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), records)
 
 		// THEN: ソフトデリートされている (ClusteredIndexIterator で走査すると削除済みレコードはスキップされる)
 		assert.NoError(t, err)
@@ -294,7 +295,7 @@ func TestSoftDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: "a" をソフトデリート
-		err = table.SoftDelete(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
 
 		// THEN: B+Tree を直接走査すると 2 件存在し、"a" は DeleteMark=1
@@ -340,7 +341,7 @@ func TestSoftDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: 存在しないキーで削除
-		err = table.SoftDelete(bp, [][]byte{[]byte("z"), []byte("Unknown")})
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("z"), []byte("Unknown")})
 
 		// THEN
 		assert.Error(t, err)
@@ -361,9 +362,9 @@ func TestSoftDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		err = table.SoftDelete(bp, record1)
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), record1)
 		assert.NoError(t, err)
-		err = table.SoftDelete(bp, record2)
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), record2)
 		assert.NoError(t, err)
 
 		// THEN: ClusteredIndexIterator で走査すると active なレコードがない
@@ -520,7 +521,7 @@ func TestUpdate(t *testing.T) {
 		// WHEN: プライマリキー "a" のレコードを更新 (キーは同じ、value のみ変更)
 		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
 		newRecord := [][]byte{[]byte("a"), []byte("Jane"), []byte("Doe-Updated")}
-		err = table.UpdateInplace(bp, oldRecord, newRecord)
+		err = table.UpdateInplace(bp, 0, lock.NewManager(5000), oldRecord, newRecord)
 
 		// THEN
 		assert.NoError(t, err)
@@ -547,7 +548,7 @@ func TestUpdate(t *testing.T) {
 		// WHEN: PK を変えずに value を更新
 		oldRecord := [][]byte{[]byte("a"), []byte("John")}
 		newRecord := [][]byte{[]byte("a"), []byte("Jane")}
-		err = table.UpdateInplace(bp, oldRecord, newRecord)
+		err = table.UpdateInplace(bp, 0, lock.NewManager(5000), oldRecord, newRecord)
 		assert.NoError(t, err)
 
 		// THEN: B+Tree を直接走査するとレコードは 1 件で DeleteMark=0 のまま
@@ -587,7 +588,7 @@ func TestUpdate(t *testing.T) {
 		// WHEN: PK を "a" → "b" に変更
 		oldRecord := [][]byte{[]byte("a"), []byte("John")}
 		newRecord := [][]byte{[]byte("b"), []byte("Jane")}
-		err = table.SoftDelete(bp, oldRecord)
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), oldRecord)
 		assert.NoError(t, err)
 		err = table.Insert(bp, newRecord)
 		assert.NoError(t, err)
@@ -639,7 +640,7 @@ func TestUpdate(t *testing.T) {
 		// WHEN: プライマリキーを "a" → "b" に変更
 		oldRecord := [][]byte{[]byte("a"), []byte("John")}
 		newRecord := [][]byte{[]byte("b"), []byte("John-Updated")}
-		err = table.SoftDelete(bp, oldRecord)
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), oldRecord)
 		assert.NoError(t, err)
 		err = table.Insert(bp, newRecord)
 
@@ -674,7 +675,7 @@ func TestUpdate(t *testing.T) {
 		// WHEN: セカンダリキー (last_name) を "Doe" → "Williams" に変更
 		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
 		newRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Williams")}
-		err = table.UpdateInplace(bp, oldRecord, newRecord)
+		err = table.UpdateInplace(bp, 0, lock.NewManager(5000), oldRecord, newRecord)
 
 		// THEN: ユニークインデックスが更新されている (active なエントリのみ確認)
 		assert.NoError(t, err)
@@ -701,7 +702,7 @@ func TestUpdate(t *testing.T) {
 		// WHEN: プライマリキーを "a" → "x" に変更、セカンダリキー "Doe" は同じ
 		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
 		newRecord := [][]byte{[]byte("x"), []byte("John"), []byte("Doe")}
-		err = table.SoftDelete(bp, oldRecord)
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), oldRecord)
 		assert.NoError(t, err)
 		err = table.Insert(bp, newRecord)
 
@@ -753,7 +754,7 @@ func TestUpdate(t *testing.T) {
 		// WHEN: プライマリキーを "a" → "b" に変更 (既存のキーと衝突)
 		oldRecord := [][]byte{[]byte("a"), []byte("John")}
 		newRecord := [][]byte{[]byte("b"), []byte("John")}
-		err = table.SoftDelete(bp, oldRecord)
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), oldRecord)
 		assert.NoError(t, err)
 		err = table.Insert(bp, newRecord)
 
@@ -781,7 +782,7 @@ func TestUpdate(t *testing.T) {
 		// WHEN: セカンダリキーを "Doe" → "Smith" に変更 (既存のインデックスキーと衝突)
 		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
 		newRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Smith")}
-		err = table.UpdateInplace(bp, oldRecord, newRecord)
+		err = table.UpdateInplace(bp, 0, lock.NewManager(5000), oldRecord, newRecord)
 
 		// THEN: ユニークインデックスの更新でエラーが返る
 		assert.Error(t, err)
@@ -810,7 +811,7 @@ func TestUpdate(t *testing.T) {
 		// WHEN: 両方のセカンダリキーが変わる更新
 		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
 		newRecord := [][]byte{[]byte("a"), []byte("Jane"), []byte("Williams")}
-		err = table.UpdateInplace(bp, oldRecord, newRecord)
+		err = table.UpdateInplace(bp, 0, lock.NewManager(5000), oldRecord, newRecord)
 		assert.NoError(t, err)
 
 		// THEN: idx_first_name が更新されている (active なエントリのみ)
@@ -835,7 +836,7 @@ func TestUpdate(t *testing.T) {
 		// WHEN: 存在しないキー "z" で更新
 		oldRecord := [][]byte{[]byte("z"), []byte("Unknown")}
 		newRecord := [][]byte{[]byte("z"), []byte("Updated")}
-		err = table.UpdateInplace(bp, oldRecord, newRecord)
+		err = table.UpdateInplace(bp, 0, lock.NewManager(5000), oldRecord, newRecord)
 
 		// THEN
 		assert.Error(t, err)
@@ -879,7 +880,7 @@ func TestSearch(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: "b" から検索
-		iter, err := table.Search(bp, RecordSearchModeKey{Key: [][]byte{[]byte("b")}})
+		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeKey{Key: [][]byte{[]byte("b")}})
 		assert.NoError(t, err)
 
 		columns, ok, err := iter.Next()
@@ -916,7 +917,7 @@ type decodedRecord struct {
 
 func collectAllTablePairs(t *testing.T, bp *buffer.BufferPool, table *Table) []decodedRecord {
 	t.Helper()
-	iter, err := table.Search(bp, RecordSearchModeStart{})
+	iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
 	assert.NoError(t, err)
 
 	var records []decodedRecord
