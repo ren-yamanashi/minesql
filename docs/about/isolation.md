@@ -103,6 +103,8 @@ InnoDB は各行に以下のフィールドを内部的に付与する
 
 不可視と判定された場合は DB_ROLL_PTR で Undo log を辿り、可視なバージョンが見つかるまで遡る。
 
+※ Read View の作成タイミングは分離レベルによって異なる。REPEATABLE READ ではトランザクション内の最初の読み取り時に作成し以降使い回すが、READ COMMITTED では文ごとに作り直す。そのため READ COMMITTED では同一トランザクション内でも他のトランザクションが Commit した挿入行が見え、Phantom Read (P3) が発生する。
+
 ### Undo log の Purge
 
 Undo log は 2 種類ある
