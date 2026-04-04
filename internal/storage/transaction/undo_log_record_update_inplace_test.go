@@ -16,7 +16,7 @@ func TestUpdateInplaceLogRecord_Undo(t *testing.T) {
 
 		prevRecord := [][]byte{[]byte("a"), []byte("John")}
 		newRecord := [][]byte{[]byte("a"), []byte("Jane")}
-		err := table.Insert(bp, prevRecord)
+		err := table.Insert(bp, 0, lock.NewManager(5000), prevRecord)
 		assert.NoError(t, err)
 		err = table.UpdateInplace(bp, 0, lock.NewManager(5000), prevRecord, newRecord)
 		assert.NoError(t, err)
@@ -42,7 +42,7 @@ func TestUpdateInplaceLogRecord_Undo(t *testing.T) {
 
 		prevRecord := [][]byte{[]byte("a"), []byte("John")}
 		newRecord := [][]byte{[]byte("a"), []byte("Jane")}
-		err := table.Insert(bp, prevRecord)
+		err := table.Insert(bp, 0, lock.NewManager(5000), prevRecord)
 		assert.NoError(t, err)
 		err = table.UpdateInplace(bp, 0, lock.NewManager(5000), prevRecord, newRecord)
 		assert.NoError(t, err)

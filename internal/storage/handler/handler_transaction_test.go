@@ -88,7 +88,7 @@ func TestRollbackTrx(t *testing.T) {
 
 		trxId := h.BeginTrx()
 		h.AppendInsertUndo(trxId, tbl, [][]byte{[]byte("1"), []byte("Alice")})
-		err = tbl.Insert(h.BufferPool, [][]byte{[]byte("1"), []byte("Alice")})
+		err = tbl.Insert(h.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("1"), []byte("Alice")})
 		assert.NoError(t, err)
 
 		// WHEN

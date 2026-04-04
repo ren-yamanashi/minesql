@@ -61,10 +61,10 @@ func (t *Table) Create(bp *buffer.BufferPool) error {
 	return nil
 }
 
-// Insert はテーブルに行を挿入する
+// Insert はテーブルに行を挿入する (挿入後に対象行に対して排他ロックを取得する)
 //
 // ソフトデリート済みの同一キーが存在する場合は Update で上書きする
-func (t *Table) Insert(bp *buffer.BufferPool, columns [][]byte) error {
+func (t *Table) Insert(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, columns [][]byte) error {
 	btr := btree.NewBTree(t.MetaPageId)
 
 	btrRecord := t.encodeBTreeRecord(columns, 0)
@@ -90,6 +90,17 @@ func (t *Table) Insert(bp *buffer.BufferPool, columns [][]byte) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	// 対象行を検索
+	_, pos, err := btr.FindByKey(bp, encodedKey)
+	if err != nil {
+		return err
+	}
+
+	// 排他ロックを取得
+	if err := lockMgr.Lock(trxId, pos, lock.Exclusive); err != nil {
+		return err
 	}
 
 	// ユニークインデックスに挿入

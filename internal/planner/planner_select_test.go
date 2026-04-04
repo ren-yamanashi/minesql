@@ -170,9 +170,12 @@ func TestPlanSelect(t *testing.T) {
 		}
 
 		// WHEN
-		exec, err := PlanSelect(0, stmt)
+		hdl := handler.Get()
+		trxId := hdl.BeginTrx()
+		exec, err := PlanSelect(trxId, stmt)
 		assert.NoError(t, err)
 		results := fetchAll(t, exec)
+		hdl.CommitTrx(trxId)
 
 		// THEN
 		assert.Equal(t, 2, len(results))

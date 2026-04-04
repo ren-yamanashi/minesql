@@ -23,9 +23,9 @@ func TestUndoIntegration(t *testing.T) {
 		// 初期データ: ("a", "Alice"), ("b", "Bob")
 		recordA := [][]byte{[]byte("a"), []byte("Alice")}
 		recordB := [][]byte{[]byte("b"), []byte("Bob")}
-		err := table.Insert(bp, recordA)
+		err := table.Insert(bp, 0, lock.NewManager(5000), recordA)
 		assert.NoError(t, err)
-		err = table.Insert(bp, recordB)
+		err = table.Insert(bp, 0, lock.NewManager(5000), recordB)
 		assert.NoError(t, err)
 
 		// 操作1: ("a", "Alice") を ("a", "Carol") に UpdateInplace
@@ -41,7 +41,7 @@ func TestUndoIntegration(t *testing.T) {
 
 		// 操作3: ("c", "Dave") を Insert
 		recordC := [][]byte{[]byte("c"), []byte("Dave")}
-		err = table.Insert(bp, recordC)
+		err = table.Insert(bp, 0, lock.NewManager(5000), recordC)
 		assert.NoError(t, err)
 		undo3 := UndoInsertRecord{table: table, Record: recordC}
 
@@ -76,14 +76,14 @@ func TestUndoIntegration(t *testing.T) {
 
 		// 初期データ: ("a", "Alice")
 		recordA := [][]byte{[]byte("a"), []byte("Alice")}
-		err := table.Insert(bp, recordA)
+		err := table.Insert(bp, 0, lock.NewManager(5000), recordA)
 		assert.NoError(t, err)
 
 		// 操作1: PK を "a" → "x" に変更 (Outofplace = SoftDelete + Insert)
 		newRecordX := [][]byte{[]byte("x"), []byte("Alice")}
 		err = table.SoftDelete(bp, 0, lock.NewManager(5000), recordA)
 		assert.NoError(t, err)
-		err = table.Insert(bp, newRecordX)
+		err = table.Insert(bp, 0, lock.NewManager(5000), newRecordX)
 		assert.NoError(t, err)
 		undo1Delete := UndoDeleteRecord{table: table, Record: recordA}
 		undo1Insert := UndoInsertRecord{table: table, Record: newRecordX}

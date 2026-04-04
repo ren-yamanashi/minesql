@@ -3,6 +3,7 @@ package handler
 import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/dictionary"
+	"minesql/internal/storage/lock"
 	"minesql/internal/storage/page"
 	"os"
 	"path/filepath"
@@ -98,7 +99,7 @@ func TestShutdown(t *testing.T) {
 		err = h.Catalog.Insert(h.BufferPool, tblMeta)
 		assert.NoError(t, err)
 
-		err = tbl.Insert(h.BufferPool, [][]byte{[]byte("1")})
+		err = tbl.Insert(h.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("1")})
 		assert.NoError(t, err)
 
 		// WHEN

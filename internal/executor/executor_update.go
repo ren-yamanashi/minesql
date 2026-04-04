@@ -75,7 +75,7 @@ func (upd *Update) Next() (Record, error) {
 				return nil, err
 			}
 			hdl.AppendInsertUndo(upd.trxId, upd.table, updatedRecords[i])
-			if err := upd.table.Insert(hdl.BufferPool, updatedRecords[i]); err != nil {
+			if err := upd.table.Insert(hdl.BufferPool, upd.trxId, hdl.LockMgr, updatedRecords[i]); err != nil {
 				return nil, err
 			}
 		}

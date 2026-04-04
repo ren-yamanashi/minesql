@@ -25,7 +25,7 @@ func (ins *Insert) Next() (Record, error) {
 
 	for _, record := range ins.records {
 		hdl.AppendInsertUndo(ins.trxId, ins.table, record)
-		if err := ins.table.Insert(hdl.BufferPool, record); err != nil {
+		if err := ins.table.Insert(hdl.BufferPool, ins.trxId, hdl.LockMgr, record); err != nil {
 			return nil, err
 		}
 	}

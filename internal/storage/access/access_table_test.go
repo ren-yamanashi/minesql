@@ -31,13 +31,13 @@ func TestCreateAndInsert(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: 行を挿入
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("d"), []byte("Eve"), []byte("Davis")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("d"), []byte("Eve"), []byte("Davis")})
 		assert.NoError(t, err)
 
 		// THEN: 挿入したデータが B+Tree に存在する
@@ -169,11 +169,11 @@ func TestCreateAndInsert(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
 
 		// WHEN: 同じ PK で Insert
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Jane")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Jane")})
 
 		// THEN
 		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
@@ -186,7 +186,7 @@ func TestCreateAndInsert(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
 
 		// ソフトデリート
@@ -194,7 +194,7 @@ func TestCreateAndInsert(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: 同じ PK で再 Insert (値は異なる)
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Jane")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Jane")})
 
 		// THEN: エラーなく挿入できる
 		assert.NoError(t, err)
@@ -222,6 +222,24 @@ func TestCreateAndInsert(t *testing.T) {
 		_, ok = iter.Get()
 		assert.False(t, ok)
 	})
+
+	t.Run("Insert で対象行に排他ロックが取得される", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTable("users", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		lockMgr := lock.NewManager(200)
+
+		// WHEN: trx1 が Insert で排他ロックを取得
+		err = table.Insert(bp, 1, lockMgr, [][]byte{[]byte("a"), []byte("Alice")})
+		assert.NoError(t, err)
+
+		// THEN: trx2 が同じ行に排他ロックを取得しようとするとタイムアウト
+		err = table.SoftDelete(bp, 2, lockMgr, [][]byte{[]byte("a"), []byte("Alice")})
+		assert.ErrorIs(t, err, lock.ErrTimeout)
+	})
 }
 
 func TestSoftDelete(t *testing.T) {
@@ -238,11 +256,11 @@ func TestSoftDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		records := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
-		err = table.Insert(bp, records)
+		err = table.Insert(bp, 0, lock.NewManager(5000), records)
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
 		assert.NoError(t, err)
 
 		// WHEN: "a" の行を削除
@@ -289,9 +307,9 @@ func TestSoftDelete(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice")})
 		assert.NoError(t, err)
 
 		// WHEN: "a" をソフトデリート
@@ -337,7 +355,7 @@ func TestSoftDelete(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
 
 		// WHEN: 存在しないキーで削除
@@ -356,9 +374,9 @@ func TestSoftDelete(t *testing.T) {
 
 		record1 := [][]byte{[]byte("a"), []byte("John")}
 		record2 := [][]byte{[]byte("b"), []byte("Alice")}
-		err = table.Insert(bp, record1)
+		err = table.Insert(bp, 0, lock.NewManager(5000), record1)
 		assert.NoError(t, err)
-		err = table.Insert(bp, record2)
+		err = table.Insert(bp, 0, lock.NewManager(5000), record2)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -379,7 +397,7 @@ func TestSoftDelete(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Alice")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Alice")})
 		assert.NoError(t, err)
 
 		lockMgr := lock.NewManager(200)
@@ -402,9 +420,9 @@ func TestDelete(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice")})
 		assert.NoError(t, err)
 
 		// WHEN: "a" を物理削除
@@ -440,9 +458,9 @@ func TestDelete(t *testing.T) {
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
 
 		// WHEN: "a" を物理削除
@@ -481,13 +499,13 @@ func TestDelete(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
 
 		// WHEN: 物理削除してから同じ PK で再挿入
 		err = table.Delete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Jane")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Jane")})
 		assert.NoError(t, err)
 
 		// THEN
@@ -506,9 +524,9 @@ func TestDelete(t *testing.T) {
 
 		record1 := [][]byte{[]byte("a"), []byte("John")}
 		record2 := [][]byte{[]byte("b"), []byte("Alice")}
-		err = table.Insert(bp, record1)
+		err = table.Insert(bp, 0, lock.NewManager(5000), record1)
 		assert.NoError(t, err)
-		err = table.Insert(bp, record2)
+		err = table.Insert(bp, 0, lock.NewManager(5000), record2)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -534,9 +552,9 @@ func TestUpdate(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
 
 		// WHEN: プライマリキー "a" のレコードを更新 (キーは同じ、value のみ変更)
@@ -563,7 +581,7 @@ func TestUpdate(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
 
 		// WHEN: PK を変えずに value を更新
@@ -603,7 +621,7 @@ func TestUpdate(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
 
 		// WHEN: PK を "a" → "b" に変更
@@ -611,7 +629,7 @@ func TestUpdate(t *testing.T) {
 		newRecord := [][]byte{[]byte("b"), []byte("Jane")}
 		err = table.SoftDelete(bp, 0, lock.NewManager(5000), oldRecord)
 		assert.NoError(t, err)
-		err = table.Insert(bp, newRecord)
+		err = table.Insert(bp, 0, lock.NewManager(5000), newRecord)
 		assert.NoError(t, err)
 
 		// THEN: B+Tree を直接走査すると 2 件存在し、"a" は DeleteMark=1、"b" は DeleteMark=0
@@ -653,9 +671,9 @@ func TestUpdate(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("c"), []byte("Bob")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("c"), []byte("Bob")})
 		assert.NoError(t, err)
 
 		// WHEN: プライマリキーを "a" → "b" に変更
@@ -663,7 +681,7 @@ func TestUpdate(t *testing.T) {
 		newRecord := [][]byte{[]byte("b"), []byte("John-Updated")}
 		err = table.SoftDelete(bp, 0, lock.NewManager(5000), oldRecord)
 		assert.NoError(t, err)
-		err = table.Insert(bp, newRecord)
+		err = table.Insert(bp, 0, lock.NewManager(5000), newRecord)
 
 		// THEN
 		assert.NoError(t, err)
@@ -688,9 +706,9 @@ func TestUpdate(t *testing.T) {
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
 
 		// WHEN: セカンダリキー (last_name) を "Doe" → "Williams" に変更
@@ -717,7 +735,7 @@ func TestUpdate(t *testing.T) {
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
 
 		// WHEN: プライマリキーを "a" → "x" に変更、セカンダリキー "Doe" は同じ
@@ -725,7 +743,7 @@ func TestUpdate(t *testing.T) {
 		newRecord := [][]byte{[]byte("x"), []byte("John"), []byte("Doe")}
 		err = table.SoftDelete(bp, 0, lock.NewManager(5000), oldRecord)
 		assert.NoError(t, err)
-		err = table.Insert(bp, newRecord)
+		err = table.Insert(bp, 0, lock.NewManager(5000), newRecord)
 
 		// THEN: テーブルが更新されている
 		assert.NoError(t, err)
@@ -767,9 +785,9 @@ func TestUpdate(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice")})
 		assert.NoError(t, err)
 
 		// WHEN: プライマリキーを "a" → "b" に変更 (既存のキーと衝突)
@@ -777,7 +795,7 @@ func TestUpdate(t *testing.T) {
 		newRecord := [][]byte{[]byte("b"), []byte("John")}
 		err = table.SoftDelete(bp, 0, lock.NewManager(5000), oldRecord)
 		assert.NoError(t, err)
-		err = table.Insert(bp, newRecord)
+		err = table.Insert(bp, 0, lock.NewManager(5000), newRecord)
 
 		// THEN: SoftDelete("a") は成功するが Insert("b") が重複キーエラーで失敗する
 		assert.Error(t, err)
@@ -795,9 +813,9 @@ func TestUpdate(t *testing.T) {
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
 
 		// WHEN: セカンダリキーを "Doe" → "Smith" に変更 (既存のインデックスキーと衝突)
@@ -824,9 +842,9 @@ func TestUpdate(t *testing.T) {
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
 
 		// WHEN: 両方のセカンダリキーが変わる更新
@@ -851,7 +869,7 @@ func TestUpdate(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
 
 		// WHEN: 存在しないキー "z" で更新
@@ -870,7 +888,7 @@ func TestUpdate(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Alice")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Alice")})
 		assert.NoError(t, err)
 
 		lockMgr := lock.NewManager(200)
@@ -897,7 +915,7 @@ func TestUpdate(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Alice")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Alice")})
 		assert.NoError(t, err)
 
 		lockMgr := lock.NewManager(200)
@@ -929,9 +947,9 @@ func TestSearch(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice")})
 		assert.NoError(t, err)
 
 		// WHEN
@@ -950,11 +968,11 @@ func TestSearch(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("c"), []byte("Bob")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("c"), []byte("Bob")})
 		assert.NoError(t, err)
 
 		// WHEN: "b" から検索
@@ -991,9 +1009,9 @@ func TestSearch(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Alice")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Alice")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Bob")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Bob")})
 		assert.NoError(t, err)
 
 		lockMgr := lock.NewManager(5000)
@@ -1091,7 +1109,7 @@ func TestLeafPageCount(t *testing.T) {
 		for i := range 200 {
 			key := fmt.Sprintf("key_%04d", i)
 			value := fmt.Sprintf("value_%04d", i)
-			err := table.Insert(bp, [][]byte{[]byte(key), []byte(value)})
+			err := table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte(key), []byte(value)})
 			assert.NoError(t, err)
 		}
 
@@ -1129,7 +1147,7 @@ func TestHeight(t *testing.T) {
 		for i := range 200 {
 			key := fmt.Sprintf("key_%04d", i)
 			value := fmt.Sprintf("value_%04d", i)
-			err := table.Insert(bp, [][]byte{[]byte(key), []byte(value)})
+			err := table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte(key), []byte(value)})
 			assert.NoError(t, err)
 		}
 

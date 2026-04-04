@@ -19,6 +19,6 @@ func NewUndoDeleteRecord(table *access.Table, record [][]byte) UndoDeleteRecord 
 }
 
 // Undo は Delete したレコードを挿入する
-func (r UndoDeleteRecord) Undo(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager) error { //nolint:revive // interface 準拠のため引数を受け取るが Insert にはロック不要
-	return r.table.Insert(bp, r.Record)
+func (r UndoDeleteRecord) Undo(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager) error {
+	return r.table.Insert(bp, trxId, lockMgr, r.Record)
 }

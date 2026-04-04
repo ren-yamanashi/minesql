@@ -44,7 +44,7 @@ func TestPlanUpdate(t *testing.T) {
 
 		tbl := getPlannerTable(t, "users")
 		hdl := handler.Get()
-		err := tbl.Insert(hdl.BufferPool, [][]byte{[]byte("1"), []byte("John"), []byte("Smith")})
+		err := tbl.Insert(hdl.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("1"), []byte("John"), []byte("Smith")})
 		assert.NoError(t, err)
 
 		var trxId handler.TrxId = 1
@@ -161,9 +161,9 @@ func TestPlanUpdate(t *testing.T) {
 		tbl := getPlannerTable(t, "users")
 
 		// データを挿入
-		err := tbl.Insert(hdl.BufferPool, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err := tbl.Insert(hdl.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
-		err = tbl.Insert(hdl.BufferPool, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		err = tbl.Insert(hdl.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
 
 		// "a" の first_name を "Jane" に更新する
@@ -259,7 +259,7 @@ func TestPlanUpdate(t *testing.T) {
 
 		tbl := getPlannerTable(t, "users")
 		hdl := handler.Get()
-		err := tbl.Insert(hdl.BufferPool, [][]byte{[]byte("1"), []byte("John"), []byte("Smith")})
+		err := tbl.Insert(hdl.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("1"), []byte("John"), []byte("Smith")})
 		assert.NoError(t, err)
 
 		var trxId handler.TrxId = 1

@@ -15,11 +15,11 @@ func TestTableIterator(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
 		assert.NoError(t, err)
 
 		// WHEN
@@ -56,11 +56,11 @@ func TestTableIterator(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("c"), []byte("Bob")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("c"), []byte("Bob")})
 		assert.NoError(t, err)
 
 		// WHEN: キー "b" から検索
@@ -101,11 +101,11 @@ func TestTableIterator(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Alice")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Alice")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Bob")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Bob")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("c"), []byte("Charlie")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("c"), []byte("Charlie")})
 		assert.NoError(t, err)
 
 		// "b" をソフトデリート
@@ -139,9 +139,9 @@ func TestTableIterator(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Alice")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Alice")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Bob")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Bob")})
 		assert.NoError(t, err)
 
 		err = table.SoftDelete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Alice")})
@@ -168,9 +168,9 @@ func TestTableIterator(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("1"), []byte("value1")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("1"), []byte("value1")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("2"), []byte("value2")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("2"), []byte("value2")})
 		assert.NoError(t, err)
 
 		// WHEN

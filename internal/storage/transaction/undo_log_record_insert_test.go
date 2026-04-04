@@ -16,7 +16,7 @@ func TestInsertLogRecord_Undo(t *testing.T) {
 		table, bp := setupTestTableForUndo(t, nil)
 
 		record := [][]byte{[]byte("a"), []byte("John")}
-		err := table.Insert(bp, record)
+		err := table.Insert(bp, 0, lock.NewManager(5000), record)
 		assert.NoError(t, err)
 
 		undoRecord := UndoInsertRecord{table: table, Record: record}
@@ -39,7 +39,7 @@ func TestInsertLogRecord_Undo(t *testing.T) {
 		table, bp := setupTestTableForUndo(t, []*access.UniqueIndex{uniqueIndex})
 
 		record := [][]byte{[]byte("a"), []byte("John")}
-		err := table.Insert(bp, record)
+		err := table.Insert(bp, 0, lock.NewManager(5000), record)
 		assert.NoError(t, err)
 
 		undoRecord := UndoInsertRecord{table: table, Record: record}
