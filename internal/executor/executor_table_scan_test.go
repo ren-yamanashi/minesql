@@ -141,15 +141,15 @@ func InitStorageEngineForTest(t *testing.T, dataDir string) *handler.Handler {
 	assert.NoError(t, err)
 
 	// 行を挿入
-	err = tbl.Insert(hdl.BufferPool, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+	err = tbl.Insert(hdl.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 	assert.NoError(t, err)
-	err = tbl.Insert(hdl.BufferPool, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+	err = tbl.Insert(hdl.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 	assert.NoError(t, err)
-	err = tbl.Insert(hdl.BufferPool, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
+	err = tbl.Insert(hdl.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
 	assert.NoError(t, err)
-	err = tbl.Insert(hdl.BufferPool, [][]byte{[]byte("d"), []byte("Eve"), []byte("Davis")})
+	err = tbl.Insert(hdl.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("d"), []byte("Eve"), []byte("Davis")})
 	assert.NoError(t, err)
-	err = tbl.Insert(hdl.BufferPool, [][]byte{[]byte("e"), []byte("Charlie"), []byte("Brown")})
+	err = tbl.Insert(hdl.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("e"), []byte("Charlie"), []byte("Brown")})
 	assert.NoError(t, err)
 
 	return hdl
