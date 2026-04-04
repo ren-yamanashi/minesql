@@ -371,6 +371,27 @@ func TestSoftDelete(t *testing.T) {
 		recs := collectAllTablePairs(t, bp, &table)
 		assert.Equal(t, 0, len(recs))
 	})
+
+	t.Run("対象行に排他ロックが取得される", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTable("users", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Alice")})
+		assert.NoError(t, err)
+
+		lockMgr := lock.NewManager(200)
+
+		// WHEN: trx1 が SoftDelete で排他ロックを取得
+		err = table.SoftDelete(bp, 1, lockMgr, [][]byte{[]byte("a"), []byte("Alice")})
+		assert.NoError(t, err)
+
+		// THEN: trx2 が同じ行に排他ロックを取得しようとするとタイムアウト
+		err = table.SoftDelete(bp, 2, lockMgr, [][]byte{[]byte("a"), []byte("Alice")})
+		assert.ErrorIs(t, err, lock.ErrTimeout)
+	})
 }
 
 func TestDelete(t *testing.T) {
@@ -387,7 +408,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: "a" を物理削除
-		err = table.Delete(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.Delete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
 
 		// THEN: B+Tree を直接走査すると 1 件のみ存在 (物理的に消えている)
@@ -425,7 +446,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: "a" を物理削除
-		err = table.Delete(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.Delete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
 
 		// THEN: クラスタ化インデックスから物理削除されている
@@ -464,7 +485,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: 物理削除してから同じ PK で再挿入
-		err = table.Delete(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.Delete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
 		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Jane")})
 		assert.NoError(t, err)
@@ -491,9 +512,9 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		err = table.Delete(bp, record1)
+		err = table.Delete(bp, 0, lock.NewManager(5000), record1)
 		assert.NoError(t, err)
-		err = table.Delete(bp, record2)
+		err = table.Delete(bp, 0, lock.NewManager(5000), record2)
 		assert.NoError(t, err)
 
 		// THEN: B+Tree を直接走査してもレコードが存在しない
@@ -841,6 +862,63 @@ func TestUpdate(t *testing.T) {
 		// THEN
 		assert.Error(t, err)
 	})
+
+	t.Run("対象行に排他ロックが取得される", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTable("users", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Alice")})
+		assert.NoError(t, err)
+
+		lockMgr := lock.NewManager(200)
+
+		// WHEN: trx1 が UpdateInplace で排他ロックを取得
+		err = table.UpdateInplace(bp, 1, lockMgr,
+			[][]byte{[]byte("a"), []byte("Alice")},
+			[][]byte{[]byte("a"), []byte("Updated")},
+		)
+		assert.NoError(t, err)
+
+		// THEN: trx2 が同じ行に排他ロックを取得しようとするとタイムアウト
+		err = table.UpdateInplace(bp, 2, lockMgr,
+			[][]byte{[]byte("a"), []byte("Updated")},
+			[][]byte{[]byte("a"), []byte("Updated2")},
+		)
+		assert.ErrorIs(t, err, lock.ErrTimeout)
+	})
+
+	t.Run("ReleaseAll 後は他のトランザクションがロックを取得できる", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTable("users", metaPageId, 1, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Alice")})
+		assert.NoError(t, err)
+
+		lockMgr := lock.NewManager(200)
+
+		// trx1 が排他ロックを取得
+		err = table.UpdateInplace(bp, 1, lockMgr,
+			[][]byte{[]byte("a"), []byte("Alice")},
+			[][]byte{[]byte("a"), []byte("Updated")},
+		)
+		assert.NoError(t, err)
+
+		// WHEN: trx1 のロックを解放
+		lockMgr.ReleaseAll(1)
+
+		// THEN: trx2 が排他ロックを取得できる
+		err = table.UpdateInplace(bp, 2, lockMgr,
+			[][]byte{[]byte("a"), []byte("Updated")},
+			[][]byte{[]byte("a"), []byte("Updated2")},
+		)
+		assert.NoError(t, err)
+	})
 }
 
 func TestSearch(t *testing.T) {
@@ -905,34 +983,40 @@ func TestSearch(t *testing.T) {
 		// THEN
 		assert.Equal(t, 0, len(recs))
 	})
-}
 
-// テーブルの全 active レコードをデコードして収集するヘルパー
-//
-// ClusteredIndexIterator を使用するため、ソフトデリート済みレコードはスキップされる
-type decodedRecord struct {
-	key   [][]byte
-	value [][]byte
-}
-
-func collectAllTablePairs(t *testing.T, bp *buffer.BufferPool, table *Table) []decodedRecord {
-	t.Helper()
-	iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
-	assert.NoError(t, err)
-
-	var records []decodedRecord
-	for {
-		columns, ok, err := iter.Next()
+	t.Run("各行の読み取り時に共有ロックが取得される", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTable("users", metaPageId, 1, nil)
+		err := table.Create(bp)
 		assert.NoError(t, err)
-		if !ok {
-			break
+
+		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Alice")})
+		assert.NoError(t, err)
+		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Bob")})
+		assert.NoError(t, err)
+
+		lockMgr := lock.NewManager(5000)
+
+		// WHEN: trx1 が Search で全行を読み取る
+		iter, err := table.Search(bp, 1, lockMgr, RecordSearchModeStart{})
+		assert.NoError(t, err)
+		for {
+			_, ok, err := iter.Next()
+			assert.NoError(t, err)
+			if !ok {
+				break
+			}
 		}
-		// columns は [PK..., NonKey...] のフラット配列
-		key := columns[:table.PrimaryKeyCount]
-		value := columns[table.PrimaryKeyCount:]
-		records = append(records, decodedRecord{key: key, value: value})
-	}
-	return records
+
+		// THEN: trx2 が共有ロックを取得できる (共有同士は競合しない)
+		iter2, err := table.Search(bp, 2, lockMgr, RecordSearchModeStart{})
+		assert.NoError(t, err)
+		record, ok, err := iter2.Next()
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, "a", string(record[0]))
+	})
 }
 
 func TestGetUniqueIndexByName(t *testing.T) {
@@ -1054,6 +1138,34 @@ func TestHeight(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Greater(t, height, uint64(1))
 	})
+}
+
+// テーブルの全 active レコードをデコードして収集するヘルパー
+//
+// ClusteredIndexIterator を使用するため、ソフトデリート済みレコードはスキップされる
+type decodedRecord struct {
+	key   [][]byte
+	value [][]byte
+}
+
+func collectAllTablePairs(t *testing.T, bp *buffer.BufferPool, table *Table) []decodedRecord {
+	t.Helper()
+	iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
+	assert.NoError(t, err)
+
+	var records []decodedRecord
+	for {
+		columns, ok, err := iter.Next()
+		assert.NoError(t, err)
+		if !ok {
+			break
+		}
+		// columns は [PK..., NonKey...] のフラット配列
+		key := columns[:table.PrimaryKeyCount]
+		value := columns[table.PrimaryKeyCount:]
+		records = append(records, decodedRecord{key: key, value: value})
+	}
+	return records
 }
 
 // ユニークインデックスの active なエントリのセカンダリキーを収集するヘルパー

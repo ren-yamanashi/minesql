@@ -44,7 +44,7 @@ func (m *Manager) Commit(trxId TrxId) {
 func (m *Manager) Rollback(bp *buffer.BufferPool, trxId TrxId) error {
 	records := m.undoLog.GetRecords(trxId)
 	for i := len(records) - 1; i >= 0; i-- {
-		if err := records[i].Undo(bp); err != nil {
+		if err := records[i].Undo(bp, trxId, m.lockMgr); err != nil {
 			return err
 		}
 	}

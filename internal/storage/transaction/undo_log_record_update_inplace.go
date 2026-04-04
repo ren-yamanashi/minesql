@@ -21,7 +21,7 @@ func NewUndoUpdateInplaceRecord(table *access.Table, prevRecord, newRecord [][]b
 }
 
 // Undo は UpdateInplace したレコードを元の値に戻す
-func (r UndoUpdateInplaceRecord) Undo(bp *buffer.BufferPool) error {
+func (r UndoUpdateInplaceRecord) Undo(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager) error {
 	// 元に戻すので、PrevRecord を新しい値、NewRecord を古い値として UpdateInplace を呼び出す
-	return r.table.UpdateInplace(bp, 0, lock.NewManager(5000), r.NewRecord, r.PrevRecord)
+	return r.table.UpdateInplace(bp, trxId, lockMgr, r.NewRecord, r.PrevRecord)
 }

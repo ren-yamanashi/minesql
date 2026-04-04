@@ -52,11 +52,11 @@ func TestUndoIntegration(t *testing.T) {
 		assert.Equal(t, []string{"c", "Dave"}, records[1])
 
 		// WHEN: 逆順に Undo
-		err = undo3.Undo(bp)
+		err = undo3.Undo(bp, 0, lock.NewManager(5000))
 		assert.NoError(t, err)
-		err = undo2.Undo(bp)
+		err = undo2.Undo(bp, 0, lock.NewManager(5000))
 		assert.NoError(t, err)
-		err = undo1.Undo(bp)
+		err = undo1.Undo(bp, 0, lock.NewManager(5000))
 		assert.NoError(t, err)
 
 		// THEN: 初期状態に戻っている
@@ -100,11 +100,11 @@ func TestUndoIntegration(t *testing.T) {
 		assert.Equal(t, []string{"x", "Bob"}, records[0])
 
 		// WHEN: 逆順に Undo (操作2 → 操作1 の Insert → 操作1 の Delete)
-		err = undo2.Undo(bp)
+		err = undo2.Undo(bp, 0, lock.NewManager(5000))
 		assert.NoError(t, err)
-		err = undo1Insert.Undo(bp)
+		err = undo1Insert.Undo(bp, 0, lock.NewManager(5000))
 		assert.NoError(t, err)
-		err = undo1Delete.Undo(bp)
+		err = undo1Delete.Undo(bp, 0, lock.NewManager(5000))
 		assert.NoError(t, err)
 
 		// THEN: 初期状態に戻っている

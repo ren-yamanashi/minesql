@@ -103,12 +103,23 @@ func (t *Table) Insert(bp *buffer.BufferPool, columns [][]byte) error {
 	return nil
 }
 
-// Delete はテーブルから行を物理削除する
+// Delete はテーブルから行を物理削除する (対象行に対して排他ロックを取得してから物理削除する)
 //   - columns: 削除する行のカラム値 (プライマリキーを含む全カラム)
-func (t *Table) Delete(bp *buffer.BufferPool, columns [][]byte) error {
+func (t *Table) Delete(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, columns [][]byte) error {
 	btr := btree.NewBTree(t.MetaPageId)
 
+	// 対象行を検索
 	encodedKey := t.EncodeKey(columns)
+	_, pos, err := btr.FindByKey(bp, encodedKey)
+	if err != nil {
+		return err
+	}
+
+	// 排他ロックを取得
+	if err := lockMgr.Lock(trxId, pos, lock.Exclusive); err != nil {
+		return err
+	}
+
 	if err := btr.Delete(bp, encodedKey); err != nil {
 		return err
 	}

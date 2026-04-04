@@ -23,7 +23,7 @@ func TestUndoDeleteRecord_Undo(t *testing.T) {
 		undoRecord := UndoDeleteRecord{table: table, Record: record}
 
 		// WHEN
-		err = undoRecord.Undo(bp)
+		err = undoRecord.Undo(bp, 0, lock.NewManager(5000))
 
 		// THEN: レコードが active に戻っている
 		assert.NoError(t, err)
@@ -46,7 +46,7 @@ func TestUndoDeleteRecord_Undo(t *testing.T) {
 		undoRecord := UndoDeleteRecord{table: table, Record: record}
 
 		// WHEN
-		err = undoRecord.Undo(bp)
+		err = undoRecord.Undo(bp, 0, lock.NewManager(5000))
 
 		// THEN: ユニークインデックスも復元されている
 		assert.NoError(t, err)
@@ -61,13 +61,13 @@ func TestUndoDeleteRecord_Undo(t *testing.T) {
 		record := [][]byte{[]byte("a"), []byte("John")}
 		err := table.Insert(bp, record)
 		assert.NoError(t, err)
-		err = table.Delete(bp, record)
+		err = table.Delete(bp, 0, lock.NewManager(5000), record)
 		assert.NoError(t, err)
 
 		undoRecord := UndoDeleteRecord{table: table, Record: record}
 
 		// WHEN
-		err = undoRecord.Undo(bp)
+		err = undoRecord.Undo(bp, 0, lock.NewManager(5000))
 
 		// THEN: レコードが再挿入されている
 		assert.NoError(t, err)

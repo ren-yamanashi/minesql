@@ -15,14 +15,14 @@ type mockLogRecord struct {
 	undone bool
 }
 
-func (m *mockLogRecord) Undo(bp *buffer.BufferPool) error {
+func (m *mockLogRecord) Undo(_ *buffer.BufferPool, _ lock.TrxId, _ *lock.Manager) error {
 	m.undone = true
 	return nil
 }
 
 type failingLogRecord struct{}
 
-func (f *failingLogRecord) Undo(bp *buffer.BufferPool) error {
+func (f *failingLogRecord) Undo(_ *buffer.BufferPool, _ lock.TrxId, _ *lock.Manager) error {
 	return errors.New("undo failed")
 }
 
