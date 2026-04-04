@@ -3,14 +3,16 @@ package btree
 import (
 	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/page"
 )
 
 // Iterator は B+Tree のリーフノード (双方向連結リスト) を走査する
 //
 // 全件スキャンや範囲検索などで、リーフノードを順番に走査するために使用する
 type Iterator struct {
-	bufferPage buffer.BufferPage // 現在参照しているバッファページ
-	slotNum    int               // 現在参照されているスロット番号 (slotted page のスロット番号)
+	bufferPage   buffer.BufferPage // 現在参照しているバッファページ
+	slotNum      int               // 現在参照されているスロット番号 (slotted page のスロット番号)
+	LastPosition page.SlotPosition // 直前に Next で返したレコードの位置
 }
 
 // newIterator は指定されたバッファページとスロット番号を持つイテレータを生成する
@@ -43,6 +45,10 @@ func (iter *Iterator) Get() (node.Record, bool) {
 
 // Next は次のレコードを取得する
 func (iter *Iterator) Next(bp *buffer.BufferPool) (node.Record, bool, error) {
+	iter.LastPosition = page.SlotPosition{
+		PageId:  iter.bufferPage.PageId,
+		SlotNum: iter.slotNum,
+	}
 	record, ok := iter.Get()
 	if !ok {
 		return node.NewRecord(nil, nil, nil), false, nil
