@@ -124,10 +124,9 @@ func (t *Table) Delete(bp *buffer.BufferPool, columns [][]byte) error {
 	return nil
 }
 
-// SoftDelete はテーブルから行をソフトデリートする
+// SoftDelete はテーブルから行をソフトデリートする (対象行に対して排他ロックを取得してからソフトデリートする)
 //
 // B+Tree からレコードを物理削除せず、DeleteMark を 1 に設定する
-// 対象行に対して排他ロックを取得してから削除する
 func (t *Table) SoftDelete(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, columns [][]byte) error {
 	btr := btree.NewBTree(t.MetaPageId)
 
