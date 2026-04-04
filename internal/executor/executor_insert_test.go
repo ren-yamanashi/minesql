@@ -74,6 +74,38 @@ func TestInsert_Next(t *testing.T) {
 			assert.Equal(t, records[i][1], record[1])
 		}
 	})
+
+	t.Run("INSERT で対象行に排他ロックが取得される", func(t *testing.T) {
+		// GIVEN
+		initLockTestHandler(t)
+		defer handler.Reset()
+
+		hdl := handler.Get()
+		tbl := createLockTestTable(t)
+
+		trx1 := hdl.BeginTrx()
+
+		// WHEN: trx1 が INSERT (排他ロック取得)
+		ins := NewInsert(trx1, tbl, []Record{
+			{[]byte("a"), []byte("Alice")},
+		})
+		_, err := ins.Next()
+		assert.NoError(t, err)
+
+		// THEN: trx2 が同じ行を UPDATE しようとするとタイムアウト
+		trx2 := hdl.BeginTrx()
+		upd := NewUpdate(trx2, tbl, []SetColumn{
+			{Pos: 1, Value: []byte("Updated")},
+		}, NewTableScan(
+			trx2, hdl.LockMgr, tbl,
+			access.RecordSearchModeStart{},
+			func(record Record) bool { return string(record[0]) == "a" },
+		))
+		_, err = upd.Next()
+		assert.ErrorIs(t, err, lock.ErrTimeout)
+
+		hdl.CommitTrx(trx1)
+	})
 }
 
 func initStorageManagerForTest(t *testing.T) {
