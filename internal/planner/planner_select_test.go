@@ -18,7 +18,7 @@ func TestPlanSelect(t *testing.T) {
 		stmt := &ast.SelectStmt{From: *ast.NewTableId("non_existent_table"), Where: nil}
 
 		// WHEN
-		exec, err := PlanSelect(stmt)
+		exec, err := PlanSelect(0, stmt)
 
 		// THEN
 		assert.Nil(t, exec)
@@ -42,7 +42,7 @@ func TestPlanSelect(t *testing.T) {
 		}
 
 		// WHEN
-		exec, err := PlanSelect(stmt)
+		exec, err := PlanSelect(0, stmt)
 
 		// THEN
 		assert.NoError(t, err)
@@ -67,7 +67,7 @@ func TestPlanSelect(t *testing.T) {
 		}
 
 		// WHEN
-		exec, err := PlanSelect(stmt)
+		exec, err := PlanSelect(0, stmt)
 
 		// THEN
 		assert.NoError(t, err)
@@ -98,7 +98,7 @@ func TestPlanSelect(t *testing.T) {
 		}
 
 		// WHEN
-		exec, err := PlanSelect(stmt)
+		exec, err := PlanSelect(0, stmt)
 
 		// THEN
 		assert.NoError(t, err)
@@ -127,7 +127,7 @@ func TestPlanSelect(t *testing.T) {
 		}
 
 		// WHEN
-		exec, err := PlanSelect(stmt)
+		exec, err := PlanSelect(0, stmt)
 
 		// THEN
 		assert.Error(t, err)
@@ -170,7 +170,7 @@ func TestPlanSelect(t *testing.T) {
 		}
 
 		// WHEN
-		exec, err := PlanSelect(stmt)
+		exec, err := PlanSelect(0, stmt)
 		assert.NoError(t, err)
 		results := fetchAll(t, exec)
 

@@ -14,7 +14,7 @@ func Start(trxId handler.TrxId, stmt ast.Statement) (executor.Executor, error) {
 	case *ast.InsertStmt:
 		return PlanInsert(trxId, s)
 	case *ast.SelectStmt:
-		return PlanSelect(s)
+		return PlanSelect(trxId, s)
 	case *ast.DeleteStmt:
 		return PlanDelete(trxId, s)
 	case *ast.UpdateStmt:

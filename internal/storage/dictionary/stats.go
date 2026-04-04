@@ -39,7 +39,7 @@ func (sc *StatsCollector) Analyze(meta *TableMeta) (*TableStats, error) {
 		return nil, err
 	}
 
-	iter, err := tbl.Search(sc.bufferPool, access.RecordSearchModeStart{})
+	iter, err := tbl.Search(sc.bufferPool, 0, nil, access.RecordSearchModeStart{})
 	if err != nil {
 		return nil, err
 	}

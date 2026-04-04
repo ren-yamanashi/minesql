@@ -61,7 +61,7 @@ func TestInsert_Next(t *testing.T) {
 			return true
 		}
 		seqScan := NewTableScan(
-			tbl,
+			0, nil, tbl,
 			access.RecordSearchModeStart{},
 			whileCondition,
 		)

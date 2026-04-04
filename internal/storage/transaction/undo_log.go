@@ -1,7 +1,7 @@
 package transaction
 
 // TrxId はトランザクション ID
-type TrxId uint64
+type TrxId = uint64
 
 // UndoLog は全トランザクションの Undo レコードをトランザクションごとに管理する
 type UndoLog struct {

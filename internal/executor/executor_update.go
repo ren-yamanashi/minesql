@@ -65,13 +65,13 @@ func (upd *Update) Next() (Record, error) {
 		if bytes.Equal(encodedOldKey, encodedNewKey) {
 			// プライマリキーが変わらない場合はインプレース更新
 			hdl.AppendUpdateInplaceUndo(upd.trxId, upd.table, record, updatedRecords[i])
-			if err := upd.table.UpdateInplace(hdl.BufferPool, record, updatedRecords[i]); err != nil {
+			if err := upd.table.UpdateInplace(hdl.BufferPool, upd.trxId, hdl.LockMgr, record, updatedRecords[i]); err != nil {
 				return nil, err
 			}
 		} else {
 			// プライマリキーが変わる場合はソフトデリート + Insert
 			hdl.AppendDeleteUndo(upd.trxId, upd.table, record)
-			if err := upd.table.SoftDelete(hdl.BufferPool, record); err != nil {
+			if err := upd.table.SoftDelete(hdl.BufferPool, upd.trxId, hdl.LockMgr, record); err != nil {
 				return nil, err
 			}
 			hdl.AppendInsertUndo(upd.trxId, upd.table, updatedRecords[i])

@@ -63,7 +63,7 @@ func TestPlanUpdate(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: 更新後のレコードが正しい
-		iter, err := tbl.Search(hdl.BufferPool, access.RecordSearchModeStart{})
+		iter, err := tbl.Search(hdl.BufferPool, 0, nil, access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -188,7 +188,7 @@ func TestPlanUpdate(t *testing.T) {
 
 		// THEN: "a" の first_name が "Jane" に更新されている
 		scan := executor.NewTableScan(
-			tbl,
+			0, nil, tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
@@ -275,7 +275,7 @@ func TestPlanUpdate(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: レコードは変更されていない
-		iter, err := tbl.Search(hdl.BufferPool, access.RecordSearchModeStart{})
+		iter, err := tbl.Search(hdl.BufferPool, 0, nil, access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)

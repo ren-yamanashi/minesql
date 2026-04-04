@@ -95,7 +95,7 @@ func TestRollbackTrx(t *testing.T) {
 
 		// THEN: Insert が取り消されてテーブルが空
 		assert.NoError(t, err)
-		iter, err := tbl.Search(h.BufferPool, access.RecordSearchModeStart{})
+		iter, err := tbl.Search(h.BufferPool, 0, nil, access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)

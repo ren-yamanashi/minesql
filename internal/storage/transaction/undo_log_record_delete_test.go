@@ -16,7 +16,7 @@ func TestUndoDeleteRecord_Undo(t *testing.T) {
 		record := [][]byte{[]byte("a"), []byte("John")}
 		err := table.Insert(bp, record)
 		assert.NoError(t, err)
-		err = table.SoftDelete(bp, record)
+		err = table.SoftDelete(bp, 0, nil, record)
 		assert.NoError(t, err)
 
 		undoRecord := UndoDeleteRecord{table: table, Record: record}
@@ -39,7 +39,7 @@ func TestUndoDeleteRecord_Undo(t *testing.T) {
 		record := [][]byte{[]byte("a"), []byte("John")}
 		err := table.Insert(bp, record)
 		assert.NoError(t, err)
-		err = table.SoftDelete(bp, record)
+		err = table.SoftDelete(bp, 0, nil, record)
 		assert.NoError(t, err)
 
 		undoRecord := UndoDeleteRecord{table: table, Record: record}

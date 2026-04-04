@@ -4,6 +4,7 @@ import (
 	"minesql/internal/executor"
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
+	"minesql/internal/storage/lock"
 	"minesql/internal/storage/transaction"
 	"testing"
 
@@ -18,7 +19,7 @@ func TestCommit(t *testing.T) {
 
 		hdl := handler.Get()
 		undoLog := hdl.UndoLog()
-		trxMgr := transaction.NewManager(undoLog)
+		trxMgr := transaction.NewManager(undoLog, lock.NewManager(5000))
 		trxId := trxMgr.Begin()
 		tbl := setupTestTable(t)
 
@@ -50,7 +51,7 @@ func TestRollback(t *testing.T) {
 
 		hdl := handler.Get()
 		undoLog := hdl.UndoLog()
-		trxMgr := transaction.NewManager(undoLog)
+		trxMgr := transaction.NewManager(undoLog, lock.NewManager(5000))
 		trxId := trxMgr.Begin()
 		tbl := setupTestTable(t)
 
@@ -79,7 +80,7 @@ func TestRollback(t *testing.T) {
 		tbl := setupTestTable(t)
 		hdl := handler.Get()
 		undoLog := hdl.UndoLog()
-		trxMgr := transaction.NewManager(undoLog)
+		trxMgr := transaction.NewManager(undoLog, lock.NewManager(5000))
 
 		// 先にデータを挿入して Commit
 		insertTrxId := trxMgr.Begin()
@@ -94,7 +95,7 @@ func TestRollback(t *testing.T) {
 		// Delete トランザクション
 		deleteTrxId := trxMgr.Begin()
 		del := executor.NewDelete(deleteTrxId, tbl, executor.NewTableScan(
-			tbl,
+			0, nil, tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		))
@@ -118,7 +119,7 @@ func TestRollback(t *testing.T) {
 		tbl := setupTestTable(t)
 		hdl := handler.Get()
 		undoLog := hdl.UndoLog()
-		trxMgr := transaction.NewManager(undoLog)
+		trxMgr := transaction.NewManager(undoLog, lock.NewManager(5000))
 
 		// 先にデータを挿入して Commit
 		insertTrxId := trxMgr.Begin()
@@ -134,7 +135,7 @@ func TestRollback(t *testing.T) {
 		upd := executor.NewUpdate(updateTrxId, tbl, []executor.SetColumn{
 			{Pos: 1, Value: []byte("Carol")},
 		}, executor.NewTableScan(
-			tbl,
+			0, nil, tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		))
@@ -163,7 +164,7 @@ func TestRollback(t *testing.T) {
 		tbl := setupTestTable(t)
 		hdl := handler.Get()
 		undoLog := hdl.UndoLog()
-		trxMgr := transaction.NewManager(undoLog)
+		trxMgr := transaction.NewManager(undoLog, lock.NewManager(5000))
 
 		// 先にデータを挿入して Commit
 		insertTrxId := trxMgr.Begin()
@@ -187,7 +188,7 @@ func TestRollback(t *testing.T) {
 		upd := executor.NewUpdate(trxId, tbl, []executor.SetColumn{
 			{Pos: 1, Value: []byte("Dave")},
 		}, executor.NewTableScan(
-			tbl,
+			0, nil, tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record executor.Record) bool { return string(record[0]) == "a" },
 		))
@@ -196,7 +197,7 @@ func TestRollback(t *testing.T) {
 
 		del := executor.NewDelete(trxId, tbl, executor.NewFilter(
 			executor.NewTableScan(
-				tbl,
+				0, nil, tbl,
 				access.RecordSearchModeStart{},
 				func(record executor.Record) bool { return true },
 			),
@@ -246,7 +247,7 @@ func setupTestTable(t *testing.T) *access.Table {
 func collectAllRecords(t *testing.T, tbl *access.Table) []executor.Record {
 	t.Helper()
 	scan := executor.NewTableScan(
-		tbl,
+		0, nil, tbl,
 		access.RecordSearchModeStart{},
 		func(record executor.Record) bool { return true },
 	)

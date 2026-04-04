@@ -17,7 +17,7 @@ func TestUpdateInplaceLogRecord_Undo(t *testing.T) {
 		newRecord := [][]byte{[]byte("a"), []byte("Jane")}
 		err := table.Insert(bp, prevRecord)
 		assert.NoError(t, err)
-		err = table.UpdateInplace(bp, prevRecord, newRecord)
+		err = table.UpdateInplace(bp, 0, nil, prevRecord, newRecord)
 		assert.NoError(t, err)
 
 		undoRecord := UndoUpdateInplaceRecord{
@@ -43,7 +43,7 @@ func TestUpdateInplaceLogRecord_Undo(t *testing.T) {
 		newRecord := [][]byte{[]byte("a"), []byte("Jane")}
 		err := table.Insert(bp, prevRecord)
 		assert.NoError(t, err)
-		err = table.UpdateInplace(bp, prevRecord, newRecord)
+		err = table.UpdateInplace(bp, 0, nil, prevRecord, newRecord)
 		assert.NoError(t, err)
 
 		undoRecord := UndoUpdateInplaceRecord{

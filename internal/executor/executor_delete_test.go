@@ -14,7 +14,7 @@ func TestDelete(t *testing.T) {
 		// GIVEN
 		var trxId handler.TrxId = 1
 		iterator := NewTableScan(
-			nil,
+			0, nil, nil,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -39,7 +39,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		del := NewDelete(trxId, tbl, NewTableScan(
-			tbl,
+			0, nil, tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
@@ -53,7 +53,7 @@ func TestDelete(t *testing.T) {
 
 		// THEN: テーブルが空になっている
 		scan := NewTableScan(
-			tbl,
+			0, nil, tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -76,7 +76,7 @@ func TestDelete(t *testing.T) {
 
 		// プライマリキーが "c" 未満のレコードを削除対象とする
 		iterator := NewTableScan(
-			tbl,
+			0, nil, tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool {
 				return string(record[0]) < "c"
@@ -94,7 +94,7 @@ func TestDelete(t *testing.T) {
 
 		// THEN: "c" 以降のレコードが残っている
 		scan := NewTableScan(
-			tbl,
+			0, nil, tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -119,7 +119,7 @@ func TestDelete(t *testing.T) {
 		// first_name が "Bob" のレコードを削除
 		iterator := NewFilter(
 			NewTableScan(
-				tbl,
+				0, nil, tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -137,7 +137,7 @@ func TestDelete(t *testing.T) {
 
 		// THEN: "Bob" 以外のレコードが残っている
 		scan := NewTableScan(
-			tbl,
+			0, nil, tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -165,7 +165,7 @@ func TestDelete(t *testing.T) {
 
 		// プライマリキーが "a" のレコードを削除 (last_name = "Doe")
 		iterator := NewTableScan(
-			tbl,
+			0, nil, tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
@@ -213,7 +213,7 @@ func TestDelete(t *testing.T) {
 		tbl, err := getTable("empty_table")
 		assert.NoError(t, err)
 		del := NewDelete(trxId, tbl, NewTableScan(
-			tbl,
+			0, nil, tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))

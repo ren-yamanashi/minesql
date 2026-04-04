@@ -22,7 +22,7 @@ func TestTableIterator(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		iter, err := table.Search(bp, RecordSearchModeStart{})
+		iter, err := table.Search(bp, 0, nil, RecordSearchModeStart{})
 		assert.NoError(t, err)
 
 		var records [][]byte
@@ -63,7 +63,7 @@ func TestTableIterator(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: キー "b" から検索
-		iter, err := table.Search(bp, RecordSearchModeKey{Key: [][]byte{[]byte("b")}})
+		iter, err := table.Search(bp, 0, nil, RecordSearchModeKey{Key: [][]byte{[]byte("b")}})
 		assert.NoError(t, err)
 
 		record, ok, err := iter.Next()
@@ -82,7 +82,7 @@ func TestTableIterator(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		iter, err := table.Search(bp, RecordSearchModeStart{})
+		iter, err := table.Search(bp, 0, nil, RecordSearchModeStart{})
 		assert.NoError(t, err)
 
 		record, ok, err := iter.Next()
@@ -108,11 +108,11 @@ func TestTableIterator(t *testing.T) {
 		assert.NoError(t, err)
 
 		// "b" をソフトデリート
-		err = table.SoftDelete(bp, [][]byte{[]byte("b"), []byte("Bob")})
+		err = table.SoftDelete(bp, 0, nil, [][]byte{[]byte("b"), []byte("Bob")})
 		assert.NoError(t, err)
 
 		// WHEN
-		iter, err := table.Search(bp, RecordSearchModeStart{})
+		iter, err := table.Search(bp, 0, nil, RecordSearchModeStart{})
 		assert.NoError(t, err)
 
 		var records [][][]byte
@@ -143,13 +143,13 @@ func TestTableIterator(t *testing.T) {
 		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Bob")})
 		assert.NoError(t, err)
 
-		err = table.SoftDelete(bp, [][]byte{[]byte("a"), []byte("Alice")})
+		err = table.SoftDelete(bp, 0, nil, [][]byte{[]byte("a"), []byte("Alice")})
 		assert.NoError(t, err)
-		err = table.SoftDelete(bp, [][]byte{[]byte("b"), []byte("Bob")})
+		err = table.SoftDelete(bp, 0, nil, [][]byte{[]byte("b"), []byte("Bob")})
 		assert.NoError(t, err)
 
 		// WHEN
-		iter, err := table.Search(bp, RecordSearchModeStart{})
+		iter, err := table.Search(bp, 0, nil, RecordSearchModeStart{})
 		assert.NoError(t, err)
 
 		record, ok, err := iter.Next()
@@ -173,7 +173,7 @@ func TestTableIterator(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		iter, err := table.Search(bp, RecordSearchModeStart{})
+		iter, err := table.Search(bp, 0, nil, RecordSearchModeStart{})
 		assert.NoError(t, err)
 
 		record1, ok, err := iter.Next()

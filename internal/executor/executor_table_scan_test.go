@@ -25,7 +25,7 @@ func TestNewTableScan(t *testing.T) {
 
 		// WHEN
 		seqScan := NewTableScan(
-			tbl,
+			0, nil, tbl,
 			access.RecordSearchModeStart{},
 			whileCondition,
 		)
@@ -48,7 +48,7 @@ func TestTableScan_Next(t *testing.T) {
 		assert.NoError(t, err)
 
 		seqScan := NewTableScan(
-			tbl,
+			0, nil, tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool {
 				return string(record[0]) < "c" // プライマリキーが "c" 未満の間、継続
@@ -85,7 +85,7 @@ func TestTableScan_Next(t *testing.T) {
 		assert.NoError(t, err)
 
 		seqScan := NewTableScan(
-			tbl,
+			0, nil, tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("b")}},
 			func(record Record) bool {
 				return string(record[0]) <= "d" // プライマリキーが "d" 以下の間、継続

@@ -21,7 +21,7 @@ func TestProject(t *testing.T) {
 		// WHEN: first_name (pos=1) と last_name (pos=2) のみ取得
 		records := collectAll(t, NewProject(
 			NewTableScan(
-				tbl,
+				0, nil, tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -49,7 +49,7 @@ func TestProject(t *testing.T) {
 		// WHEN: first_name (pos=1) のみ取得
 		records := collectAll(t, NewProject(
 			NewTableScan(
-				tbl,
+				0, nil, tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -77,7 +77,7 @@ func TestProject(t *testing.T) {
 		// WHEN: last_name (pos=2), id (pos=0) の順で取得
 		records := collectAll(t, NewProject(
 			NewTableScan(
-				tbl,
+				0, nil, tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -103,7 +103,7 @@ func TestProject(t *testing.T) {
 		records := collectAll(t, NewProject(
 			NewFilter(
 				NewTableScan(
-					tbl,
+					0, nil, tbl,
 					access.RecordSearchModeStart{},
 					func(record Record) bool { return true },
 				),
@@ -132,7 +132,7 @@ func TestProject(t *testing.T) {
 		records := collectAll(t, NewProject(
 			NewFilter(
 				NewTableScan(
-					tbl,
+					0, nil, tbl,
 					access.RecordSearchModeStart{},
 					func(record Record) bool { return true },
 				),

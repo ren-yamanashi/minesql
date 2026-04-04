@@ -29,12 +29,12 @@ func TestUndoIntegration(t *testing.T) {
 
 		// 操作1: ("a", "Alice") を ("a", "Carol") に UpdateInplace
 		updatedA := [][]byte{[]byte("a"), []byte("Carol")}
-		err = table.UpdateInplace(bp, recordA, updatedA)
+		err = table.UpdateInplace(bp, 0, nil, recordA, updatedA)
 		assert.NoError(t, err)
 		undo1 := UndoUpdateInplaceRecord{table: table, PrevRecord: recordA, NewRecord: updatedA}
 
 		// 操作2: ("b", "Bob") を SoftDelete
-		err = table.SoftDelete(bp, recordB)
+		err = table.SoftDelete(bp, 0, nil, recordB)
 		assert.NoError(t, err)
 		undo2 := UndoDeleteRecord{table: table, Record: recordB}
 
@@ -80,7 +80,7 @@ func TestUndoIntegration(t *testing.T) {
 
 		// 操作1: PK を "a" → "x" に変更 (Outofplace = SoftDelete + Insert)
 		newRecordX := [][]byte{[]byte("x"), []byte("Alice")}
-		err = table.SoftDelete(bp, recordA)
+		err = table.SoftDelete(bp, 0, nil, recordA)
 		assert.NoError(t, err)
 		err = table.Insert(bp, newRecordX)
 		assert.NoError(t, err)
@@ -89,7 +89,7 @@ func TestUndoIntegration(t *testing.T) {
 
 		// 操作2: ("x", "Alice") を ("x", "Bob") に UpdateInplace
 		updatedX := [][]byte{[]byte("x"), []byte("Bob")}
-		err = table.UpdateInplace(bp, newRecordX, updatedX)
+		err = table.UpdateInplace(bp, 0, nil, newRecordX, updatedX)
 		assert.NoError(t, err)
 		undo2 := UndoUpdateInplaceRecord{table: table, PrevRecord: newRecordX, NewRecord: updatedX}
 
@@ -141,7 +141,7 @@ func setupTestTableForUndo(t *testing.T, uniqueIndexes []*access.UniqueIndex) (*
 
 func collectActiveRecords(t *testing.T, table *access.Table, bp *buffer.BufferPool) [][]string {
 	t.Helper()
-	iter, err := table.Search(bp, access.RecordSearchModeStart{})
+	iter, err := table.Search(bp, 0, nil, access.RecordSearchModeStart{})
 	assert.NoError(t, err)
 
 	var records [][]string

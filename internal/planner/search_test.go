@@ -17,7 +17,7 @@ func TestSearch(t *testing.T) {
 		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
-		search := NewSearch(tblMeta, nil)
+		search := NewSearch(0, nil, tblMeta, nil)
 
 		// WHEN
 		exec, err := search.Build()
@@ -42,7 +42,7 @@ func TestSearch(t *testing.T) {
 				ast.NewRhsLiteral(ast.NewStringLiteral("Doe")),
 			),
 		}
-		search := NewSearch(tblMeta, where)
+		search := NewSearch(0, nil, tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -72,7 +72,7 @@ func TestSearch(t *testing.T) {
 				ast.NewRhsLiteral(ast.NewStringLiteral("John")),
 			),
 		}
-		search := NewSearch(tblMeta, where)
+		search := NewSearch(0, nil, tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -97,7 +97,7 @@ func TestSearch(t *testing.T) {
 				ast.NewRhsLiteral(ast.NewStringLiteral("value")),
 			),
 		}
-		search := NewSearch(tblMeta, where)
+		search := NewSearch(0, nil, tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -147,7 +147,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(tblMeta, where)
+		search := NewSearch(0, nil, tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -197,7 +197,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(tblMeta, where)
+		search := NewSearch(0, nil, tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -229,7 +229,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(tblMeta, where)
+		search := NewSearch(0, nil, tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -267,7 +267,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(tblMeta, where)
+		search := NewSearch(0, nil, tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -305,7 +305,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(tblMeta, where)
+		search := NewSearch(0, nil, tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -349,7 +349,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(tblMeta, where)
+		search := NewSearch(0, nil, tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -387,7 +387,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(tblMeta, where)
+		search := NewSearch(0, nil, tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -416,7 +416,7 @@ func TestSearch(t *testing.T) {
 				ast.NewRhsLiteral(ast.NewStringLiteral("value")),
 			),
 		}
-		search := NewSearch(tblMeta, where)
+		search := NewSearch(0, nil, tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -460,7 +460,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(tblMeta, where)
+		search := NewSearch(0, nil, tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -543,7 +543,7 @@ func TestComplexWhereWithData(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(tblMeta, where)
+		search := NewSearch(0, nil, tblMeta, where)
 		searchExec, err := search.Build()
 		assert.NoError(t, err)
 
@@ -586,7 +586,7 @@ func TestComplexWhereWithData(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(tblMeta, where)
+		search := NewSearch(0, nil, tblMeta, where)
 		searchExec, err := search.Build()
 		assert.NoError(t, err)
 
@@ -618,7 +618,7 @@ func TestComplexWhereWithData(t *testing.T) {
 				ast.NewRhsLiteral(ast.NewStringLiteral("1")),
 			),
 		}
-		search := NewSearch(tblMeta, where)
+		search := NewSearch(0, nil, tblMeta, where)
 		searchExec, err := search.Build()
 		assert.NoError(t, err)
 
@@ -672,7 +672,7 @@ func TestComplexWhereWithData(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(tblMeta, where)
+		search := NewSearch(0, nil, tblMeta, where)
 		searchExec, err := search.Build()
 		assert.NoError(t, err)
 

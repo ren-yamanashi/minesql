@@ -526,7 +526,7 @@ func deleteByCondition(t *testing.T, env *testEnv, tableName string, cond func([
 	tbl := env.tables[tableName]
 
 	// 削除対象のレコードを先にすべて取得する
-	iter, err := tbl.Search(env.bp, access.RecordSearchModeStart{})
+	iter, err := tbl.Search(env.bp, 0, nil, access.RecordSearchModeStart{})
 	assert.NoError(t, err)
 
 	var targets [][][]byte
@@ -543,7 +543,7 @@ func deleteByCondition(t *testing.T, env *testEnv, tableName string, cond func([
 
 	// 取得したレコードを削除
 	for _, record := range targets {
-		err := tbl.SoftDelete(env.bp, record)
+		err := tbl.SoftDelete(env.bp, 0, nil, record)
 		assert.NoError(t, err)
 	}
 }

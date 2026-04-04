@@ -12,6 +12,7 @@ import (
 	"minesql/internal/storage/config"
 	"minesql/internal/storage/dictionary"
 	"minesql/internal/storage/file"
+	"minesql/internal/storage/lock"
 	"minesql/internal/storage/page"
 	"minesql/internal/storage/transaction"
 )
@@ -35,6 +36,7 @@ var (
 // Handler はストレージ層のリソースの管理を行う
 type Handler struct {
 	BufferPool     *buffer.BufferPool
+	LockMgr        *lock.Manager
 	Catalog        *dictionary.Catalog
 	StatsCollector *dictionary.StatsCollector
 	undoLog        *transaction.UndoLog
@@ -121,13 +123,15 @@ func newHandler() (*Handler, error) {
 	}
 
 	undoLog := transaction.NewUndoLog()
+	lockMgr := lock.NewManager(config.GetLockWaitTimeout())
 
 	return &Handler{
 		BufferPool:     bp,
+		LockMgr:        lockMgr,
 		Catalog:        catalog,
 		StatsCollector: dictionary.NewStatsCollector(bp),
 		undoLog:        undoLog,
-		trxManager:     transaction.NewManager(undoLog),
+		trxManager:     transaction.NewManager(undoLog, lockMgr),
 		baseDirectory:  dataDir,
 	}, nil
 }

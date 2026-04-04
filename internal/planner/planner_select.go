@@ -7,7 +7,7 @@ import (
 	"minesql/internal/storage/handler"
 )
 
-func PlanSelect(stmt *ast.SelectStmt) (executor.Executor, error) {
+func PlanSelect(trxId handler.TrxId, stmt *ast.SelectStmt) (executor.Executor, error) {
 	hdl := handler.Get()
 
 	// 対象テーブルのメタデータを取得
@@ -17,7 +17,7 @@ func PlanSelect(stmt *ast.SelectStmt) (executor.Executor, error) {
 	}
 
 	// WHERE 句を元に検索用の Executor を構築
-	search := NewSearch(tblMeta, stmt.Where)
+	search := NewSearch(trxId, hdl.LockMgr, tblMeta, stmt.Where)
 	iterator, err := search.Build()
 	if err != nil {
 		return nil, err
