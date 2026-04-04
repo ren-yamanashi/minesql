@@ -47,11 +47,11 @@ func (ss *TableScan) Next() (Record, error) {
 
 	// レコード取得
 	record, ok, err := ss.iterator.Next()
-	if !ok {
-		return nil, nil
-	}
 	if err != nil {
 		return nil, err
+	}
+	if !ok {
+		return nil, nil
 	}
 
 	// 継続条件をチェック

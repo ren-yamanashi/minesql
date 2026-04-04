@@ -322,6 +322,45 @@ func TestConcurrentLock(t *testing.T) {
 		assert.NoError(t, lockErr)
 	})
 
+	t.Run("解放後も排他ロック待機者の後ろの共有ロックは付与されない (FIFO)", func(t *testing.T) {
+		// GIVEN: trx1, trx2 が共有ロックを保持
+		m := NewManager(200)
+		pos := slotPos(0)
+		err := m.Lock(1, pos, Shared)
+		assert.NoError(t, err)
+		err = m.Lock(2, pos, Shared)
+		assert.NoError(t, err)
+
+		var wg sync.WaitGroup
+		var err3, err4 error
+
+		// trx3 が排他ロックを待機
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err3 = m.Lock(3, pos, Exclusive)
+		}()
+
+		// trx4 が共有ロックを待機 (trx3 の後ろ)
+		time.Sleep(20 * time.Millisecond)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			err4 = m.Lock(4, pos, Shared)
+		}()
+
+		// WHEN: trx1 を解放 (trx2 はまだ保持)
+		// grantWaitingLocks: trx3(exclusive) は trx2 がいるため付与不可 → break → trx4 も未処理
+		time.Sleep(50 * time.Millisecond)
+		m.ReleaseAll(1)
+
+		wg.Wait()
+
+		// THEN: trx2 がまだ保持しているため、trx3 も trx4 もタイムアウト
+		assert.ErrorIs(t, err3, ErrTimeout)
+		assert.ErrorIs(t, err4, ErrTimeout)
+	})
+
 	t.Run("排他ロック待機中にタイムアウトした場合_待機キューから削除される", func(t *testing.T) {
 		// GIVEN
 		m := NewManager(50)
