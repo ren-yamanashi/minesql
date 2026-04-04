@@ -12,8 +12,8 @@ var ErrTimeout = errors.New("lock wait timeout")
 // Manager は行レベルロックを管理する
 type Manager struct {
 	lockTable map[page.SlotPosition]*lockState // 行ごとのロック状態を管理するマップ
+	mutex     sync.Mutex                       // lockTable への同時アクセスを防ぐための mutex
 	heldLocks map[TrxId][]page.SlotPosition    // トランザクションごとのロック保持行リスト
-	mu        sync.Mutex                       // lockTable への同時アクセスを防ぐための mutex
 	cond      *sync.Cond                       // ロックの状態変化を待ち受けるための条件変数
 	timeout   time.Duration                    // ロック取得のタイムアウト値
 }
@@ -24,7 +24,7 @@ func NewManager(timeoutMs int) *Manager {
 		heldLocks: make(map[TrxId][]page.SlotPosition),
 		timeout:   time.Duration(timeoutMs) * time.Millisecond,
 	}
-	m.cond = sync.NewCond(&m.mu)
+	m.cond = sync.NewCond(&m.mutex)
 	return m
 }
 
@@ -33,8 +33,8 @@ func NewManager(timeoutMs int) *Manager {
 // 競合がなければ即座にロックを付与する。競合がある場合は待機キューに追加し、
 // ロックが付与されるかタイムアウトするまで待機する
 func (m *Manager) Lock(trxId TrxId, pos page.SlotPosition, mode LockMode) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	state, exists := m.lockTable[pos]
 
@@ -64,10 +64,10 @@ func (m *Manager) Lock(trxId TrxId, pos page.SlotPosition, mode LockMode) error 
 	// タイムアウト用のタイマーを起動
 	timedOut := false
 	timer := time.AfterFunc(m.timeout, func() {
-		m.mu.Lock()
+		m.mutex.Lock()
 		timedOut = true
 		m.cond.Broadcast()
-		m.mu.Unlock()
+		m.mutex.Unlock()
 	})
 	defer timer.Stop()
 
@@ -90,8 +90,8 @@ func (m *Manager) Lock(trxId TrxId, pos page.SlotPosition, mode LockMode) error 
 //
 // 解放後、待機キュー内のリクエストに対してロックの付与を試みる
 func (m *Manager) ReleaseAll(trxId TrxId) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
 
 	for _, pos := range m.heldLocks[trxId] {
 		state, exists := m.lockTable[pos]

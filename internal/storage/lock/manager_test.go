@@ -195,9 +195,9 @@ func TestReleaseAll(t *testing.T) {
 		m.ReleaseAll(1)
 
 		// THEN
-		m.mu.Lock()
+		m.mutex.Lock()
 		_, exists := m.lockTable[pos]
-		m.mu.Unlock()
+		m.mutex.Unlock()
 		assert.False(t, exists)
 	})
 }
@@ -333,10 +333,10 @@ func TestConcurrentLock(t *testing.T) {
 
 		// THEN
 		assert.ErrorIs(t, err, ErrTimeout)
-		m.mu.Lock()
+		m.mutex.Lock()
 		state := m.lockTable[pos]
 		assert.Equal(t, 0, len(state.waitQueue))
-		m.mu.Unlock()
+		m.mutex.Unlock()
 	})
 }
 
