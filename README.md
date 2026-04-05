@@ -39,4 +39,4 @@ make build-client
 | [DELETE](./docs/feature/delete.md) | ✅ | |
 | [UPDATE](./docs/feature/update.md) | ✅ | |
 | JOIN | - | |
-| Transaction | - | Just "Atomicity" |
+| Transaction | - | Just "Atomicity", "Isolation" |
