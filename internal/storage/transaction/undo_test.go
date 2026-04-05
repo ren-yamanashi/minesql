@@ -113,10 +113,6 @@ func TestUndoIntegration(t *testing.T) {
 	})
 }
 
-// -------------------------------------------------
-// Undo テスト用ヘルパー
-// -------------------------------------------------
-
 func setupTestTableForUndo(t *testing.T, uniqueIndexes []*UniqueIndex) (*Table, *buffer.BufferPool) {
 	t.Helper()
 	tmpdir := t.TempDir()
