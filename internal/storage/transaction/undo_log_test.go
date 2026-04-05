@@ -78,6 +78,62 @@ func TestGetRecords(t *testing.T) {
 	})
 }
 
+func TestPopLast(t *testing.T) {
+	t.Run("最後のレコードが削除される", func(t *testing.T) {
+		// GIVEN
+		undoLog := NewUndoLog()
+		undoLog.Append(1, &mockLogRecord{id: 1})
+		undoLog.Append(1, &mockLogRecord{id: 2})
+		undoLog.Append(1, &mockLogRecord{id: 3})
+
+		// WHEN
+		undoLog.PopLast(1)
+
+		// THEN
+		records := undoLog.GetRecords(1)
+		assert.Equal(t, 2, len(records))
+		assert.Equal(t, &mockLogRecord{id: 1}, records[0])
+		assert.Equal(t, &mockLogRecord{id: 2}, records[1])
+	})
+
+	t.Run("レコードが 1 件の場合、空になる", func(t *testing.T) {
+		// GIVEN
+		undoLog := NewUndoLog()
+		undoLog.Append(1, &mockLogRecord{id: 1})
+
+		// WHEN
+		undoLog.PopLast(1)
+
+		// THEN
+		records := undoLog.GetRecords(1)
+		assert.Equal(t, 0, len(records))
+	})
+
+	t.Run("レコードが 0 件の場合、パニックしない", func(t *testing.T) {
+		// GIVEN
+		undoLog := NewUndoLog()
+
+		// WHEN / THEN
+		assert.NotPanics(t, func() {
+			undoLog.PopLast(1)
+		})
+	})
+
+	t.Run("他のトランザクションのレコードに影響しない", func(t *testing.T) {
+		// GIVEN
+		undoLog := NewUndoLog()
+		undoLog.Append(1, &mockLogRecord{id: 1})
+		undoLog.Append(2, &mockLogRecord{id: 2})
+
+		// WHEN
+		undoLog.PopLast(1)
+
+		// THEN
+		assert.Equal(t, 0, len(undoLog.GetRecords(1)))
+		assert.Equal(t, 1, len(undoLog.GetRecords(2)))
+	})
+}
+
 func TestDiscard(t *testing.T) {
 	t.Run("指定した trxId のレコードが破棄される", func(t *testing.T) {
 		// GIVEN

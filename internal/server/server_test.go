@@ -443,6 +443,50 @@ func TestExecuteQueryTransaction(t *testing.T) {
 	})
 }
 
+func TestConnectionDisconnectReleasesLock(t *testing.T) {
+	t.Run("接続切断時にアクティブなトランザクションのロックが解放される", func(t *testing.T) {
+		// GIVEN
+		s := setupTestServer(t)
+		t.Setenv("MINESQL_LOCK_WAIT_TIMEOUT", "200")
+		handler.Reset()
+		handler.Init()
+		defer handler.Reset()
+
+		sess1 := newSession()
+
+		// テーブル作成
+		_, err := s.executeQuery(sess1, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		assert.NoError(t, err)
+
+		// sess1 でトランザクション開始 → INSERT (排他ロック取得)
+		_, err = s.executeQuery(sess1, "BEGIN;")
+		assert.NoError(t, err)
+		_, err = s.executeQuery(sess1, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
+		assert.NoError(t, err)
+
+		// WHEN: sess1 の接続が切断される (auto-rollback をシミュレート)
+		hdl := handler.Get()
+		err = hdl.RollbackTrx(sess1.trxId)
+		assert.NoError(t, err)
+		sess1.trxId = 0
+
+		// THEN: sess2 が同じ行を INSERT できる (ロックが解放されている)
+		sess2 := newSession()
+		_, err = s.executeQuery(sess2, "BEGIN;")
+		assert.NoError(t, err)
+		_, err = s.executeQuery(sess2, "INSERT INTO users (id, name) VALUES ('1', 'Bob');")
+		assert.NoError(t, err)
+		_, err = s.executeQuery(sess2, "COMMIT;")
+		assert.NoError(t, err)
+
+		// データが Bob になっている
+		sess3 := newSession()
+		result, err := s.executeQuery(sess3, "SELECT * FROM users;")
+		assert.NoError(t, err)
+		assert.Contains(t, result, "1,Bob")
+	})
+}
+
 func setupTestServer(t *testing.T) *Server {
 	t.Helper()
 	tmpdir := t.TempDir()
