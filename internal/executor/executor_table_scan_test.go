@@ -3,6 +3,7 @@ package executor
 import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
+	"minesql/internal/storage/lock"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -25,7 +26,7 @@ func TestNewTableScan(t *testing.T) {
 
 		// WHEN
 		seqScan := NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			whileCondition,
 		)
@@ -48,7 +49,7 @@ func TestTableScan_Next(t *testing.T) {
 		assert.NoError(t, err)
 
 		seqScan := NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool {
 				return string(record[0]) < "c" // プライマリキーが "c" 未満の間、継続
@@ -85,7 +86,7 @@ func TestTableScan_Next(t *testing.T) {
 		assert.NoError(t, err)
 
 		seqScan := NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("b")}},
 			func(record Record) bool {
 				return string(record[0]) <= "d" // プライマリキーが "d" 以下の間、継続
@@ -140,15 +141,15 @@ func InitStorageEngineForTest(t *testing.T, dataDir string) *handler.Handler {
 	assert.NoError(t, err)
 
 	// 行を挿入
-	err = tbl.Insert(hdl.BufferPool, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+	err = tbl.Insert(hdl.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 	assert.NoError(t, err)
-	err = tbl.Insert(hdl.BufferPool, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+	err = tbl.Insert(hdl.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 	assert.NoError(t, err)
-	err = tbl.Insert(hdl.BufferPool, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
+	err = tbl.Insert(hdl.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
 	assert.NoError(t, err)
-	err = tbl.Insert(hdl.BufferPool, [][]byte{[]byte("d"), []byte("Eve"), []byte("Davis")})
+	err = tbl.Insert(hdl.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("d"), []byte("Eve"), []byte("Davis")})
 	assert.NoError(t, err)
-	err = tbl.Insert(hdl.BufferPool, [][]byte{[]byte("e"), []byte("Charlie"), []byte("Brown")})
+	err = tbl.Insert(hdl.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("e"), []byte("Charlie"), []byte("Brown")})
 	assert.NoError(t, err)
 
 	return hdl

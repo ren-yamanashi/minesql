@@ -5,6 +5,7 @@ import (
 	"minesql/internal/executor"
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
+	"minesql/internal/storage/lock"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -43,7 +44,7 @@ func TestPlanUpdate(t *testing.T) {
 
 		tbl := getPlannerTable(t, "users")
 		hdl := handler.Get()
-		err := tbl.Insert(hdl.BufferPool, [][]byte{[]byte("1"), []byte("John"), []byte("Smith")})
+		err := tbl.Insert(hdl.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("1"), []byte("John"), []byte("Smith")})
 		assert.NoError(t, err)
 
 		var trxId handler.TrxId = 1
@@ -63,7 +64,7 @@ func TestPlanUpdate(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: 更新後のレコードが正しい
-		iter, err := tbl.Search(hdl.BufferPool, access.RecordSearchModeStart{})
+		iter, err := tbl.Search(hdl.BufferPool, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -160,9 +161,9 @@ func TestPlanUpdate(t *testing.T) {
 		tbl := getPlannerTable(t, "users")
 
 		// データを挿入
-		err := tbl.Insert(hdl.BufferPool, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err := tbl.Insert(hdl.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
-		err = tbl.Insert(hdl.BufferPool, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		err = tbl.Insert(hdl.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
 
 		// "a" の first_name を "Jane" に更新する
@@ -188,7 +189,7 @@ func TestPlanUpdate(t *testing.T) {
 
 		// THEN: "a" の first_name が "Jane" に更新されている
 		scan := executor.NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
@@ -258,7 +259,7 @@ func TestPlanUpdate(t *testing.T) {
 
 		tbl := getPlannerTable(t, "users")
 		hdl := handler.Get()
-		err := tbl.Insert(hdl.BufferPool, [][]byte{[]byte("1"), []byte("John"), []byte("Smith")})
+		err := tbl.Insert(hdl.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("1"), []byte("John"), []byte("Smith")})
 		assert.NoError(t, err)
 
 		var trxId handler.TrxId = 1
@@ -275,7 +276,7 @@ func TestPlanUpdate(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: レコードは変更されていない
-		iter, err := tbl.Search(hdl.BufferPool, access.RecordSearchModeStart{})
+		iter, err := tbl.Search(hdl.BufferPool, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)

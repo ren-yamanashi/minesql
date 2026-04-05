@@ -3,6 +3,7 @@ package executor
 import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
+	"minesql/internal/storage/lock"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,7 +22,7 @@ func TestProject(t *testing.T) {
 		// WHEN: first_name (pos=1) と last_name (pos=2) のみ取得
 		records := collectAll(t, NewProject(
 			NewTableScan(
-				tbl,
+				0, lock.NewManager(5000), tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -49,7 +50,7 @@ func TestProject(t *testing.T) {
 		// WHEN: first_name (pos=1) のみ取得
 		records := collectAll(t, NewProject(
 			NewTableScan(
-				tbl,
+				0, lock.NewManager(5000), tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -77,7 +78,7 @@ func TestProject(t *testing.T) {
 		// WHEN: last_name (pos=2), id (pos=0) の順で取得
 		records := collectAll(t, NewProject(
 			NewTableScan(
-				tbl,
+				0, lock.NewManager(5000), tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -103,7 +104,7 @@ func TestProject(t *testing.T) {
 		records := collectAll(t, NewProject(
 			NewFilter(
 				NewTableScan(
-					tbl,
+					0, lock.NewManager(5000), tbl,
 					access.RecordSearchModeStart{},
 					func(record Record) bool { return true },
 				),
@@ -132,7 +133,7 @@ func TestProject(t *testing.T) {
 		records := collectAll(t, NewProject(
 			NewFilter(
 				NewTableScan(
-					tbl,
+					0, lock.NewManager(5000), tbl,
 					access.RecordSearchModeStart{},
 					func(record Record) bool { return true },
 				),

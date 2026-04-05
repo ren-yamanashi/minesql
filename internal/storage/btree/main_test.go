@@ -555,7 +555,7 @@ func TestBTreeCRUDLifecycle(t *testing.T) {
 		writeScanLog(&w, bp, tree)
 
 		// Search (FindByKey)
-		record, err := tree.FindByKey(bp, []byte("banana"))
+		record, _, err := tree.FindByKey(bp, []byte("banana"))
 		require.NoError(t, err)
 		fmt.Fprintf(&w, "FindByKey(banana): value=%s x %d\n", string(record.NonKeyBytes()[:1]), len(record.NonKeyBytes()))
 
@@ -570,7 +570,7 @@ func TestBTreeCRUDLifecycle(t *testing.T) {
 		writeScanLog(&w, bp, tree)
 
 		// FindByKey で削除済みキーが見つからない
-		_, err = tree.FindByKey(bp, []byte("banana"))
+		_, _, err = tree.FindByKey(bp, []byte("banana"))
 		fmt.Fprintf(&w, "FindByKey(banana): %v\n", err)
 
 		expected := `=== Insert 後 ===

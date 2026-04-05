@@ -7,17 +7,22 @@ import (
 	"minesql/internal/executor"
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
+	"minesql/internal/storage/lock"
 	"strconv"
 )
 
 // Search は WHERE 句に基づいてレコードを検索する Executor を構築する
 type Search struct {
+	trxId   handler.TrxId
+	lockMgr *lock.Manager
 	tblMeta *handler.TableMetadata
 	where   *ast.WhereClause
 }
 
-func NewSearch(tblMeta *handler.TableMetadata, where *ast.WhereClause) *Search {
+func NewSearch(trxId handler.TrxId, lockMgr *lock.Manager, tblMeta *handler.TableMetadata, where *ast.WhereClause) *Search {
 	return &Search{
+		trxId:   trxId,
+		lockMgr: lockMgr,
 		tblMeta: tblMeta,
 		where:   where,
 	}
@@ -32,6 +37,8 @@ func (sp *Search) Build() (executor.Executor, error) {
 	// WHERE 句が設定されていない場合フルテーブルスキャンを実行
 	if sp.where == nil {
 		return executor.NewTableScan(
+			sp.trxId,
+			sp.lockMgr,
 			tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool {
@@ -113,6 +120,8 @@ func (s *Search) planForBinaryExpr(tbl *access.Table, expr ast.BinaryExpr) (exec
 func (s *Search) chooseBestPlan(tbl *access.Table, leaves []leafCondition, cond func(executor.Record) bool) (executor.Executor, error) {
 	tableScanPlan := executor.NewFilter(
 		executor.NewTableScan(
+			s.trxId,
+			s.lockMgr,
 			tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
@@ -253,7 +262,7 @@ func (s *Search) buildPKScanPlan(tbl *access.Table, leaf leafCondition, cond fun
 		filterRequired = true
 	}
 
-	scan := executor.NewTableScan(tbl, searchMode, whileCond)
+	scan := executor.NewTableScan(s.trxId, s.lockMgr, tbl, searchMode, whileCond)
 	if filterRequired {
 		return executor.NewFilter(scan, cond)
 	}
@@ -272,6 +281,8 @@ func (s *Search) buildPKScanPlan(tbl *access.Table, leaf leafCondition, cond fun
 func (s *Search) planForORCondition(tbl *access.Table, expr ast.BinaryExpr, cond func(executor.Record) bool) (executor.Executor, error) {
 	tableScanPlan := executor.NewFilter(
 		executor.NewTableScan(
+			s.trxId,
+			s.lockMgr,
 			tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },

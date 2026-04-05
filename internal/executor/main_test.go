@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
+	"minesql/internal/storage/lock"
 	"strings"
 	"testing"
 
@@ -18,7 +19,7 @@ func TestExecutorIntegration(t *testing.T) {
 
 		// WHEN
 		records := collectAll(t, NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
@@ -46,7 +47,7 @@ func TestExecutorIntegration(t *testing.T) {
 
 		// WHEN: プライマリキーが "w" 以上 "y" 以下
 		records := collectAll(t, NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("w")}},
 			func(record Record) bool {
 				return string(record[0]) <= "y"
@@ -74,7 +75,7 @@ func TestExecutorIntegration(t *testing.T) {
 
 		// WHEN
 		records := collectAll(t, NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("y")}},
 			func(record Record) bool {
 				return string(record[0]) == "y"
@@ -101,7 +102,7 @@ func TestExecutorIntegration(t *testing.T) {
 		// WHEN: first_name が "Charlie" のレコード
 		records := collectAll(t, NewFilter(
 			NewTableScan(
-				tbl,
+				0, lock.NewManager(5000), tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -230,7 +231,7 @@ func TestExecutorIntegration(t *testing.T) {
 			{Pos: 2, Value: []byte("Anderson")},
 		}, NewFilter(
 			NewTableScan(
-				tbl,
+				0, lock.NewManager(5000), tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -243,7 +244,7 @@ func TestExecutorIntegration(t *testing.T) {
 
 		// THEN: テーブルスキャンとインデックススキャンの両方で確認
 		tableRecords := collectAll(t, NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
@@ -289,7 +290,7 @@ func TestExecutorIntegration(t *testing.T) {
 		upd := NewUpdate(trxId, tbl, []SetColumn{
 			{Pos: 0, Value: []byte("a")},
 		}, NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("v")}},
 			func(record Record) bool {
 				return string(record[0]) == "v"
@@ -300,7 +301,7 @@ func TestExecutorIntegration(t *testing.T) {
 
 		// THEN
 		records := collectAll(t, NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
@@ -328,7 +329,7 @@ func TestExecutorIntegration(t *testing.T) {
 		// WHEN: first_name (pos=1) と last_name (pos=2) のみ取得
 		records := collectAll(t, NewProject(
 			NewTableScan(
-				tbl,
+				0, lock.NewManager(5000), tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -360,7 +361,7 @@ func TestExecutorIntegration(t *testing.T) {
 		records := collectAll(t, NewProject(
 			NewFilter(
 				NewTableScan(
-					tbl,
+					0, lock.NewManager(5000), tbl,
 					access.RecordSearchModeStart{},
 					func(record Record) bool { return true },
 				),
@@ -395,7 +396,7 @@ func TestExecutorIntegration(t *testing.T) {
 		// WHEN: Bob を削除
 		del := NewDelete(trxId, tbl, NewFilter(
 			NewTableScan(
-				tbl,
+				0, lock.NewManager(5000), tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -408,7 +409,7 @@ func TestExecutorIntegration(t *testing.T) {
 
 		// THEN: テーブルスキャンとインデックススキャンの両方で確認
 		tableRecords := collectAll(t, NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))

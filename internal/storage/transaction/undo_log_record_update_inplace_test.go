@@ -2,6 +2,7 @@ package transaction
 
 import (
 	"minesql/internal/storage/access"
+	"minesql/internal/storage/lock"
 	"minesql/internal/storage/page"
 	"testing"
 
@@ -15,9 +16,9 @@ func TestUpdateInplaceLogRecord_Undo(t *testing.T) {
 
 		prevRecord := [][]byte{[]byte("a"), []byte("John")}
 		newRecord := [][]byte{[]byte("a"), []byte("Jane")}
-		err := table.Insert(bp, prevRecord)
+		err := table.Insert(bp, 0, lock.NewManager(5000), prevRecord)
 		assert.NoError(t, err)
-		err = table.UpdateInplace(bp, prevRecord, newRecord)
+		err = table.UpdateInplace(bp, 0, lock.NewManager(5000), prevRecord, newRecord)
 		assert.NoError(t, err)
 
 		undoRecord := UndoUpdateInplaceRecord{
@@ -25,7 +26,7 @@ func TestUpdateInplaceLogRecord_Undo(t *testing.T) {
 		}
 
 		// WHEN
-		err = undoRecord.Undo(bp)
+		err = undoRecord.Undo(bp, 0, lock.NewManager(5000))
 
 		// THEN: 元の値に戻っている
 		assert.NoError(t, err)
@@ -41,9 +42,9 @@ func TestUpdateInplaceLogRecord_Undo(t *testing.T) {
 
 		prevRecord := [][]byte{[]byte("a"), []byte("John")}
 		newRecord := [][]byte{[]byte("a"), []byte("Jane")}
-		err := table.Insert(bp, prevRecord)
+		err := table.Insert(bp, 0, lock.NewManager(5000), prevRecord)
 		assert.NoError(t, err)
-		err = table.UpdateInplace(bp, prevRecord, newRecord)
+		err = table.UpdateInplace(bp, 0, lock.NewManager(5000), prevRecord, newRecord)
 		assert.NoError(t, err)
 
 		undoRecord := UndoUpdateInplaceRecord{
@@ -51,7 +52,7 @@ func TestUpdateInplaceLogRecord_Undo(t *testing.T) {
 		}
 
 		// WHEN
-		err = undoRecord.Undo(bp)
+		err = undoRecord.Undo(bp, 0, lock.NewManager(5000))
 
 		// THEN: ユニークインデックスも元の値に戻っている
 		assert.NoError(t, err)

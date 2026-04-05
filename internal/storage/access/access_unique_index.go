@@ -80,7 +80,7 @@ func (ui *UniqueIndex) Insert(bp *buffer.BufferPool, encodedPK []byte, columns [
 		}
 
 		// 重複キーの場合、既存がソフトデリート済みなら Update で上書き
-		existing, findErr := btr.FindByKey(bp, fullKey)
+		existing, _, findErr := btr.FindByKey(bp, fullKey)
 		if findErr != nil {
 			return findErr
 		}

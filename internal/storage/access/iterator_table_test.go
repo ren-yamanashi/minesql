@@ -1,6 +1,7 @@
 package access
 
 import (
+	"minesql/internal/storage/lock"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,15 +15,15 @@ func TestTableIterator(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
 		assert.NoError(t, err)
 
 		// WHEN
-		iter, err := table.Search(bp, RecordSearchModeStart{})
+		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
 		assert.NoError(t, err)
 
 		var records [][]byte
@@ -55,15 +56,15 @@ func TestTableIterator(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("c"), []byte("Bob")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("c"), []byte("Bob")})
 		assert.NoError(t, err)
 
 		// WHEN: キー "b" から検索
-		iter, err := table.Search(bp, RecordSearchModeKey{Key: [][]byte{[]byte("b")}})
+		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeKey{Key: [][]byte{[]byte("b")}})
 		assert.NoError(t, err)
 
 		record, ok, err := iter.Next()
@@ -82,7 +83,7 @@ func TestTableIterator(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		iter, err := table.Search(bp, RecordSearchModeStart{})
+		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
 		assert.NoError(t, err)
 
 		record, ok, err := iter.Next()
@@ -100,19 +101,19 @@ func TestTableIterator(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Alice")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Alice")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Bob")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Bob")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("c"), []byte("Charlie")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("c"), []byte("Charlie")})
 		assert.NoError(t, err)
 
 		// "b" をソフトデリート
-		err = table.SoftDelete(bp, [][]byte{[]byte("b"), []byte("Bob")})
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Bob")})
 		assert.NoError(t, err)
 
 		// WHEN
-		iter, err := table.Search(bp, RecordSearchModeStart{})
+		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
 		assert.NoError(t, err)
 
 		var records [][][]byte
@@ -138,18 +139,18 @@ func TestTableIterator(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("Alice")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Alice")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Bob")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Bob")})
 		assert.NoError(t, err)
 
-		err = table.SoftDelete(bp, [][]byte{[]byte("a"), []byte("Alice")})
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Alice")})
 		assert.NoError(t, err)
-		err = table.SoftDelete(bp, [][]byte{[]byte("b"), []byte("Bob")})
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Bob")})
 		assert.NoError(t, err)
 
 		// WHEN
-		iter, err := table.Search(bp, RecordSearchModeStart{})
+		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
 		assert.NoError(t, err)
 
 		record, ok, err := iter.Next()
@@ -167,13 +168,13 @@ func TestTableIterator(t *testing.T) {
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("1"), []byte("value1")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("1"), []byte("value1")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("2"), []byte("value2")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("2"), []byte("value2")})
 		assert.NoError(t, err)
 
 		// WHEN
-		iter, err := table.Search(bp, RecordSearchModeStart{})
+		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
 		assert.NoError(t, err)
 
 		record1, ok, err := iter.Next()

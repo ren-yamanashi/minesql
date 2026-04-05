@@ -28,11 +28,14 @@ func fetchAll(t *testing.T, iter executor.Executor) []executor.Record {
 // AST を直接構築 → PlanStart → ExecutePlan で実行する
 func executePlan(t *testing.T, stmt ast.Statement) []executor.Record {
 	t.Helper()
-	var trxId handler.TrxId = 1
+	hdl := handler.Get()
+	trxId := hdl.BeginTrx()
 	exec, err := Start(trxId, stmt)
 	assert.NoError(t, err)
 
-	return fetchAll(t, exec)
+	records := fetchAll(t, exec)
+	hdl.CommitTrx(trxId)
+	return records
 }
 
 // ストレージを初期化し、5 カラムの users テーブルを作成してデータを投入する

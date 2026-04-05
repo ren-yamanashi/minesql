@@ -3,7 +3,10 @@ package executor
 import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
+	"minesql/internal/storage/lock"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -17,7 +20,7 @@ func TestNewUpdate(t *testing.T) {
 		}
 
 		iterator := NewTableScan(
-			nil,
+			0, lock.NewManager(5000), nil,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -46,7 +49,7 @@ func TestUpdate_Next(t *testing.T) {
 		upd := NewUpdate(trxId, tbl, []SetColumn{
 			{Pos: 1, Value: []byte("Updated")},
 		}, NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
@@ -59,7 +62,7 @@ func TestUpdate_Next(t *testing.T) {
 
 		// THEN: 全レコードの first_name が "Updated" になっている
 		scan := NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -88,7 +91,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 1, Value: []byte("Jane")},
 			{Pos: 2, Value: []byte("Updated")},
 		}, NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
@@ -103,7 +106,7 @@ func TestUpdate_Next(t *testing.T) {
 
 		// THEN: "a" のレコードが更新され、他は変わらない
 		scan := NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -131,7 +134,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 2, Value: []byte("Williams")},
 		}, NewFilter(
 			NewTableScan(
-				tbl,
+				0, lock.NewManager(5000), tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -148,7 +151,7 @@ func TestUpdate_Next(t *testing.T) {
 
 		// THEN: "Bob" の last_name が "Williams" に更新され、他は変わらない
 		scan := NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -184,7 +187,7 @@ func TestUpdate_Next(t *testing.T) {
 		upd := NewUpdate(trxId, tbl, []SetColumn{
 			{Pos: 2, Value: []byte("Zebra")},
 		}, NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
@@ -242,7 +245,7 @@ func TestUpdate_Next(t *testing.T) {
 		upd := NewUpdate(trxId, tbl, []SetColumn{
 			{Pos: 0, Value: []byte("z")},
 		}, NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
@@ -257,7 +260,7 @@ func TestUpdate_Next(t *testing.T) {
 
 		// THEN: "a" が消え "z" が追加されている
 		scan := NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -289,7 +292,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 2, Value: []byte("Changed")},
 		}, NewFilter(
 			NewTableScan(
-				tbl,
+				0, lock.NewManager(5000), tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -306,7 +309,7 @@ func TestUpdate_Next(t *testing.T) {
 
 		// THEN: 全レコードが変更されていない
 		scan := NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -340,7 +343,7 @@ func TestUpdate_Next(t *testing.T) {
 		upd := NewUpdate(trxId, tbl, []SetColumn{
 			{Pos: 1, Value: []byte("new_value")},
 		}, NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
@@ -351,4 +354,382 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 	})
+
+	t.Run("UPDATE 中に同じ行を UPDATE しようとするとブロックされる", func(t *testing.T) {
+		// GIVEN
+		initLockTestHandler(t)
+		defer handler.Reset()
+
+		hdl := handler.Get()
+		tbl := createLockTestTable(t)
+		insertLockTestData(t, tbl)
+
+		trx1 := hdl.BeginTrx()
+
+		// trx1 が UPDATE を実行 (排他ロック取得)
+		upd1 := NewUpdate(trx1, tbl, []SetColumn{
+			{Pos: 1, Value: []byte("Updated1")},
+		}, NewTableScan(
+			trx1, hdl.LockMgr, tbl,
+			access.RecordSearchModeStart{},
+			func(record Record) bool { return string(record[0]) == "a" },
+		))
+		_, err := upd1.Next()
+		assert.NoError(t, err)
+
+		// WHEN: trx2 が同じ行を UPDATE しようとする (排他ロック待ち → タイムアウト)
+		var wg sync.WaitGroup
+		var updateErr error
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			trx2 := hdl.BeginTrx()
+			upd2 := NewUpdate(trx2, tbl, []SetColumn{
+				{Pos: 1, Value: []byte("Updated2")},
+			}, NewTableScan(
+				trx2, hdl.LockMgr, tbl,
+				access.RecordSearchModeStart{},
+				func(record Record) bool { return string(record[0]) == "a" },
+			))
+			_, updateErr = upd2.Next()
+		}()
+
+		wg.Wait()
+
+		// THEN
+		assert.ErrorIs(t, updateErr, lock.ErrTimeout)
+
+		hdl.CommitTrx(trx1)
+	})
+
+	t.Run("COMMIT 後は他のトランザクションが排他ロックを取得できる", func(t *testing.T) {
+		// GIVEN
+		initLockTestHandler(t)
+		defer handler.Reset()
+
+		hdl := handler.Get()
+		tbl := createLockTestTable(t)
+		insertLockTestData(t, tbl)
+
+		trx1 := hdl.BeginTrx()
+
+		// trx1 が UPDATE (排他ロック取得)
+		upd := NewUpdate(trx1, tbl, []SetColumn{
+			{Pos: 1, Value: []byte("Updated")},
+		}, NewTableScan(
+			trx1, hdl.LockMgr, tbl,
+			access.RecordSearchModeStart{},
+			func(record Record) bool { return string(record[0]) == "a" },
+		))
+		_, err := upd.Next()
+		assert.NoError(t, err)
+
+		// WHEN: trx1 を COMMIT (ロック解放)
+		hdl.CommitTrx(trx1)
+
+		// THEN: trx2 が同じ行を UPDATE できる
+		trx2 := hdl.BeginTrx()
+		upd2 := NewUpdate(trx2, tbl, []SetColumn{
+			{Pos: 1, Value: []byte("Updated2")},
+		}, NewTableScan(
+			trx2, hdl.LockMgr, tbl,
+			access.RecordSearchModeStart{},
+			func(record Record) bool { return string(record[0]) == "a" },
+		))
+		_, err = upd2.Next()
+		assert.NoError(t, err)
+
+		hdl.CommitTrx(trx2)
+	})
+
+	t.Run("排他ロック解放後に待機中のトランザクションがロックを取得できる", func(t *testing.T) {
+		// GIVEN
+		initLockTestHandler(t)
+		defer handler.Reset()
+
+		hdl := handler.Get()
+		tbl := createLockTestTable(t)
+		insertLockTestData(t, tbl)
+
+		trx1 := hdl.BeginTrx()
+
+		// trx1 が UPDATE (排他ロック取得)
+		upd := NewUpdate(trx1, tbl, []SetColumn{
+			{Pos: 1, Value: []byte("Updated1")},
+		}, NewTableScan(
+			trx1, hdl.LockMgr, tbl,
+			access.RecordSearchModeStart{},
+			func(record Record) bool { return string(record[0]) == "a" },
+		))
+		_, err := upd.Next()
+		assert.NoError(t, err)
+
+		// WHEN: trx2 が同じ行を UPDATE しようとする (別 goroutine で待機)
+		var wg sync.WaitGroup
+		var updateErr error
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			trx2 := hdl.BeginTrx()
+			upd2 := NewUpdate(trx2, tbl, []SetColumn{
+				{Pos: 1, Value: []byte("Updated2")},
+			}, NewTableScan(
+				trx2, hdl.LockMgr, tbl,
+				access.RecordSearchModeStart{},
+				func(record Record) bool { return string(record[0]) == "a" },
+			))
+			_, updateErr = upd2.Next()
+			hdl.CommitTrx(trx2)
+		}()
+
+		// trx1 を COMMIT して排他ロックを解放
+		time.Sleep(50 * time.Millisecond)
+		hdl.CommitTrx(trx1)
+
+		wg.Wait()
+
+		// THEN: trx2 がロックを取得でき、UPDATE が成功する
+		assert.NoError(t, updateErr)
+
+		// 更新後のデータを確認
+		records := collectLockTestRecords(t, tbl)
+		assert.Equal(t, 2, len(records))
+		assert.Equal(t, "Updated2", string(records[0][1]))
+	})
+
+	t.Run("ROLLBACK 後はデータが元に戻り、他のトランザクションが更新できる", func(t *testing.T) {
+		// GIVEN
+		initLockTestHandler(t)
+		defer handler.Reset()
+
+		hdl := handler.Get()
+		tbl := createLockTestTable(t)
+		insertLockTestData(t, tbl)
+
+		trx1 := hdl.BeginTrx()
+
+		// trx1 が UPDATE (排他ロック取得)
+		upd := NewUpdate(trx1, tbl, []SetColumn{
+			{Pos: 1, Value: []byte("RolledBack")},
+		}, NewTableScan(
+			trx1, hdl.LockMgr, tbl,
+			access.RecordSearchModeStart{},
+			func(record Record) bool { return string(record[0]) == "a" },
+		))
+		_, err := upd.Next()
+		assert.NoError(t, err)
+
+		// WHEN: trx1 を ROLLBACK (ロック解放 + データ巻き戻し)
+		err = hdl.RollbackTrx(trx1)
+		assert.NoError(t, err)
+
+		// THEN: データが元に戻っている
+		records := collectLockTestRecords(t, tbl)
+		assert.Equal(t, 2, len(records))
+		assert.Equal(t, "Alice", string(records[0][1]))
+
+		// THEN: trx2 が同じ行を UPDATE できる (ロックが解放されている)
+		trx2 := hdl.BeginTrx()
+		upd2 := NewUpdate(trx2, tbl, []SetColumn{
+			{Pos: 1, Value: []byte("Updated")},
+		}, NewTableScan(
+			trx2, hdl.LockMgr, tbl,
+			access.RecordSearchModeStart{},
+			func(record Record) bool { return string(record[0]) == "a" },
+		))
+		_, err = upd2.Next()
+		assert.NoError(t, err)
+		hdl.CommitTrx(trx2)
+	})
+
+	t.Run("デッドロック発生後に ROLLBACK が成功する", func(t *testing.T) {
+		// GIVEN: T1 と T2 が同じ行に共有ロックを保持し、互いに排他昇格でデッドロック
+		initLockTestHandler(t)
+		defer handler.Reset()
+
+		hdl := handler.Get()
+		tbl := createLockTestTable(t)
+		insertLockTestData(t, tbl)
+
+		// T1: SELECT (共有ロック取得)
+		trx1 := hdl.BeginTrx()
+		scan1 := NewTableScan(
+			trx1, hdl.LockMgr, tbl,
+			access.RecordSearchModeStart{},
+			func(record Record) bool { return string(record[0]) == "a" },
+		)
+		record1, err := scan1.Next()
+		assert.NoError(t, err)
+		assert.NotNil(t, record1)
+
+		// T2: SELECT (共有ロック取得、共有同士は競合しない)
+		trx2 := hdl.BeginTrx()
+		scan2 := NewTableScan(
+			trx2, hdl.LockMgr, tbl,
+			access.RecordSearchModeStart{},
+			func(record Record) bool { return string(record[0]) == "a" },
+		)
+		record2, err := scan2.Next()
+		assert.NoError(t, err)
+		assert.NotNil(t, record2)
+
+		// T1: UPDATE → 排他ロック昇格を試みる → T2 が共有保持中 → タイムアウト
+		var wg sync.WaitGroup
+		var upd1Err, upd2Err error
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			upd1 := NewUpdate(trx1, tbl, []SetColumn{
+				{Pos: 1, Value: []byte("Trx1Updated")},
+			}, NewTableScan(
+				trx1, hdl.LockMgr, tbl,
+				access.RecordSearchModeStart{},
+				func(record Record) bool { return string(record[0]) == "a" },
+			))
+			_, upd1Err = upd1.Next()
+		}()
+
+		// T2: UPDATE → 排他ロック昇格を試みる → T1 が共有保持中 → タイムアウト
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			upd2 := NewUpdate(trx2, tbl, []SetColumn{
+				{Pos: 1, Value: []byte("Trx2Updated")},
+			}, NewTableScan(
+				trx2, hdl.LockMgr, tbl,
+				access.RecordSearchModeStart{},
+				func(record Record) bool { return string(record[0]) == "a" },
+			))
+			_, upd2Err = upd2.Next()
+		}()
+
+		wg.Wait()
+
+		// 両方タイムアウト (デッドロック)
+		assert.ErrorIs(t, upd1Err, lock.ErrTimeout)
+		assert.ErrorIs(t, upd2Err, lock.ErrTimeout)
+
+		// WHEN: 両方を ROLLBACK
+		err = hdl.RollbackTrx(trx1)
+		assert.NoError(t, err)
+
+		err = hdl.RollbackTrx(trx2)
+		assert.NoError(t, err)
+
+		// THEN: データが元のまま
+		records := collectLockTestRecords(t, tbl)
+		assert.Equal(t, 2, len(records))
+		assert.Equal(t, "Alice", string(records[0][1]))
+		assert.Equal(t, "Bob", string(records[1][1]))
+	})
+
+	t.Run("UPDATE 済みの行がある状態で ROLLBACK が成功する", func(t *testing.T) {
+		// GIVEN
+		initLockTestHandler(t)
+		defer handler.Reset()
+
+		hdl := handler.Get()
+		tbl := createLockTestTable(t)
+		insertLockTestData(t, tbl)
+
+		// trx1 が row "a" を UPDATE (排他ロック + undo 記録)
+		trx1 := hdl.BeginTrx()
+		upd := NewUpdate(trx1, tbl, []SetColumn{
+			{Pos: 1, Value: []byte("Updated")},
+		}, NewTableScan(
+			trx1, hdl.LockMgr, tbl,
+			access.RecordSearchModeStart{},
+			func(record Record) bool { return string(record[0]) == "a" },
+		))
+		_, err := upd.Next()
+		assert.NoError(t, err)
+
+		// trx2 が row "a" を排他ロック保持 (trx1 の COMMIT 後)
+		hdl.CommitTrx(trx1)
+
+		trx2 := hdl.BeginTrx()
+		upd2 := NewUpdate(trx2, tbl, []SetColumn{
+			{Pos: 1, Value: []byte("Trx2Updated")},
+		}, NewTableScan(
+			trx2, hdl.LockMgr, tbl,
+			access.RecordSearchModeStart{},
+			func(record Record) bool { return string(record[0]) == "a" },
+		))
+		_, err = upd2.Next()
+		assert.NoError(t, err)
+
+		// WHEN: trx2 を ROLLBACK (trx2 が排他ロック保持中の row "a" を undo)
+		err = hdl.RollbackTrx(trx2)
+
+		// THEN: ROLLBACK が成功し、row "a" が元に戻る
+		assert.NoError(t, err)
+
+		records := collectLockTestRecords(t, tbl)
+		assert.Equal(t, 2, len(records))
+		assert.Equal(t, "Updated", string(records[0][1])) // trx1 の更新値に戻る
+	})
+}
+
+// initLockTestHandler はロックテスト用に handler を初期化する (タイムアウト短め)
+func initLockTestHandler(t *testing.T) {
+	t.Helper()
+	tmpdir := t.TempDir()
+	t.Setenv("MINESQL_DATA_DIR", tmpdir)
+	t.Setenv("MINESQL_BUFFER_SIZE", "10")
+	t.Setenv("MINESQL_LOCK_WAIT_TIMEOUT", "200")
+	handler.Reset()
+	handler.Init()
+}
+
+func createLockTestTable(t *testing.T) *access.Table {
+	t.Helper()
+	createTable := NewCreateTable("lock_test", 1, nil, []handler.CreateColumnParam{
+		{Name: "id", Type: handler.ColumnTypeString},
+		{Name: "name", Type: handler.ColumnTypeString},
+	})
+	_, err := createTable.Next()
+	assert.NoError(t, err)
+
+	hdl := handler.Get()
+	tblMeta, ok := hdl.Catalog.GetTableMetaByName("lock_test")
+	assert.True(t, ok)
+	tbl, err := tblMeta.GetTable()
+	assert.NoError(t, err)
+	return tbl
+}
+
+func insertLockTestData(t *testing.T, tbl *access.Table) {
+	t.Helper()
+	hdl := handler.Get()
+	trxId := hdl.BeginTrx()
+	ins := NewInsert(trxId, tbl, []Record{
+		{[]byte("a"), []byte("Alice")},
+		{[]byte("b"), []byte("Bob")},
+	})
+	_, err := ins.Next()
+	assert.NoError(t, err)
+	hdl.CommitTrx(trxId)
+}
+
+func collectLockTestRecords(t *testing.T, tbl *access.Table) []Record {
+	t.Helper()
+	hdl := handler.Get()
+	trx := hdl.BeginTrx()
+	scan := NewTableScan(
+		trx, hdl.LockMgr, tbl,
+		access.RecordSearchModeStart{},
+		func(record Record) bool { return true },
+	)
+	var records []Record
+	for {
+		record, err := scan.Next()
+		assert.NoError(t, err)
+		if record == nil {
+			break
+		}
+		records = append(records, record)
+	}
+	hdl.CommitTrx(trx)
+	return records
 }

@@ -3,6 +3,7 @@ package executor
 import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
+	"minesql/internal/storage/lock"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -61,7 +62,7 @@ func TestInsert_Next(t *testing.T) {
 			return true
 		}
 		seqScan := NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			whileCondition,
 		)
@@ -72,6 +73,38 @@ func TestInsert_Next(t *testing.T) {
 			assert.Equal(t, records[i][0], record[0])
 			assert.Equal(t, records[i][1], record[1])
 		}
+	})
+
+	t.Run("INSERT で対象行に排他ロックが取得される", func(t *testing.T) {
+		// GIVEN
+		initLockTestHandler(t)
+		defer handler.Reset()
+
+		hdl := handler.Get()
+		tbl := createLockTestTable(t)
+
+		trx1 := hdl.BeginTrx()
+
+		// WHEN: trx1 が INSERT (排他ロック取得)
+		ins := NewInsert(trx1, tbl, []Record{
+			{[]byte("a"), []byte("Alice")},
+		})
+		_, err := ins.Next()
+		assert.NoError(t, err)
+
+		// THEN: trx2 が同じ行を UPDATE しようとするとタイムアウト
+		trx2 := hdl.BeginTrx()
+		upd := NewUpdate(trx2, tbl, []SetColumn{
+			{Pos: 1, Value: []byte("Updated")},
+		}, NewTableScan(
+			trx2, hdl.LockMgr, tbl,
+			access.RecordSearchModeStart{},
+			func(record Record) bool { return string(record[0]) == "a" },
+		))
+		_, err = upd.Next()
+		assert.ErrorIs(t, err, lock.ErrTimeout)
+
+		hdl.CommitTrx(trx1)
 	})
 }
 

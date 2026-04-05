@@ -3,6 +3,7 @@ package transaction
 import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/lock"
 )
 
 type UndoDeleteRecord struct {
@@ -18,6 +19,6 @@ func NewUndoDeleteRecord(table *access.Table, record [][]byte) UndoDeleteRecord 
 }
 
 // Undo は Delete したレコードを挿入する
-func (r UndoDeleteRecord) Undo(bp *buffer.BufferPool) error {
-	return r.table.Insert(bp, r.Record)
+func (r UndoDeleteRecord) Undo(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager) error {
+	return r.table.Insert(bp, trxId, lockMgr, r.Record)
 }

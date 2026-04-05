@@ -8,6 +8,7 @@ import (
 	"minesql/internal/executor"
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
+	"minesql/internal/storage/lock"
 )
 
 // セットアップヘルパー: テーブルを作成し、サンプルデータを挿入する
@@ -107,7 +108,7 @@ func ExampleTableScan_fullScan() {
 
 	// フルテーブルスキャン (プライマリキー昇順)
 	iter := executor.NewTableScan(
-		tbl,
+		0, lock.NewManager(5000), tbl,
 		access.RecordSearchModeStart{},
 		func(record executor.Record) bool { return true },
 	)
@@ -128,7 +129,7 @@ func ExampleTableScan_rangeScan() {
 
 	// プライマリキーが "w" 以上 "y" 以下の範囲スキャン
 	iter := executor.NewTableScan(
-		tbl,
+		0, lock.NewManager(5000), tbl,
 		access.RecordSearchModeKey{Key: [][]byte{[]byte("w")}},
 		func(record executor.Record) bool {
 			return string(record[0]) <= "y"
@@ -149,7 +150,7 @@ func ExampleTableScan_constSearch() {
 
 	// プライマリキーが "y" のレコードを検索
 	iter := executor.NewTableScan(
-		tbl,
+		0, lock.NewManager(5000), tbl,
 		access.RecordSearchModeKey{Key: [][]byte{[]byte("y")}},
 		func(record executor.Record) bool {
 			return string(record[0]) == "y"
@@ -169,7 +170,7 @@ func ExampleFilter() {
 	// フルテーブルスキャン + first_name が "Charlie" のレコードのみフィルタ
 	iter := executor.NewFilter(
 		executor.NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		),
@@ -291,7 +292,7 @@ func ExampleProject() {
 	// フルテーブルスキャンから first_name と last_name のみ取得
 	iter := executor.NewProject(
 		executor.NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		),
@@ -316,7 +317,7 @@ func ExampleProject_withFilter() {
 	iter := executor.NewProject(
 		executor.NewFilter(
 			executor.NewTableScan(
-				tbl,
+				0, lock.NewManager(5000), tbl,
 				access.RecordSearchModeStart{},
 				func(record executor.Record) bool { return true },
 			),
@@ -348,7 +349,7 @@ func ExampleUpdate() {
 		{Pos: 2, Value: []byte("Anderson")},
 	}, executor.NewFilter(
 		executor.NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		),
@@ -362,7 +363,7 @@ func ExampleUpdate() {
 
 	fmt.Println("=== テーブルスキャン ===")
 	printExampleRecords(executor.NewTableScan(
-		tbl,
+		0, lock.NewManager(5000), tbl,
 		access.RecordSearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
@@ -401,7 +402,7 @@ func ExampleUpdate_primaryKey() {
 	upd := executor.NewUpdate(trxId, tbl, []executor.SetColumn{
 		{Pos: 0, Value: []byte("a")},
 	}, executor.NewTableScan(
-		tbl,
+		0, lock.NewManager(5000), tbl,
 		access.RecordSearchModeKey{Key: [][]byte{[]byte("v")}},
 		func(record executor.Record) bool {
 			return string(record[0]) == "v"
@@ -412,7 +413,7 @@ func ExampleUpdate_primaryKey() {
 	}
 
 	printExampleRecords(executor.NewTableScan(
-		tbl,
+		0, lock.NewManager(5000), tbl,
 		access.RecordSearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
@@ -439,7 +440,7 @@ func ExampleDelete() {
 	var trxId handler.TrxId = 1
 	del := executor.NewDelete(trxId, tbl, executor.NewFilter(
 		executor.NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		),
@@ -453,7 +454,7 @@ func ExampleDelete() {
 
 	fmt.Println("=== テーブルスキャン ===")
 	printExampleRecords(executor.NewTableScan(
-		tbl,
+		0, lock.NewManager(5000), tbl,
 		access.RecordSearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))

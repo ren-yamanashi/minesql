@@ -532,7 +532,7 @@ func TestDelete(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		record, err := bt.FindByKey(bp, []byte("key1"))
+		record, _, err := bt.FindByKey(bp, []byte("key1"))
 		assert.NoError(t, err)
 		assert.Equal(t, "new_val1", string(record.NonKeyBytes()))
 	})
@@ -702,7 +702,7 @@ func TestFindByKey(t *testing.T) {
 		bt.mustInsert(bp, "ccc", "v3")
 
 		// WHEN
-		record, err := bt.FindByKey(bp, []byte("bbb"))
+		record, _, err := bt.FindByKey(bp, []byte("bbb"))
 
 		// THEN
 		assert.NoError(t, err)
@@ -717,7 +717,7 @@ func TestFindByKey(t *testing.T) {
 		bt.mustInsert(bp, "bbb", "v2")
 
 		// WHEN
-		record, err := bt.FindByKey(bp, []byte("aaa"))
+		record, _, err := bt.FindByKey(bp, []byte("aaa"))
 
 		// THEN
 		assert.NoError(t, err)
@@ -732,7 +732,7 @@ func TestFindByKey(t *testing.T) {
 		bt.mustInsert(bp, "bbb", "v2")
 
 		// WHEN
-		record, err := bt.FindByKey(bp, []byte("bbb"))
+		record, _, err := bt.FindByKey(bp, []byte("bbb"))
 
 		// THEN
 		assert.NoError(t, err)
@@ -747,7 +747,7 @@ func TestFindByKey(t *testing.T) {
 		bt.mustInsert(bp, "ccc", "v3")
 
 		// WHEN
-		_, err := bt.FindByKey(bp, []byte("bbb"))
+		_, _, err := bt.FindByKey(bp, []byte("bbb"))
 
 		// THEN
 		assert.ErrorIs(t, err, ErrKeyNotFound)
@@ -758,7 +758,7 @@ func TestFindByKey(t *testing.T) {
 		bt, bp := setupBTree(t)
 
 		// WHEN
-		_, err := bt.FindByKey(bp, []byte("aaa"))
+		_, _, err := bt.FindByKey(bp, []byte("aaa"))
 
 		// THEN
 		assert.ErrorIs(t, err, ErrKeyNotFound)
@@ -771,7 +771,7 @@ func TestFindByKey(t *testing.T) {
 		bt.mustInsert(bp, "bbb", "v2")
 
 		// WHEN
-		_, err := bt.FindByKey(bp, []byte("zzz"))
+		_, _, err := bt.FindByKey(bp, []byte("zzz"))
 
 		// THEN
 		assert.ErrorIs(t, err, ErrKeyNotFound)
@@ -788,11 +788,11 @@ func TestFindByKey(t *testing.T) {
 		}
 
 		// WHEN: 先頭・中間・末尾のキーを検索
-		first, err := bt.FindByKey(bp, []byte("key000"))
+		first, _, err := bt.FindByKey(bp, []byte("key000"))
 		assert.NoError(t, err)
-		mid, err := bt.FindByKey(bp, []byte("key050"))
+		mid, _, err := bt.FindByKey(bp, []byte("key050"))
 		assert.NoError(t, err)
-		last, err := bt.FindByKey(bp, []byte("key099"))
+		last, _, err := bt.FindByKey(bp, []byte("key099"))
 		assert.NoError(t, err)
 
 		// THEN
@@ -810,7 +810,7 @@ func TestFindByKey(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		record, err := bt.FindByKey(bp, []byte("key1"))
+		record, _, err := bt.FindByKey(bp, []byte("key1"))
 
 		// THEN
 		assert.NoError(t, err)
@@ -827,13 +827,13 @@ func TestFindByKey(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		_, err = bt.FindByKey(bp, []byte("key1"))
+		_, _, err = bt.FindByKey(bp, []byte("key1"))
 
 		// THEN: 物理削除されているため見つからない
 		assert.ErrorIs(t, err, ErrKeyNotFound)
 
 		// 他のキーは取得できる
-		record, err := bt.FindByKey(bp, []byte("key2"))
+		record, _, err := bt.FindByKey(bp, []byte("key2"))
 		assert.NoError(t, err)
 		assert.Equal(t, "val2", string(record.NonKeyBytes()))
 	})

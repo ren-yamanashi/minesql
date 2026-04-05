@@ -6,6 +6,7 @@ import (
 	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/encode"
 	"minesql/internal/storage/file"
+	"minesql/internal/storage/lock"
 	"minesql/internal/storage/page"
 	"path/filepath"
 	"testing"
@@ -22,25 +23,25 @@ func TestUndoIntegration(t *testing.T) {
 		// 初期データ: ("a", "Alice"), ("b", "Bob")
 		recordA := [][]byte{[]byte("a"), []byte("Alice")}
 		recordB := [][]byte{[]byte("b"), []byte("Bob")}
-		err := table.Insert(bp, recordA)
+		err := table.Insert(bp, 0, lock.NewManager(5000), recordA)
 		assert.NoError(t, err)
-		err = table.Insert(bp, recordB)
+		err = table.Insert(bp, 0, lock.NewManager(5000), recordB)
 		assert.NoError(t, err)
 
 		// 操作1: ("a", "Alice") を ("a", "Carol") に UpdateInplace
 		updatedA := [][]byte{[]byte("a"), []byte("Carol")}
-		err = table.UpdateInplace(bp, recordA, updatedA)
+		err = table.UpdateInplace(bp, 0, lock.NewManager(5000), recordA, updatedA)
 		assert.NoError(t, err)
 		undo1 := UndoUpdateInplaceRecord{table: table, PrevRecord: recordA, NewRecord: updatedA}
 
 		// 操作2: ("b", "Bob") を SoftDelete
-		err = table.SoftDelete(bp, recordB)
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), recordB)
 		assert.NoError(t, err)
 		undo2 := UndoDeleteRecord{table: table, Record: recordB}
 
 		// 操作3: ("c", "Dave") を Insert
 		recordC := [][]byte{[]byte("c"), []byte("Dave")}
-		err = table.Insert(bp, recordC)
+		err = table.Insert(bp, 0, lock.NewManager(5000), recordC)
 		assert.NoError(t, err)
 		undo3 := UndoInsertRecord{table: table, Record: recordC}
 
@@ -51,11 +52,11 @@ func TestUndoIntegration(t *testing.T) {
 		assert.Equal(t, []string{"c", "Dave"}, records[1])
 
 		// WHEN: 逆順に Undo
-		err = undo3.Undo(bp)
+		err = undo3.Undo(bp, 0, lock.NewManager(5000))
 		assert.NoError(t, err)
-		err = undo2.Undo(bp)
+		err = undo2.Undo(bp, 0, lock.NewManager(5000))
 		assert.NoError(t, err)
-		err = undo1.Undo(bp)
+		err = undo1.Undo(bp, 0, lock.NewManager(5000))
 		assert.NoError(t, err)
 
 		// THEN: 初期状態に戻っている
@@ -75,21 +76,21 @@ func TestUndoIntegration(t *testing.T) {
 
 		// 初期データ: ("a", "Alice")
 		recordA := [][]byte{[]byte("a"), []byte("Alice")}
-		err := table.Insert(bp, recordA)
+		err := table.Insert(bp, 0, lock.NewManager(5000), recordA)
 		assert.NoError(t, err)
 
 		// 操作1: PK を "a" → "x" に変更 (Outofplace = SoftDelete + Insert)
 		newRecordX := [][]byte{[]byte("x"), []byte("Alice")}
-		err = table.SoftDelete(bp, recordA)
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), recordA)
 		assert.NoError(t, err)
-		err = table.Insert(bp, newRecordX)
+		err = table.Insert(bp, 0, lock.NewManager(5000), newRecordX)
 		assert.NoError(t, err)
 		undo1Delete := UndoDeleteRecord{table: table, Record: recordA}
 		undo1Insert := UndoInsertRecord{table: table, Record: newRecordX}
 
 		// 操作2: ("x", "Alice") を ("x", "Bob") に UpdateInplace
 		updatedX := [][]byte{[]byte("x"), []byte("Bob")}
-		err = table.UpdateInplace(bp, newRecordX, updatedX)
+		err = table.UpdateInplace(bp, 0, lock.NewManager(5000), newRecordX, updatedX)
 		assert.NoError(t, err)
 		undo2 := UndoUpdateInplaceRecord{table: table, PrevRecord: newRecordX, NewRecord: updatedX}
 
@@ -99,11 +100,11 @@ func TestUndoIntegration(t *testing.T) {
 		assert.Equal(t, []string{"x", "Bob"}, records[0])
 
 		// WHEN: 逆順に Undo (操作2 → 操作1 の Insert → 操作1 の Delete)
-		err = undo2.Undo(bp)
+		err = undo2.Undo(bp, 0, lock.NewManager(5000))
 		assert.NoError(t, err)
-		err = undo1Insert.Undo(bp)
+		err = undo1Insert.Undo(bp, 0, lock.NewManager(5000))
 		assert.NoError(t, err)
-		err = undo1Delete.Undo(bp)
+		err = undo1Delete.Undo(bp, 0, lock.NewManager(5000))
 		assert.NoError(t, err)
 
 		// THEN: 初期状態に戻っている
@@ -141,7 +142,7 @@ func setupTestTableForUndo(t *testing.T, uniqueIndexes []*access.UniqueIndex) (*
 
 func collectActiveRecords(t *testing.T, table *access.Table, bp *buffer.BufferPool) [][]string {
 	t.Helper()
-	iter, err := table.Search(bp, access.RecordSearchModeStart{})
+	iter, err := table.Search(bp, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
 	assert.NoError(t, err)
 
 	var records [][]string

@@ -7,6 +7,7 @@ import (
 	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/encode"
+	"minesql/internal/storage/lock"
 	"minesql/internal/storage/page"
 )
 
@@ -29,14 +30,16 @@ func NewTable(name string, metaPageId page.PageId, primaryKeyCount uint8, unique
 	}
 }
 
-// Search は指定した検索モードでテーブルを検索し、ClusteredIndexIterator を返す
-func (t *Table) Search(bp *buffer.BufferPool, mode RecordSearchMode) (*TableIterator, error) {
+// Search は指定した検索モードでテーブルを検索し、TableIterator を返す
+//
+// 各行の読み取り時に lockMgr を通じて共有ロックを取得する
+func (t *Table) Search(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, mode RecordSearchMode) (*TableIterator, error) {
 	btr := btree.NewBTree(t.MetaPageId)
 	iterator, err := btr.Search(bp, mode.encode())
 	if err != nil {
 		return nil, err
 	}
-	return newTableIterator(iterator, bp), nil
+	return newTableIterator(iterator, bp, trxId, lockMgr), nil
 }
 
 // Create は空のテーブルを新規作成する
@@ -58,10 +61,10 @@ func (t *Table) Create(bp *buffer.BufferPool) error {
 	return nil
 }
 
-// Insert はテーブルに行を挿入する
+// Insert はテーブルに行を挿入する (挿入後に対象行に対して排他ロックを取得する)
 //
 // ソフトデリート済みの同一キーが存在する場合は Update で上書きする
-func (t *Table) Insert(bp *buffer.BufferPool, columns [][]byte) error {
+func (t *Table) Insert(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, columns [][]byte) error {
 	btr := btree.NewBTree(t.MetaPageId)
 
 	btrRecord := t.encodeBTreeRecord(columns, 0)
@@ -74,7 +77,7 @@ func (t *Table) Insert(bp *buffer.BufferPool, columns [][]byte) error {
 		}
 
 		// 重複キーの場合、既存レコードがソフトデリート済みか確認する
-		existing, findErr := btr.FindByKey(bp, encodedKey)
+		existing, _, findErr := btr.FindByKey(bp, encodedKey)
 		if findErr != nil {
 			return findErr
 		}
@@ -89,6 +92,17 @@ func (t *Table) Insert(bp *buffer.BufferPool, columns [][]byte) error {
 		}
 	}
 
+	// 対象行を検索
+	_, pos, err := btr.FindByKey(bp, encodedKey)
+	if err != nil {
+		return err
+	}
+
+	// 排他ロックを取得
+	if err := lockMgr.Lock(trxId, pos, lock.Exclusive); err != nil {
+		return err
+	}
+
 	// ユニークインデックスに挿入
 	for _, ui := range t.UniqueIndexes {
 		err := ui.Insert(bp, encodedKey, columns)
@@ -100,12 +114,23 @@ func (t *Table) Insert(bp *buffer.BufferPool, columns [][]byte) error {
 	return nil
 }
 
-// Delete はテーブルから行を物理削除する
+// Delete はテーブルから行を物理削除する (対象行に対して排他ロックを取得してから物理削除する)
 //   - columns: 削除する行のカラム値 (プライマリキーを含む全カラム)
-func (t *Table) Delete(bp *buffer.BufferPool, columns [][]byte) error {
+func (t *Table) Delete(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, columns [][]byte) error {
 	btr := btree.NewBTree(t.MetaPageId)
 
+	// 対象行を検索
 	encodedKey := t.EncodeKey(columns)
+	_, pos, err := btr.FindByKey(bp, encodedKey)
+	if err != nil {
+		return err
+	}
+
+	// 排他ロックを取得
+	if err := lockMgr.Lock(trxId, pos, lock.Exclusive); err != nil {
+		return err
+	}
+
 	if err := btr.Delete(bp, encodedKey); err != nil {
 		return err
 	}
@@ -121,11 +146,23 @@ func (t *Table) Delete(bp *buffer.BufferPool, columns [][]byte) error {
 	return nil
 }
 
-// SoftDelete はテーブルから行をソフトデリートする
+// SoftDelete はテーブルから行をソフトデリートする (対象行に対して排他ロックを取得してからソフトデリートする)
 //
 // B+Tree からレコードを物理削除せず、DeleteMark を 1 に設定する
-func (t *Table) SoftDelete(bp *buffer.BufferPool, columns [][]byte) error {
+func (t *Table) SoftDelete(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, columns [][]byte) error {
 	btr := btree.NewBTree(t.MetaPageId)
+
+	// 対象行を検索
+	encodedKey := t.EncodeKey(columns)
+	_, pos, err := btr.FindByKey(bp, encodedKey)
+	if err != nil {
+		return err
+	}
+
+	// 排他ロックを取得
+	if err := lockMgr.Lock(trxId, pos, lock.Exclusive); err != nil {
+		return err
+	}
 
 	btrRecord := t.encodeBTreeRecord(columns, 1)
 	if err := btr.Update(bp, btrRecord); err != nil {
@@ -133,7 +170,6 @@ func (t *Table) SoftDelete(bp *buffer.BufferPool, columns [][]byte) error {
 	}
 
 	// ユニークインデックスをソフトデリート
-	encodedKey := t.EncodeKey(columns)
 	for _, ui := range t.UniqueIndexes {
 		err := ui.Delete(bp, encodedKey, columns)
 		if err != nil {
@@ -144,13 +180,26 @@ func (t *Table) SoftDelete(bp *buffer.BufferPool, columns [][]byte) error {
 	return nil
 }
 
-// UpdateInplace はテーブルの行をインプレース更新する
+// UpdateInplace はテーブルの行をインプレース更新する (対象行に対して排他ロックを取得してから更新する)
 //
 // プライマリキーが変わらないことを前提とする (プライマリキーが変わる場合は呼び出し側で SoftDelete + Insert を行う)
 //
 // ユニークインデックスは物理削除 (old) + 挿入 (new) で更新する
-func (t *Table) UpdateInplace(bp *buffer.BufferPool, oldColumns [][]byte, newColumns [][]byte) error {
+func (t *Table) UpdateInplace(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, oldColumns [][]byte, newColumns [][]byte) error {
 	btr := btree.NewBTree(t.MetaPageId)
+
+	// 対象行を検索
+	encodedKey := t.EncodeKey(oldColumns)
+	_, pos, err := btr.FindByKey(bp, encodedKey)
+	if err != nil {
+		return err
+	}
+
+	// 排他ロックを取得
+	if err := lockMgr.Lock(trxId, pos, lock.Exclusive); err != nil {
+		return err
+	}
+
 	btrRecord := t.encodeBTreeRecord(newColumns, 0)
 	if err := btr.Update(bp, btrRecord); err != nil {
 		return err

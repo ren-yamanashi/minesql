@@ -19,6 +19,13 @@ func GetBufferPoolSize() int {
 	return getEnvInt("MINESQL_BUFFER_SIZE", 100)
 }
 
+// GetLockWaitTimeout はロック取得のタイムアウト値 (ミリ秒) を取得する
+//
+// 環境変数 MINESQL_LOCK_WAIT_TIMEOUT が設定されていればその値を、なければデフォルト値を返す
+func GetLockWaitTimeout() int {
+	return getEnvInt("MINESQL_LOCK_WAIT_TIMEOUT", 30000)
+}
+
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value

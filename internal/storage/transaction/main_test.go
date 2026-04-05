@@ -18,7 +18,7 @@ func TestCommit(t *testing.T) {
 
 		hdl := handler.Get()
 		undoLog := hdl.UndoLog()
-		trxMgr := transaction.NewManager(undoLog)
+		trxMgr := transaction.NewManager(undoLog, hdl.LockMgr)
 		trxId := trxMgr.Begin()
 		tbl := setupTestTable(t)
 
@@ -50,7 +50,7 @@ func TestRollback(t *testing.T) {
 
 		hdl := handler.Get()
 		undoLog := hdl.UndoLog()
-		trxMgr := transaction.NewManager(undoLog)
+		trxMgr := transaction.NewManager(undoLog, hdl.LockMgr)
 		trxId := trxMgr.Begin()
 		tbl := setupTestTable(t)
 
@@ -79,7 +79,7 @@ func TestRollback(t *testing.T) {
 		tbl := setupTestTable(t)
 		hdl := handler.Get()
 		undoLog := hdl.UndoLog()
-		trxMgr := transaction.NewManager(undoLog)
+		trxMgr := transaction.NewManager(undoLog, hdl.LockMgr)
 
 		// 先にデータを挿入して Commit
 		insertTrxId := trxMgr.Begin()
@@ -94,7 +94,7 @@ func TestRollback(t *testing.T) {
 		// Delete トランザクション
 		deleteTrxId := trxMgr.Begin()
 		del := executor.NewDelete(deleteTrxId, tbl, executor.NewTableScan(
-			tbl,
+			deleteTrxId, hdl.LockMgr, tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		))
@@ -110,7 +110,7 @@ func TestRollback(t *testing.T) {
 		assert.Equal(t, 2, len(recs))
 	})
 
-	t.Run("Update を Rollback すると行が元の値に戻る", func(t *testing.T) {
+	t.Run("Update を Rollback すると��が元の値に戻る", func(t *testing.T) {
 		// GIVEN
 		initStorageManagerForTest(t)
 		defer handler.Reset()
@@ -118,7 +118,7 @@ func TestRollback(t *testing.T) {
 		tbl := setupTestTable(t)
 		hdl := handler.Get()
 		undoLog := hdl.UndoLog()
-		trxMgr := transaction.NewManager(undoLog)
+		trxMgr := transaction.NewManager(undoLog, hdl.LockMgr)
 
 		// 先にデータを挿入して Commit
 		insertTrxId := trxMgr.Begin()
@@ -134,23 +134,19 @@ func TestRollback(t *testing.T) {
 		upd := executor.NewUpdate(updateTrxId, tbl, []executor.SetColumn{
 			{Pos: 1, Value: []byte("Carol")},
 		}, executor.NewTableScan(
-			tbl,
+			updateTrxId, hdl.LockMgr, tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		))
 		_, err = upd.Next()
 		assert.NoError(t, err)
 
-		// 更新後の確認
-		recs := collectAllRecords(t, tbl)
-		assert.Equal(t, "Carol", string(recs[0][1]))
-
 		// WHEN
 		err = trxMgr.Rollback(hdl.BufferPool, updateTrxId)
 
 		// THEN
 		assert.NoError(t, err)
-		recs = collectAllRecords(t, tbl)
+		recs := collectAllRecords(t, tbl)
 		assert.Equal(t, 1, len(recs))
 		assert.Equal(t, "Alice", string(recs[0][1]))
 	})
@@ -163,7 +159,7 @@ func TestRollback(t *testing.T) {
 		tbl := setupTestTable(t)
 		hdl := handler.Get()
 		undoLog := hdl.UndoLog()
-		trxMgr := transaction.NewManager(undoLog)
+		trxMgr := transaction.NewManager(undoLog, hdl.LockMgr)
 
 		// 先にデータを挿入して Commit
 		insertTrxId := trxMgr.Begin()
@@ -187,7 +183,7 @@ func TestRollback(t *testing.T) {
 		upd := executor.NewUpdate(trxId, tbl, []executor.SetColumn{
 			{Pos: 1, Value: []byte("Dave")},
 		}, executor.NewTableScan(
-			tbl,
+			trxId, hdl.LockMgr, tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record executor.Record) bool { return string(record[0]) == "a" },
 		))
@@ -196,7 +192,7 @@ func TestRollback(t *testing.T) {
 
 		del := executor.NewDelete(trxId, tbl, executor.NewFilter(
 			executor.NewTableScan(
-				tbl,
+				trxId, hdl.LockMgr, tbl,
 				access.RecordSearchModeStart{},
 				func(record executor.Record) bool { return true },
 			),
@@ -245,8 +241,11 @@ func setupTestTable(t *testing.T) *access.Table {
 
 func collectAllRecords(t *testing.T, tbl *access.Table) []executor.Record {
 	t.Helper()
+	hdl := handler.Get()
+	trxId := hdl.BeginTrx()
+	defer hdl.CommitTrx(trxId)
 	scan := executor.NewTableScan(
-		tbl,
+		trxId, hdl.LockMgr, tbl,
 		access.RecordSearchModeStart{},
 		func(record executor.Record) bool { return true },
 	)

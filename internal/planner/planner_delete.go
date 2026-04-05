@@ -18,7 +18,7 @@ func PlanDelete(trxId handler.TrxId, stmt *ast.DeleteStmt) (executor.Executor, e
 	}
 
 	// WHERE 句を元に検索用の Executor を構築
-	search := NewSearch(tblMeta, stmt.Where)
+	search := NewSearch(trxId, hdl.LockMgr, tblMeta, stmt.Where)
 	iterator, err := search.Build()
 	if err != nil {
 		return nil, err

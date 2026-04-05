@@ -71,7 +71,8 @@ func TestShutdown_Listen(t *testing.T) {
 		}()
 
 		time.Sleep(10 * time.Millisecond)
-		syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+		err = syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+		assert.NoError(t, err)
 
 		// THEN
 		select {
@@ -99,7 +100,8 @@ func TestShutdown_Listen(t *testing.T) {
 		}()
 
 		time.Sleep(10 * time.Millisecond)
-		syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+		err = syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+		assert.NoError(t, err)
 
 		// THEN
 		select {
@@ -127,7 +129,8 @@ func TestShutdown_Listen(t *testing.T) {
 		}()
 
 		time.Sleep(10 * time.Millisecond)
-		syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+		err = syscall.Kill(syscall.Getpid(), syscall.SIGINT)
+		assert.NoError(t, err)
 
 		// THEN
 		select {

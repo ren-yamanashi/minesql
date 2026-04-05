@@ -1,6 +1,7 @@
 package access
 
 import (
+	"minesql/internal/storage/lock"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -19,11 +20,11 @@ func TestUniqueIndexIterator(t *testing.T) {
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
 		assert.NoError(t, err)
 
 		// WHEN: インデックスを先頭から検索
@@ -68,9 +69,9 @@ func TestUniqueIndexIterator(t *testing.T) {
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
 
 		// WHEN: キー "Smith" で検索
@@ -122,15 +123,15 @@ func TestUniqueIndexIterator(t *testing.T) {
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")})
 		assert.NoError(t, err)
 
 		// "Doe" を持つ行をソフトデリート
-		err = table.SoftDelete(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
 
 		// WHEN: インデックスを先頭から検索
@@ -167,14 +168,14 @@ func TestUniqueIndexIterator(t *testing.T) {
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
-		err = table.Insert(bp, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
 
-		err = table.SoftDelete(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
-		err = table.SoftDelete(bp, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
 		assert.NoError(t, err)
 
 		// WHEN
@@ -201,13 +202,13 @@ func TestUniqueIndexIterator(t *testing.T) {
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
-		err = table.Insert(bp, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
 
 		// テーブルとインデックスを更新
 		oldRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}
 		newRecord := [][]byte{[]byte("a"), []byte("John"), []byte("Williams")}
-		err = table.UpdateInplace(bp, oldRecord, newRecord)
+		err = table.UpdateInplace(bp, 0, lock.NewManager(5000), oldRecord, newRecord)
 		assert.NoError(t, err)
 
 		// WHEN: 更新後のインデックスを検索

@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"minesql/internal/storage/lock"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,9 +24,9 @@ func TestAnalyzeTable(t *testing.T) {
 
 		meta, _ := h.Catalog.GetTableMetaByName("users")
 		tbl, _ := meta.GetTable()
-		err = tbl.Insert(h.BufferPool, [][]byte{[]byte("1"), []byte("Alice")})
+		err = tbl.Insert(h.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("1"), []byte("Alice")})
 		assert.NoError(t, err)
-		err = tbl.Insert(h.BufferPool, [][]byte{[]byte("2"), []byte("Bob")})
+		err = tbl.Insert(h.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("2"), []byte("Bob")})
 		assert.NoError(t, err)
 
 		// WHEN

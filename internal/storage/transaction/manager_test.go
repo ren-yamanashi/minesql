@@ -3,6 +3,7 @@ package transaction
 import (
 	"errors"
 	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/lock"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,14 +15,14 @@ type mockLogRecord struct {
 	undone bool
 }
 
-func (m *mockLogRecord) Undo(bp *buffer.BufferPool) error {
+func (m *mockLogRecord) Undo(_ *buffer.BufferPool, _ lock.TrxId, _ *lock.Manager) error {
 	m.undone = true
 	return nil
 }
 
 type failingLogRecord struct{}
 
-func (f *failingLogRecord) Undo(bp *buffer.BufferPool) error {
+func (f *failingLogRecord) Undo(_ *buffer.BufferPool, _ lock.TrxId, _ *lock.Manager) error {
 	return errors.New("undo failed")
 }
 
@@ -29,7 +30,7 @@ func TestNewManager(t *testing.T) {
 	t.Run("空の Manager が生成される", func(t *testing.T) {
 		// GIVEN / WHEN
 		undoLog := NewUndoLog()
-		manager := NewManager(undoLog)
+		manager := NewManager(undoLog, lock.NewManager(5000))
 
 		// THEN
 		assert.NotNil(t, manager)
@@ -41,7 +42,7 @@ func TestManagerBegin(t *testing.T) {
 	t.Run("トランザクションが存在しない場合は TrxId 1 が割り当てられる", func(t *testing.T) {
 		// GIVEN
 		undoLog := NewUndoLog()
-		manager := NewManager(undoLog)
+		manager := NewManager(undoLog, lock.NewManager(5000))
 
 		// WHEN
 		id := manager.Begin()
@@ -54,7 +55,7 @@ func TestManagerBegin(t *testing.T) {
 	t.Run("連続して Begin すると単調増加する", func(t *testing.T) {
 		// GIVEN
 		undoLog := NewUndoLog()
-		manager := NewManager(undoLog)
+		manager := NewManager(undoLog, lock.NewManager(5000))
 
 		// WHEN
 		id1 := manager.Begin()
@@ -72,7 +73,7 @@ func TestManagerCommit(t *testing.T) {
 	t.Run("Commit すると状態が INACTIVE になる", func(t *testing.T) {
 		// GIVEN
 		undoLog := NewUndoLog()
-		manager := NewManager(undoLog)
+		manager := NewManager(undoLog, lock.NewManager(5000))
 		trxId := manager.Begin()
 
 		// WHEN
@@ -85,7 +86,7 @@ func TestManagerCommit(t *testing.T) {
 	t.Run("Commit すると Undo ログが破棄される", func(t *testing.T) {
 		// GIVEN
 		undoLog := NewUndoLog()
-		manager := NewManager(undoLog)
+		manager := NewManager(undoLog, lock.NewManager(5000))
 		trxId := manager.Begin()
 		undoLog.Append(trxId, &mockLogRecord{})
 		undoLog.Append(trxId, &mockLogRecord{})
@@ -103,7 +104,7 @@ func TestManagerRollback(t *testing.T) {
 	t.Run("Rollback すると Undo ログが逆順に適用される", func(t *testing.T) {
 		// GIVEN
 		undoLog := NewUndoLog()
-		manager := NewManager(undoLog)
+		manager := NewManager(undoLog, lock.NewManager(5000))
 		trxId := manager.Begin()
 		r1 := &mockLogRecord{}
 		r2 := &mockLogRecord{}
@@ -125,7 +126,7 @@ func TestManagerRollback(t *testing.T) {
 	t.Run("Rollback すると状態が INACTIVE になり Undo ログが破棄される", func(t *testing.T) {
 		// GIVEN
 		undoLog := NewUndoLog()
-		manager := NewManager(undoLog)
+		manager := NewManager(undoLog, lock.NewManager(5000))
 		trxId := manager.Begin()
 		undoLog.Append(trxId, &mockLogRecord{})
 
@@ -141,7 +142,7 @@ func TestManagerRollback(t *testing.T) {
 	t.Run("Undo がエラーを返した場合、Rollback もエラーを返す", func(t *testing.T) {
 		// GIVEN
 		undoLog := NewUndoLog()
-		manager := NewManager(undoLog)
+		manager := NewManager(undoLog, lock.NewManager(5000))
 		trxId := manager.Begin()
 		undoLog.Append(trxId, &failingLogRecord{})
 
@@ -155,7 +156,7 @@ func TestManagerRollback(t *testing.T) {
 	t.Run("他のトランザクションの Undo ログには影響しない", func(t *testing.T) {
 		// GIVEN
 		undoLog := NewUndoLog()
-		manager := NewManager(undoLog)
+		manager := NewManager(undoLog, lock.NewManager(5000))
 		trx1 := manager.Begin()
 		trx2 := manager.Begin()
 		undoLog.Append(trx1, &mockLogRecord{})

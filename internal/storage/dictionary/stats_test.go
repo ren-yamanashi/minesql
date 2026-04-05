@@ -4,6 +4,7 @@ import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/file"
+	"minesql/internal/storage/lock"
 	"minesql/internal/storage/page"
 	"path/filepath"
 	"testing"
@@ -147,7 +148,7 @@ func TestAnalyze(t *testing.T) {
 
 		// WHEN: 新しいカテゴリを持つレコードを追加
 		tbl := env.tables["products"]
-		err = tbl.Insert(env.bp, [][]byte{[]byte("4"), []byte("Donut"), []byte("Snack")})
+		err = tbl.Insert(env.bp, 0, lock.NewManager(5000), [][]byte{[]byte("4"), []byte("Donut"), []byte("Snack")})
 		assert.NoError(t, err)
 
 		after, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
@@ -377,7 +378,7 @@ func TestGetOrAnalyze(t *testing.T) {
 
 		// WHEN: 1 レコード追加して dirty_count を加算
 		tbl := env.tables["products"]
-		err = tbl.Insert(env.bp, [][]byte{[]byte("4"), []byte("Donut"), []byte("Snack")})
+		err = tbl.Insert(env.bp, 0, lock.NewManager(5000), [][]byte{[]byte("4"), []byte("Donut"), []byte("Snack")})
 		assert.NoError(t, err)
 		sc.IncrementDirtyCount("products", 1)
 		result, err := sc.GetOrAnalyze(meta)
@@ -396,14 +397,14 @@ func TestGetOrAnalyze(t *testing.T) {
 		_, err := sc.GetOrAnalyze(meta)
 		assert.NoError(t, err)
 		tbl := env.tables["products"]
-		err = tbl.Insert(env.bp, [][]byte{[]byte("4"), []byte("Donut"), []byte("Snack")})
+		err = tbl.Insert(env.bp, 0, lock.NewManager(5000), [][]byte{[]byte("4"), []byte("Donut"), []byte("Snack")})
 		assert.NoError(t, err)
 		sc.IncrementDirtyCount("products", 1)
 		_, err = sc.GetOrAnalyze(meta)
 		assert.NoError(t, err)
 
 		// WHEN: さらに 1 レコード追加するが dirty_count は加算しない
-		err = tbl.Insert(env.bp, [][]byte{[]byte("5"), []byte("Egg"), []byte("Dairy")})
+		err = tbl.Insert(env.bp, 0, lock.NewManager(5000), [][]byte{[]byte("5"), []byte("Egg"), []byte("Dairy")})
 		assert.NoError(t, err)
 		result, err := sc.GetOrAnalyze(meta)
 
@@ -515,7 +516,7 @@ func insertRecords(t *testing.T, env *testEnv, tableName string, records [][][]b
 	t.Helper()
 	tbl := env.tables[tableName]
 	for _, record := range records {
-		err := tbl.Insert(env.bp, record)
+		err := tbl.Insert(env.bp, 0, lock.NewManager(5000), record)
 		assert.NoError(t, err)
 	}
 }
@@ -526,7 +527,7 @@ func deleteByCondition(t *testing.T, env *testEnv, tableName string, cond func([
 	tbl := env.tables[tableName]
 
 	// 削除対象のレコードを先にすべて取得する
-	iter, err := tbl.Search(env.bp, access.RecordSearchModeStart{})
+	iter, err := tbl.Search(env.bp, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
 	assert.NoError(t, err)
 
 	var targets [][][]byte
@@ -543,7 +544,7 @@ func deleteByCondition(t *testing.T, env *testEnv, tableName string, cond func([
 
 	// 取得したレコードを削除
 	for _, record := range targets {
-		err := tbl.SoftDelete(env.bp, record)
+		err := tbl.SoftDelete(env.bp, 0, lock.NewManager(5000), record)
 		assert.NoError(t, err)
 	}
 }

@@ -3,6 +3,7 @@ package executor
 import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
+	"minesql/internal/storage/lock"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,7 +13,7 @@ func TestNewFilter(t *testing.T) {
 	t.Run("正常に Filter を作成できる", func(t *testing.T) {
 		// GIVEN
 		dummyInnerExecutor := NewTableScan(
-			nil,
+			0, lock.NewManager(5000), nil,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -40,7 +41,7 @@ func TestNext(t *testing.T) {
 		assert.NoError(t, err)
 
 		seqScan := NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -68,7 +69,7 @@ func TestNext(t *testing.T) {
 		tbl, err := getTable("users")
 		assert.NoError(t, err)
 		seqScan := NewTableScan(
-			tbl,
+			0, lock.NewManager(5000), tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)

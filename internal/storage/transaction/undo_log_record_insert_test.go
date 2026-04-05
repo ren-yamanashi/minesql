@@ -3,6 +3,7 @@ package transaction
 import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/btree"
+	"minesql/internal/storage/lock"
 	"minesql/internal/storage/page"
 	"testing"
 
@@ -15,13 +16,13 @@ func TestInsertLogRecord_Undo(t *testing.T) {
 		table, bp := setupTestTableForUndo(t, nil)
 
 		record := [][]byte{[]byte("a"), []byte("John")}
-		err := table.Insert(bp, record)
+		err := table.Insert(bp, 0, lock.NewManager(5000), record)
 		assert.NoError(t, err)
 
 		undoRecord := UndoInsertRecord{table: table, Record: record}
 
 		// WHEN
-		err = undoRecord.Undo(bp)
+		err = undoRecord.Undo(bp, 0, lock.NewManager(5000))
 
 		// THEN: レコードが物理削除されている (B+Tree にも残らない)
 		assert.NoError(t, err)
@@ -38,13 +39,13 @@ func TestInsertLogRecord_Undo(t *testing.T) {
 		table, bp := setupTestTableForUndo(t, []*access.UniqueIndex{uniqueIndex})
 
 		record := [][]byte{[]byte("a"), []byte("John")}
-		err := table.Insert(bp, record)
+		err := table.Insert(bp, 0, lock.NewManager(5000), record)
 		assert.NoError(t, err)
 
 		undoRecord := UndoInsertRecord{table: table, Record: record}
 
 		// WHEN
-		err = undoRecord.Undo(bp)
+		err = undoRecord.Undo(bp, 0, lock.NewManager(5000))
 
 		// THEN: ユニークインデックスからも物理削除されている
 		assert.NoError(t, err)
