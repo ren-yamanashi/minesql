@@ -49,7 +49,7 @@ func TestInsert_Next(t *testing.T) {
 		}
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTable(tableName)
+		tbl, err := handler.Get().GetTable(tableName)
 		assert.NoError(t, err)
 
 		// WHEN

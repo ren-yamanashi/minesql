@@ -37,7 +37,7 @@ func TestNext(t *testing.T) {
 
 		// GIVEN
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTable("users")
+		tbl, err := handler.Get().GetTable("users")
 		assert.NoError(t, err)
 
 		seqScan := NewTableScan(
@@ -66,7 +66,7 @@ func TestNext(t *testing.T) {
 
 		// GIVEN
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTable("users")
+		tbl, err := handler.Get().GetTable("users")
 		assert.NoError(t, err)
 		seqScan := NewTableScan(
 			0, lock.NewManager(5000), tbl,

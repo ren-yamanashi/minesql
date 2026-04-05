@@ -36,7 +36,7 @@ func TestIndexScan(t *testing.T) {
 		// GIVEN
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTable("users")
+		tbl, err := handler.Get().GetTable("users")
 		assert.NoError(t, err)
 
 		// インデックスアクセスメソッドを取得
@@ -79,7 +79,7 @@ func TestIndexScan(t *testing.T) {
 
 		// GIVEN
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTable("users")
+		tbl, err := handler.Get().GetTable("users")
 		assert.NoError(t, err)
 
 		// インデックスアクセスメソッドを取得
