@@ -39,9 +39,7 @@ func (del *Delete) Next() (Record, error) {
 
 	// 取得したレコードを削除
 	for _, record := range records {
-		h.AppendDeleteUndo(del.trxId, del.table, record)
 		if err := del.table.SoftDelete(h.BufferPool, del.trxId, h.LockMgr, record); err != nil {
-			h.UndoLog().PopLast(del.trxId)
 			return nil, err
 		}
 	}

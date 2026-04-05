@@ -21,7 +21,7 @@ func TestNewTableScan(t *testing.T) {
 		}
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTable("users")
+		tbl, err := handler.Get().GetTable("users")
 		assert.NoError(t, err)
 
 		// WHEN
@@ -45,7 +45,7 @@ func TestTableScan_Next(t *testing.T) {
 		defer handler.Reset()
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTable("users")
+		tbl, err := handler.Get().GetTable("users")
 		assert.NoError(t, err)
 
 		seqScan := NewTableScan(
@@ -82,7 +82,7 @@ func TestTableScan_Next(t *testing.T) {
 		defer handler.Reset()
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTable("users")
+		tbl, err := handler.Get().GetTable("users")
 		assert.NoError(t, err)
 
 		seqScan := NewTableScan(
@@ -137,7 +137,7 @@ func InitStorageEngineForTest(t *testing.T, dataDir string) *handler.Handler {
 	assert.NoError(t, err)
 
 	// テーブルアクセスメソッドを取得
-	tbl, err := getTable("users")
+	tbl, err := handler.Get().GetTable("users")
 	assert.NoError(t, err)
 
 	// 行を挿入

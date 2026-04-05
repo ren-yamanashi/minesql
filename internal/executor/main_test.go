@@ -468,7 +468,7 @@ func setupExecutorTestTable(t *testing.T) *access.Table {
 	_, err := createTable.Next()
 	assert.NoError(t, err)
 
-	tbl, err := getTable("users")
+	tbl, err := handler.Get().GetTable("users")
 	assert.NoError(t, err)
 
 	var trxId handler.TrxId = 1
@@ -521,14 +521,4 @@ func writeRecords(sb *strings.Builder, records []Record) {
 		fmt.Fprintf(sb, "  (%s)\n", strings.Join(vals, ", "))
 	}
 	fmt.Fprintf(sb, "  合計: %d 件\n", len(records))
-}
-
-func getTable(tableName string) (*access.Table, error) {
-	hdl := handler.Get()
-	tblMeta, ok := hdl.Catalog.GetTableMetaByName(tableName)
-	if !ok {
-		return nil, fmt.Errorf("table %s not found in catalog", tableName)
-	}
-
-	return tblMeta.GetTable()
 }

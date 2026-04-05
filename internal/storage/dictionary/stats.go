@@ -2,6 +2,7 @@ package dictionary
 
 import (
 	"bytes"
+	"fmt"
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/lock"
@@ -35,7 +36,8 @@ func NewStatsCollector(bp *buffer.BufferPool) *StatsCollector {
 
 // Analyze はテーブルの統計情報を収集する
 func (sc *StatsCollector) Analyze(meta *TableMeta) (*TableStats, error) {
-	tbl, err := meta.GetTable()
+	// テーブルを構築
+	tbl, err := buildTable(meta)
 	if err != nil {
 		return nil, err
 	}
@@ -180,6 +182,23 @@ func updateColumnStats(
 
 		columnStats[colName] = colStat
 	}
+}
+
+// buildTable は TableMeta から Table を構築する (UndoLog なし)
+func buildTable(meta *TableMeta) (*access.Table, error) {
+	var uniqueIndexes []*access.UniqueIndex
+	for _, idxMeta := range meta.Indexes {
+		if idxMeta.Type == IndexTypeUnique {
+			colMeta, ok := meta.GetColByName(idxMeta.ColName)
+			if !ok {
+				return nil, fmt.Errorf("column %s not found in table %s", idxMeta.ColName, meta.Name)
+			}
+			ui := access.NewUniqueIndex(idxMeta.Name, idxMeta.ColName, idxMeta.DataMetaPageId, colMeta.Pos, meta.PKCount)
+			uniqueIndexes = append(uniqueIndexes, ui)
+		}
+	}
+	tbl := access.NewTable(meta.Name, meta.DataMetaPageId, meta.PKCount, uniqueIndexes, nil)
+	return &tbl, nil
 }
 
 // analyzeIndex はテーブルのユニークインデックスの統計情報を収集する

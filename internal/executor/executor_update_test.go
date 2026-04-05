@@ -43,7 +43,7 @@ func TestUpdate_Next(t *testing.T) {
 		var trxId handler.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTable("users")
+		tbl, err := handler.Get().GetTable("users")
 		assert.NoError(t, err)
 
 		upd := NewUpdate(trxId, tbl, []SetColumn{
@@ -83,7 +83,7 @@ func TestUpdate_Next(t *testing.T) {
 		var trxId handler.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTable("users")
+		tbl, err := handler.Get().GetTable("users")
 		assert.NoError(t, err)
 
 		// プライマリキーが "a" のレコードのみ更新
@@ -126,7 +126,7 @@ func TestUpdate_Next(t *testing.T) {
 		var trxId handler.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTable("users")
+		tbl, err := handler.Get().GetTable("users")
 		assert.NoError(t, err)
 
 		// first_name が "Bob" のレコードの last_name を更新
@@ -176,7 +176,7 @@ func TestUpdate_Next(t *testing.T) {
 		var trxId handler.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTable("users")
+		tbl, err := handler.Get().GetTable("users")
 		assert.NoError(t, err)
 
 		// インデックスアクセスメソッドを取得
@@ -238,7 +238,7 @@ func TestUpdate_Next(t *testing.T) {
 		var trxId handler.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTable("users")
+		tbl, err := handler.Get().GetTable("users")
 		assert.NoError(t, err)
 
 		// プライマリキーを "a" → "z" に変更
@@ -284,7 +284,7 @@ func TestUpdate_Next(t *testing.T) {
 		var trxId handler.TrxId = 1
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTable("users")
+		tbl, err := handler.Get().GetTable("users")
 		assert.NoError(t, err)
 
 		// 存在しない first_name でフィルタ
@@ -337,7 +337,7 @@ func TestUpdate_Next(t *testing.T) {
 		})
 
 		// テーブルアクセスメソッドを取得
-		tbl, err := getTable("empty_table")
+		tbl, err := handler.Get().GetTable("empty_table")
 		assert.NoError(t, err)
 
 		upd := NewUpdate(trxId, tbl, []SetColumn{
@@ -692,9 +692,7 @@ func createLockTestTable(t *testing.T) *access.Table {
 	assert.NoError(t, err)
 
 	hdl := handler.Get()
-	tblMeta, ok := hdl.Catalog.GetTableMetaByName("lock_test")
-	assert.True(t, ok)
-	tbl, err := tblMeta.GetTable()
+	tbl, err := hdl.GetTable("lock_test")
 	assert.NoError(t, err)
 	return tbl
 }

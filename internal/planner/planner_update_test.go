@@ -290,12 +290,7 @@ func TestPlanUpdate(t *testing.T) {
 //nolint:unparam // テーブル名は将来的に変わりうる
 func getPlannerTable(t *testing.T, tableName string) *access.Table {
 	t.Helper()
-	hdl := handler.Get()
-	tblMeta, ok := hdl.Catalog.GetTableMetaByName(tableName)
-	if !ok {
-		t.Fatalf("table %s not found in catalog", tableName)
-	}
-	tbl, err := tblMeta.GetTable()
+	tbl, err := handler.Get().GetTable(tableName)
 	assert.NoError(t, err)
 	return tbl
 }

@@ -1,9 +1,12 @@
-package transaction
+package access
 
 import (
 	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/lock"
 )
+
+// TrxId はトランザクション ID
+type TrxId = uint64
 
 type State string
 

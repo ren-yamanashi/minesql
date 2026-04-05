@@ -1,30 +1,11 @@
-package transaction
+package access
 
 import (
-	"errors"
-	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/lock"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
-
-// mockLogRecord はテスト用の LogRecord 実装
-type mockLogRecord struct {
-	id     int
-	undone bool
-}
-
-func (m *mockLogRecord) Undo(_ *buffer.BufferPool, _ lock.TrxId, _ *lock.Manager) error {
-	m.undone = true
-	return nil
-}
-
-type failingLogRecord struct{}
-
-func (f *failingLogRecord) Undo(_ *buffer.BufferPool, _ lock.TrxId, _ *lock.Manager) error {
-	return errors.New("undo failed")
-}
 
 func TestNewManager(t *testing.T) {
 	t.Run("空の Manager が生成される", func(t *testing.T) {
