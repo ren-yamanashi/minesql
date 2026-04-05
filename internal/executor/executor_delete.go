@@ -1,18 +1,18 @@
 package executor
 
 import (
-	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
+	"minesql/internal/storage/transaction"
 )
 
 // Delete は InnerExecutor の結果を元にレコードを削除する
 type Delete struct {
 	trxId         handler.TrxId
-	table         *access.Table
+	table         *transaction.Table
 	innerExecutor Executor
 }
 
-func NewDelete(trxId handler.TrxId, table *access.Table, innerExecutor Executor) *Delete {
+func NewDelete(trxId handler.TrxId, table *transaction.Table, innerExecutor Executor) *Delete {
 	return &Delete{
 		trxId:         trxId,
 		table:         table,

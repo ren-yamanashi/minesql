@@ -1,9 +1,9 @@
 package executor
 
 import (
-	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
 	"minesql/internal/storage/lock"
+	"minesql/internal/storage/transaction"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -27,7 +27,7 @@ func TestNewTableScan(t *testing.T) {
 		// WHEN
 		seqScan := NewTableScan(
 			0, lock.NewManager(5000), tbl,
-			access.RecordSearchModeStart{},
+			transaction.RecordSearchModeStart{},
 			whileCondition,
 		)
 
@@ -50,7 +50,7 @@ func TestTableScan_Next(t *testing.T) {
 
 		seqScan := NewTableScan(
 			0, lock.NewManager(5000), tbl,
-			access.RecordSearchModeStart{},
+			transaction.RecordSearchModeStart{},
 			func(record Record) bool {
 				return string(record[0]) < "c" // プライマリキーが "c" 未満の間、継続
 			},
@@ -87,7 +87,7 @@ func TestTableScan_Next(t *testing.T) {
 
 		seqScan := NewTableScan(
 			0, lock.NewManager(5000), tbl,
-			access.RecordSearchModeKey{Key: [][]byte{[]byte("b")}},
+			transaction.RecordSearchModeKey{Key: [][]byte{[]byte("b")}},
 			func(record Record) bool {
 				return string(record[0]) <= "d" // プライマリキーが "d" 以下の間、継続
 			},

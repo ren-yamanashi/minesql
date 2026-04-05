@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"minesql/internal/ast"
 	"minesql/internal/executor"
-	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
 	"minesql/internal/storage/lock"
+	"minesql/internal/storage/transaction"
 	"strconv"
 )
 
@@ -40,7 +40,7 @@ func (sp *Search) Build() (executor.Executor, error) {
 			sp.trxId,
 			sp.lockMgr,
 			tbl,
-			access.RecordSearchModeStart{},
+			transaction.RecordSearchModeStart{},
 			func(record executor.Record) bool {
 				return true // フルテーブルスキャンなので常に true を返す
 			},
@@ -64,7 +64,7 @@ type leafCondition struct {
 //   - 単一条件 (col op literal): chooseBestPlan でテーブルスキャン / PK / インデックスを比較
 //   - 純粋な AND 条件: extractANDLeaves でリーフを抽出 → chooseBestPlan
 //   - OR を含む条件: planForORCondition で Union 最適化を試みる
-func (s *Search) planForBinaryExpr(tbl *access.Table, expr ast.BinaryExpr) (executor.Executor, error) {
+func (s *Search) planForBinaryExpr(tbl *transaction.Table, expr ast.BinaryExpr) (executor.Executor, error) {
 	switch lhs := expr.Left.(type) {
 
 	// 単一条件: LhsColumn op RhsLiteral (例: WHERE col = 5)
@@ -117,13 +117,13 @@ func (s *Search) planForBinaryExpr(tbl *access.Table, expr ast.BinaryExpr) (exec
 //  1. テーブルスキャン + Filter (全条件をフィルタで適用)
 //  2. PK スキャン (+ Filter で残条件を適用)
 //  3. セカンダリインデックススキャン (+ Filter で残条件を適用)
-func (s *Search) chooseBestPlan(tbl *access.Table, leaves []leafCondition, cond func(executor.Record) bool) (executor.Executor, error) {
+func (s *Search) chooseBestPlan(tbl *transaction.Table, leaves []leafCondition, cond func(executor.Record) bool) (executor.Executor, error) {
 	tableScanPlan := executor.NewFilter(
 		executor.NewTableScan(
 			s.trxId,
 			s.lockMgr,
 			tbl,
-			access.RecordSearchModeStart{},
+			transaction.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		),
 		cond,
@@ -200,7 +200,7 @@ func (s *Search) chooseBestPlan(tbl *access.Table, leaves []leafCondition, cond 
 // buildIndexPlan はインデックスを使った Executor を構築する
 //
 // needsFilter が true の場合、IndexScan の上に Filter を重ねる (複合条件時)
-func (s *Search) buildIndexPlan(tbl *access.Table, leaf leafCondition, idxMeta *handler.IndexMetadata, cond func(executor.Record) bool, needsFilter bool) (executor.Executor, error) {
+func (s *Search) buildIndexPlan(tbl *transaction.Table, leaf leafCondition, idxMeta *handler.IndexMetadata, cond func(executor.Record) bool, needsFilter bool) (executor.Executor, error) {
 	index, err := tbl.GetUniqueIndexByName(idxMeta.Name)
 	if err != nil {
 		return nil, err
@@ -213,7 +213,7 @@ func (s *Search) buildIndexPlan(tbl *access.Table, leaf leafCondition, idxMeta *
 	scan := executor.NewIndexScan(
 		tbl,
 		index,
-		access.RecordSearchModeKey{Key: [][]byte{leaf.literal.ToBytes()}},
+		transaction.RecordSearchModeKey{Key: [][]byte{leaf.literal.ToBytes()}},
 		indexCond,
 	)
 
@@ -226,12 +226,12 @@ func (s *Search) buildIndexPlan(tbl *access.Table, leaf leafCondition, idxMeta *
 // buildPKScanPlan は PK カラムの条件を使った TableScan を構築する
 //
 // needsFilter が true の場合、TableScan の上に Filter を重ねる (複合条件時や > 演算子時)
-func (s *Search) buildPKScanPlan(tbl *access.Table, leaf leafCondition, cond func(executor.Record) bool, needsFilter bool) executor.Executor {
+func (s *Search) buildPKScanPlan(tbl *transaction.Table, leaf leafCondition, cond func(executor.Record) bool, needsFilter bool) executor.Executor {
 	colMeta, _ := s.tblMeta.GetColByName(leaf.colName)
 	pos := int(colMeta.Pos)
 	value := leaf.literal.ToString()
 
-	var searchMode access.RecordSearchMode
+	var searchMode transaction.RecordSearchMode
 	var whileCond func(executor.Record) bool
 	filterRequired := needsFilter
 
@@ -240,24 +240,24 @@ func (s *Search) buildPKScanPlan(tbl *access.Table, leaf leafCondition, cond fun
 	// - <, <=: 先頭から走査して条件外で停止 (whileCondition)
 	switch leaf.operator {
 	case "=":
-		searchMode = access.RecordSearchModeKey{Key: [][]byte{leaf.literal.ToBytes()}}
+		searchMode = transaction.RecordSearchModeKey{Key: [][]byte{leaf.literal.ToBytes()}}
 		whileCond = func(r executor.Record) bool { return string(r[pos]) == value }
 	case ">=":
-		searchMode = access.RecordSearchModeKey{Key: [][]byte{leaf.literal.ToBytes()}}
+		searchMode = transaction.RecordSearchModeKey{Key: [][]byte{leaf.literal.ToBytes()}}
 		whileCond = func(r executor.Record) bool { return true }
 	case ">":
-		searchMode = access.RecordSearchModeKey{Key: [][]byte{leaf.literal.ToBytes()}}
+		searchMode = transaction.RecordSearchModeKey{Key: [][]byte{leaf.literal.ToBytes()}}
 		whileCond = func(r executor.Record) bool { return true }
 		filterRequired = true // 開始位置の等値レコードを除外するため Filter が必要
 	case "<":
-		searchMode = access.RecordSearchModeStart{}
+		searchMode = transaction.RecordSearchModeStart{}
 		whileCond = func(r executor.Record) bool { return string(r[pos]) < value }
 	case "<=":
-		searchMode = access.RecordSearchModeStart{}
+		searchMode = transaction.RecordSearchModeStart{}
 		whileCond = func(r executor.Record) bool { return string(r[pos]) <= value }
 	default:
 		// != などの場合はフルテーブルスキャン + Filter
-		searchMode = access.RecordSearchModeStart{}
+		searchMode = transaction.RecordSearchModeStart{}
 		whileCond = func(r executor.Record) bool { return true }
 		filterRequired = true
 	}
@@ -278,13 +278,13 @@ func (s *Search) buildPKScanPlan(tbl *access.Table, leaf leafCondition, cond fun
 // 各 OR ブランチが PK またはセカンダリインデックスを利用できる場合、各ブランチを個別にスキャンし Union で結合する
 //
 // 最適化できない場合はテーブルスキャン + Filter にフォールバックする
-func (s *Search) planForORCondition(tbl *access.Table, expr ast.BinaryExpr, cond func(executor.Record) bool) (executor.Executor, error) {
+func (s *Search) planForORCondition(tbl *transaction.Table, expr ast.BinaryExpr, cond func(executor.Record) bool) (executor.Executor, error) {
 	tableScanPlan := executor.NewFilter(
 		executor.NewTableScan(
 			s.trxId,
 			s.lockMgr,
 			tbl,
-			access.RecordSearchModeStart{},
+			transaction.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		),
 		cond,
@@ -338,7 +338,7 @@ type orBranch struct {
 // 残りの条件は Filter で適用する
 //
 // PK/インデックスが利用できない場合は ok=false を返す
-func (s *Search) planORBranch(tbl *access.Table, branch orBranch, stats *handler.TableStatistics) (executor.Executor, float64, bool) {
+func (s *Search) planORBranch(tbl *transaction.Table, branch orBranch, stats *handler.TableStatistics) (executor.Executor, float64, bool) {
 	// ブランチ全体の条件関数を構築 (複合 AND 条件時に Filter で使用)
 	branchCond, err := s.buildConditionFunc(branch.expr)
 	if err != nil {

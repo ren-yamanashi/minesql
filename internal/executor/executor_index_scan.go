@@ -1,23 +1,23 @@
 package executor
 
 import (
-	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
+	"minesql/internal/storage/transaction"
 )
 
 // IndexScan はセカンダリインデックスを利用して検索する
 type IndexScan struct {
-	table          *access.Table
-	index          *access.UniqueIndex
-	searchMode     access.RecordSearchMode
+	table          *transaction.Table
+	index          *transaction.UniqueIndex
+	searchMode     transaction.RecordSearchMode
 	whileCondition func(Record) bool
-	iterator       *access.UniqueIndexIterator
+	iterator       *transaction.UniqueIndexIterator
 }
 
 func NewIndexScan(
-	table *access.Table,
-	index *access.UniqueIndex,
-	searchMode access.RecordSearchMode,
+	table *transaction.Table,
+	index *transaction.UniqueIndex,
+	searchMode transaction.RecordSearchMode,
 	whileCondition func(record Record) bool,
 ) *IndexScan {
 	return &IndexScan{

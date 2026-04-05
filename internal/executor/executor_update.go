@@ -2,8 +2,8 @@ package executor
 
 import (
 	"bytes"
-	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
+	"minesql/internal/storage/transaction"
 )
 
 type SetColumn struct {
@@ -14,12 +14,12 @@ type SetColumn struct {
 // Update は InnerExecutor の結果を元にレコードを更新する
 type Update struct {
 	trxId         handler.TrxId
-	table         *access.Table
+	table         *transaction.Table
 	setColumns    []SetColumn
 	innerExecutor Executor
 }
 
-func NewUpdate(trxId handler.TrxId, table *access.Table, setColumns []SetColumn, innerExecutor Executor) *Update {
+func NewUpdate(trxId handler.TrxId, table *transaction.Table, setColumns []SetColumn, innerExecutor Executor) *Update {
 	return &Update{
 		trxId:         trxId,
 		table:         table,

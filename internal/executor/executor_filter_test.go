@@ -1,9 +1,9 @@
 package executor
 
 import (
-	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
 	"minesql/internal/storage/lock"
+	"minesql/internal/storage/transaction"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -14,7 +14,7 @@ func TestNewFilter(t *testing.T) {
 		// GIVEN
 		dummyInnerExecutor := NewTableScan(
 			0, lock.NewManager(5000), nil,
-			access.RecordSearchModeStart{},
+			transaction.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		condition := func(record Record) bool {
@@ -42,7 +42,7 @@ func TestNext(t *testing.T) {
 
 		seqScan := NewTableScan(
 			0, lock.NewManager(5000), tbl,
-			access.RecordSearchModeStart{},
+			transaction.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		filter := NewFilter(seqScan, func(record Record) bool {
@@ -70,7 +70,7 @@ func TestNext(t *testing.T) {
 		assert.NoError(t, err)
 		seqScan := NewTableScan(
 			0, lock.NewManager(5000), tbl,
-			access.RecordSearchModeStart{},
+			transaction.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		filter := NewFilter(seqScan, func(record Record) bool {

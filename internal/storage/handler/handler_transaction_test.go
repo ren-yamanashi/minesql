@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"minesql/internal/storage/access"
 	"minesql/internal/storage/lock"
+	"minesql/internal/storage/transaction"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -68,7 +68,7 @@ func TestCommitTrx(t *testing.T) {
 		// THEN
 		readTrxId := h.BeginTrx()
 		defer h.CommitTrx(readTrxId)
-		iter, err := tbl.Search(h.BufferPool, readTrxId, h.LockMgr, access.RecordSearchModeStart{})
+		iter, err := tbl.Search(h.BufferPool, readTrxId, h.LockMgr, transaction.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -104,7 +104,7 @@ func TestRollbackTrx(t *testing.T) {
 
 		// THEN: Insert が取り消されてテーブルが空
 		assert.NoError(t, err)
-		iter, err := tbl.Search(h.BufferPool, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
+		iter, err := tbl.Search(h.BufferPool, 0, lock.NewManager(5000), transaction.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)

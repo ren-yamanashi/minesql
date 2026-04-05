@@ -1,9 +1,9 @@
 package executor
 
 import (
-	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
 	"minesql/internal/storage/lock"
+	"minesql/internal/storage/transaction"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -23,7 +23,7 @@ func TestProject(t *testing.T) {
 		records := collectAll(t, NewProject(
 			NewTableScan(
 				0, lock.NewManager(5000), tbl,
-				access.RecordSearchModeStart{},
+				transaction.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			[]uint16{1, 2},
@@ -51,7 +51,7 @@ func TestProject(t *testing.T) {
 		records := collectAll(t, NewProject(
 			NewTableScan(
 				0, lock.NewManager(5000), tbl,
-				access.RecordSearchModeStart{},
+				transaction.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			[]uint16{1},
@@ -79,7 +79,7 @@ func TestProject(t *testing.T) {
 		records := collectAll(t, NewProject(
 			NewTableScan(
 				0, lock.NewManager(5000), tbl,
-				access.RecordSearchModeStart{},
+				transaction.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			[]uint16{2, 0},
@@ -105,7 +105,7 @@ func TestProject(t *testing.T) {
 			NewFilter(
 				NewTableScan(
 					0, lock.NewManager(5000), tbl,
-					access.RecordSearchModeStart{},
+					transaction.RecordSearchModeStart{},
 					func(record Record) bool { return true },
 				),
 				func(record Record) bool {
@@ -134,7 +134,7 @@ func TestProject(t *testing.T) {
 			NewFilter(
 				NewTableScan(
 					0, lock.NewManager(5000), tbl,
-					access.RecordSearchModeStart{},
+					transaction.RecordSearchModeStart{},
 					func(record Record) bool { return true },
 				),
 				func(record Record) bool {

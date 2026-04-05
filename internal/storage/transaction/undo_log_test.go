@@ -1,6 +1,7 @@
-package access
+package transaction
 
 import (
+	"errors"
 	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/lock"
 	"testing"
@@ -15,6 +16,12 @@ type mockLogRecord struct {
 func (m *mockLogRecord) Undo(_ *buffer.BufferPool, _ lock.TrxId, _ *lock.Manager) error {
 	m.undone = true
 	return nil
+}
+
+type failingLogRecord struct{}
+
+func (f *failingLogRecord) Undo(_ *buffer.BufferPool, _ lock.TrxId, _ *lock.Manager) error {
+	return errors.New("undo failed")
 }
 
 func TestNewUndoLog(t *testing.T) {

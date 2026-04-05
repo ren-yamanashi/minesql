@@ -1,8 +1,8 @@
 package executor
 
 import (
-	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
+	"minesql/internal/storage/transaction"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,7 +20,7 @@ func TestIndexScan(t *testing.T) {
 		indexScan := NewIndexScan(
 			nil,
 			nil,
-			access.RecordSearchModeStart{},
+			transaction.RecordSearchModeStart{},
 			whileCondition,
 		)
 
@@ -46,7 +46,7 @@ func TestIndexScan(t *testing.T) {
 		indexScan := NewIndexScan(
 			tbl,
 			idx,
-			access.RecordSearchModeStart{},
+			transaction.RecordSearchModeStart{},
 			func(record Record) bool {
 				return string(record[0]) < "J" // セカンダリキー (姓) が "J" 未満の間、継続
 			},
@@ -89,7 +89,7 @@ func TestIndexScan(t *testing.T) {
 		indexScan := NewIndexScan(
 			tbl,
 			idx,
-			access.RecordSearchModeKey{Key: [][]byte{[]byte("Doe")}},
+			transaction.RecordSearchModeKey{Key: [][]byte{[]byte("Doe")}},
 			func(record Record) bool {
 				return string(record[0]) <= "Smith" // セカンダリキー (姓) が "Smith" 以下の間、継続
 			},

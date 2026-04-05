@@ -1,9 +1,9 @@
 package executor
 
 import (
-	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
 	"minesql/internal/storage/lock"
+	"minesql/internal/storage/transaction"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -63,7 +63,7 @@ func TestInsert_Next(t *testing.T) {
 		}
 		seqScan := NewTableScan(
 			0, lock.NewManager(5000), tbl,
-			access.RecordSearchModeStart{},
+			transaction.RecordSearchModeStart{},
 			whileCondition,
 		)
 		res, err := fetchAll(seqScan)
@@ -98,7 +98,7 @@ func TestInsert_Next(t *testing.T) {
 			{Pos: 1, Value: []byte("Updated")},
 		}, NewTableScan(
 			trx2, hdl.LockMgr, tbl,
-			access.RecordSearchModeStart{},
+			transaction.RecordSearchModeStart{},
 			func(record Record) bool { return string(record[0]) == "a" },
 		))
 		_, err = upd.Next()

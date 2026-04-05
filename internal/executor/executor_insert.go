@@ -1,18 +1,18 @@
 package executor
 
 import (
-	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
+	"minesql/internal/storage/transaction"
 )
 
 // Insert はレコードを追加する
 type Insert struct {
 	trxId   handler.TrxId
-	table   *access.Table
+	table   *transaction.Table
 	records []Record
 }
 
-func NewInsert(trxId handler.TrxId, table *access.Table, records []Record) *Insert {
+func NewInsert(trxId handler.TrxId, table *transaction.Table, records []Record) *Insert {
 	return &Insert{
 		trxId:   trxId,
 		table:   table,
