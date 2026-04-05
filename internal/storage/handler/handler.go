@@ -4,13 +4,13 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/config"
 	"minesql/internal/storage/dictionary"
 	"minesql/internal/storage/file"
 	"minesql/internal/storage/lock"
 	"minesql/internal/storage/page"
-	"minesql/internal/storage/transaction"
 	"os"
 	"path/filepath"
 	"sync"
@@ -18,8 +18,8 @@ import (
 
 const ColumnTypeString = dictionary.ColumnTypeString
 
-type TrxId = transaction.TrxId
-type UndoLog = transaction.UndoLog
+type TrxId = access.TrxId
+type UndoLog = access.UndoLog
 type TableMetadata = dictionary.TableMeta
 type IndexMetadata = dictionary.IndexMeta
 type ColumnType = dictionary.ColumnType
@@ -38,8 +38,8 @@ type Handler struct {
 	LockMgr        *lock.Manager
 	Catalog        *dictionary.Catalog
 	StatsCollector *dictionary.StatsCollector
-	undoLog        *transaction.UndoLog
-	trxManager     *transaction.Manager
+	undoLog        *access.UndoLog
+	trxManager     *access.Manager
 	baseDirectory  string
 }
 
@@ -121,7 +121,7 @@ func newHandler() (*Handler, error) {
 		return nil, err
 	}
 
-	undoLog := transaction.NewUndoLog()
+	undoLog := access.NewUndoLog()
 	lockMgr := lock.NewManager(config.GetLockWaitTimeout())
 
 	return &Handler{
@@ -130,7 +130,7 @@ func newHandler() (*Handler, error) {
 		Catalog:        catalog,
 		StatsCollector: dictionary.NewStatsCollector(bp),
 		undoLog:        undoLog,
-		trxManager:     transaction.NewManager(undoLog, lockMgr),
+		trxManager:     access.NewManager(undoLog, lockMgr),
 		baseDirectory:  dataDir,
 	}, nil
 }

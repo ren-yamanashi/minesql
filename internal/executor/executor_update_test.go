@@ -1,9 +1,9 @@
 package executor
 
 import (
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
 	"minesql/internal/storage/lock"
-	"minesql/internal/storage/transaction"
 	"sync"
 	"testing"
 	"time"
@@ -21,7 +21,7 @@ func TestNewUpdate(t *testing.T) {
 
 		iterator := NewTableScan(
 			0, lock.NewManager(5000), nil,
-			transaction.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 
@@ -50,7 +50,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 1, Value: []byte("Updated")},
 		}, NewTableScan(
 			0, lock.NewManager(5000), tbl,
-			transaction.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -63,7 +63,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: 全レコードの first_name が "Updated" になっている
 		scan := NewTableScan(
 			0, lock.NewManager(5000), tbl,
-			transaction.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -92,7 +92,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 2, Value: []byte("Updated")},
 		}, NewTableScan(
 			0, lock.NewManager(5000), tbl,
-			transaction.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
 			},
@@ -107,7 +107,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: "a" のレコードが更新され、他は変わらない
 		scan := NewTableScan(
 			0, lock.NewManager(5000), tbl,
-			transaction.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -135,7 +135,7 @@ func TestUpdate_Next(t *testing.T) {
 		}, NewFilter(
 			NewTableScan(
 				0, lock.NewManager(5000), tbl,
-				transaction.RecordSearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -152,7 +152,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: "Bob" の last_name が "Williams" に更新され、他は変わらない
 		scan := NewTableScan(
 			0, lock.NewManager(5000), tbl,
-			transaction.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -188,7 +188,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 2, Value: []byte("Zebra")},
 		}, NewTableScan(
 			0, lock.NewManager(5000), tbl,
-			transaction.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
 			},
@@ -205,7 +205,7 @@ func TestUpdate_Next(t *testing.T) {
 		indexScan := NewIndexScan(
 			tbl,
 			idx,
-			transaction.RecordSearchModeKey{Key: [][]byte{[]byte("Zebra")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("Zebra")}},
 			func(record Record) bool {
 				return string(record[0]) == "Zebra"
 			},
@@ -219,7 +219,7 @@ func TestUpdate_Next(t *testing.T) {
 		indexScanOld := NewIndexScan(
 			tbl,
 			idx,
-			transaction.RecordSearchModeKey{Key: [][]byte{[]byte("Doe")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("Doe")}},
 			func(record Record) bool {
 				return string(record[0]) == "Doe"
 			},
@@ -246,7 +246,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 0, Value: []byte("z")},
 		}, NewTableScan(
 			0, lock.NewManager(5000), tbl,
-			transaction.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
+			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
 			},
@@ -261,7 +261,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: "a" が消え "z" が追加されている
 		scan := NewTableScan(
 			0, lock.NewManager(5000), tbl,
-			transaction.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -293,7 +293,7 @@ func TestUpdate_Next(t *testing.T) {
 		}, NewFilter(
 			NewTableScan(
 				0, lock.NewManager(5000), tbl,
-				transaction.RecordSearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
 			func(record Record) bool {
@@ -310,7 +310,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN: 全レコードが変更されていない
 		scan := NewTableScan(
 			0, lock.NewManager(5000), tbl,
-			transaction.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
 		results, err := fetchAll(scan)
@@ -344,7 +344,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 1, Value: []byte("new_value")},
 		}, NewTableScan(
 			0, lock.NewManager(5000), tbl,
-			transaction.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
 
@@ -371,7 +371,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 1, Value: []byte("Updated1")},
 		}, NewTableScan(
 			trx1, hdl.LockMgr, tbl,
-			transaction.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return string(record[0]) == "a" },
 		))
 		_, err := upd1.Next()
@@ -388,7 +388,7 @@ func TestUpdate_Next(t *testing.T) {
 				{Pos: 1, Value: []byte("Updated2")},
 			}, NewTableScan(
 				trx2, hdl.LockMgr, tbl,
-				transaction.RecordSearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return string(record[0]) == "a" },
 			))
 			_, updateErr = upd2.Next()
@@ -418,7 +418,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 1, Value: []byte("Updated")},
 		}, NewTableScan(
 			trx1, hdl.LockMgr, tbl,
-			transaction.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return string(record[0]) == "a" },
 		))
 		_, err := upd.Next()
@@ -433,7 +433,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 1, Value: []byte("Updated2")},
 		}, NewTableScan(
 			trx2, hdl.LockMgr, tbl,
-			transaction.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return string(record[0]) == "a" },
 		))
 		_, err = upd2.Next()
@@ -458,7 +458,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 1, Value: []byte("Updated1")},
 		}, NewTableScan(
 			trx1, hdl.LockMgr, tbl,
-			transaction.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return string(record[0]) == "a" },
 		))
 		_, err := upd.Next()
@@ -475,7 +475,7 @@ func TestUpdate_Next(t *testing.T) {
 				{Pos: 1, Value: []byte("Updated2")},
 			}, NewTableScan(
 				trx2, hdl.LockMgr, tbl,
-				transaction.RecordSearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return string(record[0]) == "a" },
 			))
 			_, updateErr = upd2.Next()
@@ -513,7 +513,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 1, Value: []byte("RolledBack")},
 		}, NewTableScan(
 			trx1, hdl.LockMgr, tbl,
-			transaction.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return string(record[0]) == "a" },
 		))
 		_, err := upd.Next()
@@ -534,7 +534,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 1, Value: []byte("Updated")},
 		}, NewTableScan(
 			trx2, hdl.LockMgr, tbl,
-			transaction.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return string(record[0]) == "a" },
 		))
 		_, err = upd2.Next()
@@ -555,7 +555,7 @@ func TestUpdate_Next(t *testing.T) {
 		trx1 := hdl.BeginTrx()
 		scan1 := NewTableScan(
 			trx1, hdl.LockMgr, tbl,
-			transaction.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return string(record[0]) == "a" },
 		)
 		record1, err := scan1.Next()
@@ -566,7 +566,7 @@ func TestUpdate_Next(t *testing.T) {
 		trx2 := hdl.BeginTrx()
 		scan2 := NewTableScan(
 			trx2, hdl.LockMgr, tbl,
-			transaction.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return string(record[0]) == "a" },
 		)
 		record2, err := scan2.Next()
@@ -584,7 +584,7 @@ func TestUpdate_Next(t *testing.T) {
 				{Pos: 1, Value: []byte("Trx1Updated")},
 			}, NewTableScan(
 				trx1, hdl.LockMgr, tbl,
-				transaction.RecordSearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return string(record[0]) == "a" },
 			))
 			_, upd1Err = upd1.Next()
@@ -598,7 +598,7 @@ func TestUpdate_Next(t *testing.T) {
 				{Pos: 1, Value: []byte("Trx2Updated")},
 			}, NewTableScan(
 				trx2, hdl.LockMgr, tbl,
-				transaction.RecordSearchModeStart{},
+				access.RecordSearchModeStart{},
 				func(record Record) bool { return string(record[0]) == "a" },
 			))
 			_, upd2Err = upd2.Next()
@@ -639,7 +639,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 1, Value: []byte("Updated")},
 		}, NewTableScan(
 			trx1, hdl.LockMgr, tbl,
-			transaction.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return string(record[0]) == "a" },
 		))
 		_, err := upd.Next()
@@ -653,7 +653,7 @@ func TestUpdate_Next(t *testing.T) {
 			{Pos: 1, Value: []byte("Trx2Updated")},
 		}, NewTableScan(
 			trx2, hdl.LockMgr, tbl,
-			transaction.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record Record) bool { return string(record[0]) == "a" },
 		))
 		_, err = upd2.Next()
@@ -682,7 +682,7 @@ func initLockTestHandler(t *testing.T) {
 	handler.Init()
 }
 
-func createLockTestTable(t *testing.T) *transaction.Table {
+func createLockTestTable(t *testing.T) *access.Table {
 	t.Helper()
 	createTable := NewCreateTable("lock_test", 1, nil, []handler.CreateColumnParam{
 		{Name: "id", Type: handler.ColumnTypeString},
@@ -697,7 +697,7 @@ func createLockTestTable(t *testing.T) *transaction.Table {
 	return tbl
 }
 
-func insertLockTestData(t *testing.T, tbl *transaction.Table) {
+func insertLockTestData(t *testing.T, tbl *access.Table) {
 	t.Helper()
 	hdl := handler.Get()
 	trxId := hdl.BeginTrx()
@@ -710,13 +710,13 @@ func insertLockTestData(t *testing.T, tbl *transaction.Table) {
 	hdl.CommitTrx(trxId)
 }
 
-func collectLockTestRecords(t *testing.T, tbl *transaction.Table) []Record {
+func collectLockTestRecords(t *testing.T, tbl *access.Table) []Record {
 	t.Helper()
 	hdl := handler.Get()
 	trx := hdl.BeginTrx()
 	scan := NewTableScan(
 		trx, hdl.LockMgr, tbl,
-		transaction.RecordSearchModeStart{},
+		access.RecordSearchModeStart{},
 		func(record Record) bool { return true },
 	)
 	var records []Record

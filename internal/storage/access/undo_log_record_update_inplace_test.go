@@ -1,4 +1,4 @@
-package transaction
+package access
 
 import (
 	"minesql/internal/storage/lock"

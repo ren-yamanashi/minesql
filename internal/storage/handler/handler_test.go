@@ -1,10 +1,10 @@
 package handler
 
 import (
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/dictionary"
 	"minesql/internal/storage/lock"
 	"minesql/internal/storage/page"
-	"minesql/internal/storage/transaction"
 	"os"
 	"path/filepath"
 	"testing"
@@ -88,7 +88,7 @@ func TestShutdown(t *testing.T) {
 
 		metaPageId, err := h.BufferPool.AllocatePageId(fileId)
 		assert.NoError(t, err)
-		tbl := transaction.NewTable("users", metaPageId, 1, nil, nil)
+		tbl := access.NewTable("users", metaPageId, 1, nil, nil)
 		err = tbl.Create(h.BufferPool)
 		assert.NoError(t, err)
 
@@ -242,7 +242,7 @@ func TestInitCatalog(t *testing.T) {
 
 		metaPageId, err := bp.AllocatePageId(fileId)
 		assert.NoError(t, err)
-		tbl := transaction.NewTable("users", metaPageId, 1, nil, nil)
+		tbl := access.NewTable("users", metaPageId, 1, nil, nil)
 		err = tbl.Create(bp)
 		assert.NoError(t, err)
 

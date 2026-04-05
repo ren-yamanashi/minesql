@@ -1,11 +1,11 @@
 package dictionary
 
 import (
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/file"
 	"minesql/internal/storage/lock"
 	"minesql/internal/storage/page"
-	"minesql/internal/storage/transaction"
 	"path/filepath"
 	"testing"
 
@@ -510,7 +510,7 @@ func TestGetOrAnalyze(t *testing.T) {
 type testEnv struct {
 	bp      *buffer.BufferPool
 	catalog *Catalog
-	tables  map[string]*transaction.Table
+	tables  map[string]*access.Table
 }
 
 // setupTestEnv はテスト用に BufferPool とカタログを初期化する
@@ -532,7 +532,7 @@ func setupTestEnv(t *testing.T) *testEnv {
 	return &testEnv{
 		bp:      bp,
 		catalog: cat,
-		tables:  make(map[string]*transaction.Table),
+		tables:  make(map[string]*access.Table),
 	}
 }
 
@@ -568,18 +568,18 @@ func createTable(t *testing.T, env *testEnv, tableName string, pkCount uint8, in
 	assert.NoError(t, err)
 
 	// 各 UniqueIndex の metaPageId を設定
-	uniqueIndexes := make([]*transaction.UniqueIndex, len(indexes))
+	uniqueIndexes := make([]*access.UniqueIndex, len(indexes))
 	for i, idx := range indexes {
 		indexMetaPageId, err := env.bp.AllocatePageId(fileId)
 		assert.NoError(t, err)
-		uniqueIndex := transaction.NewUniqueIndex(idx.name, idx.colName, indexMetaPageId, idx.secondaryKey, pkCount)
+		uniqueIndex := access.NewUniqueIndex(idx.name, idx.colName, indexMetaPageId, idx.secondaryKey, pkCount)
 		err = uniqueIndex.Create(env.bp)
 		assert.NoError(t, err)
 		uniqueIndexes[i] = uniqueIndex
 	}
 
 	// テーブルを作成
-	tbl := transaction.NewTable(tableName, metaPageId, pkCount, uniqueIndexes, nil)
+	tbl := access.NewTable(tableName, metaPageId, pkCount, uniqueIndexes, nil)
 	err = tbl.Create(env.bp)
 	assert.NoError(t, err)
 
@@ -619,7 +619,7 @@ func deleteByCondition(t *testing.T, env *testEnv, tableName string, cond func([
 	tbl := env.tables[tableName]
 
 	// 削除対象のレコードを先にすべて取得する
-	iter, err := tbl.Search(env.bp, 0, lock.NewManager(5000), transaction.RecordSearchModeStart{})
+	iter, err := tbl.Search(env.bp, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
 	assert.NoError(t, err)
 
 	var targets [][][]byte

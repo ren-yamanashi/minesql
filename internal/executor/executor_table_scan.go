@@ -1,26 +1,26 @@
 package executor
 
 import (
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
 	"minesql/internal/storage/lock"
-	"minesql/internal/storage/transaction"
 )
 
 // TableScan はテーブル全体を走査する
 type TableScan struct {
 	trxId          handler.TrxId
 	lockMgr        *lock.Manager
-	table          *transaction.Table
-	searchMode     transaction.RecordSearchMode
+	table          *access.Table
+	searchMode     access.RecordSearchMode
 	whileCondition func(Record) bool
-	iterator       *transaction.TableIterator
+	iterator       *access.TableIterator
 }
 
 func NewTableScan(
 	trxId handler.TrxId,
 	lockMgr *lock.Manager,
-	table *transaction.Table,
-	searchMode transaction.RecordSearchMode,
+	table *access.Table,
+	searchMode access.RecordSearchMode,
 	whileCondition func(Record) bool,
 ) *TableScan {
 	return &TableScan{

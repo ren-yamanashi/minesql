@@ -3,9 +3,9 @@ package dictionary
 import (
 	"bytes"
 	"fmt"
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/lock"
-	"minesql/internal/storage/transaction"
 	"sync"
 )
 
@@ -42,7 +42,7 @@ func (sc *StatsCollector) Analyze(meta *TableMeta) (*TableStats, error) {
 		return nil, err
 	}
 
-	iter, err := tbl.Search(sc.bufferPool, 0, lock.NewManager(5000), transaction.RecordSearchModeStart{})
+	iter, err := tbl.Search(sc.bufferPool, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
 	if err != nil {
 		return nil, err
 	}
@@ -185,24 +185,24 @@ func updateColumnStats(
 }
 
 // buildTable は TableMeta から Table を構築する (UndoLog なし)
-func buildTable(meta *TableMeta) (*transaction.Table, error) {
-	var uniqueIndexes []*transaction.UniqueIndex
+func buildTable(meta *TableMeta) (*access.Table, error) {
+	var uniqueIndexes []*access.UniqueIndex
 	for _, idxMeta := range meta.Indexes {
 		if idxMeta.Type == IndexTypeUnique {
 			colMeta, ok := meta.GetColByName(idxMeta.ColName)
 			if !ok {
 				return nil, fmt.Errorf("column %s not found in table %s", idxMeta.ColName, meta.Name)
 			}
-			ui := transaction.NewUniqueIndex(idxMeta.Name, idxMeta.ColName, idxMeta.DataMetaPageId, colMeta.Pos, meta.PKCount)
+			ui := access.NewUniqueIndex(idxMeta.Name, idxMeta.ColName, idxMeta.DataMetaPageId, colMeta.Pos, meta.PKCount)
 			uniqueIndexes = append(uniqueIndexes, ui)
 		}
 	}
-	tbl := transaction.NewTable(meta.Name, meta.DataMetaPageId, meta.PKCount, uniqueIndexes, nil)
+	tbl := access.NewTable(meta.Name, meta.DataMetaPageId, meta.PKCount, uniqueIndexes, nil)
 	return &tbl, nil
 }
 
 // analyzeIndex はテーブルのユニークインデックスの統計情報を収集する
-func (sc *StatsCollector) analyzeIndex(tbl *transaction.Table) (map[string]IndexStats, error) {
+func (sc *StatsCollector) analyzeIndex(tbl *access.Table) (map[string]IndexStats, error) {
 	idxStats := make(map[string]IndexStats)
 	for _, uIdx := range tbl.UniqueIndexes {
 		height, err := uIdx.Height(sc.bufferPool)

@@ -1,4 +1,4 @@
-package transaction
+package access
 
 // UndoLog は全トランザクションの Undo レコードをトランザクションごとに管理する
 type UndoLog struct {

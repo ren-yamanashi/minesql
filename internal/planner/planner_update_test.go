@@ -3,9 +3,9 @@ package planner
 import (
 	"minesql/internal/ast"
 	"minesql/internal/executor"
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
 	"minesql/internal/storage/lock"
-	"minesql/internal/storage/transaction"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -64,7 +64,7 @@ func TestPlanUpdate(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: 更新後のレコードが正しい
-		iter, err := tbl.Search(hdl.BufferPool, 0, lock.NewManager(5000), transaction.RecordSearchModeStart{})
+		iter, err := tbl.Search(hdl.BufferPool, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -190,7 +190,7 @@ func TestPlanUpdate(t *testing.T) {
 		// THEN: "a" の first_name が "Jane" に更新されている
 		scan := executor.NewTableScan(
 			0, lock.NewManager(5000), tbl,
-			transaction.RecordSearchModeStart{},
+			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		)
 		results := fetchAll(t, scan)
@@ -276,7 +276,7 @@ func TestPlanUpdate(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: レコードは変更されていない
-		iter, err := tbl.Search(hdl.BufferPool, 0, lock.NewManager(5000), transaction.RecordSearchModeStart{})
+		iter, err := tbl.Search(hdl.BufferPool, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -288,7 +288,7 @@ func TestPlanUpdate(t *testing.T) {
 }
 
 //nolint:unparam // テーブル名は将来的に変わりうる
-func getPlannerTable(t *testing.T, tableName string) *transaction.Table {
+func getPlannerTable(t *testing.T, tableName string) *access.Table {
 	t.Helper()
 	tbl, err := handler.Get().GetTable(tableName)
 	assert.NoError(t, err)

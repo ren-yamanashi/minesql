@@ -1,8 +1,8 @@
 package handler
 
 import (
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/dictionary"
-	"minesql/internal/storage/transaction"
 )
 
 // CreateIndexParam はインデックス作成パラメータ
@@ -38,13 +38,13 @@ func (h *Handler) CreateTable(tableName string, pkCount uint8, idxParams []Creat
 	}
 
 	// 各 UniqueIndex を作成
-	uniqueIndexes := make([]*transaction.UniqueIndex, len(idxParams))
+	uniqueIndexes := make([]*access.UniqueIndex, len(idxParams))
 	for i, param := range idxParams {
 		indexMetaPageId, err := h.BufferPool.AllocatePageId(fileId)
 		if err != nil {
 			return err
 		}
-		uniqueIndex := transaction.NewUniqueIndex(param.Name, param.ColName, indexMetaPageId, param.UkIdx, pkCount)
+		uniqueIndex := access.NewUniqueIndex(param.Name, param.ColName, indexMetaPageId, param.UkIdx, pkCount)
 		if err := uniqueIndex.Create(h.BufferPool); err != nil {
 			return err
 		}
@@ -52,7 +52,7 @@ func (h *Handler) CreateTable(tableName string, pkCount uint8, idxParams []Creat
 	}
 
 	// テーブルを作成
-	tbl := transaction.NewTable(tableName, metaPageId, pkCount, uniqueIndexes, nil)
+	tbl := access.NewTable(tableName, metaPageId, pkCount, uniqueIndexes, nil)
 	if err := tbl.Create(h.BufferPool); err != nil {
 		return err
 	}
