@@ -692,9 +692,7 @@ func createLockTestTable(t *testing.T) *access.Table {
 	assert.NoError(t, err)
 
 	hdl := handler.Get()
-	tblMeta, ok := hdl.Catalog.GetTableMetaByName("lock_test")
-	assert.True(t, ok)
-	tbl, err := tblMeta.GetTable()
+	tbl, err := hdl.GetTable("lock_test")
 	assert.NoError(t, err)
 	return tbl
 }

@@ -22,12 +22,14 @@ func TestAnalyzeTable(t *testing.T) {
 		})
 		assert.NoError(t, err)
 
-		meta, _ := h.Catalog.GetTableMetaByName("users")
-		tbl, _ := meta.GetTable()
+		tbl, err := h.GetTable("users")
+		assert.NoError(t, err)
 		err = tbl.Insert(h.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("1"), []byte("Alice")})
 		assert.NoError(t, err)
 		err = tbl.Insert(h.BufferPool, 0, lock.NewManager(5000), [][]byte{[]byte("2"), []byte("Bob")})
 		assert.NoError(t, err)
+
+		meta, _ := h.Catalog.GetTableMetaByName("users")
 
 		// WHEN
 		stats, err := h.AnalyzeTable(meta)

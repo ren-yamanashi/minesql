@@ -29,7 +29,7 @@ func NewSearch(trxId handler.TrxId, lockMgr *lock.Manager, tblMeta *handler.Tabl
 }
 
 func (sp *Search) Build() (executor.Executor, error) {
-	tbl, err := sp.tblMeta.GetTable()
+	tbl, err := handler.Get().GetTable(sp.tblMeta.Name)
 	if err != nil {
 		return nil, err
 	}

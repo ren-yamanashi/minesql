@@ -25,7 +25,7 @@ func PlanDelete(trxId handler.TrxId, stmt *ast.DeleteStmt) (executor.Executor, e
 	}
 
 	// テーブルを取得
-	tbl, err := tblMeta.GetTable()
+	tbl, err := hdl.GetTable(stmt.From.TableName)
 	if err != nil {
 		return nil, err
 	}

@@ -2,8 +2,6 @@ package dictionary
 
 import (
 	"encoding/binary"
-	"fmt"
-	"minesql/internal/storage/access"
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/buffer"
@@ -64,26 +62,6 @@ func (tm *TableMeta) GetIndexByColName(colName string) (*IndexMeta, bool) {
 		}
 	}
 	return nil, false
-}
-
-// GetTable はテーブル を取得する
-func (tm *TableMeta) GetTable() (*access.Table, error) {
-	// ユニークインデックスを構築
-	var uniqueIndexes []*access.UniqueIndex
-	for _, idxMeta := range tm.Indexes {
-		if idxMeta.Type == IndexTypeUnique {
-			colMeta, ok := tm.GetColByName(idxMeta.ColName)
-			if !ok {
-				return nil, fmt.Errorf("column %s not found in table %s", idxMeta.ColName, tm.Name)
-			}
-			ui := access.NewUniqueIndex(idxMeta.Name, idxMeta.ColName, idxMeta.DataMetaPageId, colMeta.Pos, tm.PKCount)
-			uniqueIndexes = append(uniqueIndexes, ui)
-		}
-	}
-
-	// テーブルを構築
-	tbl := access.NewTable(tm.Name, tm.DataMetaPageId, tm.PKCount, uniqueIndexes)
-	return &tbl, nil
 }
 
 // Insert はテーブルメタデータを B+Tree に挿入する

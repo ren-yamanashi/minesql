@@ -1,7 +1,6 @@
-package transaction
+package access
 
 import (
-	"minesql/internal/storage/access"
 	"minesql/internal/storage/lock"
 	"minesql/internal/storage/page"
 	"testing"
@@ -21,24 +20,22 @@ func TestUpdateInplaceLogRecord_Undo(t *testing.T) {
 		err = table.UpdateInplace(bp, 0, lock.NewManager(5000), prevRecord, newRecord)
 		assert.NoError(t, err)
 
-		undoRecord := UndoUpdateInplaceRecord{
-			table: table, PrevRecord: prevRecord, NewRecord: newRecord,
-		}
+		undoRecord := NewUndoUpdateInplaceRecord(table, prevRecord, newRecord)
 
 		// WHEN
 		err = undoRecord.Undo(bp, 0, lock.NewManager(5000))
 
 		// THEN: 元の値に戻っている
 		assert.NoError(t, err)
-		records := collectActiveRecords(t, table, bp)
+		records := collectUndoActiveRecords(t, table, bp)
 		assert.Equal(t, 1, len(records))
 		assert.Equal(t, []string{"a", "John"}, records[0])
 	})
 
 	t.Run("ユニークインデックスも元の値に戻る", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex := access.NewUniqueIndex("idx_name", "name", page.PageId{}, 1, 1)
-		table, bp := setupTestTableForUndo(t, []*access.UniqueIndex{uniqueIndex})
+		uniqueIndex := NewUniqueIndex("idx_name", "name", page.PageId{}, 1, 1)
+		table, bp := setupTestTableForUndo(t, []*UniqueIndex{uniqueIndex})
 
 		prevRecord := [][]byte{[]byte("a"), []byte("John")}
 		newRecord := [][]byte{[]byte("a"), []byte("Jane")}
@@ -47,16 +44,14 @@ func TestUpdateInplaceLogRecord_Undo(t *testing.T) {
 		err = table.UpdateInplace(bp, 0, lock.NewManager(5000), prevRecord, newRecord)
 		assert.NoError(t, err)
 
-		undoRecord := UndoUpdateInplaceRecord{
-			table: table, PrevRecord: prevRecord, NewRecord: newRecord,
-		}
+		undoRecord := NewUndoUpdateInplaceRecord(table, prevRecord, newRecord)
 
 		// WHEN
 		err = undoRecord.Undo(bp, 0, lock.NewManager(5000))
 
 		// THEN: ユニークインデックスも元の値に戻っている
 		assert.NoError(t, err)
-		keys := collectActiveUniqueIndexKeys(t, table.UniqueIndexes[0], bp)
+		keys := collectUndoActiveUniqueIndexKeys(t, table.UniqueIndexes[0], bp)
 		assert.Equal(t, []string{"John"}, keys)
 	})
 }

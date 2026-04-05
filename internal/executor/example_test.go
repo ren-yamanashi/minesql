@@ -51,11 +51,7 @@ func setupExample() (*access.Table, func()) {
 
 	// テーブルアクセスメソッドを取得
 	hdl := handler.Get()
-	tblMeta, ok := hdl.Catalog.GetTableMetaByName("users")
-	if !ok {
-		panic("table users not found in catalog")
-	}
-	tbl, err := tblMeta.GetTable()
+	tbl, err := hdl.GetTable("users")
 	if err != nil {
 		panic(err)
 	}

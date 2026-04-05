@@ -44,7 +44,7 @@ func PlanUpdate(trxId handler.TrxId, stmt *ast.UpdateStmt) (executor.Executor, e
 	}
 
 	// テーブルを取得
-	tbl, err := tblMeta.GetTable()
+	tbl, err := hdl.GetTable(stmt.Table.TableName)
 	if err != nil {
 		return nil, err
 	}

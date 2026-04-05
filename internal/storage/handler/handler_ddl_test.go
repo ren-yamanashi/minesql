@@ -72,9 +72,7 @@ func TestCreateTable(t *testing.T) {
 		})
 		assert.NoError(t, err)
 
-		meta, ok := h.Catalog.GetTableMetaByName("users")
-		assert.True(t, ok)
-		tbl, err := meta.GetTable()
+		tbl, err := h.GetTable("users")
 		assert.NoError(t, err)
 
 		// WHEN

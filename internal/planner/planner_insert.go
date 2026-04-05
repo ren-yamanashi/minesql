@@ -39,7 +39,7 @@ func PlanInsert(trxId handler.TrxId, stmt *ast.InsertStmt) (executor.Executor, e
 	if !ok {
 		return nil, fmt.Errorf("table %s not found", stmt.Table.TableName)
 	}
-	tbl, err := tblMeta.GetTable()
+	tbl, err := hdl.GetTable(stmt.Table.TableName)
 	if err != nil {
 		return nil, err
 	}

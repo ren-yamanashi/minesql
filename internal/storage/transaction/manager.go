@@ -1,9 +1,13 @@
 package transaction
 
 import (
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/lock"
 )
+
+// TrxId はトランザクション ID
+type TrxId = uint64
 
 type State string
 
@@ -13,12 +17,12 @@ const (
 )
 
 type Manager struct {
-	undoLog      *UndoLog
+	undoLog      *access.UndoLog
 	lockMgr      *lock.Manager
 	Transactions map[TrxId]State
 }
 
-func NewManager(undoLog *UndoLog, lockMgr *lock.Manager) *Manager {
+func NewManager(undoLog *access.UndoLog, lockMgr *lock.Manager) *Manager {
 	return &Manager{
 		undoLog:      undoLog,
 		lockMgr:      lockMgr,
