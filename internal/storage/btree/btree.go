@@ -25,7 +25,7 @@ func CreateBTree(bp *buffer.BufferPool, metaPageId page.PageId) (*BTree, error) 
 	if err != nil {
 		return nil, err
 	}
-	meta := newMetaPage(metaBuf.GetWriteData())
+	meta := createMetaPage(metaBuf.GetWriteData())
 
 	// ルートノード (リーフノード) を作成
 	rootNodePageId, err := bp.AllocatePageId(metaPageId.FileId)
