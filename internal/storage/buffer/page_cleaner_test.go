@@ -6,6 +6,7 @@ import (
 	"minesql/internal/storage/page"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -67,7 +68,7 @@ func TestFlushOldestPages(t *testing.T) {
 	})
 }
 
-func TestFlushIfNeeded(t *testing.T) {
+func TestClean(t *testing.T) {
 	t.Run("閾値を超えていない場合はフラッシュしない", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
@@ -83,9 +84,10 @@ func TestFlushIfNeeded(t *testing.T) {
 		bp.FlushList.Add(pageId)
 
 		pc := NewPageCleaner(bp, rl, 1048576, 90) // 1MB, 90%
+		pc.lastCleanTime = time.Time{}
 
 		// WHEN
-		err = pc.FlushIfNeeded()
+		err = pc.Clean()
 		assert.NoError(t, err)
 
 		// THEN: 1/100 = 1% なのでフラッシュされない
@@ -110,9 +112,10 @@ func TestFlushIfNeeded(t *testing.T) {
 		}
 
 		pc := NewPageCleaner(bp, rl, 1048576, 90)
+		pc.lastCleanTime = time.Time{}
 
 		// WHEN
-		err = pc.FlushIfNeeded()
+		err = pc.Clean()
 		assert.NoError(t, err)
 
 		// THEN: 一部がフラッシュされてフラッシュリストが縮小する
@@ -141,9 +144,10 @@ func TestFlushIfNeeded(t *testing.T) {
 		assert.NoError(t, err)
 
 		pc := NewPageCleaner(bp, rl, 100, 90) // 閾値を 100 バイトに設定
+		pc.lastCleanTime = time.Time{}
 
 		// WHEN
-		err = pc.FlushIfNeeded()
+		err = pc.Clean()
 		assert.NoError(t, err)
 
 		// THEN: REDO ログサイズ閾値により 1 ページがフラッシュされる

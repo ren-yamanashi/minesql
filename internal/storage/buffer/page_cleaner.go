@@ -20,8 +20,8 @@ func NewPageCleaner(bp *BufferPool, redoLog *log.RedoLog, redoLogMaxSize int, ma
 	}
 }
 
-// FlushIfNeeded は閾値を超えている場合にダーティーページをフラッシュする
-func (pc *PageCleaner) FlushIfNeeded() error {
+// Clean は閾値を超えている場合にダーティーページをフラッシュする
+func (pc *PageCleaner) Clean() error {
 	if !pc.shouldFlush() {
 		return nil
 	}
