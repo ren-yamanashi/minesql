@@ -1501,6 +1501,54 @@ func TestUpdateInplaceRedoLog(t *testing.T) {
 	})
 }
 
+func TestAppendRedoRecordsForAlreadyDirtyPage(t *testing.T) {
+	t.Run("既にダーティーなページへの再書き込みでも REDO レコードが記録される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		redoLog, err := log.NewRedoLog(tmpdir)
+		assert.NoError(t, err)
+		bp := buffer.NewBufferPool(10, redoLog)
+		fileId := page.FileId(1)
+		dm, err := file.NewDisk(fileId, filepath.Join(tmpdir, "users.db"))
+		assert.NoError(t, err)
+		bp.RegisterDisk(fileId, dm)
+		metaPageId, err := bp.AllocatePageId(fileId)
+		assert.NoError(t, err)
+		table := NewTable("users", metaPageId, 1, nil, nil, redoLog)
+		err = table.Create(bp)
+		assert.NoError(t, err)
+
+		// Create で作られたダーティーページをフラッシュしてクリアする
+		err = bp.FlushAllPages()
+		assert.NoError(t, err)
+		err = redoLog.Reset()
+		assert.NoError(t, err)
+
+		lockMgr := lock.NewManager(5000)
+
+		// 1 回目の Insert (ページがダーティーになる)
+		err = table.Insert(bp, 1, lockMgr, [][]byte{[]byte("a"), []byte("Alice")})
+		assert.NoError(t, err)
+
+		err = redoLog.Flush()
+		assert.NoError(t, err)
+		recordsAfterFirst, err := redoLog.ReadAll()
+		assert.NoError(t, err)
+		countAfterFirst := len(recordsAfterFirst)
+
+		// WHEN: 2 回目の Insert (同じページに書き込み、既にダーティー)
+		err = table.Insert(bp, 1, lockMgr, [][]byte{[]byte("b"), []byte("Bob")})
+		assert.NoError(t, err)
+
+		// THEN: 2 回目の Insert でも REDO レコードが追加されている
+		err = redoLog.Flush()
+		assert.NoError(t, err)
+		recordsAfterSecond, err := redoLog.ReadAll()
+		assert.NoError(t, err)
+		assert.Greater(t, len(recordsAfterSecond), countAfterFirst)
+	})
+}
+
 // ユニークインデックスの active なエントリのセカンダリキーを収集するヘルパー
 //
 // ソフトデリート済み (DeleteMark=1) のエントリはスキップする
