@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -147,6 +148,52 @@ func TestPageCleanerLifecycle(t *testing.T) {
 		// THEN
 		assert.NotNil(t, h2.pageCleaner)
 		err = h2.Shutdown()
+		assert.NoError(t, err)
+	})
+}
+
+func TestPageCleanerFlushesDirtyPages(t *testing.T) {
+	t.Run("ダーティーページ率が閾値を超えるとページクリーナーがフラッシュする", func(t *testing.T) {
+		// GIVEN: バッファプールサイズ 10、ダーティーページ率閾値 1% (ほぼ必ず発動)
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "10")
+		t.Setenv("MINESQL_MAX_DIRTY_PAGES_PCT", "1")
+		Reset()
+		h := Init()
+
+		setupTable := func(t *testing.T, h *Handler) {
+			t.Helper()
+			err := h.CreateTable("users", 1, nil, []CreateColumnParam{
+				{Name: "id", Type: ColumnTypeString},
+				{Name: "name", Type: ColumnTypeString},
+			})
+			assert.NoError(t, err)
+		}
+		setupTable(t, h)
+
+		tbl, err := h.GetTable("users")
+		assert.NoError(t, err)
+
+		// データを挿入してダーティーページを作る
+		trxId := h.BeginTrx()
+		err = tbl.Insert(h.BufferPool, trxId, h.LockMgr, [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+		err = h.CommitTrx(trxId)
+		assert.NoError(t, err)
+
+		// フラッシュリストにダーティーページがある状態
+		flushListBefore := h.BufferPool.FlushListSize()
+		assert.Greater(t, flushListBefore, 0)
+
+		// WHEN: ページクリーナーが動くのを待つ (デフォルト 1 秒間隔)
+		time.Sleep(2 * time.Second)
+
+		// THEN: ページクリーナーによってフラッシュリストが縮小している
+		flushListAfter := h.BufferPool.FlushListSize()
+		assert.Less(t, flushListAfter, flushListBefore)
+
+		err = h.Shutdown()
 		assert.NoError(t, err)
 	})
 }
