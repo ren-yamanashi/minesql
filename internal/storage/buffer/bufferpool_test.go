@@ -2,6 +2,7 @@ package buffer
 
 import (
 	"minesql/internal/storage/file"
+	"minesql/internal/storage/log"
 	"minesql/internal/storage/page"
 	"path/filepath"
 	"testing"
@@ -463,6 +464,75 @@ func TestFlushPage(t *testing.T) {
 		assert.False(t, page1.IsDirty)
 		assert.False(t, page2.IsDirty)
 		assert.False(t, page3.IsDirty)
+	})
+}
+
+func TestSetRedoLog(t *testing.T) {
+	t.Run("RedoLog が設定される", func(t *testing.T) {
+		// GIVEN
+		bp := NewBufferPool(3)
+		tmpdir := t.TempDir()
+		rl, err := log.NewRedoLog(tmpdir)
+		assert.NoError(t, err)
+
+		// WHEN
+		bp.SetRedoLog(rl)
+
+		// THEN
+		assert.Equal(t, rl, bp.redoLog)
+	})
+}
+
+func TestDirtyPageIds(t *testing.T) {
+	t.Run("ダーティーページがない場合は空のリストを返す", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		disk, _ := createEmptyDisk(t, tmpdir)
+		bp := NewBufferPool(3)
+		bp.RegisterDisk(page.FileId(0), disk)
+
+		pageId := disk.AllocatePage()
+		p, err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+		p.IsDirty = false
+
+		// WHEN
+		dirtyPages := bp.DirtyPageIds()
+
+		// THEN
+		assert.Empty(t, dirtyPages)
+	})
+
+	t.Run("ダーティーページの PageId リストを返す", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		disk, _ := createEmptyDisk(t, tmpdir)
+		bp := NewBufferPool(5)
+		bp.RegisterDisk(page.FileId(0), disk)
+
+		pageId1 := disk.AllocatePage()
+		pageId2 := disk.AllocatePage()
+		pageId3 := disk.AllocatePage()
+
+		p1, err := bp.AddPage(pageId1)
+		assert.NoError(t, err)
+		p2, err := bp.AddPage(pageId2)
+		assert.NoError(t, err)
+		p3, err := bp.AddPage(pageId3)
+		assert.NoError(t, err)
+
+		// pageId1 と pageId3 のみダーティーにする
+		p1.IsDirty = true
+		p2.IsDirty = false
+		p3.IsDirty = true
+
+		// WHEN
+		dirtyPages := bp.DirtyPageIds()
+
+		// THEN
+		assert.Equal(t, 2, len(dirtyPages))
+		assert.Contains(t, dirtyPages, pageId1)
+		assert.Contains(t, dirtyPages, pageId3)
 	})
 }
 

@@ -1,8 +1,10 @@
 package buffer
 
 import (
+	"encoding/binary"
 	"fmt"
 	"minesql/internal/storage/file"
+	"minesql/internal/storage/log"
 	"minesql/internal/storage/page"
 )
 
@@ -23,6 +25,7 @@ type BufferPool struct {
 	maxBufferSize     int                        // バッファプールの最大サイズ (バッファページ数)
 	pageTable         PageTable                  // ページテーブル (key: PageId, value: BufferId のマップ)
 	evictionAlgorithm *LRU                       // ページ追い出しアルゴリズム
+	redoLog           *log.RedoLog               // REDO ログ (WAL 原則のため)
 }
 
 // NewBufferPool は指定されたサイズの BufferPool を生成する
@@ -92,6 +95,18 @@ func (bp *BufferPool) AddPage(pageId page.PageId) (*BufferPage, error) {
 
 	// 追い出すページがダーティーページであれば、ディスクに書き出す
 	if victim.IsDirty {
+		// victim の Page LSN 以上の REDO ログがフラッシュされていることを確認
+		if bp.redoLog != nil {
+			pg := page.NewPage(victim.Page)
+			pageLSN := log.LSN(binary.BigEndian.Uint32(pg.Header))
+			if pageLSN > bp.redoLog.FlushedLSN {
+				// フラッシュされていない場合は、REDO ログをフラッシュ
+				if err := bp.redoLog.Flush(); err != nil {
+					return nil, err
+				}
+			}
+		}
+
 		// FileId から Disk を取得
 		disk, err := bp.GetDisk(victim.PageId.FileId)
 		if err != nil {
@@ -115,6 +130,13 @@ func (bp *BufferPool) AddPage(pageId page.PageId) (*BufferPage, error) {
 
 // FlushPage はバッファプール内のすべてのダーティーページをディスクに書き出す
 func (bp *BufferPool) FlushPage() error {
+	// REDO ログを先にフラッシュ
+	if bp.redoLog != nil {
+		if err := bp.redoLog.Flush(); err != nil {
+			return err
+		}
+	}
+
 	// 全ダーティーページをディスクに書き出す
 	for pageId, bufferId := range bp.pageTable {
 		bufferPage := &bp.bufferPages[bufferId]
@@ -176,6 +198,22 @@ func (bp *BufferPool) AllocatePageId(fileId page.FileId) (page.PageId, error) {
 		return page.INVALID_PAGE_ID, err
 	}
 	return disk.AllocatePage(), nil
+}
+
+// SetRedoLog は REDO ログを設定する (WAL 原則の適用に使用)
+func (bp *BufferPool) SetRedoLog(rl *log.RedoLog) {
+	bp.redoLog = rl
+}
+
+// DirtyPageIds はダーティーページの PageId リストを返す
+func (bp *BufferPool) DirtyPageIds() []page.PageId {
+	var pages []page.PageId
+	for pageId, bufferId := range bp.pageTable {
+		if bp.bufferPages[bufferId].IsDirty {
+			pages = append(pages, pageId)
+		}
+	}
+	return pages
 }
 
 // updatePageTable はページテーブルを更新する
