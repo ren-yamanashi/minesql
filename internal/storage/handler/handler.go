@@ -12,6 +12,7 @@ import (
 	"minesql/internal/storage/lock"
 	"minesql/internal/storage/log"
 	"minesql/internal/storage/page"
+	"minesql/internal/storage/recovery"
 	"os"
 	"path/filepath"
 	"sync"
@@ -142,6 +143,19 @@ func newHandler() (*Handler, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// クラッシュリカバリを実行
+	rec := recovery.NewRecovery(redoLog, bp, catalog, catalog.UndoFileId)
+	needsRecovery, err := rec.NeedsRecovery()
+	if err != nil {
+		return nil, err
+	}
+	if needsRecovery {
+		if err := rec.Run(); err != nil {
+			return nil, fmt.Errorf("crash recovery failed: %w", err)
+		}
+	}
+
 	lockMgr := lock.NewManager(config.GetLockWaitTimeout())
 
 	return &Handler{
