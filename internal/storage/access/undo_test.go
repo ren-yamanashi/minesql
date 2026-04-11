@@ -168,8 +168,7 @@ func collectUndoActiveUniqueIndexKeys(t *testing.T, ui *UniqueIndex, bp *buffer.
 
 	var keys []string
 	for {
-		record, ok, err := indexIter.Get(bp)
-		assert.NoError(t, err)
+		record, ok := indexIter.Get()
 		if !ok {
 			break
 		}

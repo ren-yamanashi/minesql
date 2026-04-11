@@ -76,7 +76,7 @@ func TestCreateAndInsert(t *testing.T) {
 			assert.Equal(t, expected.value, decodedValue)
 
 			i++
-			_, _, err := iter.Next(bp)
+			_, _, err = iter.Next(bp)
 			assert.NoError(t, err)
 		}
 		assert.Equal(t, len(expectedRecords), i)
@@ -118,7 +118,7 @@ func TestCreateAndInsert(t *testing.T) {
 			assert.Equal(t, 0, len(record.NonKeyBytes()))
 
 			j++
-			_, _, err := uniqueIndexIter.Next(bp)
+			_, _, err = uniqueIndexIter.Next(bp)
 			assert.NoError(t, err)
 		}
 		assert.Equal(t, len(expectedUniqueIndexRecords), j)
@@ -294,7 +294,7 @@ func TestSoftDelete(t *testing.T) {
 				encode.Decode(record.KeyBytes(), &decodedKey)
 				indexKeys = append(indexKeys, string(decodedKey[0]))
 			}
-			_, _, err := indexIter.Next(bp)
+			_, _, err = indexIter.Next(bp)
 			assert.NoError(t, err)
 		}
 		// "Doe" がソフトデリートされ、active なのは "Johnson", "Smith" のみ
@@ -338,7 +338,7 @@ func TestSoftDelete(t *testing.T) {
 				pk:         string(decodedKey[0]),
 				deleteMark: record.HeaderBytes()[0],
 			})
-			_, _, err := iter.Next(bp)
+			_, _, err = iter.Next(bp)
 			assert.NoError(t, err)
 		}
 
@@ -487,7 +487,7 @@ func TestDelete(t *testing.T) {
 			var keyColumns [][]byte
 			encode.Decode(record.KeyBytes(), &keyColumns)
 			indexKeys = append(indexKeys, string(keyColumns[0]))
-			_, _, err := indexIter.Next(bp)
+			_, _, err = indexIter.Next(bp)
 			assert.NoError(t, err)
 		}
 		assert.Equal(t, []string{"Smith"}, indexKeys)
@@ -654,7 +654,7 @@ func TestUpdate(t *testing.T) {
 				pk:         string(decodedKey[0]),
 				deleteMark: record.HeaderBytes()[0],
 			})
-			_, _, err := iter.Next(bp)
+			_, _, err = iter.Next(bp)
 			assert.NoError(t, err)
 		}
 
@@ -773,7 +773,7 @@ func TestUpdate(t *testing.T) {
 				assert.Equal(t, 0, len(record.NonKeyBytes()))
 				foundActive = true
 			}
-			_, _, err := indexIter.Next(bp)
+			_, _, err = indexIter.Next(bp)
 			assert.NoError(t, err)
 		}
 		assert.True(t, foundActive, "active なインデックスエントリが存在するべき")
@@ -1521,7 +1521,7 @@ func collectActiveUniqueIndexKeys(t *testing.T, bp *buffer.BufferPool, ui *Uniqu
 			encode.Decode(record.KeyBytes(), &keyColumns)
 			keys = append(keys, string(keyColumns[0]))
 		}
-		_, _, err := indexIter.Next(bp)
+		_, _, err = indexIter.Next(bp)
 		assert.NoError(t, err)
 	}
 	return keys

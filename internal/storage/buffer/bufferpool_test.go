@@ -815,7 +815,7 @@ func TestGetReadPageData(t *testing.T) {
 	})
 }
 
-func TestDrainNewlyDirtied(t *testing.T) {
+func TestPopNewlyDirtied(t *testing.T) {
 	t.Run("GetWritePageData で新しくダーティーになったページが返される", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
@@ -837,7 +837,7 @@ func TestDrainNewlyDirtied(t *testing.T) {
 		_, err = bp.GetWritePageData(pageId2)
 		assert.NoError(t, err)
 
-		newlyDirtied := bp.DrainNewlyDirtied()
+		newlyDirtied := bp.PopNewlyDirtied()
 
 		// THEN
 		assert.Equal(t, 2, len(newlyDirtied))
@@ -845,7 +845,7 @@ func TestDrainNewlyDirtied(t *testing.T) {
 		assert.Contains(t, newlyDirtied, pageId2)
 	})
 
-	t.Run("DrainNewlyDirtied 後は空になる", func(t *testing.T) {
+	t.Run("PopNewlyDirtied 後は空になる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		disk, _ := createEmptyDisk(t, tmpdir)
@@ -858,16 +858,16 @@ func TestDrainNewlyDirtied(t *testing.T) {
 		_, err = bp.GetWritePageData(pageId)
 		assert.NoError(t, err)
 
-		bp.DrainNewlyDirtied()
+		bp.PopNewlyDirtied()
 
 		// WHEN
-		secondDrain := bp.DrainNewlyDirtied()
+		secondDrain := bp.PopNewlyDirtied()
 
 		// THEN
 		assert.Empty(t, secondDrain)
 	})
 
-	t.Run("既にダーティーなページを再度 GetWritePageData しても newlyDirtied に追加されない", func(t *testing.T) {
+	t.Run("既にダーティーなページを再度 GetWritePageData しても追跡される", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		disk, _ := createEmptyDisk(t, tmpdir)
@@ -881,14 +881,38 @@ func TestDrainNewlyDirtied(t *testing.T) {
 		// 1 回目の GetWritePageData
 		_, err = bp.GetWritePageData(pageId)
 		assert.NoError(t, err)
-		bp.DrainNewlyDirtied()
+		bp.PopNewlyDirtied()
 
 		// WHEN: 2 回目の GetWritePageData (既にダーティー)
 		_, err = bp.GetWritePageData(pageId)
 		assert.NoError(t, err)
-		result := bp.DrainNewlyDirtied()
+		result := bp.PopNewlyDirtied()
 
-		// THEN: 既にダーティーなので追加されない
+		// THEN: 既にダーティーでも書き込みごとに追跡される (REDO ログ記録のため)
+		assert.Equal(t, 1, len(result))
+		assert.Equal(t, pageId, result[0])
+	})
+}
+
+func TestClearNewlyDirtied(t *testing.T) {
+	t.Run("ClearNewlyDirtied 後は PopNewlyDirtied が空を返す", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		disk, _ := createEmptyDisk(t, tmpdir)
+		bp := NewBufferPool(5, nil)
+		bp.RegisterDisk(page.FileId(0), disk)
+
+		pageId := disk.AllocatePage()
+		err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+		_, err = bp.GetWritePageData(pageId)
+		assert.NoError(t, err)
+
+		// WHEN
+		bp.ClearNewlyDirtied()
+
+		// THEN
+		result := bp.PopNewlyDirtied()
 		assert.Empty(t, result)
 	})
 }

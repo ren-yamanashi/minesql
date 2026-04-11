@@ -18,7 +18,7 @@ func TestNewRedoLog(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, rl)
-		assert.Equal(t, LSN(0), rl.FlushedLSN)
+		assert.Equal(t, LSN(0), rl.flushedLSN)
 	})
 
 	t.Run("既存ファイルから FlushedLSN が復元される", func(t *testing.T) {
@@ -29,14 +29,14 @@ func TestNewRedoLog(t *testing.T) {
 		rl1.AppendCommit(1)
 		err = rl1.Flush()
 		assert.NoError(t, err)
-		flushed := rl1.FlushedLSN
+		flushed := rl1.flushedLSN
 
 		// WHEN
 		rl2, err := NewRedoLog(tmpDir)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, flushed, rl2.FlushedLSN)
+		assert.Equal(t, flushed, rl2.flushedLSN)
 	})
 }
 
@@ -97,7 +97,7 @@ func TestFlush(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, LSN(2), rl.FlushedLSN)
+		assert.Equal(t, LSN(2), rl.flushedLSN)
 
 		records, err := rl.ReadAll()
 		assert.NoError(t, err)
@@ -114,7 +114,7 @@ func TestFlush(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, LSN(0), rl.FlushedLSN)
+		assert.Equal(t, LSN(0), rl.flushedLSN)
 	})
 
 	t.Run("Flush 後にバッファがクリアされる", func(t *testing.T) {
@@ -211,7 +211,7 @@ func TestReset(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, LSN(0), rl.FlushedLSN)
+		assert.Equal(t, LSN(0), rl.flushedLSN)
 
 		records, err := rl.ReadAll()
 		assert.NoError(t, err)
@@ -240,6 +240,54 @@ func TestReset(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 1, len(records))
 		assert.Equal(t, uint64(10), records[0].TrxId)
+	})
+}
+
+func TestFlushedLSN(t *testing.T) {
+	t.Run("新規作成直後は 0 を返す", func(t *testing.T) {
+		// GIVEN
+		tmpDir := t.TempDir()
+		rl, err := NewRedoLog(tmpDir)
+		assert.NoError(t, err)
+
+		// WHEN
+		lsn := rl.FlushedLSN()
+
+		// THEN
+		assert.Equal(t, LSN(0), lsn)
+	})
+
+	t.Run("Flush 後にフラッシュ済み LSN が更新される", func(t *testing.T) {
+		// GIVEN
+		tmpDir := t.TempDir()
+		rl, err := NewRedoLog(tmpDir)
+		assert.NoError(t, err)
+		rl.AppendCommit(1)
+		rl.AppendCommit(2)
+
+		// WHEN
+		err = rl.Flush()
+		assert.NoError(t, err)
+
+		// THEN
+		assert.Equal(t, LSN(2), rl.FlushedLSN())
+	})
+
+	t.Run("Reset 後は 0 に戻る", func(t *testing.T) {
+		// GIVEN
+		tmpDir := t.TempDir()
+		rl, err := NewRedoLog(tmpDir)
+		assert.NoError(t, err)
+		rl.AppendCommit(1)
+		err = rl.Flush()
+		assert.NoError(t, err)
+
+		// WHEN
+		err = rl.Reset()
+		assert.NoError(t, err)
+
+		// THEN
+		assert.Equal(t, LSN(0), rl.FlushedLSN())
 	})
 }
 

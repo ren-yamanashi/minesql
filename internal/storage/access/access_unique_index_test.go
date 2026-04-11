@@ -58,8 +58,7 @@ func TestUniqueIndex(t *testing.T) {
 
 		i := 0
 		for {
-			record, ok, err := iter.Get(bp)
-			assert.NoError(t, err)
+			record, ok := iter.Get()
 			if !ok {
 				break
 			}
@@ -126,8 +125,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 		}
 		var entries []indexEntry
 		for {
-			record, ok, err := iter.Get(bp)
-			assert.NoError(t, err)
+			record, ok := iter.Get()
 			if !ok {
 				break
 			}
@@ -178,8 +176,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
-		record, ok, err := iter.Get(bp)
-		assert.NoError(t, err)
+		record, ok := iter.Get()
 		assert.True(t, ok)
 		assert.Equal(t, uint8(0), record.HeaderBytes()[0]) // active
 	})
@@ -224,8 +221,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 		}
 		var entries []indexEntry
 		for {
-			record, ok, err := iter.Get(bp)
-			assert.NoError(t, err)
+			record, ok := iter.Get()
 			if !ok {
 				break
 			}
@@ -274,8 +270,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
-		record, ok, err := iter.Get(bp)
-		assert.NoError(t, err)
+		record, ok := iter.Get()
 		assert.True(t, ok)
 		assert.Equal(t, uint8(0), record.HeaderBytes()[0]) // active
 	})

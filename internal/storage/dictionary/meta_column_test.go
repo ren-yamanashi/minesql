@@ -34,8 +34,7 @@ func TestColumnMetadata_Insert(t *testing.T) {
 		iter, err := btr.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
-		record, ok, err := iter.Get(bp)
-		assert.NoError(t, err)
+		record, ok := iter.Get()
 		assert.True(t, ok)
 
 		// key (FileId, ColName) をデコード
@@ -83,8 +82,7 @@ func TestColumnMetadata_Insert(t *testing.T) {
 
 		count := 0
 		for {
-			_, ok, err := iter.Get(bp)
-			assert.NoError(t, err)
+			_, ok := iter.Get()
 			if !ok {
 				break
 			}

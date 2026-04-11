@@ -21,7 +21,7 @@ type BufferId uint64
 type PageTable map[page.PageId]BufferId
 
 type BufferPool struct {
-	mutex             sync.Mutex
+	mutex             sync.RWMutex
 	disks             map[page.FileId]*file.Disk // FileId → Disk のマップ
 	bufferPages       []BufferPage               // バッファページのスライス
 	maxBufferSize     int                        // バッファプールの最大サイズ (バッファページ数)
@@ -29,7 +29,7 @@ type BufferPool struct {
 	evictionAlgorithm *LRU                       // ページ追い出しアルゴリズム
 	redoLog           *log.RedoLog               // REDO ログ
 	flushList         *FlushList                 // ダーティーページのフラッシュリスト
-	newlyDirtied      []page.PageId              // 前回の DrainNewlyDirtied 以降にダーティーになったページ
+	newlyDirtied      []page.PageId              // 前回の PopNewlyDirtied 以降にダーティーになったページ
 }
 
 // NewBufferPool は指定されたサイズの BufferPool を生成する
@@ -56,26 +56,36 @@ func (bp *BufferPool) GetWritePageData(pageId page.PageId) ([]byte, error) {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
 
-	bufPage, err := bp.fetchPageLocked(pageId)
+	bufPage, err := bp.fetchPage(pageId)
 	if err != nil {
 		return nil, err
 	}
 
-	// ページが clean ならダーティーページにし、フラッシュリストと newlyDirtied に追加する
+	// ページが clean ならダーティーページにし、フラッシュリストに追加する
 	if !bufPage.IsDirty {
 		bufPage.IsDirty = true
 		bp.flushList.Add(pageId)
-		bp.newlyDirtied = append(bp.newlyDirtied, pageId)
 	}
+	bp.newlyDirtied = append(bp.newlyDirtied, pageId)
 	return bufPage.Page, nil
 }
 
 // GetReadPageData は読み込み用にページデータを取得する
 func (bp *BufferPool) GetReadPageData(pageId page.PageId) ([]byte, error) {
+	// ページがプール内にある場合は RLock で返す (LRU 更新不要)
+	bp.mutex.RLock()
+	if bufferId, ok := bp.pageTable[pageId]; ok {
+		bufPage := &bp.bufferPages[bufferId]
+		bp.mutex.RUnlock()
+		return bufPage.Page, nil
+	}
+	bp.mutex.RUnlock()
+
+	// ページがプールにない場合はディスクから読み込む
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
 
-	bufPage, err := bp.fetchPageLocked(pageId)
+	bufPage, err := bp.fetchPage(pageId)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +98,7 @@ func (bp *BufferPool) GetReadPageData(pageId page.PageId) ([]byte, error) {
 func (bp *BufferPool) FetchPage(pageId page.PageId) (*BufferPage, error) {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
-	return bp.fetchPageLocked(pageId)
+	return bp.fetchPage(pageId)
 }
 
 // AddPage はバッファプールに新しいページを追加する
@@ -97,7 +107,7 @@ func (bp *BufferPool) FetchPage(pageId page.PageId) (*BufferPage, error) {
 func (bp *BufferPool) AddPage(pageId page.PageId) error {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
-	_, err := bp.addPageLocked(pageId)
+	_, err := bp.addPage(pageId)
 	return err
 }
 
@@ -121,7 +131,7 @@ func (bp *BufferPool) FlushAllPages() error {
 		}
 
 		// FileId から Disk を取得
-		disk, err := bp.getDiskLocked(pageId.FileId)
+		disk, err := bp.getDisk(pageId.FileId)
 		if err != nil {
 			return err
 		}
@@ -183,7 +193,7 @@ func (bp *BufferPool) FlushOldestPages(n int) error {
 		}
 
 		// ダーティーページをディスクに書き出す
-		disk, err := bp.getDiskLocked(pid.FileId)
+		disk, err := bp.getDisk(pid.FileId)
 		if err != nil {
 			return err
 		}
@@ -199,7 +209,7 @@ func (bp *BufferPool) FlushOldestPages(n int) error {
 
 	// フラッシュしたページのディスクを Sync してストレージデバイスへの書き込みを保証
 	for fileId := range syncDisks {
-		disk, err := bp.getDiskLocked(fileId)
+		disk, err := bp.getDisk(fileId)
 		if err != nil {
 			return err
 		}
@@ -211,8 +221,8 @@ func (bp *BufferPool) FlushOldestPages(n int) error {
 	return nil
 }
 
-// DrainNewlyDirtied は前回の呼び出し以降に新しくダーティーになったページの PageId を返し、リストをクリアする
-func (bp *BufferPool) DrainNewlyDirtied() []page.PageId {
+// PopNewlyDirtied は前回の呼び出し以降に書き込みが行われたページの PageId を返し、newlyDirtied リストをクリアする
+func (bp *BufferPool) PopNewlyDirtied() []page.PageId {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
 	result := bp.newlyDirtied
@@ -220,10 +230,17 @@ func (bp *BufferPool) DrainNewlyDirtied() []page.PageId {
 	return result
 }
 
-// FlushListSize はフラッシュリスト内のページ数を返す
-func (bp *BufferPool) FlushListSize() int {
+// ClearNewlyDirtied は newlyDirtied リストをクリアする
+func (bp *BufferPool) ClearNewlyDirtied() {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
+	bp.newlyDirtied = nil
+}
+
+// FlushListSize はフラッシュリスト内のページ数を返す
+func (bp *BufferPool) FlushListSize() int {
+	bp.mutex.RLock()
+	defer bp.mutex.RUnlock()
 	return bp.flushList.Size
 }
 
@@ -252,24 +269,24 @@ func (bp *BufferPool) RegisterDisk(fileId page.FileId, disk *file.Disk) {
 
 // GetDisk は指定された FileId に対応する Disk を取得する
 func (bp *BufferPool) GetDisk(fileId page.FileId) (*file.Disk, error) {
-	bp.mutex.Lock()
-	defer bp.mutex.Unlock()
-	return bp.getDiskLocked(fileId)
+	bp.mutex.RLock()
+	defer bp.mutex.RUnlock()
+	return bp.getDisk(fileId)
 }
 
 // AllocatePageId は指定された FileId に対して新しい PageId を割り当てる
 func (bp *BufferPool) AllocatePageId(fileId page.FileId) (page.PageId, error) {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
-	disk, err := bp.getDiskLocked(fileId)
+	disk, err := bp.getDisk(fileId)
 	if err != nil {
 		return page.INVALID_PAGE_ID, err
 	}
 	return disk.AllocatePage(), nil
 }
 
-// getDiskLocked は Disk の取得処理を行う (mutex 取得済みの状態で呼び出すこと)
-func (bp *BufferPool) getDiskLocked(fileId page.FileId) (*file.Disk, error) {
+// getDisk は指定された FileId に対応する Disk を取得する (mutex 取得済みの状態で呼び出す必要がある)
+func (bp *BufferPool) getDisk(fileId page.FileId) (*file.Disk, error) {
 	disk, ok := bp.disks[fileId]
 	if !ok {
 		return nil, fmt.Errorf("disk for FileId %d not found", fileId)
@@ -277,8 +294,8 @@ func (bp *BufferPool) getDiskLocked(fileId page.FileId) (*file.Disk, error) {
 	return disk, nil
 }
 
-// fetchPageLocked はページのフェッチ処理を行う (mutex 取得済みの状態で呼び出すこと)
-func (bp *BufferPool) fetchPageLocked(pageId page.PageId) (*BufferPage, error) {
+// fetchPage は指定されたページをバッファプールから取得する (mutex 取得済みの状態で呼び出す必要がある)
+func (bp *BufferPool) fetchPage(pageId page.PageId) (*BufferPage, error) {
 	// ページがバッファプールにある場合
 	if bufferId, ok := bp.pageTable[pageId]; ok {
 		bufferPage := &bp.bufferPages[bufferId]
@@ -287,13 +304,13 @@ func (bp *BufferPool) fetchPageLocked(pageId page.PageId) (*BufferPage, error) {
 	}
 
 	// ページがバッファプールにない場合
-	bufferPage, err := bp.addPageLocked(pageId)
+	bufferPage, err := bp.addPage(pageId)
 	if err != nil {
 		return nil, err
 	}
 
 	// ディスクからページを読み込む
-	disk, err := bp.getDiskLocked(pageId.FileId)
+	disk, err := bp.getDisk(pageId.FileId)
 	if err != nil {
 		return nil, err
 	}
@@ -307,8 +324,8 @@ func (bp *BufferPool) fetchPageLocked(pageId page.PageId) (*BufferPage, error) {
 	return bufferPage, nil
 }
 
-// addPageLocked はページの追加処理を行う (mutex 取得済みの状態で呼び出すこと)
-func (bp *BufferPool) addPageLocked(pageId page.PageId) (*BufferPage, error) {
+// addPage はバッファプールに新しいページを追加する (mutex 取得済みの状態で呼び出す必要がある)
+func (bp *BufferPool) addPage(pageId page.PageId) (*BufferPage, error) {
 	// バッファに空きがある場合、新しいバッファページを追加し、ページテーブルを更新 (エントリを追加)
 	if len(bp.bufferPages) < bp.maxBufferSize {
 		bp.bufferPages = append(bp.bufferPages, *NewBufferPage(pageId))
@@ -337,7 +354,7 @@ func (bp *BufferPool) addPageLocked(pageId page.PageId) (*BufferPage, error) {
 		}
 
 		// FileId から Disk を取得
-		disk, err := bp.getDiskLocked(victim.PageId.FileId)
+		disk, err := bp.getDisk(victim.PageId.FileId)
 		if err != nil {
 			return nil, err
 		}

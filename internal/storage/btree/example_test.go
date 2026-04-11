@@ -109,10 +109,7 @@ func ExampleBTree_Search() {
 			panic(err)
 		}
 
-		record, ok, err := iter.Get(bp)
-		if err != nil {
-			panic(err)
-		}
+		record, ok := iter.Get()
 		if ok && string(record.KeyBytes()) == key {
 			fmt.Printf("key=%s, value=%s x %d\n", string(record.KeyBytes()), string(record.NonKeyBytes()[:1]), len(record.NonKeyBytes()))
 		} else {

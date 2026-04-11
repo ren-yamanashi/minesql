@@ -71,10 +71,7 @@ func loadIndexMeta(bp *buffer.BufferPool, fileId page.FileId, metaPageId page.Pa
 
 	var indexes []*IndexMeta
 	for {
-		record, ok, err := iter.Get(bp)
-		if err != nil {
-			return nil, err
-		}
+		record, ok := iter.Get()
 		if !ok {
 			break
 		}
