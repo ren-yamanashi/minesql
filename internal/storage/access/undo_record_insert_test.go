@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestInsertLogRecord_Undo(t *testing.T) {
+func TestUndoInsertRecord_Undo(t *testing.T) {
 	t.Run("Insert した行が物理削除される", func(t *testing.T) {
 		// GIVEN
 		table, bp := setupTestTableForUndo(t, nil)
@@ -50,5 +50,27 @@ func TestInsertLogRecord_Undo(t *testing.T) {
 		assert.NoError(t, err)
 		keys := collectUndoActiveUniqueIndexKeys(t, table.UniqueIndexes[0], bp)
 		assert.Equal(t, 0, len(keys))
+	})
+}
+
+func TestUndoInsertRecord_Serialize(t *testing.T) {
+	t.Run("シリアライズしてデシリアライズすると元のデータが復元される", func(t *testing.T) {
+		// GIVEN
+		table, _ := setupTestTableForUndo(t, nil)
+		record := NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("John")})
+
+		// WHEN
+		buf := record.Serialize(1, 0)
+		trxId, undoNo, recordType, tableName, columnSets, err := DeserializeUndoRecord(buf)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(1), trxId)
+		assert.Equal(t, uint64(0), undoNo)
+		assert.Equal(t, UndoInsert, recordType)
+		assert.Equal(t, "test", tableName)
+		assert.Equal(t, 1, len(columnSets))
+		assert.Equal(t, []byte("a"), columnSets[0][0])
+		assert.Equal(t, []byte("John"), columnSets[0][1])
 	})
 }

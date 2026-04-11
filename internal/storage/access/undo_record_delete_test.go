@@ -75,3 +75,25 @@ func TestUndoDeleteRecord_Undo(t *testing.T) {
 		assert.Equal(t, []string{"a", "John"}, records[0])
 	})
 }
+
+func TestUndoDeleteRecord_Serialize(t *testing.T) {
+	t.Run("シリアライズしてデシリアライズすると元のデータが復元される", func(t *testing.T) {
+		// GIVEN
+		table, _ := setupTestTableForUndo(t, nil)
+		record := NewUndoDeleteRecord(table, [][]byte{[]byte("a"), []byte("John")})
+
+		// WHEN
+		buf := record.Serialize(2, 1)
+		trxId, undoNo, recordType, tableName, columnSets, err := DeserializeUndoRecord(buf)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(2), trxId)
+		assert.Equal(t, uint64(1), undoNo)
+		assert.Equal(t, UndoDelete, recordType)
+		assert.Equal(t, "test", tableName)
+		assert.Equal(t, 1, len(columnSets))
+		assert.Equal(t, []byte("a"), columnSets[0][0])
+		assert.Equal(t, []byte("John"), columnSets[0][1])
+	})
+}
