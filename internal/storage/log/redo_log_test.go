@@ -242,3 +242,81 @@ func TestReset(t *testing.T) {
 		assert.Equal(t, uint64(10), records[0].TrxId)
 	})
 }
+
+func TestFileSize(t *testing.T) {
+	t.Run("新規作成直後はヘッダーサイズのみ", func(t *testing.T) {
+		// GIVEN
+		tmpDir := t.TempDir()
+		rl, err := NewRedoLog(tmpDir)
+		assert.NoError(t, err)
+
+		// WHEN
+		size, err := rl.FileSize()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, int64(16), size) // ヘッダー 16 バイト
+	})
+
+	t.Run("Flush 後にファイルサイズが増加する", func(t *testing.T) {
+		// GIVEN
+		tmpDir := t.TempDir()
+		rl, err := NewRedoLog(tmpDir)
+		assert.NoError(t, err)
+		sizeBefore, _ := rl.FileSize()
+
+		// WHEN
+		rl.AppendPageCopy(1, page.NewPageId(1, 0), make([]byte, page.PAGE_SIZE))
+		err = rl.Flush()
+		assert.NoError(t, err)
+
+		// THEN
+		sizeAfter, err := rl.FileSize()
+		assert.NoError(t, err)
+		assert.Greater(t, sizeAfter, sizeBefore)
+	})
+}
+
+func TestBufferSize(t *testing.T) {
+	t.Run("バッファが空の場合は 0 を返す", func(t *testing.T) {
+		// GIVEN
+		tmpDir := t.TempDir()
+		rl, err := NewRedoLog(tmpDir)
+		assert.NoError(t, err)
+
+		// WHEN
+		size := rl.BufferSize()
+
+		// THEN
+		assert.Equal(t, 0, size)
+	})
+
+	t.Run("バッファにレコードがある場合はサイズを返す", func(t *testing.T) {
+		// GIVEN
+		tmpDir := t.TempDir()
+		rl, err := NewRedoLog(tmpDir)
+		assert.NoError(t, err)
+
+		// WHEN
+		rl.AppendCommit(1)
+		size := rl.BufferSize()
+
+		// THEN
+		assert.Greater(t, size, 0)
+	})
+
+	t.Run("Flush 後はバッファが空になる", func(t *testing.T) {
+		// GIVEN
+		tmpDir := t.TempDir()
+		rl, err := NewRedoLog(tmpDir)
+		assert.NoError(t, err)
+		rl.AppendCommit(1)
+
+		// WHEN
+		err = rl.Flush()
+		assert.NoError(t, err)
+
+		// THEN
+		assert.Equal(t, 0, rl.BufferSize())
+	})
+}

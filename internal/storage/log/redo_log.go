@@ -154,6 +154,24 @@ func (rl *RedoLog) Reset() error {
 	return rl.writeHeader()
 }
 
+// FileSize は REDO ログファイルの現在のサイズ (バイト) を返す
+func (rl *RedoLog) FileSize() (int64, error) {
+	stat, err := rl.file.Stat()
+	if err != nil {
+		return 0, err
+	}
+	return stat.Size(), nil
+}
+
+// BufferSize は REDO バッファの概算サイズ (バイト) を返す
+func (rl *RedoLog) BufferSize() int {
+	size := 0
+	for _, record := range rl.buffer {
+		size += redoRecordHeaderSize + len(record.Data)
+	}
+	return size
+}
+
 // append は新しい REDO レコードをバッファに追加し、対応する LSN を返す
 func (rl *RedoLog) append(trxId uint64, recordType RedoRecordType, pageId page.PageId, data []byte) LSN {
 	lsn := rl.lsnGen.AllocateLSN()
