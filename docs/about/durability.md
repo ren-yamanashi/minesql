@@ -55,14 +55,3 @@ ARIES は以下の 3 ステップでクラッシュリカバリを行う
 
 - 未コミットのトランザクションの操作を Undo ログを使用して逆順に取り消す
 - この際に CLR (Compensation Log Record) を書くことで、Undo 自体もリカバリ可能にする
-
-## Fuzzy Checkpoint
-
-- ARIES の仕組みの一部で、システムを停止せずに Checkpoint を取る方式
-  - https://dl.acm.org/doi/10.1145/128765.128770
-- 定期的にデータベースの状態 (アクティブなトランザクション、ダーティーページなど) を記録し、Analysis フェーズの開始位置を決定するもの
-- Checkpoint があれば、Checkpoint 時点でアクティブだったトランザクションの最も古い LSN より前の WAL は不要になるため、WAL を切り詰めることができる
-- Fuzzy Checkpoint では、ダーティーページの Flush は行わず、リカバリに必要な以下の情報だけを記録する (以下の情報のスナップショットを取得して WAL に書き込む)
-  - ATT (Active Transaction Table): 現在アクティブなトランザクション一覧と、各トランザクションの最後の LSN
-  - DPT (Dirty Page Table): 現在のダーティーページ一覧と、各ページが最初にダーティーになった時の LSN (RecLSN)
-    - DPT 内の最小の RecLSN より前の変更は、必ずディスクに反映されている
