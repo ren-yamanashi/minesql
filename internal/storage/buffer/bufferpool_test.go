@@ -1,7 +1,9 @@
 package buffer
 
 import (
+	"encoding/binary"
 	"minesql/internal/storage/file"
+	"minesql/internal/storage/log"
 	"minesql/internal/storage/page"
 	"path/filepath"
 	"testing"
@@ -184,7 +186,7 @@ func TestFetchPage(t *testing.T) {
 		bp := NewBufferPool(size, nil)
 		bp.RegisterDisk(page.FileId(0), disk)
 
-		bufferPage, err := bp.AddPage(pageId)
+		err := bp.AddPage(pageId)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -192,7 +194,7 @@ func TestFetchPage(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, bufferPage, fetchedPage)
+		assert.Equal(t, pageId, fetchedPage.PageId)
 		assert.Equal(t, BufferId(2), bp.pageTable[pageId])
 	})
 
@@ -227,12 +229,10 @@ func TestAddPage(t *testing.T) {
 		pageId := disk.AllocatePage()
 
 		// WHEN
-		bufferPage, err := bp.AddPage(pageId)
+		err := bp.AddPage(pageId)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.NotNil(t, bufferPage)
-		assert.Equal(t, pageId, bufferPage.PageId)
 		bufferId, ok := bp.pageTable[pageId]
 		assert.True(t, ok)
 		assert.Equal(t, BufferId(2), bufferId)
@@ -251,16 +251,16 @@ func TestAddPage(t *testing.T) {
 		pageId2 := disk.AllocatePage()
 		pageId3 := disk.AllocatePage()
 
-		page1, err := bp.AddPage(pageId1)
+		err := bp.AddPage(pageId1)
 		assert.NoError(t, err)
-		_, err = bp.AddPage(pageId2)
+		err = bp.AddPage(pageId2)
 		assert.NoError(t, err)
-		_, err = bp.AddPage(pageId3)
+		err = bp.AddPage(pageId3)
 		assert.NoError(t, err)
 
 		// page1 にデータを書き込み、ダーティーにする
-		page1.Page[0] = 99
-		page1.IsDirty = true
+		data1, _ := bp.GetWritePageData(pageId1)
+		data1[0] = 99
 
 		// pageId1 を最後に参照解除して、LRU の末尾に配置し最初に追い出されるようにする
 		bp.UnRefPage(pageId2)
@@ -269,12 +269,10 @@ func TestAddPage(t *testing.T) {
 
 		// WHEN
 		pageId4 := disk.AllocatePage()
-		newPage, err := bp.AddPage(pageId4)
+		err = bp.AddPage(pageId4)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.NotNil(t, newPage)
-		assert.Equal(t, pageId4, newPage.PageId)
 		// 新しいページがページテーブルに追加されていることを確認
 		_, ok := bp.pageTable[pageId4]
 		assert.True(t, ok)
@@ -302,11 +300,11 @@ func TestAddPage(t *testing.T) {
 		pageId2 := disk.AllocatePage()
 		pageId3 := disk.AllocatePage()
 
-		_, err := bp.AddPage(pageId1)
+		err := bp.AddPage(pageId1)
 		assert.NoError(t, err)
-		_, err = bp.AddPage(pageId2)
+		err = bp.AddPage(pageId2)
 		assert.NoError(t, err)
-		_, err = bp.AddPage(pageId3)
+		err = bp.AddPage(pageId3)
 		assert.NoError(t, err)
 
 		// pageId1 を最後に参照解除して、LRU の末尾に配置し最初に追い出されるようにする
@@ -320,16 +318,12 @@ func TestAddPage(t *testing.T) {
 
 		// WHEN
 		pageId4 := disk.AllocatePage()
-		newPage, err := bp.AddPage(pageId4)
+		err = bp.AddPage(pageId4)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.NotNil(t, newPage)
-		assert.Equal(t, pageId4, newPage.PageId)
-		// 新しいページがページテーブルに追加されていることを確認
 		_, ok := bp.pageTable[pageId4]
 		assert.True(t, ok)
-		// 古いページ (pageId1) がページテーブルから削除されていることを確認
 		_, ok = bp.pageTable[pageId1]
 		assert.False(t, ok)
 	})
@@ -348,11 +342,11 @@ func TestUnRefPage(t *testing.T) {
 		pageId2 := disk.AllocatePage()
 		pageId3 := disk.AllocatePage()
 
-		_, err := bp.AddPage(pageId1)
+		err := bp.AddPage(pageId1)
 		assert.NoError(t, err)
-		_, err = bp.AddPage(pageId2)
+		err = bp.AddPage(pageId2)
 		assert.NoError(t, err)
-		_, err = bp.AddPage(pageId3)
+		err = bp.AddPage(pageId3)
 		assert.NoError(t, err)
 
 		// page2 のみ参照を解除
@@ -360,7 +354,7 @@ func TestUnRefPage(t *testing.T) {
 
 		// WHEN: 新しいページを追加 (追い出しが発生)
 		pageId4 := disk.AllocatePage()
-		_, err = bp.AddPage(pageId4)
+		err = bp.AddPage(pageId4)
 		assert.NoError(t, err)
 
 		// THEN: page2 が追い出され、page1, page3, page4 がバッファに残る
@@ -375,7 +369,7 @@ func TestUnRefPage(t *testing.T) {
 	})
 }
 
-func TestFlushPage(t *testing.T) {
+func TestFlushAllPages(t *testing.T) {
 	t.Run("ページテーブル内にダーティーページが存在する場合", func(t *testing.T) {
 		// GIVEN
 		size := 3
@@ -388,27 +382,28 @@ func TestFlushPage(t *testing.T) {
 		pageId2 := disk.AllocatePage()
 		pageId3 := disk.AllocatePage()
 
-		page1, err := bp.AddPage(pageId1)
+		err := bp.AddPage(pageId1)
 		assert.NoError(t, err)
-		page2, err := bp.AddPage(pageId2)
+		err = bp.AddPage(pageId2)
 		assert.NoError(t, err)
-		_, err = bp.AddPage(pageId3)
+		err = bp.AddPage(pageId3)
 		assert.NoError(t, err)
 
 		// ページにデータを書き込み、ダーティーにする
-		page1.Page[0] = 11
-		page1.IsDirty = true
-		page2.Page[0] = 22
-		page2.IsDirty = true
+		data1, _ := bp.GetWritePageData(pageId1)
+		data1[0] = 11
+		data2, _ := bp.GetWritePageData(pageId2)
+		data2[0] = 22
 
 		// WHEN
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 
 		// THEN
-		assert.NoError(t, err)
-		assert.False(t, page1.IsDirty)
-		assert.False(t, page2.IsDirty)
+		p1, _ := bp.FetchPage(pageId1)
+		p2, _ := bp.FetchPage(pageId2)
+		assert.False(t, p1.IsDirty)
+		assert.False(t, p2.IsDirty)
 
 		// データがディスクに書き込まれていることを確認
 		// バッファプールをクリアして、ディスクから読み直す
@@ -418,11 +413,11 @@ func TestFlushPage(t *testing.T) {
 		pageId4 := disk.AllocatePage()
 		pageId5 := disk.AllocatePage()
 		pageId6 := disk.AllocatePage()
-		_, err = bp.AddPage(pageId4)
+		err = bp.AddPage(pageId4)
 		assert.NoError(t, err)
-		_, err = bp.AddPage(pageId5)
+		err = bp.AddPage(pageId5)
 		assert.NoError(t, err)
-		_, err = bp.AddPage(pageId6)
+		err = bp.AddPage(pageId6)
 		assert.NoError(t, err)
 
 		// page1 と page2 を再度フェッチして、データが正しく読み出せることを確認
@@ -447,46 +442,381 @@ func TestFlushPage(t *testing.T) {
 		pageId2 := disk.AllocatePage()
 		pageId3 := disk.AllocatePage()
 
-		page1, _ := bp.AddPage(pageId1)
-		page2, _ := bp.AddPage(pageId2)
-		page3, _ := bp.AddPage(pageId3)
+		_ = bp.AddPage(pageId1)
+		_ = bp.AddPage(pageId2)
+		_ = bp.AddPage(pageId3)
 
-		page1.IsDirty = false
-		page2.IsDirty = false
-		page3.IsDirty = false
-
-		// WHEN
-		err := bp.FlushPage()
+		// WHEN: 全ページがクリーンな状態でフラッシュ
+		err := bp.FlushAllPages()
 
 		// THEN
 		assert.NoError(t, err)
-		assert.False(t, page1.IsDirty)
-		assert.False(t, page2.IsDirty)
-		assert.False(t, page3.IsDirty)
 	})
 }
 
-func TestDirtyPageIds(t *testing.T) {
-	t.Run("ダーティーページがない場合は空のリストを返す", func(t *testing.T) {
+func TestFlushAllPagesWithRedoLog(t *testing.T) {
+	t.Run("REDO ログありの場合、REDO ログバッファを先にフラッシュしてからページをフラッシュする", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		rl, err := log.NewRedoLog(tmpdir)
+		assert.NoError(t, err)
+		bp := NewBufferPool(5, rl)
+
+		disk, err := file.NewDisk(page.FileId(1), filepath.Join(tmpdir, "test.db"))
+		assert.NoError(t, err)
+		bp.RegisterDisk(page.FileId(1), disk)
+
+		pageId, _ := bp.AllocatePageId(page.FileId(1))
+		_ = bp.AddPage(pageId)
+		data, _ := bp.GetWritePageData(pageId)
+		data[0] = 0xEE
+
+		// REDO ログバッファにレコードを追加 (未フラッシュ)
+		rl.AppendPageCopy(1, pageId, data)
+
+		// WHEN
+		err = bp.FlushAllPages()
+		assert.NoError(t, err)
+
+		// THEN: REDO ログがフラッシュされている
+		assert.Greater(t, rl.FlushedLSN(), log.LSN(0))
+		// フラッシュリストが空になっている
+		assert.Equal(t, 0, bp.FlushListSize())
+	})
+}
+
+func TestFlushOldestPagesWithRedoLog(t *testing.T) {
+	t.Run("REDO ログありの場合、REDO ログバッファを先にフラッシュする", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		rl, err := log.NewRedoLog(tmpdir)
+		assert.NoError(t, err)
+		bp := NewBufferPool(5, rl)
+
+		disk, err := file.NewDisk(page.FileId(1), filepath.Join(tmpdir, "test.db"))
+		assert.NoError(t, err)
+		bp.RegisterDisk(page.FileId(1), disk)
+
+		pageId, _ := bp.AllocatePageId(page.FileId(1))
+		_ = bp.AddPage(pageId)
+		data, _ := bp.GetWritePageData(pageId)
+		data[0] = 0xDD
+
+		// REDO ログバッファにレコードを追加 (未フラッシュ)
+		rl.AppendPageCopy(1, pageId, data)
+
+		// WHEN
+		err = bp.FlushOldestPages(1)
+		assert.NoError(t, err)
+
+		// THEN: REDO ログがフラッシュされている
+		assert.Greater(t, rl.FlushedLSN(), log.LSN(0))
+		// フラッシュリストから除外されている
+		assert.Equal(t, 0, bp.FlushListSize())
+	})
+}
+
+func TestAddPageEvictionWithRedoLogNil(t *testing.T) {
+	t.Run("redoLog が nil でもダーティーページの追い出しが正常に行われる", func(t *testing.T) {
+		// GIVEN: redoLog なしのバッファプール
+		tmpdir := t.TempDir()
+		bp := NewBufferPool(3, nil)
+		disk, _ := file.NewDisk(page.FileId(0), filepath.Join(tmpdir, "test.db"))
+		bp.RegisterDisk(page.FileId(0), disk)
+
+		pageId1 := disk.AllocatePage()
+		pageId2 := disk.AllocatePage()
+		pageId3 := disk.AllocatePage()
+
+		_ = bp.AddPage(pageId1)
+		_ = bp.AddPage(pageId2)
+		_ = bp.AddPage(pageId3)
+
+		// page1 をダーティーにする
+		data1, _ := bp.GetWritePageData(pageId1)
+		data1[0] = 0xBB
+
+		// page1 を最後に参照解除して、最初に追い出されるようにする
+		bp.UnRefPage(pageId2)
+		bp.UnRefPage(pageId3)
+		bp.UnRefPage(pageId1)
+
+		// WHEN: 新しいページを追加 (page1 が追い出される)
+		pageId4 := disk.AllocatePage()
+		err := bp.AddPage(pageId4)
+		assert.NoError(t, err)
+
+		// THEN: page1 のデータがディスクに書���込まれている
+		reFetched, err := bp.FetchPage(pageId1)
+		assert.NoError(t, err)
+		assert.Equal(t, byte(0xBB), reFetched.Page[0])
+	})
+}
+
+func TestFlushOldestPagesCleanPage(t *testing.T) {
+	t.Run("クリーンなページはフラッシュリストから除外されるだけでディスク書き込みしない", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		rl, err := log.NewRedoLog(tmpdir)
+		assert.NoError(t, err)
+		bp := NewBufferPool(10, rl)
+
+		disk, err := file.NewDisk(page.FileId(1), filepath.Join(tmpdir, "test.db"))
+		assert.NoError(t, err)
+		bp.RegisterDisk(page.FileId(1), disk)
+
+		pageId1, _ := bp.AllocatePageId(page.FileId(1))
+		_ = bp.AddPage(pageId1)
+		data1, _ := bp.GetWritePageData(pageId1)
+		data1[0] = 0x11
+
+		// フラッシュリストに入っているがクリーンにする (テスト用に直接操作)
+		p1, _ := bp.FetchPage(pageId1)
+		p1.IsDirty = false
+
+		// WHEN
+		err = bp.FlushOldestPages(1)
+		assert.NoError(t, err)
+
+		// THEN: フラッシュリストから除外される
+		assert.Equal(t, 0, bp.flushList.Size)
+	})
+}
+
+func TestFlushAllPagesWithFlushList(t *testing.T) {
+	t.Run("FlushAllPages 後にフラッシュリストがクリアされる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		rl, err := log.NewRedoLog(tmpdir)
+		assert.NoError(t, err)
+		bp := NewBufferPool(10, rl)
+
+		disk, err := file.NewDisk(page.FileId(1), filepath.Join(tmpdir, "test.db"))
+		assert.NoError(t, err)
+		bp.RegisterDisk(page.FileId(1), disk)
+
+		pageId1, _ := bp.AllocatePageId(page.FileId(1))
+		pageId2, _ := bp.AllocatePageId(page.FileId(1))
+
+		_ = bp.AddPage(pageId1)
+		data1, _ := bp.GetWritePageData(pageId1)
+		data1[0] = 0x11
+
+		_ = bp.AddPage(pageId2)
+		data2, _ := bp.GetWritePageData(pageId2)
+		data2[0] = 0x22
+
+		assert.Equal(t, 2, bp.flushList.Size)
+
+		// WHEN
+		err = bp.FlushAllPages()
+		assert.NoError(t, err)
+
+		// THEN
+		assert.Equal(t, 0, bp.flushList.Size)
+		p1, _ := bp.FetchPage(pageId1)
+		p2, _ := bp.FetchPage(pageId2)
+		assert.False(t, p1.IsDirty)
+		assert.False(t, p2.IsDirty)
+	})
+}
+
+func TestAddPageEvictionWithFlushList(t *testing.T) {
+	t.Run("ダーティーページ追い出し時にフラッシュリストから除外される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		bp := NewBufferPool(3, nil)
+		disk, _ := file.NewDisk(page.FileId(0), filepath.Join(tmpdir, "test.db"))
+		bp.RegisterDisk(page.FileId(0), disk)
+
+		pageId1 := disk.AllocatePage()
+		pageId2 := disk.AllocatePage()
+		pageId3 := disk.AllocatePage()
+
+		err := bp.AddPage(pageId1)
+		assert.NoError(t, err)
+		err = bp.AddPage(pageId2)
+		assert.NoError(t, err)
+		err = bp.AddPage(pageId3)
+		assert.NoError(t, err)
+
+		// page1 をダーティーにしてフラッシュリストに追加
+		data1, _ := bp.GetWritePageData(pageId1)
+		data1[0] = 0xAA
+		assert.True(t, bp.flushList.Contains(pageId1))
+
+		// pageId1 を最後に参照解除して、最初に追い出されるようにする
+		bp.UnRefPage(pageId2)
+		bp.UnRefPage(pageId3)
+		bp.UnRefPage(pageId1)
+
+		// WHEN: 新しいページを追加 (pageId1 が追い出される)
+		pageId4 := disk.AllocatePage()
+		err = bp.AddPage(pageId4)
+		assert.NoError(t, err)
+
+		// THEN: フラッシュリストから除外されている
+		assert.False(t, bp.flushList.Contains(pageId1))
+	})
+
+	t.Run("追い出し時に Page LSN > FlushedLSN なら REDO ログがフラッシュされる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		rl, err := log.NewRedoLog(tmpdir)
+		assert.NoError(t, err)
+		bp := NewBufferPool(3, rl)
+		disk, _ := file.NewDisk(page.FileId(0), filepath.Join(tmpdir, "test.db"))
+		bp.RegisterDisk(page.FileId(0), disk)
+
+		pageId1 := disk.AllocatePage()
+		pageId2 := disk.AllocatePage()
+		pageId3 := disk.AllocatePage()
+
+		err = bp.AddPage(pageId1)
+		assert.NoError(t, err)
+		err = bp.AddPage(pageId2)
+		assert.NoError(t, err)
+		err = bp.AddPage(pageId3)
+		assert.NoError(t, err)
+
+		// page1 をダーティーにして、Page LSN を設定 (REDO ログバッファにレコードを追加)
+		writeData, _ := bp.GetWritePageData(pageId1)
+		lsn := rl.AppendPageCopy(1, pageId1, writeData)
+		pg := page.NewPage(writeData)
+		binary.BigEndian.PutUint32(pg.Header, uint32(lsn))
+
+		// FlushedLSN < Page LSN であることを確認
+		assert.Greater(t, lsn, rl.FlushedLSN())
+
+		// pageId1 を最後に参照解除して、最初に追い出されるようにする
+		bp.UnRefPage(pageId2)
+		bp.UnRefPage(pageId3)
+		bp.UnRefPage(pageId1)
+
+		// WHEN: 新しいページを追加 (pageId1 が追い出される)
+		pageId4 := disk.AllocatePage()
+		err = bp.AddPage(pageId4)
+		assert.NoError(t, err)
+
+		// THEN: REDO ログがフラッシュされている (FlushedLSN が更新されている)
+		assert.Equal(t, lsn, rl.FlushedLSN())
+	})
+}
+
+func TestGetWritePageData(t *testing.T) {
+	t.Run("ページデータを取得して書き込める", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		disk, _ := createEmptyDisk(t, tmpdir)
-		bp := NewBufferPool(3, nil)
+		bp := NewBufferPool(5, nil)
 		bp.RegisterDisk(page.FileId(0), disk)
 
 		pageId := disk.AllocatePage()
-		p, err := bp.AddPage(pageId)
+		err := bp.AddPage(pageId)
 		assert.NoError(t, err)
-		p.IsDirty = false
 
 		// WHEN
-		dirtyPages := bp.DirtyPageIds()
+		data, err := bp.GetWritePageData(pageId)
+		assert.NoError(t, err)
+		data[0] = 0xAB
 
-		// THEN
-		assert.Empty(t, dirtyPages)
+		// THEN: 書き込んだデータが反映されている
+		readData, err := bp.GetReadPageData(pageId)
+		assert.NoError(t, err)
+		assert.Equal(t, byte(0xAB), readData[0])
 	})
 
-	t.Run("ダーティーページの PageId リストを返す", func(t *testing.T) {
+	t.Run("ページが自動的にダーティーになりフラッシュリストに追加される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		disk, _ := createEmptyDisk(t, tmpdir)
+		bp := NewBufferPool(5, nil)
+		bp.RegisterDisk(page.FileId(0), disk)
+
+		pageId := disk.AllocatePage()
+		err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+
+		assert.Equal(t, 0, bp.FlushListSize())
+
+		// WHEN
+		_, err = bp.GetWritePageData(pageId)
+		assert.NoError(t, err)
+
+		// THEN
+		p, _ := bp.FetchPage(pageId)
+		assert.True(t, p.IsDirty)
+		assert.Equal(t, 1, bp.FlushListSize())
+	})
+
+	t.Run("既にダーティーなページを再取得してもフラッシュリストに重複追加されない", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		disk, _ := createEmptyDisk(t, tmpdir)
+		bp := NewBufferPool(5, nil)
+		bp.RegisterDisk(page.FileId(0), disk)
+
+		pageId := disk.AllocatePage()
+		err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+		_, err = bp.GetWritePageData(pageId)
+		assert.NoError(t, err)
+
+		// WHEN
+		_, err = bp.GetWritePageData(pageId)
+		assert.NoError(t, err)
+
+		// THEN
+		assert.Equal(t, 1, bp.FlushListSize())
+	})
+}
+
+func TestGetReadPageData(t *testing.T) {
+	t.Run("ページデータを読み込める", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		disk, _ := createEmptyDisk(t, tmpdir)
+		bp := NewBufferPool(5, nil)
+		bp.RegisterDisk(page.FileId(0), disk)
+
+		pageId := disk.AllocatePage()
+		err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+		data, _ := bp.GetWritePageData(pageId)
+		data[0] = 0xCD
+
+		// WHEN
+		readData, err := bp.GetReadPageData(pageId)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, byte(0xCD), readData[0])
+	})
+
+	t.Run("ページがダーティーにならずフラッシュリストに追加されない", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		disk, _ := createEmptyDisk(t, tmpdir)
+		bp := NewBufferPool(5, nil)
+		bp.RegisterDisk(page.FileId(0), disk)
+
+		pageId := disk.AllocatePage()
+		err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+
+		// WHEN
+		_, err = bp.GetReadPageData(pageId)
+		assert.NoError(t, err)
+
+		// THEN
+		p, _ := bp.FetchPage(pageId)
+		assert.False(t, p.IsDirty)
+		assert.Equal(t, 0, bp.FlushListSize())
+	})
+}
+
+func TestPopNewlyDirtied(t *testing.T) {
+	t.Run("GetWritePageData で新しくダーティーになったページが返される", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		disk, _ := createEmptyDisk(t, tmpdir)
@@ -495,27 +825,95 @@ func TestDirtyPageIds(t *testing.T) {
 
 		pageId1 := disk.AllocatePage()
 		pageId2 := disk.AllocatePage()
-		pageId3 := disk.AllocatePage()
 
-		p1, err := bp.AddPage(pageId1)
+		err := bp.AddPage(pageId1)
 		assert.NoError(t, err)
-		p2, err := bp.AddPage(pageId2)
-		assert.NoError(t, err)
-		p3, err := bp.AddPage(pageId3)
+		err = bp.AddPage(pageId2)
 		assert.NoError(t, err)
 
-		// pageId1 と pageId3 のみダーティーにする
-		p1.IsDirty = true
-		p2.IsDirty = false
-		p3.IsDirty = true
+		// WHEN: 2 ページを GetWritePageData でダーティーにする
+		_, err = bp.GetWritePageData(pageId1)
+		assert.NoError(t, err)
+		_, err = bp.GetWritePageData(pageId2)
+		assert.NoError(t, err)
 
-		// WHEN
-		dirtyPages := bp.DirtyPageIds()
+		newlyDirtied := bp.PopNewlyDirtied()
 
 		// THEN
-		assert.Equal(t, 2, len(dirtyPages))
-		assert.Contains(t, dirtyPages, pageId1)
-		assert.Contains(t, dirtyPages, pageId3)
+		assert.Equal(t, 2, len(newlyDirtied))
+		assert.Contains(t, newlyDirtied, pageId1)
+		assert.Contains(t, newlyDirtied, pageId2)
+	})
+
+	t.Run("PopNewlyDirtied 後は空になる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		disk, _ := createEmptyDisk(t, tmpdir)
+		bp := NewBufferPool(5, nil)
+		bp.RegisterDisk(page.FileId(0), disk)
+
+		pageId := disk.AllocatePage()
+		err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+		_, err = bp.GetWritePageData(pageId)
+		assert.NoError(t, err)
+
+		bp.PopNewlyDirtied()
+
+		// WHEN
+		secondDrain := bp.PopNewlyDirtied()
+
+		// THEN
+		assert.Empty(t, secondDrain)
+	})
+
+	t.Run("既にダーティーなページを再度 GetWritePageData しても追跡される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		disk, _ := createEmptyDisk(t, tmpdir)
+		bp := NewBufferPool(5, nil)
+		bp.RegisterDisk(page.FileId(0), disk)
+
+		pageId := disk.AllocatePage()
+		err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+
+		// 1 回目の GetWritePageData
+		_, err = bp.GetWritePageData(pageId)
+		assert.NoError(t, err)
+		bp.PopNewlyDirtied()
+
+		// WHEN: 2 回目の GetWritePageData (既にダーティー)
+		_, err = bp.GetWritePageData(pageId)
+		assert.NoError(t, err)
+		result := bp.PopNewlyDirtied()
+
+		// THEN: 既にダーティーでも書き込みごとに追跡される (REDO ログ記録のため)
+		assert.Equal(t, 1, len(result))
+		assert.Equal(t, pageId, result[0])
+	})
+}
+
+func TestClearNewlyDirtied(t *testing.T) {
+	t.Run("ClearNewlyDirtied 後は PopNewlyDirtied が空を返す", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		disk, _ := createEmptyDisk(t, tmpdir)
+		bp := NewBufferPool(5, nil)
+		bp.RegisterDisk(page.FileId(0), disk)
+
+		pageId := disk.AllocatePage()
+		err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+		_, err = bp.GetWritePageData(pageId)
+		assert.NoError(t, err)
+
+		// WHEN
+		bp.ClearNewlyDirtied()
+
+		// THEN
+		result := bp.PopNewlyDirtied()
+		assert.Empty(t, result)
 	})
 }
 

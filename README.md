@@ -28,6 +28,8 @@ make build-client
 | -------------------- | ----------- | ------------- |
 | `MINESQL_DATA_DIR` | Data file storage directory | `./data` |
 | `MINESQL_BUFFER_SIZE` | Buffer pool size (number of pages) | `100` |
+| `MINESQL_REDO_LOG_MAX_SIZE` | Max redo log size (bytes) for page cleaner trigger | `1048576` (1MB) |
+| `MINESQL_MAX_DIRTY_PAGES_PCT` | Max dirty page percentage for page cleaner trigger | `90` |
 
 ## Feature
 
@@ -38,5 +40,5 @@ make build-client
 | [INSERT](./docs/feature/insert.md) | ✅ | |
 | [DELETE](./docs/feature/delete.md) | ✅ | |
 | [UPDATE](./docs/feature/update.md) | ✅ | |
-| JOIN | - | |
-| Transaction | - | Just "Atomicity", "Isolation" |
+| [Transaction](./docs//feature/transaction.md) | ✅ | |
+| JOIN | - | - |

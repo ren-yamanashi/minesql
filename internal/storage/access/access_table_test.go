@@ -76,7 +76,7 @@ func TestCreateAndInsert(t *testing.T) {
 			assert.Equal(t, expected.value, decodedValue)
 
 			i++
-			_, _, err := iter.Next(bp)
+			_, _, err = iter.Next(bp)
 			assert.NoError(t, err)
 		}
 		assert.Equal(t, len(expectedRecords), i)
@@ -118,7 +118,7 @@ func TestCreateAndInsert(t *testing.T) {
 			assert.Equal(t, 0, len(record.NonKeyBytes()))
 
 			j++
-			_, _, err := uniqueIndexIter.Next(bp)
+			_, _, err = uniqueIndexIter.Next(bp)
 			assert.NoError(t, err)
 		}
 		assert.Equal(t, len(expectedUniqueIndexRecords), j)
@@ -294,7 +294,7 @@ func TestSoftDelete(t *testing.T) {
 				encode.Decode(record.KeyBytes(), &decodedKey)
 				indexKeys = append(indexKeys, string(decodedKey[0]))
 			}
-			_, _, err := indexIter.Next(bp)
+			_, _, err = indexIter.Next(bp)
 			assert.NoError(t, err)
 		}
 		// "Doe" がソフトデリートされ、active なのは "Johnson", "Smith" のみ
@@ -338,7 +338,7 @@ func TestSoftDelete(t *testing.T) {
 				pk:         string(decodedKey[0]),
 				deleteMark: record.HeaderBytes()[0],
 			})
-			_, _, err := iter.Next(bp)
+			_, _, err = iter.Next(bp)
 			assert.NoError(t, err)
 		}
 
@@ -487,7 +487,7 @@ func TestDelete(t *testing.T) {
 			var keyColumns [][]byte
 			encode.Decode(record.KeyBytes(), &keyColumns)
 			indexKeys = append(indexKeys, string(keyColumns[0]))
-			_, _, err := indexIter.Next(bp)
+			_, _, err = indexIter.Next(bp)
 			assert.NoError(t, err)
 		}
 		assert.Equal(t, []string{"Smith"}, indexKeys)
@@ -654,7 +654,7 @@ func TestUpdate(t *testing.T) {
 				pk:         string(decodedKey[0]),
 				deleteMark: record.HeaderBytes()[0],
 			})
-			_, _, err := iter.Next(bp)
+			_, _, err = iter.Next(bp)
 			assert.NoError(t, err)
 		}
 
@@ -773,7 +773,7 @@ func TestUpdate(t *testing.T) {
 				assert.Equal(t, 0, len(record.NonKeyBytes()))
 				foundActive = true
 			}
-			_, _, err := indexIter.Next(bp)
+			_, _, err = indexIter.Next(bp)
 			assert.NoError(t, err)
 		}
 		assert.True(t, foundActive, "active なインデックスエントリが存在するべき")
@@ -1378,7 +1378,7 @@ func TestInsertRedoLog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Create で作られたダーティーページをフラッシュしてクリアする
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 		err = redoLog.Reset()
 		assert.NoError(t, err)
@@ -1437,7 +1437,7 @@ func TestSoftDeleteRedoLog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ダーティーページをフラッシュしてクリアする
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 		err = redoLog.Reset()
 		assert.NoError(t, err)
@@ -1481,7 +1481,7 @@ func TestUpdateInplaceRedoLog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ダーティーページをフラッシュしてクリアする
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 		err = redoLog.Reset()
 		assert.NoError(t, err)
@@ -1498,6 +1498,54 @@ func TestUpdateInplaceRedoLog(t *testing.T) {
 		records, err := redoLog.ReadAll()
 		assert.NoError(t, err)
 		assert.Greater(t, len(records), 0)
+	})
+}
+
+func TestAppendRedoRecordsForAlreadyDirtyPage(t *testing.T) {
+	t.Run("既にダーティーなページへの再書き込みでも REDO レコードが記録される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		redoLog, err := log.NewRedoLog(tmpdir)
+		assert.NoError(t, err)
+		bp := buffer.NewBufferPool(10, redoLog)
+		fileId := page.FileId(1)
+		dm, err := file.NewDisk(fileId, filepath.Join(tmpdir, "users.db"))
+		assert.NoError(t, err)
+		bp.RegisterDisk(fileId, dm)
+		metaPageId, err := bp.AllocatePageId(fileId)
+		assert.NoError(t, err)
+		table := NewTable("users", metaPageId, 1, nil, nil, redoLog)
+		err = table.Create(bp)
+		assert.NoError(t, err)
+
+		// Create で作られたダーティーページをフラッシュしてクリアする
+		err = bp.FlushAllPages()
+		assert.NoError(t, err)
+		err = redoLog.Reset()
+		assert.NoError(t, err)
+
+		lockMgr := lock.NewManager(5000)
+
+		// 1 回目の Insert (ページがダーティーになる)
+		err = table.Insert(bp, 1, lockMgr, [][]byte{[]byte("a"), []byte("Alice")})
+		assert.NoError(t, err)
+
+		err = redoLog.Flush()
+		assert.NoError(t, err)
+		recordsAfterFirst, err := redoLog.ReadAll()
+		assert.NoError(t, err)
+		countAfterFirst := len(recordsAfterFirst)
+
+		// WHEN: 2 回目の Insert (同じページに書き込み、既にダーティー)
+		err = table.Insert(bp, 1, lockMgr, [][]byte{[]byte("b"), []byte("Bob")})
+		assert.NoError(t, err)
+
+		// THEN: 2 回目の Insert でも REDO レコードが追加されている
+		err = redoLog.Flush()
+		assert.NoError(t, err)
+		recordsAfterSecond, err := redoLog.ReadAll()
+		assert.NoError(t, err)
+		assert.Greater(t, len(recordsAfterSecond), countAfterFirst)
 	})
 }
 
@@ -1521,7 +1569,7 @@ func collectActiveUniqueIndexKeys(t *testing.T, bp *buffer.BufferPool, ui *Uniqu
 			encode.Decode(record.KeyBytes(), &keyColumns)
 			keys = append(keys, string(keyColumns[0]))
 		}
-		_, _, err := indexIter.Next(bp)
+		_, _, err = indexIter.Next(bp)
 		assert.NoError(t, err)
 	}
 	return keys

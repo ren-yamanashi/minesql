@@ -1,0 +1,91 @@
+package buffer
+
+import (
+	"minesql/internal/storage/log"
+	"time"
+)
+
+// PageCleaner はバックグラウンドでダーティーページのフラッシュを管理する
+//
+// 一定間隔で閾値を確認し、超えている場合にフラッシュリストの古いページからフラッシュする
+type PageCleaner struct {
+	bp              *BufferPool
+	redoLog         *log.RedoLog
+	redoLogMaxSize  int           // REDO ログの最大サイズ (バイト)
+	maxDirtyPagePct int           // ダーティーページ率の上限 (%)
+	interval        time.Duration // クリーニング間隔
+	ticker          *time.Ticker
+	done            chan struct{}
+	stopped         chan struct{} // goroutine 終了通知用
+}
+
+// NewPageCleaner は PageCleaner を生成する
+func NewPageCleaner(bp *BufferPool, redoLog *log.RedoLog, redoLogMaxSize int, maxDirtyPagePct int) *PageCleaner {
+	return &PageCleaner{
+		bp:              bp,
+		redoLog:         redoLog,
+		redoLogMaxSize:  redoLogMaxSize,
+		maxDirtyPagePct: maxDirtyPagePct,
+		interval:        1 * time.Second,
+	}
+}
+
+// Start はバックグラウンド goroutine を起動する
+func (pc *PageCleaner) Start() {
+	pc.ticker = time.NewTicker(pc.interval)
+	pc.done = make(chan struct{})
+	pc.stopped = make(chan struct{})
+	go pc.loop()
+}
+
+// Stop はバックグラウンド goroutine を停止し、終了を待つ
+func (pc *PageCleaner) Stop() {
+	close(pc.done)
+	<-pc.stopped
+	pc.ticker.Stop()
+}
+
+// loop はバックグラウンドで定期的に clean を呼び出す
+func (pc *PageCleaner) loop() {
+	defer close(pc.stopped)
+	for {
+		select {
+		case <-pc.done:
+			return
+		case <-pc.ticker.C:
+			pc.clean()
+		}
+	}
+}
+
+// clean はフラッシュの必要がある場合にフラッシュリストの古いページからフラッシュする
+func (pc *PageCleaner) clean() {
+	if !pc.shouldFlush() {
+		return
+	}
+	flushCount := max(pc.bp.FlushListSize()/4, 1)
+	_ = pc.bp.FlushOldestPages(flushCount)
+}
+
+// shouldFlush は閾値 (以下のいずれか) を超えているかを判定する
+//   - REDO ログサイズが redoLogMaxSize を超えている
+//   - ダーティーページ率が maxDirtyPagePct を超えている
+func (pc *PageCleaner) shouldFlush() bool {
+	flushListSize := pc.bp.FlushListSize()
+	if flushListSize == 0 {
+		return false
+	}
+
+	// REDO ログサイズの閾値チェック
+	fileSize, err := pc.redoLog.FileSize()
+	if err != nil {
+		fileSize = 0
+	}
+	if fileSize+int64(pc.redoLog.BufferSize()) > int64(pc.redoLogMaxSize) {
+		return true
+	}
+
+	// ダーティーページ率の閾値チェック
+	dirtyPct := flushListSize * 100 / pc.bp.MaxBufferSize()
+	return dirtyPct > pc.maxDirtyPagePct
+}

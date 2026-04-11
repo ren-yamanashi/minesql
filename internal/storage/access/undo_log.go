@@ -23,11 +23,15 @@ func NewUndoLog(bp *buffer.BufferPool, redoLog *log.RedoLog, undoFileId page.Fil
 	if err != nil {
 		return nil, err
 	}
-	bufPage, err := bp.AddPage(pageId)
+	err = bp.AddPage(pageId)
 	if err != nil {
 		return nil, err
 	}
-	NewUndoPage(page.NewPage(bufPage.GetWriteData())).Initialize()
+	data, err := bp.GetWritePageData(pageId)
+	if err != nil {
+		return nil, err
+	}
+	NewUndoPage(page.NewPage(data)).Initialize()
 
 	return &UndoLog{
 		bp:            bp,
@@ -76,11 +80,11 @@ func (u *UndoLog) Discard(trxId TrxId) {
 
 // writeToPage はシリアライズ済みの UNDO レコードを UNDO ページに書き込む
 func (u *UndoLog) writeToPage(trxId TrxId, serialized []byte) error {
-	bufPage, err := u.bp.FetchPage(u.currentPageId)
+	data, err := u.bp.GetWritePageData(u.currentPageId)
 	if err != nil {
 		return err
 	}
-	undoPage := NewUndoPage(page.NewPage(bufPage.GetWriteData()))
+	undoPage := NewUndoPage(page.NewPage(data))
 
 	if !undoPage.Append(serialized) {
 		// ページが満杯なので新しいページを割り当て
@@ -88,7 +92,7 @@ func (u *UndoLog) writeToPage(trxId TrxId, serialized []byte) error {
 		if err != nil {
 			return err
 		}
-		newBufPage, err := u.bp.AddPage(newPageId)
+		err = u.bp.AddPage(newPageId)
 		if err != nil {
 			return err
 		}
@@ -97,17 +101,24 @@ func (u *UndoLog) writeToPage(trxId TrxId, serialized []byte) error {
 		undoPage.SetNextPageNumber(uint16(newPageId.PageNumber))
 
 		// 新しいページを初期化してレコードを追記
-		newUndoPage := NewUndoPage(page.NewPage(newBufPage.GetWriteData()))
+		newData, err := u.bp.GetWritePageData(newPageId)
+		if err != nil {
+			return err
+		}
+		newUndoPage := NewUndoPage(page.NewPage(newData))
 		newUndoPage.Initialize()
 		newUndoPage.Append(serialized)
 
 		u.currentPageId = newPageId
-		bufPage = newBufPage
 	}
 
 	// REDO ログに UNDO ページの変更を記録
 	if u.redoLog != nil {
-		u.redoLog.AppendPageCopy(trxId, u.currentPageId, bufPage.GetReadData())
+		readData, err := u.bp.GetReadPageData(u.currentPageId)
+		if err != nil {
+			return err
+		}
+		u.redoLog.AppendPageCopy(trxId, u.currentPageId, readData)
 	}
 	return nil
 }

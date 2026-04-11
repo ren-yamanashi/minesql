@@ -99,3 +99,73 @@ func TestGetLockWaitTimeout(t *testing.T) {
 		assert.Equal(t, 30000, result)
 	})
 }
+
+func TestGetRedoLogMaxSize(t *testing.T) {
+	t.Run("環境変数が設定されていない場合、デフォルト値を返す", func(t *testing.T) {
+		// GIVEN
+		t.Setenv("MINESQL_REDO_LOG_MAX_SIZE", "")
+
+		// WHEN
+		result := GetRedoLogMaxSize()
+
+		// THEN
+		assert.Equal(t, 1048576, result)
+	})
+
+	t.Run("環境変数が設定されている場合、その値を返す", func(t *testing.T) {
+		// GIVEN
+		t.Setenv("MINESQL_REDO_LOG_MAX_SIZE", "2097152")
+
+		// WHEN
+		result := GetRedoLogMaxSize()
+
+		// THEN
+		assert.Equal(t, 2097152, result)
+	})
+
+	t.Run("環境変数が数値でない場合、デフォルト値を返す", func(t *testing.T) {
+		// GIVEN
+		t.Setenv("MINESQL_REDO_LOG_MAX_SIZE", "abc")
+
+		// WHEN
+		result := GetRedoLogMaxSize()
+
+		// THEN
+		assert.Equal(t, 1048576, result)
+	})
+}
+
+func TestGetMaxDirtyPagesPct(t *testing.T) {
+	t.Run("環境変数が設定されていない場合、デフォルト値を返す", func(t *testing.T) {
+		// GIVEN
+		t.Setenv("MINESQL_MAX_DIRTY_PAGES_PCT", "")
+
+		// WHEN
+		result := GetMaxDirtyPagesPct()
+
+		// THEN
+		assert.Equal(t, 90, result)
+	})
+
+	t.Run("環境変数が設定されている場合、その値を返す", func(t *testing.T) {
+		// GIVEN
+		t.Setenv("MINESQL_MAX_DIRTY_PAGES_PCT", "75")
+
+		// WHEN
+		result := GetMaxDirtyPagesPct()
+
+		// THEN
+		assert.Equal(t, 75, result)
+	})
+
+	t.Run("環境変数が数値でない場合、デフォルト値を返す", func(t *testing.T) {
+		// GIVEN
+		t.Setenv("MINESQL_MAX_DIRTY_PAGES_PCT", "invalid")
+
+		// WHEN
+		result := GetMaxDirtyPagesPct()
+
+		// THEN
+		assert.Equal(t, 90, result)
+	})
+}

@@ -71,11 +71,12 @@ func TestRedoApply(t *testing.T) {
 		// ページを作成して初期データを書き込み
 		pageId, err := bp.AllocatePageId(fileId)
 		assert.NoError(t, err)
-		bufPage, err := bp.AddPage(pageId)
+		err = bp.AddPage(pageId)
 		assert.NoError(t, err)
-		bufPage.Page[page.PageHeaderSize] = 0x00 // 初期値
-		bufPage.IsDirty = true
-		err = bp.FlushPage()
+		writeData, err := bp.GetWritePageData(pageId)
+		assert.NoError(t, err)
+		writeData[page.PageHeaderSize] = 0x00 // 初期値
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 		err = rl.Reset()
 		assert.NoError(t, err)
@@ -98,9 +99,9 @@ func TestRedoApply(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: ページが REDO レコードの内容で復元されている
-		restoredPage, err := bp2.FetchPage(pageId)
+		restoredData, err := bp2.GetReadPageData(pageId)
 		assert.NoError(t, err)
-		assert.Equal(t, byte(0xFF), restoredPage.Page[page.PageHeaderSize])
+		assert.Equal(t, byte(0xFF), restoredData[page.PageHeaderSize])
 	})
 
 	t.Run("Page LSN が REDO レコードの LSN 以上の場合はスキップ", func(t *testing.T) {
@@ -118,12 +119,13 @@ func TestRedoApply(t *testing.T) {
 		// Page LSN = 10 のページを作成
 		pageId, err := bp.AllocatePageId(fileId)
 		assert.NoError(t, err)
-		bufPage, err := bp.AddPage(pageId)
+		err = bp.AddPage(pageId)
 		assert.NoError(t, err)
-		binary.BigEndian.PutUint32(bufPage.Page[0:page.PageHeaderSize], 10) // Page LSN = 10
-		bufPage.Page[page.PageHeaderSize] = 0xAA                            // 元の値
-		bufPage.IsDirty = true
-		err = bp.FlushPage()
+		writeData, err := bp.GetWritePageData(pageId)
+		assert.NoError(t, err)
+		binary.BigEndian.PutUint32(writeData[0:page.PageHeaderSize], 10) // Page LSN = 10
+		writeData[page.PageHeaderSize] = 0xAA                            // 元の値
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 		err = rl.Reset()
 		assert.NoError(t, err)
@@ -144,9 +146,9 @@ func TestRedoApply(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: ページは元の値のまま (REDO がスキップされた)
-		restoredPage, err := bp2.FetchPage(pageId)
+		restoredData, err := bp2.GetReadPageData(pageId)
 		assert.NoError(t, err)
-		assert.Equal(t, byte(0xAA), restoredPage.Page[page.PageHeaderSize])
+		assert.Equal(t, byte(0xAA), restoredData[page.PageHeaderSize])
 	})
 }
 
@@ -197,7 +199,7 @@ func TestUndoRollback(t *testing.T) {
 		assert.NoError(t, err)
 
 		// フラッシュしてクリーンな状態にする
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 		err = rl.Reset()
 		assert.NoError(t, err)
@@ -280,7 +282,7 @@ func TestUndoRollback(t *testing.T) {
 		assert.NoError(t, err)
 
 		// フラッシュしてクリーンな状態にする
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 		err = rl.Reset()
 		assert.NoError(t, err)

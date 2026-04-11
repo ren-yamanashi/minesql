@@ -6,6 +6,7 @@ import (
 	"minesql/internal/storage/file"
 	"minesql/internal/storage/log"
 	"minesql/internal/storage/page"
+	"sync"
 )
 
 // BufferId は、バッファプール内のバッファページを識別するための ID (index)
@@ -20,12 +21,15 @@ type BufferId uint64
 type PageTable map[page.PageId]BufferId
 
 type BufferPool struct {
+	mutex             sync.RWMutex
 	disks             map[page.FileId]*file.Disk // FileId → Disk のマップ
 	bufferPages       []BufferPage               // バッファページのスライス
 	maxBufferSize     int                        // バッファプールの最大サイズ (バッファページ数)
 	pageTable         PageTable                  // ページテーブル (key: PageId, value: BufferId のマップ)
 	evictionAlgorithm *LRU                       // ページ追い出しアルゴリズム
-	redoLog           *log.RedoLog               // REDO ログ (WAL 原則のため)
+	redoLog           *log.RedoLog               // REDO ログ
+	flushList         *FlushList                 // ダーティーページのフラッシュリスト
+	newlyDirtied      []page.PageId              // 前回の PopNewlyDirtied 以降にダーティーになったページ
 }
 
 // NewBufferPool は指定されたサイズの BufferPool を生成する
@@ -43,95 +47,75 @@ func NewBufferPool(size int, redoLog *log.RedoLog) *BufferPool {
 		pageTable:         make(PageTable),
 		evictionAlgorithm: NewLRU(size),
 		redoLog:           redoLog,
+		flushList:         NewFlushList(),
 	}
+}
+
+// GetWritePageData は書き込み用にページデータを取得する
+func (bp *BufferPool) GetWritePageData(pageId page.PageId) ([]byte, error) {
+	bp.mutex.Lock()
+	defer bp.mutex.Unlock()
+
+	bufPage, err := bp.fetchPage(pageId)
+	if err != nil {
+		return nil, err
+	}
+
+	// ページが clean ならダーティーページにし、フラッシュリストに追加する
+	if !bufPage.IsDirty {
+		bufPage.IsDirty = true
+		bp.flushList.Add(pageId)
+	}
+	bp.newlyDirtied = append(bp.newlyDirtied, pageId)
+	return bufPage.Page, nil
+}
+
+// GetReadPageData は読み込み用にページデータを取得する
+func (bp *BufferPool) GetReadPageData(pageId page.PageId) ([]byte, error) {
+	// ページがプール内にある場合は RLock で返す (LRU 更新不要)
+	bp.mutex.RLock()
+	if bufferId, ok := bp.pageTable[pageId]; ok {
+		bufPage := &bp.bufferPages[bufferId]
+		bp.mutex.RUnlock()
+		return bufPage.Page, nil
+	}
+	bp.mutex.RUnlock()
+
+	// ページがプールにない場合はディスクから読み込む
+	bp.mutex.Lock()
+	defer bp.mutex.Unlock()
+
+	bufPage, err := bp.fetchPage(pageId)
+	if err != nil {
+		return nil, err
+	}
+	return bufPage.Page, nil
 }
 
 // FetchPage は指定されたページ ID のバッファページをバッファプールから取得する
 //
 // ページがバッファプールに存在しない場合は、ディスクから読み込む
 func (bp *BufferPool) FetchPage(pageId page.PageId) (*BufferPage, error) {
-	// ページがバッファプールにある場合
-	if bufferId, ok := bp.pageTable[pageId]; ok {
-		bufferPage := &bp.bufferPages[bufferId]
-		bp.evictionAlgorithm.Access(bufferId)
-		return bufferPage, nil
-	}
-
-	// ページがバッファプールにない場合
-	bufferPage, err := bp.AddPage(pageId)
-	if err != nil {
-		return nil, err
-	}
-
-	// ディスクからページを読み込む
-	disk, err := bp.GetDisk(pageId.FileId)
-	if err != nil {
-		return nil, err
-	}
-	err = disk.ReadPageData(pageId, bufferPage.GetReadData())
-	if err != nil {
-		return nil, err
-	}
-	bufferPage.PageId = pageId
-	bufferPage.IsDirty = false
-
-	return bufferPage, nil
+	bp.mutex.Lock()
+	defer bp.mutex.Unlock()
+	return bp.fetchPage(pageId)
 }
 
-// AddPage はバッファプールに新しいページを追加する (追加されたページのバッファページを返す)
+// AddPage はバッファプールに新しいページを追加する
 //
 // バッファプールに空きがある場合は新しいページを追加し、空きがない場合は古いページを新しいページに置き換える
-func (bp *BufferPool) AddPage(pageId page.PageId) (*BufferPage, error) {
-	// バッファに空きがある場合、新しいバッファページを追加し、ページテーブルを更新 (エントリを追加)
-	if len(bp.bufferPages) < bp.maxBufferSize {
-		bp.bufferPages = append(bp.bufferPages, *NewBufferPage(pageId))
-		bufferId := BufferId(len(bp.bufferPages) - 1)
-		bp.pageTable[pageId] = bufferId
-		bp.evictionAlgorithm.Access(bufferId)
-		return &bp.bufferPages[bufferId], nil
-	}
-
-	// バッファに空きがない場合: 追い出しアルゴリズムでページを選択
-	victimBufferId := bp.evictionAlgorithm.Evict()
-	victim := &bp.bufferPages[victimBufferId]
-
-	// 追い出すページがダーティーページであれば、ディスクに書き出す
-	if victim.IsDirty {
-		// victim の Page LSN 以上の REDO ログがフラッシュされていることを確認
-		if bp.redoLog != nil {
-			pg := page.NewPage(victim.Page)
-			pageLSN := log.LSN(binary.BigEndian.Uint32(pg.Header))
-			if pageLSN > bp.redoLog.FlushedLSN {
-				// フラッシュされていない場合は、REDO ログをフラッシュ
-				if err := bp.redoLog.Flush(); err != nil {
-					return nil, err
-				}
-			}
-		}
-
-		// FileId から Disk を取得
-		disk, err := bp.GetDisk(victim.PageId.FileId)
-		if err != nil {
-			return nil, err
-		}
-		// ディスクに書き出す
-		err = disk.WritePageData(victim.PageId, victim.Page)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	// ページテーブルを更新 (追い出すページを削除し、新しいページを追加)
-	bp.updatePageTable(victim.PageId, pageId, victimBufferId)
-
-	// 新しいページに置き換え
-	bp.bufferPages[victimBufferId] = *NewBufferPage(pageId)
-	bp.evictionAlgorithm.Access(victimBufferId)
-	return &bp.bufferPages[victimBufferId], nil
+func (bp *BufferPool) AddPage(pageId page.PageId) error {
+	bp.mutex.Lock()
+	defer bp.mutex.Unlock()
+	_, err := bp.addPage(pageId)
+	return err
 }
 
-// FlushPage はバッファプール内のすべてのダーティーページをディスクに書き出す
-func (bp *BufferPool) FlushPage() error {
+// FlushAllPages はバッファプール内のすべてのダーティーページをディスクに書き出す
+func (bp *BufferPool) FlushAllPages() error {
+	bp.mutex.Lock()
+	defer bp.mutex.Unlock()
+
 	// REDO ログを先にフラッシュ
 	if bp.redoLog != nil {
 		if err := bp.redoLog.Flush(); err != nil {
@@ -147,7 +131,7 @@ func (bp *BufferPool) FlushPage() error {
 		}
 
 		// FileId から Disk を取得
-		disk, err := bp.GetDisk(pageId.FileId)
+		disk, err := bp.getDisk(pageId.FileId)
 		if err != nil {
 			return err
 		}
@@ -160,6 +144,9 @@ func (bp *BufferPool) FlushPage() error {
 		bufferPage.IsDirty = false
 	}
 
+	// フラッシュリストをクリア
+	bp.flushList.Clear()
+
 	// 全ディスクを Sync してストレージデバイスへの書き込みを保証
 	for _, disk := range bp.disks {
 		if err := disk.Sync(); err != nil {
@@ -170,8 +157,102 @@ func (bp *BufferPool) FlushPage() error {
 	return nil
 }
 
+// FlushOldestPages はフラッシュリストの先頭から n ページをディスクにフラッシュする
+func (bp *BufferPool) FlushOldestPages(n int) error {
+	bp.mutex.Lock()
+	defer bp.mutex.Unlock()
+
+	// フラッシュリストの先頭 (最も古いダーティーページ) から n 件取得
+	pageIds := bp.flushList.OldestPageIds(n)
+	if len(pageIds) == 0 {
+		return nil
+	}
+
+	// ダーティーページをディスクに書き出す前に、REDO ログバッファを先にフラッシュする
+	if bp.redoLog != nil {
+		if err := bp.redoLog.Flush(); err != nil {
+			return err
+		}
+	}
+
+	// フラッシュ対象のディスクを記録する (後でまとめて Sync するため)
+	syncDisks := make(map[page.FileId]bool)
+
+	for _, pid := range pageIds {
+		// ページテーブルからバッファページを取得
+		bufferId, ok := bp.pageTable[pid]
+		if !ok {
+			continue
+		}
+
+		// 既にクリーンなページはフラッシュリストから除外するだけ
+		bufferPage := &bp.bufferPages[bufferId]
+		if !bufferPage.IsDirty {
+			bp.flushList.Remove(pid)
+			continue
+		}
+
+		// ダーティーページをディスクに書き出す
+		disk, err := bp.getDisk(pid.FileId)
+		if err != nil {
+			return err
+		}
+		if err := disk.WritePageData(pid, bufferPage.Page); err != nil {
+			return err
+		}
+
+		// ページをクリーンにし、フラッシュリストから除外
+		bufferPage.IsDirty = false
+		bp.flushList.Remove(pid)
+		syncDisks[pid.FileId] = true
+	}
+
+	// フラッシュしたページのディスクを Sync してストレージデバイスへの書き込みを保証
+	for fileId := range syncDisks {
+		disk, err := bp.getDisk(fileId)
+		if err != nil {
+			return err
+		}
+		if err := disk.Sync(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// PopNewlyDirtied は前回の呼び出し以降に書き込みが行われたページの PageId を返し、newlyDirtied リストをクリアする
+func (bp *BufferPool) PopNewlyDirtied() []page.PageId {
+	bp.mutex.Lock()
+	defer bp.mutex.Unlock()
+	result := bp.newlyDirtied
+	bp.newlyDirtied = nil
+	return result
+}
+
+// ClearNewlyDirtied は newlyDirtied リストをクリアする
+func (bp *BufferPool) ClearNewlyDirtied() {
+	bp.mutex.Lock()
+	defer bp.mutex.Unlock()
+	bp.newlyDirtied = nil
+}
+
+// FlushListSize はフラッシュリスト内のページ数を返す
+func (bp *BufferPool) FlushListSize() int {
+	bp.mutex.RLock()
+	defer bp.mutex.RUnlock()
+	return bp.flushList.Size
+}
+
+// MaxBufferSize はバッファプールの最大サイズ (バッファページ数) を返す
+func (bp *BufferPool) MaxBufferSize() int {
+	return bp.maxBufferSize // 不変値のためロック不要
+}
+
 // UnRefPage は指定されたページの参照を解除し、優先的に追い出されるようにする
 func (bp *BufferPool) UnRefPage(pageId page.PageId) {
+	bp.mutex.Lock()
+	defer bp.mutex.Unlock()
 	if bufferId, ok := bp.pageTable[pageId]; ok {
 		bp.evictionAlgorithm.Remove(bufferId)
 	}
@@ -181,11 +262,31 @@ func (bp *BufferPool) UnRefPage(pageId page.PageId) {
 //   - fileId: 登録する Disk に対応する FileId
 //   - disk: 登録する Disk
 func (bp *BufferPool) RegisterDisk(fileId page.FileId, disk *file.Disk) {
+	bp.mutex.Lock()
+	defer bp.mutex.Unlock()
 	bp.disks[fileId] = disk
 }
 
 // GetDisk は指定された FileId に対応する Disk を取得する
 func (bp *BufferPool) GetDisk(fileId page.FileId) (*file.Disk, error) {
+	bp.mutex.RLock()
+	defer bp.mutex.RUnlock()
+	return bp.getDisk(fileId)
+}
+
+// AllocatePageId は指定された FileId に対して新しい PageId を割り当てる
+func (bp *BufferPool) AllocatePageId(fileId page.FileId) (page.PageId, error) {
+	bp.mutex.Lock()
+	defer bp.mutex.Unlock()
+	disk, err := bp.getDisk(fileId)
+	if err != nil {
+		return page.INVALID_PAGE_ID, err
+	}
+	return disk.AllocatePage(), nil
+}
+
+// getDisk は指定された FileId に対応する Disk を取得する (mutex 取得済みの状態で呼び出す必要がある)
+func (bp *BufferPool) getDisk(fileId page.FileId) (*file.Disk, error) {
 	disk, ok := bp.disks[fileId]
 	if !ok {
 		return nil, fmt.Errorf("disk for FileId %d not found", fileId)
@@ -193,24 +294,88 @@ func (bp *BufferPool) GetDisk(fileId page.FileId) (*file.Disk, error) {
 	return disk, nil
 }
 
-// AllocatePageId は指定された FileId に対して新しい PageId を割り当てる
-func (bp *BufferPool) AllocatePageId(fileId page.FileId) (page.PageId, error) {
-	disk, err := bp.GetDisk(fileId)
-	if err != nil {
-		return page.INVALID_PAGE_ID, err
+// fetchPage は指定されたページをバッファプールから取得する (mutex 取得済みの状態で呼び出す必要がある)
+func (bp *BufferPool) fetchPage(pageId page.PageId) (*BufferPage, error) {
+	// ページがバッファプールにある場合
+	if bufferId, ok := bp.pageTable[pageId]; ok {
+		bufferPage := &bp.bufferPages[bufferId]
+		bp.evictionAlgorithm.Access(bufferId)
+		return bufferPage, nil
 	}
-	return disk.AllocatePage(), nil
+
+	// ページがバッファプールにない場合
+	bufferPage, err := bp.addPage(pageId)
+	if err != nil {
+		return nil, err
+	}
+
+	// ディスクからページを読み込む
+	disk, err := bp.getDisk(pageId.FileId)
+	if err != nil {
+		return nil, err
+	}
+	err = disk.ReadPageData(pageId, bufferPage.Page)
+	if err != nil {
+		return nil, err
+	}
+	bufferPage.PageId = pageId
+	bufferPage.IsDirty = false
+
+	return bufferPage, nil
 }
 
-// DirtyPageIds はダーティーページの PageId リストを返す
-func (bp *BufferPool) DirtyPageIds() []page.PageId {
-	var pages []page.PageId
-	for pageId, bufferId := range bp.pageTable {
-		if bp.bufferPages[bufferId].IsDirty {
-			pages = append(pages, pageId)
-		}
+// addPage はバッファプールに新しいページを追加する (mutex 取得済みの状態で呼び出す必要がある)
+func (bp *BufferPool) addPage(pageId page.PageId) (*BufferPage, error) {
+	// バッファに空きがある場合、新しいバッファページを追加し、ページテーブルを更新 (エントリを追加)
+	if len(bp.bufferPages) < bp.maxBufferSize {
+		bp.bufferPages = append(bp.bufferPages, *NewBufferPage(pageId))
+		bufferId := BufferId(len(bp.bufferPages) - 1)
+		bp.pageTable[pageId] = bufferId
+		bp.evictionAlgorithm.Access(bufferId)
+		return &bp.bufferPages[bufferId], nil
 	}
-	return pages
+
+	// バッファに空きがない場合: 追い出しアルゴリズムでページを選択
+	victimBufferId := bp.evictionAlgorithm.Evict()
+	victim := &bp.bufferPages[victimBufferId]
+
+	// 追い出すページがダーティーページであればディスクに書き出す
+	if victim.IsDirty {
+		// victim の Page LSN 以上の REDO ログがフラッシュされていることを確認
+		if bp.redoLog != nil {
+			pg := page.NewPage(victim.Page)
+			pageLSN := log.LSN(binary.BigEndian.Uint32(pg.Header))
+			if pageLSN > bp.redoLog.FlushedLSN() {
+				// フラッシュされていない場合は REDO ログをフラッシュ
+				if err := bp.redoLog.Flush(); err != nil {
+					return nil, err
+				}
+			}
+		}
+
+		// FileId から Disk を取得
+		disk, err := bp.getDisk(victim.PageId.FileId)
+		if err != nil {
+			return nil, err
+		}
+
+		// ディスクに書き出す
+		err = disk.WritePageData(victim.PageId, victim.Page)
+		if err != nil {
+			return nil, err
+		}
+
+		// フラッシュリストから除外
+		bp.flushList.Remove(victim.PageId)
+	}
+
+	// ページテーブルを更新 (追い出すページを削除し、新しいページを追加)
+	bp.updatePageTable(victim.PageId, pageId, victimBufferId)
+
+	// 新しいページに置き換え
+	bp.bufferPages[victimBufferId] = *NewBufferPage(pageId)
+	bp.evictionAlgorithm.Access(victimBufferId)
+	return &bp.bufferPages[victimBufferId], nil
 }
 
 // updatePageTable はページテーブルを更新する

@@ -32,7 +32,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ページをフラッシュ
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 
 		// WHEN
@@ -74,7 +74,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ページをフラッシュ
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 
 		// WHEN
@@ -122,7 +122,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ページをフラッシュ
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 
 		// WHEN
@@ -179,7 +179,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ページをフラッシュ
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 
 		// WHEN
@@ -228,7 +228,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, page.FileId(1), cat.UndoFileId)
 
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 
 		// WHEN
@@ -261,7 +261,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ページをフラッシュ
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 
 		// WHEN
@@ -291,11 +291,13 @@ func TestNewCatalog(t *testing.T) {
 		defer removeTmpdir(t, tmpdir)
 
 		headerPageId := page.NewPageId(page.FileId(0), 0)
-		headerPage, err := bp.AddPage(headerPageId)
+		err := bp.AddPage(headerPageId)
 		assert.NoError(t, err)
-		copy(headerPage.GetWriteData()[0:4], []byte("XXXX"))
+		data, err := bp.GetWritePageData(headerPageId)
+		assert.NoError(t, err)
+		copy(data[0:4], []byte("XXXX"))
 
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 
 		// WHEN: 新しい BufferPool でカタログを開き直す
@@ -344,11 +346,10 @@ func TestCreateCatalog(t *testing.T) {
 
 		// THEN: ヘッダーページを読み込んでマジックナンバーを確認
 		headerPageId := page.NewPageId(page.FileId(0), 0)
-		headerPage, err := bp.FetchPage(headerPageId)
+		data, err := bp.GetReadPageData(headerPageId)
 		assert.NoError(t, err)
 		defer bp.UnRefPage(headerPageId)
 
-		data := headerPage.GetReadData()
 		assert.Equal(t, "MINE", string(data[0:4]))
 	})
 }
@@ -560,11 +561,9 @@ func TestAllocateFileId(t *testing.T) {
 
 		// THEN: ヘッダーページから NextFileId が読み取れる
 		headerPageId := page.NewPageId(page.FileId(0), 0)
-		headerPage, err := bp.FetchPage(headerPageId)
+		data, err := bp.GetReadPageData(headerPageId)
 		assert.NoError(t, err)
 		defer bp.UnRefPage(headerPageId)
-
-		data := headerPage.GetReadData()
 		savedNextFileId := binary.BigEndian.Uint32(data[16:20])
 		assert.Equal(t, uint32(3), savedNextFileId)
 	})

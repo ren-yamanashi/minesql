@@ -60,7 +60,7 @@ func (r *Recovery) Run() error {
 	}
 
 	// 全ダーティーページをフラッシュ
-	if err := r.bufferPool.FlushPage(); err != nil {
+	if err := r.bufferPool.FlushAllPages(); err != nil {
 		return err
 	}
 
@@ -76,20 +76,24 @@ func (r *Recovery) redoApply(records []log.RedoRecord) error {
 		}
 
 		// REDO レコードの PageId からページを取得
-		bufPage, err := r.bufferPool.FetchPage(rec.PageId)
+		readData, err := r.bufferPool.GetReadPageData(rec.PageId)
 		if err != nil {
 			return err
 		}
 
 		// Page LSN 比較し、すでに適用済みならスキップ
-		pg := page.NewPage(bufPage.GetReadData())
+		pg := page.NewPage(readData)
 		currentLSN := log.LSN(binary.BigEndian.Uint32(pg.Header))
 		if currentLSN >= rec.LSN {
 			continue
 		}
 
 		// ページ全体のコピーで上書き (Page LSN もコピーに含まれている)
-		copy(bufPage.GetWriteData(), rec.Data)
+		data, err := r.bufferPool.GetWritePageData(rec.PageId)
+		if err != nil {
+			return err
+		}
+		copy(data, rec.Data)
 	}
 	return nil
 }
@@ -163,12 +167,12 @@ func (r *Recovery) collectUndoRecords(trxId uint64) []undoRecordEntry {
 
 	for {
 		pageId := page.NewPageId(r.undoFileId, pageNum)
-		bufPage, err := r.bufferPool.FetchPage(pageId)
+		readData, err := r.bufferPool.GetReadPageData(pageId)
 		if err != nil {
 			break // ページが存在しない = 走査終了
 		}
 
-		undoPage := access.NewUndoPage(page.NewPage(bufPage.GetReadData()))
+		undoPage := access.NewUndoPage(page.NewPage(readData))
 		offset := 0
 		for offset < int(undoPage.UsedBytes()) {
 			recordBytes := undoPage.RecordAt(offset)

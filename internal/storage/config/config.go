@@ -26,6 +26,20 @@ func GetLockWaitTimeout() int {
 	return getEnvInt("MINESQL_LOCK_WAIT_TIMEOUT", 30000)
 }
 
+// GetRedoLogMaxSize は REDO ログの最大サイズ (バイト) を取得する
+//
+// 環境変数 MINESQL_REDO_LOG_MAX_SIZE が設定されていればその値を、なければデフォルト値を返す
+func GetRedoLogMaxSize() int {
+	return getEnvInt("MINESQL_REDO_LOG_MAX_SIZE", 1048576) // 1MB
+}
+
+// GetMaxDirtyPagesPct はダーティーページ率の上限 (%) を取得する
+//
+// 環境変数 MINESQL_MAX_DIRTY_PAGES_PCT が設定されていればその値を、なければデフォルト値を返す
+func GetMaxDirtyPagesPct() int {
+	return getEnvInt("MINESQL_MAX_DIRTY_PAGES_PCT", 90)
+}
+
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value

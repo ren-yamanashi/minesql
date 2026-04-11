@@ -43,6 +43,7 @@ type Handler struct {
 	undoLog        *access.UndoLog
 	redoLog        *log.RedoLog
 	trxManager     *access.Manager
+	pageCleaner    *buffer.PageCleaner
 	baseDirectory  string
 }
 
@@ -74,7 +75,11 @@ func Get() *Handler {
 
 // Shutdown はダーティーページをディスクに書き出し、すべての Disk を同期する
 func (h *Handler) Shutdown() error {
-	if err := h.BufferPool.FlushPage(); err != nil {
+	// ページクリーナーを停止
+	h.pageCleaner.Stop()
+
+	// バッファプール内のすべてのダーティーページをフラッシュ
+	if err := h.BufferPool.FlushAllPages(); err != nil {
 		return err
 	}
 	// カタログの Disk を同期
@@ -156,7 +161,12 @@ func newHandler() (*Handler, error) {
 		}
 	}
 
+	// ロックマネージャを初期化
 	lockMgr := lock.NewManager(config.GetLockWaitTimeout())
+
+	// ページクリーナーを初期化・起動
+	pc := buffer.NewPageCleaner(bp, redoLog, config.GetRedoLogMaxSize(), config.GetMaxDirtyPagesPct())
+	pc.Start()
 
 	return &Handler{
 		BufferPool:     bp,
@@ -166,6 +176,7 @@ func newHandler() (*Handler, error) {
 		undoLog:        undoLog,
 		redoLog:        redoLog,
 		trxManager:     access.NewManager(undoLog, lockMgr, redoLog),
+		pageCleaner:    pc,
 		baseDirectory:  dataDir,
 	}, nil
 }

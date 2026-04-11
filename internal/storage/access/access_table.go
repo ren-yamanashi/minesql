@@ -78,8 +78,8 @@ func (t *Table) Insert(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Ma
 		}
 	}
 
-	// 変更前のダーティーページを記録
-	dirtyBefore := t.collectDirtyPages(bp)
+	// 操作前の newlyDirtied をクリア (この操作でダーティーになったページだけを追跡するため)
+	bp.ClearNewlyDirtied()
 
 	// 行を挿入 → 排他ロックを取得
 	if err := t.insertRaw(bp, trxId, lockMgr, columns); err != nil {
@@ -90,7 +90,7 @@ func (t *Table) Insert(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Ma
 	}
 
 	// 新たにダーティーになったページの REDO ログを記録
-	return t.recordRedoForNewDirtyPages(bp, trxId, dirtyBefore)
+	return t.appendRedoRecords(bp, trxId)
 }
 
 // SoftDelete はテーブルから行をソフトデリートする (Undo ログ記録 → 排他ロック取得 → ソフトデリートの順で実行する)
@@ -104,8 +104,8 @@ func (t *Table) SoftDelete(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *loc
 		}
 	}
 
-	// 変更前のダーティーページを記録
-	dirtyBefore := t.collectDirtyPages(bp)
+	// 操作前の newlyDirtied をクリア
+	bp.ClearNewlyDirtied()
 
 	// ロック取得 → ソフトデリート
 	if err := t.softDeleteRaw(bp, trxId, lockMgr, columns); err != nil {
@@ -116,7 +116,7 @@ func (t *Table) SoftDelete(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *loc
 	}
 
 	// 新たにダーティーになったページの REDO ログを記録
-	return t.recordRedoForNewDirtyPages(bp, trxId, dirtyBefore)
+	return t.appendRedoRecords(bp, trxId)
 }
 
 // UpdateInplace はテーブルの行をインプレース更新する (Undo ログ記録 → 排他ロック取得 → 更新の順で実行する)
@@ -132,8 +132,8 @@ func (t *Table) UpdateInplace(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *
 		}
 	}
 
-	// 変更前のダーティーページを記録
-	dirtyBefore := t.collectDirtyPages(bp)
+	// 操作前の newlyDirtied をクリア
+	bp.ClearNewlyDirtied()
 
 	// ロック取得 → 更新
 	if err := t.updateInplaceRaw(bp, trxId, lockMgr, oldColumns, newColumns); err != nil {
@@ -144,7 +144,7 @@ func (t *Table) UpdateInplace(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *
 	}
 
 	// 新たにダーティーになったページの REDO ログを記録
-	return t.recordRedoForNewDirtyPages(bp, trxId, dirtyBefore)
+	return t.appendRedoRecords(bp, trxId)
 }
 
 // GetUniqueIndexByName はインデックス名からユニークインデックスを取得する
@@ -336,35 +336,18 @@ func (t *Table) updateInplaceRaw(bp *buffer.BufferPool, trxId lock.TrxId, lockMg
 	return nil
 }
 
-// collectDirtyPages は現在のダーティーページの PageId セットを返す (操作後の差分比較用。REDO 記録不要時は nil)
-func (t *Table) collectDirtyPages(bp *buffer.BufferPool) map[page.PageId]bool {
+// appendRedoRecords は書き込みが行われたページの REDO レコードを追加する
+func (t *Table) appendRedoRecords(bp *buffer.BufferPool, trxId TrxId) error {
 	if t.redoLog == nil {
 		return nil
 	}
-	result := make(map[page.PageId]bool)
-	for _, pid := range bp.DirtyPageIds() {
-		result[pid] = true
-	}
-	return result
-}
-
-// recordRedoForNewDirtyPages は操作前のダーティーページセットと比較して、新たにダーティーになったページの REDO ログを記録する
-func (t *Table) recordRedoForNewDirtyPages(bp *buffer.BufferPool, trxId TrxId, dirtyBefore map[page.PageId]bool) error {
-	if t.redoLog == nil {
-		return nil
-	}
-	for _, pid := range bp.DirtyPageIds() {
-		// 操作前からダーティーだったページはスキップ
-		if dirtyBefore[pid] {
-			continue
-		}
-		// 新たにダーティーになったページの REDO ログを記録
-		bufPage, err := bp.FetchPage(pid)
+	for _, pid := range bp.PopNewlyDirtied() {
+		data, err := bp.GetReadPageData(pid)
 		if err != nil {
 			return err
 		}
-		pg := page.NewPage(bufPage.Page)
-		lsn := t.redoLog.AppendPageCopy(trxId, pid, bufPage.Page)
+		pg := page.NewPage(data)
+		lsn := t.redoLog.AppendPageCopy(trxId, pid, data)
 		binary.BigEndian.PutUint32(pg.Header, uint32(lsn))
 	}
 	return nil

@@ -77,7 +77,7 @@ func TestUniqueIndex(t *testing.T) {
 			assert.Equal(t, 0, len(record.NonKeyBytes()))
 
 			i++
-			_, _, err := iter.Next(bp)
+			_, _, err = iter.Next(bp)
 			assert.NoError(t, err)
 		}
 		assert.Equal(t, len(expectedRecords), i)
@@ -135,7 +135,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 				secondaryKey: string(keyColumns[0]),
 				deleteMark:   record.HeaderBytes()[0],
 			})
-			_, _, err := iter.Next(bp)
+			_, _, err = iter.Next(bp)
 			assert.NoError(t, err)
 		}
 
@@ -231,7 +231,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 				secondaryKey: string(keyColumns[0]),
 				deleteMark:   record.HeaderBytes()[0],
 			})
-			_, _, err := iter.Next(bp)
+			_, _, err = iter.Next(bp)
 			assert.NoError(t, err)
 		}
 

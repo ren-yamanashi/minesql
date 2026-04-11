@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -110,6 +111,93 @@ func TestShutdown(t *testing.T) {
 	})
 }
 
+func TestPageCleanerLifecycle(t *testing.T) {
+	t.Run("Init でページクリーナーが開始され Shutdown で停止する", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "10")
+		Reset()
+
+		// WHEN
+		h := Init()
+
+		// THEN: ページクリーナーが開始されている
+		assert.NotNil(t, h.pageCleaner)
+
+		// Shutdown でパニックせずに停止する
+		err := h.Shutdown()
+		assert.NoError(t, err)
+	})
+
+	t.Run("Shutdown 後に再度 Init してもページクリーナーが正常に動作する", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "10")
+		Reset()
+
+		h1 := Init()
+		err := h1.Shutdown()
+		assert.NoError(t, err)
+
+		// WHEN
+		Reset()
+		h2 := Init()
+
+		// THEN
+		assert.NotNil(t, h2.pageCleaner)
+		err = h2.Shutdown()
+		assert.NoError(t, err)
+	})
+}
+
+func TestPageCleanerFlushesDirtyPages(t *testing.T) {
+	t.Run("ダーティーページ率が閾値を超えるとページクリーナーがフラッシュする", func(t *testing.T) {
+		// GIVEN: バッファプールサイズ 10、ダーティーページ率閾値 1% (ほぼ必ず発動)
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "10")
+		t.Setenv("MINESQL_MAX_DIRTY_PAGES_PCT", "1")
+		Reset()
+		h := Init()
+
+		setupTable := func(t *testing.T, h *Handler) {
+			t.Helper()
+			err := h.CreateTable("users", 1, nil, []CreateColumnParam{
+				{Name: "id", Type: ColumnTypeString},
+				{Name: "name", Type: ColumnTypeString},
+			})
+			assert.NoError(t, err)
+		}
+		setupTable(t, h)
+
+		tbl, err := h.GetTable("users")
+		assert.NoError(t, err)
+
+		// データを挿入してダーティーページを作る
+		trxId := h.BeginTrx()
+		err = tbl.Insert(h.BufferPool, trxId, h.LockMgr, [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+		err = h.CommitTrx(trxId)
+		assert.NoError(t, err)
+
+		// フラッシュリストにダーティーページがある状態
+		flushListBefore := h.BufferPool.FlushListSize()
+		assert.Greater(t, flushListBefore, 0)
+
+		// WHEN: ページクリーナーが動くのを待つ (デフォルト 1 秒間隔)
+		time.Sleep(2 * time.Second)
+
+		// THEN: ページクリーナーによってフラッシュリストが縮小している
+		flushListAfter := h.BufferPool.FlushListSize()
+		assert.Less(t, flushListAfter, flushListBefore)
+
+		err = h.Shutdown()
+		assert.NoError(t, err)
+	})
+}
+
 func TestCrashRecovery(t *testing.T) {
 	// テーブル作成とデータ挿入のヘルパー
 	setupTable := func(t *testing.T, h *Handler) {
@@ -132,7 +220,7 @@ func TestCrashRecovery(t *testing.T) {
 		setupTable(t, h)
 
 		// テーブル構造をディスクに永続化 (CreateTable は REDO 記録されないため)
-		err := h.BufferPool.FlushPage()
+		err := h.BufferPool.FlushAllPages()
 		assert.NoError(t, err)
 		err = h.redoLog.Reset()
 		assert.NoError(t, err)
@@ -176,7 +264,7 @@ func TestCrashRecovery(t *testing.T) {
 		h := Init()
 
 		setupTable(t, h)
-		err := h.BufferPool.FlushPage()
+		err := h.BufferPool.FlushAllPages()
 		assert.NoError(t, err)
 		err = h.redoLog.Reset()
 		assert.NoError(t, err)
@@ -221,7 +309,7 @@ func TestCrashRecovery(t *testing.T) {
 		h := Init()
 
 		setupTable(t, h)
-		err := h.BufferPool.FlushPage()
+		err := h.BufferPool.FlushAllPages()
 		assert.NoError(t, err)
 		err = h.redoLog.Reset()
 		assert.NoError(t, err)
@@ -268,7 +356,7 @@ func TestCrashRecovery(t *testing.T) {
 		h := Init()
 
 		setupTable(t, h)
-		err := h.BufferPool.FlushPage()
+		err := h.BufferPool.FlushAllPages()
 		assert.NoError(t, err)
 		err = h.redoLog.Reset()
 		assert.NoError(t, err)
@@ -285,7 +373,7 @@ func TestCrashRecovery(t *testing.T) {
 
 		// ダーティーページをフラッシュしてクリーンにする (trx2 の変更が REDO 記録されるようにする)
 		// Reset() は呼ばない (LSN カウンターを維持するため)
-		err = h.BufferPool.FlushPage()
+		err = h.BufferPool.FlushAllPages()
 		assert.NoError(t, err)
 
 		// trx2: Insert (未コミット)
@@ -330,7 +418,7 @@ func TestCrashRecovery(t *testing.T) {
 		h := Init()
 
 		setupTable(t, h)
-		err := h.BufferPool.FlushPage()
+		err := h.BufferPool.FlushAllPages()
 		assert.NoError(t, err)
 		err = h.redoLog.Reset()
 		assert.NoError(t, err)
@@ -346,7 +434,7 @@ func TestCrashRecovery(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ダーティーページをフラッシュしてクリーンにする
-		err = h.BufferPool.FlushPage()
+		err = h.BufferPool.FlushAllPages()
 		assert.NoError(t, err)
 
 		// UpdateInplace (未コミット)
@@ -465,7 +553,7 @@ func TestInitCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ダーティーページをディスクにフラッシュ
-		err = handler1.BufferPool.FlushPage()
+		err = handler1.BufferPool.FlushAllPages()
 		assert.NoError(t, err)
 
 		// Handler をリセット
@@ -524,7 +612,7 @@ func TestInitCatalog(t *testing.T) {
 		err = sm1.Catalog.Insert(bp, tblMeta)
 		assert.NoError(t, err)
 
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 
 		Reset()
