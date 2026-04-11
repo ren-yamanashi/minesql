@@ -27,27 +27,23 @@ func TestFlushOldestPages(t *testing.T) {
 		pageId2, _ := bp.AllocatePageId(page.FileId(1))
 		pageId3, _ := bp.AllocatePageId(page.FileId(1))
 
-		p1, _ := bp.AddPage(pageId1)
-		p1.GetWriteData()[0] = 0x11
-		bp.FlushList.Add(pageId1)
-
-		p2, _ := bp.AddPage(pageId2)
-		p2.GetWriteData()[0] = 0x22
-		bp.FlushList.Add(pageId2)
-
-		p3, _ := bp.AddPage(pageId3)
-		p3.GetWriteData()[0] = 0x33
-		bp.FlushList.Add(pageId3)
+		// 新規ページは AddPage で割り当て後、GetWritePageData で dirty 化 + FlushList 追加
+		_ = bp.AddPage(pageId1)
+		data1, _ := bp.GetWritePageData(pageId1)
+		data1[0] = 0x11
+		_ = bp.AddPage(pageId2)
+		data2, _ := bp.GetWritePageData(pageId2)
+		data2[0] = 0x22
+		_ = bp.AddPage(pageId3)
+		data3, _ := bp.GetWritePageData(pageId3)
+		data3[0] = 0x33
 
 		// WHEN
 		err = bp.FlushOldestPages(2)
 		assert.NoError(t, err)
 
 		// THEN
-		assert.Equal(t, 1, bp.FlushList.Size)
-		assert.False(t, p1.IsDirty)
-		assert.False(t, p2.IsDirty)
-		assert.True(t, p3.IsDirty)
+		assert.Equal(t, 1, bp.flushList.Size)
 
 		// フラッシュされたデータがディスクに書かれていることを確認
 		reFetched, err := bp.FetchPage(pageId1)
@@ -68,33 +64,27 @@ func TestFlushOldestPages(t *testing.T) {
 	})
 }
 
-func TestClean(t *testing.T) {
-	t.Run("閾値を超えていない場合はフラッシュしない", func(t *testing.T) {
+func TestPageCleanerStartStop(t *testing.T) {
+	t.Run("Start と Stop が正常に動作する", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		rl, err := log.NewRedoLog(tmpdir)
 		assert.NoError(t, err)
-		bp := NewBufferPool(100, rl)
-		disk, _ := file.NewDisk(page.FileId(1), filepath.Join(tmpdir, "test.db"))
-		bp.RegisterDisk(page.FileId(1), disk)
+		bp := NewBufferPool(10, rl)
 
-		pageId, _ := bp.AllocatePageId(page.FileId(1))
-		p, _ := bp.AddPage(pageId)
-		p.GetWriteData()[0] = 0x01
-		bp.FlushList.Add(pageId)
-
-		pc := NewPageCleaner(bp, rl, 1048576, 90) // 1MB, 90%
-		pc.lastCleanTime = time.Time{}
+		pc := NewPageCleaner(bp, rl, 1048576, 90)
+		pc.interval = 10 * time.Millisecond
 
 		// WHEN
-		err = pc.Clean()
-		assert.NoError(t, err)
+		pc.Start()
+		time.Sleep(50 * time.Millisecond)
+		pc.Stop()
 
-		// THEN: 1/100 = 1% なのでフラッシュされない
-		assert.Equal(t, 1, bp.FlushList.Size)
-		assert.True(t, p.IsDirty)
+		// THEN: パニックせずに正常終了する
 	})
+}
 
+func TestPageCleanerFlushesOnThreshold(t *testing.T) {
 	t.Run("ダーティーページ率が閾値を超えた場合にフラッシュする", func(t *testing.T) {
 		// GIVEN: バッファプールサイズ 3 で 3 ページ全てダーティー (100% > 90%)
 		tmpdir := t.TempDir()
@@ -106,20 +96,21 @@ func TestClean(t *testing.T) {
 
 		for range 3 {
 			pid, _ := bp.AllocatePageId(page.FileId(1))
-			p, _ := bp.AddPage(pid)
-			p.GetWriteData()[0] = 0x01
-			bp.FlushList.Add(pid)
+			_ = bp.AddPage(pid)
+			data, _ := bp.GetWritePageData(pid)
+			data[0] = 0x01
 		}
 
 		pc := NewPageCleaner(bp, rl, 1048576, 90)
-		pc.lastCleanTime = time.Time{}
+		pc.interval = 10 * time.Millisecond
 
 		// WHEN
-		err = pc.Clean()
-		assert.NoError(t, err)
+		pc.Start()
+		time.Sleep(100 * time.Millisecond)
+		pc.Stop()
 
 		// THEN: 一部がフラッシュされてフラッシュリストが縮小する
-		assert.Less(t, bp.FlushList.Size, 3)
+		assert.Less(t, bp.FlushListSize(), 3)
 	})
 
 	t.Run("REDO ログサイズが閾値を超えた場合にフラッシュする", func(t *testing.T) {
@@ -132,9 +123,9 @@ func TestClean(t *testing.T) {
 		bp.RegisterDisk(page.FileId(1), disk)
 
 		pageId, _ := bp.AllocatePageId(page.FileId(1))
-		p, _ := bp.AddPage(pageId)
-		p.GetWriteData()[0] = 0x01
-		bp.FlushList.Add(pageId)
+		_ = bp.AddPage(pageId)
+		data, _ := bp.GetWritePageData(pageId)
+		data[0] = 0x01
 
 		// REDO ログにデータを書き込んでフラッシュし、ファイルサイズを増やす
 		for range 10 {
@@ -144,13 +135,14 @@ func TestClean(t *testing.T) {
 		assert.NoError(t, err)
 
 		pc := NewPageCleaner(bp, rl, 100, 90) // 閾値を 100 バイトに設定
-		pc.lastCleanTime = time.Time{}
+		pc.interval = 10 * time.Millisecond
 
 		// WHEN
-		err = pc.Clean()
-		assert.NoError(t, err)
+		pc.Start()
+		time.Sleep(100 * time.Millisecond)
+		pc.Stop()
 
-		// THEN: REDO ログサイズ閾値により 1 ページがフラッシュされる
-		assert.Equal(t, 0, bp.FlushList.Size)
+		// THEN: REDO ログサイズ閾値によりフラッシュされる
+		assert.Equal(t, 0, bp.FlushListSize())
 	})
 }

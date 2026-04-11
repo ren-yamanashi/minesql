@@ -1,13 +1,22 @@
 package buffer
 
-import "minesql/internal/storage/log"
+import (
+	"minesql/internal/storage/log"
+	"time"
+)
 
-// PageCleaner はダーティーページのフラッシュを管理する
+// PageCleaner はバックグラウンドでダーティーページのフラッシュを管理する
+//
+// 一定間隔で閾値を確認し、超えている場合にフラッシュリストの古いページからフラッシュする
 type PageCleaner struct {
 	bp              *BufferPool
 	redoLog         *log.RedoLog
-	redoLogMaxSize  int // REDO ログの最大サイズ (バイト)
-	maxDirtyPagePct int // ダーティーページ率の上限 (%)
+	redoLogMaxSize  int           // REDO ログの最大サイズ (バイト)
+	maxDirtyPagePct int           // ダーティーページ率の上限 (%)
+	interval        time.Duration // クリーニング間隔
+	ticker          *time.Ticker
+	done            chan struct{}
+	stopped         chan struct{} // goroutine 終了通知用
 }
 
 // NewPageCleaner は PageCleaner を生成する
@@ -17,25 +26,53 @@ func NewPageCleaner(bp *BufferPool, redoLog *log.RedoLog, redoLogMaxSize int, ma
 		redoLog:         redoLog,
 		redoLogMaxSize:  redoLogMaxSize,
 		maxDirtyPagePct: maxDirtyPagePct,
+		interval:        1 * time.Second,
 	}
 }
 
-// Clean は閾値を超えている場合にダーティーページをフラッシュする
-func (pc *PageCleaner) Clean() error {
-	if !pc.shouldFlush() {
-		return nil
-	}
+// Start はバックグラウンド goroutine を起動する
+func (pc *PageCleaner) Start() {
+	pc.ticker = time.NewTicker(pc.interval)
+	pc.done = make(chan struct{})
+	pc.stopped = make(chan struct{})
+	go pc.loop()
+}
 
-	// フラッシュリストの 1/4 をフラッシュ (最低 1 ページ)
-	flushCount := max(pc.bp.FlushList.Size/4, 1)
-	return pc.bp.FlushOldestPages(flushCount)
+// Stop はバックグラウンド goroutine を停止し、終了を待つ
+func (pc *PageCleaner) Stop() {
+	close(pc.done)
+	<-pc.stopped
+	pc.ticker.Stop()
+}
+
+// loop はバックグラウンドで定期的に clean を呼び出す
+func (pc *PageCleaner) loop() {
+	defer close(pc.stopped)
+	for {
+		select {
+		case <-pc.done:
+			return
+		case <-pc.ticker.C:
+			pc.clean()
+		}
+	}
+}
+
+// clean はフラッシュの必要がある場合にフラッシュリストの古いページからフラッシュする
+func (pc *PageCleaner) clean() {
+	if !pc.shouldFlush() {
+		return
+	}
+	flushCount := max(pc.bp.FlushListSize()/4, 1)
+	_ = pc.bp.FlushOldestPages(flushCount)
 }
 
 // shouldFlush は閾値 (以下のいずれか) を超えているかを判定する
 //   - REDO ログサイズが redoLogMaxSize を超えている
 //   - ダーティーページ率が maxDirtyPagePct を超えている
 func (pc *PageCleaner) shouldFlush() bool {
-	if pc.bp.FlushList.Size == 0 {
+	flushListSize := pc.bp.FlushListSize()
+	if flushListSize == 0 {
 		return false
 	}
 
@@ -49,6 +86,6 @@ func (pc *PageCleaner) shouldFlush() bool {
 	}
 
 	// ダーティーページ率の閾値チェック
-	dirtyPct := pc.bp.FlushList.Size * 100 / pc.bp.maxBufferSize
+	dirtyPct := flushListSize * 100 / pc.bp.MaxBufferSize()
 	return dirtyPct > pc.maxDirtyPagePct
 }
