@@ -27,7 +27,7 @@ func NewUndoLog(bp *buffer.BufferPool, redoLog *log.RedoLog, undoFileId page.Fil
 	if err != nil {
 		return nil, err
 	}
-	NewUndoPage(bufPage.GetWriteData()).Initialize()
+	NewUndoPage(page.NewPage(bufPage.GetWriteData())).Initialize()
 
 	return &UndoLog{
 		bp:            bp,
@@ -80,7 +80,7 @@ func (u *UndoLog) writeToPage(trxId TrxId, serialized []byte) error {
 	if err != nil {
 		return err
 	}
-	undoPage := NewUndoPage(bufPage.GetWriteData())
+	undoPage := NewUndoPage(page.NewPage(bufPage.GetWriteData()))
 
 	if !undoPage.Append(serialized) {
 		// ページが満杯なので新しいページを割り当て
@@ -97,7 +97,7 @@ func (u *UndoLog) writeToPage(trxId TrxId, serialized []byte) error {
 		undoPage.SetNextPageNumber(uint16(newPageId.PageNumber))
 
 		// 新しいページを初期化してレコードを追記
-		newUndoPage := NewUndoPage(newBufPage.GetWriteData())
+		newUndoPage := NewUndoPage(page.NewPage(newBufPage.GetWriteData()))
 		newUndoPage.Initialize()
 		newUndoPage.Append(serialized)
 

@@ -1,6 +1,7 @@
 package btree
 
 import (
+	"encoding/binary"
 	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/page"
 	"testing"
@@ -14,12 +15,12 @@ func TestCreateMetaPage(t *testing.T) {
 		data := make([]byte, 128)
 
 		// WHEN
-		createMetaPage(data)
+		createMetaPage(page.NewPage(data))
 
 		// THEN
-		sp := node.NewSlottedPage(data)
+		sp := node.NewSlottedPage(page.NewPage(data).Body)
 		assert.Equal(t, 0, sp.NumSlots())
-		assert.Equal(t, uint32(0), sp.PageLSN())
+		assert.Equal(t, uint32(0), binary.BigEndian.Uint32(page.NewPage(data).Header))
 	})
 
 	t.Run("各フィールドの初期値がゼロ値になる", func(t *testing.T) {
@@ -27,7 +28,7 @@ func TestCreateMetaPage(t *testing.T) {
 		data := make([]byte, 128)
 
 		// WHEN
-		mp := createMetaPage(data)
+		mp := createMetaPage(page.NewPage(data))
 
 		// THEN
 		assert.Equal(t, page.PageId{}, mp.rootPageId())
@@ -42,11 +43,10 @@ func TestNewMetaPage(t *testing.T) {
 		data := make([]byte, 128)
 
 		// WHEN
-		mp := newMetaPage(data)
+		mp := newMetaPage(page.NewPage(data))
 
 		// THEN
 		assert.NotNil(t, mp)
-		assert.Equal(t, data, mp.data)
 	})
 }
 
@@ -54,7 +54,7 @@ func TestMetaPageRootPageId(t *testing.T) {
 	t.Run("ルートページ ID を設定・取得できる", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
-		mp := createMetaPage(data)
+		mp := createMetaPage(page.NewPage(data))
 		expectedPageId := page.NewPageId(page.FileId(2), page.PageNumber(99))
 
 		// WHEN
@@ -67,7 +67,7 @@ func TestMetaPageRootPageId(t *testing.T) {
 	t.Run("初期値はゼロ値", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
-		mp := createMetaPage(data)
+		mp := createMetaPage(page.NewPage(data))
 
 		// WHEN
 		rootPageId := mp.rootPageId()
@@ -81,7 +81,7 @@ func TestMetaPageLeafPageCount(t *testing.T) {
 	t.Run("リーフページ数を設定・取得できる", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
-		mp := createMetaPage(data)
+		mp := createMetaPage(page.NewPage(data))
 
 		// WHEN
 		mp.setLeafPageCount(42)
@@ -93,7 +93,7 @@ func TestMetaPageLeafPageCount(t *testing.T) {
 	t.Run("初期値は 0", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
-		mp := createMetaPage(data)
+		mp := createMetaPage(page.NewPage(data))
 
 		// WHEN
 		count := mp.leafPageCount()
@@ -107,7 +107,7 @@ func TestMetaPageHeight(t *testing.T) {
 	t.Run("高さを設定・取得できる", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
-		mp := createMetaPage(data)
+		mp := createMetaPage(page.NewPage(data))
 
 		// WHEN
 		mp.setHeight(5)
@@ -119,7 +119,7 @@ func TestMetaPageHeight(t *testing.T) {
 	t.Run("初期値は 0", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
-		mp := createMetaPage(data)
+		mp := createMetaPage(page.NewPage(data))
 
 		// WHEN
 		h := mp.height()
@@ -133,7 +133,7 @@ func TestMetaPageFieldIndependence(t *testing.T) {
 	t.Run("各フィールドが互いに干渉しない", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
-		mp := createMetaPage(data)
+		mp := createMetaPage(page.NewPage(data))
 		expectedPageId := page.NewPageId(page.FileId(1), page.PageNumber(10))
 
 		// WHEN
@@ -150,17 +150,16 @@ func TestMetaPageFieldIndependence(t *testing.T) {
 	t.Run("SlottedPage ヘッダーとメタデータフィールドが干渉しない", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
-		mp := createMetaPage(data)
-		sp := node.NewSlottedPage(data)
+		mp := createMetaPage(page.NewPage(data))
 
 		// WHEN
 		mp.setRootPageId(page.NewPageId(page.FileId(1), page.PageNumber(10)))
 		mp.setLeafPageCount(100)
 		mp.setHeight(3)
-		sp.SetPageLSN(999)
+		binary.BigEndian.PutUint32(page.NewPage(data).Header, 999)
 
 		// THEN
-		assert.Equal(t, uint32(999), sp.PageLSN())
+		assert.Equal(t, uint32(999), binary.BigEndian.Uint32(page.NewPage(data).Header))
 		assert.Equal(t, page.NewPageId(page.FileId(1), page.PageNumber(10)), mp.rootPageId())
 		assert.Equal(t, uint64(100), mp.leafPageCount())
 		assert.Equal(t, uint64(3), mp.height())
@@ -169,7 +168,7 @@ func TestMetaPageFieldIndependence(t *testing.T) {
 	t.Run("フィールドを上書きできる", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
-		mp := createMetaPage(data)
+		mp := createMetaPage(page.NewPage(data))
 		mp.setLeafPageCount(10)
 		mp.setHeight(2)
 

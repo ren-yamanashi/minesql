@@ -7,7 +7,7 @@ import "encoding/binary"
 // ヘッダー情報の内訳:
 //   - numSlots: 2 byte (0, 1) -- スロット数
 //   - freeOffset: 2 byte (2, 3) -- フリースペースの開始位置
-//   - pageLSN: 4 byte (4, 5, 6, 7) -- このページに最後に適用された REDO ログの LSN
+//   - pad: 4 byte (4, 5, 6, 7) -- 予約領域
 const slottedPageHeaderSize = 8
 
 type SlottedPage struct {
@@ -224,17 +224,7 @@ func (sp *SlottedPage) Data(index int) []byte {
 func (sp *SlottedPage) Initialize() {
 	binary.BigEndian.PutUint16(sp.data[0:2], 0)                    // numSlots
 	binary.BigEndian.PutUint16(sp.data[2:4], uint16(len(sp.data))) // freeOffset = end of data
-	binary.BigEndian.PutUint32(sp.data[4:8], 0)                    // pageLSN
-}
-
-// PageLSN はこのページに最後に適用された REDO ログの LSN を返す
-func (sp *SlottedPage) PageLSN() uint32 {
-	return binary.BigEndian.Uint32(sp.data[4:8])
-}
-
-// SetPageLSN はこのページの Page LSN を設定する
-func (sp *SlottedPage) SetPageLSN(lsn uint32) {
-	binary.BigEndian.PutUint32(sp.data[4:8], lsn)
+	binary.BigEndian.PutUint32(sp.data[4:8], 0)                    // pad (予約領域)
 }
 
 // 指定されたインデックスのポインタを取得する

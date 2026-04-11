@@ -453,19 +453,19 @@ Branch[keys=1]: [key_10]
 		metaBuf, err := bp.FetchPage(tree.MetaPageId)
 		require.NoError(t, err)
 		defer bp.UnRefPage(tree.MetaPageId)
-		meta := newMetaPage(metaBuf.GetReadData())
+		meta := newMetaPage(page.NewPage(metaBuf.GetReadData()))
 		rootPageId := meta.rootPageId()
 
 		rootBuf, err := bp.FetchPage(rootPageId)
 		require.NoError(t, err)
 		defer bp.UnRefPage(rootPageId)
 
-		nodeType := node.GetNodeType(rootBuf.GetReadData())
+		nodeType := node.GetNodeType(page.NewPage(rootBuf.GetReadData()).Body)
 		if !bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
 			t.Skip("ルートがブランチではないためスキップ")
 		}
 
-		branch := node.NewBranch(rootBuf.GetReadData())
+		branch := node.NewBranch(page.NewPage(rootBuf.GetReadData()).Body)
 		for i := range branch.NumRecords() {
 			boundaryKey := string(branch.RecordAt(i).KeyBytes())
 
@@ -473,7 +473,7 @@ Branch[keys=1]: [key_10]
 			leftPageId := branch.ChildPageIdAt(i)
 			leftBuf, err := bp.FetchPage(leftPageId)
 			require.NoError(t, err)
-			leftLeaf := node.NewLeaf(leftBuf.GetReadData())
+			leftLeaf := node.NewLeaf(page.NewPage(leftBuf.GetReadData()).Body)
 			lastLeftKey := string(leftLeaf.RecordAt(leftLeaf.NumRecords() - 1).KeyBytes())
 			bp.UnRefPage(leftPageId)
 
@@ -481,7 +481,7 @@ Branch[keys=1]: [key_10]
 			rightPageId := branch.ChildPageIdAt(i + 1)
 			rightBuf, err := bp.FetchPage(rightPageId)
 			require.NoError(t, err)
-			rightLeaf := node.NewLeaf(rightBuf.GetReadData())
+			rightLeaf := node.NewLeaf(page.NewPage(rightBuf.GetReadData()).Body)
 			firstRightKey := string(rightLeaf.RecordAt(0).KeyBytes())
 			bp.UnRefPage(rightPageId)
 
@@ -511,13 +511,13 @@ Branch[keys=1]: [key_10]
 
 			metaBuf, err := bp.FetchPage(tree.MetaPageId)
 			require.NoError(t, err)
-			meta := newMetaPage(metaBuf.GetReadData())
+			meta := newMetaPage(page.NewPage(metaBuf.GetReadData()))
 			rootPageId := meta.rootPageId()
 			bp.UnRefPage(tree.MetaPageId)
 
 			rootBuf, err := bp.FetchPage(rootPageId)
 			require.NoError(t, err)
-			nodeType := node.GetNodeType(rootBuf.GetReadData())
+			nodeType := node.GetNodeType(page.NewPage(rootBuf.GetReadData()).Body)
 			bp.UnRefPage(rootPageId)
 
 			var currentType string
@@ -625,7 +625,7 @@ func writeRootInfo(w *strings.Builder, bp *buffer.BufferPool, tree *BTree) {
 	}
 	defer bp.UnRefPage(tree.MetaPageId)
 
-	meta := newMetaPage(metaBuf.GetReadData())
+	meta := newMetaPage(page.NewPage(metaBuf.GetReadData()))
 	rootPageId := meta.rootPageId()
 	writeNodeInfo(w, bp, rootPageId, 0)
 }
@@ -639,17 +639,17 @@ func writeNodeInfo(w *strings.Builder, bp *buffer.BufferPool, pageId page.PageId
 	defer bp.UnRefPage(pageId)
 
 	indent := strings.Repeat("  ", depth)
-	nodeType := node.GetNodeType(buf.GetReadData())
+	nodeType := node.GetNodeType(page.NewPage(buf.GetReadData()).Body)
 
 	if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
-		leaf := node.NewLeaf(buf.GetReadData())
+		leaf := node.NewLeaf(page.NewPage(buf.GetReadData()).Body)
 		keys := make([]string, leaf.NumRecords())
 		for i := range leaf.NumRecords() {
 			keys[i] = string(leaf.RecordAt(i).KeyBytes())
 		}
 		fmt.Fprintf(w, "%sLeaf[keys=%d]: [%s]\n", indent, leaf.NumRecords(), strings.Join(keys, ", "))
 	} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
-		branch := node.NewBranch(buf.GetReadData())
+		branch := node.NewBranch(page.NewPage(buf.GetReadData()).Body)
 		keys := make([]string, branch.NumRecords())
 		for i := range branch.NumRecords() {
 			keys[i] = string(branch.RecordAt(i).KeyBytes())
@@ -669,7 +669,7 @@ func writeTreeShape(w *strings.Builder, bp *buffer.BufferPool, tree *BTree) {
 	if err != nil {
 		panic(err)
 	}
-	meta := newMetaPage(metaBuf.GetReadData())
+	meta := newMetaPage(page.NewPage(metaBuf.GetReadData()))
 	rootPageId := meta.rootPageId()
 	bp.UnRefPage(tree.MetaPageId)
 
@@ -688,19 +688,19 @@ func writeTreeShape(w *strings.Builder, bp *buffer.BufferPool, tree *BTree) {
 		}
 		defer bp.UnRefPage(pageId)
 
-		nodeType := node.GetNodeType(buf.GetReadData())
+		nodeType := node.GetNodeType(page.NewPage(buf.GetReadData()).Body)
 		if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
 			if _, ok := result[depth]; !ok {
 				result[depth] = &depthInfo{nodeType: "Leaf"}
 			}
-			leaf := node.NewLeaf(buf.GetReadData())
+			leaf := node.NewLeaf(page.NewPage(buf.GetReadData()).Body)
 			result[depth].count++
 			result[depth].totalKeys += leaf.NumRecords()
 		} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
 			if _, ok := result[depth]; !ok {
 				result[depth] = &depthInfo{nodeType: "Branch"}
 			}
-			branch := node.NewBranch(buf.GetReadData())
+			branch := node.NewBranch(page.NewPage(buf.GetReadData()).Body)
 			result[depth].count++
 			result[depth].totalKeys += branch.NumRecords()
 			for i := range branch.NumRecords() + 1 {

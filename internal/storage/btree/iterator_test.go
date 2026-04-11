@@ -247,7 +247,7 @@ func TestAdvance(t *testing.T) {
 func createLeafBufferPage(pageId page.PageId, records []node.Record, nextPageId *page.PageId) buffer.BufferPage {
 	bufpool := buffer.NewBufferPage(pageId)
 
-	leaf := node.NewLeaf(bufpool.GetWriteData())
+	leaf := node.NewLeaf(page.NewPage(bufpool.GetWriteData()).Body)
 	leaf.Initialize()
 
 	// レコードを挿入

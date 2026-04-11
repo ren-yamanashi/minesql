@@ -1,41 +1,43 @@
 package access
 
-import "encoding/binary"
+import (
+	"encoding/binary"
+	"minesql/internal/storage/page"
+)
 
-// UNDO ページのレイアウト:
+// UNDO ページのレイアウト (Body 内):
 //
-// ヘッダー (12 バイト):
-//   - offset 0-7:   SlottedPage ヘッダー (pageLSN 等)
-//   - offset 8-9:   usedBytes (uint16) - ボディの使用済みバイト数
-//   - offset 10-11: nextPageNumber (uint16) - 次の UNDO ページの PageNumber (0 = なし)
+// ヘッダー (4 バイト):
+//   - offset 0-1: usedBytes (uint16) - ボディの使用済みバイト数
+//   - offset 2-3: nextPageNumber (uint16) - 次の UNDO ページの PageNumber (0 = なし)
 //
 // ボディ:
-//   - offset 12+:   UNDO レコードが先頭から順に詰められる
+//   - offset 4+:  UNDO レコードが先頭から順に詰められる
+//
+// Page LSN は Page 構造体のヘッダー (raw data の先頭 4 バイト) で管理される
 
-const undoPageHeaderSize = 12 // SlottedPage ヘッダー (8B) + usedBytes (2B) + nextPageNumber (2B)
+const undoPageHeaderSize = 4 // usedBytes (2B) + nextPageNumber (2B)
 
 type UndoPage struct {
-	header []byte // ページデータの先頭 12 バイト
-	body   []byte // ページデータの 12 バイト目以降
+	pg     *page.Page
+	header []byte // pg.Body[:4] - usedBytes + nextPageNumber
+	body   []byte // pg.Body[4:] - UNDO レコード
 }
 
-// NewUndoPage は与えられたページデータから UndoPage を作成する
-func NewUndoPage(data []byte) *UndoPage {
+// NewUndoPage は Page から UndoPage を作成する (Page を UndoPage として扱う)
+func NewUndoPage(pg *page.Page) *UndoPage {
+	body := pg.Body
 	return &UndoPage{
-		header: data[:undoPageHeaderSize],
-		body:   data[undoPageHeaderSize:],
+		pg:     pg,
+		header: body[:undoPageHeaderSize],
+		body:   body[undoPageHeaderSize:],
 	}
 }
 
 // Initialize は UNDO ページを初期化する
 func (p *UndoPage) Initialize() {
-	// SlottedPage ヘッダーを初期化 (pageLSN = 0)
-	binary.BigEndian.PutUint16(p.header[0:2], 0) // numSlots (未使用)
-	binary.BigEndian.PutUint16(p.header[2:4], 0) // freeOffset (未使用)
-	binary.BigEndian.PutUint32(p.header[4:8], 0) // pageLSN
-	// UNDO ページ固有ヘッダー
-	binary.BigEndian.PutUint16(p.header[8:10], 0)  // usedBytes
-	binary.BigEndian.PutUint16(p.header[10:12], 0) // nextPageNumber
+	binary.BigEndian.PutUint16(p.header[0:2], 0) // usedBytes
+	binary.BigEndian.PutUint16(p.header[2:4], 0) // nextPageNumber
 }
 
 // Append は UNDO レコードをボディに追加する
@@ -47,7 +49,7 @@ func (p *UndoPage) Append(record []byte) bool {
 		return false
 	}
 	copy(p.body[used:], record)
-	binary.BigEndian.PutUint16(p.header[8:10], uint16(used+len(record)))
+	binary.BigEndian.PutUint16(p.header[0:2], uint16(used+len(record)))
 	return true
 }
 
@@ -59,7 +61,7 @@ func (p *UndoPage) RecordAt(offset int) []byte {
 	if offset+undoRecordHeaderSize > len(p.body) {
 		return nil
 	}
-	// DataLen はレコードヘッダーの末尾 2 バイトに格納されている
+	// DataLen は UNDO レコードヘッダーの末尾 2 バイトに格納されている
 	dataLenOffset := offset + undoRecordHeaderSize - 2
 	dataLen := int(binary.BigEndian.Uint16(p.body[dataLenOffset : dataLenOffset+2]))
 	totalLen := undoRecordHeaderSize + dataLen
@@ -72,17 +74,17 @@ func (p *UndoPage) RecordAt(offset int) []byte {
 
 // UsedBytes はボディの使用済みバイト数を返す
 func (p *UndoPage) UsedBytes() uint16 {
-	return binary.BigEndian.Uint16(p.header[8:10])
+	return binary.BigEndian.Uint16(p.header[0:2])
 }
 
 // NextPageNumber は次の UNDO ページの PageNumber を返す (0 = なし)
 func (p *UndoPage) NextPageNumber() uint16 {
-	return binary.BigEndian.Uint16(p.header[10:12])
+	return binary.BigEndian.Uint16(p.header[2:4])
 }
 
 // SetNextPageNumber は次の UNDO ページの PageNumber を設定する
 func (p *UndoPage) SetNextPageNumber(pn uint16) {
-	binary.BigEndian.PutUint16(p.header[10:12], pn)
+	binary.BigEndian.PutUint16(p.header[2:4], pn)
 }
 
 // FreeSpace はボディ内の空き容量を返す
