@@ -174,7 +174,7 @@ func TestInitCatalog(t *testing.T) {
 		// THEN
 		assert.NotNil(t, h)
 		assert.NotNil(t, h.Catalog)
-		assert.Equal(t, page.FileId(1), h.Catalog.NextFileId)
+		assert.Equal(t, page.FileId(2), h.Catalog.NextFileId)
 	})
 
 	t.Run("カタログファイルが既に存在する場合、既存のカタログが開かれる", func(t *testing.T) {
@@ -205,7 +205,7 @@ func TestInitCatalog(t *testing.T) {
 
 		// THEN
 		assert.NotNil(t, handler2.Catalog)
-		assert.Equal(t, page.FileId(3), handler2.Catalog.NextFileId)
+		assert.Equal(t, page.FileId(4), handler2.Catalog.NextFileId)
 	})
 
 	t.Run("カタログの Disk が BufferPool に登録される", func(t *testing.T) {
@@ -291,7 +291,7 @@ func TestInitCatalog(t *testing.T) {
 		// THEN: 新しいカタログが作成され、NextFileId は 1
 		assert.NotNil(t, h)
 		assert.NotNil(t, h.Catalog)
-		assert.Equal(t, page.FileId(1), h.Catalog.NextFileId)
+		assert.Equal(t, page.FileId(2), h.Catalog.NextFileId)
 	})
 
 	t.Run("データディレクトリが存在しない場合、自動作成される", func(t *testing.T) {

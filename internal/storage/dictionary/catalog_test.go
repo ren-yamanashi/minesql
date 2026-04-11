@@ -219,6 +219,31 @@ func TestNewCatalog(t *testing.T) {
 		assert.Equal(t, 2, len(commentsTable.Cols))
 	})
 
+	t.Run("UndoFileId が正しく復元される", func(t *testing.T) {
+		// GIVEN
+		bp, tmpdir := InitCatalogDisk(t)
+		defer removeTmpdir(t, tmpdir)
+
+		cat, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+		assert.Equal(t, page.FileId(1), cat.UndoFileId)
+
+		err = bp.FlushPage()
+		assert.NoError(t, err)
+
+		// WHEN
+		bp2 := buffer.NewBufferPool(10)
+		dm2, err := file.NewDisk(page.FileId(0), filepath.Join(tmpdir, "minesql.db"))
+		assert.NoError(t, err)
+		bp2.RegisterDisk(page.FileId(0), dm2)
+
+		cat2, err := NewCatalog(bp2)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, page.FileId(1), cat2.UndoFileId)
+	})
+
 	t.Run("NextFileId も正しく復元される", func(t *testing.T) {
 		// GIVEN
 		bp, tmpdir := InitCatalogDisk(t)
@@ -251,13 +276,13 @@ func TestNewCatalog(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, page.FileId(4), cat2.NextFileId)
+		assert.Equal(t, page.FileId(5), cat2.NextFileId)
 
 		// 次の採番が正しく動作することを確認
 		nextId, err := cat2.AllocateFileId(bp2)
 		assert.NoError(t, err)
-		assert.Equal(t, page.FileId(4), nextId)
-		assert.Equal(t, page.FileId(5), cat2.NextFileId)
+		assert.Equal(t, page.FileId(5), nextId)
+		assert.Equal(t, page.FileId(6), cat2.NextFileId)
 	})
 
 	t.Run("マジックナンバーが不正な場合、ErrInvalidCatalogFile を返す", func(t *testing.T) {
@@ -303,7 +328,8 @@ func TestCreateCatalog(t *testing.T) {
 		assert.Equal(t, page.FileId(0), cat.TableMetaPageId.FileId)
 		assert.Equal(t, page.FileId(0), cat.IndexMetaPageId.FileId)
 		assert.Equal(t, page.FileId(0), cat.ColumnMetaPageId.FileId)
-		assert.Equal(t, page.FileId(1), cat.NextFileId)
+		assert.Equal(t, page.FileId(2), cat.NextFileId)
+		assert.Equal(t, page.FileId(1), cat.UndoFileId)
 		assert.Empty(t, cat.metadata)
 	})
 
@@ -513,11 +539,11 @@ func TestAllocateFileId(t *testing.T) {
 		id3, err := cat.AllocateFileId(bp)
 		assert.NoError(t, err)
 
-		// THEN: 順番に採番される (FileId(0) はカタログ用に予約されているため 1 から開始)
-		assert.Equal(t, page.FileId(1), id1)
-		assert.Equal(t, page.FileId(2), id2)
-		assert.Equal(t, page.FileId(3), id3)
-		assert.Equal(t, page.FileId(4), cat.NextFileId)
+		// THEN: 順番に採番される (FileId(0) はカタログ、FileId(1) は UNDO ログ用なので、テーブル用は 2 から開始)
+		assert.Equal(t, page.FileId(2), id1)
+		assert.Equal(t, page.FileId(3), id2)
+		assert.Equal(t, page.FileId(4), id3)
+		assert.Equal(t, page.FileId(5), cat.NextFileId)
 	})
 
 	t.Run("採番後の FileId がディスクに保存される", func(t *testing.T) {
@@ -540,7 +566,7 @@ func TestAllocateFileId(t *testing.T) {
 
 		data := headerPage.GetReadData()
 		savedNextFileId := binary.BigEndian.Uint32(data[16:20])
-		assert.Equal(t, uint32(2), savedNextFileId)
+		assert.Equal(t, uint32(3), savedNextFileId)
 	})
 }
 

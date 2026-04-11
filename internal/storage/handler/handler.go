@@ -10,6 +10,7 @@ import (
 	"minesql/internal/storage/dictionary"
 	"minesql/internal/storage/file"
 	"minesql/internal/storage/lock"
+	"minesql/internal/storage/log"
 	"minesql/internal/storage/page"
 	"os"
 	"path/filepath"
@@ -121,7 +122,17 @@ func newHandler() (*Handler, error) {
 		return nil, err
 	}
 
-	undoLog := access.NewUndoLog()
+	// REDO ログを初期化
+	redoLog, err := log.NewRedoLog(dataDir)
+	if err != nil {
+		return nil, err
+	}
+
+	// UNDO ログを初期化
+	undoLog, err := initUndoLog(bp, redoLog, dataDir, catalog.UndoFileId)
+	if err != nil {
+		return nil, err
+	}
 	lockMgr := lock.NewManager(config.GetLockWaitTimeout())
 
 	return &Handler{
@@ -180,6 +191,22 @@ func initCatalog(baseDir string, bp *buffer.BufferPool) (*dictionary.Catalog, er
 	}
 
 	return cat, nil
+}
+
+// initUndoLog は UNDO ログ用を初期化する
+func initUndoLog(bp *buffer.BufferPool, redoLog *log.RedoLog, baseDir string, undoFileId page.FileId) (*access.UndoLog, error) {
+	// UNDO ログ用の Disk を作成
+	path := filepath.Join(baseDir, "undo.db")
+	dm, err := file.NewDisk(undoFileId, path)
+	if err != nil {
+		return nil, err
+	}
+
+	// UNDO ログ用の Disk を BufferPool に登録
+	bp.RegisterDisk(undoFileId, dm)
+
+	// UndoLog を作成して返す
+	return access.NewUndoLog(bp, redoLog, undoFileId)
 }
 
 // registerTableDisks はカタログに含まれるテーブルの Disk を BufferPool に登録する

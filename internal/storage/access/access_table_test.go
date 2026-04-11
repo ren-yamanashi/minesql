@@ -1189,10 +1189,14 @@ func collectAllTablePairs(t *testing.T, bp *buffer.BufferPool, table *Table) []d
 func TestUndoLogRecording(t *testing.T) {
 	t.Run("Insert 時に UndoInsertRecord が記録される", func(t *testing.T) {
 		// GIVEN
-		bp, metaPageId, _ := InitDisk(t, "users.db")
-		undoLog := NewUndoLog()
+		bp, metaPageId, tmpdir := InitDisk(t, "users.db")
+		undoDm, err := file.NewDisk(undoTestFileId, filepath.Join(tmpdir, "undo.db"))
+		assert.NoError(t, err)
+		bp.RegisterDisk(undoTestFileId, undoDm)
+		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		assert.NoError(t, err)
 		table := NewTable("users", metaPageId, 1, nil, undoLog)
-		err := table.Create(bp)
+		err = table.Create(bp)
 		assert.NoError(t, err)
 
 		var trxId lock.TrxId = 1
@@ -1212,10 +1216,14 @@ func TestUndoLogRecording(t *testing.T) {
 
 	t.Run("SoftDelete 時に UndoDeleteRecord が記録される", func(t *testing.T) {
 		// GIVEN
-		bp, metaPageId, _ := InitDisk(t, "users.db")
-		undoLog := NewUndoLog()
+		bp, metaPageId, tmpdir := InitDisk(t, "users.db")
+		undoDm, err := file.NewDisk(undoTestFileId, filepath.Join(tmpdir, "undo.db"))
+		assert.NoError(t, err)
+		bp.RegisterDisk(undoTestFileId, undoDm)
+		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		assert.NoError(t, err)
 		table := NewTable("users", metaPageId, 1, nil, undoLog)
-		err := table.Create(bp)
+		err = table.Create(bp)
 		assert.NoError(t, err)
 
 		var trxId lock.TrxId = 1
@@ -1238,10 +1246,14 @@ func TestUndoLogRecording(t *testing.T) {
 
 	t.Run("UpdateInplace 時に UndoUpdateInplaceRecord が記録される", func(t *testing.T) {
 		// GIVEN
-		bp, metaPageId, _ := InitDisk(t, "users.db")
-		undoLog := NewUndoLog()
+		bp, metaPageId, tmpdir := InitDisk(t, "users.db")
+		undoDm, err := file.NewDisk(undoTestFileId, filepath.Join(tmpdir, "undo.db"))
+		assert.NoError(t, err)
+		bp.RegisterDisk(undoTestFileId, undoDm)
+		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		assert.NoError(t, err)
 		table := NewTable("users", metaPageId, 1, nil, undoLog)
-		err := table.Create(bp)
+		err = table.Create(bp)
 		assert.NoError(t, err)
 
 		var trxId lock.TrxId = 1
@@ -1281,10 +1293,14 @@ func TestUndoLogRecording(t *testing.T) {
 
 	t.Run("複数操作で Undo ログが操作順に記録される", func(t *testing.T) {
 		// GIVEN
-		bp, metaPageId, _ := InitDisk(t, "users.db")
-		undoLog := NewUndoLog()
+		bp, metaPageId, tmpdir := InitDisk(t, "users.db")
+		undoDm, err := file.NewDisk(undoTestFileId, filepath.Join(tmpdir, "undo.db"))
+		assert.NoError(t, err)
+		bp.RegisterDisk(undoTestFileId, undoDm)
+		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		assert.NoError(t, err)
 		table := NewTable("users", metaPageId, 1, nil, undoLog)
-		err := table.Create(bp)
+		err = table.Create(bp)
 		assert.NoError(t, err)
 
 		var trxId lock.TrxId = 1
