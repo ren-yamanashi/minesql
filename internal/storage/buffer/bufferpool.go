@@ -26,6 +26,7 @@ type BufferPool struct {
 	pageTable         PageTable                  // ページテーブル (key: PageId, value: BufferId のマップ)
 	evictionAlgorithm *LRU                       // ページ追い出しアルゴリズム
 	redoLog           *log.RedoLog               // REDO ログ
+	FlushList         *FlushList                 // ダーティーページのフラッシュリスト
 }
 
 // NewBufferPool は指定されたサイズの BufferPool を生成する
@@ -43,6 +44,7 @@ func NewBufferPool(size int, redoLog *log.RedoLog) *BufferPool {
 		pageTable:         make(PageTable),
 		evictionAlgorithm: NewLRU(size),
 		redoLog:           redoLog,
+		FlushList:         NewFlushList(),
 	}
 }
 
@@ -119,6 +121,9 @@ func (bp *BufferPool) AddPage(pageId page.PageId) (*BufferPage, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		// フラッシュリストから除外
+		bp.FlushList.Remove(victim.PageId)
 	}
 
 	// ページテーブルを更新 (追い出すページを削除し、新しいページを追加)
@@ -131,7 +136,7 @@ func (bp *BufferPool) AddPage(pageId page.PageId) (*BufferPage, error) {
 }
 
 // FlushPage はバッファプール内のすべてのダーティーページをディスクに書き出す
-func (bp *BufferPool) FlushPage() error {
+func (bp *BufferPool) FlushAllPages() error {
 	// REDO ログを先にフラッシュ
 	if bp.redoLog != nil {
 		if err := bp.redoLog.Flush(); err != nil {
@@ -160,8 +165,72 @@ func (bp *BufferPool) FlushPage() error {
 		bufferPage.IsDirty = false
 	}
 
+	// フラッシュリストをクリア
+	bp.FlushList.Clear()
+
 	// 全ディスクを Sync してストレージデバイスへの書き込みを保証
 	for _, disk := range bp.disks {
+		if err := disk.Sync(); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// FlushOldestPages はフラッシュリストの先頭から n ページをディスクにフラッシュする
+func (bp *BufferPool) FlushOldestPages(n int) error {
+	// フラッシュリストの先頭 (最も古いダーティーページ) から n 件取得
+	pageIds := bp.FlushList.OldestPageIds(n)
+	if len(pageIds) == 0 {
+		return nil
+	}
+
+	// ダーティーページをディスクに書き出す前に、REDO ログバッファを先にフラッシュする
+	if bp.redoLog != nil {
+		if err := bp.redoLog.Flush(); err != nil {
+			return err
+		}
+	}
+
+	// フラッシュ対象のディスクを記録する (後でまとめて Sync するため)
+	syncDisks := make(map[page.FileId]bool)
+
+	for _, pid := range pageIds {
+		// ページテーブルからバッファページを取得
+		bufferId, ok := bp.pageTable[pid]
+		if !ok {
+			continue
+		}
+
+		// 既にクリーンなページはフラッシュリストから除外するだけ
+		bufferPage := &bp.bufferPages[bufferId]
+		if !bufferPage.IsDirty {
+			bp.FlushList.Remove(pid)
+			continue
+		}
+
+		// ダーティーページをディスクに書き出す
+		disk, err := bp.GetDisk(pid.FileId)
+		if err != nil {
+			return err
+		}
+		if err := disk.WritePageData(pid, bufferPage.Page); err != nil {
+			return err
+		}
+
+		// ページをクリーンにし、フラッシュリストから除外
+		bufferPage.IsDirty = false
+		bp.FlushList.Remove(pid)
+		syncDisks[pid.FileId] = true
+	}
+
+	// フラッシュしたページのディスクを Sync してストレージデバイスへの書き込みを保証
+	for fileId := range syncDisks {
+		disk, err := bp.GetDisk(fileId)
+		if err != nil {
+			return err
+		}
 		if err := disk.Sync(); err != nil {
 			return err
 		}

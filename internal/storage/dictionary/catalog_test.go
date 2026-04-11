@@ -32,7 +32,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ページをフラッシュ
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 
 		// WHEN
@@ -74,7 +74,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ページをフラッシュ
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 
 		// WHEN
@@ -122,7 +122,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ページをフラッシュ
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 
 		// WHEN
@@ -179,7 +179,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ページをフラッシュ
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 
 		// WHEN
@@ -228,7 +228,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, page.FileId(1), cat.UndoFileId)
 
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 
 		// WHEN
@@ -261,7 +261,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ページをフラッシュ
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 
 		// WHEN
@@ -295,7 +295,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 		copy(headerPage.GetWriteData()[0:4], []byte("XXXX"))
 
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 
 		// WHEN: 新しい BufferPool でカタログを開き直す

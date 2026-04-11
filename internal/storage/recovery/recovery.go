@@ -60,7 +60,7 @@ func (r *Recovery) Run() error {
 	}
 
 	// 全ダーティーページをフラッシュ
-	if err := r.bufferPool.FlushPage(); err != nil {
+	if err := r.bufferPool.FlushAllPages(); err != nil {
 		return err
 	}
 

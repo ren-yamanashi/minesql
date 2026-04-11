@@ -75,7 +75,7 @@ func TestRedoApply(t *testing.T) {
 		assert.NoError(t, err)
 		bufPage.Page[page.PageHeaderSize] = 0x00 // 初期値
 		bufPage.IsDirty = true
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 		err = rl.Reset()
 		assert.NoError(t, err)
@@ -123,7 +123,7 @@ func TestRedoApply(t *testing.T) {
 		binary.BigEndian.PutUint32(bufPage.Page[0:page.PageHeaderSize], 10) // Page LSN = 10
 		bufPage.Page[page.PageHeaderSize] = 0xAA                            // 元の値
 		bufPage.IsDirty = true
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 		err = rl.Reset()
 		assert.NoError(t, err)
@@ -197,7 +197,7 @@ func TestUndoRollback(t *testing.T) {
 		assert.NoError(t, err)
 
 		// フラッシュしてクリーンな状態にする
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 		err = rl.Reset()
 		assert.NoError(t, err)
@@ -280,7 +280,7 @@ func TestUndoRollback(t *testing.T) {
 		assert.NoError(t, err)
 
 		// フラッシュしてクリーンな状態にする
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 		err = rl.Reset()
 		assert.NoError(t, err)

@@ -85,7 +85,7 @@ func (disk *Disk) WritePageData(id page.PageId, data []byte) error {
 	return nil
 }
 
-// Sync はファイルをディスクに同期する (基本的にはプロセスの終了時に呼び出せば良い)
+// Sync はファイルをディスクに同期する
 func (disk *Disk) Sync() error {
 	return disk.heapFile.Sync()
 }

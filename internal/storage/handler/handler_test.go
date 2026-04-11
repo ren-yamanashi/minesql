@@ -132,7 +132,7 @@ func TestCrashRecovery(t *testing.T) {
 		setupTable(t, h)
 
 		// テーブル構造をディスクに永続化 (CreateTable は REDO 記録されないため)
-		err := h.BufferPool.FlushPage()
+		err := h.BufferPool.FlushAllPages()
 		assert.NoError(t, err)
 		err = h.redoLog.Reset()
 		assert.NoError(t, err)
@@ -176,7 +176,7 @@ func TestCrashRecovery(t *testing.T) {
 		h := Init()
 
 		setupTable(t, h)
-		err := h.BufferPool.FlushPage()
+		err := h.BufferPool.FlushAllPages()
 		assert.NoError(t, err)
 		err = h.redoLog.Reset()
 		assert.NoError(t, err)
@@ -221,7 +221,7 @@ func TestCrashRecovery(t *testing.T) {
 		h := Init()
 
 		setupTable(t, h)
-		err := h.BufferPool.FlushPage()
+		err := h.BufferPool.FlushAllPages()
 		assert.NoError(t, err)
 		err = h.redoLog.Reset()
 		assert.NoError(t, err)
@@ -268,7 +268,7 @@ func TestCrashRecovery(t *testing.T) {
 		h := Init()
 
 		setupTable(t, h)
-		err := h.BufferPool.FlushPage()
+		err := h.BufferPool.FlushAllPages()
 		assert.NoError(t, err)
 		err = h.redoLog.Reset()
 		assert.NoError(t, err)
@@ -285,7 +285,7 @@ func TestCrashRecovery(t *testing.T) {
 
 		// ダーティーページをフラッシュしてクリーンにする (trx2 の変更が REDO 記録されるようにする)
 		// Reset() は呼ばない (LSN カウンターを維持するため)
-		err = h.BufferPool.FlushPage()
+		err = h.BufferPool.FlushAllPages()
 		assert.NoError(t, err)
 
 		// trx2: Insert (未コミット)
@@ -330,7 +330,7 @@ func TestCrashRecovery(t *testing.T) {
 		h := Init()
 
 		setupTable(t, h)
-		err := h.BufferPool.FlushPage()
+		err := h.BufferPool.FlushAllPages()
 		assert.NoError(t, err)
 		err = h.redoLog.Reset()
 		assert.NoError(t, err)
@@ -346,7 +346,7 @@ func TestCrashRecovery(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ダーティーページをフラッシュしてクリーンにする
-		err = h.BufferPool.FlushPage()
+		err = h.BufferPool.FlushAllPages()
 		assert.NoError(t, err)
 
 		// UpdateInplace (未コミット)
@@ -465,7 +465,7 @@ func TestInitCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ダーティーページをディスクにフラッシュ
-		err = handler1.BufferPool.FlushPage()
+		err = handler1.BufferPool.FlushAllPages()
 		assert.NoError(t, err)
 
 		// Handler をリセット
@@ -524,7 +524,7 @@ func TestInitCatalog(t *testing.T) {
 		err = sm1.Catalog.Insert(bp, tblMeta)
 		assert.NoError(t, err)
 
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 
 		Reset()

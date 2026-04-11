@@ -68,7 +68,7 @@ func TestBTreeInsertAndScan(t *testing.T) {
 		}
 
 		// WHEN
-		err := bp.FlushPage()
+		err := bp.FlushAllPages()
 		require.NoError(t, err)
 
 		// THEN
@@ -92,7 +92,7 @@ func TestBTreeInsertAndScan(t *testing.T) {
 		require.NoError(t, tree.Delete(bp, []byte("banana")))
 
 		// WHEN
-		err := bp.FlushPage()
+		err := bp.FlushAllPages()
 		require.NoError(t, err)
 
 		// THEN

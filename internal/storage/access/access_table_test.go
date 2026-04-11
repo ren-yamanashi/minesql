@@ -1378,7 +1378,7 @@ func TestInsertRedoLog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Create で作られたダーティーページをフラッシュしてクリアする
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 		err = redoLog.Reset()
 		assert.NoError(t, err)
@@ -1437,7 +1437,7 @@ func TestSoftDeleteRedoLog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ダーティーページをフラッシュしてクリアする
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 		err = redoLog.Reset()
 		assert.NoError(t, err)
@@ -1481,7 +1481,7 @@ func TestUpdateInplaceRedoLog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ダーティーページをフラッシュしてクリアする
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 		err = redoLog.Reset()
 		assert.NoError(t, err)
