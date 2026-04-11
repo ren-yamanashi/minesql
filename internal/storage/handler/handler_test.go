@@ -258,6 +258,127 @@ func TestCrashRecovery(t *testing.T) {
 		err = h2.Shutdown()
 		assert.NoError(t, err)
 	})
+
+	t.Run("コミット済みと未コミットが混在する場合、未コミットのみロールバックされる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		setupTable(t, h)
+		err := h.BufferPool.FlushPage()
+		assert.NoError(t, err)
+		err = h.redoLog.Reset()
+		assert.NoError(t, err)
+
+		tbl, err := h.GetTable("users")
+		assert.NoError(t, err)
+
+		// trx1: Insert + Commit
+		trx1 := h.BeginTrx()
+		err = tbl.Insert(h.BufferPool, trx1, h.LockMgr, [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+		err = h.CommitTrx(trx1)
+		assert.NoError(t, err)
+
+		// ダーティーページをフラッシュしてクリーンにする (trx2 の変更が REDO 記録されるようにする)
+		// Reset() は呼ばない (LSN カウンターを維持するため)
+		err = h.BufferPool.FlushPage()
+		assert.NoError(t, err)
+
+		// trx2: Insert (未コミット)
+		trx2 := h.BeginTrx()
+		err = tbl.Insert(h.BufferPool, trx2, h.LockMgr, [][]byte{[]byte("2"), []byte("Bob")})
+		assert.NoError(t, err)
+
+		err = h.redoLog.Flush()
+		assert.NoError(t, err)
+
+		// WHEN: Shutdown を呼ばずに再初期化
+		Reset()
+		h2 := Init()
+
+		// THEN: trx1 のデータは残り、trx2 のデータはロールバックされている
+		tbl2, err := h2.GetTable("users")
+		assert.NoError(t, err)
+
+		readTrxId := h2.BeginTrx()
+		iter, err := tbl2.Search(h2.BufferPool, readTrxId, h2.LockMgr, access.RecordSearchModeStart{})
+		assert.NoError(t, err)
+		record, ok, err := iter.Next()
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, []byte("1"), record[0])
+		assert.Equal(t, []byte("Alice"), record[1])
+
+		_, ok, err = iter.Next()
+		assert.NoError(t, err)
+		assert.False(t, ok) // trx2 のデータは存在しない
+
+		err = h2.Shutdown()
+		assert.NoError(t, err)
+	})
+
+	t.Run("未コミットの UPDATE がクラッシュ後にロールバックされる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		setupTable(t, h)
+		err := h.BufferPool.FlushPage()
+		assert.NoError(t, err)
+		err = h.redoLog.Reset()
+		assert.NoError(t, err)
+
+		tbl, err := h.GetTable("users")
+		assert.NoError(t, err)
+
+		// Insert + Commit (ベースデータ)
+		trx1 := h.BeginTrx()
+		err = tbl.Insert(h.BufferPool, trx1, h.LockMgr, [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+		err = h.CommitTrx(trx1)
+		assert.NoError(t, err)
+
+		// ダーティーページをフラッシュしてクリーンにする
+		err = h.BufferPool.FlushPage()
+		assert.NoError(t, err)
+
+		// UpdateInplace (未コミット)
+		trx2 := h.BeginTrx()
+		err = tbl.UpdateInplace(h.BufferPool, trx2, h.LockMgr,
+			[][]byte{[]byte("1"), []byte("Alice")},
+			[][]byte{[]byte("1"), []byte("Updated")},
+		)
+		assert.NoError(t, err)
+
+		err = h.redoLog.Flush()
+		assert.NoError(t, err)
+
+		// WHEN: Shutdown を呼ばずに再初期化
+		Reset()
+		h2 := Init()
+
+		// THEN: UPDATE がロールバックされ、元のデータに戻っている
+		tbl2, err := h2.GetTable("users")
+		assert.NoError(t, err)
+
+		readTrxId := h2.BeginTrx()
+		iter, err := tbl2.Search(h2.BufferPool, readTrxId, h2.LockMgr, access.RecordSearchModeStart{})
+		assert.NoError(t, err)
+		record, ok, err := iter.Next()
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, []byte("Alice"), record[1]) // "Updated" ではなく "Alice"
+
+		err = h2.Shutdown()
+		assert.NoError(t, err)
+	})
 }
 
 func TestRegisterDmToBp(t *testing.T) {
