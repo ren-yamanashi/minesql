@@ -47,7 +47,7 @@ VALUES
 	('6', 'Tom', 'Brown', 'male', 'tombrown');`)
 		// WHEN
 		records := executeSql(t, trxId, `SELECT * FROM users;`)
-		hdl.CommitTrx(trxId)
+		assert.NoError(t, hdl.CommitTrx(trxId))
 
 		// THEN
 		var sb strings.Builder
@@ -94,7 +94,7 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 	('6', 'Tom', 'Brown', 'male', 'tombrown');`)
 		// WHEN
 		records := executeSql(t, trxId, `SELECT * FROM users WHERE username = 'janedoe';`)
-		hdl.CommitTrx(trxId)
+		assert.NoError(t, hdl.CommitTrx(trxId))
 
 		// THEN
 		var sb strings.Builder
@@ -137,7 +137,7 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 
 		// WHEN: (first_name < 'K' AND gender = 'male' AND last_name >= 'Doe') OR first_name = 'Tom'
 		records := executeSql(t, trxId, `SELECT * FROM users WHERE first_name < 'K' AND gender = 'male' AND last_name >= 'Doe' OR first_name = 'Tom';`)
-		hdl.CommitTrx(trxId)
+		assert.NoError(t, hdl.CommitTrx(trxId))
 
 		// THEN
 		var sb strings.Builder
@@ -185,7 +185,7 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 		executeSql(t, trxId, `UPDATE users SET last_name = 'Anderson' WHERE username = 'janedoe';`)
 		// THEN: UPDATE 後の全レコードを確認する
 		records := executeSql(t, trxId, `SELECT * FROM users;`)
-		hdl.CommitTrx(trxId)
+		assert.NoError(t, hdl.CommitTrx(trxId))
 
 		var sb strings.Builder
 		sb.WriteString("=== UPDATE 後の全件 ===\n")
@@ -234,7 +234,7 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 		executeSql(t, trxId, `DELETE FROM users WHERE first_name = 'John' AND last_name = 'Doe';`)
 		// THEN: DELETE 後の全レコードを確認する
 		records := executeSql(t, trxId, `SELECT * FROM users;`)
-		hdl.CommitTrx(trxId)
+		assert.NoError(t, hdl.CommitTrx(trxId))
 
 		var sb strings.Builder
 		sb.WriteString("=== DELETE 後の全件 ===\n")

@@ -26,7 +26,7 @@ func TestCommit(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		hdl.CommitTrx(trxId)
+		assert.NoError(t, hdl.CommitTrx(trxId))
 
 		// THEN: Commit 後もデータは残っている
 		recs := collectAllRecords(t, tbl)
@@ -76,7 +76,7 @@ func TestRollback(t *testing.T) {
 		})
 		_, err := ins.Next()
 		assert.NoError(t, err)
-		hdl.CommitTrx(insertTrxId)
+		assert.NoError(t, hdl.CommitTrx(insertTrxId))
 
 		// Delete トランザクション
 		deleteTrxId := hdl.BeginTrx()
@@ -112,7 +112,7 @@ func TestRollback(t *testing.T) {
 		})
 		_, err := ins.Next()
 		assert.NoError(t, err)
-		hdl.CommitTrx(insertTrxId)
+		assert.NoError(t, hdl.CommitTrx(insertTrxId))
 
 		// Update トランザクション
 		updateTrxId := hdl.BeginTrx()
@@ -152,7 +152,7 @@ func TestRollback(t *testing.T) {
 		})
 		_, err := ins.Next()
 		assert.NoError(t, err)
-		hdl.CommitTrx(insertTrxId)
+		assert.NoError(t, hdl.CommitTrx(insertTrxId))
 
 		// 1 つのトランザクション内で Insert + Update + Delete
 		trxId := hdl.BeginTrx()
@@ -224,7 +224,7 @@ func collectAllRecords(t *testing.T, tbl *access.Table) []executor.Record {
 	t.Helper()
 	hdl := handler.Get()
 	trxId := hdl.BeginTrx()
-	defer hdl.CommitTrx(trxId)
+	defer func() { assert.NoError(t, hdl.CommitTrx(trxId)) }()
 	scan := executor.NewTableScan(
 		trxId, hdl.LockMgr, tbl,
 		access.RecordSearchModeStart{},

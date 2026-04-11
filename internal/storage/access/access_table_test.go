@@ -1332,6 +1332,32 @@ func TestUndoLogRecording(t *testing.T) {
 		_, ok = records[3].(UndoDeleteRecord)
 		assert.True(t, ok)
 	})
+
+	t.Run("Insert が重複キーで失敗した場合、Undo ログが PopLast される", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, tmpdir := InitDisk(t, "users.db")
+		undoDm, err := file.NewDisk(undoTestFileId, filepath.Join(tmpdir, "undo.db"))
+		assert.NoError(t, err)
+		bp.RegisterDisk(undoTestFileId, undoDm)
+		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		assert.NoError(t, err)
+		table := NewTable("users", metaPageId, 1, nil, undoLog, nil)
+		err = table.Create(bp)
+		assert.NoError(t, err)
+
+		var trxId lock.TrxId = 1
+		lockMgr := lock.NewManager(5000)
+		err = table.Insert(bp, trxId, lockMgr, [][]byte{[]byte("a"), []byte("Alice")})
+		assert.NoError(t, err)
+
+		// WHEN: 同じ PK で Insert (重複キーエラー)
+		err = table.Insert(bp, trxId, lockMgr, [][]byte{[]byte("a"), []byte("Bob")})
+
+		// THEN: エラーが返り、Undo ログには最初の Insert のみが残る
+		assert.Error(t, err)
+		records := undoLog.GetRecords(trxId)
+		assert.Equal(t, 1, len(records))
+	})
 }
 
 func TestInsertRedoLog(t *testing.T) {
@@ -1340,23 +1366,25 @@ func TestInsertRedoLog(t *testing.T) {
 		bp, metaPageId, tmpdir := InitDisk(t, "users.db")
 		redoLog, err := log.NewRedoLog(tmpdir)
 		assert.NoError(t, err)
+		bp.SetRedoLog(redoLog)
 		table := NewTable("users", metaPageId, 1, nil, nil, redoLog)
 		err = table.Create(bp)
+		assert.NoError(t, err)
+
+		// Create で作られたダーティーページをフラッシュしてクリアする
+		err = bp.FlushPage()
+		assert.NoError(t, err)
+		err = redoLog.Reset()
 		assert.NoError(t, err)
 
 		// WHEN
 		err = table.Insert(bp, 1, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Alice")})
 		assert.NoError(t, err)
 
-		// THEN: REDO ログバッファにページ変更レコードが記録されている
-		records, err := redoLog.ReadAll()
-		assert.NoError(t, err)
-		// Flush 前なので ReadAll は空だが、Flush 後に確認する
-		assert.Empty(t, records)
-
+		// THEN
 		err = redoLog.Flush()
 		assert.NoError(t, err)
-		records, err = redoLog.ReadAll()
+		records, err := redoLog.ReadAll()
 		assert.NoError(t, err)
 		assert.Greater(t, len(records), 0)
 
@@ -1387,6 +1415,7 @@ func TestSoftDeleteRedoLog(t *testing.T) {
 		bp, metaPageId, tmpdir := InitDisk(t, "users.db")
 		redoLog, err := log.NewRedoLog(tmpdir)
 		assert.NoError(t, err)
+		bp.SetRedoLog(redoLog)
 		table := NewTable("users", metaPageId, 1, nil, nil, redoLog)
 		err = table.Create(bp)
 		assert.NoError(t, err)
@@ -1395,8 +1424,10 @@ func TestSoftDeleteRedoLog(t *testing.T) {
 		err = table.Insert(bp, 1, lockMgr, [][]byte{[]byte("a"), []byte("Alice")})
 		assert.NoError(t, err)
 
-		// Insert 分の REDO をフラッシュしてクリア
-		err = redoLog.Flush()
+		// ダーティーページをフラッシュしてクリアする
+		err = bp.FlushPage()
+		assert.NoError(t, err)
+		err = redoLog.Reset()
 		assert.NoError(t, err)
 
 		// WHEN
@@ -1408,11 +1439,8 @@ func TestSoftDeleteRedoLog(t *testing.T) {
 		assert.NoError(t, err)
 		records, err := redoLog.ReadAll()
 		assert.NoError(t, err)
-
-		// Insert 分 + SoftDelete 分のレコードが存在する
 		assert.Greater(t, len(records), 0)
 
-		// 最後のレコードが SoftDelete によるもの
 		lastRecord := records[len(records)-1]
 		assert.Equal(t, log.RedoPageWrite, lastRecord.Type)
 		assert.Equal(t, uint64(1), lastRecord.TrxId)
@@ -1425,6 +1453,7 @@ func TestUpdateInplaceRedoLog(t *testing.T) {
 		bp, metaPageId, tmpdir := InitDisk(t, "users.db")
 		redoLog, err := log.NewRedoLog(tmpdir)
 		assert.NoError(t, err)
+		bp.SetRedoLog(redoLog)
 		table := NewTable("users", metaPageId, 1, nil, nil, redoLog)
 		err = table.Create(bp)
 		assert.NoError(t, err)
@@ -1433,12 +1462,11 @@ func TestUpdateInplaceRedoLog(t *testing.T) {
 		err = table.Insert(bp, 1, lockMgr, [][]byte{[]byte("a"), []byte("Alice")})
 		assert.NoError(t, err)
 
-		// Insert 分の REDO をフラッシュ
-		err = redoLog.Flush()
+		// ダーティーページをフラッシュしてクリアする
+		err = bp.FlushPage()
 		assert.NoError(t, err)
-		recordsBefore, err := redoLog.ReadAll()
+		err = redoLog.Reset()
 		assert.NoError(t, err)
-		countBefore := len(recordsBefore)
 
 		// WHEN
 		err = table.UpdateInplace(bp, 1, lockMgr,
@@ -1449,11 +1477,9 @@ func TestUpdateInplaceRedoLog(t *testing.T) {
 		// THEN
 		err = redoLog.Flush()
 		assert.NoError(t, err)
-		recordsAfter, err := redoLog.ReadAll()
+		records, err := redoLog.ReadAll()
 		assert.NoError(t, err)
-
-		// UpdateInplace により新たな REDO レコードが追加されている
-		assert.Greater(t, len(recordsAfter), countBefore)
+		assert.Greater(t, len(records), 0)
 	})
 }
 
