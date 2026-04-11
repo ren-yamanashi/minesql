@@ -7,6 +7,7 @@ import (
 	"minesql/internal/storage/encode"
 	"minesql/internal/storage/file"
 	"minesql/internal/storage/lock"
+	"minesql/internal/storage/log"
 	"minesql/internal/storage/page"
 	"os"
 	"path/filepath"
@@ -24,7 +25,7 @@ func TestCreateAndInsert(t *testing.T) {
 		assert.NoError(t, err)
 		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil)
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
 
 		// WHEN: テーブルを作成
 		err = table.Create(bp)
@@ -135,7 +136,7 @@ func TestCreateAndInsert(t *testing.T) {
 		assert.NoError(t, err)
 		uniqueIndex2 := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId2, 2, 1)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex1, uniqueIndex2}, nil)
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex1, uniqueIndex2}, nil, nil)
 
 		// WHEN
 		err = table.Create(bp)
@@ -165,7 +166,7 @@ func TestCreateAndInsert(t *testing.T) {
 	t.Run("active なレコードが存在する PK で Insert すると重複キーエラーが返る", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -182,7 +183,7 @@ func TestCreateAndInsert(t *testing.T) {
 	t.Run("ソフトデリート済みの同一 PK を持つレコードが存在する場合、Insert で上書きされる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -226,7 +227,7 @@ func TestCreateAndInsert(t *testing.T) {
 	t.Run("Insert で対象行に排他ロックが取得される", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -251,7 +252,7 @@ func TestSoftDelete(t *testing.T) {
 		assert.NoError(t, err)
 		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil)
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -303,7 +304,7 @@ func TestSoftDelete(t *testing.T) {
 	t.Run("Delete はレコードを物理削除せず DeleteMark を 1 にするソフトデリートである", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -351,7 +352,7 @@ func TestSoftDelete(t *testing.T) {
 	t.Run("存在しないキーを削除するとエラーが返る", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -368,7 +369,7 @@ func TestSoftDelete(t *testing.T) {
 	t.Run("全行を削除した後にテーブルが空になる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -393,7 +394,7 @@ func TestSoftDelete(t *testing.T) {
 	t.Run("対象行に排他ロックが取得される", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -416,7 +417,7 @@ func TestDelete(t *testing.T) {
 	t.Run("テーブルから行を物理削除できる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -454,7 +455,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil)
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -495,7 +496,7 @@ func TestDelete(t *testing.T) {
 	t.Run("物理削除した後に同じ PK で再挿入できる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -518,7 +519,7 @@ func TestDelete(t *testing.T) {
 	t.Run("全行を物理削除した後にテーブルが空になる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -548,7 +549,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("プライマリキーが同じ場合、value のみが更新される", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -577,7 +578,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("プライマリキーが同じ場合、B+Tree レベルでインプレース更新される", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -617,7 +618,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("プライマリキーが変わる場合、B+Tree レベルでソフトデリート + Insert になる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -667,7 +668,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("プライマリキーが変わる場合、Delete + Insert が行われる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -702,7 +703,7 @@ func TestUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil)
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -731,7 +732,7 @@ func TestUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil)
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -781,7 +782,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("プライマリキーを既存のキーに変更するとエラーが返る", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -809,7 +810,7 @@ func TestUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil)
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -838,7 +839,7 @@ func TestUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		uniqueIndex2 := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId2, 2, 1)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex1, uniqueIndex2}, nil)
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex1, uniqueIndex2}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -865,7 +866,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("存在しないキーを更新するとエラーが返る", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -884,7 +885,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("対象行に排他ロックが取得される", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -911,7 +912,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("ReleaseAll 後は他のトランザクションがロックを取得できる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -943,7 +944,7 @@ func TestSearch(t *testing.T) {
 	t.Run("RecordSearchModeStart で全 active レコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -964,7 +965,7 @@ func TestSearch(t *testing.T) {
 	t.Run("RecordSearchModeKey で指定したキーから検索できる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -991,7 +992,7 @@ func TestSearch(t *testing.T) {
 	t.Run("空のテーブルを検索すると結果が空になる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -1005,7 +1006,7 @@ func TestSearch(t *testing.T) {
 	t.Run("各行の読み取り時に共有ロックが取得される", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -1042,7 +1043,7 @@ func TestGetUniqueIndexByName(t *testing.T) {
 		// GIVEN
 		uniqueIndex1 := NewUniqueIndex("idx_first_name", "first_name", page.PageId{}, 1, 1)
 		uniqueIndex2 := NewUniqueIndex("idx_last_name", "last_name", page.PageId{}, 2, 1)
-		table := NewTable("users", page.PageId{}, 1, []*UniqueIndex{uniqueIndex1, uniqueIndex2}, nil)
+		table := NewTable("users", page.PageId{}, 1, []*UniqueIndex{uniqueIndex1, uniqueIndex2}, nil, nil)
 
 		// WHEN
 		ui, err := table.GetUniqueIndexByName("idx_last_name")
@@ -1055,7 +1056,7 @@ func TestGetUniqueIndexByName(t *testing.T) {
 	t.Run("存在しないインデックス名を指定するとエラーになる", func(t *testing.T) {
 		// GIVEN
 		uniqueIndex := NewUniqueIndex("idx_first_name", "first_name", page.PageId{}, 1, 1)
-		table := NewTable("users", page.PageId{}, 1, []*UniqueIndex{uniqueIndex}, nil)
+		table := NewTable("users", page.PageId{}, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
 
 		// WHEN
 		ui, err := table.GetUniqueIndexByName("idx_last_name")
@@ -1086,7 +1087,7 @@ func TestLeafPageCount(t *testing.T) {
 	t.Run("作成直後のテーブルのリーフページ数は1", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -1101,7 +1102,7 @@ func TestLeafPageCount(t *testing.T) {
 	t.Run("データ挿入によりリーフページが分割されるとリーフページ数が増加する", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -1124,7 +1125,7 @@ func TestHeight(t *testing.T) {
 	t.Run("作成直後のテーブルの高さは1", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -1139,7 +1140,7 @@ func TestHeight(t *testing.T) {
 	t.Run("データ挿入によりリーフページが分割されるとテーブルの高さが増加する", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -1195,7 +1196,7 @@ func TestUndoLogRecording(t *testing.T) {
 		bp.RegisterDisk(undoTestFileId, undoDm)
 		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
 		assert.NoError(t, err)
-		table := NewTable("users", metaPageId, 1, nil, undoLog)
+		table := NewTable("users", metaPageId, 1, nil, undoLog, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -1222,7 +1223,7 @@ func TestUndoLogRecording(t *testing.T) {
 		bp.RegisterDisk(undoTestFileId, undoDm)
 		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
 		assert.NoError(t, err)
-		table := NewTable("users", metaPageId, 1, nil, undoLog)
+		table := NewTable("users", metaPageId, 1, nil, undoLog, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -1252,7 +1253,7 @@ func TestUndoLogRecording(t *testing.T) {
 		bp.RegisterDisk(undoTestFileId, undoDm)
 		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
 		assert.NoError(t, err)
-		table := NewTable("users", metaPageId, 1, nil, undoLog)
+		table := NewTable("users", metaPageId, 1, nil, undoLog, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -1280,7 +1281,7 @@ func TestUndoLogRecording(t *testing.T) {
 	t.Run("undoLog が nil の場合は Undo 記録がスキップされる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
-		table := NewTable("users", metaPageId, 1, nil, nil)
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
 		err := table.Create(bp)
 		assert.NoError(t, err)
 
@@ -1299,7 +1300,7 @@ func TestUndoLogRecording(t *testing.T) {
 		bp.RegisterDisk(undoTestFileId, undoDm)
 		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
 		assert.NoError(t, err)
-		table := NewTable("users", metaPageId, 1, nil, undoLog)
+		table := NewTable("users", metaPageId, 1, nil, undoLog, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -1330,6 +1331,129 @@ func TestUndoLogRecording(t *testing.T) {
 		assert.True(t, ok)
 		_, ok = records[3].(UndoDeleteRecord)
 		assert.True(t, ok)
+	})
+}
+
+func TestInsertRedoLog(t *testing.T) {
+	t.Run("Insert 後にデータページの REDO ログが記録される", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, tmpdir := InitDisk(t, "users.db")
+		redoLog, err := log.NewRedoLog(tmpdir)
+		assert.NoError(t, err)
+		table := NewTable("users", metaPageId, 1, nil, nil, redoLog)
+		err = table.Create(bp)
+		assert.NoError(t, err)
+
+		// WHEN
+		err = table.Insert(bp, 1, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Alice")})
+		assert.NoError(t, err)
+
+		// THEN: REDO ログバッファにページ変更レコードが記録されている
+		records, err := redoLog.ReadAll()
+		assert.NoError(t, err)
+		// Flush 前なので ReadAll は空だが、Flush 後に確認する
+		assert.Empty(t, records)
+
+		err = redoLog.Flush()
+		assert.NoError(t, err)
+		records, err = redoLog.ReadAll()
+		assert.NoError(t, err)
+		assert.Greater(t, len(records), 0)
+
+		// 全レコードがページ変更レコードであること
+		for _, rec := range records {
+			assert.Equal(t, log.RedoPageWrite, rec.Type)
+			assert.Equal(t, uint64(1), rec.TrxId)
+			assert.Equal(t, page.PAGE_SIZE, len(rec.Data))
+		}
+	})
+
+	t.Run("redoLog が nil の場合は REDO 記録がスキップされる", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "users.db")
+		table := NewTable("users", metaPageId, 1, nil, nil, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		// WHEN / THEN: redoLog が nil でもパニックしない
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Alice")})
+		assert.NoError(t, err)
+	})
+}
+
+func TestSoftDeleteRedoLog(t *testing.T) {
+	t.Run("SoftDelete 後にデータページの REDO ログが記録される", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, tmpdir := InitDisk(t, "users.db")
+		redoLog, err := log.NewRedoLog(tmpdir)
+		assert.NoError(t, err)
+		table := NewTable("users", metaPageId, 1, nil, nil, redoLog)
+		err = table.Create(bp)
+		assert.NoError(t, err)
+
+		lockMgr := lock.NewManager(5000)
+		err = table.Insert(bp, 1, lockMgr, [][]byte{[]byte("a"), []byte("Alice")})
+		assert.NoError(t, err)
+
+		// Insert 分の REDO をフラッシュしてクリア
+		err = redoLog.Flush()
+		assert.NoError(t, err)
+
+		// WHEN
+		err = table.SoftDelete(bp, 1, lockMgr, [][]byte{[]byte("a"), []byte("Alice")})
+		assert.NoError(t, err)
+
+		// THEN
+		err = redoLog.Flush()
+		assert.NoError(t, err)
+		records, err := redoLog.ReadAll()
+		assert.NoError(t, err)
+
+		// Insert 分 + SoftDelete 分のレコードが存在する
+		assert.Greater(t, len(records), 0)
+
+		// 最後のレコードが SoftDelete によるもの
+		lastRecord := records[len(records)-1]
+		assert.Equal(t, log.RedoPageWrite, lastRecord.Type)
+		assert.Equal(t, uint64(1), lastRecord.TrxId)
+	})
+}
+
+func TestUpdateInplaceRedoLog(t *testing.T) {
+	t.Run("UpdateInplace 後にデータページの REDO ログが記録される", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, tmpdir := InitDisk(t, "users.db")
+		redoLog, err := log.NewRedoLog(tmpdir)
+		assert.NoError(t, err)
+		table := NewTable("users", metaPageId, 1, nil, nil, redoLog)
+		err = table.Create(bp)
+		assert.NoError(t, err)
+
+		lockMgr := lock.NewManager(5000)
+		err = table.Insert(bp, 1, lockMgr, [][]byte{[]byte("a"), []byte("Alice")})
+		assert.NoError(t, err)
+
+		// Insert 分の REDO をフラッシュ
+		err = redoLog.Flush()
+		assert.NoError(t, err)
+		recordsBefore, err := redoLog.ReadAll()
+		assert.NoError(t, err)
+		countBefore := len(recordsBefore)
+
+		// WHEN
+		err = table.UpdateInplace(bp, 1, lockMgr,
+			[][]byte{[]byte("a"), []byte("Alice")},
+			[][]byte{[]byte("a"), []byte("Bob")})
+		assert.NoError(t, err)
+
+		// THEN
+		err = redoLog.Flush()
+		assert.NoError(t, err)
+		recordsAfter, err := redoLog.ReadAll()
+		assert.NoError(t, err)
+
+		// UpdateInplace により新たな REDO レコードが追加されている
+		assert.Greater(t, len(recordsAfter), countBefore)
 	})
 }
 

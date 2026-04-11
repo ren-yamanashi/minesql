@@ -175,7 +175,7 @@ func TestPlanSelect(t *testing.T) {
 		exec, err := PlanSelect(trxId, stmt)
 		assert.NoError(t, err)
 		results := fetchAll(t, exec)
-		hdl.CommitTrx(trxId)
+		assert.NoError(t, hdl.CommitTrx(trxId))
 
 		// THEN
 		assert.Equal(t, 2, len(results))

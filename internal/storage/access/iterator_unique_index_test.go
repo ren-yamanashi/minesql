@@ -16,7 +16,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 		assert.NoError(t, err)
 		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil)
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -65,7 +65,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 		assert.NoError(t, err)
 		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil)
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -95,7 +95,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 		assert.NoError(t, err)
 		uniqueIndex := NewUniqueIndex("idx_col", "col", indexMetaPageId, 0, 1)
 
-		table := NewTable("test", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil)
+		table := NewTable("test", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -119,7 +119,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 		assert.NoError(t, err)
 		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil)
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -164,7 +164,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 		assert.NoError(t, err)
 		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil)
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -198,7 +198,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 		assert.NoError(t, err)
 		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil)
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 

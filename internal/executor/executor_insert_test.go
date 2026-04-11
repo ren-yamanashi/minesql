@@ -104,7 +104,7 @@ func TestInsert_Next(t *testing.T) {
 		_, err = upd.Next()
 		assert.ErrorIs(t, err, lock.ErrTimeout)
 
-		hdl.CommitTrx(trx1)
+		assert.NoError(t, hdl.CommitTrx(trx1))
 	})
 }
 
