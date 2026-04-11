@@ -25,7 +25,7 @@ type BufferPool struct {
 	maxBufferSize     int                        // バッファプールの最大サイズ (バッファページ数)
 	pageTable         PageTable                  // ページテーブル (key: PageId, value: BufferId のマップ)
 	evictionAlgorithm *LRU                       // ページ追い出しアルゴリズム
-	redoLog           *log.RedoLog               // REDO ログ (WAL 原則のため)
+	redoLog           *log.RedoLog               // REDO ログ
 }
 
 // NewBufferPool は指定されたサイズの BufferPool を生成する
