@@ -28,14 +28,11 @@ func NewCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 	headerPageId := page.NewPageId(fileId, page.PageNumber(0))
 
 	// ヘッダーページを読み込む
-	bufPage, err := bp.FetchPage(headerPageId)
+	data, err := bp.GetReadPageData(headerPageId)
 	if err != nil {
 		return nil, err
 	}
 	defer bp.UnRefPage(headerPageId)
-
-	// データを読み取る
-	data := bufPage.GetReadData()
 	if string(data[0:4]) != "MINE" {
 		return nil, ErrInvalidCatalogFile
 	}
@@ -75,7 +72,7 @@ func CreateCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 	if err != nil {
 		return nil, err
 	}
-	bufferPage, err := bp.AddPage(headerPageId)
+	err = bp.AddPage(headerPageId)
 	if err != nil {
 		return nil, err
 	}
@@ -112,7 +109,11 @@ func CreateCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 	}
 
 	// ヘッダーページに各メタデータのメタページIDを保存
-	data := bufferPage.GetWriteData()
+	data, err := bp.GetWritePageData(headerPageId)
+	if err != nil {
+		return nil, err
+	}
+
 	nextFileId := page.FileId(1) // FileId(0) はカタログ用なので 1 から開始
 	undoFileId := nextFileId     // UNDO ログ用の FileId を採番
 	nextFileId++
@@ -189,14 +190,13 @@ func (c *Catalog) AllocateFileId(bp *buffer.BufferPool) (page.FileId, error) {
 
 	// Header Page (Page 0) を更新する
 	headerPageId := page.NewPageId(page.FileId(0), 0)
-	headerPage, err := bp.FetchPage(headerPageId)
+	data, err := bp.GetWritePageData(headerPageId)
 	if err != nil {
 		return 0, err
 	}
 	defer bp.UnRefPage(headerPageId)
 
 	// 次に割り当てる FileId をヘッダーページの指定オフセットに書き込む
-	data := headerPage.GetWriteData()
 	binary.BigEndian.PutUint32(data[16:20], uint32(c.NextFileId))
 
 	return id, nil

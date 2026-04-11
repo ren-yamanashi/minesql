@@ -28,7 +28,8 @@ func TestUndoInsertRecord_Undo(t *testing.T) {
 		tree := btree.NewBTree(table.MetaPageId)
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
-		_, ok := iter.Get()
+		_, ok, err := iter.Get(bp)
+		assert.NoError(t, err)
 		assert.False(t, ok)
 	})
 

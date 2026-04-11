@@ -151,7 +151,10 @@ func (ui *UniqueIndex) checkUniqueConstraint(bp *buffer.BufferPool, btr *btree.B
 
 	// encodedUk をプレフィックスとして持つレコードを走査する
 	for {
-		record, ok := iter.Get()
+		record, ok, err := iter.Get(bp)
+		if err != nil {
+			return err
+		}
 		if !ok {
 			break
 		}

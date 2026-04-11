@@ -58,7 +58,8 @@ func TestUniqueIndex(t *testing.T) {
 
 		i := 0
 		for {
-			record, ok := iter.Get()
+			record, ok, err := iter.Get(bp)
+			assert.NoError(t, err)
 			if !ok {
 				break
 			}
@@ -77,7 +78,7 @@ func TestUniqueIndex(t *testing.T) {
 			assert.Equal(t, 0, len(record.NonKeyBytes()))
 
 			i++
-			_, _, err := iter.Next(bp)
+			_, _, err = iter.Next(bp)
 			assert.NoError(t, err)
 		}
 		assert.Equal(t, len(expectedRecords), i)
@@ -125,7 +126,8 @@ func TestUniqueIndexDelete(t *testing.T) {
 		}
 		var entries []indexEntry
 		for {
-			record, ok := iter.Get()
+			record, ok, err := iter.Get(bp)
+			assert.NoError(t, err)
 			if !ok {
 				break
 			}
@@ -135,7 +137,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 				secondaryKey: string(keyColumns[0]),
 				deleteMark:   record.HeaderBytes()[0],
 			})
-			_, _, err := iter.Next(bp)
+			_, _, err = iter.Next(bp)
 			assert.NoError(t, err)
 		}
 
@@ -176,7 +178,8 @@ func TestUniqueIndexDelete(t *testing.T) {
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
-		record, ok := iter.Get()
+		record, ok, err := iter.Get(bp)
+		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, uint8(0), record.HeaderBytes()[0]) // active
 	})
@@ -221,7 +224,8 @@ func TestUniqueIndexDelete(t *testing.T) {
 		}
 		var entries []indexEntry
 		for {
-			record, ok := iter.Get()
+			record, ok, err := iter.Get(bp)
+			assert.NoError(t, err)
 			if !ok {
 				break
 			}
@@ -231,7 +235,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 				secondaryKey: string(keyColumns[0]),
 				deleteMark:   record.HeaderBytes()[0],
 			})
-			_, _, err := iter.Next(bp)
+			_, _, err = iter.Next(bp)
 			assert.NoError(t, err)
 		}
 
@@ -270,7 +274,8 @@ func TestUniqueIndexDelete(t *testing.T) {
 		iter, err := tree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
-		record, ok := iter.Get()
+		record, ok, err := iter.Get(bp)
+		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, uint8(0), record.HeaderBytes()[0]) // active
 	})

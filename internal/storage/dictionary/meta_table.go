@@ -101,7 +101,10 @@ func loadTableMeta(bp *buffer.BufferPool, tableMetaPageId page.PageId, indexMeta
 
 	var tables []*TableMeta
 	for {
-		record, ok := iter.Get()
+		record, ok, err := iter.Get(bp)
+		if err != nil {
+			return nil, err
+		}
 		if !ok {
 			break
 		}

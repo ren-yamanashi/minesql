@@ -168,7 +168,8 @@ func collectUndoActiveUniqueIndexKeys(t *testing.T, ui *UniqueIndex, bp *buffer.
 
 	var keys []string
 	for {
-		record, ok := indexIter.Get()
+		record, ok, err := indexIter.Get(bp)
+		assert.NoError(t, err)
 		if !ok {
 			break
 		}
@@ -177,7 +178,7 @@ func collectUndoActiveUniqueIndexKeys(t *testing.T, ui *UniqueIndex, bp *buffer.
 			encode.Decode(record.KeyBytes(), &keyColumns)
 			keys = append(keys, string(keyColumns[0]))
 		}
-		_, _, err := indexIter.Next(bp)
+		_, _, err = indexIter.Next(bp)
 		assert.NoError(t, err)
 	}
 	return keys

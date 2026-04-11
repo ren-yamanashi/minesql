@@ -110,6 +110,47 @@ func TestShutdown(t *testing.T) {
 	})
 }
 
+func TestPageCleanerLifecycle(t *testing.T) {
+	t.Run("Init でページクリーナーが開始され Shutdown で停止する", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "10")
+		Reset()
+
+		// WHEN
+		h := Init()
+
+		// THEN: ページクリーナーが開始されている
+		assert.NotNil(t, h.pageCleaner)
+
+		// Shutdown でパニックせずに停止する
+		err := h.Shutdown()
+		assert.NoError(t, err)
+	})
+
+	t.Run("Shutdown 後に再度 Init してもページクリーナーが正常に動作する", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "10")
+		Reset()
+
+		h1 := Init()
+		err := h1.Shutdown()
+		assert.NoError(t, err)
+
+		// WHEN
+		Reset()
+		h2 := Init()
+
+		// THEN
+		assert.NotNil(t, h2.pageCleaner)
+		err = h2.Shutdown()
+		assert.NoError(t, err)
+	})
+}
+
 func TestCrashRecovery(t *testing.T) {
 	// テーブル作成とデータ挿入のヘルパー
 	setupTable := func(t *testing.T, h *Handler) {

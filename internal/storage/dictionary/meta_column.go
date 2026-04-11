@@ -71,7 +71,10 @@ func loadColumnMeta(bp *buffer.BufferPool, fileId page.FileId, metaPageId page.P
 
 	var cols []*ColumnMeta
 	for {
-		record, ok := iter.Get()
+		record, ok, err := iter.Get(bp)
+		if err != nil {
+			return nil, err
+		}
 		if !ok {
 			break
 		}

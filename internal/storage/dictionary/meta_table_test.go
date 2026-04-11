@@ -243,7 +243,8 @@ func TestTableMeta_Insert(t *testing.T) {
 		iter, err := btr.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
-		record, ok := iter.Get()
+		record, ok, err := iter.Get(bp)
+		assert.NoError(t, err)
 		assert.True(t, ok)
 
 		// key (FileId) をデコード
