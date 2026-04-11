@@ -26,6 +26,6 @@ func (h *Handler) GetTable(tableName string) (*access.Table, error) {
 		}
 	}
 
-	tbl := access.NewTable(tblMeta.Name, tblMeta.DataMetaPageId, tblMeta.PKCount, uniqueIndexes, h.undoLog)
+	tbl := access.NewTable(tblMeta.Name, tblMeta.DataMetaPageId, tblMeta.PKCount, uniqueIndexes, h.undoLog, h.redoLog)
 	return &tbl, nil
 }

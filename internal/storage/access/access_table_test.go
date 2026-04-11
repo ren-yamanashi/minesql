@@ -1070,7 +1070,7 @@ func InitDisk(t *testing.T, pathname string) (bufferPool *buffer.BufferPool, met
 	tmpdir = t.TempDir()
 	filePath := filepath.Join(tmpdir, pathname)
 
-	bp := buffer.NewBufferPool(10)
+	bp := buffer.NewBufferPool(10, nil)
 	fileId := page.FileId(1)
 	dm, err := file.NewDisk(fileId, filePath)
 	assert.NoError(t, err)
@@ -1363,10 +1363,16 @@ func TestUndoLogRecording(t *testing.T) {
 func TestInsertRedoLog(t *testing.T) {
 	t.Run("Insert 後にデータページの REDO ログが記録される", func(t *testing.T) {
 		// GIVEN
-		bp, metaPageId, tmpdir := InitDisk(t, "users.db")
+		tmpdir := t.TempDir()
 		redoLog, err := log.NewRedoLog(tmpdir)
 		assert.NoError(t, err)
-		bp.SetRedoLog(redoLog)
+		bp := buffer.NewBufferPool(10, redoLog)
+		fileId := page.FileId(1)
+		dm, err := file.NewDisk(fileId, filepath.Join(tmpdir, "users.db"))
+		assert.NoError(t, err)
+		bp.RegisterDisk(fileId, dm)
+		metaPageId, err := bp.AllocatePageId(fileId)
+		assert.NoError(t, err)
 		table := NewTable("users", metaPageId, 1, nil, nil, redoLog)
 		err = table.Create(bp)
 		assert.NoError(t, err)
@@ -1412,10 +1418,16 @@ func TestInsertRedoLog(t *testing.T) {
 func TestSoftDeleteRedoLog(t *testing.T) {
 	t.Run("SoftDelete 後にデータページの REDO ログが記録される", func(t *testing.T) {
 		// GIVEN
-		bp, metaPageId, tmpdir := InitDisk(t, "users.db")
+		tmpdir := t.TempDir()
 		redoLog, err := log.NewRedoLog(tmpdir)
 		assert.NoError(t, err)
-		bp.SetRedoLog(redoLog)
+		bp := buffer.NewBufferPool(10, redoLog)
+		fileId := page.FileId(1)
+		dm, err := file.NewDisk(fileId, filepath.Join(tmpdir, "users.db"))
+		assert.NoError(t, err)
+		bp.RegisterDisk(fileId, dm)
+		metaPageId, err := bp.AllocatePageId(fileId)
+		assert.NoError(t, err)
 		table := NewTable("users", metaPageId, 1, nil, nil, redoLog)
 		err = table.Create(bp)
 		assert.NoError(t, err)
@@ -1450,10 +1462,16 @@ func TestSoftDeleteRedoLog(t *testing.T) {
 func TestUpdateInplaceRedoLog(t *testing.T) {
 	t.Run("UpdateInplace 後にデータページの REDO ログが記録される", func(t *testing.T) {
 		// GIVEN
-		bp, metaPageId, tmpdir := InitDisk(t, "users.db")
+		tmpdir := t.TempDir()
 		redoLog, err := log.NewRedoLog(tmpdir)
 		assert.NoError(t, err)
-		bp.SetRedoLog(redoLog)
+		bp := buffer.NewBufferPool(10, redoLog)
+		fileId := page.FileId(1)
+		dm, err := file.NewDisk(fileId, filepath.Join(tmpdir, "users.db"))
+		assert.NoError(t, err)
+		bp.RegisterDisk(fileId, dm)
+		metaPageId, err := bp.AllocatePageId(fileId)
+		assert.NoError(t, err)
 		table := NewTable("users", metaPageId, 1, nil, nil, redoLog)
 		err = table.Create(bp)
 		assert.NoError(t, err)

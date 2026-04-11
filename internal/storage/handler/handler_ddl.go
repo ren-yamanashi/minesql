@@ -52,7 +52,7 @@ func (h *Handler) CreateTable(tableName string, pkCount uint8, idxParams []Creat
 	}
 
 	// テーブルを作成
-	tbl := access.NewTable(tableName, metaPageId, pkCount, uniqueIndexes, nil)
+	tbl := access.NewTable(tableName, metaPageId, pkCount, uniqueIndexes, nil, nil)
 	if err := tbl.Create(h.BufferPool); err != nil {
 		return err
 	}

@@ -197,7 +197,7 @@ func buildTable(meta *TableMeta) (*access.Table, error) {
 			uniqueIndexes = append(uniqueIndexes, ui)
 		}
 	}
-	tbl := access.NewTable(meta.Name, meta.DataMetaPageId, meta.PKCount, uniqueIndexes, nil)
+	tbl := access.NewTable(meta.Name, meta.DataMetaPageId, meta.PKCount, uniqueIndexes, nil, nil)
 	return &tbl, nil
 }
 
