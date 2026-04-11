@@ -40,7 +40,7 @@ func (s *Server) Start() error {
 
 	listener, err := s.listen()
 	if err != nil {
-		return fmt.Errorf("failed to listen on %s: %w", listener.Addr().String(), err)
+		return fmt.Errorf("failed to listen on %s:%d: %w", s.address, s.port, err)
 	}
 
 	defer func() {

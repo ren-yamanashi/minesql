@@ -405,7 +405,7 @@ func TestBuildTable(t *testing.T) {
 		assert.Equal(t, "idx_username", tbl.UniqueIndexes[1].Name)
 	})
 
-	t.Run("存在しないカラム名を指定したイ��デックスがある場合、エラーを返す", func(t *testing.T) {
+	t.Run("存在しないカラム名を指定したインデックスがある場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		colMeta := []*ColumnMeta{
 			NewColumnMeta(1, "id", 0, ColumnTypeString),
