@@ -58,7 +58,7 @@ LSN の詳細: [Log Sequence Number (LSN)](../../../about/durability.md#log-sequ
 
 ## Page LSN
 
-- 各ページは [Slotted Page ヘッダー](../btree/node/slotted-page.md#ヘッダーの構成) の予約領域 (4 バイト) を Page LSN として使用する
+- 各ページは先頭 4 バイトの[ページヘッダー](../page/page.md)を Page LSN として使用する
 - Page LSN は、そのページに最後に適用された REDO ログレコードの LSN を記録する
 - クラッシュリカバリ時、REDO ログレコードの LSN がページの Page LSN 以下であれば、そのレコードは適用済みなのでスキップする (冪等性の保証)
 

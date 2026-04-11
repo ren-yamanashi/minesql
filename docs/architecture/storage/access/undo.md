@@ -32,16 +32,14 @@ UNDO ログはバッファプール上の UNDO ページに記録される。UND
 
 ### UNDO ページ
 
-- UNDO ページは先頭に [Slotted Page ヘッダー](../btree/node/slotted-page.md#ヘッダーの構成) を持つ (Page LSN を他のページ型と統一するため)
-- Slotted Page のスロット管理機能は使わず、ヘッダー直後に UNDO レコードを先頭から順に詰める
+- UNDO レコードを格納するためのページ
 - ページが満杯になると新しいページが割り当てられ、リンクドリストで繋がる
 
 UNDO ページはヘッダーとボディで構成される:
 
-- ヘッダー
-  - [Slotted Page ヘッダー](../btree/node/slotted-page.md#ヘッダーの構成) (Page LSN 等)
-  - usedBytes (ボディの使用済みバイト数)
-  - nextPageNumber (次の UNDO ページの PageNumber)(0 = なし)
+- ヘッダー (4 バイト)
+  - usedBytes (2 バイト): ボディの使用済みバイト数
+  - nextPageNumber (2 バイト): 次の UNDO ページの PageNumber (0 = なし)
 - ボディ
   - UNDO レコードが先頭から順に詰められる
 

@@ -2,7 +2,6 @@ package btree
 
 import (
 	"encoding/binary"
-	"minesql/internal/storage/btree/node"
 	"minesql/internal/storage/page"
 	"testing"
 
@@ -10,19 +9,6 @@ import (
 )
 
 func TestCreateMetaPage(t *testing.T) {
-	t.Run("SlottedPage ヘッダーが初期化される", func(t *testing.T) {
-		// GIVEN
-		data := make([]byte, 128)
-
-		// WHEN
-		createMetaPage(page.NewPage(data))
-
-		// THEN
-		sp := node.NewSlottedPage(page.NewPage(data).Body)
-		assert.Equal(t, 0, sp.NumSlots())
-		assert.Equal(t, uint32(0), binary.BigEndian.Uint32(page.NewPage(data).Header))
-	})
-
 	t.Run("各フィールドの初期値がゼロ値になる", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
@@ -147,7 +133,7 @@ func TestMetaPageFieldIndependence(t *testing.T) {
 		assert.Equal(t, uint64(3), mp.height())
 	})
 
-	t.Run("SlottedPage ヘッダーとメタデータフィールドが干渉しない", func(t *testing.T) {
+	t.Run("ページヘッダーとメタデータフィールドが干渉しない", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 128)
 		mp := createMetaPage(page.NewPage(data))

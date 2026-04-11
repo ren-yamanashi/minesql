@@ -8,14 +8,13 @@
 
 ## レイアウト
 
-メタページは [Slotted Page](./node/slotted-page.md) のレイアウトを使用しており、以下の情報が格納される
+ボディ内に以下のフィールドを格納する:
 
 | オフセット | サイズ | フィールド | 説明 |
 |-----------|--------|-----------|------|
-| 0 - 7     | 8 バイト | [Slotted Page ヘッダー](./node/slotted-page.md#ヘッダーの構成) | PageLSN など |
-| 8 - 15    | 8 バイト | rootPageId     | ルートノードの PageId (FileId 4 バイト + PageNumber 4 バイト) |
-| 16 - 23   | 8 バイト | leafPageCount  | リーフページの総数 (BigEndian uint64) |
-| 24 - 31   | 8 バイト | height         | ツリーの高さ (BigEndian uint64) |
+| 0 - 7    | 8 バイト | rootPageId     | ルートノードの PageId (FileId 4 バイト + PageNumber 4 バイト) |
+| 8 - 15   | 8 バイト | leafPageCount  | リーフページの総数 (BigEndian uint64) |
+| 16 - 23  | 8 バイト | height         | ツリーの高さ (BigEndian uint64) |
 
 ## 各フィールドの更新タイミング
 
