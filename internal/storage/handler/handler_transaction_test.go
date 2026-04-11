@@ -63,11 +63,12 @@ func TestCommitTrx(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		h.CommitTrx(trxId)
+		err = h.CommitTrx(trxId)
+		assert.NoError(t, err)
 
 		// THEN
 		readTrxId := h.BeginTrx()
-		defer h.CommitTrx(readTrxId)
+		defer func() { assert.NoError(t, h.CommitTrx(readTrxId)) }()
 		iter, err := tbl.Search(h.BufferPool, readTrxId, h.LockMgr, access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()

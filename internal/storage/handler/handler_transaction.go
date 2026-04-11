@@ -6,8 +6,8 @@ func (h *Handler) BeginTrx() TrxId {
 }
 
 // CommitTrx はトランザクションをコミットする
-func (h *Handler) CommitTrx(trxId TrxId) {
-	h.trxManager.Commit(trxId)
+func (h *Handler) CommitTrx(trxId TrxId) error {
+	return h.trxManager.Commit(trxId)
 }
 
 // RollbackTrx はトランザクションをロールバックする

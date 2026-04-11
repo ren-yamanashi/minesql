@@ -8,13 +8,13 @@
 
 ## レイアウト
 
-メタページは合計 24 バイトの固定長で、以下のフィールドを持つ
+ボディ内に以下のフィールドを格納する:
 
 | オフセット | サイズ | フィールド | 説明 |
 |-----------|--------|-----------|------|
-| 0 - 7     | 8 バイト | rootPageId     | ルートノードの PageId (FileId 4 バイト + PageNumber 4 バイト) |
-| 8 - 15    | 8 バイト | leafPageCount  | リーフページの総数 (BigEndian uint64) |
-| 16 - 23   | 8 バイト | height         | ツリーの高さ (BigEndian uint64) |
+| 0 - 7    | 8 バイト | rootPageId     | ルートノードの PageId (FileId 4 バイト + PageNumber 4 バイト) |
+| 8 - 15   | 8 バイト | leafPageCount  | リーフページの総数 (BigEndian uint64) |
+| 16 - 23  | 8 バイト | height         | ツリーの高さ (BigEndian uint64) |
 
 ## 各フィールドの更新タイミング
 

@@ -34,7 +34,7 @@ func executePlan(t *testing.T, stmt ast.Statement) []executor.Record {
 	assert.NoError(t, err)
 
 	records := fetchAll(t, exec)
-	hdl.CommitTrx(trxId)
+	assert.NoError(t, hdl.CommitTrx(trxId))
 	return records
 }
 

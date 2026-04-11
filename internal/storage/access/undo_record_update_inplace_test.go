@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUpdateInplaceLogRecord_Undo(t *testing.T) {
+func TestUndoUpdateInplaceRecord_Undo(t *testing.T) {
 	t.Run("UpdateInplace した行が元の値に戻る", func(t *testing.T) {
 		// GIVEN
 		table, bp := setupTestTableForUndo(t, nil)
@@ -53,5 +53,29 @@ func TestUpdateInplaceLogRecord_Undo(t *testing.T) {
 		assert.NoError(t, err)
 		keys := collectUndoActiveUniqueIndexKeys(t, table.UniqueIndexes[0], bp)
 		assert.Equal(t, []string{"John"}, keys)
+	})
+}
+
+func TestUndoUpdateInplaceRecord_Serialize(t *testing.T) {
+	t.Run("シリアライズしてデシリアライズすると元のデータが復元される", func(t *testing.T) {
+		// GIVEN
+		table, _ := setupTestTableForUndo(t, nil)
+		prevCols := [][]byte{[]byte("a"), []byte("John")}
+		newCols := [][]byte{[]byte("a"), []byte("Jane")}
+		record := NewUndoUpdateInplaceRecord(table, prevCols, newCols)
+
+		// WHEN
+		buf := record.Serialize(3, 2)
+		trxId, undoNo, recordType, tableName, columnSets, err := DeserializeUndoRecord(buf)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(3), trxId)
+		assert.Equal(t, uint64(2), undoNo)
+		assert.Equal(t, UndoUpdateInplace, recordType)
+		assert.Equal(t, "test", tableName)
+		assert.Equal(t, 2, len(columnSets))
+		assert.Equal(t, []byte("John"), columnSets[0][1])
+		assert.Equal(t, []byte("Jane"), columnSets[1][1])
 	})
 }

@@ -224,7 +224,7 @@ func (sp *SlottedPage) Data(index int) []byte {
 func (sp *SlottedPage) Initialize() {
 	binary.BigEndian.PutUint16(sp.data[0:2], 0)                    // numSlots
 	binary.BigEndian.PutUint16(sp.data[2:4], uint16(len(sp.data))) // freeOffset = end of data
-	binary.BigEndian.PutUint32(sp.data[4:8], 0)                    // pad
+	binary.BigEndian.PutUint32(sp.data[4:8], 0)                    // pad (予約領域)
 }
 
 // 指定されたインデックスのポインタを取得する

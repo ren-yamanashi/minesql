@@ -88,7 +88,7 @@ func TestShutdown(t *testing.T) {
 
 		metaPageId, err := h.BufferPool.AllocatePageId(fileId)
 		assert.NoError(t, err)
-		tbl := access.NewTable("users", metaPageId, 1, nil, nil)
+		tbl := access.NewTable("users", metaPageId, 1, nil, nil, nil)
 		err = tbl.Create(h.BufferPool)
 		assert.NoError(t, err)
 
@@ -106,6 +106,277 @@ func TestShutdown(t *testing.T) {
 		err = h.Shutdown()
 
 		// THEN
+		assert.NoError(t, err)
+	})
+}
+
+func TestCrashRecovery(t *testing.T) {
+	// テーブル作成とデータ挿入のヘルパー
+	setupTable := func(t *testing.T, h *Handler) {
+		t.Helper()
+		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
+			{Name: "id", Type: ColumnTypeString},
+			{Name: "name", Type: ColumnTypeString},
+		})
+		assert.NoError(t, err)
+	}
+
+	t.Run("コミット済みの変更がクラッシュ後に復元される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		setupTable(t, h)
+
+		// テーブル構造をディスクに永続化 (CreateTable は REDO 記録されないため)
+		err := h.BufferPool.FlushPage()
+		assert.NoError(t, err)
+		err = h.redoLog.Reset()
+		assert.NoError(t, err)
+
+		tbl, err := h.GetTable("users")
+		assert.NoError(t, err)
+
+		trxId := h.BeginTrx()
+		err = tbl.Insert(h.BufferPool, trxId, h.LockMgr, [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+		err = h.CommitTrx(trxId)
+		assert.NoError(t, err)
+
+		// WHEN: Shutdown を呼ばずに再初期化 (クラッシュをシミュレーション)
+		Reset()
+		h2 := Init()
+
+		// THEN: コミット済みデータが復元されている
+		tbl2, err := h2.GetTable("users")
+		assert.NoError(t, err)
+
+		readTrxId := h2.BeginTrx()
+		iter, err := tbl2.Search(h2.BufferPool, readTrxId, h2.LockMgr, access.RecordSearchModeStart{})
+		assert.NoError(t, err)
+		record, ok, err := iter.Next()
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, []byte("1"), record[0])
+		assert.Equal(t, []byte("Alice"), record[1])
+
+		err = h2.Shutdown()
+		assert.NoError(t, err)
+	})
+
+	t.Run("未コミットの変更がクラッシュ後にロールバックされる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		setupTable(t, h)
+		err := h.BufferPool.FlushPage()
+		assert.NoError(t, err)
+		err = h.redoLog.Reset()
+		assert.NoError(t, err)
+
+		tbl, err := h.GetTable("users")
+		assert.NoError(t, err)
+
+		trxId := h.BeginTrx()
+		err = tbl.Insert(h.BufferPool, trxId, h.LockMgr, [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+		// COMMIT しない
+
+		// REDO ログをフラッシュ (ページ変更は記録されるが COMMIT レコードはない)
+		err = h.redoLog.Flush()
+		assert.NoError(t, err)
+
+		// WHEN: Shutdown を呼ばずに再初期化 (クラッシュをシミュレーション)
+		Reset()
+		h2 := Init()
+
+		// THEN: 未コミットデータがロールバックされ、テーブルが空
+		tbl2, err := h2.GetTable("users")
+		assert.NoError(t, err)
+
+		readTrxId := h2.BeginTrx()
+		iter, err := tbl2.Search(h2.BufferPool, readTrxId, h2.LockMgr, access.RecordSearchModeStart{})
+		assert.NoError(t, err)
+		_, ok, err := iter.Next()
+		assert.NoError(t, err)
+		assert.False(t, ok) // レコードが存在しない
+
+		err = h2.Shutdown()
+		assert.NoError(t, err)
+	})
+
+	t.Run("正常終了後はリカバリが実行されない", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		setupTable(t, h)
+		err := h.BufferPool.FlushPage()
+		assert.NoError(t, err)
+		err = h.redoLog.Reset()
+		assert.NoError(t, err)
+
+		tbl, err := h.GetTable("users")
+		assert.NoError(t, err)
+
+		trxId := h.BeginTrx()
+		err = tbl.Insert(h.BufferPool, trxId, h.LockMgr, [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+		err = h.CommitTrx(trxId)
+		assert.NoError(t, err)
+
+		// 正常終了
+		err = h.Shutdown()
+		assert.NoError(t, err)
+
+		// WHEN: 再初期化
+		Reset()
+		h2 := Init()
+
+		// THEN: データが正常に存在する
+		tbl2, err := h2.GetTable("users")
+		assert.NoError(t, err)
+
+		readTrxId := h2.BeginTrx()
+		iter, err := tbl2.Search(h2.BufferPool, readTrxId, h2.LockMgr, access.RecordSearchModeStart{})
+		assert.NoError(t, err)
+		record, ok, err := iter.Next()
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, []byte("1"), record[0])
+
+		err = h2.Shutdown()
+		assert.NoError(t, err)
+	})
+
+	t.Run("コミット済みと未コミットが混在する場合、未コミットのみロールバックされる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		setupTable(t, h)
+		err := h.BufferPool.FlushPage()
+		assert.NoError(t, err)
+		err = h.redoLog.Reset()
+		assert.NoError(t, err)
+
+		tbl, err := h.GetTable("users")
+		assert.NoError(t, err)
+
+		// trx1: Insert + Commit
+		trx1 := h.BeginTrx()
+		err = tbl.Insert(h.BufferPool, trx1, h.LockMgr, [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+		err = h.CommitTrx(trx1)
+		assert.NoError(t, err)
+
+		// ダーティーページをフラッシュしてクリーンにする (trx2 の変更が REDO 記録されるようにする)
+		// Reset() は呼ばない (LSN カウンターを維持するため)
+		err = h.BufferPool.FlushPage()
+		assert.NoError(t, err)
+
+		// trx2: Insert (未コミット)
+		trx2 := h.BeginTrx()
+		err = tbl.Insert(h.BufferPool, trx2, h.LockMgr, [][]byte{[]byte("2"), []byte("Bob")})
+		assert.NoError(t, err)
+
+		err = h.redoLog.Flush()
+		assert.NoError(t, err)
+
+		// WHEN: Shutdown を呼ばずに再初期化
+		Reset()
+		h2 := Init()
+
+		// THEN: trx1 のデータは残り、trx2 のデータはロールバックされている
+		tbl2, err := h2.GetTable("users")
+		assert.NoError(t, err)
+
+		readTrxId := h2.BeginTrx()
+		iter, err := tbl2.Search(h2.BufferPool, readTrxId, h2.LockMgr, access.RecordSearchModeStart{})
+		assert.NoError(t, err)
+		record, ok, err := iter.Next()
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, []byte("1"), record[0])
+		assert.Equal(t, []byte("Alice"), record[1])
+
+		_, ok, err = iter.Next()
+		assert.NoError(t, err)
+		assert.False(t, ok) // trx2 のデータは存在しない
+
+		err = h2.Shutdown()
+		assert.NoError(t, err)
+	})
+
+	t.Run("未コミットの UPDATE がクラッシュ後にロールバックされる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		setupTable(t, h)
+		err := h.BufferPool.FlushPage()
+		assert.NoError(t, err)
+		err = h.redoLog.Reset()
+		assert.NoError(t, err)
+
+		tbl, err := h.GetTable("users")
+		assert.NoError(t, err)
+
+		// Insert + Commit (ベースデータ)
+		trx1 := h.BeginTrx()
+		err = tbl.Insert(h.BufferPool, trx1, h.LockMgr, [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+		err = h.CommitTrx(trx1)
+		assert.NoError(t, err)
+
+		// ダーティーページをフラッシュしてクリーンにする
+		err = h.BufferPool.FlushPage()
+		assert.NoError(t, err)
+
+		// UpdateInplace (未コミット)
+		trx2 := h.BeginTrx()
+		err = tbl.UpdateInplace(h.BufferPool, trx2, h.LockMgr,
+			[][]byte{[]byte("1"), []byte("Alice")},
+			[][]byte{[]byte("1"), []byte("Updated")},
+		)
+		assert.NoError(t, err)
+
+		err = h.redoLog.Flush()
+		assert.NoError(t, err)
+
+		// WHEN: Shutdown を呼ばずに再初期化
+		Reset()
+		h2 := Init()
+
+		// THEN: UPDATE がロールバックされ、元のデータに戻っている
+		tbl2, err := h2.GetTable("users")
+		assert.NoError(t, err)
+
+		readTrxId := h2.BeginTrx()
+		iter, err := tbl2.Search(h2.BufferPool, readTrxId, h2.LockMgr, access.RecordSearchModeStart{})
+		assert.NoError(t, err)
+		record, ok, err := iter.Next()
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, []byte("Alice"), record[1]) // "Updated" ではなく "Alice"
+
+		err = h2.Shutdown()
 		assert.NoError(t, err)
 	})
 }
@@ -174,7 +445,7 @@ func TestInitCatalog(t *testing.T) {
 		// THEN
 		assert.NotNil(t, h)
 		assert.NotNil(t, h.Catalog)
-		assert.Equal(t, page.FileId(1), h.Catalog.NextFileId)
+		assert.Equal(t, page.FileId(2), h.Catalog.NextFileId)
 	})
 
 	t.Run("カタログファイルが既に存在する場合、既存のカタログが開かれる", func(t *testing.T) {
@@ -205,7 +476,7 @@ func TestInitCatalog(t *testing.T) {
 
 		// THEN
 		assert.NotNil(t, handler2.Catalog)
-		assert.Equal(t, page.FileId(3), handler2.Catalog.NextFileId)
+		assert.Equal(t, page.FileId(4), handler2.Catalog.NextFileId)
 	})
 
 	t.Run("カタログの Disk が BufferPool に登録される", func(t *testing.T) {
@@ -242,7 +513,7 @@ func TestInitCatalog(t *testing.T) {
 
 		metaPageId, err := bp.AllocatePageId(fileId)
 		assert.NoError(t, err)
-		tbl := access.NewTable("users", metaPageId, 1, nil, nil)
+		tbl := access.NewTable("users", metaPageId, 1, nil, nil, nil)
 		err = tbl.Create(bp)
 		assert.NoError(t, err)
 
@@ -291,7 +562,7 @@ func TestInitCatalog(t *testing.T) {
 		// THEN: 新しいカタログが作成され、NextFileId は 1
 		assert.NotNil(t, h)
 		assert.NotNil(t, h.Catalog)
-		assert.Equal(t, page.FileId(1), h.Catalog.NextFileId)
+		assert.Equal(t, page.FileId(2), h.Catalog.NextFileId)
 	})
 
 	t.Run("データディレクトリが存在しない場合、自動作成される", func(t *testing.T) {

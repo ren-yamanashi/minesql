@@ -18,6 +18,7 @@ type Catalog struct {
 	IndexMetaPageId  page.PageId
 	ColumnMetaPageId page.PageId
 	NextFileId       page.FileId
+	UndoFileId       page.FileId
 	metadata         []*TableMeta
 }
 
@@ -44,13 +45,15 @@ func NewCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 	idxMetaPageNum := binary.BigEndian.Uint32(data[8:12])
 	colMetaPageNum := binary.BigEndian.Uint32(data[12:16])
 	nextFileId := page.FileId(binary.BigEndian.Uint32(data[16:20]))
+	undoFileId := page.FileId(binary.BigEndian.Uint32(data[20:24]))
 
 	catalog := &Catalog{
 		TableMetaPageId:  page.NewPageId(fileId, page.PageNumber(tblMetaPageNum)),
 		IndexMetaPageId:  page.NewPageId(fileId, page.PageNumber(idxMetaPageNum)),
 		ColumnMetaPageId: page.NewPageId(fileId, page.PageNumber(colMetaPageNum)),
-		metadata:         nil,
 		NextFileId:       nextFileId,
+		UndoFileId:       undoFileId,
+		metadata:         nil,
 	}
 
 	// ディスクから既存のメタデータを読み込む
@@ -110,18 +113,22 @@ func CreateCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 
 	// ヘッダーページに各メタデータのメタページIDを保存
 	data := bufferPage.GetWriteData()
-	initFileId := page.FileId(1)    // FileId(0) はカタログ用に予約されているため、1 から開始
+	nextFileId := page.FileId(1) // FileId(0) はカタログ用なので 1 から開始
+	undoFileId := nextFileId     // UNDO ログ用の FileId を採番
+	nextFileId++
 	copy(data[0:4], []byte("MINE")) // ファイルシグネチャとしてマジックナンバーを設定 (minesql なので MINE)
 	binary.BigEndian.PutUint32(data[4:8], uint32(tblMetaTree.MetaPageId.PageNumber))
 	binary.BigEndian.PutUint32(data[8:12], uint32(idxMetaTree.MetaPageId.PageNumber))
 	binary.BigEndian.PutUint32(data[12:16], uint32(colMetaTree.MetaPageId.PageNumber))
-	binary.BigEndian.PutUint32(data[16:20], uint32(initFileId))
+	binary.BigEndian.PutUint32(data[16:20], uint32(nextFileId))
+	binary.BigEndian.PutUint32(data[20:24], uint32(undoFileId))
 
 	return &Catalog{
 		TableMetaPageId:  tblMetaTree.MetaPageId,
 		ColumnMetaPageId: colMetaTree.MetaPageId,
 		IndexMetaPageId:  idxMetaTree.MetaPageId,
-		NextFileId:       initFileId,
+		NextFileId:       nextFileId,
+		UndoFileId:       undoFileId,
 		metadata:         nil,
 	}, nil
 }

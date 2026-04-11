@@ -1,6 +1,7 @@
 package access
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"minesql/internal/storage/btree"
@@ -8,6 +9,7 @@ import (
 	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/encode"
 	"minesql/internal/storage/lock"
+	"minesql/internal/storage/log"
 	"minesql/internal/storage/page"
 )
 
@@ -20,15 +22,17 @@ type Table struct {
 	PrimaryKeyCount uint8          // プライマリキーの列数 (プライマリキーは先頭から連続している想定) (例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる)
 	UniqueIndexes   []*UniqueIndex // テーブルに紐づくユニークインデックス群
 	undoLog         *UndoLog       // Undo ログ (nil の場合は Undo 記録をスキップ)
+	redoLog         *log.RedoLog   // REDO ログ (nil の場合は REDO 記録をスキップ)
 }
 
-func NewTable(name string, metaPageId page.PageId, primaryKeyCount uint8, uniqueIndexes []*UniqueIndex, undoLog *UndoLog) Table {
+func NewTable(name string, metaPageId page.PageId, primaryKeyCount uint8, uniqueIndexes []*UniqueIndex, undoLog *UndoLog, redoLog *log.RedoLog) Table {
 	return Table{
 		Name:            name,
 		MetaPageId:      metaPageId,
 		PrimaryKeyCount: primaryKeyCount,
 		UniqueIndexes:   uniqueIndexes,
 		undoLog:         undoLog,
+		redoLog:         redoLog,
 	}
 }
 
@@ -69,8 +73,13 @@ func (t *Table) Create(bp *buffer.BufferPool) error {
 func (t *Table) Insert(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, columns [][]byte) error {
 	// Undo ログを記録
 	if t.undoLog != nil {
-		t.undoLog.Append(trxId, NewUndoInsertRecord(t, columns))
+		if err := t.undoLog.Append(trxId, NewUndoInsertRecord(t, columns)); err != nil {
+			return err
+		}
 	}
+
+	// 変更前のダーティーページを記録
+	dirtyBefore := t.collectDirtyPages(bp)
 
 	// 行を挿入 → 排他ロックを取得
 	if err := t.insertRaw(bp, trxId, lockMgr, columns); err != nil {
@@ -80,7 +89,8 @@ func (t *Table) Insert(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Ma
 		return err
 	}
 
-	return nil
+	// 新たにダーティーになったページの REDO ログを記録
+	return t.recordRedoForNewDirtyPages(bp, trxId, dirtyBefore)
 }
 
 // SoftDelete はテーブルから行をソフトデリートする (Undo ログ記録 → 排他ロック取得 → ソフトデリートの順で実行する)
@@ -89,8 +99,13 @@ func (t *Table) Insert(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Ma
 func (t *Table) SoftDelete(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, columns [][]byte) error {
 	// Undo ログを記録
 	if t.undoLog != nil {
-		t.undoLog.Append(trxId, NewUndoDeleteRecord(t, columns))
+		if err := t.undoLog.Append(trxId, NewUndoDeleteRecord(t, columns)); err != nil {
+			return err
+		}
 	}
+
+	// 変更前のダーティーページを記録
+	dirtyBefore := t.collectDirtyPages(bp)
 
 	// ロック取得 → ソフトデリート
 	if err := t.softDeleteRaw(bp, trxId, lockMgr, columns); err != nil {
@@ -100,7 +115,8 @@ func (t *Table) SoftDelete(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *loc
 		return err
 	}
 
-	return nil
+	// 新たにダーティーになったページの REDO ログを記録
+	return t.recordRedoForNewDirtyPages(bp, trxId, dirtyBefore)
 }
 
 // UpdateInplace はテーブルの行をインプレース更新する (Undo ログ記録 → 排他ロック取得 → 更新の順で実行する)
@@ -111,8 +127,13 @@ func (t *Table) SoftDelete(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *loc
 func (t *Table) UpdateInplace(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, oldColumns [][]byte, newColumns [][]byte) error {
 	// Undo ログを記録
 	if t.undoLog != nil {
-		t.undoLog.Append(trxId, NewUndoUpdateInplaceRecord(t, oldColumns, newColumns))
+		if err := t.undoLog.Append(trxId, NewUndoUpdateInplaceRecord(t, oldColumns, newColumns)); err != nil {
+			return err
+		}
 	}
+
+	// 変更前のダーティーページを記録
+	dirtyBefore := t.collectDirtyPages(bp)
 
 	// ロック取得 → 更新
 	if err := t.updateInplaceRaw(bp, trxId, lockMgr, oldColumns, newColumns); err != nil {
@@ -122,7 +143,8 @@ func (t *Table) UpdateInplace(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *
 		return err
 	}
 
-	return nil
+	// 新たにダーティーになったページの REDO ログを記録
+	return t.recordRedoForNewDirtyPages(bp, trxId, dirtyBefore)
 }
 
 // GetUniqueIndexByName はインデックス名からユニークインデックスを取得する
@@ -311,5 +333,39 @@ func (t *Table) updateInplaceRaw(bp *buffer.BufferPool, trxId lock.TrxId, lockMg
 		}
 	}
 
+	return nil
+}
+
+// collectDirtyPages は現在のダーティーページの PageId セットを返す (操作後の差分比較用。REDO 記録不要時は nil)
+func (t *Table) collectDirtyPages(bp *buffer.BufferPool) map[page.PageId]bool {
+	if t.redoLog == nil {
+		return nil
+	}
+	result := make(map[page.PageId]bool)
+	for _, pid := range bp.DirtyPageIds() {
+		result[pid] = true
+	}
+	return result
+}
+
+// recordRedoForNewDirtyPages は操作前のダーティーページセットと比較して、新たにダーティーになったページの REDO ログを記録する
+func (t *Table) recordRedoForNewDirtyPages(bp *buffer.BufferPool, trxId TrxId, dirtyBefore map[page.PageId]bool) error {
+	if t.redoLog == nil {
+		return nil
+	}
+	for _, pid := range bp.DirtyPageIds() {
+		// 操作前からダーティーだったページはスキップ
+		if dirtyBefore[pid] {
+			continue
+		}
+		// 新たにダーティーになったページの REDO ログを記録
+		bufPage, err := bp.FetchPage(pid)
+		if err != nil {
+			return err
+		}
+		pg := page.NewPage(bufPage.Page)
+		lsn := t.redoLog.AppendPageCopy(trxId, pid, bufPage.Page)
+		binary.BigEndian.PutUint32(pg.Header, uint32(lsn))
+	}
 	return nil
 }

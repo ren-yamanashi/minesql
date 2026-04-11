@@ -40,7 +40,7 @@ func (s *Server) Start() error {
 
 	listener, err := s.listen()
 	if err != nil {
-		return fmt.Errorf("failed to listen on %s: %w", listener.Addr().String(), err)
+		return fmt.Errorf("failed to listen on %s:%d: %w", s.address, s.port, err)
 	}
 
 	defer func() {
@@ -186,7 +186,9 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 			if sess.trxId == 0 {
 				return "", fmt.Errorf("no active transaction")
 			}
-			handler.Get().CommitTrx(sess.trxId)
+			if err := handler.Get().CommitTrx(sess.trxId); err != nil {
+				return "", err
+			}
 			sess.trxId = 0
 			return "", nil
 		case ast.TxRollback:
@@ -235,7 +237,9 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 	}
 
 	if autocommit {
-		hdl.CommitTrx(trxId)
+		if err := hdl.CommitTrx(trxId); err != nil {
+			return "", err
+		}
 	}
 
 	// レスポンスは csv 形式で返す

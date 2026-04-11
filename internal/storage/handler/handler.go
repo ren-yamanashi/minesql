@@ -10,7 +10,9 @@ import (
 	"minesql/internal/storage/dictionary"
 	"minesql/internal/storage/file"
 	"minesql/internal/storage/lock"
+	"minesql/internal/storage/log"
 	"minesql/internal/storage/page"
+	"minesql/internal/storage/recovery"
 	"os"
 	"path/filepath"
 	"sync"
@@ -39,6 +41,7 @@ type Handler struct {
 	Catalog        *dictionary.Catalog
 	StatsCollector *dictionary.StatsCollector
 	undoLog        *access.UndoLog
+	redoLog        *log.RedoLog
 	trxManager     *access.Manager
 	baseDirectory  string
 }
@@ -93,6 +96,13 @@ func (h *Handler) Shutdown() error {
 			return err
 		}
 	}
+
+	// クリーンシャットダウンを記録 (REDO ログをクリア)
+	if h.redoLog != nil {
+		if err := h.redoLog.Reset(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -115,13 +125,37 @@ func newHandler() (*Handler, error) {
 		return nil, err
 	}
 
-	bp := buffer.NewBufferPool(config.GetBufferPoolSize())
+	// REDO ログを初期化
+	redoLog, err := log.NewRedoLog(dataDir)
+	if err != nil {
+		return nil, err
+	}
+
+	// BufferPool を初期化
+	bp := buffer.NewBufferPool(config.GetBufferPoolSize(), redoLog)
 	catalog, err := initCatalog(dataDir, bp)
 	if err != nil {
 		return nil, err
 	}
 
-	undoLog := access.NewUndoLog()
+	// UNDO ログを初期化
+	undoLog, err := initUndoLog(bp, redoLog, dataDir, catalog.UndoFileId)
+	if err != nil {
+		return nil, err
+	}
+
+	// クラッシュリカバリを実行
+	rec := recovery.NewRecovery(redoLog, bp, catalog, catalog.UndoFileId)
+	needsRecovery, err := rec.NeedsRecovery()
+	if err != nil {
+		return nil, err
+	}
+	if needsRecovery {
+		if err := rec.Run(); err != nil {
+			return nil, fmt.Errorf("crash recovery failed: %w", err)
+		}
+	}
+
 	lockMgr := lock.NewManager(config.GetLockWaitTimeout())
 
 	return &Handler{
@@ -130,7 +164,8 @@ func newHandler() (*Handler, error) {
 		Catalog:        catalog,
 		StatsCollector: dictionary.NewStatsCollector(bp),
 		undoLog:        undoLog,
-		trxManager:     access.NewManager(undoLog, lockMgr),
+		redoLog:        redoLog,
+		trxManager:     access.NewManager(undoLog, lockMgr, redoLog),
 		baseDirectory:  dataDir,
 	}, nil
 }
@@ -180,6 +215,22 @@ func initCatalog(baseDir string, bp *buffer.BufferPool) (*dictionary.Catalog, er
 	}
 
 	return cat, nil
+}
+
+// initUndoLog は UNDO ログ用を初期化する
+func initUndoLog(bp *buffer.BufferPool, redoLog *log.RedoLog, baseDir string, undoFileId page.FileId) (*access.UndoLog, error) {
+	// UNDO ログ用の Disk を作成
+	path := filepath.Join(baseDir, "undo.db")
+	dm, err := file.NewDisk(undoFileId, path)
+	if err != nil {
+		return nil, err
+	}
+
+	// UNDO ログ用の Disk を BufferPool に登録
+	bp.RegisterDisk(undoFileId, dm)
+
+	// UndoLog を作成して返す
+	return access.NewUndoLog(bp, redoLog, undoFileId)
 }
 
 // registerTableDisks はカタログに含まれるテーブルの Disk を BufferPool に登録する

@@ -114,7 +114,7 @@ func TestSearchModeKey(t *testing.T) {
 
 func createBranch(records []node.Record, rightChildPageId page.PageId) *node.Branch {
 	p := directio.AlignedBlock(directio.BlockSize)
-	branch := node.NewBranch(p)
+	branch := node.NewBranch(page.NewPage(p).Body)
 
 	if len(records) == 0 {
 		panic("records must not be empty")

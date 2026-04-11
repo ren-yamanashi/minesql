@@ -399,7 +399,7 @@ func TestUpdate_Next(t *testing.T) {
 		// THEN
 		assert.ErrorIs(t, updateErr, lock.ErrTimeout)
 
-		hdl.CommitTrx(trx1)
+		assert.NoError(t, hdl.CommitTrx(trx1))
 	})
 
 	t.Run("COMMIT 後は他のトランザクションが排他ロックを取得できる", func(t *testing.T) {
@@ -425,7 +425,7 @@ func TestUpdate_Next(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: trx1 を COMMIT (ロック解放)
-		hdl.CommitTrx(trx1)
+		assert.NoError(t, hdl.CommitTrx(trx1))
 
 		// THEN: trx2 が同じ行を UPDATE できる
 		trx2 := hdl.BeginTrx()
@@ -439,7 +439,7 @@ func TestUpdate_Next(t *testing.T) {
 		_, err = upd2.Next()
 		assert.NoError(t, err)
 
-		hdl.CommitTrx(trx2)
+		assert.NoError(t, hdl.CommitTrx(trx2))
 	})
 
 	t.Run("排他ロック解放後に待機中のトランザクションがロックを取得できる", func(t *testing.T) {
@@ -479,12 +479,12 @@ func TestUpdate_Next(t *testing.T) {
 				func(record Record) bool { return string(record[0]) == "a" },
 			))
 			_, updateErr = upd2.Next()
-			hdl.CommitTrx(trx2)
+			_ = hdl.CommitTrx(trx2)
 		}()
 
 		// trx1 を COMMIT して排他ロックを解放
 		time.Sleep(50 * time.Millisecond)
-		hdl.CommitTrx(trx1)
+		assert.NoError(t, hdl.CommitTrx(trx1))
 
 		wg.Wait()
 
@@ -539,7 +539,7 @@ func TestUpdate_Next(t *testing.T) {
 		))
 		_, err = upd2.Next()
 		assert.NoError(t, err)
-		hdl.CommitTrx(trx2)
+		assert.NoError(t, hdl.CommitTrx(trx2))
 	})
 
 	t.Run("デッドロック発生後に ROLLBACK が成功する", func(t *testing.T) {
@@ -646,7 +646,7 @@ func TestUpdate_Next(t *testing.T) {
 		assert.NoError(t, err)
 
 		// trx2 が row "a" を排他ロック保持 (trx1 の COMMIT 後)
-		hdl.CommitTrx(trx1)
+		assert.NoError(t, hdl.CommitTrx(trx1))
 
 		trx2 := hdl.BeginTrx()
 		upd2 := NewUpdate(trx2, tbl, []SetColumn{
@@ -707,7 +707,7 @@ func insertLockTestData(t *testing.T, tbl *access.Table) {
 	})
 	_, err := ins.Next()
 	assert.NoError(t, err)
-	hdl.CommitTrx(trxId)
+	assert.NoError(t, hdl.CommitTrx(trxId))
 }
 
 func collectLockTestRecords(t *testing.T, tbl *access.Table) []Record {
@@ -728,6 +728,6 @@ func collectLockTestRecords(t *testing.T, tbl *access.Table) []Record {
 		}
 		records = append(records, record)
 	}
-	hdl.CommitTrx(trx)
+	assert.NoError(t, hdl.CommitTrx(trx))
 	return records
 }

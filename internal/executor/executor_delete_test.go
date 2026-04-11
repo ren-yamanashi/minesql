@@ -259,7 +259,7 @@ func TestDelete(t *testing.T) {
 		// THEN: エラーなし (削除対象がないので何もしない)
 		assert.NoError(t, err)
 
-		hdl.CommitTrx(trx1)
-		hdl.CommitTrx(trx2)
+		assert.NoError(t, hdl.CommitTrx(trx1))
+		assert.NoError(t, hdl.CommitTrx(trx2))
 	})
 }
