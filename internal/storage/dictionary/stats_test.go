@@ -518,7 +518,7 @@ func setupTestEnv(t *testing.T) *testEnv {
 	t.Helper()
 	tmpdir := t.TempDir()
 
-	bp := buffer.NewBufferPool(100)
+	bp := buffer.NewBufferPool(100, nil)
 
 	// カタログ用の Disk を登録
 	catalogFileId := page.FileId(0)
@@ -579,7 +579,7 @@ func createTable(t *testing.T, env *testEnv, tableName string, pkCount uint8, in
 	}
 
 	// テーブルを作成
-	tbl := access.NewTable(tableName, metaPageId, pkCount, uniqueIndexes, nil)
+	tbl := access.NewTable(tableName, metaPageId, pkCount, uniqueIndexes, nil, nil)
 	err = tbl.Create(env.bp)
 	assert.NoError(t, err)
 

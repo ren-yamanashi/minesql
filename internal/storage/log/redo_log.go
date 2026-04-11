@@ -59,8 +59,8 @@ func NewRedoLog(dataDir string) (*RedoLog, error) {
 	return rl, nil
 }
 
-// AppendPageImage はページ全体のコピーを REDO ログバッファに記録する
-func (rl *RedoLog) AppendPageImage(trxId uint64, pageId page.PageId, data []byte) LSN {
+// AppendPageCopy はページ全体のコピーを REDO ログバッファに記録する
+func (rl *RedoLog) AppendPageCopy(trxId uint64, pageId page.PageId, data []byte) LSN {
 	return rl.append(trxId, RedoPageWrite, pageId, data)
 }
 

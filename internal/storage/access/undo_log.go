@@ -107,7 +107,7 @@ func (u *UndoLog) writeToPage(trxId TrxId, serialized []byte) error {
 
 	// REDO ログに UNDO ページの変更を記録
 	if u.redoLog != nil {
-		u.redoLog.AppendPageImage(trxId, u.currentPageId, bufPage.GetReadData())
+		u.redoLog.AppendPageCopy(trxId, u.currentPageId, bufPage.GetReadData())
 	}
 	return nil
 }

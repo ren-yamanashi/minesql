@@ -40,15 +40,15 @@ func TestNewRedoLog(t *testing.T) {
 	})
 }
 
-func TestAppendPageImage(t *testing.T) {
+func TestAppendPageCopy(t *testing.T) {
 	t.Run("LSN が単調増加する", func(t *testing.T) {
 		// GIVEN
 		tmpDir := t.TempDir()
 		rl, _ := NewRedoLog(tmpDir)
 
 		// WHEN
-		lsn1 := rl.AppendPageImage(1, page.NewPageId(1, 0), make([]byte, 4096))
-		lsn2 := rl.AppendPageImage(1, page.NewPageId(1, 1), make([]byte, 4096))
+		lsn1 := rl.AppendPageCopy(1, page.NewPageId(1, 0), make([]byte, 4096))
+		lsn2 := rl.AppendPageCopy(1, page.NewPageId(1, 1), make([]byte, 4096))
 
 		// THEN
 		assert.Equal(t, LSN(1), lsn1)
@@ -143,7 +143,7 @@ func TestReadAll(t *testing.T) {
 
 		data := make([]byte, 4096)
 		data[0] = 0xAA
-		rl.AppendPageImage(1, page.NewPageId(1, 0), data)
+		rl.AppendPageCopy(1, page.NewPageId(1, 0), data)
 		rl.AppendCommit(1)
 		err := rl.Flush()
 		assert.NoError(t, err)

@@ -117,7 +117,7 @@ func setupTestTableForUndo(t *testing.T, uniqueIndexes []*UniqueIndex) (*Table, 
 	t.Helper()
 	tmpdir := t.TempDir()
 
-	bp := buffer.NewBufferPool(100)
+	bp := buffer.NewBufferPool(100, nil)
 	fileId := page.FileId(1)
 	dm, err := file.NewDisk(fileId, filepath.Join(tmpdir, "test.db"))
 	assert.NoError(t, err)
@@ -132,7 +132,7 @@ func setupTestTableForUndo(t *testing.T, uniqueIndexes []*UniqueIndex) (*Table, 
 		ui.MetaPageId = indexMetaPageId
 	}
 
-	table := NewTable("test", metaPageId, 1, uniqueIndexes, nil)
+	table := NewTable("test", metaPageId, 1, uniqueIndexes, nil, nil)
 	err = table.Create(bp)
 	assert.NoError(t, err)
 

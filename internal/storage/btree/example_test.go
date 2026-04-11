@@ -21,7 +21,7 @@ func setupExample() (*btree.BTree, *buffer.BufferPool, func()) {
 	}
 	cleanup := func() { _ = os.RemoveAll(tmpDir) }
 
-	bp := buffer.NewBufferPool(10)
+	bp := buffer.NewBufferPool(10, nil)
 	fileId := page.FileId(1)
 
 	dm, err := file.NewDisk(fileId, filepath.Join(tmpDir, "example.db"))

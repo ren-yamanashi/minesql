@@ -36,7 +36,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bp2 := buffer.NewBufferPool(10)
+		bp2 := buffer.NewBufferPool(10, nil)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		catalogFileId := page.FileId(0)
 		dm2, err := file.NewDisk(catalogFileId, filePath)
@@ -78,7 +78,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bp2 := buffer.NewBufferPool(10)
+		bp2 := buffer.NewBufferPool(10, nil)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		catalogFileId := page.FileId(0)
 		dm2, err := file.NewDisk(catalogFileId, filePath)
@@ -126,7 +126,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bp2 := buffer.NewBufferPool(10)
+		bp2 := buffer.NewBufferPool(10, nil)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		catalogFileId := page.FileId(0)
 		dm2, err := file.NewDisk(catalogFileId, filePath)
@@ -183,7 +183,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bp2 := buffer.NewBufferPool(10)
+		bp2 := buffer.NewBufferPool(10, nil)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		catalogFileId := page.FileId(0)
 		dm2, err := file.NewDisk(catalogFileId, filePath)
@@ -232,7 +232,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bp2 := buffer.NewBufferPool(10)
+		bp2 := buffer.NewBufferPool(10, nil)
 		dm2, err := file.NewDisk(page.FileId(0), filepath.Join(tmpdir, "minesql.db"))
 		assert.NoError(t, err)
 		bp2.RegisterDisk(page.FileId(0), dm2)
@@ -265,7 +265,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bp2 := buffer.NewBufferPool(10)
+		bp2 := buffer.NewBufferPool(10, nil)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		catalogFileId := page.FileId(0)
 		dm2, err := file.NewDisk(catalogFileId, filePath)
@@ -299,7 +299,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: 新しい BufferPool でカタログを開き直す
-		bp2 := buffer.NewBufferPool(10)
+		bp2 := buffer.NewBufferPool(10, nil)
 		filePath := filepath.Join(tmpdir, "minesql.db")
 		dm2, err := file.NewDisk(page.FileId(0), filePath)
 		assert.NoError(t, err)
@@ -574,7 +574,7 @@ func InitCatalogDisk(t *testing.T) (bp *buffer.BufferPool, tmpdir string) {
 	tmpdir = t.TempDir()
 	filePath := filepath.Join(tmpdir, "minesql.db")
 
-	bp = buffer.NewBufferPool(10)
+	bp = buffer.NewBufferPool(10, nil)
 	fileId := page.FileId(0)
 	dm, err := file.NewDisk(fileId, filePath)
 	assert.NoError(t, err)

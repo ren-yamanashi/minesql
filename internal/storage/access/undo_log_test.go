@@ -244,7 +244,7 @@ func TestDiscard(t *testing.T) {
 func initUndoTestDisk(t *testing.T) *buffer.BufferPool {
 	t.Helper()
 	tmpdir := t.TempDir()
-	bp := buffer.NewBufferPool(100)
+	bp := buffer.NewBufferPool(100, nil)
 
 	// UNDO 用 Disk
 	undoDm, err := file.NewDisk(undoTestFileId, filepath.Join(tmpdir, "undo.db"))
@@ -264,7 +264,7 @@ func createUndoTestTable(t *testing.T, bp *buffer.BufferPool) *Table {
 	t.Helper()
 	metaPageId, err := bp.AllocatePageId(page.FileId(1))
 	assert.NoError(t, err)
-	table := NewTable("test", metaPageId, 1, nil, nil)
+	table := NewTable("test", metaPageId, 1, nil, nil, nil)
 	err = table.Create(bp)
 	assert.NoError(t, err)
 	return &table

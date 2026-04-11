@@ -32,7 +32,7 @@ func TestGet(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		dm := initDiskForIterator(t, tmpdir)
-		bp := buffer.NewBufferPool(3)
+		bp := buffer.NewBufferPool(3, nil)
 		bp.RegisterDisk(page.FileId(0), dm)
 
 		record1 := node.NewRecord(nil, []byte("key1"), []byte("value1"))
@@ -70,7 +70,7 @@ func TestNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		dm := initDiskForIterator(t, tmpdir)
-		bp := buffer.NewBufferPool(3)
+		bp := buffer.NewBufferPool(3, nil)
 		bp.RegisterDisk(page.FileId(0), dm)
 
 		record1 := node.NewRecord(nil, []byte("key1"), []byte("value1"))
@@ -104,7 +104,7 @@ func TestNext(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		dm := initDiskForIterator(t, tmpdir)
-		bp := buffer.NewBufferPool(3)
+		bp := buffer.NewBufferPool(3, nil)
 		bp.RegisterDisk(page.FileId(0), dm)
 
 		record1 := node.NewRecord(nil, []byte("key1"), []byte("value1"))
@@ -123,7 +123,7 @@ func TestNext(t *testing.T) {
 		// GIVEN: 2 ページ構成 (各 1 レコード)
 		tmpdir := t.TempDir()
 		dm := initDiskForIterator(t, tmpdir)
-		bp := buffer.NewBufferPool(3)
+		bp := buffer.NewBufferPool(3, nil)
 		bp.RegisterDisk(page.FileId(0), dm)
 
 		record1 := node.NewRecord(nil, []byte("key1"), []byte("value1"))
@@ -165,7 +165,7 @@ func TestAdvance(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		dm := initDiskForIterator(t, tmpdir)
-		bp := buffer.NewBufferPool(3)
+		bp := buffer.NewBufferPool(3, nil)
 		bp.RegisterDisk(page.FileId(0), dm)
 
 		record1 := node.NewRecord(nil, []byte("key1"), []byte("value1"))
@@ -187,7 +187,7 @@ func TestAdvance(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		dm := initDiskForIterator(t, tmpdir)
-		bp := buffer.NewBufferPool(3)
+		bp := buffer.NewBufferPool(3, nil)
 		bp.RegisterDisk(page.FileId(0), dm)
 
 		record1 := node.NewRecord(nil, []byte("key1"), []byte("value1"))
@@ -208,7 +208,7 @@ func TestAdvance(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		dm := initDiskForIterator(t, tmpdir)
-		bp := buffer.NewBufferPool(3)
+		bp := buffer.NewBufferPool(3, nil)
 		bp.RegisterDisk(page.FileId(0), dm)
 
 		// 最初のページ

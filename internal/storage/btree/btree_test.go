@@ -1034,7 +1034,7 @@ func setupBTree(t *testing.T) (*BTree, *buffer.BufferPool) {
 	}
 	metaPageId := dm.AllocatePage()
 
-	bp := buffer.NewBufferPool(100)
+	bp := buffer.NewBufferPool(100, nil)
 	bp.RegisterDisk(fileId, dm)
 
 	bt, err := CreateBTree(bp, metaPageId)

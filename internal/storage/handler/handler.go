@@ -40,6 +40,7 @@ type Handler struct {
 	Catalog        *dictionary.Catalog
 	StatsCollector *dictionary.StatsCollector
 	undoLog        *access.UndoLog
+	redoLog        *log.RedoLog
 	trxManager     *access.Manager
 	baseDirectory  string
 }
@@ -94,6 +95,13 @@ func (h *Handler) Shutdown() error {
 			return err
 		}
 	}
+
+	// クリーンシャットダウンを記録 (REDO ログをクリア)
+	if h.redoLog != nil {
+		if err := h.redoLog.Reset(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -116,14 +124,15 @@ func newHandler() (*Handler, error) {
 		return nil, err
 	}
 
-	bp := buffer.NewBufferPool(config.GetBufferPoolSize())
-	catalog, err := initCatalog(dataDir, bp)
+	// REDO ログを初期化
+	redoLog, err := log.NewRedoLog(dataDir)
 	if err != nil {
 		return nil, err
 	}
 
-	// REDO ログを初期化
-	redoLog, err := log.NewRedoLog(dataDir)
+	// BufferPool を初期化
+	bp := buffer.NewBufferPool(config.GetBufferPoolSize(), redoLog)
+	catalog, err := initCatalog(dataDir, bp)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +150,8 @@ func newHandler() (*Handler, error) {
 		Catalog:        catalog,
 		StatsCollector: dictionary.NewStatsCollector(bp),
 		undoLog:        undoLog,
-		trxManager:     access.NewManager(undoLog, lockMgr),
+		redoLog:        redoLog,
+		trxManager:     access.NewManager(undoLog, lockMgr, redoLog),
 		baseDirectory:  dataDir,
 	}, nil
 }

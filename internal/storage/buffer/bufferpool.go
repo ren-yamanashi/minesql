@@ -30,7 +30,8 @@ type BufferPool struct {
 
 // NewBufferPool は指定されたサイズの BufferPool を生成する
 //   - size: バッファページの数 (例: 1000 を指定すると、1000 ページ分のバッファプールが生成される)
-func NewBufferPool(size int) *BufferPool {
+//   - redoLog: REDO ログ
+func NewBufferPool(size int, redoLog *log.RedoLog) *BufferPool {
 	bufPages := make([]BufferPage, size)
 	for i := range bufPages {
 		bufPages[i] = *NewBufferPage(page.INVALID_PAGE_ID) // 仮のページ ID で初期化 (実際にはバッファプールにページが追加されるときに設定される)
@@ -41,6 +42,7 @@ func NewBufferPool(size int) *BufferPool {
 		maxBufferSize:     size,
 		pageTable:         make(PageTable),
 		evictionAlgorithm: NewLRU(size),
+		redoLog:           redoLog,
 	}
 }
 
@@ -198,11 +200,6 @@ func (bp *BufferPool) AllocatePageId(fileId page.FileId) (page.PageId, error) {
 		return page.INVALID_PAGE_ID, err
 	}
 	return disk.AllocatePage(), nil
-}
-
-// SetRedoLog は REDO ログを設定する (WAL 原則の適用に使用)
-func (bp *BufferPool) SetRedoLog(rl *log.RedoLog) {
-	bp.redoLog = rl
 }
 
 // DirtyPageIds はダーティーページの PageId リストを返す
