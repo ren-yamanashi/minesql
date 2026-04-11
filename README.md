@@ -38,5 +38,5 @@ make build-client
 | [INSERT](./docs/feature/insert.md) | ✅ | |
 | [DELETE](./docs/feature/delete.md) | ✅ | |
 | [UPDATE](./docs/feature/update.md) | ✅ | |
-| JOIN | - | |
-| Transaction | - | Just "Atomicity", "Isolation" |
+| [Transaction](./docs//feature/transaction.md) | ✅ | |
+| JOIN | - | - |
