@@ -97,4 +97,17 @@ func TestDeserializeUndoRecord(t *testing.T) {
 		// THEN
 		assert.ErrorIs(t, err, ErrInvalidUndoRecord)
 	})
+
+	t.Run("DataLen に対してデータが不足している場合はエラーを返す", func(t *testing.T) {
+		// GIVEN: 正常なレコードをシリアライズし、データ部分を途中で切る
+		columns := [][]byte{[]byte("a"), []byte("Alice")}
+		buf := SerializeUndoRecord(1, 0, UndoInsert, "users", columns)
+		truncated := buf[:undoRecordHeaderSize+2]
+
+		// WHEN
+		_, _, _, _, _, err := DeserializeUndoRecord(truncated)
+
+		// THEN
+		assert.ErrorIs(t, err, ErrInvalidUndoRecord)
+	})
 }
