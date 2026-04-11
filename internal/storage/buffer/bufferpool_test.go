@@ -1,7 +1,9 @@
 package buffer
 
 import (
+	"encoding/binary"
 	"minesql/internal/storage/file"
+	"minesql/internal/storage/log"
 	"minesql/internal/storage/page"
 	"path/filepath"
 	"testing"
@@ -402,7 +404,7 @@ func TestFlushPage(t *testing.T) {
 		page2.IsDirty = true
 
 		// WHEN
-		err = bp.FlushPage()
+		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 
 		// THEN
@@ -456,13 +458,161 @@ func TestFlushPage(t *testing.T) {
 		page3.IsDirty = false
 
 		// WHEN
-		err := bp.FlushPage()
+		err := bp.FlushAllPages()
 
 		// THEN
 		assert.NoError(t, err)
 		assert.False(t, page1.IsDirty)
 		assert.False(t, page2.IsDirty)
 		assert.False(t, page3.IsDirty)
+	})
+}
+
+func TestFlushOldestPagesCleanPage(t *testing.T) {
+	t.Run("クリーンなページはフラッシュリストから除外されるだけでディスク書き込みしない", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		rl, err := log.NewRedoLog(tmpdir)
+		assert.NoError(t, err)
+		bp := NewBufferPool(10, rl)
+
+		disk, err := file.NewDisk(page.FileId(1), filepath.Join(tmpdir, "test.db"))
+		assert.NoError(t, err)
+		bp.RegisterDisk(page.FileId(1), disk)
+
+		pageId1, _ := bp.AllocatePageId(page.FileId(1))
+		p1, _ := bp.AddPage(pageId1)
+		p1.GetWriteData()[0] = 0x11
+		bp.FlushList.Add(pageId1)
+
+		// フラッシュリストに入っているがクリーンにする
+		p1.IsDirty = false
+
+		// WHEN
+		err = bp.FlushOldestPages(1)
+		assert.NoError(t, err)
+
+		// THEN: フラッシュリストから除外される
+		assert.Equal(t, 0, bp.FlushList.Size)
+	})
+}
+
+func TestFlushAllPagesWithFlushList(t *testing.T) {
+	t.Run("FlushAllPages 後にフラッシュリストがクリアされる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		rl, err := log.NewRedoLog(tmpdir)
+		assert.NoError(t, err)
+		bp := NewBufferPool(10, rl)
+
+		disk, err := file.NewDisk(page.FileId(1), filepath.Join(tmpdir, "test.db"))
+		assert.NoError(t, err)
+		bp.RegisterDisk(page.FileId(1), disk)
+
+		pageId1, _ := bp.AllocatePageId(page.FileId(1))
+		pageId2, _ := bp.AllocatePageId(page.FileId(1))
+
+		p1, _ := bp.AddPage(pageId1)
+		p1.GetWriteData()[0] = 0x11
+		bp.FlushList.Add(pageId1)
+
+		p2, _ := bp.AddPage(pageId2)
+		p2.GetWriteData()[0] = 0x22
+		bp.FlushList.Add(pageId2)
+
+		assert.Equal(t, 2, bp.FlushList.Size)
+
+		// WHEN
+		err = bp.FlushAllPages()
+		assert.NoError(t, err)
+
+		// THEN
+		assert.Equal(t, 0, bp.FlushList.Size)
+		assert.False(t, p1.IsDirty)
+		assert.False(t, p2.IsDirty)
+	})
+}
+
+func TestAddPageEvictionWithFlushList(t *testing.T) {
+	t.Run("ダーティーページ追い出し時にフラッシュリストから除外される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		bp := NewBufferPool(3, nil)
+		disk, _ := file.NewDisk(page.FileId(0), filepath.Join(tmpdir, "test.db"))
+		bp.RegisterDisk(page.FileId(0), disk)
+
+		pageId1 := disk.AllocatePage()
+		pageId2 := disk.AllocatePage()
+		pageId3 := disk.AllocatePage()
+
+		p1, err := bp.AddPage(pageId1)
+		assert.NoError(t, err)
+		_, err = bp.AddPage(pageId2)
+		assert.NoError(t, err)
+		_, err = bp.AddPage(pageId3)
+		assert.NoError(t, err)
+
+		// page1 をダーティーにしてフラッシュリストに追加
+		p1.Page[0] = 0xAA
+		p1.IsDirty = true
+		bp.FlushList.Add(pageId1)
+		assert.True(t, bp.FlushList.Contains(pageId1))
+
+		// pageId1 を最後に参照解除して、最初に追い出されるようにする
+		bp.UnRefPage(pageId2)
+		bp.UnRefPage(pageId3)
+		bp.UnRefPage(pageId1)
+
+		// WHEN: 新しいページを追加 (pageId1 が追い出される)
+		pageId4 := disk.AllocatePage()
+		_, err = bp.AddPage(pageId4)
+		assert.NoError(t, err)
+
+		// THEN: フラッシュリストから除外されている
+		assert.False(t, bp.FlushList.Contains(pageId1))
+	})
+
+	t.Run("追い出し時に Page LSN > FlushedLSN なら REDO ログがフラッシュされる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		rl, err := log.NewRedoLog(tmpdir)
+		assert.NoError(t, err)
+		bp := NewBufferPool(3, rl)
+		disk, _ := file.NewDisk(page.FileId(0), filepath.Join(tmpdir, "test.db"))
+		bp.RegisterDisk(page.FileId(0), disk)
+
+		pageId1 := disk.AllocatePage()
+		pageId2 := disk.AllocatePage()
+		pageId3 := disk.AllocatePage()
+
+		p1, err := bp.AddPage(pageId1)
+		assert.NoError(t, err)
+		_, err = bp.AddPage(pageId2)
+		assert.NoError(t, err)
+		_, err = bp.AddPage(pageId3)
+		assert.NoError(t, err)
+
+		// page1 をダーティーにして、Page LSN を設定 (REDO ログバッファにレコードを追加)
+		p1.IsDirty = true
+		lsn := rl.AppendPageCopy(1, pageId1, p1.Page)
+		pg := page.NewPage(p1.Page)
+		binary.BigEndian.PutUint32(pg.Header, uint32(lsn))
+
+		// FlushedLSN < Page LSN であることを確認
+		assert.Greater(t, lsn, rl.FlushedLSN)
+
+		// pageId1 を最後に参照解除して、最初に追い出されるようにする
+		bp.UnRefPage(pageId2)
+		bp.UnRefPage(pageId3)
+		bp.UnRefPage(pageId1)
+
+		// WHEN: 新しいページを追加 (pageId1 が追い出される)
+		pageId4 := disk.AllocatePage()
+		_, err = bp.AddPage(pageId4)
+		assert.NoError(t, err)
+
+		// THEN: REDO ログがフラッシュされている (FlushedLSN が更新されている)
+		assert.Equal(t, lsn, rl.FlushedLSN)
 	})
 }
 
