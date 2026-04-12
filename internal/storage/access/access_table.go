@@ -21,11 +21,11 @@ type Table struct {
 	MetaPageId      page.PageId    // テーブルの内容が入っている B+Tree のメタページの ID
 	PrimaryKeyCount uint8          // プライマリキーの列数 (プライマリキーは先頭から連続している想定) (例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる)
 	UniqueIndexes   []*UniqueIndex // テーブルに紐づくユニークインデックス群
-	undoLog         *UndoLog       // Undo ログ (nil の場合は Undo 記録をスキップ)
+	undoLog         *UndoManager   // Undo ログ (nil の場合は Undo 記録をスキップ)
 	redoLog         *log.RedoLog   // REDO ログ (nil の場合は REDO 記録をスキップ)
 }
 
-func NewTable(name string, metaPageId page.PageId, primaryKeyCount uint8, uniqueIndexes []*UniqueIndex, undoLog *UndoLog, redoLog *log.RedoLog) Table {
+func NewTable(name string, metaPageId page.PageId, primaryKeyCount uint8, uniqueIndexes []*UniqueIndex, undoLog *UndoManager, redoLog *log.RedoLog) Table {
 	return Table{
 		Name:            name,
 		MetaPageId:      metaPageId,

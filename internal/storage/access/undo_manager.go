@@ -6,10 +6,10 @@ import (
 	"minesql/internal/storage/page"
 )
 
-// UndoLog は全トランザクションの Undo レコードをトランザクションごとに管理する
+// UndoManager は全トランザクションの Undo レコードをトランザクションごとに管理する
 //
 // UNDO レコードはバッファプール上の UNDO ページに永続化される
-type UndoLog struct {
+type UndoManager struct {
 	bp            *buffer.BufferPool
 	redoLog       *log.RedoLog
 	undoFileId    page.FileId            // UNDO ファイルの FileId
@@ -17,7 +17,7 @@ type UndoLog struct {
 	records       map[TrxId][]UndoRecord // メモリ上の UndoRecord (table 参照を含む)
 }
 
-func NewUndoLog(bp *buffer.BufferPool, redoLog *log.RedoLog, undoFileId page.FileId) (*UndoLog, error) {
+func NewUndoManager(bp *buffer.BufferPool, redoLog *log.RedoLog, undoFileId page.FileId) (*UndoManager, error) {
 	// UNDO ページを割り当て
 	pageId, err := bp.AllocatePageId(undoFileId)
 	if err != nil {
@@ -33,7 +33,7 @@ func NewUndoLog(bp *buffer.BufferPool, redoLog *log.RedoLog, undoFileId page.Fil
 	}
 	NewUndoPage(page.NewPage(data)).Initialize()
 
-	return &UndoLog{
+	return &UndoManager{
 		bp:            bp,
 		redoLog:       redoLog,
 		undoFileId:    undoFileId,
@@ -43,7 +43,7 @@ func NewUndoLog(bp *buffer.BufferPool, redoLog *log.RedoLog, undoFileId page.Fil
 }
 
 // Append は指定した trxId の Undo ログにレコードを追加する
-func (u *UndoLog) Append(trxId TrxId, record UndoRecord) error {
+func (u *UndoManager) Append(trxId TrxId, record UndoRecord) error {
 	undoNo := uint64(len(u.records[trxId]))
 	if err := u.writeToPage(trxId, record.Serialize(trxId, undoNo)); err != nil {
 		return err
@@ -53,7 +53,7 @@ func (u *UndoLog) Append(trxId TrxId, record UndoRecord) error {
 }
 
 // GetRecords は指定した trxId の Undo ログレコードを取得する
-func (u *UndoLog) GetRecords(trxId TrxId) []UndoRecord {
+func (u *UndoManager) GetRecords(trxId TrxId) []UndoRecord {
 	records := u.records[trxId]
 	if len(records) == 0 {
 		return nil
@@ -64,7 +64,7 @@ func (u *UndoLog) GetRecords(trxId TrxId) []UndoRecord {
 // PopLast は指定した trxId の Undo ログの最後のレコードを削除する
 //
 // メモリインデックスの操作のみ (UNDO ページ上のデータは残る)
-func (u *UndoLog) PopLast(trxId TrxId) {
+func (u *UndoManager) PopLast(trxId TrxId) {
 	records := u.records[trxId]
 	if len(records) > 0 {
 		u.records[trxId] = records[:len(records)-1]
@@ -74,12 +74,12 @@ func (u *UndoLog) PopLast(trxId TrxId) {
 // Discard は指定した trxId の Undo ログを破棄する
 //
 // メモリインデックスの操作のみ (UNDO ページ上のデータは残る)
-func (u *UndoLog) Discard(trxId TrxId) {
+func (u *UndoManager) Discard(trxId TrxId) {
 	delete(u.records, trxId)
 }
 
 // writeToPage はシリアライズ済みの UNDO レコードを UNDO ページに書き込む
-func (u *UndoLog) writeToPage(trxId TrxId, serialized []byte) error {
+func (u *UndoManager) writeToPage(trxId TrxId, serialized []byte) error {
 	data, err := u.bp.GetWritePageData(u.currentPageId)
 	if err != nil {
 		return err

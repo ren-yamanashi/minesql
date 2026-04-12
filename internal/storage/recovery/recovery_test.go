@@ -179,7 +179,7 @@ func TestUndoRollback(t *testing.T) {
 		undoDisk, err := file.NewDisk(undoFileId, filepath.Join(tmpdir, "undo.db"))
 		assert.NoError(t, err)
 		bp.RegisterDisk(undoFileId, undoDisk)
-		undoLog, err := access.NewUndoLog(bp, rl, undoFileId)
+		undoLog, err := access.NewUndoManager(bp, rl, undoFileId)
 		assert.NoError(t, err)
 
 		// テーブル作成
@@ -262,7 +262,7 @@ func TestUndoRollback(t *testing.T) {
 		undoDisk, err := file.NewDisk(undoFileId, filepath.Join(tmpdir, "undo.db"))
 		assert.NoError(t, err)
 		bp.RegisterDisk(undoFileId, undoDisk)
-		undoLog, err := access.NewUndoLog(bp, rl, undoFileId)
+		undoLog, err := access.NewUndoManager(bp, rl, undoFileId)
 		assert.NoError(t, err)
 
 		// テーブル作成
@@ -292,7 +292,7 @@ func TestUndoRollback(t *testing.T) {
 		lockMgr := lock.NewManager(5000)
 		err = table.Insert(bp, trxId, lockMgr, [][]byte{[]byte("a"), []byte("Alice")})
 		assert.NoError(t, err)
-		manager := access.NewManager(undoLog, lockMgr, rl)
+		manager := access.NewTrxManager(undoLog, lockMgr, rl)
 		manager.Begin() // trxId=1
 		err = manager.Commit(trxId)
 		assert.NoError(t, err)

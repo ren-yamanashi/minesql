@@ -1187,14 +1187,14 @@ func collectAllTablePairs(t *testing.T, bp *buffer.BufferPool, table *Table) []d
 	return records
 }
 
-func TestUndoLogRecording(t *testing.T) {
+func TestUndoManagerRecording(t *testing.T) {
 	t.Run("Insert 時に UndoInsertRecord が記録される", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, tmpdir := InitDisk(t, "users.db")
 		undoDm, err := file.NewDisk(undoTestFileId, filepath.Join(tmpdir, "undo.db"))
 		assert.NoError(t, err)
 		bp.RegisterDisk(undoTestFileId, undoDm)
-		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
 		assert.NoError(t, err)
 		table := NewTable("users", metaPageId, 1, nil, undoLog, nil)
 		err = table.Create(bp)
@@ -1221,7 +1221,7 @@ func TestUndoLogRecording(t *testing.T) {
 		undoDm, err := file.NewDisk(undoTestFileId, filepath.Join(tmpdir, "undo.db"))
 		assert.NoError(t, err)
 		bp.RegisterDisk(undoTestFileId, undoDm)
-		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
 		assert.NoError(t, err)
 		table := NewTable("users", metaPageId, 1, nil, undoLog, nil)
 		err = table.Create(bp)
@@ -1251,7 +1251,7 @@ func TestUndoLogRecording(t *testing.T) {
 		undoDm, err := file.NewDisk(undoTestFileId, filepath.Join(tmpdir, "undo.db"))
 		assert.NoError(t, err)
 		bp.RegisterDisk(undoTestFileId, undoDm)
-		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
 		assert.NoError(t, err)
 		table := NewTable("users", metaPageId, 1, nil, undoLog, nil)
 		err = table.Create(bp)
@@ -1298,7 +1298,7 @@ func TestUndoLogRecording(t *testing.T) {
 		undoDm, err := file.NewDisk(undoTestFileId, filepath.Join(tmpdir, "undo.db"))
 		assert.NoError(t, err)
 		bp.RegisterDisk(undoTestFileId, undoDm)
-		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
 		assert.NoError(t, err)
 		table := NewTable("users", metaPageId, 1, nil, undoLog, nil)
 		err = table.Create(bp)
@@ -1339,7 +1339,7 @@ func TestUndoLogRecording(t *testing.T) {
 		undoDm, err := file.NewDisk(undoTestFileId, filepath.Join(tmpdir, "undo.db"))
 		assert.NoError(t, err)
 		bp.RegisterDisk(undoTestFileId, undoDm)
-		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
 		assert.NoError(t, err)
 		table := NewTable("users", metaPageId, 1, nil, undoLog, nil)
 		err = table.Create(bp)

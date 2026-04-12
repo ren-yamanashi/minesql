@@ -184,7 +184,7 @@ func updateColumnStats(
 	}
 }
 
-// buildTable は TableMeta から Table を構築する (UndoLog なし)
+// buildTable は TableMeta から Table を構築する (UndoManager なし)
 func buildTable(meta *TableMeta) (*access.Table, error) {
 	var uniqueIndexes []*access.UniqueIndex
 	for _, idxMeta := range meta.Indexes {
