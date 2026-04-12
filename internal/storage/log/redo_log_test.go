@@ -291,6 +291,195 @@ func TestFlushedLSN(t *testing.T) {
 	})
 }
 
+func TestCheckpointLSN(t *testing.T) {
+	t.Run("新規作成直後は 0 を返す", func(t *testing.T) {
+		// GIVEN
+		tmpDir := t.TempDir()
+		rl, err := NewRedoLog(tmpDir)
+		assert.NoError(t, err)
+
+		// WHEN / THEN
+		assert.Equal(t, LSN(0), rl.CheckpointLSN())
+	})
+
+	t.Run("SetCheckpointLSN で更新できる", func(t *testing.T) {
+		// GIVEN
+		tmpDir := t.TempDir()
+		rl, err := NewRedoLog(tmpDir)
+		assert.NoError(t, err)
+
+		// WHEN
+		err = rl.SetCheckpointLSN(LSN(5))
+		assert.NoError(t, err)
+
+		// THEN
+		assert.Equal(t, LSN(5), rl.CheckpointLSN())
+	})
+
+	t.Run("再オープンで CheckpointLSN が復元される", func(t *testing.T) {
+		// GIVEN
+		tmpDir := t.TempDir()
+		rl1, err := NewRedoLog(tmpDir)
+		assert.NoError(t, err)
+		rl1.AppendCommit(1)
+		err = rl1.Flush()
+		assert.NoError(t, err)
+		err = rl1.SetCheckpointLSN(LSN(1))
+		assert.NoError(t, err)
+
+		// WHEN
+		rl2, err := NewRedoLog(tmpDir)
+		assert.NoError(t, err)
+
+		// THEN
+		assert.Equal(t, LSN(1), rl2.CheckpointLSN())
+	})
+
+	t.Run("Reset 後は 0 に戻る", func(t *testing.T) {
+		// GIVEN
+		tmpDir := t.TempDir()
+		rl, err := NewRedoLog(tmpDir)
+		assert.NoError(t, err)
+		err = rl.SetCheckpointLSN(LSN(5))
+		assert.NoError(t, err)
+
+		// WHEN
+		err = rl.Reset()
+		assert.NoError(t, err)
+
+		// THEN
+		assert.Equal(t, LSN(0), rl.CheckpointLSN())
+	})
+}
+
+func TestReadFrom(t *testing.T) {
+	t.Run("指定 LSN より大きいレコードだけ返す", func(t *testing.T) {
+		// GIVEN
+		tmpDir := t.TempDir()
+		rl, err := NewRedoLog(tmpDir)
+		assert.NoError(t, err)
+
+		rl.AppendCommit(1) // LSN=1
+		rl.AppendCommit(2) // LSN=2
+		rl.AppendCommit(3) // LSN=3
+		err = rl.Flush()
+		assert.NoError(t, err)
+
+		// WHEN
+		records, err := rl.ReadFrom(LSN(1))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 2, len(records))
+		assert.Equal(t, LSN(2), records[0].LSN)
+		assert.Equal(t, LSN(3), records[1].LSN)
+	})
+
+	t.Run("LSN 0 を指定すると全レコードを返す", func(t *testing.T) {
+		// GIVEN
+		tmpDir := t.TempDir()
+		rl, err := NewRedoLog(tmpDir)
+		assert.NoError(t, err)
+
+		rl.AppendCommit(1)
+		rl.AppendCommit(2)
+		err = rl.Flush()
+		assert.NoError(t, err)
+
+		// WHEN
+		records, err := rl.ReadFrom(LSN(0))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 2, len(records))
+	})
+
+	t.Run("全レコードが指定 LSN 以下の場合は空を返す", func(t *testing.T) {
+		// GIVEN
+		tmpDir := t.TempDir()
+		rl, err := NewRedoLog(tmpDir)
+		assert.NoError(t, err)
+
+		rl.AppendCommit(1) // LSN=1
+		err = rl.Flush()
+		assert.NoError(t, err)
+
+		// WHEN
+		records, err := rl.ReadFrom(LSN(10))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Empty(t, records)
+	})
+}
+
+func TestTruncateBefore(t *testing.T) {
+	t.Run("指定 LSN 以前のレコードが切り詰められる", func(t *testing.T) {
+		// GIVEN
+		tmpDir := t.TempDir()
+		rl, err := NewRedoLog(tmpDir)
+		assert.NoError(t, err)
+
+		rl.AppendCommit(1) // LSN=1
+		rl.AppendCommit(2) // LSN=2
+		rl.AppendCommit(3) // LSN=3
+		err = rl.Flush()
+		assert.NoError(t, err)
+
+		// WHEN
+		err = rl.TruncateBefore(LSN(2))
+		assert.NoError(t, err)
+
+		// THEN
+		records, err := rl.ReadAll()
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(records))
+		assert.Equal(t, LSN(3), records[0].LSN)
+	})
+
+	t.Run("全レコードが切り詰め対象の場合はレコードが空になる", func(t *testing.T) {
+		// GIVEN
+		tmpDir := t.TempDir()
+		rl, err := NewRedoLog(tmpDir)
+		assert.NoError(t, err)
+
+		rl.AppendCommit(1)
+		err = rl.Flush()
+		assert.NoError(t, err)
+
+		// WHEN
+		err = rl.TruncateBefore(LSN(10))
+		assert.NoError(t, err)
+
+		// THEN
+		records, err := rl.ReadAll()
+		assert.NoError(t, err)
+		assert.Empty(t, records)
+	})
+
+	t.Run("切り詰め後にファイルサイズが縮小する", func(t *testing.T) {
+		// GIVEN
+		tmpDir := t.TempDir()
+		rl, err := NewRedoLog(tmpDir)
+		assert.NoError(t, err)
+
+		rl.AppendPageCopy(1, page.NewPageId(1, 0), make([]byte, page.PAGE_SIZE))
+		rl.AppendPageCopy(2, page.NewPageId(1, 1), make([]byte, page.PAGE_SIZE))
+		err = rl.Flush()
+		assert.NoError(t, err)
+
+		sizeBefore, _ := rl.FileSize()
+
+		// WHEN
+		err = rl.TruncateBefore(LSN(1))
+		assert.NoError(t, err)
+
+		// THEN
+		sizeAfter, _ := rl.FileSize()
+		assert.Less(t, sizeAfter, sizeBefore)
+	})
+}
+
 func TestFileSize(t *testing.T) {
 	t.Run("新規作成直後はヘッダーサイズのみ", func(t *testing.T) {
 		// GIVEN
