@@ -42,14 +42,15 @@ func NewUndoManager(bp *buffer.BufferPool, redoLog *log.RedoLog, undoFileId page
 	}, nil
 }
 
-// Append は指定した trxId の Undo ログにレコードを追加する
-func (u *UndoManager) Append(trxId TrxId, record UndoRecord) error {
+// Append は指定した trxId の Undo ログにレコードを追加し、書き込み先の UndoPtr を返す
+func (u *UndoManager) Append(trxId TrxId, record UndoRecord) (UndoPtr, error) {
 	undoNo := uint64(len(u.records[trxId]))
-	if err := u.writeToPage(trxId, record.Serialize(trxId, undoNo)); err != nil {
-		return err
+	ptr, err := u.writeToPage(trxId, record.Serialize(trxId, undoNo))
+	if err != nil {
+		return UndoPtr{}, err
 	}
 	u.records[trxId] = append(u.records[trxId], record)
-	return nil
+	return ptr, nil
 }
 
 // GetRecords は指定した trxId の Undo ログレコードを取得する
@@ -78,23 +79,29 @@ func (u *UndoManager) Discard(trxId TrxId) {
 	delete(u.records, trxId)
 }
 
-// writeToPage はシリアライズ済みの UNDO レコードを UNDO ページに書き込む
-func (u *UndoManager) writeToPage(trxId TrxId, serialized []byte) error {
+// writeToPage はシリアライズ済みの UNDO レコードを UNDO ページに書き込み、書き込み先の UndoPtr を返す
+func (u *UndoManager) writeToPage(trxId TrxId, serialized []byte) (UndoPtr, error) {
 	data, err := u.bp.GetWritePageData(u.currentPageId)
 	if err != nil {
-		return err
+		return UndoPtr{}, err
 	}
 	undoPage := NewUndoPage(page.NewPage(data))
+
+	// 書き込み先の位置を記録
+	ptr := UndoPtr{
+		PageNumber: uint16(u.currentPageId.PageNumber),
+		Offset:     undoPage.UsedBytes(),
+	}
 
 	if !undoPage.Append(serialized) {
 		// ページが満杯なので新しいページを割り当て
 		newPageId, err := u.bp.AllocatePageId(u.undoFileId)
 		if err != nil {
-			return err
+			return UndoPtr{}, err
 		}
 		err = u.bp.AddPage(newPageId)
 		if err != nil {
-			return err
+			return UndoPtr{}, err
 		}
 
 		// 現在のページに次ページへのリンクを設定
@@ -103,10 +110,16 @@ func (u *UndoManager) writeToPage(trxId TrxId, serialized []byte) error {
 		// 新しいページを初期化してレコードを追記
 		newData, err := u.bp.GetWritePageData(newPageId)
 		if err != nil {
-			return err
+			return UndoPtr{}, err
 		}
 		newUndoPage := NewUndoPage(page.NewPage(newData))
 		newUndoPage.Initialize()
+
+		// 新しいページの先頭に書き込む
+		ptr = UndoPtr{
+			PageNumber: uint16(newPageId.PageNumber),
+			Offset:     0,
+		}
 		newUndoPage.Append(serialized)
 
 		u.currentPageId = newPageId
@@ -116,9 +129,9 @@ func (u *UndoManager) writeToPage(trxId TrxId, serialized []byte) error {
 	if u.redoLog != nil {
 		readData, err := u.bp.GetReadPageData(u.currentPageId)
 		if err != nil {
-			return err
+			return UndoPtr{}, err
 		}
 		u.redoLog.AppendPageCopy(trxId, u.currentPageId, readData)
 	}
-	return nil
+	return ptr, nil
 }
