@@ -917,6 +917,70 @@ func TestClearNewlyDirtied(t *testing.T) {
 	})
 }
 
+func TestMinPageLSN(t *testing.T) {
+	t.Run("ダーティーページの最小 Page LSN を返す", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		disk, _ := createEmptyDisk(t, tmpdir)
+		bp := NewBufferPool(5, nil)
+		bp.RegisterDisk(page.FileId(0), disk)
+
+		pageId1 := disk.AllocatePage()
+		pageId2 := disk.AllocatePage()
+		pageId3 := disk.AllocatePage()
+
+		_ = bp.AddPage(pageId1)
+		_ = bp.AddPage(pageId2)
+		_ = bp.AddPage(pageId3)
+
+		// 各ページをダーティーにし、Page LSN を設定
+		data1, _ := bp.GetWritePageData(pageId1)
+		binary.BigEndian.PutUint32(page.NewPage(data1).Header, 10)
+
+		data2, _ := bp.GetWritePageData(pageId2)
+		binary.BigEndian.PutUint32(page.NewPage(data2).Header, 5)
+
+		data3, _ := bp.GetWritePageData(pageId3)
+		binary.BigEndian.PutUint32(page.NewPage(data3).Header, 15)
+
+		// WHEN
+		minLSN := bp.MinPageLSN()
+
+		// THEN
+		assert.Equal(t, uint32(5), minLSN)
+	})
+
+	t.Run("ダーティーページがない場合は 0 を返す", func(t *testing.T) {
+		// GIVEN
+		bp := NewBufferPool(5, nil)
+
+		// WHEN
+		minLSN := bp.MinPageLSN()
+
+		// THEN
+		assert.Equal(t, uint32(0), minLSN)
+	})
+
+	t.Run("ダーティーページが 1 つだけの場合はその Page LSN を返す", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		disk, _ := createEmptyDisk(t, tmpdir)
+		bp := NewBufferPool(5, nil)
+		bp.RegisterDisk(page.FileId(0), disk)
+
+		pageId := disk.AllocatePage()
+		_ = bp.AddPage(pageId)
+		data, _ := bp.GetWritePageData(pageId)
+		binary.BigEndian.PutUint32(page.NewPage(data).Header, 42)
+
+		// WHEN
+		minLSN := bp.MinPageLSN()
+
+		// THEN
+		assert.Equal(t, uint32(42), minLSN)
+	})
+}
+
 func TestBufferPoolIntegration(t *testing.T) {
 	t.Run("バッファプールの統合動作テスト (ページアクセス、ページ置換)", func(t *testing.T) {
 		// GIVEN

@@ -1,6 +1,7 @@
 package buffer
 
 import (
+	"encoding/binary"
 	"minesql/internal/storage/page"
 	"testing"
 
@@ -165,5 +166,69 @@ func TestFlushListClear(t *testing.T) {
 		assert.Nil(t, fl.head)
 		assert.Nil(t, fl.tail)
 		assert.False(t, fl.Contains(page.NewPageId(1, 0)))
+	})
+}
+
+func TestFlushListMinPageLSN(t *testing.T) {
+	// ヘルパー: BufferPage を作成し Page LSN を設定する
+	makeBufferPage := func(pageId page.PageId, lsn uint32) BufferPage {
+		bp := *NewBufferPage(pageId)
+		binary.BigEndian.PutUint32(page.NewPage(bp.Page).Header, lsn)
+		return bp
+	}
+
+	t.Run("最小の Page LSN を返す", func(t *testing.T) {
+		// GIVEN
+		fl := NewFlushList()
+		pageId1 := page.NewPageId(1, 0)
+		pageId2 := page.NewPageId(1, 1)
+		pageId3 := page.NewPageId(1, 2)
+		fl.Add(pageId1)
+		fl.Add(pageId2)
+		fl.Add(pageId3)
+
+		bufferPages := []BufferPage{
+			makeBufferPage(pageId1, 10),
+			makeBufferPage(pageId2, 5),
+			makeBufferPage(pageId3, 15),
+		}
+		pageTable := PageTable{
+			pageId1: 0,
+			pageId2: 1,
+			pageId3: 2,
+		}
+
+		// WHEN
+		minLSN := fl.MinPageLSN(bufferPages, pageTable)
+
+		// THEN
+		assert.Equal(t, uint32(5), minLSN)
+	})
+
+	t.Run("フラッシュリストが空の場合は 0 を返す", func(t *testing.T) {
+		// GIVEN
+		fl := NewFlushList()
+
+		// WHEN
+		minLSN := fl.MinPageLSN(nil, nil)
+
+		// THEN
+		assert.Equal(t, uint32(0), minLSN)
+	})
+
+	t.Run("ページが 1 つだけの場合はその Page LSN を返す", func(t *testing.T) {
+		// GIVEN
+		fl := NewFlushList()
+		pageId := page.NewPageId(1, 0)
+		fl.Add(pageId)
+
+		bufferPages := []BufferPage{makeBufferPage(pageId, 42)}
+		pageTable := PageTable{pageId: 0}
+
+		// WHEN
+		minLSN := fl.MinPageLSN(bufferPages, pageTable)
+
+		// THEN
+		assert.Equal(t, uint32(42), minLSN)
 	})
 }

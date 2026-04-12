@@ -1,6 +1,9 @@
 package buffer
 
-import "minesql/internal/storage/page"
+import (
+	"encoding/binary"
+	"minesql/internal/storage/page"
+)
 
 type flushListNode struct {
 	pageId page.PageId    // このノードが表すページの ID
@@ -86,6 +89,34 @@ func (fl *FlushList) Clear() {
 	fl.tail = nil
 	fl.Size = 0
 	fl.nodeMap = make(map[page.PageId]*flushListNode)
+}
+
+// MinPageLSN はフラッシュリスト内の全ダーティーページの最小 Page LSN を返す
+//
+// ダーティーページがない場合は 0 を返す
+func (fl *FlushList) MinPageLSN(bufferPages []BufferPage, pageTable PageTable) uint32 {
+	if fl.Size == 0 {
+		return 0
+	}
+
+	var minLSN uint32
+	first := true
+	node := fl.head
+	for node != nil {
+		bufferId, ok := pageTable[node.pageId]
+		if !ok {
+			node = node.next
+			continue
+		}
+		pg := page.NewPage(bufferPages[bufferId].Page)
+		lsn := binary.BigEndian.Uint32(pg.Header)
+		if first || lsn < minLSN {
+			minLSN = lsn
+			first = false
+		}
+		node = node.next
+	}
+	return minLSN
 }
 
 // Contains は指定ページがフラッシュリストに含まれているかを返す

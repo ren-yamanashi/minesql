@@ -1,6 +1,7 @@
 package buffer
 
 import (
+	"encoding/binary"
 	"minesql/internal/storage/file"
 	"minesql/internal/storage/log"
 	"minesql/internal/storage/page"
@@ -81,6 +82,78 @@ func TestPageCleanerStartStop(t *testing.T) {
 		pc.Stop()
 
 		// THEN: パニックせずに正常終了する
+	})
+}
+
+func TestPageCleanerCheckpoint(t *testing.T) {
+	t.Run("フラッシュ後にチェックポイントが実行され checkpoint LSN が更新される", func(t *testing.T) {
+		// GIVEN: ダーティーページ率が閾値を超えた状態
+		tmpdir := t.TempDir()
+		rl, err := log.NewRedoLog(tmpdir)
+		assert.NoError(t, err)
+		bp := NewBufferPool(3, rl)
+		disk, _ := file.NewDisk(page.FileId(1), filepath.Join(tmpdir, "test.db"))
+		bp.RegisterDisk(page.FileId(1), disk)
+
+		// 3 ページをダーティーにし、REDO ログに記録してフラッシュ
+		for i := range 3 {
+			pid, _ := bp.AllocatePageId(page.FileId(1))
+			_ = bp.AddPage(pid)
+			data, _ := bp.GetWritePageData(pid)
+			data[0] = byte(i + 1)
+			rl.AppendPageCopy(1, pid, data)
+		}
+		err = rl.Flush()
+		assert.NoError(t, err)
+
+		// チェックポイント LSN が初期値 (0) であることを確認
+		assert.Equal(t, log.LSN(0), rl.CheckpointLSN())
+
+		pc := NewPageCleaner(bp, rl, 1048576, 90)
+		pc.interval = 10 * time.Millisecond
+
+		// WHEN
+		pc.Start()
+		time.Sleep(100 * time.Millisecond)
+		pc.Stop()
+
+		// THEN: フラッシュ後にチェックポイントが実行され、checkpoint LSN が 0 より大きくなる
+		assert.Greater(t, rl.CheckpointLSN(), log.LSN(0))
+	})
+
+	t.Run("全ページフラッシュ後に checkpoint LSN が FlushedLSN と一致する", func(t *testing.T) {
+		// GIVEN: バッファプールサイズ 2 で 2 ページ全てダーティー (100% > 閾値 40%)
+		tmpdir := t.TempDir()
+		rl, err := log.NewRedoLog(tmpdir)
+		assert.NoError(t, err)
+		bp := NewBufferPool(2, rl)
+		disk, _ := file.NewDisk(page.FileId(1), filepath.Join(tmpdir, "test.db"))
+		bp.RegisterDisk(page.FileId(1), disk)
+
+		for i := range 2 {
+			pid, _ := bp.AllocatePageId(page.FileId(1))
+			_ = bp.AddPage(pid)
+			data, _ := bp.GetWritePageData(pid)
+			// ページヘッダー (先頭 4 バイト) に Page LSN を設定
+			lsn := rl.AppendPageCopy(1, pid, data)
+			binary.BigEndian.PutUint32(page.NewPage(data).Header, uint32(lsn))
+			_ = i
+		}
+		err = rl.Flush()
+		assert.NoError(t, err)
+
+		// 閾値を 40% にし、1 ページフラッシュ後 (50%) でも閾値を超えるようにする
+		pc := NewPageCleaner(bp, rl, 1048576, 40)
+		pc.interval = 10 * time.Millisecond
+
+		// WHEN: 十分な時間待って全ページがフラッシュされるのを待つ
+		pc.Start()
+		time.Sleep(200 * time.Millisecond)
+		pc.Stop()
+
+		// THEN: 全ページがフラッシュされた場合、checkpoint LSN = FlushedLSN
+		assert.Equal(t, 0, bp.FlushListSize())
+		assert.Equal(t, rl.FlushedLSN(), rl.CheckpointLSN())
 	})
 }
 
