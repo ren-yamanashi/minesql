@@ -88,7 +88,7 @@ func TestFlushAllPages(t *testing.T) {
 		_ = bp.AddPage(pageId2)
 		_ = bp.AddPage(pageId3)
 
-		// WHEN: 全ページがクリーンな状態でフラッシュ
+		// WHEN
 		err := bp.FlushAllPages()
 
 		// THEN

@@ -65,6 +65,22 @@ func TestFlushOldestPages(t *testing.T) {
 	})
 }
 
+func TestPageCleanerStop(t *testing.T) {
+	t.Run("Start せずに Stop してもパニックしない", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		rl, err := log.NewRedoLog(tmpdir)
+		assert.NoError(t, err)
+		bp := NewBufferPool(10, rl)
+		pc := NewPageCleaner(bp, rl, 1048576, 90)
+
+		// WHEN / THEN
+		assert.NotPanics(t, func() {
+			pc.Stop()
+		})
+	})
+}
+
 func TestPageCleanerStartStop(t *testing.T) {
 	t.Run("Start と Stop が正常に動作する", func(t *testing.T) {
 		// GIVEN

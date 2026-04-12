@@ -1,6 +1,7 @@
 package buffer
 
 import (
+	stdlog "log"
 	"minesql/internal/storage/log"
 	"time"
 )
@@ -42,6 +43,10 @@ func (pc *PageCleaner) Start() {
 
 // Stop はバックグラウンド goroutine を停止し、終了を待つ
 func (pc *PageCleaner) Stop() {
+	// Start() が呼ばれていない場合は何もしない
+	if pc.done == nil {
+		return
+	}
 	close(pc.done)
 	<-pc.stopped
 	pc.ticker.Stop()
@@ -67,9 +72,12 @@ func (pc *PageCleaner) clean() {
 	}
 	flushCount := max(pc.bp.FlushListSize()/4, 1)
 	if err := pc.bp.FlushOldestPages(flushCount); err != nil {
+		stdlog.Printf("page cleaner: flush failed: %v", err)
 		return
 	}
-	_ = pc.checkpoint.Execute()
+	if err := pc.checkpoint.Execute(); err != nil {
+		stdlog.Printf("page cleaner: checkpoint failed: %v", err)
+	}
 }
 
 // shouldFlush は閾値 (以下のいずれか) を超えているかを判定する
