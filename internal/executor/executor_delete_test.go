@@ -5,7 +5,6 @@ import (
 
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
-	"minesql/internal/storage/lock"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -14,8 +13,7 @@ func TestDelete(t *testing.T) {
 	t.Run("正常に Delete Executor を生成できる", func(t *testing.T) {
 		// GIVEN
 		var trxId handler.TrxId = 1
-		iterator := NewTableScan(
-			0, lock.NewManager(5000), nil,
+		iterator := testTableScan(nil,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -39,8 +37,7 @@ func TestDelete(t *testing.T) {
 		tbl, err := handler.Get().GetTable("users")
 		assert.NoError(t, err)
 
-		del := NewDelete(trxId, tbl, NewTableScan(
-			0, lock.NewManager(5000), tbl,
+		del := NewDelete(trxId, tbl, testTableScan(tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
@@ -53,8 +50,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: テーブルが空になっている
-		scan := NewTableScan(
-			0, lock.NewManager(5000), tbl,
+		scan := testTableScan(tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -76,8 +72,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// プライマリキーが "c" 未満のレコードを削除対象とする
-		iterator := NewTableScan(
-			0, lock.NewManager(5000), tbl,
+		iterator := testTableScan(tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool {
 				return string(record[0]) < "c"
@@ -94,8 +89,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: "c" 以降のレコードが残っている
-		scan := NewTableScan(
-			0, lock.NewManager(5000), tbl,
+		scan := testTableScan(tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -119,8 +113,7 @@ func TestDelete(t *testing.T) {
 
 		// first_name が "Bob" のレコードを削除
 		iterator := NewFilter(
-			NewTableScan(
-				0, lock.NewManager(5000), tbl,
+			testTableScan(tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -137,8 +130,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: "Bob" 以外のレコードが残っている
-		scan := NewTableScan(
-			0, lock.NewManager(5000), tbl,
+		scan := testTableScan(tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		)
@@ -165,8 +157,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// プライマリキーが "a" のレコードを削除 (last_name = "Doe")
-		iterator := NewTableScan(
-			0, lock.NewManager(5000), tbl,
+		iterator := testTableScan(tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
 			func(record Record) bool {
 				return string(record[0]) == "a"
@@ -213,8 +204,7 @@ func TestDelete(t *testing.T) {
 
 		tbl, err := handler.Get().GetTable("empty_table")
 		assert.NoError(t, err)
-		del := NewDelete(trxId, tbl, NewTableScan(
-			0, lock.NewManager(5000), tbl,
+		del := NewDelete(trxId, tbl, testTableScan(tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
@@ -238,8 +228,7 @@ func TestDelete(t *testing.T) {
 		trx1 := hdl.BeginTrx()
 
 		// trx1 が row "a" を DELETE (排他ロック取得 + DeleteMark 設定)
-		del1 := NewDelete(trx1, tbl, NewTableScan(
-			trx1, hdl.LockMgr, tbl,
+		del1 := NewDelete(trx1, tbl, testTableScan(tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return string(record[0]) == "a" },
 		))
@@ -249,8 +238,7 @@ func TestDelete(t *testing.T) {
 		// WHEN: trx2 が同じ行を DELETE しようとする
 		// DeleteMark=1 の行は scan でスキップされるため、削除対象が 0 件で正常終了する
 		trx2 := hdl.BeginTrx()
-		del2 := NewDelete(trx2, tbl, NewTableScan(
-			trx2, hdl.LockMgr, tbl,
+		del2 := NewDelete(trx2, tbl, testTableScan(tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return string(record[0]) == "a" },
 		))

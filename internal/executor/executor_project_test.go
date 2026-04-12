@@ -3,7 +3,6 @@ package executor
 import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
-	"minesql/internal/storage/lock"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,8 +20,7 @@ func TestProject(t *testing.T) {
 
 		// WHEN: first_name (pos=1) と last_name (pos=2) のみ取得
 		records := collectAll(t, NewProject(
-			NewTableScan(
-				0, lock.NewManager(5000), tbl,
+			testTableScan(tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -49,8 +47,7 @@ func TestProject(t *testing.T) {
 
 		// WHEN: first_name (pos=1) のみ取得
 		records := collectAll(t, NewProject(
-			NewTableScan(
-				0, lock.NewManager(5000), tbl,
+			testTableScan(tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -77,8 +74,7 @@ func TestProject(t *testing.T) {
 
 		// WHEN: last_name (pos=2), id (pos=0) の順で取得
 		records := collectAll(t, NewProject(
-			NewTableScan(
-				0, lock.NewManager(5000), tbl,
+			testTableScan(tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -103,8 +99,7 @@ func TestProject(t *testing.T) {
 		// WHEN: first_name が "Alice" のレコードから first_name と last_name を取得
 		records := collectAll(t, NewProject(
 			NewFilter(
-				NewTableScan(
-					0, lock.NewManager(5000), tbl,
+				testTableScan(tbl,
 					access.RecordSearchModeStart{},
 					func(record Record) bool { return true },
 				),
@@ -132,8 +127,7 @@ func TestProject(t *testing.T) {
 		// WHEN: 存在しない条件でフィルタした結果を射影
 		records := collectAll(t, NewProject(
 			NewFilter(
-				NewTableScan(
-					0, lock.NewManager(5000), tbl,
+				testTableScan(tbl,
 					access.RecordSearchModeStart{},
 					func(record Record) bool { return true },
 				),

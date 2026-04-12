@@ -3,6 +3,7 @@ package planner
 import (
 	"minesql/internal/ast"
 	"minesql/internal/executor"
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
 	"testing"
 
@@ -110,5 +111,51 @@ func TestPlanDelete(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, exec)
 		assert.Contains(t, err.Error(), "non_existent")
+	})
+
+	t.Run("Current Read: 自トランザクション開始後にコミットされた行も DELETE 対象になる", func(t *testing.T) {
+		// GIVEN
+		initStorageManagerForTest(t)
+		defer handler.Reset()
+
+		hdl := handler.Get()
+		createTableForTest(t, []handler.CreateColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "name", Type: handler.ColumnTypeString},
+		})
+		tbl, err := hdl.GetTable("users")
+		assert.NoError(t, err)
+
+		// T1 を開始 (まだ何もしない)
+		trx1 := hdl.BeginTrx()
+
+		// T2 が行を INSERT してコミット (T1 の開始後)
+		trx2 := hdl.BeginTrx()
+		err = tbl.Insert(hdl.BufferPool, trx2, hdl.LockMgr, [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+		assert.NoError(t, hdl.CommitTrx(trx2))
+
+		// WHEN: T1 が DELETE を実行 (Current Read なので T2 のコミット済み行が見える)
+		stmt := &ast.DeleteStmt{
+			From: *ast.NewTableId("users"),
+			Where: &ast.WhereClause{
+				Condition: ast.NewBinaryExpr(
+					"=",
+					ast.NewLhsColumn(*ast.NewColumnId("id")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("1")),
+				),
+			},
+		}
+		exec, err := PlanDelete(trx1, stmt)
+		assert.NoError(t, err)
+		_, err = exec.Next()
+		assert.NoError(t, err)
+
+		// THEN: 行が削除されている (DeleteMark=1 なので全可視スキャンでも返らない)
+		iter, err := tbl.Search(hdl.BufferPool, access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), access.RecordSearchModeStart{})
+		assert.NoError(t, err)
+		_, ok, err := iter.Next()
+		assert.NoError(t, err)
+		assert.False(t, ok)
 	})
 }

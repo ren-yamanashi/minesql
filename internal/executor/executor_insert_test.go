@@ -61,8 +61,7 @@ func TestInsert_Next(t *testing.T) {
 		whileCondition := func(record Record) bool {
 			return true
 		}
-		seqScan := NewTableScan(
-			0, lock.NewManager(5000), tbl,
+		seqScan := testTableScan(tbl,
 			access.RecordSearchModeStart{},
 			whileCondition,
 		)
@@ -96,8 +95,7 @@ func TestInsert_Next(t *testing.T) {
 		trx2 := hdl.BeginTrx()
 		upd := NewUpdate(trx2, tbl, []SetColumn{
 			{Pos: 1, Value: []byte("Updated")},
-		}, NewTableScan(
-			trx2, hdl.LockMgr, tbl,
+		}, testTableScan(tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return string(record[0]) == "a" },
 		))

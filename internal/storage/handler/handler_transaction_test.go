@@ -2,7 +2,6 @@ package handler
 
 import (
 	"minesql/internal/storage/access"
-	"minesql/internal/storage/lock"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -69,7 +68,9 @@ func TestCommitTrx(t *testing.T) {
 		// THEN
 		readTrxId := h.BeginTrx()
 		defer func() { assert.NoError(t, h.CommitTrx(readTrxId)) }()
-		iter, err := tbl.Search(h.BufferPool, readTrxId, h.LockMgr, access.RecordSearchModeStart{})
+		rv := h.CreateReadView(readTrxId)
+		vr := access.NewVersionReader(h.UndoLog())
+		iter, err := tbl.Search(h.BufferPool, rv, vr, access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -105,10 +106,72 @@ func TestRollbackTrx(t *testing.T) {
 
 		// THEN: Insert が取り消されてテーブルが空
 		assert.NoError(t, err)
-		iter, err := tbl.Search(h.BufferPool, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
+		rv := access.NewReadView(0, nil, ^uint64(0))
+		vr := access.NewVersionReader(nil)
+		iter, err := tbl.Search(h.BufferPool, rv, vr, access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
+	})
+}
+
+func TestCreateReadView(t *testing.T) {
+	t.Run("トランザクション用の ReadView が作成される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "10")
+		Reset()
+		h := Init()
+
+		trx1 := h.BeginTrx()
+		trx2 := h.BeginTrx()
+
+		// WHEN
+		rv := h.CreateReadView(trx2)
+
+		// THEN
+		assert.Equal(t, trx2, rv.TrxId)
+		assert.Contains(t, rv.MIds, trx1)    // trx1 はアクティブ
+		assert.NotContains(t, rv.MIds, trx2) // 自分は含まれない
+	})
+
+	t.Run("コミット済みトランザクションは MIds に含まれない", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "10")
+		Reset()
+		h := Init()
+
+		trx1 := h.BeginTrx()
+		err := h.CommitTrx(trx1)
+		assert.NoError(t, err)
+
+		trx2 := h.BeginTrx()
+
+		// WHEN
+		rv := h.CreateReadView(trx2)
+
+		// THEN
+		assert.NotContains(t, rv.MIds, trx1) // コミット済み
+	})
+}
+
+func TestUndoLog(t *testing.T) {
+	t.Run("UndoManager が返される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "10")
+		Reset()
+		h := Init()
+
+		// WHEN
+		undoLog := h.UndoLog()
+
+		// THEN
+		assert.NotNil(t, undoLog)
 	})
 }
