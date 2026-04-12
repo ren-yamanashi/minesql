@@ -32,7 +32,7 @@ func TestNewBufferPool(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, disk, registeredDm)
 		assert.Equal(t, size, bp.maxBufferSize)
-		assert.Equal(t, size, len(bp.bufferPages))
+		assert.Equal(t, 0, len(bp.bufferPages))
 		assert.Equal(t, 0, len(bp.pageTable))
 	})
 }
@@ -195,7 +195,7 @@ func TestFetchPage(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, pageId, fetchedPage.PageId)
-		assert.Equal(t, BufferId(2), bp.pageTable[pageId])
+		assert.Equal(t, BufferId(0), bp.pageTable[pageId])
 	})
 
 	t.Run("指定されたページがページテーブルに存在しない場合、ディスクからページが読み込まれる", func(t *testing.T) {
@@ -214,7 +214,7 @@ func TestFetchPage(t *testing.T) {
 		assert.NotNil(t, fetchedPage)
 		assert.Equal(t, pageId, fetchedPage.PageId)
 		assert.False(t, fetchedPage.IsDirty)
-		assert.Equal(t, BufferId(2), bp.pageTable[pageId])
+		assert.Equal(t, BufferId(0), bp.pageTable[pageId])
 	})
 }
 
@@ -235,7 +235,7 @@ func TestAddPage(t *testing.T) {
 		assert.NoError(t, err)
 		bufferId, ok := bp.pageTable[pageId]
 		assert.True(t, ok)
-		assert.Equal(t, BufferId(2), bufferId)
+		assert.Equal(t, BufferId(0), bufferId)
 	})
 
 	t.Run("バッファプールに空きがない場合、かつ該当のページがダーティーな場合、一度ページの内容をディスクに書き込んだ後、ページが置換される", func(t *testing.T) {

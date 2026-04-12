@@ -33,16 +33,12 @@ type BufferPool struct {
 }
 
 // NewBufferPool は指定されたサイズの BufferPool を生成する
-//   - size: バッファページの数 (例: 1000 を指定すると、1000 ページ分のバッファプールが生成される)
+//   - size: バッファページの最大数 (例: 1000 を指定すると、最大 1000 ページを格納できるバッファプールが生成される)
 //   - redoLog: REDO ログ
 func NewBufferPool(size int, redoLog *log.RedoLog) *BufferPool {
-	bufPages := make([]BufferPage, size)
-	for i := range bufPages {
-		bufPages[i] = *NewBufferPage(page.InvalidPageId) // 仮のページ ID で初期化 (実際にはバッファプールにページが追加されるときに設定される)
-	}
 	return &BufferPool{
 		disks:             make(map[page.FileId]*file.Disk),
-		bufferPages:       bufPages,
+		bufferPages:       make([]BufferPage, 0, size),
 		maxBufferSize:     size,
 		pageTable:         make(PageTable),
 		evictionAlgorithm: NewLRU(size),
