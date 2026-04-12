@@ -74,7 +74,7 @@ func (fl *FlushList) Remove(pageId page.PageId) {
 
 // OldestPageIds は先頭 (最も古い) から n 件の PageId を返す
 func (fl *FlushList) OldestPageIds(n int) []page.PageId {
-	var result []page.PageId
+	result := []page.PageId{}
 	node := fl.head
 	for node != nil && len(result) < n {
 		result = append(result, node.pageId)
@@ -101,11 +101,9 @@ func (fl *FlushList) MinPageLSN(bufferPages []BufferPage, pageTable PageTable) u
 
 	var minLSN uint32
 	first := true
-	node := fl.head
-	for node != nil {
+	for node := fl.head; node != nil; node = node.next {
 		bufferId, ok := pageTable[node.pageId]
 		if !ok {
-			node = node.next
 			continue
 		}
 		pg := page.NewPage(bufferPages[bufferId].Page)
@@ -114,7 +112,6 @@ func (fl *FlushList) MinPageLSN(bufferPages []BufferPage, pageTable PageTable) u
 			minLSN = lsn
 			first = false
 		}
-		node = node.next
 	}
 	return minLSN
 }

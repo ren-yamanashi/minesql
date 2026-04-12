@@ -27,11 +27,9 @@ func (c *Checkpoint) Execute() error {
 	minLSN := c.bp.MinPageLSN()
 
 	// チェックポイント LSN を算出 (ダーティーページが存在しない場合は Flushed LSN をチェックポイント LSN とする)
-	var checkpointLSN log.LSN
+	checkpointLSN := c.redoLog.FlushedLSN()
 	if minLSN > 0 {
 		checkpointLSN = log.LSN(minLSN - 1)
-	} else {
-		checkpointLSN = c.redoLog.FlushedLSN()
 	}
 
 	// REDO ログヘッダーにチェックポイント LSN を書き込み
