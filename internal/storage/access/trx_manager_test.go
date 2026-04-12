@@ -180,6 +180,62 @@ func TestManagerRollback(t *testing.T) {
 	})
 }
 
+func TestManagerCreateReadView(t *testing.T) {
+	t.Run("自分以外のアクティブトランザクションが MIds に含まれる", func(t *testing.T) {
+		// GIVEN
+		_, undoLog, _ := initManagerTest(t)
+		manager := NewTrxManager(undoLog, lock.NewManager(5000), nil)
+		trx1 := manager.Begin() // TrxId=1
+		trx2 := manager.Begin() // TrxId=2
+		trx3 := manager.Begin() // TrxId=3
+
+		// WHEN
+		rv := manager.CreateReadView(trx2)
+
+		// THEN
+		assert.Equal(t, trx2, rv.TrxId)
+		assert.Equal(t, TrxId(4), rv.MLowLimitId) // nextTrxId
+		assert.Contains(t, rv.MIds, trx1)
+		assert.Contains(t, rv.MIds, trx3)
+		assert.NotContains(t, rv.MIds, trx2) // 自分は含まれない
+	})
+
+	t.Run("コミット済みトランザクションは MIds に含まれない", func(t *testing.T) {
+		// GIVEN
+		_, undoLog, _ := initManagerTest(t)
+		manager := NewTrxManager(undoLog, lock.NewManager(5000), nil)
+		trx1 := manager.Begin() // TrxId=1
+		trx2 := manager.Begin() // TrxId=2
+		_ = manager.Commit(trx1)
+		trx3 := manager.Begin() // TrxId=3
+
+		// WHEN
+		rv := manager.CreateReadView(trx3)
+
+		// THEN
+		assert.Equal(t, trx3, rv.TrxId)
+		assert.NotContains(t, rv.MIds, trx1) // コミット済み
+		assert.Contains(t, rv.MIds, trx2)    // アクティブ
+		// MUpLimitId は trx2 (アクティブの最小)
+		assert.Equal(t, trx2, rv.MUpLimitId)
+	})
+
+	t.Run("他にアクティブトランザクションがない場合 MUpLimitId は nextTrxId", func(t *testing.T) {
+		// GIVEN
+		_, undoLog, _ := initManagerTest(t)
+		manager := NewTrxManager(undoLog, lock.NewManager(5000), nil)
+		trx1 := manager.Begin()
+		_ = trx1
+
+		// WHEN
+		rv := manager.CreateReadView(trx1)
+
+		// THEN
+		assert.Equal(t, 0, len(rv.MIds))
+		assert.Equal(t, rv.MLowLimitId, rv.MUpLimitId)
+	})
+}
+
 // initManagerTest はテスト用にバッファプール・UndoManager・テーブルを初期化する
 func initManagerTest(t *testing.T) (*buffer.BufferPool, *UndoManager, *Table) {
 	t.Helper()

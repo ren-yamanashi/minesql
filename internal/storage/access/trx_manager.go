@@ -21,6 +21,7 @@ type TrxManager struct {
 	lockMgr      *lock.Manager
 	redoLog      *log.RedoLog
 	Transactions map[TrxId]State
+	nextTrxId    TrxId // 次に払い出すトラ���ザクション ID (単調増加)
 }
 
 func NewTrxManager(undoLog *UndoManager, lockMgr *lock.Manager, redoLog *log.RedoLog) *TrxManager {
@@ -29,6 +30,7 @@ func NewTrxManager(undoLog *UndoManager, lockMgr *lock.Manager, redoLog *log.Red
 		lockMgr:      lockMgr,
 		redoLog:      redoLog,
 		Transactions: make(map[TrxId]State),
+		nextTrxId:    1,
 	}
 }
 
@@ -76,12 +78,19 @@ func (m *TrxManager) Rollback(bp *buffer.BufferPool, trxId TrxId) error {
 	return nil
 }
 
-func (m *TrxManager) allocateTrxId() TrxId {
-	var maxTrxId TrxId
-	for trxId := range m.Transactions {
-		if trxId > maxTrxId {
-			maxTrxId = trxId
+// CreateReadView は指定したトランザクション用の ReadView を作成する
+func (m *TrxManager) CreateReadView(trxId TrxId) *ReadView {
+	var activeTrxIds []TrxId
+	for id, state := range m.Transactions {
+		if state == StateActive && id != trxId {
+			activeTrxIds = append(activeTrxIds, id)
 		}
 	}
-	return maxTrxId + 1
+	return NewReadView(trxId, activeTrxIds, m.nextTrxId)
+}
+
+func (m *TrxManager) allocateTrxId() TrxId {
+	id := m.nextTrxId
+	m.nextTrxId++
+	return id
 }
