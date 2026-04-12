@@ -79,6 +79,23 @@ func TestPageCleanerStop(t *testing.T) {
 			pc.Stop()
 		})
 	})
+
+	t.Run("Stop を 2 回呼んでもパニックしない", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		rl, err := log.NewRedoLog(tmpdir)
+		assert.NoError(t, err)
+		bp := NewBufferPool(10, rl)
+		pc := NewPageCleaner(bp, rl, 1048576, 90)
+		pc.interval = 10 * time.Millisecond
+		pc.Start()
+
+		// WHEN / THEN
+		pc.Stop()
+		assert.NotPanics(t, func() {
+			pc.Stop()
+		})
+	})
 }
 
 func TestPageCleanerStartStop(t *testing.T) {

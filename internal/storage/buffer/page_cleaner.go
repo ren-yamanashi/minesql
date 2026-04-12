@@ -50,6 +50,7 @@ func (pc *PageCleaner) Stop() {
 	close(pc.done)
 	<-pc.stopped
 	pc.ticker.Stop()
+	pc.done = nil
 }
 
 // loop はバックグラウンドで定期的に clean を呼び出す
