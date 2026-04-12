@@ -105,6 +105,74 @@ func TestUndoManagerAppend(t *testing.T) {
 	})
 }
 
+func TestReadAt(t *testing.T) {
+	t.Run("Append で書き込んだレコードを ReadAt で読み取れる", func(t *testing.T) {
+		// GIVEN
+		bp := initUndoTestDisk(t)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
+		assert.NoError(t, err)
+		table := createUndoTestTable(t, bp)
+
+		record := NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")})
+		ptr, err := undoLog.Append(1, record)
+		assert.NoError(t, err)
+
+		// WHEN
+		raw, err := undoLog.ReadAt(ptr)
+
+		// THEN
+		assert.NoError(t, err)
+		f, err := DeserializeUndoRecord(raw)
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(1), f.TrxId)
+		assert.Equal(t, UndoInsert, f.RecordType)
+		assert.Equal(t, table.Name, f.TableName)
+		assert.Equal(t, []byte("a"), f.ColumnSets[0][0])
+		assert.Equal(t, []byte("Alice"), f.ColumnSets[0][1])
+	})
+
+	t.Run("同一ページ内の複数レコードをそれぞれ読み取れる", func(t *testing.T) {
+		// GIVEN
+		bp := initUndoTestDisk(t)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
+		assert.NoError(t, err)
+		table := createUndoTestTable(t, bp)
+
+		ptr1, err := undoLog.Append(1, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
+		assert.NoError(t, err)
+		ptr2, err := undoLog.Append(1, NewUndoInsertRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
+		assert.NoError(t, err)
+
+		// WHEN
+		raw1, err := undoLog.ReadAt(ptr1)
+		assert.NoError(t, err)
+		raw2, err := undoLog.ReadAt(ptr2)
+		assert.NoError(t, err)
+
+		// THEN
+		f1, err := DeserializeUndoRecord(raw1)
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("Alice"), f1.ColumnSets[0][1])
+
+		f2, err := DeserializeUndoRecord(raw2)
+		assert.NoError(t, err)
+		assert.Equal(t, []byte("Bob"), f2.ColumnSets[0][1])
+	})
+
+	t.Run("無効な UndoPtr の場合はエラーを返す", func(t *testing.T) {
+		// GIVEN
+		bp := initUndoTestDisk(t)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
+		assert.NoError(t, err)
+
+		// WHEN: 書き込んでいないオフセットを指定
+		_, err = undoLog.ReadAt(UndoPtr{PageNumber: 0, Offset: 9999})
+
+		// THEN
+		assert.Error(t, err)
+	})
+}
+
 func TestGetRecords(t *testing.T) {
 	t.Run("存在しないトランザクション ID は nil を返す", func(t *testing.T) {
 		// GIVEN

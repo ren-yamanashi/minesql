@@ -79,6 +79,21 @@ func (u *UndoManager) Discard(trxId TrxId) {
 	delete(u.records, trxId)
 }
 
+// ReadAt は UndoPtr が指す位置から undo レコードのバイト列を読み取る
+func (u *UndoManager) ReadAt(ptr UndoPtr) ([]byte, error) {
+	pageId := page.NewPageId(u.undoFileId, page.PageNumber(ptr.PageNumber))
+	data, err := u.bp.GetReadPageData(pageId)
+	if err != nil {
+		return nil, err
+	}
+	undoPage := NewUndoPage(page.NewPage(data))
+	record := undoPage.RecordAt(int(ptr.Offset))
+	if record == nil {
+		return nil, ErrInvalidUndoRecord
+	}
+	return record, nil
+}
+
 // writeToPage はシリアライズ済みの UNDO レコードを UNDO ページに書き込み、書き込み先の UndoPtr を返す
 func (u *UndoManager) writeToPage(trxId TrxId, serialized []byte) (UndoPtr, error) {
 	data, err := u.bp.GetWritePageData(u.currentPageId)
