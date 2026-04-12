@@ -247,7 +247,6 @@ func TestTableIterator(t *testing.T) {
 	})
 }
 
-
 // allVisibleReadView は全レコードが可視な ReadView を返す (テスト用)
 func allVisibleReadView() *ReadView {
 	return NewReadView(0, nil, ^uint64(0))

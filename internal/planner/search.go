@@ -3,28 +3,28 @@ package planner
 import (
 	"errors"
 	"fmt"
+	"strconv"
+
 	"minesql/internal/ast"
 	"minesql/internal/executor"
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
-	"minesql/internal/storage/lock"
-	"strconv"
 )
 
 // Search は WHERE 句に基づいてレコードを検索する Executor を構築する
 type Search struct {
-	trxId   handler.TrxId
-	lockMgr *lock.Manager
-	tblMeta *handler.TableMetadata
-	where   *ast.WhereClause
+	readView      *access.ReadView
+	versionReader *access.VersionReader
+	tblMeta       *handler.TableMetadata
+	where         *ast.WhereClause
 }
 
-func NewSearch(trxId handler.TrxId, lockMgr *lock.Manager, tblMeta *handler.TableMetadata, where *ast.WhereClause) *Search {
+func NewSearch(readView *access.ReadView, versionReader *access.VersionReader, tblMeta *handler.TableMetadata, where *ast.WhereClause) *Search {
 	return &Search{
-		trxId:   trxId,
-		lockMgr: lockMgr,
-		tblMeta: tblMeta,
-		where:   where,
+		readView:      readView,
+		versionReader: versionReader,
+		tblMeta:       tblMeta,
+		where:         where,
 	}
 }
 
@@ -36,15 +36,13 @@ func (sp *Search) Build() (executor.Executor, error) {
 
 	// WHERE 句が設定されていない場合フルテーブルスキャンを実行
 	if sp.where == nil {
-		return executor.NewTableScan(
-			sp.trxId,
-			sp.lockMgr,
-			tbl,
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool {
-				return true // フルテーブルスキャンなので常に true を返す
-			},
-		), nil
+		return executor.NewTableScan(executor.TableScanParams{
+			ReadView:       sp.readView,
+			VersionReader:  sp.versionReader,
+			Table:          tbl,
+			SearchMode:     access.RecordSearchModeStart{},
+			WhileCondition: func(record executor.Record) bool { return true },
+		}), nil
 	}
 
 	// WHERE 句が設定されている場合
@@ -119,13 +117,13 @@ func (s *Search) planForBinaryExpr(tbl *access.Table, expr ast.BinaryExpr) (exec
 //  3. セカンダリインデックススキャン (+ Filter で残条件を適用)
 func (s *Search) chooseBestPlan(tbl *access.Table, leaves []leafCondition, cond func(executor.Record) bool) (executor.Executor, error) {
 	tableScanPlan := executor.NewFilter(
-		executor.NewTableScan(
-			s.trxId,
-			s.lockMgr,
-			tbl,
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool { return true },
-		),
+		executor.NewTableScan(executor.TableScanParams{
+			ReadView:       s.readView,
+			VersionReader:  s.versionReader,
+			Table:          tbl,
+			SearchMode:     access.RecordSearchModeStart{},
+			WhileCondition: func(record executor.Record) bool { return true },
+		}),
 		cond,
 	)
 
@@ -262,7 +260,13 @@ func (s *Search) buildPKScanPlan(tbl *access.Table, leaf leafCondition, cond fun
 		filterRequired = true
 	}
 
-	scan := executor.NewTableScan(s.trxId, s.lockMgr, tbl, searchMode, whileCond)
+	scan := executor.NewTableScan(executor.TableScanParams{
+		ReadView:       s.readView,
+		VersionReader:  s.versionReader,
+		Table:          tbl,
+		SearchMode:     searchMode,
+		WhileCondition: whileCond,
+	})
 	if filterRequired {
 		return executor.NewFilter(scan, cond)
 	}
@@ -280,13 +284,13 @@ func (s *Search) buildPKScanPlan(tbl *access.Table, leaf leafCondition, cond fun
 // 最適化できない場合はテーブルスキャン + Filter にフォールバックする
 func (s *Search) planForORCondition(tbl *access.Table, expr ast.BinaryExpr, cond func(executor.Record) bool) (executor.Executor, error) {
 	tableScanPlan := executor.NewFilter(
-		executor.NewTableScan(
-			s.trxId,
-			s.lockMgr,
-			tbl,
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool { return true },
-		),
+		executor.NewTableScan(executor.TableScanParams{
+			ReadView:       s.readView,
+			VersionReader:  s.versionReader,
+			Table:          tbl,
+			SearchMode:     access.RecordSearchModeStart{},
+			WhileCondition: func(record executor.Record) bool { return true },
+		}),
 		cond,
 	)
 

@@ -32,7 +32,7 @@ func TestNewTableScan(t *testing.T) {
 
 		// THEN
 		assert.NotNil(t, seqScan)
-		assert.Equal(t, tbl, seqScan.params.Table)
+		assert.Equal(t, tbl, seqScan.table)
 	})
 }
 

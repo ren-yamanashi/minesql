@@ -77,7 +77,7 @@ func TestDeserializeUndoRecord(t *testing.T) {
 		assert.Equal(t, []byte("Alice"), f.ColumnSets[0][1])
 	})
 
-	t.Run("DELETE レコードで prevLastModified と prevRollPtr がデシリアライズされる", func(t *testing.T) {
+	t.Run("DELETE レコードをデシリアライズできる", func(t *testing.T) {
 		// GIVEN
 		columns := [][]byte{[]byte("b"), []byte("Bob")}
 		prevRollPtr := UndoPtr{PageNumber: 2, Offset: 37}

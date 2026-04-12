@@ -229,7 +229,7 @@ func TestUndoRollback(t *testing.T) {
 
 		// THEN: INSERT がロールバックされ、テーブルが空になっている
 		table2 := access.NewTable("users", metaPageId, 1, nil, nil, nil)
-		iter, err := table2.Search(bp2, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
+		iter, err := table2.Search(bp2, access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -311,7 +311,7 @@ func TestUndoRollback(t *testing.T) {
 
 		// THEN: コミット済みの INSERT はロールバックされず、レコードが存在する
 		table2 := access.NewTable("users", metaPageId, 1, nil, nil, nil)
-		iter, err := table2.Search(bp2, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
+		iter, err := table2.Search(bp2, access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)
