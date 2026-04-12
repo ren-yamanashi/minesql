@@ -68,7 +68,8 @@ func (uii *UniqueIndexIterator) Next() (*SearchResult, bool, error) {
 		// テーブルレコード (プライマリキー + NonKey) をデコード
 		var record [][]byte
 		encode.Decode(tableRecord.KeyBytes(), &record)
-		encode.Decode(tableRecord.NonKeyBytes(), &record)
+		_, _, nonKeyColumns := decodeRecordNonKey(tableRecord.NonKeyBytes())
+		encode.Decode(nonKeyColumns, &record)
 
 		return &SearchResult{
 			UniqueKey: uniqueKey,

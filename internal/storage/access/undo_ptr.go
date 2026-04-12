@@ -11,7 +11,7 @@ var (
 	// NullUndoPtr は前バージョンが存在しないことを示すセンチネル値
 	//
 	// UndoPtr{0, 0} は undo ファイルの最初のページの先頭レコードを指す有効なポインタであるため、ゼロ値を null として使えない
-	NullUndoPtr         = UndoPtr{PageNumber: 0xFFFF, Offset: 0xFFFF}
+	NullUndoPtr           = UndoPtr{PageNumber: 0xFFFF, Offset: 0xFFFF}
 	ErrInvalidUndoPtrData = errors.New("data size must be at least 4 bytes to decode UndoPtr")
 )
 

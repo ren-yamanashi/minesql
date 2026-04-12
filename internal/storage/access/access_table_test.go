@@ -68,9 +68,9 @@ func TestCreateAndInsert(t *testing.T) {
 			var decodedKey [][]byte
 			var decodedValue [][]byte
 			keyBytes := record.KeyBytes()
-			valueBytes := record.NonKeyBytes()
+			_, _, nonKeyColumns := decodeRecordNonKey(record.NonKeyBytes())
 			encode.Decode(keyBytes, &decodedKey)
-			encode.Decode(valueBytes, &decodedValue)
+			encode.Decode(nonKeyColumns, &decodedValue)
 
 			assert.Equal(t, expected.key, decodedKey)
 			assert.Equal(t, expected.value, decodedValue)
@@ -214,7 +214,8 @@ func TestCreateAndInsert(t *testing.T) {
 		assert.Equal(t, "a", string(decodedKey[0]))
 
 		var decodedValue [][]byte
-		encode.Decode(record.NonKeyBytes(), &decodedValue)
+		_, _, nonKeyColumns := decodeRecordNonKey(record.NonKeyBytes())
+		encode.Decode(nonKeyColumns, &decodedValue)
 		assert.Equal(t, "Jane", string(decodedValue[0])) // 新しい値で上書きされている
 
 		// 2 件目は存在しない (物理的にレコードが増えていない)
@@ -605,7 +606,8 @@ func TestUpdate(t *testing.T) {
 		assert.Equal(t, "a", string(decodedKey[0]))
 
 		var decodedValue [][]byte
-		encode.Decode(record.NonKeyBytes(), &decodedValue)
+		_, _, nonKeyColumns := decodeRecordNonKey(record.NonKeyBytes())
+		encode.Decode(nonKeyColumns, &decodedValue)
 		assert.Equal(t, "Jane", string(decodedValue[0]))
 
 		// 2 件目は存在しない (ソフトデリートされたレコードが残っていない)

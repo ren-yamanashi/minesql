@@ -52,7 +52,8 @@ func (ri *TableIterator) Next() ([][]byte, bool, error) {
 		// レコード (プライマリキー + NonKey) をデコード
 		var record [][]byte
 		encode.Decode(btrRecord.KeyBytes(), &record)
-		encode.Decode(btrRecord.NonKeyBytes(), &record)
+		_, _, nonKeyColumns := decodeRecordNonKey(btrRecord.NonKeyBytes())
+		encode.Decode(nonKeyColumns, &record)
 
 		return record, true, nil
 	}

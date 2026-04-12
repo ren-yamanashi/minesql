@@ -19,7 +19,7 @@ func NewUndoDeleteRecord(table *Table, record [][]byte) UndoDeleteRecord {
 
 // Undo は Delete したレコードを挿入する
 func (r UndoDeleteRecord) Undo(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager) error {
-	return r.table.insert(bp, trxId, lockMgr, r.Record)
+	return r.table.insert(bp, trxId, lockMgr, r.Record, NullUndoPtr)
 }
 
 // Serialize は UndoDeleteRecord をバイト列にシリアライズする
