@@ -240,6 +240,37 @@ func TestSync(t *testing.T) {
 	})
 }
 
+func TestClose(t *testing.T) {
+	t.Run("Close が正常に実行できる", func(t *testing.T) {
+		// GIVEN
+		disk, _ := initDisk(t)
+
+		// WHEN
+		err := disk.Close()
+
+		// THEN
+		assert.NoError(t, err)
+	})
+
+	t.Run("Close 後に ReadPageData を呼ぶとエラーが返る", func(t *testing.T) {
+		// GIVEN
+		disk, pageId := initDisk(t)
+		writeData := createDataBuffer()
+		err := disk.WritePageData(pageId, writeData)
+		assert.NoError(t, err)
+
+		err = disk.Close()
+		assert.NoError(t, err)
+
+		// WHEN
+		readData := directio.AlignedBlock(directio.BlockSize)
+		err = disk.ReadPageData(pageId, readData)
+
+		// THEN
+		assert.Error(t, err)
+	})
+}
+
 func initDisk(t *testing.T) (*Disk, page.PageId) {
 	tmpDir := t.TempDir()
 	dbPath := filepath.Join(tmpDir, "sample.db")

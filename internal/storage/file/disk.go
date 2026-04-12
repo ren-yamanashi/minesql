@@ -91,6 +91,11 @@ func (disk *Disk) Sync() error {
 	return disk.heapFile.Sync()
 }
 
+// Close はヒープファイルのファイルディスクリプタを閉じる
+func (disk *Disk) Close() error {
+	return disk.heapFile.Close()
+}
+
 // seek はページ ID で指定されたページの先頭にシークする
 func (disk *Disk) seek(id page.PageId) error {
 	if id.FileId != disk.fileId {

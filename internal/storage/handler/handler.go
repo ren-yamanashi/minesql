@@ -82,7 +82,7 @@ func (h *Handler) Shutdown() error {
 	if err := h.BufferPool.FlushAllPages(); err != nil {
 		return err
 	}
-	// カタログの Disk を同期
+	// カタログの Disk を同期して閉じる
 	catalogDisk, err := h.BufferPool.GetDisk(page.FileId(0))
 	if err != nil {
 		return err
@@ -90,14 +90,20 @@ func (h *Handler) Shutdown() error {
 	if err := catalogDisk.Sync(); err != nil {
 		return err
 	}
+	if err := catalogDisk.Close(); err != nil {
+		return err
+	}
 
-	// 各テーブルの Disk を同期
+	// 各テーブルの Disk を同期して閉じる
 	for _, table := range h.Catalog.GetAllTables() {
 		dm, err := h.BufferPool.GetDisk(table.FileId)
 		if err != nil {
 			return err
 		}
 		if err := dm.Sync(); err != nil {
+			return err
+		}
+		if err := dm.Close(); err != nil {
 			return err
 		}
 	}
