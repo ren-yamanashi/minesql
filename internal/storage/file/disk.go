@@ -30,6 +30,7 @@ func NewDisk(fileId page.FileId, path string) (*Disk, error) {
 
 	fileInfo, err := file.Stat()
 	if err != nil {
+		file.Close()
 		return nil, err
 	}
 
@@ -59,7 +60,7 @@ func (disk *Disk) ReadPageData(id page.PageId, data []byte) error {
 	}
 	// シークした位置から PageSize バイト読み込む
 	// 読み込んだデータは `data` に格納される
-	_, err := io.ReadFull(disk.heapFile, data) // data に PageSize バイト読み込む (data の長さは PageSize と等しいので ReadFull を使用すると PageSize バイト読み込まれる)
+	_, err := io.ReadFull(disk.heapFile, data)
 	return err
 }
 
