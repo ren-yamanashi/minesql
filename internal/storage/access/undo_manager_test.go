@@ -13,13 +13,13 @@ import (
 
 const undoTestFileId = page.FileId(99) // テスト用 UNDO FileId
 
-func TestNewUndoLog(t *testing.T) {
-	t.Run("空の UndoLog が生成される", func(t *testing.T) {
+func TestNewUndoManager(t *testing.T) {
+	t.Run("空の UndoManager が生成される", func(t *testing.T) {
 		// GIVEN
 		bp := initUndoTestDisk(t)
 
 		// WHEN
-		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -28,11 +28,11 @@ func TestNewUndoLog(t *testing.T) {
 	})
 }
 
-func TestUndoLogAppend(t *testing.T) {
+func TestUndoManagerAppend(t *testing.T) {
 	t.Run("レコードを追加できる", func(t *testing.T) {
 		// GIVEN
 		bp := initUndoTestDisk(t)
-		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
 		assert.NoError(t, err)
 		table := createUndoTestTable(t, bp)
 
@@ -49,7 +49,7 @@ func TestUndoLogAppend(t *testing.T) {
 	t.Run("異なるトランザクションに独立して追加できる", func(t *testing.T) {
 		// GIVEN
 		bp := initUndoTestDisk(t)
-		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
 		assert.NoError(t, err)
 		table := createUndoTestTable(t, bp)
 
@@ -69,7 +69,7 @@ func TestUndoLogAppend(t *testing.T) {
 	t.Run("ページが満杯になると新しいページに書き込まれる", func(t *testing.T) {
 		// GIVEN
 		bp := initUndoTestDisk(t)
-		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
 		assert.NoError(t, err)
 		table := createUndoTestTable(t, bp)
 
@@ -94,7 +94,7 @@ func TestGetRecords(t *testing.T) {
 	t.Run("存在しないトランザクション ID は nil を返す", func(t *testing.T) {
 		// GIVEN
 		bp := initUndoTestDisk(t)
-		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -107,7 +107,7 @@ func TestGetRecords(t *testing.T) {
 	t.Run("追加した順序でレコードが返される", func(t *testing.T) {
 		// GIVEN
 		bp := initUndoTestDisk(t)
-		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
 		assert.NoError(t, err)
 		table := createUndoTestTable(t, bp)
 
@@ -135,7 +135,7 @@ func TestPopLast(t *testing.T) {
 	t.Run("最後のレコードが削除される", func(t *testing.T) {
 		// GIVEN
 		bp := initUndoTestDisk(t)
-		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
 		assert.NoError(t, err)
 		table := createUndoTestTable(t, bp)
 
@@ -155,7 +155,7 @@ func TestPopLast(t *testing.T) {
 	t.Run("空のトランザクションに対して PopLast してもパニックしない", func(t *testing.T) {
 		// GIVEN
 		bp := initUndoTestDisk(t)
-		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
 		assert.NoError(t, err)
 
 		// WHEN / THEN
@@ -167,7 +167,7 @@ func TestPopLast(t *testing.T) {
 	t.Run("他のトランザクションのレコードに影響しない", func(t *testing.T) {
 		// GIVEN
 		bp := initUndoTestDisk(t)
-		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
 		assert.NoError(t, err)
 		table := createUndoTestTable(t, bp)
 
@@ -191,7 +191,7 @@ func TestDiscard(t *testing.T) {
 	t.Run("指定したトランザクションのログが破棄される", func(t *testing.T) {
 		// GIVEN
 		bp := initUndoTestDisk(t)
-		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
 		assert.NoError(t, err)
 		table := createUndoTestTable(t, bp)
 
@@ -210,7 +210,7 @@ func TestDiscard(t *testing.T) {
 	t.Run("他のトランザクションのログに影響しない", func(t *testing.T) {
 		// GIVEN
 		bp := initUndoTestDisk(t)
-		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
 		assert.NoError(t, err)
 		table := createUndoTestTable(t, bp)
 
@@ -230,7 +230,7 @@ func TestDiscard(t *testing.T) {
 	t.Run("存在しないトランザクション ID を Discard してもパニックしない", func(t *testing.T) {
 		// GIVEN
 		bp := initUndoTestDisk(t)
-		undoLog, err := NewUndoLog(bp, nil, undoTestFileId)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
 		assert.NoError(t, err)
 
 		// WHEN / THEN

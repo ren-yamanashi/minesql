@@ -16,15 +16,15 @@ const (
 	StateInactive State = "INACTIVE"
 )
 
-type Manager struct {
-	undoLog      *UndoLog
+type TrxManager struct {
+	undoLog      *UndoManager
 	lockMgr      *lock.Manager
 	redoLog      *log.RedoLog
 	Transactions map[TrxId]State
 }
 
-func NewManager(undoLog *UndoLog, lockMgr *lock.Manager, redoLog *log.RedoLog) *Manager {
-	return &Manager{
+func NewTrxManager(undoLog *UndoManager, lockMgr *lock.Manager, redoLog *log.RedoLog) *TrxManager {
+	return &TrxManager{
 		undoLog:      undoLog,
 		lockMgr:      lockMgr,
 		redoLog:      redoLog,
@@ -33,14 +33,14 @@ func NewManager(undoLog *UndoLog, lockMgr *lock.Manager, redoLog *log.RedoLog) *
 }
 
 // Begin は新しいトランザクションを開始し、トランザクション ID を返す
-func (m *Manager) Begin() TrxId {
+func (m *TrxManager) Begin() TrxId {
 	trxId := m.allocateTrxId()
 	m.Transactions[trxId] = StateActive
 	return trxId
 }
 
 // Commit はトランザクションをコミットし、ロックを解放して Undo ログを破棄する
-func (m *Manager) Commit(trxId TrxId) error {
+func (m *TrxManager) Commit(trxId TrxId) error {
 	// REDO ログに COMMIT レコードを記録してフラッシュ
 	if m.redoLog != nil {
 		m.redoLog.AppendCommit(trxId)
@@ -57,7 +57,7 @@ func (m *Manager) Commit(trxId TrxId) error {
 }
 
 // Rollback は Undo ログを逆順に適用してトランザクションをロールバックし、ロックを解放する
-func (m *Manager) Rollback(bp *buffer.BufferPool, trxId TrxId) error {
+func (m *TrxManager) Rollback(bp *buffer.BufferPool, trxId TrxId) error {
 	records := m.undoLog.GetRecords(trxId)
 	for i := len(records) - 1; i >= 0; i-- {
 		if err := records[i].Undo(bp, trxId, m.lockMgr); err != nil {
@@ -76,7 +76,7 @@ func (m *Manager) Rollback(bp *buffer.BufferPool, trxId TrxId) error {
 	return nil
 }
 
-func (m *Manager) allocateTrxId() TrxId {
+func (m *TrxManager) allocateTrxId() TrxId {
 	var maxTrxId TrxId
 	for trxId := range m.Transactions {
 		if trxId > maxTrxId {

@@ -17,7 +17,7 @@ type BufferPage struct {
 func NewBufferPage(pageId page.PageId) *BufferPage {
 	return &BufferPage{
 		PageId:  pageId,
-		Page:    directio.AlignedBlock(page.PAGE_SIZE),
+		Page:    directio.AlignedBlock(page.PageSize),
 		IsDirty: false,
 	}
 }

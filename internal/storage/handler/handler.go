@@ -21,7 +21,7 @@ import (
 const ColumnTypeString = dictionary.ColumnTypeString
 
 type TrxId = access.TrxId
-type UndoLog = access.UndoLog
+type UndoManager = access.UndoManager
 type TableMetadata = dictionary.TableMeta
 type IndexMetadata = dictionary.IndexMeta
 type ColumnType = dictionary.ColumnType
@@ -40,9 +40,9 @@ type Handler struct {
 	LockMgr        *lock.Manager
 	Catalog        *dictionary.Catalog
 	StatsCollector *dictionary.StatsCollector
-	undoLog        *access.UndoLog
+	undoLog        *access.UndoManager
 	redoLog        *log.RedoLog
-	trxManager     *access.Manager
+	trxManager     *access.TrxManager
 	pageCleaner    *buffer.PageCleaner
 	baseDirectory  string
 }
@@ -82,7 +82,7 @@ func (h *Handler) Shutdown() error {
 	if err := h.BufferPool.FlushAllPages(); err != nil {
 		return err
 	}
-	// カタログの Disk を同期
+	// カタログの Disk を同期して閉じる
 	catalogDisk, err := h.BufferPool.GetDisk(page.FileId(0))
 	if err != nil {
 		return err
@@ -90,14 +90,20 @@ func (h *Handler) Shutdown() error {
 	if err := catalogDisk.Sync(); err != nil {
 		return err
 	}
+	if err := catalogDisk.Close(); err != nil {
+		return err
+	}
 
-	// 各テーブルの Disk を同期
+	// 各テーブルの Disk を同期して閉じる
 	for _, table := range h.Catalog.GetAllTables() {
 		dm, err := h.BufferPool.GetDisk(table.FileId)
 		if err != nil {
 			return err
 		}
 		if err := dm.Sync(); err != nil {
+			return err
+		}
+		if err := dm.Close(); err != nil {
 			return err
 		}
 	}
@@ -144,7 +150,7 @@ func newHandler() (*Handler, error) {
 	}
 
 	// UNDO ログを初期化
-	undoLog, err := initUndoLog(bp, redoLog, dataDir, catalog.UndoFileId)
+	undoLog, err := initUndoManager(bp, redoLog, dataDir, catalog.UndoFileId)
 	if err != nil {
 		return nil, err
 	}
@@ -175,7 +181,7 @@ func newHandler() (*Handler, error) {
 		StatsCollector: dictionary.NewStatsCollector(bp),
 		undoLog:        undoLog,
 		redoLog:        redoLog,
-		trxManager:     access.NewManager(undoLog, lockMgr, redoLog),
+		trxManager:     access.NewTrxManager(undoLog, lockMgr, redoLog),
 		pageCleaner:    pc,
 		baseDirectory:  dataDir,
 	}, nil
@@ -228,8 +234,8 @@ func initCatalog(baseDir string, bp *buffer.BufferPool) (*dictionary.Catalog, er
 	return cat, nil
 }
 
-// initUndoLog は UNDO ログ用を初期化する
-func initUndoLog(bp *buffer.BufferPool, redoLog *log.RedoLog, baseDir string, undoFileId page.FileId) (*access.UndoLog, error) {
+// initUndoManager は UNDO ログ用を初期化する
+func initUndoManager(bp *buffer.BufferPool, redoLog *log.RedoLog, baseDir string, undoFileId page.FileId) (*access.UndoManager, error) {
 	// UNDO ログ用の Disk を作成
 	path := filepath.Join(baseDir, "undo.db")
 	dm, err := file.NewDisk(undoFileId, path)
@@ -240,8 +246,8 @@ func initUndoLog(bp *buffer.BufferPool, redoLog *log.RedoLog, baseDir string, un
 	// UNDO ログ用の Disk を BufferPool に登録
 	bp.RegisterDisk(undoFileId, dm)
 
-	// UndoLog を作成して返す
-	return access.NewUndoLog(bp, redoLog, undoFileId)
+	// UndoManager を作成して返す
+	return access.NewUndoManager(bp, redoLog, undoFileId)
 }
 
 // registerTableDisks はカタログに含まれるテーブルの Disk を BufferPool に登録する

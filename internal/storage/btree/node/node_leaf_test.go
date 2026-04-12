@@ -20,7 +20,7 @@ func TestNewLeaf(t *testing.T) {
 
 		// THEN
 		assert.NotNil(t, ln)
-		assert.True(t, bytes.Equal(data[0:8], NODE_TYPE_LEAF))
+		assert.True(t, bytes.Equal(data[0:8], NodeTypeLeaf))
 	})
 }
 

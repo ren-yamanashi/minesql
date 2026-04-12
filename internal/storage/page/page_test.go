@@ -9,21 +9,21 @@ import (
 func TestNewPage(t *testing.T) {
 	t.Run("Header と Body が正しく分割される", func(t *testing.T) {
 		// GIVEN
-		data := make([]byte, PAGE_SIZE)
+		data := make([]byte, PageSize)
 
 		// WHEN
 		pg := NewPage(data)
 
 		// THEN
 		assert.Equal(t, PageHeaderSize, len(pg.Header))
-		assert.Equal(t, PAGE_SIZE-PageHeaderSize, len(pg.Body))
+		assert.Equal(t, PageSize-PageHeaderSize, len(pg.Body))
 	})
 }
 
 func TestPageHeader(t *testing.T) {
 	t.Run("Header が data[0:4] を返す", func(t *testing.T) {
 		// GIVEN
-		data := make([]byte, PAGE_SIZE)
+		data := make([]byte, PageSize)
 		data[0] = 0xAB
 
 		// WHEN
@@ -35,7 +35,7 @@ func TestPageHeader(t *testing.T) {
 
 	t.Run("Header への書き込みが元の data に反映される", func(t *testing.T) {
 		// GIVEN
-		data := make([]byte, PAGE_SIZE)
+		data := make([]byte, PageSize)
 		pg := NewPage(data)
 
 		// WHEN
@@ -47,7 +47,7 @@ func TestPageHeader(t *testing.T) {
 
 	t.Run("Header の変更が Body のデータに影響しない", func(t *testing.T) {
 		// GIVEN
-		data := make([]byte, PAGE_SIZE)
+		data := make([]byte, PageSize)
 		pg := NewPage(data)
 		copy(pg.Body[0:5], []byte("hello"))
 
@@ -65,7 +65,7 @@ func TestPageHeader(t *testing.T) {
 func TestPageBody(t *testing.T) {
 	t.Run("Body が data[4:] を返す", func(t *testing.T) {
 		// GIVEN
-		data := make([]byte, PAGE_SIZE)
+		data := make([]byte, PageSize)
 		data[4] = 0xAB
 
 		// WHEN
@@ -77,7 +77,7 @@ func TestPageBody(t *testing.T) {
 
 	t.Run("Body への書き込みが元の data に反映される", func(t *testing.T) {
 		// GIVEN
-		data := make([]byte, PAGE_SIZE)
+		data := make([]byte, PageSize)
 		pg := NewPage(data)
 
 		// WHEN

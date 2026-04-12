@@ -463,8 +463,8 @@ func TestTruncateBefore(t *testing.T) {
 		rl, err := NewRedoLog(tmpDir)
 		assert.NoError(t, err)
 
-		rl.AppendPageCopy(1, page.NewPageId(1, 0), make([]byte, page.PAGE_SIZE))
-		rl.AppendPageCopy(2, page.NewPageId(1, 1), make([]byte, page.PAGE_SIZE))
+		rl.AppendPageCopy(1, page.NewPageId(1, 0), make([]byte, page.PageSize))
+		rl.AppendPageCopy(2, page.NewPageId(1, 1), make([]byte, page.PageSize))
 		err = rl.Flush()
 		assert.NoError(t, err)
 
@@ -503,7 +503,7 @@ func TestFileSize(t *testing.T) {
 		sizeBefore, _ := rl.FileSize()
 
 		// WHEN
-		rl.AppendPageCopy(1, page.NewPageId(1, 0), make([]byte, page.PAGE_SIZE))
+		rl.AppendPageCopy(1, page.NewPageId(1, 0), make([]byte, page.PageSize))
 		err = rl.Flush()
 		assert.NoError(t, err)
 

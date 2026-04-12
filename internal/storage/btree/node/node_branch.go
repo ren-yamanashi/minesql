@@ -21,7 +21,7 @@ type Branch struct {
 //   - data[16:]: Slotted Page (16 = headerSize + branchHeaderSize)
 func NewBranch(data []byte) *Branch {
 	// ノードタイプを設定
-	copy(data[0:8], NODE_TYPE_BRANCH)
+	copy(data[0:8], NodeTypeBranch)
 
 	// data[16:] 以降を Slotted Page のボディとして扱う
 	body := NewSlottedPage(data[headerSize+branchHeaderSize:])
