@@ -6,14 +6,18 @@ import (
 )
 
 type UndoDeleteRecord struct {
-	table  *Table
-	Record [][]byte
+	table            *Table
+	Record           [][]byte
+	PrevLastModified TrxId
+	PrevRollPtr      UndoPtr
 }
 
-func NewUndoDeleteRecord(table *Table, record [][]byte) UndoDeleteRecord {
+func NewUndoDeleteRecord(table *Table, record [][]byte, prevLastModified TrxId, prevRollPtr UndoPtr) UndoDeleteRecord {
 	return UndoDeleteRecord{
-		table:  table,
-		Record: record,
+		table:            table,
+		Record:           record,
+		PrevLastModified: prevLastModified,
+		PrevRollPtr:      prevRollPtr,
 	}
 }
 
@@ -24,5 +28,13 @@ func (r UndoDeleteRecord) Undo(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr 
 
 // Serialize は UndoDeleteRecord をバイト列にシリアライズする
 func (r UndoDeleteRecord) Serialize(trxId uint64, undoNo uint64) []byte {
-	return SerializeUndoRecord(trxId, undoNo, UndoDelete, r.table.Name, r.Record)
+	return SerializeUndoRecord(UndoRecordFields{
+		TrxId:            trxId,
+		UndoNo:           undoNo,
+		RecordType:       UndoDelete,
+		PrevLastModified: r.PrevLastModified,
+		PrevRollPtr:      r.PrevRollPtr,
+		TableName:        r.table.Name,
+		ColumnSets:       [][][]byte{r.Record},
+	})
 }

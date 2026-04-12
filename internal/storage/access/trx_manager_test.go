@@ -145,7 +145,7 @@ func TestManagerRollback(t *testing.T) {
 		trxId := manager.Begin()
 
 		// テーブルに存在しない行の削除 Undo (= 存在しない行を insertRaw しようとする)
-		_, err := undoLog.Append(trxId, NewUndoDeleteRecord(table, [][]byte{[]byte("nonexistent"), []byte("data")}))
+		_, err := undoLog.Append(trxId, NewUndoDeleteRecord(table, [][]byte{[]byte("nonexistent"), []byte("data")}, 0, NullUndoPtr))
 		assert.NoError(t, err)
 
 		// さらに Insert の Undo (= 存在しない行を deleteRaw しようとする) を追加

@@ -61,16 +61,16 @@ func TestUndoInsertRecord_Serialize(t *testing.T) {
 
 		// WHEN
 		buf := record.Serialize(1, 0)
-		trxId, undoNo, recordType, tableName, columnSets, err := DeserializeUndoRecord(buf)
+		f, err := DeserializeUndoRecord(buf)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, uint64(1), trxId)
-		assert.Equal(t, uint64(0), undoNo)
-		assert.Equal(t, UndoInsert, recordType)
-		assert.Equal(t, "test", tableName)
-		assert.Equal(t, 1, len(columnSets))
-		assert.Equal(t, []byte("a"), columnSets[0][0])
-		assert.Equal(t, []byte("John"), columnSets[0][1])
+		assert.Equal(t, uint64(1), f.TrxId)
+		assert.Equal(t, uint64(0), f.UndoNo)
+		assert.Equal(t, UndoInsert, f.RecordType)
+		assert.Equal(t, "test", f.TableName)
+		assert.Equal(t, 1, len(f.ColumnSets))
+		assert.Equal(t, []byte("a"), f.ColumnSets[0][0])
+		assert.Equal(t, []byte("John"), f.ColumnSets[0][1])
 	})
 }

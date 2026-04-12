@@ -6,16 +6,20 @@ import (
 )
 
 type UndoUpdateInplaceRecord struct {
-	table      *Table
-	PrevRecord [][]byte // 更新前のレコード
-	NewRecord  [][]byte // 更新後のレコード
+	table            *Table
+	PrevRecord       [][]byte // 更新前のレコード
+	NewRecord        [][]byte // 更新後のレコード
+	PrevLastModified TrxId
+	PrevRollPtr      UndoPtr
 }
 
-func NewUndoUpdateInplaceRecord(table *Table, prevRecord, newRecord [][]byte) UndoUpdateInplaceRecord {
+func NewUndoUpdateInplaceRecord(table *Table, prevRecord, newRecord [][]byte, prevLastModified TrxId, prevRollPtr UndoPtr) UndoUpdateInplaceRecord {
 	return UndoUpdateInplaceRecord{
-		table:      table,
-		PrevRecord: prevRecord,
-		NewRecord:  newRecord,
+		table:            table,
+		PrevRecord:       prevRecord,
+		NewRecord:        newRecord,
+		PrevLastModified: prevLastModified,
+		PrevRollPtr:      prevRollPtr,
 	}
 }
 
@@ -27,5 +31,13 @@ func (r UndoUpdateInplaceRecord) Undo(bp *buffer.BufferPool, trxId lock.TrxId, l
 
 // Serialize は UndoUpdateInplaceRecord をバイト列にシリアライズする
 func (r UndoUpdateInplaceRecord) Serialize(trxId uint64, undoNo uint64) []byte {
-	return SerializeUndoRecord(trxId, undoNo, UndoUpdateInplace, r.table.Name, r.PrevRecord, r.NewRecord)
+	return SerializeUndoRecord(UndoRecordFields{
+		TrxId:            trxId,
+		UndoNo:           undoNo,
+		RecordType:       UndoUpdateInplace,
+		PrevLastModified: r.PrevLastModified,
+		PrevRollPtr:      r.PrevRollPtr,
+		TableName:        r.table.Name,
+		ColumnSets:       [][][]byte{r.PrevRecord, r.NewRecord},
+	})
 }

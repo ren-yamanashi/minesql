@@ -128,7 +128,7 @@ func TestGetRecords(t *testing.T) {
 
 		_, err = undoLog.Append(1, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
 		assert.NoError(t, err)
-		_, err = undoLog.Append(1, NewUndoDeleteRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
+		_, err = undoLog.Append(1, NewUndoDeleteRecord(table, [][]byte{[]byte("b"), []byte("Bob")}, 0, NullUndoPtr))
 		assert.NoError(t, err)
 
 		// WHEN
