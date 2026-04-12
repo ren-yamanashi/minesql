@@ -30,7 +30,7 @@ func NewDisk(fileId page.FileId, path string) (*Disk, error) {
 
 	fileInfo, err := file.Stat()
 	if err != nil {
-		file.Close()
+		_ = file.Close()
 		return nil, err
 	}
 

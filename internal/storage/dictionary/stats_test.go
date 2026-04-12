@@ -619,7 +619,7 @@ func deleteByCondition(t *testing.T, env *testEnv, tableName string, cond func([
 	tbl := env.tables[tableName]
 
 	// 削除対象のレコードを先にすべて取得する
-	iter, err := tbl.Search(env.bp, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
+	iter, err := tbl.Search(env.bp, access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), access.RecordSearchModeStart{})
 	assert.NoError(t, err)
 
 	var targets [][][]byte

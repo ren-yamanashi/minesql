@@ -141,7 +141,7 @@ func setupTestTableForUndo(t *testing.T, uniqueIndexes []*UniqueIndex) (*Table, 
 
 func collectUndoActiveRecords(t *testing.T, table *Table, bp *buffer.BufferPool) [][]string {
 	t.Helper()
-	iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
+	iter, err := table.Search(bp, allVisibleReadView(), nilVersionReader(), RecordSearchModeStart{})
 	assert.NoError(t, err)
 
 	var records [][]string

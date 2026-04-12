@@ -979,7 +979,7 @@ func TestSearch(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: "b" から検索
-		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeKey{Key: [][]byte{[]byte("b")}})
+		iter, err := table.Search(bp, allVisibleReadView(), nilVersionReader(), RecordSearchModeKey{Key: [][]byte{[]byte("b")}})
 		assert.NoError(t, err)
 
 		columns, ok, err := iter.Next()
@@ -1005,7 +1005,7 @@ func TestSearch(t *testing.T) {
 		assert.Equal(t, 0, len(recs))
 	})
 
-	t.Run("各行の読み取り時に共有ロックが取得される", func(t *testing.T) {
+	t.Run("Consistent Read はロックを取得しないため複数トランザクションが同時に読み取れる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
 		table := NewTable("users", metaPageId, 1, nil, nil, nil)
@@ -1017,10 +1017,8 @@ func TestSearch(t *testing.T) {
 		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Bob")})
 		assert.NoError(t, err)
 
-		lockMgr := lock.NewManager(5000)
-
 		// WHEN: trx1 が Search で全行を読み取る
-		iter, err := table.Search(bp, 1, lockMgr, RecordSearchModeStart{})
+		iter, err := table.Search(bp, allVisibleReadView(), nilVersionReader(), RecordSearchModeStart{})
 		assert.NoError(t, err)
 		for {
 			_, ok, err := iter.Next()
@@ -1030,8 +1028,8 @@ func TestSearch(t *testing.T) {
 			}
 		}
 
-		// THEN: trx2 が共有ロックを取得できる (共有同士は競合しない)
-		iter2, err := table.Search(bp, 2, lockMgr, RecordSearchModeStart{})
+		// THEN: trx2 も問題なく読み取れる (MVCC ではロックを取得しない)
+		iter2, err := table.Search(bp, allVisibleReadView(), nilVersionReader(), RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter2.Next()
 		assert.NoError(t, err)
@@ -1171,7 +1169,7 @@ type decodedRecord struct {
 
 func collectAllTablePairs(t *testing.T, bp *buffer.BufferPool, table *Table) []decodedRecord {
 	t.Helper()
-	iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
+	iter, err := table.Search(bp, allVisibleReadView(), nilVersionReader(), RecordSearchModeStart{})
 	assert.NoError(t, err)
 
 	var records []decodedRecord

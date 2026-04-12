@@ -40,7 +40,9 @@ func TestDecodeRecordNonKey(t *testing.T) {
 		nonKeyColumns := []byte{0xAA, 0xBB, 0xCC}
 
 		prefix := encodeRecordNonKeyPrefix(lastModified, rollPtr)
-		nonKeyBytes := append(prefix, nonKeyColumns...)
+		nonKeyBytes := make([]byte, 0, len(prefix)+len(nonKeyColumns))
+		nonKeyBytes = append(nonKeyBytes, prefix...)
+		nonKeyBytes = append(nonKeyBytes, nonKeyColumns...)
 
 		// WHEN
 		decodedLastModified, decodedRollPtr, decodedNonKeyColumns := decodeRecordNonKey(nonKeyBytes)

@@ -23,7 +23,7 @@ func TestTableIterator(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
+		iter, err := table.Search(bp, allVisibleReadView(), nilVersionReader(), RecordSearchModeStart{})
 		assert.NoError(t, err)
 
 		var records [][]byte
@@ -64,7 +64,7 @@ func TestTableIterator(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: キー "b" から検索
-		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeKey{Key: [][]byte{[]byte("b")}})
+		iter, err := table.Search(bp, allVisibleReadView(), nilVersionReader(), RecordSearchModeKey{Key: [][]byte{[]byte("b")}})
 		assert.NoError(t, err)
 
 		record, ok, err := iter.Next()
@@ -83,7 +83,7 @@ func TestTableIterator(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
+		iter, err := table.Search(bp, allVisibleReadView(), nilVersionReader(), RecordSearchModeStart{})
 		assert.NoError(t, err)
 
 		record, ok, err := iter.Next()
@@ -113,7 +113,7 @@ func TestTableIterator(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
+		iter, err := table.Search(bp, allVisibleReadView(), nilVersionReader(), RecordSearchModeStart{})
 		assert.NoError(t, err)
 
 		var records [][][]byte
@@ -150,7 +150,7 @@ func TestTableIterator(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
+		iter, err := table.Search(bp, allVisibleReadView(), nilVersionReader(), RecordSearchModeStart{})
 		assert.NoError(t, err)
 
 		record, ok, err := iter.Next()
@@ -174,7 +174,7 @@ func TestTableIterator(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
+		iter, err := table.Search(bp, allVisibleReadView(), nilVersionReader(), RecordSearchModeStart{})
 		assert.NoError(t, err)
 
 		record1, ok, err := iter.Next()
@@ -189,4 +189,71 @@ func TestTableIterator(t *testing.T) {
 		assert.Equal(t, [][]byte{[]byte("a"), []byte("1"), []byte("value1")}, record1)
 		assert.Equal(t, [][]byte{[]byte("a"), []byte("2"), []byte("value2")}, record2)
 	})
+
+	t.Run("不可視なトランザクションのレコードはスキップされる", func(t *testing.T) {
+		// GIVEN: T1 が INSERT、T2 が INSERT。T2 はアクティブ (不可視)
+		bp, metaPageId, _ := InitDisk(t, "iter_test.db")
+		table := NewTable("test", metaPageId, 1, nil, nil, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, 1, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Alice")})
+		assert.NoError(t, err)
+		err = table.Insert(bp, 2, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Bob")})
+		assert.NoError(t, err)
+
+		// WHEN: T3 の ReadView で T2 がアクティブ (不可視)
+		rv := NewReadView(3, []TrxId{2}, 4) // mIds=[2]
+		iter, err := table.Search(bp, rv, NewVersionReader(nil), RecordSearchModeStart{})
+		assert.NoError(t, err)
+
+		var records [][][]byte
+		for {
+			record, ok, err := iter.Next()
+			assert.NoError(t, err)
+			if !ok {
+				break
+			}
+			records = append(records, record)
+		}
+
+		// THEN: T1 の "a" のみ可視。T2 の "b" はスキップされる
+		assert.Equal(t, 1, len(records))
+		assert.Equal(t, "a", string(records[0][0]))
+		assert.Equal(t, "Alice", string(records[0][1]))
+	})
+
+	t.Run("自分のトランザクションのレコードは可視", func(t *testing.T) {
+		// GIVEN: T1 が INSERT
+		bp, metaPageId, _ := InitDisk(t, "iter_test.db")
+		table := NewTable("test", metaPageId, 1, nil, nil, nil)
+		err := table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, 1, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Alice")})
+		assert.NoError(t, err)
+
+		// WHEN: T1 自身の ReadView
+		rv := NewReadView(1, nil, 2)
+		iter, err := table.Search(bp, rv, NewVersionReader(nil), RecordSearchModeStart{})
+		assert.NoError(t, err)
+
+		record, ok, err := iter.Next()
+
+		// THEN: 自分の INSERT は可視
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, "a", string(record[0]))
+	})
+}
+
+
+// allVisibleReadView は全レコードが可視な ReadView を返す (テスト用)
+func allVisibleReadView() *ReadView {
+	return NewReadView(0, nil, ^uint64(0))
+}
+
+// nilVersionReader は undo チェーンを辿らない VersionReader を返す (テスト用)
+func nilVersionReader() *VersionReader {
+	return NewVersionReader(nil)
 }

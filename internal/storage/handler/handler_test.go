@@ -242,8 +242,7 @@ func TestCrashRecovery(t *testing.T) {
 		tbl2, err := h2.GetTable("users")
 		assert.NoError(t, err)
 
-		readTrxId := h2.BeginTrx()
-		iter, err := tbl2.Search(h2.BufferPool, readTrxId, h2.LockMgr, access.RecordSearchModeStart{})
+		iter, err := tbl2.Search(h2.BufferPool, access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -289,8 +288,7 @@ func TestCrashRecovery(t *testing.T) {
 		tbl2, err := h2.GetTable("users")
 		assert.NoError(t, err)
 
-		readTrxId := h2.BeginTrx()
-		iter, err := tbl2.Search(h2.BufferPool, readTrxId, h2.LockMgr, access.RecordSearchModeStart{})
+		iter, err := tbl2.Search(h2.BufferPool, access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -335,8 +333,7 @@ func TestCrashRecovery(t *testing.T) {
 		tbl2, err := h2.GetTable("users")
 		assert.NoError(t, err)
 
-		readTrxId := h2.BeginTrx()
-		iter, err := tbl2.Search(h2.BufferPool, readTrxId, h2.LockMgr, access.RecordSearchModeStart{})
+		iter, err := tbl2.Search(h2.BufferPool, access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -392,8 +389,7 @@ func TestCrashRecovery(t *testing.T) {
 		tbl2, err := h2.GetTable("users")
 		assert.NoError(t, err)
 
-		readTrxId := h2.BeginTrx()
-		iter, err := tbl2.Search(h2.BufferPool, readTrxId, h2.LockMgr, access.RecordSearchModeStart{})
+		iter, err := tbl2.Search(h2.BufferPool, access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -456,8 +452,7 @@ func TestCrashRecovery(t *testing.T) {
 		tbl2, err := h2.GetTable("users")
 		assert.NoError(t, err)
 
-		readTrxId := h2.BeginTrx()
-		iter, err := tbl2.Search(h2.BufferPool, readTrxId, h2.LockMgr, access.RecordSearchModeStart{})
+		iter, err := tbl2.Search(h2.BufferPool, access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)

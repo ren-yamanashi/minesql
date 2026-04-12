@@ -38,14 +38,14 @@ func NewTable(name string, metaPageId page.PageId, primaryKeyCount uint8, unique
 
 // Search は指定した検索モードでテーブルを検索し、TableIterator を返す
 //
-// 各行の読み取り時に lockMgr を通じて共有ロックを取得する
-func (t *Table) Search(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, mode RecordSearchMode) (*TableIterator, error) {
+// ReadView に基づく Consistent Read を行う。ロックは取得しない。
+func (t *Table) Search(bp *buffer.BufferPool, rv *ReadView, vr *VersionReader, mode RecordSearchMode) (*TableIterator, error) {
 	btr := btree.NewBTree(t.MetaPageId)
 	iterator, err := btr.Search(bp, mode.encode())
 	if err != nil {
 		return nil, err
 	}
-	return newTableIterator(iterator, bp, trxId, lockMgr), nil
+	return newTableIterator(iterator, bp, rv, vr), nil
 }
 
 // Create は空のテーブルを新規作成する
