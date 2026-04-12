@@ -94,7 +94,7 @@ func (bt *BTree) searchRecursively(bp *buffer.BufferPool, nodePageId page.PageId
 	}
 	nodeType := node.GetNodeType(page.NewPage(nodeData).Body)
 
-	if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
+	if bytes.Equal(nodeType, node.NodeTypeBranch) {
 		// ブランチノードの場合、再起呼び出し後に UnRefPage を呼び出す (優先的に evict されたいため、不要になったらすぐ UnRefPage する)
 		defer bp.UnRefPage(nodePageId)
 
@@ -105,7 +105,7 @@ func (bt *BTree) searchRecursively(bp *buffer.BufferPool, nodePageId page.PageId
 
 		// 再帰呼び出し
 		return bt.searchRecursively(bp, childPageId, searchMode)
-	} else if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
+	} else if bytes.Equal(nodeType, node.NodeTypeLeaf) {
 		leaf := node.NewLeaf(page.NewPage(nodeData).Body)
 
 		nodeBuffer, err := bp.FetchPage(nodePageId)
@@ -246,7 +246,7 @@ func (bt *BTree) insertRecursively(bp *buffer.BufferPool, nodeBuffer *buffer.Buf
 	}
 	nodeType := node.GetNodeType(page.NewPage(nodeData).Body)
 
-	if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
+	if bytes.Equal(nodeType, node.NodeTypeLeaf) {
 		nodeWriteData, err := bp.GetWritePageData(nodeBuffer.PageId)
 		if err != nil {
 			return nil, page.InvalidPageId, false, err
@@ -308,7 +308,7 @@ func (bt *BTree) insertRecursively(bp *buffer.BufferPool, nodeBuffer *buffer.Buf
 		// overflowKey は古いリーフノードの先頭のキー (親ノードの境界キーになる)
 		overflowKey := leaf.RecordAt(0).KeyBytes()
 		return overflowKey, newLeafPageId, true, nil
-	} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
+	} else if bytes.Equal(nodeType, node.NodeTypeBranch) {
 		// 挿入先の子ノードを取得
 		nodeWriteData, err := bp.GetWritePageData(nodeBuffer.PageId)
 		if err != nil {
@@ -401,7 +401,7 @@ func (bt *BTree) Delete(bp *buffer.BufferPool, key []byte) error {
 		return err
 	}
 	nodeType := node.GetNodeType(page.NewPage(rootData).Body)
-	if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
+	if bytes.Equal(nodeType, node.NodeTypeBranch) {
 		branch := node.NewBranch(page.NewPage(rootData).Body)
 		if branch.NumRecords() == 0 {
 			rootCollapsed = true
@@ -447,10 +447,10 @@ func (bt *BTree) deleteRecursively(bp *buffer.BufferPool, nodeBuffer *buffer.Buf
 	}
 	nodeType := node.GetNodeType(page.NewPage(nodeData).Body)
 
-	if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
+	if bytes.Equal(nodeType, node.NodeTypeLeaf) {
 		underflow, err = bt.deleteFromLeaf(bp, nodeBuffer, key)
 		return underflow, false, err
-	} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
+	} else if bytes.Equal(nodeType, node.NodeTypeBranch) {
 		return bt.deleteFromBranch(bp, nodeBuffer, key)
 	}
 	panic("unknown node type") // 実際にはここには到達しないので errors.New ではなく panic で良い
@@ -520,7 +520,7 @@ func (bt *BTree) deleteFromBranch(bp *buffer.BufferPool, nodeBuffer *buffer.Buff
 	if err != nil {
 		return false, false, err
 	}
-	if bytes.Equal(node.GetNodeType(page.NewPage(childReadData).Body), node.NODE_TYPE_LEAF) {
+	if bytes.Equal(node.GetNodeType(page.NewPage(childReadData).Body), node.NodeTypeLeaf) {
 		uf, lm, err := bt.resolveLeafUnderflow(bp, branch, childNodeBuffer, sibling, childSlotNum)
 		return uf, leafMerged || lm, err
 	}
@@ -779,7 +779,7 @@ func (bt *BTree) updateRecursively(bp *buffer.BufferPool, nodeBuffer *buffer.Buf
 	}
 	nodeType := node.GetNodeType(page.NewPage(nodeData).Body)
 
-	if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
+	if bytes.Equal(nodeType, node.NodeTypeBranch) {
 		// ブランチノードの場合、再帰呼び出し後に UnRefPage を呼び出す
 		defer bp.UnRefPage(nodeBuffer.PageId)
 
@@ -795,7 +795,7 @@ func (bt *BTree) updateRecursively(bp *buffer.BufferPool, nodeBuffer *buffer.Buf
 
 		// 再帰呼び出し
 		return bt.updateRecursively(bp, childNodeBuffer, record)
-	} else if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
+	} else if bytes.Equal(nodeType, node.NodeTypeLeaf) {
 		nodeWriteData, err := bp.GetWritePageData(nodeBuffer.PageId)
 		if err != nil {
 			return err

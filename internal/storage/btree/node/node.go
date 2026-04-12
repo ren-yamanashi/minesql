@@ -3,8 +3,8 @@ package node
 const headerSize = 8
 
 var (
-	NODE_TYPE_LEAF   = []byte("LEAF    ")
-	NODE_TYPE_BRANCH = []byte("BRANCH  ")
+	NodeTypeLeaf   = []byte("LEAF    ")
+	NodeTypeBranch = []byte("BRANCH  ")
 )
 
 type Header struct {
@@ -26,7 +26,7 @@ type Node interface {
 
 // ページデータからノードタイプを取得する
 //
-// 戻り値: NODE_TYPE_LEAF or NODE_TYPE_BRANCH
+// 戻り値: NodeTypeLeaf or NodeTypeBranch
 func GetNodeType(data []byte) []byte {
 	return data[0:8]
 }

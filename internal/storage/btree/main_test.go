@@ -459,7 +459,7 @@ Branch[keys=1]: [key_10]
 		require.NoError(t, err)
 
 		nodeType := node.GetNodeType(page.NewPage(rootData).Body)
-		if !bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
+		if !bytes.Equal(nodeType, node.NodeTypeBranch) {
 			t.Skip("ルートがブランチではないためスキップ")
 		}
 
@@ -515,7 +515,7 @@ Branch[keys=1]: [key_10]
 			nodeType := node.GetNodeType(page.NewPage(rootData).Body)
 
 			var currentType string
-			if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
+			if bytes.Equal(nodeType, node.NodeTypeLeaf) {
 				currentType = "Leaf"
 			} else {
 				currentType = "Branch"
@@ -633,14 +633,14 @@ func writeNodeInfo(w *strings.Builder, bp *buffer.BufferPool, pageId page.PageId
 	indent := strings.Repeat("  ", depth)
 	nodeType := node.GetNodeType(page.NewPage(data).Body)
 
-	if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
+	if bytes.Equal(nodeType, node.NodeTypeLeaf) {
 		leaf := node.NewLeaf(page.NewPage(data).Body)
 		keys := make([]string, leaf.NumRecords())
 		for i := range leaf.NumRecords() {
 			keys[i] = string(leaf.RecordAt(i).KeyBytes())
 		}
 		fmt.Fprintf(w, "%sLeaf[keys=%d]: [%s]\n", indent, leaf.NumRecords(), strings.Join(keys, ", "))
-	} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
+	} else if bytes.Equal(nodeType, node.NodeTypeBranch) {
 		branch := node.NewBranch(page.NewPage(data).Body)
 		keys := make([]string, branch.NumRecords())
 		for i := range branch.NumRecords() {
@@ -679,14 +679,14 @@ func writeTreeShape(w *strings.Builder, bp *buffer.BufferPool, tree *BTree) {
 		}
 
 		nodeType := node.GetNodeType(page.NewPage(data).Body)
-		if bytes.Equal(nodeType, node.NODE_TYPE_LEAF) {
+		if bytes.Equal(nodeType, node.NodeTypeLeaf) {
 			if _, ok := result[depth]; !ok {
 				result[depth] = &depthInfo{nodeType: "Leaf"}
 			}
 			leaf := node.NewLeaf(page.NewPage(data).Body)
 			result[depth].count++
 			result[depth].totalKeys += leaf.NumRecords()
-		} else if bytes.Equal(nodeType, node.NODE_TYPE_BRANCH) {
+		} else if bytes.Equal(nodeType, node.NodeTypeBranch) {
 			if _, ok := result[depth]; !ok {
 				result[depth] = &depthInfo{nodeType: "Branch"}
 			}

@@ -20,7 +20,7 @@ func TestNewBranch(t *testing.T) {
 
 		// THEN
 		assert.NotNil(t, bn)
-		assert.True(t, bytes.Equal(data[0:8], NODE_TYPE_BRANCH))
+		assert.True(t, bytes.Equal(data[0:8], NodeTypeBranch))
 	})
 }
 

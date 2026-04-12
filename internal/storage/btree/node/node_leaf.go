@@ -22,7 +22,7 @@ type Leaf struct {
 //   - data[24:]: Slotted Page (24 = headerSize + leafHeaderSize)
 func NewLeaf(data []byte) *Leaf {
 	// ノードタイプを設定
-	copy(data[0:8], NODE_TYPE_LEAF)
+	copy(data[0:8], NodeTypeLeaf)
 
 	// data[24:] 以降を Slotted Page のボディとして扱う
 	body := NewSlottedPage(data[headerSize+leafHeaderSize:])
@@ -183,10 +183,8 @@ func (ln *Leaf) NextPageId() *page.PageId {
 // SetPrevPageId は前のリーフノードのページ ID を設定する
 //   - prevPageId: 前のリーフノードのページ ID (前のリーフノードが存在しない場合は nil を指定する)
 func (ln *Leaf) SetPrevPageId(prevPageId *page.PageId) {
-	var pageId page.PageId
-	if prevPageId == nil {
-		pageId = page.InvalidPageId
-	} else {
+	pageId := page.InvalidPageId
+	if prevPageId != nil {
 		pageId = *prevPageId
 	}
 	pageId.WriteTo(ln.Body(), 0)
@@ -195,10 +193,8 @@ func (ln *Leaf) SetPrevPageId(prevPageId *page.PageId) {
 // SetNextPageId は次のリーフノードのページ ID を設定する
 //   - nextPageId: 次のリーフノードのページ ID (次のリーフノードが存在しない場合は nil を指定する)
 func (ln *Leaf) SetNextPageId(nextPageId *page.PageId) {
-	var pageId page.PageId
-	if nextPageId == nil {
-		pageId = page.InvalidPageId
-	} else {
+	pageId := page.InvalidPageId
+	if nextPageId != nil {
 		pageId = *nextPageId
 	}
 	pageId.WriteTo(ln.Body(), 8)
