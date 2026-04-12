@@ -29,9 +29,9 @@ func NewRecovery(redoLog *log.RedoLog, bp *buffer.BufferPool, catalog *dictionar
 	}
 }
 
-// NeedsRecovery は REDO ログにレコードが残っている (= 前回異常終了した) かを判定する
+// NeedsRecovery はチェックポイント LSN 以降に REDO レコードが残っている (= 前回異常終了した) かを判定する
 func (r *Recovery) NeedsRecovery() (bool, error) {
-	records, err := r.redoLog.ReadAll()
+	records, err := r.redoLog.ReadFrom(r.redoLog.CheckpointLSN())
 	if err != nil {
 		return false, err
 	}
@@ -39,12 +39,12 @@ func (r *Recovery) NeedsRecovery() (bool, error) {
 }
 
 // Run は以下の手順でリカバリを実行する
-//  1. REDO 適用
+//  1. REDO 適用 (チェックポイント LSN 以降のレコードのみ)
 //  2. UNDO ロールバック
 //  3. フラッシュ
 //  4. REDO クリア
 func (r *Recovery) Run() error {
-	records, err := r.redoLog.ReadAll()
+	records, err := r.redoLog.ReadFrom(r.redoLog.CheckpointLSN())
 	if err != nil {
 		return err
 	}

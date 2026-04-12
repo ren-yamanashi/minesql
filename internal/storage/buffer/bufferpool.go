@@ -237,6 +237,13 @@ func (bp *BufferPool) ClearNewlyDirtied() {
 	bp.newlyDirtied = nil
 }
 
+// MinPageLSN はフラッシュリスト内の全ダーティーページの最小 Page LSN を返す
+func (bp *BufferPool) MinPageLSN() uint32 {
+	bp.mutex.RLock()
+	defer bp.mutex.RUnlock()
+	return bp.flushList.MinPageLSN(bp.bufferPages, bp.pageTable)
+}
+
 // FlushListSize はフラッシュリスト内のページ数を返す
 func (bp *BufferPool) FlushListSize() int {
 	bp.mutex.RLock()

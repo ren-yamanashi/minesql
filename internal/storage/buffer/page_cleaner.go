@@ -11,6 +11,7 @@ import (
 type PageCleaner struct {
 	bp              *BufferPool
 	redoLog         *log.RedoLog
+	checkpoint      *Checkpoint
 	redoLogMaxSize  int           // REDO ログの最大サイズ (バイト)
 	maxDirtyPagePct int           // ダーティーページ率の上限 (%)
 	interval        time.Duration // クリーニング間隔
@@ -24,6 +25,7 @@ func NewPageCleaner(bp *BufferPool, redoLog *log.RedoLog, redoLogMaxSize int, ma
 	return &PageCleaner{
 		bp:              bp,
 		redoLog:         redoLog,
+		checkpoint:      NewCheckpoint(bp, redoLog),
 		redoLogMaxSize:  redoLogMaxSize,
 		maxDirtyPagePct: maxDirtyPagePct,
 		interval:        1 * time.Second,
@@ -58,13 +60,16 @@ func (pc *PageCleaner) loop() {
 	}
 }
 
-// clean はフラッシュの必要がある場合にフラッシュリストの古いページからフラッシュする
+// clean はフラッシュの必要がある場合にフラッシュリストの古いページからフラッシュし、チェックポイントを実行する
 func (pc *PageCleaner) clean() {
 	if !pc.shouldFlush() {
 		return
 	}
 	flushCount := max(pc.bp.FlushListSize()/4, 1)
-	_ = pc.bp.FlushOldestPages(flushCount)
+	if err := pc.bp.FlushOldestPages(flushCount); err != nil {
+		return
+	}
+	_ = pc.checkpoint.Execute()
 }
 
 // shouldFlush は閾値 (以下のいずれか) を超えているかを判定する
