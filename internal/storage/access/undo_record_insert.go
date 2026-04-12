@@ -19,7 +19,7 @@ func NewUndoInsertRecord(table *Table, record [][]byte) UndoInsertRecord {
 
 // Undo は Insert したレコードを物理削除する
 func (r UndoInsertRecord) Undo(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager) error {
-	return r.table.deleteRaw(bp, trxId, lockMgr, r.Record)
+	return r.table.delete(bp, trxId, lockMgr, r.Record)
 }
 
 // Serialize は UndoInsertRecord をバイト列にシリアライズする

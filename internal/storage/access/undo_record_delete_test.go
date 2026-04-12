@@ -60,7 +60,7 @@ func TestUndoDeleteRecord_Undo(t *testing.T) {
 		record := [][]byte{[]byte("a"), []byte("John")}
 		err := table.Insert(bp, 0, lock.NewManager(5000), record)
 		assert.NoError(t, err)
-		err = table.deleteRaw(bp, 0, lock.NewManager(5000), record)
+		err = table.delete(bp, 0, lock.NewManager(5000), record)
 		assert.NoError(t, err)
 
 		undoRecord := NewUndoDeleteRecord(table, record)

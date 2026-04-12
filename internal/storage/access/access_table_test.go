@@ -427,7 +427,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: "a" を物理削除
-		err = table.deleteRaw(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
+		err = table.delete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
 
 		// THEN: B+Tree を直接走査すると 1 件のみ存在 (物理的に消えている)
@@ -465,7 +465,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: "a" を物理削除
-		err = table.deleteRaw(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.delete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
 
 		// THEN: クラスタ化インデックスから物理削除されている
@@ -504,7 +504,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: 物理削除してから同じ PK で再挿入
-		err = table.deleteRaw(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
+		err = table.delete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
 		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Jane")})
 		assert.NoError(t, err)
@@ -531,9 +531,9 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		err = table.deleteRaw(bp, 0, lock.NewManager(5000), record1)
+		err = table.delete(bp, 0, lock.NewManager(5000), record1)
 		assert.NoError(t, err)
-		err = table.deleteRaw(bp, 0, lock.NewManager(5000), record2)
+		err = table.delete(bp, 0, lock.NewManager(5000), record2)
 		assert.NoError(t, err)
 
 		// THEN: B+Tree を直接走査してもレコードが存在しない

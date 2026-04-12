@@ -82,7 +82,7 @@ func (t *Table) Insert(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Ma
 	bp.ClearNewlyDirtied()
 
 	// 行を挿入 → 排他ロックを取得
-	if err := t.insertRaw(bp, trxId, lockMgr, columns); err != nil {
+	if err := t.insert(bp, trxId, lockMgr, columns); err != nil {
 		if t.undoLog != nil {
 			t.undoLog.PopLast(trxId)
 		}
@@ -108,7 +108,7 @@ func (t *Table) SoftDelete(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *loc
 	bp.ClearNewlyDirtied()
 
 	// ロック取得 → ソフトデリート
-	if err := t.softDeleteRaw(bp, trxId, lockMgr, columns); err != nil {
+	if err := t.softDelete(bp, trxId, lockMgr, columns); err != nil {
 		if t.undoLog != nil {
 			t.undoLog.PopLast(trxId)
 		}
@@ -136,7 +136,7 @@ func (t *Table) UpdateInplace(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *
 	bp.ClearNewlyDirtied()
 
 	// ロック取得 → 更新
-	if err := t.updateInplaceRaw(bp, trxId, lockMgr, oldColumns, newColumns); err != nil {
+	if err := t.updateInplace(bp, trxId, lockMgr, oldColumns, newColumns); err != nil {
 		if t.undoLog != nil {
 			t.undoLog.PopLast(trxId)
 		}
@@ -184,10 +184,10 @@ func (t *Table) encodeBTreeRecord(columns [][]byte, deleteMark byte) node.Record
 	return node.NewRecord([]byte{deleteMark}, key, nonKey)
 }
 
-// insertRaw は Undo 記録なしでテーブルに行を挿入する (行の挿入 → 排他ロック取得の順で実行する)
+// insert は Undo 記録なしでテーブルに行を挿入する (行の挿入 → 排他ロック取得の順で実行する)
 //
 // 新規行は書き込み前に位置が確定しないため、ロック取得は挿入後に行う
-func (t *Table) insertRaw(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, columns [][]byte) error {
+func (t *Table) insert(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, columns [][]byte) error {
 	btr := btree.NewBTree(t.MetaPageId)
 
 	btrRecord := t.encodeBTreeRecord(columns, 0)
@@ -235,8 +235,8 @@ func (t *Table) insertRaw(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock
 	return nil
 }
 
-// deleteRaw は Undo 記録なしでテーブルから行を物理削除する (排他ロック取得 → 物理削除の順で実行する)
-func (t *Table) deleteRaw(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, columns [][]byte) error {
+// delete は Undo 記録なしでテーブルから行を物理削除する (排他ロック取得 → 物理削除の順で実行する)
+func (t *Table) delete(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, columns [][]byte) error {
 	btr := btree.NewBTree(t.MetaPageId)
 
 	// 対象行を検索
@@ -266,8 +266,8 @@ func (t *Table) deleteRaw(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock
 	return nil
 }
 
-// softDeleteRaw は Undo 記録なしでテーブルから行をソフトデリートする (排他ロック取得 → ソフトデリートの順で実行する)
-func (t *Table) softDeleteRaw(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, columns [][]byte) error {
+// softDelete は Undo 記録なしでテーブルから行をソフトデリートする (排他ロック取得 → ソフトデリートの順で実行する)
+func (t *Table) softDelete(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, columns [][]byte) error {
 	btr := btree.NewBTree(t.MetaPageId)
 
 	// 対象行を検索
@@ -298,8 +298,8 @@ func (t *Table) softDeleteRaw(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *
 	return nil
 }
 
-// updateInplaceRaw は Undo 記録なしでテーブルの行をインプレース更新する (排他ロック取得 → 更新の順で実行する)
-func (t *Table) updateInplaceRaw(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, oldColumns [][]byte, newColumns [][]byte) error {
+// updateInplace は Undo 記録なしでテーブルの行をインプレース更新する (排他ロック取得 → 更新の順で実行する)
+func (t *Table) updateInplace(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, oldColumns [][]byte, newColumns [][]byte) error {
 	btr := btree.NewBTree(t.MetaPageId)
 
 	// 対象行を検索

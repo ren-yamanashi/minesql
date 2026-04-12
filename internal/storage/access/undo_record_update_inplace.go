@@ -22,7 +22,7 @@ func NewUndoUpdateInplaceRecord(table *Table, prevRecord, newRecord [][]byte) Un
 // Undo は UpdateInplace したレコードを元の値に戻す
 func (r UndoUpdateInplaceRecord) Undo(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager) error {
 	// 元に戻すので、PrevRecord を新しい値、NewRecord を古い値として UpdateInplace を呼び出す
-	return r.table.updateInplaceRaw(bp, trxId, lockMgr, r.NewRecord, r.PrevRecord)
+	return r.table.updateInplace(bp, trxId, lockMgr, r.NewRecord, r.PrevRecord)
 }
 
 // Serialize は UndoUpdateInplaceRecord をバイト列にシリアライズする
