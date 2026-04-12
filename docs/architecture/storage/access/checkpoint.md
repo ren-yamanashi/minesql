@@ -22,6 +22,17 @@
 
 ### Fuzzy Checkpoint の流れ
 
+```mermaid
+flowchart TD
+    A[ページクリーナーがダーティーページをフラッシュ] --> B{フラッシュリストにダーティーページが残っているか}
+    B -- 残っている --> C[残っているダーティーページの最小 Page LSN を取得]
+    C --> D["checkpoint LSN = 最小 Page LSN - 1"]
+    B -- 残っていない --> E["checkpoint LSN = FlushedLSN <br/> (全変更がディスクに反映済み)"]
+    D --> F[REDO ログヘッダーにcheckpoint LSN を記録]
+    E --> F
+    F --> G[checkpoint LSN 以前のREDO レコードを切り詰め]
+```
+
 1. [ページクリーナー](./page-cleaner.md)がバッファプール内のダーティーページの一部をディスクにフラッシュする
 2. フラッシュ後、残っているダーティーページの最小 Page LSN から checkpoint LSN を算出する
 3. REDO ログファイルのヘッダーに checkpoint LSN を記録する
