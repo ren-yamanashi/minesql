@@ -40,7 +40,7 @@ func TestNeedsRecovery(t *testing.T) {
 		assert.NoError(t, err)
 		bp := buffer.NewBufferPool(10, rl)
 
-		rl.AppendPageCopy(1, page.NewPageId(1, 0), make([]byte, page.PAGE_SIZE))
+		rl.AppendPageCopy(1, page.NewPageId(1, 0), make([]byte, page.PageSize))
 		err = rl.Flush()
 		assert.NoError(t, err)
 
@@ -82,7 +82,7 @@ func TestRedoApply(t *testing.T) {
 		assert.NoError(t, err)
 
 		// 変更後のページデータを含む REDO レコードを記録
-		modifiedPage := make([]byte, page.PAGE_SIZE)
+		modifiedPage := make([]byte, page.PageSize)
 		modifiedPage[page.PageHeaderSize] = 0xFF                           // 変更後の値
 		binary.BigEndian.PutUint32(modifiedPage[0:page.PageHeaderSize], 1) // Page LSN = 1
 		rl.AppendPageCopy(1, pageId, modifiedPage)
@@ -131,7 +131,7 @@ func TestRedoApply(t *testing.T) {
 		assert.NoError(t, err)
 
 		// LSN = 5 の REDO レコード (Page LSN 10 より古い)
-		modifiedPage := make([]byte, page.PAGE_SIZE)
+		modifiedPage := make([]byte, page.PageSize)
 		modifiedPage[page.PageHeaderSize] = 0xFF
 		binary.BigEndian.PutUint32(modifiedPage[0:page.PageHeaderSize], 5) // LSN = 5
 		rl.AppendPageCopy(1, pageId, modifiedPage)

@@ -38,7 +38,7 @@ type BufferPool struct {
 func NewBufferPool(size int, redoLog *log.RedoLog) *BufferPool {
 	bufPages := make([]BufferPage, size)
 	for i := range bufPages {
-		bufPages[i] = *NewBufferPage(page.INVALID_PAGE_ID) // 仮のページ ID で初期化 (実際にはバッファプールにページが追加されるときに設定される)
+		bufPages[i] = *NewBufferPage(page.InvalidPageId) // 仮のページ ID で初期化 (実際にはバッファプールにページが追加されるときに設定される)
 	}
 	return &BufferPool{
 		disks:             make(map[page.FileId]*file.Disk),
@@ -287,7 +287,7 @@ func (bp *BufferPool) AllocatePageId(fileId page.FileId) (page.PageId, error) {
 	defer bp.mutex.Unlock()
 	disk, err := bp.getDisk(fileId)
 	if err != nil {
-		return page.INVALID_PAGE_ID, err
+		return page.InvalidPageId, err
 	}
 	return disk.AllocatePage(), nil
 }

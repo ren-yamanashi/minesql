@@ -1,17 +1,11 @@
 package page
 
-import (
-	"encoding/binary"
-	"fmt"
-)
+import "encoding/binary"
 
-const MAX_FILE_ID = 0xFFFFFFFF
-const MAX_PAGE_NUMBER = 0xFFFFFFFF
+const MaxFileId = 0xFFFFFFFF
+const MaxPageNumber = 0xFFFFFFFF
 
-var (
-	ErrInvalidDataSize error  = fmt.Errorf("data size must be %d bytes", PAGE_SIZE)
-	INVALID_PAGE_ID    PageId = NewPageId(MAX_FILE_ID, MAX_PAGE_NUMBER)
-)
+var InvalidPageId = NewPageId(MaxFileId, MaxPageNumber)
 
 type (
 	FileId     uint32 // ディスクファイルの識別子
@@ -32,9 +26,9 @@ func NewPageId(fileId FileId, pageNumber PageNumber) PageId {
 	}
 }
 
-// IsInvalid はこの PageId が無効な PageID (INVALID_PAGE_ID) かどうかを判定する
+// IsInvalid はこの PageId が無効な PageID (InvalidPageId) かどうかを判定する
 func (p *PageId) IsInvalid() bool {
-	return *p == INVALID_PAGE_ID
+	return *p == InvalidPageId
 }
 
 // WriteTo は PageId を指定位置に書き込む
@@ -58,10 +52,7 @@ func RestorePageIdFromBytes(data []byte) PageId {
 	if len(data) != 8 {
 		panic("data size must be 8 bytes to convert to PageId")
 	}
-	return PageId{
-		FileId:     FileId(binary.BigEndian.Uint32(data[0:4])),
-		PageNumber: PageNumber(binary.BigEndian.Uint32(data[4:8])),
-	}
+	return ReadPageIdFromPageData(data, 0)
 }
 
 // ReadPageIdFromPageData はページデータから PageId を読み取る

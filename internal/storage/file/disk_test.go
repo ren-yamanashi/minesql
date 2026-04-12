@@ -99,10 +99,10 @@ func TestReadPageData(t *testing.T) {
 		assert.Equal(t, writeData, readData)
 	})
 
-	t.Run("読み込むバッファのサイズが PAGE_SIZE と異なる場合はエラー", func(t *testing.T) {
+	t.Run("読み込むバッファのサイズが PageSize と異なる場合はエラー", func(t *testing.T) {
 		// GIVEN
 		disk, pageId := initDisk(t)
-		invalidData := make([]byte, page.PAGE_SIZE-1)
+		invalidData := make([]byte, page.PageSize-1)
 
 		// WHEN
 		err := disk.ReadPageData(pageId, invalidData)
@@ -139,7 +139,7 @@ func TestReadPageData(t *testing.T) {
 		for i := range 3 {
 			pageIds[i] = disk.AllocatePage()
 			pages[i] = directio.AlignedBlock(directio.BlockSize)
-			for j := range page.PAGE_SIZE {
+			for j := range page.PageSize {
 				pages[i][j] = byte((i*100 + j) % 256)
 			}
 			err := disk.WritePageData(pageIds[i], pages[i])
@@ -169,10 +169,10 @@ func TestWritePageData(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("書き込むデータのサイズが PAGE_SIZE と異なる場合はエラー", func(t *testing.T) {
+	t.Run("書き込むデータのサイズが PageSize と異なる場合はエラー", func(t *testing.T) {
 		// GIVEN
 		disk, pageId := initDisk(t)
-		invalidData := make([]byte, page.PAGE_SIZE+10)
+		invalidData := make([]byte, page.PageSize+10)
 
 		// WHEN
 		err := disk.WritePageData(pageId, invalidData)
@@ -201,7 +201,7 @@ func TestWritePageData(t *testing.T) {
 		// GIVEN
 		disk, pageId := initDisk(t)
 		firstData := directio.AlignedBlock(directio.BlockSize)
-		for i := range page.PAGE_SIZE {
+		for i := range page.PageSize {
 			firstData[i] = byte(0xAA)
 		}
 		err := disk.WritePageData(pageId, firstData)
@@ -209,7 +209,7 @@ func TestWritePageData(t *testing.T) {
 
 		// WHEN: 同じページに異なるデータを上書き
 		secondData := directio.AlignedBlock(directio.BlockSize)
-		for i := range page.PAGE_SIZE {
+		for i := range page.PageSize {
 			secondData[i] = byte(0xBB)
 		}
 		err = disk.WritePageData(pageId, secondData)
@@ -252,7 +252,7 @@ func initDisk(t *testing.T) (*Disk, page.PageId) {
 
 func createDataBuffer() []byte {
 	writeData := directio.AlignedBlock(directio.BlockSize)
-	for i := range page.PAGE_SIZE {
+	for i := range page.PageSize {
 		writeData[i] = byte(i % 256)
 	}
 	return writeData

@@ -202,7 +202,7 @@ func TestPageCleanerFlushesOnThreshold(t *testing.T) {
 
 		// REDO ログにデータを書き込んでフラッシュし、ファイルサイズを増やす
 		for range 10 {
-			rl.AppendPageCopy(1, pageId, make([]byte, page.PAGE_SIZE))
+			rl.AppendPageCopy(1, pageId, make([]byte, page.PageSize))
 		}
 		err = rl.Flush()
 		assert.NoError(t, err)

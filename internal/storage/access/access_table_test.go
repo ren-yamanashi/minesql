@@ -1398,7 +1398,7 @@ func TestInsertRedoLog(t *testing.T) {
 		for _, rec := range records {
 			assert.Equal(t, log.RedoPageWrite, rec.Type)
 			assert.Equal(t, uint64(1), rec.TrxId)
-			assert.Equal(t, page.PAGE_SIZE, len(rec.Data))
+			assert.Equal(t, page.PageSize, len(rec.Data))
 		}
 	})
 

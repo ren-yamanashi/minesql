@@ -131,7 +131,7 @@ func TestAllocatePageId(t *testing.T) {
 
 		// THEN
 		assert.Error(t, err)
-		assert.Equal(t, page.INVALID_PAGE_ID, pageId)
+		assert.Equal(t, page.InvalidPageId, pageId)
 		assert.Contains(t, err.Error(), "disk for FileId 999 not found")
 	})
 

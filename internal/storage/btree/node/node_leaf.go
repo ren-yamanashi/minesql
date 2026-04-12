@@ -37,8 +37,8 @@ func NewLeaf(data []byte) *Leaf {
 //
 // 初期化時には、前後のリーフノードのポインタ (ページ ID) には無効値が設定される
 func (ln *Leaf) Initialize() {
-	page.INVALID_PAGE_ID.WriteTo(ln.Body(), 0) // 初期化時には、前のページ ID を無効値に設定
-	page.INVALID_PAGE_ID.WriteTo(ln.Body(), 8) // 初期化時には、次のページ ID を無効値に設定
+	page.InvalidPageId.WriteTo(ln.Body(), 0) // 初期化時には、前のページ ID を無効値に設定
+	page.InvalidPageId.WriteTo(ln.Body(), 8) // 初期化時には、次のページ ID を無効値に設定
 	ln.body.Initialize()
 }
 
@@ -185,7 +185,7 @@ func (ln *Leaf) NextPageId() *page.PageId {
 func (ln *Leaf) SetPrevPageId(prevPageId *page.PageId) {
 	var pageId page.PageId
 	if prevPageId == nil {
-		pageId = page.INVALID_PAGE_ID
+		pageId = page.InvalidPageId
 	} else {
 		pageId = *prevPageId
 	}
@@ -197,7 +197,7 @@ func (ln *Leaf) SetPrevPageId(prevPageId *page.PageId) {
 func (ln *Leaf) SetNextPageId(nextPageId *page.PageId) {
 	var pageId page.PageId
 	if nextPageId == nil {
-		pageId = page.INVALID_PAGE_ID
+		pageId = page.InvalidPageId
 	} else {
 		pageId = *nextPageId
 	}
