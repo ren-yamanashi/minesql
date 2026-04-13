@@ -270,6 +270,79 @@ func TestManagerCreateReadView(t *testing.T) {
 	})
 }
 
+func TestPurgeLimit(t *testing.T) {
+	t.Run("アクティブな ReadView がない場合は nextTrxId を返す", func(t *testing.T) {
+		// GIVEN
+		_, undoLog, _ := initManagerTest(t)
+		manager := NewTrxManager(undoLog, lock.NewManager(5000), nil)
+		trx1 := manager.Begin()
+		_ = manager.Commit(trx1)
+
+		// WHEN
+		limit := manager.PurgeLimit()
+
+		// THEN: nextTrxId=2 (全コミット済みトランザクションがパージ可能)
+		assert.Equal(t, TrxId(2), limit)
+	})
+
+	t.Run("アクティブな ReadView の MUpLimitId の最小値を返す", func(t *testing.T) {
+		// GIVEN
+		_, undoLog, _ := initManagerTest(t)
+		manager := NewTrxManager(undoLog, lock.NewManager(5000), nil)
+		trx1 := manager.Begin() // TrxId=1
+		_ = manager.Commit(trx1)
+		trx2 := manager.Begin() // TrxId=2
+		trx3 := manager.Begin() // TrxId=3
+
+		// T2 と T3 が ReadView を作成
+		manager.CreateReadView(trx2) // MUpLimitId=3 (T3 がアクティブ)
+		manager.CreateReadView(trx3) // MUpLimitId=2 (T2 がアクティブ)
+
+		// WHEN
+		limit := manager.PurgeLimit()
+
+		// THEN: min(3, 2) = 2
+		assert.Equal(t, TrxId(2), limit)
+	})
+
+	t.Run("ReadView が 1 つの場合はその MUpLimitId を返す", func(t *testing.T) {
+		// GIVEN
+		_, undoLog, _ := initManagerTest(t)
+		manager := NewTrxManager(undoLog, lock.NewManager(5000), nil)
+		trx1 := manager.Begin() // TrxId=1
+		_ = manager.Commit(trx1)
+		trx2 := manager.Begin() // TrxId=2
+		manager.CreateReadView(trx2)
+
+		// WHEN
+		limit := manager.PurgeLimit()
+
+		// THEN: T1 はコミット済みなので MUpLimitId=nextTrxId=3
+		assert.Equal(t, TrxId(3), limit)
+	})
+}
+
+func TestCommittedTrxIds(t *testing.T) {
+	t.Run("コミット済みトランザクションの ID を返す", func(t *testing.T) {
+		// GIVEN
+		_, undoLog, _ := initManagerTest(t)
+		manager := NewTrxManager(undoLog, lock.NewManager(5000), nil)
+		trx1 := manager.Begin()
+		trx2 := manager.Begin()
+		_ = manager.Begin() // trx3 (アクティブ)
+		_ = manager.Commit(trx1)
+		_ = manager.Commit(trx2)
+
+		// WHEN
+		ids := manager.CommittedTrxIds()
+
+		// THEN
+		assert.Equal(t, 2, len(ids))
+		assert.Contains(t, ids, trx1)
+		assert.Contains(t, ids, trx2)
+	})
+}
+
 // initManagerTest はテスト用にバッファプール・UndoManager・テーブルを初期化する
 func initManagerTest(t *testing.T) (*buffer.BufferPool, *UndoManager, *Table) {
 	t.Helper()

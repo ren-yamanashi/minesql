@@ -311,7 +311,7 @@ func (t *Table) softDelete(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *loc
 
 	// ユニークインデックスをソフトデリート
 	for _, ui := range t.UniqueIndexes {
-		err := ui.Delete(bp, encodedKey, columns)
+		err := ui.SoftDelete(bp, encodedKey, columns)
 		if err != nil {
 			return err
 		}

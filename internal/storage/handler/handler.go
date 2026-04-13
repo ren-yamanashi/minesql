@@ -44,6 +44,7 @@ type Handler struct {
 	redoLog        *log.RedoLog
 	trxManager     *access.TrxManager
 	pageCleaner    *buffer.PageCleaner
+	purgeThread    *access.PurgeThread
 	baseDirectory  string
 }
 
@@ -75,6 +76,9 @@ func Get() *Handler {
 
 // Shutdown はダーティーページをディスクに書き出し、すべての Disk を同期する
 func (h *Handler) Shutdown() error {
+	// パージスレッドを停止
+	h.purgeThread.Stop()
+
 	// ページクリーナーを停止
 	h.pageCleaner.Stop()
 
@@ -174,6 +178,15 @@ func newHandler() (*Handler, error) {
 	pc := buffer.NewPageCleaner(bp, redoLog, config.GetRedoLogMaxSize(), config.GetMaxDirtyPagesPct())
 	pc.Start()
 
+	// トランザクションマネージャを初期化
+	trxManager := access.NewTrxManager(undoLog, lockMgr, redoLog)
+
+	// パージスレッドを初期化・起動
+	pt := access.NewPurgeThread(bp, trxManager, undoLog, lockMgr, func() []*access.Table {
+		return buildAllTables(catalog, undoLog, redoLog)
+	})
+	pt.Start()
+
 	return &Handler{
 		BufferPool:     bp,
 		LockMgr:        lockMgr,
@@ -181,8 +194,9 @@ func newHandler() (*Handler, error) {
 		StatsCollector: dictionary.NewStatsCollector(bp),
 		undoLog:        undoLog,
 		redoLog:        redoLog,
-		trxManager:     access.NewTrxManager(undoLog, lockMgr, redoLog),
+		trxManager:     trxManager,
 		pageCleaner:    pc,
+		purgeThread:    pt,
 		baseDirectory:  dataDir,
 	}, nil
 }

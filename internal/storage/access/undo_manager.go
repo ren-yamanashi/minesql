@@ -100,6 +100,15 @@ func (u *UndoManager) DiscardInsertRecords(trxId TrxId) {
 	}
 }
 
+// Purge はパージ閾値より古いコミット済みトランザクションの undo エントリを破棄する
+func (u *UndoManager) Purge(purgeLimit TrxId, committedTrxIds []TrxId) {
+	for _, trxId := range committedTrxIds {
+		if trxId < purgeLimit {
+			delete(u.entries, trxId)
+		}
+	}
+}
+
 // Discard は指定した trxId の Undo ログをすべて破棄する (ROLLBACK 用)
 //
 // メモリインデックスの操作のみ (UNDO ページ上のデータは残る)
