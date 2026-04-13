@@ -100,10 +100,14 @@ func (t *Table) Insert(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Ma
 //
 // B+Tree からレコードを物理削除せず、DeleteMark を 1 に設定する
 func (t *Table) SoftDelete(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, columns [][]byte) error {
-	// Undo ログを記録
+	// Undo ログを記録 (既存行の lastModified/rollPtr を undo レコードに保存する)
 	undoPtr := NullUndoPtr
 	if t.undoLog != nil {
-		ptr, err := t.undoLog.Append(trxId, UndoDelete, NewUndoDeleteRecord(t, columns, 0, NullUndoPtr))
+		prevLastModified, prevRollPtr, err := t.readCurrentVersion(bp, columns)
+		if err != nil {
+			return err
+		}
+		ptr, err := t.undoLog.Append(trxId, UndoDelete, NewUndoDeleteRecord(t, columns, prevLastModified, prevRollPtr))
 		if err != nil {
 			return err
 		}
@@ -131,10 +135,14 @@ func (t *Table) SoftDelete(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *loc
 //
 // ユニークインデックスは物理削除 (old) + 挿入 (new) で更新する
 func (t *Table) UpdateInplace(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, oldColumns [][]byte, newColumns [][]byte) error {
-	// Undo ログを記録
+	// Undo ログを記録 (既存行の lastModified/rollPtr を undo レコードに保存する)
 	undoPtr := NullUndoPtr
 	if t.undoLog != nil {
-		ptr, err := t.undoLog.Append(trxId, UndoUpdateInplace, NewUndoUpdateInplaceRecord(t, oldColumns, newColumns, 0, NullUndoPtr))
+		prevLastModified, prevRollPtr, err := t.readCurrentVersion(bp, oldColumns)
+		if err != nil {
+			return err
+		}
+		ptr, err := t.undoLog.Append(trxId, UndoUpdateInplace, NewUndoUpdateInplaceRecord(t, oldColumns, newColumns, prevLastModified, prevRollPtr))
 		if err != nil {
 			return err
 		}
@@ -348,6 +356,18 @@ func (t *Table) updateInplace(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *
 	}
 
 	return nil
+}
+
+// readCurrentVersion は B+Tree 上の既存行から lastModified と rollPtr を読み取る
+func (t *Table) readCurrentVersion(bp *buffer.BufferPool, columns [][]byte) (TrxId, UndoPtr, error) {
+	btr := btree.NewBTree(t.MetaPageId)
+	encodedKey := t.EncodeKey(columns)
+	record, _, err := btr.FindByKey(bp, encodedKey)
+	if err != nil {
+		return 0, NullUndoPtr, err
+	}
+	lastModified, rollPtr, _ := decodeRecordNonKey(record.NonKeyBytes())
+	return lastModified, rollPtr, nil
 }
 
 // appendRedoRecords は書き込みが行われたページの REDO レコードを追加する

@@ -21,7 +21,8 @@ type TrxManager struct {
 	lockMgr      *lock.Manager
 	redoLog      *log.RedoLog
 	Transactions map[TrxId]State
-	nextTrxId    TrxId // 次に払い出すトラ���ザクション ID (単調増加)
+	readViews    map[TrxId]*ReadView // トランザクションごとの ReadView キャッシュ
+	nextTrxId    TrxId               // 次に払い出すトランザクション ID (単調増加)
 }
 
 func NewTrxManager(undoLog *UndoManager, lockMgr *lock.Manager, redoLog *log.RedoLog) *TrxManager {
@@ -30,6 +31,7 @@ func NewTrxManager(undoLog *UndoManager, lockMgr *lock.Manager, redoLog *log.Red
 		lockMgr:      lockMgr,
 		redoLog:      redoLog,
 		Transactions: make(map[TrxId]State),
+		readViews:    make(map[TrxId]*ReadView),
 		nextTrxId:    1,
 	}
 }
@@ -55,6 +57,7 @@ func (m *TrxManager) Commit(trxId TrxId) error {
 	// UPDATE/DELETE の undo レコードは他トランザクションの ReadView から undo チェーン辿りに必要なため保持する
 	m.lockMgr.ReleaseAll(trxId)
 	m.undoLog.DiscardInsertRecords(trxId)
+	delete(m.readViews, trxId)
 	m.Transactions[trxId] = StateInactive
 	return nil
 }
@@ -75,19 +78,27 @@ func (m *TrxManager) Rollback(bp *buffer.BufferPool, trxId TrxId) error {
 	// ロールバック後はロックを解放して Undo ログを破棄
 	m.lockMgr.ReleaseAll(trxId)
 	m.undoLog.Discard(trxId)
+	delete(m.readViews, trxId)
 	m.Transactions[trxId] = StateInactive
 	return nil
 }
 
-// CreateReadView は指定したトランザクション用の ReadView を作成する
+// CreateReadView は指定したトランザクション用の ReadView を返す
+//
+// REPEATABLE READ のため、同一トランザクション内では最初に作成した ReadView をキャッシュして使い回す
 func (m *TrxManager) CreateReadView(trxId TrxId) *ReadView {
+	if rv, ok := m.readViews[trxId]; ok {
+		return rv
+	}
 	var activeTrxIds []TrxId
 	for id, state := range m.Transactions {
 		if state == StateActive && id != trxId {
 			activeTrxIds = append(activeTrxIds, id)
 		}
 	}
-	return NewReadView(trxId, activeTrxIds, m.nextTrxId)
+	rv := NewReadView(trxId, activeTrxIds, m.nextTrxId)
+	m.readViews[trxId] = rv
+	return rv
 }
 
 func (m *TrxManager) allocateTrxId() TrxId {

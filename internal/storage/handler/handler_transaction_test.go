@@ -280,12 +280,8 @@ func TestTransactionIsolation(t *testing.T) {
 		assert.NoError(t, h.CommitTrx(trx2))
 	})
 
-	t.Run("Consistent Read: UPDATE 後に旧バージョンの行が不可視になる (undo チェーン辿りの制約)", func(t *testing.T) {
+	t.Run("Consistent Read: UPDATE 前の旧バージョンが undo チェーン経由で見える", func(t *testing.T) {
 		// GIVEN
-		// 現在の実装では UpdateInplace/SoftDelete が undo レコードに prevLastModified=0 を記録するため、
-		// undo チェーンを辿っても旧バージョンの復元ができない。
-		// この制約により、T3 が UPDATE した行は T2 の Consistent Read からは不可視 (見つからない) になる。
-		// TODO: UpdateInplace/SoftDelete が B+Tree 上の現在の lastModified/rollPtr を undo レコードに記録するようになれば、旧バージョンが可視になる
 		tmpdir := t.TempDir()
 		t.Setenv("MINESQL_DATA_DIR", tmpdir)
 		t.Setenv("MINESQL_BUFFER_SIZE", "100")
@@ -323,11 +319,12 @@ func TestTransactionIsolation(t *testing.T) {
 		vr := access.NewVersionReader(h.UndoLog())
 		iter, err := tbl.Search(h.BufferPool, rv, vr, access.RecordSearchModeStart{})
 		assert.NoError(t, err)
-		_, ok, err := iter.Next()
+		record, ok, err := iter.Next()
 		assert.NoError(t, err)
 
-		// THEN: prevLastModified=0 のため undo チェーン辿りで旧バージョンが見つからず、行は不可視
-		assert.False(t, ok)
+		// THEN: T3 の更新は不可視。undo チェーンを辿って T1 が書いた "Alice" が返る
+		assert.True(t, ok)
+		assert.Equal(t, "Alice", string(record[1]))
 		assert.NoError(t, h.CommitTrx(trx2))
 	})
 }
