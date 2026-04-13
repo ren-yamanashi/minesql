@@ -101,6 +101,34 @@ func (m *TrxManager) CreateReadView(trxId TrxId) *ReadView {
 	return rv
 }
 
+// PurgeLimit は全アクティブ ReadView の MUpLimitId の最小値を返す
+//
+// この値より小さい trxId のコミット済み undo ログおよび delete-marked レコードはパージ可能。
+// アクティブな ReadView がない場合は nextTrxId を返す (全コミット済みトランザクションがパージ可能)
+func (m *TrxManager) PurgeLimit() TrxId {
+	if len(m.readViews) == 0 {
+		return m.nextTrxId
+	}
+	limit := m.nextTrxId
+	for _, rv := range m.readViews {
+		if rv.MUpLimitId < limit {
+			limit = rv.MUpLimitId
+		}
+	}
+	return limit
+}
+
+// CommittedTrxIds はコミット済みトランザクションの ID 一覧を返す
+func (m *TrxManager) CommittedTrxIds() []TrxId {
+	var ids []TrxId
+	for id, state := range m.Transactions {
+		if state == StateInactive {
+			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
 func (m *TrxManager) allocateTrxId() TrxId {
 	id := m.nextTrxId
 	m.nextTrxId++
