@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
-	"minesql/internal/storage/lock"
 	"strings"
 	"testing"
 
@@ -18,8 +17,7 @@ func TestExecutorIntegration(t *testing.T) {
 		defer handler.Reset()
 
 		// WHEN
-		records := collectAll(t, NewTableScan(
-			0, lock.NewManager(5000), tbl,
+		records := collectAll(t, testTableScan(tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
@@ -46,8 +44,7 @@ func TestExecutorIntegration(t *testing.T) {
 		defer handler.Reset()
 
 		// WHEN: プライマリキーが "w" 以上 "y" 以下
-		records := collectAll(t, NewTableScan(
-			0, lock.NewManager(5000), tbl,
+		records := collectAll(t, testTableScan(tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("w")}},
 			func(record Record) bool {
 				return string(record[0]) <= "y"
@@ -74,8 +71,7 @@ func TestExecutorIntegration(t *testing.T) {
 		defer handler.Reset()
 
 		// WHEN
-		records := collectAll(t, NewTableScan(
-			0, lock.NewManager(5000), tbl,
+		records := collectAll(t, testTableScan(tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("y")}},
 			func(record Record) bool {
 				return string(record[0]) == "y"
@@ -101,8 +97,7 @@ func TestExecutorIntegration(t *testing.T) {
 
 		// WHEN: first_name が "Charlie" のレコード
 		records := collectAll(t, NewFilter(
-			NewTableScan(
-				0, lock.NewManager(5000), tbl,
+			testTableScan(tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -230,8 +225,7 @@ func TestExecutorIntegration(t *testing.T) {
 		upd := NewUpdate(trxId, tbl, []SetColumn{
 			{Pos: 2, Value: []byte("Anderson")},
 		}, NewFilter(
-			NewTableScan(
-				0, lock.NewManager(5000), tbl,
+			testTableScan(tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -243,8 +237,7 @@ func TestExecutorIntegration(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: テーブルスキャンとインデックススキャンの両方で確認
-		tableRecords := collectAll(t, NewTableScan(
-			0, lock.NewManager(5000), tbl,
+		tableRecords := collectAll(t, testTableScan(tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
@@ -289,8 +282,7 @@ func TestExecutorIntegration(t *testing.T) {
 		// WHEN: プライマリキー "v" (Eve) を "a" に変更
 		upd := NewUpdate(trxId, tbl, []SetColumn{
 			{Pos: 0, Value: []byte("a")},
-		}, NewTableScan(
-			0, lock.NewManager(5000), tbl,
+		}, testTableScan(tbl,
 			access.RecordSearchModeKey{Key: [][]byte{[]byte("v")}},
 			func(record Record) bool {
 				return string(record[0]) == "v"
@@ -300,8 +292,7 @@ func TestExecutorIntegration(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		records := collectAll(t, NewTableScan(
-			0, lock.NewManager(5000), tbl,
+		records := collectAll(t, testTableScan(tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
@@ -328,8 +319,7 @@ func TestExecutorIntegration(t *testing.T) {
 
 		// WHEN: first_name (pos=1) と last_name (pos=2) のみ取得
 		records := collectAll(t, NewProject(
-			NewTableScan(
-				0, lock.NewManager(5000), tbl,
+			testTableScan(tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -360,8 +350,7 @@ func TestExecutorIntegration(t *testing.T) {
 		// WHEN: first_name が "Charlie" のレコードから first_name と last_name を取得
 		records := collectAll(t, NewProject(
 			NewFilter(
-				NewTableScan(
-					0, lock.NewManager(5000), tbl,
+				testTableScan(tbl,
 					access.RecordSearchModeStart{},
 					func(record Record) bool { return true },
 				),
@@ -395,8 +384,7 @@ func TestExecutorIntegration(t *testing.T) {
 
 		// WHEN: Bob を削除
 		del := NewDelete(trxId, tbl, NewFilter(
-			NewTableScan(
-				0, lock.NewManager(5000), tbl,
+			testTableScan(tbl,
 				access.RecordSearchModeStart{},
 				func(record Record) bool { return true },
 			),
@@ -408,8 +396,7 @@ func TestExecutorIntegration(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: テーブルスキャンとインデックススキャンの両方で確認
-		tableRecords := collectAll(t, NewTableScan(
-			0, lock.NewManager(5000), tbl,
+		tableRecords := collectAll(t, testTableScan(tbl,
 			access.RecordSearchModeStart{},
 			func(record Record) bool { return true },
 		))
@@ -521,4 +508,15 @@ func writeRecords(sb *strings.Builder, records []Record) {
 		fmt.Fprintf(sb, "  (%s)\n", strings.Join(vals, ", "))
 	}
 	fmt.Fprintf(sb, "  合計: %d 件\n", len(records))
+}
+
+// testTableScan は全レコードが可視な TableScan を作成するテストヘルパー
+func testTableScan(tbl *access.Table, mode access.RecordSearchMode, cond func(Record) bool) *TableScan {
+	return NewTableScan(TableScanParams{
+		ReadView:       access.NewReadView(0, nil, ^uint64(0)),
+		VersionReader:  access.NewVersionReader(nil),
+		Table:          tbl,
+		SearchMode:     mode,
+		WhileCondition: cond,
+	})
 }

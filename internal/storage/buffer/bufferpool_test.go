@@ -399,7 +399,7 @@ func TestAddPageEvictionWithRedoLogNil(t *testing.T) {
 		err := bp.AddPage(pageId4)
 		assert.NoError(t, err)
 
-		// THEN: page1 のデータがディスクに書���込まれている
+		// THEN: page1 のデータがディスクに書き込まれている
 		reFetched, err := bp.FetchPage(pageId1)
 		assert.NoError(t, err)
 		assert.Equal(t, byte(0xBB), reFetched.Page[0])

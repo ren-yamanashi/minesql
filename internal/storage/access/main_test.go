@@ -80,11 +80,13 @@ func TestRollback(t *testing.T) {
 
 		// Delete トランザクション
 		deleteTrxId := hdl.BeginTrx()
-		del := executor.NewDelete(deleteTrxId, tbl, executor.NewTableScan(
-			deleteTrxId, hdl.LockMgr, tbl,
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool { return true },
-		))
+		del := executor.NewDelete(deleteTrxId, tbl, executor.NewTableScan(executor.TableScanParams{
+			ReadView:       access.NewReadView(0, nil, ^uint64(0)),
+			VersionReader:  access.NewVersionReader(nil),
+			Table:          tbl,
+			SearchMode:     access.RecordSearchModeStart{},
+			WhileCondition: func(record executor.Record) bool { return true },
+		}))
 		_, err = del.Next()
 		assert.NoError(t, err)
 
@@ -118,11 +120,13 @@ func TestRollback(t *testing.T) {
 		updateTrxId := hdl.BeginTrx()
 		upd := executor.NewUpdate(updateTrxId, tbl, []executor.SetColumn{
 			{Pos: 1, Value: []byte("Carol")},
-		}, executor.NewTableScan(
-			updateTrxId, hdl.LockMgr, tbl,
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool { return true },
-		))
+		}, executor.NewTableScan(executor.TableScanParams{
+			ReadView:       access.NewReadView(0, nil, ^uint64(0)),
+			VersionReader:  access.NewVersionReader(nil),
+			Table:          tbl,
+			SearchMode:     access.RecordSearchModeStart{},
+			WhileCondition: func(record executor.Record) bool { return true },
+		}))
 		_, err = upd.Next()
 		assert.NoError(t, err)
 
@@ -165,20 +169,24 @@ func TestRollback(t *testing.T) {
 
 		upd := executor.NewUpdate(trxId, tbl, []executor.SetColumn{
 			{Pos: 1, Value: []byte("Dave")},
-		}, executor.NewTableScan(
-			trxId, hdl.LockMgr, tbl,
-			access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
-			func(record executor.Record) bool { return string(record[0]) == "a" },
-		))
+		}, executor.NewTableScan(executor.TableScanParams{
+			ReadView:       access.NewReadView(0, nil, ^uint64(0)),
+			VersionReader:  access.NewVersionReader(nil),
+			Table:          tbl,
+			SearchMode:     access.RecordSearchModeKey{Key: [][]byte{[]byte("a")}},
+			WhileCondition: func(record executor.Record) bool { return string(record[0]) == "a" },
+		}))
 		_, err = upd.Next()
 		assert.NoError(t, err)
 
 		del := executor.NewDelete(trxId, tbl, executor.NewFilter(
-			executor.NewTableScan(
-				trxId, hdl.LockMgr, tbl,
-				access.RecordSearchModeStart{},
-				func(record executor.Record) bool { return true },
-			),
+			executor.NewTableScan(executor.TableScanParams{
+				ReadView:       access.NewReadView(0, nil, ^uint64(0)),
+				VersionReader:  access.NewVersionReader(nil),
+				Table:          tbl,
+				SearchMode:     access.RecordSearchModeStart{},
+				WhileCondition: func(record executor.Record) bool { return true },
+			}),
 			func(record executor.Record) bool { return string(record[0]) == "b" },
 		))
 		_, err = del.Next()
@@ -225,11 +233,13 @@ func collectAllRecords(t *testing.T, tbl *access.Table) []executor.Record {
 	hdl := handler.Get()
 	trxId := hdl.BeginTrx()
 	defer func() { assert.NoError(t, hdl.CommitTrx(trxId)) }()
-	scan := executor.NewTableScan(
-		trxId, hdl.LockMgr, tbl,
-		access.RecordSearchModeStart{},
-		func(record executor.Record) bool { return true },
-	)
+	scan := executor.NewTableScan(executor.TableScanParams{
+		ReadView:       access.NewReadView(0, nil, ^uint64(0)),
+		VersionReader:  access.NewVersionReader(nil),
+		Table:          tbl,
+		SearchMode:     access.RecordSearchModeStart{},
+		WhileCondition: func(record executor.Record) bool { return true },
+	})
 	var recs []executor.Record
 	for {
 		record, err := scan.Next()

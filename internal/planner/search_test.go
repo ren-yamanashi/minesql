@@ -1,11 +1,12 @@
 package planner
 
 import (
+	"testing"
+
 	"minesql/internal/ast"
 	"minesql/internal/executor"
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
-	"minesql/internal/storage/lock"
-	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -18,7 +19,7 @@ func TestSearch(t *testing.T) {
 		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
-		search := NewSearch(0, lock.NewManager(5000), tblMeta, nil)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, nil)
 
 		// WHEN
 		exec, err := search.Build()
@@ -43,7 +44,7 @@ func TestSearch(t *testing.T) {
 				ast.NewRhsLiteral(ast.NewStringLiteral("Doe")),
 			),
 		}
-		search := NewSearch(0, lock.NewManager(5000), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -73,7 +74,7 @@ func TestSearch(t *testing.T) {
 				ast.NewRhsLiteral(ast.NewStringLiteral("John")),
 			),
 		}
-		search := NewSearch(0, lock.NewManager(5000), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -98,7 +99,7 @@ func TestSearch(t *testing.T) {
 				ast.NewRhsLiteral(ast.NewStringLiteral("value")),
 			),
 		}
-		search := NewSearch(0, lock.NewManager(5000), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -148,7 +149,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(0, lock.NewManager(5000), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -198,7 +199,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(0, lock.NewManager(5000), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -230,7 +231,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(0, lock.NewManager(5000), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -268,7 +269,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(0, lock.NewManager(5000), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -306,7 +307,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(0, lock.NewManager(5000), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -350,7 +351,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(0, lock.NewManager(5000), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -388,7 +389,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(0, lock.NewManager(5000), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -417,7 +418,7 @@ func TestSearch(t *testing.T) {
 				ast.NewRhsLiteral(ast.NewStringLiteral("value")),
 			),
 		}
-		search := NewSearch(0, lock.NewManager(5000), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -461,7 +462,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(0, lock.NewManager(5000), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
 
 		// WHEN
 		exec, err := search.Build()
@@ -544,7 +545,7 @@ func TestComplexWhereWithData(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(0, lock.NewManager(5000), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
 		searchExec, err := search.Build()
 		assert.NoError(t, err)
 
@@ -587,7 +588,7 @@ func TestComplexWhereWithData(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(0, lock.NewManager(5000), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
 		searchExec, err := search.Build()
 		assert.NoError(t, err)
 
@@ -619,7 +620,7 @@ func TestComplexWhereWithData(t *testing.T) {
 				ast.NewRhsLiteral(ast.NewStringLiteral("1")),
 			),
 		}
-		search := NewSearch(0, lock.NewManager(5000), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
 		searchExec, err := search.Build()
 		assert.NoError(t, err)
 
@@ -673,7 +674,7 @@ func TestComplexWhereWithData(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(0, lock.NewManager(5000), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
 		searchExec, err := search.Build()
 		assert.NoError(t, err)
 

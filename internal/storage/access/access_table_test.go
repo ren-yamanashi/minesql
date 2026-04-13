@@ -68,9 +68,9 @@ func TestCreateAndInsert(t *testing.T) {
 			var decodedKey [][]byte
 			var decodedValue [][]byte
 			keyBytes := record.KeyBytes()
-			valueBytes := record.NonKeyBytes()
+			_, _, nonKeyColumns := decodeRecordNonKey(record.NonKeyBytes())
 			encode.Decode(keyBytes, &decodedKey)
-			encode.Decode(valueBytes, &decodedValue)
+			encode.Decode(nonKeyColumns, &decodedValue)
 
 			assert.Equal(t, expected.key, decodedKey)
 			assert.Equal(t, expected.value, decodedValue)
@@ -214,7 +214,8 @@ func TestCreateAndInsert(t *testing.T) {
 		assert.Equal(t, "a", string(decodedKey[0]))
 
 		var decodedValue [][]byte
-		encode.Decode(record.NonKeyBytes(), &decodedValue)
+		_, _, nonKeyColumns := decodeRecordNonKey(record.NonKeyBytes())
+		encode.Decode(nonKeyColumns, &decodedValue)
 		assert.Equal(t, "Jane", string(decodedValue[0])) // 新しい値で上書きされている
 
 		// 2 件目は存在しない (物理的にレコードが増えていない)
@@ -427,7 +428,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: "a" を物理削除
-		err = table.deleteRaw(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
+		err = table.delete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
 
 		// THEN: B+Tree を直接走査すると 1 件のみ存在 (物理的に消えている)
@@ -465,7 +466,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: "a" を物理削除
-		err = table.deleteRaw(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		err = table.delete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
 		assert.NoError(t, err)
 
 		// THEN: クラスタ化インデックスから物理削除されている
@@ -504,7 +505,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: 物理削除してから同じ PK で再挿入
-		err = table.deleteRaw(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
+		err = table.delete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John")})
 		assert.NoError(t, err)
 		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Jane")})
 		assert.NoError(t, err)
@@ -531,9 +532,9 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		err = table.deleteRaw(bp, 0, lock.NewManager(5000), record1)
+		err = table.delete(bp, 0, lock.NewManager(5000), record1)
 		assert.NoError(t, err)
-		err = table.deleteRaw(bp, 0, lock.NewManager(5000), record2)
+		err = table.delete(bp, 0, lock.NewManager(5000), record2)
 		assert.NoError(t, err)
 
 		// THEN: B+Tree を直接走査してもレコードが存在しない
@@ -605,7 +606,8 @@ func TestUpdate(t *testing.T) {
 		assert.Equal(t, "a", string(decodedKey[0]))
 
 		var decodedValue [][]byte
-		encode.Decode(record.NonKeyBytes(), &decodedValue)
+		_, _, nonKeyColumns := decodeRecordNonKey(record.NonKeyBytes())
+		encode.Decode(nonKeyColumns, &decodedValue)
 		assert.Equal(t, "Jane", string(decodedValue[0]))
 
 		// 2 件目は存在しない (ソフトデリートされたレコードが残っていない)
@@ -977,7 +979,7 @@ func TestSearch(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: "b" から検索
-		iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeKey{Key: [][]byte{[]byte("b")}})
+		iter, err := table.Search(bp, allVisibleReadView(), nilVersionReader(), RecordSearchModeKey{Key: [][]byte{[]byte("b")}})
 		assert.NoError(t, err)
 
 		columns, ok, err := iter.Next()
@@ -1003,7 +1005,7 @@ func TestSearch(t *testing.T) {
 		assert.Equal(t, 0, len(recs))
 	})
 
-	t.Run("各行の読み取り時に共有ロックが取得される", func(t *testing.T) {
+	t.Run("Consistent Read はロックを取得しないため複数トランザクションが同時に読み取れる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "users.db")
 		table := NewTable("users", metaPageId, 1, nil, nil, nil)
@@ -1015,10 +1017,8 @@ func TestSearch(t *testing.T) {
 		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Bob")})
 		assert.NoError(t, err)
 
-		lockMgr := lock.NewManager(5000)
-
 		// WHEN: trx1 が Search で全行を読み取る
-		iter, err := table.Search(bp, 1, lockMgr, RecordSearchModeStart{})
+		iter, err := table.Search(bp, allVisibleReadView(), nilVersionReader(), RecordSearchModeStart{})
 		assert.NoError(t, err)
 		for {
 			_, ok, err := iter.Next()
@@ -1028,8 +1028,8 @@ func TestSearch(t *testing.T) {
 			}
 		}
 
-		// THEN: trx2 が共有ロックを取得できる (共有同士は競合しない)
-		iter2, err := table.Search(bp, 2, lockMgr, RecordSearchModeStart{})
+		// THEN: trx2 も問題なく読み取れる (MVCC ではロックを取得しない)
+		iter2, err := table.Search(bp, allVisibleReadView(), nilVersionReader(), RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter2.Next()
 		assert.NoError(t, err)
@@ -1169,7 +1169,7 @@ type decodedRecord struct {
 
 func collectAllTablePairs(t *testing.T, bp *buffer.BufferPool, table *Table) []decodedRecord {
 	t.Helper()
-	iter, err := table.Search(bp, 0, lock.NewManager(5000), RecordSearchModeStart{})
+	iter, err := table.Search(bp, allVisibleReadView(), nilVersionReader(), RecordSearchModeStart{})
 	assert.NoError(t, err)
 
 	var records []decodedRecord

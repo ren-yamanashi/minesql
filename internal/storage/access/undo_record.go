@@ -26,22 +26,37 @@ const undoRecordHeaderSize = 19
 
 var ErrInvalidUndoRecord = errors.New("invalid undo record")
 
+// UndoRecordFields は UNDO レコードのシリアライズ/デシリアライズに使用するフィールド群
+type UndoRecordFields struct {
+	TrxId            uint64
+	UndoNo           uint64
+	RecordType       UndoRecordType
+	PrevLastModified TrxId   // 上書き前の行の lastModified
+	PrevRollPtr      UndoPtr // 上書き前の行の rollPtr
+	TableName        string
+	ColumnSets       [][][]byte // INSERT/DELETE は 1 セット、UPDATE_INPLACE は 2 セット (prevRecord, newRecord)
+}
+
 // SerializeUndoRecord は UNDO レコードをバイト列にシリアライズする
 //
 // Data のフォーマット:
-//   - tableNameLen (2B) + tableName + numColumns (2B) + [colLen (2B) + colData]...
-//   - UPDATE_INPLACE の場合は columnSets に prevRecord と newRecord の 2 つを渡す
-func SerializeUndoRecord(trxId uint64, undoNo uint64, recordType UndoRecordType, tableName string, columnSets ...[][]byte) []byte {
+//   - prevLastModified (8B) + prevRollPtr (4B) + tableNameLen (2B) + tableName + numColumns (2B) + [colLen (2B) + colData]...
+func SerializeUndoRecord(uFields UndoRecordFields) []byte {
 	// Data 部分をシリアライズ
 	var data []byte
 
+	// この操作で上書きされる前の行が持っていた lastModified と rollPtr を記録する
+	// undo チェーンを辿って旧バージョンを復元する際に、さらに前のバージョンへの参照として使用する
+	data = binary.BigEndian.AppendUint64(data, uFields.PrevLastModified)
+	data = append(data, uFields.PrevRollPtr.Encode()...)
+
 	// テーブル名
-	tableNameBytes := []byte(tableName)
+	tableNameBytes := []byte(uFields.TableName)
 	data = binary.BigEndian.AppendUint16(data, uint16(len(tableNameBytes)))
 	data = append(data, tableNameBytes...)
 
 	// カラムセット
-	for _, columns := range columnSets {
+	for _, columns := range uFields.ColumnSets {
 		data = binary.BigEndian.AppendUint16(data, uint16(len(columns)))
 		for _, col := range columns {
 			data = binary.BigEndian.AppendUint16(data, uint16(len(col)))
@@ -51,45 +66,53 @@ func SerializeUndoRecord(trxId uint64, undoNo uint64, recordType UndoRecordType,
 
 	// ヘッダー + Data を結合
 	buf := make([]byte, undoRecordHeaderSize+len(data))
-	binary.BigEndian.PutUint64(buf[0:8], trxId)
-	binary.BigEndian.PutUint64(buf[8:16], undoNo)
-	buf[16] = byte(recordType)
+	binary.BigEndian.PutUint64(buf[0:8], uFields.TrxId)
+	binary.BigEndian.PutUint64(buf[8:16], uFields.UndoNo)
+	buf[16] = byte(uFields.RecordType)
 	binary.BigEndian.PutUint16(buf[17:19], uint16(len(data)))
 	copy(buf[19:], data)
 
 	return buf
 }
 
-// DeserializeUndoRecord は UNDO レコードのバイト列からフィールドを復元する
-//
-// columnSets は INSERT/DELETE の場合 1 セット、UPDATE_INPLACE の場合 2 セット (prevRecord, newRecord)
-func DeserializeUndoRecord(buf []byte) (trxId uint64, undoNo uint64, recordType UndoRecordType, tableName string, columnSets [][][]byte, err error) {
+// DeserializeUndoRecord は UNDO レコードのバイト列から UndoRecordFields を復元する
+func DeserializeUndoRecord(buf []byte) (UndoRecordFields, error) {
 	if len(buf) < undoRecordHeaderSize {
-		return 0, 0, 0, "", nil, ErrInvalidUndoRecord
+		return UndoRecordFields{}, ErrInvalidUndoRecord
 	}
 
-	trxId = binary.BigEndian.Uint64(buf[0:8])
-	undoNo = binary.BigEndian.Uint64(buf[8:16])
-	recordType = UndoRecordType(buf[16])
+	var uFields UndoRecordFields
+	uFields.TrxId = binary.BigEndian.Uint64(buf[0:8])
+	uFields.UndoNo = binary.BigEndian.Uint64(buf[8:16])
+	uFields.RecordType = UndoRecordType(buf[16])
 	dataLen := int(binary.BigEndian.Uint16(buf[17:19]))
 
 	if len(buf) < undoRecordHeaderSize+dataLen {
-		return 0, 0, 0, "", nil, ErrInvalidUndoRecord
+		return UndoRecordFields{}, ErrInvalidUndoRecord
 	}
 
 	data := buf[19 : 19+dataLen]
 	offset := 0
 
+	// この操作で上書きされる前の行が持っていた lastModified と rollPtr を復元する
+	const prevFieldsSize = 8 + UndoPtrSize
+	if offset+prevFieldsSize > len(data) {
+		return UndoRecordFields{}, ErrInvalidUndoRecord
+	}
+	uFields.PrevLastModified = binary.BigEndian.Uint64(data[offset : offset+8])
+	uFields.PrevRollPtr, _ = DecodeUndoPtr(data[offset+8 : offset+prevFieldsSize])
+	offset += prevFieldsSize
+
 	// テーブル名
 	if offset+2 > len(data) {
-		return 0, 0, 0, "", nil, ErrInvalidUndoRecord
+		return UndoRecordFields{}, ErrInvalidUndoRecord
 	}
 	tableNameLen := int(binary.BigEndian.Uint16(data[offset : offset+2]))
 	offset += 2
 	if offset+tableNameLen > len(data) {
-		return 0, 0, 0, "", nil, ErrInvalidUndoRecord
+		return UndoRecordFields{}, ErrInvalidUndoRecord
 	}
-	tableName = string(data[offset : offset+tableNameLen])
+	uFields.TableName = string(data[offset : offset+tableNameLen])
 	offset += tableNameLen
 
 	// カラムセットを読み取る (残りデータがある限り)
@@ -97,13 +120,13 @@ func DeserializeUndoRecord(buf []byte) (trxId uint64, undoNo uint64, recordType 
 	for len(remaining) > 0 {
 		columns, n, parseErr := parseColumnSet(remaining)
 		if parseErr != nil {
-			return 0, 0, 0, "", nil, parseErr
+			return UndoRecordFields{}, parseErr
 		}
-		columnSets = append(columnSets, columns)
+		uFields.ColumnSets = append(uFields.ColumnSets, columns)
 		remaining = remaining[n:]
 	}
 
-	return trxId, undoNo, recordType, tableName, columnSets, nil
+	return uFields, nil
 }
 
 // parseColumnSet はバイト列からカラムセット 1 つを読み取り、読み取ったバイト数を返す

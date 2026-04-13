@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"minesql/internal/ast"
 	"minesql/internal/executor"
+	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
 )
 
@@ -17,8 +18,10 @@ func PlanDelete(trxId handler.TrxId, stmt *ast.DeleteStmt) (executor.Executor, e
 		return nil, fmt.Errorf("table %s not found", stmt.From.TableName)
 	}
 
-	// WHERE 句を元に検索用の Executor を構築
-	search := NewSearch(trxId, hdl.LockMgr, tblMeta, stmt.Where)
+	// WHERE 句を元に検索用の Executor を構築 (Current Read: 最新バージョンを読む)
+	rv := access.NewReadView(0, nil, ^uint64(0))
+	vr := access.NewVersionReader(nil)
+	search := NewSearch(rv, vr, tblMeta, stmt.Where)
 	iterator, err := search.Build()
 	if err != nil {
 		return nil, err

@@ -64,7 +64,7 @@ func TestPlanUpdate(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: 更新後のレコードが正しい
-		iter, err := tbl.Search(hdl.BufferPool, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
+		iter, err := tbl.Search(hdl.BufferPool, access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -188,11 +188,13 @@ func TestPlanUpdate(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: "a" の first_name が "Jane" に更新されている
-		scan := executor.NewTableScan(
-			0, lock.NewManager(5000), tbl,
-			access.RecordSearchModeStart{},
-			func(record executor.Record) bool { return true },
-		)
+		scan := executor.NewTableScan(executor.TableScanParams{
+			ReadView:       access.NewReadView(0, nil, ^uint64(0)),
+			VersionReader:  access.NewVersionReader(nil),
+			Table:          tbl,
+			SearchMode:     access.RecordSearchModeStart{},
+			WhileCondition: func(record executor.Record) bool { return true },
+		})
 		results := fetchAll(t, scan)
 		assert.Equal(t, 2, len(results))
 		assert.Equal(t, executor.Record{[]byte("a"), []byte("Jane"), []byte("Doe")}, results[0])
@@ -276,7 +278,7 @@ func TestPlanUpdate(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: レコードは変更されていない
-		iter, err := tbl.Search(hdl.BufferPool, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
+		iter, err := tbl.Search(hdl.BufferPool, access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -284,6 +286,51 @@ func TestPlanUpdate(t *testing.T) {
 		assert.Equal(t, "1", string(record[0]))
 		assert.Equal(t, "John", string(record[1]))
 		assert.Equal(t, "Smith", string(record[2]))
+	})
+	t.Run("Current Read: 自トランザクション開始後にコミットされた行も UPDATE 対象になる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		initStorageManager(t, tmpdir)
+		defer handler.Reset()
+
+		hdl := handler.Get()
+		tbl := getPlannerTable(t, "users")
+
+		// T1 を開始 (まだ何もしない)
+		trx1 := hdl.BeginTrx()
+
+		// T2 が行を INSERT してコミット (T1 の開始後)
+		trx2 := hdl.BeginTrx()
+		err := tbl.Insert(hdl.BufferPool, trx2, hdl.LockMgr, [][]byte{[]byte("1"), []byte("Alice"), []byte("Doe")})
+		assert.NoError(t, err)
+		assert.NoError(t, hdl.CommitTrx(trx2))
+
+		// WHEN: T1 が UPDATE を実行 (Current Read なので T2 のコミット済み行が見える)
+		stmt := &ast.UpdateStmt{
+			Table: *ast.NewTableId("users"),
+			SetClauses: []*ast.SetClause{
+				{Column: *ast.NewColumnId("first_name"), Value: ast.NewStringLiteral("Bob")},
+			},
+			Where: &ast.WhereClause{
+				Condition: ast.NewBinaryExpr(
+					"=",
+					ast.NewLhsColumn(*ast.NewColumnId("id")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("1")),
+				),
+			},
+		}
+		exec, err := PlanUpdate(trx1, stmt)
+		assert.NoError(t, err)
+		_, err = exec.Next()
+		assert.NoError(t, err)
+
+		// THEN: 行が更新されている
+		iter, err := tbl.Search(hdl.BufferPool, access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), access.RecordSearchModeStart{})
+		assert.NoError(t, err)
+		record, ok, err := iter.Next()
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, "Bob", string(record[1]))
 	})
 }
 

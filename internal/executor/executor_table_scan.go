@@ -3,32 +3,34 @@ package executor
 import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
-	"minesql/internal/storage/lock"
 )
+
+// TableScanParams は NewTableScan の引数
+type TableScanParams struct {
+	ReadView       *access.ReadView
+	VersionReader  *access.VersionReader
+	Table          *access.Table
+	SearchMode     access.RecordSearchMode
+	WhileCondition func(Record) bool
+}
 
 // TableScan はテーブル全体を走査する
 type TableScan struct {
-	trxId          handler.TrxId
-	lockMgr        *lock.Manager
+	readView       *access.ReadView
+	versionReader  *access.VersionReader
 	table          *access.Table
 	searchMode     access.RecordSearchMode
 	whileCondition func(Record) bool
 	iterator       *access.TableIterator
 }
 
-func NewTableScan(
-	trxId handler.TrxId,
-	lockMgr *lock.Manager,
-	table *access.Table,
-	searchMode access.RecordSearchMode,
-	whileCondition func(Record) bool,
-) *TableScan {
+func NewTableScan(params TableScanParams) *TableScan {
 	return &TableScan{
-		trxId:          trxId,
-		lockMgr:        lockMgr,
-		table:          table,
-		searchMode:     searchMode,
-		whileCondition: whileCondition,
+		readView:       params.ReadView,
+		versionReader:  params.VersionReader,
+		table:          params.Table,
+		searchMode:     params.SearchMode,
+		whileCondition: params.WhileCondition,
 	}
 }
 
@@ -37,7 +39,12 @@ func (ss *TableScan) Next() (Record, error) {
 
 	// 初回実行時はイテレータを作成
 	if ss.iterator == nil {
-		iterator, err := ss.table.Search(hdl.BufferPool, ss.trxId, ss.lockMgr, ss.searchMode)
+		iterator, err := ss.table.Search(
+			hdl.BufferPool,
+			ss.readView,
+			ss.versionReader,
+			ss.searchMode,
+		)
 		if err != nil {
 			return nil, err
 		}

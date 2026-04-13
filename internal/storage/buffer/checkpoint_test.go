@@ -68,7 +68,7 @@ func TestCheckpointExecute(t *testing.T) {
 		assert.Equal(t, flushedLSN, rl.CheckpointLSN())
 	})
 
-	t.Run("Execute 後に古い REDO レコード��切り詰められる", func(t *testing.T) {
+	t.Run("Execute 後に古い REDO レコードが切り詰められる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()
 		rl, err := log.NewRedoLog(tmpdir)

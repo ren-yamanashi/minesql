@@ -20,7 +20,7 @@ func TestUndoUpdateInplaceRecord_Undo(t *testing.T) {
 		err = table.UpdateInplace(bp, 0, lock.NewManager(5000), prevRecord, newRecord)
 		assert.NoError(t, err)
 
-		undoRecord := NewUndoUpdateInplaceRecord(table, prevRecord, newRecord)
+		undoRecord := NewUndoUpdateInplaceRecord(table, prevRecord, newRecord, 0, NullUndoPtr)
 
 		// WHEN
 		err = undoRecord.Undo(bp, 0, lock.NewManager(5000))
@@ -44,7 +44,7 @@ func TestUndoUpdateInplaceRecord_Undo(t *testing.T) {
 		err = table.UpdateInplace(bp, 0, lock.NewManager(5000), prevRecord, newRecord)
 		assert.NoError(t, err)
 
-		undoRecord := NewUndoUpdateInplaceRecord(table, prevRecord, newRecord)
+		undoRecord := NewUndoUpdateInplaceRecord(table, prevRecord, newRecord, 0, NullUndoPtr)
 
 		// WHEN
 		err = undoRecord.Undo(bp, 0, lock.NewManager(5000))
@@ -62,20 +62,20 @@ func TestUndoUpdateInplaceRecord_Serialize(t *testing.T) {
 		table, _ := setupTestTableForUndo(t, nil)
 		prevCols := [][]byte{[]byte("a"), []byte("John")}
 		newCols := [][]byte{[]byte("a"), []byte("Jane")}
-		record := NewUndoUpdateInplaceRecord(table, prevCols, newCols)
+		record := NewUndoUpdateInplaceRecord(table, prevCols, newCols, 0, NullUndoPtr)
 
 		// WHEN
 		buf := record.Serialize(3, 2)
-		trxId, undoNo, recordType, tableName, columnSets, err := DeserializeUndoRecord(buf)
+		f, err := DeserializeUndoRecord(buf)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, uint64(3), trxId)
-		assert.Equal(t, uint64(2), undoNo)
-		assert.Equal(t, UndoUpdateInplace, recordType)
-		assert.Equal(t, "test", tableName)
-		assert.Equal(t, 2, len(columnSets))
-		assert.Equal(t, []byte("John"), columnSets[0][1])
-		assert.Equal(t, []byte("Jane"), columnSets[1][1])
+		assert.Equal(t, uint64(3), f.TrxId)
+		assert.Equal(t, uint64(2), f.UndoNo)
+		assert.Equal(t, UndoUpdateInplace, f.RecordType)
+		assert.Equal(t, "test", f.TableName)
+		assert.Equal(t, 2, len(f.ColumnSets))
+		assert.Equal(t, []byte("John"), f.ColumnSets[0][1])
+		assert.Equal(t, []byte("Jane"), f.ColumnSets[1][1])
 	})
 }
