@@ -3,6 +3,8 @@
 ## 参考文献
 
 - [The physical structure of records in InnoDB](https://blog.jcole.us/2013/01/10/the-physical-structure-of-records-in-innodb/)
+- [InnoDB Row Formats - MySQL 8.0 Reference Manual](https://dev.mysql.com/doc/refman/8.0/en/innodb-row-format.html)
+- [InnoDB ソースコード: dict_index_build_internal_clust (dict0dict.cc)](https://github.com/mysql/mysql-server/blob/8.0/storage/innobase/dict/dict0dict.cc) - クラスタ化インデックスのフィールド順序定義
 
 ## 概要
 
@@ -37,7 +39,11 @@ B+Tree はレコード (フィールドの列) を格納し、キーフィール
 | --- | --- | --- | --- |
 | ヘッダー | DeleteMark | 1 | 削除マーク |
 | キー | プライマリキー | 可変 | プライマリキーのカラム値を Memcomparable format でエンコードしたもの |
+| 非キー | lastModified | 8 | この行を最後に INSERT/UPDATE したトランザクション ID (InnoDB の DB_TRX_ID に相当) |
+| 非キー | rollPtr | 4 | undo ログレコードへのポインタ (InnoDB の DB_ROLL_PTR に相当) |
 | 非キー | 非キーカラム | 可変 | プライマリキー以外のカラム値を Memcomparable format でエンコードしたもの |
+
+InnoDB の COMPACT/DYNAMIC フォーマットでは、データ領域に PK カラム → DB_TRX_ID (6B) → DB_ROLL_PTR (7B) → 非キーカラムの順でフィールドが配置される。MineSQL ではこれに倣い、非キー領域の先頭に lastModified と rollPtr を配置している。ヘッダーには DeleteMark のみを格納する (InnoDB でも DB_TRX_ID/DB_ROLL_PTR はレコードヘッダーではなくデータ領域に属する)
 
 #### セカンダリインデックス
 

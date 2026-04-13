@@ -6,7 +6,7 @@ import (
 	"minesql/internal/storage/dictionary"
 )
 
-// GetTable はテーブルメタデータからテーブルを取得し、UndoLog をセットして返す
+// GetTable はテーブルメタデータからテーブルを取得し、UndoManager をセットして返す
 func (h *Handler) GetTable(tableName string) (*access.Table, error) {
 	tblMeta, ok := h.Catalog.GetTableMetaByName(tableName)
 	if !ok {

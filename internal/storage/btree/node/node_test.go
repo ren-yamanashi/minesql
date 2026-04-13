@@ -35,25 +35,25 @@ func TestGetNodeType(t *testing.T) {
 	t.Run("リーフノードの場合", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 4096)
-		copy(data[0:8], NODE_TYPE_LEAF)
+		copy(data[0:8], NodeTypeLeaf)
 
 		// WHEN
 		nodeType := GetNodeType(data)
 
 		// THEN
-		assert.Equal(t, NODE_TYPE_LEAF, nodeType)
+		assert.Equal(t, NodeTypeLeaf, nodeType)
 	})
 
 	t.Run("ブランチノードの場合", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, 4096)
-		copy(data[0:8], NODE_TYPE_BRANCH)
+		copy(data[0:8], NodeTypeBranch)
 
 		// WHEN
 		nodeType := GetNodeType(data)
 
 		// THEN
-		assert.Equal(t, NODE_TYPE_BRANCH, nodeType)
+		assert.Equal(t, NodeTypeBranch, nodeType)
 	})
 }
 

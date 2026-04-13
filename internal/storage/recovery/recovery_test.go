@@ -40,7 +40,7 @@ func TestNeedsRecovery(t *testing.T) {
 		assert.NoError(t, err)
 		bp := buffer.NewBufferPool(10, rl)
 
-		rl.AppendPageCopy(1, page.NewPageId(1, 0), make([]byte, page.PAGE_SIZE))
+		rl.AppendPageCopy(1, page.NewPageId(1, 0), make([]byte, page.PageSize))
 		err = rl.Flush()
 		assert.NoError(t, err)
 
@@ -82,7 +82,7 @@ func TestRedoApply(t *testing.T) {
 		assert.NoError(t, err)
 
 		// 変更後のページデータを含む REDO レコードを記録
-		modifiedPage := make([]byte, page.PAGE_SIZE)
+		modifiedPage := make([]byte, page.PageSize)
 		modifiedPage[page.PageHeaderSize] = 0xFF                           // 変更後の値
 		binary.BigEndian.PutUint32(modifiedPage[0:page.PageHeaderSize], 1) // Page LSN = 1
 		rl.AppendPageCopy(1, pageId, modifiedPage)
@@ -131,7 +131,7 @@ func TestRedoApply(t *testing.T) {
 		assert.NoError(t, err)
 
 		// LSN = 5 の REDO レコード (Page LSN 10 より古い)
-		modifiedPage := make([]byte, page.PAGE_SIZE)
+		modifiedPage := make([]byte, page.PageSize)
 		modifiedPage[page.PageHeaderSize] = 0xFF
 		binary.BigEndian.PutUint32(modifiedPage[0:page.PageHeaderSize], 5) // LSN = 5
 		rl.AppendPageCopy(1, pageId, modifiedPage)
@@ -179,7 +179,7 @@ func TestUndoRollback(t *testing.T) {
 		undoDisk, err := file.NewDisk(undoFileId, filepath.Join(tmpdir, "undo.db"))
 		assert.NoError(t, err)
 		bp.RegisterDisk(undoFileId, undoDisk)
-		undoLog, err := access.NewUndoLog(bp, rl, undoFileId)
+		undoLog, err := access.NewUndoManager(bp, rl, undoFileId)
 		assert.NoError(t, err)
 
 		// テーブル作成
@@ -229,7 +229,7 @@ func TestUndoRollback(t *testing.T) {
 
 		// THEN: INSERT がロールバックされ、テーブルが空になっている
 		table2 := access.NewTable("users", metaPageId, 1, nil, nil, nil)
-		iter, err := table2.Search(bp2, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
+		iter, err := table2.Search(bp2, access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -262,7 +262,7 @@ func TestUndoRollback(t *testing.T) {
 		undoDisk, err := file.NewDisk(undoFileId, filepath.Join(tmpdir, "undo.db"))
 		assert.NoError(t, err)
 		bp.RegisterDisk(undoFileId, undoDisk)
-		undoLog, err := access.NewUndoLog(bp, rl, undoFileId)
+		undoLog, err := access.NewUndoManager(bp, rl, undoFileId)
 		assert.NoError(t, err)
 
 		// テーブル作成
@@ -292,7 +292,7 @@ func TestUndoRollback(t *testing.T) {
 		lockMgr := lock.NewManager(5000)
 		err = table.Insert(bp, trxId, lockMgr, [][]byte{[]byte("a"), []byte("Alice")})
 		assert.NoError(t, err)
-		manager := access.NewManager(undoLog, lockMgr, rl)
+		manager := access.NewTrxManager(undoLog, lockMgr, rl)
 		manager.Begin() // trxId=1
 		err = manager.Commit(trxId)
 		assert.NoError(t, err)
@@ -311,7 +311,7 @@ func TestUndoRollback(t *testing.T) {
 
 		// THEN: コミット済みの INSERT はロールバックされず、レコードが存在する
 		table2 := access.NewTable("users", metaPageId, 1, nil, nil, nil)
-		iter, err := table2.Search(bp2, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
+		iter, err := table2.Search(bp2, access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), access.RecordSearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)

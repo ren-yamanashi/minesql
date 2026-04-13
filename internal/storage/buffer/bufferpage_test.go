@@ -19,6 +19,6 @@ func TestNewBufferPage(t *testing.T) {
 		assert.Equal(t, bufferPage.PageId, pageId)
 		assert.False(t, bufferPage.IsDirty)
 		assert.NotNil(t, bufferPage.Page)
-		assert.Equal(t, page.PAGE_SIZE, len(bufferPage.Page))
+		assert.Equal(t, page.PageSize, len(bufferPage.Page))
 	})
 }

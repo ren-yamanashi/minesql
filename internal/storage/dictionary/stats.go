@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/lock"
 	"sync"
 )
 
@@ -42,7 +41,10 @@ func (sc *StatsCollector) Analyze(meta *TableMeta) (*TableStats, error) {
 		return nil, err
 	}
 
-	iter, err := tbl.Search(sc.bufferPool, 0, lock.NewManager(5000), access.RecordSearchModeStart{})
+	// 統計情報の収集では MVCC の可視性判定を行わず全レコードを対象にする
+	rv := access.NewReadView(0, nil, ^uint64(0))
+	vr := access.NewVersionReader(nil)
+	iter, err := tbl.Search(sc.bufferPool, rv, vr, access.RecordSearchModeStart{})
 	if err != nil {
 		return nil, err
 	}
@@ -184,7 +186,7 @@ func updateColumnStats(
 	}
 }
 
-// buildTable は TableMeta から Table を構築する (UndoLog なし)
+// buildTable は TableMeta から Table を構築する (UndoManager なし)
 func buildTable(meta *TableMeta) (*access.Table, error) {
 	var uniqueIndexes []*access.UniqueIndex
 	for _, idxMeta := range meta.Indexes {

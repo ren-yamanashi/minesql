@@ -30,13 +30,14 @@ func NewDisk(fileId page.FileId, path string) (*Disk, error) {
 
 	fileInfo, err := file.Stat()
 	if err != nil {
+		_ = file.Close()
 		return nil, err
 	}
 
 	return &Disk{
 		fileId:     fileId,
 		heapFile:   file,
-		nextPageId: page.NewPageId(fileId, page.PageNumber(fileInfo.Size()/page.PAGE_SIZE)),
+		nextPageId: page.NewPageId(fileId, page.PageNumber(fileInfo.Size()/page.PageSize)),
 	}, nil
 }
 
@@ -49,37 +50,37 @@ func (disk *Disk) AllocatePage() page.PageId {
 
 // ReadPageData は指定されたページ ID のページデータを data に読み込む (読み込んだデータは data に格納される)
 //
-// data の長さは PAGE_SIZE と等しい必要がある
+// data の長さは PageSize と等しい必要がある
 func (disk *Disk) ReadPageData(id page.PageId, data []byte) error {
-	if len(data) != page.PAGE_SIZE {
+	if len(data) != page.PageSize {
 		return page.ErrInvalidDataSize
 	}
 	if err := disk.seek(id); err != nil {
 		return err
 	}
-	// シークした位置から PAGE_SIZE バイト読み込む
+	// シークした位置から PageSize バイト読み込む
 	// 読み込んだデータは `data` に格納される
-	_, err := io.ReadFull(disk.heapFile, data) // data に PAGE_SIZE バイト読み込む (data の長さは PAGE_SIZE と等しいので ReadFull を使用すると PAGE_SIZE バイト読み込まれる)
+	_, err := io.ReadFull(disk.heapFile, data)
 	return err
 }
 
 // WritePageData は指定されたページ ID に対応するページに data の内容を書き込む
 //
-// data の長さは PAGE_SIZE と等しい必要がある
+// data の長さは PageSize と等しい必要がある
 func (disk *Disk) WritePageData(id page.PageId, data []byte) error {
-	if len(data) != page.PAGE_SIZE {
+	if len(data) != page.PageSize {
 		return page.ErrInvalidDataSize
 	}
 	if err := disk.seek(id); err != nil {
 		return err
 	}
-	// シークした位置から PAGE_SIZE バイト書き込む
+	// シークした位置から PageSize バイト書き込む
 	n, err := disk.heapFile.Write(data)
 	if err != nil {
 		return err
 	}
-	// 書き込んだバイト数が PAGE_SIZE と等しいことを確認
-	if n != page.PAGE_SIZE {
+	// 書き込んだバイト数が PageSize と等しいことを確認
+	if n != page.PageSize {
 		return io.ErrShortWrite
 	}
 	return nil
@@ -90,12 +91,17 @@ func (disk *Disk) Sync() error {
 	return disk.heapFile.Sync()
 }
 
+// Close はヒープファイルのファイルディスクリプタを閉じる
+func (disk *Disk) Close() error {
+	return disk.heapFile.Close()
+}
+
 // seek はページ ID で指定されたページの先頭にシークする
 func (disk *Disk) seek(id page.PageId) error {
 	if id.FileId != disk.fileId {
 		return fmt.Errorf("invalid FileId: expected %d, got %d", disk.fileId, id.FileId)
 	}
-	offset := page.PAGE_SIZE * uint64(id.PageNumber)
+	offset := page.PageSize * uint64(id.PageNumber)
 	_, err := disk.heapFile.Seek(int64(offset), io.SeekStart)
 	return err
 }

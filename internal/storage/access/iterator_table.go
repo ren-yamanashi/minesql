@@ -4,29 +4,28 @@ import (
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/encode"
-	"minesql/internal/storage/lock"
 )
 
 type TableIterator struct {
-	iterator *btree.Iterator
-	bp       *buffer.BufferPool
-	trxId    lock.TrxId
-	lockMgr  *lock.Manager
+	iterator      *btree.Iterator
+	bp            *buffer.BufferPool
+	rv            *ReadView
+	versionReader *VersionReader
 }
 
-func newTableIterator(iterator *btree.Iterator, bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager) *TableIterator {
+func newTableIterator(iterator *btree.Iterator, bp *buffer.BufferPool, rv *ReadView, vr *VersionReader) *TableIterator {
 	return &TableIterator{
-		iterator: iterator,
-		bp:       bp,
-		trxId:    trxId,
-		lockMgr:  lockMgr,
+		iterator:      iterator,
+		bp:            bp,
+		rv:            rv,
+		versionReader: vr,
 	}
 }
 
-// Next はデコード済みの次のレコードを返す
-// (DeleteMark が設定されているレコードはスキップする)
+// Next はデコード済みの次の可視レコードを返す
 //
-// 各行の読み取り時に共有ロックを取得する
+// ReadView に基づいて可視性を判定し、不可視なレコードは undo チェーンを辿って旧バージョンを探す。
+// 可視かつ DeleteMark が設定されているレコードはスキップする。ロックは取得しない。
 //
 // 戻り値: レコード (プライマリキー + 値), データがあるかどうか, エラー
 func (ri *TableIterator) Next() ([][]byte, bool, error) {
@@ -39,21 +38,35 @@ func (ri *TableIterator) Next() ([][]byte, bool, error) {
 			return nil, false, err
 		}
 
-		// DeleteMark が 1 のレコードはスキップ
-		if len(btrRecord.HeaderBytes()) > 0 && btrRecord.HeaderBytes()[0] == 1 {
+		// B+Tree レコードから lastModified, rollPtr を取り出す
+		deleteMark := btrRecord.HeaderBytes()[0]
+		lastModified, rollPtr, nonKeyColumns := decodeRecordNonKey(btrRecord.NonKeyBytes())
+
+		// カラムデータをデコード
+		var columns [][]byte
+		encode.Decode(btrRecord.KeyBytes(), &columns)
+		encode.Decode(nonKeyColumns, &columns)
+
+		// 可視なバージョンを探す
+		current := RecordVersion{
+			LastModified: lastModified,
+			RollPtr:      rollPtr,
+			DeleteMark:   deleteMark,
+			Columns:      columns,
+		}
+		visible, found, err := ri.versionReader.ReadVisibleVersion(ri.rv, current)
+		if err != nil {
+			return nil, false, err
+		}
+		if !found {
 			continue
 		}
 
-		// 共有ロックを取得
-		if err := ri.lockMgr.Lock(ri.trxId, ri.iterator.LastPosition, lock.Shared); err != nil {
-			return nil, false, err
+		// 可視だが DeleteMark が設定されている場合はスキップ
+		if visible.DeleteMark == 1 {
+			continue
 		}
 
-		// レコード (プライマリキー + NonKey) をデコード
-		var record [][]byte
-		encode.Decode(btrRecord.KeyBytes(), &record)
-		encode.Decode(btrRecord.NonKeyBytes(), &record)
-
-		return record, true, nil
+		return visible.Columns, true, nil
 	}
 }

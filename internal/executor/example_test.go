@@ -8,103 +8,14 @@ import (
 	"minesql/internal/executor"
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/handler"
-	"minesql/internal/storage/lock"
 )
-
-// セットアップヘルパー: テーブルを作成し、サンプルデータを挿入する
-// テーブルアクセスメソッドとクリーンアップ関数を返す
-func setupExample() (*access.Table, func()) {
-	tmpDir, err := os.MkdirTemp("", "executor_example")
-	if err != nil {
-		panic(err)
-	}
-	cleanup := func() {
-		handler.Reset()
-		_ = os.RemoveAll(tmpDir)
-	}
-
-	if err = os.Setenv("MINESQL_DATA_DIR", tmpDir); err != nil {
-		panic(err)
-	}
-	if err = os.Setenv("MINESQL_BUFFER_SIZE", "100"); err != nil {
-		panic(err)
-	}
-	handler.Reset()
-	handler.Init()
-
-	// テーブルを作成
-	ct := executor.NewCreateTable(
-		"users",
-		1,
-		[]handler.CreateIndexParam{
-			{Name: "idx_first_name", ColName: "first_name", UkIdx: 1},
-			{Name: "idx_last_name", ColName: "last_name", UkIdx: 2},
-		},
-		[]handler.CreateColumnParam{
-			{Name: "id", Type: handler.ColumnTypeString},
-			{Name: "first_name", Type: handler.ColumnTypeString},
-			{Name: "last_name", Type: handler.ColumnTypeString},
-		})
-	if _, err := ct.Next(); err != nil {
-		panic(err)
-	}
-
-	// テーブルアクセスメソッドを取得
-	hdl := handler.Get()
-	tbl, err := hdl.GetTable("users")
-	if err != nil {
-		panic(err)
-	}
-
-	// サンプルデータを挿入
-	var trxId handler.TrxId = 1
-	ins := executor.NewInsert(
-		trxId,
-		tbl,
-		[]executor.Record{
-			{[]byte("z"), []byte("Alice"), []byte("Smith")},
-			{[]byte("x"), []byte("Bob"), []byte("Johnson")},
-			{[]byte("y"), []byte("Charlie"), []byte("Williams")},
-			{[]byte("w"), []byte("Dave"), []byte("Miller")},
-			{[]byte("v"), []byte("Eve"), []byte("Brown")},
-		})
-	if _, err := ins.Next(); err != nil {
-		panic(err)
-	}
-
-	return tbl, cleanup
-}
-
-// レコードを表示するヘルパー
-func printExampleRecords(exec executor.Executor) {
-	var records []executor.Record
-	for {
-		record, err := exec.Next()
-		if err != nil {
-			panic(err)
-		}
-		if record == nil {
-			break
-		}
-		records = append(records, record)
-	}
-	for _, record := range records {
-		cols := make([]string, len(record))
-		for i, col := range record {
-			cols[i] = string(col)
-		}
-		fmt.Printf("  (%s)\n", strings.Join(cols, ", "))
-	}
-	fmt.Printf("  合計: %d 件\n", len(records))
-}
 
 func ExampleTableScan_fullScan() {
 	tbl, cleanup := setupExample()
 	defer cleanup()
 
 	// フルテーブルスキャン (プライマリキー昇順)
-	iter := executor.NewTableScan(
-		0, lock.NewManager(5000), tbl,
+	iter := exampleTableScan(tbl,
 		access.RecordSearchModeStart{},
 		func(record executor.Record) bool { return true },
 	)
@@ -124,8 +35,7 @@ func ExampleTableScan_rangeScan() {
 	defer cleanup()
 
 	// プライマリキーが "w" 以上 "y" 以下の範囲スキャン
-	iter := executor.NewTableScan(
-		0, lock.NewManager(5000), tbl,
+	iter := exampleTableScan(tbl,
 		access.RecordSearchModeKey{Key: [][]byte{[]byte("w")}},
 		func(record executor.Record) bool {
 			return string(record[0]) <= "y"
@@ -145,8 +55,7 @@ func ExampleTableScan_constSearch() {
 	defer cleanup()
 
 	// プライマリキーが "y" のレコードを検索
-	iter := executor.NewTableScan(
-		0, lock.NewManager(5000), tbl,
+	iter := exampleTableScan(tbl,
 		access.RecordSearchModeKey{Key: [][]byte{[]byte("y")}},
 		func(record executor.Record) bool {
 			return string(record[0]) == "y"
@@ -165,8 +74,7 @@ func ExampleFilter() {
 
 	// フルテーブルスキャン + first_name が "Charlie" のレコードのみフィルタ
 	iter := executor.NewFilter(
-		executor.NewTableScan(
-			0, lock.NewManager(5000), tbl,
+		exampleTableScan(tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		),
@@ -287,8 +195,7 @@ func ExampleProject() {
 
 	// フルテーブルスキャンから first_name と last_name のみ取得
 	iter := executor.NewProject(
-		executor.NewTableScan(
-			0, lock.NewManager(5000), tbl,
+		exampleTableScan(tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		),
@@ -312,8 +219,7 @@ func ExampleProject_withFilter() {
 	// first_name が "Charlie" のレコードから first_name と last_name を取得
 	iter := executor.NewProject(
 		executor.NewFilter(
-			executor.NewTableScan(
-				0, lock.NewManager(5000), tbl,
+			exampleTableScan(tbl,
 				access.RecordSearchModeStart{},
 				func(record executor.Record) bool { return true },
 			),
@@ -344,8 +250,7 @@ func ExampleUpdate() {
 	upd := executor.NewUpdate(trxId, tbl, []executor.SetColumn{
 		{Pos: 2, Value: []byte("Anderson")},
 	}, executor.NewFilter(
-		executor.NewTableScan(
-			0, lock.NewManager(5000), tbl,
+		exampleTableScan(tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		),
@@ -358,8 +263,7 @@ func ExampleUpdate() {
 	}
 
 	fmt.Println("=== テーブルスキャン ===")
-	printExampleRecords(executor.NewTableScan(
-		0, lock.NewManager(5000), tbl,
+	printExampleRecords(exampleTableScan(tbl,
 		access.RecordSearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
@@ -397,8 +301,7 @@ func ExampleUpdate_primaryKey() {
 	var trxId handler.TrxId = 1
 	upd := executor.NewUpdate(trxId, tbl, []executor.SetColumn{
 		{Pos: 0, Value: []byte("a")},
-	}, executor.NewTableScan(
-		0, lock.NewManager(5000), tbl,
+	}, exampleTableScan(tbl,
 		access.RecordSearchModeKey{Key: [][]byte{[]byte("v")}},
 		func(record executor.Record) bool {
 			return string(record[0]) == "v"
@@ -408,8 +311,7 @@ func ExampleUpdate_primaryKey() {
 		panic(err)
 	}
 
-	printExampleRecords(executor.NewTableScan(
-		0, lock.NewManager(5000), tbl,
+	printExampleRecords(exampleTableScan(tbl,
 		access.RecordSearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
@@ -435,8 +337,7 @@ func ExampleDelete() {
 	// first_name が "Bob" のレコードを削除
 	var trxId handler.TrxId = 1
 	del := executor.NewDelete(trxId, tbl, executor.NewFilter(
-		executor.NewTableScan(
-			0, lock.NewManager(5000), tbl,
+		exampleTableScan(tbl,
 			access.RecordSearchModeStart{},
 			func(record executor.Record) bool { return true },
 		),
@@ -449,8 +350,7 @@ func ExampleDelete() {
 	}
 
 	fmt.Println("=== テーブルスキャン ===")
-	printExampleRecords(executor.NewTableScan(
-		0, lock.NewManager(5000), tbl,
+	printExampleRecords(exampleTableScan(tbl,
 		access.RecordSearchModeStart{},
 		func(record executor.Record) bool { return true },
 	))
@@ -476,4 +376,101 @@ func ExampleDelete() {
 	//   (z, Alice, Smith)
 	//   (y, Charlie, Williams)
 	//   合計: 4 件
+}
+
+func exampleTableScan(tbl *access.Table, mode access.RecordSearchMode, cond func(executor.Record) bool) *executor.TableScan {
+	return executor.NewTableScan(executor.TableScanParams{
+		ReadView:       access.NewReadView(0, nil, ^uint64(0)),
+		VersionReader:  access.NewVersionReader(nil),
+		Table:          tbl,
+		SearchMode:     mode,
+		WhileCondition: cond,
+	})
+}
+
+// セットアップヘルパー: テーブルを作成し、サンプルデータを挿入する
+// テーブルアクセスメソッドとクリーンアップ関数を返す
+func setupExample() (*access.Table, func()) {
+	tmpDir, err := os.MkdirTemp("", "executor_example")
+	if err != nil {
+		panic(err)
+	}
+	cleanup := func() {
+		handler.Reset()
+		_ = os.RemoveAll(tmpDir)
+	}
+
+	if err = os.Setenv("MINESQL_DATA_DIR", tmpDir); err != nil {
+		panic(err)
+	}
+	if err = os.Setenv("MINESQL_BUFFER_SIZE", "100"); err != nil {
+		panic(err)
+	}
+	handler.Reset()
+	handler.Init()
+
+	// テーブルを作成
+	ct := executor.NewCreateTable(
+		"users",
+		1,
+		[]handler.CreateIndexParam{
+			{Name: "idx_first_name", ColName: "first_name", UkIdx: 1},
+			{Name: "idx_last_name", ColName: "last_name", UkIdx: 2},
+		},
+		[]handler.CreateColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "first_name", Type: handler.ColumnTypeString},
+			{Name: "last_name", Type: handler.ColumnTypeString},
+		})
+	if _, err := ct.Next(); err != nil {
+		panic(err)
+	}
+
+	// テーブルアクセスメソッドを取得
+	hdl := handler.Get()
+	tbl, err := hdl.GetTable("users")
+	if err != nil {
+		panic(err)
+	}
+
+	// サンプルデータを挿入
+	var trxId handler.TrxId = 1
+	ins := executor.NewInsert(
+		trxId,
+		tbl,
+		[]executor.Record{
+			{[]byte("z"), []byte("Alice"), []byte("Smith")},
+			{[]byte("x"), []byte("Bob"), []byte("Johnson")},
+			{[]byte("y"), []byte("Charlie"), []byte("Williams")},
+			{[]byte("w"), []byte("Dave"), []byte("Miller")},
+			{[]byte("v"), []byte("Eve"), []byte("Brown")},
+		})
+	if _, err := ins.Next(); err != nil {
+		panic(err)
+	}
+
+	return tbl, cleanup
+}
+
+// レコードを表示するヘルパー
+func printExampleRecords(exec executor.Executor) {
+	var records []executor.Record
+	for {
+		record, err := exec.Next()
+		if err != nil {
+			panic(err)
+		}
+		if record == nil {
+			break
+		}
+		records = append(records, record)
+	}
+	for _, record := range records {
+		cols := make([]string, len(record))
+		for i, col := range record {
+			cols[i] = string(col)
+		}
+		fmt.Printf("  (%s)\n", strings.Join(cols, ", "))
+	}
+	fmt.Printf("  合計: %d 件\n", len(records))
 }

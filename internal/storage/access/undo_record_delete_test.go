@@ -19,7 +19,7 @@ func TestUndoDeleteRecord_Undo(t *testing.T) {
 		err = table.SoftDelete(bp, 0, lock.NewManager(5000), record)
 		assert.NoError(t, err)
 
-		undoRecord := NewUndoDeleteRecord(table, record)
+		undoRecord := NewUndoDeleteRecord(table, record, 0, NullUndoPtr)
 
 		// WHEN
 		err = undoRecord.Undo(bp, 0, lock.NewManager(5000))
@@ -42,7 +42,7 @@ func TestUndoDeleteRecord_Undo(t *testing.T) {
 		err = table.SoftDelete(bp, 0, lock.NewManager(5000), record)
 		assert.NoError(t, err)
 
-		undoRecord := NewUndoDeleteRecord(table, record)
+		undoRecord := NewUndoDeleteRecord(table, record, 0, NullUndoPtr)
 
 		// WHEN
 		err = undoRecord.Undo(bp, 0, lock.NewManager(5000))
@@ -60,10 +60,10 @@ func TestUndoDeleteRecord_Undo(t *testing.T) {
 		record := [][]byte{[]byte("a"), []byte("John")}
 		err := table.Insert(bp, 0, lock.NewManager(5000), record)
 		assert.NoError(t, err)
-		err = table.deleteRaw(bp, 0, lock.NewManager(5000), record)
+		err = table.delete(bp, 0, lock.NewManager(5000), record)
 		assert.NoError(t, err)
 
-		undoRecord := NewUndoDeleteRecord(table, record)
+		undoRecord := NewUndoDeleteRecord(table, record, 0, NullUndoPtr)
 
 		// WHEN
 		err = undoRecord.Undo(bp, 0, lock.NewManager(5000))
@@ -80,20 +80,20 @@ func TestUndoDeleteRecord_Serialize(t *testing.T) {
 	t.Run("シリアライズしてデシリアライズすると元のデータが復元される", func(t *testing.T) {
 		// GIVEN
 		table, _ := setupTestTableForUndo(t, nil)
-		record := NewUndoDeleteRecord(table, [][]byte{[]byte("a"), []byte("John")})
+		record := NewUndoDeleteRecord(table, [][]byte{[]byte("a"), []byte("John")}, 0, NullUndoPtr)
 
 		// WHEN
 		buf := record.Serialize(2, 1)
-		trxId, undoNo, recordType, tableName, columnSets, err := DeserializeUndoRecord(buf)
+		f, err := DeserializeUndoRecord(buf)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, uint64(2), trxId)
-		assert.Equal(t, uint64(1), undoNo)
-		assert.Equal(t, UndoDelete, recordType)
-		assert.Equal(t, "test", tableName)
-		assert.Equal(t, 1, len(columnSets))
-		assert.Equal(t, []byte("a"), columnSets[0][0])
-		assert.Equal(t, []byte("John"), columnSets[0][1])
+		assert.Equal(t, uint64(2), f.TrxId)
+		assert.Equal(t, uint64(1), f.UndoNo)
+		assert.Equal(t, UndoDelete, f.RecordType)
+		assert.Equal(t, "test", f.TableName)
+		assert.Equal(t, 1, len(f.ColumnSets))
+		assert.Equal(t, []byte("a"), f.ColumnSets[0][0])
+		assert.Equal(t, []byte("John"), f.ColumnSets[0][1])
 	})
 }

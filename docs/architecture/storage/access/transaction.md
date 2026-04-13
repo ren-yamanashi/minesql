@@ -2,66 +2,230 @@
 
 ## 参考文献
 
-[MySQL 8.0 リファレンスマニュアル - InnoDB マルチバージョン](https://dev.mysql.com/doc/refman/8.0/ja/innodb-multi-versioning.html)
+- [InnoDB Multi-Versioning - MySQL 8.0 Reference Manual](https://dev.mysql.com/doc/refman/8.0/en/innodb-multi-versioning.html)
+- [Consistent Nonlocking Reads - MySQL 8.0 Reference Manual](https://dev.mysql.com/doc/refman/8.0/en/innodb-consistent-read.html)
+- [Locking Reads - MySQL 8.0 Reference Manual](https://dev.mysql.com/doc/refman/8.0/en/innodb-locking-reads.html)
 
 ## 概要
 
-### 用語
-
-- `row_id`: 各行に割り当てられる一意の ID。実態は `ページ ID + スロット番号`
-- `trx_id`: トランザクション ID。各トランザクションがそれぞれ一意に振られる内部 ID。ロックを取るトランザクションと、ロックを取らないトランザクションでそれぞれ桁が違うが単調増加する
-- `ReadView`: トランザクションが開始された時点のスナップショットを特定するための構造体。以下の情報などで構成される。トランザクションが終了されると破棄される
-  - `m_low_limit_id`: コミット済みの最大の `trx_id`
-  - `m_ids`: まだコミットされたない `trx_id` のリスト
-  - `m_up_limit_id`: このトランザクションの次に払い出される `trx_id`
-- undo ログ: トランザクションによって行われた変更を元に戻すためのストレージ領域。
-- undo テーブルスペース: undo ログをストレージに書き込む先のファイル
+- MineSQL では、MVCC によってトランザクション管理を実装する
+- MVCC はデータの複数バージョンを保持することで読み取りと書き込みの競合を回避する同時実行制御方式
+  - Strict 2PL はデータの一貫性を保証するが、読み取りと書き込みが互いにブロックし合うので、並行性が制限される (読み取り同士はブロックしないが、読み取りと書き込みはブロックする)
+  - MVCC は読み取りと書き込みが同時に行えるようにすることで、並行性を向上させる
+    - 書き込み同士はブロックするが、読み取りと書き込みはブロックしない
+- 大半の仕組みを MySQL InnoDB を参考にしている
 
 ### 行の構造
 
-- データベース内に格納された各行に対して以下のフィールドが追加される
-  - `last_modified` 自分を最後に変更したトランザクション ID (以下、`trx_id`)
-  - `roll_ptr` 自分が更新される 1 世代前の行の内容 (undo ログ) へのポインタ (= ロールバックポインタ)
-  - `DeleteMark` 削除済みかどうかを示すフラグ。DELETE 時に true に設定され、後でパージによって物理削除される
+MySQL 公式ドキュメントより:
+
+> Internally, InnoDB adds three fields to each row stored in the database. A 6-byte DB_TRX_ID field indicates the transaction identifier for the last transaction that inserted or updated the row. Also, a deletion is treated internally as an update where a special bit in the row is set to mark it as deleted. Each row also contains a 7-byte DB_ROLL_PTR field called the roll pointer. The roll pointer points to an undo log record written to the rollback segment.
+
+MineSQL では、データベース内に格納された各レコードに対して以下のフィールドを付与する
+
+| フィールド | 内容 |
+| --- | --- |
+| `lastModified` | この行を最後に INSERT/UPDATE したトランザクションの ID。INSERT/UPDATE の実行時に即座に設定される (コミット時ではない) |
+| `rollPtr` | undo ログレコードへのポインタ (ロールバックポインタ)。行が更新されるたびに、更新前の内容を復元するための undo ログレコードを指す |
+| `deleteMark` | 削除済みかどうかを示すフラグ。DELETE 時に設定され、後で Purge によって物理削除される |
+
+行の旧バージョンは undo ログに格納される。`rollPtr` がチェーンを形成し、更新履歴を遡ることができる:
+
+```text
+現在の行 (lastModified=103, rollPtr→)
+  → undo ログレコード (lastModified=101, rollPtr→)
+    → undo ログレコード (lastModified=99, rollPtr=NULL)
+```
+
+### スナップショット (Read View)
+
+MySQL 公式ドキュメントより:
+
+> A consistent read means that InnoDB uses multi-versioning to present to a query a snapshot of the database at a point in time. The query sees the changes made by transactions that committed before that point of time, and no changes made by later or uncommitted transactions.
+
+MVCC では、トランザクションが「どのデータが見えるか」を決定するためにスナップショット (Read View) を使用する。Read View は以下の情報を持つ
+
+| 項目 | 説明 |
+| --- | --- |
+| `trxId` | 自分のトランザクション ID |
+| `mUpLimitId` | Read View 作成時点でのアクティブトランザクションの最小 trxId。これ未満の trxId は確実にコミット済みで可視 |
+| `mLowLimitId` | Read View 作成時点で次に払い出される trxId。これ以上の trxId は Read View 作成後に開始されたため不可視 |
+| `mIds` | Read View 作成時点でアクティブ (未コミット) なトランザクション ID のリスト |
+
+※ InnoDB の命名規則は直感に反する。`m_up_limit_id` が「可視範囲の上限」(= 最小のアクティブ trxId)、`m_low_limit_id` が「不可視範囲の下限」(= 次に払い出される trxId) を意味する\
+(参照: [InnoDB ソースコード: ReadView (read0types.h L282-L289)](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/include/read0types.h#L282-L289) - `m_low_limit_id` / `m_up_limit_id` の定義)
+
+<br />
+
+Read View の作成タイミングはトランザクション分離レベルによって異なる
+
+> With REPEATABLE READ isolation level, the snapshot is based on the time when the first read operation is performed.
+> With READ COMMITTED isolation level, the snapshot is set to the time of each consistent read operation within the transaction.
+> --- [Consistent Nonlocking Reads](https://dev.mysql.com/doc/refman/8.0/en/innodb-consistent-read.html)
+
+- REPEATABLE READ: トランザクション内の最初の読み取り時に Read View を作成し、以降のステートメントで使い回す
+- READ COMMITTED: ステートメントごとに Read View を作り直す
+
+### 可視性の判定
+
+あるレコードの `lastModified` に記録された trxId に対して、以下のアルゴリズムで可視性を判定する
+
+1. `trxId < mUpLimitId` → 可視 (Read View 作成前にコミット済み)
+2. `trxId >= mLowLimitId` → 不可視 (Read View 作成後に開始されたトランザクション)
+3. `mUpLimitId <= trxId < mLowLimitId` → `mIds` を確認
+   - `mIds` に含まれている → 不可視 (Read View 作成時点で実行中だった)
+   - `mIds` に含まれていない → 可視 (Read View 作成時点でコミット済みだった)
+4. 不可視と判定された場合は `rollPtr` で undo ログを辿り、可視なバージョンが見つかるまで遡る。最後まで見つからなければ、そのレコードは存在しないものとして扱う
+
+### undo チェーンの辿り方
+
+- undo チェーンを辿って旧バージョンを復元するために、undo レコードには「上書きされる前の行が持っていた `lastModified` と `rollPtr`」が記録されている
+
+#### 例: T1 が行を INSERT し、T2 が UPDATE し、T3 が UPDATE した状態
+
+```text
+B+Tree 上の現在の行:
+  columns = T3 が書いた値
+  lastModified = T3
+  rollPtr → [T3 の undo レコード]
+
+T3 の undo レコード:
+  columns = T2 が書いた値 (T3 が上書きする前の値)
+  prevLastModified = T2   ← T3 が上書きする前の行の lastModified
+  prevRollPtr → [T2 の undo レコード]
+
+T2 の undo レコード:
+  columns = T1 が書いた値 (T2 が上書きする前の値)
+  prevLastModified = T1   ← T2 が上書きする前の行の lastModified
+  prevRollPtr = null      ← T1 は INSERT なのでそれ以前のバージョンは存在しない
+```
+
+T5 が Consistent Read でこの行を読む場合 (T3 が不可視、T2 も不可視、T1 が可視の場合):
+
+1. B+Tree の行を読む → lastModified=T3 → 不可視
+2. rollPtr から T3 の undo レコードを読む → prevLastModified=T2 で行を復元 → 不可視
+3. prevRollPtr から T2 の undo レコードを読む → prevLastModified=T1 で行を復元 → 可視 → T1 が書いた値を返す
+
+※ undo レコードに prevLastModified がないと復元した旧バージョンの可視性を判定できず、prevRollPtr がないとさらに古いバージョンに遡れない
+
+### 読み取りの種類
+
+InnoDB では読み取りに 2 種類ある。SELECT と UPDATE/DELETE で異なる読み取り方式を使用する
+
+- Consistent Read (一貫性読み取り): Read View によるスナップショット読み取り。ロックを取得しない。SELECT で使用する
+- Current Read (現在読み取り): クラスタ化インデックス上の最新バージョンを読み取り、排他ロックを取得する。UPDATE/DELETE で使用する
+
+MySQL 公式ドキュメントより:
+
+> A consistent read does not set any locks on the tables it accesses, and therefore other sessions are free to modify those tables at the same time a consistent read is being performed on the table.
+> --- [Consistent Nonlocking Reads](https://dev.mysql.com/doc/refman/8.0/en/innodb-consistent-read.html)
+
+<br />
+
+> If you query data and then insert or modify related data within the same transaction, the regular SELECT statement does not give enough protection. Other transactions can update or delete the same rows you just queried. InnoDB supports two types of locking reads that offer extra safety: SELECT ... FOR SHARE and SELECT ... FOR UPDATE.
+> --- [Locking Reads](https://dev.mysql.com/doc/refman/8.0/en/innodb-locking-reads.html)
 
 ## 処理の流れ
 
 ### INSERT
 
-1. その行がどのページに配置されるべきかを計算
-2. undo ログに挿入した行の `row_id` を記録する (ロールバック時にこの行を削除するため)
-3. 書き込み対象のページがすでにバッファプール (以下、`BP`) に読み取り済みであればそれを、`BP` にない場合はディスクからページを吸い上げてそのページに行を書き込む。この際に `last_modified` に自分の `trx_id` を書き込む (`roll_ptr` にはポインタではなくフラグが立つ。自分の 1 世代前が存在しないため)
+1. undo ログにレコードの INSERTを記録する (ロールバック時にこのレコードを削除するため)
+2. 書き込み対象のページをバッファプールから取得し (なければディスクから読み込み)、レコードを書き込む
+   - `lastModified` に自分の trxId を設定する
+   - `rollPtr` に undo ログレコードへのポインタを設定する
 
-※ undo ログを先に書かないと、レコード挿入後にクラッシュした場合にロールバックできなくなってしまうため、レコードの書き込みの前に undo ログに書き込む必要がある
+※ undo ログを先に書かないと、レコード挿入後にクラッシュした場合にロールバックできなくなるため、レコードの書き込みの前に undo ログに書き込む必要がある
 
-### SELECT
+### SELECT (Consistent Read)
 
-※単純化するために、プライマリキーをイコール検索したと仮定する
+※ 単純化するために、プライマリキーのイコール検索を例とする
 
-1. クラスタ化インデックスの B+Tree を辿って目的のノード (および対象の行) を見つける
-2. 目的の行の `last_modified` を確認する
-   - `last_modified` がない場合はその行はコミットされていないので読んではいけない
-   - minesql ではトランザクション `READ COMMITTED` の分離レベルのみをサポートしているので、`last_modified` がある場合は無条件で読んでいいと判断する
-   - 今後 `REPEATABLE READ` などの分離レベルをサポートする場合は、`last_modified` に記録された `trx_id` が自分のトランザクションの開始時にコミット済みでない場合は読んではいけない (= `ReadView` の `m_up_limit_id` より大きいか、または `m_ids` に含まれている場合)
-3. 読んではいけない行と判断された場合、読む側のトランザクションがそれを迂回して (`roll_ptr` を使用して) 自分の読むべき行イメージを探しにいく
-   - 現在 BP に載っている行の `roll_ptr` から、undo テーブルスペース内の「1 世代前の行の内容」を読み出す
-   - ここで再度 `last_modified` の判定をし、最終的に自分が読める行を見つけるか、最後まで見つけられなければ終了する
+1. クラスタ化インデックスの B+Tree を辿って対象のレコードを見つける
+2. レコードの `deleteMark` を確認する (削除済みの場合も可視性判定の対象)(可視かつ削除済みなら「存在しない」として扱う)
+3. レコードの `lastModified` を Read View と照合し、可視性を判定する (上述の可視性判定アルゴリズム)
+   - 可視 → そのレコードを返す (ただし `deleteMark` が設定されていれば「存在しない」)
+   - 不可視 → `rollPtr` を辿って undo ログから旧バージョンを復元し、再度可視性を判定する。可視なバージョンが見つかるまで遡る
 
-### UPDATE
+### UPDATE (Current Read + 排他ロック)
 
-1. SELECT と同様に、更新対象の行を見つける
-   - ただし、更新対象の行を読んではいけないと判断した場合は、`roll_ptr` を使用して探しに行かない
-2. 更新対象の行を見つけたら、undo ログに更新前の行の内容を記録する
-   - PK が変わらない場合は、undo ログに更新前の行の内容を記録する (インプレース更新)
-   - PK が変わる場合は、該当行を削除するための undo ログと、更新後の行を挿入するための undo ログの両方を記録する (Delete + Insert)
-3. 更新対象の行を更新し、`last_modified` に自分の `trx_id` を、`roll_ptr` に undo ログエントリへのポインタを書き込む
-   - PK が変わらない場合は、更新対象の行をインプレースで更新する
-   - PK が変わる場合は、更新対象の行を削除してから、更新後の行を挿入する (Delete + Insert)
+1. クラスタ化インデックスの B+Tree を辿って対象のレコードの最新バージョンを見つける
+2. 対象のレコードに排他ロックを取得する (他のトランザクションが排他ロックを保持していればロック待ち)
+3. undo ログにレコードの UPDATEを記録する (更新前のレコードの内容)
+4. レコードを更新する
+   - PK が変わらない場合は in-place 更新
+   - PK が変わる場合は Delete + Insert (削除の undo ログと挿入の undo ログの両方を記録する)
+5. `lastModified` に自分の trxId を、`rollPtr` に undo ログレコードへのポインタを設定する
 
-### DELETE
+※ UPDATE は ReadView による可視性判定を行わない。常に最新バージョンに対して操作し、排他ロックで書き込み競合を制御する
 
-1. SELECT と同様に、削除対象の行を見つける
-   - ただし、削除対象の行を読んではいけないと判断した場合は、`roll_ptr` を使用して探しに行かない
-2. 削除対象の行を見つけたら、undo ログに削除前の行の `row_id` と行の内容を記録する
-3. 削除対象の行を削除する
-   - ただし、実際に行を物理削除するのではなく、削除対象の行に `DeleteMark` フラグを立てる
+### DELETE (Current Read + 排他ロック)
+
+MySQL 公式ドキュメントより:
+
+> a deletion is treated internally as an update where a special bit in the row is set to mark it as deleted. [...] InnoDB only physically removes the corresponding row and its index entries when it discards the update undo log record written for the deletion. This removal operation is called a purge
+> --- [InnoDB Multi-Versioning](https://dev.mysql.com/doc/refman/8.0/en/innodb-multi-versioning.html)
+
+1. クラスタ化インデックスの B+Tree を辿って対象のレコードの最新バージョンを見つける
+2. 対象のレコードに排他ロックを取得する (他のトランザクションが排他ロックを保持していればロック待ち)
+3. undo ログにレコードの DELETE を記録する (削除前のレコードの内容)
+4. レコードの `deleteMark` を設定する (物理削除ではなく論理削除)
+5. `lastModified` に自分の trxId を、`rollPtr` に undo ログレコードへのポインタを設定する
+
+※ DELETE も UPDATE と同様、ReadView による可視性判定を行わない。最新バージョンに対して排他ロックを取得して操作する
+※ 物理削除は後の Purge 処理で行われる
+
+### COMMIT
+
+```mermaid
+flowchart TD
+    A[COMMIT 開始] --> B[REDO ログバッファをフラッシュ]
+    B --> C[INSERT の undo ログを解放]
+    C --> D[アクティブトランザクションリストから自身を除去]
+    D --> E[保持している全てのロックを解放]
+    E --> F[COMMIT 完了]
+```
+
+- REDO ログのフラッシュにより、コミットした変更の永続性が保証される
+- INSERT の undo ログは他のトランザクションが参照する必要がないため、コミット時に即座に解放する (パージスレッドは関与しない)
+- UPDATE/DELETE の undo ログは他のトランザクションの Consistent Read で旧バージョンの復元に使われる可能性があるため、すぐには破棄できない
+
+MySQL 公式ドキュメントより:
+
+> Insert undo log records are needed only in transaction rollback. They can be discarded as soon as the transaction commits.\
+> Update undo log records are used also in consistent reads, [...] They can be discarded only after there is no transaction present for which InnoDB has assigned a snapshot that in a consistent read could require the information in the update undo log record to build an earlier version of a database row.
+> --- [InnoDB Multi-Versioning](https://dev.mysql.com/doc/refman/8.0/en/innodb-multi-versioning.html)
+
+### ROLLBACK
+
+```mermaid
+flowchart TD
+    A[ROLLBACK 開始] --> B[undo ログの末尾から逆順に辿る]
+    B --> C{undo レコードの種類}
+    C -->|INSERT| D[挿入したレコードを物理削除]
+    C -->|UPDATE| E[更新前の値に復元]
+    C -->|DELETE| F[deleteMark を解除]
+    D --> G{残りの undo レコードがあるか}
+    E --> G
+    F --> G
+    G -->|あり| B
+    G -->|なし| H[undo ログを破棄]
+    H --> I[アクティブトランザクションリストから自身を除去]
+    I --> J[保持している全てのロックを解放]
+    J --> K[ROLLBACK 完了]
+```
+
+### 補足
+
+#### 1. Undo ログの破棄タイミングはステートメントの種類によって異なる
+
+| ステートメント | 破棄の方法 |
+| --- | --- |
+| INSERT | コミット時に即座に解放する (パージスレッドは関与しない)。INSERT で作られたレコードに「1 世代前」は存在しないため、他のトランザクションが旧バージョンを参照することがない |
+| UPDATE, DELETE | パージスレッドが、参照し得るトランザクションが全て完了した後に破棄する。Consistent Read で旧バージョンの復元に使われる可能性があるため、即座には破棄できない |
+
+※ InnoDB では INSERT の undo ログを「insert undo log」、UPDATE/DELETE の undo ログを「update undo log」と分類している
+
+#### 2. パージスレッドの責務は以下の通り
+
+- 不要になった UPDATE/DELETE の undo ログの破棄
+- `deleteMark` が設定されたレコードの物理削除

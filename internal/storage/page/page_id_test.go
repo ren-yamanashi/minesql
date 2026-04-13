@@ -22,9 +22,9 @@ func TestNewPageId(t *testing.T) {
 }
 
 func TestIsInvalid(t *testing.T) {
-	t.Run("INVALID_PAGE_ID は無効と判定される", func(t *testing.T) {
+	t.Run("InvalidPageId は無効と判定される", func(t *testing.T) {
 		// GIVEN
-		pageId := INVALID_PAGE_ID
+		pageId := InvalidPageId
 
 		// WHEN
 		result := pageId.IsInvalid()
@@ -46,7 +46,7 @@ func TestIsInvalid(t *testing.T) {
 
 	t.Run("FileId だけが最大値の PageId は無効と判定されない", func(t *testing.T) {
 		// GIVEN
-		pageId := NewPageId(MAX_FILE_ID, 0)
+		pageId := NewPageId(MaxFileId, 0)
 
 		// WHEN
 		result := pageId.IsInvalid()
@@ -57,7 +57,7 @@ func TestIsInvalid(t *testing.T) {
 
 	t.Run("PageNumber だけが最大値の PageId は無効と判定されない", func(t *testing.T) {
 		// GIVEN
-		pageId := NewPageId(0, MAX_PAGE_NUMBER)
+		pageId := NewPageId(0, MaxPageNumber)
 
 		// WHEN
 		result := pageId.IsInvalid()

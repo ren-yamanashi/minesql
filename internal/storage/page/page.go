@@ -1,7 +1,11 @@
 package page
 
-const PAGE_SIZE = 4096
+import "fmt"
+
+const PageSize = 4096
 const PageHeaderSize = 4 // 全ページ共通のヘッダーサイズ (Page LSN)
+
+var ErrInvalidDataSize error = fmt.Errorf("data size must be %d bytes", PageSize)
 
 // Page は全ページ型共通のヘッダーとボディを持つ
 type Page struct {

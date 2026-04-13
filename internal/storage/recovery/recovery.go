@@ -11,6 +11,15 @@ import (
 	"minesql/internal/storage/page"
 )
 
+// undoRecordEntry はデシリアライズ済みの UNDO レコードの情報を保持する
+type undoRecordEntry struct {
+	recordType       access.UndoRecordType
+	prevLastModified access.TrxId
+	prevRollPtr      access.UndoPtr
+	tableName        string
+	columns          [][][]byte
+}
+
 // Recovery はクラッシュリカバリを実行する
 type Recovery struct {
 	redoLog    *log.RedoLog
@@ -146,9 +155,9 @@ func (r *Recovery) rollbackTransaction(trxId uint64) error {
 		case access.UndoInsert:
 			undoRecord = access.NewUndoInsertRecord(table, rec.columns[0])
 		case access.UndoDelete:
-			undoRecord = access.NewUndoDeleteRecord(table, rec.columns[0])
+			undoRecord = access.NewUndoDeleteRecord(table, rec.columns[0], rec.prevLastModified, rec.prevRollPtr)
 		case access.UndoUpdateInplace:
-			undoRecord = access.NewUndoUpdateInplaceRecord(table, rec.columns[0], rec.columns[1])
+			undoRecord = access.NewUndoUpdateInplaceRecord(table, rec.columns[0], rec.columns[1], rec.prevLastModified, rec.prevRollPtr)
 		default:
 			return fmt.Errorf("recovery: unknown undo record type: %d", rec.recordType)
 		}
@@ -180,16 +189,18 @@ func (r *Recovery) collectUndoRecords(trxId uint64) []undoRecordEntry {
 				break
 			}
 
-			recTrxId, _, recordType, tableName, columnSets, deserializeErr := access.DeserializeUndoRecord(recordBytes)
+			f, deserializeErr := access.DeserializeUndoRecord(recordBytes)
 			if deserializeErr != nil {
 				break
 			}
 
-			if recTrxId == trxId {
+			if f.TrxId == trxId {
 				records = append(records, undoRecordEntry{
-					recordType: recordType,
-					tableName:  tableName,
-					columns:    columnSets,
+					recordType:       f.RecordType,
+					prevLastModified: f.PrevLastModified,
+					prevRollPtr:      f.PrevRollPtr,
+					tableName:        f.TableName,
+					columns:          f.ColumnSets,
 				})
 			}
 
@@ -228,11 +239,4 @@ func (r *Recovery) buildTable(tableName string) (*access.Table, error) {
 	// undoLog=nil, redoLog=nil: リカバリ中に新たな UNDO/REDO を記録しない
 	tbl := access.NewTable(tblMeta.Name, tblMeta.DataMetaPageId, tblMeta.PKCount, uniqueIndexes, nil, nil)
 	return &tbl, nil
-}
-
-// undoRecordEntry はデシリアライズ済みの UNDO レコードの情報を保持する
-type undoRecordEntry struct {
-	recordType access.UndoRecordType
-	tableName  string
-	columns    [][][]byte
 }
