@@ -159,6 +159,179 @@ func TestCreateReadView(t *testing.T) {
 	})
 }
 
+func TestTransactionIsolation(t *testing.T) {
+	t.Run("Consistent Read: 他トランザクションの未コミット INSERT は見えない", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
+			{Name: "id", Type: ColumnTypeString},
+			{Name: "name", Type: ColumnTypeString},
+		})
+		assert.NoError(t, err)
+		tbl, err := h.GetTable("users")
+		assert.NoError(t, err)
+
+		// T1 が行を INSERT (未コミット)
+		trx1 := h.BeginTrx()
+		err = tbl.Insert(h.BufferPool, trx1, h.LockMgr, [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+
+		// WHEN: T2 が Consistent Read でテーブルを読み取る
+		trx2 := h.BeginTrx()
+		rv := h.CreateReadView(trx2)
+		vr := access.NewVersionReader(h.UndoLog())
+		iter, err := tbl.Search(h.BufferPool, rv, vr, access.RecordSearchModeStart{})
+		assert.NoError(t, err)
+
+		_, ok, err := iter.Next()
+		assert.NoError(t, err)
+
+		// THEN: T1 の未コミット INSERT は不可視
+		assert.False(t, ok)
+	})
+
+	t.Run("Consistent Read: 他トランザクションのコミット済み INSERT は ReadView 作成時点に依存する", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
+			{Name: "id", Type: ColumnTypeString},
+			{Name: "name", Type: ColumnTypeString},
+		})
+		assert.NoError(t, err)
+		tbl, err := h.GetTable("users")
+		assert.NoError(t, err)
+
+		// T1 が行を INSERT してコミット
+		trx1 := h.BeginTrx()
+		err = tbl.Insert(h.BufferPool, trx1, h.LockMgr, [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+		assert.NoError(t, h.CommitTrx(trx1))
+
+		// WHEN: T2 が ReadView を作成して読み取る (T1 コミット後なので可視)
+		trx2 := h.BeginTrx()
+		rv := h.CreateReadView(trx2)
+		vr := access.NewVersionReader(h.UndoLog())
+		iter, err := tbl.Search(h.BufferPool, rv, vr, access.RecordSearchModeStart{})
+		assert.NoError(t, err)
+
+		record, ok, err := iter.Next()
+		assert.NoError(t, err)
+
+		// THEN: T1 のコミット済み INSERT は可視
+		assert.True(t, ok)
+		assert.Equal(t, "Alice", string(record[1]))
+	})
+
+	t.Run("Current Read: UPDATE は他トランザクションのコミット済み行を最新バージョンで読む", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
+			{Name: "id", Type: ColumnTypeString},
+			{Name: "name", Type: ColumnTypeString},
+		})
+		assert.NoError(t, err)
+		tbl, err := h.GetTable("users")
+		assert.NoError(t, err)
+
+		// T1 が行を INSERT してコミット
+		trx1 := h.BeginTrx()
+		err = tbl.Insert(h.BufferPool, trx1, h.LockMgr, [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+		assert.NoError(t, h.CommitTrx(trx1))
+
+		// T2 が開始 (T1 コミット後)
+		trx2 := h.BeginTrx()
+
+		// T3 が行を UPDATE してコミット (T2 の開始後)
+		trx3 := h.BeginTrx()
+		err = tbl.UpdateInplace(h.BufferPool, trx3, h.LockMgr,
+			[][]byte{[]byte("1"), []byte("Alice")},
+			[][]byte{[]byte("1"), []byte("Bob")},
+		)
+		assert.NoError(t, err)
+		assert.NoError(t, h.CommitTrx(trx3))
+
+		// WHEN: T2 が Current Read で読む (全可視 ReadView)
+		rv := access.NewReadView(0, nil, ^uint64(0))
+		vr := access.NewVersionReader(nil)
+		iter, err := tbl.Search(h.BufferPool, rv, vr, access.RecordSearchModeStart{})
+		assert.NoError(t, err)
+		record, ok, err := iter.Next()
+		assert.NoError(t, err)
+
+		// THEN: T3 が更新した最新バージョン "Bob" が見える
+		assert.True(t, ok)
+		assert.Equal(t, "Bob", string(record[1]))
+		assert.NoError(t, h.CommitTrx(trx2))
+	})
+
+	t.Run("Consistent Read: UPDATE 後に旧バージョンの行が不可視になる (undo チェーン辿りの制約)", func(t *testing.T) {
+		// GIVEN
+		// 現在の実装では UpdateInplace/SoftDelete が undo レコードに prevLastModified=0 を記録するため、
+		// undo チェーンを辿っても旧バージョンの復元ができない。
+		// この制約により、T3 が UPDATE した行は T2 の Consistent Read からは不可視 (見つからない) になる。
+		// TODO: UpdateInplace/SoftDelete が B+Tree 上の現在の lastModified/rollPtr を undo レコードに記録するようになれば、旧バージョンが可視になる
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
+			{Name: "id", Type: ColumnTypeString},
+			{Name: "name", Type: ColumnTypeString},
+		})
+		assert.NoError(t, err)
+		tbl, err := h.GetTable("users")
+		assert.NoError(t, err)
+
+		// T1 が行を INSERT してコミット
+		trx1 := h.BeginTrx()
+		err = tbl.Insert(h.BufferPool, trx1, h.LockMgr, [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+		assert.NoError(t, h.CommitTrx(trx1))
+
+		// T2 が開始し ReadView を作成 (この時点では name=Alice)
+		trx2 := h.BeginTrx()
+		rv := h.CreateReadView(trx2)
+
+		// T3 が行を UPDATE してコミット (T2 の ReadView 作成後)
+		trx3 := h.BeginTrx()
+		err = tbl.UpdateInplace(h.BufferPool, trx3, h.LockMgr,
+			[][]byte{[]byte("1"), []byte("Alice")},
+			[][]byte{[]byte("1"), []byte("Bob")},
+		)
+		assert.NoError(t, err)
+		assert.NoError(t, h.CommitTrx(trx3))
+
+		// WHEN: T2 が Consistent Read で読む (ReadView は T3 コミット前に作成済み)
+		vr := access.NewVersionReader(h.UndoLog())
+		iter, err := tbl.Search(h.BufferPool, rv, vr, access.RecordSearchModeStart{})
+		assert.NoError(t, err)
+		_, ok, err := iter.Next()
+		assert.NoError(t, err)
+
+		// THEN: prevLastModified=0 のため undo チェーン辿りで旧バージョンが見つからず、行は不可視
+		assert.False(t, ok)
+		assert.NoError(t, h.CommitTrx(trx2))
+	})
+}
+
 func TestUndoLog(t *testing.T) {
 	t.Run("UndoManager が返される", func(t *testing.T) {
 		// GIVEN

@@ -74,9 +74,9 @@ func TestManagerCommit(t *testing.T) {
 		_, undoLog, table := initManagerTest(t)
 		manager := NewTrxManager(undoLog, lock.NewManager(5000), nil)
 		trxId := manager.Begin()
-		ptr1, err := undoLog.Append(trxId, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
+		ptr1, err := undoLog.Append(trxId, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
 		assert.NoError(t, err)
-		ptr2, err := undoLog.Append(trxId, NewUndoInsertRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
+		ptr2, err := undoLog.Append(trxId, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
 		assert.NoError(t, err)
 		assert.Equal(t, 2, len(undoLog.GetRecords(trxId)))
 		// Append が有効な UndoPtr を返すことを確認
@@ -90,6 +90,40 @@ func TestManagerCommit(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Nil(t, undoLog.GetRecords(trxId))
+	})
+	t.Run("Commit すると INSERT の undo ログは破棄されるが UPDATE/DELETE の undo ログは残る", func(t *testing.T) {
+		// GIVEN
+		bp, undoLog, table := initManagerTest(t)
+		lockMgr := lock.NewManager(5000)
+		table.undoLog = undoLog
+		manager := NewTrxManager(undoLog, lockMgr, nil)
+		trxId := manager.Begin()
+
+		// INSERT → UPDATE → DELETE の undo レコードを記録
+		err := table.Insert(bp, trxId, lockMgr, [][]byte{[]byte("a"), []byte("Alice")})
+		assert.NoError(t, err)
+		err = table.UpdateInplace(bp, trxId, lockMgr,
+			[][]byte{[]byte("a"), []byte("Alice")},
+			[][]byte{[]byte("a"), []byte("Bob")},
+		)
+		assert.NoError(t, err)
+		err = table.Insert(bp, trxId, lockMgr, [][]byte{[]byte("b"), []byte("Carol")})
+		assert.NoError(t, err)
+		err = table.SoftDelete(bp, trxId, lockMgr, [][]byte{[]byte("b"), []byte("Carol")})
+		assert.NoError(t, err)
+		assert.Equal(t, 4, len(undoLog.GetRecords(trxId)))
+
+		// WHEN
+		err = manager.Commit(trxId)
+
+		// THEN: INSERT の undo レコード (2 件) は破棄され、UPDATE + DELETE の undo レコード (2 件) が残る
+		assert.NoError(t, err)
+		records := undoLog.GetRecords(trxId)
+		assert.Equal(t, 2, len(records))
+		_, isUpdate := records[0].(UndoUpdateInplaceRecord)
+		assert.True(t, isUpdate)
+		_, isDelete := records[1].(UndoDeleteRecord)
+		assert.True(t, isDelete)
 	})
 }
 
@@ -145,11 +179,11 @@ func TestManagerRollback(t *testing.T) {
 		trxId := manager.Begin()
 
 		// テーブルに存在しない行の削除 Undo (= 存在しない行を insertRaw しようとする)
-		_, err := undoLog.Append(trxId, NewUndoDeleteRecord(table, [][]byte{[]byte("nonexistent"), []byte("data")}, 0, NullUndoPtr))
+		_, err := undoLog.Append(trxId, UndoDelete, NewUndoDeleteRecord(table, [][]byte{[]byte("nonexistent"), []byte("data")}, 0, NullUndoPtr))
 		assert.NoError(t, err)
 
 		// さらに Insert の Undo (= 存在しない行を deleteRaw しようとする) を追加
-		_, err = undoLog.Append(trxId, NewUndoInsertRecord(table, [][]byte{[]byte("nonexistent"), []byte("data")}))
+		_, err = undoLog.Append(trxId, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("nonexistent"), []byte("data")}))
 		assert.NoError(t, err)
 
 		// WHEN
@@ -168,7 +202,7 @@ func TestManagerRollback(t *testing.T) {
 
 		err := table.Insert(bp, trx1, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("Alice")})
 		assert.NoError(t, err)
-		_, err = undoLog.Append(trx2, NewUndoInsertRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
+		_, err = undoLog.Append(trx2, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
 		assert.NoError(t, err)
 
 		// WHEN

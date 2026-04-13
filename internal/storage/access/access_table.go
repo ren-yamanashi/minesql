@@ -74,7 +74,7 @@ func (t *Table) Insert(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Ma
 	// Undo ログを記録
 	undoPtr := NullUndoPtr
 	if t.undoLog != nil {
-		ptr, err := t.undoLog.Append(trxId, NewUndoInsertRecord(t, columns))
+		ptr, err := t.undoLog.Append(trxId, UndoInsert, NewUndoInsertRecord(t, columns))
 		if err != nil {
 			return err
 		}
@@ -103,7 +103,7 @@ func (t *Table) SoftDelete(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *loc
 	// Undo ログを記録
 	undoPtr := NullUndoPtr
 	if t.undoLog != nil {
-		ptr, err := t.undoLog.Append(trxId, NewUndoDeleteRecord(t, columns, 0, NullUndoPtr))
+		ptr, err := t.undoLog.Append(trxId, UndoDelete, NewUndoDeleteRecord(t, columns, 0, NullUndoPtr))
 		if err != nil {
 			return err
 		}
@@ -134,7 +134,7 @@ func (t *Table) UpdateInplace(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *
 	// Undo ログを記録
 	undoPtr := NullUndoPtr
 	if t.undoLog != nil {
-		ptr, err := t.undoLog.Append(trxId, NewUndoUpdateInplaceRecord(t, oldColumns, newColumns, 0, NullUndoPtr))
+		ptr, err := t.undoLog.Append(trxId, UndoUpdateInplace, NewUndoUpdateInplaceRecord(t, oldColumns, newColumns, 0, NullUndoPtr))
 		if err != nil {
 			return err
 		}

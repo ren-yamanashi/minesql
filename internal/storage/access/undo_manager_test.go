@@ -37,9 +37,9 @@ func TestUndoManagerAppend(t *testing.T) {
 		table := createUndoTestTable(t, bp)
 
 		// WHEN
-		ptr1, err := undoLog.Append(1, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
+		ptr1, err := undoLog.Append(1, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
 		assert.NoError(t, err)
-		ptr2, err := undoLog.Append(1, NewUndoInsertRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
+		ptr2, err := undoLog.Append(1, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
 		assert.NoError(t, err)
 
 		// THEN
@@ -57,11 +57,11 @@ func TestUndoManagerAppend(t *testing.T) {
 		table := createUndoTestTable(t, bp)
 
 		// WHEN
-		ptr1, err := undoLog.Append(1, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
+		ptr1, err := undoLog.Append(1, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
 		assert.NoError(t, err)
-		ptr2, err := undoLog.Append(2, NewUndoInsertRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
+		ptr2, err := undoLog.Append(2, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
 		assert.NoError(t, err)
-		ptr3, err := undoLog.Append(2, NewUndoInsertRecord(table, [][]byte{[]byte("c"), []byte("Carol")}))
+		ptr3, err := undoLog.Append(2, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("c"), []byte("Carol")}))
 		assert.NoError(t, err)
 
 		// THEN
@@ -89,7 +89,7 @@ func TestUndoManagerAppend(t *testing.T) {
 		var firstPtr, lastPtr UndoPtr
 		for i := range recordCount {
 			col := []byte(fmt.Sprintf("v%04d", i))
-			ptr, err := undoLog.Append(1, NewUndoInsertRecord(table, [][]byte{[]byte("a"), col}))
+			ptr, err := undoLog.Append(1, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("a"), col}))
 			assert.NoError(t, err)
 			if i == 0 {
 				firstPtr = ptr
@@ -114,7 +114,7 @@ func TestReadAt(t *testing.T) {
 		table := createUndoTestTable(t, bp)
 
 		record := NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")})
-		ptr, err := undoLog.Append(1, record)
+		ptr, err := undoLog.Append(1, UndoInsert, record)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -138,9 +138,9 @@ func TestReadAt(t *testing.T) {
 		assert.NoError(t, err)
 		table := createUndoTestTable(t, bp)
 
-		ptr1, err := undoLog.Append(1, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
+		ptr1, err := undoLog.Append(1, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
 		assert.NoError(t, err)
-		ptr2, err := undoLog.Append(1, NewUndoInsertRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
+		ptr2, err := undoLog.Append(1, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
 		assert.NoError(t, err)
 
 		// WHEN
@@ -194,9 +194,9 @@ func TestGetRecords(t *testing.T) {
 		assert.NoError(t, err)
 		table := createUndoTestTable(t, bp)
 
-		_, err = undoLog.Append(1, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
+		_, err = undoLog.Append(1, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
 		assert.NoError(t, err)
-		_, err = undoLog.Append(1, NewUndoDeleteRecord(table, [][]byte{[]byte("b"), []byte("Bob")}, 0, NullUndoPtr))
+		_, err = undoLog.Append(1, UndoDelete, NewUndoDeleteRecord(table, [][]byte{[]byte("b"), []byte("Bob")}, 0, NullUndoPtr))
 		assert.NoError(t, err)
 
 		// WHEN
@@ -222,9 +222,9 @@ func TestPopLast(t *testing.T) {
 		assert.NoError(t, err)
 		table := createUndoTestTable(t, bp)
 
-		_, err = undoLog.Append(1, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
+		_, err = undoLog.Append(1, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
 		assert.NoError(t, err)
-		_, err = undoLog.Append(1, NewUndoInsertRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
+		_, err = undoLog.Append(1, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
 		assert.NoError(t, err)
 
 		// WHEN
@@ -254,11 +254,11 @@ func TestPopLast(t *testing.T) {
 		assert.NoError(t, err)
 		table := createUndoTestTable(t, bp)
 
-		_, err = undoLog.Append(1, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
+		_, err = undoLog.Append(1, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
 		assert.NoError(t, err)
-		_, err = undoLog.Append(2, NewUndoInsertRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
+		_, err = undoLog.Append(2, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
 		assert.NoError(t, err)
-		_, err = undoLog.Append(2, NewUndoInsertRecord(table, [][]byte{[]byte("c"), []byte("Carol")}))
+		_, err = undoLog.Append(2, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("c"), []byte("Carol")}))
 		assert.NoError(t, err)
 
 		// WHEN
@@ -278,9 +278,9 @@ func TestDiscard(t *testing.T) {
 		assert.NoError(t, err)
 		table := createUndoTestTable(t, bp)
 
-		_, err = undoLog.Append(1, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
+		_, err = undoLog.Append(1, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
 		assert.NoError(t, err)
-		_, err = undoLog.Append(1, NewUndoInsertRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
+		_, err = undoLog.Append(1, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
 		assert.NoError(t, err)
 
 		// WHEN
@@ -297,9 +297,9 @@ func TestDiscard(t *testing.T) {
 		assert.NoError(t, err)
 		table := createUndoTestTable(t, bp)
 
-		_, err = undoLog.Append(1, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
+		_, err = undoLog.Append(1, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
 		assert.NoError(t, err)
-		_, err = undoLog.Append(2, NewUndoInsertRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
+		_, err = undoLog.Append(2, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
 		assert.NoError(t, err)
 
 		// WHEN
@@ -320,6 +320,70 @@ func TestDiscard(t *testing.T) {
 		assert.NotPanics(t, func() {
 			undoLog.Discard(999)
 		})
+	})
+}
+
+func TestDiscardInsertRecords(t *testing.T) {
+	t.Run("INSERT の undo レコードのみ破棄され UPDATE/DELETE は残る", func(t *testing.T) {
+		// GIVEN
+		bp := initUndoTestDisk(t)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
+		assert.NoError(t, err)
+		table := createUndoTestTable(t, bp)
+
+		_, err = undoLog.Append(1, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
+		assert.NoError(t, err)
+		_, err = undoLog.Append(1, UndoDelete, NewUndoDeleteRecord(table, [][]byte{[]byte("b"), []byte("Bob")}, 0, NullUndoPtr))
+		assert.NoError(t, err)
+		_, err = undoLog.Append(1, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("c"), []byte("Carol")}))
+		assert.NoError(t, err)
+
+		// WHEN
+		undoLog.DiscardInsertRecords(1)
+
+		// THEN: DELETE の undo レコードだけが残る
+		records := undoLog.GetRecords(1)
+		assert.Equal(t, 1, len(records))
+		deleteRecord, ok := records[0].(UndoDeleteRecord)
+		assert.True(t, ok)
+		assert.Equal(t, []byte("b"), deleteRecord.Record[0])
+	})
+
+	t.Run("INSERT のみの場合はエントリごと削除される", func(t *testing.T) {
+		// GIVEN
+		bp := initUndoTestDisk(t)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
+		assert.NoError(t, err)
+		table := createUndoTestTable(t, bp)
+
+		_, err = undoLog.Append(1, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
+		assert.NoError(t, err)
+
+		// WHEN
+		undoLog.DiscardInsertRecords(1)
+
+		// THEN
+		assert.Nil(t, undoLog.GetRecords(1))
+	})
+
+	t.Run("他のトランザクションに影響しない", func(t *testing.T) {
+		// GIVEN
+		bp := initUndoTestDisk(t)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
+		assert.NoError(t, err)
+		table := createUndoTestTable(t, bp)
+
+		_, err = undoLog.Append(1, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")}))
+		assert.NoError(t, err)
+		_, err = undoLog.Append(2, UndoInsert, NewUndoInsertRecord(table, [][]byte{[]byte("b"), []byte("Bob")}))
+		assert.NoError(t, err)
+
+		// WHEN
+		undoLog.DiscardInsertRecords(1)
+
+		// THEN
+		assert.Nil(t, undoLog.GetRecords(1))
+		assert.Equal(t, 1, len(undoLog.GetRecords(2)))
 	})
 }
 

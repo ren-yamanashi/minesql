@@ -43,7 +43,7 @@ func TestReadVisibleVersion(t *testing.T) {
 
 		// T1 の INSERT の undo レコード (prevLastModified=0, prevRollPtr=null)
 		t1UndoRecord := NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")})
-		t1Ptr, err := undoLog.Append(1, t1UndoRecord)
+		t1Ptr, err := undoLog.Append(1, UndoInsert, t1UndoRecord)
 		assert.NoError(t, err)
 
 		// T2 の UPDATE の undo レコード (prevLastModified=T1, prevRollPtr=T1のundo)
@@ -52,7 +52,7 @@ func TestReadVisibleVersion(t *testing.T) {
 			[][]byte{[]byte("a"), []byte("Alice")}, // T2 が上書きする前の値
 			1, t1Ptr,
 		)
-		t2Ptr, err := undoLog.Append(2, t2UndoRecord)
+		t2Ptr, err := undoLog.Append(2, UndoDelete, t2UndoRecord)
 		assert.NoError(t, err)
 
 		// ReadView: T2 は不可視、T1 は可視
@@ -85,7 +85,7 @@ func TestReadVisibleVersion(t *testing.T) {
 
 		// T1 の INSERT の undo レコード
 		t1UndoRecord := NewUndoInsertRecord(table, [][]byte{[]byte("a"), []byte("Alice")})
-		t1Ptr, err := undoLog.Append(1, t1UndoRecord)
+		t1Ptr, err := undoLog.Append(1, UndoInsert, t1UndoRecord)
 		assert.NoError(t, err)
 
 		// ReadView: T1 も不可視

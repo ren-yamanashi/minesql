@@ -51,9 +51,10 @@ func (m *TrxManager) Commit(trxId TrxId) error {
 		}
 	}
 
-	// コミット後はロックを解放して Undo ログを破棄
+	// コミット後はロックを解放して INSERT の Undo ログを破棄
+	// UPDATE/DELETE の undo レコードは他トランザクションの ReadView から undo チェーン辿りに必要なため保持する
 	m.lockMgr.ReleaseAll(trxId)
-	m.undoLog.Discard(trxId)
+	m.undoLog.DiscardInsertRecords(trxId)
 	m.Transactions[trxId] = StateInactive
 	return nil
 }
