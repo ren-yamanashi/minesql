@@ -329,6 +329,160 @@ func TestTransactionIsolation(t *testing.T) {
 	})
 }
 
+func TestPurgeThreadIntegration(t *testing.T) {
+	t.Run("DELETE → COMMIT 後にパージスレッドが delete-marked レコードを物理削除する", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
+			{Name: "id", Type: ColumnTypeString},
+			{Name: "name", Type: ColumnTypeString},
+		})
+		assert.NoError(t, err)
+		tbl, err := h.GetTable("users")
+		assert.NoError(t, err)
+
+		// INSERT → COMMIT
+		trx1 := h.BeginTrx()
+		err = tbl.Insert(h.BufferPool, trx1, h.LockMgr, [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+		assert.NoError(t, h.CommitTrx(trx1))
+
+		// DELETE → COMMIT
+		trx2 := h.BeginTrx()
+		err = tbl.SoftDelete(h.BufferPool, trx2, h.LockMgr, [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+		assert.NoError(t, h.CommitTrx(trx2))
+
+		// WHEN: パージを直接実行 (バックグラウンドスレッドを待つ代わりに)
+		pt := h.purgeThread
+		purgeLimit := h.trxManager.PurgeLimit()
+		committedIds := h.trxManager.CommittedTrxIds()
+		err = pt.RunPurge(purgeLimit, committedIds)
+		assert.NoError(t, err)
+
+		// THEN: テーブルが空 (物理削除済み)
+		rv := access.NewReadView(0, nil, ^uint64(0))
+		vr := access.NewVersionReader(nil)
+		iter, err := tbl.Search(h.BufferPool, rv, vr, access.RecordSearchModeStart{})
+		assert.NoError(t, err)
+		_, ok, err := iter.Next()
+		assert.NoError(t, err)
+		assert.False(t, ok)
+	})
+
+	t.Run("アクティブな ReadView がある場合はパージされない", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
+			{Name: "id", Type: ColumnTypeString},
+			{Name: "name", Type: ColumnTypeString},
+		})
+		assert.NoError(t, err)
+		tbl, err := h.GetTable("users")
+		assert.NoError(t, err)
+
+		// INSERT → COMMIT
+		trx1 := h.BeginTrx()
+		err = tbl.Insert(h.BufferPool, trx1, h.LockMgr, [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+		assert.NoError(t, h.CommitTrx(trx1))
+
+		// T2 が ReadView を作成 (DELETE 前の状態を保持)
+		trx2 := h.BeginTrx()
+		h.CreateReadView(trx2)
+
+		// T3 が DELETE → COMMIT
+		trx3 := h.BeginTrx()
+		err = tbl.SoftDelete(h.BufferPool, trx3, h.LockMgr, [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+		assert.NoError(t, h.CommitTrx(trx3))
+
+		// WHEN: パージを実行
+		pt := h.purgeThread
+		purgeLimit := h.trxManager.PurgeLimit()
+		committedIds := h.trxManager.CommittedTrxIds()
+		err = pt.RunPurge(purgeLimit, committedIds)
+		assert.NoError(t, err)
+
+		// THEN: T2 の ReadView があるのでパージされない (Consistent Read で元の行が見える)
+		rv := h.CreateReadView(trx2)
+		vr := access.NewVersionReader(h.UndoLog())
+		iter, err := tbl.Search(h.BufferPool, rv, vr, access.RecordSearchModeStart{})
+		assert.NoError(t, err)
+		record, ok, err := iter.Next()
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, "Alice", string(record[1]))
+
+		assert.NoError(t, h.CommitTrx(trx2))
+	})
+
+	t.Run("UPDATE → COMMIT 後にパージスレッドが undo ログを破棄する", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
+			{Name: "id", Type: ColumnTypeString},
+			{Name: "name", Type: ColumnTypeString},
+		})
+		assert.NoError(t, err)
+		tbl, err := h.GetTable("users")
+		assert.NoError(t, err)
+
+		// INSERT → COMMIT
+		trx1 := h.BeginTrx()
+		err = tbl.Insert(h.BufferPool, trx1, h.LockMgr, [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+		assert.NoError(t, h.CommitTrx(trx1))
+
+		// UPDATE → COMMIT
+		trx2 := h.BeginTrx()
+		err = tbl.UpdateInplace(h.BufferPool, trx2, h.LockMgr,
+			[][]byte{[]byte("1"), []byte("Alice")},
+			[][]byte{[]byte("1"), []byte("Bob")},
+		)
+		assert.NoError(t, err)
+		assert.NoError(t, h.CommitTrx(trx2))
+
+		// UPDATE の undo ログが残っている
+		assert.NotNil(t, h.UndoLog().GetRecords(trx2))
+
+		// WHEN: パージを実行
+		pt := h.purgeThread
+		purgeLimit := h.trxManager.PurgeLimit()
+		committedIds := h.trxManager.CommittedTrxIds()
+		err = pt.RunPurge(purgeLimit, committedIds)
+		assert.NoError(t, err)
+
+		// THEN: undo ログが破棄されている
+		assert.Nil(t, h.UndoLog().GetRecords(trx2))
+
+		// レコードは残っている (UPDATE なので物理削除されない)
+		rv := access.NewReadView(0, nil, ^uint64(0))
+		vr := access.NewVersionReader(nil)
+		iter, err := tbl.Search(h.BufferPool, rv, vr, access.RecordSearchModeStart{})
+		assert.NoError(t, err)
+		record, ok, err := iter.Next()
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, "Bob", string(record[1]))
+	})
+}
+
 func TestUndoLog(t *testing.T) {
 	t.Run("UndoManager が返される", func(t *testing.T) {
 		// GIVEN

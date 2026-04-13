@@ -108,3 +108,103 @@ func TestGetTable(t *testing.T) {
 		assert.Contains(t, err.Error(), "table non_existent not found")
 	})
 }
+
+func TestBuildTable(t *testing.T) {
+	t.Run("メタデータから Table が構築される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
+			{Name: "id", Type: ColumnTypeString},
+			{Name: "name", Type: ColumnTypeString},
+		})
+		assert.NoError(t, err)
+		tblMeta, ok := h.Catalog.GetTableMetaByName("users")
+		assert.True(t, ok)
+
+		// WHEN
+		tbl, err := buildTable(tblMeta, h.undoLog, h.redoLog)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, "users", tbl.Name)
+		assert.Equal(t, uint8(1), tbl.PrimaryKeyCount)
+	})
+
+	t.Run("ユニークインデックス付きの Table が構築される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		err := h.CreateTable("users", 1,
+			[]CreateIndexParam{{Name: "idx_email", ColName: "email", UkIdx: 1}},
+			[]CreateColumnParam{
+				{Name: "id", Type: ColumnTypeString},
+				{Name: "email", Type: ColumnTypeString},
+			},
+		)
+		assert.NoError(t, err)
+		tblMeta, ok := h.Catalog.GetTableMetaByName("users")
+		assert.True(t, ok)
+
+		// WHEN
+		tbl, err := buildTable(tblMeta, h.undoLog, h.redoLog)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(tbl.UniqueIndexes))
+		assert.Equal(t, "idx_email", tbl.UniqueIndexes[0].Name)
+	})
+}
+
+func TestBuildAllTables(t *testing.T) {
+	t.Run("カタログの全テーブルが構築される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
+			{Name: "id", Type: ColumnTypeString},
+		})
+		assert.NoError(t, err)
+		err = h.CreateTable("orders", 1, nil, []CreateColumnParam{
+			{Name: "id", Type: ColumnTypeString},
+		})
+		assert.NoError(t, err)
+
+		// WHEN
+		tables := buildAllTables(h.Catalog, h.undoLog, h.redoLog)
+
+		// THEN
+		assert.Equal(t, 2, len(tables))
+		names := []string{tables[0].Name, tables[1].Name}
+		assert.Contains(t, names, "users")
+		assert.Contains(t, names, "orders")
+	})
+
+	t.Run("テーブルが存在しない場合は空を返す", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		// WHEN
+		tables := buildAllTables(h.Catalog, h.undoLog, h.redoLog)
+
+		// THEN
+		assert.Equal(t, 0, len(tables))
+	})
+}
+
