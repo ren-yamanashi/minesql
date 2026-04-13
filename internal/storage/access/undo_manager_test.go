@@ -387,6 +387,48 @@ func TestDiscardInsertRecords(t *testing.T) {
 	})
 }
 
+func TestPurge(t *testing.T) {
+	t.Run("パージ閾値より古いコミット済みトランザクションの undo が破棄される", func(t *testing.T) {
+		// GIVEN
+		bp := initUndoTestDisk(t)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
+		assert.NoError(t, err)
+		table := createUndoTestTable(t, bp)
+
+		_, err = undoLog.Append(1, UndoDelete, NewUndoDeleteRecord(table, [][]byte{[]byte("a"), []byte("Alice")}, 0, NullUndoPtr))
+		assert.NoError(t, err)
+		_, err = undoLog.Append(2, UndoUpdateInplace, NewUndoUpdateInplaceRecord(table, [][]byte{[]byte("b"), []byte("Bob")}, [][]byte{[]byte("b"), []byte("Carol")}, 0, NullUndoPtr))
+		assert.NoError(t, err)
+		_, err = undoLog.Append(3, UndoDelete, NewUndoDeleteRecord(table, [][]byte{[]byte("c"), []byte("Dave")}, 0, NullUndoPtr))
+		assert.NoError(t, err)
+
+		// WHEN: purgeLimit=3 で trx1, trx2 がコミット済み
+		undoLog.Purge(3, []TrxId{1, 2})
+
+		// THEN: trx1, trx2 の undo は破棄され、trx3 は残る
+		assert.Nil(t, undoLog.GetRecords(1))
+		assert.Nil(t, undoLog.GetRecords(2))
+		assert.Equal(t, 1, len(undoLog.GetRecords(3)))
+	})
+
+	t.Run("パージ閾値以上のトランザクションは破棄されない", func(t *testing.T) {
+		// GIVEN
+		bp := initUndoTestDisk(t)
+		undoLog, err := NewUndoManager(bp, nil, undoTestFileId)
+		assert.NoError(t, err)
+		table := createUndoTestTable(t, bp)
+
+		_, err = undoLog.Append(5, UndoDelete, NewUndoDeleteRecord(table, [][]byte{[]byte("a"), []byte("Alice")}, 0, NullUndoPtr))
+		assert.NoError(t, err)
+
+		// WHEN: purgeLimit=5 で trx5 がコミット済み
+		undoLog.Purge(5, []TrxId{5})
+
+		// THEN: trx5 は purgeLimit 以上なので残る
+		assert.Equal(t, 1, len(undoLog.GetRecords(5)))
+	})
+}
+
 // initUndoTestDisk はテスト用にバッファプールと UNDO Disk を初期化する
 func initUndoTestDisk(t *testing.T) *buffer.BufferPool {
 	t.Helper()
