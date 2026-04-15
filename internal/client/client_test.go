@@ -70,6 +70,17 @@ func TestReadMultilineInput(t *testing.T) {
 		assert.Equal(t, "exit", result)
 	})
 
+	t.Run("exit; を入力すると exit を返す", func(t *testing.T) {
+		// GIVEN
+		reader := bufio.NewReader(strings.NewReader("exit;\n"))
+
+		// WHEN
+		result := c.readMultilineInput(reader)
+
+		// THEN
+		assert.Equal(t, "exit", result)
+	})
+
 	t.Run("複数行入力の途中で exit を入力すると exit を返す", func(t *testing.T) {
 		// GIVEN: セミコロンを待っている途中で exit が来る
 		input := "SELECT *\nexit\n"

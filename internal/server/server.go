@@ -143,7 +143,7 @@ func (s *Server) onConnection(conn *net.TCPConn) {
 		}
 
 		// exit なら切断
-		if strings.ToLower(strings.TrimSpace(sql)) == "exit" {
+		if strings.ToLower(strings.TrimSuffix(strings.TrimSpace(sql), ";")) == "exit" {
 			return
 		}
 

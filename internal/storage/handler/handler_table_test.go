@@ -207,4 +207,3 @@ func TestBuildAllTables(t *testing.T) {
 		assert.Equal(t, 0, len(tables))
 	})
 }
-
