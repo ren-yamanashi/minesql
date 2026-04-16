@@ -1,1 +1,0 @@
-# Nested Loop Join (NLJ)
