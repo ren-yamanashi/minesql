@@ -23,6 +23,12 @@ mysql> SELECT cost_name, cost_value, default_value FROM mysql.server_cost WHERE 
 +------------------------------+------------+---------------+
 ```
 
+## コストの算出
+
+- SQL コストは以下の二つのパラメータから計算される
+  - foundRecords: 読み取られるレコード数の推定値
+  - readTime: ディスクアクセス回数の推定値
+
 ## 単一テーブルのフルスキャン
 
 ```sql
@@ -30,47 +36,40 @@ mysql> SELECT cost_name, cost_value, default_value FROM mysql.server_cost WHERE 
 SELECT * FROM users WHERE first_name = 'John';
 ```
 
-- SQL コストは以下の二つのパラメータから計算される
-  - foundRecords: 読み取られるレコード数の推定値
-  - readTime: ディスクアクセス回数の推定値
+- foundRecords: テーブル統計情報の中の、「レコード数」を用いる
+- readTime: テーブル統計情報の中の「データサイズ」をページサイズ (4KB) で割った値を用いる
+- コスト: readTime + foundRecords * RowEvaluateCost (参考: [sql_planner.cc#L1097-L1101](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L1097-L1101))
 
-- フルスキャンの場合
-  - foundRecords: テーブル統計情報の中の、「レコード数」を用いる
-  - readTime: テーブル統計情報の中の「データサイズ」をページサイズ (4KB) で割った値を用いる
-  - コスト: readTime + foundRecords * RowEvaluateCost
+### 例
 
-- 例:
-  - 仮定
-    - レコード数: 74822
-    - データサイズ: 7880704
-    - ページサイズ: 4096
-  - 計算式:
-    - foundRecords: 74822
-    - readTime: 7880704 / 4096 = 1,924
-    - コスト: 1,924 + 74822 * 0.1 = 9,406.2
+- 仮定
+  - レコード数: 74822
+  - データサイズ: 7880704
+  - ページサイズ: 4096
+- 計算式:
+  - foundRecords: 74822
+  - readTime: 7880704 / 4096 = 1,924
+  - コスト: 1,924 + 74822 * 0.1 = 9,406.2
 
 ## 単一テーブルのユニークスキャン
-
-(ユニークインデックスを使用して、検索した場合)
 
 ```sql
 --- username にユニークインデックスがあると仮定
 SELECT * FROM users WHERE username = 'john-doe';
 ```
 
-- ユニークスキャンの場合
-  - foundRecords: 1
-  - readTime: 1
-
-- オプティマイザは、検索条件にユニークインデックスの等価条件が含まれていることを検出すると、必ずユニークスキャンを選択する
-  - 他の選択肢については探索自体行わない
+- コストは 1.0 固定とする
+  - 参考: [sql_optimizer.cc#L5905-L5910](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_optimizer.cc#L5905-L5910)
+- オプティマイザは、より良いキータイプ (e.g. UNIQUE キー) が既にあるなら、劣るキータイプのコスト計算を省略する
+  - 参考: [sql_planner.cc#L412-L423](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L412-L423)
+  - 従って、UNIQUE インデックスが見つかった後、NOT_UNIQUE のインデックスはスキップされる
 
 ## 単一テーブルのレンジスキャン
 
 (インデックスの貼られたカラムに対して範囲検索をした場合)
 
-- PostgreSQL などの場合は、範囲検索に対してはヒストグラム統計を用いて読み取りレコード数を推定しているが、minesql では MySQL と同様に、ヒストグラム統計を用いない
-- 範囲検索におけるレコード数の推定は、ストレージエンジンが担う (MySQL ではこの処理を「レンジ分析」と呼ぶので、minesql でも同様に「レンジ分析」と呼ぶことにする)
+- PostgreSQL などの場合は、範囲検索に対してはヒストグラム統計を用いて読み取りレコード数を推定しているが、minesql では MySQL と同様にヒストグラム統計を用いない
+- 範囲検索におけるレコード数の推定は、ストレージエンジンが担う (MySQL ではこの処理を「レンジ分析」と呼ぶので minesql でも同様に「レンジ分析」と呼ぶことにする)
   - 補足: MySQL ではストレージエンジン API の `records_in_range()` を呼び出すことでストレージエンジンに読み取りレコード数の見積もりを依頼する
 
 ### foundRecords の推定方法
@@ -83,42 +82,56 @@ SELECT * FROM users WHERE username = 'john-doe';
 
 - リーフページを読み取ることで以下の情報を得ることができる
   - 該当のページに含まれるインデックスのエントリ数
-  - それぞれ (下限値と上限値) のインデックスエントリが、ページのにはの位置にあるのか
+  - それぞれ (下限値と上限値) のインデックスエントリが、ページのどの位置にあるのか
 - 下限値、上限値におけるインデックスエントリの番号を `nth_rec_1`, `nth_rec_2` とすると、読み取られるレコード数の推定値は以下の式で表せる
-  - foundRecords = nth_rec_2 - nth_rec_1
+  - foundRecords = nth_rec_2 - nth_rec_1 - 1 (参考: [btr0cur.cc#L5287](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L5287))
+    - 左右どちらの境界もカウントしないため、-1 としている
+    >　We do not count the borders (nor the left nor the right one), thus "- 1".
 
-#### 上限値のインデックスエントリが、下限値のインデックスエントリから少し離れている場合・・・
+#### 上限値のインデックスエントリが、下限値のインデックスエントリと異なるリーフページにあり、かつそれらが隣接している場合・・・
 
-- 読み取りレコード数を推定するためには、その間に挟まっているリーフページを考慮する必要がある
-- この場合は INDEX RANGE SCAN を行って実際に読み取る
-- リーフページに含まれるインデックスエントリ数を `n_recs_N` とすると、読み取りレコード数の推定値は以下の式で表される
-  - (n_recs_1 - nth_rec_1) + Σ (n_recs_middle) + (nth_rec_2 - 1)
+- 下限値、上限値のリーフページに含まれるレコード数をそれぞれ `n_recs_1`, `n_recs_2` とし、また下限値、上限値におけるインデックスのエントリ番号をそれぞれ `nth_rec_1`, `nth_rec_2` とすると、読み取られるレコード数の推定値は以下の式で表せる (参考: [btr0cur.cc#L5312-L5326](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L5312-L5326))
+  - (n_recs_1 - nth_rec_1) + (nth_rec_2 - 1)
 
-#### 上限値のインデックスエントリが、下限値のインデックスエントリから大幅に離れている場合・・・
+#### 上限値のインデックスエントリが、下限値のインデックスエントリと異なるリーフページにあり、かつそれらが隣接していない場合・・・
 
-- この場合も同様に INDEX RANGE SCAN を行って実際に読み取る
-- ただし、リーフページが大量にある場合は読み取りを途中で打ち切る
-  - 具体的には、中間のリーフページを 9 ページ目まで読み取る
-- 読み取りを途中で打ち切った場合は、ルートページの情報も見積りに用いられる。
-- ルートページにおいて下限値へのポインタと上限値へのポインタの間にあるエントリ数 (=検索範囲内にあるリーフページの数) を `n_rows_on_prev_level` とし、また中間のリーフページに含まれるインデックスエントリの数を `n_recs_middle_9` とすると、読み取りレコード数の推定値は以下の式で表される
-  - (検索範囲内のリーフページ数) * (リーフページあたりの推定レコード数) * 2  
-  -> n_rows_on_prev_level * ((n_recs_1 - nth_rec_1) + n_recs_middle_9 + (nth_rec_2 -1)) / 10 * 2
-    - 補足: 利用している 10, 2 のハードコードの意味はそれぞれ以下
-      - 10: 読み込んだリーフページの数 (実際には 11 だが、下限と上限はそれぞれ 0.5 扱いになっていると思われる)
-      - 2: 補正係数
-        > 「このアルゴリズムでは推定値が実際の値より少なくなることが多いため、2倍にした」とソースコードのコメントに書いてありました
-        >
-        > https://dbstudy.info/files/20120310/mysql_costcalc.pdf
-- ここまでの計算で得られた読み取りレコード数の推定値が、テーブルの行数の半分を上回った場合、推定値はテーブルの行数の半分に補正される
+- 下限値のページから上限値のページに向かってリンクリストを辿り、合計 10 ページまで読み取る (参考: [btr0cur.cc#L4914](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L4914))
+
+- 10 ページ以内に上限値のインデックスエントリが見った場合・・・
+  - 下限値、上限値のリーフページに含まれるレコード数をそれぞれ `n_recs_1`, `n_recs_2` とし、また下限値、上限値におけるインデックスのエントリ番号をそれぞれ `nth_rec_1`, `nth_rec_2` とすると、読み取られるレコード数の推定値は以下の式で表せる (参考: [btr0cur.cc#L4892-L4904](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L4892-L4904), [btr0cur.cc#L4964-L4968](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L4964-L4968))
+    - (n_recs_1 - nth_rec_1) + Σ n_recs_mid + (nth_rec_2 - 1)
+
+- 10 ページ以内に上限値のインデックスエントリが見つからなかった場合・・・
+  - 読んだページから 1 ページあたりの平均レコード数を求め、それに対象範囲のページ数を掛けて全体のレコード数を推定する。この場合は「行数が確定していない扱い (mysql でいうところの `is_n_rows_exact = false`)」になる (参考: [btr0cur.cc#L4993-L5003](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L4993-L5003))
+    - foundRecords = n_rows_on_prev_level × (n_rows / n_pages_read)
+      - `n_rows / n_pages_read`
+        - 読み取ったページから算出した 1 ページあたりの平均レコード数
+      - `n_rows_on_prev_level`
+        - B-tree の 1 つ上のレベル (ブランチノード) で推定された、対象範囲内のレコード数
+        - ブランチノードの各レコードは境界キーと子ページへのポインタを持っており、1 レコードが下のレベルの 1 ページに対応する
+        - そのため、上のレベルで下限値と上限値の間にあるレコード数を数えれば、それがそのまま現在のレベルにおける対象範囲の中間ページ数となる
 
 ### readTime の推定方法
 
-- `1 + (読み取りレコード数の推定値) / (レコード数の上限値) * (テーブルのページ数)` を A
-- `(読み取りレコード数の推定値) * RowEvaluateCost * 0.01` を B
-- とした場合の A + B を readTime の推定値とする
+- レンジスキャンにおけるディスクアクセス回数は、以下の 2 つの要素から推定される
+  - レンジの区間ごとにインデックス上でランダムシークが 1 回発生する
+  - ランダムシーク後、該当するレコードの数だけページ読み取りが発生する
+- これらを合計すると以下の式になる (参考: [handler.h#L5202-L5205](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.h#L5202-L5205))
+  - readTime = n_ranges + foundRecords
+    - `n_ranges`: レンジ条件の区間の数。`WHERE x BETWEEN 10 AND 20` は `10 <= x <= 20` という 1 つの連続した区間なので 1。`WHERE x IN (1, 5, 10)` は `x = 1`, `x = 5`, `x = 10` という 3 つの独立した区間に分かれるので 3
+    - `foundRecords`: 前述の方法で推定されたレコード数
+- 補足: MySQL ではさらにバッファプールのキャッシュヒット率を考慮した重み付け (`page_read_cost`) を掛けるが (参考: [opt_costmodel.cc#L86-L100](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/opt_costmodel.cc#L86-L100))、minesql ではバッファプールを考慮しないため省略する
 
 ### 最終的なコスト算出
 
-- foundRecords: 上記の方法で推定した読み取りレコード数
-- readTime: 上記の方法で推定した読み取り時間
-- コスト: readTime + foundRecords * RowEvaluateCost
+- フルスキャンと同様に、ディスクアクセスの I/O コストとレコード評価の CPU コストを合算する (参考: [handler.cc#L6360-L6374](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6360-L6374))
+  - コスト = readTime + foundRecords × RowEvaluateCost
+
+#### 例
+
+- 仮定
+  - foundRecords: 500 (レンジ分析により推定)
+  - n_ranges: 1 (`WHERE age BETWEEN 20 AND 30` のような単一レンジ)
+- 計算式:
+  - readTime: 1 + 500 = 501
+  - コスト: 501 + 500 × 0.1 = 551.0
