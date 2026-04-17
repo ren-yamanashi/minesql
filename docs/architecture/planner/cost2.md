@@ -38,7 +38,7 @@ SELECT * FROM users WHERE first_name = 'John';
 
 - foundRecords: テーブル統計情報の中の、「レコード数」を用いる
 - readTime: テーブル統計情報の中の「データサイズ」をページサイズ (4KB) で割った値を用いる
-- コスト: readTime + foundRecords * RowEvaluateCost (参考: [sql_planner.cc#L1097-L1101](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L1097-L1101))
+- コスト: readTime + foundRecords × RowEvaluateCost (参考: [sql_planner.cc#L1097-L1101](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L1097-L1101))
 
 ### 例
 
@@ -49,7 +49,7 @@ SELECT * FROM users WHERE first_name = 'John';
 - 計算式:
   - foundRecords: 74822
   - readTime: 7880704 / 4096 = 1,924
-  - コスト: 1,924 + 74822 * 0.1 = 9,406.2
+  - コスト: 1,924 + 74822 × 0.1 = 9,406.2
 
 ## 単一テーブルのユニークスキャン
 
@@ -113,21 +113,31 @@ SELECT * FROM users WHERE username = 'john-doe';
 
 ### readTime の推定方法
 
-- レンジスキャンにおけるディスクアクセス回数は、以下の 2 つの要素から推定される
-  - レンジの区間ごとにインデックス上でランダムシークが 1 回発生する
-  - ランダムシーク後、該当するレコードの数だけページ読み取りが発生する
-- これらを合計すると以下の式になる (参考: [handler.h#L5202-L5205](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.h#L5202-L5205))
-  - readTime = n_ranges + foundRecords
-    - `n_ranges`: レンジ条件の区間の数。`WHERE x BETWEEN 10 AND 20` は `10 <= x <= 20` という 1 つの連続した区間なので 1。`WHERE x IN (1, 5, 10)` は `x = 1`, `x = 5`, `x = 10` という 3 つの独立した区間に分かれるので 3
+- レンジスキャンにおけるディスクアクセス回数は、以下の 3 つの要素から推定される
+  - ランダムシーク回数: レンジの区間数と等しい (区間ごとにインデックス上の異なる位置へシークするため)
+  - ページ読み取り回数: 読み取りレコード数の推定値と等しい
+  - ページ読み取りコスト: バッファプールのキャッシュヒット率を考慮した重み付け (参考: [opt_costmodel.cc#L79-L93](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/opt_costmodel.cc#L79-L93))
+- これらを合計すると以下の式になる (参考: [handler.cc#L6075-L6077](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6075-L6077))
+  - readTime = (n_ranges + foundRecords) × page_read_cost
+    - `n_ranges`: レンジ条件の区間の数
+      - 例:
+        - `WHERE x BETWEEN 10 AND 20` は `10 <= x <= 20` という 1 つの連続した区間なので 1
+        - `WHERE x IN (1, 5, 10)` は `x = 1`, `x = 5`, `x = 10` という 3 つの独立した区間に分かれるので 3
     - `foundRecords`: 前述の方法で推定されたレコード数
-- 補足: MySQL ではさらにバッファプールのキャッシュヒット率を考慮した重み付け (`page_read_cost`) を掛けるが (参考: [opt_costmodel.cc#L86-L100](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/opt_costmodel.cc#L86-L100))、minesql ではバッファプールを考慮しないため省略する
+  - readTime = (n_ranges + foundRecords) × page_read_cost
+  - `page_read_cost`: 1 ページの読み取りコスト
+    - テーブルがバッファプールに載っている割合 (`in_mem`: 0.0 〜 1.0) に応じて以下のように計算される
+      - page_read_cost = in_mem × 0.25 + (1 - in_mem) × 1.0
+        - `0.25`: バッファプール内 (メモリ上) のページ読み取りコスト
+        - `1.0`: ディスク上のページ読み取りコスト
+        - 例えばテーブルの 100% がバッファプールにある場合は page_read_cost = 0.25、全くない場合は 1.0 となる
 
 ### 最終的なコスト算出
 
-- フルスキャンと同様に、ディスクアクセスの I/O コストとレコード評価の CPU コストを合算する (参考: [handler.cc#L6360-L6374](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6360-L6374))
+- ディスクアクセスの I/O コストとレコード評価の CPU コストを合算する (参考: [handler.cc#L6360-L6374](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6360-L6374))
   - コスト = readTime + foundRecords × RowEvaluateCost
 
-#### 例
+### 例
 
 - 仮定
   - foundRecords: 500 (レンジ分析により推定)
