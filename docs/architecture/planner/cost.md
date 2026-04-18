@@ -1,427 +1,323 @@
 # コストモデル
 
-## コストの算出 (テーブル)
+MySQL のコストモデルを参考に、minesql のコストモデルを設計する
 
-| s | B(s) | R(s) | V(s,F) |
-|-----|------|------|--------|
-| テーブルスキャン | B(T) | R(T) | V(T,F) |
-| 選択スキャン(s1, A=c) | B(s1) | R(s1)/V(s1,A) | if F = A then 1 else V(s1,F) |
-| 選択スキャン(s1, A!=c) | B(s1) | R(s1) * (V(s1,A)-1)/V(s1,A) | if F = A then V(s1,A)-1 else V(s1,F) |
-| 選択スキャン(s1, A>c) | B(s1) | R(s1) * sel | if F = A then V(s1,A) * sel else V(s1,F) |
-| PK 選択スキャン(s1, A=c) | H(T) | R(s1)/V(s1,A) | if F = A then 1 else V(s1,F) |
-| PK 選択スキャン(s1, A!=c) | B(s1) | R(s1) * (V(s1,A)-1)/V(s1,A) | if F = A then V(s1,A)-1 else V(s1,F) |
-| PK 選択スキャン(s1, A>c) | H(T) + sel * B(s1) | R(s1) * sel | if F = A then V(s1,A) * sel else V(s1,F) |
-| PK 選択スキャン(s1, A<c) | sel * B(s1) | R(s1) * sel | if F = A then V(s1,A) * sel else V(s1,F) |
-| 射影スキャン(s1,L) | B(s1) | R(s1) | V(s1,F) |
+## 参考文献
 
-<br />
+- [MySQL SQLオプティマイザのコスト計算アルゴリズム](https://dbstudy.info/files/20120310/mysql_costcalc.pdf)
+- [MySQL 8.0.40 のソースコード](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0) (特に `sql/sql_planner.cc` と `sql/handler.cc`)
 
-- s: スキャンの種類 (テーブルスキャン、選択スキャン、射影スキャンなど)
-- B(s): スキャン s の I/O コスト。結果を出力するために必要なディスクアクセス (ページ読み取り) 数
-- R(s): スキャン s の CPU コスト。結果に含まれるレコード数であり、Filter での条件評価回数に相当する
-- V(s, F): スキャン s の結果に含まれるフィールド F の異なる値の数 (重複を除いた値の数)。総合コストの算出には直接関与しないが、後続の選択スキャンの R(s) を推定するために使用する統計量
+## コストに使用する変数
 
-※1. ディスクアクセス数の算出にあたって、バッファプールのキャッシュ状況は考慮しない (全ページがディスク上にある最悪ケースを前提とする)
-理由はキャッシュ状況は刻々と変わりコスト見積もり時に正確な予測が困難なため
+| 変数名 | 説明 | デフォルト値 |
+| --- | --- | --- |
+| RowEvaluateCost | 1 レコードを評価するコスト | 0.1 |
 
-※2. R(T) や V(T, F) などの統計情報は statistics で管理されている値を参照する (統計情報の管理方法については [統計情報](../storage/dictionary/stats.md) を参照)
+これは MySQL の server_cost テーブルに格納されているコストパラメータを参考にしている
 
-<br />
-
-- T: テーブルスキャンの対象となるテーブル
-- A: 選択スキャンの条件で指定されたカラム
-- c: 選択スキャンの条件で指定された値 (リテラル値)
-
-### テーブルスキャン
-
-- B(s), R(s), V(s, F) の値は、走査対象となっているテーブル自体の数値と一致する
-  - 例えば、テーブルスキャン時のディスクアクセス数 (`B(s)`) は、テーブル全体を走査するためのディスクアクセス数と同じになる
-
-### 選択スキャン (PK・インデックスなし)
-
-- 選択スキャン (s) は、下位スキャン (s1) を 1 つ持ち、述語 (WHERE 条件) でフィルタリングする
-  - s1 はテーブルスキャンなど、行を取得する元のスキャン
-    - `executor.SearchTable` とかがこれに該当
-  - s は s1 の出力を受け取り、条件に合う行だけを返す
-    - `executor.Filter` がこれに該当
-
-- 値の取得は s1 に委譲するだけなので、追加のディスクアクセスは発生しない
-  - よって、ディスクアクセス数は下位スキャンと同じ (`B(s) = B(s1)`)
-
-- `R(s)` と `V(s, F)` の計算は WHERE 句の条件の種類による (以下にそれを記載)
-
-#### 等価比較 (`A = c`) の場合
-
-※改めて、`A` は選択スキャンの条件で指定されたカラム、`c` はその条件で指定された値 (リテラル値) を表す (e.g. `WHERE city = 'Tokyo'` -> `A: city`, `c: 'Tokyo'`)
-
-- `R(s)` の算出
-  - カラム A の値が均等に分布していると仮定すると、条件に一致するレコード数は全体の `1/V(s1, A)` になる
-
-    ```sh
-    R(s) = R(s1) / V(s1, A)
-    # e.g. 1000 レコードで A に 10 種類の値がある場合、R(s) = 1000 / 10 = 100
-    ```
-
-- `V(s, F)` の算出
-  - F が A の場合 (つまり条件で指定したカラムが F である場合)
-    - `V(s, A)` は 1 になる
-  - F が A 以外のカラムの場合
-    - A の値でフィルタリングしても、他のカラムの分布は変わらないと仮定する (均等分布の仮定)
-    - よって `V(s, F)` は `V(s1, F)` と同じになる
-  - 例: 以下のテーブルに `WHERE city = 'Tokyo'` を適用した場合
-
-    | id | city | gender |
-    |----|------|--------|
-    | 1 | Tokyo | male |
-    | 2 | Tokyo | female |
-    | 3 | Osaka | male |
-    | 4 | Osaka | male |
-    | 5 | Tokyo | male |
-
-    - フィルタ前: `V(s1, city) = 2`, `V(s1, gender) = 2`
-    - フィルタ後: `V(s, city) = 1` (Tokyo だけ), `V(s, gender) = 2` (元と同じ)
-
-#### 非等価比較 (`A != c`) の場合
-
-- `R(s)` の算出
-  - `A != c` に一致するレコードは、全体から `A = c` に一致するレコードを除いたものになる
-
-  ```sh
-  R(s) = R(s1) - R(s1) / V(s1, A) = R(s1) * (V(s1, A) - 1) / V(s1, A)
-  # e.g. 1000 レコードで A に 10 種類の値がある場合、R(s) = 1000 * (10 - 1) / 10 = 900
-  ```
-
-- `V(s, F)` の算出
-  - F が A の場合
-    - `V(s, A)` は `V(s1, A)` から 1 を引いたものになる (条件で指定した値を除くため)
-  - F が A 以外のカラムの場合
-    - `A != c` でフィルタリングしても、他のカラムの分布は変わらないと仮定する (均等分布の仮定)
-    - よって `V(s, F)` は `V(s1, F)` と同じになる
-
-#### 範囲比較 (`A > c`, `A >= c`, `A < c`, `A <= c`) の場合
-
-- `R(s)` の算出
-  - カラム A の値が均等に分布していると仮定すると、条件に一致するレコード数は全体のうち、該当する値域の割合に比例する
-  - 値の最小値 `min(A)` と最大値 `max(A)` が分かる場合、値域に占める割合から推定できる
-
-  ```sh
-  // A > c の場合
-  R(s) = R(s1) * (max(A) - c) / (max(A) - min(A))
-
-  // A < c の場合
-  R(s) = R(s1) * (c - min(A)) / (max(A) - min(A))
-
-  # e.g. A の値が 1〜100 で `A > 70` の場合、R(s) = R(s1) * (100 - 70) / (100 - 1) ≒ R(s1) * 0.3
-  ```
-
-- `V(s, F)` の算出
-  - F が A の場合
-    - 値域のうち条件に該当する割合に応じて、異なる値の数も同じ割合で減る
-    - min/max が不明な場合は `V(s1, A) / 3` で推定する
-      - 経験則として、範囲クエリで条件に該当する値の数は全体の 1/3 程度になると仮定する
-  - F が A 以外のカラムの場合
-    - 範囲比較でフィルタリングしても、他のカラムの分布は変わらないと仮定する (均等分布の仮定)
-
-    ```txt
-    V(s, A) = V(s1, A) * (該当する値域の割合)    // min/max が不明なら V(s1, A) / 3
-    V(s, F) = V(s1, F)                           // A 以外のカラム
-    ```
-
-### 選択スキャン (PK)
-
-- minesql ではテーブルのデータがプライマリキーの B+Tree に格納されている (クラスタ化インデックス)
-- テーブルスキャン = PK の B+Tree 走査なので、PK カラムへの条件では B+Tree のソート順を活用して走査範囲を絞れる
-- R(s) と V(s,F) は通常の選択スキャンと同じ (結果集合は条件で決まる)
-- B(s) のみ、PK のソート順を活用した分だけ削減される
-
-| s | B(s) | R(s) | V(s,F) |
-|-----|------|------|--------|
-| PK 選択スキャン(s1, A=c) | H(T) | R(s1)/V(s1,A) | if F = A then 1 else V(s1,F) |
-| PK 選択スキャン(s1, A!=c) | B(s1) | R(s1) * (V(s1,A)-1)/V(s1,A) | if F = A then V(s1,A)-1 else V(s1,F) |
-| PK 選択スキャン(s1, A>c) | H(T) + sel * B(s1) | R(s1) * sel | if F = A then V(s1,A) * sel else V(s1,F) |
-| PK 選択スキャン(s1, A<c) | sel * B(s1) | R(s1) * sel | if F = A then V(s1,A) * sel else V(s1,F) |
-
-<br />
-
-- s: スキャンの種類 (インデックススキャン、選択スキャン、射影スキャンなど)
-- B(s): スキャンsの結果を出力するために必要なディスクアクセス数
-- R(s): スキャンsの結果に含まれるレコード数
-- V(s, F): スキャンsの結果に含まれるフィールドFの異なる値の数 (重複を除いた値の数)
-
-<br />
-
-- T: テーブルスキャン の対象となるテーブル
-- A: 選択スキャンの条件で指定されたカラム
-- c: 選択スキャンの条件で指定された値 (リテラル値)
-- H(T): テーブル T のプライマリキー B+Tree の高さ
-- sel = (max(A)-c)/(max(A)-min(A)) など、範囲条件の選択率
-
-#### 等価比較 (`A = c`) の場合
-
-- `B(s)` の算出
-  - B+Tree の二分探索で直接該当キーに到達できるため、ルートからリーフまでの高さ分のページアクセスのみ
-
-    ```txt
-    B(s) = H(T)
-    # e.g. プライマリ B+Tree の高さが 3 の場合、B(s) = 3
-    ```
-
-#### 非等価比較 (`A != c`) の場合
-
-- PK のソート順を活用できないため、通常の選択スキャンと同じ
-  - `B(s) = B(s1)`
-
-#### 範囲比較 (`A > c`, `A >= c`) の場合
-
-- `B(s)` の算出
-  - B+Tree の二分探索で開始位置にシークし、そこからリーフページを順に走査する
-
-    ```txt
-    B(s) = H(T) + sel * B(s1)
-    # e.g. プライマリの高さ 3、リーフページ数 100、sel = 0.3 の場合
-    #   B(s) = 3 + 0.3 * 100 = 33
-    ```
-
-#### 範囲比較 (`A < c`, `A <= c`) の場合
-
-- `B(s)` の算出
-  - 先頭から走査し、PK がソート済みなので条件を満たさなくなった時点で走査を終了できる
-
-    ```txt
-    B(s) = sel * B(s1)
-    # e.g. リーフページ数 100、sel = 0.3 の場合
-    #   B(s) = 0.3 * 100 = 30
-    ```
-
-### 射影スキャン (SELECT 句でのカラム指定)
-
-- 射影スキャン (s) は、下位スキャン (s1) から特定のカラムだけを取り出す操作 (`SELECT col1, col2 FROM ...`)
-  - 選択スキャンと同様に s1 を 1 つ持ち、追加のディスクアクセスは発生しない
-- 射影は行を減らさず、値も変更しない (カラムを絞るだけ)
-  - よって、レコード数と各カラムの異なる値の数は下位スキャンと同じ
-
-```txt
-B(s) = B(s1)               // ディスクアクセス数は変わらない
-R(s) = R(s1)               // レコード数も変わらない
-V(s, F) = V(s1, F)         // 各カラムの異なる値の数も変わらない
+```sql
+mysql> SELECT cost_name, cost_value, default_value FROM mysql.server_cost WHERE cost_name = 'row_evaluate_cost';
++------------------------------+------------+---------------+
+| cost_name                    | cost_value | default_value |
++------------------------------+------------+---------------+
+| row_evaluate_cost            |       NULL |           0.1 |
++------------------------------+------------+---------------+
 ```
 
-## コスト算出 (インデックス)
+## コストの算出
 
-| s | B(s) | R(s) | V(s,F) |
-|-----|------|------|--------|
-| インデックススキャン | H(I) | R(T) | V(T,F) |
-| 選択スキャン(I, A=c) | H(I) | R(T)/V(T,A) | if F = A then 1 else V(T,F) |
-| 選択スキャン(I, A!=c) | H(I) + Bl(I) | R(T) * (V(T,A)-1)/V(T,A) | if F = A then V(T,A)-1 else V(T,F) |
-| 選択スキャン(I, A>c) | H(I) + Bl(I) * (max(A)-c)/(max(A)-min(A)) | R(T) * (max(A)-c)/(max(A)-min(A)) | if F = A then V(T,A) * (max(A)-c)/(max(A)-min(A)) else V(T,F) |
-| インデックス + テーブル(I, A=c) | H(I) + R(s) * H(T) | R(T)/V(T,A) | if F = A then 1 else V(T,F) |
-| インデックス + テーブル(I, A!=c) | H(I) + Bl(I) + R(s) * H(T) | R(T) * (V(T,A)-1)/V(T,A) | if F = A then V(T,A)-1 else V(T,F) |
-| インデックス + テーブル(I, A>c) | H(I) + Bl(I) * (max(A)-c)/(max(A)-min(A)) + R(s) * H(T) | R(T) * (max(A)-c)/(max(A)-min(A)) | if F = A then V(T,A) * (max(A)-c)/(max(A)-min(A)) else V(T,F) |
+- SQL コストは以下の二つのパラメータから計算される
+  - foundRecords: 読み取られるレコード数の推定値
+  - readTime: ディスクアクセスの I/O コスト
 
-<br />
+### page_read_cost について
 
-- s: スキャンの種類 (インデックススキャン、選択スキャン、射影スキャンなど)
-- B(s): スキャンsの結果を出力するために必要なディスクアクセス数
-- R(s): スキャンsの結果に含まれるレコード数
-- V(s, F): スキャンsの結果に含まれるフィールドFの異なる値の数 (重複を除いた値の数)
+- コスト算出の際に `page_read_cost` という値を頻繁に使用する
+- `page_read_cost` は、1 ページの読み取りコストをバッファプールのキャッシュヒット率に応じて重み付けした値 (参考: [opt_costmodel.cc#L79-L93](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/opt_costmodel.cc#L79-L93))
+  - page_read_cost = in_mem × 0.25 + (1 - in_mem) × 1.0
+    - `in_mem`: バッファプールに載っている割合 (0.0 〜 1.0)
+    - `0.25`: バッファプール内 (メモリ上) のページ読み取りコスト
+    - `1.0`: ディスク上のページ読み取りコスト
+    - 例えばテーブルの 100% がバッファプールにある場合は page_read_cost = 0.25、全くない場合は 1.0 となる
+  - `in_mem` の計算方法 (InnoDB の場合, 参考: [ha_innodb.cc#L17159-L17172](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/handler/ha_innodb.cc#L17159-L17172))
+    - in_mem = n_in_mem / n_leaf
+      - `n_in_mem`: バッファプール内の該当インデックスのページ数 (InnoDB 内部の `buf_stat_per_index` カウンタから取得)
+      - `n_leaf`: 該当インデックスのリーフページ総数 (`stat_n_leaf_pages`)
+  - `in_mem` の参照先はスキャンの種類によって異なる
+    - index-only scan: セカンダリインデックスの in_mem を使う (参考: [opt_costmodel.cc#L95-L105](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/opt_costmodel.cc#L95-L105))
+    - 非 index-only scan / フルスキャン: クラスタ化インデックス の in_mem を使う (参考: [opt_costmodel.cc#L79-L93](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/opt_costmodel.cc#L79-L93), [ha_innodb.cc#L17379-L17381](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/handler/ha_innodb.cc#L17379-L17381))
+  - ※ MySQL の Optimizer Trace の `in_memory` フィールドは常にインデックスの常駐率 (`KEY::in_memory_estimate()`) を表示する (参考: [index_range_scan_plan.cc#L908](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/range_optimizer/index_range_scan_plan.cc#L908))。非 index-only scan でもインデックスの値が表示されるため、コスト計算に使われる主キーの常駐率とは異なる場合がある
 
-<br />
+## 単一テーブルのフルスキャン
 
-- T: テーブルスキャン の対象となるテーブル
-- A: 選択スキャンの条件で指定されたカラム
-- c: 選択スキャンの条件で指定された値 (リテラル値)
-- I: インデックス
-- H(I): インデックス I の B+Tree の高さ (ルートからリーフまでのページ数)
-- H(T): テーブル T のプライマリキー B+Tree の高さ
-- Bl(I): インデックス I のリーフページ数
-
-### インデックススキャン
-
-- B(s), R(s), V(s, F) の値はテーブルスキャンと同様に、走査対象となっているインデックス自体の数値と一致する
-
-### 選択スキャン
-
-- インデックスの選択スキャンはテーブルの選択スキャンと同じ構造を持つ
-  - 下位スキャン (s1) としてインデックススキャンを取り、述語 (WHERE 条件) でフィルタリングする
-
-#### 等価比較 (`A = c`) の場合
-
-- `B(s)` の算出
-  - ルートからリーフまでの各ページを 1 回ずつアクセスするため、ディスクアクセス数は B+Tree の高さと等しい
-
-    ```txt
-    B(s) = H(I)
-    # e.g. B+Tree の高さが 3 の場合、B(s) = 3
-    ```
-
-- `R(s)` の算出
-  - テーブルの選択スキャンと同様に `R(T) / V(T, A)` で算出する
-  - ユニークインデックスの場合、V(T, A) = R(T) なので R(s) = 1 になる
-
-    ```txt
-    R(s) = R(T) / V(T, A)
-    # ユニークインデックスの場合: R(s) = 1
-    ```
-
-- `V(s, F)` の算出
-  - テーブルの選択スキャンの等価比較と同じルールに従う
-
-#### 非等価比較 (`A != c`) の場合
-
-- `B(s)` の算出
-  - B+Tree は特定の値だけをスキップする操作を持たないため、全リーフページを走査する必要がある
-  - ルートからリーフまでの走査 H(I) に加え、全リーフページ Bl(I) を走査する
-
-    ```txt
-    B(s) = H(I) + Bl(I)
-    # e.g. 高さ 3、リーフページ数 100 の場合、B(s) = 3 + 100 = 103
-    ```
-
-- `R(s)` の算出
-  - テーブルの選択スキャンの非等価比較と同じ式で算出する
-
-    ```txt
-    R(s) = R(T) * (V(T, A) - 1) / V(T, A)
-    ```
-
-- `V(s, F)` の算出
-  - テーブルの選択スキャンの非等価比較と同じルールに従う
-
-#### 範囲比較 (`A > c`, `A >= c`, `A < c`, `A <= c`) の場合
-
-- `B(s)` の算出
-  - まずルートからリーフまでの走査で H(I) 回のアクセスが発生する
-  - その後、条件に一致するリーフページをチェーンで辿る
-  - 一致するリーフページ数は、全リーフページ数 Bl(I) に選択率を掛けて推定する
-
-    ```txt
-    // A > c の場合
-    B(s) = H(I) + Bl(I) * (max(A) - c) / (max(A) - min(A))
-
-    // A < c の場合
-    B(s) = H(I) + Bl(I) * (c - min(A)) / (max(A) - min(A))
-
-    # e.g. 高さ 3、リーフページ数 100、A の値が 1〜100 で A > 70 の場合
-    #   B(s) = 3 + 100 * (100 - 70) / (100 - 1) ≒ 33
-    ```
-
-- `R(s)` の算出
-  - テーブルの選択スキャンの範囲比較と同じ式で算出する
-
-    ```txt
-    R(s) = R(T) * (max(A) - c) / (max(A) - min(A))
-    ```
-
-- `V(s, F)` の算出
-  - テーブルの選択スキャンの範囲比較と同じルールに従う
-
-### インデックス + テーブル (Primary Lookup)
-
-- インデックスにないカラムも必要な場合、インデックスから取得したプライマリキーを使って、プライマリキーの B+Tree を別途辿る必要がある
-- インデックススキャン (または選択スキャン) のコストに加えて、ヒットした各レコードについてプライマリキーの B+Tree を辿るコスト (`R(s) * H(T)`) が加算される
-- `R(s)` と `V(s, F)` はインデックススキャン (または選択スキャン) と同じ (Primary Lookup は行数や値の分布に影響しない)
-
-#### 等価比較 (`A = c`) の場合
-
-- `B(s)` の算出
-  - インデックスの走査コスト H(I) に加え、ヒットした R(s) 件それぞれについてプライマリキーの B+Tree を辿る
-
-    ```txt
-    B(s) = H(I) + R(s) * H(T)
-
-    # e.g. ユニークインデックスの場合: R(s) = 1 なので
-    #   B(s) = H(I) + H(T)
-    #   インデックスの高さ 3 + プライマリの高さ 3 = 6
-    ```
-
-#### 非等価比較 (`A != c`) の場合
-
-- `B(s)` の算出
-  - インデックスの全リーフページ走査コスト H(I) + Bl(I) に加え、ヒットした R(s) 件の Primary Lookup が加算される
-
-    ```txt
-    B(s) = H(I) + Bl(I) + R(s) * H(T)
-
-    # e.g. 高さ 3、リーフページ数 100、プライマリの高さ 3、V(T, A) = 10、R(T) = 10000 の場合
-    #   R(s) = 10000 * 9/10 = 9000
-    #   B(s) = 3 + 100 + 9000 * 3 = 27103
-    #   テーブルスキャンの B(T) が 500 なら、テーブルスキャンの方がはるかに安い
-    ```
-
-#### 範囲比較 (`A > c`, `A >= c`, `A < c`, `A <= c`) の場合
-
-- `B(s)` の算出
-  - インデックスのリーフページ走査コストに加え、ヒットした R(s) 件の Primary Lookup が加算される
-  - R(s) が大きい場合、Primary Lookup のコストが支配的になり、テーブルスキャンの方が安くなるケースがある
-
-    ```txt
-    // A > c の場合
-    B(s) = H(I) + Bl(I) * (max(A) - c) / (max(A) - min(A)) + R(s) * H(T)
-
-    # e.g. 高さ 3、リーフページ数 100、プライマリの高さ 3、
-    #       A の値が 1〜100 で A > 70、R(T) = 10000 の場合
-    #   R(s) = 10000 * 30/99 ≒ 3030
-    #   B(s) = 3 + 100 * 30/99 + 3030 * 3 ≒ 9123
-    #   テーブルスキャンの B(T) が 500 なら、テーブルスキャンの方が安い
-    ```
-
-## 総合コストの算出
-
-プラン選択時には、B(s) と R(s) を重み付けした総合コストで比較する。
-
-```txt
-TotalCost = B(s) * w_io + R(s) * w_cpu
+```sql
+-- first_name にインデックスがないと仮定
+SELECT * FROM users WHERE first_name = 'John';
 ```
 
-| 重み | 値 | 意味 |
-|------|-----|------|
-| w_io | 1.0 | ディスクからのブロック読み取り 1 回あたりのコスト |
-| w_cpu | 0.1 | レコード 1 件の条件評価 (CPU) あたりのコスト |
+- foundRecords: テーブル統計情報の中の「レコード数」を用いる
+- readTime: scan_time × page_read_cost (参考: [handler.cc#L6030-L6042](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6030-L6042))
+  - `scan_time`: クラスタ化インデックスのページ数 (= データサイズ / ページサイズ)
+  - `page_read_cost`: 1 ページの読み取りコスト (詳細: [page_read_cost について](#page_read_cost-について))
+- コスト: readTime + foundRecords × RowEvaluateCost (参考: [sql_planner.cc#L1097-L1101](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L1097-L1101))
+  - ディスクアクセスの I/O コスト (`readTime`) とレコード評価の CPU コスト (`foundRecords × RowEvaluateCost`) を合算する
 
-重みの値は MySQL のコストモデル ([The Optimizer Cost Model](https://dev.mysql.com/doc/refman/8.0/en/cost-model.html)) を参考にしている。
+### 例
 
-w_io は MySQL の engine_cost の `io_block_read_cost` の値を参考にしており、w_cpu は server_cost `row_evaluate_cost` の値を参考にしている (MySQL 8.0)
+- 仮定
+  - レコード数: 74822
+  - データサイズ: 7880704
+  - ページサイズ: 4096
+  - page_read_cost: 1.0 (全データがディスク上)
+- 計算式:
+  - scan_time: 7880704 / 4096 = 1,924
+  - readTime: 1,924 × 1.0 (= page_read_cost) = 1,924
+  - foundRecords: 74822
+  - コスト: 1,924 + 74822 × 0.1 = 9,406.2
 
-## プラン選択
+## 単一テーブルのユニークスキャン
 
-### AND 条件
-
-`WHERE col1 = v1 AND col2 > v2` のような AND 条件では、以下の候補からコスト最安のプランを選択する:
-
-1. テーブルスキャン + Filter (全条件)
-2. PK スキャン (+ Filter で残条件)
-3. セカンダリインデックススキャン (+ Filter で残条件)
-
-### OR 条件 (Union)
-
-`WHERE col1 = v1 OR col2 = v2` のような OR 条件では、各ブランチが PK またはセカンダリインデックスを利用できる場合、Union による最適化を行う。
-
-Union は各ブランチを個別にスキャンし、結果を結合して重複を除去する。
-
-```txt
-# WHERE id = 1 OR username = 'alice' の場合
-
-Union
-  ├── TableScan (id = 1)        ... PK スキャン: B(s) = H(T)
-  └── IndexScan (username = 'alice') ... インデックススキャン: B(s) = H(I) + R(s) * H(T)
-
-Union コスト = 各ブランチの総合コストの合計
+```sql
+--- username にユニークインデックスがあると仮定
+SELECT * FROM users WHERE username = 'john-doe';
 ```
 
-Union の総合コストがテーブルスキャンの総合コストより安い場合に Union を選択する。
+- コストは 1.0 固定とする
+  - 参考: [sql_optimizer.cc#L5905-L5910](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_optimizer.cc#L5905-L5910)
+- オプティマイザは、より良いキータイプ (e.g. UNIQUE キー) が既にあるなら、劣るキータイプのコスト計算を省略する
+  - 参考: [sql_planner.cc#L412-L423](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L412-L423)
+  - 従って、UNIQUE インデックスが見つかった後、NOT_UNIQUE のインデックスはスキップされる
 
-各ブランチは単一条件だけでなく複合 AND 条件も許容する。複合 AND ブランチの場合、ブランチ内の各リーフ条件から最もコストの安い PK/インデックスを選択し、残条件は Filter で適用する。
+## 単一テーブルのレンジスキャン
 
-```txt
-# WHERE (id = 1 AND gender = 'male') OR username = 'alice' の場合
-
-Union
-  ├── Filter (gender = 'male')
-  │     └── TableScan (id = 1)    ... PK スキャン: B(s) = H(T)
-  └── IndexScan (username = 'alice') ... インデックススキャン: B(s) = H(I) + R(s) * H(T)
+```sql
+--- age にインデックスがあると仮定
+SELECT * FROM users WHERE age BETWEEN 20 AND 30;
 ```
 
-以下の場合はテーブルスキャン + Filter にフォールバックする:
+- PostgreSQL などの場合は、範囲検索に対してはヒストグラム統計を用いて読み取りレコード数を推定しているが、minesql では MySQL と同様にヒストグラム統計を用いない
+- 範囲検索におけるレコード数の推定は、ストレージエンジンが担う (MySQL ではこの処理を「レンジ分析」と呼ぶので minesql でも同様に「レンジ分析」と呼ぶことにする)
+  - 補足: MySQL ではストレージエンジン API の `records_in_range()` を呼び出すことでストレージエンジンに読み取りレコード数の見積もりを依頼する
 
-- いずれかのブランチが PK/インデックスを利用できない
-- Union コストがテーブルスキャンより高い
+### foundRecords の推定方法
+
+1. プランナーがストレージエンジンに対して、レンジ分析の API を呼び出す
+2. ストレージエンジンは、検索範囲の下限値と上限値を受け取り、それらが格納されているリーフページを読み取る
+3. それぞれのリーフページの位置に応じて、読み取られるレコード数の推定値を算出する
+
+#### 下限値と上限値が同じリーフページにある場合・・・
+
+- リーフページを読み取ることで以下の情報を得ることができる
+  - 該当のページに含まれるインデックスのエントリ数
+  - それぞれ (下限値と上限値) のインデックスエントリが、ページのどの位置にあるのか
+- 下限値、上限値におけるインデックスエントリの番号を `nth_rec_1`, `nth_rec_2` とすると、読み取られるレコード数の推定値は以下の式で表せる
+  - foundRecords = nth_rec_2 - nth_rec_1 - 1 + left_incl + right_incl (参考: [btr0cur.cc#L5287](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L5287), [btr0cur.cc#L5216-L5230](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L5216-L5230))
+    - `nth_rec_2 - nth_rec_1 - 1`: 左右どちらの境界もカウントしない基本値
+    - `left_incl`: 左境界を含むなら 1、含まないなら 0 (`>=` なら 1、`>` なら 0)
+    - `right_incl`: 右境界を含むなら 1、含まないなら 0 (`<=` なら 1、`<` なら 0)
+    - 例: `BETWEEN 10 AND 20` (= `>= 10 AND <= 20`) なら left_incl = 1, right_incl = 1 で -1 + 1 + 1 = +1
+
+#### 上限値のインデックスエントリが、下限値のインデックスエントリと異なるリーフページにあり、かつそれらが隣接している場合・・・
+
+- 下限値、上限値のリーフページに含まれるレコード数をそれぞれ `n_recs_1`, `n_recs_2` とし、また下限値、上限値におけるインデックスのエントリ番号をそれぞれ `nth_rec_1`, `nth_rec_2` とすると、読み取られるレコード数の推定値は以下の式で表せる (参考: [btr0cur.cc#L5312-L5326](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L5312-L5326))
+  - foundRecords = (n_recs_1 - nth_rec_1) + (nth_rec_2 - 1) + left_incl + right_incl
+    - `n_recs_1 - nth_rec_1`: 下限値のページで境界より右にあるレコード数 (境界自体は含まない)
+    - `nth_rec_2 - 1`: 上限値のページで境界より左にあるレコード数 (境界自体は含まない)
+    - `left_incl`, `right_incl`: 同じリーフページの場合と同じ境界調整 (参考: [btr0cur.cc#L5224-L5230](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L5224-L5230))
+
+#### 上限値のインデックスエントリが、下限値のインデックスエントリと異なるリーフページにあり、かつそれらが隣接していない場合・・・
+
+- 下限値のページから上限値のページに向かってリンクリストを辿り、合計 10 ページまで読み取る (参考: [btr0cur.cc#L4914](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L4914))
+
+- 10 ページ以内に上限値のインデックスエントリが見つかった場合・・・
+  - 下限値、上限値のリーフページに含まれるレコード数をそれぞれ `n_recs_1`, `n_recs_2` とし、また下限値、上限値におけるインデックスのエントリ番号をそれぞれ `nth_rec_1`, `nth_rec_2` とすると、読み取られるレコード数の推定値は以下の式で表せる (参考: [btr0cur.cc#L4892-L4904](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L4892-L4904), [btr0cur.cc#L4964-L4968](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L4964-L4968))
+    - foundRecords = (n_recs_1 - nth_rec_1) + Σ n_recs_mid + (nth_rec_2 - 1) + left_incl + right_incl (参考: [btr0cur.cc#L5224-L5230](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L5224-L5230))
+      - `n_recs_1 - nth_rec_1`: 下限値のページで境界より右にあるレコード数 (境界自体は含まない)
+      - `Σ n_recs_mid`: 中間ページのレコード数の合計
+      - `nth_rec_2 - 1`: 上限値のページで境界より左にあるレコード数 (境界自体は含まない)
+      - `left_incl`: 左境界を含むなら 1、含まないなら 0 (`>=` なら 1、`>` なら 0)
+      - `right_incl`: 右境界を含むなら 1、含まないなら 0 (`<=` なら 1、`<` なら 0)
+
+- 10 ページ以内に上限値のインデックスエントリが見つからなかった場合・・・
+  - 読んだページから 1 ページあたりの平均レコード数を求め、それに対象範囲のページ数を掛けて全体のレコード数を推定する。この場合は「行数が確定していない扱い (mysql でいうところの `is_n_rows_exact = false`)」になる (参考: [btr0cur.cc#L4993-L5003](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L4993-L5003))
+    - foundRecords = n_rows_on_prev_level × (n_rows / n_pages_read)
+      - `n_rows_on_prev_level`
+        - 対象範囲内のリーフページ数。ブランチノード内のエントリ位置から数える
+        - ブランチノードの各エントリは子ページへのポインタを持っており、1 エントリが 1 リーフページに対応する。上限・下限の間にあるエントリ数を数えれば、対象範囲のリーフページ数が得られる
+      - `n_rows / n_pages_read`
+        - サンプリングした 10 ページから算出した 1 ページあたりの平均レコード数
+  - 「行数が確定していない扱い」になった場合は、以下の補正処理が適用される
+    - B+Tree の高さが 1 より大きい場合、推定値を 2 倍にする (参考: [btr0cur.cc#L5234-L5239](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L5234-L5239))
+        > In trees whose height is > 1 our algorithm tends to underestimate: multiply the estimate by 2
+    - 推定値がテーブルの総行数の半分を超えた場合、総行数の半分に切り詰める (参考: [btr0cur.cc#L5248-L5257](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L5248-L5257))
+
+### readTime の推定方法
+
+以下の式で共通して使用する変数:
+
+- `n_ranges`: レンジ条件の区間の数
+  - 例:
+    - `WHERE x BETWEEN 10 AND 20` は `10 <= x <= 20` という 1 つの連続した区間なので 1
+    - `WHERE x IN (1, 5, 10)` は `x = 1`, `x = 5`, `x = 10` という 3 つの独立した区間に分かれるので 3
+- `foundRecords`: 前述の方法で推定されたレコード数
+- `page_read_cost`: 1 ページの読み取りコスト (詳細: [page_read_cost について](#page_read_cost-について))
+
+#### セカンダリインデックスの場合 (非 index-only scan)
+
+- readTime = (n_ranges + foundRecords) × page_read_cost (参考: [handler.cc#L6075-L6077](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6075-L6077))
+
+#### セカンダリインデックスの場合 (index-only scan)
+
+- readTime = index_only_read_time × page_read_cost (参考: [handler.cc#L6057-L6058](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6057-L6058))
+  - `index_only_read_time`: 読み取るページ数の推定値 (参考: [handler.cc#L5916-L5923](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L5916-L5923))
+    - index_only_read_time = (foundRecords + keys_per_block - 1) / keys_per_block
+      - keys_per_block = (block_size / 2 / (key_length + ref_length)) + 1
+        - `block_size`: ページサイズ (InnoDB デフォルト: 16384)
+        - `key_length`: インデックスキーのバイト長 (EXPLAIN の `key_len` に対応)
+        - `ref_length`: 主キーのバイト長 (セカンダリインデックスのリーフには主キーの値が含まれるため)
+  - `page_read_cost`: 1 ページの読み取りコスト (詳細: [page_read_cost について](#page_read_cost-について))
+
+#### クラスタ化インデックスの場合
+
+- クラスタ化インデックスではデータ行がインデックスのリーフに直接格納されているため、フルスキャンのコストに対する読み取り行数の比率で I/O コストを推定する (参考: [ha_innodb.cc#L16899](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/handler/ha_innodb.cc#L16899))
+  - readTime = (n_ranges + (foundRecords / total_rows) × scan_time) × page_read_cost
+    - `total_rows`: テーブルの総行数の上限推定値
+    - `scan_time`: クラスタ化インデックスのページ数 (参考: [ha_innodb.cc#L16840-L16868](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/handler/ha_innodb.cc#L16840-L16868))
+    - `foundRecords / total_rows`: 読み取る行がテーブル全体の何割かを表す比率
+    - `page_read_cost`: 1 ページの読み取りコスト (詳細: [page_read_cost について](#page_read_cost-について))
+  - ただし `foundRecords` が 2 以下の場合は readTime = foundRecords × page_read_cost となる (参考: [ha_innodb.cc#L16886-L16888](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/handler/ha_innodb.cc#L16886-L16888))
+
+### 最終的なコスト算出
+
+以下の 2 段階で計算される
+
+1. レンジオプティマイザが readTime に CPU コストを加算する (参考: [handler.cc#L6297-L6298](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6297-L6298))
+   - rangeCost = readTime + foundRecords × RowEvaluateCost + 0.01
+
+2. ジョインオプティマイザが rangeCost を `read_cost` として受け取り ([sql_planner.cc#L1168](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L1168), [sql_planner.cc#L1220](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L1220))、さらにレコード評価コストを加算する ([sql_select.h#L568](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_select.h#L568))
+   - コスト = rangeCost + foundRecords × RowEvaluateCost
+
+展開すると
+
+- コスト = readTime + (2 × foundRecords × RowEvaluateCost) + 0.01
+
+※単一テーブルのクエリでも `JOIN::make_join_plan()` ([sql_optimizer.cc#L5307](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_optimizer.cc#L5307)) → `choose_table_order()` ([sql_optimizer.cc#L5394](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_optimizer.cc#L5394)) を経由してジョインオプティマイザを通るため、両方の段階が適用される
+
+### 例
+
+- 仮定
+  - foundRecords: 500 (レンジ分析により推定)
+  - n_ranges: 1 (`WHERE age BETWEEN 20 AND 30` のような単一レンジ)
+  - セカンダリインデックスを使用
+  - page_read_cost: 1.0 (全データがディスク上)
+- 計算式:
+  - readTime: (1 + 500) × 1.0 = 501
+  - rangeCost: 501 + 500 × 0.1 + 0.01 = 551.01
+  - コスト: 551.01 + 500 × 0.1 = 601.01
+
+## 複数テーブルの結合 (INNER JOIN)
+
+MySQL は INNER JOIN を Nested Loop Join (NLJ) で実行する。外側のテーブル (駆動表) から 1 行ずつ読み取り、その値を使って内側のテーブル (内部表) を検索する。
+
+### コスト計算の構造
+
+- JOIN のコストは、各テーブルのアクセスコストを累積した `prefix_cost` として計算される (参考: [sql_select.h#L565-L575](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_select.h#L565-L575))。
+  - prefix_cost = テーブル A のアクセスコスト + (A の結果行数 × テーブル B の 1 回あたりのアクセスコスト)
+    - テーブルが 3 つ以上の場合も同様に累積していく
+      - prefix_cost = A のコスト + (A の行数 × B のコスト) + (A の行数 × B の行数 × C のコスト) + ...
+- 各テーブルのアクセスコストは `best_access_path()` で決定され (参考: [sql_planner.cc#L981](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L981))、単一テーブルの場合と同じ方法 (フルスキャン、レンジスキャン、ユニークスキャンなど) で計算される。
+
+### コスト計算の手順
+
+- `prefix_cost` は結合するテーブルを 1 つずつ追加しながら累積する
+- テーブルごとに以下を繰り返す (初期値: prefix_cost = 0, prefix_rowcount = 1)
+
+1. read_cost を計算 (テーブルの I/O コスト)
+   - 駆動表: 単一テーブルの readTime と同じ。ただしレンジスキャンの場合は rangeCost (readTime + foundRecords × RowEvaluateCost + 0.01) が使われる
+   - 内部表: prefix_rowcount × 1 回あたりの read_cost
+
+2. fanout を計算 (テーブルから取得される行数)
+   - フルスキャン: foundRecords
+   - eq_ref (UNIQUE キー): 1
+   - ref (非ユニークインデックス): rec_per_key (平均マッチ行数)
+
+3. prefix_rowcount を更新
+   - prefix_rowcount = prefix_rowcount × fanout
+
+4. prefix_cost を更新 (参考: [sql_select.h#L565-L575](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_select.h#L565-L575))
+   - prefix_cost = prefix_cost + read_cost + prefix_rowcount × RowEvaluateCost
+   - アクセス方法によって展開すると:
+     - フルスキャンの場合: read_cost は I/O のみ ([handler.cc#L6030-L6042](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6030-L6042))
+       - prefix_cost += readTime + prefix_rowcount × RowEvaluateCost
+     - レンジスキャンの場合: read_cost = rangeCost ([handler.cc#L6297-L6298](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6297-L6298))
+       - prefix_cost += (readTime + foundRecords × RowEvaluateCost + 0.01) + prefix_rowcount × RowEvaluateCost
+       - = prefix_cost += readTime + (2 × foundRecords × RowEvaluateCost) + 0.01
+
+補足: 実際の MySQL では `prefix_rowcount` に `filtered` (インデックスで絞り込めない WHERE 条件の通過率) が掛けられる (参考: [sql_select.h#L574](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_select.h#L574))。これはコスト計算自体には影響しないが、次のテーブルへの入力行数を減らすことで後続テーブルの read_cost に間接的に影響する。
+
+#### 内部表の 1 回あたりの read_cost
+
+- 1 回あたりの read_cost は内部表へのアクセス方法によって異なる
+  - eq_ref (UNIQUE キーでの検索)
+    - page_read_cost (参考: [sql_planner.cc#L432-L434](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L432-L434))
+- フルスキャン
+  - scan_time × page_read_cost (単一テーブルと同じ)
+
+### 例
+
+```sql
+SELECT * FROM users
+INNER JOIN orders ON users.id = orders.user_id;
+```
+
+- 仮定
+  - users: 10000 行、100 ページ
+  - orders: 50000 行、user_id に UNIQUE INDEX
+  - page_read_cost = 1.0 (全データがディスク上)
+  - 結合順序: users → orders
+
+- テーブル 1: users (駆動表、フルスキャン)
+  - read_cost = scan_time × page_read_cost = 100 × 1.0 = 100
+  - fanout = 10000 (foundRecords)
+  - prefix_rowcount = 1 × 10000 = 10000
+  - prefix_cost     = 0 + 100 + 10000 × 0.1 = 1100
+
+- テーブル 2: orders (内部表、eq_ref via user_id UNIQUE)
+  - read_cost       = prefix_rowcount × page_read_cost = 10000 × 1.0 = 10000
+  - fanout          = 1 (UNIQUE)
+  - prefix_rowcount = 10000 × 1 = 10000
+  - prefix_cost     = 1100 + 10000 + 10000 × 0.1 = 12100
+
+- 最終コスト = 12100
+  - 内訳
+    - users の I/O コスト: 100 (10000 行をフルスキャン)
+    - users の行評価コスト: 1000 (prefix_rowcount 10000 × 0.1)
+    - orders の I/O コスト: 10000 (10000 回の UNIQUE キー検索)
+    - orders の行評価コスト: 1000 (prefix_rowcount 10000 × 0.1)
+
+### 駆動表と内部表の違い
+
+駆動表 (最初にアクセスするテーブル) と内部表 (JOIN で結合される側) では、foundRecords の推定方法が異なる。
+
+- 駆動表
+  - 単一テーブルの場合と同じ方法を使う
+  - レンジスキャンの場合は実際にインデックスを読み取って推定する
+- 内部表
+  - 検索条件のキーの値は駆動表の行を読み取るまでわからない (実行時に決まる) ため、1 キーあたりの平均マッチ行数 (`rec_per_key`) という統計情報を使って推定する (参考: [sql_planner.cc#L462-L464](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L462-L464))
+    - rec_per_key = テーブルの総行数 / インデックスのカーディナリティ
+      - 例: テーブルが 10000 行、インデックスのカーディナリティが 1000 なら、rec_per_key = 10 (1 つのキーにつき平均 10 行)
+      - UNIQUE インデックスの場合は rec_per_key = 1 (eq_ref アクセス)
+
+### rec_per_key の統計情報
+
+`rec_per_key` は SQL 実行のたびに計算されるのではなく、事前に計算・永続化された統計情報を参照する。
+
+統計情報の更新タイミング:
+
+- `ANALYZE TABLE` を明示的に実行したとき
+- テーブルの行が約 10% 変更されたとき (自動再計算、`innodb_stats_auto_recalc = ON` の場合)
+- テーブルが初めて開かれたとき
+
+### 結合順序の最適化
+
+N 個のテーブルの結合順序は N! 通りあり、全探索は現実的ではない。MySQL は貪欲法 (`greedy_search()`, 参考: [sql_planner.cc#L2328](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L2328)) により、探索深度を制限しながら最小コストの結合順序を探す (`best_extension_by_limited_search()`, 参考: [sql_planner.cc#L2719](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L2719))。
