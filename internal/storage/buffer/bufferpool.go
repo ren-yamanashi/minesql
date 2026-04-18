@@ -112,6 +112,14 @@ func (bp *BufferPool) MaxBufferSize() int {
 	return bp.maxBufferSize // 不変値のためロック不要
 }
 
+// IsPageCached は指定ページがバッファプールに載っているかを返す
+func (bp *BufferPool) IsPageCached(pageId page.PageId) bool {
+	bp.mutex.RLock()
+	defer bp.mutex.RUnlock()
+	_, ok := bp.pageTable[pageId]
+	return ok
+}
+
 // UnRefPage は指定されたページの参照を解除し、優先的に追い出されるようにする
 func (bp *BufferPool) UnRefPage(pageId page.PageId) {
 	bp.mutex.Lock()
