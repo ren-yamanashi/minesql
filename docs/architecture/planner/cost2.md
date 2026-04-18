@@ -39,6 +39,7 @@ SELECT * FROM users WHERE first_name = 'John';
 - foundRecords: テーブル統計情報の中の、「レコード数」を用いる
 - readTime: テーブル統計情報の中の「データサイズ」をページサイズ (4KB) で割った値を用いる
 - コスト: readTime + foundRecords × RowEvaluateCost (参考: [sql_planner.cc#L1097-L1101](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L1097-L1101))
+  - ディスクアクセスの I/O コスト (`readTime`) とレコード評価の CPU コスト (`foundRecords × RowEvaluateCost`) を合算する
 
 ### 例
 
@@ -87,6 +88,7 @@ SELECT * FROM users WHERE username = 'john-doe';
   - foundRecords = nth_rec_2 - nth_rec_1 - 1 (参考: [btr0cur.cc#L5287](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L5287))
     - 左右どちらの境界もカウントしないため、-1 としている
     >　We do not count the borders (nor the left nor the right one), thus "- 1".
+    - その後、検索条件の演算子に応じて左境界・右境界をそれぞれ +1 する (例: `<=` なら右境界を含むので +1、`<` なら +0) (参考: [btr0cur.cc#L5216-L5230](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L5216-L5230))
 
 #### 上限値のインデックスエントリが、下限値のインデックスエントリと異なるリーフページにあり、かつそれらが隣接している場合・・・
 
@@ -97,7 +99,7 @@ SELECT * FROM users WHERE username = 'john-doe';
 
 - 下限値のページから上限値のページに向かってリンクリストを辿り、合計 10 ページまで読み取る (参考: [btr0cur.cc#L4914](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L4914))
 
-- 10 ページ以内に上限値のインデックスエントリが見った場合・・・
+- 10 ページ以内に上限値のインデックスエントリが見つかった場合・・・
   - 下限値、上限値のリーフページに含まれるレコード数をそれぞれ `n_recs_1`, `n_recs_2` とし、また下限値、上限値におけるインデックスのエントリ番号をそれぞれ `nth_rec_1`, `nth_rec_2` とすると、読み取られるレコード数の推定値は以下の式で表せる (参考: [btr0cur.cc#L4892-L4904](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L4892-L4904), [btr0cur.cc#L4964-L4968](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L4964-L4968))
     - (n_recs_1 - nth_rec_1) + Σ n_recs_mid + (nth_rec_2 - 1)
 
@@ -111,7 +113,17 @@ SELECT * FROM users WHERE username = 'john-doe';
         - ブランチノードの各レコードは境界キーと子ページへのポインタを持っており、1 レコードが下のレベルの 1 ページに対応する
         - そのため、上のレベルで下限値と上限値の間にあるレコード数を数えれば、それがそのまま現在のレベルにおける対象範囲の中間ページ数となる
 
+#### foundRecords の後処理
+
+上記で算出した推定値に対して、以下の補正が順に適用される。いずれも行数が確定していない場合 (`is_n_rows_exact = false`) にのみ適用される。
+
+- x2 補正: B+Tree の高さが 1 より大きい場合、推定値を 2 倍にする (参考: [btr0cur.cc#L5234-L5239](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L5234-L5239))
+  > In trees whose height is > 1 our algorithm tends to underestimate: multiply the estimate by 2
+- 半数キャップ: 推定値がテーブルの総行数の半分を超えた場合、総行数の半分に切り詰める (参考: [btr0cur.cc#L5248-L5257](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/btr/btr0cur.cc#L5248-L5257))
+
 ### readTime の推定方法
+
+#### セカンダリインデックスの場合
 
 - レンジスキャンにおけるディスクアクセス回数は、以下の 3 つの要素から推定される
   - ランダムシーク回数: レンジの区間数と等しい (区間ごとにインデックス上の異なる位置へシークするため)
@@ -124,17 +136,32 @@ SELECT * FROM users WHERE username = 'john-doe';
         - `WHERE x BETWEEN 10 AND 20` は `10 <= x <= 20` という 1 つの連続した区間なので 1
         - `WHERE x IN (1, 5, 10)` は `x = 1`, `x = 5`, `x = 10` という 3 つの独立した区間に分かれるので 3
     - `foundRecords`: 前述の方法で推定されたレコード数
-  - readTime = (n_ranges + foundRecords) × page_read_cost
-  - `page_read_cost`: 1 ページの読み取りコスト
-    - テーブルがバッファプールに載っている割合 (`in_mem`: 0.0 〜 1.0) に応じて以下のように計算される
-      - page_read_cost = in_mem × 0.25 + (1 - in_mem) × 1.0
-        - `0.25`: バッファプール内 (メモリ上) のページ読み取りコスト
-        - `1.0`: ディスク上のページ読み取りコスト
-        - 例えばテーブルの 100% がバッファプールにある場合は page_read_cost = 0.25、全くない場合は 1.0 となる
+  - `page_read_cost`: 1 ページの読み取りコスト (詳細: [page_read_cost について](#page_read_cost-について))
+
+#### クラスタ化インデックスの場合
+
+- クラスタ化インデックスではデータ行がインデックスのリーフに直接格納されているため、フルスキャンのコストに対する読み取り行数の比率で I/O コストを推定する (参考: [ha_innodb.cc#L16899](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/handler/ha_innodb.cc#L16899))
+  - readTime = (n_ranges + (foundRecords / total_rows) × scan_time) × page_read_cost
+    - `n_ranges`: レンジ条件の区間の数
+    - `foundRecords`: 前述の方法で推定されたレコード数
+    - `total_rows`: テーブルの総行数の上限推定値
+    - `scan_time`: テーブルフルスキャンの時間 (= データサイズ / ページサイズ + 2)
+    - `foundRecords / total_rows`: 読み取る行がテーブル全体の何割かを表す比率
+    - `page_read_cost`: 1 ページの読み取りコスト (詳細: [page_read_cost について](#page_read_cost-について))
+  - ただし `foundRecords` が 2 以下の場合は readTime = foundRecords となる (参考: [ha_innodb.cc#L16886-L16888](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/handler/ha_innodb.cc#L16886-L16888))
+
+#### page_read_cost について
+
+- 上記の式に含まれる `page_read_cost` は、1 ページの読み取りコストをバッファプールのキャッシュヒット率に応じて重み付けした値 (参考: [opt_costmodel.cc#L79-L93](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/opt_costmodel.cc#L79-L93))
+  - テーブルがバッファプールに載っている割合 (`in_mem`: 0.0 〜 1.0) に応じて以下のように計算される
+    - page_read_cost = in_mem × 0.25 + (1 - in_mem) × 1.0
+      - `0.25`: バッファプール内 (メモリ上) のページ読み取りコスト
+      - `1.0`: ディスク上のページ読み取りコスト
+      - 例えばテーブルの 100% がバッファプールにある場合は page_read_cost = 0.25、全くない場合は 1.0 となる
 
 ### 最終的なコスト算出
 
-- ディスクアクセスの I/O コストとレコード評価の CPU コストを合算する (参考: [handler.cc#L6360-L6374](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6360-L6374))
+- ディスクアクセスの I/O コスト (`readTime`) とレコード評価の CPU コスト (`foundRecords × RowEvaluateCost`) を合算する (参考: [handler.cc#L6297-L6298](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6297-L6298))
   - コスト = readTime + foundRecords × RowEvaluateCost
 
 ### 例
