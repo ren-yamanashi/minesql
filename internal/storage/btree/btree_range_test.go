@@ -365,6 +365,62 @@ func TestRecordsInRange(t *testing.T) {
 	})
 }
 
+func TestLeafPageIds(t *testing.T) {
+	t.Run("高さ 1 のツリーでルートの PageId が返される", func(t *testing.T) {
+		// GIVEN
+		bt, bp := setupBTree(t)
+		bt.mustInsert(bp, "aaa", "v1")
+
+		// WHEN
+		pageIds, err := bt.LeafPageIds(bp)
+
+		// THEN
+		require.NoError(t, err)
+		assert.Len(t, pageIds, 1)
+	})
+
+	t.Run("複数ページに分割されたツリーで全リーフの PageId が返される", func(t *testing.T) {
+		// GIVEN
+		bt, bp := setupBTree(t)
+		for i := range 100 {
+			key := fmt.Sprintf("key_%03d", i)
+			bt.mustInsert(bp, key, strings.Repeat("x", 200))
+		}
+
+		leafCount, err := bt.LeafPageCount(bp)
+		require.NoError(t, err)
+
+		// WHEN
+		pageIds, err := bt.LeafPageIds(bp)
+
+		// THEN
+		require.NoError(t, err)
+		assert.Equal(t, int(leafCount), len(pageIds))
+	})
+
+	t.Run("返された PageId で IsPageCached が正しく判定できる", func(t *testing.T) {
+		// GIVEN: レコードを挿入してページがキャッシュに載った状態
+		bt, bp := setupBTree(t)
+		for i := range 50 {
+			key := fmt.Sprintf("key_%03d", i)
+			bt.mustInsert(bp, key, strings.Repeat("x", 200))
+		}
+
+		// WHEN
+		pageIds, err := bt.LeafPageIds(bp)
+		require.NoError(t, err)
+
+		// THEN: 挿入直後なのでリーフページはキャッシュに載っているはず
+		cachedCount := 0
+		for _, pid := range pageIds {
+			if bp.IsPageCached(pid) {
+				cachedCount++
+			}
+		}
+		assert.Greater(t, cachedCount, 0, "少なくとも一部のリーフがキャッシュに載っている")
+	})
+}
+
 func TestFindLeafPosition(t *testing.T) {
 	t.Run("単一リーフページで正しい位置を返す", func(t *testing.T) {
 		// GIVEN
@@ -398,4 +454,3 @@ func TestFindLeafPosition(t *testing.T) {
 		assert.Equal(t, 1, pos.slotNum) // 挿入位置は 1 (aaa の次)
 	})
 }
-

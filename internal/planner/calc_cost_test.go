@@ -1,6 +1,7 @@
 package planner
 
 import (
+	"minesql/internal/storage/btree"
 	"minesql/internal/storage/handler"
 	"testing"
 
@@ -328,6 +329,25 @@ func TestTotalCost(t *testing.T) {
 
 		// THEN: 4 * 1.0 + 10000 * 0.1 = 1004
 		assert.Equal(t, float64(1004), total)
+	})
+}
+
+func TestCalcPageReadCost(t *testing.T) {
+	t.Run("データ投入直後はリーフがキャッシュに載っておりコストが 1.0 未満になる", func(t *testing.T) {
+		// GIVEN: ストレージを初期化し、テーブルにデータを投入
+		setupUsersTable(t)
+		hdl := handler.Get()
+		tbl, err := hdl.GetTable("users")
+		assert.NoError(t, err)
+
+		// WHEN
+		bt := btree.NewBTree(tbl.MetaPageId)
+		cost, err := calcPageReadCost(hdl.BufferPool, bt)
+
+		// THEN: 挿入直後なのでキャッシュに載っている → コストが 1.0 以下
+		assert.NoError(t, err)
+		assert.LessOrEqual(t, cost, 1.0)
+		assert.GreaterOrEqual(t, cost, 0.25) // 全キャッシュなら 0.25
 	})
 }
 

@@ -1,6 +1,10 @@
 package planner
 
-import "minesql/internal/storage/handler"
+import (
+	"minesql/internal/storage/btree"
+	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/handler"
+)
 
 // defaultRangeSelectivity は min/max が不明な場合の範囲比較の推定選択率
 const defaultRangeSelectivity = 1.0 / 3.0
@@ -461,6 +465,38 @@ func calcIndexTableRangeCost(stats *handler.TableStatistics, colName string, ind
 		RecordCount:  recordCount,
 		UniqueValues: uv,
 	}
+}
+
+// -----------------------------------------------
+// page_read_cost
+// -----------------------------------------------
+
+// calcPageReadCost はバッファプールのキャッシュ率から page_read_cost を算出する
+//
+// page_read_cost = in_mem × 0.25 + (1 - in_mem) × 1.0
+// in_mem = バッファプール内のリーフページ数 / 総リーフページ数
+//
+// リーフページ自体は読まず、ブランチから PageId を列挙して IsPageCached で判定する
+func calcPageReadCost(bp *buffer.BufferPool, bt *btree.BTree) (float64, error) {
+	leafPageIds, err := bt.LeafPageIds(bp)
+	if err != nil {
+		return 0, err
+	}
+
+	nLeaf := len(leafPageIds)
+	if nLeaf == 0 {
+		return 1.0, nil
+	}
+
+	nInMem := 0
+	for _, pageId := range leafPageIds {
+		if bp.IsPageCached(pageId) {
+			nInMem++
+		}
+	}
+
+	inMem := float64(nInMem) / float64(nLeaf)
+	return inMem*0.25 + (1-inMem)*1.0, nil
 }
 
 // -----------------------------------------------
