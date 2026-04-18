@@ -50,6 +50,18 @@ type RHS interface {
 	isRHS()
 }
 
+type RhsColumn struct {
+	Column ColumnId
+}
+
+func (*RhsColumn) isRHS() {}
+
+func NewRhsColumn(col ColumnId) *RhsColumn {
+	return &RhsColumn{
+		Column: col,
+	}
+}
+
 type RhsLiteral struct {
 	Literal Literal
 }

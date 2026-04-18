@@ -13,10 +13,14 @@ const (
 
 	// -- SELECT Statement --
 
-	SelectStateColumns // SELECT 中
-	SelectStateFrom    // FROM 中
-	SelectStateWhere   // WHERE 中
-	SelectStateEnd     // SELECT Statement の終わり
+	SelectStateColumns   // SELECT 中
+	SelectStateFrom      // FROM 中
+	SelectStateInner     // INNER キーワード後、JOIN キーワード待ち
+	SelectStateJoin      // JOIN キーワード後、テーブル名待ち
+	SelectStateJoinTable // JOIN テーブル名取得後、ON キーワード待ち
+	SelectStateOn        // ON 条件式の解析中
+	SelectStateWhere     // WHERE 中
+	SelectStateEnd       // SELECT Statement の終わり
 
 	// -- INSERT Statement --
 

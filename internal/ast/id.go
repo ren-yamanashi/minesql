@@ -5,7 +5,8 @@ package ast
 // --------------------------------
 
 type ColumnId struct {
-	ColName string
+	TableName string
+	ColName   string
 }
 
 func NewColumnId(name string) *ColumnId {

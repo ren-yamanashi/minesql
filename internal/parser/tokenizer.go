@@ -57,6 +57,9 @@ const (
 	KSet      = "SET"
 	KAnd      = "AND"
 	KOr       = "OR"
+	KJoin     = "JOIN"
+	KInner    = "INNER"
+	KOn       = "ON"
 	KBegin    = "BEGIN"
 	KCommit   = "COMMIT"
 	KRollback = "ROLLBACK"
@@ -296,6 +299,7 @@ func (t *Tokenizer) isKeyword(word string) bool {
 		KUpdate, KSet,
 		KVarchar,
 		KAnd, KOr,
+		KJoin, KInner, KOn,
 		KBegin, KCommit, KRollback,
 	}
 
