@@ -143,6 +143,9 @@ SELECT * FROM users WHERE username = 'john-doe';
 - クラスタ化インデックスではデータ行がインデックスのリーフに直接格納されているため、フルスキャンのコストに対する読み取り行数の比率で I/O コストを推定する (参考: [ha_innodb.cc#L16899](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/handler/ha_innodb.cc#L16899))
   - readTime = (n_ranges + (foundRecords / total_rows) × scan_time) × page_read_cost
     - `n_ranges`: レンジ条件の区間の数
+      - 例:
+        - `WHERE x BETWEEN 10 AND 20` は `10 <= x <= 20` という 1 つの連続した区間なので 1
+        - `WHERE x IN (1, 5, 10)` は `x = 1`, `x = 5`, `x = 10` という 3 つの独立した区間に分かれるので 3
     - `foundRecords`: 前述の方法で推定されたレコード数
     - `total_rows`: テーブルの総行数の上限推定値
     - `scan_time`: クラスタ化インデックスのページ数 (参考: [ha_innodb.cc#L16840-L16868](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/handler/ha_innodb.cc#L16840-L16868))
