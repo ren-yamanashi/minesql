@@ -54,7 +54,7 @@ mysql> SELECT cost_name, cost_value, default_value FROM mysql.server_cost WHERE 
 SELECT * FROM users WHERE first_name = 'John';
 ```
 
-- foundRecords: テーブル統計情報の中の、「レコード数」を用いる
+- foundRecords: テーブル統計情報の中の「レコード数」を用いる
 - readTime: scan_time × page_read_cost (参考: [handler.cc#L6030-L6042](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6030-L6042))
   - `scan_time`: クラスタ化インデックスのページ数 (= データサイズ / ページサイズ)
   - `page_read_cost`: 1 ページの読み取りコスト (詳細: [page_read_cost について](#page_read_cost-について))
@@ -89,7 +89,10 @@ SELECT * FROM users WHERE username = 'john-doe';
 
 ## 単一テーブルのレンジスキャン
 
-(インデックスの貼られたカラムに対して範囲検索をした場合)
+```sql
+--- age にインデックスがあると仮定
+SELECT * FROM users WHERE age BETWEEN 20 AND 30;
+```
 
 - PostgreSQL などの場合は、範囲検索に対してはヒストグラム統計を用いて読み取りレコード数を推定しているが、minesql では MySQL と同様にヒストグラム統計を用いない
 - 範囲検索におけるレコード数の推定は、ストレージエンジンが担う (MySQL ではこの処理を「レンジ分析」と呼ぶので minesql でも同様に「レンジ分析」と呼ぶことにする)
@@ -206,3 +209,105 @@ MySQL ではレンジスキャンのコストが 2 段階で計算される。
   - readTime: (1 + 500) × 1.0 = 501
   - rangeCost: 501 + 500 × 0.1 + 0.01 = 551.01
   - コスト: 551.01 + 500 × 0.1 = 601.01
+
+## 複数テーブルの結合 (INNER JOIN)
+
+MySQL は INNER JOIN を Nested Loop Join (NLJ) で実行する。外側のテーブル (駆動表) から 1 行ずつ読み取り、その値を使って内側のテーブル (内部表) を検索する。
+
+### コスト計算の構造
+
+- JOIN のコストは、各テーブルのアクセスコストを累積した `prefix_cost` として計算される (参考: [sql_select.h#L565-L575](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_select.h#L565-L575))。
+  - prefix_cost = テーブル A のアクセスコスト + (A の結果行数 × テーブル B の 1 回あたりのアクセスコスト)
+    - テーブルが 3 つ以上の場合も同様に累積していく
+      - prefix_cost = A のコスト + (A の行数 × B のコスト) + (A の行数 × B の行数 × C のコスト) + ...
+
+各テーブルのアクセスコストは `best_access_path()` で決定され (参考: [sql_planner.cc#L981](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L981))、単一テーブルの場合と同じ方法 (フルスキャン、レンジスキャン、ユニークスキャンなど) で計算される。
+
+### コスト計算の手順
+
+- `prefix_cost` は結合するテーブルを 1 つずつ追加しながら累積する
+- テーブルごとに以下を繰り返す (初期値: prefix_cost = 0, prefix_rowcount = 1)
+
+1. read_cost を計算 (テーブルの I/O コスト)
+   - 駆動表: 単一テーブルの readTime と同じ
+   - 内部表: prefix_rowcount × 1 回あたりの read_cost
+
+2. fanout を計算 (テーブルから取得される行数)
+   - フルスキャン: foundRecords
+   - eq_ref (UNIQUE キー): 1
+   - ref (非ユニークインデックス): rec_per_key (平均マッチ行数)
+
+3. prefix_rowcount を更新
+   - prefix_rowcount = prefix_rowcount × fanout
+
+4. prefix_cost を更新
+   - prefix_cost = prefix_cost + read_cost + prefix_rowcount × RowEvaluateCost
+
+補足: 実際の MySQL では `prefix_rowcount` に `filtered` (インデックスで絞り込めない WHERE 条件の通過率) が掛けられる (参考: [sql_select.h#L574](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_select.h#L574))。これはコスト計算自体には影響しないが、次のテーブルへの入力行数を減らすことで後続テーブルの read_cost に間接的に影響する。
+
+#### 内部表の 1 回あたりの read_cost
+
+- 1 回あたりの read_cost は内部表へのアクセス方法によって異なる
+  - eq_ref (UNIQUE キーでの検索)
+    - page_read_cost (参考: [sql_planner.cc#L432-L434](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L432-L434))
+- フルスキャン
+  - scan_time × page_read_cost (単一テーブルと同じ)
+
+### 例
+
+```sql
+SELECT * FROM users
+INNER JOIN orders ON users.id = orders.user_id;
+```
+
+- 仮定
+  - users: 10000 行、100 ページ
+  - orders: 50000 行、user_id に UNIQUE INDEX
+  - page_read_cost = 1.0 (全データがディスク上)
+  - 結合順序: users → orders
+
+- テーブル 1: users (駆動表、フルスキャン)
+  - read_cost = scan_time × page_read_cost = 100 × 1.0 = 100
+  - fanout = 10000 (foundRecords)
+  - prefix_rowcount = 1 × 10000 = 10000
+  - prefix_cost     = 0 + 100 + 10000 × 0.1 = 1100
+
+- テーブル 2: orders (内部表、eq_ref via user_id UNIQUE)
+  - read_cost       = prefix_rowcount × page_read_cost = 10000 × 1.0 = 10000
+  - fanout          = 1 (UNIQUE)
+  - prefix_rowcount = 10000 × 1 = 10000
+  - prefix_cost     = 1100 + 10000 + 10000 × 0.1 = 12100
+
+- 最終コスト = 12100
+  - 内訳
+    - users の I/O コスト: 100 (10000 行をフルスキャン)
+    - users の行評価コスト: 1000 (prefix_rowcount 10000 × 0.1)
+    - orders の I/O コスト: 10000 (10000 回の UNIQUE キー検索)
+    - orders の行評価コスト: 1000 (prefix_rowcount 10000 × 0.1)
+
+### 駆動表と内部表の違い
+
+駆動表 (最初にアクセスするテーブル) と内部表 (JOIN で結合される側) では、foundRecords の推定方法が異なる。
+
+- 駆動表
+  - 単一テーブルの場合と同じ方法を使う
+  - レンジスキャンの場合は実際にインデックスを読み取って推定する
+- 内部表
+  - 検索条件のキーの値は駆動表の行を読み取るまでわからない (実行時に決まる) ため、1 キーあたりの平均マッチ行数 (`rec_per_key`) という統計情報を使って推定する (参考: [sql_planner.cc#L462-L464](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L462-L464))
+    - rec_per_key = テーブルの総行数 / インデックスのカーディナリティ
+      - 例: テーブルが 10000 行、インデックスのカーディナリティが 1000 なら、rec_per_key = 10 (1 つのキーにつき平均 10 行)
+      - UNIQUE インデックスの場合は rec_per_key = 1 (eq_ref アクセス)
+
+### rec_per_key の統計情報
+
+`rec_per_key` は SQL 実行のたびに計算されるのではなく、事前に計算・永続化された統計情報を参照する。
+
+統計情報の更新タイミング:
+
+- `ANALYZE TABLE` を明示的に実行したとき
+- テーブルの行が約 10% 変更されたとき (自動再計算、`innodb_stats_auto_recalc = ON` の場合)
+- テーブルが初めて開かれたとき
+
+### 結合順序の最適化
+
+N 個のテーブルの結合順序は N! 通りあり、全探索は現実的ではない。MySQL は貪欲法 (`greedy_search()`, 参考: [sql_planner.cc#L2328](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L2328)) により、探索深度を制限しながら最小コストの結合順序を探す (`best_extension_by_limited_search()`, 参考: [sql_planner.cc#L2719](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L2719))。
