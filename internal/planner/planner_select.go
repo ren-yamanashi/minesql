@@ -20,7 +20,7 @@ func PlanSelect(trxId handler.TrxId, stmt *ast.SelectStmt) (executor.Executor, e
 	// WHERE 句を元に検索用の Executor を構築
 	rv := hdl.CreateReadView(trxId)
 	vr := access.NewVersionReader(hdl.UndoLog())
-	search := NewSearch(rv, vr, tblMeta, stmt.Where)
+	search := NewSearch(rv, vr, tblMeta, stmt.Where, hdl.BufferPool)
 	iterator, err := search.Build()
 	if err != nil {
 		return nil, err
