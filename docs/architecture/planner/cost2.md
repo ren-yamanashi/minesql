@@ -169,6 +169,8 @@ SELECT * FROM users WHERE username = 'john-doe';
 - 仮定
   - foundRecords: 500 (レンジ分析により推定)
   - n_ranges: 1 (`WHERE age BETWEEN 20 AND 30` のような単一レンジ)
+  - セカンダリインデックスを使用
+  - page_read_cost: 1.0 (全データがディスク上)
 - 計算式:
-  - readTime: 1 + 500 = 501
+  - readTime: (1 + 500) × 1.0 = 501
   - コスト: 501 + 500 × 0.1 = 551.0
