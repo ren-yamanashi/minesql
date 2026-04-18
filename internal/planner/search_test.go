@@ -19,7 +19,7 @@ func TestSearch(t *testing.T) {
 		defer handler.Reset()
 
 		tblMeta := getTableMetadata(t, "users")
-		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, nil)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, nil, handler.Get().BufferPool)
 
 		// WHEN
 		exec, err := search.Build()
@@ -44,7 +44,7 @@ func TestSearch(t *testing.T) {
 				ast.NewRhsLiteral(ast.NewStringLiteral("Doe")),
 			),
 		}
-		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
 
 		// WHEN
 		exec, err := search.Build()
@@ -74,7 +74,7 @@ func TestSearch(t *testing.T) {
 				ast.NewRhsLiteral(ast.NewStringLiteral("John")),
 			),
 		}
-		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
 
 		// WHEN
 		exec, err := search.Build()
@@ -99,7 +99,7 @@ func TestSearch(t *testing.T) {
 				ast.NewRhsLiteral(ast.NewStringLiteral("value")),
 			),
 		}
-		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
 
 		// WHEN
 		exec, err := search.Build()
@@ -149,7 +149,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
 
 		// WHEN
 		exec, err := search.Build()
@@ -199,7 +199,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
 
 		// WHEN
 		exec, err := search.Build()
@@ -231,7 +231,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
 
 		// WHEN
 		exec, err := search.Build()
@@ -269,7 +269,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
 
 		// WHEN
 		exec, err := search.Build()
@@ -307,7 +307,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
 
 		// WHEN
 		exec, err := search.Build()
@@ -351,7 +351,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
 
 		// WHEN
 		exec, err := search.Build()
@@ -389,7 +389,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
 
 		// WHEN
 		exec, err := search.Build()
@@ -418,7 +418,7 @@ func TestSearch(t *testing.T) {
 				ast.NewRhsLiteral(ast.NewStringLiteral("value")),
 			),
 		}
-		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
 
 		// WHEN
 		exec, err := search.Build()
@@ -462,7 +462,7 @@ func TestSearch(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
 
 		// WHEN
 		exec, err := search.Build()
@@ -545,7 +545,7 @@ func TestComplexWhereWithData(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
 		searchExec, err := search.Build()
 		assert.NoError(t, err)
 
@@ -588,7 +588,7 @@ func TestComplexWhereWithData(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
 		searchExec, err := search.Build()
 		assert.NoError(t, err)
 
@@ -620,7 +620,7 @@ func TestComplexWhereWithData(t *testing.T) {
 				ast.NewRhsLiteral(ast.NewStringLiteral("1")),
 			),
 		}
-		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
 		searchExec, err := search.Build()
 		assert.NoError(t, err)
 
@@ -674,7 +674,7 @@ func TestComplexWhereWithData(t *testing.T) {
 				),
 			),
 		}
-		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where)
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
 		searchExec, err := search.Build()
 		assert.NoError(t, err)
 
@@ -689,132 +689,6 @@ func TestComplexWhereWithData(t *testing.T) {
 		assert.Equal(t, "2", string(results[1][0]))
 		assert.Equal(t, "Jane", string(results[1][1]))
 		assert.Equal(t, "Smith", string(results[1][2]))
-	})
-}
-
-func TestOperatorToCondition(t *testing.T) {
-	// operatorToCondition は Search のメソッドなので、ダミーの Search を使用する
-	s := &Search{}
-
-	t.Run("= 演算子が正しく動作する", func(t *testing.T) {
-		// GIVEN
-		record := executor.Record{[]byte("apple"), []byte("banana"), []byte("cherry")}
-
-		// WHEN
-		cond, err := s.operatorToCondition("=", 1, "banana")
-
-		// THEN
-		assert.NoError(t, err)
-		assert.NotNil(t, cond)
-		assert.True(t, cond(record))
-		assert.False(t, cond(executor.Record{[]byte("apple"), []byte("orange"), []byte("cherry")}))
-	})
-
-	t.Run("!= 演算子が正しく動作する", func(t *testing.T) {
-		// GIVEN
-		record := executor.Record{[]byte("apple"), []byte("banana"), []byte("cherry")}
-
-		// WHEN
-		cond, err := s.operatorToCondition("!=", 1, "banana")
-
-		// THEN
-		assert.NoError(t, err)
-		assert.NotNil(t, cond)
-		assert.False(t, cond(record))
-		assert.True(t, cond(executor.Record{[]byte("apple"), []byte("orange"), []byte("cherry")}))
-	})
-
-	t.Run("< 演算子が正しく動作する", func(t *testing.T) {
-		// GIVEN
-		// WHEN
-		cond, err := s.operatorToCondition("<", 0, "c")
-
-		// THEN
-		assert.NoError(t, err)
-		assert.NotNil(t, cond)
-		assert.True(t, cond(executor.Record{[]byte("a"), []byte("banana")}))
-		assert.True(t, cond(executor.Record{[]byte("b"), []byte("banana")}))
-		assert.False(t, cond(executor.Record{[]byte("c"), []byte("banana")}))
-		assert.False(t, cond(executor.Record{[]byte("d"), []byte("banana")}))
-	})
-
-	t.Run("<= 演算子が正しく動作する", func(t *testing.T) {
-		// GIVEN
-		// WHEN
-		cond, err := s.operatorToCondition("<=", 0, "c")
-
-		// THEN
-		assert.NoError(t, err)
-		assert.NotNil(t, cond)
-		assert.True(t, cond(executor.Record{[]byte("a"), []byte("banana")}))
-		assert.True(t, cond(executor.Record{[]byte("b"), []byte("banana")}))
-		assert.True(t, cond(executor.Record{[]byte("c"), []byte("banana")}))
-		assert.False(t, cond(executor.Record{[]byte("d"), []byte("banana")}))
-	})
-
-	t.Run("> 演算子が正しく動作する", func(t *testing.T) {
-		// GIVEN
-		// WHEN
-		cond, err := s.operatorToCondition(">", 0, "c")
-
-		// THEN
-		assert.NoError(t, err)
-		assert.NotNil(t, cond)
-		assert.False(t, cond(executor.Record{[]byte("a"), []byte("banana")}))
-		assert.False(t, cond(executor.Record{[]byte("b"), []byte("banana")}))
-		assert.False(t, cond(executor.Record{[]byte("c"), []byte("banana")}))
-		assert.True(t, cond(executor.Record{[]byte("d"), []byte("banana")}))
-	})
-
-	t.Run(">= 演算子が正しく動作する", func(t *testing.T) {
-		// GIVEN
-		// WHEN
-		cond, err := s.operatorToCondition(">=", 0, "c")
-
-		// THEN
-		assert.NoError(t, err)
-		assert.NotNil(t, cond)
-		assert.False(t, cond(executor.Record{[]byte("a"), []byte("banana")}))
-		assert.False(t, cond(executor.Record{[]byte("b"), []byte("banana")}))
-		assert.True(t, cond(executor.Record{[]byte("c"), []byte("banana")}))
-		assert.True(t, cond(executor.Record{[]byte("d"), []byte("banana")}))
-	})
-
-	t.Run("サポートされていない演算子の場合、エラーを返す", func(t *testing.T) {
-		// GIVEN
-		// WHEN
-		cond, err := s.operatorToCondition("LIKE", 0, "pattern")
-
-		// THEN
-		assert.Error(t, err)
-		assert.Nil(t, cond)
-		assert.Contains(t, err.Error(), "unsupported operator")
-		assert.Contains(t, err.Error(), "LIKE")
-	})
-
-	t.Run("異なる position で条件が正しく適用される", func(t *testing.T) {
-		// GIVEN
-		record := executor.Record{[]byte("1"), []byte("John"), []byte("Doe")}
-
-		// WHEN: position 0 (id)
-		cond0, err0 := s.operatorToCondition("=", 0, "1")
-		// WHEN: position 1 (first_name)
-		cond1, err1 := s.operatorToCondition("=", 1, "John")
-		// WHEN: position 2 (last_name)
-		cond2, err2 := s.operatorToCondition("=", 2, "Doe")
-
-		// THEN
-		assert.NoError(t, err0)
-		assert.NoError(t, err1)
-		assert.NoError(t, err2)
-		assert.True(t, cond0(record))
-		assert.True(t, cond1(record))
-		assert.True(t, cond2(record))
-
-		// 異なる値の場合は false
-		assert.False(t, cond0(executor.Record{[]byte("2"), []byte("John"), []byte("Doe")}))
-		assert.False(t, cond1(executor.Record{[]byte("1"), []byte("Jane"), []byte("Doe")}))
-		assert.False(t, cond2(executor.Record{[]byte("1"), []byte("John"), []byte("Smith")}))
 	})
 }
 
@@ -837,6 +711,183 @@ func initStorageManager(t *testing.T, dataDir string) {
 	})
 	_, err := createTable.Next()
 	assert.NoError(t, err)
+}
+
+func TestPlanSelection(t *testing.T) {
+	t.Run("PK の = 検索ではユニークスキャンが選ばれ TableScan が返される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		initStorageManager(t, tmpdir)
+		defer handler.Reset()
+
+		tblMeta := getTableMetadata(t, "users")
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
+				"=",
+				ast.NewLhsColumn(*ast.NewColumnId("id")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("1")),
+			),
+		}
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
+
+		// WHEN
+		exec, err := search.Build()
+
+		// THEN: PK = 検索 → ユニークスキャン (コスト 1.0) → TableScan が選ばれる
+		assert.NoError(t, err)
+		assert.NotNil(t, exec)
+		assert.IsType(t, &executor.TableScan{}, exec)
+	})
+
+	t.Run("UNIQUE INDEX の = 検索ではユニークスキャンが選ばれ IndexScan が返される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		initStorageManager(t, tmpdir)
+		defer handler.Reset()
+
+		tblMeta := getTableMetadata(t, "users")
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
+				"=",
+				ast.NewLhsColumn(*ast.NewColumnId("last_name")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("Doe")),
+			),
+		}
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
+
+		// WHEN
+		exec, err := search.Build()
+
+		// THEN: UNIQUE INDEX = 検索 → ユニークスキャン (コスト 1.0) → IndexScan が選ばれる
+		assert.NoError(t, err)
+		assert.NotNil(t, exec)
+		assert.IsType(t, &executor.IndexScan{}, exec)
+	})
+
+	t.Run("!= 検索ではフルスキャン + Filter が選ばれる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		initStorageManager(t, tmpdir)
+		defer handler.Reset()
+
+		tblMeta := getTableMetadata(t, "users")
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
+				"!=",
+				ast.NewLhsColumn(*ast.NewColumnId("id")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("1")),
+			),
+		}
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
+
+		// WHEN
+		exec, err := search.Build()
+
+		// THEN: != はレンジ分析対象外 → フルスキャン + Filter
+		assert.NoError(t, err)
+		assert.NotNil(t, exec)
+		assert.IsType(t, &executor.Filter{}, exec)
+	})
+
+	t.Run("インデックスなしカラムの = 検索ではフルスキャン + Filter が選ばれる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		initStorageManager(t, tmpdir)
+		defer handler.Reset()
+
+		tblMeta := getTableMetadata(t, "users")
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
+				"=",
+				ast.NewLhsColumn(*ast.NewColumnId("first_name")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("John")),
+			),
+		}
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
+
+		// WHEN
+		exec, err := search.Build()
+
+		// THEN: first_name にインデックスがない → フルスキャン + Filter
+		assert.NoError(t, err)
+		assert.NotNil(t, exec)
+		assert.IsType(t, &executor.Filter{}, exec)
+	})
+}
+
+func TestCostFormulas(t *testing.T) {
+	t.Run("フルスキャンのコストが cost2.md の式と一致する", func(t *testing.T) {
+		// GIVEN: cost2.md の計算例
+		stats := &handler.TableStatistics{
+			RecordCount:   74822,
+			LeafPageCount: 1924,
+		}
+		pageReadCost := 1.0
+
+		// WHEN
+		readCost := calcFullScanReadCost(stats, pageReadCost)
+		totalCost := calcFullScanCost(stats, pageReadCost)
+
+		// THEN: cost2.md の式: scanTime × pageReadCost + foundRecords × RowEvaluateCost
+		assert.Equal(t, 1924.0, readCost)                       // scanTime × 1.0
+		assert.Equal(t, 1924.0+74822.0*0.1, totalCost)          // 9406.2
+	})
+
+	t.Run("ユニークスキャンのコストが 1.0 固定である", func(t *testing.T) {
+		// WHEN
+		cost := calcUniqueScanCost()
+
+		// THEN
+		assert.Equal(t, 1.0, cost)
+	})
+
+	t.Run("レンジスキャンのコストが cost2.md の 2 段階計算と一致する", func(t *testing.T) {
+		// GIVEN: cost2.md の計算例 (セカンダリインデックス)
+		foundRecords := 500.0
+		nRanges := 1
+		pageReadCost := 1.0
+
+		// WHEN
+		readTime := calcReadTimeForSecondaryIndex(nRanges, foundRecords, pageReadCost)
+		totalCost := calcRangeScanCost(readTime, foundRecords)
+
+		// THEN: readTime = (1 + 500) × 1.0 = 501
+		//       rangeCost = 501 + 500 × 0.1 + 0.01 = 551.01
+		//       totalCost = 551.01 + 500 × 0.1 = 601.01
+		assert.Equal(t, 501.0, readTime)
+		assert.Equal(t, 601.01, totalCost)
+	})
+
+	t.Run("クラスタ化インデックスの readTime が foundRecords に応じて分岐する", func(t *testing.T) {
+		// GIVEN
+		pageReadCost := 1.0
+
+		// WHEN: foundRecords <= 2
+		readTime1 := calcReadTimeForClusteredIndex(1, 2, 10000, 100, pageReadCost)
+
+		// WHEN: foundRecords > 2
+		readTime500 := calcReadTimeForClusteredIndex(1, 500, 10000, 100, pageReadCost)
+
+		// THEN
+		assert.Equal(t, 2.0, readTime1)  // foundRecords × pageReadCost
+		assert.Equal(t, 6.0, readTime500) // (1 + 500/10000 × 100) × 1.0
+	})
+
+	t.Run("フルスキャンよりユニークスキャンの方がコストが低い", func(t *testing.T) {
+		// GIVEN: 少数でもテーブルがあればフルスキャン > 1.0
+		stats := &handler.TableStatistics{
+			RecordCount:   10,
+			LeafPageCount: 1,
+		}
+		pageReadCost := 1.0
+
+		// WHEN
+		fullCost := calcFullScanCost(stats, pageReadCost)
+		uniqueCost := calcUniqueScanCost()
+
+		// THEN: フルスキャン = 1.0 + 10 × 0.1 = 2.0 > ユニーク = 1.0
+		assert.Greater(t, fullCost, uniqueCost)
+	})
 }
 
 // テスト用にテーブルメタデータを取得する
