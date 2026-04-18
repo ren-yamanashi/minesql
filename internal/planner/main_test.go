@@ -460,4 +460,178 @@ func TestPlannerIntegration(t *testing.T) {
 			"  合計: 5 件\n"
 		assert.Equal(t, expected, sb.String())
 	})
+
+	t.Run("INNER JOIN で 2 テーブルを結合できる", func(t *testing.T) {
+		// GIVEN: users テーブル + orders テーブル
+		setupUsersTable(t)
+		defer handler.Reset()
+
+		// orders テーブルを作成
+		executePlan(t, &ast.CreateTableStmt{
+			TableName: "orders",
+			CreateDefinitions: []ast.Definition{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "user_id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "item", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{
+					*ast.NewColumnId("id"),
+				}},
+				&ast.ConstraintUniqueKeyDef{Column: *ast.NewColumnId("user_id")},
+			},
+		})
+
+		// orders にデータを投入
+		executePlan(t, &ast.InsertStmt{
+			Table: *ast.NewTableId("orders"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+				*ast.NewColumnId("user_id"),
+				*ast.NewColumnId("item"),
+			},
+			Values: [][]ast.Literal{
+				{ast.NewStringLiteral("100"), ast.NewStringLiteral("1"), ast.NewStringLiteral("apple")},
+				{ast.NewStringLiteral("101"), ast.NewStringLiteral("3"), ast.NewStringLiteral("banana")},
+			},
+		})
+
+		// WHEN: SELECT * FROM users JOIN orders ON users.id = orders.user_id
+		records := executePlan(t, &ast.SelectStmt{
+			From: *ast.NewTableId("users"),
+			Joins: []*ast.JoinClause{
+				{
+					Table: *ast.NewTableId("orders"),
+					Condition: ast.NewBinaryExpr(
+						"=",
+						ast.NewLhsColumn(ast.ColumnId{TableName: "users", ColName: "id"}),
+						ast.NewRhsColumn(ast.ColumnId{TableName: "orders", ColName: "user_id"}),
+					),
+				},
+			},
+		})
+
+		// THEN: 2 行がマッチ (結合順序はオプティマイザが決定するためカラム順序に依存しない検証)
+		assert.Len(t, records, 2)
+
+		// レコード内容を文字列化して検証
+		var sb strings.Builder
+		writeRecords(&sb, records)
+		result := sb.String()
+		// user_id=1 と item=apple が同一行にある
+		assert.Contains(t, result, "apple")
+		assert.Contains(t, result, "banana")
+		// users のデータも含まれている
+		assert.Contains(t, result, "John")
+		assert.Contains(t, result, "Doe")
+	})
+
+	t.Run("INNER JOIN で内部表が UNIQUE INDEX eq_ref で検索される", func(t *testing.T) {
+		// GIVEN: users (6 行) が駆動表、orders (10 行) が内部表になるよう orders を大きくする
+		setupUsersTable(t)
+		defer handler.Reset()
+
+		executePlan(t, &ast.CreateTableStmt{
+			TableName: "orders",
+			CreateDefinitions: []ast.Definition{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "user_id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "item", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{*ast.NewColumnId("id")}},
+				&ast.ConstraintUniqueKeyDef{Column: *ast.NewColumnId("user_id")},
+			},
+		})
+
+		// orders に 10 行投入 (users の 6 行より多い → users が駆動表、orders が内部表)
+		for i := range 10 {
+			executePlan(t, &ast.InsertStmt{
+				Table: *ast.NewTableId("orders"),
+				Cols:  []ast.ColumnId{*ast.NewColumnId("id"), *ast.NewColumnId("user_id"), *ast.NewColumnId("item")},
+				Values: [][]ast.Literal{{
+					ast.NewStringLiteral(fmt.Sprintf("%d", 100+i)),
+					ast.NewStringLiteral(fmt.Sprintf("%d", i+1)),
+					ast.NewStringLiteral(fmt.Sprintf("item_%d", i)),
+				}},
+			})
+		}
+
+		// WHEN: SELECT * FROM users JOIN orders ON users.id = orders.user_id
+		records := executePlan(t, &ast.SelectStmt{
+			From: *ast.NewTableId("users"),
+			Joins: []*ast.JoinClause{
+				{
+					Table: *ast.NewTableId("orders"),
+					Condition: ast.NewBinaryExpr(
+						"=",
+						ast.NewLhsColumn(ast.ColumnId{TableName: "users", ColName: "id"}),
+						ast.NewRhsColumn(ast.ColumnId{TableName: "orders", ColName: "user_id"}),
+					),
+				},
+			},
+		})
+
+		// THEN: users 6 行 × orders の一致行 → 6 行 (users の全 id が orders に存在)
+		assert.Len(t, records, 6)
+	})
+
+	t.Run("INNER JOIN + WHERE で結合後にフィルタリングできる", func(t *testing.T) {
+		// GIVEN: 上と同じ users + orders
+		setupUsersTable(t)
+		defer handler.Reset()
+
+		executePlan(t, &ast.CreateTableStmt{
+			TableName: "orders",
+			CreateDefinitions: []ast.Definition{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "user_id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "item", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{
+					*ast.NewColumnId("id"),
+				}},
+				&ast.ConstraintUniqueKeyDef{Column: *ast.NewColumnId("user_id")},
+			},
+		})
+		executePlan(t, &ast.InsertStmt{
+			Table: *ast.NewTableId("orders"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+				*ast.NewColumnId("user_id"),
+				*ast.NewColumnId("item"),
+			},
+			Values: [][]ast.Literal{
+				{ast.NewStringLiteral("100"), ast.NewStringLiteral("1"), ast.NewStringLiteral("apple")},
+				{ast.NewStringLiteral("101"), ast.NewStringLiteral("3"), ast.NewStringLiteral("banana")},
+			},
+		})
+
+		// WHEN: SELECT * FROM users JOIN orders ON users.id = orders.user_id WHERE orders.item = 'banana'
+		records := executePlan(t, &ast.SelectStmt{
+			From: *ast.NewTableId("users"),
+			Joins: []*ast.JoinClause{
+				{
+					Table: *ast.NewTableId("orders"),
+					Condition: ast.NewBinaryExpr(
+						"=",
+						ast.NewLhsColumn(ast.ColumnId{TableName: "users", ColName: "id"}),
+						ast.NewRhsColumn(ast.ColumnId{TableName: "orders", ColName: "user_id"}),
+					),
+				},
+			},
+			Where: &ast.WhereClause{
+				Condition: ast.NewBinaryExpr(
+					"=",
+					ast.NewLhsColumn(ast.ColumnId{TableName: "orders", ColName: "item"}),
+					ast.NewRhsLiteral(ast.NewStringLiteral("banana")),
+				),
+			},
+		})
+
+		// THEN: item='banana' でフィルタ → 1 行のみ
+		assert.Len(t, records, 1)
+
+		var sb strings.Builder
+		writeRecords(&sb, records)
+		result := sb.String()
+		assert.Contains(t, result, "banana")
+		assert.Contains(t, result, "John")   // users.id=3 の John
+		assert.Contains(t, result, "Doe3")   // users.id=3 の Doe3
+	})
 }

@@ -77,7 +77,7 @@ func (s *Search) planForBinaryExpr(tbl *access.Table, expr ast.BinaryExpr) (exec
 			if !ok {
 				return nil, errors.New("column " + colName + " does not exist in table " + s.tblMeta.Name)
 			}
-			cond, err := s.operatorToCondition(expr.Operator, int(colMeta.Pos), rhs.Literal.ToString())
+			cond, err := operatorToCondition(expr.Operator, int(colMeta.Pos), rhs.Literal.ToString())
 			if err != nil {
 				return nil, err
 			}
@@ -246,7 +246,7 @@ func (s *Search) buildIndexPlan(tbl *access.Table, leaf leafCondition, idxMeta *
 	if err != nil {
 		return nil, err
 	}
-	indexCond, err := s.operatorToCondition(leaf.operator, 0, leaf.literal.ToString())
+	indexCond, err := operatorToCondition(leaf.operator, 0, leaf.literal.ToString())
 	if err != nil {
 		return nil, err
 	}

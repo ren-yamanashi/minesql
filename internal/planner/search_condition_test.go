@@ -8,15 +8,13 @@ import (
 )
 
 func TestOperatorToCondition(t *testing.T) {
-	// operatorToCondition は Search のメソッドなので、ダミーの Search を使用する
-	s := &Search{}
 
 	t.Run("= 演算子が正しく動作する", func(t *testing.T) {
 		// GIVEN
 		record := executor.Record{[]byte("apple"), []byte("banana"), []byte("cherry")}
 
 		// WHEN
-		cond, err := s.operatorToCondition("=", 1, "banana")
+		cond, err := operatorToCondition("=", 1, "banana")
 
 		// THEN
 		assert.NoError(t, err)
@@ -30,7 +28,7 @@ func TestOperatorToCondition(t *testing.T) {
 		record := executor.Record{[]byte("apple"), []byte("banana"), []byte("cherry")}
 
 		// WHEN
-		cond, err := s.operatorToCondition("!=", 1, "banana")
+		cond, err := operatorToCondition("!=", 1, "banana")
 
 		// THEN
 		assert.NoError(t, err)
@@ -42,7 +40,7 @@ func TestOperatorToCondition(t *testing.T) {
 	t.Run("< 演算子が正しく動作する", func(t *testing.T) {
 		// GIVEN
 		// WHEN
-		cond, err := s.operatorToCondition("<", 0, "c")
+		cond, err := operatorToCondition("<", 0, "c")
 
 		// THEN
 		assert.NoError(t, err)
@@ -56,7 +54,7 @@ func TestOperatorToCondition(t *testing.T) {
 	t.Run("<= 演算子が正しく動作する", func(t *testing.T) {
 		// GIVEN
 		// WHEN
-		cond, err := s.operatorToCondition("<=", 0, "c")
+		cond, err := operatorToCondition("<=", 0, "c")
 
 		// THEN
 		assert.NoError(t, err)
@@ -70,7 +68,7 @@ func TestOperatorToCondition(t *testing.T) {
 	t.Run("> 演算子が正しく動作する", func(t *testing.T) {
 		// GIVEN
 		// WHEN
-		cond, err := s.operatorToCondition(">", 0, "c")
+		cond, err := operatorToCondition(">", 0, "c")
 
 		// THEN
 		assert.NoError(t, err)
@@ -84,7 +82,7 @@ func TestOperatorToCondition(t *testing.T) {
 	t.Run(">= 演算子が正しく動作する", func(t *testing.T) {
 		// GIVEN
 		// WHEN
-		cond, err := s.operatorToCondition(">=", 0, "c")
+		cond, err := operatorToCondition(">=", 0, "c")
 
 		// THEN
 		assert.NoError(t, err)
@@ -98,7 +96,7 @@ func TestOperatorToCondition(t *testing.T) {
 	t.Run("サポートされていない演算子の場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		// WHEN
-		cond, err := s.operatorToCondition("LIKE", 0, "pattern")
+		cond, err := operatorToCondition("LIKE", 0, "pattern")
 
 		// THEN
 		assert.Error(t, err)
@@ -112,11 +110,11 @@ func TestOperatorToCondition(t *testing.T) {
 		record := executor.Record{[]byte("1"), []byte("John"), []byte("Doe")}
 
 		// WHEN: position 0 (id)
-		cond0, err0 := s.operatorToCondition("=", 0, "1")
+		cond0, err0 := operatorToCondition("=", 0, "1")
 		// WHEN: position 1 (first_name)
-		cond1, err1 := s.operatorToCondition("=", 1, "John")
+		cond1, err1 := operatorToCondition("=", 1, "John")
 		// WHEN: position 2 (last_name)
-		cond2, err2 := s.operatorToCondition("=", 2, "Doe")
+		cond2, err2 := operatorToCondition("=", 2, "Doe")
 
 		// THEN
 		assert.NoError(t, err0)

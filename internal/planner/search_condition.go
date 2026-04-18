@@ -103,7 +103,7 @@ func extractORBranches(expr ast.BinaryExpr) []orBranch {
 // 条件関数の構築
 // -------------------------------------------------
 
-// buildConditionFunc は式の木構造から単一の条件関数を再帰的に構築する
+// buildConditionFunc は式の木構造から単一テーブル用の条件関数を再帰的に構築する
 func (s *Search) buildConditionFunc(expr ast.BinaryExpr) (func(executor.Record) bool, error) {
 	switch lhs := expr.Left.(type) {
 
@@ -116,38 +116,26 @@ func (s *Search) buildConditionFunc(expr ast.BinaryExpr) (func(executor.Record) 
 		}
 
 		switch rhs := expr.Right.(type) {
-		// 左辺がカラムで右辺がリテラルの場合 (例: col1 = 5)
 		case *ast.RhsLiteral:
-			return s.operatorToCondition(expr.Operator, int(colMeta.Pos), rhs.Literal.ToString())
-		// 左辺がカラムの場合は右辺はリテラルでなければならない (`col1 = col2` のような条件は現状サポートしていない)
+			return operatorToCondition(expr.Operator, int(colMeta.Pos), rhs.Literal.ToString())
 		default:
 			return nil, errors.New("when LHS is a column, RHS must be a literal")
 		}
 
 	// ブランチノード: expr AND/OR expr (例: col1 = 5 AND col2 > 10 のような複合条件)
 	case *ast.LhsExpr:
-		// 左辺の式から条件関数を再帰的に構築
 		leftCond, err := s.buildConditionFunc(*lhs.Expr)
 		if err != nil {
 			return nil, err
 		}
 
 		switch rhs := expr.Right.(type) {
-		// 右辺が式の場合、右辺の式から条件関数を再帰的に構築し、論理演算子 (AND/OR) に応じて条件関数を組み合わせる
 		case *ast.RhsExpr:
 			rightCond, err := s.buildConditionFunc(*rhs.Expr)
 			if err != nil {
 				return nil, err
 			}
-			switch expr.Operator {
-			case "AND":
-				return func(r executor.Record) bool { return leftCond(r) && rightCond(r) }, nil
-			case "OR":
-				return func(r executor.Record) bool { return leftCond(r) || rightCond(r) }, nil
-			default:
-				return nil, fmt.Errorf("unsupported logical operator: %s", expr.Operator)
-			}
-		// 左辺が式の場合は右辺も式でなければならない
+			return combineConditions(expr.Operator, leftCond, rightCond)
 		default:
 			return nil, errors.New("when LHS is an expression, RHS cannot be a literal")
 		}
@@ -157,10 +145,55 @@ func (s *Search) buildConditionFunc(expr ast.BinaryExpr) (func(executor.Record) 
 	}
 }
 
+// buildJoinedConditionFunc は結合レコードに対する条件関数を再帰的に構築する
+//
+// カラム位置は resolveJoinedColumns で得た結合レコード全体の位置を使用する
+func buildJoinedConditionFunc(expr ast.BinaryExpr, columns []joinedColumn) (func(executor.Record) bool, error) {
+	switch lhs := expr.Left.(type) {
+
+	case *ast.LhsColumn:
+		pos, err := findColumnPos(columns, lhs.Column.TableName, lhs.Column.ColName)
+		if err != nil {
+			return nil, err
+		}
+
+		switch rhs := expr.Right.(type) {
+		case *ast.RhsLiteral:
+			return operatorToCondition(expr.Operator, pos, rhs.Literal.ToString())
+		default:
+			return nil, errors.New("unsupported RHS type in joined WHERE condition")
+		}
+
+	case *ast.LhsExpr:
+		leftCond, err := buildJoinedConditionFunc(*lhs.Expr, columns)
+		if err != nil {
+			return nil, err
+		}
+
+		switch rhs := expr.Right.(type) {
+		case *ast.RhsExpr:
+			rightCond, err := buildJoinedConditionFunc(*rhs.Expr, columns)
+			if err != nil {
+				return nil, err
+			}
+			return combineConditions(expr.Operator, leftCond, rightCond)
+		default:
+			return nil, errors.New("when LHS is an expression, RHS must also be an expression")
+		}
+
+	default:
+		panic("unsupported LHS type in buildJoinedConditionFunc")
+	}
+}
+
+// -------------------------------------------------
+// 条件関数ヘルパー
+// -------------------------------------------------
+
 // operatorToCondition は二項演算子を条件関数に変換する
 //
 // 条件関数: レコードを受け取り、条件を満たすかどうか (bool) を返す関数
-func (s *Search) operatorToCondition(operator string, pos int, value string) (func(executor.Record) bool, error) {
+func operatorToCondition(operator string, pos int, value string) (func(executor.Record) bool, error) {
 	switch operator {
 	case "=":
 		return func(record executor.Record) bool {
@@ -188,5 +221,17 @@ func (s *Search) operatorToCondition(operator string, pos int, value string) (fu
 		}, nil
 	default:
 		return nil, fmt.Errorf("unsupported operator in WHERE clause: %s", operator)
+	}
+}
+
+// combineConditions は 2 つの条件関数を論理演算子 (AND/OR) で結合する
+func combineConditions(operator string, left, right func(executor.Record) bool) (func(executor.Record) bool, error) {
+	switch operator {
+	case "AND":
+		return func(r executor.Record) bool { return left(r) && right(r) }, nil
+	case "OR":
+		return func(r executor.Record) bool { return left(r) || right(r) }, nil
+	default:
+		return nil, fmt.Errorf("unsupported logical operator: %s", operator)
 	}
 }
