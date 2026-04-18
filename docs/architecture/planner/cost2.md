@@ -189,9 +189,19 @@ SELECT * FROM users WHERE age BETWEEN 20 AND 30;
 
 ### 最終的なコスト算出
 
-- readTime に CPU コストを加算する (参考: [handler.cc#L6297-L6298](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6297-L6298))
-- 単一テーブルのレンジスキャンの最終コストは以下の式で表せる
-  - rangeCost = readTime + foundRecords × RowEvaluateCost + 0.01
+以下の 2 段階で計算される
+
+1. レンジオプティマイザが readTime に CPU コストを加算する (参考: [handler.cc#L6297-L6298](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6297-L6298))
+   - rangeCost = readTime + foundRecords × RowEvaluateCost + 0.01
+
+2. ジョインオプティマイザが rangeCost を `read_cost` として受け取り ([sql_planner.cc#L1168](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L1168), [sql_planner.cc#L1220](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L1220))、さらにレコード評価コストを加算する ([sql_select.h#L568](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_select.h#L568))
+   - コスト = rangeCost + foundRecords × RowEvaluateCost
+
+展開すると
+
+- コスト = readTime + (2 × foundRecords × RowEvaluateCost) + 0.01
+
+※単一テーブルのクエリでも `JOIN::make_join_plan()` ([sql_optimizer.cc#L5307](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_optimizer.cc#L5307)) → `choose_table_order()` ([sql_optimizer.cc#L5394](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_optimizer.cc#L5394)) を経由してジョインオプティマイザを通るため、両方の段階が適用される
 
 ### 例
 
