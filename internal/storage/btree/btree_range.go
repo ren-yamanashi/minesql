@@ -74,7 +74,7 @@ func (bt *BTree) RecordsInRange(
 
 // estimateSamePage は同一リーフページ内でのレコード数を算出する
 //
-// cost2.md の式: nth_rec_2 - nth_rec_1 - 1 + left_incl + right_incl
+// cost.md の式: nth_rec_2 - nth_rec_1 - 1 + left_incl + right_incl
 // 実装では等価な式 (upper - lower + 1 - !leftIncl - !rightIncl) を使用
 //
 // 境界除外 (!leftIncl / !rightIncl) はキーが完全一致した場合のみ適用する。

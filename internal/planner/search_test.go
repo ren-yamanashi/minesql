@@ -816,8 +816,8 @@ func TestPlanSelection(t *testing.T) {
 }
 
 func TestCostFormulas(t *testing.T) {
-	t.Run("フルスキャンのコストが cost2.md の式と一致する", func(t *testing.T) {
-		// GIVEN: cost2.md の計算例
+	t.Run("フルスキャンのコストが cost.md の式と一致する", func(t *testing.T) {
+		// GIVEN: cost.md の計算例
 		stats := &handler.TableStatistics{
 			RecordCount:   74822,
 			LeafPageCount: 1924,
@@ -828,7 +828,7 @@ func TestCostFormulas(t *testing.T) {
 		readCost := calcFullScanReadCost(stats, pageReadCost)
 		totalCost := calcFullScanCost(stats, pageReadCost)
 
-		// THEN: cost2.md の式: scanTime × pageReadCost + foundRecords × RowEvaluateCost
+		// THEN: cost.md の式: scanTime × pageReadCost + foundRecords × RowEvaluateCost
 		assert.Equal(t, 1924.0, readCost)                       // scanTime × 1.0
 		assert.Equal(t, 1924.0+74822.0*0.1, totalCost)          // 9406.2
 	})
@@ -841,8 +841,8 @@ func TestCostFormulas(t *testing.T) {
 		assert.Equal(t, 1.0, cost)
 	})
 
-	t.Run("レンジスキャンのコストが cost2.md の 2 段階計算と一致する", func(t *testing.T) {
-		// GIVEN: cost2.md の計算例 (セカンダリインデックス)
+	t.Run("レンジスキャンのコストが cost.md の 2 段階計算と一致する", func(t *testing.T) {
+		// GIVEN: cost.md の計算例 (セカンダリインデックス)
 		foundRecords := 500.0
 		nRanges := 1
 		pageReadCost := 1.0

@@ -9,8 +9,8 @@ import (
 )
 
 func TestCalcFullScanCost(t *testing.T) {
-	t.Run("cost2.md の計算例と一致する", func(t *testing.T) {
-		// GIVEN: cost2.md の例
+	t.Run("cost.md の計算例と一致する", func(t *testing.T) {
+		// GIVEN: cost.md の例
 		// RecordCount=74822, LeafPageCount=1924 (= 7880704 / 4096), pageReadCost=1.0
 		stats := &handler.TableStatistics{
 			RecordCount:   74822,
@@ -52,8 +52,8 @@ func TestCalcUniqueScanCost(t *testing.T) {
 }
 
 func TestCalcRangeScanCost(t *testing.T) {
-	t.Run("cost2.md のセカンダリインデックス計算例と一致する", func(t *testing.T) {
-		// GIVEN: cost2.md の例
+	t.Run("cost.md のセカンダリインデックス計算例と一致する", func(t *testing.T) {
+		// GIVEN: cost.md の例
 		// foundRecords=500, nRanges=1, pageReadCost=1.0
 		foundRecords := 500.0
 		readTime := calcReadTimeForSecondaryIndex(1, foundRecords, 1.0)
