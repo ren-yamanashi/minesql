@@ -468,6 +468,68 @@ func calcIndexTableRangeCost(stats *handler.TableStatistics, colName string, ind
 }
 
 // -----------------------------------------------
+// 新コストモデル (cost2.md 準拠)
+// -----------------------------------------------
+
+// RowEvaluateCost は 1 レコードを評価するコスト (MySQL の row_evaluate_cost に対応)
+const RowEvaluateCost = 0.1
+
+// calcFullScanReadCost はフルテーブルスキャンの I/O コスト (readCost) のみを返す
+//
+// readCost = scanTime × pageReadCost
+//
+// RowEvaluateCost を含まない。JOIN の prefix_cost 累積で二重加算を防ぐため分離している
+func calcFullScanReadCost(stats *handler.TableStatistics, pageReadCost float64) float64 {
+	scanTime := float64(stats.LeafPageCount)
+	return scanTime * pageReadCost
+}
+
+// calcFullScanCost はフルテーブルスキャンの最終コストを算出する
+//
+// cost = readCost + foundRecords × RowEvaluateCost
+//      = scanTime × pageReadCost + foundRecords × RowEvaluateCost
+func calcFullScanCost(stats *handler.TableStatistics, pageReadCost float64) float64 {
+	readCost := calcFullScanReadCost(stats, pageReadCost)
+	foundRecords := float64(stats.RecordCount)
+	return readCost + foundRecords*RowEvaluateCost
+}
+
+// calcUniqueScanCost はユニークスキャン (UNIQUE KEY or PK で = 検索) のコストを返す
+//
+// MySQL と同様にコスト 1.0 固定
+func calcUniqueScanCost() float64 {
+	return 1.0
+}
+
+// calcRangeScanCost はレンジスキャンの最終コストを算出する
+//
+// rangeCost = readTime + foundRecords × RowEvaluateCost + 0.01
+// 最終コスト = rangeCost + foundRecords × RowEvaluateCost
+//            = readTime + 2 × foundRecords × RowEvaluateCost + 0.01
+func calcRangeScanCost(readTime float64, foundRecords float64) float64 {
+	return readTime + 2*foundRecords*RowEvaluateCost + 0.01
+}
+
+// calcReadTimeForSecondaryIndex はセカンダリインデックス (非 index-only) の readTime を算出する
+//
+// readTime = (nRanges + foundRecords) × pageReadCost
+func calcReadTimeForSecondaryIndex(nRanges int, foundRecords float64, pageReadCost float64) float64 {
+	return (float64(nRanges) + foundRecords) * pageReadCost
+}
+
+// calcReadTimeForClusteredIndex はクラスタ化インデックスの readTime を算出する
+//
+// foundRecords <= 2 の場合: readTime = foundRecords × pageReadCost
+// それ以外: readTime = (nRanges + (foundRecords / totalRows) × scanTime) × pageReadCost
+func calcReadTimeForClusteredIndex(nRanges int, foundRecords float64, totalRows float64, scanTime float64, pageReadCost float64) float64 {
+	if foundRecords <= 2 {
+		return foundRecords * pageReadCost
+	}
+	ratio := foundRecords / totalRows
+	return (float64(nRanges) + ratio*scanTime) * pageReadCost
+}
+
+// -----------------------------------------------
 // page_read_cost
 // -----------------------------------------------
 
