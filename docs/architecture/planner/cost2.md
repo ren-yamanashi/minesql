@@ -27,7 +27,25 @@ mysql> SELECT cost_name, cost_value, default_value FROM mysql.server_cost WHERE 
 
 - SQL コストは以下の二つのパラメータから計算される
   - foundRecords: 読み取られるレコード数の推定値
-  - readTime: ディスクアクセス回数の推定値
+  - readTime: ディスクアクセスの I/O コスト
+
+### page_read_cost について
+
+- コスト算出の際に `page_read_cost` という値を頻繁に使用する
+- `page_read_cost` は、1 ページの読み取りコストをバッファプールのキャッシュヒット率に応じて重み付けした値 (参考: [opt_costmodel.cc#L79-L93](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/opt_costmodel.cc#L79-L93))
+  - page_read_cost = in_mem × 0.25 + (1 - in_mem) × 1.0
+    - `in_mem`: バッファプールに載っている割合 (0.0 〜 1.0)
+    - `0.25`: バッファプール内 (メモリ上) のページ読み取りコスト
+    - `1.0`: ディスク上のページ読み取りコスト
+    - 例えばテーブルの 100% がバッファプールにある場合は page_read_cost = 0.25、全くない場合は 1.0 となる
+  - `in_mem` の計算方法 (InnoDB の場合, 参考: [ha_innodb.cc#L17159-L17172](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/handler/ha_innodb.cc#L17159-L17172))
+    - in_mem = n_in_mem / n_leaf
+      - `n_in_mem`: バッファプール内の該当インデックスのページ数 (InnoDB 内部の `buf_stat_per_index` カウンタから取得)
+      - `n_leaf`: 該当インデックスのリーフページ総数 (`stat_n_leaf_pages`)
+  - `in_mem` の参照先はスキャンの種類によって異なる
+    - index-only scan: セカンダリインデックスの in_mem を使う (参考: [opt_costmodel.cc#L95-L105](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/opt_costmodel.cc#L95-L105))
+    - 非 index-only scan / フルスキャン: クラスタ化インデックス の in_mem を使う (参考: [opt_costmodel.cc#L79-L93](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/opt_costmodel.cc#L79-L93), [ha_innodb.cc#L17379-L17381](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/handler/ha_innodb.cc#L17379-L17381))
+  - ※ MySQL の Optimizer Trace の `in_memory` フィールドは常にインデックスの常駐率 (`KEY::in_memory_estimate()`) を表示する (参考: [index_range_scan_plan.cc#L908](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/range_optimizer/index_range_scan_plan.cc#L908))。非 index-only scan でもインデックスの値が表示されるため、コスト計算に使われる主キーの常駐率とは異なる場合がある
 
 ## 単一テーブルのフルスキャン
 
@@ -37,7 +55,9 @@ SELECT * FROM users WHERE first_name = 'John';
 ```
 
 - foundRecords: テーブル統計情報の中の、「レコード数」を用いる
-- readTime: テーブル統計情報の中の「データサイズ」をページサイズ (4KB) で割った値を用いる
+- readTime: scan_time × page_read_cost (参考: [handler.cc#L6030-L6042](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6030-L6042))
+  - `scan_time`: クラスタ化インデックスのページ数 (= データサイズ / ページサイズ)
+  - `page_read_cost`: 1 ページの読み取りコスト (詳細: [page_read_cost について](#page_read_cost-について))
 - コスト: readTime + foundRecords × RowEvaluateCost (参考: [sql_planner.cc#L1097-L1101](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L1097-L1101))
   - ディスクアクセスの I/O コスト (`readTime`) とレコード評価の CPU コスト (`foundRecords × RowEvaluateCost`) を合算する
 
@@ -47,9 +67,11 @@ SELECT * FROM users WHERE first_name = 'John';
   - レコード数: 74822
   - データサイズ: 7880704
   - ページサイズ: 4096
+  - page_read_cost: 1.0 (全データがディスク上)
 - 計算式:
+  - scan_time: 7880704 / 4096 = 1,924
+  - readTime: 1,924 × 1.0 = 1,924
   - foundRecords: 74822
-  - readTime: 7880704 / 4096 = 1,924
   - コスト: 1,924 + 74822 × 0.1 = 9,406.2
 
 ## 単一テーブルのユニークスキャン
@@ -123,49 +145,55 @@ SELECT * FROM users WHERE username = 'john-doe';
 
 ### readTime の推定方法
 
-#### セカンダリインデックスの場合
+以下の式で共通して使用する変数:
 
-- レンジスキャンにおけるディスクアクセス回数は、以下の 3 つの要素から推定される
-  - ランダムシーク回数: レンジの区間数と等しい (区間ごとにインデックス上の異なる位置へシークするため)
-  - ページ読み取り回数: 読み取りレコード数の推定値と等しい
-  - ページ読み取りコスト: バッファプールのキャッシュヒット率を考慮した重み付け (参考: [opt_costmodel.cc#L79-L93](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/opt_costmodel.cc#L79-L93))
-- これらを合計すると以下の式になる (参考: [handler.cc#L6075-L6077](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6075-L6077))
-  - readTime = (n_ranges + foundRecords) × page_read_cost
-    - `n_ranges`: レンジ条件の区間の数
-      - 例:
-        - `WHERE x BETWEEN 10 AND 20` は `10 <= x <= 20` という 1 つの連続した区間なので 1
-        - `WHERE x IN (1, 5, 10)` は `x = 1`, `x = 5`, `x = 10` という 3 つの独立した区間に分かれるので 3
-    - `foundRecords`: 前述の方法で推定されたレコード数
+- `n_ranges`: レンジ条件の区間の数
+  - 例:
+    - `WHERE x BETWEEN 10 AND 20` は `10 <= x <= 20` という 1 つの連続した区間なので 1
+    - `WHERE x IN (1, 5, 10)` は `x = 1`, `x = 5`, `x = 10` という 3 つの独立した区間に分かれるので 3
+- `foundRecords`: 前述の方法で推定されたレコード数
+- `page_read_cost`: 1 ページの読み取りコスト (詳細: [page_read_cost について](#page_read_cost-について))
+
+#### セカンダリインデックスの非 index-only scan の場合
+
+- readTime = (n_ranges + foundRecords) × page_read_cost (参考: [handler.cc#L6075-L6077](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6075-L6077))
+
+#### index-only scan の場合
+
+- readTime = index_only_read_time × page_read_cost (参考: [handler.cc#L6057-L6058](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6057-L6058))
+  - `index_only_read_time`: 読み取るページ数の推定値 (参考: [handler.cc#L5916-L5923](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L5916-L5923))
+    - index_only_read_time = (foundRecords + keys_per_block - 1) / keys_per_block
+      - keys_per_block = (block_size / 2 / (key_length + ref_length)) + 1
+        - `block_size`: ページサイズ (InnoDB デフォルト: 16384)
+        - `key_length`: インデックスキーのバイト長 (EXPLAIN の `key_len` に対応)
+        - `ref_length`: 主キーのバイト長 (セカンダリインデックスのリーフには主キーの値が含まれるため)
   - `page_read_cost`: 1 ページの読み取りコスト (詳細: [page_read_cost について](#page_read_cost-について))
 
 #### クラスタ化インデックスの場合
 
 - クラスタ化インデックスではデータ行がインデックスのリーフに直接格納されているため、フルスキャンのコストに対する読み取り行数の比率で I/O コストを推定する (参考: [ha_innodb.cc#L16899](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/handler/ha_innodb.cc#L16899))
   - readTime = (n_ranges + (foundRecords / total_rows) × scan_time) × page_read_cost
-    - `n_ranges`: レンジ条件の区間の数
-      - 例:
-        - `WHERE x BETWEEN 10 AND 20` は `10 <= x <= 20` という 1 つの連続した区間なので 1
-        - `WHERE x IN (1, 5, 10)` は `x = 1`, `x = 5`, `x = 10` という 3 つの独立した区間に分かれるので 3
-    - `foundRecords`: 前述の方法で推定されたレコード数
     - `total_rows`: テーブルの総行数の上限推定値
     - `scan_time`: クラスタ化インデックスのページ数 (参考: [ha_innodb.cc#L16840-L16868](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/handler/ha_innodb.cc#L16840-L16868))
     - `foundRecords / total_rows`: 読み取る行がテーブル全体の何割かを表す比率
     - `page_read_cost`: 1 ページの読み取りコスト (詳細: [page_read_cost について](#page_read_cost-について))
   - ただし `foundRecords` が 2 以下の場合は readTime = foundRecords × page_read_cost となる (参考: [ha_innodb.cc#L16886-L16888](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/handler/ha_innodb.cc#L16886-L16888))
 
-#### page_read_cost について
-
-- 上記の式に含まれる `page_read_cost` は、1 ページの読み取りコストをバッファプールのキャッシュヒット率に応じて重み付けした値 (参考: [opt_costmodel.cc#L79-L93](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/opt_costmodel.cc#L79-L93))
-  - テーブルがバッファプールに載っている割合 (`in_mem`: 0.0 〜 1.0) に応じて以下のように計算される
-    - page_read_cost = in_mem × 0.25 + (1 - in_mem) × 1.0
-      - `0.25`: バッファプール内 (メモリ上) のページ読み取りコスト
-      - `1.0`: ディスク上のページ読み取りコスト
-      - 例えばテーブルの 100% がバッファプールにある場合は page_read_cost = 0.25、全くない場合は 1.0 となる
-
 ### 最終的なコスト算出
 
-- ディスクアクセスの I/O コスト (`readTime`) とレコード評価の CPU コスト (`foundRecords × RowEvaluateCost`) を合算する (参考: [handler.cc#L6297-L6298](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6297-L6298))
-  - コスト = readTime + foundRecords × RowEvaluateCost
+MySQL ではレンジスキャンのコストが 2 段階で計算される。
+
+1. レンジオプティマイザが readTime に CPU コストを加算する (参考: [handler.cc#L6297-L6298](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6297-L6298))
+   - rangeCost = readTime + foundRecords × RowEvaluateCost + 0.01
+2. ジョインオプティマイザがさらにレコード評価コストを加算する (参考: [sql_planner.cc#L1153-L1155](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L1153-L1155))
+   - コスト = rangeCost + foundRecords × RowEvaluateCost
+
+1 と 2 の各段階で `foundRecords × RowEvaluateCost` が 1 回ずつ、合計 2 回加算される。展開すると:
+
+- コスト = readTime + foundRecords × RowEvaluateCost + 0.01 + foundRecords × RowEvaluateCost
+- = readTime + 2 × foundRecords × RowEvaluateCost + 0.01
+
+※ フルスキャンでは readTime に RowEvaluateCost が含まれないため 1 回のみの加算になる ([sql_planner.cc#L1097-L1101](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/sql_planner.cc#L1097-L1101))。この差異はレンジオプティマイザとジョインオプティマイザが独立したコンポーネントであることに起因する。レンジオプティマイザの `multi_range_read_info_const` は全行分の CPU コストを含めて返すが ([handler.cc#L6297-L6298](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6297-L6298))、フルスキャンの `table_scan_cost` は I/O コストのみを返す ([handler.cc#L6030-L6042](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/sql/handler.cc#L6030-L6042))。ジョインオプティマイザはどちらの場合もレコード評価コストを加算するため、レンジスキャンでは二重加算になる。
 
 ### 例
 
@@ -176,4 +204,5 @@ SELECT * FROM users WHERE username = 'john-doe';
   - page_read_cost: 1.0 (全データがディスク上)
 - 計算式:
   - readTime: (1 + 500) × 1.0 = 501
-  - コスト: 501 + 500 × 0.1 = 551.0
+  - rangeCost: 501 + 500 × 0.1 + 0.01 = 551.01
+  - コスト: 551.01 + 500 × 0.1 = 601.01
