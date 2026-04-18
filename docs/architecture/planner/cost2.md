@@ -145,10 +145,10 @@ SELECT * FROM users WHERE username = 'john-doe';
     - `n_ranges`: レンジ条件の区間の数
     - `foundRecords`: 前述の方法で推定されたレコード数
     - `total_rows`: テーブルの総行数の上限推定値
-    - `scan_time`: テーブルフルスキャンの時間 (= データサイズ / ページサイズ + 2)
+    - `scan_time`: クラスタ化インデックスのページ数 (参考: [ha_innodb.cc#L16840-L16868](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/handler/ha_innodb.cc#L16840-L16868))
     - `foundRecords / total_rows`: 読み取る行がテーブル全体の何割かを表す比率
     - `page_read_cost`: 1 ページの読み取りコスト (詳細: [page_read_cost について](#page_read_cost-について))
-  - ただし `foundRecords` が 2 以下の場合は readTime = foundRecords となる (参考: [ha_innodb.cc#L16886-L16888](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/handler/ha_innodb.cc#L16886-L16888))
+  - ただし `foundRecords` が 2 以下の場合は readTime = foundRecords × page_read_cost となる (参考: [ha_innodb.cc#L16886-L16888](https://github.com/mysql/mysql-server/blob/89e1c722476deebc3ddc8675e779869f6da654c0/storage/innobase/handler/ha_innodb.cc#L16886-L16888))
 
 #### page_read_cost について
 
