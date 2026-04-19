@@ -6,9 +6,8 @@ package executor
 type NestedLoopJoin struct {
 	leftExec       Executor
 	buildRightExec func(leftRecord Record) (Executor, error)
-
-	currentLeft  Record
-	currentRight Executor
+	currentLeft    Record
+	currentRight   Executor
 }
 
 func NewNestedLoopJoin(

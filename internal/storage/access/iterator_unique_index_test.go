@@ -190,6 +190,147 @@ func TestUniqueIndexIterator(t *testing.T) {
 		assert.Nil(t, result)
 	})
 
+	t.Run("NextIndexOnly で PK と UK がインデックスから取得できる", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "idx_iter_test.db")
+
+		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		err = table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		assert.NoError(t, err)
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		assert.NoError(t, err)
+
+		// WHEN: NextIndexOnly で全件取得
+		iter, err := uniqueIndex.Search(bp, &table, RecordSearchModeStart{})
+		assert.NoError(t, err)
+
+		var results []*SearchResult
+		for {
+			result, ok, err := iter.NextIndexOnly()
+			assert.NoError(t, err)
+			if !ok {
+				break
+			}
+			results = append(results, result)
+		}
+
+		// THEN: UK と PK が取得でき、Record は空 (primary lookup なし)
+		assert.Equal(t, 2, len(results))
+
+		// "Doe" → PK "a"
+		assert.Equal(t, [][]byte{[]byte("Doe")}, results[0].UniqueKey)
+		assert.Equal(t, [][]byte{[]byte("a")}, results[0].PKValues)
+		assert.Nil(t, results[0].Record)
+
+		// "Smith" → PK "b"
+		assert.Equal(t, [][]byte{[]byte("Smith")}, results[1].UniqueKey)
+		assert.Equal(t, [][]byte{[]byte("b")}, results[1].PKValues)
+		assert.Nil(t, results[1].Record)
+	})
+
+	t.Run("NextIndexOnly でソフトデリート済みエントリはスキップされる", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "idx_iter_test.db")
+
+		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		err = table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		assert.NoError(t, err)
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		assert.NoError(t, err)
+
+		// "Doe" をソフトデリート
+		err = table.SoftDelete(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		assert.NoError(t, err)
+
+		// WHEN
+		iter, err := uniqueIndex.Search(bp, &table, RecordSearchModeStart{})
+		assert.NoError(t, err)
+
+		var results []*SearchResult
+		for {
+			result, ok, err := iter.NextIndexOnly()
+			assert.NoError(t, err)
+			if !ok {
+				break
+			}
+			results = append(results, result)
+		}
+
+		// THEN: "Doe" はスキップされ、"Smith" のみ
+		assert.Equal(t, 1, len(results))
+		assert.Equal(t, [][]byte{[]byte("Smith")}, results[0].UniqueKey)
+		assert.Equal(t, [][]byte{[]byte("b")}, results[0].PKValues)
+	})
+
+	t.Run("NextIndexOnly で指定キーから検索できる", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "idx_iter_test.db")
+
+		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+
+		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		err = table.Create(bp)
+		assert.NoError(t, err)
+
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("a"), []byte("John"), []byte("Doe")})
+		assert.NoError(t, err)
+		err = table.Insert(bp, 0, lock.NewManager(5000), [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")})
+		assert.NoError(t, err)
+
+		// WHEN: キー "Smith" で検索
+		iter, err := uniqueIndex.Search(bp, &table, RecordSearchModeKey{Key: [][]byte{[]byte("Smith")}})
+		assert.NoError(t, err)
+
+		result, ok, err := iter.NextIndexOnly()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, [][]byte{[]byte("Smith")}, result.UniqueKey)
+		assert.Equal(t, [][]byte{[]byte("b")}, result.PKValues)
+		assert.Nil(t, result.Record)
+	})
+
+	t.Run("空のインデックスで NextIndexOnly は ok=false を返す", func(t *testing.T) {
+		// GIVEN
+		bp, metaPageId, _ := InitDisk(t, "idx_iter_test.db")
+
+		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
+		assert.NoError(t, err)
+		uniqueIndex := NewUniqueIndex("idx_col", "col", indexMetaPageId, 0, 1)
+
+		table := NewTable("test", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		err = table.Create(bp)
+		assert.NoError(t, err)
+
+		// WHEN
+		iter, err := uniqueIndex.Search(bp, &table, RecordSearchModeStart{})
+		assert.NoError(t, err)
+
+		result, ok, err := iter.NextIndexOnly()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.False(t, ok)
+		assert.Nil(t, result)
+	})
+
 	t.Run("更新後のインデックスから正しいレコードが返される", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "idx_iter_test.db")

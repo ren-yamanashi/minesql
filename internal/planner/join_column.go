@@ -2,6 +2,7 @@ package planner
 
 import (
 	"fmt"
+	"minesql/internal/ast"
 	"minesql/internal/storage/handler"
 )
 
@@ -63,4 +64,57 @@ func findColumnPos(columns []joinedColumn, tableName, colName string) (int, erro
 		return -1, fmt.Errorf("column %s not found in joined tables", colName)
 	}
 	return found, nil
+}
+
+// resolveSelectColumns は単一テーブルの SELECT カラムをカラム位置に変換する
+//
+// columns が nil の場合は SELECT * (全カラム)
+func resolveSelectColumns(columns []ast.ColumnId, tables []*handler.TableMetadata) ([]uint16, error) {
+	if len(columns) == 0 {
+		// SELECT *: 全カラムの位置を返す
+		var pos []uint16
+		for _, tbl := range tables {
+			for _, col := range tbl.GetSortedCols() {
+				pos = append(pos, col.Pos)
+			}
+		}
+		return pos, nil
+	}
+
+	// 指定カラムの位置を解決
+	joined := resolveJoinedColumns(tables)
+	pos := make([]uint16, 0, len(columns))
+	for _, col := range columns {
+		p, err := findColumnPos(joined, col.TableName, col.ColName)
+		if err != nil {
+			return nil, err
+		}
+		pos = append(pos, uint16(p))
+	}
+	return pos, nil
+}
+
+// resolveSelectColumnsForJoin は JOIN 後の結合レコードに対する SELECT カラムをカラム位置に変換する
+//
+// columns が nil の場合は SELECT * (全カラム)
+func resolveSelectColumnsForJoin(columns []ast.ColumnId, joinedCols []joinedColumn, totalColCount int) ([]uint16, error) {
+	if len(columns) == 0 {
+		// SELECT *: 全カラムの位置を返す
+		pos := make([]uint16, totalColCount)
+		for i := range pos {
+			pos[i] = uint16(i)
+		}
+		return pos, nil
+	}
+
+	// 指定カラムの位置を解決
+	pos := make([]uint16, 0, len(columns))
+	for _, col := range columns {
+		p, err := findColumnPos(joinedCols, col.TableName, col.ColName)
+		if err != nil {
+			return nil, err
+		}
+		pos = append(pos, uint16(p))
+	}
+	return pos, nil
 }

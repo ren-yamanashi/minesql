@@ -28,14 +28,15 @@ func planSelectSingle(trxId handler.TrxId, stmt *ast.SelectStmt) (executor.Execu
 	rv := hdl.CreateReadView(trxId)
 	vr := access.NewVersionReader(hdl.UndoLog())
 	search := NewSearch(rv, vr, tblMeta, stmt.Where, hdl.BufferPool)
+	search.SetSelectColumns(stmt.Columns)
 	iterator, err := search.Build()
 	if err != nil {
 		return nil, err
 	}
 
-	var colPos []uint16
-	for _, colMeta := range tblMeta.Cols {
-		colPos = append(colPos, colMeta.Pos)
+	colPos, err := resolveSelectColumns(stmt.Columns, []*handler.TableMetadata{tblMeta})
+	if err != nil {
+		return nil, err
 	}
 	return executor.NewProject(iterator, colPos), nil
 }
@@ -60,7 +61,12 @@ func planSelectJoin(trxId handler.TrxId, stmt *ast.SelectStmt) (executor.Executo
 	}
 
 	// 3. 貪欲法で結合順序を決定
-	ordered, err := optimizeJoinOrder(hdl.BufferPool, candidates, predicates)
+	// 全テーブルのメタデータ (WHERE pushdown の曖昧性チェック用)
+	allMetas := make([]*handler.TableMetadata, len(candidates))
+	for i, c := range candidates {
+		allMetas[i] = c.tblMeta
+	}
+	ordered, err := optimizeJoinOrder(hdl.BufferPool, candidates, predicates, stmt.Where, allMetas)
 	if err != nil {
 		return nil, err
 	}
@@ -72,14 +78,15 @@ func planSelectJoin(trxId handler.TrxId, stmt *ast.SelectStmt) (executor.Executo
 	}
 	joinedColumns := resolveJoinedColumns(orderedMetas)
 
-	// 駆動表の TableScan
-	var exec executor.Executor = executor.NewTableScan(executor.TableScanParams{
-		ReadView:       rv,
-		VersionReader:  vr,
-		Table:          ordered[0].table,
-		SearchMode:     access.RecordSearchModeStart{},
-		WhileCondition: func(record executor.Record) bool { return true },
-	})
+	// 駆動表のアクセスパスを決定
+	// WHERE 条件のうち駆動表のカラムのみに関係する条件を抽出し、Search で最適化する
+	drivingTable := ordered[0]
+	drivingWhere, remainingWhere := splitWhereForTable(stmt.Where, drivingTable.tblMeta, orderedMetas)
+	search := NewSearch(rv, vr, drivingTable.tblMeta, drivingWhere, hdl.BufferPool)
+	exec, err := search.Build()
+	if err != nil {
+		return nil, err
+	}
 
 	// 2 番目以降のテーブルを NestedLoopJoin で結合
 	leftColCount := int(ordered[0].tblMeta.NCols)
@@ -96,21 +103,115 @@ func planSelectJoin(trxId handler.TrxId, stmt *ast.SelectStmt) (executor.Executo
 		leftColCount += int(rightCandidate.tblMeta.NCols)
 	}
 
-	// 5. WHERE 句があれば Filter を重ねる (結合レコード全体のカラム位置で解決)
-	if stmt.Where != nil {
-		condFunc, err := buildJoinedConditionFunc(*stmt.Where.Condition, joinedColumns)
+	// 5. 駆動表に pushdown されなかった WHERE 条件があれば Filter を重ねる
+	if remainingWhere != nil {
+		condFunc, err := buildJoinedConditionFunc(*remainingWhere.Condition, joinedColumns)
 		if err != nil {
 			return nil, err
 		}
 		exec = executor.NewFilter(exec, condFunc)
 	}
 
-	// 6. Project (SELECT * → 全カラム)
-	colPos := make([]uint16, leftColCount)
-	for i := range colPos {
-		colPos[i] = uint16(i)
+	// 6. Project
+	colPos, err := resolveSelectColumnsForJoin(stmt.Columns, joinedColumns, leftColCount)
+	if err != nil {
+		return nil, err
 	}
 	return executor.NewProject(exec, colPos), nil
+}
+
+// splitWhereForTable は WHERE 条件を「指定テーブルのカラムのみの条件」と「残り」に分離する
+//
+// AND で結合された条件を分解し、指定テーブルのカラムのみで構成される部分を抽出する
+// 抽出できない場合や WHERE が nil の場合は (nil, 元の WHERE) を返す
+func splitWhereForTable(where *ast.WhereClause, tblMeta *handler.TableMetadata, allTables []*handler.TableMetadata) (forTable *ast.WhereClause, remaining *ast.WhereClause) {
+	if where == nil {
+		return nil, nil
+	}
+
+	tableExprs, otherExprs := splitExprForTable(where.Condition, tblMeta, allTables)
+
+	var forTableWhere *ast.WhereClause
+	if len(tableExprs) > 0 {
+		combined := combineExprsWithAND(tableExprs)
+		forTableWhere = &ast.WhereClause{Condition: combined}
+	}
+
+	var remainingWhere *ast.WhereClause
+	if len(otherExprs) > 0 {
+		combined := combineExprsWithAND(otherExprs)
+		remainingWhere = &ast.WhereClause{Condition: combined}
+	}
+
+	return forTableWhere, remainingWhere
+}
+
+// splitExprForTable は BinaryExpr を再帰的に走査し、指定テーブルのカラムのみを参照する式を分離する
+func splitExprForTable(expr *ast.BinaryExpr, tblMeta *handler.TableMetadata, allTables []*handler.TableMetadata) (forTable []*ast.BinaryExpr, other []*ast.BinaryExpr) {
+	if expr == nil {
+		return nil, nil
+	}
+
+	// AND の場合: 左右を再帰的に分離
+	if expr.Operator == "AND" {
+		if lhsExpr, ok := expr.Left.(*ast.LhsExpr); ok {
+			if rhsExpr, ok := expr.Right.(*ast.RhsExpr); ok {
+				lt, lo := splitExprForTable(lhsExpr.Expr, tblMeta, allTables)
+				rt, ro := splitExprForTable(rhsExpr.Expr, tblMeta, allTables)
+				return append(lt, rt...), append(lo, ro...)
+			}
+		}
+	}
+
+	// リーフ条件: テーブルに属するか判定
+	if belongsToTable(expr, tblMeta, allTables) {
+		return []*ast.BinaryExpr{expr}, nil
+	}
+	return nil, []*ast.BinaryExpr{expr}
+}
+
+// belongsToTable は式が指定テーブルのカラムのみを参照するか判定する
+//
+// allTables を渡した場合、非修飾名で同名カラムが複数テーブルにあるケースは
+// 曖昧と判定して false を返す (pushdown しない)
+func belongsToTable(expr *ast.BinaryExpr, tblMeta *handler.TableMetadata, allTables []*handler.TableMetadata) bool {
+	lhs, ok := expr.Left.(*ast.LhsColumn)
+	if !ok {
+		return false
+	}
+
+	// 修飾名の場合: テーブル名が一致するか
+	if lhs.Column.TableName != "" {
+		return lhs.Column.TableName == tblMeta.Name
+	}
+
+	// 非修飾名の場合: そのカラムがテーブルに存在し、かつ他テーブルに同名カラムがないか
+	_, exists := tblMeta.GetColByName(lhs.Column.ColName)
+	if !exists {
+		return false
+	}
+	for _, other := range allTables {
+		if other.Name == tblMeta.Name {
+			continue
+		}
+		if _, dup := other.GetColByName(lhs.Column.ColName); dup {
+			return false // 同名カラムが他テーブルにもある → 曖昧なので pushdown しない
+		}
+	}
+	return true
+}
+
+// combineExprsWithAND は複数の式を AND で結合する
+func combineExprsWithAND(exprs []*ast.BinaryExpr) *ast.BinaryExpr {
+	if len(exprs) == 1 {
+		return exprs[0]
+	}
+	// 左から順に AND で結合
+	result := exprs[0]
+	for _, e := range exprs[1:] {
+		result = ast.NewBinaryExpr("AND", ast.NewLhsExpr(result), ast.NewRhsExpr(e))
+	}
+	return result
 }
 
 // collectTableNames は SELECT 文から参加テーブル名を収集する

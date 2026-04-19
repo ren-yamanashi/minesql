@@ -20,9 +20,10 @@ func (*CreateTableStmt) isStatement() {}
 // ---------------------------------------
 
 type SelectStmt struct {
-	From  TableId
-	Joins []*JoinClause
-	Where *WhereClause
+	Columns []ColumnId // SELECT で指定されたカラム (nil なら SELECT *)
+	From    TableId
+	Joins   []*JoinClause
+	Where   *WhereClause
 }
 
 func (*SelectStmt) isStatement() {}

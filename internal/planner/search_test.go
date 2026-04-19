@@ -829,8 +829,8 @@ func TestCostFormulas(t *testing.T) {
 		totalCost := calcFullScanCost(stats, pageReadCost)
 
 		// THEN: cost.md の式: scanTime × pageReadCost + foundRecords × RowEvaluateCost
-		assert.Equal(t, 1924.0, readCost)                       // scanTime × 1.0
-		assert.Equal(t, 1924.0+74822.0*0.1, totalCost)          // 9406.2
+		assert.Equal(t, 1924.0, readCost)              // scanTime × 1.0
+		assert.Equal(t, 1924.0+74822.0*0.1, totalCost) // 9406.2
 	})
 
 	t.Run("ユニークスキャンのコストが 1.0 固定である", func(t *testing.T) {
@@ -869,7 +869,7 @@ func TestCostFormulas(t *testing.T) {
 		readTime500 := calcReadTimeForClusteredIndex(1, 500, 10000, 100, pageReadCost)
 
 		// THEN
-		assert.Equal(t, 2.0, readTime1)  // foundRecords × pageReadCost
+		assert.Equal(t, 2.0, readTime1)   // foundRecords × pageReadCost
 		assert.Equal(t, 6.0, readTime500) // (1 + 500/10000 × 100) × 1.0
 	})
 
@@ -887,6 +887,65 @@ func TestCostFormulas(t *testing.T) {
 
 		// THEN: フルスキャン = 1.0 + 10 × 0.1 = 2.0 > ユニーク = 1.0
 		assert.Greater(t, fullCost, uniqueCost)
+	})
+}
+
+func TestIsPKLeadingColumn(t *testing.T) {
+	t.Run("単一カラム PK の先頭カラムで true を返す", func(t *testing.T) {
+		// GIVEN
+		setupUsersTable(t)
+		tblMeta := getTableMetadata(t, "users")
+		s := &Search{tblMeta: tblMeta}
+
+		// WHEN & THEN
+		assert.True(t, s.isPKLeadingColumn("id"))
+	})
+
+	t.Run("PK でないカラムで false を返す", func(t *testing.T) {
+		// GIVEN
+		setupUsersTable(t)
+		tblMeta := getTableMetadata(t, "users")
+		s := &Search{tblMeta: tblMeta}
+
+		// WHEN & THEN
+		assert.False(t, s.isPKLeadingColumn("first_name"))
+	})
+
+	t.Run("存在しないカラムで false を返す", func(t *testing.T) {
+		// GIVEN
+		setupUsersTable(t)
+		tblMeta := getTableMetadata(t, "users")
+		s := &Search{tblMeta: tblMeta}
+
+		// WHEN & THEN
+		assert.False(t, s.isPKLeadingColumn("nonexistent"))
+	})
+
+	t.Run("複合 PK の先頭カラムで false を返す", func(t *testing.T) {
+		// GIVEN: 複合 PK (id, name) のテーブル
+		tmpdir := t.TempDir()
+		initStorageManager(t, tmpdir)
+		defer handler.Reset()
+
+		executePlan(t, &ast.CreateTableStmt{
+			TableName: "composite_pk",
+			CreateDefinitions: []ast.Definition{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "name", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "val", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{
+					*ast.NewColumnId("id"),
+					*ast.NewColumnId("name"),
+				}},
+			},
+		})
+
+		tblMeta := getTableMetadata(t, "composite_pk")
+		s := &Search{tblMeta: tblMeta}
+
+		// WHEN & THEN: 複合 PK では先頭カラムだけでは一意にならないため false
+		assert.False(t, s.isPKLeadingColumn("id"))
+		assert.False(t, s.isPKLeadingColumn("name"))
 	})
 }
 

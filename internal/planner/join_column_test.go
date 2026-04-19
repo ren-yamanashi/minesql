@@ -1,6 +1,7 @@
 package planner
 
 import (
+	"minesql/internal/ast"
 	"minesql/internal/storage/dictionary"
 	"minesql/internal/storage/handler"
 	"testing"
@@ -118,5 +119,122 @@ func TestFindColumnPos(t *testing.T) {
 		// THEN
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "not found")
+	})
+}
+
+func TestResolveSelectColumns(t *testing.T) {
+	t.Run("SELECT * で全カラムの位置が返される", func(t *testing.T) {
+		// GIVEN
+		tbl := &handler.TableMetadata{
+			Name: "users", NCols: 3,
+			Cols: []*dictionary.ColumnMeta{
+				{Name: "id", Pos: 0}, {Name: "name", Pos: 1}, {Name: "age", Pos: 2},
+			},
+		}
+
+		// WHEN
+		pos, err := resolveSelectColumns(nil, []*handler.TableMetadata{tbl})
+
+		// THEN
+		require.NoError(t, err)
+		assert.Equal(t, []uint16{0, 1, 2}, pos)
+	})
+
+	t.Run("指定カラムの位置が解決される", func(t *testing.T) {
+		// GIVEN
+		tbl := &handler.TableMetadata{
+			Name: "users", NCols: 3,
+			Cols: []*dictionary.ColumnMeta{
+				{Name: "id", Pos: 0}, {Name: "name", Pos: 1}, {Name: "age", Pos: 2},
+			},
+		}
+
+		// WHEN: age, id の順で指定
+		pos, err := resolveSelectColumns(
+			[]ast.ColumnId{{ColName: "age"}, {ColName: "id"}},
+			[]*handler.TableMetadata{tbl},
+		)
+
+		// THEN: カラム位置が指定順に返される
+		require.NoError(t, err)
+		assert.Equal(t, []uint16{2, 0}, pos)
+	})
+
+	t.Run("存在しないカラムでエラーになる", func(t *testing.T) {
+		// GIVEN
+		tbl := &handler.TableMetadata{
+			Name: "users", NCols: 2,
+			Cols: []*dictionary.ColumnMeta{
+				{Name: "id", Pos: 0}, {Name: "name", Pos: 1},
+			},
+		}
+
+		// WHEN
+		_, err := resolveSelectColumns(
+			[]ast.ColumnId{{ColName: "nonexistent"}},
+			[]*handler.TableMetadata{tbl},
+		)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "not found")
+	})
+}
+
+func TestResolveSelectColumnsForJoin(t *testing.T) {
+	// GIVEN: users(id, name) + orders(id, user_id) の結合カラム
+	joinedCols := []joinedColumn{
+		{tableName: "users", colName: "id", pos: 0},
+		{tableName: "users", colName: "name", pos: 1},
+		{tableName: "orders", colName: "id", pos: 2},
+		{tableName: "orders", colName: "user_id", pos: 3},
+	}
+
+	t.Run("SELECT * で全カラムの位置が返される", func(t *testing.T) {
+		// WHEN
+		pos, err := resolveSelectColumnsForJoin(nil, joinedCols, 4)
+
+		// THEN
+		require.NoError(t, err)
+		assert.Equal(t, []uint16{0, 1, 2, 3}, pos)
+	})
+
+	t.Run("修飾名で特定カラムの位置が解決される", func(t *testing.T) {
+		// WHEN: orders.user_id と users.name を指定
+		pos, err := resolveSelectColumnsForJoin(
+			[]ast.ColumnId{
+				{TableName: "orders", ColName: "user_id"},
+				{TableName: "users", ColName: "name"},
+			},
+			joinedCols, 4,
+		)
+
+		// THEN: カラム位置が指定順に返される
+		require.NoError(t, err)
+		assert.Equal(t, []uint16{3, 1}, pos)
+	})
+
+	t.Run("非修飾名で曖昧なカラムはエラーになる", func(t *testing.T) {
+		// WHEN: "id" は users と orders の両方にある
+		_, err := resolveSelectColumnsForJoin(
+			[]ast.ColumnId{{ColName: "id"}},
+			joinedCols, 4,
+		)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "ambiguous")
+	})
+
+	t.Run("非修飾名で一意のカラムは解決される", func(t *testing.T) {
+		// WHEN: "user_id" は orders にのみ存在
+		pos, err := resolveSelectColumnsForJoin(
+			[]ast.ColumnId{{ColName: "user_id"}},
+			joinedCols, 4,
+		)
+
+		// THEN
+		require.NoError(t, err)
+		assert.Equal(t, []uint16{3}, pos)
 	})
 }
