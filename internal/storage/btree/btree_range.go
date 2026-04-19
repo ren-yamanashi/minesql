@@ -22,6 +22,7 @@ const samplingMaxPages = 10
 // RecordsInRange は lowerKey から upperKey の範囲に含まれるレコード数を推定する
 //
 // lowerKey/upperKey が nil の場合、先頭/末尾までの全範囲を意味する
+//
 // leftIncl, rightIncl はそれぞれ境界を含むかどうかを指定する (>= なら true, > なら false)
 func (bt *BTree) RecordsInRange(
 	bp *buffer.BufferPool,
@@ -75,9 +76,11 @@ func (bt *BTree) RecordsInRange(
 // estimateSamePage は同一リーフページ内でのレコード数を算出する
 //
 // cost.md の式: nth_rec_2 - nth_rec_1 - 1 + left_incl + right_incl
-// 実装では等価な式 (upper - lower + 1 - !leftIncl - !rightIncl) を使用
+//
+// 実装では等価な式 (upper.slotNum - lower.slotNum + 1 - !leftIncl - !rightIncl) を使用
 //
 // 境界除外 (!leftIncl / !rightIncl) はキーが完全一致した場合のみ適用する。
+//
 // キーが存在しない場合、GE 位置は既に「最初の record > key」を指すため、
 // 追加で除外すると 1 つ余分にスキップしてしまう (上限側の LE 調整後も同様)
 func (bt *BTree) estimateSamePage(lower, upper leafPosition, leftIncl, rightIncl bool) int64 {
@@ -96,7 +99,7 @@ func (bt *BTree) estimateSamePage(lower, upper leafPosition, leftIncl, rightIncl
 
 // estimateDifferentPages は異なるリーフページにまたがる場合のレコード数を推定する
 //
-// 下限ページから NextPageId を辿り、上限ページとの距離に応じて分岐する:
+// 下限ページから NextPageId を辿り、上限ページとの距離に応じて分岐する
 //   - 隣接ページ: 正確なカウント
 //   - 10 ページ以内: 中間ページのレコード数を合算
 //   - 10 ページ超: サンプリングベース推定
