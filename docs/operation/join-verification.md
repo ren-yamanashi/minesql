@@ -25,11 +25,8 @@ make build-client
 CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));
 CREATE TABLE orders (id VARCHAR, user_id VARCHAR, item VARCHAR, PRIMARY KEY (id), UNIQUE KEY idx_user_id (user_id));
 BEGIN;
-INSERT INTO users (id, name) VALUES ('1', 'Alice');
-INSERT INTO users (id, name) VALUES ('2', 'Bob');
-INSERT INTO users (id, name) VALUES ('3', 'Charlie');
-INSERT INTO orders (id, user_id, item) VALUES ('100', '1', 'apple');
-INSERT INTO orders (id, user_id, item) VALUES ('101', '3', 'banana');
+INSERT INTO users (id, name) VALUES ('1', 'Alice'), ('2', 'Bob'), ('3', 'Charlie');
+INSERT INTO orders (id, user_id, item) VALUES ('100', '1', 'apple'), ('101', '3', 'banana');
 COMMIT;
 BEGIN;
 SELECT * FROM users JOIN orders ON users.id = orders.user_id;
