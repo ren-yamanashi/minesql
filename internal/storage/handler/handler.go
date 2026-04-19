@@ -22,7 +22,7 @@ import (
 
 const ColumnTypeString = dictionary.ColumnTypeString
 
-type TrxId = access.TrxId
+type TrxId = lock.TrxId
 type UndoManager = access.UndoManager
 type TableMetadata = dictionary.TableMeta
 type IndexMetadata = dictionary.IndexMeta
@@ -296,9 +296,9 @@ func registerTableDisks(cat *dictionary.Catalog, baseDir string, bp *buffer.Buff
 // サーバー再起動時に TrxManager の nextTrxId を復元するために使用する。
 // nextTrxId が過去のコミット済み trxId 以下だと、ReadView が過去のレコードを
 // 不可視と判定してしまうバグを防ぐ。
-func findMaxTrxId(bp *buffer.BufferPool, catalog *dictionary.Catalog, undoLog *access.UndoManager, redoLog *log.RedoLog) (access.TrxId, error) {
+func findMaxTrxId(bp *buffer.BufferPool, catalog *dictionary.Catalog, undoLog *access.UndoManager, redoLog *log.RedoLog) (lock.TrxId, error) {
 	tables := buildAllTables(catalog, undoLog, redoLog)
-	var maxTrxId access.TrxId
+	var maxTrxId lock.TrxId
 
 	for _, tbl := range tables {
 		tableBTree := btree.NewBTree(tbl.MetaPageId)

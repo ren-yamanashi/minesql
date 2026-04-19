@@ -693,7 +693,7 @@ func TestFindMaxTrxId(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, access.TrxId(2), maxTrxId)
+		assert.Equal(t, lock.TrxId(2), maxTrxId)
 	})
 
 	t.Run("テーブルが空の場合、0 が返される", func(t *testing.T) {
@@ -714,7 +714,7 @@ func TestFindMaxTrxId(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, access.TrxId(0), maxTrxId)
+		assert.Equal(t, lock.TrxId(0), maxTrxId)
 	})
 
 	t.Run("複数テーブルの中で最大の trxId が返される", func(t *testing.T) {
@@ -749,7 +749,7 @@ func TestFindMaxTrxId(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, access.TrxId(5), maxTrxId)
+		assert.Equal(t, lock.TrxId(5), maxTrxId)
 	})
 }
 

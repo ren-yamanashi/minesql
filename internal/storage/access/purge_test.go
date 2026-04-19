@@ -117,7 +117,7 @@ func TestPurgeDeleteMarked(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: B+Tree から物理削除されている
-		targets, err := pt.collectPurgeTargets(table, ^TrxId(0))
+		targets, err := pt.collectPurgeTargets(table, ^lock.TrxId(0))
 		assert.NoError(t, err)
 		assert.Equal(t, 0, len(targets))
 
@@ -164,7 +164,7 @@ func TestRunPurge(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: 物理削除されている
-		targets, err := pt.collectPurgeTargets(table, ^TrxId(0))
+		targets, err := pt.collectPurgeTargets(table, ^lock.TrxId(0))
 		assert.NoError(t, err)
 		assert.Equal(t, 0, len(targets))
 
@@ -248,7 +248,7 @@ func TestPurgeThread(t *testing.T) {
 		pt.Stop()
 
 		// THEN: delete-marked レコードが物理削除されている
-		targets, err := pt.collectPurgeTargets(table, ^TrxId(0))
+		targets, err := pt.collectPurgeTargets(table, ^lock.TrxId(0))
 		assert.NoError(t, err)
 		assert.Equal(t, 0, len(targets))
 

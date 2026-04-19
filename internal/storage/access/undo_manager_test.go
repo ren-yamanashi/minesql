@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/file"
+	"minesql/internal/storage/lock"
 	"minesql/internal/storage/page"
 	"path/filepath"
 	"testing"
@@ -403,7 +404,7 @@ func TestPurge(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: purgeLimit=3 で trx1, trx2 がコミット済み
-		undoLog.Purge(3, []TrxId{1, 2})
+		undoLog.Purge(3, []lock.TrxId{1, 2})
 
 		// THEN: trx1, trx2 の undo は破棄され、trx3 は残る
 		assert.Nil(t, undoLog.GetRecords(1))
@@ -422,7 +423,7 @@ func TestPurge(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: purgeLimit=5 で trx5 がコミット済み
-		undoLog.Purge(5, []TrxId{5})
+		undoLog.Purge(5, []lock.TrxId{5})
 
 		// THEN: trx5 は purgeLimit 以上なので残る
 		assert.Equal(t, 1, len(undoLog.GetRecords(5)))

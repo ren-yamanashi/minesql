@@ -2,6 +2,7 @@ package access
 
 import (
 	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/lock"
 	"minesql/internal/storage/log"
 	"minesql/internal/storage/page"
 )
@@ -18,9 +19,9 @@ type undoEntry struct {
 type UndoManager struct {
 	bp            *buffer.BufferPool
 	redoLog       *log.RedoLog
-	undoFileId    page.FileId           // UNDO ファイルの FileId
-	currentPageId page.PageId           // 現在書き込み中の UNDO ページ
-	entries       map[TrxId][]undoEntry // メモリ上の UndoRecord (table 参照を含む)
+	undoFileId    page.FileId                // UNDO ファイルの FileId
+	currentPageId page.PageId                // 現在書き込み中の UNDO ページ
+	entries       map[lock.TrxId][]undoEntry // メモリ上の UndoRecord (table 参照を含む)
 }
 
 func NewUndoManager(bp *buffer.BufferPool, redoLog *log.RedoLog, undoFileId page.FileId) (*UndoManager, error) {
@@ -44,12 +45,12 @@ func NewUndoManager(bp *buffer.BufferPool, redoLog *log.RedoLog, undoFileId page
 		redoLog:       redoLog,
 		undoFileId:    undoFileId,
 		currentPageId: pageId,
-		entries:       make(map[TrxId][]undoEntry),
+		entries:       make(map[lock.TrxId][]undoEntry),
 	}, nil
 }
 
 // Append は指定した trxId の Undo ログにレコードを追加し、書き込み先の UndoPtr を返す
-func (u *UndoManager) Append(trxId TrxId, recordType UndoRecordType, record UndoRecord) (UndoPtr, error) {
+func (u *UndoManager) Append(trxId lock.TrxId, recordType UndoRecordType, record UndoRecord) (UndoPtr, error) {
 	undoNo := uint64(len(u.entries[trxId]))
 	ptr, err := u.writeToPage(trxId, record.Serialize(trxId, undoNo))
 	if err != nil {
@@ -60,7 +61,7 @@ func (u *UndoManager) Append(trxId TrxId, recordType UndoRecordType, record Undo
 }
 
 // GetRecords は指定した trxId の Undo ログレコードを取得する
-func (u *UndoManager) GetRecords(trxId TrxId) []UndoRecord {
+func (u *UndoManager) GetRecords(trxId lock.TrxId) []UndoRecord {
 	entries := u.entries[trxId]
 	if len(entries) == 0 {
 		return nil
@@ -75,7 +76,7 @@ func (u *UndoManager) GetRecords(trxId TrxId) []UndoRecord {
 // PopLast は指定した trxId の Undo ログの最後のレコードを削除する
 //
 // メモリインデックスの操作のみ (UNDO ページ上のデータは残る)
-func (u *UndoManager) PopLast(trxId TrxId) {
+func (u *UndoManager) PopLast(trxId lock.TrxId) {
 	entries := u.entries[trxId]
 	if len(entries) > 0 {
 		u.entries[trxId] = entries[:len(entries)-1]
@@ -85,7 +86,7 @@ func (u *UndoManager) PopLast(trxId TrxId) {
 // DiscardInsertRecords は指定した trxId の INSERT undo レコードのみ破棄する (COMMIT 用)
 //
 // UPDATE/DELETE の undo レコードは他トランザクションの ReadView から undo チェーン辿りに必要なため保持する
-func (u *UndoManager) DiscardInsertRecords(trxId TrxId) {
+func (u *UndoManager) DiscardInsertRecords(trxId lock.TrxId) {
 	entries := u.entries[trxId]
 	kept := make([]undoEntry, 0, len(entries))
 	for _, e := range entries {
@@ -101,7 +102,7 @@ func (u *UndoManager) DiscardInsertRecords(trxId TrxId) {
 }
 
 // Purge はパージ閾値より古いコミット済みトランザクションの undo エントリを破棄する
-func (u *UndoManager) Purge(purgeLimit TrxId, committedTrxIds []TrxId) {
+func (u *UndoManager) Purge(purgeLimit lock.TrxId, committedTrxIds []lock.TrxId) {
 	for _, trxId := range committedTrxIds {
 		if trxId < purgeLimit {
 			delete(u.entries, trxId)
@@ -112,7 +113,7 @@ func (u *UndoManager) Purge(purgeLimit TrxId, committedTrxIds []TrxId) {
 // Discard は指定した trxId の Undo ログをすべて破棄する (ROLLBACK 用)
 //
 // メモリインデックスの操作のみ (UNDO ページ上のデータは残る)
-func (u *UndoManager) Discard(trxId TrxId) {
+func (u *UndoManager) Discard(trxId lock.TrxId) {
 	delete(u.entries, trxId)
 }
 
@@ -132,7 +133,7 @@ func (u *UndoManager) ReadAt(ptr UndoPtr) ([]byte, error) {
 }
 
 // writeToPage はシリアライズ済みの UNDO レコードを UNDO ページに書き込み、書き込み先の UndoPtr を返す
-func (u *UndoManager) writeToPage(trxId TrxId, serialized []byte) (UndoPtr, error) {
+func (u *UndoManager) writeToPage(trxId lock.TrxId, serialized []byte) (UndoPtr, error) {
 	data, err := u.bp.GetWritePageData(u.currentPageId)
 	if err != nil {
 		return UndoPtr{}, err

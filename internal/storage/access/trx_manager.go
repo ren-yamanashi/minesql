@@ -6,9 +6,6 @@ import (
 	"minesql/internal/storage/log"
 )
 
-// TrxId はトランザクション ID
-type TrxId = uint64
-
 type State string
 
 const (
@@ -20,9 +17,9 @@ type TrxManager struct {
 	undoLog      *UndoManager
 	lockMgr      *lock.Manager
 	redoLog      *log.RedoLog
-	Transactions map[TrxId]State
-	readViews    map[TrxId]*ReadView // トランザクションごとの ReadView キャッシュ
-	nextTrxId    TrxId               // 次に払い出すトランザクション ID (単調増加)
+	Transactions map[lock.TrxId]State
+	readViews    map[lock.TrxId]*ReadView // トランザクションごとの ReadView キャッシュ
+	nextTrxId    lock.TrxId               // 次に払い出すトランザクション ID (単調増加)
 }
 
 func NewTrxManager(undoLog *UndoManager, lockMgr *lock.Manager, redoLog *log.RedoLog) *TrxManager {
@@ -30,21 +27,21 @@ func NewTrxManager(undoLog *UndoManager, lockMgr *lock.Manager, redoLog *log.Red
 		undoLog:      undoLog,
 		lockMgr:      lockMgr,
 		redoLog:      redoLog,
-		Transactions: make(map[TrxId]State),
-		readViews:    make(map[TrxId]*ReadView),
+		Transactions: make(map[lock.TrxId]State),
+		readViews:    make(map[lock.TrxId]*ReadView),
 		nextTrxId:    1,
 	}
 }
 
 // Begin は新しいトランザクションを開始し、トランザクション ID を返す
-func (m *TrxManager) Begin() TrxId {
+func (m *TrxManager) Begin() lock.TrxId {
 	trxId := m.allocateTrxId()
 	m.Transactions[trxId] = StateActive
 	return trxId
 }
 
 // Commit はトランザクションをコミットし、ロックを解放して Undo ログを破棄する
-func (m *TrxManager) Commit(trxId TrxId) error {
+func (m *TrxManager) Commit(trxId lock.TrxId) error {
 	// REDO ログに COMMIT レコードを記録してフラッシュ
 	if m.redoLog != nil {
 		m.redoLog.AppendCommit(trxId)
@@ -63,7 +60,7 @@ func (m *TrxManager) Commit(trxId TrxId) error {
 }
 
 // Rollback は Undo ログを逆順に適用してトランザクションをロールバックし、ロックを解放する
-func (m *TrxManager) Rollback(bp *buffer.BufferPool, trxId TrxId) error {
+func (m *TrxManager) Rollback(bp *buffer.BufferPool, trxId lock.TrxId) error {
 	records := m.undoLog.GetRecords(trxId)
 	for i := len(records) - 1; i >= 0; i-- {
 		if err := records[i].Undo(bp, trxId, m.lockMgr); err != nil {
@@ -86,11 +83,11 @@ func (m *TrxManager) Rollback(bp *buffer.BufferPool, trxId TrxId) error {
 // CreateReadView は指定したトランザクション用の ReadView を返す
 //
 // REPEATABLE READ のため、同一トランザクション内では最初に作成した ReadView をキャッシュして使い回す
-func (m *TrxManager) CreateReadView(trxId TrxId) *ReadView {
+func (m *TrxManager) CreateReadView(trxId lock.TrxId) *ReadView {
 	if rv, ok := m.readViews[trxId]; ok {
 		return rv
 	}
-	var activeTrxIds []TrxId
+	var activeTrxIds []lock.TrxId
 	for id, state := range m.Transactions {
 		if state == StateActive && id != trxId {
 			activeTrxIds = append(activeTrxIds, id)
@@ -105,7 +102,7 @@ func (m *TrxManager) CreateReadView(trxId TrxId) *ReadView {
 //
 // この値より小さい trxId のコミット済み undo ログおよび delete-marked レコードはパージ可能。
 // アクティブな ReadView がない場合は nextTrxId を返す (全コミット済みトランザクションがパージ可能)
-func (m *TrxManager) PurgeLimit() TrxId {
+func (m *TrxManager) PurgeLimit() lock.TrxId {
 	if len(m.readViews) == 0 {
 		return m.nextTrxId
 	}
@@ -119,8 +116,8 @@ func (m *TrxManager) PurgeLimit() TrxId {
 }
 
 // CommittedTrxIds はコミット済みトランザクションの ID 一覧を返す
-func (m *TrxManager) CommittedTrxIds() []TrxId {
-	var ids []TrxId
+func (m *TrxManager) CommittedTrxIds() []lock.TrxId {
+	var ids []lock.TrxId
 	for id, state := range m.Transactions {
 		if state == StateInactive {
 			ids = append(ids, id)
@@ -133,13 +130,13 @@ func (m *TrxManager) CommittedTrxIds() []TrxId {
 //
 // サーバー再起動時に、既存レコードの lastModified の最大値に基づいて
 // nextTrxId を復元するために使用する
-func (m *TrxManager) SetNextTrxId(minNextTrxId TrxId) {
+func (m *TrxManager) SetNextTrxId(minNextTrxId lock.TrxId) {
 	if minNextTrxId > m.nextTrxId {
 		m.nextTrxId = minNextTrxId
 	}
 }
 
-func (m *TrxManager) allocateTrxId() TrxId {
+func (m *TrxManager) allocateTrxId() lock.TrxId {
 	id := m.nextTrxId
 	m.nextTrxId++
 	return id

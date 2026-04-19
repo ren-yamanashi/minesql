@@ -1,5 +1,7 @@
 package access
 
+import "minesql/internal/storage/lock"
+
 // VersionReader は undo チェーンを辿って可視なバージョンのレコードを見つける
 type VersionReader struct {
 	undoMgr *UndoManager
@@ -11,10 +13,10 @@ func NewVersionReader(undoMgr *UndoManager) *VersionReader {
 
 // RecordVersion は行の 1 つのバージョンを表す
 type RecordVersion struct {
-	LastModified TrxId    // この行を最後に INSERT/UPDATE したトランザクション ID
-	RollPtr      UndoPtr  // undo ログレコードへのポインタ (旧バージョンへの参照)
-	DeleteMark   byte     // 削除マーク (0: 有効, 1: 削除)
-	Columns      [][]byte // レコードのカラムデータ (プライマリキー + 非キーカラム)
+	LastModified lock.TrxId // この行を最後に INSERT/UPDATE したトランザクション ID
+	RollPtr      UndoPtr    // undo ログレコードへのポインタ (旧バージョンへの参照)
+	DeleteMark   byte       // 削除マーク (0: 有効, 1: 削除)
+	Columns      [][]byte   // レコードのカラムデータ (プライマリキー + 非キーカラム)
 }
 
 // ReadVisibleVersion は ReadView に基づいて可視なバージョンのレコードを返す

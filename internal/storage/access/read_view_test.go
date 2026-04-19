@@ -1,6 +1,7 @@
 package access
 
 import (
+	"minesql/internal/storage/lock"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -12,18 +13,18 @@ func TestNewReadView(t *testing.T) {
 		rv := NewReadView(5, nil, 6)
 
 		// THEN
-		assert.Equal(t, TrxId(5), rv.TrxId)
-		assert.Equal(t, TrxId(6), rv.MUpLimitId)
-		assert.Equal(t, TrxId(6), rv.MLowLimitId)
+		assert.Equal(t, lock.TrxId(5), rv.TrxId)
+		assert.Equal(t, lock.TrxId(6), rv.MUpLimitId)
+		assert.Equal(t, lock.TrxId(6), rv.MLowLimitId)
 	})
 
 	t.Run("アクティブトランザクションの最小値が MUpLimitId になる", func(t *testing.T) {
 		// GIVEN / WHEN
-		rv := NewReadView(5, []TrxId{3, 7, 4}, 10)
+		rv := NewReadView(5, []lock.TrxId{3, 7, 4}, 10)
 
 		// THEN
-		assert.Equal(t, TrxId(3), rv.MUpLimitId)
-		assert.Equal(t, TrxId(10), rv.MLowLimitId)
+		assert.Equal(t, lock.TrxId(3), rv.MUpLimitId)
+		assert.Equal(t, lock.TrxId(10), rv.MLowLimitId)
 	})
 }
 
@@ -35,7 +36,7 @@ func TestReadViewIsVisible(t *testing.T) {
 	//
 	//   trxId: 1  2  [3]  4  (5)  6  [7]  8  9  | 10  11 ...
 	//          可視     不可視  自分  可視     不可視        不可視
-	rv := NewReadView(5, []TrxId{3, 7}, 10)
+	rv := NewReadView(5, []lock.TrxId{3, 7}, 10)
 
 	t.Run("自分の変更は可視", func(t *testing.T) {
 		// WHEN / THEN
