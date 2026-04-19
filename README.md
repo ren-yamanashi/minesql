@@ -41,4 +41,3 @@ make build-client
 | [DELETE](./docs/feature/delete.md) | ✅ | |
 | [UPDATE](./docs/feature/update.md) | ✅ | |
 | [Transaction](./docs//feature/transaction.md) | ✅ | |
-| JOIN | - | - |
