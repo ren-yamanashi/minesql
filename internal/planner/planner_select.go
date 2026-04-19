@@ -61,7 +61,7 @@ func planSelectJoin(trxId handler.TrxId, stmt *ast.SelectStmt) (executor.Executo
 	}
 
 	// 3. 貪欲法で結合順序を決定
-	// 全テーブルのメタデータ (WHERE pushdown の曖昧性チェック用)
+	// 全テーブルのメタデータ (非修飾カラム名が複数テーブルに存在するか判定するために使用)
 	allMetas := make([]*handler.TableMetadata, len(candidates))
 	for i, c := range candidates {
 		allMetas[i] = c.tblMeta
@@ -103,7 +103,7 @@ func planSelectJoin(trxId handler.TrxId, stmt *ast.SelectStmt) (executor.Executo
 		leftColCount += int(rightCandidate.tblMeta.NCols)
 	}
 
-	// 5. 駆動表に pushdown されなかった WHERE 条件があれば Filter を重ねる
+	// 5. 駆動表に分離されなかった WHERE 条件があれば Filter を重ねる
 	if remainingWhere != nil {
 		condFunc, err := buildJoinedConditionFunc(*remainingWhere.Condition, joinedColumns)
 		if err != nil {
@@ -173,7 +173,7 @@ func splitExprForTable(expr *ast.BinaryExpr, tblMeta *handler.TableMetadata, all
 // belongsToTable は式が指定テーブルのカラムのみを参照するか判定する
 //
 // allTables を渡した場合、非修飾名で同名カラムが複数テーブルにあるケースは
-// 曖昧と判定して false を返す (pushdown しない)
+// 曖昧と判定して false を返す (分離しない)
 func belongsToTable(expr *ast.BinaryExpr, tblMeta *handler.TableMetadata, allTables []*handler.TableMetadata) bool {
 	lhs, ok := expr.Left.(*ast.LhsColumn)
 	if !ok {
@@ -195,7 +195,7 @@ func belongsToTable(expr *ast.BinaryExpr, tblMeta *handler.TableMetadata, allTab
 			continue
 		}
 		if _, dup := other.GetColByName(lhs.Column.ColName); dup {
-			return false // 同名カラムが他テーブルにもある → 曖昧なので pushdown しない
+			return false // 同名カラムが他テーブルにもある → 曖昧なので分離しない
 		}
 	}
 	return true

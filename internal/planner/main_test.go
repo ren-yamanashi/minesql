@@ -590,7 +590,7 @@ func TestPlannerIntegration(t *testing.T) {
 		assert.Len(t, records, 6)
 		assert.Len(t, records[0], 2)
 		assert.Equal(t, "1", string(records[0][0]))    // id
-		assert.Equal(t, "John", string(records[0][1]))  // first_name
+		assert.Equal(t, "John", string(records[0][1])) // first_name
 	})
 
 	t.Run("index-only scan で PK + UK のみ取得できる", func(t *testing.T) {
@@ -614,14 +614,14 @@ func TestPlannerIntegration(t *testing.T) {
 			},
 		})
 
-		// THEN: 1 行、2 カラム (primary lookup なしで取得)
+		// THEN: 1 行、2 カラム (テーブル本体の検索なしで取得)
 		assert.Len(t, records, 1)
 		assert.Len(t, records[0], 2)
-		assert.Equal(t, "1", string(records[0][0]))        // id (PK)
-		assert.Equal(t, "johndoe", string(records[0][1]))   // username (UK)
+		assert.Equal(t, "1", string(records[0][0]))       // id (PK)
+		assert.Equal(t, "johndoe", string(records[0][1])) // username (UK)
 	})
 
-	t.Run("INNER JOIN + WHERE で駆動表の条件が pushdown される", func(t *testing.T) {
+	t.Run("INNER JOIN + WHERE で駆動表の条件が分離される", func(t *testing.T) {
 		// GIVEN: users (6 行) が駆動表、orders (10 行) が内部表
 		setupUsersTable(t)
 		defer handler.Reset()
@@ -648,7 +648,7 @@ func TestPlannerIntegration(t *testing.T) {
 			})
 		}
 
-		// WHEN: WHERE users.id = '1' (駆動表の PK 条件 → pushdown で PK lookup)
+		// WHEN: WHERE users.id = '1' (駆動表のPK条件 → 分離でPKの等値検索)
 		records := executePlan(t, &ast.SelectStmt{
 			From: *ast.NewTableId("users"),
 			Joins: []*ast.JoinClause{
@@ -670,7 +670,7 @@ func TestPlannerIntegration(t *testing.T) {
 			},
 		})
 
-		// THEN: PK pushdown により users.id='1' の 1 行のみ → orders と JOIN → 1 行
+		// THEN: PK 分離により users.id='1' の 1 行のみ → orders と JOIN → 1 行
 		assert.Len(t, records, 1)
 		var sb strings.Builder
 		writeRecords(&sb, records)

@@ -221,7 +221,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 			results = append(results, result)
 		}
 
-		// THEN: UK と PK が取得でき、Record は空 (primary lookup なし)
+		// THEN: UK と PK が取得でき、Record は空 (テーブル本体の検索なし)
 		assert.Equal(t, 2, len(results))
 
 		// "Doe" → PK "a"

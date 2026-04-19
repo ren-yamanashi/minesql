@@ -197,7 +197,7 @@ func TestSplitWhereForTable(t *testing.T) {
 	}
 	allTables := []*handler.TableMetadata{usersMeta, ordersMeta}
 
-	t.Run("駆動表のカラムのみの条件が pushdown される", func(t *testing.T) {
+	t.Run("駆動表のカラムのみの条件が分離される", func(t *testing.T) {
 		// GIVEN: WHERE users.id = '1'
 		where := &ast.WhereClause{
 			Condition: ast.NewBinaryExpr("=",
@@ -215,7 +215,7 @@ func TestSplitWhereForTable(t *testing.T) {
 		assert.Equal(t, "=", forTable.Condition.Operator)
 	})
 
-	t.Run("他テーブルの条件は pushdown されず remaining に残る", func(t *testing.T) {
+	t.Run("他テーブルの条件は分離されず remaining に残る", func(t *testing.T) {
 		// GIVEN: WHERE orders.user_id = '1'
 		where := &ast.WhereClause{
 			Condition: ast.NewBinaryExpr("=",
@@ -250,7 +250,7 @@ func TestSplitWhereForTable(t *testing.T) {
 		// WHEN
 		forTable, remaining := splitWhereForTable(where, usersMeta, allTables)
 
-		// THEN: users.id = '1' が pushdown、orders.user_id = '1' が remaining
+		// THEN: users.id = '1' が分離、orders.user_id = '1' が remaining
 		require.NotNil(t, forTable)
 		require.NotNil(t, remaining)
 	})
@@ -264,7 +264,7 @@ func TestSplitWhereForTable(t *testing.T) {
 		assert.Nil(t, remaining)
 	})
 
-	t.Run("非修飾名で同名カラムが複数テーブルにある場合は pushdown されない", func(t *testing.T) {
+	t.Run("非修飾名で同名カラムが複数テーブルにある場合は分離されない", func(t *testing.T) {
 		// GIVEN: 両テーブルに "id" カラムがある場合、WHERE id = '1' は曖昧
 		where := &ast.WhereClause{
 			Condition: ast.NewBinaryExpr("=",
@@ -276,12 +276,12 @@ func TestSplitWhereForTable(t *testing.T) {
 		// WHEN
 		forTable, remaining := splitWhereForTable(where, usersMeta, allTables)
 
-		// THEN: 曖昧なので pushdown されず remaining に残る
+		// THEN: 曖昧なので分離されず remaining に残る
 		assert.Nil(t, forTable)
 		require.NotNil(t, remaining)
 	})
 
-	t.Run("非修飾名で片方のテーブルにしかないカラムは pushdown される", func(t *testing.T) {
+	t.Run("非修飾名で片方のテーブルにしかないカラムは分離される", func(t *testing.T) {
 		// GIVEN: "name" は users にのみ存在、"user_id" は orders にのみ存在
 		where := &ast.WhereClause{
 			Condition: ast.NewBinaryExpr("=",
@@ -293,7 +293,7 @@ func TestSplitWhereForTable(t *testing.T) {
 		// WHEN
 		forTable, remaining := splitWhereForTable(where, usersMeta, allTables)
 
-		// THEN: users にのみ存在するので pushdown される
+		// THEN: users にのみ存在するので分離される
 		require.NotNil(t, forTable)
 		assert.Nil(t, remaining)
 	})

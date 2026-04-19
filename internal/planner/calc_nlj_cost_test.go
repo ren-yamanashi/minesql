@@ -217,7 +217,7 @@ func TestCalcDrivingTableCostWithWhere(t *testing.T) {
 
 		// THEN: fanout が変わる (コスト推定に反映される)
 		assert.Equal(t, float64(stats.RecordCount), fanoutNoWhere) // フルスキャン: 全行
-		assert.Equal(t, 1.0, fanoutWithWhere)                      // PK lookup: 1 行
+		assert.Equal(t, 1.0, fanoutWithWhere)                      // PKの等値検索: 1行
 	})
 }
 

@@ -11,7 +11,7 @@ type IndexScan struct {
 	index          *access.UniqueIndex
 	searchMode     access.RecordSearchMode
 	whileCondition func(Record) bool
-	indexOnly      bool // true の場合、primary lookup をスキップし index データのみで結果を返す
+	indexOnly      bool // true の場合、テーブル本体の検索をスキップし index データのみで結果を返す
 	nCols          int  // テーブルのカラム数 (indexOnly 時のレコード構築用)
 	ukColPos       int  // ユニークキーのカラム位置 (indexOnly 時のレコード構築用)
 	iterator       *access.UniqueIndexIterator
@@ -71,7 +71,7 @@ func (is *IndexScan) Next() (Record, error) {
 	return is.nextWithPrimaryLookup()
 }
 
-// nextWithPrimaryLookup はインデックスから取得後 primary lookup して全カラムを返す (従来の動作)
+// nextWithPrimaryLookup はインデックスから取得後、PK でテーブル本体を検索して全カラムを返す (従来の動作)
 func (is *IndexScan) nextWithPrimaryLookup() (Record, error) {
 	result, ok, err := is.iterator.Next()
 	if !ok {
@@ -86,7 +86,7 @@ func (is *IndexScan) nextWithPrimaryLookup() (Record, error) {
 	return result.Record, nil
 }
 
-// nextIndexOnly はインデックスデータのみからレコードを構築する (primary lookup なし)
+// nextIndexOnly はインデックスデータのみからレコードを構築する (テーブル本体の検索なし)
 //
 // PK カラムはインデックスキーに含まれるため取得可能。UK カラムも同様。
 // その他のカラムは nil を設定し、Project で必要なカラムのみ取り出す

@@ -79,7 +79,7 @@ func (uii *UniqueIndexIterator) Next() (*SearchResult, bool, error) {
 	}
 }
 
-// NextIndexOnly はインデックスデータのみから結果を返す (primary lookup なし)
+// NextIndexOnly はインデックスデータのみから結果を返す (テーブル本体の検索なし)
 //
 // PK と UK をインデックスキーからデコードして返す
 func (uii *UniqueIndexIterator) NextIndexOnly() (*SearchResult, bool, error) {
