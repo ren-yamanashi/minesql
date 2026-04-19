@@ -19,6 +19,7 @@ type Search struct {
 	tblMeta       *handler.TableMetadata
 	where         *ast.WhereClause
 	bufferPool    *buffer.BufferPool
+	selectColumns []ast.ColumnId // SELECT で指定されたカラム (nil なら SELECT *)
 }
 
 func NewSearch(readView *access.ReadView, versionReader *access.VersionReader, tblMeta *handler.TableMetadata, where *ast.WhereClause, bp *buffer.BufferPool) *Search {
@@ -29,6 +30,11 @@ func NewSearch(readView *access.ReadView, versionReader *access.VersionReader, t
 		where:         where,
 		bufferPool:    bp,
 	}
+}
+
+// SetSelectColumns は SELECT カラムを設定する (index-only scan 判定用)
+func (s *Search) SetSelectColumns(columns []ast.ColumnId) {
+	s.selectColumns = columns
 }
 
 func (sp *Search) Build() (executor.Executor, error) {
@@ -212,7 +218,16 @@ func (s *Search) chooseBestPlan(tbl *access.Table, leaves []leafCondition, cond 
 			if err != nil {
 				return nil, err
 			}
-			readTime := calcReadTimeForSecondaryIndex(1, float64(foundRecords), idxPageReadCost)
+
+			var readTime float64
+			if s.isIndexOnlyScan(idxMeta.ColName) {
+				idxStats := stats.IdxStats[idxMeta.Name]
+				keysPerBlock := float64(stats.RecordCount) / float64(max(idxStats.LeafPageCount, 1))
+				readTime = calcReadTimeForIndexOnly(float64(foundRecords), keysPerBlock, idxPageReadCost)
+			} else {
+				// 非 index-only scan ではクラスタ化インデックスの pageReadCost を使う
+				readTime = calcReadTimeForSecondaryIndex(1, float64(foundRecords), clusterPageReadCost)
+			}
 			cost := calcRangeScanCost(readTime, float64(foundRecords))
 			if bestLeaf == nil || cost < bestCost {
 				bestLeaf = leaf
@@ -251,12 +266,26 @@ func (s *Search) buildIndexPlan(tbl *access.Table, leaf leafCondition, idxMeta *
 		return nil, err
 	}
 
-	scan := executor.NewIndexScan(
-		tbl,
-		index,
-		access.RecordSearchModeKey{Key: [][]byte{leaf.literal.ToBytes()}},
-		indexCond,
-	)
+	var scan executor.Executor
+	if s.isIndexOnlyScan(idxMeta.ColName) {
+		colMeta, _ := s.tblMeta.GetColByName(idxMeta.ColName)
+		scan = executor.NewIndexScanWithParams(executor.IndexScanParams{
+			Table:          tbl,
+			Index:          index,
+			SearchMode:     access.RecordSearchModeKey{Key: [][]byte{leaf.literal.ToBytes()}},
+			WhileCondition: indexCond,
+			IndexOnly:      true,
+			NCols:          int(s.tblMeta.NCols),
+			UKColPos:       int(colMeta.Pos),
+		})
+	} else {
+		scan = executor.NewIndexScan(
+			tbl,
+			index,
+			access.RecordSearchModeKey{Key: [][]byte{leaf.literal.ToBytes()}},
+			indexCond,
+		)
+	}
 
 	if needsFilter {
 		return executor.NewFilter(scan, cond), nil
@@ -354,7 +383,10 @@ func (s *Search) planForORCondition(tbl *access.Table, expr ast.BinaryExpr, cond
 	var executors []executor.Executor
 	var totalCost float64
 	for _, branch := range branches {
-		exec, cost, ok := s.planORBranch(tbl, branch, stats)
+		exec, cost, ok, err := s.planORBranch(tbl, branch, stats)
+		if err != nil {
+			return nil, err
+		}
 		if !ok {
 			return tableScanPlan, nil
 		}
@@ -390,15 +422,22 @@ type orBranch struct {
 // 残りの条件は Filter で適用する
 //
 // PK/インデックスが利用できない場合は ok=false を返す
-func (s *Search) planORBranch(tbl *access.Table, branch orBranch, stats *handler.TableStatistics) (executor.Executor, float64, bool) {
+func (s *Search) planORBranch(tbl *access.Table, branch orBranch, stats *handler.TableStatistics) (executor.Executor, float64, bool, error) {
 	// ブランチ全体の条件関数を構築 (複合 AND 条件時に Filter で使用)
 	branchCond, err := s.buildConditionFunc(branch.expr)
 	if err != nil {
-		return nil, 0, false
+		return nil, 0, false, err
 	}
 
 	// 複合条件の場合、最適な 1 条件で PK/インデックスを使い、残条件は Filter で適用
 	needsFilter := len(branch.leaves) > 1
+
+	// クラスタ化インデックスの pageReadCost (PK レンジスキャン・セカンダリインデックスの非 index-only scan で使用)
+	primaryBTree := btree.NewBTree(tbl.MetaPageId)
+	clusterPRC, err := calcPageReadCost(s.bufferPool, primaryBTree)
+	if err != nil {
+		return nil, 0, false, err
+	}
 
 	// 各リーフ条件について PK/インデックスのコストを算出し、最安を選択
 	var bestLeaf *leafCondition
@@ -431,15 +470,10 @@ func (s *Search) planORBranch(tbl *access.Table, branch orBranch, stats *handler
 
 		// PK レンジスキャン
 		if s.isPKLeadingColumn(leaf.colName) {
-			primaryBTree := btree.NewBTree(tbl.MetaPageId)
 			lowerKey, upperKey, leftIncl, rightIncl := buildRangeKeys(leaf.operator, leaf.literal)
 			foundRecords, err := primaryBTree.RecordsInRange(s.bufferPool, lowerKey, upperKey, leftIncl, rightIncl)
 			if err != nil {
-				return nil, 0, false
-			}
-			clusterPRC, err := calcPageReadCost(s.bufferPool, primaryBTree)
-			if err != nil {
-				return nil, 0, false
+				return nil, 0, false, err
 			}
 			readTime := calcReadTimeForClusteredIndex(1, float64(foundRecords), float64(stats.RecordCount), float64(stats.LeafPageCount), clusterPRC)
 			cost := calcRangeScanCost(readTime, float64(foundRecords))
@@ -455,19 +489,16 @@ func (s *Search) planORBranch(tbl *access.Table, branch orBranch, stats *handler
 		if hasIndex {
 			index, err := tbl.GetUniqueIndexByName(idxMeta.Name)
 			if err != nil {
-				return nil, 0, false
+				return nil, 0, false, err
 			}
 			indexBTree := btree.NewBTree(index.MetaPageId)
 			lowerKey, upperKey, leftIncl, rightIncl := buildRangeKeys(leaf.operator, leaf.literal)
 			foundRecords, err := indexBTree.RecordsInRange(s.bufferPool, lowerKey, upperKey, leftIncl, rightIncl)
 			if err != nil {
-				return nil, 0, false
+				return nil, 0, false, err
 			}
-			idxPRC, err := calcPageReadCost(s.bufferPool, indexBTree)
-			if err != nil {
-				return nil, 0, false
-			}
-			readTime := calcReadTimeForSecondaryIndex(1, float64(foundRecords), idxPRC)
+			// 非 index-only scan ではクラスタ化インデックスの pageReadCost を使う
+			readTime := calcReadTimeForSecondaryIndex(1, float64(foundRecords), clusterPRC)
 			cost := calcRangeScanCost(readTime, float64(foundRecords))
 			if bestLeaf == nil || cost < bestCost {
 				bestLeaf = leaf
@@ -478,23 +509,23 @@ func (s *Search) planORBranch(tbl *access.Table, branch orBranch, stats *handler
 	}
 
 	if bestLeaf == nil {
-		return nil, 0, false
+		return nil, 0, false, nil
 	}
 
 	switch bestPlan {
 	case "PK":
 		exec := s.buildPKScanPlan(tbl, *bestLeaf, branchCond, needsFilter)
-		return exec, bestCost, true
+		return exec, bestCost, true, nil
 	case "Index":
 		idxMeta, _ := s.tblMeta.GetIndexByColName(bestLeaf.colName)
 		exec, err := s.buildIndexPlan(tbl, *bestLeaf, idxMeta, branchCond, needsFilter)
 		if err != nil {
-			return nil, 0, false
+			return nil, 0, false, err
 		}
-		return exec, bestCost, true
+		return exec, bestCost, true, nil
 	}
 
-	return nil, 0, false
+	return nil, 0, false, nil
 }
 
 // -------------------------------------------------
@@ -524,9 +555,38 @@ func buildRangeKeys(operator string, literal ast.Literal) (lowerKey, upperKey []
 	}
 }
 
-// isPKLeadingColumn は指定カラムがプライマリキーの先頭カラムかどうかを判定する
+// isIndexOnlyScan は SELECT カラムがインデックス (UK + PK) でカバーされるか判定する
+//
+// SELECT * の場合は false (全カラムが必要なので index-only にならない)
+func (s *Search) isIndexOnlyScan(indexColName string) bool {
+	if len(s.selectColumns) == 0 {
+		return false // SELECT * → index-only 不可
+	}
+
+	// カバーされるカラム: PK カラム群 + インデックスカラム
+	covered := make(map[string]bool)
+	for _, col := range s.tblMeta.Cols {
+		if col.Pos < uint16(s.tblMeta.PKCount) {
+			covered[col.Name] = true
+		}
+	}
+	covered[indexColName] = true
+
+	// 全 SELECT カラムがカバーされているか
+	for _, col := range s.selectColumns {
+		colName := col.ColName
+		if !covered[colName] {
+			return false
+		}
+	}
+	return true
+}
+
+// isPKLeadingColumn は指定カラムが単一カラムプライマリキーかどうかを判定する
+//
+// 複合 PK の先頭カラムだけでは一意にならないため、PKCount == 1 の場合のみ true を返す
 func (s *Search) isPKLeadingColumn(colName string) bool {
-	if s.tblMeta.PKCount == 0 {
+	if s.tblMeta.PKCount != 1 {
 		return false
 	}
 	colMeta, ok := s.tblMeta.GetColByName(colName)

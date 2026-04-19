@@ -6,6 +6,8 @@ import (
 	"minesql/internal/ast"
 	"minesql/internal/executor"
 	"minesql/internal/storage/access"
+	"minesql/internal/storage/dictionary"
+	"minesql/internal/storage/encode"
 	"minesql/internal/storage/handler"
 
 	"github.com/stretchr/testify/assert"
@@ -813,6 +815,37 @@ func TestPlanSelection(t *testing.T) {
 		assert.NotNil(t, exec)
 		assert.IsType(t, &executor.Filter{}, exec)
 	})
+
+	t.Run("UNIQUE INDEX のレンジスキャンで IndexScan または Filter が返される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		initStorageManager(t, tmpdir)
+		defer handler.Reset()
+
+		tblMeta := getTableMetadata(t, "users")
+		// WHERE last_name > 'C' (UNIQUE INDEX レンジスキャン)
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
+				">",
+				ast.NewLhsColumn(*ast.NewColumnId("last_name")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("C")),
+			),
+		}
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
+
+		// WHEN
+		exec, err := search.Build()
+
+		// THEN: コストベースで IndexScan または Filter が選ばれる
+		assert.NoError(t, err)
+		assert.NotNil(t, exec)
+		isValid := false
+		switch exec.(type) {
+		case *executor.IndexScan, *executor.Filter:
+			isValid = true
+		}
+		assert.True(t, isValid, "expected IndexScan or Filter, got %T", exec)
+	})
 }
 
 func TestCostFormulas(t *testing.T) {
@@ -946,6 +979,135 @@ func TestIsPKLeadingColumn(t *testing.T) {
 		// WHEN & THEN: 複合 PK では先頭カラムだけでは一意にならないため false
 		assert.False(t, s.isPKLeadingColumn("id"))
 		assert.False(t, s.isPKLeadingColumn("name"))
+	})
+}
+
+func TestBuildRangeKeys(t *testing.T) {
+	literal := ast.NewStringLiteral("abc")
+	var expectedKey []byte
+	encode.Encode([][]byte{literal.ToBytes()}, &expectedKey)
+
+	t.Run("= は lower=upper で両端を含む", func(t *testing.T) {
+		// WHEN
+		lower, upper, leftIncl, rightIncl := buildRangeKeys("=", literal)
+
+		// THEN
+		assert.Equal(t, expectedKey, lower)
+		assert.Equal(t, expectedKey, upper)
+		assert.True(t, leftIncl)
+		assert.True(t, rightIncl)
+	})
+
+	t.Run("> は lower=key, upper=nil で左端を含まない", func(t *testing.T) {
+		// WHEN
+		lower, upper, leftIncl, rightIncl := buildRangeKeys(">", literal)
+
+		// THEN
+		assert.Equal(t, expectedKey, lower)
+		assert.Nil(t, upper)
+		assert.False(t, leftIncl)
+		assert.True(t, rightIncl)
+	})
+
+	t.Run(">= は lower=key, upper=nil で左端を含む", func(t *testing.T) {
+		// WHEN
+		lower, upper, leftIncl, rightIncl := buildRangeKeys(">=", literal)
+
+		// THEN
+		assert.Equal(t, expectedKey, lower)
+		assert.Nil(t, upper)
+		assert.True(t, leftIncl)
+		assert.True(t, rightIncl)
+	})
+
+	t.Run("< は lower=nil, upper=key で右端を含まない", func(t *testing.T) {
+		// WHEN
+		lower, upper, leftIncl, rightIncl := buildRangeKeys("<", literal)
+
+		// THEN
+		assert.Nil(t, lower)
+		assert.Equal(t, expectedKey, upper)
+		assert.True(t, leftIncl)
+		assert.False(t, rightIncl)
+	})
+
+	t.Run("<= は lower=nil, upper=key で右端を含む", func(t *testing.T) {
+		// WHEN
+		lower, upper, leftIncl, rightIncl := buildRangeKeys("<=", literal)
+
+		// THEN
+		assert.Nil(t, lower)
+		assert.Equal(t, expectedKey, upper)
+		assert.True(t, leftIncl)
+		assert.True(t, rightIncl)
+	})
+}
+
+func TestIsIndexOnlyScan(t *testing.T) {
+	// GIVEN: users (id=PK, name, email=UK) のテーブルメタ
+	tblMeta := &handler.TableMetadata{
+		Name: "users", NCols: 3, PKCount: 1,
+		Cols: []*dictionary.ColumnMeta{
+			{Name: "id", Pos: 0}, {Name: "name", Pos: 1}, {Name: "email", Pos: 2},
+		},
+		Indexes: []*dictionary.IndexMeta{
+			{Name: "idx_email", ColName: "email", Type: dictionary.IndexTypeUnique},
+		},
+	}
+
+	t.Run("SELECT * は index-only にならない", func(t *testing.T) {
+		// GIVEN
+		s := &Search{tblMeta: tblMeta}
+
+		// WHEN & THEN
+		assert.False(t, s.isIndexOnlyScan("email"))
+	})
+
+	t.Run("SELECT に PK + UK のみ指定した場合は index-only になる", func(t *testing.T) {
+		// GIVEN
+		s := &Search{
+			tblMeta:       tblMeta,
+			selectColumns: []ast.ColumnId{{ColName: "id"}, {ColName: "email"}},
+		}
+
+		// WHEN & THEN
+		assert.True(t, s.isIndexOnlyScan("email"))
+	})
+
+	t.Run("SELECT にインデックスでカバーされないカラムがあると index-only にならない", func(t *testing.T) {
+		// GIVEN
+		s := &Search{
+			tblMeta:       tblMeta,
+			selectColumns: []ast.ColumnId{{ColName: "id"}, {ColName: "name"}},
+		}
+
+		// WHEN & THEN: name は PK でも UK でもない
+		assert.False(t, s.isIndexOnlyScan("email"))
+	})
+
+	t.Run("SELECT に PK のみ指定しても index-only になる", func(t *testing.T) {
+		// GIVEN: PK カラムもインデックスキーに含まれる
+		s := &Search{
+			tblMeta:       tblMeta,
+			selectColumns: []ast.ColumnId{{ColName: "id"}},
+		}
+
+		// WHEN & THEN
+		assert.True(t, s.isIndexOnlyScan("email"))
+	})
+}
+
+func TestSetSelectColumns(t *testing.T) {
+	t.Run("SetSelectColumns で selectColumns が設定される", func(t *testing.T) {
+		// GIVEN
+		s := &Search{}
+
+		// WHEN
+		cols := []ast.ColumnId{{ColName: "id"}, {ColName: "name"}}
+		s.SetSelectColumns(cols)
+
+		// THEN
+		assert.Equal(t, cols, s.selectColumns)
 	})
 }
 
