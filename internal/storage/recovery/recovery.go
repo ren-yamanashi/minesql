@@ -226,12 +226,13 @@ func (r *Recovery) buildTable(tableName string) (*access.Table, error) {
 
 	var secondaryIndexes []*access.SecondaryIndex
 	for _, idxMeta := range tblMeta.Indexes {
-		if idxMeta.Type == dictionary.IndexTypeUnique {
+		isUnique := idxMeta.Type == dictionary.IndexTypeUnique
+		if idxMeta.Type == dictionary.IndexTypeUnique || idxMeta.Type == dictionary.IndexTypeNonUnique {
 			colMeta, ok := tblMeta.GetColByName(idxMeta.ColName)
 			if !ok {
 				return nil, fmt.Errorf("column %s not found in table %s", idxMeta.ColName, tableName)
 			}
-			si := access.NewSecondaryIndex(idxMeta.Name, idxMeta.ColName, idxMeta.DataMetaPageId, colMeta.Pos, tblMeta.PKCount, true)
+			si := access.NewSecondaryIndex(idxMeta.Name, idxMeta.ColName, idxMeta.DataMetaPageId, colMeta.Pos, tblMeta.PKCount, isUnique)
 			secondaryIndexes = append(secondaryIndexes, si)
 		}
 	}

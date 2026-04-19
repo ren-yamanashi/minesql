@@ -12,7 +12,8 @@ import (
 type IndexType string
 
 const (
-	IndexTypeUnique IndexType = "unique secondary"
+	IndexTypeUnique    IndexType = "unique secondary"
+	IndexTypeNonUnique IndexType = "non-unique secondary"
 )
 
 // IndexMeta はセカンダリインデックスのメタデータを表す

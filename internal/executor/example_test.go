@@ -414,8 +414,8 @@ func setupExample() (*access.Table, func()) {
 		"users",
 		1,
 		[]handler.CreateIndexParam{
-			{Name: "idx_first_name", ColName: "first_name", UkIdx: 1},
-			{Name: "idx_last_name", ColName: "last_name", UkIdx: 2},
+			{Name: "idx_first_name", ColName: "first_name", ColIdx: 1, Unique: true},
+			{Name: "idx_last_name", ColName: "last_name", ColIdx: 2, Unique: true},
 		},
 		[]handler.CreateColumnParam{
 			{Name: "id", Type: handler.ColumnTypeString},

@@ -37,3 +37,10 @@ type ConstraintUniqueKeyDef struct {
 }
 
 func (*ConstraintUniqueKeyDef) isDefinition() {}
+
+type ConstraintKeyDef struct {
+	KeyName string
+	Column  ColumnId
+}
+
+func (*ConstraintKeyDef) isDefinition() {}

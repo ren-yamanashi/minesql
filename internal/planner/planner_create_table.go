@@ -118,7 +118,8 @@ func getUkParams(ukDefs []*ast.ConstraintUniqueKeyDef, colIndexMap map[string]in
 		uniqueKeyParams = append(uniqueKeyParams, handler.CreateIndexParam{
 			Name:    ukDef.KeyName,
 			ColName: ukDef.Column.ColName,
-			UkIdx:   uint16(idx),
+			ColIdx:  uint16(idx),
+			Unique:  true,
 		})
 	}
 	return uniqueKeyParams, nil

@@ -9,7 +9,8 @@ import (
 type CreateIndexParam struct {
 	Name    string // インデックス名
 	ColName string // インデックスを構成するカラム名
-	UkIdx   uint16 // ユニークキーに含めるカラムのインデックス (0 始まりの列番号)
+	ColIdx  uint16 // インデックスカラムの位置 (0 始まりの列番号)
+	Unique  bool   // ユニーク制約の有無
 }
 
 // CreateColumnParam はカラム作成パラメータ
@@ -44,7 +45,7 @@ func (h *Handler) CreateTable(tableName string, pkCount uint8, idxParams []Creat
 		if err != nil {
 			return err
 		}
-		si := access.NewSecondaryIndex(param.Name, param.ColName, indexMetaPageId, param.UkIdx, pkCount, true)
+		si := access.NewSecondaryIndex(param.Name, param.ColName, indexMetaPageId, param.ColIdx, pkCount, param.Unique)
 		if err := si.Create(h.BufferPool); err != nil {
 			return err
 		}
@@ -59,8 +60,12 @@ func (h *Handler) CreateTable(tableName string, pkCount uint8, idxParams []Creat
 
 	// インデックスメタデータを作成
 	idxMeta := make([]*dictionary.IndexMeta, len(idxParams))
-	for i, idx := range secondaryIndexes {
-		idxMeta[i] = dictionary.NewIndexMeta(fileId, idx.Name, idx.ColName, dictionary.IndexTypeUnique, idx.MetaPageId)
+	for i, param := range idxParams {
+		idxType := dictionary.IndexTypeNonUnique
+		if param.Unique {
+			idxType = dictionary.IndexTypeUnique
+		}
+		idxMeta[i] = dictionary.NewIndexMeta(fileId, secondaryIndexes[i].Name, secondaryIndexes[i].ColName, idxType, secondaryIndexes[i].MetaPageId)
 	}
 
 	// カラムメタデータを作成

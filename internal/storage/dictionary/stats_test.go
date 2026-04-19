@@ -333,6 +333,87 @@ func TestAnalyze(t *testing.T) {
 			assert.Nil(t, colStat.MaxValue)
 		}
 	})
+
+	t.Run("非ユニークインデックスの RecPerKey が重複数に応じて算出される", func(t *testing.T) {
+		// GIVEN: category カラムに非ユニークインデックス。"Fruit" が 2 件、"Veggie" が 1 件
+		env := setupNonUniqueIndexTable(t)
+
+		meta, ok := env.catalog.GetTableMetaByName("products_nu")
+		assert.True(t, ok)
+
+		// WHEN
+		result, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
+
+		// THEN: RecPerKey = 3 (レコード数) / 2 (distinct キー数) = 1.5
+		assert.NoError(t, err)
+		assert.Len(t, result.IdxStats, 1)
+		assert.Equal(t, 1.5, result.IdxStats["idx_category"].RecPerKey)
+	})
+
+	t.Run("非ユニークインデックスで全レコードが同一キーの場合 RecPerKey がレコード数と一致する", func(t *testing.T) {
+		// GIVEN: category がすべて "Fruit" (distinct = 1)
+		env := setupTestEnv(t)
+		createTable(t, env, "same_cat", 1,
+			[]indexParam{
+				{name: "idx_category", colName: "category", secondaryKey: 2, unique: false},
+			},
+			[]columnParam{
+				{name: "id", columnType: ColumnTypeString},
+				{name: "name", columnType: ColumnTypeString},
+				{name: "category", columnType: ColumnTypeString},
+			},
+		)
+		insertRecords(t, env, "same_cat", [][][]byte{
+			{[]byte("1"), []byte("Apple"), []byte("Fruit")},
+			{[]byte("2"), []byte("Banana"), []byte("Fruit")},
+			{[]byte("3"), []byte("Cherry"), []byte("Fruit")},
+		})
+
+		meta, ok := env.catalog.GetTableMetaByName("same_cat")
+		assert.True(t, ok)
+
+		// WHEN
+		result, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
+
+		// THEN: RecPerKey = 3 / 1 = 3.0
+		assert.NoError(t, err)
+		assert.Equal(t, 3.0, result.IdxStats["idx_category"].RecPerKey)
+	})
+
+	t.Run("ユニークインデックスの RecPerKey は常に 1.0", func(t *testing.T) {
+		// GIVEN: name に UNIQUE INDEX
+		env := setupStatsTable(t)
+
+		meta, ok := env.catalog.GetTableMetaByName("products")
+		assert.True(t, ok)
+
+		// WHEN
+		result, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
+
+		// THEN: UNIQUE なので RecPerKey = 1.0
+		assert.NoError(t, err)
+		assert.Equal(t, 1.0, result.IdxStats["idx_name"].RecPerKey)
+	})
+
+	t.Run("非ユニークインデックスでソフトデリート済みレコードは RecPerKey の算出から除外される", func(t *testing.T) {
+		// GIVEN: 3 レコード挿入後、1 件をソフトデリート
+		env := setupNonUniqueIndexTable(t)
+		tbl := env.tables["products_nu"]
+
+		// "Banana" (category="Fruit") をソフトデリート → active は "Apple"(Fruit) と "Carrot"(Veggie)
+		err := tbl.SoftDelete(env.bp, 0, lock.NewManager(5000), [][]byte{[]byte("2"), []byte("Banana"), []byte("Fruit")})
+		assert.NoError(t, err)
+
+		meta, ok := env.catalog.GetTableMetaByName("products_nu")
+		assert.True(t, ok)
+
+		// WHEN
+		result, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
+
+		// THEN: active 2 件 / distinct 2 キー = 1.0
+		assert.NoError(t, err)
+		assert.Equal(t, 1.0, result.IdxStats["idx_category"].RecPerKey)
+	})
 }
 
 func TestBuildTable(t *testing.T) {
@@ -424,6 +505,51 @@ func TestBuildTable(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, tbl)
 		assert.Contains(t, err.Error(), "column email not found in table users")
+	})
+
+	t.Run("非ユニークインデックス付きのテーブルを構築できる", func(t *testing.T) {
+		// GIVEN
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "category", 1, ColumnTypeString),
+		}
+		idxMeta := []*IndexMeta{
+			NewIndexMeta(1, "idx_category", "category", IndexTypeNonUnique, page.NewPageId(page.FileId(1), 1)),
+		}
+		tableMeta := NewTableMeta(1, "items", 2, 1, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
+
+		// WHEN
+		tbl, err := buildTable(&tableMeta)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, tbl)
+		assert.Equal(t, 1, len(tbl.SecondaryIndexes))
+		assert.Equal(t, "idx_category", tbl.SecondaryIndexes[0].Name)
+		assert.False(t, tbl.SecondaryIndexes[0].Unique)
+	})
+
+	t.Run("ユニークと非ユニークのインデックスが混在するテーブルを構築できる", func(t *testing.T) {
+		// GIVEN
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "email", 1, ColumnTypeString),
+			NewColumnMeta(1, "category", 2, ColumnTypeString),
+		}
+		idxMeta := []*IndexMeta{
+			NewIndexMeta(1, "idx_email", "email", IndexTypeUnique, page.NewPageId(page.FileId(1), 1)),
+			NewIndexMeta(1, "idx_category", "category", IndexTypeNonUnique, page.NewPageId(page.FileId(1), 2)),
+		}
+		tableMeta := NewTableMeta(1, "items", 3, 1, colMeta, idxMeta, page.NewPageId(page.FileId(1), 0))
+
+		// WHEN
+		tbl, err := buildTable(&tableMeta)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 2, len(tbl.SecondaryIndexes))
+		assert.True(t, tbl.SecondaryIndexes[0].Unique)
+		assert.False(t, tbl.SecondaryIndexes[1].Unique)
 	})
 }
 
@@ -542,6 +668,7 @@ type indexParam struct {
 	name         string
 	colName      string
 	secondaryKey uint16
+	unique       bool
 }
 
 // columnParam はテスト用のカラムパラメータ
@@ -573,7 +700,7 @@ func createTable(t *testing.T, env *testEnv, tableName string, pkCount uint8, in
 	for i, idx := range indexes {
 		indexMetaPageId, err := env.bp.AllocatePageId(fileId)
 		assert.NoError(t, err)
-		si := access.NewSecondaryIndex(idx.name, idx.colName, indexMetaPageId, idx.secondaryKey, pkCount, true)
+		si := access.NewSecondaryIndex(idx.name, idx.colName, indexMetaPageId, idx.secondaryKey, pkCount, idx.unique)
 		err = si.Create(env.bp)
 		assert.NoError(t, err)
 		secondaryIndexes[i] = si
@@ -587,7 +714,11 @@ func createTable(t *testing.T, env *testEnv, tableName string, pkCount uint8, in
 	// インデックスのメタデータを作成
 	idxMeta := make([]*IndexMeta, len(indexes))
 	for i, si := range secondaryIndexes {
-		idxMeta[i] = NewIndexMeta(fileId, si.Name, si.ColName, IndexTypeUnique, si.MetaPageId)
+		idxType := IndexTypeNonUnique
+		if indexes[i].unique {
+			idxType = IndexTypeUnique
+		}
+		idxMeta[i] = NewIndexMeta(fileId, si.Name, si.ColName, idxType, si.MetaPageId)
 	}
 
 	// カラムのメタデータを作成
@@ -669,7 +800,7 @@ func setupStatsTable(t *testing.T) *testEnv {
 
 	createTable(t, env, "products", 1,
 		[]indexParam{
-			{name: "idx_name", colName: "name", secondaryKey: 1},
+			{name: "idx_name", colName: "name", secondaryKey: 1, unique: true},
 		},
 		[]columnParam{
 			{name: "id", columnType: ColumnTypeString},
@@ -679,6 +810,38 @@ func setupStatsTable(t *testing.T) *testEnv {
 	)
 
 	insertRecords(t, env, "products",
+		[][][]byte{
+			{[]byte("1"), []byte("Apple"), []byte("Fruit")},
+			{[]byte("2"), []byte("Banana"), []byte("Fruit")},
+			{[]byte("3"), []byte("Carrot"), []byte("Veggie")},
+		},
+	)
+
+	return env
+}
+
+// setupNonUniqueIndexTable はストレージを初期化し、非ユニークインデックス付きのテーブルを作成する
+//
+// テーブル: products_nu (id PK, name, category)
+// インデックス: idx_category (category, 非ユニーク)
+// データ: ("1","Apple","Fruit"), ("2","Banana","Fruit"), ("3","Carrot","Veggie")
+func setupNonUniqueIndexTable(t *testing.T) *testEnv {
+	t.Helper()
+
+	env := setupTestEnv(t)
+
+	createTable(t, env, "products_nu", 1,
+		[]indexParam{
+			{name: "idx_category", colName: "category", secondaryKey: 2, unique: false},
+		},
+		[]columnParam{
+			{name: "id", columnType: ColumnTypeString},
+			{name: "name", columnType: ColumnTypeString},
+			{name: "category", columnType: ColumnTypeString},
+		},
+	)
+
+	insertRecords(t, env, "products_nu",
 		[][][]byte{
 			{[]byte("1"), []byte("Apple"), []byte("Fruit")},
 			{[]byte("2"), []byte("Banana"), []byte("Fruit")},
@@ -787,7 +950,7 @@ func setupMultiIndexTable(t *testing.T) *testEnv {
 
 	createTable(t, env, "multi_idx", 1,
 		[]indexParam{
-			{name: "idx_name", colName: "name", secondaryKey: 1},
+			{name: "idx_name", colName: "name", secondaryKey: 1, unique: true},
 			{name: "idx_email", colName: "email", secondaryKey: 2},
 		},
 		[]columnParam{
