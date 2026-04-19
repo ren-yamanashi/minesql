@@ -343,6 +343,56 @@ func TestCommittedTrxIds(t *testing.T) {
 	})
 }
 
+func TestSetNextTrxId(t *testing.T) {
+	t.Run("指定値が現在の nextTrxId より大きい場合に更新される", func(t *testing.T) {
+		// GIVEN
+		_, undoLog, _ := initManagerTest(t)
+		manager := NewTrxManager(undoLog, lock.NewManager(5000), nil)
+		// nextTrxId は初期値 1
+
+		// WHEN
+		manager.SetNextTrxId(10)
+
+		// THEN: 次の Begin で trxId=10 が払い出される
+		trxId := manager.Begin()
+		assert.Equal(t, TrxId(10), trxId)
+	})
+
+	t.Run("指定値が現在の nextTrxId 以下の場合は更新されない", func(t *testing.T) {
+		// GIVEN
+		_, undoLog, _ := initManagerTest(t)
+		manager := NewTrxManager(undoLog, lock.NewManager(5000), nil)
+		manager.Begin() // trxId=1 を消費 → nextTrxId=2
+		manager.Begin() // trxId=2 を消費 → nextTrxId=3
+
+		// WHEN: nextTrxId(3) より小さい値を指定
+		manager.SetNextTrxId(1)
+
+		// THEN: nextTrxId は変わらず、次の Begin で trxId=3 が払い出される
+		trxId := manager.Begin()
+		assert.Equal(t, TrxId(3), trxId)
+	})
+
+	t.Run("SetNextTrxId 後の ReadView が過去の trxId を可視と判定する", func(t *testing.T) {
+		// GIVEN: サーバー再起動を模擬 — 過去に trxId=5 でコミットされたレコードがある想定
+		_, undoLog, _ := initManagerTest(t)
+		manager := NewTrxManager(undoLog, lock.NewManager(5000), nil)
+		// nextTrxId を 6 に設定 (過去の最大 trxId=5 + 1)
+		manager.SetNextTrxId(6)
+
+		// WHEN
+		trxId := manager.Begin() // trxId=6
+		rv := manager.CreateReadView(trxId)
+
+		// THEN: 過去の trxId=5 は MUpLimitId(6) 未満なので可視
+		assert.True(t, rv.IsVisible(5))
+		// trxId=6 は自分自身なので可視
+		assert.True(t, rv.IsVisible(6))
+		// trxId=7 は MLowLimitId(7) 以上なので不可視
+		assert.False(t, rv.IsVisible(7))
+	})
+}
+
 // initManagerTest はテスト用にバッファプール・UndoManager・テーブルを初期化する
 func initManagerTest(t *testing.T) (*buffer.BufferPool, *UndoManager, *Table) {
 	t.Helper()

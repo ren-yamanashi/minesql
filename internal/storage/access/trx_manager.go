@@ -129,6 +129,16 @@ func (m *TrxManager) CommittedTrxIds() []TrxId {
 	return ids
 }
 
+// SetNextTrxId は nextTrxId を指定した値以上に設定する
+//
+// サーバー再起動時に、既存レコードの lastModified の最大値に基づいて
+// nextTrxId を復元するために使用する
+func (m *TrxManager) SetNextTrxId(minNextTrxId TrxId) {
+	if minNextTrxId > m.nextTrxId {
+		m.nextTrxId = minNextTrxId
+	}
+}
+
 func (m *TrxManager) allocateTrxId() TrxId {
 	id := m.nextTrxId
 	m.nextTrxId++
