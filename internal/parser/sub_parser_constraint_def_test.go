@@ -140,6 +140,90 @@ func TestConstraintDefParser_UniqueKey(t *testing.T) {
 	})
 }
 
+func TestConstraintDefParser_Key(t *testing.T) {
+	t.Run("KEY をパースできる", func(t *testing.T) {
+		// GIVEN
+		cp := NewConstraintDefParser()
+
+		// WHEN: KEY idx_category (category)
+		cp.onKeyword("KEY")
+		cp.onIdentifier("idx_category")
+		cp.onSymbol("(")
+		cp.onIdentifier("category")
+		cp.onSymbol(")")
+		err := cp.finalize()
+
+		// THEN
+		assert.NoError(t, err)
+		def := cp.getDef()
+		keyDef, ok := def.(*ast.ConstraintKeyDef)
+		assert.True(t, ok)
+		assert.Equal(t, "idx_category", keyDef.KeyName)
+		assert.Equal(t, "category", keyDef.Column.ColName)
+	})
+
+	t.Run("KEY のカラムが指定されていない場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		cp := NewConstraintDefParser()
+
+		// WHEN
+		cp.onKeyword("KEY")
+		cp.onIdentifier("idx_category")
+		cp.onSymbol("(")
+		cp.onSymbol(")")
+		err := cp.finalize()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "unexpected symbol in constraint")
+	})
+
+	t.Run("KEY のキー名が重複して指定された場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		cp := NewConstraintDefParser()
+
+		// WHEN
+		cp.onKeyword("KEY")
+		cp.onIdentifier("idx_1")
+		cp.onIdentifier("idx_2")
+		err := cp.finalize()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "key name already set")
+	})
+
+	t.Run("KEY でインデックス名を省略するとエラーになる", func(t *testing.T) {
+		// GIVEN
+		cp := NewConstraintDefParser()
+
+		// WHEN: KEY (column) — インデックス名なし
+		cp.onKeyword("KEY")
+		cp.onSymbol("(")
+		cp.onIdentifier("category")
+		cp.onSymbol(")")
+		err := cp.finalize()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "index name is required")
+	})
+
+	t.Run("KEY でカラムなしで finalize するとエラーになる", func(t *testing.T) {
+		// GIVEN
+		cp := NewConstraintDefParser()
+
+		// WHEN
+		cp.onKeyword("KEY")
+		cp.onIdentifier("idx_category")
+		err := cp.finalize()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "requires at least one column")
+	})
+}
+
 func TestConstraintDefParser_Error(t *testing.T) {
 	t.Run("PRIMARY でも UNIQUE でもないキーワードの場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
@@ -151,7 +235,7 @@ func TestConstraintDefParser_Error(t *testing.T) {
 
 		// THEN
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "expected 'PRIMARY' or 'UNIQUE'")
+		assert.Contains(t, err.Error(), "expected 'PRIMARY', 'UNIQUE', or 'KEY'")
 	})
 
 	t.Run("KEY キーワードがない場合、エラーを返す", func(t *testing.T) {
@@ -213,7 +297,7 @@ func TestConstraintDefParser_Error(t *testing.T) {
 
 		// THEN
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "expected 'PRIMARY' or 'UNIQUE'")
+		assert.Contains(t, err.Error(), "expected 'PRIMARY', 'UNIQUE', or 'KEY'")
 	})
 
 	t.Run("カラムリストが開かれたまま finalize された場合、エラーを返す", func(t *testing.T) {
