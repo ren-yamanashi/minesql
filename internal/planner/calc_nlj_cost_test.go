@@ -159,6 +159,37 @@ func TestCalcDrivingTableCostWithWhere(t *testing.T) {
 		assert.Greater(t, readCost, 0.0)
 	})
 
+	t.Run("WHERE に UNIQUE INDEX レンジスキャンがある場合 rangeCost が返される", func(t *testing.T) {
+		// GIVEN: users テーブルの username カラムに UNIQUE INDEX がある
+		setupUsersTable(t)
+		hdl := handler.Get()
+		tblMeta, _ := hdl.Catalog.GetTableMetaByName("users")
+		stats, err := hdl.AnalyzeTable(tblMeta)
+		require.NoError(t, err)
+		tbl, err := hdl.GetTable("users")
+		require.NoError(t, err)
+
+		candidate := joinCandidate{tblMeta: tblMeta, stats: stats, table: tbl}
+
+		// WHERE users.username > 'k' (UNIQUE INDEX レンジスキャン)
+		// username の値: janedoe, johndoe, johndoe2, johndoe3, jonathanblack, tombrown
+		// 'k' より大きいのは tombrown のみ
+		drivingWhere := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(">",
+				ast.NewLhsColumn(ast.ColumnId{TableName: "users", ColName: "username"}),
+				ast.NewRhsLiteral(ast.NewStringLiteral("k")),
+			),
+		}
+
+		// WHEN
+		readCost, fanout, err := calcTableJoinCost(hdl.BufferPool, candidate, 1.0, nil, drivingWhere)
+
+		// THEN: レンジスキャンコスト、fanout はフルスキャンより小さい
+		require.NoError(t, err)
+		assert.Less(t, fanout, float64(stats.RecordCount), "レンジスキャンの fanout はフルスキャンより小さい")
+		assert.Greater(t, readCost, 0.0)
+	})
+
 	t.Run("WHERE ありは fanout が 1 になり WHERE なしは RecordCount になる", func(t *testing.T) {
 		// GIVEN
 		setupUsersTable(t)
@@ -280,6 +311,90 @@ func TestCalcFiltered(t *testing.T) {
 
 		// THEN: 1/2 × 1/5 = 0.1
 		assert.Equal(t, 0.1, filtered)
+	})
+
+	t.Run("UNIQUE INDEX カラムの条件は filtered = 1.0", func(t *testing.T) {
+		// GIVEN: email に UNIQUE INDEX がある
+		candidate := joinCandidate{
+			tblMeta: &handler.TableMetadata{
+				Name: "users", NCols: 3, PKCount: 1,
+				Cols: []*dictionary.ColumnMeta{
+					{Name: "id", Pos: 0}, {Name: "name", Pos: 1}, {Name: "email", Pos: 2},
+				},
+				Indexes: []*dictionary.IndexMeta{
+					{Name: "idx_email", ColName: "email", Type: dictionary.IndexTypeUnique},
+				},
+			},
+			stats: &handler.TableStatistics{
+				RecordCount: 100,
+				ColStats:    map[string]handler.ColumnStatistics{"email": {UniqueValues: 100}},
+				IdxStats:    map[string]handler.IndexStatistics{"idx_email": {RecPerKey: 1.0}},
+			},
+		}
+
+		// WHEN: WHERE email = 'test@example.com' (UNIQUE INDEX → fanout に反映済み)
+		expr := ast.NewBinaryExpr("=",
+			ast.NewLhsColumn(ast.ColumnId{ColName: "email"}),
+			ast.NewRhsLiteral(ast.NewStringLiteral("test@example.com")),
+		)
+		filtered := calcFiltered(expr, candidate)
+
+		// THEN: 1.0 (二重に削減しない)
+		assert.Equal(t, 1.0, filtered)
+	})
+
+	t.Run("不等値検索で通過率が (V-1)/V になる", func(t *testing.T) {
+		// GIVEN: gender に 2 種類の値がある (V=2)
+		candidate := joinCandidate{
+			tblMeta: &handler.TableMetadata{
+				Name: "users", NCols: 3, PKCount: 1,
+				Cols: []*dictionary.ColumnMeta{
+					{Name: "id", Pos: 0}, {Name: "name", Pos: 1}, {Name: "gender", Pos: 2},
+				},
+			},
+			stats: &handler.TableStatistics{
+				RecordCount: 100,
+				ColStats:    map[string]handler.ColumnStatistics{"gender": {UniqueValues: 2}},
+				IdxStats:    map[string]handler.IndexStatistics{},
+			},
+		}
+
+		// WHEN: WHERE gender != 'male'
+		expr := ast.NewBinaryExpr("!=",
+			ast.NewLhsColumn(ast.ColumnId{ColName: "gender"}),
+			ast.NewRhsLiteral(ast.NewStringLiteral("male")),
+		)
+		filtered := calcFiltered(expr, candidate)
+
+		// THEN: (2-1)/2 = 0.5
+		assert.Equal(t, 0.5, filtered)
+	})
+
+	t.Run("レンジ演算子で通過率が 1/3 になる", func(t *testing.T) {
+		// GIVEN: age にインデックスがない
+		candidate := joinCandidate{
+			tblMeta: &handler.TableMetadata{
+				Name: "users", NCols: 3, PKCount: 1,
+				Cols: []*dictionary.ColumnMeta{
+					{Name: "id", Pos: 0}, {Name: "name", Pos: 1}, {Name: "age", Pos: 2},
+				},
+			},
+			stats: &handler.TableStatistics{
+				RecordCount: 100,
+				ColStats:    map[string]handler.ColumnStatistics{"age": {UniqueValues: 50}},
+				IdxStats:    map[string]handler.IndexStatistics{},
+			},
+		}
+
+		// WHEN: WHERE age > '30'
+		expr := ast.NewBinaryExpr(">",
+			ast.NewLhsColumn(ast.ColumnId{ColName: "age"}),
+			ast.NewRhsLiteral(ast.NewStringLiteral("30")),
+		)
+		filtered := calcFiltered(expr, candidate)
+
+		// THEN: 1/3
+		assert.InDelta(t, 1.0/3.0, filtered, 1e-10)
 	})
 }
 
@@ -676,5 +791,227 @@ func TestOptimizeJoinOrder(t *testing.T) {
 		// THEN
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "no valid join order")
+	})
+}
+
+func TestFindPredicate(t *testing.T) {
+	predicates := []joinPredicate{
+		{leftTable: "users", leftCol: "id", rightTable: "orders", rightCol: "user_id"},
+		{leftTable: "orders", leftCol: "item_id", rightTable: "items", rightCol: "id"},
+	}
+
+	t.Run("候補が leftTable の場合にマッチする", func(t *testing.T) {
+		// GIVEN: resultTableNames に "orders" がある
+		resultTableNames := map[string]struct{}{"orders": {}}
+
+		// WHEN: 候補テーブル "users" で検索
+		pred := findPredicate(predicates, "users", resultTableNames)
+
+		// THEN: users.id = orders.user_id がマッチ
+		require.NotNil(t, pred)
+		assert.Equal(t, "users", pred.leftTable)
+		assert.Equal(t, "orders", pred.rightTable)
+	})
+
+	t.Run("候補が rightTable の場合にマッチする", func(t *testing.T) {
+		// GIVEN: resultTableNames に "orders" がある
+		resultTableNames := map[string]struct{}{"orders": {}}
+
+		// WHEN: 候補テーブル "items" で検索
+		pred := findPredicate(predicates, "items", resultTableNames)
+
+		// THEN: orders.item_id = items.id がマッチ
+		require.NotNil(t, pred)
+		assert.Equal(t, "orders", pred.leftTable)
+		assert.Equal(t, "items", pred.rightTable)
+	})
+
+	t.Run("結合条件がない候補は nil を返す", func(t *testing.T) {
+		// GIVEN: resultTableNames に "users" がある
+		resultTableNames := map[string]struct{}{"users": {}}
+
+		// WHEN: 候補テーブル "items" で検索 (users-items 間の条件はない)
+		pred := findPredicate(predicates, "items", resultTableNames)
+
+		// THEN
+		assert.Nil(t, pred)
+	})
+
+	t.Run("resultTableNames が空の場合は nil を返す", func(t *testing.T) {
+		// GIVEN
+		resultTableNames := map[string]struct{}{}
+
+		// WHEN
+		pred := findPredicate(predicates, "users", resultTableNames)
+
+		// THEN
+		assert.Nil(t, pred)
+	})
+}
+
+func TestResolveJoinCol(t *testing.T) {
+	pred := &joinPredicate{
+		leftTable: "users", leftCol: "id",
+		rightTable: "orders", rightCol: "user_id",
+	}
+
+	t.Run("候補が leftTable の場合に leftCol を返す", func(t *testing.T) {
+		// WHEN
+		col := resolveJoinCol(pred, "users")
+
+		// THEN
+		assert.Equal(t, "id", col)
+	})
+
+	t.Run("候補が rightTable の場合に rightCol を返す", func(t *testing.T) {
+		// WHEN
+		col := resolveJoinCol(pred, "orders")
+
+		// THEN
+		assert.Equal(t, "user_id", col)
+	})
+}
+
+func TestCalcFilteredEdgeCases(t *testing.T) {
+	t.Run("nil の式は 1.0 を返す", func(t *testing.T) {
+		// GIVEN
+		candidate := joinCandidate{
+			tblMeta: &handler.TableMetadata{Name: "t", NCols: 1, PKCount: 1},
+			stats:   &handler.TableStatistics{IdxStats: map[string]handler.IndexStatistics{}},
+		}
+
+		// WHEN
+		filtered := calcFiltered(nil, candidate)
+
+		// THEN
+		assert.Equal(t, 1.0, filtered)
+	})
+
+	t.Run("LHS がカラムでない式は 1.0 を返す", func(t *testing.T) {
+		// GIVEN: LHS が式 (LhsExpr) の場合
+		candidate := joinCandidate{
+			tblMeta: &handler.TableMetadata{
+				Name: "t", NCols: 2, PKCount: 1,
+				Cols: []*dictionary.ColumnMeta{{Name: "id", Pos: 0}, {Name: "name", Pos: 1}},
+			},
+			stats: &handler.TableStatistics{
+				ColStats: map[string]handler.ColumnStatistics{"name": {UniqueValues: 10}},
+				IdxStats: map[string]handler.IndexStatistics{},
+			},
+		}
+		expr := ast.NewBinaryExpr("AND",
+			ast.NewLhsColumn(ast.ColumnId{ColName: "name"}),
+			ast.NewRhsLiteral(ast.NewStringLiteral("x")),
+		)
+		// LHS を LhsExpr に差し替え (非カラム)
+		exprNonCol := ast.NewBinaryExpr("=",
+			ast.NewLhsExpr(expr),
+			ast.NewRhsLiteral(ast.NewStringLiteral("x")),
+		)
+
+		// WHEN
+		filtered := calcFiltered(exprNonCol, candidate)
+
+		// THEN
+		assert.Equal(t, 1.0, filtered)
+	})
+
+	t.Run("ColStats にないカラムは 0.1 を返す", func(t *testing.T) {
+		// GIVEN: status カラムの統計情報がない
+		candidate := joinCandidate{
+			tblMeta: &handler.TableMetadata{
+				Name: "t", NCols: 2, PKCount: 1,
+				Cols: []*dictionary.ColumnMeta{{Name: "id", Pos: 0}, {Name: "status", Pos: 1}},
+			},
+			stats: &handler.TableStatistics{
+				ColStats: map[string]handler.ColumnStatistics{}, // status の統計なし
+				IdxStats: map[string]handler.IndexStatistics{},
+			},
+		}
+		expr := ast.NewBinaryExpr("=",
+			ast.NewLhsColumn(ast.ColumnId{ColName: "status"}),
+			ast.NewRhsLiteral(ast.NewStringLiteral("active")),
+		)
+
+		// WHEN
+		filtered := calcFiltered(expr, candidate)
+
+		// THEN: 統計がない場合は MySQL のデフォルト (COND_FILTER_EQUALITY = 0.1)
+		assert.Equal(t, 0.1, filtered)
+	})
+}
+
+func TestCalcDrivingTableCostWithWhereAND(t *testing.T) {
+	t.Run("AND 複合条件で最もコストの低いアクセスパスが選ばれる", func(t *testing.T) {
+		// GIVEN: users テーブルに PK(id) と UNIQUE INDEX(username) がある
+		setupUsersTable(t)
+		hdl := handler.Get()
+		tblMeta, _ := hdl.Catalog.GetTableMetaByName("users")
+		stats, err := hdl.AnalyzeTable(tblMeta)
+		require.NoError(t, err)
+		tbl, err := hdl.GetTable("users")
+		require.NoError(t, err)
+
+		candidate := joinCandidate{tblMeta: tblMeta, stats: stats, table: tbl}
+
+		// WHERE users.id = '1' AND users.username > 'k'
+		// PK 等値検索 (コスト 1.0) と UNIQUE INDEX レンジスキャンの最安が選ばれる
+		drivingWhere := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr("AND",
+				ast.NewLhsExpr(ast.NewBinaryExpr("=",
+					ast.NewLhsColumn(ast.ColumnId{TableName: "users", ColName: "id"}),
+					ast.NewRhsLiteral(ast.NewStringLiteral("1")),
+				)),
+				ast.NewRhsExpr(ast.NewBinaryExpr(">",
+					ast.NewLhsColumn(ast.ColumnId{TableName: "users", ColName: "username"}),
+					ast.NewRhsLiteral(ast.NewStringLiteral("k")),
+				)),
+			),
+		}
+
+		// WHEN
+		readCost, fanout, err := calcTableJoinCost(hdl.BufferPool, candidate, 1.0, nil, drivingWhere)
+
+		// THEN: AND の各リーフから最安コストが選ばれる (ユニークスキャン以下)
+		require.NoError(t, err)
+		assert.LessOrEqual(t, readCost, calcUniqueScanCost(), "AND 内の最安コストはユニークスキャン以下")
+		assert.Greater(t, readCost, 0.0)
+		assert.Greater(t, fanout, 0.0)
+	})
+
+	t.Run("AND でインデックスなしの条件のみの場合はフルスキャンにフォールバック", func(t *testing.T) {
+		// GIVEN
+		setupUsersTable(t)
+		hdl := handler.Get()
+		tblMeta, _ := hdl.Catalog.GetTableMetaByName("users")
+		stats, err := hdl.AnalyzeTable(tblMeta)
+		require.NoError(t, err)
+		tbl, err := hdl.GetTable("users")
+		require.NoError(t, err)
+
+		candidate := joinCandidate{tblMeta: tblMeta, stats: stats, table: tbl}
+
+		// WHERE first_name = 'John' AND gender = 'male'
+		// どちらもインデックスなし → evalDrivingWhereConditions は ok=false
+		drivingWhere := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr("AND",
+				ast.NewLhsExpr(ast.NewBinaryExpr("=",
+					ast.NewLhsColumn(ast.ColumnId{ColName: "first_name"}),
+					ast.NewRhsLiteral(ast.NewStringLiteral("John")),
+				)),
+				ast.NewRhsExpr(ast.NewBinaryExpr("=",
+					ast.NewLhsColumn(ast.ColumnId{ColName: "gender"}),
+					ast.NewRhsLiteral(ast.NewStringLiteral("male")),
+				)),
+			),
+		}
+
+		// WHEN
+		readCost, fanout, err := calcTableJoinCost(hdl.BufferPool, candidate, 1.0, nil, drivingWhere)
+
+		// THEN: フルスキャン → fanout = RecordCount
+		require.NoError(t, err)
+		assert.Equal(t, float64(stats.RecordCount), fanout)
+		assert.Greater(t, readCost, 0.0)
 	})
 }
