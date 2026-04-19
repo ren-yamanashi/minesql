@@ -1,6 +1,7 @@
 package access
 
 import (
+	"minesql/internal/storage/lock"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -56,7 +57,7 @@ func TestReadVisibleVersion(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ReadView: T2 は不可視、T1 は可視
-		rv := NewReadView(3, []TrxId{2}, 4)
+		rv := NewReadView(3, []lock.TrxId{2}, 4)
 
 		// B+Tree 上の現在の行: lastModified=T2, rollPtr=T2のundo
 		current := RecordVersion{
@@ -89,7 +90,7 @@ func TestReadVisibleVersion(t *testing.T) {
 		assert.NoError(t, err)
 
 		// ReadView: T1 も不可視
-		rv := NewReadView(3, []TrxId{1}, 4)
+		rv := NewReadView(3, []lock.TrxId{1}, 4)
 
 		current := RecordVersion{
 			LastModified: 1,
@@ -114,7 +115,7 @@ func TestReadVisibleVersion(t *testing.T) {
 		vr := NewVersionReader(undoLog)
 
 		// 不可視な行で rollPtr が null (undo チェーンがない)
-		rv := NewReadView(3, []TrxId{1}, 4)
+		rv := NewReadView(3, []lock.TrxId{1}, 4)
 		current := RecordVersion{
 			LastModified: 1,
 			RollPtr:      NullUndoPtr,

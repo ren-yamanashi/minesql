@@ -12,7 +12,7 @@ import (
 // purgeTrxId はパージ操作で使用するトランザクション ID
 //
 // パージはどのユーザートランザクションにも属さないため、専用の ID を使い、操作完了後にロックを解放する
-const purgeTrxId TrxId = 0
+const purgeTrxId lock.TrxId = 0
 
 // PurgeThread はバックグラウンドで不要な delete-marked レコードと undo ログを回収する
 type PurgeThread struct {
@@ -76,7 +76,7 @@ func (pt *PurgeThread) loop() {
 }
 
 // RunPurge はパージ閾値に基づいて delete-marked レコードの物理削除と undo ログの破棄を行う
-func (pt *PurgeThread) RunPurge(purgeLimit TrxId, committedTrxIds []TrxId) error {
+func (pt *PurgeThread) RunPurge(purgeLimit lock.TrxId, committedTrxIds []lock.TrxId) error {
 	// delete-marked レコードの物理削除
 	for _, table := range pt.tables() {
 		if err := pt.purgeDeleteMarked(table, purgeLimit); err != nil {
@@ -91,7 +91,7 @@ func (pt *PurgeThread) RunPurge(purgeLimit TrxId, committedTrxIds []TrxId) error
 // purgeDeleteMarked はテーブルから delete-marked かつ lastModified < purgeLimit のレコードを物理削除する
 //
 // B+Tree の走査中に物理削除するとイテレータが壊れるため、削除対象のキーを先に収集し、走査完了後にまとめて削除する
-func (pt *PurgeThread) purgeDeleteMarked(table *Table, purgeLimit TrxId) error {
+func (pt *PurgeThread) purgeDeleteMarked(table *Table, purgeLimit lock.TrxId) error {
 	targets, err := pt.collectPurgeTargets(table, purgeLimit)
 	if err != nil {
 		return err
@@ -107,7 +107,7 @@ func (pt *PurgeThread) purgeDeleteMarked(table *Table, purgeLimit TrxId) error {
 }
 
 // collectPurgeTargets は B+Tree を走査し、パージ対象のレコードのカラムデータを収集する
-func (pt *PurgeThread) collectPurgeTargets(table *Table, purgeLimit TrxId) ([][][]byte, error) {
+func (pt *PurgeThread) collectPurgeTargets(table *Table, purgeLimit lock.TrxId) ([][][]byte, error) {
 	btr := btree.NewBTree(table.MetaPageId)
 	iter, err := btr.Search(pt.bp, btree.SearchModeStart{})
 	if err != nil {

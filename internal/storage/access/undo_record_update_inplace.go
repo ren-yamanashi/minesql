@@ -9,11 +9,11 @@ type UndoUpdateInplaceRecord struct {
 	table            *Table
 	PrevRecord       [][]byte // 更新前のレコード
 	NewRecord        [][]byte // 更新後のレコード
-	PrevLastModified TrxId
+	PrevLastModified lock.TrxId
 	PrevRollPtr      UndoPtr
 }
 
-func NewUndoUpdateInplaceRecord(table *Table, prevRecord, newRecord [][]byte, prevLastModified TrxId, prevRollPtr UndoPtr) UndoUpdateInplaceRecord {
+func NewUndoUpdateInplaceRecord(table *Table, prevRecord, newRecord [][]byte, prevLastModified lock.TrxId, prevRollPtr UndoPtr) UndoUpdateInplaceRecord {
 	return UndoUpdateInplaceRecord{
 		table:            table,
 		PrevRecord:       prevRecord,
@@ -24,9 +24,11 @@ func NewUndoUpdateInplaceRecord(table *Table, prevRecord, newRecord [][]byte, pr
 }
 
 // Undo は UpdateInplace したレコードを元の値に戻す
+//
+// lastModified と rollPtr も更新前の値に復元する。これにより、他のトランザクションの
+// ReadView から undo チェーンを辿って旧バージョンを正しく参照できる。
 func (r UndoUpdateInplaceRecord) Undo(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager) error {
-	// 元に戻すので、PrevRecord を新しい値、NewRecord を古い値として UpdateInplace を呼び出す
-	return r.table.updateInplace(bp, trxId, lockMgr, r.NewRecord, r.PrevRecord, NullUndoPtr)
+	return r.table.updateInplace(bp, trxId, lockMgr, r.NewRecord, r.PrevRecord, r.PrevLastModified, r.PrevRollPtr)
 }
 
 // Serialize は UndoUpdateInplaceRecord をバイト列にシリアライズする

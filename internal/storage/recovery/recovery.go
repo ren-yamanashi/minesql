@@ -14,7 +14,7 @@ import (
 // undoRecordEntry はデシリアライズ済みの UNDO レコードの情報を保持する
 type undoRecordEntry struct {
 	recordType       access.UndoRecordType
-	prevLastModified access.TrxId
+	prevLastModified lock.TrxId
 	prevRollPtr      access.UndoPtr
 	tableName        string
 	columns          [][][]byte

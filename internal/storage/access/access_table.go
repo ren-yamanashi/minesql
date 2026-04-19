@@ -153,7 +153,7 @@ func (t *Table) UpdateInplace(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *
 	bp.ClearNewlyDirtied()
 
 	// ロック取得 → 更新
-	if err := t.updateInplace(bp, trxId, lockMgr, oldColumns, newColumns, undoPtr); err != nil {
+	if err := t.updateInplace(bp, trxId, lockMgr, oldColumns, newColumns, trxId, undoPtr); err != nil {
 		if t.undoLog != nil {
 			t.undoLog.PopLast(trxId)
 		}
@@ -196,7 +196,7 @@ func (t *Table) EncodeKey(columns [][]byte) []byte {
 // encodeBTreeRecord はカラム値を B+Tree レコードに変換する
 //
 // Non-key 領域のレイアウト: [lastModified (8B)] [rollPtr (4B)] [非キーカラム (memcomparable)]
-func (t *Table) encodeBTreeRecord(columns [][]byte, deleteMark byte, lastModified TrxId, rollPtr UndoPtr) node.Record {
+func (t *Table) encodeBTreeRecord(columns [][]byte, deleteMark byte, lastModified lock.TrxId, rollPtr UndoPtr) node.Record {
 	var key []byte
 	encode.Encode(columns[:t.PrimaryKeyCount], &key)
 
@@ -321,7 +321,11 @@ func (t *Table) softDelete(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *loc
 }
 
 // updateInplace は Undo 記録なしでテーブルの行をインプレース更新する (排他ロック取得 → 更新の順で実行する)
-func (t *Table) updateInplace(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, oldColumns [][]byte, newColumns [][]byte, undoPtr UndoPtr) error {
+// updateInplace はレコードをインプレース更新する
+//
+// lastModified にはレコードに書き込む trxId を指定する。
+// 通常の UPDATE では trxId を渡し、ROLLBACK では更新前の lastModified を渡して復元する。
+func (t *Table) updateInplace(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Manager, oldColumns [][]byte, newColumns [][]byte, lastModified lock.TrxId, undoPtr UndoPtr) error {
 	btr := btree.NewBTree(t.MetaPageId)
 
 	// 対象行を検索
@@ -336,12 +340,12 @@ func (t *Table) updateInplace(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *
 		return err
 	}
 
-	btrRecord := t.encodeBTreeRecord(newColumns, 0, trxId, undoPtr)
+	btrRecord := t.encodeBTreeRecord(newColumns, 0, lastModified, undoPtr)
 	if err := btr.Update(bp, btrRecord); err != nil {
 		return err
 	}
 
-	// ユニークインデックスを更新 (物理削除 + Insert)
+	// セカンダリインデックスを更新 (物理削除 + Insert)
 	encodedOldKey := t.EncodeKey(oldColumns)
 	encodedNewKey := t.EncodeKey(newColumns)
 	for _, si := range t.SecondaryIndexes {
@@ -359,7 +363,7 @@ func (t *Table) updateInplace(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *
 }
 
 // readCurrentVersion は B+Tree 上の既存行から lastModified と rollPtr を読み取る
-func (t *Table) readCurrentVersion(bp *buffer.BufferPool, columns [][]byte) (TrxId, UndoPtr, error) {
+func (t *Table) readCurrentVersion(bp *buffer.BufferPool, columns [][]byte) (lock.TrxId, UndoPtr, error) {
 	btr := btree.NewBTree(t.MetaPageId)
 	encodedKey := t.EncodeKey(columns)
 	record, _, err := btr.FindByKey(bp, encodedKey)
@@ -371,7 +375,7 @@ func (t *Table) readCurrentVersion(bp *buffer.BufferPool, columns [][]byte) (Trx
 }
 
 // appendRedoRecords は書き込みが行われたページの REDO レコードを追加する
-func (t *Table) appendRedoRecords(bp *buffer.BufferPool, trxId TrxId) error {
+func (t *Table) appendRedoRecords(bp *buffer.BufferPool, trxId lock.TrxId) error {
 	if t.redoLog == nil {
 		return nil
 	}

@@ -8,8 +8,8 @@ import (
 type UndoInsertRecord struct {
 	table            *Table
 	Record           [][]byte
-	PrevLastModified TrxId   // INSERT は前バージョンが存在しないため常に 0
-	PrevRollPtr      UndoPtr // INSERT は前バージョンが存在しないため常に NullUndoPtr
+	PrevLastModified lock.TrxId // INSERT は前バージョンが存在しないため常に 0
+	PrevRollPtr      UndoPtr    // INSERT は前バージョンが存在しないため常に NullUndoPtr
 }
 
 func NewUndoInsertRecord(table *Table, record [][]byte) UndoInsertRecord {

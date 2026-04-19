@@ -31,8 +31,8 @@ type UndoRecordFields struct {
 	TrxId            uint64
 	UndoNo           uint64
 	RecordType       UndoRecordType
-	PrevLastModified TrxId   // 上書き前の行の lastModified
-	PrevRollPtr      UndoPtr // 上書き前の行の rollPtr
+	PrevLastModified lock.TrxId // 上書き前の行の lastModified
+	PrevRollPtr      UndoPtr    // 上書き前の行の rollPtr
 	TableName        string
 	ColumnSets       [][][]byte // INSERT/DELETE は 1 セット、UPDATE_INPLACE は 2 セット (prevRecord, newRecord)
 }

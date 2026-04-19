@@ -203,7 +203,7 @@ func TestTableIterator(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: T3 の ReadView で T2 がアクティブ (不可視)
-		rv := NewReadView(3, []TrxId{2}, 4) // mIds=[2]
+		rv := NewReadView(3, []lock.TrxId{2}, 4) // mIds=[2]
 		iter, err := table.Search(bp, rv, NewVersionReader(nil), RecordSearchModeStart{})
 		assert.NoError(t, err)
 

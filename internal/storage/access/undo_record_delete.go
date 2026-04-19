@@ -8,11 +8,11 @@ import (
 type UndoDeleteRecord struct {
 	table            *Table
 	Record           [][]byte
-	PrevLastModified TrxId
+	PrevLastModified lock.TrxId
 	PrevRollPtr      UndoPtr
 }
 
-func NewUndoDeleteRecord(table *Table, record [][]byte, prevLastModified TrxId, prevRollPtr UndoPtr) UndoDeleteRecord {
+func NewUndoDeleteRecord(table *Table, record [][]byte, prevLastModified lock.TrxId, prevRollPtr UndoPtr) UndoDeleteRecord {
 	return UndoDeleteRecord{
 		table:            table,
 		Record:           record,
