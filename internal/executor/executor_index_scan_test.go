@@ -40,7 +40,7 @@ func TestIndexScan(t *testing.T) {
 		assert.NoError(t, err)
 
 		// インデックスアクセスメソッドを取得
-		idx, err := tbl.GetUniqueIndexByName("last_name")
+		idx, err := tbl.GetSecondaryIndexByName("last_name")
 		assert.NoError(t, err)
 
 		indexScan := NewIndexScan(
@@ -81,7 +81,7 @@ func TestIndexScan(t *testing.T) {
 			WhileCondition: func(record Record) bool { return true },
 			IndexOnly:      true,
 			NCols:          3,
-			UKColPos:       2,
+			SecColPos:      2,
 		}
 
 		// WHEN
@@ -91,7 +91,7 @@ func TestIndexScan(t *testing.T) {
 		assert.NotNil(t, indexScan)
 		assert.True(t, indexScan.indexOnly)
 		assert.Equal(t, 3, indexScan.nCols)
-		assert.Equal(t, 2, indexScan.ukColPos)
+		assert.Equal(t, 2, indexScan.secColPos)
 	})
 
 	t.Run("index-only scan で PK と UK のみ取得できる", func(t *testing.T) {
@@ -103,10 +103,10 @@ func TestIndexScan(t *testing.T) {
 		tbl, err := handler.Get().GetTable("users")
 		assert.NoError(t, err)
 
-		idx, err := tbl.GetUniqueIndexByName("last_name")
+		idx, err := tbl.GetSecondaryIndexByName("last_name")
 		assert.NoError(t, err)
 
-		// index-only scan: nCols=3 (id, first_name, last_name), ukColPos=2 (last_name)
+		// index-only scan: nCols=3 (id, first_name, last_name), secColPos=2 (last_name)
 		indexScan := NewIndexScanWithParams(IndexScanParams{
 			Table:          tbl,
 			Index:          idx,
@@ -114,7 +114,7 @@ func TestIndexScan(t *testing.T) {
 			WhileCondition: func(record Record) bool { return true },
 			IndexOnly:      true,
 			NCols:          3,
-			UKColPos:       2,
+			SecColPos:      2,
 		})
 
 		// WHEN
@@ -155,7 +155,7 @@ func TestIndexScan(t *testing.T) {
 		tbl, err := handler.Get().GetTable("users")
 		assert.NoError(t, err)
 
-		idx, err := tbl.GetUniqueIndexByName("last_name")
+		idx, err := tbl.GetSecondaryIndexByName("last_name")
 		assert.NoError(t, err)
 
 		// whileCondition: UK < "J" (Brown, Davis, Doe の 3 件)
@@ -168,7 +168,7 @@ func TestIndexScan(t *testing.T) {
 			},
 			IndexOnly: true,
 			NCols:     3,
-			UKColPos:  2,
+			SecColPos: 2,
 		})
 
 		// WHEN
@@ -200,7 +200,7 @@ func TestIndexScan(t *testing.T) {
 		assert.NoError(t, err)
 
 		// インデックスアクセスメソッドを取得
-		idx, err := tbl.GetUniqueIndexByName("last_name")
+		idx, err := tbl.GetSecondaryIndexByName("last_name")
 		assert.NoError(t, err)
 
 		indexScan := NewIndexScan(

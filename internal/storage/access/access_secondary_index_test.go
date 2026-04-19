@@ -10,14 +10,14 @@ import (
 )
 
 // Create と Insert をテスト
-func TestUniqueIndex(t *testing.T) {
+func TestSecondaryIndex(t *testing.T) {
 	t.Run("ユニークインデックスの作成ができ、そのインデックスに値が挿入できる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "test.db")
 
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("test_index", "test", indexMetapageId, 0, 1)
+		uniqueIndex := NewSecondaryIndex("test_index", "test", indexMetapageId, 0, 1, true)
 
 		// WHEN: ユニークインデックスを作成
 		err = uniqueIndex.Create(bp)
@@ -84,14 +84,14 @@ func TestUniqueIndex(t *testing.T) {
 	})
 }
 
-func TestUniqueIndexDelete(t *testing.T) {
+func TestSecondaryIndexDelete(t *testing.T) {
 	t.Run("ユニークインデックスからソフトデリートできる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "test.db")
 
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("test_index", "test", indexMetapageId, 0, 1)
+		uniqueIndex := NewSecondaryIndex("test_index", "test", indexMetapageId, 0, 1, true)
 
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
@@ -154,7 +154,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("test_index", "test", indexMetapageId, 0, 1)
+		uniqueIndex := NewSecondaryIndex("test_index", "test", indexMetapageId, 0, 1, true)
 
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
@@ -187,7 +187,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("test_index", "test", indexMetapageId, 0, 1)
+		uniqueIndex := NewSecondaryIndex("test_index", "test", indexMetapageId, 0, 1, true)
 
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
@@ -248,7 +248,7 @@ func TestUniqueIndexDelete(t *testing.T) {
 
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("test_index", "test", indexMetapageId, 0, 1)
+		uniqueIndex := NewSecondaryIndex("test_index", "test", indexMetapageId, 0, 1, true)
 
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
@@ -276,14 +276,14 @@ func TestUniqueIndexDelete(t *testing.T) {
 	})
 }
 
-func TestUniqueIndexConstraint(t *testing.T) {
+func TestSecondaryIndexConstraint(t *testing.T) {
 	t.Run("active なレコードが存在する場合にユニーク制約違反エラーが返る", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "test.db")
 
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("test_index", "test", indexMetapageId, 0, 1)
+		uniqueIndex := NewSecondaryIndex("test_index", "test", indexMetapageId, 0, 1, true)
 
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
@@ -308,7 +308,7 @@ func TestUniqueIndexConstraint(t *testing.T) {
 
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("test_index", "test", indexMetapageId, 0, 1)
+		uniqueIndex := NewSecondaryIndex("test_index", "test", indexMetapageId, 0, 1, true)
 
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
@@ -336,7 +336,7 @@ func TestUniqueIndexConstraint(t *testing.T) {
 		bp, metaPageId, _ := InitDisk(t, "test.db")
 		indexMetapageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("test_index", "test", indexMetapageId, 0, 1)
+		uniqueIndex := NewSecondaryIndex("test_index", "test", indexMetapageId, 0, 1, true)
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
 
@@ -364,13 +364,13 @@ func TestUniqueIndexConstraint(t *testing.T) {
 	})
 }
 
-func TestUniqueIndexLeafPageCount(t *testing.T) {
+func TestSecondaryIndexLeafPageCount(t *testing.T) {
 	t.Run("作成直後のテーブルのリーフページ数は 1", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "test.db")
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("test_index", "test", indexMetaPageId, 0, 1)
+		uniqueIndex := NewSecondaryIndex("test_index", "test", indexMetaPageId, 0, 1, true)
 
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
@@ -388,7 +388,7 @@ func TestUniqueIndexLeafPageCount(t *testing.T) {
 		bp, metaPageId, _ := InitDisk(t, "test.db")
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("test_index", "test", indexMetaPageId, 0, 1)
+		uniqueIndex := NewSecondaryIndex("test_index", "test", indexMetaPageId, 0, 1, true)
 
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
@@ -408,13 +408,13 @@ func TestUniqueIndexLeafPageCount(t *testing.T) {
 	})
 }
 
-func TestUniqueIndexHeight(t *testing.T) {
+func TestSecondaryIndexHeight(t *testing.T) {
 	t.Run("作成直後のインデックスの高さは 1", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "test.db")
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("test_index", "test", indexMetaPageId, 0, 1)
+		uniqueIndex := NewSecondaryIndex("test_index", "test", indexMetaPageId, 0, 1, true)
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
 
@@ -431,7 +431,7 @@ func TestUniqueIndexHeight(t *testing.T) {
 		bp, metaPageId, _ := InitDisk(t, "test.db")
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("test_index", "test", indexMetaPageId, 0, 1)
+		uniqueIndex := NewSecondaryIndex("test_index", "test", indexMetaPageId, 0, 1, true)
 		err = uniqueIndex.Create(bp)
 		assert.NoError(t, err)
 

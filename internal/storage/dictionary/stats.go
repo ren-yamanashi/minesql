@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"minesql/internal/storage/access"
+	"minesql/internal/storage/btree"
 	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/encode"
 	"sync"
 )
 
@@ -188,38 +190,95 @@ func updateColumnStats(
 
 // buildTable は TableMeta から Table を構築する (UndoManager なし)
 func buildTable(meta *TableMeta) (*access.Table, error) {
-	var uniqueIndexes []*access.UniqueIndex
+	var secondaryIndexes []*access.SecondaryIndex
 	for _, idxMeta := range meta.Indexes {
-		if idxMeta.Type == IndexTypeUnique {
+		isUnique := idxMeta.Type == IndexTypeUnique
+		if idxMeta.Type == IndexTypeUnique || idxMeta.Type == IndexTypeNonUnique {
 			colMeta, ok := meta.GetColByName(idxMeta.ColName)
 			if !ok {
 				return nil, fmt.Errorf("column %s not found in table %s", idxMeta.ColName, meta.Name)
 			}
-			ui := access.NewUniqueIndex(idxMeta.Name, idxMeta.ColName, idxMeta.DataMetaPageId, colMeta.Pos, meta.PKCount)
-			uniqueIndexes = append(uniqueIndexes, ui)
+			si := access.NewSecondaryIndex(idxMeta.Name, idxMeta.ColName, idxMeta.DataMetaPageId, colMeta.Pos, meta.PKCount, isUnique)
+			secondaryIndexes = append(secondaryIndexes, si)
 		}
 	}
-	tbl := access.NewTable(meta.Name, meta.DataMetaPageId, meta.PKCount, uniqueIndexes, nil, nil)
+	tbl := access.NewTable(meta.Name, meta.DataMetaPageId, meta.PKCount, secondaryIndexes, nil, nil)
 	return &tbl, nil
 }
 
-// analyzeIndex はテーブルのユニークインデックスの統計情報を収集する
+// analyzeIndex はテーブルのセカンダリインデックスの統計情報を収集する
 func (sc *StatsCollector) analyzeIndex(tbl *access.Table) (map[string]IndexStats, error) {
 	idxStats := make(map[string]IndexStats)
-	for _, uIdx := range tbl.UniqueIndexes {
-		height, err := uIdx.Height(sc.bufferPool)
+	for _, si := range tbl.SecondaryIndexes {
+		height, err := si.Height(sc.bufferPool)
 		if err != nil {
 			return nil, err
 		}
-		leafPageCount, err := uIdx.LeafPageCount(sc.bufferPool)
+		leafPageCount, err := si.LeafPageCount(sc.bufferPool)
 		if err != nil {
 			return nil, err
 		}
-		idxStats[uIdx.Name] = IndexStats{
+
+		recPerKey := 1.0
+		if !si.Unique {
+			recPerKey, err = sc.calcRecPerKey(si)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		idxStats[si.Name] = IndexStats{
 			Height:        height,
 			LeafPageCount: leafPageCount,
-			RecPerKey:     1.0, // UNIQUE INDEX は常に 1.0
+			RecPerKey:     recPerKey,
 		}
 	}
 	return idxStats, nil
+}
+
+// calcRecPerKey は非ユニークインデックスの RecPerKey を算出する
+//
+// インデックス B+Tree を先頭から走査し、active レコード数と distinct なセカンダリキー数を数える
+func (sc *StatsCollector) calcRecPerKey(si *access.SecondaryIndex) (float64, error) {
+	indexBTree := btree.NewBTree(si.MetaPageId)
+	iter, err := indexBTree.Search(sc.bufferPool, btree.SearchModeStart{})
+	if err != nil {
+		return 1.0, err
+	}
+
+	var totalRecords int64
+	var distinctKeys int64
+	var prevSecKey []byte
+
+	for {
+		record, ok, err := iter.Next(sc.bufferPool)
+		if err != nil {
+			return 1.0, err
+		}
+		if !ok {
+			break
+		}
+
+		// DeleteMark が 1 のレコードはスキップ
+		if len(record.HeaderBytes()) > 0 && record.HeaderBytes()[0] == 1 {
+			continue
+		}
+
+		totalRecords++
+
+		// セカンダリキー部分 (先頭 1 カラム) のエンコード済みバイト列を切り出す
+		keyBytes := record.KeyBytes()
+		_, rest := encode.DecodeFirstN(keyBytes, 1)
+		encodedSecKey := keyBytes[:len(keyBytes)-len(rest)]
+
+		if !bytes.Equal(encodedSecKey, prevSecKey) {
+			distinctKeys++
+			prevSecKey = append([]byte{}, encodedSecKey...)
+		}
+	}
+
+	if distinctKeys == 0 {
+		return 1.0, nil
+	}
+	return float64(totalRecords) / float64(distinctKeys), nil
 }

@@ -219,6 +219,66 @@ func TestCalcDrivingTableCostWithWhere(t *testing.T) {
 		assert.Equal(t, float64(stats.RecordCount), fanoutNoWhere) // フルスキャン: 全行
 		assert.Equal(t, 1.0, fanoutWithWhere)                      // PKの等値検索: 1行
 	})
+
+	t.Run("WHERE に非ユニークインデックスの等値検索がある場合 fanout が RecPerKey になる", func(t *testing.T) {
+		// GIVEN: products テーブル (category に非ユニークインデックス)
+		setupProductsTable(t)
+		hdl := handler.Get()
+		tblMeta, _ := hdl.Catalog.GetTableMetaByName("products")
+		stats, err := hdl.AnalyzeTable(tblMeta)
+		require.NoError(t, err)
+		tbl, err := hdl.GetTable("products")
+		require.NoError(t, err)
+
+		candidate := joinCandidate{tblMeta: tblMeta, stats: stats, table: tbl}
+
+		// WHERE products.category = 'Fruit' (非ユニークインデックスの等値検索)
+		drivingWhere := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr("=",
+				ast.NewLhsColumn(ast.ColumnId{TableName: "products", ColName: "category"}),
+				ast.NewRhsLiteral(ast.NewStringLiteral("Fruit")),
+			),
+		}
+
+		// WHEN
+		readCost, fanout, err := calcTableJoinCost(hdl.BufferPool, candidate, 1.0, nil, drivingWhere)
+
+		// THEN: 非ユニークなので fanout = RecPerKey (1.0 ではない)
+		require.NoError(t, err)
+		assert.Greater(t, readCost, 0.0)
+		// RecPerKey = 3レコード / 2キー = 1.5
+		assert.Equal(t, 1.5, fanout)
+	})
+
+	t.Run("WHERE に非ユニークインデックスの等値検索がある場合コストは rangeCost 方式で算出される", func(t *testing.T) {
+		// GIVEN
+		setupProductsTable(t)
+		hdl := handler.Get()
+		tblMeta, _ := hdl.Catalog.GetTableMetaByName("products")
+		stats, err := hdl.AnalyzeTable(tblMeta)
+		require.NoError(t, err)
+		tbl, err := hdl.GetTable("products")
+		require.NoError(t, err)
+
+		candidate := joinCandidate{tblMeta: tblMeta, stats: stats, table: tbl}
+
+		// WHEN: 非ユニークインデックスの等値検索
+		drivingWhere := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr("=",
+				ast.NewLhsColumn(ast.ColumnId{ColName: "category"}),
+				ast.NewRhsLiteral(ast.NewStringLiteral("Fruit")),
+			),
+		}
+		readCost, fanout, err := calcTableJoinCost(hdl.BufferPool, candidate, 1.0, nil, drivingWhere)
+		require.NoError(t, err)
+
+		// THEN: readCost > 0 かつ fanout = RecPerKey = 1.5
+		// readCost = readTime + RecPerKey × RowEvaluateCost + 0.01 (rangeCost 方式)
+		assert.Greater(t, readCost, 0.0)
+		assert.Equal(t, 1.5, fanout)
+		// readCost はユニークスキャン (1.0) とは異なる値になる
+		assert.NotEqual(t, calcUniqueScanCost(), readCost)
+	})
 }
 
 func TestCalcFiltered(t *testing.T) {

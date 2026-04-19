@@ -6,6 +6,7 @@ import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/dictionary"
 	"minesql/internal/storage/handler"
 )
 
@@ -136,12 +137,13 @@ func calcTableJoinCost(
 		}
 	}
 
-	// UNIQUE INDEX で eq_ref
+	// セカンダリインデックスで検索 (unique: eq_ref fanout=1, non-unique: ref fanout=RecPerKey)
+	// 1 回あたりの read_cost = RecPerKey × pageReadCost (MySQL の find_cost_for_ref に対応)
 	idxMeta, hasIndex := candidate.tblMeta.GetIndexByColName(joinColName)
 	if hasIndex {
 		idxStats, ok := candidate.stats.IdxStats[idxMeta.Name]
 		if ok {
-			return prefixRowcount * pageReadCost, idxStats.RecPerKey, nil
+			return prefixRowcount * idxStats.RecPerKey * pageReadCost, idxStats.RecPerKey, nil
 		}
 	}
 
@@ -218,15 +220,23 @@ func evalDrivingWhereConditions(bp *buffer.BufferPool, candidate joinCandidate, 
 
 	colName := lhs.Column.ColName
 
-	// 等値検索: PK or UNIQUE INDEX
+	// 等値検索: PK or INDEX
 	if expr.Operator == "=" {
 		if candidate.tblMeta.PKCount == 1 {
 			if colMeta, exists := candidate.tblMeta.GetColByName(colName); exists && colMeta.Pos == 0 {
 				return calcUniqueScanCost(), 1.0, true, nil
 			}
 		}
-		if _, hasIdx := candidate.tblMeta.GetIndexByColName(colName); hasIdx {
-			return calcUniqueScanCost(), 1.0, true, nil
+		if idxMeta, hasIdx := candidate.tblMeta.GetIndexByColName(colName); hasIdx {
+			if idxMeta.Type == dictionary.IndexTypeUnique {
+				return calcUniqueScanCost(), 1.0, true, nil
+			}
+			// 非ユニークインデックス: read_cost = RecPerKey × pageReadCost (MySQL の find_cost_for_ref に対応)
+			idxStats, ok := candidate.stats.IdxStats[idxMeta.Name]
+			if ok {
+				readCost := idxStats.RecPerKey * pageReadCost
+				return readCost, idxStats.RecPerKey, true, nil
+			}
 		}
 	}
 
@@ -254,7 +264,7 @@ func evalDrivingWhereConditions(bp *buffer.BufferPool, candidate joinCandidate, 
 	if idxMeta, hasIdx := candidate.tblMeta.GetIndexByColName(colName); hasIdx {
 		if expr.Operator == ">" || expr.Operator == ">=" || expr.Operator == "<" || expr.Operator == "<=" {
 			rhs := expr.Right.(*ast.RhsLiteral)
-			index, err := candidate.table.GetUniqueIndexByName(idxMeta.Name)
+			index, err := candidate.table.GetSecondaryIndexByName(idxMeta.Name)
 			if err != nil {
 				return 0, 0, false, err
 			}

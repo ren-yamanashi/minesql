@@ -153,7 +153,7 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// インデックスアクセスメソッドを取得
-		idx, err := tbl.GetUniqueIndexByName("last_name")
+		idx, err := tbl.GetSecondaryIndexByName("last_name")
 		assert.NoError(t, err)
 
 		// プライマリキーが "a" のレコードを削除 (last_name = "Doe")

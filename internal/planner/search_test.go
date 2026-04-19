@@ -705,7 +705,7 @@ func initStorageManager(t *testing.T, dataDir string) {
 
 	// テーブルを作成
 	createTable := executor.NewCreateTable("users", 1, []handler.CreateIndexParam{
-		{Name: "last_name", ColName: "last_name", UkIdx: 2},
+		{Name: "last_name", ColName: "last_name", ColIdx: 2, Unique: true},
 	}, []handler.CreateColumnParam{
 		{Name: "id", Type: handler.ColumnTypeString},
 		{Name: "first_name", Type: handler.ColumnTypeString},
@@ -814,6 +814,156 @@ func TestPlanSelection(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, exec)
 		assert.IsType(t, &executor.Filter{}, exec)
+	})
+
+	t.Run("非ユニークインデックスの = 検索で IndexScan または Filter が返される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		initStorageManagerWithNonUniqueIndex(t, tmpdir)
+		defer handler.Reset()
+
+		tblMeta := getTableMetadata(t, "products")
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
+				"=",
+				ast.NewLhsColumn(*ast.NewColumnId("category")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("Fruit")),
+			),
+		}
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
+
+		// WHEN
+		exec, err := search.Build()
+
+		// THEN: コストベースで IndexScan または Filter が選ばれる
+		assert.NoError(t, err)
+		assert.NotNil(t, exec)
+		isValid := false
+		switch exec.(type) {
+		case *executor.IndexScan, *executor.Filter:
+			isValid = true
+		}
+		assert.True(t, isValid, "expected IndexScan or Filter, got %T", exec)
+	})
+
+	t.Run("非ユニークインデックスのレンジスキャンで IndexScan または Filter が返される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		initStorageManagerWithNonUniqueIndex(t, tmpdir)
+		defer handler.Reset()
+
+		tblMeta := getTableMetadata(t, "products")
+		// WHERE category > 'F' (非ユニークインデックスのレンジスキャン)
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(
+				">",
+				ast.NewLhsColumn(*ast.NewColumnId("category")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("F")),
+			),
+		}
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
+
+		// WHEN
+		exec, err := search.Build()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, exec)
+		isValid := false
+		switch exec.(type) {
+		case *executor.IndexScan, *executor.Filter:
+			isValid = true
+		}
+		assert.True(t, isValid, "expected IndexScan or Filter, got %T", exec)
+	})
+
+	t.Run("非ユニークインデックスの = 検索で同一キーの複数行が返される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		initStorageManagerWithNonUniqueIndex(t, tmpdir)
+		defer handler.Reset()
+
+		// データを挿入 (同一カテゴリが 2 件)
+		var trxId handler.TrxId = 1
+		insertExec, err := PlanInsert(trxId, &ast.InsertStmt{
+			Table: *ast.NewTableId("products"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+				*ast.NewColumnId("name"),
+				*ast.NewColumnId("category"),
+			},
+			Values: [][]ast.Literal{
+				{ast.NewStringLiteral("1"), ast.NewStringLiteral("Apple"), ast.NewStringLiteral("Fruit")},
+				{ast.NewStringLiteral("2"), ast.NewStringLiteral("Banana"), ast.NewStringLiteral("Fruit")},
+				{ast.NewStringLiteral("3"), ast.NewStringLiteral("Carrot"), ast.NewStringLiteral("Veggie")},
+			},
+		})
+		assert.NoError(t, err)
+		_, err = insertExec.Next()
+		assert.NoError(t, err)
+
+		tblMeta := getTableMetadata(t, "products")
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr("=",
+				ast.NewLhsColumn(*ast.NewColumnId("category")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("Fruit")),
+			),
+		}
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
+
+		// WHEN
+		exec, err := search.Build()
+		assert.NoError(t, err)
+		results := fetchAll(t, exec)
+
+		// THEN: "Fruit" の 2 行が返される
+		assert.Equal(t, 2, len(results))
+		assert.Equal(t, "Apple", string(results[0][1]))
+		assert.Equal(t, "Banana", string(results[1][1]))
+	})
+
+	t.Run("非ユニークインデックスのレンジスキャンで条件に合う行が返される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		initStorageManagerWithNonUniqueIndex(t, tmpdir)
+		defer handler.Reset()
+
+		var trxId handler.TrxId = 1
+		insertExec, err := PlanInsert(trxId, &ast.InsertStmt{
+			Table: *ast.NewTableId("products"),
+			Cols: []ast.ColumnId{
+				*ast.NewColumnId("id"),
+				*ast.NewColumnId("name"),
+				*ast.NewColumnId("category"),
+			},
+			Values: [][]ast.Literal{
+				{ast.NewStringLiteral("1"), ast.NewStringLiteral("Apple"), ast.NewStringLiteral("Fruit")},
+				{ast.NewStringLiteral("2"), ast.NewStringLiteral("Banana"), ast.NewStringLiteral("Fruit")},
+				{ast.NewStringLiteral("3"), ast.NewStringLiteral("Carrot"), ast.NewStringLiteral("Veggie")},
+			},
+		})
+		assert.NoError(t, err)
+		_, err = insertExec.Next()
+		assert.NoError(t, err)
+
+		tblMeta := getTableMetadata(t, "products")
+		// WHERE category > 'Fruit' → "Veggie" のみ
+		where := &ast.WhereClause{
+			Condition: ast.NewBinaryExpr(">",
+				ast.NewLhsColumn(*ast.NewColumnId("category")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("Fruit")),
+			),
+		}
+		search := NewSearch(access.NewReadView(0, nil, ^uint64(0)), access.NewVersionReader(nil), tblMeta, where, handler.Get().BufferPool)
+
+		// WHEN
+		exec, err := search.Build()
+		assert.NoError(t, err)
+		results := fetchAll(t, exec)
+
+		// THEN: "Veggie" の 1 行のみ
+		assert.Equal(t, 1, len(results))
+		assert.Equal(t, "Carrot", string(results[0][1]))
 	})
 
 	t.Run("UNIQUE INDEX のレンジスキャンで IndexScan または Filter が返される", func(t *testing.T) {
@@ -1108,6 +1258,26 @@ func TestSetSelectColumns(t *testing.T) {
 		// THEN
 		assert.Equal(t, cols, s.selectColumns)
 	})
+}
+
+// 非ユニークインデックス付きテーブルの storage manager を初期化
+func initStorageManagerWithNonUniqueIndex(t *testing.T, dataDir string) {
+	t.Setenv("MINESQL_DATA_DIR", dataDir)
+	t.Setenv("MINESQL_BUFFER_SIZE", "10")
+
+	handler.Reset()
+	handler.Init()
+
+	// テーブルを作成 (category に非ユニークインデックス)
+	createTable := executor.NewCreateTable("products", 1, []handler.CreateIndexParam{
+		{Name: "idx_category", ColName: "category", ColIdx: 2, Unique: false},
+	}, []handler.CreateColumnParam{
+		{Name: "id", Type: handler.ColumnTypeString},
+		{Name: "name", Type: handler.ColumnTypeString},
+		{Name: "category", Type: handler.ColumnTypeString},
+	})
+	_, err := createTable.Next()
+	assert.NoError(t, err)
 }
 
 // テスト用にテーブルメタデータを取得する

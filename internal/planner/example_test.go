@@ -241,6 +241,94 @@ func Example_filter() {
 	//   合計: 4 件
 }
 
+func Example_join() {
+	cleanup := setupPlannerExample()
+	defer cleanup()
+
+	// CREATE TABLE orders
+	runPlan(&ast.CreateTableStmt{
+		TableName: "orders",
+		CreateDefinitions: []ast.Definition{
+			&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{ColName: "user_id", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{ColName: "item", DataType: ast.DataTypeVarchar},
+			&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{*ast.NewColumnId("id")}},
+			&ast.ConstraintUniqueKeyDef{KeyName: "idx_user_id", Column: *ast.NewColumnId("user_id")},
+		},
+	})
+	runPlan(&ast.InsertStmt{
+		Table: *ast.NewTableId("orders"),
+		Cols:  []ast.ColumnId{*ast.NewColumnId("id"), *ast.NewColumnId("user_id"), *ast.NewColumnId("item")},
+		Values: [][]ast.Literal{
+			{ast.NewStringLiteral("100"), ast.NewStringLiteral("1"), ast.NewStringLiteral("apple")},
+			{ast.NewStringLiteral("101"), ast.NewStringLiteral("3"), ast.NewStringLiteral("banana")},
+		},
+	})
+
+	// SELECT * FROM users JOIN orders ON users.id = orders.user_id
+	records := runPlan(&ast.SelectStmt{
+		From: *ast.NewTableId("users"),
+		Joins: []*ast.JoinClause{
+			{
+				Table: *ast.NewTableId("orders"),
+				Condition: ast.NewBinaryExpr("=",
+					ast.NewLhsColumn(ast.ColumnId{TableName: "users", ColName: "id"}),
+					ast.NewRhsColumn(ast.ColumnId{TableName: "orders", ColName: "user_id"}),
+				),
+			},
+		},
+	})
+	printPlanRecords(records)
+
+	// Output:
+	//   (100, 1, apple, 1, John, Doe, male, johndoe)
+	//   (101, 3, banana, 3, John, Doe3, male, johndoe3)
+	//   合計: 2 件
+}
+
+func Example_nonUniqueIndex() {
+	cleanup := setupPlannerExample()
+	defer cleanup()
+
+	// 非ユニークインデックス付きテーブルを作成
+	runPlan(&ast.CreateTableStmt{
+		TableName: "products",
+		CreateDefinitions: []ast.Definition{
+			&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{ColName: "name", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{ColName: "category", DataType: ast.DataTypeVarchar},
+			&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{*ast.NewColumnId("id")}},
+			&ast.ConstraintKeyDef{KeyName: "idx_category", Column: *ast.NewColumnId("category")},
+		},
+	})
+	runPlan(&ast.InsertStmt{
+		Table: *ast.NewTableId("products"),
+		Cols:  []ast.ColumnId{*ast.NewColumnId("id"), *ast.NewColumnId("name"), *ast.NewColumnId("category")},
+		Values: [][]ast.Literal{
+			{ast.NewStringLiteral("1"), ast.NewStringLiteral("Apple"), ast.NewStringLiteral("Fruit")},
+			{ast.NewStringLiteral("2"), ast.NewStringLiteral("Banana"), ast.NewStringLiteral("Fruit")},
+			{ast.NewStringLiteral("3"), ast.NewStringLiteral("Carrot"), ast.NewStringLiteral("Veggie")},
+		},
+	})
+
+	// 同一カテゴリで複数行が取得できる
+	records := runPlan(&ast.SelectStmt{
+		From: *ast.NewTableId("products"),
+		Where: &ast.WhereClause{
+			Condition: ast.NewBinaryExpr("=",
+				ast.NewLhsColumn(*ast.NewColumnId("category")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("Fruit")),
+			),
+		},
+	})
+	printPlanRecords(records)
+
+	// Output:
+	//   (1, Apple, Fruit)
+	//   (2, Banana, Fruit)
+	//   合計: 2 件
+}
+
 func Example_update() {
 	cleanup := setupPlannerExample()
 	defer cleanup()

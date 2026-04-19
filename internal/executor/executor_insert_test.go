@@ -35,7 +35,7 @@ func TestInsert_Next(t *testing.T) {
 
 		tableName := "users"
 		createTableForTest(t, tableName, []handler.CreateIndexParam{
-			{Name: "name", ColName: "name", UkIdx: 1},
+			{Name: "name", ColName: "name", ColIdx: 1, Unique: true},
 		}, []handler.CreateColumnParam{
 			{Name: "id", Type: handler.ColumnTypeString},
 			{Name: "name", Type: handler.ColumnTypeString},

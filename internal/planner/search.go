@@ -8,6 +8,7 @@ import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/dictionary"
 	"minesql/internal/storage/encode"
 	"minesql/internal/storage/handler"
 )
@@ -174,12 +175,26 @@ func (s *Search) chooseBestPlan(tbl *access.Table, leaves []leafCondition, cond 
 				uniqueFound = true
 				break
 			}
-			if _, hasIndex := s.tblMeta.GetIndexByColName(leaf.colName); hasIndex {
-				bestLeaf = leaf
-				bestCost = calcUniqueScanCost()
-				bestPlan = "Index"
-				uniqueFound = true
-				break
+			if idxMeta, hasIndex := s.tblMeta.GetIndexByColName(leaf.colName); hasIndex {
+				// ユニークインデックス
+				if idxMeta.Type == dictionary.IndexTypeUnique {
+					bestLeaf = leaf
+					bestCost = calcUniqueScanCost()
+					bestPlan = "Index"
+					uniqueFound = true
+					break
+				}
+				// 非ユニークインデックス: read_cost = RecPerKey × pageReadCost (MySQL の find_cost_for_ref に対応)
+				idxStats, ok := stats.IdxStats[idxMeta.Name]
+				if ok {
+					readCost := idxStats.RecPerKey * clusterPageReadCost
+					cost := readCost + idxStats.RecPerKey*RowEvaluateCost
+					if bestLeaf == nil || cost < bestCost {
+						bestLeaf = leaf
+						bestCost = cost
+						bestPlan = "Index"
+					}
+				}
 			}
 		}
 
@@ -204,7 +219,7 @@ func (s *Search) chooseBestPlan(tbl *access.Table, leaves []leafCondition, cond 
 		// セカンダリインデックスのレンジスキャン
 		idxMeta, hasIndex := s.tblMeta.GetIndexByColName(leaf.colName)
 		if hasIndex {
-			index, err := tbl.GetUniqueIndexByName(idxMeta.Name)
+			index, err := tbl.GetSecondaryIndexByName(idxMeta.Name)
 			if err != nil {
 				return nil, err
 			}
@@ -257,7 +272,7 @@ func (s *Search) chooseBestPlan(tbl *access.Table, leaves []leafCondition, cond 
 //
 // needsFilter が true の場合、IndexScan の上に Filter を重ねる (複合条件時)
 func (s *Search) buildIndexPlan(tbl *access.Table, leaf leafCondition, idxMeta *handler.IndexMetadata, cond func(executor.Record) bool, needsFilter bool) (executor.Executor, error) {
-	index, err := tbl.GetUniqueIndexByName(idxMeta.Name)
+	index, err := tbl.GetSecondaryIndexByName(idxMeta.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -276,7 +291,7 @@ func (s *Search) buildIndexPlan(tbl *access.Table, leaf leafCondition, idxMeta *
 			WhileCondition: indexCond,
 			IndexOnly:      true,
 			NCols:          int(s.tblMeta.NCols),
-			UKColPos:       int(colMeta.Pos),
+			SecColPos:      int(colMeta.Pos),
 		})
 	} else {
 		scan = executor.NewIndexScan(
@@ -460,11 +475,24 @@ func (s *Search) planORBranch(tbl *access.Table, branch orBranch, stats *handler
 				bestPlan = "PK"
 				break
 			}
-			if _, hasIdx := s.tblMeta.GetIndexByColName(leaf.colName); hasIdx {
-				bestLeaf = leaf
-				bestCost = calcUniqueScanCost()
-				bestPlan = "Index"
-				break
+			if idxMeta, hasIdx := s.tblMeta.GetIndexByColName(leaf.colName); hasIdx {
+				if idxMeta.Type == dictionary.IndexTypeUnique {
+					bestLeaf = leaf
+					bestCost = calcUniqueScanCost()
+					bestPlan = "Index"
+					break
+				}
+				// 非ユニークインデックス: read_cost = RecPerKey × pageReadCost (MySQL の find_cost_for_ref に対応)
+				idxStats, ok := stats.IdxStats[idxMeta.Name]
+				if ok {
+					readCost := idxStats.RecPerKey * clusterPRC
+					cost := readCost + idxStats.RecPerKey*RowEvaluateCost
+					if bestLeaf == nil || cost < bestCost {
+						bestLeaf = leaf
+						bestCost = cost
+						bestPlan = "Index"
+					}
+				}
 			}
 		}
 
@@ -487,7 +515,7 @@ func (s *Search) planORBranch(tbl *access.Table, branch orBranch, stats *handler
 		// セカンダリインデックスのレンジスキャン
 		idxMeta, hasIndex := s.tblMeta.GetIndexByColName(leaf.colName)
 		if hasIndex {
-			index, err := tbl.GetUniqueIndexByName(idxMeta.Name)
+			index, err := tbl.GetSecondaryIndexByName(idxMeta.Name)
 			if err != nil {
 				return nil, 0, false, err
 			}

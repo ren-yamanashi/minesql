@@ -5,8 +5,8 @@
 | テーブル検索 | ✅ | - |
 | Index 検索 | ✅ | セカンダリインデックスを辿った結果を元に、クラスタ化インデックスを辿ってレコードを取得 |
 | サブクエリ | - | - |
-| JOIN | - | - |
-| カラム指定 | - | 全部 `SELECT * FROM ...` として扱われる |
+| JOIN | ✅ | Block Nested Loop Join (BNLJ) や Batched Key Access Join (BKAJ) はサポートしていない |
+| カラム指定 | ✅ | `SELECT col1, col2 FROM ...` で特定カラムの取得が可能。index-only scan にも対応 |
 | WHERE 句 | ✅ | `=`, `<`, `>`, `<=`, `>=`, `!=` をサポート。`AND` もいけるが `OR` は不可。`IN` なども非対応。カラム同士の比較も未対応 |
 | ORDER BY 句 | - | - |
 | LIMIT 句 | - | - |

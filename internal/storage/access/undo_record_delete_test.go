@@ -33,8 +33,8 @@ func TestUndoDeleteRecord_Undo(t *testing.T) {
 
 	t.Run("SoftDelete した行のユニークインデックスも復元される", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex := NewUniqueIndex("idx_name", "name", page.PageId{}, 1, 1)
-		table, bp := setupTestTableForUndo(t, []*UniqueIndex{uniqueIndex})
+		uniqueIndex := NewSecondaryIndex("idx_name", "name", page.PageId{}, 1, 1, true)
+		table, bp := setupTestTableForUndo(t, []*SecondaryIndex{uniqueIndex})
 
 		record := [][]byte{[]byte("a"), []byte("John")}
 		err := table.Insert(bp, 0, lock.NewManager(5000), record)
@@ -49,7 +49,7 @@ func TestUndoDeleteRecord_Undo(t *testing.T) {
 
 		// THEN: ユニークインデックスも復元されている
 		assert.NoError(t, err)
-		keys := collectUndoActiveUniqueIndexKeys(t, table.UniqueIndexes[0], bp)
+		keys := collectUndoActiveSecondaryIndexKeys(t, table.SecondaryIndexes[0], bp)
 		assert.Equal(t, []string{"John"}, keys)
 	})
 

@@ -224,19 +224,20 @@ func (r *Recovery) buildTable(tableName string) (*access.Table, error) {
 		return nil, fmt.Errorf("table %s not found in catalog", tableName)
 	}
 
-	var uniqueIndexes []*access.UniqueIndex
+	var secondaryIndexes []*access.SecondaryIndex
 	for _, idxMeta := range tblMeta.Indexes {
-		if idxMeta.Type == dictionary.IndexTypeUnique {
+		isUnique := idxMeta.Type == dictionary.IndexTypeUnique
+		if idxMeta.Type == dictionary.IndexTypeUnique || idxMeta.Type == dictionary.IndexTypeNonUnique {
 			colMeta, ok := tblMeta.GetColByName(idxMeta.ColName)
 			if !ok {
 				return nil, fmt.Errorf("column %s not found in table %s", idxMeta.ColName, tableName)
 			}
-			ui := access.NewUniqueIndex(idxMeta.Name, idxMeta.ColName, idxMeta.DataMetaPageId, colMeta.Pos, tblMeta.PKCount)
-			uniqueIndexes = append(uniqueIndexes, ui)
+			si := access.NewSecondaryIndex(idxMeta.Name, idxMeta.ColName, idxMeta.DataMetaPageId, colMeta.Pos, tblMeta.PKCount, isUnique)
+			secondaryIndexes = append(secondaryIndexes, si)
 		}
 	}
 
 	// undoLog=nil, redoLog=nil: リカバリ中に新たな UNDO/REDO を記録しない
-	tbl := access.NewTable(tblMeta.Name, tblMeta.DataMetaPageId, tblMeta.PKCount, uniqueIndexes, nil, nil)
+	tbl := access.NewTable(tblMeta.Name, tblMeta.DataMetaPageId, tblMeta.PKCount, secondaryIndexes, nil, nil)
 	return &tbl, nil
 }

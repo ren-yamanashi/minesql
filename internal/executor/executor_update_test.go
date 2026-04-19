@@ -173,7 +173,7 @@ func TestUpdate_Next(t *testing.T) {
 		assert.NoError(t, err)
 
 		// インデックスアクセスメソッドを取得
-		idx, err := tbl.GetUniqueIndexByName("last_name")
+		idx, err := tbl.GetSecondaryIndexByName("last_name")
 		assert.NoError(t, err)
 
 		// "a" (last_name = "Doe") の last_name を "Zebra" に更新

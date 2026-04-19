@@ -123,7 +123,7 @@ func TestExecutorIntegration(t *testing.T) {
 		tbl := setupExecutorTestTable(t)
 		defer handler.Reset()
 
-		idx, err := tbl.GetUniqueIndexByName("idx_first_name")
+		idx, err := tbl.GetSecondaryIndexByName("idx_first_name")
 		assert.NoError(t, err)
 
 		// WHEN
@@ -155,7 +155,7 @@ func TestExecutorIntegration(t *testing.T) {
 		tbl := setupExecutorTestTable(t)
 		defer handler.Reset()
 
-		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
+		idx, err := tbl.GetSecondaryIndexByName("idx_last_name")
 		assert.NoError(t, err)
 
 		// WHEN: 姓が "J" 以上 "N" 未満
@@ -187,7 +187,7 @@ func TestExecutorIntegration(t *testing.T) {
 		tbl := setupExecutorTestTable(t)
 		defer handler.Reset()
 
-		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
+		idx, err := tbl.GetSecondaryIndexByName("idx_last_name")
 		assert.NoError(t, err)
 
 		// WHEN
@@ -218,7 +218,7 @@ func TestExecutorIntegration(t *testing.T) {
 		defer handler.Reset()
 
 		var trxId handler.TrxId = 1
-		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
+		idx, err := tbl.GetSecondaryIndexByName("idx_last_name")
 		assert.NoError(t, err)
 
 		// WHEN: Alice の last_name を Anderson に更新
@@ -379,7 +379,7 @@ func TestExecutorIntegration(t *testing.T) {
 		defer handler.Reset()
 
 		var trxId handler.TrxId = 1
-		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
+		idx, err := tbl.GetSecondaryIndexByName("idx_last_name")
 		assert.NoError(t, err)
 
 		// WHEN: Bob を削除
@@ -428,6 +428,63 @@ func TestExecutorIntegration(t *testing.T) {
 			"  合計: 4 件\n"
 		assert.Equal(t, expected, sb.String())
 	})
+
+	t.Run("NestedLoopJoin で非ユニークインデックスを使って結合できる", func(t *testing.T) {
+		// GIVEN: users テーブル + orders テーブル (user_id に非ユニークインデックス)
+		tbl := setupExecutorTestTable(t)
+		defer handler.Reset()
+
+		hdl := handler.Get()
+		ct := NewCreateTable("orders", 1,
+			[]handler.CreateIndexParam{
+				{Name: "idx_user_id", ColName: "user_id", ColIdx: 1, Unique: false},
+			},
+			[]handler.CreateColumnParam{
+				{Name: "id", Type: handler.ColumnTypeString},
+				{Name: "user_id", Type: handler.ColumnTypeString},
+				{Name: "item", Type: handler.ColumnTypeString},
+			})
+		_, err := ct.Next()
+		assert.NoError(t, err)
+
+		ordersTbl, err := hdl.GetTable("orders")
+		assert.NoError(t, err)
+
+		var trxId handler.TrxId = 1
+		ins := NewInsert(trxId, ordersTbl, []Record{
+			{[]byte("100"), []byte("z"), []byte("apple")},
+			{[]byte("101"), []byte("x"), []byte("banana")},
+		})
+		_, err = ins.Next()
+		assert.NoError(t, err)
+
+		idx, err := ordersTbl.GetSecondaryIndexByName("idx_user_id")
+		assert.NoError(t, err)
+
+		// WHEN: NestedLoopJoin
+		nlj := NewNestedLoopJoin(
+			testTableScan(tbl, access.RecordSearchModeStart{}, func(r Record) bool { return true }),
+			func(leftRecord Record) (Executor, error) {
+				userId := leftRecord[0]
+				return NewIndexScan(
+					ordersTbl, idx,
+					access.RecordSearchModeKey{Key: [][]byte{userId}},
+					func(secKey Record) bool { return string(secKey[0]) == string(userId) },
+				), nil
+			},
+		)
+		records := collectAll(t, nlj)
+
+		// THEN: users.id=x と users.id=z がマッチ → 2 行
+		assert.Len(t, records, 2)
+		var sb strings.Builder
+		writeRecords(&sb, records)
+		result := sb.String()
+		assert.Contains(t, result, "Bob")
+		assert.Contains(t, result, "banana")
+		assert.Contains(t, result, "Alice")
+		assert.Contains(t, result, "apple")
+	})
 }
 
 // 5 人のユーザーを持つテーブルを作成し、テーブルアクセスメソッドを返す
@@ -444,8 +501,8 @@ func setupExecutorTestTable(t *testing.T) *access.Table {
 		"users",
 		1,
 		[]handler.CreateIndexParam{
-			{Name: "idx_first_name", ColName: "first_name", UkIdx: 1},
-			{Name: "idx_last_name", ColName: "last_name", UkIdx: 2},
+			{Name: "idx_first_name", ColName: "first_name", ColIdx: 1, Unique: true},
+			{Name: "idx_last_name", ColName: "last_name", ColIdx: 2, Unique: true},
 		},
 		[]handler.CreateColumnParam{
 			{Name: "id", Type: handler.ColumnTypeString},

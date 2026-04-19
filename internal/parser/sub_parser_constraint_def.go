@@ -6,12 +6,23 @@ import (
 	"strings"
 )
 
+// constraintKind は制約の種類を表す直和型
+type constraintKind int
+
+const (
+	constraintKindUnset     constraintKind = iota // 未決定
+	constraintKindPK                              // PRIMARY KEY
+	constraintKindUniqueKey                       // UNIQUE KEY
+	constraintKindKey                             // KEY (非ユニーク)
+)
+
 type ConstraintDefParser struct {
-	state parserState                  // 現在のステート
-	isPK  bool                         // PK か UK かのフラグ
-	pkDef *ast.ConstraintPrimaryKeyDef // 生成される PK 定義
-	ukDef *ast.ConstraintUniqueKeyDef  // 生成される UK 定義
-	err   error                        // エラー情報
+	state  parserState                 // 現在のステート
+	kind   constraintKind              // 制約の種類
+	pkDef  ast.ConstraintPrimaryKeyDef // 生成される PK 定義
+	ukDef  ast.ConstraintUniqueKeyDef  // 生成される UK 定義
+	keyDef ast.ConstraintKeyDef        // 生成される KEY 定義 (非ユニーク)
+	err    error                       // エラー情報
 }
 
 func NewConstraintDefParser() *ConstraintDefParser {
@@ -25,16 +36,32 @@ func (cp *ConstraintDefParser) finalize() error {
 		return cp.err
 	}
 
-	// カラムが1つも指定されていない場合はエラー
-	var colCount = func() int {
-		if cp.isPK {
-			return len(cp.pkDef.Columns)
+	// インデックス名の必須チェック (UNIQUE KEY / KEY)
+	switch cp.kind {
+	case constraintKindUniqueKey:
+		if cp.ukDef.KeyName == "" {
+			return errors.New("[parse error] index name is required for UNIQUE KEY")
 		}
+	case constraintKindKey:
+		if cp.keyDef.KeyName == "" {
+			return errors.New("[parse error] index name is required for KEY")
+		}
+	}
+
+	// カラムが 1 つも指定されていない場合はエラー
+	colCount := 0
+	switch cp.kind {
+	case constraintKindPK:
+		colCount = len(cp.pkDef.Columns)
+	case constraintKindUniqueKey:
 		if cp.ukDef.Column.ColName != "" {
-			return 1
+			colCount = 1
 		}
-		return 0
-	}()
+	case constraintKindKey:
+		if cp.keyDef.Column.ColName != "" {
+			colCount = 1
+		}
+	}
 	if colCount == 0 {
 		return errors.New("[parse error] constraint definition requires at least one column")
 	}
@@ -43,10 +70,16 @@ func (cp *ConstraintDefParser) finalize() error {
 }
 
 func (cp *ConstraintDefParser) getDef() ast.Definition {
-	if cp.isPK {
-		return cp.pkDef
+	switch cp.kind {
+	case constraintKindPK:
+		return &cp.pkDef
+	case constraintKindUniqueKey:
+		return &cp.ukDef
+	case constraintKindKey:
+		return &cp.keyDef
+	default:
+		return nil
 	}
-	return cp.ukDef
 }
 
 func (cp *ConstraintDefParser) onKeyword(word string) {
@@ -55,26 +88,30 @@ func (cp *ConstraintDefParser) onKeyword(word string) {
 	}
 
 	upper := strings.ToUpper(word)
-	// 開始時の PRIMARY / UNIQUE 判定
-	if cp.pkDef == nil && cp.ukDef == nil {
+	// 開始時の PRIMARY / UNIQUE / KEY 判定
+	if cp.kind == constraintKindUnset {
 		switch upper {
 		case KPrimary:
-			cp.isPK = true
-			cp.pkDef = &ast.ConstraintPrimaryKeyDef{}
+			cp.kind = constraintKindPK
 			cp.state = CreateStateConstraint
 			return
 		case KUnique:
-			cp.isPK = false
-			cp.ukDef = &ast.ConstraintUniqueKeyDef{}
+			cp.kind = constraintKindUniqueKey
 			cp.state = CreateStateConstraint
 			return
+		case KKey:
+			// 単独の KEY: KEY index_name (column) の形式
+			// KEY キーワード自体が KEY なので直接次の状態へ
+			cp.kind = constraintKindKey
+			cp.state = CreateStateConstraintKey
+			return
 		default:
-			cp.setError(errors.New("[parse error] expected 'PRIMARY' or 'UNIQUE', got: " + word))
+			cp.setError(errors.New("[parse error] expected 'PRIMARY', 'UNIQUE', or 'KEY', got: " + word))
 			return
 		}
 	}
 
-	// KEY キーワードの処理
+	// KEY キーワードの処理 (PRIMARY KEY / UNIQUE KEY の 2 語目)
 	if cp.state == CreateStateConstraint {
 		if upper == KKey {
 			cp.state = CreateStateConstraintKey
@@ -94,27 +131,36 @@ func (cp *ConstraintDefParser) onIdentifier(ident string) {
 
 	switch cp.state {
 	case CreateStateConstraintKey:
-		// UNIQUE KEY index_name ( ... ) のパターン
-		if !cp.isPK {
+		// KEY index_name / UNIQUE KEY index_name のパターン
+		switch cp.kind {
+		case constraintKindKey:
+			if cp.keyDef.KeyName != "" {
+				cp.setError(errors.New("[parse error] unexpected identifier (key name already set): " + ident))
+				return
+			}
+			cp.keyDef.KeyName = ident
+		case constraintKindUniqueKey:
 			if cp.ukDef.KeyName != "" {
 				cp.setError(errors.New("[parse error] unexpected identifier (key name already set): " + ident))
 				return
 			}
 			cp.ukDef.KeyName = ident
-			return
+		case constraintKindPK:
+			// PRIMARY KEY には名前をつけないのでエラー
+			cp.setError(errors.New("[parse error] unexpected identifier (PRIMARY KEY name not supported): " + ident))
 		}
-		// PRIMARY KEY には通常名前をつけないのでエラー
-		cp.setError(errors.New("[parse error] unexpected identifier (PRIMARY KEY name not supported): " + ident))
 		return
 
 	case CreateStateConstraintCol:
 		// カラム名の追加
-		// PK の場合は PK 定義のカラムリストに追加、UK の場合は UK 定義のカラムにセット
 		colId := *ast.NewColumnId(ident)
-		if cp.isPK {
+		switch cp.kind {
+		case constraintKindPK:
 			cp.pkDef.Columns = append(cp.pkDef.Columns, colId)
-		} else {
+		case constraintKindUniqueKey:
 			cp.ukDef.Column = colId
+		case constraintKindKey:
+			cp.keyDef.Column = colId
 		}
 		cp.state = CreateStateConstraintWaitSeparator
 		return

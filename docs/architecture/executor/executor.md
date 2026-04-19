@@ -31,7 +31,7 @@ CREATE TABLE users (
 
 - ツリーを構成するノードの種類は以下の通り
   - TableScan: テーブルをプライマリキーで範囲検索する
-  - IndexScan: インデックスを利用して検索する
+  - IndexScan: セカンダリインデックスを利用して検索する (ユニーク・非ユニーク両対応)
   - NestedLoopJoin: 左の各行に対して右のテーブルを検索し、結合する
   - Filter: 不要な行をフィルタする
   - Union: 複数のスキャン結果を結合し、重複を除去する
@@ -96,7 +96,7 @@ SELECT * FROM users WHERE id = 1 OR username = 'alice';
 それぞれにインデックスがあるため、各スキャン結果を Union で結合できる。
 
 - TableScan: PK を利用して `id = 1` を検索
-- IndexScan: ユニークインデックスを利用して `username = 'alice'` を検索
+- IndexScan: セカンダリインデックスを利用して `username = 'alice'` を検索
 - Union: 両方の結果を結合し、重複を除去
 - Project: 検索結果から全カラムを取り出す
 

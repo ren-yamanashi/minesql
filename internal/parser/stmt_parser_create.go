@@ -74,7 +74,7 @@ func (cp *CreateParser) onKeyword(word string) {
 			return
 		}
 	case CreateStateBody:
-		if upper == KPrimary || upper == KUnique {
+		if upper == KPrimary || upper == KUnique || upper == KKey {
 			cp.conParser = NewConstraintDefParser()
 			cp.conParser.onKeyword(word)
 			return

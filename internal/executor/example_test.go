@@ -93,11 +93,11 @@ func ExampleIndexScan_fullScan() {
 	tbl, cleanup := setupExample()
 	defer cleanup()
 
-	idxFirstName, err := tbl.GetUniqueIndexByName("idx_first_name")
+	idxFirstName, err := tbl.GetSecondaryIndexByName("idx_first_name")
 	if err != nil {
 		panic(err)
 	}
-	idxLastName, err := tbl.GetUniqueIndexByName("idx_last_name")
+	idxLastName, err := tbl.GetSecondaryIndexByName("idx_last_name")
 	if err != nil {
 		panic(err)
 	}
@@ -141,7 +141,7 @@ func ExampleIndexScan_rangeScan() {
 	tbl, cleanup := setupExample()
 	defer cleanup()
 
-	idxLastName, err := tbl.GetUniqueIndexByName("idx_last_name")
+	idxLastName, err := tbl.GetSecondaryIndexByName("idx_last_name")
 	if err != nil {
 		panic(err)
 	}
@@ -168,7 +168,7 @@ func ExampleIndexScan_constSearch() {
 	tbl, cleanup := setupExample()
 	defer cleanup()
 
-	idxLastName, err := tbl.GetUniqueIndexByName("idx_last_name")
+	idxLastName, err := tbl.GetSecondaryIndexByName("idx_last_name")
 	if err != nil {
 		panic(err)
 	}
@@ -240,7 +240,7 @@ func ExampleUpdate() {
 	tbl, cleanup := setupExample()
 	defer cleanup()
 
-	idxLastName, err := tbl.GetUniqueIndexByName("idx_last_name")
+	idxLastName, err := tbl.GetSecondaryIndexByName("idx_last_name")
 	if err != nil {
 		panic(err)
 	}
@@ -329,7 +329,7 @@ func ExampleDelete() {
 	tbl, cleanup := setupExample()
 	defer cleanup()
 
-	idxLastName, err := tbl.GetUniqueIndexByName("idx_last_name")
+	idxLastName, err := tbl.GetSecondaryIndexByName("idx_last_name")
 	if err != nil {
 		panic(err)
 	}
@@ -378,6 +378,145 @@ func ExampleDelete() {
 	//   合計: 4 件
 }
 
+func ExampleNestedLoopJoin() {
+	tbl, cleanup := setupExample()
+	defer cleanup()
+
+	// orders テーブルを作成 (user_id に非ユニークインデックス)
+	hdl := handler.Get()
+	ct := executor.NewCreateTable(
+		"orders",
+		1,
+		[]handler.CreateIndexParam{
+			{Name: "idx_user_id", ColName: "user_id", ColIdx: 1, Unique: false},
+		},
+		[]handler.CreateColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "user_id", Type: handler.ColumnTypeString},
+			{Name: "item", Type: handler.ColumnTypeString},
+		})
+	if _, err := ct.Next(); err != nil {
+		panic(err)
+	}
+
+	ordersTbl, err := hdl.GetTable("orders")
+	if err != nil {
+		panic(err)
+	}
+
+	// orders にデータを挿入
+	var trxId handler.TrxId = 1
+	ins := executor.NewInsert(trxId, ordersTbl, []executor.Record{
+		{[]byte("100"), []byte("z"), []byte("apple")},
+		{[]byte("101"), []byte("x"), []byte("banana")},
+	})
+	if _, err := ins.Next(); err != nil {
+		panic(err)
+	}
+
+	// NestedLoopJoin: users (左) の各行に対して orders (右) をインデックス検索
+	idxUserId, err := ordersTbl.GetSecondaryIndexByName("idx_user_id")
+	if err != nil {
+		panic(err)
+	}
+
+	nlj := executor.NewNestedLoopJoin(
+		// 左: users のフルスキャン
+		exampleTableScan(tbl,
+			access.RecordSearchModeStart{},
+			func(record executor.Record) bool { return true },
+		),
+		// 右: users.id で orders をインデックス検索
+		func(leftRecord executor.Record) (executor.Executor, error) {
+			userId := leftRecord[0] // users.id
+			return executor.NewIndexScan(
+				ordersTbl,
+				idxUserId,
+				access.RecordSearchModeKey{Key: [][]byte{userId}},
+				func(secondaryKey executor.Record) bool {
+					return string(secondaryKey[0]) == string(userId)
+				},
+			), nil
+		},
+	)
+	printExampleRecords(nlj)
+
+	// Output:
+	//   (x, Bob, Johnson, 101, x, banana)
+	//   (z, Alice, Smith, 100, z, apple)
+	//   合計: 2 件
+}
+
+func ExampleNestedLoopJoin_withFilter() {
+	tbl, cleanup := setupExample()
+	defer cleanup()
+
+	// orders テーブルを作成
+	hdl := handler.Get()
+	ct := executor.NewCreateTable(
+		"orders",
+		1,
+		[]handler.CreateIndexParam{
+			{Name: "idx_user_id", ColName: "user_id", ColIdx: 1, Unique: false},
+		},
+		[]handler.CreateColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "user_id", Type: handler.ColumnTypeString},
+			{Name: "item", Type: handler.ColumnTypeString},
+		})
+	if _, err := ct.Next(); err != nil {
+		panic(err)
+	}
+
+	ordersTbl, err := hdl.GetTable("orders")
+	if err != nil {
+		panic(err)
+	}
+
+	var trxId handler.TrxId = 1
+	ins := executor.NewInsert(trxId, ordersTbl, []executor.Record{
+		{[]byte("100"), []byte("z"), []byte("apple")},
+		{[]byte("101"), []byte("x"), []byte("banana")},
+	})
+	if _, err := ins.Next(); err != nil {
+		panic(err)
+	}
+
+	idxUserId, err := ordersTbl.GetSecondaryIndexByName("idx_user_id")
+	if err != nil {
+		panic(err)
+	}
+
+	// NestedLoopJoin + Filter: 結合後に item = 'banana' でフィルタ
+	nlj := executor.NewNestedLoopJoin(
+		exampleTableScan(tbl,
+			access.RecordSearchModeStart{},
+			func(record executor.Record) bool { return true },
+		),
+		func(leftRecord executor.Record) (executor.Executor, error) {
+			userId := leftRecord[0]
+			return executor.NewIndexScan(
+				ordersTbl,
+				idxUserId,
+				access.RecordSearchModeKey{Key: [][]byte{userId}},
+				func(secondaryKey executor.Record) bool {
+					return string(secondaryKey[0]) == string(userId)
+				},
+			), nil
+		},
+	)
+
+	filtered := executor.NewFilter(nlj, func(record executor.Record) bool {
+		// 結合レコードの 6 番目 (orders.item) が "banana"
+		return string(record[5]) == "banana"
+	})
+	printExampleRecords(filtered)
+
+	// Output:
+	//   (x, Bob, Johnson, 101, x, banana)
+	//   合計: 1 件
+}
+
 func exampleTableScan(tbl *access.Table, mode access.RecordSearchMode, cond func(executor.Record) bool) *executor.TableScan {
 	return executor.NewTableScan(executor.TableScanParams{
 		ReadView:       access.NewReadView(0, nil, ^uint64(0)),
@@ -414,8 +553,8 @@ func setupExample() (*access.Table, func()) {
 		"users",
 		1,
 		[]handler.CreateIndexParam{
-			{Name: "idx_first_name", ColName: "first_name", UkIdx: 1},
-			{Name: "idx_last_name", ColName: "last_name", UkIdx: 2},
+			{Name: "idx_first_name", ColName: "first_name", ColIdx: 1, Unique: true},
+			{Name: "idx_last_name", ColName: "last_name", ColIdx: 2, Unique: true},
 		},
 		[]handler.CreateColumnParam{
 			{Name: "id", Type: handler.ColumnTypeString},

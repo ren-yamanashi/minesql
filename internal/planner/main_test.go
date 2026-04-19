@@ -121,6 +121,42 @@ func setupUsersTable(t *testing.T) {
 	})
 }
 
+// ストレージを初期化し、非ユニークインデックス付きの products テーブルを作成してデータを投入する
+//
+// テーブル: products (id PK, name, category)
+// インデックス: KEY idx_category (category)
+// データ: ("1","Apple","Fruit"), ("2","Banana","Fruit"), ("3","Carrot","Veggie")
+func setupProductsTable(t *testing.T) {
+	t.Helper()
+
+	tmpdir := t.TempDir()
+	t.Setenv("MINESQL_DATA_DIR", tmpdir)
+	t.Setenv("MINESQL_BUFFER_SIZE", "100")
+	handler.Reset()
+	handler.Init()
+
+	executePlan(t, &ast.CreateTableStmt{
+		TableName: "products",
+		CreateDefinitions: []ast.Definition{
+			&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{ColName: "name", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{ColName: "category", DataType: ast.DataTypeVarchar},
+			&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{*ast.NewColumnId("id")}},
+			&ast.ConstraintKeyDef{KeyName: "idx_category", Column: *ast.NewColumnId("category")},
+		},
+	})
+
+	executePlan(t, &ast.InsertStmt{
+		Table: *ast.NewTableId("products"),
+		Cols:  []ast.ColumnId{*ast.NewColumnId("id"), *ast.NewColumnId("name"), *ast.NewColumnId("category")},
+		Values: [][]ast.Literal{
+			{ast.NewStringLiteral("1"), ast.NewStringLiteral("Apple"), ast.NewStringLiteral("Fruit")},
+			{ast.NewStringLiteral("2"), ast.NewStringLiteral("Banana"), ast.NewStringLiteral("Fruit")},
+			{ast.NewStringLiteral("3"), ast.NewStringLiteral("Carrot"), ast.NewStringLiteral("Veggie")},
+		},
+	})
+}
+
 // レコードを strings.Builder に書き出す
 func writeRecords(sb *strings.Builder, records []executor.Record) {
 	for _, record := range records {
@@ -740,5 +776,47 @@ func TestPlannerIntegration(t *testing.T) {
 		assert.Contains(t, result, "banana")
 		assert.Contains(t, result, "John") // users.id=3 の John
 		assert.Contains(t, result, "Doe3") // users.id=3 の Doe3
+	})
+
+	t.Run("非ユニークインデックス付きテーブルで同一キーの複数行を取得できる", func(t *testing.T) {
+		// GIVEN: 非ユニークインデックス付きテーブル
+		setupUsersTable(t)
+		defer handler.Reset()
+
+		executePlan(t, &ast.CreateTableStmt{
+			TableName: "products",
+			CreateDefinitions: []ast.Definition{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "name", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "category", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{*ast.NewColumnId("id")}},
+				&ast.ConstraintKeyDef{KeyName: "idx_category", Column: *ast.NewColumnId("category")},
+			},
+		})
+		executePlan(t, &ast.InsertStmt{
+			Table: *ast.NewTableId("products"),
+			Cols:  []ast.ColumnId{*ast.NewColumnId("id"), *ast.NewColumnId("name"), *ast.NewColumnId("category")},
+			Values: [][]ast.Literal{
+				{ast.NewStringLiteral("1"), ast.NewStringLiteral("Apple"), ast.NewStringLiteral("Fruit")},
+				{ast.NewStringLiteral("2"), ast.NewStringLiteral("Banana"), ast.NewStringLiteral("Fruit")},
+				{ast.NewStringLiteral("3"), ast.NewStringLiteral("Carrot"), ast.NewStringLiteral("Veggie")},
+			},
+		})
+
+		// WHEN: WHERE category = 'Fruit'
+		records := executePlan(t, &ast.SelectStmt{
+			From: *ast.NewTableId("products"),
+			Where: &ast.WhereClause{
+				Condition: ast.NewBinaryExpr("=",
+					ast.NewLhsColumn(*ast.NewColumnId("category")),
+					ast.NewRhsLiteral(ast.NewStringLiteral("Fruit")),
+				),
+			},
+		})
+
+		// THEN: "Fruit" の 2 行が返される
+		assert.Len(t, records, 2)
+		assert.Equal(t, "Apple", string(records[0][1]))
+		assert.Equal(t, "Banana", string(records[1][1]))
 	})
 }

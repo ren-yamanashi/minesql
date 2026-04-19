@@ -385,4 +385,53 @@ CREATE TABLE users ( /* テーブル定義開始 */
 			assert.Contains(t, err.Error(), "unexpected string")
 		})
 	})
+
+	t.Run("KEY 制約を含む CREATE TABLE 文をパースできる", func(t *testing.T) {
+		// GIVEN
+		sql := "CREATE TABLE products (id VARCHAR, category VARCHAR, PRIMARY KEY (id), KEY idx_category (category));"
+		parser := NewParser()
+
+		// WHEN
+		result, err := parser.Parse(sql)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+
+		createStmt, ok := result.(*ast.CreateTableStmt)
+		assert.True(t, ok)
+		assert.Equal(t, "products", createStmt.TableName)
+		assert.Equal(t, 4, len(createStmt.CreateDefinitions))
+
+		// KEY 制約の検証
+		keyDef, ok := createStmt.CreateDefinitions[3].(*ast.ConstraintKeyDef)
+		assert.True(t, ok)
+		assert.Equal(t, "idx_category", keyDef.KeyName)
+		assert.Equal(t, "category", keyDef.Column.ColName)
+	})
+
+	t.Run("UNIQUE KEY と KEY が混在する CREATE TABLE 文をパースできる", func(t *testing.T) {
+		// GIVEN
+		sql := "CREATE TABLE products (id VARCHAR, name VARCHAR, category VARCHAR, PRIMARY KEY (id), UNIQUE KEY idx_name (name), KEY idx_category (category));"
+		parser := NewParser()
+
+		// WHEN
+		result, err := parser.Parse(sql)
+
+		// THEN
+		assert.NoError(t, err)
+		createStmt, ok := result.(*ast.CreateTableStmt)
+		assert.True(t, ok)
+		assert.Equal(t, 6, len(createStmt.CreateDefinitions))
+
+		// UNIQUE KEY
+		ukDef, ok := createStmt.CreateDefinitions[4].(*ast.ConstraintUniqueKeyDef)
+		assert.True(t, ok)
+		assert.Equal(t, "idx_name", ukDef.KeyName)
+
+		// KEY
+		keyDef, ok := createStmt.CreateDefinitions[5].(*ast.ConstraintKeyDef)
+		assert.True(t, ok)
+		assert.Equal(t, "idx_category", keyDef.KeyName)
+	})
 }

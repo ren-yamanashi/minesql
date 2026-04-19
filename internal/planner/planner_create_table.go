@@ -15,8 +15,9 @@ func PlanCreateTable(stmt *ast.CreateTableStmt) (executor.Executor, error) {
 
 	var pkDef *ast.ConstraintPrimaryKeyDef
 	var ukDefs []*ast.ConstraintUniqueKeyDef
-	ukKeyNames := map[string]bool{} // 登録済みのユニークキー名
-	ukColNames := map[string]bool{} // 登録済みのユニークキーカラム名
+	var keyDefs []*ast.ConstraintKeyDef
+	idxKeyNames := map[string]bool{} // 登録済みのインデックス名 (UK/KEY 共通)
+	idxColNames := map[string]bool{} // 登録済みのインデックスカラム名 (UK/KEY 共通)
 	currentColIdx := 0
 
 	// テーブル定義の検証とカラム・インデックスの収集
@@ -43,15 +44,27 @@ func PlanCreateTable(stmt *ast.CreateTableStmt) (executor.Executor, error) {
 
 		case *ast.ConstraintUniqueKeyDef:
 			// ユニークキー定義の検証
-			if _, exists := ukKeyNames[def.KeyName]; exists {
-				return nil, errors.New("duplicate unique key name: " + def.KeyName)
+			if _, exists := idxKeyNames[def.KeyName]; exists {
+				return nil, errors.New("duplicate index name: " + def.KeyName)
 			}
-			if _, exists := ukColNames[def.Column.ColName]; exists {
-				return nil, errors.New("column '" + def.Column.ColName + "' cannot be part of multiple unique keys")
+			if _, exists := idxColNames[def.Column.ColName]; exists {
+				return nil, errors.New("column '" + def.Column.ColName + "' cannot have multiple indexes")
 			}
-			ukKeyNames[def.KeyName] = true
-			ukColNames[def.Column.ColName] = true
+			idxKeyNames[def.KeyName] = true
+			idxColNames[def.Column.ColName] = true
 			ukDefs = append(ukDefs, def)
+
+		case *ast.ConstraintKeyDef:
+			// 非ユニークキー定義の検証
+			if _, exists := idxKeyNames[def.KeyName]; exists {
+				return nil, errors.New("duplicate index name: " + def.KeyName)
+			}
+			if _, exists := idxColNames[def.Column.ColName]; exists {
+				return nil, errors.New("column '" + def.Column.ColName + "' cannot have multiple indexes")
+			}
+			idxKeyNames[def.KeyName] = true
+			idxColNames[def.Column.ColName] = true
+			keyDefs = append(keyDefs, def)
 		}
 	}
 
@@ -65,12 +78,12 @@ func PlanCreateTable(stmt *ast.CreateTableStmt) (executor.Executor, error) {
 		return nil, err
 	}
 
-	uniqueKeyParams, err := getUkParams(ukDefs, colIndexMap)
+	idxParams, err := getIndexParams(ukDefs, keyDefs, colIndexMap)
 	if err != nil {
 		return nil, err
 	}
 
-	return executor.NewCreateTable(stmt.TableName, uint8(pkCount), uniqueKeyParams, colParams), nil
+	return executor.NewCreateTable(stmt.TableName, uint8(pkCount), idxParams, colParams), nil
 }
 
 // getPkCount はプライマリキーのカラム定義を検証し、プライマリキーのカラム数を返す
@@ -104,22 +117,40 @@ func getPkCount(pkDef *ast.ConstraintPrimaryKeyDef, colIndexMap map[string]int) 
 	return len(pkDef.Columns), nil
 }
 
-// getUkParams はユニークキーの定義を検証し、ユニークキーのパラメータを返す
+// getIndexParams はユニークキーと非ユニークキーの定義を検証し、インデックスのパラメータを返す
 //
 // 以下の場合はエラーを返す
-//   - ユニークキーのカラムがテーブルのカラムに存在しない場合
-func getUkParams(ukDefs []*ast.ConstraintUniqueKeyDef, colIndexMap map[string]int) ([]handler.CreateIndexParam, error) {
-	uniqueKeyParams := make([]handler.CreateIndexParam, 0, len(ukDefs))
+//   - インデックスのカラムがテーブルのカラムに存在しない場合
+func getIndexParams(ukDefs []*ast.ConstraintUniqueKeyDef, keyDefs []*ast.ConstraintKeyDef, colIndexMap map[string]int) ([]handler.CreateIndexParam, error) {
+	params := make([]handler.CreateIndexParam, 0, len(ukDefs)+len(keyDefs))
+
+	// ユニークキー
 	for _, ukDef := range ukDefs {
 		idx, exists := colIndexMap[ukDef.Column.ColName]
 		if !exists {
 			return nil, fmt.Errorf("unique key column '%s' does not exist", ukDef.Column.ColName)
 		}
-		uniqueKeyParams = append(uniqueKeyParams, handler.CreateIndexParam{
+		params = append(params, handler.CreateIndexParam{
 			Name:    ukDef.KeyName,
 			ColName: ukDef.Column.ColName,
-			UkIdx:   uint16(idx),
+			ColIdx:  uint16(idx),
+			Unique:  true,
 		})
 	}
-	return uniqueKeyParams, nil
+
+	// 非ユニークキー
+	for _, keyDef := range keyDefs {
+		idx, exists := colIndexMap[keyDef.Column.ColName]
+		if !exists {
+			return nil, fmt.Errorf("key column '%s' does not exist", keyDef.Column.ColName)
+		}
+		params = append(params, handler.CreateIndexParam{
+			Name:    keyDef.KeyName,
+			ColName: keyDef.Column.ColName,
+			ColIdx:  uint16(idx),
+			Unique:  false,
+		})
+	}
+
+	return params, nil
 }

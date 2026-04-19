@@ -34,8 +34,8 @@ func TestUndoInsertRecord_Undo(t *testing.T) {
 
 	t.Run("Insert した行のユニークインデックスも物理削除される", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex := NewUniqueIndex("idx_name", "name", page.PageId{}, 1, 1)
-		table, bp := setupTestTableForUndo(t, []*UniqueIndex{uniqueIndex})
+		uniqueIndex := NewSecondaryIndex("idx_name", "name", page.PageId{}, 1, 1, true)
+		table, bp := setupTestTableForUndo(t, []*SecondaryIndex{uniqueIndex})
 
 		record := [][]byte{[]byte("a"), []byte("John")}
 		err := table.Insert(bp, 0, lock.NewManager(5000), record)
@@ -48,7 +48,7 @@ func TestUndoInsertRecord_Undo(t *testing.T) {
 
 		// THEN: ユニークインデックスからも物理削除されている
 		assert.NoError(t, err)
-		keys := collectUndoActiveUniqueIndexKeys(t, table.UniqueIndexes[0], bp)
+		keys := collectUndoActiveSecondaryIndexKeys(t, table.SecondaryIndexes[0], bp)
 		assert.Equal(t, 0, len(keys))
 	})
 }
