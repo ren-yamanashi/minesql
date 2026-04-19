@@ -72,7 +72,10 @@ func calcReadTimeForIndexOnly(foundRecords float64, keysPerBlock float64, pageRe
 // calcReadTimeForSecondaryIndex はセカンダリインデックス (非 index-only) の readTime を算出する
 //
 // readTime = (nRanges + foundRecords) × pageReadCost
-func calcReadTimeForSecondaryIndex(nRanges int, foundRecords float64, pageReadCost float64) float64 {
+//
+// nRanges は現状 1 固定 (IN 句など複数レンジの対応時に変更する)
+func calcReadTimeForSecondaryIndex(foundRecords float64, pageReadCost float64) float64 {
+	const nRanges = 1
 	return (float64(nRanges) + foundRecords) * pageReadCost
 }
 
@@ -80,7 +83,10 @@ func calcReadTimeForSecondaryIndex(nRanges int, foundRecords float64, pageReadCo
 //
 // foundRecords <= 2 の場合: readTime = foundRecords × pageReadCost
 // それ以外: readTime = (nRanges + (foundRecords / totalRows) × scanTime) × pageReadCost
-func calcReadTimeForClusteredIndex(nRanges int, foundRecords float64, totalRows float64, scanTime float64, pageReadCost float64) float64 {
+//
+// nRanges は現状 1 固定 (IN 句など複数レンジの対応時に変更する)
+func calcReadTimeForClusteredIndex(foundRecords float64, totalRows float64, scanTime float64, pageReadCost float64) float64 {
+	const nRanges = 1
 	if foundRecords <= 2 {
 		return foundRecords * pageReadCost
 	}

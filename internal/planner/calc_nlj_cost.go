@@ -241,7 +241,7 @@ func evalDrivingWhereConditions(bp *buffer.BufferPool, candidate joinCandidate, 
 				if err != nil {
 					return 0, 0, false, err
 				}
-				readTime := calcReadTimeForClusteredIndex(1, float64(foundRecords), float64(candidate.stats.RecordCount), float64(candidate.stats.LeafPageCount), pageReadCost)
+				readTime := calcReadTimeForClusteredIndex(float64(foundRecords), float64(candidate.stats.RecordCount), float64(candidate.stats.LeafPageCount), pageReadCost)
 				// rangeCost = readTime + foundRecords × RowEvaluateCost + 0.01
 				// (calcRangeScanCost は最終コストなので JOIN の prefix_cost 計算では使わない)
 				rangeCost := readTime + float64(foundRecords)*RowEvaluateCost + 0.01
@@ -265,7 +265,7 @@ func evalDrivingWhereConditions(bp *buffer.BufferPool, candidate joinCandidate, 
 				return 0, 0, false, err
 			}
 			// 非 index-only scan ではクラスタ化インデックスの pageReadCost を使う
-			readTime := calcReadTimeForSecondaryIndex(1, float64(foundRecords), pageReadCost)
+			readTime := calcReadTimeForSecondaryIndex(float64(foundRecords), pageReadCost)
 			rangeCost := readTime + float64(foundRecords)*RowEvaluateCost + 0.01
 			return rangeCost, float64(foundRecords), true, nil
 		}

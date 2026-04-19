@@ -877,11 +877,10 @@ func TestCostFormulas(t *testing.T) {
 	t.Run("レンジスキャンのコストが cost.md の 2 段階計算と一致する", func(t *testing.T) {
 		// GIVEN: cost.md の計算例 (セカンダリインデックス)
 		foundRecords := 500.0
-		nRanges := 1
 		pageReadCost := 1.0
 
 		// WHEN
-		readTime := calcReadTimeForSecondaryIndex(nRanges, foundRecords, pageReadCost)
+		readTime := calcReadTimeForSecondaryIndex(foundRecords, pageReadCost)
 		totalCost := calcRangeScanCost(readTime, foundRecords)
 
 		// THEN: readTime = (1 + 500) × 1.0 = 501
@@ -896,10 +895,10 @@ func TestCostFormulas(t *testing.T) {
 		pageReadCost := 1.0
 
 		// WHEN: foundRecords <= 2
-		readTime1 := calcReadTimeForClusteredIndex(1, 2, 10000, 100, pageReadCost)
+		readTime1 := calcReadTimeForClusteredIndex(2, 10000, 100, pageReadCost)
 
 		// WHEN: foundRecords > 2
-		readTime500 := calcReadTimeForClusteredIndex(1, 500, 10000, 100, pageReadCost)
+		readTime500 := calcReadTimeForClusteredIndex(500, 10000, 100, pageReadCost)
 
 		// THEN
 		assert.Equal(t, 2.0, readTime1)   // foundRecords × pageReadCost

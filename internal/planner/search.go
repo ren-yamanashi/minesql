@@ -191,7 +191,7 @@ func (s *Search) chooseBestPlan(tbl *access.Table, leaves []leafCondition, cond 
 				return nil, err
 			}
 			readTime := calcReadTimeForClusteredIndex(
-				1, float64(foundRecords), float64(stats.RecordCount), float64(stats.LeafPageCount), clusterPageReadCost,
+				float64(foundRecords), float64(stats.RecordCount), float64(stats.LeafPageCount), clusterPageReadCost,
 			)
 			cost := calcRangeScanCost(readTime, float64(foundRecords))
 			if bestLeaf == nil || cost < bestCost {
@@ -226,7 +226,7 @@ func (s *Search) chooseBestPlan(tbl *access.Table, leaves []leafCondition, cond 
 				readTime = calcReadTimeForIndexOnly(float64(foundRecords), keysPerBlock, idxPageReadCost)
 			} else {
 				// 非 index-only scan ではクラスタ化インデックスの pageReadCost を使う
-				readTime = calcReadTimeForSecondaryIndex(1, float64(foundRecords), clusterPageReadCost)
+				readTime = calcReadTimeForSecondaryIndex(float64(foundRecords), clusterPageReadCost)
 			}
 			cost := calcRangeScanCost(readTime, float64(foundRecords))
 			if bestLeaf == nil || cost < bestCost {
@@ -475,7 +475,7 @@ func (s *Search) planORBranch(tbl *access.Table, branch orBranch, stats *handler
 			if err != nil {
 				return nil, 0, false, err
 			}
-			readTime := calcReadTimeForClusteredIndex(1, float64(foundRecords), float64(stats.RecordCount), float64(stats.LeafPageCount), clusterPRC)
+			readTime := calcReadTimeForClusteredIndex(float64(foundRecords), float64(stats.RecordCount), float64(stats.LeafPageCount), clusterPRC)
 			cost := calcRangeScanCost(readTime, float64(foundRecords))
 			if bestLeaf == nil || cost < bestCost {
 				bestLeaf = leaf
@@ -498,7 +498,7 @@ func (s *Search) planORBranch(tbl *access.Table, branch orBranch, stats *handler
 				return nil, 0, false, err
 			}
 			// 非 index-only scan ではクラスタ化インデックスの pageReadCost を使う
-			readTime := calcReadTimeForSecondaryIndex(1, float64(foundRecords), clusterPRC)
+			readTime := calcReadTimeForSecondaryIndex(float64(foundRecords), clusterPRC)
 			cost := calcRangeScanCost(readTime, float64(foundRecords))
 			if bestLeaf == nil || cost < bestCost {
 				bestLeaf = leaf
