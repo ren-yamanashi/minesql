@@ -168,8 +168,9 @@ func (sp *SelectParser) onIdentifier(ident string) {
 
 	switch sp.state {
 	case SelectStateColumns:
-		// 現状 SELECT 句では "*" のみサポートしているので、Identifier が来たらエラー
-		sp.setError(errors.New("[parse error] currently only SELECT * is supported"))
+		// カラム名を追加 (修飾名 "table.column" にも対応)
+		colId := parseColumnId(ident)
+		sp.stmt.Columns = append(sp.stmt.Columns, colId)
 		return
 	case SelectStateFrom:
 		sp.stmt.From = *ast.NewTableId(ident)
@@ -196,11 +197,16 @@ func (sp *SelectParser) onSymbol(symbol string) {
 
 	switch sp.state {
 	case SelectStateColumns:
-		// 現状 SELECT 句では "*" のみサポートしているので、"*" 以外のシンボルが来たらエラー
-		if symbol != string(CAsterisk) {
-			sp.setError(errors.New("[parse error] currently only SELECT * is supported"))
+		if symbol == string(CAsterisk) {
+			// SELECT * → Columns は nil のまま (全カラム)
 			return
 		}
+		if symbol == string(SComma) {
+			// カラム名の区切り → 次のカラム名を待つ
+			return
+		}
+		sp.setError(errors.New("[parse error] unexpected symbol in SELECT clause: " + symbol))
+		return
 	case SelectStateFrom:
 		// FROM 句ではシンボルは来ないはずなのでエラー
 		sp.setError(errors.New("[parse error] unexpected symbol in FROM clause: " + symbol))

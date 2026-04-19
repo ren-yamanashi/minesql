@@ -150,7 +150,7 @@ WHERE id = '1' /* id が 1 のレコード */
 			assert.Contains(t, err.Error(), "incomplete SELECT statement")
 		})
 
-		t.Run("SELECT で特定カラム名を指定した場合エラーになる", func(t *testing.T) {
+		t.Run("SELECT で特定カラム名を指定した場合にパースできる", func(t *testing.T) {
 			// GIVEN
 			sql := "SELECT id FROM users;"
 			parser := NewParser()
@@ -159,9 +159,13 @@ WHERE id = '1' /* id が 1 のレコード */
 			result, err := parser.Parse(sql)
 
 			// THEN
-			assert.Error(t, err)
-			assert.Nil(t, result)
-			assert.Contains(t, err.Error(), "currently only SELECT * is supported")
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+			selectStmt, ok := result.(*ast.SelectStmt)
+			assert.True(t, ok)
+			assert.Len(t, selectStmt.Columns, 1)
+			assert.Equal(t, "id", selectStmt.Columns[0].ColName)
+			assert.Equal(t, "users", selectStmt.From.TableName)
 		})
 
 		t.Run("FROM 句が重複している場合エラーになる", func(t *testing.T) {
@@ -219,6 +223,58 @@ WHERE id = '1' /* id が 1 のレコード */
 			assert.Nil(t, result)
 			assert.Contains(t, err.Error(), "empty expression in WHERE clause")
 		})
+	})
+
+	t.Run("SELECT で複数カラムを指定できる", func(t *testing.T) {
+		// GIVEN
+		sql := "SELECT id, name, age FROM users;"
+		parser := NewParser()
+
+		// WHEN
+		result, err := parser.Parse(sql)
+
+		// THEN
+		assert.NoError(t, err)
+		selectStmt, ok := result.(*ast.SelectStmt)
+		assert.True(t, ok)
+		assert.Len(t, selectStmt.Columns, 3)
+		assert.Equal(t, "id", selectStmt.Columns[0].ColName)
+		assert.Equal(t, "name", selectStmt.Columns[1].ColName)
+		assert.Equal(t, "age", selectStmt.Columns[2].ColName)
+	})
+
+	t.Run("SELECT で修飾名カラムを指定できる", func(t *testing.T) {
+		// GIVEN
+		sql := "SELECT users.id, users.name FROM users;"
+		parser := NewParser()
+
+		// WHEN
+		result, err := parser.Parse(sql)
+
+		// THEN
+		assert.NoError(t, err)
+		selectStmt, ok := result.(*ast.SelectStmt)
+		assert.True(t, ok)
+		assert.Len(t, selectStmt.Columns, 2)
+		assert.Equal(t, "users", selectStmt.Columns[0].TableName)
+		assert.Equal(t, "id", selectStmt.Columns[0].ColName)
+		assert.Equal(t, "users", selectStmt.Columns[1].TableName)
+		assert.Equal(t, "name", selectStmt.Columns[1].ColName)
+	})
+
+	t.Run("SELECT * の場合 Columns は nil", func(t *testing.T) {
+		// GIVEN
+		sql := "SELECT * FROM users;"
+		parser := NewParser()
+
+		// WHEN
+		result, err := parser.Parse(sql)
+
+		// THEN
+		assert.NoError(t, err)
+		selectStmt, ok := result.(*ast.SelectStmt)
+		assert.True(t, ok)
+		assert.Nil(t, selectStmt.Columns)
 	})
 
 	t.Run("WHERE 句で数値リテラルを使用できる", func(t *testing.T) {

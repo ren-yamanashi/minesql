@@ -55,6 +55,20 @@ func calcRangeScanCost(readTime float64, foundRecords float64) float64 {
 // readTime 算出
 // -----------------------------------------------
 
+// calcReadTimeForIndexOnly はセカンダリインデックスの index-only scan の readTime を算出する
+//
+// index_only_read_time = (foundRecords + keysPerBlock - 1) / keysPerBlock
+// readTime = index_only_read_time × pageReadCost
+//
+// keysPerBlock はインデックスの 1 ページあたりのレコード数で近似する (= RecordCount / IndexLeafPageCount)
+func calcReadTimeForIndexOnly(foundRecords float64, keysPerBlock float64, pageReadCost float64) float64 {
+	if keysPerBlock <= 0 {
+		keysPerBlock = 1
+	}
+	indexOnlyReadTime := (foundRecords + keysPerBlock - 1) / keysPerBlock
+	return indexOnlyReadTime * pageReadCost
+}
+
 // calcReadTimeForSecondaryIndex はセカンダリインデックス (非 index-only) の readTime を算出する
 //
 // readTime = (nRanges + foundRecords) × pageReadCost
