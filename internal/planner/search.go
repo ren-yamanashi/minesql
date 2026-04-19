@@ -204,7 +204,7 @@ func (s *Search) chooseBestPlan(tbl *access.Table, leaves []leafCondition, cond 
 		// セカンダリインデックスのレンジスキャン
 		idxMeta, hasIndex := s.tblMeta.GetIndexByColName(leaf.colName)
 		if hasIndex {
-			index, err := tbl.GetUniqueIndexByName(idxMeta.Name)
+			index, err := tbl.GetSecondaryIndexByName(idxMeta.Name)
 			if err != nil {
 				return nil, err
 			}
@@ -257,7 +257,7 @@ func (s *Search) chooseBestPlan(tbl *access.Table, leaves []leafCondition, cond 
 //
 // needsFilter が true の場合、IndexScan の上に Filter を重ねる (複合条件時)
 func (s *Search) buildIndexPlan(tbl *access.Table, leaf leafCondition, idxMeta *handler.IndexMetadata, cond func(executor.Record) bool, needsFilter bool) (executor.Executor, error) {
-	index, err := tbl.GetUniqueIndexByName(idxMeta.Name)
+	index, err := tbl.GetSecondaryIndexByName(idxMeta.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -276,7 +276,7 @@ func (s *Search) buildIndexPlan(tbl *access.Table, leaf leafCondition, idxMeta *
 			WhileCondition: indexCond,
 			IndexOnly:      true,
 			NCols:          int(s.tblMeta.NCols),
-			UKColPos:       int(colMeta.Pos),
+			SecColPos:      int(colMeta.Pos),
 		})
 	} else {
 		scan = executor.NewIndexScan(
@@ -487,7 +487,7 @@ func (s *Search) planORBranch(tbl *access.Table, branch orBranch, stats *handler
 		// セカンダリインデックスのレンジスキャン
 		idxMeta, hasIndex := s.tblMeta.GetIndexByColName(leaf.colName)
 		if hasIndex {
-			index, err := tbl.GetUniqueIndexByName(idxMeta.Name)
+			index, err := tbl.GetSecondaryIndexByName(idxMeta.Name)
 			if err != nil {
 				return nil, 0, false, err
 			}

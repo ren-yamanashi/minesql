@@ -8,28 +8,28 @@ import (
 // IndexScan はセカンダリインデックスを利用して検索する
 type IndexScan struct {
 	table          *access.Table
-	index          *access.UniqueIndex
+	index          *access.SecondaryIndex
 	searchMode     access.RecordSearchMode
 	whileCondition func(Record) bool
 	indexOnly      bool // true の場合、テーブル本体の検索をスキップし index データのみで結果を返す
 	nCols          int  // テーブルのカラム数 (indexOnly 時のレコード構築用)
-	ukColPos       int  // ユニークキーのカラム位置 (indexOnly 時のレコード構築用)
-	iterator       *access.UniqueIndexIterator
+	secColPos      int  // セカンダリキーのカラム位置 (indexOnly 時のレコード構築用)
+	iterator       *access.SecondaryIndexIterator
 }
 
 type IndexScanParams struct {
 	Table          *access.Table
-	Index          *access.UniqueIndex
+	Index          *access.SecondaryIndex
 	SearchMode     access.RecordSearchMode
 	WhileCondition func(Record) bool
 	IndexOnly      bool
 	NCols          int
-	UKColPos       int
+	SecColPos      int
 }
 
 func NewIndexScan(
 	table *access.Table,
-	index *access.UniqueIndex,
+	index *access.SecondaryIndex,
 	searchMode access.RecordSearchMode,
 	whileCondition func(record Record) bool,
 ) *IndexScan {
@@ -49,7 +49,7 @@ func NewIndexScanWithParams(params IndexScanParams) *IndexScan {
 		whileCondition: params.WhileCondition,
 		indexOnly:      params.IndexOnly,
 		nCols:          params.NCols,
-		ukColPos:       params.UKColPos,
+		secColPos:      params.SecColPos,
 	}
 }
 
@@ -80,7 +80,7 @@ func (is *IndexScan) nextWithPrimaryLookup() (Record, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !is.whileCondition(result.UniqueKey) {
+	if !is.whileCondition(result.SecondaryKey) {
 		return nil, nil
 	}
 	return result.Record, nil
@@ -98,7 +98,7 @@ func (is *IndexScan) nextIndexOnly() (Record, error) {
 	if err != nil {
 		return nil, err
 	}
-	if !is.whileCondition(result.UniqueKey) {
+	if !is.whileCondition(result.SecondaryKey) {
 		return nil, nil
 	}
 
@@ -107,8 +107,8 @@ func (is *IndexScan) nextIndexOnly() (Record, error) {
 	// PK カラム (先頭から pkCount 個)
 	copy(record, result.PKValues)
 	// UK カラム
-	if is.ukColPos < is.nCols && len(result.UniqueKey) > 0 {
-		record[is.ukColPos] = result.UniqueKey[0]
+	if is.secColPos < is.nCols && len(result.SecondaryKey) > 0 {
+		record[is.secColPos] = result.SecondaryKey[0]
 	}
 
 	return record, nil

@@ -23,9 +23,9 @@ func TestCreateAndInsert(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+		uniqueIndex := NewSecondaryIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1, true)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		table := NewTable("users", metaPageId, 1, []*SecondaryIndex{uniqueIndex}, nil, nil)
 
 		// WHEN: テーブルを作成
 		err = table.Create(bp)
@@ -82,13 +82,13 @@ func TestCreateAndInsert(t *testing.T) {
 		assert.Equal(t, len(expectedRecords), i)
 
 		// THEN: ユニークインデックスにもデータが挿入されている
-		uniqueIndexTree := btree.NewBTree(table.UniqueIndexes[0].MetaPageId)
+		uniqueIndexTree := btree.NewBTree(table.SecondaryIndexes[0].MetaPageId)
 		uniqueIndexIter, err := uniqueIndexTree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
 		// Key = concat(encodedSecondaryKey, encodedPK) で、NonKey は空
 		// セカンダリキーでソートされ、同一セカンダリキー内では PK でソートされる
-		expectedUniqueIndexRecords := []struct {
+		expectedSecondaryIndexRecords := []struct {
 			secondaryKey string
 			pk           string
 		}{
@@ -104,7 +104,7 @@ func TestCreateAndInsert(t *testing.T) {
 			if !ok {
 				break
 			}
-			expected := expectedUniqueIndexRecords[j]
+			expected := expectedSecondaryIndexRecords[j]
 
 			// Key をデコードしてセカンダリキーと PK を分離
 			var keyColumns [][]byte
@@ -121,7 +121,7 @@ func TestCreateAndInsert(t *testing.T) {
 			_, _, err = uniqueIndexIter.Next(bp)
 			assert.NoError(t, err)
 		}
-		assert.Equal(t, len(expectedUniqueIndexRecords), j)
+		assert.Equal(t, len(expectedSecondaryIndexRecords), j)
 	})
 
 	t.Run("テーブルとそのインデックスが同じディスクファイル (同じ FileId) に保存される", func(t *testing.T) {
@@ -131,12 +131,12 @@ func TestCreateAndInsert(t *testing.T) {
 
 		indexMetaPageId1, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex1 := NewUniqueIndex("idx_first_name", "first_name", indexMetaPageId1, 1, 1)
+		uniqueIndex1 := NewSecondaryIndex("idx_first_name", "first_name", indexMetaPageId1, 1, 1, true)
 		indexMetaPageId2, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex2 := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId2, 2, 1)
+		uniqueIndex2 := NewSecondaryIndex("idx_last_name", "last_name", indexMetaPageId2, 2, 1, true)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex1, uniqueIndex2}, nil, nil)
+		table := NewTable("users", metaPageId, 1, []*SecondaryIndex{uniqueIndex1, uniqueIndex2}, nil, nil)
 
 		// WHEN
 		err = table.Create(bp)
@@ -251,9 +251,9 @@ func TestSoftDelete(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+		uniqueIndex := NewSecondaryIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1, true)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		table := NewTable("users", metaPageId, 1, []*SecondaryIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -279,7 +279,7 @@ func TestSoftDelete(t *testing.T) {
 
 		// THEN: ユニークインデックスもソフトデリートされている
 		// B+Tree を直接走査し、active なエントリのみ確認する
-		indexTree := btree.NewBTree(table.UniqueIndexes[0].MetaPageId)
+		indexTree := btree.NewBTree(table.SecondaryIndexes[0].MetaPageId)
 		indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -454,9 +454,9 @@ func TestDelete(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+		uniqueIndex := NewSecondaryIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1, true)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		table := NewTable("users", metaPageId, 1, []*SecondaryIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -475,7 +475,7 @@ func TestDelete(t *testing.T) {
 		assert.Equal(t, [][]byte{[]byte("b")}, recs[0].key)
 
 		// THEN: ユニークインデックスからも物理削除されている (全エントリを走査)
-		indexTree := btree.NewBTree(table.UniqueIndexes[0].MetaPageId)
+		indexTree := btree.NewBTree(table.SecondaryIndexes[0].MetaPageId)
 		indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -703,9 +703,9 @@ func TestUpdate(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+		uniqueIndex := NewSecondaryIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1, true)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		table := NewTable("users", metaPageId, 1, []*SecondaryIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -721,7 +721,7 @@ func TestUpdate(t *testing.T) {
 
 		// THEN: ユニークインデックスが更新されている (active なエントリのみ確認)
 		assert.NoError(t, err)
-		indexKeys := collectActiveUniqueIndexKeys(t, bp, table.UniqueIndexes[0])
+		indexKeys := collectActiveSecondaryIndexKeys(t, bp, table.SecondaryIndexes[0])
 		// "Doe" がソフトデリートされ "Williams" が追加されている
 		assert.Equal(t, []string{"Smith", "Williams"}, indexKeys)
 	})
@@ -732,9 +732,9 @@ func TestUpdate(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+		uniqueIndex := NewSecondaryIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1, true)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		table := NewTable("users", metaPageId, 1, []*SecondaryIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -756,7 +756,7 @@ func TestUpdate(t *testing.T) {
 
 		// THEN: ユニークインデックスが更新されている
 		// active なエントリのみ確認し、Key にセカンダリキーと新しい PK が含まれる
-		indexTree := btree.NewBTree(table.UniqueIndexes[0].MetaPageId)
+		indexTree := btree.NewBTree(table.SecondaryIndexes[0].MetaPageId)
 		indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -810,9 +810,9 @@ func TestUpdate(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+		uniqueIndex := NewSecondaryIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1, true)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		table := NewTable("users", metaPageId, 1, []*SecondaryIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -836,12 +836,12 @@ func TestUpdate(t *testing.T) {
 
 		indexMetaPageId1, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex1 := NewUniqueIndex("idx_first_name", "first_name", indexMetaPageId1, 1, 1)
+		uniqueIndex1 := NewSecondaryIndex("idx_first_name", "first_name", indexMetaPageId1, 1, 1, true)
 		indexMetaPageId2, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex2 := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId2, 2, 1)
+		uniqueIndex2 := NewSecondaryIndex("idx_last_name", "last_name", indexMetaPageId2, 2, 1, true)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex1, uniqueIndex2}, nil, nil)
+		table := NewTable("users", metaPageId, 1, []*SecondaryIndex{uniqueIndex1, uniqueIndex2}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -857,11 +857,11 @@ func TestUpdate(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN: idx_first_name が更新されている (active なエントリのみ)
-		firstNameKeys := collectActiveUniqueIndexKeys(t, bp, table.UniqueIndexes[0])
+		firstNameKeys := collectActiveSecondaryIndexKeys(t, bp, table.SecondaryIndexes[0])
 		assert.Equal(t, []string{"Alice", "Jane"}, firstNameKeys)
 
 		// THEN: idx_last_name が更新されている (active なエントリのみ)
-		lastNameKeys := collectActiveUniqueIndexKeys(t, bp, table.UniqueIndexes[1])
+		lastNameKeys := collectActiveSecondaryIndexKeys(t, bp, table.SecondaryIndexes[1])
 		assert.Equal(t, []string{"Smith", "Williams"}, lastNameKeys)
 	})
 
@@ -1038,15 +1038,15 @@ func TestSearch(t *testing.T) {
 	})
 }
 
-func TestGetUniqueIndexByName(t *testing.T) {
+func TestGetSecondaryIndexByName(t *testing.T) {
 	t.Run("インデックス名からユニークインデックスを取得できる", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex1 := NewUniqueIndex("idx_first_name", "first_name", page.PageId{}, 1, 1)
-		uniqueIndex2 := NewUniqueIndex("idx_last_name", "last_name", page.PageId{}, 2, 1)
-		table := NewTable("users", page.PageId{}, 1, []*UniqueIndex{uniqueIndex1, uniqueIndex2}, nil, nil)
+		uniqueIndex1 := NewSecondaryIndex("idx_first_name", "first_name", page.PageId{}, 1, 1, true)
+		uniqueIndex2 := NewSecondaryIndex("idx_last_name", "last_name", page.PageId{}, 2, 1, true)
+		table := NewTable("users", page.PageId{}, 1, []*SecondaryIndex{uniqueIndex1, uniqueIndex2}, nil, nil)
 
 		// WHEN
-		ui, err := table.GetUniqueIndexByName("idx_last_name")
+		ui, err := table.GetSecondaryIndexByName("idx_last_name")
 
 		// THEN
 		assert.NoError(t, err)
@@ -1055,11 +1055,11 @@ func TestGetUniqueIndexByName(t *testing.T) {
 
 	t.Run("存在しないインデックス名を指定するとエラーになる", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex := NewUniqueIndex("idx_first_name", "first_name", page.PageId{}, 1, 1)
-		table := NewTable("users", page.PageId{}, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		uniqueIndex := NewSecondaryIndex("idx_first_name", "first_name", page.PageId{}, 1, 1, true)
+		table := NewTable("users", page.PageId{}, 1, []*SecondaryIndex{uniqueIndex}, nil, nil)
 
 		// WHEN
-		ui, err := table.GetUniqueIndexByName("idx_last_name")
+		ui, err := table.GetSecondaryIndexByName("idx_last_name")
 		// THEN
 		assert.Nil(t, ui)
 		assert.Error(t, err)
@@ -1552,7 +1552,7 @@ func TestAppendRedoRecordsForAlreadyDirtyPage(t *testing.T) {
 // ユニークインデックスの active なエントリのセカンダリキーを収集するヘルパー
 //
 // ソフトデリート済み (DeleteMark=1) のエントリはスキップする
-func collectActiveUniqueIndexKeys(t *testing.T, bp *buffer.BufferPool, ui *UniqueIndex) []string {
+func collectActiveSecondaryIndexKeys(t *testing.T, bp *buffer.BufferPool, ui *SecondaryIndex) []string {
 	t.Helper()
 	indexTree := btree.NewBTree(ui.MetaPageId)
 	indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})

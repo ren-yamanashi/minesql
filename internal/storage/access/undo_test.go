@@ -16,8 +16,8 @@ import (
 func TestUndoIntegration(t *testing.T) {
 	t.Run("複数操作を逆順に Undo すると元の状態に戻る", func(t *testing.T) {
 		// GIVEN: ユニークインデックス付きテーブルにデータを投入
-		uniqueIndex := NewUniqueIndex("idx_name", "name", page.PageId{}, 1, 1)
-		table, bp := setupTestTableForUndo(t, []*UniqueIndex{uniqueIndex})
+		uniqueIndex := NewSecondaryIndex("idx_name", "name", page.PageId{}, 1, 1, true)
+		table, bp := setupTestTableForUndo(t, []*SecondaryIndex{uniqueIndex})
 
 		// 初期データ: ("a", "Alice"), ("b", "Bob")
 		recordA := [][]byte{[]byte("a"), []byte("Alice")}
@@ -65,7 +65,7 @@ func TestUndoIntegration(t *testing.T) {
 		assert.Equal(t, []string{"b", "Bob"}, records[1])
 
 		// THEN: ユニークインデックスも初期状態に戻っている
-		keys := collectUndoActiveUniqueIndexKeys(t, table.UniqueIndexes[0], bp)
+		keys := collectUndoActiveSecondaryIndexKeys(t, table.SecondaryIndexes[0], bp)
 		assert.Equal(t, []string{"Alice", "Bob"}, keys)
 	})
 
@@ -113,7 +113,7 @@ func TestUndoIntegration(t *testing.T) {
 	})
 }
 
-func setupTestTableForUndo(t *testing.T, uniqueIndexes []*UniqueIndex) (*Table, *buffer.BufferPool) {
+func setupTestTableForUndo(t *testing.T, uniqueIndexes []*SecondaryIndex) (*Table, *buffer.BufferPool) {
 	t.Helper()
 	tmpdir := t.TempDir()
 
@@ -160,7 +160,7 @@ func collectUndoActiveRecords(t *testing.T, table *Table, bp *buffer.BufferPool)
 	return records
 }
 
-func collectUndoActiveUniqueIndexKeys(t *testing.T, ui *UniqueIndex, bp *buffer.BufferPool) []string {
+func collectUndoActiveSecondaryIndexKeys(t *testing.T, ui *SecondaryIndex, bp *buffer.BufferPool) []string {
 	t.Helper()
 	indexTree := btree.NewBTree(ui.MetaPageId)
 	indexIter, err := indexTree.Search(bp, btree.SearchModeStart{})

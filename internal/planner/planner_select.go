@@ -360,7 +360,7 @@ func buildRightExecFunc(
 
 	// UNIQUE INDEX eq_ref
 	if idxMeta, hasIdx := candidate.tblMeta.GetIndexByColName(joinCol); hasIdx {
-		index, err := candidate.table.GetUniqueIndexByName(idxMeta.Name)
+		index, err := candidate.table.GetSecondaryIndexByName(idxMeta.Name)
 		if err != nil {
 			return nil, err
 		}

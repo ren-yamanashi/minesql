@@ -31,18 +31,18 @@ func buildAllTables(catalog *dictionary.Catalog, undoLog *access.UndoManager, re
 
 // buildTable はテーブルメタデータから Table を構築する
 func buildTable(tblMeta *dictionary.TableMeta, undoLog *access.UndoManager, redoLog *log.RedoLog) (*access.Table, error) {
-	var uniqueIndexes []*access.UniqueIndex
+	var secondaryIndexes []*access.SecondaryIndex
 	for _, idxMeta := range tblMeta.Indexes {
 		if idxMeta.Type == dictionary.IndexTypeUnique {
 			colMeta, ok := tblMeta.GetColByName(idxMeta.ColName)
 			if !ok {
 				return nil, fmt.Errorf("column %s not found in table %s", idxMeta.ColName, tblMeta.Name)
 			}
-			ui := access.NewUniqueIndex(idxMeta.Name, idxMeta.ColName, idxMeta.DataMetaPageId, colMeta.Pos, tblMeta.PKCount)
-			uniqueIndexes = append(uniqueIndexes, ui)
+			si := access.NewSecondaryIndex(idxMeta.Name, idxMeta.ColName, idxMeta.DataMetaPageId, colMeta.Pos, tblMeta.PKCount, true)
+			secondaryIndexes = append(secondaryIndexes, si)
 		}
 	}
 
-	tbl := access.NewTable(tblMeta.Name, tblMeta.DataMetaPageId, tblMeta.PKCount, uniqueIndexes, undoLog, redoLog)
+	tbl := access.NewTable(tblMeta.Name, tblMeta.DataMetaPageId, tblMeta.PKCount, secondaryIndexes, undoLog, redoLog)
 	return &tbl, nil
 }

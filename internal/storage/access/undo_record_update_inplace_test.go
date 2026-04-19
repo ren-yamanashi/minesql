@@ -34,8 +34,8 @@ func TestUndoUpdateInplaceRecord_Undo(t *testing.T) {
 
 	t.Run("ユニークインデックスも元の値に戻る", func(t *testing.T) {
 		// GIVEN
-		uniqueIndex := NewUniqueIndex("idx_name", "name", page.PageId{}, 1, 1)
-		table, bp := setupTestTableForUndo(t, []*UniqueIndex{uniqueIndex})
+		uniqueIndex := NewSecondaryIndex("idx_name", "name", page.PageId{}, 1, 1, true)
+		table, bp := setupTestTableForUndo(t, []*SecondaryIndex{uniqueIndex})
 
 		prevRecord := [][]byte{[]byte("a"), []byte("John")}
 		newRecord := [][]byte{[]byte("a"), []byte("Jane")}
@@ -51,7 +51,7 @@ func TestUndoUpdateInplaceRecord_Undo(t *testing.T) {
 
 		// THEN: ユニークインデックスも元の値に戻っている
 		assert.NoError(t, err)
-		keys := collectUndoActiveUniqueIndexKeys(t, table.UniqueIndexes[0], bp)
+		keys := collectUndoActiveSecondaryIndexKeys(t, table.SecondaryIndexes[0], bp)
 		assert.Equal(t, []string{"John"}, keys)
 	})
 }

@@ -55,9 +55,9 @@ func TestGetTable(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, 1, len(tbl.UniqueIndexes))
-		assert.Equal(t, "idx_email", tbl.UniqueIndexes[0].Name)
-		assert.Equal(t, "email", tbl.UniqueIndexes[0].ColName)
+		assert.Equal(t, 1, len(tbl.SecondaryIndexes))
+		assert.Equal(t, "idx_email", tbl.SecondaryIndexes[0].Name)
+		assert.Equal(t, "email", tbl.SecondaryIndexes[0].ColName)
 	})
 
 	t.Run("複数のユニークインデックスが構築される", func(t *testing.T) {
@@ -86,9 +86,9 @@ func TestGetTable(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, 2, len(tbl.UniqueIndexes))
-		assert.Equal(t, "idx_email", tbl.UniqueIndexes[0].Name)
-		assert.Equal(t, "idx_username", tbl.UniqueIndexes[1].Name)
+		assert.Equal(t, 2, len(tbl.SecondaryIndexes))
+		assert.Equal(t, "idx_email", tbl.SecondaryIndexes[0].Name)
+		assert.Equal(t, "idx_username", tbl.SecondaryIndexes[1].Name)
 	})
 
 	t.Run("存在しないテーブル名を指定するとエラーを返す", func(t *testing.T) {
@@ -159,8 +159,8 @@ func TestBuildTable(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, 1, len(tbl.UniqueIndexes))
-		assert.Equal(t, "idx_email", tbl.UniqueIndexes[0].Name)
+		assert.Equal(t, 1, len(tbl.SecondaryIndexes))
+		assert.Equal(t, "idx_email", tbl.SecondaryIndexes[0].Name)
 	})
 }
 

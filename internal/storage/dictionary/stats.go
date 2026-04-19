@@ -188,34 +188,34 @@ func updateColumnStats(
 
 // buildTable は TableMeta から Table を構築する (UndoManager なし)
 func buildTable(meta *TableMeta) (*access.Table, error) {
-	var uniqueIndexes []*access.UniqueIndex
+	var secondaryIndexes []*access.SecondaryIndex
 	for _, idxMeta := range meta.Indexes {
 		if idxMeta.Type == IndexTypeUnique {
 			colMeta, ok := meta.GetColByName(idxMeta.ColName)
 			if !ok {
 				return nil, fmt.Errorf("column %s not found in table %s", idxMeta.ColName, meta.Name)
 			}
-			ui := access.NewUniqueIndex(idxMeta.Name, idxMeta.ColName, idxMeta.DataMetaPageId, colMeta.Pos, meta.PKCount)
-			uniqueIndexes = append(uniqueIndexes, ui)
+			si := access.NewSecondaryIndex(idxMeta.Name, idxMeta.ColName, idxMeta.DataMetaPageId, colMeta.Pos, meta.PKCount, true)
+			secondaryIndexes = append(secondaryIndexes, si)
 		}
 	}
-	tbl := access.NewTable(meta.Name, meta.DataMetaPageId, meta.PKCount, uniqueIndexes, nil, nil)
+	tbl := access.NewTable(meta.Name, meta.DataMetaPageId, meta.PKCount, secondaryIndexes, nil, nil)
 	return &tbl, nil
 }
 
-// analyzeIndex はテーブルのユニークインデックスの統計情報を収集する
+// analyzeIndex はテーブルのセカンダリインデックスの統計情報を収集する
 func (sc *StatsCollector) analyzeIndex(tbl *access.Table) (map[string]IndexStats, error) {
 	idxStats := make(map[string]IndexStats)
-	for _, uIdx := range tbl.UniqueIndexes {
-		height, err := uIdx.Height(sc.bufferPool)
+	for _, si := range tbl.SecondaryIndexes {
+		height, err := si.Height(sc.bufferPool)
 		if err != nil {
 			return nil, err
 		}
-		leafPageCount, err := uIdx.LeafPageCount(sc.bufferPool)
+		leafPageCount, err := si.LeafPageCount(sc.bufferPool)
 		if err != nil {
 			return nil, err
 		}
-		idxStats[uIdx.Name] = IndexStats{
+		idxStats[si.Name] = IndexStats{
 			Height:        height,
 			LeafPageCount: leafPageCount,
 			RecPerKey:     1.0, // UNIQUE INDEX は常に 1.0

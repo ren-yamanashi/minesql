@@ -254,7 +254,7 @@ func evalDrivingWhereConditions(bp *buffer.BufferPool, candidate joinCandidate, 
 	if idxMeta, hasIdx := candidate.tblMeta.GetIndexByColName(colName); hasIdx {
 		if expr.Operator == ">" || expr.Operator == ">=" || expr.Operator == "<" || expr.Operator == "<=" {
 			rhs := expr.Right.(*ast.RhsLiteral)
-			index, err := candidate.table.GetUniqueIndexByName(idxMeta.Name)
+			index, err := candidate.table.GetSecondaryIndexByName(idxMeta.Name)
 			if err != nil {
 				return 0, 0, false, err
 			}

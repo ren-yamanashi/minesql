@@ -352,7 +352,7 @@ func TestBuildTable(t *testing.T) {
 		assert.NotNil(t, tbl)
 		assert.Equal(t, "users", tbl.Name)
 		assert.Equal(t, uint8(1), tbl.PrimaryKeyCount)
-		assert.Equal(t, 0, len(tbl.UniqueIndexes))
+		assert.Equal(t, 0, len(tbl.SecondaryIndexes))
 		assert.Equal(t, page.NewPageId(page.FileId(1), 0), tbl.MetaPageId)
 	})
 
@@ -374,12 +374,12 @@ func TestBuildTable(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, tbl)
 		assert.Equal(t, "users", tbl.Name)
-		assert.Equal(t, 1, len(tbl.UniqueIndexes))
-		assert.Equal(t, "idx_email", tbl.UniqueIndexes[0].Name)
-		assert.Equal(t, "email", tbl.UniqueIndexes[0].ColName)
-		assert.Equal(t, uint16(1), tbl.UniqueIndexes[0].UkIdx)
-		assert.Equal(t, uint8(1), tbl.UniqueIndexes[0].PkCount)
-		assert.Equal(t, page.NewPageId(page.FileId(1), 1), tbl.UniqueIndexes[0].MetaPageId)
+		assert.Equal(t, 1, len(tbl.SecondaryIndexes))
+		assert.Equal(t, "idx_email", tbl.SecondaryIndexes[0].Name)
+		assert.Equal(t, "email", tbl.SecondaryIndexes[0].ColName)
+		assert.Equal(t, uint16(1), tbl.SecondaryIndexes[0].ColIdx)
+		assert.Equal(t, uint8(1), tbl.SecondaryIndexes[0].PkCount)
+		assert.Equal(t, page.NewPageId(page.FileId(1), 1), tbl.SecondaryIndexes[0].MetaPageId)
 	})
 
 	t.Run("複数のユニークインデックス付きのテーブルを構築できる", func(t *testing.T) {
@@ -401,9 +401,9 @@ func TestBuildTable(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, tbl)
-		assert.Equal(t, 2, len(tbl.UniqueIndexes))
-		assert.Equal(t, "idx_email", tbl.UniqueIndexes[0].Name)
-		assert.Equal(t, "idx_username", tbl.UniqueIndexes[1].Name)
+		assert.Equal(t, 2, len(tbl.SecondaryIndexes))
+		assert.Equal(t, "idx_email", tbl.SecondaryIndexes[0].Name)
+		assert.Equal(t, "idx_username", tbl.SecondaryIndexes[1].Name)
 	})
 
 	t.Run("存在しないカラム名を指定したインデックスがある場合、エラーを返す", func(t *testing.T) {
@@ -568,26 +568,26 @@ func createTable(t *testing.T, env *testEnv, tableName string, pkCount uint8, in
 	metaPageId, err := env.bp.AllocatePageId(fileId)
 	assert.NoError(t, err)
 
-	// 各 UniqueIndex の metaPageId を設定
-	uniqueIndexes := make([]*access.UniqueIndex, len(indexes))
+	// 各セカンダリインデックスの metaPageId を設定
+	secondaryIndexes := make([]*access.SecondaryIndex, len(indexes))
 	for i, idx := range indexes {
 		indexMetaPageId, err := env.bp.AllocatePageId(fileId)
 		assert.NoError(t, err)
-		uniqueIndex := access.NewUniqueIndex(idx.name, idx.colName, indexMetaPageId, idx.secondaryKey, pkCount)
-		err = uniqueIndex.Create(env.bp)
+		si := access.NewSecondaryIndex(idx.name, idx.colName, indexMetaPageId, idx.secondaryKey, pkCount, true)
+		err = si.Create(env.bp)
 		assert.NoError(t, err)
-		uniqueIndexes[i] = uniqueIndex
+		secondaryIndexes[i] = si
 	}
 
 	// テーブルを作成
-	tbl := access.NewTable(tableName, metaPageId, pkCount, uniqueIndexes, nil, nil)
+	tbl := access.NewTable(tableName, metaPageId, pkCount, secondaryIndexes, nil, nil)
 	err = tbl.Create(env.bp)
 	assert.NoError(t, err)
 
 	// インデックスのメタデータを作成
 	idxMeta := make([]*IndexMeta, len(indexes))
-	for i, ui := range uniqueIndexes {
-		idxMeta[i] = NewIndexMeta(fileId, ui.Name, ui.ColName, IndexTypeUnique, ui.MetaPageId)
+	for i, si := range secondaryIndexes {
+		idxMeta[i] = NewIndexMeta(fileId, si.Name, si.ColName, IndexTypeUnique, si.MetaPageId)
 	}
 
 	// カラムのメタデータを作成

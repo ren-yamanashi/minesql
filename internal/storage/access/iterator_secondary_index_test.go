@@ -7,16 +7,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUniqueIndexIterator(t *testing.T) {
+func TestSecondaryIndexIterator(t *testing.T) {
 	t.Run("インデックス経由でテーブルレコードをデコード済みで取得できる", func(t *testing.T) {
 		// GIVEN
 		bp, metaPageId, _ := InitDisk(t, "idx_iter_test.db")
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+		uniqueIndex := NewSecondaryIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1, true)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		table := NewTable("users", metaPageId, 1, []*SecondaryIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -45,15 +45,15 @@ func TestUniqueIndexIterator(t *testing.T) {
 		assert.Equal(t, 3, len(results))
 
 		// "Doe" → record "a"
-		assert.Equal(t, [][]byte{[]byte("Doe")}, results[0].UniqueKey)
+		assert.Equal(t, [][]byte{[]byte("Doe")}, results[0].SecondaryKey)
 		assert.Equal(t, [][]byte{[]byte("a"), []byte("John"), []byte("Doe")}, results[0].Record)
 
 		// "Johnson" → record "c"
-		assert.Equal(t, [][]byte{[]byte("Johnson")}, results[1].UniqueKey)
+		assert.Equal(t, [][]byte{[]byte("Johnson")}, results[1].SecondaryKey)
 		assert.Equal(t, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")}, results[1].Record)
 
 		// "Smith" → record "b"
-		assert.Equal(t, [][]byte{[]byte("Smith")}, results[2].UniqueKey)
+		assert.Equal(t, [][]byte{[]byte("Smith")}, results[2].SecondaryKey)
 		assert.Equal(t, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")}, results[2].Record)
 	})
 
@@ -63,9 +63,9 @@ func TestUniqueIndexIterator(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+		uniqueIndex := NewSecondaryIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1, true)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		table := NewTable("users", metaPageId, 1, []*SecondaryIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -83,7 +83,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, [][]byte{[]byte("Smith")}, result.UniqueKey)
+		assert.Equal(t, [][]byte{[]byte("Smith")}, result.SecondaryKey)
 		assert.Equal(t, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")}, result.Record)
 	})
 
@@ -93,9 +93,9 @@ func TestUniqueIndexIterator(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("idx_col", "col", indexMetaPageId, 0, 1)
+		uniqueIndex := NewSecondaryIndex("idx_col", "col", indexMetaPageId, 0, 1, true)
 
-		table := NewTable("test", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		table := NewTable("test", metaPageId, 1, []*SecondaryIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -117,9 +117,9 @@ func TestUniqueIndexIterator(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+		uniqueIndex := NewSecondaryIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1, true)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		table := NewTable("users", metaPageId, 1, []*SecondaryIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -150,9 +150,9 @@ func TestUniqueIndexIterator(t *testing.T) {
 
 		// THEN: ソフトデリート済みの "Doe" はスキップされ、2 件のみ返される
 		assert.Equal(t, 2, len(results))
-		assert.Equal(t, [][]byte{[]byte("Johnson")}, results[0].UniqueKey)
+		assert.Equal(t, [][]byte{[]byte("Johnson")}, results[0].SecondaryKey)
 		assert.Equal(t, [][]byte{[]byte("c"), []byte("Bob"), []byte("Johnson")}, results[0].Record)
-		assert.Equal(t, [][]byte{[]byte("Smith")}, results[1].UniqueKey)
+		assert.Equal(t, [][]byte{[]byte("Smith")}, results[1].SecondaryKey)
 		assert.Equal(t, [][]byte{[]byte("b"), []byte("Alice"), []byte("Smith")}, results[1].Record)
 	})
 
@@ -162,9 +162,9 @@ func TestUniqueIndexIterator(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+		uniqueIndex := NewSecondaryIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1, true)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		table := NewTable("users", metaPageId, 1, []*SecondaryIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -196,9 +196,9 @@ func TestUniqueIndexIterator(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+		uniqueIndex := NewSecondaryIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1, true)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		table := NewTable("users", metaPageId, 1, []*SecondaryIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -225,12 +225,12 @@ func TestUniqueIndexIterator(t *testing.T) {
 		assert.Equal(t, 2, len(results))
 
 		// "Doe" → PK "a"
-		assert.Equal(t, [][]byte{[]byte("Doe")}, results[0].UniqueKey)
+		assert.Equal(t, [][]byte{[]byte("Doe")}, results[0].SecondaryKey)
 		assert.Equal(t, [][]byte{[]byte("a")}, results[0].PKValues)
 		assert.Nil(t, results[0].Record)
 
 		// "Smith" → PK "b"
-		assert.Equal(t, [][]byte{[]byte("Smith")}, results[1].UniqueKey)
+		assert.Equal(t, [][]byte{[]byte("Smith")}, results[1].SecondaryKey)
 		assert.Equal(t, [][]byte{[]byte("b")}, results[1].PKValues)
 		assert.Nil(t, results[1].Record)
 	})
@@ -241,9 +241,9 @@ func TestUniqueIndexIterator(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+		uniqueIndex := NewSecondaryIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1, true)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		table := NewTable("users", metaPageId, 1, []*SecondaryIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -272,7 +272,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 
 		// THEN: "Doe" はスキップされ、"Smith" のみ
 		assert.Equal(t, 1, len(results))
-		assert.Equal(t, [][]byte{[]byte("Smith")}, results[0].UniqueKey)
+		assert.Equal(t, [][]byte{[]byte("Smith")}, results[0].SecondaryKey)
 		assert.Equal(t, [][]byte{[]byte("b")}, results[0].PKValues)
 	})
 
@@ -282,9 +282,9 @@ func TestUniqueIndexIterator(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+		uniqueIndex := NewSecondaryIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1, true)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		table := NewTable("users", metaPageId, 1, []*SecondaryIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -302,7 +302,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, [][]byte{[]byte("Smith")}, result.UniqueKey)
+		assert.Equal(t, [][]byte{[]byte("Smith")}, result.SecondaryKey)
 		assert.Equal(t, [][]byte{[]byte("b")}, result.PKValues)
 		assert.Nil(t, result.Record)
 	})
@@ -313,9 +313,9 @@ func TestUniqueIndexIterator(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("idx_col", "col", indexMetaPageId, 0, 1)
+		uniqueIndex := NewSecondaryIndex("idx_col", "col", indexMetaPageId, 0, 1, true)
 
-		table := NewTable("test", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		table := NewTable("test", metaPageId, 1, []*SecondaryIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -337,9 +337,9 @@ func TestUniqueIndexIterator(t *testing.T) {
 
 		indexMetaPageId, err := bp.AllocatePageId(metaPageId.FileId)
 		assert.NoError(t, err)
-		uniqueIndex := NewUniqueIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1)
+		uniqueIndex := NewSecondaryIndex("idx_last_name", "last_name", indexMetaPageId, 2, 1, true)
 
-		table := NewTable("users", metaPageId, 1, []*UniqueIndex{uniqueIndex}, nil, nil)
+		table := NewTable("users", metaPageId, 1, []*SecondaryIndex{uniqueIndex}, nil, nil)
 		err = table.Create(bp)
 		assert.NoError(t, err)
 
@@ -361,7 +361,7 @@ func TestUniqueIndexIterator(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, [][]byte{[]byte("Williams")}, result.UniqueKey)
+		assert.Equal(t, [][]byte{[]byte("Williams")}, result.SecondaryKey)
 		assert.Equal(t, [][]byte{[]byte("a"), []byte("John"), []byte("Williams")}, result.Record)
 	})
 }

@@ -17,22 +17,22 @@ import (
 //
 // 1 つの AccessMethod は 1 つの *.db (= 1 テーブル) ファイルに対応する
 type Table struct {
-	Name            string         // テーブル名
-	MetaPageId      page.PageId    // テーブルの内容が入っている B+Tree のメタページの ID
-	PrimaryKeyCount uint8          // プライマリキーの列数 (プライマリキーは先頭から連続している想定) (例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる)
-	UniqueIndexes   []*UniqueIndex // テーブルに紐づくユニークインデックス群
-	undoLog         *UndoManager   // Undo ログ (nil の場合は Undo 記録をスキップ)
-	redoLog         *log.RedoLog   // REDO ログ (nil の場合は REDO 記録をスキップ)
+	Name             string            // テーブル名
+	MetaPageId       page.PageId       // テーブルの内容が入っている B+Tree のメタページの ID
+	PrimaryKeyCount  uint8             // プライマリキーの列数 (プライマリキーは先頭から連続している想定) (例: プライマリキーが (id, name) の場合、PrimaryKeyCount は 2 になる)
+	SecondaryIndexes []*SecondaryIndex // テーブルに紐づくセカンダリインデックス群
+	undoLog          *UndoManager      // Undo ログ (nil の場合は Undo 記録をスキップ)
+	redoLog          *log.RedoLog      // REDO ログ (nil の場合は REDO 記録をスキップ)
 }
 
-func NewTable(name string, metaPageId page.PageId, primaryKeyCount uint8, uniqueIndexes []*UniqueIndex, undoLog *UndoManager, redoLog *log.RedoLog) Table {
+func NewTable(name string, metaPageId page.PageId, primaryKeyCount uint8, secondaryIndexes []*SecondaryIndex, undoLog *UndoManager, redoLog *log.RedoLog) Table {
 	return Table{
-		Name:            name,
-		MetaPageId:      metaPageId,
-		PrimaryKeyCount: primaryKeyCount,
-		UniqueIndexes:   uniqueIndexes,
-		undoLog:         undoLog,
-		redoLog:         redoLog,
+		Name:             name,
+		MetaPageId:       metaPageId,
+		PrimaryKeyCount:  primaryKeyCount,
+		SecondaryIndexes: secondaryIndexes,
+		undoLog:          undoLog,
+		redoLog:          redoLog,
 	}
 }
 
@@ -58,8 +58,8 @@ func (t *Table) Create(bp *buffer.BufferPool) error {
 	t.MetaPageId = tree.MetaPageId
 
 	// ユニークインデックスを作成
-	for _, ui := range t.UniqueIndexes {
-		err = ui.Create(bp)
+	for _, si := range t.SecondaryIndexes {
+		err = si.Create(bp)
 		if err != nil {
 			return err
 		}
@@ -164,14 +164,14 @@ func (t *Table) UpdateInplace(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *
 	return t.appendRedoRecords(bp, trxId)
 }
 
-// GetUniqueIndexByName はインデックス名からユニークインデックスを取得する
-func (t *Table) GetUniqueIndexByName(indexName string) (*UniqueIndex, error) {
-	for _, ui := range t.UniqueIndexes {
-		if ui.Name == indexName {
-			return ui, nil
+// GetSecondaryIndexByName はインデックス名からセカンダリインデックスを取得する
+func (t *Table) GetSecondaryIndexByName(indexName string) (*SecondaryIndex, error) {
+	for _, si := range t.SecondaryIndexes {
+		if si.Name == indexName {
+			return si, nil
 		}
 	}
-	return nil, fmt.Errorf("unique index %s not found in table %s", indexName, t.Name)
+	return nil, fmt.Errorf("secondary index %s not found in table %s", indexName, t.Name)
 }
 
 // LeafPageCount は B+Tree のメタページからリーフページ数を取得する
@@ -247,8 +247,8 @@ func (t *Table) insert(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Ma
 	}
 
 	// ユニークインデックスに挿入
-	for _, ui := range t.UniqueIndexes {
-		err := ui.Insert(bp, encodedKey, columns)
+	for _, si := range t.SecondaryIndexes {
+		err := si.Insert(bp, encodedKey, columns)
 		if err != nil {
 			return err
 		}
@@ -278,8 +278,8 @@ func (t *Table) delete(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *lock.Ma
 	}
 
 	// ユニークインデックスを物理削除
-	for _, ui := range t.UniqueIndexes {
-		err := ui.Delete(bp, encodedKey, columns)
+	for _, si := range t.SecondaryIndexes {
+		err := si.Delete(bp, encodedKey, columns)
 		if err != nil {
 			return err
 		}
@@ -310,8 +310,8 @@ func (t *Table) softDelete(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *loc
 	}
 
 	// ユニークインデックスをソフトデリート
-	for _, ui := range t.UniqueIndexes {
-		err := ui.SoftDelete(bp, encodedKey, columns)
+	for _, si := range t.SecondaryIndexes {
+		err := si.SoftDelete(bp, encodedKey, columns)
 		if err != nil {
 			return err
 		}
@@ -344,12 +344,12 @@ func (t *Table) updateInplace(bp *buffer.BufferPool, trxId lock.TrxId, lockMgr *
 	// ユニークインデックスを更新 (物理削除 + Insert)
 	encodedOldKey := t.EncodeKey(oldColumns)
 	encodedNewKey := t.EncodeKey(newColumns)
-	for _, ui := range t.UniqueIndexes {
-		err := ui.Delete(bp, encodedOldKey, oldColumns)
+	for _, si := range t.SecondaryIndexes {
+		err := si.Delete(bp, encodedOldKey, oldColumns)
 		if err != nil {
 			return err
 		}
-		err = ui.Insert(bp, encodedNewKey, newColumns)
+		err = si.Insert(bp, encodedNewKey, newColumns)
 		if err != nil {
 			return err
 		}

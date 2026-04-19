@@ -123,7 +123,7 @@ func TestExecutorIntegration(t *testing.T) {
 		tbl := setupExecutorTestTable(t)
 		defer handler.Reset()
 
-		idx, err := tbl.GetUniqueIndexByName("idx_first_name")
+		idx, err := tbl.GetSecondaryIndexByName("idx_first_name")
 		assert.NoError(t, err)
 
 		// WHEN
@@ -155,7 +155,7 @@ func TestExecutorIntegration(t *testing.T) {
 		tbl := setupExecutorTestTable(t)
 		defer handler.Reset()
 
-		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
+		idx, err := tbl.GetSecondaryIndexByName("idx_last_name")
 		assert.NoError(t, err)
 
 		// WHEN: 姓が "J" 以上 "N" 未満
@@ -187,7 +187,7 @@ func TestExecutorIntegration(t *testing.T) {
 		tbl := setupExecutorTestTable(t)
 		defer handler.Reset()
 
-		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
+		idx, err := tbl.GetSecondaryIndexByName("idx_last_name")
 		assert.NoError(t, err)
 
 		// WHEN
@@ -218,7 +218,7 @@ func TestExecutorIntegration(t *testing.T) {
 		defer handler.Reset()
 
 		var trxId handler.TrxId = 1
-		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
+		idx, err := tbl.GetSecondaryIndexByName("idx_last_name")
 		assert.NoError(t, err)
 
 		// WHEN: Alice の last_name を Anderson に更新
@@ -379,7 +379,7 @@ func TestExecutorIntegration(t *testing.T) {
 		defer handler.Reset()
 
 		var trxId handler.TrxId = 1
-		idx, err := tbl.GetUniqueIndexByName("idx_last_name")
+		idx, err := tbl.GetSecondaryIndexByName("idx_last_name")
 		assert.NoError(t, err)
 
 		// WHEN: Bob を削除

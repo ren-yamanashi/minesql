@@ -93,11 +93,11 @@ func ExampleIndexScan_fullScan() {
 	tbl, cleanup := setupExample()
 	defer cleanup()
 
-	idxFirstName, err := tbl.GetUniqueIndexByName("idx_first_name")
+	idxFirstName, err := tbl.GetSecondaryIndexByName("idx_first_name")
 	if err != nil {
 		panic(err)
 	}
-	idxLastName, err := tbl.GetUniqueIndexByName("idx_last_name")
+	idxLastName, err := tbl.GetSecondaryIndexByName("idx_last_name")
 	if err != nil {
 		panic(err)
 	}
@@ -141,7 +141,7 @@ func ExampleIndexScan_rangeScan() {
 	tbl, cleanup := setupExample()
 	defer cleanup()
 
-	idxLastName, err := tbl.GetUniqueIndexByName("idx_last_name")
+	idxLastName, err := tbl.GetSecondaryIndexByName("idx_last_name")
 	if err != nil {
 		panic(err)
 	}
@@ -168,7 +168,7 @@ func ExampleIndexScan_constSearch() {
 	tbl, cleanup := setupExample()
 	defer cleanup()
 
-	idxLastName, err := tbl.GetUniqueIndexByName("idx_last_name")
+	idxLastName, err := tbl.GetSecondaryIndexByName("idx_last_name")
 	if err != nil {
 		panic(err)
 	}
@@ -240,7 +240,7 @@ func ExampleUpdate() {
 	tbl, cleanup := setupExample()
 	defer cleanup()
 
-	idxLastName, err := tbl.GetUniqueIndexByName("idx_last_name")
+	idxLastName, err := tbl.GetSecondaryIndexByName("idx_last_name")
 	if err != nil {
 		panic(err)
 	}
@@ -329,7 +329,7 @@ func ExampleDelete() {
 	tbl, cleanup := setupExample()
 	defer cleanup()
 
-	idxLastName, err := tbl.GetUniqueIndexByName("idx_last_name")
+	idxLastName, err := tbl.GetSecondaryIndexByName("idx_last_name")
 	if err != nil {
 		panic(err)
 	}
