@@ -218,6 +218,7 @@ func (sc *StatsCollector) analyzeIndex(tbl *access.Table) (map[string]IndexStats
 		idxStats[uIdx.Name] = IndexStats{
 			Height:        height,
 			LeafPageCount: leafPageCount,
+			RecPerKey:     1.0, // UNIQUE INDEX は常に 1.0
 		}
 	}
 	return idxStats, nil

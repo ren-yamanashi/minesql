@@ -7,8 +7,9 @@ type ColumnStats struct {
 }
 
 type IndexStats struct {
-	Height        uint64 // B+Tree の高さ (ルートからリーフまでのページ数) = H(I)
-	LeafPageCount uint64 // B+Tree のリーフページ数 = Bl(I)
+	Height        uint64  // B+Tree の高さ (ルートからリーフまでのページ数) = H(I)
+	LeafPageCount uint64  // B+Tree のリーフページ数 = Bl(I)
+	RecPerKey     float64 // 1 キーあたりの平均マッチ行数 (UNIQUE なら 1.0)
 }
 
 // TableStats はテーブルの統計情報を表す

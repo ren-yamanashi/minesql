@@ -12,10 +12,12 @@ var (
 )
 
 type SelectParser struct {
-	state parserState     // 現在のステート
-	stmt  *ast.SelectStmt // 現在構築中の SELECT 文
-	where WhereParser     // WHERE 句パーサー
-	err   error           // エラー情報
+	state       parserState     // 現在のステート
+	stmt        *ast.SelectStmt // 現在構築中の SELECT 文
+	where       WhereParser     // WHERE 句パーサー
+	on          WhereParser     // ON 句パーサー (JOIN 条件)
+	currentJoin *ast.JoinClause // 現在パース中の JOIN 句
+	err         error           // エラー情報
 }
 
 func NewSelectParser() *SelectParser {
@@ -49,6 +51,12 @@ func (sp *SelectParser) finalize() {
 		return
 	}
 
+	// 未確定の JOIN 句があれば確定する
+	if err := sp.finalizeCurrentJoin(); err != nil {
+		sp.setError(err)
+		return
+	}
+
 	// WHERE 句を確定
 	whereClause, err := sp.where.finalizeWhere()
 	if err != nil {
@@ -79,8 +87,49 @@ func (sp *SelectParser) onKeyword(word string) {
 		sp.setError(errors.New("[parse error] FROM clause is in invalid position"))
 		return
 
+	case KInner:
+		// INNER は JOIN の前置キーワード。FROM 後または ON 条件後に来る
+		if sp.state == SelectStateFrom || sp.state == SelectStateOn {
+			if err := sp.finalizeCurrentJoin(); err != nil {
+				sp.setError(err)
+				return
+			}
+			sp.state = SelectStateInner
+			return
+		}
+		sp.setError(errors.New("[parse error] INNER keyword is in invalid position"))
+		return
+
+	case KJoin:
+		// JOIN は FROM 後、ON 条件後、または INNER 後に来る
+		if sp.state == SelectStateInner {
+			// INNER JOIN の場合: INNER で既に SelectStateInner に遷移済み
+			sp.currentJoin = &ast.JoinClause{}
+			sp.state = SelectStateJoin
+			return
+		}
+		if sp.state == SelectStateFrom || sp.state == SelectStateOn {
+			sp.beginJoin()
+			return
+		}
+		sp.setError(errors.New("[parse error] JOIN keyword is in invalid position"))
+		return
+
+	case KOn:
+		if sp.state == SelectStateJoinTable {
+			sp.on.initWhere()
+			sp.state = SelectStateOn
+			return
+		}
+		sp.setError(errors.New("[parse error] ON keyword is in invalid position"))
+		return
+
 	case KWhere:
-		if sp.state == SelectStateFrom {
+		if sp.state == SelectStateFrom || sp.state == SelectStateOn {
+			if err := sp.finalizeCurrentJoin(); err != nil {
+				sp.setError(err)
+				return
+			}
 			sp.stmt.Where = sp.where.initWhere()
 			sp.state = SelectStateWhere
 			return
@@ -92,6 +141,12 @@ func (sp *SelectParser) onKeyword(word string) {
 	case KAnd, KOr:
 		if sp.state == SelectStateWhere {
 			if err := sp.where.handleOperator(upperWord); err != nil {
+				sp.setError(err)
+			}
+			return
+		}
+		if sp.state == SelectStateOn {
+			if err := sp.on.handleOperator(upperWord); err != nil {
 				sp.setError(err)
 			}
 			return
@@ -113,11 +168,17 @@ func (sp *SelectParser) onIdentifier(ident string) {
 
 	switch sp.state {
 	case SelectStateColumns:
-		// 現状 SELECT 句では "*" のみサポートしているので、Identifier が来たらエラー
-		sp.setError(errors.New("[parse error] currently only SELECT * is supported"))
+		// カラム名を追加 (修飾名 "table.column" にも対応)
+		colId := parseColumnId(ident)
+		sp.stmt.Columns = append(sp.stmt.Columns, colId)
 		return
 	case SelectStateFrom:
 		sp.stmt.From = *ast.NewTableId(ident)
+	case SelectStateJoin:
+		sp.currentJoin.Table = *ast.NewTableId(ident)
+		sp.state = SelectStateJoinTable
+	case SelectStateOn:
+		sp.on.pushColumn(ident)
 	case SelectStateWhere:
 		sp.where.pushColumn(ident)
 	}
@@ -136,15 +197,24 @@ func (sp *SelectParser) onSymbol(symbol string) {
 
 	switch sp.state {
 	case SelectStateColumns:
-		// 現状 SELECT 句では "*" のみサポートしているので、"*" 以外のシンボルが来たらエラー
-		if symbol != string(CAsterisk) {
-			sp.setError(errors.New("[parse error] currently only SELECT * is supported"))
+		if symbol == string(CAsterisk) {
+			// SELECT * → Columns は nil のまま (全カラム)
 			return
 		}
+		if symbol == string(SComma) {
+			// カラム名の区切り → 次のカラム名を待つ
+			return
+		}
+		sp.setError(errors.New("[parse error] unexpected symbol in SELECT clause: " + symbol))
+		return
 	case SelectStateFrom:
 		// FROM 句ではシンボルは来ないはずなのでエラー
 		sp.setError(errors.New("[parse error] unexpected symbol in FROM clause: " + symbol))
 		return
+	case SelectStateOn:
+		if err := sp.on.handleOperator(symbol); err != nil {
+			sp.setError(err)
+		}
 	case SelectStateWhere:
 		if err := sp.where.handleOperator(symbol); err != nil {
 			sp.setError(err)
@@ -156,7 +226,10 @@ func (sp *SelectParser) onString(value string) {
 	if sp.err != nil {
 		return
 	}
-	if sp.state == SelectStateWhere {
+	switch sp.state {
+	case SelectStateOn:
+		sp.on.pushLiteral(ast.NewStringLiteral(value))
+	case SelectStateWhere:
 		sp.where.pushLiteral(ast.NewStringLiteral(value))
 	}
 }
@@ -165,13 +238,47 @@ func (sp *SelectParser) onNumber(num string) {
 	if sp.err != nil {
 		return
 	}
-	if sp.state == SelectStateWhere {
+	switch sp.state {
+	case SelectStateOn:
+		sp.on.pushLiteral(ast.NewStringLiteral(num))
+	case SelectStateWhere:
 		sp.where.pushLiteral(ast.NewStringLiteral(num))
 	}
 }
 
 func (sp *SelectParser) onComment(text string) {}
 func (sp *SelectParser) onError(err error)     { sp.setError(err) }
+
+// beginJoin は新しい JOIN 句のパースを開始する
+//
+// 既にパース中の JOIN 句がある場合は先に確定する
+func (sp *SelectParser) beginJoin() {
+	if err := sp.finalizeCurrentJoin(); err != nil {
+		sp.setError(err)
+		return
+	}
+	sp.currentJoin = &ast.JoinClause{}
+	sp.state = SelectStateJoin
+}
+
+// finalizeCurrentJoin は現在パース中の JOIN 句を確定し、SelectStmt に追加する
+func (sp *SelectParser) finalizeCurrentJoin() error {
+	if sp.currentJoin == nil {
+		return nil
+	}
+
+	onClause, err := sp.on.finalizeWhere()
+	if err != nil {
+		return err
+	}
+	if onClause == nil {
+		return errors.New("[parse error] missing ON clause in JOIN")
+	}
+	sp.currentJoin.Condition = onClause.Condition
+	sp.stmt.Joins = append(sp.stmt.Joins, sp.currentJoin)
+	sp.currentJoin = nil
+	return nil
+}
 
 // setError はエラーを設定する (既にエラーが設定されている場合は無視する)
 func (sp *SelectParser) setError(err error) {

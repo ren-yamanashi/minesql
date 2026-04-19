@@ -22,8 +22,10 @@ func (wp *WhereParser) initWhere() *ast.WhereClause {
 }
 
 // pushColumn は識別子をカラム名としてスタックに積む
+//
+// "table.column" 形式の修飾名にも対応する
 func (wp *WhereParser) pushColumn(ident string) {
-	colId := *ast.NewColumnId(ident)
+	colId := parseColumnId(ident)
 	wp.nodeStack = append(wp.nodeStack, colId)
 }
 
@@ -122,6 +124,8 @@ func (wp *WhereParser) reduce() error {
 
 	// 右辺の型判定
 	switch v := rightRaw.(type) {
+	case ast.ColumnId:
+		rhs = ast.NewRhsColumn(v)
 	case ast.Literal:
 		rhs = ast.NewRhsLiteral(v)
 	case *ast.BinaryExpr:

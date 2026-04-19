@@ -2,12 +2,13 @@ package planner
 
 import (
 	"errors"
-	"fmt"
-	"strconv"
 
 	"minesql/internal/ast"
 	"minesql/internal/executor"
 	"minesql/internal/storage/access"
+	"minesql/internal/storage/btree"
+	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/encode"
 	"minesql/internal/storage/handler"
 )
 
@@ -17,15 +18,23 @@ type Search struct {
 	versionReader *access.VersionReader
 	tblMeta       *handler.TableMetadata
 	where         *ast.WhereClause
+	bufferPool    *buffer.BufferPool
+	selectColumns []ast.ColumnId // SELECT で指定されたカラム (nil なら SELECT *)
 }
 
-func NewSearch(readView *access.ReadView, versionReader *access.VersionReader, tblMeta *handler.TableMetadata, where *ast.WhereClause) *Search {
+func NewSearch(readView *access.ReadView, versionReader *access.VersionReader, tblMeta *handler.TableMetadata, where *ast.WhereClause, bp *buffer.BufferPool) *Search {
 	return &Search{
 		readView:      readView,
 		versionReader: versionReader,
 		tblMeta:       tblMeta,
 		where:         where,
+		bufferPool:    bp,
 	}
+}
+
+// SetSelectColumns は SELECT カラムを設定する (index-only scan 判定用)
+func (s *Search) SetSelectColumns(columns []ast.ColumnId) {
+	s.selectColumns = columns
 }
 
 func (sp *Search) Build() (executor.Executor, error) {
@@ -74,7 +83,7 @@ func (s *Search) planForBinaryExpr(tbl *access.Table, expr ast.BinaryExpr) (exec
 			if !ok {
 				return nil, errors.New("column " + colName + " does not exist in table " + s.tblMeta.Name)
 			}
-			cond, err := s.operatorToCondition(expr.Operator, int(colMeta.Pos), rhs.Literal.ToString())
+			cond, err := operatorToCondition(expr.Operator, int(colMeta.Pos), rhs.Literal.ToString())
 			if err != nil {
 				return nil, err
 			}
@@ -134,62 +143,111 @@ func (s *Search) chooseBestPlan(tbl *access.Table, leaves []leafCondition, cond 
 		return nil, err
 	}
 
-	// テーブルスキャン + Filter プランのコストを見積もる
-	// 複数の AND 条件がある場合、各条件の選択コスト関数を連鎖的に適用して
-	// フィルタ後の R(s) や V(s,F) を推定する (Executor ノード数とは無関係)
-	tableScanCost := calcTableScanCost(stats)
-	for _, leaf := range leaves {
-		tableScanCost = s.applySelectionCost(tableScanCost, leaf.colName, leaf.operator, leaf.literal, stats)
+	// フルスキャンのコスト
+	primaryBTree := btree.NewBTree(tbl.MetaPageId)
+	clusterPageReadCost, err := calcPageReadCost(s.bufferPool, primaryBTree)
+	if err != nil {
+		return nil, err
 	}
+	fullScanCost := calcFullScanCost(stats, clusterPageReadCost)
 
-	// 各リーフ条件について、セカンダリインデックス / PK スキャンのコストを算出し最安を記録
-	var bestIdxLeaf *leafCondition
-	var bestIdxCost ScanCost
-	var bestPKLeaf *leafCondition
-	var bestPKCost ScanCost
+	// 各リーフ条件について PK/インデックスのコストを算出し最安を記録
+	var bestLeaf *leafCondition
+	var bestCost float64
+	var bestPlan string // "PK", "Index", or ""
+	uniqueFound := false
+
 	for i := range leaves {
 		leaf := &leaves[i]
 
-		// セカンダリインデックスのコストを算出
+		// != はレンジ分析の対象外 (フルスキャンにフォールバック)
+		if leaf.operator == "!=" {
+			continue
+		}
+
+		// ユニークスキャン判定: PK or UNIQUE INDEX の = 検索はコスト 1.0 で即確定
+		if leaf.operator == "=" {
+			if s.isPKLeadingColumn(leaf.colName) {
+				bestLeaf = leaf
+				bestCost = calcUniqueScanCost()
+				bestPlan = "PK"
+				uniqueFound = true
+				break
+			}
+			if _, hasIndex := s.tblMeta.GetIndexByColName(leaf.colName); hasIndex {
+				bestLeaf = leaf
+				bestCost = calcUniqueScanCost()
+				bestPlan = "Index"
+				uniqueFound = true
+				break
+			}
+		}
+
+		// PK レンジスキャン
+		if s.isPKLeadingColumn(leaf.colName) {
+			lowerKey, upperKey, leftIncl, rightIncl := buildRangeKeys(leaf.operator, leaf.literal)
+			foundRecords, err := primaryBTree.RecordsInRange(s.bufferPool, lowerKey, upperKey, leftIncl, rightIncl)
+			if err != nil {
+				return nil, err
+			}
+			readTime := calcReadTimeForClusteredIndex(
+				float64(foundRecords), float64(stats.RecordCount), float64(stats.LeafPageCount), clusterPageReadCost,
+			)
+			cost := calcRangeScanCost(readTime, float64(foundRecords))
+			if bestLeaf == nil || cost < bestCost {
+				bestLeaf = leaf
+				bestCost = cost
+				bestPlan = "PK"
+			}
+		}
+
+		// セカンダリインデックスのレンジスキャン
 		idxMeta, hasIndex := s.tblMeta.GetIndexByColName(leaf.colName)
 		if hasIndex {
-			idxStats, ok := stats.IdxStats[idxMeta.Name]
-			if ok {
-				cost := s.calcIndexPlanCost(stats, leaf.colName, leaf.operator, leaf.literal, idxStats)
-				if bestIdxLeaf == nil || cost.TotalCost() < bestIdxCost.TotalCost() {
-					bestIdxLeaf = leaf
-					bestIdxCost = cost
-				}
+			index, err := tbl.GetUniqueIndexByName(idxMeta.Name)
+			if err != nil {
+				return nil, err
 			}
-		}
+			indexBTree := btree.NewBTree(index.MetaPageId)
+			lowerKey, upperKey, leftIncl, rightIncl := buildRangeKeys(leaf.operator, leaf.literal)
+			foundRecords, err := indexBTree.RecordsInRange(s.bufferPool, lowerKey, upperKey, leftIncl, rightIncl)
+			if err != nil {
+				return nil, err
+			}
+			idxPageReadCost, err := calcPageReadCost(s.bufferPool, indexBTree)
+			if err != nil {
+				return nil, err
+			}
 
-		// PK スキャンのコストを算出
-		if s.isPKLeadingColumn(leaf.colName) {
-			cost := s.calcPKPlanCost(stats, leaf.colName, leaf.operator, leaf.literal)
-			if bestPKLeaf == nil || cost.TotalCost() < bestPKCost.TotalCost() {
-				bestPKLeaf = leaf
-				bestPKCost = cost
+			var readTime float64
+			if s.isIndexOnlyScan(idxMeta.ColName) {
+				idxStats := stats.IdxStats[idxMeta.Name]
+				keysPerBlock := float64(stats.RecordCount) / float64(max(idxStats.LeafPageCount, 1))
+				readTime = calcReadTimeForIndexOnly(float64(foundRecords), keysPerBlock, idxPageReadCost)
+			} else {
+				// 非 index-only scan ではクラスタ化インデックスの pageReadCost を使う
+				readTime = calcReadTimeForSecondaryIndex(float64(foundRecords), clusterPageReadCost)
+			}
+			cost := calcRangeScanCost(readTime, float64(foundRecords))
+			if bestLeaf == nil || cost < bestCost {
+				bestLeaf = leaf
+				bestCost = cost
+				bestPlan = "Index"
 			}
 		}
 	}
 
-	// 3-way 比較: テーブルスキャン vs インデックス vs PK
-	minCost := tableScanCost.TotalCost()
-	bestPlan := "TableScan"
-	if bestIdxLeaf != nil && bestIdxCost.TotalCost() < minCost {
-		minCost = bestIdxCost.TotalCost()
-		bestPlan = "Index"
-	}
-	if bestPKLeaf != nil && bestPKCost.TotalCost() < minCost {
-		bestPlan = "PK"
+	// フルスキャン vs 最安プラン
+	if bestLeaf == nil || (!uniqueFound && fullScanCost <= bestCost) {
+		return tableScanPlan, nil
 	}
 
 	switch bestPlan {
 	case "Index":
-		idxMeta, _ := s.tblMeta.GetIndexByColName(bestIdxLeaf.colName)
-		return s.buildIndexPlan(tbl, *bestIdxLeaf, idxMeta, cond, len(leaves) > 1)
+		idxMeta, _ := s.tblMeta.GetIndexByColName(bestLeaf.colName)
+		return s.buildIndexPlan(tbl, *bestLeaf, idxMeta, cond, len(leaves) > 1)
 	case "PK":
-		return s.buildPKScanPlan(tbl, *bestPKLeaf, cond, len(leaves) > 1), nil
+		return s.buildPKScanPlan(tbl, *bestLeaf, cond, len(leaves) > 1), nil
 	default:
 		return tableScanPlan, nil
 	}
@@ -203,17 +261,31 @@ func (s *Search) buildIndexPlan(tbl *access.Table, leaf leafCondition, idxMeta *
 	if err != nil {
 		return nil, err
 	}
-	indexCond, err := s.operatorToCondition(leaf.operator, 0, leaf.literal.ToString())
+	indexCond, err := operatorToCondition(leaf.operator, 0, leaf.literal.ToString())
 	if err != nil {
 		return nil, err
 	}
 
-	scan := executor.NewIndexScan(
-		tbl,
-		index,
-		access.RecordSearchModeKey{Key: [][]byte{leaf.literal.ToBytes()}},
-		indexCond,
-	)
+	var scan executor.Executor
+	if s.isIndexOnlyScan(idxMeta.ColName) {
+		colMeta, _ := s.tblMeta.GetColByName(idxMeta.ColName)
+		scan = executor.NewIndexScanWithParams(executor.IndexScanParams{
+			Table:          tbl,
+			Index:          index,
+			SearchMode:     access.RecordSearchModeKey{Key: [][]byte{leaf.literal.ToBytes()}},
+			WhileCondition: indexCond,
+			IndexOnly:      true,
+			NCols:          int(s.tblMeta.NCols),
+			UKColPos:       int(colMeta.Pos),
+		})
+	} else {
+		scan = executor.NewIndexScan(
+			tbl,
+			index,
+			access.RecordSearchModeKey{Key: [][]byte{leaf.literal.ToBytes()}},
+			indexCond,
+		)
+	}
 
 	if needsFilter {
 		return executor.NewFilter(scan, cond), nil
@@ -311,7 +383,10 @@ func (s *Search) planForORCondition(tbl *access.Table, expr ast.BinaryExpr, cond
 	var executors []executor.Executor
 	var totalCost float64
 	for _, branch := range branches {
-		exec, cost, ok := s.planORBranch(tbl, branch, stats)
+		exec, cost, ok, err := s.planORBranch(tbl, branch, stats)
+		if err != nil {
+			return nil, err
+		}
 		if !ok {
 			return tableScanPlan, nil
 		}
@@ -319,9 +394,14 @@ func (s *Search) planForORCondition(tbl *access.Table, expr ast.BinaryExpr, cond
 		totalCost += cost
 	}
 
-	// Union の合計コスト < テーブルスキャンのコストなら Union を採用
-	tableCost := calcTableScanCost(stats)
-	if totalCost < tableCost.TotalCost() {
+	// Union の合計コスト < フルスキャンのコストなら Union を採用
+	primaryBTree := btree.NewBTree(tbl.MetaPageId)
+	clusterPageReadCost, err := calcPageReadCost(s.bufferPool, primaryBTree)
+	if err != nil {
+		return nil, err
+	}
+	fullScanCost := calcFullScanCost(stats, clusterPageReadCost)
+	if totalCost < fullScanCost {
 		return executor.NewUnion(executors), nil
 	}
 
@@ -342,15 +422,22 @@ type orBranch struct {
 // 残りの条件は Filter で適用する
 //
 // PK/インデックスが利用できない場合は ok=false を返す
-func (s *Search) planORBranch(tbl *access.Table, branch orBranch, stats *handler.TableStatistics) (executor.Executor, float64, bool) {
+func (s *Search) planORBranch(tbl *access.Table, branch orBranch, stats *handler.TableStatistics) (executor.Executor, float64, bool, error) {
 	// ブランチ全体の条件関数を構築 (複合 AND 条件時に Filter で使用)
 	branchCond, err := s.buildConditionFunc(branch.expr)
 	if err != nil {
-		return nil, 0, false
+		return nil, 0, false, err
 	}
 
 	// 複合条件の場合、最適な 1 条件で PK/インデックスを使い、残条件は Filter で適用
 	needsFilter := len(branch.leaves) > 1
+
+	// クラスタ化インデックスの pageReadCost (PK レンジスキャン・セカンダリインデックスの非 index-only scan で使用)
+	primaryBTree := btree.NewBTree(tbl.MetaPageId)
+	clusterPRC, err := calcPageReadCost(s.bufferPool, primaryBTree)
+	if err != nil {
+		return nil, 0, false, err
+	}
 
 	// 各リーフ条件について PK/インデックスのコストを算出し、最安を選択
 	var bestLeaf *leafCondition
@@ -360,324 +447,146 @@ func (s *Search) planORBranch(tbl *access.Table, branch orBranch, stats *handler
 	for i := range branch.leaves {
 		leaf := &branch.leaves[i]
 
-		// != は PK/インデックスで最適化しても効果が薄いため対象外
+		// != はレンジ分析の対象外
 		if leaf.operator == "!=" {
 			continue
 		}
 
-		// PK スキャンのコストを算出
-		if s.isPKLeadingColumn(leaf.colName) {
-			cost := s.calcPKPlanCost(stats, leaf.colName, leaf.operator, leaf.literal)
-			if bestLeaf == nil || cost.TotalCost() < bestCost {
+		// ユニークスキャン (= 検索) → コスト 1.0
+		if leaf.operator == "=" {
+			if s.isPKLeadingColumn(leaf.colName) {
 				bestLeaf = leaf
-				bestCost = cost.TotalCost()
+				bestCost = calcUniqueScanCost()
+				bestPlan = "PK"
+				break
+			}
+			if _, hasIdx := s.tblMeta.GetIndexByColName(leaf.colName); hasIdx {
+				bestLeaf = leaf
+				bestCost = calcUniqueScanCost()
+				bestPlan = "Index"
+				break
+			}
+		}
+
+		// PK レンジスキャン
+		if s.isPKLeadingColumn(leaf.colName) {
+			lowerKey, upperKey, leftIncl, rightIncl := buildRangeKeys(leaf.operator, leaf.literal)
+			foundRecords, err := primaryBTree.RecordsInRange(s.bufferPool, lowerKey, upperKey, leftIncl, rightIncl)
+			if err != nil {
+				return nil, 0, false, err
+			}
+			readTime := calcReadTimeForClusteredIndex(float64(foundRecords), float64(stats.RecordCount), float64(stats.LeafPageCount), clusterPRC)
+			cost := calcRangeScanCost(readTime, float64(foundRecords))
+			if bestLeaf == nil || cost < bestCost {
+				bestLeaf = leaf
+				bestCost = cost
 				bestPlan = "PK"
 			}
 		}
 
-		// セカンダリインデックススキャンのコストを算出
+		// セカンダリインデックスのレンジスキャン
 		idxMeta, hasIndex := s.tblMeta.GetIndexByColName(leaf.colName)
 		if hasIndex {
-			idxStats, ok := stats.IdxStats[idxMeta.Name]
-			if ok {
-				cost := s.calcIndexPlanCost(stats, leaf.colName, leaf.operator, leaf.literal, idxStats)
-				if bestLeaf == nil || cost.TotalCost() < bestCost {
-					bestLeaf = leaf
-					bestCost = cost.TotalCost()
-					bestPlan = "Index"
-				}
+			index, err := tbl.GetUniqueIndexByName(idxMeta.Name)
+			if err != nil {
+				return nil, 0, false, err
+			}
+			indexBTree := btree.NewBTree(index.MetaPageId)
+			lowerKey, upperKey, leftIncl, rightIncl := buildRangeKeys(leaf.operator, leaf.literal)
+			foundRecords, err := indexBTree.RecordsInRange(s.bufferPool, lowerKey, upperKey, leftIncl, rightIncl)
+			if err != nil {
+				return nil, 0, false, err
+			}
+			// 非 index-only scan ではクラスタ化インデックスの pageReadCost を使う
+			readTime := calcReadTimeForSecondaryIndex(float64(foundRecords), clusterPRC)
+			cost := calcRangeScanCost(readTime, float64(foundRecords))
+			if bestLeaf == nil || cost < bestCost {
+				bestLeaf = leaf
+				bestCost = cost
+				bestPlan = "Index"
 			}
 		}
 	}
 
 	if bestLeaf == nil {
-		return nil, 0, false
+		return nil, 0, false, nil
 	}
 
 	switch bestPlan {
 	case "PK":
 		exec := s.buildPKScanPlan(tbl, *bestLeaf, branchCond, needsFilter)
-		return exec, bestCost, true
+		return exec, bestCost, true, nil
 	case "Index":
 		idxMeta, _ := s.tblMeta.GetIndexByColName(bestLeaf.colName)
 		exec, err := s.buildIndexPlan(tbl, *bestLeaf, idxMeta, branchCond, needsFilter)
 		if err != nil {
-			return nil, 0, false
+			return nil, 0, false, err
 		}
-		return exec, bestCost, true
+		return exec, bestCost, true, nil
 	}
 
-	return nil, 0, false
-}
-
-// -------------------------------------------------
-// リーフ条件の抽出
-// -------------------------------------------------
-
-// extractANDLeaves は純粋な AND ツリーからリーフ条件を抽出する
-//
-// OR が含まれている場合は nil を返す
-func extractANDLeaves(expr ast.BinaryExpr) []leafCondition {
-	// リーフ: LhsColumn op RhsLiteral
-	if lhs, ok := expr.Left.(*ast.LhsColumn); ok {
-		if rhs, ok := expr.Right.(*ast.RhsLiteral); ok {
-			return []leafCondition{{
-				colName:  lhs.Column.ColName,
-				operator: expr.Operator,
-				literal:  rhs.Literal,
-			}}
-		}
-		return nil
-	}
-
-	// ブランチ: LhsExpr AND/OR RhsExpr
-	lhsExpr, lhsOk := expr.Left.(*ast.LhsExpr)
-	rhsExpr, rhsOk := expr.Right.(*ast.RhsExpr)
-	if !lhsOk || !rhsOk {
-		return nil
-	}
-
-	// OR が含まれていたら最適化不可
-	if expr.Operator != "AND" {
-		return nil
-	}
-
-	leftLeaves := extractANDLeaves(*lhsExpr.Expr)
-	if leftLeaves == nil {
-		return nil
-	}
-	rightLeaves := extractANDLeaves(*rhsExpr.Expr)
-	if rightLeaves == nil {
-		return nil
-	}
-
-	return append(leftLeaves, rightLeaves...)
-}
-
-// extractORBranches は OR ツリーから各ブランチを抽出する
-//
-// 各ブランチは単一条件 (col op literal) または複合 AND 条件を保持できる
-// AND サブツリーは extractANDLeaves でリーフ条件に分解する
-// 分解できないブランチがある場合は nil を返す
-func extractORBranches(expr ast.BinaryExpr) []orBranch {
-	// リーフ: LhsColumn op RhsLiteral → 単一条件のブランチ
-	if lhs, ok := expr.Left.(*ast.LhsColumn); ok {
-		if rhs, ok := expr.Right.(*ast.RhsLiteral); ok {
-			leaf := leafCondition{
-				colName:  lhs.Column.ColName,
-				operator: expr.Operator,
-				literal:  rhs.Literal,
-			}
-			return []orBranch{{leaves: []leafCondition{leaf}, expr: expr}}
-		}
-		return nil
-	}
-
-	// ブランチ: LhsExpr op RhsExpr
-	lhsExpr, lhsOk := expr.Left.(*ast.LhsExpr)
-	rhsExpr, rhsOk := expr.Right.(*ast.RhsExpr)
-	if !lhsOk || !rhsOk {
-		return nil
-	}
-
-	if expr.Operator == "OR" {
-		// OR ノード: 左右を再帰して連結
-		leftBranches := extractORBranches(*lhsExpr.Expr)
-		if leftBranches == nil {
-			return nil
-		}
-		rightBranches := extractORBranches(*rhsExpr.Expr)
-		if rightBranches == nil {
-			return nil
-		}
-		return append(leftBranches, rightBranches...)
-	}
-
-	// AND ノード (またはその他): サブツリー全体を 1 つのブランチとして扱う
-	leaves := extractANDLeaves(expr)
-	if leaves == nil {
-		return nil
-	}
-	return []orBranch{{leaves: leaves, expr: expr}}
-}
-
-// -------------------------------------------------
-// コスト計算
-// -------------------------------------------------
-
-// calcPKPlanCost は PK スキャンのコストを算出する
-func (s *Search) calcPKPlanCost(stats *handler.TableStatistics, colName string, operator string, literal ast.Literal) ScanCost {
-	inner := calcTableScanCost(stats)
-	switch operator {
-	case "=":
-		return calcPKSelectEqualCost(inner, colName, stats.TreeHeight)
-	case ">", ">=":
-		sel := s.calcSelectivity(colName, operator, literal, stats)
-		return calcPKSelectRangeGTCost(inner, colName, sel, stats.TreeHeight)
-	case "<", "<=":
-		sel := s.calcSelectivity(colName, operator, literal, stats)
-		return calcPKSelectRangeLTCost(inner, colName, sel)
-	default:
-		// != やサポートされていない演算子は PK 最適化の対象外 (高コストを返す)
-		return ScanCost{DiskAccesses: float64(stats.LeafPageCount) * 2}
-	}
-}
-
-// applySelectionCost はテーブルスキャンコストに WHERE 条件の選択コストを適用する
-func (s *Search) applySelectionCost(baseCost ScanCost, colName string, operator string, literal ast.Literal, stats *handler.TableStatistics) ScanCost {
-	switch operator {
-	case "=":
-		return calcSelectEqualCost(baseCost, colName)
-	case "!=":
-		return calcSelectNotEqualCost(baseCost, colName)
-	case ">", ">=", "<", "<=":
-		sel := s.calcSelectivity(colName, operator, literal, stats)
-		return calcSelectRangeCost(baseCost, colName, sel)
-	default:
-		return baseCost
-	}
-}
-
-// calcIndexPlanCost はインデックス+テーブルプランのコストを算出する
-func (s *Search) calcIndexPlanCost(stats *handler.TableStatistics, colName string, operator string, literal ast.Literal, idxStats handler.IndexStatistics) ScanCost {
-	switch operator {
-	case "=":
-		return calcIndexTableEqualCost(stats, colName, idxStats.Height, stats.TreeHeight)
-	case "!=":
-		return calcIndexTableNotEqualCost(stats, colName, idxStats.Height, idxStats.LeafPageCount, stats.TreeHeight)
-	case ">", ">=", "<", "<=":
-		sel := s.calcSelectivity(colName, operator, literal, stats)
-		return calcIndexTableRangeCost(stats, colName, idxStats.Height, idxStats.LeafPageCount, sel, stats.TreeHeight)
-	default:
-		// サポートされていない演算子の場合は高コストを返してテーブルスキャンを選ばせる
-		return ScanCost{DiskAccesses: float64(stats.LeafPageCount) * 2}
-	}
-}
-
-// calcSelectivity は範囲比較の選択率を算出する
-func (s *Search) calcSelectivity(colName string, operator string, literal ast.Literal, stats *handler.TableStatistics) float64 {
-	colStats, ok := stats.ColStats[colName]
-	if !ok {
-		return defaultRangeSelectivity
-	}
-
-	// min/max が []byte なので float64 に変換を試みる
-	c, err := strconv.ParseFloat(literal.ToString(), 64)
-	if err != nil {
-		// 数値に変換できない場合はデフォルト値
-		return defaultRangeSelectivity
-	}
-	minVal, err := strconv.ParseFloat(string(colStats.MinValue), 64)
-	if err != nil {
-		return defaultRangeSelectivity
-	}
-	maxVal, err := strconv.ParseFloat(string(colStats.MaxValue), 64)
-	if err != nil {
-		return defaultRangeSelectivity
-	}
-
-	return calcRangeSelectivity(operator, c, minVal, maxVal)
-}
-
-// -------------------------------------------------
-// 条件関数の構築
-// -------------------------------------------------
-
-// buildConditionFunc は式の木構造から単一の条件関数を再帰的に構築する
-func (s *Search) buildConditionFunc(expr ast.BinaryExpr) (func(executor.Record) bool, error) {
-	switch lhs := expr.Left.(type) {
-
-	// リーフノード: col op literal のような単純な条件 (例: col1 = 5)
-	case *ast.LhsColumn:
-		colName := lhs.Column.ColName
-		colMeta, ok := s.tblMeta.GetColByName(colName)
-		if !ok {
-			return nil, errors.New("column " + colName + " does not exist in table " + s.tblMeta.Name)
-		}
-
-		switch rhs := expr.Right.(type) {
-		// 左辺がカラムで右辺がリテラルの場合 (例: col1 = 5)
-		case *ast.RhsLiteral:
-			return s.operatorToCondition(expr.Operator, int(colMeta.Pos), rhs.Literal.ToString())
-		// 左辺がカラムの場合は右辺はリテラルでなければならない (`col1 = col2` のような条件は現状サポートしていない)
-		default:
-			return nil, errors.New("when LHS is a column, RHS must be a literal")
-		}
-
-	// ブランチノード: expr AND/OR expr (例: col1 = 5 AND col2 > 10 のような複合条件)
-	case *ast.LhsExpr:
-		// 左辺の式から条件関数を再帰的に構築
-		leftCond, err := s.buildConditionFunc(*lhs.Expr)
-		if err != nil {
-			return nil, err
-		}
-
-		switch rhs := expr.Right.(type) {
-		// 右辺が式の場合、右辺の式から条件関数を再帰的に構築し、論理演算子 (AND/OR) に応じて条件関数を組み合わせる
-		case *ast.RhsExpr:
-			rightCond, err := s.buildConditionFunc(*rhs.Expr)
-			if err != nil {
-				return nil, err
-			}
-			switch expr.Operator {
-			case "AND":
-				return func(r executor.Record) bool { return leftCond(r) && rightCond(r) }, nil
-			case "OR":
-				return func(r executor.Record) bool { return leftCond(r) || rightCond(r) }, nil
-			default:
-				return nil, fmt.Errorf("unsupported logical operator: %s", expr.Operator)
-			}
-		// 左辺が式の場合は右辺も式でなければならない
-		default:
-			return nil, errors.New("when LHS is an expression, RHS cannot be a literal")
-		}
-
-	default:
-		panic("unsupported LHS type in buildConditionFunc")
-	}
-}
-
-// operatorToCondition は二項演算子を条件関数に変換する
-//
-// 条件関数: レコードを受け取り、条件を満たすかどうか (bool) を返す関数
-func (s *Search) operatorToCondition(operator string, pos int, value string) (func(executor.Record) bool, error) {
-	switch operator {
-	case "=":
-		return func(record executor.Record) bool {
-			return string(record[pos]) == value
-		}, nil
-	case "!=":
-		return func(record executor.Record) bool {
-			return string(record[pos]) != value
-		}, nil
-	case "<":
-		return func(record executor.Record) bool {
-			return string(record[pos]) < value
-		}, nil
-	case "<=":
-		return func(record executor.Record) bool {
-			return string(record[pos]) <= value
-		}, nil
-	case ">":
-		return func(record executor.Record) bool {
-			return string(record[pos]) > value
-		}, nil
-	case ">=":
-		return func(record executor.Record) bool {
-			return string(record[pos]) >= value
-		}, nil
-	default:
-		return nil, fmt.Errorf("unsupported operator in WHERE clause: %s", operator)
-	}
+	return nil, 0, false, nil
 }
 
 // -------------------------------------------------
 // その他
 // -------------------------------------------------
 
-// isPKLeadingColumn は指定カラムがプライマリキーの先頭カラムかどうかを判定する
+// buildRangeKeys は演算子とリテラルからレンジ分析用のキーを組み立てる
+//
+// 非有界側は nil を返す。RecordsInRange は nil を「先頭から」「末尾まで」として扱う
+func buildRangeKeys(operator string, literal ast.Literal) (lowerKey, upperKey []byte, leftIncl, rightIncl bool) {
+	var encoded []byte
+	encode.Encode([][]byte{literal.ToBytes()}, &encoded)
+
+	switch operator {
+	case "=":
+		return encoded, encoded, true, true
+	case ">":
+		return encoded, nil, false, true
+	case ">=":
+		return encoded, nil, true, true
+	case "<":
+		return nil, encoded, true, false
+	case "<=":
+		return nil, encoded, true, true
+	default:
+		return nil, nil, true, true
+	}
+}
+
+// isIndexOnlyScan は SELECT カラムがインデックス (UK + PK) でカバーされるか判定する
+//
+// SELECT * の場合は false (全カラムが必要なので index-only にならない)
+func (s *Search) isIndexOnlyScan(indexColName string) bool {
+	if len(s.selectColumns) == 0 {
+		return false // SELECT * → index-only 不可
+	}
+
+	// カバーされるカラム: PK カラム群 + インデックスカラム
+	covered := make(map[string]bool)
+	for _, col := range s.tblMeta.Cols {
+		if col.Pos < uint16(s.tblMeta.PKCount) {
+			covered[col.Name] = true
+		}
+	}
+	covered[indexColName] = true
+
+	// 全 SELECT カラムがカバーされているか
+	for _, col := range s.selectColumns {
+		colName := col.ColName
+		if !covered[colName] {
+			return false
+		}
+	}
+	return true
+}
+
+// isPKLeadingColumn は指定カラムが単一カラムプライマリキーかどうかを判定する
+//
+// 複合 PK の先頭カラムだけでは一意にならないため、PKCount == 1 の場合のみ true を返す
 func (s *Search) isPKLeadingColumn(colName string) bool {
-	if s.tblMeta.PKCount == 0 {
+	if s.tblMeta.PKCount != 1 {
 		return false
 	}
 	colMeta, ok := s.tblMeta.GetColByName(colName)

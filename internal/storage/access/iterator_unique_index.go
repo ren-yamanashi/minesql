@@ -9,6 +9,7 @@ import (
 // SearchResult はインデックス検索の結果
 type SearchResult struct {
 	UniqueKey [][]byte // デコード済みユニークキー
+	PKValues  [][]byte // デコード済みプライマリキー (index-only scan 用)
 	Record    [][]byte // デコード済みレコード (プライマリキー + 値)
 }
 
@@ -74,6 +75,37 @@ func (uii *UniqueIndexIterator) Next() (*SearchResult, bool, error) {
 		return &SearchResult{
 			UniqueKey: uniqueKey,
 			Record:    record,
+		}, true, nil
+	}
+}
+
+// NextIndexOnly はインデックスデータのみから結果を返す (テーブル本体の検索なし)
+//
+// PK と UK をインデックスキーからデコードして返す
+func (uii *UniqueIndexIterator) NextIndexOnly() (*SearchResult, bool, error) {
+	for {
+		indexRecord, ok, err := uii.iterator.Next(uii.bp)
+		if !ok {
+			return nil, false, nil
+		}
+		if err != nil {
+			return nil, false, err
+		}
+
+		// DeleteMark が 1 のレコードはスキップ
+		if len(indexRecord.HeaderBytes()) > 0 && indexRecord.HeaderBytes()[0] == 1 {
+			continue
+		}
+
+		// Key = concat(encodedUK, encodedPK) から UK と PK をデコード
+		uniqueKey, encodedPK := encode.DecodeFirstN(indexRecord.KeyBytes(), 1)
+
+		var pkValues [][]byte
+		encode.Decode(encodedPK, &pkValues)
+
+		return &SearchResult{
+			UniqueKey: uniqueKey,
+			PKValues:  pkValues,
 		}, true, nil
 	}
 }

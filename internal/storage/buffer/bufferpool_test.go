@@ -704,6 +704,37 @@ func TestBufferPoolIntegration(t *testing.T) {
 	})
 }
 
+func TestIsPageCached(t *testing.T) {
+	t.Run("AddPage したページはキャッシュされている", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		disk, pageId := createEmptyDisk(t, tmpdir)
+		bp := NewBufferPool(5, nil)
+		bp.RegisterDisk(page.FileId(0), disk)
+
+		err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+
+		// WHEN
+		cached := bp.IsPageCached(pageId)
+
+		// THEN
+		assert.True(t, cached)
+	})
+
+	t.Run("追加していないページはキャッシュされていない", func(t *testing.T) {
+		// GIVEN
+		bp := NewBufferPool(5, nil)
+		pageId := page.PageId{FileId: page.FileId(0), PageNumber: page.PageNumber(999)}
+
+		// WHEN
+		cached := bp.IsPageCached(pageId)
+
+		// THEN
+		assert.False(t, cached)
+	})
+}
+
 func createEmptyDisk(t *testing.T, tmpdir string) (*file.Disk, page.PageId) {
 	path := filepath.Join(tmpdir, "test.db")
 	disk, err := file.NewDisk(page.FileId(0), path)

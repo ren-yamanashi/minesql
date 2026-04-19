@@ -45,7 +45,7 @@ func (c *Client) Start() error {
 		}
 
 		// exit コマンドで終了
-		if text == "exit" {
+		if strings.TrimSuffix(text, ";") == "exit" {
 			fmt.Println("Bye!")
 			return nil
 		}
@@ -80,7 +80,7 @@ func (c *Client) readMultilineInput(reader *bufio.Reader) string {
 		// 1行読み取る
 		line, _ := reader.ReadString('\n')
 		line = strings.TrimRight(line, "\n\r")
-		if line == "exit" {
+		if strings.TrimSuffix(line, ";") == "exit" {
 			return "exit"
 		}
 

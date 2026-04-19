@@ -150,7 +150,7 @@ WHERE id = '1' /* id が 1 のレコード */
 			assert.Contains(t, err.Error(), "incomplete SELECT statement")
 		})
 
-		t.Run("SELECT で特定カラム名を指定した場合エラーになる", func(t *testing.T) {
+		t.Run("SELECT で特定カラム名を指定した場合にパースできる", func(t *testing.T) {
 			// GIVEN
 			sql := "SELECT id FROM users;"
 			parser := NewParser()
@@ -159,9 +159,13 @@ WHERE id = '1' /* id が 1 のレコード */
 			result, err := parser.Parse(sql)
 
 			// THEN
-			assert.Error(t, err)
-			assert.Nil(t, result)
-			assert.Contains(t, err.Error(), "currently only SELECT * is supported")
+			assert.NoError(t, err)
+			assert.NotNil(t, result)
+			selectStmt, ok := result.(*ast.SelectStmt)
+			assert.True(t, ok)
+			assert.Len(t, selectStmt.Columns, 1)
+			assert.Equal(t, "id", selectStmt.Columns[0].ColName)
+			assert.Equal(t, "users", selectStmt.From.TableName)
 		})
 
 		t.Run("FROM 句が重複している場合エラーになる", func(t *testing.T) {
@@ -221,6 +225,58 @@ WHERE id = '1' /* id が 1 のレコード */
 		})
 	})
 
+	t.Run("SELECT で複数カラムを指定できる", func(t *testing.T) {
+		// GIVEN
+		sql := "SELECT id, name, age FROM users;"
+		parser := NewParser()
+
+		// WHEN
+		result, err := parser.Parse(sql)
+
+		// THEN
+		assert.NoError(t, err)
+		selectStmt, ok := result.(*ast.SelectStmt)
+		assert.True(t, ok)
+		assert.Len(t, selectStmt.Columns, 3)
+		assert.Equal(t, "id", selectStmt.Columns[0].ColName)
+		assert.Equal(t, "name", selectStmt.Columns[1].ColName)
+		assert.Equal(t, "age", selectStmt.Columns[2].ColName)
+	})
+
+	t.Run("SELECT で修飾名カラムを指定できる", func(t *testing.T) {
+		// GIVEN
+		sql := "SELECT users.id, users.name FROM users;"
+		parser := NewParser()
+
+		// WHEN
+		result, err := parser.Parse(sql)
+
+		// THEN
+		assert.NoError(t, err)
+		selectStmt, ok := result.(*ast.SelectStmt)
+		assert.True(t, ok)
+		assert.Len(t, selectStmt.Columns, 2)
+		assert.Equal(t, "users", selectStmt.Columns[0].TableName)
+		assert.Equal(t, "id", selectStmt.Columns[0].ColName)
+		assert.Equal(t, "users", selectStmt.Columns[1].TableName)
+		assert.Equal(t, "name", selectStmt.Columns[1].ColName)
+	})
+
+	t.Run("SELECT * の場合 Columns は nil", func(t *testing.T) {
+		// GIVEN
+		sql := "SELECT * FROM users;"
+		parser := NewParser()
+
+		// WHEN
+		result, err := parser.Parse(sql)
+
+		// THEN
+		assert.NoError(t, err)
+		selectStmt, ok := result.(*ast.SelectStmt)
+		assert.True(t, ok)
+		assert.Nil(t, selectStmt.Columns)
+	})
+
 	t.Run("WHERE 句で数値リテラルを使用できる", func(t *testing.T) {
 		// GIVEN
 		sql := "SELECT * FROM users WHERE age = 25;"
@@ -243,6 +299,210 @@ WHERE id = '1' /* id が 1 のレコード */
 		rhsLit, ok := binaryExpr.Right.(*ast.RhsLiteral)
 		assert.True(t, ok)
 		assert.Equal(t, "25", rhsLit.Literal.ToString())
+	})
+
+	t.Run("INNER JOIN 付きの SELECT 文をパースできる", func(t *testing.T) {
+		// GIVEN
+		sql := "SELECT * FROM users INNER JOIN orders ON users.id = orders.user_id;"
+		parser := NewParser()
+
+		// WHEN
+		result, err := parser.Parse(sql)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+
+		selectStmt, ok := result.(*ast.SelectStmt)
+		assert.True(t, ok)
+
+		assert.Equal(t, "users", selectStmt.From.TableName)
+
+		assert.Len(t, selectStmt.Joins, 1)
+		join := selectStmt.Joins[0]
+		assert.Equal(t, "orders", join.Table.TableName)
+
+		assert.NotNil(t, join.Condition)
+		assert.Equal(t, "=", join.Condition.Operator)
+
+		lhsCol, ok := join.Condition.Left.(*ast.LhsColumn)
+		assert.True(t, ok)
+		assert.Equal(t, "users", lhsCol.Column.TableName)
+		assert.Equal(t, "id", lhsCol.Column.ColName)
+
+		rhsCol, ok := join.Condition.Right.(*ast.RhsColumn)
+		assert.True(t, ok)
+		assert.Equal(t, "orders", rhsCol.Column.TableName)
+		assert.Equal(t, "user_id", rhsCol.Column.ColName)
+	})
+
+	t.Run("JOIN (INNER 省略) 付きの SELECT 文をパースできる", func(t *testing.T) {
+		// GIVEN
+		sql := "SELECT * FROM users JOIN orders ON users.id = orders.user_id;"
+		parser := NewParser()
+
+		// WHEN
+		result, err := parser.Parse(sql)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+
+		selectStmt, ok := result.(*ast.SelectStmt)
+		assert.True(t, ok)
+
+		assert.Equal(t, "users", selectStmt.From.TableName)
+		assert.Len(t, selectStmt.Joins, 1)
+
+		join := selectStmt.Joins[0]
+		assert.Equal(t, "orders", join.Table.TableName)
+		assert.Equal(t, "=", join.Condition.Operator)
+	})
+
+	t.Run("JOIN + WHERE 付きの SELECT 文をパースできる", func(t *testing.T) {
+		// GIVEN
+		sql := "SELECT * FROM users JOIN orders ON users.id = orders.user_id WHERE users.id = '1';"
+		parser := NewParser()
+
+		// WHEN
+		result, err := parser.Parse(sql)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+
+		selectStmt, ok := result.(*ast.SelectStmt)
+		assert.True(t, ok)
+
+		assert.Equal(t, "users", selectStmt.From.TableName)
+		assert.Len(t, selectStmt.Joins, 1)
+
+		join := selectStmt.Joins[0]
+		assert.Equal(t, "orders", join.Table.TableName)
+
+		assert.NotNil(t, selectStmt.Where)
+		whereExpr := selectStmt.Where.Condition
+		assert.Equal(t, "=", whereExpr.Operator)
+
+		lhsCol, ok := whereExpr.Left.(*ast.LhsColumn)
+		assert.True(t, ok)
+		assert.Equal(t, "users", lhsCol.Column.TableName)
+		assert.Equal(t, "id", lhsCol.Column.ColName)
+	})
+
+	t.Run("複数の JOIN をパースできる", func(t *testing.T) {
+		// GIVEN
+		sql := "SELECT * FROM users JOIN orders ON users.id = orders.user_id JOIN items ON orders.item_id = items.id;"
+		parser := NewParser()
+
+		// WHEN
+		result, err := parser.Parse(sql)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+
+		selectStmt, ok := result.(*ast.SelectStmt)
+		assert.True(t, ok)
+
+		assert.Equal(t, "users", selectStmt.From.TableName)
+		assert.Len(t, selectStmt.Joins, 2)
+
+		assert.Equal(t, "orders", selectStmt.Joins[0].Table.TableName)
+		assert.Equal(t, "=", selectStmt.Joins[0].Condition.Operator)
+
+		assert.Equal(t, "items", selectStmt.Joins[1].Table.TableName)
+		assert.Equal(t, "=", selectStmt.Joins[1].Condition.Operator)
+	})
+
+	t.Run("ON 条件で AND を使った複合条件をパースできる", func(t *testing.T) {
+		// GIVEN
+		sql := "SELECT * FROM users JOIN orders ON users.id = orders.user_id AND users.name = orders.name;"
+		parser := NewParser()
+
+		// WHEN
+		result, err := parser.Parse(sql)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+
+		selectStmt, ok := result.(*ast.SelectStmt)
+		assert.True(t, ok)
+
+		assert.Len(t, selectStmt.Joins, 1)
+		join := selectStmt.Joins[0]
+		assert.Equal(t, "AND", join.Condition.Operator)
+	})
+
+	t.Run("不正な JOIN 文でエラーになる", func(t *testing.T) {
+		t.Run("ON 句がない場合", func(t *testing.T) {
+			// GIVEN
+			sql := "SELECT * FROM users JOIN orders;"
+			parser := NewParser()
+
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "ON")
+		})
+
+		t.Run("JOIN のテーブル名がない場合", func(t *testing.T) {
+			// GIVEN
+			sql := "SELECT * FROM users JOIN ON users.id = orders.user_id;"
+			parser := NewParser()
+
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "invalid position")
+		})
+
+		t.Run("ON 条件が空の場合", func(t *testing.T) {
+			// GIVEN
+			sql := "SELECT * FROM users JOIN orders ON;"
+			parser := NewParser()
+
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.Error(t, err)
+			assert.Nil(t, result)
+			assert.Contains(t, err.Error(), "expression")
+		})
+
+		t.Run("INNER の後に JOIN がない場合", func(t *testing.T) {
+			// GIVEN
+			sql := "SELECT * FROM users INNER orders ON users.id = orders.user_id;"
+			parser := NewParser()
+
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.Error(t, err)
+			assert.Nil(t, result)
+		})
+
+		t.Run("FROM 句の前に JOIN がある場合", func(t *testing.T) {
+			// GIVEN
+			sql := "SELECT * JOIN orders ON users.id = orders.user_id;"
+			parser := NewParser()
+
+			// WHEN
+			result, err := parser.Parse(sql)
+
+			// THEN
+			assert.Error(t, err)
+			assert.Nil(t, result)
+		})
 	})
 
 	t.Run("WHERE 句で AND を使った複合条件をパースできる", func(t *testing.T) {

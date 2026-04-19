@@ -32,6 +32,7 @@ CREATE TABLE users (
 - ツリーを構成するノードの種類は以下の通り
   - TableScan: テーブルをプライマリキーで範囲検索する
   - IndexScan: インデックスを利用して検索する
+  - NestedLoopJoin: 左の各行に対して右のテーブルを検索し、結合する
   - Filter: 不要な行をフィルタする
   - Union: 複数のスキャン結果を結合し、重複を除去する
   - CreateTable: テーブルを作成する
@@ -45,15 +46,11 @@ CREATE TABLE users (
 ### 例1
 
 ```sql
+-- id は PRIMARY KEY
 SELECT first_name, last_name FROM users WHERE id = 1;
 ```
 
-この場合、PRIMARY KEY のインデックスを使って検索できるため、Filter を経由せずに TableScan 自体が条件を処理できる。そのためエグゼキュータのツリーは以下のようになる
-
-- TableScan: テーブルに対して検索をかける
-  - 条件: `id = 1`
-- Project: 検索結果から特定のカラムだけを取り出す
-  - 対象カラム: `first_name`, `last_name`
+PRIMARY KEY なので、TableScan が B+Tree のキー検索で直接条件を処理でき、Filter を経由しない。
 
 ```txt
 Project (first_name, last_name)
@@ -63,18 +60,11 @@ Project (first_name, last_name)
 ### 例2
 
 ```sql
+-- gender にインデックスなし
 SELECT * FROM users WHERE gender = 'male';
 ```
 
-この場合、gender にインデックスがないため、TableScan はフルスキャンしか行えず、フィルタリングは上位の Filter ノードが担当する。  
-そのためエグゼキュータのツリーは以下のようになる
-
-- Filter: テーブルに対して検索をかける
-  - 条件: `gender = 'male'`
-- TableScan: テーブルに対して検索をかける
-  - 条件: フルテーブルスキャン
-- Project: 検索結果から特定のカラムだけを取り出す
-  - 対象カラム: `*` (全てのカラム)
+インデックスがないため、TableScan はフルスキャンしか行えず、フィルタリングは上位の Filter ノードが担当する。
 
 ```txt
 Project (*)
@@ -85,16 +75,11 @@ Project (*)
 ### 例3
 
 ```sql
+-- username に UNIQUE INDEX がある
 SELECT * FROM users WHERE username = 'alice';
 ```
 
-この場合、username にユニークインデックスがあるため、TableScan はフルスキャンを行う必要はなく、IndexScan を利用して検索できる。  
-そのためエグゼキュータのツリーは以下のようになる
-
-- IndexScan: インデックスを利用して検索する
-  - 条件: `username = 'alice'`
-- Project: 検索結果から特定のカラムだけを取り出す
-  - 対象カラム: `*` (全てのカラム)
+UNIQUE INDEX があるため IndexScan を利用して検索できる。SELECT * なので全カラムが必要となり、IndexScan はインデックスからマッチするエントリを見つけた後、そこに含まれる PK でテーブル本体を検索して全カラムを取得する。
 
 ```txt
 Project (*)
@@ -104,10 +89,11 @@ Project (*)
 ### 例4
 
 ```sql
+-- id は PRIMARY KEY、username に UNIQUE INDEX がある
 SELECT * FROM users WHERE id = 1 OR username = 'alice';
 ```
 
-この場合、id は PRIMARY KEY、username にはユニークインデックスがあるため、それぞれのスキャン結果を Union で結合できる。
+それぞれにインデックスがあるため、各スキャン結果を Union で結合できる。
 
 - TableScan: PK を利用して `id = 1` を検索
 - IndexScan: ユニークインデックスを利用して `username = 'alice'` を検索
@@ -121,6 +107,62 @@ Project (*)
         └── IndexScan (username = 'alice')
 ```
 
+### 例5
+
+```sql
+-- orders.user_id に UNIQUE INDEX がある
+-- users が orders より行数が少ない
+SELECT * FROM users
+INNER JOIN orders ON users.id = orders.user_id
+WHERE orders.item = 'apple';
+```
+
+users が駆動表に選ばれ、orders は UNIQUE INDEX で eq_ref アクセスする\
+WHERE 条件 (`orders.item = 'apple'`) は内部表のカラムなので駆動表側に分離できず、結合後に Filter で適用される (詳細: [プランナー - WHERE 条件の分離](../planner/planner.md#where-条件の分離))。
+
+```txt
+Project (*)
+  └── Filter (orders.item = 'apple')
+        └── NestedLoopJoin
+              ├── TableScan (users: フルスキャン)
+              └── IndexScan (orders: user_id UNIQUE INDEX で eq_ref)
+```
+
+### 例6
+
+```sql
+-- orders.user_id に UNIQUE INDEX がある
+-- users が orders より行数が少ない
+SELECT * FROM users
+INNER JOIN orders ON users.id = orders.user_id;
+```
+
+SELECT * なので全カラムが必要となり、内部表 (orders) の IndexScan はインデックスからマッチするエントリを見つけた後、PK でテーブル本体を検索して全カラムを取得する。
+
+```txt
+Project (*)
+  └── NestedLoopJoin
+        ├── TableScan (users: フルスキャン)
+        └── IndexScan (orders: user_id UNIQUE INDEX で eq_ref)
+```
+
+### 例7
+
+```sql
+-- id は PRIMARY KEY、username に UNIQUE INDEX がある
+SELECT id, username FROM users WHERE username = 'alice';
+```
+
+SELECT カラム (id, username) は PK + UNIQUE INDEX カラムだけで構成されるため、index-only scan が適用される。インデックスのリーフにはセカンダリキーと PK の値が格納されているので、テーブル本体を読まずにインデックスだけで結果を返せる。
+
+```txt
+Project (id, username)
+  └── IndexScan (username = 'alice', index-only)
+```
+
+- IndexScan は内部モード (`indexOnly`) で index-only scan を行う。独立したノード型ではなく、IndexScan のフラグで制御する
+- SELECT カラムがインデックスでカバーされないカラムを含む場合は通常の IndexScan (PK でテーブル本体を検索) になる
+
 ### ツリー図
 
 全ての Executor は共通の `Executor` interface (`Next() (Record, error)`) を実装する。
@@ -132,6 +174,8 @@ Executor (interface)
   ├── TableScan          (リーフノード: テーブル全体を走査する)
   ├── IndexScan          (リーフノード: セカンダリインデックスを利用して検索する)
   │
+  ├── NestedLoopJoin     (ブランチノード: 左の各行に対して右の Executor を生成し、結合する)
+  │     └── InnerExecutor
   ├── Filter             (ブランチノード: InnerExecutor の結果から条件に合う行だけを返す)
   │     └── InnerExecutor
   ├── Union              (ブランチノード: 複数の InnerExecutor の結果を結合し、重複を除去する)

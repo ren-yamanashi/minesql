@@ -163,6 +163,47 @@ func (bt *BTree) FindByKey(bp *buffer.BufferPool, key []byte) (node.Record, page
 	return record, pos, nil
 }
 
+// LeafPageIds はブランチページのみを辿り、全リーフページの PageId を収集する
+//
+// リーフページ自体は読まないため、バッファプールのキャッシュ状態に影響しない
+// (page_read_cost の in_mem 算出で使用する)
+func (bt *BTree) LeafPageIds(bp *buffer.BufferPool) ([]page.PageId, error) {
+	defer bp.UnRefPage(bt.MetaPageId)
+	metaData, err := bp.GetReadPageData(bt.MetaPageId)
+	if err != nil {
+		return nil, err
+	}
+	meta := newMetaPage(page.NewPage(metaData))
+	rootPageId := meta.rootPageId()
+	height := meta.height()
+
+	// 高さ 1: ルートがリーフ
+	if height <= 1 {
+		return []page.PageId{rootPageId}, nil
+	}
+
+	// 高さ 2 以上: ブランチを辿ってリーフの PageId を収集
+	// 幅優先でブランチレベルを 1 つずつ降りていく
+	currentLevel := []page.PageId{rootPageId}
+	for level := uint64(1); level < height; level++ {
+		var nextLevel []page.PageId
+		for _, nodePageId := range currentLevel {
+			data, err := bp.GetReadPageData(nodePageId)
+			if err != nil {
+				return nil, err
+			}
+			bp.UnRefPage(nodePageId)
+			branch := node.NewBranch(page.NewPage(data).Body)
+			for i := 0; i <= branch.NumRecords(); i++ {
+				nextLevel = append(nextLevel, branch.ChildPageIdAt(i))
+			}
+		}
+		currentLevel = nextLevel
+	}
+
+	return currentLevel, nil
+}
+
 // LeafPageCount はメタページからリーフページ数を取得する
 func (bt *BTree) LeafPageCount(bp *buffer.BufferPool) (uint64, error) {
 	// メタページは使い終わったらすぐ不要になる (優先的に evict されたい) ので、 UnRefPage する

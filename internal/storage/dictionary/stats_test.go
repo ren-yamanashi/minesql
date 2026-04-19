@@ -108,11 +108,12 @@ func TestAnalyze(t *testing.T) {
 		// WHEN
 		result, err := (&StatsCollector{bufferPool: env.bp, states: make(map[string]*tableState)}).Analyze(meta)
 
-		// THEN: ユニークインデックスが 1 つ、高さ 1
+		// THEN: ユニークインデックスが 1 つ、高さ 1、RecPerKey 1.0
 		assert.NoError(t, err)
 		assert.Len(t, result.IdxStats, 1)
 		for _, idxStat := range result.IdxStats {
 			assert.Equal(t, uint64(1), idxStat.Height)
+			assert.Equal(t, 1.0, idxStat.RecPerKey)
 		}
 	})
 
