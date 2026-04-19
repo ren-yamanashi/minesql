@@ -286,6 +286,49 @@ func Example_join() {
 	//   合計: 2 件
 }
 
+func Example_nonUniqueIndex() {
+	cleanup := setupPlannerExample()
+	defer cleanup()
+
+	// 非ユニークインデックス付きテーブルを作成
+	runPlan(&ast.CreateTableStmt{
+		TableName: "products",
+		CreateDefinitions: []ast.Definition{
+			&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{ColName: "name", DataType: ast.DataTypeVarchar},
+			&ast.ColumnDef{ColName: "category", DataType: ast.DataTypeVarchar},
+			&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{*ast.NewColumnId("id")}},
+			&ast.ConstraintKeyDef{KeyName: "idx_category", Column: *ast.NewColumnId("category")},
+		},
+	})
+	runPlan(&ast.InsertStmt{
+		Table: *ast.NewTableId("products"),
+		Cols:  []ast.ColumnId{*ast.NewColumnId("id"), *ast.NewColumnId("name"), *ast.NewColumnId("category")},
+		Values: [][]ast.Literal{
+			{ast.NewStringLiteral("1"), ast.NewStringLiteral("Apple"), ast.NewStringLiteral("Fruit")},
+			{ast.NewStringLiteral("2"), ast.NewStringLiteral("Banana"), ast.NewStringLiteral("Fruit")},
+			{ast.NewStringLiteral("3"), ast.NewStringLiteral("Carrot"), ast.NewStringLiteral("Veggie")},
+		},
+	})
+
+	// 同一カテゴリで複数行が取得できる
+	records := runPlan(&ast.SelectStmt{
+		From: *ast.NewTableId("products"),
+		Where: &ast.WhereClause{
+			Condition: ast.NewBinaryExpr("=",
+				ast.NewLhsColumn(*ast.NewColumnId("category")),
+				ast.NewRhsLiteral(ast.NewStringLiteral("Fruit")),
+			),
+		},
+	})
+	printPlanRecords(records)
+
+	// Output:
+	//   (1, Apple, Fruit)
+	//   (2, Banana, Fruit)
+	//   合計: 2 件
+}
+
 func Example_update() {
 	cleanup := setupPlannerExample()
 	defer cleanup()

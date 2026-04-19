@@ -8,6 +8,7 @@ import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/dictionary"
 	"minesql/internal/storage/encode"
 	"minesql/internal/storage/handler"
 )
@@ -174,12 +175,26 @@ func (s *Search) chooseBestPlan(tbl *access.Table, leaves []leafCondition, cond 
 				uniqueFound = true
 				break
 			}
-			if _, hasIndex := s.tblMeta.GetIndexByColName(leaf.colName); hasIndex {
-				bestLeaf = leaf
-				bestCost = calcUniqueScanCost()
-				bestPlan = "Index"
-				uniqueFound = true
-				break
+			if idxMeta, hasIndex := s.tblMeta.GetIndexByColName(leaf.colName); hasIndex {
+				// ユニークインデックス
+				if idxMeta.Type == dictionary.IndexTypeUnique {
+					bestLeaf = leaf
+					bestCost = calcUniqueScanCost()
+					bestPlan = "Index"
+					uniqueFound = true
+					break
+				}
+				// 非ユニークインデックス: foundRecords=RecPerKey のレンジスキャンとして扱う
+				idxStats, ok := stats.IdxStats[idxMeta.Name]
+				if ok {
+					readTime := calcReadTimeForSecondaryIndex(idxStats.RecPerKey, clusterPageReadCost)
+					cost := calcRangeScanCost(readTime, idxStats.RecPerKey)
+					if bestLeaf == nil || cost < bestCost {
+						bestLeaf = leaf
+						bestCost = cost
+						bestPlan = "Index"
+					}
+				}
 			}
 		}
 
@@ -460,11 +475,24 @@ func (s *Search) planORBranch(tbl *access.Table, branch orBranch, stats *handler
 				bestPlan = "PK"
 				break
 			}
-			if _, hasIdx := s.tblMeta.GetIndexByColName(leaf.colName); hasIdx {
-				bestLeaf = leaf
-				bestCost = calcUniqueScanCost()
-				bestPlan = "Index"
-				break
+			if idxMeta, hasIdx := s.tblMeta.GetIndexByColName(leaf.colName); hasIdx {
+				if idxMeta.Type == dictionary.IndexTypeUnique {
+					bestLeaf = leaf
+					bestCost = calcUniqueScanCost()
+					bestPlan = "Index"
+					break
+				}
+				// 非ユニークインデックス: foundRecords=RecPerKey のレンジスキャンとして扱う
+				idxStats, ok := stats.IdxStats[idxMeta.Name]
+				if ok {
+					readTime := calcReadTimeForSecondaryIndex(idxStats.RecPerKey, clusterPRC)
+					cost := calcRangeScanCost(readTime, idxStats.RecPerKey)
+					if bestLeaf == nil || cost < bestCost {
+						bestLeaf = leaf
+						bestCost = cost
+						bestPlan = "Index"
+					}
+				}
 			}
 		}
 

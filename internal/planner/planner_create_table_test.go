@@ -291,7 +291,7 @@ func TestPlanCreateTable(t *testing.T) {
 		// THEN
 		assert.Error(t, err)
 		assert.Nil(t, exec)
-		assert.Contains(t, err.Error(), "duplicate unique key name: uk_same")
+		assert.Contains(t, err.Error(), "duplicate index name: uk_same")
 	})
 
 	t.Run("同一カラムが複数のユニークキーに指定されている場合、エラーを返す", func(t *testing.T) {
@@ -321,7 +321,7 @@ func TestPlanCreateTable(t *testing.T) {
 		// THEN
 		assert.Error(t, err)
 		assert.Nil(t, exec)
-		assert.Contains(t, err.Error(), "column 'email' cannot be part of multiple unique keys")
+		assert.Contains(t, err.Error(), "column 'email' cannot have multiple indexes")
 	})
 
 	t.Run("カラムが1つだけのテーブルを作成できる", func(t *testing.T) {
@@ -358,6 +358,91 @@ func TestPlanCreateTable(t *testing.T) {
 					*ast.NewColumnId("id"),
 				}},
 				ukDef,
+			},
+		}
+
+		// WHEN
+		exec, err := PlanCreateTable(stmt)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "does not exist")
+	})
+
+	t.Run("非ユニークインデックスがあるテーブルを作成できる", func(t *testing.T) {
+		// GIVEN
+		stmt := &ast.CreateTableStmt{
+			TableName: "products",
+			CreateDefinitions: []ast.Definition{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "category", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{*ast.NewColumnId("id")}},
+				&ast.ConstraintKeyDef{KeyName: "idx_category", Column: *ast.NewColumnId("category")},
+			},
+		}
+
+		// WHEN
+		exec, err := PlanCreateTable(stmt)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, exec)
+	})
+
+	t.Run("ユニークと非ユニークのインデックスが混在するテーブルを作成できる", func(t *testing.T) {
+		// GIVEN
+		stmt := &ast.CreateTableStmt{
+			TableName: "products",
+			CreateDefinitions: []ast.Definition{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "name", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "category", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{*ast.NewColumnId("id")}},
+				&ast.ConstraintUniqueKeyDef{KeyName: "idx_name", Column: *ast.NewColumnId("name")},
+				&ast.ConstraintKeyDef{KeyName: "idx_category", Column: *ast.NewColumnId("category")},
+			},
+		}
+
+		// WHEN
+		exec, err := PlanCreateTable(stmt)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, exec)
+	})
+
+	t.Run("UNIQUE KEY と KEY でインデックス名が重複する場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		stmt := &ast.CreateTableStmt{
+			TableName: "products",
+			CreateDefinitions: []ast.Definition{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "name", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "category", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{*ast.NewColumnId("id")}},
+				&ast.ConstraintUniqueKeyDef{KeyName: "idx_same", Column: *ast.NewColumnId("name")},
+				&ast.ConstraintKeyDef{KeyName: "idx_same", Column: *ast.NewColumnId("category")},
+			},
+		}
+
+		// WHEN
+		exec, err := PlanCreateTable(stmt)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "duplicate index name: idx_same")
+	})
+
+	t.Run("非ユニークインデックスに指定されたカラムが存在しない場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		stmt := &ast.CreateTableStmt{
+			TableName: "products",
+			CreateDefinitions: []ast.Definition{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{*ast.NewColumnId("id")}},
+				&ast.ConstraintKeyDef{KeyName: "idx_nonexistent", Column: *ast.NewColumnId("nonexistent")},
 			},
 		}
 

@@ -6,6 +6,7 @@ import (
 	"minesql/internal/storage/access"
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/buffer"
+	"minesql/internal/storage/dictionary"
 	"minesql/internal/storage/handler"
 )
 
@@ -136,7 +137,7 @@ func calcTableJoinCost(
 		}
 	}
 
-	// UNIQUE INDEX で eq_ref
+	// セカンダリインデックスで検索 (unique: eq_ref fanout=1, non-unique: ref fanout=RecPerKey)
 	idxMeta, hasIndex := candidate.tblMeta.GetIndexByColName(joinColName)
 	if hasIndex {
 		idxStats, ok := candidate.stats.IdxStats[idxMeta.Name]
@@ -218,15 +219,24 @@ func evalDrivingWhereConditions(bp *buffer.BufferPool, candidate joinCandidate, 
 
 	colName := lhs.Column.ColName
 
-	// 等値検索: PK or UNIQUE INDEX
+	// 等値検索: PK or INDEX
 	if expr.Operator == "=" {
 		if candidate.tblMeta.PKCount == 1 {
 			if colMeta, exists := candidate.tblMeta.GetColByName(colName); exists && colMeta.Pos == 0 {
 				return calcUniqueScanCost(), 1.0, true, nil
 			}
 		}
-		if _, hasIdx := candidate.tblMeta.GetIndexByColName(colName); hasIdx {
-			return calcUniqueScanCost(), 1.0, true, nil
+		if idxMeta, hasIdx := candidate.tblMeta.GetIndexByColName(colName); hasIdx {
+			if idxMeta.Type == dictionary.IndexTypeUnique {
+				return calcUniqueScanCost(), 1.0, true, nil
+			}
+			// 非ユニークインデックス: foundRecords=RecPerKey のレンジスキャンとして扱う
+			idxStats, ok := candidate.stats.IdxStats[idxMeta.Name]
+			if ok {
+				readTime := calcReadTimeForSecondaryIndex(idxStats.RecPerKey, pageReadCost)
+				rangeCost := readTime + idxStats.RecPerKey*RowEvaluateCost + 0.01
+				return rangeCost, idxStats.RecPerKey, true, nil
+			}
 		}
 	}
 
