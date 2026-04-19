@@ -665,3 +665,132 @@ func TestInitCatalog(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestFindMaxTrxId(t *testing.T) {
+	t.Run("テーブルにレコードがある場合、最大の trxId が返される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
+			{Name: "id", Type: ColumnTypeString},
+			{Name: "name", Type: ColumnTypeString},
+		})
+		assert.NoError(t, err)
+
+		tbl, err := h.GetTable("users")
+		assert.NoError(t, err)
+
+		// trxId=2 で INSERT
+		err = tbl.Insert(h.BufferPool, 2, lock.NewManager(5000), [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+
+		// WHEN
+		maxTrxId, err := findMaxTrxId(h.BufferPool, h.Catalog, h.undoLog, h.redoLog)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, access.TrxId(2), maxTrxId)
+	})
+
+	t.Run("テーブルが空の場合、0 が返される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
+			{Name: "id", Type: ColumnTypeString},
+		})
+		assert.NoError(t, err)
+
+		// WHEN
+		maxTrxId, err := findMaxTrxId(h.BufferPool, h.Catalog, h.undoLog, h.redoLog)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, access.TrxId(0), maxTrxId)
+	})
+
+	t.Run("複数テーブルの中で最大の trxId が返される", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
+			{Name: "id", Type: ColumnTypeString},
+		})
+		assert.NoError(t, err)
+		err = h.CreateTable("orders", 1, nil, []CreateColumnParam{
+			{Name: "id", Type: ColumnTypeString},
+		})
+		assert.NoError(t, err)
+
+		tblUsers, err := h.GetTable("users")
+		assert.NoError(t, err)
+		tblOrders, err := h.GetTable("orders")
+		assert.NoError(t, err)
+
+		err = tblUsers.Insert(h.BufferPool, 3, lock.NewManager(5000), [][]byte{[]byte("1")})
+		assert.NoError(t, err)
+		err = tblOrders.Insert(h.BufferPool, 5, lock.NewManager(5000), [][]byte{[]byte("100")})
+		assert.NoError(t, err)
+
+		// WHEN
+		maxTrxId, err := findMaxTrxId(h.BufferPool, h.Catalog, h.undoLog, h.redoLog)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, access.TrxId(5), maxTrxId)
+	})
+}
+
+func TestNextTrxIdRecovery(t *testing.T) {
+	t.Run("再起動後の nextTrxId が既存レコードの trxId より大きい", func(t *testing.T) {
+		// GIVEN: テーブル作成 → INSERT → Shutdown → 再初期化
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
+			{Name: "id", Type: ColumnTypeString},
+			{Name: "name", Type: ColumnTypeString},
+		})
+		assert.NoError(t, err)
+
+		// BEGIN → INSERT → COMMIT
+		trxId := h.BeginTrx()
+		tbl, err := h.GetTable("users")
+		assert.NoError(t, err)
+		err = tbl.Insert(h.BufferPool, trxId, h.LockMgr, [][]byte{[]byte("1"), []byte("Alice")})
+		assert.NoError(t, err)
+		err = h.CommitTrx(trxId)
+		assert.NoError(t, err)
+
+		// Shutdown
+		err = h.Shutdown()
+		assert.NoError(t, err)
+
+		// WHEN: 再初期化 (サーバー再起動相当)
+		Reset()
+		h2 := Init()
+
+		// 再起動後に BEGIN → SELECT
+		trxId2 := h2.BeginTrx()
+		rv := h2.CreateReadView(trxId2)
+
+		// THEN: INSERT 時の trxId で書かれたレコードが可視
+		assert.True(t, rv.IsVisible(trxId), "再起動前にコミットされた trxId は可視であるべき")
+		assert.Greater(t, rv.MLowLimitId, trxId, "MLowLimitId は過去の trxId より大きいべき")
+	})
+}

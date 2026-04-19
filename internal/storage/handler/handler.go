@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"minesql/internal/storage/access"
+	"minesql/internal/storage/btree"
 	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/config"
 	"minesql/internal/storage/dictionary"
@@ -181,6 +183,13 @@ func newHandler() (*Handler, error) {
 	// トランザクションマネージャを初期化
 	trxManager := access.NewTrxManager(undoLog, lockMgr, redoLog)
 
+	// 既存レコードの最大 trxId に基づいて nextTrxId を復元
+	maxTrxId, err := findMaxTrxId(bp, catalog, undoLog, redoLog)
+	if err != nil {
+		return nil, fmt.Errorf("failed to find max trxId: %w", err)
+	}
+	trxManager.SetNextTrxId(maxTrxId + 1)
+
 	// パージスレッドを初期化・起動
 	pt := access.NewPurgeThread(bp, trxManager, undoLog, lockMgr, func() []*access.Table {
 		return buildAllTables(catalog, undoLog, redoLog)
@@ -280,4 +289,43 @@ func registerTableDisks(cat *dictionary.Catalog, baseDir string, bp *buffer.Buff
 		bp.RegisterDisk(fileId, dm)
 	}
 	return nil
+}
+
+// findMaxTrxId は全テーブルの全レコードを走査し、最大の lastModified (trxId) を返す
+//
+// サーバー再起動時に TrxManager の nextTrxId を復元するために使用する。
+// nextTrxId が過去のコミット済み trxId 以下だと、ReadView が過去のレコードを
+// 不可視と判定してしまうバグを防ぐ。
+func findMaxTrxId(bp *buffer.BufferPool, catalog *dictionary.Catalog, undoLog *access.UndoManager, redoLog *log.RedoLog) (access.TrxId, error) {
+	tables := buildAllTables(catalog, undoLog, redoLog)
+	var maxTrxId access.TrxId
+
+	for _, tbl := range tables {
+		tableBTree := btree.NewBTree(tbl.MetaPageId)
+		iter, err := tableBTree.Search(bp, btree.SearchModeStart{})
+		if err != nil {
+			return 0, err
+		}
+
+		for {
+			record, ok, err := iter.Next(bp)
+			if err != nil {
+				return 0, err
+			}
+			if !ok {
+				break
+			}
+
+			// NonKey の先頭 8 バイトが lastModified (trxId)
+			nonKey := record.NonKeyBytes()
+			if len(nonKey) >= 8 {
+				trxId := binary.BigEndian.Uint64(nonKey[0:8])
+				if trxId > maxTrxId {
+					maxTrxId = trxId
+				}
+			}
+		}
+	}
+
+	return maxTrxId, nil
 }
