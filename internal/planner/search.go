@@ -184,11 +184,11 @@ func (s *Search) chooseBestPlan(tbl *access.Table, leaves []leafCondition, cond 
 					uniqueFound = true
 					break
 				}
-				// 非ユニークインデックス: foundRecords=RecPerKey のレンジスキャンとして扱う
+				// 非ユニークインデックス: read_cost = RecPerKey × pageReadCost (MySQL の find_cost_for_ref に対応)
 				idxStats, ok := stats.IdxStats[idxMeta.Name]
 				if ok {
-					readTime := calcReadTimeForSecondaryIndex(idxStats.RecPerKey, clusterPageReadCost)
-					cost := calcRangeScanCost(readTime, idxStats.RecPerKey)
+					readCost := idxStats.RecPerKey * clusterPageReadCost
+					cost := readCost + idxStats.RecPerKey*RowEvaluateCost
 					if bestLeaf == nil || cost < bestCost {
 						bestLeaf = leaf
 						bestCost = cost
@@ -482,11 +482,11 @@ func (s *Search) planORBranch(tbl *access.Table, branch orBranch, stats *handler
 					bestPlan = "Index"
 					break
 				}
-				// 非ユニークインデックス: foundRecords=RecPerKey のレンジスキャンとして扱う
+				// 非ユニークインデックス: read_cost = RecPerKey × pageReadCost (MySQL の find_cost_for_ref に対応)
 				idxStats, ok := stats.IdxStats[idxMeta.Name]
 				if ok {
-					readTime := calcReadTimeForSecondaryIndex(idxStats.RecPerKey, clusterPRC)
-					cost := calcRangeScanCost(readTime, idxStats.RecPerKey)
+					readCost := idxStats.RecPerKey * clusterPRC
+					cost := readCost + idxStats.RecPerKey*RowEvaluateCost
 					if bestLeaf == nil || cost < bestCost {
 						bestLeaf = leaf
 						bestCost = cost
