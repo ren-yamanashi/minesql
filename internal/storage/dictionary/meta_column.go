@@ -17,8 +17,6 @@ const (
 )
 
 // ColumnMeta はカラムのメタデータを表す
-//
-// 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-columns-table.html
 type ColumnMeta struct {
 	MetaPageId page.PageId // カラムのメタデータが格納される B+Tree のメタページID
 	FileId     page.FileId // カラムが属するテーブルの FileId

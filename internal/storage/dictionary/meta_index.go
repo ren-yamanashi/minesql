@@ -17,8 +17,6 @@ const (
 )
 
 // IndexMeta はセカンダリインデックスのメタデータを表す
-//
-// 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-indexes-table.html
 type IndexMeta struct {
 	MetaPageId     page.PageId // インデックスのメタデータが格納される B+Tree のメタページID
 	FileId         page.FileId // インデックスが属するテーブルの FileId
