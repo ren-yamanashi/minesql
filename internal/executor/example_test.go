@@ -394,7 +394,7 @@ func ExampleNestedLoopJoin() {
 			{Name: "id", Type: handler.ColumnTypeString},
 			{Name: "user_id", Type: handler.ColumnTypeString},
 			{Name: "item", Type: handler.ColumnTypeString},
-		})
+		}, nil)
 	if _, err := ct.Next(); err != nil {
 		panic(err)
 	}
@@ -463,7 +463,7 @@ func ExampleNestedLoopJoin_withFilter() {
 			{Name: "id", Type: handler.ColumnTypeString},
 			{Name: "user_id", Type: handler.ColumnTypeString},
 			{Name: "item", Type: handler.ColumnTypeString},
-		})
+		}, nil)
 	if _, err := ct.Next(); err != nil {
 		panic(err)
 	}
@@ -560,7 +560,7 @@ func setupExample() (*access.Table, func()) {
 			{Name: "id", Type: handler.ColumnTypeString},
 			{Name: "first_name", Type: handler.ColumnTypeString},
 			{Name: "last_name", Type: handler.ColumnTypeString},
-		})
+		}, nil)
 	if _, err := ct.Next(); err != nil {
 		panic(err)
 	}

@@ -115,7 +115,7 @@ func initStorageManagerForTest(t *testing.T) {
 }
 
 func createTableForTest(t *testing.T, tableName string, indexes []handler.CreateIndexParam, columns []handler.CreateColumnParam) {
-	createTable := NewCreateTable(tableName, 1, indexes, columns)
+	createTable := NewCreateTable(tableName, 1, indexes, columns, nil)
 	_, err := createTable.Next()
 	assert.NoError(t, err)
 }

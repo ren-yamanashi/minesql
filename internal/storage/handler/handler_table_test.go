@@ -18,7 +18,7 @@ func TestGetTable(t *testing.T) {
 		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
 			{Name: "name", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -47,6 +47,7 @@ func TestGetTable(t *testing.T) {
 				{Name: "id", Type: ColumnTypeString},
 				{Name: "email", Type: ColumnTypeString},
 			},
+			nil,
 		)
 		assert.NoError(t, err)
 
@@ -78,6 +79,7 @@ func TestGetTable(t *testing.T) {
 				{Name: "email", Type: ColumnTypeString},
 				{Name: "username", Type: ColumnTypeString},
 			},
+			nil,
 		)
 		assert.NoError(t, err)
 
@@ -107,6 +109,7 @@ func TestGetTable(t *testing.T) {
 				{Name: "id", Type: ColumnTypeString},
 				{Name: "category", Type: ColumnTypeString},
 			},
+			nil,
 		)
 		assert.NoError(t, err)
 
@@ -138,6 +141,7 @@ func TestGetTable(t *testing.T) {
 				{Name: "category", Type: ColumnTypeString},
 				{Name: "brand", Type: ColumnTypeString},
 			},
+			nil,
 		)
 		assert.NoError(t, err)
 
@@ -171,6 +175,7 @@ func TestGetTable(t *testing.T) {
 				{Name: "name", Type: ColumnTypeString},
 				{Name: "category", Type: ColumnTypeString},
 			},
+			nil,
 		)
 		assert.NoError(t, err)
 
@@ -216,7 +221,7 @@ func TestBuildTable(t *testing.T) {
 		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
 			{Name: "name", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 		tblMeta, ok := h.Catalog.GetTableMetaByName("users")
 		assert.True(t, ok)
@@ -244,6 +249,7 @@ func TestBuildTable(t *testing.T) {
 				{Name: "id", Type: ColumnTypeString},
 				{Name: "email", Type: ColumnTypeString},
 			},
+			nil,
 		)
 		assert.NoError(t, err)
 		tblMeta, ok := h.Catalog.GetTableMetaByName("users")
@@ -270,11 +276,11 @@ func TestBuildAllTables(t *testing.T) {
 
 		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 		err = h.CreateTable("orders", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 
 		// WHEN

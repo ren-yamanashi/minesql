@@ -19,8 +19,16 @@ type CreateColumnParam struct {
 	Type ColumnType
 }
 
+// CreateConstraintParam は外部キー制約の作成パラメータ
+type CreateConstraintParam struct {
+	ConstraintName string // 制約名
+	ColName        string // 外部キーカラム名
+	RefTableName   string // 参照先テーブル名
+	RefColName     string // 参照先カラム名
+}
+
 // CreateTable はテーブルを新規作成し、カタログに登録する
-func (h *Handler) CreateTable(tableName string, pkCount uint8, idxParams []CreateIndexParam, colParams []CreateColumnParam) error {
+func (h *Handler) CreateTable(tableName string, pkCount uint8, idxParams []CreateIndexParam, colParams []CreateColumnParam, constraintParams []CreateConstraintParam) error {
 	// FileId を採番
 	fileId, err := h.Catalog.AllocateFileId(h.BufferPool)
 	if err != nil {
@@ -74,7 +82,28 @@ func (h *Handler) CreateTable(tableName string, pkCount uint8, idxParams []Creat
 		colMeta[i] = dictionary.NewColumnMeta(fileId, col.Name, uint16(i), col.Type)
 	}
 
+	// 制約メタデータを作成
+	var conMeta []*dictionary.ConstraintMeta
+
+	// PK 制約を自動生成
+	for i := uint8(0); i < pkCount && int(i) < len(colParams); i++ {
+		conMeta = append(conMeta, dictionary.NewConstraintMeta(fileId, colParams[i].Name, string(dictionary.ConstraintTypePrimaryKey), "", ""))
+	}
+
+	// UK 制約を自動生成
+	for _, param := range idxParams {
+		if param.Unique {
+			conMeta = append(conMeta, dictionary.NewConstraintMeta(fileId, param.ColName, param.Name, "", ""))
+		}
+	}
+
+	// FK 制約を追加
+	for _, param := range constraintParams {
+		conMeta = append(conMeta, dictionary.NewConstraintMeta(fileId, param.ColName, param.ConstraintName, param.RefTableName, param.RefColName))
+	}
+
 	// テーブルメタデータを作成してカタログに登録
 	tblMeta := dictionary.NewTableMeta(fileId, tableName, uint8(len(colParams)), pkCount, colMeta, idxMeta, metaPageId)
+	tblMeta.Constraints = conMeta
 	return h.Catalog.Insert(h.BufferPool, tblMeta)
 }

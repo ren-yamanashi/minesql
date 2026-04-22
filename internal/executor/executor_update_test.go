@@ -629,7 +629,7 @@ func createLockTestTable(t *testing.T) *access.Table {
 	createTable := NewCreateTable("lock_test", 1, nil, []handler.CreateColumnParam{
 		{Name: "id", Type: handler.ColumnTypeString},
 		{Name: "name", Type: handler.ColumnTypeString},
-	})
+	}, nil)
 	_, err := createTable.Next()
 	assert.NoError(t, err)
 

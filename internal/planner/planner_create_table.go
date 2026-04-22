@@ -83,7 +83,7 @@ func PlanCreateTable(stmt *ast.CreateTableStmt) (executor.Executor, error) {
 		return nil, err
 	}
 
-	return executor.NewCreateTable(stmt.TableName, uint8(pkCount), idxParams, colParams), nil
+	return executor.NewCreateTable(stmt.TableName, uint8(pkCount), idxParams, colParams, nil), nil
 }
 
 // getPkCount はプライマリキーのカラム定義を検証し、プライマリキーのカラム数を返す

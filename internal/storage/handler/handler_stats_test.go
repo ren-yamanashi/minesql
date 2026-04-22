@@ -19,7 +19,7 @@ func TestAnalyzeTable(t *testing.T) {
 		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
 			{Name: "name", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 
 		tbl, err := h.GetTable("users")
@@ -52,7 +52,7 @@ func TestAnalyzeTable(t *testing.T) {
 
 		err := h.CreateTable("empty", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 		meta, _ := h.Catalog.GetTableMetaByName("empty")
 
