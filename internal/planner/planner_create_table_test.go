@@ -3,6 +3,7 @@ package planner
 import (
 	"minesql/internal/ast"
 	"minesql/internal/executor"
+	"minesql/internal/storage/handler"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -453,5 +454,249 @@ func TestPlanCreateTable(t *testing.T) {
 		assert.Error(t, err)
 		assert.Nil(t, exec)
 		assert.Contains(t, err.Error(), "does not exist")
+	})
+
+	t.Run("FK 制約付きのテーブルを作成できる", func(t *testing.T) {
+		// GIVEN: 親テーブルをカタログに登録
+		initStorageManagerForTest(t)
+		defer handler.Reset()
+
+		parentTable := executor.NewCreateTable("users", 1, nil, []handler.CreateColumnParam{
+			{Name: "id", Type: "string"},
+		}, nil)
+		_, err := parentTable.Next()
+		assert.NoError(t, err)
+
+		stmt := &ast.CreateTableStmt{
+			TableName: "orders",
+			CreateDefinitions: []ast.Definition{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "user_id", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{*ast.NewColumnId("id")}},
+				&ast.ConstraintKeyDef{KeyName: "idx_user_id", Column: *ast.NewColumnId("user_id")},
+				&ast.ConstraintForeignKeyDef{KeyName: "fk_user", Column: *ast.NewColumnId("user_id"), RefTable: "users", RefColumn: "id"},
+			},
+		}
+
+		// WHEN
+		exec, err := PlanCreateTable(stmt)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, exec)
+	})
+
+	t.Run("FK の参照先テーブルが存在しない場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		initStorageManagerForTest(t)
+		defer handler.Reset()
+
+		stmt := &ast.CreateTableStmt{
+			TableName: "orders",
+			CreateDefinitions: []ast.Definition{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "user_id", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{*ast.NewColumnId("id")}},
+				&ast.ConstraintKeyDef{KeyName: "idx_user_id", Column: *ast.NewColumnId("user_id")},
+				&ast.ConstraintForeignKeyDef{KeyName: "fk_user", Column: *ast.NewColumnId("user_id"), RefTable: "users", RefColumn: "id"},
+			},
+		}
+
+		// WHEN
+		exec, err := PlanCreateTable(stmt)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "referenced table 'users' does not exist")
+	})
+
+	t.Run("FK の参照先カラムが存在しない場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		initStorageManagerForTest(t)
+		defer handler.Reset()
+
+		parentTable := executor.NewCreateTable("users", 1, nil, []handler.CreateColumnParam{
+			{Name: "id", Type: "string"},
+		}, nil)
+		_, err := parentTable.Next()
+		assert.NoError(t, err)
+
+		stmt := &ast.CreateTableStmt{
+			TableName: "orders",
+			CreateDefinitions: []ast.Definition{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "user_id", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{*ast.NewColumnId("id")}},
+				&ast.ConstraintKeyDef{KeyName: "idx_user_id", Column: *ast.NewColumnId("user_id")},
+				&ast.ConstraintForeignKeyDef{KeyName: "fk_user", Column: *ast.NewColumnId("user_id"), RefTable: "users", RefColumn: "nonexistent"},
+			},
+		}
+
+		// WHEN
+		exec, err := PlanCreateTable(stmt)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "referenced column 'nonexistent' does not exist in table 'users'")
+	})
+
+	t.Run("FK の参照先カラムに PK も UNIQUE KEY もない場合、エラーを返す", func(t *testing.T) {
+		// GIVEN: 参照先カラムが非ユニークインデックスしか持たないテーブル
+		initStorageManagerForTest(t)
+		defer handler.Reset()
+
+		parentTable := executor.NewCreateTable("users", 1,
+			[]handler.CreateIndexParam{{Name: "idx_name", ColName: "name", ColIdx: 1, Unique: false}},
+			[]handler.CreateColumnParam{
+				{Name: "id", Type: "string"},
+				{Name: "name", Type: "string"},
+			}, nil)
+		_, err := parentTable.Next()
+		assert.NoError(t, err)
+
+		stmt := &ast.CreateTableStmt{
+			TableName: "orders",
+			CreateDefinitions: []ast.Definition{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "user_name", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{*ast.NewColumnId("id")}},
+				&ast.ConstraintKeyDef{KeyName: "idx_user_name", Column: *ast.NewColumnId("user_name")},
+				&ast.ConstraintForeignKeyDef{KeyName: "fk_user", Column: *ast.NewColumnId("user_name"), RefTable: "users", RefColumn: "name"},
+			},
+		}
+
+		// WHEN
+		exec, err := PlanCreateTable(stmt)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "must be a primary key or have a unique index")
+	})
+
+	t.Run("自己参照 FK の場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		initStorageManagerForTest(t)
+		defer handler.Reset()
+
+		stmt := &ast.CreateTableStmt{
+			TableName: "categories",
+			CreateDefinitions: []ast.Definition{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "parent_id", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{*ast.NewColumnId("id")}},
+				&ast.ConstraintKeyDef{KeyName: "idx_parent_id", Column: *ast.NewColumnId("parent_id")},
+				&ast.ConstraintForeignKeyDef{KeyName: "fk_parent", Column: *ast.NewColumnId("parent_id"), RefTable: "categories", RefColumn: "id"},
+			},
+		}
+
+		// WHEN
+		exec, err := PlanCreateTable(stmt)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "self-referencing foreign key is not supported")
+	})
+
+	t.Run("FK カラムが存在しない場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		initStorageManagerForTest(t)
+		defer handler.Reset()
+
+		parentTable := executor.NewCreateTable("users", 1, nil, []handler.CreateColumnParam{
+			{Name: "id", Type: "string"},
+		}, nil)
+		_, err := parentTable.Next()
+		assert.NoError(t, err)
+
+		stmt := &ast.CreateTableStmt{
+			TableName: "orders",
+			CreateDefinitions: []ast.Definition{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{*ast.NewColumnId("id")}},
+				&ast.ConstraintForeignKeyDef{KeyName: "fk_user", Column: *ast.NewColumnId("nonexistent"), RefTable: "users", RefColumn: "id"},
+			},
+		}
+
+		// WHEN
+		exec, err := PlanCreateTable(stmt)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "foreign key column 'nonexistent' does not exist")
+	})
+
+	t.Run("同一 CREATE TABLE 内で FK 名が重複する場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		initStorageManagerForTest(t)
+		defer handler.Reset()
+
+		parentTable1 := executor.NewCreateTable("t1", 1, nil, []handler.CreateColumnParam{
+			{Name: "id", Type: "string"},
+		}, nil)
+		_, err := parentTable1.Next()
+		assert.NoError(t, err)
+		parentTable2 := executor.NewCreateTable("t2", 1, nil, []handler.CreateColumnParam{
+			{Name: "id", Type: "string"},
+		}, nil)
+		_, err = parentTable2.Next()
+		assert.NoError(t, err)
+
+		stmt := &ast.CreateTableStmt{
+			TableName: "orders",
+			CreateDefinitions: []ast.Definition{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "col1", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "col2", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{*ast.NewColumnId("id")}},
+				&ast.ConstraintKeyDef{KeyName: "idx_col1", Column: *ast.NewColumnId("col1")},
+				&ast.ConstraintKeyDef{KeyName: "idx_col2", Column: *ast.NewColumnId("col2")},
+				&ast.ConstraintForeignKeyDef{KeyName: "fk_dup", Column: *ast.NewColumnId("col1"), RefTable: "t1", RefColumn: "id"},
+				&ast.ConstraintForeignKeyDef{KeyName: "fk_dup", Column: *ast.NewColumnId("col2"), RefTable: "t2", RefColumn: "id"},
+			},
+		}
+
+		// WHEN
+		exec, err := PlanCreateTable(stmt)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "duplicate foreign key constraint name: 'fk_dup'")
+	})
+
+	t.Run("FK カラムにインデックスがない場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		initStorageManagerForTest(t)
+		defer handler.Reset()
+
+		parentTable := executor.NewCreateTable("users", 1, nil, []handler.CreateColumnParam{
+			{Name: "id", Type: "string"},
+		}, nil)
+		_, err := parentTable.Next()
+		assert.NoError(t, err)
+
+		stmt := &ast.CreateTableStmt{
+			TableName: "orders",
+			CreateDefinitions: []ast.Definition{
+				&ast.ColumnDef{ColName: "id", DataType: ast.DataTypeVarchar},
+				&ast.ColumnDef{ColName: "user_id", DataType: ast.DataTypeVarchar},
+				&ast.ConstraintPrimaryKeyDef{Columns: []ast.ColumnId{*ast.NewColumnId("id")}},
+				// KEY idx_user_id (user_id) がない
+				&ast.ConstraintForeignKeyDef{KeyName: "fk_user", Column: *ast.NewColumnId("user_id"), RefTable: "users", RefColumn: "id"},
+			},
+		}
+
+		// WHEN
+		exec, err := PlanCreateTable(stmt)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, exec)
+		assert.Contains(t, err.Error(), "foreign key column 'user_id' must have an index")
 	})
 }
