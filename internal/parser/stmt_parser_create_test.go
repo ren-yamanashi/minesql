@@ -434,4 +434,92 @@ CREATE TABLE users ( /* テーブル定義開始 */
 		assert.True(t, ok)
 		assert.Equal(t, "idx_category", keyDef.KeyName)
 	})
+
+	t.Run("FOREIGN KEY 付きの CREATE TABLE 文をパースできる", func(t *testing.T) {
+		// GIVEN
+		sql := "CREATE TABLE orders (id VARCHAR, user_id VARCHAR, PRIMARY KEY (id), KEY idx_user_id (user_id), FOREIGN KEY fk_user (user_id) REFERENCES users (id));"
+		parser := NewParser()
+
+		// WHEN
+		result, err := parser.Parse(sql)
+
+		// THEN
+		assert.NoError(t, err)
+		createStmt, ok := result.(*ast.CreateTableStmt)
+		assert.True(t, ok)
+		assert.Equal(t, "orders", createStmt.TableName)
+		assert.Equal(t, 5, len(createStmt.CreateDefinitions))
+
+		// FOREIGN KEY
+		fkDef, ok := createStmt.CreateDefinitions[4].(*ast.ConstraintForeignKeyDef)
+		assert.True(t, ok)
+		assert.Equal(t, "fk_user", fkDef.KeyName)
+		assert.Equal(t, "user_id", fkDef.Column.ColName)
+		assert.Equal(t, "users", fkDef.RefTable)
+		assert.Equal(t, "id", fkDef.RefColumn)
+	})
+
+	t.Run("複数の FOREIGN KEY 付きの CREATE TABLE 文をパースできる", func(t *testing.T) {
+		// GIVEN
+		sql := "CREATE TABLE order_items (id VARCHAR, order_id VARCHAR, product_id VARCHAR, PRIMARY KEY (id), KEY idx_order_id (order_id), FOREIGN KEY fk_order (order_id) REFERENCES orders (id), FOREIGN KEY fk_product (product_id) REFERENCES products (id));"
+		parser := NewParser()
+
+		// WHEN
+		result, err := parser.Parse(sql)
+
+		// THEN
+		assert.NoError(t, err)
+		createStmt, ok := result.(*ast.CreateTableStmt)
+		assert.True(t, ok)
+		assert.Equal(t, 7, len(createStmt.CreateDefinitions))
+
+		// 1 つ目の FK
+		fk1, ok := createStmt.CreateDefinitions[5].(*ast.ConstraintForeignKeyDef)
+		assert.True(t, ok)
+		assert.Equal(t, "fk_order", fk1.KeyName)
+		assert.Equal(t, "order_id", fk1.Column.ColName)
+		assert.Equal(t, "orders", fk1.RefTable)
+
+		// 2 つ目の FK
+		fk2, ok := createStmt.CreateDefinitions[6].(*ast.ConstraintForeignKeyDef)
+		assert.True(t, ok)
+		assert.Equal(t, "fk_product", fk2.KeyName)
+		assert.Equal(t, "product_id", fk2.Column.ColName)
+		assert.Equal(t, "products", fk2.RefTable)
+	})
+
+	t.Run("PK, UK, KEY, FK が混在する CREATE TABLE 文をパースできる", func(t *testing.T) {
+		// GIVEN
+		sql := "CREATE TABLE orders (id VARCHAR, code VARCHAR, user_id VARCHAR, PRIMARY KEY (id), UNIQUE KEY idx_code (code), KEY idx_user_id (user_id), FOREIGN KEY fk_user (user_id) REFERENCES users (id));"
+		parser := NewParser()
+
+		// WHEN
+		result, err := parser.Parse(sql)
+
+		// THEN
+		assert.NoError(t, err)
+		createStmt, ok := result.(*ast.CreateTableStmt)
+		assert.True(t, ok)
+		assert.Equal(t, 7, len(createStmt.CreateDefinitions))
+
+		// PK
+		_, ok = createStmt.CreateDefinitions[3].(*ast.ConstraintPrimaryKeyDef)
+		assert.True(t, ok)
+
+		// UK
+		ukDef, ok := createStmt.CreateDefinitions[4].(*ast.ConstraintUniqueKeyDef)
+		assert.True(t, ok)
+		assert.Equal(t, "idx_code", ukDef.KeyName)
+
+		// KEY
+		keyDef, ok := createStmt.CreateDefinitions[5].(*ast.ConstraintKeyDef)
+		assert.True(t, ok)
+		assert.Equal(t, "idx_user_id", keyDef.KeyName)
+
+		// FK
+		fkDef, ok := createStmt.CreateDefinitions[6].(*ast.ConstraintForeignKeyDef)
+		assert.True(t, ok)
+		assert.Equal(t, "fk_user", fkDef.KeyName)
+		assert.Equal(t, "users", fkDef.RefTable)
+	})
 }

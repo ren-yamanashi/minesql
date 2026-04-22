@@ -251,6 +251,38 @@ VALUES
 	//   合計: 2 件
 }
 
+func Example_foreignKey() {
+	var trxId handler.TrxId = 1
+	cleanup := setupParserExample(trxId)
+	defer cleanup()
+
+	// FK 付き子テーブルを作成
+	runSQL(trxId, `
+CREATE TABLE orders (
+	id VARCHAR,
+	user_id VARCHAR,
+	item VARCHAR,
+	PRIMARY KEY (id),
+	KEY idx_user_id (user_id),
+	FOREIGN KEY fk_user (user_id) REFERENCES users (id)
+);`)
+
+	runSQL(trxId, `
+INSERT INTO
+	orders (id, user_id, item)
+VALUES
+	('100', '1', 'apple'),
+	('101', '3', 'banana');`)
+
+	records := runSQL(trxId, `SELECT * FROM orders;`)
+	printRecords(records)
+
+	// Output:
+	//   (100, 1, apple)
+	//   (101, 3, banana)
+	//   合計: 2 件
+}
+
 func Example_delete() {
 	var trxId handler.TrxId = 1
 	cleanup := setupParserExample(trxId)
