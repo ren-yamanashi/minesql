@@ -208,6 +208,31 @@ func (c *Catalog) GetAllTables() []*TableMeta {
 	return c.metadata
 }
 
+// ChildForeignKey は参照元テーブルの FK 制約と、その FK が属するテーブル名を組み合わせたもの
+type ChildForeignKey struct {
+	TableName  string          // FK 制約が属するテーブル名 (子テーブル名)
+	Constraint *ConstraintMeta // FK 制約メタデータ
+}
+
+// GetForeignKeysReferencingTable は指定されたテーブルを参照する FK 制約を全テーブルから収集する
+//
+// 計算量は O(テーブル数 x 制約数) の全走査。学習プロジェクトのため許容する。
+// 将来的に逆引きインデックスの追加で最適化可能。
+func (c *Catalog) GetForeignKeysReferencingTable(tableName string) []ChildForeignKey {
+	var result []ChildForeignKey
+	for _, tblMeta := range c.metadata {
+		for _, con := range tblMeta.Constraints {
+			if con.RefTableName == tableName {
+				result = append(result, ChildForeignKey{
+					TableName:  tblMeta.Name,
+					Constraint: con,
+				})
+			}
+		}
+	}
+	return result
+}
+
 // AllocateFileId は新しい FileId を採番し、ディスク上のカウンターを更新する
 func (c *Catalog) AllocateFileId(bp *buffer.BufferPool) (page.FileId, error) {
 	id := c.NextFileId

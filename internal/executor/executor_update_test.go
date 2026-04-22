@@ -521,6 +521,118 @@ func TestUpdate_Next(t *testing.T) {
 		assert.NoError(t, hdl.CommitTrx(trx2))
 	})
 
+	t.Run("FK カラムの値を存在しない参照先に変更するとエラーになる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "10")
+		handler.Reset()
+		handler.Init()
+		defer handler.Reset()
+
+		parentCt := NewCreateTable("users", 1, nil, []handler.CreateColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+		}, nil)
+		_, err := parentCt.Next()
+		assert.NoError(t, err)
+
+		childCt := NewCreateTable("orders", 1,
+			[]handler.CreateIndexParam{{Name: "idx_user_id", ColName: "user_id", ColIdx: 1, Unique: false}},
+			[]handler.CreateColumnParam{
+				{Name: "id", Type: handler.ColumnTypeString},
+				{Name: "user_id", Type: handler.ColumnTypeString},
+			},
+			[]handler.CreateConstraintParam{{ConstraintName: "fk_user", ColName: "user_id", RefTableName: "users", RefColName: "id"}},
+		)
+		_, err = childCt.Next()
+		assert.NoError(t, err)
+
+		hdl := handler.Get()
+		trxId := hdl.BeginTrx()
+
+		// 親にレコード挿入、子から参照
+		usersTbl, err := hdl.GetTable("users")
+		assert.NoError(t, err)
+		ins := NewInsert(trxId, usersTbl, []Record{{[]byte("1")}})
+		_, err = ins.Next()
+		assert.NoError(t, err)
+
+		ordersTbl, err := hdl.GetTable("orders")
+		assert.NoError(t, err)
+		insChild := NewInsert(trxId, ordersTbl, []Record{{[]byte("100"), []byte("1")}})
+		_, err = insChild.Next()
+		assert.NoError(t, err)
+
+		// WHEN: FK カラムを存在しない値に更新
+		upd := NewUpdate(trxId, ordersTbl, []SetColumn{
+			{Pos: 1, Value: []byte("999")},
+		}, testTableScan(ordersTbl,
+			access.RecordSearchModeStart{},
+			func(record Record) bool { return true },
+		))
+		_, err = upd.Next()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "foreign key constraint fails")
+	})
+
+	t.Run("参照されている親の PK を変更するとエラーになる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "10")
+		handler.Reset()
+		handler.Init()
+		defer handler.Reset()
+
+		parentCt := NewCreateTable("users", 1, nil, []handler.CreateColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "name", Type: handler.ColumnTypeString},
+		}, nil)
+		_, err := parentCt.Next()
+		assert.NoError(t, err)
+
+		childCt := NewCreateTable("orders", 1,
+			[]handler.CreateIndexParam{{Name: "idx_user_id", ColName: "user_id", ColIdx: 1, Unique: false}},
+			[]handler.CreateColumnParam{
+				{Name: "id", Type: handler.ColumnTypeString},
+				{Name: "user_id", Type: handler.ColumnTypeString},
+			},
+			[]handler.CreateConstraintParam{{ConstraintName: "fk_user", ColName: "user_id", RefTableName: "users", RefColName: "id"}},
+		)
+		_, err = childCt.Next()
+		assert.NoError(t, err)
+
+		hdl := handler.Get()
+		trxId := hdl.BeginTrx()
+
+		usersTbl, err := hdl.GetTable("users")
+		assert.NoError(t, err)
+		ins := NewInsert(trxId, usersTbl, []Record{{[]byte("1"), []byte("Alice")}})
+		_, err = ins.Next()
+		assert.NoError(t, err)
+
+		ordersTbl, err := hdl.GetTable("orders")
+		assert.NoError(t, err)
+		insChild := NewInsert(trxId, ordersTbl, []Record{{[]byte("100"), []byte("1")}})
+		_, err = insChild.Next()
+		assert.NoError(t, err)
+
+		// WHEN: 参照されている親の PK を変更
+		upd := NewUpdate(trxId, usersTbl, []SetColumn{
+			{Pos: 0, Value: []byte("999")},
+		}, testTableScan(usersTbl,
+			access.RecordSearchModeStart{},
+			func(record Record) bool { return true },
+		))
+		_, err = upd.Next()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "foreign key constraint fails")
+	})
+
 	t.Run("デッドロック発生後に ROLLBACK が成功する", func(t *testing.T) {
 		// GIVEN: MVCC では SELECT は共有ロックを取らないため、S2PL のような共有ロック昇格のデッドロックは発生しない
 		// 代わりに、2 つの UPDATE が同じ行に排他ロックを取ろうとし、一方がタイムアウトする

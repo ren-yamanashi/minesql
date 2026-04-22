@@ -660,6 +660,114 @@ func TestAllocateFileId(t *testing.T) {
 	})
 }
 
+func TestGetForeignKeysReferencingTable(t *testing.T) {
+	t.Run("指定したテーブルを参照する FK 制約を取得できる", func(t *testing.T) {
+		// GIVEN
+		bp, tmpdir := InitCatalogDisk(t)
+		defer removeTmpdir(t, tmpdir)
+
+		cat, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+
+		// 親テーブル
+		parentMeta := NewTableMeta(page.FileId(1), "users", 1, 1, []*ColumnMeta{
+			NewColumnMeta(page.FileId(1), "id", 0, ColumnTypeString),
+		}, []*IndexMeta{}, page.NewPageId(page.FileId(1), 0))
+		err = cat.Insert(bp, parentMeta)
+		assert.NoError(t, err)
+
+		// 子テーブル (users を参照する FK 制約あり)
+		childMeta := NewTableMeta(page.FileId(2), "orders", 2, 1, []*ColumnMeta{
+			NewColumnMeta(page.FileId(2), "id", 0, ColumnTypeString),
+			NewColumnMeta(page.FileId(2), "user_id", 1, ColumnTypeString),
+		}, []*IndexMeta{}, page.NewPageId(page.FileId(2), 0))
+		childMeta.Constraints = []*ConstraintMeta{
+			NewConstraintMeta(page.FileId(2), "id", "PRIMARY", "", ""),
+			NewConstraintMeta(page.FileId(2), "user_id", "fk_user", "users", "id"),
+		}
+		err = cat.Insert(bp, childMeta)
+		assert.NoError(t, err)
+
+		// WHEN
+		result := cat.GetForeignKeysReferencingTable("users")
+
+		// THEN
+		assert.Equal(t, 1, len(result))
+		assert.Equal(t, "orders", result[0].TableName)
+		assert.Equal(t, "fk_user", result[0].Constraint.ConstraintName)
+		assert.Equal(t, "user_id", result[0].Constraint.ColName)
+		assert.Equal(t, "users", result[0].Constraint.RefTableName)
+	})
+
+	t.Run("参照する FK 制約がない場合は空のスライスを返す", func(t *testing.T) {
+		// GIVEN
+		bp, tmpdir := InitCatalogDisk(t)
+		defer removeTmpdir(t, tmpdir)
+
+		cat, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+
+		parentMeta := NewTableMeta(page.FileId(1), "users", 1, 1, []*ColumnMeta{
+			NewColumnMeta(page.FileId(1), "id", 0, ColumnTypeString),
+		}, []*IndexMeta{}, page.NewPageId(page.FileId(1), 0))
+		err = cat.Insert(bp, parentMeta)
+		assert.NoError(t, err)
+
+		// WHEN
+		result := cat.GetForeignKeysReferencingTable("users")
+
+		// THEN
+		assert.Empty(t, result)
+	})
+
+	t.Run("複数のテーブルから参照されている場合、全ての FK 制約を返す", func(t *testing.T) {
+		// GIVEN
+		bp, tmpdir := InitCatalogDisk(t)
+		defer removeTmpdir(t, tmpdir)
+
+		cat, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+
+		// 親テーブル
+		parentMeta := NewTableMeta(page.FileId(1), "users", 1, 1, []*ColumnMeta{
+			NewColumnMeta(page.FileId(1), "id", 0, ColumnTypeString),
+		}, []*IndexMeta{}, page.NewPageId(page.FileId(1), 0))
+		err = cat.Insert(bp, parentMeta)
+		assert.NoError(t, err)
+
+		// 子テーブル 1
+		child1 := NewTableMeta(page.FileId(2), "orders", 2, 1, []*ColumnMeta{
+			NewColumnMeta(page.FileId(2), "id", 0, ColumnTypeString),
+			NewColumnMeta(page.FileId(2), "user_id", 1, ColumnTypeString),
+		}, []*IndexMeta{}, page.NewPageId(page.FileId(2), 0))
+		child1.Constraints = []*ConstraintMeta{
+			NewConstraintMeta(page.FileId(2), "user_id", "fk_order_user", "users", "id"),
+		}
+		err = cat.Insert(bp, child1)
+		assert.NoError(t, err)
+
+		// 子テーブル 2
+		child2 := NewTableMeta(page.FileId(3), "comments", 2, 1, []*ColumnMeta{
+			NewColumnMeta(page.FileId(3), "id", 0, ColumnTypeString),
+			NewColumnMeta(page.FileId(3), "author_id", 1, ColumnTypeString),
+		}, []*IndexMeta{}, page.NewPageId(page.FileId(3), 0))
+		child2.Constraints = []*ConstraintMeta{
+			NewConstraintMeta(page.FileId(3), "author_id", "fk_comment_user", "users", "id"),
+		}
+		err = cat.Insert(bp, child2)
+		assert.NoError(t, err)
+
+		// WHEN
+		result := cat.GetForeignKeysReferencingTable("users")
+
+		// THEN
+		assert.Equal(t, 2, len(result))
+		names := []string{result[0].TableName, result[1].TableName}
+		assert.Contains(t, names, "orders")
+		assert.Contains(t, names, "comments")
+	})
+}
+
 func InitCatalogDisk(t *testing.T) (bp *buffer.BufferPool, tmpdir string) {
 	tmpdir = t.TempDir()
 	filePath := filepath.Join(tmpdir, "minesql.db")
