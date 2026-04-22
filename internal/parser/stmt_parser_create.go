@@ -74,7 +74,7 @@ func (cp *CreateParser) onKeyword(word string) {
 			return
 		}
 	case CreateStateBody:
-		if upper == KPrimary || upper == KUnique || upper == KKey {
+		if upper == KPrimary || upper == KUnique || upper == KKey || upper == KForeign {
 			cp.conParser = NewConstraintDefParser()
 			cp.conParser.onKeyword(word)
 			return
@@ -134,7 +134,11 @@ func (cp *CreateParser) onSymbol(symbol string) {
 		}
 		if symbol == string(SRightParen) {
 			cp.conParser.onSymbol(symbol)
-			cp.flushActiveParser()
+			// FK では FOREIGN KEY fk (col) の ")" の後に REFERENCES ... が続くため、
+			// isDone() が true の時だけ flush する
+			if cp.conParser.done {
+				cp.flushActiveParser()
+			}
 			return
 		}
 	}

@@ -44,3 +44,12 @@ type ConstraintKeyDef struct {
 }
 
 func (*ConstraintKeyDef) isDefinition() {}
+
+type ConstraintForeignKeyDef struct {
+	KeyName   string   // FK 制約名 (必須)
+	Column    ColumnId // FK カラム
+	RefTable  string   // 参照先テーブル名
+	RefColumn string   // 参照先カラム名
+}
+
+func (*ConstraintForeignKeyDef) isDefinition() {}

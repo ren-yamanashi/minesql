@@ -710,7 +710,7 @@ func initStorageManager(t *testing.T, dataDir string) {
 		{Name: "id", Type: handler.ColumnTypeString},
 		{Name: "first_name", Type: handler.ColumnTypeString},
 		{Name: "last_name", Type: handler.ColumnTypeString},
-	})
+	}, nil)
 	_, err := createTable.Next()
 	assert.NoError(t, err)
 }
@@ -1275,7 +1275,7 @@ func initStorageManagerWithNonUniqueIndex(t *testing.T, dataDir string) {
 		{Name: "id", Type: handler.ColumnTypeString},
 		{Name: "name", Type: handler.ColumnTypeString},
 		{Name: "category", Type: handler.ColumnTypeString},
-	})
+	}, nil)
 	_, err := createTable.Next()
 	assert.NoError(t, err)
 }

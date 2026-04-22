@@ -63,6 +63,28 @@ func TestParse(t *testing.T) {
 		assert.Equal(t, "users", stmt.TableName)
 	})
 
+	t.Run("FOREIGN KEY 付き CREATE TABLE 文をパースできる", func(t *testing.T) {
+		// GIVEN
+		p := NewParser()
+
+		// WHEN
+		result, err := p.Parse("CREATE TABLE orders (id VARCHAR, user_id VARCHAR, PRIMARY KEY (id), KEY idx_user_id (user_id), FOREIGN KEY fk_user (user_id) REFERENCES users (id));")
+
+		// THEN
+		assert.NoError(t, err)
+		stmt, ok := result.(*ast.CreateTableStmt)
+		assert.True(t, ok)
+		assert.Equal(t, "orders", stmt.TableName)
+		assert.Equal(t, 5, len(stmt.CreateDefinitions))
+
+		fkDef, ok := stmt.CreateDefinitions[4].(*ast.ConstraintForeignKeyDef)
+		assert.True(t, ok)
+		assert.Equal(t, "fk_user", fkDef.KeyName)
+		assert.Equal(t, "user_id", fkDef.Column.ColName)
+		assert.Equal(t, "users", fkDef.RefTable)
+		assert.Equal(t, "id", fkDef.RefColumn)
+	})
+
 	t.Run("DELETE 文をパースできる", func(t *testing.T) {
 		// GIVEN
 		p := NewParser()

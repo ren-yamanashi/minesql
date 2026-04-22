@@ -7,7 +7,7 @@
 | カラムのデータ型指定 | - | 全部文字列型として扱う |
 | デフォルト値の指定 | - | - |
 | NOT NULL 制約 | - | - |
-| 外部キー制約 | - | - |
+| 外部キー制約 | ✅ | RESTRICT のみ。自己参照は非対応。FK カラムにインデックス必須 |
 
 ### テーブル (クラスタ化インデックス)
 
@@ -31,3 +31,18 @@
 
 - インデックス名は一意でなければならない
 - 1 つのカラムに対して複数のセカンダリインデックスを作成することはできない
+
+### 外部キー制約
+
+| 機能 | 実装 | 備考 |
+| ---- | --- | ---- |
+| FOREIGN KEY 構文 | ✅ | `FOREIGN KEY fk_name (col) REFERENCES ref_table (ref_col)` |
+| ON DELETE RESTRICT | ✅ | デフォルト動作 |
+| ON DELETE CASCADE | - | - |
+| ON UPDATE RESTRICT | ✅ | デフォルト動作 |
+| ON UPDATE CASCADE | - | - |
+| 自己参照 FK | - | - |
+
+- FK 制約名は全テーブルを通じて一意でなければならない
+- FK カラム (子テーブル側) には KEY, UNIQUE KEY, PRIMARY KEY のいずれかのインデックスが必須
+- 参照先カラム (親テーブル側) には PRIMARY KEY または UNIQUE KEY が必須

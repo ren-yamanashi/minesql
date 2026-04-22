@@ -129,7 +129,7 @@ func InitStorageEngineForTest(t *testing.T, dataDir string) *handler.Handler {
 		{Name: "id", Type: handler.ColumnTypeString},
 		{Name: "first_name", Type: handler.ColumnTypeString},
 		{Name: "last_name", Type: handler.ColumnTypeString},
-	})
+	}, nil)
 	_, err := createTable.Next()
 	assert.NoError(t, err)
 

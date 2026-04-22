@@ -104,6 +104,47 @@ func TestInsert_Next(t *testing.T) {
 
 		assert.NoError(t, hdl.CommitTrx(trx1))
 	})
+
+	t.Run("FK 制約がある場合、参照先に値が存在しなければ INSERT がエラーになる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "10")
+		handler.Reset()
+		handler.Init()
+		defer handler.Reset()
+
+		// プランナー経由で FK 付きテーブルを作成
+		parentCt := NewCreateTable("users", 1, nil, []handler.CreateColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+		}, nil)
+		_, err := parentCt.Next()
+		assert.NoError(t, err)
+
+		childCt := NewCreateTable("orders", 1,
+			[]handler.CreateIndexParam{{Name: "idx_user_id", ColName: "user_id", ColIdx: 1, Unique: false}},
+			[]handler.CreateColumnParam{
+				{Name: "id", Type: handler.ColumnTypeString},
+				{Name: "user_id", Type: handler.ColumnTypeString},
+			},
+			[]handler.CreateConstraintParam{{ConstraintName: "fk_user", ColName: "user_id", RefTableName: "users", RefColName: "id"}},
+		)
+		_, err = childCt.Next()
+		assert.NoError(t, err)
+
+		hdl := handler.Get()
+		trxId := hdl.BeginTrx()
+
+		// WHEN: 親テーブルに値がない状態で子に INSERT
+		ordersTbl, err := hdl.GetTable("orders")
+		assert.NoError(t, err)
+		insChild := NewInsert(trxId, ordersTbl, []Record{{[]byte("100"), []byte("999")}})
+		_, err = insChild.Next()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "foreign key constraint fails")
+	})
 }
 
 func initStorageManagerForTest(t *testing.T) {
@@ -115,7 +156,7 @@ func initStorageManagerForTest(t *testing.T) {
 }
 
 func createTableForTest(t *testing.T, tableName string, indexes []handler.CreateIndexParam, columns []handler.CreateColumnParam) {
-	createTable := NewCreateTable(tableName, 1, indexes, columns)
+	createTable := NewCreateTable(tableName, 1, indexes, columns, nil)
 	_, err := createTable.Next()
 	assert.NoError(t, err)
 }

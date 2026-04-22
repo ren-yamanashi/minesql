@@ -281,7 +281,7 @@ func TestLoadTableMeta(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		result, err := loadTableMeta(bp, cat.TableMetaPageId, cat.IndexMetaPageId, cat.ColumnMetaPageId)
+		result, err := loadTableMeta(bp, cat.TableMetaPageId, cat.IndexMetaPageId, cat.ColumnMetaPageId, cat.ConstraintMetaPageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -311,7 +311,7 @@ func TestLoadTableMeta(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		result, err := loadTableMeta(bp, cat.TableMetaPageId, cat.IndexMetaPageId, cat.ColumnMetaPageId)
+		result, err := loadTableMeta(bp, cat.TableMetaPageId, cat.IndexMetaPageId, cat.ColumnMetaPageId, cat.ConstraintMetaPageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -343,7 +343,7 @@ func TestLoadTableMeta(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		result, err := loadTableMeta(bp, cat.TableMetaPageId, cat.IndexMetaPageId, cat.ColumnMetaPageId)
+		result, err := loadTableMeta(bp, cat.TableMetaPageId, cat.IndexMetaPageId, cat.ColumnMetaPageId, cat.ConstraintMetaPageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -353,6 +353,72 @@ func TestLoadTableMeta(t *testing.T) {
 		assert.Equal(t, "email", result[0].Indexes[0].ColName)
 		assert.Equal(t, IndexTypeUnique, result[0].Indexes[0].Type)
 		assert.Equal(t, idxDataPageId, result[0].Indexes[0].DataMetaPageId)
+	})
+
+	t.Run("制約メタデータも含めて読み込める", func(t *testing.T) {
+		// GIVEN
+		bp, tmpdir := InitCatalogDisk(t)
+		defer removeTmpdir(t, tmpdir)
+
+		cat, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+			NewColumnMeta(1, "user_id", 1, ColumnTypeString),
+		}
+		conMeta := []*ConstraintMeta{
+			NewConstraintMeta(1, "id", "PRIMARY", "", ""),
+			NewConstraintMeta(1, "user_id", "fk_user", "users", "id"),
+		}
+		tableMeta := NewTableMeta(1, "orders", 2, 1, colMeta, []*IndexMeta{}, page.NewPageId(page.FileId(1), 0))
+		tableMeta.Constraints = conMeta
+		err = cat.Insert(bp, tableMeta)
+		assert.NoError(t, err)
+
+		// WHEN
+		result, err := loadTableMeta(bp, cat.TableMetaPageId, cat.IndexMetaPageId, cat.ColumnMetaPageId, cat.ConstraintMetaPageId)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(result))
+		assert.Equal(t, 2, len(result[0].Constraints))
+
+		// PK 制約
+		assert.Equal(t, "id", result[0].Constraints[0].ColName)
+		assert.Equal(t, "PRIMARY", result[0].Constraints[0].ConstraintName)
+		assert.Equal(t, "", result[0].Constraints[0].RefTableName)
+		assert.Equal(t, "", result[0].Constraints[0].RefColName)
+
+		// FK 制約
+		assert.Equal(t, "user_id", result[0].Constraints[1].ColName)
+		assert.Equal(t, "fk_user", result[0].Constraints[1].ConstraintName)
+		assert.Equal(t, "users", result[0].Constraints[1].RefTableName)
+		assert.Equal(t, "id", result[0].Constraints[1].RefColName)
+	})
+
+	t.Run("制約メタデータがない場合は空のスライスになる", func(t *testing.T) {
+		// GIVEN
+		bp, tmpdir := InitCatalogDisk(t)
+		defer removeTmpdir(t, tmpdir)
+
+		cat, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(1, "id", 0, ColumnTypeString),
+		}
+		tableMeta := NewTableMeta(1, "users", 1, 1, colMeta, []*IndexMeta{}, page.NewPageId(page.FileId(1), 0))
+		err = cat.Insert(bp, tableMeta)
+		assert.NoError(t, err)
+
+		// WHEN
+		result, err := loadTableMeta(bp, cat.TableMetaPageId, cat.IndexMetaPageId, cat.ColumnMetaPageId, cat.ConstraintMetaPageId)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(result))
+		assert.Empty(t, result[0].Constraints)
 	})
 
 	t.Run("複数のテーブルメタデータを読み込める", func(t *testing.T) {
@@ -379,7 +445,7 @@ func TestLoadTableMeta(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		result, err := loadTableMeta(bp, cat.TableMetaPageId, cat.IndexMetaPageId, cat.ColumnMetaPageId)
+		result, err := loadTableMeta(bp, cat.TableMetaPageId, cat.IndexMetaPageId, cat.ColumnMetaPageId, cat.ConstraintMetaPageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -401,7 +467,7 @@ func TestLoadTableMeta(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		result, err := loadTableMeta(bp, cat.TableMetaPageId, cat.IndexMetaPageId, cat.ColumnMetaPageId)
+		result, err := loadTableMeta(bp, cat.TableMetaPageId, cat.IndexMetaPageId, cat.ColumnMetaPageId, cat.ConstraintMetaPageId)
 
 		// THEN
 		assert.NoError(t, err)

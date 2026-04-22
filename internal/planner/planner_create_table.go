@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"minesql/internal/ast"
 	"minesql/internal/executor"
+	"minesql/internal/storage/dictionary"
 	"minesql/internal/storage/handler"
 )
 
@@ -16,7 +17,8 @@ func PlanCreateTable(stmt *ast.CreateTableStmt) (executor.Executor, error) {
 	var pkDef *ast.ConstraintPrimaryKeyDef
 	var ukDefs []*ast.ConstraintUniqueKeyDef
 	var keyDefs []*ast.ConstraintKeyDef
-	idxKeyNames := map[string]bool{} // 登録済みのインデックス名 (UK/KEY 共通)
+	var fkDefs []*ast.ConstraintForeignKeyDef
+	idxKeyNames := map[string]bool{} // 登録済みのインデックス名 (UK/KEY/FK 名との重複チェックにも使用)
 	idxColNames := map[string]bool{} // 登録済みのインデックスカラム名 (UK/KEY 共通)
 	currentColIdx := 0
 
@@ -65,6 +67,9 @@ func PlanCreateTable(stmt *ast.CreateTableStmt) (executor.Executor, error) {
 			idxKeyNames[def.KeyName] = true
 			idxColNames[def.Column.ColName] = true
 			keyDefs = append(keyDefs, def)
+
+		case *ast.ConstraintForeignKeyDef:
+			fkDefs = append(fkDefs, def)
 		}
 	}
 
@@ -83,7 +88,12 @@ func PlanCreateTable(stmt *ast.CreateTableStmt) (executor.Executor, error) {
 		return nil, err
 	}
 
-	return executor.NewCreateTable(stmt.TableName, uint8(pkCount), idxParams, colParams), nil
+	constraintParams, err := getForeignKeyParams(stmt.TableName, fkDefs, colIndexMap, idxKeyNames, idxColNames)
+	if err != nil {
+		return nil, err
+	}
+
+	return executor.NewCreateTable(stmt.TableName, uint8(pkCount), idxParams, colParams, constraintParams), nil
 }
 
 // getPkCount はプライマリキーのカラム定義を検証し、プライマリキーのカラム数を返す
@@ -149,6 +159,82 @@ func getIndexParams(ukDefs []*ast.ConstraintUniqueKeyDef, keyDefs []*ast.Constra
 			ColName: keyDef.Column.ColName,
 			ColIdx:  uint16(idx),
 			Unique:  false,
+		})
+	}
+
+	return params, nil
+}
+
+// getForeignKeyParams は外部キー定義を検証し、外部キー制約のパラメータを返す
+func getForeignKeyParams(tableName string, fkDefs []*ast.ConstraintForeignKeyDef, colIndexMap map[string]int, idxKeyNames map[string]bool, idxColNames map[string]bool) ([]handler.CreateConstraintParam, error) {
+	if len(fkDefs) == 0 {
+		return nil, nil
+	}
+
+	hdl := handler.Get()
+	params := make([]handler.CreateConstraintParam, 0, len(fkDefs))
+	fkNames := map[string]bool{} // 同一 CREATE TABLE 内で処理済みの FK 名
+
+	for _, fkDef := range fkDefs {
+		// FK 名が同一 CREATE TABLE 内で重複していないか
+		if fkNames[fkDef.KeyName] {
+			return nil, fmt.Errorf("duplicate foreign key constraint name: '%s'", fkDef.KeyName)
+		}
+
+		// FK 名が全テーブルを通じて一意であるか
+		for _, tblMeta := range hdl.Catalog.GetAllTables() {
+			for _, con := range tblMeta.Constraints {
+				if con.ConstraintName == fkDef.KeyName {
+					return nil, fmt.Errorf("duplicate foreign key constraint name: '%s'", fkDef.KeyName)
+				}
+			}
+		}
+		if _, exists := idxKeyNames[fkDef.KeyName]; exists {
+			return nil, fmt.Errorf("duplicate constraint name: '%s'", fkDef.KeyName)
+		}
+
+		fkNames[fkDef.KeyName] = true
+
+		// FK カラムがテーブルのカラム定義に存在するか
+		if _, exists := colIndexMap[fkDef.Column.ColName]; !exists {
+			return nil, fmt.Errorf("foreign key column '%s' does not exist", fkDef.Column.ColName)
+		}
+
+		// 自己参照でないか
+		if fkDef.RefTable == tableName {
+			return nil, fmt.Errorf("self-referencing foreign key is not supported")
+		}
+
+		// 参照先テーブルがカタログに存在するか
+		refTableMeta, ok := hdl.Catalog.GetTableMetaByName(fkDef.RefTable)
+		if !ok {
+			return nil, fmt.Errorf("referenced table '%s' does not exist", fkDef.RefTable)
+		}
+
+		// 参照先カラムが参照先テーブルに存在するか
+		refCol, ok := refTableMeta.GetColByName(fkDef.RefColumn)
+		if !ok {
+			return nil, fmt.Errorf("referenced column '%s' does not exist in table '%s'", fkDef.RefColumn, fkDef.RefTable)
+		}
+
+		// 参照先カラムに PK または UNIQUE KEY があるか
+		isPK := refCol.Pos < uint16(refTableMeta.PKCount)
+		refIdx, hasIdx := refTableMeta.GetIndexByColName(fkDef.RefColumn)
+		hasUniqueIdx := hasIdx && refIdx.Type == dictionary.IndexTypeUnique
+		if !isPK && !hasUniqueIdx {
+			return nil, fmt.Errorf("referenced column '%s' in table '%s' must be a primary key or have a unique index", fkDef.RefColumn, fkDef.RefTable)
+		}
+
+		// FK カラムにインデックスがあるか (同一 CREATE TABLE 内で定義されている必要あり)
+		if _, exists := idxColNames[fkDef.Column.ColName]; !exists {
+			return nil, fmt.Errorf("foreign key column '%s' must have an index", fkDef.Column.ColName)
+		}
+
+		params = append(params, handler.CreateConstraintParam{
+			ConstraintName: fkDef.KeyName,
+			ColName:        fkDef.Column.ColName,
+			RefTableName:   fkDef.RefTable,
+			RefColName:     fkDef.RefColumn,
 		})
 	}
 

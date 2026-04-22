@@ -216,6 +216,108 @@ func TestDelete(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("FK 制約で参照されている親レコードは削除できない", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "10")
+		handler.Reset()
+		handler.Init()
+		defer handler.Reset()
+
+		parentCt := NewCreateTable("users", 1, nil, []handler.CreateColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+			{Name: "name", Type: handler.ColumnTypeString},
+		}, nil)
+		_, err := parentCt.Next()
+		assert.NoError(t, err)
+
+		childCt := NewCreateTable("orders", 1,
+			[]handler.CreateIndexParam{{Name: "idx_user_id", ColName: "user_id", ColIdx: 1, Unique: false}},
+			[]handler.CreateColumnParam{
+				{Name: "id", Type: handler.ColumnTypeString},
+				{Name: "user_id", Type: handler.ColumnTypeString},
+			},
+			[]handler.CreateConstraintParam{{ConstraintName: "fk_user", ColName: "user_id", RefTableName: "users", RefColName: "id"}},
+		)
+		_, err = childCt.Next()
+		assert.NoError(t, err)
+
+		hdl := handler.Get()
+		trxId := hdl.BeginTrx()
+
+		// 親にレコード挿入、子から参照
+		usersTbl, err := hdl.GetTable("users")
+		assert.NoError(t, err)
+		ins := NewInsert(trxId, usersTbl, []Record{{[]byte("1"), []byte("Alice")}})
+		_, err = ins.Next()
+		assert.NoError(t, err)
+
+		ordersTbl, err := hdl.GetTable("orders")
+		assert.NoError(t, err)
+		insChild := NewInsert(trxId, ordersTbl, []Record{{[]byte("100"), []byte("1")}})
+		_, err = insChild.Next()
+		assert.NoError(t, err)
+
+		// WHEN: 参照されている親レコードを削除しようとする
+		del := NewDelete(trxId, usersTbl, testTableScan(usersTbl,
+			access.RecordSearchModeStart{},
+			func(record Record) bool { return true },
+		))
+		_, err = del.Next()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "foreign key constraint fails")
+	})
+
+	t.Run("FK 制約で参照されていない親レコードは削除できる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "10")
+		handler.Reset()
+		handler.Init()
+		defer handler.Reset()
+
+		parentCt := NewCreateTable("users", 1, nil, []handler.CreateColumnParam{
+			{Name: "id", Type: handler.ColumnTypeString},
+		}, nil)
+		_, err := parentCt.Next()
+		assert.NoError(t, err)
+
+		childCt := NewCreateTable("orders", 1,
+			[]handler.CreateIndexParam{{Name: "idx_user_id", ColName: "user_id", ColIdx: 1, Unique: false}},
+			[]handler.CreateColumnParam{
+				{Name: "id", Type: handler.ColumnTypeString},
+				{Name: "user_id", Type: handler.ColumnTypeString},
+			},
+			[]handler.CreateConstraintParam{{ConstraintName: "fk_user", ColName: "user_id", RefTableName: "users", RefColName: "id"}},
+		)
+		_, err = childCt.Next()
+		assert.NoError(t, err)
+
+		hdl := handler.Get()
+		trxId := hdl.BeginTrx()
+
+		// 親にのみレコード挿入 (子からは参照されない)
+		usersTbl, err := hdl.GetTable("users")
+		assert.NoError(t, err)
+		ins := NewInsert(trxId, usersTbl, []Record{{[]byte("1")}})
+		_, err = ins.Next()
+		assert.NoError(t, err)
+
+		// WHEN: 参照されていない親レコードを削除
+		del := NewDelete(trxId, usersTbl, testTableScan(usersTbl,
+			access.RecordSearchModeStart{},
+			func(record Record) bool { return true },
+		))
+		_, err = del.Next()
+
+		// THEN
+		assert.NoError(t, err)
+	})
+
 	t.Run("DELETE 済みの行は他のトランザクションの scan でスキップされる", func(t *testing.T) {
 		// GIVEN
 		initLockTestHandler(t)

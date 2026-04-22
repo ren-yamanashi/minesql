@@ -14,6 +14,7 @@ const (
 	constraintKindPK                              // PRIMARY KEY
 	constraintKindUniqueKey                       // UNIQUE KEY
 	constraintKindKey                             // KEY (非ユニーク)
+	constraintKindFK                              // FOREIGN KEY
 )
 
 type ConstraintDefParser struct {
@@ -22,6 +23,8 @@ type ConstraintDefParser struct {
 	pkDef  ast.ConstraintPrimaryKeyDef // 生成される PK 定義
 	ukDef  ast.ConstraintUniqueKeyDef  // 生成される UK 定義
 	keyDef ast.ConstraintKeyDef        // 生成される KEY 定義 (非ユニーク)
+	fkDef  ast.ConstraintForeignKeyDef // 生成される FK 定義
+	done   bool                        // パースが完了したかどうか (PK/UK/KEY ではカラムリストの ")" 受信時、FK では参照先カラムの ")" 受信時に true になる)
 	err    error                       // エラー情報
 }
 
@@ -61,6 +64,19 @@ func (cp *ConstraintDefParser) finalize() error {
 		if cp.keyDef.Column.ColName != "" {
 			colCount = 1
 		}
+	case constraintKindFK:
+		if cp.fkDef.Column.ColName != "" {
+			colCount = 1
+		}
+		if cp.fkDef.KeyName == "" {
+			return errors.New("[parse error] foreign key name is required")
+		}
+		if cp.fkDef.RefTable == "" {
+			return errors.New("[parse error] REFERENCES table is required")
+		}
+		if cp.fkDef.RefColumn == "" {
+			return errors.New("[parse error] REFERENCES column is required")
+		}
 	}
 	if colCount == 0 {
 		return errors.New("[parse error] constraint definition requires at least one column")
@@ -77,6 +93,8 @@ func (cp *ConstraintDefParser) getDef() ast.Definition {
 		return &cp.ukDef
 	case constraintKindKey:
 		return &cp.keyDef
+	case constraintKindFK:
+		return &cp.fkDef
 	default:
 		return nil
 	}
@@ -88,7 +106,7 @@ func (cp *ConstraintDefParser) onKeyword(word string) {
 	}
 
 	upper := strings.ToUpper(word)
-	// 開始時の PRIMARY / UNIQUE / KEY 判定
+	// 開始時の PRIMARY / UNIQUE / KEY / FOREIGN 判定
 	if cp.kind == constraintKindUnset {
 		switch upper {
 		case KPrimary:
@@ -105,19 +123,37 @@ func (cp *ConstraintDefParser) onKeyword(word string) {
 			cp.kind = constraintKindKey
 			cp.state = CreateStateConstraintKey
 			return
+		case KForeign:
+			cp.kind = constraintKindFK
+			cp.state = CreateStateConstraint
+			return
 		default:
-			cp.setError(errors.New("[parse error] expected 'PRIMARY', 'UNIQUE', or 'KEY', got: " + word))
+			cp.setError(errors.New("[parse error] expected 'PRIMARY', 'UNIQUE', 'KEY', or 'FOREIGN', got: " + word))
 			return
 		}
 	}
 
-	// KEY キーワードの処理 (PRIMARY KEY / UNIQUE KEY の 2 語目)
+	// KEY キーワードの処理 (PRIMARY KEY / UNIQUE KEY / FOREIGN KEY の 2 語目)
 	if cp.state == CreateStateConstraint {
 		if upper == KKey {
-			cp.state = CreateStateConstraintKey
+			if cp.kind == constraintKindFK {
+				cp.state = CreateStateConstraintFKName
+			} else {
+				cp.state = CreateStateConstraintKey
+			}
 			return
 		}
 		cp.setError(errors.New("[parse error] expected 'KEY', got: " + word))
+		return
+	}
+
+	// REFERENCES キーワードの処理 (FK の参照先指定)
+	if cp.state == CreateStateConstraintFKReferences {
+		if upper == KReferences {
+			cp.state = CreateStateConstraintFKRefTable
+			return
+		}
+		cp.setError(errors.New("[parse error] expected 'REFERENCES', got: " + word))
 		return
 	}
 
@@ -164,6 +200,26 @@ func (cp *ConstraintDefParser) onIdentifier(ident string) {
 		}
 		cp.state = CreateStateConstraintWaitSeparator
 		return
+
+	case CreateStateConstraintFKName:
+		cp.fkDef.KeyName = ident
+		cp.state = CreateStateConstraintFKCol
+		return
+
+	case CreateStateConstraintFKColName:
+		cp.fkDef.Column = *ast.NewColumnId(ident)
+		cp.state = CreateStateConstraintFKColEnd
+		return
+
+	case CreateStateConstraintFKRefTable:
+		cp.fkDef.RefTable = ident
+		cp.state = CreateStateConstraintFKRefColOpen
+		return
+
+	case CreateStateConstraintFKRefColName:
+		cp.fkDef.RefColumn = ident
+		cp.state = CreateStateConstraintFKRefColEnd
+		return
 	}
 
 	cp.setError(errors.New("[parse error] unexpected identifier: " + ident))
@@ -189,6 +245,29 @@ func (cp *ConstraintDefParser) onSymbol(symbol string) {
 			return
 		}
 		if symbol == string(SRightParen) {
+			cp.done = true
+			return
+		}
+
+	// FK ステートのシンボル処理
+	case CreateStateConstraintFKCol:
+		if symbol == string(SLeftParen) {
+			cp.state = CreateStateConstraintFKColName
+			return
+		}
+	case CreateStateConstraintFKColEnd:
+		if symbol == string(SRightParen) {
+			cp.state = CreateStateConstraintFKReferences
+			return
+		}
+	case CreateStateConstraintFKRefColOpen:
+		if symbol == string(SLeftParen) {
+			cp.state = CreateStateConstraintFKRefColName
+			return
+		}
+	case CreateStateConstraintFKRefColEnd:
+		if symbol == string(SRightParen) {
+			cp.done = true
 			return
 		}
 	}

@@ -51,7 +51,7 @@ func TestCommitTrx(t *testing.T) {
 
 		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 
 		tbl, err := h.GetTable("users")
@@ -91,7 +91,7 @@ func TestRollbackTrx(t *testing.T) {
 		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
 			{Name: "name", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 
 		tbl, err := h.GetTable("users")
@@ -171,7 +171,7 @@ func TestTransactionIsolation(t *testing.T) {
 		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
 			{Name: "name", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 		tbl, err := h.GetTable("users")
 		assert.NoError(t, err)
@@ -206,7 +206,7 @@ func TestTransactionIsolation(t *testing.T) {
 		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
 			{Name: "name", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 		tbl, err := h.GetTable("users")
 		assert.NoError(t, err)
@@ -243,7 +243,7 @@ func TestTransactionIsolation(t *testing.T) {
 		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
 			{Name: "name", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 		tbl, err := h.GetTable("users")
 		assert.NoError(t, err)
@@ -291,7 +291,7 @@ func TestTransactionIsolation(t *testing.T) {
 		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
 			{Name: "name", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 		tbl, err := h.GetTable("users")
 		assert.NoError(t, err)
@@ -341,7 +341,7 @@ func TestPurgeThreadIntegration(t *testing.T) {
 		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
 			{Name: "name", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 		tbl, err := h.GetTable("users")
 		assert.NoError(t, err)
@@ -386,7 +386,7 @@ func TestPurgeThreadIntegration(t *testing.T) {
 		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
 			{Name: "name", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 		tbl, err := h.GetTable("users")
 		assert.NoError(t, err)
@@ -438,7 +438,7 @@ func TestPurgeThreadIntegration(t *testing.T) {
 		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
 			{Name: "name", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 		tbl, err := h.GetTable("users")
 		assert.NoError(t, err)

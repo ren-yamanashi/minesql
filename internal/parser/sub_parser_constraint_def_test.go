@@ -224,18 +224,118 @@ func TestConstraintDefParser_Key(t *testing.T) {
 	})
 }
 
+func TestConstraintDefParser_ForeignKey(t *testing.T) {
+	t.Run("FOREIGN KEY をパースできる", func(t *testing.T) {
+		// GIVEN
+		cp := NewConstraintDefParser()
+
+		// WHEN: FOREIGN KEY fk_user (user_id) REFERENCES users (id)
+		cp.onKeyword("FOREIGN")
+		cp.onKeyword("KEY")
+		cp.onIdentifier("fk_user")
+		cp.onSymbol("(")
+		cp.onIdentifier("user_id")
+		cp.onSymbol(")")
+		cp.onKeyword("REFERENCES")
+		cp.onIdentifier("users")
+		cp.onSymbol("(")
+		cp.onIdentifier("id")
+		cp.onSymbol(")")
+		err := cp.finalize()
+
+		// THEN
+		assert.NoError(t, err)
+		def := cp.getDef()
+		fkDef, ok := def.(*ast.ConstraintForeignKeyDef)
+		assert.True(t, ok)
+		assert.Equal(t, "fk_user", fkDef.KeyName)
+		assert.Equal(t, "user_id", fkDef.Column.ColName)
+		assert.Equal(t, "users", fkDef.RefTable)
+		assert.Equal(t, "id", fkDef.RefColumn)
+	})
+
+	t.Run("FK パース途中で isDone は false を返す", func(t *testing.T) {
+		// GIVEN
+		cp := NewConstraintDefParser()
+
+		// WHEN: FOREIGN KEY fk_user (user_id) まで
+		cp.onKeyword("FOREIGN")
+		cp.onKeyword("KEY")
+		cp.onIdentifier("fk_user")
+		cp.onSymbol("(")
+		cp.onIdentifier("user_id")
+		cp.onSymbol(")")
+
+		// THEN: REFERENCES が未処理なので done ではない
+		assert.False(t, cp.done)
+	})
+
+	t.Run("FK パース完了後に isDone は true を返す", func(t *testing.T) {
+		// GIVEN
+		cp := NewConstraintDefParser()
+
+		// WHEN: 全トークンを処理
+		cp.onKeyword("FOREIGN")
+		cp.onKeyword("KEY")
+		cp.onIdentifier("fk_user")
+		cp.onSymbol("(")
+		cp.onIdentifier("user_id")
+		cp.onSymbol(")")
+		cp.onKeyword("REFERENCES")
+		cp.onIdentifier("users")
+		cp.onSymbol("(")
+		cp.onIdentifier("id")
+		cp.onSymbol(")")
+
+		// THEN
+		assert.True(t, cp.done)
+	})
+
+	t.Run("FK 名がない場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		cp := NewConstraintDefParser()
+
+		// WHEN: FOREIGN KEY だけで finalize
+		cp.onKeyword("FOREIGN")
+		cp.onKeyword("KEY")
+		err := cp.finalize()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "foreign key name is required")
+	})
+
+	t.Run("REFERENCES がない場合、エラーを返す", func(t *testing.T) {
+		// GIVEN
+		cp := NewConstraintDefParser()
+
+		// WHEN: FOREIGN KEY fk_user (user_id) だけで finalize
+		cp.onKeyword("FOREIGN")
+		cp.onKeyword("KEY")
+		cp.onIdentifier("fk_user")
+		cp.onSymbol("(")
+		cp.onIdentifier("user_id")
+		cp.onSymbol(")")
+		err := cp.finalize()
+
+		// THEN
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "REFERENCES table is required")
+	})
+}
+
 func TestConstraintDefParser_Error(t *testing.T) {
 	t.Run("PRIMARY でも UNIQUE でもないキーワードの場合、エラーを返す", func(t *testing.T) {
 		// GIVEN
 		cp := NewConstraintDefParser()
 
 		// WHEN
-		cp.onKeyword("FOREIGN")
+		cp.onKeyword("INVALID")
 		err := cp.finalize()
 
 		// THEN
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "expected 'PRIMARY', 'UNIQUE', or 'KEY'")
+		assert.Contains(t, err.Error(), "expected 'PRIMARY', 'UNIQUE', 'KEY', or 'FOREIGN'")
 	})
 
 	t.Run("KEY キーワードがない場合、エラーを返す", func(t *testing.T) {
@@ -289,7 +389,7 @@ func TestConstraintDefParser_Error(t *testing.T) {
 		cp := NewConstraintDefParser()
 
 		// WHEN
-		cp.onKeyword("FOREIGN") // エラー発生
+		cp.onKeyword("INVALID") // エラー発生
 		cp.onKeyword("KEY")     // 無視される
 		cp.onSymbol("(")        // 無視される
 		cp.onIdentifier("id")   // 無視される
@@ -297,7 +397,7 @@ func TestConstraintDefParser_Error(t *testing.T) {
 
 		// THEN
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "expected 'PRIMARY', 'UNIQUE', or 'KEY'")
+		assert.Contains(t, err.Error(), "expected 'PRIMARY', 'UNIQUE', 'KEY', or 'FOREIGN'")
 	})
 
 	t.Run("カラムリストが開かれたまま finalize された場合、エラーを返す", func(t *testing.T) {

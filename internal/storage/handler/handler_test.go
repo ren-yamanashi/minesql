@@ -167,7 +167,7 @@ func TestPageCleanerFlushesDirtyPages(t *testing.T) {
 			err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 				{Name: "id", Type: ColumnTypeString},
 				{Name: "name", Type: ColumnTypeString},
-			})
+			}, nil)
 			assert.NoError(t, err)
 		}
 		setupTable(t, h)
@@ -205,7 +205,7 @@ func TestCrashRecovery(t *testing.T) {
 		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
 			{Name: "name", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 	}
 
@@ -678,7 +678,7 @@ func TestFindMaxTrxId(t *testing.T) {
 		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
 			{Name: "name", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 
 		tbl, err := h.GetTable("users")
@@ -706,7 +706,7 @@ func TestFindMaxTrxId(t *testing.T) {
 
 		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -727,11 +727,11 @@ func TestFindMaxTrxId(t *testing.T) {
 
 		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 		err = h.CreateTable("orders", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 
 		tblUsers, err := h.GetTable("users")
@@ -765,7 +765,7 @@ func TestNextTrxIdRecovery(t *testing.T) {
 		err := h.CreateTable("users", 1, nil, []CreateColumnParam{
 			{Name: "id", Type: ColumnTypeString},
 			{Name: "name", Type: ColumnTypeString},
-		})
+		}, nil)
 		assert.NoError(t, err)
 
 		// BEGIN → INSERT → COMMIT

@@ -443,7 +443,7 @@ func TestExecutorIntegration(t *testing.T) {
 				{Name: "id", Type: handler.ColumnTypeString},
 				{Name: "user_id", Type: handler.ColumnTypeString},
 				{Name: "item", Type: handler.ColumnTypeString},
-			})
+			}, nil)
 		_, err := ct.Next()
 		assert.NoError(t, err)
 
@@ -508,7 +508,7 @@ func setupExecutorTestTable(t *testing.T) *access.Table {
 			{Name: "id", Type: handler.ColumnTypeString},
 			{Name: "first_name", Type: handler.ColumnTypeString},
 			{Name: "last_name", Type: handler.ColumnTypeString},
-		})
+		}, nil)
 	_, err := createTable.Next()
 	assert.NoError(t, err)
 

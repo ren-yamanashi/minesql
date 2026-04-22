@@ -203,6 +203,70 @@ INSERT INTO users (id, first_name, last_name, gender, username) VALUES
 		assert.Equal(t, expected, sb.String())
 	})
 
+	t.Run("FOREIGN KEY 付きテーブルを作成してレコードを挿入できる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		handler.Reset()
+		handler.Init()
+		defer handler.Reset()
+
+		hdl := handler.Get()
+		trxId := hdl.BeginTrx()
+
+		// 親テーブルを作成
+		executeSql(t, trxId, `
+CREATE TABLE users (
+	id VARCHAR,
+	name VARCHAR,
+	PRIMARY KEY (id)
+);`)
+
+		// FK 付き子テーブルを作成
+		executeSql(t, trxId, `
+CREATE TABLE orders (
+	id VARCHAR,
+	user_id VARCHAR,
+	item VARCHAR,
+	PRIMARY KEY (id),
+	KEY idx_user_id (user_id),
+	FOREIGN KEY fk_user (user_id) REFERENCES users (id)
+);`)
+
+		// 親テーブルにレコードを挿入
+		executeSql(t, trxId, `
+INSERT INTO users (id, name) VALUES
+	('1', 'Alice'),
+	('2', 'Bob');`)
+
+		// WHEN: 子テーブルにレコードを挿入
+		executeSql(t, trxId, `
+INSERT INTO orders (id, user_id, item) VALUES
+	('100', '1', 'apple'),
+	('101', '2', 'banana');`)
+
+		records := executeSql(t, trxId, `SELECT * FROM orders;`)
+		assert.NoError(t, hdl.CommitTrx(trxId))
+
+		// THEN
+		var sb strings.Builder
+		sb.WriteString("=== FK 付きテーブルの全件 ===\n")
+		writeRecords(&sb, records)
+
+		expected := `=== FK 付きテーブルの全件 ===
+  (100, 1, apple)
+  (101, 2, banana)
+  合計: 2 件
+`
+		assert.Equal(t, expected, sb.String())
+
+		// PK 制約がカタログに自動登録されている
+		ordersMeta, ok := hdl.Catalog.GetTableMetaByName("orders")
+		assert.True(t, ok)
+		assert.Equal(t, uint8(1), ordersMeta.PKCount)
+	})
+
 	t.Run("DELETE でレコードを削除できる", func(t *testing.T) {
 		// GIVEN
 		tmpdir := t.TempDir()

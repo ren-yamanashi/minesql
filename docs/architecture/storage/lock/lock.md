@@ -7,7 +7,8 @@
 - ロックには、以下の 2 種類がある
   - Shared ロック: 読み取り専用のロックで、複数のトランザクションが同時に取得できる
   - Exclusive ロック: 書き込み用のロックで、1 つのトランザクションしか取得できない
-- ロック取得のアルゴリズムには Strict Two-Phase Locking (Strict 2PL) を採用しており、トランザクションが COMMIT/ROLLBACK するまでロックを保持する ([Strict Two-Phase Locking の詳細](../../../about/isolation.md#cascading-abort-を防止するための-strict-two-phase-locking))
+- 読み取りは MVCC (Consistent Read) によってロックを取得せずに行い、書き込みの競合制御にのみロックを使用する
+- ロックの保持期間は Strict 2PL のルールに従い、トランザクションが COMMIT/ROLLBACK するまで保持する ([Strict Two-Phase Locking の詳細](../../../about/isolation.md#cascading-abort-を防止するための-strict-two-phase-locking))
 
 ### ロックの競合
 
@@ -20,7 +21,11 @@
 ## ロック取得タイミング
 
 - SELECT は MVCC の Consistent Read により、ロックを取得せずに読み取る
-- UPDATE/DELETE は、WHERE 句評価 (Current Read) はロックを取得せずに行い、実際に行を更新/削除する時点で Exclusive Lock を取得する
+- INSERT は、行を B+Tree に挿入した後に排他ロックを取得する
+- UPDATE/DELETE は、WHERE 句の評価はロックを取得せずに行い、実際に行を更新/削除する時点で排他ロックを取得する
+- 外部キー制約チェックでは以下のロックを取得する
+  - INSERT/UPDATE (子テーブル): 参照先 (親テーブル) のレコードに共有ロックを取得する。これにより、参照先が並行する DELETE で削除されることを防ぐ
+  - DELETE/UPDATE (親テーブル): 対象行の排他ロックを先に取得してから参照元 (子テーブル) を検索する。排他ロック保持中に検索するため、並行する INSERT が親行に共有ロックを取得しようとすると待機し、孤立した子行の発生を防ぐ
 
 ## ロックの管理
 
@@ -83,7 +88,7 @@ flowchart TD
 
 ### ロック解放の流れ
 
-Strict 2PL に従い、トランザクションの COMMIT/ROLLBACK 時に保持しているロックを一括解放する
+トランザクションの COMMIT/ROLLBACK 時に保持しているロックを一括解放する
 
 1. 保持している各行のロックを順に解放する
 2. 各行について、ロック解放により競合が解消された待機中のトランザクションにロックを付与する

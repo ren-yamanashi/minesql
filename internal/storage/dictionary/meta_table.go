@@ -11,14 +11,15 @@ import (
 
 // TableMeta はテーブルのメタデータを表す
 type TableMeta struct {
-	MetaPageId     page.PageId   // テーブルのメタデータが格納される B+Tree のメタページID
-	FileId         page.FileId   // テーブルの実データが格納されるディスクファイルの識別子
-	Name           string        // テーブル名
-	NCols          uint8         // カラム数
-	PKCount        uint8         // プライマリキーのカラム数 (プライマリキーは先頭から連続している想定) (例: PK が (id, name) の場合、PKCount は 2)
-	DataMetaPageId page.PageId   // 実データが格納される B+Tree のメタページID
-	Cols           []*ColumnMeta // テーブルのカラム情報
-	Indexes        []*IndexMeta  // テーブルのインデックス情報
+	MetaPageId     page.PageId       // テーブルのメタデータが格納される B+Tree のメタページID
+	FileId         page.FileId       // テーブルの実データが格納されるディスクファイルの識別子
+	Name           string            // テーブル名
+	NCols          uint8             // カラム数
+	PKCount        uint8             // プライマリキーのカラム数 (プライマリキーは先頭から連続している想定) (例: PK が (id, name) の場合、PKCount は 2)
+	DataMetaPageId page.PageId       // 実データが格納される B+Tree のメタページID
+	Cols           []*ColumnMeta     // テーブルのカラム情報
+	Indexes        []*IndexMeta      // テーブルのインデックス情報
+	Constraints    []*ConstraintMeta // テーブルの制約情報
 }
 
 func NewTableMeta(fileId page.FileId, name string, nCols uint8, pkCount uint8, cols []*ColumnMeta, indexes []*IndexMeta, dataMetaPageId page.PageId) TableMeta {
@@ -50,6 +51,17 @@ func (tm *TableMeta) GetColByName(colName string) (*ColumnMeta, bool) {
 		}
 	}
 	return nil, false
+}
+
+// GetForeignKeyConstraints はテーブルの外部キー制約を取得する
+func (tm *TableMeta) GetForeignKeyConstraints() []*ConstraintMeta {
+	var fks []*ConstraintMeta
+	for _, con := range tm.Constraints {
+		if con.RefTableName != "" {
+			fks = append(fks, con)
+		}
+	}
+	return fks
 }
 
 // GetIndexByColName は指定されたカラム名で構成されるインデックスを取得する
@@ -89,7 +101,8 @@ func (tm *TableMeta) Insert(bp *buffer.BufferPool) error {
 //   - tableMetaPageId: テーブルメタデータが格納されている B+Tree のメタページID
 //   - indexMetaPageId: インデックスメタデータが格納されている B+Tree のメタページID
 //   - columnMetaPageId: カラムメタデータが格納されている B+Tree のメタページID
-func loadTableMeta(bp *buffer.BufferPool, tableMetaPageId page.PageId, indexMetaPageId page.PageId, columnMetaPageId page.PageId) ([]*TableMeta, error) {
+//   - constraintMetaPageId: 制約メタデータが格納されている B+Tree のメタページID
+func loadTableMeta(bp *buffer.BufferPool, tableMetaPageId page.PageId, indexMetaPageId page.PageId, columnMetaPageId page.PageId, constraintMetaPageId page.PageId) ([]*TableMeta, error) {
 	// B+Tree を開く
 	tableMetaTree := btree.NewBTree(tableMetaPageId)
 	iter, err := tableMetaTree.Search(bp, btree.SearchModeStart{})
@@ -129,6 +142,12 @@ func loadTableMeta(bp *buffer.BufferPool, tableMetaPageId page.PageId, indexMeta
 			return nil, err
 		}
 
+		// 制約メタデータを読み込む
+		constraints, err := loadConstraintMeta(bp, fileId, constraintMetaPageId)
+		if err != nil {
+			return nil, err
+		}
+
 		tables = append(tables, &TableMeta{
 			FileId:         fileId,
 			Name:           name,
@@ -137,6 +156,7 @@ func loadTableMeta(bp *buffer.BufferPool, tableMetaPageId page.PageId, indexMeta
 			DataMetaPageId: dataMetaPageId,
 			Indexes:        indexes,
 			Cols:           cols,
+			Constraints:    constraints,
 		})
 
 		if err := iter.Advance(bp); err != nil {

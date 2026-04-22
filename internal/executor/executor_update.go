@@ -3,7 +3,9 @@ package executor
 import (
 	"bytes"
 	"minesql/internal/storage/access"
+	"minesql/internal/storage/btree"
 	"minesql/internal/storage/handler"
+	"minesql/internal/storage/lock"
 )
 
 type SetColumn struct {
@@ -57,10 +59,32 @@ func (upd *Update) Next() (Record, error) {
 		updatedRecords = append(updatedRecords, updatedRecord)
 	}
 
+	// テーブルの FK 制約を確認
+	tableMeta, _ := hdl.Catalog.GetTableMetaByName(upd.table.Name)
+	fks := tableMeta.GetForeignKeyConstraints()
+	refFKs := hdl.Catalog.GetForeignKeysReferencingTable(upd.table.Name)
+	hasFKChecks := len(fks) > 0 || len(refFKs) > 0
+
 	// 更新後のレコードで更新を実行
 	for i, record := range records {
 		encodedOldKey := upd.table.EncodeKey(record)
 		encodedNewKey := upd.table.EncodeKey(updatedRecords[i])
+
+		// FK チェック: 排他ロックを先に取得してから FK 制約を検証する
+		if hasFKChecks {
+			btr := btree.NewBTree(upd.table.MetaPageId)
+			_, pos, err := btr.FindByKey(hdl.BufferPool, encodedOldKey)
+			if err != nil {
+				return nil, err
+			}
+			if err := hdl.LockMgr.Lock(upd.trxId, pos, lock.Exclusive); err != nil {
+				return nil, err
+			}
+
+			if err := checkFKOnUpdate(hdl.BufferPool, upd.trxId, hdl.LockMgr, tableMeta, refFKs, fks, record, updatedRecords[i]); err != nil {
+				return nil, err
+			}
+		}
 
 		if bytes.Equal(encodedOldKey, encodedNewKey) {
 			// プライマリキーが変わらない場合はインプレース更新

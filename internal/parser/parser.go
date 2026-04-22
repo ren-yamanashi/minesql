@@ -47,6 +47,15 @@ const (
 	CreateStateConstraintKey           // CREATE TABLE の PRIMARY KEY または UNIQUE KEY (現在は KEY キーワードの直後) の状態 | `UNIQUE KEY index_name` の "index_name" または `PRIMARY KEY (...)` の "(" 待ち
 	CreateStateConstraintCol           // CREATE TABLE の KEY 制約のカラム名を指定中 (または指定待ち) の状態 | `PRIMARY KEY (col1, col2, ...)` または `UNIQUE KEY index_name (col1, col2, ...)` の "(" の直後か、"," の直後の状態
 	CreateStateConstraintWaitSeparator // CREATE TABLE の KEY 制約のカラムリスト区切り文字 ("," または ")") 待ち
+	CreateStateConstraintFKName        // CREATE TABLE の FOREIGN KEY 制約中であり、FK 名待ちの状態 | `FOREIGN KEY fk_name (...)` の "fk_name" 待ち
+	CreateStateConstraintFKCol         // CREATE TABLE の FOREIGN KEY 制約中であり、カラムリスト開始待ちの状態 | `FOREIGN KEY fk_name (...)` の "(" 待ち
+	CreateStateConstraintFKColName     // CREATE TABLE の FOREIGN KEY 制約のカラム名を指定中の状態 | `FOREIGN KEY fk_name (col)` の "col" 待ち
+	CreateStateConstraintFKColEnd      // CREATE TABLE の FOREIGN KEY 制約のカラムリスト終了待ちの状態 | `FOREIGN KEY fk_name (col)` の ")" 待ち
+	CreateStateConstraintFKReferences  // CREATE TABLE の FOREIGN KEY 制約中であり、REFERENCES キーワード待ちの状態
+	CreateStateConstraintFKRefTable    // CREATE TABLE の FOREIGN KEY 制約中であり、参照先テーブル名待ちの状態 | `REFERENCES ref_table (...)` の "ref_table" 待ち
+	CreateStateConstraintFKRefColOpen  // CREATE TABLE の FOREIGN KEY 制約中であり、参照先カラムリスト開始待ちの状態 | `REFERENCES ref_table (...)` の "(" 待ち
+	CreateStateConstraintFKRefColName  // CREATE TABLE の FOREIGN KEY 制約の参照先カラム名を指定中の状態 | `REFERENCES ref_table (ref_col)` の "ref_col" 待ち
+	CreateStateConstraintFKRefColEnd   // CREATE TABLE の FOREIGN KEY 制約の参照先カラムリスト終了待ちの状態 | `REFERENCES ref_table (ref_col)` の ")" 待ち
 	CreateStateEnd                     // CREATE Statement の終わり
 
 	// -- DELETE Statement --
