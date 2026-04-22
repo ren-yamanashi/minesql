@@ -145,6 +145,63 @@ func TestNewCatalog(t *testing.T) {
 		assert.Equal(t, indexMetaPageId, cat2.metadata[0].Indexes[0].DataMetaPageId)
 	})
 
+	t.Run("制約メタデータも正しく読み込まれる", func(t *testing.T) {
+		// GIVEN
+		bp, tmpdir := InitCatalogDisk(t)
+		defer removeTmpdir(t, tmpdir)
+
+		cat, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+
+		fileId := page.FileId(1)
+		metaPageId := page.NewPageId(page.FileId(1), 0)
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(fileId, "id", 0, ColumnTypeString),
+			NewColumnMeta(fileId, "user_id", 1, ColumnTypeString),
+		}
+		conMeta := []*ConstraintMeta{
+			NewConstraintMeta(fileId, "id", "PRIMARY", "", ""),
+			NewConstraintMeta(fileId, "user_id", "fk_user", "users", "id"),
+		}
+		tableMeta := NewTableMeta(fileId, "orders", 2, 1, colMeta, []*IndexMeta{}, metaPageId)
+		tableMeta.Constraints = conMeta
+		err = cat.Insert(bp, tableMeta)
+		assert.NoError(t, err)
+
+		// ページをフラッシュ
+		err = bp.FlushAllPages()
+		assert.NoError(t, err)
+
+		// WHEN
+		bp2 := buffer.NewBufferPool(10, nil)
+		filePath := filepath.Join(tmpdir, "minesql.db")
+		catalogFileId := page.FileId(0)
+		dm2, err := file.NewDisk(catalogFileId, filePath)
+		assert.NoError(t, err)
+		bp2.RegisterDisk(catalogFileId, dm2)
+
+		cat2, err := NewCatalog(bp2)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(cat2.metadata))
+		assert.Equal(t, 2, len(cat2.metadata[0].Constraints))
+
+		// PK 制約
+		pkCon := cat2.metadata[0].Constraints[0]
+		assert.Equal(t, "id", pkCon.ColName)
+		assert.Equal(t, "PRIMARY", pkCon.ConstraintName)
+		assert.Equal(t, "", pkCon.RefTableName)
+		assert.Equal(t, "", pkCon.RefColName)
+
+		// FK 制約
+		fkCon := cat2.metadata[0].Constraints[1]
+		assert.Equal(t, "user_id", fkCon.ColName)
+		assert.Equal(t, "fk_user", fkCon.ConstraintName)
+		assert.Equal(t, "users", fkCon.RefTableName)
+		assert.Equal(t, "id", fkCon.RefColName)
+	})
+
 	t.Run("複数のテーブルが正しく読み込まれる", func(t *testing.T) {
 		// GIVEN
 		bp, tmpdir := InitCatalogDisk(t)
@@ -411,6 +468,40 @@ func TestInsert(t *testing.T) {
 		assert.Equal(t, 3, len(cat.metadata[0].Cols))
 	})
 
+	t.Run("制約メタデータ付きのテーブルメタデータを挿入できる", func(t *testing.T) {
+		// GIVEN
+		bp, tmpdir := InitCatalogDisk(t)
+		defer removeTmpdir(t, tmpdir)
+
+		cat, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+
+		fileId := page.FileId(1)
+		metaPageId := page.NewPageId(page.FileId(1), 0)
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(fileId, "id", 0, ColumnTypeString),
+			NewColumnMeta(fileId, "user_id", 1, ColumnTypeString),
+		}
+		conMeta := []*ConstraintMeta{
+			NewConstraintMeta(fileId, "id", "PRIMARY", "", ""),
+			NewConstraintMeta(fileId, "user_id", "fk_user", "users", "id"),
+		}
+		tableMeta := NewTableMeta(fileId, "orders", 2, 1, colMeta, []*IndexMeta{}, metaPageId)
+		tableMeta.Constraints = conMeta
+
+		// WHEN
+		err = cat.Insert(bp, tableMeta)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(cat.metadata))
+		assert.Equal(t, 2, len(cat.metadata[0].Constraints))
+		assert.Equal(t, "PRIMARY", cat.metadata[0].Constraints[0].ConstraintName)
+		assert.Equal(t, "fk_user", cat.metadata[0].Constraints[1].ConstraintName)
+		assert.Equal(t, "users", cat.metadata[0].Constraints[1].RefTableName)
+		assert.Equal(t, "id", cat.metadata[0].Constraints[1].RefColName)
+	})
+
 	t.Run("インデックスメタデータ付きのテーブルメタデータを挿入できる", func(t *testing.T) {
 		// GIVEN
 		bp, tmpdir := InitCatalogDisk(t)
@@ -564,7 +655,7 @@ func TestAllocateFileId(t *testing.T) {
 		data, err := bp.GetReadPageData(headerPageId)
 		assert.NoError(t, err)
 		defer bp.UnRefPage(headerPageId)
-		savedNextFileId := binary.BigEndian.Uint32(data[16:20])
+		savedNextFileId := binary.BigEndian.Uint32(data[20:24])
 		assert.Equal(t, uint32(3), savedNextFileId)
 	})
 }
