@@ -44,7 +44,7 @@ CommandState --クライアントまたはサーバーが接続を閉じる--> E
 - クライアントが初期ハンドシェイクパケットを受け取ると「ハンドシェイク応答パケット」を返す
   - この段階で、クライアントは SSL 接続を要求することができる
   - その場合は、クライアントが認証応答を送信する前に、SSL 通信チャネルが確立される
-- 最初のハンドシェイクが終わると、サーバーは認証に使用する方法をクライアントに通知する
+- サーバーは初期ハンドシェイクパケットの中に認証方式の名前と初期認証データを含めてクライアントに送信する
 - その後、サーバーが [OK パケット](./protocol-basic.md#ok_packet)を送信して接続を承認するか、ERR パケットを送信して拒否するまで、認証情報のやり取りが継続される
 
 ```mermaid
@@ -58,11 +58,9 @@ IsSSL -->|No| ClientResponse[ハンドシェイク応答パケットの送信]
 SSL --> ClientResponse
 
 ClientResponse --> ClientOK{クライアント側の機能が不足していないか？}
-ClientOK -->|Yes| SwitchAuth{認証方法を切り替えるか？}
+ClientOK -->|Yes| Auth[認証（続行）]
 ClientOK -->|No| ERR
 
-SwitchAuth -->|Yes| DISCONNECT
-SwitchAuth -->|No| Auth[認証（続行）]
 Auth --> AuthOK{認証成功？}
 AuthOK -->|Yes| ServerResponse[サーバー応答]
 AuthOK -->|No| ERR
@@ -101,45 +99,18 @@ Server->>Server: クライアントの機能、使用する認証方式を確認
 
 - クライアントとサーバーは、接続フェーズの最初の段階で、互いの機能 (capabilities) を交換する
 - サーバーが初期ハンドシェイクパケットを送信する際に、サーバーの機能をクライアントに通知する
-- クライアントが、ハンドシェイク応答パケットを送信する際に、自身とサーバーがの両方が共通して持っている機能のみを通知する
+- クライアントが、ハンドシェイク応答パケットを送信する際に、自身とサーバーの両方が共通して持っている機能のみを通知する
 - クライアントの機能が不足している場合、サーバーは ERR パケットを返して接続を終了する
 
 ### 認証方式の決定
 
 - 認証方式はユーザーアカウントに関連づけられている
-  - 詳細は[認証プラグイン](authentication-plugin.md)を参照
+  - 詳細は[認証プラグイン](../../account/authentication-plugin.md)を参照
+  - 認証の詳細なフローは[アカウント](../../account/acount.md)を参照
 - 通信の往復回数を減らすために、サーバーとクライアントは初期ハンドシェイクの段階で、使用される認証方式を予測し、認証情報のやり取りを開始する
-  - サーバーは、`authentication_policy` で定義されたデフォルトの認証方式を使用して初期認証データを作成し、使用した方式名とともに初期ハンドシェイクパケットに含めてクライアントに送信する
+  - サーバーは、デフォルトの認証方式 (MineSQL では caching_sha2_password) を使用して初期認証データを作成し、方式名とともに初期ハンドシェイクパケットに含めてクライアントに送信する
   - クライアントは、サーバーから送られた認証データへの応答をハンドシェイク応答パケットに含めてサーバーに送信する
-    - この際に、クライアントは必ずしもサーバーが初期ハンドシェイクパケットで予測した認証方式を使用する必要はない
-    - 初期ハンドシェイクにおいて、予測した認証方式が正しくなかった場合、サーバーは「認証切り替えリクエスト」を用いて予測された認証方式が正しくないことを通知する
-    - 認証方式の不一致が起きた場合は、正しい認証方式を用いて認証プロセスを最初からやり直す必要がある
-
-#### 認証の予測が成功した場合の流れ
-
-```mermaid
-sequenceDiagram
-Client->>Server: Connect
-Server->>Client: 初期ハンドシェイクパケット (認証方式を予測して含める)
-Client->>Server: ハンドシェイク応答パケット (予測された認証方式を使用して認証情報を含める)
-Note over Client,Server: (クライアントとサーバー間で、追加の認証方式に関するパケットがやり取りされる場合がある)
-Server->>Client: OK パケット (認証成功)
-Note over Client,Server: 認証が成功し、コマンドフェーズに移行する
-```
-
-※サーバーがユーザーの認証を拒否すると判断した場合は、OK パケット ではなく ERR パケット を返し、接続を終了する
-
-#### 認証方式の変更の流れ
-
-```mermaid
-sequenceDiagram
-Client->>Server: Connect
-Server->>Client: 初期ハンドシェイクパケット (認証方式を予測して含める)
-Client->>Server: ハンドシェイク応答パケット (予測された認証方式を使用して認証情報を含める)
-Server->>Client: 認証切り替えリクエスト (予測された認証方式が正しくないことを通知)
-Note over Client,Server: (クライアントが認証しようとしているユーザーアカウントの認証方式に応じて <br/> 必要に応じてさらにパケットのやり取りをする)
-Server->>Client: OK or ERR (認証成功または失敗を通知)
-```
+- MineSQL では caching_sha2_password のみサポートしているため、認証方式の切り替えは発生しない
 
 ## コマンドフェーズ (Command Phase)
 
@@ -167,12 +138,12 @@ Server->>Client: OK or ERR (認証成功または失敗を通知)
     - クライアントが接続の終了を求めていることを、サーバーに伝える
   - [COM_PING](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_ping.html)
     - サーバーが稼働しているかを確認する
-  - [COM_RESET_CONNECTION](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_reset_connection.html)
-    - セッション状態をリセットする
-  - [COM_SET_OPTION](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_set_option.html)
-    - 現在の接続に対するオプションを設定する
 
 - 以下のコマンドはサポートしていない
+  - [COM_RESET_CONNECTION](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_reset_connection.html)
+    - MineSQL ではセッション状態のリセットをサポートしていないため
+  - [COM_SET_OPTION](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_set_option.html)
+    - MineSQL ではオプション設定をサポートしていないため
   - [COM_INIT_DB](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_init_db.html)
     - MineSQL では複数スキーマ (データベース) をサポートしていないため
   - [COM_FIELD_LIST](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_field_list.html)
