@@ -1,7 +1,7 @@
 package server
 
 import (
-	"encoding/binary"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"io"
@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"minesql/internal/ast"
@@ -22,6 +23,7 @@ type Server struct {
 	address        string // IPアドレスまたはホスト名
 	port           int    // ポート番号
 	storageManager *handler.Handler
+	nextConnId     atomic.Uint32
 }
 
 func NewServer(address string, port int) *Server {
@@ -107,34 +109,107 @@ func (s *Server) accept(listener *net.TCPListener) {
 
 // onConnection はクライアントからの接続を処理する
 //
-// プロトコルの定義は docs/architecture/server/server.md#プロトコル を参照
+// 接続フェーズ (Handshake → 認証) を経て、コマンドフェーズに移行する
+//
+// プロトコルの定義は docs/architecture/server/protocol/ を参照
 func (s *Server) onConnection(conn *net.TCPConn) {
-	session := newSession()
+	cc := newClientConn(conn)
 
 	defer func() {
-		// アクティブなトランザクションがあれば自動ロールバック
-		if session.trxId != 0 {
-			if err := handler.Get().RollbackTrx(session.trxId); err != nil {
-				log.Printf("Auto rollback error: %v", err)
-			}
-			session.trxId = 0
-		}
 		log.Printf("Closing connection from %s", conn.RemoteAddr().String())
 		if err := conn.Close(); err != nil {
 			log.Printf("failed to close connection: %v", err)
 		}
 	}()
 
+	// --- 接続フェーズ ---
+
+	// コネクション ID の採番
+	connId := s.nextConnId.Add(1)
+
+	// nonce (20 バイト) の生成
+	nonce := make([]byte, 20)
+	if _, err := rand.Read(nonce); err != nil {
+		log.Printf("Failed to generate nonce: %v", err)
+		return
+	}
+
+	// HandshakeV10 パケットの送信 (seq=0)
+	hsPacket := &handshakePacket{
+		connectionId:     connId,
+		nonce:            nonce,
+		serverCapability: serverCapability,
+	}
+	if err := cc.writePacket(hsPacket.build()); err != nil {
+		log.Printf("Failed to send handshake: %v", err)
+		return
+	}
+
+	// ハンドシェイク応答の受信 (seq=1)
+	payload, err := cc.readPacket()
+	if err != nil {
+		log.Printf("Failed to read handshake response: %v", err)
+		return
+	}
+
+	// ハンドシェイク応答のパース
+	hsResp, err := parseHandshakeResponse41(payload)
+	if err != nil {
+		log.Printf("Failed to parse handshake response: %v", err)
+		_ = cc.writePacket((&errPacket{
+			errorCode: erUnknownError,
+			sqlState:  sqlStateGeneralError,
+			message:   err.Error(),
+		}).build())
+		return
+	}
+
+	// 認証
+	if err := authenticate(hsResp.username, hsResp.authResponse, nonce); err != nil {
+		_ = cc.writePacket((&errPacket{
+			errorCode: erAccessDenied,
+			sqlState:  sqlStateAuthError,
+			message:   err.Error(),
+		}).build())
+		return
+	}
+
+	// AuthMoreData (fast auth success) の送信 (seq=2)
+	if err := cc.writePacket((&authMoreDataPacket{statusByte: fastAuthSuccess}).build()); err != nil {
+		log.Printf("Failed to send auth more data: %v", err)
+		return
+	}
+
+	// OK_Packet の送信 (seq=3)
+	if err := cc.writePacket((&okPacket{statusFlags: serverStatusAutocommit}).build()); err != nil {
+		log.Printf("Failed to send OK after auth: %v", err)
+		return
+	}
+
+	// セッションの生成
+	sess := newSession(hsResp.username, hsResp.capability)
+	defer func() {
+		// アクティブなトランザクションがあれば自動ロールバック
+		// (切断時に未コミットのトランザクションが残るとロックが解放されないため)
+		if sess.trxId != 0 {
+			if err := handler.Get().RollbackTrx(sess.trxId); err != nil {
+				log.Printf("Auto rollback error: %v", err)
+			}
+		}
+	}()
+
+	// --- コマンドフェーズ ---
 	for {
+		cc.resetSequenceId()
+
 		// タイムアウトの設定 (60 秒間何も送ってこなければ切断)
-		err := conn.SetReadDeadline(time.Now().Add(60 * time.Second))
-		if err != nil {
+		if err := conn.SetReadDeadline(time.Now().Add(60 * time.Second)); err != nil {
 			log.Printf("SetReadDeadline error: %v", err)
 			return
 		}
 
-		// パケットの受信
-		sql, err := s.readPacket(conn)
+		// パケットの受信 (seq=0)
+		cmdPayload, err := cc.readPacket()
 		if err != nil {
 			if !errors.Is(err, io.EOF) {
 				log.Printf("Read error: %v", err)
@@ -142,27 +217,64 @@ func (s *Server) onConnection(conn *net.TCPConn) {
 			return
 		}
 
-		// exit なら切断
-		if strings.ToLower(strings.TrimSuffix(strings.TrimSpace(sql), ";")) == "exit" {
-			return
-		}
-
-		// クエリの実行
-		result, err := s.executeQuery(session, sql)
-		if err != nil {
-			err := s.writePacket(conn, fmt.Sprintf("Error: %v", err))
-			if err != nil {
-				log.Printf("Write error: %v", err)
-			}
+		if len(cmdPayload) == 0 {
 			continue
 		}
 
-		// 結果の送信
-		if err := s.writePacket(conn, result); err != nil {
-			log.Printf("Write error: %v", err)
+		// コマンド種別の判定
+		cmdType := cmdPayload[0]
+		switch cmdType {
+		case comQuit:
 			return
+		case comPing:
+			_ = cc.writePacket((&okPacket{statusFlags: s.statusFlags(sess)}).build())
+			continue
+		case comQuery:
+			// SQL 文字列は payload[1:] (コマンドバイトを除く)
+			sql := string(cmdPayload[1:])
+			s.handleComQuery(cc, sess, sql)
+		default:
+			_ = cc.writePacket((&errPacket{
+				errorCode: 1047,
+				sqlState:  sqlStateGeneralError,
+				message:   "Unknown command",
+			}).build())
 		}
 	}
+}
+
+// コマンド種別の定数
+const (
+	comQuit  byte = 0x01
+	comQuery byte = 0x03
+	comPing  byte = 0x0e
+)
+
+// handleComQuery は COM_QUERY を処理する
+//
+// 現時点では結果を旧プロトコルの CSV 形式で返す (Phase 3 で MySQL プロトコル形式に置き換え予定)。
+func (s *Server) handleComQuery(cc *clientConn, sess *session, sql string) {
+	result, err := s.executeQuery(sess, sql)
+	if err != nil {
+		_ = cc.writePacket((&errPacket{
+			errorCode: erUnknownError,
+			sqlState:  sqlStateGeneralError,
+			message:   err.Error(),
+		}).build())
+		return
+	}
+
+	// 暫定: 結果を OK_Packet で返す (Phase 3 で結果セットに置き換え)
+	_ = cc.writePacket((&okPacket{statusFlags: s.statusFlags(sess)}).build())
+	_ = result // TODO: Phase 3 で結果セットのレスポンスに置き換え
+}
+
+// statusFlags はセッションの状態に応じた Server Status Flags を返す
+func (s *Server) statusFlags(sess *session) uint16 {
+	if sess.trxId != 0 {
+		return serverStatusInTrans
+	}
+	return serverStatusAutocommit
 }
 
 // executeQuery はクエリを実行して結果を文字列で返す
@@ -252,37 +364,4 @@ func (s *Server) executeQuery(sess *session, sql string) (string, error) {
 		msg.WriteString(strings.Join(line, ",") + "\n")
 	}
 	return msg.String(), nil
-}
-
-// readPacket は [Header 4 byte][Body N byte] を読み込む
-func (s *Server) readPacket(conn *net.TCPConn) (string, error) {
-	// ヘッダーの読み込み
-	header := make([]byte, 4)
-	if _, err := io.ReadFull(conn, header); err != nil {
-		return "", err
-	}
-
-	// ボディの読み込み
-	length := binary.BigEndian.Uint32(header)
-	body := make([]byte, length)
-	if _, err := io.ReadFull(conn, body); err != nil {
-		return "", err
-	}
-
-	return string(body), nil
-}
-
-// writePacket は [Header 4 byte][Body N byte] を書き込む
-func (s *Server) writePacket(conn *net.TCPConn, msg string) error {
-	dataBytes := []byte(msg)
-	length := uint32(len(dataBytes))
-
-	// パケットの作成 (先頭4バイトがヘッダー、続くバイトがボディ)
-	packet := make([]byte, 4+len(dataBytes))
-	binary.BigEndian.PutUint32(packet[0:4], length)
-	copy(packet[4:], dataBytes)
-
-	// パケットの書き込み
-	_, err := conn.Write(packet)
-	return err
 }

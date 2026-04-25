@@ -28,6 +28,7 @@ type errPacket struct {
 	message   string
 }
 
+// build は ERR_Packet のペイロードを構築する
 func (p *errPacket) build() []byte {
 	buf := []byte{0xFF}
 

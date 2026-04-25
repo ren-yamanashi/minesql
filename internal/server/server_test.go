@@ -23,7 +23,7 @@ func TestExecuteQuery(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
 		defer handler.Reset()
-		sess := newSession()
+		sess := newSession("", 0)
 
 		// WHEN
 		result, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
@@ -37,7 +37,7 @@ func TestExecuteQuery(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
 		defer handler.Reset()
-		sess := newSession()
+		sess := newSession("", 0)
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
@@ -58,7 +58,7 @@ func TestExecuteQuery(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
 		defer handler.Reset()
-		sess := newSession()
+		sess := newSession("", 0)
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
@@ -80,7 +80,7 @@ func TestExecuteQuery(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
 		defer handler.Reset()
-		sess := newSession()
+		sess := newSession("", 0)
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
@@ -103,7 +103,7 @@ func TestExecuteQuery(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
 		defer handler.Reset()
-		sess := newSession()
+		sess := newSession("", 0)
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
@@ -125,7 +125,7 @@ func TestExecuteQuery(t *testing.T) {
 		// GIVEN: BEGIN なしで INSERT (autocommit)
 		s := setupTestServer(t)
 		defer handler.Reset()
-		sess := newSession()
+		sess := newSession("", 0)
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
@@ -151,7 +151,7 @@ func TestExecuteQuery(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
 		defer handler.Reset()
-		sess := newSession()
+		sess := newSession("", 0)
 
 		// WHEN
 		_, err := s.executeQuery(sess, "INVALID SQL;")
@@ -166,7 +166,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
 		defer handler.Reset()
-		sess := newSession()
+		sess := newSession("", 0)
 		assert.Equal(t, handler.TrxId(0), sess.trxId)
 
 		// WHEN
@@ -182,7 +182,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
 		defer handler.Reset()
-		sess := newSession()
+		sess := newSession("", 0)
 
 		_, err := s.executeQuery(sess, "BEGIN;")
 		assert.NoError(t, err)
@@ -206,7 +206,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
 		defer handler.Reset()
-		sess := newSession()
+		sess := newSession("", 0)
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
@@ -231,7 +231,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
 		defer handler.Reset()
-		sess := newSession()
+		sess := newSession("", 0)
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
@@ -261,7 +261,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
 		defer handler.Reset()
-		sess := newSession()
+		sess := newSession("", 0)
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
@@ -291,7 +291,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
 		defer handler.Reset()
-		sess := newSession()
+		sess := newSession("", 0)
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
@@ -323,7 +323,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
 		defer handler.Reset()
-		sess := newSession()
+		sess := newSession("", 0)
 
 		_, err := s.executeQuery(sess, "BEGIN;")
 		assert.NoError(t, err)
@@ -340,7 +340,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
 		defer handler.Reset()
-		sess := newSession()
+		sess := newSession("", 0)
 
 		// WHEN
 		_, err := s.executeQuery(sess, "COMMIT;")
@@ -354,7 +354,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
 		defer handler.Reset()
-		sess := newSession()
+		sess := newSession("", 0)
 
 		// WHEN
 		_, err := s.executeQuery(sess, "ROLLBACK;")
@@ -368,8 +368,8 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)
 		defer handler.Reset()
-		sessA := newSession()
-		sessB := newSession()
+		sessA := newSession("", 0)
+		sessB := newSession("", 0)
 
 		_, err := s.executeQuery(sessA, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
@@ -399,7 +399,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		// GIVEN: BEGIN → INSERT したが COMMIT していない
 		s := setupTestServer(t)
 		defer handler.Reset()
-		sess := newSession()
+		sess := newSession("", 0)
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
@@ -426,7 +426,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		// GIVEN: BEGIN していない
 		s := setupTestServer(t)
 		defer handler.Reset()
-		sess := newSession()
+		sess := newSession("", 0)
 
 		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
@@ -452,7 +452,7 @@ func TestConnectionDisconnectReleasesLock(t *testing.T) {
 		handler.Init()
 		defer handler.Reset()
 
-		sess1 := newSession()
+		sess1 := newSession("", 0)
 
 		// テーブル作成
 		_, err := s.executeQuery(sess1, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
@@ -471,7 +471,7 @@ func TestConnectionDisconnectReleasesLock(t *testing.T) {
 		sess1.trxId = 0
 
 		// THEN: sess2 が同じ行を INSERT できる (ロックが解放されている)
-		sess2 := newSession()
+		sess2 := newSession("", 0)
 		_, err = s.executeQuery(sess2, "BEGIN;")
 		assert.NoError(t, err)
 		_, err = s.executeQuery(sess2, "INSERT INTO users (id, name) VALUES ('1', 'Bob');")
@@ -480,7 +480,7 @@ func TestConnectionDisconnectReleasesLock(t *testing.T) {
 		assert.NoError(t, err)
 
 		// データが Bob になっている
-		sess3 := newSession()
+		sess3 := newSession("", 0)
 		result, err := s.executeQuery(sess3, "SELECT * FROM users;")
 		assert.NoError(t, err)
 		assert.Contains(t, result, "1,Bob")

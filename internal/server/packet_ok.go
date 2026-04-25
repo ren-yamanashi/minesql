@@ -14,6 +14,7 @@ type okPacket struct {
 	statusFlags  uint16
 }
 
+// build は OK_Packet のペイロードを構築する
 func (p *okPacket) build() []byte {
 	buf := []byte{0x00}
 	buf = putLenEncInt(buf, p.affectedRows)
