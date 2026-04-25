@@ -86,6 +86,40 @@
 | ヘッダー | 1 バイト | 常に 0x01 |
 | status_byte | 1 バイト | 0x03 = Fast Authentication 成功、0x04 = Complete Authentication に切り替え |
 
+## コマンドフェーズのパケット
+
+### COM_QUERY の結果セット
+
+- SELECT の結果は、以下のパケット列として返される
+- 参考: https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response.html
+
+1. Column Count パケット: カラム数を長さエンコード整数で送信
+2. Column Definition パケット (カラム数分): 各カラムのメタデータ
+3. Row パケット (行数分): 各行のデータ。結果が 0 行の場合は送信しない
+4. OK_Packet: 結果セットの終了を示す (CLIENT_DEPRECATE_EOF により EOF_Packet の代わりに OK_Packet を使用)
+
+#### Column Definition パケット
+
+| フィールド | サイズ | 説明 |
+| --- | --- | --- |
+| catalog | 長さエンコード文字列 | 常に "def" |
+| schema | 長さエンコード文字列 | スキーマ名 (MineSQL では空文字列) |
+| table | 長さエンコード文字列 | テーブル名 |
+| org_table | 長さエンコード文字列 | 元のテーブル名 |
+| name | 長さエンコード文字列 | カラム名 |
+| org_name | 長さエンコード文字列 | 元のカラム名 |
+| fixed_fields_length | 長さエンコード整数 | 後続の固定長フィールドの長さ (常に 0x0c) |
+| character_set | 2 バイト | カラムの文字セット |
+| column_length | 4 バイト | カラムの最大長 |
+| column_type | 1 バイト | カラムの型 (MineSQL では全て VARCHAR = 0xFD) |
+| flags | 2 バイト | カラムのフラグ |
+| decimals | 1 バイト | 小数点以下の桁数 |
+| filler | 2 バイト | 予約領域 (常に 0x0000) |
+
+#### Row パケット
+
+- 各フィールドの値を長さエンコード文字列として順番に格納する
+
 ## 汎用レスポンスパケット
 
 - クライアントから送られたほとんどのコマンドへのレスポンスとして、以下のいずれかのパケットを返す
