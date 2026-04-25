@@ -6,7 +6,7 @@
 
 ## プロトコルの基本型
 
-- 全体とを通して使用される基本的な型
+- 全体を通して使用される基本的な型
 
 ### Integer
 
@@ -30,7 +30,7 @@
 ### String
 
 - 固定長文字列型
-  - あらかじめ決められた (ハードコードされた) 長さを持つも文字列
+  - あらかじめ決められた (ハードコードされた) 長さを持つ文字列
   - 例: ERR_Packet の sql-state は常に 5 バイトの文字列
 
 - NULL 終端文字列型
@@ -62,7 +62,7 @@
 
 - シーケンス ID は、パケットごとに加算され、上限に達すると 0 に戻る
   - 初期値: 0
-  - Command Phase (後述) で新しいコマンドが開始されるたびに 0 にリセットされ
+  - Command Phase (後述) で新しいコマンドが開始されるたびに 0 にリセットされる
 
 ### 例
 
@@ -85,7 +85,7 @@
 #### OK_Packet
 
 - コマンドが正常に完了したことを知らせるためのパケット
-- OK_Packet は EOF を示すためにも使用される (そのため EOF_Packet は存在しない)(MySQL 5.7.5 以降で非推奨となったため)
+- OK_Packet は EOF を示すためにも使用される (MySQL 5.7.5 以降で EOF_Packet は非推奨となっており、MineSQL では EOF_Packet を使用しない)
 - 詳細: https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_ok_packet.html
 
 #### ERR_Packet
@@ -97,15 +97,9 @@
 
 - utf8mb4_general_ci のみサポート
 
-## 圧縮
-
-- 圧縮は、独自のプロトコルレイヤーとして機能する
-  - MySQL の他のプロトコルレイヤーに対しては透過
-- 詳細: https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_compression.html
-
 ## TLS
 
 - TLS による暗号化と認証にも対応している
 - データが圧縮された後、ネットワーク層に書き込まれる直前のタイミングで適用される
-- TLS の対応は、サーバーから送信される Handshake ないの `CLIENT_SSL` フラグを通じて通知される
+- TLS の対応は、サーバーから送信される Handshake 内の `CLIENT_SSL` フラグを通じて通知される
   - クライアント側も同じ機能をサポートしていると返答した場合に、TLS が有効化される
