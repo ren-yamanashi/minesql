@@ -60,6 +60,20 @@ func TestOkPacketBuild(t *testing.T) {
 		assert.Equal(t, byte(0x00), buf[0]) // ヘッダー
 		assert.Equal(t, byte(0xFC), buf[1]) // 長さエンコード: 3 バイト形式
 	})
+
+	t.Run("isEOF=true の場合ヘッダーが 0xFE になる", func(t *testing.T) {
+		// GIVEN
+		pkt := &okPacket{
+			statusFlags: serverStatusAutocommit,
+			isEOF:       true,
+		}
+
+		// WHEN
+		buf := pkt.build()
+
+		// THEN
+		assert.Equal(t, byte(0xFE), buf[0])
+	})
 }
 
 func TestOkPacketImplementsPacket(t *testing.T) {

@@ -95,25 +95,26 @@ func (s *Server) accept(listener *net.TCPListener) {
 		}
 		log.Printf("New connection from %s", conn.RemoteAddr().String())
 		go func() {
+			var (
+				cc   *clientConn
+				sess *session
+			)
 			defer func() {
+				if sess != nil && sess.trxId != 0 {
+					if err := handler.Get().RollbackTrx(sess.trxId); err != nil {
+						log.Printf("Auto rollback error: %v", err)
+					}
+				}
 				log.Printf("Closing connection from %s", conn.RemoteAddr().String())
 				if err := conn.Close(); err != nil {
 					log.Printf("failed to close connection: %v", err)
 				}
 			}()
 
-			cc, sess := s.onConnection(conn)
+			cc, sess = s.onConnection(conn)
 			if sess == nil {
 				return
 			}
-			defer func() {
-				if sess.trxId != 0 {
-					if err := handler.Get().RollbackTrx(sess.trxId); err != nil {
-						log.Printf("Auto rollback error: %v", err)
-					}
-				}
-			}()
-
 			s.onCommand(cc, sess)
 		}()
 	}

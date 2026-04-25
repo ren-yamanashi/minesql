@@ -96,10 +96,10 @@ func TestOnComQuery(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "Alice", val2)
 
-		// 4. OK_Packet (EOF 代替)
+		// 4. OK_Packet (EOF 代替、ヘッダーは 0xFE)
 		okPkt, err := clientConn.readPacket()
 		require.NoError(t, err)
-		assert.Equal(t, byte(0x00), okPkt[0])
+		assert.Equal(t, byte(0xFE), okPkt[0])
 	})
 
 	t.Run("不正な SQL は ERR_Packet を返す", func(t *testing.T) {
@@ -194,10 +194,10 @@ func TestOnComQuery(t *testing.T) {
 		_, err = clientConn.readPacket()
 		require.NoError(t, err)
 
-		// 3. Row パケットなし → 直接 OK_Packet
+		// 3. Row パケットなし → 直接 OK_Packet (EOF 代替、ヘッダーは 0xFE)
 		okPkt, err := clientConn.readPacket()
 		require.NoError(t, err)
-		assert.Equal(t, byte(0x00), okPkt[0])
+		assert.Equal(t, byte(0xFE), okPkt[0])
 	})
 }
 

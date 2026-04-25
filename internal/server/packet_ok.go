@@ -3,7 +3,7 @@ package server
 // okPacket は OK_Packet を表す
 //
 // 構造:
-//   - 0x00 (ヘッダー)
+//   - ヘッダー (通常は 0x00、EOF 代替時は 0xFE)
 //   - affected_rows (長さエンコード整数)
 //   - last_insert_id (長さエンコード整数)
 //   - status_flags (2 バイト LittleEndian)
@@ -12,11 +12,16 @@ type okPacket struct {
 	affectedRows uint64
 	lastInsertId uint64
 	statusFlags  uint16
+	isEOF        bool // true の場合、ヘッダーを 0xFE にする (結果セット終了の EOF 代替)
 }
 
 // build は OK_Packet のペイロードを構築する
 func (p *okPacket) build() []byte {
-	buf := []byte{0x00}
+	header := byte(0x00)
+	if p.isEOF {
+		header = 0xFE
+	}
+	buf := []byte{header}
 	buf = putLenEncInt(buf, p.affectedRows)
 	buf = putLenEncInt(buf, p.lastInsertId)
 

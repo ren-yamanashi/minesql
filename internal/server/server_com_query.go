@@ -65,8 +65,8 @@ func writeResultSet(cc *clientConn, result *queryResult, statusFlags uint16) err
 		}
 	}
 
-	// 4. OK_Packet (EOF 代替、CLIENT_DEPRECATE_EOF)
-	return cc.writePacket((&okPacket{statusFlags: statusFlags}).build())
+	// 4. OK_Packet (EOF 代替、CLIENT_DEPRECATE_EOF によりヘッダーは 0xFE)
+	return cc.writePacket((&okPacket{statusFlags: statusFlags, isEOF: true}).build())
 }
 
 // buildRowPacket は Row パケットのペイロードを構築する
