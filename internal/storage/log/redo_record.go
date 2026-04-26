@@ -3,7 +3,8 @@ package log
 import (
 	"encoding/binary"
 	"errors"
-	"minesql/internal/storage/page"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 type RedoRecordType uint8

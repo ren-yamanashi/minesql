@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 
-	"minesql/internal/ast"
-	"minesql/internal/executor"
-	"minesql/internal/parser"
-	"minesql/internal/planner"
-	"minesql/internal/storage/handler"
+	"github.com/ren-yamanashi/minesql/internal/ast"
+	"github.com/ren-yamanashi/minesql/internal/executor"
+	"github.com/ren-yamanashi/minesql/internal/parser"
+	"github.com/ren-yamanashi/minesql/internal/planner"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 )
 
 // handleQuery は SQL をパースし、ステートメントの種類に応じて適切なハンドラにディスパッチする

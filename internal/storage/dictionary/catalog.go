@@ -3,9 +3,10 @@ package dictionary
 import (
 	"encoding/binary"
 	"fmt"
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/page"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 var (

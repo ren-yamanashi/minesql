@@ -1,6 +1,6 @@
 package access
 
-import "minesql/internal/storage/lock"
+import "github.com/ren-yamanashi/minesql/internal/storage/lock"
 
 // VersionReader は undo チェーンを辿って可視なバージョンのレコードを見つける
 type VersionReader struct {

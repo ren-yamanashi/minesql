@@ -6,11 +6,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/btree/node"
-	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/file"
-	"minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 // セットアップヘルパー: B+Tree とバッファプールを作成する

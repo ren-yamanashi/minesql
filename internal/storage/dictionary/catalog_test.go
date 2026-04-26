@@ -2,13 +2,13 @@ package dictionary
 
 import (
 	"encoding/binary"
-	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/file"
-	"minesql/internal/storage/page"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
 

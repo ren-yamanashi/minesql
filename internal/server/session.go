@@ -1,6 +1,6 @@
 package server
 
-import "minesql/internal/storage/handler"
+import "github.com/ren-yamanashi/minesql/internal/storage/handler"
 
 // session はクライアントごとの接続状態を管理する
 type session struct {

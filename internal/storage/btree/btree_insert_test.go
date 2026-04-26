@@ -2,9 +2,9 @@ package btree
 
 import (
 	"fmt"
-	"minesql/internal/storage/btree/node"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
 	"github.com/stretchr/testify/assert"
 )
 

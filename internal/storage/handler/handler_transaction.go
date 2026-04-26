@@ -1,6 +1,6 @@
 package handler
 
-import "minesql/internal/storage/access"
+import "github.com/ren-yamanashi/minesql/internal/storage/access"
 
 // BeginTrx は新しいトランザクションを開始し、トランザクション ID を返す
 func (h *Handler) BeginTrx() TrxId {

@@ -2,9 +2,10 @@ package btree
 
 import (
 	"bytes"
-	"minesql/internal/storage/btree/node"
-	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/page"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 // leafPosition はリーフページ内の位置情報を保持する

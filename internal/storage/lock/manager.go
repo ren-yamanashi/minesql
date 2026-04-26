@@ -2,9 +2,10 @@ package lock
 
 import (
 	"errors"
-	"minesql/internal/storage/page"
 	"sync"
 	"time"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 var ErrTimeout = errors.New("lock wait timeout")

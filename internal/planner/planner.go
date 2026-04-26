@@ -2,9 +2,10 @@ package planner
 
 import (
 	"fmt"
-	"minesql/internal/ast"
-	"minesql/internal/executor"
-	"minesql/internal/storage/handler"
+
+	"github.com/ren-yamanashi/minesql/internal/ast"
+	"github.com/ren-yamanashi/minesql/internal/executor"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 )
 
 // ColumnMeta は結果セットのカラムメタデータ

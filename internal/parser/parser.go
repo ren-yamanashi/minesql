@@ -2,8 +2,9 @@ package parser
 
 import (
 	"errors"
-	"minesql/internal/ast"
 	"strings"
+
+	"github.com/ren-yamanashi/minesql/internal/ast"
 )
 
 type parserState int

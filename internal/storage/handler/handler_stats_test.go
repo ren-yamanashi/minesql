@@ -1,9 +1,9 @@
 package handler
 
 import (
-	"minesql/internal/storage/lock"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/stretchr/testify/assert"
 )
 

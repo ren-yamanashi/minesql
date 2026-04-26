@@ -2,9 +2,10 @@ package handler
 
 import (
 	"fmt"
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/dictionary"
-	"minesql/internal/storage/log"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/access"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
+	"github.com/ren-yamanashi/minesql/internal/storage/log"
 )
 
 // GetTable はテーブルメタデータからテーブルを取得し、UndoManager をセットして返す

@@ -2,7 +2,8 @@ package access
 
 import (
 	"encoding/binary"
-	"minesql/internal/storage/lock"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 )
 
 const lastModifiedSize = 8

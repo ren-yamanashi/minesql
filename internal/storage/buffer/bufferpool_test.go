@@ -2,13 +2,13 @@ package buffer
 
 import (
 	"encoding/binary"
-	"minesql/internal/storage/file"
-	"minesql/internal/storage/log"
-	"minesql/internal/storage/page"
 	"path/filepath"
 	"testing"
 
 	"github.com/ncw/directio"
+	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/log"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
 

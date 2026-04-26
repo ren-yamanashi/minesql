@@ -2,12 +2,13 @@ package dictionary
 
 import (
 	"encoding/binary"
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/btree/node"
-	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/encode"
-	"minesql/internal/storage/page"
 	"sort"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/encode"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 type ColumnType string

@@ -1,9 +1,8 @@
 package buffer
 
 import (
-	"minesql/internal/storage/page"
-
 	"github.com/ncw/directio"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 // BufferPage はバッファプール内のページ (バッファページ) を表す

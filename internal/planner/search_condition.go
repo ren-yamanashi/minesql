@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
-	"minesql/internal/ast"
-	"minesql/internal/executor"
+	"github.com/ren-yamanashi/minesql/internal/ast"
+	"github.com/ren-yamanashi/minesql/internal/executor"
 )
 
 // -------------------------------------------------

@@ -3,10 +3,11 @@ package planner
 import (
 	"errors"
 	"fmt"
-	"minesql/internal/ast"
-	"minesql/internal/executor"
-	"minesql/internal/storage/dictionary"
-	"minesql/internal/storage/handler"
+
+	"github.com/ren-yamanashi/minesql/internal/ast"
+	"github.com/ren-yamanashi/minesql/internal/executor"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 )
 
 // PlanCreateTable は CREATE TABLE 文の実行計画を構築する

@@ -1,8 +1,8 @@
 package executor
 
 import (
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/handler"
+	"github.com/ren-yamanashi/minesql/internal/storage/access"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 )
 
 // TableScanParams は NewTableScan の引数

@@ -1,11 +1,11 @@
 package lock
 
 import (
-	"minesql/internal/storage/page"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
 

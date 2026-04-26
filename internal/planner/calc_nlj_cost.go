@@ -2,12 +2,13 @@ package planner
 
 import (
 	"errors"
-	"minesql/internal/ast"
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/dictionary"
-	"minesql/internal/storage/handler"
+
+	"github.com/ren-yamanashi/minesql/internal/ast"
+	"github.com/ren-yamanashi/minesql/internal/storage/access"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 )
 
 // joinCandidate は結合候補のテーブル情報

@@ -2,7 +2,8 @@ package btree
 
 import (
 	"encoding/binary"
-	"minesql/internal/storage/page"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 // メタページのレイアウト (Body 内):

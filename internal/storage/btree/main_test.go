@@ -6,10 +6,9 @@ import (
 	"strings"
 	"testing"
 
-	"minesql/internal/storage/btree/node"
-	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/page"
-
+	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

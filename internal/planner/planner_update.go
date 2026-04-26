@@ -3,10 +3,11 @@ package planner
 import (
 	"errors"
 	"fmt"
-	"minesql/internal/ast"
-	"minesql/internal/executor"
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/handler"
+
+	"github.com/ren-yamanashi/minesql/internal/ast"
+	"github.com/ren-yamanashi/minesql/internal/executor"
+	"github.com/ren-yamanashi/minesql/internal/storage/access"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 )
 
 func PlanUpdate(trxId handler.TrxId, stmt *ast.UpdateStmt) (executor.Executor, error) {

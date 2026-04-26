@@ -1,8 +1,8 @@
 package access
 
 import (
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/encode"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
+	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 )
 
 // RecordSearchMode は検索方法を表すインターフェース

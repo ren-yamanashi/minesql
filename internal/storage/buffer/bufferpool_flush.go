@@ -1,6 +1,6 @@
 package buffer
 
-import "minesql/internal/storage/page"
+import "github.com/ren-yamanashi/minesql/internal/storage/page"
 
 // FlushAllPages はバッファプール内のすべてのダーティーページをディスクに書き出す
 func (bp *BufferPool) FlushAllPages() error {

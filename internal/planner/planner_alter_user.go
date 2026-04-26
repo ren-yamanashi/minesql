@@ -3,10 +3,10 @@ package planner
 import (
 	"fmt"
 
-	"minesql/internal/ast"
-	"minesql/internal/executor"
-	"minesql/internal/storage/acl"
-	"minesql/internal/storage/handler"
+	"github.com/ren-yamanashi/minesql/internal/ast"
+	"github.com/ren-yamanashi/minesql/internal/executor"
+	"github.com/ren-yamanashi/minesql/internal/storage/acl"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 )
 
 // PlanAlterUser は ALTER USER 文のバリデーションを行い、AlterUser executor を構築する

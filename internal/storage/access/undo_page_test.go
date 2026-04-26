@@ -4,8 +4,7 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"minesql/internal/storage/page"
-
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
 

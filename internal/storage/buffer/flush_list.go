@@ -2,7 +2,8 @@ package buffer
 
 import (
 	"encoding/binary"
-	"minesql/internal/storage/page"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 type flushListNode struct {
