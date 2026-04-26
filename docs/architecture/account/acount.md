@@ -53,5 +53,13 @@ VerifyAuthInfo -->|不一致| MissAccountOrPasswordError
 
 ## 初期ユーザー
 
-- サーバー初回起動時にコマンドライン引数 (`--init-user`, `--init-password`, `--init-host`) で初期ユーザーを設定する
+- サーバー初回起動時にコマンドライン引数 (`--init-user`, `--init-host`) で初期ユーザーを設定する
+- パスワードはランダム生成されてログに出力される
+- ユーザーは ALTER USER でパスワードを変更する
 - 2 回目以降の起動ではカタログから読み込む。`--init-*` 引数を指定した場合は無視される (WARN ログを出力)
+
+## ALTER USER
+
+- `ALTER USER 'user'@'host' IDENTIFIED BY 'new_password';` でパスワードを変更する
+- カタログの UserMeta を更新し、オンメモリの ACL も再構築する
+- 変更は即座に反映される (次回の認証から新しいパスワードが使われる)
