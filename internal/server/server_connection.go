@@ -4,6 +4,8 @@ import (
 	"crypto/rand"
 	"log"
 	"net"
+
+	"minesql/internal/storage/handler"
 )
 
 // onConnection は接続フェーズ (Handshake + 認証) を処理する
@@ -61,7 +63,7 @@ func (s *Server) onConnection(conn *net.TCPConn) (*clientConn, *session) {
 		log.Printf("Failed to parse remote address: %v", err)
 		return nil, nil
 	}
-	if err := authenticate(s.acl, clientHost, hsResp.username, hsResp.authResponse, nonce); err != nil {
+	if err := authenticate(handler.Get().ACL, clientHost, hsResp.username, hsResp.authResponse, nonce); err != nil {
 		if writeErr := cc.writePacket((&errPacket{
 			errorCode: erAccessDenied,
 			sqlState:  sqlStateAuthError,

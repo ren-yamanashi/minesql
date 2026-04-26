@@ -3,10 +3,38 @@ package handler
 import (
 	"fmt"
 
+	"minesql/internal/storage/acl"
 	"minesql/internal/storage/dictionary"
 )
 
-// CreateUser は初期ユーザーをカタログに作成する
+// LoadACL はカタログからユーザーを読み込んで ACL を構築する
+//
+// ユーザーが存在しない場合は false を返す
+func (h *Handler) LoadACL() bool {
+	if !h.Catalog.HasUsers() {
+		return false
+	}
+	user := h.Catalog.Users[0]
+	h.ACL = acl.NewACLFromCatalog(user.Username, user.Host, user.AuthString)
+	return true
+}
+
+// CreateInitialUser は初期ユーザーを作成し、生成したランダムパスワードを返す
+func (h *Handler) CreateInitialUser(username, host string) (string, error) {
+	password, err := acl.GeneratePassword()
+	if err != nil {
+		return "", fmt.Errorf("failed to generate password: %w", err)
+	}
+
+	authString := acl.ComputeAuthString(password)
+	if err := h.CreateUser(username, host, authString); err != nil {
+		return "", err
+	}
+
+	return password, nil
+}
+
+// CreateUser はユーザーをカタログに作成し、ACL を構築する
 func (h *Handler) CreateUser(username, host string, authString [32]byte) error {
 	userMeta := &dictionary.UserMeta{
 		MetaPageId: h.Catalog.UserMetaPageId,
@@ -18,10 +46,11 @@ func (h *Handler) CreateUser(username, host string, authString [32]byte) error {
 		return err
 	}
 	h.Catalog.Users = append(h.Catalog.Users, userMeta)
+	h.ACL = acl.NewACLFromCatalog(username, host, authString)
 	return nil
 }
 
-// UpdateUser はカタログ上のユーザーの認証情報を更新する
+// UpdateUser はカタログ上のユーザーの認証情報を更新し、ACL を再構築する
 func (h *Handler) UpdateUser(username, host string, authString [32]byte) error {
 	user, ok := h.Catalog.GetUserByName(username)
 	if !ok {
@@ -35,5 +64,7 @@ func (h *Handler) UpdateUser(username, host string, authString [32]byte) error {
 		return err
 	}
 
+	// ACL を再構築
+	h.ACL = acl.NewACLFromCatalog(username, host, authString)
 	return nil
 }

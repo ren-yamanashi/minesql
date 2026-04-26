@@ -8,7 +8,6 @@ import (
 	"minesql/internal/executor"
 	"minesql/internal/parser"
 	"minesql/internal/planner"
-	"minesql/internal/storage/acl"
 	"minesql/internal/storage/handler"
 )
 
@@ -38,19 +37,7 @@ func (s *Server) onQuery(sess *session, sql string) (*queryResult, error) {
 	}
 
 	// それ以外は planner を通して実行する
-	result, err := s.executeQuery(sess, node)
-	if err != nil {
-		return nil, err
-	}
-
-	// ALTER USER の場合はオンメモリの ACL を再構築する
-	if alterStmt, ok := node.(*ast.AlterUserStmt); ok {
-		hdl := handler.Get()
-		user, _ := hdl.Catalog.GetUserByName(alterStmt.Username)
-		s.acl = acl.NewACLFromCatalog(user.Username, user.Host, user.AuthString)
-	}
-
-	return result, nil
+	return s.executeQuery(sess, node)
 }
 
 // executeTransaction はトランザクション制御文 (BEGIN/COMMIT/ROLLBACK) を実行する

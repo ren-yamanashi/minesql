@@ -40,7 +40,8 @@ VerifyAuthInfo -->|不一致| MissAccountOrPasswordError
 ## ACL の構築
 
 - ACL はカタログに永続化される
-- サーバー初回起動時にコマンドライン引数 (`--init-user`, `--init-password`, `--init-host`) で初期ユーザーを設定する
+- サーバー初回起動時にコマンドライン引数 (`--init-user`, `--init-host`) で初期ユーザーを設定する
+- パスワードはランダム生成されてログに出力される
 - 2 回目以降の起動ではカタログから読み込む。`--init-*` 引数を指定した場合は無視される (WARN ログを出力)
 
 ## ホストマッチング

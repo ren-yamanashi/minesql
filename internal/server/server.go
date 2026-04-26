@@ -7,14 +7,12 @@ import (
 	"os"
 	"sync/atomic"
 
-	"minesql/internal/storage/acl"
 	"minesql/internal/storage/handler"
 )
 
 // InitUserOpts は初期ユーザーの設定
 type InitUserOpts struct {
 	Username string
-	Password string
 	Host     string
 }
 
@@ -22,7 +20,6 @@ type Server struct {
 	address        string // IPアドレスまたはホスト名
 	port           int    // ポート番号
 	initUser       *InitUserOpts
-	acl            *acl.ACL
 	storageManager *handler.Handler
 	nextConnId     atomic.Uint32
 }
@@ -88,31 +85,24 @@ func (s *Server) init() error {
 func (s *Server) initACL() error {
 	hdl := handler.Get()
 
-	if hdl.Catalog.HasUsers() {
-		// カタログにユーザーが存在する場合はそこから ACL を構築
+	if hdl.LoadACL() {
 		if s.initUser != nil {
 			log.Println("WARN: --init-user specified but user already exists in catalog, ignoring")
 		}
-		user := hdl.Catalog.Users[0]
-		s.acl = acl.NewACLFromCatalog(user.Username, user.Host, user.AuthString)
 		return nil
 	}
 
 	// カタログにユーザーがない場合は --init-* 引数が必要
 	if s.initUser == nil {
-		return fmt.Errorf("no user found in catalog; specify --init-user, --init-password, --init-host on first startup")
+		return fmt.Errorf("no user found in catalog; specify --init-user, --init-host on first startup")
 	}
 
-	// 初期ユーザーを作成して ACL を構築
-	aclUser := acl.NewUser(s.initUser.Username, s.initUser.Password, s.initUser.Host)
-	s.acl = acl.NewACL(aclUser)
-
-	// カタログに永続化
-	if err := hdl.CreateUser(s.initUser.Username, s.initUser.Host, aclUser.AuthString); err != nil {
+	password, err := hdl.CreateInitialUser(s.initUser.Username, s.initUser.Host)
+	if err != nil {
 		return err
 	}
 
-	log.Printf("Initial user '%s'@'%s' created", s.initUser.Username, s.initUser.Host)
+	log.Printf("Initial user '%s'@'%s' created with password: %s", s.initUser.Username, s.initUser.Host, password)
 	return nil
 }
 

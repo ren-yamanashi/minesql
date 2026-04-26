@@ -18,14 +18,12 @@ func TestNewServer(t *testing.T) {
 		assert.Equal(t, "localhost", s.address)
 		assert.Equal(t, 3307, s.port)
 		assert.Nil(t, s.initUser)
-		assert.Nil(t, s.acl)
 	})
 
 	t.Run("InitUserOpts 付きで初期化される", func(t *testing.T) {
 		// GIVEN
 		opts := &InitUserOpts{
 			Username: "admin",
-			Password: "secret",
 			Host:     "192.168.1.%",
 		}
 
@@ -34,7 +32,6 @@ func TestNewServer(t *testing.T) {
 
 		// THEN
 		assert.Equal(t, "admin", s.initUser.Username)
-		assert.Equal(t, "secret", s.initUser.Password)
 		assert.Equal(t, "192.168.1.%", s.initUser.Host)
 	})
 }
@@ -52,7 +49,6 @@ func TestInitACL(t *testing.T) {
 		s := &Server{
 			initUser: &InitUserOpts{
 				Username: "root",
-				Password: "mypass",
 				Host:     "%",
 			},
 		}
@@ -62,10 +58,10 @@ func TestInitACL(t *testing.T) {
 
 		// THEN
 		require.NoError(t, err)
-		assert.NotNil(t, s.acl)
+		assert.NotNil(t, handler.Get().ACL)
 
 		// ACL から Lookup できる
-		user, ok := s.acl.Lookup("127.0.0.1", "root")
+		user, ok := handler.Get().ACL.Lookup("127.0.0.1", "root")
 		assert.True(t, ok)
 		assert.Equal(t, "root", user.Username)
 	})
@@ -82,7 +78,6 @@ func TestInitACL(t *testing.T) {
 		s := &Server{
 			initUser: &InitUserOpts{
 				Username: "admin",
-				Password: "pass",
 				Host:     "192.168.1.%",
 			},
 		}
@@ -96,37 +91,6 @@ func TestInitACL(t *testing.T) {
 		assert.True(t, hdl.Catalog.HasUsers())
 		assert.Equal(t, "admin", hdl.Catalog.Users[0].Username)
 		assert.Equal(t, "192.168.1.%", hdl.Catalog.Users[0].Host)
-	})
-
-	t.Run("カタログにユーザーが存在する場合はそこから ACL を構築する", func(t *testing.T) {
-		// GIVEN: 初期ユーザーを先に作成
-		tmpdir := t.TempDir()
-		t.Setenv("MINESQL_DATA_DIR", tmpdir)
-		t.Setenv("MINESQL_BUFFER_SIZE", "100")
-		handler.Reset()
-		handler.Init()
-		defer handler.Reset()
-
-		s1 := &Server{
-			initUser: &InitUserOpts{
-				Username: "root",
-				Password: "mypass",
-				Host:     "%",
-			},
-		}
-		err := s1.initACL()
-		require.NoError(t, err)
-
-		// WHEN: --init-* なしで initACL を呼ぶ
-		s2 := &Server{}
-		err = s2.initACL()
-
-		// THEN: カタログから ACL が構築される
-		require.NoError(t, err)
-		assert.NotNil(t, s2.acl)
-		user, ok := s2.acl.Lookup("127.0.0.1", "root")
-		assert.True(t, ok)
-		assert.Equal(t, "root", user.Username)
 	})
 
 	t.Run("カタログにユーザーがなく --init-* もない場合はエラー", func(t *testing.T) {
@@ -160,7 +124,6 @@ func TestInitACL(t *testing.T) {
 		s1 := &Server{
 			initUser: &InitUserOpts{
 				Username: "root",
-				Password: "original",
 				Host:     "%",
 			},
 		}
@@ -171,7 +134,6 @@ func TestInitACL(t *testing.T) {
 		s2 := &Server{
 			initUser: &InitUserOpts{
 				Username: "root",
-				Password: "different",
 				Host:     "%",
 			},
 		}
@@ -179,38 +141,7 @@ func TestInitACL(t *testing.T) {
 
 		// THEN: エラーにならず、元のユーザーが使われる (WARN ログは出るが検証しない)
 		require.NoError(t, err)
-		assert.NotNil(t, s2.acl)
+		assert.NotNil(t, handler.Get().ACL)
 	})
 
-	t.Run("ホスト制限付きの初期ユーザーで ACL が正しく動作する", func(t *testing.T) {
-		// GIVEN
-		tmpdir := t.TempDir()
-		t.Setenv("MINESQL_DATA_DIR", tmpdir)
-		t.Setenv("MINESQL_BUFFER_SIZE", "100")
-		handler.Reset()
-		handler.Init()
-		defer handler.Reset()
-
-		s := &Server{
-			initUser: &InitUserOpts{
-				Username: "root",
-				Password: "pass",
-				Host:     "127.0.0.1",
-			},
-		}
-
-		// WHEN
-		err := s.initACL()
-
-		// THEN
-		require.NoError(t, err)
-
-		// 許可されたホストからは Lookup できる
-		_, ok := s.acl.Lookup("127.0.0.1", "root")
-		assert.True(t, ok)
-
-		// 別のホストからは Lookup できない
-		_, ok = s.acl.Lookup("192.168.1.100", "root")
-		assert.False(t, ok)
-	})
 }

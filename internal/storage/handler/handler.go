@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"minesql/internal/storage/access"
+	"minesql/internal/storage/acl"
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/buffer"
 	"minesql/internal/storage/config"
@@ -42,6 +43,7 @@ type Handler struct {
 	LockMgr        *lock.Manager
 	Catalog        *dictionary.Catalog
 	StatsCollector *dictionary.StatsCollector
+	ACL            *acl.ACL
 	undoLog        *access.UndoManager
 	redoLog        *log.RedoLog
 	trxManager     *access.TrxManager

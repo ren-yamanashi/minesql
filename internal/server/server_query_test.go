@@ -229,7 +229,6 @@ func TestExecuteQueryAlterUser(t *testing.T) {
 		oldAuthString := acl.ComputeAuthString("oldpass")
 		err := hdl.CreateUser("root", "%", oldAuthString)
 		require.NoError(t, err)
-		s.acl = acl.NewACLFromCatalog("root", "%", oldAuthString)
 
 		// WHEN
 		result, err := s.onQuery(sess, "ALTER USER 'root'@'%' IDENTIFIED BY 'newpass';")
@@ -245,7 +244,7 @@ func TestExecuteQueryAlterUser(t *testing.T) {
 		assert.Equal(t, expectedAuthString, user.AuthString)
 
 		// ACL が再構築されている (新しいパスワードで認証できる)
-		aclUser, ok := s.acl.Lookup("%", "root")
+		aclUser, ok := hdl.ACL.Lookup("%", "root")
 		assert.True(t, ok)
 		assert.Equal(t, expectedAuthString, aclUser.AuthString)
 	})
@@ -735,9 +734,11 @@ func setupTestServer(t *testing.T) *Server {
 	handler.Reset()
 	handler.Init()
 
-	return &Server{
-		acl: acl.NewACL(acl.NewUser("root", "root", "%")),
-	}
+	// テスト用の ACL を構築
+	hdl := handler.Get()
+	hdl.ACL = acl.NewACL(acl.NewUser("root", "root", "%"))
+
+	return &Server{}
 }
 
 // resultToCSV は queryResult のレコードを CSV 形式の文字列に変換する (テスト用)

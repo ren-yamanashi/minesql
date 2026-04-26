@@ -30,14 +30,19 @@ mysql -u root -proot -h 127.0.0.1 -P 8888 --default-auth=caching_sha2_password -
 On first startup, specify the initial user with command-line arguments:
 
 ```sh
-./bin/server -h localhost -p 8888 --init-user root --init-password mypass --init-host %
+./bin/server -h localhost -p 8888 --init-user root --init-host %
 ```
 
 | Argument | Description |
 | -------- | ----------- |
 | `--init-user` | Initial username |
-| `--init-password` | Initial password |
 | `--init-host` | Allowed host (`%` for all hosts, `192.168.1.%` for subnet pattern) |
+
+A random password is generated and printed to the server log. Use `ALTER USER` to change the password:
+
+```sql
+ALTER USER 'root'@'%' IDENTIFIED BY 'new_password';
+```
 
 On subsequent startups, these arguments are not needed (user is loaded from catalog). If specified when a user already exists, they will be ignored with a warning.
 
