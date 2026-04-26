@@ -13,9 +13,23 @@ import (
 
 // executeQuery はクエリを実行して構造化された結果を返す
 func (s *Server) executeQuery(sess *session, sql string) (*queryResult, error) {
+	sql = strings.TrimSpace(sql)
+
+	upperSQL := strings.ToUpper(sql)
+
 	// SET 文は無視して OK を返す (go-sql-driver/mysql が接続時に SET NAMES utf8mb4 などを送るため)
-	if strings.HasPrefix(strings.ToUpper(strings.TrimSpace(sql)), "SET ") {
+	if strings.HasPrefix(upperSQL, "SET ") {
 		return &queryResult{resultType: resultOK}, nil
+	}
+
+	// START TRANSACTION は BEGIN と同等として扱う
+	if upperSQL == "START TRANSACTION" || strings.HasPrefix(upperSQL, "START TRANSACTION;") {
+		sql = "BEGIN;"
+	}
+
+	// mysql クライアントは末尾のセミコロンを除去して送信するため、なければ補完する
+	if !strings.HasSuffix(sql, ";") {
+		sql += ";"
 	}
 
 	p := parser.NewParser()
@@ -54,12 +68,6 @@ func (s *Server) executeQuery(sess *session, sql string) (*queryResult, error) {
 		}
 	}
 
-	// SELECT の場合、カラム情報を取得する
-	var columns []columnDefPacket
-	if selectStmt, ok := node.(*ast.SelectStmt); ok {
-		columns = resolveColumnInfo(selectStmt)
-	}
-
 	// トランザクション外の DML は autocommit (一時的な trxId を発行して即 Commit)
 	hdl := handler.Get()
 	autocommit := sess.trxId == 0
@@ -69,7 +77,7 @@ func (s *Server) executeQuery(sess *session, sql string) (*queryResult, error) {
 	}
 
 	// 実行計画の作成
-	exec, err := planner.Start(trxId, node)
+	plan, err := planner.Start(trxId, node)
 	if err != nil {
 		if autocommit {
 			_ = hdl.RollbackTrx(trxId)
@@ -81,7 +89,7 @@ func (s *Server) executeQuery(sess *session, sql string) (*queryResult, error) {
 	var records []executor.Record
 	var affectedRows uint64
 	for {
-		record, err := exec.Next()
+		record, err := plan.Exec.Next()
 		if err != nil {
 			if autocommit {
 				_ = hdl.RollbackTrx(trxId)
@@ -102,7 +110,11 @@ func (s *Server) executeQuery(sess *session, sql string) (*queryResult, error) {
 	}
 
 	// SELECT の場合は結果セット、それ以外は OK
-	if columns != nil {
+	if plan.Columns != nil {
+		columns := make([]columnDefPacket, len(plan.Columns))
+		for i, col := range plan.Columns {
+			columns[i] = columnDefPacket{tableName: col.TableName, name: col.ColName}
+		}
 		return &queryResult{
 			resultType: resultResultSet,
 			columns:    columns,
@@ -114,62 +126,4 @@ func (s *Server) executeQuery(sess *session, sql string) (*queryResult, error) {
 		resultType:   resultOK,
 		affectedRows: affectedRows,
 	}, nil
-}
-
-// resolveColumnInfo は SELECT 文のカラム情報を解決する
-func resolveColumnInfo(stmt *ast.SelectStmt) []columnDefPacket {
-	hdl := handler.Get()
-	tableName := stmt.From.TableName
-
-	// JOIN の場合
-	if len(stmt.Joins) > 0 {
-		var columns []columnDefPacket
-		tables := []string{tableName}
-		for _, join := range stmt.Joins {
-			tables = append(tables, join.Table.TableName)
-		}
-
-		if stmt.Columns == nil {
-			// SELECT *: 全テーブルの全カラムを順序位置でソートして結合
-			for _, tbl := range tables {
-				tblMeta, ok := hdl.Catalog.GetTableMetaByName(tbl)
-				if !ok {
-					continue
-				}
-				for _, col := range tblMeta.GetSortedCols() {
-					columns = append(columns, columnDefPacket{tableName: tbl, name: col.Name})
-				}
-			}
-		} else {
-			for _, col := range stmt.Columns {
-				columns = append(columns, columnDefPacket{tableName: col.TableName, name: col.ColName})
-			}
-		}
-		return columns
-	}
-
-	// 単一テーブルの場合
-	if stmt.Columns == nil {
-		// SELECT *: テーブルの全カラムを順序位置でソートして取得
-		tblMeta, ok := hdl.Catalog.GetTableMetaByName(tableName)
-		if !ok {
-			return nil
-		}
-		columns := make([]columnDefPacket, 0, len(tblMeta.GetSortedCols()))
-		for _, col := range tblMeta.GetSortedCols() {
-			columns = append(columns, columnDefPacket{tableName: tableName, name: col.Name})
-		}
-		return columns
-	}
-
-	// カラム指定の場合
-	columns := make([]columnDefPacket, 0, len(stmt.Columns))
-	for _, col := range stmt.Columns {
-		tbl := col.TableName
-		if tbl == "" {
-			tbl = tableName
-		}
-		columns = append(columns, columnDefPacket{tableName: tbl, name: col.ColName})
-	}
-	return columns
 }

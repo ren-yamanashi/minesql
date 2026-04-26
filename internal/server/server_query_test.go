@@ -158,6 +158,49 @@ func TestExecuteQuery(t *testing.T) {
 		assert.Error(t, err)
 	})
 
+	t.Run("START TRANSACTION が BEGIN として処理される", func(t *testing.T) {
+		// GIVEN
+		s := setupTestServer(t)
+		defer handler.Reset()
+		sess := newSession("", 0)
+
+		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		assert.NoError(t, err)
+
+		// WHEN: START TRANSACTION でトランザクション開始
+		result, err := s.executeQuery(sess, "START TRANSACTION;")
+		assert.NoError(t, err)
+		assert.Equal(t, resultOK, result.resultType)
+		assert.NotEqual(t, handler.TrxId(0), sess.trxId)
+
+		// INSERT → ROLLBACK
+		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
+		assert.NoError(t, err)
+		_, err = s.executeQuery(sess, "ROLLBACK;")
+		assert.NoError(t, err)
+
+		// THEN: ROLLBACK されているのでテーブルが空
+		selectResult, err := s.executeQuery(sess, "SELECT * FROM users;")
+		assert.NoError(t, err)
+		assert.Empty(t, selectResult.records)
+	})
+
+	t.Run("START TRANSACTION はセミコロンなしでも処理される", func(t *testing.T) {
+		// GIVEN
+		s := setupTestServer(t)
+		defer handler.Reset()
+		sess := newSession("", 0)
+
+		// WHEN: セミコロンなし (mysql クライアントが送る形式)
+		result, err := s.executeQuery(sess, "START TRANSACTION")
+		assert.NoError(t, err)
+		assert.Equal(t, resultOK, result.resultType)
+		assert.NotEqual(t, handler.TrxId(0), sess.trxId)
+
+		// クリーンアップ
+		_, _ = s.executeQuery(sess, "ROLLBACK;")
+	})
+
 	t.Run("SET 文は無視して OK を返す", func(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)

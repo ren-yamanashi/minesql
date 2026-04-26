@@ -11,15 +11,14 @@ See [docs](./docs) for more details. (Sorry, now only japanese)
 ### Start Server
 
 ```sh
-make build-server
+make build
 ./bin/server -h localhost -p 8888 # -h = hostname, -p = port
 ```
 
-### Start Client
+### Connect
 
 ```sh
-make build-client
-./bin/client -h localhost -p 8888 # -h = hostname, -p = port
+mysql -u root -proot -h 127.0.0.1 -P 8888 --default-auth=caching_sha2_password
 ```
 
 ## Settings

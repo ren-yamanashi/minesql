@@ -18,6 +18,14 @@ func TestOnConnection(t *testing.T) {
 		defer handler.Reset()
 
 		serverTCP, clientTCP := createTCPPair(t)
+		defer func() {
+			if err := serverTCP.Close(); err != nil {
+				t.Errorf("failed to close serverTCP: %v", err)
+			}
+			if err := clientTCP.Close(); err != nil {
+				t.Errorf("failed to close clientTCP: %v", err)
+			}
+		}()
 
 		type result struct {
 			cc   *clientConn
@@ -32,8 +40,7 @@ func TestOnConnection(t *testing.T) {
 		clientCC := newClientConn(clientTCP)
 
 		// WHEN: ハンドシェイクを実行
-		nonce := performClientHandshake(t, clientCC)
-		_ = nonce
+		performClientHandshake(t, clientCC)
 
 		// THEN: clientConn と session が返る
 		r := <-resultCh
@@ -48,6 +55,14 @@ func TestOnConnection(t *testing.T) {
 		defer handler.Reset()
 
 		serverTCP, clientTCP := createTCPPair(t)
+		defer func() {
+			if err := serverTCP.Close(); err != nil {
+				t.Errorf("failed to close serverTCP: %v", err)
+			}
+			if err := clientTCP.Close(); err != nil {
+				t.Errorf("failed to close clientTCP: %v", err)
+			}
+		}()
 
 		type result struct {
 			cc   *clientConn
@@ -99,7 +114,9 @@ func TestOnConnection(t *testing.T) {
 		_, pos1 = readNullTermString(pos1)
 		connId1 := readUint32(pos1[:4])
 
-		clientTCP1.Close()
+		if err := clientTCP1.Close(); err != nil {
+			t.Logf("clientTCP1.Close: %v", err)
+		}
 
 		// 2 回目の接続
 		serverTCP2, clientTCP2 := createTCPPair(t)
@@ -116,7 +133,9 @@ func TestOnConnection(t *testing.T) {
 		// THEN: コネクション ID がインクリメントされている
 		assert.Equal(t, connId1+1, connId2)
 
-		clientTCP2.Close()
+		if err := clientTCP2.Close(); err != nil {
+			t.Logf("clientTCP2.Close: %v", err)
+		}
 	})
 
 	t.Run("accept から onConnection → onCommand の流れが正しく動作する", func(t *testing.T) {
@@ -129,7 +148,9 @@ func TestOnConnection(t *testing.T) {
 		done := make(chan struct{})
 		go func() {
 			defer func() {
-				serverTCP.Close()
+				if err := serverTCP.Close(); err != nil {
+					t.Logf("serverTCP.Close: %v", err)
+				}
 				close(done)
 			}()
 			cc, sess := s.onConnection(serverTCP)
@@ -168,7 +189,7 @@ func TestOnConnection(t *testing.T) {
 // performClientHandshake はテスト用にクライアント側のハンドシェイクを実行する
 //
 // ハンドシェイクパケットの受信 → 応答送信 → AuthMoreData 受信 → OK 受信を行い、nonce を返す
-func performClientHandshake(t *testing.T, clientCC *clientConn) []byte {
+func performClientHandshake(t *testing.T, clientCC *clientConn) {
 	t.Helper()
 
 	// ハンドシェイクパケットを受信
@@ -205,15 +226,20 @@ func performClientHandshake(t *testing.T, clientCC *clientConn) []byte {
 	require.NoError(t, err)
 	assert.Equal(t, byte(0x00), okPkt[0])
 
-	return nonce
 }
 
 // createTCPPair はテスト用に接続された TCP コネクションのペアを作成する
+//
+// 呼び出し元がコネクションのクローズを管理する
 func createTCPPair(t *testing.T) (serverConn *net.TCPConn, clientConn *net.TCPConn) {
 	t.Helper()
 	listener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.IPv4(127, 0, 0, 1), Port: 0})
 	require.NoError(t, err)
-	t.Cleanup(func() { listener.Close() })
+	defer func() {
+		if err := listener.Close(); err != nil {
+			t.Errorf("failed to close listener: %v", err)
+		}
+	}()
 
 	accepted := make(chan *net.TCPConn, 1)
 	go func() {
@@ -227,11 +253,8 @@ func createTCPPair(t *testing.T) (serverConn *net.TCPConn, clientConn *net.TCPCo
 	addr := listener.Addr().(*net.TCPAddr)
 	client, err := net.DialTCP("tcp", nil, addr)
 	require.NoError(t, err)
-	t.Cleanup(func() { client.Close() })
 
 	server := <-accepted
-	t.Cleanup(func() { server.Close() })
-
 	return server, client
 }
 

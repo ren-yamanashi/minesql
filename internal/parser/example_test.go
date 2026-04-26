@@ -64,14 +64,14 @@ func runSQL(trxId handler.TrxId, sql string) []executor.Record {
 		panic(err)
 	}
 
-	exec, err := planner.Start(trxId, result)
+	plan, err := planner.Start(trxId, result)
 	if err != nil {
 		panic(err)
 	}
 
 	var records []executor.Record
 	for {
-		record, err := exec.Next()
+		record, err := plan.Exec.Next()
 		if err != nil {
 			panic(err)
 		}

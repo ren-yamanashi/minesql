@@ -25,7 +25,7 @@ func init() {
 // 認証成功時は nil を返す。失敗時はエラーを返す。
 func authenticate(username string, clientScramble []byte, nonce []byte) error {
 	if username != fixedUsername {
-		return fmt.Errorf("Access denied for user '%s'", username)
+		return fmt.Errorf("access denied for user '%s'", username)
 	}
 
 	// 空パスワードの判定
@@ -33,7 +33,7 @@ func authenticate(username string, clientScramble []byte, nonce []byte) error {
 		if fixedPassword == "" {
 			return nil
 		}
-		return fmt.Errorf("Access denied for user '%s'", username)
+		return fmt.Errorf("access denied for user '%s'", username)
 	}
 
 	// サーバー側の検証:
@@ -45,7 +45,7 @@ func authenticate(username string, clientScramble []byte, nonce []byte) error {
 
 	// 2. candidate_stage1 = XOR(client_scramble, expected)
 	if len(clientScramble) != len(expected) {
-		return fmt.Errorf("Access denied for user '%s'", username)
+		return fmt.Errorf("access denied for user '%s'", username)
 	}
 	candidateStage1 := make([]byte, len(clientScramble))
 	for i := range candidateStage1 {
@@ -57,7 +57,7 @@ func authenticate(username string, clientScramble []byte, nonce []byte) error {
 
 	// 4. candidate_stage2 == cached_hash なら認証成功
 	if subtle.ConstantTimeCompare(candidateStage2[:], cachedHash[:]) != 1 {
-		return fmt.Errorf("Access denied for user '%s'", username)
+		return fmt.Errorf("access denied for user '%s'", username)
 	}
 
 	return nil

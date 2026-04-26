@@ -337,10 +337,10 @@ func executeSql(t *testing.T, trxId handler.TrxId, sql string) []executor.Record
 	result, err := p.Parse(sql)
 	assert.NoError(t, err)
 
-	exec, err := planner.Start(trxId, result)
+	plan, err := planner.Start(trxId, result)
 	assert.NoError(t, err)
 
-	return fetchAll(t, exec)
+	return fetchAll(t, plan.Exec)
 }
 
 // レコード一覧を strings.Builder に書き出す

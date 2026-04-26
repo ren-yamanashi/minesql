@@ -33,7 +33,7 @@ func TestAuthenticate(t *testing.T) {
 
 		// THEN
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Access denied for user 'unknown'")
+		assert.Contains(t, err.Error(), "access denied for user 'unknown'")
 	})
 
 	t.Run("不正なパスワードで認証失敗", func(t *testing.T) {
@@ -49,7 +49,7 @@ func TestAuthenticate(t *testing.T) {
 
 		// THEN
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Access denied")
+		assert.Contains(t, err.Error(), "access denied")
 	})
 
 	t.Run("空パスワードで認証失敗 (固定パスワードは空ではない)", func(t *testing.T) {
@@ -61,7 +61,7 @@ func TestAuthenticate(t *testing.T) {
 
 		// THEN
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Access denied")
+		assert.Contains(t, err.Error(), "access denied")
 	})
 
 	t.Run("異なる nonce で正しい scramble を計算すれば認証成功", func(t *testing.T) {
@@ -89,7 +89,7 @@ func TestAuthenticate(t *testing.T) {
 
 		// THEN
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "Access denied")
+		assert.Contains(t, err.Error(), "access denied")
 	})
 }
 

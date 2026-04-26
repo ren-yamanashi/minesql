@@ -86,7 +86,12 @@ func TestOnComQuery(t *testing.T) {
 		require.NoError(t, err)
 		assert.NotEmpty(t, colDef2)
 
-		// 3. Row パケット (1 行)
+		// 3. EOF_Packet (Column Definition の終了)
+		eofPkt1, err := clientConn.readPacket()
+		require.NoError(t, err)
+		assert.Equal(t, byte(0xFE), eofPkt1[0])
+
+		// 4. Row パケット (1 行)
 		row, err := clientConn.readPacket()
 		require.NoError(t, err)
 		val1, rest, err := readLenEncString(row)
@@ -96,10 +101,10 @@ func TestOnComQuery(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "Alice", val2)
 
-		// 4. OK_Packet (EOF 代替、ヘッダーは 0xFE)
-		okPkt, err := clientConn.readPacket()
+		// 5. EOF_Packet (結果セットの終了)
+		eofPkt2, err := clientConn.readPacket()
 		require.NoError(t, err)
-		assert.Equal(t, byte(0xFE), okPkt[0])
+		assert.Equal(t, byte(0xFE), eofPkt2[0])
 	})
 
 	t.Run("不正な SQL は ERR_Packet を返す", func(t *testing.T) {
@@ -194,10 +199,15 @@ func TestOnComQuery(t *testing.T) {
 		_, err = clientConn.readPacket()
 		require.NoError(t, err)
 
-		// 3. Row パケットなし → 直接 OK_Packet (EOF 代替、ヘッダーは 0xFE)
-		okPkt, err := clientConn.readPacket()
+		// 3. EOF_Packet (Column Definition の終了)
+		eofPkt1, err := clientConn.readPacket()
 		require.NoError(t, err)
-		assert.Equal(t, byte(0xFE), okPkt[0])
+		assert.Equal(t, byte(0xFE), eofPkt1[0])
+
+		// 4. Row パケットなし → 直接 EOF_Packet (結果セットの終了)
+		eofPkt2, err := clientConn.readPacket()
+		require.NoError(t, err)
+		assert.Equal(t, byte(0xFE), eofPkt2[0])
 	})
 }
 

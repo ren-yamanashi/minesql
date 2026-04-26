@@ -109,14 +109,14 @@ func setupPlannerExample() func() {
 // AST を直接構築 → planner.Start → 実行して結果を返す
 func runPlan(stmt ast.Statement) []executor.Record {
 	var trxId handler.TrxId = 1
-	exec, err := planner.Start(trxId, stmt)
+	plan, err := planner.Start(trxId, stmt)
 	if err != nil {
 		panic(err)
 	}
 
 	var records []executor.Record
 	for {
-		record, err := exec.Next()
+		record, err := plan.Exec.Next()
 		if err != nil {
 			panic(err)
 		}

@@ -144,8 +144,12 @@ func createConnPair(t *testing.T) (serverConn *clientConn, clientConn *clientCon
 	t.Helper()
 	s, c := net.Pipe()
 	t.Cleanup(func() {
-		s.Close()
-		c.Close()
+		if err := s.Close(); err != nil {
+			t.Errorf("failed to close server conn: %v", err)
+		}
+		if err := c.Close(); err != nil {
+			t.Errorf("failed to close client conn: %v", err)
+		}
 	})
 	return newClientConn(s), newClientConn(c)
 }

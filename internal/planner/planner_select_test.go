@@ -20,10 +20,10 @@ func TestPlanSelect(t *testing.T) {
 		stmt := &ast.SelectStmt{From: *ast.NewTableId("non_existent_table"), Where: nil}
 
 		// WHEN
-		exec, err := PlanSelect(0, stmt)
+		plan, err := PlanSelect(0, stmt)
 
 		// THEN
-		assert.Nil(t, exec)
+		assert.Nil(t, plan)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "non_existent_table")
 	})
@@ -44,12 +44,12 @@ func TestPlanSelect(t *testing.T) {
 		}
 
 		// WHEN
-		exec, err := PlanSelect(0, stmt)
+		plan, err := PlanSelect(0, stmt)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.NotNil(t, exec)
-		assert.IsType(t, &executor.Project{}, exec)
+		assert.NotNil(t, plan.Exec)
+		assert.IsType(t, &executor.Project{}, plan.Exec)
 	})
 
 	t.Run("Project が全カラムの位置を保持する", func(t *testing.T) {
@@ -69,11 +69,11 @@ func TestPlanSelect(t *testing.T) {
 		}
 
 		// WHEN
-		exec, err := PlanSelect(0, stmt)
+		plan, err := PlanSelect(0, stmt)
 
 		// THEN
 		assert.NoError(t, err)
-		proj, ok := exec.(*executor.Project)
+		proj, ok := plan.Exec.(*executor.Project)
 		assert.True(t, ok)
 		assert.Equal(t, []uint16{0, 1, 2}, proj.ColPos)
 	})
@@ -100,12 +100,12 @@ func TestPlanSelect(t *testing.T) {
 		}
 
 		// WHEN
-		exec, err := PlanSelect(0, stmt)
+		plan, err := PlanSelect(0, stmt)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.NotNil(t, exec)
-		assert.IsType(t, &executor.Project{}, exec)
+		assert.NotNil(t, plan.Exec)
+		assert.IsType(t, &executor.Project{}, plan.Exec)
 	})
 
 	t.Run("WHERE句に存在しないカラムが指定された場合、エラーを返す", func(t *testing.T) {
@@ -129,11 +129,11 @@ func TestPlanSelect(t *testing.T) {
 		}
 
 		// WHEN
-		exec, err := PlanSelect(0, stmt)
+		plan, err := PlanSelect(0, stmt)
 
 		// THEN
 		assert.Error(t, err)
-		assert.Nil(t, exec)
+		assert.Nil(t, plan)
 		assert.Contains(t, err.Error(), "non_existent")
 	})
 
@@ -174,9 +174,9 @@ func TestPlanSelect(t *testing.T) {
 		// WHEN
 		hdl := handler.Get()
 		trxId := hdl.BeginTrx()
-		exec, err := PlanSelect(trxId, stmt)
+		plan, err := PlanSelect(trxId, stmt)
 		assert.NoError(t, err)
-		results := fetchAll(t, exec)
+		results := fetchAll(t, plan.Exec)
 		assert.NoError(t, hdl.CommitTrx(trxId))
 
 		// THEN

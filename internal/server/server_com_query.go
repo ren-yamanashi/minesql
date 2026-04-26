@@ -38,12 +38,13 @@ func (s *Server) onComQuery(cc *clientConn, sess *session, sql string) {
 			statusFlags:  statusFlags,
 		}).build())
 	case resultResultSet:
-		_ = writeResultSet(cc, result, statusFlags)
+		deprecateEOF := sess.capability&clientDeprecateEOF != 0
+		_ = writeResultSet(cc, result, statusFlags, deprecateEOF)
 	}
 }
 
 // writeResultSet は SELECT の結果セットを MySQL プロトコル形式で書き出す
-func writeResultSet(cc *clientConn, result *queryResult, statusFlags uint16) error {
+func writeResultSet(cc *clientConn, result *queryResult, statusFlags uint16, deprecateEOF bool) error {
 	colCount := len(result.columns)
 
 	// 1. Column Count パケット
@@ -58,15 +59,30 @@ func writeResultSet(cc *clientConn, result *queryResult, statusFlags uint16) err
 		}
 	}
 
-	// 3. Row パケット (行数分)
+	// 3. Column Definition の後の区切り
+	if deprecateEOF {
+		// CLIENT_DEPRECATE_EOF: 区切りなし (Row パケットに直接続く)
+	} else {
+		// EOF_Packet で Column Definition の終了を通知
+		if err := cc.writePacket((&eofPacket{statusFlags: statusFlags}).build()); err != nil {
+			return err
+		}
+	}
+
+	// 4. Row パケット (行数分)
 	for _, record := range result.records {
 		if err := cc.writePacket(buildRowPacket(record)); err != nil {
 			return err
 		}
 	}
 
-	// 4. OK_Packet (EOF 代替、CLIENT_DEPRECATE_EOF によりヘッダーは 0xFE)
-	return cc.writePacket((&okPacket{statusFlags: statusFlags, isEOF: true}).build())
+	// 5. 結果セットの終了
+	if deprecateEOF {
+		// OK_Packet (ヘッダー 0xFE) で結果セットの終了を通知
+		return cc.writePacket((&okPacket{statusFlags: statusFlags, isEOF: true}).build())
+	}
+	// EOF_Packet で結果セットの終了を通知
+	return cc.writePacket((&eofPacket{statusFlags: statusFlags}).build())
 }
 
 // buildRowPacket は Row パケットのペイロードを構築する

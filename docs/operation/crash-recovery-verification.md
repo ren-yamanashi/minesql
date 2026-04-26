@@ -8,8 +8,7 @@
 ## 準備
 
 ```sh
-make build-server
-make build-client
+make build
 ```
 
 ## ケース 1: コミット済み変更の復元
@@ -27,7 +26,7 @@ make build-client
 ターミナル 2 (クライアント):
 
 ```sh
-./bin/client -h localhost -p 8888
+mysql -u root -proot -h 127.0.0.1 -P 8888 --default-auth=caching_sha2_password
 ```
 
 ```sql
@@ -52,7 +51,7 @@ kill -9 $(pgrep -f './bin/server')
 ターミナル 2 (クライアント再接続):
 
 ```sh
-./bin/client -h localhost -p 8888
+mysql -u root -proot -h 127.0.0.1 -P 8888 --default-auth=caching_sha2_password
 ```
 
 ```sql
@@ -82,7 +81,7 @@ COMMIT;
 ターミナル 2 (クライアント) - テーブル作成後、Ctrl+C でサーバーを正常終了し再起動:
 
 ```sh
-./bin/client -h localhost -p 8888
+mysql -u root -proot -h 127.0.0.1 -P 8888 --default-auth=caching_sha2_password
 ```
 
 ```sql
@@ -98,7 +97,7 @@ CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));
 ターミナル 2 (クライアント再接続) - INSERT (COMMIT なし):
 
 ```sh
-./bin/client -h localhost -p 8888
+mysql -u root -proot -h 127.0.0.1 -P 8888 --default-auth=caching_sha2_password
 ```
 
 ```sql
@@ -123,7 +122,7 @@ kill -9 $(pgrep -f './bin/server')
 ターミナル 2 (クライアント再接続):
 
 ```sh
-./bin/client -h localhost -p 8888
+mysql -u root -proot -h 127.0.0.1 -P 8888 --default-auth=caching_sha2_password
 ```
 
 ```sql
@@ -147,7 +146,7 @@ COMMIT;
 ```
 
 ```sh
-./bin/client -h localhost -p 8888
+mysql -u root -proot -h 127.0.0.1 -P 8888 --default-auth=caching_sha2_password
 ```
 
 ```sql

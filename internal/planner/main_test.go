@@ -30,10 +30,10 @@ func executePlan(t *testing.T, stmt ast.Statement) []executor.Record {
 	t.Helper()
 	hdl := handler.Get()
 	trxId := hdl.BeginTrx()
-	exec, err := Start(trxId, stmt)
+	plan, err := Start(trxId, stmt)
 	assert.NoError(t, err)
 
-	records := fetchAll(t, exec)
+	records := fetchAll(t, plan.Exec)
 	assert.NoError(t, hdl.CommitTrx(trxId))
 	return records
 }

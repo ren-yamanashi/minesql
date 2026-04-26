@@ -217,12 +217,12 @@ func TestPlanUpdate(t *testing.T) {
 		}
 
 		// WHEN
-		exec, err := Start(trxId, stmt)
+		plan, err := Start(trxId, stmt)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.NotNil(t, exec)
-		assert.IsType(t, &executor.Update{}, exec)
+		assert.NotNil(t, plan)
+		assert.IsType(t, &executor.Update{}, plan.Exec)
 	})
 
 	t.Run("PlanStart 経由で WHERE 句付きの Update Executor が生成される", func(t *testing.T) {
@@ -245,12 +245,12 @@ func TestPlanUpdate(t *testing.T) {
 		}
 
 		// WHEN
-		exec, err := Start(trxId, stmt)
+		plan, err := Start(trxId, stmt)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.NotNil(t, exec)
-		assert.IsType(t, &executor.Update{}, exec)
+		assert.NotNil(t, plan)
+		assert.IsType(t, &executor.Update{}, plan.Exec)
 	})
 
 	t.Run("SetClauses が空の場合でも Executor が生成され、レコードは変更されない", func(t *testing.T) {

@@ -92,12 +92,18 @@
 
 - SELECT の結果は、以下のパケット列として返される
 - 参考: https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_query_response.html
-
-1. Column Count パケット: カラム数を長さエンコード整数で送信
-2. Column Definition パケット (カラム数分): 各カラムのメタデータ
-3. Row パケット (行数分): 各行のデータ。結果が 0 行の場合は送信しない
-4. OK_Packet: 結果セットの終了を示す (CLIENT_DEPRECATE_EOF により EOF_Packet の代わりに OK_Packet を使用)
-   - ただしヘッダーバイトは通常の OK_Packet (0x00) ではなく 0xFE を使用する。これはクライアントが Row パケットと区別するため (Row パケットは長さエンコード文字列で始まるため 0x00 と区別できない)
+- CLIENT_DEPRECATE_EOF の有無で結果セットの構成が異なる
+  - CLIENT_DEPRECATE_EOF が有効な場合
+    1. Column Count パケット: カラム数を長さエンコード整数で送信
+    2. Column Definition パケット (カラム数分): 各カラムのメタデータ
+    3. Row パケット (行数分): 各行のデータ。結果が 0 行の場合は送信しない
+    4. OK_Packet (ヘッダー 0xFE): 結果セットの終了を示す
+  - CLIENT_DEPRECATE_EOF が無効な場合
+    1. Column Count パケット: カラム数を長さエンコード整数で送信
+    2. Column Definition パケット (カラム数分): 各カラムのメタデータ
+    3. EOF_Packet: Column Definition の終了を示す
+    4. Row パケット (行数分): 各行のデータ。結果が 0 行の場合は送信しない
+    5. EOF_Packet: 結果セットの終了を示す
 
 #### Column Definition パケット
 
@@ -128,7 +134,7 @@
 ### OK_Packet
 
 - コマンドが正常に完了したことを知らせるためのパケット
-- OK_Packet は EOF を示すためにも使用される (MySQL 5.7.5 以降で EOF_Packet は非推奨となっており、MineSQL では EOF_Packet を使用しない)
+- CLIENT_DEPRECATE_EOF が有効な場合、EOF_Packet の代わりに OK_Packet が使用される。この場合ヘッダーは 0xFE になる
 - 詳細: https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_ok_packet.html
 
 | フィールド | サイズ | 説明 |
@@ -182,6 +188,19 @@ SQL State のクラス一覧 (上記で使用されるもの)
 | 28 | 認可に関する異常 (Invalid Authorization Specification) |
 | 42 | 構文エラーまたはアクセスルール違反 (Syntax Error or Access Rule Violation) |
 | HY | 固有クラスなし (No Specific SQLSTATE Class)。特定のクラスに分類できない汎用的なエラーに使用される |
+
+### EOF_Packet
+
+- 結果セットの区切りや終了を示すためのパケット
+- MySQL 5.7.5 以降で非推奨 (CLIENT_DEPRECATE_EOF が有効な場合は OK_Packet で代替される)
+- CLIENT_DEPRECATE_EOF が無効なクライアント (go-sql-driver/mysql など) との互換性のために使用する
+- 詳細: https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_basic_eof_packet.html
+
+| フィールド | サイズ | 説明 |
+| --- | --- | --- |
+| ヘッダー | 1 バイト | 常に 0xFE |
+| warnings | 2 バイト | 警告の数 (MineSQL では常に 0) |
+| status_flags | 2 バイト | サーバーの状態フラグ |
 
 ## ペイロードで使用される型
 
