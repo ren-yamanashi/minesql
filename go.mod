@@ -1,4 +1,4 @@
-module minesql
+module github.com/ren-yamanashi/minesql
 
 go 1.25.5
 

@@ -1,13 +1,8 @@
 bin/
 data/
-sandbox/
-examples/
 .vscode/
-.claude/.ai-output/*
-.claude/.sandbox/*
-.claude/settings.local.json
+.claude/
+sandbox/
 coverage.*
 .DS_Store
-.claude/
-CLAUDE.md
 memo.md
