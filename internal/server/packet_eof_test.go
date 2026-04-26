@@ -16,8 +16,8 @@ func TestEofPacketBuild(t *testing.T) {
 
 		// THEN
 		assert.Equal(t, byte(0xFE), buf[0])                           // ヘッダー
-		assert.Equal(t, uint16(0), readUint16(buf[1:3]))               // warnings = 0
-		assert.Equal(t, serverStatusAutocommit, readUint16(buf[3:5]))  // status_flags
+		assert.Equal(t, uint16(0), readUint16(buf[1:3]))              // warnings = 0
+		assert.Equal(t, serverStatusAutocommit, readUint16(buf[3:5])) // status_flags
 		assert.Len(t, buf, 5)
 	})
 
