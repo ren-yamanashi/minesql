@@ -17,8 +17,12 @@ make build
 
 ### Connect
 
+MineSQL (server) implemented MySQL protocol, so you can connect using MySQL client.
+
+Connection is always using TLS, so you need to specify `--ssl-mode=REQUIRED` when connecting with MySQL client.
+
 ```sh
-mysql -u root -proot -h 127.0.0.1 -P 8888 --default-auth=caching_sha2_password
+mysql -u root -proot -h 127.0.0.1 -P 8888 --default-auth=caching_sha2_password --ssl-mode=REQUIRED
 ```
 
 ## Settings
@@ -32,11 +36,12 @@ mysql -u root -proot -h 127.0.0.1 -P 8888 --default-auth=caching_sha2_password
 
 ## Feature
 
-| Statement | Implementation | Details |
-| --------- | -------------- | ------- |
-| [CREATE TABLE](./docs/feature/create-table.md) | ✅ | |
-| [SELECT](./docs/feature/select.md) | ✅ | |
-| [INSERT](./docs/feature/insert.md) | ✅ | |
-| [DELETE](./docs/feature/delete.md) | ✅ | |
-| [UPDATE](./docs/feature/update.md) | ✅ | |
-| [Transaction](./docs//feature/transaction.md) | ✅ | |
+| Statement | Implementation |
+| --------- | -------------- |
+| [CREATE TABLE](./docs/feature/create-table.md) | ✅ |
+| [SELECT](./docs/feature/select.md) | ✅ |
+| [INSERT](./docs/feature/insert.md) | ✅ |
+| [DELETE](./docs/feature/delete.md) | ✅ |
+| [UPDATE](./docs/feature/update.md) | ✅ |
+| [Transaction](./docs//feature/transaction.md) | ✅ |
+| [Account](./docs/feature/account.md) | ✅ |
