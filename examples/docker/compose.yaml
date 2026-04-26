@@ -1,0 +1,10 @@
+services:
+  minesql:
+    build: .
+    ports:
+      - "13306:3306"
+    volumes:
+      - minesql-data:/app/data
+
+volumes:
+  minesql-data:

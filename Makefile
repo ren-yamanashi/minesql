@@ -27,5 +27,15 @@ doc:
 build:
 	go build -o bin/server ./cmd/server
 
+docker-up:
+	docker compose -f examples/docker/compose.yaml up -d
+	docker compose -f examples/docker/compose.yaml logs
+
+docker-down:
+	docker compose -f examples/docker/compose.yaml down -v
+
+docker-logs:
+	docker compose -f examples/docker/compose.yaml logs
+
 run-example-go-mysql-driver:
 	cd examples/go-mysql-driver && go run main.go
