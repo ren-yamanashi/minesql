@@ -19,8 +19,8 @@ func (s *Server) onCommand(cc *clientConn, sess *session) {
 	for {
 		cc.resetSequenceId()
 
-		// タイムアウトの設定 (60 秒間何も送ってこなければ切断)
-		if err := cc.conn.SetReadDeadline(time.Now().Add(60 * time.Second)); err != nil {
+		// タイムアウトの設定 (1 時間何も送ってこなければ切断)
+		if err := cc.conn.SetReadDeadline(time.Now().Add(1 * time.Hour)); err != nil {
 			log.Printf("SetReadDeadline error: %v", err)
 			return
 		}

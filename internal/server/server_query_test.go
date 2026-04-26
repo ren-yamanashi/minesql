@@ -249,6 +249,30 @@ func TestExecuteQueryAlterUser(t *testing.T) {
 		assert.True(t, acl.VerifyCryptPassword("newpass", aclAuthString))
 	})
 
+	t.Run("ALTER USER 後に別のクエリを実行できる", func(t *testing.T) {
+		// GIVEN
+		s := setupTestServer(t)
+		defer handler.Reset()
+		sess := newSession("", 0)
+
+		hdl := handler.Get()
+		oldAuthString, err := acl.CryptPassword("oldpass")
+		require.NoError(t, err)
+		err = hdl.CreateUser("root", "%", oldAuthString)
+		require.NoError(t, err)
+
+		// ALTER USER を実行
+		_, err = s.onQuery(sess, "ALTER USER 'root'@'%' IDENTIFIED BY 'newpass';")
+		require.NoError(t, err)
+
+		// WHEN: ALTER USER 後に CREATE TABLE を実行
+		result, err := s.onQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, resultOK, result.resultType)
+	})
+
 	t.Run("存在しないユーザーの ALTER USER はエラーになる", func(t *testing.T) {
 		// GIVEN
 		s := setupTestServer(t)

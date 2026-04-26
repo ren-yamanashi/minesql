@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"minesql/internal/storage/acl"
 	"minesql/internal/storage/handler"
 )
 
@@ -189,6 +190,64 @@ func TestOnConnection(t *testing.T) {
 		pingResp, err := clientCC.readPacket()
 		require.NoError(t, err)
 		assert.Equal(t, byte(0x00), pingResp[0])
+
+		// COM_QUIT で終了
+		clientCC.resetSequenceId()
+		_ = clientCC.writePacket([]byte{comQuit})
+		<-done
+	})
+
+	t.Run("ALTER USER 後に別のクエリを同一接続で実行できる", func(t *testing.T) {
+		// GIVEN
+		s := setupTestServer(t)
+		defer handler.Reset()
+
+		// ユーザーを作成 (performClientHandshake が "root" で認証する)
+		hdl := handler.Get()
+		authString, err := acl.CryptPassword("root")
+		require.NoError(t, err)
+		err = hdl.CreateUser("root", "%", authString)
+		require.NoError(t, err)
+
+		serverTCP, clientTCP := createTCPPair(t)
+
+		done := make(chan struct{})
+		go func() {
+			defer func() {
+				if err := serverTCP.Close(); err != nil {
+					t.Logf("serverTCP.Close: %v", err)
+				}
+				close(done)
+			}()
+			cc, sess := s.onConnection(serverTCP)
+			if sess == nil {
+				return
+			}
+			s.onCommand(cc, sess)
+		}()
+
+		clientCC := newClientConn(clientTCP)
+		performClientHandshake(t, clientCC, clientTCP)
+
+		// WHEN: ALTER USER を実行
+		clientCC.resetSequenceId()
+		alterSQL := "ALTER USER 'root'@'%' IDENTIFIED BY 'newpass';"
+		err = clientCC.writePacket(append([]byte{comQuery}, []byte(alterSQL)...))
+		require.NoError(t, err)
+
+		alterResp, err := clientCC.readPacket()
+		require.NoError(t, err)
+		require.Equal(t, byte(0x00), alterResp[0], "ALTER USER should return OK")
+
+		// THEN: 同じ接続で CREATE TABLE を実行できる
+		clientCC.resetSequenceId()
+		createSQL := "CREATE TABLE t1 (id VARCHAR, PRIMARY KEY (id));"
+		err = clientCC.writePacket(append([]byte{comQuery}, []byte(createSQL)...))
+		require.NoError(t, err)
+
+		createResp, err := clientCC.readPacket()
+		require.NoError(t, err)
+		assert.Equal(t, byte(0x00), createResp[0], "CREATE TABLE should return OK")
 
 		// COM_QUIT で終了
 		clientCC.resetSequenceId()
