@@ -144,3 +144,26 @@ sequenceDiagram
 3. `candidate_stage1 = XOR(client_scramble, expected)` で `SHA256(password)` を復元
 4. `candidate_stage2 = SHA256(candidate_stage1)` を計算
 5. `candidate_stage2 == cached_hash` なら認証成功
+
+#### サーバー側の検証 (Complete authentication)
+
+- Fast Authentication に失敗した場合、または Hash Entry のキャッシュがない場合に使用する
+- TLS 接続上でのみサポートする (非 TLS の RSA 公開鍵暗号化パスはサポートしない)
+- フローは以下の通り
+  1. サーバーが AuthMoreData パケット (0x04 = perform full auth) を送信
+  2. クライアントが平文パスワード + NUL 終端を TLS 上で送信
+  3. サーバーがパスワードを受信し、authentication_string と照合
+  4. 照合成功: Hash Entry をキャッシュに保存し、OK パケットを送信
+  5. 照合失敗: ERR パケットを送信
+
+#### ソルト付きハッシュ
+
+- authentication_string は MySQL 互換のソルト付きハッシュ (SHA-crypt: SHA-256 を 5000 回イテレーション + ソルト) で永続化する
+- Fast Authentication 用のキャッシュ (`SHA256(SHA256(password))`) は別の値であり、ソルト付きハッシュから復元することはできない
+- そのため、サーバー起動後の初回接続時は必ず Complete Authentication が発生する
+  1. ハッシュエントリのキャッシュが空のため、Fast Authentication は失敗する
+  2. Complete Authentication で平文パスワードを TLS 上で受信する
+  3. 平文パスワードからソルト付きハッシュと照合する
+  4. 照合成功時に `SHA256(SHA256(password))` を計算してキャッシュに保存する
+  5. 以降の接続では Fast Authentication が使用される
+- ALTER USER でパスワードを変更した場合、キャッシュはクリアされる (次回接続時に Complete Authentication が発生する)

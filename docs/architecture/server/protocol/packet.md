@@ -76,6 +76,23 @@
 
 - auth_response のフィールド構造はクライアントの Capability Flags によって決まる
 
+### SSL 接続要求パケット
+
+- クライアントが TLS 接続を要求する場合に送信するパケット
+- ハンドシェイク応答パケットの先頭部分のみで構成され、認証データは含まない
+- このパケットを受信後、サーバーは TCP コネクションを TLS コネクションにアップグレードする
+- 参考: https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_connection_phase_packets_protocol_ssl_request.html
+
+| フィールド | サイズ | 説明 |
+| --- | --- | --- |
+| capability_flags | 4 バイト | クライアントの Capability Flags (`CLIENT_SSL` フラグを含む) |
+| max_packet_size | 4 バイト | クライアントが受け入れる最大パケットサイズ |
+| character_set | 1 バイト | クライアントの文字セット |
+| reserved | 23 バイト | 予約領域 (全て 0x00) |
+
+- ハンドシェイク応答パケットと先頭 32 バイトの構造が同じだが、username 以降のフィールドが存在しない
+- サーバーはパケットサイズでハンドシェイク応答パケットと区別できる (SSL 接続要求パケットは常に 32 バイト)
+
 ### AuthMoreData パケット
 
 - 認証フェーズの途中で、サーバーからクライアントに追加の認証情報を送信するためのパケット
