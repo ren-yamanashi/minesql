@@ -3,10 +3,9 @@ package server
 import (
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"minesql/internal/storage/handler"
 )
 
 func TestNewServer(t *testing.T) {

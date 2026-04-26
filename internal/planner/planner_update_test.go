@@ -1,13 +1,13 @@
 package planner
 
 import (
-	"minesql/internal/ast"
-	"minesql/internal/executor"
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/handler"
-	"minesql/internal/storage/lock"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/ast"
+	"github.com/ren-yamanashi/minesql/internal/executor"
+	"github.com/ren-yamanashi/minesql/internal/storage/access"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/stretchr/testify/assert"
 )
 

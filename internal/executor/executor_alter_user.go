@@ -1,6 +1,6 @@
 package executor
 
-import "minesql/internal/storage/handler"
+import "github.com/ren-yamanashi/minesql/internal/storage/handler"
 
 // AlterUser はユーザーの認証情報を更新する
 type AlterUser struct {

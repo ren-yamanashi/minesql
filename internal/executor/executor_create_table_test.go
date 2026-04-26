@@ -1,9 +1,9 @@
 package executor
 
 import (
-	"minesql/internal/storage/handler"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -1,11 +1,11 @@
 package access
 
 import (
-	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/lock"
 	"testing"
 	"time"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/stretchr/testify/assert"
 )
 

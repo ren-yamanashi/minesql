@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
-
 	"github.com/stretchr/testify/assert"
 )
 

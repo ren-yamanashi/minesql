@@ -5,9 +5,9 @@ import (
 	"os"
 	"strings"
 
-	"minesql/internal/executor"
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/handler"
+	"github.com/ren-yamanashi/minesql/internal/executor"
+	"github.com/ren-yamanashi/minesql/internal/storage/access"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 )
 
 func ExampleTableScan_fullScan() {

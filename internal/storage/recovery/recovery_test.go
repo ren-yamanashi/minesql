@@ -12,7 +12,6 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/log"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
-
 	"github.com/stretchr/testify/assert"
 )
 

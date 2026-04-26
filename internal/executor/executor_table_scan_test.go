@@ -1,11 +1,11 @@
 package executor
 
 import (
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/handler"
-	"minesql/internal/storage/lock"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/access"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/stretchr/testify/assert"
 )
 

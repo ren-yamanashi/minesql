@@ -2,17 +2,17 @@ package access
 
 import (
 	"fmt"
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/encode"
-	"minesql/internal/storage/file"
-	"minesql/internal/storage/lock"
-	"minesql/internal/storage/log"
-	"minesql/internal/storage/page"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/encode"
+	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
+	"github.com/ren-yamanashi/minesql/internal/storage/log"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
 

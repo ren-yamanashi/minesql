@@ -1,9 +1,9 @@
 package planner
 
 import (
-	"minesql/internal/executor"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/executor"
 	"github.com/stretchr/testify/assert"
 )
 
