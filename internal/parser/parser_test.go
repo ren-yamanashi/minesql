@@ -155,6 +155,36 @@ func TestParse(t *testing.T) {
 		assert.Equal(t, ast.TxRollback, stmt.Kind)
 	})
 
+	t.Run("START TRANSACTION 文をパースできる", func(t *testing.T) {
+		// GIVEN
+		p := NewParser()
+
+		// WHEN
+		result, err := p.Parse("START TRANSACTION;")
+
+		// THEN
+		assert.NoError(t, err)
+		stmt, ok := result.(*ast.TransactionStmt)
+		assert.True(t, ok)
+		assert.Equal(t, ast.TxBegin, stmt.Kind)
+	})
+
+	t.Run("ALTER USER 文をパースできる", func(t *testing.T) {
+		// GIVEN
+		p := NewParser()
+
+		// WHEN
+		result, err := p.Parse("ALTER USER 'root'@'%' IDENTIFIED BY 'newpass';")
+
+		// THEN
+		assert.NoError(t, err)
+		stmt, ok := result.(*ast.AlterUserStmt)
+		assert.True(t, ok)
+		assert.Equal(t, "root", stmt.Username)
+		assert.Equal(t, "%", stmt.Host)
+		assert.Equal(t, "newpass", stmt.Password)
+	})
+
 	t.Run("コメント付き SQL をパースできる", func(t *testing.T) {
 		// GIVEN
 		p := NewParser()
@@ -340,6 +370,30 @@ func TestOnKeyword(t *testing.T) {
 		tp, ok := p.currentParser.(*TransactionParser)
 		assert.True(t, ok)
 		assert.Equal(t, ast.TxRollback, tp.kind)
+	})
+
+	t.Run("START で TransactionParser がセットされる", func(t *testing.T) {
+		// GIVEN
+		p := NewParser()
+
+		// WHEN
+		p.onKeyword("START")
+
+		// THEN
+		_, ok := p.currentParser.(*TransactionParser)
+		assert.True(t, ok)
+	})
+
+	t.Run("ALTER で AlterUserParser がセットされる", func(t *testing.T) {
+		// GIVEN
+		p := NewParser()
+
+		// WHEN
+		p.onKeyword("ALTER")
+
+		// THEN
+		_, ok := p.currentParser.(*AlterUserParser)
+		assert.True(t, ok)
 	})
 
 	t.Run("小文字でもディスパッチされる", func(t *testing.T) {

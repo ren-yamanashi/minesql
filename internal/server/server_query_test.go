@@ -19,7 +19,7 @@ func TestExecuteQuery(t *testing.T) {
 		sess := newSession("", 0)
 
 		// WHEN
-		result, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		result, err := s.onQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 
 		// THEN
 		assert.NoError(t, err)
@@ -32,14 +32,14 @@ func TestExecuteQuery(t *testing.T) {
 		defer handler.Reset()
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
 
 		// WHEN
-		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice'), ('2', 'Bob');")
+		_, err = s.onQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice'), ('2', 'Bob');")
 		assert.NoError(t, err)
 
-		result, err := s.executeQuery(sess, "SELECT * FROM users;")
+		result, err := s.onQuery(sess, "SELECT * FROM users;")
 
 		// THEN
 		assert.NoError(t, err)
@@ -55,16 +55,16 @@ func TestExecuteQuery(t *testing.T) {
 		defer handler.Reset()
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
+		_, err = s.onQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
 		assert.NoError(t, err)
 
 		// WHEN
-		_, err = s.executeQuery(sess, "UPDATE users SET name = 'Carol' WHERE id = '1';")
+		_, err = s.onQuery(sess, "UPDATE users SET name = 'Carol' WHERE id = '1';")
 		assert.NoError(t, err)
 
-		result, err := s.executeQuery(sess, "SELECT * FROM users;")
+		result, err := s.onQuery(sess, "SELECT * FROM users;")
 
 		// THEN
 		assert.NoError(t, err)
@@ -78,16 +78,16 @@ func TestExecuteQuery(t *testing.T) {
 		defer handler.Reset()
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice'), ('2', 'Bob');")
+		_, err = s.onQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice'), ('2', 'Bob');")
 		assert.NoError(t, err)
 
 		// WHEN
-		_, err = s.executeQuery(sess, "DELETE FROM users WHERE id = '1';")
+		_, err = s.onQuery(sess, "DELETE FROM users WHERE id = '1';")
 		assert.NoError(t, err)
 
-		result, err := s.executeQuery(sess, "SELECT * FROM users;")
+		result, err := s.onQuery(sess, "SELECT * FROM users;")
 
 		// THEN
 		assert.NoError(t, err)
@@ -102,18 +102,18 @@ func TestExecuteQuery(t *testing.T) {
 		defer handler.Reset()
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
 
 		// WHEN: BEGIN なしで INSERT
-		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
+		_, err = s.onQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
 		assert.NoError(t, err)
 
 		// THEN: trxId は 0 のまま (autocommit 済み)
 		assert.Equal(t, handler.TrxId(0), sess.trxId)
 
 		// THEN: データは永続化されている
-		result, err := s.executeQuery(sess, "SELECT * FROM users;")
+		result, err := s.onQuery(sess, "SELECT * FROM users;")
 		assert.NoError(t, err)
 		csv := resultToCSV(result)
 		assert.Contains(t, csv, "1,Alice")
@@ -125,21 +125,21 @@ func TestExecuteQuery(t *testing.T) {
 		defer handler.Reset()
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
+		_, err = s.onQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
 		assert.NoError(t, err)
 
 		// WHEN: その後 BEGIN → ROLLBACK しても autocommit 済みのデータは残る
-		_, err = s.executeQuery(sess, "BEGIN;")
+		_, err = s.onQuery(sess, "BEGIN;")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('2', 'Bob');")
+		_, err = s.onQuery(sess, "INSERT INTO users (id, name) VALUES ('2', 'Bob');")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess, "ROLLBACK;")
+		_, err = s.onQuery(sess, "ROLLBACK;")
 		assert.NoError(t, err)
 
 		// THEN: autocommit の Alice は残り、トランザクション内の Bob は消える
-		result, err := s.executeQuery(sess, "SELECT * FROM users;")
+		result, err := s.onQuery(sess, "SELECT * FROM users;")
 		assert.NoError(t, err)
 		csv := resultToCSV(result)
 		assert.Contains(t, csv, "1,Alice")
@@ -153,7 +153,7 @@ func TestExecuteQuery(t *testing.T) {
 		sess := newSession("", 0)
 
 		// WHEN
-		_, err := s.executeQuery(sess, "INVALID SQL;")
+		_, err := s.onQuery(sess, "INVALID SQL;")
 
 		// THEN
 		assert.Error(t, err)
@@ -165,23 +165,23 @@ func TestExecuteQuery(t *testing.T) {
 		defer handler.Reset()
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
 
 		// WHEN: START TRANSACTION でトランザクション開始
-		result, err := s.executeQuery(sess, "START TRANSACTION;")
+		result, err := s.onQuery(sess, "START TRANSACTION;")
 		assert.NoError(t, err)
 		assert.Equal(t, resultOK, result.resultType)
 		assert.NotEqual(t, handler.TrxId(0), sess.trxId)
 
 		// INSERT → ROLLBACK
-		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
+		_, err = s.onQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess, "ROLLBACK;")
+		_, err = s.onQuery(sess, "ROLLBACK;")
 		assert.NoError(t, err)
 
 		// THEN: ROLLBACK されているのでテーブルが空
-		selectResult, err := s.executeQuery(sess, "SELECT * FROM users;")
+		selectResult, err := s.onQuery(sess, "SELECT * FROM users;")
 		assert.NoError(t, err)
 		assert.Empty(t, selectResult.records)
 	})
@@ -193,13 +193,13 @@ func TestExecuteQuery(t *testing.T) {
 		sess := newSession("", 0)
 
 		// WHEN: セミコロンなし (mysql クライアントが送る形式)
-		result, err := s.executeQuery(sess, "START TRANSACTION")
+		result, err := s.onQuery(sess, "START TRANSACTION")
 		assert.NoError(t, err)
 		assert.Equal(t, resultOK, result.resultType)
 		assert.NotEqual(t, handler.TrxId(0), sess.trxId)
 
 		// クリーンアップ
-		_, _ = s.executeQuery(sess, "ROLLBACK;")
+		_, _ = s.onQuery(sess, "ROLLBACK;")
 	})
 
 	t.Run("SET 文は無視して OK を返す", func(t *testing.T) {
@@ -209,11 +209,59 @@ func TestExecuteQuery(t *testing.T) {
 		sess := newSession("", 0)
 
 		// WHEN
-		result, err := s.executeQuery(sess, "SET NAMES utf8mb4;")
+		result, err := s.onQuery(sess, "SET NAMES utf8mb4;")
 
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, resultOK, result.resultType)
+	})
+}
+
+func TestExecuteQueryAlterUser(t *testing.T) {
+	t.Run("ALTER USER でパスワードを変更できる", func(t *testing.T) {
+		// GIVEN
+		s := setupTestServer(t)
+		defer handler.Reset()
+		sess := newSession("", 0)
+
+		// 初期ユーザーを作成
+		hdl := handler.Get()
+		oldAuthString := acl.ComputeAuthString("oldpass")
+		err := hdl.CreateUser("root", "%", oldAuthString)
+		require.NoError(t, err)
+		s.acl = acl.NewACLFromCatalog("root", "%", oldAuthString)
+
+		// WHEN
+		result, err := s.onQuery(sess, "ALTER USER 'root'@'%' IDENTIFIED BY 'newpass';")
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, resultOK, result.resultType)
+
+		// カタログ上の AuthString が更新されている
+		user, ok := hdl.Catalog.GetUserByName("root")
+		assert.True(t, ok)
+		expectedAuthString := acl.ComputeAuthString("newpass")
+		assert.Equal(t, expectedAuthString, user.AuthString)
+
+		// ACL が再構築されている (新しいパスワードで認証できる)
+		aclUser, ok := s.acl.Lookup("%", "root")
+		assert.True(t, ok)
+		assert.Equal(t, expectedAuthString, aclUser.AuthString)
+	})
+
+	t.Run("存在しないユーザーの ALTER USER はエラーになる", func(t *testing.T) {
+		// GIVEN
+		s := setupTestServer(t)
+		defer handler.Reset()
+		sess := newSession("", 0)
+
+		// WHEN
+		_, err := s.onQuery(sess, "ALTER USER 'nonexistent'@'%' IDENTIFIED BY 'pass';")
+
+		// THEN
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "user 'nonexistent' not found")
 	})
 }
 
@@ -226,7 +274,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		assert.Equal(t, handler.TrxId(0), sess.trxId)
 
 		// WHEN
-		result, err := s.executeQuery(sess, "BEGIN;")
+		result, err := s.onQuery(sess, "BEGIN;")
 
 		// THEN
 		assert.NoError(t, err)
@@ -240,17 +288,17 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		defer handler.Reset()
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "BEGIN;")
+		_, err := s.onQuery(sess, "BEGIN;")
 		assert.NoError(t, err)
 
-		_, err = s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		_, err = s.onQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
 
-		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
+		_, err = s.onQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
 		assert.NoError(t, err)
 
 		// WHEN
-		result, err := s.executeQuery(sess, "COMMIT;")
+		result, err := s.onQuery(sess, "COMMIT;")
 
 		// THEN
 		assert.NoError(t, err)
@@ -264,21 +312,21 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		defer handler.Reset()
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
 
-		_, err = s.executeQuery(sess, "BEGIN;")
+		_, err = s.onQuery(sess, "BEGIN;")
 		assert.NoError(t, err)
 
-		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
+		_, err = s.onQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
 		assert.NoError(t, err)
 
 		// WHEN
-		_, err = s.executeQuery(sess, "ROLLBACK;")
+		_, err = s.onQuery(sess, "ROLLBACK;")
 		assert.NoError(t, err)
 
 		// THEN: INSERT が取り消されてテーブルが空
-		result, err := s.executeQuery(sess, "SELECT * FROM users;")
+		result, err := s.onQuery(sess, "SELECT * FROM users;")
 		assert.NoError(t, err)
 		assert.Empty(t, result.records)
 	})
@@ -289,26 +337,26 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		defer handler.Reset()
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess, "BEGIN;")
+		_, err = s.onQuery(sess, "BEGIN;")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
+		_, err = s.onQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess, "COMMIT;")
+		_, err = s.onQuery(sess, "COMMIT;")
 		assert.NoError(t, err)
 
-		_, err = s.executeQuery(sess, "BEGIN;")
+		_, err = s.onQuery(sess, "BEGIN;")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess, "UPDATE users SET name = 'Carol' WHERE id = '1';")
+		_, err = s.onQuery(sess, "UPDATE users SET name = 'Carol' WHERE id = '1';")
 		assert.NoError(t, err)
 
 		// WHEN
-		_, err = s.executeQuery(sess, "ROLLBACK;")
+		_, err = s.onQuery(sess, "ROLLBACK;")
 		assert.NoError(t, err)
 
 		// THEN: UPDATE が取り消されて元の値
-		result, err := s.executeQuery(sess, "SELECT * FROM users;")
+		result, err := s.onQuery(sess, "SELECT * FROM users;")
 		assert.NoError(t, err)
 		csv := resultToCSV(result)
 		assert.Contains(t, csv, "1,Alice")
@@ -320,26 +368,26 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		defer handler.Reset()
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess, "BEGIN;")
+		_, err = s.onQuery(sess, "BEGIN;")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
+		_, err = s.onQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess, "COMMIT;")
+		_, err = s.onQuery(sess, "COMMIT;")
 		assert.NoError(t, err)
 
-		_, err = s.executeQuery(sess, "BEGIN;")
+		_, err = s.onQuery(sess, "BEGIN;")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess, "DELETE FROM users WHERE id = '1';")
+		_, err = s.onQuery(sess, "DELETE FROM users WHERE id = '1';")
 		assert.NoError(t, err)
 
 		// WHEN
-		_, err = s.executeQuery(sess, "ROLLBACK;")
+		_, err = s.onQuery(sess, "ROLLBACK;")
 		assert.NoError(t, err)
 
 		// THEN: DELETE が取り消されてレコードが復元
-		result, err := s.executeQuery(sess, "SELECT * FROM users;")
+		result, err := s.onQuery(sess, "SELECT * FROM users;")
 		assert.NoError(t, err)
 		csv := resultToCSV(result)
 		assert.Contains(t, csv, "1,Alice")
@@ -351,27 +399,27 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		defer handler.Reset()
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
 
 		// 1 回目のトランザクション: INSERT → COMMIT
-		_, err = s.executeQuery(sess, "BEGIN;")
+		_, err = s.onQuery(sess, "BEGIN;")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
+		_, err = s.onQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess, "COMMIT;")
+		_, err = s.onQuery(sess, "COMMIT;")
 		assert.NoError(t, err)
 
 		// 2 回目のトランザクション: INSERT → ROLLBACK
-		_, err = s.executeQuery(sess, "BEGIN;")
+		_, err = s.onQuery(sess, "BEGIN;")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('2', 'Bob');")
+		_, err = s.onQuery(sess, "INSERT INTO users (id, name) VALUES ('2', 'Bob');")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess, "ROLLBACK;")
+		_, err = s.onQuery(sess, "ROLLBACK;")
 		assert.NoError(t, err)
 
 		// THEN: 1 回目の INSERT のみ残る
-		result, err := s.executeQuery(sess, "SELECT * FROM users;")
+		result, err := s.onQuery(sess, "SELECT * FROM users;")
 		assert.NoError(t, err)
 		csv := resultToCSV(result)
 		assert.Contains(t, csv, "1,Alice")
@@ -384,11 +432,11 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		defer handler.Reset()
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "BEGIN;")
+		_, err := s.onQuery(sess, "BEGIN;")
 		assert.NoError(t, err)
 
 		// WHEN
-		_, err = s.executeQuery(sess, "BEGIN;")
+		_, err = s.onQuery(sess, "BEGIN;")
 
 		// THEN
 		assert.Error(t, err)
@@ -402,7 +450,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		sess := newSession("", 0)
 
 		// WHEN
-		_, err := s.executeQuery(sess, "COMMIT;")
+		_, err := s.onQuery(sess, "COMMIT;")
 
 		// THEN
 		assert.Error(t, err)
@@ -416,7 +464,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		sess := newSession("", 0)
 
 		// WHEN
-		_, err := s.executeQuery(sess, "ROLLBACK;")
+		_, err := s.onQuery(sess, "ROLLBACK;")
 
 		// THEN
 		assert.Error(t, err)
@@ -430,26 +478,26 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		sessA := newSession("", 0)
 		sessB := newSession("", 0)
 
-		_, err := s.executeQuery(sessA, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sessA, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
 
 		// セッション A で BEGIN + INSERT
-		_, err = s.executeQuery(sessA, "BEGIN;")
+		_, err = s.onQuery(sessA, "BEGIN;")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sessA, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
+		_, err = s.onQuery(sessA, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
 		assert.NoError(t, err)
 
 		// WHEN: セッション B で BEGIN + ROLLBACK
-		_, err = s.executeQuery(sessB, "BEGIN;")
+		_, err = s.onQuery(sessB, "BEGIN;")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sessB, "ROLLBACK;")
+		_, err = s.onQuery(sessB, "ROLLBACK;")
 		assert.NoError(t, err)
 
 		// THEN: セッション A のデータは影響を受けない
-		_, err = s.executeQuery(sessA, "COMMIT;")
+		_, err = s.onQuery(sessA, "COMMIT;")
 		assert.NoError(t, err)
 
-		result, err := s.executeQuery(sessA, "SELECT * FROM users;")
+		result, err := s.onQuery(sessA, "SELECT * FROM users;")
 		assert.NoError(t, err)
 		csv := resultToCSV(result)
 		assert.Contains(t, csv, "1,Alice")
@@ -461,13 +509,13 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		defer handler.Reset()
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
 
-		_, err = s.executeQuery(sess, "BEGIN;")
+		_, err = s.onQuery(sess, "BEGIN;")
 		assert.NoError(t, err)
 
-		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
+		_, err = s.onQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
 		assert.NoError(t, err)
 
 		// WHEN: 接続切断をシミュレート
@@ -477,7 +525,7 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		sess.trxId = 0
 
 		// THEN: INSERT がロールバックされてテーブルが空
-		result, err := s.executeQuery(sess, "SELECT * FROM users;")
+		result, err := s.onQuery(sess, "SELECT * FROM users;")
 		assert.NoError(t, err)
 		assert.Empty(t, result.records)
 	})
@@ -488,16 +536,16 @@ func TestExecuteQueryTransaction(t *testing.T) {
 		defer handler.Reset()
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
+		_, err = s.onQuery(sess, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
 		assert.NoError(t, err)
 
 		// WHEN: 接続切断をシミュレート (trxId == 0 なのでロールバックは走らない)
 		assert.Equal(t, handler.TrxId(0), sess.trxId)
 
 		// THEN: データはそのまま残る
-		result, err := s.executeQuery(sess, "SELECT * FROM users;")
+		result, err := s.onQuery(sess, "SELECT * FROM users;")
 		assert.NoError(t, err)
 		csv := resultToCSV(result)
 		assert.Contains(t, csv, "1,Alice")
@@ -516,13 +564,13 @@ func TestConnectionDisconnectReleasesLock(t *testing.T) {
 		sess1 := newSession("", 0)
 
 		// テーブル作成
-		_, err := s.executeQuery(sess1, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess1, "CREATE TABLE users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		assert.NoError(t, err)
 
 		// sess1 でトランザクション開始 → INSERT (排他ロック取得)
-		_, err = s.executeQuery(sess1, "BEGIN;")
+		_, err = s.onQuery(sess1, "BEGIN;")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess1, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
+		_, err = s.onQuery(sess1, "INSERT INTO users (id, name) VALUES ('1', 'Alice');")
 		assert.NoError(t, err)
 
 		// WHEN: sess1 の接続が切断される (auto-rollback をシミュレート)
@@ -533,16 +581,16 @@ func TestConnectionDisconnectReleasesLock(t *testing.T) {
 
 		// THEN: sess2 が同じ行を INSERT できる (ロックが解放されている)
 		sess2 := newSession("", 0)
-		_, err = s.executeQuery(sess2, "BEGIN;")
+		_, err = s.onQuery(sess2, "BEGIN;")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess2, "INSERT INTO users (id, name) VALUES ('1', 'Bob');")
+		_, err = s.onQuery(sess2, "INSERT INTO users (id, name) VALUES ('1', 'Bob');")
 		assert.NoError(t, err)
-		_, err = s.executeQuery(sess2, "COMMIT;")
+		_, err = s.onQuery(sess2, "COMMIT;")
 		assert.NoError(t, err)
 
 		// データが Bob になっている
 		sess3 := newSession("", 0)
-		result, err := s.executeQuery(sess3, "SELECT * FROM users;")
+		result, err := s.onQuery(sess3, "SELECT * FROM users;")
 		assert.NoError(t, err)
 		csv := resultToCSV(result)
 		assert.Contains(t, csv, "1,Bob")
@@ -557,10 +605,10 @@ func TestResolveColumnInfo(t *testing.T) {
 		s := &Server{}
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE rc_all (id VARCHAR, name VARCHAR, age VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE rc_all (id VARCHAR, name VARCHAR, age VARCHAR, PRIMARY KEY (id));")
 		require.NoError(t, err)
 
-		result, err := s.executeQuery(sess, "SELECT * FROM rc_all;")
+		result, err := s.onQuery(sess, "SELECT * FROM rc_all;")
 
 		// THEN
 		require.NoError(t, err)
@@ -580,10 +628,10 @@ func TestResolveColumnInfo(t *testing.T) {
 		s := &Server{}
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE rc_cols (id VARCHAR, name VARCHAR, age VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE rc_cols (id VARCHAR, name VARCHAR, age VARCHAR, PRIMARY KEY (id));")
 		require.NoError(t, err)
 
-		result, err := s.executeQuery(sess, "SELECT name, id FROM rc_cols;")
+		result, err := s.onQuery(sess, "SELECT name, id FROM rc_cols;")
 
 		// THEN
 		require.NoError(t, err)
@@ -599,10 +647,10 @@ func TestResolveColumnInfo(t *testing.T) {
 		s := &Server{}
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE rc_tbl (id VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE rc_tbl (id VARCHAR, PRIMARY KEY (id));")
 		require.NoError(t, err)
 
-		result, err := s.executeQuery(sess, "SELECT id FROM rc_tbl;")
+		result, err := s.onQuery(sess, "SELECT id FROM rc_tbl;")
 
 		// THEN
 		require.NoError(t, err)
@@ -618,12 +666,12 @@ func TestResolveColumnInfo(t *testing.T) {
 		s := &Server{}
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE rc_users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE rc_users (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		require.NoError(t, err)
-		_, err = s.executeQuery(sess, "CREATE TABLE rc_orders (id VARCHAR, user_id VARCHAR, PRIMARY KEY (id));")
+		_, err = s.onQuery(sess, "CREATE TABLE rc_orders (id VARCHAR, user_id VARCHAR, PRIMARY KEY (id));")
 		require.NoError(t, err)
 
-		result, err := s.executeQuery(sess, "SELECT * FROM rc_users INNER JOIN rc_orders ON rc_users.id = rc_orders.user_id;")
+		result, err := s.onQuery(sess, "SELECT * FROM rc_users INNER JOIN rc_orders ON rc_users.id = rc_orders.user_id;")
 
 		// THEN
 		require.NoError(t, err)
@@ -645,12 +693,12 @@ func TestResolveColumnInfo(t *testing.T) {
 		s := &Server{}
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE rc_u2 (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE rc_u2 (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		require.NoError(t, err)
-		_, err = s.executeQuery(sess, "CREATE TABLE rc_o2 (id VARCHAR, user_id VARCHAR, PRIMARY KEY (id));")
+		_, err = s.onQuery(sess, "CREATE TABLE rc_o2 (id VARCHAR, user_id VARCHAR, PRIMARY KEY (id));")
 		require.NoError(t, err)
 
-		result, err := s.executeQuery(sess, "SELECT rc_u2.name, rc_o2.id FROM rc_u2 INNER JOIN rc_o2 ON rc_u2.id = rc_o2.user_id;")
+		result, err := s.onQuery(sess, "SELECT rc_u2.name, rc_o2.id FROM rc_u2 INNER JOIN rc_o2 ON rc_u2.id = rc_o2.user_id;")
 
 		// THEN
 		require.NoError(t, err)
@@ -669,7 +717,7 @@ func TestResolveColumnInfo(t *testing.T) {
 		sess := newSession("", 0)
 
 		// WHEN
-		result, err := s.executeQuery(sess, "CREATE TABLE rc_ddl (id VARCHAR, PRIMARY KEY (id));")
+		result, err := s.onQuery(sess, "CREATE TABLE rc_ddl (id VARCHAR, PRIMARY KEY (id));")
 
 		// THEN
 		require.NoError(t, err)

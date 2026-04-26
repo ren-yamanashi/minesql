@@ -35,6 +35,9 @@ func Start(trxId handler.TrxId, stmt ast.Statement) (*PlanResult, error) {
 	case *ast.UpdateStmt:
 		exec, err := PlanUpdate(trxId, s)
 		return &PlanResult{Exec: exec}, err
+	case *ast.AlterUserStmt:
+		exec, err := PlanAlterUser(s)
+		return &PlanResult{Exec: exec}, err
 	default:
 		return nil, fmt.Errorf("unsupported statement: %T", s)
 	}

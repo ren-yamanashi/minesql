@@ -52,6 +52,48 @@ func TestCreateUser(t *testing.T) {
 	})
 }
 
+func TestUpdateUser(t *testing.T) {
+	t.Run("ユーザーの認証情報を更新できる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		oldAuthString := computeHandlerTestAuthString("oldpassword")
+		err := h.CreateUser("root", "%", oldAuthString)
+		assert.NoError(t, err)
+
+		// WHEN
+		newAuthString := computeHandlerTestAuthString("newpassword")
+		err = h.UpdateUser("root", "%", newAuthString)
+
+		// THEN
+		assert.NoError(t, err)
+		user, ok := h.Catalog.GetUserByName("root")
+		assert.True(t, ok)
+		assert.Equal(t, newAuthString, user.AuthString)
+	})
+
+	t.Run("存在しないユーザーの更新はエラーになる", func(t *testing.T) {
+		// GIVEN
+		tmpdir := t.TempDir()
+		t.Setenv("MINESQL_DATA_DIR", tmpdir)
+		t.Setenv("MINESQL_BUFFER_SIZE", "100")
+		Reset()
+		h := Init()
+
+		// WHEN
+		authString := computeHandlerTestAuthString("password")
+		err := h.UpdateUser("nonexistent", "%", authString)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "user 'nonexistent' not found")
+	})
+}
+
 func computeHandlerTestAuthString(password string) [32]byte {
 	stage1 := sha256.Sum256([]byte(password))
 	return sha256.Sum256(stage1[:])

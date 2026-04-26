@@ -95,6 +95,69 @@ func TestUserMeta_Insert(t *testing.T) {
 	})
 }
 
+func TestUserMeta_Update(t *testing.T) {
+	t.Run("ユーザーメタデータの AuthString を更新できる", func(t *testing.T) {
+		// GIVEN
+		bp, tmpdir := InitCatalogDisk(t)
+		defer removeTmpdir(t, tmpdir)
+
+		metaPageId, err := bp.AllocatePageId(page.FileId(0))
+		assert.NoError(t, err)
+		_, err = btree.CreateBTree(bp, metaPageId)
+		assert.NoError(t, err)
+
+		oldAuthString := computeTestAuthString("oldpassword")
+		userMeta := &UserMeta{
+			MetaPageId: metaPageId,
+			Username:   "root",
+			Host:       "%",
+			AuthString: oldAuthString,
+		}
+		err = userMeta.Insert(bp)
+		assert.NoError(t, err)
+
+		// WHEN: AuthString を新しい値に更新
+		newAuthString := computeTestAuthString("newpassword")
+		userMeta.AuthString = newAuthString
+		err = userMeta.Update(bp)
+
+		// THEN
+		assert.NoError(t, err)
+
+		// B+Tree から読み込んで更新を確認
+		users, err := loadUserMeta(bp, metaPageId)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(users))
+		assert.Equal(t, "root", users[0].Username)
+		assert.Equal(t, "%", users[0].Host)
+		assert.Equal(t, newAuthString, users[0].AuthString)
+	})
+
+	t.Run("存在しないユーザーの更新はエラーになる", func(t *testing.T) {
+		// GIVEN
+		bp, tmpdir := InitCatalogDisk(t)
+		defer removeTmpdir(t, tmpdir)
+
+		metaPageId, err := bp.AllocatePageId(page.FileId(0))
+		assert.NoError(t, err)
+		_, err = btree.CreateBTree(bp, metaPageId)
+		assert.NoError(t, err)
+
+		userMeta := &UserMeta{
+			MetaPageId: metaPageId,
+			Username:   "nonexistent",
+			Host:       "%",
+			AuthString: computeTestAuthString("pass"),
+		}
+
+		// WHEN
+		err = userMeta.Update(bp)
+
+		// THEN
+		assert.Error(t, err)
+	})
+}
+
 func TestLoadUserMeta(t *testing.T) {
 	t.Run("ユーザーメタデータを読み込める", func(t *testing.T) {
 		// GIVEN

@@ -35,7 +35,7 @@ func TestOnComQuery(t *testing.T) {
 		defer handler.Reset()
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE hcq_ins (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE hcq_ins (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		require.NoError(t, err)
 
 		serverConn, clientConn := createConnPair(t)
@@ -57,9 +57,9 @@ func TestOnComQuery(t *testing.T) {
 		defer handler.Reset()
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE hcq_sel (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE hcq_sel (id VARCHAR, name VARCHAR, PRIMARY KEY (id));")
 		require.NoError(t, err)
-		_, err = s.executeQuery(sess, "INSERT INTO hcq_sel (id, name) VALUES ('1', 'Alice');")
+		_, err = s.onQuery(sess, "INSERT INTO hcq_sel (id, name) VALUES ('1', 'Alice');")
 		require.NoError(t, err)
 
 		serverConn, clientConn := createConnPair(t)
@@ -149,9 +149,9 @@ func TestOnComQuery(t *testing.T) {
 		defer handler.Reset()
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE hcq_tx (id VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE hcq_tx (id VARCHAR, PRIMARY KEY (id));")
 		require.NoError(t, err)
-		_, err = s.executeQuery(sess, "BEGIN;")
+		_, err = s.onQuery(sess, "BEGIN;")
 		require.NoError(t, err)
 
 		serverConn, clientConn := createConnPair(t)
@@ -168,7 +168,7 @@ func TestOnComQuery(t *testing.T) {
 		assert.Equal(t, serverStatusInTrans, readUint16(resp[3:5]))
 
 		// クリーンアップ
-		_, _ = s.executeQuery(sess, "ROLLBACK;")
+		_, _ = s.onQuery(sess, "ROLLBACK;")
 	})
 
 	t.Run("SELECT 結果が 0 行の場合も結果セットを返す (Row パケットなし)", func(t *testing.T) {
@@ -177,7 +177,7 @@ func TestOnComQuery(t *testing.T) {
 		defer handler.Reset()
 		sess := newSession("", 0)
 
-		_, err := s.executeQuery(sess, "CREATE TABLE hcq_empty (id VARCHAR, PRIMARY KEY (id));")
+		_, err := s.onQuery(sess, "CREATE TABLE hcq_empty (id VARCHAR, PRIMARY KEY (id));")
 		require.NoError(t, err)
 
 		serverConn, clientConn := createConnPair(t)

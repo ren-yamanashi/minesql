@@ -40,31 +40,37 @@ const (
 
 // Keyword
 const (
-	KSelect     = "SELECT"
-	KFrom       = "FROM"
-	KWhere      = "WHERE"
-	KInsert     = "INSERT"
-	KInto       = "INTO"
-	KValues     = "VALUES"
-	KCreate     = "CREATE"
-	KTable      = "TABLE"
-	KPrimary    = "PRIMARY"
-	KUnique     = "UNIQUE"
-	KKey        = "KEY"
-	KVarchar    = "VARCHAR"
-	KDelete     = "DELETE"
-	KUpdate     = "UPDATE"
-	KSet        = "SET"
-	KAnd        = "AND"
-	KOr         = "OR"
-	KJoin       = "JOIN"
-	KInner      = "INNER"
-	KOn         = "ON"
-	KBegin      = "BEGIN"
-	KCommit     = "COMMIT"
-	KRollback   = "ROLLBACK"
-	KForeign    = "FOREIGN"
-	KReferences = "REFERENCES"
+	KSelect      = "SELECT"
+	KFrom        = "FROM"
+	KWhere       = "WHERE"
+	KInsert      = "INSERT"
+	KInto        = "INTO"
+	KValues      = "VALUES"
+	KCreate      = "CREATE"
+	KTable       = "TABLE"
+	KPrimary     = "PRIMARY"
+	KUnique      = "UNIQUE"
+	KKey         = "KEY"
+	KVarchar     = "VARCHAR"
+	KDelete      = "DELETE"
+	KUpdate      = "UPDATE"
+	KSet         = "SET"
+	KAnd         = "AND"
+	KOr          = "OR"
+	KJoin        = "JOIN"
+	KInner       = "INNER"
+	KOn          = "ON"
+	KBegin       = "BEGIN"
+	KCommit      = "COMMIT"
+	KRollback    = "ROLLBACK"
+	KForeign     = "FOREIGN"
+	KReferences  = "REFERENCES"
+	KAlter       = "ALTER"
+	KUser        = "USER"
+	KIdentified  = "IDENTIFIED"
+	KBy          = "BY"
+	KStart       = "START"
+	KTransaction = "TRANSACTION"
 )
 
 type TokenHandler interface {
@@ -304,6 +310,8 @@ func (t *Tokenizer) isKeyword(word string) bool {
 		KJoin, KInner, KOn,
 		KBegin, KCommit, KRollback,
 		KForeign, KReferences,
+		KAlter, KUser, KIdentified, KBy,
+		KStart, KTransaction,
 	}
 
 	upperWord := strings.ToUpper(word)

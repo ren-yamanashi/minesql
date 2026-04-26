@@ -20,7 +20,7 @@ type queryResult struct {
 
 // onComQuery は COM_QUERY を処理する
 func (s *Server) onComQuery(cc *clientConn, sess *session, sql string) {
-	result, err := s.executeQuery(sess, sql)
+	result, err := s.onQuery(sess, sql)
 	if err != nil {
 		_ = cc.writePacket((&errPacket{
 			errorCode: erUnknownError,

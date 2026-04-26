@@ -60,4 +60,5 @@ On subsequent startups, these arguments are not needed (user is loaded from cata
 | [DELETE](./docs/feature/delete.md) | ✅ |
 | [UPDATE](./docs/feature/update.md) | ✅ |
 | [Transaction](./docs//feature/transaction.md) | ✅ |
+| [ALTER USER](./docs/feature/alter-user.md) | ✅ |
 | [Account](./docs/feature/account.md) | ✅ |

@@ -31,6 +31,21 @@ func (um *UserMeta) Insert(bp *buffer.BufferPool) error {
 	return btr.Insert(bp, node.NewRecord(nil, encodedKey, encodedNonKey))
 }
 
+// Update はユーザーメタデータを B+Tree 上で更新する
+func (um *UserMeta) Update(bp *buffer.BufferPool) error {
+	btr := btree.NewBTree(um.MetaPageId)
+
+	// キー: Username
+	var encodedKey []byte
+	encode.Encode([][]byte{[]byte(um.Username)}, &encodedKey)
+
+	// 非キー: Host, AuthString
+	var encodedNonKey []byte
+	encode.Encode([][]byte{[]byte(um.Host), um.AuthString[:]}, &encodedNonKey)
+
+	return btr.Update(bp, node.NewRecord(nil, encodedKey, encodedNonKey))
+}
+
 // loadUserMeta はユーザーメタデータを B+Tree から読み込む
 func loadUserMeta(bp *buffer.BufferPool, metaPageId page.PageId) ([]*UserMeta, error) {
 	userMetaTree := btree.NewBTree(metaPageId)
