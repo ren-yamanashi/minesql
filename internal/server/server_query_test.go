@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"minesql/internal/storage/acl"
 	"minesql/internal/storage/handler"
 )
 
@@ -686,7 +687,9 @@ func setupTestServer(t *testing.T) *Server {
 	handler.Reset()
 	handler.Init()
 
-	return &Server{}
+	return &Server{
+		acl: acl.NewACL(acl.NewUser("root", "root", "%")),
+	}
 }
 
 // resultToCSV は queryResult のレコードを CSV 形式の文字列に変換する (テスト用)

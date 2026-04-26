@@ -45,21 +45,30 @@ func (s *Server) onConnection(conn *net.TCPConn) (*clientConn, *session) {
 	hsResp, err := parseHandshakeResponse41(payload)
 	if err != nil {
 		log.Printf("Failed to parse handshake response: %v", err)
-		_ = cc.writePacket((&errPacket{
+		if writeErr := cc.writePacket((&errPacket{
 			errorCode: erUnknownError,
 			sqlState:  sqlStateGeneralError,
 			message:   err.Error(),
-		}).build())
+		}).build()); writeErr != nil {
+			log.Printf("Failed to send ERR packet: %v", writeErr)
+		}
 		return nil, nil
 	}
 
 	// 認証
-	if err := authenticate(hsResp.username, hsResp.authResponse, nonce); err != nil {
-		_ = cc.writePacket((&errPacket{
+	clientHost, _, err := net.SplitHostPort(conn.RemoteAddr().String())
+	if err != nil {
+		log.Printf("Failed to parse remote address: %v", err)
+		return nil, nil
+	}
+	if err := authenticate(s.acl, clientHost, hsResp.username, hsResp.authResponse, nonce); err != nil {
+		if writeErr := cc.writePacket((&errPacket{
 			errorCode: erAccessDenied,
 			sqlState:  sqlStateAuthError,
 			message:   err.Error(),
-		}).build())
+		}).build()); writeErr != nil {
+			log.Printf("Failed to send ERR packet: %v", writeErr)
+		}
 		return nil, nil
 	}
 

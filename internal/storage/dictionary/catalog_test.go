@@ -655,7 +655,7 @@ func TestAllocateFileId(t *testing.T) {
 		data, err := bp.GetReadPageData(headerPageId)
 		assert.NoError(t, err)
 		defer bp.UnRefPage(headerPageId)
-		savedNextFileId := binary.BigEndian.Uint32(data[20:24])
+		savedNextFileId := binary.BigEndian.Uint32(data[24:28])
 		assert.Equal(t, uint32(3), savedNextFileId)
 	})
 }
@@ -765,6 +765,86 @@ func TestGetForeignKeysReferencingTable(t *testing.T) {
 		names := []string{result[0].TableName, result[1].TableName}
 		assert.Contains(t, names, "orders")
 		assert.Contains(t, names, "comments")
+	})
+}
+
+func TestGetUserByName(t *testing.T) {
+	t.Run("ユーザー名からユーザーメタデータを取得できる", func(t *testing.T) {
+		// GIVEN
+		bp, tmpdir := InitCatalogDisk(t)
+		defer removeTmpdir(t, tmpdir)
+
+		cat, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+
+		userMeta := &UserMeta{
+			MetaPageId: cat.UserMetaPageId,
+			Username:   "root",
+			Host:       "%",
+			AuthString: [32]byte{1, 2, 3},
+		}
+		err = userMeta.Insert(bp)
+		assert.NoError(t, err)
+		cat.Users = append(cat.Users, userMeta)
+
+		// WHEN
+		found, ok := cat.GetUserByName("root")
+
+		// THEN
+		assert.True(t, ok)
+		assert.Equal(t, "root", found.Username)
+		assert.Equal(t, "%", found.Host)
+		assert.Equal(t, [32]byte{1, 2, 3}, found.AuthString)
+	})
+
+	t.Run("存在しないユーザー名を指定すると false を返す", func(t *testing.T) {
+		// GIVEN
+		bp, tmpdir := InitCatalogDisk(t)
+		defer removeTmpdir(t, tmpdir)
+
+		cat, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+
+		// WHEN
+		_, ok := cat.GetUserByName("nonexistent")
+
+		// THEN
+		assert.False(t, ok)
+	})
+}
+
+func TestHasUsers(t *testing.T) {
+	t.Run("ユーザーがいない場合は false を返す", func(t *testing.T) {
+		// GIVEN
+		bp, tmpdir := InitCatalogDisk(t)
+		defer removeTmpdir(t, tmpdir)
+
+		cat, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+
+		// THEN
+		assert.False(t, cat.HasUsers())
+	})
+
+	t.Run("ユーザーを追加した後は true を返す", func(t *testing.T) {
+		// GIVEN
+		bp, tmpdir := InitCatalogDisk(t)
+		defer removeTmpdir(t, tmpdir)
+
+		cat, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+
+		userMeta := &UserMeta{
+			MetaPageId: cat.UserMetaPageId,
+			Username:   "root",
+			Host:       "%",
+		}
+		err = userMeta.Insert(bp)
+		assert.NoError(t, err)
+		cat.Users = append(cat.Users, userMeta)
+
+		// THEN
+		assert.True(t, cat.HasUsers())
 	})
 }
 

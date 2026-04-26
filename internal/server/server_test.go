@@ -9,7 +9,7 @@ import (
 func TestNewServer(t *testing.T) {
 	t.Run("Server が正しく初期化される", func(t *testing.T) {
 		// WHEN
-		s := NewServer("localhost", 3307)
+		s := NewServer("localhost", 3307, nil)
 
 		// THEN
 		assert.Equal(t, "localhost", s.address)

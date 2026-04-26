@@ -7,28 +7,38 @@ import (
 	"os"
 	"sync/atomic"
 
+	"minesql/internal/storage/acl"
 	"minesql/internal/storage/handler"
 )
+
+// InitUserOpts は初期ユーザーの設定
+type InitUserOpts struct {
+	Username string
+	Password string
+	Host     string
+}
 
 type Server struct {
 	address        string // IPアドレスまたはホスト名
 	port           int    // ポート番号
+	initUser       *InitUserOpts
+	acl            *acl.ACL
 	storageManager *handler.Handler
 	nextConnId     atomic.Uint32
 }
 
-func NewServer(address string, port int) *Server {
+func NewServer(address string, port int, initUser *InitUserOpts) *Server {
 	return &Server{
-		address: address,
-		port:    port,
+		address:  address,
+		port:     port,
+		initUser: initUser,
 	}
 }
 
 // Start はサーバーを開始する
 func (s *Server) Start() error {
-	err := s.init()
-	if err != nil {
-		return fmt.Errorf("failed to initialize storage manager: %w", err)
+	if err := s.init(); err != nil {
+		return fmt.Errorf("failed to initialize: %w", err)
 	}
 
 	listener, err := s.listen()
@@ -58,15 +68,51 @@ func (s *Server) Stop() error {
 // init はサーバーの初期化を行う
 func (s *Server) init() error {
 	dataDir := "data"
-	err := os.MkdirAll(dataDir, 0750)
-	if err != nil {
+	if err := os.MkdirAll(dataDir, 0750); err != nil {
 		return err
 	}
-	err = os.Setenv("MINESQL_DATA_DIR", dataDir)
-	if err != nil {
+	if err := os.Setenv("MINESQL_DATA_DIR", dataDir); err != nil {
 		return err
 	}
 	s.storageManager = handler.Init()
+
+	// ACL の初期化
+	if err := s.initACL(); err != nil {
+		return fmt.Errorf("failed to initialize ACL: %w", err)
+	}
+
+	return nil
+}
+
+// initACL はカタログからユーザーを読み込むか、初期ユーザーを作成して ACL を構築する
+func (s *Server) initACL() error {
+	hdl := handler.Get()
+
+	if hdl.Catalog.HasUsers() {
+		// カタログにユーザーが存在する場合はそこから ACL を構築
+		if s.initUser != nil {
+			log.Println("WARN: --init-user specified but user already exists in catalog, ignoring")
+		}
+		user := hdl.Catalog.Users[0]
+		s.acl = acl.NewACLFromCatalog(user.Username, user.Host, user.AuthString)
+		return nil
+	}
+
+	// カタログにユーザーがない場合は --init-* 引数が必要
+	if s.initUser == nil {
+		return fmt.Errorf("no user found in catalog; specify --init-user, --init-password, --init-host on first startup")
+	}
+
+	// 初期ユーザーを作成して ACL を構築
+	aclUser := acl.NewUser(s.initUser.Username, s.initUser.Password, s.initUser.Host)
+	s.acl = acl.NewACL(aclUser)
+
+	// カタログに永続化
+	if err := hdl.CreateUser(s.initUser.Username, s.initUser.Host, aclUser.AuthString); err != nil {
+		return err
+	}
+
+	log.Printf("Initial user '%s'@'%s' created", s.initUser.Username, s.initUser.Host)
 	return nil
 }
 

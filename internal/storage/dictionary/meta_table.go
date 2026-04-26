@@ -74,7 +74,7 @@ func (tm *TableMeta) GetIndexByColName(colName string) (*IndexMeta, bool) {
 	return nil, false
 }
 
-// Insert はテーブルメタデータを B+Tree に挿入する
+// Insert はテーブルメタデータと関連メタデータ (インデックス、カラム、制約) を B+Tree に挿入する
 func (tm *TableMeta) Insert(bp *buffer.BufferPool) error {
 	btr := btree.NewBTree(tm.MetaPageId)
 
@@ -89,8 +89,33 @@ func (tm *TableMeta) Insert(bp *buffer.BufferPool) error {
 	pkCountBuf := binary.BigEndian.AppendUint64(nil, uint64(tm.PKCount))
 	encode.Encode([][]byte{[]byte(tm.Name), nColsBuf, pkCountBuf, tm.DataMetaPageId.ToBytes()}, &encodedNonKey)
 
-	// B+Tree に挿入
-	return btr.Insert(bp, node.NewRecord(nil, encodedKey, encodedNonKey))
+	// テーブルメタデータを B+Tree に挿入
+	if err := btr.Insert(bp, node.NewRecord(nil, encodedKey, encodedNonKey)); err != nil {
+		return err
+	}
+
+	// インデックスメタデータを挿入
+	for _, indexMeta := range tm.Indexes {
+		if err := indexMeta.Insert(bp); err != nil {
+			return err
+		}
+	}
+
+	// カラムメタデータを挿入
+	for _, colMeta := range tm.Cols {
+		if err := colMeta.Insert(bp); err != nil {
+			return err
+		}
+	}
+
+	// 制約メタデータを挿入
+	for _, conMeta := range tm.Constraints {
+		if err := conMeta.Insert(bp); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // loadTableMeta は指定されたテーブルのメタデータを読み込む
