@@ -26,7 +26,10 @@ func (h *Handler) CreateInitialUser(username, host string) (string, error) {
 		return "", fmt.Errorf("failed to generate password: %w", err)
 	}
 
-	authString := acl.ComputeAuthString(password)
+	authString, err := acl.CryptPassword(password)
+	if err != nil {
+		return "", fmt.Errorf("failed to hash password: %w", err)
+	}
 	if err := h.CreateUser(username, host, authString); err != nil {
 		return "", err
 	}
@@ -35,7 +38,7 @@ func (h *Handler) CreateInitialUser(username, host string) (string, error) {
 }
 
 // CreateUser はユーザーをカタログに作成し、ACL を構築する
-func (h *Handler) CreateUser(username, host string, authString [32]byte) error {
+func (h *Handler) CreateUser(username, host string, authString string) error {
 	userMeta := &dictionary.UserMeta{
 		MetaPageId: h.Catalog.UserMetaPageId,
 		Username:   username,
@@ -51,7 +54,7 @@ func (h *Handler) CreateUser(username, host string, authString [32]byte) error {
 }
 
 // UpdateUser はカタログ上のユーザーの認証情報を更新し、ACL を再構築する
-func (h *Handler) UpdateUser(username, host string, authString [32]byte) error {
+func (h *Handler) UpdateUser(username, host string, authString string) error {
 	user, ok := h.Catalog.GetUserByName(username)
 	if !ok {
 		return fmt.Errorf("user '%s' not found", username)
@@ -64,7 +67,7 @@ func (h *Handler) UpdateUser(username, host string, authString [32]byte) error {
 		return err
 	}
 
-	// ACL を再構築
+	// ACL を再構築 (Hash Entry Cache は新しい ACL でクリアされる)
 	h.ACL = acl.NewACLFromCatalog(username, host, authString)
 	return nil
 }

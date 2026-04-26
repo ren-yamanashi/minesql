@@ -1,10 +1,12 @@
 package handler
 
 import (
-	"crypto/sha256"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"minesql/internal/storage/acl"
 )
 
 func TestCreateUser(t *testing.T) {
@@ -16,7 +18,7 @@ func TestCreateUser(t *testing.T) {
 		Reset()
 		h := Init()
 
-		authString := computeHandlerTestAuthString("mypassword")
+		authString := cryptTestPassword(t, "mypassword")
 
 		// WHEN
 		err := h.CreateUser("root", "%", authString)
@@ -38,7 +40,7 @@ func TestCreateUser(t *testing.T) {
 		Reset()
 		h := Init()
 
-		authString := computeHandlerTestAuthString("mypassword")
+		authString := cryptTestPassword(t, "mypassword")
 
 		// WHEN
 		err := h.CreateUser("root", "%", authString)
@@ -46,9 +48,9 @@ func TestCreateUser(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, h.ACL)
-		user, ok := h.ACL.Lookup("127.0.0.1", "root")
+		aclAuthString, ok := h.ACL.Lookup("127.0.0.1", "root")
 		assert.True(t, ok)
-		assert.Equal(t, authString, user.AuthString)
+		assert.Equal(t, authString, aclAuthString)
 	})
 
 	t.Run("ホスト付きのユーザーを作成できる", func(t *testing.T) {
@@ -59,7 +61,7 @@ func TestCreateUser(t *testing.T) {
 		Reset()
 		h := Init()
 
-		authString := computeHandlerTestAuthString("secret")
+		authString := cryptTestPassword(t, "secret")
 
 		// WHEN
 		err := h.CreateUser("admin", "192.168.1.%", authString)
@@ -82,12 +84,12 @@ func TestUpdateUser(t *testing.T) {
 		Reset()
 		h := Init()
 
-		oldAuthString := computeHandlerTestAuthString("oldpassword")
+		oldAuthString := cryptTestPassword(t, "oldpassword")
 		err := h.CreateUser("root", "%", oldAuthString)
 		assert.NoError(t, err)
 
 		// WHEN
-		newAuthString := computeHandlerTestAuthString("newpassword")
+		newAuthString := cryptTestPassword(t, "newpassword")
 		err = h.UpdateUser("root", "%", newAuthString)
 
 		// THEN
@@ -105,20 +107,20 @@ func TestUpdateUser(t *testing.T) {
 		Reset()
 		h := Init()
 
-		oldAuthString := computeHandlerTestAuthString("oldpassword")
+		oldAuthString := cryptTestPassword(t, "oldpassword")
 		err := h.CreateUser("root", "%", oldAuthString)
 		assert.NoError(t, err)
 
 		// WHEN
-		newAuthString := computeHandlerTestAuthString("newpassword")
+		newAuthString := cryptTestPassword(t, "newpassword")
 		err = h.UpdateUser("root", "%", newAuthString)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, h.ACL)
-		user, ok := h.ACL.Lookup("127.0.0.1", "root")
+		aclAuthString, ok := h.ACL.Lookup("127.0.0.1", "root")
 		assert.True(t, ok)
-		assert.Equal(t, newAuthString, user.AuthString)
+		assert.Equal(t, newAuthString, aclAuthString)
 	})
 
 	t.Run("存在しないユーザーの更新はエラーになる", func(t *testing.T) {
@@ -130,7 +132,7 @@ func TestUpdateUser(t *testing.T) {
 		h := Init()
 
 		// WHEN
-		authString := computeHandlerTestAuthString("password")
+		authString := cryptTestPassword(t, "password")
 		err := h.UpdateUser("nonexistent", "%", authString)
 
 		// THEN
@@ -148,7 +150,7 @@ func TestLoadACL(t *testing.T) {
 		Reset()
 		h := Init()
 
-		authString := computeHandlerTestAuthString("password")
+		authString := cryptTestPassword(t, "password")
 		err := h.CreateUser("root", "%", authString)
 		assert.NoError(t, err)
 
@@ -161,9 +163,8 @@ func TestLoadACL(t *testing.T) {
 		// THEN
 		assert.True(t, ok)
 		assert.NotNil(t, h.ACL)
-		user, found := h.ACL.Lookup("127.0.0.1", "root")
+		_, found := h.ACL.Lookup("127.0.0.1", "root")
 		assert.True(t, found)
-		assert.Equal(t, "root", user.Username)
 	})
 
 	t.Run("カタログにユーザーが存在しない場合は false を返す", func(t *testing.T) {
@@ -201,9 +202,8 @@ func TestCreateInitialUser(t *testing.T) {
 		assert.True(t, h.Catalog.HasUsers())
 		assert.NotNil(t, h.ACL)
 
-		user, ok := h.ACL.Lookup("127.0.0.1", "root")
+		_, ok := h.ACL.Lookup("127.0.0.1", "root")
 		assert.True(t, ok)
-		assert.Equal(t, "root", user.Username)
 	})
 
 	t.Run("生成されるパスワードが毎回異なる", func(t *testing.T) {
@@ -228,7 +228,9 @@ func TestCreateInitialUser(t *testing.T) {
 	})
 }
 
-func computeHandlerTestAuthString(password string) [32]byte {
-	stage1 := sha256.Sum256([]byte(password))
-	return sha256.Sum256(stage1[:])
+func cryptTestPassword(t *testing.T, password string) string {
+	t.Helper()
+	authString, err := acl.CryptPassword(password)
+	require.NoError(t, err)
+	return authString
 }

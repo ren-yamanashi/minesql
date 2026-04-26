@@ -13,7 +13,7 @@ type UserMeta struct {
 	MetaPageId page.PageId // ユーザーメタデータが格納される B+Tree のメタページ ID
 	Username   string
 	Host       string
-	AuthString [32]byte // SHA256(SHA256(password))
+	AuthString string // ソルト付きハッシュ ($A$005$ 形式)
 }
 
 // Insert はユーザーメタデータを B+Tree に挿入する
@@ -26,7 +26,7 @@ func (um *UserMeta) Insert(bp *buffer.BufferPool) error {
 
 	// 非キー: Host, AuthString
 	var encodedNonKey []byte
-	encode.Encode([][]byte{[]byte(um.Host), um.AuthString[:]}, &encodedNonKey)
+	encode.Encode([][]byte{[]byte(um.Host), []byte(um.AuthString)}, &encodedNonKey)
 
 	return btr.Insert(bp, node.NewRecord(nil, encodedKey, encodedNonKey))
 }
@@ -41,7 +41,7 @@ func (um *UserMeta) Update(bp *buffer.BufferPool) error {
 
 	// 非キー: Host, AuthString
 	var encodedNonKey []byte
-	encode.Encode([][]byte{[]byte(um.Host), um.AuthString[:]}, &encodedNonKey)
+	encode.Encode([][]byte{[]byte(um.Host), []byte(um.AuthString)}, &encodedNonKey)
 
 	return btr.Update(bp, node.NewRecord(nil, encodedKey, encodedNonKey))
 }
@@ -71,14 +71,11 @@ func loadUserMeta(bp *buffer.BufferPool, metaPageId page.PageId) ([]*UserMeta, e
 		encode.Decode(record.NonKeyBytes(), &nonKeyParts)
 		host := string(nonKeyParts[0])
 
-		var authString [32]byte
-		copy(authString[:], nonKeyParts[1])
-
 		users = append(users, &UserMeta{
 			MetaPageId: metaPageId,
 			Username:   username,
 			Host:       host,
-			AuthString: authString,
+			AuthString: string(nonKeyParts[1]),
 		})
 
 		if err := iter.Advance(bp); err != nil {

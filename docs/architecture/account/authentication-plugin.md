@@ -24,7 +24,7 @@
 | Nonce | サーバーが接続ごとに生成する 20 バイトのランダムデータ。初期ハンドシェイクパケットに含まれる |
 | Scramble | クライアントがパスワードと Nonce から計算した 32 バイトのデータ。パスワードそのものをネットワーク上に流さずに認証するために使う |
 | Hash Entry | サーバーがメモリ上にキャッシュしている `SHA256(SHA256(password))` の値 |
-| authentication_string | サーバーが永続化しているパスワードハッシュ。Hash Entry と同じ値 (`SHA256(SHA256(password))`)。ACL ファイルに保存される |
+| authentication_string | サーバーが永続化しているソルト付きハッシュ (`$A$005$<salt><hash>` 形式) <br/> SHA-256 を 5000 回イテレーションして生成 |
 
 ### 認証フロー全体
 
@@ -151,7 +151,7 @@ sequenceDiagram
 - TLS 接続上でのみサポートする (非 TLS の RSA 公開鍵暗号化パスはサポートしない)
 - フローは以下の通り
   1. サーバーが AuthMoreData パケット (0x04 = perform full auth) を送信
-  2. クライアントが平文パスワード + NUL 終端を TLS 上で送信
+  2. クライアントが平文パスワード + NUL 終端を送信 (TLS により暗号化されている)
   3. サーバーがパスワードを受信し、authentication_string と照合
   4. 照合成功: Hash Entry をキャッシュに保存し、OK パケットを送信
   5. 照合失敗: ERR パケットを送信
@@ -162,7 +162,7 @@ sequenceDiagram
 - Fast Authentication 用のキャッシュ (`SHA256(SHA256(password))`) は別の値であり、ソルト付きハッシュから復元することはできない
 - そのため、サーバー起動後の初回接続時は必ず Complete Authentication が発生する
   1. ハッシュエントリのキャッシュが空のため、Fast Authentication は失敗する
-  2. Complete Authentication で平文パスワードを TLS 上で受信する
+  2. Complete Authentication で平文パスワードを受信する (TLS により暗号化されている)
   3. 平文パスワードからソルト付きハッシュと照合する
   4. 照合成功時に `SHA256(SHA256(password))` を計算してキャッシュに保存する
   5. 以降の接続では Fast Authentication が使用される

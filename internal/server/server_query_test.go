@@ -226,8 +226,9 @@ func TestExecuteQueryAlterUser(t *testing.T) {
 
 		// 初期ユーザーを作成
 		hdl := handler.Get()
-		oldAuthString := acl.ComputeAuthString("oldpass")
-		err := hdl.CreateUser("root", "%", oldAuthString)
+		oldAuthString, err := acl.CryptPassword("oldpass")
+		require.NoError(t, err)
+		err = hdl.CreateUser("root", "%", oldAuthString)
 		require.NoError(t, err)
 
 		// WHEN
@@ -237,16 +238,15 @@ func TestExecuteQueryAlterUser(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, resultOK, result.resultType)
 
-		// カタログ上の AuthString が更新されている
+		// カタログ上の AuthString が更新されている (ソルト付きハッシュ)
 		user, ok := hdl.Catalog.GetUserByName("root")
 		assert.True(t, ok)
-		expectedAuthString := acl.ComputeAuthString("newpass")
-		assert.Equal(t, expectedAuthString, user.AuthString)
+		assert.True(t, acl.VerifyCryptPassword("newpass", user.AuthString))
 
-		// ACL が再構築されている (新しいパスワードで認証できる)
-		aclUser, ok := hdl.ACL.Lookup("%", "root")
+		// ACL が再構築されている (新しいパスワードで検証できる)
+		aclAuthString, ok := hdl.ACL.Lookup("%", "root")
 		assert.True(t, ok)
-		assert.Equal(t, expectedAuthString, aclUser.AuthString)
+		assert.True(t, acl.VerifyCryptPassword("newpass", aclAuthString))
 	})
 
 	t.Run("存在しないユーザーの ALTER USER はエラーになる", func(t *testing.T) {
@@ -736,9 +736,17 @@ func setupTestServer(t *testing.T) *Server {
 
 	// テスト用の ACL を構築
 	hdl := handler.Get()
-	hdl.ACL = acl.NewACL(acl.NewUser("root", "root", "%"))
+	authString, err := acl.CryptPassword("root")
+	if err != nil {
+		t.Fatalf("failed to crypt password: %v", err)
+	}
+	hdl.ACL = acl.NewACLFromCatalog("root", "%", authString)
 
-	return &Server{}
+	tlsConfig, err := loadOrGenerateTLSConfig(tmpdir)
+	if err != nil {
+		t.Fatalf("failed to load TLS config: %v", err)
+	}
+	return &Server{tlsConfig: tlsConfig}
 }
 
 // resultToCSV は queryResult のレコードを CSV 形式の文字列に変換する (テスト用)

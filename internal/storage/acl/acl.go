@@ -2,39 +2,61 @@ package acl
 
 import "strings"
 
-// ACL はアクセス制御リストを表す
-type ACL struct {
-	user *User
+// user はユーザーアカウントの認証情報を表す
+type user struct {
+	username   string
+	host       string
+	authString string // ソルト付きハッシュ ($A$005$ 形式)
 }
 
-// NewACL はユーザーから ACL を構築する
-func NewACL(user *User) *ACL {
-	return &ACL{user: user}
+// ACL はアクセス制御リストを表す
+type ACL struct {
+	u              *user
+	hashEntryCache map[string][32]byte // username → SHA256(SHA256(password))
 }
 
 // NewACLFromCatalog はカタログのユーザーメタデータから ACL を構築する
-func NewACLFromCatalog(username, host string, authString [32]byte) *ACL {
-	return &ACL{user: &User{
-		Username:   username,
-		Host:       host,
-		AuthString: authString,
-	}}
+func NewACLFromCatalog(username, host string, authString string) *ACL {
+	return &ACL{
+		u: &user{
+			username:   username,
+			host:       host,
+			authString: authString,
+		},
+		hashEntryCache: make(map[string][32]byte),
+	}
 }
 
-// Lookup はホスト名とユーザー名でユーザーを検索する
+// SetHashEntry は Hash Entry Cache にエントリを追加する
+func (a *ACL) SetHashEntry(username string, entry [32]byte) {
+	a.hashEntryCache[username] = entry
+}
+
+// GetHashEntry は Hash Entry Cache からエントリを取得する
+func (a *ACL) GetHashEntry(username string) ([32]byte, bool) {
+	entry, ok := a.hashEntryCache[username]
+	return entry, ok
+}
+
+// ClearHashEntry は Hash Entry Cache からエントリを削除する
+func (a *ACL) ClearHashEntry(username string) {
+	delete(a.hashEntryCache, username)
+}
+
+// Lookup はホスト名とユーザー名でユーザーを検索し、authentication_string を返す
 //
 // ホストマッチングの優先順位: 完全一致 → サブネットパターン → % (全許可)
-func (a *ACL) Lookup(host, username string) (*User, bool) {
-	if a.user == nil {
-		return nil, false
+func (a *ACL) Lookup(host, username string) (authString string, ok bool) {
+	if a.u == nil {
+		return "", false
 	}
-	if a.user.Username != username {
-		return nil, false
+	if a.u.username != username {
+		return "", false
 	}
-	if !MatchHost(a.user.Host, host) {
-		return nil, false
+	if !MatchHost(a.u.host, host) {
+		return "", false
 	}
-	return a.user, true
+	return a.u.authString, true
 }
 
 // MatchHost はホストパターンが接続元ホストにマッチするか判定する

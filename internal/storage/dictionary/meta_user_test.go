@@ -1,13 +1,14 @@
 package dictionary
 
 import (
-	"crypto/sha256"
+	"minesql/internal/storage/acl"
 	"minesql/internal/storage/btree"
 	"minesql/internal/storage/encode"
 	"minesql/internal/storage/page"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUserMeta_Insert(t *testing.T) {
@@ -21,7 +22,7 @@ func TestUserMeta_Insert(t *testing.T) {
 		_, err = btree.CreateBTree(bp, metaPageId)
 		assert.NoError(t, err)
 
-		authString := computeTestAuthString("mypassword")
+		authString := cryptTestAuthString(t, "mypassword")
 		userMeta := &UserMeta{
 			MetaPageId: metaPageId,
 			Username:   "root",
@@ -51,10 +52,10 @@ func TestUserMeta_Insert(t *testing.T) {
 		var valueParts [][]byte
 		encode.Decode(record.NonKeyBytes(), &valueParts)
 		assert.Equal(t, "%", string(valueParts[0]))
-		assert.Equal(t, authString[:], valueParts[1])
+		assert.Equal(t, []byte(authString), valueParts[1])
 	})
 
-	t.Run("AuthString の 32 バイトが正しく保存される", func(t *testing.T) {
+	t.Run("AuthString の可変長バイト列が正しく保存される", func(t *testing.T) {
 		// GIVEN
 		bp, tmpdir := InitCatalogDisk(t)
 		defer removeTmpdir(t, tmpdir)
@@ -64,11 +65,7 @@ func TestUserMeta_Insert(t *testing.T) {
 		_, err = btree.CreateBTree(bp, metaPageId)
 		assert.NoError(t, err)
 
-		// 全バイトが異なる AuthString
-		var authString [32]byte
-		for i := range authString {
-			authString[i] = byte(i)
-		}
+		authString := cryptTestAuthString(t, "testpassword")
 
 		userMeta := &UserMeta{
 			MetaPageId: metaPageId,
@@ -91,7 +88,7 @@ func TestUserMeta_Insert(t *testing.T) {
 
 		var valueParts [][]byte
 		encode.Decode(record.NonKeyBytes(), &valueParts)
-		assert.Equal(t, authString[:], valueParts[1])
+		assert.Equal(t, []byte(authString), valueParts[1])
 	})
 }
 
@@ -106,7 +103,7 @@ func TestUserMeta_Update(t *testing.T) {
 		_, err = btree.CreateBTree(bp, metaPageId)
 		assert.NoError(t, err)
 
-		oldAuthString := computeTestAuthString("oldpassword")
+		oldAuthString := cryptTestAuthString(t, "oldpassword")
 		userMeta := &UserMeta{
 			MetaPageId: metaPageId,
 			Username:   "root",
@@ -117,7 +114,7 @@ func TestUserMeta_Update(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN: AuthString を新しい値に更新
-		newAuthString := computeTestAuthString("newpassword")
+		newAuthString := cryptTestAuthString(t, "newpassword")
 		userMeta.AuthString = newAuthString
 		err = userMeta.Update(bp)
 
@@ -147,7 +144,7 @@ func TestUserMeta_Update(t *testing.T) {
 			MetaPageId: metaPageId,
 			Username:   "nonexistent",
 			Host:       "%",
-			AuthString: computeTestAuthString("pass"),
+			AuthString: cryptTestAuthString(t, "pass"),
 		}
 
 		// WHEN
@@ -167,7 +164,7 @@ func TestLoadUserMeta(t *testing.T) {
 		cat, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		authString := computeTestAuthString("secret")
+		authString := cryptTestAuthString(t, "secret")
 		userMeta := &UserMeta{
 			MetaPageId: cat.UserMetaPageId,
 			Username:   "admin",
@@ -205,7 +202,9 @@ func TestLoadUserMeta(t *testing.T) {
 	})
 }
 
-func computeTestAuthString(password string) [32]byte {
-	stage1 := sha256.Sum256([]byte(password))
-	return sha256.Sum256(stage1[:])
+func cryptTestAuthString(t *testing.T, password string) string {
+	t.Helper()
+	s, err := acl.CryptPassword(password)
+	require.NoError(t, err)
+	return s
 }

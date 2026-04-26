@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/tls"
 	"fmt"
 	"log"
 	"net"
@@ -21,6 +22,7 @@ type Server struct {
 	port           int    // ポート番号
 	initUser       *InitUserOpts
 	storageManager *handler.Handler
+	tlsConfig      *tls.Config
 	nextConnId     atomic.Uint32
 }
 
@@ -72,6 +74,13 @@ func (s *Server) init() error {
 		return err
 	}
 	s.storageManager = handler.Init()
+
+	// TLS の初期化
+	tlsConfig, err := loadOrGenerateTLSConfig(dataDir)
+	if err != nil {
+		return fmt.Errorf("failed to initialize TLS: %w", err)
+	}
+	s.tlsConfig = tlsConfig
 
 	// ACL の初期化
 	if err := s.initACL(); err != nil {

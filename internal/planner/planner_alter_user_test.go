@@ -1,13 +1,14 @@
 package planner
 
 import (
-	"crypto/sha256"
 	"minesql/internal/ast"
 	"minesql/internal/executor"
+	"minesql/internal/storage/acl"
 	"minesql/internal/storage/handler"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPlanAlterUser(t *testing.T) {
@@ -17,7 +18,7 @@ func TestPlanAlterUser(t *testing.T) {
 		defer handler.Reset()
 
 		hdl := handler.Get()
-		authString := computePlannerTestAuthString("oldpass")
+		authString := cryptPlannerTestPassword(t, "oldpass")
 		err := hdl.CreateUser("root", "%", authString)
 		assert.NoError(t, err)
 
@@ -57,7 +58,9 @@ func TestPlanAlterUser(t *testing.T) {
 	})
 }
 
-func computePlannerTestAuthString(password string) [32]byte {
-	stage1 := sha256.Sum256([]byte(password))
-	return sha256.Sum256(stage1[:])
+func cryptPlannerTestPassword(t *testing.T, password string) string {
+	t.Helper()
+	s, err := acl.CryptPassword(password)
+	require.NoError(t, err)
+	return s
 }

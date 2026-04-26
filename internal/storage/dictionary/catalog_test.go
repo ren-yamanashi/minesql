@@ -781,7 +781,7 @@ func TestGetUserByName(t *testing.T) {
 			MetaPageId: cat.UserMetaPageId,
 			Username:   "root",
 			Host:       "%",
-			AuthString: [32]byte{1, 2, 3},
+			AuthString: "test-auth-string",
 		}
 		err = userMeta.Insert(bp)
 		assert.NoError(t, err)
@@ -794,7 +794,7 @@ func TestGetUserByName(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, "root", found.Username)
 		assert.Equal(t, "%", found.Host)
-		assert.Equal(t, [32]byte{1, 2, 3}, found.AuthString)
+		assert.Equal(t, "test-auth-string", found.AuthString)
 	})
 
 	t.Run("存在しないユーザー名を指定すると false を返す", func(t *testing.T) {

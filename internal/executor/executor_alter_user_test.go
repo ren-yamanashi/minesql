@@ -1,11 +1,12 @@
 package executor
 
 import (
-	"crypto/sha256"
+	"minesql/internal/storage/acl"
 	"minesql/internal/storage/handler"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestAlterUser_Next(t *testing.T) {
@@ -18,12 +19,12 @@ func TestAlterUser_Next(t *testing.T) {
 		handler.Init()
 		hdl := handler.Get()
 
-		oldAuthString := computeAlterUserTestAuthString("oldpass")
+		oldAuthString := cryptAlterUserTestPassword(t, "oldpass")
 		err := hdl.CreateUser("root", "%", oldAuthString)
 		assert.NoError(t, err)
 
 		// WHEN
-		newAuthString := computeAlterUserTestAuthString("newpass")
+		newAuthString := cryptAlterUserTestPassword(t, "newpass")
 		alterUser := NewAlterUser("root", "%", newAuthString)
 		_, err = alterUser.Next()
 
@@ -43,7 +44,7 @@ func TestAlterUser_Next(t *testing.T) {
 		handler.Init()
 
 		// WHEN
-		authString := computeAlterUserTestAuthString("pass")
+		authString := cryptAlterUserTestPassword(t, "pass")
 		alterUser := NewAlterUser("nonexistent", "%", authString)
 		_, err := alterUser.Next()
 
@@ -53,7 +54,9 @@ func TestAlterUser_Next(t *testing.T) {
 	})
 }
 
-func computeAlterUserTestAuthString(password string) [32]byte {
-	stage1 := sha256.Sum256([]byte(password))
-	return sha256.Sum256(stage1[:])
+func cryptAlterUserTestPassword(t *testing.T, password string) string {
+	t.Helper()
+	s, err := acl.CryptPassword(password)
+	require.NoError(t, err)
+	return s
 }

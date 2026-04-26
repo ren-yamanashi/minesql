@@ -6,10 +6,10 @@ import "minesql/internal/storage/handler"
 type AlterUser struct {
 	username   string
 	host       string
-	authString [32]byte
+	authString string
 }
 
-func NewAlterUser(username, host string, authString [32]byte) *AlterUser {
+func NewAlterUser(username, host string, authString string) *AlterUser {
 	return &AlterUser{
 		username:   username,
 		host:       host,

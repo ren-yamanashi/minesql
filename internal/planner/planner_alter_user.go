@@ -19,8 +19,11 @@ func PlanAlterUser(stmt *ast.AlterUserStmt) (executor.Executor, error) {
 		return nil, fmt.Errorf("user '%s' not found", stmt.Username)
 	}
 
-	// パスワードから authentication_string を計算
-	authString := acl.ComputeAuthString(stmt.Password)
+	// パスワードからソルト付きハッシュを計算
+	authString, err := acl.CryptPassword(stmt.Password)
+	if err != nil {
+		return nil, fmt.Errorf("failed to hash password: %w", err)
+	}
 
 	return executor.NewAlterUser(stmt.Username, stmt.Host, authString), nil
 }

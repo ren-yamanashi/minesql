@@ -1,10 +1,10 @@
 package acl
 
 import (
-	"crypto/sha256"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMatchHost(t *testing.T) {
@@ -49,49 +49,26 @@ func TestMatchHost(t *testing.T) {
 	})
 }
 
-func TestNewACL(t *testing.T) {
-	t.Run("ユーザーから ACL を構築できる", func(t *testing.T) {
-		// GIVEN
-		user := NewUser("root", "pass", "%")
-
-		// WHEN
-		a := NewACL(user)
-
-		// THEN
-		found, ok := a.Lookup("127.0.0.1", "root")
-		assert.True(t, ok)
-		assert.Equal(t, "root", found.Username)
-	})
-
-	t.Run("nil ユーザーで ACL を構築できる", func(t *testing.T) {
-		// WHEN
-		a := NewACL(nil)
-
-		// THEN
-		_, ok := a.Lookup("127.0.0.1", "root")
-		assert.False(t, ok)
-	})
-}
-
 func TestNewACLFromCatalog(t *testing.T) {
 	t.Run("カタログ情報から ACL を構築できる", func(t *testing.T) {
 		// GIVEN
-		authString := ComputeAuthString("mypass")
+		authString, err := CryptPassword("mypass")
+		require.NoError(t, err)
 
 		// WHEN
 		a := NewACLFromCatalog("admin", "192.168.1.%", authString)
 
 		// THEN
-		found, ok := a.Lookup("192.168.1.50", "admin")
+		foundAuthString, ok := a.Lookup("192.168.1.50", "admin")
 		assert.True(t, ok)
-		assert.Equal(t, "admin", found.Username)
-		assert.Equal(t, "192.168.1.%", found.Host)
-		assert.Equal(t, authString, found.AuthString)
+		assert.Equal(t, authString, foundAuthString)
 	})
 
 	t.Run("カタログから構築した ACL でホスト不一致は見つからない", func(t *testing.T) {
 		// GIVEN
-		a := NewACLFromCatalog("admin", "192.168.1.%", ComputeAuthString("pass"))
+		authString, err := CryptPassword("pass")
+		require.NoError(t, err)
+		a := NewACLFromCatalog("admin", "192.168.1.%", authString)
 
 		// WHEN
 		_, ok := a.Lookup("10.0.0.1", "admin")
@@ -102,7 +79,9 @@ func TestNewACLFromCatalog(t *testing.T) {
 
 	t.Run("カタログから構築した ACL でユーザー名不一致は見つからない", func(t *testing.T) {
 		// GIVEN
-		a := NewACLFromCatalog("admin", "%", ComputeAuthString("pass"))
+		authString, err := CryptPassword("pass")
+		require.NoError(t, err)
+		a := NewACLFromCatalog("admin", "%", authString)
 
 		// WHEN
 		_, ok := a.Lookup("127.0.0.1", "root")
@@ -115,21 +94,18 @@ func TestNewACLFromCatalog(t *testing.T) {
 func TestLookup(t *testing.T) {
 	t.Run("ユーザー名とホストが一致する場合に見つかる", func(t *testing.T) {
 		// GIVEN
-		user := NewUser("root", "pass", "%")
-		a := NewACL(user)
+		a := testACL(t, "pass", "%")
 
 		// WHEN
-		found, ok := a.Lookup("192.168.1.100", "root")
+		_, ok := a.Lookup("192.168.1.100", "root")
 
 		// THEN
 		assert.True(t, ok)
-		assert.Equal(t, "root", found.Username)
 	})
 
 	t.Run("ユーザー名が一致しない場合は見つからない", func(t *testing.T) {
 		// GIVEN
-		user := NewUser("root", "pass", "%")
-		a := NewACL(user)
+		a := testACL(t, "pass", "%")
 
 		// WHEN
 		_, ok := a.Lookup("192.168.1.100", "unknown")
@@ -140,8 +116,7 @@ func TestLookup(t *testing.T) {
 
 	t.Run("ホストが一致しない場合は見つからない", func(t *testing.T) {
 		// GIVEN
-		user := NewUser("root", "pass", "127.0.0.1")
-		a := NewACL(user)
+		a := testACL(t, "pass", "127.0.0.1")
 
 		// WHEN
 		_, ok := a.Lookup("192.168.1.100", "root")
@@ -152,20 +127,18 @@ func TestLookup(t *testing.T) {
 
 	t.Run("サブネットパターンでホストがマッチする", func(t *testing.T) {
 		// GIVEN
-		user := NewUser("root", "pass", "192.168.1.%")
-		a := NewACL(user)
+		a := testACL(t, "pass", "192.168.1.%")
 
 		// WHEN
-		found, ok := a.Lookup("192.168.1.50", "root")
+		_, ok := a.Lookup("192.168.1.50", "root")
 
 		// THEN
 		assert.True(t, ok)
-		assert.Equal(t, "root", found.Username)
 	})
 
 	t.Run("ユーザーが nil の場合は見つからない", func(t *testing.T) {
 		// GIVEN
-		a := NewACL(nil)
+		a := &ACL{hashEntryCache: make(map[string][32]byte)}
 
 		// WHEN
 		_, ok := a.Lookup("127.0.0.1", "root")
@@ -176,36 +149,30 @@ func TestLookup(t *testing.T) {
 
 	t.Run("見つかったユーザーの AuthString が正しい", func(t *testing.T) {
 		// GIVEN
-		user := NewUser("root", "secret", "%")
-		a := NewACL(user)
+		a := testACL(t, "secret", "%")
 
 		// WHEN
-		found, ok := a.Lookup("127.0.0.1", "root")
+		authString, ok := a.Lookup("127.0.0.1", "root")
 
 		// THEN
 		assert.True(t, ok)
-		stage1 := sha256.Sum256([]byte("secret"))
-		expected := sha256.Sum256(stage1[:])
-		assert.Equal(t, expected, found.AuthString)
+		assert.True(t, VerifyCryptPassword("secret", authString))
 	})
 
 	t.Run("完全一致のホストでマッチする", func(t *testing.T) {
 		// GIVEN
-		user := NewUser("root", "pass", "10.0.0.5")
-		a := NewACL(user)
+		a := testACL(t, "pass", "10.0.0.5")
 
 		// WHEN
-		found, ok := a.Lookup("10.0.0.5", "root")
+		_, ok := a.Lookup("10.0.0.5", "root")
 
 		// THEN
 		assert.True(t, ok)
-		assert.Equal(t, "root", found.Username)
 	})
 
 	t.Run("完全一致のホストで別 IP は見つからない", func(t *testing.T) {
 		// GIVEN
-		user := NewUser("root", "pass", "10.0.0.5")
-		a := NewACL(user)
+		a := testACL(t, "pass", "10.0.0.5")
 
 		// WHEN
 		_, ok := a.Lookup("10.0.0.6", "root")
@@ -213,4 +180,52 @@ func TestLookup(t *testing.T) {
 		// THEN
 		assert.False(t, ok)
 	})
+}
+
+func TestHashEntryCache(t *testing.T) {
+	t.Run("Set/Get でキャッシュにエントリを追加・取得できる", func(t *testing.T) {
+		// GIVEN
+		a := &ACL{hashEntryCache: make(map[string][32]byte)}
+		entry := [32]byte{1, 2, 3}
+
+		// WHEN
+		a.SetHashEntry("root", entry)
+		got, ok := a.GetHashEntry("root")
+
+		// THEN
+		assert.True(t, ok)
+		assert.Equal(t, entry, got)
+	})
+
+	t.Run("キャッシュにないユーザーは見つからない", func(t *testing.T) {
+		// GIVEN
+		a := &ACL{hashEntryCache: make(map[string][32]byte)}
+
+		// WHEN
+		_, ok := a.GetHashEntry("unknown")
+
+		// THEN
+		assert.False(t, ok)
+	})
+
+	t.Run("ClearHashEntry でキャッシュからエントリを削除できる", func(t *testing.T) {
+		// GIVEN
+		a := &ACL{hashEntryCache: make(map[string][32]byte)}
+		a.SetHashEntry("root", [32]byte{1})
+
+		// WHEN
+		a.ClearHashEntry("root")
+
+		// THEN
+		_, ok := a.GetHashEntry("root")
+		assert.False(t, ok)
+	})
+}
+
+// testACL はテスト用の ACL を構築する
+func testACL(t *testing.T, password, host string) *ACL {
+	t.Helper()
+	authString, err := CryptPassword(password)
+	require.NoError(t, err)
+	return NewACLFromCatalog("root", host, authString)
 }

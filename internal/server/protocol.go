@@ -9,6 +9,7 @@ import (
 const (
 	clientConnectWithDB    uint32 = 0x00000008 // 接続時にデータベース名を指定できる
 	clientProtocol41       uint32 = 0x00000200 // 4.1 プロトコルを使用する
+	clientSSL              uint32 = 0x00000800 // TLS 接続をサポートする
 	clientTransactions     uint32 = 0x00002000 // トランザクション状態をステータスフラグで通知する
 	clientSecureConnection uint32 = 0x00008000 // 4.1 認証プロトコルを使用する
 	clientPluginAuth       uint32 = 0x00080000 // 認証プラグインのネゴシエーションをサポートする
@@ -17,6 +18,7 @@ const (
 
 // serverCapability はサーバーがサポートする Capability Flags の組み合わせ
 var serverCapability = clientProtocol41 |
+	clientSSL |
 	clientSecureConnection |
 	clientPluginAuth |
 	clientDeprecateEOF |

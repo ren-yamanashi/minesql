@@ -1,7 +1,7 @@
 package server
 
 import (
-	"crypto/sha256"
+	"crypto/tls"
 	"net"
 	"testing"
 
@@ -39,8 +39,8 @@ func TestOnConnection(t *testing.T) {
 
 		clientCC := newClientConn(clientTCP)
 
-		// WHEN: ハンドシェイクを実行
-		performClientHandshake(t, clientCC)
+		// WHEN: ハンドシェイクを実行 (TLS + Complete Auth)
+		performClientHandshake(t, clientCC, clientTCP)
 
 		// THEN: clientConn と session が返る
 		r := <-resultCh
@@ -80,7 +80,18 @@ func TestOnConnection(t *testing.T) {
 		_, err := clientCC.readPacket()
 		require.NoError(t, err)
 
+		// SSL 接続要求パケットを送信
+		sslReq := buildSSLConnectionRequest()
+		err = clientCC.writePacket(sslReq)
+		require.NoError(t, err)
+
+		// TLS アップグレード
+		tlsConn := tls.Client(clientTCP, &tls.Config{InsecureSkipVerify: true}) //nolint:gosec // テスト用自己署名証明書
+		require.NoError(t, tlsConn.Handshake())
+		clientCC.conn = tlsConn
+
 		// 不正なユーザー名でハンドシェイク応答を送信
+		// 存在しないユーザーなので authFailed が即座に返り ERR パケットが送信される
 		hsResp := buildTestHandshakeResponse("unknown_user", []byte{})
 		err = clientCC.writePacket(hsResp)
 		require.NoError(t, err)
@@ -167,8 +178,8 @@ func TestOnConnection(t *testing.T) {
 
 		clientCC := newClientConn(clientTCP)
 
-		// WHEN: ハンドシェイクを実行
-		performClientHandshake(t, clientCC)
+		// WHEN: ハンドシェイクを実行 (TLS + Complete Auth)
+		performClientHandshake(t, clientCC, clientTCP)
 
 		// THEN: COM_PING が使える
 		clientCC.resetSequenceId()
@@ -184,48 +195,118 @@ func TestOnConnection(t *testing.T) {
 		_ = clientCC.writePacket([]byte{comQuit})
 		<-done
 	})
+
+	t.Run("TLS なし接続が拒否される", func(t *testing.T) {
+		// GIVEN
+		s := setupTestServer(t)
+		defer handler.Reset()
+
+		serverTCP, clientTCP := createTCPPair(t)
+		defer func() {
+			if err := clientTCP.Close(); err != nil {
+				t.Logf("clientTCP.Close: %v", err)
+			}
+		}()
+
+		type result struct {
+			cc   *clientConn
+			sess *session
+		}
+		resultCh := make(chan result, 1)
+		go func() {
+			cc, sess := s.onConnection(serverTCP)
+			resultCh <- result{cc, sess}
+		}()
+
+		clientCC := newClientConn(clientTCP)
+
+		// WHEN: ハンドシェイクパケットを受信
+		_, err := clientCC.readPacket()
+		require.NoError(t, err)
+
+		// TLS なしでハンドシェイク応答を直接送信 (32 バイトではないので拒否される)
+		hsResp := buildTestHandshakeResponse("root", []byte{})
+		err = clientCC.writePacket(hsResp)
+		require.NoError(t, err)
+
+		// ERR パケットを受信
+		errPkt, err := clientCC.readPacket()
+		require.NoError(t, err)
+		assert.Equal(t, byte(0xFF), errPkt[0])
+
+		// THEN: nil が返る
+		r := <-resultCh
+		assert.Nil(t, r.cc)
+		assert.Nil(t, r.sess)
+	})
 }
 
 // performClientHandshake はテスト用にクライアント側のハンドシェイクを実行する
 //
-// ハンドシェイクパケットの受信 → 応答送信 → AuthMoreData 受信 → OK 受信を行い、nonce を返す
-func performClientHandshake(t *testing.T, clientCC *clientConn) {
+// ハンドシェイクパケット受信 → SSL 接続要求送信 → TLS アップグレード →
+// ハンドシェイク応答送信 → Complete Auth (平文パスワード送信) → OK 受信を行う。
+// clientCC.conn は TLS コネクションに差し替えられる。
+func performClientHandshake(t *testing.T, clientCC *clientConn, rawConn net.Conn) {
 	t.Helper()
 
-	// ハンドシェイクパケットを受信
-	hsPayload, err := clientCC.readPacket()
+	// ハンドシェイクパケットを受信 (seq=0)
+	_, err := clientCC.readPacket()
 	require.NoError(t, err)
 
-	// nonce を抽出
-	pos := hsPayload[1:]
-	_, pos = readNullTermString(pos) // server_version
-	pos = pos[4:]                    // connection_id
-	noncePart1 := pos[:8]
-	pos = pos[8:]
-	pos = pos[19:] // filler + cap_lower + charset + status + cap_upper + auth_data_len + reserved
-	noncePart2 := pos[:12]
+	// SSL 接続要求パケットを送信 (seq=1)
+	sslReq := buildSSLConnectionRequest()
+	err = clientCC.writePacket(sslReq)
+	require.NoError(t, err)
 
-	nonce := make([]byte, 20)
-	copy(nonce[:8], noncePart1)
-	copy(nonce[8:], noncePart2)
+	// TLS アップグレード (シーケンス ID はそのまま維持)
+	tlsConn := tls.Client(rawConn, &tls.Config{InsecureSkipVerify: true}) //nolint:gosec // テスト用自己署名証明書
+	require.NoError(t, tlsConn.Handshake())
+	clientCC.conn = tlsConn
 
-	// ハンドシェイク応答を送信
-	scramble := testComputeScramble("root", nonce)
-	hsResp := buildTestHandshakeResponse("root", scramble)
+	// ハンドシェイク応答を送信 (seq=2, TLS 上)
+	// キャッシュが空なので scramble の内容は問わない (Complete Auth になる)
+	hsResp := buildTestHandshakeResponse("root", make([]byte, 32))
 	err = clientCC.writePacket(hsResp)
 	require.NoError(t, err)
 
-	// AuthMoreData パケットを受信
+	// Complete Auth: AuthMoreData (0x04 = perform full auth) を受信
 	authMore, err := clientCC.readPacket()
 	require.NoError(t, err)
 	assert.Equal(t, byte(0x01), authMore[0])
-	assert.Equal(t, fastAuthSuccess, authMore[1])
+	assert.Equal(t, performFullAuth, authMore[1])
+
+	// 平文パスワード + NUL 終端を送信
+	err = clientCC.writePacket(append([]byte("root"), 0x00))
+	require.NoError(t, err)
 
 	// OK パケットを受信
 	okPkt, err := clientCC.readPacket()
 	require.NoError(t, err)
 	assert.Equal(t, byte(0x00), okPkt[0])
+}
 
+// buildSSLConnectionRequest は SSL 接続要求パケット (32 バイト) を構築する
+func buildSSLConnectionRequest() []byte {
+	capability := serverCapability
+	var buf []byte
+
+	// capability_flags (4 バイト)
+	cap := make([]byte, 4)
+	putUint32(cap, capability)
+	buf = append(buf, cap...)
+
+	// max_packet_size (4 バイト)
+	maxPkt := make([]byte, 4)
+	putUint32(maxPkt, 16777216)
+	buf = append(buf, maxPkt...)
+
+	// character_set (1 バイト)
+	buf = append(buf, charsetUTF8MB4)
+
+	// reserved (23 バイト)
+	buf = append(buf, make([]byte, 23)...)
+
+	return buf // 4 + 4 + 1 + 23 = 32 バイト
 }
 
 // createTCPPair はテスト用に接続された TCP コネクションのペアを作成する
@@ -279,21 +360,4 @@ func buildTestHandshakeResponse(username string, scramble []byte) []byte {
 	buf = putNullTermString(buf, authPluginName)
 
 	return buf
-}
-
-// testComputeScramble はテスト用の scramble を計算する
-func testComputeScramble(password string, nonce []byte) []byte {
-	stage1 := sha256.Sum256([]byte(password))
-	stage2 := sha256.Sum256(stage1[:])
-
-	h := sha256.New()
-	h.Write(stage2[:])
-	h.Write(nonce)
-	digest := h.Sum(nil)
-
-	scramble := make([]byte, 32)
-	for i := range scramble {
-		scramble[i] = stage1[i] ^ digest[i]
-	}
-	return scramble
 }
