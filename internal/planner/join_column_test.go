@@ -1,11 +1,11 @@
 package planner
 
 import (
-	"minesql/internal/ast"
-	"minesql/internal/storage/dictionary"
-	"minesql/internal/storage/handler"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/ast"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

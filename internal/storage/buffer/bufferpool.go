@@ -3,10 +3,11 @@ package buffer
 import (
 	"encoding/binary"
 	"fmt"
-	"minesql/internal/storage/file"
-	"minesql/internal/storage/log"
-	"minesql/internal/storage/page"
 	"sync"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/log"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 // BufferId は、バッファプール内のバッファページを識別するための ID (index)

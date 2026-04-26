@@ -2,8 +2,9 @@ package parser
 
 import (
 	"errors"
-	"minesql/internal/ast"
 	"strings"
+
+	"github.com/ren-yamanashi/minesql/internal/ast"
 )
 
 // WhereParser は WHERE 句のパース処理を行う

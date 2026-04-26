@@ -1,9 +1,9 @@
 package handler
 
 import (
-	"minesql/internal/storage/access"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/access"
 	"github.com/stretchr/testify/assert"
 )
 

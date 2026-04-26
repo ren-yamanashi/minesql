@@ -3,9 +3,8 @@ package executor
 import (
 	"testing"
 
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/handler"
-
+	"github.com/ren-yamanashi/minesql/internal/storage/access"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 	"github.com/stretchr/testify/assert"
 )
 

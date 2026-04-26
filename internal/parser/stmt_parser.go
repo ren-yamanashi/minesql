@@ -1,8 +1,9 @@
 package parser
 
 import (
-	"minesql/internal/ast"
 	"strings"
+
+	"github.com/ren-yamanashi/minesql/internal/ast"
 )
 
 type StatementParser interface {

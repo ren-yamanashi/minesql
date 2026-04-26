@@ -2,13 +2,13 @@ package access
 
 import (
 	"fmt"
-	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/file"
-	"minesql/internal/storage/lock"
-	"minesql/internal/storage/page"
 	"path/filepath"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
 

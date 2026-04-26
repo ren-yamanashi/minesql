@@ -1,9 +1,9 @@
 package planner
 
 import (
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/handler"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 )
 
 // RowEvaluateCost は 1 レコードを評価するコスト (MySQL の row_evaluate_cost に対応)

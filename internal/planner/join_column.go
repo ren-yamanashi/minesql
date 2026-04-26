@@ -2,8 +2,9 @@ package planner
 
 import (
 	"fmt"
-	"minesql/internal/ast"
-	"minesql/internal/storage/handler"
+
+	"github.com/ren-yamanashi/minesql/internal/ast"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 )
 
 // joinedColumn は結合後のレコード内でのカラム位置情報

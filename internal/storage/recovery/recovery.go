@@ -3,12 +3,13 @@ package recovery
 import (
 	"encoding/binary"
 	"fmt"
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/dictionary"
-	"minesql/internal/storage/lock"
-	"minesql/internal/storage/log"
-	"minesql/internal/storage/page"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/access"
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
+	"github.com/ren-yamanashi/minesql/internal/storage/log"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 // undoRecordEntry はデシリアライズ済みの UNDO レコードの情報を保持する

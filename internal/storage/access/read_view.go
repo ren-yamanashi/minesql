@@ -1,8 +1,9 @@
 package access
 
 import (
-	"minesql/internal/storage/lock"
 	"slices"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 )
 
 // ReadView はトランザクションの可視性判定に使用するスナップショット

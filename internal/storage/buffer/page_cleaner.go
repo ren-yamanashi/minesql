@@ -2,8 +2,9 @@ package buffer
 
 import (
 	stdlog "log"
-	"minesql/internal/storage/log"
 	"time"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/log"
 )
 
 // PageCleaner はバックグラウンドでダーティーページのフラッシュを管理する

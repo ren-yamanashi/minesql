@@ -1,8 +1,8 @@
 package btree
 
 import (
-	"minesql/internal/storage/btree/node"
-	"minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 type SearchMode interface {

@@ -1,6 +1,6 @@
 package server
 
-import "minesql/internal/executor"
+import "github.com/ren-yamanashi/minesql/internal/executor"
 
 // resultType はクエリ結果の種別
 type resultType int

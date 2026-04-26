@@ -2,8 +2,9 @@ package parser
 
 import (
 	"errors"
-	"minesql/internal/ast"
 	"strings"
+
+	"github.com/ren-yamanashi/minesql/internal/ast"
 )
 
 // constraintKind は制約の種類を表す直和型

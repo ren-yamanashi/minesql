@@ -3,8 +3,9 @@ package access
 import (
 	"encoding/binary"
 	"errors"
-	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/lock"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 )
 
 // UndoRecord は Undo ログの各レコードが実装するインターフェース

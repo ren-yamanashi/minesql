@@ -7,8 +7,8 @@ import (
 	"log"
 	"net"
 
-	"minesql/internal/storage/acl"
-	"minesql/internal/storage/handler"
+	"github.com/ren-yamanashi/minesql/internal/storage/acl"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 )
 
 // onConnection は接続フェーズ (Handshake + 認証) を処理する

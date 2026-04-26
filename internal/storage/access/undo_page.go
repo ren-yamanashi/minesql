@@ -2,7 +2,8 @@ package access
 
 import (
 	"encoding/binary"
-	"minesql/internal/storage/page"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 // UNDO ページのレイアウト (Body 内):

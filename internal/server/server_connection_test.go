@@ -5,11 +5,10 @@ import (
 	"net"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/acl"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"minesql/internal/storage/acl"
-	"minesql/internal/storage/handler"
 )
 
 func TestOnConnection(t *testing.T) {

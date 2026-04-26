@@ -1,10 +1,10 @@
 package access
 
 import (
-	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/lock"
-	"minesql/internal/storage/log"
-	"minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
+	"github.com/ren-yamanashi/minesql/internal/storage/log"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 // undoEntry は UndoRecord とその種別を保持する

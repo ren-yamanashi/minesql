@@ -2,11 +2,11 @@ package executor
 
 import (
 	"fmt"
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/handler"
 	"strings"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/access"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 	"github.com/stretchr/testify/assert"
 )
 

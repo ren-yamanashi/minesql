@@ -5,10 +5,10 @@ import (
 	"os"
 	"strings"
 
-	"minesql/internal/ast"
-	"minesql/internal/executor"
-	"minesql/internal/planner"
-	"minesql/internal/storage/handler"
+	"github.com/ren-yamanashi/minesql/internal/ast"
+	"github.com/ren-yamanashi/minesql/internal/executor"
+	"github.com/ren-yamanashi/minesql/internal/planner"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 )
 
 // セットアップヘルパー: テーブルを作成し、サンプルデータを挿入する

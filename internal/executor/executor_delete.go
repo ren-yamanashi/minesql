@@ -1,10 +1,10 @@
 package executor
 
 import (
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/handler"
-	"minesql/internal/storage/lock"
+	"github.com/ren-yamanashi/minesql/internal/storage/access"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 )
 
 // Delete は InnerExecutor の結果を元にレコードを削除する

@@ -1,12 +1,12 @@
 package dictionary
 
 import (
-	"minesql/internal/storage/acl"
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/encode"
-	"minesql/internal/storage/page"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/acl"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
+	"github.com/ren-yamanashi/minesql/internal/storage/encode"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

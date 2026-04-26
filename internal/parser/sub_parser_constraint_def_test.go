@@ -1,9 +1,9 @@
 package parser
 
 import (
-	"minesql/internal/ast"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/ast"
 	"github.com/stretchr/testify/assert"
 )
 

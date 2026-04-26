@@ -8,7 +8,7 @@ import (
 	"os"
 	"sync/atomic"
 
-	"minesql/internal/storage/handler"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 )
 
 // InitUserOpts は初期ユーザーの設定

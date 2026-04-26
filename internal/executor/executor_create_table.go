@@ -1,6 +1,6 @@
 package executor
 
-import "minesql/internal/storage/handler"
+import "github.com/ren-yamanashi/minesql/internal/storage/handler"
 
 // CreateTable はテーブルを作成する
 type CreateTable struct {

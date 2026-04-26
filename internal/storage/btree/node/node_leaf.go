@@ -2,7 +2,8 @@ package node
 
 import (
 	"errors"
-	"minesql/internal/storage/page"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 const leafHeaderSize = 16

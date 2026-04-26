@@ -5,9 +5,8 @@ import (
 	"io"
 	"os"
 
-	"minesql/internal/storage/page"
-
 	"github.com/ncw/directio"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 // Disk はディスク上のヒープファイルを管理する

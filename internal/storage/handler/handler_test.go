@@ -1,15 +1,15 @@
 package handler
 
 import (
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/dictionary"
-	"minesql/internal/storage/lock"
-	"minesql/internal/storage/page"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/access"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
 

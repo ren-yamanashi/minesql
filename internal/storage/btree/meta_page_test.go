@@ -2,9 +2,9 @@ package btree
 
 import (
 	"encoding/binary"
-	"minesql/internal/storage/page"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
 

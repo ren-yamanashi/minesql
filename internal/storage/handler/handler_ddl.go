@@ -1,8 +1,8 @@
 package handler
 
 import (
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/dictionary"
+	"github.com/ren-yamanashi/minesql/internal/storage/access"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 )
 
 // CreateIndexParam はインデックス作成パラメータ

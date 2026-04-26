@@ -1,10 +1,10 @@
 package planner
 
 import (
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/handler"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 	"github.com/stretchr/testify/assert"
 )
 

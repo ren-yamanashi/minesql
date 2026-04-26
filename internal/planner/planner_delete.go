@@ -2,10 +2,11 @@ package planner
 
 import (
 	"fmt"
-	"minesql/internal/ast"
-	"minesql/internal/executor"
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/handler"
+
+	"github.com/ren-yamanashi/minesql/internal/ast"
+	"github.com/ren-yamanashi/minesql/internal/executor"
+	"github.com/ren-yamanashi/minesql/internal/storage/access"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 )
 
 // PlanDelete は DELETE 文の実行計画を構築する

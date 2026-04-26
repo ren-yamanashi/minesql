@@ -4,10 +4,9 @@ import (
 	"crypto/sha256"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/acl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"minesql/internal/storage/acl"
 )
 
 // setupTestACLWithCache は ACL を構築し、Hash Entry Cache にエントリを追加する

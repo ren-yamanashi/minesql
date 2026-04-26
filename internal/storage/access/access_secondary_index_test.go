@@ -2,10 +2,10 @@ package access
 
 import (
 	"fmt"
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/encode"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
+	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 	"github.com/stretchr/testify/assert"
 )
 

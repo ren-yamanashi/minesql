@@ -5,7 +5,7 @@ import (
 	"crypto/subtle"
 	"fmt"
 
-	"minesql/internal/storage/acl"
+	"github.com/ren-yamanashi/minesql/internal/storage/acl"
 )
 
 // authResult は認証結果を表す

@@ -1,11 +1,11 @@
 package access_test
 
 import (
-	"minesql/internal/executor"
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/handler"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/executor"
+	"github.com/ren-yamanashi/minesql/internal/storage/access"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 	"github.com/stretchr/testify/assert"
 )
 

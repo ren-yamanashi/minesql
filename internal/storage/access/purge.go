@@ -2,11 +2,12 @@ package access
 
 import (
 	stdlog "log"
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/encode"
-	"minesql/internal/storage/lock"
 	"time"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/encode"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 )
 
 // purgeTrxId はパージ操作で使用するトランザクション ID

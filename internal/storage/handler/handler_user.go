@@ -3,8 +3,8 @@ package handler
 import (
 	"fmt"
 
-	"minesql/internal/storage/acl"
-	"minesql/internal/storage/dictionary"
+	"github.com/ren-yamanashi/minesql/internal/storage/acl"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 )
 
 // LoadACL はカタログからユーザーを読み込んで ACL を構築する

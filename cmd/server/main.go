@@ -3,8 +3,9 @@ package main
 import (
 	"flag"
 	"log"
-	"minesql/internal/server"
 	"os"
+
+	"github.com/ren-yamanashi/minesql/internal/server"
 )
 
 func main() {

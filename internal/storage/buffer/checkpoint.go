@@ -1,6 +1,6 @@
 package buffer
 
-import "minesql/internal/storage/log"
+import "github.com/ren-yamanashi/minesql/internal/storage/log"
 
 // Checkpoint はチェックポイントの実行を管理する
 //

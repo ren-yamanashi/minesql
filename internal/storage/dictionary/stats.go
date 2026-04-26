@@ -3,11 +3,12 @@ package dictionary
 import (
 	"bytes"
 	"fmt"
-	"minesql/internal/storage/access"
-	"minesql/internal/storage/btree"
-	"minesql/internal/storage/buffer"
-	"minesql/internal/storage/encode"
 	"sync"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/access"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 )
 
 // analyzeThreshold は Analyze 実行判定の閾値

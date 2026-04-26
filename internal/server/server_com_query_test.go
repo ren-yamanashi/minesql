@@ -3,11 +3,10 @@ package server
 import (
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/executor"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"minesql/internal/executor"
-	"minesql/internal/storage/handler"
 )
 
 func TestOnComQuery(t *testing.T) {

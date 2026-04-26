@@ -1,10 +1,10 @@
 package executor
 
 import (
-	"minesql/internal/storage/acl"
-	"minesql/internal/storage/handler"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/acl"
+	"github.com/ren-yamanashi/minesql/internal/storage/handler"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

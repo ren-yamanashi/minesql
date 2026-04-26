@@ -26,3 +26,6 @@ doc:
 
 build:
 	go build -o bin/server ./cmd/server
+
+run-example-go-mysql-driver:
+	cd examples/go-mysql-driver && go run main.go
