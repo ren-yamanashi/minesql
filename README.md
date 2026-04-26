@@ -52,6 +52,7 @@ ALTER USER '<username>'@'<host>' IDENTIFIED BY '<new-password>';
 | Example | Description |
 | ------- | ----------- |
 | [go-mysql-driver](./examples/go-mysql-driver) | Connect to MineSQL using go-sql-driver/mysql |
+| [docker](./examples/docker) | Run MineSQL in Docker |
 
 ## Feature
 
