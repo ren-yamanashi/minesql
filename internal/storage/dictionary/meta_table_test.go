@@ -260,6 +260,121 @@ func TestTableMeta_Insert(t *testing.T) {
 		assert.Equal(t, uint64(1), binary.BigEndian.Uint64(valueParts[2]))
 		assert.Equal(t, dataMetaPageId, page.RestorePageIdFromBytes(valueParts[3]))
 	})
+
+	t.Run("関連するカラムメタデータも挿入される", func(t *testing.T) {
+		// GIVEN
+		bp, tmpdir := InitCatalogDisk(t)
+		defer removeTmpdir(t, tmpdir)
+
+		cat, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+
+		fileId := page.FileId(1)
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(fileId, "id", 0, ColumnTypeString),
+			NewColumnMeta(fileId, "name", 1, ColumnTypeString),
+			NewColumnMeta(fileId, "email", 2, ColumnTypeString),
+		}
+		tableMeta := NewTableMeta(fileId, "users", 3, 1, colMeta, []*IndexMeta{}, page.NewPageId(fileId, 0))
+		tableMeta.MetaPageId = cat.TableMetaPageId
+		for _, col := range tableMeta.Cols {
+			col.MetaPageId = cat.ColumnMetaPageId
+		}
+
+		// WHEN
+		err = tableMeta.Insert(bp)
+
+		// THEN: カラムメタデータの B+Tree に 3 件挿入されている
+		assert.NoError(t, err)
+
+		cols, err := loadColumnMeta(bp, fileId, cat.ColumnMetaPageId)
+		assert.NoError(t, err)
+		assert.Equal(t, 3, len(cols))
+		assert.Equal(t, "id", cols[0].Name)
+		assert.Equal(t, "name", cols[1].Name)
+		assert.Equal(t, "email", cols[2].Name)
+	})
+
+	t.Run("関連するインデックスメタデータも挿入される", func(t *testing.T) {
+		// GIVEN
+		bp, tmpdir := InitCatalogDisk(t)
+		defer removeTmpdir(t, tmpdir)
+
+		cat, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+
+		fileId := page.FileId(1)
+		indexDataPageId := page.NewPageId(fileId, 1)
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(fileId, "id", 0, ColumnTypeString),
+			NewColumnMeta(fileId, "email", 1, ColumnTypeString),
+		}
+		idxMeta := []*IndexMeta{
+			NewIndexMeta(fileId, "idx_email", "email", IndexTypeUnique, indexDataPageId),
+		}
+		tableMeta := NewTableMeta(fileId, "users", 2, 1, colMeta, idxMeta, page.NewPageId(fileId, 0))
+		tableMeta.MetaPageId = cat.TableMetaPageId
+		for _, col := range tableMeta.Cols {
+			col.MetaPageId = cat.ColumnMetaPageId
+		}
+		for _, idx := range tableMeta.Indexes {
+			idx.MetaPageId = cat.IndexMetaPageId
+		}
+
+		// WHEN
+		err = tableMeta.Insert(bp)
+
+		// THEN: インデックスメタデータの B+Tree に 1 件挿入されている
+		assert.NoError(t, err)
+
+		indexes, err := loadIndexMeta(bp, fileId, cat.IndexMetaPageId)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, len(indexes))
+		assert.Equal(t, "idx_email", indexes[0].Name)
+		assert.Equal(t, "email", indexes[0].ColName)
+		assert.Equal(t, IndexTypeUnique, indexes[0].Type)
+	})
+
+	t.Run("関連する制約メタデータも挿入される", func(t *testing.T) {
+		// GIVEN
+		bp, tmpdir := InitCatalogDisk(t)
+		defer removeTmpdir(t, tmpdir)
+
+		cat, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+
+		fileId := page.FileId(1)
+		colMeta := []*ColumnMeta{
+			NewColumnMeta(fileId, "id", 0, ColumnTypeString),
+			NewColumnMeta(fileId, "user_id", 1, ColumnTypeString),
+		}
+		conMeta := []*ConstraintMeta{
+			NewConstraintMeta(fileId, "id", "PRIMARY", "", ""),
+			NewConstraintMeta(fileId, "user_id", "fk_user", "users", "id"),
+		}
+		tableMeta := NewTableMeta(fileId, "orders", 2, 1, colMeta, []*IndexMeta{}, page.NewPageId(fileId, 0))
+		tableMeta.Constraints = conMeta
+		tableMeta.MetaPageId = cat.TableMetaPageId
+		for _, col := range tableMeta.Cols {
+			col.MetaPageId = cat.ColumnMetaPageId
+		}
+		for _, con := range tableMeta.Constraints {
+			con.MetaPageId = cat.ConstraintMetaPageId
+		}
+
+		// WHEN
+		err = tableMeta.Insert(bp)
+
+		// THEN: 制約メタデータの B+Tree に 2 件挿入されている
+		assert.NoError(t, err)
+
+		constraints, err := loadConstraintMeta(bp, fileId, cat.ConstraintMetaPageId)
+		assert.NoError(t, err)
+		assert.Equal(t, 2, len(constraints))
+		assert.Equal(t, "PRIMARY", constraints[0].ConstraintName)
+		assert.Equal(t, "fk_user", constraints[1].ConstraintName)
+		assert.Equal(t, "users", constraints[1].RefTableName)
+	})
 }
 
 func TestLoadTableMeta(t *testing.T) {

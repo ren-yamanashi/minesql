@@ -9,7 +9,7 @@ import (
 	"minesql/internal/storage/handler"
 )
 
-func PlanSelect(trxId handler.TrxId, stmt *ast.SelectStmt) (executor.Executor, error) {
+func PlanSelect(trxId handler.TrxId, stmt *ast.SelectStmt) (*PlanResult, error) {
 	if len(stmt.Joins) > 0 {
 		return planSelectJoin(trxId, stmt)
 	}
@@ -17,7 +17,7 @@ func PlanSelect(trxId handler.TrxId, stmt *ast.SelectStmt) (executor.Executor, e
 }
 
 // planSelectSingle は単一テーブルの SELECT を計画する (従来の処理)
-func planSelectSingle(trxId handler.TrxId, stmt *ast.SelectStmt) (executor.Executor, error) {
+func planSelectSingle(trxId handler.TrxId, stmt *ast.SelectStmt) (*PlanResult, error) {
 	hdl := handler.Get()
 
 	tblMeta, ok := hdl.Catalog.GetTableMetaByName(stmt.From.TableName)
@@ -38,11 +38,18 @@ func planSelectSingle(trxId handler.TrxId, stmt *ast.SelectStmt) (executor.Execu
 	if err != nil {
 		return nil, err
 	}
-	return executor.NewProject(iterator, colPos), nil
+
+	// カラムメタデータを構築
+	columns := buildColumnMeta(colPos, []*handler.TableMetadata{tblMeta})
+
+	return &PlanResult{
+		Exec:    executor.NewProject(iterator, colPos),
+		Columns: columns,
+	}, nil
 }
 
 // planSelectJoin は JOIN を含む SELECT を計画する
-func planSelectJoin(trxId handler.TrxId, stmt *ast.SelectStmt) (executor.Executor, error) {
+func planSelectJoin(trxId handler.TrxId, stmt *ast.SelectStmt) (*PlanResult, error) {
 	hdl := handler.Get()
 	rv := hdl.CreateReadView(trxId)
 	vr := access.NewVersionReader(hdl.UndoLog())
@@ -117,7 +124,40 @@ func planSelectJoin(trxId handler.TrxId, stmt *ast.SelectStmt) (executor.Executo
 	if err != nil {
 		return nil, err
 	}
-	return executor.NewProject(exec, colPos), nil
+
+	// カラムメタデータを構築 (colPos の順序で joinedColumns から取得)
+	columns := make([]ColumnMeta, len(colPos))
+	for i, pos := range colPos {
+		jc := joinedColumns[pos]
+		columns[i] = ColumnMeta{TableName: jc.tableName, ColName: jc.colName}
+	}
+
+	return &PlanResult{
+		Exec:    executor.NewProject(exec, colPos),
+		Columns: columns,
+	}, nil
+}
+
+// buildColumnMeta は ColPos とテーブルメタデータからカラムメタデータを構築する (単一テーブル用)
+func buildColumnMeta(colPos []uint16, tables []*handler.TableMetadata) []ColumnMeta {
+	// 全テーブルのカラムをフラットに並べる
+	type flatCol struct {
+		tableName string
+		colName   string
+	}
+	var allCols []flatCol
+	for _, tbl := range tables {
+		for _, col := range tbl.GetSortedCols() {
+			allCols = append(allCols, flatCol{tableName: tbl.Name, colName: col.Name})
+		}
+	}
+
+	columns := make([]ColumnMeta, len(colPos))
+	for i, pos := range colPos {
+		fc := allCols[pos]
+		columns[i] = ColumnMeta{TableName: fc.tableName, ColName: fc.colName}
+	}
+	return columns
 }
 
 // splitWhereForTable は WHERE 条件を「指定テーブルのカラムのみの条件」と「残り」に分離する

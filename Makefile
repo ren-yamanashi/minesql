@@ -1,4 +1,4 @@
-.PHONY: lint lint_diff test test_v test_run test_cov clean doc build build-client build-server
+.PHONY: lint lint_diff test test_v test_run test_cov clean doc build
 
 lint:
 	golangci-lint run
@@ -24,10 +24,5 @@ doc:
 	@echo "Press Ctrl+C to stop"
 	godoc -http=:6060
 
-build-client:
-	go build -o bin/client ./cmd/client
-
-build-server:
+build:
 	go build -o bin/server ./cmd/server
-
-build: build-client build-server

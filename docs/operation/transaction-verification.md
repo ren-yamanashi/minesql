@@ -8,8 +8,7 @@
 ## 準備
 
 ```sh
-make build-server
-make build-client
+make build
 ```
 
 サーバーを起動:

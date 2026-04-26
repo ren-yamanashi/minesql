@@ -75,6 +75,24 @@ const (
 	UpdateStateSetVal // SET 句の値の後、"," or WHERE or ";" 待ちの状態
 	UpdateStateWhere  // UPDATE の WHERE 中
 	UpdateStateEnd    // UPDATE Statement の終わり
+
+	// -- ALTER USER Statement --
+
+	// -- START TRANSACTION Statement --
+
+	StartTxStateStart // START キーワード後、TRANSACTION キーワード待ち
+	StartTxStateEnd   // START TRANSACTION の終わり
+
+	// -- ALTER USER Statement --
+
+	AlterUserStateAlter      // ALTER キーワード後、USER キーワード待ち
+	AlterUserStateUser       // USER キーワード後、ユーザー名 (文字列リテラル) 待ち
+	AlterUserStateUsername   // ユーザー名取得後、"@" 待ち
+	AlterUserStateAt         // "@" 取得後、ホスト名 (文字列リテラル) 待ち
+	AlterUserStateHost       // ホスト名取得後、IDENTIFIED キーワード待ち
+	AlterUserStateIdentified // IDENTIFIED キーワード後、BY キー��ード待ち
+	AlterUserStateBy         // BY キーワード後、パスワード (文字列リテラル) 待ち
+	AlterUserStateEnd        // ALTER USER Statement の終わり
 )
 
 type Parser struct {
@@ -136,6 +154,16 @@ func (p *Parser) onKeyword(word string) {
 
 	case KUpdate:
 		p.currentParser = NewUpdateParser()
+		p.currentParser.onKeyword(word)
+		return
+
+	case KAlter:
+		p.currentParser = NewAlterUserParser()
+		p.currentParser.onKeyword(word)
+		return
+
+	case KStart:
+		p.currentParser = NewStartTransactionParser()
 		p.currentParser.onKeyword(word)
 		return
 

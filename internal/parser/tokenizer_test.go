@@ -88,6 +88,28 @@ func TestTokenizerKeywords(t *testing.T) {
 		assert.Equal(t, []string{"BEGIN", "COMMIT", "ROLLBACK"}, c.keywords)
 	})
 
+	t.Run("START TRANSACTION キーワードを認識する", func(t *testing.T) {
+		// GIVEN
+		sql := "START TRANSACTION"
+
+		// WHEN
+		c := tokenize(sql)
+
+		// THEN
+		assert.Equal(t, []string{"START", "TRANSACTION"}, c.keywords)
+	})
+
+	t.Run("ALTER USER 関連キーワードを認識する", func(t *testing.T) {
+		// GIVEN
+		sql := "ALTER USER IDENTIFIED BY"
+
+		// WHEN
+		c := tokenize(sql)
+
+		// THEN
+		assert.Equal(t, []string{"ALTER", "USER", "IDENTIFIED", "BY"}, c.keywords)
+	})
+
 	t.Run("小文字でもキーワードとして認識する", func(t *testing.T) {
 		// GIVEN
 		sql := "select from where"

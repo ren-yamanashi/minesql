@@ -78,6 +78,18 @@ type SetClause struct {
 }
 
 // ---------------------------------------
+// Alter User
+// ---------------------------------------
+
+type AlterUserStmt struct {
+	Username string
+	Host     string
+	Password string // IDENTIFIED BY で指定された新パスワード
+}
+
+func (*AlterUserStmt) isStatement() {}
+
+// ---------------------------------------
 // Transaction
 // ---------------------------------------
 

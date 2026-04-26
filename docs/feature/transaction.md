@@ -6,4 +6,4 @@
 | Isolation | ✅ | - |
 | Durability | ✅ | - |
 | MVCC | ✅ | - |
-| トランザクション分離レベルの指定 | - | - |
+| トランザクション分離レベルの指定 | - | 全て REPEATABLE READ 扱い |

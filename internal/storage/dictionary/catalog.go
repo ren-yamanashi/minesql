@@ -18,9 +18,11 @@ type Catalog struct {
 	IndexMetaPageId      page.PageId
 	ColumnMetaPageId     page.PageId
 	ConstraintMetaPageId page.PageId
+	UserMetaPageId       page.PageId
 	NextFileId           page.FileId
 	UndoFileId           page.FileId
 	metadata             []*TableMeta
+	Users                []*UserMeta
 }
 
 // NewCatalog は既存のカタログを開く
@@ -43,14 +45,16 @@ func NewCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 	idxMetaPageNum := binary.BigEndian.Uint32(data[8:12])
 	colMetaPageNum := binary.BigEndian.Uint32(data[12:16])
 	conMetaPageNum := binary.BigEndian.Uint32(data[16:20])
-	nextFileId := page.FileId(binary.BigEndian.Uint32(data[20:24]))
-	undoFileId := page.FileId(binary.BigEndian.Uint32(data[24:28]))
+	userMetaPageNum := binary.BigEndian.Uint32(data[20:24])
+	nextFileId := page.FileId(binary.BigEndian.Uint32(data[24:28]))
+	undoFileId := page.FileId(binary.BigEndian.Uint32(data[28:32]))
 
 	catalog := &Catalog{
 		TableMetaPageId:      page.NewPageId(fileId, page.PageNumber(tblMetaPageNum)),
 		IndexMetaPageId:      page.NewPageId(fileId, page.PageNumber(idxMetaPageNum)),
 		ColumnMetaPageId:     page.NewPageId(fileId, page.PageNumber(colMetaPageNum)),
 		ConstraintMetaPageId: page.NewPageId(fileId, page.PageNumber(conMetaPageNum)),
+		UserMetaPageId:       page.NewPageId(fileId, page.PageNumber(userMetaPageNum)),
 		NextFileId:           nextFileId,
 		UndoFileId:           undoFileId,
 		metadata:             nil,
@@ -62,6 +66,13 @@ func NewCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 		return nil, err
 	}
 	catalog.metadata = tableMeta
+
+	// ユーザーメタデータを読み込む
+	users, err := loadUserMeta(bp, catalog.UserMetaPageId)
+	if err != nil {
+		return nil, err
+	}
+	catalog.Users = users
 
 	return catalog, nil
 }
@@ -121,6 +132,16 @@ func CreateCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 		return nil, err
 	}
 
+	// ユーザーメタデータ用の B+Tree を作成
+	userMetaPageId, err := bp.AllocatePageId(fileId)
+	if err != nil {
+		return nil, err
+	}
+	userMetaTree, err := btree.CreateBTree(bp, userMetaPageId)
+	if err != nil {
+		return nil, err
+	}
+
 	// ヘッダーページに各メタデータのメタページIDを保存
 	data, err := bp.GetWritePageData(headerPageId)
 	if err != nil {
@@ -135,21 +156,23 @@ func CreateCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 	binary.BigEndian.PutUint32(data[8:12], uint32(idxMetaTree.MetaPageId.PageNumber))
 	binary.BigEndian.PutUint32(data[12:16], uint32(colMetaTree.MetaPageId.PageNumber))
 	binary.BigEndian.PutUint32(data[16:20], uint32(conMetaTree.MetaPageId.PageNumber))
-	binary.BigEndian.PutUint32(data[20:24], uint32(nextFileId))
-	binary.BigEndian.PutUint32(data[24:28], uint32(undoFileId))
+	binary.BigEndian.PutUint32(data[20:24], uint32(userMetaTree.MetaPageId.PageNumber))
+	binary.BigEndian.PutUint32(data[24:28], uint32(nextFileId))
+	binary.BigEndian.PutUint32(data[28:32], uint32(undoFileId))
 
 	return &Catalog{
 		TableMetaPageId:      tblMetaTree.MetaPageId,
 		IndexMetaPageId:      idxMetaTree.MetaPageId,
 		ColumnMetaPageId:     colMetaTree.MetaPageId,
 		ConstraintMetaPageId: conMetaTree.MetaPageId,
+		UserMetaPageId:       userMetaTree.MetaPageId,
 		NextFileId:           nextFileId,
 		UndoFileId:           undoFileId,
 		metadata:             nil,
 	}, nil
 }
 
-// Insert はカタログにメタデータを挿入する
+// Insert はカタログにテーブルメタデータを挿入する
 func (c *Catalog) Insert(bp *buffer.BufferPool, tableMeta TableMeta) error {
 	// 各メタデータに MetaPageId を設定する
 	tableMeta.MetaPageId = c.TableMetaPageId
@@ -163,30 +186,8 @@ func (c *Catalog) Insert(bp *buffer.BufferPool, tableMeta TableMeta) error {
 		conMeta.MetaPageId = c.ConstraintMetaPageId
 	}
 
-	// テーブルメタデータを挿入
 	if err := tableMeta.Insert(bp); err != nil {
 		return err
-	}
-
-	// インデックスメタデータを挿入
-	for _, indexMeta := range tableMeta.Indexes {
-		if err := indexMeta.Insert(bp); err != nil {
-			return err
-		}
-	}
-
-	// カラムメタデータを挿入
-	for _, colMeta := range tableMeta.Cols {
-		if err := colMeta.Insert(bp); err != nil {
-			return err
-		}
-	}
-
-	// 制約メタデータを挿入
-	for _, conMeta := range tableMeta.Constraints {
-		if err := conMeta.Insert(bp); err != nil {
-			return err
-		}
 	}
 
 	c.metadata = append(c.metadata, &tableMeta)
@@ -233,6 +234,21 @@ func (c *Catalog) GetForeignKeysReferencingTable(tableName string) []ChildForeig
 	return result
 }
 
+// GetUserByName はユーザー名からユーザーメタデータを取得する
+func (c *Catalog) GetUserByName(username string) (*UserMeta, bool) {
+	for _, user := range c.Users {
+		if user.Username == username {
+			return user, true
+		}
+	}
+	return nil, false
+}
+
+// HasUsers はカタログにユーザーが存在するかを返す
+func (c *Catalog) HasUsers() bool {
+	return len(c.Users) > 0
+}
+
 // AllocateFileId は新しい FileId を採番し、ディスク上のカウンターを更新する
 func (c *Catalog) AllocateFileId(bp *buffer.BufferPool) (page.FileId, error) {
 	id := c.NextFileId
@@ -247,7 +263,7 @@ func (c *Catalog) AllocateFileId(bp *buffer.BufferPool) (page.FileId, error) {
 	defer bp.UnRefPage(headerPageId)
 
 	// 次に割り当てる FileId をヘッダーページの指定オフセットに書き込む
-	binary.BigEndian.PutUint32(data[20:24], uint32(c.NextFileId))
+	binary.BigEndian.PutUint32(data[24:28], uint32(c.NextFileId))
 
 	return id, nil
 }
