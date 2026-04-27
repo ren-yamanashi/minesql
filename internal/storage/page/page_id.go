@@ -8,58 +8,65 @@ import (
 const MaxFileId = 0xFFFFFFFF
 const MaxPageNumber = 0xFFFFFFFF
 
-var InvalidId = NewId(MaxFileId, MaxPageNumber)
+var InvalidPageId = NewPageId(MaxFileId, MaxPageNumber)
 
-// Id は全体でページを一意に特定するための識別子
+type (
+	FileId     uint32
+	PageNumber uint32
+)
+
+// PageId は全体でページを一意に特定するための識別子
 //
 // レイアウト:
 //   - FileId: 先頭 4 バイト
 //   - PageNumber: 次の 4 バイト
-type Id struct {
-	FileId     uint32
-	PageNumber uint32
+type PageId struct {
+	FileId     FileId
+	PageNumber PageNumber
 }
 
-func NewId(fileId uint32, pageNum uint32) Id {
-	return Id{
+func NewPageId(fileId FileId, pageNumber PageNumber) PageId {
+	return PageId{
 		FileId:     fileId,
-		PageNumber: pageNum,
+		PageNumber: pageNumber,
 	}
 }
 
-func (id Id) IsInvalid() bool {
-	return id == InvalidId
+// IsInvalid はこの PageId が無効かどうかを判定する
+func (id PageId) IsInvalid() bool {
+	return id == InvalidPageId
 }
 
-func (id Id) ToBytes() []byte {
+// ToBytes は PageId をバイト列に変換する
+func (id PageId) ToBytes() []byte {
 	data := make([]byte, 8)
 	id.WriteTo(data, 0)
 	return data
 }
 
-// WriteTo は Id を指定位置に書き込む
+// WriteTo は PageId を指定位置に書き込む
 //   - data: データ全体
 //   - offset: 書き込み開始位置
-func (id Id) WriteTo(data []byte, offset int) {
-	binary.BigEndian.PutUint32(data[offset:offset+4], id.FileId)
-	binary.BigEndian.PutUint32(data[offset+4:offset+8], id.PageNumber)
+func (id PageId) WriteTo(data []byte, offset int) {
+	binary.BigEndian.PutUint32(data[offset:offset+4], uint32(id.FileId))
+	binary.BigEndian.PutUint32(data[offset+4:offset+8], uint32(id.PageNumber))
 }
 
-// ReadId は Id を指定位置から読み込む
+// ReadPageId は PageId を指定位置から読み込む
 //   - data: データ全体
-//   - offset: Id が格納されている位置
-func ReadId(data []byte, offset int) Id {
+//   - offset: PageId が格納されている位置
+func ReadPageId(data []byte, offset int) PageId {
 	fileId := binary.BigEndian.Uint32(data[offset : offset+4])
-	pageNum := binary.BigEndian.Uint32(data[offset+4 : offset+8])
-	return NewId(fileId, pageNum)
+	pageNumber := binary.BigEndian.Uint32(data[offset+4 : offset+8])
+	return NewPageId(FileId(fileId), PageNumber(pageNumber))
 }
 
-// RestoreId はバイト列から Id を復元する
-//   - data: Id を表す 8 バイトのバイト列 (先頭4バイトに FileId、次の4バイトに PageNumber が格納されている必要がある)
-func RestoreId(data []byte) (Id, error) {
+// RestorePageId はバイト列から PageId を復元する
+//   - data: PageId を表す 8 バイトのバイト列
+func RestorePageId(data []byte) (PageId, error) {
 	size := len(data)
 	if size != 8 {
-		return InvalidId, fmt.Errorf("page id must be 8 bytes, got %d", size)
+		return InvalidPageId, fmt.Errorf("page id must be 8 bytes, got %d", size)
 	}
-	return ReadId(data, 0), nil
+	return ReadPageId(data, 0), nil
 }

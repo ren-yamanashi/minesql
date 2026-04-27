@@ -18,12 +18,19 @@ type Page struct {
 }
 
 func NewPage(data []byte) (*Page, error) {
-	size := len(data)
-	if size != PageSize {
-		return nil, ErrInvalidDataSize
+	if err := CheckPageSize(data); err != nil {
+		return nil, err
 	}
 	return &Page{
 		Header: data[:PageHeaderSize],
 		Body:   data[PageHeaderSize:],
 	}, nil
+}
+
+// CheckPageSize は data が 16KB であるかを確認する
+func CheckPageSize(data []byte) error {
+	if len(data) != PageSize {
+		return ErrInvalidDataSize
+	}
+	return nil
 }
