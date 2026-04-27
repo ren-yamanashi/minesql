@@ -6,3 +6,4 @@ sandbox/
 coverage.*
 .DS_Store
 memo.md
+__legacy/
