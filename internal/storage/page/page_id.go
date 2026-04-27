@@ -57,8 +57,9 @@ func ReadId(data []byte, offset int) Id {
 // RestoreId はバイト列から Id を復元する
 //   - data: Id を表す 8 バイトのバイト列 (先頭4バイトに FileId、次の4バイトに PageNumber が格納されている必要がある)
 func RestoreId(data []byte) (Id, error) {
-	if len(data) != 8 {
-		return InvalidId, fmt.Errorf("page id must be 8 bytes, got %d", len(data))
+	size := len(data)
+	if size != 8 {
+		return InvalidId, fmt.Errorf("page id must be 8 bytes, got %d", size)
 	}
 	return ReadId(data, 0), nil
 }
