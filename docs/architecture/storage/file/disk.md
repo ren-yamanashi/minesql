@@ -1,25 +1,23 @@
-# ディスクマネージャ
+# ディスク
 
 ## 概要
 
-- ディスクマネージャはデータをファイルに永続化 (読み書き) する役割を担う
 - データのバッファリングは独自のバッファプールで行われるため、ディスクへの書き込みには OS のキャッシュを利用しない (O_DIRECT を使用する)
-- ディスクは、[バッファプール](../buffer/buffer-pool.md)から依頼された通りに[ページ](../page/page.md)を永続化 (読み書き) する
+- [バッファプール](../buffer/buffer-pool.md)から依頼された通りに[ページ](../page/page.md)を永続化 (読み書き) する
   - [PageId](../page/page.md#pageid) を受け取り、ページ単位でデータを読み書きする
-  - ディスクはページの中身 (ページ内にどのようなデータが格納されているのかどうか) という点は一切関知しない
-    - ページデータの中身に意味を持たせるのはディスクよりも上のレイヤーの責任
+  - ページの中身 (ページ内にどのようなデータが格納されているのかどうか) という点は一切関知しない
 
 ## ファイル
 
 - ヒープファイル構造
-  - ヒープファイル: ファイルをページという固定の長さごとに区切ったファイル
-- ファイルは FileId で識別される
-- テーブルごとに個別のディスクファイルを持つ
-  - どのファイルがどの FileId に対応するかという情報は、[カタログ](../dictionary/catalog.md) が管理する
+  - ヒープファイル: ページという固定の長さごとに区切ったファイル
+- ヒープファイルは FileId で識別される
+- テーブルごとに個別のヒープファイルを持つ
+  - どのファイルがどの FileId に対応するかという情報は、[カタログ](../dictionary/catalog.md)が管理する
     - つまりファイル内に (ヘッダーなどに) FileId が格納されるわけではない
 - ファイル内のページは PageId で識別される
 
-## ディスクマネージャによる I/O 操作
+## 操作
 
 ### PageId の採番
 
@@ -46,8 +44,8 @@
 ### ページの Sync
 
 - 前述の通り、MineSQL では OS のキャッシュを使用せずに独自のバッファプールを使用しているため、ディスクへの書き込みには O_DIRECT を使用している
-- そのため、基本的にディスクが行うファイルの書き込みは、OS のキャッシュを経由せず直接ディスク (HDD/SSD) に書き込まれる
-- ただし、ストレージ自体がデータをライトバックキャッシュに保持している可能性があり、それを考慮すると確実に書き込みを行うためには `fsync()` を呼び出す必要がある
+- そのため、基本的にディスクへの書き込みは、OS のキャッシュを経由せず直接ディスク (HDD/SSD) に書き込まれる
+- ただし、ストレージ自体がデータをライトバックキャッシュに保持している可能性があり、それを考慮すると確実に書き込みを行うためには `fsync()` を呼び出す必要がある (と思われる)
   - 参考: https://lwn.net/Articles/457667/
   > I/O operations performed against files opened with O_DIRECT bypass the kernel's page cache, writing directly to the storage. Recall that the storage may itself store the data in a write-back cache, so fsync() is still required for files opened with O_DIRECT in order to save the data to stable storage. The O_DIRECT flag is only relevant for the system I/O API.
   - そのため、サーバーのプロセス停止時などには `Sync()` を呼び出す方針としている
