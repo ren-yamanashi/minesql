@@ -12,7 +12,7 @@ import (
 // HeapFile はページ単位で区切られたヒープファイルを管理する
 type HeapFile struct {
 	fileId     page.FileId // 管理対象ファイルの FileId
-	heapFile   *os.File    // ヒープファイルのファイルディスクリプタ
+	file       *os.File    // ヒープファイルのファイルディスクリプタ
 	nextPageId page.PageId // 次に採番する PageId
 }
 
@@ -33,7 +33,7 @@ func NewHeapFile(fileId page.FileId, path string) (*HeapFile, error) {
 
 	return &HeapFile{
 		fileId:     fileId,
-		heapFile:   file,
+		file:       file,
 		nextPageId: page.NewPageId(fileId, page.PageNumber(fileInfo.Size()/page.PageSize)),
 	}, nil
 }
@@ -57,7 +57,7 @@ func (hf *HeapFile) Read(pageNumber page.PageNumber, data []byte) error {
 		return err
 	}
 	// シークした位置から PageSize バイト読み込む
-	_, err := io.ReadFull(hf.heapFile, data)
+	_, err := io.ReadFull(hf.file, data)
 	return err
 }
 
@@ -72,7 +72,7 @@ func (hf *HeapFile) Write(pageNumber page.PageNumber, data []byte) error {
 		return err
 	}
 	// シークした位置から書き込む
-	n, err := hf.heapFile.Write(data)
+	n, err := hf.file.Write(data)
 	if err != nil {
 		return err
 	}
@@ -84,17 +84,17 @@ func (hf *HeapFile) Write(pageNumber page.PageNumber, data []byte) error {
 
 // Sync はファイルをディスクに同期する
 func (hf *HeapFile) Sync() error {
-	return hf.heapFile.Sync()
+	return hf.file.Sync()
 }
 
 // Close はヒープファイルのファイルディスクリプタを閉じる
 func (hf *HeapFile) Close() error {
-	return hf.heapFile.Close()
+	return hf.file.Close()
 }
 
 // seek は PageNumber で指定されたページの先頭にシークする
 func (hf *HeapFile) seek(pageNumber page.PageNumber) error {
 	offset := page.PageSize * pageNumber
-	_, err := hf.heapFile.Seek(int64(offset), io.SeekStart)
+	_, err := hf.file.Seek(int64(offset), io.SeekStart)
 	return err
 }
