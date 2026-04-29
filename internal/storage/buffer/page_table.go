@@ -39,3 +39,10 @@ func (pt PageTable) Update(evictPageId, newPageId page.PageId, bufferId BufferId
 func (pt PageTable) Remove(pageId page.PageId) {
 	delete(pt.data, pageId)
 }
+
+// ForEach は全エントリに対してコールバックを実行する
+func (pt PageTable) ForEach(fn func(pageId page.PageId, bufferId BufferId)) {
+	for pageId, bufferId := range pt.data {
+		fn(pageId, bufferId)
+	}
+}

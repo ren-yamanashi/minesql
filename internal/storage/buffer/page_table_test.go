@@ -158,3 +158,39 @@ func TestPageTableRemove(t *testing.T) {
 		assert.True(t, exists)
 	})
 }
+
+func TestPageTableForEach(t *testing.T) {
+	t.Run("全エントリに対してコールバックが実行される", func(t *testing.T) {
+		// GIVEN
+		pt := NewPageTable()
+		id1 := page.NewPageId(0, 1)
+		id2 := page.NewPageId(0, 2)
+		pt.Add(id1, BufferId(10))
+		pt.Add(id2, BufferId(20))
+
+		// WHEN
+		visited := map[page.PageId]BufferId{}
+		pt.ForEach(func(pageId page.PageId, bufferId BufferId) {
+			visited[pageId] = bufferId
+		})
+
+		// THEN
+		assert.Equal(t, 2, len(visited))
+		assert.Equal(t, BufferId(10), visited[id1])
+		assert.Equal(t, BufferId(20), visited[id2])
+	})
+
+	t.Run("空のテーブルではコールバックが呼ばれない", func(t *testing.T) {
+		// GIVEN
+		pt := NewPageTable()
+
+		// WHEN
+		count := 0
+		pt.ForEach(func(pageId page.PageId, bufferId BufferId) {
+			count++
+		})
+
+		// THEN
+		assert.Equal(t, 0, count)
+	})
+}

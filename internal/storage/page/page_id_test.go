@@ -9,11 +9,11 @@ import (
 func TestNewPageId(t *testing.T) {
 	t.Run("指定した FileId と PageNumber で PageId を生成できる", func(t *testing.T) {
 		// GIVEN
-		fileId := uint32(1)
-		pageNumber := uint32(2)
+		fileId := FileId(1)
+		pageNumber := PageNumber(2)
 
 		// WHEN
-		pageId := NewPageId(FileId(fileId), PageNumber(pageNumber))
+		pageId := NewPageId(fileId, pageNumber)
 
 		// THEN
 		assert.Equal(t, fileId, pageId.FileId)
@@ -89,8 +89,8 @@ func TestReadPageId(t *testing.T) {
 		pageId := ReadPageId(data, offset)
 
 		// THEN
-		assert.Equal(t, uint32(3), pageId.FileId)
-		assert.Equal(t, uint32(7), pageId.PageNumber)
+		assert.Equal(t, FileId(3), pageId.FileId)
+		assert.Equal(t, PageNumber(7), pageId.PageNumber)
 	})
 }
 

@@ -24,8 +24,8 @@ func NewPage(data []byte) (*Page, error) {
 		return nil, err
 	}
 	return &Page{
-		Header: data[:PageHeaderSize],
-		Body:   data[PageHeaderSize:],
+		Header: data[:PageHeaderSize], //nolint:gosec // CheckPageSize で len(data) == PageSize を検証済み
+		Body:   data[PageHeaderSize:], //nolint:gosec // CheckPageSize で len(data) == PageSize を検証済み
 	}, nil
 }
 
