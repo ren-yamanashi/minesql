@@ -4,12 +4,12 @@ import (
 	"fmt"
 )
 
-const PageSize = 16384
+const PageSize = 4096
 const PageHeaderSize = 4
 
 var ErrInvalidDataSize = fmt.Errorf("data size must be %d bytes", PageSize)
 
-// Page は 16KB のページ
+// Page は 4KB のページ
 //
 // レイアウト:
 //   - ヘッダー: 先頭 4 バイト
@@ -34,7 +34,7 @@ func (p Page) ToBytes() []byte {
 	return p.Header[:PageSize]
 }
 
-// CheckPageSize は data が 16KB であるかを確認する
+// CheckPageSize は data が 4KB であるかを確認する
 func CheckPageSize(data []byte) error {
 	if len(data) != PageSize {
 		return ErrInvalidDataSize

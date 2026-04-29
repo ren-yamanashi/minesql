@@ -7,7 +7,7 @@ import (
 )
 
 func TestNewPage(t *testing.T) {
-	t.Run("16KB のデータから Page を生成できる", func(t *testing.T) {
+	t.Run("4KB のデータから Page を生成できる", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, PageSize)
 		data[0] = 0x01
@@ -53,7 +53,7 @@ func TestNewPage(t *testing.T) {
 		assert.Equal(t, byte(0xFF), p.Body[0])
 	})
 
-	t.Run("データサイズが 16KB 未満の場合エラーを返す", func(t *testing.T) {
+	t.Run("データサイズが 4KB 未満の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, PageSize-1)
 
@@ -65,7 +65,7 @@ func TestNewPage(t *testing.T) {
 		assert.Nil(t, p)
 	})
 
-	t.Run("データサイズが 16KB 超過の場合エラーを返す", func(t *testing.T) {
+	t.Run("データサイズが 4KB 超過の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, PageSize+1)
 
