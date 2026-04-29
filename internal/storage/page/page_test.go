@@ -89,3 +89,76 @@ func TestNewPage(t *testing.T) {
 		assert.Nil(t, p)
 	})
 }
+
+func TestPageToBytes(t *testing.T) {
+	t.Run("Header と Body を結合したバイト列を返す", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, PageSize)
+		data[0] = 0xAA
+		data[PageHeaderSize] = 0xBB
+		p, _ := NewPage(data)
+
+		// WHEN
+		result := p.ToBytes()
+
+		// THEN
+		assert.Equal(t, PageSize, len(result))
+		assert.Equal(t, byte(0xAA), result[0])
+		assert.Equal(t, byte(0xBB), result[PageHeaderSize])
+	})
+
+	t.Run("NewPage で生成した Page を ToBytes で変換すると元のデータと一致する", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, PageSize)
+		for i := range data {
+			data[i] = byte(i % 256)
+		}
+		p, _ := NewPage(data)
+
+		// WHEN
+		result := p.ToBytes()
+
+		// THEN
+		assert.Equal(t, data, result)
+	})
+
+	t.Run("ToBytes は元のデータと同じメモリ領域を返す", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, PageSize)
+		p, _ := NewPage(data)
+
+		// WHEN
+		result := p.ToBytes()
+		result[0] = 0xFF
+		result[PageHeaderSize] = 0xEE
+
+		// THEN
+		// ToBytes で返したスライスへの書き込みが Header/Body に反映される
+		assert.Equal(t, byte(0xFF), p.Header[0])
+		assert.Equal(t, byte(0xEE), p.Body[0])
+	})
+}
+
+func TestCheckPageSize(t *testing.T) {
+	t.Run("PageSize と一致する場合 nil を返す", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, PageSize)
+
+		// WHEN
+		err := CheckPageSize(data)
+
+		// THEN
+		assert.NoError(t, err)
+	})
+
+	t.Run("PageSize と一致しない場合エラーを返す", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, 100)
+
+		// WHEN
+		err := CheckPageSize(data)
+
+		// THEN
+		assert.ErrorIs(t, err, ErrInvalidDataSize)
+	})
+}
