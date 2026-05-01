@@ -5,7 +5,6 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
-// BufferPage はバッファプール内のページ
 type BufferPage struct {
 	PageId  page.PageId
 	Page    *page.Page

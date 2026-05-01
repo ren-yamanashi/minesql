@@ -9,7 +9,6 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
-// HeapFile はページ単位で区切られたヒープファイルを管理する
 type HeapFile struct {
 	fileId     page.FileId // 管理対象ファイルの FileId
 	file       *os.File    // ヒープファイルのファイルディスクリプタ
