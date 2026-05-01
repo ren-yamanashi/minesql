@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetWritePageData(t *testing.T) {
+func TestGetWritePage(t *testing.T) {
 	t.Run("取得したページがダーティーになる", func(t *testing.T) {
 		// GIVEN
 		bp := NewBufferPool(page.PageSize * 2)
@@ -16,7 +16,7 @@ func TestGetWritePageData(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		_, err = bp.GetWritePageData(pageId)
+		_, err = bp.GetWritePage(pageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -31,11 +31,11 @@ func TestGetWritePageData(t *testing.T) {
 		pageId := page.NewPageId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
-		_, err = bp.GetWritePageData(pageId)
+		_, err = bp.GetWritePage(pageId)
 		assert.NoError(t, err)
 
 		// WHEN
-		_, err = bp.GetWritePageData(pageId)
+		_, err = bp.GetWritePage(pageId)
 		assert.NoError(t, err)
 
 		// THEN
@@ -50,7 +50,7 @@ func TestGetWritePageData(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		p, err := bp.GetWritePageData(pageId)
+		p, err := bp.GetWritePage(pageId)
 		assert.NoError(t, err)
 		p.Body[0] = 0xAA
 
@@ -61,8 +61,8 @@ func TestGetWritePageData(t *testing.T) {
 	})
 }
 
-func TestGetReadPageData(t *testing.T) {
-	t.Run("キャッシュ済みのページデータを取得できる", func(t *testing.T) {
+func TestGetReadPage(t *testing.T) {
+	t.Run("キャッシュ済みのページを取得できる", func(t *testing.T) {
 		// GIVEN
 		bp := NewBufferPool(page.PageSize * 2)
 		pageId := page.NewPageId(0, 0)
@@ -71,7 +71,7 @@ func TestGetReadPageData(t *testing.T) {
 		addedPage.Page.Body[0] = 0xCC
 
 		// WHEN
-		p, err := bp.GetReadPageData(pageId)
+		p, err := bp.GetReadPage(pageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -87,7 +87,7 @@ func TestGetReadPageData(t *testing.T) {
 
 		// WHEN
 		pageId := page.NewPageId(0, 0)
-		p, err := bp.GetReadPageData(pageId)
+		p, err := bp.GetReadPage(pageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -102,7 +102,7 @@ func TestGetReadPageData(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		_, err = bp.GetReadPageData(pageId)
+		_, err = bp.GetReadPage(pageId)
 		assert.NoError(t, err)
 
 		// THEN

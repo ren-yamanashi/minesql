@@ -122,8 +122,8 @@ func TestLeafNodeUpdate(t *testing.T) {
 
 		// THEN
 		assert.True(t, ok)
-		assert.Equal(t, []byte{0x02}, ln.RecordAt(0).Header())
-		assert.Equal(t, []byte{0xBB, 0xCC}, ln.RecordAt(0).NonKey())
+		assert.Equal(t, []byte{0x02}, ln.Record(0).Header())
+		assert.Equal(t, []byte{0xBB, 0xCC}, ln.Record(0).NonKey())
 	})
 }
 
@@ -172,7 +172,7 @@ func TestLeafNodeRecordAt(t *testing.T) {
 		ln.Insert(1, NewRecord([]byte{0x02}, []byte{0x20}, []byte{0xBB}))
 
 		// WHEN
-		r := ln.RecordAt(1)
+		r := ln.Record(1)
 
 		// THEN
 		assert.Equal(t, []byte{0x02}, r.Header())
@@ -280,8 +280,8 @@ func TestLeafNodeTransferAllFrom(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, 0, src.NumRecords())
 		assert.Equal(t, 2, dest.NumRecords())
-		assert.Equal(t, []byte{0x10}, dest.RecordAt(0).Key())
-		assert.Equal(t, []byte{0x20}, dest.RecordAt(1).Key())
+		assert.Equal(t, []byte{0x10}, dest.Record(0).Key())
+		assert.Equal(t, []byte{0x20}, dest.Record(1).Key())
 	})
 }
 

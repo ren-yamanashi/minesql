@@ -3,7 +3,15 @@ package node
 import (
 	"bytes"
 	"encoding/binary"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
+
+// RecordPosition はページ内のレコードの物理的な位置を示す
+type RecordPosition struct {
+	PageId  page.PageId
+	SlotNum int
+}
 
 // Record は B+Tree のノードに格納されるレコード
 //   - record[0]: ヘッダー

@@ -76,7 +76,7 @@ func (bn *BranchNode) SplitInsert(newBranch *BranchNode, newRecord Record) ([]by
 		}
 
 		// `古いノードの先頭レコードのキー < 挿入対象のキー` の場合
-		if bn.RecordAt(0).CompareKey(newRecord.Key()) < 0 {
+		if bn.Record(0).CompareKey(newRecord.Key()) < 0 {
 			if err := bn.transfer(newBranch); err != nil {
 				return nil, err
 			}
@@ -139,8 +139,8 @@ func (bn *BranchNode) CanTransferRecord(toRight bool) bool {
 	return 2*freeSpaceAfterTransfer < bn.body.Capacity()
 }
 
-// RecordAt は指定されたスロット番号のレコードを取得する
-func (bn *BranchNode) RecordAt(slotNum int) Record {
+// Record は指定されたスロット番号のレコードを取得する
+func (bn *BranchNode) Record(slotNum int) Record {
 	return recordFromBytes(bn.body.Cell(slotNum))
 }
 
@@ -156,7 +156,7 @@ func (bn *BranchNode) ChildPageId(slotNum int) (page.PageId, error) {
 	if slotNum == bn.NumRecords() {
 		return page.ReadPageId(bn.header[nodeHeaderSize:], 0), nil
 	}
-	record := bn.RecordAt(slotNum)
+	record := bn.Record(slotNum)
 	return page.RestorePageId(record.NonKey())
 }
 
@@ -184,7 +184,7 @@ func (bn *BranchNode) IsHalfFull() bool {
 //   - return: 取り出したキー
 func (bn *BranchNode) fillRightChild() ([]byte, error) {
 	lastSlotNum := bn.NumRecords() - 1
-	record := bn.RecordAt(lastSlotNum)
+	record := bn.Record(lastSlotNum)
 	rightChild, err := page.RestorePageId(record.NonKey())
 	if err != nil {
 		return nil, err

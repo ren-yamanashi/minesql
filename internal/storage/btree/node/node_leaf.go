@@ -65,7 +65,7 @@ func (ln *LeafNode) SplitInsert(newLeaf *LeafNode, newRecord Record) ([]byte, er
 		}
 
 		// `古いノードの先頭レコードのキー < 挿入対象のキー` の場合
-		if ln.RecordAt(0).CompareKey(newRecord.Key()) < 0 {
+		if ln.Record(0).CompareKey(newRecord.Key()) < 0 {
 			if err := ln.transfer(newLeaf); err != nil {
 				return nil, err
 			}
@@ -83,7 +83,7 @@ func (ln *LeafNode) SplitInsert(newLeaf *LeafNode, newRecord Record) ([]byte, er
 		}
 		break
 	}
-	return newLeaf.RecordAt(0).Key(), nil
+	return newLeaf.Record(0).Key(), nil
 }
 
 // Remove はレコードを削除する
@@ -123,8 +123,8 @@ func (ln *LeafNode) CanTransferRecord(toRight bool) bool {
 	return 2*freeSpaceAfterTransfer < ln.body.Capacity()
 }
 
-// RecordAt は指定されたスロット番号のレコードを取得する
-func (ln *LeafNode) RecordAt(slotNum int) Record {
+// Record は指定されたスロット番号のレコードを取得する
+func (ln *LeafNode) Record(slotNum int) Record {
 	return recordFromBytes(ln.body.Cell(slotNum))
 }
 

@@ -16,7 +16,7 @@ func TestFlushAllPages(t *testing.T) {
 		pageId := page.NewPageId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
-		p, err := bp.GetWritePageData(pageId)
+		p, err := bp.GetWritePage(pageId)
 		assert.NoError(t, err)
 		p.Body[0] = 0xAA
 
@@ -38,7 +38,7 @@ func TestFlushAllPages(t *testing.T) {
 		pageId := page.NewPageId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
-		_, err = bp.GetWritePageData(pageId)
+		_, err = bp.GetWritePage(pageId)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -57,7 +57,7 @@ func TestFlushAllPages(t *testing.T) {
 		pageId := page.NewPageId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
-		p, err := bp.GetWritePageData(pageId)
+		p, err := bp.GetWritePage(pageId)
 		assert.NoError(t, err)
 		p.Body[0] = 0xBB
 		err = bp.FlushAllPages()
@@ -100,9 +100,9 @@ func TestFlushOldestPages(t *testing.T) {
 		assert.NoError(t, err)
 		_, err = bp.AddPage(id1)
 		assert.NoError(t, err)
-		_, err = bp.GetWritePageData(id0)
+		_, err = bp.GetWritePage(id0)
 		assert.NoError(t, err)
-		_, err = bp.GetWritePageData(id1)
+		_, err = bp.GetWritePage(id1)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -132,7 +132,7 @@ func TestFlushOldestPages(t *testing.T) {
 		pageId := page.NewPageId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
-		_, err = bp.GetWritePageData(pageId)
+		_, err = bp.GetWritePage(pageId)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -154,9 +154,9 @@ func TestFlushListSize(t *testing.T) {
 		assert.NoError(t, err)
 		_, err = bp.AddPage(page.NewPageId(0, 1))
 		assert.NoError(t, err)
-		_, err = bp.GetWritePageData(page.NewPageId(0, 0))
+		_, err = bp.GetWritePage(page.NewPageId(0, 0))
 		assert.NoError(t, err)
-		_, err = bp.GetWritePageData(page.NewPageId(0, 1))
+		_, err = bp.GetWritePage(page.NewPageId(0, 1))
 		assert.NoError(t, err)
 
 		// WHEN

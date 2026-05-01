@@ -2,8 +2,8 @@ package buffer
 
 import "github.com/ren-yamanashi/minesql/internal/storage/page"
 
-// GetWritePageData は書き込み用のページデータを取得する
-func (bp *BufferPool) GetWritePageData(pageId page.PageId) (*page.Page, error) {
+// GetWritePage は書き込み用のページデータを取得する
+func (bp *BufferPool) GetWritePage(pageId page.PageId) (*page.Page, error) {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
 
@@ -20,8 +20,8 @@ func (bp *BufferPool) GetWritePageData(pageId page.PageId) (*page.Page, error) {
 	return bufPage.Page, nil
 }
 
-// GetReadPageData は読み込み用のページデータを取得する
-func (bp *BufferPool) GetReadPageData(pageId page.PageId) (*page.Page, error) {
+// GetReadPage は読み込み用のページデータを取得する
+func (bp *BufferPool) GetReadPage(pageId page.PageId) (*page.Page, error) {
 	// ページがバッファプールにある場合は RLock で返す (LRU 更新不要な為)
 	bp.mutex.RLock()
 	if bufId, exists := bp.pageTable.GetBufferId(pageId); exists {

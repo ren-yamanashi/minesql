@@ -20,7 +20,7 @@ func TestBranchNodeInitialize(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, 1, bn.NumRecords())
-		assert.Equal(t, []byte{0x10}, bn.RecordAt(0).Key())
+		assert.Equal(t, []byte{0x10}, bn.Record(0).Key())
 		assert.Equal(t, rightChild, bn.RightChildPageId())
 	})
 }
@@ -198,7 +198,7 @@ func TestBranchNodeUpdate(t *testing.T) {
 
 		// THEN
 		assert.True(t, ok)
-		assert.Equal(t, []byte{0xFF}, bn.RecordAt(0).Key())
+		assert.Equal(t, []byte{0xFF}, bn.Record(0).Key())
 	})
 }
 
@@ -243,7 +243,7 @@ func TestBranchNodeRecordAt(t *testing.T) {
 		bn.Insert(1, newBranchRecord([]byte{0x20}, page.NewPageId(0, 10)))
 
 		// WHEN
-		r := bn.RecordAt(1)
+		r := bn.Record(1)
 
 		// THEN
 		assert.Equal(t, []byte{0x20}, r.Key())

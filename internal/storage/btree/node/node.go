@@ -16,8 +16,8 @@ type Node interface {
 	CanTransferRecord(toRight bool) bool
 	// NumRecords はレコード数を取得する
 	NumRecords() int
-	// RecordAt は指定されたスロット番号のレコードを取得する
-	RecordAt(slotNum int) Record
+	// Record は指定されたスロット番号のレコードを取得する
+	Record(slotNum int) Record
 	// SearchSlotNum は指定された key に対応するスロット番号を検索する
 	SearchSlotNum(key []byte) (int, bool)
 	// IsHalfFull はノードが半分以上埋まっているかどうかを判定する

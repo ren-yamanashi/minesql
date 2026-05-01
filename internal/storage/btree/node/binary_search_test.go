@@ -130,7 +130,7 @@ func newMockNode(keys [][]byte) *mockNode {
 }
 
 func (m *mockNode) NumRecords() int                    { return len(m.records) }
-func (m *mockNode) RecordAt(slotNum int) Record        { return m.records[slotNum] }
+func (m *mockNode) Record(slotNum int) Record          { return m.records[slotNum] }
 func (m *mockNode) Insert(_ int, _ Record) bool        { return false }
 func (m *mockNode) Remove(_ int)                       {}
 func (m *mockNode) CanTransferRecord(_ bool) bool      { return false }
