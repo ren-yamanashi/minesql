@@ -7,10 +7,6 @@ var (
 	NodeTypeBranch = []byte("BRANCH  ")
 )
 
-type NodeHeader struct {
-	NodeType [nodeHeaderSize]byte // LEAF or BRANCH
-}
-
 type Node interface {
 	// Insert はレコードを挿入する
 	Insert(slotNum int, record Record) bool

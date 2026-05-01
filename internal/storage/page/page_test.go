@@ -133,9 +133,34 @@ func TestPageToBytes(t *testing.T) {
 		result[PageHeaderSize] = 0xEE
 
 		// THEN
-		// ToBytes で返したスライスへの書き込みが Header/Body に反映される
 		assert.Equal(t, byte(0xFF), p.Header[0])
 		assert.Equal(t, byte(0xEE), p.Body[0])
+	})
+
+	t.Run("Header への書き込みが ToBytes の結果に反映される", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, PageSize)
+		p, _ := NewPage(data)
+
+		// WHEN
+		p.Header[0] = 0xFF
+		result := p.ToBytes()
+
+		// THEN
+		assert.Equal(t, byte(0xFF), result[0])
+	})
+
+	t.Run("Body への書き込みが ToBytes の結果に反映される", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, PageSize)
+		p, _ := NewPage(data)
+
+		// WHEN
+		p.Body[0] = 0xEE
+		result := p.ToBytes()
+
+		// THEN
+		assert.Equal(t, byte(0xEE), result[PageHeaderSize])
 	})
 }
 

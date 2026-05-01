@@ -5,8 +5,10 @@ import (
 	"fmt"
 )
 
-const MaxFileId = 0xFFFFFFFF
-const MaxPageNumber = 0xFFFFFFFF
+const (
+	MaxFileId     = 0xFFFFFFFF
+	MaxPageNumber = 0xFFFFFFFF
+)
 
 var InvalidPageId = NewPageId(MaxFileId, MaxPageNumber)
 

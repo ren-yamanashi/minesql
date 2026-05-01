@@ -77,7 +77,7 @@ func (fl *FlushList) Clear() {
 
 // OldestPageIds は先頭 (最も古い) から n 件の PageId を返す
 func (fl *FlushList) OldestPageIds(n int) []page.PageId {
-	result := []page.PageId{}
+	result := make([]page.PageId, 0, n)
 	node := fl.head
 	for node != nil && len(result) < n {
 		result = append(result, node.pageId)

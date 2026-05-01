@@ -93,7 +93,7 @@ func (hf *HeapFile) Close() error {
 
 // seek は PageNumber で指定されたページの先頭にシークする
 func (hf *HeapFile) seek(pageNumber page.PageNumber) error {
-	offset := page.PageSize * pageNumber
-	_, err := hf.file.Seek(int64(offset), io.SeekStart)
+	offset := int64(page.PageSize) * int64(pageNumber)
+	_, err := hf.file.Seek(offset, io.SeekStart)
 	return err
 }
