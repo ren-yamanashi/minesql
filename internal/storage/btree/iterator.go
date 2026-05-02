@@ -10,29 +10,29 @@ import (
 // Iterator は B+Tree のリーフノードを走査する
 type Iterator struct {
 	bufferPool   *buffer.BufferPool
-	bufferPage   buffer.BufferPage   // 現在参照しているバッファページ
-	slotNum      int                 // 現在参照されているスロット番号
+	BufferPage   buffer.BufferPage   // 現在参照しているバッファページ
+	SlotNum      int                 // 現在参照されているスロット番号
 	LastPosition node.RecordPosition // 直前に Next で取得されたレコードの位置
 }
 
 func NewIterator(bufPool *buffer.BufferPool, bufPage buffer.BufferPage, slotNum int) *Iterator {
 	return &Iterator{
 		bufferPool: bufPool,
-		bufferPage: bufPage,
-		slotNum:    slotNum,
+		BufferPage: bufPage,
+		SlotNum:    slotNum,
 	}
 }
 
 // Get は現在参照しているリーフノードのレコードを取得
 func (iter *Iterator) Get() (node.Record, bool, error) {
-	pg, err := iter.bufferPool.GetReadPage(iter.bufferPage.PageId)
+	pg, err := iter.bufferPool.GetReadPage(iter.BufferPage.PageId)
 	if err != nil {
 		return node.NewRecord(nil, nil, nil), false, err
 	}
 	leaf := node.NewLeafNode(pg)
 
-	if iter.slotNum < leaf.NumRecords() {
-		record := leaf.Record(iter.slotNum)
+	if iter.SlotNum < leaf.NumRecords() {
+		record := leaf.Record(iter.SlotNum)
 		header := bytes.Clone(record.Header())
 		key := bytes.Clone(record.Key())
 		nonKey := bytes.Clone(record.NonKey())
@@ -44,8 +44,8 @@ func (iter *Iterator) Get() (node.Record, bool, error) {
 // Next は次のレコードを取得する
 func (iter *Iterator) Next() (node.Record, bool, error) {
 	iter.LastPosition = node.RecordPosition{
-		PageId:  iter.bufferPage.PageId,
-		SlotNum: iter.slotNum,
+		PageId:  iter.BufferPage.PageId,
+		SlotNum: iter.SlotNum,
 	}
 
 	record, ok, err := iter.Get()
@@ -65,15 +65,15 @@ func (iter *Iterator) Next() (node.Record, bool, error) {
 
 // Advance は次のレコードに進む
 func (iter *Iterator) Advance() error {
-	pg, err := iter.bufferPool.GetReadPage(iter.bufferPage.PageId)
+	pg, err := iter.bufferPool.GetReadPage(iter.BufferPage.PageId)
 	if err != nil {
 		return err
 	}
 	leaf := node.NewLeafNode(pg)
 
 	// 現在のページ内に、次のレコードがある場合
-	if iter.slotNum < leaf.NumRecords() {
-		iter.slotNum++
+	if iter.SlotNum < leaf.NumRecords() {
+		iter.SlotNum++
 		return nil
 	}
 
@@ -86,14 +86,14 @@ func (iter *Iterator) Advance() error {
 	}
 
 	// 次のページに移動
-	oldPageId := iter.bufferPage.PageId
+	oldPageId := iter.BufferPage.PageId
 	iter.bufferPool.UnRefPage(oldPageId)
 	nextPage, err := iter.bufferPool.FetchPage(nextPageId)
 	if err != nil {
 		return err
 	}
 
-	iter.bufferPage = *nextPage
-	iter.slotNum = 0
+	iter.BufferPage = *nextPage
+	iter.SlotNum = 0
 	return nil
 }

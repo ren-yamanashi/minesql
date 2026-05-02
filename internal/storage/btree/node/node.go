@@ -1,5 +1,7 @@
 package node
 
+import "github.com/ren-yamanashi/minesql/internal/storage/page"
+
 const nodeHeaderSize = 8
 
 var (
@@ -24,4 +26,9 @@ type Node interface {
 	IsHalfFull() bool
 	// maxRecordSize は自身のノードに格納できる最大のレコードサイズを返す
 	maxRecordSize() int
+}
+
+// ページデータからノードタイプを取得する
+func GetNodeType(pg *page.Page) []byte {
+	return pg.Body[0:8]
 }
