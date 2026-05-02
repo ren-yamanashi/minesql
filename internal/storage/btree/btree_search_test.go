@@ -155,6 +155,31 @@ func TestLeafPageIds(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 1, len(pageIds))
 	})
+
+	t.Run("高さ 2 以上の場合はブランチノードを辿って全リーフの PageId を返す", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeBufferPool(t)
+		metaPageId, _ := bp.AllocatePageId(0)
+		bt, _ := CreateBtree(bp, metaPageId)
+		nonKey := make([]byte, 1500)
+		bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
+		bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
+		bt.Insert(node.NewRecord([]byte{}, []byte{0x03}, nonKey))
+		height, _ := bt.Height()
+		assert.Equal(t, uint64(2), height)
+		leafCount, _ := bt.LeafPageCount()
+
+		// WHEN
+		pageIds, err := bt.LeafPageIds()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, int(leafCount), len(pageIds))
+		// 各 PageId が有効であることを確認
+		for _, id := range pageIds {
+			assert.False(t, id.IsInvalid())
+		}
+	})
 }
 
 // insertRecordToBtree はテスト用に B+Tree のルートリーフノードにレコードを直接挿入する

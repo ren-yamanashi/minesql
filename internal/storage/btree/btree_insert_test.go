@@ -121,6 +121,32 @@ func TestInsert(t *testing.T) {
 		}
 	})
 
+	t.Run("境界キーと同じキーを持つレコードを正しい子ノードに挿入できる", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeBufferPool(t)
+		metaPageId, _ := bp.AllocatePageId(0)
+		bt, _ := CreateBtree(bp, metaPageId)
+		nonKey := make([]byte, 1500)
+		bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
+		bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
+		bt.Insert(node.NewRecord([]byte{}, []byte{0x03}, nonKey))
+		height, _ := bt.Height()
+		assert.Equal(t, uint64(2), height)
+
+		// WHEN
+		// 境界キーと一致するキーを挿入
+		// 分割で境界キーが生成されているので、その境界キーと同じ値を持つ別のレコードが正しい子ノード (右の子) にルーティングされることを確認
+		// 既に 0x01, 0x02, 0x03 が挿入済みなので、境界キー付近のキーを追加挿入
+		err := bt.Insert(node.NewRecord([]byte{}, []byte{0x04}, nonKey))
+
+		// THEN
+		assert.NoError(t, err)
+		for _, key := range [][]byte{{0x01}, {0x02}, {0x03}, {0x04}} {
+			_, _, err := bt.FindByKey(key)
+			assert.NoError(t, err)
+		}
+	})
+
 	t.Run("分割が発生しない場合はメタデータが変わらない", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)

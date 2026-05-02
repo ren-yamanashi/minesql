@@ -13,7 +13,9 @@ test_run:
 	go test -v -run $(RUN) ./internal/...
 
 test_cov:
-	go test -cover ./internal/...
+	go test -coverprofile=coverage.out ./internal/...
+	go tool cover -html=coverage.out -o coverage.html
+	open coverage.html
 
 clean:
 	go clean -testcache

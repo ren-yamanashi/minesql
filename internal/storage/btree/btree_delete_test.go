@@ -118,6 +118,35 @@ func TestDelete(t *testing.T) {
 		assert.False(t, ok)
 	})
 
+	t.Run("ブランチノード経由で削除してもアンダーフローしない場合は isLeafMerged が false", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeBufferPool(t)
+		metaPageId, _ := bp.AllocatePageId(0)
+		bt, _ := CreateBtree(bp, metaPageId)
+		nonKey := make([]byte, 1500)
+		bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
+		bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
+		bt.Insert(node.NewRecord([]byte{}, []byte{0x03}, nonKey))
+		bt.Insert(node.NewRecord([]byte{}, []byte{0x04}, nonKey))
+		height, _ := bt.Height()
+		assert.Equal(t, uint64(2), height)
+		countBefore, _ := bt.LeafPageCount()
+
+		// WHEN
+		err := bt.Delete([]byte{0x02})
+
+		// THEN
+		assert.NoError(t, err)
+		countAfter, _ := bt.LeafPageCount()
+		assert.Equal(t, countBefore, countAfter)
+		_, _, err = bt.FindByKey([]byte{0x01})
+		assert.NoError(t, err)
+		_, _, err = bt.FindByKey([]byte{0x03})
+		assert.NoError(t, err)
+		_, _, err = bt.FindByKey([]byte{0x04})
+		assert.NoError(t, err)
+	})
+
 	t.Run("削除後もアンダーフローしない場合はメタデータが変わらない", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
