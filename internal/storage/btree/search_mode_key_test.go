@@ -39,7 +39,20 @@ func TestSearchModeKeySlotNum(t *testing.T) {
 }
 
 func TestSearchModeKeyChildPageId(t *testing.T) {
-	t.Run("キーに対応する子の PageId を返す", func(t *testing.T) {
+	t.Run("境界キーより小さいキーの場合は左の子の PageId を返す", func(t *testing.T) {
+		// GIVEN
+		bn := newSearchModeKeyTestBranchNode()
+		sm := SearchModeKey{Key: []byte{0x05}}
+
+		// WHEN
+		id, err := sm.childPageId(bn)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, page.NewPageId(0, 1), id)
+	})
+
+	t.Run("境界キーと一致するキーの場合は右の子の PageId を返す", func(t *testing.T) {
 		// GIVEN
 		bn := newSearchModeKeyTestBranchNode()
 		sm := SearchModeKey{Key: []byte{0x10}}
@@ -49,7 +62,7 @@ func TestSearchModeKeyChildPageId(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, page.NewPageId(0, 1), id)
+		assert.Equal(t, page.NewPageId(0, 2), id)
 	})
 
 	t.Run("キーが全レコードより大きい場合は右の子の PageId を返す", func(t *testing.T) {

@@ -51,9 +51,9 @@ func (ln *LeafNode) Insert(slotNum int, record Record) bool {
 }
 
 // SplitInsert はリーフノードを分割しながらレコードを挿入する
-//   - newLeaf: 分割後の新しいリーフノード
+//   - newLeaf: 分割後の新しいリーフノード (小さい方のレコードが格納される)
 //   - newRecord: 挿入するレコード
-//   - return: 新しいリーフノードの最小キー
+//   - return: 古いノード (=右の子) の最小キー (=親ブランチノードの境界キー)
 func (ln *LeafNode) SplitInsert(newLeaf *LeafNode, newRecord Record) ([]byte, error) {
 	newLeaf.Initialize()
 	for {
@@ -84,7 +84,7 @@ func (ln *LeafNode) SplitInsert(newLeaf *LeafNode, newRecord Record) ([]byte, er
 		}
 		break
 	}
-	return newLeaf.Record(0).Key(), nil
+	return ln.Record(0).Key(), nil
 }
 
 // Remove はレコードを削除する

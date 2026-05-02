@@ -18,6 +18,9 @@ func (sm SearchModeKey) slotNum(ln *node.LeafNode) int {
 
 // childPageId は指定した key に基づいて子の PageId を取得する
 func (sm SearchModeKey) childPageId(bn *node.BranchNode) (page.PageId, error) {
-	childIdx, _ := bn.SearchSlotNum(sm.Key)
-	return bn.ChildPageId(childIdx)
+	slotNum, found := bn.SearchSlotNum(sm.Key)
+	if found {
+		slotNum++ // 境界キーと一致する場合、右の子に属する
+	}
+	return bn.ChildPageId(slotNum)
 }

@@ -46,27 +46,19 @@ func (bt *Btree) searchRecursively(nodePageId page.PageId, mode SearchMode) (*It
 	// リーフノードの場合、検索モードに応じて探索する
 	case bytes.Equal(nodeType, node.NodeTypeLeaf):
 		leafNode := node.NewLeafNode(bufPage.Page)
-
-		switch sm := mode.(type) {
-		case SearchModeStart:
-			return NewIterator(bt.bufferPool, *bufPage, 0), nil
-		case SearchModeKey:
-			slotNum, _ := leafNode.SearchSlotNum(sm.Key)
-			iter := NewIterator(bt.bufferPool, *bufPage, slotNum)
-			// 検索対象のキーが現在のリーフノードの末端のレコードより大きい場合、次のリーフノードに進める
-			// 例: リーフノードに (1, ...), (3, ...), (5, ...) のレコードが格納されている場合に、キー 6 を検索したいときなど
-			// (この場合 `leaf.SearchSlotNum(sm.Key)` は `leaf.NumRecords()` と等しい値を返す)
-			// この場合、次のリーフノードに進めてからイテレータを返す
-			if leafNode.NumRecords() == slotNum {
-				err := iter.Advance()
-				if err != nil {
-					return nil, err
-				}
+		slotNum := mode.slotNum(leafNode)
+		iter := NewIterator(bt.bufferPool, *bufPage, slotNum)
+		// 検索対象のキーが現在のリーフノードの末端のレコードより大きい場合、次のリーフノードに進める
+		// 例: リーフノードに (1, ...), (3, ...), (5, ...) のレコードが格納されている場合に、キー 6 を検索したいときなど
+		// (この場合 SearchSlotNum は NumRecords と等しい値を返す)
+		// この場合、次のリーフノードに進めてからイテレータを返す
+		if leafNode.NumRecords() == slotNum {
+			err := iter.Advance()
+			if err != nil {
+				return nil, err
 			}
-			return iter, nil
-		default:
-			return nil, errors.New("unknown search mode")
 		}
+		return iter, nil
 
 	default:
 		return nil, errors.New("unknown node type")

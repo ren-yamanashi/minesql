@@ -74,10 +74,14 @@ func (iter *Iterator) Advance() error {
 	// 現在のページ内に、次のレコードがある場合
 	if iter.SlotNum < leaf.NumRecords() {
 		iter.SlotNum++
+	}
+
+	// まだ現在のページ内にレコードがある場合
+	if iter.SlotNum < leaf.NumRecords() {
 		return nil
 	}
 
-	// 次のレコードが無い場合
+	// 現在のページのレコードを全て読み終えた場合
 	nextPageId := leaf.NextPageId()
 
 	// 次のページがなければ何もしない
