@@ -10,7 +10,7 @@ import (
 func TestLeafNodeInsert(t *testing.T) {
 	t.Run("レコードを挿入できる", func(t *testing.T) {
 		// GIVEN
-		ln := newTestLeafNode(256)
+		ln := newTestLeafNode()
 		record := NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA})
 
 		// WHEN
@@ -23,7 +23,7 @@ func TestLeafNodeInsert(t *testing.T) {
 
 	t.Run("maxRecordSize を超えるレコードは挿入できない", func(t *testing.T) {
 		// GIVEN
-		ln := newTestLeafNode(64)
+		ln := newTestLeafNode()
 		maxSize := ln.maxRecordSize()
 		largeData := make([]byte, maxSize) // ToBytes で 4 バイト追加されるため超過する
 
@@ -39,13 +39,13 @@ func TestLeafNodeInsert(t *testing.T) {
 func TestLeafNodeSplitInsert(t *testing.T) {
 	t.Run("挿入キーが先頭キーより大きい場合に分割できる", func(t *testing.T) {
 		// GIVEN
-		ln := newTestLeafNode(128)
+		ln := newTestLeafNode()
 		padding := make([]byte, 8)
-		for i := range 8 {
-			ln.Insert(i, NewRecord([]byte{0x01}, []byte{byte(i + 1)}, padding))
+		for i := range 150 {
+			ln.Insert(i, NewRecord([]byte{0x01}, []byte{byte(i/256 + 1), byte(i % 256)}, padding))
 		}
-		newLeaf := newTestLeafNode(128)
-		newRecord := NewRecord([]byte{0x01}, []byte{0x05, 0x01}, padding)
+		newLeaf := newTestLeafNode()
+		newRecord := NewRecord([]byte{0x01}, []byte{0xFF}, padding)
 
 		// WHEN
 		key, err := ln.SplitInsert(newLeaf, newRecord)
@@ -59,12 +59,12 @@ func TestLeafNodeSplitInsert(t *testing.T) {
 
 	t.Run("挿入キーが先頭キー以下の場合に分割できる", func(t *testing.T) {
 		// GIVEN
-		ln := newTestLeafNode(128)
+		ln := newTestLeafNode()
 		padding := make([]byte, 8)
-		for i := range 8 {
-			ln.Insert(i, NewRecord([]byte{0x01}, []byte{byte(i + 1)}, padding))
+		for i := range 150 {
+			ln.Insert(i, NewRecord([]byte{0x01}, []byte{byte(i/256 + 1), byte(i % 256)}, padding))
 		}
-		newLeaf := newTestLeafNode(128)
+		newLeaf := newTestLeafNode()
 		newRecord := NewRecord([]byte{0x01}, []byte{0x00}, padding)
 
 		// WHEN
@@ -77,15 +77,20 @@ func TestLeafNodeSplitInsert(t *testing.T) {
 		assert.True(t, newLeaf.NumRecords() > 0)
 	})
 
-	t.Run("転送先の容量が不足している場合はエラーを返す", func(t *testing.T) {
+	t.Run("分割後に古いノードの容量が不足するとエラーを返す", func(t *testing.T) {
 		// GIVEN
-		ln := newTestLeafNode(128)
-		padding := make([]byte, 8)
-		for i := range 8 {
-			ln.Insert(i, NewRecord([]byte{0x01}, []byte{byte(i + 1)}, padding))
-		}
-		newLeaf := newTestLeafNode(48)
-		newRecord := NewRecord([]byte{0x01}, []byte{0x05, 0x01}, padding)
+		ln := newTestLeafNode()
+		maxSize := ln.maxRecordSize()
+		bigNonKey := make([]byte, maxSize-6)
+		bigNonKey[0] = 0x01
+		ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x01}, bigNonKey))
+		bigNonKey2 := make([]byte, maxSize-6)
+		bigNonKey2[0] = 0x02
+		ln.Insert(1, NewRecord([]byte{0x01}, []byte{0x02}, bigNonKey2))
+		newLeaf := newTestLeafNode()
+		bigNonKey3 := make([]byte, maxSize-6)
+		bigNonKey3[0] = 0x03
+		newRecord := NewRecord([]byte{0x01}, []byte{0x01, 0x01}, bigNonKey3)
 
 		// WHEN
 		key, err := ln.SplitInsert(newLeaf, newRecord)
@@ -99,7 +104,7 @@ func TestLeafNodeSplitInsert(t *testing.T) {
 func TestLeafNodeRemove(t *testing.T) {
 	t.Run("レコードを削除できる", func(t *testing.T) {
 		// GIVEN
-		ln := newTestLeafNode(256)
+		ln := newTestLeafNode()
 		ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
@@ -113,7 +118,7 @@ func TestLeafNodeRemove(t *testing.T) {
 func TestLeafNodeUpdate(t *testing.T) {
 	t.Run("レコードを更新できる", func(t *testing.T) {
 		// GIVEN
-		ln := newTestLeafNode(256)
+		ln := newTestLeafNode()
 		ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		newRecord := NewRecord([]byte{0x02}, []byte{0x10}, []byte{0xBB, 0xCC})
 
@@ -130,7 +135,7 @@ func TestLeafNodeUpdate(t *testing.T) {
 func TestLeafNodeNumRecords(t *testing.T) {
 	t.Run("レコード数を返す", func(t *testing.T) {
 		// GIVEN
-		ln := newTestLeafNode(256)
+		ln := newTestLeafNode()
 		ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{}))
 		ln.Insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{}))
 
@@ -142,7 +147,7 @@ func TestLeafNodeNumRecords(t *testing.T) {
 func TestLeafNodeCanTransferRecord(t *testing.T) {
 	t.Run("レコードが 1 つ以下の場合は false を返す", func(t *testing.T) {
 		// GIVEN
-		ln := newTestLeafNode(256)
+		ln := newTestLeafNode()
 		ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN / THEN
@@ -152,10 +157,10 @@ func TestLeafNodeCanTransferRecord(t *testing.T) {
 
 	t.Run("転送後も半分以上埋まっている場合は true を返す", func(t *testing.T) {
 		// GIVEN
-		ln := newTestLeafNode(128)
-		// 小さいレコードを複数挿入して半分以上埋める
-		for i := range 10 {
-			ln.Insert(i, NewRecord([]byte{0x01}, []byte{byte(i)}, []byte{0xAA, 0xBB}))
+		ln := newTestLeafNode()
+		padding := make([]byte, 200)
+		for i := range 15 {
+			ln.Insert(i, NewRecord([]byte{0x01}, []byte{byte(i)}, padding))
 		}
 
 		// WHEN / THEN
@@ -167,7 +172,7 @@ func TestLeafNodeCanTransferRecord(t *testing.T) {
 func TestLeafNodeRecordAt(t *testing.T) {
 	t.Run("指定したスロット番号のレコードを取得できる", func(t *testing.T) {
 		// GIVEN
-		ln := newTestLeafNode(256)
+		ln := newTestLeafNode()
 		ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		ln.Insert(1, NewRecord([]byte{0x02}, []byte{0x20}, []byte{0xBB}))
 
@@ -184,7 +189,7 @@ func TestLeafNodeRecordAt(t *testing.T) {
 func TestLeafNodeSearchSlotNum(t *testing.T) {
 	t.Run("キーが見つかった場合はスロット番号と true を返す", func(t *testing.T) {
 		// GIVEN
-		ln := newTestLeafNode(256)
+		ln := newTestLeafNode()
 		ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{}))
 		ln.Insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{}))
 
@@ -198,7 +203,7 @@ func TestLeafNodeSearchSlotNum(t *testing.T) {
 
 	t.Run("キーが見つからない場合は挿入位置と false を返す", func(t *testing.T) {
 		// GIVEN
-		ln := newTestLeafNode(256)
+		ln := newTestLeafNode()
 		ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{}))
 		ln.Insert(1, NewRecord([]byte{0x01}, []byte{0x30}, []byte{}))
 
@@ -214,7 +219,7 @@ func TestLeafNodeSearchSlotNum(t *testing.T) {
 func TestLeafNodePrevPageId(t *testing.T) {
 	t.Run("初期化後は InvalidPageId を返す", func(t *testing.T) {
 		// GIVEN
-		ln := newTestLeafNode(256)
+		ln := newTestLeafNode()
 
 		// WHEN
 		id := ln.PrevPageId()
@@ -227,7 +232,7 @@ func TestLeafNodePrevPageId(t *testing.T) {
 func TestLeafNodeNextPageId(t *testing.T) {
 	t.Run("初期化後は InvalidPageId を返す", func(t *testing.T) {
 		// GIVEN
-		ln := newTestLeafNode(256)
+		ln := newTestLeafNode()
 
 		// WHEN
 		id := ln.NextPageId()
@@ -240,7 +245,7 @@ func TestLeafNodeNextPageId(t *testing.T) {
 func TestLeafNodeSetPrevPageId(t *testing.T) {
 	t.Run("前のリーフノードのページ ID を設定できる", func(t *testing.T) {
 		// GIVEN
-		ln := newTestLeafNode(256)
+		ln := newTestLeafNode()
 		prevId := page.NewPageId(0, 5)
 
 		// WHEN
@@ -254,7 +259,7 @@ func TestLeafNodeSetPrevPageId(t *testing.T) {
 func TestLeafNodeSetNextPageId(t *testing.T) {
 	t.Run("次のリーフノードのページ ID を設定できる", func(t *testing.T) {
 		// GIVEN
-		ln := newTestLeafNode(256)
+		ln := newTestLeafNode()
 		nextId := page.NewPageId(0, 10)
 
 		// WHEN
@@ -268,10 +273,10 @@ func TestLeafNodeSetNextPageId(t *testing.T) {
 func TestLeafNodeTransferAllFrom(t *testing.T) {
 	t.Run("全レコードを転送できる", func(t *testing.T) {
 		// GIVEN
-		src := newTestLeafNode(256)
+		src := newTestLeafNode()
 		src.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		src.Insert(1, NewRecord([]byte{0x02}, []byte{0x20}, []byte{0xBB}))
-		dest := newTestLeafNode(256)
+		dest := newTestLeafNode()
 
 		// WHEN
 		ok := dest.TransferAllFrom(src)
@@ -288,7 +293,7 @@ func TestLeafNodeTransferAllFrom(t *testing.T) {
 func TestLeafNodeIsHalfFull(t *testing.T) {
 	t.Run("空の場合は false を返す", func(t *testing.T) {
 		// GIVEN
-		ln := newTestLeafNode(256)
+		ln := newTestLeafNode()
 
 		// WHEN / THEN
 		assert.False(t, ln.IsHalfFull())
@@ -296,9 +301,10 @@ func TestLeafNodeIsHalfFull(t *testing.T) {
 
 	t.Run("半分以上埋まっている場合は true を返す", func(t *testing.T) {
 		// GIVEN
-		ln := newTestLeafNode(128)
-		for i := range 10 {
-			ln.Insert(i, NewRecord([]byte{0x01}, []byte{byte(i)}, []byte{0xAA, 0xBB}))
+		ln := newTestLeafNode()
+		padding := make([]byte, 200)
+		for i := range 15 {
+			ln.Insert(i, NewRecord([]byte{0x01}, []byte{byte(i)}, padding))
 		}
 
 		// WHEN / THEN
@@ -307,9 +313,8 @@ func TestLeafNodeIsHalfFull(t *testing.T) {
 }
 
 // newTestLeafNode は初期化済みの LeafNode を作成する
-func newTestLeafNode(size int) *LeafNode {
-	data := make([]byte, size)
-	pg, err := page.NewPage(data)
+func newTestLeafNode() *LeafNode {
+	pg, err := page.NewPage(make([]byte, page.PageSize))
 	if err != nil {
 		panic(err)
 	}

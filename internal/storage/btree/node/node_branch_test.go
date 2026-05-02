@@ -10,7 +10,7 @@ import (
 func TestBranchNodeInitialize(t *testing.T) {
 	t.Run("初期化後にレコードが 1 つ挿入され右の子が設定される", func(t *testing.T) {
 		// GIVEN
-		bn := newUninitializedBranchNode(256)
+		bn := newUninitializedBranchNode()
 		leftChild := page.NewPageId(0, 1)
 		rightChild := page.NewPageId(0, 2)
 
@@ -28,7 +28,7 @@ func TestBranchNodeInitialize(t *testing.T) {
 func TestBranchNodeInsert(t *testing.T) {
 	t.Run("レコードを挿入できる", func(t *testing.T) {
 		// GIVEN
-		bn := newTestBranchNode(256)
+		bn := newTestBranchNode()
 		record := newBranchRecord([]byte{0x20}, page.NewPageId(0, 10))
 
 		// WHEN
@@ -41,7 +41,7 @@ func TestBranchNodeInsert(t *testing.T) {
 
 	t.Run("maxRecordSize を超えるレコードは挿入できない", func(t *testing.T) {
 		// GIVEN
-		bn := newTestBranchNode(64)
+		bn := newTestBranchNode()
 		maxSize := bn.maxRecordSize()
 		largeKey := make([]byte, maxSize)
 
@@ -56,11 +56,11 @@ func TestBranchNodeInsert(t *testing.T) {
 func TestBranchNodeSplitInsert(t *testing.T) {
 	t.Run("挿入キーが先頭キーより大きい場合に分割できる", func(t *testing.T) {
 		// GIVEN
-		bn := newTestBranchNode(128)
-		for i := range 6 {
-			bn.Insert(bn.NumRecords(), newBranchRecord([]byte{byte(i + 0x11)}, page.NewPageId(0, page.PageNumber(i+10))))
+		bn := newTestBranchNode()
+		for i := range 150 {
+			bn.Insert(bn.NumRecords(), newBranchRecord([]byte{byte(i/256 + 0x11), byte(i % 256)}, page.NewPageId(0, page.PageNumber(i+10))))
 		}
-		newBranch := newUninitializedBranchNode(128)
+		newBranch := newUninitializedBranchNode()
 		newRecord := newBranchRecord([]byte{0xFF}, page.NewPageId(0, 99))
 
 		// WHEN
@@ -75,12 +75,12 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 
 	t.Run("挿入キーが先頭キー以下の場合に分割できる", func(t *testing.T) {
 		// GIVEN
-		bn := newUninitializedBranchNode(256)
+		bn := newUninitializedBranchNode()
 		bn.Initialize([]byte{0x10}, page.NewPageId(0, 1), page.NewPageId(0, 2))
-		for i := range 9 {
-			bn.Insert(bn.NumRecords(), newBranchRecord([]byte{byte(i + 0x11)}, page.NewPageId(0, page.PageNumber(i+10))))
+		for i := range 150 {
+			bn.Insert(bn.NumRecords(), newBranchRecord([]byte{byte(i/256 + 0x11), byte(i % 256)}, page.NewPageId(0, page.PageNumber(i+10))))
 		}
-		newBranch := newUninitializedBranchNode(256)
+		newBranch := newUninitializedBranchNode()
 		newRecord := newBranchRecord([]byte{0x01}, page.NewPageId(0, 99))
 
 		// WHEN
@@ -95,7 +95,7 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 
 	t.Run("分割後に古いノードの容量が不足するとエラーを返す", func(t *testing.T) {
 		// GIVEN
-		bn := newUninitializedBranchNode(128)
+		bn := newUninitializedBranchNode()
 		maxSize := bn.maxRecordSize()
 		bigKey := make([]byte, maxSize-12)
 		bigKey[0] = 0x01
@@ -103,7 +103,7 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 		bigKey2 := make([]byte, maxSize-12)
 		bigKey2[0] = 0x02
 		bn.Insert(bn.NumRecords(), newBranchRecord(bigKey2, page.NewPageId(0, 10)))
-		newBranch := newUninitializedBranchNode(128)
+		newBranch := newUninitializedBranchNode()
 		bigKey3 := make([]byte, maxSize-12)
 		bigKey3[0] = 0x01
 		bigKey3[1] = 0x01
@@ -119,13 +119,18 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 
 	t.Run("挿入キーが大きい場合に転送先の容量が不足するとエラーを返す", func(t *testing.T) {
 		// GIVEN
-		bn := newUninitializedBranchNode(256)
-		bn.Initialize([]byte{0x10}, page.NewPageId(0, 1), page.NewPageId(0, 2))
-		for i := range 9 {
-			bn.Insert(bn.NumRecords(), newBranchRecord([]byte{byte(i + 0x11)}, page.NewPageId(0, page.PageNumber(i+10))))
-		}
-		newBranch := newUninitializedBranchNode(48)
-		newRecord := newBranchRecord([]byte{0x04, 0x01}, page.NewPageId(0, 99))
+		bn := newUninitializedBranchNode()
+		maxSize := bn.maxRecordSize()
+		bigKey := make([]byte, maxSize-12)
+		bigKey[0] = 0x01
+		bn.Initialize(bigKey, page.NewPageId(0, 1), page.NewPageId(0, 2))
+		bigKey2 := make([]byte, maxSize-12)
+		bigKey2[0] = 0x02
+		bn.Insert(bn.NumRecords(), newBranchRecord(bigKey2, page.NewPageId(0, 10)))
+		newBranch := newUninitializedBranchNode()
+		bigKey3 := make([]byte, maxSize-12)
+		bigKey3[0] = 0x03
+		newRecord := newBranchRecord(bigKey3, page.NewPageId(0, 99))
 
 		// WHEN
 		key, err := bn.SplitInsert(newBranch, newRecord)
@@ -137,13 +142,18 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 
 	t.Run("挿入キーが小さく転送先に Insert できない場合はエラーを返す", func(t *testing.T) {
 		// GIVEN
-		bn := newUninitializedBranchNode(256)
-		bn.Initialize([]byte{0x10}, page.NewPageId(0, 1), page.NewPageId(0, 2))
-		for i := range 9 {
-			bn.Insert(bn.NumRecords(), newBranchRecord([]byte{byte(i + 0x11)}, page.NewPageId(0, page.PageNumber(i+10))))
-		}
-		newBranch := newUninitializedBranchNode(32)
-		newRecord := newBranchRecord([]byte{0x01}, page.NewPageId(0, 99))
+		bn := newUninitializedBranchNode()
+		maxSize := bn.maxRecordSize()
+		bigKey := make([]byte, maxSize-12)
+		bigKey[0] = 0x10
+		bn.Initialize(bigKey, page.NewPageId(0, 1), page.NewPageId(0, 2))
+		bigKey2 := make([]byte, maxSize-12)
+		bigKey2[0] = 0x20
+		bn.Insert(bn.NumRecords(), newBranchRecord(bigKey2, page.NewPageId(0, 10)))
+		newBranch := newUninitializedBranchNode()
+		bigKey3 := make([]byte, maxSize-12)
+		bigKey3[0] = 0x01
+		newRecord := newBranchRecord(bigKey3, page.NewPageId(0, 99))
 
 		// WHEN
 		key, err := bn.SplitInsert(newBranch, newRecord)
@@ -155,14 +165,18 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 
 	t.Run("挿入キーが小さい場合に転送先の容量が不足するとエラーを返す", func(t *testing.T) {
 		// GIVEN
-		bn := newUninitializedBranchNode(256)
-		bn.Initialize([]byte{0x10}, page.NewPageId(0, 1), page.NewPageId(0, 2))
-		for i := range 9 {
-			bn.Insert(bn.NumRecords(), newBranchRecord([]byte{byte(i + 0x11)}, page.NewPageId(0, page.PageNumber(i+10))))
-		}
-		// newBranch は Insert 1 回分は入るが、transfer で溢れるサイズ
-		newBranch := newUninitializedBranchNode(64)
-		newRecord := newBranchRecord([]byte{0x01}, page.NewPageId(0, 99))
+		bn := newUninitializedBranchNode()
+		maxSize := bn.maxRecordSize()
+		bigKey := make([]byte, maxSize-12)
+		bigKey[0] = 0x10
+		bn.Initialize(bigKey, page.NewPageId(0, 1), page.NewPageId(0, 2))
+		bigKey2 := make([]byte, maxSize-12)
+		bigKey2[0] = 0x20
+		bn.Insert(bn.NumRecords(), newBranchRecord(bigKey2, page.NewPageId(0, 10)))
+		newBranch := newUninitializedBranchNode()
+		bigKey3 := make([]byte, maxSize-12)
+		bigKey3[0] = 0x05
+		newRecord := newBranchRecord(bigKey3, page.NewPageId(0, 99))
 
 		// WHEN
 		key, err := bn.SplitInsert(newBranch, newRecord)
@@ -176,7 +190,7 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 func TestBranchNodeRemove(t *testing.T) {
 	t.Run("レコードを削除できる", func(t *testing.T) {
 		// GIVEN
-		bn := newTestBranchNode(256)
+		bn := newTestBranchNode()
 		bn.Insert(1, newBranchRecord([]byte{0x20}, page.NewPageId(0, 10)))
 
 		// WHEN
@@ -190,7 +204,7 @@ func TestBranchNodeRemove(t *testing.T) {
 func TestBranchNodeUpdate(t *testing.T) {
 	t.Run("レコードを更新できる", func(t *testing.T) {
 		// GIVEN
-		bn := newTestBranchNode(256)
+		bn := newTestBranchNode()
 		newRecord := newBranchRecord([]byte{0xFF}, page.NewPageId(0, 99))
 
 		// WHEN
@@ -205,7 +219,7 @@ func TestBranchNodeUpdate(t *testing.T) {
 func TestBranchNodeNumRecords(t *testing.T) {
 	t.Run("レコード数を返す", func(t *testing.T) {
 		// GIVEN
-		bn := newTestBranchNode(256)
+		bn := newTestBranchNode()
 		bn.Insert(1, newBranchRecord([]byte{0x20}, page.NewPageId(0, 10)))
 
 		// WHEN / THEN
@@ -216,7 +230,7 @@ func TestBranchNodeNumRecords(t *testing.T) {
 func TestBranchNodeCanTransferRecord(t *testing.T) {
 	t.Run("レコードが 1 つ以下の場合は false を返す", func(t *testing.T) {
 		// GIVEN
-		bn := newTestBranchNode(256)
+		bn := newTestBranchNode()
 
 		// WHEN / THEN
 		assert.False(t, bn.CanTransferRecord(true))
@@ -225,9 +239,12 @@ func TestBranchNodeCanTransferRecord(t *testing.T) {
 
 	t.Run("転送後も半分以上埋まっている場合は true を返す", func(t *testing.T) {
 		// GIVEN
-		bn := newTestBranchNode(128)
-		for i := range 8 {
-			bn.Insert(bn.NumRecords(), newBranchRecord([]byte{byte(i + 2)}, page.NewPageId(0, page.PageNumber(i+10))))
+		bn := newTestBranchNode()
+		for i := range 100 {
+			key := make([]byte, 20)
+			key[0] = byte(i/256 + 0x11)
+			key[1] = byte(i % 256)
+			bn.Insert(bn.NumRecords(), newBranchRecord(key, page.NewPageId(0, page.PageNumber(i+10))))
 		}
 
 		// WHEN / THEN
@@ -239,7 +256,7 @@ func TestBranchNodeCanTransferRecord(t *testing.T) {
 func TestBranchNodeRecordAt(t *testing.T) {
 	t.Run("指定したスロット番号のレコードを取得できる", func(t *testing.T) {
 		// GIVEN
-		bn := newTestBranchNode(256)
+		bn := newTestBranchNode()
 		bn.Insert(1, newBranchRecord([]byte{0x20}, page.NewPageId(0, 10)))
 
 		// WHEN
@@ -253,7 +270,7 @@ func TestBranchNodeRecordAt(t *testing.T) {
 func TestBranchNodeSearchSlotNum(t *testing.T) {
 	t.Run("キーが見つかった場合はスロット番号と true を返す", func(t *testing.T) {
 		// GIVEN
-		bn := newTestBranchNode(256)
+		bn := newTestBranchNode()
 		bn.Insert(1, newBranchRecord([]byte{0x20}, page.NewPageId(0, 10)))
 
 		// WHEN
@@ -266,7 +283,7 @@ func TestBranchNodeSearchSlotNum(t *testing.T) {
 
 	t.Run("キーが見つからない場合は挿入位置と false を返す", func(t *testing.T) {
 		// GIVEN
-		bn := newTestBranchNode(256)
+		bn := newTestBranchNode()
 		bn.Insert(1, newBranchRecord([]byte{0x30}, page.NewPageId(0, 10)))
 
 		// WHEN
@@ -282,7 +299,7 @@ func TestBranchNodeChildPageId(t *testing.T) {
 	t.Run("通常のスロット番号の場合はレコードの NonKey から PageId を返す", func(t *testing.T) {
 		// GIVEN
 		childId := page.NewPageId(0, 10)
-		bn := newTestBranchNode(256)
+		bn := newTestBranchNode()
 		bn.Insert(1, newBranchRecord([]byte{0x20}, childId))
 
 		// WHEN
@@ -295,7 +312,7 @@ func TestBranchNodeChildPageId(t *testing.T) {
 
 	t.Run("スロット番号がレコード数と同じ場合は右の子の PageId を返す", func(t *testing.T) {
 		// GIVEN
-		bn := newTestBranchNode(256)
+		bn := newTestBranchNode()
 
 		// WHEN
 		id, err := bn.ChildPageId(bn.NumRecords())
@@ -310,7 +327,7 @@ func TestBranchNodeRightChildPageId(t *testing.T) {
 	t.Run("Initialize で設定した右の子の PageId を返す", func(t *testing.T) {
 		// GIVEN
 		rightChild := page.NewPageId(0, 2)
-		bn := newUninitializedBranchNode(256)
+		bn := newUninitializedBranchNode()
 		bn.Initialize([]byte{0x10}, page.NewPageId(0, 1), rightChild)
 
 		// WHEN
@@ -324,7 +341,7 @@ func TestBranchNodeRightChildPageId(t *testing.T) {
 func TestBranchNodeSetRightChildPageId(t *testing.T) {
 	t.Run("右の子の PageId を更新できる", func(t *testing.T) {
 		// GIVEN
-		bn := newTestBranchNode(256)
+		bn := newTestBranchNode()
 		newId := page.NewPageId(1, 99)
 
 		// WHEN
@@ -338,9 +355,9 @@ func TestBranchNodeSetRightChildPageId(t *testing.T) {
 func TestBranchNodeTransferAllFrom(t *testing.T) {
 	t.Run("全レコードを転送できる", func(t *testing.T) {
 		// GIVEN
-		src := newTestBranchNode(256)
+		src := newTestBranchNode()
 		src.Insert(1, newBranchRecord([]byte{0x20}, page.NewPageId(0, 10)))
-		dest := newTestBranchNode(256)
+		dest := newTestBranchNode()
 
 		// WHEN
 		ok := dest.TransferAllFrom(src)
@@ -355,7 +372,7 @@ func TestBranchNodeTransferAllFrom(t *testing.T) {
 func TestBranchNodeIsHalfFull(t *testing.T) {
 	t.Run("空の場合は false を返す", func(t *testing.T) {
 		// GIVEN
-		bn := newUninitializedBranchNode(256)
+		bn := newUninitializedBranchNode()
 		bn.body.Initialize()
 
 		// WHEN / THEN
@@ -364,9 +381,12 @@ func TestBranchNodeIsHalfFull(t *testing.T) {
 
 	t.Run("半分以上埋まっている場合は true を返す", func(t *testing.T) {
 		// GIVEN
-		bn := newTestBranchNode(128)
-		for i := range 8 {
-			bn.Insert(bn.NumRecords(), newBranchRecord([]byte{byte(i + 2)}, page.NewPageId(0, page.PageNumber(i+10))))
+		bn := newTestBranchNode()
+		for i := range 100 {
+			key := make([]byte, 20)
+			key[0] = byte(i/256 + 0x11)
+			key[1] = byte(i % 256)
+			bn.Insert(bn.NumRecords(), newBranchRecord(key, page.NewPageId(0, page.PageNumber(i+10))))
 		}
 
 		// WHEN / THEN
@@ -375,9 +395,8 @@ func TestBranchNodeIsHalfFull(t *testing.T) {
 }
 
 // newUninitializedBranchNode は未初期化の BranchNode を作成する
-func newUninitializedBranchNode(size int) *BranchNode {
-	data := make([]byte, size)
-	pg, err := page.NewPage(data)
+func newUninitializedBranchNode() *BranchNode {
+	pg, err := page.NewPage(make([]byte, page.PageSize))
 	if err != nil {
 		panic(err)
 	}
@@ -385,8 +404,8 @@ func newUninitializedBranchNode(size int) *BranchNode {
 }
 
 // newTestBranchNode は初期化済みの BranchNode を作成する (レコード 1 つ、key=0x10)
-func newTestBranchNode(size int) *BranchNode {
-	bn := newUninitializedBranchNode(size)
+func newTestBranchNode() *BranchNode {
+	bn := newUninitializedBranchNode()
 	bn.Initialize([]byte{0x10}, page.NewPageId(0, 1), page.NewPageId(0, 2))
 	return bn
 }
