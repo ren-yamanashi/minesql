@@ -66,8 +66,8 @@ func (l *LRU) Evict() BufferId {
 	return victim.bufferId
 }
 
-// Remove はページの参照を解除し、優先的に追い出されるようにする
-func (l *LRU) Remove(bufferId BufferId) {
+// Delete はページの参照を解除し、優先的に追い出されるようにする
+func (l *LRU) Delete(bufferId BufferId) {
 	node := l.nodeMap[bufferId]
 	l.moveToOldTail(node)
 }

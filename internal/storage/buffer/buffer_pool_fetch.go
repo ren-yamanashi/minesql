@@ -62,7 +62,7 @@ func (bp *BufferPool) UnRefPage(pageId page.PageId) {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
 	if bufferId, exists := bp.pageTable.GetBufferId(pageId); exists {
-		bp.lru.Remove(bufferId)
+		bp.lru.Delete(bufferId)
 	}
 }
 

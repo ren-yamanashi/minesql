@@ -60,7 +60,7 @@ func TestNewBtree(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		metaPageId, _ := bp.AllocatePageId(0)
-		CreateBtree(bp, metaPageId)
+		_, _ = CreateBtree(bp, metaPageId)
 
 		// WHEN
 		bt := NewBtree(bp, metaPageId)
@@ -73,7 +73,7 @@ func TestNewBtree(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		metaPageId, _ := bp.AllocatePageId(0)
-		CreateBtree(bp, metaPageId)
+		_, _ = CreateBtree(bp, metaPageId)
 
 		// WHEN
 		bt := NewBtree(bp, metaPageId)

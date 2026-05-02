@@ -52,8 +52,8 @@ func (sp *SlottedPage) Insert(index int, data []byte) bool {
 	return true
 }
 
-// Remove は指定されたインデックスのデータを削除する
-func (sp *SlottedPage) Remove(index int) {
+// Delete は指定されたインデックスのデータを削除する
+func (sp *SlottedPage) Delete(index int) {
 	sp.Resize(index, 0)
 	numSlots := sp.NumSlots()
 

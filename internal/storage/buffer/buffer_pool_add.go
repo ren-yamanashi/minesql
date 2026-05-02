@@ -41,7 +41,7 @@ func (bp *BufferPool) addPage(pageId page.PageId) (*BufferPage, error) {
 			return nil, err
 		}
 
-		bp.flushList.Remove(victimBufPage.PageId)
+		bp.flushList.Delete(victimBufPage.PageId)
 	}
 
 	// 新しいページに置き換え

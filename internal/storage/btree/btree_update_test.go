@@ -13,7 +13,7 @@ func TestUpdate(t *testing.T) {
 		bp := setupBtreeTestBufferPool(t)
 		metaPageId, _ := bp.AllocatePageId(0)
 		bt, _ := CreateBtree(bp, metaPageId)
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
 		err := bt.Update(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
@@ -30,7 +30,7 @@ func TestUpdate(t *testing.T) {
 		bp := setupBtreeTestBufferPool(t)
 		metaPageId, _ := bp.AllocatePageId(0)
 		bt, _ := CreateBtree(bp, metaPageId)
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
 		err := bt.Update(node.NewRecord([]byte{}, []byte{0xFF}, []byte{0xBB}))
@@ -57,8 +57,8 @@ func TestUpdate(t *testing.T) {
 		bp := setupBtreeTestBufferPool(t)
 		metaPageId, _ := bp.AllocatePageId(0)
 		bt, _ := CreateBtree(bp, metaPageId)
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
 
 		// WHEN
 		err := bt.Update(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xFF}))
@@ -81,9 +81,9 @@ func TestUpdate(t *testing.T) {
 		metaPageId, _ := bp.AllocatePageId(0)
 		bt, _ := CreateBtree(bp, metaPageId)
 		nonKey := make([]byte, 1500)
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x03}, nonKey))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x03}, nonKey))
 		height, _ := bt.Height()
 		assert.Equal(t, uint64(2), height)
 
@@ -105,8 +105,8 @@ func TestUpdate(t *testing.T) {
 		metaPageId, _ := bp.AllocatePageId(0)
 		bt, _ := CreateBtree(bp, metaPageId)
 		nonKey := make([]byte, 1500)
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, nonKey))
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x20}, nonKey))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, nonKey))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x20}, nonKey))
 
 		// WHEN (ページの空き容量を超える nonKey で更新)
 		hugeNonKey := make([]byte, 3000)
@@ -121,10 +121,10 @@ func TestUpdate(t *testing.T) {
 		bp := setupBtreeTestBufferPool(t)
 		metaPageId, _ := bp.AllocatePageId(0)
 		bt, _ := CreateBtree(bp, metaPageId)
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
-		bt.Update(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
+		_ = bt.Update(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
 		err := bt.Update(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xCC}))
 
 		// THEN

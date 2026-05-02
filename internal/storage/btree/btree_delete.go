@@ -117,7 +117,7 @@ func (bt *Btree) deleteRecursively(bufPage *buffer.BufferPage, key []byte) (unde
 		if !found {
 			return false, false, ErrKeyNotFound
 		}
-		leafNode.Remove(slotNum)
+		leafNode.Delete(slotNum)
 		return !leafNode.IsHalfFull(), false, nil
 
 	default:

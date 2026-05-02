@@ -87,9 +87,9 @@ func (ln *LeafNode) SplitInsert(newLeaf *LeafNode, newRecord Record) ([]byte, er
 	return ln.Record(0).Key(), nil
 }
 
-// Remove はレコードを削除する
-func (ln *LeafNode) Remove(slotNum int) {
-	ln.body.Remove(slotNum)
+// Delete はレコードを削除する
+func (ln *LeafNode) Delete(slotNum int) {
+	ln.body.Delete(slotNum)
 }
 
 // Update は指定されたスロットのレコードを更新する
@@ -182,6 +182,6 @@ func (ln *LeafNode) transfer(dest *LeafNode) error {
 		return errors.New("no space in dest leaf node")
 	}
 
-	ln.body.Remove(0)
+	ln.body.Delete(0)
 	return nil
 }

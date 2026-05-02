@@ -93,7 +93,7 @@ func (bt *Btree) onLeafUnderflow(
 			if !childLeaf.Insert(0, siblingRecord) {
 				return false, false, errors.New("new leaf node must have space")
 			}
-			siblingLeaf.Remove(lastSlotNum)
+			siblingLeaf.Delete(lastSlotNum)
 			parentRecord := parentBranch.Record(childSlotNum - 1)
 			updated := node.NewRecord(parentRecord.Header(), childLeaf.Record(0).Key(), parentRecord.NonKey())
 			if !parentBranch.Update(childSlotNum-1, updated) {
@@ -107,7 +107,7 @@ func (bt *Btree) onLeafUnderflow(
 		if !childLeaf.Insert(childLeaf.NumRecords(), siblingRecord) {
 			return false, false, errors.New("new leaf node must have space")
 		}
-		siblingLeaf.Remove(0)
+		siblingLeaf.Delete(0)
 		parentRecord := parentBranch.Record(childSlotNum)
 		updated := node.NewRecord(parentRecord.Header(), siblingLeaf.Record(0).Key(), parentRecord.NonKey())
 		if !parentBranch.Update(childSlotNum, updated) {
@@ -134,7 +134,7 @@ func (bt *Btree) onLeafUnderflow(
 			nextLeaf.SetPrevPageId(sibling.bufferPage.PageId)
 		}
 		// 親の右端のレコードは不要になるので削除し、RightChild を兄弟ノードに更新
-		parentBranch.Remove(parentBranch.NumRecords() - 1)
+		parentBranch.Delete(parentBranch.NumRecords() - 1)
 		parentBranch.SetRightChildPageId(sibling.bufferPage.PageId)
 		return !parentBranch.IsHalfFull(), true, nil
 	}
@@ -157,7 +157,7 @@ func (bt *Btree) onLeafUnderflow(
 
 	// 兄弟が RightChild(右端) の場合、親の右端のレコードを削除し、RightChild を子ノードに更新
 	if childSlotNum+1 == parentBranch.NumRecords() {
-		parentBranch.Remove(parentBranch.NumRecords() - 1)
+		parentBranch.Delete(parentBranch.NumRecords() - 1)
 		parentBranch.SetRightChildPageId(childBufPage.PageId)
 		return !parentBranch.IsHalfFull(), true, nil
 	}
@@ -169,7 +169,7 @@ func (bt *Btree) onLeafUnderflow(
 	if !parentBranch.Update(childSlotNum, updated) {
 		return false, false, errors.New("failed to update parent branch node key")
 	}
-	parentBranch.Remove(childSlotNum + 1) // 右の兄弟を削除するので `childSlotNum + 1`
+	parentBranch.Delete(childSlotNum + 1) // 右の兄弟を削除するので `childSlotNum + 1`
 	return !parentBranch.IsHalfFull(), true, nil
 }
 
@@ -219,7 +219,7 @@ func (bt *Btree) onBranchUnderflow(
 				return false, err
 			}
 			siblingBranch.SetRightChildPageId(rightChildPageId)
-			siblingBranch.Remove(lastSlotNum)
+			siblingBranch.Delete(lastSlotNum)
 			return false, nil
 		}
 
@@ -241,7 +241,7 @@ func (bt *Btree) onBranchUnderflow(
 		if !parentBranch.Update(childSlotNum, updated) {
 			return false, errors.New("failed to update parent branch node key")
 		}
-		siblingBranch.Remove(0)
+		siblingBranch.Delete(0)
 		return false, nil
 	}
 
@@ -257,7 +257,7 @@ func (bt *Btree) onBranchUnderflow(
 		siblingBranch.TransferAllFrom(childBranch)
 		siblingBranch.SetRightChildPageId(childBranch.RightChildPageId())
 		// 親の右端のレコードは不要になるので削除し、RightChild を兄弟ノードに更新
-		parentBranch.Remove(parentBranch.NumRecords() - 1)
+		parentBranch.Delete(parentBranch.NumRecords() - 1)
 		parentBranch.SetRightChildPageId(sibling.bufferPage.PageId)
 		return !parentBranch.IsHalfFull(), nil
 	}
@@ -275,7 +275,7 @@ func (bt *Btree) onBranchUnderflow(
 
 	// 兄弟が RightChild(右端) の場合、親の右端のレコードを削除し、RightChild を子ノードに更新
 	if childSlotNum+1 == parentBranch.NumRecords() {
-		parentBranch.Remove(parentBranch.NumRecords() - 1)
+		parentBranch.Delete(parentBranch.NumRecords() - 1)
 		parentBranch.SetRightChildPageId(childBufPage.PageId)
 		return !parentBranch.IsHalfFull(), nil
 	}
@@ -287,7 +287,7 @@ func (bt *Btree) onBranchUnderflow(
 	if !parentBranch.Update(childSlotNum, updated) {
 		return false, errors.New("failed to update parent branch node key")
 	}
-	parentBranch.Remove(childSlotNum + 1)
+	parentBranch.Delete(childSlotNum + 1)
 	return !parentBranch.IsHalfFull(), nil
 }
 

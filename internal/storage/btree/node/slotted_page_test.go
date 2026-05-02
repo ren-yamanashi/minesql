@@ -51,14 +51,14 @@ func TestInsert(t *testing.T) {
 	})
 }
 
-func TestRemove(t *testing.T) {
+func TestDelete(t *testing.T) {
 	t.Run("データを削除できる", func(t *testing.T) {
 		// GIVEN
 		sp := newTestSlottedPage(64)
 		sp.Insert(0, []byte{0xAA})
 
 		// WHEN
-		sp.Remove(0)
+		sp.Delete(0)
 
 		// THEN
 		assert.Equal(t, 0, sp.NumSlots())
@@ -72,7 +72,7 @@ func TestRemove(t *testing.T) {
 		sp.Insert(2, []byte{0x03})
 
 		// WHEN
-		sp.Remove(1)
+		sp.Delete(1)
 
 		// THEN
 		assert.Equal(t, 2, sp.NumSlots())
@@ -87,7 +87,7 @@ func TestRemove(t *testing.T) {
 		sp.Insert(1, []byte{0x02})
 
 		// WHEN
-		sp.Remove(1)
+		sp.Delete(1)
 
 		// THEN
 		assert.Equal(t, 1, sp.NumSlots())

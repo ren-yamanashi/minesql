@@ -66,7 +66,7 @@ func TestFlushListAdd(t *testing.T) {
 	})
 }
 
-func TestFlushListRemove(t *testing.T) {
+func TestFlushListDelete(t *testing.T) {
 	t.Run("先頭のページを削除できる", func(t *testing.T) {
 		// GIVEN
 		fl := NewFlushList()
@@ -76,7 +76,7 @@ func TestFlushListRemove(t *testing.T) {
 		fl.Add(id2)
 
 		// WHEN
-		fl.Remove(id1)
+		fl.Delete(id1)
 
 		// THEN
 		assert.Equal(t, uint32(1), fl.NumOfPage)
@@ -92,7 +92,7 @@ func TestFlushListRemove(t *testing.T) {
 		fl.Add(id2)
 
 		// WHEN
-		fl.Remove(id2)
+		fl.Delete(id2)
 
 		// THEN
 		assert.Equal(t, uint32(1), fl.NumOfPage)
@@ -110,7 +110,7 @@ func TestFlushListRemove(t *testing.T) {
 		fl.Add(id3)
 
 		// WHEN
-		fl.Remove(id2)
+		fl.Delete(id2)
 
 		// THEN
 		assert.Equal(t, uint32(2), fl.NumOfPage)
@@ -125,7 +125,7 @@ func TestFlushListRemove(t *testing.T) {
 		fl.Add(pageId)
 
 		// WHEN
-		fl.Remove(pageId)
+		fl.Delete(pageId)
 
 		// THEN
 		assert.Equal(t, uint32(0), fl.NumOfPage)
@@ -139,7 +139,7 @@ func TestFlushListRemove(t *testing.T) {
 		fl.Add(page.NewPageId(0, 1))
 
 		// WHEN
-		fl.Remove(page.NewPageId(0, 99))
+		fl.Delete(page.NewPageId(0, 99))
 
 		// THEN
 		assert.Equal(t, uint32(1), fl.NumOfPage)

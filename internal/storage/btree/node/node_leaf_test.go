@@ -101,14 +101,14 @@ func TestLeafNodeSplitInsert(t *testing.T) {
 	})
 }
 
-func TestLeafNodeRemove(t *testing.T) {
+func TestLeafNodeDelete(t *testing.T) {
 	t.Run("レコードを削除できる", func(t *testing.T) {
 		// GIVEN
 		ln := newTestLeafNode()
 		ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
-		ln.Remove(0)
+		ln.Delete(0)
 
 		// THEN
 		assert.Equal(t, 0, ln.NumRecords())

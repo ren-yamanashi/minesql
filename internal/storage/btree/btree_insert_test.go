@@ -31,9 +31,9 @@ func TestInsert(t *testing.T) {
 		bt, _ := CreateBtree(bp, metaPageId)
 
 		// WHEN
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x30}, []byte{0xCC}))
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x30}, []byte{0xCC}))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
 
 		// THEN
 		iter, err := bt.Search(SearchModeStart{})
@@ -54,7 +54,7 @@ func TestInsert(t *testing.T) {
 		bp := setupBtreeTestBufferPool(t)
 		metaPageId, _ := bp.AllocatePageId(0)
 		bt, _ := CreateBtree(bp, metaPageId)
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
 		err := bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
@@ -69,8 +69,8 @@ func TestInsert(t *testing.T) {
 		metaPageId, _ := bp.AllocatePageId(0)
 		bt, _ := CreateBtree(bp, metaPageId)
 		nonKey := make([]byte, 1500)
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
 		countBefore, _ := bt.LeafPageCount()
 
 		// WHEN
@@ -88,8 +88,8 @@ func TestInsert(t *testing.T) {
 		metaPageId, _ := bp.AllocatePageId(0)
 		bt, _ := CreateBtree(bp, metaPageId)
 		nonKey := make([]byte, 1500)
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
 		heightBefore, _ := bt.Height()
 		assert.Equal(t, uint64(1), heightBefore)
 
@@ -110,9 +110,9 @@ func TestInsert(t *testing.T) {
 		nonKey := make([]byte, 1500)
 
 		// WHEN
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x03}, nonKey))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x03}, nonKey))
 
 		// THEN
 		for _, key := range [][]byte{{0x01}, {0x02}, {0x03}} {
@@ -127,9 +127,9 @@ func TestInsert(t *testing.T) {
 		metaPageId, _ := bp.AllocatePageId(0)
 		bt, _ := CreateBtree(bp, metaPageId)
 		nonKey := make([]byte, 1500)
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x03}, nonKey))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x03}, nonKey))
 		height, _ := bt.Height()
 		assert.Equal(t, uint64(2), height)
 
@@ -145,7 +145,7 @@ func TestInsert(t *testing.T) {
 		bp := setupBtreeTestBufferPool(t)
 		metaPageId, _ := bp.AllocatePageId(0)
 		bt, _ := CreateBtree(bp, metaPageId)
-		bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 		countBefore, _ := bt.LeafPageCount()
 		heightBefore, _ := bt.Height()
 

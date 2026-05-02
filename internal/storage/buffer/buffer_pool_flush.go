@@ -70,7 +70,7 @@ func (bp *BufferPool) FlushOldestPages(n int) error {
 
 		bufPage := &bp.bufferPages[bufId]
 		if !bufPage.IsDirty {
-			bp.flushList.Remove(pid)
+			bp.flushList.Delete(pid)
 			continue
 		}
 
@@ -83,7 +83,7 @@ func (bp *BufferPool) FlushOldestPages(n int) error {
 		}
 
 		bufPage.IsDirty = false
-		bp.flushList.Remove(pid)
+		bp.flushList.Delete(pid)
 		syncHeapFiles[pid.FileId] = true
 	}
 

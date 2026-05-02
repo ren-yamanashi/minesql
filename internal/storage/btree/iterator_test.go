@@ -83,7 +83,7 @@ func TestIteratorNext(t *testing.T) {
 		iter := NewIterator(bp, *bufPage, 0)
 
 		// WHEN
-		iter.Next()
+		_, _, _ = iter.Next()
 
 		// THEN
 		assert.Equal(t, pageId, iter.LastPosition.PageId)

@@ -130,7 +130,7 @@ func TestPageTableUpdate(t *testing.T) {
 	})
 }
 
-func TestPageTableRemove(t *testing.T) {
+func TestPageTableDelete(t *testing.T) {
 	t.Run("存在する PageId を削除できる", func(t *testing.T) {
 		// GIVEN
 		pt := NewPageTable()
@@ -138,7 +138,7 @@ func TestPageTableRemove(t *testing.T) {
 		pt.Add(pageId, BufferId(0))
 
 		// WHEN
-		pt.Remove(pageId)
+		pt.Delete(pageId)
 
 		// THEN
 		_, exists := pt.GetBufferId(pageId)
@@ -151,7 +151,7 @@ func TestPageTableRemove(t *testing.T) {
 		pt.Add(page.NewPageId(0, 1), BufferId(0))
 
 		// WHEN
-		pt.Remove(page.NewPageId(0, 99))
+		pt.Delete(page.NewPageId(0, 99))
 
 		// THEN
 		_, exists := pt.GetBufferId(page.NewPageId(0, 1))

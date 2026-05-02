@@ -31,8 +31,8 @@ func (pt PageTable) Update(evictPageId, newPageId page.PageId, bufferId BufferId
 	pt[newPageId] = bufferId
 }
 
-// Remove は pageId に対応するエントリをテーブルから削除する
-func (pt PageTable) Remove(pageId page.PageId) {
+// Delete は pageId に対応するエントリをテーブルから削除する
+func (pt PageTable) Delete(pageId page.PageId) {
 	delete(pt, pageId)
 }
 

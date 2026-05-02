@@ -44,8 +44,8 @@ func (fl *FlushList) Add(pageId page.PageId) {
 	fl.NumOfPage++
 }
 
-// Remove はページをフラッシュリストから削除する
-func (fl *FlushList) Remove(pageId page.PageId) {
+// Delete はページをフラッシュリストから削除する
+func (fl *FlushList) Delete(pageId page.PageId) {
 	node, exists := fl.nodeMap[pageId]
 	if !exists {
 		return

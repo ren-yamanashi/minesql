@@ -99,6 +99,6 @@ func newSearchModeKeyTestBranchNode() *node.BranchNode {
 		panic(err)
 	}
 	bn := node.NewBranchNode(pg)
-	bn.Initialize([]byte{0x10}, page.NewPageId(0, 1), page.NewPageId(0, 2))
+	_ = bn.Initialize([]byte{0x10}, page.NewPageId(0, 1), page.NewPageId(0, 2))
 	return bn
 }

@@ -103,9 +103,9 @@ func (bn *BranchNode) SplitInsert(newBranch *BranchNode, newRecord Record) ([]by
 	}
 }
 
-// Remove はレコードを削除する
-func (bn *BranchNode) Remove(slotNum int) {
-	bn.body.Remove(slotNum)
+// Delete はレコードを削除する
+func (bn *BranchNode) Delete(slotNum int) {
+	bn.body.Delete(slotNum)
 }
 
 // Update は指定されたスロットのレコードを更新する
@@ -193,7 +193,7 @@ func (bn *BranchNode) fillRightChild() ([]byte, error) {
 
 	key := make([]byte, len(record.Key()))
 	copy(key, record.Key())
-	bn.body.Remove(lastSlotNum)
+	bn.body.Delete(lastSlotNum)
 	rightChild.WriteTo(bn.header[nodeHeaderSize:], 0)
 	return key, nil
 }
@@ -236,6 +236,6 @@ func (bn *BranchNode) transfer(dest *BranchNode) error {
 		return errors.New("no space in dest branch node")
 	}
 
-	bn.body.Remove(0)
+	bn.body.Delete(0)
 	return nil
 }

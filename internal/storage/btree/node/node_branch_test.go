@@ -76,7 +76,7 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 	t.Run("挿入キーが先頭キー以下の場合に分割できる", func(t *testing.T) {
 		// GIVEN
 		bn := newUninitializedBranchNode()
-		bn.Initialize([]byte{0x10}, page.NewPageId(0, 1), page.NewPageId(0, 2))
+		_ = bn.Initialize([]byte{0x10}, page.NewPageId(0, 1), page.NewPageId(0, 2))
 		for i := range 150 {
 			bn.Insert(bn.NumRecords(), newBranchRecord([]byte{byte(i/256 + 0x11), byte(i % 256)}, page.NewPageId(0, page.PageNumber(i+10))))
 		}
@@ -99,7 +99,7 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 		maxSize := bn.maxRecordSize()
 		bigKey := make([]byte, maxSize-12)
 		bigKey[0] = 0x01
-		bn.Initialize(bigKey, page.NewPageId(0, 1), page.NewPageId(0, 2))
+		_ = bn.Initialize(bigKey, page.NewPageId(0, 1), page.NewPageId(0, 2))
 		bigKey2 := make([]byte, maxSize-12)
 		bigKey2[0] = 0x02
 		bn.Insert(bn.NumRecords(), newBranchRecord(bigKey2, page.NewPageId(0, 10)))
@@ -123,7 +123,7 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 		maxSize := bn.maxRecordSize()
 		bigKey := make([]byte, maxSize-12)
 		bigKey[0] = 0x01
-		bn.Initialize(bigKey, page.NewPageId(0, 1), page.NewPageId(0, 2))
+		_ = bn.Initialize(bigKey, page.NewPageId(0, 1), page.NewPageId(0, 2))
 		bigKey2 := make([]byte, maxSize-12)
 		bigKey2[0] = 0x02
 		bn.Insert(bn.NumRecords(), newBranchRecord(bigKey2, page.NewPageId(0, 10)))
@@ -146,7 +146,7 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 		maxSize := bn.maxRecordSize()
 		bigKey := make([]byte, maxSize-12)
 		bigKey[0] = 0x10
-		bn.Initialize(bigKey, page.NewPageId(0, 1), page.NewPageId(0, 2))
+		_ = bn.Initialize(bigKey, page.NewPageId(0, 1), page.NewPageId(0, 2))
 		bigKey2 := make([]byte, maxSize-12)
 		bigKey2[0] = 0x20
 		bn.Insert(bn.NumRecords(), newBranchRecord(bigKey2, page.NewPageId(0, 10)))
@@ -169,7 +169,7 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 		maxSize := bn.maxRecordSize()
 		bigKey := make([]byte, maxSize-12)
 		bigKey[0] = 0x10
-		bn.Initialize(bigKey, page.NewPageId(0, 1), page.NewPageId(0, 2))
+		_ = bn.Initialize(bigKey, page.NewPageId(0, 1), page.NewPageId(0, 2))
 		bigKey2 := make([]byte, maxSize-12)
 		bigKey2[0] = 0x20
 		bn.Insert(bn.NumRecords(), newBranchRecord(bigKey2, page.NewPageId(0, 10)))
@@ -187,14 +187,14 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 	})
 }
 
-func TestBranchNodeRemove(t *testing.T) {
+func TestBranchNodeDelete(t *testing.T) {
 	t.Run("レコードを削除できる", func(t *testing.T) {
 		// GIVEN
 		bn := newTestBranchNode()
 		bn.Insert(1, newBranchRecord([]byte{0x20}, page.NewPageId(0, 10)))
 
 		// WHEN
-		bn.Remove(1)
+		bn.Delete(1)
 
 		// THEN
 		assert.Equal(t, 1, bn.NumRecords())
@@ -328,7 +328,7 @@ func TestBranchNodeRightChildPageId(t *testing.T) {
 		// GIVEN
 		rightChild := page.NewPageId(0, 2)
 		bn := newUninitializedBranchNode()
-		bn.Initialize([]byte{0x10}, page.NewPageId(0, 1), rightChild)
+		_ = bn.Initialize([]byte{0x10}, page.NewPageId(0, 1), rightChild)
 
 		// WHEN
 		id := bn.RightChildPageId()
@@ -406,7 +406,7 @@ func newUninitializedBranchNode() *BranchNode {
 // newTestBranchNode は初期化済みの BranchNode を作成する (レコード 1 つ、key=0x10)
 func newTestBranchNode() *BranchNode {
 	bn := newUninitializedBranchNode()
-	bn.Initialize([]byte{0x10}, page.NewPageId(0, 1), page.NewPageId(0, 2))
+	_ = bn.Initialize([]byte{0x10}, page.NewPageId(0, 1), page.NewPageId(0, 2))
 	return bn
 }
 

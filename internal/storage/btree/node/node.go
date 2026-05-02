@@ -12,8 +12,8 @@ var (
 type Node interface {
 	// Insert はレコードを挿入する
 	Insert(slotNum int, record Record) bool
-	// Remove はレコードを削除する
-	Remove(slotNum int)
+	// Delete はレコードを削除する
+	Delete(slotNum int)
 	// CanTransferRecord は兄弟ノードにレコードを転送できるか判定する
 	CanTransferRecord(toRight bool) bool
 	// NumRecords はレコード数を取得する
