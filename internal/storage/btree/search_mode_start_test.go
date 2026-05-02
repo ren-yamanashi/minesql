@@ -40,16 +40,24 @@ func TestSearchModeStartChildPageId(t *testing.T) {
 
 // newSearchModeStartTestLeafNode はテスト用の初期化済み LeafNode を作成する
 func newSearchModeStartTestLeafNode() *node.LeafNode {
-	data := make([]byte, 256)
-	ln := node.NewLeafNode(data)
+	data := make([]byte, page.PageSize)
+	pg, err := page.NewPage(data)
+	if err != nil {
+		panic(err)
+	}
+	ln := node.NewLeafNode(pg)
 	ln.Initialize()
 	return ln
 }
 
 // newSearchModeStartTestBranchNode はテスト用の初期化済み BranchNode を作成する
 func newSearchModeStartTestBranchNode() *node.BranchNode {
-	data := make([]byte, 256)
-	bn := node.NewBranchNode(data)
+	data := make([]byte, page.PageSize)
+	pg, err := page.NewPage(data)
+	if err != nil {
+		panic(err)
+	}
+	bn := node.NewBranchNode(pg)
 	bn.Initialize([]byte{0x10}, page.NewPageId(0, 1), page.NewPageId(0, 2))
 	return bn
 }

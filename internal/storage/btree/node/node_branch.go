@@ -16,7 +16,8 @@ type BranchNode struct {
 	body   *SlottedPage
 }
 
-func NewBranchNode(data []byte) *BranchNode {
+func NewBranchNode(pg *page.Page) *BranchNode {
+	data := pg.Body
 	copy(data[0:8], NodeTypeBranch)
 	headerSize := nodeHeaderSize + branchHeaderSize
 	header := data[:headerSize]

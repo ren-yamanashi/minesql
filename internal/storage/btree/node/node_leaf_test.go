@@ -309,7 +309,11 @@ func TestLeafNodeIsHalfFull(t *testing.T) {
 // newTestLeafNode は初期化済みの LeafNode を作成する
 func newTestLeafNode(size int) *LeafNode {
 	data := make([]byte, size)
-	ln := NewLeafNode(data)
+	pg, err := page.NewPage(data)
+	if err != nil {
+		panic(err)
+	}
+	ln := NewLeafNode(pg)
 	ln.Initialize()
 	return ln
 }

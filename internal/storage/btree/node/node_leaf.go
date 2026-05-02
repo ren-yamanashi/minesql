@@ -17,7 +17,8 @@ type LeafNode struct {
 	body   *SlottedPage
 }
 
-func NewLeafNode(data []byte) *LeafNode {
+func NewLeafNode(pg *page.Page) *LeafNode {
+	data := pg.Body
 	copy(data[0:8], NodeTypeLeaf)
 	headerSize := nodeHeaderSize + leafHeaderSize
 	header := data[:headerSize]

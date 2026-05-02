@@ -29,7 +29,7 @@ func (iter *Iterator) Get() (node.Record, bool, error) {
 	if err != nil {
 		return node.NewRecord(nil, nil, nil), false, err
 	}
-	leaf := node.NewLeafNode(pg.Body)
+	leaf := node.NewLeafNode(pg)
 
 	if iter.slotNum < leaf.NumRecords() {
 		record := leaf.Record(iter.slotNum)
@@ -69,7 +69,7 @@ func (iter *Iterator) Advance() error {
 	if err != nil {
 		return err
 	}
-	leaf := node.NewLeafNode(pg.Body)
+	leaf := node.NewLeafNode(pg)
 
 	// 現在のページ内に、次のレコードがある場合
 	if iter.slotNum < leaf.NumRecords() {
