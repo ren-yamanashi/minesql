@@ -22,8 +22,9 @@ clean:
 	rm -rf bin/
 
 doc:
-	@echo "Starting godoc server at http://localhost:6060 (e.g. http://localhost:6060/pkg/minesql/internal/storage/disk/)"
+	@echo "Starting godoc server at http://localhost:6060"
 	@echo "Press Ctrl+C to stop"
+	@sleep 1 && open http://localhost:6060/pkg/github.com/ren-yamanashi/minesql/internal/storage/file/ &
 	godoc -http=:6060
 
 build:

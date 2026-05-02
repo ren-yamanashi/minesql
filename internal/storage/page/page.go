@@ -4,14 +4,14 @@ import (
 	"fmt"
 )
 
-const PageSize = 4096
-const PageHeaderSize = 4
+const (
+	PageSize       = 4096
+	PageHeaderSize = 4
+)
 
 var ErrInvalidDataSize = fmt.Errorf("data size must be %d bytes", PageSize)
 
 // Page は 4KB のページ
-//
-// レイアウト:
 //   - ヘッダー: 先頭 4 バイト
 //   - ボディ: 残りバイト
 type Page struct {
