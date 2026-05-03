@@ -29,23 +29,18 @@ func NewPrimaryIndex(bp *buffer.BufferPool, metaPageId page.PageId, pkCount int)
 
 // CreatePrimaryIndex は空のプライマリインデックスを作成する
 //   - fileId: プライマリインデックスを格納するファイルの ID
-func CreatePrimaryIndex(bp *buffer.BufferPool, fileId page.FileId) (*PrimaryIndex, error) {
+func CreatePrimaryIndex(bp *buffer.BufferPool, fileId page.FileId, pkCount int) (*PrimaryIndex, error) {
 	tree, err := btree.CreateBtree(bp, fileId)
 	if err != nil {
 		return nil, err
 	}
 	return &PrimaryIndex{
 		tree:    tree,
-		pkCount: 0,
+		pkCount: pkCount,
 	}, nil
 }
 
-// SetPkCount はプライマリキーのカラム数を設定する
-func (pi *PrimaryIndex) SetPkCount(pkCount int) {
-	pi.pkCount = pkCount
-}
-
-// Search は指定した検索モードでテーブルを検索し、PrimaryIterator を返す
+// Search は指定した検索モードでテーブルを検索し、イテレータを返す
 func (pi *PrimaryIndex) Search(mode SearchMode) (*PrimaryIterator, error) {
 	iter, err := pi.tree.Search(mode.encode())
 	if err != nil {

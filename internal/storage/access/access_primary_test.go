@@ -14,7 +14,7 @@ func TestCreatePrimaryIndex(t *testing.T) {
 		bp := setupSecondaryTestBufferPool(t)
 
 		// WHEN
-		pi, err := CreatePrimaryIndex(bp, page.FileId(0))
+		pi, err := CreatePrimaryIndex(bp, page.FileId(0), 1)
 
 		// THEN
 		assert.NoError(t, err)
@@ -318,10 +318,9 @@ func TestPrimaryIndexHeight(t *testing.T) {
 func setupTestPrimaryIndex(t *testing.T, pkCount int) *PrimaryIndex {
 	t.Helper()
 	bp := setupSecondaryTestBufferPool(t)
-	pi, err := CreatePrimaryIndex(bp, page.FileId(0))
+	pi, err := CreatePrimaryIndex(bp, page.FileId(0), pkCount)
 	if err != nil {
 		t.Fatalf("PrimaryIndex の作成に失敗: %v", err)
 	}
-	pi.SetPkCount(pkCount)
 	return pi
 }

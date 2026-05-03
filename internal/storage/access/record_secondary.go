@@ -1,8 +1,6 @@
 package access
 
 import (
-	"encoding/binary"
-
 	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 )
@@ -26,13 +24,9 @@ func newSecondaryRecord(skCount int, deleteMark byte, data [][]byte) *SecondaryR
 func (sr *SecondaryRecord) encode() node.Record {
 	var key []byte
 	encode.Encode(sr.data[:sr.skCount], &key)
-	skByteLen := len(key)
 	encode.Encode(sr.data[sr.skCount:], &key)
 
-	nonKey := make([]byte, 2)
-	binary.BigEndian.PutUint16(nonKey, uint16(skByteLen))
-
-	return node.NewRecord([]byte{sr.deleteMark}, key, nonKey)
+	return node.NewRecord([]byte{sr.deleteMark}, key, nil)
 }
 
 // encodedSecondaryKey はエンコード済みのセカンダリキーを返す

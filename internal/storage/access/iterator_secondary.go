@@ -14,23 +14,20 @@ type SearchResult struct {
 
 // SecondaryIterator はセカンダリインデックスを辿るイテレータ
 type SecondaryIterator struct {
-	iterator     *btree.Iterator
-	primaryBtree *btree.Btree // プライマリインデックスの B+Tree
-	pkCount      int          // PrimaryKey のカラム数
-	skCount      int          // SecondaryKey のカラム数
+	iterator    *btree.Iterator
+	primaryTree *btree.Btree // プライマリインデックスの B+Tree
+	skCount     int          // SecondaryKey のカラム数
 }
 
 func newSecondaryIterator(
 	iter *btree.Iterator,
 	pb *btree.Btree,
-	pkCount int,
 	skCount int,
 ) *SecondaryIterator {
 	return &SecondaryIterator{
-		iterator:     iter,
-		primaryBtree: pb,
-		pkCount:      pkCount,
-		skCount:      skCount,
+		iterator:    iter,
+		primaryTree: pb,
+		skCount:     skCount,
 	}
 }
 
@@ -47,7 +44,7 @@ func (si *SecondaryIterator) Next() (*SearchResult, bool, error) {
 	}
 
 	// PrimaryIterator を使用してレコード検索
-	iter, err := si.primaryBtree.Search(btree.SearchModeKey{Key: encodedPk})
+	iter, err := si.primaryTree.Search(btree.SearchModeKey{Key: encodedPk})
 	if err != nil {
 		return nil, false, err
 	}

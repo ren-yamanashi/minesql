@@ -1,7 +1,6 @@
 package access
 
 import (
-	"encoding/binary"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
@@ -26,11 +25,8 @@ func TestSecondaryRecordEncode(t *testing.T) {
 		encode.Decode(rest, &pk)
 		assert.Equal(t, [][]byte{[]byte("pk1")}, pk)
 
-		// 非キー領域: セカンダリキーのバイト数 (2 バイト)
-		skByteLen := binary.BigEndian.Uint16(record.NonKey())
-		var expectedSk []byte
-		encode.Encode([][]byte{[]byte("sk1")}, &expectedSk)
-		assert.Equal(t, uint16(len(expectedSk)), skByteLen)
+		// 非キー領域: 使用しない
+		assert.Nil(t, record.NonKey())
 	})
 
 	t.Run("複合セカンダリキーを正しくエンコードする", func(t *testing.T) {

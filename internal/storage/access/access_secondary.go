@@ -11,9 +11,10 @@ import (
 
 // SecondaryIndex はセカンダリインデックスへのアクセスを提供する
 type SecondaryIndex struct {
-	tree    *btree.Btree // セカンダリインデックスの B+Tree
-	skCount int          // セカンダリキーのカラム数
-	unique  bool         // ユニーク制約の有無
+	tree        *btree.Btree // セカンダリインデックスの B+Tree
+	primaryTree *btree.Btree // プライマリインデックスの B+Tree
+	skCount     int          // セカンダリキーのカラム数
+	unique      bool         // ユニーク制約の有無
 }
 
 // NewSecondaryIndex は既存のセカンダリインデックスを開く
@@ -38,6 +39,15 @@ func CreateSecondaryIndex(bp *buffer.BufferPool, fileId page.FileId, skCount int
 		skCount: skCount,
 		unique:  unique,
 	}, nil
+}
+
+// Search は指定した検索モードでインデックスを検索し、イテレータを返す
+func (si *SecondaryIndex) Search(mode SearchMode) (*SecondaryIterator, error) {
+	iter, err := si.tree.Search(mode.encode())
+	if err != nil {
+		return nil, err
+	}
+	return newSecondaryIterator(iter, si.primaryTree, si.skCount), nil
 }
 
 // Insert は行を挿入する

@@ -29,7 +29,7 @@ func TestSecondaryIteratorNext(t *testing.T) {
 
 		iter, err := secondaryBt.Search(btree.SearchModeStart{})
 		assert.NoError(t, err)
-		si := newSecondaryIterator(iter, primaryBt, 1, 1)
+		si := newSecondaryIterator(iter, primaryBt, 1)
 
 		// WHEN
 		result, ok, err := si.Next()
@@ -63,7 +63,7 @@ func TestSecondaryIteratorNext(t *testing.T) {
 
 		iter, err := secondaryBt.Search(btree.SearchModeStart{})
 		assert.NoError(t, err)
-		si := newSecondaryIterator(iter, primaryBt, 1, 1)
+		si := newSecondaryIterator(iter, primaryBt, 1)
 
 		// WHEN
 		result, ok, err := si.Next()
@@ -83,7 +83,7 @@ func TestSecondaryIteratorNext(t *testing.T) {
 
 		iter, err := secondaryBt.Search(btree.SearchModeStart{})
 		assert.NoError(t, err)
-		si := newSecondaryIterator(iter, primaryBt, 1, 1)
+		si := newSecondaryIterator(iter, primaryBt, 1)
 
 		// WHEN
 		result, ok, err := si.Next()
@@ -109,7 +109,7 @@ func TestSecondaryIteratorNextIndexOnly(t *testing.T) {
 
 		iter, err := secondaryBt.Search(btree.SearchModeStart{})
 		assert.NoError(t, err)
-		si := newSecondaryIterator(iter, primaryBt, 1, 1)
+		si := newSecondaryIterator(iter, primaryBt, 1)
 
 		// WHEN
 		result, ok, err := si.NextIndexOnly()
@@ -139,7 +139,7 @@ func TestSecondaryIteratorNextIndexOnly(t *testing.T) {
 
 		iter, err := secondaryBt.Search(btree.SearchModeStart{})
 		assert.NoError(t, err)
-		si := newSecondaryIterator(iter, primaryBt, 1, 1)
+		si := newSecondaryIterator(iter, primaryBt, 1)
 
 		// WHEN
 		result, ok, err := si.NextIndexOnly()
@@ -159,7 +159,7 @@ func TestSecondaryIteratorNextIndexOnly(t *testing.T) {
 
 		iter, err := secondaryBt.Search(btree.SearchModeStart{})
 		assert.NoError(t, err)
-		si := newSecondaryIterator(iter, primaryBt, 1, 1)
+		si := newSecondaryIterator(iter, primaryBt, 1)
 
 		// WHEN
 		result, ok, err := si.NextIndexOnly()
@@ -187,7 +187,7 @@ func TestSecondaryIteratorNextIndexOnly(t *testing.T) {
 
 		iter, err := secondaryBt.Search(btree.SearchModeStart{})
 		assert.NoError(t, err)
-		si := newSecondaryIterator(iter, primaryBt, 1, 1)
+		si := newSecondaryIterator(iter, primaryBt, 1)
 
 		// WHEN
 		result, ok, err := si.NextIndexOnly()
