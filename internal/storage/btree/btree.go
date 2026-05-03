@@ -19,8 +19,8 @@ type Btree struct {
 }
 
 // NewBtree は既存の B+Tree を開く
-func NewBtree(bp *buffer.BufferPool, MetaPageId page.PageId) *Btree {
-	return &Btree{bufferPool: bp, MetaPageId: MetaPageId}
+func NewBtree(bp *buffer.BufferPool, metaPageId page.PageId) *Btree {
+	return &Btree{bufferPool: bp, MetaPageId: metaPageId}
 }
 
 // CreateBtree は新しい B+Tree を作成する

@@ -1,6 +1,7 @@
 package catalog
 
 import (
+	"bytes"
 	"encoding/binary"
 	"errors"
 
@@ -9,9 +10,25 @@ import (
 )
 
 var (
-	catalogFileId         = page.FileId(page.FileId(0))
+	catalogFileId         = page.FileId(0)
 	catalogHeaderPageNum  = page.PageNumber(0)
 	ErrInvalidCatalogFile = errors.New("invalid database catalog file: magic number mismatch")
+	catalogMagicNumber    = []byte("MINE")
+)
+
+// ヘッダーページ内のオフセット
+const (
+	headerMagicNumberOffset     = 0
+	headerTableMetaOffset       = 4
+	headerIndexMetaOffset       = 8
+	headerIndexKeyColMetaOffset = 12
+	headerColumnMetaOffset      = 16
+	headerConstraintMetaOffset  = 20
+	headerUserMetaOffset        = 24
+	headerNextFileIdOffset      = 28
+	headerNextIndexIdOffset     = 32
+	headerUndoLogFileIdOffset   = 36
+	headerFieldSize             = 4 // 各フィールドのバイト数
 )
 
 type Catalog struct {
@@ -34,19 +51,21 @@ func NewCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 		return nil, err
 	}
 	defer bp.UnRefPage(headerPageId)
-	if string(pageHeader.Body[0:4]) != "MINE" {
+
+	magicEnd := headerMagicNumberOffset + len(catalogMagicNumber)
+	if !bytes.Equal(pageHeader.Body[headerMagicNumberOffset:magicEnd], catalogMagicNumber) {
 		return nil, ErrInvalidCatalogFile
 	}
 
-	tableMetaPageNumber := page.PageNumber(binary.BigEndian.Uint32(pageHeader.Body[4:8]))
-	indexMetaPageNumber := page.PageNumber(binary.BigEndian.Uint32(pageHeader.Body[8:12]))
-	indexKeyColMetaPageNumber := page.PageNumber(binary.BigEndian.Uint32(pageHeader.Body[12:16]))
-	columnMetaPageNumber := page.PageNumber(binary.BigEndian.Uint32(pageHeader.Body[16:20]))
-	constraintMetaPageNumber := page.PageNumber(binary.BigEndian.Uint32(pageHeader.Body[20:24]))
-	userMetaPageNumber := page.PageNumber(binary.BigEndian.Uint32(pageHeader.Body[24:28]))
-	nextFileId := page.FileId(binary.BigEndian.Uint32(pageHeader.Body[28:32]))
-	nextIndexId := IndexId(binary.BigEndian.Uint32(pageHeader.Body[32:36]))
-	undoLogFileId := page.FileId(binary.BigEndian.Uint32(pageHeader.Body[36:40]))
+	tableMetaPageNumber := readPageNumber(pageHeader.Body, headerTableMetaOffset)
+	indexMetaPageNumber := readPageNumber(pageHeader.Body, headerIndexMetaOffset)
+	indexKeyColMetaPageNumber := readPageNumber(pageHeader.Body, headerIndexKeyColMetaOffset)
+	columnMetaPageNumber := readPageNumber(pageHeader.Body, headerColumnMetaOffset)
+	constraintMetaPageNumber := readPageNumber(pageHeader.Body, headerConstraintMetaOffset)
+	userMetaPageNumber := readPageNumber(pageHeader.Body, headerUserMetaOffset)
+	nextFileId := page.FileId(binary.BigEndian.Uint32(pageHeader.Body[headerNextFileIdOffset : headerNextFileIdOffset+headerFieldSize]))
+	nextIndexId := IndexId(binary.BigEndian.Uint32(pageHeader.Body[headerNextIndexIdOffset : headerNextIndexIdOffset+headerFieldSize]))
+	undoLogFileId := page.FileId(binary.BigEndian.Uint32(pageHeader.Body[headerUndoLogFileIdOffset : headerUndoLogFileIdOffset+headerFieldSize]))
 
 	return &Catalog{
 		nextFileId:      nextFileId,
@@ -107,16 +126,17 @@ func CreateCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 	nextIndexId := IndexId(0)
 	undoLogFileId := nextFileId // Undo ログ用の FileId を採番
 	nextFileId++
-	copy(pageHeader.Body[0:4], []byte("MINE"))
-	binary.BigEndian.PutUint32(pageHeader.Body[4:8], uint32(tableMeta.metaPageId.PageNumber))
-	binary.BigEndian.PutUint32(pageHeader.Body[8:12], uint32(indexMeta.metaPageId.PageNumber))
-	binary.BigEndian.PutUint32(pageHeader.Body[12:16], uint32(indexKeyColMeta.metaPageId.PageNumber))
-	binary.BigEndian.PutUint32(pageHeader.Body[16:20], uint32(columnMeta.metaPageId.PageNumber))
-	binary.BigEndian.PutUint32(pageHeader.Body[20:24], uint32(constraintMeta.metaPageId.PageNumber))
-	binary.BigEndian.PutUint32(pageHeader.Body[24:28], uint32(userMeta.metaPageId.PageNumber))
-	binary.BigEndian.PutUint32(pageHeader.Body[28:32], uint32(nextFileId))
-	binary.BigEndian.PutUint32(pageHeader.Body[32:36], uint32(nextIndexId))
-	binary.BigEndian.PutUint32(pageHeader.Body[36:40], uint32(undoLogFileId))
+
+	copy(pageHeader.Body[headerMagicNumberOffset:], catalogMagicNumber)
+	writePageNumber(pageHeader.Body, headerTableMetaOffset, tableMeta.metaPageId.PageNumber)
+	writePageNumber(pageHeader.Body, headerIndexMetaOffset, indexMeta.metaPageId.PageNumber)
+	writePageNumber(pageHeader.Body, headerIndexKeyColMetaOffset, indexKeyColMeta.metaPageId.PageNumber)
+	writePageNumber(pageHeader.Body, headerColumnMetaOffset, columnMeta.metaPageId.PageNumber)
+	writePageNumber(pageHeader.Body, headerConstraintMetaOffset, constraintMeta.metaPageId.PageNumber)
+	writePageNumber(pageHeader.Body, headerUserMetaOffset, userMeta.metaPageId.PageNumber)
+	binary.BigEndian.PutUint32(pageHeader.Body[headerNextFileIdOffset:headerNextFileIdOffset+headerFieldSize], uint32(nextFileId))
+	binary.BigEndian.PutUint32(pageHeader.Body[headerNextIndexIdOffset:headerNextIndexIdOffset+headerFieldSize], uint32(nextIndexId))
+	binary.BigEndian.PutUint32(pageHeader.Body[headerUndoLogFileIdOffset:headerUndoLogFileIdOffset+headerFieldSize], uint32(undoLogFileId))
 
 	return &Catalog{
 		nextFileId:      nextFileId,
@@ -129,4 +149,12 @@ func CreateCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 		constraintMeta:  constraintMeta,
 		userMeta:        userMeta,
 	}, nil
+}
+
+func readPageNumber(body []byte, offset int) page.PageNumber {
+	return page.PageNumber(binary.BigEndian.Uint32(body[offset : offset+headerFieldSize]))
+}
+
+func writePageNumber(body []byte, offset int, pn page.PageNumber) {
+	binary.BigEndian.PutUint32(body[offset:offset+headerFieldSize], uint32(pn))
 }
