@@ -14,23 +14,21 @@ func TestCreateBtree(t *testing.T) {
 	t.Run("B+Tree を作成できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		metaPageId, _ := bp.AllocatePageId(0)
 
 		// WHEN
-		bt, err := CreateBtree(bp, metaPageId)
+		bt, err := CreateBtree(bp, page.FileId(0))
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, metaPageId, bt.MetaPageId)
+		assert.False(t, bt.MetaPageId.IsInvalid())
 	})
 
 	t.Run("作成後のリーフページ数は 1 になる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		metaPageId, _ := bp.AllocatePageId(0)
 
 		// WHEN
-		bt, err := CreateBtree(bp, metaPageId)
+		bt, err := CreateBtree(bp, page.FileId(0))
 		assert.NoError(t, err)
 		count, err := bt.LeafPageCount()
 
@@ -42,10 +40,9 @@ func TestCreateBtree(t *testing.T) {
 	t.Run("作成後の高さは 1 になる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		metaPageId, _ := bp.AllocatePageId(0)
 
 		// WHEN
-		bt, err := CreateBtree(bp, metaPageId)
+		bt, err := CreateBtree(bp, page.FileId(0))
 		assert.NoError(t, err)
 		height, err := bt.Height()
 
@@ -59,24 +56,22 @@ func TestNewBtree(t *testing.T) {
 	t.Run("既存の B+Tree を開ける", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		metaPageId, _ := bp.AllocatePageId(0)
-		_, _ = CreateBtree(bp, metaPageId)
+		created, _ := CreateBtree(bp, page.FileId(0))
 
 		// WHEN
-		bt := NewBtree(bp, metaPageId)
+		bt := NewBtree(bp, created.MetaPageId)
 
 		// THEN
-		assert.Equal(t, metaPageId, bt.MetaPageId)
+		assert.Equal(t, created.MetaPageId, bt.MetaPageId)
 	})
 
 	t.Run("NewBtree で開いた B+Tree のメタデータを読み取れる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		metaPageId, _ := bp.AllocatePageId(0)
-		_, _ = CreateBtree(bp, metaPageId)
+		created, _ := CreateBtree(bp, page.FileId(0))
 
 		// WHEN
-		bt := NewBtree(bp, metaPageId)
+		bt := NewBtree(bp, created.MetaPageId)
 		count, err := bt.LeafPageCount()
 
 		// THEN
@@ -89,8 +84,7 @@ func TestLeafPageCount(t *testing.T) {
 	t.Run("リーフページ数を取得できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		metaPageId, _ := bp.AllocatePageId(0)
-		bt, _ := CreateBtree(bp, metaPageId)
+		bt, _ := CreateBtree(bp, page.FileId(0))
 
 		// WHEN
 		count, err := bt.LeafPageCount()
@@ -105,8 +99,7 @@ func TestHeight(t *testing.T) {
 	t.Run("B+Tree の高さを取得できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		metaPageId, _ := bp.AllocatePageId(0)
-		bt, _ := CreateBtree(bp, metaPageId)
+		bt, _ := CreateBtree(bp, page.FileId(0))
 
 		// WHEN
 		height, err := bt.Height()

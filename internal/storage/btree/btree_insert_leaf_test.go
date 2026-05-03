@@ -92,9 +92,7 @@ func setupBtreeBufferPool(t *testing.T) *buffer.BufferPool {
 func setupBtreeForTest(t *testing.T) (*Btree, *buffer.BufferPool) {
 	t.Helper()
 	bp := setupBtreeBufferPool(t)
-	metaPageId, err := bp.AllocatePageId(0)
-	assert.NoError(t, err)
-	bt, err := CreateBtree(bp, metaPageId)
+	bt, err := CreateBtree(bp, page.FileId(0))
 	assert.NoError(t, err)
 	return bt, bp
 }

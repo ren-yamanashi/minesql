@@ -178,3 +178,93 @@ func TestDecode(t *testing.T) {
 		assert.Less(t, string(a), string(b))
 	})
 }
+
+func TestDecodeFirstN(t *testing.T) {
+	t.Run("先頭 1 要素のみデコードできる", func(t *testing.T) {
+		// GIVEN
+		encoded := []byte{}
+		Encode([][]byte{{0xAA}, {0xBB}, {0xCC}}, &encoded)
+
+		// WHEN
+		decoded, rest := DecodeFirstN(encoded, 1)
+
+		// THEN
+		assert.Equal(t, [][]byte{{0xAA}}, decoded)
+		// rest をさらにデコードすると残りの要素が得られる
+		remaining := [][]byte{}
+		Decode(rest, &remaining)
+		assert.Equal(t, [][]byte{{0xBB}, {0xCC}}, remaining)
+	})
+
+	t.Run("先頭 2 要素をデコードし残りを返す", func(t *testing.T) {
+		// GIVEN
+		encoded := []byte{}
+		Encode([][]byte{{0x01}, {0x02}, {0x03}}, &encoded)
+
+		// WHEN
+		decoded, rest := DecodeFirstN(encoded, 2)
+
+		// THEN
+		assert.Equal(t, [][]byte{{0x01}, {0x02}}, decoded)
+		remaining := [][]byte{}
+		Decode(rest, &remaining)
+		assert.Equal(t, [][]byte{{0x03}}, remaining)
+	})
+
+	t.Run("n が要素数より大きい場合は全要素をデコードする", func(t *testing.T) {
+		// GIVEN
+		encoded := []byte{}
+		Encode([][]byte{{0xAA}, {0xBB}}, &encoded)
+
+		// WHEN
+		decoded, rest := DecodeFirstN(encoded, 10)
+
+		// THEN
+		assert.Equal(t, [][]byte{{0xAA}, {0xBB}}, decoded)
+		assert.Empty(t, rest)
+	})
+
+	t.Run("空のデータに対しては空の結果を返す", func(t *testing.T) {
+		// GIVEN
+		var encoded []byte
+
+		// WHEN
+		decoded, rest := DecodeFirstN(encoded, 3)
+
+		// THEN
+		assert.Nil(t, decoded)
+		assert.Empty(t, rest)
+	})
+
+	t.Run("n が 0 の場合はデコードせず全体を rest として返す", func(t *testing.T) {
+		// GIVEN
+		encoded := []byte{}
+		Encode([][]byte{{0xAA}}, &encoded)
+
+		// WHEN
+		decoded, rest := DecodeFirstN(encoded, 0)
+
+		// THEN
+		assert.Nil(t, decoded)
+		assert.Equal(t, encoded, rest)
+	})
+
+	t.Run("8 バイトを超える要素を含むデータをデコードできる", func(t *testing.T) {
+		// GIVEN
+		original := [][]byte{
+			{1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+			{0xFF},
+		}
+		encoded := []byte{}
+		Encode(original, &encoded)
+
+		// WHEN
+		decoded, rest := DecodeFirstN(encoded, 1)
+
+		// THEN
+		assert.Equal(t, [][]byte{{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}}, decoded)
+		remaining := [][]byte{}
+		Decode(rest, &remaining)
+		assert.Equal(t, [][]byte{{0xFF}}, remaining)
+	})
+}

@@ -24,9 +24,14 @@ func NewBtree(bp *buffer.BufferPool, metaPageId page.PageId) *Btree {
 }
 
 // CreateBtree は新しい B+Tree を作成する
-func CreateBtree(bp *buffer.BufferPool, metaPageId page.PageId) (*Btree, error) {
+func CreateBtree(bp *buffer.BufferPool, fileId page.FileId) (*Btree, error) {
+	metaPageId, err := bp.AllocatePageId(fileId)
+	if err != nil {
+		return nil, err
+	}
+
 	// メタページ作成
-	_, err := bp.AddPage(metaPageId)
+	_, err = bp.AddPage(metaPageId)
 	if err != nil {
 		return nil, err
 	}

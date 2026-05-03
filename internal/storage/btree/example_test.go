@@ -176,12 +176,7 @@ func setup() (*btree.Btree, func()) {
 	}
 	bp.RegisterHeapFile(fileId, dm)
 
-	metaPageId, err := bp.AllocatePageId(fileId)
-	if err != nil {
-		panic(err)
-	}
-
-	tree, err := btree.CreateBtree(bp, metaPageId)
+	tree, err := btree.CreateBtree(bp, fileId)
 	if err != nil {
 		panic(err)
 	}
