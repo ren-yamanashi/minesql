@@ -15,35 +15,35 @@ var (
 
 type Btree struct {
 	bufferPool *buffer.BufferPool
-	metaPageId page.PageId
+	MetaPageId page.PageId
 }
 
 // NewBtree は既存の B+Tree を開く
-func NewBtree(bp *buffer.BufferPool, metaPageId page.PageId) *Btree {
-	return &Btree{bufferPool: bp, metaPageId: metaPageId}
+func NewBtree(bp *buffer.BufferPool, MetaPageId page.PageId) *Btree {
+	return &Btree{bufferPool: bp, MetaPageId: MetaPageId}
 }
 
 // CreateBtree は新しい B+Tree を作成する
 func CreateBtree(bp *buffer.BufferPool, fileId page.FileId) (*Btree, error) {
-	metaPageId, err := bp.AllocatePageId(fileId)
+	MetaPageId, err := bp.AllocatePageId(fileId)
 	if err != nil {
 		return nil, err
 	}
 
 	// メタページ作成
-	_, err = bp.AddPage(metaPageId)
+	_, err = bp.AddPage(MetaPageId)
 	if err != nil {
 		return nil, err
 	}
 
-	pageMeta, err := bp.GetWritePage(metaPageId)
+	pageMeta, err := bp.GetWritePage(MetaPageId)
 	if err != nil {
 		return nil, err
 	}
 	metaPage := newMetaPage(pageMeta)
 
 	// ルートリーフノード作成
-	rootNodePageId, err := bp.AllocatePageId(metaPageId.FileId)
+	rootNodePageId, err := bp.AllocatePageId(MetaPageId.FileId)
 	if err != nil {
 		return nil, err
 	}
@@ -63,27 +63,27 @@ func CreateBtree(bp *buffer.BufferPool, fileId page.FileId) (*Btree, error) {
 	metaPage.setLeafPageCount(1)
 	metaPage.setHeight(1)
 
-	return NewBtree(bp, metaPageId), nil
+	return NewBtree(bp, MetaPageId), nil
 }
 
 // LeafPageCount はメタページからリーフページ数を取得する
 func (bt *Btree) LeafPageCount() (uint64, error) {
-	pageMeta, err := bt.bufferPool.GetReadPage(bt.metaPageId)
+	pageMeta, err := bt.bufferPool.GetReadPage(bt.MetaPageId)
 	if err != nil {
 		return 0, err
 	}
-	defer bt.bufferPool.UnRefPage(bt.metaPageId)
+	defer bt.bufferPool.UnRefPage(bt.MetaPageId)
 	metaPage := newMetaPage(pageMeta)
 	return metaPage.leafPageCount(), nil
 }
 
 // Height はメタページから B+Tree の高さを取得する
 func (bt *Btree) Height() (uint64, error) {
-	pageMeta, err := bt.bufferPool.GetReadPage(bt.metaPageId)
+	pageMeta, err := bt.bufferPool.GetReadPage(bt.MetaPageId)
 	if err != nil {
 		return 0, err
 	}
-	defer bt.bufferPool.UnRefPage(bt.metaPageId)
+	defer bt.bufferPool.UnRefPage(bt.MetaPageId)
 	metaPage := newMetaPage(pageMeta)
 	return metaPage.height(), nil
 }

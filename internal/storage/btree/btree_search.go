@@ -11,11 +11,11 @@ import (
 // Search は指定された検索モードで B+Tree を検索する
 func (bt *Btree) Search(mode SearchMode) (*Iterator, error) {
 	// メタページ取得
-	pageMeta, err := bt.bufferPool.GetReadPage(bt.metaPageId)
+	pageMeta, err := bt.bufferPool.GetReadPage(bt.MetaPageId)
 	if err != nil {
 		return nil, err
 	}
-	defer bt.bufferPool.UnRefPage(bt.metaPageId)
+	defer bt.bufferPool.UnRefPage(bt.MetaPageId)
 	metaPage := newMetaPage(pageMeta)
 
 	// ルートページ取得
@@ -90,11 +90,11 @@ func (bt *Btree) FindByKey(key []byte) (node.Record, node.RecordPosition, error)
 
 // LeafPageIds はブランチページのみ辿り、全リーフページの PageId を収集する
 func (bt *Btree) LeafPageIds() ([]page.PageId, error) {
-	pageMeta, err := bt.bufferPool.GetReadPage(bt.metaPageId)
+	pageMeta, err := bt.bufferPool.GetReadPage(bt.MetaPageId)
 	if err != nil {
 		return nil, err
 	}
-	defer bt.bufferPool.UnRefPage(bt.metaPageId)
+	defer bt.bufferPool.UnRefPage(bt.MetaPageId)
 	metaPage := newMetaPage(pageMeta)
 	rootPageId := metaPage.rootPageId()
 	height := metaPage.height()

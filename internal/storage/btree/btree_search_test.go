@@ -176,7 +176,7 @@ func TestLeafPageIds(t *testing.T) {
 // insertRecordToBtree はテスト用に B+Tree のルートリーフノードにレコードを直接挿入する
 func insertRecordToBtree(t *testing.T, bt *Btree, key, nonKey []byte) {
 	t.Helper()
-	pageMeta, err := bt.bufferPool.GetReadPage(bt.metaPageId)
+	pageMeta, err := bt.bufferPool.GetReadPage(bt.MetaPageId)
 	assert.NoError(t, err)
 	mp := newMetaPage(pageMeta)
 	rootPageId := mp.rootPageId()

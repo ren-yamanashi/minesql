@@ -12,11 +12,11 @@ import (
 // Insert は B+Tree にレコードを挿入する
 func (bt *Btree) Insert(record node.Record) error {
 	// メタページを取得
-	pageMeta, err := bt.bufferPool.GetWritePage(bt.metaPageId)
+	pageMeta, err := bt.bufferPool.GetWritePage(bt.MetaPageId)
 	if err != nil {
 		return err
 	}
-	defer bt.bufferPool.UnRefPage(bt.metaPageId)
+	defer bt.bufferPool.UnRefPage(bt.MetaPageId)
 	metaPage := newMetaPage(pageMeta)
 
 	// ルートページを取得
@@ -47,7 +47,7 @@ func (bt *Btree) Insert(record node.Record) error {
 	}
 
 	// ルートノードの分割が発生した場合
-	newRootPageId, err := bt.bufferPool.AllocatePageId(bt.metaPageId.FileId)
+	newRootPageId, err := bt.bufferPool.AllocatePageId(bt.MetaPageId.FileId)
 	if err != nil {
 		return err
 	}
