@@ -122,16 +122,8 @@ func (bt *Btree) onLeafUnderflow(
 		if !siblingLeaf.TransferAllFrom(childLeaf) {
 			return false, false, nil // ノードの容量を超えてマージ不可の場合はアンダーフローを許容する
 		}
-		siblingLeaf.SetNextPageId(childLeaf.NextPageId())
-		// 消滅する childNode の次のリーフの prevPageId を sibling に更新する
-		if nextPageId := childLeaf.NextPageId(); !nextPageId.IsInvalid() {
-			defer bt.bufferPool.UnRefPage(nextPageId)
-			pageNext, err := bt.bufferPool.GetWritePage(nextPageId)
-			if err != nil {
-				return false, false, err
-			}
-			nextLeaf := node.NewLeafNode(pageNext)
-			nextLeaf.SetPrevPageId(sibling.bufferPage.PageId)
+		if err := bt.relinkLeafAfterMerge(childLeaf, siblingLeaf, sibling.bufferPage.PageId); err != nil {
+			return false, false, err
 		}
 		// 親の右端のレコードは不要になるので削除し、RightChild を兄弟ノードに更新
 		parentBranch.Delete(parentBranch.NumRecords() - 1)
@@ -143,34 +135,15 @@ func (bt *Btree) onLeafUnderflow(
 	if !childLeaf.TransferAllFrom(siblingLeaf) {
 		return false, false, nil // ノードの容量を超えてマージ不可の場合はアンダーフローを許容する
 	}
-	childLeaf.SetNextPageId(siblingLeaf.NextPageId())
-	// 消滅する siblingNode の次のリーフの prevPageId を child に更新する
-	if nextPageId := siblingLeaf.NextPageId(); !nextPageId.IsInvalid() {
-		defer bt.bufferPool.UnRefPage(nextPageId)
-		pageNext, err := bt.bufferPool.GetWritePage(nextPageId)
-		if err != nil {
-			return false, false, err
-		}
-		nextLeaf := node.NewLeafNode(pageNext)
-		nextLeaf.SetPrevPageId(childBufPage.PageId)
+	if err := bt.relinkLeafAfterMerge(siblingLeaf, childLeaf, childBufPage.PageId); err != nil {
+		return false, false, err
 	}
 
-	// 兄弟が RightChild(右端) の場合、親の右端のレコードを削除し、RightChild を子ノードに更新
-	if childSlotNum+1 == parentBranch.NumRecords() {
-		parentBranch.Delete(parentBranch.NumRecords() - 1)
-		parentBranch.SetRightChildPageId(childBufPage.PageId)
-		return !parentBranch.IsHalfFull(), true, nil
+	uf, err := bt.mergeRightSiblingFromParent(parentBranch, childBufPage.PageId, childSlotNum)
+	if err != nil {
+		return false, false, err
 	}
-
-	// 兄弟が RightChild(右端) でない場合、キーを更新してから削除
-	childRecord := parentBranch.Record(childSlotNum)
-	nextRecord := parentBranch.Record(childSlotNum + 1)
-	updated := node.NewRecord(childRecord.Header(), nextRecord.Key(), childRecord.NonKey())
-	if !parentBranch.Update(childSlotNum, updated) {
-		return false, false, errors.New("failed to update parent branch node key")
-	}
-	parentBranch.Delete(childSlotNum + 1) // 右の兄弟を削除するので `childSlotNum + 1`
-	return !parentBranch.IsHalfFull(), true, nil
+	return uf, true, nil
 }
 
 // onBranchUnderflow はブランチノードのアンダーフロー処理を行う
@@ -273,10 +246,40 @@ func (bt *Btree) onBranchUnderflow(
 	childBranch.TransferAllFrom(siblingBranch)
 	childBranch.SetRightChildPageId(siblingBranch.RightChildPageId())
 
+	return bt.mergeRightSiblingFromParent(parentBranch, childBufPage.PageId, childSlotNum)
+}
+
+// relinkLeafAfterMerge は消滅するリーフノードのリンクを残るリーフノードに繋ぎ直す
+//   - disappearing: マージにより消滅するリーフノード
+//   - survivor: マージ後に残るリーフノード
+//   - survivorPageId: survivor の PageId
+func (bt *Btree) relinkLeafAfterMerge(disappearing, survivor *node.LeafNode, survivorPageId page.PageId) error {
+	survivor.SetNextPageId(disappearing.NextPageId())
+	if nextPageId := disappearing.NextPageId(); !nextPageId.IsInvalid() {
+		defer bt.bufferPool.UnRefPage(nextPageId)
+		pageNext, err := bt.bufferPool.GetWritePage(nextPageId)
+		if err != nil {
+			return err
+		}
+		nextLeaf := node.NewLeafNode(pageNext)
+		nextLeaf.SetPrevPageId(survivorPageId)
+	}
+	return nil
+}
+
+// mergeRightSiblingFromParent は右の兄弟とマージした後の親ブランチノードの更新を行う
+//   - parentBranch: 親ブランチノード
+//   - survivorPageId: マージ後に残るノードの PageId
+//   - childSlotNum: 子ノードのスロット番号
+func (bt *Btree) mergeRightSiblingFromParent(
+	parentBranch *node.BranchNode,
+	survivorPageId page.PageId,
+	childSlotNum int,
+) (underflow bool, err error) {
 	// 兄弟が RightChild(右端) の場合、親の右端のレコードを削除し、RightChild を子ノードに更新
 	if childSlotNum+1 == parentBranch.NumRecords() {
 		parentBranch.Delete(parentBranch.NumRecords() - 1)
-		parentBranch.SetRightChildPageId(childBufPage.PageId)
+		parentBranch.SetRightChildPageId(survivorPageId)
 		return !parentBranch.IsHalfFull(), nil
 	}
 
