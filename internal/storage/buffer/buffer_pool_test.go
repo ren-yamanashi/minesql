@@ -16,7 +16,7 @@ func TestNewBufferPool(t *testing.T) {
 		bp := NewBufferPool(page.PageSize)
 
 		// THEN
-		assert.Equal(t, uint32(1), bp.MaxNumOfPage)
+		assert.Equal(t, uint32(1), bp.maxNumOfPage)
 	})
 
 	t.Run("サイズが PageSize より大きい場合 MaxNumOfPage が算出される", func(t *testing.T) {
@@ -24,7 +24,7 @@ func TestNewBufferPool(t *testing.T) {
 		bp := NewBufferPool(page.PageSize * 3)
 
 		// THEN
-		assert.Equal(t, uint32(4), bp.MaxNumOfPage) // 3 + 1
+		assert.Equal(t, uint32(4), bp.maxNumOfPage) // 3 + 1
 	})
 
 	t.Run("サイズが 0 の場合 MaxNumOfPage が 1 になる", func(t *testing.T) {
@@ -32,7 +32,7 @@ func TestNewBufferPool(t *testing.T) {
 		bp := NewBufferPool(0)
 
 		// THEN
-		assert.Equal(t, uint32(1), bp.MaxNumOfPage)
+		assert.Equal(t, uint32(1), bp.maxNumOfPage)
 	})
 }
 

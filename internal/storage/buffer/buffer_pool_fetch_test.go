@@ -22,7 +22,7 @@ func TestGetWritePage(t *testing.T) {
 		assert.NoError(t, err)
 		bufPage, err := bp.FetchPage(pageId)
 		assert.NoError(t, err)
-		assert.True(t, bufPage.IsDirty)
+		assert.True(t, bufPage.isDirty)
 	})
 
 	t.Run("既にダーティーなページを再取得してもフラッシュリストに重複追加されない", func(t *testing.T) {
@@ -39,7 +39,7 @@ func TestGetWritePage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		assert.Equal(t, uint32(1), bp.flushList.NumOfPage)
+		assert.Equal(t, uint32(1), bp.flushList.numOfPage)
 	})
 
 	t.Run("書き込んだデータがフェッチ時に反映されている", func(t *testing.T) {
@@ -108,7 +108,7 @@ func TestGetReadPage(t *testing.T) {
 		// THEN
 		bufPage, err := bp.FetchPage(pageId)
 		assert.NoError(t, err)
-		assert.False(t, bufPage.IsDirty)
+		assert.False(t, bufPage.isDirty)
 	})
 }
 

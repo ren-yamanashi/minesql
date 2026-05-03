@@ -20,7 +20,7 @@ func TestAddPage(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, bufPage)
 		assert.Equal(t, pageId, bufPage.PageId)
-		assert.False(t, bufPage.IsDirty)
+		assert.False(t, bufPage.isDirty)
 	})
 
 	t.Run("追加したページはキャッシュされている", func(t *testing.T) {

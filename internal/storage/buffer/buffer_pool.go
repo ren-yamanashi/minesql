@@ -17,7 +17,7 @@ type BufferPool struct {
 	pageTable    PageTable
 	lru          *LRU
 	flushList    *FlushList
-	MaxNumOfPage uint32 // バッファプールの最大バッファページ数
+	maxNumOfPage uint32 // バッファプールの最大バッファページ数
 }
 
 func NewBufferPool(size uint32) *BufferPool {
@@ -30,7 +30,7 @@ func NewBufferPool(size uint32) *BufferPool {
 	return &BufferPool{
 		files:        make(map[page.FileId]*file.HeapFile),
 		bufferPages:  make([]BufferPage, 0, maxNumOfPage),
-		MaxNumOfPage: maxNumOfPage,
+		maxNumOfPage: maxNumOfPage,
 		pageTable:    NewPageTable(),
 		lru:          NewLRU(int(maxNumOfPage)),
 		flushList:    NewFlushList(),

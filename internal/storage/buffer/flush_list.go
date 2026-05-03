@@ -12,7 +12,7 @@ type flushListNode struct {
 
 // FlushList はダーティーページをダーティーになった順に管理する双方向リンクリスト
 type FlushList struct {
-	NumOfPage uint32         // リスト内のページ数
+	numOfPage uint32         // リスト内のページ数
 	head      *flushListNode // 最も古いダーティーページ
 	tail      *flushListNode // 最も新しいダーティーページ
 	nodeMap   map[page.PageId]*flushListNode
@@ -41,7 +41,7 @@ func (fl *FlushList) Add(pageId page.PageId) {
 		fl.tail.next = node
 		fl.tail = node
 	}
-	fl.NumOfPage++
+	fl.numOfPage++
 }
 
 // Delete はページをフラッシュリストから削除する
@@ -64,14 +64,14 @@ func (fl *FlushList) Delete(pageId page.PageId) {
 	}
 
 	delete(fl.nodeMap, pageId)
-	fl.NumOfPage--
+	fl.numOfPage--
 }
 
 // Clear はフラッシュリスト全体をクリアする
 func (fl *FlushList) Clear() {
 	fl.head = nil
 	fl.tail = nil
-	fl.NumOfPage = 0
+	fl.numOfPage = 0
 	fl.nodeMap = make(map[page.PageId]*flushListNode)
 }
 

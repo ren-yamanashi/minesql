@@ -86,8 +86,8 @@ func TestIteratorNext(t *testing.T) {
 		_, _, _ = iter.Next()
 
 		// THEN
-		assert.Equal(t, pageId, iter.LastPosition.PageId)
-		assert.Equal(t, 0, iter.LastPosition.SlotNum)
+		assert.Equal(t, pageId, iter.lastPosition.PageId)
+		assert.Equal(t, 0, iter.lastPosition.SlotNum)
 	})
 }
 

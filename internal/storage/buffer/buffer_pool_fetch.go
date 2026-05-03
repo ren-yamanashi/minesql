@@ -13,8 +13,8 @@ func (bp *BufferPool) GetWritePage(pageId page.PageId) (*page.Page, error) {
 	}
 
 	// 書き込み用なのでダーティーページとして扱う
-	if !bufPage.IsDirty {
-		bufPage.IsDirty = true
+	if !bufPage.isDirty {
+		bufPage.isDirty = true
 		bp.flushList.Add(pageId)
 	}
 	return bufPage.Page, nil
@@ -91,7 +91,7 @@ func (bp *BufferPool) fetchPage(pageId page.PageId) (*BufferPage, error) {
 		return nil, err
 	}
 	bufPage.PageId = pageId
-	bufPage.IsDirty = false
+	bufPage.isDirty = false
 
 	return bufPage, nil
 }

@@ -27,7 +27,7 @@ func TestFlushAllPages(t *testing.T) {
 		assert.NoError(t, err)
 		bufPage, err := bp.FetchPage(pageId)
 		assert.NoError(t, err)
-		assert.False(t, bufPage.IsDirty)
+		assert.False(t, bufPage.isDirty)
 	})
 
 	t.Run("フラッシュ後にフラッシュリストがクリアされる", func(t *testing.T) {
@@ -142,7 +142,7 @@ func TestFlushOldestPages(t *testing.T) {
 		// THEN
 		bufPage, err := bp.FetchPage(pageId)
 		assert.NoError(t, err)
-		assert.False(t, bufPage.IsDirty)
+		assert.False(t, bufPage.isDirty)
 	})
 }
 

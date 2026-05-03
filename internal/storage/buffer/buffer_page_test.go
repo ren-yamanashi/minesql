@@ -19,7 +19,7 @@ func TestNewBufferPage(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, pageId, bp.PageId)
 		assert.NotNil(t, bp.Page)
-		assert.False(t, bp.IsDirty)
+		assert.False(t, bp.isDirty)
 	})
 
 	t.Run("生成した Page のサイズが PageSize と一致する", func(t *testing.T) {

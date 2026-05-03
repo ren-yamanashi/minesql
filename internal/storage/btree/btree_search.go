@@ -11,11 +11,11 @@ import (
 // Search は指定された検索モードで B+Tree を検索する
 func (bt *Btree) Search(mode SearchMode) (*Iterator, error) {
 	// メタページ取得
-	pageMeta, err := bt.bufferPool.GetReadPage(bt.MetaPageId)
+	pageMeta, err := bt.bufferPool.GetReadPage(bt.metaPageId)
 	if err != nil {
 		return nil, err
 	}
-	defer bt.bufferPool.UnRefPage(bt.MetaPageId)
+	defer bt.bufferPool.UnRefPage(bt.metaPageId)
 	metaPage := newMetaPage(pageMeta)
 
 	// ルートページ取得
@@ -72,8 +72,8 @@ func (bt *Btree) FindByKey(key []byte) (node.Record, node.RecordPosition, error)
 		return nil, node.RecordPosition{}, err
 	}
 	position := node.RecordPosition{
-		PageId:  iter.BufferPage.PageId,
-		SlotNum: iter.SlotNum,
+		PageId:  iter.bufferPage.PageId,
+		SlotNum: iter.slotNum,
 	}
 	record, ok, err := iter.Get()
 	if err != nil {
@@ -90,11 +90,11 @@ func (bt *Btree) FindByKey(key []byte) (node.Record, node.RecordPosition, error)
 
 // LeafPageIds はブランチページのみ辿り、全リーフページの PageId を収集する
 func (bt *Btree) LeafPageIds() ([]page.PageId, error) {
-	pageMeta, err := bt.bufferPool.GetReadPage(bt.MetaPageId)
+	pageMeta, err := bt.bufferPool.GetReadPage(bt.metaPageId)
 	if err != nil {
 		return nil, err
 	}
-	defer bt.bufferPool.UnRefPage(bt.MetaPageId)
+	defer bt.bufferPool.UnRefPage(bt.metaPageId)
 	metaPage := newMetaPage(pageMeta)
 	rootPageId := metaPage.rootPageId()
 	height := metaPage.height()

@@ -8,7 +8,7 @@ import (
 type BufferPage struct {
 	PageId  page.PageId
 	Page    *page.Page
-	IsDirty bool
+	isDirty bool
 }
 
 func NewBufferPage(pageId page.PageId) (*BufferPage, error) {
@@ -19,6 +19,6 @@ func NewBufferPage(pageId page.PageId) (*BufferPage, error) {
 	return &BufferPage{
 		PageId:  pageId,
 		Page:    p,
-		IsDirty: false,
+		isDirty: false,
 	}, nil
 }

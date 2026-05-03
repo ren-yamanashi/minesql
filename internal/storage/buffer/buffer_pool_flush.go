@@ -16,7 +16,7 @@ func (bp *BufferPool) FlushAllPages() error {
 		}
 
 		bufPage := &bp.bufferPages[bufId]
-		if !bufPage.IsDirty {
+		if !bufPage.isDirty {
 			return
 		}
 
@@ -31,7 +31,7 @@ func (bp *BufferPool) FlushAllPages() error {
 			flushErr = err
 			return
 		}
-		bufPage.IsDirty = false
+		bufPage.isDirty = false
 	})
 	if flushErr != nil {
 		return flushErr
@@ -69,7 +69,7 @@ func (bp *BufferPool) FlushOldestPages(n int) error {
 		}
 
 		bufPage := &bp.bufferPages[bufId]
-		if !bufPage.IsDirty {
+		if !bufPage.isDirty {
 			bp.flushList.Delete(pid)
 			continue
 		}
@@ -82,7 +82,7 @@ func (bp *BufferPool) FlushOldestPages(n int) error {
 			return err
 		}
 
-		bufPage.IsDirty = false
+		bufPage.isDirty = false
 		bp.flushList.Delete(pid)
 		syncHeapFiles[pid.FileId] = true
 	}
@@ -104,5 +104,5 @@ func (bp *BufferPool) FlushOldestPages(n int) error {
 func (bp *BufferPool) FlushListSize() uint32 {
 	bp.mutex.RLock()
 	defer bp.mutex.RUnlock()
-	return bp.flushList.NumOfPage
+	return bp.flushList.numOfPage
 }

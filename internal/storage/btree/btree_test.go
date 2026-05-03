@@ -20,7 +20,7 @@ func TestCreateBtree(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.False(t, bt.MetaPageId.IsInvalid())
+		assert.False(t, bt.metaPageId.IsInvalid())
 	})
 
 	t.Run("作成後のリーフページ数は 1 になる", func(t *testing.T) {
@@ -59,10 +59,10 @@ func TestNewBtree(t *testing.T) {
 		created, _ := CreateBtree(bp, page.FileId(0))
 
 		// WHEN
-		bt := NewBtree(bp, created.MetaPageId)
+		bt := NewBtree(bp, created.metaPageId)
 
 		// THEN
-		assert.Equal(t, created.MetaPageId, bt.MetaPageId)
+		assert.Equal(t, created.metaPageId, bt.metaPageId)
 	})
 
 	t.Run("NewBtree で開いた B+Tree のメタデータを読み取れる", func(t *testing.T) {
@@ -71,7 +71,7 @@ func TestNewBtree(t *testing.T) {
 		created, _ := CreateBtree(bp, page.FileId(0))
 
 		// WHEN
-		bt := NewBtree(bp, created.MetaPageId)
+		bt := NewBtree(bp, created.metaPageId)
 		count, err := bt.LeafPageCount()
 
 		// THEN
