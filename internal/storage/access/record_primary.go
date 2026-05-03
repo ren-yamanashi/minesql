@@ -5,6 +5,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 )
 
+// PrimaryRecord はプライマリインデックスレコード
 type PrimaryRecord struct {
 	pkCount    int
 	deleteMark byte
@@ -19,6 +20,7 @@ func newPrimaryRecord(pkCount int, deleteMark byte, data [][]byte) *PrimaryRecor
 	}
 }
 
+// encode は node.Record にエンコードする
 func (pr *PrimaryRecord) encode() node.Record {
 	var key []byte
 	var nonKey []byte

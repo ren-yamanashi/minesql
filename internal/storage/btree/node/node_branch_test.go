@@ -25,6 +25,34 @@ func TestBranchNodeInitialize(t *testing.T) {
 	})
 }
 
+func TestBranchNodeInsert(t *testing.T) {
+	t.Run("レコードを挿入できる", func(t *testing.T) {
+		// GIVEN
+		bn := newTestBranchNode()
+		record := newBranchRecord([]byte{0x20}, page.NewPageId(0, 10))
+
+		// WHEN
+		ok := bn.Insert(1, record)
+
+		// THEN
+		assert.True(t, ok)
+		assert.Equal(t, 2, bn.NumRecords())
+	})
+
+	t.Run("maxRecordSize を超えるレコードは挿入できない", func(t *testing.T) {
+		// GIVEN
+		bn := newTestBranchNode()
+		maxSize := bn.maxRecordSize()
+		largeKey := make([]byte, maxSize)
+
+		// WHEN
+		ok := bn.Insert(1, NewRecord([]byte{}, largeKey, page.NewPageId(0, 1).ToBytes()))
+
+		// THEN
+		assert.False(t, ok)
+	})
+}
+
 func TestBranchNodeSplitInsert(t *testing.T) {
 	t.Run("挿入キーが先頭キーより大きい場合に分割できる", func(t *testing.T) {
 		// GIVEN
@@ -159,6 +187,114 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 	})
 }
 
+func TestBranchNodeDelete(t *testing.T) {
+	t.Run("レコードを削除できる", func(t *testing.T) {
+		// GIVEN
+		bn := newTestBranchNode()
+		bn.Insert(1, newBranchRecord([]byte{0x20}, page.NewPageId(0, 10)))
+
+		// WHEN
+		bn.Delete(1)
+
+		// THEN
+		assert.Equal(t, 1, bn.NumRecords())
+	})
+}
+
+func TestBranchNodeUpdate(t *testing.T) {
+	t.Run("レコードを更新できる", func(t *testing.T) {
+		// GIVEN
+		bn := newTestBranchNode()
+		newRecord := newBranchRecord([]byte{0xFF}, page.NewPageId(0, 99))
+
+		// WHEN
+		ok := bn.Update(0, newRecord)
+
+		// THEN
+		assert.True(t, ok)
+		assert.Equal(t, []byte{0xFF}, bn.Record(0).Key())
+	})
+}
+
+func TestBranchNodeNumRecords(t *testing.T) {
+	t.Run("レコード数を返す", func(t *testing.T) {
+		// GIVEN
+		bn := newTestBranchNode()
+		bn.Insert(1, newBranchRecord([]byte{0x20}, page.NewPageId(0, 10)))
+
+		// WHEN / THEN
+		assert.Equal(t, 2, bn.NumRecords())
+	})
+}
+
+func TestBranchNodeCanTransferRecord(t *testing.T) {
+	t.Run("レコードが 1 つ以下の場合は false を返す", func(t *testing.T) {
+		// GIVEN
+		bn := newTestBranchNode()
+
+		// WHEN / THEN
+		assert.False(t, bn.CanTransferRecord(true))
+		assert.False(t, bn.CanTransferRecord(false))
+	})
+
+	t.Run("転送後も半分以上埋まっている場合は true を返す", func(t *testing.T) {
+		// GIVEN
+		bn := newTestBranchNode()
+		for i := range 100 {
+			key := make([]byte, 20)
+			key[0] = byte(i/256 + 0x11)
+			key[1] = byte(i % 256)
+			bn.Insert(bn.NumRecords(), newBranchRecord(key, page.NewPageId(0, page.PageNumber(i+10))))
+		}
+
+		// WHEN / THEN
+		assert.True(t, bn.CanTransferRecord(true))
+		assert.True(t, bn.CanTransferRecord(false))
+	})
+}
+
+func TestBranchNodeRecordAt(t *testing.T) {
+	t.Run("指定したスロット番号のレコードを取得できる", func(t *testing.T) {
+		// GIVEN
+		bn := newTestBranchNode()
+		bn.Insert(1, newBranchRecord([]byte{0x20}, page.NewPageId(0, 10)))
+
+		// WHEN
+		r := bn.Record(1)
+
+		// THEN
+		assert.Equal(t, []byte{0x20}, r.Key())
+	})
+}
+
+func TestBranchNodeSearchSlotNum(t *testing.T) {
+	t.Run("キーが見つかった場合はスロット番号と true を返す", func(t *testing.T) {
+		// GIVEN
+		bn := newTestBranchNode()
+		bn.Insert(1, newBranchRecord([]byte{0x20}, page.NewPageId(0, 10)))
+
+		// WHEN
+		slotNum, found := bn.SearchSlotNum([]byte{0x20})
+
+		// THEN
+		assert.Equal(t, 1, slotNum)
+		assert.True(t, found)
+	})
+
+	t.Run("キーが見つからない場合は挿入位置と false を返す", func(t *testing.T) {
+		// GIVEN
+		bn := newTestBranchNode()
+		bn.Insert(1, newBranchRecord([]byte{0x30}, page.NewPageId(0, 10)))
+
+		// WHEN
+		slotNum, found := bn.SearchSlotNum([]byte{0x20})
+
+		// THEN
+		assert.Equal(t, 1, slotNum)
+		assert.False(t, found)
+	})
+}
+
 func TestBranchNodeChildPageId(t *testing.T) {
 	t.Run("通常のスロット番号の場合はレコードの NonKey から PageId を返す", func(t *testing.T) {
 		// GIVEN
@@ -230,6 +366,31 @@ func TestBranchNodeTransferAllFrom(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, 0, src.NumRecords())
 		assert.Equal(t, 3, dest.NumRecords()) // dest の 1 + src の 2
+	})
+}
+
+func TestBranchNodeIsHalfFull(t *testing.T) {
+	t.Run("空の場合は false を返す", func(t *testing.T) {
+		// GIVEN
+		bn := newUninitializedBranchNode()
+		bn.body.Initialize()
+
+		// WHEN / THEN
+		assert.False(t, bn.IsHalfFull())
+	})
+
+	t.Run("半分以上埋まっている場合は true を返す", func(t *testing.T) {
+		// GIVEN
+		bn := newTestBranchNode()
+		for i := range 100 {
+			key := make([]byte, 20)
+			key[0] = byte(i/256 + 0x11)
+			key[1] = byte(i % 256)
+			bn.Insert(bn.NumRecords(), newBranchRecord(key, page.NewPageId(0, page.PageNumber(i+10))))
+		}
+
+		// WHEN / THEN
+		assert.True(t, bn.IsHalfFull())
 	})
 }
 

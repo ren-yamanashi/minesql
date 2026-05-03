@@ -8,27 +8,41 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
+var (
+	ErrAlreadyDeleted = errors.New("already deleted")
+)
+
 // PrimaryIndex はプライマリインデックスへのアクセスを提供する
 type PrimaryIndex struct {
-	bufferPool *buffer.BufferPool
-	tree       *btree.Btree // プライマリインデックスの B+Tree
-	TableName  string
-	PkCount    int // プライマリキーのカラム数 (先頭から連続している想定)
+	tree    *btree.Btree // プライマリインデックスの B+Tree
+	pkCount int          // プライマリキーのカラム数
 }
 
 // NewPrimaryIndex は既存のプライマリインデックスを開く
-func NewPrimaryIndex(bp *buffer.BufferPool, metaPageId page.PageId, table string, pkCount int) *PrimaryIndex {
+func NewPrimaryIndex(bp *buffer.BufferPool, metaPageId page.PageId, pkCount int) *PrimaryIndex {
 	tree := btree.NewBtree(bp, metaPageId)
 	return &PrimaryIndex{
-		TableName: table,
-		tree:      tree,
-		PkCount:   pkCount,
+		tree:    tree,
+		pkCount: pkCount,
 	}
 }
 
-// Create は空のプライマリインデックスを作成する
-func CreatePrimaryIndex() *PrimaryIndex {
-	tree := btree.CreateBtree()
+// CreatePrimaryIndex は空のプライマリインデックスを作成する
+//   - fileId: プライマリインデックスを格納するファイルの ID
+func CreatePrimaryIndex(bp *buffer.BufferPool, fileId page.FileId) (*PrimaryIndex, error) {
+	tree, err := btree.CreateBtree(bp, fileId)
+	if err != nil {
+		return nil, err
+	}
+	return &PrimaryIndex{
+		tree:    tree,
+		pkCount: 0,
+	}, nil
+}
+
+// SetPkCount はプライマリキーのカラム数を設定する
+func (pi *PrimaryIndex) SetPkCount(pkCount int) {
+	pi.pkCount = pkCount
 }
 
 // Search は指定した検索モードでテーブルを検索し、PrimaryIterator を返す
@@ -41,22 +55,26 @@ func (pi *PrimaryIndex) Search(mode SearchMode) (*PrimaryIterator, error) {
 }
 
 // Insert は行を挿入する
-// (論理削除済みの同一キーが存在する場合は Update で上書きする)
+// (論理削除済みの同一キーが存在する場合は上書きする)
 func (pi *PrimaryIndex) Insert(data [][]byte) error {
 	// TODO: Undo ログの記録
-	return pi.insert(data)
+	record := newPrimaryRecord(pi.pkCount, 0, data)
+	return pi.insert(record)
 }
 
 // SoftDelete は行を論理削除する
 func (pi *PrimaryIndex) SoftDelete(data [][]byte) error {
 	// TODO: Undo ログの記録
-	return pi.softDelete(data)
+	record := newPrimaryRecord(pi.pkCount, 1, data)
+	return pi.softDelete(record)
 }
 
 // UpdateInplace は行を更新する
 func (pi *PrimaryIndex) UpdateInplace(old [][]byte, new [][]byte) error {
 	// TODO: Undo ログの記録
-	return pi.updateInplace(old, new)
+	recordOld := newPrimaryRecord(pi.pkCount, 0, old)
+	recordNew := newPrimaryRecord(pi.pkCount, 0, new)
+	return pi.updateInplace(recordOld, recordNew)
 }
 
 // LeafPageCount はリーフページ数を取得する
@@ -65,50 +83,58 @@ func (pi *PrimaryIndex) LeafPageCount() (uint64, error) {
 }
 
 // Height はツリーの高さを取得する
-func (pi *PrimaryIndex) Height(bp *buffer.BufferPool) (uint64, error) {
+func (pi *PrimaryIndex) Height() (uint64, error) {
 	return pi.tree.Height()
 }
 
 // insert は Undo ログを記録せずテーブルに行を挿入する
-func (pi *PrimaryIndex) insert(data [][]byte) error {
+func (pi *PrimaryIndex) insert(pr *PrimaryRecord) error {
 	// TODO: ロック処理
-	record := newPrimaryRecord(pi.PkCount, 0, data).encode()
+	record := pr.encode()
 	err := pi.tree.Insert(record)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, btree.ErrDuplicateKey) {
+		return err
+	}
 
 	// 重複キーエラーの場合、既存のレコードが論理削除済みか確認
-	if err != nil && errors.Is(err, btree.ErrDuplicateKey) {
-		existing, _, err := pi.tree.FindByKey(record.Key())
-		if err != nil {
-			return err
-		}
-		if existing.Header()[0] != 1 {
-			return btree.ErrDuplicateKey
-		}
-
-		// 論理削除済みの場合は上書き
-		err = pi.tree.Update(record)
-		if err != nil {
-			return err
-		}
-	}
-	return err
-}
-
-// softDelete は Undo ログを記録せず行を論理削除する
-func (pi *PrimaryIndex) softDelete(data [][]byte) error {
-	// TODO: ロック処理
-	record := newPrimaryRecord(pi.PkCount, 1, data).encode()
-	_, _, err := pi.tree.FindByKey(record.Key())
+	existing, _, err := pi.tree.FindByKey(record.Key())
 	if err != nil {
 		return err
 	}
+
+	deleteMark := existing.Header()[0]
+	if deleteMark != 1 {
+		return btree.ErrDuplicateKey
+	}
+
+	// 論理削除済みの場合は上書き
+	return pi.tree.Update(record)
+}
+
+// softDelete は Undo ログを記録せず行を論理削除する
+func (pi *PrimaryIndex) softDelete(pr *PrimaryRecord) error {
+	// TODO: ロック処理
+	record := pr.encode()
+	existing, _, err := pi.tree.FindByKey(record.Key())
+	if err != nil {
+		return err
+	}
+
+	deleteMark := existing.Header()[0]
+	if deleteMark == 1 {
+		return ErrAlreadyDeleted
+	}
+
 	return pi.tree.Update(record)
 }
 
 // delete は Undo ログを記録せず行を削除する
-func (pi *PrimaryIndex) delete(data [][]byte) error {
+func (pi *PrimaryIndex) delete(pr *PrimaryRecord) error {
 	// TODO: ロック処理
-	key := newPrimaryRecord(pi.PkCount, 0, data).encode().Key()
+	key := pr.encode().Key()
 	_, _, err := pi.tree.FindByKey(key)
 	if err != nil {
 		return err
@@ -117,14 +143,11 @@ func (pi *PrimaryIndex) delete(data [][]byte) error {
 }
 
 // updateInplace は Undo ログを記録せず行を更新する
-func (pi *PrimaryIndex) updateInplace(old [][]byte, new [][]byte) error {
+func (pi *PrimaryIndex) updateInplace(old *PrimaryRecord, new *PrimaryRecord) error {
 	// TODO: ロック処理
-	recordOld := newPrimaryRecord(pi.PkCount, 0, old).encode()
-	recordNew := newPrimaryRecord(pi.PkCount, 0, new).encode()
-
-	_, _, err := pi.tree.FindByKey(recordOld.Key())
+	_, _, err := pi.tree.FindByKey(old.encode().Key())
 	if err != nil {
 		return err
 	}
-	return pi.tree.Update(recordNew)
+	return pi.tree.Update(new.encode())
 }
