@@ -6,221 +6,277 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestSecondaryIteratorNext(t *testing.T) {
-	t.Run("セカンダリインデックスからプライマリインデックスを辿ってレコードを返す", func(t *testing.T) {
+	t.Run("セカンダリインデックス経由でプライマリレコードを取得できる", func(t *testing.T) {
 		// GIVEN
-		bp := setupSecondaryTestBufferPool(t)
-		primaryBt := setupBtreeWithBp(t, bp)
-		secondaryBt := setupBtreeWithBp(t, bp)
+		env := setupIteratorTestEnv(t)
+		insertPrimaryRecord(t, env, 0, []string{"id", "name", "email"}, []string{"1", "Alice", "alice@example.com"})
+		insertSecondaryRecord(t, env, []string{"name"}, []string{"Alice"}, []string{"1"})
 
-		// プライマリに pk=key1, nonKey=val1 を挿入
-		insertPrimaryRecord(primaryBt, []byte{0x00}, [][]byte{[]byte("key1")}, [][]byte{[]byte("val1")})
-
-		// セカンダリに sk=name1, pk=key1 を挿入 (skCount=1)
-		sr := newSecondaryRecord(1, 0x00, [][]byte{[]byte("name1"), []byte("key1")})
-		if err := secondaryBt.Insert(sr.encode()); err != nil {
-			t.Fatal(err)
-		}
-
-		iter, err := secondaryBt.Search(btree.SearchModeStart{})
-		assert.NoError(t, err)
-		si := newSecondaryIterator(iter, primaryBt, 1)
+		iter := searchSecondaryIndex(t, env)
 
 		// WHEN
-		result, ok, err := si.Next()
+		result, ok, err := iter.Next()
 
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, [][]byte{[]byte("name1")}, result.SecondaryKey)
-		assert.Equal(t, [][]byte{[]byte("key1"), []byte("val1")}, result.Record)
+		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, result.Values)
 	})
 
-	t.Run("削除マーク付きセカンダリレコードをスキップする", func(t *testing.T) {
+	t.Run("複数レコードを順に取得できる", func(t *testing.T) {
 		// GIVEN
-		bp := setupSecondaryTestBufferPool(t)
-		primaryBt := setupBtreeWithBp(t, bp)
-		secondaryBt := setupBtreeWithBp(t, bp)
+		env := setupIteratorTestEnv(t)
+		insertPrimaryRecord(t, env, 0, []string{"id", "name", "email"}, []string{"1", "Alice", "a@example.com"})
+		insertPrimaryRecord(t, env, 0, []string{"id", "name", "email"}, []string{"2", "Bob", "b@example.com"})
+		insertSecondaryRecord(t, env, []string{"name"}, []string{"Alice"}, []string{"1"})
+		insertSecondaryRecord(t, env, []string{"name"}, []string{"Bob"}, []string{"2"})
 
-		insertPrimaryRecord(primaryBt, []byte{0x00}, [][]byte{[]byte("key1")}, [][]byte{[]byte("val1")})
-		insertPrimaryRecord(primaryBt, []byte{0x00}, [][]byte{[]byte("key2")}, [][]byte{[]byte("val2")})
-
-		// 削除済みのセカンダリレコード
-		deleted := newSecondaryRecord(1, 0x01, [][]byte{[]byte("aaa"), []byte("key1")})
-		if err := secondaryBt.Insert(deleted.encode()); err != nil {
-			t.Fatal(err)
-		}
-		// 可視のセカンダリレコード
-		visible := newSecondaryRecord(1, 0x00, [][]byte{[]byte("bbb"), []byte("key2")})
-		if err := secondaryBt.Insert(visible.encode()); err != nil {
-			t.Fatal(err)
-		}
-
-		iter, err := secondaryBt.Search(btree.SearchModeStart{})
-		assert.NoError(t, err)
-		si := newSecondaryIterator(iter, primaryBt, 1)
+		iter := searchSecondaryIndex(t, env)
 
 		// WHEN
-		result, ok, err := si.Next()
+		r1, ok1, err1 := iter.Next()
+		r2, ok2, err2 := iter.Next()
+		_, ok3, err3 := iter.Next()
 
 		// THEN
-		assert.NoError(t, err)
-		assert.True(t, ok)
-		assert.Equal(t, [][]byte{[]byte("bbb")}, result.SecondaryKey)
-		assert.Equal(t, [][]byte{[]byte("key2"), []byte("val2")}, result.Record)
+		assert.NoError(t, err1)
+		assert.True(t, ok1)
+		assert.Equal(t, "Alice", r1.Values[1])
+
+		assert.NoError(t, err2)
+		assert.True(t, ok2)
+		assert.Equal(t, "Bob", r2.Values[1])
+
+		assert.NoError(t, err3)
+		assert.False(t, ok3)
 	})
 
-	t.Run("セカンダリインデックスが空の場合は false を返す", func(t *testing.T) {
+	t.Run("論理削除されたレコードをスキップする", func(t *testing.T) {
 		// GIVEN
-		bp := setupSecondaryTestBufferPool(t)
-		primaryBt := setupBtreeWithBp(t, bp)
-		secondaryBt := setupBtreeWithBp(t, bp)
+		env := setupIteratorTestEnv(t)
+		insertPrimaryRecord(t, env, 0, []string{"id", "name", "email"}, []string{"1", "Alice", "a@example.com"})
+		insertPrimaryRecord(t, env, 0, []string{"id", "name", "email"}, []string{"2", "Bob", "b@example.com"})
+		insertSecondaryRecord(t, env, []string{"name"}, []string{"Alice"}, []string{"1"})
+		insertSecondaryRecordWithDeleteMark(t, env, 1, []string{"name"}, []string{"Bob"}, []string{"2"})
 
-		iter, err := secondaryBt.Search(btree.SearchModeStart{})
-		assert.NoError(t, err)
-		si := newSecondaryIterator(iter, primaryBt, 1)
+		iter := searchSecondaryIndex(t, env)
 
 		// WHEN
-		result, ok, err := si.Next()
+		r1, ok1, err1 := iter.Next()
+		_, ok2, err2 := iter.Next()
+
+		// THEN
+		assert.NoError(t, err1)
+		assert.True(t, ok1)
+		assert.Equal(t, "Alice", r1.Values[1])
+
+		assert.NoError(t, err2)
+		assert.False(t, ok2)
+	})
+
+	t.Run("プライマリに対応するレコードが存在しない場合データなしを返す", func(t *testing.T) {
+		// GIVEN: セカンダリにはあるがプライマリにはない PK
+		env := setupIteratorTestEnv(t)
+		insertSecondaryRecord(t, env, []string{"name"}, []string{"Alice"}, []string{"999"})
+
+		iter := searchSecondaryIndex(t, env)
+
+		// WHEN
+		_, ok, err := iter.Next()
 
 		// THEN
 		assert.NoError(t, err)
 		assert.False(t, ok)
-		assert.Nil(t, result)
+	})
+
+	t.Run("空のインデックスから取得するとデータなしを返す", func(t *testing.T) {
+		// GIVEN
+		env := setupIteratorTestEnv(t)
+		iter := searchSecondaryIndex(t, env)
+
+		// WHEN
+		_, ok, err := iter.Next()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.False(t, ok)
 	})
 }
 
 func TestSecondaryIteratorNextIndexOnly(t *testing.T) {
-	t.Run("セカンダリインデックスのみからセカンダリキーとプライマリキーを返す", func(t *testing.T) {
+	t.Run("セカンダリインデックスのレコードのみを取得できる", func(t *testing.T) {
 		// GIVEN
-		bp := setupSecondaryTestBufferPool(t)
-		primaryBt := setupBtreeWithBp(t, bp)
-		secondaryBt := setupBtreeWithBp(t, bp)
+		env := setupIteratorTestEnv(t)
+		insertSecondaryRecord(t, env, []string{"name"}, []string{"Alice"}, []string{"1"})
 
-		sr := newSecondaryRecord(1, 0x00, [][]byte{[]byte("name1"), []byte("key1")})
-		if err := secondaryBt.Insert(sr.encode()); err != nil {
-			t.Fatal(err)
-		}
-
-		iter, err := secondaryBt.Search(btree.SearchModeStart{})
-		assert.NoError(t, err)
-		si := newSecondaryIterator(iter, primaryBt, 1)
+		iter := searchSecondaryIndex(t, env)
 
 		// WHEN
-		result, ok, err := si.NextIndexOnly()
+		result, ok, err := iter.NextIndexOnly()
 
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, [][]byte{[]byte("name1")}, result.SecondaryKey)
-		assert.Equal(t, [][]byte{[]byte("key1")}, result.PKValues)
-		assert.Nil(t, result.Record)
+		assert.Equal(t, []string{"name"}, result.ColNames)
+		assert.Equal(t, []string{"Alice"}, result.Values)
+		assert.Equal(t, []string{"1"}, result.Pk)
 	})
 
-	t.Run("削除マーク付きレコードをスキップする", func(t *testing.T) {
+	t.Run("論理削除されたレコードをスキップする", func(t *testing.T) {
 		// GIVEN
-		bp := setupSecondaryTestBufferPool(t)
-		primaryBt := setupBtreeWithBp(t, bp)
-		secondaryBt := setupBtreeWithBp(t, bp)
+		env := setupIteratorTestEnv(t)
+		insertSecondaryRecordWithDeleteMark(t, env, 1, []string{"name"}, []string{"Alice"}, []string{"1"})
+		insertSecondaryRecord(t, env, []string{"name"}, []string{"Bob"}, []string{"2"})
 
-		deleted := newSecondaryRecord(1, 0x01, [][]byte{[]byte("aaa"), []byte("key1")})
-		if err := secondaryBt.Insert(deleted.encode()); err != nil {
-			t.Fatal(err)
-		}
-		visible := newSecondaryRecord(1, 0x00, [][]byte{[]byte("bbb"), []byte("key2")})
-		if err := secondaryBt.Insert(visible.encode()); err != nil {
-			t.Fatal(err)
-		}
-
-		iter, err := secondaryBt.Search(btree.SearchModeStart{})
-		assert.NoError(t, err)
-		si := newSecondaryIterator(iter, primaryBt, 1)
+		iter := searchSecondaryIndex(t, env)
 
 		// WHEN
-		result, ok, err := si.NextIndexOnly()
+		result, ok, err := iter.NextIndexOnly()
 
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, [][]byte{[]byte("bbb")}, result.SecondaryKey)
-		assert.Equal(t, [][]byte{[]byte("key2")}, result.PKValues)
+		assert.Equal(t, []string{"Bob"}, result.Values)
 	})
 
-	t.Run("セカンダリインデックスが空の場合は false を返す", func(t *testing.T) {
+	t.Run("空のインデックスから取得するとデータなしを返す", func(t *testing.T) {
 		// GIVEN
-		bp := setupSecondaryTestBufferPool(t)
-		primaryBt := setupBtreeWithBp(t, bp)
-		secondaryBt := setupBtreeWithBp(t, bp)
-
-		iter, err := secondaryBt.Search(btree.SearchModeStart{})
-		assert.NoError(t, err)
-		si := newSecondaryIterator(iter, primaryBt, 1)
+		env := setupIteratorTestEnv(t)
+		iter := searchSecondaryIndex(t, env)
 
 		// WHEN
-		result, ok, err := si.NextIndexOnly()
+		_, ok, err := iter.NextIndexOnly()
 
 		// THEN
 		assert.NoError(t, err)
 		assert.False(t, ok)
-		assert.Nil(t, result)
-	})
-
-	t.Run("全レコードが削除済みの場合は false を返す", func(t *testing.T) {
-		// GIVEN
-		bp := setupSecondaryTestBufferPool(t)
-		primaryBt := setupBtreeWithBp(t, bp)
-		secondaryBt := setupBtreeWithBp(t, bp)
-
-		d1 := newSecondaryRecord(1, 0x01, [][]byte{[]byte("aaa"), []byte("key1")})
-		if err := secondaryBt.Insert(d1.encode()); err != nil {
-			t.Fatal(err)
-		}
-		d2 := newSecondaryRecord(1, 0x01, [][]byte{[]byte("bbb"), []byte("key2")})
-		if err := secondaryBt.Insert(d2.encode()); err != nil {
-			t.Fatal(err)
-		}
-
-		iter, err := secondaryBt.Search(btree.SearchModeStart{})
-		assert.NoError(t, err)
-		si := newSecondaryIterator(iter, primaryBt, 1)
-
-		// WHEN
-		result, ok, err := si.NextIndexOnly()
-
-		// THEN
-		assert.NoError(t, err)
-		assert.False(t, ok)
-		assert.Nil(t, result)
 	})
 }
 
-// setupSecondaryTestBufferPool はセカンダリテスト用のバッファプールを作成する (複数 B+Tree を同じファイルで共有)
-func setupSecondaryTestBufferPool(t *testing.T) *buffer.BufferPool {
-	t.Helper()
-	tmpdir := t.TempDir()
-	path := filepath.Join(tmpdir, "secondary_test.db")
-	fileId := page.FileId(0)
-	heapFile, err := file.NewHeapFile(fileId, path)
-	if err != nil {
-		t.Fatalf("HeapFile の作成に失敗: %v", err)
-	}
-	t.Cleanup(func() { _ = heapFile.Close() })
-	bp := buffer.NewBufferPool(page.PageSize * 20)
-	bp.RegisterHeapFile(fileId, heapFile)
-	return bp
+// iteratorTestEnv はイテレータテスト用の環境
+type iteratorTestEnv struct {
+	ct            *catalog.Catalog
+	bp            *buffer.BufferPool
+	primaryTree   *btree.Btree
+	secondaryTree *btree.Btree
 }
 
-// setupBtreeWithBp は既存のバッファプール上に B+Tree を作成する
-func setupBtreeWithBp(t *testing.T, bp *buffer.BufferPool) *btree.Btree {
+// setupIteratorTestEnv はセカンダリイテレータのテスト用環境を構築する
+func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	t.Helper()
-	bt, err := btree.CreateBtree(bp, page.FileId(0))
+
+	// カタログ用 HeapFile (FileId=0)
+	catalogPath := filepath.Join(t.TempDir(), "catalog.db")
+	catalogHf, err := file.NewHeapFile(page.FileId(0), catalogPath)
 	if err != nil {
-		t.Fatalf("B+Tree の作成に失敗: %v", err)
+		t.Fatalf("カタログ HeapFile の作成に失敗: %v", err)
 	}
-	return bt
+	t.Cleanup(func() { _ = catalogHf.Close() })
+
+	// テーブルデータ用 HeapFile (FileId=2)
+	dataPath := filepath.Join(t.TempDir(), "data.db")
+	dataHf, err := file.NewHeapFile(page.FileId(2), dataPath)
+	if err != nil {
+		t.Fatalf("データ HeapFile の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = dataHf.Close() })
+
+	bp := buffer.NewBufferPool(page.PageSize * 50)
+	bp.RegisterHeapFile(page.FileId(0), catalogHf)
+	bp.RegisterHeapFile(page.FileId(2), dataHf)
+
+	ct, err := catalog.CreateCatalog(bp)
+	if err != nil {
+		t.Fatalf("Catalog の作成に失敗: %v", err)
+	}
+
+	// テーブル定義: id:0, name:1, email:2
+	tableFileId := page.FileId(2)
+	_ = ct.TableMeta.Insert("users", tableFileId, 3)
+	_ = ct.ColumnMeta.Insert(tableFileId, "id", 0)
+	_ = ct.ColumnMeta.Insert(tableFileId, "name", 1)
+	_ = ct.ColumnMeta.Insert(tableFileId, "email", 2)
+
+	// インデックス定義
+	indexId1 := catalog.IndexId(1)
+	_ = ct.IndexMeta.Insert(tableFileId, "idx_name", indexId1, catalog.IndexTypeNonUnique, 1)
+	_ = ct.IndexKeyColMeta.Insert(indexId1, "name", 0)
+
+	indexId2 := catalog.IndexId(2)
+	_ = ct.IndexMeta.Insert(tableFileId, "idx_email", indexId2, catalog.IndexTypeUnique, 1)
+	_ = ct.IndexKeyColMeta.Insert(indexId2, "email", 0)
+
+	// プライマリ B+Tree
+	primaryTree, err := btree.CreateBtree(bp, tableFileId)
+	if err != nil {
+		t.Fatalf("プライマリ B+Tree の作成に失敗: %v", err)
+	}
+
+	// セカンダリ B+Tree
+	secondaryTree, err := btree.CreateBtree(bp, tableFileId)
+	if err != nil {
+		t.Fatalf("セカンダリ B+Tree の作成に失敗: %v", err)
+	}
+
+	return &iteratorTestEnv{
+		ct:            ct,
+		bp:            bp,
+		primaryTree:   primaryTree,
+		secondaryTree: secondaryTree,
+	}
+}
+
+// insertPrimaryRecord はプライマリ B+Tree にレコードを挿入する (pkCount=1)
+func insertPrimaryRecord(t *testing.T, env *iteratorTestEnv, deleteMark byte, colNames, values []string) {
+	t.Helper()
+	pr, err := newPrimaryRecord(env.ct, page.FileId(2), 1, deleteMark, colNames, values)
+	if err != nil {
+		t.Fatalf("PrimaryRecord の作成に失敗: %v", err)
+	}
+	if err := env.primaryTree.Insert(pr.encode()); err != nil {
+		t.Fatalf("プライマリレコードの挿入に失敗: %v", err)
+	}
+}
+
+// insertSecondaryRecord はセカンダリ B+Tree に idx_name インデックスのレコードを挿入する (deleteMark=0)
+func insertSecondaryRecord(t *testing.T, env *iteratorTestEnv, colNames, values, pk []string) {
+	t.Helper()
+	insertSecondaryRecordWithDeleteMark(t, env, 0, colNames, values, pk)
+}
+
+// insertSecondaryRecordWithDeleteMark はセカンダリ B+Tree に指定した deleteMark でレコードを挿入する
+func insertSecondaryRecordWithDeleteMark(t *testing.T, env *iteratorTestEnv, deleteMark byte, colNames, values, pk []string) {
+	t.Helper()
+	sr, err := newSecondaryRecord(env.ct, newSecondaryRecordInput{
+		fileId:     page.FileId(2),
+		deleteMark: deleteMark,
+		indexName:  "idx_name",
+		colNames:   colNames,
+		values:     values,
+		pk:         pk,
+	})
+	if err != nil {
+		t.Fatalf("SecondaryRecord の作成に失敗: %v", err)
+	}
+	if err := env.secondaryTree.Insert(sr.encode()); err != nil {
+		t.Fatalf("セカンダリレコードの挿入に失敗: %v", err)
+	}
+}
+
+// searchSecondaryIndex はセカンダリ B+Tree を先頭から検索してイテレータを返す
+func searchSecondaryIndex(t *testing.T, env *iteratorTestEnv) *SecondaryIterator {
+	t.Helper()
+	mode := SearchModeStart{}
+	iter, err := env.secondaryTree.Search(mode.encode())
+	if err != nil {
+		t.Fatalf("セカンダリインデックスの検索に失敗: %v", err)
+	}
+	return newSecondaryIterator("idx_name", iter, env.ct, env.primaryTree)
 }

@@ -46,6 +46,6 @@ func (cm *ConstraintMeta) Insert(
 	refTableFileId page.FileId,
 	refColName string,
 ) error {
-	record := newConstraintRecord(fileId, colName, constraintName, refTableFileId, refColName)
+	record := NewConstraintRecord(fileId, colName, constraintName, refTableFileId, refColName)
 	return cm.tree.Insert(record.encode())
 }

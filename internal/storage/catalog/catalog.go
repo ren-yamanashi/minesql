@@ -35,12 +35,12 @@ type Catalog struct {
 	nextFileId      page.FileId
 	nextIndexId     IndexId
 	undoLogFileId   page.FileId
-	tableMeta       *TableMeta
-	indexMeta       *IndexMeta
-	indexKeyColMeta *IndexKeyColMeta
-	columnMeta      *ColumnMeta
-	constraintMeta  *ConstraintMeta
-	userMeta        *UserMeta
+	TableMeta       *TableMeta
+	IndexMeta       *IndexMeta
+	IndexKeyColMeta *IndexKeyColMeta
+	ColumnMeta      *ColumnMeta
+	ConstraintMeta  *ConstraintMeta
+	UserMeta        *UserMeta
 }
 
 // NewCatalog は既存のカタログを開く
@@ -71,12 +71,12 @@ func NewCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 		nextFileId:      nextFileId,
 		nextIndexId:     nextIndexId,
 		undoLogFileId:   undoLogFileId,
-		tableMeta:       NewTableMeta(bp, page.NewPageId(catalogFileId, tableMetaPageNumber)),
-		indexMeta:       NewIndexMeta(bp, page.NewPageId(catalogFileId, indexMetaPageNumber)),
-		indexKeyColMeta: NewIndexKeyColMeta(bp, page.NewPageId(catalogFileId, indexKeyColMetaPageNumber)),
-		columnMeta:      NewColumnMeta(bp, page.NewPageId(catalogFileId, columnMetaPageNumber)),
-		constraintMeta:  NewConstraintMeta(bp, page.NewPageId(catalogFileId, constraintMetaPageNumber)),
-		userMeta:        NewUserMeta(bp, page.NewPageId(catalogFileId, userMetaPageNumber)),
+		TableMeta:       NewTableMeta(bp, page.NewPageId(catalogFileId, tableMetaPageNumber)),
+		IndexMeta:       NewIndexMeta(bp, page.NewPageId(catalogFileId, indexMetaPageNumber)),
+		IndexKeyColMeta: NewIndexKeyColMeta(bp, page.NewPageId(catalogFileId, indexKeyColMetaPageNumber)),
+		ColumnMeta:      NewColumnMeta(bp, page.NewPageId(catalogFileId, columnMetaPageNumber)),
+		ConstraintMeta:  NewConstraintMeta(bp, page.NewPageId(catalogFileId, constraintMetaPageNumber)),
+		UserMeta:        NewUserMeta(bp, page.NewPageId(catalogFileId, userMetaPageNumber)),
 	}, nil
 }
 
@@ -142,12 +142,12 @@ func CreateCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 		nextFileId:      nextFileId,
 		nextIndexId:     nextIndexId,
 		undoLogFileId:   undoLogFileId,
-		tableMeta:       tableMeta,
-		indexMeta:       indexMeta,
-		indexKeyColMeta: indexKeyColMeta,
-		columnMeta:      columnMeta,
-		constraintMeta:  constraintMeta,
-		userMeta:        userMeta,
+		TableMeta:       tableMeta,
+		IndexMeta:       indexMeta,
+		IndexKeyColMeta: indexKeyColMeta,
+		ColumnMeta:      columnMeta,
+		ConstraintMeta:  constraintMeta,
+		UserMeta:        userMeta,
 	}, nil
 }
 

@@ -2,23 +2,28 @@ package access
 
 import (
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
-	"github.com/ren-yamanashi/minesql/internal/storage/encode"
+	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 // PrimaryIterator はプライマリインデックスを辿るイテレータ
 type PrimaryIterator struct {
 	iterator *btree.Iterator
+	catalog  *catalog.Catalog
+	fileId   page.FileId
 }
 
-func newPrimaryIterator(iter *btree.Iterator) *PrimaryIterator {
+func newPrimaryIterator(iter *btree.Iterator, ct *catalog.Catalog, fileId page.FileId) *PrimaryIterator {
 	return &PrimaryIterator{
+		fileId:   fileId,
+		catalog:  ct,
 		iterator: iter,
 	}
 }
 
 // Next はデコード済みの次の可視レコードを返す
 //   - return: レコード, データがあるか
-func (pi *PrimaryIterator) Next() ([][]byte, bool, error) {
+func (pi *PrimaryIterator) Next() (*PrimaryRecord, bool, error) {
 	for {
 		record, ok, err := pi.iterator.Next()
 		if err != nil {
@@ -33,9 +38,10 @@ func (pi *PrimaryIterator) Next() ([][]byte, bool, error) {
 			continue
 		}
 
-		var result [][]byte
-		encode.Decode(record.Key(), &result)
-		encode.Decode(record.NonKey(), &result)
+		result, err := decodePrimaryRecord(record, pi.catalog, pi.fileId)
+		if err != nil {
+			return nil, false, err
+		}
 		return result, true, nil
 	}
 }

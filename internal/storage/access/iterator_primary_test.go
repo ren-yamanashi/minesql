@@ -1,150 +1,109 @@
 package access
 
 import (
-	"path/filepath"
 	"testing"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree"
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
-	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/encode"
-	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestPrimaryIteratorNext(t *testing.T) {
-	t.Run("レコードをデコードして返す", func(t *testing.T) {
+	t.Run("プライマリレコードを取得できる", func(t *testing.T) {
 		// GIVEN
-		bt := setupPrimaryBtree(t)
-		insertPrimaryRecord(bt, []byte{0x00}, [][]byte{[]byte("key1")}, [][]byte{[]byte("val1")})
+		env := setupIteratorTestEnv(t)
+		insertPrimaryRecord(t, env, 0, []string{"id", "name", "email"}, []string{"1", "Alice", "alice@example.com"})
 
-		iter, err := bt.Search(btree.SearchModeStart{})
-		assert.NoError(t, err)
-		pi := newPrimaryIterator(iter)
+		iter := searchPrimaryIndex(t, env)
 
 		// WHEN
-		result, ok, err := pi.Next()
+		result, ok, err := iter.Next()
 
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, [][]byte{[]byte("key1"), []byte("val1")}, result)
+		assert.Equal(t, []string{"id", "name", "email"}, result.ColNames)
+		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, result.Values)
 	})
 
 	t.Run("複数レコードを順に取得できる", func(t *testing.T) {
 		// GIVEN
-		bt := setupPrimaryBtree(t)
-		insertPrimaryRecord(bt, []byte{0x00}, [][]byte{[]byte("a")}, [][]byte{[]byte("v1")})
-		insertPrimaryRecord(bt, []byte{0x00}, [][]byte{[]byte("b")}, [][]byte{[]byte("v2")})
+		env := setupIteratorTestEnv(t)
+		insertPrimaryRecord(t, env, 0, []string{"id", "name", "email"}, []string{"1", "Alice", "a@example.com"})
+		insertPrimaryRecord(t, env, 0, []string{"id", "name", "email"}, []string{"2", "Bob", "b@example.com"})
 
-		iter, err := bt.Search(btree.SearchModeStart{})
-		assert.NoError(t, err)
-		pi := newPrimaryIterator(iter)
+		iter := searchPrimaryIndex(t, env)
 
 		// WHEN
-		r1, ok1, err1 := pi.Next()
-		r2, ok2, err2 := pi.Next()
-		_, ok3, err3 := pi.Next()
+		r1, ok1, err1 := iter.Next()
+		r2, ok2, err2 := iter.Next()
+		_, ok3, err3 := iter.Next()
 
 		// THEN
 		assert.NoError(t, err1)
 		assert.True(t, ok1)
-		assert.Equal(t, [][]byte{[]byte("a"), []byte("v1")}, r1)
+		assert.Equal(t, "1", r1.Values[0])
 
 		assert.NoError(t, err2)
 		assert.True(t, ok2)
-		assert.Equal(t, [][]byte{[]byte("b"), []byte("v2")}, r2)
+		assert.Equal(t, "2", r2.Values[0])
 
 		assert.NoError(t, err3)
 		assert.False(t, ok3)
 	})
 
-	t.Run("削除マーク付きレコードをスキップする", func(t *testing.T) {
+	t.Run("論理削除されたレコードをスキップする", func(t *testing.T) {
 		// GIVEN
-		bt := setupPrimaryBtree(t)
-		insertPrimaryRecord(bt, []byte{0x01}, [][]byte{[]byte("deleted")}, [][]byte{[]byte("x")})
-		insertPrimaryRecord(bt, []byte{0x00}, [][]byte{[]byte("visible")}, [][]byte{[]byte("y")})
+		env := setupIteratorTestEnv(t)
+		insertPrimaryRecord(t, env, 1, []string{"id", "name", "email"}, []string{"1", "Alice", "a@example.com"})
+		insertPrimaryRecord(t, env, 0, []string{"id", "name", "email"}, []string{"2", "Bob", "b@example.com"})
 
-		iter, err := bt.Search(btree.SearchModeStart{})
-		assert.NoError(t, err)
-		pi := newPrimaryIterator(iter)
+		iter := searchPrimaryIndex(t, env)
 
 		// WHEN
-		result, ok, err := pi.Next()
+		result, ok, err := iter.Next()
 
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, [][]byte{[]byte("visible"), []byte("y")}, result)
+		assert.Equal(t, "2", result.Values[0])
 	})
 
-	t.Run("全レコードが削除済みの場合は false を返す", func(t *testing.T) {
+	t.Run("全レコードが論理削除済みの場合データなしを返す", func(t *testing.T) {
 		// GIVEN
-		bt := setupPrimaryBtree(t)
-		insertPrimaryRecord(bt, []byte{0x01}, [][]byte{[]byte("d1")}, [][]byte{[]byte("x")})
-		insertPrimaryRecord(bt, []byte{0x01}, [][]byte{[]byte("d2")}, [][]byte{[]byte("y")})
+		env := setupIteratorTestEnv(t)
+		insertPrimaryRecord(t, env, 1, []string{"id", "name", "email"}, []string{"1", "Alice", "a@example.com"})
 
-		iter, err := bt.Search(btree.SearchModeStart{})
-		assert.NoError(t, err)
-		pi := newPrimaryIterator(iter)
+		iter := searchPrimaryIndex(t, env)
 
 		// WHEN
-		result, ok, err := pi.Next()
+		_, ok, err := iter.Next()
 
 		// THEN
 		assert.NoError(t, err)
 		assert.False(t, ok)
-		assert.Nil(t, result)
 	})
 
-	t.Run("レコードが空の場合は false を返す", func(t *testing.T) {
+	t.Run("空のインデックスから取得するとデータなしを返す", func(t *testing.T) {
 		// GIVEN
-		bt := setupPrimaryBtree(t)
-
-		iter, err := bt.Search(btree.SearchModeStart{})
-		assert.NoError(t, err)
-		pi := newPrimaryIterator(iter)
+		env := setupIteratorTestEnv(t)
+		iter := searchPrimaryIndex(t, env)
 
 		// WHEN
-		result, ok, err := pi.Next()
+		_, ok, err := iter.Next()
 
 		// THEN
 		assert.NoError(t, err)
 		assert.False(t, ok)
-		assert.Nil(t, result)
 	})
 }
 
-// setupPrimaryBtree はテスト用の B+Tree をセットアップする
-func setupPrimaryBtree(t *testing.T) *btree.Btree {
+// searchPrimaryIndex はプライマリ B+Tree を先頭から検索してイテレータを返す
+func searchPrimaryIndex(t *testing.T, env *iteratorTestEnv) *PrimaryIterator {
 	t.Helper()
-	tmpdir := t.TempDir()
-	path := filepath.Join(tmpdir, "primary_test.db")
-	fileId := page.FileId(0)
-	heapFile, err := file.NewHeapFile(fileId, path)
+	mode := SearchModeStart{}
+	iter, err := env.primaryTree.Search(mode.encode())
 	if err != nil {
-		t.Fatalf("HeapFile の作成に失敗: %v", err)
+		t.Fatalf("プライマリインデックスの検索に失敗: %v", err)
 	}
-	bp := buffer.NewBufferPool(page.PageSize * 10)
-	bp.RegisterHeapFile(fileId, heapFile)
-
-	bt, err := btree.CreateBtree(bp, fileId)
-	if err != nil {
-		t.Fatalf("B+Tree の作成に失敗: %v", err)
-	}
-	return bt
-}
-
-// insertPrimaryRecord はエンコード済みのレコードを B+Tree に挿入する
-func insertPrimaryRecord(bt *btree.Btree, header []byte, keyParts, nonKeyParts [][]byte) {
-	var encodedKey []byte
-	encode.Encode(keyParts, &encodedKey)
-	var encodedNonKey []byte
-	encode.Encode(nonKeyParts, &encodedNonKey)
-
-	record := node.NewRecord(header, encodedKey, encodedNonKey)
-	if err := bt.Insert(record); err != nil {
-		panic(err)
-	}
+	return newPrimaryIterator(iter, env.ct, page.FileId(2))
 }

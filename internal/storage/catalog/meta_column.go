@@ -38,6 +38,6 @@ func (cm *ColumnMeta) Search(mode SearchMode) (*ColumnIterator, error) {
 //   - name: カラム名
 //   - pos: テーブル上のカラム位置
 func (cm *ColumnMeta) Insert(fileId page.FileId, name string, pos int) error {
-	record := newColumnRecord(fileId, name, pos)
+	record := NewColumnRecord(fileId, name, pos)
 	return cm.tree.Insert(record.encode())
 }

@@ -11,13 +11,13 @@ func newIndexIterator(iter *btree.Iterator) *IndexIterator {
 }
 
 // Next はインデックスメタデータから次の結果を返す
-func (imi *IndexIterator) Next() (indexRecord, bool, error) {
+func (imi *IndexIterator) Next() (IndexRecord, bool, error) {
 	record, ok, err := imi.iterator.Next()
 	if err != nil {
-		return indexRecord{}, false, err
+		return IndexRecord{}, false, err
 	}
 	if !ok {
-		return indexRecord{}, false, nil
+		return IndexRecord{}, false, nil
 	}
 	return decodeIndexRecord(record), true, nil
 }

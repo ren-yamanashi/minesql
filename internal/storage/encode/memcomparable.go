@@ -36,20 +36,6 @@ func Decode(src []byte, elements *[][]byte) {
 	}
 }
 
-// DecodeFirstN は先頭 n 要素のみをデコードする
-//   - return:
-//   - decoded: デコード済みのバイト列
-//   - rest: 未デコード (エンコード済み) のバイト列
-func DecodeFirstN(src []byte, n int) (decoded [][]byte, rest []byte) {
-	rest = src
-	for i := 0; i < n && len(rest) > 0; i++ {
-		element := make([]byte, 0)
-		decodeFromMemcomparable(&rest, &element)
-		decoded = append(decoded, element)
-	}
-	return decoded, rest
-}
-
 // encodedSize はエンコード後のサイズを計測する
 //   - size: エンコード前のバイト列のサイズ
 //   - 計測方法: size を 8 バイトずつに分割し、各ブロックに対して 9 バイトを割り当てる

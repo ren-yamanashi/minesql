@@ -68,13 +68,13 @@ func TestUserMetaSearch(t *testing.T) {
 		// THEN
 		assert.NoError(t, err1)
 		assert.True(t, ok1)
-		assert.Equal(t, "alice", r1.username)
-		assert.Equal(t, "localhost", r1.host)
-		assert.Equal(t, []byte("auth1"), r1.authString)
+		assert.Equal(t, "alice", r1.Username)
+		assert.Equal(t, "localhost", r1.Host)
+		assert.Equal(t, []byte("auth1"), r1.AuthString)
 
 		assert.NoError(t, err2)
 		assert.True(t, ok2)
-		assert.Equal(t, "bob", r2.username)
+		assert.Equal(t, "bob", r2.Username)
 
 		assert.NoError(t, err3)
 		assert.False(t, ok3)
@@ -95,9 +95,9 @@ func TestUserMetaSearch(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "bob", r.username)
-		assert.Equal(t, "%", r.host)
-		assert.Equal(t, []byte("auth2"), r.authString)
+		assert.Equal(t, "bob", r.Username)
+		assert.Equal(t, "%", r.Host)
+		assert.Equal(t, []byte("auth2"), r.AuthString)
 	})
 
 	t.Run("空のメタデータを検索するとレコードが返らない", func(t *testing.T) {

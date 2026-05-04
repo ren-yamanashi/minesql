@@ -19,50 +19,54 @@ const (
 	IndexTypeNonUnique IndexType = 3
 )
 
-type indexRecord struct {
-	fileId    page.FileId // インデックスが属するテーブルの FileId
-	indexId   IndexId     // インデックス ID
-	name      string      // インデックス名
-	indexType IndexType   // インデックス種類
+type IndexRecord struct {
+	FileId    page.FileId // インデックスが属するテーブルの FileId
+	IndexId   IndexId     // インデックス ID
+	Name      string      // インデックス名
+	IndexType IndexType   // インデックス種類
+	NumOfCol  int         // インデックスを構成するカラム数
 }
 
-func newIndexRecord(fileId page.FileId, indexId IndexId, name string, indexType IndexType) indexRecord {
-	return indexRecord{
-		fileId:    fileId,
-		indexId:   indexId,
-		name:      name,
-		indexType: indexType,
+func NewIndexRecord(fileId page.FileId, indexId IndexId, name string, indexType IndexType, numOfCol int) IndexRecord {
+	return IndexRecord{
+		FileId:    fileId,
+		IndexId:   indexId,
+		Name:      name,
+		IndexType: indexType,
+		NumOfCol:  numOfCol,
 	}
 }
 
 // encode は node.Record にエンコードする
-func (ir indexRecord) encode() node.Record {
-	// key = fileId + indexId
+func (ir IndexRecord) encode() node.Record {
+	// key = fileId + name
 	var key []byte
-	fileId := binary.BigEndian.AppendUint32(nil, uint32(ir.fileId))
-	indexId := binary.BigEndian.AppendUint32(nil, uint32(ir.indexId))
-	encode.Encode([][]byte{fileId, indexId}, &key)
+	fileId := binary.BigEndian.AppendUint32(nil, uint32(ir.FileId))
+	encode.Encode([][]byte{fileId, []byte(ir.Name)}, &key)
 
-	// nonKey = name + indexType
+	// nonKey = indexId + indexType + numOfCol
 	var nonKey []byte
-	encode.Encode([][]byte{[]byte(ir.name), {byte(ir.indexType)}}, &nonKey)
+	indexId := binary.BigEndian.AppendUint32(nil, uint32(ir.IndexId))
+	numOfCol := binary.BigEndian.AppendUint32(nil, uint32(ir.NumOfCol))
+	encode.Encode([][]byte{indexId, {byte(ir.IndexType)}, numOfCol}, &nonKey)
 
 	return node.NewRecord(nil, key, nonKey)
 }
 
-// decodeIndexRecord は node.Record から indexRecord にデコードする
-func decodeIndexRecord(record node.Record) indexRecord {
-	// key = [fileId, indexId]
+// decodeIndexRecord は node.Record から IndexRecord にデコードする
+func decodeIndexRecord(record node.Record) IndexRecord {
+	// key = [fileId, name]
 	var key [][]byte
 	encode.Decode(record.Key(), &key)
 	fileId := page.FileId(binary.BigEndian.Uint32(key[0]))
-	indexId := IndexId(binary.BigEndian.Uint32(key[1]))
+	name := string(key[1])
 
-	// nonKey = [name, indexType]
+	// nonKey = [indexId, indexType, numOfCol]
 	var nonKey [][]byte
 	encode.Decode(record.NonKey(), &nonKey)
-	name := string(nonKey[0])
+	indexId := IndexId(binary.BigEndian.Uint32(nonKey[0]))
 	indexType := IndexType(nonKey[1][0])
+	numOfCol := int(binary.BigEndian.Uint32(nonKey[2]))
 
-	return newIndexRecord(fileId, indexId, name, indexType)
+	return NewIndexRecord(fileId, indexId, name, indexType, numOfCol)
 }

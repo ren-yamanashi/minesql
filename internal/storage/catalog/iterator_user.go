@@ -11,13 +11,13 @@ func newUserIterator(iter *btree.Iterator) *UserIterator {
 }
 
 // Next はユーザーメタデータから次の結果を返す
-func (umi *UserIterator) Next() (userRecord, bool, error) {
+func (umi *UserIterator) Next() (UserRecord, bool, error) {
 	record, ok, err := umi.iterator.Next()
 	if err != nil {
-		return userRecord{}, false, err
+		return UserRecord{}, false, err
 	}
 	if !ok {
-		return userRecord{}, false, nil
+		return UserRecord{}, false, nil
 	}
 	return decodeUserRecord(record), true, nil
 }

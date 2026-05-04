@@ -8,37 +8,37 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
-type columnRecord struct {
-	fileId page.FileId // カラムが属するテーブルの FileId
-	name   string      // カラム名
-	pos    int         // テーブル上のカラム位置
+type ColumnRecord struct {
+	FileId page.FileId // カラムが属するテーブルの FileId
+	Name   string      // カラム名
+	Pos    int         // テーブル上のカラム位置
 }
 
-func newColumnRecord(fileId page.FileId, name string, pos int) columnRecord {
-	return columnRecord{
-		fileId: fileId,
-		name:   name,
-		pos:    pos,
+func NewColumnRecord(fileId page.FileId, name string, pos int) ColumnRecord {
+	return ColumnRecord{
+		FileId: fileId,
+		Name:   name,
+		Pos:    pos,
 	}
 }
 
 // encode は node.Record にエンコードする
-func (cr columnRecord) encode() node.Record {
+func (cr ColumnRecord) encode() node.Record {
 	// key = fileId + name
 	var key []byte
-	fileId := binary.BigEndian.AppendUint32(nil, uint32(cr.fileId))
-	encode.Encode([][]byte{fileId, []byte(cr.name)}, &key)
+	fileId := binary.BigEndian.AppendUint32(nil, uint32(cr.FileId))
+	encode.Encode([][]byte{fileId, []byte(cr.Name)}, &key)
 
 	// nonKey = pos
 	var nonKey []byte
-	pos := binary.BigEndian.AppendUint32(nil, uint32(cr.pos))
+	pos := binary.BigEndian.AppendUint32(nil, uint32(cr.Pos))
 	encode.Encode([][]byte{pos}, &nonKey)
 
 	return node.NewRecord(nil, key, nonKey)
 }
 
 // decodeColumnRecord は node.Record から columnRecord にデコードする
-func decodeColumnRecord(record node.Record) columnRecord {
+func decodeColumnRecord(record node.Record) ColumnRecord {
 	// key = [fileId, name]
 	var key [][]byte
 	encode.Decode(record.Key(), &key)
@@ -50,5 +50,5 @@ func decodeColumnRecord(record node.Record) columnRecord {
 	encode.Decode(record.NonKey(), &nonKey)
 	pos := int(binary.BigEndian.Uint32(nonKey[0]))
 
-	return newColumnRecord(fileId, name, pos)
+	return NewColumnRecord(fileId, name, pos)
 }

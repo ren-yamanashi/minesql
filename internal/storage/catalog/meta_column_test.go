@@ -77,15 +77,15 @@ func TestColumnMetaSearch(t *testing.T) {
 		// THEN
 		assert.NoError(t, err1)
 		assert.True(t, ok1)
-		assert.Equal(t, page.FileId(1), r1.fileId)
-		assert.Equal(t, "id", r1.name)
-		assert.Equal(t, 0, r1.pos)
+		assert.Equal(t, page.FileId(1), r1.FileId)
+		assert.Equal(t, "id", r1.Name)
+		assert.Equal(t, 0, r1.Pos)
 
 		assert.NoError(t, err2)
 		assert.True(t, ok2)
-		assert.Equal(t, page.FileId(1), r2.fileId)
-		assert.Equal(t, "name", r2.name)
-		assert.Equal(t, 1, r2.pos)
+		assert.Equal(t, page.FileId(1), r2.FileId)
+		assert.Equal(t, "name", r2.Name)
+		assert.Equal(t, 1, r2.Pos)
 
 		assert.NoError(t, err3)
 		assert.False(t, ok3)

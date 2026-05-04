@@ -5,35 +5,35 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 )
 
-type userRecord struct {
-	username   string // ユーザー名
-	host       string // ホスト名
-	authString []byte // 認証文字列
+type UserRecord struct {
+	Username   string // ユーザー名
+	Host       string // ホスト名
+	AuthString []byte // 認証文字列
 }
 
-func newUserRecord(username, host string, authString []byte) userRecord {
-	return userRecord{
-		username:   username,
-		host:       host,
-		authString: authString,
+func NewUserRecord(username, host string, authString []byte) UserRecord {
+	return UserRecord{
+		Username:   username,
+		Host:       host,
+		AuthString: authString,
 	}
 }
 
 // encode は node.Record にエンコードする
-func (ur userRecord) encode() node.Record {
+func (ur UserRecord) encode() node.Record {
 	// key = username
 	var key []byte
-	encode.Encode([][]byte{[]byte(ur.username)}, &key)
+	encode.Encode([][]byte{[]byte(ur.Username)}, &key)
 
 	// nonKey = host + authString
 	var nonKey []byte
-	encode.Encode([][]byte{[]byte(ur.host), ur.authString}, &nonKey)
+	encode.Encode([][]byte{[]byte(ur.Host), ur.AuthString}, &nonKey)
 
 	return node.NewRecord(nil, key, nonKey)
 }
 
 // decodeUserRecord は node.Record から userRecord にデコードする
-func decodeUserRecord(record node.Record) userRecord {
+func decodeUserRecord(record node.Record) UserRecord {
 	// key = [username]
 	var key [][]byte
 	encode.Decode(record.Key(), &key)
@@ -45,5 +45,5 @@ func decodeUserRecord(record node.Record) userRecord {
 	host := string(nonKey[0])
 	authString := nonKey[1]
 
-	return newUserRecord(username, host, authString)
+	return NewUserRecord(username, host, authString)
 }

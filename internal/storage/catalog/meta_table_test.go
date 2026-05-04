@@ -28,31 +28,31 @@ func TestTableMetaInsert(t *testing.T) {
 		tm := setupTestTableMeta(t)
 
 		// WHEN
-		err := tm.Insert(page.FileId(1), "users", 3)
+		err := tm.Insert("users", page.FileId(1), 3)
 
 		// THEN
 		assert.NoError(t, err)
 	})
 
-	t.Run("同じ FileId の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
+	t.Run("同じテーブル名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
 		// GIVEN
 		tm := setupTestTableMeta(t)
-		_ = tm.Insert(page.FileId(1), "users", 3)
+		_ = tm.Insert("users", page.FileId(1), 3)
 
 		// WHEN
-		err := tm.Insert(page.FileId(1), "orders", 5)
+		err := tm.Insert("users", page.FileId(2), 5)
 
 		// THEN
 		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
 	})
 
-	t.Run("異なる FileId であれば複数挿入できる", func(t *testing.T) {
+	t.Run("異なるテーブル名であれば複数挿入できる", func(t *testing.T) {
 		// GIVEN
 		tm := setupTestTableMeta(t)
-		_ = tm.Insert(page.FileId(1), "users", 3)
+		_ = tm.Insert("users", page.FileId(1), 3)
 
 		// WHEN
-		err := tm.Insert(page.FileId(2), "orders", 5)
+		err := tm.Insert("orders", page.FileId(2), 5)
 
 		// THEN
 		assert.NoError(t, err)
@@ -63,8 +63,8 @@ func TestTableMetaSearch(t *testing.T) {
 	t.Run("SearchModeStart で全件スキャンできる", func(t *testing.T) {
 		// GIVEN
 		tm := setupTestTableMeta(t)
-		_ = tm.Insert(page.FileId(1), "users", 3)
-		_ = tm.Insert(page.FileId(2), "orders", 5)
+		_ = tm.Insert("users", page.FileId(1), 3)
+		_ = tm.Insert("orders", page.FileId(2), 5)
 
 		// WHEN
 		iter, err := tm.Search(SearchModeStart{})
@@ -74,18 +74,18 @@ func TestTableMetaSearch(t *testing.T) {
 		r2, ok2, err2 := iter.Next()
 		_, ok3, err3 := iter.Next()
 
-		// THEN
+		// THEN: テーブル名でソートされる
 		assert.NoError(t, err1)
 		assert.True(t, ok1)
-		assert.Equal(t, page.FileId(1), r1.fileId)
-		assert.Equal(t, "users", r1.name)
-		assert.Equal(t, 3, r1.numOfCol)
+		assert.Equal(t, "orders", r1.Name)
+		assert.Equal(t, page.FileId(2), r1.FileId)
+		assert.Equal(t, 5, r1.NumOfCol)
 
 		assert.NoError(t, err2)
 		assert.True(t, ok2)
-		assert.Equal(t, page.FileId(2), r2.fileId)
-		assert.Equal(t, "orders", r2.name)
-		assert.Equal(t, 5, r2.numOfCol)
+		assert.Equal(t, "users", r2.Name)
+		assert.Equal(t, page.FileId(1), r2.FileId)
+		assert.Equal(t, 3, r2.NumOfCol)
 
 		assert.NoError(t, err3)
 		assert.False(t, ok3)

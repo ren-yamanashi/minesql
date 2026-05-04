@@ -11,13 +11,13 @@ func newIndexKeyColIterator(iter *btree.Iterator) *IndexKeyColIterator {
 }
 
 // Next はインデックスキーカラムメタデータから次の結果を返す
-func (imi *IndexKeyColIterator) Next() (indexKeyColRecord, bool, error) {
+func (imi *IndexKeyColIterator) Next() (IndexKeyColRecord, bool, error) {
 	record, ok, err := imi.iterator.Next()
 	if err != nil {
-		return indexKeyColRecord{}, false, err
+		return IndexKeyColRecord{}, false, err
 	}
 	if !ok {
-		return indexKeyColRecord{}, false, nil
+		return IndexKeyColRecord{}, false, nil
 	}
 	return decodeIndexKeyColRecord(record), true, nil
 }

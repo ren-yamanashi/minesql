@@ -8,47 +8,47 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
-type tableRecord struct {
-	fileId   page.FileId // テーブルの FileId
-	name     string      // テーブル名
-	numOfCol int         // カラム数
+type TableRecord struct {
+	FileId   page.FileId // テーブルの FileId
+	Name     string      // テーブル名
+	NumOfCol int         // カラム数
 }
 
-func newTableRecord(fileId page.FileId, name string, numOfCol int) tableRecord {
-	return tableRecord{
-		fileId:   fileId,
-		name:     name,
-		numOfCol: numOfCol,
+func NewTableRecord(fileId page.FileId, name string, numOfCol int) TableRecord {
+	return TableRecord{
+		FileId:   fileId,
+		Name:     name,
+		NumOfCol: numOfCol,
 	}
 }
 
 // encode は node.Record にエンコードする
-func (tr tableRecord) encode() node.Record {
-	// key = fileId
+func (tr TableRecord) encode() node.Record {
+	// key = name
 	var key []byte
-	fileId := binary.BigEndian.AppendUint32(nil, uint32(tr.fileId))
-	encode.Encode([][]byte{fileId}, &key)
+	encode.Encode([][]byte{[]byte(tr.Name)}, &key)
 
-	// nonKey = name + numOfCol
+	// nonKey = fileId + numOfCol
 	var nonKey []byte
-	numOfCol := binary.BigEndian.AppendUint32(nil, uint32(tr.numOfCol))
-	encode.Encode([][]byte{[]byte(tr.name), numOfCol}, &nonKey)
+	fileId := binary.BigEndian.AppendUint32(nil, uint32(tr.FileId))
+	numOfCol := binary.BigEndian.AppendUint32(nil, uint32(tr.NumOfCol))
+	encode.Encode([][]byte{fileId, numOfCol}, &nonKey)
 
 	return node.NewRecord(nil, key, nonKey)
 }
 
 // decodeTableRecord は node.Record から tableRecord にデコードする
-func decodeTableRecord(record node.Record) tableRecord {
-	// key = [fileId]
+func decodeTableRecord(record node.Record) TableRecord {
+	// key = [name]
 	var key [][]byte
 	encode.Decode(record.Key(), &key)
-	fileId := page.FileId(binary.BigEndian.Uint32(key[0]))
+	name := string(key[0])
 
-	// nonKey = [name, numOfCol]
+	// nonKey = [fileId, numOfCol]
 	var nonKey [][]byte
 	encode.Decode(record.NonKey(), &nonKey)
-	name := string(nonKey[0])
+	fileId := page.FileId(binary.BigEndian.Uint32(nonKey[0]))
 	numOfCol := int(binary.BigEndian.Uint32(nonKey[1]))
 
-	return newTableRecord(fileId, name, numOfCol)
+	return NewTableRecord(fileId, name, numOfCol)
 }

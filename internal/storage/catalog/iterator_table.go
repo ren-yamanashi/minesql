@@ -11,13 +11,13 @@ func newTableIterator(iter *btree.Iterator) *TableIterator {
 }
 
 // Next はテーブルメタデータから次の結果を返す
-func (imi *TableIterator) Next() (tableRecord, bool, error) {
+func (imi *TableIterator) Next() (TableRecord, bool, error) {
 	record, ok, err := imi.iterator.Next()
 	if err != nil {
-		return tableRecord{}, false, err
+		return TableRecord{}, false, err
 	}
 	if !ok {
-		return tableRecord{}, false, nil
+		return TableRecord{}, false, nil
 	}
 	return decodeTableRecord(record), true, nil
 }

@@ -7,37 +7,37 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 )
 
-type indexKeyColRecord struct {
-	indexId IndexId
-	name    string // カラム名
-	pos     int    // テーブル上のカラム位置
+type IndexKeyColRecord struct {
+	IndexId IndexId
+	Name    string // カラム名
+	Pos     int    // インデックス上のカラム位置
 }
 
-func newIndexKeyColRecord(indexId IndexId, name string, pos int) indexKeyColRecord {
-	return indexKeyColRecord{
-		indexId: indexId,
-		name:    name,
-		pos:     pos,
+func NewIndexKeyColRecord(indexId IndexId, name string, pos int) IndexKeyColRecord {
+	return IndexKeyColRecord{
+		IndexId: indexId,
+		Name:    name,
+		Pos:     pos,
 	}
 }
 
 // encode は node.Record にエンコードする
-func (kcr indexKeyColRecord) encode() node.Record {
+func (kcr IndexKeyColRecord) encode() node.Record {
 	// key = indexId + name
 	var key []byte
-	indexId := binary.BigEndian.AppendUint32(nil, uint32(kcr.indexId))
-	encode.Encode([][]byte{indexId, []byte(kcr.name)}, &key)
+	indexId := binary.BigEndian.AppendUint32(nil, uint32(kcr.IndexId))
+	encode.Encode([][]byte{indexId, []byte(kcr.Name)}, &key)
 
 	// nonKey = pos
 	var nonKey []byte
-	pos := binary.BigEndian.AppendUint32(nil, uint32(kcr.pos))
+	pos := binary.BigEndian.AppendUint32(nil, uint32(kcr.Pos))
 	encode.Encode([][]byte{pos}, &nonKey)
 
 	return node.NewRecord(nil, key, nonKey)
 }
 
 // decodeIndexKeyColRecord は node.Record から indexKeyColRecord にデコードする
-func decodeIndexKeyColRecord(record node.Record) indexKeyColRecord {
+func decodeIndexKeyColRecord(record node.Record) IndexKeyColRecord {
 	// key = [indexId, name]
 	var key [][]byte
 	encode.Decode(record.Key(), &key)
@@ -49,5 +49,5 @@ func decodeIndexKeyColRecord(record node.Record) indexKeyColRecord {
 	encode.Decode(record.NonKey(), &nonKey)
 	pos := int(binary.BigEndian.Uint32(nonKey[0]))
 
-	return newIndexKeyColRecord(indexId, name, pos)
+	return NewIndexKeyColRecord(indexId, name, pos)
 }

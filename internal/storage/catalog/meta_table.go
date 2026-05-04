@@ -34,10 +34,10 @@ func (tm *TableMeta) Search(mode SearchMode) (*TableIterator, error) {
 }
 
 // Insert はレコードを挿入する
-//   - fileId: テーブルの FileId
 //   - name: テーブル名
+//   - fileId: テーブルの FileId
 //   - numOfCol: カラム数
-func (tm *TableMeta) Insert(fileId page.FileId, name string, numOfCol int) error {
-	record := newTableRecord(fileId, name, numOfCol)
+func (tm *TableMeta) Insert(name string, fileId page.FileId, numOfCol int) error {
+	record := NewTableRecord(fileId, name, numOfCol)
 	return tm.tree.Insert(record.encode())
 }

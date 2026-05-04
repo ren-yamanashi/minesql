@@ -35,10 +35,11 @@ func (im *IndexMeta) Search(mode SearchMode) (*IndexIterator, error) {
 
 // Insert はレコードを挿入する
 //   - fileId: テーブルの FileId
-//   - indexId: インデックス ID
 //   - name: インデックス名
+//   - indexId: インデックス ID
 //   - indexType: インデックス種類
-func (im *IndexMeta) Insert(fileId page.FileId, indexId IndexId, name string, indexType IndexType) error {
-	record := newIndexRecord(fileId, indexId, name, indexType)
+//   - numOfCol: インデックスを構成するカラム数
+func (im *IndexMeta) Insert(fileId page.FileId, name string, indexId IndexId, indexType IndexType, numOfCol int) error {
+	record := NewIndexRecord(fileId, indexId, name, indexType, numOfCol)
 	return im.tree.Insert(record.encode())
 }
