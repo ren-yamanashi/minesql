@@ -225,8 +225,8 @@ func TestPrimaryIndexDelete(t *testing.T) {
 	t.Run("存在しないレコードの削除はエラーを返す", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		pr, _ := newPrimaryRecord(pi.catalog, pi.tree.MetaPageId.FileId, 1, 0,
-			[]string{"id", "name", "email"}, []string{"999", "Nobody", "no@example.com"})
+		pr, _ := newPrimaryRecord(pi.catalog, newPrimaryRecordInput{fileId: pi.tree.MetaPageId.FileId, pkCount: 1, deleteMark: 0,
+			colNames: []string{"id", "name", "email"}, values: []string{"999", "Nobody", "no@example.com"}})
 
 		// WHEN
 		err := pi.delete(pr)

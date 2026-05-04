@@ -236,7 +236,7 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 // insertPrimaryRecord はプライマリ B+Tree にレコードを挿入する (pkCount=1)
 func insertPrimaryRecord(t *testing.T, env *iteratorTestEnv, deleteMark byte, colNames, values []string) {
 	t.Helper()
-	pr, err := newPrimaryRecord(env.ct, page.FileId(2), 1, deleteMark, colNames, values)
+	pr, err := newPrimaryRecord(env.ct, newPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: deleteMark, colNames: colNames, values: values})
 	if err != nil {
 		t.Fatalf("PrimaryRecord の作成に失敗: %v", err)
 	}

@@ -210,41 +210,6 @@ func TestNewSecondaryRecord(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("ユニークインデックスの場合 isUnique が true になる", func(t *testing.T) {
-		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-
-		// WHEN
-		sr, err := newSecondaryRecord(ct, newSecondaryRecordInput{
-			fileId:    page.FileId(2),
-			indexName: "idx_email",
-			colNames:  []string{"email"},
-			values:    []string{"alice@example.com"},
-			pk:        []string{"1"},
-		})
-
-		// THEN
-		assert.NoError(t, err)
-		assert.True(t, sr.isUnique)
-	})
-
-	t.Run("非ユニークインデックスの場合 isUnique が false になる", func(t *testing.T) {
-		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-
-		// WHEN
-		sr, err := newSecondaryRecord(ct, newSecondaryRecordInput{
-			fileId:    page.FileId(2),
-			indexName: "idx_name",
-			colNames:  []string{"name"},
-			values:    []string{"Alice"},
-			pk:        []string{"1"},
-		})
-
-		// THEN
-		assert.NoError(t, err)
-		assert.False(t, sr.isUnique)
-	})
 }
 
 func TestDecodeSecondaryRecord(t *testing.T) {

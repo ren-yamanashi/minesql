@@ -11,6 +11,14 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
+type newPrimaryRecordInput struct {
+	fileId     page.FileId
+	pkCount    int
+	deleteMark byte
+	colNames   []string // テーブルを構成するカラムのリスト
+	values     []string // テーブルを構成するカラム値のリスト
+}
+
 // PrimaryRecord はプライマリインデックスレコード
 type PrimaryRecord struct {
 	pkCount    int
@@ -19,17 +27,11 @@ type PrimaryRecord struct {
 	Values     []string
 }
 
-func newPrimaryRecord(
-	ct *catalog.Catalog,
-	fileId page.FileId,
-	pkCount int,
-	deleteMark byte,
-	colNames, values []string,
-) (*PrimaryRecord, error) {
-	if len(colNames) != len(values) {
+func newPrimaryRecord(ct *catalog.Catalog, input newPrimaryRecordInput) (*PrimaryRecord, error) {
+	if len(input.colNames) != len(input.values) {
 		return nil, errors.New("number of colNames not equal values")
 	}
-	return sortPrimaryRecord(ct, fileId, pkCount, deleteMark, colNames, values)
+	return sortPrimaryRecord(ct, input)
 }
 
 // update は指定されたカラムの値を更新した新しい PrimaryRecord を返す
@@ -109,25 +111,19 @@ func decodePrimaryRecord(record node.Record, ct *catalog.Catalog, fileId page.Fi
 }
 
 // sortPrimaryRecord はカラムメタデータを参照して、レコードをテーブル定義順に並び替える
-func sortPrimaryRecord(
-	ct *catalog.Catalog,
-	fileId page.FileId,
-	pkCount int,
-	deleteMark byte,
-	colNames, values []string,
-) (*PrimaryRecord, error) {
-	colDefs, err := fetchColumnDefs(ct, fileId)
+func sortPrimaryRecord(ct *catalog.Catalog, input newPrimaryRecordInput) (*PrimaryRecord, error) {
+	colDefs, err := fetchColumnDefs(ct, input.fileId)
 	if err != nil {
 		return nil, err
 	}
-	if len(colNames) != len(colDefs) {
-		return nil, fmt.Errorf("column count mismatch: got %d columns, expected %d", len(colNames), len(colDefs))
+	if len(input.colNames) != len(colDefs) {
+		return nil, fmt.Errorf("column count mismatch: got %d columns, expected %d", len(input.colNames), len(colDefs))
 	}
 
 	sortedColNames := make([]string, len(colDefs))
 	sortedValues := make([]string, len(colDefs))
 	seen := map[string]bool{}
-	for i, name := range colNames {
+	for i, name := range input.colNames {
 		if seen[name] {
 			return nil, fmt.Errorf("duplicate column %q", name)
 		}
@@ -137,12 +133,12 @@ func sortPrimaryRecord(
 			return nil, fmt.Errorf("column %q not found in table definition", name)
 		}
 		sortedColNames[pos] = name
-		sortedValues[pos] = values[i]
+		sortedValues[pos] = input.values[i]
 	}
 
 	return &PrimaryRecord{
-		pkCount:    pkCount,
-		deleteMark: deleteMark,
+		pkCount:    input.pkCount,
+		deleteMark: input.deleteMark,
 		ColNames:   sortedColNames,
 		Values:     sortedValues,
 	}, nil

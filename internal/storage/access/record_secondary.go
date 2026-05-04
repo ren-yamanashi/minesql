@@ -24,7 +24,6 @@ type newSecondaryRecordInput struct {
 type SecondaryRecord struct {
 	deleteMark byte
 	indexName  string
-	isUnique   bool     // ユニークインデックスか
 	ColNames   []string // インデックスを構成するカラム名のリスト
 	Values     []string // インデックスを構成するカラム値のリスト (SK)
 	Pk         []string // プライマリキー
@@ -91,7 +90,6 @@ func decodeSecondaryRecord(
 	return &SecondaryRecord{
 		deleteMark: record.Header()[0],
 		indexName:  indexName,
-		isUnique:   index.IndexType == catalog.IndexTypeUnique,
 		ColNames:   colNames,
 		Values:     byteSliceToString(sk),
 		Pk:         byteSliceToString(pk),
@@ -131,7 +129,6 @@ func sortSecondaryRecord(ct *catalog.Catalog, input newSecondaryRecordInput) (*S
 	return &SecondaryRecord{
 		deleteMark: input.deleteMark,
 		indexName:  input.indexName,
-		isUnique:   index.IndexType == catalog.IndexTypeUnique,
 		ColNames:   sortedColNames,
 		Values:     sortedValues,
 		Pk:         input.pk,

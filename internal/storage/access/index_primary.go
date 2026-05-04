@@ -52,7 +52,13 @@ func (pi *PrimaryIndex) Search(mode SearchMode) (*PrimaryIterator, error) {
 // (論理削除済みの同一キーが存在する場合は上書きする)
 func (pi *PrimaryIndex) Insert(colNames, value []string) error {
 	// TODO: Undo ログの記録
-	record, err := newPrimaryRecord(pi.catalog, pi.tree.MetaPageId.FileId, pi.pkCount, 0, colNames, value)
+	record, err := newPrimaryRecord(pi.catalog, newPrimaryRecordInput{
+		fileId:     pi.tree.MetaPageId.FileId,
+		pkCount:    pi.pkCount,
+		deleteMark: 0,
+		colNames:   colNames,
+		values:     value,
+	})
 	if err != nil {
 		return err
 	}
@@ -62,11 +68,15 @@ func (pi *PrimaryIndex) Insert(colNames, value []string) error {
 // SoftDelete は行を論理削除する
 func (pi *PrimaryIndex) SoftDelete(record *PrimaryRecord) error {
 	// TODO: Undo ログの記録
+	colNames := make([]string, len(record.ColNames))
+	values := make([]string, len(record.Values))
+	copy(colNames, record.ColNames)
+	copy(values, record.Values)
 	deleted := &PrimaryRecord{
 		pkCount:    record.pkCount,
 		deleteMark: 1,
-		ColNames:   record.ColNames,
-		Values:     record.Values,
+		ColNames:   colNames,
+		Values:     values,
 	}
 	return pi.softDelete(deleted)
 }
