@@ -17,8 +17,6 @@ func TestTableUpdateInplace(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-
-		// プライマリインデックスの値が更新されている
 		updated := searchFirstPrimaryRecord(t, table)
 		assert.Equal(t, "Bob", updated.Values[1])
 		assert.Equal(t, "alice@example.com", updated.Values[2])
@@ -29,13 +27,11 @@ func TestTableUpdateInplace(t *testing.T) {
 		table := setupTableWithRecord(t)
 		before := searchFirstPrimaryRecord(t, table)
 
-		// WHEN: name を更新 → idx_name に影響
+		// WHEN
 		err := table.UpdateInplace(before, []string{"name"}, []string{"Bob"})
 
 		// THEN
 		assert.NoError(t, err)
-
-		// idx_name を検索すると更新後の値でプライマリレコードが取得できる
 		idxName := findSecondaryIndex(t, table, "idx_name")
 		iter, err := idxName.Search(SearchModeStart{})
 		assert.NoError(t, err)
@@ -50,13 +46,11 @@ func TestTableUpdateInplace(t *testing.T) {
 		table := setupTableWithRecord(t)
 		before := searchFirstPrimaryRecord(t, table)
 
-		// WHEN: email を更新 → idx_name は影響しない
+		// WHEN
 		err := table.UpdateInplace(before, []string{"email"}, []string{"new@example.com"})
 
 		// THEN
 		assert.NoError(t, err)
-
-		// idx_name を検索すると元の name=Alice でプライマリレコードが取得できる (更新された email 値で)
 		idxName := findSecondaryIndex(t, table, "idx_name")
 		iter, err := idxName.Search(SearchModeStart{})
 		assert.NoError(t, err)
@@ -72,13 +66,11 @@ func TestTableUpdateInplace(t *testing.T) {
 		table := setupTableWithRecord(t)
 		before := searchFirstPrimaryRecord(t, table)
 
-		// WHEN: name を更新 → idx_name は影響、idx_email は影響しない
+		// WHEN
 		err := table.UpdateInplace(before, []string{"name"}, []string{"Charlie"})
 
 		// THEN
 		assert.NoError(t, err)
-
-		// idx_name: 新しい name=Charlie で取得できる
 		idxName := findSecondaryIndex(t, table, "idx_name")
 		nameIter, err := idxName.Search(SearchModeStart{})
 		assert.NoError(t, err)
@@ -86,8 +78,6 @@ func TestTableUpdateInplace(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "Charlie", nameResult.Values[1])
-
-		// idx_email: 元の email=alice@example.com で取得できる (name は更新後の値)
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
 		emailIter, err := idxEmail.Search(SearchModeStart{})
 		assert.NoError(t, err)

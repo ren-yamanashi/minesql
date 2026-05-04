@@ -2,10 +2,13 @@ package catalog
 
 import (
 	"encoding/binary"
+	"fmt"
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
@@ -93,7 +96,7 @@ func TestCreateCatalog(t *testing.T) {
 
 	t.Run("カタログを新規作成できる", func(t *testing.T) {
 		// GIVEN
-		bp := setupCatalogTestBufferPool(t)
+		bp := setupCatalogTestBufferPoolTempDir(t)
 
 		// WHEN
 		catalog, err := CreateCatalog(bp)
@@ -105,7 +108,7 @@ func TestCreateCatalog(t *testing.T) {
 
 	t.Run("ヘッダーページにマジックナンバーが書き込まれる", func(t *testing.T) {
 		// GIVEN
-		bp := setupCatalogTestBufferPool(t)
+		bp := setupCatalogTestBufferPoolTempDir(t)
 
 		// WHEN
 		_, err := CreateCatalog(bp)
@@ -123,7 +126,7 @@ func TestCreateCatalog(t *testing.T) {
 
 	t.Run("ヘッダーページにスカラー値が正しく書き込まれる", func(t *testing.T) {
 		// GIVEN
-		bp := setupCatalogTestBufferPool(t)
+		bp := setupCatalogTestBufferPoolTempDir(t)
 
 		// WHEN
 		_, err := CreateCatalog(bp)
@@ -146,7 +149,7 @@ func TestCreateCatalog(t *testing.T) {
 
 	t.Run("6 つのメタデータが初期化される", func(t *testing.T) {
 		// GIVEN
-		bp := setupCatalogTestBufferPool(t)
+		bp := setupCatalogTestBufferPoolTempDir(t)
 
 		// WHEN
 		catalog, err := CreateCatalog(bp)
@@ -163,7 +166,7 @@ func TestCreateCatalog(t *testing.T) {
 
 	t.Run("各メタデータの metaPageId が有効な値になる", func(t *testing.T) {
 		// GIVEN
-		bp := setupCatalogTestBufferPool(t)
+		bp := setupCatalogTestBufferPoolTempDir(t)
 
 		// WHEN
 		catalog, err := CreateCatalog(bp)
@@ -182,7 +185,7 @@ func TestCreateCatalog(t *testing.T) {
 func TestAllocateFileId(t *testing.T) {
 	t.Run("FileId を採番するたびにインクリメントされる", func(t *testing.T) {
 		// GIVEN
-		bp := setupCatalogTestBufferPool(t)
+		bp := setupCatalogTestBufferPoolTempDir(t)
 		ct, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
@@ -190,7 +193,7 @@ func TestAllocateFileId(t *testing.T) {
 		id1 := ct.AllocateFileId()
 		id2 := ct.AllocateFileId()
 
-		// THEN: nextFileId は 2 から開始 (0=カタログ, 1=UndoLog)
+		// THEN
 		assert.Equal(t, page.FileId(2), id1)
 		assert.Equal(t, page.FileId(3), id2)
 	})
@@ -199,7 +202,7 @@ func TestAllocateFileId(t *testing.T) {
 func TestAllocateIndexId(t *testing.T) {
 	t.Run("IndexId を採番するたびにインクリメントされる", func(t *testing.T) {
 		// GIVEN
-		bp := setupCatalogTestBufferPool(t)
+		bp := setupCatalogTestBufferPoolTempDir(t)
 		ct, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
@@ -207,17 +210,37 @@ func TestAllocateIndexId(t *testing.T) {
 		id1 := ct.AllocateIndexId()
 		id2 := ct.AllocateIndexId()
 
-		// THEN: nextIndexId は 0 から開始
+		// THEN
 		assert.Equal(t, IndexId(0), id1)
 		assert.Equal(t, IndexId(1), id2)
 	})
 }
 
 // setupCatalogTestBufferPool はカタログテスト用のバッファプールを作成する
-// CreateCatalog は 13 ページ (ヘッダー 1 + B+Tree 6×2) を割り当てるため、十分な容量を確保する
+// NewCatalog は createCatalogFile で config.BaseDir/minesql.db を開くため、同じパスに作成する
 func setupCatalogTestBufferPool(t *testing.T) *buffer.BufferPool {
 	t.Helper()
-	path := filepath.Join(t.TempDir(), "catalog_test.db")
+	_ = os.MkdirAll(config.BaseDir, 0o755)
+	path := filepath.Join(config.BaseDir, "minesql.db")
+	fileId := page.FileId(0)
+	hf, err := file.NewHeapFile(fileId, path)
+	if err != nil {
+		t.Fatalf("HeapFile の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = hf.Close()
+		_ = os.Remove(path)
+		_ = os.Remove(config.BaseDir)
+	})
+	bp := buffer.NewBufferPool(page.PageSize * 20)
+	bp.RegisterHeapFile(fileId, hf)
+	return bp
+}
+
+// setupCatalogTestBufferPoolTempDir は一時ディレクトリにカタログを作成する (NewCatalog を使わないテスト用)
+func setupCatalogTestBufferPoolTempDir(t *testing.T) *buffer.BufferPool {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), fmt.Sprintf("catalog_%d.db", os.Getpid()))
 	fileId := page.FileId(0)
 	hf, err := file.NewHeapFile(fileId, path)
 	if err != nil {

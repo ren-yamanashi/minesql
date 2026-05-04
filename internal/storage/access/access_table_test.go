@@ -33,7 +33,7 @@ func TestNewTable(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Len(t, table.secondaryIndexes, 2) // idx_name, idx_email
+		assert.Len(t, table.secondaryIndexes, 2)
 	})
 
 	t.Run("存在しないテーブル名を指定するとエラーを返す", func(t *testing.T) {
@@ -85,7 +85,7 @@ func TestTableExtractPrimaryKey(t *testing.T) {
 		// WHEN
 		pk := table.extractPrimaryKey([]string{"1", "Alice", "alice@example.com"})
 
-		// THEN: pkCount=1 なので先頭 1 要素
+		// THEN
 		assert.Equal(t, []string{"1"}, pk)
 	})
 }
@@ -116,7 +116,6 @@ func TestTableBuildSecondaryRecord(t *testing.T) {
 		env := setupTableTestEnv(t)
 		table, _ := NewTable(env.bp, env.ct, "users")
 
-		// idx_name のインデックスを探す
 		var si *SecondaryIndex
 		for _, s := range table.secondaryIndexes {
 			if s.indexName == "idx_name" {

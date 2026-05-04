@@ -48,7 +48,7 @@ func TestIndexKeyColRecordEncode(t *testing.T) {
 		assert.Equal(t, 0, decoded.Pos)
 	})
 
-	t.Run("IndexId が 0 の場合も正しくエ��コード・デコードで��る", func(t *testing.T) {
+	t.Run("IndexId が 0 の場合も正しくエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
 		original := NewIndexKeyColRecord(IndexId(0), "col", 3)
 
@@ -64,7 +64,7 @@ func TestIndexKeyColRecordEncode(t *testing.T) {
 }
 
 func TestDecodeIndexKeyColRecord(t *testing.T) {
-	t.Run("エンコード済みレコードからインデックス ID と��ラム名を復元できる", func(t *testing.T) {
+	t.Run("エンコード済みレコードからインデックス ID とカラム名を復元できる", func(t *testing.T) {
 		// GIVEN
 		kcr := NewIndexKeyColRecord(IndexId(42), "age", 5)
 		record := kcr.encode()

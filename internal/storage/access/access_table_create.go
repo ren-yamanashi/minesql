@@ -39,11 +39,6 @@ func Create(bp *buffer.BufferPool, input CreateTableInput) (*Table, error) {
 		return nil, err
 	}
 
-	table, err := fetchTable(ct, input.TableName)
-	if err != nil {
-		return nil, err
-	}
-
 	// ファイル作成
 	fileId, err := createTableFile(ct, bp, input.TableName)
 	if err != nil {
@@ -64,6 +59,12 @@ func Create(bp *buffer.BufferPool, input CreateTableInput) (*Table, error) {
 
 	// 制約作成
 	if err := createConstraints(ct, fileId, input.Constraints); err != nil {
+		return nil, err
+	}
+
+	// テーブルメタデータを取得
+	table, err := fetchTable(ct, input.TableName)
+	if err != nil {
 		return nil, err
 	}
 

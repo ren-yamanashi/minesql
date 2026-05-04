@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"path/filepath"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/config"
+	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
@@ -45,6 +48,11 @@ type Catalog struct {
 
 // NewCatalog は既存のカタログを開く
 func NewCatalog(bp *buffer.BufferPool) (*Catalog, error) {
+	err := createCatalogFile(bp)
+	if err != nil {
+		return nil, err
+	}
+
 	headerPageId := page.NewPageId(catalogFileId, catalogHeaderPageNum)
 	pageHeader, err := bp.GetReadPage(headerPageId)
 	if err != nil {
@@ -171,4 +179,14 @@ func readPageNumber(body []byte, offset int) page.PageNumber {
 
 func writePageNumber(body []byte, offset int, pn page.PageNumber) {
 	binary.BigEndian.PutUint32(body[offset:offset+headerFieldSize], uint32(pn))
+}
+
+func createCatalogFile(bp *buffer.BufferPool) error {
+	path := filepath.Join(config.BaseDir, "minesql.db")
+	hp, err := file.NewHeapFile(catalogFileId, path)
+	if err != nil {
+		return err
+	}
+	bp.RegisterHeapFile(catalogFileId, hp)
+	return nil
 }
