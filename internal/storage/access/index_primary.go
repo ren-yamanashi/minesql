@@ -5,36 +5,35 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
-)
-
-var (
-	ErrAlreadyDeleted = errors.New("already deleted")
 )
 
 // PrimaryIndex はプライマリインデックスへのアクセスを提供する
 type PrimaryIndex struct {
+	catalog *catalog.Catalog
 	tree    *btree.Btree // プライマリインデックスの B+Tree
 	pkCount int          // プライマリキーのカラム数
 }
 
 // NewPrimaryIndex は既存のプライマリインデックスを開く
-func NewPrimaryIndex(bp *buffer.BufferPool, metaPageId page.PageId, pkCount int) *PrimaryIndex {
+func NewPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, metaPageId page.PageId, pkCount int) *PrimaryIndex {
 	tree := btree.NewBtree(bp, metaPageId)
 	return &PrimaryIndex{
+		catalog: ct,
 		tree:    tree,
 		pkCount: pkCount,
 	}
 }
 
 // CreatePrimaryIndex は空のプライマリインデックスを作成する
-//   - fileId: プライマリインデックスを格納するファイルの ID
-func CreatePrimaryIndex(bp *buffer.BufferPool, fileId page.FileId, pkCount int) (*PrimaryIndex, error) {
+func CreatePrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, fileId page.FileId, pkCount int) (*PrimaryIndex, error) {
 	tree, err := btree.CreateBtree(bp, fileId)
 	if err != nil {
 		return nil, err
 	}
 	return &PrimaryIndex{
+		catalog: ct,
 		tree:    tree,
 		pkCount: pkCount,
 	}, nil
@@ -46,30 +45,40 @@ func (pi *PrimaryIndex) Search(mode SearchMode) (*PrimaryIterator, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newPrimaryIterator(iter), nil
+	return newPrimaryIterator(iter, pi.catalog, pi.tree.MetaPageId.FileId), nil
 }
 
 // Insert は行を挿入する
 // (論理削除済みの同一キーが存在する場合は上書きする)
-func (pi *PrimaryIndex) Insert(data [][]byte) error {
+func (pi *PrimaryIndex) Insert(colNames, value []string) error {
 	// TODO: Undo ログの記録
-	record := newPrimaryRecord(pi.pkCount, 0, data)
+	record, err := newPrimaryRecord(pi.catalog, pi.tree.MetaPageId.FileId, pi.pkCount, 0, colNames, value)
+	if err != nil {
+		return err
+	}
 	return pi.insert(record)
 }
 
 // SoftDelete は行を論理削除する
-func (pi *PrimaryIndex) SoftDelete(data [][]byte) error {
+func (pi *PrimaryIndex) SoftDelete(record *PrimaryRecord) error {
 	// TODO: Undo ログの記録
-	record := newPrimaryRecord(pi.pkCount, 1, data)
-	return pi.softDelete(record)
+	deleted := &PrimaryRecord{
+		pkCount:    record.pkCount,
+		deleteMark: 1,
+		ColNames:   record.ColNames,
+		Values:     record.Values,
+	}
+	return pi.softDelete(deleted)
 }
 
 // UpdateInplace は行を更新する
-func (pi *PrimaryIndex) UpdateInplace(old [][]byte, new [][]byte) error {
+func (pi *PrimaryIndex) UpdateInplace(currentRecord *PrimaryRecord, colNames, value []string) error {
 	// TODO: Undo ログの記録
-	recordOld := newPrimaryRecord(pi.pkCount, 0, old)
-	recordNew := newPrimaryRecord(pi.pkCount, 0, new)
-	return pi.updateInplace(recordOld, recordNew)
+	newRecord, err := currentRecord.update(colNames, value)
+	if err != nil {
+		return err
+	}
+	return pi.updateInplace(newRecord)
 }
 
 // LeafPageCount はリーフページ数を取得する
@@ -112,37 +121,17 @@ func (pi *PrimaryIndex) insert(pr *PrimaryRecord) error {
 // softDelete は Undo ログを記録せず行を論理削除する
 func (pi *PrimaryIndex) softDelete(pr *PrimaryRecord) error {
 	// TODO: ロック処理
-	record := pr.encode()
-	existing, _, err := pi.tree.FindByKey(record.Key())
-	if err != nil {
-		return err
-	}
-
-	deleteMark := existing.Header()[0]
-	if deleteMark == 1 {
-		return ErrAlreadyDeleted
-	}
-
-	return pi.tree.Update(record)
+	return pi.tree.Update(pr.encode())
 }
 
 // delete は Undo ログを記録せず行を削除する
 func (pi *PrimaryIndex) delete(pr *PrimaryRecord) error {
 	// TODO: ロック処理
-	key := pr.encode().Key()
-	_, _, err := pi.tree.FindByKey(key)
-	if err != nil {
-		return err
-	}
-	return pi.tree.Delete(key)
+	return pi.tree.Delete(pr.encode().Key())
 }
 
 // updateInplace は Undo ログを記録せず行を更新する
-func (pi *PrimaryIndex) updateInplace(old *PrimaryRecord, new *PrimaryRecord) error {
+func (pi *PrimaryIndex) updateInplace(newRecord *PrimaryRecord) error {
 	// TODO: ロック処理
-	_, _, err := pi.tree.FindByKey(old.encode().Key())
-	if err != nil {
-		return err
-	}
-	return pi.tree.Update(new.encode())
+	return pi.tree.Update(newRecord.encode())
 }

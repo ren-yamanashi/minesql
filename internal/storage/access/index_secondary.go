@@ -6,38 +6,68 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 // SecondaryIndex はセカンダリインデックスへのアクセスを提供する
 type SecondaryIndex struct {
+	catalog     *catalog.Catalog
 	tree        *btree.Btree // セカンダリインデックスの B+Tree
 	primaryTree *btree.Btree // プライマリインデックスの B+Tree
-	skCount     int          // セカンダリキーのカラム数
-	unique      bool         // ユニーク制約の有無
+	fileId      page.FileId  // テーブルの FileId
+	indexName   string       // インデックス名
+	isUnique    bool         // ユニーク制約の有無
+}
+
+type NewSecondaryIndexInput struct {
+	MetaPageId  page.PageId
+	PrimaryTree *btree.Btree
+	IndexName   string
+	IsUnique    bool
 }
 
 // NewSecondaryIndex は既存のセカンダリインデックスを開く
-func NewSecondaryIndex(bp *buffer.BufferPool, metaPageId page.PageId, skCount int, unique bool) *SecondaryIndex {
-	tree := btree.NewBtree(bp, metaPageId)
+func NewSecondaryIndex(
+	ct *catalog.Catalog,
+	bp *buffer.BufferPool,
+	input NewSecondaryIndexInput,
+) *SecondaryIndex {
+	tree := btree.NewBtree(bp, input.MetaPageId)
 	return &SecondaryIndex{
-		tree:    tree,
-		skCount: skCount,
-		unique:  unique,
+		catalog:     ct,
+		tree:        tree,
+		primaryTree: input.PrimaryTree,
+		fileId:      input.PrimaryTree.MetaPageId.FileId,
+		indexName:   input.IndexName,
+		isUnique:    input.IsUnique,
 	}
 }
 
+type CreateSecondaryIndexInput struct {
+	FileId      page.FileId
+	PrimaryTree *btree.Btree
+	IndexName   string
+	IsUnique    bool
+}
+
 // CreateSecondaryIndex は空のセカンダリインデックスを作成する
-//   - fileId: セカンダリインデックスを格納するファイルの ID
-func CreateSecondaryIndex(bp *buffer.BufferPool, fileId page.FileId, skCount int, unique bool) (*SecondaryIndex, error) {
-	tree, err := btree.CreateBtree(bp, fileId)
+func CreateSecondaryIndex(
+	ct *catalog.Catalog,
+	bp *buffer.BufferPool,
+	input CreateSecondaryIndexInput,
+) (*SecondaryIndex, error) {
+	tree, err := btree.CreateBtree(bp, input.FileId)
 	if err != nil {
 		return nil, err
 	}
 	return &SecondaryIndex{
-		tree:    tree,
-		skCount: skCount,
-		unique:  unique,
+		catalog:     ct,
+		tree:        tree,
+		primaryTree: input.PrimaryTree,
+		fileId:      input.PrimaryTree.MetaPageId.FileId,
+		indexName:   input.IndexName,
+		isUnique:    input.IsUnique,
 	}, nil
 }
 
@@ -47,16 +77,25 @@ func (si *SecondaryIndex) Search(mode SearchMode) (*SecondaryIterator, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newSecondaryIterator(iter, si.primaryTree, si.skCount), nil
+	return newSecondaryIterator(si.indexName, iter, si.catalog, si.primaryTree), nil
 }
 
 // Insert は行を挿入する
-//   - data: SK + PK
 //   - unique index の場合かつセカンダリキーの重複があるとエラー
 //   - 論理削除済みの同一キー (SK + PK) が存在する場合は上書きする
-func (si *SecondaryIndex) Insert(data [][]byte) error {
-	record := newSecondaryRecord(si.skCount, 0, data)
-	if si.unique {
+func (si *SecondaryIndex) Insert(colNames, values, pk []string) error {
+	record, err := newSecondaryRecord(si.catalog, newSecondaryRecordInput{
+		fileId:     si.fileId,
+		deleteMark: 0,
+		indexName:  si.indexName,
+		colNames:   colNames,
+		values:     values,
+		pk:         pk,
+	})
+	if err != nil {
+		return err
+	}
+	if si.isUnique {
 		if err := si.checkUnique(record); err != nil {
 			return err
 		}
@@ -65,29 +104,27 @@ func (si *SecondaryIndex) Insert(data [][]byte) error {
 }
 
 // Delete は行を物理削除する
-//   - data: SK + PK
-func (si *SecondaryIndex) Delete(data [][]byte) error {
+func (si *SecondaryIndex) Delete(record *SecondaryRecord) error {
 	// TODO: ロック処理
-	key := newSecondaryRecord(si.skCount, 0, data).encode().Key()
-	return si.tree.Delete(key)
+	return si.tree.Delete(record.encode().Key())
 }
 
 // SoftDelete は行を論理削除する
-//   - data: SK + PK
-func (si *SecondaryIndex) SoftDelete(data [][]byte) error {
+func (si *SecondaryIndex) SoftDelete(record *SecondaryRecord) error {
 	// TODO: ロック処理
-	record := newSecondaryRecord(si.skCount, 1, data).encode()
-	existing, _, err := si.tree.FindByKey(record.Key())
+	// deleteMark を 1 にしたレコードで上書き
+	deleted, err := newSecondaryRecord(si.catalog, newSecondaryRecordInput{
+		fileId:     si.fileId,
+		deleteMark: 1,
+		indexName:  si.indexName,
+		colNames:   record.ColNames,
+		values:     record.Values,
+		pk:         record.Pk,
+	})
 	if err != nil {
 		return err
 	}
-
-	deleteMark := existing.Header()[0]
-	if deleteMark == 1 {
-		return ErrAlreadyDeleted
-	}
-
-	return si.tree.Update(record)
+	return si.tree.Update(deleted.encode())
 }
 
 // LeafPageCount はリーフページ数を取得する
@@ -127,7 +164,7 @@ func (si *SecondaryIndex) insert(sr *SecondaryRecord) error {
 	return si.tree.Update(record)
 }
 
-// checkUnique は record のセカンダリキー に対して active なレコードが存在するか確認する
+// checkUnique は record のセカンダリキーに対して active なレコードが存在するか確認する
 //   - return: 存在する場合は ErrDuplicateKey
 func (si *SecondaryIndex) checkUnique(sr *SecondaryRecord) error {
 	encodedSk := sr.encodedSecondaryKey()
