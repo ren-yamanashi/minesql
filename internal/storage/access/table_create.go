@@ -39,6 +39,11 @@ func Create(bp *buffer.BufferPool, input CreateTableInput) (*Table, error) {
 		return nil, err
 	}
 
+	table, err := fetchTable(ct, input.TableName)
+	if err != nil {
+		return nil, err
+	}
+
 	// ファイル作成
 	fileId, err := createTableFile(ct, bp, input.TableName)
 	if err != nil {
@@ -63,7 +68,7 @@ func Create(bp *buffer.BufferPool, input CreateTableInput) (*Table, error) {
 	}
 
 	return &Table{
-		name:             input.TableName,
+		table:            table,
 		primaryIndex:     pi,
 		secondaryIndexes: sis,
 		catalog:          ct,
