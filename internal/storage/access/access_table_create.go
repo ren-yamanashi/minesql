@@ -136,7 +136,7 @@ func createSecondaryIndexes(
 			PrimaryTree: pt,
 			IndexId:     indexId,
 			IndexName:   input.IndexName,
-			IsUnique:    input.IndexType == catalog.IndexTypeUnique,
+			Unique:      input.IndexType == catalog.IndexTypeUnique,
 		})
 		if err != nil {
 			return nil, err

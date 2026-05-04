@@ -80,14 +80,19 @@ func fetchPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, fileId page.F
 }
 
 // fetchSecondaryIndexes は指定テーブルのセカンダリインデックス一覧を返す
-func fetchSecondaryIndexes(ct *catalog.Catalog, bp *buffer.BufferPool, fileId page.FileId, pt *btree.Btree) ([]*SecondaryIndex, error) {
+func fetchSecondaryIndexes(
+	ct *catalog.Catalog,
+	bp *buffer.BufferPool,
+	fileId page.FileId,
+	pt *btree.Btree,
+) ([]*SecondaryIndex, error) {
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
 	iter, err := ct.IndexMeta.Search(catalog.SearchModeKey{Key: [][]byte{fileIdBytes}})
 	if err != nil {
 		return nil, err
 	}
 
-	indexes := make([]*SecondaryIndex, 0)
+	var indexes []*SecondaryIndex
 	for {
 		record, ok, err := iter.Next()
 		if err != nil {
@@ -104,7 +109,7 @@ func fetchSecondaryIndexes(ct *catalog.Catalog, bp *buffer.BufferPool, fileId pa
 			PrimaryTree: pt,
 			IndexId:     record.IndexId,
 			IndexName:   record.Name,
-			IsUnique:    record.IndexType == catalog.IndexTypeUnique,
+			Unique:      record.IndexType == catalog.IndexTypeUnique,
 		})
 		indexes = append(indexes, index)
 	}

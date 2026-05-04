@@ -16,7 +16,7 @@ func TestNewSecondaryIndex(t *testing.T) {
 			FileId:      page.FileId(2),
 			PrimaryTree: env.primaryTree,
 			IndexName:   "idx_name",
-			IsUnique:    false,
+			Unique:      false,
 		})
 		assert.NoError(t, err)
 
@@ -25,7 +25,7 @@ func TestNewSecondaryIndex(t *testing.T) {
 			MetaPageId:  created.tree.MetaPageId,
 			PrimaryTree: env.primaryTree,
 			IndexName:   "idx_name",
-			IsUnique:    false,
+			Unique:      false,
 		})
 
 		// THEN
@@ -43,7 +43,7 @@ func TestCreateSecondaryIndex(t *testing.T) {
 			FileId:      page.FileId(2),
 			PrimaryTree: env.primaryTree,
 			IndexName:   "idx_name",
-			IsUnique:    false,
+			Unique:      false,
 		})
 
 		// THEN
@@ -268,14 +268,14 @@ func TestSecondaryIndexHeight(t *testing.T) {
 }
 
 // setupTestSecondaryIndex はテスト用の SecondaryIndex を作成する
-func setupTestSecondaryIndex(t *testing.T, indexName string, isUnique bool) *SecondaryIndex {
+func setupTestSecondaryIndex(t *testing.T, indexName string, unique bool) *SecondaryIndex {
 	t.Helper()
 	env := setupIteratorTestEnv(t)
 	si, err := CreateSecondaryIndex(env.ct, env.bp, CreateSecondaryIndexInput{
 		FileId:      page.FileId(2),
 		PrimaryTree: env.primaryTree,
 		IndexName:   indexName,
-		IsUnique:    isUnique,
+		Unique:      unique,
 	})
 	if err != nil {
 		t.Fatalf("SecondaryIndex の作成に失敗: %v", err)

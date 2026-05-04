@@ -143,7 +143,7 @@ func TestCreate(t *testing.T) {
 		assert.True(t, names["idx_email"])
 	})
 
-	t.Run("ユニークインデックスの isUnique が true になる", func(t *testing.T) {
+	t.Run("ユニークインデックスの unique が true になる", func(t *testing.T) {
 		// GIVEN
 		env := setupCreateTestEnvWithTable(t)
 		inputs := []CreateIndexInput{
@@ -155,10 +155,10 @@ func TestCreate(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.True(t, sis[0].isUnique)
+		assert.True(t, sis[0].unique)
 	})
 
-	t.Run("非ユニークインデックスの isUnique が false になる", func(t *testing.T) {
+	t.Run("非ユニークインデックスの unique が false になる", func(t *testing.T) {
 		// GIVEN
 		env := setupCreateTestEnvWithTable(t)
 		inputs := []CreateIndexInput{
@@ -170,7 +170,7 @@ func TestCreate(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.False(t, sis[0].isUnique)
+		assert.False(t, sis[0].unique)
 	})
 
 	t.Run("同一インデックス名で 2 回作成するとエラーを返す", func(t *testing.T) {

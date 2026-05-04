@@ -18,7 +18,7 @@ type SecondaryIndex struct {
 	fileId      page.FileId     // インデックスが属するテーブルの FileId
 	indexId     catalog.IndexId // インデックス ID
 	indexName   string          // インデックス名
-	isUnique    bool            // ユニーク制約の有無
+	unique      bool            // ユニーク制約の有無
 }
 
 type NewSecondaryIndexInput struct {
@@ -26,7 +26,7 @@ type NewSecondaryIndexInput struct {
 	PrimaryTree *btree.Btree    // プライマリインデックスの B+Tree
 	IndexId     catalog.IndexId // インデックス ID
 	IndexName   string          // インデックス名
-	IsUnique    bool            // ユニークインデックスか
+	Unique      bool            // ユニークインデックスか
 }
 
 // NewSecondaryIndex は既存のセカンダリインデックスを開く
@@ -43,7 +43,7 @@ func NewSecondaryIndex(
 		fileId:      input.PrimaryTree.MetaPageId.FileId,
 		indexId:     input.IndexId,
 		indexName:   input.IndexName,
-		isUnique:    input.IsUnique,
+		unique:      input.Unique,
 	}
 }
 
@@ -52,7 +52,7 @@ type CreateSecondaryIndexInput struct {
 	PrimaryTree *btree.Btree    // プライマリインデックスの B+Tree
 	IndexId     catalog.IndexId // インデックス ID
 	IndexName   string          // インデックス名
-	IsUnique    bool            // ユニークか
+	Unique      bool            // ユニークか
 }
 
 // CreateSecondaryIndex は空のセカンダリインデックスを作成する
@@ -72,7 +72,7 @@ func CreateSecondaryIndex(
 		fileId:      input.PrimaryTree.MetaPageId.FileId,
 		indexId:     input.IndexId,
 		indexName:   input.IndexName,
-		isUnique:    input.IsUnique,
+		unique:      input.Unique,
 	}, nil
 }
 
@@ -100,7 +100,7 @@ func (si *SecondaryIndex) Insert(colNames, values, pk []string) error {
 	if err != nil {
 		return err
 	}
-	if si.isUnique {
+	if si.unique {
 		if err := si.checkUnique(record); err != nil {
 			return err
 		}
