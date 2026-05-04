@@ -129,17 +129,17 @@ func createSecondaryIndexes(
 ) ([]*SecondaryIndex, error) {
 	indexes := make([]*SecondaryIndex, 0, len(inputs))
 	for _, input := range inputs {
+		indexId := ct.AllocateIndexId()
 		index, err := CreateSecondaryIndex(ct, bp, CreateSecondaryIndexInput{
 			FileId:      fileId,
 			PrimaryTree: pt,
+			IndexId:     indexId,
 			IndexName:   input.IndexName,
 			IsUnique:    input.IndexType == catalog.IndexTypeUnique,
 		})
 		if err != nil {
 			return nil, err
 		}
-
-		indexId := ct.AllocateIndexId()
 		err = ct.IndexMeta.Insert(
 			fileId,
 			input.IndexName,

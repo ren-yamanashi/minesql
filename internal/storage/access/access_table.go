@@ -102,10 +102,50 @@ func fetchSecondaryIndexes(ct *catalog.Catalog, bp *buffer.BufferPool, fileId pa
 		index := NewSecondaryIndex(ct, bp, NewSecondaryIndexInput{
 			MetaPageId:  record.MetaPageId,
 			PrimaryTree: pt,
+			IndexId:     record.IndexId,
 			IndexName:   record.Name,
 			IsUnique:    record.IndexType == catalog.IndexTypeUnique,
 		})
 		indexes = append(indexes, index)
 	}
 	return indexes, nil
+}
+
+// buildValMap はカラム名 → 値のマップを構築する
+func (t *Table) buildValMap(colNames, values []string) map[string]string {
+	m := make(map[string]string, len(colNames))
+	for i, name := range colNames {
+		m[name] = values[i]
+	}
+	return m
+}
+
+// extractPrimaryKey はテーブル定義順のカラム値からプライマリキー部分を抽出する
+func (t *Table) extractPrimaryKey(values []string) []string {
+	pk := make([]string, t.primaryIndex.pkCount)
+	copy(pk, values[:t.primaryIndex.pkCount])
+	return pk
+}
+
+// extractSecondaryKey は keyCols と valMap からインデックス定義順のセカンダリキーのカラム名とカラム値を抽出する
+func (t *Table) extractSecondaryKey(keyCols map[string]int, valMap map[string]string) (colNames, values []string) {
+	colNames = make([]string, len(keyCols))
+	values = make([]string, len(keyCols))
+	for name, pos := range keyCols {
+		colNames[pos] = name
+		values[pos] = valMap[name]
+	}
+	return colNames, values
+}
+
+// buildSecondaryRecord はセカンダリインデックス用のレコードを構築する
+func (t *Table) buildSecondaryRecord(si *SecondaryIndex, skColNames, skValues, pk []string) (*SecondaryRecord, error) {
+	return newSecondaryRecord(t.catalog, newSecondaryRecordInput{
+		fileId:     si.fileId,
+		deleteMark: 0,
+		indexName:  si.indexName,
+		colNames:   skColNames,
+		values:     skValues,
+		pk:         pk,
+	})
 }

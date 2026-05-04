@@ -13,18 +13,20 @@ import (
 // SecondaryIndex はセカンダリインデックスへのアクセスを提供する
 type SecondaryIndex struct {
 	catalog     *catalog.Catalog
-	tree        *btree.Btree // セカンダリインデックスの B+Tree
-	primaryTree *btree.Btree // プライマリインデックスの B+Tree
-	fileId      page.FileId  // インデックスが属するテーブルの FileId
-	indexName   string       // インデックス名
-	isUnique    bool         // ユニーク制約の有無
+	tree        *btree.Btree    // セカンダリインデックスの B+Tree
+	primaryTree *btree.Btree    // プライマリインデックスの B+Tree
+	fileId      page.FileId     // インデックスが属するテーブルの FileId
+	indexId     catalog.IndexId // インデックス ID
+	indexName   string          // インデックス名
+	isUnique    bool            // ユニーク制約の有無
 }
 
 type NewSecondaryIndexInput struct {
-	MetaPageId  page.PageId  // セカンダリインデックスの MetaPageId
-	PrimaryTree *btree.Btree // プライマリインデックスの B+Tree
-	IndexName   string       // インデックス名
-	IsUnique    bool         // ユーニークインデックスか
+	MetaPageId  page.PageId     // セカンダリインデックスの MetaPageId
+	PrimaryTree *btree.Btree    // プライマリインデックスの B+Tree
+	IndexId     catalog.IndexId // インデックス ID
+	IndexName   string          // インデックス名
+	IsUnique    bool            // ユニークインデックスか
 }
 
 // NewSecondaryIndex は既存のセカンダリインデックスを開く
@@ -39,16 +41,18 @@ func NewSecondaryIndex(
 		tree:        tree,
 		primaryTree: input.PrimaryTree,
 		fileId:      input.PrimaryTree.MetaPageId.FileId,
+		indexId:     input.IndexId,
 		indexName:   input.IndexName,
 		isUnique:    input.IsUnique,
 	}
 }
 
 type CreateSecondaryIndexInput struct {
-	FileId      page.FileId  // インデックスが属するテーブルの FileId
-	PrimaryTree *btree.Btree // プライマリインデックスの B+Tree
-	IndexName   string       // インデックス名
-	IsUnique    bool         // ユニークか
+	FileId      page.FileId     // インデックスが属するテーブルの FileId
+	PrimaryTree *btree.Btree    // プライマリインデックスの B+Tree
+	IndexId     catalog.IndexId // インデックス ID
+	IndexName   string          // インデックス名
+	IsUnique    bool            // ユニークか
 }
 
 // CreateSecondaryIndex は空のセカンダリインデックスを作成する
@@ -66,6 +70,7 @@ func CreateSecondaryIndex(
 		tree:        tree,
 		primaryTree: input.PrimaryTree,
 		fileId:      input.PrimaryTree.MetaPageId.FileId,
+		indexId:     input.IndexId,
 		indexName:   input.IndexName,
 		isUnique:    input.IsUnique,
 	}, nil
