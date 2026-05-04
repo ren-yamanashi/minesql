@@ -4,11 +4,8 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
-	"path/filepath"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/config"
-	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
@@ -35,6 +32,7 @@ const (
 )
 
 type Catalog struct {
+	bufferPool      *buffer.BufferPool
 	nextFileId      page.FileId
 	nextIndexId     IndexId
 	UndoLogFileId   page.FileId
@@ -48,11 +46,6 @@ type Catalog struct {
 
 // NewCatalog は既存のカタログを開く
 func NewCatalog(bp *buffer.BufferPool) (*Catalog, error) {
-	err := createCatalogFile(bp)
-	if err != nil {
-		return nil, err
-	}
-
 	headerPageId := page.NewPageId(catalogFileId, catalogHeaderPageNum)
 	pageHeader, err := bp.GetReadPage(headerPageId)
 	if err != nil {
@@ -71,11 +64,18 @@ func NewCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 	columnMetaPageNumber := readPageNumber(pageHeader.Body, headerColumnMetaOffset)
 	constraintMetaPageNumber := readPageNumber(pageHeader.Body, headerConstraintMetaOffset)
 	userMetaPageNumber := readPageNumber(pageHeader.Body, headerUserMetaOffset)
-	nextFileId := page.FileId(binary.BigEndian.Uint32(pageHeader.Body[headerNextFileIdOffset : headerNextFileIdOffset+headerFieldSize]))
-	nextIndexId := IndexId(binary.BigEndian.Uint32(pageHeader.Body[headerNextIndexIdOffset : headerNextIndexIdOffset+headerFieldSize]))
-	undoLogFileId := page.FileId(binary.BigEndian.Uint32(pageHeader.Body[headerUndoLogFileIdOffset : headerUndoLogFileIdOffset+headerFieldSize]))
+	nextFileId := page.FileId(binary.BigEndian.Uint32(
+		pageHeader.Body[headerNextFileIdOffset : headerNextFileIdOffset+headerFieldSize],
+	))
+	nextIndexId := IndexId(binary.BigEndian.Uint32(
+		pageHeader.Body[headerNextIndexIdOffset : headerNextIndexIdOffset+headerFieldSize],
+	))
+	undoLogFileId := page.FileId(binary.BigEndian.Uint32(
+		pageHeader.Body[headerUndoLogFileIdOffset : headerUndoLogFileIdOffset+headerFieldSize],
+	))
 
 	return &Catalog{
+		bufferPool:      bp,
 		nextFileId:      nextFileId,
 		nextIndexId:     nextIndexId,
 		UndoLogFileId:   undoLogFileId,
@@ -142,11 +142,12 @@ func CreateCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 	writePageNumber(pageHeader.Body, headerColumnMetaOffset, columnMeta.tree.MetaPageId.PageNumber)
 	writePageNumber(pageHeader.Body, headerConstraintMetaOffset, constraintMeta.tree.MetaPageId.PageNumber)
 	writePageNumber(pageHeader.Body, headerUserMetaOffset, userMeta.tree.MetaPageId.PageNumber)
-	binary.BigEndian.PutUint32(pageHeader.Body[headerNextFileIdOffset:headerNextFileIdOffset+headerFieldSize], uint32(nextFileId))
-	binary.BigEndian.PutUint32(pageHeader.Body[headerNextIndexIdOffset:headerNextIndexIdOffset+headerFieldSize], uint32(nextIndexId))
-	binary.BigEndian.PutUint32(pageHeader.Body[headerUndoLogFileIdOffset:headerUndoLogFileIdOffset+headerFieldSize], uint32(undoLogFileId))
+	writeScalar(pageHeader.Body, headerNextFileIdOffset, uint32(nextFileId))
+	writeScalar(pageHeader.Body, headerNextIndexIdOffset, uint32(nextIndexId))
+	writeScalar(pageHeader.Body, headerUndoLogFileIdOffset, uint32(undoLogFileId))
 
 	return &Catalog{
+		bufferPool:      bp,
 		nextFileId:      nextFileId,
 		nextIndexId:     nextIndexId,
 		UndoLogFileId:   undoLogFileId,
@@ -159,34 +160,49 @@ func CreateCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 	}, nil
 }
 
-// AllocateIndexId は IndexId を採番する
-func (c *Catalog) AllocateIndexId() IndexId {
+// AllocateIndexId は IndexId を採番し、ヘッダーページに永続化する
+func (c *Catalog) AllocateIndexId() (IndexId, error) {
 	id := c.nextIndexId
 	c.nextIndexId++
-	return id
+	if err := c.persistScalar(headerNextIndexIdOffset, uint32(c.nextIndexId)); err != nil {
+		return 0, err
+	}
+	return id, nil
 }
 
-// AllocateFileId は FileId を採番する
-func (c *Catalog) AllocateFileId() page.FileId {
+// AllocateFileId は FileId を採番し、ヘッダーページに永続化する
+func (c *Catalog) AllocateFileId() (page.FileId, error) {
 	id := c.nextFileId
 	c.nextFileId++
-	return id
+	if err := c.persistScalar(headerNextFileIdOffset, uint32(c.nextFileId)); err != nil {
+		return 0, err
+	}
+	return id, nil
 }
 
+// persistScalar はヘッダーページの指定オフセットに uint32 値を書き込む
+func (c *Catalog) persistScalar(offset int, value uint32) error {
+	headerPageId := page.NewPageId(catalogFileId, catalogHeaderPageNum)
+	pageHeader, err := c.bufferPool.GetWritePage(headerPageId)
+	if err != nil {
+		return err
+	}
+	defer c.bufferPool.UnRefPage(headerPageId)
+	writeScalar(pageHeader.Body, offset, value)
+	return nil
+}
+
+// writeScalar はヘッダーページの指定オフセットに uint32 値を書き込む
+func writeScalar(body []byte, offset int, value uint32) {
+	binary.BigEndian.PutUint32(body[offset:offset+headerFieldSize], value)
+}
+
+// readPageNumber はヘッダーページの指定オフセットから PageNumber を読み取る
 func readPageNumber(body []byte, offset int) page.PageNumber {
 	return page.PageNumber(binary.BigEndian.Uint32(body[offset : offset+headerFieldSize]))
 }
 
+// writePageNumber はヘッダーページの指定オフセットに PageNumber を書き込む
 func writePageNumber(body []byte, offset int, pn page.PageNumber) {
 	binary.BigEndian.PutUint32(body[offset:offset+headerFieldSize], uint32(pn))
-}
-
-func createCatalogFile(bp *buffer.BufferPool) error {
-	path := filepath.Join(config.BaseDir, "minesql.db")
-	hp, err := file.NewHeapFile(catalogFileId, path)
-	if err != nil {
-		return err
-	}
-	bp.RegisterHeapFile(catalogFileId, hp)
-	return nil
 }

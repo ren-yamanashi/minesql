@@ -343,19 +343,19 @@ func setupSecondaryTestCatalog(t *testing.T) *catalog.Catalog {
 
 	// PRIMARY: プライマリインデックス, カラム (id)
 	indexId0 := catalog.IndexId(0)
-	_ = ct.IndexMeta.Insert(tableFileId, catalog.PrimaryIndexName, indexId0, catalog.IndexTypePrimary, 1, dummyPageId)
+	_ = ct.IndexMeta.Insert(catalog.IndexRecord{FileId: tableFileId, Name: catalog.PrimaryIndexName, IndexId: indexId0, IndexType: catalog.IndexTypePrimary, NumOfCol: 1, MetaPageId: dummyPageId})
 	_ = ct.IndexKeyColMeta.Insert(indexId0, "id", 0)
 
 	indexId1 := catalog.IndexId(1)
-	_ = ct.IndexMeta.Insert(tableFileId, "idx_name", indexId1, catalog.IndexTypeNonUnique, 1, dummyPageId)
+	_ = ct.IndexMeta.Insert(catalog.IndexRecord{FileId: tableFileId, Name: "idx_name", IndexId: indexId1, IndexType: catalog.IndexTypeNonUnique, NumOfCol: 1, MetaPageId: dummyPageId})
 	_ = ct.IndexKeyColMeta.Insert(indexId1, "name", 0)
 
 	indexId2 := catalog.IndexId(2)
-	_ = ct.IndexMeta.Insert(tableFileId, "idx_email", indexId2, catalog.IndexTypeUnique, 1, dummyPageId)
+	_ = ct.IndexMeta.Insert(catalog.IndexRecord{FileId: tableFileId, Name: "idx_email", IndexId: indexId2, IndexType: catalog.IndexTypeUnique, NumOfCol: 1, MetaPageId: dummyPageId})
 	_ = ct.IndexKeyColMeta.Insert(indexId2, "email", 0)
 
 	indexId3 := catalog.IndexId(3)
-	_ = ct.IndexMeta.Insert(tableFileId, "idx_name_email", indexId3, catalog.IndexTypeNonUnique, 2, dummyPageId)
+	_ = ct.IndexMeta.Insert(catalog.IndexRecord{FileId: tableFileId, Name: "idx_name_email", IndexId: indexId3, IndexType: catalog.IndexTypeNonUnique, NumOfCol: 2, MetaPageId: dummyPageId})
 	_ = ct.IndexKeyColMeta.Insert(indexId3, "name", 0)
 	_ = ct.IndexKeyColMeta.Insert(indexId3, "email", 1)
 

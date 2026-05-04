@@ -11,8 +11,8 @@ func newIndexIterator(iter *btree.Iterator) *IndexIterator {
 }
 
 // Next はインデックスメタデータから次の結果を返す
-func (imi *IndexIterator) Next() (IndexRecord, bool, error) {
-	record, ok, err := imi.iterator.Next()
+func (ii *IndexIterator) Next() (IndexRecord, bool, error) {
+	record, ok, err := ii.iterator.Next()
 	if err != nil {
 		return IndexRecord{}, false, err
 	}

@@ -80,7 +80,10 @@ func Create(bp *buffer.BufferPool, input CreateTableInput) (*Table, error) {
 // createTableFile はテーブルのファイルを作成する
 func createTableFile(ct *catalog.Catalog, bp *buffer.BufferPool, tableName string) (page.FileId, error) {
 	path := filepath.Join(config.BaseDir, fmt.Sprintf("%s.db", tableName))
-	fileId := ct.AllocateFileId()
+	fileId, err := ct.AllocateFileId()
+	if err != nil {
+		return 0, err
+	}
 	hp, err := file.NewHeapFile(fileId, path)
 	if err != nil {
 		return 0, err
@@ -101,14 +104,18 @@ func createPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, fileId page.
 	if err != nil {
 		return nil, err
 	}
-	err = ct.IndexMeta.Insert(
-		fileId,
-		catalog.PrimaryIndexName,
-		ct.AllocateIndexId(),
-		catalog.IndexTypePrimary,
-		input.PkCount,
-		index.tree.MetaPageId,
-	)
+	indexId, err := ct.AllocateIndexId()
+	if err != nil {
+		return nil, err
+	}
+	err = ct.IndexMeta.Insert(catalog.IndexRecord{
+		FileId:     fileId,
+		Name:       catalog.PrimaryIndexName,
+		IndexId:    indexId,
+		IndexType:  catalog.IndexTypePrimary,
+		NumOfCol:   input.PkCount,
+		MetaPageId: index.tree.MetaPageId,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +137,10 @@ func createSecondaryIndexes(
 ) ([]*SecondaryIndex, error) {
 	indexes := make([]*SecondaryIndex, 0, len(inputs))
 	for _, input := range inputs {
-		indexId := ct.AllocateIndexId()
+		indexId, err := ct.AllocateIndexId()
+		if err != nil {
+			return nil, err
+		}
 		index, err := CreateSecondaryIndex(ct, bp, CreateSecondaryIndexInput{
 			FileId:      fileId,
 			PrimaryTree: pt,
@@ -141,14 +151,14 @@ func createSecondaryIndexes(
 		if err != nil {
 			return nil, err
 		}
-		err = ct.IndexMeta.Insert(
-			fileId,
-			input.IndexName,
-			indexId,
-			input.IndexType,
-			len(input.ColNames),
-			index.tree.MetaPageId,
-		)
+		err = ct.IndexMeta.Insert(catalog.IndexRecord{
+			FileId:     fileId,
+			Name:       input.IndexName,
+			IndexId:    indexId,
+			IndexType:  input.IndexType,
+			NumOfCol:   len(input.ColNames),
+			MetaPageId: index.tree.MetaPageId,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -172,13 +182,13 @@ func createConstraints(ct *catalog.Catalog, fileId page.FileId, inputs []CreateC
 		if err != nil {
 			return err
 		}
-		err = ct.ConstraintMeta.Insert(
-			fileId,
-			input.ColName,
-			input.ConstraintName,
-			refTable.MetaPageId.FileId,
-			input.RefColName,
-		)
+		err = ct.ConstraintMeta.Insert(catalog.ConstraintRecord{
+			FileId:         fileId,
+			ColName:        input.ColName,
+			ConstraintName: input.ConstraintName,
+			RefTableFileId: refTable.MetaPageId.FileId,
+			RefColName:     input.RefColName,
+		})
 		if err != nil {
 			return err
 		}

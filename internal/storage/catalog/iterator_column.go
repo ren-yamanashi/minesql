@@ -11,8 +11,8 @@ func newColumnIterator(iter *btree.Iterator) *ColumnIterator {
 }
 
 // Next はカラムメタデータから次の結果を返す
-func (imi *ColumnIterator) Next() (ColumnRecord, bool, error) {
-	record, ok, err := imi.iterator.Next()
+func (ci *ColumnIterator) Next() (ColumnRecord, bool, error) {
+	record, ok, err := ci.iterator.Next()
 	if err != nil {
 		return ColumnRecord{}, false, err
 	}

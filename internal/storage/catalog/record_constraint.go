@@ -16,22 +16,6 @@ type ConstraintRecord struct {
 	RefColName     string      // 制約により参照されるカラム名
 }
 
-func NewConstraintRecord(
-	fileId page.FileId,
-	colName string,
-	constraintName string,
-	refTableFileId page.FileId,
-	refColName string,
-) ConstraintRecord {
-	return ConstraintRecord{
-		FileId:         fileId,
-		ColName:        colName,
-		ConstraintName: constraintName,
-		RefTableFileId: refTableFileId,
-		RefColName:     refColName,
-	}
-}
-
 // encode は node.Record にエンコードする
 func (cr ConstraintRecord) encode() node.Record {
 	// key = fileId + colName + constraintName
@@ -62,5 +46,11 @@ func decodeConstraintRecord(record node.Record) ConstraintRecord {
 	refTableFileId := page.FileId(binary.BigEndian.Uint32(nonKey[0]))
 	refColName := string(nonKey[1])
 
-	return NewConstraintRecord(fileId, colName, constraintName, refTableFileId, refColName)
+	return ConstraintRecord{
+		FileId:         fileId,
+		ColName:        colName,
+		ConstraintName: constraintName,
+		RefTableFileId: refTableFileId,
+		RefColName:     refColName,
+	}
 }

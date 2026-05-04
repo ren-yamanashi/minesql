@@ -11,8 +11,8 @@ func newConstraintIterator(iter *btree.Iterator) *ConstraintIterator {
 }
 
 // Next は制約メタデータから次の結果を返す
-func (imi *ConstraintIterator) Next() (ConstraintRecord, bool, error) {
-	record, ok, err := imi.iterator.Next()
+func (ci *ConstraintIterator) Next() (ConstraintRecord, bool, error) {
+	record, ok, err := ci.iterator.Next()
 	if err != nil {
 		return ConstraintRecord{}, false, err
 	}

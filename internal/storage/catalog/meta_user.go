@@ -41,6 +41,6 @@ func (um *UserMeta) Insert(
 	host string,
 	authString []byte,
 ) error {
-	record := NewUserRecord(username, host, authString)
+	record := newUserRecord(username, host, authString)
 	return um.tree.Insert(record.encode())
 }

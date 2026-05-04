@@ -32,13 +32,6 @@ func (im *IndexMeta) Search(mode SearchMode) (*IndexIterator, error) {
 }
 
 // Insert はレコードを挿入する
-//   - fileId: インデックスが属するテーブルの FileId
-//   - name: インデックス名
-//   - indexId: インデックス ID
-//   - indexType: インデックス種類
-//   - numOfCol: インデックスを構成するカラム数
-//   - metaPageId: セカンダリ or プライマリインデックスの B+Tree メタページ ID
-func (im *IndexMeta) Insert(fileId page.FileId, name string, indexId IndexId, indexType IndexType, numOfCol int, metaPageId page.PageId) error {
-	record := newIndexRecord(fileId, name, indexId, indexType, numOfCol, metaPageId)
+func (im *IndexMeta) Insert(record IndexRecord) error {
 	return im.tree.Insert(record.encode())
 }

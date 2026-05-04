@@ -18,7 +18,7 @@ func TestCreate(t *testing.T) {
 	t.Run("テーブルのファイルを作成しバッファプールに登録できる", func(t *testing.T) {
 		// GIVEN
 		env := setupCreateTestEnv(t)
-		_ = os.MkdirAll(config.BaseDir, 0o755)
+		_ = os.MkdirAll(config.BaseDir, 0o750)
 		t.Cleanup(func() {
 			_ = os.Remove(filepath.Join(config.BaseDir, "test_table.db"))
 			_ = os.Remove(config.BaseDir)
@@ -288,7 +288,10 @@ func setupCreateTestEnv(t *testing.T) *createTestEnv {
 
 	// テスト用テーブルの HeapFile
 	dataPath := filepath.Join(t.TempDir(), "data.db")
-	fileId := ct.AllocateFileId()
+	fileId, err := ct.AllocateFileId()
+	if err != nil {
+		t.Fatalf("FileId の採番に失敗: %v", err)
+	}
 	dataHf, err := file.NewHeapFile(fileId, dataPath)
 	if err != nil {
 		t.Fatalf("データ HeapFile の作成に失敗: %v", err)

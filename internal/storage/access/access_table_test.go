@@ -162,26 +162,26 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 
 	// プライマリインデックスメタデータ
 	piIndexId := catalog.IndexId(0)
-	_ = env.ct.IndexMeta.Insert(
-		fileId,
-		catalog.PrimaryIndexName,
-		piIndexId,
-		catalog.IndexTypePrimary,
-		1,
-		env.primaryTree.MetaPageId,
-	)
+	_ = env.ct.IndexMeta.Insert(catalog.IndexRecord{
+		FileId:     fileId,
+		Name:       catalog.PrimaryIndexName,
+		IndexId:    piIndexId,
+		IndexType:  catalog.IndexTypePrimary,
+		NumOfCol:   1,
+		MetaPageId: env.primaryTree.MetaPageId,
+	})
 	_ = env.ct.IndexKeyColMeta.Insert(piIndexId, "id", 0)
 
 	// セカンダリインデックス idx_name のメタデータ (B+Tree は secondaryTree を再利用)
 	siNameId := catalog.IndexId(1)
-	_ = env.ct.IndexMeta.Insert(
-		fileId,
-		"idx_name",
-		siNameId,
-		catalog.IndexTypeNonUnique,
-		1,
-		env.secondaryTree.MetaPageId,
-	)
+	_ = env.ct.IndexMeta.Insert(catalog.IndexRecord{
+		FileId:     fileId,
+		Name:       "idx_name",
+		IndexId:    siNameId,
+		IndexType:  catalog.IndexTypeNonUnique,
+		NumOfCol:   1,
+		MetaPageId: env.secondaryTree.MetaPageId,
+	})
 	_ = env.ct.IndexKeyColMeta.Insert(siNameId, "name", 0)
 
 	// セカンダリインデックス idx_email のメタデータ (新しい B+Tree が必要)
@@ -190,14 +190,14 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 		t.Fatalf("idx_email B+Tree の作成に失敗: %v", err)
 	}
 	siEmailId := catalog.IndexId(2)
-	_ = env.ct.IndexMeta.Insert(
-		fileId,
-		"idx_email",
-		siEmailId,
-		catalog.IndexTypeUnique,
-		1,
-		siEmailTree.MetaPageId,
-	)
+	_ = env.ct.IndexMeta.Insert(catalog.IndexRecord{
+		FileId:     fileId,
+		Name:       "idx_email",
+		IndexId:    siEmailId,
+		IndexType:  catalog.IndexTypeUnique,
+		NumOfCol:   1,
+		MetaPageId: siEmailTree.MetaPageId,
+	})
 	_ = env.ct.IndexKeyColMeta.Insert(siEmailId, "email", 0)
 
 	return &tableTestEnv{

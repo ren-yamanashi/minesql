@@ -10,7 +10,7 @@ import (
 func TestConstraintRecordEncode(t *testing.T) {
 	t.Run("制約レコードをエンコードできる", func(t *testing.T) {
 		// GIVEN
-		cr := NewConstraintRecord(page.FileId(1), "id", "PRIMARY", page.FileId(0), "")
+		cr := ConstraintRecord{FileId: page.FileId(1), ColName: "id", ConstraintName: "PRIMARY", RefTableFileId: page.FileId(0), RefColName: ""}
 
 		// WHEN
 		record := cr.encode()
@@ -23,7 +23,7 @@ func TestConstraintRecordEncode(t *testing.T) {
 
 	t.Run("主キー制約をエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
-		original := NewConstraintRecord(page.FileId(1), "id", "PRIMARY", page.FileId(0), "")
+		original := ConstraintRecord{FileId: page.FileId(1), ColName: "id", ConstraintName: "PRIMARY", RefTableFileId: page.FileId(0), RefColName: ""}
 
 		// WHEN
 		record := original.encode()
@@ -39,13 +39,7 @@ func TestConstraintRecordEncode(t *testing.T) {
 
 	t.Run("外部キー制約をエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
-		original := NewConstraintRecord(
-			page.FileId(2),
-			"user_id",
-			"fk_orders_users",
-			page.FileId(1),
-			"id",
-		)
+		original := ConstraintRecord{FileId: page.FileId(2), ColName: "user_id", ConstraintName: "fk_orders_users", RefTableFileId: page.FileId(1), RefColName: "id"}
 
 		// WHEN
 		record := original.encode()
@@ -61,7 +55,7 @@ func TestConstraintRecordEncode(t *testing.T) {
 
 	t.Run("ユニークキー制約をエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
-		original := NewConstraintRecord(page.FileId(1), "email", "idx_email", page.FileId(0), "")
+		original := ConstraintRecord{FileId: page.FileId(1), ColName: "email", ConstraintName: "idx_email", RefTableFileId: page.FileId(0), RefColName: ""}
 
 		// WHEN
 		record := original.encode()
@@ -76,7 +70,7 @@ func TestConstraintRecordEncode(t *testing.T) {
 
 	t.Run("FileId が 0 の場合も正しくエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
-		original := NewConstraintRecord(page.FileId(0), "col", "pk", page.FileId(0), "")
+		original := ConstraintRecord{FileId: page.FileId(0), ColName: "col", ConstraintName: "pk", RefTableFileId: page.FileId(0), RefColName: ""}
 
 		// WHEN
 		record := original.encode()
@@ -91,7 +85,7 @@ func TestConstraintRecordEncode(t *testing.T) {
 func TestDecodeConstraintRecord(t *testing.T) {
 	t.Run("エンコード済みレコードから FileId とカラム名と制約名を復元できる", func(t *testing.T) {
 		// GIVEN
-		cr := NewConstraintRecord(page.FileId(42), "name", "uq_name", page.FileId(0), "")
+		cr := ConstraintRecord{FileId: page.FileId(42), ColName: "name", ConstraintName: "uq_name", RefTableFileId: page.FileId(0), RefColName: ""}
 		record := cr.encode()
 
 		// WHEN
@@ -105,7 +99,7 @@ func TestDecodeConstraintRecord(t *testing.T) {
 
 	t.Run("エンコード済みレコードから参照先テーブルとカラムを復元できる", func(t *testing.T) {
 		// GIVEN
-		cr := NewConstraintRecord(page.FileId(3), "dept_id", "fk_dept", page.FileId(5), "id")
+		cr := ConstraintRecord{FileId: page.FileId(3), ColName: "dept_id", ConstraintName: "fk_dept", RefTableFileId: page.FileId(5), RefColName: "id"}
 		record := cr.encode()
 
 		// WHEN

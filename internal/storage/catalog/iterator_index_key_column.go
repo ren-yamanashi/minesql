@@ -11,8 +11,8 @@ func newIndexKeyColIterator(iter *btree.Iterator) *IndexKeyColIterator {
 }
 
 // Next はインデックスキーカラムメタデータから次の結果を返す
-func (imi *IndexKeyColIterator) Next() (IndexKeyColRecord, bool, error) {
-	record, ok, err := imi.iterator.Next()
+func (iki *IndexKeyColIterator) Next() (IndexKeyColRecord, bool, error) {
+	record, ok, err := iki.iterator.Next()
 	if err != nil {
 		return IndexKeyColRecord{}, false, err
 	}

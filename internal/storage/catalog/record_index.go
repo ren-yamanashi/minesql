@@ -29,17 +29,6 @@ type IndexRecord struct {
 	MetaPageId page.PageId // セカンダリ or プライマリインデックスの B+Tree メタページ ID
 }
 
-func newIndexRecord(fileId page.FileId, name string, indexId IndexId, indexType IndexType, numOfCol int, metaPageId page.PageId) IndexRecord {
-	return IndexRecord{
-		FileId:     fileId,
-		IndexId:    indexId,
-		Name:       name,
-		IndexType:  indexType,
-		NumOfCol:   numOfCol,
-		MetaPageId: metaPageId,
-	}
-}
-
 // encode は node.Record にエンコードする
 func (ir IndexRecord) encode() node.Record {
 	// key = fileId + name
@@ -73,5 +62,12 @@ func decodeIndexRecord(record node.Record) IndexRecord {
 	numOfCol := int(binary.BigEndian.Uint32(nonKey[2]))
 	metaPageId := page.ReadPageId(nonKey[3], 0)
 
-	return newIndexRecord(fileId, name, indexId, indexType, numOfCol, metaPageId)
+	return IndexRecord{
+		FileId:     fileId,
+		IndexId:    indexId,
+		Name:       name,
+		IndexType:  indexType,
+		NumOfCol:   numOfCol,
+		MetaPageId: metaPageId,
+	}
 }

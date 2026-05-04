@@ -14,7 +14,7 @@ type ColumnRecord struct {
 	Pos    int         // テーブル上のカラム位置
 }
 
-func NewColumnRecord(fileId page.FileId, name string, pos int) ColumnRecord {
+func newColumnRecord(fileId page.FileId, name string, pos int) ColumnRecord {
 	return ColumnRecord{
 		FileId: fileId,
 		Name:   name,
@@ -50,5 +50,5 @@ func decodeColumnRecord(record node.Record) ColumnRecord {
 	encode.Decode(record.NonKey(), &nonKey)
 	pos := int(binary.BigEndian.Uint32(nonKey[0]))
 
-	return NewColumnRecord(fileId, name, pos)
+	return newColumnRecord(fileId, name, pos)
 }

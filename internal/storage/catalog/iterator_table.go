@@ -11,8 +11,8 @@ func newTableIterator(iter *btree.Iterator) *TableIterator {
 }
 
 // Next はテーブルメタデータから次の結果を返す
-func (imi *TableIterator) Next() (TableRecord, bool, error) {
-	record, ok, err := imi.iterator.Next()
+func (ti *TableIterator) Next() (TableRecord, bool, error) {
+	record, ok, err := ti.iterator.Next()
 	if err != nil {
 		return TableRecord{}, false, err
 	}

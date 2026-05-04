@@ -207,11 +207,11 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 
 	// インデックス定義
 	indexId1 := catalog.IndexId(1)
-	_ = ct.IndexMeta.Insert(tableFileId, "idx_name", indexId1, catalog.IndexTypeNonUnique, 1, dummyPageId)
+	_ = ct.IndexMeta.Insert(catalog.IndexRecord{FileId: tableFileId, Name: "idx_name", IndexId: indexId1, IndexType: catalog.IndexTypeNonUnique, NumOfCol: 1, MetaPageId: dummyPageId})
 	_ = ct.IndexKeyColMeta.Insert(indexId1, "name", 0)
 
 	indexId2 := catalog.IndexId(2)
-	_ = ct.IndexMeta.Insert(tableFileId, "idx_email", indexId2, catalog.IndexTypeUnique, 1, dummyPageId)
+	_ = ct.IndexMeta.Insert(catalog.IndexRecord{FileId: tableFileId, Name: "idx_email", IndexId: indexId2, IndexType: catalog.IndexTypeUnique, NumOfCol: 1, MetaPageId: dummyPageId})
 	_ = ct.IndexKeyColMeta.Insert(indexId2, "email", 0)
 
 	// プライマリ B+Tree

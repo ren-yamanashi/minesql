@@ -32,18 +32,6 @@ func (cm *ConstraintMeta) Search(mode SearchMode) (*ConstraintIterator, error) {
 }
 
 // Insert はレコードを挿入する
-//   - fileId: 制約が属するテーブルの FileId
-//   - colName: 制約のあるカラム名
-//   - constraintName: 制約名
-//   - refTableFileId: 制約により参照されるテーブルの FileId
-//   - refColName: 制約により参照されるカラム名
-func (cm *ConstraintMeta) Insert(
-	fileId page.FileId,
-	colName string,
-	constraintName string,
-	refTableFileId page.FileId,
-	refColName string,
-) error {
-	record := NewConstraintRecord(fileId, colName, constraintName, refTableFileId, refColName)
+func (cm *ConstraintMeta) Insert(record ConstraintRecord) error {
 	return cm.tree.Insert(record.encode())
 }

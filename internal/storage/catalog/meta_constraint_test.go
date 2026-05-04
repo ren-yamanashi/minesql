@@ -28,7 +28,7 @@ func TestConstraintMetaInsert(t *testing.T) {
 		cm := setupTestConstraintMeta(t)
 
 		// WHEN
-		err := cm.Insert(page.FileId(1), "id", "PRIMARY", page.FileId(0), "")
+		err := cm.Insert(ConstraintRecord{FileId: page.FileId(1), ColName: "id", ConstraintName: "PRIMARY", RefTableFileId: page.FileId(0), RefColName: ""})
 
 		// THEN
 		assert.NoError(t, err)
@@ -39,7 +39,7 @@ func TestConstraintMetaInsert(t *testing.T) {
 		cm := setupTestConstraintMeta(t)
 
 		// WHEN
-		err := cm.Insert(page.FileId(2), "user_id", "fk_orders_users", page.FileId(1), "id")
+		err := cm.Insert(ConstraintRecord{FileId: page.FileId(2), ColName: "user_id", ConstraintName: "fk_orders_users", RefTableFileId: page.FileId(1), RefColName: "id"})
 
 		// THEN
 		assert.NoError(t, err)
@@ -48,10 +48,10 @@ func TestConstraintMetaInsert(t *testing.T) {
 	t.Run("同じ FileId + カラム名 + 制約名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
 		// GIVEN
 		cm := setupTestConstraintMeta(t)
-		_ = cm.Insert(page.FileId(1), "id", "PRIMARY", page.FileId(0), "")
+		_ = cm.Insert(ConstraintRecord{FileId: page.FileId(1), ColName: "id", ConstraintName: "PRIMARY", RefTableFileId: page.FileId(0), RefColName: ""})
 
 		// WHEN
-		err := cm.Insert(page.FileId(1), "id", "PRIMARY", page.FileId(0), "")
+		err := cm.Insert(ConstraintRecord{FileId: page.FileId(1), ColName: "id", ConstraintName: "PRIMARY", RefTableFileId: page.FileId(0), RefColName: ""})
 
 		// THEN
 		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
@@ -60,10 +60,10 @@ func TestConstraintMetaInsert(t *testing.T) {
 	t.Run("同じカラムに異なる制約名であれば複数挿入できる", func(t *testing.T) {
 		// GIVEN
 		cm := setupTestConstraintMeta(t)
-		_ = cm.Insert(page.FileId(1), "email", "PRIMARY", page.FileId(0), "")
+		_ = cm.Insert(ConstraintRecord{FileId: page.FileId(1), ColName: "email", ConstraintName: "PRIMARY", RefTableFileId: page.FileId(0), RefColName: ""})
 
 		// WHEN
-		err := cm.Insert(page.FileId(1), "email", "idx_email", page.FileId(0), "")
+		err := cm.Insert(ConstraintRecord{FileId: page.FileId(1), ColName: "email", ConstraintName: "idx_email", RefTableFileId: page.FileId(0), RefColName: ""})
 
 		// THEN
 		assert.NoError(t, err)
@@ -74,8 +74,8 @@ func TestConstraintMetaSearch(t *testing.T) {
 	t.Run("SearchModeStart で全件スキャンできる", func(t *testing.T) {
 		// GIVEN
 		cm := setupTestConstraintMeta(t)
-		_ = cm.Insert(page.FileId(1), "id", "PRIMARY", page.FileId(0), "")
-		_ = cm.Insert(page.FileId(2), "user_id", "fk_orders_users", page.FileId(1), "id")
+		_ = cm.Insert(ConstraintRecord{FileId: page.FileId(1), ColName: "id", ConstraintName: "PRIMARY", RefTableFileId: page.FileId(0), RefColName: ""})
+		_ = cm.Insert(ConstraintRecord{FileId: page.FileId(2), ColName: "user_id", ConstraintName: "fk_orders_users", RefTableFileId: page.FileId(1), RefColName: "id"})
 
 		// WHEN
 		iter, err := cm.Search(SearchModeStart{})

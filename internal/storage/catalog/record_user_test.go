@@ -9,7 +9,7 @@ import (
 func TestUserRecordEncode(t *testing.T) {
 	t.Run("ユーザーレコードをエンコードできる", func(t *testing.T) {
 		// GIVEN
-		ur := NewUserRecord("alice", "localhost", []byte("authdata"))
+		ur := newUserRecord("alice", "localhost", []byte("authdata"))
 
 		// WHEN
 		record := ur.encode()
@@ -22,7 +22,7 @@ func TestUserRecordEncode(t *testing.T) {
 
 	t.Run("エンコードした結果をデコードすると元のデータに戻る", func(t *testing.T) {
 		// GIVEN
-		original := NewUserRecord("bob", "192.168.1.1", []byte{0xAB, 0xCD, 0xEF})
+		original := newUserRecord("bob", "192.168.1.1", []byte{0xAB, 0xCD, 0xEF})
 
 		// WHEN
 		record := original.encode()
@@ -40,7 +40,7 @@ func TestUserRecordEncode(t *testing.T) {
 		for i := range 32 {
 			authString[i] = byte(i)
 		}
-		original := NewUserRecord("user", "%", authString)
+		original := newUserRecord("user", "%", authString)
 
 		// WHEN
 		record := original.encode()
@@ -54,7 +54,7 @@ func TestUserRecordEncode(t *testing.T) {
 
 	t.Run("ホスト名がワイルドカードの場合も正しくエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
-		original := NewUserRecord("root", "%", []byte("secret"))
+		original := newUserRecord("root", "%", []byte("secret"))
 
 		// WHEN
 		record := original.encode()
@@ -69,7 +69,7 @@ func TestUserRecordEncode(t *testing.T) {
 func TestDecodeUserRecord(t *testing.T) {
 	t.Run("エンコード済みレコードからユーザー名を復元できる", func(t *testing.T) {
 		// GIVEN
-		ur := NewUserRecord("alice", "localhost", []byte("auth"))
+		ur := newUserRecord("alice", "localhost", []byte("auth"))
 		record := ur.encode()
 
 		// WHEN
@@ -81,7 +81,7 @@ func TestDecodeUserRecord(t *testing.T) {
 
 	t.Run("エンコード済みレコードからホスト名と認証文字列を復元できる", func(t *testing.T) {
 		// GIVEN
-		ur := NewUserRecord("bob", "10.0.0.1", []byte{0x01, 0x02, 0x03})
+		ur := newUserRecord("bob", "10.0.0.1", []byte{0x01, 0x02, 0x03})
 		record := ur.encode()
 
 		// WHEN
