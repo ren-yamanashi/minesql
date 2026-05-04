@@ -7,14 +7,12 @@ import (
 )
 
 type UserMeta struct {
-	metaPageId page.PageId
-	tree       *btree.Btree // ユーザーメタデータが格納される B+Tree
+	tree *btree.Btree // ユーザーメタデータが格納される B+Tree
 }
 
 // NewUserMeta は既存のユーザーメタデータを開く
 func NewUserMeta(bp *buffer.BufferPool, metaPageId page.PageId) *UserMeta {
-	tree := btree.NewBtree(bp, metaPageId)
-	return &UserMeta{metaPageId: metaPageId, tree: tree}
+	return &UserMeta{tree: btree.NewBtree(bp, metaPageId)}
 }
 
 func CreateUserMeta(bp *buffer.BufferPool) (*UserMeta, error) {
@@ -22,7 +20,7 @@ func CreateUserMeta(bp *buffer.BufferPool) (*UserMeta, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &UserMeta{metaPageId: tree.MetaPageId, tree: tree}, nil
+	return &UserMeta{tree: tree}, nil
 }
 
 // Search は指定した検索モードでメタデータを検索し、イテレータを返す

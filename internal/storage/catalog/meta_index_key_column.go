@@ -7,13 +7,11 @@ import (
 )
 
 type IndexKeyColMeta struct {
-	metaPageId page.PageId
-	tree       *btree.Btree // インデックスキーカラムメタデータが格納される B+Tree
+	tree *btree.Btree // インデックスキーカラムメタデータが格納される B+Tree
 }
 
 func NewIndexKeyColMeta(bp *buffer.BufferPool, metaPageId page.PageId) *IndexKeyColMeta {
-	tree := btree.NewBtree(bp, metaPageId)
-	return &IndexKeyColMeta{metaPageId: metaPageId, tree: tree}
+	return &IndexKeyColMeta{tree: btree.NewBtree(bp, metaPageId)}
 }
 
 func CreateIndexKeyColMeta(bp *buffer.BufferPool) (*IndexKeyColMeta, error) {
@@ -21,7 +19,7 @@ func CreateIndexKeyColMeta(bp *buffer.BufferPool) (*IndexKeyColMeta, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &IndexKeyColMeta{metaPageId: tree.MetaPageId, tree: tree}, nil
+	return &IndexKeyColMeta{tree: tree}, nil
 }
 
 // Search は指定した検索モードでメタデータを検索し、イテレータを返す

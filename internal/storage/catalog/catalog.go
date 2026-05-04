@@ -34,7 +34,7 @@ const (
 type Catalog struct {
 	nextFileId      page.FileId
 	nextIndexId     IndexId
-	undoLogFileId   page.FileId
+	UndoLogFileId   page.FileId
 	TableMeta       *TableMeta
 	IndexMeta       *IndexMeta
 	IndexKeyColMeta *IndexKeyColMeta
@@ -70,7 +70,7 @@ func NewCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 	return &Catalog{
 		nextFileId:      nextFileId,
 		nextIndexId:     nextIndexId,
-		undoLogFileId:   undoLogFileId,
+		UndoLogFileId:   undoLogFileId,
 		TableMeta:       NewTableMeta(bp, page.NewPageId(catalogFileId, tableMetaPageNumber)),
 		IndexMeta:       NewIndexMeta(bp, page.NewPageId(catalogFileId, indexMetaPageNumber)),
 		IndexKeyColMeta: NewIndexKeyColMeta(bp, page.NewPageId(catalogFileId, indexKeyColMetaPageNumber)),
@@ -128,12 +128,12 @@ func CreateCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 	nextFileId++
 
 	copy(pageHeader.Body[headerMagicNumberOffset:], catalogMagicNumber)
-	writePageNumber(pageHeader.Body, headerTableMetaOffset, tableMeta.metaPageId.PageNumber)
-	writePageNumber(pageHeader.Body, headerIndexMetaOffset, indexMeta.metaPageId.PageNumber)
-	writePageNumber(pageHeader.Body, headerIndexKeyColMetaOffset, indexKeyColMeta.metaPageId.PageNumber)
-	writePageNumber(pageHeader.Body, headerColumnMetaOffset, columnMeta.metaPageId.PageNumber)
-	writePageNumber(pageHeader.Body, headerConstraintMetaOffset, constraintMeta.metaPageId.PageNumber)
-	writePageNumber(pageHeader.Body, headerUserMetaOffset, userMeta.metaPageId.PageNumber)
+	writePageNumber(pageHeader.Body, headerTableMetaOffset, tableMeta.tree.MetaPageId.PageNumber)
+	writePageNumber(pageHeader.Body, headerIndexMetaOffset, indexMeta.tree.MetaPageId.PageNumber)
+	writePageNumber(pageHeader.Body, headerIndexKeyColMetaOffset, indexKeyColMeta.tree.MetaPageId.PageNumber)
+	writePageNumber(pageHeader.Body, headerColumnMetaOffset, columnMeta.tree.MetaPageId.PageNumber)
+	writePageNumber(pageHeader.Body, headerConstraintMetaOffset, constraintMeta.tree.MetaPageId.PageNumber)
+	writePageNumber(pageHeader.Body, headerUserMetaOffset, userMeta.tree.MetaPageId.PageNumber)
 	binary.BigEndian.PutUint32(pageHeader.Body[headerNextFileIdOffset:headerNextFileIdOffset+headerFieldSize], uint32(nextFileId))
 	binary.BigEndian.PutUint32(pageHeader.Body[headerNextIndexIdOffset:headerNextIndexIdOffset+headerFieldSize], uint32(nextIndexId))
 	binary.BigEndian.PutUint32(pageHeader.Body[headerUndoLogFileIdOffset:headerUndoLogFileIdOffset+headerFieldSize], uint32(undoLogFileId))
@@ -141,7 +141,7 @@ func CreateCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 	return &Catalog{
 		nextFileId:      nextFileId,
 		nextIndexId:     nextIndexId,
-		undoLogFileId:   undoLogFileId,
+		UndoLogFileId:   undoLogFileId,
 		TableMeta:       tableMeta,
 		IndexMeta:       indexMeta,
 		IndexKeyColMeta: indexKeyColMeta,
@@ -149,6 +149,20 @@ func CreateCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 		ConstraintMeta:  constraintMeta,
 		UserMeta:        userMeta,
 	}, nil
+}
+
+// AllocateIndexId は IndexId を採番する
+func (c *Catalog) AllocateIndexId() IndexId {
+	id := c.nextIndexId
+	c.nextIndexId++
+	return id
+}
+
+// AllocateFileId は FileId を採番する
+func (c *Catalog) AllocateFileId() page.FileId {
+	id := c.nextFileId
+	c.nextFileId++
+	return id
 }
 
 func readPageNumber(body []byte, offset int) page.PageNumber {

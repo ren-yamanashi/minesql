@@ -9,16 +9,16 @@ import (
 )
 
 type TableRecord struct {
-	FileId   page.FileId // テーブルの FileId
-	Name     string      // テーブル名
-	NumOfCol int         // カラム数
+	Name       string      // テーブル名
+	MetaPageId page.PageId // プライマリインデックスの B+Tree メタページ ID
+	NumOfCol   int         // カラム数
 }
 
-func NewTableRecord(fileId page.FileId, name string, numOfCol int) TableRecord {
+func newTableRecord(name string, metaPageId page.PageId, numOfCol int) TableRecord {
 	return TableRecord{
-		FileId:   fileId,
-		Name:     name,
-		NumOfCol: numOfCol,
+		Name:       name,
+		MetaPageId: metaPageId,
+		NumOfCol:   numOfCol,
 	}
 }
 
@@ -28,27 +28,27 @@ func (tr TableRecord) encode() node.Record {
 	var key []byte
 	encode.Encode([][]byte{[]byte(tr.Name)}, &key)
 
-	// nonKey = fileId + numOfCol
+	// nonKey = metaPageId + numOfCol
 	var nonKey []byte
-	fileId := binary.BigEndian.AppendUint32(nil, uint32(tr.FileId))
+	metaPageIdBytes := tr.MetaPageId.ToBytes()
 	numOfCol := binary.BigEndian.AppendUint32(nil, uint32(tr.NumOfCol))
-	encode.Encode([][]byte{fileId, numOfCol}, &nonKey)
+	encode.Encode([][]byte{metaPageIdBytes, numOfCol}, &nonKey)
 
 	return node.NewRecord(nil, key, nonKey)
 }
 
-// decodeTableRecord は node.Record から tableRecord にデコードする
+// decodeTableRecord は node.Record から TableRecord にデコードする
 func decodeTableRecord(record node.Record) TableRecord {
 	// key = [name]
 	var key [][]byte
 	encode.Decode(record.Key(), &key)
 	name := string(key[0])
 
-	// nonKey = [fileId, numOfCol]
+	// nonKey = [metaPageId, numOfCol]
 	var nonKey [][]byte
 	encode.Decode(record.NonKey(), &nonKey)
-	fileId := page.FileId(binary.BigEndian.Uint32(nonKey[0]))
+	metaPageId := page.ReadPageId(nonKey[0], 0)
 	numOfCol := int(binary.BigEndian.Uint32(nonKey[1]))
 
-	return NewTableRecord(fileId, name, numOfCol)
+	return newTableRecord(name, metaPageId, numOfCol)
 }

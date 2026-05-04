@@ -7,13 +7,11 @@ import (
 )
 
 type ConstraintMeta struct {
-	metaPageId page.PageId
-	tree       *btree.Btree // 制約メタデータが格納される B+Tree
+	tree *btree.Btree // 制約メタデータが格納される B+Tree
 }
 
 func NewConstraintMeta(bp *buffer.BufferPool, metaPageId page.PageId) *ConstraintMeta {
-	tree := btree.NewBtree(bp, metaPageId)
-	return &ConstraintMeta{metaPageId: metaPageId, tree: tree}
+	return &ConstraintMeta{tree: btree.NewBtree(bp, metaPageId)}
 }
 
 func CreateConstraintMeta(bp *buffer.BufferPool) (*ConstraintMeta, error) {
@@ -21,7 +19,7 @@ func CreateConstraintMeta(bp *buffer.BufferPool) (*ConstraintMeta, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ConstraintMeta{metaPageId: tree.MetaPageId, tree: tree}, nil
+	return &ConstraintMeta{tree: tree}, nil
 }
 
 // Search は指定した検索モードでメタデータを検索し、イテレータを返す

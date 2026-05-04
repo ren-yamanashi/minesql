@@ -7,13 +7,11 @@ import (
 )
 
 type ColumnMeta struct {
-	metaPageId page.PageId
-	tree       *btree.Btree // カラムメタデータが格納される B+Tree
+	tree *btree.Btree // カラムメタデータが格納される B+Tree
 }
 
 func NewColumnMeta(bp *buffer.BufferPool, metaPageId page.PageId) *ColumnMeta {
-	tree := btree.NewBtree(bp, metaPageId)
-	return &ColumnMeta{metaPageId: metaPageId, tree: tree}
+	return &ColumnMeta{tree: btree.NewBtree(bp, metaPageId)}
 }
 
 func CreateColumnMeta(bp *buffer.BufferPool) (*ColumnMeta, error) {
@@ -21,7 +19,7 @@ func CreateColumnMeta(bp *buffer.BufferPool) (*ColumnMeta, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &ColumnMeta{metaPageId: tree.MetaPageId, tree: tree}, nil
+	return &ColumnMeta{tree: tree}, nil
 }
 
 // Search は指定した検索モードでメタデータを検索し、イテレータを返す

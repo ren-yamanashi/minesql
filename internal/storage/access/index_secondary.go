@@ -15,16 +15,16 @@ type SecondaryIndex struct {
 	catalog     *catalog.Catalog
 	tree        *btree.Btree // セカンダリインデックスの B+Tree
 	primaryTree *btree.Btree // プライマリインデックスの B+Tree
-	fileId      page.FileId  // テーブルの FileId
+	fileId      page.FileId  // インデックスが属するテーブルの FileId
 	indexName   string       // インデックス名
 	isUnique    bool         // ユニーク制約の有無
 }
 
 type NewSecondaryIndexInput struct {
-	MetaPageId  page.PageId
-	PrimaryTree *btree.Btree
-	IndexName   string
-	IsUnique    bool
+	MetaPageId  page.PageId  // セカンダリインデックスの MetaPageId
+	PrimaryTree *btree.Btree // プライマリインデックスの B+Tree
+	IndexName   string       // インデックス名
+	IsUnique    bool         // ユーニークインデックスか
 }
 
 // NewSecondaryIndex は既存のセカンダリインデックスを開く
@@ -45,10 +45,10 @@ func NewSecondaryIndex(
 }
 
 type CreateSecondaryIndexInput struct {
-	FileId      page.FileId
-	PrimaryTree *btree.Btree
-	IndexName   string
-	IsUnique    bool
+	FileId      page.FileId  // インデックスが属するテーブルの FileId
+	PrimaryTree *btree.Btree // プライマリインデックスの B+Tree
+	IndexName   string       // インデックス名
+	IsUnique    bool         // ユニークか
 }
 
 // CreateSecondaryIndex は空のセカンダリインデックスを作成する

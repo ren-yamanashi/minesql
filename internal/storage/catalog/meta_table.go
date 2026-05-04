@@ -7,13 +7,11 @@ import (
 )
 
 type TableMeta struct {
-	metaPageId page.PageId
-	tree       *btree.Btree // テーブルメタデータが格納される B+Tree
+	tree *btree.Btree // テーブルメタデータが格納される B+Tree
 }
 
 func NewTableMeta(bp *buffer.BufferPool, metaPageId page.PageId) *TableMeta {
-	tree := btree.NewBtree(bp, metaPageId)
-	return &TableMeta{metaPageId: metaPageId, tree: tree}
+	return &TableMeta{tree: btree.NewBtree(bp, metaPageId)}
 }
 
 func CreateTableMeta(bp *buffer.BufferPool) (*TableMeta, error) {
@@ -21,7 +19,7 @@ func CreateTableMeta(bp *buffer.BufferPool) (*TableMeta, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &TableMeta{metaPageId: tree.MetaPageId, tree: tree}, nil
+	return &TableMeta{tree: tree}, nil
 }
 
 // Search は指定した検索モードでメタデータを検索し、イテレータを返す
@@ -35,9 +33,9 @@ func (tm *TableMeta) Search(mode SearchMode) (*TableIterator, error) {
 
 // Insert はレコードを挿入する
 //   - name: テーブル名
-//   - fileId: テーブルの FileId
+//   - metaPageId: プライマリインデックスの B+Tree メタページ ID
 //   - numOfCol: カラム数
-func (tm *TableMeta) Insert(name string, fileId page.FileId, numOfCol int) error {
-	record := NewTableRecord(fileId, name, numOfCol)
+func (tm *TableMeta) Insert(name string, metaPageId page.PageId, numOfCol int) error {
+	record := newTableRecord(name, metaPageId, numOfCol)
 	return tm.tree.Insert(record.encode())
 }

@@ -149,9 +149,6 @@ func fetchIndex(ct *catalog.Catalog, fileId page.FileId, indexName string) (cata
 	if !ok || indexRecord.FileId != fileId || indexRecord.Name != indexName {
 		return catalog.IndexRecord{}, fmt.Errorf("index %q not found", indexName)
 	}
-	if indexRecord.IndexType == catalog.IndexTypePrimary {
-		return catalog.IndexRecord{}, errors.New("specified index is primary")
-	}
 	return indexRecord, nil
 }
 

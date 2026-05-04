@@ -21,7 +21,7 @@ func TestCreateUserMeta(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.False(t, um.metaPageId.IsInvalid())
+		assert.False(t, um.tree.MetaPageId.IsInvalid())
 	})
 }
 

@@ -37,7 +37,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NotNil(t, catalog)
 		assert.Equal(t, page.FileId(2), catalog.nextFileId)
 		assert.Equal(t, IndexId(0), catalog.nextIndexId)
-		assert.Equal(t, page.FileId(1), catalog.undoLogFileId)
+		assert.Equal(t, page.FileId(1), catalog.UndoLogFileId)
 	})
 
 	t.Run("6 つのメタデータのページ ID が復元される", func(t *testing.T) {
@@ -51,12 +51,12 @@ func TestNewCatalog(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, created.TableMeta.metaPageId, opened.TableMeta.metaPageId)
-		assert.Equal(t, created.IndexMeta.metaPageId, opened.IndexMeta.metaPageId)
-		assert.Equal(t, created.IndexKeyColMeta.metaPageId, opened.IndexKeyColMeta.metaPageId)
-		assert.Equal(t, created.ColumnMeta.metaPageId, opened.ColumnMeta.metaPageId)
-		assert.Equal(t, created.ConstraintMeta.metaPageId, opened.ConstraintMeta.metaPageId)
-		assert.Equal(t, created.UserMeta.metaPageId, opened.UserMeta.metaPageId)
+		assert.Equal(t, created.TableMeta.tree.MetaPageId, opened.TableMeta.tree.MetaPageId)
+		assert.Equal(t, created.IndexMeta.tree.MetaPageId, opened.IndexMeta.tree.MetaPageId)
+		assert.Equal(t, created.IndexKeyColMeta.tree.MetaPageId, opened.IndexKeyColMeta.tree.MetaPageId)
+		assert.Equal(t, created.ColumnMeta.tree.MetaPageId, opened.ColumnMeta.tree.MetaPageId)
+		assert.Equal(t, created.ConstraintMeta.tree.MetaPageId, opened.ConstraintMeta.tree.MetaPageId)
+		assert.Equal(t, created.UserMeta.tree.MetaPageId, opened.UserMeta.tree.MetaPageId)
 	})
 
 	t.Run("マジックナンバーが不正な場合 ErrInvalidCatalogFile を返す", func(t *testing.T) {
@@ -170,12 +170,46 @@ func TestCreateCatalog(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.False(t, catalog.TableMeta.metaPageId.IsInvalid())
-		assert.False(t, catalog.IndexMeta.metaPageId.IsInvalid())
-		assert.False(t, catalog.IndexKeyColMeta.metaPageId.IsInvalid())
-		assert.False(t, catalog.ColumnMeta.metaPageId.IsInvalid())
-		assert.False(t, catalog.ConstraintMeta.metaPageId.IsInvalid())
-		assert.False(t, catalog.UserMeta.metaPageId.IsInvalid())
+		assert.False(t, catalog.TableMeta.tree.MetaPageId.IsInvalid())
+		assert.False(t, catalog.IndexMeta.tree.MetaPageId.IsInvalid())
+		assert.False(t, catalog.IndexKeyColMeta.tree.MetaPageId.IsInvalid())
+		assert.False(t, catalog.ColumnMeta.tree.MetaPageId.IsInvalid())
+		assert.False(t, catalog.ConstraintMeta.tree.MetaPageId.IsInvalid())
+		assert.False(t, catalog.UserMeta.tree.MetaPageId.IsInvalid())
+	})
+}
+
+func TestAllocateFileId(t *testing.T) {
+	t.Run("FileId を採番するたびにインクリメントされる", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+		ct, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+
+		// WHEN
+		id1 := ct.AllocateFileId()
+		id2 := ct.AllocateFileId()
+
+		// THEN: nextFileId は 2 から開始 (0=カタログ, 1=UndoLog)
+		assert.Equal(t, page.FileId(2), id1)
+		assert.Equal(t, page.FileId(3), id2)
+	})
+}
+
+func TestAllocateIndexId(t *testing.T) {
+	t.Run("IndexId を採番するたびにインクリメントされる", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+		ct, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+
+		// WHEN
+		id1 := ct.AllocateIndexId()
+		id2 := ct.AllocateIndexId()
+
+		// THEN: nextIndexId は 0 から開始
+		assert.Equal(t, IndexId(0), id1)
+		assert.Equal(t, IndexId(1), id2)
 	})
 }
 

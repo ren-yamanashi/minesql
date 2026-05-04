@@ -18,7 +18,7 @@ func TestCreateTableMeta(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.False(t, tm.metaPageId.IsInvalid())
+		assert.False(t, tm.tree.MetaPageId.IsInvalid())
 	})
 }
 
@@ -28,7 +28,7 @@ func TestTableMetaInsert(t *testing.T) {
 		tm := setupTestTableMeta(t)
 
 		// WHEN
-		err := tm.Insert("users", page.FileId(1), 3)
+		err := tm.Insert("users", page.NewPageId(page.FileId(1), page.PageNumber(0)), 3)
 
 		// THEN
 		assert.NoError(t, err)
@@ -37,10 +37,10 @@ func TestTableMetaInsert(t *testing.T) {
 	t.Run("同じテーブル名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
 		// GIVEN
 		tm := setupTestTableMeta(t)
-		_ = tm.Insert("users", page.FileId(1), 3)
+		_ = tm.Insert("users", page.NewPageId(page.FileId(1), page.PageNumber(0)), 3)
 
 		// WHEN
-		err := tm.Insert("users", page.FileId(2), 5)
+		err := tm.Insert("users", page.NewPageId(page.FileId(2), page.PageNumber(0)), 5)
 
 		// THEN
 		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
@@ -49,10 +49,10 @@ func TestTableMetaInsert(t *testing.T) {
 	t.Run("異なるテーブル名であれば複数挿入できる", func(t *testing.T) {
 		// GIVEN
 		tm := setupTestTableMeta(t)
-		_ = tm.Insert("users", page.FileId(1), 3)
+		_ = tm.Insert("users", page.NewPageId(page.FileId(1), page.PageNumber(0)), 3)
 
 		// WHEN
-		err := tm.Insert("orders", page.FileId(2), 5)
+		err := tm.Insert("orders", page.NewPageId(page.FileId(2), page.PageNumber(0)), 5)
 
 		// THEN
 		assert.NoError(t, err)
@@ -63,8 +63,8 @@ func TestTableMetaSearch(t *testing.T) {
 	t.Run("SearchModeStart で全件スキャンできる", func(t *testing.T) {
 		// GIVEN
 		tm := setupTestTableMeta(t)
-		_ = tm.Insert("users", page.FileId(1), 3)
-		_ = tm.Insert("orders", page.FileId(2), 5)
+		_ = tm.Insert("users", page.NewPageId(page.FileId(1), page.PageNumber(0)), 3)
+		_ = tm.Insert("orders", page.NewPageId(page.FileId(2), page.PageNumber(0)), 5)
 
 		// WHEN
 		iter, err := tm.Search(SearchModeStart{})
@@ -78,13 +78,13 @@ func TestTableMetaSearch(t *testing.T) {
 		assert.NoError(t, err1)
 		assert.True(t, ok1)
 		assert.Equal(t, "orders", r1.Name)
-		assert.Equal(t, page.FileId(2), r1.FileId)
+		assert.Equal(t, page.NewPageId(page.FileId(2), page.PageNumber(0)), r1.MetaPageId)
 		assert.Equal(t, 5, r1.NumOfCol)
 
 		assert.NoError(t, err2)
 		assert.True(t, ok2)
 		assert.Equal(t, "users", r2.Name)
-		assert.Equal(t, page.FileId(1), r2.FileId)
+		assert.Equal(t, page.NewPageId(page.FileId(1), page.PageNumber(0)), r2.MetaPageId)
 		assert.Equal(t, 3, r2.NumOfCol)
 
 		assert.NoError(t, err3)

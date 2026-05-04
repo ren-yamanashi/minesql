@@ -17,7 +17,7 @@ func TestCreateIndexKeyColMeta(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.False(t, kcm.metaPageId.IsInvalid())
+		assert.False(t, kcm.tree.MetaPageId.IsInvalid())
 	})
 }
 

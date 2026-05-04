@@ -199,18 +199,19 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 
 	// テーブル定義: id:0, name:1, email:2
 	tableFileId := page.FileId(2)
-	_ = ct.TableMeta.Insert("users", tableFileId, 3)
+	dummyPageId := page.NewPageId(tableFileId, page.PageNumber(0))
+	_ = ct.TableMeta.Insert("users", dummyPageId, 3)
 	_ = ct.ColumnMeta.Insert(tableFileId, "id", 0)
 	_ = ct.ColumnMeta.Insert(tableFileId, "name", 1)
 	_ = ct.ColumnMeta.Insert(tableFileId, "email", 2)
 
 	// インデックス定義
 	indexId1 := catalog.IndexId(1)
-	_ = ct.IndexMeta.Insert(tableFileId, "idx_name", indexId1, catalog.IndexTypeNonUnique, 1)
+	_ = ct.IndexMeta.Insert(tableFileId, "idx_name", indexId1, catalog.IndexTypeNonUnique, 1, dummyPageId)
 	_ = ct.IndexKeyColMeta.Insert(indexId1, "name", 0)
 
 	indexId2 := catalog.IndexId(2)
-	_ = ct.IndexMeta.Insert(tableFileId, "idx_email", indexId2, catalog.IndexTypeUnique, 1)
+	_ = ct.IndexMeta.Insert(tableFileId, "idx_email", indexId2, catalog.IndexTypeUnique, 1, dummyPageId)
 	_ = ct.IndexKeyColMeta.Insert(indexId2, "email", 0)
 
 	// プライマリ B+Tree

@@ -17,23 +17,26 @@ const (
 	IndexTypePrimary   IndexType = 1
 	IndexTypeUnique    IndexType = 2
 	IndexTypeNonUnique IndexType = 3
+	PrimaryIndexName             = "PRIMARY"
 )
 
 type IndexRecord struct {
-	FileId    page.FileId // インデックスが属するテーブルの FileId
-	IndexId   IndexId     // インデックス ID
-	Name      string      // インデックス名
-	IndexType IndexType   // インデックス種類
-	NumOfCol  int         // インデックスを構成するカラム数
+	FileId     page.FileId // インデックスが属するテーブルの FileId
+	IndexId    IndexId     // インデックス ID
+	Name       string      // インデックス名
+	IndexType  IndexType   // インデックス種類
+	NumOfCol   int         // インデックスを構成するカラム数
+	MetaPageId page.PageId // セカンダリ or プライマリインデックスの B+Tree メタページ ID
 }
 
-func NewIndexRecord(fileId page.FileId, indexId IndexId, name string, indexType IndexType, numOfCol int) IndexRecord {
+func newIndexRecord(fileId page.FileId, name string, indexId IndexId, indexType IndexType, numOfCol int, metaPageId page.PageId) IndexRecord {
 	return IndexRecord{
-		FileId:    fileId,
-		IndexId:   indexId,
-		Name:      name,
-		IndexType: indexType,
-		NumOfCol:  numOfCol,
+		FileId:     fileId,
+		IndexId:    indexId,
+		Name:       name,
+		IndexType:  indexType,
+		NumOfCol:   numOfCol,
+		MetaPageId: metaPageId,
 	}
 }
 
@@ -44,11 +47,12 @@ func (ir IndexRecord) encode() node.Record {
 	fileId := binary.BigEndian.AppendUint32(nil, uint32(ir.FileId))
 	encode.Encode([][]byte{fileId, []byte(ir.Name)}, &key)
 
-	// nonKey = indexId + indexType + numOfCol
+	// nonKey = indexId + indexType + numOfCol + metaPageId
 	var nonKey []byte
 	indexId := binary.BigEndian.AppendUint32(nil, uint32(ir.IndexId))
 	numOfCol := binary.BigEndian.AppendUint32(nil, uint32(ir.NumOfCol))
-	encode.Encode([][]byte{indexId, {byte(ir.IndexType)}, numOfCol}, &nonKey)
+	metaPageIdBytes := ir.MetaPageId.ToBytes()
+	encode.Encode([][]byte{indexId, {byte(ir.IndexType)}, numOfCol, metaPageIdBytes}, &nonKey)
 
 	return node.NewRecord(nil, key, nonKey)
 }
@@ -61,12 +65,13 @@ func decodeIndexRecord(record node.Record) IndexRecord {
 	fileId := page.FileId(binary.BigEndian.Uint32(key[0]))
 	name := string(key[1])
 
-	// nonKey = [indexId, indexType, numOfCol]
+	// nonKey = [indexId, indexType, numOfCol, metaPageId]
 	var nonKey [][]byte
 	encode.Decode(record.NonKey(), &nonKey)
 	indexId := IndexId(binary.BigEndian.Uint32(nonKey[0]))
 	indexType := IndexType(nonKey[1][0])
 	numOfCol := int(binary.BigEndian.Uint32(nonKey[2]))
+	metaPageId := page.ReadPageId(nonKey[3], 0)
 
-	return NewIndexRecord(fileId, indexId, name, indexType, numOfCol)
+	return newIndexRecord(fileId, name, indexId, indexType, numOfCol, metaPageId)
 }

@@ -18,7 +18,7 @@ func TestCreateIndexMeta(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.False(t, im.metaPageId.IsInvalid())
+		assert.False(t, im.tree.MetaPageId.IsInvalid())
 	})
 }
 
@@ -28,7 +28,7 @@ func TestIndexMetaInsert(t *testing.T) {
 		im := setupTestIndexMeta(t)
 
 		// WHEN
-		err := im.Insert(page.FileId(1), "PRIMARY", IndexId(1), IndexTypePrimary, 1)
+		err := im.Insert(page.FileId(1), PrimaryIndexName, IndexId(1), IndexTypePrimary, 1, page.NewPageId(page.FileId(1), page.PageNumber(0)))
 
 		// THEN
 		assert.NoError(t, err)
@@ -37,10 +37,10 @@ func TestIndexMetaInsert(t *testing.T) {
 	t.Run("同じ FileId + インデックス名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
 		// GIVEN
 		im := setupTestIndexMeta(t)
-		_ = im.Insert(page.FileId(1), "PRIMARY", IndexId(1), IndexTypePrimary, 1)
+		_ = im.Insert(page.FileId(1), PrimaryIndexName, IndexId(1), IndexTypePrimary, 1, page.NewPageId(page.FileId(1), page.PageNumber(0)))
 
 		// WHEN
-		err := im.Insert(page.FileId(1), "PRIMARY", IndexId(2), IndexTypePrimary, 1)
+		err := im.Insert(page.FileId(1), PrimaryIndexName, IndexId(2), IndexTypePrimary, 1, page.NewPageId(page.FileId(1), page.PageNumber(0)))
 
 		// THEN
 		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
@@ -49,10 +49,10 @@ func TestIndexMetaInsert(t *testing.T) {
 	t.Run("異なるインデックス名であれば同じテーブルに複数挿入できる", func(t *testing.T) {
 		// GIVEN
 		im := setupTestIndexMeta(t)
-		_ = im.Insert(page.FileId(1), "PRIMARY", IndexId(1), IndexTypePrimary, 1)
+		_ = im.Insert(page.FileId(1), PrimaryIndexName, IndexId(1), IndexTypePrimary, 1, page.NewPageId(page.FileId(1), page.PageNumber(0)))
 
 		// WHEN
-		err := im.Insert(page.FileId(1), "idx_email", IndexId(2), IndexTypeUnique, 1)
+		err := im.Insert(page.FileId(1), "idx_email", IndexId(2), IndexTypeUnique, 1, page.NewPageId(page.FileId(1), page.PageNumber(0)))
 
 		// THEN
 		assert.NoError(t, err)
@@ -63,8 +63,8 @@ func TestIndexMetaSearch(t *testing.T) {
 	t.Run("SearchModeStart で全件スキャンできる", func(t *testing.T) {
 		// GIVEN
 		im := setupTestIndexMeta(t)
-		_ = im.Insert(page.FileId(1), "PRIMARY", IndexId(1), IndexTypePrimary, 1)
-		_ = im.Insert(page.FileId(1), "idx_name", IndexId(2), IndexTypeNonUnique, 2)
+		_ = im.Insert(page.FileId(1), "PRIMARY", IndexId(1), IndexTypePrimary, 1, page.NewPageId(page.FileId(1), page.PageNumber(0)))
+		_ = im.Insert(page.FileId(1), "idx_name", IndexId(2), IndexTypeNonUnique, 2, page.NewPageId(page.FileId(1), page.PageNumber(0)))
 
 		// THEN: インデックス名でソートされる
 		iter, err := im.Search(SearchModeStart{})

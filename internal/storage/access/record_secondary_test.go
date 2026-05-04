@@ -308,19 +308,6 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 		// THEN
 		assert.Error(t, err)
 	})
-
-	t.Run("プライマリインデックスを指定するとエラーを返す", func(t *testing.T) {
-		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		record := node.NewRecord([]byte{0x00}, []byte{}, nil)
-
-		// WHEN
-		_, err := decodeSecondaryRecord(record, ct, page.FileId(2), "PRIMARY")
-
-		// THEN
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "specified index is primary")
-	})
 }
 
 // setupSecondaryTestCatalog はセカンダリインデックスのテスト用カタログを作成する
@@ -348,26 +335,27 @@ func setupSecondaryTestCatalog(t *testing.T) *catalog.Catalog {
 	}
 
 	tableFileId := page.FileId(2)
-	_ = ct.TableMeta.Insert("users", tableFileId, 3)
+	dummyPageId := page.NewPageId(tableFileId, page.PageNumber(0))
+	_ = ct.TableMeta.Insert("users", dummyPageId, 3)
 	_ = ct.ColumnMeta.Insert(tableFileId, "id", 0)
 	_ = ct.ColumnMeta.Insert(tableFileId, "name", 1)
 	_ = ct.ColumnMeta.Insert(tableFileId, "email", 2)
 
 	// PRIMARY: プライマリインデックス, カラム (id)
 	indexId0 := catalog.IndexId(0)
-	_ = ct.IndexMeta.Insert(tableFileId, "PRIMARY", indexId0, catalog.IndexTypePrimary, 1)
+	_ = ct.IndexMeta.Insert(tableFileId, catalog.PrimaryIndexName, indexId0, catalog.IndexTypePrimary, 1, dummyPageId)
 	_ = ct.IndexKeyColMeta.Insert(indexId0, "id", 0)
 
 	indexId1 := catalog.IndexId(1)
-	_ = ct.IndexMeta.Insert(tableFileId, "idx_name", indexId1, catalog.IndexTypeNonUnique, 1)
+	_ = ct.IndexMeta.Insert(tableFileId, "idx_name", indexId1, catalog.IndexTypeNonUnique, 1, dummyPageId)
 	_ = ct.IndexKeyColMeta.Insert(indexId1, "name", 0)
 
 	indexId2 := catalog.IndexId(2)
-	_ = ct.IndexMeta.Insert(tableFileId, "idx_email", indexId2, catalog.IndexTypeUnique, 1)
+	_ = ct.IndexMeta.Insert(tableFileId, "idx_email", indexId2, catalog.IndexTypeUnique, 1, dummyPageId)
 	_ = ct.IndexKeyColMeta.Insert(indexId2, "email", 0)
 
 	indexId3 := catalog.IndexId(3)
-	_ = ct.IndexMeta.Insert(tableFileId, "idx_name_email", indexId3, catalog.IndexTypeNonUnique, 2)
+	_ = ct.IndexMeta.Insert(tableFileId, "idx_name_email", indexId3, catalog.IndexTypeNonUnique, 2, dummyPageId)
 	_ = ct.IndexKeyColMeta.Insert(indexId3, "name", 0)
 	_ = ct.IndexKeyColMeta.Insert(indexId3, "email", 1)
 
