@@ -10,6 +10,14 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
+type NewSecondaryIndexInput struct {
+	MetaPageId  page.PageId     // セカンダリインデックスの MetaPageId
+	PrimaryTree *btree.Btree    // プライマリインデックスの B+Tree
+	IndexId     catalog.IndexId // インデックス ID
+	IndexName   string          // インデックス名
+	Unique      bool            // ユニークインデックスか
+}
+
 // SecondaryIndex はセカンダリインデックスへのアクセスを提供する
 type SecondaryIndex struct {
 	catalog     *catalog.Catalog
@@ -19,14 +27,6 @@ type SecondaryIndex struct {
 	indexId     catalog.IndexId // インデックス ID
 	indexName   string          // インデックス名
 	unique      bool            // ユニーク制約の有無
-}
-
-type NewSecondaryIndexInput struct {
-	MetaPageId  page.PageId     // セカンダリインデックスの MetaPageId
-	PrimaryTree *btree.Btree    // プライマリインデックスの B+Tree
-	IndexId     catalog.IndexId // インデックス ID
-	IndexName   string          // インデックス名
-	Unique      bool            // ユニークインデックスか
 }
 
 // NewSecondaryIndex は既存のセカンダリインデックスを開く

@@ -1,5 +1,6 @@
 package config
 
 const (
-	BaseDir = "data"
+	BaseDir           = "data"
+	LockWaitTimeoutMs = 30000
 )
