@@ -266,7 +266,7 @@ func insertSecondaryRecordWithDeleteMark(t *testing.T, env *iteratorTestEnv, del
 	if err != nil {
 		t.Fatalf("SecondaryRecord の作成に失敗: %v", err)
 	}
-	if err := env.secondaryTree.Insert(sr.encode()); err != nil {
+	if err := env.secondaryTree.Insert(sr.Encode()); err != nil {
 		t.Fatalf("セカンダリレコードの挿入に失敗: %v", err)
 	}
 }

@@ -14,7 +14,6 @@ import (
 
 // Table はテーブルへのアクセスを提供する
 type Table struct {
-	Table            catalog.TableRecord
 	primaryIndex     *PrimaryIndex
 	secondaryIndexes []*SecondaryIndex
 	catalog          *catalog.Catalog
@@ -42,7 +41,6 @@ func NewTable(bp *buffer.BufferPool, ct *catalog.Catalog, undo *undo.Manager, lo
 	}
 
 	return &Table{
-		Table:            table,
 		primaryIndex:     pi,
 		secondaryIndexes: sis,
 		catalog:          ct,

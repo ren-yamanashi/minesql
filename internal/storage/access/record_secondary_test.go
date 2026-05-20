@@ -23,7 +23,7 @@ func TestSecondaryRecordEncode(t *testing.T) {
 		}
 
 		// WHEN
-		record := sr.encode()
+		record := sr.Encode()
 
 		// THEN
 		assert.Equal(t, []byte{0x00}, record.Header())
@@ -44,7 +44,7 @@ func TestSecondaryRecordEncode(t *testing.T) {
 		}
 
 		// WHEN
-		record := sr.encode()
+		record := sr.Encode()
 
 		// THEN
 		var decoded [][]byte
@@ -61,7 +61,7 @@ func TestSecondaryRecordEncode(t *testing.T) {
 		}
 
 		// WHEN
-		record := sr.encode()
+		record := sr.Encode()
 
 		// THEN
 		assert.Equal(t, []byte{0x01}, record.Header())
@@ -76,7 +76,7 @@ func TestSecondaryRecordEncode(t *testing.T) {
 		}
 
 		// WHEN
-		record := sr.encode()
+		record := sr.Encode()
 
 		// THEN
 		var decoded [][]byte
@@ -225,7 +225,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 			pk:         []string{"1"},
 		})
 		assert.NoError(t, err)
-		encoded := original.encode()
+		encoded := original.Encode()
 
 		// WHEN
 		decoded, err := decodeSecondaryRecord(encoded, ct, page.FileId(2), "idx_name")
@@ -250,7 +250,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 			pk:         []string{"1"},
 		})
 		assert.NoError(t, err)
-		encoded := original.encode()
+		encoded := original.Encode()
 
 		// WHEN
 		decoded, err := decodeSecondaryRecord(encoded, ct, page.FileId(2), "idx_name")
@@ -272,7 +272,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 			pk:         []string{"1"},
 		})
 		assert.NoError(t, err)
-		encoded := original.encode()
+		encoded := original.Encode()
 
 		// WHEN
 		decoded, err := decodeSecondaryRecord(encoded, ct, page.FileId(2), "idx_name_email")

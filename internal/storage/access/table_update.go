@@ -17,7 +17,7 @@ func (t *Table) Update(currentRecord *PrimaryRecord, colNames, values []string, 
 	}
 
 	// Undo ログを更新
-	undoRecord := undo.NewUpdateRecord(t.Table.MetaPageId.FileId, currentRecord.Encode(), newRecord.Encode(), currentRecord.lastTrxId, currentRecord.rollPtr)
+	undoRecord := undo.NewUpdateRecord(t.primaryIndex.FileId(), currentRecord.Encode(), newRecord.Encode(), currentRecord.lastTrxId, currentRecord.rollPtr)
 	ptr, err := t.undoLog.Append(trxId, undo.RecordTypeUpdate, undoRecord)
 	if err != nil {
 		return err
@@ -68,14 +68,7 @@ func (t *Table) updateSecondaryIndexes(before *PrimaryRecord, updateColNames, up
 
 		// 更新後のセカンダリキーで新規挿入
 		afterSkColNames, afterSkValues := t.extractSecondaryKey(keyCols, newValMap)
-		record, err := newSecondaryRecord(si.catalog, newSecondaryRecordInput{
-			fileId:     si.fileId,
-			deleteMark: 0,
-			indexName:  si.indexName,
-			colNames:   afterSkColNames,
-			values:     afterSkValues,
-			pk:         pk,
-		})
+		record, err := t.buildSecondaryRecord(si, afterSkColNames, afterSkValues, pk)
 		if err != nil {
 			return err
 		}

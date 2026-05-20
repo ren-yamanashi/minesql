@@ -87,21 +87,21 @@ func (r *PrimaryRecord) setRollPtr(rollPtr undo.Pointer) {
 }
 
 // Encode は node.Record にエンコードする
-//   - 非キー領域: lastTrxId (4B) + rollPtr (4B) + 非キーカラム
-func (pr *PrimaryRecord) Encode() node.Record {
+//   - 非キー領域: lastTrxId (4B) + rollPtr (6B) + 非キーカラム
+func (r *PrimaryRecord) Encode() node.Record {
 	var key []byte
-	encode.Encode(stringToByteSlice(pr.Values[:pr.pkCount]), &key)
+	encode.Encode(stringToByteSlice(r.Values[:r.pkCount]), &key)
 
 	var nonKey []byte
-	nonKey = binary.BigEndian.AppendUint32(nonKey, pr.lastTrxId)
-	nonKey = append(nonKey, pr.rollPtr.Encode()...)
-	encode.Encode(stringToByteSlice(pr.Values[pr.pkCount:]), &nonKey)
+	nonKey = binary.BigEndian.AppendUint32(nonKey, r.lastTrxId)
+	nonKey = append(nonKey, r.rollPtr.Encode()...)
+	encode.Encode(stringToByteSlice(r.Values[r.pkCount:]), &nonKey)
 
-	return node.NewRecord([]byte{pr.deleteMark}, key, nonKey)
+	return node.NewRecord([]byte{r.deleteMark}, key, nonKey)
 }
 
 // decodePrimaryRecord は node.Record から PrimaryRecord にデコードする
-//   - 非キー領域: lastTrxId (4B) + rollPtr (4B) + 非キーカラム
+//   - 非キー領域: lastTrxId (4B) + rollPtr (6B) + 非キーカラム
 func decodePrimaryRecord(record node.Record, ct *catalog.Catalog, fileId page.FileId) (*PrimaryRecord, error) {
 	var values [][]byte
 	encode.Decode(record.Key(), &values)

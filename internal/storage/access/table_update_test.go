@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
+	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -101,6 +102,67 @@ func TestTableUpdate(t *testing.T) {
 
 		// THEN
 		assert.Error(t, err)
+	})
+
+	t.Run("複数カラムを同時に更新できる", func(t *testing.T) {
+		// GIVEN
+		table := setupTableWithRecord(t)
+		before := searchFirstPrimaryRecord(t, table)
+
+		// WHEN
+		err := table.Update(before, []string{"name", "email"}, []string{"Bob", "bob@example.com"}, tableTrxId)
+
+		// THEN
+		assert.NoError(t, err)
+		updated := searchFirstPrimaryRecord(t, table)
+		assert.Equal(t, "1", updated.Values[0])
+		assert.Equal(t, "Bob", updated.Values[1])
+		assert.Equal(t, "bob@example.com", updated.Values[2])
+	})
+
+	t.Run("複数カラムの更新で全セカンダリインデックスが更新される", func(t *testing.T) {
+		// GIVEN
+		table := setupTableWithRecord(t)
+		before := searchFirstPrimaryRecord(t, table)
+
+		// WHEN
+		err := table.Update(before, []string{"name", "email"}, []string{"Bob", "bob@example.com"}, tableTrxId)
+
+		// THEN
+		assert.NoError(t, err)
+
+		// idx_name が更新されている
+		idxName := findSecondaryIndex(t, table, "idx_name")
+		nameIter, err := idxName.Search(SearchModeStart{})
+		assert.NoError(t, err)
+		nameResult, ok, err := nameIter.Next()
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, "Bob", nameResult.Values[1])
+
+		// idx_email も更新されている
+		idxEmail := findSecondaryIndex(t, table, "idx_email")
+		emailIter, err := idxEmail.Search(SearchModeStart{})
+		assert.NoError(t, err)
+		emailResult, ok, err := emailIter.Next()
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, "bob@example.com", emailResult.Values[2])
+	})
+
+	t.Run("更新後のレコードに rollPtr が設定される", func(t *testing.T) {
+		// GIVEN
+		table := setupTableWithRecord(t)
+		before := searchFirstPrimaryRecord(t, table)
+
+		// WHEN
+		err := table.Update(before, []string{"name"}, []string{"Bob"}, tableTrxId)
+
+		// THEN
+		assert.NoError(t, err)
+		updated := searchFirstPrimaryRecord(t, table)
+		// Undo ログが書かれ rollPtr が NullPointer ではなくなる
+		assert.NotEqual(t, undo.NullPointer, updated.rollPtr)
 	})
 }
 

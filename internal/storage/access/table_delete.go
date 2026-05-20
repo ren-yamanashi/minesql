@@ -8,7 +8,7 @@ import (
 // SoftDelete はテーブルの行を論理削除する
 func (t *Table) SoftDelete(record *PrimaryRecord, trxId lock.TrxId) error {
 	// Undo ログを更新
-	undoRecord := undo.NewDeleteRecord(t.Table.MetaPageId.FileId, record.Encode(), record.lastTrxId, record.rollPtr)
+	undoRecord := undo.NewDeleteRecord(t.primaryIndex.FileId(), record.Encode(), record.lastTrxId, record.rollPtr)
 	ptr, err := t.undoLog.Append(trxId, undo.RecordTypeDelete, undoRecord)
 	if err != nil {
 		return err

@@ -31,7 +31,10 @@ func NewReadView(trxId lock.TrxId, mdIds []lock.TrxId, nextTrxId lock.TrxId) *Re
 
 // IsVisible は指定された trxId のレコードが可視かどうか判定する
 func (rv *ReadView) IsVisible(recordTrxId lock.TrxId) bool {
-	if recordTrxId == rv.TrxId || recordTrxId < rv.MLockLimitId {
+	if recordTrxId == rv.TrxId {
+		return true
+	}
+	if recordTrxId < rv.MUpLimitId {
 		return true
 	}
 	if recordTrxId >= rv.MLockLimitId {

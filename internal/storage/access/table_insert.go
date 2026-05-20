@@ -8,7 +8,7 @@ import (
 // Insert はテーブルに行を挿入する
 func (t *Table) Insert(colNames []string, values []string, trxId lock.TrxId) error {
 	record, err := newPrimaryRecord(t.catalog, newPrimaryRecordInput{
-		fileId:     t.Table.MetaPageId.FileId,
+		fileId:     t.primaryIndex.FileId(),
 		pkCount:    t.primaryIndex.pkCount,
 		deleteMark: 0,
 		colNames:   colNames,
@@ -19,7 +19,7 @@ func (t *Table) Insert(colNames []string, values []string, trxId lock.TrxId) err
 	}
 
 	// Undo ログを更新
-	undoRecord := undo.NewInsertRecord(t.Table.MetaPageId.FileId, record.Encode())
+	undoRecord := undo.NewInsertRecord(t.primaryIndex.FileId(), record.Encode())
 	ptr, err := t.undoLog.Append(trxId, undo.RecordTypeInsert, undoRecord)
 	if err != nil {
 		return err
@@ -30,7 +30,7 @@ func (t *Table) Insert(colNames []string, values []string, trxId lock.TrxId) err
 	if err := t.primaryIndex.Insert(record, trxId); err != nil {
 		return err
 	}
-	return t.insertSecondaryIndexes(colNames, values, trxId)
+	return t.insertSecondaryIndexes(record.ColNames, record.Values, trxId)
 }
 
 // insertSecondaryIndexes は全セカンダリインデックスにレコードを挿入する
@@ -44,14 +44,7 @@ func (t *Table) insertSecondaryIndexes(colNames, values []string, trxId lock.Trx
 			return err
 		}
 		skColNames, skValues := t.extractSecondaryKey(keyCols, valMap)
-		record, err := newSecondaryRecord(si.catalog, newSecondaryRecordInput{
-			fileId:     si.fileId,
-			deleteMark: 0,
-			indexName:  si.indexName,
-			colNames:   skColNames,
-			values:     skValues,
-			pk:         pk,
-		})
+		record, err := t.buildSecondaryRecord(si, skColNames, skValues, pk)
 		if err != nil {
 			return err
 		}

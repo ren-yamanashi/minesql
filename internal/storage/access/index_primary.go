@@ -99,7 +99,7 @@ func (pi *PrimaryIndex) Delete(record *PrimaryRecord, trxId lock.TrxId) error {
 	}
 
 	// 物理削除
-	return pi.tree.Delete(record.Encode().Key())
+	return pi.tree.Delete(encodedRecord.Key())
 }
 
 // SoftDelete は行を論理削除する
@@ -120,6 +120,8 @@ func (pi *PrimaryIndex) SoftDelete(record *PrimaryRecord, trxId lock.TrxId) erro
 		fileId:     pi.tree.MetaPageId.FileId,
 		pkCount:    record.pkCount,
 		deleteMark: 1,
+		lastTrxId:  trxId,
+		rollPtr:    record.rollPtr,
 		colNames:   record.ColNames,
 		values:     record.Values,
 	})
@@ -143,6 +145,11 @@ func (pi *PrimaryIndex) Update(currentRecord *PrimaryRecord, newRecord *PrimaryR
 
 	// 更新
 	return pi.tree.Update(encodedRecord)
+}
+
+// FileId はテーブルの FileId を返す
+func (pi *PrimaryIndex) FileId() page.FileId {
+	return pi.tree.MetaPageId.FileId
 }
 
 // LeafPageCount はリーフページ数を取得する

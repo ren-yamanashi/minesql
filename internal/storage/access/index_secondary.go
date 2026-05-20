@@ -100,7 +100,7 @@ func (si *SecondaryIndex) Insert(record *SecondaryRecord, pk []string, trxId loc
 			return err
 		}
 	}
-	encodedRecord := record.encode()
+	encodedRecord := record.Encode()
 
 	// 挿入
 	err := si.tree.Insert(encodedRecord)
@@ -134,7 +134,7 @@ func (si *SecondaryIndex) Insert(record *SecondaryRecord, pk []string, trxId loc
 // Delete は行を物理削除する
 func (si *SecondaryIndex) Delete(record *SecondaryRecord, trxId lock.TrxId) error {
 	// 排他ロックを取得
-	encodedRecord := record.encode()
+	encodedRecord := record.Encode()
 	_, pos, err := si.tree.FindByKey(encodedRecord.Key())
 	if err != nil {
 		return err
@@ -144,13 +144,13 @@ func (si *SecondaryIndex) Delete(record *SecondaryRecord, trxId lock.TrxId) erro
 	}
 
 	// 物理削除
-	return si.tree.Delete(record.encode().Key())
+	return si.tree.Delete(encodedRecord.Key())
 }
 
 // SoftDelete は行を論理削除する
 func (si *SecondaryIndex) SoftDelete(record *SecondaryRecord, trxId lock.TrxId) error {
 	// 排他ロックを取得
-	encodedRecord := record.encode()
+	encodedRecord := record.Encode()
 	_, pos, err := si.tree.FindByKey(encodedRecord.Key())
 	if err != nil {
 		return err
@@ -172,7 +172,7 @@ func (si *SecondaryIndex) SoftDelete(record *SecondaryRecord, trxId lock.TrxId) 
 	if err != nil {
 		return err
 	}
-	return si.tree.Update(deleted.encode())
+	return si.tree.Update(deleted.Encode())
 }
 
 // LeafPageCount はリーフページ数を取得する

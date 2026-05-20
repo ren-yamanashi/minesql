@@ -70,6 +70,26 @@ func TestTableSoftDelete(t *testing.T) {
 		assert.Equal(t, "bob@example.com", reinserted.Values[2])
 	})
 
+	t.Run("論理削除後のレコードに rollPtr が設定される", func(t *testing.T) {
+		// GIVEN
+		table := setupTableWithRecord(t)
+		record := searchFirstPrimaryRecord(t, table)
+
+		// WHEN
+		err := table.SoftDelete(record, tableTrxId)
+
+		// THEN
+		assert.NoError(t, err)
+
+		// 論理削除済みレコードを直接 B+Tree から取得して rollPtr を確認
+		encodedRecord := record.Encode()
+		existing, _, err := table.primaryIndex.tree.FindByKey(encodedRecord.Key())
+		assert.NoError(t, err)
+		decoded, err := decodePrimaryRecord(existing, table.catalog, table.primaryIndex.FileId())
+		assert.NoError(t, err)
+		assert.NotEqual(t, undo.NullPointer, decoded.rollPtr)
+	})
+
 	t.Run("存在しないレコードを論理削除するとエラーを返す", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
@@ -174,6 +194,26 @@ func TestTableDelete(t *testing.T) {
 		reinserted := searchFirstPrimaryRecord(t, table)
 		assert.Equal(t, "Bob", reinserted.Values[1])
 		assert.Equal(t, "bob@example.com", reinserted.Values[2])
+	})
+
+	t.Run("存在しないレコードを物理削除するとエラーを返す", func(t *testing.T) {
+		// GIVEN
+		env := setupTableTestEnv(t)
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		assert.NoError(t, err)
+		fakeRecord := &PrimaryRecord{
+			pkCount:    1,
+			deleteMark: 0,
+			rollPtr:    undo.NullPointer,
+			ColNames:   []string{"id", "name", "email"},
+			Values:     []string{"999", "Nobody", "nobody@example.com"},
+		}
+
+		// WHEN
+		err = table.Delete(fakeRecord, tableTrxId)
+
+		// THEN
+		assert.Error(t, err)
 	})
 
 	t.Run("複数レコードのうち 1 件だけ物理削除できる", func(t *testing.T) {

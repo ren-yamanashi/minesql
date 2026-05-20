@@ -63,14 +63,7 @@ func Create(bp *buffer.BufferPool, lock *lock.Manager, input CreateTableInput) (
 		return nil, err
 	}
 
-	// テーブルメタデータを取得
-	table, err := fetchTable(ct, input.TableName)
-	if err != nil {
-		return nil, err
-	}
-
 	return &Table{
-		Table:            table,
 		primaryIndex:     pi,
 		secondaryIndexes: sis,
 		catalog:          ct,

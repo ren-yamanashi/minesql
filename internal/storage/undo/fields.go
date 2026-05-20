@@ -24,7 +24,7 @@ type Fields struct {
 }
 
 // Serialize は Undo レコードをバイト列にシリアライズする
-//   - return : prevLastTrxId (4B) + prevRollPtr (4B) + tableFileId (4B) + [numColumns (2B) + [colLen (2B) + colData]]...
+//   - return : prevLastTrxId (4B) + prevRollPtr (6B) + tableFileId (4B) + [numColumns (2B) + [colLen (2B) + colData]]...
 func (f *Fields) Serialize() []byte {
 	var data []byte
 

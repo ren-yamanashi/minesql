@@ -23,7 +23,6 @@ type newSecondaryRecordInput struct {
 // SecondaryRecord はセカンダリインデックスレコード
 type SecondaryRecord struct {
 	deleteMark byte
-	indexName  string
 	ColNames   []string // インデックスを構成するカラム名のリスト
 	Values     []string // インデックスを構成するカラム値のリスト (SK)
 	Pk         []string // プライマリキー
@@ -36,9 +35,9 @@ func newSecondaryRecord(ct *catalog.Catalog, input newSecondaryRecordInput) (*Se
 	return sortSecondaryRecord(ct, input)
 }
 
-// encode は node.Record にエンコードする
+// Encode は node.Record にエンコードする
 // キー領域は SK + PK を連結したもの
-func (sr *SecondaryRecord) encode() node.Record {
+func (sr *SecondaryRecord) Encode() node.Record {
 	var key []byte
 	encode.Encode(stringToByteSlice(sr.Values), &key)
 	encode.Encode(stringToByteSlice(sr.Pk), &key)
@@ -89,7 +88,6 @@ func decodeSecondaryRecord(
 
 	return &SecondaryRecord{
 		deleteMark: record.Header()[0],
-		indexName:  indexName,
 		ColNames:   colNames,
 		Values:     byteSliceToString(sk),
 		Pk:         byteSliceToString(pk),
@@ -128,7 +126,6 @@ func sortSecondaryRecord(ct *catalog.Catalog, input newSecondaryRecordInput) (*S
 
 	return &SecondaryRecord{
 		deleteMark: input.deleteMark,
-		indexName:  input.indexName,
 		ColNames:   sortedColNames,
 		Values:     sortedValues,
 		Pk:         input.pk,

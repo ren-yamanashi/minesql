@@ -276,6 +276,19 @@ func TestPrimaryIndexDelete(t *testing.T) {
 	})
 }
 
+func TestPrimaryIndexFileId(t *testing.T) {
+	t.Run("テーブルの FileId を返す", func(t *testing.T) {
+		// GIVEN
+		pi := setupTestPrimaryIndex(t)
+
+		// WHEN
+		fileId := pi.FileId()
+
+		// THEN
+		assert.Equal(t, page.FileId(2), fileId)
+	})
+}
+
 func TestPrimaryIndexLeafPageCount(t *testing.T) {
 	t.Run("リーフページ数を取得できる", func(t *testing.T) {
 		// GIVEN
