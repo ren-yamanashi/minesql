@@ -11,6 +11,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
 type CreateConstraintInput struct {
@@ -34,7 +35,13 @@ type CreateTableInput struct {
 	Constraints []CreateConstraintInput // 制約
 }
 
-func Create(bp *buffer.BufferPool, lock *lock.Manager, input CreateTableInput) (*Table, error) {
+// CreateTable はテーブルを新規作成する
+func CreateTable(
+	bp *buffer.BufferPool,
+	undo *undo.Manager,
+	lock *lock.Manager,
+	input CreateTableInput,
+) (*Table, error) {
 	ct, err := catalog.NewCatalog(bp)
 	if err != nil {
 		return nil, err
@@ -52,8 +59,13 @@ func Create(bp *buffer.BufferPool, lock *lock.Manager, input CreateTableInput) (
 		return nil, err
 	}
 
+	// テーブルメタ・カラムメタをカタログに登録
+	if err := registerTableMeta(ct, fileId, pi, input); err != nil {
+		return nil, err
+	}
+
 	// セカンダリインデックス作成
-	sis, err := createSecondaryIndexes(ct, bp, fileId, pi.tree, input.Indexes)
+	sis, err := createSecondaryIndexes(ct, bp, fileId, pi.tree, lock, input.Indexes)
 	if err != nil {
 		return nil, err
 	}
@@ -67,6 +79,8 @@ func Create(bp *buffer.BufferPool, lock *lock.Manager, input CreateTableInput) (
 		primaryIndex:     pi,
 		secondaryIndexes: sis,
 		catalog:          ct,
+		undoLog:          undo,
+		lock:             lock,
 		bufferPool:       bp,
 	}, nil
 }
@@ -87,20 +101,32 @@ func createTableFile(ct *catalog.Catalog, bp *buffer.BufferPool, tableName strin
 }
 
 // createPrimaryIndex はプライマリインデックスを作成する
-func createPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, fileId page.FileId, lock *lock.Manager, input CreateTableInput) (*PrimaryIndex, error) {
-	index, err := CreatePrimaryIndex(ct, bp, fileId, input.PkCount, lock)
-	if err != nil {
-		return nil, err
+func createPrimaryIndex(
+	ct *catalog.Catalog,
+	bp *buffer.BufferPool,
+	fileId page.FileId,
+	lock *lock.Manager,
+	input CreateTableInput,
+) (*PrimaryIndex, error) {
+	return CreatePrimaryIndex(ct, bp, fileId, input.PkCount, lock)
+}
+
+// registerTableMeta はテーブルメタ・インデックスメタ (プライマリ)・カラムメタをカタログに登録する
+func registerTableMeta(
+	ct *catalog.Catalog,
+	fileId page.FileId,
+	pi *PrimaryIndex,
+	input CreateTableInput,
+) error {
+	// テーブルメタ
+	if err := ct.TableMeta.Insert(input.TableName, pi.tree.MetaPageId, len(input.ColNames)); err != nil {
+		return err
 	}
 
-	// カタログに挿入
-	err = ct.TableMeta.Insert(input.TableName, index.tree.MetaPageId, len(input.ColNames))
-	if err != nil {
-		return nil, err
-	}
+	// インデックスメタ
 	indexId, err := ct.AllocateIndexId()
 	if err != nil {
-		return nil, err
+		return err
 	}
 	err = ct.IndexMeta.Insert(catalog.IndexRecord{
 		FileId:     fileId,
@@ -108,17 +134,19 @@ func createPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, fileId page.
 		IndexId:    indexId,
 		IndexType:  catalog.IndexTypePrimary,
 		NumOfCol:   input.PkCount,
-		MetaPageId: index.tree.MetaPageId,
+		MetaPageId: pi.tree.MetaPageId,
 	})
 	if err != nil {
-		return nil, err
+		return err
 	}
+
+	// カラムメタ
 	for i, col := range input.ColNames {
 		if err := ct.ColumnMeta.Insert(fileId, col, i); err != nil {
-			return nil, err
+			return err
 		}
 	}
-	return index, nil
+	return nil
 }
 
 // createSecondaryIndexes はセカンダリインデックスを作成する
@@ -127,6 +155,7 @@ func createSecondaryIndexes(
 	bp *buffer.BufferPool,
 	fileId page.FileId,
 	pt *btree.Btree,
+	lock *lock.Manager,
 	inputs []CreateIndexInput,
 ) ([]*SecondaryIndex, error) {
 	indexes := make([]*SecondaryIndex, 0, len(inputs))
@@ -141,6 +170,7 @@ func createSecondaryIndexes(
 			IndexId:     indexId,
 			IndexName:   input.IndexName,
 			Unique:      input.IndexType == catalog.IndexTypeUnique,
+			Lock:        lock,
 		})
 		if err != nil {
 			return nil, err

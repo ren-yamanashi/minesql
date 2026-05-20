@@ -78,6 +78,18 @@ func TestTableBuildValMap(t *testing.T) {
 		assert.Equal(t, "1", m["id"])
 		assert.Equal(t, "Alice", m["name"])
 	})
+
+	t.Run("空のスライスでは空のマップを返す", func(t *testing.T) {
+		// GIVEN
+		env := setupTableTestEnv(t)
+		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+
+		// WHEN
+		m := table.buildValMap([]string{}, []string{})
+
+		// THEN
+		assert.Empty(t, m)
+	})
 }
 
 func TestTableExtractPrimaryKey(t *testing.T) {
@@ -111,6 +123,24 @@ func TestTableExtractSecondaryKey(t *testing.T) {
 		// THEN
 		assert.Equal(t, []string{"name"}, colNames)
 		assert.Equal(t, []string{"Alice"}, values)
+	})
+
+	t.Run("複数カラムのセカンダリキーを定義順で抽出する", func(t *testing.T) {
+		// GIVEN
+		env := setupTableTestEnv(t)
+		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		valMap := table.buildValMap(
+			[]string{"id", "name", "email"},
+			[]string{"1", "Alice", "alice@example.com"},
+		)
+		keyCols := map[string]int{"email": 0, "name": 1}
+
+		// WHEN
+		colNames, values := table.extractSecondaryKey(keyCols, valMap)
+
+		// THEN
+		assert.Equal(t, []string{"email", "name"}, colNames)
+		assert.Equal(t, []string{"alice@example.com", "Alice"}, values)
 	})
 }
 
