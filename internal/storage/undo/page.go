@@ -54,7 +54,7 @@ func (p *Page) RecordAt(offset int) []byte {
 	if offset+recordHeaderSize > len(p.body) {
 		return nil
 	}
-	dataLen := int(binary.BigEndian.Uint16(p.body[headerDataLenOffset:recordHeaderSize]))
+	dataLen := int(binary.BigEndian.Uint16(p.body[offset+headerDataLenOffset : offset+recordHeaderSize]))
 	totalLen := recordHeaderSize + dataLen
 	if offset+totalLen > len(p.body) {
 		return nil
