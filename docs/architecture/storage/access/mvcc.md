@@ -96,11 +96,11 @@
   - Trx3 の undo ログレコード
     - columns: Trx2 が書いた値 (Trx3 が上書きする前の値)
     - prevLastTrx: 2
-    - rollPtr: Trx2 の undo ログレコード
+    - prevPollPtr: Trx2 の undo ログレコード
   - Trx2 の undo ログレコード
     - columns: Trx1 が書いた値 (Trx2 が上書きする前の値)
     - prevLastTrx: 1
-    - rollPtr: null (Trx1 は INSERT なのでそれ以前のバージョンは存在しない)
+    - prevPollPtr: null (Trx1 は INSERT なのでそれ以前のバージョンは存在しない)
 
 この状態で、Trx4 が Consistent Read でこの行を読む場合の流れは以下となる
 

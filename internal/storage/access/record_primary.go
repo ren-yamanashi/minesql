@@ -8,21 +8,27 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
 	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
 type newPrimaryRecordInput struct {
 	fileId     page.FileId
 	pkCount    int
 	deleteMark byte
+	lastTrxId  lock.TrxId
+	rollPtr    undo.Pointer
 	colNames   []string // テーブルを構成するカラムのリスト
-	values     []string // テーブルを構成するカラム値のリスト
+	values     []string // テーブルを構成するカラム値のリスト (lastTrxId, rollPtr は含まない)
 }
 
 // PrimaryRecord はプライマリインデックスレコード
 type PrimaryRecord struct {
 	pkCount    int
 	deleteMark byte
+	lastTrxId  lock.TrxId
+	rollPtr    undo.Pointer
 	ColNames   []string
 	Values     []string
 }
@@ -36,7 +42,7 @@ func newPrimaryRecord(ct *catalog.Catalog, input newPrimaryRecordInput) (*Primar
 
 // update は指定されたカラムの値を更新した新しい PrimaryRecord を返す
 // (colNames はテーブルの全カラムである必要はない)
-func (r *PrimaryRecord) update(colNames, values []string) (*PrimaryRecord, error) {
+func (r *PrimaryRecord) update(trxId lock.TrxId, colNames, values []string) (*PrimaryRecord, error) {
 	if len(colNames) != len(values) {
 		return nil, errors.New("number of colNames not equal values")
 	}
@@ -68,26 +74,53 @@ func (r *PrimaryRecord) update(colNames, values []string) (*PrimaryRecord, error
 	return &PrimaryRecord{
 		pkCount:    r.pkCount,
 		deleteMark: r.deleteMark,
+		lastTrxId:  trxId,
+		rollPtr:    r.rollPtr,
 		ColNames:   newColNames,
 		Values:     newValues,
 	}, nil
 }
 
-// encode は node.Record にエンコードする
-func (pr *PrimaryRecord) encode() node.Record {
+// setRollPtr は rollPtr をセットする
+func (r *PrimaryRecord) setRollPtr(rollPtr undo.Pointer) {
+	r.rollPtr = rollPtr
+}
+
+// Encode は node.Record にエンコードする
+//   - 非キー領域: lastTrxId (4B) + rollPtr (4B) + 非キーカラム
+func (pr *PrimaryRecord) Encode() node.Record {
 	var key []byte
-	var nonKey []byte
 	encode.Encode(stringToByteSlice(pr.Values[:pr.pkCount]), &key)
+
+	var nonKey []byte
+	nonKey = binary.BigEndian.AppendUint32(nonKey, pr.lastTrxId)
+	nonKey = append(nonKey, pr.rollPtr.Encode()...)
 	encode.Encode(stringToByteSlice(pr.Values[pr.pkCount:]), &nonKey)
+
 	return node.NewRecord([]byte{pr.deleteMark}, key, nonKey)
 }
 
-// decodeRecord は node.Record から PrimaryRecord にデコードする
+// decodePrimaryRecord は node.Record から PrimaryRecord にデコードする
+//   - 非キー領域: lastTrxId (4B) + rollPtr (4B) + 非キーカラム
 func decodePrimaryRecord(record node.Record, ct *catalog.Catalog, fileId page.FileId) (*PrimaryRecord, error) {
 	var values [][]byte
 	encode.Decode(record.Key(), &values)
 	pkCount := len(values)
-	encode.Decode(record.NonKey(), &values)
+
+	// 非キー領域から lastTrxId と rollPtr を読み取る
+	nonKey := record.NonKey()
+	const systemFieldsSize = lock.TrxIdSize + undo.PointerSize
+	if len(nonKey) < systemFieldsSize {
+		return nil, fmt.Errorf("non-key data too short: got %d bytes, need at least %d", len(nonKey), systemFieldsSize)
+	}
+	lastTrxId := binary.BigEndian.Uint32(nonKey[:lock.TrxIdSize])
+	rollPtr, err := undo.DecodePointer(nonKey[lock.TrxIdSize:systemFieldsSize])
+	if err != nil {
+		return nil, err
+	}
+
+	// 残りの非キー領域からカラムデータをデコード
+	encode.Decode(nonKey[systemFieldsSize:], &values)
 
 	colDefs, err := fetchColumnDefs(ct, fileId)
 	if err != nil {
@@ -105,6 +138,8 @@ func decodePrimaryRecord(record node.Record, ct *catalog.Catalog, fileId page.Fi
 	return &PrimaryRecord{
 		pkCount:    pkCount,
 		deleteMark: record.Header()[0],
+		lastTrxId:  lastTrxId,
+		rollPtr:    rollPtr,
 		ColNames:   colNames,
 		Values:     byteSliceToString(values),
 	}, nil
@@ -139,6 +174,8 @@ func sortPrimaryRecord(ct *catalog.Catalog, input newPrimaryRecordInput) (*Prima
 	return &PrimaryRecord{
 		pkCount:    input.pkCount,
 		deleteMark: input.deleteMark,
+		lastTrxId:  input.lastTrxId,
+		rollPtr:    input.rollPtr,
 		ColNames:   sortedColNames,
 		Values:     sortedValues,
 	}, nil

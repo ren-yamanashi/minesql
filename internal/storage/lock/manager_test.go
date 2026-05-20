@@ -1,14 +1,21 @@
 package lock
 
 import (
+	"os"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
+
+func TestMain(m *testing.M) {
+	config.LockWaitTimeout = 100 * time.Millisecond
+	os.Exit(m.Run())
+}
 
 func TestNewManager(t *testing.T) {
 	t.Run("Manager を作成できる", func(t *testing.T) {

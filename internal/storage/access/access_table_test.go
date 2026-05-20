@@ -1,12 +1,16 @@
 package access
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
+	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -16,7 +20,7 @@ func TestNewTable(t *testing.T) {
 		env := setupTableTestEnv(t)
 
 		// WHEN
-		table, err := NewTable(env.bp, env.ct, "users")
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
 
 		// THEN
 		assert.NoError(t, err)
@@ -29,7 +33,7 @@ func TestNewTable(t *testing.T) {
 		env := setupTableTestEnv(t)
 
 		// WHEN
-		table, err := NewTable(env.bp, env.ct, "users")
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
 
 		// THEN
 		assert.NoError(t, err)
@@ -41,7 +45,7 @@ func TestNewTable(t *testing.T) {
 		env := setupTableTestEnv(t)
 
 		// WHEN
-		_, err := NewTable(env.bp, env.ct, "nonexistent")
+		_, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "nonexistent")
 
 		// THEN
 		assert.Error(t, err)
@@ -53,7 +57,7 @@ func TestNewTable(t *testing.T) {
 		env := setupTableTestEnvWithoutPrimaryIndex(t)
 
 		// WHEN
-		_, err := NewTable(env.bp, env.ct, "orders")
+		_, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "orders")
 
 		// THEN
 		assert.Error(t, err)
@@ -65,7 +69,7 @@ func TestTableBuildValMap(t *testing.T) {
 	t.Run("カラム名と値のマップを構築できる", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, _ := NewTable(env.bp, env.ct, "users")
+		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
 
 		// WHEN
 		m := table.buildValMap([]string{"id", "name"}, []string{"1", "Alice"})
@@ -80,7 +84,7 @@ func TestTableExtractPrimaryKey(t *testing.T) {
 	t.Run("テーブル定義順の先頭からプライマリキーを抽出する", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, _ := NewTable(env.bp, env.ct, "users")
+		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
 
 		// WHEN
 		pk := table.extractPrimaryKey([]string{"1", "Alice", "alice@example.com"})
@@ -94,7 +98,7 @@ func TestTableExtractSecondaryKey(t *testing.T) {
 	t.Run("keyCols と valMap からインデックス定義順の SK を抽出する", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, _ := NewTable(env.bp, env.ct, "users")
+		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
 		valMap := table.buildValMap(
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
@@ -114,7 +118,7 @@ func TestTableBuildSecondaryRecord(t *testing.T) {
 	t.Run("セカンダリインデックス用のレコードを構築できる", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, _ := NewTable(env.bp, env.ct, "users")
+		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
 
 		var si *SecondaryIndex
 		for _, s := range table.secondaryIndexes {
@@ -138,8 +142,10 @@ func TestTableBuildSecondaryRecord(t *testing.T) {
 
 // tableTestEnv は Table テスト用の環境
 type tableTestEnv struct {
-	ct *catalog.Catalog
-	bp *buffer.BufferPool
+	ct      *catalog.Catalog
+	bp      *buffer.BufferPool
+	lock    *lock.Manager
+	undoLog *undo.Manager
 }
 
 // setupTableTestEnv は NewTable テスト用の環境を構築する
@@ -154,6 +160,22 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 
 	// setupIteratorTestEnv と同じバッファプール + カタログを使う
 	env := setupIteratorTestEnv(t)
+
+	// Undo 用 HeapFile (FileId=3)
+	undoPath := filepath.Join(t.TempDir(), "undo.db")
+	undoHf, err := file.NewHeapFile(page.FileId(3), undoPath)
+	if err != nil {
+		t.Fatalf("Undo HeapFile の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = undoHf.Close() })
+	env.bp.RegisterHeapFile(page.FileId(3), undoHf)
+
+	undoMgr, err := undo.NewManager(env.bp, page.FileId(3))
+	if err != nil {
+		t.Fatalf("undo.Manager の作成に失敗: %v", err)
+	}
+
+	lockMgr := lock.NewManager()
 
 	fileId := page.FileId(2)
 
@@ -201,8 +223,10 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 	_ = env.ct.IndexKeyColMeta.Insert(siEmailId, "email", 0)
 
 	return &tableTestEnv{
-		ct: env.ct,
-		bp: env.bp,
+		ct:      env.ct,
+		bp:      env.bp,
+		lock:    lockMgr,
+		undoLog: undoMgr,
 	}
 }
 
@@ -212,11 +236,29 @@ func setupTableTestEnvWithoutPrimaryIndex(t *testing.T) *tableTestEnv {
 
 	env := setupIteratorTestEnv(t)
 
+	// Undo 用 HeapFile (FileId=3)
+	undoPath := filepath.Join(t.TempDir(), "undo.db")
+	undoHf, err := file.NewHeapFile(page.FileId(3), undoPath)
+	if err != nil {
+		t.Fatalf("Undo HeapFile の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = undoHf.Close() })
+	env.bp.RegisterHeapFile(page.FileId(3), undoHf)
+
+	undoMgr, err := undo.NewManager(env.bp, page.FileId(3))
+	if err != nil {
+		t.Fatalf("undo.Manager の作成に失敗: %v", err)
+	}
+
+	lockMgr := lock.NewManager()
+
 	// テーブルメタデータのみ登録 (プライマリインデックスなし)
 	_ = env.ct.TableMeta.Insert("orders", env.primaryTree.MetaPageId, 2)
 
 	return &tableTestEnv{
-		ct: env.ct,
-		bp: env.bp,
+		ct:      env.ct,
+		bp:      env.bp,
+		lock:    lockMgr,
+		undoLog: undoMgr,
 	}
 }

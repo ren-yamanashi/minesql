@@ -24,7 +24,7 @@ func NewManager() *Manager {
 	lm := &Manager{
 		lockTable: make(map[node.RecordPosition]*state),
 		heldLocks: make(map[TrxId][]node.RecordPosition),
-		timeout:   time.Duration(config.LockWaitTimeoutMs) * time.Millisecond,
+		timeout:   config.LockWaitTimeout,
 	}
 	lm.cond = sync.NewCond(&lm.mutex)
 	return lm

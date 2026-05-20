@@ -1,6 +1,7 @@
 package config
 
-const (
-	BaseDir           = "data"
-	LockWaitTimeoutMs = 30000
-)
+import "time"
+
+const BaseDir = "data"
+
+var LockWaitTimeout = 30000 * time.Millisecond

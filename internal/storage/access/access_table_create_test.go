@@ -10,6 +10,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
 	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -42,7 +43,7 @@ func TestCreate(t *testing.T) {
 		}
 
 		// WHEN
-		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input)
+		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, env.lockMgr, input)
 
 		// THEN
 		assert.NoError(t, err)
@@ -72,7 +73,7 @@ func TestCreate(t *testing.T) {
 		}
 
 		// WHEN
-		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input)
+		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, env.lockMgr, input)
 
 		// THEN
 		assert.NoError(t, err)
@@ -87,11 +88,11 @@ func TestCreate(t *testing.T) {
 			ColNames:  []string{"id", "name"},
 			PkCount:   1,
 		}
-		_, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input)
+		_, err := createPrimaryIndex(env.ct, env.bp, env.fileId, env.lockMgr, input)
 		assert.NoError(t, err)
 
 		// WHEN
-		_, err = createPrimaryIndex(env.ct, env.bp, env.fileId, input)
+		_, err = createPrimaryIndex(env.ct, env.bp, env.fileId, env.lockMgr, input)
 
 		// THEN
 		assert.Error(t, err)
@@ -105,7 +106,7 @@ func TestCreate(t *testing.T) {
 			ColNames:  []string{"id", "name"},
 			PkCount:   1,
 		}
-		_, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input1)
+		_, err := createPrimaryIndex(env.ct, env.bp, env.fileId, env.lockMgr, input1)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -114,7 +115,7 @@ func TestCreate(t *testing.T) {
 			ColNames:  []string{"id", "item"},
 			PkCount:   1,
 		}
-		_, err = createPrimaryIndex(env.ct, env.bp, env.fileId, input2)
+		_, err = createPrimaryIndex(env.ct, env.bp, env.fileId, env.lockMgr, input2)
 
 		// THEN
 		assert.Error(t, err)
@@ -254,9 +255,10 @@ func TestCreate(t *testing.T) {
 
 // createTestEnv は Create テスト用の基本環境
 type createTestEnv struct {
-	ct     *catalog.Catalog
-	bp     *buffer.BufferPool
-	fileId page.FileId
+	ct      *catalog.Catalog
+	bp      *buffer.BufferPool
+	fileId  page.FileId
+	lockMgr *lock.Manager
 }
 
 // createTestEnvWithTable はテーブル作成済みの Create テスト用環境
@@ -299,10 +301,13 @@ func setupCreateTestEnv(t *testing.T) *createTestEnv {
 	t.Cleanup(func() { _ = dataHf.Close() })
 	bp.RegisterHeapFile(fileId, dataHf)
 
+	lockMgr := lock.NewManager()
+
 	return &createTestEnv{
-		ct:     ct,
-		bp:     bp,
-		fileId: fileId,
+		ct:      ct,
+		bp:      bp,
+		fileId:  fileId,
+		lockMgr: lockMgr,
 	}
 }
 
@@ -316,7 +321,7 @@ func setupCreateTestEnvWithTable(t *testing.T) *createTestEnvWithTable {
 		ColNames:  []string{"id", "name", "email"},
 		PkCount:   1,
 	}
-	pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input)
+	pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, env.lockMgr, input)
 	if err != nil {
 		t.Fatalf("プライマリインデックスの作成に失敗: %v", err)
 	}

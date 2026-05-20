@@ -6,6 +6,7 @@ import (
 )
 
 const (
+	FileIdSize    = 4
 	MaxFileId     = 0xFFFFFFFF
 	MaxPageNumber = 0xFFFFFFFF
 )

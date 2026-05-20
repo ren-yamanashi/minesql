@@ -9,6 +9,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
 	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
@@ -33,7 +34,7 @@ type CreateTableInput struct {
 	Constraints []CreateConstraintInput // 制約
 }
 
-func Create(bp *buffer.BufferPool, input CreateTableInput) (*Table, error) {
+func Create(bp *buffer.BufferPool, lock *lock.Manager, input CreateTableInput) (*Table, error) {
 	ct, err := catalog.NewCatalog(bp)
 	if err != nil {
 		return nil, err
@@ -46,7 +47,7 @@ func Create(bp *buffer.BufferPool, input CreateTableInput) (*Table, error) {
 	}
 
 	// プライマリインデックス作成
-	pi, err := createPrimaryIndex(ct, bp, fileId, input)
+	pi, err := createPrimaryIndex(ct, bp, fileId, lock, input)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +70,7 @@ func Create(bp *buffer.BufferPool, input CreateTableInput) (*Table, error) {
 	}
 
 	return &Table{
-		table:            table,
+		Table:            table,
 		primaryIndex:     pi,
 		secondaryIndexes: sis,
 		catalog:          ct,
@@ -93,8 +94,8 @@ func createTableFile(ct *catalog.Catalog, bp *buffer.BufferPool, tableName strin
 }
 
 // createPrimaryIndex はプライマリインデックスを作成する
-func createPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, fileId page.FileId, input CreateTableInput) (*PrimaryIndex, error) {
-	index, err := CreatePrimaryIndex(ct, bp, fileId, input.PkCount)
+func createPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, fileId page.FileId, lock *lock.Manager, input CreateTableInput) (*PrimaryIndex, error) {
+	index, err := CreatePrimaryIndex(ct, bp, fileId, input.PkCount, lock)
 	if err != nil {
 		return nil, err
 	}

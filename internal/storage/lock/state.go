@@ -6,6 +6,7 @@ type (
 )
 
 const (
+	TrxIdSize      = 4
 	Shared    Mode = iota + 1 // 共有ロック
 	Exclusive                 // 排他ロック
 )

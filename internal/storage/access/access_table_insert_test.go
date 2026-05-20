@@ -11,13 +11,14 @@ func TestTableInsert(t *testing.T) {
 	t.Run("テーブルにレコードを挿入できる", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, err := NewTable(env.bp, env.ct, "users")
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
 		assert.NoError(t, err)
 
 		// WHEN
 		err = table.Insert(
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
+			tableTrxId,
 		)
 
 		// THEN
@@ -55,6 +56,7 @@ func TestTableInsert(t *testing.T) {
 		err := table.Insert(
 			[]string{"id", "name", "email"},
 			[]string{"2", "Bob", "bob@example.com"},
+			tableTrxId,
 		)
 
 		// THEN
@@ -71,6 +73,7 @@ func TestTableInsert(t *testing.T) {
 		err := table.Insert(
 			[]string{"id", "name", "email"},
 			[]string{"1", "Bob", "bob@example.com"},
+			tableTrxId,
 		)
 
 		// THEN
@@ -81,13 +84,14 @@ func TestTableInsert(t *testing.T) {
 		// GIVEN
 		table := setupTableWithRecord(t) // id=1, Alice
 		record := searchFirstPrimaryRecord(t, table)
-		err := table.SoftDelete(record)
+		err := table.SoftDelete(record, tableTrxId)
 		assert.NoError(t, err)
 
 		// WHEN
 		err = table.Insert(
 			[]string{"id", "name", "email"},
 			[]string{"1", "Charlie", "charlie@example.com"},
+			tableTrxId,
 		)
 
 		// THEN
@@ -99,13 +103,14 @@ func TestTableInsert(t *testing.T) {
 	t.Run("カラム数が不足しているとエラーを返す", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, err := NewTable(env.bp, env.ct, "users")
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
 		assert.NoError(t, err)
 
 		// WHEN
 		err = table.Insert(
 			[]string{"id", "name"},
 			[]string{"1", "Alice"},
+			tableTrxId,
 		)
 
 		// THEN

@@ -7,6 +7,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
@@ -16,6 +17,7 @@ type NewSecondaryIndexInput struct {
 	IndexId     catalog.IndexId // インデックス ID
 	IndexName   string          // インデックス名
 	Unique      bool            // ユニークインデックスか
+	Lock        *lock.Manager
 }
 
 // SecondaryIndex はセカンダリインデックスへのアクセスを提供する
@@ -27,6 +29,7 @@ type SecondaryIndex struct {
 	indexId     catalog.IndexId // インデックス ID
 	indexName   string          // インデックス名
 	unique      bool            // ユニーク制約の有無
+	lock        *lock.Manager
 }
 
 // NewSecondaryIndex は既存のセカンダリインデックスを開く
@@ -44,6 +47,7 @@ func NewSecondaryIndex(
 		indexId:     input.IndexId,
 		indexName:   input.IndexName,
 		unique:      input.Unique,
+		lock:        input.Lock,
 	}
 }
 
@@ -53,6 +57,7 @@ type CreateSecondaryIndexInput struct {
 	IndexId     catalog.IndexId // インデックス ID
 	IndexName   string          // インデックス名
 	Unique      bool            // ユニークか
+	Lock        *lock.Manager
 }
 
 // CreateSecondaryIndex は空のセカンダリインデックスを作成する
@@ -73,6 +78,7 @@ func CreateSecondaryIndex(
 		indexId:     input.IndexId,
 		indexName:   input.IndexName,
 		unique:      input.Unique,
+		lock:        input.Lock,
 	}, nil
 }
 
@@ -88,35 +94,72 @@ func (si *SecondaryIndex) Search(mode SearchMode) (*SecondaryIterator, error) {
 // Insert は行を挿入する
 //   - unique index の場合かつセカンダリキーの重複があるとエラー
 //   - 論理削除済みの同一キー (SK + PK) が存在する場合は上書きする
-func (si *SecondaryIndex) Insert(colNames, values, pk []string) error {
-	record, err := newSecondaryRecord(si.catalog, newSecondaryRecordInput{
-		fileId:     si.fileId,
-		deleteMark: 0,
-		indexName:  si.indexName,
-		colNames:   colNames,
-		values:     values,
-		pk:         pk,
-	})
-	if err != nil {
-		return err
-	}
+func (si *SecondaryIndex) Insert(record *SecondaryRecord, pk []string, trxId lock.TrxId) error {
 	if si.unique {
 		if err := si.checkUnique(record); err != nil {
 			return err
 		}
 	}
-	return si.insert(record)
+	encodedRecord := record.encode()
+
+	// 挿入
+	err := si.tree.Insert(encodedRecord)
+	// 重複キーエラーの場合、既存のレコードが論理削除済みか確認
+	if errors.Is(err, btree.ErrDuplicateKey) {
+		existing, _, findErr := si.tree.FindByKey(encodedRecord.Key())
+		if findErr != nil {
+			return findErr
+		}
+		deleteMark := existing.Header()[0]
+		// 論理削除済みでない場合はエラー
+		if deleteMark != 1 {
+			return btree.ErrDuplicateKey
+		}
+		// 論理削除済みの場合は上書き
+		if updateErr := si.tree.Update(encodedRecord); updateErr != nil {
+			return updateErr
+		}
+	} else if err != nil {
+		return err
+	}
+
+	// 排他ロックを取得
+	_, pos, err := si.tree.FindByKey(encodedRecord.Key())
+	if err != nil {
+		return err
+	}
+	return si.lock.Lock(trxId, pos, lock.Exclusive)
 }
 
 // Delete は行を物理削除する
-func (si *SecondaryIndex) Delete(record *SecondaryRecord) error {
-	// TODO: ロック処理
+func (si *SecondaryIndex) Delete(record *SecondaryRecord, trxId lock.TrxId) error {
+	// 排他ロックを取得
+	encodedRecord := record.encode()
+	_, pos, err := si.tree.FindByKey(encodedRecord.Key())
+	if err != nil {
+		return err
+	}
+	if err := si.lock.Lock(trxId, pos, lock.Exclusive); err != nil {
+		return err
+	}
+
+	// 物理削除
 	return si.tree.Delete(record.encode().Key())
 }
 
 // SoftDelete は行を論理削除する
-func (si *SecondaryIndex) SoftDelete(record *SecondaryRecord) error {
-	// TODO: ロック処理
+func (si *SecondaryIndex) SoftDelete(record *SecondaryRecord, trxId lock.TrxId) error {
+	// 排他ロックを取得
+	encodedRecord := record.encode()
+	_, pos, err := si.tree.FindByKey(encodedRecord.Key())
+	if err != nil {
+		return err
+	}
+	if err := si.lock.Lock(trxId, pos, lock.Exclusive); err != nil {
+		return err
+	}
+
+	// 論理削除
 	// deleteMark を 1 にしたレコードで上書き
 	deleted, err := newSecondaryRecord(si.catalog, newSecondaryRecordInput{
 		fileId:     si.fileId,
@@ -140,33 +183,6 @@ func (si *SecondaryIndex) LeafPageCount() (uint64, error) {
 // Height はツリーの高さを取得する
 func (si *SecondaryIndex) Height() (uint64, error) {
 	return si.tree.Height()
-}
-
-// insert は行を挿入する
-func (si *SecondaryIndex) insert(sr *SecondaryRecord) error {
-	// TODO: ロック処理
-	record := sr.encode()
-	err := si.tree.Insert(record)
-	if err == nil {
-		return nil
-	}
-	if !errors.Is(err, btree.ErrDuplicateKey) {
-		return err
-	}
-
-	// 重複キーエラーの場合、既存のレコードが論理削除済みか確認
-	existing, _, err := si.tree.FindByKey(record.Key())
-	if err != nil {
-		return err
-	}
-
-	deleteMark := existing.Header()[0]
-	if deleteMark != 1 {
-		return btree.ErrDuplicateKey
-	}
-
-	// 論理削除済みの場合は上書き
-	return si.tree.Update(record)
 }
 
 // checkUnique は record のセカンダリキーに対して active なレコードが存在するか確認する

@@ -7,41 +7,47 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
 // Table はテーブルへのアクセスを提供する
 type Table struct {
-	table            catalog.TableRecord
+	Table            catalog.TableRecord
 	primaryIndex     *PrimaryIndex
 	secondaryIndexes []*SecondaryIndex
 	catalog          *catalog.Catalog
+	undoLog          *undo.Manager
+	lock             *lock.Manager
 	bufferPool       *buffer.BufferPool
 }
 
 // NewTable は既存のテーブルを開く
-func NewTable(bp *buffer.BufferPool, ct *catalog.Catalog, name string) (*Table, error) {
+func NewTable(bp *buffer.BufferPool, ct *catalog.Catalog, undo *undo.Manager, lock *lock.Manager, name string) (*Table, error) {
 	table, err := fetchTable(ct, name)
 	if err != nil {
 		return nil, err
 	}
 
 	fileId := table.MetaPageId.FileId
-	pi, err := fetchPrimaryIndex(ct, bp, fileId)
+	pi, err := fetchPrimaryIndex(ct, bp, fileId, lock, undo)
 	if err != nil {
 		return nil, err
 	}
 
-	sis, err := fetchSecondaryIndexes(ct, bp, fileId, pi.tree)
+	sis, err := fetchSecondaryIndexes(ct, bp, fileId, pi.tree, lock)
 	if err != nil {
 		return nil, err
 	}
 
 	return &Table{
-		table:            table,
+		Table:            table,
 		primaryIndex:     pi,
 		secondaryIndexes: sis,
 		catalog:          ct,
+		undoLog:          undo,
+		lock:             lock,
 		bufferPool:       bp,
 	}, nil
 }
@@ -63,7 +69,7 @@ func fetchTable(ct *catalog.Catalog, name string) (catalog.TableRecord, error) {
 }
 
 // fetchPrimaryIndex はカタログからプライマリインデックスを取得して PrimaryIndex を構築する
-func fetchPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, fileId page.FileId) (*PrimaryIndex, error) {
+func fetchPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, fileId page.FileId, lock *lock.Manager, undoLog *undo.Manager) (*PrimaryIndex, error) {
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
 	iter, err := ct.IndexMeta.Search(catalog.SearchModeKey{Key: [][]byte{fileIdBytes, []byte(catalog.PrimaryIndexName)}})
 	if err != nil {
@@ -76,7 +82,7 @@ func fetchPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, fileId page.F
 	if !ok || record.FileId != fileId || record.Name != catalog.PrimaryIndexName {
 		return nil, fmt.Errorf("primary index not found for table (file %d)", fileId)
 	}
-	return NewPrimaryIndex(ct, bp, record.MetaPageId, record.NumOfCol), nil
+	return NewPrimaryIndex(ct, bp, record.MetaPageId, record.NumOfCol, lock), nil
 }
 
 // fetchSecondaryIndexes は指定テーブルのセカンダリインデックス一覧を返す
@@ -85,6 +91,7 @@ func fetchSecondaryIndexes(
 	bp *buffer.BufferPool,
 	fileId page.FileId,
 	pt *btree.Btree,
+	lock *lock.Manager,
 ) ([]*SecondaryIndex, error) {
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
 	iter, err := ct.IndexMeta.Search(catalog.SearchModeKey{Key: [][]byte{fileIdBytes}})
@@ -110,6 +117,7 @@ func fetchSecondaryIndexes(
 			IndexId:     record.IndexId,
 			IndexName:   record.Name,
 			Unique:      record.IndexType == catalog.IndexTypeUnique,
+			Lock:        lock,
 		})
 		indexes = append(indexes, index)
 	}

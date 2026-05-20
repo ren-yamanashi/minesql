@@ -241,7 +241,7 @@ func insertPrimaryRecord(t *testing.T, env *iteratorTestEnv, deleteMark byte, co
 	if err != nil {
 		t.Fatalf("PrimaryRecord の作成に失敗: %v", err)
 	}
-	if err := env.primaryTree.Insert(pr.encode()); err != nil {
+	if err := env.primaryTree.Insert(pr.Encode()); err != nil {
 		t.Fatalf("プライマリレコードの挿入に失敗: %v", err)
 	}
 }

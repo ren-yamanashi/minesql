@@ -1,19 +1,39 @@
 package access
 
-// UpdateInplace はテーブルの行をインプレース更新する
-//   - before: 更新前のレコード (executor が Search で取得したもの)
+import (
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
+	"github.com/ren-yamanashi/minesql/internal/storage/undo"
+)
+
+// Update はテーブルの行をインプレース更新する
+//   - currentRecord: 更新前のレコード (executor が Search で取得したもの)
 //   - colNames: 更新するカラム名 (SET 句の対象)
 //   - values: 更新後の値
-func (t *Table) UpdateInplace(before *PrimaryRecord, colNames, values []string) error {
-	if err := t.primaryIndex.UpdateInplace(before, colNames, values); err != nil {
+func (t *Table) Update(currentRecord *PrimaryRecord, colNames, values []string, trxId lock.TrxId) error {
+	// 更新後のレコードを生成
+	newRecord, err := currentRecord.update(trxId, colNames, values)
+	if err != nil {
 		return err
 	}
-	return t.updateSecondaryIndexes(before, colNames, values)
+
+	// Undo ログを更新
+	undoRecord := undo.NewUpdateRecord(t.Table.MetaPageId.FileId, currentRecord.Encode(), newRecord.Encode(), currentRecord.lastTrxId, currentRecord.rollPtr)
+	ptr, err := t.undoLog.Append(trxId, undo.Update, undoRecord)
+	if err != nil {
+		return err
+	}
+	newRecord.setRollPtr(ptr)
+
+	// レコード更新
+	if err := t.primaryIndex.Update(currentRecord, newRecord, trxId); err != nil {
+		return err
+	}
+	return t.updateSecondaryIndexes(currentRecord, colNames, values, trxId)
 }
 
 // updateSecondaryIndexes はセカンダリインデックスを更新する
 // インデックスを構成するカラムの値が変更される場合のみ、論理削除 + 新規挿入で更新する
-func (t *Table) updateSecondaryIndexes(before *PrimaryRecord, updateColNames, updateValues []string) error {
+func (t *Table) updateSecondaryIndexes(before *PrimaryRecord, updateColNames, updateValues []string, trxId lock.TrxId) error {
 	updatedCols := t.buildValMap(updateColNames, updateValues)
 	oldValMap := t.buildValMap(before.ColNames, before.Values)
 
@@ -42,13 +62,24 @@ func (t *Table) updateSecondaryIndexes(before *PrimaryRecord, updateColNames, up
 		if err != nil {
 			return err
 		}
-		if err := si.SoftDelete(oldSr); err != nil {
+		if err := si.SoftDelete(oldSr, trxId); err != nil {
 			return err
 		}
 
 		// 更新後のセカンダリキーで新規挿入
 		afterSkColNames, afterSkValues := t.extractSecondaryKey(keyCols, newValMap)
-		if err := si.Insert(afterSkColNames, afterSkValues, pk); err != nil {
+		record, err := newSecondaryRecord(si.catalog, newSecondaryRecordInput{
+			fileId:     si.fileId,
+			deleteMark: 0,
+			indexName:  si.indexName,
+			colNames:   afterSkColNames,
+			values:     afterSkValues,
+			pk:         pk,
+		})
+		if err != nil {
+			return err
+		}
+		if err := si.Insert(record, pk, trxId); err != nil {
 			return err
 		}
 	}
