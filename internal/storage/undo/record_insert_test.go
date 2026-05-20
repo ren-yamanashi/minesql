@@ -38,6 +38,19 @@ func TestNewInsertRecord(t *testing.T) {
 	})
 }
 
+func TestInsertRecordTableFileId(t *testing.T) {
+	t.Run("コンストラクタで指定した FileId を返す", func(t *testing.T) {
+		// GIVEN
+		ir := NewInsertRecord(page.FileId(5), node.Record{[]byte("a")})
+
+		// WHEN
+		result := ir.TableFileId()
+
+		// THEN
+		assert.Equal(t, page.FileId(5), result)
+	})
+}
+
 func TestInsertRecordSerialize(t *testing.T) {
 	t.Run("シリアライズ結果を Deserialize でラウンドトリップできる", func(t *testing.T) {
 		// GIVEN

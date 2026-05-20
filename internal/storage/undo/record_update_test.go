@@ -41,6 +41,19 @@ func TestNewUpdateRecord(t *testing.T) {
 	})
 }
 
+func TestUpdateRecordTableFileId(t *testing.T) {
+	t.Run("コンストラクタで指定した FileId を返す", func(t *testing.T) {
+		// GIVEN
+		ur := NewUpdateRecord(page.FileId(5), node.Record{[]byte("a")}, node.Record{[]byte("b")}, 0, NullPointer)
+
+		// WHEN
+		result := ur.TableFileId()
+
+		// THEN
+		assert.Equal(t, page.FileId(5), result)
+	})
+}
+
 func TestUpdateRecordSerialize(t *testing.T) {
 	t.Run("シリアライズ結果を Deserialize でラウンドトリップできる", func(t *testing.T) {
 		// GIVEN

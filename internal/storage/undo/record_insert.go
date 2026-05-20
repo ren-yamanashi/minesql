@@ -35,3 +35,7 @@ func (ir InsertRecord) Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte {
 	}
 	return fields.Serialize()
 }
+
+func (ir InsertRecord) TableFileId() page.FileId {
+	return ir.tableFileId
+}

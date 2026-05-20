@@ -76,9 +76,25 @@ func (m *Manager) PopLast(trxId lock.TrxId) {
 	}
 }
 
-// Discard は指定した trxId の Undo ログをすべて破棄する (ROLLBACK 用)
+// Discard は指定した trxId の Undo ログをすべて破棄する
 func (m *Manager) Discard(trxId lock.TrxId) {
 	delete(m.entries, trxId)
+}
+
+// DiscardRecordType は指定した trxId の指定したレコードタイプの Undo レコードのみ破棄する
+func (m *Manager) DiscardRecordType(trxId lock.TrxId, recordType RecordType) {
+	entries := m.entries[trxId]
+	kept := make([]entry, 0, len(entries))
+	for _, e := range entries {
+		if e.recordType != recordType {
+			kept = append(kept, e)
+		}
+	}
+	if len(kept) == 0 {
+		delete(m.entries, trxId)
+	} else {
+		m.entries[trxId] = kept
+	}
 }
 
 // writeToPage は Undo レコードを Undo ページに書き込み、書き込み先の Pointer を返す

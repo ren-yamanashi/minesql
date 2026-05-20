@@ -37,3 +37,7 @@ func (ur UpdateRecord) Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte {
 	}
 	return fields.Serialize()
 }
+
+func (ur UpdateRecord) TableFileId() page.FileId {
+	return ur.tableFileId
+}

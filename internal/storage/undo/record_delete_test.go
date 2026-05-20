@@ -38,6 +38,19 @@ func TestNewDeleteRecord(t *testing.T) {
 	})
 }
 
+func TestDeleteRecordTableFileId(t *testing.T) {
+	t.Run("コンストラクタで指定した FileId を返す", func(t *testing.T) {
+		// GIVEN
+		dr := NewDeleteRecord(page.FileId(5), node.Record{[]byte("a")}, 0, NullPointer)
+
+		// WHEN
+		result := dr.TableFileId()
+
+		// THEN
+		assert.Equal(t, page.FileId(5), result)
+	})
+}
+
 func TestDeleteRecordSerialize(t *testing.T) {
 	t.Run("シリアライズ結果を Deserialize でラウンドトリップできる", func(t *testing.T) {
 		// GIVEN

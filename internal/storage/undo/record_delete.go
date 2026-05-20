@@ -35,3 +35,7 @@ func (dr DeleteRecord) Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte {
 	}
 	return fields.Serialize()
 }
+
+func (dr DeleteRecord) TableFileId() page.FileId {
+	return dr.tableFileId
+}
