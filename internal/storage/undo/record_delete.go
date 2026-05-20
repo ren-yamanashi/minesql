@@ -27,7 +27,7 @@ func (dr DeleteRecord) Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte {
 	fields := Fields{
 		TrxId:         trxId,
 		UndoNum:       undoNum,
-		RecordType:    Delete,
+		RecordType:    RecordTypeDelete,
 		PrevLastTrxId: dr.PrevLastTrxId,
 		PrevRollPtr:   dr.PrevRollPtr,
 		TableFileId:   dr.tableFileId,

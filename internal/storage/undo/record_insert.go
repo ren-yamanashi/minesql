@@ -27,7 +27,7 @@ func (ir InsertRecord) Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte {
 	fields := Fields{
 		TrxId:         trxId,
 		UndoNum:       undoNum,
-		RecordType:    Insert,
+		RecordType:    RecordTypeInsert,
 		PrevLastTrxId: ir.PrevLastTrxId,
 		PrevRollPtr:   ir.PrevRollPtr,
 		TableFileId:   ir.tableFileId,

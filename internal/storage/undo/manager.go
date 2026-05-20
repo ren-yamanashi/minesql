@@ -1,6 +1,8 @@
 package undo
 
 import (
+	"errors"
+
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -47,7 +49,7 @@ func NewManager(bp *buffer.BufferPool, undoFileId page.FileId) (*Manager, error)
 func (m *Manager) Append(trxId lock.TrxId, recordType RecordType, record Record) (Pointer, error) {
 	ptr, err := m.writeToPage(trxId, record)
 	if err != nil {
-		return Pointer{}, nil
+		return Pointer{}, err
 	}
 	m.entries[trxId] = append(m.entries[trxId], entry{recordType: recordType, record: record})
 	return ptr, nil
@@ -103,9 +105,13 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 		undoPage.SetNextPageNumber(newPageId.PageNumber)
 
 		// 新しいページを初期化してレコードを追記
+		_, err = m.bufferPool.AddPage(newPageId)
+		if err != nil {
+			return Pointer{}, err
+		}
 		pageNewUndo, err := m.bufferPool.GetWritePage(newPageId)
 		if err != nil {
-			return Pointer{}, nil
+			return Pointer{}, err
 		}
 		newUndoPage := NewPage(*pageNewUndo)
 		newUndoPage.Initialize()
@@ -114,7 +120,9 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 			PageNumber: newPageId.PageNumber,
 			Offset:     0,
 		}
-		newUndoPage.Append(serialized)
+		if !newUndoPage.Append(serialized) {
+			return Pointer{}, errors.New("undo: record too large for a single page")
+		}
 		m.currentPageId = newPageId
 	}
 

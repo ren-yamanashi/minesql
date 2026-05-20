@@ -18,7 +18,7 @@ func (t *Table) Update(currentRecord *PrimaryRecord, colNames, values []string, 
 
 	// Undo ログを更新
 	undoRecord := undo.NewUpdateRecord(t.Table.MetaPageId.FileId, currentRecord.Encode(), newRecord.Encode(), currentRecord.lastTrxId, currentRecord.rollPtr)
-	ptr, err := t.undoLog.Append(trxId, undo.Update, undoRecord)
+	ptr, err := t.undoLog.Append(trxId, undo.RecordTypeUpdate, undoRecord)
 	if err != nil {
 		return err
 	}

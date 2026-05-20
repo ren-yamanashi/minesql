@@ -29,7 +29,7 @@ func (ur UpdateRecord) Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte {
 	fields := Fields{
 		TrxId:         trxId,
 		UndoNum:       undoNum,
-		RecordType:    Update,
+		RecordType:    RecordTypeUpdate,
 		PrevLastTrxId: ur.PrevLastTrxId,
 		PrevRollPtr:   ur.PrevRollPtr,
 		TableFileId:   ur.tableFileId,

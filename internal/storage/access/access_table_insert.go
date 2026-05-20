@@ -20,7 +20,7 @@ func (t *Table) Insert(colNames []string, values []string, trxId lock.TrxId) err
 
 	// Undo ログを更新
 	undoRecord := undo.NewInsertRecord(t.Table.MetaPageId.FileId, record.Encode())
-	ptr, err := t.undoLog.Append(trxId, undo.Insert, undoRecord)
+	ptr, err := t.undoLog.Append(trxId, undo.RecordTypeInsert, undoRecord)
 	if err != nil {
 		return err
 	}

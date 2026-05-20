@@ -52,7 +52,7 @@ func TestInsertRecordSerialize(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(10), fields.TrxId)
 		assert.Equal(t, UndoNumber(2), fields.UndoNum)
-		assert.Equal(t, Insert, fields.RecordType)
+		assert.Equal(t, RecordTypeInsert, fields.RecordType)
 		assert.Equal(t, lock.TrxId(0), fields.PrevLastTrxId)
 		assert.Equal(t, NullPointer, fields.PrevRollPtr)
 		assert.Equal(t, page.FileId(5), fields.TableFileId)

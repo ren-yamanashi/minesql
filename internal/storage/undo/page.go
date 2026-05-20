@@ -9,7 +9,7 @@ import (
 const (
 	headerUsedBytesOffset      = 0
 	headerNextPageNumberOffset = 2
-	pageHeaderSize             = 6 // UsedBytes(2) + NextPageNum(2)
+	pageHeaderSize             = 6 // UsedBytes(2) + NextPageNum(4)
 )
 
 type Page struct {
@@ -30,7 +30,7 @@ func NewPage(page page.Page) *Page {
 // Initialize は Undo ページを初期化する
 func (p *Page) Initialize() {
 	binary.BigEndian.PutUint16(p.header[headerUsedBytesOffset:headerNextPageNumberOffset], 0) // usedBytes
-	binary.BigEndian.PutUint16(p.header[headerNextPageNumberOffset:pageHeaderSize], 0)        // nextPageNumber
+	binary.BigEndian.PutUint32(p.header[headerNextPageNumberOffset:pageHeaderSize], 0)        // nextPageNumber
 }
 
 // Append は Undo レコードをボディに追加する

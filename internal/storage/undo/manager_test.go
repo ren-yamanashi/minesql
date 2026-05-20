@@ -33,7 +33,7 @@ func TestManagerAppend(t *testing.T) {
 		record := NewInsertRecord(page.FileId(1), node.Record{[]byte("Alice")})
 
 		// WHEN
-		ptr, err := mgr.Append(lock.TrxId(1), Insert, record)
+		ptr, err := mgr.Append(lock.TrxId(1), RecordTypeInsert, record)
 
 		// THEN
 		assert.NoError(t, err)
@@ -47,8 +47,8 @@ func TestManagerAppend(t *testing.T) {
 		r2 := NewDeleteRecord(page.FileId(1), node.Record{[]byte("Bob")}, 1, NullPointer)
 
 		// WHEN
-		ptr1, err1 := mgr.Append(lock.TrxId(1), Insert, r1)
-		ptr2, err2 := mgr.Append(lock.TrxId(1), Delete, r2)
+		ptr1, err1 := mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
+		ptr2, err2 := mgr.Append(lock.TrxId(1), RecordTypeDelete, r2)
 
 		// THEN
 		assert.NoError(t, err1)
@@ -63,8 +63,8 @@ func TestManagerAppend(t *testing.T) {
 		r2 := NewInsertRecord(page.FileId(1), node.Record{[]byte("Bob")})
 
 		// WHEN
-		_, err1 := mgr.Append(lock.TrxId(1), Insert, r1)
-		_, err2 := mgr.Append(lock.TrxId(2), Insert, r2)
+		_, err1 := mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
+		_, err2 := mgr.Append(lock.TrxId(2), RecordTypeInsert, r2)
 
 		// THEN
 		assert.NoError(t, err1)
@@ -79,7 +79,7 @@ func TestManagerRecords(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
 		r := NewInsertRecord(page.FileId(1), node.Record{[]byte("Alice")})
-		_, _ = mgr.Append(lock.TrxId(1), Insert, r)
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r)
 
 		// WHEN
 		records := mgr.Records(lock.TrxId(1))
@@ -93,8 +93,8 @@ func TestManagerRecords(t *testing.T) {
 		mgr := setupTestManager(t)
 		r1 := NewInsertRecord(page.FileId(1), node.Record{[]byte("first")})
 		r2 := NewDeleteRecord(page.FileId(1), node.Record{[]byte("second")}, 1, NullPointer)
-		_, _ = mgr.Append(lock.TrxId(1), Insert, r1)
-		_, _ = mgr.Append(lock.TrxId(1), Delete, r2)
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r2)
 
 		// WHEN
 		records := mgr.Records(lock.TrxId(1))
@@ -118,7 +118,7 @@ func TestManagerRecords(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
 		r := NewInsertRecord(page.FileId(1), node.Record{[]byte("Alice")})
-		_, _ = mgr.Append(lock.TrxId(1), Insert, r)
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r)
 
 		// WHEN
 		records := mgr.Records(lock.TrxId(2))
@@ -134,8 +134,8 @@ func TestManagerPopLast(t *testing.T) {
 		mgr := setupTestManager(t)
 		r1 := NewInsertRecord(page.FileId(1), node.Record{[]byte("first")})
 		r2 := NewInsertRecord(page.FileId(1), node.Record{[]byte("second")})
-		_, _ = mgr.Append(lock.TrxId(1), Insert, r1)
-		_, _ = mgr.Append(lock.TrxId(1), Insert, r2)
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r2)
 
 		// WHEN
 		mgr.PopLast(lock.TrxId(1))
@@ -148,7 +148,7 @@ func TestManagerPopLast(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
 		r := NewInsertRecord(page.FileId(1), node.Record{[]byte("only")})
-		_, _ = mgr.Append(lock.TrxId(1), Insert, r)
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r)
 
 		// WHEN
 		mgr.PopLast(lock.TrxId(1))
@@ -175,8 +175,8 @@ func TestManagerDiscard(t *testing.T) {
 		mgr := setupTestManager(t)
 		r1 := NewInsertRecord(page.FileId(1), node.Record{[]byte("first")})
 		r2 := NewInsertRecord(page.FileId(1), node.Record{[]byte("second")})
-		_, _ = mgr.Append(lock.TrxId(1), Insert, r1)
-		_, _ = mgr.Append(lock.TrxId(1), Insert, r2)
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r2)
 
 		// WHEN
 		mgr.Discard(lock.TrxId(1))
@@ -190,8 +190,8 @@ func TestManagerDiscard(t *testing.T) {
 		mgr := setupTestManager(t)
 		r1 := NewInsertRecord(page.FileId(1), node.Record{[]byte("trx1")})
 		r2 := NewInsertRecord(page.FileId(1), node.Record{[]byte("trx2")})
-		_, _ = mgr.Append(lock.TrxId(1), Insert, r1)
-		_, _ = mgr.Append(lock.TrxId(2), Insert, r2)
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
+		_, _ = mgr.Append(lock.TrxId(2), RecordTypeInsert, r2)
 
 		// WHEN
 		mgr.Discard(lock.TrxId(1))

@@ -227,7 +227,7 @@ func TestRecordAt(t *testing.T) {
 		f := &Fields{
 			TrxId:       1,
 			UndoNum:     0,
-			RecordType:  Insert,
+			RecordType:  RecordTypeInsert,
 			PrevRollPtr: NullPointer,
 			TableFileId: 1,
 			ColumnSets:  [][][]byte{{[]byte("data")}},
@@ -274,12 +274,12 @@ func TestRecordAt(t *testing.T) {
 		undoPage := newTestUndoPage(t)
 		undoPage.Initialize()
 		f1 := &Fields{
-			TrxId: 1, UndoNum: 0, RecordType: Insert,
+			TrxId: 1, UndoNum: 0, RecordType: RecordTypeInsert,
 			PrevRollPtr: NullPointer, TableFileId: 1,
 			ColumnSets: [][][]byte{{[]byte("first")}},
 		}
 		f2 := &Fields{
-			TrxId: 2, UndoNum: 1, RecordType: Delete,
+			TrxId: 2, UndoNum: 1, RecordType: RecordTypeDelete,
 			PrevRollPtr: NullPointer, TableFileId: 1,
 			ColumnSets: [][][]byte{{[]byte("second")}},
 		}
@@ -305,7 +305,7 @@ func TestRecordAt(t *testing.T) {
 		f := &Fields{
 			TrxId:       1,
 			UndoNum:     0,
-			RecordType:  Insert,
+			RecordType:  RecordTypeInsert,
 			PrevRollPtr: NullPointer,
 			TableFileId: 1,
 			ColumnSets:  [][][]byte{{make([]byte, len(undoPage.body))}},

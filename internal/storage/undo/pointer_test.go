@@ -151,7 +151,7 @@ func TestDecodePointer(t *testing.T) {
 		_, err := DecodePointer(buf)
 
 		// THEN
-		assert.ErrorIs(t, err, ErrInvalidUndoPtrData)
+		assert.ErrorIs(t, err, ErrInvalidPointerData)
 	})
 
 	t.Run("空のデータの場合エラーを返す", func(t *testing.T) {
@@ -162,7 +162,7 @@ func TestDecodePointer(t *testing.T) {
 		_, err := DecodePointer(buf)
 
 		// THEN
-		assert.ErrorIs(t, err, ErrInvalidUndoPtrData)
+		assert.ErrorIs(t, err, ErrInvalidPointerData)
 	})
 
 	t.Run("nil の場合エラーを返す", func(t *testing.T) {
@@ -170,7 +170,7 @@ func TestDecodePointer(t *testing.T) {
 		_, err := DecodePointer(nil)
 
 		// THEN
-		assert.ErrorIs(t, err, ErrInvalidUndoPtrData)
+		assert.ErrorIs(t, err, ErrInvalidPointerData)
 	})
 
 	t.Run("PointerSize より長いデータでも先頭 4 バイトからデコードできる", func(t *testing.T) {

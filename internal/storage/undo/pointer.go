@@ -16,10 +16,10 @@ const (
 var (
 	// NullPointer は前バージョンが存在しないことを示す
 	NullPointer           = Pointer{PageNumber: 0xFFFF, Offset: 0xFFFF}
-	ErrInvalidUndoPtrData = errors.New("data size must be at least 4 bytes to decode UndoPtr")
+	ErrInvalidPointerData = errors.New("undo: data size must be at least 4 bytes to decode pointer")
 )
 
-// UndoPtr は Undo ログレコードの位置を指すポインタ
+// Pointer は Undo ログレコードの位置を指すポインタ
 type Pointer struct {
 	PageNumber page.PageNumber // Undo ページのページ番号
 	Offset     uint16          // Undo ページ内のバイトオフセット
@@ -45,7 +45,7 @@ func (p Pointer) Encode() []byte {
 // DecodePointer はバイト列から Pointer をデコードする
 func DecodePointer(data []byte) (Pointer, error) {
 	if len(data) < PointerSize {
-		return NullPointer, ErrInvalidUndoPtrData
+		return NullPointer, ErrInvalidPointerData
 	}
 	return Pointer{
 		PageNumber: page.PageNumber(binary.BigEndian.Uint16(data[pageNumberOffset:dataOffsetOffset])),

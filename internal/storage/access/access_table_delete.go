@@ -9,7 +9,7 @@ import (
 func (t *Table) SoftDelete(record *PrimaryRecord, trxId lock.TrxId) error {
 	// Undo ログを更新
 	undoRecord := undo.NewDeleteRecord(t.Table.MetaPageId.FileId, record.Encode(), record.lastTrxId, record.rollPtr)
-	ptr, err := t.undoLog.Append(trxId, undo.Delete, undoRecord)
+	ptr, err := t.undoLog.Append(trxId, undo.RecordTypeDelete, undoRecord)
 	if err != nil {
 		return err
 	}

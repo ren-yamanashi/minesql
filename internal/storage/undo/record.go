@@ -12,17 +12,20 @@ type (
 )
 
 const (
-	headerTrxIdOffset                 = 0
-	headerUndoNumOffset               = 4
-	headerRecordTypeOffset            = 8
-	headerDataLenOffset               = 9
-	recordHeaderSize                  = 11 // TrxId(4) + UndoNum(4) + Type(1) + DataLen(2)
-	Insert                 RecordType = iota + 1
-	Delete
-	Update
+	headerTrxIdOffset      = 0
+	headerUndoNumOffset    = 4
+	headerRecordTypeOffset = 8
+	headerDataLenOffset    = 9
+	recordHeaderSize       = 11 // TrxId(4) + UndoNum(4) + Type(1) + DataLen(2)
 )
 
-var ErrInvalid = errors.New("invalid undo record")
+const (
+	RecordTypeInsert RecordType = iota + 1
+	RecordTypeDelete
+	RecordTypeUpdate
+)
+
+var ErrInvalidRecord = errors.New("undo: invalid record")
 
 type Record interface {
 	Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte

@@ -15,7 +15,7 @@ func TestSerialize(t *testing.T) {
 		f := &Fields{
 			TrxId:         10,
 			UndoNum:       3,
-			RecordType:    Insert,
+			RecordType:    RecordTypeInsert,
 			PrevLastTrxId: 100,
 			PrevRollPtr:   newPointer(5, 128),
 			TableFileId:   page.FileId(7),
@@ -28,7 +28,7 @@ func TestSerialize(t *testing.T) {
 		// THEN
 		assert.Equal(t, uint32(10), binary.BigEndian.Uint32(buf[headerTrxIdOffset:headerUndoNumOffset]))
 		assert.Equal(t, uint32(3), binary.BigEndian.Uint32(buf[headerUndoNumOffset:headerRecordTypeOffset]))
-		assert.Equal(t, byte(Insert), buf[headerRecordTypeOffset])
+		assert.Equal(t, byte(RecordTypeInsert), buf[headerRecordTypeOffset])
 		dataLen := binary.BigEndian.Uint16(buf[headerDataLenOffset:recordHeaderSize])
 		assert.Equal(t, len(buf)-recordHeaderSize, int(dataLen))
 	})
@@ -38,7 +38,7 @@ func TestSerialize(t *testing.T) {
 		f := &Fields{
 			TrxId:         1,
 			UndoNum:       2,
-			RecordType:    Insert,
+			RecordType:    RecordTypeInsert,
 			PrevLastTrxId: 100,
 			PrevRollPtr:   newPointer(3, 64),
 			TableFileId:   page.FileId(5),
@@ -58,7 +58,7 @@ func TestSerialize(t *testing.T) {
 		f := &Fields{
 			TrxId:         1,
 			UndoNum:       0,
-			RecordType:    Delete,
+			RecordType:    RecordTypeDelete,
 			PrevLastTrxId: 0,
 			PrevRollPtr:   NullPointer,
 			TableFileId:   page.FileId(1),
@@ -77,7 +77,7 @@ func TestSerialize(t *testing.T) {
 		f := &Fields{
 			TrxId:         1,
 			UndoNum:       0,
-			RecordType:    Insert,
+			RecordType:    RecordTypeInsert,
 			PrevLastTrxId: 0,
 			PrevRollPtr:   NullPointer,
 			TableFileId:   page.FileId(1),
@@ -99,7 +99,7 @@ func TestDeserialize(t *testing.T) {
 		original := &Fields{
 			TrxId:         10,
 			UndoNum:       3,
-			RecordType:    Insert,
+			RecordType:    RecordTypeInsert,
 			PrevLastTrxId: 200,
 			PrevRollPtr:   newPointer(5, 128),
 			TableFileId:   page.FileId(7),
@@ -120,7 +120,7 @@ func TestDeserialize(t *testing.T) {
 		original := &Fields{
 			TrxId:         5,
 			UndoNum:       1,
-			RecordType:    Update,
+			RecordType:    RecordTypeUpdate,
 			PrevLastTrxId: 50,
 			PrevRollPtr:   newPointer(2, 32),
 			TableFileId:   page.FileId(3),
@@ -144,7 +144,7 @@ func TestDeserialize(t *testing.T) {
 		original := &Fields{
 			TrxId:         1,
 			UndoNum:       0,
-			RecordType:    Delete,
+			RecordType:    RecordTypeDelete,
 			PrevLastTrxId: 0,
 			PrevRollPtr:   NullPointer,
 			TableFileId:   page.FileId(1),
@@ -165,7 +165,7 @@ func TestDeserialize(t *testing.T) {
 		original := &Fields{
 			TrxId:         lock.TrxId(0xFFFFFFFF),
 			UndoNum:       UndoNumber(0xFFFFFFFE),
-			RecordType:    Insert,
+			RecordType:    RecordTypeInsert,
 			PrevLastTrxId: lock.TrxId(0xFFFFFFFD),
 			PrevRollPtr:   newPointer(1, 10),
 			TableFileId:   page.FileId(1),
@@ -188,7 +188,7 @@ func TestDeserialize(t *testing.T) {
 		original := &Fields{
 			TrxId:         1,
 			UndoNum:       0,
-			RecordType:    Insert,
+			RecordType:    RecordTypeInsert,
 			PrevLastTrxId: 0,
 			PrevRollPtr:   NullPointer,
 			TableFileId:   page.FileId(1),
@@ -209,7 +209,7 @@ func TestDeserialize(t *testing.T) {
 		original := &Fields{
 			TrxId:         1,
 			UndoNum:       0,
-			RecordType:    Insert,
+			RecordType:    RecordTypeInsert,
 			PrevLastTrxId: 0,
 			PrevRollPtr:   NullPointer,
 			TableFileId:   page.FileId(1),
@@ -227,7 +227,7 @@ func TestDeserialize(t *testing.T) {
 
 	t.Run("全 RecordType でラウンドトリップできる", func(t *testing.T) {
 		// GIVEN
-		recordTypes := []RecordType{Insert, Delete, Update}
+		recordTypes := []RecordType{RecordTypeInsert, RecordTypeDelete, RecordTypeUpdate}
 		for _, rt := range recordTypes {
 			original := &Fields{
 				TrxId:         1,
@@ -257,7 +257,7 @@ func TestDeserialize(t *testing.T) {
 		_, err := Deserialize(buf)
 
 		// THEN
-		assert.ErrorIs(t, err, ErrInvalid)
+		assert.ErrorIs(t, err, ErrInvalidRecord)
 	})
 
 	t.Run("バッファが headerSize 未満の場合エラーを返す", func(t *testing.T) {
@@ -268,7 +268,7 @@ func TestDeserialize(t *testing.T) {
 		_, err := Deserialize(buf)
 
 		// THEN
-		assert.ErrorIs(t, err, ErrInvalid)
+		assert.ErrorIs(t, err, ErrInvalidRecord)
 	})
 
 	t.Run("DataLen がバッファサイズを超える場合エラーを返す", func(t *testing.T) {
@@ -276,7 +276,7 @@ func TestDeserialize(t *testing.T) {
 		f := &Fields{
 			TrxId:       1,
 			UndoNum:     0,
-			RecordType:  Insert,
+			RecordType:  RecordTypeInsert,
 			PrevRollPtr: NullPointer,
 			TableFileId: page.FileId(1),
 			ColumnSets:  [][][]byte{{[]byte("data")}},
@@ -288,19 +288,19 @@ func TestDeserialize(t *testing.T) {
 		_, err := Deserialize(truncated)
 
 		// THEN
-		assert.ErrorIs(t, err, ErrInvalid)
+		assert.ErrorIs(t, err, ErrInvalidRecord)
 	})
 
 	t.Run("データ部が prevFields に満たない場合エラーを返す", func(t *testing.T) {
 		// GIVEN: prevLastTrxId (4B) + prevRollPtr (4B) = 8B 必要だが 4B しかない
 		data := make([]byte, 4)
-		buf := buildRawBuffer(1, 0, Insert, data)
+		buf := buildRawBuffer(1, 0, RecordTypeInsert, data)
 
 		// WHEN
 		_, err := Deserialize(buf)
 
 		// THEN
-		assert.ErrorIs(t, err, ErrInvalid)
+		assert.ErrorIs(t, err, ErrInvalidRecord)
 	})
 
 	t.Run("データ部が FileId に満たない場合エラーを返す", func(t *testing.T) {
@@ -308,13 +308,13 @@ func TestDeserialize(t *testing.T) {
 		var data []byte
 		data = binary.BigEndian.AppendUint32(data, 100)
 		data = append(data, NullPointer.Encode()...)
-		buf := buildRawBuffer(1, 0, Insert, data)
+		buf := buildRawBuffer(1, 0, RecordTypeInsert, data)
 
 		// WHEN
 		_, err := Deserialize(buf)
 
 		// THEN
-		assert.ErrorIs(t, err, ErrInvalid)
+		assert.ErrorIs(t, err, ErrInvalidRecord)
 	})
 
 	t.Run("カラムセット領域が columnCountSize 未満の場合エラーを返す", func(t *testing.T) {
@@ -324,13 +324,13 @@ func TestDeserialize(t *testing.T) {
 		data = append(data, NullPointer.Encode()...)          // prevRollPtr
 		data = binary.BigEndian.AppendUint32(data, uint32(1)) // tableFileId
 		data = append(data, 0x01)                             // 1 バイト (columnCountSize 未満)
-		buf := buildRawBuffer(1, 0, Insert, data)
+		buf := buildRawBuffer(1, 0, RecordTypeInsert, data)
 
 		// WHEN
 		_, err := Deserialize(buf)
 
 		// THEN
-		assert.ErrorIs(t, err, ErrInvalid)
+		assert.ErrorIs(t, err, ErrInvalidRecord)
 	})
 
 	t.Run("カラムデータ長ヘッダーが不足する場合エラーを返す", func(t *testing.T) {
@@ -340,13 +340,13 @@ func TestDeserialize(t *testing.T) {
 		data = append(data, NullPointer.Encode()...)          // prevRollPtr
 		data = binary.BigEndian.AppendUint32(data, uint32(1)) // tableFileId
 		data = binary.BigEndian.AppendUint16(data, 2)         // numCols = 2
-		buf := buildRawBuffer(1, 0, Insert, data)
+		buf := buildRawBuffer(1, 0, RecordTypeInsert, data)
 
 		// WHEN
 		_, err := Deserialize(buf)
 
 		// THEN
-		assert.ErrorIs(t, err, ErrInvalid)
+		assert.ErrorIs(t, err, ErrInvalidRecord)
 	})
 
 	t.Run("カラムデータ本体が不足する場合エラーを返す", func(t *testing.T) {
@@ -357,13 +357,13 @@ func TestDeserialize(t *testing.T) {
 		data = binary.BigEndian.AppendUint32(data, uint32(1)) // tableFileId
 		data = binary.BigEndian.AppendUint16(data, 1)         // numCols = 1
 		data = binary.BigEndian.AppendUint16(data, 100)       // colLen = 100
-		buf := buildRawBuffer(1, 0, Insert, data)
+		buf := buildRawBuffer(1, 0, RecordTypeInsert, data)
 
 		// WHEN
 		_, err := Deserialize(buf)
 
 		// THEN
-		assert.ErrorIs(t, err, ErrInvalid)
+		assert.ErrorIs(t, err, ErrInvalidRecord)
 	})
 }
 

@@ -57,7 +57,7 @@ func TestUpdateRecordSerialize(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(10), fields.TrxId)
 		assert.Equal(t, UndoNumber(2), fields.UndoNum)
-		assert.Equal(t, Update, fields.RecordType)
+		assert.Equal(t, RecordTypeUpdate, fields.RecordType)
 		assert.Equal(t, lock.TrxId(100), fields.PrevLastTrxId)
 		assert.Equal(t, rollPtr, fields.PrevRollPtr)
 		assert.Equal(t, page.FileId(5), fields.TableFileId)
