@@ -43,7 +43,7 @@ func TestIsNull(t *testing.T) {
 
 	t.Run("PageNumber だけ一致しても false を返す", func(t *testing.T) {
 		// GIVEN
-		p := Pointer{PageNumber: 0xFFFF, Offset: 0}
+		p := Pointer{PageNumber: 0xFFFFFFFF, Offset: 0}
 
 		// WHEN
 		result := p.IsNull()
@@ -54,7 +54,7 @@ func TestIsNull(t *testing.T) {
 }
 
 func TestEncode(t *testing.T) {
-	t.Run("4 バイトのバイト列にエンコードされる", func(t *testing.T) {
+	t.Run("6 バイトのバイト列にエンコードされる", func(t *testing.T) {
 		// GIVEN
 		p := Pointer{PageNumber: 3, Offset: 64}
 
@@ -74,7 +74,7 @@ func TestEncode(t *testing.T) {
 
 		// THEN
 		assert.Len(t, buf, PointerSize)
-		assert.Equal(t, []byte{0xFF, 0xFF, 0xFF, 0xFF}, buf)
+		assert.Equal(t, []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}, buf)
 	})
 
 	t.Run("ゼロ値をエンコードできる", func(t *testing.T) {
@@ -85,7 +85,7 @@ func TestEncode(t *testing.T) {
 		buf := p.Encode()
 
 		// THEN
-		assert.Equal(t, []byte{0x00, 0x00, 0x00, 0x00}, buf)
+		assert.Equal(t, []byte{0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, buf)
 	})
 }
 
@@ -132,7 +132,7 @@ func TestDecodePointer(t *testing.T) {
 
 	t.Run("最大値のラウンドトリップ", func(t *testing.T) {
 		// GIVEN
-		original := Pointer{PageNumber: page.PageNumber(0xFFFF), Offset: 0xFFFF}
+		original := Pointer{PageNumber: page.PageNumber(0xFFFFFFFF), Offset: 0xFFFF}
 		buf := original.Encode()
 
 		// WHEN
@@ -145,7 +145,7 @@ func TestDecodePointer(t *testing.T) {
 
 	t.Run("データが PointerSize 未満の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		buf := []byte{0x00, 0x01, 0x02}
+		buf := []byte{0x00, 0x01, 0x02, 0x03, 0x04}
 
 		// WHEN
 		_, err := DecodePointer(buf)
@@ -173,7 +173,7 @@ func TestDecodePointer(t *testing.T) {
 		assert.ErrorIs(t, err, ErrInvalidPointerData)
 	})
 
-	t.Run("PointerSize より長いデータでも先頭 4 バイトからデコードできる", func(t *testing.T) {
+	t.Run("PointerSize より長いデータでも先頭 6 バイトからデコードできる", func(t *testing.T) {
 		// GIVEN
 		original := Pointer{PageNumber: 5, Offset: 128}
 		buf := append(original.Encode(), 0xFF, 0xFF) // 余分なデータ
