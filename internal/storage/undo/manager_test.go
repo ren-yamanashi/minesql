@@ -213,6 +213,101 @@ func TestManagerDiscard(t *testing.T) {
 	})
 }
 
+func TestManagerDiscardRecordType(t *testing.T) {
+	t.Run("指定したレコードタイプのみ破棄される", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		r1 := NewInsertRecord(page.FileId(1), node.Record{[]byte("inserted")})
+		r2 := NewDeleteRecord(page.FileId(1), node.Record{[]byte("deleted")}, 1, NullPointer)
+		r3 := NewInsertRecord(page.FileId(1), node.Record{[]byte("inserted2")})
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r2)
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r3)
+
+		// WHEN
+		mgr.DiscardRecordType(lock.TrxId(1), RecordTypeInsert)
+
+		// THEN
+		records := mgr.Records(lock.TrxId(1))
+		assert.Len(t, records, 1)
+		_, ok := records[0].(DeleteRecord)
+		assert.True(t, ok)
+	})
+
+	t.Run("全レコードが対象タイプの場合はエントリ自体が削除される", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		r1 := NewInsertRecord(page.FileId(1), node.Record{[]byte("a")})
+		r2 := NewInsertRecord(page.FileId(1), node.Record{[]byte("b")})
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r2)
+
+		// WHEN
+		mgr.DiscardRecordType(lock.TrxId(1), RecordTypeInsert)
+
+		// THEN
+		assert.Nil(t, mgr.Records(lock.TrxId(1)))
+	})
+
+	t.Run("対象タイプが存在しない場合はレコードが変わらない", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		r := NewDeleteRecord(page.FileId(1), node.Record{[]byte("a")}, 1, NullPointer)
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r)
+
+		// WHEN
+		mgr.DiscardRecordType(lock.TrxId(1), RecordTypeInsert)
+
+		// THEN
+		records := mgr.Records(lock.TrxId(1))
+		assert.Len(t, records, 1)
+	})
+
+	t.Run("別トランザクションのレコードには影響しない", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		r1 := NewInsertRecord(page.FileId(1), node.Record{[]byte("trx1")})
+		r2 := NewInsertRecord(page.FileId(1), node.Record{[]byte("trx2")})
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
+		_, _ = mgr.Append(lock.TrxId(2), RecordTypeInsert, r2)
+
+		// WHEN
+		mgr.DiscardRecordType(lock.TrxId(1), RecordTypeInsert)
+
+		// THEN
+		assert.Nil(t, mgr.Records(lock.TrxId(1)))
+		assert.Len(t, mgr.Records(lock.TrxId(2)), 1)
+	})
+}
+
+func TestManagerWriteToPageOverflow(t *testing.T) {
+	t.Run("ページが満杯になると新しいページに書き込まれる", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		// 大きなレコードを作成してページを埋める
+		bigData := make([]byte, 1000)
+		for i := range bigData {
+			bigData[i] = byte(i % 256)
+		}
+
+		// WHEN (ページサイズを超えるまで書き込む)
+		var lastPtr Pointer
+		var err error
+		for i := range 20 {
+			r := NewInsertRecord(page.FileId(1), node.Record{bigData})
+			lastPtr, err = mgr.Append(lock.TrxId(1), RecordTypeInsert, r)
+			if err != nil {
+				t.Fatalf("Append %d に失敗: %v", i, err)
+			}
+		}
+
+		// THEN
+		assert.NoError(t, err)
+		// 複数ページにまたがるため、最後の Pointer のページ番号は最初と異なるはず
+		assert.NotEqual(t, page.PageNumber(0), lastPtr.PageNumber)
+	})
+}
+
 // setupTestBufferPool はテスト用の BufferPool を作成する (Undo ファイル用 FileId=1)
 func setupTestBufferPool(t *testing.T) *buffer.BufferPool {
 	t.Helper()

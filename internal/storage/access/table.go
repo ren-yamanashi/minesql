@@ -30,7 +30,7 @@ func NewTable(bp *buffer.BufferPool, ct *catalog.Catalog, undo *undo.Manager, lo
 	}
 
 	fileId := table.MetaPageId.FileId
-	pi, err := fetchPrimaryIndex(ct, bp, fileId, lock, undo)
+	pi, err := fetchPrimaryIndex(ct, bp, fileId, lock)
 	if err != nil {
 		return nil, err
 	}
@@ -67,20 +67,32 @@ func fetchTable(ct *catalog.Catalog, name string) (catalog.TableRecord, error) {
 }
 
 // fetchPrimaryIndex はカタログからプライマリインデックスを取得して PrimaryIndex を構築する
-func fetchPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, fileId page.FileId, lock *lock.Manager, undoLog *undo.Manager) (*PrimaryIndex, error) {
-	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
-	iter, err := ct.IndexMeta.Search(catalog.SearchModeKey{Key: [][]byte{fileIdBytes, []byte(catalog.PrimaryIndexName)}})
+func fetchPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, fileId page.FileId, lock *lock.Manager) (*PrimaryIndex, error) {
+	record, err := fetchPrimaryIndexRecord(ct, fileId)
 	if err != nil {
 		return nil, err
+	}
+	return NewPrimaryIndex(ct, bp, record.MetaPageId, record.NumOfCol, lock), nil
+}
+
+// fetchPrimaryIndexRecord はカタログからプライマリインデックスの IndexRecord を取得する
+func fetchPrimaryIndexRecord(ct *catalog.Catalog, fileId page.FileId) (catalog.IndexRecord, error) {
+	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
+	key := catalog.SearchModeKey{
+		Key: [][]byte{fileIdBytes, []byte(catalog.PrimaryIndexName)},
+	}
+	iter, err := ct.IndexMeta.Search(key)
+	if err != nil {
+		return catalog.IndexRecord{}, err
 	}
 	record, ok, err := iter.Next()
 	if err != nil {
-		return nil, err
+		return catalog.IndexRecord{}, err
 	}
 	if !ok || record.FileId != fileId || record.Name != catalog.PrimaryIndexName {
-		return nil, fmt.Errorf("primary index not found for table (file %d)", fileId)
+		return catalog.IndexRecord{}, fmt.Errorf("primary index not found for table (file %d)", fileId)
 	}
-	return NewPrimaryIndex(ct, bp, record.MetaPageId, record.NumOfCol, lock), nil
+	return record, nil
 }
 
 // fetchSecondaryIndexes は指定テーブルのセカンダリインデックス一覧を返す
@@ -91,24 +103,12 @@ func fetchSecondaryIndexes(
 	pt *btree.Btree,
 	lock *lock.Manager,
 ) ([]*SecondaryIndex, error) {
-	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
-	iter, err := ct.IndexMeta.Search(catalog.SearchModeKey{Key: [][]byte{fileIdBytes}})
+	records, err := fetchSecondaryIndexRecords(ct, fileId)
 	if err != nil {
 		return nil, err
 	}
-
-	var indexes []*SecondaryIndex
-	for {
-		record, ok, err := iter.Next()
-		if err != nil {
-			return nil, err
-		}
-		if !ok || record.FileId != fileId {
-			break
-		}
-		if record.Name == catalog.PrimaryIndexName {
-			continue
-		}
+	indexes := make([]*SecondaryIndex, 0, len(records))
+	for _, record := range records {
 		index := NewSecondaryIndex(ct, bp, NewSecondaryIndexInput{
 			MetaPageId:  record.MetaPageId,
 			PrimaryTree: pt,
@@ -120,6 +120,30 @@ func fetchSecondaryIndexes(
 		indexes = append(indexes, index)
 	}
 	return indexes, nil
+}
+
+// fetchSecondaryIndexRecords はカタログからセカンダリインデックスの IndexRecord 一覧を取得する
+func fetchSecondaryIndexRecords(ct *catalog.Catalog, fileId page.FileId) ([]catalog.IndexRecord, error) {
+	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
+	iter, err := ct.IndexMeta.Search(catalog.SearchModeKey{Key: [][]byte{fileIdBytes}})
+	if err != nil {
+		return nil, err
+	}
+	var records []catalog.IndexRecord
+	for {
+		record, ok, err := iter.Next()
+		if err != nil {
+			return nil, err
+		}
+		if !ok || record.FileId != fileId {
+			break
+		}
+		if record.Name == catalog.PrimaryIndexName {
+			continue
+		}
+		records = append(records, record)
+	}
+	return records, nil
 }
 
 // buildValMap はカラム名 → 値のマップを構築する
