@@ -9,7 +9,7 @@ import (
 //   - currentRecord: 更新前のレコード (executor が Search で取得したもの)
 //   - colNames: 更新するカラム名 (SET 句の対象)
 //   - values: 更新後の値
-func (t *Table) Update(currentRecord *PrimaryRecord, colNames, values []string, trxId lock.TrxId) error {
+func (t *Table) Update(currentRecord *primaryRecord, colNames, values []string, trxId lock.TrxId) error {
 	// 更新後のレコードを生成
 	newRecord, err := currentRecord.update(trxId, colNames, values)
 	if err != nil {
@@ -17,7 +17,7 @@ func (t *Table) Update(currentRecord *PrimaryRecord, colNames, values []string, 
 	}
 
 	// Undo ログを更新
-	undoRecord := undo.NewUpdateRecord(t.primaryIndex.FileId(), currentRecord.Encode(), newRecord.Encode(), currentRecord.lastTrxId, currentRecord.rollPtr)
+	undoRecord := undo.NewUpdateRecord(t.primaryIndex.fileId(), currentRecord.encode(), newRecord.encode(), currentRecord.lastTrxId, currentRecord.rollPtr)
 	ptr, err := t.undoLog.Append(trxId, undo.RecordTypeUpdate, undoRecord)
 	if err != nil {
 		return err
@@ -25,7 +25,7 @@ func (t *Table) Update(currentRecord *PrimaryRecord, colNames, values []string, 
 	newRecord.setRollPtr(ptr)
 
 	// レコード更新
-	if err := t.primaryIndex.Update(currentRecord, newRecord, trxId); err != nil {
+	if err := t.primaryIndex.update(currentRecord, newRecord, trxId); err != nil {
 		return err
 	}
 	return t.updateSecondaryIndexes(currentRecord, colNames, values, trxId)
@@ -33,7 +33,7 @@ func (t *Table) Update(currentRecord *PrimaryRecord, colNames, values []string, 
 
 // updateSecondaryIndexes はセカンダリインデックスを更新する
 // インデックスを構成するカラムの値が変更される場合のみ、論理削除 + 新規挿入で更新する
-func (t *Table) updateSecondaryIndexes(before *PrimaryRecord, updateColNames, updateValues []string, trxId lock.TrxId) error {
+func (t *Table) updateSecondaryIndexes(before *primaryRecord, updateColNames, updateValues []string, trxId lock.TrxId) error {
 	updatedCols := t.buildValMap(updateColNames, updateValues)
 	oldValMap := t.buildValMap(before.ColNames, before.Values)
 
@@ -62,7 +62,7 @@ func (t *Table) updateSecondaryIndexes(before *PrimaryRecord, updateColNames, up
 		if err != nil {
 			return err
 		}
-		if err := si.SoftDelete(oldSr, trxId); err != nil {
+		if err := si.softDelete(oldSr, trxId); err != nil {
 			return err
 		}
 
@@ -72,7 +72,7 @@ func (t *Table) updateSecondaryIndexes(before *PrimaryRecord, updateColNames, up
 		if err != nil {
 			return err
 		}
-		if err := si.Insert(record, pk, trxId); err != nil {
+		if err := si.insert(record, pk, trxId); err != nil {
 			return err
 		}
 	}

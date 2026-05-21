@@ -22,7 +22,7 @@ type TrxManager struct {
 	bufferPool   *buffer.BufferPool
 	catalog      *catalog.Catalog
 	transactions map[lock.TrxId]TrxState
-	readViews    map[lock.TrxId]*ReadView // トランザクションごとの ReadView キャッシュ
+	readViews    map[lock.TrxId]*readView // トランザクションごとの ReadView キャッシュ
 	nextTrxId    lock.TrxId               // 次に払い出すトランザクション ID
 }
 
@@ -33,7 +33,7 @@ func NewTrxManager(ct *catalog.Catalog, undo *undo.Manager, lockMgr *lock.Manage
 		bufferPool:   bp,
 		catalog:      ct,
 		transactions: make(map[lock.TrxId]TrxState),
-		readViews:    make(map[lock.TrxId]*ReadView),
+		readViews:    make(map[lock.TrxId]*readView),
 	}
 }
 
@@ -76,7 +76,7 @@ func (t *TrxManager) Rollback(trxId lock.TrxId) error {
 }
 
 // CreateReadView は指定したトランザクション用の ReadView を作成する
-func (t *TrxManager) CreateReadView(trxId lock.TrxId) *ReadView {
+func (t *TrxManager) CreateReadView(trxId lock.TrxId) *readView {
 	// REPEATABLE READ のみのため、同一トランザクション内では最初に作成した ReadView をキャッシュして使い回す
 	if rv, ok := t.readViews[trxId]; ok {
 		return rv
@@ -87,7 +87,7 @@ func (t *TrxManager) CreateReadView(trxId lock.TrxId) *ReadView {
 			activeTrxIds = append(activeTrxIds, id)
 		}
 	}
-	rv := NewReadView(trxId, activeTrxIds, t.nextTrxId)
+	rv := newReadView(trxId, activeTrxIds, t.nextTrxId)
 	t.readViews[trxId] = rv
 	return rv
 }

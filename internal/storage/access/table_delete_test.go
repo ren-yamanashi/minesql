@@ -18,9 +18,9 @@ func TestTableSoftDelete(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		iter, err := table.primaryIndex.Search(SearchModeStart{})
+		iter, err := table.primaryIndex.search(SearchModeStart{})
 		assert.NoError(t, err)
-		_, ok, err := iter.Next()
+		_, ok, err := iter.next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 	})
@@ -36,15 +36,15 @@ func TestTableSoftDelete(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.Search(SearchModeStart{})
+		nameIter, err := idxName.search(SearchModeStart{})
 		assert.NoError(t, err)
-		_, ok, err := nameIter.Next()
+		_, ok, err := nameIter.next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
-		emailIter, err := idxEmail.Search(SearchModeStart{})
+		emailIter, err := idxEmail.search(SearchModeStart{})
 		assert.NoError(t, err)
-		_, ok, err = emailIter.Next()
+		_, ok, err = emailIter.next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 	})
@@ -82,10 +82,10 @@ func TestTableSoftDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// 論理削除済みレコードを直接 B+Tree から取得して rollPtr を確認
-		encodedRecord := record.Encode()
+		encodedRecord := record.encode()
 		existing, _, err := table.primaryIndex.tree.FindByKey(encodedRecord.Key())
 		assert.NoError(t, err)
-		decoded, err := decodePrimaryRecord(existing, table.catalog, table.primaryIndex.FileId())
+		decoded, err := decodePrimaryRecord(existing, table.catalog, table.primaryIndex.fileId())
 		assert.NoError(t, err)
 		assert.NotEqual(t, undo.NullPointer, decoded.rollPtr)
 	})
@@ -95,7 +95,7 @@ func TestTableSoftDelete(t *testing.T) {
 		env := setupTableTestEnv(t)
 		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
 		assert.NoError(t, err)
-		fakeRecord := &PrimaryRecord{
+		fakeRecord := &primaryRecord{
 			pkCount:    1,
 			deleteMark: 0,
 			rollPtr:    undo.NullPointer,
@@ -144,9 +144,9 @@ func TestTableDelete(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		iter, err := table.primaryIndex.Search(SearchModeStart{})
+		iter, err := table.primaryIndex.search(SearchModeStart{})
 		assert.NoError(t, err)
-		_, ok, err := iter.Next()
+		_, ok, err := iter.next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 	})
@@ -162,15 +162,15 @@ func TestTableDelete(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.Search(SearchModeStart{})
+		nameIter, err := idxName.search(SearchModeStart{})
 		assert.NoError(t, err)
-		_, ok, err := nameIter.Next()
+		_, ok, err := nameIter.next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
-		emailIter, err := idxEmail.Search(SearchModeStart{})
+		emailIter, err := idxEmail.search(SearchModeStart{})
 		assert.NoError(t, err)
-		_, ok, err = emailIter.Next()
+		_, ok, err = emailIter.next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 	})
@@ -201,7 +201,7 @@ func TestTableDelete(t *testing.T) {
 		env := setupTableTestEnv(t)
 		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
 		assert.NoError(t, err)
-		fakeRecord := &PrimaryRecord{
+		fakeRecord := &primaryRecord{
 			pkCount:    1,
 			deleteMark: 0,
 			rollPtr:    undo.NullPointer,

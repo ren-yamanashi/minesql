@@ -27,17 +27,17 @@ func TestRollbackInsertSecondary(t *testing.T) {
 
 		// idx_name からも削除されている
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.Search(SearchModeStart{})
+		nameIter, err := idxName.search(SearchModeStart{})
 		assert.NoError(t, err)
-		_, ok, err := nameIter.Next()
+		_, ok, err := nameIter.next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 
 		// idx_email からも削除されている
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
-		emailIter, err := idxEmail.Search(SearchModeStart{})
+		emailIter, err := idxEmail.search(SearchModeStart{})
 		assert.NoError(t, err)
-		_, ok, err = emailIter.Next()
+		_, ok, err = emailIter.next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 	})
@@ -57,8 +57,8 @@ func TestRollbackDeleteSecondary(t *testing.T) {
 		_ = tm.Commit(trxId)
 
 		trxId2 := tm.Begin()
-		iter, _ := table.primaryIndex.Search(SearchModeStart{})
-		record, _, _ := iter.Next()
+		iter, _ := table.primaryIndex.search(SearchModeStart{})
+		record, _, _ := iter.next()
 		err := table.SoftDelete(record, trxId2)
 		assert.NoError(t, err)
 
@@ -70,9 +70,9 @@ func TestRollbackDeleteSecondary(t *testing.T) {
 
 		// idx_name が復元されている
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.Search(SearchModeStart{})
+		nameIter, err := idxName.search(SearchModeStart{})
 		assert.NoError(t, err)
-		nameResult, ok, err := nameIter.Next()
+		nameResult, ok, err := nameIter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "Alice", nameResult.Values[1])
@@ -93,8 +93,8 @@ func TestRollbackUpdateSecondary(t *testing.T) {
 		_ = tm.Commit(trxId)
 
 		trxId2 := tm.Begin()
-		iter, _ := table.primaryIndex.Search(SearchModeStart{})
-		record, _, _ := iter.Next()
+		iter, _ := table.primaryIndex.search(SearchModeStart{})
+		record, _, _ := iter.next()
 		// name を変更 → idx_name の SK が変わる
 		err := table.Update(record, []string{"name"}, []string{"Bob"}, trxId2)
 		assert.NoError(t, err)
@@ -107,9 +107,9 @@ func TestRollbackUpdateSecondary(t *testing.T) {
 
 		// idx_name が元の "Alice" に戻っている
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.Search(SearchModeStart{})
+		nameIter, err := idxName.search(SearchModeStart{})
 		assert.NoError(t, err)
-		nameResult, ok, err := nameIter.Next()
+		nameResult, ok, err := nameIter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "Alice", nameResult.Values[1])
@@ -128,8 +128,8 @@ func TestRollbackUpdateSecondary(t *testing.T) {
 		_ = tm.Commit(trxId)
 
 		trxId2 := tm.Begin()
-		iter, _ := table.primaryIndex.Search(SearchModeStart{})
-		record, _, _ := iter.Next()
+		iter, _ := table.primaryIndex.search(SearchModeStart{})
+		record, _, _ := iter.next()
 		// email を変更 → idx_name の SK は変わらない
 		err := table.Update(record, []string{"email"}, []string{"new@example.com"}, trxId2)
 		assert.NoError(t, err)
@@ -142,9 +142,9 @@ func TestRollbackUpdateSecondary(t *testing.T) {
 
 		// idx_name は変わらず "Alice"
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.Search(SearchModeStart{})
+		nameIter, err := idxName.search(SearchModeStart{})
 		assert.NoError(t, err)
-		nameResult, ok, err := nameIter.Next()
+		nameResult, ok, err := nameIter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "Alice", nameResult.Values[1])
@@ -154,7 +154,7 @@ func TestRollbackUpdateSecondary(t *testing.T) {
 func TestEncodeSecondaryKey(t *testing.T) {
 	t.Run("PrimaryRecord から SK+PK キーを構築できる", func(t *testing.T) {
 		// GIVEN
-		record := &PrimaryRecord{
+		record := &primaryRecord{
 			pkCount:  1,
 			ColNames: []string{"id", "name", "email"},
 			Values:   []string{"1", "Alice", "alice@example.com"},
@@ -170,7 +170,7 @@ func TestEncodeSecondaryKey(t *testing.T) {
 
 	t.Run("同じ入力に対して同じキーを返す", func(t *testing.T) {
 		// GIVEN
-		record := &PrimaryRecord{
+		record := &primaryRecord{
 			pkCount:  1,
 			ColNames: []string{"id", "name"},
 			Values:   []string{"1", "Alice"},
@@ -187,12 +187,12 @@ func TestEncodeSecondaryKey(t *testing.T) {
 
 	t.Run("異なる SK 値に対して異なるキーを返す", func(t *testing.T) {
 		// GIVEN
-		record1 := &PrimaryRecord{
+		record1 := &primaryRecord{
 			pkCount:  1,
 			ColNames: []string{"id", "name"},
 			Values:   []string{"1", "Alice"},
 		}
-		record2 := &PrimaryRecord{
+		record2 := &primaryRecord{
 			pkCount:  1,
 			ColNames: []string{"id", "name"},
 			Values:   []string{"1", "Bob"},
@@ -209,7 +209,7 @@ func TestEncodeSecondaryKey(t *testing.T) {
 
 	t.Run("複合セカンダリキーを正しくエンコードする", func(t *testing.T) {
 		// GIVEN
-		record := &PrimaryRecord{
+		record := &primaryRecord{
 			pkCount:  1,
 			ColNames: []string{"id", "name", "email"},
 			Values:   []string{"1", "Alice", "alice@example.com"},

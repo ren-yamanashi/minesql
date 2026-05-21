@@ -20,24 +20,24 @@ type newSecondaryRecordInput struct {
 	pk         []string // プライマリキー
 }
 
-// SecondaryRecord はセカンダリインデックスレコード
-type SecondaryRecord struct {
+// secondaryRecord はセカンダリインデックスレコード
+type secondaryRecord struct {
 	deleteMark byte
 	ColNames   []string // インデックスを構成するカラム名のリスト
 	Values     []string // インデックスを構成するカラム値のリスト (SK)
 	Pk         []string // プライマリキー
 }
 
-func newSecondaryRecord(ct *catalog.Catalog, input newSecondaryRecordInput) (*SecondaryRecord, error) {
+func newSecondaryRecord(ct *catalog.Catalog, input newSecondaryRecordInput) (*secondaryRecord, error) {
 	if len(input.colNames) != len(input.values) {
 		return nil, errors.New("number of colNames not equal values")
 	}
 	return sortSecondaryRecord(ct, input)
 }
 
-// Encode は node.Record にエンコードする
+// encode は node.Record にエンコードする
 // キー領域は SK + PK を連結したもの
-func (sr *SecondaryRecord) Encode() node.Record {
+func (sr *secondaryRecord) encode() node.Record {
 	var key []byte
 	encode.Encode(stringToByteSlice(sr.Values), &key)
 	encode.Encode(stringToByteSlice(sr.Pk), &key)
@@ -47,7 +47,7 @@ func (sr *SecondaryRecord) Encode() node.Record {
 // encodedSecondaryKey はエンコード済みのセカンダリキーを返す
 //
 // B+Tree 上のキー (SK + PK) ではなく SK のみ
-func (sr *SecondaryRecord) encodedSecondaryKey() []byte {
+func (sr *secondaryRecord) encodedSecondaryKey() []byte {
 	var sk []byte
 	encode.Encode(stringToByteSlice(sr.Values), &sk)
 	return sk
@@ -59,7 +59,7 @@ func decodeSecondaryRecord(
 	ct *catalog.Catalog,
 	fileId page.FileId,
 	indexName string,
-) (*SecondaryRecord, error) {
+) (*secondaryRecord, error) {
 	index, err := fetchIndex(ct, fileId, indexName)
 	if err != nil {
 		return nil, err
@@ -86,7 +86,7 @@ func decodeSecondaryRecord(
 		colNames[pos] = name
 	}
 
-	return &SecondaryRecord{
+	return &secondaryRecord{
 		deleteMark: record.Header()[0],
 		ColNames:   colNames,
 		Values:     byteSliceToString(sk),
@@ -95,7 +95,7 @@ func decodeSecondaryRecord(
 }
 
 // sortSecondaryRecord はメタデータを参照して、レコードをインデックス定義順に並び替える
-func sortSecondaryRecord(ct *catalog.Catalog, input newSecondaryRecordInput) (*SecondaryRecord, error) {
+func sortSecondaryRecord(ct *catalog.Catalog, input newSecondaryRecordInput) (*secondaryRecord, error) {
 	index, err := fetchIndex(ct, input.fileId, input.indexName)
 	if err != nil {
 		return nil, err
@@ -124,7 +124,7 @@ func sortSecondaryRecord(ct *catalog.Catalog, input newSecondaryRecordInput) (*S
 		sortedValues[pos] = input.values[i]
 	}
 
-	return &SecondaryRecord{
+	return &secondaryRecord{
 		deleteMark: input.deleteMark,
 		ColNames:   sortedColNames,
 		Values:     sortedValues,

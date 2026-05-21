@@ -54,7 +54,7 @@ func CreateTable(
 	}
 
 	// プライマリインデックス作成
-	pi, err := createPrimaryIndex(ct, bp, fileId, lock, input)
+	pi, err := createPrimaryIndex(ct, bp, fileId, input.PkCount, lock)
 	if err != nil {
 		return nil, err
 	}
@@ -100,22 +100,11 @@ func createTableFile(ct *catalog.Catalog, bp *buffer.BufferPool, tableName strin
 	return fileId, nil
 }
 
-// createPrimaryIndex はプライマリインデックスを作成する
-func createPrimaryIndex(
-	ct *catalog.Catalog,
-	bp *buffer.BufferPool,
-	fileId page.FileId,
-	lock *lock.Manager,
-	input CreateTableInput,
-) (*PrimaryIndex, error) {
-	return CreatePrimaryIndex(ct, bp, fileId, input.PkCount, lock)
-}
-
 // registerTableMeta はテーブルメタ・インデックスメタ (プライマリ)・カラムメタをカタログに登録する
 func registerTableMeta(
 	ct *catalog.Catalog,
 	fileId page.FileId,
-	pi *PrimaryIndex,
+	pi *primaryIndex,
 	input CreateTableInput,
 ) error {
 	// テーブルメタ
@@ -157,14 +146,14 @@ func createSecondaryIndexes(
 	pt *btree.Btree,
 	lock *lock.Manager,
 	inputs []CreateIndexInput,
-) ([]*SecondaryIndex, error) {
-	indexes := make([]*SecondaryIndex, 0, len(inputs))
+) ([]*secondaryIndex, error) {
+	indexes := make([]*secondaryIndex, 0, len(inputs))
 	for _, input := range inputs {
 		indexId, err := ct.AllocateIndexId()
 		if err != nil {
 			return nil, err
 		}
-		index, err := CreateSecondaryIndex(ct, bp, CreateSecondaryIndexInput{
+		index, err := createSecondaryIndex(ct, bp, createSecondaryIndexInput{
 			FileId:      fileId,
 			PrimaryTree: pt,
 			IndexId:     indexId,

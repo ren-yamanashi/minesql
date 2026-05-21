@@ -5,8 +5,8 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
 )
 
-// SecondaryIterator はセカンダリインデックスを辿るイテレータ
-type SecondaryIterator struct {
+// secondaryIterator はセカンダリインデックスを辿るイテレータ
+type secondaryIterator struct {
 	indexName   string
 	iterator    *btree.Iterator
 	catalog     *catalog.Catalog
@@ -18,8 +18,8 @@ func newSecondaryIterator(
 	iter *btree.Iterator,
 	ct *catalog.Catalog,
 	pt *btree.Btree,
-) *SecondaryIterator {
-	return &SecondaryIterator{
+) *secondaryIterator {
+	return &secondaryIterator{
 		indexName:   indexName,
 		iterator:    iter,
 		catalog:     ct,
@@ -27,10 +27,10 @@ func newSecondaryIterator(
 	}
 }
 
-// Next はセカンダリインデックスから次の結果を返す
+// next はセカンダリインデックスから次の結果を返す
 // (secondary-index -> primary-index の順で検索する)
 //   - return: 検索結果, データがあるか
-func (si *SecondaryIterator) Next() (*PrimaryRecord, bool, error) {
+func (si *secondaryIterator) next() (*primaryRecord, bool, error) {
 	for {
 		secondaryRecord, err := si.nextVisibleSecondaryRecord()
 		if err != nil {
@@ -47,7 +47,7 @@ func (si *SecondaryIterator) Next() (*PrimaryRecord, bool, error) {
 		}
 
 		pi := newPrimaryIterator(iter, si.catalog, si.primaryTree.MetaPageId.FileId)
-		result, found, err := pi.Next()
+		result, found, err := pi.next()
 		if err != nil {
 			return nil, false, err
 		}
@@ -58,9 +58,9 @@ func (si *SecondaryIterator) Next() (*PrimaryRecord, bool, error) {
 	}
 }
 
-// NextIndexOnly はセカンダリインデックスのみを検索して次の結果を返す
+// nextIndexOnly はセカンダリインデックスのみを検索して次の結果を返す
 //   - return: 検索結果, データがあるか
-func (si *SecondaryIterator) NextIndexOnly() (*SecondaryRecord, bool, error) {
+func (si *secondaryIterator) nextIndexOnly() (*secondaryRecord, bool, error) {
 	record, err := si.nextVisibleSecondaryRecord()
 	if err != nil {
 		return nil, false, err
@@ -72,7 +72,7 @@ func (si *SecondaryIterator) NextIndexOnly() (*SecondaryRecord, bool, error) {
 }
 
 // nextVisibleSecondaryRecord は削除済みレコードをスキップして次の可視セカンダリレコードを返す
-func (si *SecondaryIterator) nextVisibleSecondaryRecord() (*SecondaryRecord, error) {
+func (si *secondaryIterator) nextVisibleSecondaryRecord() (*secondaryRecord, error) {
 	for {
 		record, ok, err := si.iterator.Next()
 		if err != nil {

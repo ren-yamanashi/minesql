@@ -17,11 +17,11 @@ func TestNewPrimaryIndex(t *testing.T) {
 		// GIVEN
 		env := setupIteratorTestEnv(t)
 		lockMgr := lock.NewManager()
-		created, err := CreatePrimaryIndex(env.ct, env.bp, page.FileId(2), 1, lockMgr)
+		created, err := createPrimaryIndex(env.ct, env.bp, page.FileId(2), 1, lockMgr)
 		assert.NoError(t, err)
 
 		// WHEN
-		pi := NewPrimaryIndex(env.ct, env.bp, created.tree.MetaPageId, 1, lockMgr)
+		pi := newPrimaryIndex(env.ct, env.bp, created.tree.MetaPageId, 1, lockMgr)
 
 		// THEN
 		assert.NotNil(t, pi)
@@ -35,7 +35,7 @@ func TestCreatePrimaryIndex(t *testing.T) {
 		lockMgr := lock.NewManager()
 
 		// WHEN
-		pi, err := CreatePrimaryIndex(env.ct, env.bp, page.FileId(2), 1, lockMgr)
+		pi, err := createPrimaryIndex(env.ct, env.bp, page.FileId(2), 1, lockMgr)
 
 		// THEN
 		assert.NoError(t, err)
@@ -50,7 +50,7 @@ func TestPrimaryIndexInsert(t *testing.T) {
 		record := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
 
 		// WHEN
-		err := pi.Insert(record, testTrxId)
+		err := pi.insert(record, testTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -60,11 +60,11 @@ func TestPrimaryIndexInsert(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
 		r1 := buildTestPrimaryRecord(t, pi, "1", "Alice", "a@example.com")
-		_ = pi.Insert(r1, testTrxId)
+		_ = pi.insert(r1, testTrxId)
 		r2 := buildTestPrimaryRecord(t, pi, "1", "Bob", "b@example.com")
 
 		// WHEN
-		err := pi.Insert(r2, testTrxId)
+		err := pi.insert(r2, testTrxId)
 
 		// THEN
 		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
@@ -74,11 +74,11 @@ func TestPrimaryIndexInsert(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
 		r1 := buildTestPrimaryRecord(t, pi, "1", "Alice", "a@example.com")
-		_ = pi.Insert(r1, testTrxId)
+		_ = pi.insert(r1, testTrxId)
 		r2 := buildTestPrimaryRecord(t, pi, "2", "Bob", "b@example.com")
 
 		// WHEN
-		err := pi.Insert(r2, testTrxId)
+		err := pi.insert(r2, testTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -88,17 +88,17 @@ func TestPrimaryIndexInsert(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
 		r1 := buildTestPrimaryRecord(t, pi, "1", "Alice", "a@example.com")
-		_ = pi.Insert(r1, testTrxId)
+		_ = pi.insert(r1, testTrxId)
 
 		// 論理削除
-		iter, _ := pi.Search(SearchModeStart{})
-		record, _, _ := iter.Next()
-		_ = pi.SoftDelete(record, testTrxId)
+		iter, _ := pi.search(SearchModeStart{})
+		record, _, _ := iter.next()
+		_ = pi.softDelete(record, testTrxId)
 
 		r2 := buildTestPrimaryRecord(t, pi, "1", "Bob", "b@example.com")
 
 		// WHEN
-		err := pi.Insert(r2, testTrxId)
+		err := pi.insert(r2, testTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -110,12 +110,12 @@ func TestPrimaryIndexInsert(t *testing.T) {
 		record := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
 
 		// WHEN
-		err := pi.Insert(record, testTrxId)
+		err := pi.insert(record, testTrxId)
 
 		// THEN
 		assert.NoError(t, err)
 		// 同一トランザクションで既に排他ロックを保持しているので再取得は成功する
-		encodedRecord := record.Encode()
+		encodedRecord := record.encode()
 		_, pos, err := pi.tree.FindByKey(encodedRecord.Key())
 		assert.NoError(t, err)
 		err = pi.lock.Lock(testTrxId, pos, lock.Exclusive)
@@ -128,14 +128,14 @@ func TestPrimaryIndexSearch(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
 		record := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
-		_ = pi.Insert(record, testTrxId)
+		_ = pi.insert(record, testTrxId)
 
 		// WHEN
-		iter, err := pi.Search(SearchModeStart{})
+		iter, err := pi.search(SearchModeStart{})
 
 		// THEN
 		assert.NoError(t, err)
-		result, ok, err := iter.Next()
+		result, ok, err := iter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, result.Values)
@@ -146,10 +146,10 @@ func TestPrimaryIndexSearch(t *testing.T) {
 		pi := setupTestPrimaryIndex(t)
 
 		// WHEN
-		iter, err := pi.Search(SearchModeStart{})
+		iter, err := pi.search(SearchModeStart{})
 		assert.NoError(t, err)
 
-		_, ok, err := iter.Next()
+		_, ok, err := iter.next()
 
 		// THEN
 		assert.NoError(t, err)
@@ -162,20 +162,20 @@ func TestPrimaryIndexSoftDelete(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
 		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
-		_ = pi.Insert(r, testTrxId)
+		_ = pi.insert(r, testTrxId)
 
-		iter, _ := pi.Search(SearchModeStart{})
-		record, _, _ := iter.Next()
+		iter, _ := pi.search(SearchModeStart{})
+		record, _, _ := iter.next()
 
 		// WHEN
-		err := pi.SoftDelete(record, testTrxId)
+		err := pi.softDelete(record, testTrxId)
 
 		// THEN
 		assert.NoError(t, err)
 
 		// 論理削除後は検索でスキップされる
-		iter2, _ := pi.Search(SearchModeStart{})
-		_, ok, _ := iter2.Next()
+		iter2, _ := pi.search(SearchModeStart{})
+		_, ok, _ := iter2.next()
 		assert.False(t, ok)
 	})
 
@@ -183,16 +183,16 @@ func TestPrimaryIndexSoftDelete(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
 		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
-		_ = pi.Insert(r, testTrxId)
+		_ = pi.insert(r, testTrxId)
 
-		iter, _ := pi.Search(SearchModeStart{})
-		record, _, _ := iter.Next()
-		_ = pi.SoftDelete(record, testTrxId)
+		iter, _ := pi.search(SearchModeStart{})
+		record, _, _ := iter.next()
+		_ = pi.softDelete(record, testTrxId)
 
 		r2 := buildTestPrimaryRecord(t, pi, "1", "Bob", "bob@example.com")
 
 		// WHEN
-		err := pi.Insert(r2, testTrxId)
+		err := pi.insert(r2, testTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -204,21 +204,21 @@ func TestPrimaryIndexUpdate(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
 		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
-		_ = pi.Insert(r, testTrxId)
+		_ = pi.insert(r, testTrxId)
 
-		iter, _ := pi.Search(SearchModeStart{})
-		current, _, _ := iter.Next()
+		iter, _ := pi.search(SearchModeStart{})
+		current, _, _ := iter.next()
 		newRecord, _ := current.update(testTrxId, []string{"name"}, []string{"Bob"})
 
 		// WHEN
-		err := pi.Update(current, newRecord, testTrxId)
+		err := pi.update(current, newRecord, testTrxId)
 
 		// THEN
 		assert.NoError(t, err)
 
 		// 更新後の値を確認
-		iter2, _ := pi.Search(SearchModeStart{})
-		updated, ok, _ := iter2.Next()
+		iter2, _ := pi.search(SearchModeStart{})
+		updated, ok, _ := iter2.next()
 		assert.True(t, ok)
 		assert.Equal(t, "Bob", updated.Values[1])
 		assert.Equal(t, "alice@example.com", updated.Values[2])
@@ -228,10 +228,10 @@ func TestPrimaryIndexUpdate(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
 		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "a@example.com")
-		_ = pi.Insert(r, testTrxId)
+		_ = pi.insert(r, testTrxId)
 
-		iter, _ := pi.Search(SearchModeStart{})
-		current, _, _ := iter.Next()
+		iter, _ := pi.search(SearchModeStart{})
+		current, _, _ := iter.next()
 
 		// WHEN
 		_, err := current.update(testTrxId, []string{"nonexistent"}, []string{"val"})
@@ -246,20 +246,20 @@ func TestPrimaryIndexDelete(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
 		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
-		_ = pi.Insert(r, testTrxId)
+		_ = pi.insert(r, testTrxId)
 
-		iter, _ := pi.Search(SearchModeStart{})
-		record, _, _ := iter.Next()
+		iter, _ := pi.search(SearchModeStart{})
+		record, _, _ := iter.next()
 
 		// WHEN
-		err := pi.Delete(record, testTrxId)
+		err := pi.delete(record, testTrxId)
 
 		// THEN
 		assert.NoError(t, err)
 
 		// 削除後は取得できない
-		iter2, _ := pi.Search(SearchModeStart{})
-		_, ok, _ := iter2.Next()
+		iter2, _ := pi.search(SearchModeStart{})
+		_, ok, _ := iter2.next()
 		assert.False(t, ok)
 	})
 
@@ -269,7 +269,7 @@ func TestPrimaryIndexDelete(t *testing.T) {
 		pr := buildTestPrimaryRecord(t, pi, "999", "Nobody", "no@example.com")
 
 		// WHEN
-		err := pi.Delete(pr, testTrxId)
+		err := pi.delete(pr, testTrxId)
 
 		// THEN
 		assert.Error(t, err)
@@ -282,7 +282,7 @@ func TestPrimaryIndexFileId(t *testing.T) {
 		pi := setupTestPrimaryIndex(t)
 
 		// WHEN
-		fileId := pi.FileId()
+		fileId := pi.fileId()
 
 		// THEN
 		assert.Equal(t, page.FileId(2), fileId)
@@ -295,7 +295,7 @@ func TestPrimaryIndexLeafPageCount(t *testing.T) {
 		pi := setupTestPrimaryIndex(t)
 
 		// WHEN
-		count, err := pi.LeafPageCount()
+		count, err := pi.leafPageCount()
 
 		// THEN
 		assert.NoError(t, err)
@@ -309,7 +309,7 @@ func TestPrimaryIndexHeight(t *testing.T) {
 		pi := setupTestPrimaryIndex(t)
 
 		// WHEN
-		height, err := pi.Height()
+		height, err := pi.height()
 
 		// THEN
 		assert.NoError(t, err)
@@ -318,11 +318,11 @@ func TestPrimaryIndexHeight(t *testing.T) {
 }
 
 // setupTestPrimaryIndex はテスト用の PrimaryIndex (pkCount=1) を作成する
-func setupTestPrimaryIndex(t *testing.T) *PrimaryIndex {
+func setupTestPrimaryIndex(t *testing.T) *primaryIndex {
 	t.Helper()
 	env := setupIteratorTestEnv(t)
 	lockMgr := lock.NewManager()
-	pi, err := CreatePrimaryIndex(env.ct, env.bp, page.FileId(2), 1, lockMgr)
+	pi, err := createPrimaryIndex(env.ct, env.bp, page.FileId(2), 1, lockMgr)
 	if err != nil {
 		t.Fatalf("PrimaryIndex の作成に失敗: %v", err)
 	}
@@ -330,7 +330,7 @@ func setupTestPrimaryIndex(t *testing.T) *PrimaryIndex {
 }
 
 // buildTestPrimaryRecord はテスト用の PrimaryRecord (id, name, email) を構築する
-func buildTestPrimaryRecord(t *testing.T, pi *PrimaryIndex, id, name, email string) *PrimaryRecord {
+func buildTestPrimaryRecord(t *testing.T, pi *primaryIndex, id, name, email string) *primaryRecord {
 	t.Helper()
 	pr, err := newPrimaryRecord(pi.catalog, newPrimaryRecordInput{
 		fileId:     pi.tree.MetaPageId.FileId,

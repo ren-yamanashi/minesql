@@ -11,7 +11,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
-type NewSecondaryIndexInput struct {
+type newSecondaryIndexInput struct {
 	MetaPageId  page.PageId     // セカンダリインデックスの MetaPageId
 	PrimaryTree *btree.Btree    // プライマリインデックスの B+Tree
 	IndexId     catalog.IndexId // インデックス ID
@@ -20,8 +20,8 @@ type NewSecondaryIndexInput struct {
 	Lock        *lock.Manager
 }
 
-// SecondaryIndex はセカンダリインデックスへのアクセスを提供する
-type SecondaryIndex struct {
+// secondaryIndex はセカンダリインデックスへのアクセスを提供する
+type secondaryIndex struct {
 	catalog     *catalog.Catalog
 	tree        *btree.Btree    // セカンダリインデックスの B+Tree
 	primaryTree *btree.Btree    // プライマリインデックスの B+Tree
@@ -32,14 +32,14 @@ type SecondaryIndex struct {
 	lock        *lock.Manager
 }
 
-// NewSecondaryIndex は既存のセカンダリインデックスを開く
-func NewSecondaryIndex(
+// newSecondaryIndex は既存のセカンダリインデックスを開く
+func newSecondaryIndex(
 	ct *catalog.Catalog,
 	bp *buffer.BufferPool,
-	input NewSecondaryIndexInput,
-) *SecondaryIndex {
+	input newSecondaryIndexInput,
+) *secondaryIndex {
 	tree := btree.NewBtree(bp, input.MetaPageId)
-	return &SecondaryIndex{
+	return &secondaryIndex{
 		catalog:     ct,
 		tree:        tree,
 		primaryTree: input.PrimaryTree,
@@ -51,7 +51,7 @@ func NewSecondaryIndex(
 	}
 }
 
-type CreateSecondaryIndexInput struct {
+type createSecondaryIndexInput struct {
 	FileId      page.FileId     // インデックスが属するテーブルの FileId
 	PrimaryTree *btree.Btree    // プライマリインデックスの B+Tree
 	IndexId     catalog.IndexId // インデックス ID
@@ -60,17 +60,17 @@ type CreateSecondaryIndexInput struct {
 	Lock        *lock.Manager
 }
 
-// CreateSecondaryIndex は空のセカンダリインデックスを作成する
-func CreateSecondaryIndex(
+// createSecondaryIndex は空のセカンダリインデックスを作成する
+func createSecondaryIndex(
 	ct *catalog.Catalog,
 	bp *buffer.BufferPool,
-	input CreateSecondaryIndexInput,
-) (*SecondaryIndex, error) {
+	input createSecondaryIndexInput,
+) (*secondaryIndex, error) {
 	tree, err := btree.CreateBtree(bp, input.FileId)
 	if err != nil {
 		return nil, err
 	}
-	return &SecondaryIndex{
+	return &secondaryIndex{
 		catalog:     ct,
 		tree:        tree,
 		primaryTree: input.PrimaryTree,
@@ -82,8 +82,8 @@ func CreateSecondaryIndex(
 	}, nil
 }
 
-// Search は指定した検索モードでインデックスを検索し、イテレータを返す
-func (si *SecondaryIndex) Search(mode SearchMode) (*SecondaryIterator, error) {
+// search は指定した検索モードでインデックスを検索し、イテレータを返す
+func (si *secondaryIndex) search(mode SearchMode) (*secondaryIterator, error) {
 	iter, err := si.tree.Search(mode.encode())
 	if err != nil {
 		return nil, err
@@ -91,16 +91,16 @@ func (si *SecondaryIndex) Search(mode SearchMode) (*SecondaryIterator, error) {
 	return newSecondaryIterator(si.indexName, iter, si.catalog, si.primaryTree), nil
 }
 
-// Insert は行を挿入する
+// insert は行を挿入する
 //   - unique index の場合かつセカンダリキーの重複があるとエラー
 //   - 論理削除済みの同一キー (SK + PK) が存在する場合は上書きする
-func (si *SecondaryIndex) Insert(record *SecondaryRecord, pk []string, trxId lock.TrxId) error {
+func (si *secondaryIndex) insert(record *secondaryRecord, pk []string, trxId lock.TrxId) error {
 	if si.unique {
 		if err := si.checkUnique(record); err != nil {
 			return err
 		}
 	}
-	encodedRecord := record.Encode()
+	encodedRecord := record.encode()
 
 	// 挿入
 	err := si.tree.Insert(encodedRecord)
@@ -131,10 +131,10 @@ func (si *SecondaryIndex) Insert(record *SecondaryRecord, pk []string, trxId loc
 	return si.lock.Lock(trxId, pos, lock.Exclusive)
 }
 
-// Delete は行を物理削除する
-func (si *SecondaryIndex) Delete(record *SecondaryRecord, trxId lock.TrxId) error {
+// delete は行を物理削除する
+func (si *secondaryIndex) delete(record *secondaryRecord, trxId lock.TrxId) error {
 	// 排他ロックを取得
-	encodedRecord := record.Encode()
+	encodedRecord := record.encode()
 	_, pos, err := si.tree.FindByKey(encodedRecord.Key())
 	if err != nil {
 		return err
@@ -147,10 +147,10 @@ func (si *SecondaryIndex) Delete(record *SecondaryRecord, trxId lock.TrxId) erro
 	return si.tree.Delete(encodedRecord.Key())
 }
 
-// SoftDelete は行を論理削除する
-func (si *SecondaryIndex) SoftDelete(record *SecondaryRecord, trxId lock.TrxId) error {
+// softDelete は行を論理削除する
+func (si *secondaryIndex) softDelete(record *secondaryRecord, trxId lock.TrxId) error {
 	// 排他ロックを取得
-	encodedRecord := record.Encode()
+	encodedRecord := record.encode()
 	_, pos, err := si.tree.FindByKey(encodedRecord.Key())
 	if err != nil {
 		return err
@@ -172,22 +172,22 @@ func (si *SecondaryIndex) SoftDelete(record *SecondaryRecord, trxId lock.TrxId) 
 	if err != nil {
 		return err
 	}
-	return si.tree.Update(deleted.Encode())
+	return si.tree.Update(deleted.encode())
 }
 
-// LeafPageCount はリーフページ数を取得する
-func (si *SecondaryIndex) LeafPageCount() (uint64, error) {
+// leafPageCount はリーフページ数を取得する
+func (si *secondaryIndex) leafPageCount() (uint64, error) {
 	return si.tree.LeafPageCount()
 }
 
 // Height はツリーの高さを取得する
-func (si *SecondaryIndex) Height() (uint64, error) {
+func (si *secondaryIndex) Height() (uint64, error) {
 	return si.tree.Height()
 }
 
 // checkUnique は record のセカンダリキーに対して active なレコードが存在するか確認する
 //   - return: 存在する場合は ErrDuplicateKey
-func (si *SecondaryIndex) checkUnique(sr *SecondaryRecord) error {
+func (si *secondaryIndex) checkUnique(sr *secondaryRecord) error {
 	encodedSk := sr.encodedSecondaryKey()
 	// セカンダリインデックスのキーは SK+PK の構成であり、SK のみで SearchModeKey を使うと SK 以上の最初のキーの位置に着地する
 	iter, err := si.tree.Search(btree.SearchModeKey{Key: encodedSk})

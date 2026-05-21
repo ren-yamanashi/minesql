@@ -14,8 +14,8 @@ import (
 
 // Table はテーブルへのアクセスを提供する
 type Table struct {
-	primaryIndex     *PrimaryIndex
-	secondaryIndexes []*SecondaryIndex
+	primaryIndex     *primaryIndex
+	secondaryIndexes []*secondaryIndex
 	catalog          *catalog.Catalog
 	undoLog          *undo.Manager
 	lock             *lock.Manager
@@ -67,12 +67,12 @@ func fetchTable(ct *catalog.Catalog, name string) (catalog.TableRecord, error) {
 }
 
 // fetchPrimaryIndex はカタログからプライマリインデックスを取得して PrimaryIndex を構築する
-func fetchPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, fileId page.FileId, lock *lock.Manager) (*PrimaryIndex, error) {
+func fetchPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, fileId page.FileId, lock *lock.Manager) (*primaryIndex, error) {
 	record, err := fetchPrimaryIndexRecord(ct, fileId)
 	if err != nil {
 		return nil, err
 	}
-	return NewPrimaryIndex(ct, bp, record.MetaPageId, record.NumOfCol, lock), nil
+	return newPrimaryIndex(ct, bp, record.MetaPageId, record.NumOfCol, lock), nil
 }
 
 // fetchPrimaryIndexRecord はカタログからプライマリインデックスの IndexRecord を取得する
@@ -102,14 +102,14 @@ func fetchSecondaryIndexes(
 	fileId page.FileId,
 	pt *btree.Btree,
 	lock *lock.Manager,
-) ([]*SecondaryIndex, error) {
+) ([]*secondaryIndex, error) {
 	records, err := fetchSecondaryIndexRecords(ct, fileId)
 	if err != nil {
 		return nil, err
 	}
-	indexes := make([]*SecondaryIndex, 0, len(records))
+	indexes := make([]*secondaryIndex, 0, len(records))
 	for _, record := range records {
-		index := NewSecondaryIndex(ct, bp, NewSecondaryIndexInput{
+		index := newSecondaryIndex(ct, bp, newSecondaryIndexInput{
 			MetaPageId:  record.MetaPageId,
 			PrimaryTree: pt,
 			IndexId:     record.IndexId,
@@ -174,7 +174,7 @@ func (t *Table) extractSecondaryKey(keyCols map[string]int, valMap map[string]st
 }
 
 // buildSecondaryRecord はセカンダリインデックス用のレコードを構築する
-func (t *Table) buildSecondaryRecord(si *SecondaryIndex, skColNames, skValues, pk []string) (*SecondaryRecord, error) {
+func (t *Table) buildSecondaryRecord(si *secondaryIndex, skColNames, skValues, pk []string) (*secondaryRecord, error) {
 	return newSecondaryRecord(t.catalog, newSecondaryRecordInput{
 		fileId:     si.fileId,
 		deleteMark: 0,

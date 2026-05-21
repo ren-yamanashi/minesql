@@ -255,7 +255,7 @@ func TestPrimaryRecordSetRollPtr(t *testing.T) {
 		pr.setRollPtr(newPtr)
 
 		// WHEN
-		record := pr.Encode()
+		record := pr.encode()
 
 		// THEN
 		nonKey := record.NonKey()
@@ -270,7 +270,7 @@ func TestPrimaryRecordEncode(t *testing.T) {
 		pr, _ := newPrimaryRecord(ct, newPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "alice@example.com"}})
 
 		// WHEN
-		record := pr.Encode()
+		record := pr.encode()
 
 		// THEN
 		assert.Equal(t, []byte{0x00}, record.Header())
@@ -299,7 +299,7 @@ func TestPrimaryRecordEncode(t *testing.T) {
 		})
 
 		// WHEN
-		record := pr.Encode()
+		record := pr.encode()
 
 		// THEN
 		nonKey := record.NonKey()
@@ -313,7 +313,7 @@ func TestPrimaryRecordEncode(t *testing.T) {
 		pr, _ := newPrimaryRecord(ct, newPrimaryRecordInput{fileId: page.FileId(2), pkCount: 2, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "alice@example.com"}})
 
 		// WHEN
-		record := pr.Encode()
+		record := pr.encode()
 
 		// THEN
 		var decodedKey [][]byte
@@ -332,7 +332,7 @@ func TestPrimaryRecordEncode(t *testing.T) {
 		pr, _ := newPrimaryRecord(ct, newPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 1, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "a@b.com"}})
 
 		// WHEN
-		record := pr.Encode()
+		record := pr.encode()
 
 		// THEN
 		assert.Equal(t, []byte{0x01}, record.Header())
@@ -344,7 +344,7 @@ func TestDecodePrimaryRecord(t *testing.T) {
 		// GIVEN
 		ct := setupSecondaryTestCatalog(t)
 		original, _ := newPrimaryRecord(ct, newPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "alice@example.com"}})
-		encoded := original.Encode()
+		encoded := original.encode()
 
 		// WHEN
 		decoded, err := decodePrimaryRecord(encoded, ct, page.FileId(2))
@@ -367,7 +367,7 @@ func TestDecodePrimaryRecord(t *testing.T) {
 			colNames: []string{"id", "name", "email"},
 			values:   []string{"1", "Alice", "a@b.com"},
 		})
-		encoded := original.Encode()
+		encoded := original.encode()
 
 		// WHEN
 		decoded, err := decodePrimaryRecord(encoded, ct, page.FileId(2))
@@ -387,7 +387,7 @@ func TestDecodePrimaryRecord(t *testing.T) {
 			colNames: []string{"id", "name", "email"},
 			values:   []string{"1", "Alice", "a@b.com"},
 		})
-		encoded := original.Encode()
+		encoded := original.encode()
 
 		// WHEN
 		decoded, err := decodePrimaryRecord(encoded, ct, page.FileId(2))
@@ -401,7 +401,7 @@ func TestDecodePrimaryRecord(t *testing.T) {
 		// GIVEN
 		ct := setupSecondaryTestCatalog(t)
 		original, _ := newPrimaryRecord(ct, newPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 1, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "a@b.com"}})
-		encoded := original.Encode()
+		encoded := original.encode()
 
 		// WHEN
 		decoded, err := decodePrimaryRecord(encoded, ct, page.FileId(2))

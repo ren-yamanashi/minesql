@@ -150,7 +150,7 @@ func TestTableBuildSecondaryRecord(t *testing.T) {
 		env := setupTableTestEnv(t)
 		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
 
-		var si *SecondaryIndex
+		var si *secondaryIndex
 		for _, s := range table.secondaryIndexes {
 			if s.indexName == "idx_name" {
 				si = s

@@ -8,7 +8,7 @@ import (
 // Insert はテーブルに行を挿入する
 func (t *Table) Insert(colNames []string, values []string, trxId lock.TrxId) error {
 	record, err := newPrimaryRecord(t.catalog, newPrimaryRecordInput{
-		fileId:     t.primaryIndex.FileId(),
+		fileId:     t.primaryIndex.fileId(),
 		pkCount:    t.primaryIndex.pkCount,
 		deleteMark: 0,
 		colNames:   colNames,
@@ -19,7 +19,7 @@ func (t *Table) Insert(colNames []string, values []string, trxId lock.TrxId) err
 	}
 
 	// Undo ログを更新
-	undoRecord := undo.NewInsertRecord(t.primaryIndex.FileId(), record.Encode())
+	undoRecord := undo.NewInsertRecord(t.primaryIndex.fileId(), record.encode())
 	ptr, err := t.undoLog.Append(trxId, undo.RecordTypeInsert, undoRecord)
 	if err != nil {
 		return err
@@ -27,7 +27,7 @@ func (t *Table) Insert(colNames []string, values []string, trxId lock.TrxId) err
 	record.setRollPtr(ptr)
 
 	// レコード挿入
-	if err := t.primaryIndex.Insert(record, trxId); err != nil {
+	if err := t.primaryIndex.insert(record, trxId); err != nil {
 		return err
 	}
 	return t.insertSecondaryIndexes(record.ColNames, record.Values, trxId)
@@ -48,7 +48,7 @@ func (t *Table) insertSecondaryIndexes(colNames, values []string, trxId lock.Trx
 		if err != nil {
 			return err
 		}
-		if err := si.Insert(record, pk, trxId); err != nil {
+		if err := si.insert(record, pk, trxId); err != nil {
 			return err
 		}
 	}

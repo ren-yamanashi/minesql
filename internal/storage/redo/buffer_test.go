@@ -45,7 +45,7 @@ func TestBufferAppendPageCopy(t *testing.T) {
 		lsn2 := buf.AppendPageCopy(lock.TrxId(1), page.NewPageId(1, 2), *pg)
 
 		// THEN
-		assert.Equal(t, Lsn(0), lsn1)
+		assert.Equal(t, Lsn(1), lsn1)
 		assert.Equal(t, Lsn(2), lsn2)
 	})
 }
@@ -190,21 +190,21 @@ func TestBufferFlushedLsn(t *testing.T) {
 		lsn := buf.FlushedLsn()
 
 		// THEN
-		assert.Equal(t, Lsn(1), lsn)
+		assert.Equal(t, Lsn(0), lsn)
 	})
 
 	t.Run("フラッシュ後は最後のレコードの LSN を返す", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
-		buf.AppendCommit(lock.TrxId(1)) // LSN=0
-		buf.AppendCommit(lock.TrxId(2)) // LSN=1
+		buf.AppendCommit(lock.TrxId(1)) // LSN=1
+		buf.AppendCommit(lock.TrxId(2)) // LSN=2
 		_ = buf.Flush()
 
 		// WHEN
 		lsn := buf.FlushedLsn()
 
 		// THEN
-		assert.Equal(t, Lsn(1), lsn)
+		assert.Equal(t, Lsn(2), lsn)
 	})
 }
 
@@ -230,20 +230,20 @@ func TestBufferTruncateBefore(t *testing.T) {
 	t.Run("指定 LSN 以前のレコードが削除される", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
-		buf.AppendCommit(lock.TrxId(1)) // LSN=0
-		buf.AppendCommit(lock.TrxId(2)) // LSN=1
-		buf.AppendCommit(lock.TrxId(3)) // LSN=2
+		buf.AppendCommit(lock.TrxId(1)) // LSN=1
+		buf.AppendCommit(lock.TrxId(2)) // LSN=2
+		buf.AppendCommit(lock.TrxId(3)) // LSN=3
 		_ = buf.Flush()
 
 		// WHEN
-		err := buf.TruncateBefore(Lsn(1))
+		err := buf.TruncateBefore(Lsn(2))
 
 		// THEN
 		assert.NoError(t, err)
 		records, err := buf.ReadAll()
 		assert.NoError(t, err)
 		assert.Len(t, records, 1)
-		assert.Equal(t, Lsn(2), records[0].Lsn)
+		assert.Equal(t, Lsn(3), records[0].Lsn)
 	})
 }
 

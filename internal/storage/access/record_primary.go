@@ -23,8 +23,8 @@ type newPrimaryRecordInput struct {
 	values     []string // テーブルを構成するカラム値のリスト (lastTrxId, rollPtr は含まない)
 }
 
-// PrimaryRecord はプライマリインデックスレコード
-type PrimaryRecord struct {
+// primaryRecord はプライマリインデックスレコード
+type primaryRecord struct {
 	pkCount    int
 	deleteMark byte
 	lastTrxId  lock.TrxId
@@ -33,7 +33,7 @@ type PrimaryRecord struct {
 	Values     []string
 }
 
-func newPrimaryRecord(ct *catalog.Catalog, input newPrimaryRecordInput) (*PrimaryRecord, error) {
+func newPrimaryRecord(ct *catalog.Catalog, input newPrimaryRecordInput) (*primaryRecord, error) {
 	if len(input.colNames) != len(input.values) {
 		return nil, errors.New("number of colNames not equal values")
 	}
@@ -42,7 +42,7 @@ func newPrimaryRecord(ct *catalog.Catalog, input newPrimaryRecordInput) (*Primar
 
 // update は指定されたカラムの値を更新した新しい PrimaryRecord を返す
 // (colNames はテーブルの全カラムである必要はない)
-func (r *PrimaryRecord) update(trxId lock.TrxId, colNames, values []string) (*PrimaryRecord, error) {
+func (r *primaryRecord) update(trxId lock.TrxId, colNames, values []string) (*primaryRecord, error) {
 	if len(colNames) != len(values) {
 		return nil, errors.New("number of colNames not equal values")
 	}
@@ -71,7 +71,7 @@ func (r *PrimaryRecord) update(trxId lock.TrxId, colNames, values []string) (*Pr
 		newValues[pos] = values[i]
 	}
 
-	return &PrimaryRecord{
+	return &primaryRecord{
 		pkCount:    r.pkCount,
 		deleteMark: r.deleteMark,
 		lastTrxId:  trxId,
@@ -82,13 +82,13 @@ func (r *PrimaryRecord) update(trxId lock.TrxId, colNames, values []string) (*Pr
 }
 
 // setRollPtr は rollPtr をセットする
-func (r *PrimaryRecord) setRollPtr(rollPtr undo.Pointer) {
+func (r *primaryRecord) setRollPtr(rollPtr undo.Pointer) {
 	r.rollPtr = rollPtr
 }
 
-// Encode は node.Record にエンコードする
+// encode は node.Record にエンコードする
 //   - 非キー領域: lastTrxId (4B) + rollPtr (6B) + 非キーカラム
-func (r *PrimaryRecord) Encode() node.Record {
+func (r *primaryRecord) encode() node.Record {
 	var key []byte
 	encode.Encode(stringToByteSlice(r.Values[:r.pkCount]), &key)
 
@@ -102,7 +102,7 @@ func (r *PrimaryRecord) Encode() node.Record {
 
 // decodePrimaryRecord は node.Record から PrimaryRecord にデコードする
 //   - 非キー領域: lastTrxId (4B) + rollPtr (6B) + 非キーカラム
-func decodePrimaryRecord(record node.Record, ct *catalog.Catalog, fileId page.FileId) (*PrimaryRecord, error) {
+func decodePrimaryRecord(record node.Record, ct *catalog.Catalog, fileId page.FileId) (*primaryRecord, error) {
 	var values [][]byte
 	encode.Decode(record.Key(), &values)
 	pkCount := len(values)
@@ -135,7 +135,7 @@ func decodePrimaryRecord(record node.Record, ct *catalog.Catalog, fileId page.Fi
 		colNames[pos] = name
 	}
 
-	return &PrimaryRecord{
+	return &primaryRecord{
 		pkCount:    pkCount,
 		deleteMark: record.Header()[0],
 		lastTrxId:  lastTrxId,
@@ -146,7 +146,7 @@ func decodePrimaryRecord(record node.Record, ct *catalog.Catalog, fileId page.Fi
 }
 
 // sortPrimaryRecord はカラムメタデータを参照して、レコードをテーブル定義順に並び替える
-func sortPrimaryRecord(ct *catalog.Catalog, input newPrimaryRecordInput) (*PrimaryRecord, error) {
+func sortPrimaryRecord(ct *catalog.Catalog, input newPrimaryRecordInput) (*primaryRecord, error) {
 	colDefs, err := fetchColumnDefs(ct, input.fileId)
 	if err != nil {
 		return nil, err
@@ -171,7 +171,7 @@ func sortPrimaryRecord(ct *catalog.Catalog, input newPrimaryRecordInput) (*Prima
 		sortedValues[pos] = input.values[i]
 	}
 
-	return &PrimaryRecord{
+	return &primaryRecord{
 		pkCount:    input.pkCount,
 		deleteMark: input.deleteMark,
 		lastTrxId:  input.lastTrxId,

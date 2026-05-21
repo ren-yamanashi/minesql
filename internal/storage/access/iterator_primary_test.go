@@ -16,7 +16,7 @@ func TestPrimaryIteratorNext(t *testing.T) {
 		iter := searchPrimaryIndex(t, env)
 
 		// WHEN
-		result, ok, err := iter.Next()
+		result, ok, err := iter.next()
 
 		// THEN
 		assert.NoError(t, err)
@@ -34,9 +34,9 @@ func TestPrimaryIteratorNext(t *testing.T) {
 		iter := searchPrimaryIndex(t, env)
 
 		// WHEN
-		r1, ok1, err1 := iter.Next()
-		r2, ok2, err2 := iter.Next()
-		_, ok3, err3 := iter.Next()
+		r1, ok1, err1 := iter.next()
+		r2, ok2, err2 := iter.next()
+		_, ok3, err3 := iter.next()
 
 		// THEN
 		assert.NoError(t, err1)
@@ -60,7 +60,7 @@ func TestPrimaryIteratorNext(t *testing.T) {
 		iter := searchPrimaryIndex(t, env)
 
 		// WHEN
-		result, ok, err := iter.Next()
+		result, ok, err := iter.next()
 
 		// THEN
 		assert.NoError(t, err)
@@ -76,7 +76,7 @@ func TestPrimaryIteratorNext(t *testing.T) {
 		iter := searchPrimaryIndex(t, env)
 
 		// WHEN
-		_, ok, err := iter.Next()
+		_, ok, err := iter.next()
 
 		// THEN
 		assert.NoError(t, err)
@@ -89,7 +89,7 @@ func TestPrimaryIteratorNext(t *testing.T) {
 		iter := searchPrimaryIndex(t, env)
 
 		// WHEN
-		_, ok, err := iter.Next()
+		_, ok, err := iter.next()
 
 		// THEN
 		assert.NoError(t, err)
@@ -98,7 +98,7 @@ func TestPrimaryIteratorNext(t *testing.T) {
 }
 
 // searchPrimaryIndex はプライマリ B+Tree を先頭から検索してイテレータを返す
-func searchPrimaryIndex(t *testing.T, env *iteratorTestEnv) *PrimaryIterator {
+func searchPrimaryIndex(t *testing.T, env *iteratorTestEnv) *primaryIterator {
 	t.Helper()
 	mode := SearchModeStart{}
 	iter, err := env.primaryTree.Search(mode.encode())

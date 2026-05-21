@@ -16,14 +16,14 @@ import (
 func TestSecondaryRecordEncode(t *testing.T) {
 	t.Run("セカンダリキーとプライマリキーをエンコードしたレコードを返す", func(t *testing.T) {
 		// GIVEN
-		sr := &SecondaryRecord{
+		sr := &secondaryRecord{
 			deleteMark: 0x00,
 			Values:     []string{"sk1"},
 			Pk:         []string{"pk1"},
 		}
 
 		// WHEN
-		record := sr.Encode()
+		record := sr.encode()
 
 		// THEN
 		assert.Equal(t, []byte{0x00}, record.Header())
@@ -37,14 +37,14 @@ func TestSecondaryRecordEncode(t *testing.T) {
 
 	t.Run("複合セカンダリキーを正しくエンコードする", func(t *testing.T) {
 		// GIVEN
-		sr := &SecondaryRecord{
+		sr := &secondaryRecord{
 			deleteMark: 0x00,
 			Values:     []string{"sk1", "sk2"},
 			Pk:         []string{"pk1"},
 		}
 
 		// WHEN
-		record := sr.Encode()
+		record := sr.encode()
 
 		// THEN
 		var decoded [][]byte
@@ -54,14 +54,14 @@ func TestSecondaryRecordEncode(t *testing.T) {
 
 	t.Run("削除マークが設定される", func(t *testing.T) {
 		// GIVEN
-		sr := &SecondaryRecord{
+		sr := &secondaryRecord{
 			deleteMark: 0x01,
 			Values:     []string{"sk1"},
 			Pk:         []string{"pk1"},
 		}
 
 		// WHEN
-		record := sr.Encode()
+		record := sr.encode()
 
 		// THEN
 		assert.Equal(t, []byte{0x01}, record.Header())
@@ -69,14 +69,14 @@ func TestSecondaryRecordEncode(t *testing.T) {
 
 	t.Run("複合プライマリキーを正しくエンコードする", func(t *testing.T) {
 		// GIVEN
-		sr := &SecondaryRecord{
+		sr := &secondaryRecord{
 			deleteMark: 0x00,
 			Values:     []string{"sk1"},
 			Pk:         []string{"pk1", "pk2"},
 		}
 
 		// WHEN
-		record := sr.Encode()
+		record := sr.encode()
 
 		// THEN
 		var decoded [][]byte
@@ -88,7 +88,7 @@ func TestSecondaryRecordEncode(t *testing.T) {
 func TestSecondaryRecordEncodedSecondaryKey(t *testing.T) {
 	t.Run("エンコード済みのセカンダリキーのみを返す", func(t *testing.T) {
 		// GIVEN
-		sr := &SecondaryRecord{
+		sr := &secondaryRecord{
 			Values: []string{"sk1"},
 			Pk:     []string{"pk1"},
 		}
@@ -104,7 +104,7 @@ func TestSecondaryRecordEncodedSecondaryKey(t *testing.T) {
 
 	t.Run("複合セカンダリキーの場合も正しくエンコードする", func(t *testing.T) {
 		// GIVEN
-		sr := &SecondaryRecord{
+		sr := &secondaryRecord{
 			Values: []string{"sk1", "sk2"},
 			Pk:     []string{"pk1"},
 		}
@@ -225,7 +225,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 			pk:         []string{"1"},
 		})
 		assert.NoError(t, err)
-		encoded := original.Encode()
+		encoded := original.encode()
 
 		// WHEN
 		decoded, err := decodeSecondaryRecord(encoded, ct, page.FileId(2), "idx_name")
@@ -250,7 +250,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 			pk:         []string{"1"},
 		})
 		assert.NoError(t, err)
-		encoded := original.Encode()
+		encoded := original.encode()
 
 		// WHEN
 		decoded, err := decodeSecondaryRecord(encoded, ct, page.FileId(2), "idx_name")
@@ -272,7 +272,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 			pk:         []string{"1"},
 		})
 		assert.NoError(t, err)
-		encoded := original.Encode()
+		encoded := original.encode()
 
 		// WHEN
 		decoded, err := decodeSecondaryRecord(encoded, ct, page.FileId(2), "idx_name_email")

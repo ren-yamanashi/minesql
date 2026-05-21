@@ -16,7 +16,7 @@ func TestNewSecondaryIndex(t *testing.T) {
 		// GIVEN
 		env := setupIteratorTestEnv(t)
 		lockMgr := lock.NewManager()
-		created, err := CreateSecondaryIndex(env.ct, env.bp, CreateSecondaryIndexInput{
+		created, err := createSecondaryIndex(env.ct, env.bp, createSecondaryIndexInput{
 			FileId:      page.FileId(2),
 			PrimaryTree: env.primaryTree,
 			IndexName:   "idx_name",
@@ -26,7 +26,7 @@ func TestNewSecondaryIndex(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		si := NewSecondaryIndex(env.ct, env.bp, NewSecondaryIndexInput{
+		si := newSecondaryIndex(env.ct, env.bp, newSecondaryIndexInput{
 			MetaPageId:  created.tree.MetaPageId,
 			PrimaryTree: env.primaryTree,
 			IndexName:   "idx_name",
@@ -46,7 +46,7 @@ func TestCreateSecondaryIndex(t *testing.T) {
 		lockMgr := lock.NewManager()
 
 		// WHEN
-		si, err := CreateSecondaryIndex(env.ct, env.bp, CreateSecondaryIndexInput{
+		si, err := createSecondaryIndex(env.ct, env.bp, createSecondaryIndexInput{
 			FileId:      page.FileId(2),
 			PrimaryTree: env.primaryTree,
 			IndexName:   "idx_name",
@@ -67,7 +67,7 @@ func TestSecondaryIndexInsert(t *testing.T) {
 		record := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
 
 		// WHEN
-		err := si.Insert(record, []string{"1"}, testSecondaryTrxId)
+		err := si.insert(record, []string{"1"}, testSecondaryTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -77,11 +77,11 @@ func TestSecondaryIndexInsert(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
 		r1 := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
-		_ = si.Insert(r1, []string{"1"}, testSecondaryTrxId)
+		_ = si.insert(r1, []string{"1"}, testSecondaryTrxId)
 		r2 := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
 
 		// WHEN
-		err := si.Insert(r2, []string{"1"}, testSecondaryTrxId)
+		err := si.insert(r2, []string{"1"}, testSecondaryTrxId)
 
 		// THEN
 		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
@@ -91,11 +91,11 @@ func TestSecondaryIndexInsert(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
 		r1 := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
-		_ = si.Insert(r1, []string{"1"}, testSecondaryTrxId)
+		_ = si.insert(r1, []string{"1"}, testSecondaryTrxId)
 		r2 := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"2"})
 
 		// WHEN
-		err := si.Insert(r2, []string{"2"}, testSecondaryTrxId)
+		err := si.insert(r2, []string{"2"}, testSecondaryTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -105,11 +105,11 @@ func TestSecondaryIndexInsert(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_email", true)
 		r1 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"1"})
-		_ = si.Insert(r1, []string{"1"}, testSecondaryTrxId)
+		_ = si.insert(r1, []string{"1"}, testSecondaryTrxId)
 		r2 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"2"})
 
 		// WHEN
-		err := si.Insert(r2, []string{"2"}, testSecondaryTrxId)
+		err := si.insert(r2, []string{"2"}, testSecondaryTrxId)
 
 		// THEN
 		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
@@ -119,22 +119,22 @@ func TestSecondaryIndexInsert(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_email", true)
 		r1 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"1"})
-		err := si.Insert(r1, []string{"1"}, testSecondaryTrxId)
+		err := si.insert(r1, []string{"1"}, testSecondaryTrxId)
 		assert.NoError(t, err)
 
 		// 論理削除
-		iter, err := si.Search(SearchModeStart{})
+		iter, err := si.search(SearchModeStart{})
 		assert.NoError(t, err)
-		record, ok, err := iter.NextIndexOnly()
+		record, ok, err := iter.nextIndexOnly()
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		err = si.SoftDelete(record, testSecondaryTrxId)
+		err = si.softDelete(record, testSecondaryTrxId)
 		assert.NoError(t, err)
 
 		r2 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"2"})
 
 		// WHEN
-		err = si.Insert(r2, []string{"2"}, testSecondaryTrxId)
+		err = si.insert(r2, []string{"2"}, testSecondaryTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -144,22 +144,22 @@ func TestSecondaryIndexInsert(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
 		r1 := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
-		err := si.Insert(r1, []string{"1"}, testSecondaryTrxId)
+		err := si.insert(r1, []string{"1"}, testSecondaryTrxId)
 		assert.NoError(t, err)
 
 		// 論理削除
-		iter, err := si.Search(SearchModeStart{})
+		iter, err := si.search(SearchModeStart{})
 		assert.NoError(t, err)
-		record, ok, err := iter.NextIndexOnly()
+		record, ok, err := iter.nextIndexOnly()
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		err = si.SoftDelete(record, testSecondaryTrxId)
+		err = si.softDelete(record, testSecondaryTrxId)
 		assert.NoError(t, err)
 
 		r2 := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
 
 		// WHEN
-		err = si.Insert(r2, []string{"1"}, testSecondaryTrxId)
+		err = si.insert(r2, []string{"1"}, testSecondaryTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -171,14 +171,14 @@ func TestSecondaryIndexSearch(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
 		r := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
-		_ = si.Insert(r, []string{"1"}, testSecondaryTrxId)
+		_ = si.insert(r, []string{"1"}, testSecondaryTrxId)
 
 		// WHEN
-		iter, err := si.Search(SearchModeStart{})
+		iter, err := si.search(SearchModeStart{})
 
 		// THEN
 		assert.NoError(t, err)
-		result, ok, err := iter.NextIndexOnly()
+		result, ok, err := iter.nextIndexOnly()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, []string{"Alice"}, result.Values)
@@ -190,34 +190,34 @@ func TestSecondaryIndexDelete(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
 		r := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
-		_ = si.Insert(r, []string{"1"}, testSecondaryTrxId)
+		_ = si.insert(r, []string{"1"}, testSecondaryTrxId)
 
-		iter, _ := si.Search(SearchModeStart{})
-		record, _, _ := iter.NextIndexOnly()
+		iter, _ := si.search(SearchModeStart{})
+		record, _, _ := iter.nextIndexOnly()
 
 		// WHEN
-		err := si.Delete(record, testSecondaryTrxId)
+		err := si.delete(record, testSecondaryTrxId)
 
 		// THEN
 		assert.NoError(t, err)
 
 		// 削除後は取得できない
-		iter2, _ := si.Search(SearchModeStart{})
-		_, ok, _ := iter2.NextIndexOnly()
+		iter2, _ := si.search(SearchModeStart{})
+		_, ok, _ := iter2.nextIndexOnly()
 		assert.False(t, ok)
 	})
 
 	t.Run("存在しないレコードの削除はエラーを返す", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
-		sr := &SecondaryRecord{
+		sr := &secondaryRecord{
 			ColNames: []string{"name"},
 			Values:   []string{"nonexistent"},
 			Pk:       []string{"999"},
 		}
 
 		// WHEN
-		err := si.Delete(sr, testSecondaryTrxId)
+		err := si.delete(sr, testSecondaryTrxId)
 
 		// THEN
 		assert.Error(t, err)
@@ -229,20 +229,20 @@ func TestSecondaryIndexSoftDelete(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
 		r := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
-		_ = si.Insert(r, []string{"1"}, testSecondaryTrxId)
+		_ = si.insert(r, []string{"1"}, testSecondaryTrxId)
 
-		iter, _ := si.Search(SearchModeStart{})
-		record, _, _ := iter.NextIndexOnly()
+		iter, _ := si.search(SearchModeStart{})
+		record, _, _ := iter.nextIndexOnly()
 
 		// WHEN
-		err := si.SoftDelete(record, testSecondaryTrxId)
+		err := si.softDelete(record, testSecondaryTrxId)
 
 		// THEN
 		assert.NoError(t, err)
 
 		// 論理削除後は検索でスキップされる
-		iter2, _ := si.Search(SearchModeStart{})
-		_, ok, _ := iter2.NextIndexOnly()
+		iter2, _ := si.search(SearchModeStart{})
+		_, ok, _ := iter2.nextIndexOnly()
 		assert.False(t, ok)
 	})
 
@@ -250,16 +250,16 @@ func TestSecondaryIndexSoftDelete(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
 		r := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
-		_ = si.Insert(r, []string{"1"}, testSecondaryTrxId)
+		_ = si.insert(r, []string{"1"}, testSecondaryTrxId)
 
-		iter, _ := si.Search(SearchModeStart{})
-		record, _, _ := iter.NextIndexOnly()
-		_ = si.SoftDelete(record, testSecondaryTrxId)
+		iter, _ := si.search(SearchModeStart{})
+		record, _, _ := iter.nextIndexOnly()
+		_ = si.softDelete(record, testSecondaryTrxId)
 
 		r2 := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
 
 		// WHEN
-		err := si.Insert(r2, []string{"1"}, testSecondaryTrxId)
+		err := si.insert(r2, []string{"1"}, testSecondaryTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -273,12 +273,12 @@ func TestSecondaryIndexInsertLock(t *testing.T) {
 		record := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
 
 		// WHEN
-		err := si.Insert(record, []string{"1"}, testSecondaryTrxId)
+		err := si.insert(record, []string{"1"}, testSecondaryTrxId)
 
 		// THEN
 		assert.NoError(t, err)
 		// 別トランザクションが同じレコードに排他ロックを取得しようとするとタイムアウト
-		encodedRecord := record.Encode()
+		encodedRecord := record.encode()
 		_, pos, err := si.tree.FindByKey(encodedRecord.Key())
 		assert.NoError(t, err)
 		err = si.lock.Lock(lock.TrxId(999), pos, lock.Exclusive)
@@ -291,13 +291,13 @@ func TestSecondaryIndexDeleteLock(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
 		r := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
-		_ = si.Insert(r, []string{"1"}, testSecondaryTrxId)
+		_ = si.insert(r, []string{"1"}, testSecondaryTrxId)
 
-		iter, _ := si.Search(SearchModeStart{})
-		record, _, _ := iter.NextIndexOnly()
+		iter, _ := si.search(SearchModeStart{})
+		record, _, _ := iter.nextIndexOnly()
 
 		// WHEN
-		err := si.Delete(record, testSecondaryTrxId)
+		err := si.delete(record, testSecondaryTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -309,13 +309,13 @@ func TestSecondaryIndexSoftDeleteLock(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
 		r := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
-		_ = si.Insert(r, []string{"1"}, testSecondaryTrxId)
+		_ = si.insert(r, []string{"1"}, testSecondaryTrxId)
 
-		iter, _ := si.Search(SearchModeStart{})
-		record, _, _ := iter.NextIndexOnly()
+		iter, _ := si.search(SearchModeStart{})
+		record, _, _ := iter.nextIndexOnly()
 
 		// WHEN
-		err := si.SoftDelete(record, testSecondaryTrxId)
+		err := si.softDelete(record, testSecondaryTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -328,7 +328,7 @@ func TestSecondaryIndexLeafPageCount(t *testing.T) {
 		si := setupTestSecondaryIndex(t, "idx_name", false)
 
 		// WHEN
-		count, err := si.LeafPageCount()
+		count, err := si.leafPageCount()
 
 		// THEN
 		assert.NoError(t, err)
@@ -351,11 +351,11 @@ func TestSecondaryIndexHeight(t *testing.T) {
 }
 
 // setupTestSecondaryIndex はテスト用の SecondaryIndex を作成する
-func setupTestSecondaryIndex(t *testing.T, indexName string, unique bool) *SecondaryIndex {
+func setupTestSecondaryIndex(t *testing.T, indexName string, unique bool) *secondaryIndex {
 	t.Helper()
 	env := setupIteratorTestEnv(t)
 	lockMgr := lock.NewManager()
-	si, err := CreateSecondaryIndex(env.ct, env.bp, CreateSecondaryIndexInput{
+	si, err := createSecondaryIndex(env.ct, env.bp, createSecondaryIndexInput{
 		FileId:      page.FileId(2),
 		PrimaryTree: env.primaryTree,
 		IndexName:   indexName,
@@ -369,7 +369,7 @@ func setupTestSecondaryIndex(t *testing.T, indexName string, unique bool) *Secon
 }
 
 // buildTestSecondaryRecord はテスト用の SecondaryRecord を構築する
-func buildTestSecondaryRecord(t *testing.T, si *SecondaryIndex, colNames, values, pk []string) *SecondaryRecord {
+func buildTestSecondaryRecord(t *testing.T, si *secondaryIndex, colNames, values, pk []string) *secondaryRecord {
 	t.Helper()
 	sr, err := newSecondaryRecord(si.catalog, newSecondaryRecordInput{
 		fileId:     si.fileId,

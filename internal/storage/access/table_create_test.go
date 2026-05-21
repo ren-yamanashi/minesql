@@ -64,9 +64,9 @@ func TestCreateTable(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		iter, err := table.primaryIndex.Search(SearchModeStart{})
+		iter, err := table.primaryIndex.search(SearchModeStart{})
 		assert.NoError(t, err)
-		record, ok, err := iter.Next()
+		record, ok, err := iter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, record.Values)
@@ -202,7 +202,7 @@ func TestCreate(t *testing.T) {
 		}
 
 		// WHEN
-		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, env.lockMgr, input)
+		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr)
 
 		// THEN
 		assert.NoError(t, err)
@@ -218,7 +218,7 @@ func TestCreate(t *testing.T) {
 			ColNames:  []string{"id", "name", "email"},
 			PkCount:   1,
 		}
-		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, env.lockMgr, input)
+		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -250,7 +250,7 @@ func TestCreate(t *testing.T) {
 		}
 
 		// WHEN
-		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, env.lockMgr, input)
+		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr)
 
 		// THEN
 		assert.NoError(t, err)
@@ -265,7 +265,7 @@ func TestCreate(t *testing.T) {
 			ColNames:  []string{"id", "name"},
 			PkCount:   1,
 		}
-		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, env.lockMgr, input)
+		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr)
 		assert.NoError(t, err)
 		err = registerTableMeta(env.ct, env.fileId, pi, input)
 		assert.NoError(t, err)
@@ -478,7 +478,7 @@ func setupCreateTestEnvWithTable(t *testing.T) *createTestEnvWithTable {
 		ColNames:  []string{"id", "name", "email"},
 		PkCount:   1,
 	}
-	pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, env.lockMgr, input)
+	pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr)
 	if err != nil {
 		t.Fatalf("プライマリインデックスの作成に失敗: %v", err)
 	}

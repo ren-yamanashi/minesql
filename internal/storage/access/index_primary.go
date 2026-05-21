@@ -10,18 +10,18 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
-// PrimaryIndex はプライマリインデックスへのアクセスを提供する
-type PrimaryIndex struct {
+// primaryIndex はプライマリインデックスへのアクセスを提供する
+type primaryIndex struct {
 	catalog *catalog.Catalog
 	tree    *btree.Btree // プライマリインデックスの B+Tree
 	pkCount int          // プライマリキーのカラム数
 	lock    *lock.Manager
 }
 
-// NewPrimaryIndex は既存のプライマリインデックスを開く
-func NewPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, metaPageId page.PageId, pkCount int, lock *lock.Manager) *PrimaryIndex {
+// newPrimaryIndex は既存のプライマリインデックスを開く
+func newPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, metaPageId page.PageId, pkCount int, lock *lock.Manager) *primaryIndex {
 	tree := btree.NewBtree(bp, metaPageId)
-	return &PrimaryIndex{
+	return &primaryIndex{
 		catalog: ct,
 		tree:    tree,
 		pkCount: pkCount,
@@ -29,13 +29,13 @@ func NewPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, metaPageId page
 	}
 }
 
-// CreatePrimaryIndex は空のプライマリインデックスを作成する
-func CreatePrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, fileId page.FileId, pkCount int, lock *lock.Manager) (*PrimaryIndex, error) {
+// createPrimaryIndex は空のプライマリインデックスを作成する
+func createPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, fileId page.FileId, pkCount int, lock *lock.Manager) (*primaryIndex, error) {
 	tree, err := btree.CreateBtree(bp, fileId)
 	if err != nil {
 		return nil, err
 	}
-	return &PrimaryIndex{
+	return &primaryIndex{
 		catalog: ct,
 		tree:    tree,
 		pkCount: pkCount,
@@ -43,8 +43,8 @@ func CreatePrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, fileId page.
 	}, nil
 }
 
-// Search は指定した検索モードでテーブルを検索し、イテレータを返す
-func (pi *PrimaryIndex) Search(mode SearchMode) (*PrimaryIterator, error) {
+// search は指定した検索モードでテーブルを検索し、イテレータを返す
+func (pi *primaryIndex) search(mode SearchMode) (*primaryIterator, error) {
 	iter, err := pi.tree.Search(mode.encode())
 	if err != nil {
 		return nil, err
@@ -52,11 +52,11 @@ func (pi *PrimaryIndex) Search(mode SearchMode) (*PrimaryIterator, error) {
 	return newPrimaryIterator(iter, pi.catalog, pi.tree.MetaPageId.FileId), nil
 }
 
-// Insert は行を挿入する
+// insert は行を挿入する
 // (論理削除済みの同一キーが存在する場合は上書きする)
-func (pi *PrimaryIndex) Insert(record *PrimaryRecord, trxId lock.TrxId) error {
+func (pi *primaryIndex) insert(record *primaryRecord, trxId lock.TrxId) error {
 	// 挿入
-	encodedRecord := record.Encode()
+	encodedRecord := record.encode()
 	err := pi.tree.Insert(encodedRecord)
 
 	// 重複キーエラーの場合、既存のレコードが論理削除済みか確認
@@ -86,10 +86,10 @@ func (pi *PrimaryIndex) Insert(record *PrimaryRecord, trxId lock.TrxId) error {
 	return pi.lock.Lock(trxId, pos, lock.Exclusive)
 }
 
-// Delete は 行を物理削除する
-func (pi *PrimaryIndex) Delete(record *PrimaryRecord, trxId lock.TrxId) error {
+// delete は 行を物理削除する
+func (pi *primaryIndex) delete(record *primaryRecord, trxId lock.TrxId) error {
 	// 排他ロックを取得
-	encodedRecord := record.Encode()
+	encodedRecord := record.encode()
 	_, pos, err := pi.tree.FindByKey(encodedRecord.Key())
 	if err != nil {
 		return err
@@ -102,10 +102,10 @@ func (pi *PrimaryIndex) Delete(record *PrimaryRecord, trxId lock.TrxId) error {
 	return pi.tree.Delete(encodedRecord.Key())
 }
 
-// SoftDelete は行を論理削除する
-func (pi *PrimaryIndex) SoftDelete(record *PrimaryRecord, trxId lock.TrxId) error {
+// softDelete は行を論理削除する
+func (pi *primaryIndex) softDelete(record *primaryRecord, trxId lock.TrxId) error {
 	// 排他ロックを取得
-	encodedRecord := record.Encode()
+	encodedRecord := record.encode()
 	_, pos, err := pi.tree.FindByKey(encodedRecord.Key())
 	if err != nil {
 		return err
@@ -128,13 +128,13 @@ func (pi *PrimaryIndex) SoftDelete(record *PrimaryRecord, trxId lock.TrxId) erro
 	if err != nil {
 		return err
 	}
-	return pi.tree.Update(deleted.Encode())
+	return pi.tree.Update(deleted.encode())
 }
 
-// Update は行を更新する
-func (pi *PrimaryIndex) Update(currentRecord *PrimaryRecord, newRecord *PrimaryRecord, trxId lock.TrxId) error {
+// update は行を更新する
+func (pi *primaryIndex) update(currentRecord *primaryRecord, newRecord *primaryRecord, trxId lock.TrxId) error {
 	// 排他ロックを取得
-	encodedRecord := newRecord.Encode()
+	encodedRecord := newRecord.encode()
 	_, pos, err := pi.tree.FindByKey(encodedRecord.Key())
 	if err != nil {
 		return err
@@ -147,17 +147,17 @@ func (pi *PrimaryIndex) Update(currentRecord *PrimaryRecord, newRecord *PrimaryR
 	return pi.tree.Update(encodedRecord)
 }
 
-// FileId はテーブルの FileId を返す
-func (pi *PrimaryIndex) FileId() page.FileId {
+// fileId はテーブルの fileId を返す
+func (pi *primaryIndex) fileId() page.FileId {
 	return pi.tree.MetaPageId.FileId
 }
 
-// LeafPageCount はリーフページ数を取得する
-func (pi *PrimaryIndex) LeafPageCount() (uint64, error) {
+// leafPageCount はリーフページ数を取得する
+func (pi *primaryIndex) leafPageCount() (uint64, error) {
 	return pi.tree.LeafPageCount()
 }
 
-// Height はツリーの高さを取得する
-func (pi *PrimaryIndex) Height() (uint64, error) {
+// height はツリーの高さを取得する
+func (pi *primaryIndex) height() (uint64, error) {
 	return pi.tree.Height()
 }

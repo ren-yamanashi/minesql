@@ -34,16 +34,16 @@ func TestTableInsert(t *testing.T) {
 
 		// THEN
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.Search(SearchModeStart{})
+		nameIter, err := idxName.search(SearchModeStart{})
 		assert.NoError(t, err)
-		nameResult, ok, err := nameIter.Next()
+		nameResult, ok, err := nameIter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "Alice", nameResult.Values[1])
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
-		emailIter, err := idxEmail.Search(SearchModeStart{})
+		emailIter, err := idxEmail.search(SearchModeStart{})
 		assert.NoError(t, err)
-		emailResult, ok, err := emailIter.Next()
+		emailResult, ok, err := emailIter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "alice@example.com", emailResult.Values[2])
@@ -140,9 +140,9 @@ func TestTableInsert(t *testing.T) {
 
 		// セカンダリインデックスからプライマリキー "1" で検索できる
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.Search(SearchModeStart{})
+		nameIter, err := idxName.search(SearchModeStart{})
 		assert.NoError(t, err)
-		nameResult, ok, err := nameIter.Next()
+		nameResult, ok, err := nameIter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "Alice", nameResult.Values[1])

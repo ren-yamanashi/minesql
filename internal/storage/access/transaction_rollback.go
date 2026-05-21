@@ -116,7 +116,7 @@ func (t *TrxManager) forEachSecondaryTree(
 }
 
 // encodeSecondaryKey は PrimaryRecord からセカンダリインデックスの B+Tree キー (SK+PK) を構築する
-func encodeSecondaryKey(record *PrimaryRecord, keyCols map[string]int) []byte {
+func encodeSecondaryKey(record *primaryRecord, keyCols map[string]int) []byte {
 	valMap := make(map[string]string, len(record.ColNames))
 	for i, name := range record.ColNames {
 		valMap[name] = record.Values[i]
