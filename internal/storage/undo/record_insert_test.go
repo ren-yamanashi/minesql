@@ -61,7 +61,7 @@ func TestInsertRecordSerialize(t *testing.T) {
 		buf := ir.Serialize(10, 2)
 
 		// THEN
-		fields, err := Deserialize(buf)
+		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(10), fields.TrxId)
 		assert.Equal(t, UndoNumber(2), fields.UndoNum)
@@ -94,7 +94,7 @@ func TestInsertRecordSerialize(t *testing.T) {
 		buf := ir.Serialize(1, 0)
 
 		// THEN
-		fields, err := Deserialize(buf)
+		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Len(t, fields.ColumnSets, 1)
 		assert.Equal(t, [][]byte{[]byte("only_col")}, fields.ColumnSets[0])
@@ -108,7 +108,7 @@ func TestInsertRecordSerialize(t *testing.T) {
 		buf := ir.Serialize(lock.TrxId(0xFFFFFFFF), UndoNumber(0xFFFFFFFE))
 
 		// THEN
-		fields, err := Deserialize(buf)
+		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(0xFFFFFFFF), fields.TrxId)
 		assert.Equal(t, UndoNumber(0xFFFFFFFE), fields.UndoNum)

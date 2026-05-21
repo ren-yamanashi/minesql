@@ -66,7 +66,7 @@ func TestUpdateRecordSerialize(t *testing.T) {
 		buf := ur.Serialize(10, 2)
 
 		// THEN
-		fields, err := Deserialize(buf)
+		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(10), fields.TrxId)
 		assert.Equal(t, UndoNumber(2), fields.UndoNum)
@@ -101,7 +101,7 @@ func TestUpdateRecordSerialize(t *testing.T) {
 		buf := ur.Serialize(1, 0)
 
 		// THEN
-		fields, err := Deserialize(buf)
+		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Len(t, fields.ColumnSets, 2)
 		assert.Equal(t, [][]byte{{}}, fields.ColumnSets[0])
@@ -116,7 +116,7 @@ func TestUpdateRecordSerialize(t *testing.T) {
 		buf := ur.Serialize(lock.TrxId(0xFFFFFFFE), UndoNumber(0xFFFFFFFD))
 
 		// THEN
-		fields, err := Deserialize(buf)
+		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(0xFFFFFFFE), fields.TrxId)
 		assert.Equal(t, UndoNumber(0xFFFFFFFD), fields.UndoNum)

@@ -52,8 +52,8 @@ func (f *Fields) Serialize() []byte {
 	return buf
 }
 
-// Deserialize は Undo レコードのバイト列から Fields を復元する
-func Deserialize(buf []byte) (Fields, error) {
+// DeserializeFields は Undo レコードのバイト列から Fields を復元する
+func DeserializeFields(buf []byte) (Fields, error) {
 	if len(buf) < recordHeaderSize {
 		return Fields{}, ErrInvalidRecord
 	}

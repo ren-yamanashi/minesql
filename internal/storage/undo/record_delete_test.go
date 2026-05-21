@@ -62,7 +62,7 @@ func TestDeleteRecordSerialize(t *testing.T) {
 		buf := dr.Serialize(10, 2)
 
 		// THEN
-		fields, err := Deserialize(buf)
+		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(10), fields.TrxId)
 		assert.Equal(t, UndoNumber(2), fields.UndoNum)
@@ -95,7 +95,7 @@ func TestDeleteRecordSerialize(t *testing.T) {
 		buf := dr.Serialize(1, 0)
 
 		// THEN
-		fields, err := Deserialize(buf)
+		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Len(t, fields.ColumnSets, 1)
 		assert.Equal(t, [][]byte{[]byte("only_col")}, fields.ColumnSets[0])
@@ -109,7 +109,7 @@ func TestDeleteRecordSerialize(t *testing.T) {
 		buf := dr.Serialize(lock.TrxId(0xFFFFFFFE), UndoNumber(0xFFFFFFFD))
 
 		// THEN
-		fields, err := Deserialize(buf)
+		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(0xFFFFFFFE), fields.TrxId)
 		assert.Equal(t, UndoNumber(0xFFFFFFFD), fields.UndoNum)

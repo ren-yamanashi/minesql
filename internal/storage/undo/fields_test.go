@@ -93,7 +93,7 @@ func TestSerialize(t *testing.T) {
 	})
 }
 
-func TestDeserialize(t *testing.T) {
+func TestDeserializeFields(t *testing.T) {
 	t.Run("Serialize した結果を Deserialize でラウンドトリップできる", func(t *testing.T) {
 		// GIVEN
 		original := &Fields{
@@ -108,7 +108,7 @@ func TestDeserialize(t *testing.T) {
 		buf := original.Serialize()
 
 		// WHEN
-		restored, err := Deserialize(buf)
+		restored, err := DeserializeFields(buf)
 
 		// THEN
 		assert.NoError(t, err)
@@ -132,7 +132,7 @@ func TestDeserialize(t *testing.T) {
 		buf := original.Serialize()
 
 		// WHEN
-		restored, err := Deserialize(buf)
+		restored, err := DeserializeFields(buf)
 
 		// THEN
 		assert.NoError(t, err)
@@ -153,7 +153,7 @@ func TestDeserialize(t *testing.T) {
 		buf := original.Serialize()
 
 		// WHEN
-		restored, err := Deserialize(buf)
+		restored, err := DeserializeFields(buf)
 
 		// THEN
 		assert.NoError(t, err)
@@ -174,7 +174,7 @@ func TestDeserialize(t *testing.T) {
 		buf := original.Serialize()
 
 		// WHEN
-		restored, err := Deserialize(buf)
+		restored, err := DeserializeFields(buf)
 
 		// THEN
 		assert.NoError(t, err)
@@ -197,7 +197,7 @@ func TestDeserialize(t *testing.T) {
 		buf := original.Serialize()
 
 		// WHEN
-		restored, err := Deserialize(buf)
+		restored, err := DeserializeFields(buf)
 
 		// THEN
 		assert.NoError(t, err)
@@ -218,7 +218,7 @@ func TestDeserialize(t *testing.T) {
 		buf := original.Serialize()
 
 		// WHEN
-		restored, err := Deserialize(buf)
+		restored, err := DeserializeFields(buf)
 
 		// THEN
 		assert.NoError(t, err)
@@ -241,7 +241,7 @@ func TestDeserialize(t *testing.T) {
 			buf := original.Serialize()
 
 			// WHEN
-			restored, err := Deserialize(buf)
+			restored, err := DeserializeFields(buf)
 
 			// THEN
 			assert.NoError(t, err)
@@ -254,7 +254,7 @@ func TestDeserialize(t *testing.T) {
 		buf := []byte{}
 
 		// WHEN
-		_, err := Deserialize(buf)
+		_, err := DeserializeFields(buf)
 
 		// THEN
 		assert.ErrorIs(t, err, ErrInvalidRecord)
@@ -265,7 +265,7 @@ func TestDeserialize(t *testing.T) {
 		buf := make([]byte, recordHeaderSize-1)
 
 		// WHEN
-		_, err := Deserialize(buf)
+		_, err := DeserializeFields(buf)
 
 		// THEN
 		assert.ErrorIs(t, err, ErrInvalidRecord)
@@ -285,7 +285,7 @@ func TestDeserialize(t *testing.T) {
 		truncated := buf[:recordHeaderSize+2]
 
 		// WHEN
-		_, err := Deserialize(truncated)
+		_, err := DeserializeFields(truncated)
 
 		// THEN
 		assert.ErrorIs(t, err, ErrInvalidRecord)
@@ -297,7 +297,7 @@ func TestDeserialize(t *testing.T) {
 		buf := buildRawBuffer(1, 0, RecordTypeInsert, data)
 
 		// WHEN
-		_, err := Deserialize(buf)
+		_, err := DeserializeFields(buf)
 
 		// THEN
 		assert.ErrorIs(t, err, ErrInvalidRecord)
@@ -311,7 +311,7 @@ func TestDeserialize(t *testing.T) {
 		buf := buildRawBuffer(1, 0, RecordTypeInsert, data)
 
 		// WHEN
-		_, err := Deserialize(buf)
+		_, err := DeserializeFields(buf)
 
 		// THEN
 		assert.ErrorIs(t, err, ErrInvalidRecord)
@@ -327,7 +327,7 @@ func TestDeserialize(t *testing.T) {
 		buf := buildRawBuffer(1, 0, RecordTypeInsert, data)
 
 		// WHEN
-		_, err := Deserialize(buf)
+		_, err := DeserializeFields(buf)
 
 		// THEN
 		assert.ErrorIs(t, err, ErrInvalidRecord)
@@ -343,7 +343,7 @@ func TestDeserialize(t *testing.T) {
 		buf := buildRawBuffer(1, 0, RecordTypeInsert, data)
 
 		// WHEN
-		_, err := Deserialize(buf)
+		_, err := DeserializeFields(buf)
 
 		// THEN
 		assert.ErrorIs(t, err, ErrInvalidRecord)
@@ -360,7 +360,7 @@ func TestDeserialize(t *testing.T) {
 		buf := buildRawBuffer(1, 0, RecordTypeInsert, data)
 
 		// WHEN
-		_, err := Deserialize(buf)
+		_, err := DeserializeFields(buf)
 
 		// THEN
 		assert.ErrorIs(t, err, ErrInvalidRecord)
