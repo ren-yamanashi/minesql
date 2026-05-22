@@ -18,16 +18,11 @@ type Recovery struct {
 	undoFileId  page.FileId // Undo ログの FileId
 }
 
-func NewRecovery(
-	redoLog *redo.Buffer,
-	bufferPool *buffer.BufferPool,
-	transaction *TrxManager,
-	undoFileId page.FileId,
-) *Recovery {
+func NewRecovery(redo *redo.Buffer, bp *buffer.BufferPool, trx *TrxManager, undoFileId page.FileId) *Recovery {
 	return &Recovery{
-		redoLog:     redoLog,
-		bufferPool:  bufferPool,
-		transaction: transaction,
+		redoLog:     redo,
+		bufferPool:  bp,
+		transaction: trx,
 		undoFileId:  undoFileId,
 	}
 }

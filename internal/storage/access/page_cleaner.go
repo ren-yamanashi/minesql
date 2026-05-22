@@ -1,6 +1,8 @@
 package access
 
 import (
+	"log"
+	"sync"
 	"time"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
@@ -18,6 +20,8 @@ type PageCleaner struct {
 	ticker          *time.Ticker
 	done            chan struct{}
 	stopped         chan struct{} // goroutine 終了通知用
+	stopOnce        sync.Once
+	isRunning       bool
 }
 
 func NewPageCleaner(bp *buffer.BufferPool, redo *redo.Buffer, redoMaxSize int, maxDirtyPct int) *PageCleaner {
@@ -33,21 +37,28 @@ func NewPageCleaner(bp *buffer.BufferPool, redo *redo.Buffer, redoMaxSize int, m
 
 // Start はバックグラウンド goroutine を起動する
 func (pc *PageCleaner) Start() {
+	if pc.isRunning {
+		return
+	}
 	pc.ticker = time.NewTicker(pc.interval)
 	pc.done = make(chan struct{})
 	pc.stopped = make(chan struct{})
+	pc.stopOnce = sync.Once{}
+	pc.isRunning = true
 	go pc.loop()
 }
 
-// Stop はバックグランド goroutine を停止し、終了を待つ
+// Stop はバックグラウンド goroutine を停止し、終了を待つ
 func (pc *PageCleaner) Stop() {
-	if pc.done == nil {
-		return
-	}
-	close(pc.done)
-	<-pc.stopped
-	pc.ticker.Stop()
-	pc.done = nil
+	pc.stopOnce.Do(func() {
+		if !pc.isRunning {
+			return
+		}
+		close(pc.done)
+		<-pc.stopped
+		pc.ticker.Stop()
+		pc.isRunning = false
+	})
 }
 
 // loop はバックグラウンドで定期的に clean を呼び出す
@@ -58,7 +69,9 @@ func (pc *PageCleaner) loop() {
 		case <-pc.done:
 			return
 		case <-pc.ticker.C:
-			pc.clean()
+			if err := pc.clean(); err != nil {
+				log.Printf("page cleaner: %v", err)
+			}
 		}
 	}
 }
@@ -73,6 +86,12 @@ func (pc *PageCleaner) clean() error {
 		return nil
 	}
 
+	// データページより先に Redo ログをディスクにフラッシュ
+	if err := pc.redoLog.Flush(); err != nil {
+		return err
+	}
+
+	// データページのフラッシュ
 	flushCount := max(pc.bufferPool.NumOfFlushListPage()/4, 1)
 	if err := pc.bufferPool.FlushOldestPages(flushCount); err != nil {
 		return err
