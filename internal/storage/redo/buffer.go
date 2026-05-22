@@ -20,9 +20,11 @@ func NewBuffer() (*Buffer, error) {
 	if err != nil {
 		return nil, err
 	}
+	// クラッシュリカバリ時: フラッシュ済み LSN の次から採番を再開する
+	nextLsn := file.flushedLsn + 1
 	return &Buffer{
 		logFile: file,
-		nextLsn: 1, // LSN=0 は無効値
+		nextLsn: nextLsn,
 	}, nil
 }
 
@@ -65,15 +67,14 @@ func (b *Buffer) ReadFrom(lsn Lsn) ([]Record, error) {
 func (b *Buffer) SetCheckpointLsn(lsn Lsn) error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
-	b.logFile.checkPointLsn = lsn
-	return b.logFile.writeHeader()
+	return b.logFile.setCheckpointLsn(lsn)
 }
 
 // CheckpointLsn はチェックポイント LSN を返す
 func (b *Buffer) CheckpointLsn() Lsn {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
-	return b.logFile.checkPointLsn
+	return b.logFile.checkpointLsn
 }
 
 // FlushedLsn はディスクにフラッシュ済みの最大 LSN を返す

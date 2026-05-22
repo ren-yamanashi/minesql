@@ -23,21 +23,22 @@ const (
 type File struct {
 	file          *os.File // Redo ログファイルのファイルディスクリプタ
 	flushedLsn    Lsn      // ディスクにフラッシュ済みの最大 LSN
-	checkPointLsn Lsn      // チェックポイント LSN (この LSN 以前の Redo レコードは不要)
+	checkpointLsn Lsn      // チェックポイント LSN (この LSN 以前の Redo レコードは不要)
 }
 
+// newFile は redo.log ファイルを開く (存在しない場合は新規作成する)
 func newFile() (*File, error) {
 	filePath := filepath.Join(config.BaseDir, filename)
 	// read-write モードで開き、存在しない場合は作成する
 	// (os.O_DIRECT は directio.OpenFile 内で設定される)
 	file, err := directio.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open redo log file: %w", err)
+		return nil, fmt.Errorf("redo: failed to open log file: %w", err)
 	}
 
 	f := &File{file: file}
 
-	// ファイルヘッダーから FlushedLSN と CheckPointLSN を読み取る
+	// ファイルヘッダーから FlushedLSN と CheckpointLSN を読み取る
 	stat, err := file.Stat()
 	if err != nil {
 		return nil, errors.Join(err, file.Close())
@@ -49,8 +50,10 @@ func newFile() (*File, error) {
 		if _, err := file.ReadAt(header, 0); err != nil {
 			return nil, errors.Join(err, file.Close())
 		}
-		f.flushedLsn = Lsn(binary.BigEndian.Uint32(header[fileHeaderFlushedLsnOffset:fileHeaderCheckpointLsnOffset]))
-		f.checkPointLsn = Lsn(binary.BigEndian.Uint32(header[fileHeaderCheckpointLsnOffset:fileHeaderReservedAreaOffset]))
+		flushedBytes := header[fileHeaderFlushedLsnOffset:fileHeaderCheckpointLsnOffset]
+		f.flushedLsn = Lsn(binary.BigEndian.Uint32(flushedBytes))
+		checkpointBytes := header[fileHeaderCheckpointLsnOffset:fileHeaderReservedAreaOffset]
+		f.checkpointLsn = Lsn(binary.BigEndian.Uint32(checkpointBytes))
 		return f, nil
 	}
 
@@ -94,6 +97,10 @@ func (f *File) readRecords(lsn Lsn) ([]Record, error) {
 
 // flushRecords はレコードをディスクに書き込み、FlushedLSN を更新する
 func (f *File) flushRecords(records []Record) error {
+	if len(records) == 0 {
+		return nil
+	}
+
 	if _, err := f.file.Seek(0, io.SeekEnd); err != nil {
 		return err
 	}
@@ -113,7 +120,13 @@ func (f *File) flushRecords(records []Record) error {
 	return f.writeHeader()
 }
 
-// TruncateBefore は指定 LSN 以前のレコードをファイルから切り詰める
+// setCheckpointLsn はチェックポイント LSN を更新し、ヘッダーに書き込む
+func (f *File) setCheckpointLsn(lsn Lsn) error {
+	f.checkpointLsn = lsn
+	return f.writeHeader()
+}
+
+// truncateBefore は指定 LSN 以前のレコードをファイルから切り詰める
 func (f *File) truncateBefore(lsn Lsn) error {
 	records, err := f.readRecords(Lsn(0))
 	if err != nil {
@@ -149,7 +162,7 @@ func (f *File) clear() error {
 		return err
 	}
 	f.flushedLsn = 0
-	f.checkPointLsn = 0
+	f.checkpointLsn = 0
 	return f.writeHeader()
 }
 
@@ -165,8 +178,10 @@ func (f *File) size() (int64, error) {
 // writeHeader はファイルヘッダーに FlushedLSN と CheckpointLSN を書き込む
 func (f *File) writeHeader() error {
 	header := make([]byte, fileHeaderSize)
-	binary.BigEndian.PutUint32(header[fileHeaderFlushedLsnOffset:fileHeaderCheckpointLsnOffset], uint32(f.flushedLsn))
-	binary.BigEndian.PutUint32(header[fileHeaderCheckpointLsnOffset:fileHeaderReservedAreaOffset], uint32(f.checkPointLsn))
+	flushedSlice := header[fileHeaderFlushedLsnOffset:fileHeaderCheckpointLsnOffset]
+	binary.BigEndian.PutUint32(flushedSlice, uint32(f.flushedLsn))
+	checkpointSlice := header[fileHeaderCheckpointLsnOffset:fileHeaderReservedAreaOffset]
+	binary.BigEndian.PutUint32(checkpointSlice, uint32(f.checkpointLsn))
 	if _, err := f.file.WriteAt(header, 0); err != nil {
 		return err
 	}
