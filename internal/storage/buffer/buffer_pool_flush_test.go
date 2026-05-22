@@ -46,7 +46,7 @@ func TestFlushAllPages(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		assert.Equal(t, uint32(0), bp.FlushListSize())
+		assert.Equal(t, 0, bp.FlushListSize())
 	})
 
 	t.Run("フラッシュ後にデータがディスクに永続化されている", func(t *testing.T) {
@@ -110,7 +110,7 @@ func TestFlushOldestPages(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, uint32(1), bp.FlushListSize())
+		assert.Equal(t, 1, bp.FlushListSize())
 	})
 
 	t.Run("フラッシュリストが空の場合何もしない", func(t *testing.T) {
@@ -163,7 +163,7 @@ func TestFlushListSize(t *testing.T) {
 		size := bp.FlushListSize()
 
 		// THEN
-		assert.Equal(t, uint32(2), size)
+		assert.Equal(t, 2, size)
 	})
 
 	t.Run("ダーティーページがない場合 0 を返す", func(t *testing.T) {
@@ -174,6 +174,6 @@ func TestFlushListSize(t *testing.T) {
 		size := bp.FlushListSize()
 
 		// THEN
-		assert.Equal(t, uint32(0), size)
+		assert.Equal(t, 0, size)
 	})
 }

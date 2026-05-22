@@ -110,7 +110,7 @@ func TestBufferFlush(t *testing.T) {
 		_ = buf.Flush()
 
 		// THEN
-		assert.Equal(t, 0, buf.Size())
+		assert.Equal(t, 0, len(buf.records))
 	})
 }
 
@@ -248,40 +248,57 @@ func TestBufferTruncateBefore(t *testing.T) {
 }
 
 func TestBufferSize(t *testing.T) {
-	t.Run("空のバッファは 0 を返す", func(t *testing.T) {
+	t.Run("空のバッファはファイルヘッダーサイズのみ返す", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
 
 		// WHEN
-		size := buf.Size()
+		size, err := buf.Size()
 
 		// THEN
-		assert.Equal(t, 0, size)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(fileHeaderSize), size)
 	})
 
-	t.Run("COMMIT レコード追加後はヘッダーサイズのみ", func(t *testing.T) {
+	t.Run("COMMIT レコード追加後はバッファサイズが加算される", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
 		buf.AppendCommit(lock.TrxId(1))
 
 		// WHEN
-		size := buf.Size()
+		size, err := buf.Size()
 
 		// THEN
-		assert.Equal(t, recordHeaderSize, size)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(fileHeaderSize+recordHeaderSize), size)
 	})
 
-	t.Run("ページ変更レコード追加後はヘッダー + ページサイズ", func(t *testing.T) {
+	t.Run("ページ変更レコード追加後はヘッダー + ページサイズが加算される", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
 		pg := buildTestPage(t)
 		buf.AppendPageCopy(lock.TrxId(1), page.NewPageId(1, 1), *pg)
 
 		// WHEN
-		size := buf.Size()
+		size, err := buf.Size()
 
 		// THEN
-		assert.Equal(t, recordHeaderSize+page.PageSize, size)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(fileHeaderSize+recordHeaderSize+page.PageSize), size)
+	})
+
+	t.Run("フラッシュ後はファイルサイズのみ返す", func(t *testing.T) {
+		// GIVEN
+		buf := setupTestBuffer(t)
+		buf.AppendCommit(lock.TrxId(1))
+		_ = buf.Flush()
+
+		// WHEN
+		size, err := buf.Size()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Greater(t, size, int64(fileHeaderSize))
 	})
 }
 

@@ -15,7 +15,7 @@ func (bp *BufferPool) GetWritePage(pageId page.PageId) (*page.Page, error) {
 	// 書き込み用なのでダーティーページとして扱う
 	if !bufPage.isDirty {
 		bufPage.isDirty = true
-		bp.flushList.Add(pageId)
+		bp.FlushList.Add(pageId)
 	}
 	return bufPage.Page, nil
 }

@@ -116,20 +116,26 @@ func (b *Buffer) TruncateBefore(lsn Lsn) error {
 	return b.logFile.truncateBefore(lsn)
 }
 
-// Size は Redo バッファの概算サイズ (バイト数) を返す
-func (b *Buffer) Size() int {
+// Size は Redo ログのサイズ (ファイルサイズ + バッファサイズ) を返す
+func (b *Buffer) Size() (int64, error) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	size := 0
+	fileSize, err := b.logFile.size()
+	if err != nil {
+		return 0, err
+	}
+
+	var bufferSize int
 	for _, record := range b.records {
 		dataSize := 0
 		if record.Data.Header != nil {
 			dataSize = len(record.Data.ToBytes())
 		}
-		size += recordHeaderSize + dataSize
+		bufferSize += recordHeaderSize + dataSize
 	}
-	return size
+
+	return fileSize + int64(bufferSize), nil
 }
 
 // append は新しい Redo レコードをバッファに追加し、対応する LSN を返す

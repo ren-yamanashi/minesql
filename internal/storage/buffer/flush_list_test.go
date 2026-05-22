@@ -13,9 +13,9 @@ func TestNewFlushList(t *testing.T) {
 		fl := NewFlushList()
 
 		// THEN
-		assert.Equal(t, uint32(0), fl.numOfPage)
-		assert.Nil(t, fl.head)
-		assert.Nil(t, fl.tail)
+		assert.Equal(t, 0, fl.NumOfPage)
+		assert.Nil(t, fl.Head)
+		assert.Nil(t, fl.Tail)
 	})
 }
 
@@ -29,9 +29,9 @@ func TestFlushListAdd(t *testing.T) {
 		fl.Add(pageId)
 
 		// THEN
-		assert.Equal(t, uint32(1), fl.numOfPage)
-		assert.Equal(t, pageId, fl.head.pageId)
-		assert.Equal(t, pageId, fl.tail.pageId)
+		assert.Equal(t, 1, fl.NumOfPage)
+		assert.Equal(t, pageId, fl.Head.PageId)
+		assert.Equal(t, pageId, fl.Tail.PageId)
 	})
 
 	t.Run("複数ページを追加すると追加順に並ぶ", func(t *testing.T) {
@@ -47,9 +47,9 @@ func TestFlushListAdd(t *testing.T) {
 		fl.Add(id3)
 
 		// THEN
-		assert.Equal(t, uint32(3), fl.numOfPage)
-		assert.Equal(t, id1, fl.head.pageId)
-		assert.Equal(t, id3, fl.tail.pageId)
+		assert.Equal(t, 3, fl.NumOfPage)
+		assert.Equal(t, id1, fl.Head.PageId)
+		assert.Equal(t, id3, fl.Tail.PageId)
 	})
 
 	t.Run("同じ PageId を重複追加しても無視される", func(t *testing.T) {
@@ -62,7 +62,7 @@ func TestFlushListAdd(t *testing.T) {
 		fl.Add(pageId)
 
 		// THEN
-		assert.Equal(t, uint32(1), fl.numOfPage)
+		assert.Equal(t, 1, fl.NumOfPage)
 	})
 }
 
@@ -79,8 +79,8 @@ func TestFlushListDelete(t *testing.T) {
 		fl.Delete(id1)
 
 		// THEN
-		assert.Equal(t, uint32(1), fl.numOfPage)
-		assert.Equal(t, id2, fl.head.pageId)
+		assert.Equal(t, 1, fl.NumOfPage)
+		assert.Equal(t, id2, fl.Head.PageId)
 	})
 
 	t.Run("末尾のページを削除できる", func(t *testing.T) {
@@ -95,8 +95,8 @@ func TestFlushListDelete(t *testing.T) {
 		fl.Delete(id2)
 
 		// THEN
-		assert.Equal(t, uint32(1), fl.numOfPage)
-		assert.Equal(t, id1, fl.tail.pageId)
+		assert.Equal(t, 1, fl.NumOfPage)
+		assert.Equal(t, id1, fl.Tail.PageId)
 	})
 
 	t.Run("中間のページを削除できる", func(t *testing.T) {
@@ -113,9 +113,9 @@ func TestFlushListDelete(t *testing.T) {
 		fl.Delete(id2)
 
 		// THEN
-		assert.Equal(t, uint32(2), fl.numOfPage)
-		assert.Equal(t, id1, fl.head.pageId)
-		assert.Equal(t, id3, fl.tail.pageId)
+		assert.Equal(t, 2, fl.NumOfPage)
+		assert.Equal(t, id1, fl.Head.PageId)
+		assert.Equal(t, id3, fl.Tail.PageId)
 	})
 
 	t.Run("唯一のページを削除するとリストが空になる", func(t *testing.T) {
@@ -128,9 +128,9 @@ func TestFlushListDelete(t *testing.T) {
 		fl.Delete(pageId)
 
 		// THEN
-		assert.Equal(t, uint32(0), fl.numOfPage)
-		assert.Nil(t, fl.head)
-		assert.Nil(t, fl.tail)
+		assert.Equal(t, 0, fl.NumOfPage)
+		assert.Nil(t, fl.Head)
+		assert.Nil(t, fl.Tail)
 	})
 
 	t.Run("存在しない PageId を削除しても何も起きない", func(t *testing.T) {
@@ -142,7 +142,7 @@ func TestFlushListDelete(t *testing.T) {
 		fl.Delete(page.NewPageId(0, 99))
 
 		// THEN
-		assert.Equal(t, uint32(1), fl.numOfPage)
+		assert.Equal(t, 1, fl.NumOfPage)
 	})
 }
 
@@ -157,9 +157,9 @@ func TestFlushListClear(t *testing.T) {
 		fl.Clear()
 
 		// THEN
-		assert.Equal(t, uint32(0), fl.numOfPage)
-		assert.Nil(t, fl.head)
-		assert.Nil(t, fl.tail)
+		assert.Equal(t, 0, fl.NumOfPage)
+		assert.Nil(t, fl.Head)
+		assert.Nil(t, fl.Tail)
 	})
 
 	t.Run("空のリストをクリアしてもエラーにならない", func(t *testing.T) {
@@ -170,7 +170,7 @@ func TestFlushListClear(t *testing.T) {
 		fl.Clear()
 
 		// THEN
-		assert.Equal(t, uint32(0), fl.numOfPage)
+		assert.Equal(t, 0, fl.NumOfPage)
 	})
 }
 

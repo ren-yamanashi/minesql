@@ -39,7 +39,7 @@ func TestGetWritePage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		assert.Equal(t, uint32(1), bp.flushList.numOfPage)
+		assert.Equal(t, 1, bp.FlushList.NumOfPage)
 	})
 
 	t.Run("書き込んだデータがフェッチ時に反映されている", func(t *testing.T) {

@@ -16,7 +16,7 @@ func TestNewBufferPool(t *testing.T) {
 		bp := NewBufferPool(page.PageSize)
 
 		// THEN
-		assert.Equal(t, uint32(1), bp.maxNumOfPage)
+		assert.Equal(t, 1, bp.MaxNumOfPage)
 	})
 
 	t.Run("サイズが PageSize より大きい場合 MaxNumOfPage が算出される", func(t *testing.T) {
@@ -24,7 +24,7 @@ func TestNewBufferPool(t *testing.T) {
 		bp := NewBufferPool(page.PageSize * 3)
 
 		// THEN
-		assert.Equal(t, uint32(4), bp.maxNumOfPage) // 3 + 1
+		assert.Equal(t, 4, bp.MaxNumOfPage) // 3 + 1
 	})
 
 	t.Run("サイズが 0 の場合 MaxNumOfPage が 1 になる", func(t *testing.T) {
@@ -32,7 +32,7 @@ func TestNewBufferPool(t *testing.T) {
 		bp := NewBufferPool(0)
 
 		// THEN
-		assert.Equal(t, uint32(1), bp.maxNumOfPage)
+		assert.Equal(t, 1, bp.MaxNumOfPage)
 	})
 }
 
@@ -95,6 +95,38 @@ func TestRegisterHeapFile(t *testing.T) {
 		got, err := bp.GetHeapFile(1)
 		assert.NoError(t, err)
 		assert.Equal(t, hf, got)
+	})
+}
+
+func TestBufferPage(t *testing.T) {
+	t.Run("キャッシュ済みページの BufferPage を取得できる", func(t *testing.T) {
+		// GIVEN
+		bp := NewBufferPool(page.PageSize * 2)
+		hf := setupHeapFile(t, 0)
+		bp.RegisterHeapFile(0, hf)
+		pageId := page.NewPageId(0, 0)
+		_, _ = bp.AddPage(pageId)
+
+		// WHEN
+		bufPage, ok := bp.BufferPage(pageId)
+
+		// THEN
+		assert.True(t, ok)
+		assert.NotNil(t, bufPage)
+		assert.Equal(t, pageId, bufPage.PageId)
+	})
+
+	t.Run("未キャッシュの PageId は false を返す", func(t *testing.T) {
+		// GIVEN
+		bp := NewBufferPool(page.PageSize * 2)
+		pageId := page.NewPageId(0, 99)
+
+		// WHEN
+		bufPage, ok := bp.BufferPage(pageId)
+
+		// THEN
+		assert.False(t, ok)
+		assert.Nil(t, bufPage)
 	})
 }
 

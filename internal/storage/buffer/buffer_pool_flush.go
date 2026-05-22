@@ -37,7 +37,7 @@ func (bp *BufferPool) FlushAllPages() error {
 		return flushErr
 	}
 
-	bp.flushList.Clear()
+	bp.FlushList.Clear()
 
 	for _, hf := range bp.files {
 		if err := hf.Sync(); err != nil {
@@ -53,7 +53,7 @@ func (bp *BufferPool) FlushOldestPages(n int) error {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
 
-	pageIds := bp.flushList.OldestPageIds(n)
+	pageIds := bp.FlushList.OldestPageIds(n)
 	if len(pageIds) == 0 {
 		return nil
 	}
@@ -70,7 +70,7 @@ func (bp *BufferPool) FlushOldestPages(n int) error {
 
 		bufPage := &bp.bufferPages[bufId]
 		if !bufPage.isDirty {
-			bp.flushList.Delete(pid)
+			bp.FlushList.Delete(pid)
 			continue
 		}
 
@@ -83,7 +83,7 @@ func (bp *BufferPool) FlushOldestPages(n int) error {
 		}
 
 		bufPage.isDirty = false
-		bp.flushList.Delete(pid)
+		bp.FlushList.Delete(pid)
 		syncHeapFiles[pid.FileId] = true
 	}
 
@@ -101,8 +101,8 @@ func (bp *BufferPool) FlushOldestPages(n int) error {
 }
 
 // FlushListSize はフラッシュリスト内のページ数を返す
-func (bp *BufferPool) FlushListSize() uint32 {
+func (bp *BufferPool) FlushListSize() int {
 	bp.mutex.RLock()
 	defer bp.mutex.RUnlock()
-	return bp.flushList.numOfPage
+	return bp.FlushList.NumOfPage
 }

@@ -11,29 +11,29 @@ import (
 type BufferId uint64
 
 type BufferPool struct {
+	FlushList    *FlushList
+	MaxNumOfPage int // バッファプールの最大バッファページ数
 	mutex        sync.RWMutex
 	files        map[page.FileId]*file.HeapFile
 	bufferPages  []BufferPage
 	pageTable    PageTable
 	lru          *LRU
-	flushList    *FlushList
-	maxNumOfPage uint32 // バッファプールの最大バッファページ数
 }
 
-func NewBufferPool(size uint32) *BufferPool {
-	var maxNumOfPage uint32
+func NewBufferPool(size int) *BufferPool {
+	var maxNumOfPage int
 	if size <= page.PageSize {
-		maxNumOfPage = uint32(1)
+		maxNumOfPage = 1
 	} else {
 		maxNumOfPage = (size / page.PageSize) + 1
 	}
 	return &BufferPool{
+		FlushList:    NewFlushList(),
+		MaxNumOfPage: maxNumOfPage,
 		files:        make(map[page.FileId]*file.HeapFile),
 		bufferPages:  make([]BufferPage, 0, maxNumOfPage),
-		maxNumOfPage: maxNumOfPage,
 		pageTable:    NewPageTable(),
 		lru:          NewLRU(int(maxNumOfPage)),
-		flushList:    NewFlushList(),
 	}
 }
 
@@ -55,6 +55,17 @@ func (bp *BufferPool) RegisterHeapFile(fileId page.FileId, heapFile *file.HeapFi
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
 	bp.files[fileId] = heapFile
+}
+
+// BUfferId は指定された pageId に対応するバッファページを取得する
+func (bp *BufferPool) BufferPage(pageId page.PageId) (*BufferPage, bool) {
+	bp.mutex.RLock()
+	defer bp.mutex.RUnlock()
+	bufferId, ok := bp.pageTable[pageId]
+	if !ok {
+		return nil, false
+	}
+	return &bp.bufferPages[bufferId], true
 }
 
 // GetHeapFile は指定された FileId に対応する HeapFile を取得する

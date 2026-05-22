@@ -4,23 +4,23 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
-type flushListNode struct {
-	pageId page.PageId // このノードが表すページの PageId
-	prev   *flushListNode
-	next   *flushListNode
+type FlushListNode struct {
+	PageId page.PageId // このノードが表すページの PageId
+	Prev   *FlushListNode
+	Next   *FlushListNode
 }
 
 // FlushList はダーティーページをダーティーになった順に管理する双方向リンクリスト
 type FlushList struct {
-	numOfPage uint32         // リスト内のページ数
-	head      *flushListNode // 最も古いダーティーページ
-	tail      *flushListNode // 最も新しいダーティーページ
-	nodeMap   map[page.PageId]*flushListNode
+	NumOfPage int            // リスト内のページ数
+	Head      *FlushListNode // 最も古いダーティーページ
+	Tail      *FlushListNode // 最も新しいダーティーページ
+	nodeMap   map[page.PageId]*FlushListNode
 }
 
 func NewFlushList() *FlushList {
 	return &FlushList{
-		nodeMap: make(map[page.PageId]*flushListNode),
+		nodeMap: make(map[page.PageId]*FlushListNode),
 	}
 }
 
@@ -30,18 +30,18 @@ func (fl *FlushList) Add(pageId page.PageId) {
 		return
 	}
 
-	node := &flushListNode{pageId: pageId}
+	node := &FlushListNode{PageId: pageId}
 	fl.nodeMap[pageId] = node
 
-	if fl.tail == nil {
-		fl.head = node
-		fl.tail = node
+	if fl.Tail == nil {
+		fl.Head = node
+		fl.Tail = node
 	} else {
-		node.prev = fl.tail
-		fl.tail.next = node
-		fl.tail = node
+		node.Prev = fl.Tail
+		fl.Tail.Next = node
+		fl.Tail = node
 	}
-	fl.numOfPage++
+	fl.NumOfPage++
 }
 
 // Delete はページをフラッシュリストから削除する
@@ -51,37 +51,37 @@ func (fl *FlushList) Delete(pageId page.PageId) {
 		return
 	}
 
-	if node.prev != nil {
-		node.prev.next = node.next
+	if node.Prev != nil {
+		node.Prev.Next = node.Next
 	} else {
-		fl.head = node.next
+		fl.Head = node.Next
 	}
 
-	if node.next != nil {
-		node.next.prev = node.prev
+	if node.Next != nil {
+		node.Next.Prev = node.Prev
 	} else {
-		fl.tail = node.prev
+		fl.Tail = node.Prev
 	}
 
 	delete(fl.nodeMap, pageId)
-	fl.numOfPage--
+	fl.NumOfPage--
 }
 
 // Clear はフラッシュリスト全体をクリアする
 func (fl *FlushList) Clear() {
-	fl.head = nil
-	fl.tail = nil
-	fl.numOfPage = 0
-	fl.nodeMap = make(map[page.PageId]*flushListNode)
+	fl.Head = nil
+	fl.Tail = nil
+	fl.NumOfPage = 0
+	fl.nodeMap = make(map[page.PageId]*FlushListNode)
 }
 
 // OldestPageIds は先頭 (最も古い) から n 件の PageId を返す
 func (fl *FlushList) OldestPageIds(n int) []page.PageId {
 	result := make([]page.PageId, 0, n)
-	node := fl.head
+	node := fl.Head
 	for node != nil && len(result) < n {
-		result = append(result, node.pageId)
-		node = node.next
+		result = append(result, node.PageId)
+		node = node.Next
 	}
 	return result
 }
