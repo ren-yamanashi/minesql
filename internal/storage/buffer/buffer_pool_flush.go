@@ -10,7 +10,7 @@ func (bp *BufferPool) FlushAllPages() error {
 	var flushErr error
 
 	// 全ダーティーページをディスクに書き出す
-	bp.pageTable.ForEach(func(pageId page.PageId, bufId BufferId) {
+	bp.pageTable.forEach(func(pageId page.PageId, bufId BufferId) {
 		if flushErr != nil {
 			return
 		}
@@ -37,7 +37,7 @@ func (bp *BufferPool) FlushAllPages() error {
 		return flushErr
 	}
 
-	bp.FlushList.Clear()
+	bp.flushList.clear()
 
 	for _, hf := range bp.files {
 		if err := hf.Sync(); err != nil {
@@ -53,7 +53,7 @@ func (bp *BufferPool) FlushOldestPages(n int) error {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
 
-	pageIds := bp.FlushList.OldestPageIds(n)
+	pageIds := bp.flushList.oldestPageIds(n)
 	if len(pageIds) == 0 {
 		return nil
 	}
@@ -63,14 +63,14 @@ func (bp *BufferPool) FlushOldestPages(n int) error {
 
 	// 対象のダーティーページをディスクに書き出す
 	for _, pid := range pageIds {
-		bufId, exists := bp.pageTable.GetBufferId(pid)
+		bufId, exists := bp.pageTable.getBufferId(pid)
 		if !exists {
 			continue
 		}
 
 		bufPage := &bp.bufferPages[bufId]
 		if !bufPage.isDirty {
-			bp.FlushList.Delete(pid)
+			bp.flushList.delete(pid)
 			continue
 		}
 
@@ -83,7 +83,7 @@ func (bp *BufferPool) FlushOldestPages(n int) error {
 		}
 
 		bufPage.isDirty = false
-		bp.FlushList.Delete(pid)
+		bp.flushList.delete(pid)
 		syncHeapFiles[pid.FileId] = true
 	}
 
@@ -100,9 +100,23 @@ func (bp *BufferPool) FlushOldestPages(n int) error {
 	return nil
 }
 
-// FlushListSize はフラッシュリスト内のページ数を返す
-func (bp *BufferPool) FlushListSize() int {
+// NumOfFlushListPage はフラッシュリスト内のページ数を返す
+func (bp *BufferPool) NumOfFlushListPage() int {
 	bp.mutex.RLock()
 	defer bp.mutex.RUnlock()
-	return bp.FlushList.NumOfPage
+	return bp.flushList.NumOfPage
+}
+
+// ForEachDirtyPage はフラッシュリスト内の全ダーティーページに対してコールバックを実行する
+func (bp *BufferPool) ForEachDirtyPage(fn func(pg *page.Page)) {
+	bp.mutex.RLock()
+	defer bp.mutex.RUnlock()
+
+	for node := bp.flushList.Head; node != nil; node = node.next {
+		bufId, ok := bp.pageTable.getBufferId(node.pageId)
+		if !ok {
+			continue
+		}
+		fn(bp.bufferPages[bufId].Page)
+	}
 }

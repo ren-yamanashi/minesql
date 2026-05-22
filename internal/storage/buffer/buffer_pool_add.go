@@ -15,19 +15,19 @@ func (bp *BufferPool) AddPage(pageId page.PageId) (*BufferPage, error) {
 func (bp *BufferPool) addPage(pageId page.PageId) (*BufferPage, error) {
 	// バッファプールに空きがある場合: 新しいバッファページを追加・ページテーブルを更新
 	if len(bp.bufferPages) < int(bp.MaxNumOfPage) {
-		newBufPage, err := NewBufferPage(pageId)
+		newBufPage, err := newBufferPage(pageId)
 		if err != nil {
 			return nil, err
 		}
 		bp.bufferPages = append(bp.bufferPages, *newBufPage)
 		bufferId := BufferId(len(bp.bufferPages) - 1)
-		bp.pageTable.Add(pageId, bufferId)
-		bp.lru.Access(bufferId)
+		bp.pageTable.add(pageId, bufferId)
+		bp.lru.access(bufferId)
 		return &bp.bufferPages[bufferId], nil
 	}
 
 	// バッファプールに空きがない場合: ページを追い出す
-	victimBufId := bp.lru.Evict()
+	victimBufId := bp.lru.evict()
 	victimBufPage := &bp.bufferPages[victimBufId]
 
 	if victimBufPage.isDirty {
@@ -41,16 +41,16 @@ func (bp *BufferPool) addPage(pageId page.PageId) (*BufferPage, error) {
 			return nil, err
 		}
 
-		bp.FlushList.Delete(victimBufPage.PageId)
+		bp.flushList.delete(victimBufPage.PageId)
 	}
 
 	// 新しいページに置き換え
-	bp.pageTable.Update(victimBufPage.PageId, pageId, victimBufId)
-	newBufPage, err := NewBufferPage(pageId)
+	bp.pageTable.update(victimBufPage.PageId, pageId, victimBufId)
+	newBufPage, err := newBufferPage(pageId)
 	if err != nil {
 		return nil, err
 	}
 	bp.bufferPages[victimBufId] = *newBufPage
-	bp.lru.Access(victimBufId)
+	bp.lru.access(victimBufId)
 	return &bp.bufferPages[victimBufId], nil
 }

@@ -11,7 +11,7 @@ type BufferPage struct {
 	isDirty bool
 }
 
-func NewBufferPage(pageId page.PageId) (*BufferPage, error) {
+func newBufferPage(pageId page.PageId) (*BufferPage, error) {
 	p, err := page.NewPage(directio.AlignedBlock(page.PageSize))
 	if err != nil {
 		return nil, err

@@ -15,7 +15,7 @@ func (bp *BufferPool) GetWritePage(pageId page.PageId) (*page.Page, error) {
 	// 書き込み用なのでダーティーページとして扱う
 	if !bufPage.isDirty {
 		bufPage.isDirty = true
-		bp.FlushList.Add(pageId)
+		bp.flushList.add(pageId)
 	}
 	return bufPage.Page, nil
 }
@@ -24,7 +24,7 @@ func (bp *BufferPool) GetWritePage(pageId page.PageId) (*page.Page, error) {
 func (bp *BufferPool) GetReadPage(pageId page.PageId) (*page.Page, error) {
 	// ページがバッファプールにある場合は RLock で返す (LRU 更新不要な為)
 	bp.mutex.RLock()
-	if bufId, exists := bp.pageTable.GetBufferId(pageId); exists {
+	if bufId, exists := bp.pageTable.getBufferId(pageId); exists {
 		bufPage := &bp.bufferPages[bufId]
 		bp.mutex.RUnlock()
 		return bufPage.Page, nil
@@ -53,7 +53,7 @@ func (bp *BufferPool) FetchPage(pageId page.PageId) (*BufferPage, error) {
 func (bp *BufferPool) IsPageCached(pageId page.PageId) bool {
 	bp.mutex.RLock()
 	defer bp.mutex.RUnlock()
-	_, ok := bp.pageTable.GetBufferId(pageId)
+	_, ok := bp.pageTable.getBufferId(pageId)
 	return ok
 }
 
@@ -61,7 +61,7 @@ func (bp *BufferPool) IsPageCached(pageId page.PageId) bool {
 func (bp *BufferPool) UnRefPage(pageId page.PageId) {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
-	if bufferId, exists := bp.pageTable.GetBufferId(pageId); exists {
+	if bufferId, exists := bp.pageTable.getBufferId(pageId); exists {
 		bp.lru.Delete(bufferId)
 	}
 }
@@ -69,9 +69,9 @@ func (bp *BufferPool) UnRefPage(pageId page.PageId) {
 // fetchPage は指定されたページをバッファプールから取得する
 func (bp *BufferPool) fetchPage(pageId page.PageId) (*BufferPage, error) {
 	// ページがバッファプールにある場合
-	if bufferId, exists := bp.pageTable.GetBufferId(pageId); exists {
+	if bufferId, exists := bp.pageTable.getBufferId(pageId); exists {
 		bufferPage := &bp.bufferPages[bufferId]
-		bp.lru.Access(bufferId)
+		bp.lru.access(bufferId)
 		return bufferPage, nil
 	}
 

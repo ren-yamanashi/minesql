@@ -8,7 +8,7 @@ type lruNode struct {
 	isUnused bool // 未使用 or 追い出し直後
 }
 
-type LRU struct {
+type lru struct {
 	head     *lruNode              // リストの先頭 (NewSublist の先頭)
 	tail     *lruNode              // リストの末尾 (OldSublist の末尾 = 追い出し候補)
 	midpoint *lruNode              // OldSublist の先頭 (midpoint)
@@ -18,8 +18,8 @@ type LRU struct {
 	maxNew   int                   // NewSublist の最大長 (全体の 5/8)
 }
 
-func NewLRU(numOfPage int) *LRU {
-	lru := &LRU{
+func newLru(numOfPage int) *lru {
+	lru := &lru{
 		nodeMap: make(map[BufferId]*lruNode, numOfPage),
 		maxNew:  numOfPage * 5 / 8,
 	}
@@ -38,8 +38,8 @@ func NewLRU(numOfPage int) *LRU {
 	return lru
 }
 
-// Access はページがアクセスされたことを記録する
-func (l *LRU) Access(bufferId BufferId) {
+// access はページがアクセスされたことを記録する
+func (l *lru) access(bufferId BufferId) {
 	node := l.nodeMap[bufferId]
 
 	// 新規ページにアクセスした場合: midpoint に配置
@@ -59,21 +59,21 @@ func (l *LRU) Access(bufferId BufferId) {
 	l.moveToNewHead(node)
 }
 
-// Evict は追い出すページの BufferId を返す
-func (l *LRU) Evict() BufferId {
+// evict は追い出すページの BufferId を返す
+func (l *lru) evict() BufferId {
 	victim := l.tail
 	victim.isUnused = true
 	return victim.bufferId
 }
 
 // Delete はページの参照を解除し、優先的に追い出されるようにする
-func (l *LRU) Delete(bufferId BufferId) {
+func (l *lru) Delete(bufferId BufferId) {
 	node := l.nodeMap[bufferId]
 	l.moveToOldTail(node)
 }
 
 // moveToMidpoint はノードを midpoint (OldSublist の先頭) に配置する
-func (l *LRU) moveToMidpoint(node *lruNode) {
+func (l *lru) moveToMidpoint(node *lruNode) {
 	if node == l.midpoint {
 		return
 	}
@@ -91,7 +91,7 @@ func (l *LRU) moveToMidpoint(node *lruNode) {
 }
 
 // moveToNewHead は NewSublist 内のノードを先頭に移動する
-func (l *LRU) moveToNewHead(node *lruNode) {
+func (l *lru) moveToNewHead(node *lruNode) {
 	if l.head == node {
 		return
 	}
@@ -101,7 +101,7 @@ func (l *LRU) moveToNewHead(node *lruNode) {
 }
 
 // moveToOldTail はノードを OldSublist の末尾に移動する
-func (l *LRU) moveToOldTail(node *lruNode) {
+func (l *lru) moveToOldTail(node *lruNode) {
 	if l.tail == node {
 		node.isOld = true
 		return
@@ -113,7 +113,7 @@ func (l *LRU) moveToOldTail(node *lruNode) {
 }
 
 // rebalance は NewSublist が最大長を超えた場合、midpoint を前方に移動して NewSublist の末尾ノードを OldSublist に降格する
-func (l *LRU) rebalance() {
+func (l *lru) rebalance() {
 	for l.newLen > l.maxNew {
 		switch {
 		case l.midpoint == nil:
@@ -131,7 +131,7 @@ func (l *LRU) rebalance() {
 }
 
 // detach はノードをリストから切り離す
-func (l *LRU) detach(node *lruNode) {
+func (l *lru) detach(node *lruNode) {
 	if node == l.midpoint {
 		l.midpoint = node.next
 	}
@@ -155,7 +155,7 @@ func (l *LRU) detach(node *lruNode) {
 }
 
 // insertBefore は target の直前にノードを挿入する
-func (l *LRU) insertBefore(target, node *lruNode) {
+func (l *lru) insertBefore(target, node *lruNode) {
 	node.next = target
 	node.prev = target.prev
 	if target.prev != nil {
@@ -167,7 +167,7 @@ func (l *LRU) insertBefore(target, node *lruNode) {
 }
 
 // insertToTail はリストの末尾にノードを追加する
-func (l *LRU) insertToTail(node *lruNode) {
+func (l *lru) insertToTail(node *lruNode) {
 	node.next = nil
 	node.prev = l.tail
 	if l.tail != nil {
@@ -179,7 +179,7 @@ func (l *LRU) insertToTail(node *lruNode) {
 }
 
 // promoteToNew は OldSublist のノードを NewSublist の先頭に昇格する
-func (l *LRU) promoteToNew(node *lruNode) {
+func (l *lru) promoteToNew(node *lruNode) {
 	l.detach(node)
 	l.prependToHead(node)
 	node.isOld = false
@@ -188,7 +188,7 @@ func (l *LRU) promoteToNew(node *lruNode) {
 }
 
 // prependToHead はリストの先頭にノードを追加する
-func (l *LRU) prependToHead(node *lruNode) {
+func (l *lru) prependToHead(node *lruNode) {
 	node.prev = nil
 	node.next = l.head
 	if l.head != nil {

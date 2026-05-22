@@ -6,10 +6,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewLRU(t *testing.T) {
+func TestNewLru(t *testing.T) {
 	t.Run("全スロットが OldSublist に配置される", func(t *testing.T) {
 		// GIVEN / WHEN
-		lru := NewLRU(8)
+		lru := newLru(8)
 
 		// THEN
 		assert.Equal(t, 8, lru.oldLen)
@@ -20,7 +20,7 @@ func TestNewLRU(t *testing.T) {
 
 	t.Run("全ノードが未使用状態で作成される", func(t *testing.T) {
 		// GIVEN / WHEN
-		lru := NewLRU(4)
+		lru := newLru(4)
 
 		// THEN
 		for _, node := range lru.nodeMap {
@@ -33,10 +33,10 @@ func TestNewLRU(t *testing.T) {
 func TestAccess(t *testing.T) {
 	t.Run("未使用ノードにアクセスすると midpoint に配置される", func(t *testing.T) {
 		// GIVEN
-		lru := NewLRU(4)
+		lru := newLru(4)
 
 		// WHEN
-		lru.Access(2)
+		lru.access(2)
 
 		// THEN
 		node := lru.nodeMap[2]
@@ -47,12 +47,12 @@ func TestAccess(t *testing.T) {
 
 	t.Run("OldSublist のノードに再アクセスすると NewSublist の先頭に昇格する", func(t *testing.T) {
 		// GIVEN
-		lru := NewLRU(8)
-		lru.Access(0) // unused → midpoint (Old)
-		lru.Access(1) // unused → midpoint (Old)
+		lru := newLru(8)
+		lru.access(0) // unused → midpoint (Old)
+		lru.access(1) // unused → midpoint (Old)
 
 		// WHEN
-		lru.Access(0) // Old → New head
+		lru.access(0) // Old → New head
 
 		// THEN
 		node := lru.nodeMap[0]
@@ -62,14 +62,14 @@ func TestAccess(t *testing.T) {
 
 	t.Run("NewSublist のノードに再アクセスすると NewSublist の先頭に移動する", func(t *testing.T) {
 		// GIVEN
-		lru := NewLRU(8)
-		lru.Access(0)
-		lru.Access(1)
-		lru.Access(0) // New head
-		lru.Access(1) // New head
+		lru := newLru(8)
+		lru.access(0)
+		lru.access(1)
+		lru.access(0) // New head
+		lru.access(1) // New head
 
 		// WHEN
-		lru.Access(0) // New 内で先頭に移動
+		lru.access(0) // New 内で先頭に移動
 
 		// THEN
 		assert.Equal(t, lru.head, lru.nodeMap[0])
@@ -77,12 +77,12 @@ func TestAccess(t *testing.T) {
 
 	t.Run("NewSublist の先頭ノードに再アクセスしても位置が変わらない", func(t *testing.T) {
 		// GIVEN
-		lru := NewLRU(8)
-		lru.Access(0)
-		lru.Access(0) // Old → New head
+		lru := newLru(8)
+		lru.access(0)
+		lru.access(0) // Old → New head
 
 		// WHEN
-		lru.Access(0) // head と同じノード → early return
+		lru.access(0) // head と同じノード → early return
 
 		// THEN
 		assert.Equal(t, lru.head, lru.nodeMap[0])
@@ -91,14 +91,14 @@ func TestAccess(t *testing.T) {
 	t.Run("NewSublist が maxNew を超えるとリバランスが発生する", func(t *testing.T) {
 		// GIVEN
 		// size=8, maxNew=5
-		lru := NewLRU(8)
+		lru := newLru(8)
 		// 6 個のノードにアクセスして midpoint に配置
 		for i := range 6 {
-			lru.Access(BufferId(i))
+			lru.access(BufferId(i))
 		}
 		// 全て Old → New に昇格 (6 個)
 		for i := range 6 {
-			lru.Access(BufferId(i))
+			lru.access(BufferId(i))
 		}
 
 		// THEN
@@ -108,11 +108,11 @@ func TestAccess(t *testing.T) {
 
 	t.Run("size 1 で昇格時にリバランスが正しく動作する", func(t *testing.T) {
 		// GIVEN
-		lru := NewLRU(1) // maxNew=0, 全て Old
+		lru := newLru(1) // maxNew=0, 全て Old
 
 		// WHEN
-		lru.Access(0) // unused → midpoint
-		lru.Access(0) // Old → New (リバランスで midpoint.prev == nil のパスに入る)
+		lru.access(0) // unused → midpoint
+		lru.access(0) // Old → New (リバランスで midpoint.prev == nil のパスに入る)
 
 		// THEN
 		assert.LessOrEqual(t, lru.newLen, lru.maxNew+1)
@@ -121,20 +121,20 @@ func TestAccess(t *testing.T) {
 	t.Run("フルスキャンでホットページが追い出されない", func(t *testing.T) {
 		// GIVEN
 		// size=8, maxNew=5
-		lru := NewLRU(8)
+		lru := newLru(8)
 
 		// ページ 0, 1, 2 をホットページとして New に昇格
 		for i := range 3 {
-			lru.Access(BufferId(i)) // unused → midpoint
+			lru.access(BufferId(i)) // unused → midpoint
 		}
 		for i := range 3 {
-			lru.Access(BufferId(i)) // Old → New head
+			lru.access(BufferId(i)) // Old → New head
 		}
 
 		// WHEN
 		// ページ 3, 4, 5, 6, 7 をスキャン (midpoint に配置されるだけ)
 		for i := 3; i < 8; i++ {
-			lru.Access(BufferId(i)) // unused → midpoint
+			lru.access(BufferId(i)) // unused → midpoint
 		}
 
 		// THEN
@@ -149,10 +149,10 @@ func TestAccess(t *testing.T) {
 func TestEvict(t *testing.T) {
 	t.Run("リストの末尾の BufferId を返す", func(t *testing.T) {
 		// GIVEN
-		lru := NewLRU(4)
+		lru := newLru(4)
 
 		// WHEN
-		victim := lru.Evict()
+		victim := lru.evict()
 
 		// THEN
 		assert.Equal(t, lru.tail.bufferId, victim)
@@ -160,11 +160,11 @@ func TestEvict(t *testing.T) {
 
 	t.Run("追い出されたノードは未使用状態になる", func(t *testing.T) {
 		// GIVEN
-		lru := NewLRU(4)
-		lru.Access(0)
+		lru := newLru(4)
+		lru.access(0)
 
 		// WHEN
-		victim := lru.Evict()
+		victim := lru.evict()
 
 		// THEN
 		node := lru.nodeMap[victim]
@@ -173,12 +173,12 @@ func TestEvict(t *testing.T) {
 
 	t.Run("追い出し後に再アクセスすると midpoint に配置される", func(t *testing.T) {
 		// GIVEN
-		lru := NewLRU(4)
-		lru.Access(0)
-		victim := lru.Evict()
+		lru := newLru(4)
+		lru.access(0)
+		victim := lru.evict()
 
 		// WHEN
-		lru.Access(victim) // 未使用 → midpoint
+		lru.access(victim) // 未使用 → midpoint
 
 		// THEN
 		node := lru.nodeMap[victim]
@@ -190,10 +190,10 @@ func TestEvict(t *testing.T) {
 func TestDelete(t *testing.T) {
 	t.Run("指定したノードが OldSublist の末尾に移動する", func(t *testing.T) {
 		// GIVEN
-		lru := NewLRU(8)
-		lru.Access(0)
-		lru.Access(1)
-		lru.Access(0) // New に昇格
+		lru := newLru(8)
+		lru.access(0)
+		lru.access(1)
+		lru.access(0) // New に昇格
 
 		// WHEN
 		lru.Delete(0)
@@ -206,7 +206,7 @@ func TestDelete(t *testing.T) {
 
 	t.Run("既に tail にあるノードを Delete しても位置が変わらない", func(t *testing.T) {
 		// GIVEN
-		lru := NewLRU(4)
+		lru := newLru(4)
 		tail := lru.tail
 
 		// WHEN

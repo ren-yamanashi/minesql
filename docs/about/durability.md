@@ -27,7 +27,7 @@
 
 ## Log Sequence Number (LSN)
 
-- 各 WAL レコード (=Undo レコード) には LSN と言う連番が付与される
+- 各 WAL レコード (=Redo レコード) には LSN と言う連番が付与される
 - LSN 配下の役割を果たす
   - 順序の保証: WAL レコードの時系列順序を保証
   - Page LSN: 各ページは、「このページに最後に適用された WAL の LSN」 を記録する

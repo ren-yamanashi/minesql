@@ -13,7 +13,7 @@ func TestNewBufferPage(t *testing.T) {
 		pageId := page.NewPageId(1, 0)
 
 		// WHEN
-		bp, err := NewBufferPage(pageId)
+		bp, err := newBufferPage(pageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -27,7 +27,7 @@ func TestNewBufferPage(t *testing.T) {
 		pageId := page.NewPageId(0, 0)
 
 		// WHEN
-		bp, err := NewBufferPage(pageId)
+		bp, err := newBufferPage(pageId)
 
 		// THEN
 		assert.NoError(t, err)

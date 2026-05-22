@@ -92,7 +92,7 @@ func TestRegisterHeapFile(t *testing.T) {
 		bp.RegisterHeapFile(1, hf)
 
 		// THEN
-		got, err := bp.GetHeapFile(1)
+		got, err := bp.HeapFile(1)
 		assert.NoError(t, err)
 		assert.Equal(t, hf, got)
 	})
@@ -130,7 +130,7 @@ func TestBufferPage(t *testing.T) {
 	})
 }
 
-func TestGetHeapFile(t *testing.T) {
+func TestHeapFile(t *testing.T) {
 	t.Run("登録済みの HeapFile を取得できる", func(t *testing.T) {
 		// GIVEN
 		bp := NewBufferPool(page.PageSize)
@@ -138,7 +138,7 @@ func TestGetHeapFile(t *testing.T) {
 		bp.RegisterHeapFile(0, hf)
 
 		// WHEN
-		got, err := bp.GetHeapFile(0)
+		got, err := bp.HeapFile(0)
 
 		// THEN
 		assert.NoError(t, err)
@@ -150,7 +150,7 @@ func TestGetHeapFile(t *testing.T) {
 		bp := NewBufferPool(page.PageSize)
 
 		// WHEN
-		got, err := bp.GetHeapFile(99)
+		got, err := bp.HeapFile(99)
 
 		// THEN
 		assert.Error(t, err)

@@ -10,7 +10,7 @@ import (
 func TestNewFlushList(t *testing.T) {
 	t.Run("空のフラッシュリストが作成される", func(t *testing.T) {
 		// GIVEN / WHEN
-		fl := NewFlushList()
+		fl := newFlushList()
 
 		// THEN
 		assert.Equal(t, 0, fl.NumOfPage)
@@ -22,44 +22,44 @@ func TestNewFlushList(t *testing.T) {
 func TestFlushListAdd(t *testing.T) {
 	t.Run("ページを追加するとリストに反映される", func(t *testing.T) {
 		// GIVEN
-		fl := NewFlushList()
+		fl := newFlushList()
 		pageId := page.NewPageId(0, 1)
 
 		// WHEN
-		fl.Add(pageId)
+		fl.add(pageId)
 
 		// THEN
 		assert.Equal(t, 1, fl.NumOfPage)
-		assert.Equal(t, pageId, fl.Head.PageId)
-		assert.Equal(t, pageId, fl.Tail.PageId)
+		assert.Equal(t, pageId, fl.Head.pageId)
+		assert.Equal(t, pageId, fl.Tail.pageId)
 	})
 
 	t.Run("複数ページを追加すると追加順に並ぶ", func(t *testing.T) {
 		// GIVEN
-		fl := NewFlushList()
+		fl := newFlushList()
 		id1 := page.NewPageId(0, 1)
 		id2 := page.NewPageId(0, 2)
 		id3 := page.NewPageId(0, 3)
 
 		// WHEN
-		fl.Add(id1)
-		fl.Add(id2)
-		fl.Add(id3)
+		fl.add(id1)
+		fl.add(id2)
+		fl.add(id3)
 
 		// THEN
 		assert.Equal(t, 3, fl.NumOfPage)
-		assert.Equal(t, id1, fl.Head.PageId)
-		assert.Equal(t, id3, fl.Tail.PageId)
+		assert.Equal(t, id1, fl.Head.pageId)
+		assert.Equal(t, id3, fl.Tail.pageId)
 	})
 
 	t.Run("同じ PageId を重複追加しても無視される", func(t *testing.T) {
 		// GIVEN
-		fl := NewFlushList()
+		fl := newFlushList()
 		pageId := page.NewPageId(0, 1)
-		fl.Add(pageId)
+		fl.add(pageId)
 
 		// WHEN
-		fl.Add(pageId)
+		fl.add(pageId)
 
 		// THEN
 		assert.Equal(t, 1, fl.NumOfPage)
@@ -69,63 +69,63 @@ func TestFlushListAdd(t *testing.T) {
 func TestFlushListDelete(t *testing.T) {
 	t.Run("先頭のページを削除できる", func(t *testing.T) {
 		// GIVEN
-		fl := NewFlushList()
+		fl := newFlushList()
 		id1 := page.NewPageId(0, 1)
 		id2 := page.NewPageId(0, 2)
-		fl.Add(id1)
-		fl.Add(id2)
+		fl.add(id1)
+		fl.add(id2)
 
 		// WHEN
-		fl.Delete(id1)
+		fl.delete(id1)
 
 		// THEN
 		assert.Equal(t, 1, fl.NumOfPage)
-		assert.Equal(t, id2, fl.Head.PageId)
+		assert.Equal(t, id2, fl.Head.pageId)
 	})
 
 	t.Run("末尾のページを削除できる", func(t *testing.T) {
 		// GIVEN
-		fl := NewFlushList()
+		fl := newFlushList()
 		id1 := page.NewPageId(0, 1)
 		id2 := page.NewPageId(0, 2)
-		fl.Add(id1)
-		fl.Add(id2)
+		fl.add(id1)
+		fl.add(id2)
 
 		// WHEN
-		fl.Delete(id2)
+		fl.delete(id2)
 
 		// THEN
 		assert.Equal(t, 1, fl.NumOfPage)
-		assert.Equal(t, id1, fl.Tail.PageId)
+		assert.Equal(t, id1, fl.Tail.pageId)
 	})
 
 	t.Run("中間のページを削除できる", func(t *testing.T) {
 		// GIVEN
-		fl := NewFlushList()
+		fl := newFlushList()
 		id1 := page.NewPageId(0, 1)
 		id2 := page.NewPageId(0, 2)
 		id3 := page.NewPageId(0, 3)
-		fl.Add(id1)
-		fl.Add(id2)
-		fl.Add(id3)
+		fl.add(id1)
+		fl.add(id2)
+		fl.add(id3)
 
 		// WHEN
-		fl.Delete(id2)
+		fl.delete(id2)
 
 		// THEN
 		assert.Equal(t, 2, fl.NumOfPage)
-		assert.Equal(t, id1, fl.Head.PageId)
-		assert.Equal(t, id3, fl.Tail.PageId)
+		assert.Equal(t, id1, fl.Head.pageId)
+		assert.Equal(t, id3, fl.Tail.pageId)
 	})
 
 	t.Run("唯一のページを削除するとリストが空になる", func(t *testing.T) {
 		// GIVEN
-		fl := NewFlushList()
+		fl := newFlushList()
 		pageId := page.NewPageId(0, 1)
-		fl.Add(pageId)
+		fl.add(pageId)
 
 		// WHEN
-		fl.Delete(pageId)
+		fl.delete(pageId)
 
 		// THEN
 		assert.Equal(t, 0, fl.NumOfPage)
@@ -135,11 +135,11 @@ func TestFlushListDelete(t *testing.T) {
 
 	t.Run("存在しない PageId を削除しても何も起きない", func(t *testing.T) {
 		// GIVEN
-		fl := NewFlushList()
-		fl.Add(page.NewPageId(0, 1))
+		fl := newFlushList()
+		fl.add(page.NewPageId(0, 1))
 
 		// WHEN
-		fl.Delete(page.NewPageId(0, 99))
+		fl.delete(page.NewPageId(0, 99))
 
 		// THEN
 		assert.Equal(t, 1, fl.NumOfPage)
@@ -149,12 +149,12 @@ func TestFlushListDelete(t *testing.T) {
 func TestFlushListClear(t *testing.T) {
 	t.Run("リストをクリアすると空になる", func(t *testing.T) {
 		// GIVEN
-		fl := NewFlushList()
-		fl.Add(page.NewPageId(0, 1))
-		fl.Add(page.NewPageId(0, 2))
+		fl := newFlushList()
+		fl.add(page.NewPageId(0, 1))
+		fl.add(page.NewPageId(0, 2))
 
 		// WHEN
-		fl.Clear()
+		fl.clear()
 
 		// THEN
 		assert.Equal(t, 0, fl.NumOfPage)
@@ -164,10 +164,10 @@ func TestFlushListClear(t *testing.T) {
 
 	t.Run("空のリストをクリアしてもエラーにならない", func(t *testing.T) {
 		// GIVEN
-		fl := NewFlushList()
+		fl := newFlushList()
 
 		// WHEN
-		fl.Clear()
+		fl.clear()
 
 		// THEN
 		assert.Equal(t, 0, fl.NumOfPage)
@@ -177,16 +177,16 @@ func TestFlushListClear(t *testing.T) {
 func TestFlushListOldestPageIds(t *testing.T) {
 	t.Run("先頭から n 件の PageId を返す", func(t *testing.T) {
 		// GIVEN
-		fl := NewFlushList()
+		fl := newFlushList()
 		id1 := page.NewPageId(0, 1)
 		id2 := page.NewPageId(0, 2)
 		id3 := page.NewPageId(0, 3)
-		fl.Add(id1)
-		fl.Add(id2)
-		fl.Add(id3)
+		fl.add(id1)
+		fl.add(id2)
+		fl.add(id3)
 
 		// WHEN
-		result := fl.OldestPageIds(2)
+		result := fl.oldestPageIds(2)
 
 		// THEN
 		assert.Equal(t, []page.PageId{id1, id2}, result)
@@ -194,14 +194,14 @@ func TestFlushListOldestPageIds(t *testing.T) {
 
 	t.Run("リストのページ数より多い n を指定すると全件返す", func(t *testing.T) {
 		// GIVEN
-		fl := NewFlushList()
+		fl := newFlushList()
 		id1 := page.NewPageId(0, 1)
 		id2 := page.NewPageId(0, 2)
-		fl.Add(id1)
-		fl.Add(id2)
+		fl.add(id1)
+		fl.add(id2)
 
 		// WHEN
-		result := fl.OldestPageIds(10)
+		result := fl.oldestPageIds(10)
 
 		// THEN
 		assert.Equal(t, []page.PageId{id1, id2}, result)
@@ -209,10 +209,10 @@ func TestFlushListOldestPageIds(t *testing.T) {
 
 	t.Run("空のリストでは空のスライスを返す", func(t *testing.T) {
 		// GIVEN
-		fl := NewFlushList()
+		fl := newFlushList()
 
 		// WHEN
-		result := fl.OldestPageIds(5)
+		result := fl.oldestPageIds(5)
 
 		// THEN
 		assert.Equal(t, []page.PageId{}, result)
