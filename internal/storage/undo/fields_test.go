@@ -367,6 +367,123 @@ func TestDeserializeFields(t *testing.T) {
 	})
 }
 
+func TestFieldsToRecord(t *testing.T) {
+	t.Run("Insert の Fields を InsertRecord に変換できる", func(t *testing.T) {
+		// GIVEN
+		f := &Fields{
+			TrxId:         1,
+			UndoNum:       0,
+			RecordType:    RecordTypeInsert,
+			PrevLastTrxId: 0,
+			PrevRollPtr:   NullPointer,
+			TableFileId:   page.FileId(5),
+			ColumnSets:    [][][]byte{{[]byte("alice"), []byte("bob")}},
+		}
+
+		// WHEN
+		record, err := f.ToRecord()
+
+		// THEN
+		assert.NoError(t, err)
+		ir, ok := record.(InsertRecord)
+		assert.True(t, ok)
+		assert.Equal(t, page.FileId(5), ir.TableFileId())
+		assert.Equal(t, [][]byte{[]byte("alice"), []byte("bob")}, [][]byte(ir.Record))
+	})
+
+	t.Run("Delete の Fields を DeleteRecord に変換できる", func(t *testing.T) {
+		// GIVEN
+		f := &Fields{
+			TrxId:         2,
+			UndoNum:       1,
+			RecordType:    RecordTypeDelete,
+			PrevLastTrxId: 100,
+			PrevRollPtr:   newPointer(3, 64),
+			TableFileId:   page.FileId(7),
+			ColumnSets:    [][][]byte{{[]byte("data")}},
+		}
+
+		// WHEN
+		record, err := f.ToRecord()
+
+		// THEN
+		assert.NoError(t, err)
+		dr, ok := record.(DeleteRecord)
+		assert.True(t, ok)
+		assert.Equal(t, page.FileId(7), dr.TableFileId())
+		assert.Equal(t, lock.TrxId(100), dr.PrevLastTrxId)
+	})
+
+	t.Run("Update の Fields を UpdateRecord に変換できる", func(t *testing.T) {
+		// GIVEN
+		f := &Fields{
+			TrxId:         3,
+			UndoNum:       2,
+			RecordType:    RecordTypeUpdate,
+			PrevLastTrxId: 50,
+			PrevRollPtr:   newPointer(2, 32),
+			TableFileId:   page.FileId(9),
+			ColumnSets: [][][]byte{
+				{[]byte("old_val")},
+				{[]byte("new_val")},
+			},
+		}
+
+		// WHEN
+		record, err := f.ToRecord()
+
+		// THEN
+		assert.NoError(t, err)
+		ur, ok := record.(UpdateRecord)
+		assert.True(t, ok)
+		assert.Equal(t, page.FileId(9), ur.TableFileId())
+		assert.Equal(t, [][]byte{[]byte("old_val")}, [][]byte(ur.PrevRecord))
+		assert.Equal(t, [][]byte{[]byte("new_val")}, [][]byte(ur.NewRecord))
+	})
+
+	t.Run("Insert で ColumnSets が空の場合エラーを返す", func(t *testing.T) {
+		// GIVEN
+		f := &Fields{
+			RecordType: RecordTypeInsert,
+			ColumnSets: [][][]byte{},
+		}
+
+		// WHEN
+		_, err := f.ToRecord()
+
+		// THEN
+		assert.ErrorIs(t, err, ErrInvalidRecord)
+	})
+
+	t.Run("Update で ColumnSets が 1 つしかない場合エラーを返す", func(t *testing.T) {
+		// GIVEN
+		f := &Fields{
+			RecordType: RecordTypeUpdate,
+			ColumnSets: [][][]byte{{[]byte("only_one")}},
+		}
+
+		// WHEN
+		_, err := f.ToRecord()
+
+		// THEN
+		assert.ErrorIs(t, err, ErrInvalidRecord)
+	})
+
+	t.Run("不明な RecordType の場合エラーを返す", func(t *testing.T) {
+		// GIVEN
+		f := &Fields{
+			RecordType: RecordType(99),
+			ColumnSets: [][][]byte{{[]byte("data")}},
+		}
+
+		// WHEN
+		_, err := f.ToRecord()
+
+		// THEN
+		assert.ErrorIs(t, err, ErrInvalidRecord)
+	})
+}
+
 // buildRawBuffer はテスト用にヘッダーと任意のデータ部から Undo レコードのバイト列を構築する
 func buildRawBuffer(trxId lock.TrxId, undoNum UndoNumber, recordType RecordType, data []byte) []byte {
 	buf := make([]byte, recordHeaderSize+len(data))

@@ -104,6 +104,45 @@ func DeserializeFields(buf []byte) (Fields, error) {
 	return fields, nil
 }
 
+// ToRecord は Fields を RecordType に対応する Record に変換する
+func (f *Fields) ToRecord() (Record, error) {
+	switch f.RecordType {
+	case RecordTypeInsert:
+		if len(f.ColumnSets) < 1 {
+			return nil, ErrInvalidRecord
+		}
+		return InsertRecord{
+			tableFileId:   f.TableFileId,
+			Record:        f.ColumnSets[0],
+			PrevLastTrxId: f.PrevLastTrxId,
+			PrevRollPtr:   f.PrevRollPtr,
+		}, nil
+	case RecordTypeDelete:
+		if len(f.ColumnSets) < 1 {
+			return nil, ErrInvalidRecord
+		}
+		return DeleteRecord{
+			tableFileId:   f.TableFileId,
+			Record:        f.ColumnSets[0],
+			PrevLastTrxId: f.PrevLastTrxId,
+			PrevRollPtr:   f.PrevRollPtr,
+		}, nil
+	case RecordTypeUpdate:
+		if len(f.ColumnSets) < 2 {
+			return nil, ErrInvalidRecord
+		}
+		return UpdateRecord{
+			tableFileId:   f.TableFileId,
+			PrevRecord:    f.ColumnSets[0],
+			NewRecord:     f.ColumnSets[1],
+			PrevLastTrxId: f.PrevLastTrxId,
+			PrevRollPtr:   f.PrevRollPtr,
+		}, nil
+	default:
+		return nil, ErrInvalidRecord
+	}
+}
+
 // parseColumnSet はバイト列からカラムセット 1 つを読み取り、読み取ったバイト数を返す
 func parseColumnSet(data []byte) ([][]byte, int, error) {
 	if len(data) < columnCountSize {
