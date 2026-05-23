@@ -28,7 +28,7 @@ func TestColumnMetaInsert(t *testing.T) {
 		cm := setupTestColumnMeta(t)
 
 		// WHEN
-		err := cm.Insert(page.FileId(1), "name", 0)
+		err := cm.Insert(NewColumnRecord(page.FileId(1), "name", 0))
 
 		// THEN
 		assert.NoError(t, err)
@@ -37,10 +37,10 @@ func TestColumnMetaInsert(t *testing.T) {
 	t.Run("同じ FileId + カラム名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
 		// GIVEN
 		cm := setupTestColumnMeta(t)
-		_ = cm.Insert(page.FileId(1), "name", 0)
+		_ = cm.Insert(NewColumnRecord(page.FileId(1), "name", 0))
 
 		// WHEN
-		err := cm.Insert(page.FileId(1), "name", 1)
+		err := cm.Insert(NewColumnRecord(page.FileId(1), "name", 1))
 
 		// THEN
 		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
@@ -49,10 +49,10 @@ func TestColumnMetaInsert(t *testing.T) {
 	t.Run("同じテーブルに異なるカラム名であれば複数挿入できる", func(t *testing.T) {
 		// GIVEN
 		cm := setupTestColumnMeta(t)
-		_ = cm.Insert(page.FileId(1), "id", 0)
+		_ = cm.Insert(NewColumnRecord(page.FileId(1), "id", 0))
 
 		// WHEN
-		err := cm.Insert(page.FileId(1), "name", 1)
+		err := cm.Insert(NewColumnRecord(page.FileId(1), "name", 1))
 
 		// THEN
 		assert.NoError(t, err)
@@ -63,8 +63,8 @@ func TestColumnMetaSearch(t *testing.T) {
 	t.Run("SearchModeStart で全件スキャンできる", func(t *testing.T) {
 		// GIVEN
 		cm := setupTestColumnMeta(t)
-		_ = cm.Insert(page.FileId(1), "id", 0)
-		_ = cm.Insert(page.FileId(1), "name", 1)
+		_ = cm.Insert(NewColumnRecord(page.FileId(1), "id", 0))
+		_ = cm.Insert(NewColumnRecord(page.FileId(1), "name", 1))
 
 		// WHEN
 		iter, err := cm.Search(SearchModeStart{})

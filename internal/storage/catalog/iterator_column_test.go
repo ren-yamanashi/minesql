@@ -11,7 +11,7 @@ func TestColumnIteratorClose(t *testing.T) {
 	t.Run("検索結果のイテレータを Close できる", func(t *testing.T) {
 		// GIVEN
 		cm := setupTestColumnMeta(t)
-		_ = cm.Insert(page.FileId(1), "id", 0)
+		_ = cm.Insert(NewColumnRecord(page.FileId(1), "id", 0))
 		iter, err := cm.Search(SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -38,8 +38,8 @@ func TestColumnIteratorNext(t *testing.T) {
 	t.Run("レコードを順に取得できる", func(t *testing.T) {
 		// GIVEN
 		cm := setupTestColumnMeta(t)
-		_ = cm.Insert(page.FileId(1), "id", 0)
-		_ = cm.Insert(page.FileId(1), "name", 1)
+		_ = cm.Insert(NewColumnRecord(page.FileId(1), "id", 0))
+		_ = cm.Insert(NewColumnRecord(page.FileId(1), "name", 1))
 		iter, err := cm.Search(SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter.Close()

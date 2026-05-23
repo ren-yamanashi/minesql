@@ -200,19 +200,19 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	// テーブル定義: id:0, name:1, email:2
 	tableFileId := page.FileId(2)
 	dummyPageId := page.NewId(tableFileId, page.PageNumber(0))
-	_ = ct.TableMeta().Insert("users", dummyPageId, 3)
-	_ = ct.ColumnMeta().Insert(tableFileId, "id", 0)
-	_ = ct.ColumnMeta().Insert(tableFileId, "name", 1)
-	_ = ct.ColumnMeta().Insert(tableFileId, "email", 2)
+	_ = ct.TableMeta().Insert(catalog.NewTableRecord("users", dummyPageId, 3))
+	_ = ct.ColumnMeta().Insert(catalog.NewColumnRecord(tableFileId, "id", 0))
+	_ = ct.ColumnMeta().Insert(catalog.NewColumnRecord(tableFileId, "name", 1))
+	_ = ct.ColumnMeta().Insert(catalog.NewColumnRecord(tableFileId, "email", 2))
 
 	// インデックス定義
 	indexId1 := catalog.IndexId(1)
 	_ = ct.IndexMeta().Insert(catalog.NewIndexRecord(tableFileId, indexId1, "idx_name", catalog.IndexTypeNonUnique, 1, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(indexId1, "name", 0)
+	_ = ct.IndexKeyColumnMeta().Insert(catalog.NewIndexKeyColumnRecord(indexId1, "name", 0))
 
 	indexId2 := catalog.IndexId(2)
 	_ = ct.IndexMeta().Insert(catalog.NewIndexRecord(tableFileId, indexId2, "idx_email", catalog.IndexTypeUnique, 1, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(indexId2, "email", 0)
+	_ = ct.IndexKeyColumnMeta().Insert(catalog.NewIndexKeyColumnRecord(indexId2, "email", 0))
 
 	// プライマリ B+Tree
 	primaryTree, err := btree.CreateTree(bp, tableFileId)

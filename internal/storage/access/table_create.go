@@ -108,7 +108,7 @@ func registerTableMeta(
 	input CreateTableInput,
 ) error {
 	// テーブルメタ
-	if err := ct.TableMeta().Insert(input.TableName, pi.tree.MetaPageId(), len(input.ColNames)); err != nil {
+	if err := ct.TableMeta().Insert(catalog.NewTableRecord(input.TableName, pi.tree.MetaPageId(), len(input.ColNames))); err != nil {
 		return err
 	}
 
@@ -131,7 +131,7 @@ func registerTableMeta(
 
 	// カラムメタ
 	for i, col := range input.ColNames {
-		if err := ct.ColumnMeta().Insert(fileId, col, i); err != nil {
+		if err := ct.ColumnMeta().Insert(catalog.NewColumnRecord(fileId, col, i)); err != nil {
 			return err
 		}
 	}
@@ -177,7 +177,7 @@ func createSecondaryIndexes(
 		}
 
 		for i, keyCol := range input.ColNames {
-			if err := ct.IndexKeyColumnMeta().Insert(indexId, keyCol, i); err != nil {
+			if err := ct.IndexKeyColumnMeta().Insert(catalog.NewIndexKeyColumnRecord(indexId, keyCol, i)); err != nil {
 				return nil, err
 			}
 		}

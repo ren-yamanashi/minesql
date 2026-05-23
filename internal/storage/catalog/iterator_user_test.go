@@ -10,8 +10,8 @@ func TestUserIteratorNext(t *testing.T) {
 	t.Run("レコードを順に取得できる", func(t *testing.T) {
 		// GIVEN
 		um := setupTestUserMeta(t)
-		_ = um.Insert("alice", "localhost", []byte("auth1"))
-		_ = um.Insert("bob", "%", []byte("auth2"))
+		_ = um.Insert(NewUserRecord("alice", "localhost", []byte("auth1")))
+		_ = um.Insert(NewUserRecord("bob", "%", []byte("auth2")))
 		iter, err := um.Search(SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter.Close()
@@ -58,7 +58,7 @@ func TestUserIteratorClose(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 		ct, err := CreateCatalog(bp)
 		assert.NoError(t, err)
-		err = ct.UserMeta().Insert("testuser", "%", []byte("authstring"))
+		err = ct.UserMeta().Insert(NewUserRecord("testuser", "%", []byte("authstring")))
 		assert.NoError(t, err)
 
 		iter, err := ct.UserMeta().Search(SearchModeStart{})

@@ -32,10 +32,6 @@ func (kcm *IndexKeyColumnMeta) Search(mode SearchMode) (*IndexKeyColumnIterator,
 }
 
 // Insert はレコードを挿入する
-//   - indexId: インデックス ID
-//   - name: カラム名
-//   - colPos: インデックス上のカラム位置
-func (kcm *IndexKeyColumnMeta) Insert(indexId IndexId, name string, colPos int) error {
-	record := NewIndexKeyColumnRecord(indexId, name, colPos)
+func (kcm *IndexKeyColumnMeta) Insert(record IndexKeyColumnRecord) error {
 	return kcm.tree.Insert(record.encode())
 }

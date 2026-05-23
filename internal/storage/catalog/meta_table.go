@@ -32,10 +32,6 @@ func (tm *TableMeta) Search(mode SearchMode) (*TableIterator, error) {
 }
 
 // Insert はレコードを挿入する
-//   - name: テーブル名
-//   - metaPageId: プライマリインデックスの B+Tree メタページ ID
-//   - numOfCol: カラム数
-func (tm *TableMeta) Insert(name string, metaPageId page.Id, numOfCol int) error {
-	record := NewTableRecord(name, metaPageId, numOfCol)
+func (tm *TableMeta) Insert(record TableRecord) error {
 	return tm.tree.Insert(record.encode())
 }

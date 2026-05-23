@@ -32,10 +32,6 @@ func (cm *ColumnMeta) Search(mode SearchMode) (*ColumnIterator, error) {
 }
 
 // Insert はレコードを挿入する
-//   - fileId: テーブルの FileId
-//   - name: カラム名
-//   - pos: テーブル上のカラム位置
-func (cm *ColumnMeta) Insert(fileId page.FileId, name string, pos int) error {
-	record := NewColumnRecord(fileId, name, pos)
+func (cm *ColumnMeta) Insert(record ColumnRecord) error {
 	return cm.tree.Insert(record.encode())
 }

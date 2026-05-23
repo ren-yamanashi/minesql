@@ -32,14 +32,6 @@ func (um *UserMeta) Search(mode SearchMode) (*UserIterator, error) {
 }
 
 // Insert はレコードを挿入する
-//   - username: ユーザー名
-//   - host: ホスト名
-//   - authString: 認証文字列
-func (um *UserMeta) Insert(
-	username string,
-	host string,
-	authString []byte,
-) error {
-	record := NewUserRecord(username, host, authString)
+func (um *UserMeta) Insert(record UserRecord) error {
 	return um.tree.Insert(record.encode())
 }

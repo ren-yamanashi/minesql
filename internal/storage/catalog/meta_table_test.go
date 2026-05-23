@@ -28,7 +28,7 @@ func TestTableMetaInsert(t *testing.T) {
 		tm := setupTestTableMeta(t)
 
 		// WHEN
-		err := tm.Insert("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3)
+		err := tm.Insert(NewTableRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
 
 		// THEN
 		assert.NoError(t, err)
@@ -37,10 +37,10 @@ func TestTableMetaInsert(t *testing.T) {
 	t.Run("同じテーブル名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
 		// GIVEN
 		tm := setupTestTableMeta(t)
-		_ = tm.Insert("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3)
+		_ = tm.Insert(NewTableRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
 
 		// WHEN
-		err := tm.Insert("users", page.NewId(page.FileId(2), page.PageNumber(0)), 5)
+		err := tm.Insert(NewTableRecord("users", page.NewId(page.FileId(2), page.PageNumber(0)), 5))
 
 		// THEN
 		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
@@ -49,10 +49,10 @@ func TestTableMetaInsert(t *testing.T) {
 	t.Run("異なるテーブル名であれば複数挿入できる", func(t *testing.T) {
 		// GIVEN
 		tm := setupTestTableMeta(t)
-		_ = tm.Insert("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3)
+		_ = tm.Insert(NewTableRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
 
 		// WHEN
-		err := tm.Insert("orders", page.NewId(page.FileId(2), page.PageNumber(0)), 5)
+		err := tm.Insert(NewTableRecord("orders", page.NewId(page.FileId(2), page.PageNumber(0)), 5))
 
 		// THEN
 		assert.NoError(t, err)
@@ -63,8 +63,8 @@ func TestTableMetaSearch(t *testing.T) {
 	t.Run("SearchModeStart で全件スキャンできる", func(t *testing.T) {
 		// GIVEN
 		tm := setupTestTableMeta(t)
-		_ = tm.Insert("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3)
-		_ = tm.Insert("orders", page.NewId(page.FileId(2), page.PageNumber(0)), 5)
+		_ = tm.Insert(NewTableRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
+		_ = tm.Insert(NewTableRecord("orders", page.NewId(page.FileId(2), page.PageNumber(0)), 5))
 
 		// WHEN
 		iter, err := tm.Search(SearchModeStart{})

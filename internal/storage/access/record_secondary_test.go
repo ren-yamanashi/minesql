@@ -335,28 +335,28 @@ func setupSecondaryTestCatalog(t *testing.T) *catalog.Catalog {
 
 	tableFileId := page.FileId(2)
 	dummyPageId := page.NewId(tableFileId, page.PageNumber(0))
-	_ = ct.TableMeta().Insert("users", dummyPageId, 3)
-	_ = ct.ColumnMeta().Insert(tableFileId, "id", 0)
-	_ = ct.ColumnMeta().Insert(tableFileId, "name", 1)
-	_ = ct.ColumnMeta().Insert(tableFileId, "email", 2)
+	_ = ct.TableMeta().Insert(catalog.NewTableRecord("users", dummyPageId, 3))
+	_ = ct.ColumnMeta().Insert(catalog.NewColumnRecord(tableFileId, "id", 0))
+	_ = ct.ColumnMeta().Insert(catalog.NewColumnRecord(tableFileId, "name", 1))
+	_ = ct.ColumnMeta().Insert(catalog.NewColumnRecord(tableFileId, "email", 2))
 
 	// PRIMARY: プライマリインデックス, カラム (id)
 	indexId0 := catalog.IndexId(0)
 	_ = ct.IndexMeta().Insert(catalog.NewIndexRecord(tableFileId, indexId0, catalog.PrimaryIndexName, catalog.IndexTypePrimary, 1, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(indexId0, "id", 0)
+	_ = ct.IndexKeyColumnMeta().Insert(catalog.NewIndexKeyColumnRecord(indexId0, "id", 0))
 
 	indexId1 := catalog.IndexId(1)
 	_ = ct.IndexMeta().Insert(catalog.NewIndexRecord(tableFileId, indexId1, "idx_name", catalog.IndexTypeNonUnique, 1, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(indexId1, "name", 0)
+	_ = ct.IndexKeyColumnMeta().Insert(catalog.NewIndexKeyColumnRecord(indexId1, "name", 0))
 
 	indexId2 := catalog.IndexId(2)
 	_ = ct.IndexMeta().Insert(catalog.NewIndexRecord(tableFileId, indexId2, "idx_email", catalog.IndexTypeUnique, 1, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(indexId2, "email", 0)
+	_ = ct.IndexKeyColumnMeta().Insert(catalog.NewIndexKeyColumnRecord(indexId2, "email", 0))
 
 	indexId3 := catalog.IndexId(3)
 	_ = ct.IndexMeta().Insert(catalog.NewIndexRecord(tableFileId, indexId3, "idx_name_email", catalog.IndexTypeNonUnique, 2, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(indexId3, "name", 0)
-	_ = ct.IndexKeyColumnMeta().Insert(indexId3, "email", 1)
+	_ = ct.IndexKeyColumnMeta().Insert(catalog.NewIndexKeyColumnRecord(indexId3, "name", 0))
+	_ = ct.IndexKeyColumnMeta().Insert(catalog.NewIndexKeyColumnRecord(indexId3, "email", 1))
 
 	return ct
 }

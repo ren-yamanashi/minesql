@@ -11,7 +11,7 @@ func TestTableIteratorClose(t *testing.T) {
 	t.Run("検索結果のイテレータを Close できる", func(t *testing.T) {
 		// GIVEN
 		tm := setupTestTableMeta(t)
-		_ = tm.Insert("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3)
+		_ = tm.Insert(NewTableRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
 		iter, err := tm.Search(SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -38,8 +38,8 @@ func TestTableIteratorNext(t *testing.T) {
 	t.Run("レコードを順に取得できる", func(t *testing.T) {
 		// GIVEN
 		tm := setupTestTableMeta(t)
-		_ = tm.Insert("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3)
-		_ = tm.Insert("orders", page.NewId(page.FileId(2), page.PageNumber(0)), 5)
+		_ = tm.Insert(NewTableRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
+		_ = tm.Insert(NewTableRecord("orders", page.NewId(page.FileId(2), page.PageNumber(0)), 5))
 		iter, err := tm.Search(SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter.Close()

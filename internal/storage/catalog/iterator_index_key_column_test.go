@@ -10,7 +10,7 @@ func TestIndexKeyColumnIteratorClose(t *testing.T) {
 	t.Run("検索結果のイテレータを Close できる", func(t *testing.T) {
 		// GIVEN
 		kcm := setupTestIndexKeyColumnMeta(t)
-		_ = kcm.Insert(IndexId(1), "name", 1)
+		_ = kcm.Insert(NewIndexKeyColumnRecord(IndexId(1), "name", 1))
 		iter, err := kcm.Search(SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -37,8 +37,8 @@ func TestIndexKeyColumnIteratorNext(t *testing.T) {
 	t.Run("レコードを順に取得できる", func(t *testing.T) {
 		// GIVEN
 		kcm := setupTestIndexKeyColumnMeta(t)
-		_ = kcm.Insert(IndexId(1), "name", 1)
-		_ = kcm.Insert(IndexId(1), "age", 2)
+		_ = kcm.Insert(NewIndexKeyColumnRecord(IndexId(1), "name", 1))
+		_ = kcm.Insert(NewIndexKeyColumnRecord(IndexId(1), "age", 2))
 		iter, err := kcm.Search(SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter.Close()
