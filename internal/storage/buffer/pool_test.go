@@ -142,33 +142,6 @@ func TestBufferPageForRead(t *testing.T) {
 	})
 }
 
-func TestIsPageCached(t *testing.T) {
-	t.Run("キャッシュ済みのページに対して true を返す", func(t *testing.T) {
-		// GIVEN
-		bp := NewPool(page.Size * 2)
-		pageId := page.NewId(0, 0)
-		_, err := bp.AddPage(pageId)
-		assert.NoError(t, err)
-
-		// WHEN
-		result := bp.IsPageCached(pageId)
-
-		// THEN
-		assert.True(t, result)
-	})
-
-	t.Run("キャッシュにないページに対して false を返す", func(t *testing.T) {
-		// GIVEN
-		bp := NewPool(page.Size * 2)
-
-		// WHEN
-		result := bp.IsPageCached(page.NewId(0, 99))
-
-		// THEN
-		assert.False(t, result)
-	})
-}
-
 func TestUnRefPage(t *testing.T) {
 	t.Run("参照解除したページが優先的に追い出される", func(t *testing.T) {
 		// GIVEN
@@ -192,8 +165,10 @@ func TestUnRefPage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		assert.False(t, bp.IsPageCached(id0))
-		assert.True(t, bp.IsPageCached(newId))
+		_, cached := bp.pageTable.bufferId(id0)
+		assert.False(t, cached)
+		_, cached = bp.pageTable.bufferId(newId)
+		assert.True(t, cached)
 	})
 
 	t.Run("キャッシュにないページを参照解除しても何も起きない", func(t *testing.T) {
@@ -205,7 +180,8 @@ func TestUnRefPage(t *testing.T) {
 
 		// WHEN / THEN (panic しない)
 		bp.UnRefPage(page.NewId(0, 99))
-		assert.True(t, bp.IsPageCached(pageId))
+		_, cached := bp.pageTable.bufferId(pageId)
+		assert.True(t, cached)
 	})
 }
 
@@ -265,37 +241,9 @@ func TestRegisterHeapFile(t *testing.T) {
 		bp.RegisterHeapFile(1, hf)
 
 		// THEN
-		got, err := bp.HeapFile(1)
+		got, err := bp.heapFile(1)
 		assert.NoError(t, err)
 		assert.Equal(t, hf, got)
-	})
-}
-
-func TestHeapFile(t *testing.T) {
-	t.Run("登録済みの HeapFile を取得できる", func(t *testing.T) {
-		// GIVEN
-		bp := NewPool(page.Size)
-		hf := setupHeapFile(t, 0)
-		bp.RegisterHeapFile(0, hf)
-
-		// WHEN
-		got, err := bp.HeapFile(0)
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, hf, got)
-	})
-
-	t.Run("未登録の FileId の場合エラーを返す", func(t *testing.T) {
-		// GIVEN
-		bp := NewPool(page.Size)
-
-		// WHEN
-		got, err := bp.HeapFile(99)
-
-		// THEN
-		assert.Error(t, err)
-		assert.Nil(t, got)
 	})
 }
 

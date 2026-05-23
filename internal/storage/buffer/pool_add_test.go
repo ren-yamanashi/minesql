@@ -33,7 +33,8 @@ func TestAddPage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		assert.True(t, bp.IsPageCached(pageId))
+		_, cached := bp.pageTable.bufferId(pageId)
+		assert.True(t, cached)
 	})
 
 	t.Run("バッファプールが満杯の場合ページを追い出して追加する", func(t *testing.T) {
@@ -52,7 +53,8 @@ func TestAddPage(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, secondId, bufPage.PageId)
-		assert.False(t, bp.IsPageCached(firstId))
+		_, cached := bp.pageTable.bufferId(firstId)
+		assert.False(t, cached)
 	})
 
 	t.Run("ダーティーページの追い出し時にフラッシュリストから削除される", func(t *testing.T) {

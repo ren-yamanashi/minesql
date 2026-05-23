@@ -60,14 +60,6 @@ func (p *Pool) PageForRead(pageId page.Id) (*Page, error) {
 	return p.page(pageId)
 }
 
-// IsPageCached は指定ページがバッファプールに載っているかを返す
-func (p *Pool) IsPageCached(pageId page.Id) bool {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	_, ok := p.pageTable.bufferId(pageId)
-	return ok
-}
-
 // UnRefPage は指定されたページの参照を解除し、優先的に追い出されるようにする
 func (p *Pool) UnRefPage(pageId page.Id) {
 	p.mu.Lock()
@@ -95,13 +87,6 @@ func (p *Pool) RegisterHeapFile(fileId page.FileId, heapFile *file.HeapFile) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	p.files[fileId] = heapFile
-}
-
-// HeapFile は指定された FileId に対応する HeapFile を取得する
-func (p *Pool) HeapFile(fileId page.FileId) (*file.HeapFile, error) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	return p.heapFile(fileId)
 }
 
 // MaxPages はバッファプールの最大バッファページ数を返す
