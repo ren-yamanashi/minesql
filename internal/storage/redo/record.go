@@ -25,7 +25,7 @@ const (
 	recordHeaderSize             = 19
 )
 
-var errInvalidRecord = errors.New("redo: invalid record")
+var ErrInvalidRecord = errors.New("redo: invalid record")
 
 type Record struct {
 	lsn        Lsn
@@ -41,8 +41,7 @@ func (r *Record) Type() RecordType  { return r.recordType }
 func (r *Record) PageId() page.Id   { return r.pageId }
 func (r *Record) Data() page.Page   { return r.data }
 
-// serialize は Record をバイト列にシリアライズする
-func (r *Record) serialize() []byte {
+func (r *Record) Serialize() []byte {
 	var pageBytes []byte
 	if r.data.Header != nil {
 		pageBytes = r.data.ToBytes()
@@ -65,7 +64,7 @@ func (r *Record) serialize() []byte {
 //   - return: デシリアライズした Record, 読み取ったバイト数, エラー
 func deserializeRecord(data []byte) (Record, int, error) {
 	if len(data) < recordHeaderSize {
-		return Record{}, 0, errInvalidRecord
+		return Record{}, 0, ErrInvalidRecord
 	}
 
 	lsn := Lsn(binary.BigEndian.Uint32(data[recordHeaderLsnOffset:recordHeaderTrxOffset]))
@@ -76,7 +75,7 @@ func deserializeRecord(data []byte) (Record, int, error) {
 	totalLen := recordHeaderSize + dataLen
 
 	if len(data) < totalLen {
-		return Record{}, 0, errInvalidRecord
+		return Record{}, 0, ErrInvalidRecord
 	}
 
 	// ページデータがある場合のみデコード (COMMIT/ROLLBACK はページデータなし)

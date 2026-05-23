@@ -106,7 +106,7 @@ func (f *file) flushRecords(records []Record) error {
 	}
 
 	for _, record := range records {
-		if _, err := f.osFile.Write(record.serialize()); err != nil {
+		if _, err := f.osFile.Write(record.Serialize()); err != nil {
 			return err
 		}
 	}
@@ -147,7 +147,7 @@ func (f *file) truncateBefore(lsn Lsn) error {
 		if rec.lsn <= lsn {
 			continue
 		}
-		if _, err := f.osFile.Write(rec.serialize()); err != nil {
+		if _, err := f.osFile.Write(rec.Serialize()); err != nil {
 			return err
 		}
 		lastLsn = rec.lsn

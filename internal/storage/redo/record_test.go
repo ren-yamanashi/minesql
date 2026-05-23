@@ -143,7 +143,7 @@ func TestRecordSerialize(t *testing.T) {
 		}
 
 		// WHEN
-		buf := r.serialize()
+		buf := r.Serialize()
 
 		// THEN
 		assert.Equal(t, recordHeaderSize+page.Size, len(buf))
@@ -158,7 +158,7 @@ func TestRecordSerialize(t *testing.T) {
 		}
 
 		// WHEN
-		buf := r.serialize()
+		buf := r.Serialize()
 
 		// THEN
 		assert.Equal(t, recordHeaderSize, len(buf))
@@ -173,7 +173,7 @@ func TestRecordSerialize(t *testing.T) {
 		}
 
 		// WHEN
-		buf := r.serialize()
+		buf := r.Serialize()
 
 		// THEN
 		assert.Equal(t, recordHeaderSize, len(buf))
@@ -191,7 +191,7 @@ func TestDeserializeRecord(t *testing.T) {
 			pageId:     page.NewId(page.FileId(1), page.PageNumber(10)),
 			data:       *pg,
 		}
-		buf := original.serialize()
+		buf := original.Serialize()
 
 		// WHEN
 		decoded, readBytes, err := deserializeRecord(buf)
@@ -215,7 +215,7 @@ func TestDeserializeRecord(t *testing.T) {
 			trxId:      42,
 			recordType: RecordTypeCommit,
 		}
-		buf := original.serialize()
+		buf := original.Serialize()
 
 		// WHEN
 		decoded, readBytes, err := deserializeRecord(buf)
@@ -235,7 +235,7 @@ func TestDeserializeRecord(t *testing.T) {
 			trxId:      42,
 			recordType: RecordTypeRollback,
 		}
-		buf := original.serialize()
+		buf := original.Serialize()
 
 		// WHEN
 		decoded, readBytes, err := deserializeRecord(buf)
@@ -256,7 +256,7 @@ func TestDeserializeRecord(t *testing.T) {
 		_, _, err := deserializeRecord(data)
 
 		// THEN
-		assert.ErrorIs(t, err, errInvalidRecord)
+		assert.ErrorIs(t, err, ErrInvalidRecord)
 	})
 
 	t.Run("データ長が実データより大きい場合はエラーを返す", func(t *testing.T) {
@@ -269,7 +269,7 @@ func TestDeserializeRecord(t *testing.T) {
 			pageId:     page.NewId(page.FileId(1), page.PageNumber(1)),
 			data:       *pg,
 		}
-		buf := r.serialize()
+		buf := r.Serialize()
 		// データ部分を切り詰めてデータ長と実データを不一致にする
 		truncated := buf[:recordHeaderSize+10]
 
@@ -277,14 +277,14 @@ func TestDeserializeRecord(t *testing.T) {
 		_, _, err := deserializeRecord(truncated)
 
 		// THEN
-		assert.ErrorIs(t, err, errInvalidRecord)
+		assert.ErrorIs(t, err, ErrInvalidRecord)
 	})
 
 	t.Run("複数レコードが連続するバイト列から 1 件目を読み取れる", func(t *testing.T) {
 		// GIVEN
 		r1 := Record{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit}
 		r2 := Record{lsn: Lsn(2), trxId: 2, recordType: RecordTypeCommit}
-		buf := append(r1.serialize(), r2.serialize()...)
+		buf := append(r1.Serialize(), r2.Serialize()...)
 
 		// WHEN
 		decoded, readBytes, err := deserializeRecord(buf)
@@ -306,7 +306,7 @@ func TestDeserializeRecord(t *testing.T) {
 		_, _, err := deserializeRecord(data)
 
 		// THEN
-		assert.ErrorIs(t, err, errInvalidRecord)
+		assert.ErrorIs(t, err, ErrInvalidRecord)
 	})
 }
 

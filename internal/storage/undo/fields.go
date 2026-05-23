@@ -95,8 +95,17 @@ func (f Fields) serialize() []byte {
 
 // DeserializeFields は Undo レコードのバイト列から Fields を復元する
 func DeserializeFields(buf []byte) (Fields, error) {
+	fields, data, err := parseRecordHeader(buf)
+	if err != nil {
+		return Fields{}, err
+	}
+	return parseRecordBody(fields, data)
+}
+
+// parseRecordHeader はヘッダーを読み取り、Fields の基本フィールドとデータ部分を返す
+func parseRecordHeader(buf []byte) (Fields, []byte, error) {
 	if len(buf) < recordHeaderSize {
-		return Fields{}, ErrInvalidRecord
+		return Fields{}, nil, ErrInvalidRecord
 	}
 
 	var fields Fields
@@ -106,10 +115,15 @@ func DeserializeFields(buf []byte) (Fields, error) {
 	dataLen := int(binary.BigEndian.Uint16(buf[headerDataLenOffset:recordHeaderSize]))
 
 	if len(buf) < recordHeaderSize+dataLen {
-		return Fields{}, ErrInvalidRecord
+		return Fields{}, nil, ErrInvalidRecord
 	}
 
 	data := buf[recordHeaderSize : recordHeaderSize+dataLen]
+	return fields, data, nil
+}
+
+// parseRecordBody はデータ部分から prevFields, tableFileId, columnSets をパースする
+func parseRecordBody(fields Fields, data []byte) (Fields, error) {
 	offset := 0
 
 	// この操作で上書きされる前のレコードが持っていた lastTrxId と rollPtr を復元
