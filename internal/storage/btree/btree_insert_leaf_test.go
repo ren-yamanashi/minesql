@@ -87,11 +87,11 @@ func setupBtreeBufferPool(t *testing.T) *buffer.Pool {
 	return bp
 }
 
-// setupBtreeForTest はテスト用の Btree とバッファプールを返す
-func setupBtreeForTest(t *testing.T) (*Btree, *buffer.Pool) {
+// setupBtreeForTest はテスト用の Tree とバッファプールを返す
+func setupBtreeForTest(t *testing.T) (*Tree, *buffer.Pool) {
 	t.Helper()
 	bp := setupBtreeBufferPool(t)
-	bt, err := CreateBtree(bp, page.FileId(0))
+	bt, err := CreateTree(bp, page.FileId(0))
 	assert.NoError(t, err)
 	return bt, bp
 }

@@ -143,7 +143,7 @@ func (p *Purge) deletePrimaryRecord(fileId page.FileId, record btree.Record) err
 	if err != nil {
 		return err
 	}
-	primaryTree := btree.NewBtree(p.bufferPool, piRecord.MetaPageId)
+	primaryTree := btree.NewTree(p.bufferPool, piRecord.MetaPageId)
 	return primaryTree.Delete(record.Key())
 }
 
@@ -165,7 +165,7 @@ func (p *Purge) deleteSecondaryRecords(fileId page.FileId, record btree.Record) 
 			return err
 		}
 		sk := prevRec.secondaryKey(keyCols)
-		tree := btree.NewBtree(p.bufferPool, siRecord.MetaPageId)
+		tree := btree.NewTree(p.bufferPool, siRecord.MetaPageId)
 
 		// キーが存在し、deleteMark=1 の場合のみ物理削除
 		existing, _, err := tree.FindByKey(sk)

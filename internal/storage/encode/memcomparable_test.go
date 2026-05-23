@@ -78,6 +78,47 @@ func TestEncode(t *testing.T) {
 		assert.Equal(t, expected, dest)
 	})
 
+	t.Run("空の要素をエンコードできる", func(t *testing.T) {
+		// GIVEN
+		elements := [][]byte{{}}
+		dest := []byte{}
+
+		// WHEN
+		Encode(elements, &dest)
+
+		// THEN
+		expected := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0}
+		assert.Equal(t, expected, dest)
+	})
+
+	t.Run("空のスライスの場合は何も書き込まれない", func(t *testing.T) {
+		// GIVEN
+		elements := [][]byte{}
+		dest := []byte{}
+
+		// WHEN
+		Encode(elements, &dest)
+
+		// THEN
+		assert.Empty(t, dest)
+	})
+
+	t.Run("16 バイトのデータが 2 ブロックにエンコードされる", func(t *testing.T) {
+		// GIVEN
+		elements := [][]byte{{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}}
+		dest := []byte{}
+
+		// WHEN
+		Encode(elements, &dest)
+
+		// THEN
+		expected := []byte{
+			1, 2, 3, 4, 5, 6, 7, 8, 9,
+			9, 10, 11, 12, 13, 14, 15, 16, 8,
+		}
+		assert.Equal(t, expected, dest)
+	})
+
 	t.Run("dest の容量が不足している場合は拡張される", func(t *testing.T) {
 		// GIVEN
 		elements := [][]byte{{1, 2, 3, 4, 5, 6, 7, 8}}
@@ -145,6 +186,33 @@ func TestDecode(t *testing.T) {
 
 		// THEN
 		assert.Equal(t, [][]byte{{0xAA}, {0xBB}}, elements)
+	})
+
+	t.Run("空の要素をデコードできる", func(t *testing.T) {
+		// GIVEN
+		src := []byte{0, 0, 0, 0, 0, 0, 0, 0, 0}
+
+		// WHEN
+		elements := [][]byte{}
+		Decode(src, &elements)
+
+		// THEN
+		assert.Equal(t, [][]byte{{}}, elements)
+	})
+
+	t.Run("16 バイトのデータをデコードできる", func(t *testing.T) {
+		// GIVEN
+		src := []byte{
+			1, 2, 3, 4, 5, 6, 7, 8, 9,
+			9, 10, 11, 12, 13, 14, 15, 16, 8,
+		}
+
+		// WHEN
+		elements := [][]byte{}
+		Decode(src, &elements)
+
+		// THEN
+		assert.Equal(t, [][]byte{{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16}}, elements)
 	})
 
 	t.Run("Encode した結果を Decode すると元のデータに戻る", func(t *testing.T) {

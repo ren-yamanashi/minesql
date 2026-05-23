@@ -11,7 +11,7 @@ func TestDelete(t *testing.T) {
 	t.Run("レコードを削除できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
 
@@ -30,7 +30,7 @@ func TestDelete(t *testing.T) {
 	t.Run("存在しないキーを削除すると ErrKeyNotFound を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
@@ -43,7 +43,7 @@ func TestDelete(t *testing.T) {
 	t.Run("空の B+Tree から削除すると ErrKeyNotFound を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 
 		// WHEN
 		err := bt.Delete([]byte{0x10})
@@ -55,7 +55,7 @@ func TestDelete(t *testing.T) {
 	t.Run("削除後にリーフマージが発生すると leafPageCount がデクリメントされる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 		nonKey := make([]byte, 1500)
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x01}, nonKey))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x02}, nonKey))
@@ -75,7 +75,7 @@ func TestDelete(t *testing.T) {
 	t.Run("削除後にルート縮退が発生すると height がデクリメントされる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 		nonKey := make([]byte, 1500)
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x01}, nonKey))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x02}, nonKey))
@@ -95,7 +95,7 @@ func TestDelete(t *testing.T) {
 	t.Run("全レコードを削除できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
 
@@ -115,7 +115,7 @@ func TestDelete(t *testing.T) {
 	t.Run("ブランチノード経由で削除してもアンダーフローしない場合は isLeafMerged が false", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 		nonKey := make([]byte, 1500)
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x01}, nonKey))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x02}, nonKey))
@@ -143,7 +143,7 @@ func TestDelete(t *testing.T) {
 	t.Run("削除後もアンダーフローしない場合はメタデータが変わらない", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x30}, []byte{0xCC}))

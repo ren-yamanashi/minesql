@@ -73,21 +73,6 @@ func TestIteratorNext(t *testing.T) {
 		assert.False(t, ok3)
 	})
 
-	t.Run("LastPosition が更新される", func(t *testing.T) {
-		// GIVEN
-		bp, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
-			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
-		})
-		bufPage, _ := bp.PageForRead(pageId)
-		iter := NewIterator(bp, *bufPage, 0)
-
-		// WHEN
-		_, _, _ = iter.Next()
-
-		// THEN
-		assert.Equal(t, pageId, iter.lastPosition.PageId)
-		assert.Equal(t, 0, iter.lastPosition.SlotNum)
-	})
 }
 
 func TestIteratorAdvance(t *testing.T) {

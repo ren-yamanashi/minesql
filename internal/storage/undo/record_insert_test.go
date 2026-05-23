@@ -19,7 +19,7 @@ func TestNewInsertRecord(t *testing.T) {
 
 		// THEN
 		assert.Equal(t, page.FileId(5), ir.tableFileId)
-		assert.Equal(t, record, ir.Record)
+		assert.Equal(t, record, ir.Record())
 		assert.Equal(t, lock.TrxId(0), ir.prevLastTrxId)
 		assert.Equal(t, NullPointer, ir.prevRollPtr)
 	})
@@ -32,7 +32,7 @@ func TestNewInsertRecord(t *testing.T) {
 		ir := NewInsertRecord(page.FileId(1), record)
 
 		// THEN
-		assert.Empty(t, ir.Record)
+		assert.Empty(t, ir.Record())
 		assert.Equal(t, lock.TrxId(0), ir.prevLastTrxId)
 		assert.Equal(t, NullPointer, ir.prevRollPtr)
 	})

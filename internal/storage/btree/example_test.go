@@ -12,7 +12,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
-func ExampleBtree_Insert() {
+func ExampleTree_Insert() {
 	tree, cleanup := setup()
 	defer cleanup()
 
@@ -37,7 +37,7 @@ func ExampleBtree_Insert() {
 	//   合計: 5 件
 }
 
-func ExampleBtree_Search() {
+func ExampleTree_Search() {
 	tree, cleanup := setup()
 	defer cleanup()
 
@@ -73,7 +73,7 @@ func ExampleBtree_Search() {
 	// key=watermelon not found
 }
 
-func ExampleBtree_Delete() {
+func ExampleTree_Delete() {
 	tree, cleanup := setup()
 	defer cleanup()
 
@@ -118,7 +118,7 @@ func ExampleBtree_Delete() {
 	// 存在しないキーの削除: key not found
 }
 
-func ExampleBtree_Update() {
+func ExampleTree_Update() {
 	tree, cleanup := setup()
 	defer cleanup()
 
@@ -159,7 +159,7 @@ func ExampleBtree_Update() {
 	// 存在しないキーの更新: key not found
 }
 
-func setup() (*btree.Btree, func()) {
+func setup() (*btree.Tree, func()) {
 	tmpDir, err := os.MkdirTemp("", "btree_example")
 	if err != nil {
 		panic(err)
@@ -175,7 +175,7 @@ func setup() (*btree.Btree, func()) {
 	}
 	bp.RegisterHeapFile(fileId, dm)
 
-	tree, err := btree.CreateBtree(bp, fileId)
+	tree, err := btree.CreateTree(bp, fileId)
 	if err != nil {
 		panic(err)
 	}
@@ -184,7 +184,7 @@ func setup() (*btree.Btree, func()) {
 }
 
 // printAll は B+Tree の全データを表示する
-func printAll(tree *btree.Btree) {
+func printAll(tree *btree.Tree) {
 	iter, err := tree.Search(btree.SearchModeStart{})
 	if err != nil {
 		panic(err)

@@ -11,7 +11,7 @@ func TestInsert(t *testing.T) {
 	t.Run("レコードを挿入できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 
 		// WHEN
 		err := bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -26,7 +26,7 @@ func TestInsert(t *testing.T) {
 	t.Run("複数レコードをソート順に挿入できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 
 		// WHEN
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x30}, []byte{0xCC}))
@@ -50,7 +50,7 @@ func TestInsert(t *testing.T) {
 	t.Run("重複キーを挿入すると ErrDuplicateKey を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
@@ -63,7 +63,7 @@ func TestInsert(t *testing.T) {
 	t.Run("リーフノードの分割が発生すると leafPageCount がインクリメントされる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 		nonKey := make([]byte, 1500)
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x01}, nonKey))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x02}, nonKey))
@@ -81,7 +81,7 @@ func TestInsert(t *testing.T) {
 	t.Run("ルートノードの分割が発生すると height がインクリメントされる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 		nonKey := make([]byte, 1500)
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x01}, nonKey))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x02}, nonKey))
@@ -100,7 +100,7 @@ func TestInsert(t *testing.T) {
 	t.Run("分割後も全レコードを検索できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 		nonKey := make([]byte, 1500)
 
 		// WHEN
@@ -118,7 +118,7 @@ func TestInsert(t *testing.T) {
 	t.Run("境界キーと同じキーを挿入すると正しい子ノードで重複検出される", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 		nonKey := make([]byte, 1500)
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x01}, nonKey))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x02}, nonKey))
@@ -136,7 +136,7 @@ func TestInsert(t *testing.T) {
 	t.Run("分割が発生しない場合はメタデータが変わらない", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 		countBefore, _ := bt.LeafPageCount()
 		heightBefore, _ := bt.Height()

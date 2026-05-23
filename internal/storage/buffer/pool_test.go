@@ -68,7 +68,7 @@ func TestBufferPageForWrite(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		assert.Equal(t, 1, bp.flushList.numOfPage)
+		assert.Equal(t, 1, bp.flushList.pageCount)
 	})
 
 	t.Run("書き込んだデータがフェッチ時に反映されている", func(t *testing.T) {
@@ -296,6 +296,30 @@ func TestHeapFile(t *testing.T) {
 		// THEN
 		assert.Error(t, err)
 		assert.Nil(t, got)
+	})
+}
+
+func TestMaxPages(t *testing.T) {
+	t.Run("バッファプールの最大ページ数を返す", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.PageSize * 3)
+
+		// WHEN
+		result := bp.MaxPages()
+
+		// THEN
+		assert.Equal(t, 4, result) // 3 + 1
+	})
+
+	t.Run("最小サイズの場合 1 を返す", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(0)
+
+		// WHEN
+		result := bp.MaxPages()
+
+		// THEN
+		assert.Equal(t, 1, result)
 	})
 }
 

@@ -7,15 +7,15 @@ import (
 )
 
 type IndexKeyColMeta struct {
-	tree *btree.Btree // インデックスキーカラムメタデータが格納される B+Tree
+	tree *btree.Tree // インデックスキーカラムメタデータが格納される B+Tree
 }
 
 func NewIndexKeyColMeta(bp *buffer.Pool, metaPageId page.Id) *IndexKeyColMeta {
-	return &IndexKeyColMeta{tree: btree.NewBtree(bp, metaPageId)}
+	return &IndexKeyColMeta{tree: btree.NewTree(bp, metaPageId)}
 }
 
 func CreateIndexKeyColMeta(bp *buffer.Pool) (*IndexKeyColMeta, error) {
-	tree, err := btree.CreateBtree(bp, catalogFileId)
+	tree, err := btree.CreateTree(bp, catalogFileId)
 	if err != nil {
 		return nil, err
 	}

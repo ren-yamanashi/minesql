@@ -237,7 +237,7 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 	_ = env.ct.IndexKeyColMeta.Insert(siNameId, "name", 0)
 
 	// セカンダリインデックス idx_email のメタデータ (新しい B+Tree が必要)
-	siEmailTree, err := btree.CreateBtree(env.bp, fileId)
+	siEmailTree, err := btree.CreateTree(env.bp, fileId)
 	if err != nil {
 		t.Fatalf("idx_email B+Tree の作成に失敗: %v", err)
 	}

@@ -7,15 +7,15 @@ import (
 )
 
 type TableMeta struct {
-	tree *btree.Btree // テーブルメタデータが格納される B+Tree
+	tree *btree.Tree // テーブルメタデータが格納される B+Tree
 }
 
 func NewTableMeta(bp *buffer.Pool, metaPageId page.Id) *TableMeta {
-	return &TableMeta{tree: btree.NewBtree(bp, metaPageId)}
+	return &TableMeta{tree: btree.NewTree(bp, metaPageId)}
 }
 
 func CreateTableMeta(bp *buffer.Pool) (*TableMeta, error) {
-	tree, err := btree.CreateBtree(bp, catalogFileId)
+	tree, err := btree.CreateTree(bp, catalogFileId)
 	if err != nil {
 		return nil, err
 	}

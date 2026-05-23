@@ -10,14 +10,14 @@ type secondaryIterator struct {
 	indexName   string
 	iterator    *btree.Iterator
 	catalog     *catalog.Catalog
-	primaryTree *btree.Btree // プライマリインデックスの B+Tree
+	primaryTree *btree.Tree // プライマリインデックスの B+Tree
 }
 
 func newSecondaryIterator(
 	indexName string,
 	iter *btree.Iterator,
 	ct *catalog.Catalog,
-	pt *btree.Btree,
+	pt *btree.Tree,
 ) *secondaryIterator {
 	return &secondaryIterator{
 		indexName:   indexName,

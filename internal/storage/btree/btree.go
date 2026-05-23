@@ -12,37 +12,37 @@ var (
 	ErrKeyNotFound  = errors.New("key not found")
 )
 
-type Btree struct {
+type Tree struct {
 	bufferPool *buffer.Pool
 	metaPageId page.Id
 }
 
-// NewBtree は既存の B+Tree を開く
-func NewBtree(bp *buffer.Pool, metaPageId page.Id) *Btree {
-	return &Btree{bufferPool: bp, metaPageId: metaPageId}
+// NewTree は既存の B+Tree を開く
+func NewTree(bp *buffer.Pool, metaPageId page.Id) *Tree {
+	return &Tree{bufferPool: bp, metaPageId: metaPageId}
 }
 
-// CreateBtree は新しい B+Tree を作成する
-func CreateBtree(bp *buffer.Pool, fileId page.FileId) (*Btree, error) {
-	MetaPageId, err := bp.AllocatePageId(fileId)
+// CreateTree は新しい B+Tree を作成する
+func CreateTree(bp *buffer.Pool, fileId page.FileId) (*Tree, error) {
+	metaPageId, err := bp.AllocatePageId(fileId)
 	if err != nil {
 		return nil, err
 	}
 
 	// メタページ作成
-	_, err = bp.AddPage(MetaPageId)
+	_, err = bp.AddPage(metaPageId)
 	if err != nil {
 		return nil, err
 	}
 
-	pageMeta, err := bp.PageForWrite(MetaPageId)
+	pageMeta, err := bp.PageForWrite(metaPageId)
 	if err != nil {
 		return nil, err
 	}
 	metaPage := newMetaPage(pageMeta.Page)
 
 	// ルートリーフノード作成
-	rootNodePageId, err := bp.AllocatePageId(MetaPageId.FileId)
+	rootNodePageId, err := bp.AllocatePageId(metaPageId.FileId)
 	if err != nil {
 		return nil, err
 	}
@@ -62,32 +62,32 @@ func CreateBtree(bp *buffer.Pool, fileId page.FileId) (*Btree, error) {
 	metaPage.setLeafPageCount(1)
 	metaPage.setHeight(1)
 
-	return NewBtree(bp, MetaPageId), nil
+	return NewTree(bp, metaPageId), nil
 }
 
 // LeafPageCount はメタページからリーフページ数を取得する
-func (bt *Btree) LeafPageCount() (uint64, error) {
-	pageMeta, err := bt.bufferPool.PageForRead(bt.metaPageId)
+func (t *Tree) LeafPageCount() (uint64, error) {
+	pageMeta, err := t.bufferPool.PageForRead(t.metaPageId)
 	if err != nil {
 		return 0, err
 	}
-	defer bt.bufferPool.UnRefPage(bt.metaPageId)
+	defer t.bufferPool.UnRefPage(t.metaPageId)
 	metaPage := newMetaPage(pageMeta.Page)
 	return metaPage.leafPageCount(), nil
 }
 
 // Height はメタページから B+Tree の高さを取得する
-func (bt *Btree) Height() (uint64, error) {
-	pageMeta, err := bt.bufferPool.PageForRead(bt.metaPageId)
+func (t *Tree) Height() (uint64, error) {
+	pageMeta, err := t.bufferPool.PageForRead(t.metaPageId)
 	if err != nil {
 		return 0, err
 	}
-	defer bt.bufferPool.UnRefPage(bt.metaPageId)
+	defer t.bufferPool.UnRefPage(t.metaPageId)
 	metaPage := newMetaPage(pageMeta.Page)
 	return metaPage.height(), nil
 }
 
 // MetaPageId は B+Tree のメタページの PageId を返す
-func (bt *Btree) MetaPageId() page.Id {
-	return bt.metaPageId
+func (t *Tree) MetaPageId() page.Id {
+	return t.metaPageId
 }

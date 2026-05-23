@@ -46,7 +46,7 @@ func TestFlushAllPages(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		assert.Equal(t, 0, bp.NumOfFlushListPage())
+		assert.Equal(t, 0, bp.FlushListPageCount())
 	})
 
 	t.Run("フラッシュ後にデータがディスクに永続化されている", func(t *testing.T) {
@@ -110,7 +110,7 @@ func TestFlushOldestPages(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, 1, bp.NumOfFlushListPage())
+		assert.Equal(t, 1, bp.FlushListPageCount())
 	})
 
 	t.Run("フラッシュリストが空の場合何もしない", func(t *testing.T) {
@@ -143,6 +143,38 @@ func TestFlushOldestPages(t *testing.T) {
 		bufPage, err := bp.PageForRead(pageId)
 		assert.NoError(t, err)
 		assert.False(t, bufPage.isDirty)
+	})
+}
+
+func TestFlushListPageCount(t *testing.T) {
+	t.Run("ダーティーページの数を返す", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.PageSize * 3)
+		_, err := bp.AddPage(page.NewId(0, 0))
+		assert.NoError(t, err)
+		_, err = bp.AddPage(page.NewId(0, 1))
+		assert.NoError(t, err)
+		_, err = bp.PageForWrite(page.NewId(0, 0))
+		assert.NoError(t, err)
+		_, err = bp.PageForWrite(page.NewId(0, 1))
+		assert.NoError(t, err)
+
+		// WHEN
+		size := bp.FlushListPageCount()
+
+		// THEN
+		assert.Equal(t, 2, size)
+	})
+
+	t.Run("ダーティーページがない場合 0 を返す", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.PageSize)
+
+		// WHEN
+		size := bp.FlushListPageCount()
+
+		// THEN
+		assert.Equal(t, 0, size)
 	})
 }
 
@@ -205,37 +237,5 @@ func TestForEachDirtyPage(t *testing.T) {
 		// THEN
 		assert.Equal(t, byte(0x12), header[0])
 		assert.Equal(t, byte(0x34), header[1])
-	})
-}
-
-func TestNumOfFlushListPage(t *testing.T) {
-	t.Run("ダーティーページの数を返す", func(t *testing.T) {
-		// GIVEN
-		bp := NewPool(page.PageSize * 3)
-		_, err := bp.AddPage(page.NewId(0, 0))
-		assert.NoError(t, err)
-		_, err = bp.AddPage(page.NewId(0, 1))
-		assert.NoError(t, err)
-		_, err = bp.PageForWrite(page.NewId(0, 0))
-		assert.NoError(t, err)
-		_, err = bp.PageForWrite(page.NewId(0, 1))
-		assert.NoError(t, err)
-
-		// WHEN
-		size := bp.NumOfFlushListPage()
-
-		// THEN
-		assert.Equal(t, 2, size)
-	})
-
-	t.Run("ダーティーページがない場合 0 を返す", func(t *testing.T) {
-		// GIVEN
-		bp := NewPool(page.PageSize)
-
-		// WHEN
-		size := bp.NumOfFlushListPage()
-
-		// THEN
-		assert.Equal(t, 0, size)
 	})
 }

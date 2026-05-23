@@ -7,15 +7,15 @@ import (
 )
 
 type ConstraintMeta struct {
-	tree *btree.Btree // 制約メタデータが格納される B+Tree
+	tree *btree.Tree // 制約メタデータが格納される B+Tree
 }
 
 func NewConstraintMeta(bp *buffer.Pool, metaPageId page.Id) *ConstraintMeta {
-	return &ConstraintMeta{tree: btree.NewBtree(bp, metaPageId)}
+	return &ConstraintMeta{tree: btree.NewTree(bp, metaPageId)}
 }
 
 func CreateConstraintMeta(bp *buffer.Pool) (*ConstraintMeta, error) {
-	tree, err := btree.CreateBtree(bp, catalogFileId)
+	tree, err := btree.CreateTree(bp, catalogFileId)
 	if err != nil {
 		return nil, err
 	}

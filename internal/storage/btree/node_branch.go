@@ -126,16 +126,16 @@ func (bn *branchNode) numRecords() int {
 }
 
 // canTransferRecord は兄弟ノードにレコードを転送できるか判定する
-//   - toRight: true の場合は右の兄弟に転送する
+//   - isLeftSibling: true の場合は左の兄弟からの転送 (末尾レコードが転送対象)
 //   - return: 転送後も半分以上埋まっている場合は true を返す
-func (bn *branchNode) canTransferRecord(toRight bool) bool {
+func (bn *branchNode) canTransferRecord(isLeftSibling bool) bool {
 	if bn.numRecords() <= 1 {
 		return false
 	}
 
-	// 右の兄弟に転送する場合は末尾レコード、左の兄弟に転送する場合は先頭レコードが転送対象
+	// 左の兄弟の場合は末尾レコード、右の兄弟の場合は先頭レコードが転送対象
 	var targetIndex int
-	if toRight {
+	if isLeftSibling {
 		targetIndex = bn.numRecords() - 1
 	}
 	targetRecordData := bn.body.cell(targetIndex)

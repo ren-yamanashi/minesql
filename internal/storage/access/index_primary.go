@@ -13,14 +13,14 @@ import (
 // primaryIndex はプライマリインデックスへのアクセスを提供する
 type primaryIndex struct {
 	catalog *catalog.Catalog
-	tree    *btree.Btree // プライマリインデックスの B+Tree
-	pkCount int          // プライマリキーのカラム数
+	tree    *btree.Tree // プライマリインデックスの B+Tree
+	pkCount int         // プライマリキーのカラム数
 	lock    *lock.Manager
 }
 
 // newPrimaryIndex は既存のプライマリインデックスを開く
 func newPrimaryIndex(ct *catalog.Catalog, bp *buffer.Pool, metaPageId page.Id, pkCount int, lock *lock.Manager) *primaryIndex {
-	tree := btree.NewBtree(bp, metaPageId)
+	tree := btree.NewTree(bp, metaPageId)
 	return &primaryIndex{
 		catalog: ct,
 		tree:    tree,
@@ -31,7 +31,7 @@ func newPrimaryIndex(ct *catalog.Catalog, bp *buffer.Pool, metaPageId page.Id, p
 
 // createPrimaryIndex は空のプライマリインデックスを作成する
 func createPrimaryIndex(ct *catalog.Catalog, bp *buffer.Pool, fileId page.FileId, pkCount int, lock *lock.Manager) (*primaryIndex, error) {
-	tree, err := btree.CreateBtree(bp, fileId)
+	tree, err := btree.CreateTree(bp, fileId)
 	if err != nil {
 		return nil, err
 	}

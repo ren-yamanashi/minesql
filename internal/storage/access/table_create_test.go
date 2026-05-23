@@ -422,7 +422,7 @@ type createTestEnvWithTable struct {
 	ct          *catalog.Catalog
 	bp          *buffer.Pool
 	fileId      page.FileId
-	primaryTree *btree.Btree
+	primaryTree *btree.Tree
 	lockMgr     *lock.Manager
 }
 

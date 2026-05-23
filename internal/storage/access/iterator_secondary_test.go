@@ -164,8 +164,8 @@ func TestSecondaryIteratorNextIndexOnly(t *testing.T) {
 type iteratorTestEnv struct {
 	ct            *catalog.Catalog
 	bp            *buffer.Pool
-	primaryTree   *btree.Btree
-	secondaryTree *btree.Btree
+	primaryTree   *btree.Tree
+	secondaryTree *btree.Tree
 }
 
 // setupIteratorTestEnv はセカンダリイテレータのテスト用環境を構築する
@@ -215,13 +215,13 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	_ = ct.IndexKeyColMeta.Insert(indexId2, "email", 0)
 
 	// プライマリ B+Tree
-	primaryTree, err := btree.CreateBtree(bp, tableFileId)
+	primaryTree, err := btree.CreateTree(bp, tableFileId)
 	if err != nil {
 		t.Fatalf("プライマリ B+Tree の作成に失敗: %v", err)
 	}
 
 	// セカンダリ B+Tree
-	secondaryTree, err := btree.CreateBtree(bp, tableFileId)
+	secondaryTree, err := btree.CreateTree(bp, tableFileId)
 	if err != nil {
 		t.Fatalf("セカンダリ B+Tree の作成に失敗: %v", err)
 	}

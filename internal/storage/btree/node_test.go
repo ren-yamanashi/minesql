@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestGetNodeType(t *testing.T) {
+func TestNodeType(t *testing.T) {
 	t.Run("リーフノードのタイプを取得できる", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, page.PageSize)
@@ -15,7 +15,7 @@ func TestGetNodeType(t *testing.T) {
 		pg, _ := page.NewPage(data)
 
 		// WHEN
-		result := getNodeType(pg)
+		result := nodeType(pg)
 
 		// THEN
 		assert.Equal(t, nodeTypeLeaf, result)
@@ -28,7 +28,7 @@ func TestGetNodeType(t *testing.T) {
 		pg, _ := page.NewPage(data)
 
 		// WHEN
-		result := getNodeType(pg)
+		result := nodeType(pg)
 
 		// THEN
 		assert.Equal(t, nodeTypeBranch, result)

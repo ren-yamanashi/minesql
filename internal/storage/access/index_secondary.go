@@ -13,7 +13,7 @@ import (
 
 type newSecondaryIndexInput struct {
 	MetaPageId  page.Id         // セカンダリインデックスの MetaPageId
-	PrimaryTree *btree.Btree    // プライマリインデックスの B+Tree
+	PrimaryTree *btree.Tree     // プライマリインデックスの B+Tree
 	IndexId     catalog.IndexId // インデックス ID
 	IndexName   string          // インデックス名
 	Unique      bool            // ユニークインデックスか
@@ -23,8 +23,8 @@ type newSecondaryIndexInput struct {
 // secondaryIndex はセカンダリインデックスへのアクセスを提供する
 type secondaryIndex struct {
 	catalog     *catalog.Catalog
-	tree        *btree.Btree    // セカンダリインデックスの B+Tree
-	primaryTree *btree.Btree    // プライマリインデックスの B+Tree
+	tree        *btree.Tree     // セカンダリインデックスの B+Tree
+	primaryTree *btree.Tree     // プライマリインデックスの B+Tree
 	fileId      page.FileId     // インデックスが属するテーブルの FileId
 	indexId     catalog.IndexId // インデックス ID
 	indexName   string          // インデックス名
@@ -38,7 +38,7 @@ func newSecondaryIndex(
 	bp *buffer.Pool,
 	input newSecondaryIndexInput,
 ) *secondaryIndex {
-	tree := btree.NewBtree(bp, input.MetaPageId)
+	tree := btree.NewTree(bp, input.MetaPageId)
 	return &secondaryIndex{
 		catalog:     ct,
 		tree:        tree,
@@ -53,7 +53,7 @@ func newSecondaryIndex(
 
 type createSecondaryIndexInput struct {
 	FileId      page.FileId     // インデックスが属するテーブルの FileId
-	PrimaryTree *btree.Btree    // プライマリインデックスの B+Tree
+	PrimaryTree *btree.Tree     // プライマリインデックスの B+Tree
 	IndexId     catalog.IndexId // インデックス ID
 	IndexName   string          // インデックス名
 	Unique      bool            // ユニークか
@@ -66,7 +66,7 @@ func createSecondaryIndex(
 	bp *buffer.Pool,
 	input createSecondaryIndexInput,
 ) (*secondaryIndex, error) {
-	tree, err := btree.CreateBtree(bp, input.FileId)
+	tree, err := btree.CreateTree(bp, input.FileId)
 	if err != nil {
 		return nil, err
 	}

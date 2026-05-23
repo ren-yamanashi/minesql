@@ -8,10 +8,9 @@ import (
 
 // Iterator は B+Tree のリーフノードを走査する
 type Iterator struct {
-	bufferPool   *buffer.Pool
-	bufferPage   buffer.Page    // 現在参照しているバッファページ
-	slotNum      int            // 現在参照されているスロット番号
-	lastPosition RecordPosition // 直前に Next で取得されたレコードの位置
+	bufferPool *buffer.Pool
+	bufferPage buffer.Page // 現在参照しているバッファページ
+	slotNum    int         // 現在参照されているスロット番号
 }
 
 func NewIterator(bufPool *buffer.Pool, bufPage buffer.Page, slotNum int) *Iterator {
@@ -42,11 +41,6 @@ func (iter *Iterator) Get() (Record, bool, error) {
 
 // Next は次のレコードを取得する
 func (iter *Iterator) Next() (Record, bool, error) {
-	iter.lastPosition = RecordPosition{
-		PageId:  iter.bufferPage.PageId,
-		SlotNum: iter.slotNum,
-	}
-
 	record, ok, err := iter.Get()
 	if err != nil {
 		return nil, false, err

@@ -143,7 +143,7 @@ func createSecondaryIndexes(
 	ct *catalog.Catalog,
 	bp *buffer.Pool,
 	fileId page.FileId,
-	pt *btree.Btree,
+	pt *btree.Tree,
 	lock *lock.Manager,
 	inputs []CreateIndexInput,
 ) ([]*secondaryIndex, error) {

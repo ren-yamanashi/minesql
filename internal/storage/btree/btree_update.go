@@ -8,50 +8,50 @@ import (
 )
 
 // Update は B+Tree の特定のノードの値を更新する
-func (bt *Btree) Update(record Record) error {
+func (t *Tree) Update(record Record) error {
 	// メタページを取得
-	pageMeta, err := bt.bufferPool.PageForRead(bt.MetaPageId())
+	pageMeta, err := t.bufferPool.PageForRead(t.MetaPageId())
 	if err != nil {
 		return err
 	}
 	metaPage := newMetaPage(pageMeta.Page)
-	defer bt.bufferPool.UnRefPage(bt.MetaPageId())
+	defer t.bufferPool.UnRefPage(t.MetaPageId())
 
 	// ルートページ取得
 	rootPageId := metaPage.rootPageId()
-	rootBufPage, err := bt.bufferPool.PageForRead(rootPageId)
+	rootBufPage, err := t.bufferPool.PageForRead(rootPageId)
 	if err != nil {
 		return err
 	}
-	return bt.updateRecursively(rootBufPage, record)
+	return t.updateRecursively(rootBufPage, record)
 }
 
 // updateRecursively は再起的にノードを辿ってレコードを更新する
-func (bt *Btree) updateRecursively(bufPage *buffer.Page, record Record) error {
-	pg, err := bt.bufferPool.PageForWrite(bufPage.PageId)
+func (t *Tree) updateRecursively(bufPage *buffer.Page, record Record) error {
+	pg, err := t.bufferPool.PageForWrite(bufPage.PageId)
 	if err != nil {
 		return err
 	}
 
-	nodeType := getNodeType(pg.Page)
+	nt := nodeType(pg.Page)
 	switch {
 	// ブランチノードの場合: 子ノードに対して再帰実行する
-	case bytes.Equal(nodeType, nodeTypeBranch):
-		defer bt.bufferPool.UnRefPage(bufPage.PageId)
+	case bytes.Equal(nt, nodeTypeBranch):
+		defer t.bufferPool.UnRefPage(bufPage.PageId)
 		branchNode := newBranchNode(pg.Page)
 		mode := SearchModeKey{Key: record.Key()}
 		childPageId, err := mode.childPageId(branchNode)
 		if err != nil {
 			return err
 		}
-		childBufPage, err := bt.bufferPool.PageForRead(childPageId)
+		childBufPage, err := t.bufferPool.PageForRead(childPageId)
 		if err != nil {
 			return err
 		}
-		return bt.updateRecursively(childBufPage, record)
+		return t.updateRecursively(childBufPage, record)
 
 	// リーフノードの場合: そのまま更新する
-	case bytes.Equal(nodeType, nodeTypeLeaf):
+	case bytes.Equal(nt, nodeTypeLeaf):
 		leafNode := newLeafNode(pg.Page)
 		slotNum, found := leafNode.searchSlotNum(record.Key())
 		if !found {

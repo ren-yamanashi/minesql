@@ -92,7 +92,7 @@ func (pc *PageCleaner) clean() error {
 	}
 
 	// データページのフラッシュ
-	flushCount := max(pc.bufferPool.NumOfFlushListPage()/4, 1)
+	flushCount := max(pc.bufferPool.FlushListPageCount()/4, 1)
 	if err := pc.bufferPool.FlushOldestPages(flushCount); err != nil {
 		return err
 	}
@@ -103,7 +103,7 @@ func (pc *PageCleaner) clean() error {
 //   - Redo ログサイズが redoLogMaxSize を超えている
 //   - ダーティーページ率が maxDirtyPagePct を超えている
 func (pc *PageCleaner) shouldFlush() (bool, error) {
-	numOfFlushListPage := pc.bufferPool.NumOfFlushListPage()
+	numOfFlushListPage := pc.bufferPool.FlushListPageCount()
 	if numOfFlushListPage == 0 {
 		return false, nil
 	}

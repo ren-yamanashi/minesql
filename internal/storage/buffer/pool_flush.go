@@ -100,11 +100,11 @@ func (p *Pool) FlushOldestPages(n int) error {
 	return nil
 }
 
-// NumOfFlushListPage はフラッシュリスト内のページ数を返す
-func (p *Pool) NumOfFlushListPage() int {
+// FlushListPageCount はフラッシュリスト内のページ数を返す
+func (p *Pool) FlushListPageCount() int {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
-	return p.flushList.numOfPage
+	return p.flushList.pageCount
 }
 
 // ForEachDirtyPage はフラッシュリスト内の全ダーティーページに対してコールバックを実行する

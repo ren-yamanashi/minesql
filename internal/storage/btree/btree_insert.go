@@ -9,24 +9,24 @@ import (
 )
 
 // Insert は B+Tree にレコードを挿入する
-func (bt *Btree) Insert(record Record) error {
+func (t *Tree) Insert(record Record) error {
 	// メタページを取得
-	pageMeta, err := bt.bufferPool.PageForWrite(bt.MetaPageId())
+	pageMeta, err := t.bufferPool.PageForWrite(t.MetaPageId())
 	if err != nil {
 		return err
 	}
-	defer bt.bufferPool.UnRefPage(bt.MetaPageId())
+	defer t.bufferPool.UnRefPage(t.MetaPageId())
 	metaPage := newMetaPage(pageMeta.Page)
 
 	// ルートページを取得
 	rootPageId := metaPage.rootPageId()
-	rootPageBuf, err := bt.bufferPool.PageForRead(rootPageId)
+	rootPageBuf, err := t.bufferPool.PageForRead(rootPageId)
 	if err != nil {
 		return err
 	}
 
 	// 再帰的に挿入
-	overflowKey, overflowChildPageId, isLeafSplit, err := bt.insertRecursively(rootPageBuf, record)
+	overflowKey, overflowChildPageId, isLeafSplit, err := t.insertRecursively(rootPageBuf, record)
 	if err != nil {
 		return err
 	}
@@ -46,15 +46,15 @@ func (bt *Btree) Insert(record Record) error {
 	}
 
 	// ルートノードの分割が発生した場合
-	newRootPageId, err := bt.bufferPool.AllocatePageId(bt.MetaPageId().FileId)
+	newRootPageId, err := t.bufferPool.AllocatePageId(t.MetaPageId().FileId)
 	if err != nil {
 		return err
 	}
-	_, err = bt.bufferPool.AddPage(newRootPageId)
+	_, err = t.bufferPool.AddPage(newRootPageId)
 	if err != nil {
 		return err
 	}
-	pageNewRoot, err := bt.bufferPool.PageForWrite(newRootPageId)
+	pageNewRoot, err := t.bufferPool.PageForWrite(newRootPageId)
 	if err != nil {
 		return err
 	}
@@ -75,19 +75,19 @@ func (bt *Btree) Insert(record Record) error {
 //   - overflowKey: 分割時の境界キー (分割なしの場合は nil)
 //   - newPageId: 分割で作られたノードの PageId (分割なしの場合は InvalidPageId)
 //   - isLeafSplit: リーフノードの分割が発生したか
-func (bt *Btree) insertRecursively(
+func (t *Tree) insertRecursively(
 	bufPage *buffer.Page,
 	record Record,
 ) (overflowKey []byte, newPageId page.Id, isLeafSplit bool, err error) {
-	pg, err := bt.bufferPool.PageForWrite(bufPage.PageId)
+	pg, err := t.bufferPool.PageForWrite(bufPage.PageId)
 	if err != nil {
 		return nil, page.InvalidId, false, err
 	}
-	nodeType := getNodeType(pg.Page)
+	nt := nodeType(pg.Page)
 
 	switch {
 	// ブランチノードの場合: 子ノードに対して再帰実行する
-	case bytes.Equal(nodeType, nodeTypeBranch):
+	case bytes.Equal(nt, nodeTypeBranch):
 		// 挿入先の子ノードを取得
 		branchNode := newBranchNode(pg.Page)
 		childSlotNum, found := branchNode.searchSlotNum(record.Key())
@@ -98,14 +98,14 @@ func (bt *Btree) insertRecursively(
 		if err != nil {
 			return nil, page.InvalidId, false, err
 		}
-		childBufPage, err := bt.bufferPool.PageForRead(childPageId)
+		childBufPage, err := t.bufferPool.PageForRead(childPageId)
 		if err != nil {
 			return nil, page.InvalidId, false, err
 		}
-		defer bt.bufferPool.UnRefPage(childPageId)
+		defer t.bufferPool.UnRefPage(childPageId)
 
 		// 子ノードに対して挿入処理を再帰的に実行
-		overflowKeyFromChild, overflowChildPageId, isLeafSplit, err := bt.insertRecursively(childBufPage, record)
+		overflowKeyFromChild, overflowChildPageId, isLeafSplit, err := t.insertRecursively(childBufPage, record)
 		if err != nil {
 			return nil, page.InvalidId, false, err
 		}
@@ -114,7 +114,7 @@ func (bt *Btree) insertRecursively(
 			return nil, page.InvalidId, isLeafSplit, nil
 		}
 		// 子ノードが分割された場合、ブランチノードにオーバーフローレコードを挿入
-		overflowKey, newPageId, err := bt.insertBranchOverflow(
+		overflowKey, newPageId, err := t.insertBranchOverflow(
 			branchNode,
 			childSlotNum,
 			overflowKeyFromChild,
@@ -126,8 +126,8 @@ func (bt *Btree) insertRecursively(
 		return overflowKey, newPageId, isLeafSplit, nil
 
 	// リーフノードの場合: そのまま挿入する
-	case bytes.Equal(nodeType, nodeTypeLeaf):
-		overflowKey, newPageId, err := bt.insertLeaf(bufPage.PageId, pg.Page, record)
+	case bytes.Equal(nt, nodeTypeLeaf):
+		overflowKey, newPageId, err := t.insertLeaf(bufPage.PageId, pg.Page, record)
 		if err != nil {
 			return nil, page.InvalidId, false, err
 		}

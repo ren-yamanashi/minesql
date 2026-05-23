@@ -7,15 +7,15 @@ import (
 )
 
 type IndexMeta struct {
-	tree *btree.Btree // インデックスメタデータが格納される B+Tree
+	tree *btree.Tree // インデックスメタデータが格納される B+Tree
 }
 
 func NewIndexMeta(bp *buffer.Pool, metaPageId page.Id) *IndexMeta {
-	return &IndexMeta{tree: btree.NewBtree(bp, metaPageId)}
+	return &IndexMeta{tree: btree.NewTree(bp, metaPageId)}
 }
 
 func CreateIndexMeta(bp *buffer.Pool) (*IndexMeta, error) {
-	tree, err := btree.CreateBtree(bp, catalogFileId)
+	tree, err := btree.CreateTree(bp, catalogFileId)
 	if err != nil {
 		return nil, err
 	}

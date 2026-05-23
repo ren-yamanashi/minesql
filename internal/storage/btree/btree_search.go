@@ -8,45 +8,45 @@ import (
 )
 
 // Search は指定された検索モードで B+Tree を検索する
-func (bt *Btree) Search(mode SearchMode) (*Iterator, error) {
+func (t *Tree) Search(mode SearchMode) (*Iterator, error) {
 	// メタページ取得
-	pageMeta, err := bt.bufferPool.PageForRead(bt.MetaPageId())
+	pageMeta, err := t.bufferPool.PageForRead(t.MetaPageId())
 	if err != nil {
 		return nil, err
 	}
-	defer bt.bufferPool.UnRefPage(bt.MetaPageId())
+	defer t.bufferPool.UnRefPage(t.MetaPageId())
 	metaPage := newMetaPage(pageMeta.Page)
 
 	// ルートページ取得
 	rootPageId := metaPage.rootPageId()
 
-	return bt.searchRecursively(rootPageId, mode)
+	return t.searchRecursively(rootPageId, mode)
 }
 
 // searchRecursively は再帰的にノードを辿って該当のリーフノードを見つける
-func (bt *Btree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator, error) {
-	bufPage, err := bt.bufferPool.PageForRead(nodePageId)
+func (t *Tree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator, error) {
+	bufPage, err := t.bufferPool.PageForRead(nodePageId)
 	if err != nil {
 		return nil, err
 	}
-	nodeType := getNodeType(bufPage.Page)
+	nt := nodeType(bufPage.Page)
 
 	switch {
 	// ブランチノードの場合、子ノードに対して再帰探索する
-	case bytes.Equal(nodeType, nodeTypeBranch):
-		defer bt.bufferPool.UnRefPage(nodePageId)
+	case bytes.Equal(nt, nodeTypeBranch):
+		defer t.bufferPool.UnRefPage(nodePageId)
 		branchNode := newBranchNode(bufPage.Page)
 		childPageId, err := mode.childPageId(branchNode)
 		if err != nil {
 			return nil, err
 		}
-		return bt.searchRecursively(childPageId, mode)
+		return t.searchRecursively(childPageId, mode)
 
 	// リーフノードの場合、検索モードに応じて探索する
-	case bytes.Equal(nodeType, nodeTypeLeaf):
+	case bytes.Equal(nt, nodeTypeLeaf):
 		leafNode := newLeafNode(bufPage.Page)
 		slotNum := mode.slotNum(leafNode)
-		iter := NewIterator(bt.bufferPool, *bufPage, slotNum)
+		iter := NewIterator(t.bufferPool, *bufPage, slotNum)
 		// 検索対象のキーが現在のリーフノードの末端のレコードより大きい場合、次のリーフノードに進める
 		// 例: リーフノードに (1, ...), (3, ...), (5, ...) のレコードが格納されている場合に、キー 6 を検索したいときなど
 		// (この場合 SearchSlotNum は NumRecords と等しい値を返す)
@@ -65,8 +65,8 @@ func (bt *Btree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterat
 }
 
 // FindByKey は指定されたキーで B+Tree を検索し、完全一致するレコードとその物理的な位置を返す (キーが見つからない場合は ErrKeyNotFound)
-func (bt *Btree) FindByKey(key []byte) (Record, RecordPosition, error) {
-	iter, err := bt.Search(SearchModeKey{Key: key})
+func (t *Tree) FindByKey(key []byte) (Record, RecordPosition, error) {
+	iter, err := t.Search(SearchModeKey{Key: key})
 	if err != nil {
 		return nil, RecordPosition{}, err
 	}
@@ -88,12 +88,12 @@ func (bt *Btree) FindByKey(key []byte) (Record, RecordPosition, error) {
 }
 
 // LeafPageIds はブランチページのみ辿り、全リーフページの PageId を収集する
-func (bt *Btree) LeafPageIds() ([]page.Id, error) {
-	pageMeta, err := bt.bufferPool.PageForRead(bt.MetaPageId())
+func (t *Tree) LeafPageIds() ([]page.Id, error) {
+	pageMeta, err := t.bufferPool.PageForRead(t.MetaPageId())
 	if err != nil {
 		return nil, err
 	}
-	defer bt.bufferPool.UnRefPage(bt.MetaPageId())
+	defer t.bufferPool.UnRefPage(t.MetaPageId())
 	metaPage := newMetaPage(pageMeta.Page)
 	rootPageId := metaPage.rootPageId()
 	height := metaPage.height()
@@ -109,11 +109,10 @@ func (bt *Btree) LeafPageIds() ([]page.Id, error) {
 	for range height - 1 {
 		var nextLevel []page.Id
 		for _, nodePageId := range currentLevel {
-			pg, err := bt.bufferPool.PageForRead(nodePageId)
+			pg, err := t.bufferPool.PageForRead(nodePageId)
 			if err != nil {
 				return nil, err
 			}
-			bt.bufferPool.UnRefPage(nodePageId)
 			branchNode := newBranchNode(pg.Page)
 
 			for idx := range branchNode.numRecords() {
@@ -124,6 +123,7 @@ func (bt *Btree) LeafPageIds() ([]page.Id, error) {
 				nextLevel = append(nextLevel, childPageId)
 			}
 			nextLevel = append(nextLevel, branchNode.rightChildPageId())
+			t.bufferPool.UnRefPage(nodePageId)
 		}
 		currentLevel = nextLevel
 	}

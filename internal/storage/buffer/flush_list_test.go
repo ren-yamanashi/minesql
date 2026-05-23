@@ -13,7 +13,7 @@ func TestNewFlushList(t *testing.T) {
 		fl := newFlushList()
 
 		// THEN
-		assert.Equal(t, 0, fl.numOfPage)
+		assert.Equal(t, 0, fl.pageCount)
 		assert.Nil(t, fl.head)
 		assert.Nil(t, fl.tail)
 	})
@@ -29,7 +29,7 @@ func TestFlushListAdd(t *testing.T) {
 		fl.add(pageId)
 
 		// THEN
-		assert.Equal(t, 1, fl.numOfPage)
+		assert.Equal(t, 1, fl.pageCount)
 		assert.Equal(t, pageId, fl.head.pageId)
 		assert.Equal(t, pageId, fl.tail.pageId)
 	})
@@ -47,7 +47,7 @@ func TestFlushListAdd(t *testing.T) {
 		fl.add(id3)
 
 		// THEN
-		assert.Equal(t, 3, fl.numOfPage)
+		assert.Equal(t, 3, fl.pageCount)
 		assert.Equal(t, id1, fl.head.pageId)
 		assert.Equal(t, id3, fl.tail.pageId)
 	})
@@ -62,7 +62,7 @@ func TestFlushListAdd(t *testing.T) {
 		fl.add(pageId)
 
 		// THEN
-		assert.Equal(t, 1, fl.numOfPage)
+		assert.Equal(t, 1, fl.pageCount)
 	})
 }
 
@@ -79,7 +79,7 @@ func TestFlushListDelete(t *testing.T) {
 		fl.delete(id1)
 
 		// THEN
-		assert.Equal(t, 1, fl.numOfPage)
+		assert.Equal(t, 1, fl.pageCount)
 		assert.Equal(t, id2, fl.head.pageId)
 	})
 
@@ -95,7 +95,7 @@ func TestFlushListDelete(t *testing.T) {
 		fl.delete(id2)
 
 		// THEN
-		assert.Equal(t, 1, fl.numOfPage)
+		assert.Equal(t, 1, fl.pageCount)
 		assert.Equal(t, id1, fl.tail.pageId)
 	})
 
@@ -113,7 +113,7 @@ func TestFlushListDelete(t *testing.T) {
 		fl.delete(id2)
 
 		// THEN
-		assert.Equal(t, 2, fl.numOfPage)
+		assert.Equal(t, 2, fl.pageCount)
 		assert.Equal(t, id1, fl.head.pageId)
 		assert.Equal(t, id3, fl.tail.pageId)
 	})
@@ -128,7 +128,7 @@ func TestFlushListDelete(t *testing.T) {
 		fl.delete(pageId)
 
 		// THEN
-		assert.Equal(t, 0, fl.numOfPage)
+		assert.Equal(t, 0, fl.pageCount)
 		assert.Nil(t, fl.head)
 		assert.Nil(t, fl.tail)
 	})
@@ -142,7 +142,7 @@ func TestFlushListDelete(t *testing.T) {
 		fl.delete(page.NewId(0, 99))
 
 		// THEN
-		assert.Equal(t, 1, fl.numOfPage)
+		assert.Equal(t, 1, fl.pageCount)
 	})
 }
 
@@ -157,7 +157,7 @@ func TestFlushListClear(t *testing.T) {
 		fl.clear()
 
 		// THEN
-		assert.Equal(t, 0, fl.numOfPage)
+		assert.Equal(t, 0, fl.pageCount)
 		assert.Nil(t, fl.head)
 		assert.Nil(t, fl.tail)
 	})
@@ -170,7 +170,7 @@ func TestFlushListClear(t *testing.T) {
 		fl.clear()
 
 		// THEN
-		assert.Equal(t, 0, fl.numOfPage)
+		assert.Equal(t, 0, fl.pageCount)
 	})
 }
 

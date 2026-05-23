@@ -22,39 +22,32 @@ type siblingInfo struct {
 //   - return:
 //   - underflow: 親ブランチノードがアンダーフローしたか
 //   - isLeafMerged: リーフノードのマージが発生したか
-func (bt *Btree) deleteUnderflow(
+func (t *Tree) deleteUnderflow(
 	branchNode *branchNode,
 	childBufPage *buffer.Page,
 	childSlotNum int,
 ) (underflow bool, isLeafMerged bool, err error) {
 	// 転送・マージする兄弟ノードを決定
-	sibling, err := bt.findSibling(branchNode, childSlotNum)
+	sibling, err := t.findSibling(branchNode, childSlotNum)
 	if err != nil {
 		return false, false, err
 	}
-
-	// 兄弟ノードの取得
-	siblingBufPage, err := bt.bufferPool.PageForRead(sibling.pageId)
-	if err != nil {
-		return false, false, err
-	}
-	sibling.bufferPage = siblingBufPage
-	defer bt.bufferPool.UnRefPage(sibling.pageId)
+	defer t.bufferPool.UnRefPage(sibling.pageId)
 
 	// 子ノードの取得
-	childPage, err := bt.bufferPool.PageForRead(childBufPage.PageId)
+	childPage, err := t.bufferPool.PageForRead(childBufPage.PageId)
 	if err != nil {
 		return false, false, err
 	}
 
 	// リーフノードのアンダーフロー処理
-	if bytes.Equal(getNodeType(childPage.Page), nodeTypeLeaf) {
-		uf, lm, err := bt.onLeafUnderflow(branchNode, childBufPage, sibling, childSlotNum)
+	if bytes.Equal(nodeType(childPage.Page), nodeTypeLeaf) {
+		uf, lm, err := t.onLeafUnderflow(branchNode, childBufPage, sibling, childSlotNum)
 		return uf, lm, err
 	}
 
 	// ブランチノードのアンダーフロー処理
-	uf, err := bt.onBranchUnderflow(branchNode, childBufPage, sibling, childSlotNum)
+	uf, err := t.onBranchUnderflow(branchNode, childBufPage, sibling, childSlotNum)
 	return uf, isLeafMerged, err
 }
 
@@ -66,17 +59,17 @@ func (bt *Btree) deleteUnderflow(
 //   - return:
 //   - underflow: 親ブランチノードがアンダーフローしたか
 //   - isLeafMerged: リーフノードのマージが発生したか
-func (bt *Btree) onLeafUnderflow(
+func (t *Tree) onLeafUnderflow(
 	parentBranch *branchNode,
 	childBufPage *buffer.Page,
 	sibling siblingInfo,
 	childSlotNum int,
 ) (underflow bool, isLeafMerged bool, err error) {
-	pageChild, err := bt.bufferPool.PageForWrite(childBufPage.PageId)
+	pageChild, err := t.bufferPool.PageForWrite(childBufPage.PageId)
 	if err != nil {
 		return false, false, err
 	}
-	pageSibling, err := bt.bufferPool.PageForWrite(sibling.pageId)
+	pageSibling, err := t.bufferPool.PageForWrite(sibling.pageId)
 	if err != nil {
 		return false, false, err
 	}
@@ -121,7 +114,7 @@ func (bt *Btree) onLeafUnderflow(
 		if !siblingLeaf.transferAllFrom(childLeaf) {
 			return false, false, nil // ノードの容量を超えてマージ不可の場合はアンダーフローを許容する
 		}
-		if err := bt.relinkLeafAfterMerge(childLeaf, siblingLeaf, sibling.bufferPage.PageId); err != nil {
+		if err := t.relinkLeafAfterMerge(childLeaf, siblingLeaf, sibling.bufferPage.PageId); err != nil {
 			return false, false, err
 		}
 		// 親の右端のレコードは不要になるので削除し、RightChild を兄弟ノードに更新
@@ -134,11 +127,11 @@ func (bt *Btree) onLeafUnderflow(
 	if !childLeaf.transferAllFrom(siblingLeaf) {
 		return false, false, nil // ノードの容量を超えてマージ不可の場合はアンダーフローを許容する
 	}
-	if err := bt.relinkLeafAfterMerge(siblingLeaf, childLeaf, childBufPage.PageId); err != nil {
+	if err := t.relinkLeafAfterMerge(siblingLeaf, childLeaf, childBufPage.PageId); err != nil {
 		return false, false, err
 	}
 
-	uf, err := bt.mergeRightSiblingFromParent(parentBranch, childBufPage.PageId, childSlotNum)
+	uf, err := t.mergeRightSiblingFromParent(parentBranch, childBufPage.PageId, childSlotNum)
 	if err != nil {
 		return false, false, err
 	}
@@ -151,17 +144,17 @@ func (bt *Btree) onLeafUnderflow(
 //   - sibling: childBufPage の兄弟ノードの情報
 //   - childSlotNum: childBufPage が親ブランチノードの子ノードの中で何番目か
 //   - return: (アンダーフローが発生したかどうか, リーフマージが発生したかどうか)
-func (bt *Btree) onBranchUnderflow(
+func (t *Tree) onBranchUnderflow(
 	parentBranch *branchNode,
 	childBufPage *buffer.Page,
 	sibling siblingInfo,
 	childSlotNum int,
 ) (underflow bool, err error) {
-	pageChild, err := bt.bufferPool.PageForWrite(childBufPage.PageId)
+	pageChild, err := t.bufferPool.PageForWrite(childBufPage.PageId)
 	if err != nil {
 		return false, err
 	}
-	pageSibling, err := bt.bufferPool.PageForWrite(sibling.pageId)
+	pageSibling, err := t.bufferPool.PageForWrite(sibling.pageId)
 	if err != nil {
 		return false, err
 	}
@@ -245,18 +238,18 @@ func (bt *Btree) onBranchUnderflow(
 	childBranch.transferAllFrom(siblingBranch)
 	childBranch.setRightChildPageId(siblingBranch.rightChildPageId())
 
-	return bt.mergeRightSiblingFromParent(parentBranch, childBufPage.PageId, childSlotNum)
+	return t.mergeRightSiblingFromParent(parentBranch, childBufPage.PageId, childSlotNum)
 }
 
 // relinkLeafAfterMerge は消滅するリーフノードのリンクを残るリーフノードに繋ぎ直す
 //   - disappearing: マージにより消滅するリーフノード
 //   - survivor: マージ後に残るリーフノード
 //   - survivorPageId: survivor の PageId
-func (bt *Btree) relinkLeafAfterMerge(disappearing, survivor *leafNode, survivorPageId page.Id) error {
+func (t *Tree) relinkLeafAfterMerge(disappearing, survivor *leafNode, survivorPageId page.Id) error {
 	survivor.setNextPageId(disappearing.nextPageId())
 	if nextPageId := disappearing.nextPageId(); !nextPageId.IsInvalid() {
-		defer bt.bufferPool.UnRefPage(nextPageId)
-		pageNext, err := bt.bufferPool.PageForWrite(nextPageId)
+		defer t.bufferPool.UnRefPage(nextPageId)
+		pageNext, err := t.bufferPool.PageForWrite(nextPageId)
 		if err != nil {
 			return err
 		}
@@ -270,7 +263,7 @@ func (bt *Btree) relinkLeafAfterMerge(disappearing, survivor *leafNode, survivor
 //   - parentBranch: 親ブランチノード
 //   - survivorPageId: マージ後に残るノードの PageId
 //   - childSlotNum: 子ノードのスロット番号
-func (bt *Btree) mergeRightSiblingFromParent(
+func (t *Tree) mergeRightSiblingFromParent(
 	parentBranch *branchNode,
 	survivorPageId page.Id,
 	childSlotNum int,
@@ -294,11 +287,25 @@ func (bt *Btree) mergeRightSiblingFromParent(
 }
 
 // findSibling は転送・マージ対象の兄弟ノードを決定する
-func (bt *Btree) findSibling(branchNode *branchNode, childSlotNum int) (siblingInfo, error) {
+func (t *Tree) findSibling(branchNode *branchNode, childSlotNum int) (siblingInfo, error) {
 	if childSlotNum < branchNode.numRecords() {
 		siblingPageId, err := branchNode.childPageId(childSlotNum + 1)
-		return siblingInfo{pageId: siblingPageId, isLeft: false}, err
+		if err != nil {
+			return siblingInfo{}, err
+		}
+		bufPage, err := t.bufferPool.PageForRead(siblingPageId)
+		if err != nil {
+			return siblingInfo{}, err
+		}
+		return siblingInfo{pageId: siblingPageId, bufferPage: bufPage, isLeft: false}, nil
 	}
 	siblingPageId, err := branchNode.childPageId(childSlotNum - 1)
-	return siblingInfo{pageId: siblingPageId, isLeft: true}, err
+	if err != nil {
+		return siblingInfo{}, err
+	}
+	bufPage, err := t.bufferPool.PageForRead(siblingPageId)
+	if err != nil {
+		return siblingInfo{}, err
+	}
+	return siblingInfo{pageId: siblingPageId, bufferPage: bufPage, isLeft: true}, nil
 }

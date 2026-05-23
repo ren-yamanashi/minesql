@@ -8,35 +8,35 @@ import (
 )
 
 // Delete は B+Tree からレコードを削除する
-func (bt *Btree) Delete(key []byte) error {
+func (t *Tree) Delete(key []byte) error {
 	// メタページを取得
-	pageMeta, err := bt.bufferPool.PageForWrite(bt.MetaPageId())
+	pageMeta, err := t.bufferPool.PageForWrite(t.MetaPageId())
 	if err != nil {
 		return err
 	}
-	defer bt.bufferPool.UnRefPage(bt.MetaPageId())
+	defer t.bufferPool.UnRefPage(t.MetaPageId())
 	metaPage := newMetaPage(pageMeta.Page)
 
 	// ルートページを取得
 	rootPageId := metaPage.rootPageId()
-	rootPageBuf, err := bt.bufferPool.PageForRead(rootPageId)
+	rootPageBuf, err := t.bufferPool.PageForRead(rootPageId)
 	if err != nil {
 		return err
 	}
 
 	// 再帰的に削除
-	underflow, isLeafMerged, err := bt.deleteRecursively(rootPageBuf, key)
+	underflow, isLeafMerged, err := t.deleteRecursively(rootPageBuf, key)
 	if err != nil {
 		return err
 	}
 
 	// ルートノードがブランチノードで、子が 1 つになった場合 (=ブランチノード1, リーフノード1 になった場合)、子をルートにする
 	var isRootCollapsed bool
-	pageRoot, err := bt.bufferPool.PageForRead(rootPageBuf.PageId)
+	pageRoot, err := t.bufferPool.PageForRead(rootPageBuf.PageId)
 	if err != nil {
 		return err
 	}
-	if underflow && bytes.Equal(getNodeType(pageRoot.Page), nodeTypeBranch) {
+	if underflow && bytes.Equal(nodeType(pageRoot.Page), nodeTypeBranch) {
 		branch := newBranchNode(pageRoot.Page)
 		if branch.numRecords() == 0 {
 			isRootCollapsed = true
@@ -70,16 +70,16 @@ func (bt *Btree) Delete(key []byte) error {
 //   - return:
 //   - underflow: アンダーフローが発生したか
 //   - isLeafMerged: リーフノードのマージが発生したか
-func (bt *Btree) deleteRecursively(bufPage *buffer.Page, key []byte) (underflow bool, isLeafMerged bool, err error) {
-	pg, err := bt.bufferPool.PageForWrite(bufPage.PageId)
+func (t *Tree) deleteRecursively(bufPage *buffer.Page, key []byte) (underflow bool, isLeafMerged bool, err error) {
+	pg, err := t.bufferPool.PageForWrite(bufPage.PageId)
 	if err != nil {
 		return false, false, err
 	}
-	nodeType := getNodeType(pg.Page)
+	nt := nodeType(pg.Page)
 
 	switch {
 	// ブランチノードの場合: 子ノードに対して再帰実行する
-	case bytes.Equal(nodeType, nodeTypeBranch):
+	case bytes.Equal(nt, nodeTypeBranch):
 		// 削除先の子ノードを取得
 		branchNode := newBranchNode(pg.Page)
 		childSlotNum, found := branchNode.searchSlotNum(key)
@@ -90,14 +90,14 @@ func (bt *Btree) deleteRecursively(bufPage *buffer.Page, key []byte) (underflow 
 		if err != nil {
 			return false, false, err
 		}
-		childBufPage, err := bt.bufferPool.PageForRead(childPageId)
+		childBufPage, err := t.bufferPool.PageForRead(childPageId)
 		if err != nil {
 			return false, false, err
 		}
-		defer bt.bufferPool.UnRefPage(childPageId)
+		defer t.bufferPool.UnRefPage(childPageId)
 
 		// 子ノードに対して削除処理を再帰的に実行
-		underflow, isLeafMerged, err := bt.deleteRecursively(childBufPage, key)
+		underflow, isLeafMerged, err := t.deleteRecursively(childBufPage, key)
 		if err != nil {
 			return false, false, err
 		}
@@ -106,11 +106,11 @@ func (bt *Btree) deleteRecursively(bufPage *buffer.Page, key []byte) (underflow 
 			return false, isLeafMerged, nil
 		}
 		// 子ノードがアンダーフローした場合、兄弟ノードとマージ
-		uf, lm, err := bt.deleteUnderflow(branchNode, childBufPage, childSlotNum)
+		uf, lm, err := t.deleteUnderflow(branchNode, childBufPage, childSlotNum)
 		return uf, isLeafMerged || lm, err
 
 	// リーフノードの場合: そのまま削除する
-	case bytes.Equal(nodeType, nodeTypeLeaf):
+	case bytes.Equal(nt, nodeTypeLeaf):
 		leafNode := newLeafNode(pg.Page)
 		slotNum, found := leafNode.searchSlotNum(key)
 		if !found {

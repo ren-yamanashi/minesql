@@ -129,14 +129,14 @@ func TestPageCleanerClean(t *testing.T) {
 		}
 		_ = env.redoLog.Flush()
 
-		flushListSizeBefore := env.bp.NumOfFlushListPage()
+		flushListSizeBefore := env.bp.FlushListPageCount()
 
 		// WHEN
 		err := pc.clean()
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Less(t, env.bp.NumOfFlushListPage(), flushListSizeBefore)
+		assert.Less(t, env.bp.FlushListPageCount(), flushListSizeBefore)
 	})
 
 	t.Run("ダーティーページ率が閾値を超えるとフラッシュが実行される", func(t *testing.T) {

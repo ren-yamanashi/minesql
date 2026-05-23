@@ -11,7 +11,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("レコードの非キーを更新できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
@@ -27,7 +27,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("存在しないキーを更新すると ErrKeyNotFound を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
@@ -40,7 +40,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("空の B+Tree で更新すると ErrKeyNotFound を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 
 		// WHEN
 		err := bt.Update(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -52,7 +52,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("更新後もキーは変わらない", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
 
@@ -74,7 +74,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("ブランチノードを経由してリーフノードのレコードを更新できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 		nonKey := make([]byte, 1500)
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x01}, nonKey))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x02}, nonKey))
@@ -97,7 +97,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("非キーのサイズが大きすぎて更新できない場合はエラーを返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 		nonKey := make([]byte, 1500)
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, nonKey))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x20}, nonKey))
@@ -113,7 +113,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("同じレコードを複数回更新できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateBtree(bp, page.FileId(0))
+		bt, _ := CreateTree(bp, page.FileId(0))
 		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN

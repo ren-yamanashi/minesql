@@ -20,7 +20,7 @@ func TestNewDeleteRecord(t *testing.T) {
 
 		// THEN
 		assert.Equal(t, page.FileId(5), dr.tableFileId)
-		assert.Equal(t, record, dr.Record)
+		assert.Equal(t, record, dr.Record())
 		assert.Equal(t, lock.TrxId(100), dr.prevLastTrxId)
 		assert.Equal(t, rollPtr, dr.prevRollPtr)
 	})

@@ -100,7 +100,7 @@ func fetchSecondaryIndexes(
 	ct *catalog.Catalog,
 	bp *buffer.Pool,
 	fileId page.FileId,
-	pt *btree.Btree,
+	pt *btree.Tree,
 	lock *lock.Manager,
 ) ([]*secondaryIndex, error) {
 	records, err := fetchSecondaryIndexRecords(ct, fileId)

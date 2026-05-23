@@ -461,7 +461,7 @@ Branch[keys=1]: [key_10]
 		bufPageRoot, err := tree.bufferPool.PageForRead(rootPageId)
 		require.NoError(t, err)
 
-		nodeType := getNodeType(bufPageRoot.Page)
+		nodeType := nodeType(bufPageRoot.Page)
 		if !bytes.Equal(nodeType, nodeTypeBranch) {
 			t.Skip("ルートがブランチではないためスキップ")
 		}
@@ -517,7 +517,7 @@ Branch[keys=1]: [key_10]
 
 			bufPageRoot, err := tree.bufferPool.PageForRead(rootPageId)
 			require.NoError(t, err)
-			nodeType := getNodeType(bufPageRoot.Page)
+			nodeType := nodeType(bufPageRoot.Page)
 
 			var currentType string
 			switch {
@@ -595,7 +595,7 @@ FindByKey(banana): key not found
 }
 
 // B+Tree の全データをスキャンし、key=..., value=... 形式でログに書き出す
-func writeScanLog(w *strings.Builder, tree *Btree) {
+func writeScanLog(w *strings.Builder, tree *Tree) {
 	iter, err := tree.Search(SearchModeStart{})
 	if err != nil {
 		panic(err)
@@ -616,7 +616,7 @@ func writeScanLog(w *strings.Builder, tree *Btree) {
 }
 
 // ツリーのルートノード情報をログに書き出す (ノードタイプ, キー数, キー一覧)
-func writeRootInfo(w *strings.Builder, tree *Btree) {
+func writeRootInfo(w *strings.Builder, tree *Tree) {
 	bufPageMeta, err := tree.bufferPool.PageForRead(tree.metaPageId)
 	if err != nil {
 		panic(err)
@@ -625,14 +625,14 @@ func writeRootInfo(w *strings.Builder, tree *Btree) {
 }
 
 // ノード情報を再帰的にログに書き出す
-func writeNodeInfo(w *strings.Builder, pageId page.Id, depth int, tree *Btree) {
+func writeNodeInfo(w *strings.Builder, pageId page.Id, depth int, tree *Tree) {
 	pg, err := tree.bufferPool.PageForRead(pageId)
 	if err != nil {
 		panic(err)
 	}
 
 	indent := strings.Repeat("  ", depth)
-	nodeType := getNodeType(pg.Page)
+	nodeType := nodeType(pg.Page)
 
 	switch {
 	case bytes.Equal(nodeType, nodeTypeLeaf):
@@ -661,7 +661,7 @@ func writeNodeInfo(w *strings.Builder, pageId page.Id, depth int, tree *Btree) {
 }
 
 // ツリーの形状 (高さ、各深さのノードタイプ・ノード数・キー数) をコンパクトに出力する
-func writeTreeShape(w *strings.Builder, tree *Btree) {
+func writeTreeShape(w *strings.Builder, tree *Tree) {
 	pageMeta, err := tree.bufferPool.PageForRead(tree.metaPageId)
 	if err != nil {
 		panic(err)
@@ -683,7 +683,7 @@ func writeTreeShape(w *strings.Builder, tree *Btree) {
 			panic(err)
 		}
 
-		nodeType := getNodeType(pg.Page)
+		nodeType := nodeType(pg.Page)
 		switch {
 		case bytes.Equal(nodeType, nodeTypeLeaf):
 			if _, ok := result[depth]; !ok {
@@ -719,7 +719,7 @@ func writeTreeShape(w *strings.Builder, tree *Btree) {
 }
 
 // レコードを挿入するヘルパー (エラー時は panic)
-func (bt *Btree) mustInsert(key, value string) {
+func (bt *Tree) mustInsert(key, value string) {
 	record := NewRecord([]byte{}, []byte(key), []byte(value))
 	err := bt.Insert(record)
 	if err != nil {
@@ -728,7 +728,7 @@ func (bt *Btree) mustInsert(key, value string) {
 }
 
 // setupBtree はテスト用の B+Tree をセットアップする
-func setupBtree(t *testing.T) *Btree {
+func setupBtree(t *testing.T) *Tree {
 	t.Helper()
 	tmpdir := t.TempDir()
 	path := filepath.Join(tmpdir, "btree_test.db")
@@ -740,7 +740,7 @@ func setupBtree(t *testing.T) *Btree {
 	bp := buffer.NewPool(page.PageSize * 10)
 	bp.RegisterHeapFile(fileId, heapFile)
 
-	bt, err := CreateBtree(bp, fileId)
+	bt, err := CreateTree(bp, fileId)
 	if err != nil {
 		t.Fatalf("B+Tree の作成に失敗: %v", err)
 	}
