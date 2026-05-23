@@ -146,6 +146,36 @@ func TestRead(t *testing.T) {
 		// THEN
 		assert.Error(t, err)
 	})
+
+	t.Run("存在しないページを読み込むと EOF エラーを返す", func(t *testing.T) {
+		// GIVEN
+		path := filepath.Join(t.TempDir(), "test.db")
+		hf, err := NewHeapFile(0, path)
+		assert.NoError(t, err)
+		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
+		data := newAlignedPage()
+
+		// WHEN
+		err = hf.Read(0, data)
+
+		// THEN
+		assert.Error(t, err)
+	})
+
+	t.Run("Close 済みのファイルから読み込むとエラーを返す", func(t *testing.T) {
+		// GIVEN
+		path := filepath.Join(t.TempDir(), "test.db")
+		hf, err := NewHeapFile(0, path)
+		assert.NoError(t, err)
+		assert.NoError(t, hf.Close())
+		data := newAlignedPage()
+
+		// WHEN
+		err = hf.Read(0, data)
+
+		// THEN
+		assert.Error(t, err)
+	})
 }
 
 func TestWrite(t *testing.T) {
@@ -189,6 +219,43 @@ func TestWrite(t *testing.T) {
 
 		// WHEN
 		err = hf.Write(0, nil)
+
+		// THEN
+		assert.Error(t, err)
+	})
+
+	t.Run("同じページに上書きできる", func(t *testing.T) {
+		// GIVEN
+		path := filepath.Join(t.TempDir(), "test.db")
+		hf, err := NewHeapFile(0, path)
+		assert.NoError(t, err)
+		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
+		data1 := newAlignedPage()
+		data1[0] = 0xAA
+		assert.NoError(t, hf.Write(0, data1))
+		data2 := newAlignedPage()
+		data2[0] = 0xBB
+
+		// WHEN
+		err = hf.Write(0, data2)
+
+		// THEN
+		assert.NoError(t, err)
+		readData := newAlignedPage()
+		assert.NoError(t, hf.Read(0, readData))
+		assert.Equal(t, byte(0xBB), readData[0])
+	})
+
+	t.Run("Close 済みのファイルに書き込むとエラーを返す", func(t *testing.T) {
+		// GIVEN
+		path := filepath.Join(t.TempDir(), "test.db")
+		hf, err := NewHeapFile(0, path)
+		assert.NoError(t, err)
+		assert.NoError(t, hf.Close())
+		data := newAlignedPage()
+
+		// WHEN
+		err = hf.Write(0, data)
 
 		// THEN
 		assert.Error(t, err)
