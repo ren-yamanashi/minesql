@@ -72,8 +72,8 @@ func (l *lru) undoEvict(bufferId id) {
 	node.isUnused = false
 }
 
-// Delete はページの参照を解除し、優先的に追い出されるようにする
-func (l *lru) Delete(bufferId id) {
+// delete はページの参照を解除し、優先的に追い出されるようにする
+func (l *lru) delete(bufferId id) {
 	node := l.nodeMap[bufferId]
 	l.moveToOldTail(node)
 }

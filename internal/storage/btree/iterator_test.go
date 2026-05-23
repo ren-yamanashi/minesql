@@ -17,7 +17,7 @@ func TestIteratorGet(t *testing.T) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
 		bufPage, _ := bp.PageForRead(pageId)
-		iter := NewIterator(bp, *bufPage, 0)
+		iter := newIterator(bp, *bufPage, 0)
 
 		// WHEN
 		record, ok, err := iter.Get()
@@ -34,7 +34,7 @@ func TestIteratorGet(t *testing.T) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
 		bufPage, _ := bp.PageForRead(pageId)
-		iter := NewIterator(bp, *bufPage, 1)
+		iter := newIterator(bp, *bufPage, 1)
 
 		// WHEN
 		_, ok, err := iter.Get()
@@ -53,7 +53,7 @@ func TestIteratorNext(t *testing.T) {
 			ln.insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
 		})
 		bufPage, _ := bp.PageForRead(pageId)
-		iter := NewIterator(bp, *bufPage, 0)
+		iter := newIterator(bp, *bufPage, 0)
 
 		// WHEN
 		record1, ok1, err1 := iter.Next()
@@ -83,7 +83,7 @@ func TestIteratorAdvance(t *testing.T) {
 			ln.insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
 		})
 		bufPage, _ := bp.PageForRead(pageId)
-		iter := NewIterator(bp, *bufPage, 0)
+		iter := newIterator(bp, *bufPage, 0)
 
 		// WHEN
 		err := iter.Advance()

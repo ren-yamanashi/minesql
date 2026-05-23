@@ -219,7 +219,7 @@ func TestUndoEvict(t *testing.T) {
 	})
 }
 
-func TestDelete(t *testing.T) {
+func TestLruDelete(t *testing.T) {
 	t.Run("指定したノードが OldSublist の末尾に移動する", func(t *testing.T) {
 		// GIVEN
 		lru := newLru(8)
@@ -228,7 +228,7 @@ func TestDelete(t *testing.T) {
 		lru.access(0) // New に昇格
 
 		// WHEN
-		lru.Delete(0)
+		lru.delete(0)
 
 		// THEN
 		node := lru.nodeMap[0]
@@ -242,7 +242,7 @@ func TestDelete(t *testing.T) {
 		tail := lru.tail
 
 		// WHEN
-		lru.Delete(tail.bufferId)
+		lru.delete(tail.bufferId)
 
 		// THEN
 		assert.Equal(t, lru.tail, tail)
@@ -261,7 +261,7 @@ func TestDelete(t *testing.T) {
 		lru.newLen++
 
 		// WHEN
-		lru.Delete(lru.tail.bufferId)
+		lru.delete(lru.tail.bufferId)
 
 		// THEN
 		assert.True(t, lru.tail.isOld)

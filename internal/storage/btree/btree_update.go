@@ -55,7 +55,7 @@ func (t *Tree) updateRecursively(bufPage *buffer.Page, record Record) error {
 		leafNode := newLeafNode(pg.Page)
 		slotNum, found := leafNode.searchSlotNum(record.Key())
 		if !found {
-			return ErrKeyNotFound
+			return errKeyNotFound
 		}
 		if !leafNode.update(slotNum, record) {
 			return errors.New("failed to update record")

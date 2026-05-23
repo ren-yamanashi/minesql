@@ -115,7 +115,7 @@ func (t *Tree) deleteRecursively(bufPage *buffer.Page, key []byte) (underflow bo
 		leafNode := newLeafNode(pg.Page)
 		slotNum, found := leafNode.searchSlotNum(key)
 		if !found {
-			return false, false, ErrKeyNotFound
+			return false, false, errKeyNotFound
 		}
 		leafNode.delete(slotNum)
 		return !leafNode.isHalfFull(), false, nil

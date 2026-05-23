@@ -21,13 +21,13 @@ func TestDelete(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		_, _, err = bt.FindByKey([]byte{0x10})
-		assert.ErrorIs(t, err, ErrKeyNotFound)
+		assert.ErrorIs(t, err, errKeyNotFound)
 		record, _, err := bt.FindByKey([]byte{0x20})
 		assert.NoError(t, err)
 		assert.Equal(t, []byte{0xBB}, record.NonKey())
 	})
 
-	t.Run("存在しないキーを削除すると ErrKeyNotFound を返す", func(t *testing.T) {
+	t.Run("存在しないキーを削除すると errKeyNotFound を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateTree(bp, page.FileId(0))
@@ -37,10 +37,10 @@ func TestDelete(t *testing.T) {
 		err := bt.Delete([]byte{0xFF})
 
 		// THEN
-		assert.ErrorIs(t, err, ErrKeyNotFound)
+		assert.ErrorIs(t, err, errKeyNotFound)
 	})
 
-	t.Run("空の B+Tree から削除すると ErrKeyNotFound を返す", func(t *testing.T) {
+	t.Run("空の B+Tree から削除すると errKeyNotFound を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateTree(bp, page.FileId(0))
@@ -49,7 +49,7 @@ func TestDelete(t *testing.T) {
 		err := bt.Delete([]byte{0x10})
 
 		// THEN
-		assert.ErrorIs(t, err, ErrKeyNotFound)
+		assert.ErrorIs(t, err, errKeyNotFound)
 	})
 
 	t.Run("削除後にリーフマージが発生すると leafPageCount がデクリメントされる", func(t *testing.T) {

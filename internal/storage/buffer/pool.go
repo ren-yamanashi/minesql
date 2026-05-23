@@ -65,7 +65,7 @@ func (p *Pool) UnRefPage(pageId page.Id) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if bufferId, exists := p.pageTable.bufferId(pageId); exists {
-		p.lru.Delete(bufferId)
+		p.lru.delete(bufferId)
 	}
 }
 

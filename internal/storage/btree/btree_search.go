@@ -46,7 +46,7 @@ func (t *Tree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator
 	case bytes.Equal(nt, nodeTypeLeaf):
 		leafNode := newLeafNode(bufPage.Page)
 		slotNum := mode.slotNum(leafNode)
-		iter := NewIterator(t.bufferPool, *bufPage, slotNum)
+		iter := newIterator(t.bufferPool, *bufPage, slotNum)
 		// 検索対象のキーが現在のリーフノードの末端のレコードより大きい場合、次のリーフノードに進める
 		// 例: リーフノードに (1, ...), (3, ...), (5, ...) のレコードが格納されている場合に、キー 6 を検索したいときなど
 		// (この場合 SearchSlotNum は NumRecords と等しい値を返す)
@@ -64,7 +64,7 @@ func (t *Tree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator
 	}
 }
 
-// FindByKey は指定されたキーで B+Tree を検索し、完全一致するレコードとその物理的な位置を返す (キーが見つからない場合は ErrKeyNotFound)
+// FindByKey は指定されたキーで B+Tree を検索し、完全一致するレコードとその物理的な位置を返す (キーが見つからない場合は errKeyNotFound)
 func (t *Tree) FindByKey(key []byte) (Record, RecordPosition, error) {
 	iter, err := t.Search(SearchModeKey{Key: key})
 	if err != nil {
@@ -79,10 +79,10 @@ func (t *Tree) FindByKey(key []byte) (Record, RecordPosition, error) {
 		return nil, RecordPosition{}, err
 	}
 	if !ok {
-		return nil, RecordPosition{}, ErrKeyNotFound
+		return nil, RecordPosition{}, errKeyNotFound
 	}
 	if !bytes.Equal(record.Key(), key) {
-		return nil, RecordPosition{}, ErrKeyNotFound
+		return nil, RecordPosition{}, errKeyNotFound
 	}
 	return record, position, nil
 }

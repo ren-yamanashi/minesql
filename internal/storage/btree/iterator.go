@@ -13,7 +13,7 @@ type Iterator struct {
 	slotNum    int         // 現在参照されているスロット番号
 }
 
-func NewIterator(bufPool *buffer.Pool, bufPage buffer.Page, slotNum int) *Iterator {
+func newIterator(bufPool *buffer.Pool, bufPage buffer.Page, slotNum int) *Iterator {
 	return &Iterator{
 		bufferPool: bufPool,
 		bufferPage: bufPage,

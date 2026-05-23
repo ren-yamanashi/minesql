@@ -24,7 +24,7 @@ func TestUpdate(t *testing.T) {
 		assert.Equal(t, []byte{0xBB}, record.NonKey())
 	})
 
-	t.Run("存在しないキーを更新すると ErrKeyNotFound を返す", func(t *testing.T) {
+	t.Run("存在しないキーを更新すると errKeyNotFound を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateTree(bp, page.FileId(0))
@@ -34,10 +34,10 @@ func TestUpdate(t *testing.T) {
 		err := bt.Update(NewRecord([]byte{}, []byte{0xFF}, []byte{0xBB}))
 
 		// THEN
-		assert.ErrorIs(t, err, ErrKeyNotFound)
+		assert.ErrorIs(t, err, errKeyNotFound)
 	})
 
-	t.Run("空の B+Tree で更新すると ErrKeyNotFound を返す", func(t *testing.T) {
+	t.Run("空の B+Tree で更新すると errKeyNotFound を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateTree(bp, page.FileId(0))
@@ -46,7 +46,7 @@ func TestUpdate(t *testing.T) {
 		err := bt.Update(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// THEN
-		assert.ErrorIs(t, err, ErrKeyNotFound)
+		assert.ErrorIs(t, err, errKeyNotFound)
 	})
 
 	t.Run("更新後もキーは変わらない", func(t *testing.T) {
