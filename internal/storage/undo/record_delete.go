@@ -8,34 +8,40 @@ import (
 
 type DeleteRecord struct {
 	tableFileId   page.FileId  // テーブルの FileId
-	Record        btree.Record // 削除したレコード
-	PrevLastTrxId lock.TrxId
-	PrevRollPtr   Pointer
+	record        btree.Record // 削除したレコード
+	prevLastTrxId lock.TrxId
+	prevRollPtr   Pointer
 }
 
 func NewDeleteRecord(tableFileId page.FileId, record btree.Record, prevLastTrxId lock.TrxId, prevRollPtr Pointer) DeleteRecord {
 	return DeleteRecord{
 		tableFileId:   tableFileId,
-		Record:        record,
-		PrevLastTrxId: prevLastTrxId,
-		PrevRollPtr:   prevRollPtr,
+		record:        record,
+		prevLastTrxId: prevLastTrxId,
+		prevRollPtr:   prevRollPtr,
 	}
 }
 
-// Serialize は DeleteRecord を バイト列にシリアライズする
-func (dr DeleteRecord) Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte {
+// TableFileId はテーブルの FileId を返す
+func (dr DeleteRecord) TableFileId() page.FileId {
+	return dr.tableFileId
+}
+
+// Record は削除したレコードを返す
+func (dr DeleteRecord) Record() btree.Record {
+	return dr.record
+}
+
+// serialize は DeleteRecord を バイト列にシリアライズする
+func (dr DeleteRecord) serialize(trxId lock.TrxId, undoNum undoNumber) []byte {
 	fields := Fields{
 		TrxId:         trxId,
 		UndoNum:       undoNum,
 		RecordType:    RecordTypeDelete,
-		PrevLastTrxId: dr.PrevLastTrxId,
-		PrevRollPtr:   dr.PrevRollPtr,
+		PrevLastTrxId: dr.prevLastTrxId,
+		PrevRollPtr:   dr.prevRollPtr,
 		TableFileId:   dr.tableFileId,
-		ColumnSets:    [][][]byte{dr.Record},
+		ColumnSets:    [][][]byte{dr.record},
 	}
 	return fields.Serialize()
-}
-
-func (dr DeleteRecord) TableFileId() page.FileId {
-	return dr.tableFileId
 }

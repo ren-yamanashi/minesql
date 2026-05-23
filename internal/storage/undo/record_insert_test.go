@@ -20,8 +20,8 @@ func TestNewInsertRecord(t *testing.T) {
 		// THEN
 		assert.Equal(t, page.FileId(5), ir.tableFileId)
 		assert.Equal(t, record, ir.Record)
-		assert.Equal(t, lock.TrxId(0), ir.PrevLastTrxId)
-		assert.Equal(t, NullPointer, ir.PrevRollPtr)
+		assert.Equal(t, lock.TrxId(0), ir.prevLastTrxId)
+		assert.Equal(t, NullPointer, ir.prevRollPtr)
 	})
 
 	t.Run("空のレコードで作成できる", func(t *testing.T) {
@@ -33,8 +33,8 @@ func TestNewInsertRecord(t *testing.T) {
 
 		// THEN
 		assert.Empty(t, ir.Record)
-		assert.Equal(t, lock.TrxId(0), ir.PrevLastTrxId)
-		assert.Equal(t, NullPointer, ir.PrevRollPtr)
+		assert.Equal(t, lock.TrxId(0), ir.prevLastTrxId)
+		assert.Equal(t, NullPointer, ir.prevRollPtr)
 	})
 }
 
@@ -58,13 +58,13 @@ func TestInsertRecordSerialize(t *testing.T) {
 		ir := NewInsertRecord(page.FileId(5), record)
 
 		// WHEN
-		buf := ir.Serialize(10, 2)
+		buf := ir.serialize(10, 2)
 
 		// THEN
 		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(10), fields.TrxId)
-		assert.Equal(t, UndoNumber(2), fields.UndoNum)
+		assert.Equal(t, undoNumber(2), fields.UndoNum)
 		assert.Equal(t, RecordTypeInsert, fields.RecordType)
 		assert.Equal(t, lock.TrxId(0), fields.PrevLastTrxId)
 		assert.Equal(t, NullPointer, fields.PrevRollPtr)
@@ -81,7 +81,7 @@ func TestInsertRecordSerialize(t *testing.T) {
 		var r Record = ir
 
 		// THEN
-		buf := r.Serialize(1, 0)
+		buf := r.serialize(1, 0)
 		assert.NotEmpty(t, buf)
 	})
 
@@ -91,7 +91,7 @@ func TestInsertRecordSerialize(t *testing.T) {
 		ir := NewInsertRecord(page.FileId(1), record)
 
 		// WHEN
-		buf := ir.Serialize(1, 0)
+		buf := ir.serialize(1, 0)
 
 		// THEN
 		fields, err := DeserializeFields(buf)
@@ -105,12 +105,12 @@ func TestInsertRecordSerialize(t *testing.T) {
 		ir := NewInsertRecord(page.FileId(1), btree.Record{[]byte("a")})
 
 		// WHEN
-		buf := ir.Serialize(lock.TrxId(0xFFFFFFFF), UndoNumber(0xFFFFFFFE))
+		buf := ir.serialize(lock.TrxId(0xFFFFFFFF), undoNumber(0xFFFFFFFE))
 
 		// THEN
 		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(0xFFFFFFFF), fields.TrxId)
-		assert.Equal(t, UndoNumber(0xFFFFFFFE), fields.UndoNum)
+		assert.Equal(t, undoNumber(0xFFFFFFFE), fields.UndoNum)
 	})
 }

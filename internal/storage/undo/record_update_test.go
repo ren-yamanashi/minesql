@@ -14,17 +14,17 @@ func TestNewUpdateRecord(t *testing.T) {
 		// GIVEN
 		prevRecord := btree.Record{[]byte("old_name"), []byte("old_email")}
 		newRecord := btree.Record{[]byte("new_name"), []byte("new_email")}
-		rollPtr := Pointer{PageNumber: 3, Offset: 64}
+		rollPtr := Pointer{pageNumber: 3, offset: 64}
 
 		// WHEN
 		ur := NewUpdateRecord(page.FileId(5), prevRecord, newRecord, 100, rollPtr)
 
 		// THEN
 		assert.Equal(t, page.FileId(5), ur.tableFileId)
-		assert.Equal(t, prevRecord, ur.PrevRecord)
-		assert.Equal(t, newRecord, ur.NewRecord)
-		assert.Equal(t, lock.TrxId(100), ur.PrevLastTrxId)
-		assert.Equal(t, rollPtr, ur.PrevRollPtr)
+		assert.Equal(t, prevRecord, ur.prevRecord)
+		assert.Equal(t, newRecord, ur.newRecord)
+		assert.Equal(t, lock.TrxId(100), ur.prevLastTrxId)
+		assert.Equal(t, rollPtr, ur.prevRollPtr)
 	})
 
 	t.Run("NullPointer で作成できる", func(t *testing.T) {
@@ -36,8 +36,8 @@ func TestNewUpdateRecord(t *testing.T) {
 		ur := NewUpdateRecord(page.FileId(1), prevRecord, newRecord, 0, NullPointer)
 
 		// THEN
-		assert.Equal(t, NullPointer, ur.PrevRollPtr)
-		assert.Equal(t, lock.TrxId(0), ur.PrevLastTrxId)
+		assert.Equal(t, NullPointer, ur.prevRollPtr)
+		assert.Equal(t, lock.TrxId(0), ur.prevLastTrxId)
 	})
 }
 
@@ -59,17 +59,17 @@ func TestUpdateRecordSerialize(t *testing.T) {
 		// GIVEN
 		prevRecord := btree.Record{[]byte("old_name"), []byte("old_email")}
 		newRecord := btree.Record{[]byte("new_name"), []byte("new_email")}
-		rollPtr := Pointer{PageNumber: 3, Offset: 64}
+		rollPtr := Pointer{pageNumber: 3, offset: 64}
 		ur := NewUpdateRecord(page.FileId(5), prevRecord, newRecord, 100, rollPtr)
 
 		// WHEN
-		buf := ur.Serialize(10, 2)
+		buf := ur.serialize(10, 2)
 
 		// THEN
 		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(10), fields.TrxId)
-		assert.Equal(t, UndoNumber(2), fields.UndoNum)
+		assert.Equal(t, undoNumber(2), fields.UndoNum)
 		assert.Equal(t, RecordTypeUpdate, fields.RecordType)
 		assert.Equal(t, lock.TrxId(100), fields.PrevLastTrxId)
 		assert.Equal(t, rollPtr, fields.PrevRollPtr)
@@ -87,7 +87,7 @@ func TestUpdateRecordSerialize(t *testing.T) {
 		var r Record = ur
 
 		// THEN
-		buf := r.Serialize(1, 0)
+		buf := r.serialize(1, 0)
 		assert.NotEmpty(t, buf)
 	})
 
@@ -98,7 +98,7 @@ func TestUpdateRecordSerialize(t *testing.T) {
 		ur := NewUpdateRecord(page.FileId(1), prevRecord, newRecord, 0, NullPointer)
 
 		// WHEN
-		buf := ur.Serialize(1, 0)
+		buf := ur.serialize(1, 0)
 
 		// THEN
 		fields, err := DeserializeFields(buf)
@@ -113,13 +113,13 @@ func TestUpdateRecordSerialize(t *testing.T) {
 		ur := NewUpdateRecord(page.FileId(1), btree.Record{[]byte("a")}, btree.Record{[]byte("b")}, lock.TrxId(0xFFFFFFFF), NullPointer)
 
 		// WHEN
-		buf := ur.Serialize(lock.TrxId(0xFFFFFFFE), UndoNumber(0xFFFFFFFD))
+		buf := ur.serialize(lock.TrxId(0xFFFFFFFE), undoNumber(0xFFFFFFFD))
 
 		// THEN
 		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(0xFFFFFFFE), fields.TrxId)
-		assert.Equal(t, UndoNumber(0xFFFFFFFD), fields.UndoNum)
+		assert.Equal(t, undoNumber(0xFFFFFFFD), fields.UndoNum)
 		assert.Equal(t, lock.TrxId(0xFFFFFFFF), fields.PrevLastTrxId)
 	})
 }

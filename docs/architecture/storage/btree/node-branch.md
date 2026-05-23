@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | ノードタイプヘッダー | 8 バイト | `"BRANCH  "` が格納される |
 | ブランチノードヘッダー | 8 バイト | 右の子ノードの PageId |
-| Slotted Page | 4080 バイト | ボディ部分 |
+| Slotted Page | 4076 バイト | ボディ部分 |
 
 - ブランチノードのデータ構造は Slotted Page になっているので、データの挿入などは [Slotted Page](./slotted-page.md) の仕様に従う
 - Slotted Page のスロット数 = レコードの数

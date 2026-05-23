@@ -7,56 +7,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIsNull(t *testing.T) {
-	t.Run("NullPointer は true を返す", func(t *testing.T) {
-		// GIVEN
-		p := NullPointer
-
-		// WHEN
-		result := p.IsNull()
-
-		// THEN
-		assert.True(t, result)
-	})
-
-	t.Run("有効な Pointer は false を返す", func(t *testing.T) {
-		// GIVEN
-		p := Pointer{PageNumber: 1, Offset: 10}
-
-		// WHEN
-		result := p.IsNull()
-
-		// THEN
-		assert.False(t, result)
-	})
-
-	t.Run("ゼロ値の Pointer は false を返す", func(t *testing.T) {
-		// GIVEN
-		p := Pointer{}
-
-		// WHEN
-		result := p.IsNull()
-
-		// THEN
-		assert.False(t, result)
-	})
-
-	t.Run("PageNumber だけ一致しても false を返す", func(t *testing.T) {
-		// GIVEN
-		p := Pointer{PageNumber: 0xFFFFFFFF, Offset: 0}
-
-		// WHEN
-		result := p.IsNull()
-
-		// THEN
-		assert.False(t, result)
-	})
-}
-
 func TestEncode(t *testing.T) {
 	t.Run("6 バイトのバイト列にエンコードされる", func(t *testing.T) {
 		// GIVEN
-		p := Pointer{PageNumber: 3, Offset: 64}
+		p := Pointer{pageNumber: 3, offset: 64}
 
 		// WHEN
 		buf := p.Encode()
@@ -89,10 +43,56 @@ func TestEncode(t *testing.T) {
 	})
 }
 
+func TestIsNull(t *testing.T) {
+	t.Run("NullPointer は true を返す", func(t *testing.T) {
+		// GIVEN
+		p := NullPointer
+
+		// WHEN
+		result := p.isNull()
+
+		// THEN
+		assert.True(t, result)
+	})
+
+	t.Run("有効な Pointer は false を返す", func(t *testing.T) {
+		// GIVEN
+		p := Pointer{pageNumber: 1, offset: 10}
+
+		// WHEN
+		result := p.isNull()
+
+		// THEN
+		assert.False(t, result)
+	})
+
+	t.Run("ゼロ値の Pointer は false を返す", func(t *testing.T) {
+		// GIVEN
+		p := Pointer{}
+
+		// WHEN
+		result := p.isNull()
+
+		// THEN
+		assert.False(t, result)
+	})
+
+	t.Run("pageNumber だけ一致しても false を返す", func(t *testing.T) {
+		// GIVEN
+		p := Pointer{pageNumber: 0xFFFFFFFF, offset: 0}
+
+		// WHEN
+		result := p.isNull()
+
+		// THEN
+		assert.False(t, result)
+	})
+}
+
 func TestDecodePointer(t *testing.T) {
 	t.Run("Encode した結果を DecodePointer でラウンドトリップできる", func(t *testing.T) {
 		// GIVEN
-		original := Pointer{PageNumber: 3, Offset: 64}
+		original := Pointer{pageNumber: 3, offset: 64}
 		buf := original.Encode()
 
 		// WHEN
@@ -113,7 +113,7 @@ func TestDecodePointer(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, NullPointer, decoded)
-		assert.True(t, decoded.IsNull())
+		assert.True(t, decoded.isNull())
 	})
 
 	t.Run("ゼロ値のラウンドトリップ", func(t *testing.T) {
@@ -126,13 +126,13 @@ func TestDecodePointer(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, page.PageNumber(0), decoded.PageNumber)
-		assert.Equal(t, uint16(0), decoded.Offset)
+		assert.Equal(t, page.PageNumber(0), decoded.pageNumber)
+		assert.Equal(t, uint16(0), decoded.offset)
 	})
 
 	t.Run("最大値のラウンドトリップ", func(t *testing.T) {
 		// GIVEN
-		original := Pointer{PageNumber: page.PageNumber(0xFFFFFFFF), Offset: 0xFFFF}
+		original := Pointer{pageNumber: page.PageNumber(0xFFFFFFFF), offset: 0xFFFF}
 		buf := original.Encode()
 
 		// WHEN
@@ -175,7 +175,7 @@ func TestDecodePointer(t *testing.T) {
 
 	t.Run("PointerSize より長いデータでも先頭 6 バイトからデコードできる", func(t *testing.T) {
 		// GIVEN
-		original := Pointer{PageNumber: 5, Offset: 128}
+		original := Pointer{pageNumber: 5, offset: 128}
 		buf := append(original.Encode(), 0xFF, 0xFF) // 余分なデータ
 
 		// WHEN

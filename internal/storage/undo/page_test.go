@@ -34,191 +34,6 @@ func TestInitialize(t *testing.T) {
 	})
 }
 
-func TestAppend(t *testing.T) {
-	t.Run("レコードを追加できる", func(t *testing.T) {
-		// GIVEN
-		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
-		record := []byte{0x01, 0x02, 0x03}
-
-		// WHEN
-		ok := undoPage.Append(record)
-
-		// THEN
-		assert.True(t, ok)
-		assert.Equal(t, uint16(3), undoPage.UsedBytes())
-	})
-
-	t.Run("複数回追加すると UsedBytes が累積する", func(t *testing.T) {
-		// GIVEN
-		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
-
-		// WHEN
-		ok1 := undoPage.Append([]byte{0x01, 0x02})
-		ok2 := undoPage.Append([]byte{0x03, 0x04, 0x05})
-
-		// THEN
-		assert.True(t, ok1)
-		assert.True(t, ok2)
-		assert.Equal(t, uint16(5), undoPage.UsedBytes())
-	})
-
-	t.Run("空き不足の場合 false を返す", func(t *testing.T) {
-		// GIVEN
-		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
-		bodySize := len(undoPage.body)
-		largeRecord := make([]byte, bodySize+1)
-
-		// WHEN
-		ok := undoPage.Append(largeRecord)
-
-		// THEN
-		assert.False(t, ok)
-		assert.Equal(t, uint16(0), undoPage.UsedBytes())
-	})
-
-	t.Run("ボディサイズちょうどのレコードを追加できる", func(t *testing.T) {
-		// GIVEN
-		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
-		bodySize := len(undoPage.body)
-		record := make([]byte, bodySize)
-
-		// WHEN
-		ok := undoPage.Append(record)
-
-		// THEN
-		assert.True(t, ok)
-		assert.Equal(t, uint16(bodySize), undoPage.UsedBytes())
-	})
-
-	t.Run("ボディが満杯の場合 false を返す", func(t *testing.T) {
-		// GIVEN
-		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
-		bodySize := len(undoPage.body)
-		_ = undoPage.Append(make([]byte, bodySize))
-
-		// WHEN
-		ok := undoPage.Append([]byte{0x01})
-
-		// THEN
-		assert.False(t, ok)
-	})
-
-	t.Run("空のレコードを追加できる", func(t *testing.T) {
-		// GIVEN
-		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
-
-		// WHEN
-		ok := undoPage.Append([]byte{})
-
-		// THEN
-		assert.True(t, ok)
-		assert.Equal(t, uint16(0), undoPage.UsedBytes())
-	})
-}
-
-func TestUsedBytes(t *testing.T) {
-	t.Run("初期化後は 0 を返す", func(t *testing.T) {
-		// GIVEN
-		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
-
-		// WHEN
-		used := undoPage.UsedBytes()
-
-		// THEN
-		assert.Equal(t, uint16(0), used)
-	})
-}
-
-func TestNextPageNumber(t *testing.T) {
-	t.Run("初期化後は 0 を返す", func(t *testing.T) {
-		// GIVEN
-		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
-
-		// WHEN
-		next := undoPage.NextPageNumber()
-
-		// THEN
-		assert.Equal(t, page.PageNumber(0), next)
-	})
-}
-
-func TestSetNextPageNumber(t *testing.T) {
-	t.Run("次のページ番号を設定できる", func(t *testing.T) {
-		// GIVEN
-		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
-
-		// WHEN
-		undoPage.SetNextPageNumber(page.PageNumber(42))
-
-		// THEN
-		assert.Equal(t, page.PageNumber(42), undoPage.NextPageNumber())
-	})
-
-	t.Run("設定した値を上書きできる", func(t *testing.T) {
-		// GIVEN
-		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
-		undoPage.SetNextPageNumber(page.PageNumber(10))
-
-		// WHEN
-		undoPage.SetNextPageNumber(page.PageNumber(20))
-
-		// THEN
-		assert.Equal(t, page.PageNumber(20), undoPage.NextPageNumber())
-	})
-}
-
-func TestFreeSpace(t *testing.T) {
-	t.Run("初期化後はボディ全体が空き", func(t *testing.T) {
-		// GIVEN
-		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
-		bodySize := len(undoPage.body)
-
-		// WHEN
-		free := undoPage.FreeSpace()
-
-		// THEN
-		assert.Equal(t, bodySize, free)
-	})
-
-	t.Run("レコード追加後に空きが減る", func(t *testing.T) {
-		// GIVEN
-		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
-		bodySize := len(undoPage.body)
-		_ = undoPage.Append([]byte{0x01, 0x02, 0x03})
-
-		// WHEN
-		free := undoPage.FreeSpace()
-
-		// THEN
-		assert.Equal(t, bodySize-3, free)
-	})
-
-	t.Run("ボディが満杯の場合 0 を返す", func(t *testing.T) {
-		// GIVEN
-		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
-		_ = undoPage.Append(make([]byte, len(undoPage.body)))
-
-		// WHEN
-		free := undoPage.FreeSpace()
-
-		// THEN
-		assert.Equal(t, 0, free)
-	})
-}
-
 func TestRecordAt(t *testing.T) {
 	t.Run("Append したレコードを読み取れる", func(t *testing.T) {
 		// GIVEN
@@ -233,7 +48,7 @@ func TestRecordAt(t *testing.T) {
 			ColumnSets:  [][][]byte{{[]byte("data")}},
 		}
 		serialized := f.Serialize()
-		_ = undoPage.Append(serialized)
+		_ = undoPage.append(serialized)
 
 		// WHEN
 		result := undoPage.RecordAt(0)
@@ -285,8 +100,8 @@ func TestRecordAt(t *testing.T) {
 		}
 		s1 := f1.Serialize()
 		s2 := f2.Serialize()
-		_ = undoPage.Append(s1)
-		_ = undoPage.Append(s2)
+		_ = undoPage.append(s1)
+		_ = undoPage.append(s2)
 
 		// WHEN
 		result := undoPage.RecordAt(len(s1))
@@ -319,6 +134,191 @@ func TestRecordAt(t *testing.T) {
 
 		// THEN
 		assert.Nil(t, result)
+	})
+}
+
+func TestUsedBytes(t *testing.T) {
+	t.Run("初期化後は 0 を返す", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.Initialize()
+
+		// WHEN
+		used := undoPage.UsedBytes()
+
+		// THEN
+		assert.Equal(t, uint16(0), used)
+	})
+}
+
+func TestNextPageNumber(t *testing.T) {
+	t.Run("初期化後は 0 を返す", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.Initialize()
+
+		// WHEN
+		next := undoPage.NextPageNumber()
+
+		// THEN
+		assert.Equal(t, page.PageNumber(0), next)
+	})
+}
+
+func TestAppend(t *testing.T) {
+	t.Run("レコードを追加できる", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.Initialize()
+		record := []byte{0x01, 0x02, 0x03}
+
+		// WHEN
+		ok := undoPage.append(record)
+
+		// THEN
+		assert.True(t, ok)
+		assert.Equal(t, uint16(3), undoPage.UsedBytes())
+	})
+
+	t.Run("複数回追加すると UsedBytes が累積する", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.Initialize()
+
+		// WHEN
+		ok1 := undoPage.append([]byte{0x01, 0x02})
+		ok2 := undoPage.append([]byte{0x03, 0x04, 0x05})
+
+		// THEN
+		assert.True(t, ok1)
+		assert.True(t, ok2)
+		assert.Equal(t, uint16(5), undoPage.UsedBytes())
+	})
+
+	t.Run("空き不足の場合 false を返す", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.Initialize()
+		bodySize := len(undoPage.body)
+		largeRecord := make([]byte, bodySize+1)
+
+		// WHEN
+		ok := undoPage.append(largeRecord)
+
+		// THEN
+		assert.False(t, ok)
+		assert.Equal(t, uint16(0), undoPage.UsedBytes())
+	})
+
+	t.Run("ボディサイズちょうどのレコードを追加できる", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.Initialize()
+		bodySize := len(undoPage.body)
+		record := make([]byte, bodySize)
+
+		// WHEN
+		ok := undoPage.append(record)
+
+		// THEN
+		assert.True(t, ok)
+		assert.Equal(t, uint16(bodySize), undoPage.UsedBytes())
+	})
+
+	t.Run("ボディが満杯の場合 false を返す", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.Initialize()
+		bodySize := len(undoPage.body)
+		_ = undoPage.append(make([]byte, bodySize))
+
+		// WHEN
+		ok := undoPage.append([]byte{0x01})
+
+		// THEN
+		assert.False(t, ok)
+	})
+
+	t.Run("空のレコードを追加できる", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.Initialize()
+
+		// WHEN
+		ok := undoPage.append([]byte{})
+
+		// THEN
+		assert.True(t, ok)
+		assert.Equal(t, uint16(0), undoPage.UsedBytes())
+	})
+}
+
+func TestSetNextPageNumber(t *testing.T) {
+	t.Run("次のページ番号を設定できる", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.Initialize()
+
+		// WHEN
+		undoPage.setNextPageNumber(page.PageNumber(42))
+
+		// THEN
+		assert.Equal(t, page.PageNumber(42), undoPage.NextPageNumber())
+	})
+
+	t.Run("設定した値を上書きできる", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.Initialize()
+		undoPage.setNextPageNumber(page.PageNumber(10))
+
+		// WHEN
+		undoPage.setNextPageNumber(page.PageNumber(20))
+
+		// THEN
+		assert.Equal(t, page.PageNumber(20), undoPage.NextPageNumber())
+	})
+}
+
+func TestFreeSpace(t *testing.T) {
+	t.Run("初期化後はボディ全体が空き", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.Initialize()
+		bodySize := len(undoPage.body)
+
+		// WHEN
+		free := undoPage.freeSpace()
+
+		// THEN
+		assert.Equal(t, bodySize, free)
+	})
+
+	t.Run("レコード追加後に空きが減る", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.Initialize()
+		bodySize := len(undoPage.body)
+		_ = undoPage.append([]byte{0x01, 0x02, 0x03})
+
+		// WHEN
+		free := undoPage.freeSpace()
+
+		// THEN
+		assert.Equal(t, bodySize-3, free)
+	})
+
+	t.Run("ボディが満杯の場合 0 を返す", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.Initialize()
+		_ = undoPage.append(make([]byte, len(undoPage.body)))
+
+		// WHEN
+		free := undoPage.freeSpace()
+
+		// THEN
+		assert.Equal(t, 0, free)
 	})
 }
 

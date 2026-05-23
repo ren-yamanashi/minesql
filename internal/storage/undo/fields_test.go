@@ -17,7 +17,7 @@ func TestSerialize(t *testing.T) {
 			UndoNum:       3,
 			RecordType:    RecordTypeInsert,
 			PrevLastTrxId: 100,
-			PrevRollPtr:   newPointer(5, 128),
+			PrevRollPtr:   NewPointer(5, 128),
 			TableFileId:   page.FileId(7),
 			ColumnSets:    [][][]byte{{[]byte("a")}},
 		}
@@ -40,7 +40,7 @@ func TestSerialize(t *testing.T) {
 			UndoNum:       2,
 			RecordType:    RecordTypeInsert,
 			PrevLastTrxId: 100,
-			PrevRollPtr:   newPointer(3, 64),
+			PrevRollPtr:   NewPointer(3, 64),
 			TableFileId:   page.FileId(5),
 			ColumnSets:    [][][]byte{{[]byte("alice"), []byte("bob")}},
 		}
@@ -101,7 +101,7 @@ func TestDeserializeFields(t *testing.T) {
 			UndoNum:       3,
 			RecordType:    RecordTypeInsert,
 			PrevLastTrxId: 200,
-			PrevRollPtr:   newPointer(5, 128),
+			PrevRollPtr:   NewPointer(5, 128),
 			TableFileId:   page.FileId(7),
 			ColumnSets:    [][][]byte{{[]byte("alice"), []byte("bob")}},
 		}
@@ -122,7 +122,7 @@ func TestDeserializeFields(t *testing.T) {
 			UndoNum:       1,
 			RecordType:    RecordTypeUpdate,
 			PrevLastTrxId: 50,
-			PrevRollPtr:   newPointer(2, 32),
+			PrevRollPtr:   NewPointer(2, 32),
 			TableFileId:   page.FileId(3),
 			ColumnSets: [][][]byte{
 				{[]byte("old_val1"), []byte("old_val2")},
@@ -164,10 +164,10 @@ func TestDeserializeFields(t *testing.T) {
 		// GIVEN
 		original := &Fields{
 			TrxId:         lock.TrxId(0xFFFFFFFF),
-			UndoNum:       UndoNumber(0xFFFFFFFE),
+			UndoNum:       undoNumber(0xFFFFFFFE),
 			RecordType:    RecordTypeInsert,
 			PrevLastTrxId: lock.TrxId(0xFFFFFFFD),
-			PrevRollPtr:   newPointer(1, 10),
+			PrevRollPtr:   NewPointer(1, 10),
 			TableFileId:   page.FileId(1),
 			ColumnSets:    [][][]byte{{[]byte("x")}},
 		}
@@ -227,7 +227,7 @@ func TestDeserializeFields(t *testing.T) {
 
 	t.Run("全 RecordType でラウンドトリップできる", func(t *testing.T) {
 		// GIVEN
-		recordTypes := []RecordType{RecordTypeInsert, RecordTypeDelete, RecordTypeUpdate}
+		recordTypes := []recordType{RecordTypeInsert, RecordTypeDelete, RecordTypeUpdate}
 		for _, rt := range recordTypes {
 			original := &Fields{
 				TrxId:         1,
@@ -388,7 +388,7 @@ func TestFieldsToRecord(t *testing.T) {
 		ir, ok := record.(InsertRecord)
 		assert.True(t, ok)
 		assert.Equal(t, page.FileId(5), ir.TableFileId())
-		assert.Equal(t, [][]byte{[]byte("alice"), []byte("bob")}, [][]byte(ir.Record))
+		assert.Equal(t, [][]byte{[]byte("alice"), []byte("bob")}, [][]byte(ir.record))
 	})
 
 	t.Run("Delete の Fields を DeleteRecord に変換できる", func(t *testing.T) {
@@ -398,7 +398,7 @@ func TestFieldsToRecord(t *testing.T) {
 			UndoNum:       1,
 			RecordType:    RecordTypeDelete,
 			PrevLastTrxId: 100,
-			PrevRollPtr:   newPointer(3, 64),
+			PrevRollPtr:   NewPointer(3, 64),
 			TableFileId:   page.FileId(7),
 			ColumnSets:    [][][]byte{{[]byte("data")}},
 		}
@@ -411,7 +411,7 @@ func TestFieldsToRecord(t *testing.T) {
 		dr, ok := record.(DeleteRecord)
 		assert.True(t, ok)
 		assert.Equal(t, page.FileId(7), dr.TableFileId())
-		assert.Equal(t, lock.TrxId(100), dr.PrevLastTrxId)
+		assert.Equal(t, lock.TrxId(100), dr.prevLastTrxId)
 	})
 
 	t.Run("Update の Fields を UpdateRecord に変換できる", func(t *testing.T) {
@@ -421,7 +421,7 @@ func TestFieldsToRecord(t *testing.T) {
 			UndoNum:       2,
 			RecordType:    RecordTypeUpdate,
 			PrevLastTrxId: 50,
-			PrevRollPtr:   newPointer(2, 32),
+			PrevRollPtr:   NewPointer(2, 32),
 			TableFileId:   page.FileId(9),
 			ColumnSets: [][][]byte{
 				{[]byte("old_val")},
@@ -437,8 +437,8 @@ func TestFieldsToRecord(t *testing.T) {
 		ur, ok := record.(UpdateRecord)
 		assert.True(t, ok)
 		assert.Equal(t, page.FileId(9), ur.TableFileId())
-		assert.Equal(t, [][]byte{[]byte("old_val")}, [][]byte(ur.PrevRecord))
-		assert.Equal(t, [][]byte{[]byte("new_val")}, [][]byte(ur.NewRecord))
+		assert.Equal(t, [][]byte{[]byte("old_val")}, [][]byte(ur.prevRecord))
+		assert.Equal(t, [][]byte{[]byte("new_val")}, [][]byte(ur.newRecord))
 	})
 
 	t.Run("Insert で ColumnSets が空の場合エラーを返す", func(t *testing.T) {
@@ -472,7 +472,7 @@ func TestFieldsToRecord(t *testing.T) {
 	t.Run("不明な RecordType の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
 		f := &Fields{
-			RecordType: RecordType(99),
+			RecordType: recordType(99),
 			ColumnSets: [][][]byte{{[]byte("data")}},
 		}
 
@@ -485,7 +485,7 @@ func TestFieldsToRecord(t *testing.T) {
 }
 
 // buildRawBuffer はテスト用にヘッダーと任意のデータ部から Undo レコードのバイト列を構築する
-func buildRawBuffer(trxId lock.TrxId, undoNum UndoNumber, recordType RecordType, data []byte) []byte {
+func buildRawBuffer(trxId lock.TrxId, undoNum undoNumber, recordType recordType, data []byte) []byte {
 	buf := make([]byte, recordHeaderSize+len(data))
 	binary.BigEndian.PutUint32(buf[headerTrxIdOffset:headerUndoNumOffset], trxId)
 	binary.BigEndian.PutUint32(buf[headerUndoNumOffset:headerRecordTypeOffset], undoNum)

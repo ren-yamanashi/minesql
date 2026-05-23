@@ -15,8 +15,8 @@ const (
 // Fields は Undo ログレコードのシリアライズ/デシリアライズに使用するフィールド群
 type Fields struct {
 	TrxId         lock.TrxId
-	UndoNum       UndoNumber
-	RecordType    RecordType
+	UndoNum       undoNumber
+	RecordType    recordType
 	PrevLastTrxId lock.TrxId  // 上書き前のレコードの lastTrxId
 	PrevRollPtr   Pointer     // 上書き前のレコードの rollPtr
 	TableFileId   page.FileId // テーブルの FileId
@@ -61,7 +61,7 @@ func DeserializeFields(buf []byte) (Fields, error) {
 	var fields Fields
 	fields.TrxId = binary.BigEndian.Uint32(buf[headerTrxIdOffset:headerUndoNumOffset])
 	fields.UndoNum = binary.BigEndian.Uint32(buf[headerUndoNumOffset:headerRecordTypeOffset])
-	fields.RecordType = RecordType(buf[headerRecordTypeOffset])
+	fields.RecordType = recordType(buf[headerRecordTypeOffset])
 	dataLen := int(binary.BigEndian.Uint16(buf[headerDataLenOffset:recordHeaderSize]))
 
 	if len(buf) < recordHeaderSize+dataLen {
@@ -113,9 +113,9 @@ func (f *Fields) ToRecord() (Record, error) {
 		}
 		return InsertRecord{
 			tableFileId:   f.TableFileId,
-			Record:        f.ColumnSets[0],
-			PrevLastTrxId: f.PrevLastTrxId,
-			PrevRollPtr:   f.PrevRollPtr,
+			record:        f.ColumnSets[0],
+			prevLastTrxId: f.PrevLastTrxId,
+			prevRollPtr:   f.PrevRollPtr,
 		}, nil
 	case RecordTypeDelete:
 		if len(f.ColumnSets) < 1 {
@@ -123,9 +123,9 @@ func (f *Fields) ToRecord() (Record, error) {
 		}
 		return DeleteRecord{
 			tableFileId:   f.TableFileId,
-			Record:        f.ColumnSets[0],
-			PrevLastTrxId: f.PrevLastTrxId,
-			PrevRollPtr:   f.PrevRollPtr,
+			record:        f.ColumnSets[0],
+			prevLastTrxId: f.PrevLastTrxId,
+			prevRollPtr:   f.PrevRollPtr,
 		}, nil
 	case RecordTypeUpdate:
 		if len(f.ColumnSets) < 2 {
@@ -133,10 +133,10 @@ func (f *Fields) ToRecord() (Record, error) {
 		}
 		return UpdateRecord{
 			tableFileId:   f.TableFileId,
-			PrevRecord:    f.ColumnSets[0],
-			NewRecord:     f.ColumnSets[1],
-			PrevLastTrxId: f.PrevLastTrxId,
-			PrevRollPtr:   f.PrevRollPtr,
+			prevRecord:    f.ColumnSets[0],
+			newRecord:     f.ColumnSets[1],
+			prevLastTrxId: f.PrevLastTrxId,
+			prevRollPtr:   f.PrevRollPtr,
 		}, nil
 	default:
 		return nil, ErrInvalidRecord

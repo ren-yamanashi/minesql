@@ -32,10 +32,10 @@ func (t *TrxManager) rollbackRecord(record undo.Record) error {
 
 // rollbackInsert は Insert を取り消す (Primary, Secondary の物理削除)
 func (t *TrxManager) rollbackInsert(primaryTree *btree.Btree, record undo.InsertRecord, fileId page.FileId) error {
-	if err := primaryTree.Delete(record.Record.Key()); err != nil {
+	if err := primaryTree.Delete(record.Record().Key()); err != nil {
 		return err
 	}
-	primaryRecord, err := decodePrimaryRecord(record.Record, t.catalog, fileId)
+	primaryRecord, err := decodePrimaryRecord(record.Record(), t.catalog, fileId)
 	if err != nil {
 		return err
 	}
@@ -48,10 +48,10 @@ func (t *TrxManager) rollbackInsert(primaryTree *btree.Btree, record undo.Insert
 // rollbackDelete は SoftDelete を取り消す (Primary, Secondary の DeleteMark 復元)
 func (t *TrxManager) rollbackDelete(primaryTree *btree.Btree, record undo.DeleteRecord, fileId page.FileId) error {
 	// Undo ログには削除前のレコード (DeleteMark=0) が保存されているので、削除前のレコードで上書き
-	if err := primaryTree.Update(record.Record); err != nil {
+	if err := primaryTree.Update(record.Record()); err != nil {
 		return err
 	}
-	primaryRecord, err := decodePrimaryRecord(record.Record, t.catalog, fileId)
+	primaryRecord, err := decodePrimaryRecord(record.Record(), t.catalog, fileId)
 	if err != nil {
 		return err
 	}
@@ -64,14 +64,14 @@ func (t *TrxManager) rollbackDelete(primaryTree *btree.Btree, record undo.Delete
 
 // rollbackUpdate は Update を取り消す (Primary を旧レコードで上書き + Secondary 復元)
 func (t *TrxManager) rollbackUpdate(primaryTree *btree.Btree, record undo.UpdateRecord, fileId page.FileId) error {
-	if err := primaryTree.Update(record.PrevRecord); err != nil {
+	if err := primaryTree.Update(record.PrevRecord()); err != nil {
 		return err
 	}
-	prevPrimaryRecord, err := decodePrimaryRecord(record.PrevRecord, t.catalog, fileId)
+	prevPrimaryRecord, err := decodePrimaryRecord(record.PrevRecord(), t.catalog, fileId)
 	if err != nil {
 		return err
 	}
-	newPrimaryRecord, err := decodePrimaryRecord(record.NewRecord, t.catalog, fileId)
+	newPrimaryRecord, err := decodePrimaryRecord(record.NewRecord(), t.catalog, fileId)
 	if err != nil {
 		return err
 	}

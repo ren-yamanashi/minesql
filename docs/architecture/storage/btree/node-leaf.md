@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | ノードタイプヘッダー | 8 バイト | `"LEAF    "` が格納される |
 | リーフノードヘッダー | 16 バイト | 前の PageId + 次の PageId が格納される |
-| Slotted Page | 4072 バイト | ボディ部分 |
+| Slotted Page | 4068 バイト | ボディ部分 |
 
 - リーフノードのデータ構造は Slotted Page になっているので、データの挿入などは [Slotted Page](./slotted-page.md) の仕様に従う
 - Slotted Page のスロット数 = レコードの数

@@ -8,8 +8,8 @@ import (
 )
 
 type (
-	UndoNumber = uint32
-	RecordType int
+	undoNumber = uint32
+	recordType int
 )
 
 const (
@@ -21,7 +21,7 @@ const (
 )
 
 const (
-	RecordTypeInsert RecordType = iota + 1
+	RecordTypeInsert recordType = iota + 1
 	RecordTypeDelete
 	RecordTypeUpdate
 )
@@ -29,6 +29,6 @@ const (
 var ErrInvalidRecord = errors.New("undo: invalid record")
 
 type Record interface {
-	Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte
 	TableFileId() page.FileId
+	serialize(trxId lock.TrxId, undoNum undoNumber) []byte
 }

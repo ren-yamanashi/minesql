@@ -12,7 +12,7 @@ import (
 // Entry は Undo ログのエントリ
 type Entry struct {
 	TrxId      lock.TrxId
-	RecordType RecordType
+	RecordType recordType
 	Record     Record
 }
 
@@ -51,7 +51,7 @@ func NewManager(bp *buffer.Pool, redo *redo.Buffer, undoFileId page.FileId) (*Ma
 }
 
 // Append は指定した trxId の Undo ログにレコードを追加し、書き込み先の Pointer を返す
-func (m *Manager) Append(trxId lock.TrxId, recordType RecordType, record Record) (Pointer, error) {
+func (m *Manager) Append(trxId lock.TrxId, recordType recordType, record Record) (Pointer, error) {
 	ptr, err := m.writeToPage(trxId, record)
 	if err != nil {
 		return Pointer{}, err
@@ -101,7 +101,7 @@ func (m *Manager) Discard(trxId lock.TrxId) {
 }
 
 // DiscardRecordType は指定した trxId の指定したレコードタイプの Undo レコードのみ破棄する
-func (m *Manager) DiscardRecordType(trxId lock.TrxId, recordType RecordType) {
+func (m *Manager) DiscardRecordType(trxId lock.TrxId, recordType recordType) {
 	entries := m.entries[trxId]
 	kept := make([]Entry, 0, len(entries))
 	for _, e := range entries {
@@ -118,8 +118,8 @@ func (m *Manager) DiscardRecordType(trxId lock.TrxId, recordType RecordType) {
 
 // writeToPage は Undo レコードを Undo ページに書き込み、書き込み先の Pointer を返す
 func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) {
-	undoNum := UndoNumber(len(m.entries[trxId]))
-	serialized := record.Serialize(trxId, undoNum)
+	undoNum := undoNumber(len(m.entries[trxId]))
+	serialized := record.serialize(trxId, undoNum)
 
 	pageUndo, err := m.bufferPool.PageForWrite(m.currentPageId)
 	if err != nil {
@@ -127,17 +127,17 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 	}
 	bufPageUndo := NewPage(*pageUndo.Page)
 
-	ptr := newPointer(m.currentPageId.PageNumber, bufPageUndo.UsedBytes())
+	ptr := NewPointer(m.currentPageId.PageNumber, bufPageUndo.UsedBytes())
 
 	// ページが満杯の場合は、新しいページを割り当てる
-	if !bufPageUndo.Append(serialized) {
+	if !bufPageUndo.append(serialized) {
 		newPageId, err := m.bufferPool.AllocatePageId(m.undoFileId)
 		if err != nil {
 			return Pointer{}, err
 		}
 
 		// 現在のページに次のページへのリンクを設定
-		bufPageUndo.SetNextPageNumber(newPageId.PageNumber)
+		bufPageUndo.setNextPageNumber(newPageId.PageNumber)
 
 		// 新しいページを初期化してレコードを追記
 		_, err = m.bufferPool.AddPage(newPageId)
@@ -152,10 +152,10 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 		newBufPageUndo.Initialize()
 
 		ptr = Pointer{
-			PageNumber: newPageId.PageNumber,
-			Offset:     0,
+			pageNumber: newPageId.PageNumber,
+			offset:     0,
 		}
-		if !newBufPageUndo.Append(serialized) {
+		if !newBufPageUndo.append(serialized) {
 			return Pointer{}, errors.New("undo: record too large for a single page")
 		}
 		m.currentPageId = newPageId

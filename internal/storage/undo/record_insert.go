@@ -8,34 +8,40 @@ import (
 
 type InsertRecord struct {
 	tableFileId   page.FileId  // テーブルの FileId
-	Record        btree.Record // 挿入したレコード
-	PrevLastTrxId lock.TrxId   // INSERT は前バージョンが存在しないため常に 0
-	PrevRollPtr   Pointer      // INSERT は前バージョンが存在しないため常に NullPointer
+	record        btree.Record // 挿入したレコード
+	prevLastTrxId lock.TrxId   // INSERT は前バージョンが存在しないため常に 0
+	prevRollPtr   Pointer      // INSERT は前バージョンが存在しないため常に NullPointer
 }
 
 func NewInsertRecord(tableFileId page.FileId, record btree.Record) InsertRecord {
 	return InsertRecord{
 		tableFileId:   tableFileId,
-		Record:        record,
-		PrevLastTrxId: 0,
-		PrevRollPtr:   NullPointer,
+		record:        record,
+		prevLastTrxId: 0,
+		prevRollPtr:   NullPointer,
 	}
 }
 
-// Serialize は InsertRecord を バイト列にシリアライズする
-func (ir InsertRecord) Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte {
+// TableFileId はテーブルの FileId を返す
+func (ir InsertRecord) TableFileId() page.FileId {
+	return ir.tableFileId
+}
+
+// Record は挿入したレコードを返す
+func (ir InsertRecord) Record() btree.Record {
+	return ir.record
+}
+
+// serialize は InsertRecord を バイト列にシリアライズする
+func (ir InsertRecord) serialize(trxId lock.TrxId, undoNum undoNumber) []byte {
 	fields := Fields{
 		TrxId:         trxId,
 		UndoNum:       undoNum,
 		RecordType:    RecordTypeInsert,
-		PrevLastTrxId: ir.PrevLastTrxId,
-		PrevRollPtr:   ir.PrevRollPtr,
+		PrevLastTrxId: ir.prevLastTrxId,
+		PrevRollPtr:   ir.prevRollPtr,
 		TableFileId:   ir.tableFileId,
-		ColumnSets:    [][][]byte{ir.Record},
+		ColumnSets:    [][][]byte{ir.record},
 	}
 	return fields.Serialize()
-}
-
-func (ir InsertRecord) TableFileId() page.FileId {
-	return ir.tableFileId
 }

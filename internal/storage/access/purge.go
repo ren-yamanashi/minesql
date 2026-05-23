@@ -119,10 +119,10 @@ func (p *Purge) purgeDelete(record undo.Record) error {
 	}
 	fileId := record.TableFileId()
 
-	if err := p.deletePrimaryRecord(fileId, deleteRecord.Record); err != nil {
+	if err := p.deletePrimaryRecord(fileId, deleteRecord.Record()); err != nil {
 		return err
 	}
-	return p.deleteSecondaryRecords(fileId, deleteRecord.Record)
+	return p.deleteSecondaryRecords(fileId, deleteRecord.Record())
 }
 
 // purgeUpdate は UPDATE の Undo レコードからセカンダリの論理削除済みレコードを物理削除する
@@ -134,7 +134,7 @@ func (p *Purge) purgeUpdate(record undo.Record) error {
 	fileId := record.TableFileId()
 
 	// 更新前のレコードからセカンダリキーを参照して物理削除
-	return p.deleteSecondaryRecords(fileId, updateRecord.PrevRecord)
+	return p.deleteSecondaryRecords(fileId, updateRecord.PrevRecord())
 }
 
 // deletePrimaryRecord はプライマリレコードを物理削除する

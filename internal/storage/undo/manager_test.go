@@ -37,7 +37,7 @@ func TestManagerAppend(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.False(t, ptr.IsNull())
+		assert.False(t, ptr.isNull())
 	})
 
 	t.Run("同一トランザクションに複数レコードを追加できる", func(t *testing.T) {
@@ -382,7 +382,7 @@ func TestManagerWriteToPageOverflow(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		// 複数ページにまたがるため、最後の Pointer のページ番号は最初と異なるはず
-		assert.NotEqual(t, page.PageNumber(0), lastPtr.PageNumber)
+		assert.NotEqual(t, page.PageNumber(0), lastPtr.pageNumber)
 	})
 }
 
