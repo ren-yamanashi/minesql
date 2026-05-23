@@ -20,21 +20,7 @@ func TestNewPage(t *testing.T) {
 	})
 }
 
-func TestInitialize(t *testing.T) {
-	t.Run("UsedBytes と NextPageNumber が 0 に初期化される", func(t *testing.T) {
-		// GIVEN
-		undoPage := newTestUndoPage(t)
-
-		// WHEN
-		undoPage.initialize()
-
-		// THEN
-		assert.Equal(t, uint16(0), undoPage.UsedBytes())
-		assert.Equal(t, page.PageNumber(0), undoPage.NextPageNumber())
-	})
-}
-
-func TestRecordAt(t *testing.T) {
+func TestPageRecord(t *testing.T) {
 	t.Run("Append したレコードを読み取れる", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
@@ -137,7 +123,7 @@ func TestRecordAt(t *testing.T) {
 	})
 }
 
-func TestUsedBytes(t *testing.T) {
+func TestPageUsedBytes(t *testing.T) {
 	t.Run("初期化後は 0 を返す", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
@@ -149,9 +135,22 @@ func TestUsedBytes(t *testing.T) {
 		// THEN
 		assert.Equal(t, uint16(0), used)
 	})
+
+	t.Run("レコード追加後に使用量が増える", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.initialize()
+		_ = undoPage.append([]byte{0x01, 0x02, 0x03})
+
+		// WHEN
+		used := undoPage.UsedBytes()
+
+		// THEN
+		assert.Equal(t, uint16(3), used)
+	})
 }
 
-func TestNextPageNumber(t *testing.T) {
+func TestPageNextPageNumber(t *testing.T) {
 	t.Run("初期化後は 0 を返す", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
@@ -163,9 +162,51 @@ func TestNextPageNumber(t *testing.T) {
 		// THEN
 		assert.Equal(t, page.PageNumber(0), next)
 	})
+
+	t.Run("設定した値を返す", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.initialize()
+		undoPage.setNextPageNumber(page.PageNumber(42))
+
+		// WHEN
+		next := undoPage.NextPageNumber()
+
+		// THEN
+		assert.Equal(t, page.PageNumber(42), next)
+	})
 }
 
-func TestAppend(t *testing.T) {
+func TestPageInitialize(t *testing.T) {
+	t.Run("UsedBytes と NextPageNumber が 0 に初期化される", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+
+		// WHEN
+		undoPage.initialize()
+
+		// THEN
+		assert.Equal(t, uint16(0), undoPage.UsedBytes())
+		assert.Equal(t, page.PageNumber(0), undoPage.NextPageNumber())
+	})
+
+	t.Run("既存データがある状態でも初期化できる", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.initialize()
+		_ = undoPage.append([]byte{0x01, 0x02, 0x03})
+		undoPage.setNextPageNumber(page.PageNumber(10))
+
+		// WHEN
+		undoPage.initialize()
+
+		// THEN
+		assert.Equal(t, uint16(0), undoPage.UsedBytes())
+		assert.Equal(t, page.PageNumber(0), undoPage.NextPageNumber())
+	})
+}
+
+func TestPageAppend(t *testing.T) {
 	t.Run("レコードを追加できる", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
@@ -253,7 +294,7 @@ func TestAppend(t *testing.T) {
 	})
 }
 
-func TestSetNextPageNumber(t *testing.T) {
+func TestPageSetNextPageNumber(t *testing.T) {
 	t.Run("次のページ番号を設定できる", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
@@ -280,7 +321,7 @@ func TestSetNextPageNumber(t *testing.T) {
 	})
 }
 
-func TestFreeSpace(t *testing.T) {
+func TestPageFreeSpace(t *testing.T) {
 	t.Run("初期化後はボディ全体が空き", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)

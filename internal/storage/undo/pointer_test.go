@@ -7,7 +7,40 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestEncode(t *testing.T) {
+func TestNewPointer(t *testing.T) {
+	t.Run("指定した PageNumber と offset で Pointer を作成できる", func(t *testing.T) {
+		// GIVEN
+		pageNum := page.PageNumber(3)
+		offset := uint16(64)
+
+		// WHEN
+		p := NewPointer(pageNum, offset)
+
+		// THEN
+		assert.Equal(t, page.PageNumber(3), p.pageNumber)
+		assert.Equal(t, uint16(64), p.offset)
+	})
+
+	t.Run("ゼロ値で Pointer を作成できる", func(t *testing.T) {
+		// GIVEN / WHEN
+		p := NewPointer(0, 0)
+
+		// THEN
+		assert.Equal(t, page.PageNumber(0), p.pageNumber)
+		assert.Equal(t, uint16(0), p.offset)
+	})
+
+	t.Run("最大値で Pointer を作成できる", func(t *testing.T) {
+		// GIVEN / WHEN
+		p := NewPointer(page.PageNumber(0xFFFFFFFF), 0xFFFF)
+
+		// THEN
+		assert.Equal(t, page.PageNumber(0xFFFFFFFF), p.pageNumber)
+		assert.Equal(t, uint16(0xFFFF), p.offset)
+	})
+}
+
+func TestPointerEncode(t *testing.T) {
 	t.Run("6 バイトのバイト列にエンコードされる", func(t *testing.T) {
 		// GIVEN
 		p := Pointer{pageNumber: 3, offset: 64}
@@ -43,7 +76,7 @@ func TestEncode(t *testing.T) {
 	})
 }
 
-func TestIsNull(t *testing.T) {
+func TestPointerIsNull(t *testing.T) {
 	t.Run("NullPointer は true を返す", func(t *testing.T) {
 		// GIVEN
 		p := NullPointer

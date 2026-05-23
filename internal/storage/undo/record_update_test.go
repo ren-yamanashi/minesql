@@ -54,6 +54,58 @@ func TestUpdateRecordTableFileId(t *testing.T) {
 	})
 }
 
+func TestUpdateRecordPrevRecord(t *testing.T) {
+	t.Run("コンストラクタで指定した更新前レコードを返す", func(t *testing.T) {
+		// GIVEN
+		prevRecord := btree.Record{[]byte("old_name"), []byte("old_email")}
+		newRecord := btree.Record{[]byte("new_name"), []byte("new_email")}
+		ur := NewUpdateRecord(page.FileId(5), prevRecord, newRecord, 100, NullPointer)
+
+		// WHEN
+		result := ur.PrevRecord()
+
+		// THEN
+		assert.Equal(t, prevRecord, result)
+	})
+
+	t.Run("空のレコードを返す", func(t *testing.T) {
+		// GIVEN
+		ur := NewUpdateRecord(page.FileId(1), btree.Record{}, btree.Record{[]byte("b")}, 0, NullPointer)
+
+		// WHEN
+		result := ur.PrevRecord()
+
+		// THEN
+		assert.Empty(t, result)
+	})
+}
+
+func TestUpdateRecordNewRecord(t *testing.T) {
+	t.Run("コンストラクタで指定した更新後レコードを返す", func(t *testing.T) {
+		// GIVEN
+		prevRecord := btree.Record{[]byte("old_name"), []byte("old_email")}
+		newRecord := btree.Record{[]byte("new_name"), []byte("new_email")}
+		ur := NewUpdateRecord(page.FileId(5), prevRecord, newRecord, 100, NullPointer)
+
+		// WHEN
+		result := ur.NewRecord()
+
+		// THEN
+		assert.Equal(t, newRecord, result)
+	})
+
+	t.Run("空のレコードを返す", func(t *testing.T) {
+		// GIVEN
+		ur := NewUpdateRecord(page.FileId(1), btree.Record{[]byte("a")}, btree.Record{}, 0, NullPointer)
+
+		// WHEN
+		result := ur.NewRecord()
+
+		// THEN
+		assert.Empty(t, result)
+	})
+}
+
 func TestUpdateRecordSerialize(t *testing.T) {
 	t.Run("シリアライズ結果を Deserialize でラウンドトリップできる", func(t *testing.T) {
 		// GIVEN

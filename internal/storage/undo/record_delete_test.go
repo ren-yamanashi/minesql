@@ -51,6 +51,31 @@ func TestDeleteRecordTableFileId(t *testing.T) {
 	})
 }
 
+func TestDeleteRecordRecord(t *testing.T) {
+	t.Run("コンストラクタで指定したレコードを返す", func(t *testing.T) {
+		// GIVEN
+		record := btree.Record{[]byte("Alice"), []byte("alice@example.com")}
+		dr := NewDeleteRecord(page.FileId(5), record, 100, NullPointer)
+
+		// WHEN
+		result := dr.Record()
+
+		// THEN
+		assert.Equal(t, record, result)
+	})
+
+	t.Run("空のレコードを返す", func(t *testing.T) {
+		// GIVEN
+		dr := NewDeleteRecord(page.FileId(1), btree.Record{}, 0, NullPointer)
+
+		// WHEN
+		result := dr.Record()
+
+		// THEN
+		assert.Empty(t, result)
+	})
+}
+
 func TestDeleteRecordSerialize(t *testing.T) {
 	t.Run("シリアライズ結果を Deserialize でラウンドトリップできる", func(t *testing.T) {
 		// GIVEN

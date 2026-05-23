@@ -128,50 +128,6 @@ func TestManagerRecords(t *testing.T) {
 	})
 }
 
-func TestManagerDiscard(t *testing.T) {
-	t.Run("指定トランザクションのレコードがすべて破棄される", func(t *testing.T) {
-		// GIVEN
-		mgr := setupTestManager(t)
-		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("first")})
-		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("second")})
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r2)
-
-		// WHEN
-		mgr.Discard(lock.TrxId(1))
-
-		// THEN
-		assert.Nil(t, mgr.Records(lock.TrxId(1)))
-	})
-
-	t.Run("別トランザクションのレコードには影響しない", func(t *testing.T) {
-		// GIVEN
-		mgr := setupTestManager(t)
-		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("trx1")})
-		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("trx2")})
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
-		_, _ = mgr.Append(lock.TrxId(2), RecordTypeInsert, r2)
-
-		// WHEN
-		mgr.Discard(lock.TrxId(1))
-
-		// THEN
-		assert.Nil(t, mgr.Records(lock.TrxId(1)))
-		assert.Len(t, mgr.Records(lock.TrxId(2)), 1)
-	})
-
-	t.Run("レコードがないトランザクションに対しては何もしない", func(t *testing.T) {
-		// GIVEN
-		mgr := setupTestManager(t)
-
-		// WHEN (パニックしないことを確認)
-		mgr.Discard(lock.TrxId(999))
-
-		// THEN
-		assert.Nil(t, mgr.Records(lock.TrxId(999)))
-	})
-}
-
 func TestManagerCommittedEntries(t *testing.T) {
 	t.Run("指定したトランザクションのエントリを返す", func(t *testing.T) {
 		// GIVEN
@@ -250,6 +206,50 @@ func TestManagerCommittedEntries(t *testing.T) {
 	})
 }
 
+func TestManagerDiscard(t *testing.T) {
+	t.Run("指定トランザクションのレコードがすべて破棄される", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("first")})
+		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("second")})
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r2)
+
+		// WHEN
+		mgr.Discard(lock.TrxId(1))
+
+		// THEN
+		assert.Nil(t, mgr.Records(lock.TrxId(1)))
+	})
+
+	t.Run("別トランザクションのレコードには影響しない", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("trx1")})
+		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("trx2")})
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
+		_, _ = mgr.Append(lock.TrxId(2), RecordTypeInsert, r2)
+
+		// WHEN
+		mgr.Discard(lock.TrxId(1))
+
+		// THEN
+		assert.Nil(t, mgr.Records(lock.TrxId(1)))
+		assert.Len(t, mgr.Records(lock.TrxId(2)), 1)
+	})
+
+	t.Run("レコードがないトランザクションに対しては何もしない", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+
+		// WHEN (パニックしないことを確認)
+		mgr.Discard(lock.TrxId(999))
+
+		// THEN
+		assert.Nil(t, mgr.Records(lock.TrxId(999)))
+	})
+}
+
 func TestManagerDiscardRecordType(t *testing.T) {
 	t.Run("指定したレコードタイプのみ破棄される", func(t *testing.T) {
 		// GIVEN
@@ -315,9 +315,20 @@ func TestManagerDiscardRecordType(t *testing.T) {
 		assert.Nil(t, mgr.Records(lock.TrxId(1)))
 		assert.Len(t, mgr.Records(lock.TrxId(2)), 1)
 	})
+
+	t.Run("レコードがないトランザクションに対しては何もしない", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+
+		// WHEN (パニックしないことを確認)
+		mgr.DiscardRecordType(lock.TrxId(999), RecordTypeInsert)
+
+		// THEN
+		assert.Nil(t, mgr.Records(lock.TrxId(999)))
+	})
 }
 
-func TestManagerWriteToPageOverflow(t *testing.T) {
+func TestManagerWriteToPage(t *testing.T) {
 	t.Run("ページが満杯になると新しいページに書き込まれる", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)

@@ -9,7 +9,133 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSerialize(t *testing.T) {
+func TestFieldsTrxId(t *testing.T) {
+	t.Run("設定した TrxId を返す", func(t *testing.T) {
+		// GIVEN
+		f := &Fields{trxId: 42}
+
+		// WHEN
+		result := f.TrxId()
+
+		// THEN
+		assert.Equal(t, lock.TrxId(42), result)
+	})
+}
+
+func TestFieldsUndoNum(t *testing.T) {
+	t.Run("設定した UndoNum を返す", func(t *testing.T) {
+		// GIVEN
+		f := &Fields{undoNum: 7}
+
+		// WHEN
+		result := f.UndoNum()
+
+		// THEN
+		assert.Equal(t, undoNumber(7), result)
+	})
+}
+
+func TestFieldsRecordType(t *testing.T) {
+	t.Run("設定した RecordType を返す", func(t *testing.T) {
+		// GIVEN
+		f := &Fields{recordType: RecordTypeUpdate}
+
+		// WHEN
+		result := f.RecordType()
+
+		// THEN
+		assert.Equal(t, RecordTypeUpdate, result)
+	})
+}
+
+func TestFieldsPrevLastTrxId(t *testing.T) {
+	t.Run("設定した PrevLastTrxId を返す", func(t *testing.T) {
+		// GIVEN
+		f := &Fields{prevLastTrxId: 100}
+
+		// WHEN
+		result := f.PrevLastTrxId()
+
+		// THEN
+		assert.Equal(t, lock.TrxId(100), result)
+	})
+}
+
+func TestFieldsPrevRollPtr(t *testing.T) {
+	t.Run("設定した PrevRollPtr を返す", func(t *testing.T) {
+		// GIVEN
+		ptr := NewPointer(5, 128)
+		f := &Fields{prevRollPtr: ptr}
+
+		// WHEN
+		result := f.PrevRollPtr()
+
+		// THEN
+		assert.Equal(t, ptr, result)
+	})
+
+	t.Run("NullPointer を返す", func(t *testing.T) {
+		// GIVEN
+		f := &Fields{prevRollPtr: NullPointer}
+
+		// WHEN
+		result := f.PrevRollPtr()
+
+		// THEN
+		assert.Equal(t, NullPointer, result)
+	})
+}
+
+func TestFieldsTableFileId(t *testing.T) {
+	t.Run("設定した TableFileId を返す", func(t *testing.T) {
+		// GIVEN
+		f := &Fields{tableFileId: page.FileId(7)}
+
+		// WHEN
+		result := f.TableFileId()
+
+		// THEN
+		assert.Equal(t, page.FileId(7), result)
+	})
+}
+
+func TestFieldsColumnSets(t *testing.T) {
+	t.Run("設定した ColumnSets を返す", func(t *testing.T) {
+		// GIVEN
+		cs := [][][]byte{{[]byte("a"), []byte("b")}, {[]byte("c")}}
+		f := &Fields{columnSets: cs}
+
+		// WHEN
+		result := f.ColumnSets()
+
+		// THEN
+		assert.Equal(t, cs, result)
+	})
+
+	t.Run("空の ColumnSets を返す", func(t *testing.T) {
+		// GIVEN
+		f := &Fields{columnSets: [][][]byte{}}
+
+		// WHEN
+		result := f.ColumnSets()
+
+		// THEN
+		assert.Empty(t, result)
+	})
+
+	t.Run("nil の ColumnSets を返す", func(t *testing.T) {
+		// GIVEN
+		f := &Fields{}
+
+		// WHEN
+		result := f.ColumnSets()
+
+		// THEN
+		assert.Nil(t, result)
+	})
+}
+
+func TestFieldsSerialize(t *testing.T) {
 	t.Run("ヘッダーにフィールド値が正しくエンコードされる", func(t *testing.T) {
 		// GIVEN
 		f := &Fields{
@@ -455,11 +581,39 @@ func TestFieldsToRecord(t *testing.T) {
 		assert.ErrorIs(t, err, errInvalidRecord)
 	})
 
+	t.Run("Delete で ColumnSets が空の場合エラーを返す", func(t *testing.T) {
+		// GIVEN
+		f := &Fields{
+			recordType: RecordTypeDelete,
+			columnSets: [][][]byte{},
+		}
+
+		// WHEN
+		_, err := f.ToRecord()
+
+		// THEN
+		assert.ErrorIs(t, err, errInvalidRecord)
+	})
+
 	t.Run("Update で ColumnSets が 1 つしかない場合エラーを返す", func(t *testing.T) {
 		// GIVEN
 		f := &Fields{
 			recordType: RecordTypeUpdate,
 			columnSets: [][][]byte{{[]byte("only_one")}},
+		}
+
+		// WHEN
+		_, err := f.ToRecord()
+
+		// THEN
+		assert.ErrorIs(t, err, errInvalidRecord)
+	})
+
+	t.Run("Update で ColumnSets が空の場合エラーを返す", func(t *testing.T) {
+		// GIVEN
+		f := &Fields{
+			recordType: RecordTypeUpdate,
+			columnSets: [][][]byte{},
 		}
 
 		// WHEN

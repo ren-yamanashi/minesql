@@ -51,6 +51,31 @@ func TestInsertRecordTableFileId(t *testing.T) {
 	})
 }
 
+func TestInsertRecordRecord(t *testing.T) {
+	t.Run("コンストラクタで指定したレコードを返す", func(t *testing.T) {
+		// GIVEN
+		record := btree.Record{[]byte("Alice"), []byte("alice@example.com")}
+		ir := NewInsertRecord(page.FileId(5), record)
+
+		// WHEN
+		result := ir.Record()
+
+		// THEN
+		assert.Equal(t, record, result)
+	})
+
+	t.Run("空のレコードを返す", func(t *testing.T) {
+		// GIVEN
+		ir := NewInsertRecord(page.FileId(1), btree.Record{})
+
+		// WHEN
+		result := ir.Record()
+
+		// THEN
+		assert.Empty(t, result)
+	})
+}
+
 func TestInsertRecordSerialize(t *testing.T) {
 	t.Run("シリアライズ結果を Deserialize でラウンドトリップできる", func(t *testing.T) {
 		// GIVEN
