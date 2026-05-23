@@ -96,6 +96,37 @@ func TestAllocatePageId(t *testing.T) {
 	})
 }
 
+func TestRead(t *testing.T) {
+	t.Run("データサイズが PageSize でない場合エラーを返す", func(t *testing.T) {
+		// GIVEN
+		path := filepath.Join(t.TempDir(), "test.db")
+		hf, err := NewHeapFile(0, path)
+		assert.NoError(t, err)
+		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
+		data := make([]byte, 100)
+
+		// WHEN
+		err = hf.Read(0, data)
+
+		// THEN
+		assert.ErrorIs(t, err, page.ErrInvalidDataSize)
+	})
+
+	t.Run("nil データの場合エラーを返す", func(t *testing.T) {
+		// GIVEN
+		path := filepath.Join(t.TempDir(), "test.db")
+		hf, err := NewHeapFile(0, path)
+		assert.NoError(t, err)
+		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
+
+		// WHEN
+		err = hf.Read(0, nil)
+
+		// THEN
+		assert.ErrorIs(t, err, page.ErrInvalidDataSize)
+	})
+}
+
 func TestWrite(t *testing.T) {
 	t.Run("PageSize のデータを書き込める", func(t *testing.T) {
 		// GIVEN
@@ -127,19 +158,16 @@ func TestWrite(t *testing.T) {
 		// THEN
 		assert.ErrorIs(t, err, page.ErrInvalidDataSize)
 	})
-}
 
-func TestRead(t *testing.T) {
-	t.Run("データサイズが PageSize でない場合エラーを返す", func(t *testing.T) {
+	t.Run("nil データの場合エラーを返す", func(t *testing.T) {
 		// GIVEN
 		path := filepath.Join(t.TempDir(), "test.db")
 		hf, err := NewHeapFile(0, path)
 		assert.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
-		data := make([]byte, 100)
 
 		// WHEN
-		err = hf.Read(0, data)
+		err = hf.Write(0, nil)
 
 		// THEN
 		assert.ErrorIs(t, err, page.ErrInvalidDataSize)
