@@ -104,6 +104,7 @@ func (p *Pool) HeapFile(fileId page.FileId) (*file.HeapFile, error) {
 	return p.heapFile(fileId)
 }
 
+// MaxPages はバッファプールの最大バッファページ数を返す
 func (p *Pool) MaxPages() int {
 	p.mu.RLock()
 	defer p.mu.RUnlock()

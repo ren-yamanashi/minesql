@@ -51,12 +51,12 @@ func TestNewCatalog(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, created.TableMeta.tree.MetaPageId, opened.TableMeta.tree.MetaPageId)
-		assert.Equal(t, created.IndexMeta.tree.MetaPageId, opened.IndexMeta.tree.MetaPageId)
-		assert.Equal(t, created.IndexKeyColMeta.tree.MetaPageId, opened.IndexKeyColMeta.tree.MetaPageId)
-		assert.Equal(t, created.ColumnMeta.tree.MetaPageId, opened.ColumnMeta.tree.MetaPageId)
-		assert.Equal(t, created.ConstraintMeta.tree.MetaPageId, opened.ConstraintMeta.tree.MetaPageId)
-		assert.Equal(t, created.UserMeta.tree.MetaPageId, opened.UserMeta.tree.MetaPageId)
+		assert.Equal(t, created.TableMeta.tree.MetaPageId(), opened.TableMeta.tree.MetaPageId())
+		assert.Equal(t, created.IndexMeta.tree.MetaPageId(), opened.IndexMeta.tree.MetaPageId())
+		assert.Equal(t, created.IndexKeyColMeta.tree.MetaPageId(), opened.IndexKeyColMeta.tree.MetaPageId())
+		assert.Equal(t, created.ColumnMeta.tree.MetaPageId(), opened.ColumnMeta.tree.MetaPageId())
+		assert.Equal(t, created.ConstraintMeta.tree.MetaPageId(), opened.ConstraintMeta.tree.MetaPageId())
+		assert.Equal(t, created.UserMeta.tree.MetaPageId(), opened.UserMeta.tree.MetaPageId())
 	})
 
 	t.Run("マジックナンバーが不正な場合 ErrInvalidCatalogFile を返す", func(t *testing.T) {
@@ -170,12 +170,12 @@ func TestCreateCatalog(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.False(t, catalog.TableMeta.tree.MetaPageId.IsInvalid())
-		assert.False(t, catalog.IndexMeta.tree.MetaPageId.IsInvalid())
-		assert.False(t, catalog.IndexKeyColMeta.tree.MetaPageId.IsInvalid())
-		assert.False(t, catalog.ColumnMeta.tree.MetaPageId.IsInvalid())
-		assert.False(t, catalog.ConstraintMeta.tree.MetaPageId.IsInvalid())
-		assert.False(t, catalog.UserMeta.tree.MetaPageId.IsInvalid())
+		assert.False(t, catalog.TableMeta.tree.MetaPageId().IsInvalid())
+		assert.False(t, catalog.IndexMeta.tree.MetaPageId().IsInvalid())
+		assert.False(t, catalog.IndexKeyColMeta.tree.MetaPageId().IsInvalid())
+		assert.False(t, catalog.ColumnMeta.tree.MetaPageId().IsInvalid())
+		assert.False(t, catalog.ConstraintMeta.tree.MetaPageId().IsInvalid())
+		assert.False(t, catalog.UserMeta.tree.MetaPageId().IsInvalid())
 	})
 }
 

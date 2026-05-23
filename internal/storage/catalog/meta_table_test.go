@@ -18,7 +18,7 @@ func TestCreateTableMeta(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.False(t, tm.tree.MetaPageId.IsInvalid())
+		assert.False(t, tm.tree.MetaPageId().IsInvalid())
 	})
 }
 

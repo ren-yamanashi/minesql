@@ -21,7 +21,7 @@ func TestNewPrimaryIndex(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		pi := newPrimaryIndex(env.ct, env.bp, created.tree.MetaPageId, 1, lockMgr)
+		pi := newPrimaryIndex(env.ct, env.bp, created.tree.MetaPageId(), 1, lockMgr)
 
 		// THEN
 		assert.NotNil(t, pi)
@@ -333,7 +333,7 @@ func setupTestPrimaryIndex(t *testing.T) *primaryIndex {
 func buildTestPrimaryRecord(t *testing.T, pi *primaryIndex, id, name, email string) *primaryRecord {
 	t.Helper()
 	pr, err := newPrimaryRecord(pi.catalog, newPrimaryRecordInput{
-		fileId:     pi.tree.MetaPageId.FileId,
+		fileId:     pi.tree.MetaPageId().FileId,
 		pkCount:    pi.pkCount,
 		deleteMark: 0,
 		rollPtr:    undo.NullPointer,

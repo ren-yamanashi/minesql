@@ -136,12 +136,12 @@ func CreateCatalog(bp *buffer.Pool) (*Catalog, error) {
 	nextFileId++
 
 	copy(bufPageHeader.Page.Body[headerMagicNumberOffset:], catalogMagicNumber)
-	writePageNumber(bufPageHeader.Page.Body, headerTableMetaOffset, tableMeta.tree.MetaPageId.PageNumber)
-	writePageNumber(bufPageHeader.Page.Body, headerIndexMetaOffset, indexMeta.tree.MetaPageId.PageNumber)
-	writePageNumber(bufPageHeader.Page.Body, headerIndexKeyColMetaOffset, indexKeyColMeta.tree.MetaPageId.PageNumber)
-	writePageNumber(bufPageHeader.Page.Body, headerColumnMetaOffset, columnMeta.tree.MetaPageId.PageNumber)
-	writePageNumber(bufPageHeader.Page.Body, headerConstraintMetaOffset, constraintMeta.tree.MetaPageId.PageNumber)
-	writePageNumber(bufPageHeader.Page.Body, headerUserMetaOffset, userMeta.tree.MetaPageId.PageNumber)
+	writePageNumber(bufPageHeader.Page.Body, headerTableMetaOffset, tableMeta.tree.MetaPageId().PageNumber)
+	writePageNumber(bufPageHeader.Page.Body, headerIndexMetaOffset, indexMeta.tree.MetaPageId().PageNumber)
+	writePageNumber(bufPageHeader.Page.Body, headerIndexKeyColMetaOffset, indexKeyColMeta.tree.MetaPageId().PageNumber)
+	writePageNumber(bufPageHeader.Page.Body, headerColumnMetaOffset, columnMeta.tree.MetaPageId().PageNumber)
+	writePageNumber(bufPageHeader.Page.Body, headerConstraintMetaOffset, constraintMeta.tree.MetaPageId().PageNumber)
+	writePageNumber(bufPageHeader.Page.Body, headerUserMetaOffset, userMeta.tree.MetaPageId().PageNumber)
 	writeScalar(bufPageHeader.Page.Body, headerNextFileIdOffset, uint32(nextFileId))
 	writeScalar(bufPageHeader.Page.Body, headerNextIndexIdOffset, uint32(nextIndexId))
 	writeScalar(bufPageHeader.Page.Body, headerUndoLogFileIdOffset, uint32(undoLogFileId))

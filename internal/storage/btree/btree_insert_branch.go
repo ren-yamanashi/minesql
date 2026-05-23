@@ -37,7 +37,7 @@ func (bt *Btree) splitInsertBranch(
 	branchNode *branchNode,
 	record Record,
 ) ([]byte, page.Id, error) {
-	newBranchPageId, err := bt.bufferPool.AllocatePageId(bt.MetaPageId.FileId)
+	newBranchPageId, err := bt.bufferPool.AllocatePageId(bt.MetaPageId().FileId)
 	if err != nil {
 		return nil, page.InvalidId, err
 	}

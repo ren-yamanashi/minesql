@@ -18,7 +18,7 @@ func TestCreateIndexMeta(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.False(t, im.tree.MetaPageId.IsInvalid())
+		assert.False(t, im.tree.MetaPageId().IsInvalid())
 	})
 }
 

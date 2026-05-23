@@ -453,7 +453,7 @@ Branch[keys=1]: [key_10]
 
 		// THEN: ブランチの境界キーと左右の子のキーの関係をログに出力
 		var w strings.Builder
-		bufPageMeta, err := tree.bufferPool.PageForRead(tree.MetaPageId)
+		bufPageMeta, err := tree.bufferPool.PageForRead(tree.metaPageId)
 		require.NoError(t, err)
 		meta := newMetaPage(bufPageMeta.Page)
 		rootPageId := meta.rootPageId()
@@ -510,7 +510,7 @@ Branch[keys=1]: [key_10]
 			key := fmt.Sprintf("key_%02d", i)
 			tree.mustInsert(key, strings.Repeat("x", 200))
 
-			pageMeta, err := tree.bufferPool.PageForRead(tree.MetaPageId)
+			pageMeta, err := tree.bufferPool.PageForRead(tree.metaPageId)
 			require.NoError(t, err)
 			bufPageMeta := newMetaPage(pageMeta.Page)
 			rootPageId := bufPageMeta.rootPageId()
@@ -617,7 +617,7 @@ func writeScanLog(w *strings.Builder, tree *Btree) {
 
 // ツリーのルートノード情報をログに書き出す (ノードタイプ, キー数, キー一覧)
 func writeRootInfo(w *strings.Builder, tree *Btree) {
-	bufPageMeta, err := tree.bufferPool.PageForRead(tree.MetaPageId)
+	bufPageMeta, err := tree.bufferPool.PageForRead(tree.metaPageId)
 	if err != nil {
 		panic(err)
 	}
@@ -662,7 +662,7 @@ func writeNodeInfo(w *strings.Builder, pageId page.Id, depth int, tree *Btree) {
 
 // ツリーの形状 (高さ、各深さのノードタイプ・ノード数・キー数) をコンパクトに出力する
 func writeTreeShape(w *strings.Builder, tree *Btree) {
-	pageMeta, err := tree.bufferPool.PageForRead(tree.MetaPageId)
+	pageMeta, err := tree.bufferPool.PageForRead(tree.metaPageId)
 	if err != nil {
 		panic(err)
 	}

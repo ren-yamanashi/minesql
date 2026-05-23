@@ -10,12 +10,12 @@ import (
 // Update は B+Tree の特定のノードの値を更新する
 func (bt *Btree) Update(record Record) error {
 	// メタページを取得
-	pageMeta, err := bt.bufferPool.PageForRead(bt.MetaPageId)
+	pageMeta, err := bt.bufferPool.PageForRead(bt.MetaPageId())
 	if err != nil {
 		return err
 	}
 	metaPage := newMetaPage(pageMeta.Page)
-	defer bt.bufferPool.UnRefPage(bt.MetaPageId)
+	defer bt.bufferPool.UnRefPage(bt.MetaPageId())
 
 	// ルートページ取得
 	rootPageId := metaPage.rootPageId()

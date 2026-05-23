@@ -10,11 +10,11 @@ import (
 // Delete は B+Tree からレコードを削除する
 func (bt *Btree) Delete(key []byte) error {
 	// メタページを取得
-	pageMeta, err := bt.bufferPool.PageForWrite(bt.MetaPageId)
+	pageMeta, err := bt.bufferPool.PageForWrite(bt.MetaPageId())
 	if err != nil {
 		return err
 	}
-	defer bt.bufferPool.UnRefPage(bt.MetaPageId)
+	defer bt.bufferPool.UnRefPage(bt.MetaPageId())
 	metaPage := newMetaPage(pageMeta.Page)
 
 	// ルートページを取得

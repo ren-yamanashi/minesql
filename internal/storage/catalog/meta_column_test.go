@@ -18,7 +18,7 @@ func TestCreateColumnMeta(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.False(t, cm.tree.MetaPageId.IsInvalid())
+		assert.False(t, cm.tree.MetaPageId().IsInvalid())
 	})
 }
 

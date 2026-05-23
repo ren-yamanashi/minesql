@@ -108,7 +108,7 @@ func registerTableMeta(
 	input CreateTableInput,
 ) error {
 	// テーブルメタ
-	if err := ct.TableMeta.Insert(input.TableName, pi.tree.MetaPageId, len(input.ColNames)); err != nil {
+	if err := ct.TableMeta.Insert(input.TableName, pi.tree.MetaPageId(), len(input.ColNames)); err != nil {
 		return err
 	}
 
@@ -123,7 +123,7 @@ func registerTableMeta(
 		IndexId:    indexId,
 		IndexType:  catalog.IndexTypePrimary,
 		NumOfCol:   input.PkCount,
-		MetaPageId: pi.tree.MetaPageId,
+		MetaPageId: pi.tree.MetaPageId(),
 	})
 	if err != nil {
 		return err
@@ -170,7 +170,7 @@ func createSecondaryIndexes(
 			IndexId:    indexId,
 			IndexType:  input.IndexType,
 			NumOfCol:   len(input.ColNames),
-			MetaPageId: index.tree.MetaPageId,
+			MetaPageId: index.tree.MetaPageId(),
 		})
 		if err != nil {
 			return nil, err

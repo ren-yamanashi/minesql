@@ -49,7 +49,7 @@ func (pi *primaryIndex) search(mode SearchMode) (*primaryIterator, error) {
 	if err != nil {
 		return nil, err
 	}
-	return newPrimaryIterator(iter, pi.catalog, pi.tree.MetaPageId.FileId), nil
+	return newPrimaryIterator(iter, pi.catalog, pi.tree.MetaPageId().FileId), nil
 }
 
 // insert は行を挿入する
@@ -117,7 +117,7 @@ func (pi *primaryIndex) softDelete(record *primaryRecord, trxId lock.TrxId) erro
 	// 論理削除
 	// deleteMark を 1 にしたレコードで上書き
 	deleted, err := newPrimaryRecord(pi.catalog, newPrimaryRecordInput{
-		fileId:     pi.tree.MetaPageId.FileId,
+		fileId:     pi.tree.MetaPageId().FileId,
 		pkCount:    record.pkCount,
 		deleteMark: 1,
 		lastTrxId:  trxId,
@@ -149,7 +149,7 @@ func (pi *primaryIndex) update(newRecord *primaryRecord, trxId lock.TrxId) error
 
 // fileId はテーブルの fileId を返す
 func (pi *primaryIndex) fileId() page.FileId {
-	return pi.tree.MetaPageId.FileId
+	return pi.tree.MetaPageId().FileId
 }
 
 // leafPageCount はリーフページ数を取得する

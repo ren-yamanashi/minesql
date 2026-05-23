@@ -43,7 +43,7 @@ func (bt *Btree) splitInsertLeaf(
 	}
 
 	// 新しいリーフノードを作成
-	newLeafPageId, err := bt.bufferPool.AllocatePageId(bt.MetaPageId.FileId)
+	newLeafPageId, err := bt.bufferPool.AllocatePageId(bt.MetaPageId().FileId)
 	if err != nil {
 		return nil, page.InvalidId, err
 	}

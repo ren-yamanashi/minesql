@@ -27,7 +27,7 @@ func TestNewSecondaryIndex(t *testing.T) {
 
 		// WHEN
 		si := newSecondaryIndex(env.ct, env.bp, newSecondaryIndexInput{
-			MetaPageId:  created.tree.MetaPageId,
+			MetaPageId:  created.tree.MetaPageId(),
 			PrimaryTree: env.primaryTree,
 			IndexName:   "idx_name",
 			Unique:      false,

@@ -210,7 +210,7 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 	fileId := page.FileId(2)
 
 	// テーブルメタデータ (MetaPageId としてプライマリ B+Tree の MetaPageId を使用)
-	_ = env.ct.TableMeta.Insert("users", env.primaryTree.MetaPageId, 3)
+	_ = env.ct.TableMeta.Insert("users", env.primaryTree.MetaPageId(), 3)
 
 	// プライマリインデックスメタデータ
 	piIndexId := catalog.IndexId(0)
@@ -220,7 +220,7 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 		IndexId:    piIndexId,
 		IndexType:  catalog.IndexTypePrimary,
 		NumOfCol:   1,
-		MetaPageId: env.primaryTree.MetaPageId,
+		MetaPageId: env.primaryTree.MetaPageId(),
 	})
 	_ = env.ct.IndexKeyColMeta.Insert(piIndexId, "id", 0)
 
@@ -232,7 +232,7 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 		IndexId:    siNameId,
 		IndexType:  catalog.IndexTypeNonUnique,
 		NumOfCol:   1,
-		MetaPageId: env.secondaryTree.MetaPageId,
+		MetaPageId: env.secondaryTree.MetaPageId(),
 	})
 	_ = env.ct.IndexKeyColMeta.Insert(siNameId, "name", 0)
 
@@ -248,7 +248,7 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 		IndexId:    siEmailId,
 		IndexType:  catalog.IndexTypeUnique,
 		NumOfCol:   1,
-		MetaPageId: siEmailTree.MetaPageId,
+		MetaPageId: siEmailTree.MetaPageId(),
 	})
 	_ = env.ct.IndexKeyColMeta.Insert(siEmailId, "email", 0)
 
@@ -283,7 +283,7 @@ func setupTableTestEnvWithoutPrimaryIndex(t *testing.T) *tableTestEnv {
 	lockMgr := lock.NewManager()
 
 	// テーブルメタデータのみ登録 (プライマリインデックスなし)
-	_ = env.ct.TableMeta.Insert("orders", env.primaryTree.MetaPageId, 2)
+	_ = env.ct.TableMeta.Insert("orders", env.primaryTree.MetaPageId(), 2)
 
 	return &tableTestEnv{
 		ct:      env.ct,
