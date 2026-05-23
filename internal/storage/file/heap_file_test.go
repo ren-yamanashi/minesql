@@ -1,6 +1,7 @@
 package file
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -47,6 +48,24 @@ func TestNewHeapFile(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, page.FileId(1), nextId.FileId)
 		assert.Equal(t, page.PageNumber(2), nextId.PageNumber)
+	})
+
+	t.Run("ファイルサイズがページサイズの倍数でない場合エラーを返す", func(t *testing.T) {
+		// GIVEN
+		path := filepath.Join(t.TempDir(), "test.db")
+		f, err := os.Create(path)
+		assert.NoError(t, err)
+		_, err = f.Write(make([]byte, page.Size+1)) // ページサイズ + 1 バイト
+		assert.NoError(t, err)
+		assert.NoError(t, f.Close())
+
+		// WHEN
+		hf, err := NewHeapFile(0, path)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Nil(t, hf)
+		assert.Contains(t, err.Error(), "not a multiple of page size")
 	})
 
 	t.Run("存在しないディレクトリのパスの場合エラーを返す", func(t *testing.T) {

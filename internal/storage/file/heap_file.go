@@ -36,10 +36,15 @@ func NewHeapFile(fileId page.FileId, path string) (heapFile *HeapFile, retErr er
 		return nil, err
 	}
 
+	fileSize := fileInfo.Size()
+	if fileSize%int64(page.Size) != 0 {
+		return nil, fmt.Errorf("file %q: size %d is not a multiple of page size %d", path, fileSize, page.Size)
+	}
+
 	return &HeapFile{
 		fileId:     fileId,
 		file:       file,
-		nextPageId: page.NewId(fileId, page.PageNumber(fileInfo.Size()/page.Size)),
+		nextPageId: page.NewId(fileId, page.PageNumber(fileSize/int64(page.Size))),
 	}, nil
 }
 

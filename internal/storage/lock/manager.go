@@ -45,7 +45,9 @@ func (m *Manager) Lock(trxId TrxId, pos btree.RecordPosition, mode Mode) error {
 	}
 
 	// 既に適切なロックを保持している場合
-	if held, ok := state.holders[trxId]; ok && (held == Exclusive || mode == Shared) {
+	held, alreadyHolds := state.holders[trxId]
+	isAlreadySatisfied := alreadyHolds && (held == Exclusive || mode == Shared)
+	if isAlreadySatisfied {
 		return nil
 	}
 
@@ -70,7 +72,9 @@ func (m *Manager) Lock(trxId TrxId, pos btree.RecordPosition, mode Mode) error {
 
 	// ロックが付与されるかタイムアウトするまで待機
 	for {
-		if held, ok := state.holders[trxId]; ok && (held == Exclusive || mode == Shared) {
+		held, exists := state.holders[trxId]
+		isGranted := exists && (held == Exclusive || mode == Shared)
+		if isGranted {
 			m.appendRecordHeldLock(trxId, pos)
 			return nil
 		}
@@ -129,7 +133,7 @@ func (m *Manager) grantWaitingLocks(state *state) {
 		if canGrant {
 			// grantWaitingLocks によってロックが付与されたか確認
 			state.holders[request.trxId] = request.mode
-			state.waitQueue = append(state.waitQueue[:i], state.waitQueue[i+1:]...)
+			state.waitQueue = slices.Delete(state.waitQueue, i, i+1)
 			continue
 		}
 		// 排他ロックの待機者にロックを付与できない場合、後続のロック(Shared 含む)に対しても付与しない
