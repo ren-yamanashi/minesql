@@ -15,7 +15,7 @@ import (
 
 var errColNameValueMismatch = errors.New("number of colNames not equal values")
 
-type newPrimaryRecordInput struct {
+type NewPrimaryRecordInput struct {
 	fileId     page.FileId
 	pkCount    int
 	deleteMark byte
@@ -25,8 +25,8 @@ type newPrimaryRecordInput struct {
 	values     []string // テーブルを構成するカラム値のリスト (lastTrxId, rollPtr は含まない)
 }
 
-// primaryRecord はプライマリインデックスレコード
-type primaryRecord struct {
+// PrimaryRecord はプライマリインデックスレコード
+type PrimaryRecord struct {
 	pkCount    int
 	deleteMark byte
 	lastTrxId  lock.TrxId
@@ -35,7 +35,7 @@ type primaryRecord struct {
 	values     []string
 }
 
-func newPrimaryRecord(ct *catalog.Catalog, input newPrimaryRecordInput) (*primaryRecord, error) {
+func NewPrimaryRecord(ct *catalog.Catalog, input NewPrimaryRecordInput) (*PrimaryRecord, error) {
 	if len(input.colNames) != len(input.values) {
 		return nil, errColNameValueMismatch
 	}
@@ -44,7 +44,7 @@ func newPrimaryRecord(ct *catalog.Catalog, input newPrimaryRecordInput) (*primar
 
 // update は指定されたカラムの値を更新した新しい PrimaryRecord を返す
 // (colNames はテーブルの全カラムである必要はない)
-func (r *primaryRecord) update(trxId lock.TrxId, colNames, values []string) (*primaryRecord, error) {
+func (r *PrimaryRecord) update(trxId lock.TrxId, colNames, values []string) (*PrimaryRecord, error) {
 	if len(colNames) != len(values) {
 		return nil, errColNameValueMismatch
 	}
@@ -73,7 +73,7 @@ func (r *primaryRecord) update(trxId lock.TrxId, colNames, values []string) (*pr
 		newValues[pos] = values[i]
 	}
 
-	return &primaryRecord{
+	return &PrimaryRecord{
 		pkCount:    r.pkCount,
 		deleteMark: r.deleteMark,
 		lastTrxId:  trxId,
@@ -84,12 +84,12 @@ func (r *primaryRecord) update(trxId lock.TrxId, colNames, values []string) (*pr
 }
 
 // setRollPtr は rollPtr をセットする
-func (r *primaryRecord) setRollPtr(rollPtr undo.Pointer) {
+func (r *PrimaryRecord) setRollPtr(rollPtr undo.Pointer) {
 	r.rollPtr = rollPtr
 }
 
 // secondaryKey はセカンダリインデックスの B+Tree キー (SK+PK) を構築する
-func (r *primaryRecord) secondaryKey(keyCols map[string]int) []byte {
+func (r *PrimaryRecord) secondaryKey(keyCols map[string]int) []byte {
 	valMap := make(map[string]string, len(r.colNames))
 	for i, name := range r.colNames {
 		valMap[name] = r.values[i]
@@ -113,7 +113,7 @@ func (r *primaryRecord) secondaryKey(keyCols map[string]int) []byte {
 
 // encode は btree.Record にエンコードする
 //   - 非キー領域: lastTrxId (4B) + rollPtr (6B) + 非キーカラム
-func (r *primaryRecord) encode() btree.Record {
+func (r *PrimaryRecord) encode() btree.Record {
 	var key []byte
 	encode.Encode(stringToByteSlice(r.values[:r.pkCount]), &key)
 
@@ -127,7 +127,7 @@ func (r *primaryRecord) encode() btree.Record {
 
 // decodePrimaryRecord は btree.Record から PrimaryRecord にデコードする
 //   - 非キー領域: lastTrxId (4B) + rollPtr (6B) + 非キーカラム
-func decodePrimaryRecord(record btree.Record, ct *catalog.Catalog, fileId page.FileId) (*primaryRecord, error) {
+func decodePrimaryRecord(record btree.Record, ct *catalog.Catalog, fileId page.FileId) (*PrimaryRecord, error) {
 	var values [][]byte
 	encode.Decode(record.Key(), &values)
 	pkCount := len(values)
@@ -163,7 +163,7 @@ func decodePrimaryRecord(record btree.Record, ct *catalog.Catalog, fileId page.F
 		colNames[pos] = name
 	}
 
-	return &primaryRecord{
+	return &PrimaryRecord{
 		pkCount:    pkCount,
 		deleteMark: record.Header()[0],
 		lastTrxId:  lastTrxId,
@@ -174,7 +174,7 @@ func decodePrimaryRecord(record btree.Record, ct *catalog.Catalog, fileId page.F
 }
 
 // sortPrimaryRecord はカラムメタデータを参照して、レコードをテーブル定義順に並び替える
-func sortPrimaryRecord(ct *catalog.Catalog, input newPrimaryRecordInput) (*primaryRecord, error) {
+func sortPrimaryRecord(ct *catalog.Catalog, input NewPrimaryRecordInput) (*PrimaryRecord, error) {
 	colDefs, err := fetchColumnDefs(ct, input.fileId)
 	if err != nil {
 		return nil, err
@@ -199,7 +199,7 @@ func sortPrimaryRecord(ct *catalog.Catalog, input newPrimaryRecordInput) (*prima
 		sortedValues[pos] = input.values[i]
 	}
 
-	return &primaryRecord{
+	return &PrimaryRecord{
 		pkCount:    input.pkCount,
 		deleteMark: input.deleteMark,
 		lastTrxId:  input.lastTrxId,
@@ -216,6 +216,7 @@ func fetchColumnDefs(ct *catalog.Catalog, fileId page.FileId) (map[string]int, e
 	if err != nil {
 		return nil, err
 	}
+	defer iter.Close()
 
 	colDefs := map[string]int{}
 	for {

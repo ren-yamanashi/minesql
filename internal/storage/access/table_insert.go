@@ -7,7 +7,7 @@ import (
 
 // Insert はテーブルに行を挿入する
 func (t *Table) Insert(colNames []string, values []string, trxId lock.TrxId) error {
-	record, err := newPrimaryRecord(t.catalog, newPrimaryRecordInput{
+	record, err := NewPrimaryRecord(t.catalog, NewPrimaryRecordInput{
 		fileId:     t.primaryIndex.fileId(),
 		pkCount:    t.primaryIndex.pkCount,
 		deleteMark: 0,

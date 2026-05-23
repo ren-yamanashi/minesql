@@ -2,16 +2,21 @@ package catalog
 
 import "github.com/ren-yamanashi/minesql/internal/storage/btree"
 
-type constraintIterator struct {
+type ConstraintIterator struct {
 	iterator *btree.Iterator
 }
 
-func newConstraintIterator(iter *btree.Iterator) *constraintIterator {
-	return &constraintIterator{iterator: iter}
+func NewConstraintIterator(iter *btree.Iterator) *ConstraintIterator {
+	return &ConstraintIterator{iterator: iter}
+}
+
+// Close はイテレータが保持しているバッファページの参照を解放する
+func (ci *ConstraintIterator) Close() {
+	ci.iterator.Close()
 }
 
 // Next は制約メタデータから次の結果を返す
-func (ci *constraintIterator) Next() (ConstraintRecord, bool, error) {
+func (ci *ConstraintIterator) Next() (ConstraintRecord, bool, error) {
 	record, ok, err := ci.iterator.Next()
 	if err != nil {
 		return ConstraintRecord{}, false, err

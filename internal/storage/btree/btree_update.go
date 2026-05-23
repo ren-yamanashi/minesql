@@ -1,7 +1,6 @@
 package btree
 
 import (
-	"bytes"
 	"errors"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
@@ -23,6 +22,7 @@ func (t *Tree) Update(record Record) error {
 	if err != nil {
 		return err
 	}
+	defer t.bufferPool.UnrefPage(rootPageId)
 	return t.updateRecursively(rootBufPage, record)
 }
 
@@ -32,12 +32,12 @@ func (t *Tree) updateRecursively(bufPage *buffer.Page, record Record) error {
 	if err != nil {
 		return err
 	}
+	defer t.bufferPool.UnrefPage(bufPage.PageId())
 
 	nt := nodeType(pg.Data())
-	switch {
+	switch nt {
 	// ブランチノードの場合: 子ノードに対して再帰実行する
-	case bytes.Equal(nt, nodeTypeBranch):
-		defer t.bufferPool.UnrefPage(bufPage.PageId())
+	case nodeTypeBranch:
 		branchNode := newBranchNode(pg.Data())
 		mode := SearchModeKey{Key: record.Key()}
 		childPageId, err := mode.childPageId(branchNode)
@@ -51,7 +51,7 @@ func (t *Tree) updateRecursively(bufPage *buffer.Page, record Record) error {
 		return t.updateRecursively(childBufPage, record)
 
 	// リーフノードの場合: そのまま更新する
-	case bytes.Equal(nt, nodeTypeLeaf):
+	case nodeTypeLeaf:
 		leafNode := newLeafNode(pg.Data())
 		slotNum, found := leafNode.searchSlotNum(record.Key())
 		if !found {
@@ -63,6 +63,6 @@ func (t *Tree) updateRecursively(bufPage *buffer.Page, record Record) error {
 		return nil
 
 	default:
-		return errors.New("unknown node type")
+		return errUnknownNodeType
 	}
 }

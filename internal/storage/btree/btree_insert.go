@@ -1,9 +1,6 @@
 package btree
 
 import (
-	"bytes"
-	"errors"
-
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
@@ -24,6 +21,7 @@ func (t *Tree) Insert(record Record) error {
 	if err != nil {
 		return err
 	}
+	defer t.bufferPool.UnrefPage(rootPageId)
 
 	// 再帰的に挿入
 	overflowKey, overflowChildPageId, isLeafSplit, err := t.insertRecursively(rootPageBuf, record)
@@ -83,11 +81,12 @@ func (t *Tree) insertRecursively(
 	if err != nil {
 		return nil, page.InvalidId, false, err
 	}
+	defer t.bufferPool.UnrefPage(bufPage.PageId())
 	nt := nodeType(pg.Data())
 
-	switch {
+	switch nt {
 	// ブランチノードの場合: 子ノードに対して再帰実行する
-	case bytes.Equal(nt, nodeTypeBranch):
+	case nodeTypeBranch:
 		// 挿入先の子ノードを取得
 		branchNode := newBranchNode(pg.Data())
 		childSlotNum, found := branchNode.searchSlotNum(record.Key())
@@ -125,7 +124,7 @@ func (t *Tree) insertRecursively(
 		return overflowKey, newPageId, isLeafSplit, nil
 
 	// リーフノードの場合: そのまま挿入する
-	case bytes.Equal(nt, nodeTypeLeaf):
+	case nodeTypeLeaf:
 		overflowKey, newPageId, err := t.insertLeaf(bufPage.PageId(), pg.Data(), record)
 		if err != nil {
 			return nil, page.InvalidId, false, err
@@ -134,6 +133,6 @@ func (t *Tree) insertRecursively(
 		return overflowKey, newPageId, isSplit, nil
 
 	default:
-		return nil, page.InvalidId, false, errors.New("unknown node type")
+		return nil, page.InvalidId, false, errUnknownNodeType
 	}
 }

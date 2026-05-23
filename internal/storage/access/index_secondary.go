@@ -83,18 +83,18 @@ func createSecondaryIndex(
 }
 
 // search は指定した検索モードでインデックスを検索し、イテレータを返す
-func (si *secondaryIndex) search(mode SearchMode) (*secondaryIterator, error) {
+func (si *secondaryIndex) search(mode SearchMode) (*SecondaryIterator, error) {
 	iter, err := si.tree.Search(mode.encode())
 	if err != nil {
 		return nil, err
 	}
-	return newSecondaryIterator(si.indexName, iter, si.catalog, si.primaryTree), nil
+	return NewSecondaryIterator(si.indexName, iter, si.catalog, si.primaryTree), nil
 }
 
 // insert は行を挿入する
 //   - unique index の場合かつセカンダリキーの重複があるとエラー
 //   - 論理削除済みの同一キー (SK + PK) が存在する場合は上書きする
-func (si *secondaryIndex) insert(record *secondaryRecord, trxId lock.TrxId) error {
+func (si *secondaryIndex) insert(record *SecondaryRecord, trxId lock.TrxId) error {
 	if si.unique {
 		if err := si.checkUnique(record); err != nil {
 			return err
@@ -132,7 +132,7 @@ func (si *secondaryIndex) insert(record *secondaryRecord, trxId lock.TrxId) erro
 }
 
 // delete は行を物理削除する
-func (si *secondaryIndex) delete(record *secondaryRecord, trxId lock.TrxId) error {
+func (si *secondaryIndex) delete(record *SecondaryRecord, trxId lock.TrxId) error {
 	// 排他ロックを取得
 	encodedRecord := record.encode()
 	_, pos, err := si.tree.FindByKey(encodedRecord.Key())
@@ -148,7 +148,7 @@ func (si *secondaryIndex) delete(record *secondaryRecord, trxId lock.TrxId) erro
 }
 
 // softDelete は行を論理削除する
-func (si *secondaryIndex) softDelete(record *secondaryRecord, trxId lock.TrxId) error {
+func (si *secondaryIndex) softDelete(record *SecondaryRecord, trxId lock.TrxId) error {
 	// 排他ロックを取得
 	encodedRecord := record.encode()
 	_, pos, err := si.tree.FindByKey(encodedRecord.Key())
@@ -161,7 +161,7 @@ func (si *secondaryIndex) softDelete(record *secondaryRecord, trxId lock.TrxId) 
 
 	// 論理削除
 	// deleteMark を 1 にしたレコードで上書き
-	deleted, err := newSecondaryRecord(si.catalog, newSecondaryRecordInput{
+	deleted, err := NewSecondaryRecord(si.catalog, NewSecondaryRecordInput{
 		fileId:     si.fileId,
 		deleteMark: 1,
 		indexName:  si.indexName,
@@ -187,13 +187,14 @@ func (si *secondaryIndex) height() (uint64, error) {
 
 // checkUnique は record のセカンダリキーに対して active なレコードが存在するか確認する
 //   - return: 存在する場合は ErrDuplicateKey
-func (si *secondaryIndex) checkUnique(sr *secondaryRecord) error {
+func (si *secondaryIndex) checkUnique(sr *SecondaryRecord) error {
 	encodedSk := sr.encodedSecondaryKey()
 	// セカンダリインデックスのキーは SK+PK の構成であり、SK のみで SearchModeKey を使うと SK 以上の最初のキーの位置に着地する
 	iter, err := si.tree.Search(btree.SearchModeKey{Key: encodedSk})
 	if err != nil {
 		return err
 	}
+	defer iter.Close()
 
 	for {
 		existing, ok, err := iter.Get()

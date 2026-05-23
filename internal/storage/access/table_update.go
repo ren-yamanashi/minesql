@@ -9,7 +9,7 @@ import (
 //   - currentRecord: 更新前のレコード (executor が Search で取得したもの)
 //   - colNames: 更新するカラム名 (SET 句の対象)
 //   - values: 更新後の値
-func (t *Table) Update(currentRecord *primaryRecord, colNames, values []string, trxId lock.TrxId) error {
+func (t *Table) Update(currentRecord *PrimaryRecord, colNames, values []string, trxId lock.TrxId) error {
 	// 更新後のレコードを生成
 	newRecord, err := currentRecord.update(trxId, colNames, values)
 	if err != nil {
@@ -40,7 +40,7 @@ func (t *Table) Update(currentRecord *primaryRecord, colNames, values []string, 
 // updateSecondaryIndexes はセカンダリインデックスを更新する
 // インデックスを構成するカラムの値が変更される場合のみ、論理削除 + 新規挿入で更新する
 func (t *Table) updateSecondaryIndexes(
-	before *primaryRecord,
+	before *PrimaryRecord,
 	updateColNames, updateValues []string,
 	trxId lock.TrxId,
 ) error {

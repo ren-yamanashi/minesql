@@ -10,7 +10,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
-type newSecondaryRecordInput struct {
+type NewSecondaryRecordInput struct {
 	fileId     page.FileId
 	deleteMark byte
 	indexName  string
@@ -19,15 +19,15 @@ type newSecondaryRecordInput struct {
 	pk         []string // プライマリキー
 }
 
-// secondaryRecord はセカンダリインデックスレコード
-type secondaryRecord struct {
+// SecondaryRecord はセカンダリインデックスレコード
+type SecondaryRecord struct {
 	deleteMark byte
 	colNames   []string // インデックスを構成するカラム名のリスト
 	values     []string // インデックスを構成するカラム値のリスト (SK)
 	pk         []string // プライマリキー
 }
 
-func newSecondaryRecord(ct *catalog.Catalog, input newSecondaryRecordInput) (*secondaryRecord, error) {
+func NewSecondaryRecord(ct *catalog.Catalog, input NewSecondaryRecordInput) (*SecondaryRecord, error) {
 	if len(input.colNames) != len(input.values) {
 		return nil, errColNameValueMismatch
 	}
@@ -36,7 +36,7 @@ func newSecondaryRecord(ct *catalog.Catalog, input newSecondaryRecordInput) (*se
 
 // encode は btree.Record にエンコードする
 // キー領域は SK + PK を連結したもの
-func (r *secondaryRecord) encode() btree.Record {
+func (r *SecondaryRecord) encode() btree.Record {
 	var key []byte
 	encode.Encode(stringToByteSlice(r.values), &key)
 	encode.Encode(stringToByteSlice(r.pk), &key)
@@ -46,7 +46,7 @@ func (r *secondaryRecord) encode() btree.Record {
 // encodedSecondaryKey はエンコード済みのセカンダリキーを返す
 //
 // B+Tree 上のキー (SK + PK) ではなく SK のみ
-func (r *secondaryRecord) encodedSecondaryKey() []byte {
+func (r *SecondaryRecord) encodedSecondaryKey() []byte {
 	var sk []byte
 	encode.Encode(stringToByteSlice(r.values), &sk)
 	return sk
@@ -58,7 +58,7 @@ func decodeSecondaryRecord(
 	ct *catalog.Catalog,
 	fileId page.FileId,
 	indexName string,
-) (*secondaryRecord, error) {
+) (*SecondaryRecord, error) {
 	index, err := fetchIndex(ct, fileId, indexName)
 	if err != nil {
 		return nil, err
@@ -91,7 +91,7 @@ func decodeSecondaryRecord(
 		colNames[pos] = name
 	}
 
-	return &secondaryRecord{
+	return &SecondaryRecord{
 		deleteMark: record.Header()[0],
 		colNames:   colNames,
 		values:     byteSliceToString(sk),
@@ -100,7 +100,7 @@ func decodeSecondaryRecord(
 }
 
 // sortSecondaryRecord はメタデータを参照して、レコードをインデックス定義順に並び替える
-func sortSecondaryRecord(ct *catalog.Catalog, input newSecondaryRecordInput) (*secondaryRecord, error) {
+func sortSecondaryRecord(ct *catalog.Catalog, input NewSecondaryRecordInput) (*SecondaryRecord, error) {
 	index, err := fetchIndex(ct, input.fileId, input.indexName)
 	if err != nil {
 		return nil, err
@@ -132,7 +132,7 @@ func sortSecondaryRecord(ct *catalog.Catalog, input newSecondaryRecordInput) (*s
 		sortedValues[pos] = input.values[i]
 	}
 
-	return &secondaryRecord{
+	return &SecondaryRecord{
 		deleteMark: input.deleteMark,
 		colNames:   sortedColNames,
 		values:     sortedValues,
@@ -147,6 +147,7 @@ func fetchIndex(ct *catalog.Catalog, fileId page.FileId, indexName string) (cata
 	if err != nil {
 		return catalog.IndexRecord{}, err
 	}
+	defer iter.Close()
 	indexRecord, ok, err := iter.Next()
 	if err != nil {
 		return catalog.IndexRecord{}, err
@@ -164,6 +165,7 @@ func fetchIndexKeyColumn(ct *catalog.Catalog, indexId catalog.IndexId) (map[stri
 	if err != nil {
 		return nil, err
 	}
+	defer keyColMetaIter.Close()
 
 	keyCols := map[string]int{}
 	for {

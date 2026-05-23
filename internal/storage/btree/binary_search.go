@@ -13,7 +13,7 @@ func binarySearch(node node, key []byte) (int, bool) {
 		mid := left + (right-left)/2
 		record := node.record(mid) // "1ノード=1ページ" であるため、`mid=slotNum` として該当のレコードを取得可能
 
-		switch record.CompareKey(key) {
+		switch record.compareKey(key) {
 		case 0:
 			return mid, true
 		case -1: // record.Key < key の場合、右側に進む

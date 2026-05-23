@@ -10,7 +10,7 @@ import (
 func TestTableRecordName(t *testing.T) {
 	t.Run("コンストラクタで指定した名前を返す", func(t *testing.T) {
 		// GIVEN
-		tr := newTableRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3)
+		tr := NewTableRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3)
 
 		// WHEN
 		got := tr.Name()
@@ -24,7 +24,7 @@ func TestTableRecordMetaPageId(t *testing.T) {
 	t.Run("コンストラクタで指定したメタページ ID を返す", func(t *testing.T) {
 		// GIVEN
 		metaPageId := page.NewId(page.FileId(1), page.PageNumber(0))
-		tr := newTableRecord("users", metaPageId, 3)
+		tr := NewTableRecord("users", metaPageId, 3)
 
 		// WHEN
 		got := tr.MetaPageId()
@@ -37,7 +37,7 @@ func TestTableRecordMetaPageId(t *testing.T) {
 func TestTableRecordColumnCount(t *testing.T) {
 	t.Run("コンストラクタで指定したカラム数を返す", func(t *testing.T) {
 		// GIVEN
-		tr := newTableRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3)
+		tr := NewTableRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3)
 
 		// WHEN
 		got := tr.ColumnCount()
@@ -50,7 +50,7 @@ func TestTableRecordColumnCount(t *testing.T) {
 func TestTableRecordEncode(t *testing.T) {
 	t.Run("テーブルレコードをエンコードできる", func(t *testing.T) {
 		// GIVEN
-		tr := newTableRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3)
+		tr := NewTableRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3)
 
 		// WHEN
 		record := tr.encode()
@@ -63,7 +63,7 @@ func TestTableRecordEncode(t *testing.T) {
 
 	t.Run("エンコードした結果をデコードすると元のデータに戻る", func(t *testing.T) {
 		// GIVEN
-		original := newTableRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3)
+		original := NewTableRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3)
 
 		// WHEN
 		record := original.encode()
@@ -77,7 +77,7 @@ func TestTableRecordEncode(t *testing.T) {
 
 	t.Run("カラム数が 0 の場合も正しくエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
-		original := newTableRecord("empty_table", page.NewId(page.FileId(2), page.PageNumber(0)), 0)
+		original := NewTableRecord("empty_table", page.NewId(page.FileId(2), page.PageNumber(0)), 0)
 
 		// WHEN
 		record := original.encode()
@@ -91,7 +91,7 @@ func TestTableRecordEncode(t *testing.T) {
 
 	t.Run("長いテーブル名でも正しくエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
-		original := newTableRecord("very_long_table_name_for_testing", page.NewId(page.FileId(3), page.PageNumber(0)), 10)
+		original := NewTableRecord("very_long_table_name_for_testing", page.NewId(page.FileId(3), page.PageNumber(0)), 10)
 
 		// WHEN
 		record := original.encode()
@@ -103,7 +103,7 @@ func TestTableRecordEncode(t *testing.T) {
 
 	t.Run("MetaPageId のページ番号が 0 の場合も正しくエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
-		original := newTableRecord("t", page.NewId(page.FileId(0), page.PageNumber(0)), 1)
+		original := NewTableRecord("t", page.NewId(page.FileId(0), page.PageNumber(0)), 1)
 
 		// WHEN
 		record := original.encode()
@@ -119,7 +119,7 @@ func TestTableRecordEncode(t *testing.T) {
 func TestDecodeTableRecord(t *testing.T) {
 	t.Run("エンコード済みレコードから MetaPageId を復元できる", func(t *testing.T) {
 		// GIVEN
-		tr := newTableRecord("orders", page.NewId(page.FileId(42), page.PageNumber(0)), 5)
+		tr := NewTableRecord("orders", page.NewId(page.FileId(42), page.PageNumber(0)), 5)
 		record := tr.encode()
 
 		// WHEN
@@ -131,7 +131,7 @@ func TestDecodeTableRecord(t *testing.T) {
 
 	t.Run("エンコード済みレコードからテーブル名とカラム数を復元できる", func(t *testing.T) {
 		// GIVEN
-		tr := newTableRecord("products", page.NewId(page.FileId(1), page.PageNumber(0)), 7)
+		tr := NewTableRecord("products", page.NewId(page.FileId(1), page.PageNumber(0)), 7)
 		record := tr.encode()
 
 		// WHEN

@@ -11,7 +11,7 @@ type UserRecord struct {
 	authString []byte // 認証文字列
 }
 
-func newUserRecord(username, host string, authString []byte) UserRecord {
+func NewUserRecord(username, host string, authString []byte) UserRecord {
 	return UserRecord{
 		username:   username,
 		host:       host,
@@ -49,5 +49,5 @@ func decodeUserRecord(record btree.Record) UserRecord {
 	host := string(nonKey[0])
 	authString := nonKey[1]
 
-	return newUserRecord(username, host, authString)
+	return NewUserRecord(username, host, authString)
 }

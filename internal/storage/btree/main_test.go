@@ -1,7 +1,6 @@
 package btree
 
 import (
-	"bytes"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -462,7 +461,7 @@ Branch[keys=1]: [key_10]
 		require.NoError(t, err)
 
 		nodeType := nodeType(bufPageRoot.Data())
-		if !bytes.Equal(nodeType, nodeTypeBranch) {
+		if nodeType != nodeTypeBranch {
 			t.Skip("ルートがブランチではないためスキップ")
 		}
 
@@ -520,8 +519,8 @@ Branch[keys=1]: [key_10]
 			nodeType := nodeType(bufPageRoot.Data())
 
 			var currentType string
-			switch {
-			case bytes.Equal(nodeType, nodeTypeLeaf):
+			switch nodeType {
+			case nodeTypeLeaf:
 				currentType = "Leaf"
 			default:
 				currentType = "Branch"
@@ -634,15 +633,15 @@ func writeNodeInfo(w *strings.Builder, pageId page.Id, depth int, tree *Tree) {
 	indent := strings.Repeat("  ", depth)
 	nodeType := nodeType(pg.Data())
 
-	switch {
-	case bytes.Equal(nodeType, nodeTypeLeaf):
+	switch nodeType {
+	case nodeTypeLeaf:
 		leafNode := newLeafNode(pg.Data())
 		keys := make([]string, leafNode.numRecords())
 		for i := range leafNode.numRecords() {
 			keys[i] = string(leafNode.record(i).Key())
 		}
 		fmt.Fprintf(w, "%sLeaf[keys=%d]: [%s]\n", indent, leafNode.numRecords(), strings.Join(keys, ", "))
-	case bytes.Equal(nodeType, nodeTypeBranch):
+	case nodeTypeBranch:
 		branchNode := newBranchNode(pg.Data())
 		keys := make([]string, branchNode.numRecords())
 		for i := range branchNode.numRecords() {
@@ -684,15 +683,15 @@ func writeTreeShape(w *strings.Builder, tree *Tree) {
 		}
 
 		nodeType := nodeType(pg.Data())
-		switch {
-		case bytes.Equal(nodeType, nodeTypeLeaf):
+		switch nodeType {
+		case nodeTypeLeaf:
 			if _, ok := result[depth]; !ok {
 				result[depth] = &depthInfo{nodeType: "Leaf"}
 			}
 			leaf := newLeafNode(pg.Data())
 			result[depth].count++
 			result[depth].totalKeys += leaf.numRecords()
-		case bytes.Equal(nodeType, nodeTypeBranch):
+		case nodeTypeBranch:
 			if _, ok := result[depth]; !ok {
 				result[depth] = &depthInfo{nodeType: "Branch"}
 			}

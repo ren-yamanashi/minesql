@@ -5,21 +5,21 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
 )
 
-// secondaryIterator はセカンダリインデックスを辿るイテレータ
-type secondaryIterator struct {
+// SecondaryIterator はセカンダリインデックスを辿るイテレータ
+type SecondaryIterator struct {
 	indexName   string
 	iterator    *btree.Iterator
 	catalog     *catalog.Catalog
 	primaryTree *btree.Tree // プライマリインデックスの B+Tree
 }
 
-func newSecondaryIterator(
+func NewSecondaryIterator(
 	indexName string,
 	iter *btree.Iterator,
 	ct *catalog.Catalog,
 	pt *btree.Tree,
-) *secondaryIterator {
-	return &secondaryIterator{
+) *SecondaryIterator {
+	return &SecondaryIterator{
 		indexName:   indexName,
 		iterator:    iter,
 		catalog:     ct,
@@ -27,10 +27,14 @@ func newSecondaryIterator(
 	}
 }
 
-// next はセカンダリインデックスから次の結果を返す
+func (si *SecondaryIterator) Close() {
+	si.iterator.Close()
+}
+
+// Next はセカンダリインデックスから次の結果を返す
 // (secondary-index -> primary-index の順で検索する)
 //   - return: 検索結果, データがあるか
-func (si *secondaryIterator) next() (*primaryRecord, bool, error) {
+func (si *SecondaryIterator) Next() (*PrimaryRecord, bool, error) {
 	for {
 		secondaryRecord, err := si.nextVisibleSecondaryRecord()
 		if err != nil {
@@ -46,8 +50,9 @@ func (si *secondaryIterator) next() (*primaryRecord, bool, error) {
 			return nil, false, err
 		}
 
-		pi := newPrimaryIterator(iter, si.catalog, si.primaryTree.MetaPageId().FileId)
-		result, found, err := pi.next()
+		pi := NewPrimaryIterator(iter, si.catalog, si.primaryTree.MetaPageId().FileId)
+		result, found, err := pi.Next()
+		pi.Close()
 		if err != nil {
 			return nil, false, err
 		}
@@ -58,9 +63,9 @@ func (si *secondaryIterator) next() (*primaryRecord, bool, error) {
 	}
 }
 
-// nextIndexOnly はセカンダリインデックスのみを検索して次の結果を返す
+// NextIndexOnly はセカンダリインデックスのみを検索して次の結果を返す
 //   - return: 検索結果, データがあるか
-func (si *secondaryIterator) nextIndexOnly() (*secondaryRecord, bool, error) {
+func (si *SecondaryIterator) NextIndexOnly() (*SecondaryRecord, bool, error) {
 	record, err := si.nextVisibleSecondaryRecord()
 	if err != nil {
 		return nil, false, err
@@ -72,7 +77,7 @@ func (si *secondaryIterator) nextIndexOnly() (*secondaryRecord, bool, error) {
 }
 
 // nextVisibleSecondaryRecord は削除済みレコードをスキップして次の可視セカンダリレコードを返す
-func (si *secondaryIterator) nextVisibleSecondaryRecord() (*secondaryRecord, error) {
+func (si *SecondaryIterator) nextVisibleSecondaryRecord() (*SecondaryRecord, error) {
 	for {
 		record, ok, err := si.iterator.Next()
 		if err != nil {

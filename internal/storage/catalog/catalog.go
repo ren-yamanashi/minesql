@@ -89,14 +89,14 @@ func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
 		nextFileId:    nextFileId,
 		nextIndexId:   nextIndexId,
 		undoLogFileId: undoLogFileId,
-		tableMeta:     newTableMeta(bp, page.NewId(catalogFileId, tableMetaPageNumber)),
-		indexMeta:     newIndexMeta(bp, page.NewId(catalogFileId, indexMetaPageNumber)),
-		indexKeyColumnMeta: newIndexKeyColumnMeta(
+		tableMeta:     NewTableMeta(bp, page.NewId(catalogFileId, tableMetaPageNumber)),
+		indexMeta:     NewIndexMeta(bp, page.NewId(catalogFileId, indexMetaPageNumber)),
+		indexKeyColumnMeta: NewIndexKeyColumnMeta(
 			bp, page.NewId(catalogFileId, indexKeyColumnMetaPageNumber),
 		),
-		columnMeta:     newColumnMeta(bp, page.NewId(catalogFileId, columnMetaPageNumber)),
-		constraintMeta: newConstraintMeta(bp, page.NewId(catalogFileId, constraintMetaPageNumber)),
-		userMeta:       newUserMeta(bp, page.NewId(catalogFileId, userMetaPageNumber)),
+		columnMeta:     NewColumnMeta(bp, page.NewId(catalogFileId, columnMetaPageNumber)),
+		constraintMeta: NewConstraintMeta(bp, page.NewId(catalogFileId, constraintMetaPageNumber)),
+		userMeta:       NewUserMeta(bp, page.NewId(catalogFileId, userMetaPageNumber)),
 	}, nil
 }
 
@@ -117,27 +117,27 @@ func CreateCatalog(bp *buffer.Pool) (*Catalog, error) {
 		return nil, err
 	}
 
-	tableMeta, err := createTableMeta(bp)
+	tableMeta, err := CreateTableMeta(bp)
 	if err != nil {
 		return nil, err
 	}
-	indexMeta, err := createIndexMeta(bp)
+	indexMeta, err := CreateIndexMeta(bp)
 	if err != nil {
 		return nil, err
 	}
-	indexKeyColumnMeta, err := createIndexKeyColumnMeta(bp)
+	indexKeyColumnMeta, err := CreateIndexKeyColumnMeta(bp)
 	if err != nil {
 		return nil, err
 	}
-	columnMeta, err := createColumnMeta(bp)
+	columnMeta, err := CreateColumnMeta(bp)
 	if err != nil {
 		return nil, err
 	}
-	constraintMeta, err := createConstraintMeta(bp)
+	constraintMeta, err := CreateConstraintMeta(bp)
 	if err != nil {
 		return nil, err
 	}
-	userMeta, err := createUserMeta(bp)
+	userMeta, err := CreateUserMeta(bp)
 	if err != nil {
 		return nil, err
 	}

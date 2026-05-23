@@ -13,7 +13,7 @@ type IndexKeyColumnRecord struct {
 	position int    // インデックス上のカラム位置
 }
 
-func newIndexKeyColumnRecord(indexId IndexId, name string, pos int) IndexKeyColumnRecord {
+func NewIndexKeyColumnRecord(indexId IndexId, name string, pos int) IndexKeyColumnRecord {
 	return IndexKeyColumnRecord{
 		indexId:  indexId,
 		name:     name,
@@ -53,5 +53,5 @@ func decodeIndexKeyColumnRecord(record btree.Record) IndexKeyColumnRecord {
 	encode.Decode(record.NonKey(), &nonKey)
 	pos := int(binary.BigEndian.Uint32(nonKey[0]))
 
-	return newIndexKeyColumnRecord(indexId, name, pos)
+	return NewIndexKeyColumnRecord(indexId, name, pos)
 }

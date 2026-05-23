@@ -13,12 +13,17 @@ type Iterator struct {
 	slotNum    int         // 現在参照されているスロット番号
 }
 
-func newIterator(bufPool *buffer.Pool, bufPage buffer.Page, slotNum int) *Iterator {
+func NewIterator(bufPool *buffer.Pool, bufPage buffer.Page, slotNum int) *Iterator {
 	return &Iterator{
 		bufferPool: bufPool,
 		bufferPage: bufPage,
 		slotNum:    slotNum,
 	}
+}
+
+// Close はイテレータが保持しているバッファページの参照を解放する
+func (it *Iterator) Close() {
+	it.bufferPool.UnrefPage(it.bufferPage.PageId())
 }
 
 // Get は現在参照しているリーフノードのレコードを取得

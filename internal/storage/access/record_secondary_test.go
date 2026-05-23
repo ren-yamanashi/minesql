@@ -19,7 +19,7 @@ func TestNewSecondaryRecord(t *testing.T) {
 		ct := setupSecondaryTestCatalog(t)
 
 		// WHEN
-		sr, err := newSecondaryRecord(ct, newSecondaryRecordInput{
+		sr, err := NewSecondaryRecord(ct, NewSecondaryRecordInput{
 			fileId:     page.FileId(2),
 			deleteMark: 0,
 			indexName:  "idx_name",
@@ -41,7 +41,7 @@ func TestNewSecondaryRecord(t *testing.T) {
 		ct := setupSecondaryTestCatalog(t)
 
 		// WHEN
-		_, err := newSecondaryRecord(ct, newSecondaryRecordInput{
+		_, err := NewSecondaryRecord(ct, NewSecondaryRecordInput{
 			fileId:    page.FileId(2),
 			indexName: "idx_name",
 			colNames:  []string{"name", "extra"},
@@ -58,7 +58,7 @@ func TestNewSecondaryRecord(t *testing.T) {
 		ct := setupSecondaryTestCatalog(t)
 
 		// WHEN
-		_, err := newSecondaryRecord(ct, newSecondaryRecordInput{
+		_, err := NewSecondaryRecord(ct, NewSecondaryRecordInput{
 			fileId:    page.FileId(2),
 			indexName: "idx_name",
 			colNames:  []string{"nonexistent"},
@@ -75,7 +75,7 @@ func TestNewSecondaryRecord(t *testing.T) {
 		ct := setupSecondaryTestCatalog(t)
 
 		// WHEN
-		_, err := newSecondaryRecord(ct, newSecondaryRecordInput{
+		_, err := NewSecondaryRecord(ct, NewSecondaryRecordInput{
 			fileId:    page.FileId(2),
 			indexName: "idx_name_email",
 			colNames:  []string{"name", "name"},
@@ -92,7 +92,7 @@ func TestNewSecondaryRecord(t *testing.T) {
 		ct := setupSecondaryTestCatalog(t)
 
 		// WHEN
-		_, err := newSecondaryRecord(ct, newSecondaryRecordInput{
+		_, err := NewSecondaryRecord(ct, NewSecondaryRecordInput{
 			fileId:    page.FileId(2),
 			indexName: "idx_name",
 			colNames:  []string{"name", "email"},
@@ -108,7 +108,7 @@ func TestNewSecondaryRecord(t *testing.T) {
 func TestSecondaryRecordEncode(t *testing.T) {
 	t.Run("セカンダリキーとプライマリキーをエンコードしたレコードを返す", func(t *testing.T) {
 		// GIVEN
-		sr := &secondaryRecord{
+		sr := &SecondaryRecord{
 			deleteMark: 0x00,
 			values:     []string{"sk1"},
 			pk:         []string{"pk1"},
@@ -129,7 +129,7 @@ func TestSecondaryRecordEncode(t *testing.T) {
 
 	t.Run("複合セカンダリキーを正しくエンコードする", func(t *testing.T) {
 		// GIVEN
-		sr := &secondaryRecord{
+		sr := &SecondaryRecord{
 			deleteMark: 0x00,
 			values:     []string{"sk1", "sk2"},
 			pk:         []string{"pk1"},
@@ -146,7 +146,7 @@ func TestSecondaryRecordEncode(t *testing.T) {
 
 	t.Run("削除マークが設定される", func(t *testing.T) {
 		// GIVEN
-		sr := &secondaryRecord{
+		sr := &SecondaryRecord{
 			deleteMark: 0x01,
 			values:     []string{"sk1"},
 			pk:         []string{"pk1"},
@@ -161,7 +161,7 @@ func TestSecondaryRecordEncode(t *testing.T) {
 
 	t.Run("複合プライマリキーを正しくエンコードする", func(t *testing.T) {
 		// GIVEN
-		sr := &secondaryRecord{
+		sr := &SecondaryRecord{
 			deleteMark: 0x00,
 			values:     []string{"sk1"},
 			pk:         []string{"pk1", "pk2"},
@@ -180,7 +180,7 @@ func TestSecondaryRecordEncode(t *testing.T) {
 func TestSecondaryRecordEncodedSecondaryKey(t *testing.T) {
 	t.Run("エンコード済みのセカンダリキーのみを返す", func(t *testing.T) {
 		// GIVEN
-		sr := &secondaryRecord{
+		sr := &SecondaryRecord{
 			values: []string{"sk1"},
 			pk:     []string{"pk1"},
 		}
@@ -196,7 +196,7 @@ func TestSecondaryRecordEncodedSecondaryKey(t *testing.T) {
 
 	t.Run("複合セカンダリキーの場合も正しくエンコードする", func(t *testing.T) {
 		// GIVEN
-		sr := &secondaryRecord{
+		sr := &SecondaryRecord{
 			values: []string{"sk1", "sk2"},
 			pk:     []string{"pk1"},
 		}
@@ -215,7 +215,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 	t.Run("エンコードしたレコードをデコードすると元のデータに戻る", func(t *testing.T) {
 		// GIVEN
 		ct := setupSecondaryTestCatalog(t)
-		original, err := newSecondaryRecord(ct, newSecondaryRecordInput{
+		original, err := NewSecondaryRecord(ct, NewSecondaryRecordInput{
 			fileId:     page.FileId(2),
 			deleteMark: 0,
 			indexName:  "idx_name",
@@ -240,7 +240,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 	t.Run("削除マーク付きレコードをデコードできる", func(t *testing.T) {
 		// GIVEN
 		ct := setupSecondaryTestCatalog(t)
-		original, err := newSecondaryRecord(ct, newSecondaryRecordInput{
+		original, err := NewSecondaryRecord(ct, NewSecondaryRecordInput{
 			fileId:     page.FileId(2),
 			deleteMark: 1,
 			indexName:  "idx_name",
@@ -262,7 +262,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 	t.Run("複合セカンダリキーのレコードをデコードできる", func(t *testing.T) {
 		// GIVEN
 		ct := setupSecondaryTestCatalog(t)
-		original, err := newSecondaryRecord(ct, newSecondaryRecordInput{
+		original, err := NewSecondaryRecord(ct, NewSecondaryRecordInput{
 			fileId:     page.FileId(2),
 			deleteMark: 0,
 			indexName:  "idx_name_email",

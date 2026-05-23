@@ -72,7 +72,7 @@ func TestSecondaryIndexSearch(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		result, ok, err := iter.nextIndexOnly()
+		result, ok, err := iter.NextIndexOnly()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, []string{"Alice"}, result.values)
@@ -144,7 +144,7 @@ func TestSecondaryIndexInsert(t *testing.T) {
 		// 論理削除
 		iter, err := si.search(SearchModeStart{})
 		assert.NoError(t, err)
-		record, ok, err := iter.nextIndexOnly()
+		record, ok, err := iter.NextIndexOnly()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		err = si.softDelete(record, testSecondaryTrxId)
@@ -169,7 +169,7 @@ func TestSecondaryIndexInsert(t *testing.T) {
 		// 論理削除
 		iter, err := si.search(SearchModeStart{})
 		assert.NoError(t, err)
-		record, ok, err := iter.nextIndexOnly()
+		record, ok, err := iter.NextIndexOnly()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		err = si.softDelete(record, testSecondaryTrxId)
@@ -211,7 +211,7 @@ func TestSecondaryIndexDelete(t *testing.T) {
 		_ = si.insert(r, testSecondaryTrxId)
 
 		iter, _ := si.search(SearchModeStart{})
-		record, _, _ := iter.nextIndexOnly()
+		record, _, _ := iter.NextIndexOnly()
 
 		// WHEN
 		err := si.delete(record, testSecondaryTrxId)
@@ -221,14 +221,14 @@ func TestSecondaryIndexDelete(t *testing.T) {
 
 		// 削除後は取得できない
 		iter2, _ := si.search(SearchModeStart{})
-		_, ok, _ := iter2.nextIndexOnly()
+		_, ok, _ := iter2.NextIndexOnly()
 		assert.False(t, ok)
 	})
 
 	t.Run("存在しないレコードの削除はエラーを返す", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
-		sr := &secondaryRecord{
+		sr := &SecondaryRecord{
 			colNames: []string{"name"},
 			values:   []string{"nonexistent"},
 			pk:       []string{"999"},
@@ -250,7 +250,7 @@ func TestSecondaryIndexSoftDelete(t *testing.T) {
 		_ = si.insert(r, testSecondaryTrxId)
 
 		iter, _ := si.search(SearchModeStart{})
-		record, _, _ := iter.nextIndexOnly()
+		record, _, _ := iter.NextIndexOnly()
 
 		// WHEN
 		err := si.softDelete(record, testSecondaryTrxId)
@@ -260,7 +260,7 @@ func TestSecondaryIndexSoftDelete(t *testing.T) {
 
 		// 論理削除後は検索でスキップされる
 		iter2, _ := si.search(SearchModeStart{})
-		_, ok, _ := iter2.nextIndexOnly()
+		_, ok, _ := iter2.NextIndexOnly()
 		assert.False(t, ok)
 	})
 
@@ -271,7 +271,7 @@ func TestSecondaryIndexSoftDelete(t *testing.T) {
 		_ = si.insert(r, testSecondaryTrxId)
 
 		iter, _ := si.search(SearchModeStart{})
-		record, _, _ := iter.nextIndexOnly()
+		record, _, _ := iter.NextIndexOnly()
 		_ = si.softDelete(record, testSecondaryTrxId)
 
 		r2 := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
@@ -347,7 +347,7 @@ func TestSecondaryIndexCheckUnique(t *testing.T) {
 
 		// 論理削除
 		iter, _ := si.search(SearchModeStart{})
-		record, _, _ := iter.nextIndexOnly()
+		record, _, _ := iter.NextIndexOnly()
 		_ = si.softDelete(record, testSecondaryTrxId)
 
 		r2 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"2"})
@@ -379,9 +379,9 @@ func setupTestSecondaryIndex(t *testing.T, indexName string, unique bool) *secon
 }
 
 // buildTestSecondaryRecord はテスト用の SecondaryRecord を構築する
-func buildTestSecondaryRecord(t *testing.T, si *secondaryIndex, colNames, values, pk []string) *secondaryRecord {
+func buildTestSecondaryRecord(t *testing.T, si *secondaryIndex, colNames, values, pk []string) *SecondaryRecord {
 	t.Helper()
-	sr, err := newSecondaryRecord(si.catalog, newSecondaryRecordInput{
+	sr, err := NewSecondaryRecord(si.catalog, NewSecondaryRecordInput{
 		fileId:     si.fileId,
 		deleteMark: 0,
 		indexName:  si.indexName,

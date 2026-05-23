@@ -140,7 +140,7 @@ func TestLeafPageIds(t *testing.T) {
 		bt, _ := CreateTree(bp, page.FileId(0))
 
 		// WHEN
-		pageIds, err := bt.LeafPageIds()
+		pageIds, err := bt.leafPageIds()
 
 		// THEN
 		assert.NoError(t, err)
@@ -160,7 +160,7 @@ func TestLeafPageIds(t *testing.T) {
 		leafCount, _ := bt.LeafPageCount()
 
 		// WHEN
-		pageIds, err := bt.LeafPageIds()
+		pageIds, err := bt.leafPageIds()
 
 		// THEN
 		assert.NoError(t, err)

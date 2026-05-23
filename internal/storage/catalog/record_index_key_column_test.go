@@ -9,7 +9,7 @@ import (
 func TestIndexKeyColumnRecordIndexId(t *testing.T) {
 	t.Run("コンストラクタで指定したインデックス ID を返す", func(t *testing.T) {
 		// GIVEN
-		kcr := newIndexKeyColumnRecord(IndexId(1), "name", 0)
+		kcr := NewIndexKeyColumnRecord(IndexId(1), "name", 0)
 
 		// WHEN
 		got := kcr.IndexId()
@@ -22,7 +22,7 @@ func TestIndexKeyColumnRecordIndexId(t *testing.T) {
 func TestIndexKeyColumnRecordName(t *testing.T) {
 	t.Run("コンストラクタで指定したカラム名を返す", func(t *testing.T) {
 		// GIVEN
-		kcr := newIndexKeyColumnRecord(IndexId(1), "name", 0)
+		kcr := NewIndexKeyColumnRecord(IndexId(1), "name", 0)
 
 		// WHEN
 		got := kcr.Name()
@@ -35,7 +35,7 @@ func TestIndexKeyColumnRecordName(t *testing.T) {
 func TestIndexKeyColumnRecordPosition(t *testing.T) {
 	t.Run("コンストラクタで指定したカラム位置を返す", func(t *testing.T) {
 		// GIVEN
-		kcr := newIndexKeyColumnRecord(IndexId(1), "name", 3)
+		kcr := NewIndexKeyColumnRecord(IndexId(1), "name", 3)
 
 		// WHEN
 		got := kcr.Position()
@@ -48,7 +48,7 @@ func TestIndexKeyColumnRecordPosition(t *testing.T) {
 func TestIndexKeyColumnRecordEncode(t *testing.T) {
 	t.Run("インデックスキーカラムレコードをエンコードできる", func(t *testing.T) {
 		// GIVEN
-		kcr := newIndexKeyColumnRecord(IndexId(1), "name", 0)
+		kcr := NewIndexKeyColumnRecord(IndexId(1), "name", 0)
 
 		// WHEN
 		record := kcr.encode()
@@ -61,7 +61,7 @@ func TestIndexKeyColumnRecordEncode(t *testing.T) {
 
 	t.Run("エンコードした結果をデコードすると元のデータに戻る", func(t *testing.T) {
 		// GIVEN
-		original := newIndexKeyColumnRecord(IndexId(10), "email", 2)
+		original := NewIndexKeyColumnRecord(IndexId(10), "email", 2)
 
 		// WHEN
 		record := original.encode()
@@ -75,7 +75,7 @@ func TestIndexKeyColumnRecordEncode(t *testing.T) {
 
 	t.Run("カラム位置が 0 の場合も正しくエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
-		original := newIndexKeyColumnRecord(IndexId(5), "id", 0)
+		original := NewIndexKeyColumnRecord(IndexId(5), "id", 0)
 
 		// WHEN
 		record := original.encode()
@@ -89,7 +89,7 @@ func TestIndexKeyColumnRecordEncode(t *testing.T) {
 
 	t.Run("IndexId が 0 の場合も正しくエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
-		original := newIndexKeyColumnRecord(IndexId(0), "col", 3)
+		original := NewIndexKeyColumnRecord(IndexId(0), "col", 3)
 
 		// WHEN
 		record := original.encode()
@@ -105,7 +105,7 @@ func TestIndexKeyColumnRecordEncode(t *testing.T) {
 func TestDecodeIndexKeyColumnRecord(t *testing.T) {
 	t.Run("エンコード済みレコードからインデックス ID とカラム名を復元できる", func(t *testing.T) {
 		// GIVEN
-		kcr := newIndexKeyColumnRecord(IndexId(42), "age", 5)
+		kcr := NewIndexKeyColumnRecord(IndexId(42), "age", 5)
 		record := kcr.encode()
 
 		// WHEN
@@ -118,7 +118,7 @@ func TestDecodeIndexKeyColumnRecord(t *testing.T) {
 
 	t.Run("エンコード済みレコードからカラム位置を復元できる", func(t *testing.T) {
 		// GIVEN
-		kcr := newIndexKeyColumnRecord(IndexId(1), "status", 7)
+		kcr := NewIndexKeyColumnRecord(IndexId(1), "status", 7)
 		record := kcr.encode()
 
 		// WHEN

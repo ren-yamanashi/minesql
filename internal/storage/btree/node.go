@@ -4,9 +4,14 @@ import "github.com/ren-yamanashi/minesql/internal/storage/page"
 
 const nodeHeaderSize = 8
 
+const (
+	nodeTypeLeaf   = "LEAF    "
+	nodeTypeBranch = "BRANCH  "
+)
+
 var (
-	nodeTypeLeaf   = []byte("LEAF    ")
-	nodeTypeBranch = []byte("BRANCH  ")
+	_ node = (*leafNode)(nil)
+	_ node = (*branchNode)(nil)
 )
 
 type node interface {
@@ -21,6 +26,6 @@ type node interface {
 }
 
 // ページデータからノードタイプを取得する
-func nodeType(pg *page.Page) []byte {
-	return pg.Body[0:8]
+func nodeType(pg *page.Page) string {
+	return string(pg.Body[:nodeHeaderSize])
 }

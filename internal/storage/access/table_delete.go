@@ -6,7 +6,7 @@ import (
 )
 
 // SoftDelete はテーブルの行を論理削除する
-func (t *Table) SoftDelete(record *primaryRecord, trxId lock.TrxId) error {
+func (t *Table) SoftDelete(record *PrimaryRecord, trxId lock.TrxId) error {
 	// Undo ログを更新
 	undoRecord := undo.NewDeleteRecord(t.primaryIndex.fileId(), record.encode(), record.lastTrxId, record.rollPtr)
 	ptr, err := t.undoLog.Append(trxId, undo.RecordTypeDelete, undoRecord)
@@ -24,7 +24,7 @@ func (t *Table) SoftDelete(record *primaryRecord, trxId lock.TrxId) error {
 
 // Delete はテーブルの行を物理削除する
 // (物理削除は DML 操作では行われないので、Undo ログの作成はしない)
-func (t *Table) Delete(record *primaryRecord, trxId lock.TrxId) error {
+func (t *Table) Delete(record *PrimaryRecord, trxId lock.TrxId) error {
 	if err := t.primaryIndex.delete(record, trxId); err != nil {
 		return err
 	}
@@ -32,21 +32,21 @@ func (t *Table) Delete(record *primaryRecord, trxId lock.TrxId) error {
 }
 
 // softDeleteSecondaryIndexes は全セカンダリインデックスのレコードを論理削除する
-func (t *Table) softDeleteSecondaryIndexes(record *primaryRecord, trxId lock.TrxId) error {
-	return t.forEachSecondaryRecord(record, func(si *secondaryIndex, sr *secondaryRecord) error {
+func (t *Table) softDeleteSecondaryIndexes(record *PrimaryRecord, trxId lock.TrxId) error {
+	return t.forEachSecondaryRecord(record, func(si *secondaryIndex, sr *SecondaryRecord) error {
 		return si.softDelete(sr, trxId)
 	})
 }
 
 // deleteSecondaryIndexes は全セカンダリインデックスのレコードを物理削除する
-func (t *Table) deleteSecondaryIndexes(record *primaryRecord, trxId lock.TrxId) error {
-	return t.forEachSecondaryRecord(record, func(si *secondaryIndex, sr *secondaryRecord) error {
+func (t *Table) deleteSecondaryIndexes(record *PrimaryRecord, trxId lock.TrxId) error {
+	return t.forEachSecondaryRecord(record, func(si *secondaryIndex, sr *SecondaryRecord) error {
 		return si.delete(sr, trxId)
 	})
 }
 
 // forEachSecondaryRecord は PrimaryRecord から各セカンダリインデックス用のレコードを構築し、コールバックを適用する
-func (t *Table) forEachSecondaryRecord(record *primaryRecord, op func(*secondaryIndex, *secondaryRecord) error) error {
+func (t *Table) forEachSecondaryRecord(record *PrimaryRecord, op func(*secondaryIndex, *SecondaryRecord) error) error {
 	valMap := t.buildValMap(record.colNames, record.values)
 	pk := t.extractPrimaryKey(record.values)
 

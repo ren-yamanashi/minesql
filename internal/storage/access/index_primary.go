@@ -56,17 +56,17 @@ func createPrimaryIndex(
 }
 
 // search は指定した検索モードでテーブルを検索し、イテレータを返す
-func (pi *primaryIndex) search(mode SearchMode) (*primaryIterator, error) {
+func (pi *primaryIndex) search(mode SearchMode) (*PrimaryIterator, error) {
 	iter, err := pi.tree.Search(mode.encode())
 	if err != nil {
 		return nil, err
 	}
-	return newPrimaryIterator(iter, pi.catalog, pi.tree.MetaPageId().FileId), nil
+	return NewPrimaryIterator(iter, pi.catalog, pi.tree.MetaPageId().FileId), nil
 }
 
 // insert は行を挿入する
 // (論理削除済みの同一キーが存在する場合は上書きする)
-func (pi *primaryIndex) insert(record *primaryRecord, trxId lock.TrxId) error {
+func (pi *primaryIndex) insert(record *PrimaryRecord, trxId lock.TrxId) error {
 	// 挿入
 	encodedRecord := record.encode()
 	err := pi.tree.Insert(encodedRecord)
@@ -99,7 +99,7 @@ func (pi *primaryIndex) insert(record *primaryRecord, trxId lock.TrxId) error {
 }
 
 // delete は 行を物理削除する
-func (pi *primaryIndex) delete(record *primaryRecord, trxId lock.TrxId) error {
+func (pi *primaryIndex) delete(record *PrimaryRecord, trxId lock.TrxId) error {
 	// 排他ロックを取得
 	encodedRecord := record.encode()
 	_, pos, err := pi.tree.FindByKey(encodedRecord.Key())
@@ -115,7 +115,7 @@ func (pi *primaryIndex) delete(record *primaryRecord, trxId lock.TrxId) error {
 }
 
 // softDelete は行を論理削除する
-func (pi *primaryIndex) softDelete(record *primaryRecord, trxId lock.TrxId) error {
+func (pi *primaryIndex) softDelete(record *PrimaryRecord, trxId lock.TrxId) error {
 	// 排他ロックを取得
 	encodedRecord := record.encode()
 	_, pos, err := pi.tree.FindByKey(encodedRecord.Key())
@@ -128,7 +128,7 @@ func (pi *primaryIndex) softDelete(record *primaryRecord, trxId lock.TrxId) erro
 
 	// 論理削除
 	// deleteMark を 1 にしたレコードで上書き
-	deleted, err := newPrimaryRecord(pi.catalog, newPrimaryRecordInput{
+	deleted, err := NewPrimaryRecord(pi.catalog, NewPrimaryRecordInput{
 		fileId:     pi.tree.MetaPageId().FileId,
 		pkCount:    record.pkCount,
 		deleteMark: 1,
@@ -144,7 +144,7 @@ func (pi *primaryIndex) softDelete(record *primaryRecord, trxId lock.TrxId) erro
 }
 
 // update は行を更新する
-func (pi *primaryIndex) update(newRecord *primaryRecord, trxId lock.TrxId) error {
+func (pi *primaryIndex) update(newRecord *PrimaryRecord, trxId lock.TrxId) error {
 	// 排他ロックを取得
 	encodedRecord := newRecord.encode()
 	_, pos, err := pi.tree.FindByKey(encodedRecord.Key())

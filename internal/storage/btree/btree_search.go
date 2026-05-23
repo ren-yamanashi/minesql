@@ -2,7 +2,6 @@ package btree
 
 import (
 	"bytes"
-	"errors"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
@@ -31,9 +30,9 @@ func (t *Tree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator
 	}
 	nt := nodeType(bufPage.Data())
 
-	switch {
+	switch nt {
 	// ブランチノードの場合、子ノードに対して再帰探索する
-	case bytes.Equal(nt, nodeTypeBranch):
+	case nodeTypeBranch:
 		defer t.bufferPool.UnrefPage(nodePageId)
 		branchNode := newBranchNode(bufPage.Data())
 		childPageId, err := mode.childPageId(branchNode)
@@ -43,10 +42,10 @@ func (t *Tree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator
 		return t.searchRecursively(childPageId, mode)
 
 	// リーフノードの場合、検索モードに応じて探索する
-	case bytes.Equal(nt, nodeTypeLeaf):
+	case nodeTypeLeaf:
 		leafNode := newLeafNode(bufPage.Data())
 		slotNum := mode.slotNum(leafNode)
-		iter := newIterator(t.bufferPool, *bufPage, slotNum)
+		iter := NewIterator(t.bufferPool, *bufPage, slotNum)
 		// 検索対象のキーが現在のリーフノードの末端のレコードより大きい場合、次のリーフノードに進める
 		// 例: リーフノードに (1, ...), (3, ...), (5, ...) のレコードが格納されている場合に、キー 6 を検索したいときなど
 		// (この場合 SearchSlotNum は NumRecords と等しい値を返す)
@@ -60,7 +59,7 @@ func (t *Tree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator
 		return iter, nil
 
 	default:
-		return nil, errors.New("unknown node type")
+		return nil, errUnknownNodeType
 	}
 }
 
@@ -87,8 +86,8 @@ func (t *Tree) FindByKey(key []byte) (Record, RecordPosition, error) {
 	return record, position, nil
 }
 
-// LeafPageIds はブランチページのみ辿り、全リーフページの PageId を収集する
-func (t *Tree) LeafPageIds() ([]page.Id, error) {
+// leafPageIds はブランチページのみ辿り、全リーフページの PageId を収集する
+func (t *Tree) leafPageIds() ([]page.Id, error) {
 	pageMeta, err := t.bufferPool.PageForRead(t.MetaPageId())
 	if err != nil {
 		return nil, err
@@ -107,7 +106,7 @@ func (t *Tree) LeafPageIds() ([]page.Id, error) {
 	// 幅優先でブランチレベルを 1 つずつ降りていく
 	currentLevel := []page.Id{rootPageId}
 	for range height - 1 {
-		var nextLevel []page.Id
+		nextLevel := []page.Id{}
 		for _, nodePageId := range currentLevel {
 			pg, err := t.bufferPool.PageForRead(nodePageId)
 			if err != nil {

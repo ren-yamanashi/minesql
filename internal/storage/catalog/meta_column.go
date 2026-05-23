@@ -10,11 +10,11 @@ type ColumnMeta struct {
 	tree *btree.Tree // カラムメタデータが格納される B+Tree
 }
 
-func newColumnMeta(bp *buffer.Pool, metaPageId page.Id) *ColumnMeta {
+func NewColumnMeta(bp *buffer.Pool, metaPageId page.Id) *ColumnMeta {
 	return &ColumnMeta{tree: btree.NewTree(bp, metaPageId)}
 }
 
-func createColumnMeta(bp *buffer.Pool) (*ColumnMeta, error) {
+func CreateColumnMeta(bp *buffer.Pool) (*ColumnMeta, error) {
 	tree, err := btree.CreateTree(bp, catalogFileId)
 	if err != nil {
 		return nil, err
@@ -23,12 +23,12 @@ func createColumnMeta(bp *buffer.Pool) (*ColumnMeta, error) {
 }
 
 // Search は指定した検索モードでメタデータを検索し、イテレータを返す
-func (cm *ColumnMeta) Search(mode SearchMode) (*columnIterator, error) {
+func (cm *ColumnMeta) Search(mode SearchMode) (*ColumnIterator, error) {
 	iter, err := cm.tree.Search(mode.encode())
 	if err != nil {
 		return nil, err
 	}
-	return newColumnIterator(iter), nil
+	return NewColumnIterator(iter), nil
 }
 
 // Insert はレコードを挿入する
@@ -36,6 +36,6 @@ func (cm *ColumnMeta) Search(mode SearchMode) (*columnIterator, error) {
 //   - name: カラム名
 //   - pos: テーブル上のカラム位置
 func (cm *ColumnMeta) Insert(fileId page.FileId, name string, pos int) error {
-	record := newColumnRecord(fileId, name, pos)
+	record := NewColumnRecord(fileId, name, pos)
 	return cm.tree.Insert(record.encode())
 }

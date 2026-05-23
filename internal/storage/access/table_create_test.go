@@ -66,7 +66,7 @@ func TestCreateTable(t *testing.T) {
 		assert.NoError(t, err)
 		iter, err := table.primaryIndex.search(SearchModeStart{})
 		assert.NoError(t, err)
-		record, ok, err := iter.next()
+		record, ok, err := iter.Next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, record.values)

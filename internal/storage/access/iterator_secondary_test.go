@@ -22,7 +22,7 @@ func TestSecondaryIteratorNext(t *testing.T) {
 		iter := searchSecondaryIndex(t, env)
 
 		// WHEN
-		result, ok, err := iter.next()
+		result, ok, err := iter.Next()
 
 		// THEN
 		assert.NoError(t, err)
@@ -41,9 +41,9 @@ func TestSecondaryIteratorNext(t *testing.T) {
 		iter := searchSecondaryIndex(t, env)
 
 		// WHEN
-		r1, ok1, err1 := iter.next()
-		r2, ok2, err2 := iter.next()
-		_, ok3, err3 := iter.next()
+		r1, ok1, err1 := iter.Next()
+		r2, ok2, err2 := iter.Next()
+		_, ok3, err3 := iter.Next()
 
 		// THEN
 		assert.NoError(t, err1)
@@ -69,8 +69,8 @@ func TestSecondaryIteratorNext(t *testing.T) {
 		iter := searchSecondaryIndex(t, env)
 
 		// WHEN
-		r1, ok1, err1 := iter.next()
-		_, ok2, err2 := iter.next()
+		r1, ok1, err1 := iter.Next()
+		_, ok2, err2 := iter.Next()
 
 		// THEN
 		assert.NoError(t, err1)
@@ -89,7 +89,7 @@ func TestSecondaryIteratorNext(t *testing.T) {
 		iter := searchSecondaryIndex(t, env)
 
 		// WHEN
-		_, ok, err := iter.next()
+		_, ok, err := iter.Next()
 
 		// THEN
 		assert.NoError(t, err)
@@ -102,7 +102,7 @@ func TestSecondaryIteratorNext(t *testing.T) {
 		iter := searchSecondaryIndex(t, env)
 
 		// WHEN
-		_, ok, err := iter.next()
+		_, ok, err := iter.Next()
 
 		// THEN
 		assert.NoError(t, err)
@@ -119,7 +119,7 @@ func TestSecondaryIteratorNextIndexOnly(t *testing.T) {
 		iter := searchSecondaryIndex(t, env)
 
 		// WHEN
-		result, ok, err := iter.nextIndexOnly()
+		result, ok, err := iter.NextIndexOnly()
 
 		// THEN
 		assert.NoError(t, err)
@@ -138,7 +138,7 @@ func TestSecondaryIteratorNextIndexOnly(t *testing.T) {
 		iter := searchSecondaryIndex(t, env)
 
 		// WHEN
-		result, ok, err := iter.nextIndexOnly()
+		result, ok, err := iter.NextIndexOnly()
 
 		// THEN
 		assert.NoError(t, err)
@@ -152,7 +152,7 @@ func TestSecondaryIteratorNextIndexOnly(t *testing.T) {
 		iter := searchSecondaryIndex(t, env)
 
 		// WHEN
-		_, ok, err := iter.nextIndexOnly()
+		_, ok, err := iter.NextIndexOnly()
 
 		// THEN
 		assert.NoError(t, err)
@@ -237,7 +237,7 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 // insertPrimaryRecord はプライマリ B+Tree にレコードを挿入する (pkCount=1)
 func insertPrimaryRecord(t *testing.T, env *iteratorTestEnv, deleteMark byte, colNames, values []string) {
 	t.Helper()
-	pr, err := newPrimaryRecord(env.ct, newPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: deleteMark, colNames: colNames, values: values})
+	pr, err := NewPrimaryRecord(env.ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: deleteMark, colNames: colNames, values: values})
 	if err != nil {
 		t.Fatalf("PrimaryRecord の作成に失敗: %v", err)
 	}
@@ -255,7 +255,7 @@ func insertSecondaryRecord(t *testing.T, env *iteratorTestEnv, colNames, values,
 // insertSecondaryRecordWithDeleteMark はセカンダリ B+Tree に指定した deleteMark でレコードを挿入する
 func insertSecondaryRecordWithDeleteMark(t *testing.T, env *iteratorTestEnv, deleteMark byte, colNames, values, pk []string) {
 	t.Helper()
-	sr, err := newSecondaryRecord(env.ct, newSecondaryRecordInput{
+	sr, err := NewSecondaryRecord(env.ct, NewSecondaryRecordInput{
 		fileId:     page.FileId(2),
 		deleteMark: deleteMark,
 		indexName:  "idx_name",
@@ -272,12 +272,12 @@ func insertSecondaryRecordWithDeleteMark(t *testing.T, env *iteratorTestEnv, del
 }
 
 // searchSecondaryIndex はセカンダリ B+Tree を先頭から検索してイテレータを返す
-func searchSecondaryIndex(t *testing.T, env *iteratorTestEnv) *secondaryIterator {
+func searchSecondaryIndex(t *testing.T, env *iteratorTestEnv) *SecondaryIterator {
 	t.Helper()
 	mode := SearchModeStart{}
 	iter, err := env.secondaryTree.Search(mode.encode())
 	if err != nil {
 		t.Fatalf("セカンダリインデックスの検索に失敗: %v", err)
 	}
-	return newSecondaryIterator("idx_name", iter, env.ct, env.primaryTree)
+	return NewSecondaryIterator("idx_name", iter, env.ct, env.primaryTree)
 }

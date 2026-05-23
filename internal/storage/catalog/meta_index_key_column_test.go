@@ -13,7 +13,7 @@ func TestCreateIndexKeyColumnMeta(t *testing.T) {
 		bp := setupDictTestBufferPool(t)
 
 		// WHEN
-		kcm, err := createIndexKeyColumnMeta(bp)
+		kcm, err := CreateIndexKeyColumnMeta(bp)
 
 		// THEN
 		assert.NoError(t, err)
@@ -110,7 +110,7 @@ func TestIndexKeyColumnMetaSearch(t *testing.T) {
 func setupTestIndexKeyColumnMeta(t *testing.T) *IndexKeyColumnMeta {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
-	kcm, err := createIndexKeyColumnMeta(bp)
+	kcm, err := CreateIndexKeyColumnMeta(bp)
 	if err != nil {
 		t.Fatalf("IndexKeyColumnMeta の作成に失敗: %v", err)
 	}

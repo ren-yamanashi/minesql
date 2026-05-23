@@ -1,6 +1,7 @@
 package btree
 
 import (
+	"bytes"
 	"errors"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -24,7 +25,6 @@ type leafNode struct {
 
 func newLeafNode(pg *page.Page) *leafNode {
 	data := pg.Body
-	copy(data[0:nodeHeaderSize], nodeTypeLeaf)
 	headerSize := nodeHeaderSize + leafNodeHeaderSize
 	header := data[:headerSize]
 	body := newSlottedPage(data[headerSize:])
@@ -38,6 +38,7 @@ func newLeafNode(pg *page.Page) *leafNode {
 //
 // 初期化時には、ノードタイプヘッダーを設定し、前後のリーフノードのポインタ (PageId) には無効値が設定される
 func (ln *leafNode) initialize() {
+	copy(ln.header[:nodeHeaderSize], nodeTypeLeaf)
 	page.InvalidId.WriteTo(ln.header[nodeHeaderSize:], leafNodePrevPageIdOffset)
 	page.InvalidId.WriteTo(ln.header[nodeHeaderSize:], leafNodeNextPageIdOffset)
 	ln.body.initialize()
@@ -48,7 +49,7 @@ func (ln *leafNode) initialize() {
 //   - record: 挿入するレコード
 //   - return: 挿入に成功した場合は true
 func (ln *leafNode) insert(slotNum int, record Record) bool {
-	recordBytes := record.ToBytes()
+	recordBytes := record.toBytes()
 	if len(recordBytes) > ln.maxRecordSize() {
 		return false
 	}
@@ -71,7 +72,7 @@ func (ln *leafNode) splitInsert(newLeaf *leafNode, newRecord Record) ([]byte, er
 		}
 
 		// `古いノードの先頭レコードのキー < 挿入対象のキー` の場合
-		if ln.record(0).CompareKey(newRecord.Key()) < 0 {
+		if ln.record(0).compareKey(newRecord.Key()) < 0 {
 			if err := ln.transfer(newLeaf); err != nil {
 				return nil, err
 			}
@@ -89,7 +90,7 @@ func (ln *leafNode) splitInsert(newLeaf *leafNode, newRecord Record) ([]byte, er
 		}
 		break
 	}
-	return ln.record(0).Key(), nil
+	return bytes.Clone(ln.record(0).Key()), nil
 }
 
 // delete はレコードを削除する
@@ -101,7 +102,7 @@ func (ln *leafNode) delete(slotNum int) {
 //   - slotNum: 更新するレコードのスロット番号
 //   - record: 新しいレコード (key は変更されない前提)
 func (ln *leafNode) update(slotNum int, record Record) bool {
-	return ln.body.update(slotNum, record.ToBytes())
+	return ln.body.update(slotNum, record.toBytes())
 }
 
 // numRecords はレコード数を取得する
@@ -136,7 +137,7 @@ func (ln *leafNode) record(slotNum int) Record {
 
 // searchSlotNum は指定された key に対応するスロット番号を検索する
 //   - 見つかった場合: (スロット番号, true)
-//   - 見つからなかった場合: (0, false)
+//   - 見つからなかった場合: (挿入すべき位置, false)
 func (ln *leafNode) searchSlotNum(key []byte) (int, bool) {
 	return binarySearch(ln, key)
 }

@@ -9,7 +9,7 @@ import (
 func TestUserRecordUsername(t *testing.T) {
 	t.Run("コンストラクタで指定したユーザー名を返す", func(t *testing.T) {
 		// GIVEN
-		ur := newUserRecord("alice", "localhost", []byte("authdata"))
+		ur := NewUserRecord("alice", "localhost", []byte("authdata"))
 
 		// WHEN
 		got := ur.Username()
@@ -22,7 +22,7 @@ func TestUserRecordUsername(t *testing.T) {
 func TestUserRecordHost(t *testing.T) {
 	t.Run("コンストラクタで指定したホスト名を返す", func(t *testing.T) {
 		// GIVEN
-		ur := newUserRecord("alice", "localhost", []byte("authdata"))
+		ur := NewUserRecord("alice", "localhost", []byte("authdata"))
 
 		// WHEN
 		got := ur.Host()
@@ -36,7 +36,7 @@ func TestUserRecordAuthString(t *testing.T) {
 	t.Run("コンストラクタで指定した認証文字列を返す", func(t *testing.T) {
 		// GIVEN
 		authString := []byte{0xAB, 0xCD, 0xEF}
-		ur := newUserRecord("alice", "localhost", authString)
+		ur := NewUserRecord("alice", "localhost", authString)
 
 		// WHEN
 		got := ur.AuthString()
@@ -49,7 +49,7 @@ func TestUserRecordAuthString(t *testing.T) {
 func TestUserRecordEncode(t *testing.T) {
 	t.Run("ユーザーレコードをエンコードできる", func(t *testing.T) {
 		// GIVEN
-		ur := newUserRecord("alice", "localhost", []byte("authdata"))
+		ur := NewUserRecord("alice", "localhost", []byte("authdata"))
 
 		// WHEN
 		record := ur.encode()
@@ -62,7 +62,7 @@ func TestUserRecordEncode(t *testing.T) {
 
 	t.Run("エンコードした結果をデコードすると元のデータに戻る", func(t *testing.T) {
 		// GIVEN
-		original := newUserRecord("bob", "192.168.1.1", []byte{0xAB, 0xCD, 0xEF})
+		original := NewUserRecord("bob", "192.168.1.1", []byte{0xAB, 0xCD, 0xEF})
 
 		// WHEN
 		record := original.encode()
@@ -80,7 +80,7 @@ func TestUserRecordEncode(t *testing.T) {
 		for i := range 32 {
 			authString[i] = byte(i)
 		}
-		original := newUserRecord("user", "%", authString)
+		original := NewUserRecord("user", "%", authString)
 
 		// WHEN
 		record := original.encode()
@@ -94,7 +94,7 @@ func TestUserRecordEncode(t *testing.T) {
 
 	t.Run("ホスト名がワイルドカードの場合も正しくエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
-		original := newUserRecord("root", "%", []byte("secret"))
+		original := NewUserRecord("root", "%", []byte("secret"))
 
 		// WHEN
 		record := original.encode()
@@ -109,7 +109,7 @@ func TestUserRecordEncode(t *testing.T) {
 func TestDecodeUserRecord(t *testing.T) {
 	t.Run("エンコード済みレコードからユーザー名を復元できる", func(t *testing.T) {
 		// GIVEN
-		ur := newUserRecord("alice", "localhost", []byte("auth"))
+		ur := NewUserRecord("alice", "localhost", []byte("auth"))
 		record := ur.encode()
 
 		// WHEN
@@ -121,7 +121,7 @@ func TestDecodeUserRecord(t *testing.T) {
 
 	t.Run("エンコード済みレコードからホスト名と認証文字列を復元できる", func(t *testing.T) {
 		// GIVEN
-		ur := newUserRecord("bob", "10.0.0.1", []byte{0x01, 0x02, 0x03})
+		ur := NewUserRecord("bob", "10.0.0.1", []byte{0x01, 0x02, 0x03})
 		record := ur.encode()
 
 		// WHEN

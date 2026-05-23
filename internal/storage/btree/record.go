@@ -27,17 +27,17 @@ func (r Record) Header() []byte { return r[0] }
 func (r Record) Key() []byte    { return r[1] }
 func (r Record) NonKey() []byte { return r[2] }
 
-// CompareKey はレコードのキーと指定されたキーを比較する
+// compareKey はレコードのキーと指定されたキーを比較する
 //   - -1: record.Key < otherKey
 //   - 0:  record.Key == otherKey
 //   - 1:  record.Key > otherKey
-func (r Record) CompareKey(otherKey []byte) int {
+func (r Record) compareKey(otherKey []byte) int {
 	return bytes.Compare(r[1], otherKey)
 }
 
-// ToBytes はレコードをバイト列にシリアライズする
+// toBytes はレコードをバイト列にシリアライズする
 //   - フォーマット: [headerSize(2B)][keySize(2B)][header][key][nonKey]
-func (r Record) ToBytes() []byte {
+func (r Record) toBytes() []byte {
 	headerLen := len(r[0])
 	keyLen := len(r[1])
 	nonKeyLen := len(r[2])

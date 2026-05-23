@@ -14,7 +14,7 @@ type TableRecord struct {
 	columnCount int     // カラム数
 }
 
-func newTableRecord(name string, metaPageId page.Id, numOfCol int) TableRecord {
+func NewTableRecord(name string, metaPageId page.Id, numOfCol int) TableRecord {
 	return TableRecord{
 		name:        name,
 		metaPageId:  metaPageId,
@@ -54,5 +54,5 @@ func decodeTableRecord(record btree.Record) TableRecord {
 	metaPageId := page.ReadId(nonKey[0], 0)
 	numOfCol := int(binary.BigEndian.Uint32(nonKey[1]))
 
-	return newTableRecord(name, metaPageId, numOfCol)
+	return NewTableRecord(name, metaPageId, numOfCol)
 }

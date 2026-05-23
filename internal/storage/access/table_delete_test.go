@@ -20,7 +20,7 @@ func TestTableSoftDelete(t *testing.T) {
 		assert.NoError(t, err)
 		iter, err := table.primaryIndex.search(SearchModeStart{})
 		assert.NoError(t, err)
-		_, ok, err := iter.next()
+		_, ok, err := iter.Next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 	})
@@ -38,13 +38,13 @@ func TestTableSoftDelete(t *testing.T) {
 		idxName := findSecondaryIndex(t, table, "idx_name")
 		nameIter, err := idxName.search(SearchModeStart{})
 		assert.NoError(t, err)
-		_, ok, err := nameIter.next()
+		_, ok, err := nameIter.Next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
 		emailIter, err := idxEmail.search(SearchModeStart{})
 		assert.NoError(t, err)
-		_, ok, err = emailIter.next()
+		_, ok, err = emailIter.Next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 	})
@@ -95,7 +95,7 @@ func TestTableSoftDelete(t *testing.T) {
 		env := setupTableTestEnv(t)
 		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
 		assert.NoError(t, err)
-		fakeRecord := &primaryRecord{
+		fakeRecord := &PrimaryRecord{
 			pkCount:    1,
 			deleteMark: 0,
 			rollPtr:    undo.NullPointer,
@@ -146,7 +146,7 @@ func TestTableDelete(t *testing.T) {
 		assert.NoError(t, err)
 		iter, err := table.primaryIndex.search(SearchModeStart{})
 		assert.NoError(t, err)
-		_, ok, err := iter.next()
+		_, ok, err := iter.Next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 	})
@@ -164,13 +164,13 @@ func TestTableDelete(t *testing.T) {
 		idxName := findSecondaryIndex(t, table, "idx_name")
 		nameIter, err := idxName.search(SearchModeStart{})
 		assert.NoError(t, err)
-		_, ok, err := nameIter.next()
+		_, ok, err := nameIter.Next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
 		emailIter, err := idxEmail.search(SearchModeStart{})
 		assert.NoError(t, err)
-		_, ok, err = emailIter.next()
+		_, ok, err = emailIter.Next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 	})
@@ -201,7 +201,7 @@ func TestTableDelete(t *testing.T) {
 		env := setupTableTestEnv(t)
 		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
 		assert.NoError(t, err)
-		fakeRecord := &primaryRecord{
+		fakeRecord := &PrimaryRecord{
 			pkCount:    1,
 			deleteMark: 0,
 			rollPtr:    undo.NullPointer,

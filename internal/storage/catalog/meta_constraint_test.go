@@ -14,7 +14,7 @@ func TestCreateConstraintMeta(t *testing.T) {
 		bp := setupDictTestBufferPool(t)
 
 		// WHEN
-		cm, err := createConstraintMeta(bp)
+		cm, err := CreateConstraintMeta(bp)
 
 		// THEN
 		assert.NoError(t, err)
@@ -126,7 +126,7 @@ func TestConstraintMetaSearch(t *testing.T) {
 func setupTestConstraintMeta(t *testing.T) *ConstraintMeta {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
-	cm, err := createConstraintMeta(bp)
+	cm, err := CreateConstraintMeta(bp)
 	if err != nil {
 		t.Fatalf("ConstraintMeta の作成に失敗: %v", err)
 	}

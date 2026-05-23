@@ -1,9 +1,6 @@
 package btree
 
 import (
-	"bytes"
-	"errors"
-
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 )
 
@@ -37,7 +34,7 @@ func (t *Tree) Delete(key []byte) error {
 		return err
 	}
 	defer t.bufferPool.UnrefPage(bufPageRoot.PageId())
-	if underflow && bytes.Equal(nodeType(pageRoot.Data()), nodeTypeBranch) {
+	if underflow && nodeType(pageRoot.Data()) == nodeTypeBranch {
 		branch := newBranchNode(pageRoot.Data())
 		if branch.numRecords() == 0 {
 			isRootCollapsed = true
@@ -76,11 +73,12 @@ func (t *Tree) deleteRecursively(bufPage *buffer.Page, key []byte) (underflow bo
 	if err != nil {
 		return false, false, err
 	}
+	defer t.bufferPool.UnrefPage(bufPage.PageId())
 	nt := nodeType(pg.Data())
 
-	switch {
+	switch nt {
 	// ブランチノードの場合: 子ノードに対して再帰実行する
-	case bytes.Equal(nt, nodeTypeBranch):
+	case nodeTypeBranch:
 		// 削除先の子ノードを取得
 		branchNode := newBranchNode(pg.Data())
 		childSlotNum, found := branchNode.searchSlotNum(key)
@@ -111,7 +109,7 @@ func (t *Tree) deleteRecursively(bufPage *buffer.Page, key []byte) (underflow bo
 		return uf, isLeafMerged || lm, err
 
 	// リーフノードの場合: そのまま削除する
-	case bytes.Equal(nt, nodeTypeLeaf):
+	case nodeTypeLeaf:
 		leafNode := newLeafNode(pg.Data())
 		slotNum, found := leafNode.searchSlotNum(key)
 		if !found {
@@ -121,6 +119,6 @@ func (t *Tree) deleteRecursively(bufPage *buffer.Page, key []byte) (underflow bo
 		return !leafNode.isHalfFull(), false, nil
 
 	default:
-		return false, false, errors.New("unknown node type")
+		return false, false, errUnknownNodeType
 	}
 }

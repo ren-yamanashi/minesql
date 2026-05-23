@@ -10,11 +10,11 @@ type TableMeta struct {
 	tree *btree.Tree // テーブルメタデータが格納される B+Tree
 }
 
-func newTableMeta(bp *buffer.Pool, metaPageId page.Id) *TableMeta {
+func NewTableMeta(bp *buffer.Pool, metaPageId page.Id) *TableMeta {
 	return &TableMeta{tree: btree.NewTree(bp, metaPageId)}
 }
 
-func createTableMeta(bp *buffer.Pool) (*TableMeta, error) {
+func CreateTableMeta(bp *buffer.Pool) (*TableMeta, error) {
 	tree, err := btree.CreateTree(bp, catalogFileId)
 	if err != nil {
 		return nil, err
@@ -23,12 +23,12 @@ func createTableMeta(bp *buffer.Pool) (*TableMeta, error) {
 }
 
 // Search は指定した検索モードでメタデータを検索し、イテレータを返す
-func (tm *TableMeta) Search(mode SearchMode) (*tableIterator, error) {
+func (tm *TableMeta) Search(mode SearchMode) (*TableIterator, error) {
 	iter, err := tm.tree.Search(mode.encode())
 	if err != nil {
 		return nil, err
 	}
-	return newTableIterator(iter), nil
+	return NewTableIterator(iter), nil
 }
 
 // Insert はレコードを挿入する
@@ -36,6 +36,6 @@ func (tm *TableMeta) Search(mode SearchMode) (*tableIterator, error) {
 //   - metaPageId: プライマリインデックスの B+Tree メタページ ID
 //   - numOfCol: カラム数
 func (tm *TableMeta) Insert(name string, metaPageId page.Id, numOfCol int) error {
-	record := newTableRecord(name, metaPageId, numOfCol)
+	record := NewTableRecord(name, metaPageId, numOfCol)
 	return tm.tree.Insert(record.encode())
 }

@@ -69,7 +69,7 @@ func TestPrimaryIndexSearch(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		result, ok, err := iter.next()
+		result, ok, err := iter.Next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, result.values)
@@ -83,7 +83,7 @@ func TestPrimaryIndexSearch(t *testing.T) {
 		iter, err := pi.search(SearchModeStart{})
 		assert.NoError(t, err)
 
-		_, ok, err := iter.next()
+		_, ok, err := iter.Next()
 
 		// THEN
 		assert.NoError(t, err)
@@ -140,7 +140,7 @@ func TestPrimaryIndexInsert(t *testing.T) {
 
 		// 論理削除
 		iter, _ := pi.search(SearchModeStart{})
-		record, _, _ := iter.next()
+		record, _, _ := iter.Next()
 		_ = pi.softDelete(record, testTrxId)
 
 		r2 := buildTestPrimaryRecord(t, pi, "1", "Bob", "b@example.com")
@@ -179,7 +179,7 @@ func TestPrimaryIndexDelete(t *testing.T) {
 		_ = pi.insert(r, testTrxId)
 
 		iter, _ := pi.search(SearchModeStart{})
-		record, _, _ := iter.next()
+		record, _, _ := iter.Next()
 
 		// WHEN
 		err := pi.delete(record, testTrxId)
@@ -189,7 +189,7 @@ func TestPrimaryIndexDelete(t *testing.T) {
 
 		// 削除後は取得できない
 		iter2, _ := pi.search(SearchModeStart{})
-		_, ok, _ := iter2.next()
+		_, ok, _ := iter2.Next()
 		assert.False(t, ok)
 	})
 
@@ -214,7 +214,7 @@ func TestPrimaryIndexSoftDelete(t *testing.T) {
 		_ = pi.insert(r, testTrxId)
 
 		iter, _ := pi.search(SearchModeStart{})
-		record, _, _ := iter.next()
+		record, _, _ := iter.Next()
 
 		// WHEN
 		err := pi.softDelete(record, testTrxId)
@@ -224,7 +224,7 @@ func TestPrimaryIndexSoftDelete(t *testing.T) {
 
 		// 論理削除後は検索でスキップされる
 		iter2, _ := pi.search(SearchModeStart{})
-		_, ok, _ := iter2.next()
+		_, ok, _ := iter2.Next()
 		assert.False(t, ok)
 	})
 
@@ -235,7 +235,7 @@ func TestPrimaryIndexSoftDelete(t *testing.T) {
 		_ = pi.insert(r, testTrxId)
 
 		iter, _ := pi.search(SearchModeStart{})
-		record, _, _ := iter.next()
+		record, _, _ := iter.Next()
 		_ = pi.softDelete(record, testTrxId)
 
 		r2 := buildTestPrimaryRecord(t, pi, "1", "Bob", "bob@example.com")
@@ -256,7 +256,7 @@ func TestPrimaryIndexUpdate(t *testing.T) {
 		_ = pi.insert(r, testTrxId)
 
 		iter, _ := pi.search(SearchModeStart{})
-		current, _, _ := iter.next()
+		current, _, _ := iter.Next()
 		newRecord, _ := current.update(testTrxId, []string{"name"}, []string{"Bob"})
 
 		// WHEN
@@ -267,7 +267,7 @@ func TestPrimaryIndexUpdate(t *testing.T) {
 
 		// 更新後の値を確認
 		iter2, _ := pi.search(SearchModeStart{})
-		updated, ok, _ := iter2.next()
+		updated, ok, _ := iter2.Next()
 		assert.True(t, ok)
 		assert.Equal(t, "Bob", updated.values[1])
 		assert.Equal(t, "alice@example.com", updated.values[2])
@@ -280,7 +280,7 @@ func TestPrimaryIndexUpdate(t *testing.T) {
 		_ = pi.insert(r, testTrxId)
 
 		iter, _ := pi.search(SearchModeStart{})
-		current, _, _ := iter.next()
+		current, _, _ := iter.Next()
 
 		// WHEN
 		_, err := current.update(testTrxId, []string{"nonexistent"}, []string{"val"})
@@ -344,9 +344,9 @@ func setupTestPrimaryIndex(t *testing.T) *primaryIndex {
 }
 
 // buildTestPrimaryRecord はテスト用の PrimaryRecord (id, name, email) を構築する
-func buildTestPrimaryRecord(t *testing.T, pi *primaryIndex, id, name, email string) *primaryRecord {
+func buildTestPrimaryRecord(t *testing.T, pi *primaryIndex, id, name, email string) *PrimaryRecord {
 	t.Helper()
-	pr, err := newPrimaryRecord(pi.catalog, newPrimaryRecordInput{
+	pr, err := NewPrimaryRecord(pi.catalog, NewPrimaryRecordInput{
 		fileId:     pi.tree.MetaPageId().FileId,
 		pkCount:    pi.pkCount,
 		deleteMark: 0,

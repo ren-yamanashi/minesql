@@ -62,6 +62,7 @@ func fetchTable(ct *catalog.Catalog, name string) (catalog.TableRecord, error) {
 	if err != nil {
 		return catalog.TableRecord{}, err
 	}
+	defer iter.Close()
 	record, ok, err := iter.Next()
 	if err != nil {
 		return catalog.TableRecord{}, err
@@ -96,6 +97,7 @@ func fetchPrimaryIndexRecord(ct *catalog.Catalog, fileId page.FileId) (catalog.I
 	if err != nil {
 		return catalog.IndexRecord{}, err
 	}
+	defer iter.Close()
 	record, ok, err := iter.Next()
 	if err != nil {
 		return catalog.IndexRecord{}, err
@@ -140,6 +142,7 @@ func fetchSecondaryIndexRecords(ct *catalog.Catalog, fileId page.FileId) ([]cata
 	if err != nil {
 		return nil, err
 	}
+	defer iter.Close()
 	var records []catalog.IndexRecord
 	for {
 		record, ok, err := iter.Next()
@@ -185,8 +188,8 @@ func (t *Table) extractSecondaryKey(keyCols map[string]int, valMap map[string]st
 }
 
 // buildSecondaryRecord はセカンダリインデックス用のレコードを構築する
-func (t *Table) buildSecondaryRecord(si *secondaryIndex, skColNames, skValues, pk []string) (*secondaryRecord, error) {
-	return newSecondaryRecord(t.catalog, newSecondaryRecordInput{
+func (t *Table) buildSecondaryRecord(si *secondaryIndex, skColNames, skValues, pk []string) (*SecondaryRecord, error) {
+	return NewSecondaryRecord(t.catalog, NewSecondaryRecordInput{
 		fileId:     si.fileId,
 		deleteMark: 0,
 		indexName:  si.indexName,

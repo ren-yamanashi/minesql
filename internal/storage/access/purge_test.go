@@ -126,7 +126,7 @@ func TestPurgePurge(t *testing.T) {
 		// 論理削除してコミット
 		trx2 := env.trxManager.Begin()
 		iter, _ := table.primaryIndex.search(SearchModeStart{})
-		record, _, _ := iter.next()
+		record, _, _ := iter.Next()
 		_ = table.SoftDelete(record, trx2)
 		_ = env.trxManager.Commit(trx2)
 
@@ -159,7 +159,7 @@ func TestPurgePurge(t *testing.T) {
 		// name を更新してコミット (セカンダリインデックスの SK が変わる)
 		trx2 := env.trxManager.Begin()
 		iter, _ := table.primaryIndex.search(SearchModeStart{})
-		record, _, _ := iter.next()
+		record, _, _ := iter.Next()
 		_ = table.Update(record, []string{"name"}, []string{"Bob"}, trx2)
 		_ = env.trxManager.Commit(trx2)
 
@@ -170,7 +170,7 @@ func TestPurgePurge(t *testing.T) {
 		assert.NoError(t, err)
 		// プライマリインデックスのレコードは残っている (UPDATE はインプレース)
 		iter2, _ := table.primaryIndex.search(SearchModeStart{})
-		updated, ok, _ := iter2.next()
+		updated, ok, _ := iter2.Next()
 		assert.True(t, ok)
 		assert.Equal(t, "Bob", updated.values[1])
 	})
@@ -193,7 +193,7 @@ func TestPurgePurge(t *testing.T) {
 		// 論理削除用のトランザクションを開始
 		trx2 := env.trxManager.Begin()
 		iter, _ := table.primaryIndex.search(SearchModeStart{})
-		record, _, _ := iter.next()
+		record, _, _ := iter.Next()
 		_ = table.SoftDelete(record, trx2)
 
 		// trx2 がコミットする前に ReadView を作成 (trx2 はアクティブなので mIds に含まれる)

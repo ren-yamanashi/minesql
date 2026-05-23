@@ -10,11 +10,11 @@ type IndexMeta struct {
 	tree *btree.Tree // インデックスメタデータが格納される B+Tree
 }
 
-func newIndexMeta(bp *buffer.Pool, metaPageId page.Id) *IndexMeta {
+func NewIndexMeta(bp *buffer.Pool, metaPageId page.Id) *IndexMeta {
 	return &IndexMeta{tree: btree.NewTree(bp, metaPageId)}
 }
 
-func createIndexMeta(bp *buffer.Pool) (*IndexMeta, error) {
+func CreateIndexMeta(bp *buffer.Pool) (*IndexMeta, error) {
 	tree, err := btree.CreateTree(bp, catalogFileId)
 	if err != nil {
 		return nil, err
@@ -23,12 +23,12 @@ func createIndexMeta(bp *buffer.Pool) (*IndexMeta, error) {
 }
 
 // Search は指定した検索モードでメタデータを検索し、イテレータを返す
-func (im *IndexMeta) Search(mode SearchMode) (*indexIterator, error) {
+func (im *IndexMeta) Search(mode SearchMode) (*IndexIterator, error) {
 	iter, err := im.tree.Search(mode.encode())
 	if err != nil {
 		return nil, err
 	}
-	return newIndexIterator(iter), nil
+	return NewIndexIterator(iter), nil
 }
 
 // Insert はレコードを挿入する

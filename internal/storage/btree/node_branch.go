@@ -23,7 +23,6 @@ type branchNode struct {
 
 func newBranchNode(pg *page.Page) *branchNode {
 	data := pg.Body
-	copy(data[branchNodeRightChildOffset:nodeHeaderSize], nodeTypeBranch)
 	headerSize := nodeHeaderSize + branchNodeHeaderSize
 	header := data[:headerSize]
 	body := newSlottedPage(data[headerSize:])
@@ -38,6 +37,7 @@ func newBranchNode(pg *page.Page) *branchNode {
 //   - leftChildPageId: 最初のレコードの非キーフィールド (左の子の PageId)
 //   - rightChildId: ヘッダーに設定する右の子の PageId
 func (bn *branchNode) initialize(key []byte, leftChildPageId, rightChildId page.Id) error {
+	copy(bn.header[:nodeHeaderSize], nodeTypeBranch)
 	bn.body.initialize()
 
 	record := NewRecord([]byte{}, key, leftChildPageId.ToBytes())
@@ -54,7 +54,7 @@ func (bn *branchNode) initialize(key []byte, leftChildPageId, rightChildId page.
 //   - record: 挿入するレコード
 //   - return: 挿入に成功した場合は true
 func (bn *branchNode) insert(slotNum int, record Record) bool {
-	recordBytes := record.ToBytes()
+	recordBytes := record.toBytes()
 	if len(recordBytes) > bn.maxRecordSize() {
 		return false
 	}
@@ -66,6 +66,7 @@ func (bn *branchNode) insert(slotNum int, record Record) bool {
 //   - newRecord: 挿入するレコード
 //   - return: 新しいブランチノードの最小キー
 func (bn *branchNode) splitInsert(newBranch *branchNode, newRecord Record) ([]byte, error) {
+	copy(newBranch.header[:nodeHeaderSize], nodeTypeBranch)
 	newBranch.body.initialize()
 	for {
 		// newBranch が十分に埋まったら、挿入対象のレコードを古いノードに挿入
@@ -82,7 +83,7 @@ func (bn *branchNode) splitInsert(newBranch *branchNode, newRecord Record) ([]by
 		}
 
 		// `古いノードの先頭レコードのキー < 挿入対象のキー` の場合
-		if bn.record(0).CompareKey(newRecord.Key()) < 0 {
+		if bn.record(0).compareKey(newRecord.Key()) < 0 {
 			if err := bn.transfer(newBranch); err != nil {
 				return nil, err
 			}
@@ -117,7 +118,7 @@ func (bn *branchNode) delete(slotNum int) {
 //   - slotNum: 更新するレコードのスロット番号
 //   - record: 新しいレコード
 func (bn *branchNode) update(slotNum int, record Record) bool {
-	return bn.body.update(slotNum, record.ToBytes())
+	return bn.body.update(slotNum, record.toBytes())
 }
 
 // numRecords はレコード数を取得する
@@ -152,7 +153,7 @@ func (bn *branchNode) record(slotNum int) Record {
 
 // searchSlotNum は指定された key に対応するスロット番号を検索する
 //   - 見つかった場合: (スロット番号, true)
-//   - 見つからなかった場合: (0, false)
+//   - 見つからなかった場合: (挿入すべき位置, false)
 func (bn *branchNode) searchSlotNum(key []byte) (int, bool) {
 	return binarySearch(bn, key)
 }

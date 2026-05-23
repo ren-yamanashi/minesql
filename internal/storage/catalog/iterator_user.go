@@ -2,17 +2,22 @@ package catalog
 
 import "github.com/ren-yamanashi/minesql/internal/storage/btree"
 
-type userIterator struct {
+type UserIterator struct {
 	iterator *btree.Iterator
 }
 
-func newUserIterator(iter *btree.Iterator) *userIterator {
-	return &userIterator{iterator: iter}
+func NewUserIterator(iter *btree.Iterator) *UserIterator {
+	return &UserIterator{iterator: iter}
+}
+
+// Close はイテレータが保持しているバッファページの参照を解放する
+func (ui *UserIterator) Close() {
+	ui.iterator.Close()
 }
 
 // Next はユーザーメタデータから次の結果を返す
-func (umi *userIterator) Next() (UserRecord, bool, error) {
-	record, ok, err := umi.iterator.Next()
+func (ui *UserIterator) Next() (UserRecord, bool, error) {
+	record, ok, err := ui.iterator.Next()
 	if err != nil {
 		return UserRecord{}, false, err
 	}

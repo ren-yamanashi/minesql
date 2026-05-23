@@ -1,7 +1,6 @@
 package btree
 
 import (
-	"bytes"
 	"errors"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
@@ -39,9 +38,10 @@ func (t *Tree) deleteUnderflow(
 	if err != nil {
 		return false, false, err
 	}
+	defer t.bufferPool.UnrefPage(childBufPage.PageId())
 
 	// リーフノードのアンダーフロー処理
-	if bytes.Equal(nodeType(childPage.Data()), nodeTypeLeaf) {
+	if nodeType(childPage.Data()) == nodeTypeLeaf {
 		uf, lm, err := t.onLeafUnderflow(branchNode, childBufPage, sibling, childSlotNum)
 		return uf, lm, err
 	}

@@ -10,7 +10,7 @@ import (
 func TestColumnRecordFileId(t *testing.T) {
 	t.Run("コンストラクタで指定した FileId を返す", func(t *testing.T) {
 		// GIVEN
-		cr := newColumnRecord(page.FileId(1), "name", 0)
+		cr := NewColumnRecord(page.FileId(1), "name", 0)
 
 		// WHEN
 		got := cr.FileId()
@@ -23,7 +23,7 @@ func TestColumnRecordFileId(t *testing.T) {
 func TestColumnRecordName(t *testing.T) {
 	t.Run("コンストラクタで指定したカラム名を返す", func(t *testing.T) {
 		// GIVEN
-		cr := newColumnRecord(page.FileId(1), "email", 2)
+		cr := NewColumnRecord(page.FileId(1), "email", 2)
 
 		// WHEN
 		got := cr.Name()
@@ -36,7 +36,7 @@ func TestColumnRecordName(t *testing.T) {
 func TestColumnRecordPosition(t *testing.T) {
 	t.Run("コンストラクタで指定したカラム位置を返す", func(t *testing.T) {
 		// GIVEN
-		cr := newColumnRecord(page.FileId(1), "name", 5)
+		cr := NewColumnRecord(page.FileId(1), "name", 5)
 
 		// WHEN
 		got := cr.Position()
@@ -49,7 +49,7 @@ func TestColumnRecordPosition(t *testing.T) {
 func TestColumnRecordEncode(t *testing.T) {
 	t.Run("カラムレコードをエンコードできる", func(t *testing.T) {
 		// GIVEN
-		cr := newColumnRecord(page.FileId(1), "name", 0)
+		cr := NewColumnRecord(page.FileId(1), "name", 0)
 
 		// WHEN
 		record := cr.encode()
@@ -62,7 +62,7 @@ func TestColumnRecordEncode(t *testing.T) {
 
 	t.Run("エンコードした結果をデコードすると元のデータに戻る", func(t *testing.T) {
 		// GIVEN
-		original := newColumnRecord(page.FileId(1), "email", 2)
+		original := NewColumnRecord(page.FileId(1), "email", 2)
 
 		// WHEN
 		record := original.encode()
@@ -76,7 +76,7 @@ func TestColumnRecordEncode(t *testing.T) {
 
 	t.Run("カラム位置が 0 の場合も正しくエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
-		original := newColumnRecord(page.FileId(2), "id", 0)
+		original := NewColumnRecord(page.FileId(2), "id", 0)
 
 		// WHEN
 		record := original.encode()
@@ -90,7 +90,7 @@ func TestColumnRecordEncode(t *testing.T) {
 
 	t.Run("FileId が 0 の場合も正しくエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
-		original := newColumnRecord(page.FileId(0), "col", 5)
+		original := NewColumnRecord(page.FileId(0), "col", 5)
 
 		// WHEN
 		record := original.encode()
@@ -104,7 +104,7 @@ func TestColumnRecordEncode(t *testing.T) {
 
 	t.Run("長いカラム名でも正しくエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
-		original := newColumnRecord(page.FileId(3), "very_long_column_name_for_testing", 10)
+		original := NewColumnRecord(page.FileId(3), "very_long_column_name_for_testing", 10)
 
 		// WHEN
 		record := original.encode()
@@ -118,7 +118,7 @@ func TestColumnRecordEncode(t *testing.T) {
 func TestDecodeColumnRecord(t *testing.T) {
 	t.Run("エンコード済みレコードから FileId とカラム名を復元できる", func(t *testing.T) {
 		// GIVEN
-		cr := newColumnRecord(page.FileId(42), "age", 3)
+		cr := NewColumnRecord(page.FileId(42), "age", 3)
 		record := cr.encode()
 
 		// WHEN
@@ -131,7 +131,7 @@ func TestDecodeColumnRecord(t *testing.T) {
 
 	t.Run("エンコード済みレコードからカラム位置を復元できる", func(t *testing.T) {
 		// GIVEN
-		cr := newColumnRecord(page.FileId(1), "status", 7)
+		cr := NewColumnRecord(page.FileId(1), "status", 7)
 		record := cr.encode()
 
 		// WHEN

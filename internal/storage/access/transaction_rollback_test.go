@@ -29,7 +29,7 @@ func TestRollbackInsertSecondary(t *testing.T) {
 		idxName := findSecondaryIndex(t, table, "idx_name")
 		nameIter, err := idxName.search(SearchModeStart{})
 		assert.NoError(t, err)
-		_, ok, err := nameIter.next()
+		_, ok, err := nameIter.Next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 
@@ -37,7 +37,7 @@ func TestRollbackInsertSecondary(t *testing.T) {
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
 		emailIter, err := idxEmail.search(SearchModeStart{})
 		assert.NoError(t, err)
-		_, ok, err = emailIter.next()
+		_, ok, err = emailIter.Next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 	})
@@ -58,7 +58,7 @@ func TestRollbackDeleteSecondary(t *testing.T) {
 
 		trxId2 := tm.Begin()
 		iter, _ := table.primaryIndex.search(SearchModeStart{})
-		record, _, _ := iter.next()
+		record, _, _ := iter.Next()
 		err := table.SoftDelete(record, trxId2)
 		assert.NoError(t, err)
 
@@ -72,7 +72,7 @@ func TestRollbackDeleteSecondary(t *testing.T) {
 		idxName := findSecondaryIndex(t, table, "idx_name")
 		nameIter, err := idxName.search(SearchModeStart{})
 		assert.NoError(t, err)
-		nameResult, ok, err := nameIter.next()
+		nameResult, ok, err := nameIter.Next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "Alice", nameResult.values[1])
@@ -94,7 +94,7 @@ func TestRollbackUpdateSecondary(t *testing.T) {
 
 		trxId2 := tm.Begin()
 		iter, _ := table.primaryIndex.search(SearchModeStart{})
-		record, _, _ := iter.next()
+		record, _, _ := iter.Next()
 		// name を変更 → idx_name の SK が変わる
 		err := table.Update(record, []string{"name"}, []string{"Bob"}, trxId2)
 		assert.NoError(t, err)
@@ -109,7 +109,7 @@ func TestRollbackUpdateSecondary(t *testing.T) {
 		idxName := findSecondaryIndex(t, table, "idx_name")
 		nameIter, err := idxName.search(SearchModeStart{})
 		assert.NoError(t, err)
-		nameResult, ok, err := nameIter.next()
+		nameResult, ok, err := nameIter.Next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "Alice", nameResult.values[1])
@@ -129,7 +129,7 @@ func TestRollbackUpdateSecondary(t *testing.T) {
 
 		trxId2 := tm.Begin()
 		iter, _ := table.primaryIndex.search(SearchModeStart{})
-		record, _, _ := iter.next()
+		record, _, _ := iter.Next()
 		// email を変更 → idx_name の SK は変わらない
 		err := table.Update(record, []string{"email"}, []string{"new@example.com"}, trxId2)
 		assert.NoError(t, err)
@@ -144,7 +144,7 @@ func TestRollbackUpdateSecondary(t *testing.T) {
 		idxName := findSecondaryIndex(t, table, "idx_name")
 		nameIter, err := idxName.search(SearchModeStart{})
 		assert.NoError(t, err)
-		nameResult, ok, err := nameIter.next()
+		nameResult, ok, err := nameIter.Next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "Alice", nameResult.values[1])

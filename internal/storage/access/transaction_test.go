@@ -141,7 +141,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		// レコードが存在しないことを確認
 		iter, err := table.primaryIndex.search(SearchModeStart{})
 		assert.NoError(t, err)
-		_, ok, err := iter.next()
+		_, ok, err := iter.Next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 	})
@@ -160,7 +160,7 @@ func TestTrxManagerRollback(t *testing.T) {
 
 		trxId2 := tm.Begin()
 		iter, _ := table.primaryIndex.search(SearchModeStart{})
-		record, _, _ := iter.next()
+		record, _, _ := iter.Next()
 		err := table.SoftDelete(record, trxId2)
 		assert.NoError(t, err)
 
@@ -173,7 +173,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		// レコードが復元されていることを確認
 		iter2, err := table.primaryIndex.search(SearchModeStart{})
 		assert.NoError(t, err)
-		restored, ok, err := iter2.next()
+		restored, ok, err := iter2.Next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "Alice", restored.values[1])
@@ -193,7 +193,7 @@ func TestTrxManagerRollback(t *testing.T) {
 
 		trxId2 := tm.Begin()
 		iter, _ := table.primaryIndex.search(SearchModeStart{})
-		record, _, _ := iter.next()
+		record, _, _ := iter.Next()
 		err := table.Update(record, []string{"name"}, []string{"Bob"}, trxId2)
 		assert.NoError(t, err)
 
@@ -206,7 +206,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		// 旧レコードに復元されていることを確認
 		iter2, err := table.primaryIndex.search(SearchModeStart{})
 		assert.NoError(t, err)
-		restored, ok, err := iter2.next()
+		restored, ok, err := iter2.Next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "Alice", restored.values[1])

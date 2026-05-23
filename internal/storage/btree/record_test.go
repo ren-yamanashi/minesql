@@ -29,7 +29,7 @@ func TestCompareKey(t *testing.T) {
 		r := NewRecord([]byte{0x00}, []byte{0x01, 0x02}, []byte{})
 
 		// WHEN
-		result := r.CompareKey([]byte{0x01, 0x02})
+		result := r.compareKey([]byte{0x01, 0x02})
 
 		// THEN
 		assert.Equal(t, 0, result)
@@ -40,7 +40,7 @@ func TestCompareKey(t *testing.T) {
 		r := NewRecord([]byte{0x00}, []byte{0x01}, []byte{})
 
 		// WHEN
-		result := r.CompareKey([]byte{0x02})
+		result := r.compareKey([]byte{0x02})
 
 		// THEN
 		assert.Equal(t, -1, result)
@@ -51,7 +51,7 @@ func TestCompareKey(t *testing.T) {
 		r := NewRecord([]byte{0x00}, []byte{0x02}, []byte{})
 
 		// WHEN
-		result := r.CompareKey([]byte{0x01})
+		result := r.compareKey([]byte{0x01})
 
 		// THEN
 		assert.Equal(t, 1, result)
@@ -64,7 +64,7 @@ func TestToBytes(t *testing.T) {
 		r := NewRecord([]byte{0x01}, []byte{0x02, 0x03}, []byte{0x04, 0x05, 0x06})
 
 		// WHEN
-		data := r.ToBytes()
+		data := r.toBytes()
 		restored := recordFromBytes(data)
 
 		// THEN
@@ -78,7 +78,7 @@ func TestToBytes(t *testing.T) {
 		r := NewRecord([]byte{0x01}, []byte{0x02}, []byte{})
 
 		// WHEN
-		data := r.ToBytes()
+		data := r.toBytes()
 		restored := recordFromBytes(data)
 
 		// THEN
@@ -92,7 +92,7 @@ func TestToBytes(t *testing.T) {
 		key := []byte{0xCC, 0xDD, 0xEE}
 
 		// WHEN
-		data := NewRecord(header, key, []byte{}).ToBytes()
+		data := NewRecord(header, key, []byte{}).toBytes()
 
 		// THEN
 		assert.Equal(t, byte(0), data[0])

@@ -39,7 +39,7 @@ func TestTableUpdate(t *testing.T) {
 		idxName := findSecondaryIndex(t, table, "idx_name")
 		iter, err := idxName.search(SearchModeStart{})
 		assert.NoError(t, err)
-		result, ok, err := iter.next()
+		result, ok, err := iter.Next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "Bob", result.values[1])
@@ -58,7 +58,7 @@ func TestTableUpdate(t *testing.T) {
 		idxName := findSecondaryIndex(t, table, "idx_name")
 		iter, err := idxName.search(SearchModeStart{})
 		assert.NoError(t, err)
-		result, ok, err := iter.next()
+		result, ok, err := iter.Next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "Alice", result.values[1])
@@ -78,14 +78,14 @@ func TestTableUpdate(t *testing.T) {
 		idxName := findSecondaryIndex(t, table, "idx_name")
 		nameIter, err := idxName.search(SearchModeStart{})
 		assert.NoError(t, err)
-		nameResult, ok, err := nameIter.next()
+		nameResult, ok, err := nameIter.Next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "Charlie", nameResult.values[1])
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
 		emailIter, err := idxEmail.search(SearchModeStart{})
 		assert.NoError(t, err)
-		emailResult, ok, err := emailIter.next()
+		emailResult, ok, err := emailIter.Next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "Charlie", emailResult.values[1])
@@ -135,7 +135,7 @@ func TestTableUpdate(t *testing.T) {
 		idxName := findSecondaryIndex(t, table, "idx_name")
 		nameIter, err := idxName.search(SearchModeStart{})
 		assert.NoError(t, err)
-		nameResult, ok, err := nameIter.next()
+		nameResult, ok, err := nameIter.Next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "Bob", nameResult.values[1])
@@ -144,7 +144,7 @@ func TestTableUpdate(t *testing.T) {
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
 		emailIter, err := idxEmail.search(SearchModeStart{})
 		assert.NoError(t, err)
-		emailResult, ok, err := emailIter.next()
+		emailResult, ok, err := emailIter.Next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "bob@example.com", emailResult.values[2])
@@ -229,13 +229,13 @@ func setupTableWithRecord(t *testing.T) *Table {
 }
 
 // searchFirstPrimaryRecord はプライマリインデックスの先頭レコードを返す
-func searchFirstPrimaryRecord(t *testing.T, table *Table) *primaryRecord {
+func searchFirstPrimaryRecord(t *testing.T, table *Table) *PrimaryRecord {
 	t.Helper()
 	iter, err := table.primaryIndex.search(SearchModeStart{})
 	if err != nil {
 		t.Fatalf("プライマリインデックスの検索に失敗: %v", err)
 	}
-	record, ok, err := iter.next()
+	record, ok, err := iter.Next()
 	if err != nil {
 		t.Fatalf("レコードの取得に失敗: %v", err)
 	}

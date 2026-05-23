@@ -10,12 +10,11 @@ type UserMeta struct {
 	tree *btree.Tree // ユーザーメタデータが格納される B+Tree
 }
 
-// newUserMeta は既存のユーザーメタデータを開く
-func newUserMeta(bp *buffer.Pool, metaPageId page.Id) *UserMeta {
+func NewUserMeta(bp *buffer.Pool, metaPageId page.Id) *UserMeta {
 	return &UserMeta{tree: btree.NewTree(bp, metaPageId)}
 }
 
-func createUserMeta(bp *buffer.Pool) (*UserMeta, error) {
+func CreateUserMeta(bp *buffer.Pool) (*UserMeta, error) {
 	tree, err := btree.CreateTree(bp, catalogFileId)
 	if err != nil {
 		return nil, err
@@ -24,12 +23,12 @@ func createUserMeta(bp *buffer.Pool) (*UserMeta, error) {
 }
 
 // Search は指定した検索モードでメタデータを検索し、イテレータを返す
-func (um *UserMeta) Search(mode SearchMode) (*userIterator, error) {
+func (um *UserMeta) Search(mode SearchMode) (*UserIterator, error) {
 	iter, err := um.tree.Search(mode.encode())
 	if err != nil {
 		return nil, err
 	}
-	return newUserIterator(iter), nil
+	return NewUserIterator(iter), nil
 }
 
 // Insert はレコードを挿入する
@@ -41,6 +40,6 @@ func (um *UserMeta) Insert(
 	host string,
 	authString []byte,
 ) error {
-	record := newUserRecord(username, host, authString)
+	record := NewUserRecord(username, host, authString)
 	return um.tree.Insert(record.encode())
 }

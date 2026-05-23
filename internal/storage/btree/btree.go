@@ -8,8 +8,9 @@ import (
 )
 
 var (
-	ErrDuplicateKey = errors.New("duplicate key")
-	ErrKeyNotFound  = errors.New("key not found")
+	ErrDuplicateKey    = errors.New("duplicate key")
+	ErrKeyNotFound     = errors.New("key not found")
+	errUnknownNodeType = errors.New("btree: unknown node type")
 )
 
 type Tree struct {
