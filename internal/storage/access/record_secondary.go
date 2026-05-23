@@ -37,19 +37,19 @@ func newSecondaryRecord(ct *catalog.Catalog, input newSecondaryRecordInput) (*se
 
 // encode は node.Record にエンコードする
 // キー領域は SK + PK を連結したもの
-func (sr *secondaryRecord) encode() node.Record {
+func (r *secondaryRecord) encode() node.Record {
 	var key []byte
-	encode.Encode(stringToByteSlice(sr.Values), &key)
-	encode.Encode(stringToByteSlice(sr.Pk), &key)
-	return node.NewRecord([]byte{sr.deleteMark}, key, nil)
+	encode.Encode(stringToByteSlice(r.Values), &key)
+	encode.Encode(stringToByteSlice(r.Pk), &key)
+	return node.NewRecord([]byte{r.deleteMark}, key, nil)
 }
 
 // encodedSecondaryKey はエンコード済みのセカンダリキーを返す
 //
 // B+Tree 上のキー (SK + PK) ではなく SK のみ
-func (sr *secondaryRecord) encodedSecondaryKey() []byte {
+func (r *secondaryRecord) encodedSecondaryKey() []byte {
 	var sk []byte
-	encode.Encode(stringToByteSlice(sr.Values), &sk)
+	encode.Encode(stringToByteSlice(r.Values), &sk)
 	return sk
 }
 

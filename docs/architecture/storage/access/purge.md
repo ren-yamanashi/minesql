@@ -9,7 +9,7 @@
 ## 概要
 
 - パージは、MVCC で不要になったデータをバックグラウンドで回収する処理
-- 以下の 2 つの責務を持つ
+- Undo ログ (History List) を駆動源として、以下の 2 つの責務を持つ
 
 1. 論理削除済みレコードの物理削除 (プライマリインデックス + セカンダリインデックス)
 2. 不要になった UPDATE/DELETE の Undo ログの破棄 (INSERT の Undo ログはコミット時に破棄されるので、パージでの破棄は不要)
@@ -26,41 +26,59 @@
 > Insert undo logs are needed only in transaction rollback and can be discarded as soon as the transaction commits. Update undo logs are used also in consistent reads, but they can be discarded only after there is no transaction present for which InnoDB has assigned a snapshot that in a consistent read could require the information in the update undo log to build an earlier version of a database row.\
 > https://dev.mysql.com/doc/refman/8.0/en/innodb-multi-versioning.html
 
+## Undo ログ駆動のパージ
+
+- パージは Undo ログを起点として動作する
+- レコード側 (プライマリ/セカンダリインデックス) から探索するのではなく、Undo ログを走査して削除対象のレコードを特定する
+  - 理由
+    - セカンダリインデックスのレコードには LastTrxId がない
+    - したがって、セカンダリインデックスのレコードだけを見てパージ可否を判定することはできない
+    - Undo ログには TrxId が記録されているため、Undo ログの TrxId でパージ可否を判定し、Undo ログの内容からプライマリ/セカンダリの削除対象を特定する
+
 ## パージ可否の判定
 
 - パージ可否は「パージ閾値 (purge limit)」によって判定する
 - パージ閾値は、全アクティブ ReadView の `mUpLimitId` の最小値
 - パージ可否の判定は以下の通り
   - Undo レコードの TrxId がパージ閾値よりも小さい -> パージ可能 (どの ReadView からも参照されていない)
-  - アクティブな ReadView がひとつも存在しない-> コミット済みの Undo レコードはすべてパージ可能
+  - アクティブな ReadView がひとつも存在しない -> コミット済みの Undo レコードはすべてパージ可能
 
 パージ可否判定 (閾値チェック) はバックグラウンド goroutine として動作し、1 秒間隔で行う
-
-### 論理削除済みレコードを物理削除する条件
-
-- 論理削除済みレコードの物理削除も、同じパージ閾値で判定する
-- レコードの `lastTrxId` がパージ閾値より小さい -> 物理削除可能
 
 ## 処理フロー
 
 1. パージ閾値を算出する (全アクティブ ReadView の `mUpLimitId` の最小値)
 2. コミット済みトランザクションの Undo ログ (History List) を古い順に走査する
-   - TrxId がパージ閾値以上であれば走査を終了 (これ以降はすべてパージ不可)
-3. 論理削除済みレコードを物理削除する
-4. 処理済みの undo ログを破棄する
+   - Undo レコードの TrxId がパージ閾値以上であれば走査を終了 (これ以降はすべてパージ不可)
+3. Undo レコードの種別に応じてレコードを物理削除する
+   - DELETE の Undo レコード: Undo レコードの内容からプライマリキーを復元し、プライマリインデックスとセカンダリインデックスの論理削除済みレコードを物理削除する
+   - UPDATE の Undo レコード: Undo レコードの内容からセカンダリキーを復元し、セカンダリインデックスの論理削除済みレコードを物理削除する (プライマリはインプレース更新のため物理削除不要)
+4. 処理済みの Undo ログを破棄する
 
 ```mermaid
 flowchart TD
     A[パージ開始] --> B[パージ閾値を算出]
-    B --> C[ヒストリリストの先頭から走査]
-    C --> D{trxId < パージ閾値?}
+    B --> C[Undo ログを古い順に走査]
+    C --> D{TrxId < パージ閾値?}
     D -- No --> H[パージ終了]
-    D -- Yes --> E{undo レコードの種別}
-    E -- DELETE --> F[論理削除済みレコードを物理削除（プライマリ・セカンダリ）]
-    E -- UPDATE --> G[論理削除済みレコードを物理削除（セカンダリ）]
-    F --> I[undo ログを破棄]
-    G --> I
+    D -- Yes --> E{Undo レコードの種別}
+    E -- DELETE --> F1[Undo レコードから PK を復元]
+    F1 --> F2[プライマリ + セカンダリの論理削除済みレコードを物理削除]
+    E -- UPDATE --> G1[Undo レコードから旧 SK を復元]
+    G1 --> G2[セカンダリの論理削除済みレコードを物理削除]
+    F2 --> I[Undo ログを破棄]
+    G2 --> I
     I --> C
 ```
 
-※ UPDATE の場合、プライマリインデックスはインプレース更新されるが、セカンダリインデックスは「論理削除 + 作成」で処理されるため、セカンダリインデックスのみ削除する
+### DELETE の Undo レコードからの物理削除
+
+1. Undo レコードのカラムセットからプライマリキーを取得する
+2. プライマリインデックスで該当レコードを検索し、deleteMark=1 であれば物理削除する
+3. プライマリキーを元にセカンダリインデックスのキー (SK + PK) を構築し、deleteMark=1 であれば物理削除する
+
+### UPDATE の Undo レコードからの物理削除
+
+1. Undo レコードには更新前後のレコードが含まれる
+2. 更新前のレコードからセカンダリキーを復元し、セカンダリインデックスで deleteMark=1 のレコードを物理削除する
+3. プライマリインデックスはインプレース更新されるため、物理削除は不要
