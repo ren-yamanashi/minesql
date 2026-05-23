@@ -412,7 +412,7 @@ func TestCreate(t *testing.T) {
 // createTestEnv は Create テスト用の基本環境
 type createTestEnv struct {
 	ct      *catalog.Catalog
-	bp      *buffer.BufferPool
+	bp      *buffer.Pool
 	fileId  page.FileId
 	lockMgr *lock.Manager
 }
@@ -420,7 +420,7 @@ type createTestEnv struct {
 // createTestEnvWithTable はテーブル作成済みの Create テスト用環境
 type createTestEnvWithTable struct {
 	ct          *catalog.Catalog
-	bp          *buffer.BufferPool
+	bp          *buffer.Pool
 	fileId      page.FileId
 	primaryTree *btree.Btree
 	lockMgr     *lock.Manager
@@ -437,7 +437,7 @@ func setupCreateTestEnv(t *testing.T) *createTestEnv {
 	}
 	t.Cleanup(func() { _ = catalogHf.Close() })
 
-	bp := buffer.NewBufferPool(page.PageSize * 50)
+	bp := buffer.NewPool(page.PageSize * 50)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
 	ct, err := catalog.CreateCatalog(bp)
@@ -497,7 +497,7 @@ func setupCreateTestEnvWithTable(t *testing.T) *createTestEnvWithTable {
 
 // createTableTestEnv は CreateTable テスト用環境
 type createTableTestEnv struct {
-	bp      *buffer.BufferPool
+	bp      *buffer.Pool
 	undoLog *undo.Manager
 	lockMgr *lock.Manager
 }
@@ -517,7 +517,7 @@ func setupCreateTableTestEnv(t *testing.T) *createTableTestEnv {
 	}
 	t.Cleanup(func() { _ = catalogHf.Close() })
 
-	bp := buffer.NewBufferPool(page.PageSize * 50)
+	bp := buffer.NewPool(page.PageSize * 50)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
 	_, err = catalog.CreateCatalog(bp)

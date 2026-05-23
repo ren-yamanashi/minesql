@@ -10,11 +10,11 @@ type ConstraintMeta struct {
 	tree *btree.Btree // 制約メタデータが格納される B+Tree
 }
 
-func NewConstraintMeta(bp *buffer.BufferPool, metaPageId page.Id) *ConstraintMeta {
+func NewConstraintMeta(bp *buffer.Pool, metaPageId page.Id) *ConstraintMeta {
 	return &ConstraintMeta{tree: btree.NewBtree(bp, metaPageId)}
 }
 
-func CreateConstraintMeta(bp *buffer.BufferPool) (*ConstraintMeta, error) {
+func CreateConstraintMeta(bp *buffer.Pool) (*ConstraintMeta, error) {
 	tree, err := btree.CreateBtree(bp, catalogFileId)
 	if err != nil {
 		return nil, err

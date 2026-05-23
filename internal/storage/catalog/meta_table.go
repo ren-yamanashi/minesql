@@ -10,11 +10,11 @@ type TableMeta struct {
 	tree *btree.Btree // テーブルメタデータが格納される B+Tree
 }
 
-func NewTableMeta(bp *buffer.BufferPool, metaPageId page.Id) *TableMeta {
+func NewTableMeta(bp *buffer.Pool, metaPageId page.Id) *TableMeta {
 	return &TableMeta{tree: btree.NewBtree(bp, metaPageId)}
 }
 
-func CreateTableMeta(bp *buffer.BufferPool) (*TableMeta, error) {
+func CreateTableMeta(bp *buffer.Pool) (*TableMeta, error) {
 	tree, err := btree.CreateBtree(bp, catalogFileId)
 	if err != nil {
 		return nil, err

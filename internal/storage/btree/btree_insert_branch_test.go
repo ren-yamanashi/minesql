@@ -51,13 +51,13 @@ func TestInsertBranchOverflow(t *testing.T) {
 }
 
 // setupTestBranchNode はテスト用の初期化済みブランチノードを作成する
-func setupTestBranchNode(t *testing.T, bp *buffer.BufferPool) *BranchNode {
+func setupTestBranchNode(t *testing.T, bp *buffer.Pool) *BranchNode {
 	t.Helper()
 	pageId, err := bp.AllocatePageId(0)
 	assert.NoError(t, err)
 	_, err = bp.AddPage(pageId)
 	assert.NoError(t, err)
-	pg, err := bp.GetWritePage(pageId)
+	pg, err := bp.BufferPageForWrite(pageId)
 	assert.NoError(t, err)
 	bn := NewBranchNode(pg)
 	err = bn.Initialize([]byte{0x10}, page.NewId(0, 1), page.NewId(0, 2))

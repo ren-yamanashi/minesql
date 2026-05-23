@@ -387,7 +387,7 @@ func TestManagerWriteToPageOverflow(t *testing.T) {
 }
 
 // setupTestBufferPool はテスト用の BufferPool を作成する (Undo ファイル用 FileId=1)
-func setupTestBufferPool(t *testing.T) *buffer.BufferPool {
+func setupTestBufferPool(t *testing.T) *buffer.Pool {
 	t.Helper()
 	undoPath := filepath.Join(t.TempDir(), "undo.db")
 	hf, err := file.NewHeapFile(page.FileId(1), undoPath)
@@ -396,7 +396,7 @@ func setupTestBufferPool(t *testing.T) *buffer.BufferPool {
 	}
 	t.Cleanup(func() { _ = hf.Close() })
 
-	bp := buffer.NewBufferPool(page.PageSize * 20)
+	bp := buffer.NewPool(page.PageSize * 20)
 	bp.RegisterHeapFile(page.FileId(1), hf)
 	return bp
 }

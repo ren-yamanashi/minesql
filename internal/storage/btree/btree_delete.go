@@ -10,7 +10,7 @@ import (
 // Delete は B+Tree からレコードを削除する
 func (bt *Btree) Delete(key []byte) error {
 	// メタページを取得
-	pageMeta, err := bt.bufferPool.GetWritePage(bt.MetaPageId)
+	pageMeta, err := bt.bufferPool.BufferPageForWrite(bt.MetaPageId)
 	if err != nil {
 		return err
 	}
@@ -19,7 +19,7 @@ func (bt *Btree) Delete(key []byte) error {
 
 	// ルートページを取得
 	rootPageId := metaPage.rootPageId()
-	rootPageBuf, err := bt.bufferPool.FetchPage(rootPageId)
+	rootPageBuf, err := bt.bufferPool.BufferPage(rootPageId)
 	if err != nil {
 		return err
 	}
@@ -32,7 +32,7 @@ func (bt *Btree) Delete(key []byte) error {
 
 	// ルートノードがブランチノードで、子が 1 つになった場合 (=ブランチノード1, リーフノード1 になった場合)、子をルートにする
 	var isRootCollapsed bool
-	pageRoot, err := bt.bufferPool.GetReadPage(rootPageBuf.PageId)
+	pageRoot, err := bt.bufferPool.BufferPageForRead(rootPageBuf.PageId)
 	if err != nil {
 		return err
 	}
@@ -70,8 +70,8 @@ func (bt *Btree) Delete(key []byte) error {
 //   - return:
 //   - underflow: アンダーフローが発生したか
 //   - isLeafMerged: リーフノードのマージが発生したか
-func (bt *Btree) deleteRecursively(bufPage *buffer.BufferPage, key []byte) (underflow bool, isLeafMerged bool, err error) {
-	pg, err := bt.bufferPool.GetWritePage(bufPage.PageId)
+func (bt *Btree) deleteRecursively(bufPage *buffer.Page, key []byte) (underflow bool, isLeafMerged bool, err error) {
+	pg, err := bt.bufferPool.BufferPageForWrite(bufPage.PageId)
 	if err != nil {
 		return false, false, err
 	}
@@ -90,7 +90,7 @@ func (bt *Btree) deleteRecursively(bufPage *buffer.BufferPage, key []byte) (unde
 		if err != nil {
 			return false, false, err
 		}
-		childBufPage, err := bt.bufferPool.FetchPage(childPageId)
+		childBufPage, err := bt.bufferPool.BufferPage(childPageId)
 		if err != nil {
 			return false, false, err
 		}

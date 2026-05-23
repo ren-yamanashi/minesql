@@ -2,12 +2,12 @@ package buffer
 
 import "github.com/ren-yamanashi/minesql/internal/storage/page"
 
-// GetWritePage は書き込み用のページデータを取得する
-func (bp *BufferPool) GetWritePage(pageId page.Id) (*page.Page, error) {
+// BufferPageForWrite は書き込み用のページデータを取得する
+func (bp *Pool) BufferPageForWrite(pageId page.Id) (*page.Page, error) {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
 
-	bufPage, err := bp.fetchPage(pageId)
+	bufPage, err := bp.bufferPage(pageId)
 	if err != nil {
 		return nil, err
 	}
@@ -20,57 +20,47 @@ func (bp *BufferPool) GetWritePage(pageId page.Id) (*page.Page, error) {
 	return bufPage.Page, nil
 }
 
-// GetReadPage は読み込み用のページデータを取得する
-func (bp *BufferPool) GetReadPage(pageId page.Id) (*page.Page, error) {
-	// ページがバッファプールにある場合は RLock で返す (LRU 更新不要な為)
-	bp.mutex.RLock()
-	if bufId, exists := bp.pageTable.getBufferId(pageId); exists {
-		bufPage := &bp.bufferPages[bufId]
-		bp.mutex.RUnlock()
-		return bufPage.Page, nil
-	}
-	bp.mutex.RUnlock()
-
-	// ページテーブルにない場合はディスクから読み込む
+// BufferPageForRead は読み込み用のページデータを取得する
+func (bp *Pool) BufferPageForRead(pageId page.Id) (*page.Page, error) {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
 
-	bufPage, err := bp.fetchPage(pageId)
+	bufPage, err := bp.bufferPage(pageId)
 	if err != nil {
 		return nil, err
 	}
 	return bufPage.Page, nil
 }
 
-// FetchPage は指定された pageId のバッファページを取得する
-func (bp *BufferPool) FetchPage(pageId page.Id) (*BufferPage, error) {
+// BufferPage は指定された pageId のバッファページを取得する
+func (bp *Pool) BufferPage(pageId page.Id) (*Page, error) {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
-	return bp.fetchPage(pageId)
+	return bp.bufferPage(pageId)
 }
 
 // IsPageCached は指定ページがバッファプールに載っているかを返す
-func (bp *BufferPool) IsPageCached(pageId page.Id) bool {
+func (bp *Pool) IsPageCached(pageId page.Id) bool {
 	bp.mutex.RLock()
 	defer bp.mutex.RUnlock()
-	_, ok := bp.pageTable.getBufferId(pageId)
+	_, ok := bp.pageTable.bufferId(pageId)
 	return ok
 }
 
 // UnRefPage は指定されたページの参照を解除し、優先的に追い出されるようにする
-func (bp *BufferPool) UnRefPage(pageId page.Id) {
+func (bp *Pool) UnRefPage(pageId page.Id) {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
-	if bufferId, exists := bp.pageTable.getBufferId(pageId); exists {
+	if bufferId, exists := bp.pageTable.bufferId(pageId); exists {
 		bp.lru.Delete(bufferId)
 	}
 }
 
-// fetchPage は指定されたページをバッファプールから取得する
-func (bp *BufferPool) fetchPage(pageId page.Id) (*BufferPage, error) {
+// bufferPage は指定されたページをバッファプールから取得する
+func (bp *Pool) bufferPage(pageId page.Id) (*Page, error) {
 	// ページがバッファプールにある場合
-	if bufferId, exists := bp.pageTable.getBufferId(pageId); exists {
-		bufferPage := &bp.bufferPages[bufferId]
+	if bufferId, exists := bp.pageTable.bufferId(pageId); exists {
+		bufferPage := &bp.pages[bufferId]
 		bp.lru.access(bufferId)
 		return bufferPage, nil
 	}

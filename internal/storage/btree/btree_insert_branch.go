@@ -47,7 +47,7 @@ func (bt *Btree) splitInsertBranch(
 	}
 	defer bt.bufferPool.UnRefPage(newBranchPageId)
 
-	pageNewBranch, err := bt.bufferPool.GetWritePage(newBranchPageId)
+	pageNewBranch, err := bt.bufferPool.BufferPageForWrite(newBranchPageId)
 	if err != nil {
 		return nil, page.InvalidId, err
 	}

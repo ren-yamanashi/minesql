@@ -15,7 +15,7 @@ import (
 
 // Purge はバックグラウンドで不要な論理削除済みレコードと Undo ログを破棄する
 type Purge struct {
-	bufferPool  *buffer.BufferPool
+	bufferPool  *buffer.Pool
 	transaction *TrxManager
 	undoLog     *undo.Manager
 	interval    time.Duration
@@ -26,7 +26,7 @@ type Purge struct {
 	isRunning   bool
 }
 
-func NewPurge(bp *buffer.BufferPool, trx *TrxManager, undoLog *undo.Manager) *Purge {
+func NewPurge(bp *buffer.Pool, trx *TrxManager, undoLog *undo.Manager) *Purge {
 	return &Purge{
 		bufferPool:  bp,
 		transaction: trx,

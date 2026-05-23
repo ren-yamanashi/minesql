@@ -10,11 +10,11 @@ type IndexMeta struct {
 	tree *btree.Btree // インデックスメタデータが格納される B+Tree
 }
 
-func NewIndexMeta(bp *buffer.BufferPool, metaPageId page.Id) *IndexMeta {
+func NewIndexMeta(bp *buffer.Pool, metaPageId page.Id) *IndexMeta {
 	return &IndexMeta{tree: btree.NewBtree(bp, metaPageId)}
 }
 
-func CreateIndexMeta(bp *buffer.BufferPool) (*IndexMeta, error) {
+func CreateIndexMeta(bp *buffer.Pool) (*IndexMeta, error) {
 	tree, err := btree.CreateBtree(bp, catalogFileId)
 	if err != nil {
 		return nil, err

@@ -10,11 +10,11 @@ type ColumnMeta struct {
 	tree *btree.Btree // カラムメタデータが格納される B+Tree
 }
 
-func NewColumnMeta(bp *buffer.BufferPool, metaPageId page.Id) *ColumnMeta {
+func NewColumnMeta(bp *buffer.Pool, metaPageId page.Id) *ColumnMeta {
 	return &ColumnMeta{tree: btree.NewBtree(bp, metaPageId)}
 }
 
-func CreateColumnMeta(bp *buffer.BufferPool) (*ColumnMeta, error) {
+func CreateColumnMeta(bp *buffer.Pool) (*ColumnMeta, error) {
 	tree, err := btree.CreateBtree(bp, catalogFileId)
 	if err != nil {
 		return nil, err

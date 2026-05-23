@@ -32,7 +32,7 @@ const (
 )
 
 type Catalog struct {
-	bufferPool      *buffer.BufferPool
+	bufferPool      *buffer.Pool
 	nextFileId      page.FileId
 	nextIndexId     IndexId
 	UndoLogFileId   page.FileId
@@ -45,9 +45,9 @@ type Catalog struct {
 }
 
 // NewCatalog は既存のカタログを開く
-func NewCatalog(bp *buffer.BufferPool) (*Catalog, error) {
+func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
 	headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
-	pageHeader, err := bp.GetReadPage(headerPageId)
+	pageHeader, err := bp.BufferPageForRead(headerPageId)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func NewCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 }
 
 // CreateCatalog はカタログを新規作成する
-func CreateCatalog(bp *buffer.BufferPool) (*Catalog, error) {
+func CreateCatalog(bp *buffer.Pool) (*Catalog, error) {
 	headerPageId, err := bp.AllocatePageId(catalogFileId)
 	if err != nil {
 		return nil, err
@@ -100,7 +100,7 @@ func CreateCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 	}
 	defer bp.UnRefPage(headerPageId)
 
-	pageHeader, err := bp.GetWritePage(headerPageId)
+	pageHeader, err := bp.BufferPageForWrite(headerPageId)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func (c *Catalog) AllocateFileId() (page.FileId, error) {
 // persistScalar はヘッダーページの指定オフセットに uint32 値を書き込む
 func (c *Catalog) persistScalar(offset int, value uint32) error {
 	headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
-	pageHeader, err := c.bufferPool.GetWritePage(headerPageId)
+	pageHeader, err := c.bufferPool.BufferPageForWrite(headerPageId)
 	if err != nil {
 		return err
 	}

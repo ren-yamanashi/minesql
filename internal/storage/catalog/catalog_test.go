@@ -14,7 +14,7 @@ import (
 func TestNewCatalog(t *testing.T) {
 	t.Run("HeapFile が未登録の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		bp := buffer.NewBufferPool(page.PageSize * 20)
+		bp := buffer.NewPool(page.PageSize * 20)
 
 		// WHEN
 		_, err := NewCatalog(bp)
@@ -66,7 +66,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
-		pageHeader, err := bp.GetWritePage(headerPageId)
+		pageHeader, err := bp.BufferPageForWrite(headerPageId)
 		assert.NoError(t, err)
 		copy(pageHeader.Body[headerMagicNumberOffset:], []byte("XXXX"))
 		bp.UnRefPage(headerPageId)
@@ -82,7 +82,7 @@ func TestNewCatalog(t *testing.T) {
 func TestCreateCatalog(t *testing.T) {
 	t.Run("HeapFile が未登録の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		bp := buffer.NewBufferPool(page.PageSize * 20)
+		bp := buffer.NewPool(page.PageSize * 20)
 
 		// WHEN
 		_, err := CreateCatalog(bp)
@@ -113,7 +113,7 @@ func TestCreateCatalog(t *testing.T) {
 
 		// THEN
 		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
-		pageHeader, err := bp.GetReadPage(headerPageId)
+		pageHeader, err := bp.BufferPageForRead(headerPageId)
 		assert.NoError(t, err)
 		defer bp.UnRefPage(headerPageId)
 
@@ -131,7 +131,7 @@ func TestCreateCatalog(t *testing.T) {
 
 		// THEN
 		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
-		pageHeader, err := bp.GetReadPage(headerPageId)
+		pageHeader, err := bp.BufferPageForRead(headerPageId)
 		assert.NoError(t, err)
 		defer bp.UnRefPage(headerPageId)
 
@@ -218,7 +218,7 @@ func TestAllocateIndexId(t *testing.T) {
 }
 
 // setupCatalogTestBufferPool はカタログテスト用のバッファプールを作成する
-func setupCatalogTestBufferPool(t *testing.T) *buffer.BufferPool {
+func setupCatalogTestBufferPool(t *testing.T) *buffer.Pool {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "catalog_test.db")
 	fileId := page.FileId(0)
@@ -227,7 +227,7 @@ func setupCatalogTestBufferPool(t *testing.T) *buffer.BufferPool {
 		t.Fatalf("HeapFile の作成に失敗: %v", err)
 	}
 	t.Cleanup(func() { _ = hf.Close() })
-	bp := buffer.NewBufferPool(page.PageSize * 20)
+	bp := buffer.NewPool(page.PageSize * 20)
 	bp.RegisterHeapFile(fileId, hf)
 	return bp
 }

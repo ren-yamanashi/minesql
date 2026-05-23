@@ -10,7 +10,7 @@ import (
 // Search は指定された検索モードで B+Tree を検索する
 func (bt *Btree) Search(mode SearchMode) (*Iterator, error) {
 	// メタページ取得
-	pageMeta, err := bt.bufferPool.GetReadPage(bt.MetaPageId)
+	pageMeta, err := bt.bufferPool.BufferPageForRead(bt.MetaPageId)
 	if err != nil {
 		return nil, err
 	}
@@ -25,7 +25,7 @@ func (bt *Btree) Search(mode SearchMode) (*Iterator, error) {
 
 // searchRecursively は再帰的にノードを辿って該当のリーフノードを見つける
 func (bt *Btree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator, error) {
-	bufPage, err := bt.bufferPool.FetchPage(nodePageId)
+	bufPage, err := bt.bufferPool.BufferPage(nodePageId)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +89,7 @@ func (bt *Btree) FindByKey(key []byte) (Record, RecordPosition, error) {
 
 // LeafPageIds はブランチページのみ辿り、全リーフページの PageId を収集する
 func (bt *Btree) LeafPageIds() ([]page.Id, error) {
-	pageMeta, err := bt.bufferPool.GetReadPage(bt.MetaPageId)
+	pageMeta, err := bt.bufferPool.BufferPageForRead(bt.MetaPageId)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,7 @@ func (bt *Btree) LeafPageIds() ([]page.Id, error) {
 	for range height - 1 {
 		var nextLevel []page.Id
 		for _, nodePageId := range currentLevel {
-			pg, err := bt.bufferPool.GetReadPage(nodePageId)
+			pg, err := bt.bufferPool.BufferPageForRead(nodePageId)
 			if err != nil {
 				return nil, err
 			}

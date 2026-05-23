@@ -16,7 +16,7 @@ func TestIteratorGet(t *testing.T) {
 		bp, pageId := setupIteratorTestPage(t, func(ln *LeafNode) {
 			ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
-		bufPage, _ := bp.FetchPage(pageId)
+		bufPage, _ := bp.BufferPage(pageId)
 		iter := NewIterator(bp, *bufPage, 0)
 
 		// WHEN
@@ -33,7 +33,7 @@ func TestIteratorGet(t *testing.T) {
 		bp, pageId := setupIteratorTestPage(t, func(ln *LeafNode) {
 			ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
-		bufPage, _ := bp.FetchPage(pageId)
+		bufPage, _ := bp.BufferPage(pageId)
 		iter := NewIterator(bp, *bufPage, 1)
 
 		// WHEN
@@ -52,7 +52,7 @@ func TestIteratorNext(t *testing.T) {
 			ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 			ln.Insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
 		})
-		bufPage, _ := bp.FetchPage(pageId)
+		bufPage, _ := bp.BufferPage(pageId)
 		iter := NewIterator(bp, *bufPage, 0)
 
 		// WHEN
@@ -78,7 +78,7 @@ func TestIteratorNext(t *testing.T) {
 		bp, pageId := setupIteratorTestPage(t, func(ln *LeafNode) {
 			ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
-		bufPage, _ := bp.FetchPage(pageId)
+		bufPage, _ := bp.BufferPage(pageId)
 		iter := NewIterator(bp, *bufPage, 0)
 
 		// WHEN
@@ -97,7 +97,7 @@ func TestIteratorAdvance(t *testing.T) {
 			ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 			ln.Insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
 		})
-		bufPage, _ := bp.FetchPage(pageId)
+		bufPage, _ := bp.BufferPage(pageId)
 		iter := NewIterator(bp, *bufPage, 0)
 
 		// WHEN
@@ -112,10 +112,10 @@ func TestIteratorAdvance(t *testing.T) {
 }
 
 // setupIteratorTestPage はテスト用のバッファプールとリーフページを作成する
-func setupIteratorTestPage(t *testing.T, setup func(ln *LeafNode)) (*buffer.BufferPool, page.Id) {
+func setupIteratorTestPage(t *testing.T, setup func(ln *LeafNode)) (*buffer.Pool, page.Id) {
 	t.Helper()
 
-	bp := buffer.NewBufferPool(page.PageSize * 3)
+	bp := buffer.NewPool(page.PageSize * 3)
 	path := filepath.Join(t.TempDir(), "test.db")
 	hf, err := file.NewHeapFile(0, path)
 	assert.NoError(t, err)

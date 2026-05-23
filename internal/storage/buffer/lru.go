@@ -1,7 +1,7 @@
 package buffer
 
 type lruNode struct {
-	bufferId BufferId
+	bufferId id
 	prev     *lruNode
 	next     *lruNode
 	isOld    bool // OldSublist に所属しているか
@@ -9,28 +9,28 @@ type lruNode struct {
 }
 
 type lru struct {
-	head     *lruNode              // リストの先頭 (NewSublist の先頭)
-	tail     *lruNode              // リストの末尾 (OldSublist の末尾 = 追い出し候補)
-	midpoint *lruNode              // OldSublist の先頭 (midpoint)
-	nodeMap  map[BufferId]*lruNode // BufferId → ノードの参照
-	newLen   int                   // NewSublist の現在の長さ
-	oldLen   int                   // OldSublist の現在の長さ
-	maxNew   int                   // NewSublist の最大長 (全体の 5/8)
+	head     *lruNode        // リストの先頭 (NewSublist の先頭)
+	tail     *lruNode        // リストの末尾 (OldSublist の末尾 = 追い出し候補)
+	midpoint *lruNode        // OldSublist の先頭 (midpoint)
+	nodeMap  map[id]*lruNode // BufferId → ノードの参照
+	newLen   int             // NewSublist の現在の長さ
+	oldLen   int             // OldSublist の現在の長さ
+	maxNew   int             // NewSublist の最大長 (全体の 5/8)
 }
 
 func newLru(numOfPage int) *lru {
 	lru := &lru{
-		nodeMap: make(map[BufferId]*lruNode, numOfPage),
+		nodeMap: make(map[id]*lruNode, numOfPage),
 		maxNew:  numOfPage * 5 / 8,
 	}
 	// 初期状態では全て未使用なので、全スロットを OldSublist に追加
 	for i := range numOfPage {
 		node := &lruNode{
-			bufferId: BufferId(i),
+			bufferId: id(i),
 			isOld:    true,
 			isUnused: true,
 		}
-		lru.nodeMap[BufferId(i)] = node
+		lru.nodeMap[id(i)] = node
 		lru.insertToTail(node)
 	}
 	lru.midpoint = lru.head // 初期時点では全て OldSublist に属しているため、midpoint はリストの先頭を指す
@@ -39,7 +39,7 @@ func newLru(numOfPage int) *lru {
 }
 
 // access はページがアクセスされたことを記録する
-func (l *lru) access(bufferId BufferId) {
+func (l *lru) access(bufferId id) {
 	node := l.nodeMap[bufferId]
 
 	// 新規ページにアクセスした場合: midpoint に配置
@@ -60,14 +60,14 @@ func (l *lru) access(bufferId BufferId) {
 }
 
 // evict は追い出すページの BufferId を返す
-func (l *lru) evict() BufferId {
+func (l *lru) evict() id {
 	victim := l.tail
 	victim.isUnused = true
 	return victim.bufferId
 }
 
 // Delete はページの参照を解除し、優先的に追い出されるようにする
-func (l *lru) Delete(bufferId BufferId) {
+func (l *lru) Delete(bufferId id) {
 	node := l.nodeMap[bufferId]
 	l.moveToOldTail(node)
 }

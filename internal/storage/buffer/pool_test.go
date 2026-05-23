@@ -10,10 +10,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewBufferPool(t *testing.T) {
+func TestNewPool(t *testing.T) {
 	t.Run("サイズが PageSize 以下の場合 MaxNumOfPage が 1 になる", func(t *testing.T) {
 		// GIVEN / WHEN
-		bp := NewBufferPool(page.PageSize)
+		bp := NewPool(page.PageSize)
 
 		// THEN
 		assert.Equal(t, 1, bp.MaxNumOfPage)
@@ -21,7 +21,7 @@ func TestNewBufferPool(t *testing.T) {
 
 	t.Run("サイズが PageSize より大きい場合 MaxNumOfPage が算出される", func(t *testing.T) {
 		// GIVEN / WHEN
-		bp := NewBufferPool(page.PageSize * 3)
+		bp := NewPool(page.PageSize * 3)
 
 		// THEN
 		assert.Equal(t, 4, bp.MaxNumOfPage) // 3 + 1
@@ -29,7 +29,7 @@ func TestNewBufferPool(t *testing.T) {
 
 	t.Run("サイズが 0 の場合 MaxNumOfPage が 1 になる", func(t *testing.T) {
 		// GIVEN / WHEN
-		bp := NewBufferPool(0)
+		bp := NewPool(0)
 
 		// THEN
 		assert.Equal(t, 1, bp.MaxNumOfPage)
@@ -39,7 +39,7 @@ func TestNewBufferPool(t *testing.T) {
 func TestAllocatePageId(t *testing.T) {
 	t.Run("新しい PageId を割り当てられる", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(page.PageSize)
+		bp := NewPool(page.PageSize)
 		hf := setupHeapFile(t, 5)
 		bp.RegisterHeapFile(5, hf)
 
@@ -54,7 +54,7 @@ func TestAllocatePageId(t *testing.T) {
 
 	t.Run("連続で割り当てると PageNumber がインクリメントされる", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(page.PageSize)
+		bp := NewPool(page.PageSize)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 
@@ -71,7 +71,7 @@ func TestAllocatePageId(t *testing.T) {
 
 	t.Run("未登録の FileId の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(page.PageSize)
+		bp := NewPool(page.PageSize)
 
 		// WHEN
 		id, err := bp.AllocatePageId(99)
@@ -85,7 +85,7 @@ func TestAllocatePageId(t *testing.T) {
 func TestRegisterHeapFile(t *testing.T) {
 	t.Run("HeapFile を登録すると取得できる", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(page.PageSize)
+		bp := NewPool(page.PageSize)
 		hf := setupHeapFile(t, 1)
 
 		// WHEN
@@ -98,42 +98,10 @@ func TestRegisterHeapFile(t *testing.T) {
 	})
 }
 
-func TestBufferPage(t *testing.T) {
-	t.Run("キャッシュ済みページの BufferPage を取得できる", func(t *testing.T) {
-		// GIVEN
-		bp := NewBufferPool(page.PageSize * 2)
-		hf := setupHeapFile(t, 0)
-		bp.RegisterHeapFile(0, hf)
-		pageId := page.NewId(0, 0)
-		_, _ = bp.AddPage(pageId)
-
-		// WHEN
-		bufPage, ok := bp.BufferPage(pageId)
-
-		// THEN
-		assert.True(t, ok)
-		assert.NotNil(t, bufPage)
-		assert.Equal(t, pageId, bufPage.PageId)
-	})
-
-	t.Run("未キャッシュの PageId は false を返す", func(t *testing.T) {
-		// GIVEN
-		bp := NewBufferPool(page.PageSize * 2)
-		pageId := page.NewId(0, 99)
-
-		// WHEN
-		bufPage, ok := bp.BufferPage(pageId)
-
-		// THEN
-		assert.False(t, ok)
-		assert.Nil(t, bufPage)
-	})
-}
-
 func TestHeapFile(t *testing.T) {
 	t.Run("登録済みの HeapFile を取得できる", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(page.PageSize)
+		bp := NewPool(page.PageSize)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 
@@ -147,7 +115,7 @@ func TestHeapFile(t *testing.T) {
 
 	t.Run("未登録の FileId の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(page.PageSize)
+		bp := NewPool(page.PageSize)
 
 		// WHEN
 		got, err := bp.HeapFile(99)

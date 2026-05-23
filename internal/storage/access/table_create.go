@@ -37,7 +37,7 @@ type CreateTableInput struct {
 
 // CreateTable はテーブルを新規作成する
 func CreateTable(
-	bp *buffer.BufferPool,
+	bp *buffer.Pool,
 	undo *undo.Manager,
 	lock *lock.Manager,
 	input CreateTableInput,
@@ -86,7 +86,7 @@ func CreateTable(
 }
 
 // createTableFile はテーブルのファイルを作成する
-func createTableFile(ct *catalog.Catalog, bp *buffer.BufferPool, tableName string) (page.FileId, error) {
+func createTableFile(ct *catalog.Catalog, bp *buffer.Pool, tableName string) (page.FileId, error) {
 	path := filepath.Join(config.BaseDir, fmt.Sprintf("%s.db", tableName))
 	fileId, err := ct.AllocateFileId()
 	if err != nil {
@@ -141,7 +141,7 @@ func registerTableMeta(
 // createSecondaryIndexes はセカンダリインデックスを作成する
 func createSecondaryIndexes(
 	ct *catalog.Catalog,
-	bp *buffer.BufferPool,
+	bp *buffer.Pool,
 	fileId page.FileId,
 	pt *btree.Btree,
 	lock *lock.Manager,

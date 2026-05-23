@@ -19,11 +19,11 @@ type Table struct {
 	catalog          *catalog.Catalog
 	undoLog          *undo.Manager
 	lock             *lock.Manager
-	bufferPool       *buffer.BufferPool
+	bufferPool       *buffer.Pool
 }
 
 // NewTable は既存のテーブルを開く
-func NewTable(bp *buffer.BufferPool, ct *catalog.Catalog, undo *undo.Manager, lock *lock.Manager, name string) (*Table, error) {
+func NewTable(bp *buffer.Pool, ct *catalog.Catalog, undo *undo.Manager, lock *lock.Manager, name string) (*Table, error) {
 	table, err := fetchTable(ct, name)
 	if err != nil {
 		return nil, err
@@ -67,7 +67,7 @@ func fetchTable(ct *catalog.Catalog, name string) (catalog.TableRecord, error) {
 }
 
 // fetchPrimaryIndex はカタログからプライマリインデックスを取得して PrimaryIndex を構築する
-func fetchPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, fileId page.FileId, lock *lock.Manager) (*primaryIndex, error) {
+func fetchPrimaryIndex(ct *catalog.Catalog, bp *buffer.Pool, fileId page.FileId, lock *lock.Manager) (*primaryIndex, error) {
 	record, err := fetchPrimaryIndexRecord(ct, fileId)
 	if err != nil {
 		return nil, err
@@ -98,7 +98,7 @@ func fetchPrimaryIndexRecord(ct *catalog.Catalog, fileId page.FileId) (catalog.I
 // fetchSecondaryIndexes は指定テーブルのセカンダリインデックス一覧を返す
 func fetchSecondaryIndexes(
 	ct *catalog.Catalog,
-	bp *buffer.BufferPool,
+	bp *buffer.Pool,
 	fileId page.FileId,
 	pt *btree.Btree,
 	lock *lock.Manager,

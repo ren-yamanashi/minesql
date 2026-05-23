@@ -13,17 +13,17 @@ var (
 )
 
 type Btree struct {
-	bufferPool *buffer.BufferPool
+	bufferPool *buffer.Pool
 	MetaPageId page.Id
 }
 
 // NewBtree は既存の B+Tree を開く
-func NewBtree(bp *buffer.BufferPool, metaPageId page.Id) *Btree {
+func NewBtree(bp *buffer.Pool, metaPageId page.Id) *Btree {
 	return &Btree{bufferPool: bp, MetaPageId: metaPageId}
 }
 
 // CreateBtree は新しい B+Tree を作成する
-func CreateBtree(bp *buffer.BufferPool, fileId page.FileId) (*Btree, error) {
+func CreateBtree(bp *buffer.Pool, fileId page.FileId) (*Btree, error) {
 	MetaPageId, err := bp.AllocatePageId(fileId)
 	if err != nil {
 		return nil, err
@@ -35,7 +35,7 @@ func CreateBtree(bp *buffer.BufferPool, fileId page.FileId) (*Btree, error) {
 		return nil, err
 	}
 
-	pageMeta, err := bp.GetWritePage(MetaPageId)
+	pageMeta, err := bp.BufferPageForWrite(MetaPageId)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +50,7 @@ func CreateBtree(bp *buffer.BufferPool, fileId page.FileId) (*Btree, error) {
 	if err != nil {
 		return nil, err
 	}
-	pageRoot, err := bp.GetWritePage(rootNodePageId)
+	pageRoot, err := bp.BufferPageForWrite(rootNodePageId)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func CreateBtree(bp *buffer.BufferPool, fileId page.FileId) (*Btree, error) {
 
 // LeafPageCount はメタページからリーフページ数を取得する
 func (bt *Btree) LeafPageCount() (uint64, error) {
-	pageMeta, err := bt.bufferPool.GetReadPage(bt.MetaPageId)
+	pageMeta, err := bt.bufferPool.BufferPageForRead(bt.MetaPageId)
 	if err != nil {
 		return 0, err
 	}
@@ -78,7 +78,7 @@ func (bt *Btree) LeafPageCount() (uint64, error) {
 
 // Height はメタページから B+Tree の高さを取得する
 func (bt *Btree) Height() (uint64, error) {
-	pageMeta, err := bt.bufferPool.GetReadPage(bt.MetaPageId)
+	pageMeta, err := bt.bufferPool.BufferPageForRead(bt.MetaPageId)
 	if err != nil {
 		return 0, err
 	}

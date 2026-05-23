@@ -10,11 +10,11 @@ type IndexKeyColMeta struct {
 	tree *btree.Btree // インデックスキーカラムメタデータが格納される B+Tree
 }
 
-func NewIndexKeyColMeta(bp *buffer.BufferPool, metaPageId page.Id) *IndexKeyColMeta {
+func NewIndexKeyColMeta(bp *buffer.Pool, metaPageId page.Id) *IndexKeyColMeta {
 	return &IndexKeyColMeta{tree: btree.NewBtree(bp, metaPageId)}
 }
 
-func CreateIndexKeyColMeta(bp *buffer.BufferPool) (*IndexKeyColMeta, error) {
+func CreateIndexKeyColMeta(bp *buffer.Pool) (*IndexKeyColMeta, error) {
 	tree, err := btree.CreateBtree(bp, catalogFileId)
 	if err != nil {
 		return nil, err

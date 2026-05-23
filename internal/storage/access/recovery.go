@@ -13,12 +13,12 @@ import (
 
 type Recovery struct {
 	redoLog     *redo.Buffer
-	bufferPool  *buffer.BufferPool
+	bufferPool  *buffer.Pool
 	transaction *TrxManager
 	undoFileId  page.FileId // Undo ログの FileId
 }
 
-func NewRecovery(redo *redo.Buffer, bp *buffer.BufferPool, trx *TrxManager, undoFileId page.FileId) *Recovery {
+func NewRecovery(redo *redo.Buffer, bp *buffer.Pool, trx *TrxManager, undoFileId page.FileId) *Recovery {
 	return &Recovery{
 		redoLog:     redo,
 		bufferPool:  bp,
@@ -64,7 +64,7 @@ func (r *Recovery) applyRedoLog(records []redo.Record) error {
 		}
 
 		// Redo レコードの PageId から変更ページ取得
-		writePage, err := r.bufferPool.GetWritePage(rec.PageId)
+		writePage, err := r.bufferPool.BufferPageForWrite(rec.PageId)
 		if err != nil {
 			return err
 		}
@@ -124,7 +124,7 @@ func (r *Recovery) collectUndoRecords(trxId lock.TrxId) ([]undo.Record, error) {
 	var records []undo.Record
 	for {
 		pageId := page.NewId(r.undoFileId, pageNum)
-		readPage, readErr := r.bufferPool.GetReadPage(pageId)
+		readPage, readErr := r.bufferPool.BufferPageForRead(pageId)
 		if readErr != nil {
 			// Undo ページチェーンの終端に達した場合は正常終了
 			// GetReadPage はページが存在しない場合もエラーを返すため、先頭ページの読み取り失敗はチェーンが空であることを意味する

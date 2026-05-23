@@ -111,9 +111,9 @@ func TestHeight(t *testing.T) {
 }
 
 // setupBtreeTestBufferPool はテスト用のバッファプールを作成する
-func setupBtreeTestBufferPool(t *testing.T) *buffer.BufferPool {
+func setupBtreeTestBufferPool(t *testing.T) *buffer.Pool {
 	t.Helper()
-	bp := buffer.NewBufferPool(page.PageSize * 10)
+	bp := buffer.NewPool(page.PageSize * 10)
 	path := filepath.Join(t.TempDir(), "test.db")
 	hf, err := file.NewHeapFile(0, path)
 	assert.NoError(t, err)

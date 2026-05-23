@@ -11,7 +11,7 @@ import (
 
 // PageCleaner はバックグラウンドでのダーティーページのフラッシュを管理する
 type PageCleaner struct {
-	bufferPool      *buffer.BufferPool
+	bufferPool      *buffer.Pool
 	redoLog         *redo.Buffer
 	checkpoint      *Checkpoint
 	redoLogMaxSize  int           // Redo ログの最大サイズ
@@ -24,7 +24,7 @@ type PageCleaner struct {
 	isRunning       bool
 }
 
-func NewPageCleaner(bp *buffer.BufferPool, redo *redo.Buffer, redoMaxSize int, maxDirtyPct int) *PageCleaner {
+func NewPageCleaner(bp *buffer.Pool, redo *redo.Buffer, redoMaxSize int, maxDirtyPct int) *PageCleaner {
 	return &PageCleaner{
 		bufferPool:      bp,
 		redoLog:         redo,

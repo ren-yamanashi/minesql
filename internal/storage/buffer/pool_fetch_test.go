@@ -10,32 +10,32 @@ import (
 func TestGetWritePage(t *testing.T) {
 	t.Run("取得したページがダーティーになる", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(page.PageSize * 2)
+		bp := NewPool(page.PageSize * 2)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
 
 		// WHEN
-		_, err = bp.GetWritePage(pageId)
+		_, err = bp.BufferPageForWrite(pageId)
 
 		// THEN
 		assert.NoError(t, err)
-		bufPage, err := bp.FetchPage(pageId)
+		bufPage, err := bp.BufferPage(pageId)
 		assert.NoError(t, err)
 		assert.True(t, bufPage.isDirty)
 	})
 
 	t.Run("既にダーティーなページを再取得してもフラッシュリストに重複追加されない", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(page.PageSize * 2)
+		bp := NewPool(page.PageSize * 2)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
-		_, err = bp.GetWritePage(pageId)
+		_, err = bp.BufferPageForWrite(pageId)
 		assert.NoError(t, err)
 
 		// WHEN
-		_, err = bp.GetWritePage(pageId)
+		_, err = bp.BufferPageForWrite(pageId)
 		assert.NoError(t, err)
 
 		// THEN
@@ -44,18 +44,18 @@ func TestGetWritePage(t *testing.T) {
 
 	t.Run("書き込んだデータがフェッチ時に反映されている", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(page.PageSize * 2)
+		bp := NewPool(page.PageSize * 2)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
 
 		// WHEN
-		p, err := bp.GetWritePage(pageId)
+		p, err := bp.BufferPageForWrite(pageId)
 		assert.NoError(t, err)
 		p.Body[0] = 0xAA
 
 		// THEN
-		fetched, err := bp.FetchPage(pageId)
+		fetched, err := bp.BufferPage(pageId)
 		assert.NoError(t, err)
 		assert.Equal(t, byte(0xAA), fetched.Page.Body[0])
 	})
@@ -64,14 +64,14 @@ func TestGetWritePage(t *testing.T) {
 func TestGetReadPage(t *testing.T) {
 	t.Run("キャッシュ済みのページを取得できる", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(page.PageSize * 2)
+		bp := NewPool(page.PageSize * 2)
 		pageId := page.NewId(0, 0)
 		addedPage, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
 		addedPage.Page.Body[0] = 0xCC
 
 		// WHEN
-		p, err := bp.GetReadPage(pageId)
+		p, err := bp.BufferPageForRead(pageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -80,14 +80,14 @@ func TestGetReadPage(t *testing.T) {
 
 	t.Run("キャッシュにないページをディスクから読み込める", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(page.PageSize * 2)
+		bp := NewPool(page.PageSize * 2)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		writePageToDisk(t, hf, 0, 0xDD)
 
 		// WHEN
 		pageId := page.NewId(0, 0)
-		p, err := bp.GetReadPage(pageId)
+		p, err := bp.BufferPageForRead(pageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -96,17 +96,17 @@ func TestGetReadPage(t *testing.T) {
 
 	t.Run("読み込み用なのでダーティーにならない", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(page.PageSize * 2)
+		bp := NewPool(page.PageSize * 2)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
 
 		// WHEN
-		_, err = bp.GetReadPage(pageId)
+		_, err = bp.BufferPageForRead(pageId)
 		assert.NoError(t, err)
 
 		// THEN
-		bufPage, err := bp.FetchPage(pageId)
+		bufPage, err := bp.BufferPage(pageId)
 		assert.NoError(t, err)
 		assert.False(t, bufPage.isDirty)
 	})
@@ -115,13 +115,13 @@ func TestGetReadPage(t *testing.T) {
 func TestFetchPage(t *testing.T) {
 	t.Run("キャッシュ済みのページを取得できる", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(page.PageSize * 2)
+		bp := NewPool(page.PageSize * 2)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
 
 		// WHEN
-		bufPage, err := bp.FetchPage(pageId)
+		bufPage, err := bp.BufferPage(pageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -130,14 +130,14 @@ func TestFetchPage(t *testing.T) {
 
 	t.Run("キャッシュにないページをディスクから読み込める", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(page.PageSize * 2)
+		bp := NewPool(page.PageSize * 2)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		writePageToDisk(t, hf, 0, 0xAB)
 
 		// WHEN
 		pageId := page.NewId(0, 0)
-		bufPage, err := bp.FetchPage(pageId)
+		bufPage, err := bp.BufferPage(pageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -146,16 +146,16 @@ func TestFetchPage(t *testing.T) {
 
 	t.Run("同じページを 2 回フェッチしても同じデータが返る", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(page.PageSize * 2)
+		bp := NewPool(page.PageSize * 2)
 		pageId := page.NewId(0, 0)
 		addedPage, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
 		addedPage.Page.Body[0] = 0x42
 
 		// WHEN
-		bufPage1, err := bp.FetchPage(pageId)
+		bufPage1, err := bp.BufferPage(pageId)
 		assert.NoError(t, err)
-		bufPage2, err := bp.FetchPage(pageId)
+		bufPage2, err := bp.BufferPage(pageId)
 		assert.NoError(t, err)
 
 		// THEN
@@ -167,7 +167,7 @@ func TestFetchPage(t *testing.T) {
 func TestIsPageCached(t *testing.T) {
 	t.Run("キャッシュ済みのページに対して true を返す", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(page.PageSize * 2)
+		bp := NewPool(page.PageSize * 2)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -181,7 +181,7 @@ func TestIsPageCached(t *testing.T) {
 
 	t.Run("キャッシュにないページに対して false を返す", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(page.PageSize * 2)
+		bp := NewPool(page.PageSize * 2)
 
 		// WHEN
 		result := bp.IsPageCached(page.NewId(0, 99))
@@ -194,7 +194,7 @@ func TestIsPageCached(t *testing.T) {
 func TestUnRefPage(t *testing.T) {
 	t.Run("参照解除したページが優先的に追い出される", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(page.PageSize * 2) // MaxNumOfPage=3
+		bp := NewPool(page.PageSize * 2) // MaxNumOfPage=3
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		id0 := page.NewId(0, 0)
@@ -220,7 +220,7 @@ func TestUnRefPage(t *testing.T) {
 
 	t.Run("キャッシュにないページを参照解除しても何も起きない", func(t *testing.T) {
 		// GIVEN
-		bp := NewBufferPool(page.PageSize * 2)
+		bp := NewPool(page.PageSize * 2)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)

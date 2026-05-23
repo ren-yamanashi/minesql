@@ -18,9 +18,7 @@ type (
 	PageNumber uint32
 )
 
-// Id は全体でページを一意に特定するための識別子
-//
-// レイアウト:
+// Id は全体でページを一意に特定するための識別子 (PageId)
 //   - FileId: 先頭 4 バイト
 //   - PageNumber: 次の 4 バイト
 type Id struct {

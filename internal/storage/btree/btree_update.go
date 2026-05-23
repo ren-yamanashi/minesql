@@ -10,7 +10,7 @@ import (
 // Update は B+Tree の特定のノードの値を更新する
 func (bt *Btree) Update(record Record) error {
 	// メタページを取得
-	pageMeta, err := bt.bufferPool.GetReadPage(bt.MetaPageId)
+	pageMeta, err := bt.bufferPool.BufferPageForRead(bt.MetaPageId)
 	if err != nil {
 		return err
 	}
@@ -19,7 +19,7 @@ func (bt *Btree) Update(record Record) error {
 
 	// ルートページ取得
 	rootPageId := metaPage.rootPageId()
-	rootBufPage, err := bt.bufferPool.FetchPage(rootPageId)
+	rootBufPage, err := bt.bufferPool.BufferPage(rootPageId)
 	if err != nil {
 		return err
 	}
@@ -27,8 +27,8 @@ func (bt *Btree) Update(record Record) error {
 }
 
 // updateRecursively は再起的にノードを辿ってレコードを更新する
-func (bt *Btree) updateRecursively(bufPage *buffer.BufferPage, record Record) error {
-	pg, err := bt.bufferPool.GetWritePage(bufPage.PageId)
+func (bt *Btree) updateRecursively(bufPage *buffer.Page, record Record) error {
+	pg, err := bt.bufferPool.BufferPageForWrite(bufPage.PageId)
 	if err != nil {
 		return err
 	}
@@ -44,7 +44,7 @@ func (bt *Btree) updateRecursively(bufPage *buffer.BufferPage, record Record) er
 		if err != nil {
 			return err
 		}
-		childBufPage, err := bt.bufferPool.FetchPage(childPageId)
+		childBufPage, err := bt.bufferPool.BufferPage(childPageId)
 		if err != nil {
 			return err
 		}

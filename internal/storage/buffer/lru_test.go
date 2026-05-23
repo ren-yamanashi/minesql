@@ -94,11 +94,11 @@ func TestAccess(t *testing.T) {
 		lru := newLru(8)
 		// 6 個のノードにアクセスして midpoint に配置
 		for i := range 6 {
-			lru.access(BufferId(i))
+			lru.access(id(i))
 		}
 		// 全て Old → New に昇格 (6 個)
 		for i := range 6 {
-			lru.access(BufferId(i))
+			lru.access(id(i))
 		}
 
 		// THEN
@@ -125,22 +125,22 @@ func TestAccess(t *testing.T) {
 
 		// ページ 0, 1, 2 をホットページとして New に昇格
 		for i := range 3 {
-			lru.access(BufferId(i)) // unused → midpoint
+			lru.access(id(i)) // unused → midpoint
 		}
 		for i := range 3 {
-			lru.access(BufferId(i)) // Old → New head
+			lru.access(id(i)) // Old → New head
 		}
 
 		// WHEN
 		// ページ 3, 4, 5, 6, 7 をスキャン (midpoint に配置されるだけ)
 		for i := 3; i < 8; i++ {
-			lru.access(BufferId(i)) // unused → midpoint
+			lru.access(id(i)) // unused → midpoint
 		}
 
 		// THEN
 		// ホットページ 0, 1, 2 はまだ New にいる
 		for i := range 3 {
-			node := lru.nodeMap[BufferId(i)]
+			node := lru.nodeMap[id(i)]
 			assert.False(t, node.isOld)
 		}
 	})

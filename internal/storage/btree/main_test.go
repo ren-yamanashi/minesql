@@ -453,12 +453,12 @@ Branch[keys=1]: [key_10]
 
 		// THEN: ブランチの境界キーと左右の子のキーの関係をログに出力
 		var w strings.Builder
-		pageMeta, err := tree.bufferPool.GetReadPage(tree.MetaPageId)
+		pageMeta, err := tree.bufferPool.BufferPageForRead(tree.MetaPageId)
 		require.NoError(t, err)
 		meta := newMetaPage(pageMeta)
 		rootPageId := meta.rootPageId()
 
-		pageRoot, err := tree.bufferPool.GetReadPage(rootPageId)
+		pageRoot, err := tree.bufferPool.BufferPageForRead(rootPageId)
 		require.NoError(t, err)
 
 		nodeType := GetNodeType(pageRoot)
@@ -473,7 +473,7 @@ Branch[keys=1]: [key_10]
 			// 左の子
 			leftPageId, err := branch.ChildPageId(i)
 			require.NoError(t, err)
-			pageLeaf, err := tree.bufferPool.GetReadPage(leftPageId)
+			pageLeaf, err := tree.bufferPool.BufferPageForRead(leftPageId)
 			require.NoError(t, err)
 			leftLeaf := NewLeafNode(pageLeaf)
 			lastLeftKey := string(leftLeaf.Record(leftLeaf.NumRecords() - 1).Key())
@@ -481,7 +481,7 @@ Branch[keys=1]: [key_10]
 			// 右の子
 			rightPageId, err := branch.ChildPageId(i + 1)
 			require.NoError(t, err)
-			pageRight, err := tree.bufferPool.GetReadPage(rightPageId)
+			pageRight, err := tree.bufferPool.BufferPageForRead(rightPageId)
 			require.NoError(t, err)
 			rightLeaf := NewLeafNode(pageRight)
 			firstRightKey := string(rightLeaf.Record(0).Key())
@@ -510,12 +510,12 @@ Branch[keys=1]: [key_10]
 			key := fmt.Sprintf("key_%02d", i)
 			tree.mustInsert(key, strings.Repeat("x", 200))
 
-			pageMeta, err := tree.bufferPool.GetReadPage(tree.MetaPageId)
+			pageMeta, err := tree.bufferPool.BufferPageForRead(tree.MetaPageId)
 			require.NoError(t, err)
 			metaPage := newMetaPage(pageMeta)
 			rootPageId := metaPage.rootPageId()
 
-			pageRoot, err := tree.bufferPool.GetReadPage(rootPageId)
+			pageRoot, err := tree.bufferPool.BufferPageForRead(rootPageId)
 			require.NoError(t, err)
 			nodeType := GetNodeType(pageRoot)
 
@@ -617,7 +617,7 @@ func writeScanLog(w *strings.Builder, tree *Btree) {
 
 // ツリーのルートノード情報をログに書き出す (ノードタイプ, キー数, キー一覧)
 func writeRootInfo(w *strings.Builder, tree *Btree) {
-	pageMeta, err := tree.bufferPool.GetReadPage(tree.MetaPageId)
+	pageMeta, err := tree.bufferPool.BufferPageForRead(tree.MetaPageId)
 	if err != nil {
 		panic(err)
 	}
@@ -626,7 +626,7 @@ func writeRootInfo(w *strings.Builder, tree *Btree) {
 
 // ノード情報を再帰的にログに書き出す
 func writeNodeInfo(w *strings.Builder, pageId page.Id, depth int, tree *Btree) {
-	pg, err := tree.bufferPool.GetReadPage(pageId)
+	pg, err := tree.bufferPool.BufferPageForRead(pageId)
 	if err != nil {
 		panic(err)
 	}
@@ -662,7 +662,7 @@ func writeNodeInfo(w *strings.Builder, pageId page.Id, depth int, tree *Btree) {
 
 // ツリーの形状 (高さ、各深さのノードタイプ・ノード数・キー数) をコンパクトに出力する
 func writeTreeShape(w *strings.Builder, tree *Btree) {
-	pageMeta, err := tree.bufferPool.GetReadPage(tree.MetaPageId)
+	pageMeta, err := tree.bufferPool.BufferPageForRead(tree.MetaPageId)
 	if err != nil {
 		panic(err)
 	}
@@ -678,7 +678,7 @@ func writeTreeShape(w *strings.Builder, tree *Btree) {
 
 	var collect func(pageId page.Id, depth int)
 	collect = func(pageId page.Id, depth int) {
-		pg, err := tree.bufferPool.GetReadPage(pageId)
+		pg, err := tree.bufferPool.BufferPageForRead(pageId)
 		if err != nil {
 			panic(err)
 		}
@@ -737,7 +737,7 @@ func setupBtree(t *testing.T) *Btree {
 	if err != nil {
 		t.Fatalf("HeapFile の作成に失敗: %v", err)
 	}
-	bp := buffer.NewBufferPool(page.PageSize * 10)
+	bp := buffer.NewPool(page.PageSize * 10)
 	bp.RegisterHeapFile(fileId, heapFile)
 
 	bt, err := CreateBtree(bp, fileId)

@@ -19,7 +19,7 @@ type primaryIndex struct {
 }
 
 // newPrimaryIndex は既存のプライマリインデックスを開く
-func newPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, metaPageId page.Id, pkCount int, lock *lock.Manager) *primaryIndex {
+func newPrimaryIndex(ct *catalog.Catalog, bp *buffer.Pool, metaPageId page.Id, pkCount int, lock *lock.Manager) *primaryIndex {
 	tree := btree.NewBtree(bp, metaPageId)
 	return &primaryIndex{
 		catalog: ct,
@@ -30,7 +30,7 @@ func newPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, metaPageId page
 }
 
 // createPrimaryIndex は空のプライマリインデックスを作成する
-func createPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, fileId page.FileId, pkCount int, lock *lock.Manager) (*primaryIndex, error) {
+func createPrimaryIndex(ct *catalog.Catalog, bp *buffer.Pool, fileId page.FileId, pkCount int, lock *lock.Manager) (*primaryIndex, error) {
 	tree, err := btree.CreateBtree(bp, fileId)
 	if err != nil {
 		return nil, err

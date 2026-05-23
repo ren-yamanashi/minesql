@@ -8,13 +8,13 @@ import (
 
 // Iterator は B+Tree のリーフノードを走査する
 type Iterator struct {
-	bufferPool   *buffer.BufferPool
-	bufferPage   buffer.BufferPage // 現在参照しているバッファページ
-	slotNum      int               // 現在参照されているスロット番号
-	lastPosition RecordPosition    // 直前に Next で取得されたレコードの位置
+	bufferPool   *buffer.Pool
+	bufferPage   buffer.Page    // 現在参照しているバッファページ
+	slotNum      int            // 現在参照されているスロット番号
+	lastPosition RecordPosition // 直前に Next で取得されたレコードの位置
 }
 
-func NewIterator(bufPool *buffer.BufferPool, bufPage buffer.BufferPage, slotNum int) *Iterator {
+func NewIterator(bufPool *buffer.Pool, bufPage buffer.Page, slotNum int) *Iterator {
 	return &Iterator{
 		bufferPool: bufPool,
 		bufferPage: bufPage,
@@ -24,7 +24,7 @@ func NewIterator(bufPool *buffer.BufferPool, bufPage buffer.BufferPage, slotNum 
 
 // Get は現在参照しているリーフノードのレコードを取得
 func (iter *Iterator) Get() (Record, bool, error) {
-	pg, err := iter.bufferPool.GetReadPage(iter.bufferPage.PageId)
+	pg, err := iter.bufferPool.BufferPageForRead(iter.bufferPage.PageId)
 	if err != nil {
 		return NewRecord(nil, nil, nil), false, err
 	}
@@ -64,7 +64,7 @@ func (iter *Iterator) Next() (Record, bool, error) {
 
 // Advance は次のレコードに進む
 func (iter *Iterator) Advance() error {
-	pg, err := iter.bufferPool.GetReadPage(iter.bufferPage.PageId)
+	pg, err := iter.bufferPool.BufferPageForRead(iter.bufferPage.PageId)
 	if err != nil {
 		return err
 	}
@@ -91,7 +91,7 @@ func (iter *Iterator) Advance() error {
 	// 次のページに移動
 	oldPageId := iter.bufferPage.PageId
 	iter.bufferPool.UnRefPage(oldPageId)
-	nextPage, err := iter.bufferPool.FetchPage(nextPageId)
+	nextPage, err := iter.bufferPool.BufferPage(nextPageId)
 	if err != nil {
 		return err
 	}

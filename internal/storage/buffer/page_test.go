@@ -7,13 +7,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewBufferPage(t *testing.T) {
-	t.Run("指定した PageId で BufferPage を生成できる", func(t *testing.T) {
+func TestNewPage(t *testing.T) {
+	t.Run("指定した PageId で Page を生成できる", func(t *testing.T) {
 		// GIVEN
 		pageId := page.NewId(1, 0)
 
 		// WHEN
-		bp, err := newBufferPage(pageId)
+		bp, err := newPage(pageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -27,7 +27,7 @@ func TestNewBufferPage(t *testing.T) {
 		pageId := page.NewId(0, 0)
 
 		// WHEN
-		bp, err := newBufferPage(pageId)
+		bp, err := newPage(pageId)
 
 		// THEN
 		assert.NoError(t, err)

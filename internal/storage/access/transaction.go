@@ -23,14 +23,14 @@ type TrxManager struct {
 	undoLog      *undo.Manager
 	redoLog      *redo.Buffer
 	lock         *lock.Manager
-	bufferPool   *buffer.BufferPool
+	bufferPool   *buffer.Pool
 	catalog      *catalog.Catalog
 	transactions map[lock.TrxId]TrxState
 	readViews    map[lock.TrxId]*readView // トランザクションごとの ReadView キャッシュ
 	nextTrxId    lock.TrxId               // 次に払い出すトランザクション ID
 }
 
-func NewTrxManager(ct *catalog.Catalog, undo *undo.Manager, redo *redo.Buffer, lockMgr *lock.Manager, bp *buffer.BufferPool) *TrxManager {
+func NewTrxManager(ct *catalog.Catalog, undo *undo.Manager, redo *redo.Buffer, lockMgr *lock.Manager, bp *buffer.Pool) *TrxManager {
 	return &TrxManager{
 		undoLog:      undo,
 		redoLog:      redo,

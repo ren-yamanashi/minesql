@@ -5,18 +5,18 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
-type BufferPage struct {
+type Page struct {
 	PageId  page.Id
 	Page    *page.Page
 	isDirty bool
 }
 
-func newBufferPage(pageId page.Id) (*BufferPage, error) {
+func newPage(pageId page.Id) (*Page, error) {
 	p, err := page.NewPage(directio.AlignedBlock(page.PageSize))
 	if err != nil {
 		return nil, err
 	}
-	return &BufferPage{
+	return &Page{
 		PageId:  pageId,
 		Page:    p,
 		isDirty: false,

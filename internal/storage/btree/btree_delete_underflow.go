@@ -11,7 +11,7 @@ import (
 // siblingInfo は兄弟ノードの情報を表す
 type siblingInfo struct {
 	pageId     page.Id
-	bufferPage *buffer.BufferPage
+	bufferPage *buffer.Page
 	isLeft     bool // true: 兄弟ノードは左の兄弟ノード, false: 兄弟ノードは右の兄弟ノード
 }
 
@@ -24,7 +24,7 @@ type siblingInfo struct {
 //   - isLeafMerged: リーフノードのマージが発生したか
 func (bt *Btree) deleteUnderflow(
 	branchNode *BranchNode,
-	childBufPage *buffer.BufferPage,
+	childBufPage *buffer.Page,
 	childSlotNum int,
 ) (underflow bool, isLeafMerged bool, err error) {
 	// 転送・マージする兄弟ノードを決定
@@ -34,7 +34,7 @@ func (bt *Btree) deleteUnderflow(
 	}
 
 	// 兄弟ノードの取得
-	siblingBufPage, err := bt.bufferPool.FetchPage(sibling.pageId)
+	siblingBufPage, err := bt.bufferPool.BufferPage(sibling.pageId)
 	if err != nil {
 		return false, false, err
 	}
@@ -42,7 +42,7 @@ func (bt *Btree) deleteUnderflow(
 	defer bt.bufferPool.UnRefPage(sibling.pageId)
 
 	// 子ノードの取得
-	childPage, err := bt.bufferPool.GetReadPage(childBufPage.PageId)
+	childPage, err := bt.bufferPool.BufferPageForRead(childBufPage.PageId)
 	if err != nil {
 		return false, false, err
 	}
@@ -68,15 +68,15 @@ func (bt *Btree) deleteUnderflow(
 //   - isLeafMerged: リーフノードのマージが発生したか
 func (bt *Btree) onLeafUnderflow(
 	parentBranch *BranchNode,
-	childBufPage *buffer.BufferPage,
+	childBufPage *buffer.Page,
 	sibling siblingInfo,
 	childSlotNum int,
 ) (underflow bool, isLeafMerged bool, err error) {
-	pageChild, err := bt.bufferPool.GetWritePage(childBufPage.PageId)
+	pageChild, err := bt.bufferPool.BufferPageForWrite(childBufPage.PageId)
 	if err != nil {
 		return false, false, err
 	}
-	pageSibling, err := bt.bufferPool.GetWritePage(sibling.pageId)
+	pageSibling, err := bt.bufferPool.BufferPageForWrite(sibling.pageId)
 	if err != nil {
 		return false, false, err
 	}
@@ -153,15 +153,15 @@ func (bt *Btree) onLeafUnderflow(
 //   - return: (アンダーフローが発生したかどうか, リーフマージが発生したかどうか)
 func (bt *Btree) onBranchUnderflow(
 	parentBranch *BranchNode,
-	childBufPage *buffer.BufferPage,
+	childBufPage *buffer.Page,
 	sibling siblingInfo,
 	childSlotNum int,
 ) (underflow bool, err error) {
-	pageChild, err := bt.bufferPool.GetWritePage(childBufPage.PageId)
+	pageChild, err := bt.bufferPool.BufferPageForWrite(childBufPage.PageId)
 	if err != nil {
 		return false, err
 	}
-	pageSibling, err := bt.bufferPool.GetWritePage(sibling.pageId)
+	pageSibling, err := bt.bufferPool.BufferPageForWrite(sibling.pageId)
 	if err != nil {
 		return false, err
 	}
@@ -256,7 +256,7 @@ func (bt *Btree) relinkLeafAfterMerge(disappearing, survivor *LeafNode, survivor
 	survivor.SetNextPageId(disappearing.NextPageId())
 	if nextPageId := disappearing.NextPageId(); !nextPageId.IsInvalid() {
 		defer bt.bufferPool.UnRefPage(nextPageId)
-		pageNext, err := bt.bufferPool.GetWritePage(nextPageId)
+		pageNext, err := bt.bufferPool.BufferPageForWrite(nextPageId)
 		if err != nil {
 			return err
 		}

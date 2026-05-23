@@ -128,7 +128,7 @@ func setupTestUserMeta(t *testing.T) *UserMeta {
 }
 
 // setupDictTestBufferPool は dictionary テスト用のバッファプールを作成する
-func setupDictTestBufferPool(t *testing.T) *buffer.BufferPool {
+func setupDictTestBufferPool(t *testing.T) *buffer.Pool {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "dict_test.db")
 	fileId := page.FileId(0)
@@ -137,7 +137,7 @@ func setupDictTestBufferPool(t *testing.T) *buffer.BufferPool {
 		t.Fatalf("HeapFile の作成に失敗: %v", err)
 	}
 	t.Cleanup(func() { _ = hf.Close() })
-	bp := buffer.NewBufferPool(page.PageSize * 10)
+	bp := buffer.NewPool(page.PageSize * 10)
 	bp.RegisterHeapFile(fileId, hf)
 	return bp
 }

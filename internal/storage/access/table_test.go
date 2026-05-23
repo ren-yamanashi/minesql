@@ -173,7 +173,7 @@ func TestTableBuildSecondaryRecord(t *testing.T) {
 // tableTestEnv は Table テスト用の環境
 type tableTestEnv struct {
 	ct      *catalog.Catalog
-	bp      *buffer.BufferPool
+	bp      *buffer.Pool
 	lock    *lock.Manager
 	undoLog *undo.Manager
 }

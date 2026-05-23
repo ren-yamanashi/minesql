@@ -35,7 +35,7 @@ type secondaryIndex struct {
 // newSecondaryIndex は既存のセカンダリインデックスを開く
 func newSecondaryIndex(
 	ct *catalog.Catalog,
-	bp *buffer.BufferPool,
+	bp *buffer.Pool,
 	input newSecondaryIndexInput,
 ) *secondaryIndex {
 	tree := btree.NewBtree(bp, input.MetaPageId)
@@ -63,7 +63,7 @@ type createSecondaryIndexInput struct {
 // createSecondaryIndex は空のセカンダリインデックスを作成する
 func createSecondaryIndex(
 	ct *catalog.Catalog,
-	bp *buffer.BufferPool,
+	bp *buffer.Pool,
 	input createSecondaryIndexInput,
 ) (*secondaryIndex, error) {
 	tree, err := btree.CreateBtree(bp, input.FileId)

@@ -10,11 +10,11 @@ import (
 
 // Checkpoint はチェックポイントの実行を管理する
 type Checkpoint struct {
-	bufferPool *buffer.BufferPool
+	bufferPool *buffer.Pool
 	redoLog    *redo.Buffer
 }
 
-func NewCheckpoint(bp *buffer.BufferPool, redo *redo.Buffer) *Checkpoint {
+func NewCheckpoint(bp *buffer.Pool, redo *redo.Buffer) *Checkpoint {
 	return &Checkpoint{bufferPool: bp, redoLog: redo}
 }
 

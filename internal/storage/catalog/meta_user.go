@@ -11,11 +11,11 @@ type UserMeta struct {
 }
 
 // NewUserMeta は既存のユーザーメタデータを開く
-func NewUserMeta(bp *buffer.BufferPool, metaPageId page.Id) *UserMeta {
+func NewUserMeta(bp *buffer.Pool, metaPageId page.Id) *UserMeta {
 	return &UserMeta{tree: btree.NewBtree(bp, metaPageId)}
 }
 
-func CreateUserMeta(bp *buffer.BufferPool) (*UserMeta, error) {
+func CreateUserMeta(bp *buffer.Pool) (*UserMeta, error) {
 	tree, err := btree.CreateBtree(bp, catalogFileId)
 	if err != nil {
 		return nil, err

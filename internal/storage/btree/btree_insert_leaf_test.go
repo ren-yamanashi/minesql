@@ -76,9 +76,9 @@ func TestInsertLeaf(t *testing.T) {
 }
 
 // setupBtreeBufferPool はテスト用のバッファプールを作成する
-func setupBtreeBufferPool(t *testing.T) *buffer.BufferPool {
+func setupBtreeBufferPool(t *testing.T) *buffer.Pool {
 	t.Helper()
-	bp := buffer.NewBufferPool(page.PageSize * 20)
+	bp := buffer.NewPool(page.PageSize * 20)
 	path := filepath.Join(t.TempDir(), "test.db")
 	hf, err := file.NewHeapFile(0, path)
 	assert.NoError(t, err)
@@ -88,7 +88,7 @@ func setupBtreeBufferPool(t *testing.T) *buffer.BufferPool {
 }
 
 // setupBtreeForTest はテスト用の Btree とバッファプールを返す
-func setupBtreeForTest(t *testing.T) (*Btree, *buffer.BufferPool) {
+func setupBtreeForTest(t *testing.T) (*Btree, *buffer.Pool) {
 	t.Helper()
 	bp := setupBtreeBufferPool(t)
 	bt, err := CreateBtree(bp, page.FileId(0))
@@ -97,13 +97,13 @@ func setupBtreeForTest(t *testing.T) (*Btree, *buffer.BufferPool) {
 }
 
 // setupTestLeafPage はテスト用のリーフページを作成し、PageId と Page を返す
-func setupTestLeafPage(t *testing.T, bp *buffer.BufferPool) (page.Id, *page.Page) {
+func setupTestLeafPage(t *testing.T, bp *buffer.Pool) (page.Id, *page.Page) {
 	t.Helper()
 	pageId, err := bp.AllocatePageId(0)
 	assert.NoError(t, err)
 	_, err = bp.AddPage(pageId)
 	assert.NoError(t, err)
-	pg, err := bp.GetWritePage(pageId)
+	pg, err := bp.BufferPageForWrite(pageId)
 	assert.NoError(t, err)
 	ln := NewLeafNode(pg)
 	ln.Initialize()

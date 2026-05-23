@@ -116,7 +116,7 @@ func TestExecute(t *testing.T) {
 
 		// COMMIT せずに Redo ログにページ変更だけ記録してフラッシュ
 		pgId := page.NewId(env.undoFileId, 0)
-		readPage, _ := env.bp.GetReadPage(pgId)
+		readPage, _ := env.bp.BufferPageForRead(pgId)
 		env.redoLog.AppendPageCopy(trxId, pgId, *readPage)
 		_ = env.redoLog.Flush()
 
@@ -188,7 +188,7 @@ func TestApplyRedoLog(t *testing.T) {
 
 		// ページを取得して、Page LSN に大きな値を書き込む
 		pgId := page.NewId(env.undoFileId, 0)
-		writePage, err := env.bp.GetWritePage(pgId)
+		writePage, err := env.bp.BufferPageForWrite(pgId)
 		assert.NoError(t, err)
 		originalData := make([]byte, page.PageSize)
 		copy(originalData, writePage.ToBytes())
@@ -214,7 +214,7 @@ func TestApplyRedoLog(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		// ページが上書きされていないことを確認 (body の先頭は 0xFF ではない)
-		readPage, _ := env.bp.GetReadPage(pgId)
+		readPage, _ := env.bp.BufferPageForRead(pgId)
 		assert.NotEqual(t, byte(0xFF), readPage.Body[0])
 	})
 }
@@ -242,7 +242,7 @@ func TestApplyRollback(t *testing.T) {
 
 		// trx1 は COMMIT 済み (Commit 内で Redo ログに記録される)、trx2 は未 COMMIT
 		pgId := page.NewId(env.undoFileId, 0)
-		readPage, _ := env.bp.GetReadPage(pgId)
+		readPage, _ := env.bp.BufferPageForRead(pgId)
 		env.redoLog.AppendPageCopy(trx2, pgId, *readPage)
 		_ = env.redoLog.Flush()
 
@@ -267,7 +267,7 @@ func TestApplyRollback(t *testing.T) {
 
 // recoveryTestEnv はリカバリテスト用の環境
 type recoveryTestEnv struct {
-	bp         *buffer.BufferPool
+	bp         *buffer.Pool
 	redoLog    *redo.Buffer
 	trxManager *TrxManager
 	undoFileId page.FileId

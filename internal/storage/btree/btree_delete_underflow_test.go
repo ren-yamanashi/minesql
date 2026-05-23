@@ -349,7 +349,7 @@ func TestDeleteUnderflow(t *testing.T) {
 }
 
 // allocateTestPage はテスト用にページを割り当ててバッファプールに追加する
-func allocateTestPage(t *testing.T, bp *buffer.BufferPool) (page.Id, *buffer.BufferPage) {
+func allocateTestPage(t *testing.T, bp *buffer.Pool) (page.Id, *buffer.Page) {
 	t.Helper()
 	pageId, err := bp.AllocatePageId(0)
 	assert.NoError(t, err)
@@ -359,9 +359,9 @@ func allocateTestPage(t *testing.T, bp *buffer.BufferPool) (page.Id, *buffer.Buf
 }
 
 // initTestLeafNode はテスト用の初期化済みリーフノードを作成する
-func initTestLeafNode(t *testing.T, bp *buffer.BufferPool, pageId page.Id) *LeafNode {
+func initTestLeafNode(t *testing.T, bp *buffer.Pool, pageId page.Id) *LeafNode {
 	t.Helper()
-	pg, err := bp.GetWritePage(pageId)
+	pg, err := bp.BufferPageForWrite(pageId)
 	assert.NoError(t, err)
 	leaf := NewLeafNode(pg)
 	leaf.Initialize()
@@ -371,13 +371,13 @@ func initTestLeafNode(t *testing.T, bp *buffer.BufferPool, pageId page.Id) *Leaf
 // initTestBranchNode はテスト用の初期化済みブランチノードを作成する
 func initTestBranchNode(
 	t *testing.T,
-	bp *buffer.BufferPool,
+	bp *buffer.Pool,
 	pageId page.Id,
 	key []byte,
 	leftChild, rightChild page.Id,
 ) *BranchNode {
 	t.Helper()
-	pg, err := bp.GetWritePage(pageId)
+	pg, err := bp.BufferPageForWrite(pageId)
 	assert.NoError(t, err)
 	branch := NewBranchNode(pg)
 	err = branch.Initialize(key, leftChild, rightChild)
