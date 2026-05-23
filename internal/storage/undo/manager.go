@@ -2,12 +2,15 @@ package undo
 
 import (
 	"errors"
+	"slices"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
+
+var errRecordTooLarge = errors.New("undo: record too large for a single page")
 
 // Entry は Undo ログのエントリ
 type Entry struct {
@@ -39,7 +42,7 @@ func NewManager(bp *buffer.Pool, redo *redo.Buffer, undoFileId page.FileId) (*Ma
 	if err != nil {
 		return nil, err
 	}
-	NewPage(*bufPageUndo.Page).Initialize()
+	NewPage(*bufPageUndo.Page).initialize()
 
 	return &Manager{
 		bufferPool:    bp,
@@ -88,19 +91,14 @@ func (m *Manager) CommittedEntries(committedTrxIds []lock.TrxId) []Entry {
 }
 
 // Discard は指定した trxId の Undo ログをすべて破棄する
-func (m *Manager) Discard(trxId lock.TrxId) {
-	delete(m.entries, trxId)
-}
+func (m *Manager) Discard(trxId lock.TrxId) { delete(m.entries, trxId) }
 
 // DiscardRecordType は指定した trxId の指定したレコードタイプの Undo レコードのみ破棄する
 func (m *Manager) DiscardRecordType(trxId lock.TrxId, recordType recordType) {
 	entries := m.entries[trxId]
-	kept := make([]Entry, 0, len(entries))
-	for _, e := range entries {
-		if e.RecordType != recordType {
-			kept = append(kept, e)
-		}
-	}
+	kept := slices.DeleteFunc(entries, func(e Entry) bool {
+		return e.RecordType == recordType
+	})
 	if len(kept) == 0 {
 		delete(m.entries, trxId)
 	} else {
@@ -131,6 +129,15 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 		// 現在のページに次のページへのリンクを設定
 		bufPageUndo.setNextPageNumber(newPageId.PageNumber)
 
+		// 旧ページの REDO ログを記録 (nextPageNumber の変更を反映)
+		if m.redoLog != nil {
+			oldPage, err := m.bufferPool.PageForRead(m.currentPageId)
+			if err != nil {
+				return Pointer{}, err
+			}
+			m.redoLog.AppendPageCopy(trxId, m.currentPageId, *oldPage.Page)
+		}
+
 		// 新しいページを初期化してレコードを追記
 		_, err = m.bufferPool.AddPage(newPageId)
 		if err != nil {
@@ -141,14 +148,14 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 			return Pointer{}, err
 		}
 		newBufPageUndo := NewPage(*pageNewUndo.Page)
-		newBufPageUndo.Initialize()
+		newBufPageUndo.initialize()
 
 		ptr = Pointer{
 			pageNumber: newPageId.PageNumber,
 			offset:     0,
 		}
 		if !newBufPageUndo.append(serialized) {
-			return Pointer{}, errors.New("undo: record too large for a single page")
+			return Pointer{}, errRecordTooLarge
 		}
 		m.currentPageId = newPageId
 	}

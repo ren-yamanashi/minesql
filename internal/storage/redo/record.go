@@ -8,10 +8,10 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
-type RecordType int
+type recordType int
 
 const (
-	RecordTypePageWrite RecordType = iota + 1
+	RecordTypePageWrite recordType = iota + 1
 	RecordTypeCommit
 	RecordTypeRollback
 )
@@ -30,7 +30,7 @@ var ErrInvalidRecord = errors.New("redo: invalid record")
 type Record struct {
 	Lsn    Lsn
 	TrxId  lock.TrxId // 変更を行ったトランザクション ID
-	Type   RecordType
+	Type   recordType
 	PageId page.Id   // 変更対象のページ (COMMIT/ROLLBACK の場合はゼロ値)
 	Data   page.Page // 変更対象ページ全体のコピー (COMMIT/ROLLBACK の場合はゼロ値)
 }
@@ -64,7 +64,7 @@ func DeserializeRecord(data []byte) (Record, int, error) {
 
 	lsn := Lsn(binary.BigEndian.Uint32(data[recordHeaderLsnOffset:recordHeaderTrxOffset]))
 	trxId := binary.BigEndian.Uint32(data[recordHeaderTrxOffset:recordHeaderRecordTypeOffset])
-	recordType := RecordType(data[recordHeaderRecordTypeOffset])
+	recordType := recordType(data[recordHeaderRecordTypeOffset])
 	pageId := page.ReadId(data, recordHeaderPageIdOffset)
 	dataLen := int(binary.BigEndian.Uint16(data[recordHeaderDataLenOffset:recordHeaderSize]))
 	totalLen := recordHeaderSize + dataLen

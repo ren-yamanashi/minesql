@@ -23,25 +23,21 @@ func NewInsertRecord(tableFileId page.FileId, record btree.Record) InsertRecord 
 }
 
 // TableFileId はテーブルの FileId を返す
-func (ir InsertRecord) TableFileId() page.FileId {
-	return ir.tableFileId
-}
+func (ir InsertRecord) TableFileId() page.FileId { return ir.tableFileId }
 
 // Record は挿入したレコードを返す
-func (ir InsertRecord) Record() btree.Record {
-	return ir.record
-}
+func (ir InsertRecord) Record() btree.Record { return ir.record }
 
 // serialize は InsertRecord を バイト列にシリアライズする
 func (ir InsertRecord) serialize(trxId lock.TrxId, undoNum undoNumber) []byte {
 	fields := Fields{
-		TrxId:         trxId,
-		UndoNum:       undoNum,
-		RecordType:    RecordTypeInsert,
-		PrevLastTrxId: ir.prevLastTrxId,
-		PrevRollPtr:   ir.prevRollPtr,
-		TableFileId:   ir.tableFileId,
-		ColumnSets:    [][][]byte{ir.record},
+		trxId:         trxId,
+		undoNum:       undoNum,
+		recordType:    RecordTypeInsert,
+		prevLastTrxId: ir.prevLastTrxId,
+		prevRollPtr:   ir.prevRollPtr,
+		tableFileId:   ir.tableFileId,
+		columnSets:    [][][]byte{ir.record},
 	}
-	return fields.Serialize()
+	return fields.serialize()
 }

@@ -96,7 +96,7 @@ func TestIsCompatible(t *testing.T) {
 		s.holders[1] = Shared
 
 		// WHEN
-		result := s.isCompatible(Mode(99))
+		result := s.isCompatible(mode(99))
 
 		// THEN
 		assert.False(t, result)

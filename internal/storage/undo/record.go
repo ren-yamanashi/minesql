@@ -26,7 +26,7 @@ const (
 	RecordTypeUpdate
 )
 
-var ErrInvalidRecord = errors.New("undo: invalid record")
+var errInvalidRecord = errors.New("undo: invalid record")
 
 type Record interface {
 	TableFileId() page.FileId

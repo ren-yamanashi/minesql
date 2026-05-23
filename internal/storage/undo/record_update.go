@@ -25,30 +25,24 @@ func NewUpdateRecord(tableFileId page.FileId, prevRecord, newRecord btree.Record
 }
 
 // TableFileId はテーブルの FileId を返す
-func (ur UpdateRecord) TableFileId() page.FileId {
-	return ur.tableFileId
-}
+func (ur UpdateRecord) TableFileId() page.FileId { return ur.tableFileId }
 
 // PrevRecord は更新前のレコードを返す
-func (ur UpdateRecord) PrevRecord() btree.Record {
-	return ur.prevRecord
-}
+func (ur UpdateRecord) PrevRecord() btree.Record { return ur.prevRecord }
 
-// PrevRecord は更新後のレコードを返す
-func (ur UpdateRecord) NewRecord() btree.Record {
-	return ur.newRecord
-}
+// NewRecord は更新後のレコードを返す
+func (ur UpdateRecord) NewRecord() btree.Record { return ur.newRecord }
 
 // serialize は UpdateRecord を バイト列にシリアライズする
 func (ur UpdateRecord) serialize(trxId lock.TrxId, undoNum undoNumber) []byte {
 	fields := Fields{
-		TrxId:         trxId,
-		UndoNum:       undoNum,
-		RecordType:    RecordTypeUpdate,
-		PrevLastTrxId: ur.prevLastTrxId,
-		PrevRollPtr:   ur.prevRollPtr,
-		TableFileId:   ur.tableFileId,
-		ColumnSets:    [][][]byte{ur.prevRecord, ur.newRecord},
+		trxId:         trxId,
+		undoNum:       undoNum,
+		recordType:    RecordTypeUpdate,
+		prevLastTrxId: ur.prevLastTrxId,
+		prevRollPtr:   ur.prevRollPtr,
+		tableFileId:   ur.tableFileId,
+		columnSets:    [][][]byte{ur.prevRecord, ur.newRecord},
 	}
-	return fields.Serialize()
+	return fields.serialize()
 }

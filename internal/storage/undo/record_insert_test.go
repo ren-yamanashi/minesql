@@ -63,14 +63,14 @@ func TestInsertRecordSerialize(t *testing.T) {
 		// THEN
 		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
-		assert.Equal(t, lock.TrxId(10), fields.TrxId)
-		assert.Equal(t, undoNumber(2), fields.UndoNum)
-		assert.Equal(t, RecordTypeInsert, fields.RecordType)
-		assert.Equal(t, lock.TrxId(0), fields.PrevLastTrxId)
-		assert.Equal(t, NullPointer, fields.PrevRollPtr)
-		assert.Equal(t, page.FileId(5), fields.TableFileId)
-		assert.Len(t, fields.ColumnSets, 1)
-		assert.Equal(t, [][]byte(record), fields.ColumnSets[0])
+		assert.Equal(t, lock.TrxId(10), fields.trxId)
+		assert.Equal(t, undoNumber(2), fields.undoNum)
+		assert.Equal(t, RecordTypeInsert, fields.recordType)
+		assert.Equal(t, lock.TrxId(0), fields.prevLastTrxId)
+		assert.Equal(t, NullPointer, fields.prevRollPtr)
+		assert.Equal(t, page.FileId(5), fields.tableFileId)
+		assert.Len(t, fields.columnSets, 1)
+		assert.Equal(t, [][]byte(record), fields.columnSets[0])
 	})
 
 	t.Run("Record interface を満たす", func(t *testing.T) {
@@ -96,8 +96,8 @@ func TestInsertRecordSerialize(t *testing.T) {
 		// THEN
 		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
-		assert.Len(t, fields.ColumnSets, 1)
-		assert.Equal(t, [][]byte{[]byte("only_col")}, fields.ColumnSets[0])
+		assert.Len(t, fields.columnSets, 1)
+		assert.Equal(t, [][]byte{[]byte("only_col")}, fields.columnSets[0])
 	})
 
 	t.Run("大きい TrxId でシリアライズできる", func(t *testing.T) {
@@ -110,7 +110,7 @@ func TestInsertRecordSerialize(t *testing.T) {
 		// THEN
 		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
-		assert.Equal(t, lock.TrxId(0xFFFFFFFF), fields.TrxId)
-		assert.Equal(t, undoNumber(0xFFFFFFFE), fields.UndoNum)
+		assert.Equal(t, lock.TrxId(0xFFFFFFFF), fields.trxId)
+		assert.Equal(t, undoNumber(0xFFFFFFFE), fields.undoNum)
 	})
 }

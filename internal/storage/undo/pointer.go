@@ -16,7 +16,7 @@ const (
 var (
 	// NullPointer は前バージョンが存在しないことを示す
 	NullPointer           = Pointer{pageNumber: 0xFFFFFFFF, offset: 0xFFFF}
-	ErrInvalidPointerData = errors.New("undo: data size must be at least 6 bytes to decode pointer")
+	errInvalidPointerData = errors.New("undo: data size must be at least 6 bytes to decode pointer")
 )
 
 // Pointer は Undo ログレコードの位置を指すポインタ
@@ -38,14 +38,12 @@ func (p Pointer) Encode() []byte {
 }
 
 // isNull は前バージョンが存在しないかどうかを返す
-func (p Pointer) isNull() bool {
-	return p == NullPointer
-}
+func (p Pointer) isNull() bool { return p == NullPointer }
 
 // DecodePointer はバイト列から Pointer をデコードする
 func DecodePointer(data []byte) (Pointer, error) {
 	if len(data) < PointerSize {
-		return NullPointer, ErrInvalidPointerData
+		return NullPointer, errInvalidPointerData
 	}
 	return Pointer{
 		pageNumber: page.PageNumber(binary.BigEndian.Uint32(data[pageNumberOffset:dataOffsetOffset])),

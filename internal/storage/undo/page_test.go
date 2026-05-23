@@ -26,7 +26,7 @@ func TestInitialize(t *testing.T) {
 		undoPage := newTestUndoPage(t)
 
 		// WHEN
-		undoPage.Initialize()
+		undoPage.initialize()
 
 		// THEN
 		assert.Equal(t, uint16(0), undoPage.UsedBytes())
@@ -38,20 +38,20 @@ func TestRecordAt(t *testing.T) {
 	t.Run("Append したレコードを読み取れる", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
+		undoPage.initialize()
 		f := &Fields{
-			TrxId:       1,
-			UndoNum:     0,
-			RecordType:  RecordTypeInsert,
-			PrevRollPtr: NullPointer,
-			TableFileId: 1,
-			ColumnSets:  [][][]byte{{[]byte("data")}},
+			trxId:       1,
+			undoNum:     0,
+			recordType:  RecordTypeInsert,
+			prevRollPtr: NullPointer,
+			tableFileId: 1,
+			columnSets:  [][][]byte{{[]byte("data")}},
 		}
-		serialized := f.Serialize()
+		serialized := f.serialize()
 		_ = undoPage.append(serialized)
 
 		// WHEN
-		result := undoPage.RecordAt(0)
+		result := undoPage.Record(0)
 
 		// THEN
 		assert.NotNil(t, result)
@@ -61,10 +61,10 @@ func TestRecordAt(t *testing.T) {
 	t.Run("offset がボディサイズ以上の場合 nil を返す", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
+		undoPage.initialize()
 
 		// WHEN
-		result := undoPage.RecordAt(len(undoPage.body))
+		result := undoPage.Record(len(undoPage.body))
 
 		// THEN
 		assert.Nil(t, result)
@@ -73,12 +73,12 @@ func TestRecordAt(t *testing.T) {
 	t.Run("offset からヘッダーを読み取れない場合 nil を返す", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
+		undoPage.initialize()
 		// ボディ末尾から recordHeaderSize 未満の位置
 		offset := len(undoPage.body) - recordHeaderSize + 1
 
 		// WHEN
-		result := undoPage.RecordAt(offset)
+		result := undoPage.Record(offset)
 
 		// THEN
 		assert.Nil(t, result)
@@ -87,24 +87,24 @@ func TestRecordAt(t *testing.T) {
 	t.Run("offset が 0 でないレコードを読み取れる", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
+		undoPage.initialize()
 		f1 := &Fields{
-			TrxId: 1, UndoNum: 0, RecordType: RecordTypeInsert,
-			PrevRollPtr: NullPointer, TableFileId: 1,
-			ColumnSets: [][][]byte{{[]byte("first")}},
+			trxId: 1, undoNum: 0, recordType: RecordTypeInsert,
+			prevRollPtr: NullPointer, tableFileId: 1,
+			columnSets: [][][]byte{{[]byte("first")}},
 		}
 		f2 := &Fields{
-			TrxId: 2, UndoNum: 1, RecordType: RecordTypeDelete,
-			PrevRollPtr: NullPointer, TableFileId: 1,
-			ColumnSets: [][][]byte{{[]byte("second")}},
+			trxId: 2, undoNum: 1, recordType: RecordTypeDelete,
+			prevRollPtr: NullPointer, tableFileId: 1,
+			columnSets: [][][]byte{{[]byte("second")}},
 		}
-		s1 := f1.Serialize()
-		s2 := f2.Serialize()
+		s1 := f1.serialize()
+		s2 := f2.serialize()
 		_ = undoPage.append(s1)
 		_ = undoPage.append(s2)
 
 		// WHEN
-		result := undoPage.RecordAt(len(s1))
+		result := undoPage.Record(len(s1))
 
 		// THEN
 		assert.NotNil(t, result)
@@ -114,23 +114,23 @@ func TestRecordAt(t *testing.T) {
 	t.Run("dataLen がボディの残りサイズを超える場合 nil を返す", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
+		undoPage.initialize()
 		// ボディ先頭にヘッダーだけ書き込み、dataLen をボディサイズより大きい値に設定
 		// RecordAt は p.body[headerDataLenOffset:recordHeaderSize] から dataLen を読む (offset 非加算)
 		f := &Fields{
-			TrxId:       1,
-			UndoNum:     0,
-			RecordType:  RecordTypeInsert,
-			PrevRollPtr: NullPointer,
-			TableFileId: 1,
-			ColumnSets:  [][][]byte{{make([]byte, len(undoPage.body))}},
+			trxId:       1,
+			undoNum:     0,
+			recordType:  RecordTypeInsert,
+			prevRollPtr: NullPointer,
+			tableFileId: 1,
+			columnSets:  [][][]byte{{make([]byte, len(undoPage.body))}},
 		}
-		serialized := f.Serialize()
+		serialized := f.serialize()
 		// ヘッダーだけコピー (本体は入りきらない)
 		copy(undoPage.body, serialized[:recordHeaderSize])
 
 		// WHEN
-		result := undoPage.RecordAt(0)
+		result := undoPage.Record(0)
 
 		// THEN
 		assert.Nil(t, result)
@@ -141,7 +141,7 @@ func TestUsedBytes(t *testing.T) {
 	t.Run("初期化後は 0 を返す", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
+		undoPage.initialize()
 
 		// WHEN
 		used := undoPage.UsedBytes()
@@ -155,7 +155,7 @@ func TestNextPageNumber(t *testing.T) {
 	t.Run("初期化後は 0 を返す", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
+		undoPage.initialize()
 
 		// WHEN
 		next := undoPage.NextPageNumber()
@@ -169,7 +169,7 @@ func TestAppend(t *testing.T) {
 	t.Run("レコードを追加できる", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
+		undoPage.initialize()
 		record := []byte{0x01, 0x02, 0x03}
 
 		// WHEN
@@ -183,7 +183,7 @@ func TestAppend(t *testing.T) {
 	t.Run("複数回追加すると UsedBytes が累積する", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
+		undoPage.initialize()
 
 		// WHEN
 		ok1 := undoPage.append([]byte{0x01, 0x02})
@@ -198,7 +198,7 @@ func TestAppend(t *testing.T) {
 	t.Run("空き不足の場合 false を返す", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
+		undoPage.initialize()
 		bodySize := len(undoPage.body)
 		largeRecord := make([]byte, bodySize+1)
 
@@ -213,7 +213,7 @@ func TestAppend(t *testing.T) {
 	t.Run("ボディサイズちょうどのレコードを追加できる", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
+		undoPage.initialize()
 		bodySize := len(undoPage.body)
 		record := make([]byte, bodySize)
 
@@ -228,7 +228,7 @@ func TestAppend(t *testing.T) {
 	t.Run("ボディが満杯の場合 false を返す", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
+		undoPage.initialize()
 		bodySize := len(undoPage.body)
 		_ = undoPage.append(make([]byte, bodySize))
 
@@ -242,7 +242,7 @@ func TestAppend(t *testing.T) {
 	t.Run("空のレコードを追加できる", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
+		undoPage.initialize()
 
 		// WHEN
 		ok := undoPage.append([]byte{})
@@ -257,7 +257,7 @@ func TestSetNextPageNumber(t *testing.T) {
 	t.Run("次のページ番号を設定できる", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
+		undoPage.initialize()
 
 		// WHEN
 		undoPage.setNextPageNumber(page.PageNumber(42))
@@ -269,7 +269,7 @@ func TestSetNextPageNumber(t *testing.T) {
 	t.Run("設定した値を上書きできる", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
+		undoPage.initialize()
 		undoPage.setNextPageNumber(page.PageNumber(10))
 
 		// WHEN
@@ -284,7 +284,7 @@ func TestFreeSpace(t *testing.T) {
 	t.Run("初期化後はボディ全体が空き", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
+		undoPage.initialize()
 		bodySize := len(undoPage.body)
 
 		// WHEN
@@ -297,7 +297,7 @@ func TestFreeSpace(t *testing.T) {
 	t.Run("レコード追加後に空きが減る", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
+		undoPage.initialize()
 		bodySize := len(undoPage.body)
 		_ = undoPage.append([]byte{0x01, 0x02, 0x03})
 
@@ -311,7 +311,7 @@ func TestFreeSpace(t *testing.T) {
 	t.Run("ボディが満杯の場合 0 を返す", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
-		undoPage.Initialize()
+		undoPage.initialize()
 		_ = undoPage.append(make([]byte, len(undoPage.body)))
 
 		// WHEN

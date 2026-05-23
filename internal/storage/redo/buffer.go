@@ -139,7 +139,7 @@ func (b *Buffer) Size() (int64, error) {
 }
 
 // append は新しい Redo レコードをバッファに追加し、対応する LSN を返す
-func (b *Buffer) append(trxId lock.TrxId, recordType RecordType, pageId page.Id, pg page.Page) Lsn {
+func (b *Buffer) append(trxId lock.TrxId, recordType recordType, pageId page.Id, pg page.Page) Lsn {
 	lsn := b.allocateLsn()
 	b.records = append(b.records, Record{
 		Lsn:    lsn,

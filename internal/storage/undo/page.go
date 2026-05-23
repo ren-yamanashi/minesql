@@ -27,14 +27,8 @@ func NewPage(page page.Page) *Page {
 	}
 }
 
-// Initialize は Undo ページを初期化する
-func (p *Page) Initialize() {
-	binary.BigEndian.PutUint16(p.header[headerUsedBytesOffset:headerNextPageNumberOffset], 0) // usedBytes
-	binary.BigEndian.PutUint32(p.header[headerNextPageNumberOffset:pageHeaderSize], 0)        // nextPageNumber
-}
-
-// RecordAt はボティ内の指定 offset のレコードを読み取る
-func (p *Page) RecordAt(offset int) []byte {
+// Record はボティ内の指定 offset のレコードを読み取る
+func (p *Page) Record(offset int) []byte {
 	if offset >= len(p.body) {
 		return nil
 	}
@@ -59,6 +53,12 @@ func (p *Page) NextPageNumber() page.PageNumber {
 	return page.PageNumber(binary.BigEndian.Uint32(p.header[headerNextPageNumberOffset:pageHeaderSize]))
 }
 
+// initialize は Undo ページを初期化する
+func (p *Page) initialize() {
+	binary.BigEndian.PutUint16(p.header[headerUsedBytesOffset:headerNextPageNumberOffset], 0) // usedBytes
+	binary.BigEndian.PutUint32(p.header[headerNextPageNumberOffset:pageHeaderSize], 0)        // nextPageNumber
+}
+
 // append は Undo レコードをボディに追加する
 //
 // 空き不足の場合は false を返す
@@ -78,6 +78,4 @@ func (p *Page) setNextPageNumber(pn page.PageNumber) {
 }
 
 // freeSpace はボディ内の空き容量を返す
-func (p *Page) freeSpace() int {
-	return len(p.body) - int(p.UsedBytes())
-}
+func (p *Page) freeSpace() int { return len(p.body) - int(p.UsedBytes()) }

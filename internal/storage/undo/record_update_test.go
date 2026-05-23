@@ -68,15 +68,15 @@ func TestUpdateRecordSerialize(t *testing.T) {
 		// THEN
 		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
-		assert.Equal(t, lock.TrxId(10), fields.TrxId)
-		assert.Equal(t, undoNumber(2), fields.UndoNum)
-		assert.Equal(t, RecordTypeUpdate, fields.RecordType)
-		assert.Equal(t, lock.TrxId(100), fields.PrevLastTrxId)
-		assert.Equal(t, rollPtr, fields.PrevRollPtr)
-		assert.Equal(t, page.FileId(5), fields.TableFileId)
-		assert.Len(t, fields.ColumnSets, 2)
-		assert.Equal(t, [][]byte(prevRecord), fields.ColumnSets[0])
-		assert.Equal(t, [][]byte(newRecord), fields.ColumnSets[1])
+		assert.Equal(t, lock.TrxId(10), fields.trxId)
+		assert.Equal(t, undoNumber(2), fields.undoNum)
+		assert.Equal(t, RecordTypeUpdate, fields.recordType)
+		assert.Equal(t, lock.TrxId(100), fields.prevLastTrxId)
+		assert.Equal(t, rollPtr, fields.prevRollPtr)
+		assert.Equal(t, page.FileId(5), fields.tableFileId)
+		assert.Len(t, fields.columnSets, 2)
+		assert.Equal(t, [][]byte(prevRecord), fields.columnSets[0])
+		assert.Equal(t, [][]byte(newRecord), fields.columnSets[1])
 	})
 
 	t.Run("Record interface を満たす", func(t *testing.T) {
@@ -103,9 +103,9 @@ func TestUpdateRecordSerialize(t *testing.T) {
 		// THEN
 		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
-		assert.Len(t, fields.ColumnSets, 2)
-		assert.Equal(t, [][]byte{{}}, fields.ColumnSets[0])
-		assert.Equal(t, [][]byte{{}}, fields.ColumnSets[1])
+		assert.Len(t, fields.columnSets, 2)
+		assert.Equal(t, [][]byte{{}}, fields.columnSets[0])
+		assert.Equal(t, [][]byte{{}}, fields.columnSets[1])
 	})
 
 	t.Run("大きい TrxId でシリアライズできる", func(t *testing.T) {
@@ -118,8 +118,8 @@ func TestUpdateRecordSerialize(t *testing.T) {
 		// THEN
 		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
-		assert.Equal(t, lock.TrxId(0xFFFFFFFE), fields.TrxId)
-		assert.Equal(t, undoNumber(0xFFFFFFFD), fields.UndoNum)
-		assert.Equal(t, lock.TrxId(0xFFFFFFFF), fields.PrevLastTrxId)
+		assert.Equal(t, lock.TrxId(0xFFFFFFFE), fields.trxId)
+		assert.Equal(t, undoNumber(0xFFFFFFFD), fields.undoNum)
+		assert.Equal(t, lock.TrxId(0xFFFFFFFF), fields.prevLastTrxId)
 	})
 }

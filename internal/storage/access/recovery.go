@@ -134,7 +134,7 @@ func (r *Recovery) collectUndoRecords(trxId lock.TrxId) ([]undo.Record, error) {
 		undoPage := undo.NewPage(*readPage.Page)
 		offset := 0
 		for offset < int(undoPage.UsedBytes()) {
-			recordBytes := undoPage.RecordAt(offset)
+			recordBytes := undoPage.Record(offset)
 			if recordBytes == nil {
 				break
 			}
@@ -144,7 +144,7 @@ func (r *Recovery) collectUndoRecords(trxId lock.TrxId) ([]undo.Record, error) {
 				return nil, deserializeErr
 			}
 
-			if fields.TrxId == trxId {
+			if fields.TrxId() == trxId {
 				record, toRecordErr := fields.ToRecord()
 				if toRecordErr != nil {
 					return nil, toRecordErr
