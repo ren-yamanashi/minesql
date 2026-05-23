@@ -33,7 +33,7 @@ func TestPageRecord(t *testing.T) {
 			tableFileId: 1,
 			columnSets:  [][][]byte{{[]byte("data")}},
 		}
-		serialized := f.serialize()
+		serialized := f.Serialize()
 		_ = undoPage.append(serialized)
 
 		// WHEN
@@ -84,8 +84,8 @@ func TestPageRecord(t *testing.T) {
 			prevRollPtr: NullPointer, tableFileId: 1,
 			columnSets: [][][]byte{{[]byte("second")}},
 		}
-		s1 := f1.serialize()
-		s2 := f2.serialize()
+		s1 := f1.Serialize()
+		s2 := f2.Serialize()
 		_ = undoPage.append(s1)
 		_ = undoPage.append(s2)
 
@@ -111,7 +111,7 @@ func TestPageRecord(t *testing.T) {
 			tableFileId: 1,
 			columnSets:  [][][]byte{{make([]byte, len(undoPage.body))}},
 		}
-		serialized := f.serialize()
+		serialized := f.Serialize()
 		// ヘッダーだけコピー (本体は入りきらない)
 		copy(undoPage.body, serialized[:recordHeaderSize])
 

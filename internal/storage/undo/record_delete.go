@@ -40,5 +40,5 @@ func (dr DeleteRecord) Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte {
 		tableFileId:   dr.tableFileId,
 		columnSets:    [][][]byte{dr.record},
 	}
-	return fields.serialize()
+	return fields.Serialize()
 }

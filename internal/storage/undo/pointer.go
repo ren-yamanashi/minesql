@@ -19,7 +19,6 @@ var (
 	ErrInvalidPointerData = errors.New("undo: data size must be at least 6 bytes to decode pointer")
 )
 
-// Pointer は Undo ログレコードの位置を指すポインタ
 type Pointer struct {
 	pageNumber page.PageNumber // Undo ページのページ番号
 	offset     uint16          // Undo ページ内のバイトオフセット
@@ -29,7 +28,6 @@ func NewPointer(pageNum page.PageNumber, offset uint16) Pointer {
 	return Pointer{pageNumber: pageNum, offset: offset}
 }
 
-// Encode は Pointer を 6 バイトのバイト列にエンコードする
 func (p Pointer) Encode() []byte {
 	buf := make([]byte, PointerSize)
 	binary.BigEndian.PutUint32(buf[pageNumberOffset:dataOffsetOffset], uint32(p.pageNumber))
@@ -37,12 +35,10 @@ func (p Pointer) Encode() []byte {
 	return buf
 }
 
-// IsNull は前バージョンが存在しないかどうかを返す
 func (p Pointer) IsNull() bool {
 	return p == NullPointer
 }
 
-// DecodePointer はバイト列から Pointer をデコードする
 func DecodePointer(data []byte) (Pointer, error) {
 	if len(data) < PointerSize {
 		return NullPointer, ErrInvalidPointerData

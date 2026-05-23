@@ -149,7 +149,7 @@ func TestFieldsSerialize(t *testing.T) {
 		}
 
 		// WHEN
-		buf := f.serialize()
+		buf := f.Serialize()
 
 		// THEN
 		assert.Equal(t, uint32(10), binary.BigEndian.Uint32(buf[headerTrxIdOffset:headerUndoNumOffset]))
@@ -172,7 +172,7 @@ func TestFieldsSerialize(t *testing.T) {
 		}
 
 		// WHEN
-		buf := f.serialize()
+		buf := f.Serialize()
 
 		// THEN
 		assert.NotEmpty(t, buf)
@@ -192,7 +192,7 @@ func TestFieldsSerialize(t *testing.T) {
 		}
 
 		// WHEN
-		buf := f.serialize()
+		buf := f.Serialize()
 
 		// THEN
 		assert.NotEmpty(t, buf)
@@ -211,7 +211,7 @@ func TestFieldsSerialize(t *testing.T) {
 		}
 
 		// WHEN
-		buf := f.serialize()
+		buf := f.Serialize()
 
 		// THEN
 		// ヘッダー (11B) + prevLastTrxId (4B) + prevRollPtr (4B) + tableFileId (4B) = 23B
@@ -231,7 +231,7 @@ func TestDeserializeFields(t *testing.T) {
 			tableFileId:   page.FileId(7),
 			columnSets:    [][][]byte{{[]byte("alice"), []byte("bob")}},
 		}
-		buf := original.serialize()
+		buf := original.Serialize()
 
 		// WHEN
 		restored, err := DeserializeFields(buf)
@@ -255,7 +255,7 @@ func TestDeserializeFields(t *testing.T) {
 				{[]byte("new_val1"), []byte("new_val2")},
 			},
 		}
-		buf := original.serialize()
+		buf := original.Serialize()
 
 		// WHEN
 		restored, err := DeserializeFields(buf)
@@ -276,7 +276,7 @@ func TestDeserializeFields(t *testing.T) {
 			tableFileId:   page.FileId(1),
 			columnSets:    [][][]byte{{[]byte("data")}},
 		}
-		buf := original.serialize()
+		buf := original.Serialize()
 
 		// WHEN
 		restored, err := DeserializeFields(buf)
@@ -297,7 +297,7 @@ func TestDeserializeFields(t *testing.T) {
 			tableFileId:   page.FileId(1),
 			columnSets:    [][][]byte{{[]byte("x")}},
 		}
-		buf := original.serialize()
+		buf := original.Serialize()
 
 		// WHEN
 		restored, err := DeserializeFields(buf)
@@ -320,7 +320,7 @@ func TestDeserializeFields(t *testing.T) {
 			tableFileId:   page.FileId(1),
 			columnSets:    [][][]byte{},
 		}
-		buf := original.serialize()
+		buf := original.Serialize()
 
 		// WHEN
 		restored, err := DeserializeFields(buf)
@@ -341,7 +341,7 @@ func TestDeserializeFields(t *testing.T) {
 			tableFileId:   page.FileId(1),
 			columnSets:    [][][]byte{{[]byte{}, []byte("data"), []byte{}}},
 		}
-		buf := original.serialize()
+		buf := original.Serialize()
 
 		// WHEN
 		restored, err := DeserializeFields(buf)
@@ -364,7 +364,7 @@ func TestDeserializeFields(t *testing.T) {
 				tableFileId:   page.FileId(1),
 				columnSets:    [][][]byte{{[]byte("data")}},
 			}
-			buf := original.serialize()
+			buf := original.Serialize()
 
 			// WHEN
 			restored, err := DeserializeFields(buf)
@@ -407,7 +407,7 @@ func TestDeserializeFields(t *testing.T) {
 			tableFileId: page.FileId(1),
 			columnSets:  [][][]byte{{[]byte("data")}},
 		}
-		buf := f.serialize()
+		buf := f.Serialize()
 		truncated := buf[:recordHeaderSize+2]
 
 		// WHEN

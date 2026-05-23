@@ -43,5 +43,5 @@ func (ur UpdateRecord) Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte {
 		tableFileId:   ur.tableFileId,
 		columnSets:    [][][]byte{ur.prevRecord, ur.newRecord},
 	}
-	return fields.serialize()
+	return fields.Serialize()
 }

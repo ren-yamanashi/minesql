@@ -12,14 +12,12 @@ import (
 
 var errRecordTooLarge = errors.New("undo: record too large for a single page")
 
-// Entry は Undo ログのエントリ
 type Entry struct {
 	TrxId      lock.TrxId
 	RecordType RecordType
 	Record     Record
 }
 
-// Manager は全トランザクションの Undo レコードをトランザクションごとに管理する
 type Manager struct {
 	bufferPool    *buffer.Pool
 	redoLog       *redo.Buffer

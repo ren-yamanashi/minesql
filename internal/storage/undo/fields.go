@@ -66,7 +66,7 @@ func (f Fields) ToRecord() (Record, error) {
 
 // serialize は Undo レコードをバイト列にシリアライズする
 //   - return : prevLastTrxId (4B) + prevRollPtr (6B) + tableFileId (4B) + [numColumns (2B) + [colLen (2B) + colData]]...
-func (f Fields) serialize() []byte {
+func (f Fields) Serialize() []byte {
 	var data []byte
 
 	// prevLastTrxId, prevRollPtr, tableFileId

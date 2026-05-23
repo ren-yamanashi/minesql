@@ -35,5 +35,5 @@ func (ir InsertRecord) Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte {
 		tableFileId:   ir.tableFileId,
 		columnSets:    [][][]byte{ir.record},
 	}
-	return fields.serialize()
+	return fields.Serialize()
 }

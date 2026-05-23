@@ -61,7 +61,6 @@ func (r *Record) Serialize() []byte {
 	return buf
 }
 
-// serializedSize はシリアライズ後のバイト数を返す
 func (r *Record) serializedSize() int {
 	dataSize := 0
 	if r.data.Header != nil {

@@ -7,7 +7,6 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
-// Buffer は Redo ログの記録・フラッシュ・読み取りを管理する
 type Buffer struct {
 	mutex   sync.Mutex
 	records []Record
