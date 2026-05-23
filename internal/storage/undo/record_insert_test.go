@@ -83,13 +83,13 @@ func TestInsertRecordSerialize(t *testing.T) {
 		ir := NewInsertRecord(page.FileId(5), record)
 
 		// WHEN
-		buf := ir.serialize(10, 2)
+		buf := ir.Serialize(10, 2)
 
 		// THEN
 		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(10), fields.trxId)
-		assert.Equal(t, undoNumber(2), fields.undoNum)
+		assert.Equal(t, UndoNumber(2), fields.undoNum)
 		assert.Equal(t, RecordTypeInsert, fields.recordType)
 		assert.Equal(t, lock.TrxId(0), fields.prevLastTrxId)
 		assert.Equal(t, NullPointer, fields.prevRollPtr)
@@ -106,7 +106,7 @@ func TestInsertRecordSerialize(t *testing.T) {
 		var r Record = ir
 
 		// THEN
-		buf := r.serialize(1, 0)
+		buf := r.Serialize(1, 0)
 		assert.NotEmpty(t, buf)
 	})
 
@@ -116,7 +116,7 @@ func TestInsertRecordSerialize(t *testing.T) {
 		ir := NewInsertRecord(page.FileId(1), record)
 
 		// WHEN
-		buf := ir.serialize(1, 0)
+		buf := ir.Serialize(1, 0)
 
 		// THEN
 		fields, err := DeserializeFields(buf)
@@ -130,12 +130,12 @@ func TestInsertRecordSerialize(t *testing.T) {
 		ir := NewInsertRecord(page.FileId(1), btree.Record{[]byte("a")})
 
 		// WHEN
-		buf := ir.serialize(lock.TrxId(0xFFFFFFFF), undoNumber(0xFFFFFFFE))
+		buf := ir.Serialize(lock.TrxId(0xFFFFFFFF), UndoNumber(0xFFFFFFFE))
 
 		// THEN
 		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(0xFFFFFFFF), fields.trxId)
-		assert.Equal(t, undoNumber(0xFFFFFFFE), fields.undoNum)
+		assert.Equal(t, UndoNumber(0xFFFFFFFE), fields.undoNum)
 	})
 }

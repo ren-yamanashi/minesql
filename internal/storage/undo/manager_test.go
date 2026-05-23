@@ -37,7 +37,7 @@ func TestManagerAppend(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.False(t, ptr.isNull())
+		assert.False(t, ptr.IsNull())
 	})
 
 	t.Run("同一トランザクションに複数レコードを追加できる", func(t *testing.T) {

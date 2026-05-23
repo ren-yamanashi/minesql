@@ -33,8 +33,7 @@ func (ur UpdateRecord) TableFileId() page.FileId { return ur.tableFileId }
 func (ur UpdateRecord) PrevRecord() btree.Record { return ur.prevRecord }
 func (ur UpdateRecord) NewRecord() btree.Record  { return ur.newRecord }
 
-// serialize は UpdateRecord を バイト列にシリアライズする
-func (ur UpdateRecord) serialize(trxId lock.TrxId, undoNum undoNumber) []byte {
+func (ur UpdateRecord) Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte {
 	fields := Fields{
 		trxId:         trxId,
 		undoNum:       undoNum,

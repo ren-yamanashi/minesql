@@ -15,8 +15,8 @@ const (
 // Fields は Undo ログレコードのシリアライズ/デシリアライズに使用するフィールド群
 type Fields struct {
 	trxId         lock.TrxId
-	undoNum       undoNumber
-	recordType    recordType
+	undoNum       UndoNumber
+	recordType    RecordType
 	prevLastTrxId lock.TrxId  // 上書き前のレコードの lastTrxId
 	prevRollPtr   Pointer     // 上書き前のレコードの rollPtr
 	tableFileId   page.FileId // テーブルの FileId
@@ -30,7 +30,7 @@ func (f Fields) ToRecord() (Record, error) {
 	switch f.recordType {
 	case RecordTypeInsert:
 		if len(f.columnSets) < 1 {
-			return nil, errInvalidRecord
+			return nil, ErrInvalidRecord
 		}
 		return InsertRecord{
 			tableFileId:   f.tableFileId,
@@ -40,7 +40,7 @@ func (f Fields) ToRecord() (Record, error) {
 		}, nil
 	case RecordTypeDelete:
 		if len(f.columnSets) < 1 {
-			return nil, errInvalidRecord
+			return nil, ErrInvalidRecord
 		}
 		return DeleteRecord{
 			tableFileId:   f.tableFileId,
@@ -50,7 +50,7 @@ func (f Fields) ToRecord() (Record, error) {
 		}, nil
 	case RecordTypeUpdate:
 		if len(f.columnSets) < 2 {
-			return nil, errInvalidRecord
+			return nil, ErrInvalidRecord
 		}
 		return UpdateRecord{
 			tableFileId:   f.tableFileId,
@@ -60,7 +60,7 @@ func (f Fields) ToRecord() (Record, error) {
 			prevRollPtr:   f.prevRollPtr,
 		}, nil
 	default:
-		return nil, errInvalidRecord
+		return nil, ErrInvalidRecord
 	}
 }
 
@@ -96,17 +96,17 @@ func (f Fields) serialize() []byte {
 // DeserializeFields は Undo レコードのバイト列から Fields を復元する
 func DeserializeFields(buf []byte) (Fields, error) {
 	if len(buf) < recordHeaderSize {
-		return Fields{}, errInvalidRecord
+		return Fields{}, ErrInvalidRecord
 	}
 
 	var fields Fields
 	fields.trxId = lock.TrxId(binary.BigEndian.Uint32(buf[headerTrxIdOffset:headerUndoNumOffset]))
 	fields.undoNum = binary.BigEndian.Uint32(buf[headerUndoNumOffset:headerRecordTypeOffset])
-	fields.recordType = recordType(buf[headerRecordTypeOffset])
+	fields.recordType = RecordType(buf[headerRecordTypeOffset])
 	dataLen := int(binary.BigEndian.Uint16(buf[headerDataLenOffset:recordHeaderSize]))
 
 	if len(buf) < recordHeaderSize+dataLen {
-		return Fields{}, errInvalidRecord
+		return Fields{}, ErrInvalidRecord
 	}
 
 	data := buf[recordHeaderSize : recordHeaderSize+dataLen]
@@ -115,7 +115,7 @@ func DeserializeFields(buf []byte) (Fields, error) {
 	// この操作で上書きされる前のレコードが持っていた lastTrxId と rollPtr を復元
 	const prevFieldsSize = lock.TrxIdSize + PointerSize
 	if offset+prevFieldsSize > len(data) {
-		return Fields{}, errInvalidRecord
+		return Fields{}, ErrInvalidRecord
 	}
 	fields.prevLastTrxId = lock.TrxId(binary.BigEndian.Uint32(data[offset : offset+lock.TrxIdSize]))
 	prevRollPtr, err := DecodePointer(data[offset+lock.TrxIdSize : offset+prevFieldsSize])
@@ -127,7 +127,7 @@ func DeserializeFields(buf []byte) (Fields, error) {
 
 	// tableFileId
 	if offset+page.FileIdSize > len(data) {
-		return Fields{}, errInvalidRecord
+		return Fields{}, ErrInvalidRecord
 	}
 	fields.tableFileId = page.FileId(binary.BigEndian.Uint32(data[offset : offset+page.FileIdSize]))
 	offset += page.FileIdSize
@@ -148,7 +148,7 @@ func DeserializeFields(buf []byte) (Fields, error) {
 // parseColumnSet はバイト列からカラムセット 1 つを読み取り、読み取ったバイト数を返す
 func parseColumnSet(data []byte) ([][]byte, int, error) {
 	if len(data) < columnCountSize {
-		return nil, 0, errInvalidRecord
+		return nil, 0, ErrInvalidRecord
 	}
 	numCols := int(binary.BigEndian.Uint16(data[0:columnCountSize]))
 	offset := columnCountSize
@@ -156,12 +156,12 @@ func parseColumnSet(data []byte) ([][]byte, int, error) {
 	columns := make([][]byte, numCols)
 	for i := range numCols {
 		if offset+columnLenSize > len(data) {
-			return nil, 0, errInvalidRecord
+			return nil, 0, ErrInvalidRecord
 		}
 		colLen := int(binary.BigEndian.Uint16(data[offset : offset+columnLenSize]))
 		offset += columnLenSize
 		if offset+colLen > len(data) {
-			return nil, 0, errInvalidRecord
+			return nil, 0, ErrInvalidRecord
 		}
 		columns[i] = make([]byte, colLen)
 		copy(columns[i], data[offset:offset+colLen])

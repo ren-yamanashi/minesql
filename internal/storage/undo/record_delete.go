@@ -30,8 +30,7 @@ func NewDeleteRecord(
 func (dr DeleteRecord) TableFileId() page.FileId { return dr.tableFileId }
 func (dr DeleteRecord) Record() btree.Record     { return dr.record }
 
-// serialize は DeleteRecord を バイト列にシリアライズする
-func (dr DeleteRecord) serialize(trxId lock.TrxId, undoNum undoNumber) []byte {
+func (dr DeleteRecord) Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte {
 	fields := Fields{
 		trxId:         trxId,
 		undoNum:       undoNum,

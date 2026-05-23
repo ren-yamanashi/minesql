@@ -25,8 +25,7 @@ func NewInsertRecord(tableFileId page.FileId, record btree.Record) InsertRecord 
 func (ir InsertRecord) TableFileId() page.FileId { return ir.tableFileId }
 func (ir InsertRecord) Record() btree.Record     { return ir.record }
 
-// serialize は InsertRecord を バイト列にシリアライズする
-func (ir InsertRecord) serialize(trxId lock.TrxId, undoNum undoNumber) []byte {
+func (ir InsertRecord) Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte {
 	fields := Fields{
 		trxId:         trxId,
 		undoNum:       undoNum,

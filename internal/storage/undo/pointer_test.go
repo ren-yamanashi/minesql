@@ -14,7 +14,7 @@ func TestNewPointer(t *testing.T) {
 		offset := uint16(64)
 
 		// WHEN
-		p := newPointer(pageNum, offset)
+		p := NewPointer(pageNum, offset)
 
 		// THEN
 		assert.Equal(t, page.PageNumber(3), p.pageNumber)
@@ -23,7 +23,7 @@ func TestNewPointer(t *testing.T) {
 
 	t.Run("ゼロ値で Pointer を作成できる", func(t *testing.T) {
 		// GIVEN / WHEN
-		p := newPointer(0, 0)
+		p := NewPointer(0, 0)
 
 		// THEN
 		assert.Equal(t, page.PageNumber(0), p.pageNumber)
@@ -32,7 +32,7 @@ func TestNewPointer(t *testing.T) {
 
 	t.Run("最大値で Pointer を作成できる", func(t *testing.T) {
 		// GIVEN / WHEN
-		p := newPointer(page.PageNumber(0xFFFFFFFF), 0xFFFF)
+		p := NewPointer(page.PageNumber(0xFFFFFFFF), 0xFFFF)
 
 		// THEN
 		assert.Equal(t, page.PageNumber(0xFFFFFFFF), p.pageNumber)
@@ -82,7 +82,7 @@ func TestPointerIsNull(t *testing.T) {
 		p := NullPointer
 
 		// WHEN
-		result := p.isNull()
+		result := p.IsNull()
 
 		// THEN
 		assert.True(t, result)
@@ -93,7 +93,7 @@ func TestPointerIsNull(t *testing.T) {
 		p := Pointer{pageNumber: 1, offset: 10}
 
 		// WHEN
-		result := p.isNull()
+		result := p.IsNull()
 
 		// THEN
 		assert.False(t, result)
@@ -104,7 +104,7 @@ func TestPointerIsNull(t *testing.T) {
 		p := Pointer{}
 
 		// WHEN
-		result := p.isNull()
+		result := p.IsNull()
 
 		// THEN
 		assert.False(t, result)
@@ -115,7 +115,7 @@ func TestPointerIsNull(t *testing.T) {
 		p := Pointer{pageNumber: 0xFFFFFFFF, offset: 0}
 
 		// WHEN
-		result := p.isNull()
+		result := p.IsNull()
 
 		// THEN
 		assert.False(t, result)
@@ -146,7 +146,7 @@ func TestDecodePointer(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, NullPointer, decoded)
-		assert.True(t, decoded.isNull())
+		assert.True(t, decoded.IsNull())
 	})
 
 	t.Run("ゼロ値のラウンドトリップ", func(t *testing.T) {
@@ -184,7 +184,7 @@ func TestDecodePointer(t *testing.T) {
 		_, err := DecodePointer(buf)
 
 		// THEN
-		assert.ErrorIs(t, err, errInvalidPointerData)
+		assert.ErrorIs(t, err, ErrInvalidPointerData)
 	})
 
 	t.Run("空のデータの場合エラーを返す", func(t *testing.T) {
@@ -195,7 +195,7 @@ func TestDecodePointer(t *testing.T) {
 		_, err := DecodePointer(buf)
 
 		// THEN
-		assert.ErrorIs(t, err, errInvalidPointerData)
+		assert.ErrorIs(t, err, ErrInvalidPointerData)
 	})
 
 	t.Run("nil の場合エラーを返す", func(t *testing.T) {
@@ -203,7 +203,7 @@ func TestDecodePointer(t *testing.T) {
 		_, err := DecodePointer(nil)
 
 		// THEN
-		assert.ErrorIs(t, err, errInvalidPointerData)
+		assert.ErrorIs(t, err, ErrInvalidPointerData)
 	})
 
 	t.Run("PointerSize より長いデータでも先頭 6 バイトからデコードできる", func(t *testing.T) {

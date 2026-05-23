@@ -15,7 +15,7 @@ var errRecordTooLarge = errors.New("undo: record too large for a single page")
 // Entry は Undo ログのエントリ
 type Entry struct {
 	TrxId      lock.TrxId
-	RecordType recordType
+	RecordType RecordType
 	Record     Record
 }
 
@@ -54,7 +54,7 @@ func NewManager(bp *buffer.Pool, redo *redo.Buffer, undoFileId page.FileId) (*Ma
 }
 
 // Append は指定した trxId の Undo ログにレコードを追加し、書き込み先の Pointer を返す
-func (m *Manager) Append(trxId lock.TrxId, recordType recordType, record Record) (Pointer, error) {
+func (m *Manager) Append(trxId lock.TrxId, recordType RecordType, record Record) (Pointer, error) {
 	ptr, err := m.writeToPage(trxId, record)
 	if err != nil {
 		return Pointer{}, err
@@ -96,7 +96,7 @@ func (m *Manager) Discard(trxId lock.TrxId) {
 }
 
 // DiscardRecordType は指定した trxId の指定したレコードタイプの Undo レコードのみ破棄する
-func (m *Manager) DiscardRecordType(trxId lock.TrxId, recordType recordType) {
+func (m *Manager) DiscardRecordType(trxId lock.TrxId, recordType RecordType) {
 	entries := m.entries[trxId]
 	kept := slices.DeleteFunc(entries, func(e Entry) bool {
 		return e.RecordType == recordType
@@ -110,8 +110,8 @@ func (m *Manager) DiscardRecordType(trxId lock.TrxId, recordType recordType) {
 
 // writeToPage は Undo レコードを Undo ページに書き込み、書き込み先の Pointer を返す
 func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) {
-	undoNum := undoNumber(len(m.entries[trxId]))
-	serialized := record.serialize(trxId, undoNum)
+	undoNum := UndoNumber(len(m.entries[trxId]))
+	serialized := record.Serialize(trxId, undoNum)
 
 	pageUndo, err := m.bufferPool.PageForWrite(m.currentPageId)
 	if err != nil {
@@ -119,7 +119,7 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 	}
 	bufPageUndo := NewPage(*pageUndo.Data())
 
-	ptr := newPointer(m.currentPageId.PageNumber, bufPageUndo.UsedBytes())
+	ptr := NewPointer(m.currentPageId.PageNumber, bufPageUndo.UsedBytes())
 
 	// ページが満杯の場合は、新しいページを割り当てる
 	if !bufPageUndo.append(serialized) {

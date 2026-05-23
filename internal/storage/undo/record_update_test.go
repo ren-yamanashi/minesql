@@ -115,13 +115,13 @@ func TestUpdateRecordSerialize(t *testing.T) {
 		ur := NewUpdateRecord(page.FileId(5), prevRecord, newRecord, 100, rollPtr)
 
 		// WHEN
-		buf := ur.serialize(10, 2)
+		buf := ur.Serialize(10, 2)
 
 		// THEN
 		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(10), fields.trxId)
-		assert.Equal(t, undoNumber(2), fields.undoNum)
+		assert.Equal(t, UndoNumber(2), fields.undoNum)
 		assert.Equal(t, RecordTypeUpdate, fields.recordType)
 		assert.Equal(t, lock.TrxId(100), fields.prevLastTrxId)
 		assert.Equal(t, rollPtr, fields.prevRollPtr)
@@ -139,7 +139,7 @@ func TestUpdateRecordSerialize(t *testing.T) {
 		var r Record = ur
 
 		// THEN
-		buf := r.serialize(1, 0)
+		buf := r.Serialize(1, 0)
 		assert.NotEmpty(t, buf)
 	})
 
@@ -150,7 +150,7 @@ func TestUpdateRecordSerialize(t *testing.T) {
 		ur := NewUpdateRecord(page.FileId(1), prevRecord, newRecord, 0, NullPointer)
 
 		// WHEN
-		buf := ur.serialize(1, 0)
+		buf := ur.Serialize(1, 0)
 
 		// THEN
 		fields, err := DeserializeFields(buf)
@@ -165,13 +165,13 @@ func TestUpdateRecordSerialize(t *testing.T) {
 		ur := NewUpdateRecord(page.FileId(1), btree.Record{[]byte("a")}, btree.Record{[]byte("b")}, lock.TrxId(0xFFFFFFFF), NullPointer)
 
 		// WHEN
-		buf := ur.serialize(lock.TrxId(0xFFFFFFFE), undoNumber(0xFFFFFFFD))
+		buf := ur.Serialize(lock.TrxId(0xFFFFFFFE), UndoNumber(0xFFFFFFFD))
 
 		// THEN
 		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(0xFFFFFFFE), fields.trxId)
-		assert.Equal(t, undoNumber(0xFFFFFFFD), fields.undoNum)
+		assert.Equal(t, UndoNumber(0xFFFFFFFD), fields.undoNum)
 		assert.Equal(t, lock.TrxId(0xFFFFFFFF), fields.prevLastTrxId)
 	})
 }

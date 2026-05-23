@@ -84,13 +84,13 @@ func TestDeleteRecordSerialize(t *testing.T) {
 		dr := NewDeleteRecord(page.FileId(5), record, 100, rollPtr)
 
 		// WHEN
-		buf := dr.serialize(10, 2)
+		buf := dr.Serialize(10, 2)
 
 		// THEN
 		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(10), fields.trxId)
-		assert.Equal(t, undoNumber(2), fields.undoNum)
+		assert.Equal(t, UndoNumber(2), fields.undoNum)
 		assert.Equal(t, RecordTypeDelete, fields.recordType)
 		assert.Equal(t, lock.TrxId(100), fields.prevLastTrxId)
 		assert.Equal(t, rollPtr, fields.prevRollPtr)
@@ -107,7 +107,7 @@ func TestDeleteRecordSerialize(t *testing.T) {
 		var r Record = dr
 
 		// THEN
-		buf := r.serialize(1, 0)
+		buf := r.Serialize(1, 0)
 		assert.NotEmpty(t, buf)
 	})
 
@@ -117,7 +117,7 @@ func TestDeleteRecordSerialize(t *testing.T) {
 		dr := NewDeleteRecord(page.FileId(1), record, 50, NullPointer)
 
 		// WHEN
-		buf := dr.serialize(1, 0)
+		buf := dr.Serialize(1, 0)
 
 		// THEN
 		fields, err := DeserializeFields(buf)
@@ -131,13 +131,13 @@ func TestDeleteRecordSerialize(t *testing.T) {
 		dr := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, lock.TrxId(0xFFFFFFFF), NullPointer)
 
 		// WHEN
-		buf := dr.serialize(lock.TrxId(0xFFFFFFFE), undoNumber(0xFFFFFFFD))
+		buf := dr.Serialize(lock.TrxId(0xFFFFFFFE), UndoNumber(0xFFFFFFFD))
 
 		// THEN
 		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(0xFFFFFFFE), fields.trxId)
-		assert.Equal(t, undoNumber(0xFFFFFFFD), fields.undoNum)
+		assert.Equal(t, UndoNumber(0xFFFFFFFD), fields.undoNum)
 		assert.Equal(t, lock.TrxId(0xFFFFFFFF), fields.prevLastTrxId)
 	})
 }
