@@ -21,7 +21,8 @@ const (
 )
 
 const (
-	RecordTypeInsert RecordType = iota + 1
+	recordTypeUnknown RecordType = iota
+	RecordTypeInsert
 	RecordTypeDelete
 	RecordTypeUpdate
 )

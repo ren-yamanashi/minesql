@@ -181,7 +181,7 @@ func TestManagerCommittedEntries(t *testing.T) {
 		assert.Equal(t, lock.TrxId(1), entries[0].TrxId)
 	})
 
-	t.Run("該当するエントリがない場合 nil を返す", func(t *testing.T) {
+	t.Run("該当するエントリがない場合空のスライスを返す", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
 
@@ -189,10 +189,10 @@ func TestManagerCommittedEntries(t *testing.T) {
 		entries := mgr.CommittedEntries([]lock.TrxId{999})
 
 		// THEN
-		assert.Nil(t, entries)
+		assert.Empty(t, entries)
 	})
 
-	t.Run("空のトランザクション ID リストでは nil を返す", func(t *testing.T) {
+	t.Run("空のトランザクション ID リストでは空のスライスを返す", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
 		r := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer)
@@ -202,7 +202,7 @@ func TestManagerCommittedEntries(t *testing.T) {
 		entries := mgr.CommittedEntries([]lock.TrxId{})
 
 		// THEN
-		assert.Nil(t, entries)
+		assert.Empty(t, entries)
 	})
 }
 

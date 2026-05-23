@@ -13,15 +13,13 @@ const (
 )
 
 type Page struct {
-	page   *page.Page
 	header []byte
 	body   []byte
 }
 
-func NewPage(page page.Page) *Page {
-	body := page.Body
+func NewPage(pg page.Page) *Page {
+	body := pg.Body
 	return &Page{
-		page:   &page,
 		header: body[:pageHeaderSize],
 		body:   body[pageHeaderSize:],
 	}
