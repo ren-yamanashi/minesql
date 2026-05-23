@@ -9,13 +9,13 @@ import (
 )
 
 type Pool struct {
-	MaxNumOfPage int // バッファプールの最大バッファページ数
-	flushList    *flushList
-	mutex        sync.RWMutex
-	files        map[page.FileId]*file.HeapFile
-	pages        []Page
-	pageTable    pageTable
-	lru          *lru
+	mu        sync.RWMutex
+	files     map[page.FileId]*file.HeapFile
+	pages     []Page
+	pageTable pageTable
+	flushList *flushList
+	lru       *lru
+	maxPages  int // バッファプールの最大バッファページ数
 }
 
 func NewPool(size int) *Pool {
@@ -26,21 +26,21 @@ func NewPool(size int) *Pool {
 		maxNumOfPage = (size / page.PageSize) + 1
 	}
 	return &Pool{
-		flushList:    newFlushList(),
-		MaxNumOfPage: maxNumOfPage,
-		files:        make(map[page.FileId]*file.HeapFile),
-		pages:        make([]Page, 0, maxNumOfPage),
-		pageTable:    newPageTable(),
-		lru:          newLru(maxNumOfPage),
+		files:     make(map[page.FileId]*file.HeapFile),
+		pages:     make([]Page, 0, maxNumOfPage),
+		pageTable: newPageTable(),
+		flushList: newFlushList(),
+		lru:       newLru(maxNumOfPage),
+		maxPages:  maxNumOfPage,
 	}
 }
 
-// BufferPageForWrite は書き込み用のバッファページを取得する
-func (bp *Pool) BufferPageForWrite(pageId page.Id) (*Page, error) {
-	bp.mutex.Lock()
-	defer bp.mutex.Unlock()
+// PageForWrite は書き込み用のバッファページを取得する
+func (p *Pool) PageForWrite(pageId page.Id) (*Page, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
-	bufPage, err := bp.bufferPage(pageId)
+	bufPage, err := p.page(pageId)
 	if err != nil {
 		return nil, err
 	}
@@ -48,40 +48,40 @@ func (bp *Pool) BufferPageForWrite(pageId page.Id) (*Page, error) {
 	// 書き込み用なのでダーティーページとして扱う
 	if !bufPage.isDirty {
 		bufPage.isDirty = true
-		bp.flushList.add(pageId)
+		p.flushList.add(pageId)
 	}
 	return bufPage, nil
 }
 
-// BufferPageForRead は読み込み用のバッファページを取得する
-func (bp *Pool) BufferPageForRead(pageId page.Id) (*Page, error) {
-	bp.mutex.Lock()
-	defer bp.mutex.Unlock()
-	return bp.bufferPage(pageId)
+// PageForRead は読み込み用のバッファページを取得する
+func (p *Pool) PageForRead(pageId page.Id) (*Page, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.page(pageId)
 }
 
 // IsPageCached は指定ページがバッファプールに載っているかを返す
-func (bp *Pool) IsPageCached(pageId page.Id) bool {
-	bp.mutex.RLock()
-	defer bp.mutex.RUnlock()
-	_, ok := bp.pageTable.bufferId(pageId)
+func (p *Pool) IsPageCached(pageId page.Id) bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	_, ok := p.pageTable.bufferId(pageId)
 	return ok
 }
 
 // UnRefPage は指定されたページの参照を解除し、優先的に追い出されるようにする
-func (bp *Pool) UnRefPage(pageId page.Id) {
-	bp.mutex.Lock()
-	defer bp.mutex.Unlock()
-	if bufferId, exists := bp.pageTable.bufferId(pageId); exists {
-		bp.lru.Delete(bufferId)
+func (p *Pool) UnRefPage(pageId page.Id) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if bufferId, exists := p.pageTable.bufferId(pageId); exists {
+		p.lru.Delete(bufferId)
 	}
 }
 
 // AllocatePageId は指定された FileId に対して新しい PageId を割り当てる
-func (bp *Pool) AllocatePageId(fileId page.FileId) (page.Id, error) {
-	bp.mutex.Lock()
-	defer bp.mutex.Unlock()
-	heapFile, err := bp.heapFile(fileId)
+func (p *Pool) AllocatePageId(fileId page.FileId) (page.Id, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	heapFile, err := p.heapFile(fileId)
 	if err != nil {
 		return page.InvalidId, err
 	}
@@ -91,45 +91,51 @@ func (bp *Pool) AllocatePageId(fileId page.FileId) (page.Id, error) {
 // RegisterHeapFile は BufferPool に HeapFile を登録する
 //   - fileId: 登録する HeapFile に対応する FileId
 //   - heapFile: 登録する HeapFile
-func (bp *Pool) RegisterHeapFile(fileId page.FileId, heapFile *file.HeapFile) {
-	bp.mutex.Lock()
-	defer bp.mutex.Unlock()
-	bp.files[fileId] = heapFile
+func (p *Pool) RegisterHeapFile(fileId page.FileId, heapFile *file.HeapFile) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.files[fileId] = heapFile
 }
 
 // HeapFile は指定された FileId に対応する HeapFile を取得する
-func (bp *Pool) HeapFile(fileId page.FileId) (*file.HeapFile, error) {
-	bp.mutex.RLock()
-	defer bp.mutex.RUnlock()
-	return bp.heapFile(fileId)
+func (p *Pool) HeapFile(fileId page.FileId) (*file.HeapFile, error) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.heapFile(fileId)
+}
+
+func (p *Pool) MaxPages() int {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.maxPages
 }
 
 // heapFile は指定された FileId に対応する HeapFile を取得する
-func (bp *Pool) heapFile(fileId page.FileId) (*file.HeapFile, error) {
-	heapFile, ok := bp.files[fileId]
+func (p *Pool) heapFile(fileId page.FileId) (*file.HeapFile, error) {
+	heapFile, ok := p.files[fileId]
 	if !ok {
 		return nil, fmt.Errorf("heap file for FileId %d not found", fileId)
 	}
 	return heapFile, nil
 }
 
-// bufferPage は指定されたページをバッファプールから取得する
-func (bp *Pool) bufferPage(pageId page.Id) (*Page, error) {
+// page は指定されたページをバッファプールから取得する
+func (p *Pool) page(pageId page.Id) (*Page, error) {
 	// ページがバッファプールにある場合
-	if bufferId, exists := bp.pageTable.bufferId(pageId); exists {
-		bufferPage := &bp.pages[bufferId]
-		bp.lru.access(bufferId)
+	if bufferId, exists := p.pageTable.bufferId(pageId); exists {
+		bufferPage := &p.pages[bufferId]
+		p.lru.access(bufferId)
 		return bufferPage, nil
 	}
 
 	// ページがバッファプールにない場合
-	bufPage, err := bp.addPage(pageId)
+	bufPage, err := p.addPage(pageId)
 	if err != nil {
 		return nil, err
 	}
 
 	// ディスク上のファイルからページを読み込む
-	heapFile, err := bp.heapFile(pageId.FileId)
+	heapFile, err := p.heapFile(pageId.FileId)
 	if err != nil {
 		return nil, err
 	}

@@ -66,6 +66,12 @@ func (l *lru) evict() id {
 	return victim.bufferId
 }
 
+// undoEvict は evict の結果を取り消し、ノードを元の状態に戻す
+func (l *lru) undoEvict(bufferId id) {
+	node := l.nodeMap[bufferId]
+	node.isUnused = false
+}
+
 // Delete はページの参照を解除し、優先的に追い出されるようにする
 func (l *lru) Delete(bufferId id) {
 	node := l.nodeMap[bufferId]
@@ -103,7 +109,11 @@ func (l *lru) moveToNewHead(node *lruNode) {
 // moveToOldTail はノードを OldSublist の末尾に移動する
 func (l *lru) moveToOldTail(node *lruNode) {
 	if l.tail == node {
-		node.isOld = true
+		if !node.isOld {
+			node.isOld = true
+			l.newLen--
+			l.oldLen++
+		}
 		return
 	}
 	l.detach(node)

@@ -3,24 +3,24 @@ package buffer
 import "github.com/ren-yamanashi/minesql/internal/storage/page"
 
 // FlushAllPages はバッファプール内のすべてのダーティーページをフラッシュする
-func (bp *Pool) FlushAllPages() error {
-	bp.mutex.Lock()
-	defer bp.mutex.Unlock()
+func (p *Pool) FlushAllPages() error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
 	var flushErr error
 
 	// 全ダーティーページをディスクに書き出す
-	bp.pageTable.forEach(func(pageId page.Id, bufId id) {
+	p.pageTable.forEach(func(pageId page.Id, bufId id) {
 		if flushErr != nil {
 			return
 		}
 
-		bufPage := &bp.pages[bufId]
+		bufPage := &p.pages[bufId]
 		if !bufPage.isDirty {
 			return
 		}
 
-		heapFile, err := bp.heapFile(pageId.FileId)
+		heapFile, err := p.heapFile(pageId.FileId)
 		if err != nil {
 			flushErr = err
 			return
@@ -37,9 +37,9 @@ func (bp *Pool) FlushAllPages() error {
 		return flushErr
 	}
 
-	bp.flushList.clear()
+	p.flushList.clear()
 
-	for _, hf := range bp.files {
+	for _, hf := range p.files {
 		if err := hf.Sync(); err != nil {
 			return err
 		}
@@ -49,11 +49,11 @@ func (bp *Pool) FlushAllPages() error {
 }
 
 // FlushOldestPages はフラッシュリストの先頭から n ページをディスクにフラッシュする
-func (bp *Pool) FlushOldestPages(n int) error {
-	bp.mutex.Lock()
-	defer bp.mutex.Unlock()
+func (p *Pool) FlushOldestPages(n int) error {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 
-	pageIds := bp.flushList.oldestPageIds(n)
+	pageIds := p.flushList.oldestPageIds(n)
 	if len(pageIds) == 0 {
 		return nil
 	}
@@ -63,18 +63,18 @@ func (bp *Pool) FlushOldestPages(n int) error {
 
 	// 対象のダーティーページをディスクに書き出す
 	for _, pid := range pageIds {
-		bufId, exists := bp.pageTable.bufferId(pid)
+		bufId, exists := p.pageTable.bufferId(pid)
 		if !exists {
 			continue
 		}
 
-		bufPage := &bp.pages[bufId]
+		bufPage := &p.pages[bufId]
 		if !bufPage.isDirty {
-			bp.flushList.delete(pid)
+			p.flushList.delete(pid)
 			continue
 		}
 
-		heapFile, err := bp.heapFile(pid.FileId)
+		heapFile, err := p.heapFile(pid.FileId)
 		if err != nil {
 			return err
 		}
@@ -83,12 +83,12 @@ func (bp *Pool) FlushOldestPages(n int) error {
 		}
 
 		bufPage.isDirty = false
-		bp.flushList.delete(pid)
+		p.flushList.delete(pid)
 		syncHeapFiles[pid.FileId] = true
 	}
 
 	for fileId := range syncHeapFiles {
-		heapFile, err := bp.heapFile(fileId)
+		heapFile, err := p.heapFile(fileId)
 		if err != nil {
 			return err
 		}
@@ -101,22 +101,22 @@ func (bp *Pool) FlushOldestPages(n int) error {
 }
 
 // NumOfFlushListPage はフラッシュリスト内のページ数を返す
-func (bp *Pool) NumOfFlushListPage() int {
-	bp.mutex.RLock()
-	defer bp.mutex.RUnlock()
-	return bp.flushList.NumOfPage
+func (p *Pool) NumOfFlushListPage() int {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.flushList.numOfPage
 }
 
 // ForEachDirtyPage はフラッシュリスト内の全ダーティーページに対してコールバックを実行する
-func (bp *Pool) ForEachDirtyPage(fn func(pg *page.Page)) {
-	bp.mutex.RLock()
-	defer bp.mutex.RUnlock()
+func (p *Pool) ForEachDirtyPage(fn func(pg *page.Page)) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 
-	for node := bp.flushList.Head; node != nil; node = node.next {
-		bufId, ok := bp.pageTable.bufferId(node.pageId)
+	for node := p.flushList.head; node != nil; node = node.next {
+		bufId, ok := p.pageTable.bufferId(node.pageId)
 		if !ok {
 			continue
 		}
-		fn(bp.pages[bufId].Page)
+		fn(p.pages[bufId].Page)
 	}
 }

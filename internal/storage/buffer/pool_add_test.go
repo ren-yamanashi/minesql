@@ -63,7 +63,7 @@ func TestAddPage(t *testing.T) {
 		firstId := page.NewId(0, 0)
 		_, err := bp.AddPage(firstId)
 		assert.NoError(t, err)
-		_, err = bp.BufferPageForWrite(firstId)
+		_, err = bp.PageForWrite(firstId)
 		assert.NoError(t, err)
 		assert.Equal(t, 1, bp.NumOfFlushListPage())
 

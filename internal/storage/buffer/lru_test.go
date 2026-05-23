@@ -187,6 +187,38 @@ func TestEvict(t *testing.T) {
 	})
 }
 
+func TestUndoEvict(t *testing.T) {
+	t.Run("evict の結果を取り消すと isUnused が false に戻る", func(t *testing.T) {
+		// GIVEN
+		lru := newLru(4)
+		lru.access(0)
+		victim := lru.evict()
+
+		// WHEN
+		lru.undoEvict(victim)
+
+		// THEN
+		node := lru.nodeMap[victim]
+		assert.False(t, node.isUnused)
+	})
+
+	t.Run("undoEvict 後の再アクセスは midpoint ではなく通常のアクセスとして扱われる", func(t *testing.T) {
+		// GIVEN
+		lru := newLru(8)
+		lru.access(0) // unused → midpoint (Old)
+		victim := lru.evict()
+		lru.undoEvict(victim)
+
+		// WHEN
+		lru.access(victim) // isUnused=false, isOld=true → New head に昇格
+
+		// THEN
+		node := lru.nodeMap[victim]
+		assert.False(t, node.isOld)
+		assert.Equal(t, lru.head, node)
+	})
+}
+
 func TestDelete(t *testing.T) {
 	t.Run("指定したノードが OldSublist の末尾に移動する", func(t *testing.T) {
 		// GIVEN
@@ -215,5 +247,24 @@ func TestDelete(t *testing.T) {
 		// THEN
 		assert.Equal(t, lru.tail, tail)
 		assert.True(t, tail.isOld)
+	})
+
+	t.Run("tail にある NewSublist のノードを Delete するとカウンタが正しく更新される", func(t *testing.T) {
+		// GIVEN
+		// 通常操作では tail が NewSublist にある状態は到達しにくいため、ノード状態を直接構築する
+		lru := newLru(2)
+		lru.access(0)
+		lru.access(1)
+		// tail のノードを強制的に NewSublist に変更して edge case を再現
+		lru.tail.isOld = false
+		lru.oldLen--
+		lru.newLen++
+
+		// WHEN
+		lru.Delete(lru.tail.bufferId)
+
+		// THEN
+		assert.True(t, lru.tail.isOld)
+		assert.Equal(t, 2, lru.newLen+lru.oldLen)
 	})
 }

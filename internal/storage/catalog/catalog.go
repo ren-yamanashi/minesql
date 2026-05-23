@@ -47,7 +47,7 @@ type Catalog struct {
 // NewCatalog は既存のカタログを開く
 func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
 	headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
-	bufPageHeader, err := bp.BufferPageForRead(headerPageId)
+	bufPageHeader, err := bp.PageForRead(headerPageId)
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +100,7 @@ func CreateCatalog(bp *buffer.Pool) (*Catalog, error) {
 	}
 	defer bp.UnRefPage(headerPageId)
 
-	bufPageHeader, err := bp.BufferPageForWrite(headerPageId)
+	bufPageHeader, err := bp.PageForWrite(headerPageId)
 	if err != nil {
 		return nil, err
 	}
@@ -183,7 +183,7 @@ func (c *Catalog) AllocateFileId() (page.FileId, error) {
 // persistScalar はヘッダーページの指定オフセットに uint32 値を書き込む
 func (c *Catalog) persistScalar(offset int, value uint32) error {
 	headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
-	bufPageHeader, err := c.bufferPool.BufferPageForWrite(headerPageId)
+	bufPageHeader, err := c.bufferPool.PageForWrite(headerPageId)
 	if err != nil {
 		return err
 	}
