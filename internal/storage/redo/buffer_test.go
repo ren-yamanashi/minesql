@@ -108,8 +108,8 @@ func TestBufferAppendRollback(t *testing.T) {
 	})
 }
 
-func TestBufferReadAll(t *testing.T) {
-	t.Run("フラッシュ済みの全レコードを読み取れる", func(t *testing.T) {
+func TestBufferReadFrom(t *testing.T) {
+	t.Run("LSN 0 を指定すると全レコードを返す", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
 		pg := buildTestPage(t)
@@ -118,7 +118,7 @@ func TestBufferReadAll(t *testing.T) {
 		_ = buf.Flush()
 
 		// WHEN
-		records, err := buf.ReadAll()
+		records, err := buf.ReadFrom(Lsn(0))
 
 		// THEN
 		assert.NoError(t, err)
@@ -127,33 +127,6 @@ func TestBufferReadAll(t *testing.T) {
 		assert.Equal(t, Lsn(2), records[1].Lsn())
 	})
 
-	t.Run("フラッシュ前のレコードは含まない", func(t *testing.T) {
-		// GIVEN
-		buf := setupTestBuffer(t)
-		buf.AppendCommit(lock.TrxId(1))
-
-		// WHEN
-		records, err := buf.ReadAll()
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Nil(t, records)
-	})
-
-	t.Run("空のバッファから読み取ると nil を返す", func(t *testing.T) {
-		// GIVEN
-		buf := setupTestBuffer(t)
-
-		// WHEN
-		records, err := buf.ReadAll()
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Nil(t, records)
-	})
-}
-
-func TestBufferReadFrom(t *testing.T) {
 	t.Run("指定 LSN より大きいレコードだけ返す", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
@@ -172,7 +145,7 @@ func TestBufferReadFrom(t *testing.T) {
 		assert.Equal(t, Lsn(3), records[1].Lsn())
 	})
 
-	t.Run("全レコードが指定 LSN 以下の場合 nil を返す", func(t *testing.T) {
+	t.Run("全レコードが指定 LSN 以下の場合 空を返す", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
 		buf.AppendCommit(lock.TrxId(1)) // LSN=1
@@ -183,7 +156,7 @@ func TestBufferReadFrom(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Nil(t, records)
+		assert.Empty(t, records)
 	})
 }
 
@@ -295,7 +268,7 @@ func TestBufferFlush(t *testing.T) {
 		assert.Empty(t, buf.records)
 	})
 
-	t.Run("フラッシュしたレコードが ReadAll で読み取れる", func(t *testing.T) {
+	t.Run("フラッシュしたレコードが ReadFrom で読み取れる", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
 		pg := buildTestPage(t)
@@ -306,7 +279,7 @@ func TestBufferFlush(t *testing.T) {
 		_ = buf.Flush()
 
 		// THEN
-		records, err := buf.ReadAll()
+		records, err := buf.ReadFrom(Lsn(0))
 		assert.NoError(t, err)
 		assert.Len(t, records, 2)
 		assert.Equal(t, RecordTypePageWrite, records[0].Type())
@@ -326,9 +299,9 @@ func TestBufferClear(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		records, err := buf.ReadAll()
+		records, err := buf.ReadFrom(Lsn(0))
 		assert.NoError(t, err)
-		assert.Nil(t, records)
+		assert.Empty(t, records)
 	})
 
 	t.Run("クリア後に FlushedLsn が 0 になる", func(t *testing.T) {
@@ -374,7 +347,7 @@ func TestBufferTruncateBefore(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		records, err := buf.ReadAll()
+		records, err := buf.ReadFrom(Lsn(0))
 		assert.NoError(t, err)
 		assert.Len(t, records, 1)
 		assert.Equal(t, Lsn(3), records[0].Lsn())
@@ -392,9 +365,9 @@ func TestBufferTruncateBefore(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		records, err := buf.ReadAll()
+		records, err := buf.ReadFrom(Lsn(0))
 		assert.NoError(t, err)
-		assert.Nil(t, records)
+		assert.Empty(t, records)
 	})
 }
 

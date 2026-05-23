@@ -25,6 +25,7 @@ func NewBuffer() (*Buffer, error) {
 	return &Buffer{
 		logFile: file,
 		nextLsn: nextLsn,
+		records: []Record{},
 	}, nil
 }
 
@@ -47,13 +48,6 @@ func (b *Buffer) AppendRollback(trxId lock.TrxId) Lsn {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 	return b.append(trxId, RecordTypeRollback, page.Id{}, page.Page{})
-}
-
-// ReadAll はディスク上の全レコードを読み込む (フラッシュされていないバッファ内のレコードは含まない)
-func (b *Buffer) ReadAll() ([]Record, error) {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-	return b.logFile.readRecords(Lsn(0))
 }
 
 // ReadFrom は指定 LSN より大きい LSN を持つレコードを読み込む
@@ -98,7 +92,7 @@ func (b *Buffer) Flush() error {
 		return err
 	}
 
-	b.records = nil
+	b.records = []Record{}
 	return nil
 }
 
@@ -135,11 +129,7 @@ func (b *Buffer) Size() (int64, error) {
 
 	var bufferSize int
 	for _, record := range b.records {
-		dataSize := 0
-		if record.data.Header != nil {
-			dataSize = len(record.data.ToBytes())
-		}
-		bufferSize += recordHeaderSize + dataSize
+		bufferSize += record.serializedSize()
 	}
 
 	return fileSize + int64(bufferSize), nil

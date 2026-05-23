@@ -180,6 +180,60 @@ func TestRecordSerialize(t *testing.T) {
 	})
 }
 
+func TestRecordSerializedSize(t *testing.T) {
+	t.Run("ページ変更レコードはヘッダー + ページサイズを返す", func(t *testing.T) {
+		// GIVEN
+		pg := buildTestPage(t)
+		r := Record{
+			lsn:        Lsn(1),
+			trxId:      10,
+			recordType: RecordTypePageWrite,
+			pageId:     page.NewId(page.FileId(2), page.PageNumber(3)),
+			data:       *pg,
+		}
+
+		// WHEN
+		size := r.serializedSize()
+
+		// THEN
+		assert.Equal(t, recordHeaderSize+page.Size, size)
+	})
+
+	t.Run("COMMIT レコードはヘッダーサイズのみ返す", func(t *testing.T) {
+		// GIVEN
+		r := Record{
+			lsn:        Lsn(2),
+			trxId:      10,
+			recordType: RecordTypeCommit,
+		}
+
+		// WHEN
+		size := r.serializedSize()
+
+		// THEN
+		assert.Equal(t, recordHeaderSize, size)
+	})
+
+	t.Run("Serialize のバイト数と一致する", func(t *testing.T) {
+		// GIVEN
+		pg := buildTestPage(t)
+		r := Record{
+			lsn:        Lsn(1),
+			trxId:      10,
+			recordType: RecordTypePageWrite,
+			pageId:     page.NewId(page.FileId(2), page.PageNumber(3)),
+			data:       *pg,
+		}
+
+		// WHEN
+		size := r.serializedSize()
+		serialized := r.Serialize()
+
+		// THEN
+		assert.Equal(t, len(serialized), size)
+	})
+}
+
 func TestDeserializeRecord(t *testing.T) {
 	t.Run("ページ変更レコードのラウンドトリップ", func(t *testing.T) {
 		// GIVEN
@@ -296,6 +350,32 @@ func TestDeserializeRecord(t *testing.T) {
 		decoded2, _, err := deserializeRecord(buf[readBytes:])
 		assert.NoError(t, err)
 		assert.Equal(t, Lsn(2), decoded2.Lsn())
+	})
+
+	t.Run("不正な RecordType の場合はエラーを返す", func(t *testing.T) {
+		// GIVEN
+		r := Record{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit}
+		buf := r.Serialize()
+		buf[recordHeaderRecordTypeOffset] = 0
+
+		// WHEN
+		_, _, err := deserializeRecord(buf)
+
+		// THEN
+		assert.ErrorIs(t, err, ErrInvalidRecord)
+	})
+
+	t.Run("範囲外の RecordType の場合はエラーを返す", func(t *testing.T) {
+		// GIVEN
+		r := Record{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit}
+		buf := r.Serialize()
+		buf[recordHeaderRecordTypeOffset] = 255
+
+		// WHEN
+		_, _, err := deserializeRecord(buf)
+
+		// THEN
+		assert.ErrorIs(t, err, ErrInvalidRecord)
 	})
 
 	t.Run("空のバイト列はエラーを返す", func(t *testing.T) {

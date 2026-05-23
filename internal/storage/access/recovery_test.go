@@ -206,7 +206,7 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 		env.redoLog.AppendPageCopy(lock.TrxId(1), pgId, *newPage)
 		_ = env.redoLog.Flush()
 
-		records, _ := env.redoLog.ReadAll()
+		records, _ := env.redoLog.ReadFrom(redo.Lsn(0))
 
 		// WHEN
 		err = r.applyRedoLog(records)
@@ -246,7 +246,7 @@ func TestRecoveryApplyRollback(t *testing.T) {
 		env.redoLog.AppendPageCopy(trx2, pgId, *readPage.Data())
 		_ = env.redoLog.Flush()
 
-		records, _ := env.redoLog.ReadAll()
+		records, _ := env.redoLog.ReadFrom(redo.Lsn(0))
 		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
 
 		// WHEN

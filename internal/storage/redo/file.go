@@ -79,12 +79,12 @@ func (f *file) readRecords(lsn Lsn) ([]Record, error) {
 		return nil, err
 	}
 
-	var records []Record
+	records := []Record{}
 	offset := 0
 	for offset < len(body) {
 		record, readBytesNum, err := deserializeRecord(body[offset:])
 		if err != nil {
-			return nil, err
+			break // 末尾の不完全レコードはクラッシュ時に発生しうるため無視する
 		}
 		offset += readBytesNum
 		if record.lsn <= lsn {

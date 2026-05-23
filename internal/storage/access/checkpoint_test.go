@@ -92,7 +92,7 @@ func TestCheckpointExecute(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		// LSN=1 が切り詰められ、LSN=2, 3 が残る
-		records, err := env.redoLog.ReadAll()
+		records, err := env.redoLog.ReadFrom(redo.Lsn(0))
 		assert.NoError(t, err)
 		assert.Len(t, records, 2)
 		assert.Equal(t, redo.Lsn(2), records[0].Lsn())

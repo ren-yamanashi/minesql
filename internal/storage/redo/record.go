@@ -11,7 +11,8 @@ import (
 type RecordType int
 
 const (
-	RecordTypePageWrite RecordType = iota + 1
+	recordTypeUnknown RecordType = iota
+	RecordTypePageWrite
 	RecordTypeCommit
 	RecordTypeRollback
 )
@@ -42,7 +43,7 @@ func (r *Record) PageId() page.Id   { return r.pageId }
 func (r *Record) Data() page.Page   { return r.data }
 
 func (r *Record) Serialize() []byte {
-	var pageBytes []byte
+	pageBytes := []byte{}
 	if r.data.Header != nil {
 		pageBytes = r.data.ToBytes()
 	}
@@ -60,6 +61,15 @@ func (r *Record) Serialize() []byte {
 	return buf
 }
 
+// serializedSize はシリアライズ後のバイト数を返す
+func (r *Record) serializedSize() int {
+	dataSize := 0
+	if r.data.Header != nil {
+		dataSize = len(r.data.ToBytes())
+	}
+	return recordHeaderSize + dataSize
+}
+
 // deserializeRecord はバイト列から Record をデシリアライズする
 //   - return: デシリアライズした Record, 読み取ったバイト数, エラー
 func deserializeRecord(data []byte) (Record, int, error) {
@@ -70,6 +80,9 @@ func deserializeRecord(data []byte) (Record, int, error) {
 	lsn := Lsn(binary.BigEndian.Uint32(data[recordHeaderLsnOffset:recordHeaderTrxOffset]))
 	trxId := lock.TrxId(binary.BigEndian.Uint32(data[recordHeaderTrxOffset:recordHeaderRecordTypeOffset]))
 	recordType := RecordType(data[recordHeaderRecordTypeOffset])
+	if recordType <= recordTypeUnknown || recordType > RecordTypeRollback {
+		return Record{}, 0, ErrInvalidRecord
+	}
 	pageId := page.ReadId(data, recordHeaderPageIdOffset)
 	dataLen := int(binary.BigEndian.Uint16(data[recordHeaderDataLenOffset:recordHeaderSize]))
 	totalLen := recordHeaderSize + dataLen

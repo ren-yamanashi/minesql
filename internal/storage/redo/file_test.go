@@ -105,7 +105,7 @@ func TestFileReadRecords(t *testing.T) {
 		assert.Equal(t, Lsn(3), result[1].Lsn())
 	})
 
-	t.Run("空のファイルから読み取ると nil を返す", func(t *testing.T) {
+	t.Run("空のファイルから読み取ると空を返す", func(t *testing.T) {
 		// GIVEN
 		f := setupTestFile(t)
 
@@ -114,10 +114,10 @@ func TestFileReadRecords(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Nil(t, result)
+		assert.Empty(t, result)
 	})
 
-	t.Run("全レコードが指定 LSN 以下の場合 nil を返す", func(t *testing.T) {
+	t.Run("全レコードが指定 LSN 以下の場合。空を返す", func(t *testing.T) {
 		// GIVEN
 		f := setupTestFile(t)
 		records := []Record{
@@ -131,7 +131,7 @@ func TestFileReadRecords(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Nil(t, result)
+		assert.Empty(t, result)
 	})
 
 	t.Run("ページ変更レコードのデータが正しく読み取れる", func(t *testing.T) {
@@ -276,7 +276,7 @@ func TestFileTruncateBefore(t *testing.T) {
 		assert.NoError(t, err)
 		result, err := f.readRecords(Lsn(0))
 		assert.NoError(t, err)
-		assert.Nil(t, result)
+		assert.Empty(t, result)
 	})
 
 	t.Run("空のファイルに対して truncate してもエラーにならない", func(t *testing.T) {
@@ -329,7 +329,7 @@ func TestFileClear(t *testing.T) {
 
 		result, err := f.readRecords(Lsn(0))
 		assert.NoError(t, err)
-		assert.Nil(t, result)
+		assert.Empty(t, result)
 	})
 
 	t.Run("checkpointLsn が設定されている状態からクリアすると 0 に戻る", func(t *testing.T) {
