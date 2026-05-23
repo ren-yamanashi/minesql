@@ -33,7 +33,7 @@ func NewManager() *Manager {
 // Lock は指定した行に対してロックを取得する
 //   - 競合がなければ即座にロックを付与する
 //   - 競合がある場合は待機キューに追加し、ロックが付与されるかタイムアウトするまで待機する
-func (m *Manager) Lock(trxId TrxId, pos btree.RecordPosition, mode mode) error {
+func (m *Manager) Lock(trxId TrxId, pos btree.RecordPosition, mode Mode) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 

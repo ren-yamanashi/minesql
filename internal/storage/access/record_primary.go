@@ -116,7 +116,7 @@ func (r *primaryRecord) encode() btree.Record {
 	encode.Encode(stringToByteSlice(r.Values[:r.pkCount]), &key)
 
 	var nonKey []byte
-	nonKey = binary.BigEndian.AppendUint32(nonKey, r.lastTrxId)
+	nonKey = binary.BigEndian.AppendUint32(nonKey, uint32(r.lastTrxId))
 	nonKey = append(nonKey, r.rollPtr.Encode()...)
 	encode.Encode(stringToByteSlice(r.Values[r.pkCount:]), &nonKey)
 
@@ -136,7 +136,7 @@ func decodePrimaryRecord(record btree.Record, ct *catalog.Catalog, fileId page.F
 	if len(nonKey) < systemFieldsSize {
 		return nil, fmt.Errorf("non-key data too short: got %d bytes, need at least %d", len(nonKey), systemFieldsSize)
 	}
-	lastTrxId := binary.BigEndian.Uint32(nonKey[:lock.TrxIdSize])
+	lastTrxId := lock.TrxId(binary.BigEndian.Uint32(nonKey[:lock.TrxIdSize]))
 	rollPtr, err := undo.DecodePointer(nonKey[lock.TrxIdSize:systemFieldsSize])
 	if err != nil {
 		return nil, err

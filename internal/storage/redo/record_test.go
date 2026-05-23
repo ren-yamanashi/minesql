@@ -3,6 +3,7 @@ package redo
 import (
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -40,7 +41,7 @@ func TestRecordTrxId(t *testing.T) {
 		got := r.TrxId()
 
 		// THEN
-		assert.Equal(t, uint32(100), got)
+		assert.Equal(t, lock.TrxId(100), got)
 	})
 }
 

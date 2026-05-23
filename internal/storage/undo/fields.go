@@ -50,7 +50,7 @@ func (f *Fields) serialize() []byte {
 	var data []byte
 
 	// prevLastTrxId, prevRollPtr, tableFileId
-	data = binary.BigEndian.AppendUint32(data, f.prevLastTrxId)
+	data = binary.BigEndian.AppendUint32(data, uint32(f.prevLastTrxId))
 	data = append(data, f.prevRollPtr.Encode()...)
 	data = binary.BigEndian.AppendUint32(data, uint32(f.tableFileId))
 
@@ -65,7 +65,7 @@ func (f *Fields) serialize() []byte {
 
 	// ヘッダー + Data 統合
 	buf := make([]byte, recordHeaderSize+len(data))
-	binary.BigEndian.PutUint32(buf[headerTrxIdOffset:headerUndoNumOffset], f.trxId)
+	binary.BigEndian.PutUint32(buf[headerTrxIdOffset:headerUndoNumOffset], uint32(f.trxId))
 	binary.BigEndian.PutUint32(buf[headerUndoNumOffset:headerRecordTypeOffset], f.undoNum)
 	buf[headerRecordTypeOffset] = byte(f.recordType)
 	binary.BigEndian.PutUint16(buf[headerDataLenOffset:recordHeaderSize], uint16(len(data)))
@@ -80,7 +80,7 @@ func DeserializeFields(buf []byte) (Fields, error) {
 	}
 
 	var fields Fields
-	fields.trxId = binary.BigEndian.Uint32(buf[headerTrxIdOffset:headerUndoNumOffset])
+	fields.trxId = lock.TrxId(binary.BigEndian.Uint32(buf[headerTrxIdOffset:headerUndoNumOffset]))
 	fields.undoNum = binary.BigEndian.Uint32(buf[headerUndoNumOffset:headerRecordTypeOffset])
 	fields.recordType = recordType(buf[headerRecordTypeOffset])
 	dataLen := int(binary.BigEndian.Uint16(buf[headerDataLenOffset:recordHeaderSize]))
@@ -97,7 +97,7 @@ func DeserializeFields(buf []byte) (Fields, error) {
 	if offset+prevFieldsSize > len(data) {
 		return Fields{}, errInvalidRecord
 	}
-	fields.prevLastTrxId = binary.BigEndian.Uint32(data[offset : offset+lock.TrxIdSize])
+	fields.prevLastTrxId = lock.TrxId(binary.BigEndian.Uint32(data[offset : offset+lock.TrxIdSize]))
 	prevRollPtr, err := DecodePointer(data[offset+lock.TrxIdSize : offset+prevFieldsSize])
 	if err != nil {
 		return Fields{}, err

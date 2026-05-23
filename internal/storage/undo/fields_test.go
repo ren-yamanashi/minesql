@@ -641,7 +641,7 @@ func TestFieldsToRecord(t *testing.T) {
 // buildRawBuffer はテスト用にヘッダーと任意のデータ部から Undo レコードのバイト列を構築する
 func buildRawBuffer(trxId lock.TrxId, undoNum undoNumber, recordType recordType, data []byte) []byte {
 	buf := make([]byte, recordHeaderSize+len(data))
-	binary.BigEndian.PutUint32(buf[headerTrxIdOffset:headerUndoNumOffset], trxId)
+	binary.BigEndian.PutUint32(buf[headerTrxIdOffset:headerUndoNumOffset], uint32(trxId))
 	binary.BigEndian.PutUint32(buf[headerUndoNumOffset:headerRecordTypeOffset], undoNum)
 	buf[headerRecordTypeOffset] = byte(recordType)
 	binary.BigEndian.PutUint16(buf[headerDataLenOffset:recordHeaderSize], uint16(len(data)))

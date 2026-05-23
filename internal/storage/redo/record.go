@@ -51,7 +51,7 @@ func (r *Record) serialize() []byte {
 	buf := make([]byte, recordHeaderSize+dataLen)
 
 	binary.BigEndian.PutUint32(buf[recordHeaderLsnOffset:recordHeaderTrxOffset], uint32(r.lsn))
-	binary.BigEndian.PutUint32(buf[recordHeaderTrxOffset:recordHeaderRecordTypeOffset], r.trxId)
+	binary.BigEndian.PutUint32(buf[recordHeaderTrxOffset:recordHeaderRecordTypeOffset], uint32(r.trxId))
 	buf[recordHeaderRecordTypeOffset] = byte(r.recordType)
 	r.pageId.WriteTo(buf, recordHeaderPageIdOffset)
 	binary.BigEndian.PutUint16(buf[recordHeaderDataLenOffset:recordHeaderSize], uint16(dataLen))
@@ -69,7 +69,7 @@ func deserializeRecord(data []byte) (Record, int, error) {
 	}
 
 	lsn := Lsn(binary.BigEndian.Uint32(data[recordHeaderLsnOffset:recordHeaderTrxOffset]))
-	trxId := binary.BigEndian.Uint32(data[recordHeaderTrxOffset:recordHeaderRecordTypeOffset])
+	trxId := lock.TrxId(binary.BigEndian.Uint32(data[recordHeaderTrxOffset:recordHeaderRecordTypeOffset]))
 	recordType := RecordType(data[recordHeaderRecordTypeOffset])
 	pageId := page.ReadId(data, recordHeaderPageIdOffset)
 	dataLen := int(binary.BigEndian.Uint16(data[recordHeaderDataLenOffset:recordHeaderSize]))
