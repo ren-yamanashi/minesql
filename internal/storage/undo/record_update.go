@@ -14,7 +14,12 @@ type UpdateRecord struct {
 	prevRollPtr   Pointer
 }
 
-func NewUpdateRecord(tableFileId page.FileId, prevRecord, newRecord btree.Record, prevLastTrxId lock.TrxId, prevRollPtr Pointer) UpdateRecord {
+func NewUpdateRecord(
+	tableFileId page.FileId,
+	prevRecord, newRecord btree.Record,
+	prevLastTrxId lock.TrxId,
+	prevRollPtr Pointer,
+) UpdateRecord {
 	return UpdateRecord{
 		tableFileId:   tableFileId,
 		prevRecord:    prevRecord,

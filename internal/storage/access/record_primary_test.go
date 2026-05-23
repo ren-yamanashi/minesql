@@ -31,7 +31,7 @@ func TestNewPrimaryRecord(t *testing.T) {
 	t.Run("lastTrxId と rollPtr が設定される", func(t *testing.T) {
 		// GIVEN
 		ct := setupSecondaryTestCatalog(t)
-		rollPtr := undo.NewPointer(3, 64)
+		rollPtr := testUndoPointer(3, 64)
 
 		// WHEN
 		pr, err := newPrimaryRecord(ct, newPrimaryRecordInput{
@@ -125,7 +125,7 @@ func TestPrimaryRecordUpdate(t *testing.T) {
 	t.Run("更新後のレコードに新しい trxId が設定され rollPtr は元の値が保持される", func(t *testing.T) {
 		// GIVEN
 		ct := setupSecondaryTestCatalog(t)
-		rollPtr := undo.NewPointer(5, 128)
+		rollPtr := testUndoPointer(5, 128)
 		pr, _ := newPrimaryRecord(ct, newPrimaryRecordInput{
 			fileId: page.FileId(2), pkCount: 1, deleteMark: 0,
 			lastTrxId: 10, rollPtr: rollPtr,
@@ -219,7 +219,7 @@ func TestPrimaryRecordSetRollPtr(t *testing.T) {
 		assert.Equal(t, undo.Pointer{}, pr.rollPtr)
 
 		// WHEN
-		newPtr := undo.NewPointer(7, 256)
+		newPtr := testUndoPointer(7, 256)
 		pr.setRollPtr(newPtr)
 
 		// THEN
@@ -231,7 +231,7 @@ func TestPrimaryRecordSetRollPtr(t *testing.T) {
 		ct := setupSecondaryTestCatalog(t)
 		pr, _ := newPrimaryRecord(ct, newPrimaryRecordInput{
 			fileId: page.FileId(2), pkCount: 1, deleteMark: 0,
-			rollPtr:  undo.NewPointer(1, 10),
+			rollPtr:  testUndoPointer(1, 10),
 			colNames: []string{"id", "name", "email"},
 			values:   []string{"1", "Alice", "a@b.com"},
 		})
@@ -251,7 +251,7 @@ func TestPrimaryRecordSetRollPtr(t *testing.T) {
 			colNames: []string{"id", "name", "email"},
 			values:   []string{"1", "Alice", "a@b.com"},
 		})
-		newPtr := undo.NewPointer(3, 64)
+		newPtr := testUndoPointer(3, 64)
 		pr.setRollPtr(newPtr)
 
 		// WHEN
@@ -290,7 +290,7 @@ func TestPrimaryRecordEncode(t *testing.T) {
 	t.Run("非キー領域の先頭に lastTrxId と rollPtr がエンコードされる", func(t *testing.T) {
 		// GIVEN
 		ct := setupSecondaryTestCatalog(t)
-		rollPtr := undo.NewPointer(3, 64)
+		rollPtr := testUndoPointer(3, 64)
 		pr, _ := newPrimaryRecord(ct, newPrimaryRecordInput{
 			fileId: page.FileId(2), pkCount: 1, deleteMark: 0,
 			lastTrxId: 100, rollPtr: rollPtr,
@@ -433,7 +433,7 @@ func TestDecodePrimaryRecord(t *testing.T) {
 	t.Run("lastTrxId と rollPtr がデコードされる", func(t *testing.T) {
 		// GIVEN
 		ct := setupSecondaryTestCatalog(t)
-		rollPtr := undo.NewPointer(5, 128)
+		rollPtr := testUndoPointer(5, 128)
 		original, _ := newPrimaryRecord(ct, newPrimaryRecordInput{
 			fileId: page.FileId(2), pkCount: 1, deleteMark: 0,
 			lastTrxId: 42, rollPtr: rollPtr,
@@ -517,4 +517,12 @@ func TestDecodePrimaryRecord(t *testing.T) {
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "column count mismatch")
 	})
+}
+
+func testUndoPointer(pageNum page.PageNumber, offset uint16) undo.Pointer {
+	buf := make([]byte, undo.PointerSize)
+	binary.BigEndian.PutUint32(buf[0:4], uint32(pageNum))
+	binary.BigEndian.PutUint16(buf[4:6], offset)
+	p, _ := undo.DecodePointer(buf)
+	return p
 }

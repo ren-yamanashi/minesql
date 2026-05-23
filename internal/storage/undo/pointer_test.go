@@ -14,7 +14,7 @@ func TestNewPointer(t *testing.T) {
 		offset := uint16(64)
 
 		// WHEN
-		p := NewPointer(pageNum, offset)
+		p := newPointer(pageNum, offset)
 
 		// THEN
 		assert.Equal(t, page.PageNumber(3), p.pageNumber)
@@ -23,7 +23,7 @@ func TestNewPointer(t *testing.T) {
 
 	t.Run("ゼロ値で Pointer を作成できる", func(t *testing.T) {
 		// GIVEN / WHEN
-		p := NewPointer(0, 0)
+		p := newPointer(0, 0)
 
 		// THEN
 		assert.Equal(t, page.PageNumber(0), p.pageNumber)
@@ -32,7 +32,7 @@ func TestNewPointer(t *testing.T) {
 
 	t.Run("最大値で Pointer を作成できる", func(t *testing.T) {
 		// GIVEN / WHEN
-		p := NewPointer(page.PageNumber(0xFFFFFFFF), 0xFFFF)
+		p := newPointer(page.PageNumber(0xFFFFFFFF), 0xFFFF)
 
 		// THEN
 		assert.Equal(t, page.PageNumber(0xFFFFFFFF), p.pageNumber)

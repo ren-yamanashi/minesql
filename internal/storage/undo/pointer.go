@@ -25,7 +25,7 @@ type Pointer struct {
 	offset     uint16          // Undo ページ内のバイトオフセット
 }
 
-func NewPointer(pageNum page.PageNumber, offset uint16) Pointer {
+func newPointer(pageNum page.PageNumber, offset uint16) Pointer {
 	return Pointer{pageNumber: pageNum, offset: offset}
 }
 

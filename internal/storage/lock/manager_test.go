@@ -180,6 +180,33 @@ func TestManagerLock(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 	})
+
+	t.Run("他のトランザクションも Shared を保持している場合は Shared→Exclusive の昇格がタイムアウトする", func(t *testing.T) {
+		// GIVEN
+		m := newManagerWithShortTimeout()
+		pos := testPos(1, 0)
+		_ = m.Lock(1, pos, Shared)
+		_ = m.Lock(2, pos, Shared)
+
+		// WHEN
+		err := m.Lock(1, pos, Exclusive)
+
+		// THEN
+		assert.ErrorIs(t, err, ErrTimeout)
+	})
+
+	t.Run("同一トランザクションが Exclusive 保持中に Exclusive を再要求しても成功する", func(t *testing.T) {
+		// GIVEN
+		m := NewManager()
+		pos := testPos(1, 0)
+		_ = m.Lock(1, pos, Exclusive)
+
+		// WHEN
+		err := m.Lock(1, pos, Exclusive)
+
+		// THEN
+		assert.NoError(t, err)
+	})
 }
 
 func TestManagerRelease(t *testing.T) {
@@ -218,6 +245,50 @@ func TestManagerRelease(t *testing.T) {
 		assert.NotPanics(t, func() {
 			m.Release(999)
 		})
+	})
+
+	t.Run("Shared ロック保持者の 1 人を解放しても他の保持者のロックは維持される", func(t *testing.T) {
+		// GIVEN
+		m := NewManager()
+		pos := testPos(1, 0)
+		_ = m.Lock(1, pos, Shared)
+		_ = m.Lock(2, pos, Shared)
+
+		// WHEN
+		m.Release(1)
+
+		// THEN
+		m.mutex.Lock()
+		state := m.lockTable[pos]
+		assert.Equal(t, Shared, state.holders[2])
+		_, hasTrx1 := state.holders[1]
+		assert.False(t, hasTrx1)
+		m.mutex.Unlock()
+	})
+
+	t.Run("最後の Shared 保持者を解放すると待機中の Exclusive が付与される", func(t *testing.T) {
+		// GIVEN
+		m := NewManager()
+		pos := testPos(1, 0)
+		_ = m.Lock(1, pos, Shared)
+		_ = m.Lock(2, pos, Shared)
+
+		var wg sync.WaitGroup
+		var lockErr error
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			lockErr = m.Lock(3, pos, Exclusive)
+		}()
+		time.Sleep(10 * time.Millisecond)
+
+		// WHEN
+		m.Release(1)
+		m.Release(2)
+		wg.Wait()
+
+		// THEN
+		assert.NoError(t, lockErr)
 	})
 
 	t.Run("解放後に待機キューの Shared ロックが連続して付与される", func(t *testing.T) {
@@ -332,6 +403,58 @@ func TestManagerGrantWaitingLocks(t *testing.T) {
 		// THEN
 		assert.Equal(t, Shared, s.holders[2])
 		assert.Empty(t, s.waitQueue)
+	})
+
+	t.Run("Shared 保持者が自身のみの場合に待機キューの Exclusive 昇格を付与できる", func(t *testing.T) {
+		// GIVEN
+		m := NewManager()
+		s := newState()
+		s.holders[1] = Shared
+		s.waitQueue = []*request{
+			{trxId: 1, mode: Exclusive},
+		}
+
+		// WHEN
+		m.grantWaitingLocks(s)
+
+		// THEN
+		assert.Equal(t, Exclusive, s.holders[1])
+		assert.Empty(t, s.waitQueue)
+	})
+
+	t.Run("Exclusive 保持者がいる場合に待機キューの Exclusive は付与されない", func(t *testing.T) {
+		// GIVEN
+		m := NewManager()
+		s := newState()
+		s.holders[1] = Exclusive
+		s.waitQueue = []*request{
+			{trxId: 2, mode: Exclusive},
+		}
+
+		// WHEN
+		m.grantWaitingLocks(s)
+
+		// THEN
+		assert.Len(t, s.holders, 1)
+		assert.Equal(t, Exclusive, s.holders[1])
+		assert.Len(t, s.waitQueue, 1)
+	})
+
+	t.Run("Exclusive 保持者がいる場合に待機キューの Shared も付与されない", func(t *testing.T) {
+		// GIVEN
+		m := NewManager()
+		s := newState()
+		s.holders[1] = Exclusive
+		s.waitQueue = []*request{
+			{trxId: 2, mode: Shared},
+		}
+
+		// WHEN
+		m.grantWaitingLocks(s)
+
+		// THEN
+		assert.Len(t, s.holders, 1)
+		assert.Len(t, s.waitQueue, 1)
 	})
 }
 

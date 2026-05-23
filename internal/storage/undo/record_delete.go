@@ -13,7 +13,12 @@ type DeleteRecord struct {
 	prevRollPtr   Pointer
 }
 
-func NewDeleteRecord(tableFileId page.FileId, record btree.Record, prevLastTrxId lock.TrxId, prevRollPtr Pointer) DeleteRecord {
+func NewDeleteRecord(
+	tableFileId page.FileId,
+	record btree.Record,
+	prevLastTrxId lock.TrxId,
+	prevRollPtr Pointer,
+) DeleteRecord {
 	return DeleteRecord{
 		tableFileId:   tableFileId,
 		record:        record,

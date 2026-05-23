@@ -23,30 +23,50 @@ type Fields struct {
 	columnSets    [][][]byte  // Insert/Delete は 1 Update は 2 セット
 }
 
-// TrxId はトランザクション ID を返す
-func (f *Fields) TrxId() lock.TrxId { return f.trxId }
+func (f Fields) TrxId() lock.TrxId { return f.trxId }
 
-// UndoNum は Undo 番号を返す
-func (f *Fields) UndoNum() undoNumber { return f.undoNum }
-
-// RecordType はレコードタイプを返す
-func (f *Fields) RecordType() recordType { return f.recordType }
-
-// PrevLastTrxId は上書き前のレコードの lastTrxId を返す
-func (f *Fields) PrevLastTrxId() lock.TrxId { return f.prevLastTrxId }
-
-// PrevRollPtr は上書き前のレコードの rollPtr を返す
-func (f *Fields) PrevRollPtr() Pointer { return f.prevRollPtr }
-
-// TableFileId はテーブルの FileId を返す
-func (f *Fields) TableFileId() page.FileId { return f.tableFileId }
-
-// ColumnSets はカラムセットを返す
-func (f *Fields) ColumnSets() [][][]byte { return f.columnSets }
+// ToRecord は Fields を RecordType に対応する Record に変換する
+func (f Fields) ToRecord() (Record, error) {
+	switch f.recordType {
+	case RecordTypeInsert:
+		if len(f.columnSets) < 1 {
+			return nil, errInvalidRecord
+		}
+		return InsertRecord{
+			tableFileId:   f.tableFileId,
+			record:        f.columnSets[0],
+			prevLastTrxId: f.prevLastTrxId,
+			prevRollPtr:   f.prevRollPtr,
+		}, nil
+	case RecordTypeDelete:
+		if len(f.columnSets) < 1 {
+			return nil, errInvalidRecord
+		}
+		return DeleteRecord{
+			tableFileId:   f.tableFileId,
+			record:        f.columnSets[0],
+			prevLastTrxId: f.prevLastTrxId,
+			prevRollPtr:   f.prevRollPtr,
+		}, nil
+	case RecordTypeUpdate:
+		if len(f.columnSets) < 2 {
+			return nil, errInvalidRecord
+		}
+		return UpdateRecord{
+			tableFileId:   f.tableFileId,
+			prevRecord:    f.columnSets[0],
+			newRecord:     f.columnSets[1],
+			prevLastTrxId: f.prevLastTrxId,
+			prevRollPtr:   f.prevRollPtr,
+		}, nil
+	default:
+		return nil, errInvalidRecord
+	}
+}
 
 // serialize は Undo レコードをバイト列にシリアライズする
 //   - return : prevLastTrxId (4B) + prevRollPtr (6B) + tableFileId (4B) + [numColumns (2B) + [colLen (2B) + colData]]...
-func (f *Fields) serialize() []byte {
+func (f Fields) serialize() []byte {
 	var data []byte
 
 	// prevLastTrxId, prevRollPtr, tableFileId
@@ -123,45 +143,6 @@ func DeserializeFields(buf []byte) (Fields, error) {
 		remaining = remaining[n:]
 	}
 	return fields, nil
-}
-
-// ToRecord は Fields を RecordType に対応する Record に変換する
-func (f *Fields) ToRecord() (Record, error) {
-	switch f.recordType {
-	case RecordTypeInsert:
-		if len(f.columnSets) < 1 {
-			return nil, errInvalidRecord
-		}
-		return InsertRecord{
-			tableFileId:   f.tableFileId,
-			record:        f.columnSets[0],
-			prevLastTrxId: f.prevLastTrxId,
-			prevRollPtr:   f.prevRollPtr,
-		}, nil
-	case RecordTypeDelete:
-		if len(f.columnSets) < 1 {
-			return nil, errInvalidRecord
-		}
-		return DeleteRecord{
-			tableFileId:   f.tableFileId,
-			record:        f.columnSets[0],
-			prevLastTrxId: f.prevLastTrxId,
-			prevRollPtr:   f.prevRollPtr,
-		}, nil
-	case RecordTypeUpdate:
-		if len(f.columnSets) < 2 {
-			return nil, errInvalidRecord
-		}
-		return UpdateRecord{
-			tableFileId:   f.tableFileId,
-			prevRecord:    f.columnSets[0],
-			newRecord:     f.columnSets[1],
-			prevLastTrxId: f.prevLastTrxId,
-			prevRollPtr:   f.prevRollPtr,
-		}, nil
-	default:
-		return nil, errInvalidRecord
-	}
 }
 
 // parseColumnSet はバイト列からカラムセット 1 つを読み取り、読み取ったバイト数を返す

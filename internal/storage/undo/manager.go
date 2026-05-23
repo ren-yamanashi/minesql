@@ -117,7 +117,7 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 	}
 	bufPageUndo := NewPage(*pageUndo.Page)
 
-	ptr := NewPointer(m.currentPageId.PageNumber, bufPageUndo.UsedBytes())
+	ptr := newPointer(m.currentPageId.PageNumber, bufPageUndo.UsedBytes())
 
 	// ページが満杯の場合は、新しいページを割り当てる
 	if !bufPageUndo.append(serialized) {

@@ -28,7 +28,7 @@ func TestFieldsUndoNum(t *testing.T) {
 		f := &Fields{undoNum: 7}
 
 		// WHEN
-		result := f.UndoNum()
+		result := f.undoNum
 
 		// THEN
 		assert.Equal(t, undoNumber(7), result)
@@ -41,7 +41,7 @@ func TestFieldsRecordType(t *testing.T) {
 		f := &Fields{recordType: RecordTypeUpdate}
 
 		// WHEN
-		result := f.RecordType()
+		result := f.recordType
 
 		// THEN
 		assert.Equal(t, RecordTypeUpdate, result)
@@ -54,7 +54,7 @@ func TestFieldsPrevLastTrxId(t *testing.T) {
 		f := &Fields{prevLastTrxId: 100}
 
 		// WHEN
-		result := f.PrevLastTrxId()
+		result := f.prevLastTrxId
 
 		// THEN
 		assert.Equal(t, lock.TrxId(100), result)
@@ -64,11 +64,11 @@ func TestFieldsPrevLastTrxId(t *testing.T) {
 func TestFieldsPrevRollPtr(t *testing.T) {
 	t.Run("設定した PrevRollPtr を返す", func(t *testing.T) {
 		// GIVEN
-		ptr := NewPointer(5, 128)
+		ptr := newPointer(5, 128)
 		f := &Fields{prevRollPtr: ptr}
 
 		// WHEN
-		result := f.PrevRollPtr()
+		result := f.prevRollPtr
 
 		// THEN
 		assert.Equal(t, ptr, result)
@@ -79,7 +79,7 @@ func TestFieldsPrevRollPtr(t *testing.T) {
 		f := &Fields{prevRollPtr: NullPointer}
 
 		// WHEN
-		result := f.PrevRollPtr()
+		result := f.prevRollPtr
 
 		// THEN
 		assert.Equal(t, NullPointer, result)
@@ -92,7 +92,7 @@ func TestFieldsTableFileId(t *testing.T) {
 		f := &Fields{tableFileId: page.FileId(7)}
 
 		// WHEN
-		result := f.TableFileId()
+		result := f.tableFileId
 
 		// THEN
 		assert.Equal(t, page.FileId(7), result)
@@ -106,7 +106,7 @@ func TestFieldsColumnSets(t *testing.T) {
 		f := &Fields{columnSets: cs}
 
 		// WHEN
-		result := f.ColumnSets()
+		result := f.columnSets
 
 		// THEN
 		assert.Equal(t, cs, result)
@@ -117,7 +117,7 @@ func TestFieldsColumnSets(t *testing.T) {
 		f := &Fields{columnSets: [][][]byte{}}
 
 		// WHEN
-		result := f.ColumnSets()
+		result := f.columnSets
 
 		// THEN
 		assert.Empty(t, result)
@@ -128,7 +128,7 @@ func TestFieldsColumnSets(t *testing.T) {
 		f := &Fields{}
 
 		// WHEN
-		result := f.ColumnSets()
+		result := f.columnSets
 
 		// THEN
 		assert.Nil(t, result)
@@ -143,7 +143,7 @@ func TestFieldsSerialize(t *testing.T) {
 			undoNum:       3,
 			recordType:    RecordTypeInsert,
 			prevLastTrxId: 100,
-			prevRollPtr:   NewPointer(5, 128),
+			prevRollPtr:   newPointer(5, 128),
 			tableFileId:   page.FileId(7),
 			columnSets:    [][][]byte{{[]byte("a")}},
 		}
@@ -166,7 +166,7 @@ func TestFieldsSerialize(t *testing.T) {
 			undoNum:       2,
 			recordType:    RecordTypeInsert,
 			prevLastTrxId: 100,
-			prevRollPtr:   NewPointer(3, 64),
+			prevRollPtr:   newPointer(3, 64),
 			tableFileId:   page.FileId(5),
 			columnSets:    [][][]byte{{[]byte("alice"), []byte("bob")}},
 		}
@@ -227,7 +227,7 @@ func TestDeserializeFields(t *testing.T) {
 			undoNum:       3,
 			recordType:    RecordTypeInsert,
 			prevLastTrxId: 200,
-			prevRollPtr:   NewPointer(5, 128),
+			prevRollPtr:   newPointer(5, 128),
 			tableFileId:   page.FileId(7),
 			columnSets:    [][][]byte{{[]byte("alice"), []byte("bob")}},
 		}
@@ -248,7 +248,7 @@ func TestDeserializeFields(t *testing.T) {
 			undoNum:       1,
 			recordType:    RecordTypeUpdate,
 			prevLastTrxId: 50,
-			prevRollPtr:   NewPointer(2, 32),
+			prevRollPtr:   newPointer(2, 32),
 			tableFileId:   page.FileId(3),
 			columnSets: [][][]byte{
 				{[]byte("old_val1"), []byte("old_val2")},
@@ -293,7 +293,7 @@ func TestDeserializeFields(t *testing.T) {
 			undoNum:       undoNumber(0xFFFFFFFE),
 			recordType:    RecordTypeInsert,
 			prevLastTrxId: lock.TrxId(0xFFFFFFFD),
-			prevRollPtr:   NewPointer(1, 10),
+			prevRollPtr:   newPointer(1, 10),
 			tableFileId:   page.FileId(1),
 			columnSets:    [][][]byte{{[]byte("x")}},
 		}
@@ -524,7 +524,7 @@ func TestFieldsToRecord(t *testing.T) {
 			undoNum:       1,
 			recordType:    RecordTypeDelete,
 			prevLastTrxId: 100,
-			prevRollPtr:   NewPointer(3, 64),
+			prevRollPtr:   newPointer(3, 64),
 			tableFileId:   page.FileId(7),
 			columnSets:    [][][]byte{{[]byte("data")}},
 		}
@@ -547,7 +547,7 @@ func TestFieldsToRecord(t *testing.T) {
 			undoNum:       2,
 			recordType:    RecordTypeUpdate,
 			prevLastTrxId: 50,
-			prevRollPtr:   NewPointer(2, 32),
+			prevRollPtr:   newPointer(2, 32),
 			tableFileId:   page.FileId(9),
 			columnSets: [][][]byte{
 				{[]byte("old_val")},
