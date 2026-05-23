@@ -8,10 +8,10 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
-type recordType int
+type RecordType int
 
 const (
-	RecordTypePageWrite recordType = iota + 1
+	RecordTypePageWrite RecordType = iota + 1
 	RecordTypeCommit
 	RecordTypeRollback
 )
@@ -25,29 +25,35 @@ const (
 	recordHeaderSize             = 19
 )
 
-var ErrInvalidRecord = errors.New("redo: invalid record")
+var errInvalidRecord = errors.New("redo: invalid record")
 
 type Record struct {
-	Lsn    Lsn
-	TrxId  lock.TrxId // 変更を行ったトランザクション ID
-	Type   recordType
-	PageId page.Id   // 変更対象のページ (COMMIT/ROLLBACK の場合はゼロ値)
-	Data   page.Page // 変更対象ページ全体のコピー (COMMIT/ROLLBACK の場合はゼロ値)
+	lsn        Lsn
+	trxId      lock.TrxId // 変更を行ったトランザクション ID
+	recordType RecordType
+	pageId     page.Id   // 変更対象のページ (COMMIT/ROLLBACK の場合はゼロ値)
+	data       page.Page // 変更対象ページ全体のコピー (COMMIT/ROLLBACK の場合はゼロ値)
 }
 
-// Serialize は Record をバイト列にシリアライズする
-func (r *Record) Serialize() []byte {
+func (r *Record) Lsn() Lsn          { return r.lsn }
+func (r *Record) TrxId() lock.TrxId { return r.trxId }
+func (r *Record) Type() RecordType  { return r.recordType }
+func (r *Record) PageId() page.Id   { return r.pageId }
+func (r *Record) Data() page.Page   { return r.data }
+
+// serialize は Record をバイト列にシリアライズする
+func (r *Record) serialize() []byte {
 	var pageBytes []byte
-	if r.Data.Header != nil {
-		pageBytes = r.Data.ToBytes()
+	if r.data.Header != nil {
+		pageBytes = r.data.ToBytes()
 	}
 	dataLen := len(pageBytes)
 	buf := make([]byte, recordHeaderSize+dataLen)
 
-	binary.BigEndian.PutUint32(buf[recordHeaderLsnOffset:recordHeaderTrxOffset], uint32(r.Lsn))
-	binary.BigEndian.PutUint32(buf[recordHeaderTrxOffset:recordHeaderRecordTypeOffset], r.TrxId)
-	buf[recordHeaderRecordTypeOffset] = byte(r.Type)
-	r.PageId.WriteTo(buf, recordHeaderPageIdOffset)
+	binary.BigEndian.PutUint32(buf[recordHeaderLsnOffset:recordHeaderTrxOffset], uint32(r.lsn))
+	binary.BigEndian.PutUint32(buf[recordHeaderTrxOffset:recordHeaderRecordTypeOffset], r.trxId)
+	buf[recordHeaderRecordTypeOffset] = byte(r.recordType)
+	r.pageId.WriteTo(buf, recordHeaderPageIdOffset)
 	binary.BigEndian.PutUint16(buf[recordHeaderDataLenOffset:recordHeaderSize], uint16(dataLen))
 
 	copy(buf[recordHeaderSize:], pageBytes)
@@ -55,22 +61,22 @@ func (r *Record) Serialize() []byte {
 	return buf
 }
 
-// DeserializeRecord はバイト列から Record をデシリアライズする
+// deserializeRecord はバイト列から Record をデシリアライズする
 //   - return: デシリアライズした Record, 読み取ったバイト数, エラー
-func DeserializeRecord(data []byte) (Record, int, error) {
+func deserializeRecord(data []byte) (Record, int, error) {
 	if len(data) < recordHeaderSize {
-		return Record{}, 0, ErrInvalidRecord
+		return Record{}, 0, errInvalidRecord
 	}
 
 	lsn := Lsn(binary.BigEndian.Uint32(data[recordHeaderLsnOffset:recordHeaderTrxOffset]))
 	trxId := binary.BigEndian.Uint32(data[recordHeaderTrxOffset:recordHeaderRecordTypeOffset])
-	recordType := recordType(data[recordHeaderRecordTypeOffset])
+	recordType := RecordType(data[recordHeaderRecordTypeOffset])
 	pageId := page.ReadId(data, recordHeaderPageIdOffset)
 	dataLen := int(binary.BigEndian.Uint16(data[recordHeaderDataLenOffset:recordHeaderSize]))
 	totalLen := recordHeaderSize + dataLen
 
 	if len(data) < totalLen {
-		return Record{}, 0, ErrInvalidRecord
+		return Record{}, 0, errInvalidRecord
 	}
 
 	// ページデータがある場合のみデコード (COMMIT/ROLLBACK はページデータなし)
@@ -86,10 +92,10 @@ func DeserializeRecord(data []byte) (Record, int, error) {
 	}
 
 	return Record{
-		Lsn:    lsn,
-		TrxId:  trxId,
-		Type:   recordType,
-		PageId: pageId,
-		Data:   pg,
+		lsn:        lsn,
+		trxId:      trxId,
+		recordType: recordType,
+		pageId:     pageId,
+		data:       pg,
 	}, totalLen, nil
 }

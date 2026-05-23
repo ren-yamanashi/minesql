@@ -110,7 +110,7 @@ func TestBufferFlush(t *testing.T) {
 		_ = buf.Flush()
 
 		// THEN
-		assert.Equal(t, 0, len(buf.records))
+		assert.Empty(t, buf.records)
 	})
 }
 
@@ -129,8 +129,8 @@ func TestBufferReadAll(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Len(t, records, 2)
-		assert.Equal(t, Lsn(1), records[0].Lsn)
-		assert.Equal(t, Lsn(2), records[1].Lsn)
+		assert.Equal(t, Lsn(1), records[0].Lsn())
+		assert.Equal(t, Lsn(2), records[1].Lsn())
 	})
 }
 
@@ -149,8 +149,8 @@ func TestBufferReadFrom(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Len(t, records, 2)
-		assert.Equal(t, Lsn(2), records[0].Lsn)
-		assert.Equal(t, Lsn(3), records[1].Lsn)
+		assert.Equal(t, Lsn(2), records[0].Lsn())
+		assert.Equal(t, Lsn(3), records[1].Lsn())
 	})
 }
 
@@ -243,7 +243,7 @@ func TestBufferTruncateBefore(t *testing.T) {
 		records, err := buf.ReadAll()
 		assert.NoError(t, err)
 		assert.Len(t, records, 1)
-		assert.Equal(t, Lsn(3), records[0].Lsn)
+		assert.Equal(t, Lsn(3), records[0].Lsn())
 	})
 }
 
@@ -310,6 +310,6 @@ func setupTestBuffer(t *testing.T) *Buffer {
 	if err != nil {
 		t.Fatalf("Buffer の作成に失敗: %v", err)
 	}
-	t.Cleanup(func() { _ = buf.logFile.file.Close() })
+	t.Cleanup(func() { _ = buf.Close() })
 	return buf
 }

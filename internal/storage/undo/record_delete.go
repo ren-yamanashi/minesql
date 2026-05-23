@@ -22,11 +22,8 @@ func NewDeleteRecord(tableFileId page.FileId, record btree.Record, prevLastTrxId
 	}
 }
 
-// TableFileId はテーブルの FileId を返す
 func (dr DeleteRecord) TableFileId() page.FileId { return dr.tableFileId }
-
-// Record は削除したレコードを返す
-func (dr DeleteRecord) Record() btree.Record { return dr.record }
+func (dr DeleteRecord) Record() btree.Record     { return dr.record }
 
 // serialize は DeleteRecord を バイト列にシリアライズする
 func (dr DeleteRecord) serialize(trxId lock.TrxId, undoNum undoNumber) []byte {

@@ -22,7 +22,7 @@ func TestNewFile(t *testing.T) {
 		assert.NotNil(t, f)
 		assert.Equal(t, Lsn(0), f.flushedLsn)
 		assert.Equal(t, Lsn(0), f.checkpointLsn)
-		_ = f.file.Close()
+		_ = f.close()
 	})
 
 	t.Run("既存ファイルを開くとヘッダーが読み取られる", func(t *testing.T) {
@@ -31,10 +31,10 @@ func TestNewFile(t *testing.T) {
 		f1, err := newFile()
 		assert.NoError(t, err)
 		pg := buildTestPage(t)
-		records := []Record{{Lsn: Lsn(5), TrxId: 1, Type: RecordTypePageWrite, PageId: page.NewId(1, 1), Data: *pg}}
+		records := []Record{{lsn: Lsn(5), trxId: 1, recordType: RecordTypePageWrite, pageId: page.NewId(1, 1), data: *pg}}
 		err = f1.flushRecords(records)
 		assert.NoError(t, err)
-		_ = f1.file.Close()
+		_ = f1.close()
 
 		// WHEN
 		f2, err := newFile()
@@ -42,7 +42,7 @@ func TestNewFile(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, Lsn(5), f2.flushedLsn)
-		_ = f2.file.Close()
+		_ = f2.close()
 	})
 
 	t.Run("既存ファイルから checkpointLsn も復元される", func(t *testing.T) {
@@ -52,7 +52,7 @@ func TestNewFile(t *testing.T) {
 		assert.NoError(t, err)
 		err = f1.setCheckpointLsn(Lsn(10))
 		assert.NoError(t, err)
-		_ = f1.file.Close()
+		_ = f1.close()
 
 		// WHEN
 		f2, err := newFile()
@@ -60,7 +60,7 @@ func TestNewFile(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, Lsn(10), f2.checkpointLsn)
-		_ = f2.file.Close()
+		_ = f2.close()
 	})
 }
 
@@ -70,8 +70,8 @@ func TestFileFlushRecords(t *testing.T) {
 		f := setupTestFile(t)
 		pg := buildTestPage(t)
 		records := []Record{
-			{Lsn: Lsn(1), TrxId: 1, Type: RecordTypePageWrite, PageId: page.NewId(1, 1), Data: *pg},
-			{Lsn: Lsn(2), TrxId: 1, Type: RecordTypeCommit},
+			{lsn: Lsn(1), trxId: 1, recordType: RecordTypePageWrite, pageId: page.NewId(1, 1), data: *pg},
+			{lsn: Lsn(2), trxId: 1, recordType: RecordTypeCommit},
 		}
 
 		// WHEN
@@ -97,10 +97,10 @@ func TestFileFlushRecords(t *testing.T) {
 	t.Run("複数回フラッシュするとレコードが追記される", func(t *testing.T) {
 		// GIVEN
 		f := setupTestFile(t)
-		first := []Record{{Lsn: Lsn(1), TrxId: 1, Type: RecordTypeCommit}}
+		first := []Record{{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit}}
 		_ = f.flushRecords(first)
 
-		second := []Record{{Lsn: Lsn(2), TrxId: 2, Type: RecordTypeCommit}}
+		second := []Record{{lsn: Lsn(2), trxId: 2, recordType: RecordTypeCommit}}
 
 		// WHEN
 		err := f.flushRecords(second)
@@ -120,8 +120,8 @@ func TestFileReadRecords(t *testing.T) {
 		f := setupTestFile(t)
 		pg := buildTestPage(t)
 		records := []Record{
-			{Lsn: Lsn(1), TrxId: 1, Type: RecordTypePageWrite, PageId: page.NewId(1, 1), Data: *pg},
-			{Lsn: Lsn(2), TrxId: 1, Type: RecordTypeCommit},
+			{lsn: Lsn(1), trxId: 1, recordType: RecordTypePageWrite, pageId: page.NewId(1, 1), data: *pg},
+			{lsn: Lsn(2), trxId: 1, recordType: RecordTypeCommit},
 		}
 		_ = f.flushRecords(records)
 
@@ -131,17 +131,17 @@ func TestFileReadRecords(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Len(t, result, 2)
-		assert.Equal(t, Lsn(1), result[0].Lsn)
-		assert.Equal(t, Lsn(2), result[1].Lsn)
+		assert.Equal(t, Lsn(1), result[0].Lsn())
+		assert.Equal(t, Lsn(2), result[1].Lsn())
 	})
 
 	t.Run("指定 LSN より大きいレコードだけ返す", func(t *testing.T) {
 		// GIVEN
 		f := setupTestFile(t)
 		records := []Record{
-			{Lsn: Lsn(1), TrxId: 1, Type: RecordTypeCommit},
-			{Lsn: Lsn(2), TrxId: 2, Type: RecordTypeCommit},
-			{Lsn: Lsn(3), TrxId: 3, Type: RecordTypeCommit},
+			{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit},
+			{lsn: Lsn(2), trxId: 2, recordType: RecordTypeCommit},
+			{lsn: Lsn(3), trxId: 3, recordType: RecordTypeCommit},
 		}
 		_ = f.flushRecords(records)
 
@@ -151,8 +151,8 @@ func TestFileReadRecords(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Len(t, result, 2)
-		assert.Equal(t, Lsn(2), result[0].Lsn)
-		assert.Equal(t, Lsn(3), result[1].Lsn)
+		assert.Equal(t, Lsn(2), result[0].Lsn())
+		assert.Equal(t, Lsn(3), result[1].Lsn())
 	})
 
 	t.Run("空のファイルから読み取ると nil を返す", func(t *testing.T) {
@@ -171,8 +171,8 @@ func TestFileReadRecords(t *testing.T) {
 		// GIVEN
 		f := setupTestFile(t)
 		records := []Record{
-			{Lsn: Lsn(1), TrxId: 1, Type: RecordTypeCommit},
-			{Lsn: Lsn(2), TrxId: 2, Type: RecordTypeCommit},
+			{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit},
+			{lsn: Lsn(2), trxId: 2, recordType: RecordTypeCommit},
 		}
 		_ = f.flushRecords(records)
 
@@ -189,7 +189,7 @@ func TestFileReadRecords(t *testing.T) {
 		f := setupTestFile(t)
 		pg := buildTestPage(t)
 		records := []Record{
-			{Lsn: Lsn(1), TrxId: 1, Type: RecordTypePageWrite, PageId: page.NewId(2, 3), Data: *pg},
+			{lsn: Lsn(1), trxId: 1, recordType: RecordTypePageWrite, pageId: page.NewId(2, 3), data: *pg},
 		}
 		_ = f.flushRecords(records)
 
@@ -199,9 +199,10 @@ func TestFileReadRecords(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Len(t, result, 1)
-		assert.Equal(t, RecordTypePageWrite, result[0].Type)
-		assert.Equal(t, page.NewId(2, 3), result[0].PageId)
-		assert.Equal(t, pg.ToBytes(), result[0].Data.ToBytes())
+		assert.Equal(t, RecordTypePageWrite, result[0].Type())
+		assert.Equal(t, page.NewId(2, 3), result[0].PageId())
+		resultData := result[0].Data()
+		assert.Equal(t, pg.ToBytes(), resultData.ToBytes())
 	})
 }
 
@@ -225,7 +226,7 @@ func TestFileSetCheckpointLsn(t *testing.T) {
 		assert.NoError(t, err)
 		err = f1.setCheckpointLsn(Lsn(15))
 		assert.NoError(t, err)
-		_ = f1.file.Close()
+		_ = f1.close()
 
 		// WHEN
 		f2, err := newFile()
@@ -233,7 +234,7 @@ func TestFileSetCheckpointLsn(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, Lsn(15), f2.checkpointLsn)
-		_ = f2.file.Close()
+		_ = f2.close()
 	})
 }
 
@@ -254,7 +255,7 @@ func TestFileSize(t *testing.T) {
 		// GIVEN
 		f := setupTestFile(t)
 		records := []Record{
-			{Lsn: Lsn(1), TrxId: 1, Type: RecordTypeCommit},
+			{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit},
 		}
 		_ = f.flushRecords(records)
 
@@ -272,7 +273,7 @@ func TestFileClear(t *testing.T) {
 		// GIVEN
 		f := setupTestFile(t)
 		records := []Record{
-			{Lsn: Lsn(1), TrxId: 1, Type: RecordTypeCommit},
+			{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit},
 		}
 		_ = f.flushRecords(records)
 
@@ -293,7 +294,7 @@ func TestFileClear(t *testing.T) {
 		// GIVEN
 		f := setupTestFile(t)
 		_ = f.setCheckpointLsn(Lsn(20))
-		records := []Record{{Lsn: Lsn(1), TrxId: 1, Type: RecordTypeCommit}}
+		records := []Record{{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit}}
 		_ = f.flushRecords(records)
 
 		// WHEN
@@ -308,7 +309,7 @@ func TestFileClear(t *testing.T) {
 	t.Run("クリア後にファイルサイズがヘッダーサイズになる", func(t *testing.T) {
 		// GIVEN
 		f := setupTestFile(t)
-		records := []Record{{Lsn: Lsn(1), TrxId: 1, Type: RecordTypeCommit}}
+		records := []Record{{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit}}
 		_ = f.flushRecords(records)
 
 		// WHEN
@@ -326,9 +327,9 @@ func TestFileTruncateBefore(t *testing.T) {
 		// GIVEN
 		f := setupTestFile(t)
 		records := []Record{
-			{Lsn: Lsn(1), TrxId: 1, Type: RecordTypeCommit},
-			{Lsn: Lsn(2), TrxId: 2, Type: RecordTypeCommit},
-			{Lsn: Lsn(3), TrxId: 3, Type: RecordTypeCommit},
+			{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit},
+			{lsn: Lsn(2), trxId: 2, recordType: RecordTypeCommit},
+			{lsn: Lsn(3), trxId: 3, recordType: RecordTypeCommit},
 		}
 		_ = f.flushRecords(records)
 
@@ -340,15 +341,15 @@ func TestFileTruncateBefore(t *testing.T) {
 		result, err := f.readRecords(Lsn(0))
 		assert.NoError(t, err)
 		assert.Len(t, result, 1)
-		assert.Equal(t, Lsn(3), result[0].Lsn)
+		assert.Equal(t, Lsn(3), result[0].Lsn())
 	})
 
 	t.Run("全レコードの LSN 以上を指定すると全て削除される", func(t *testing.T) {
 		// GIVEN
 		f := setupTestFile(t)
 		records := []Record{
-			{Lsn: Lsn(1), TrxId: 1, Type: RecordTypeCommit},
-			{Lsn: Lsn(2), TrxId: 2, Type: RecordTypeCommit},
+			{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit},
+			{lsn: Lsn(2), trxId: 2, recordType: RecordTypeCommit},
 		}
 		_ = f.flushRecords(records)
 
@@ -377,8 +378,8 @@ func TestFileTruncateBefore(t *testing.T) {
 		// GIVEN
 		f := setupTestFile(t)
 		records := []Record{
-			{Lsn: Lsn(1), TrxId: 1, Type: RecordTypeCommit},
-			{Lsn: Lsn(2), TrxId: 2, Type: RecordTypeCommit},
+			{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit},
+			{lsn: Lsn(2), trxId: 2, recordType: RecordTypeCommit},
 		}
 		_ = f.flushRecords(records)
 
@@ -403,7 +404,7 @@ func TestFileWriteHeader(t *testing.T) {
 		f1.checkpointLsn = Lsn(50)
 		err = f1.writeHeader()
 		assert.NoError(t, err)
-		_ = f1.file.Close()
+		_ = f1.close()
 
 		// WHEN
 		f2, err := newFile()
@@ -412,7 +413,7 @@ func TestFileWriteHeader(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, Lsn(100), f2.flushedLsn)
 		assert.Equal(t, Lsn(50), f2.checkpointLsn)
-		_ = f2.file.Close()
+		_ = f2.close()
 	})
 }
 
@@ -426,13 +427,13 @@ func setupRedoTestDir(t *testing.T) {
 }
 
 // setupTestFile はテスト用の File を作成する
-func setupTestFile(t *testing.T) *File {
+func setupTestFile(t *testing.T) *file {
 	t.Helper()
 	setupRedoTestDir(t)
 	f, err := newFile()
 	if err != nil {
 		t.Fatalf("File の作成に失敗: %v", err)
 	}
-	t.Cleanup(func() { _ = f.file.Close() })
+	t.Cleanup(func() { _ = f.close() })
 	return f
 }

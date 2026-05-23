@@ -22,11 +22,8 @@ func NewInsertRecord(tableFileId page.FileId, record btree.Record) InsertRecord 
 	}
 }
 
-// TableFileId はテーブルの FileId を返す
 func (ir InsertRecord) TableFileId() page.FileId { return ir.tableFileId }
-
-// Record は挿入したレコードを返す
-func (ir InsertRecord) Record() btree.Record { return ir.record }
+func (ir InsertRecord) Record() btree.Record     { return ir.record }
 
 // serialize は InsertRecord を バイト列にシリアライズする
 func (ir InsertRecord) serialize(trxId lock.TrxId, undoNum undoNumber) []byte {

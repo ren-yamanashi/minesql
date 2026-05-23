@@ -59,24 +59,25 @@ func (r *Recovery) Execute() error {
 // applyRedoLog は Redo ログを先頭からスキャンし、ページ変更レコードを順に適用する
 func (r *Recovery) applyRedoLog(records []redo.Record) error {
 	for _, rec := range records {
-		if rec.Type != redo.RecordTypePageWrite {
+		if rec.Type() != redo.RecordTypePageWrite {
 			continue
 		}
 
 		// Redo レコードの PageId から変更ページ取得
-		writePage, err := r.bufferPool.PageForWrite(rec.PageId)
+		writePage, err := r.bufferPool.PageForWrite(rec.PageId())
 		if err != nil {
 			return err
 		}
 
 		// Page LSN を比較し、すでに適用済みならスキップ
 		currentLsn := redo.Lsn(binary.BigEndian.Uint32(writePage.Page.Header))
-		if currentLsn >= rec.Lsn {
+		if currentLsn >= rec.Lsn() {
 			continue
 		}
 
 		// ページ全体のコピーで上書き
-		copy(writePage.Page.ToBytes(), rec.Data.ToBytes())
+		recData := rec.Data()
+		copy(writePage.Page.ToBytes(), recData.ToBytes())
 	}
 	return nil
 }
@@ -86,9 +87,9 @@ func (r *Recovery) applyRollback(records []redo.Record) error {
 	completed := make(map[lock.TrxId]bool)
 	active := make(map[lock.TrxId]bool)
 	for _, rec := range records {
-		active[rec.TrxId] = true
-		if rec.Type == redo.RecordTypeCommit || rec.Type == redo.RecordTypeRollback {
-			completed[rec.TrxId] = true
+		active[rec.TrxId()] = true
+		if rec.Type() == redo.RecordTypeCommit || rec.Type() == redo.RecordTypeRollback {
+			completed[rec.TrxId()] = true
 		}
 	}
 

@@ -95,8 +95,8 @@ func TestCheckpointExecute(t *testing.T) {
 		records, err := env.redoLog.ReadAll()
 		assert.NoError(t, err)
 		assert.Len(t, records, 2)
-		assert.Equal(t, redo.Lsn(2), records[0].Lsn)
-		assert.Equal(t, redo.Lsn(3), records[1].Lsn)
+		assert.Equal(t, redo.Lsn(2), records[0].Lsn())
+		assert.Equal(t, redo.Lsn(3), records[1].Lsn())
 	})
 
 	t.Run("複数のダーティーページがある場合 最小の Page LSN が使われる", func(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 type Buffer struct {
 	mutex   sync.Mutex
 	records []Record
-	logFile *File
+	logFile *file
 	nextLsn Lsn // 次に割り当てる LSN
 }
 
@@ -49,7 +49,7 @@ func (b *Buffer) AppendRollback(trxId lock.TrxId) Lsn {
 	return b.append(trxId, RecordTypeRollback, page.Id{}, page.Page{})
 }
 
-// ReadAll は全レコードを読み込む
+// ReadAll はディスク上の全レコードを読み込む (フラッシュされていないバッファ内のレコードは含まない)
 func (b *Buffer) ReadAll() ([]Record, error) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -109,6 +109,13 @@ func (b *Buffer) Clear() error {
 	return b.logFile.clear()
 }
 
+// Close はバッファが保持するファイルリソースを解放する
+func (b *Buffer) Close() error {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	return b.logFile.close()
+}
+
 // TruncateBefore は指定 LSN 以前のレコードをファイルから切り詰める
 func (b *Buffer) TruncateBefore(lsn Lsn) error {
 	b.mutex.Lock()
@@ -129,8 +136,8 @@ func (b *Buffer) Size() (int64, error) {
 	var bufferSize int
 	for _, record := range b.records {
 		dataSize := 0
-		if record.Data.Header != nil {
-			dataSize = len(record.Data.ToBytes())
+		if record.data.Header != nil {
+			dataSize = len(record.data.ToBytes())
 		}
 		bufferSize += recordHeaderSize + dataSize
 	}
@@ -139,14 +146,14 @@ func (b *Buffer) Size() (int64, error) {
 }
 
 // append は新しい Redo レコードをバッファに追加し、対応する LSN を返す
-func (b *Buffer) append(trxId lock.TrxId, recordType recordType, pageId page.Id, pg page.Page) Lsn {
+func (b *Buffer) append(trxId lock.TrxId, rt RecordType, pageId page.Id, pg page.Page) Lsn {
 	lsn := b.allocateLsn()
 	b.records = append(b.records, Record{
-		Lsn:    lsn,
-		TrxId:  trxId,
-		Type:   recordType,
-		PageId: pageId,
-		Data:   pg,
+		lsn:        lsn,
+		trxId:      trxId,
+		recordType: rt,
+		pageId:     pageId,
+		data:       pg,
 	})
 	return lsn
 }

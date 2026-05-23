@@ -24,14 +24,9 @@ func NewUpdateRecord(tableFileId page.FileId, prevRecord, newRecord btree.Record
 	}
 }
 
-// TableFileId はテーブルの FileId を返す
 func (ur UpdateRecord) TableFileId() page.FileId { return ur.tableFileId }
-
-// PrevRecord は更新前のレコードを返す
 func (ur UpdateRecord) PrevRecord() btree.Record { return ur.prevRecord }
-
-// NewRecord は更新後のレコードを返す
-func (ur UpdateRecord) NewRecord() btree.Record { return ur.newRecord }
+func (ur UpdateRecord) NewRecord() btree.Record  { return ur.newRecord }
 
 // serialize は UpdateRecord を バイト列にシリアライズする
 func (ur UpdateRecord) serialize(trxId lock.TrxId, undoNum undoNumber) []byte {
