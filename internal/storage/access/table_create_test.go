@@ -534,7 +534,7 @@ func setupCreateTableTestEnv(t *testing.T) *createTableTestEnv {
 	t.Cleanup(func() { _ = undoHf.Close() })
 	bp.RegisterHeapFile(page.FileId(1), undoHf)
 
-	undoMgr, err := undo.NewManager(bp, page.FileId(1))
+	undoMgr, err := undo.NewManager(bp, nil, page.FileId(1))
 	if err != nil {
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
 	}

@@ -200,7 +200,7 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 	t.Cleanup(func() { _ = undoHf.Close() })
 	env.bp.RegisterHeapFile(page.FileId(3), undoHf)
 
-	undoMgr, err := undo.NewManager(env.bp, page.FileId(3))
+	undoMgr, err := undo.NewManager(env.bp, nil, page.FileId(3))
 	if err != nil {
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
 	}
@@ -275,7 +275,7 @@ func setupTableTestEnvWithoutPrimaryIndex(t *testing.T) *tableTestEnv {
 	t.Cleanup(func() { _ = undoHf.Close() })
 	env.bp.RegisterHeapFile(page.FileId(3), undoHf)
 
-	undoMgr, err := undo.NewManager(env.bp, page.FileId(3))
+	undoMgr, err := undo.NewManager(env.bp, nil, page.FileId(3))
 	if err != nil {
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
 	}

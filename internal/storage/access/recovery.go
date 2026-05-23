@@ -124,8 +124,8 @@ func (r *Recovery) collectUndoRecords(trxId lock.TrxId) ([]undo.Record, error) {
 	var records []undo.Record
 	for {
 		pageId := page.NewPageId(r.undoFileId, pageNum)
-		readPage, err := r.bufferPool.GetReadPage(pageId)
-		if err != nil {
+		readPage, readErr := r.bufferPool.GetReadPage(pageId)
+		if readErr != nil {
 			// Undo ページチェーンの終端に達した場合は正常終了
 			// GetReadPage はページが存在しない場合もエラーを返すため、先頭ページの読み取り失敗はチェーンが空であることを意味する
 			break
@@ -158,8 +158,8 @@ func (r *Recovery) collectUndoRecords(trxId lock.TrxId) ([]undo.Record, error) {
 		if nextPageNum == 0 {
 			break
 		}
-		pageNum = page.PageNumber(nextPageNum)
+		pageNum = nextPageNum
 	}
 
-	return records, nil
+	return records, nil //nolint:nilerr // readErr はページ未存在を示し、チェーン終端として正常扱い
 }

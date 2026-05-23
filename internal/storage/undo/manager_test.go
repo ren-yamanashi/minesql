@@ -18,7 +18,7 @@ func TestNewManager(t *testing.T) {
 		bp := setupTestBufferPool(t)
 
 		// WHEN
-		mgr, err := NewManager(bp, page.FileId(1))
+		mgr, err := NewManager(bp, nil, page.FileId(1))
 
 		// THEN
 		assert.NoError(t, err)
@@ -405,7 +405,7 @@ func setupTestBufferPool(t *testing.T) *buffer.BufferPool {
 func setupTestManager(t *testing.T) *Manager {
 	t.Helper()
 	bp := setupTestBufferPool(t)
-	mgr, err := NewManager(bp, page.FileId(1))
+	mgr, err := NewManager(bp, nil, page.FileId(1))
 	if err != nil {
 		t.Fatalf("Manager の作成に失敗: %v", err)
 	}

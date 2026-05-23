@@ -1,9 +1,12 @@
 package access
 
 import (
+	"os"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,7 +16,8 @@ func TestNewTrxManager(t *testing.T) {
 		env := setupTableTestEnv(t)
 
 		// WHEN
-		tm := NewTrxManager(env.ct, env.undoLog, env.lock, env.bp)
+		redoLog := setupTestRedoLog(t)
+		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp)
 
 		// THEN
 		assert.NotNil(t, tm)
@@ -265,17 +269,17 @@ func TestTrxManagerCreateReadView(t *testing.T) {
 	})
 }
 
-func TestTrxManagerPurgeLimit(t *testing.T) {
+func TestTrxManagerOldestVisibleTrxId(t *testing.T) {
 	t.Run("ReadView がない場合は nextTrxId を返す", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
 		_ = tm.Begin() // nextTrxId = 1
 
 		// WHEN
-		limit := tm.PurgeLimit()
+		oldest := tm.OldestVisibleTrxId()
 
 		// THEN
-		assert.Equal(t, lock.TrxId(1), limit)
+		assert.Equal(t, lock.TrxId(1), oldest)
 	})
 
 	t.Run("ReadView がある場合は MUpLimitId の最小値を返す", func(t *testing.T) {
@@ -287,12 +291,12 @@ func TestTrxManagerPurgeLimit(t *testing.T) {
 		_ = tm.CreateReadView(id2)
 
 		// WHEN
-		limit := tm.PurgeLimit()
+		oldest := tm.OldestVisibleTrxId()
 
 		// THEN
 		// id1 の ReadView: MUpLimitId = min(activeTrxIds except id1) = id2 = 1
 		// id2 の ReadView: MUpLimitId = min(activeTrxIds except id2) = id1 = 0
-		assert.Equal(t, lock.TrxId(0), limit)
+		assert.Equal(t, lock.TrxId(0), oldest)
 	})
 }
 
@@ -339,11 +343,81 @@ func TestTrxManagerActiveTrxIds(t *testing.T) {
 	})
 }
 
+func TestTrxManagerInactiveTrxIds(t *testing.T) {
+	t.Run("コミット済みのトランザクション ID を返す", func(t *testing.T) {
+		// GIVEN
+		tm := setupTrxManager(t)
+		id1 := tm.Begin()
+		id2 := tm.Begin()
+		_ = tm.Commit(id1)
+		_ = tm.Commit(id2)
+
+		// WHEN
+		ids := tm.InactiveTrxIds()
+
+		// THEN
+		assert.Len(t, ids, 2)
+		assert.Contains(t, ids, id1)
+		assert.Contains(t, ids, id2)
+	})
+
+	t.Run("ロールバック済みのトランザクションも含まれる", func(t *testing.T) {
+		// GIVEN
+		tm := setupTrxManager(t)
+		id1 := tm.Begin()
+		_ = tm.Rollback(id1)
+
+		// WHEN
+		ids := tm.InactiveTrxIds()
+
+		// THEN
+		assert.Len(t, ids, 1)
+		assert.Contains(t, ids, id1)
+	})
+
+	t.Run("アクティブなトランザクションは含まれない", func(t *testing.T) {
+		// GIVEN
+		tm := setupTrxManager(t)
+		_ = tm.Begin()
+
+		// WHEN
+		ids := tm.InactiveTrxIds()
+
+		// THEN
+		assert.Empty(t, ids)
+	})
+
+	t.Run("トランザクションがない場合は空を返す", func(t *testing.T) {
+		// GIVEN
+		tm := setupTrxManager(t)
+
+		// WHEN
+		ids := tm.InactiveTrxIds()
+
+		// THEN
+		assert.Empty(t, ids)
+	})
+}
+
 // setupTrxManager はテスト用の TrxManager を構築する
 func setupTrxManager(t *testing.T) *TrxManager {
 	t.Helper()
 	env := setupTableTestEnv(t)
-	return NewTrxManager(env.ct, env.undoLog, env.lock, env.bp)
+	redoLog := setupTestRedoLog(t)
+	return NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp)
+}
+
+// setupTestRedoLog はテスト用の redo.Buffer を作成する
+func setupTestRedoLog(t *testing.T) *redo.Buffer {
+	t.Helper()
+	_ = os.MkdirAll(config.BaseDir, 0o750)
+	t.Cleanup(func() { _ = os.RemoveAll(config.BaseDir) })
+	redoLog, err := redo.NewBuffer()
+	if err != nil {
+		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = redoLog.Clear() })
+	return redoLog
 }
 
 // setupTableForTrxTest は TrxManager のロールバックテスト用に Table を構築する

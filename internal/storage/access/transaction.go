@@ -2,10 +2,12 @@ package access
 
 import (
 	"slices"
+	"sync"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
@@ -17,7 +19,9 @@ const (
 )
 
 type TrxManager struct {
+	mu           sync.RWMutex
 	undoLog      *undo.Manager
+	redoLog      *redo.Buffer
 	lock         *lock.Manager
 	bufferPool   *buffer.BufferPool
 	catalog      *catalog.Catalog
@@ -26,9 +30,10 @@ type TrxManager struct {
 	nextTrxId    lock.TrxId               // 次に払い出すトランザクション ID
 }
 
-func NewTrxManager(ct *catalog.Catalog, undo *undo.Manager, lockMgr *lock.Manager, bp *buffer.BufferPool) *TrxManager {
+func NewTrxManager(ct *catalog.Catalog, undo *undo.Manager, redo *redo.Buffer, lockMgr *lock.Manager, bp *buffer.BufferPool) *TrxManager {
 	return &TrxManager{
 		undoLog:      undo,
+		redoLog:      redo,
 		lock:         lockMgr,
 		bufferPool:   bp,
 		catalog:      ct,
@@ -39,6 +44,9 @@ func NewTrxManager(ct *catalog.Catalog, undo *undo.Manager, lockMgr *lock.Manage
 
 // Begin は新しいトランザクションを開始し、トランザクション ID を返す
 func (t *TrxManager) Begin() lock.TrxId {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	trxId := t.allocateTrxId()
 	t.transactions[trxId] = TrxStateActive
 	return trxId
@@ -46,14 +54,22 @@ func (t *TrxManager) Begin() lock.TrxId {
 
 // Commit はトランザクションをコミットし、ロックを開放して Undo ログを破棄する
 func (t *TrxManager) Commit(trxId lock.TrxId) error {
-	// TODO: Redo ログに Commit を記録する処理追加
+	// Redo ログに Commit レコードを記録してフラッシュ
+	t.redoLog.AppendCommit(trxId)
+	if err := t.redoLog.Flush(); err != nil {
+		return err
+	}
 
 	// コミット後はロックを開放して INSERT の Undo ログを破棄
 	// UPDATE/DELETE の Undo レコードは他のトランザクションの ReadView から Undo チェーン辿りに必要
 	t.lock.Release(trxId)
 	t.undoLog.DiscardRecordType(trxId, undo.RecordTypeInsert)
+
+	t.mu.Lock()
 	delete(t.readViews, trxId)
 	t.transactions[trxId] = TrxStateInactive
+	t.mu.Unlock()
+
 	return nil
 }
 
@@ -62,9 +78,15 @@ func (t *TrxManager) Rollback(trxId lock.TrxId) error {
 	defer func() {
 		t.lock.Release(trxId)
 		t.undoLog.Discard(trxId)
+
+		t.mu.Lock()
 		delete(t.readViews, trxId)
 		t.transactions[trxId] = TrxStateInactive
+		t.mu.Unlock()
 	}()
+
+	// Redo ログに Rollback レコードを記録 (フラッシュなし)
+	t.redoLog.AppendRollback(trxId)
 
 	records := t.undoLog.Records(trxId)
 	for _, r := range slices.Backward(records) {
@@ -77,6 +99,9 @@ func (t *TrxManager) Rollback(trxId lock.TrxId) error {
 
 // CreateReadView は指定したトランザクション用の ReadView を作成する
 func (t *TrxManager) CreateReadView(trxId lock.TrxId) *readView {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
 	// REPEATABLE READ のみのため、同一トランザクション内では最初に作成した ReadView をキャッシュして使い回す
 	if rv, ok := t.readViews[trxId]; ok {
 		return rv
@@ -92,10 +117,13 @@ func (t *TrxManager) CreateReadView(trxId lock.TrxId) *readView {
 	return rv
 }
 
-// PurgeLimit は全アクティブ ReadView の MUpLimitId の最小値を返す
-//
-// この値より小さい trxId のコミット済み undo ログおよび論理削除済みレコードはパージ可能
-func (t *TrxManager) PurgeLimit() lock.TrxId {
+// OldestVisibleTrxId は全アクティブ ReadView の MUpLimitId の最小値を返す
+//   - この値未満の trxId は、どの ReadView からも参照されない
+//   - アクティブな ReadView がない場合は nextTrxId を返す
+func (t *TrxManager) OldestVisibleTrxId() lock.TrxId {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
 	// アクティブな ReadView がない場合は nextTrxId を返す (全コミット済みトランザクションがパージ可能)
 	if len(t.readViews) == 0 {
 		return t.nextTrxId
@@ -109,10 +137,27 @@ func (t *TrxManager) PurgeLimit() lock.TrxId {
 
 // ActiveTrxIds はアクティブなトランザクションの ID 一覧を返す
 func (t *TrxManager) ActiveTrxIds() []lock.TrxId {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
 	var ids []lock.TrxId
 	for id, state := range t.transactions {
 		if state == TrxStateActive {
 			ids = append(ids, id)
+		}
+	}
+	return ids
+}
+
+// InactiveTrxIds は完了済み (コミットまたはロールバック済み) のトランザクション ID 一覧を返す
+func (t *TrxManager) InactiveTrxIds() []lock.TrxId {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	var ids []lock.TrxId
+	for trxId, state := range t.transactions {
+		if state == TrxStateInactive {
+			ids = append(ids, trxId)
 		}
 	}
 	return ids

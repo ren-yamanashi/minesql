@@ -94,7 +94,7 @@ func (si *secondaryIndex) search(mode SearchMode) (*secondaryIterator, error) {
 // insert は行を挿入する
 //   - unique index の場合かつセカンダリキーの重複があるとエラー
 //   - 論理削除済みの同一キー (SK + PK) が存在する場合は上書きする
-func (si *secondaryIndex) insert(record *secondaryRecord, pk []string, trxId lock.TrxId) error {
+func (si *secondaryIndex) insert(record *secondaryRecord, trxId lock.TrxId) error {
 	if si.unique {
 		if err := si.checkUnique(record); err != nil {
 			return err

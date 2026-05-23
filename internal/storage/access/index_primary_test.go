@@ -211,7 +211,7 @@ func TestPrimaryIndexUpdate(t *testing.T) {
 		newRecord, _ := current.update(testTrxId, []string{"name"}, []string{"Bob"})
 
 		// WHEN
-		err := pi.update(current, newRecord, testTrxId)
+		err := pi.update(newRecord, testTrxId)
 
 		// THEN
 		assert.NoError(t, err)

@@ -14,7 +14,7 @@ func (bp *BufferPool) AddPage(pageId page.PageId) (*BufferPage, error) {
 // addPage はバッファプールに新しいページを追加する
 func (bp *BufferPool) addPage(pageId page.PageId) (*BufferPage, error) {
 	// バッファプールに空きがある場合: 新しいバッファページを追加・ページテーブルを更新
-	if len(bp.bufferPages) < int(bp.MaxNumOfPage) {
+	if len(bp.bufferPages) < bp.MaxNumOfPage {
 		newBufPage, err := newBufferPage(pageId)
 		if err != nil {
 			return nil, err

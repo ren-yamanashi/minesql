@@ -132,7 +132,7 @@ func (pi *primaryIndex) softDelete(record *primaryRecord, trxId lock.TrxId) erro
 }
 
 // update は行を更新する
-func (pi *primaryIndex) update(currentRecord *primaryRecord, newRecord *primaryRecord, trxId lock.TrxId) error {
+func (pi *primaryIndex) update(newRecord *primaryRecord, trxId lock.TrxId) error {
 	// 排他ロックを取得
 	encodedRecord := newRecord.encode()
 	_, pos, err := pi.tree.FindByKey(encodedRecord.Key())

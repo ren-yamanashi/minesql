@@ -6,6 +6,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
 
 // Entry は Undo ログのエントリ
@@ -18,12 +19,13 @@ type Entry struct {
 // Manager は全トランザクションの Undo レコードをトランザクションごとに管理する
 type Manager struct {
 	bufferPool    *buffer.BufferPool
+	redoLog       *redo.Buffer
 	undoFileId    page.FileId            // Undo ファイルの FileId
 	currentPageId page.PageId            // 現在書き込み中の Undo ページ
 	entries       map[lock.TrxId][]Entry // trxId → Entry[] のマップ
 }
 
-func NewManager(bp *buffer.BufferPool, undoFileId page.FileId) (*Manager, error) {
+func NewManager(bp *buffer.BufferPool, redo *redo.Buffer, undoFileId page.FileId) (*Manager, error) {
 	// Undo ページを割り当て
 	pageId, err := bp.AllocatePageId(undoFileId)
 	if err != nil {
@@ -41,6 +43,7 @@ func NewManager(bp *buffer.BufferPool, undoFileId page.FileId) (*Manager, error)
 
 	return &Manager{
 		bufferPool:    bp,
+		redoLog:       redo,
 		undoFileId:    undoFileId,
 		currentPageId: pageId,
 		entries:       make(map[lock.TrxId][]Entry),
@@ -158,6 +161,13 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 		m.currentPageId = newPageId
 	}
 
-	// TODO: Redo ログに Undo ページの変更を記録
+	// Redo ログに Undo ページの変更を記録
+	if m.redoLog != nil {
+		pageUndo, err := m.bufferPool.GetReadPage(m.currentPageId)
+		if err != nil {
+			return Pointer{}, err
+		}
+		m.redoLog.AppendPageCopy(trxId, m.currentPageId, *pageUndo)
+	}
 	return ptr, nil
 }

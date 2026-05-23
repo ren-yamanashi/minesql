@@ -3,9 +3,9 @@
 ## 参考文献
 
 - [InnoDB のリカバリ](https://dev.mysql.com/doc/refman/8.0/ja/innodb-recovery.html)
-- [MySQL Source: log0constants.h](https://github.com/mysql/mysql-server/blob/8.0/storage/innobase/include/log0constants.h) - REDO ログの定数定義
-- [MySQL Source: log0types.h](https://github.com/mysql/mysql-server/blob/8.0/storage/innobase/include/log0types.h) - REDO ログの型定義
-- [MySQL Source: mtr0types.h](https://github.com/mysql/mysql-server/blob/8.0/storage/innobase/include/mtr0types.h) - REDO ログレコードの型定義
+- [MySQL Source: log0constants.h](https://github.com/mysql/mysql-server/blob/8.0/storage/innobase/include/log0constants.h) - Redo ログの定数定義
+- [MySQL Source: log0types.h](https://github.com/mysql/mysql-server/blob/8.0/storage/innobase/include/log0types.h) - Redo ログの型定義
+- [MySQL Source: mtr0types.h](https://github.com/mysql/mysql-server/blob/8.0/storage/innobase/include/mtr0types.h) - Redo ログレコードの型定義
 
 ## 概要
 
@@ -62,7 +62,6 @@
 ## Page LSN
 
 - 各[ページ](../page/page.md)は先頭 4 バイトのページヘッダーを Page LSN として使用する
-<!-- TODO: 表現の見直し -->
 - Page LSN はそのページに最後に適用された Redo ログレコードの LSN を記録する
 - クラッシュリカバリ時、Redo ログレコードの LSN がページの Page LSN 以下であれば、そのレコードは適用済みなのでスキップする
 
@@ -72,7 +71,6 @@
 
 ### データ変更時
 
-<!-- TODO: Redo ログに記録する Undo ログページの内容がイメージしにくいので修正 -->
 1. Undo ログページへの書き込みを Redo ログに記録する
 2. Undo ログレコードをバッファプール上の Undo ログページに書き込む
 3. バッファプール上のデータページを変更する

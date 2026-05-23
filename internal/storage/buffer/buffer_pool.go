@@ -33,7 +33,7 @@ func NewBufferPool(size int) *BufferPool {
 		files:        make(map[page.FileId]*file.HeapFile),
 		bufferPages:  make([]BufferPage, 0, maxNumOfPage),
 		pageTable:    newPageTable(),
-		lru:          newLru(int(maxNumOfPage)),
+		lru:          newLru(maxNumOfPage),
 	}
 }
 

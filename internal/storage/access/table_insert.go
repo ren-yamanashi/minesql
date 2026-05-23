@@ -48,7 +48,7 @@ func (t *Table) insertSecondaryIndexes(colNames, values []string, trxId lock.Trx
 		if err != nil {
 			return err
 		}
-		if err := si.insert(record, pk, trxId); err != nil {
+		if err := si.insert(record, trxId); err != nil {
 			return err
 		}
 	}

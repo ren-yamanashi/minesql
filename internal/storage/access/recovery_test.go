@@ -86,10 +86,6 @@ func TestExecute(t *testing.T) {
 		assert.NoError(t, err)
 		_ = env.trxManager.Commit(trxId)
 
-		// Redo ログに COMMIT レコードを記録してフラッシュ
-		env.redoLog.AppendCommit(trxId)
-		_ = env.redoLog.Flush()
-
 		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
 
 		// WHEN
@@ -244,11 +240,9 @@ func TestApplyRollback(t *testing.T) {
 			trx2,
 		)
 
-		// trx1 は COMMIT、trx2 は未 COMMIT
+		// trx1 は COMMIT 済み (Commit 内で Redo ログに記録される)、trx2 は未 COMMIT
 		pgId := page.NewPageId(env.undoFileId, 0)
 		readPage, _ := env.bp.GetReadPage(pgId)
-		env.redoLog.AppendPageCopy(trx1, pgId, *readPage)
-		env.redoLog.AppendCommit(trx1)
 		env.redoLog.AppendPageCopy(trx2, pgId, *readPage)
 		_ = env.redoLog.Flush()
 
@@ -294,7 +288,7 @@ func setupRecoveryTestEnv(t *testing.T) *recoveryTestEnv {
 	t.Cleanup(func() { _ = redoLog.Clear() })
 
 	env := setupTableTestEnv(t)
-	trxManager := NewTrxManager(env.ct, env.undoLog, env.lock, env.bp)
+	trxManager := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp)
 
 	return &recoveryTestEnv{
 		bp:         env.bp,

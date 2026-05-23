@@ -25,7 +25,7 @@ func (t *Table) Update(currentRecord *primaryRecord, colNames, values []string, 
 	newRecord.setRollPtr(ptr)
 
 	// レコード更新
-	if err := t.primaryIndex.update(currentRecord, newRecord, trxId); err != nil {
+	if err := t.primaryIndex.update(newRecord, trxId); err != nil {
 		return err
 	}
 	return t.updateSecondaryIndexes(currentRecord, colNames, values, trxId)
@@ -72,7 +72,7 @@ func (t *Table) updateSecondaryIndexes(before *primaryRecord, updateColNames, up
 		if err != nil {
 			return err
 		}
-		if err := si.insert(record, pk, trxId); err != nil {
+		if err := si.insert(record, trxId); err != nil {
 			return err
 		}
 	}
