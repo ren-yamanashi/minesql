@@ -33,7 +33,7 @@
 
 ## テーブルメタデータ
 
-- B+Tree の[レコード](../btree/node/node.md#レコード)はヘッダー領域・キー領域・非キー領域の 3 領域で構成される
+- B+Tree の[レコード](../btree/node.md#レコード)はヘッダー領域・キー領域・非キー領域の 3 領域で構成される
   - 参考: https://dev.mysql.com/doc/refman/8.0/ja/information-schema-innodb-tables-table.html
 - テーブルメタデータでは、各領域を以下のような内容で使用する (意味付けている)
 

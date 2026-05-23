@@ -2,8 +2,8 @@
 
 ## 種類
 
-- [リーフノード](./leaf-node.md)
-- [ブランチノード](./branch-node.md)
+- [リーフノード](./node-leaf.md)
+- [ブランチノード](./node-branch.md)
 
 ## 構造
 
@@ -17,7 +17,7 @@
 - ノードには複数のレコードが格納される
 - レコードはヘッダー領域・キー領域・非キー領域の 3 領域で構成される
 - レコードのバイト列は以下のように構成される
-- キーは Memcomparable format でエンコードされる ([参照](../../encode/memcomparable-format.md))
+- キーは Memcomparable format でエンコードされる ([参照](../encode/memcomparable-format.md))
   - これにより複合キーの場合も正しくソートされる
 
 | フィールド名 | バイト数 | 説明 |
