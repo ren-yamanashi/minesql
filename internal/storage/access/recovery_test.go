@@ -117,7 +117,7 @@ func TestRecoveryExecute(t *testing.T) {
 		// COMMIT せずに Redo ログにページ変更だけ記録してフラッシュ
 		pgId := page.NewId(env.undoFileId, 0)
 		readPage, _ := env.bp.PageForRead(pgId)
-		env.redoLog.AppendPageCopy(trxId, pgId, *readPage.Page)
+		env.redoLog.AppendPageCopy(trxId, pgId, *readPage.Data())
 		_ = env.redoLog.Flush()
 
 		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
@@ -191,13 +191,13 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 		writePage, err := env.bp.PageForWrite(pgId)
 		assert.NoError(t, err)
 		originalData := make([]byte, page.Size)
-		copy(originalData, writePage.Page.ToBytes())
+		copy(originalData, writePage.Data().ToBytes())
 
 		// Redo レコードの LSN=1、Page LSN=10 → スキップされるはず
-		writePage.Page.Header[0] = 0
-		writePage.Page.Header[1] = 0
-		writePage.Page.Header[2] = 0
-		writePage.Page.Header[3] = 10 // Page LSN = 10
+		writePage.Data().Header[0] = 0
+		writePage.Data().Header[1] = 0
+		writePage.Data().Header[2] = 0
+		writePage.Data().Header[3] = 10 // Page LSN = 10
 
 		// LSN=1 のページ変更レコードを Redo ログに記録
 		newPageData := make([]byte, page.Size)
@@ -215,7 +215,7 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 		assert.NoError(t, err)
 		// ページが上書きされていないことを確認 (body の先頭は 0xFF ではない)
 		readPage, _ := env.bp.PageForRead(pgId)
-		assert.NotEqual(t, byte(0xFF), readPage.Page.Body[0])
+		assert.NotEqual(t, byte(0xFF), readPage.Data().Body[0])
 	})
 }
 
@@ -243,7 +243,7 @@ func TestRecoveryApplyRollback(t *testing.T) {
 		// trx1 は COMMIT 済み (Commit 内で Redo ログに記録される)、trx2 は未 COMMIT
 		pgId := page.NewId(env.undoFileId, 0)
 		readPage, _ := env.bp.PageForRead(pgId)
-		env.redoLog.AppendPageCopy(trx2, pgId, *readPage.Page)
+		env.redoLog.AppendPageCopy(trx2, pgId, *readPage.Data())
 		_ = env.redoLog.Flush()
 
 		records, _ := env.redoLog.ReadAll()

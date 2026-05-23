@@ -19,7 +19,7 @@ func TestAddPage(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, bufPage)
-		assert.Equal(t, pageId, bufPage.PageId)
+		assert.Equal(t, pageId, bufPage.pageId)
 		assert.False(t, bufPage.isDirty)
 	})
 
@@ -52,7 +52,7 @@ func TestAddPage(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, secondId, bufPage.PageId)
+		assert.Equal(t, secondId, bufPage.pageId)
 		_, cached := bp.pageTable.bufferId(firstId)
 		assert.False(t, cached)
 	})

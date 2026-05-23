@@ -31,27 +31,28 @@ func (p *Pool) addPage(pageId page.Id) (*Page, error) {
 	victimBufPage := &p.pages[victimBufId]
 
 	if victimBufPage.isDirty {
-		heapFile, err := p.heapFile(victimBufPage.PageId.FileId)
+		heapFile, err := p.heapFile(victimBufPage.pageId.FileId)
 		if err != nil {
 			p.lru.undoEvict(victimBufId)
 			return nil, err
 		}
 
-		err = heapFile.Write(victimBufPage.PageId.PageNumber, victimBufPage.Page.ToBytes())
+		err = heapFile.Write(victimBufPage.pageId.PageNumber, victimBufPage.data.ToBytes())
 		if err != nil {
 			p.lru.undoEvict(victimBufId)
 			return nil, err
 		}
 
-		p.flushList.delete(victimBufPage.PageId)
+		p.flushList.delete(victimBufPage.pageId)
 	}
 
-	// 新しいページに置き換え
-	p.pageTable.update(victimBufPage.PageId, pageId, victimBufId)
+	// 新しいページに置き換え (newPage を pageTable.update より先に実行し、失敗時の不整合を防ぐ)
 	newBufPage, err := newPage(pageId)
 	if err != nil {
+		p.lru.undoEvict(victimBufId)
 		return nil, err
 	}
+	p.pageTable.update(victimBufPage.pageId, pageId, victimBufId)
 	p.pages[victimBufId] = *newBufPage
 	p.lru.access(victimBufId)
 	return &p.pages[victimBufId], nil

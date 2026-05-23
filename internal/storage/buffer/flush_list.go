@@ -85,3 +85,10 @@ func (fl *flushList) oldestPageIds(n int) []page.Id {
 	}
 	return result
 }
+
+// forEach は全ノードに対してコールバックを実行する
+func (fl *flushList) forEach(fn func(pageId page.Id)) {
+	for node := fl.head; node != nil; node = node.next {
+		fn(node.pageId)
+	}
+}

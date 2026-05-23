@@ -24,7 +24,7 @@ func TestNewPool(t *testing.T) {
 		bp := NewPool(page.Size * 3)
 
 		// THEN
-		assert.Equal(t, 4, bp.maxPages) // 3 + 1
+		assert.Equal(t, 3, bp.maxPages)
 	})
 
 	t.Run("サイズが 0 の場合 maxNumOfPage が 1 になる", func(t *testing.T) {
@@ -81,12 +81,12 @@ func TestBufferPageForWrite(t *testing.T) {
 		// WHEN
 		p, err := bp.PageForWrite(pageId)
 		assert.NoError(t, err)
-		p.Page.Body[0] = 0xAA
+		p.data.Body[0] = 0xAA
 
 		// THEN
 		fetched, err := bp.PageForRead(pageId)
 		assert.NoError(t, err)
-		assert.Equal(t, byte(0xAA), fetched.Page.Body[0])
+		assert.Equal(t, byte(0xAA), fetched.data.Body[0])
 	})
 }
 
@@ -103,7 +103,7 @@ func TestBufferPageForRead(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, pageId, bufPage.PageId)
+		assert.Equal(t, pageId, bufPage.pageId)
 	})
 
 	t.Run("キャッシュにないページをディスクから読み込める", func(t *testing.T) {
@@ -119,7 +119,7 @@ func TestBufferPageForRead(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, byte(0xAB), bufPage.Page.Body[0])
+		assert.Equal(t, byte(0xAB), bufPage.data.Body[0])
 	})
 
 	t.Run("同じページを 2 回フェッチしても同じデータが返る", func(t *testing.T) {
@@ -128,7 +128,7 @@ func TestBufferPageForRead(t *testing.T) {
 		pageId := page.NewId(0, 0)
 		addedPage, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
-		addedPage.Page.Body[0] = 0x42
+		addedPage.data.Body[0] = 0x42
 
 		// WHEN
 		bufPage1, err := bp.PageForRead(pageId)
@@ -137,15 +137,15 @@ func TestBufferPageForRead(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		assert.Equal(t, byte(0x42), bufPage1.Page.Body[0])
-		assert.Equal(t, byte(0x42), bufPage2.Page.Body[0])
+		assert.Equal(t, byte(0x42), bufPage1.data.Body[0])
+		assert.Equal(t, byte(0x42), bufPage2.data.Body[0])
 	})
 }
 
-func TestUnRefPage(t *testing.T) {
+func TestUnrefPage(t *testing.T) {
 	t.Run("参照解除したページが優先的に追い出される", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 2) // maxNumOfPage=3
+		bp := NewPool(page.Size * 3)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		id0 := page.NewId(0, 0)
@@ -159,7 +159,7 @@ func TestUnRefPage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bp.UnRefPage(id0)
+		bp.UnrefPage(id0)
 		newId := page.NewId(0, 3)
 		_, err = bp.AddPage(newId)
 		assert.NoError(t, err)
@@ -179,7 +179,7 @@ func TestUnRefPage(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN / THEN (panic しない)
-		bp.UnRefPage(page.NewId(0, 99))
+		bp.UnrefPage(page.NewId(0, 99))
 		_, cached := bp.pageTable.bufferId(pageId)
 		assert.True(t, cached)
 	})
@@ -256,7 +256,7 @@ func TestMaxPages(t *testing.T) {
 		result := bp.MaxPages()
 
 		// THEN
-		assert.Equal(t, 4, result) // 3 + 1
+		assert.Equal(t, 3, result)
 	})
 
 	t.Run("最小サイズの場合 1 を返す", func(t *testing.T) {

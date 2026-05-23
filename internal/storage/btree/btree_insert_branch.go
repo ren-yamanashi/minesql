@@ -45,13 +45,13 @@ func (t *Tree) splitInsertBranch(
 	if err != nil {
 		return nil, page.InvalidId, err
 	}
-	defer t.bufferPool.UnRefPage(newBranchPageId)
+	defer t.bufferPool.UnrefPage(newBranchPageId)
 
 	pageNewBranch, err := t.bufferPool.PageForWrite(newBranchPageId)
 	if err != nil {
 		return nil, page.InvalidId, err
 	}
-	newBranch := newBranchNode(pageNewBranch.Page)
+	newBranch := newBranchNode(pageNewBranch.Data())
 	overflowKey, err := branchNode.splitInsert(newBranch, record)
 	if err != nil {
 		return nil, page.InvalidId, err

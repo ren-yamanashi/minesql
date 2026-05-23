@@ -455,18 +455,18 @@ Branch[keys=1]: [key_10]
 		var w strings.Builder
 		bufPageMeta, err := tree.bufferPool.PageForRead(tree.metaPageId)
 		require.NoError(t, err)
-		meta := newMetaPage(bufPageMeta.Page)
+		meta := newMetaPage(bufPageMeta.Data())
 		rootPageId := meta.rootPageId()
 
 		bufPageRoot, err := tree.bufferPool.PageForRead(rootPageId)
 		require.NoError(t, err)
 
-		nodeType := nodeType(bufPageRoot.Page)
+		nodeType := nodeType(bufPageRoot.Data())
 		if !bytes.Equal(nodeType, nodeTypeBranch) {
 			t.Skip("ルートがブランチではないためスキップ")
 		}
 
-		branch := newBranchNode(bufPageRoot.Page)
+		branch := newBranchNode(bufPageRoot.Data())
 		for i := range branch.numRecords() {
 			boundaryKey := string(branch.record(i).Key())
 
@@ -475,7 +475,7 @@ Branch[keys=1]: [key_10]
 			require.NoError(t, err)
 			bufPageLeaf, err := tree.bufferPool.PageForRead(leftPageId)
 			require.NoError(t, err)
-			leftLeaf := newLeafNode(bufPageLeaf.Page)
+			leftLeaf := newLeafNode(bufPageLeaf.Data())
 			lastLeftKey := string(leftLeaf.record(leftLeaf.numRecords() - 1).Key())
 
 			// 右の子
@@ -483,7 +483,7 @@ Branch[keys=1]: [key_10]
 			require.NoError(t, err)
 			bufPageRight, err := tree.bufferPool.PageForRead(rightPageId)
 			require.NoError(t, err)
-			rightLeaf := newLeafNode(bufPageRight.Page)
+			rightLeaf := newLeafNode(bufPageRight.Data())
 			firstRightKey := string(rightLeaf.record(0).Key())
 
 			fmt.Fprintf(&w, "境界キー: %s\n", boundaryKey)
@@ -512,12 +512,12 @@ Branch[keys=1]: [key_10]
 
 			pageMeta, err := tree.bufferPool.PageForRead(tree.metaPageId)
 			require.NoError(t, err)
-			bufPageMeta := newMetaPage(pageMeta.Page)
+			bufPageMeta := newMetaPage(pageMeta.Data())
 			rootPageId := bufPageMeta.rootPageId()
 
 			bufPageRoot, err := tree.bufferPool.PageForRead(rootPageId)
 			require.NoError(t, err)
-			nodeType := nodeType(bufPageRoot.Page)
+			nodeType := nodeType(bufPageRoot.Data())
 
 			var currentType string
 			switch {
@@ -621,7 +621,7 @@ func writeRootInfo(w *strings.Builder, tree *Tree) {
 	if err != nil {
 		panic(err)
 	}
-	writeNodeInfo(w, newMetaPage(bufPageMeta.Page).rootPageId(), 0, tree)
+	writeNodeInfo(w, newMetaPage(bufPageMeta.Data()).rootPageId(), 0, tree)
 }
 
 // ノード情報を再帰的にログに書き出す
@@ -632,18 +632,18 @@ func writeNodeInfo(w *strings.Builder, pageId page.Id, depth int, tree *Tree) {
 	}
 
 	indent := strings.Repeat("  ", depth)
-	nodeType := nodeType(pg.Page)
+	nodeType := nodeType(pg.Data())
 
 	switch {
 	case bytes.Equal(nodeType, nodeTypeLeaf):
-		leafNode := newLeafNode(pg.Page)
+		leafNode := newLeafNode(pg.Data())
 		keys := make([]string, leafNode.numRecords())
 		for i := range leafNode.numRecords() {
 			keys[i] = string(leafNode.record(i).Key())
 		}
 		fmt.Fprintf(w, "%sLeaf[keys=%d]: [%s]\n", indent, leafNode.numRecords(), strings.Join(keys, ", "))
 	case bytes.Equal(nodeType, nodeTypeBranch):
-		branchNode := newBranchNode(pg.Page)
+		branchNode := newBranchNode(pg.Data())
 		keys := make([]string, branchNode.numRecords())
 		for i := range branchNode.numRecords() {
 			keys[i] = string(branchNode.record(i).Key())
@@ -666,7 +666,7 @@ func writeTreeShape(w *strings.Builder, tree *Tree) {
 	if err != nil {
 		panic(err)
 	}
-	metaPage := newMetaPage(pageMeta.Page)
+	metaPage := newMetaPage(pageMeta.Data())
 	rootPageId := metaPage.rootPageId()
 
 	type depthInfo struct {
@@ -683,20 +683,20 @@ func writeTreeShape(w *strings.Builder, tree *Tree) {
 			panic(err)
 		}
 
-		nodeType := nodeType(pg.Page)
+		nodeType := nodeType(pg.Data())
 		switch {
 		case bytes.Equal(nodeType, nodeTypeLeaf):
 			if _, ok := result[depth]; !ok {
 				result[depth] = &depthInfo{nodeType: "Leaf"}
 			}
-			leaf := newLeafNode(pg.Page)
+			leaf := newLeafNode(pg.Data())
 			result[depth].count++
 			result[depth].totalKeys += leaf.numRecords()
 		case bytes.Equal(nodeType, nodeTypeBranch):
 			if _, ok := result[depth]; !ok {
 				result[depth] = &depthInfo{nodeType: "Branch"}
 			}
-			branch := newBranchNode(pg.Page)
+			branch := newBranchNode(pg.Data())
 			result[depth].count++
 			result[depth].totalKeys += branch.numRecords()
 			for i := range branch.numRecords() + 1 {

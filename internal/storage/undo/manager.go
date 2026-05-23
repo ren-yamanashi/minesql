@@ -42,7 +42,7 @@ func NewManager(bp *buffer.Pool, redo *redo.Buffer, undoFileId page.FileId) (*Ma
 	if err != nil {
 		return nil, err
 	}
-	NewPage(*bufPageUndo.Page).initialize()
+	NewPage(*bufPageUndo.Data()).initialize()
 
 	return &Manager{
 		bufferPool:    bp,
@@ -117,7 +117,7 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 	if err != nil {
 		return Pointer{}, err
 	}
-	bufPageUndo := NewPage(*pageUndo.Page)
+	bufPageUndo := NewPage(*pageUndo.Data())
 
 	ptr := newPointer(m.currentPageId.PageNumber, bufPageUndo.UsedBytes())
 
@@ -137,7 +137,7 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 			if err != nil {
 				return Pointer{}, err
 			}
-			m.redoLog.AppendPageCopy(trxId, m.currentPageId, *oldPage.Page)
+			m.redoLog.AppendPageCopy(trxId, m.currentPageId, *oldPage.Data())
 		}
 
 		// 新しいページを初期化してレコードを追記
@@ -149,7 +149,7 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 		if err != nil {
 			return Pointer{}, err
 		}
-		newBufPageUndo := NewPage(*pageNewUndo.Page)
+		newBufPageUndo := NewPage(*pageNewUndo.Data())
 		newBufPageUndo.initialize()
 
 		ptr = Pointer{
@@ -168,7 +168,7 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 		if err != nil {
 			return Pointer{}, err
 		}
-		m.redoLog.AppendPageCopy(trxId, m.currentPageId, *pageUndo.Page)
+		m.redoLog.AppendPageCopy(trxId, m.currentPageId, *pageUndo.Data())
 	}
 	return ptr, nil
 }

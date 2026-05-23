@@ -15,8 +15,8 @@ func (t *Tree) Insert(record Record) error {
 	if err != nil {
 		return err
 	}
-	defer t.bufferPool.UnRefPage(t.MetaPageId())
-	metaPage := newMetaPage(pageMeta.Page)
+	defer t.bufferPool.UnrefPage(t.MetaPageId())
+	metaPage := newMetaPage(pageMeta.Data())
 
 	// ルートページを取得
 	rootPageId := metaPage.rootPageId()
@@ -58,7 +58,7 @@ func (t *Tree) Insert(record Record) error {
 	if err != nil {
 		return err
 	}
-	newRootBranch := newBranchNode(pageNewRoot.Page)
+	newRootBranch := newBranchNode(pageNewRoot.Data())
 	err = newRootBranch.initialize(overflowKey, overflowChildPageId, rootPageId)
 	if err != nil {
 		return err
@@ -79,17 +79,17 @@ func (t *Tree) insertRecursively(
 	bufPage *buffer.Page,
 	record Record,
 ) (overflowKey []byte, newPageId page.Id, isLeafSplit bool, err error) {
-	pg, err := t.bufferPool.PageForWrite(bufPage.PageId)
+	pg, err := t.bufferPool.PageForWrite(bufPage.PageId())
 	if err != nil {
 		return nil, page.InvalidId, false, err
 	}
-	nt := nodeType(pg.Page)
+	nt := nodeType(pg.Data())
 
 	switch {
 	// ブランチノードの場合: 子ノードに対して再帰実行する
 	case bytes.Equal(nt, nodeTypeBranch):
 		// 挿入先の子ノードを取得
-		branchNode := newBranchNode(pg.Page)
+		branchNode := newBranchNode(pg.Data())
 		childSlotNum, found := branchNode.searchSlotNum(record.Key())
 		if found {
 			childSlotNum++ // 境界キーと一致する場合、右の子に属する
@@ -102,8 +102,7 @@ func (t *Tree) insertRecursively(
 		if err != nil {
 			return nil, page.InvalidId, false, err
 		}
-		defer t.bufferPool.UnRefPage(childPageId)
-
+		defer t.bufferPool.UnrefPage(childPageId)
 		// 子ノードに対して挿入処理を再帰的に実行
 		overflowKeyFromChild, overflowChildPageId, isLeafSplit, err := t.insertRecursively(childBufPage, record)
 		if err != nil {
@@ -127,7 +126,7 @@ func (t *Tree) insertRecursively(
 
 	// リーフノードの場合: そのまま挿入する
 	case bytes.Equal(nt, nodeTypeLeaf):
-		overflowKey, newPageId, err := t.insertLeaf(bufPage.PageId, pg.Page, record)
+		overflowKey, newPageId, err := t.insertLeaf(bufPage.PageId(), pg.Data(), record)
 		if err != nil {
 			return nil, page.InvalidId, false, err
 		}

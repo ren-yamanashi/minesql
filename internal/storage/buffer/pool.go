@@ -19,19 +19,17 @@ type Pool struct {
 }
 
 func NewPool(size int) *Pool {
-	var maxNumOfPage int
-	if size <= page.Size {
-		maxNumOfPage = 1
-	} else {
-		maxNumOfPage = (size / page.Size) + 1
+	maxPages := 1
+	if size > page.Size {
+		maxPages = (size + page.Size - 1) / page.Size
 	}
 	return &Pool{
 		files:     make(map[page.FileId]*file.HeapFile),
-		pages:     make([]Page, 0, maxNumOfPage),
+		pages:     make([]Page, 0, maxPages),
 		pageTable: newPageTable(),
 		flushList: newFlushList(),
-		lru:       newLru(maxNumOfPage),
-		maxPages:  maxNumOfPage,
+		lru:       newLru(maxPages),
+		maxPages:  maxPages,
 	}
 }
 
@@ -60,8 +58,8 @@ func (p *Pool) PageForRead(pageId page.Id) (*Page, error) {
 	return p.page(pageId)
 }
 
-// UnRefPage は指定されたページの参照を解除し、優先的に追い出されるようにする
-func (p *Pool) UnRefPage(pageId page.Id) {
+// UnrefPage は指定されたページの参照を解除し、優先的に追い出されるようにする
+func (p *Pool) UnrefPage(pageId page.Id) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if bufferId, exists := p.pageTable.bufferId(pageId); exists {
@@ -109,9 +107,9 @@ func (p *Pool) heapFile(fileId page.FileId) (*file.HeapFile, error) {
 func (p *Pool) page(pageId page.Id) (*Page, error) {
 	// ページがバッファプールにある場合
 	if bufferId, exists := p.pageTable.bufferId(pageId); exists {
-		bufferPage := &p.pages[bufferId]
+		bufPage := &p.pages[bufferId]
 		p.lru.access(bufferId)
-		return bufferPage, nil
+		return bufPage, nil
 	}
 
 	// ページがバッファプールにない場合
@@ -123,14 +121,14 @@ func (p *Pool) page(pageId page.Id) (*Page, error) {
 	// ディスク上のファイルからページを読み込む
 	heapFile, err := p.heapFile(pageId.FileId)
 	if err != nil {
+		p.pageTable.delete(pageId)
 		return nil, err
 	}
-	err = heapFile.Read(pageId.PageNumber, bufPage.Page.ToBytes())
+	err = heapFile.Read(pageId.PageNumber, bufPage.data.ToBytes())
 	if err != nil {
+		p.pageTable.delete(pageId)
 		return nil, err
 	}
-	bufPage.PageId = pageId
-	bufPage.isDirty = false
 
 	return bufPage, nil
 }

@@ -26,7 +26,7 @@ func (p *Pool) FlushAllPages() error {
 			return
 		}
 
-		err = heapFile.Write(pageId.PageNumber, bufPage.Page.ToBytes())
+		err = heapFile.Write(pageId.PageNumber, bufPage.data.ToBytes())
 		if err != nil {
 			flushErr = err
 			return
@@ -59,7 +59,7 @@ func (p *Pool) FlushOldestPages(n int) error {
 	}
 
 	// フラッシュ対象のディスクを記録する (後でまとめて Sync するため)
-	syncHeapFiles := make(map[page.FileId]bool)
+	filesToSync := make(map[page.FileId]struct{})
 
 	// 対象のダーティーページをディスクに書き出す
 	for _, pid := range pageIds {
@@ -78,16 +78,16 @@ func (p *Pool) FlushOldestPages(n int) error {
 		if err != nil {
 			return err
 		}
-		if err := heapFile.Write(pid.PageNumber, bufPage.Page.ToBytes()); err != nil {
+		if err := heapFile.Write(pid.PageNumber, bufPage.data.ToBytes()); err != nil {
 			return err
 		}
 
 		bufPage.isDirty = false
 		p.flushList.delete(pid)
-		syncHeapFiles[pid.FileId] = true
+		filesToSync[pid.FileId] = struct{}{}
 	}
 
-	for fileId := range syncHeapFiles {
+	for fileId := range filesToSync {
 		heapFile, err := p.heapFile(fileId)
 		if err != nil {
 			return err
@@ -112,11 +112,11 @@ func (p *Pool) ForEachDirtyPage(fn func(pg *page.Page)) {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 
-	for node := p.flushList.head; node != nil; node = node.next {
-		bufId, ok := p.pageTable.bufferId(node.pageId)
+	p.flushList.forEach(func(pageId page.Id) {
+		bufId, ok := p.pageTable.bufferId(pageId)
 		if !ok {
-			continue
+			return
 		}
-		fn(p.pages[bufId].Page)
-	}
+		fn(p.pages[bufId].data)
+	})
 }

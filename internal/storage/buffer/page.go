@@ -6,10 +6,13 @@ import (
 )
 
 type Page struct {
-	PageId  page.Id
-	Page    *page.Page
+	pageId  page.Id
+	data    *page.Page
 	isDirty bool
 }
+
+func (p *Page) PageId() page.Id  { return p.pageId }
+func (p *Page) Data() *page.Page { return p.data }
 
 func newPage(pageId page.Id) (*Page, error) {
 	p, err := page.NewPage(directio.AlignedBlock(page.Size))
@@ -17,8 +20,8 @@ func newPage(pageId page.Id) (*Page, error) {
 		return nil, err
 	}
 	return &Page{
-		PageId:  pageId,
-		Page:    p,
+		pageId:  pageId,
+		data:    p,
 		isDirty: false,
 	}, nil
 }

@@ -18,24 +18,24 @@ type lru struct {
 	maxNew   int             // NewSublist の最大長 (全体の 5/8)
 }
 
-func newLru(numOfPage int) *lru {
-	lru := &lru{
-		nodeMap: make(map[id]*lruNode, numOfPage),
-		maxNew:  numOfPage * 5 / 8,
+func newLru(maxPages int) *lru {
+	l := &lru{
+		nodeMap: make(map[id]*lruNode, maxPages),
+		maxNew:  maxPages * 5 / 8,
 	}
 	// 初期状態では全て未使用なので、全スロットを OldSublist に追加
-	for i := range numOfPage {
+	for i := range maxPages {
 		node := &lruNode{
 			bufferId: id(i),
 			isOld:    true,
 			isUnused: true,
 		}
-		lru.nodeMap[id(i)] = node
-		lru.insertToTail(node)
+		l.nodeMap[id(i)] = node
+		l.insertToTail(node)
 	}
-	lru.midpoint = lru.head // 初期時点では全て OldSublist に属しているため、midpoint はリストの先頭を指す
-	lru.oldLen = numOfPage
-	return lru
+	l.midpoint = l.head // 初期時点では全て OldSublist に属しているため、midpoint はリストの先頭を指す
+	l.oldLen = maxPages
+	return l
 }
 
 // access はページがアクセスされたことを記録する

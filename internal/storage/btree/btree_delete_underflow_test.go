@@ -111,9 +111,9 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.True(t, isLeafMerged)
 		assert.Equal(t, 4, siblingLeaf.numRecords())
 		assert.Equal(t, 0, parentBranch.numRecords())
-		assert.Equal(t, siblingBufPage.PageId, parentBranch.rightChildPageId())
+		assert.Equal(t, siblingBufPage.PageId(), parentBranch.rightChildPageId())
 		assert.Equal(t, nextPageId, siblingLeaf.nextPageId())
-		assert.Equal(t, siblingBufPage.PageId, nextLeaf.prevPageId())
+		assert.Equal(t, siblingBufPage.PageId(), nextLeaf.prevPageId())
 	})
 
 	t.Run("リーフノードのアンダーフロー: 右の兄弟とマージ (兄弟が RightChild)", func(t *testing.T) {
@@ -147,9 +147,9 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.True(t, isLeafMerged)
 		assert.Equal(t, 4, childLeaf.numRecords())
 		assert.Equal(t, 0, parentBranch.numRecords())
-		assert.Equal(t, childBufPage.PageId, parentBranch.rightChildPageId())
+		assert.Equal(t, childBufPage.PageId(), parentBranch.rightChildPageId())
 		assert.Equal(t, nextPageId, childLeaf.nextPageId())
-		assert.Equal(t, childBufPage.PageId, nextLeaf.prevPageId())
+		assert.Equal(t, childBufPage.PageId(), nextLeaf.prevPageId())
 	})
 
 	t.Run("リーフノードのアンダーフロー: 右の兄弟とマージ (兄弟が RightChild でない)", func(t *testing.T) {
@@ -293,7 +293,7 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.True(t, underflow)
 		assert.False(t, isLeafMerged)
 		assert.Equal(t, 0, parentBranch.numRecords())
-		assert.Equal(t, siblingBufPage.PageId, parentBranch.rightChildPageId())
+		assert.Equal(t, siblingBufPage.PageId(), parentBranch.rightChildPageId())
 	})
 
 	t.Run("ブランチノードのアンダーフロー: 右の兄弟とマージ (兄弟が RightChild)", func(t *testing.T) {
@@ -317,7 +317,7 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.True(t, underflow)
 		assert.False(t, isLeafMerged)
 		assert.Equal(t, 0, parentBranch.numRecords())
-		assert.Equal(t, childBufPage.PageId, parentBranch.rightChildPageId())
+		assert.Equal(t, childBufPage.PageId(), parentBranch.rightChildPageId())
 	})
 
 	t.Run("ブランチノードのアンダーフロー: 右の兄弟とマージ (兄弟が RightChild でない)", func(t *testing.T) {
@@ -363,7 +363,7 @@ func initTestLeafNode(t *testing.T, bp *buffer.Pool, pageId page.Id) *leafNode {
 	t.Helper()
 	pg, err := bp.PageForWrite(pageId)
 	assert.NoError(t, err)
-	leaf := newLeafNode(pg.Page)
+	leaf := newLeafNode(pg.Data())
 	leaf.initialize()
 	return leaf
 }
@@ -379,7 +379,7 @@ func initTestBranchNode(
 	t.Helper()
 	pg, err := bp.PageForWrite(pageId)
 	assert.NoError(t, err)
-	branch := newBranchNode(pg.Page)
+	branch := newBranchNode(pg.Data())
 	err = branch.initialize(key, leftChild, rightChild)
 	assert.NoError(t, err)
 	return branch

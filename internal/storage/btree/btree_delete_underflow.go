@@ -32,16 +32,16 @@ func (t *Tree) deleteUnderflow(
 	if err != nil {
 		return false, false, err
 	}
-	defer t.bufferPool.UnRefPage(sibling.pageId)
+	defer t.bufferPool.UnrefPage(sibling.pageId)
 
 	// 子ノードの取得
-	childPage, err := t.bufferPool.PageForRead(childBufPage.PageId)
+	childPage, err := t.bufferPool.PageForRead(childBufPage.PageId())
 	if err != nil {
 		return false, false, err
 	}
 
 	// リーフノードのアンダーフロー処理
-	if bytes.Equal(nodeType(childPage.Page), nodeTypeLeaf) {
+	if bytes.Equal(nodeType(childPage.Data()), nodeTypeLeaf) {
 		uf, lm, err := t.onLeafUnderflow(branchNode, childBufPage, sibling, childSlotNum)
 		return uf, lm, err
 	}
@@ -65,7 +65,7 @@ func (t *Tree) onLeafUnderflow(
 	sibling siblingInfo,
 	childSlotNum int,
 ) (underflow bool, isLeafMerged bool, err error) {
-	pageChild, err := t.bufferPool.PageForWrite(childBufPage.PageId)
+	pageChild, err := t.bufferPool.PageForWrite(childBufPage.PageId())
 	if err != nil {
 		return false, false, err
 	}
@@ -73,8 +73,8 @@ func (t *Tree) onLeafUnderflow(
 	if err != nil {
 		return false, false, err
 	}
-	childLeaf := newLeafNode(pageChild.Page)
-	siblingLeaf := newLeafNode(pageSibling.Page)
+	childLeaf := newLeafNode(pageChild.Data())
+	siblingLeaf := newLeafNode(pageSibling.Data())
 
 	// 兄弟からレコードを転送できる場合
 	if siblingLeaf.canTransferRecord(sibling.isLeft) {
@@ -114,12 +114,12 @@ func (t *Tree) onLeafUnderflow(
 		if !siblingLeaf.transferAllFrom(childLeaf) {
 			return false, false, nil // ノードの容量を超えてマージ不可の場合はアンダーフローを許容する
 		}
-		if err := t.relinkLeafAfterMerge(childLeaf, siblingLeaf, sibling.bufferPage.PageId); err != nil {
+		if err := t.relinkLeafAfterMerge(childLeaf, siblingLeaf, sibling.bufferPage.PageId()); err != nil {
 			return false, false, err
 		}
 		// 親の右端のレコードは不要になるので削除し、RightChild を兄弟ノードに更新
 		parentBranch.delete(parentBranch.numRecords() - 1)
-		parentBranch.setRightChildPageId(sibling.bufferPage.PageId)
+		parentBranch.setRightChildPageId(sibling.bufferPage.PageId())
 		return !parentBranch.isHalfFull(), true, nil
 	}
 
@@ -127,11 +127,11 @@ func (t *Tree) onLeafUnderflow(
 	if !childLeaf.transferAllFrom(siblingLeaf) {
 		return false, false, nil // ノードの容量を超えてマージ不可の場合はアンダーフローを許容する
 	}
-	if err := t.relinkLeafAfterMerge(siblingLeaf, childLeaf, childBufPage.PageId); err != nil {
+	if err := t.relinkLeafAfterMerge(siblingLeaf, childLeaf, childBufPage.PageId()); err != nil {
 		return false, false, err
 	}
 
-	uf, err := t.mergeRightSiblingFromParent(parentBranch, childBufPage.PageId, childSlotNum)
+	uf, err := t.mergeRightSiblingFromParent(parentBranch, childBufPage.PageId(), childSlotNum)
 	if err != nil {
 		return false, false, err
 	}
@@ -150,7 +150,7 @@ func (t *Tree) onBranchUnderflow(
 	sibling siblingInfo,
 	childSlotNum int,
 ) (underflow bool, err error) {
-	pageChild, err := t.bufferPool.PageForWrite(childBufPage.PageId)
+	pageChild, err := t.bufferPool.PageForWrite(childBufPage.PageId())
 	if err != nil {
 		return false, err
 	}
@@ -158,8 +158,8 @@ func (t *Tree) onBranchUnderflow(
 	if err != nil {
 		return false, err
 	}
-	childBranch := newBranchNode(pageChild.Page)
-	siblingBranch := newBranchNode(pageSibling.Page)
+	childBranch := newBranchNode(pageChild.Data())
+	siblingBranch := newBranchNode(pageSibling.Data())
 
 	// 兄弟からレコードを転送できる場合
 	if siblingBranch.canTransferRecord(sibling.isLeft) {
@@ -223,7 +223,7 @@ func (t *Tree) onBranchUnderflow(
 		siblingBranch.setRightChildPageId(childBranch.rightChildPageId())
 		// 親の右端のレコードは不要になるので削除し、RightChild を兄弟ノードに更新
 		parentBranch.delete(parentBranch.numRecords() - 1)
-		parentBranch.setRightChildPageId(sibling.bufferPage.PageId)
+		parentBranch.setRightChildPageId(sibling.bufferPage.PageId())
 		return !parentBranch.isHalfFull(), nil
 	}
 
@@ -238,7 +238,7 @@ func (t *Tree) onBranchUnderflow(
 	childBranch.transferAllFrom(siblingBranch)
 	childBranch.setRightChildPageId(siblingBranch.rightChildPageId())
 
-	return t.mergeRightSiblingFromParent(parentBranch, childBufPage.PageId, childSlotNum)
+	return t.mergeRightSiblingFromParent(parentBranch, childBufPage.PageId(), childSlotNum)
 }
 
 // relinkLeafAfterMerge は消滅するリーフノードのリンクを残るリーフノードに繋ぎ直す
@@ -248,12 +248,12 @@ func (t *Tree) onBranchUnderflow(
 func (t *Tree) relinkLeafAfterMerge(disappearing, survivor *leafNode, survivorPageId page.Id) error {
 	survivor.setNextPageId(disappearing.nextPageId())
 	if nextPageId := disappearing.nextPageId(); !nextPageId.IsInvalid() {
-		defer t.bufferPool.UnRefPage(nextPageId)
+		defer t.bufferPool.UnrefPage(nextPageId)
 		pageNext, err := t.bufferPool.PageForWrite(nextPageId)
 		if err != nil {
 			return err
 		}
-		nextLeaf := newLeafNode(pageNext.Page)
+		nextLeaf := newLeafNode(pageNext.Data())
 		nextLeaf.setPrevPageId(survivorPageId)
 	}
 	return nil

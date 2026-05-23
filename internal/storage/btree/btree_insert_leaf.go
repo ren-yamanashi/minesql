@@ -43,7 +43,7 @@ func (t *Tree) splitInsertLeaf(
 ) ([]byte, page.Id, error) {
 	prevLeafPageId := leafNode.prevPageId()
 	if !prevLeafPageId.IsInvalid() {
-		defer t.bufferPool.UnRefPage(prevLeafPageId)
+		defer t.bufferPool.UnrefPage(prevLeafPageId)
 	}
 
 	// 新しいリーフノードを作成
@@ -55,7 +55,7 @@ func (t *Tree) splitInsertLeaf(
 	if err != nil {
 		return nil, page.InvalidId, err
 	}
-	defer t.bufferPool.UnRefPage(newLeafPageId)
+	defer t.bufferPool.UnrefPage(newLeafPageId)
 
 	// 前のリーフノードが存在する場合は、nextPageId を新しいリーフノードの PageId に更新
 	if !prevLeafPageId.IsInvalid() {
@@ -69,7 +69,7 @@ func (t *Tree) splitInsertLeaf(
 	if err != nil {
 		return nil, page.InvalidId, err
 	}
-	newLeaf := newLeafNode(pageNewLeaf.Page)
+	newLeaf := newLeafNode(pageNewLeaf.Data())
 	overflowKey, err := leafNode.splitInsert(newLeaf, record)
 	if err != nil {
 		return nil, page.InvalidId, err
@@ -89,7 +89,7 @@ func (t *Tree) updatePrevLeafLink(prevLeafPageId, newNextPageId page.Id) error {
 	if err != nil {
 		return err
 	}
-	prevLeaf := newLeafNode(pagePrevLeaf.Page)
+	prevLeaf := newLeafNode(pagePrevLeaf.Data())
 	prevLeaf.setNextPageId(newNextPageId)
 	return nil
 }

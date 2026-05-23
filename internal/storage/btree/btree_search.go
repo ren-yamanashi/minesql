@@ -14,8 +14,8 @@ func (t *Tree) Search(mode SearchMode) (*Iterator, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer t.bufferPool.UnRefPage(t.MetaPageId())
-	metaPage := newMetaPage(pageMeta.Page)
+	defer t.bufferPool.UnrefPage(t.MetaPageId())
+	metaPage := newMetaPage(pageMeta.Data())
 
 	// ルートページ取得
 	rootPageId := metaPage.rootPageId()
@@ -29,13 +29,13 @@ func (t *Tree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator
 	if err != nil {
 		return nil, err
 	}
-	nt := nodeType(bufPage.Page)
+	nt := nodeType(bufPage.Data())
 
 	switch {
 	// ブランチノードの場合、子ノードに対して再帰探索する
 	case bytes.Equal(nt, nodeTypeBranch):
-		defer t.bufferPool.UnRefPage(nodePageId)
-		branchNode := newBranchNode(bufPage.Page)
+		defer t.bufferPool.UnrefPage(nodePageId)
+		branchNode := newBranchNode(bufPage.Data())
 		childPageId, err := mode.childPageId(branchNode)
 		if err != nil {
 			return nil, err
@@ -44,7 +44,7 @@ func (t *Tree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator
 
 	// リーフノードの場合、検索モードに応じて探索する
 	case bytes.Equal(nt, nodeTypeLeaf):
-		leafNode := newLeafNode(bufPage.Page)
+		leafNode := newLeafNode(bufPage.Data())
 		slotNum := mode.slotNum(leafNode)
 		iter := newIterator(t.bufferPool, *bufPage, slotNum)
 		// 検索対象のキーが現在のリーフノードの末端のレコードより大きい場合、次のリーフノードに進める
@@ -71,7 +71,7 @@ func (t *Tree) FindByKey(key []byte) (Record, RecordPosition, error) {
 		return nil, RecordPosition{}, err
 	}
 	position := RecordPosition{
-		PageId:  iter.bufferPage.PageId,
+		PageId:  iter.bufferPage.PageId(),
 		SlotNum: iter.slotNum,
 	}
 	record, ok, err := iter.Get()
@@ -93,8 +93,8 @@ func (t *Tree) LeafPageIds() ([]page.Id, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer t.bufferPool.UnRefPage(t.MetaPageId())
-	metaPage := newMetaPage(pageMeta.Page)
+	defer t.bufferPool.UnrefPage(t.MetaPageId())
+	metaPage := newMetaPage(pageMeta.Data())
 	rootPageId := metaPage.rootPageId()
 	height := metaPage.height()
 
@@ -113,7 +113,7 @@ func (t *Tree) LeafPageIds() ([]page.Id, error) {
 			if err != nil {
 				return nil, err
 			}
-			branchNode := newBranchNode(pg.Page)
+			branchNode := newBranchNode(pg.Data())
 
 			for idx := range branchNode.numRecords() {
 				childPageId, err := branchNode.childPageId(idx)
@@ -123,7 +123,7 @@ func (t *Tree) LeafPageIds() ([]page.Id, error) {
 				nextLevel = append(nextLevel, childPageId)
 			}
 			nextLevel = append(nextLevel, branchNode.rightChildPageId())
-			t.bufferPool.UnRefPage(nodePageId)
+			t.bufferPool.UnrefPage(nodePageId)
 		}
 		currentLevel = nextLevel
 	}

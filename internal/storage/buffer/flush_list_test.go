@@ -218,3 +218,39 @@ func TestFlushListOldestPageIds(t *testing.T) {
 		assert.Equal(t, []page.Id{}, result)
 	})
 }
+
+func TestFlushListForEach(t *testing.T) {
+	t.Run("全ノードに対してコールバックが実行される", func(t *testing.T) {
+		// GIVEN
+		fl := newFlushList()
+		id1 := page.NewId(0, 1)
+		id2 := page.NewId(0, 2)
+		id3 := page.NewId(0, 3)
+		fl.add(id1)
+		fl.add(id2)
+		fl.add(id3)
+
+		// WHEN
+		var result []page.Id
+		fl.forEach(func(pageId page.Id) {
+			result = append(result, pageId)
+		})
+
+		// THEN
+		assert.Equal(t, []page.Id{id1, id2, id3}, result)
+	})
+
+	t.Run("空のリストではコールバックが呼ばれない", func(t *testing.T) {
+		// GIVEN
+		fl := newFlushList()
+
+		// WHEN
+		called := false
+		fl.forEach(func(pageId page.Id) {
+			called = true
+		})
+
+		// THEN
+		assert.False(t, called)
+	})
+}

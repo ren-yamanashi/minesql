@@ -113,7 +113,7 @@ func setupIteratorTestPage(t *testing.T, setup func(ln *leafNode)) (*buffer.Pool
 	bufPage, err := bp.AddPage(pageId)
 	assert.NoError(t, err)
 
-	ln := newLeafNode(bufPage.Page)
+	ln := newLeafNode(bufPage.Data())
 	ln.initialize()
 	setup(ln)
 
