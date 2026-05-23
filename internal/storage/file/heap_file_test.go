@@ -109,7 +109,7 @@ func TestRead(t *testing.T) {
 		err = hf.Read(0, data)
 
 		// THEN
-		assert.ErrorIs(t, err, page.ErrInvalidDataSize)
+		assert.Error(t, err)
 	})
 
 	t.Run("nil データの場合エラーを返す", func(t *testing.T) {
@@ -123,7 +123,7 @@ func TestRead(t *testing.T) {
 		err = hf.Read(0, nil)
 
 		// THEN
-		assert.ErrorIs(t, err, page.ErrInvalidDataSize)
+		assert.Error(t, err)
 	})
 }
 
@@ -156,7 +156,7 @@ func TestWrite(t *testing.T) {
 		err = hf.Write(0, data)
 
 		// THEN
-		assert.ErrorIs(t, err, page.ErrInvalidDataSize)
+		assert.Error(t, err)
 	})
 
 	t.Run("nil データの場合エラーを返す", func(t *testing.T) {
@@ -170,7 +170,7 @@ func TestWrite(t *testing.T) {
 		err = hf.Write(0, nil)
 
 		// THEN
-		assert.ErrorIs(t, err, page.ErrInvalidDataSize)
+		assert.Error(t, err)
 	})
 }
 

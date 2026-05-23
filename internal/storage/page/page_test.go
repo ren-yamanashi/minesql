@@ -61,7 +61,7 @@ func TestNewPage(t *testing.T) {
 		p, err := NewPage(data)
 
 		// THEN
-		assert.ErrorIs(t, err, ErrInvalidDataSize)
+		assert.ErrorIs(t, err, errInvalidDataSize)
 		assert.Nil(t, p)
 	})
 
@@ -73,7 +73,7 @@ func TestNewPage(t *testing.T) {
 		p, err := NewPage(data)
 
 		// THEN
-		assert.ErrorIs(t, err, ErrInvalidDataSize)
+		assert.ErrorIs(t, err, errInvalidDataSize)
 		assert.Nil(t, p)
 	})
 
@@ -85,7 +85,7 @@ func TestNewPage(t *testing.T) {
 		p, err := NewPage(data)
 
 		// THEN
-		assert.ErrorIs(t, err, ErrInvalidDataSize)
+		assert.ErrorIs(t, err, errInvalidDataSize)
 		assert.Nil(t, p)
 	})
 
@@ -94,7 +94,7 @@ func TestNewPage(t *testing.T) {
 		p, err := NewPage(nil)
 
 		// THEN
-		assert.ErrorIs(t, err, ErrInvalidDataSize)
+		assert.ErrorIs(t, err, errInvalidDataSize)
 		assert.Nil(t, p)
 	})
 }
@@ -193,7 +193,7 @@ func TestCheckPageSize(t *testing.T) {
 		err := CheckPageSize(data)
 
 		// THEN
-		assert.ErrorIs(t, err, ErrInvalidDataSize)
+		assert.ErrorIs(t, err, errInvalidDataSize)
 	})
 
 	t.Run("nil の場合エラーを返す", func(t *testing.T) {
@@ -201,6 +201,6 @@ func TestCheckPageSize(t *testing.T) {
 		err := CheckPageSize(nil)
 
 		// THEN
-		assert.ErrorIs(t, err, ErrInvalidDataSize)
+		assert.ErrorIs(t, err, errInvalidDataSize)
 	})
 }

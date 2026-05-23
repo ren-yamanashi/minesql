@@ -10,7 +10,7 @@ const (
 	HeaderSize = 4
 )
 
-var ErrInvalidDataSize = errors.New("data size must be " + strconv.Itoa(Size) + " bytes")
+var errInvalidDataSize = errors.New("data size must be " + strconv.Itoa(Size) + " bytes")
 
 // Page は 4KB のページ
 //   - ヘッダー: 先頭 4 バイト
@@ -40,7 +40,7 @@ func (p *Page) ToBytes() []byte {
 // CheckPageSize は data が 4KB であるかを確認する
 func CheckPageSize(data []byte) error {
 	if len(data) != Size {
-		return ErrInvalidDataSize
+		return errInvalidDataSize
 	}
 	return nil
 }
