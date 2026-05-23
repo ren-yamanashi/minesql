@@ -63,7 +63,7 @@ func TestIsInvalid(t *testing.T) {
 	})
 }
 
-func TestToBytes(t *testing.T) {
+func TestIdToBytes(t *testing.T) {
 	t.Run("BigEndian で 8 バイトのバイト列に変換できる", func(t *testing.T) {
 		// GIVEN
 		id := NewId(0x00000001, 0x00000002)
