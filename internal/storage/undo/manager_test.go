@@ -213,6 +213,84 @@ func TestManagerDiscard(t *testing.T) {
 	})
 }
 
+func TestManagerCommittedEntries(t *testing.T) {
+	t.Run("指定したトランザクションのエントリを返す", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		r1 := NewDeleteRecord(page.FileId(1), node.Record{[]byte("a")}, 1, NullPointer)
+		r2 := NewUpdateRecord(page.FileId(1), node.Record{[]byte("old")}, node.Record{[]byte("new")}, 1, NullPointer)
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r1)
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeUpdate, r2)
+
+		// WHEN
+		entries := mgr.CommittedEntries([]lock.TrxId{1})
+
+		// THEN
+		assert.Len(t, entries, 2)
+		assert.Equal(t, lock.TrxId(1), entries[0].TrxId)
+		assert.Equal(t, RecordTypeDelete, entries[0].RecordType)
+		assert.Equal(t, lock.TrxId(1), entries[1].TrxId)
+		assert.Equal(t, RecordTypeUpdate, entries[1].RecordType)
+	})
+
+	t.Run("複数トランザクションのエントリをまとめて返す", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		r1 := NewDeleteRecord(page.FileId(1), node.Record{[]byte("a")}, 1, NullPointer)
+		r2 := NewUpdateRecord(page.FileId(1), node.Record{[]byte("old")}, node.Record{[]byte("new")}, 2, NullPointer)
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r1)
+		_, _ = mgr.Append(lock.TrxId(2), RecordTypeUpdate, r2)
+
+		// WHEN
+		entries := mgr.CommittedEntries([]lock.TrxId{1, 2})
+
+		// THEN
+		assert.Len(t, entries, 2)
+		assert.Equal(t, lock.TrxId(1), entries[0].TrxId)
+		assert.Equal(t, lock.TrxId(2), entries[1].TrxId)
+	})
+
+	t.Run("指定していないトランザクションのエントリは含まれない", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		r1 := NewDeleteRecord(page.FileId(1), node.Record{[]byte("a")}, 1, NullPointer)
+		r2 := NewDeleteRecord(page.FileId(1), node.Record{[]byte("b")}, 2, NullPointer)
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r1)
+		_, _ = mgr.Append(lock.TrxId(2), RecordTypeDelete, r2)
+
+		// WHEN
+		entries := mgr.CommittedEntries([]lock.TrxId{1})
+
+		// THEN
+		assert.Len(t, entries, 1)
+		assert.Equal(t, lock.TrxId(1), entries[0].TrxId)
+	})
+
+	t.Run("該当するエントリがない場合 nil を返す", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+
+		// WHEN
+		entries := mgr.CommittedEntries([]lock.TrxId{999})
+
+		// THEN
+		assert.Nil(t, entries)
+	})
+
+	t.Run("空のトランザクション ID リストでは nil を返す", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		r := NewDeleteRecord(page.FileId(1), node.Record{[]byte("a")}, 1, NullPointer)
+		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r)
+
+		// WHEN
+		entries := mgr.CommittedEntries([]lock.TrxId{})
+
+		// THEN
+		assert.Nil(t, entries)
+	})
+}
+
 func TestManagerDiscardRecordType(t *testing.T) {
 	t.Run("指定したレコードタイプのみ破棄される", func(t *testing.T) {
 		// GIVEN

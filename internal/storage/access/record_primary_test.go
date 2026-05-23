@@ -339,6 +339,79 @@ func TestPrimaryRecordEncode(t *testing.T) {
 	})
 }
 
+func TestPrimaryRecordSecondaryKey(t *testing.T) {
+	t.Run("primaryRecord から SK+PK キーを構築できる", func(t *testing.T) {
+		// GIVEN
+		record := &primaryRecord{
+			pkCount:  1,
+			ColNames: []string{"id", "name", "email"},
+			Values:   []string{"1", "Alice", "alice@example.com"},
+		}
+		keyCols := map[string]int{"name": 0}
+
+		// WHEN
+		key := record.secondaryKey(keyCols)
+
+		// THEN
+		assert.NotEmpty(t, key)
+	})
+
+	t.Run("同じ入力に対して同じキーを返す", func(t *testing.T) {
+		// GIVEN
+		record := &primaryRecord{
+			pkCount:  1,
+			ColNames: []string{"id", "name"},
+			Values:   []string{"1", "Alice"},
+		}
+		keyCols := map[string]int{"name": 0}
+
+		// WHEN
+		key1 := record.secondaryKey(keyCols)
+		key2 := record.secondaryKey(keyCols)
+
+		// THEN
+		assert.Equal(t, key1, key2)
+	})
+
+	t.Run("異なる SK 値に対して異なるキーを返す", func(t *testing.T) {
+		// GIVEN
+		record1 := &primaryRecord{
+			pkCount:  1,
+			ColNames: []string{"id", "name"},
+			Values:   []string{"1", "Alice"},
+		}
+		record2 := &primaryRecord{
+			pkCount:  1,
+			ColNames: []string{"id", "name"},
+			Values:   []string{"1", "Bob"},
+		}
+		keyCols := map[string]int{"name": 0}
+
+		// WHEN
+		key1 := record1.secondaryKey(keyCols)
+		key2 := record2.secondaryKey(keyCols)
+
+		// THEN
+		assert.NotEqual(t, key1, key2)
+	})
+
+	t.Run("複合セカンダリキーを正しくエンコードする", func(t *testing.T) {
+		// GIVEN
+		record := &primaryRecord{
+			pkCount:  1,
+			ColNames: []string{"id", "name", "email"},
+			Values:   []string{"1", "Alice", "alice@example.com"},
+		}
+		keyCols := map[string]int{"email": 0, "name": 1}
+
+		// WHEN
+		key := record.secondaryKey(keyCols)
+
+		// THEN
+		assert.NotEmpty(t, key)
+	})
+}
+
 func TestDecodePrimaryRecord(t *testing.T) {
 	t.Run("エンコードしたレコードをデコードすると元のデータに戻る", func(t *testing.T) {
 		// GIVEN

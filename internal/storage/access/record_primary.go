@@ -86,6 +86,29 @@ func (r *primaryRecord) setRollPtr(rollPtr undo.Pointer) {
 	r.rollPtr = rollPtr
 }
 
+// secondaryKey はセカンダリインデックスの B+Tree キー (SK+PK) を構築する
+func (r *primaryRecord) secondaryKey(keyCols map[string]int) []byte {
+	valMap := make(map[string]string, len(r.ColNames))
+	for i, name := range r.ColNames {
+		valMap[name] = r.Values[i]
+	}
+
+	// SK をインデックス定義順に取得
+	skValues := make([]string, len(keyCols))
+	for name, pos := range keyCols {
+		skValues[pos] = valMap[name]
+	}
+
+	// PK を取得
+	pkValues := r.Values[:r.pkCount]
+
+	// SK + PK をエンコード
+	var key []byte
+	encode.Encode(stringToByteSlice(skValues), &key)
+	encode.Encode(stringToByteSlice(pkValues), &key)
+	return key
+}
+
 // encode は node.Record にエンコードする
 //   - 非キー領域: lastTrxId (4B) + rollPtr (6B) + 非キーカラム
 func (r *primaryRecord) encode() node.Record {

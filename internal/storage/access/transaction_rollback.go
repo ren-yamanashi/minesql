@@ -6,7 +6,6 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
-	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
@@ -42,7 +41,7 @@ func (t *TrxManager) rollbackInsert(primaryTree *btree.Btree, record undo.Insert
 		return err
 	}
 	return t.forEachSecondaryTree(fileId, func(tree *btree.Btree, keyCols map[string]int) error {
-		key := encodeSecondaryKey(primaryRecord, keyCols)
+		key := primaryRecord.secondaryKey(keyCols)
 		return tree.Delete(key)
 	})
 }
@@ -58,7 +57,7 @@ func (t *TrxManager) rollbackDelete(primaryTree *btree.Btree, record undo.Delete
 		return err
 	}
 	return t.forEachSecondaryTree(fileId, func(tree *btree.Btree, keyCols map[string]int) error {
-		key := encodeSecondaryKey(primaryRecord, keyCols)
+		key := primaryRecord.secondaryKey(keyCols)
 		restored := node.NewRecord([]byte{0}, key, nil) // header: deleteMark(0), key: sk+pk, nonKey: nil
 		return tree.Update(restored)
 	})
@@ -78,8 +77,8 @@ func (t *TrxManager) rollbackUpdate(primaryTree *btree.Btree, record undo.Update
 		return err
 	}
 	return t.forEachSecondaryTree(fileId, func(tree *btree.Btree, keyCols map[string]int) error {
-		oldKey := encodeSecondaryKey(prevPrimaryRecord, keyCols)
-		newKey := encodeSecondaryKey(newPrimaryRecord, keyCols)
+		oldKey := prevPrimaryRecord.secondaryKey(keyCols)
+		newKey := newPrimaryRecord.secondaryKey(keyCols)
 		// SK が変わってない場合はスキップ
 		if bytes.Equal(oldKey, newKey) {
 			return nil
@@ -113,27 +112,4 @@ func (t *TrxManager) forEachSecondaryTree(
 		}
 	}
 	return nil
-}
-
-// encodeSecondaryKey は PrimaryRecord からセカンダリインデックスの B+Tree キー (SK+PK) を構築する
-func encodeSecondaryKey(record *primaryRecord, keyCols map[string]int) []byte {
-	valMap := make(map[string]string, len(record.ColNames))
-	for i, name := range record.ColNames {
-		valMap[name] = record.Values[i]
-	}
-
-	// SK をインデックス定義順に取得
-	skValues := make([]string, len(keyCols))
-	for name, pos := range keyCols {
-		skValues[pos] = valMap[name]
-	}
-
-	// PK を取得
-	pkValues := record.Values[:record.pkCount]
-
-	// SK + PK をエンコード
-	var key []byte
-	encode.Encode(stringToByteSlice(skValues), &key)
-	encode.Encode(stringToByteSlice(pkValues), &key)
-	return key
 }

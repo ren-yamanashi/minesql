@@ -8,9 +8,11 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
-type entry struct {
-	recordType RecordType
-	record     Record
+// Entry は Undo ログのエントリ
+type Entry struct {
+	TrxId      lock.TrxId
+	RecordType RecordType
+	Record     Record
 }
 
 // Manager は全トランザクションの Undo レコードをトランザクションごとに管理する
@@ -18,7 +20,7 @@ type Manager struct {
 	bufferPool    *buffer.BufferPool
 	undoFileId    page.FileId            // Undo ファイルの FileId
 	currentPageId page.PageId            // 現在書き込み中の Undo ページ
-	entries       map[lock.TrxId][]entry // trxId → entry[] のマップ
+	entries       map[lock.TrxId][]Entry // trxId → Entry[] のマップ
 }
 
 func NewManager(bp *buffer.BufferPool, undoFileId page.FileId) (*Manager, error) {
@@ -41,7 +43,7 @@ func NewManager(bp *buffer.BufferPool, undoFileId page.FileId) (*Manager, error)
 		bufferPool:    bp,
 		undoFileId:    undoFileId,
 		currentPageId: pageId,
-		entries:       make(map[lock.TrxId][]entry),
+		entries:       make(map[lock.TrxId][]Entry),
 	}, nil
 }
 
@@ -51,7 +53,11 @@ func (m *Manager) Append(trxId lock.TrxId, recordType RecordType, record Record)
 	if err != nil {
 		return Pointer{}, err
 	}
-	m.entries[trxId] = append(m.entries[trxId], entry{recordType: recordType, record: record})
+	m.entries[trxId] = append(m.entries[trxId], Entry{
+		TrxId:      trxId,
+		RecordType: recordType,
+		Record:     record,
+	})
 	return ptr, nil
 }
 
@@ -63,9 +69,19 @@ func (m *Manager) Records(trxId lock.TrxId) []Record {
 	}
 	records := make([]Record, len(entries))
 	for i, e := range entries {
-		records[i] = e.record
+		records[i] = e.Record
 	}
 	return records
+}
+
+// CommittedEntries はコミット済みトランザクションの Undo エントリを返す
+// (INSERT のエントリはコミット時に破棄済みのため、UPDATE/DELETE のみ含まれる)
+func (m *Manager) CommittedEntries(committedTrxIds []lock.TrxId) []Entry {
+	var result []Entry
+	for _, trxId := range committedTrxIds {
+		result = append(result, m.entries[trxId]...)
+	}
+	return result
 }
 
 // PopLast は指定した trxId の Undo ログの最後のレコードを削除する
@@ -84,9 +100,9 @@ func (m *Manager) Discard(trxId lock.TrxId) {
 // DiscardRecordType は指定した trxId の指定したレコードタイプの Undo レコードのみ破棄する
 func (m *Manager) DiscardRecordType(trxId lock.TrxId, recordType RecordType) {
 	entries := m.entries[trxId]
-	kept := make([]entry, 0, len(entries))
+	kept := make([]Entry, 0, len(entries))
 	for _, e := range entries {
-		if e.recordType != recordType {
+		if e.RecordType != recordType {
 			kept = append(kept, e)
 		}
 	}
