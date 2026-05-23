@@ -36,7 +36,7 @@ func TestNewPool(t *testing.T) {
 	})
 }
 
-func TestBufferPageForWrite(t *testing.T) {
+func TestPageForWrite(t *testing.T) {
 	t.Run("取得したページがダーティーになる", func(t *testing.T) {
 		// GIVEN
 		bp := NewPool(page.Size * 2)
@@ -90,7 +90,7 @@ func TestBufferPageForWrite(t *testing.T) {
 	})
 }
 
-func TestBufferPageForRead(t *testing.T) {
+func TestPageForRead(t *testing.T) {
 	t.Run("キャッシュ済みのページを取得できる", func(t *testing.T) {
 		// GIVEN
 		bp := NewPool(page.Size * 2)

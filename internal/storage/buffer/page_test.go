@@ -7,6 +7,38 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestPageId(t *testing.T) {
+	t.Run("設定された PageId を返す", func(t *testing.T) {
+		// GIVEN
+		pageId := page.NewId(1, 2)
+		bp, err := newPage(pageId)
+		assert.NoError(t, err)
+
+		// WHEN
+		result := bp.PageId()
+
+		// THEN
+		assert.Equal(t, pageId, result)
+	})
+}
+
+func TestData(t *testing.T) {
+	t.Run("Page のデータを返す", func(t *testing.T) {
+		// GIVEN
+		pageId := page.NewId(0, 0)
+		bp, err := newPage(pageId)
+		assert.NoError(t, err)
+
+		// WHEN
+		result := bp.Data()
+
+		// THEN
+		assert.NotNil(t, result)
+		assert.Equal(t, page.Size-page.HeaderSize, len(result.Body))
+		assert.Equal(t, page.HeaderSize, len(result.Header))
+	})
+}
+
 func TestNewPage(t *testing.T) {
 	t.Run("指定した PageId で Page を生成できる", func(t *testing.T) {
 		// GIVEN
