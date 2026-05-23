@@ -10,11 +10,11 @@ type ConstraintMeta struct {
 	tree *btree.Tree // 制約メタデータが格納される B+Tree
 }
 
-func NewConstraintMeta(bp *buffer.Pool, metaPageId page.Id) *ConstraintMeta {
+func newConstraintMeta(bp *buffer.Pool, metaPageId page.Id) *ConstraintMeta {
 	return &ConstraintMeta{tree: btree.NewTree(bp, metaPageId)}
 }
 
-func CreateConstraintMeta(bp *buffer.Pool) (*ConstraintMeta, error) {
+func createConstraintMeta(bp *buffer.Pool) (*ConstraintMeta, error) {
 	tree, err := btree.CreateTree(bp, catalogFileId)
 	if err != nil {
 		return nil, err
@@ -23,7 +23,7 @@ func CreateConstraintMeta(bp *buffer.Pool) (*ConstraintMeta, error) {
 }
 
 // Search は指定した検索モードでメタデータを検索し、イテレータを返す
-func (cm *ConstraintMeta) Search(mode SearchMode) (*ConstraintIterator, error) {
+func (cm *ConstraintMeta) Search(mode SearchMode) (*constraintIterator, error) {
 	iter, err := cm.tree.Search(mode.encode())
 	if err != nil {
 		return nil, err

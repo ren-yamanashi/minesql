@@ -14,7 +14,7 @@ func TestCreateTableMeta(t *testing.T) {
 		bp := setupDictTestBufferPool(t)
 
 		// WHEN
-		tm, err := CreateTableMeta(bp)
+		tm, err := createTableMeta(bp)
 
 		// THEN
 		assert.NoError(t, err)
@@ -111,7 +111,7 @@ func TestTableMetaSearch(t *testing.T) {
 func setupTestTableMeta(t *testing.T) *TableMeta {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
-	tm, err := CreateTableMeta(bp)
+	tm, err := createTableMeta(bp)
 	if err != nil {
 		t.Fatalf("TableMeta の作成に失敗: %v", err)
 	}

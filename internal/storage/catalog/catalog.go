@@ -12,7 +12,7 @@ import (
 var (
 	catalogFileId         = page.FileId(0)
 	catalogHeaderPageNum  = page.PageNumber(0)
-	ErrInvalidCatalogFile = errors.New("invalid database catalog file: magic number mismatch")
+	errInvalidCatalogFile = errors.New("invalid database catalog file: magic number mismatch")
 	catalogMagicNumber    = []byte("MINE")
 )
 
@@ -55,7 +55,7 @@ func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
 
 	magicEnd := headerMagicNumberOffset + len(catalogMagicNumber)
 	if !bytes.Equal(bufPageHeader.Page.Body[headerMagicNumberOffset:magicEnd], catalogMagicNumber) {
-		return nil, ErrInvalidCatalogFile
+		return nil, errInvalidCatalogFile
 	}
 
 	tableMetaPageNumber := readPageNumber(bufPageHeader.Page.Body, headerTableMetaOffset)
@@ -79,12 +79,12 @@ func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
 		nextFileId:      nextFileId,
 		nextIndexId:     nextIndexId,
 		UndoLogFileId:   undoLogFileId,
-		TableMeta:       NewTableMeta(bp, page.NewId(catalogFileId, tableMetaPageNumber)),
-		IndexMeta:       NewIndexMeta(bp, page.NewId(catalogFileId, indexMetaPageNumber)),
-		IndexKeyColMeta: NewIndexKeyColMeta(bp, page.NewId(catalogFileId, indexKeyColMetaPageNumber)),
-		ColumnMeta:      NewColumnMeta(bp, page.NewId(catalogFileId, columnMetaPageNumber)),
-		ConstraintMeta:  NewConstraintMeta(bp, page.NewId(catalogFileId, constraintMetaPageNumber)),
-		UserMeta:        NewUserMeta(bp, page.NewId(catalogFileId, userMetaPageNumber)),
+		TableMeta:       newTableMeta(bp, page.NewId(catalogFileId, tableMetaPageNumber)),
+		IndexMeta:       newIndexMeta(bp, page.NewId(catalogFileId, indexMetaPageNumber)),
+		IndexKeyColMeta: newIndexKeyColMeta(bp, page.NewId(catalogFileId, indexKeyColMetaPageNumber)),
+		ColumnMeta:      newColumnMeta(bp, page.NewId(catalogFileId, columnMetaPageNumber)),
+		ConstraintMeta:  newConstraintMeta(bp, page.NewId(catalogFileId, constraintMetaPageNumber)),
+		UserMeta:        newUserMeta(bp, page.NewId(catalogFileId, userMetaPageNumber)),
 	}, nil
 }
 
@@ -105,27 +105,27 @@ func CreateCatalog(bp *buffer.Pool) (*Catalog, error) {
 		return nil, err
 	}
 
-	tableMeta, err := CreateTableMeta(bp)
+	tableMeta, err := createTableMeta(bp)
 	if err != nil {
 		return nil, err
 	}
-	indexMeta, err := CreateIndexMeta(bp)
+	indexMeta, err := createIndexMeta(bp)
 	if err != nil {
 		return nil, err
 	}
-	indexKeyColMeta, err := CreateIndexKeyColMeta(bp)
+	indexKeyColMeta, err := createIndexKeyColMeta(bp)
 	if err != nil {
 		return nil, err
 	}
-	columnMeta, err := CreateColumnMeta(bp)
+	columnMeta, err := createColumnMeta(bp)
 	if err != nil {
 		return nil, err
 	}
-	constraintMeta, err := CreateConstraintMeta(bp)
+	constraintMeta, err := createConstraintMeta(bp)
 	if err != nil {
 		return nil, err
 	}
-	userMeta, err := CreateUserMeta(bp)
+	userMeta, err := createUserMeta(bp)
 	if err != nil {
 		return nil, err
 	}
@@ -165,6 +165,7 @@ func (c *Catalog) AllocateIndexId() (IndexId, error) {
 	id := c.nextIndexId
 	c.nextIndexId++
 	if err := c.persistScalar(headerNextIndexIdOffset, uint32(c.nextIndexId)); err != nil {
+		c.nextIndexId-- // rollback
 		return 0, err
 	}
 	return id, nil
@@ -175,6 +176,7 @@ func (c *Catalog) AllocateFileId() (page.FileId, error) {
 	id := c.nextFileId
 	c.nextFileId++
 	if err := c.persistScalar(headerNextFileIdOffset, uint32(c.nextFileId)); err != nil {
+		c.nextFileId-- // rollback
 		return 0, err
 	}
 	return id, nil

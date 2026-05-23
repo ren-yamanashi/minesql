@@ -173,6 +173,49 @@ func TestPageToBytes(t *testing.T) {
 	})
 }
 
+func TestCopy(t *testing.T) {
+	t.Run("コピーされた Page は元の Page と同じデータを持つ", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, Size)
+		data[0] = 0xAA
+		data[HeaderSize] = 0xBB
+		original, _ := NewPage(data)
+
+		// WHEN
+		copied := Copy(*original)
+
+		// THEN
+		assert.Equal(t, original.ToBytes(), copied.ToBytes())
+	})
+
+	t.Run("コピーされた Page は元の Page と異なるメモリ領域を持つ", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, Size)
+		data[0] = 0x01
+		original, _ := NewPage(data)
+
+		// WHEN
+		copied := Copy(*original)
+		copied.Header[0] = 0xFF
+
+		// THEN
+		assert.Equal(t, byte(0x01), original.Header[0])
+		assert.Equal(t, byte(0xFF), copied.Header[0])
+	})
+
+	t.Run("Header が nil の場合はゼロ値の Page を返す", func(t *testing.T) {
+		// GIVEN
+		pg := Page{}
+
+		// WHEN
+		copied := Copy(pg)
+
+		// THEN
+		assert.Nil(t, copied.Header)
+		assert.Nil(t, copied.Body)
+	})
+}
+
 func TestCheckPageSize(t *testing.T) {
 	t.Run("PageSize と一致する場合 nil を返す", func(t *testing.T) {
 		// GIVEN

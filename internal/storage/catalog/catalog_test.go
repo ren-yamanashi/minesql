@@ -59,7 +59,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.Equal(t, created.UserMeta.tree.MetaPageId(), opened.UserMeta.tree.MetaPageId())
 	})
 
-	t.Run("マジックナンバーが不正な場合 ErrInvalidCatalogFile を返す", func(t *testing.T) {
+	t.Run("マジックナンバーが不正な場合 errInvalidCatalogFile を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
 		_, err := CreateCatalog(bp)
@@ -75,7 +75,7 @@ func TestNewCatalog(t *testing.T) {
 		_, err = NewCatalog(bp)
 
 		// THEN
-		assert.ErrorIs(t, err, ErrInvalidCatalogFile)
+		assert.ErrorIs(t, err, errInvalidCatalogFile)
 	})
 }
 

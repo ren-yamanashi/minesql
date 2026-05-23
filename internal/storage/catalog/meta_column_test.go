@@ -14,7 +14,7 @@ func TestCreateColumnMeta(t *testing.T) {
 		bp := setupDictTestBufferPool(t)
 
 		// WHEN
-		cm, err := CreateColumnMeta(bp)
+		cm, err := createColumnMeta(bp)
 
 		// THEN
 		assert.NoError(t, err)
@@ -111,7 +111,7 @@ func TestColumnMetaSearch(t *testing.T) {
 func setupTestColumnMeta(t *testing.T) *ColumnMeta {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
-	cm, err := CreateColumnMeta(bp)
+	cm, err := createColumnMeta(bp)
 	if err != nil {
 		t.Fatalf("ColumnMeta の作成に失敗: %v", err)
 	}

@@ -13,7 +13,7 @@ func TestCreateIndexKeyColMeta(t *testing.T) {
 		bp := setupDictTestBufferPool(t)
 
 		// WHEN
-		kcm, err := CreateIndexKeyColMeta(bp)
+		kcm, err := createIndexKeyColMeta(bp)
 
 		// THEN
 		assert.NoError(t, err)
@@ -110,7 +110,7 @@ func TestIndexKeyColMetaSearch(t *testing.T) {
 func setupTestIndexKeyColMeta(t *testing.T) *IndexKeyColMeta {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
-	kcm, err := CreateIndexKeyColMeta(bp)
+	kcm, err := createIndexKeyColMeta(bp)
 	if err != nil {
 		t.Fatalf("IndexKeyColMeta の作成に失敗: %v", err)
 	}

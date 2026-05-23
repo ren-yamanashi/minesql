@@ -153,7 +153,7 @@ func (b *Buffer) append(trxId lock.TrxId, rt RecordType, pageId page.Id, pg page
 		trxId:      trxId,
 		recordType: rt,
 		pageId:     pageId,
-		data:       pg,
+		data:       page.Copy(pg),
 	})
 	return lsn
 }

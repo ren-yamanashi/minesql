@@ -2,16 +2,16 @@ package catalog
 
 import "github.com/ren-yamanashi/minesql/internal/storage/btree"
 
-type ColumnIterator struct {
+type columnIterator struct {
 	iterator *btree.Iterator
 }
 
-func newColumnIterator(iter *btree.Iterator) *ColumnIterator {
-	return &ColumnIterator{iterator: iter}
+func newColumnIterator(iter *btree.Iterator) *columnIterator {
+	return &columnIterator{iterator: iter}
 }
 
 // Next はカラムメタデータから次の結果を返す
-func (ci *ColumnIterator) Next() (ColumnRecord, bool, error) {
+func (ci *columnIterator) Next() (ColumnRecord, bool, error) {
 	record, ok, err := ci.iterator.Next()
 	if err != nil {
 		return ColumnRecord{}, false, err

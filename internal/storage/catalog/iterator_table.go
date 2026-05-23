@@ -2,16 +2,16 @@ package catalog
 
 import "github.com/ren-yamanashi/minesql/internal/storage/btree"
 
-type TableIterator struct {
+type tableIterator struct {
 	iterator *btree.Iterator
 }
 
-func newTableIterator(iter *btree.Iterator) *TableIterator {
-	return &TableIterator{iterator: iter}
+func newTableIterator(iter *btree.Iterator) *tableIterator {
+	return &tableIterator{iterator: iter}
 }
 
 // Next はテーブルメタデータから次の結果を返す
-func (ti *TableIterator) Next() (TableRecord, bool, error) {
+func (ti *tableIterator) Next() (TableRecord, bool, error) {
 	record, ok, err := ti.iterator.Next()
 	if err != nil {
 		return TableRecord{}, false, err

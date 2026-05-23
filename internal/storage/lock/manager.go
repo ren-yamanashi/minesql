@@ -2,6 +2,7 @@ package lock
 
 import (
 	"errors"
+	"slices"
 	"sync"
 	"time"
 
@@ -141,20 +142,15 @@ func (m *Manager) grantWaitingLocks(state *state) {
 
 // appendRecordHeldLock は、指定したトランザクションのロック保持リストにレコードを登録する
 func (m *Manager) appendRecordHeldLock(trxId TrxId, pos btree.RecordPosition) {
-	for _, existing := range m.heldLocks[trxId] {
-		if existing == pos {
-			return
-		}
+	if slices.Contains(m.heldLocks[trxId], pos) {
+		return
 	}
 	m.heldLocks[trxId] = append(m.heldLocks[trxId], pos)
 }
 
 // removeFromWaitQueue は待機キューから指定したトランザクションのリクエストを削除する
 func (m *Manager) removeFromWaitQueue(state *state, trxId TrxId) {
-	for i, request := range state.waitQueue {
-		if request.trxId == trxId {
-			state.waitQueue = append(state.waitQueue[:i], state.waitQueue[i+1:]...)
-			return
-		}
-	}
+	state.waitQueue = slices.DeleteFunc(state.waitQueue, func(r *request) bool {
+		return r.trxId == trxId
+	})
 }

@@ -10,11 +10,11 @@ type TableMeta struct {
 	tree *btree.Tree // テーブルメタデータが格納される B+Tree
 }
 
-func NewTableMeta(bp *buffer.Pool, metaPageId page.Id) *TableMeta {
+func newTableMeta(bp *buffer.Pool, metaPageId page.Id) *TableMeta {
 	return &TableMeta{tree: btree.NewTree(bp, metaPageId)}
 }
 
-func CreateTableMeta(bp *buffer.Pool) (*TableMeta, error) {
+func createTableMeta(bp *buffer.Pool) (*TableMeta, error) {
 	tree, err := btree.CreateTree(bp, catalogFileId)
 	if err != nil {
 		return nil, err
@@ -23,7 +23,7 @@ func CreateTableMeta(bp *buffer.Pool) (*TableMeta, error) {
 }
 
 // Search は指定した検索モードでメタデータを検索し、イテレータを返す
-func (tm *TableMeta) Search(mode SearchMode) (*TableIterator, error) {
+func (tm *TableMeta) Search(mode SearchMode) (*tableIterator, error) {
 	iter, err := tm.tree.Search(mode.encode())
 	if err != nil {
 		return nil, err

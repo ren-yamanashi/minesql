@@ -142,6 +142,7 @@ func (f *file) truncateBefore(lsn Lsn) error {
 	}
 
 	// 指定 LSN より大きいレコードだけ書き直す
+	var lastLsn Lsn
 	for _, rec := range records {
 		if rec.lsn <= lsn {
 			continue
@@ -149,8 +150,17 @@ func (f *file) truncateBefore(lsn Lsn) error {
 		if _, err := f.osFile.Write(rec.serialize()); err != nil {
 			return err
 		}
+		lastLsn = rec.lsn
 	}
-	return f.osFile.Sync()
+
+	if err := f.osFile.Sync(); err != nil {
+		return err
+	}
+
+	// flushedLsn を更新してヘッダーに書き込む
+	// 全レコードが切り詰められた場合でも、指定 LSN までは処理済みなので lsn を下限とする
+	f.flushedLsn = max(lastLsn, lsn)
+	return f.writeHeader()
 }
 
 // clear は Redo ログファイルをクリアする

@@ -10,11 +10,11 @@ type ColumnMeta struct {
 	tree *btree.Tree // カラムメタデータが格納される B+Tree
 }
 
-func NewColumnMeta(bp *buffer.Pool, metaPageId page.Id) *ColumnMeta {
+func newColumnMeta(bp *buffer.Pool, metaPageId page.Id) *ColumnMeta {
 	return &ColumnMeta{tree: btree.NewTree(bp, metaPageId)}
 }
 
-func CreateColumnMeta(bp *buffer.Pool) (*ColumnMeta, error) {
+func createColumnMeta(bp *buffer.Pool) (*ColumnMeta, error) {
 	tree, err := btree.CreateTree(bp, catalogFileId)
 	if err != nil {
 		return nil, err
@@ -23,7 +23,7 @@ func CreateColumnMeta(bp *buffer.Pool) (*ColumnMeta, error) {
 }
 
 // Search は指定した検索モードでメタデータを検索し、イテレータを返す
-func (cm *ColumnMeta) Search(mode SearchMode) (*ColumnIterator, error) {
+func (cm *ColumnMeta) Search(mode SearchMode) (*columnIterator, error) {
 	iter, err := cm.tree.Search(mode.encode())
 	if err != nil {
 		return nil, err

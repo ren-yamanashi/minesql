@@ -17,7 +17,7 @@ func TestCreateUserMeta(t *testing.T) {
 		bp := setupDictTestBufferPool(t)
 
 		// WHEN
-		um, err := CreateUserMeta(bp)
+		um, err := createUserMeta(bp)
 
 		// THEN
 		assert.NoError(t, err)
@@ -120,7 +120,7 @@ func TestUserMetaSearch(t *testing.T) {
 func setupTestUserMeta(t *testing.T) *UserMeta {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
-	um, err := CreateUserMeta(bp)
+	um, err := createUserMeta(bp)
 	if err != nil {
 		t.Fatalf("UserMeta の作成に失敗: %v", err)
 	}

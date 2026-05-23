@@ -10,11 +10,11 @@ type IndexKeyColMeta struct {
 	tree *btree.Tree // インデックスキーカラムメタデータが格納される B+Tree
 }
 
-func NewIndexKeyColMeta(bp *buffer.Pool, metaPageId page.Id) *IndexKeyColMeta {
+func newIndexKeyColMeta(bp *buffer.Pool, metaPageId page.Id) *IndexKeyColMeta {
 	return &IndexKeyColMeta{tree: btree.NewTree(bp, metaPageId)}
 }
 
-func CreateIndexKeyColMeta(bp *buffer.Pool) (*IndexKeyColMeta, error) {
+func createIndexKeyColMeta(bp *buffer.Pool) (*IndexKeyColMeta, error) {
 	tree, err := btree.CreateTree(bp, catalogFileId)
 	if err != nil {
 		return nil, err
@@ -23,7 +23,7 @@ func CreateIndexKeyColMeta(bp *buffer.Pool) (*IndexKeyColMeta, error) {
 }
 
 // Search は指定した検索モードでメタデータを検索し、イテレータを返す
-func (kcm *IndexKeyColMeta) Search(mode SearchMode) (*IndexKeyColIterator, error) {
+func (kcm *IndexKeyColMeta) Search(mode SearchMode) (*indexKeyColIterator, error) {
 	iter, err := kcm.tree.Search(mode.encode())
 	if err != nil {
 		return nil, err

@@ -37,6 +37,19 @@ func (p *Page) ToBytes() []byte {
 	return p.data
 }
 
+// Copy はページのデータを新しいメモリ領域にコピーした Page を返す
+//
+// pg が nil データの場合はゼロ値の Page を返す
+func Copy(pg Page) Page {
+	if pg.Header == nil {
+		return Page{}
+	}
+	copied := make([]byte, Size)
+	copy(copied, pg.ToBytes())
+	p, _ := NewPage(copied)
+	return *p
+}
+
 // CheckPageSize は data が 4KB であるかを確認する
 func CheckPageSize(data []byte) error {
 	if len(data) != Size {
