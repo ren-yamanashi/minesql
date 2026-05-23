@@ -5,10 +5,12 @@ type (
 	Mode  int
 )
 
+const TrxIdSize = 4
+
 const (
-	TrxIdSize      = 4
-	Shared    Mode = iota + 1 // 共有ロック
-	Exclusive                 // 排他ロック
+	modeUnknown Mode = iota
+	Shared
+	Exclusive
 )
 
 type request struct {
@@ -24,7 +26,8 @@ type state struct {
 
 func newState() *state {
 	return &state{
-		holders: make(map[TrxId]Mode),
+		holders:   make(map[TrxId]Mode),
+		waitQueue: []*request{},
 	}
 }
 
