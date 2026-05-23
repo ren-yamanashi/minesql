@@ -3,7 +3,6 @@ package btree
 import (
 	"testing"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
@@ -52,7 +51,7 @@ func TestInsertBranchOverflow(t *testing.T) {
 }
 
 // setupTestBranchNode はテスト用の初期化済みブランチノードを作成する
-func setupTestBranchNode(t *testing.T, bp *buffer.BufferPool) *node.BranchNode {
+func setupTestBranchNode(t *testing.T, bp *buffer.BufferPool) *BranchNode {
 	t.Helper()
 	pageId, err := bp.AllocatePageId(0)
 	assert.NoError(t, err)
@@ -60,17 +59,17 @@ func setupTestBranchNode(t *testing.T, bp *buffer.BufferPool) *node.BranchNode {
 	assert.NoError(t, err)
 	pg, err := bp.GetWritePage(pageId)
 	assert.NoError(t, err)
-	bn := node.NewBranchNode(pg)
+	bn := NewBranchNode(pg)
 	err = bn.Initialize([]byte{0x10}, page.NewPageId(0, 1), page.NewPageId(0, 2))
 	assert.NoError(t, err)
 	return bn
 }
 
 // fillBranchNodeUntilFull はブランチノードを Insert が失敗するまで埋める
-func fillBranchNodeUntilFull(bn *node.BranchNode) {
+func fillBranchNodeUntilFull(bn *BranchNode) {
 	for i := range 1000 {
 		key := []byte{byte(i/256 + 0x11), byte(i % 256)}
-		record := node.NewRecord([]byte{}, key, page.NewPageId(0, page.PageNumber(i+10)).ToBytes())
+		record := NewRecord([]byte{}, key, page.NewPageId(0, page.PageNumber(i+10)).ToBytes())
 		if !bn.Insert(bn.NumRecords(), record) {
 			return
 		}

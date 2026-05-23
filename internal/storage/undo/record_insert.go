@@ -1,19 +1,19 @@
 package undo
 
 import (
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 type InsertRecord struct {
-	tableFileId   page.FileId // テーブルの FileId
-	Record        node.Record // 挿入したレコード
-	PrevLastTrxId lock.TrxId  // INSERT は前バージョンが存在しないため常に 0
-	PrevRollPtr   Pointer     // INSERT は前バージョンが存在しないため常に NullPointer
+	tableFileId   page.FileId  // テーブルの FileId
+	Record        btree.Record // 挿入したレコード
+	PrevLastTrxId lock.TrxId   // INSERT は前バージョンが存在しないため常に 0
+	PrevRollPtr   Pointer      // INSERT は前バージョンが存在しないため常に NullPointer
 }
 
-func NewInsertRecord(tableFileId page.FileId, record node.Record) InsertRecord {
+func NewInsertRecord(tableFileId page.FileId, record btree.Record) InsertRecord {
 	return InsertRecord{
 		tableFileId:   tableFileId,
 		Record:        record,

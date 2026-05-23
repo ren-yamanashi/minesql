@@ -3,7 +3,6 @@ package btree
 import (
 	"testing"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -13,8 +12,8 @@ func TestDelete(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateBtree(bp, page.FileId(0))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
 
 		// WHEN
 		err := bt.Delete([]byte{0x10})
@@ -32,7 +31,7 @@ func TestDelete(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateBtree(bp, page.FileId(0))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
 		err := bt.Delete([]byte{0xFF})
@@ -58,9 +57,9 @@ func TestDelete(t *testing.T) {
 		bp := setupBtreeBufferPool(t)
 		bt, _ := CreateBtree(bp, page.FileId(0))
 		nonKey := make([]byte, 1500)
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x03}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x01}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x02}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x03}, nonKey))
 		countBefore, _ := bt.LeafPageCount()
 		assert.Equal(t, uint64(2), countBefore)
 
@@ -78,9 +77,9 @@ func TestDelete(t *testing.T) {
 		bp := setupBtreeBufferPool(t)
 		bt, _ := CreateBtree(bp, page.FileId(0))
 		nonKey := make([]byte, 1500)
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x03}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x01}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x02}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x03}, nonKey))
 		heightBefore, _ := bt.Height()
 		assert.Equal(t, uint64(2), heightBefore)
 
@@ -97,8 +96,8 @@ func TestDelete(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateBtree(bp, page.FileId(0))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
 
 		// WHEN
 		err1 := bt.Delete([]byte{0x10})
@@ -118,10 +117,10 @@ func TestDelete(t *testing.T) {
 		bp := setupBtreeBufferPool(t)
 		bt, _ := CreateBtree(bp, page.FileId(0))
 		nonKey := make([]byte, 1500)
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x03}, nonKey))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x04}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x01}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x02}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x03}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x04}, nonKey))
 		height, _ := bt.Height()
 		assert.Equal(t, uint64(2), height)
 		countBefore, _ := bt.LeafPageCount()
@@ -145,9 +144,9 @@ func TestDelete(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateBtree(bp, page.FileId(0))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x30}, []byte{0xCC}))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x30}, []byte{0xCC}))
 		countBefore, _ := bt.LeafPageCount()
 		heightBefore, _ := bt.Height()
 

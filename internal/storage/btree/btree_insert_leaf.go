@@ -1,7 +1,6 @@
 package btree
 
 import (
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
@@ -12,8 +11,8 @@ import (
 //   - return:
 //   - overflowKey: 分割時の境界キー (分割なしの場合は nil)
 //   - newPageId: 分割で作られたリーフノードの PageId (分割なしの場合は InvalidPageId)
-func (bt *Btree) insertLeaf(leafPageId page.PageId, leafPage *page.Page, record node.Record) (overflowKey []byte, newPageId page.PageId, err error) {
-	leafNode := node.NewLeafNode(leafPage)
+func (bt *Btree) insertLeaf(leafPageId page.PageId, leafPage *page.Page, record Record) (overflowKey []byte, newPageId page.PageId, err error) {
+	leafNode := NewLeafNode(leafPage)
 	slotNum, found := leafNode.SearchSlotNum(record.Key())
 	if found {
 		return nil, page.InvalidPageId, ErrDuplicateKey
@@ -35,8 +34,8 @@ func (bt *Btree) insertLeaf(leafPageId page.PageId, leafPage *page.Page, record 
 //   - return: 境界キー, 新しいリーフノードの PageId
 func (bt *Btree) splitInsertLeaf(
 	leafPageId page.PageId,
-	leafNode *node.LeafNode,
-	record node.Record,
+	leafNode *LeafNode,
+	record Record,
 ) ([]byte, page.PageId, error) {
 	prevLeafPageId := leafNode.PrevPageId()
 	if !prevLeafPageId.IsInvalid() {
@@ -66,7 +65,7 @@ func (bt *Btree) splitInsertLeaf(
 	if err != nil {
 		return nil, page.InvalidPageId, err
 	}
-	newLeaf := node.NewLeafNode(pageNewLeaf)
+	newLeaf := NewLeafNode(pageNewLeaf)
 	overflowKey, err := leafNode.SplitInsert(newLeaf, record)
 	if err != nil {
 		return nil, page.InvalidPageId, err
@@ -86,7 +85,7 @@ func (bt *Btree) updatePrevLeafLink(prevLeafPageId, newNextPageId page.PageId) e
 	if err != nil {
 		return err
 	}
-	prevLeaf := node.NewLeafNode(pagePrevLeaf)
+	prevLeaf := NewLeafNode(pagePrevLeaf)
 	prevLeaf.SetNextPageId(newNextPageId)
 	return nil
 }

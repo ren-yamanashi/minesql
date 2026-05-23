@@ -3,7 +3,7 @@ package catalog
 import (
 	"encoding/binary"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
@@ -22,8 +22,8 @@ func newColumnRecord(fileId page.FileId, name string, pos int) ColumnRecord {
 	}
 }
 
-// encode は node.Record にエンコードする
-func (cr ColumnRecord) encode() node.Record {
+// encode は btree.Record にエンコードする
+func (cr ColumnRecord) encode() btree.Record {
 	// key = fileId + name
 	var key []byte
 	fileId := binary.BigEndian.AppendUint32(nil, uint32(cr.FileId))
@@ -34,11 +34,11 @@ func (cr ColumnRecord) encode() node.Record {
 	pos := binary.BigEndian.AppendUint32(nil, uint32(cr.Pos))
 	encode.Encode([][]byte{pos}, &nonKey)
 
-	return node.NewRecord(nil, key, nonKey)
+	return btree.NewRecord(nil, key, nonKey)
 }
 
-// decodeColumnRecord は node.Record から columnRecord にデコードする
-func decodeColumnRecord(record node.Record) ColumnRecord {
+// decodeColumnRecord は btree.Record から columnRecord にデコードする
+func decodeColumnRecord(record btree.Record) ColumnRecord {
 	// key = [fileId, name]
 	var key [][]byte
 	encode.Decode(record.Key(), &key)

@@ -3,16 +3,15 @@ package btree
 import (
 	"bytes"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 )
 
 // Iterator は B+Tree のリーフノードを走査する
 type Iterator struct {
 	bufferPool   *buffer.BufferPool
-	bufferPage   buffer.BufferPage   // 現在参照しているバッファページ
-	slotNum      int                 // 現在参照されているスロット番号
-	lastPosition node.RecordPosition // 直前に Next で取得されたレコードの位置
+	bufferPage   buffer.BufferPage // 現在参照しているバッファページ
+	slotNum      int               // 現在参照されているスロット番号
+	lastPosition RecordPosition    // 直前に Next で取得されたレコードの位置
 }
 
 func NewIterator(bufPool *buffer.BufferPool, bufPage buffer.BufferPage, slotNum int) *Iterator {
@@ -24,26 +23,26 @@ func NewIterator(bufPool *buffer.BufferPool, bufPage buffer.BufferPage, slotNum 
 }
 
 // Get は現在参照しているリーフノードのレコードを取得
-func (iter *Iterator) Get() (node.Record, bool, error) {
+func (iter *Iterator) Get() (Record, bool, error) {
 	pg, err := iter.bufferPool.GetReadPage(iter.bufferPage.PageId)
 	if err != nil {
-		return node.NewRecord(nil, nil, nil), false, err
+		return NewRecord(nil, nil, nil), false, err
 	}
-	leaf := node.NewLeafNode(pg)
+	leaf := NewLeafNode(pg)
 
 	if iter.slotNum < leaf.NumRecords() {
 		record := leaf.Record(iter.slotNum)
 		header := bytes.Clone(record.Header())
 		key := bytes.Clone(record.Key())
 		nonKey := bytes.Clone(record.NonKey())
-		return node.NewRecord(header, key, nonKey), true, nil
+		return NewRecord(header, key, nonKey), true, nil
 	}
-	return node.NewRecord(nil, nil, nil), false, nil
+	return NewRecord(nil, nil, nil), false, nil
 }
 
 // Next は次のレコードを取得する
-func (iter *Iterator) Next() (node.Record, bool, error) {
-	iter.lastPosition = node.RecordPosition{
+func (iter *Iterator) Next() (Record, bool, error) {
+	iter.lastPosition = RecordPosition{
 		PageId:  iter.bufferPage.PageId,
 		SlotNum: iter.slotNum,
 	}
@@ -53,12 +52,12 @@ func (iter *Iterator) Next() (node.Record, bool, error) {
 		return nil, false, err
 	}
 	if !ok {
-		return node.NewRecord(nil, nil, nil), false, nil
+		return NewRecord(nil, nil, nil), false, nil
 	}
 
 	err = iter.Advance()
 	if err != nil {
-		return node.NewRecord(nil, nil, nil), false, err
+		return NewRecord(nil, nil, nil), false, err
 	}
 	return record, true, nil
 }
@@ -69,7 +68,7 @@ func (iter *Iterator) Advance() error {
 	if err != nil {
 		return err
 	}
-	leaf := node.NewLeafNode(pg)
+	leaf := NewLeafNode(pg)
 
 	// 現在のページ内に、次のレコードがある場合
 	if iter.slotNum < leaf.NumRecords() {

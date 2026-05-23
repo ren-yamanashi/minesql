@@ -5,7 +5,6 @@ import (
 	"errors"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
@@ -58,7 +57,7 @@ func (t *TrxManager) rollbackDelete(primaryTree *btree.Btree, record undo.Delete
 	}
 	return t.forEachSecondaryTree(fileId, func(tree *btree.Btree, keyCols map[string]int) error {
 		key := primaryRecord.secondaryKey(keyCols)
-		restored := node.NewRecord([]byte{0}, key, nil) // header: deleteMark(0), key: sk+pk, nonKey: nil
+		restored := btree.NewRecord([]byte{0}, key, nil) // header: deleteMark(0), key: sk+pk, nonKey: nil
 		return tree.Update(restored)
 	})
 }
@@ -87,7 +86,7 @@ func (t *TrxManager) rollbackUpdate(primaryTree *btree.Btree, record undo.Update
 		if err := tree.Delete(newKey); err != nil {
 			return err
 		}
-		restored := node.NewRecord([]byte{0}, oldKey, nil) // header: deleteMark(0), key: sk+pk, nonKey: nil
+		restored := btree.NewRecord([]byte{0}, oldKey, nil) // header: deleteMark(0), key: sk+pk, nonKey: nil
 		return tree.Update(restored)
 	})
 }

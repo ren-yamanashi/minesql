@@ -3,7 +3,7 @@ package catalog
 import (
 	"encoding/binary"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
@@ -16,8 +16,8 @@ type ConstraintRecord struct {
 	RefColName     string      // 制約により参照されるカラム名
 }
 
-// encode は node.Record にエンコードする
-func (cr ConstraintRecord) encode() node.Record {
+// encode は btree.Record にエンコードする
+func (cr ConstraintRecord) encode() btree.Record {
 	// key = fileId + colName + constraintName
 	var key []byte
 	fileId := binary.BigEndian.AppendUint32(nil, uint32(cr.FileId))
@@ -28,11 +28,11 @@ func (cr ConstraintRecord) encode() node.Record {
 	refTableFileId := binary.BigEndian.AppendUint32(nil, uint32(cr.RefTableFileId))
 	encode.Encode([][]byte{refTableFileId, []byte(cr.RefColName)}, &nonKey)
 
-	return node.NewRecord(nil, key, nonKey)
+	return btree.NewRecord(nil, key, nonKey)
 }
 
-// decodeConstraintRecord は node.Record から constraintRecord にデコードする
-func decodeConstraintRecord(record node.Record) ConstraintRecord {
+// decodeConstraintRecord は btree.Record から constraintRecord にデコードする
+func decodeConstraintRecord(record btree.Record) ConstraintRecord {
 	// key = [fileId, colName, constraintName]
 	var key [][]byte
 	encode.Decode(record.Key(), &key)

@@ -1,7 +1,7 @@
 package catalog
 
 import (
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 )
 
@@ -19,8 +19,8 @@ func newUserRecord(username, host string, authString []byte) UserRecord {
 	}
 }
 
-// encode は node.Record にエンコードする
-func (ur UserRecord) encode() node.Record {
+// encode は btree.Record にエンコードする
+func (ur UserRecord) encode() btree.Record {
 	// key = username
 	var key []byte
 	encode.Encode([][]byte{[]byte(ur.Username)}, &key)
@@ -29,11 +29,11 @@ func (ur UserRecord) encode() node.Record {
 	var nonKey []byte
 	encode.Encode([][]byte{[]byte(ur.Host), ur.AuthString}, &nonKey)
 
-	return node.NewRecord(nil, key, nonKey)
+	return btree.NewRecord(nil, key, nonKey)
 }
 
-// decodeUserRecord は node.Record から userRecord にデコードする
-func decodeUserRecord(record node.Record) UserRecord {
+// decodeUserRecord は btree.Record から userRecord にデコードする
+func decodeUserRecord(record btree.Record) UserRecord {
 	// key = [username]
 	var key [][]byte
 	encode.Decode(record.Key(), &key)

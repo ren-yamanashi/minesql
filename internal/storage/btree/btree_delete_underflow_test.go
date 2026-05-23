@@ -3,7 +3,6 @@ package btree
 import (
 	"testing"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
@@ -172,7 +171,7 @@ func TestDeleteUnderflow(t *testing.T) {
 
 		parentPageId, _ := allocateTestPage(t, bp)
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x20}, childPageId, otherPageId)
-		parentBranch.Insert(1, node.NewRecord([]byte{}, []byte{0x50}, siblingPageId.ToBytes()))
+		parentBranch.Insert(1, NewRecord([]byte{}, []byte{0x50}, siblingPageId.ToBytes()))
 
 		// WHEN (childSlotNum=0, sibling=slot1, RightChild=otherPageId)
 		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 0)
@@ -336,7 +335,7 @@ func TestDeleteUnderflow(t *testing.T) {
 
 		parentPageId, _ := allocateTestPage(t, bp)
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x30}, childPageId, otherPageId)
-		parentBranch.Insert(1, node.NewRecord([]byte{}, []byte{0x70}, siblingPageId.ToBytes()))
+		parentBranch.Insert(1, NewRecord([]byte{}, []byte{0x70}, siblingPageId.ToBytes()))
 
 		// WHEN (childSlotNum=0, sibling=slot1, RightChild=otherPageId)
 		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 0)
@@ -360,11 +359,11 @@ func allocateTestPage(t *testing.T, bp *buffer.BufferPool) (page.PageId, *buffer
 }
 
 // initTestLeafNode はテスト用の初期化済みリーフノードを作成する
-func initTestLeafNode(t *testing.T, bp *buffer.BufferPool, pageId page.PageId) *node.LeafNode {
+func initTestLeafNode(t *testing.T, bp *buffer.BufferPool, pageId page.PageId) *LeafNode {
 	t.Helper()
 	pg, err := bp.GetWritePage(pageId)
 	assert.NoError(t, err)
-	leaf := node.NewLeafNode(pg)
+	leaf := NewLeafNode(pg)
 	leaf.Initialize()
 	return leaf
 }
@@ -376,19 +375,19 @@ func initTestBranchNode(
 	pageId page.PageId,
 	key []byte,
 	leftChild, rightChild page.PageId,
-) *node.BranchNode {
+) *BranchNode {
 	t.Helper()
 	pg, err := bp.GetWritePage(pageId)
 	assert.NoError(t, err)
-	branch := node.NewBranchNode(pg)
+	branch := NewBranchNode(pg)
 	err = branch.Initialize(key, leftChild, rightChild)
 	assert.NoError(t, err)
 	return branch
 }
 
 // largeLeafRecord は 900 バイトの nonKey を持つリーフレコードを作成する
-func largeLeafRecord(key byte) node.Record {
-	return node.NewRecord([]byte{}, []byte{key}, make([]byte, 900))
+func largeLeafRecord(key byte) Record {
+	return NewRecord([]byte{}, []byte{key}, make([]byte, 900))
 }
 
 // largeBranchKey は 400 バイトのキーを作成する (先頭バイトで識別)
@@ -399,10 +398,10 @@ func largeBranchKey(firstByte byte) []byte {
 }
 
 // insertLargeBranchRecords はブランチノードに指定数の大きいレコードを追加する
-func insertLargeBranchRecords(bn *node.BranchNode, count int, startKeyByte byte) {
+func insertLargeBranchRecords(bn *BranchNode, count int, startKeyByte byte) {
 	for i := range count {
 		key := largeBranchKey(startKeyByte + byte(i)*0x10)
-		record := node.NewRecord([]byte{}, key, page.NewPageId(0, page.PageNumber(300+i)).ToBytes())
+		record := NewRecord([]byte{}, key, page.NewPageId(0, page.PageNumber(300+i)).ToBytes())
 		bn.Insert(bn.NumRecords(), record)
 	}
 }

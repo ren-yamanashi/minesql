@@ -4,7 +4,7 @@ import (
 	"encoding/binary"
 	"testing"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -490,7 +490,7 @@ func TestDecodePrimaryRecord(t *testing.T) {
 		var key []byte
 		encode.Encode([][]byte{[]byte("1")}, &key)
 		// 非キー領域が空 (lastTrxId + rollPtr の 8B に満たない)
-		record := node.NewRecord([]byte{0x00}, key, nil)
+		record := btree.NewRecord([]byte{0x00}, key, nil)
 
 		// WHEN
 		_, err := decodePrimaryRecord(record, ct, page.FileId(2))
@@ -508,7 +508,7 @@ func TestDecodePrimaryRecord(t *testing.T) {
 		// lastTrxId + rollPtr だけでカラムデータなし → pkCount=1, カラム合計=1 (テーブル定義は 3)
 		nonKey := make([]byte, lock.TrxIdSize+undo.PointerSize)
 
-		record := node.NewRecord([]byte{0x00}, key, nonKey)
+		record := btree.NewRecord([]byte{0x00}, key, nonKey)
 
 		// WHEN
 		_, err := decodePrimaryRecord(record, ct, page.FileId(2))

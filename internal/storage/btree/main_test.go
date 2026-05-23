@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -237,7 +236,7 @@ Delete: grape
 		require.NoError(t, tree.Delete([]byte("banana")))
 
 		// WHEN
-		err := tree.Insert(node.NewRecord(nil, []byte("blueberry"), []byte(strings.Repeat("b", 100))))
+		err := tree.Insert(NewRecord(nil, []byte("blueberry"), []byte(strings.Repeat("b", 100))))
 		require.NoError(t, err)
 
 		// THEN
@@ -266,7 +265,7 @@ func TestBtreeUpdateIntegration(t *testing.T) {
 		fmt.Fprintln(&w, "=== 更新前 ===")
 		writeScanLog(&w, tree)
 
-		require.NoError(t, tree.Update(node.NewRecord(nil, []byte("banana"), []byte(strings.Repeat("X", 50)))))
+		require.NoError(t, tree.Update(NewRecord(nil, []byte("banana"), []byte(strings.Repeat("X", 50)))))
 
 		fmt.Fprintln(&w, "=== 更新後 ===")
 		writeScanLog(&w, tree)
@@ -295,7 +294,7 @@ func TestBtreeUpdateIntegration(t *testing.T) {
 
 		// WHEN
 		require.NoError(t, tree.Delete([]byte("apple")))
-		require.NoError(t, tree.Insert(node.NewRecord(nil, []byte("avocado"), []byte(strings.Repeat("a", 100)))))
+		require.NoError(t, tree.Insert(NewRecord(nil, []byte("avocado"), []byte(strings.Repeat("a", 100)))))
 
 		// THEN
 		var w strings.Builder
@@ -316,7 +315,7 @@ func TestBtreeUpdateIntegration(t *testing.T) {
 
 		// WHEN
 		var w strings.Builder
-		err := tree.Update(node.NewRecord(nil, []byte("banana"), []byte("new_value")))
+		err := tree.Update(NewRecord(nil, []byte("banana"), []byte("new_value")))
 		fmt.Fprintf(&w, "error: %v\n", err)
 
 		// THEN
@@ -332,7 +331,7 @@ func TestBtreeUpdateIntegration(t *testing.T) {
 		var w strings.Builder
 		for i := range 3 {
 			newValue := fmt.Sprintf("update_%d_%s", i+1, strings.Repeat("!", 50))
-			require.NoError(t, tree.Update(node.NewRecord(nil, []byte("cherry"), []byte(newValue))))
+			require.NoError(t, tree.Update(NewRecord(nil, []byte("cherry"), []byte(newValue))))
 			fmt.Fprintf(&w, "Update #%d: len=%d\n", i+1, len(newValue))
 		}
 
@@ -462,12 +461,12 @@ Branch[keys=1]: [key_10]
 		pageRoot, err := tree.bufferPool.GetReadPage(rootPageId)
 		require.NoError(t, err)
 
-		nodeType := node.GetNodeType(pageRoot)
-		if !bytes.Equal(nodeType, node.NodeTypeBranch) {
+		nodeType := GetNodeType(pageRoot)
+		if !bytes.Equal(nodeType, NodeTypeBranch) {
 			t.Skip("ルートがブランチではないためスキップ")
 		}
 
-		branch := node.NewBranchNode(pageRoot)
+		branch := NewBranchNode(pageRoot)
 		for i := range branch.NumRecords() {
 			boundaryKey := string(branch.Record(i).Key())
 
@@ -476,7 +475,7 @@ Branch[keys=1]: [key_10]
 			require.NoError(t, err)
 			pageLeaf, err := tree.bufferPool.GetReadPage(leftPageId)
 			require.NoError(t, err)
-			leftLeaf := node.NewLeafNode(pageLeaf)
+			leftLeaf := NewLeafNode(pageLeaf)
 			lastLeftKey := string(leftLeaf.Record(leftLeaf.NumRecords() - 1).Key())
 
 			// 右の子
@@ -484,7 +483,7 @@ Branch[keys=1]: [key_10]
 			require.NoError(t, err)
 			pageRight, err := tree.bufferPool.GetReadPage(rightPageId)
 			require.NoError(t, err)
-			rightLeaf := node.NewLeafNode(pageRight)
+			rightLeaf := NewLeafNode(pageRight)
 			firstRightKey := string(rightLeaf.Record(0).Key())
 
 			fmt.Fprintf(&w, "境界キー: %s\n", boundaryKey)
@@ -518,11 +517,11 @@ Branch[keys=1]: [key_10]
 
 			pageRoot, err := tree.bufferPool.GetReadPage(rootPageId)
 			require.NoError(t, err)
-			nodeType := node.GetNodeType(pageRoot)
+			nodeType := GetNodeType(pageRoot)
 
 			var currentType string
 			switch {
-			case bytes.Equal(nodeType, node.NodeTypeLeaf):
+			case bytes.Equal(nodeType, NodeTypeLeaf):
 				currentType = "Leaf"
 			default:
 				currentType = "Branch"
@@ -561,7 +560,7 @@ func TestBtreeCRUDLifecycle(t *testing.T) {
 		fmt.Fprintf(&w, "FindByKey(banana): value=%s x %d\n", string(record.NonKey()[:1]), len(record.NonKey()))
 
 		// Update
-		require.NoError(t, tree.Update(node.NewRecord(nil, []byte("banana"), []byte(strings.Repeat("X", 50)))))
+		require.NoError(t, tree.Update(NewRecord(nil, []byte("banana"), []byte(strings.Repeat("X", 50)))))
 		fmt.Fprintln(&w, "=== Update 後 ===")
 		writeScanLog(&w, tree)
 
@@ -633,18 +632,18 @@ func writeNodeInfo(w *strings.Builder, pageId page.PageId, depth int, tree *Btre
 	}
 
 	indent := strings.Repeat("  ", depth)
-	nodeType := node.GetNodeType(pg)
+	nodeType := GetNodeType(pg)
 
 	switch {
-	case bytes.Equal(nodeType, node.NodeTypeLeaf):
-		leafNode := node.NewLeafNode(pg)
+	case bytes.Equal(nodeType, NodeTypeLeaf):
+		leafNode := NewLeafNode(pg)
 		keys := make([]string, leafNode.NumRecords())
 		for i := range leafNode.NumRecords() {
 			keys[i] = string(leafNode.Record(i).Key())
 		}
 		fmt.Fprintf(w, "%sLeaf[keys=%d]: [%s]\n", indent, leafNode.NumRecords(), strings.Join(keys, ", "))
-	case bytes.Equal(nodeType, node.NodeTypeBranch):
-		branchNode := node.NewBranchNode(pg)
+	case bytes.Equal(nodeType, NodeTypeBranch):
+		branchNode := NewBranchNode(pg)
 		keys := make([]string, branchNode.NumRecords())
 		for i := range branchNode.NumRecords() {
 			keys[i] = string(branchNode.Record(i).Key())
@@ -684,20 +683,20 @@ func writeTreeShape(w *strings.Builder, tree *Btree) {
 			panic(err)
 		}
 
-		nodeType := node.GetNodeType(pg)
+		nodeType := GetNodeType(pg)
 		switch {
-		case bytes.Equal(nodeType, node.NodeTypeLeaf):
+		case bytes.Equal(nodeType, NodeTypeLeaf):
 			if _, ok := result[depth]; !ok {
 				result[depth] = &depthInfo{nodeType: "Leaf"}
 			}
-			leaf := node.NewLeafNode(pg)
+			leaf := NewLeafNode(pg)
 			result[depth].count++
 			result[depth].totalKeys += leaf.NumRecords()
-		case bytes.Equal(nodeType, node.NodeTypeBranch):
+		case bytes.Equal(nodeType, NodeTypeBranch):
 			if _, ok := result[depth]; !ok {
 				result[depth] = &depthInfo{nodeType: "Branch"}
 			}
-			branch := node.NewBranchNode(pg)
+			branch := NewBranchNode(pg)
 			result[depth].count++
 			result[depth].totalKeys += branch.NumRecords()
 			for i := range branch.NumRecords() + 1 {
@@ -721,7 +720,7 @@ func writeTreeShape(w *strings.Builder, tree *Btree) {
 
 // レコードを挿入するヘルパー (エラー時は panic)
 func (bt *Btree) mustInsert(key, value string) {
-	record := node.NewRecord([]byte{}, []byte(key), []byte(value))
+	record := NewRecord([]byte{}, []byte(key), []byte(value))
 	err := bt.Insert(record)
 	if err != nil {
 		panic(fmt.Sprintf("Insert に失敗: %v", err))

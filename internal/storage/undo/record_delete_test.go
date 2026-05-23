@@ -3,7 +3,7 @@ package undo
 import (
 	"testing"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
@@ -12,7 +12,7 @@ import (
 func TestNewDeleteRecord(t *testing.T) {
 	t.Run("フィールドが正しく設定される", func(t *testing.T) {
 		// GIVEN
-		record := node.Record{[]byte("Alice"), []byte("alice@example.com")}
+		record := btree.Record{[]byte("Alice"), []byte("alice@example.com")}
 		rollPtr := Pointer{PageNumber: 3, Offset: 64}
 
 		// WHEN
@@ -27,7 +27,7 @@ func TestNewDeleteRecord(t *testing.T) {
 
 	t.Run("NullPointer で作成できる", func(t *testing.T) {
 		// GIVEN
-		record := node.Record{[]byte("a")}
+		record := btree.Record{[]byte("a")}
 
 		// WHEN
 		dr := NewDeleteRecord(page.FileId(1), record, 0, NullPointer)
@@ -41,7 +41,7 @@ func TestNewDeleteRecord(t *testing.T) {
 func TestDeleteRecordTableFileId(t *testing.T) {
 	t.Run("コンストラクタで指定した FileId を返す", func(t *testing.T) {
 		// GIVEN
-		dr := NewDeleteRecord(page.FileId(5), node.Record{[]byte("a")}, 0, NullPointer)
+		dr := NewDeleteRecord(page.FileId(5), btree.Record{[]byte("a")}, 0, NullPointer)
 
 		// WHEN
 		result := dr.TableFileId()
@@ -54,7 +54,7 @@ func TestDeleteRecordTableFileId(t *testing.T) {
 func TestDeleteRecordSerialize(t *testing.T) {
 	t.Run("シリアライズ結果を Deserialize でラウンドトリップできる", func(t *testing.T) {
 		// GIVEN
-		record := node.Record{[]byte("Alice"), []byte("alice@example.com")}
+		record := btree.Record{[]byte("Alice"), []byte("alice@example.com")}
 		rollPtr := Pointer{PageNumber: 3, Offset: 64}
 		dr := NewDeleteRecord(page.FileId(5), record, 100, rollPtr)
 
@@ -76,7 +76,7 @@ func TestDeleteRecordSerialize(t *testing.T) {
 
 	t.Run("Record interface を満たす", func(t *testing.T) {
 		// GIVEN
-		dr := NewDeleteRecord(page.FileId(1), node.Record{[]byte("a")}, 0, NullPointer)
+		dr := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 0, NullPointer)
 
 		// WHEN
 		var r Record = dr
@@ -88,7 +88,7 @@ func TestDeleteRecordSerialize(t *testing.T) {
 
 	t.Run("カラムが 1 つのレコードでシリアライズできる", func(t *testing.T) {
 		// GIVEN
-		record := node.Record{[]byte("only_col")}
+		record := btree.Record{[]byte("only_col")}
 		dr := NewDeleteRecord(page.FileId(1), record, 50, NullPointer)
 
 		// WHEN
@@ -103,7 +103,7 @@ func TestDeleteRecordSerialize(t *testing.T) {
 
 	t.Run("大きい TrxId でシリアライズできる", func(t *testing.T) {
 		// GIVEN
-		dr := NewDeleteRecord(page.FileId(1), node.Record{[]byte("a")}, lock.TrxId(0xFFFFFFFF), NullPointer)
+		dr := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, lock.TrxId(0xFFFFFFFF), NullPointer)
 
 		// WHEN
 		buf := dr.Serialize(lock.TrxId(0xFFFFFFFE), UndoNumber(0xFFFFFFFD))

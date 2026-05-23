@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
@@ -109,9 +109,9 @@ func (r *primaryRecord) secondaryKey(keyCols map[string]int) []byte {
 	return key
 }
 
-// encode は node.Record にエンコードする
+// encode は btree.Record にエンコードする
 //   - 非キー領域: lastTrxId (4B) + rollPtr (6B) + 非キーカラム
-func (r *primaryRecord) encode() node.Record {
+func (r *primaryRecord) encode() btree.Record {
 	var key []byte
 	encode.Encode(stringToByteSlice(r.Values[:r.pkCount]), &key)
 
@@ -120,12 +120,12 @@ func (r *primaryRecord) encode() node.Record {
 	nonKey = append(nonKey, r.rollPtr.Encode()...)
 	encode.Encode(stringToByteSlice(r.Values[r.pkCount:]), &nonKey)
 
-	return node.NewRecord([]byte{r.deleteMark}, key, nonKey)
+	return btree.NewRecord([]byte{r.deleteMark}, key, nonKey)
 }
 
-// decodePrimaryRecord は node.Record から PrimaryRecord にデコードする
+// decodePrimaryRecord は btree.Record から PrimaryRecord にデコードする
 //   - 非キー領域: lastTrxId (4B) + rollPtr (6B) + 非キーカラム
-func decodePrimaryRecord(record node.Record, ct *catalog.Catalog, fileId page.FileId) (*primaryRecord, error) {
+func decodePrimaryRecord(record btree.Record, ct *catalog.Catalog, fileId page.FileId) (*primaryRecord, error) {
 	var values [][]byte
 	encode.Decode(record.Key(), &values)
 	pkCount := len(values)

@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
@@ -336,8 +336,8 @@ func TestManagerGrantWaitingLocks(t *testing.T) {
 }
 
 // testPos はテスト用の RecordPosition を作成する
-func testPos(pageNum page.PageNumber, slot int) node.RecordPosition {
-	return node.RecordPosition{
+func testPos(pageNum page.PageNumber, slot int) btree.RecordPosition {
+	return btree.RecordPosition{
 		PageId:  page.NewPageId(page.FileId(1), pageNum),
 		SlotNum: slot,
 	}

@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
@@ -30,7 +30,7 @@ func TestManagerAppend(t *testing.T) {
 	t.Run("Undo レコードを追加すると Pointer を返す", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		record := NewInsertRecord(page.FileId(1), node.Record{[]byte("Alice")})
+		record := NewInsertRecord(page.FileId(1), btree.Record{[]byte("Alice")})
 
 		// WHEN
 		ptr, err := mgr.Append(lock.TrxId(1), RecordTypeInsert, record)
@@ -43,8 +43,8 @@ func TestManagerAppend(t *testing.T) {
 	t.Run("同一トランザクションに複数レコードを追加できる", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r1 := NewInsertRecord(page.FileId(1), node.Record{[]byte("Alice")})
-		r2 := NewDeleteRecord(page.FileId(1), node.Record{[]byte("Bob")}, 1, NullPointer)
+		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("Alice")})
+		r2 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("Bob")}, 1, NullPointer)
 
 		// WHEN
 		ptr1, err1 := mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
@@ -59,8 +59,8 @@ func TestManagerAppend(t *testing.T) {
 	t.Run("異なるトランザクションにレコードを追加できる", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r1 := NewInsertRecord(page.FileId(1), node.Record{[]byte("Alice")})
-		r2 := NewInsertRecord(page.FileId(1), node.Record{[]byte("Bob")})
+		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("Alice")})
+		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("Bob")})
 
 		// WHEN
 		_, err1 := mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
@@ -78,7 +78,7 @@ func TestManagerRecords(t *testing.T) {
 	t.Run("追加したレコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r := NewInsertRecord(page.FileId(1), node.Record{[]byte("Alice")})
+		r := NewInsertRecord(page.FileId(1), btree.Record{[]byte("Alice")})
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r)
 
 		// WHEN
@@ -91,8 +91,8 @@ func TestManagerRecords(t *testing.T) {
 	t.Run("複数レコードを追加順に取得できる", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r1 := NewInsertRecord(page.FileId(1), node.Record{[]byte("first")})
-		r2 := NewDeleteRecord(page.FileId(1), node.Record{[]byte("second")}, 1, NullPointer)
+		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("first")})
+		r2 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("second")}, 1, NullPointer)
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r2)
 
@@ -117,7 +117,7 @@ func TestManagerRecords(t *testing.T) {
 	t.Run("別トランザクションのレコードは返さない", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r := NewInsertRecord(page.FileId(1), node.Record{[]byte("Alice")})
+		r := NewInsertRecord(page.FileId(1), btree.Record{[]byte("Alice")})
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r)
 
 		// WHEN
@@ -132,8 +132,8 @@ func TestManagerPopLast(t *testing.T) {
 	t.Run("最後のレコードが削除される", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r1 := NewInsertRecord(page.FileId(1), node.Record{[]byte("first")})
-		r2 := NewInsertRecord(page.FileId(1), node.Record{[]byte("second")})
+		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("first")})
+		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("second")})
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r2)
 
@@ -147,7 +147,7 @@ func TestManagerPopLast(t *testing.T) {
 	t.Run("レコードが 1 件の場合は空になる", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r := NewInsertRecord(page.FileId(1), node.Record{[]byte("only")})
+		r := NewInsertRecord(page.FileId(1), btree.Record{[]byte("only")})
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r)
 
 		// WHEN
@@ -173,8 +173,8 @@ func TestManagerDiscard(t *testing.T) {
 	t.Run("指定トランザクションのレコードがすべて破棄される", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r1 := NewInsertRecord(page.FileId(1), node.Record{[]byte("first")})
-		r2 := NewInsertRecord(page.FileId(1), node.Record{[]byte("second")})
+		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("first")})
+		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("second")})
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r2)
 
@@ -188,8 +188,8 @@ func TestManagerDiscard(t *testing.T) {
 	t.Run("別トランザクションのレコードには影響しない", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r1 := NewInsertRecord(page.FileId(1), node.Record{[]byte("trx1")})
-		r2 := NewInsertRecord(page.FileId(1), node.Record{[]byte("trx2")})
+		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("trx1")})
+		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("trx2")})
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
 		_, _ = mgr.Append(lock.TrxId(2), RecordTypeInsert, r2)
 
@@ -217,8 +217,8 @@ func TestManagerCommittedEntries(t *testing.T) {
 	t.Run("指定したトランザクションのエントリを返す", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r1 := NewDeleteRecord(page.FileId(1), node.Record{[]byte("a")}, 1, NullPointer)
-		r2 := NewUpdateRecord(page.FileId(1), node.Record{[]byte("old")}, node.Record{[]byte("new")}, 1, NullPointer)
+		r1 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer)
+		r2 := NewUpdateRecord(page.FileId(1), btree.Record{[]byte("old")}, btree.Record{[]byte("new")}, 1, NullPointer)
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r1)
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeUpdate, r2)
 
@@ -236,8 +236,8 @@ func TestManagerCommittedEntries(t *testing.T) {
 	t.Run("複数トランザクションのエントリをまとめて返す", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r1 := NewDeleteRecord(page.FileId(1), node.Record{[]byte("a")}, 1, NullPointer)
-		r2 := NewUpdateRecord(page.FileId(1), node.Record{[]byte("old")}, node.Record{[]byte("new")}, 2, NullPointer)
+		r1 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer)
+		r2 := NewUpdateRecord(page.FileId(1), btree.Record{[]byte("old")}, btree.Record{[]byte("new")}, 2, NullPointer)
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r1)
 		_, _ = mgr.Append(lock.TrxId(2), RecordTypeUpdate, r2)
 
@@ -253,8 +253,8 @@ func TestManagerCommittedEntries(t *testing.T) {
 	t.Run("指定していないトランザクションのエントリは含まれない", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r1 := NewDeleteRecord(page.FileId(1), node.Record{[]byte("a")}, 1, NullPointer)
-		r2 := NewDeleteRecord(page.FileId(1), node.Record{[]byte("b")}, 2, NullPointer)
+		r1 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer)
+		r2 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("b")}, 2, NullPointer)
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r1)
 		_, _ = mgr.Append(lock.TrxId(2), RecordTypeDelete, r2)
 
@@ -280,7 +280,7 @@ func TestManagerCommittedEntries(t *testing.T) {
 	t.Run("空のトランザクション ID リストでは nil を返す", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r := NewDeleteRecord(page.FileId(1), node.Record{[]byte("a")}, 1, NullPointer)
+		r := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer)
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r)
 
 		// WHEN
@@ -295,9 +295,9 @@ func TestManagerDiscardRecordType(t *testing.T) {
 	t.Run("指定したレコードタイプのみ破棄される", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r1 := NewInsertRecord(page.FileId(1), node.Record{[]byte("inserted")})
-		r2 := NewDeleteRecord(page.FileId(1), node.Record{[]byte("deleted")}, 1, NullPointer)
-		r3 := NewInsertRecord(page.FileId(1), node.Record{[]byte("inserted2")})
+		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("inserted")})
+		r2 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("deleted")}, 1, NullPointer)
+		r3 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("inserted2")})
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r2)
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r3)
@@ -315,8 +315,8 @@ func TestManagerDiscardRecordType(t *testing.T) {
 	t.Run("全レコードが対象タイプの場合はエントリ自体が削除される", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r1 := NewInsertRecord(page.FileId(1), node.Record{[]byte("a")})
-		r2 := NewInsertRecord(page.FileId(1), node.Record{[]byte("b")})
+		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("a")})
+		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("b")})
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r2)
 
@@ -330,7 +330,7 @@ func TestManagerDiscardRecordType(t *testing.T) {
 	t.Run("対象タイプが存在しない場合はレコードが変わらない", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r := NewDeleteRecord(page.FileId(1), node.Record{[]byte("a")}, 1, NullPointer)
+		r := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer)
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r)
 
 		// WHEN
@@ -344,8 +344,8 @@ func TestManagerDiscardRecordType(t *testing.T) {
 	t.Run("別トランザクションのレコードには影響しない", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r1 := NewInsertRecord(page.FileId(1), node.Record{[]byte("trx1")})
-		r2 := NewInsertRecord(page.FileId(1), node.Record{[]byte("trx2")})
+		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("trx1")})
+		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("trx2")})
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
 		_, _ = mgr.Append(lock.TrxId(2), RecordTypeInsert, r2)
 
@@ -372,7 +372,7 @@ func TestManagerWriteToPageOverflow(t *testing.T) {
 		var lastPtr Pointer
 		var err error
 		for i := range 20 {
-			r := NewInsertRecord(page.FileId(1), node.Record{bigData})
+			r := NewInsertRecord(page.FileId(1), btree.Record{bigData})
 			lastPtr, err = mgr.Append(lock.TrxId(1), RecordTypeInsert, r)
 			if err != nil {
 				t.Fatalf("Append %d に失敗: %v", i, err)

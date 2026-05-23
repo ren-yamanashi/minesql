@@ -1,4 +1,4 @@
-package node
+package btree
 
 // 二分探索を行う
 //   - node: 探索対象のノード

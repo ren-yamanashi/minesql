@@ -1,20 +1,20 @@
 package undo
 
 import (
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 type UpdateRecord struct {
-	tableFileId   page.FileId // テーブルの FileId
-	PrevRecord    node.Record // 更新前のレコード
-	NewRecord     node.Record // 更新後のレコード
+	tableFileId   page.FileId  // テーブルの FileId
+	PrevRecord    btree.Record // 更新前のレコード
+	NewRecord     btree.Record // 更新後のレコード
 	PrevLastTrxId lock.TrxId
 	PrevRollPtr   Pointer
 }
 
-func NewUpdateRecord(tableFileId page.FileId, prevRecord, newRecord node.Record, prevLastTrxId lock.TrxId, prevRollPtr Pointer) UpdateRecord {
+func NewUpdateRecord(tableFileId page.FileId, prevRecord, newRecord btree.Record, prevLastTrxId lock.TrxId, prevRollPtr Pointer) UpdateRecord {
 	return UpdateRecord{
 		tableFileId:   tableFileId,
 		PrevRecord:    prevRecord,

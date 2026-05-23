@@ -3,7 +3,6 @@ package btree
 import (
 	"testing"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -13,10 +12,10 @@ func TestUpdate(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateBtree(bp, page.FileId(0))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
-		err := bt.Update(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
+		err := bt.Update(NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
 
 		// THEN
 		assert.NoError(t, err)
@@ -29,10 +28,10 @@ func TestUpdate(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateBtree(bp, page.FileId(0))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
-		err := bt.Update(node.NewRecord([]byte{}, []byte{0xFF}, []byte{0xBB}))
+		err := bt.Update(NewRecord([]byte{}, []byte{0xFF}, []byte{0xBB}))
 
 		// THEN
 		assert.ErrorIs(t, err, ErrKeyNotFound)
@@ -44,7 +43,7 @@ func TestUpdate(t *testing.T) {
 		bt, _ := CreateBtree(bp, page.FileId(0))
 
 		// WHEN
-		err := bt.Update(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		err := bt.Update(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// THEN
 		assert.ErrorIs(t, err, ErrKeyNotFound)
@@ -54,11 +53,11 @@ func TestUpdate(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateBtree(bp, page.FileId(0))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
 
 		// WHEN
-		err := bt.Update(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xFF}))
+		err := bt.Update(NewRecord([]byte{}, []byte{0x10}, []byte{0xFF}))
 
 		// THEN
 		assert.NoError(t, err)
@@ -77,16 +76,16 @@ func TestUpdate(t *testing.T) {
 		bp := setupBtreeBufferPool(t)
 		bt, _ := CreateBtree(bp, page.FileId(0))
 		nonKey := make([]byte, 1500)
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x03}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x01}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x02}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x03}, nonKey))
 		height, _ := bt.Height()
 		assert.Equal(t, uint64(2), height)
 
 		// WHEN
 		newNonKey := make([]byte, 1500)
 		newNonKey[0] = 0xFF
-		err := bt.Update(node.NewRecord([]byte{}, []byte{0x01}, newNonKey))
+		err := bt.Update(NewRecord([]byte{}, []byte{0x01}, newNonKey))
 
 		// THEN
 		assert.NoError(t, err)
@@ -100,12 +99,12 @@ func TestUpdate(t *testing.T) {
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateBtree(bp, page.FileId(0))
 		nonKey := make([]byte, 1500)
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, nonKey))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x20}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x20}, nonKey))
 
 		// WHEN (ページの空き容量を超える nonKey で更新)
 		hugeNonKey := make([]byte, 3000)
-		err := bt.Update(node.NewRecord([]byte{}, []byte{0x10}, hugeNonKey))
+		err := bt.Update(NewRecord([]byte{}, []byte{0x10}, hugeNonKey))
 
 		// THEN
 		assert.Error(t, err)
@@ -115,11 +114,11 @@ func TestUpdate(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateBtree(bp, page.FileId(0))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
-		_ = bt.Update(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
-		err := bt.Update(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xCC}))
+		_ = bt.Update(NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
+		err := bt.Update(NewRecord([]byte{}, []byte{0x10}, []byte{0xCC}))
 
 		// THEN
 		assert.NoError(t, err)

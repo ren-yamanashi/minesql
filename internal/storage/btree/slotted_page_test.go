@@ -1,4 +1,4 @@
-package node
+package btree
 
 import (
 	"testing"
@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestInsert(t *testing.T) {
+func TestSlottedPageInsert(t *testing.T) {
 	t.Run("データを挿入できる", func(t *testing.T) {
 		// GIVEN
 		sp := newTestSlottedPage(64)
@@ -51,7 +51,7 @@ func TestInsert(t *testing.T) {
 	})
 }
 
-func TestDelete(t *testing.T) {
+func TestSlottedPageDelete(t *testing.T) {
 	t.Run("データを削除できる", func(t *testing.T) {
 		// GIVEN
 		sp := newTestSlottedPage(64)
@@ -95,7 +95,7 @@ func TestDelete(t *testing.T) {
 	})
 }
 
-func TestUpdate(t *testing.T) {
+func TestSlottedPageUpdate(t *testing.T) {
 	t.Run("データを更新できる", func(t *testing.T) {
 		// GIVEN
 		sp := newTestSlottedPage(64)
@@ -136,7 +136,7 @@ func TestUpdate(t *testing.T) {
 	})
 }
 
-func TestResize(t *testing.T) {
+func TestSlottedPageResize(t *testing.T) {
 	t.Run("データ領域を拡張できる", func(t *testing.T) {
 		// GIVEN
 		sp := newTestSlottedPage(64)
@@ -190,7 +190,7 @@ func TestResize(t *testing.T) {
 	})
 }
 
-func TestTransferAllTo(t *testing.T) {
+func TestSlottedPageTransferAllTo(t *testing.T) {
 	t.Run("全スロットを転送先に移動できる", func(t *testing.T) {
 		// GIVEN
 		src := newTestSlottedPage(64)
@@ -257,7 +257,7 @@ func TestTransferAllTo(t *testing.T) {
 	})
 }
 
-func TestCapacity(t *testing.T) {
+func TestSlottedPageCapacity(t *testing.T) {
 	t.Run("ヘッダー領域を除いた容量を返す", func(t *testing.T) {
 		// GIVEN
 		sp := newTestSlottedPage(64)
@@ -267,7 +267,7 @@ func TestCapacity(t *testing.T) {
 	})
 }
 
-func TestNumSlots(t *testing.T) {
+func TestSlottedPageNumSlots(t *testing.T) {
 	t.Run("挿入したスロット数を返す", func(t *testing.T) {
 		// GIVEN
 		sp := newTestSlottedPage(64)
@@ -279,7 +279,7 @@ func TestNumSlots(t *testing.T) {
 	})
 }
 
-func TestFreeSpace(t *testing.T) {
+func TestSlottedPageFreeSpace(t *testing.T) {
 	t.Run("初期状態では Capacity と同じ値を返す", func(t *testing.T) {
 		// GIVEN
 		sp := newTestSlottedPage(64)
@@ -301,7 +301,7 @@ func TestFreeSpace(t *testing.T) {
 	})
 }
 
-func TestCell(t *testing.T) {
+func TestSlottedPageCell(t *testing.T) {
 	t.Run("指定したインデックスのデータを取得できる", func(t *testing.T) {
 		// GIVEN
 		sp := newTestSlottedPage(64)
@@ -315,7 +315,7 @@ func TestCell(t *testing.T) {
 	})
 }
 
-func TestInitialize(t *testing.T) {
+func TestSlottedPageInitialize(t *testing.T) {
 	t.Run("スロット数が 0 になりフリースペースが全容量になる", func(t *testing.T) {
 		// GIVEN
 		sp := newTestSlottedPage(64)

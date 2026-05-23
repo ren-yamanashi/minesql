@@ -1,4 +1,4 @@
-package node
+package btree
 
 const pointerSize = 4
 

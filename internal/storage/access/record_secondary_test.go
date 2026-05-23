@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
@@ -287,7 +287,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 	t.Run("デコードされたキーの長さがインデックスカラム数未満の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
 		ct := setupSecondaryTestCatalog(t)
-		record := node.NewRecord([]byte{0x00}, nil, nil)
+		record := btree.NewRecord([]byte{0x00}, nil, nil)
 
 		// WHEN
 		_, err := decodeSecondaryRecord(record, ct, page.FileId(2), "idx_name")
@@ -300,7 +300,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 	t.Run("存在しないインデックス名を指定するとエラーを返す", func(t *testing.T) {
 		// GIVEN
 		ct := setupSecondaryTestCatalog(t)
-		record := node.NewRecord([]byte{0x00}, []byte{}, nil)
+		record := btree.NewRecord([]byte{0x00}, []byte{}, nil)
 
 		// WHEN
 		_, err := decodeSecondaryRecord(record, ct, page.FileId(2), "nonexistent")

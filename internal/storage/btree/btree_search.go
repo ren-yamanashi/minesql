@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
@@ -30,13 +29,13 @@ func (bt *Btree) searchRecursively(nodePageId page.PageId, mode SearchMode) (*It
 	if err != nil {
 		return nil, err
 	}
-	nodeType := node.GetNodeType(bufPage.Page)
+	nodeType := GetNodeType(bufPage.Page)
 
 	switch {
 	// ブランチノードの場合、子ノードに対して再帰探索する
-	case bytes.Equal(nodeType, node.NodeTypeBranch):
+	case bytes.Equal(nodeType, NodeTypeBranch):
 		defer bt.bufferPool.UnRefPage(nodePageId)
-		branchNode := node.NewBranchNode(bufPage.Page)
+		branchNode := NewBranchNode(bufPage.Page)
 		childPageId, err := mode.childPageId(branchNode)
 		if err != nil {
 			return nil, err
@@ -44,8 +43,8 @@ func (bt *Btree) searchRecursively(nodePageId page.PageId, mode SearchMode) (*It
 		return bt.searchRecursively(childPageId, mode)
 
 	// リーフノードの場合、検索モードに応じて探索する
-	case bytes.Equal(nodeType, node.NodeTypeLeaf):
-		leafNode := node.NewLeafNode(bufPage.Page)
+	case bytes.Equal(nodeType, NodeTypeLeaf):
+		leafNode := NewLeafNode(bufPage.Page)
 		slotNum := mode.slotNum(leafNode)
 		iter := NewIterator(bt.bufferPool, *bufPage, slotNum)
 		// 検索対象のキーが現在のリーフノードの末端のレコードより大きい場合、次のリーフノードに進める
@@ -66,24 +65,24 @@ func (bt *Btree) searchRecursively(nodePageId page.PageId, mode SearchMode) (*It
 }
 
 // FindByKey は指定されたキーで B+Tree を検索し、完全一致するレコードとその物理的な位置を返す (キーが見つからない場合は ErrKeyNotFound)
-func (bt *Btree) FindByKey(key []byte) (node.Record, node.RecordPosition, error) {
+func (bt *Btree) FindByKey(key []byte) (Record, RecordPosition, error) {
 	iter, err := bt.Search(SearchModeKey{Key: key})
 	if err != nil {
-		return nil, node.RecordPosition{}, err
+		return nil, RecordPosition{}, err
 	}
-	position := node.RecordPosition{
+	position := RecordPosition{
 		PageId:  iter.bufferPage.PageId,
 		SlotNum: iter.slotNum,
 	}
 	record, ok, err := iter.Get()
 	if err != nil {
-		return nil, node.RecordPosition{}, err
+		return nil, RecordPosition{}, err
 	}
 	if !ok {
-		return nil, node.RecordPosition{}, ErrKeyNotFound
+		return nil, RecordPosition{}, ErrKeyNotFound
 	}
 	if !bytes.Equal(record.Key(), key) {
-		return nil, node.RecordPosition{}, ErrKeyNotFound
+		return nil, RecordPosition{}, ErrKeyNotFound
 	}
 	return record, position, nil
 }
@@ -115,7 +114,7 @@ func (bt *Btree) LeafPageIds() ([]page.PageId, error) {
 				return nil, err
 			}
 			bt.bufferPool.UnRefPage(nodePageId)
-			branchNode := node.NewBranchNode(pg)
+			branchNode := NewBranchNode(pg)
 
 			for idx := range branchNode.NumRecords() {
 				childPageId, err := branchNode.ChildPageId(idx)

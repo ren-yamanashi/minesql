@@ -1,4 +1,4 @@
-package node
+package btree
 
 import "github.com/ren-yamanashi/minesql/internal/storage/page"
 

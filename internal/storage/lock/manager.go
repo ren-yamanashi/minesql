@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/config"
 )
 
@@ -13,17 +13,17 @@ var ErrTimeout = errors.New("lock wait timeout")
 
 // Manager は行レベルロックを管理する
 type Manager struct {
-	lockTable map[node.RecordPosition]*state  // レコード位置 → ロック状態のマップ
-	mutex     sync.Mutex                      // lockTable への同時アクセスを防ぐための mutex
-	heldLocks map[TrxId][]node.RecordPosition // トランザクションごとのロック保持レコードリスト
-	cond      *sync.Cond                      // ロックの状態変化を待ち受けるための条件変数
-	timeout   time.Duration                   // ロック取得のタイムアウト値
+	lockTable map[btree.RecordPosition]*state  // レコード位置 → ロック状態のマップ
+	mutex     sync.Mutex                       // lockTable への同時アクセスを防ぐための mutex
+	heldLocks map[TrxId][]btree.RecordPosition // トランザクションごとのロック保持レコードリスト
+	cond      *sync.Cond                       // ロックの状態変化を待ち受けるための条件変数
+	timeout   time.Duration                    // ロック取得のタイムアウト値
 }
 
 func NewManager() *Manager {
 	lm := &Manager{
-		lockTable: make(map[node.RecordPosition]*state),
-		heldLocks: make(map[TrxId][]node.RecordPosition),
+		lockTable: make(map[btree.RecordPosition]*state),
+		heldLocks: make(map[TrxId][]btree.RecordPosition),
 		timeout:   config.LockWaitTimeout,
 	}
 	lm.cond = sync.NewCond(&lm.mutex)
@@ -33,7 +33,7 @@ func NewManager() *Manager {
 // Lock は指定した行に対してロックを取得する
 //   - 競合がなければ即座にロックを付与する
 //   - 競合がある場合は待機キューに追加し、ロックが付与されるかタイムアウトするまで待機する
-func (m *Manager) Lock(trxId TrxId, pos node.RecordPosition, mode Mode) error {
+func (m *Manager) Lock(trxId TrxId, pos btree.RecordPosition, mode Mode) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -140,7 +140,7 @@ func (m *Manager) grantWaitingLocks(state *state) {
 }
 
 // appendRecordHeldLock は、指定したトランザクションのロック保持リストにレコードを登録する
-func (m *Manager) appendRecordHeldLock(trxId TrxId, pos node.RecordPosition) {
+func (m *Manager) appendRecordHeldLock(trxId TrxId, pos btree.RecordPosition) {
 	for _, existing := range m.heldLocks[trxId] {
 		if existing == pos {
 			return

@@ -3,7 +3,6 @@ package btree
 import (
 	"testing"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -153,9 +152,9 @@ func TestLeafPageIds(t *testing.T) {
 		bp := setupBtreeBufferPool(t)
 		bt, _ := CreateBtree(bp, page.FileId(0))
 		nonKey := make([]byte, 1500)
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x03}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x01}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x02}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x03}, nonKey))
 		height, _ := bt.Height()
 		assert.Equal(t, uint64(2), height)
 		leafCount, _ := bt.LeafPageCount()
@@ -183,7 +182,7 @@ func insertRecordToBtree(t *testing.T, bt *Btree, key, nonKey []byte) {
 
 	pg, err := bt.bufferPool.GetWritePage(rootPageId)
 	assert.NoError(t, err)
-	ln := node.NewLeafNode(pg)
+	ln := NewLeafNode(pg)
 	slotNum, _ := ln.SearchSlotNum(key)
-	ln.Insert(slotNum, node.NewRecord([]byte{}, key, nonKey))
+	ln.Insert(slotNum, NewRecord([]byte{}, key, nonKey))
 }

@@ -3,7 +3,7 @@ package undo
 import (
 	"testing"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
@@ -12,7 +12,7 @@ import (
 func TestNewInsertRecord(t *testing.T) {
 	t.Run("フィールドが正しく設定される", func(t *testing.T) {
 		// GIVEN
-		record := node.Record{[]byte("Alice"), []byte("alice@example.com")}
+		record := btree.Record{[]byte("Alice"), []byte("alice@example.com")}
 
 		// WHEN
 		ir := NewInsertRecord(page.FileId(5), record)
@@ -26,7 +26,7 @@ func TestNewInsertRecord(t *testing.T) {
 
 	t.Run("空のレコードで作成できる", func(t *testing.T) {
 		// GIVEN
-		record := node.Record{}
+		record := btree.Record{}
 
 		// WHEN
 		ir := NewInsertRecord(page.FileId(1), record)
@@ -41,7 +41,7 @@ func TestNewInsertRecord(t *testing.T) {
 func TestInsertRecordTableFileId(t *testing.T) {
 	t.Run("コンストラクタで指定した FileId を返す", func(t *testing.T) {
 		// GIVEN
-		ir := NewInsertRecord(page.FileId(5), node.Record{[]byte("a")})
+		ir := NewInsertRecord(page.FileId(5), btree.Record{[]byte("a")})
 
 		// WHEN
 		result := ir.TableFileId()
@@ -54,7 +54,7 @@ func TestInsertRecordTableFileId(t *testing.T) {
 func TestInsertRecordSerialize(t *testing.T) {
 	t.Run("シリアライズ結果を Deserialize でラウンドトリップできる", func(t *testing.T) {
 		// GIVEN
-		record := node.Record{[]byte("Alice"), []byte("alice@example.com")}
+		record := btree.Record{[]byte("Alice"), []byte("alice@example.com")}
 		ir := NewInsertRecord(page.FileId(5), record)
 
 		// WHEN
@@ -75,7 +75,7 @@ func TestInsertRecordSerialize(t *testing.T) {
 
 	t.Run("Record interface を満たす", func(t *testing.T) {
 		// GIVEN
-		ir := NewInsertRecord(page.FileId(1), node.Record{[]byte("a")})
+		ir := NewInsertRecord(page.FileId(1), btree.Record{[]byte("a")})
 
 		// WHEN
 		var r Record = ir
@@ -87,7 +87,7 @@ func TestInsertRecordSerialize(t *testing.T) {
 
 	t.Run("カラムが 1 つのレコードでシリアライズできる", func(t *testing.T) {
 		// GIVEN
-		record := node.Record{[]byte("only_col")}
+		record := btree.Record{[]byte("only_col")}
 		ir := NewInsertRecord(page.FileId(1), record)
 
 		// WHEN
@@ -102,7 +102,7 @@ func TestInsertRecordSerialize(t *testing.T) {
 
 	t.Run("大きい TrxId でシリアライズできる", func(t *testing.T) {
 		// GIVEN
-		ir := NewInsertRecord(page.FileId(1), node.Record{[]byte("a")})
+		ir := NewInsertRecord(page.FileId(1), btree.Record{[]byte("a")})
 
 		// WHEN
 		buf := ir.Serialize(lock.TrxId(0xFFFFFFFF), UndoNumber(0xFFFFFFFE))

@@ -3,7 +3,7 @@ package catalog
 import (
 	"encoding/binary"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 )
 
@@ -21,8 +21,8 @@ func newIndexKeyColRecord(indexId IndexId, name string, pos int) IndexKeyColReco
 	}
 }
 
-// encode は node.Record にエンコードする
-func (kcr IndexKeyColRecord) encode() node.Record {
+// encode は btree.Record にエンコードする
+func (kcr IndexKeyColRecord) encode() btree.Record {
 	// key = indexId + name
 	var key []byte
 	indexId := binary.BigEndian.AppendUint32(nil, uint32(kcr.IndexId))
@@ -33,11 +33,11 @@ func (kcr IndexKeyColRecord) encode() node.Record {
 	pos := binary.BigEndian.AppendUint32(nil, uint32(kcr.Pos))
 	encode.Encode([][]byte{pos}, &nonKey)
 
-	return node.NewRecord(nil, key, nonKey)
+	return btree.NewRecord(nil, key, nonKey)
 }
 
-// decodeIndexKeyColRecord は node.Record から indexKeyColRecord にデコードする
-func decodeIndexKeyColRecord(record node.Record) IndexKeyColRecord {
+// decodeIndexKeyColRecord は btree.Record から indexKeyColRecord にデコードする
+func decodeIndexKeyColRecord(record btree.Record) IndexKeyColRecord {
 	// key = [indexId, name]
 	var key [][]byte
 	encode.Decode(record.Key(), &key)

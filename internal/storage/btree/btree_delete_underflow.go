@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
@@ -24,7 +23,7 @@ type siblingInfo struct {
 //   - underflow: 親ブランチノードがアンダーフローしたか
 //   - isLeafMerged: リーフノードのマージが発生したか
 func (bt *Btree) deleteUnderflow(
-	branchNode *node.BranchNode,
+	branchNode *BranchNode,
 	childBufPage *buffer.BufferPage,
 	childSlotNum int,
 ) (underflow bool, isLeafMerged bool, err error) {
@@ -49,7 +48,7 @@ func (bt *Btree) deleteUnderflow(
 	}
 
 	// リーフノードのアンダーフロー処理
-	if bytes.Equal(node.GetNodeType(childPage), node.NodeTypeLeaf) {
+	if bytes.Equal(GetNodeType(childPage), NodeTypeLeaf) {
 		uf, lm, err := bt.onLeafUnderflow(branchNode, childBufPage, sibling, childSlotNum)
 		return uf, lm, err
 	}
@@ -68,7 +67,7 @@ func (bt *Btree) deleteUnderflow(
 //   - underflow: 親ブランチノードがアンダーフローしたか
 //   - isLeafMerged: リーフノードのマージが発生したか
 func (bt *Btree) onLeafUnderflow(
-	parentBranch *node.BranchNode,
+	parentBranch *BranchNode,
 	childBufPage *buffer.BufferPage,
 	sibling siblingInfo,
 	childSlotNum int,
@@ -81,8 +80,8 @@ func (bt *Btree) onLeafUnderflow(
 	if err != nil {
 		return false, false, err
 	}
-	childLeaf := node.NewLeafNode(pageChild)
-	siblingLeaf := node.NewLeafNode(pageSibling)
+	childLeaf := NewLeafNode(pageChild)
+	siblingLeaf := NewLeafNode(pageSibling)
 
 	// 兄弟からレコードを転送できる場合
 	if siblingLeaf.CanTransferRecord(sibling.isLeft) {
@@ -95,7 +94,7 @@ func (bt *Btree) onLeafUnderflow(
 			}
 			siblingLeaf.Delete(lastSlotNum)
 			parentRecord := parentBranch.Record(childSlotNum - 1)
-			updated := node.NewRecord(parentRecord.Header(), childLeaf.Record(0).Key(), parentRecord.NonKey())
+			updated := NewRecord(parentRecord.Header(), childLeaf.Record(0).Key(), parentRecord.NonKey())
 			if !parentBranch.Update(childSlotNum-1, updated) {
 				return false, false, errors.New("failed to update parent branch node key")
 			}
@@ -109,7 +108,7 @@ func (bt *Btree) onLeafUnderflow(
 		}
 		siblingLeaf.Delete(0)
 		parentRecord := parentBranch.Record(childSlotNum)
-		updated := node.NewRecord(parentRecord.Header(), siblingLeaf.Record(0).Key(), parentRecord.NonKey())
+		updated := NewRecord(parentRecord.Header(), siblingLeaf.Record(0).Key(), parentRecord.NonKey())
 		if !parentBranch.Update(childSlotNum, updated) {
 			return false, false, errors.New("failed to update parent branch node key")
 		}
@@ -153,7 +152,7 @@ func (bt *Btree) onLeafUnderflow(
 //   - childSlotNum: childBufPage が親ブランチノードの子ノードの中で何番目か
 //   - return: (アンダーフローが発生したかどうか, リーフマージが発生したかどうか)
 func (bt *Btree) onBranchUnderflow(
-	parentBranch *node.BranchNode,
+	parentBranch *BranchNode,
 	childBufPage *buffer.BufferPage,
 	sibling siblingInfo,
 	childSlotNum int,
@@ -166,8 +165,8 @@ func (bt *Btree) onBranchUnderflow(
 	if err != nil {
 		return false, err
 	}
-	childBranch := node.NewBranchNode(pageChild)
-	siblingBranch := node.NewBranchNode(pageSibling)
+	childBranch := NewBranchNode(pageChild)
+	siblingBranch := NewBranchNode(pageSibling)
 
 	// 兄弟からレコードを転送できる場合
 	if siblingBranch.CanTransferRecord(sibling.isLeft) {
@@ -175,7 +174,7 @@ func (bt *Btree) onBranchUnderflow(
 		if sibling.isLeft {
 			parentRecord := parentBranch.Record(childSlotNum - 1)
 			siblingRightChild := siblingBranch.RightChildPageId()
-			record := node.NewRecord([]byte{}, parentRecord.Key(), siblingRightChild.ToBytes())
+			record := NewRecord([]byte{}, parentRecord.Key(), siblingRightChild.ToBytes())
 			if !childBranch.Insert(0, record) {
 				return false, errors.New("new branch node must have space")
 			}
@@ -183,7 +182,7 @@ func (bt *Btree) onBranchUnderflow(
 			lastSlotNum := siblingBranch.NumRecords() - 1
 			siblingRecord := siblingBranch.Record(lastSlotNum)
 			existingRecord := parentBranch.Record(childSlotNum - 1)
-			updated := node.NewRecord(existingRecord.Header(), siblingRecord.Key(), existingRecord.NonKey())
+			updated := NewRecord(existingRecord.Header(), siblingRecord.Key(), existingRecord.NonKey())
 			if !parentBranch.Update(childSlotNum-1, updated) {
 				return false, errors.New("failed to update parent branch node key")
 			}
@@ -198,7 +197,7 @@ func (bt *Btree) onBranchUnderflow(
 
 		// 右の兄弟から転送: 親の境界キーを子の末尾に下ろし、兄弟の先頭キーを親に上げる
 		parentRecord := parentBranch.Record(childSlotNum)
-		record := node.NewRecord([]byte{}, parentRecord.Key(), childBranch.RightChildPageId().ToBytes())
+		record := NewRecord([]byte{}, parentRecord.Key(), childBranch.RightChildPageId().ToBytes())
 		if !childBranch.Insert(childBranch.NumRecords(), record) {
 			return false, errors.New("new branch node must have space")
 		}
@@ -210,7 +209,7 @@ func (bt *Btree) onBranchUnderflow(
 		}
 		childBranch.SetRightChildPageId(rightChildPageId)
 		existingRecord := parentBranch.Record(childSlotNum)
-		updated := node.NewRecord(existingRecord.Header(), siblingRecord.Key(), existingRecord.NonKey())
+		updated := NewRecord(existingRecord.Header(), siblingRecord.Key(), existingRecord.NonKey())
 		if !parentBranch.Update(childSlotNum, updated) {
 			return false, errors.New("failed to update parent branch node key")
 		}
@@ -223,7 +222,7 @@ func (bt *Btree) onBranchUnderflow(
 	if sibling.isLeft {
 		parentRecord := parentBranch.Record(parentBranch.NumRecords() - 1)
 		siblingRightChildPageId := siblingBranch.RightChildPageId()
-		record := node.NewRecord([]byte{}, parentRecord.Key(), siblingRightChildPageId.ToBytes())
+		record := NewRecord([]byte{}, parentRecord.Key(), siblingRightChildPageId.ToBytes())
 		if !siblingBranch.Insert(siblingBranch.NumRecords(), record) {
 			return false, errors.New("new branch node must have space")
 		}
@@ -238,7 +237,7 @@ func (bt *Btree) onBranchUnderflow(
 	// 右の兄弟とマージ: 兄弟(右)のレコードをすべて子(左)に移動 (子が残る)
 	parentRecord := parentBranch.Record(childSlotNum)
 	childRightChildPageId := childBranch.RightChildPageId()
-	record := node.NewRecord([]byte{}, parentRecord.Key(), childRightChildPageId.ToBytes())
+	record := NewRecord([]byte{}, parentRecord.Key(), childRightChildPageId.ToBytes())
 	if !childBranch.Insert(childBranch.NumRecords(), record) {
 		return false, errors.New("new branch node must have space")
 	}
@@ -253,7 +252,7 @@ func (bt *Btree) onBranchUnderflow(
 //   - disappearing: マージにより消滅するリーフノード
 //   - survivor: マージ後に残るリーフノード
 //   - survivorPageId: survivor の PageId
-func (bt *Btree) relinkLeafAfterMerge(disappearing, survivor *node.LeafNode, survivorPageId page.PageId) error {
+func (bt *Btree) relinkLeafAfterMerge(disappearing, survivor *LeafNode, survivorPageId page.PageId) error {
 	survivor.SetNextPageId(disappearing.NextPageId())
 	if nextPageId := disappearing.NextPageId(); !nextPageId.IsInvalid() {
 		defer bt.bufferPool.UnRefPage(nextPageId)
@@ -261,7 +260,7 @@ func (bt *Btree) relinkLeafAfterMerge(disappearing, survivor *node.LeafNode, sur
 		if err != nil {
 			return err
 		}
-		nextLeaf := node.NewLeafNode(pageNext)
+		nextLeaf := NewLeafNode(pageNext)
 		nextLeaf.SetPrevPageId(survivorPageId)
 	}
 	return nil
@@ -272,7 +271,7 @@ func (bt *Btree) relinkLeafAfterMerge(disappearing, survivor *node.LeafNode, sur
 //   - survivorPageId: マージ後に残るノードの PageId
 //   - childSlotNum: 子ノードのスロット番号
 func (bt *Btree) mergeRightSiblingFromParent(
-	parentBranch *node.BranchNode,
+	parentBranch *BranchNode,
 	survivorPageId page.PageId,
 	childSlotNum int,
 ) (underflow bool, err error) {
@@ -286,7 +285,7 @@ func (bt *Btree) mergeRightSiblingFromParent(
 	// 兄弟が RightChild(右端) でない場合、キーを更新してから削除
 	childRecord := parentBranch.Record(childSlotNum)
 	nextRecord := parentBranch.Record(childSlotNum + 1)
-	updated := node.NewRecord(childRecord.Header(), nextRecord.Key(), childRecord.NonKey())
+	updated := NewRecord(childRecord.Header(), nextRecord.Key(), childRecord.NonKey())
 	if !parentBranch.Update(childSlotNum, updated) {
 		return false, errors.New("failed to update parent branch node key")
 	}
@@ -295,7 +294,7 @@ func (bt *Btree) mergeRightSiblingFromParent(
 }
 
 // findSibling は転送・マージ対象の兄弟ノードを決定する
-func (bt *Btree) findSibling(branchNode *node.BranchNode, childSlotNum int) (siblingInfo, error) {
+func (bt *Btree) findSibling(branchNode *BranchNode, childSlotNum int) (siblingInfo, error) {
 	if childSlotNum < branchNode.NumRecords() {
 		siblingPageId, err := branchNode.ChildPageId(childSlotNum + 1)
 		return siblingInfo{pageId: siblingPageId, isLeft: false}, err

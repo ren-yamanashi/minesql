@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 )
 
@@ -37,8 +36,8 @@ func (bt *Btree) Delete(key []byte) error {
 	if err != nil {
 		return err
 	}
-	if underflow && bytes.Equal(node.GetNodeType(pageRoot), node.NodeTypeBranch) {
-		branch := node.NewBranchNode(pageRoot)
+	if underflow && bytes.Equal(GetNodeType(pageRoot), NodeTypeBranch) {
+		branch := NewBranchNode(pageRoot)
 		if branch.NumRecords() == 0 {
 			isRootCollapsed = true
 		}
@@ -58,7 +57,7 @@ func (bt *Btree) Delete(key []byte) error {
 	}
 
 	// ルートノードの縮退が発生した場合
-	branchNode := node.NewBranchNode(pageRoot)
+	branchNode := NewBranchNode(pageRoot)
 	newRootPageId := branchNode.RightChildPageId()
 	metaPage.setRootPageId(newRootPageId)
 	metaPage.setHeight(metaPage.height() - 1)
@@ -76,13 +75,13 @@ func (bt *Btree) deleteRecursively(bufPage *buffer.BufferPage, key []byte) (unde
 	if err != nil {
 		return false, false, err
 	}
-	nodeType := node.GetNodeType(pg)
+	nodeType := GetNodeType(pg)
 
 	switch {
 	// ブランチノードの場合: 子ノードに対して再帰実行する
-	case bytes.Equal(nodeType, node.NodeTypeBranch):
+	case bytes.Equal(nodeType, NodeTypeBranch):
 		// 削除先の子ノードを取得
-		branchNode := node.NewBranchNode(pg)
+		branchNode := NewBranchNode(pg)
 		childSlotNum, found := branchNode.SearchSlotNum(key)
 		if found {
 			childSlotNum++ // 境界キーと一致する場合、右の子に属する
@@ -111,8 +110,8 @@ func (bt *Btree) deleteRecursively(bufPage *buffer.BufferPage, key []byte) (unde
 		return uf, isLeafMerged || lm, err
 
 	// リーフノードの場合: そのまま削除する
-	case bytes.Equal(nodeType, node.NodeTypeLeaf):
-		leafNode := node.NewLeafNode(pg)
+	case bytes.Equal(nodeType, NodeTypeLeaf):
+		leafNode := NewLeafNode(pg)
 		slotNum, found := leafNode.SearchSlotNum(key)
 		if !found {
 			return false, false, ErrKeyNotFound

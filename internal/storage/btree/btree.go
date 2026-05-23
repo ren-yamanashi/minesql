@@ -3,7 +3,6 @@ package btree
 import (
 	"errors"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
@@ -55,7 +54,7 @@ func CreateBtree(bp *buffer.BufferPool, fileId page.FileId) (*Btree, error) {
 	if err != nil {
 		return nil, err
 	}
-	rootLeaf := node.NewLeafNode(pageRoot)
+	rootLeaf := NewLeafNode(pageRoot)
 	rootLeaf.Initialize()
 
 	// メタページの設定

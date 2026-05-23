@@ -3,7 +3,6 @@ package btree
 import (
 	"testing"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -12,7 +11,7 @@ func TestSearchModeStartSlotNum(t *testing.T) {
 	t.Run("常に 0 を返す", func(t *testing.T) {
 		// GIVEN
 		ln := newSearchModeStartTestLeafNode()
-		ln.Insert(0, node.NewRecord([]byte{0x01}, []byte{0x10}, []byte{}))
+		ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{}))
 		sm := SearchModeStart{}
 
 		// WHEN
@@ -39,25 +38,25 @@ func TestSearchModeStartChildPageId(t *testing.T) {
 }
 
 // newSearchModeStartTestLeafNode はテスト用の初期化済み LeafNode を作成する
-func newSearchModeStartTestLeafNode() *node.LeafNode {
+func newSearchModeStartTestLeafNode() *LeafNode {
 	data := make([]byte, page.PageSize)
 	pg, err := page.NewPage(data)
 	if err != nil {
 		panic(err)
 	}
-	ln := node.NewLeafNode(pg)
+	ln := NewLeafNode(pg)
 	ln.Initialize()
 	return ln
 }
 
 // newSearchModeStartTestBranchNode はテスト用の初期化済み BranchNode を作成する
-func newSearchModeStartTestBranchNode() *node.BranchNode {
+func newSearchModeStartTestBranchNode() *BranchNode {
 	data := make([]byte, page.PageSize)
 	pg, err := page.NewPage(data)
 	if err != nil {
 		panic(err)
 	}
-	bn := node.NewBranchNode(pg)
+	bn := NewBranchNode(pg)
 	_ = bn.Initialize([]byte{0x10}, page.NewPageId(0, 1), page.NewPageId(0, 2))
 	return bn
 }

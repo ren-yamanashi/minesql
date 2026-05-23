@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -139,7 +138,7 @@ func (p *Purge) purgeUpdate(record undo.Record) error {
 }
 
 // deletePrimaryRecord はプライマリレコードを物理削除する
-func (p *Purge) deletePrimaryRecord(fileId page.FileId, record node.Record) error {
+func (p *Purge) deletePrimaryRecord(fileId page.FileId, record btree.Record) error {
 	piRecord, err := fetchPrimaryIndexRecord(p.transaction.catalog, fileId)
 	if err != nil {
 		return err
@@ -149,7 +148,7 @@ func (p *Purge) deletePrimaryRecord(fileId page.FileId, record node.Record) erro
 }
 
 // deleteSecondaryRecords は指定されたプライマリインデックスのレコードに対応するセカンダリインデックスの論理削除済みレコードを物理削除する
-func (p *Purge) deleteSecondaryRecords(fileId page.FileId, record node.Record) error {
+func (p *Purge) deleteSecondaryRecords(fileId page.FileId, record btree.Record) error {
 	prevRec, err := decodePrimaryRecord(record, p.transaction.catalog, fileId)
 	if err != nil {
 		return err

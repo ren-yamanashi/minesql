@@ -3,7 +3,7 @@ package catalog
 import (
 	"encoding/binary"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
@@ -29,8 +29,8 @@ type IndexRecord struct {
 	MetaPageId page.PageId // セカンダリ or プライマリインデックスの B+Tree メタページ ID
 }
 
-// encode は node.Record にエンコードする
-func (ir IndexRecord) encode() node.Record {
+// encode は btree.Record にエンコードする
+func (ir IndexRecord) encode() btree.Record {
 	// key = fileId + name
 	var key []byte
 	fileId := binary.BigEndian.AppendUint32(nil, uint32(ir.FileId))
@@ -43,11 +43,11 @@ func (ir IndexRecord) encode() node.Record {
 	metaPageIdBytes := ir.MetaPageId.ToBytes()
 	encode.Encode([][]byte{indexId, {byte(ir.IndexType)}, numOfCol, metaPageIdBytes}, &nonKey)
 
-	return node.NewRecord(nil, key, nonKey)
+	return btree.NewRecord(nil, key, nonKey)
 }
 
-// decodeIndexRecord は node.Record から IndexRecord にデコードする
-func decodeIndexRecord(record node.Record) IndexRecord {
+// decodeIndexRecord は btree.Record から IndexRecord にデコードする
+func decodeIndexRecord(record btree.Record) IndexRecord {
 	// key = [fileId, name]
 	var key [][]byte
 	encode.Decode(record.Key(), &key)

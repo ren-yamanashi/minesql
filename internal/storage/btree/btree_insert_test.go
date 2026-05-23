@@ -3,7 +3,6 @@ package btree
 import (
 	"testing"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -15,7 +14,7 @@ func TestInsert(t *testing.T) {
 		bt, _ := CreateBtree(bp, page.FileId(0))
 
 		// WHEN
-		err := bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		err := bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// THEN
 		assert.NoError(t, err)
@@ -30,9 +29,9 @@ func TestInsert(t *testing.T) {
 		bt, _ := CreateBtree(bp, page.FileId(0))
 
 		// WHEN
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x30}, []byte{0xCC}))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x30}, []byte{0xCC}))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
 
 		// THEN
 		iter, err := bt.Search(SearchModeStart{})
@@ -52,10 +51,10 @@ func TestInsert(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateBtree(bp, page.FileId(0))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
-		err := bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
+		err := bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
 
 		// THEN
 		assert.ErrorIs(t, err, ErrDuplicateKey)
@@ -66,12 +65,12 @@ func TestInsert(t *testing.T) {
 		bp := setupBtreeBufferPool(t)
 		bt, _ := CreateBtree(bp, page.FileId(0))
 		nonKey := make([]byte, 1500)
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x01}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x02}, nonKey))
 		countBefore, _ := bt.LeafPageCount()
 
 		// WHEN
-		err := bt.Insert(node.NewRecord([]byte{}, []byte{0x03}, nonKey))
+		err := bt.Insert(NewRecord([]byte{}, []byte{0x03}, nonKey))
 
 		// THEN
 		assert.NoError(t, err)
@@ -84,13 +83,13 @@ func TestInsert(t *testing.T) {
 		bp := setupBtreeBufferPool(t)
 		bt, _ := CreateBtree(bp, page.FileId(0))
 		nonKey := make([]byte, 1500)
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x01}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x02}, nonKey))
 		heightBefore, _ := bt.Height()
 		assert.Equal(t, uint64(1), heightBefore)
 
 		// WHEN
-		err := bt.Insert(node.NewRecord([]byte{}, []byte{0x03}, nonKey))
+		err := bt.Insert(NewRecord([]byte{}, []byte{0x03}, nonKey))
 
 		// THEN
 		assert.NoError(t, err)
@@ -105,9 +104,9 @@ func TestInsert(t *testing.T) {
 		nonKey := make([]byte, 1500)
 
 		// WHEN
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x03}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x01}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x02}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x03}, nonKey))
 
 		// THEN
 		for _, key := range [][]byte{{0x01}, {0x02}, {0x03}} {
@@ -121,14 +120,14 @@ func TestInsert(t *testing.T) {
 		bp := setupBtreeBufferPool(t)
 		bt, _ := CreateBtree(bp, page.FileId(0))
 		nonKey := make([]byte, 1500)
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x01}, nonKey))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x03}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x01}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x02}, nonKey))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x03}, nonKey))
 		height, _ := bt.Height()
 		assert.Equal(t, uint64(2), height)
 
 		// WHEN
-		err := bt.Insert(node.NewRecord([]byte{}, []byte{0x02}, nonKey))
+		err := bt.Insert(NewRecord([]byte{}, []byte{0x02}, nonKey))
 
 		// THEN
 		assert.ErrorIs(t, err, ErrDuplicateKey)
@@ -138,12 +137,12 @@ func TestInsert(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateBtree(bp, page.FileId(0))
-		_ = bt.Insert(node.NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 		countBefore, _ := bt.LeafPageCount()
 		heightBefore, _ := bt.Height()
 
 		// WHEN
-		err := bt.Insert(node.NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
+		err := bt.Insert(NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
 
 		// THEN
 		assert.NoError(t, err)

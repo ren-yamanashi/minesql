@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -35,13 +35,13 @@ func newSecondaryRecord(ct *catalog.Catalog, input newSecondaryRecordInput) (*se
 	return sortSecondaryRecord(ct, input)
 }
 
-// encode は node.Record にエンコードする
+// encode は btree.Record にエンコードする
 // キー領域は SK + PK を連結したもの
-func (r *secondaryRecord) encode() node.Record {
+func (r *secondaryRecord) encode() btree.Record {
 	var key []byte
 	encode.Encode(stringToByteSlice(r.Values), &key)
 	encode.Encode(stringToByteSlice(r.Pk), &key)
-	return node.NewRecord([]byte{r.deleteMark}, key, nil)
+	return btree.NewRecord([]byte{r.deleteMark}, key, nil)
 }
 
 // encodedSecondaryKey はエンコード済みのセカンダリキーを返す
@@ -53,9 +53,9 @@ func (r *secondaryRecord) encodedSecondaryKey() []byte {
 	return sk
 }
 
-// decodeSecondaryRecord は node.Record から SecondaryRecord にデコードする
+// decodeSecondaryRecord は btree.Record から SecondaryRecord にデコードする
 func decodeSecondaryRecord(
-	record node.Record,
+	record btree.Record,
 	ct *catalog.Catalog,
 	fileId page.FileId,
 	indexName string,

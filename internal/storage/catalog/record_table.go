@@ -3,7 +3,7 @@ package catalog
 import (
 	"encoding/binary"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree/node"
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
@@ -22,8 +22,8 @@ func newTableRecord(name string, metaPageId page.PageId, numOfCol int) TableReco
 	}
 }
 
-// encode は node.Record にエンコードする
-func (tr TableRecord) encode() node.Record {
+// encode は btree.Record にエンコードする
+func (tr TableRecord) encode() btree.Record {
 	// key = name
 	var key []byte
 	encode.Encode([][]byte{[]byte(tr.Name)}, &key)
@@ -34,11 +34,11 @@ func (tr TableRecord) encode() node.Record {
 	numOfCol := binary.BigEndian.AppendUint32(nil, uint32(tr.NumOfCol))
 	encode.Encode([][]byte{metaPageIdBytes, numOfCol}, &nonKey)
 
-	return node.NewRecord(nil, key, nonKey)
+	return btree.NewRecord(nil, key, nonKey)
 }
 
-// decodeTableRecord は node.Record から TableRecord にデコードする
-func decodeTableRecord(record node.Record) TableRecord {
+// decodeTableRecord は btree.Record から TableRecord にデコードする
+func decodeTableRecord(record btree.Record) TableRecord {
 	// key = [name]
 	var key [][]byte
 	encode.Decode(record.Key(), &key)
