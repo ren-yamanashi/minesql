@@ -25,7 +25,7 @@ type leafNode struct {
 
 func newLeafNode(pg *page.Page) *leafNode {
 	data := pg.Body
-	copy(data[0:8], nodeTypeLeaf)
+	copy(data[0:nodeHeaderSize], nodeTypeLeaf)
 	headerSize := nodeHeaderSize + leafHeaderSize
 	header := data[:headerSize]
 	body := newSlottedPage(data[headerSize:])
@@ -37,7 +37,7 @@ func newLeafNode(pg *page.Page) *leafNode {
 
 // initialize はリーフノードを初期化する
 //
-// 初期化時には、前後のリーフノードのポインタ (PageId) には無効値が設定される
+// 初期化時には、ノードタイプヘッダーを設定し、前後のリーフノードのポインタ (PageId) には無効値が設定される
 func (ln *leafNode) initialize() {
 	page.InvalidId.WriteTo(ln.header[nodeHeaderSize:], leafPrevPageIdOffset)
 	page.InvalidId.WriteTo(ln.header[nodeHeaderSize:], leafNextPageIdOffset)

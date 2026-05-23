@@ -169,7 +169,7 @@ func TestLeafNodeCanTransferRecord(t *testing.T) {
 	})
 }
 
-func TestLeafNodeRecordAt(t *testing.T) {
+func TestLeafNodeRecord(t *testing.T) {
 	t.Run("指定したスロット番号のレコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		ln := newTestLeafNode()

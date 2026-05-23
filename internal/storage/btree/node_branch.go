@@ -23,7 +23,7 @@ type branchNode struct {
 
 func newBranchNode(pg *page.Page) *branchNode {
 	data := pg.Body
-	copy(data[0:8], nodeTypeBranch)
+	copy(data[branchRightChildOffset:nodeHeaderSize], nodeTypeBranch)
 	headerSize := nodeHeaderSize + branchHeaderSize
 	header := data[:headerSize]
 	body := newSlottedPage(data[headerSize:])

@@ -22,15 +22,15 @@ func NewIterator(bufPool *buffer.Pool, bufPage buffer.Page, slotNum int) *Iterat
 }
 
 // Get は現在参照しているリーフノードのレコードを取得
-func (iter *Iterator) Get() (Record, bool, error) {
-	pg, err := iter.bufferPool.PageForRead(iter.bufferPage.PageId)
+func (it *Iterator) Get() (Record, bool, error) {
+	pg, err := it.bufferPool.PageForRead(it.bufferPage.PageId)
 	if err != nil {
 		return NewRecord(nil, nil, nil), false, err
 	}
 	leaf := newLeafNode(pg.Page)
 
-	if iter.slotNum < leaf.numRecords() {
-		record := leaf.record(iter.slotNum)
+	if it.slotNum < leaf.numRecords() {
+		record := leaf.record(it.slotNum)
 		header := bytes.Clone(record.Header())
 		key := bytes.Clone(record.Key())
 		nonKey := bytes.Clone(record.NonKey())
@@ -40,8 +40,8 @@ func (iter *Iterator) Get() (Record, bool, error) {
 }
 
 // Next は次のレコードを取得する
-func (iter *Iterator) Next() (Record, bool, error) {
-	record, ok, err := iter.Get()
+func (it *Iterator) Next() (Record, bool, error) {
+	record, ok, err := it.Get()
 	if err != nil {
 		return nil, false, err
 	}
@@ -49,7 +49,7 @@ func (iter *Iterator) Next() (Record, bool, error) {
 		return NewRecord(nil, nil, nil), false, nil
 	}
 
-	err = iter.Advance()
+	err = it.Advance()
 	if err != nil {
 		return NewRecord(nil, nil, nil), false, err
 	}
@@ -57,20 +57,20 @@ func (iter *Iterator) Next() (Record, bool, error) {
 }
 
 // Advance は次のレコードに進む
-func (iter *Iterator) Advance() error {
-	pg, err := iter.bufferPool.PageForRead(iter.bufferPage.PageId)
+func (it *Iterator) Advance() error {
+	pg, err := it.bufferPool.PageForRead(it.bufferPage.PageId)
 	if err != nil {
 		return err
 	}
 	leaf := newLeafNode(pg.Page)
 
 	// 現在のページ内に、次のレコードがある場合
-	if iter.slotNum < leaf.numRecords() {
-		iter.slotNum++
+	if it.slotNum < leaf.numRecords() {
+		it.slotNum++
 	}
 
 	// まだ現在のページ内にレコードがある場合
-	if iter.slotNum < leaf.numRecords() {
+	if it.slotNum < leaf.numRecords() {
 		return nil
 	}
 
@@ -83,14 +83,14 @@ func (iter *Iterator) Advance() error {
 	}
 
 	// 次のページに移動
-	oldPageId := iter.bufferPage.PageId
-	iter.bufferPool.UnRefPage(oldPageId)
-	nextPage, err := iter.bufferPool.PageForRead(nextPageId)
+	oldPageId := it.bufferPage.PageId
+	it.bufferPool.UnRefPage(oldPageId)
+	nextPage, err := it.bufferPool.PageForRead(nextPageId)
 	if err != nil {
 		return err
 	}
 
-	iter.bufferPage = *nextPage
-	iter.slotNum = 0
+	it.bufferPage = *nextPage
+	it.slotNum = 0
 	return nil
 }

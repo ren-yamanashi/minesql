@@ -19,23 +19,24 @@ func (t *Tree) Delete(key []byte) error {
 
 	// ルートページを取得
 	rootPageId := metaPage.rootPageId()
-	rootPageBuf, err := t.bufferPool.PageForRead(rootPageId)
+	bufPageRoot, err := t.bufferPool.PageForRead(rootPageId)
 	if err != nil {
 		return err
 	}
 
 	// 再帰的に削除
-	underflow, isLeafMerged, err := t.deleteRecursively(rootPageBuf, key)
+	underflow, isLeafMerged, err := t.deleteRecursively(bufPageRoot, key)
 	if err != nil {
 		return err
 	}
 
 	// ルートノードがブランチノードで、子が 1 つになった場合 (=ブランチノード1, リーフノード1 になった場合)、子をルートにする
 	var isRootCollapsed bool
-	pageRoot, err := t.bufferPool.PageForRead(rootPageBuf.PageId)
+	pageRoot, err := t.bufferPool.PageForRead(bufPageRoot.PageId)
 	if err != nil {
 		return err
 	}
+	defer t.bufferPool.UnRefPage(bufPageRoot.PageId)
 	if underflow && bytes.Equal(nodeType(pageRoot.Page), nodeTypeBranch) {
 		branch := newBranchNode(pageRoot.Page)
 		if branch.numRecords() == 0 {

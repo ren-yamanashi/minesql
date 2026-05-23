@@ -87,14 +87,6 @@ func (m *Manager) CommittedEntries(committedTrxIds []lock.TrxId) []Entry {
 	return result
 }
 
-// PopLast は指定した trxId の Undo ログの最後のレコードを削除する
-func (m *Manager) PopLast(trxId lock.TrxId) {
-	entries := m.entries[trxId]
-	if len(entries) > 0 {
-		m.entries[trxId] = entries[:len(entries)-1]
-	}
-}
-
 // Discard は指定した trxId の Undo ログをすべて破棄する
 func (m *Manager) Discard(trxId lock.TrxId) {
 	delete(m.entries, trxId)

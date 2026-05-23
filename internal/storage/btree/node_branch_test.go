@@ -253,7 +253,7 @@ func TestBranchNodeCanTransferRecord(t *testing.T) {
 	})
 }
 
-func TestBranchNodeRecordAt(t *testing.T) {
+func TestBranchNodeRecord(t *testing.T) {
 	t.Run("指定したスロット番号のレコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		bn := newTestBranchNode()

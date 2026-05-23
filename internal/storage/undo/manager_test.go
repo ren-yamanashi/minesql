@@ -128,47 +128,6 @@ func TestManagerRecords(t *testing.T) {
 	})
 }
 
-func TestManagerPopLast(t *testing.T) {
-	t.Run("最後のレコードが削除される", func(t *testing.T) {
-		// GIVEN
-		mgr := setupTestManager(t)
-		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("first")})
-		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("second")})
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r2)
-
-		// WHEN
-		mgr.PopLast(lock.TrxId(1))
-
-		// THEN
-		assert.Len(t, mgr.Records(lock.TrxId(1)), 1)
-	})
-
-	t.Run("レコードが 1 件の場合は空になる", func(t *testing.T) {
-		// GIVEN
-		mgr := setupTestManager(t)
-		r := NewInsertRecord(page.FileId(1), btree.Record{[]byte("only")})
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r)
-
-		// WHEN
-		mgr.PopLast(lock.TrxId(1))
-
-		// THEN
-		assert.Nil(t, mgr.Records(lock.TrxId(1)))
-	})
-
-	t.Run("レコードがないトランザクションに対しては何もしない", func(t *testing.T) {
-		// GIVEN
-		mgr := setupTestManager(t)
-
-		// WHEN (パニックしないことを確認)
-		mgr.PopLast(lock.TrxId(999))
-
-		// THEN
-		assert.Nil(t, mgr.Records(lock.TrxId(999)))
-	})
-}
-
 func TestManagerDiscard(t *testing.T) {
 	t.Run("指定トランザクションのレコードがすべて破棄される", func(t *testing.T) {
 		// GIVEN

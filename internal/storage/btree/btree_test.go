@@ -10,6 +10,34 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestNewTree(t *testing.T) {
+	t.Run("既存の B+Tree を開ける", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		created, _ := CreateTree(bp, page.FileId(0))
+
+		// WHEN
+		bt := NewTree(bp, created.MetaPageId())
+
+		// THEN
+		assert.Equal(t, created.MetaPageId(), bt.MetaPageId())
+	})
+
+	t.Run("NewTree で開いた B+Tree のメタデータを読み取れる", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		created, _ := CreateTree(bp, page.FileId(0))
+
+		// WHEN
+		bt := NewTree(bp, created.MetaPageId())
+		count, err := bt.LeafPageCount()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(1), count)
+	})
+}
+
 func TestCreateTree(t *testing.T) {
 	t.Run("B+Tree を作成できる", func(t *testing.T) {
 		// GIVEN
@@ -49,34 +77,6 @@ func TestCreateTree(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(1), height)
-	})
-}
-
-func TestNewTree(t *testing.T) {
-	t.Run("既存の B+Tree を開ける", func(t *testing.T) {
-		// GIVEN
-		bp := setupBtreeTestBufferPool(t)
-		created, _ := CreateTree(bp, page.FileId(0))
-
-		// WHEN
-		bt := NewTree(bp, created.MetaPageId())
-
-		// THEN
-		assert.Equal(t, created.MetaPageId(), bt.MetaPageId())
-	})
-
-	t.Run("NewTree で開いた B+Tree のメタデータを読み取れる", func(t *testing.T) {
-		// GIVEN
-		bp := setupBtreeTestBufferPool(t)
-		created, _ := CreateTree(bp, page.FileId(0))
-
-		// WHEN
-		bt := NewTree(bp, created.MetaPageId())
-		count, err := bt.LeafPageCount()
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, uint64(1), count)
 	})
 }
 

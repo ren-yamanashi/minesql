@@ -26,7 +26,7 @@ func (t *Tree) Update(record Record) error {
 	return t.updateRecursively(rootBufPage, record)
 }
 
-// updateRecursively は再起的にノードを辿ってレコードを更新する
+// updateRecursively は再帰的にノードを辿ってレコードを更新する
 func (t *Tree) updateRecursively(bufPage *buffer.Page, record Record) error {
 	pg, err := t.bufferPool.PageForWrite(bufPage.PageId)
 	if err != nil {
