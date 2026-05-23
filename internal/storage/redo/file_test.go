@@ -64,56 +64,6 @@ func TestNewFile(t *testing.T) {
 	})
 }
 
-func TestFileFlushRecords(t *testing.T) {
-	t.Run("レコードをフラッシュすると flushedLsn が更新される", func(t *testing.T) {
-		// GIVEN
-		f := setupTestFile(t)
-		pg := buildTestPage(t)
-		records := []Record{
-			{lsn: Lsn(1), trxId: 1, recordType: RecordTypePageWrite, pageId: page.NewId(1, 1), data: *pg},
-			{lsn: Lsn(2), trxId: 1, recordType: RecordTypeCommit},
-		}
-
-		// WHEN
-		err := f.flushRecords(records)
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, Lsn(2), f.flushedLsn)
-	})
-
-	t.Run("空のレコードスライスをフラッシュしてもエラーにならない", func(t *testing.T) {
-		// GIVEN
-		f := setupTestFile(t)
-
-		// WHEN
-		err := f.flushRecords([]Record{})
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, Lsn(0), f.flushedLsn)
-	})
-
-	t.Run("複数回フラッシュするとレコードが追記される", func(t *testing.T) {
-		// GIVEN
-		f := setupTestFile(t)
-		first := []Record{{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit}}
-		_ = f.flushRecords(first)
-
-		second := []Record{{lsn: Lsn(2), trxId: 2, recordType: RecordTypeCommit}}
-
-		// WHEN
-		err := f.flushRecords(second)
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, Lsn(2), f.flushedLsn)
-		result, err := f.readRecords(Lsn(0))
-		assert.NoError(t, err)
-		assert.Len(t, result, 2)
-	})
-}
-
 func TestFileReadRecords(t *testing.T) {
 	t.Run("フラッシュしたレコードを読み取れる", func(t *testing.T) {
 		// GIVEN
@@ -206,6 +156,56 @@ func TestFileReadRecords(t *testing.T) {
 	})
 }
 
+func TestFileFlushRecords(t *testing.T) {
+	t.Run("レコードをフラッシュすると flushedLsn が更新される", func(t *testing.T) {
+		// GIVEN
+		f := setupTestFile(t)
+		pg := buildTestPage(t)
+		records := []Record{
+			{lsn: Lsn(1), trxId: 1, recordType: RecordTypePageWrite, pageId: page.NewId(1, 1), data: *pg},
+			{lsn: Lsn(2), trxId: 1, recordType: RecordTypeCommit},
+		}
+
+		// WHEN
+		err := f.flushRecords(records)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, Lsn(2), f.flushedLsn)
+	})
+
+	t.Run("空のレコードスライスをフラッシュしてもエラーにならない", func(t *testing.T) {
+		// GIVEN
+		f := setupTestFile(t)
+
+		// WHEN
+		err := f.flushRecords([]Record{})
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, Lsn(0), f.flushedLsn)
+	})
+
+	t.Run("複数回フラッシュするとレコードが追記される", func(t *testing.T) {
+		// GIVEN
+		f := setupTestFile(t)
+		first := []Record{{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit}}
+		_ = f.flushRecords(first)
+
+		second := []Record{{lsn: Lsn(2), trxId: 2, recordType: RecordTypeCommit}}
+
+		// WHEN
+		err := f.flushRecords(second)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, Lsn(2), f.flushedLsn)
+		result, err := f.readRecords(Lsn(0))
+		assert.NoError(t, err)
+		assert.Len(t, result, 2)
+	})
+}
+
 func TestFileSetCheckpointLsn(t *testing.T) {
 	t.Run("checkpointLsn を更新できる", func(t *testing.T) {
 		// GIVEN
@@ -235,90 +235,6 @@ func TestFileSetCheckpointLsn(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, Lsn(15), f2.checkpointLsn)
 		_ = f2.close()
-	})
-}
-
-func TestFileSize(t *testing.T) {
-	t.Run("新規ファイルのサイズはヘッダーサイズと等しい", func(t *testing.T) {
-		// GIVEN
-		f := setupTestFile(t)
-
-		// WHEN
-		size, err := f.size()
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, int64(fileHeaderSize), size)
-	})
-
-	t.Run("レコードフラッシュ後にサイズが増加する", func(t *testing.T) {
-		// GIVEN
-		f := setupTestFile(t)
-		records := []Record{
-			{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit},
-		}
-		_ = f.flushRecords(records)
-
-		// WHEN
-		size, err := f.size()
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Greater(t, size, int64(fileHeaderSize))
-	})
-}
-
-func TestFileClear(t *testing.T) {
-	t.Run("クリア後にレコードが空になる", func(t *testing.T) {
-		// GIVEN
-		f := setupTestFile(t)
-		records := []Record{
-			{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit},
-		}
-		_ = f.flushRecords(records)
-
-		// WHEN
-		err := f.clear()
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, Lsn(0), f.flushedLsn)
-		assert.Equal(t, Lsn(0), f.checkpointLsn)
-
-		result, err := f.readRecords(Lsn(0))
-		assert.NoError(t, err)
-		assert.Nil(t, result)
-	})
-
-	t.Run("checkpointLsn が設定されている状態からクリアすると 0 に戻る", func(t *testing.T) {
-		// GIVEN
-		f := setupTestFile(t)
-		_ = f.setCheckpointLsn(Lsn(20))
-		records := []Record{{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit}}
-		_ = f.flushRecords(records)
-
-		// WHEN
-		err := f.clear()
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, Lsn(0), f.flushedLsn)
-		assert.Equal(t, Lsn(0), f.checkpointLsn)
-	})
-
-	t.Run("クリア後にファイルサイズがヘッダーサイズになる", func(t *testing.T) {
-		// GIVEN
-		f := setupTestFile(t)
-		records := []Record{{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit}}
-		_ = f.flushRecords(records)
-
-		// WHEN
-		_ = f.clear()
-
-		// THEN
-		size, err := f.size()
-		assert.NoError(t, err)
-		assert.Equal(t, int64(fileHeaderSize), size)
 	})
 }
 
@@ -391,6 +307,105 @@ func TestFileTruncateBefore(t *testing.T) {
 		result, err := f.readRecords(Lsn(0))
 		assert.NoError(t, err)
 		assert.Len(t, result, 2)
+	})
+}
+
+func TestFileClear(t *testing.T) {
+	t.Run("クリア後にレコードが空になる", func(t *testing.T) {
+		// GIVEN
+		f := setupTestFile(t)
+		records := []Record{
+			{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit},
+		}
+		_ = f.flushRecords(records)
+
+		// WHEN
+		err := f.clear()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, Lsn(0), f.flushedLsn)
+		assert.Equal(t, Lsn(0), f.checkpointLsn)
+
+		result, err := f.readRecords(Lsn(0))
+		assert.NoError(t, err)
+		assert.Nil(t, result)
+	})
+
+	t.Run("checkpointLsn が設定されている状態からクリアすると 0 に戻る", func(t *testing.T) {
+		// GIVEN
+		f := setupTestFile(t)
+		_ = f.setCheckpointLsn(Lsn(20))
+		records := []Record{{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit}}
+		_ = f.flushRecords(records)
+
+		// WHEN
+		err := f.clear()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, Lsn(0), f.flushedLsn)
+		assert.Equal(t, Lsn(0), f.checkpointLsn)
+	})
+
+	t.Run("クリア後にファイルサイズがヘッダーサイズになる", func(t *testing.T) {
+		// GIVEN
+		f := setupTestFile(t)
+		records := []Record{{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit}}
+		_ = f.flushRecords(records)
+
+		// WHEN
+		_ = f.clear()
+
+		// THEN
+		size, err := f.size()
+		assert.NoError(t, err)
+		assert.Equal(t, int64(fileHeaderSize), size)
+	})
+}
+
+func TestFileClose(t *testing.T) {
+	t.Run("ファイルを閉じることができる", func(t *testing.T) {
+		// GIVEN
+		setupRedoTestDir(t)
+		f, err := newFile()
+		assert.NoError(t, err)
+
+		// WHEN
+		err = f.close()
+
+		// THEN
+		assert.NoError(t, err)
+	})
+}
+
+func TestFileSize(t *testing.T) {
+	t.Run("新規ファイルのサイズはヘッダーサイズと等しい", func(t *testing.T) {
+		// GIVEN
+		f := setupTestFile(t)
+
+		// WHEN
+		size, err := f.size()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, int64(fileHeaderSize), size)
+	})
+
+	t.Run("レコードフラッシュ後にサイズが増加する", func(t *testing.T) {
+		// GIVEN
+		f := setupTestFile(t)
+		records := []Record{
+			{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit},
+		}
+		_ = f.flushRecords(records)
+
+		// WHEN
+		size, err := f.size()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, int64(fileHeaderSize+recordHeaderSize), size)
 	})
 }
 

@@ -7,6 +7,128 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestRecordLsn(t *testing.T) {
+	t.Run("設定した LSN を返す", func(t *testing.T) {
+		// GIVEN
+		r := Record{lsn: Lsn(42)}
+
+		// WHEN
+		got := r.Lsn()
+
+		// THEN
+		assert.Equal(t, Lsn(42), got)
+	})
+
+	t.Run("ゼロ値の LSN を返す", func(t *testing.T) {
+		// GIVEN
+		r := Record{}
+
+		// WHEN
+		got := r.Lsn()
+
+		// THEN
+		assert.Equal(t, Lsn(0), got)
+	})
+}
+
+func TestRecordTrxId(t *testing.T) {
+	t.Run("設定したトランザクション ID を返す", func(t *testing.T) {
+		// GIVEN
+		r := Record{trxId: 100}
+
+		// WHEN
+		got := r.TrxId()
+
+		// THEN
+		assert.Equal(t, uint32(100), got)
+	})
+}
+
+func TestRecordType(t *testing.T) {
+	t.Run("PageWrite タイプを返す", func(t *testing.T) {
+		// GIVEN
+		r := Record{recordType: RecordTypePageWrite}
+
+		// WHEN
+		got := r.Type()
+
+		// THEN
+		assert.Equal(t, RecordTypePageWrite, got)
+	})
+
+	t.Run("Commit タイプを返す", func(t *testing.T) {
+		// GIVEN
+		r := Record{recordType: RecordTypeCommit}
+
+		// WHEN
+		got := r.Type()
+
+		// THEN
+		assert.Equal(t, RecordTypeCommit, got)
+	})
+
+	t.Run("Rollback タイプを返す", func(t *testing.T) {
+		// GIVEN
+		r := Record{recordType: RecordTypeRollback}
+
+		// WHEN
+		got := r.Type()
+
+		// THEN
+		assert.Equal(t, RecordTypeRollback, got)
+	})
+}
+
+func TestRecordPageId(t *testing.T) {
+	t.Run("設定したページ ID を返す", func(t *testing.T) {
+		// GIVEN
+		pid := page.NewId(page.FileId(5), page.PageNumber(10))
+		r := Record{pageId: pid}
+
+		// WHEN
+		got := r.PageId()
+
+		// THEN
+		assert.Equal(t, pid, got)
+	})
+
+	t.Run("ゼロ値のページ ID を返す", func(t *testing.T) {
+		// GIVEN
+		r := Record{}
+
+		// WHEN
+		got := r.PageId()
+
+		// THEN
+		assert.Equal(t, page.Id{}, got)
+	})
+}
+
+func TestRecordData(t *testing.T) {
+	t.Run("設定したページデータを返す", func(t *testing.T) {
+		// GIVEN
+		pg := buildTestPage(t)
+		r := Record{data: *pg}
+
+		// WHEN
+		got := r.Data()
+
+		// THEN
+		assert.Equal(t, pg.ToBytes(), got.ToBytes())
+	})
+
+	t.Run("データなしの場合はゼロ値のページを返す", func(t *testing.T) {
+		// GIVEN
+		r := Record{}
+
+		// WHEN
+		got := r.Data()
+
+		// THEN
+		assert.Nil(t, got.Header)
+	})
+}
+
 func TestRecordSerialize(t *testing.T) {
 	t.Run("ページ変更レコードをシリアライズできる", func(t *testing.T) {
 		// GIVEN
@@ -173,6 +295,17 @@ func TestDeserializeRecord(t *testing.T) {
 		decoded2, _, err := deserializeRecord(buf[readBytes:])
 		assert.NoError(t, err)
 		assert.Equal(t, Lsn(2), decoded2.Lsn())
+	})
+
+	t.Run("空のバイト列はエラーを返す", func(t *testing.T) {
+		// GIVEN
+		data := []byte{}
+
+		// WHEN
+		_, _, err := deserializeRecord(data)
+
+		// THEN
+		assert.ErrorIs(t, err, errInvalidRecord)
 	})
 }
 
