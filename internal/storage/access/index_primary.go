@@ -19,7 +19,13 @@ type primaryIndex struct {
 }
 
 // newPrimaryIndex は既存のプライマリインデックスを開く
-func newPrimaryIndex(ct *catalog.Catalog, bp *buffer.Pool, metaPageId page.Id, pkCount int, lock *lock.Manager) *primaryIndex {
+func newPrimaryIndex(
+	ct *catalog.Catalog,
+	bp *buffer.Pool,
+	metaPageId page.Id,
+	pkCount int,
+	lock *lock.Manager,
+) *primaryIndex {
 	tree := btree.NewTree(bp, metaPageId)
 	return &primaryIndex{
 		catalog: ct,
@@ -30,7 +36,13 @@ func newPrimaryIndex(ct *catalog.Catalog, bp *buffer.Pool, metaPageId page.Id, p
 }
 
 // createPrimaryIndex は空のプライマリインデックスを作成する
-func createPrimaryIndex(ct *catalog.Catalog, bp *buffer.Pool, fileId page.FileId, pkCount int, lock *lock.Manager) (*primaryIndex, error) {
+func createPrimaryIndex(
+	ct *catalog.Catalog,
+	bp *buffer.Pool,
+	fileId page.FileId,
+	pkCount int,
+	lock *lock.Manager,
+) (*primaryIndex, error) {
 	tree, err := btree.CreateTree(bp, fileId)
 	if err != nil {
 		return nil, err
@@ -122,8 +134,8 @@ func (pi *primaryIndex) softDelete(record *primaryRecord, trxId lock.TrxId) erro
 		deleteMark: 1,
 		lastTrxId:  trxId,
 		rollPtr:    record.rollPtr,
-		colNames:   record.ColNames,
-		values:     record.Values,
+		colNames:   record.colNames,
+		values:     record.values,
 	})
 	if err != nil {
 		return err

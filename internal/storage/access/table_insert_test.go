@@ -25,7 +25,7 @@ func TestTableInsert(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		record := searchFirstPrimaryRecord(t, table)
-		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, record.Values)
+		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, record.values)
 	})
 
 	t.Run("セカンダリインデックスにも挿入される", func(t *testing.T) {
@@ -39,14 +39,14 @@ func TestTableInsert(t *testing.T) {
 		nameResult, ok, err := nameIter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "Alice", nameResult.Values[1])
+		assert.Equal(t, "Alice", nameResult.values[1])
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
 		emailIter, err := idxEmail.search(SearchModeStart{})
 		assert.NoError(t, err)
 		emailResult, ok, err := emailIter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "alice@example.com", emailResult.Values[2])
+		assert.Equal(t, "alice@example.com", emailResult.values[2])
 	})
 
 	t.Run("異なるプライマリキーで複数レコードを挿入できる", func(t *testing.T) {
@@ -63,7 +63,7 @@ func TestTableInsert(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		first := searchFirstPrimaryRecord(t, table)
-		assert.Equal(t, "Alice", first.Values[1])
+		assert.Equal(t, "Alice", first.values[1])
 	})
 
 	t.Run("同一プライマリキーで挿入すると ErrDuplicateKey を返す", func(t *testing.T) {
@@ -98,7 +98,7 @@ func TestTableInsert(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		reinserted := searchFirstPrimaryRecord(t, table)
-		assert.Equal(t, "Charlie", reinserted.Values[1])
+		assert.Equal(t, "Charlie", reinserted.values[1])
 	})
 
 	t.Run("カラム数が不足しているとエラーを返す", func(t *testing.T) {
@@ -136,7 +136,7 @@ func TestTableInsert(t *testing.T) {
 
 		// プライマリインデックスのレコードがテーブル定義順で格納されている
 		record := searchFirstPrimaryRecord(t, table)
-		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, record.Values)
+		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, record.values)
 
 		// セカンダリインデックスからプライマリキー "1" で検索できる
 		idxName := findSecondaryIndex(t, table, "idx_name")
@@ -145,8 +145,8 @@ func TestTableInsert(t *testing.T) {
 		nameResult, ok, err := nameIter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "Alice", nameResult.Values[1])
-		assert.Equal(t, "1", nameResult.Values[0])
+		assert.Equal(t, "Alice", nameResult.values[1])
+		assert.Equal(t, "1", nameResult.values[0])
 	})
 
 	t.Run("挿入後に rollPtr が設定される", func(t *testing.T) {

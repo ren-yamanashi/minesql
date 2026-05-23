@@ -9,29 +9,33 @@ import (
 )
 
 type TableRecord struct {
-	Name       string  // テーブル名
-	MetaPageId page.Id // プライマリインデックスの B+Tree メタページ ID
-	NumOfCol   int     // カラム数
+	name        string  // テーブル名
+	metaPageId  page.Id // プライマリインデックスの B+Tree メタページ ID
+	columnCount int     // カラム数
 }
 
 func newTableRecord(name string, metaPageId page.Id, numOfCol int) TableRecord {
 	return TableRecord{
-		Name:       name,
-		MetaPageId: metaPageId,
-		NumOfCol:   numOfCol,
+		name:        name,
+		metaPageId:  metaPageId,
+		columnCount: numOfCol,
 	}
 }
+
+func (tr TableRecord) Name() string        { return tr.name }
+func (tr TableRecord) MetaPageId() page.Id { return tr.metaPageId }
+func (tr TableRecord) ColumnCount() int    { return tr.columnCount }
 
 // encode は btree.Record にエンコードする
 func (tr TableRecord) encode() btree.Record {
 	// key = name
 	var key []byte
-	encode.Encode([][]byte{[]byte(tr.Name)}, &key)
+	encode.Encode([][]byte{[]byte(tr.name)}, &key)
 
 	// nonKey = metaPageId + numOfCol
 	var nonKey []byte
-	metaPageIdBytes := tr.MetaPageId.ToBytes()
-	numOfCol := binary.BigEndian.AppendUint32(nil, uint32(tr.NumOfCol))
+	metaPageIdBytes := tr.metaPageId.ToBytes()
+	numOfCol := binary.BigEndian.AppendUint32(nil, uint32(tr.columnCount))
 	encode.Encode([][]byte{metaPageIdBytes, numOfCol}, &nonKey)
 
 	return btree.NewRecord(nil, key, nonKey)

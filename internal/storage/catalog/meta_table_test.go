@@ -77,15 +77,15 @@ func TestTableMetaSearch(t *testing.T) {
 		// THEN: テーブル名でソートされる
 		assert.NoError(t, err1)
 		assert.True(t, ok1)
-		assert.Equal(t, "orders", r1.Name)
-		assert.Equal(t, page.NewId(page.FileId(2), page.PageNumber(0)), r1.MetaPageId)
-		assert.Equal(t, 5, r1.NumOfCol)
+		assert.Equal(t, "orders", r1.Name())
+		assert.Equal(t, page.NewId(page.FileId(2), page.PageNumber(0)), r1.MetaPageId())
+		assert.Equal(t, 5, r1.ColumnCount())
 
 		assert.NoError(t, err2)
 		assert.True(t, ok2)
-		assert.Equal(t, "users", r2.Name)
-		assert.Equal(t, page.NewId(page.FileId(1), page.PageNumber(0)), r2.MetaPageId)
-		assert.Equal(t, 3, r2.NumOfCol)
+		assert.Equal(t, "users", r2.Name())
+		assert.Equal(t, page.NewId(page.FileId(1), page.PageNumber(0)), r2.MetaPageId())
+		assert.Equal(t, 3, r2.ColumnCount())
 
 		assert.NoError(t, err3)
 		assert.False(t, ok3)

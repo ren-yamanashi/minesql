@@ -2,7 +2,6 @@ package access
 
 import (
 	"encoding/binary"
-	"errors"
 	"fmt"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
@@ -23,14 +22,14 @@ type newSecondaryRecordInput struct {
 // secondaryRecord はセカンダリインデックスレコード
 type secondaryRecord struct {
 	deleteMark byte
-	ColNames   []string // インデックスを構成するカラム名のリスト
-	Values     []string // インデックスを構成するカラム値のリスト (SK)
-	Pk         []string // プライマリキー
+	colNames   []string // インデックスを構成するカラム名のリスト
+	values     []string // インデックスを構成するカラム値のリスト (SK)
+	pk         []string // プライマリキー
 }
 
 func newSecondaryRecord(ct *catalog.Catalog, input newSecondaryRecordInput) (*secondaryRecord, error) {
 	if len(input.colNames) != len(input.values) {
-		return nil, errors.New("number of colNames not equal values")
+		return nil, errColNameValueMismatch
 	}
 	return sortSecondaryRecord(ct, input)
 }
@@ -39,8 +38,8 @@ func newSecondaryRecord(ct *catalog.Catalog, input newSecondaryRecordInput) (*se
 // キー領域は SK + PK を連結したもの
 func (r *secondaryRecord) encode() btree.Record {
 	var key []byte
-	encode.Encode(stringToByteSlice(r.Values), &key)
-	encode.Encode(stringToByteSlice(r.Pk), &key)
+	encode.Encode(stringToByteSlice(r.values), &key)
+	encode.Encode(stringToByteSlice(r.pk), &key)
 	return btree.NewRecord([]byte{r.deleteMark}, key, nil)
 }
 
@@ -49,7 +48,7 @@ func (r *secondaryRecord) encode() btree.Record {
 // B+Tree 上のキー (SK + PK) ではなく SK のみ
 func (r *secondaryRecord) encodedSecondaryKey() []byte {
 	var sk []byte
-	encode.Encode(stringToByteSlice(r.Values), &sk)
+	encode.Encode(stringToByteSlice(r.values), &sk)
 	return sk
 }
 
@@ -64,21 +63,27 @@ func decodeSecondaryRecord(
 	if err != nil {
 		return nil, err
 	}
-	keyCols, err := fetchIndexKeyCol(ct, index.IndexId)
+	keyCols, err := fetchIndexKeyColumn(ct, index.IndexId())
 	if err != nil {
 		return nil, err
 	}
 
 	var key [][]byte
 	encode.Decode(record.Key(), &key)
-	if len(key) < index.NumOfCol {
-		return nil, fmt.Errorf("decoded key length %d is less than index column count %d", len(key), index.NumOfCol)
+	if len(key) < index.ColumnCount() {
+		return nil, fmt.Errorf(
+			"decoded key length %d is less than index column count %d",
+			len(key), index.ColumnCount(),
+		)
 	}
-	sk := key[:index.NumOfCol]
-	pk := key[index.NumOfCol:]
+	sk := key[:index.ColumnCount()]
+	pk := key[index.ColumnCount():]
 
 	if len(sk) != len(keyCols) {
-		return nil, fmt.Errorf("index key column count mismatch: got %d values, expected %d", len(sk), len(keyCols))
+		return nil, fmt.Errorf(
+			"index key column count mismatch: got %d values, expected %d",
+			len(sk), len(keyCols),
+		)
 	}
 
 	colNames := make([]string, len(keyCols))
@@ -88,9 +93,9 @@ func decodeSecondaryRecord(
 
 	return &secondaryRecord{
 		deleteMark: record.Header()[0],
-		ColNames:   colNames,
-		Values:     byteSliceToString(sk),
-		Pk:         byteSliceToString(pk),
+		colNames:   colNames,
+		values:     byteSliceToString(sk),
+		pk:         byteSliceToString(pk),
 	}, nil
 }
 
@@ -100,12 +105,15 @@ func sortSecondaryRecord(ct *catalog.Catalog, input newSecondaryRecordInput) (*s
 	if err != nil {
 		return nil, err
 	}
-	keyCols, err := fetchIndexKeyCol(ct, index.IndexId)
+	keyCols, err := fetchIndexKeyColumn(ct, index.IndexId())
 	if err != nil {
 		return nil, err
 	}
 	if len(input.values) != len(keyCols) {
-		return nil, fmt.Errorf("index key column count mismatch: got %d values, expected %d", len(input.values), len(keyCols))
+		return nil, fmt.Errorf(
+			"index key column count mismatch: got %d values, expected %d",
+			len(input.values), len(keyCols),
+		)
 	}
 
 	sortedColNames := make([]string, len(keyCols))
@@ -126,16 +134,16 @@ func sortSecondaryRecord(ct *catalog.Catalog, input newSecondaryRecordInput) (*s
 
 	return &secondaryRecord{
 		deleteMark: input.deleteMark,
-		ColNames:   sortedColNames,
-		Values:     sortedValues,
-		Pk:         input.pk,
+		colNames:   sortedColNames,
+		values:     sortedValues,
+		pk:         input.pk,
 	}, nil
 }
 
 // fetchIndex はインデックスメタデータを検索し、指定された名前のインデックスレコードを返す
 func fetchIndex(ct *catalog.Catalog, fileId page.FileId, indexName string) (catalog.IndexRecord, error) {
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
-	iter, err := ct.IndexMeta.Search(catalog.SearchModeKey{Key: [][]byte{fileIdBytes, []byte(indexName)}})
+	iter, err := ct.IndexMeta().Search(catalog.SearchModeKey{Key: [][]byte{fileIdBytes, []byte(indexName)}})
 	if err != nil {
 		return catalog.IndexRecord{}, err
 	}
@@ -143,16 +151,16 @@ func fetchIndex(ct *catalog.Catalog, fileId page.FileId, indexName string) (cata
 	if err != nil {
 		return catalog.IndexRecord{}, err
 	}
-	if !ok || indexRecord.FileId != fileId || indexRecord.Name != indexName {
+	if !ok || indexRecord.FileId() != fileId || indexRecord.Name() != indexName {
 		return catalog.IndexRecord{}, fmt.Errorf("index %q not found", indexName)
 	}
 	return indexRecord, nil
 }
 
-// fetchIndexKeyCol はインデックスキーカラムメタデータを検索し、カラム名 → インデックス上のカラム位置のマップを返す
-func fetchIndexKeyCol(ct *catalog.Catalog, indexId catalog.IndexId) (map[string]int, error) {
+// fetchIndexKeyColumn はインデックスキーカラムメタデータを検索し、カラム名 → インデックス上のカラム位置のマップを返す
+func fetchIndexKeyColumn(ct *catalog.Catalog, indexId catalog.IndexId) (map[string]int, error) {
 	indexIdBytes := binary.BigEndian.AppendUint32(nil, uint32(indexId))
-	keyColMetaIter, err := ct.IndexKeyColMeta.Search(catalog.SearchModeKey{Key: [][]byte{indexIdBytes}})
+	keyColMetaIter, err := ct.IndexKeyColumnMeta().Search(catalog.SearchModeKey{Key: [][]byte{indexIdBytes}})
 	if err != nil {
 		return nil, err
 	}
@@ -166,10 +174,10 @@ func fetchIndexKeyCol(ct *catalog.Catalog, indexId catalog.IndexId) (map[string]
 		if !ok {
 			break
 		}
-		if keyColRecord.IndexId != indexId {
+		if keyColRecord.IndexId() != indexId {
 			break
 		}
-		keyCols[keyColRecord.Name] = keyColRecord.Pos
+		keyCols[keyColRecord.Name()] = keyColRecord.Position()
 	}
 	return keyCols, nil
 }

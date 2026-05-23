@@ -25,7 +25,7 @@ func TestNewRecovery(t *testing.T) {
 	})
 }
 
-func TestNeedsRecovery(t *testing.T) {
+func TestRecoveryNeedsRecovery(t *testing.T) {
 	t.Run("Redo ログが空の場合はリカバリ不要", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
@@ -71,7 +71,7 @@ func TestNeedsRecovery(t *testing.T) {
 	})
 }
 
-func TestExecute(t *testing.T) {
+func TestRecoveryExecute(t *testing.T) {
 	t.Run("COMMIT 済みトランザクションはロールバックされない", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
@@ -180,7 +180,7 @@ func TestExecute(t *testing.T) {
 	})
 }
 
-func TestApplyRedoLog(t *testing.T) {
+func TestRecoveryApplyRedoLog(t *testing.T) {
 	t.Run("Page LSN がレコードの LSN 以上ならスキップされる", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
@@ -219,7 +219,7 @@ func TestApplyRedoLog(t *testing.T) {
 	})
 }
 
-func TestApplyRollback(t *testing.T) {
+func TestRecoveryApplyRollback(t *testing.T) {
 	t.Run("COMMIT 済みと未 COMMIT が混在する場合は未 COMMIT のみロールバック", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
@@ -258,7 +258,7 @@ func TestApplyRollback(t *testing.T) {
 		iter, _ := table.primaryIndex.search(SearchModeStart{})
 		record, ok, _ := iter.next()
 		assert.True(t, ok)
-		assert.Equal(t, "1", record.Values[0])
+		assert.Equal(t, "1", record.values[0])
 
 		_, ok, _ = iter.next()
 		assert.False(t, ok)

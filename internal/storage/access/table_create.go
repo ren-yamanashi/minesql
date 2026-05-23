@@ -15,10 +15,10 @@ import (
 )
 
 type CreateConstraintInput struct {
-	ColName        string // 制約のあるカラム名
-	ConstraintName string // 制約名
-	RefTableName   string // 制約により参照されるテーブル名
-	RefColName     string // 制約により参照されるカラム名 (構成順通り)
+	ColumnName          string // 制約のあるカラム名
+	ConstraintName      string // 制約名
+	ReferenceTableName  string // 制約により参照されるテーブル名
+	ReferenceColumnName string // 制約により参照されるカラム名 (構成順通り)
 }
 
 type CreateIndexInput struct {
@@ -108,7 +108,7 @@ func registerTableMeta(
 	input CreateTableInput,
 ) error {
 	// テーブルメタ
-	if err := ct.TableMeta.Insert(input.TableName, pi.tree.MetaPageId(), len(input.ColNames)); err != nil {
+	if err := ct.TableMeta().Insert(input.TableName, pi.tree.MetaPageId(), len(input.ColNames)); err != nil {
 		return err
 	}
 
@@ -117,21 +117,21 @@ func registerTableMeta(
 	if err != nil {
 		return err
 	}
-	err = ct.IndexMeta.Insert(catalog.IndexRecord{
-		FileId:     fileId,
-		Name:       catalog.PrimaryIndexName,
-		IndexId:    indexId,
-		IndexType:  catalog.IndexTypePrimary,
-		NumOfCol:   input.PkCount,
-		MetaPageId: pi.tree.MetaPageId(),
-	})
+	err = ct.IndexMeta().Insert(catalog.NewIndexRecord(
+		fileId,
+		indexId,
+		catalog.PrimaryIndexName,
+		catalog.IndexTypePrimary,
+		input.PkCount,
+		pi.tree.MetaPageId(),
+	))
 	if err != nil {
 		return err
 	}
 
 	// カラムメタ
 	for i, col := range input.ColNames {
-		if err := ct.ColumnMeta.Insert(fileId, col, i); err != nil {
+		if err := ct.ColumnMeta().Insert(fileId, col, i); err != nil {
 			return err
 		}
 	}
@@ -164,20 +164,20 @@ func createSecondaryIndexes(
 		if err != nil {
 			return nil, err
 		}
-		err = ct.IndexMeta.Insert(catalog.IndexRecord{
-			FileId:     fileId,
-			Name:       input.IndexName,
-			IndexId:    indexId,
-			IndexType:  input.IndexType,
-			NumOfCol:   len(input.ColNames),
-			MetaPageId: index.tree.MetaPageId(),
-		})
+		err = ct.IndexMeta().Insert(catalog.NewIndexRecord(
+			fileId,
+			indexId,
+			input.IndexName,
+			input.IndexType,
+			len(input.ColNames),
+			index.tree.MetaPageId(),
+		))
 		if err != nil {
 			return nil, err
 		}
 
 		for i, keyCol := range input.ColNames {
-			if err := ct.IndexKeyColMeta.Insert(indexId, keyCol, i); err != nil {
+			if err := ct.IndexKeyColumnMeta().Insert(indexId, keyCol, i); err != nil {
 				return nil, err
 			}
 		}
@@ -191,17 +191,17 @@ func createSecondaryIndexes(
 // createConstraints は制約をカタログに登録する
 func createConstraints(ct *catalog.Catalog, fileId page.FileId, inputs []CreateConstraintInput) error {
 	for _, input := range inputs {
-		refTable, err := fetchTable(ct, input.RefTableName)
+		refTable, err := fetchTable(ct, input.ReferenceTableName)
 		if err != nil {
 			return err
 		}
-		err = ct.ConstraintMeta.Insert(catalog.ConstraintRecord{
-			FileId:         fileId,
-			ColName:        input.ColName,
-			ConstraintName: input.ConstraintName,
-			RefTableFileId: refTable.MetaPageId.FileId,
-			RefColName:     input.RefColName,
-		})
+		err = ct.ConstraintMeta().Insert(catalog.NewConstraintRecord(
+			fileId,
+			input.ColumnName,
+			input.ConstraintName,
+			refTable.MetaPageId().FileId,
+			input.ReferenceColumnName,
+		))
 		if err != nil {
 			return err
 		}

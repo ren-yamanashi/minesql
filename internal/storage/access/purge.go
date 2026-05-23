@@ -1,9 +1,11 @@
 package access
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
@@ -23,7 +25,7 @@ type Purge struct {
 	done        chan struct{}
 	stopped     chan struct{}
 	stopOnce    sync.Once
-	isRunning   bool
+	isRunning   atomic.Bool
 }
 
 func NewPurge(bp *buffer.Pool, trx *TrxManager, undoLog *undo.Manager) *Purge {
@@ -37,27 +39,26 @@ func NewPurge(bp *buffer.Pool, trx *TrxManager, undoLog *undo.Manager) *Purge {
 
 // Start はバックグラウンド goroutine を起動する
 func (p *Purge) Start() {
-	if p.isRunning {
+	if !p.isRunning.CompareAndSwap(false, true) {
 		return
 	}
 	p.ticker = time.NewTicker(p.interval)
 	p.done = make(chan struct{})
 	p.stopped = make(chan struct{})
 	p.stopOnce = sync.Once{}
-	p.isRunning = true
 	go p.loop()
 }
 
 // Stop はバックグラウンド goroutine を停止し、終了を待つ
 func (p *Purge) Stop() {
 	p.stopOnce.Do(func() {
-		if !p.isRunning {
+		if !p.isRunning.Load() {
 			return
 		}
 		close(p.done)
 		<-p.stopped
 		p.ticker.Stop()
-		p.isRunning = false
+		p.isRunning.Store(false)
 	})
 }
 
@@ -143,7 +144,7 @@ func (p *Purge) deletePrimaryRecord(fileId page.FileId, record btree.Record) err
 	if err != nil {
 		return err
 	}
-	primaryTree := btree.NewTree(p.bufferPool, piRecord.MetaPageId)
+	primaryTree := btree.NewTree(p.bufferPool, piRecord.MetaPageId())
 	return primaryTree.Delete(record.Key())
 }
 
@@ -160,17 +161,20 @@ func (p *Purge) deleteSecondaryRecords(fileId page.FileId, record btree.Record) 
 	}
 
 	for _, siRecord := range siRecords {
-		keyCols, err := fetchIndexKeyCol(p.transaction.catalog, siRecord.IndexId)
+		keyCols, err := fetchIndexKeyColumn(p.transaction.catalog, siRecord.IndexId())
 		if err != nil {
 			return err
 		}
 		sk := prevRec.secondaryKey(keyCols)
-		tree := btree.NewTree(p.bufferPool, siRecord.MetaPageId)
+		tree := btree.NewTree(p.bufferPool, siRecord.MetaPageId())
 
 		// キーが存在し、deleteMark=1 の場合のみ物理削除
 		existing, _, err := tree.FindByKey(sk)
+		if errors.Is(err, btree.ErrKeyNotFound) {
+			continue
+		}
 		if err != nil {
-			continue // キーが見つからない場合はスキップ
+			return err
 		}
 		if existing.Header()[0] == 0 {
 			continue

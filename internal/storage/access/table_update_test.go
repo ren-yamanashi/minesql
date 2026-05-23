@@ -22,8 +22,8 @@ func TestTableUpdate(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		updated := searchFirstPrimaryRecord(t, table)
-		assert.Equal(t, "Bob", updated.Values[1])
-		assert.Equal(t, "alice@example.com", updated.Values[2])
+		assert.Equal(t, "Bob", updated.values[1])
+		assert.Equal(t, "alice@example.com", updated.values[2])
 	})
 
 	t.Run("セカンダリインデックスのカラムを更新すると旧 SK が論理削除され新 SK が挿入される", func(t *testing.T) {
@@ -42,7 +42,7 @@ func TestTableUpdate(t *testing.T) {
 		result, ok, err := iter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "Bob", result.Values[1])
+		assert.Equal(t, "Bob", result.values[1])
 	})
 
 	t.Run("セカンダリインデックスに影響しないカラムの更新ではインデックスが変更されない", func(t *testing.T) {
@@ -61,8 +61,8 @@ func TestTableUpdate(t *testing.T) {
 		result, ok, err := iter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "Alice", result.Values[1])
-		assert.Equal(t, "new@example.com", result.Values[2])
+		assert.Equal(t, "Alice", result.values[1])
+		assert.Equal(t, "new@example.com", result.values[2])
 	})
 
 	t.Run("複数のセカンダリインデックスのうち影響するものだけが更新される", func(t *testing.T) {
@@ -81,15 +81,15 @@ func TestTableUpdate(t *testing.T) {
 		nameResult, ok, err := nameIter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "Charlie", nameResult.Values[1])
+		assert.Equal(t, "Charlie", nameResult.values[1])
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
 		emailIter, err := idxEmail.search(SearchModeStart{})
 		assert.NoError(t, err)
 		emailResult, ok, err := emailIter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "Charlie", emailResult.Values[1])
-		assert.Equal(t, "alice@example.com", emailResult.Values[2])
+		assert.Equal(t, "Charlie", emailResult.values[1])
+		assert.Equal(t, "alice@example.com", emailResult.values[2])
 	})
 
 	t.Run("存在しないカラムで更新するとエラーを返す", func(t *testing.T) {
@@ -115,9 +115,9 @@ func TestTableUpdate(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		updated := searchFirstPrimaryRecord(t, table)
-		assert.Equal(t, "1", updated.Values[0])
-		assert.Equal(t, "Bob", updated.Values[1])
-		assert.Equal(t, "bob@example.com", updated.Values[2])
+		assert.Equal(t, "1", updated.values[0])
+		assert.Equal(t, "Bob", updated.values[1])
+		assert.Equal(t, "bob@example.com", updated.values[2])
 	})
 
 	t.Run("複数カラムの更新で全セカンダリインデックスが更新される", func(t *testing.T) {
@@ -138,7 +138,7 @@ func TestTableUpdate(t *testing.T) {
 		nameResult, ok, err := nameIter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "Bob", nameResult.Values[1])
+		assert.Equal(t, "Bob", nameResult.values[1])
 
 		// idx_email も更新されている
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
@@ -147,7 +147,7 @@ func TestTableUpdate(t *testing.T) {
 		emailResult, ok, err := emailIter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "bob@example.com", emailResult.Values[2])
+		assert.Equal(t, "bob@example.com", emailResult.values[2])
 	})
 
 	t.Run("更新後のレコードに rollPtr が設定される", func(t *testing.T) {

@@ -11,11 +11,11 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
-type TrxState int
+type trxState int
 
 const (
-	TrxStateActive TrxState = iota + 1
-	TrxStateInactive
+	trxStateActive trxState = iota + 1
+	trxStateInactive
 )
 
 type TrxManager struct {
@@ -25,19 +25,25 @@ type TrxManager struct {
 	lock         *lock.Manager
 	bufferPool   *buffer.Pool
 	catalog      *catalog.Catalog
-	transactions map[lock.TrxId]TrxState
+	transactions map[lock.TrxId]trxState
 	readViews    map[lock.TrxId]*readView // トランザクションごとの ReadView キャッシュ
 	nextTrxId    lock.TrxId               // 次に払い出すトランザクション ID
 }
 
-func NewTrxManager(ct *catalog.Catalog, undo *undo.Manager, redo *redo.Buffer, lockMgr *lock.Manager, bp *buffer.Pool) *TrxManager {
+func NewTrxManager(
+	ct *catalog.Catalog,
+	undo *undo.Manager,
+	redo *redo.Buffer,
+	lockMgr *lock.Manager,
+	bp *buffer.Pool,
+) *TrxManager {
 	return &TrxManager{
 		undoLog:      undo,
 		redoLog:      redo,
 		lock:         lockMgr,
 		bufferPool:   bp,
 		catalog:      ct,
-		transactions: make(map[lock.TrxId]TrxState),
+		transactions: make(map[lock.TrxId]trxState),
 		readViews:    make(map[lock.TrxId]*readView),
 	}
 }
@@ -48,7 +54,7 @@ func (t *TrxManager) Begin() lock.TrxId {
 	defer t.mu.Unlock()
 
 	trxId := t.allocateTrxId()
-	t.transactions[trxId] = TrxStateActive
+	t.transactions[trxId] = trxStateActive
 	return trxId
 }
 
@@ -67,7 +73,7 @@ func (t *TrxManager) Commit(trxId lock.TrxId) error {
 
 	t.mu.Lock()
 	delete(t.readViews, trxId)
-	t.transactions[trxId] = TrxStateInactive
+	t.transactions[trxId] = trxStateInactive
 	t.mu.Unlock()
 
 	return nil
@@ -81,7 +87,7 @@ func (t *TrxManager) Rollback(trxId lock.TrxId) error {
 
 		t.mu.Lock()
 		delete(t.readViews, trxId)
-		t.transactions[trxId] = TrxStateInactive
+		t.transactions[trxId] = trxStateInactive
 		t.mu.Unlock()
 	}()
 
@@ -108,7 +114,7 @@ func (t *TrxManager) CreateReadView(trxId lock.TrxId) *readView {
 	}
 	var activeTrxIds []lock.TrxId
 	for id, state := range t.transactions {
-		if state == TrxStateActive && id != trxId {
+		if state == trxStateActive && id != trxId {
 			activeTrxIds = append(activeTrxIds, id)
 		}
 	}
@@ -117,7 +123,7 @@ func (t *TrxManager) CreateReadView(trxId lock.TrxId) *readView {
 	return rv
 }
 
-// OldestVisibleTrxId は全アクティブ ReadView の MUpLimitId の最小値を返す
+// OldestVisibleTrxId は全アクティブ ReadView の upLimitId の最小値を返す
 //   - この値未満の trxId は、どの ReadView からも参照されない
 //   - アクティブな ReadView がない場合は nextTrxId を返す
 func (t *TrxManager) OldestVisibleTrxId() lock.TrxId {
@@ -130,19 +136,19 @@ func (t *TrxManager) OldestVisibleTrxId() lock.TrxId {
 	}
 	limit := t.nextTrxId
 	for _, rv := range t.readViews {
-		limit = min(limit, rv.MUpLimitId)
+		limit = min(limit, rv.upLimitId)
 	}
 	return limit
 }
 
-// ActiveTrxIds はアクティブなトランザクションの ID 一覧を返す
-func (t *TrxManager) ActiveTrxIds() []lock.TrxId {
+// activeTrxIds はアクティブなトランザクションの ID 一覧を返す
+func (t *TrxManager) activeTrxIds() []lock.TrxId {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
 	var ids []lock.TrxId
 	for id, state := range t.transactions {
-		if state == TrxStateActive {
+		if state == trxStateActive {
 			ids = append(ids, id)
 		}
 	}
@@ -156,7 +162,7 @@ func (t *TrxManager) InactiveTrxIds() []lock.TrxId {
 
 	var ids []lock.TrxId
 	for trxId, state := range t.transactions {
-		if state == TrxStateInactive {
+		if state == trxStateInactive {
 			ids = append(ids, trxId)
 		}
 	}

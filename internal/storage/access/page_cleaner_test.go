@@ -36,7 +36,7 @@ func TestPageCleanerStartStop(t *testing.T) {
 		pc.Stop()
 
 		// THEN
-		assert.False(t, pc.isRunning)
+		assert.False(t, pc.isRunning.Load())
 	})
 
 	t.Run("Stop を二重呼び出ししてもパニックしない", func(t *testing.T) {
@@ -74,9 +74,9 @@ func TestPageCleanerStartStop(t *testing.T) {
 		pc.Start() // 二重呼び出し
 
 		// THEN
-		assert.True(t, pc.isRunning)
+		assert.True(t, pc.isRunning.Load())
 		pc.Stop()
-		assert.False(t, pc.isRunning)
+		assert.False(t, pc.isRunning.Load())
 	})
 
 	t.Run("Stop 後に再度 Start できる", func(t *testing.T) {
@@ -92,7 +92,7 @@ func TestPageCleanerStartStop(t *testing.T) {
 		pc.Stop()
 
 		// THEN
-		assert.False(t, pc.isRunning)
+		assert.False(t, pc.isRunning.Load())
 	})
 }
 

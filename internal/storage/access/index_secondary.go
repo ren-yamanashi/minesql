@@ -165,9 +165,9 @@ func (si *secondaryIndex) softDelete(record *secondaryRecord, trxId lock.TrxId) 
 		fileId:     si.fileId,
 		deleteMark: 1,
 		indexName:  si.indexName,
-		colNames:   record.ColNames,
-		values:     record.Values,
-		pk:         record.Pk,
+		colNames:   record.colNames,
+		values:     record.values,
+		pk:         record.pk,
 	})
 	if err != nil {
 		return err
@@ -180,8 +180,8 @@ func (si *secondaryIndex) leafPageCount() (uint64, error) {
 	return si.tree.LeafPageCount()
 }
 
-// Height はツリーの高さを取得する
-func (si *secondaryIndex) Height() (uint64, error) {
+// height はツリーの高さを取得する
+func (si *secondaryIndex) height() (uint64, error) {
 	return si.tree.Height()
 }
 

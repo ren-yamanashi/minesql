@@ -8,37 +8,35 @@ import (
 
 // readView はトランザクションの可視性判定に使用するスナップショット
 type readView struct {
-	TrxId        lock.TrxId   // 自身の TrxId
-	MUpLimitId   lock.TrxId   // アクティブトランザクションの最小の TrxId (これ未満は確実にコミット済みで可視)
-	MLockLimitId lock.TrxId   // 次に払い出される TrxId (これ以上は不可視)
-	MIds         []lock.TrxId // ReadView 作成時点でアクティブ (未コミット) な TrxId 一覧
+	trxId        lock.TrxId   // 自身の TrxId
+	upLimitId    lock.TrxId   // アクティブトランザクションの最小の TrxId (これ未満は確実にコミット済みで可視)
+	lowLimitId   lock.TrxId   // 次に払い出される TrxId (これ以上は不可視)
+	activeTrxIds []lock.TrxId // ReadView 作成時点でアクティブ (未コミット) な TrxId 一覧
 }
 
-func newReadView(trxId lock.TrxId, mdIds []lock.TrxId, nextTrxId lock.TrxId) *readView {
-	mUpLimitId := nextTrxId
-	for _, id := range mdIds {
-		if id < mUpLimitId {
-			mUpLimitId = id
-		}
+func newReadView(trxId lock.TrxId, activeTrxIds []lock.TrxId, nextTrxId lock.TrxId) *readView {
+	upLimitId := nextTrxId
+	if len(activeTrxIds) > 0 {
+		upLimitId = min(nextTrxId, slices.Min(activeTrxIds))
 	}
 	return &readView{
-		TrxId:        trxId,
-		MUpLimitId:   mUpLimitId,
-		MLockLimitId: nextTrxId,
-		MIds:         mdIds,
+		trxId:        trxId,
+		upLimitId:    upLimitId,
+		lowLimitId:   nextTrxId,
+		activeTrxIds: activeTrxIds,
 	}
 }
 
 // isVisible は指定された trxId のレコードが可視かどうか判定する
 func (rv *readView) isVisible(recordTrxId lock.TrxId) bool {
-	if recordTrxId == rv.TrxId {
+	if recordTrxId == rv.trxId {
 		return true
 	}
-	if recordTrxId < rv.MUpLimitId {
+	if recordTrxId < rv.upLimitId {
 		return true
 	}
-	if recordTrxId >= rv.MLockLimitId {
+	if recordTrxId >= rv.lowLimitId {
 		return false
 	}
-	return !slices.Contains(rv.MIds, recordTrxId)
+	return !slices.Contains(rv.activeTrxIds, recordTrxId)
 }

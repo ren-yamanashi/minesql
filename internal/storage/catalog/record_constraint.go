@@ -9,24 +9,46 @@ import (
 )
 
 type ConstraintRecord struct {
-	FileId         page.FileId // 制約が属するテーブルの FileId
-	ColName        string      // 制約のあるカラム名
-	ConstraintName string      // 制約名
-	RefTableFileId page.FileId // 制約により参照されるテーブルの FileId
-	RefColName     string      // 制約により参照されるカラム名
+	fileId               page.FileId // 制約が属するテーブルの FileId
+	columnName           string      // 制約のあるカラム名
+	constraintName       string      // 制約名
+	referenceTableFileId page.FileId // 制約により参照されるテーブルの FileId
+	referenceColumnName  string      // 制約により参照されるカラム名
 }
+
+func NewConstraintRecord(
+	fileId page.FileId,
+	columnName string,
+	constraintName string,
+	referenceTableFileId page.FileId,
+	referenceColumnName string,
+) ConstraintRecord {
+	return ConstraintRecord{
+		fileId:               fileId,
+		columnName:           columnName,
+		constraintName:       constraintName,
+		referenceTableFileId: referenceTableFileId,
+		referenceColumnName:  referenceColumnName,
+	}
+}
+
+func (cr ConstraintRecord) FileId() page.FileId               { return cr.fileId }
+func (cr ConstraintRecord) ColumnName() string                { return cr.columnName }
+func (cr ConstraintRecord) ConstraintName() string            { return cr.constraintName }
+func (cr ConstraintRecord) ReferenceTableFileId() page.FileId { return cr.referenceTableFileId }
+func (cr ConstraintRecord) ReferenceColumnName() string       { return cr.referenceColumnName }
 
 // encode は btree.Record にエンコードする
 func (cr ConstraintRecord) encode() btree.Record {
 	// key = fileId + colName + constraintName
 	var key []byte
-	fileId := binary.BigEndian.AppendUint32(nil, uint32(cr.FileId))
-	encode.Encode([][]byte{fileId, []byte(cr.ColName), []byte(cr.ConstraintName)}, &key)
+	fileId := binary.BigEndian.AppendUint32(nil, uint32(cr.fileId))
+	encode.Encode([][]byte{fileId, []byte(cr.columnName), []byte(cr.constraintName)}, &key)
 
-	// nonKey = refTableFileId + refColName
+	// nonKey = refTableFileId + refColumnName
 	var nonKey []byte
-	refTableFileId := binary.BigEndian.AppendUint32(nil, uint32(cr.RefTableFileId))
-	encode.Encode([][]byte{refTableFileId, []byte(cr.RefColName)}, &nonKey)
+	refTableFileId := binary.BigEndian.AppendUint32(nil, uint32(cr.referenceTableFileId))
+	encode.Encode([][]byte{refTableFileId, []byte(cr.referenceColumnName)}, &nonKey)
 
 	return btree.NewRecord(nil, key, nonKey)
 }
@@ -40,17 +62,11 @@ func decodeConstraintRecord(record btree.Record) ConstraintRecord {
 	colName := string(key[1])
 	constraintName := string(key[2])
 
-	// nonKey = [refTableFileId, refColName]
+	// nonKey = [refTableFileId, refColumnName]
 	var nonKey [][]byte
 	encode.Decode(record.NonKey(), &nonKey)
 	refTableFileId := page.FileId(binary.BigEndian.Uint32(nonKey[0]))
-	refColName := string(nonKey[1])
+	refColumnName := string(nonKey[1])
 
-	return ConstraintRecord{
-		FileId:         fileId,
-		ColName:        colName,
-		ConstraintName: constraintName,
-		RefTableFileId: refTableFileId,
-		RefColName:     refColName,
-	}
+	return NewConstraintRecord(fileId, colName, constraintName, refTableFileId, refColumnName)
 }

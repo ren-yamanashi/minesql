@@ -21,8 +21,8 @@ func TestPrimaryIteratorNext(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, []string{"id", "name", "email"}, result.ColNames)
-		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, result.Values)
+		assert.Equal(t, []string{"id", "name", "email"}, result.colNames)
+		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, result.values)
 	})
 
 	t.Run("複数レコードを順に取得できる", func(t *testing.T) {
@@ -41,11 +41,11 @@ func TestPrimaryIteratorNext(t *testing.T) {
 		// THEN
 		assert.NoError(t, err1)
 		assert.True(t, ok1)
-		assert.Equal(t, "1", r1.Values[0])
+		assert.Equal(t, "1", r1.values[0])
 
 		assert.NoError(t, err2)
 		assert.True(t, ok2)
-		assert.Equal(t, "2", r2.Values[0])
+		assert.Equal(t, "2", r2.values[0])
 
 		assert.NoError(t, err3)
 		assert.False(t, ok3)
@@ -65,7 +65,7 @@ func TestPrimaryIteratorNext(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "2", result.Values[0])
+		assert.Equal(t, "2", result.values[0])
 	})
 
 	t.Run("全レコードが論理削除済みの場合データなしを返す", func(t *testing.T) {

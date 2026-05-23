@@ -7,37 +7,41 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 )
 
-type IndexKeyColRecord struct {
-	IndexId IndexId
-	Name    string // カラム名
-	Pos     int    // インデックス上のカラム位置
+type IndexKeyColumnRecord struct {
+	indexId  IndexId
+	name     string // カラム名
+	position int    // インデックス上のカラム位置
 }
 
-func newIndexKeyColRecord(indexId IndexId, name string, pos int) IndexKeyColRecord {
-	return IndexKeyColRecord{
-		IndexId: indexId,
-		Name:    name,
-		Pos:     pos,
+func newIndexKeyColumnRecord(indexId IndexId, name string, pos int) IndexKeyColumnRecord {
+	return IndexKeyColumnRecord{
+		indexId:  indexId,
+		name:     name,
+		position: pos,
 	}
 }
 
+func (kcr IndexKeyColumnRecord) IndexId() IndexId { return kcr.indexId }
+func (kcr IndexKeyColumnRecord) Name() string     { return kcr.name }
+func (kcr IndexKeyColumnRecord) Position() int    { return kcr.position }
+
 // encode は btree.Record にエンコードする
-func (kcr IndexKeyColRecord) encode() btree.Record {
+func (kcr IndexKeyColumnRecord) encode() btree.Record {
 	// key = indexId + name
 	var key []byte
-	indexId := binary.BigEndian.AppendUint32(nil, uint32(kcr.IndexId))
-	encode.Encode([][]byte{indexId, []byte(kcr.Name)}, &key)
+	indexId := binary.BigEndian.AppendUint32(nil, uint32(kcr.indexId))
+	encode.Encode([][]byte{indexId, []byte(kcr.name)}, &key)
 
 	// nonKey = pos
 	var nonKey []byte
-	pos := binary.BigEndian.AppendUint32(nil, uint32(kcr.Pos))
+	pos := binary.BigEndian.AppendUint32(nil, uint32(kcr.position))
 	encode.Encode([][]byte{pos}, &nonKey)
 
 	return btree.NewRecord(nil, key, nonKey)
 }
 
-// decodeIndexKeyColRecord は btree.Record から indexKeyColRecord にデコードする
-func decodeIndexKeyColRecord(record btree.Record) IndexKeyColRecord {
+// decodeIndexKeyColumnRecord は btree.Record から indexKeyColRecord にデコードする
+func decodeIndexKeyColumnRecord(record btree.Record) IndexKeyColumnRecord {
 	// key = [indexId, name]
 	var key [][]byte
 	encode.Decode(record.Key(), &key)
@@ -49,5 +53,5 @@ func decodeIndexKeyColRecord(record btree.Record) IndexKeyColRecord {
 	encode.Decode(record.NonKey(), &nonKey)
 	pos := int(binary.BigEndian.Uint32(nonKey[0]))
 
-	return newIndexKeyColRecord(indexId, name, pos)
+	return newIndexKeyColumnRecord(indexId, name, pos)
 }

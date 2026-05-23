@@ -27,7 +27,7 @@ func TestSecondaryIteratorNext(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, result.Values)
+		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, result.values)
 	})
 
 	t.Run("複数レコードを順に取得できる", func(t *testing.T) {
@@ -48,11 +48,11 @@ func TestSecondaryIteratorNext(t *testing.T) {
 		// THEN
 		assert.NoError(t, err1)
 		assert.True(t, ok1)
-		assert.Equal(t, "Alice", r1.Values[1])
+		assert.Equal(t, "Alice", r1.values[1])
 
 		assert.NoError(t, err2)
 		assert.True(t, ok2)
-		assert.Equal(t, "Bob", r2.Values[1])
+		assert.Equal(t, "Bob", r2.values[1])
 
 		assert.NoError(t, err3)
 		assert.False(t, ok3)
@@ -75,7 +75,7 @@ func TestSecondaryIteratorNext(t *testing.T) {
 		// THEN
 		assert.NoError(t, err1)
 		assert.True(t, ok1)
-		assert.Equal(t, "Alice", r1.Values[1])
+		assert.Equal(t, "Alice", r1.values[1])
 
 		assert.NoError(t, err2)
 		assert.False(t, ok2)
@@ -124,9 +124,9 @@ func TestSecondaryIteratorNextIndexOnly(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, []string{"name"}, result.ColNames)
-		assert.Equal(t, []string{"Alice"}, result.Values)
-		assert.Equal(t, []string{"1"}, result.Pk)
+		assert.Equal(t, []string{"name"}, result.colNames)
+		assert.Equal(t, []string{"Alice"}, result.values)
+		assert.Equal(t, []string{"1"}, result.pk)
 	})
 
 	t.Run("論理削除されたレコードをスキップする", func(t *testing.T) {
@@ -143,7 +143,7 @@ func TestSecondaryIteratorNextIndexOnly(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, []string{"Bob"}, result.Values)
+		assert.Equal(t, []string{"Bob"}, result.values)
 	})
 
 	t.Run("空のインデックスから取得するとデータなしを返す", func(t *testing.T) {
@@ -200,19 +200,19 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	// テーブル定義: id:0, name:1, email:2
 	tableFileId := page.FileId(2)
 	dummyPageId := page.NewId(tableFileId, page.PageNumber(0))
-	_ = ct.TableMeta.Insert("users", dummyPageId, 3)
-	_ = ct.ColumnMeta.Insert(tableFileId, "id", 0)
-	_ = ct.ColumnMeta.Insert(tableFileId, "name", 1)
-	_ = ct.ColumnMeta.Insert(tableFileId, "email", 2)
+	_ = ct.TableMeta().Insert("users", dummyPageId, 3)
+	_ = ct.ColumnMeta().Insert(tableFileId, "id", 0)
+	_ = ct.ColumnMeta().Insert(tableFileId, "name", 1)
+	_ = ct.ColumnMeta().Insert(tableFileId, "email", 2)
 
 	// インデックス定義
 	indexId1 := catalog.IndexId(1)
-	_ = ct.IndexMeta.Insert(catalog.IndexRecord{FileId: tableFileId, Name: "idx_name", IndexId: indexId1, IndexType: catalog.IndexTypeNonUnique, NumOfCol: 1, MetaPageId: dummyPageId})
-	_ = ct.IndexKeyColMeta.Insert(indexId1, "name", 0)
+	_ = ct.IndexMeta().Insert(catalog.NewIndexRecord(tableFileId, indexId1, "idx_name", catalog.IndexTypeNonUnique, 1, dummyPageId))
+	_ = ct.IndexKeyColumnMeta().Insert(indexId1, "name", 0)
 
 	indexId2 := catalog.IndexId(2)
-	_ = ct.IndexMeta.Insert(catalog.IndexRecord{FileId: tableFileId, Name: "idx_email", IndexId: indexId2, IndexType: catalog.IndexTypeUnique, NumOfCol: 1, MetaPageId: dummyPageId})
-	_ = ct.IndexKeyColMeta.Insert(indexId2, "email", 0)
+	_ = ct.IndexMeta().Insert(catalog.NewIndexRecord(tableFileId, indexId2, "idx_email", catalog.IndexTypeUnique, 1, dummyPageId))
+	_ = ct.IndexKeyColumnMeta().Insert(indexId2, "email", 0)
 
 	// プライマリ B+Tree
 	primaryTree, err := btree.CreateTree(bp, tableFileId)

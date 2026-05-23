@@ -6,28 +6,32 @@ import (
 )
 
 type UserRecord struct {
-	Username   string // ユーザー名
-	Host       string // ホスト名
-	AuthString []byte // 認証文字列
+	username   string // ユーザー名
+	host       string // ホスト名
+	authString []byte // 認証文字列
 }
 
 func newUserRecord(username, host string, authString []byte) UserRecord {
 	return UserRecord{
-		Username:   username,
-		Host:       host,
-		AuthString: authString,
+		username:   username,
+		host:       host,
+		authString: authString,
 	}
 }
+
+func (ur UserRecord) Username() string   { return ur.username }
+func (ur UserRecord) Host() string       { return ur.host }
+func (ur UserRecord) AuthString() []byte { return ur.authString }
 
 // encode は btree.Record にエンコードする
 func (ur UserRecord) encode() btree.Record {
 	// key = username
 	var key []byte
-	encode.Encode([][]byte{[]byte(ur.Username)}, &key)
+	encode.Encode([][]byte{[]byte(ur.username)}, &key)
 
 	// nonKey = host + authString
 	var nonKey []byte
-	encode.Encode([][]byte{[]byte(ur.Host), ur.AuthString}, &nonKey)
+	encode.Encode([][]byte{[]byte(ur.host), ur.authString}, &nonKey)
 
 	return btree.NewRecord(nil, key, nonKey)
 }

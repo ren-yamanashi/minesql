@@ -7,13 +7,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateIndexKeyColMeta(t *testing.T) {
+func TestCreateIndexKeyColumnMeta(t *testing.T) {
 	t.Run("インデックスキーカラムメタデータを新規作成できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupDictTestBufferPool(t)
 
 		// WHEN
-		kcm, err := createIndexKeyColMeta(bp)
+		kcm, err := createIndexKeyColumnMeta(bp)
 
 		// THEN
 		assert.NoError(t, err)
@@ -21,10 +21,10 @@ func TestCreateIndexKeyColMeta(t *testing.T) {
 	})
 }
 
-func TestIndexKeyColMetaInsert(t *testing.T) {
+func TestIndexKeyColumnMetaInsert(t *testing.T) {
 	t.Run("インデックスキーカラムメタデータを挿入できる", func(t *testing.T) {
 		// GIVEN
-		kcm := setupTestIndexKeyColMeta(t)
+		kcm := setupTestIndexKeyColumnMeta(t)
 
 		// WHEN
 		err := kcm.Insert(IndexId(1), "name", 1)
@@ -35,7 +35,7 @@ func TestIndexKeyColMetaInsert(t *testing.T) {
 
 	t.Run("同じインデックス ID + カラム名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
 		// GIVEN
-		kcm := setupTestIndexKeyColMeta(t)
+		kcm := setupTestIndexKeyColumnMeta(t)
 		_ = kcm.Insert(IndexId(1), "name", 1)
 
 		// WHEN
@@ -47,7 +47,7 @@ func TestIndexKeyColMetaInsert(t *testing.T) {
 
 	t.Run("同じインデックス ID でもカラム名が異なれば複数挿入できる", func(t *testing.T) {
 		// GIVEN
-		kcm := setupTestIndexKeyColMeta(t)
+		kcm := setupTestIndexKeyColumnMeta(t)
 		_ = kcm.Insert(IndexId(1), "name", 1)
 
 		// WHEN
@@ -58,10 +58,10 @@ func TestIndexKeyColMetaInsert(t *testing.T) {
 	})
 }
 
-func TestIndexKeyColMetaSearch(t *testing.T) {
+func TestIndexKeyColumnMetaSearch(t *testing.T) {
 	t.Run("SearchModeStart で全件スキャンできる", func(t *testing.T) {
 		// GIVEN
-		kcm := setupTestIndexKeyColMeta(t)
+		kcm := setupTestIndexKeyColumnMeta(t)
 		_ = kcm.Insert(IndexId(1), "name", 1)
 		_ = kcm.Insert(IndexId(1), "age", 2)
 
@@ -76,15 +76,15 @@ func TestIndexKeyColMetaSearch(t *testing.T) {
 		// THEN
 		assert.NoError(t, err1)
 		assert.True(t, ok1)
-		assert.Equal(t, IndexId(1), r1.IndexId)
-		assert.Equal(t, "age", r1.Name)
-		assert.Equal(t, 2, r1.Pos)
+		assert.Equal(t, IndexId(1), r1.IndexId())
+		assert.Equal(t, "age", r1.Name())
+		assert.Equal(t, 2, r1.Position())
 
 		assert.NoError(t, err2)
 		assert.True(t, ok2)
-		assert.Equal(t, IndexId(1), r2.IndexId)
-		assert.Equal(t, "name", r2.Name)
-		assert.Equal(t, 1, r2.Pos)
+		assert.Equal(t, IndexId(1), r2.IndexId())
+		assert.Equal(t, "name", r2.Name())
+		assert.Equal(t, 1, r2.Position())
 
 		assert.NoError(t, err3)
 		assert.False(t, ok3)
@@ -92,7 +92,7 @@ func TestIndexKeyColMetaSearch(t *testing.T) {
 
 	t.Run("空のメタデータを検索するとレコードが返らない", func(t *testing.T) {
 		// GIVEN
-		kcm := setupTestIndexKeyColMeta(t)
+		kcm := setupTestIndexKeyColumnMeta(t)
 
 		// WHEN
 		iter, err := kcm.Search(SearchModeStart{})
@@ -106,13 +106,13 @@ func TestIndexKeyColMetaSearch(t *testing.T) {
 	})
 }
 
-// setupTestIndexKeyColMeta はテスト用の IndexKeyColMeta を作成する
-func setupTestIndexKeyColMeta(t *testing.T) *IndexKeyColMeta {
+// setupTestIndexKeyColumnMeta はテスト用の IndexKeyColumnMeta を作成する
+func setupTestIndexKeyColumnMeta(t *testing.T) *IndexKeyColumnMeta {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
-	kcm, err := createIndexKeyColMeta(bp)
+	kcm, err := createIndexKeyColumnMeta(bp)
 	if err != nil {
-		t.Fatalf("IndexKeyColMeta の作成に失敗: %v", err)
+		t.Fatalf("IndexKeyColumnMeta の作成に失敗: %v", err)
 	}
 	return kcm
 }

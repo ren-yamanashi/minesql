@@ -4,4 +4,4 @@ import "time"
 
 const BaseDir = "data"
 
-var LockWaitTimeout = 30000 * time.Millisecond
+var LockWaitTimeout = 30 * time.Second

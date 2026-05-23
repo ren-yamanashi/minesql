@@ -41,7 +41,7 @@ func (si *secondaryIterator) next() (*primaryRecord, bool, error) {
 		}
 
 		// PrimaryIterator を使用してレコード検索
-		iter, err := si.primaryTree.Search(SearchModeKey{Key: stringToByteSlice(secondaryRecord.Pk)}.encode())
+		iter, err := si.primaryTree.Search(SearchModeKey{Key: stringToByteSlice(secondaryRecord.pk)}.encode())
 		if err != nil {
 			return nil, false, err
 		}

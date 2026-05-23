@@ -47,11 +47,11 @@ func (t *Table) deleteSecondaryIndexes(record *primaryRecord, trxId lock.TrxId) 
 
 // forEachSecondaryRecord は PrimaryRecord から各セカンダリインデックス用のレコードを構築し、コールバックを適用する
 func (t *Table) forEachSecondaryRecord(record *primaryRecord, op func(*secondaryIndex, *secondaryRecord) error) error {
-	valMap := t.buildValMap(record.ColNames, record.Values)
-	pk := t.extractPrimaryKey(record.Values)
+	valMap := t.buildValMap(record.colNames, record.values)
+	pk := t.extractPrimaryKey(record.values)
 
 	for _, si := range t.secondaryIndexes {
-		keyCols, err := fetchIndexKeyCol(t.catalog, si.indexId)
+		keyCols, err := fetchIndexKeyColumn(t.catalog, si.indexId)
 		if err != nil {
 			return err
 		}

@@ -37,7 +37,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.NotNil(t, catalog)
 		assert.Equal(t, page.FileId(2), catalog.nextFileId)
 		assert.Equal(t, IndexId(0), catalog.nextIndexId)
-		assert.Equal(t, page.FileId(1), catalog.UndoLogFileId)
+		assert.Equal(t, page.FileId(1), catalog.undoLogFileId)
 	})
 
 	t.Run("6 つのメタデータのページ ID が復元される", func(t *testing.T) {
@@ -51,12 +51,12 @@ func TestNewCatalog(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, created.TableMeta.tree.MetaPageId(), opened.TableMeta.tree.MetaPageId())
-		assert.Equal(t, created.IndexMeta.tree.MetaPageId(), opened.IndexMeta.tree.MetaPageId())
-		assert.Equal(t, created.IndexKeyColMeta.tree.MetaPageId(), opened.IndexKeyColMeta.tree.MetaPageId())
-		assert.Equal(t, created.ColumnMeta.tree.MetaPageId(), opened.ColumnMeta.tree.MetaPageId())
-		assert.Equal(t, created.ConstraintMeta.tree.MetaPageId(), opened.ConstraintMeta.tree.MetaPageId())
-		assert.Equal(t, created.UserMeta.tree.MetaPageId(), opened.UserMeta.tree.MetaPageId())
+		assert.Equal(t, created.tableMeta.tree.MetaPageId(), opened.tableMeta.tree.MetaPageId())
+		assert.Equal(t, created.indexMeta.tree.MetaPageId(), opened.indexMeta.tree.MetaPageId())
+		assert.Equal(t, created.indexKeyColumnMeta.tree.MetaPageId(), opened.indexKeyColumnMeta.tree.MetaPageId())
+		assert.Equal(t, created.columnMeta.tree.MetaPageId(), opened.columnMeta.tree.MetaPageId())
+		assert.Equal(t, created.constraintMeta.tree.MetaPageId(), opened.constraintMeta.tree.MetaPageId())
+		assert.Equal(t, created.userMeta.tree.MetaPageId(), opened.userMeta.tree.MetaPageId())
 	})
 
 	t.Run("マジックナンバーが不正な場合 errInvalidCatalogFile を返す", func(t *testing.T) {
@@ -153,12 +153,12 @@ func TestCreateCatalog(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.NotNil(t, catalog.TableMeta)
-		assert.NotNil(t, catalog.IndexMeta)
-		assert.NotNil(t, catalog.IndexKeyColMeta)
-		assert.NotNil(t, catalog.ColumnMeta)
-		assert.NotNil(t, catalog.ConstraintMeta)
-		assert.NotNil(t, catalog.UserMeta)
+		assert.NotNil(t, catalog.tableMeta)
+		assert.NotNil(t, catalog.indexMeta)
+		assert.NotNil(t, catalog.indexKeyColumnMeta)
+		assert.NotNil(t, catalog.columnMeta)
+		assert.NotNil(t, catalog.constraintMeta)
+		assert.NotNil(t, catalog.userMeta)
 	})
 
 	t.Run("各メタデータの metaPageId が有効な値になる", func(t *testing.T) {
@@ -170,12 +170,12 @@ func TestCreateCatalog(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.False(t, catalog.TableMeta.tree.MetaPageId().IsInvalid())
-		assert.False(t, catalog.IndexMeta.tree.MetaPageId().IsInvalid())
-		assert.False(t, catalog.IndexKeyColMeta.tree.MetaPageId().IsInvalid())
-		assert.False(t, catalog.ColumnMeta.tree.MetaPageId().IsInvalid())
-		assert.False(t, catalog.ConstraintMeta.tree.MetaPageId().IsInvalid())
-		assert.False(t, catalog.UserMeta.tree.MetaPageId().IsInvalid())
+		assert.False(t, catalog.tableMeta.tree.MetaPageId().IsInvalid())
+		assert.False(t, catalog.indexMeta.tree.MetaPageId().IsInvalid())
+		assert.False(t, catalog.indexKeyColumnMeta.tree.MetaPageId().IsInvalid())
+		assert.False(t, catalog.columnMeta.tree.MetaPageId().IsInvalid())
+		assert.False(t, catalog.constraintMeta.tree.MetaPageId().IsInvalid())
+		assert.False(t, catalog.userMeta.tree.MetaPageId().IsInvalid())
 	})
 }
 

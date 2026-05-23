@@ -75,7 +75,7 @@ func TestRollbackDeleteSecondary(t *testing.T) {
 		nameResult, ok, err := nameIter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "Alice", nameResult.Values[1])
+		assert.Equal(t, "Alice", nameResult.values[1])
 	})
 }
 
@@ -112,7 +112,7 @@ func TestRollbackUpdateSecondary(t *testing.T) {
 		nameResult, ok, err := nameIter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "Alice", nameResult.Values[1])
+		assert.Equal(t, "Alice", nameResult.values[1])
 	})
 
 	t.Run("SK が変わらない Update のロールバックではセカンダリインデックスはそのまま", func(t *testing.T) {
@@ -147,6 +147,6 @@ func TestRollbackUpdateSecondary(t *testing.T) {
 		nameResult, ok, err := nameIter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "Alice", nameResult.Values[1])
+		assert.Equal(t, "Alice", nameResult.values[1])
 	})
 }

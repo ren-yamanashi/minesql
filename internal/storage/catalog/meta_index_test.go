@@ -28,7 +28,7 @@ func TestIndexMetaInsert(t *testing.T) {
 		im := setupTestIndexMeta(t)
 
 		// WHEN
-		err := im.Insert(IndexRecord{FileId: page.FileId(1), Name: PrimaryIndexName, IndexId: IndexId(1), IndexType: IndexTypePrimary, NumOfCol: 1, MetaPageId: page.NewId(page.FileId(1), page.PageNumber(0))})
+		err := im.Insert(NewIndexRecord(page.FileId(1), IndexId(1), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
 
 		// THEN
 		assert.NoError(t, err)
@@ -37,10 +37,10 @@ func TestIndexMetaInsert(t *testing.T) {
 	t.Run("同じ FileId + インデックス名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
 		// GIVEN
 		im := setupTestIndexMeta(t)
-		_ = im.Insert(IndexRecord{FileId: page.FileId(1), Name: PrimaryIndexName, IndexId: IndexId(1), IndexType: IndexTypePrimary, NumOfCol: 1, MetaPageId: page.NewId(page.FileId(1), page.PageNumber(0))})
+		_ = im.Insert(NewIndexRecord(page.FileId(1), IndexId(1), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
 
 		// WHEN
-		err := im.Insert(IndexRecord{FileId: page.FileId(1), Name: PrimaryIndexName, IndexId: IndexId(2), IndexType: IndexTypePrimary, NumOfCol: 1, MetaPageId: page.NewId(page.FileId(1), page.PageNumber(0))})
+		err := im.Insert(NewIndexRecord(page.FileId(1), IndexId(2), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
 
 		// THEN
 		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
@@ -49,10 +49,10 @@ func TestIndexMetaInsert(t *testing.T) {
 	t.Run("異なるインデックス名であれば同じテーブルに複数挿入できる", func(t *testing.T) {
 		// GIVEN
 		im := setupTestIndexMeta(t)
-		_ = im.Insert(IndexRecord{FileId: page.FileId(1), Name: PrimaryIndexName, IndexId: IndexId(1), IndexType: IndexTypePrimary, NumOfCol: 1, MetaPageId: page.NewId(page.FileId(1), page.PageNumber(0))})
+		_ = im.Insert(NewIndexRecord(page.FileId(1), IndexId(1), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
 
 		// WHEN
-		err := im.Insert(IndexRecord{FileId: page.FileId(1), Name: "idx_email", IndexId: IndexId(2), IndexType: IndexTypeUnique, NumOfCol: 1, MetaPageId: page.NewId(page.FileId(1), page.PageNumber(0))})
+		err := im.Insert(NewIndexRecord(page.FileId(1), IndexId(2), "idx_email", IndexTypeUnique, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
 
 		// THEN
 		assert.NoError(t, err)
@@ -63,8 +63,8 @@ func TestIndexMetaSearch(t *testing.T) {
 	t.Run("SearchModeStart で全件スキャンできる", func(t *testing.T) {
 		// GIVEN
 		im := setupTestIndexMeta(t)
-		_ = im.Insert(IndexRecord{FileId: page.FileId(1), Name: "PRIMARY", IndexId: IndexId(1), IndexType: IndexTypePrimary, NumOfCol: 1, MetaPageId: page.NewId(page.FileId(1), page.PageNumber(0))})
-		_ = im.Insert(IndexRecord{FileId: page.FileId(1), Name: "idx_name", IndexId: IndexId(2), IndexType: IndexTypeNonUnique, NumOfCol: 2, MetaPageId: page.NewId(page.FileId(1), page.PageNumber(0))})
+		_ = im.Insert(NewIndexRecord(page.FileId(1), IndexId(1), "PRIMARY", IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
+		_ = im.Insert(NewIndexRecord(page.FileId(1), IndexId(2), "idx_name", IndexTypeNonUnique, 2, page.NewId(page.FileId(1), page.PageNumber(0))))
 
 		// THEN: インデックス名でソートされる
 		iter, err := im.Search(SearchModeStart{})
@@ -77,18 +77,18 @@ func TestIndexMetaSearch(t *testing.T) {
 		// THEN
 		assert.NoError(t, err1)
 		assert.True(t, ok1)
-		assert.Equal(t, page.FileId(1), r1.FileId)
-		assert.Equal(t, "PRIMARY", r1.Name)
-		assert.Equal(t, IndexId(1), r1.IndexId)
-		assert.Equal(t, IndexTypePrimary, r1.IndexType)
-		assert.Equal(t, 1, r1.NumOfCol)
+		assert.Equal(t, page.FileId(1), r1.FileId())
+		assert.Equal(t, "PRIMARY", r1.Name())
+		assert.Equal(t, IndexId(1), r1.IndexId())
+		assert.Equal(t, IndexTypePrimary, r1.IndexType())
+		assert.Equal(t, 1, r1.ColumnCount())
 
 		assert.NoError(t, err2)
 		assert.True(t, ok2)
-		assert.Equal(t, "idx_name", r2.Name)
-		assert.Equal(t, IndexId(2), r2.IndexId)
-		assert.Equal(t, IndexTypeNonUnique, r2.IndexType)
-		assert.Equal(t, 2, r2.NumOfCol)
+		assert.Equal(t, "idx_name", r2.Name())
+		assert.Equal(t, IndexId(2), r2.IndexId())
+		assert.Equal(t, IndexTypeNonUnique, r2.IndexType())
+		assert.Equal(t, 2, r2.ColumnCount())
 
 		assert.NoError(t, err3)
 		assert.False(t, ok3)

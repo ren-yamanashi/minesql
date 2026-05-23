@@ -13,112 +13,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSecondaryRecordEncode(t *testing.T) {
-	t.Run("セカンダリキーとプライマリキーをエンコードしたレコードを返す", func(t *testing.T) {
-		// GIVEN
-		sr := &secondaryRecord{
-			deleteMark: 0x00,
-			Values:     []string{"sk1"},
-			Pk:         []string{"pk1"},
-		}
-
-		// WHEN
-		record := sr.encode()
-
-		// THEN
-		assert.Equal(t, []byte{0x00}, record.Header())
-
-		var decoded [][]byte
-		encode.Decode(record.Key(), &decoded)
-		assert.Equal(t, [][]byte{[]byte("sk1"), []byte("pk1")}, decoded)
-
-		assert.Nil(t, record.NonKey())
-	})
-
-	t.Run("複合セカンダリキーを正しくエンコードする", func(t *testing.T) {
-		// GIVEN
-		sr := &secondaryRecord{
-			deleteMark: 0x00,
-			Values:     []string{"sk1", "sk2"},
-			Pk:         []string{"pk1"},
-		}
-
-		// WHEN
-		record := sr.encode()
-
-		// THEN
-		var decoded [][]byte
-		encode.Decode(record.Key(), &decoded)
-		assert.Equal(t, [][]byte{[]byte("sk1"), []byte("sk2"), []byte("pk1")}, decoded)
-	})
-
-	t.Run("削除マークが設定される", func(t *testing.T) {
-		// GIVEN
-		sr := &secondaryRecord{
-			deleteMark: 0x01,
-			Values:     []string{"sk1"},
-			Pk:         []string{"pk1"},
-		}
-
-		// WHEN
-		record := sr.encode()
-
-		// THEN
-		assert.Equal(t, []byte{0x01}, record.Header())
-	})
-
-	t.Run("複合プライマリキーを正しくエンコードする", func(t *testing.T) {
-		// GIVEN
-		sr := &secondaryRecord{
-			deleteMark: 0x00,
-			Values:     []string{"sk1"},
-			Pk:         []string{"pk1", "pk2"},
-		}
-
-		// WHEN
-		record := sr.encode()
-
-		// THEN
-		var decoded [][]byte
-		encode.Decode(record.Key(), &decoded)
-		assert.Equal(t, [][]byte{[]byte("sk1"), []byte("pk1"), []byte("pk2")}, decoded)
-	})
-}
-
-func TestSecondaryRecordEncodedSecondaryKey(t *testing.T) {
-	t.Run("エンコード済みのセカンダリキーのみを返す", func(t *testing.T) {
-		// GIVEN
-		sr := &secondaryRecord{
-			Values: []string{"sk1"},
-			Pk:     []string{"pk1"},
-		}
-
-		// WHEN
-		result := sr.encodedSecondaryKey()
-
-		// THEN
-		var expected []byte
-		encode.Encode([][]byte{[]byte("sk1")}, &expected)
-		assert.Equal(t, expected, result)
-	})
-
-	t.Run("複合セカンダリキーの場合も正しくエンコードする", func(t *testing.T) {
-		// GIVEN
-		sr := &secondaryRecord{
-			Values: []string{"sk1", "sk2"},
-			Pk:     []string{"pk1"},
-		}
-
-		// WHEN
-		result := sr.encodedSecondaryKey()
-
-		// THEN
-		var expected []byte
-		encode.Encode([][]byte{[]byte("sk1"), []byte("sk2")}, &expected)
-		assert.Equal(t, expected, result)
-	})
-}
-
 func TestNewSecondaryRecord(t *testing.T) {
 	t.Run("カタログを参照してインデックス定義順に並び替えたレコードを返す", func(t *testing.T) {
 		// GIVEN
@@ -136,9 +30,9 @@ func TestNewSecondaryRecord(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, []string{"name"}, sr.ColNames)
-		assert.Equal(t, []string{"Alice"}, sr.Values)
-		assert.Equal(t, []string{"1"}, sr.Pk)
+		assert.Equal(t, []string{"name"}, sr.colNames)
+		assert.Equal(t, []string{"Alice"}, sr.values)
+		assert.Equal(t, []string{"1"}, sr.pk)
 		assert.Equal(t, byte(0), sr.deleteMark)
 	})
 
@@ -209,7 +103,112 @@ func TestNewSecondaryRecord(t *testing.T) {
 		// THEN
 		assert.Error(t, err)
 	})
+}
 
+func TestSecondaryRecordEncode(t *testing.T) {
+	t.Run("セカンダリキーとプライマリキーをエンコードしたレコードを返す", func(t *testing.T) {
+		// GIVEN
+		sr := &secondaryRecord{
+			deleteMark: 0x00,
+			values:     []string{"sk1"},
+			pk:         []string{"pk1"},
+		}
+
+		// WHEN
+		record := sr.encode()
+
+		// THEN
+		assert.Equal(t, []byte{0x00}, record.Header())
+
+		var decoded [][]byte
+		encode.Decode(record.Key(), &decoded)
+		assert.Equal(t, [][]byte{[]byte("sk1"), []byte("pk1")}, decoded)
+
+		assert.Nil(t, record.NonKey())
+	})
+
+	t.Run("複合セカンダリキーを正しくエンコードする", func(t *testing.T) {
+		// GIVEN
+		sr := &secondaryRecord{
+			deleteMark: 0x00,
+			values:     []string{"sk1", "sk2"},
+			pk:         []string{"pk1"},
+		}
+
+		// WHEN
+		record := sr.encode()
+
+		// THEN
+		var decoded [][]byte
+		encode.Decode(record.Key(), &decoded)
+		assert.Equal(t, [][]byte{[]byte("sk1"), []byte("sk2"), []byte("pk1")}, decoded)
+	})
+
+	t.Run("削除マークが設定される", func(t *testing.T) {
+		// GIVEN
+		sr := &secondaryRecord{
+			deleteMark: 0x01,
+			values:     []string{"sk1"},
+			pk:         []string{"pk1"},
+		}
+
+		// WHEN
+		record := sr.encode()
+
+		// THEN
+		assert.Equal(t, []byte{0x01}, record.Header())
+	})
+
+	t.Run("複合プライマリキーを正しくエンコードする", func(t *testing.T) {
+		// GIVEN
+		sr := &secondaryRecord{
+			deleteMark: 0x00,
+			values:     []string{"sk1"},
+			pk:         []string{"pk1", "pk2"},
+		}
+
+		// WHEN
+		record := sr.encode()
+
+		// THEN
+		var decoded [][]byte
+		encode.Decode(record.Key(), &decoded)
+		assert.Equal(t, [][]byte{[]byte("sk1"), []byte("pk1"), []byte("pk2")}, decoded)
+	})
+}
+
+func TestSecondaryRecordEncodedSecondaryKey(t *testing.T) {
+	t.Run("エンコード済みのセカンダリキーのみを返す", func(t *testing.T) {
+		// GIVEN
+		sr := &secondaryRecord{
+			values: []string{"sk1"},
+			pk:     []string{"pk1"},
+		}
+
+		// WHEN
+		result := sr.encodedSecondaryKey()
+
+		// THEN
+		var expected []byte
+		encode.Encode([][]byte{[]byte("sk1")}, &expected)
+		assert.Equal(t, expected, result)
+	})
+
+	t.Run("複合セカンダリキーの場合も正しくエンコードする", func(t *testing.T) {
+		// GIVEN
+		sr := &secondaryRecord{
+			values: []string{"sk1", "sk2"},
+			pk:     []string{"pk1"},
+		}
+
+		// WHEN
+		result := sr.encodedSecondaryKey()
+
+		// THEN
+		var expected []byte
+		encode.Encode([][]byte{[]byte("sk1"), []byte("sk2")}, &expected)
+		assert.Equal(t, expected, result)
+	})
 }
 
 func TestDecodeSecondaryRecord(t *testing.T) {
@@ -232,9 +231,9 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, original.ColNames, decoded.ColNames)
-		assert.Equal(t, original.Values, decoded.Values)
-		assert.Equal(t, original.Pk, decoded.Pk)
+		assert.Equal(t, original.colNames, decoded.colNames)
+		assert.Equal(t, original.values, decoded.values)
+		assert.Equal(t, original.pk, decoded.pk)
 		assert.Equal(t, original.deleteMark, decoded.deleteMark)
 	})
 
@@ -279,9 +278,9 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, original.ColNames, decoded.ColNames)
-		assert.Equal(t, original.Values, decoded.Values)
-		assert.Equal(t, original.Pk, decoded.Pk)
+		assert.Equal(t, original.colNames, decoded.colNames)
+		assert.Equal(t, original.values, decoded.values)
+		assert.Equal(t, original.pk, decoded.pk)
 	})
 
 	t.Run("デコードされたキーの長さがインデックスカラム数未満の場合エラーを返す", func(t *testing.T) {
@@ -336,28 +335,28 @@ func setupSecondaryTestCatalog(t *testing.T) *catalog.Catalog {
 
 	tableFileId := page.FileId(2)
 	dummyPageId := page.NewId(tableFileId, page.PageNumber(0))
-	_ = ct.TableMeta.Insert("users", dummyPageId, 3)
-	_ = ct.ColumnMeta.Insert(tableFileId, "id", 0)
-	_ = ct.ColumnMeta.Insert(tableFileId, "name", 1)
-	_ = ct.ColumnMeta.Insert(tableFileId, "email", 2)
+	_ = ct.TableMeta().Insert("users", dummyPageId, 3)
+	_ = ct.ColumnMeta().Insert(tableFileId, "id", 0)
+	_ = ct.ColumnMeta().Insert(tableFileId, "name", 1)
+	_ = ct.ColumnMeta().Insert(tableFileId, "email", 2)
 
 	// PRIMARY: プライマリインデックス, カラム (id)
 	indexId0 := catalog.IndexId(0)
-	_ = ct.IndexMeta.Insert(catalog.IndexRecord{FileId: tableFileId, Name: catalog.PrimaryIndexName, IndexId: indexId0, IndexType: catalog.IndexTypePrimary, NumOfCol: 1, MetaPageId: dummyPageId})
-	_ = ct.IndexKeyColMeta.Insert(indexId0, "id", 0)
+	_ = ct.IndexMeta().Insert(catalog.NewIndexRecord(tableFileId, indexId0, catalog.PrimaryIndexName, catalog.IndexTypePrimary, 1, dummyPageId))
+	_ = ct.IndexKeyColumnMeta().Insert(indexId0, "id", 0)
 
 	indexId1 := catalog.IndexId(1)
-	_ = ct.IndexMeta.Insert(catalog.IndexRecord{FileId: tableFileId, Name: "idx_name", IndexId: indexId1, IndexType: catalog.IndexTypeNonUnique, NumOfCol: 1, MetaPageId: dummyPageId})
-	_ = ct.IndexKeyColMeta.Insert(indexId1, "name", 0)
+	_ = ct.IndexMeta().Insert(catalog.NewIndexRecord(tableFileId, indexId1, "idx_name", catalog.IndexTypeNonUnique, 1, dummyPageId))
+	_ = ct.IndexKeyColumnMeta().Insert(indexId1, "name", 0)
 
 	indexId2 := catalog.IndexId(2)
-	_ = ct.IndexMeta.Insert(catalog.IndexRecord{FileId: tableFileId, Name: "idx_email", IndexId: indexId2, IndexType: catalog.IndexTypeUnique, NumOfCol: 1, MetaPageId: dummyPageId})
-	_ = ct.IndexKeyColMeta.Insert(indexId2, "email", 0)
+	_ = ct.IndexMeta().Insert(catalog.NewIndexRecord(tableFileId, indexId2, "idx_email", catalog.IndexTypeUnique, 1, dummyPageId))
+	_ = ct.IndexKeyColumnMeta().Insert(indexId2, "email", 0)
 
 	indexId3 := catalog.IndexId(3)
-	_ = ct.IndexMeta.Insert(catalog.IndexRecord{FileId: tableFileId, Name: "idx_name_email", IndexId: indexId3, IndexType: catalog.IndexTypeNonUnique, NumOfCol: 2, MetaPageId: dummyPageId})
-	_ = ct.IndexKeyColMeta.Insert(indexId3, "name", 0)
-	_ = ct.IndexKeyColMeta.Insert(indexId3, "email", 1)
+	_ = ct.IndexMeta().Insert(catalog.NewIndexRecord(tableFileId, indexId3, "idx_name_email", catalog.IndexTypeNonUnique, 2, dummyPageId))
+	_ = ct.IndexKeyColumnMeta().Insert(indexId3, "name", 0)
+	_ = ct.IndexKeyColumnMeta().Insert(indexId3, "email", 1)
 
 	return ct
 }

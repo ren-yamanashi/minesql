@@ -6,6 +6,7 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
+	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -34,7 +35,7 @@ func TestPurgeStartStop(t *testing.T) {
 		p.Stop()
 
 		// THEN
-		assert.False(t, p.isRunning)
+		assert.False(t, p.isRunning.Load())
 	})
 
 	t.Run("Stop を二重呼び出ししてもパニックしない", func(t *testing.T) {
@@ -60,6 +61,37 @@ func TestPurgeStartStop(t *testing.T) {
 		assert.NotPanics(t, func() {
 			p.Stop()
 		})
+	})
+
+	t.Run("Start を二重呼び出しすると最初の goroutine が維持される", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog)
+		p.Start()
+
+		// WHEN
+		p.Start() // 二重呼び出し
+
+		// THEN
+		assert.True(t, p.isRunning.Load())
+		p.Stop()
+		assert.False(t, p.isRunning.Load())
+	})
+
+	t.Run("Stop 後に再度 Start できる", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog)
+		p.Start()
+		p.Stop()
+
+		// WHEN
+		p.Start()
+		time.Sleep(10 * time.Millisecond)
+		p.Stop()
+
+		// THEN
+		assert.False(t, p.isRunning.Load())
 	})
 }
 
@@ -140,7 +172,7 @@ func TestPurgePurge(t *testing.T) {
 		iter2, _ := table.primaryIndex.search(SearchModeStart{})
 		updated, ok, _ := iter2.next()
 		assert.True(t, ok)
-		assert.Equal(t, "Bob", updated.Values[1])
+		assert.Equal(t, "Bob", updated.values[1])
 	})
 
 	t.Run("アクティブな ReadView がある場合はパージされない", func(t *testing.T) {
@@ -180,6 +212,23 @@ func TestPurgePurge(t *testing.T) {
 		treeIter, _ := table.primaryIndex.tree.Search(btree.SearchModeStart{})
 		_, ok, _ := treeIter.Get()
 		assert.True(t, ok)
+	})
+}
+
+func TestPurgePurgeEntry(t *testing.T) {
+	t.Run("INSERT タイプのエントリは何もせず正常終了する", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog)
+		entry := undo.Entry{
+			RecordType: undo.RecordTypeInsert,
+		}
+
+		// WHEN
+		err := p.purgeEntry(entry)
+
+		// THEN
+		assert.NoError(t, err)
 	})
 }
 

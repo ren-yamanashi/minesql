@@ -9,7 +9,7 @@ import (
 
 var (
 	ErrDuplicateKey = errors.New("duplicate key")
-	errKeyNotFound  = errors.New("key not found")
+	ErrKeyNotFound  = errors.New("key not found")
 )
 
 type Tree struct {

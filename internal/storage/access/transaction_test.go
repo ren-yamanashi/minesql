@@ -59,7 +59,7 @@ func TestTrxManagerBegin(t *testing.T) {
 		trxId := tm.Begin()
 
 		// THEN
-		assert.Equal(t, TrxStateActive, tm.transactions[trxId])
+		assert.Equal(t, trxStateActive, tm.transactions[trxId])
 	})
 }
 
@@ -74,7 +74,7 @@ func TestTrxManagerCommit(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, TrxStateInactive, tm.transactions[trxId])
+		assert.Equal(t, trxStateInactive, tm.transactions[trxId])
 	})
 
 	t.Run("コミット後に ReadView が削除される", func(t *testing.T) {
@@ -103,7 +103,7 @@ func TestTrxManagerRollback(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, TrxStateInactive, tm.transactions[trxId])
+		assert.Equal(t, trxStateInactive, tm.transactions[trxId])
 	})
 
 	t.Run("ロールバック後に ReadView が削除される", func(t *testing.T) {
@@ -176,7 +176,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		restored, ok, err := iter2.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "Alice", restored.Values[1])
+		assert.Equal(t, "Alice", restored.values[1])
 	})
 
 	t.Run("Update のロールバックで旧レコードに復元される", func(t *testing.T) {
@@ -209,7 +209,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		restored, ok, err := iter2.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, "Alice", restored.Values[1])
+		assert.Equal(t, "Alice", restored.values[1])
 	})
 }
 
@@ -224,7 +224,7 @@ func TestTrxManagerCreateReadView(t *testing.T) {
 
 		// THEN
 		assert.NotNil(t, rv)
-		assert.Equal(t, trxId, rv.TrxId)
+		assert.Equal(t, trxId, rv.trxId)
 	})
 
 	t.Run("同一トランザクションで 2 回呼ぶとキャッシュされた ReadView を返す", func(t *testing.T) {
@@ -250,8 +250,8 @@ func TestTrxManagerCreateReadView(t *testing.T) {
 		rv := tm.CreateReadView(id2)
 
 		// THEN
-		assert.Contains(t, rv.MIds, id1)
-		assert.NotContains(t, rv.MIds, id2)
+		assert.Contains(t, rv.activeTrxIds, id1)
+		assert.NotContains(t, rv.activeTrxIds, id2)
 	})
 
 	t.Run("コミット済みトランザクションは MIds に含まれない", func(t *testing.T) {
@@ -265,7 +265,7 @@ func TestTrxManagerCreateReadView(t *testing.T) {
 		rv := tm.CreateReadView(id2)
 
 		// THEN
-		assert.NotContains(t, rv.MIds, id1)
+		assert.NotContains(t, rv.activeTrxIds, id1)
 	})
 }
 
@@ -300,7 +300,7 @@ func TestTrxManagerOldestVisibleTrxId(t *testing.T) {
 	})
 }
 
-func TestTrxManagerActiveTrxIds(t *testing.T) {
+func TestTrxManagerActiveTrxIDs(t *testing.T) {
 	t.Run("アクティブなトランザクション ID を返す", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
@@ -308,7 +308,7 @@ func TestTrxManagerActiveTrxIds(t *testing.T) {
 		_ = tm.Begin()
 
 		// WHEN
-		ids := tm.ActiveTrxIds()
+		ids := tm.activeTrxIds()
 
 		// THEN
 		assert.Len(t, ids, 2)
@@ -323,7 +323,7 @@ func TestTrxManagerActiveTrxIds(t *testing.T) {
 		_ = tm.Commit(id1)
 
 		// WHEN
-		ids := tm.ActiveTrxIds()
+		ids := tm.activeTrxIds()
 
 		// THEN
 		assert.Len(t, ids, 1)
@@ -336,7 +336,7 @@ func TestTrxManagerActiveTrxIds(t *testing.T) {
 		tm := setupTrxManager(t)
 
 		// WHEN
-		ids := tm.ActiveTrxIds()
+		ids := tm.activeTrxIds()
 
 		// THEN
 		assert.Empty(t, ids)

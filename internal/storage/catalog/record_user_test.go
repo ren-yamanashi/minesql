@@ -6,6 +6,46 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestUserRecordUsername(t *testing.T) {
+	t.Run("コンストラクタで指定したユーザー名を返す", func(t *testing.T) {
+		// GIVEN
+		ur := newUserRecord("alice", "localhost", []byte("authdata"))
+
+		// WHEN
+		got := ur.Username()
+
+		// THEN
+		assert.Equal(t, "alice", got)
+	})
+}
+
+func TestUserRecordHost(t *testing.T) {
+	t.Run("コンストラクタで指定したホスト名を返す", func(t *testing.T) {
+		// GIVEN
+		ur := newUserRecord("alice", "localhost", []byte("authdata"))
+
+		// WHEN
+		got := ur.Host()
+
+		// THEN
+		assert.Equal(t, "localhost", got)
+	})
+}
+
+func TestUserRecordAuthString(t *testing.T) {
+	t.Run("コンストラクタで指定した認証文字列を返す", func(t *testing.T) {
+		// GIVEN
+		authString := []byte{0xAB, 0xCD, 0xEF}
+		ur := newUserRecord("alice", "localhost", authString)
+
+		// WHEN
+		got := ur.AuthString()
+
+		// THEN
+		assert.Equal(t, authString, got)
+	})
+}
+
 func TestUserRecordEncode(t *testing.T) {
 	t.Run("ユーザーレコードをエンコードできる", func(t *testing.T) {
 		// GIVEN
@@ -29,9 +69,9 @@ func TestUserRecordEncode(t *testing.T) {
 		decoded := decodeUserRecord(record)
 
 		// THEN
-		assert.Equal(t, original.Username, decoded.Username)
-		assert.Equal(t, original.Host, decoded.Host)
-		assert.Equal(t, original.AuthString, decoded.AuthString)
+		assert.Equal(t, original.Username(), decoded.Username())
+		assert.Equal(t, original.Host(), decoded.Host())
+		assert.Equal(t, original.AuthString(), decoded.AuthString())
 	})
 
 	t.Run("認証文字列が 32 バイトの場合も正しくエンコード・デコードできる", func(t *testing.T) {
@@ -47,9 +87,9 @@ func TestUserRecordEncode(t *testing.T) {
 		decoded := decodeUserRecord(record)
 
 		// THEN
-		assert.Equal(t, original.Username, decoded.Username)
-		assert.Equal(t, original.Host, decoded.Host)
-		assert.Equal(t, original.AuthString, decoded.AuthString)
+		assert.Equal(t, original.Username(), decoded.Username())
+		assert.Equal(t, original.Host(), decoded.Host())
+		assert.Equal(t, original.AuthString(), decoded.AuthString())
 	})
 
 	t.Run("ホスト名がワイルドカードの場合も正しくエンコード・デコードできる", func(t *testing.T) {
@@ -61,8 +101,8 @@ func TestUserRecordEncode(t *testing.T) {
 		decoded := decodeUserRecord(record)
 
 		// THEN
-		assert.Equal(t, "root", decoded.Username)
-		assert.Equal(t, "%", decoded.Host)
+		assert.Equal(t, "root", decoded.Username())
+		assert.Equal(t, "%", decoded.Host())
 	})
 }
 
@@ -76,7 +116,7 @@ func TestDecodeUserRecord(t *testing.T) {
 		decoded := decodeUserRecord(record)
 
 		// THEN
-		assert.Equal(t, "alice", decoded.Username)
+		assert.Equal(t, "alice", decoded.Username())
 	})
 
 	t.Run("エンコード済みレコードからホスト名と認証文字列を復元できる", func(t *testing.T) {
@@ -88,7 +128,7 @@ func TestDecodeUserRecord(t *testing.T) {
 		decoded := decodeUserRecord(record)
 
 		// THEN
-		assert.Equal(t, "10.0.0.1", decoded.Host)
-		assert.Equal(t, []byte{0x01, 0x02, 0x03}, decoded.AuthString)
+		assert.Equal(t, "10.0.0.1", decoded.Host())
+		assert.Equal(t, []byte{0x01, 0x02, 0x03}, decoded.AuthString())
 	})
 }

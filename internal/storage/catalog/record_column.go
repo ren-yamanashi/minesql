@@ -9,29 +9,33 @@ import (
 )
 
 type ColumnRecord struct {
-	FileId page.FileId // カラムが属するテーブルの FileId
-	Name   string      // カラム名
-	Pos    int         // テーブル上のカラム位置
+	fileId   page.FileId // カラムが属するテーブルの FileId
+	name     string      // カラム名
+	position int         // テーブル上のカラム位置
 }
 
 func newColumnRecord(fileId page.FileId, name string, pos int) ColumnRecord {
 	return ColumnRecord{
-		FileId: fileId,
-		Name:   name,
-		Pos:    pos,
+		fileId:   fileId,
+		name:     name,
+		position: pos,
 	}
 }
+
+func (cr ColumnRecord) FileId() page.FileId { return cr.fileId }
+func (cr ColumnRecord) Name() string        { return cr.name }
+func (cr ColumnRecord) Position() int       { return cr.position }
 
 // encode は btree.Record にエンコードする
 func (cr ColumnRecord) encode() btree.Record {
 	// key = fileId + name
 	var key []byte
-	fileId := binary.BigEndian.AppendUint32(nil, uint32(cr.FileId))
-	encode.Encode([][]byte{fileId, []byte(cr.Name)}, &key)
+	fileId := binary.BigEndian.AppendUint32(nil, uint32(cr.fileId))
+	encode.Encode([][]byte{fileId, []byte(cr.name)}, &key)
 
 	// nonKey = pos
 	var nonKey []byte
-	pos := binary.BigEndian.AppendUint32(nil, uint32(cr.Pos))
+	pos := binary.BigEndian.AppendUint32(nil, uint32(cr.position))
 	encode.Encode([][]byte{pos}, &nonKey)
 
 	return btree.NewRecord(nil, key, nonKey)

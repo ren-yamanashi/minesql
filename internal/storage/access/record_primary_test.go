@@ -22,8 +22,8 @@ func TestNewPrimaryRecord(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, []string{"id", "name", "email"}, pr.ColNames)
-		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, pr.Values)
+		assert.Equal(t, []string{"id", "name", "email"}, pr.colNames)
+		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, pr.values)
 		assert.Equal(t, 1, pr.pkCount)
 		assert.Equal(t, byte(0), pr.deleteMark)
 	})
@@ -118,8 +118,8 @@ func TestPrimaryRecordUpdate(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, []string{"id", "name", "email"}, updated.ColNames)
-		assert.Equal(t, []string{"1", "Bob", "alice@example.com"}, updated.Values)
+		assert.Equal(t, []string{"id", "name", "email"}, updated.colNames)
+		assert.Equal(t, []string{"1", "Bob", "alice@example.com"}, updated.values)
 	})
 
 	t.Run("更新後のレコードに新しい trxId が設定され rollPtr は元の値が保持される", func(t *testing.T) {
@@ -152,7 +152,7 @@ func TestPrimaryRecordUpdate(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, pr.Values)
+		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, pr.values)
 	})
 
 	t.Run("複数カラムを同時に更新できる", func(t *testing.T) {
@@ -165,7 +165,7 @@ func TestPrimaryRecordUpdate(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, []string{"1", "Bob", "bob@example.com"}, updated.Values)
+		assert.Equal(t, []string{"1", "Bob", "bob@example.com"}, updated.values)
 	})
 
 	t.Run("カラム名と値の数が一致しない場合エラーを返す", func(t *testing.T) {
@@ -263,6 +263,79 @@ func TestPrimaryRecordSetRollPtr(t *testing.T) {
 	})
 }
 
+func TestPrimaryRecordSecondaryKey(t *testing.T) {
+	t.Run("primaryRecord から SK+PK キーを構築できる", func(t *testing.T) {
+		// GIVEN
+		record := &primaryRecord{
+			pkCount:  1,
+			colNames: []string{"id", "name", "email"},
+			values:   []string{"1", "Alice", "alice@example.com"},
+		}
+		keyCols := map[string]int{"name": 0}
+
+		// WHEN
+		key := record.secondaryKey(keyCols)
+
+		// THEN
+		assert.NotEmpty(t, key)
+	})
+
+	t.Run("同じ入力に対して同じキーを返す", func(t *testing.T) {
+		// GIVEN
+		record := &primaryRecord{
+			pkCount:  1,
+			colNames: []string{"id", "name"},
+			values:   []string{"1", "Alice"},
+		}
+		keyCols := map[string]int{"name": 0}
+
+		// WHEN
+		key1 := record.secondaryKey(keyCols)
+		key2 := record.secondaryKey(keyCols)
+
+		// THEN
+		assert.Equal(t, key1, key2)
+	})
+
+	t.Run("異なる SK 値に対して異なるキーを返す", func(t *testing.T) {
+		// GIVEN
+		record1 := &primaryRecord{
+			pkCount:  1,
+			colNames: []string{"id", "name"},
+			values:   []string{"1", "Alice"},
+		}
+		record2 := &primaryRecord{
+			pkCount:  1,
+			colNames: []string{"id", "name"},
+			values:   []string{"1", "Bob"},
+		}
+		keyCols := map[string]int{"name": 0}
+
+		// WHEN
+		key1 := record1.secondaryKey(keyCols)
+		key2 := record2.secondaryKey(keyCols)
+
+		// THEN
+		assert.NotEqual(t, key1, key2)
+	})
+
+	t.Run("複合セカンダリキーを正しくエンコードする", func(t *testing.T) {
+		// GIVEN
+		record := &primaryRecord{
+			pkCount:  1,
+			colNames: []string{"id", "name", "email"},
+			values:   []string{"1", "Alice", "alice@example.com"},
+		}
+		keyCols := map[string]int{"email": 0, "name": 1}
+
+		// WHEN
+		key := record.secondaryKey(keyCols)
+
+		// THEN
+		assert.NotEmpty(t, key)
+	})
+}
+
 func TestPrimaryRecordEncode(t *testing.T) {
 	t.Run("プライマリキーと非キーカラムをエンコードしたレコードを返す", func(t *testing.T) {
 		// GIVEN
@@ -339,79 +412,6 @@ func TestPrimaryRecordEncode(t *testing.T) {
 	})
 }
 
-func TestPrimaryRecordSecondaryKey(t *testing.T) {
-	t.Run("primaryRecord から SK+PK キーを構築できる", func(t *testing.T) {
-		// GIVEN
-		record := &primaryRecord{
-			pkCount:  1,
-			ColNames: []string{"id", "name", "email"},
-			Values:   []string{"1", "Alice", "alice@example.com"},
-		}
-		keyCols := map[string]int{"name": 0}
-
-		// WHEN
-		key := record.secondaryKey(keyCols)
-
-		// THEN
-		assert.NotEmpty(t, key)
-	})
-
-	t.Run("同じ入力に対して同じキーを返す", func(t *testing.T) {
-		// GIVEN
-		record := &primaryRecord{
-			pkCount:  1,
-			ColNames: []string{"id", "name"},
-			Values:   []string{"1", "Alice"},
-		}
-		keyCols := map[string]int{"name": 0}
-
-		// WHEN
-		key1 := record.secondaryKey(keyCols)
-		key2 := record.secondaryKey(keyCols)
-
-		// THEN
-		assert.Equal(t, key1, key2)
-	})
-
-	t.Run("異なる SK 値に対して異なるキーを返す", func(t *testing.T) {
-		// GIVEN
-		record1 := &primaryRecord{
-			pkCount:  1,
-			ColNames: []string{"id", "name"},
-			Values:   []string{"1", "Alice"},
-		}
-		record2 := &primaryRecord{
-			pkCount:  1,
-			ColNames: []string{"id", "name"},
-			Values:   []string{"1", "Bob"},
-		}
-		keyCols := map[string]int{"name": 0}
-
-		// WHEN
-		key1 := record1.secondaryKey(keyCols)
-		key2 := record2.secondaryKey(keyCols)
-
-		// THEN
-		assert.NotEqual(t, key1, key2)
-	})
-
-	t.Run("複合セカンダリキーを正しくエンコードする", func(t *testing.T) {
-		// GIVEN
-		record := &primaryRecord{
-			pkCount:  1,
-			ColNames: []string{"id", "name", "email"},
-			Values:   []string{"1", "Alice", "alice@example.com"},
-		}
-		keyCols := map[string]int{"email": 0, "name": 1}
-
-		// WHEN
-		key := record.secondaryKey(keyCols)
-
-		// THEN
-		assert.NotEmpty(t, key)
-	})
-}
-
 func TestDecodePrimaryRecord(t *testing.T) {
 	t.Run("エンコードしたレコードをデコードすると元のデータに戻る", func(t *testing.T) {
 		// GIVEN
@@ -424,8 +424,8 @@ func TestDecodePrimaryRecord(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, original.ColNames, decoded.ColNames)
-		assert.Equal(t, original.Values, decoded.Values)
+		assert.Equal(t, original.colNames, decoded.colNames)
+		assert.Equal(t, original.values, decoded.values)
 		assert.Equal(t, original.pkCount, decoded.pkCount)
 		assert.Equal(t, original.deleteMark, decoded.deleteMark)
 	})

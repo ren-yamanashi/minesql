@@ -13,6 +13,8 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
+var errColNameValueMismatch = errors.New("number of colNames not equal values")
+
 type newPrimaryRecordInput struct {
 	fileId     page.FileId
 	pkCount    int
@@ -29,13 +31,13 @@ type primaryRecord struct {
 	deleteMark byte
 	lastTrxId  lock.TrxId
 	rollPtr    undo.Pointer
-	ColNames   []string
-	Values     []string
+	colNames   []string
+	values     []string
 }
 
 func newPrimaryRecord(ct *catalog.Catalog, input newPrimaryRecordInput) (*primaryRecord, error) {
 	if len(input.colNames) != len(input.values) {
-		return nil, errors.New("number of colNames not equal values")
+		return nil, errColNameValueMismatch
 	}
 	return sortPrimaryRecord(ct, input)
 }
@@ -44,19 +46,19 @@ func newPrimaryRecord(ct *catalog.Catalog, input newPrimaryRecordInput) (*primar
 // (colNames はテーブルの全カラムである必要はない)
 func (r *primaryRecord) update(trxId lock.TrxId, colNames, values []string) (*primaryRecord, error) {
 	if len(colNames) != len(values) {
-		return nil, errors.New("number of colNames not equal values")
+		return nil, errColNameValueMismatch
 	}
 
 	// 既存の PrimaryRecord のカラム名 → 位置のマップを構築
 	posMap := map[string]int{}
-	for i, name := range r.ColNames {
+	for i, name := range r.colNames {
 		posMap[name] = i
 	}
 
-	newColNames := make([]string, len(r.ColNames))
-	newValues := make([]string, len(r.Values))
-	copy(newColNames, r.ColNames)
-	copy(newValues, r.Values)
+	newColNames := make([]string, len(r.colNames))
+	newValues := make([]string, len(r.values))
+	copy(newColNames, r.colNames)
+	copy(newValues, r.values)
 
 	seen := map[string]bool{}
 	for i, name := range colNames {
@@ -76,8 +78,8 @@ func (r *primaryRecord) update(trxId lock.TrxId, colNames, values []string) (*pr
 		deleteMark: r.deleteMark,
 		lastTrxId:  trxId,
 		rollPtr:    r.rollPtr,
-		ColNames:   newColNames,
-		Values:     newValues,
+		colNames:   newColNames,
+		values:     newValues,
 	}, nil
 }
 
@@ -88,9 +90,9 @@ func (r *primaryRecord) setRollPtr(rollPtr undo.Pointer) {
 
 // secondaryKey はセカンダリインデックスの B+Tree キー (SK+PK) を構築する
 func (r *primaryRecord) secondaryKey(keyCols map[string]int) []byte {
-	valMap := make(map[string]string, len(r.ColNames))
-	for i, name := range r.ColNames {
-		valMap[name] = r.Values[i]
+	valMap := make(map[string]string, len(r.colNames))
+	for i, name := range r.colNames {
+		valMap[name] = r.values[i]
 	}
 
 	// SK をインデックス定義順に取得
@@ -100,7 +102,7 @@ func (r *primaryRecord) secondaryKey(keyCols map[string]int) []byte {
 	}
 
 	// PK を取得
-	pkValues := r.Values[:r.pkCount]
+	pkValues := r.values[:r.pkCount]
 
 	// SK + PK をエンコード
 	var key []byte
@@ -113,12 +115,12 @@ func (r *primaryRecord) secondaryKey(keyCols map[string]int) []byte {
 //   - 非キー領域: lastTrxId (4B) + rollPtr (6B) + 非キーカラム
 func (r *primaryRecord) encode() btree.Record {
 	var key []byte
-	encode.Encode(stringToByteSlice(r.Values[:r.pkCount]), &key)
+	encode.Encode(stringToByteSlice(r.values[:r.pkCount]), &key)
 
 	var nonKey []byte
 	nonKey = binary.BigEndian.AppendUint32(nonKey, uint32(r.lastTrxId))
 	nonKey = append(nonKey, r.rollPtr.Encode()...)
-	encode.Encode(stringToByteSlice(r.Values[r.pkCount:]), &nonKey)
+	encode.Encode(stringToByteSlice(r.values[r.pkCount:]), &nonKey)
 
 	return btree.NewRecord([]byte{r.deleteMark}, key, nonKey)
 }
@@ -134,7 +136,10 @@ func decodePrimaryRecord(record btree.Record, ct *catalog.Catalog, fileId page.F
 	nonKey := record.NonKey()
 	const systemFieldsSize = lock.TrxIdSize + undo.PointerSize
 	if len(nonKey) < systemFieldsSize {
-		return nil, fmt.Errorf("non-key data too short: got %d bytes, need at least %d", len(nonKey), systemFieldsSize)
+		return nil, fmt.Errorf(
+			"non-key data too short: got %d bytes, need at least %d",
+			len(nonKey), systemFieldsSize,
+		)
 	}
 	lastTrxId := lock.TrxId(binary.BigEndian.Uint32(nonKey[:lock.TrxIdSize]))
 	rollPtr, err := undo.DecodePointer(nonKey[lock.TrxIdSize:systemFieldsSize])
@@ -163,8 +168,8 @@ func decodePrimaryRecord(record btree.Record, ct *catalog.Catalog, fileId page.F
 		deleteMark: record.Header()[0],
 		lastTrxId:  lastTrxId,
 		rollPtr:    rollPtr,
-		ColNames:   colNames,
-		Values:     byteSliceToString(values),
+		colNames:   colNames,
+		values:     byteSliceToString(values),
 	}, nil
 }
 
@@ -199,15 +204,15 @@ func sortPrimaryRecord(ct *catalog.Catalog, input newPrimaryRecordInput) (*prima
 		deleteMark: input.deleteMark,
 		lastTrxId:  input.lastTrxId,
 		rollPtr:    input.rollPtr,
-		ColNames:   sortedColNames,
-		Values:     sortedValues,
+		colNames:   sortedColNames,
+		values:     sortedValues,
 	}, nil
 }
 
 // fetchColumnDefs はカラムメタデータを検索し、カラム名 → テーブル定義上の位置のマップを返す
 func fetchColumnDefs(ct *catalog.Catalog, fileId page.FileId) (map[string]int, error) {
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
-	iter, err := ct.ColumnMeta.Search(catalog.SearchModeKey{Key: [][]byte{fileIdBytes}})
+	iter, err := ct.ColumnMeta().Search(catalog.SearchModeKey{Key: [][]byte{fileIdBytes}})
 	if err != nil {
 		return nil, err
 	}
@@ -221,10 +226,10 @@ func fetchColumnDefs(ct *catalog.Catalog, fileId page.FileId) (map[string]int, e
 		if !ok {
 			break
 		}
-		if colRecord.FileId != fileId {
+		if colRecord.FileId() != fileId {
 			break
 		}
-		colDefs[colRecord.Name] = colRecord.Pos
+		colDefs[colRecord.Name()] = colRecord.Position()
 	}
 	return colDefs, nil
 }

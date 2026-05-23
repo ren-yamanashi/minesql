@@ -17,7 +17,13 @@ func (t *Table) Update(currentRecord *primaryRecord, colNames, values []string, 
 	}
 
 	// Undo ログを更新
-	undoRecord := undo.NewUpdateRecord(t.primaryIndex.fileId(), currentRecord.encode(), newRecord.encode(), currentRecord.lastTrxId, currentRecord.rollPtr)
+	undoRecord := undo.NewUpdateRecord(
+		t.primaryIndex.fileId(),
+		currentRecord.encode(),
+		newRecord.encode(),
+		currentRecord.lastTrxId,
+		currentRecord.rollPtr,
+	)
 	ptr, err := t.undoLog.Append(trxId, undo.RecordTypeUpdate, undoRecord)
 	if err != nil {
 		return err
@@ -33,20 +39,24 @@ func (t *Table) Update(currentRecord *primaryRecord, colNames, values []string, 
 
 // updateSecondaryIndexes はセカンダリインデックスを更新する
 // インデックスを構成するカラムの値が変更される場合のみ、論理削除 + 新規挿入で更新する
-func (t *Table) updateSecondaryIndexes(before *primaryRecord, updateColNames, updateValues []string, trxId lock.TrxId) error {
+func (t *Table) updateSecondaryIndexes(
+	before *primaryRecord,
+	updateColNames, updateValues []string,
+	trxId lock.TrxId,
+) error {
 	updatedCols := t.buildValMap(updateColNames, updateValues)
-	oldValMap := t.buildValMap(before.ColNames, before.Values)
+	oldValMap := t.buildValMap(before.colNames, before.values)
 
 	// 更新後の値マップ (before をベースに更新カラムだけ上書き)
-	newValMap := t.buildValMap(before.ColNames, before.Values)
+	newValMap := t.buildValMap(before.colNames, before.values)
 	for name, val := range updatedCols {
 		newValMap[name] = val
 	}
 
-	pk := t.extractPrimaryKey(before.Values)
+	pk := t.extractPrimaryKey(before.values)
 
 	for _, si := range t.secondaryIndexes {
-		keyCols, err := fetchIndexKeyCol(t.catalog, si.indexId)
+		keyCols, err := fetchIndexKeyColumn(t.catalog, si.indexId)
 		if err != nil {
 			return err
 		}

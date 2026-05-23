@@ -6,36 +6,36 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
-type IndexKeyColMeta struct {
+type IndexKeyColumnMeta struct {
 	tree *btree.Tree // インデックスキーカラムメタデータが格納される B+Tree
 }
 
-func newIndexKeyColMeta(bp *buffer.Pool, metaPageId page.Id) *IndexKeyColMeta {
-	return &IndexKeyColMeta{tree: btree.NewTree(bp, metaPageId)}
+func newIndexKeyColumnMeta(bp *buffer.Pool, metaPageId page.Id) *IndexKeyColumnMeta {
+	return &IndexKeyColumnMeta{tree: btree.NewTree(bp, metaPageId)}
 }
 
-func createIndexKeyColMeta(bp *buffer.Pool) (*IndexKeyColMeta, error) {
+func createIndexKeyColumnMeta(bp *buffer.Pool) (*IndexKeyColumnMeta, error) {
 	tree, err := btree.CreateTree(bp, catalogFileId)
 	if err != nil {
 		return nil, err
 	}
-	return &IndexKeyColMeta{tree: tree}, nil
+	return &IndexKeyColumnMeta{tree: tree}, nil
 }
 
 // Search は指定した検索モードでメタデータを検索し、イテレータを返す
-func (kcm *IndexKeyColMeta) Search(mode SearchMode) (*indexKeyColIterator, error) {
+func (kcm *IndexKeyColumnMeta) Search(mode SearchMode) (*indexKeyColumnIterator, error) {
 	iter, err := kcm.tree.Search(mode.encode())
 	if err != nil {
 		return nil, err
 	}
-	return newIndexKeyColIterator(iter), nil
+	return newIndexKeyColumnIterator(iter), nil
 }
 
 // Insert はレコードを挿入する
 //   - indexId: インデックス ID
 //   - name: カラム名
 //   - colPos: インデックス上のカラム位置
-func (kcm *IndexKeyColMeta) Insert(indexId IndexId, name string, colPos int) error {
-	record := newIndexKeyColRecord(indexId, name, colPos)
+func (kcm *IndexKeyColumnMeta) Insert(indexId IndexId, name string, colPos int) error {
+	record := newIndexKeyColumnRecord(indexId, name, colPos)
 	return kcm.tree.Insert(record.encode())
 }

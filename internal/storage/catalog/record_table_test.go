@@ -7,6 +7,46 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestTableRecordName(t *testing.T) {
+	t.Run("コンストラクタで指定した名前を返す", func(t *testing.T) {
+		// GIVEN
+		tr := newTableRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3)
+
+		// WHEN
+		got := tr.Name()
+
+		// THEN
+		assert.Equal(t, "users", got)
+	})
+}
+
+func TestTableRecordMetaPageId(t *testing.T) {
+	t.Run("コンストラクタで指定したメタページ ID を返す", func(t *testing.T) {
+		// GIVEN
+		metaPageId := page.NewId(page.FileId(1), page.PageNumber(0))
+		tr := newTableRecord("users", metaPageId, 3)
+
+		// WHEN
+		got := tr.MetaPageId()
+
+		// THEN
+		assert.Equal(t, metaPageId, got)
+	})
+}
+
+func TestTableRecordColumnCount(t *testing.T) {
+	t.Run("コンストラクタで指定したカラム数を返す", func(t *testing.T) {
+		// GIVEN
+		tr := newTableRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3)
+
+		// WHEN
+		got := tr.ColumnCount()
+
+		// THEN
+		assert.Equal(t, 3, got)
+	})
+}
+
 func TestTableRecordEncode(t *testing.T) {
 	t.Run("テーブルレコードをエンコードできる", func(t *testing.T) {
 		// GIVEN
@@ -30,9 +70,9 @@ func TestTableRecordEncode(t *testing.T) {
 		decoded := decodeTableRecord(record)
 
 		// THEN
-		assert.Equal(t, original.MetaPageId, decoded.MetaPageId)
-		assert.Equal(t, original.Name, decoded.Name)
-		assert.Equal(t, original.NumOfCol, decoded.NumOfCol)
+		assert.Equal(t, original.MetaPageId(), decoded.MetaPageId())
+		assert.Equal(t, original.Name(), decoded.Name())
+		assert.Equal(t, original.ColumnCount(), decoded.ColumnCount())
 	})
 
 	t.Run("カラム数が 0 の場合も正しくエンコード・デコードできる", func(t *testing.T) {
@@ -44,9 +84,9 @@ func TestTableRecordEncode(t *testing.T) {
 		decoded := decodeTableRecord(record)
 
 		// THEN
-		assert.Equal(t, original.MetaPageId, decoded.MetaPageId)
-		assert.Equal(t, original.Name, decoded.Name)
-		assert.Equal(t, original.NumOfCol, decoded.NumOfCol)
+		assert.Equal(t, original.MetaPageId(), decoded.MetaPageId())
+		assert.Equal(t, original.Name(), decoded.Name())
+		assert.Equal(t, original.ColumnCount(), decoded.ColumnCount())
 	})
 
 	t.Run("長いテーブル名でも正しくエンコード・デコードできる", func(t *testing.T) {
@@ -58,7 +98,7 @@ func TestTableRecordEncode(t *testing.T) {
 		decoded := decodeTableRecord(record)
 
 		// THEN
-		assert.Equal(t, original.Name, decoded.Name)
+		assert.Equal(t, original.Name(), decoded.Name())
 	})
 
 	t.Run("MetaPageId のページ番号が 0 の場合も正しくエンコード・デコードできる", func(t *testing.T) {
@@ -70,9 +110,9 @@ func TestTableRecordEncode(t *testing.T) {
 		decoded := decodeTableRecord(record)
 
 		// THEN
-		assert.Equal(t, page.NewId(page.FileId(0), page.PageNumber(0)), decoded.MetaPageId)
-		assert.Equal(t, "t", decoded.Name)
-		assert.Equal(t, 1, decoded.NumOfCol)
+		assert.Equal(t, page.NewId(page.FileId(0), page.PageNumber(0)), decoded.MetaPageId())
+		assert.Equal(t, "t", decoded.Name())
+		assert.Equal(t, 1, decoded.ColumnCount())
 	})
 }
 
@@ -86,7 +126,7 @@ func TestDecodeTableRecord(t *testing.T) {
 		decoded := decodeTableRecord(record)
 
 		// THEN
-		assert.Equal(t, page.NewId(page.FileId(42), page.PageNumber(0)), decoded.MetaPageId)
+		assert.Equal(t, page.NewId(page.FileId(42), page.PageNumber(0)), decoded.MetaPageId())
 	})
 
 	t.Run("エンコード済みレコードからテーブル名とカラム数を復元できる", func(t *testing.T) {
@@ -98,7 +138,7 @@ func TestDecodeTableRecord(t *testing.T) {
 		decoded := decodeTableRecord(record)
 
 		// THEN
-		assert.Equal(t, "products", decoded.Name)
-		assert.Equal(t, 7, decoded.NumOfCol)
+		assert.Equal(t, "products", decoded.Name())
+		assert.Equal(t, 7, decoded.ColumnCount())
 	})
 }

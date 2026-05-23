@@ -3,6 +3,7 @@ package access
 import (
 	"log"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
@@ -21,7 +22,7 @@ type PageCleaner struct {
 	done            chan struct{}
 	stopped         chan struct{} // goroutine 終了通知用
 	stopOnce        sync.Once
-	isRunning       bool
+	isRunning       atomic.Bool
 }
 
 func NewPageCleaner(bp *buffer.Pool, redo *redo.Buffer, redoMaxSize int, maxDirtyPct int) *PageCleaner {
@@ -37,27 +38,26 @@ func NewPageCleaner(bp *buffer.Pool, redo *redo.Buffer, redoMaxSize int, maxDirt
 
 // Start はバックグラウンド goroutine を起動する
 func (pc *PageCleaner) Start() {
-	if pc.isRunning {
+	if !pc.isRunning.CompareAndSwap(false, true) {
 		return
 	}
 	pc.ticker = time.NewTicker(pc.interval)
 	pc.done = make(chan struct{})
 	pc.stopped = make(chan struct{})
 	pc.stopOnce = sync.Once{}
-	pc.isRunning = true
 	go pc.loop()
 }
 
 // Stop はバックグラウンド goroutine を停止し、終了を待つ
 func (pc *PageCleaner) Stop() {
 	pc.stopOnce.Do(func() {
-		if !pc.isRunning {
+		if !pc.isRunning.Load() {
 			return
 		}
 		close(pc.done)
 		<-pc.stopped
 		pc.ticker.Stop()
-		pc.isRunning = false
+		pc.isRunning.Store(false)
 	})
 }
 

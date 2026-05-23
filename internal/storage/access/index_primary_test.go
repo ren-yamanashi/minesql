@@ -40,6 +40,54 @@ func TestCreatePrimaryIndex(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, pi)
+		assert.Equal(t, 1, pi.pkCount)
+	})
+
+	t.Run("pkCount が複数のプライマリインデックスを作成できる", func(t *testing.T) {
+		// GIVEN
+		env := setupIteratorTestEnv(t)
+		lockMgr := lock.NewManager()
+
+		// WHEN
+		pi, err := createPrimaryIndex(env.ct, env.bp, page.FileId(2), 2, lockMgr)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 2, pi.pkCount)
+	})
+}
+
+func TestPrimaryIndexSearch(t *testing.T) {
+	t.Run("全件スキャンでレコードを取得できる", func(t *testing.T) {
+		// GIVEN
+		pi := setupTestPrimaryIndex(t)
+		record := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
+		_ = pi.insert(record, testTrxId)
+
+		// WHEN
+		iter, err := pi.search(SearchModeStart{})
+
+		// THEN
+		assert.NoError(t, err)
+		result, ok, err := iter.next()
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, result.values)
+	})
+
+	t.Run("空のインデックスを検索するとデータなしを返す", func(t *testing.T) {
+		// GIVEN
+		pi := setupTestPrimaryIndex(t)
+
+		// WHEN
+		iter, err := pi.search(SearchModeStart{})
+		assert.NoError(t, err)
+
+		_, ok, err := iter.next()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.False(t, ok)
 	})
 }
 
@@ -123,37 +171,38 @@ func TestPrimaryIndexInsert(t *testing.T) {
 	})
 }
 
-func TestPrimaryIndexSearch(t *testing.T) {
-	t.Run("全件スキャンでレコードを取得できる", func(t *testing.T) {
+func TestPrimaryIndexDelete(t *testing.T) {
+	t.Run("レコードを物理削除できる", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		record := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
-		_ = pi.insert(record, testTrxId)
+		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
+		_ = pi.insert(r, testTrxId)
+
+		iter, _ := pi.search(SearchModeStart{})
+		record, _, _ := iter.next()
 
 		// WHEN
-		iter, err := pi.search(SearchModeStart{})
+		err := pi.delete(record, testTrxId)
 
 		// THEN
 		assert.NoError(t, err)
-		result, ok, err := iter.next()
-		assert.NoError(t, err)
-		assert.True(t, ok)
-		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, result.Values)
+
+		// 削除後は取得できない
+		iter2, _ := pi.search(SearchModeStart{})
+		_, ok, _ := iter2.next()
+		assert.False(t, ok)
 	})
 
-	t.Run("空のインデックスを検索するとデータなしを返す", func(t *testing.T) {
+	t.Run("存在しないレコードの削除はエラーを返す", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
+		pr := buildTestPrimaryRecord(t, pi, "999", "Nobody", "no@example.com")
 
 		// WHEN
-		iter, err := pi.search(SearchModeStart{})
-		assert.NoError(t, err)
-
-		_, ok, err := iter.next()
+		err := pi.delete(pr, testTrxId)
 
 		// THEN
-		assert.NoError(t, err)
-		assert.False(t, ok)
+		assert.Error(t, err)
 	})
 }
 
@@ -220,8 +269,8 @@ func TestPrimaryIndexUpdate(t *testing.T) {
 		iter2, _ := pi.search(SearchModeStart{})
 		updated, ok, _ := iter2.next()
 		assert.True(t, ok)
-		assert.Equal(t, "Bob", updated.Values[1])
-		assert.Equal(t, "alice@example.com", updated.Values[2])
+		assert.Equal(t, "Bob", updated.values[1])
+		assert.Equal(t, "alice@example.com", updated.values[2])
 	})
 
 	t.Run("存在しないカラムで更新するとエラーを返す", func(t *testing.T) {
@@ -235,41 +284,6 @@ func TestPrimaryIndexUpdate(t *testing.T) {
 
 		// WHEN
 		_, err := current.update(testTrxId, []string{"nonexistent"}, []string{"val"})
-
-		// THEN
-		assert.Error(t, err)
-	})
-}
-
-func TestPrimaryIndexDelete(t *testing.T) {
-	t.Run("レコードを物理削除できる", func(t *testing.T) {
-		// GIVEN
-		pi := setupTestPrimaryIndex(t)
-		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
-		_ = pi.insert(r, testTrxId)
-
-		iter, _ := pi.search(SearchModeStart{})
-		record, _, _ := iter.next()
-
-		// WHEN
-		err := pi.delete(record, testTrxId)
-
-		// THEN
-		assert.NoError(t, err)
-
-		// 削除後は取得できない
-		iter2, _ := pi.search(SearchModeStart{})
-		_, ok, _ := iter2.next()
-		assert.False(t, ok)
-	})
-
-	t.Run("存在しないレコードの削除はエラーを返す", func(t *testing.T) {
-		// GIVEN
-		pi := setupTestPrimaryIndex(t)
-		pr := buildTestPrimaryRecord(t, pi, "999", "Nobody", "no@example.com")
-
-		// WHEN
-		err := pi.delete(pr, testTrxId)
 
 		// THEN
 		assert.Error(t, err)

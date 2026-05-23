@@ -69,7 +69,7 @@ func TestCreateTable(t *testing.T) {
 		record, ok, err := iter.next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, record.Values)
+		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, record.values)
 	})
 
 	t.Run("制約付きテーブルを作成できる", func(t *testing.T) {
@@ -95,10 +95,10 @@ func TestCreateTable(t *testing.T) {
 			},
 			Constraints: []CreateConstraintInput{
 				{
-					ColName:        "dept_id",
-					ConstraintName: "fk_dept",
-					RefTableName:   "departments",
-					RefColName:     "id",
+					ColumnName:          "dept_id",
+					ConstraintName:      "fk_dept",
+					ReferenceTableName:  "departments",
+					ReferenceColumnName: "id",
 				},
 			},
 		}
@@ -140,10 +140,10 @@ func TestCreateTable(t *testing.T) {
 			PkCount:   1,
 			Constraints: []CreateConstraintInput{
 				{
-					ColName:        "dept_id",
-					ConstraintName: "fk_dept",
-					RefTableName:   "nonexistent",
-					RefColName:     "id",
+					ColumnName:          "dept_id",
+					ConstraintName:      "fk_dept",
+					ReferenceTableName:  "nonexistent",
+					ReferenceColumnName: "id",
 				},
 			},
 		}
@@ -174,7 +174,7 @@ func TestCreateTable(t *testing.T) {
 	})
 }
 
-func TestCreate(t *testing.T) {
+func TestCreateTableFile(t *testing.T) {
 	t.Run("テーブルのファイルを作成しバッファプールに登録できる", func(t *testing.T) {
 		// GIVEN
 		env := setupCreateTestEnv(t)
@@ -191,25 +191,9 @@ func TestCreate(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotEqual(t, page.FileId(0), fileId)
 	})
+}
 
-	t.Run("プライマリインデックスを作成できる", func(t *testing.T) {
-		// GIVEN
-		env := setupCreateTestEnv(t)
-		input := CreateTableInput{
-			TableName: "users",
-			ColNames:  []string{"id", "name", "email"},
-			PkCount:   1,
-		}
-
-		// WHEN
-		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr)
-
-		// THEN
-		assert.NoError(t, err)
-		assert.NotNil(t, pi)
-		assert.Equal(t, 1, pi.pkCount)
-	})
-
+func TestRegisterTableMeta(t *testing.T) {
 	t.Run("テーブルメタ・カラムメタをカタログに登録できる", func(t *testing.T) {
 		// GIVEN
 		env := setupCreateTestEnv(t)
@@ -229,8 +213,8 @@ func TestCreate(t *testing.T) {
 
 		tableRecord, err := fetchTable(env.ct, "users")
 		assert.NoError(t, err)
-		assert.Equal(t, "users", tableRecord.Name)
-		assert.Equal(t, 3, tableRecord.NumOfCol)
+		assert.Equal(t, "users", tableRecord.Name())
+		assert.Equal(t, 3, tableRecord.ColumnCount())
 
 		colDefs, err := fetchColumnDefs(env.ct, env.fileId)
 		assert.NoError(t, err)
@@ -240,24 +224,7 @@ func TestCreate(t *testing.T) {
 		assert.Equal(t, 2, colDefs["email"])
 	})
 
-	t.Run("pkCount が複数のプライマリインデックスを作成できる", func(t *testing.T) {
-		// GIVEN
-		env := setupCreateTestEnv(t)
-		input := CreateTableInput{
-			TableName: "composite",
-			ColNames:  []string{"k1", "k2", "val"},
-			PkCount:   2,
-		}
-
-		// WHEN
-		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr)
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, 2, pi.pkCount)
-	})
-
-	t.Run("同一テーブル名で registerTableMeta を 2 回呼ぶとエラーを返す", func(t *testing.T) {
+	t.Run("同一テーブル名で 2 回呼ぶとエラーを返す", func(t *testing.T) {
 		// GIVEN
 		env := setupCreateTestEnv(t)
 		input := CreateTableInput{
@@ -276,7 +243,9 @@ func TestCreate(t *testing.T) {
 		// THEN
 		assert.Error(t, err)
 	})
+}
 
+func TestCreateSecondaryIndexes(t *testing.T) {
 	t.Run("セカンダリインデックスを作成しカタログに登録できる", func(t *testing.T) {
 		// GIVEN
 		env := setupCreateTestEnvWithTable(t)
@@ -357,16 +326,18 @@ func TestCreate(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Empty(t, sis)
 	})
+}
 
+func TestCreateConstraints(t *testing.T) {
 	t.Run("制約をカタログに登録できる", func(t *testing.T) {
 		// GIVEN
 		env := setupCreateTestEnvWithTable(t)
 		inputs := []CreateConstraintInput{
 			{
-				ColName:        "manager_id",
-				ConstraintName: "fk_manager",
-				RefTableName:   "users",
-				RefColName:     "id",
+				ColumnName:          "manager_id",
+				ConstraintName:      "fk_manager",
+				ReferenceTableName:  "users",
+				ReferenceColumnName: "id",
 			},
 		}
 
@@ -382,10 +353,10 @@ func TestCreate(t *testing.T) {
 		env := setupCreateTestEnvWithTable(t)
 		inputs := []CreateConstraintInput{
 			{
-				ColName:        "user_id",
-				ConstraintName: "fk_user",
-				RefTableName:   "nonexistent",
-				RefColName:     "id",
+				ColumnName:          "user_id",
+				ConstraintName:      "fk_user",
+				ReferenceTableName:  "nonexistent",
+				ReferenceColumnName: "id",
 			},
 		}
 

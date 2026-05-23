@@ -66,8 +66,8 @@ func TestTableSoftDelete(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		reinserted := searchFirstPrimaryRecord(t, table)
-		assert.Equal(t, "Bob", reinserted.Values[1])
-		assert.Equal(t, "bob@example.com", reinserted.Values[2])
+		assert.Equal(t, "Bob", reinserted.values[1])
+		assert.Equal(t, "bob@example.com", reinserted.values[2])
 	})
 
 	t.Run("論理削除後のレコードに rollPtr が設定される", func(t *testing.T) {
@@ -99,8 +99,8 @@ func TestTableSoftDelete(t *testing.T) {
 			pkCount:    1,
 			deleteMark: 0,
 			rollPtr:    undo.NullPointer,
-			ColNames:   []string{"id", "name", "email"},
-			Values:     []string{"999", "Nobody", "nobody@example.com"},
+			colNames:   []string{"id", "name", "email"},
+			values:     []string{"999", "Nobody", "nobody@example.com"},
 		}
 
 		// WHEN
@@ -120,7 +120,7 @@ func TestTableSoftDelete(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		alice := searchFirstPrimaryRecord(t, table)
-		assert.Equal(t, "Alice", alice.Values[1])
+		assert.Equal(t, "Alice", alice.values[1])
 
 		// WHEN
 		err = table.SoftDelete(alice, tableTrxId)
@@ -128,8 +128,8 @@ func TestTableSoftDelete(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		remaining := searchFirstPrimaryRecord(t, table)
-		assert.Equal(t, "Bob", remaining.Values[1])
-		assert.Equal(t, "bob@example.com", remaining.Values[2])
+		assert.Equal(t, "Bob", remaining.values[1])
+		assert.Equal(t, "bob@example.com", remaining.values[2])
 	})
 }
 
@@ -192,8 +192,8 @@ func TestTableDelete(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		reinserted := searchFirstPrimaryRecord(t, table)
-		assert.Equal(t, "Bob", reinserted.Values[1])
-		assert.Equal(t, "bob@example.com", reinserted.Values[2])
+		assert.Equal(t, "Bob", reinserted.values[1])
+		assert.Equal(t, "bob@example.com", reinserted.values[2])
 	})
 
 	t.Run("存在しないレコードを物理削除するとエラーを返す", func(t *testing.T) {
@@ -205,8 +205,8 @@ func TestTableDelete(t *testing.T) {
 			pkCount:    1,
 			deleteMark: 0,
 			rollPtr:    undo.NullPointer,
-			ColNames:   []string{"id", "name", "email"},
-			Values:     []string{"999", "Nobody", "nobody@example.com"},
+			colNames:   []string{"id", "name", "email"},
+			values:     []string{"999", "Nobody", "nobody@example.com"},
 		}
 
 		// WHEN
@@ -226,7 +226,7 @@ func TestTableDelete(t *testing.T) {
 		)
 		assert.NoError(t, err)
 		alice := searchFirstPrimaryRecord(t, table)
-		assert.Equal(t, "Alice", alice.Values[1])
+		assert.Equal(t, "Alice", alice.values[1])
 
 		// WHEN
 		err = table.Delete(alice, tableTrxId)
@@ -234,7 +234,7 @@ func TestTableDelete(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		remaining := searchFirstPrimaryRecord(t, table)
-		assert.Equal(t, "Bob", remaining.Values[1])
-		assert.Equal(t, "bob@example.com", remaining.Values[2])
+		assert.Equal(t, "Bob", remaining.values[1])
+		assert.Equal(t, "bob@example.com", remaining.values[2])
 	})
 }

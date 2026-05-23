@@ -165,8 +165,8 @@ func TestTableBuildSecondaryRecord(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, sr)
-		assert.Equal(t, []string{"Alice"}, sr.Values)
-		assert.Equal(t, []string{"1"}, sr.Pk)
+		assert.Equal(t, []string{"Alice"}, sr.values)
+		assert.Equal(t, []string{"1"}, sr.pk)
 	})
 }
 
@@ -210,31 +210,31 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 	fileId := page.FileId(2)
 
 	// テーブルメタデータ (MetaPageId としてプライマリ B+Tree の MetaPageId を使用)
-	_ = env.ct.TableMeta.Insert("users", env.primaryTree.MetaPageId(), 3)
+	_ = env.ct.TableMeta().Insert("users", env.primaryTree.MetaPageId(), 3)
 
 	// プライマリインデックスメタデータ
 	piIndexId := catalog.IndexId(0)
-	_ = env.ct.IndexMeta.Insert(catalog.IndexRecord{
-		FileId:     fileId,
-		Name:       catalog.PrimaryIndexName,
-		IndexId:    piIndexId,
-		IndexType:  catalog.IndexTypePrimary,
-		NumOfCol:   1,
-		MetaPageId: env.primaryTree.MetaPageId(),
-	})
-	_ = env.ct.IndexKeyColMeta.Insert(piIndexId, "id", 0)
+	_ = env.ct.IndexMeta().Insert(catalog.NewIndexRecord(
+		fileId,
+		piIndexId,
+		catalog.PrimaryIndexName,
+		catalog.IndexTypePrimary,
+		1,
+		env.primaryTree.MetaPageId(),
+	))
+	_ = env.ct.IndexKeyColumnMeta().Insert(piIndexId, "id", 0)
 
 	// セカンダリインデックス idx_name のメタデータ (B+Tree は secondaryTree を再利用)
 	siNameId := catalog.IndexId(1)
-	_ = env.ct.IndexMeta.Insert(catalog.IndexRecord{
-		FileId:     fileId,
-		Name:       "idx_name",
-		IndexId:    siNameId,
-		IndexType:  catalog.IndexTypeNonUnique,
-		NumOfCol:   1,
-		MetaPageId: env.secondaryTree.MetaPageId(),
-	})
-	_ = env.ct.IndexKeyColMeta.Insert(siNameId, "name", 0)
+	_ = env.ct.IndexMeta().Insert(catalog.NewIndexRecord(
+		fileId,
+		siNameId,
+		"idx_name",
+		catalog.IndexTypeNonUnique,
+		1,
+		env.secondaryTree.MetaPageId(),
+	))
+	_ = env.ct.IndexKeyColumnMeta().Insert(siNameId, "name", 0)
 
 	// セカンダリインデックス idx_email のメタデータ (新しい B+Tree が必要)
 	siEmailTree, err := btree.CreateTree(env.bp, fileId)
@@ -242,15 +242,15 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 		t.Fatalf("idx_email B+Tree の作成に失敗: %v", err)
 	}
 	siEmailId := catalog.IndexId(2)
-	_ = env.ct.IndexMeta.Insert(catalog.IndexRecord{
-		FileId:     fileId,
-		Name:       "idx_email",
-		IndexId:    siEmailId,
-		IndexType:  catalog.IndexTypeUnique,
-		NumOfCol:   1,
-		MetaPageId: siEmailTree.MetaPageId(),
-	})
-	_ = env.ct.IndexKeyColMeta.Insert(siEmailId, "email", 0)
+	_ = env.ct.IndexMeta().Insert(catalog.NewIndexRecord(
+		fileId,
+		siEmailId,
+		"idx_email",
+		catalog.IndexTypeUnique,
+		1,
+		siEmailTree.MetaPageId(),
+	))
+	_ = env.ct.IndexKeyColumnMeta().Insert(siEmailId, "email", 0)
 
 	return &tableTestEnv{
 		ct:      env.ct,
@@ -283,7 +283,7 @@ func setupTableTestEnvWithoutPrimaryIndex(t *testing.T) *tableTestEnv {
 	lockMgr := lock.NewManager()
 
 	// テーブルメタデータのみ登録 (プライマリインデックスなし)
-	_ = env.ct.TableMeta.Insert("orders", env.primaryTree.MetaPageId(), 2)
+	_ = env.ct.TableMeta().Insert("orders", env.primaryTree.MetaPageId(), 2)
 
 	return &tableTestEnv{
 		ct:      env.ct,

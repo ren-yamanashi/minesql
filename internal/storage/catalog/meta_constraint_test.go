@@ -28,7 +28,7 @@ func TestConstraintMetaInsert(t *testing.T) {
 		cm := setupTestConstraintMeta(t)
 
 		// WHEN
-		err := cm.Insert(ConstraintRecord{FileId: page.FileId(1), ColName: "id", ConstraintName: "PRIMARY", RefTableFileId: page.FileId(0), RefColName: ""})
+		err := cm.Insert(NewConstraintRecord(page.FileId(1), "id", "PRIMARY", page.FileId(0), ""))
 
 		// THEN
 		assert.NoError(t, err)
@@ -39,7 +39,7 @@ func TestConstraintMetaInsert(t *testing.T) {
 		cm := setupTestConstraintMeta(t)
 
 		// WHEN
-		err := cm.Insert(ConstraintRecord{FileId: page.FileId(2), ColName: "user_id", ConstraintName: "fk_orders_users", RefTableFileId: page.FileId(1), RefColName: "id"})
+		err := cm.Insert(NewConstraintRecord(page.FileId(2), "user_id", "fk_orders_users", page.FileId(1), "id"))
 
 		// THEN
 		assert.NoError(t, err)
@@ -48,10 +48,10 @@ func TestConstraintMetaInsert(t *testing.T) {
 	t.Run("同じ FileId + カラム名 + 制約名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
 		// GIVEN
 		cm := setupTestConstraintMeta(t)
-		_ = cm.Insert(ConstraintRecord{FileId: page.FileId(1), ColName: "id", ConstraintName: "PRIMARY", RefTableFileId: page.FileId(0), RefColName: ""})
+		_ = cm.Insert(NewConstraintRecord(page.FileId(1), "id", "PRIMARY", page.FileId(0), ""))
 
 		// WHEN
-		err := cm.Insert(ConstraintRecord{FileId: page.FileId(1), ColName: "id", ConstraintName: "PRIMARY", RefTableFileId: page.FileId(0), RefColName: ""})
+		err := cm.Insert(NewConstraintRecord(page.FileId(1), "id", "PRIMARY", page.FileId(0), ""))
 
 		// THEN
 		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
@@ -60,10 +60,10 @@ func TestConstraintMetaInsert(t *testing.T) {
 	t.Run("同じカラムに異なる制約名であれば複数挿入できる", func(t *testing.T) {
 		// GIVEN
 		cm := setupTestConstraintMeta(t)
-		_ = cm.Insert(ConstraintRecord{FileId: page.FileId(1), ColName: "email", ConstraintName: "PRIMARY", RefTableFileId: page.FileId(0), RefColName: ""})
+		_ = cm.Insert(NewConstraintRecord(page.FileId(1), "email", "PRIMARY", page.FileId(0), ""))
 
 		// WHEN
-		err := cm.Insert(ConstraintRecord{FileId: page.FileId(1), ColName: "email", ConstraintName: "idx_email", RefTableFileId: page.FileId(0), RefColName: ""})
+		err := cm.Insert(NewConstraintRecord(page.FileId(1), "email", "idx_email", page.FileId(0), ""))
 
 		// THEN
 		assert.NoError(t, err)
@@ -74,8 +74,8 @@ func TestConstraintMetaSearch(t *testing.T) {
 	t.Run("SearchModeStart で全件スキャンできる", func(t *testing.T) {
 		// GIVEN
 		cm := setupTestConstraintMeta(t)
-		_ = cm.Insert(ConstraintRecord{FileId: page.FileId(1), ColName: "id", ConstraintName: "PRIMARY", RefTableFileId: page.FileId(0), RefColName: ""})
-		_ = cm.Insert(ConstraintRecord{FileId: page.FileId(2), ColName: "user_id", ConstraintName: "fk_orders_users", RefTableFileId: page.FileId(1), RefColName: "id"})
+		_ = cm.Insert(NewConstraintRecord(page.FileId(1), "id", "PRIMARY", page.FileId(0), ""))
+		_ = cm.Insert(NewConstraintRecord(page.FileId(2), "user_id", "fk_orders_users", page.FileId(1), "id"))
 
 		// WHEN
 		iter, err := cm.Search(SearchModeStart{})
@@ -88,19 +88,19 @@ func TestConstraintMetaSearch(t *testing.T) {
 		// THEN
 		assert.NoError(t, err1)
 		assert.True(t, ok1)
-		assert.Equal(t, page.FileId(1), r1.FileId)
-		assert.Equal(t, "id", r1.ColName)
-		assert.Equal(t, "PRIMARY", r1.ConstraintName)
-		assert.Equal(t, page.FileId(0), r1.RefTableFileId)
-		assert.Equal(t, "", r1.RefColName)
+		assert.Equal(t, page.FileId(1), r1.FileId())
+		assert.Equal(t, "id", r1.ColumnName())
+		assert.Equal(t, "PRIMARY", r1.ConstraintName())
+		assert.Equal(t, page.FileId(0), r1.ReferenceTableFileId())
+		assert.Equal(t, "", r1.ReferenceColumnName())
 
 		assert.NoError(t, err2)
 		assert.True(t, ok2)
-		assert.Equal(t, page.FileId(2), r2.FileId)
-		assert.Equal(t, "user_id", r2.ColName)
-		assert.Equal(t, "fk_orders_users", r2.ConstraintName)
-		assert.Equal(t, page.FileId(1), r2.RefTableFileId)
-		assert.Equal(t, "id", r2.RefColName)
+		assert.Equal(t, page.FileId(2), r2.FileId())
+		assert.Equal(t, "user_id", r2.ColumnName())
+		assert.Equal(t, "fk_orders_users", r2.ConstraintName())
+		assert.Equal(t, page.FileId(1), r2.ReferenceTableFileId())
+		assert.Equal(t, "id", r2.ReferenceColumnName())
 
 		assert.NoError(t, err3)
 		assert.False(t, ok3)

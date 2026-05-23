@@ -9,6 +9,21 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
+// ヘッダーページ内のオフセット
+const (
+	headerMagicNumberOffset        = 0
+	headerTableMetaOffset          = 4
+	headerIndexMetaOffset          = 8
+	headerIndexKeyColumnMetaOffset = 12
+	headerColumnMetaOffset         = 16
+	headerConstraintMetaOffset     = 20
+	headerUserMetaOffset           = 24
+	headerNextFileIdOffset         = 28
+	headerNextIndexIdOffset        = 32
+	headerUndoLogFileIdOffset      = 36
+	headerFieldSize                = 4 // 各フィールドのバイト数
+)
+
 var (
 	catalogFileId         = page.FileId(0)
 	catalogHeaderPageNum  = page.PageNumber(0)
@@ -16,33 +31,26 @@ var (
 	catalogMagicNumber    = []byte("MINE")
 )
 
-// ヘッダーページ内のオフセット
-const (
-	headerMagicNumberOffset     = 0
-	headerTableMetaOffset       = 4
-	headerIndexMetaOffset       = 8
-	headerIndexKeyColMetaOffset = 12
-	headerColumnMetaOffset      = 16
-	headerConstraintMetaOffset  = 20
-	headerUserMetaOffset        = 24
-	headerNextFileIdOffset      = 28
-	headerNextIndexIdOffset     = 32
-	headerUndoLogFileIdOffset   = 36
-	headerFieldSize             = 4 // 各フィールドのバイト数
-)
-
 type Catalog struct {
-	bufferPool      *buffer.Pool
-	nextFileId      page.FileId
-	nextIndexId     IndexId
-	UndoLogFileId   page.FileId
-	TableMeta       *TableMeta
-	IndexMeta       *IndexMeta
-	IndexKeyColMeta *IndexKeyColMeta
-	ColumnMeta      *ColumnMeta
-	ConstraintMeta  *ConstraintMeta
-	UserMeta        *UserMeta
+	bufferPool         *buffer.Pool
+	nextFileId         page.FileId
+	nextIndexId        IndexId
+	undoLogFileId      page.FileId
+	tableMeta          *TableMeta
+	indexMeta          *IndexMeta
+	indexKeyColumnMeta *IndexKeyColumnMeta
+	columnMeta         *ColumnMeta
+	constraintMeta     *ConstraintMeta
+	userMeta           *UserMeta
 }
+
+func (c *Catalog) UndoLogFileId() page.FileId              { return c.undoLogFileId }
+func (c *Catalog) TableMeta() *TableMeta                   { return c.tableMeta }
+func (c *Catalog) IndexMeta() *IndexMeta                   { return c.indexMeta }
+func (c *Catalog) IndexKeyColumnMeta() *IndexKeyColumnMeta { return c.indexKeyColumnMeta }
+func (c *Catalog) ColumnMeta() *ColumnMeta                 { return c.columnMeta }
+func (c *Catalog) ConstraintMeta() *ConstraintMeta         { return c.constraintMeta }
+func (c *Catalog) UserMeta() *UserMeta                     { return c.userMeta }
 
 // NewCatalog は既存のカタログを開く
 func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
@@ -60,7 +68,9 @@ func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
 
 	tableMetaPageNumber := readPageNumber(bufPageHeader.Page.Body, headerTableMetaOffset)
 	indexMetaPageNumber := readPageNumber(bufPageHeader.Page.Body, headerIndexMetaOffset)
-	indexKeyColMetaPageNumber := readPageNumber(bufPageHeader.Page.Body, headerIndexKeyColMetaOffset)
+	indexKeyColumnMetaPageNumber := readPageNumber(
+		bufPageHeader.Page.Body, headerIndexKeyColumnMetaOffset,
+	)
 	columnMetaPageNumber := readPageNumber(bufPageHeader.Page.Body, headerColumnMetaOffset)
 	constraintMetaPageNumber := readPageNumber(bufPageHeader.Page.Body, headerConstraintMetaOffset)
 	userMetaPageNumber := readPageNumber(bufPageHeader.Page.Body, headerUserMetaOffset)
@@ -75,16 +85,18 @@ func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
 	))
 
 	return &Catalog{
-		bufferPool:      bp,
-		nextFileId:      nextFileId,
-		nextIndexId:     nextIndexId,
-		UndoLogFileId:   undoLogFileId,
-		TableMeta:       newTableMeta(bp, page.NewId(catalogFileId, tableMetaPageNumber)),
-		IndexMeta:       newIndexMeta(bp, page.NewId(catalogFileId, indexMetaPageNumber)),
-		IndexKeyColMeta: newIndexKeyColMeta(bp, page.NewId(catalogFileId, indexKeyColMetaPageNumber)),
-		ColumnMeta:      newColumnMeta(bp, page.NewId(catalogFileId, columnMetaPageNumber)),
-		ConstraintMeta:  newConstraintMeta(bp, page.NewId(catalogFileId, constraintMetaPageNumber)),
-		UserMeta:        newUserMeta(bp, page.NewId(catalogFileId, userMetaPageNumber)),
+		bufferPool:    bp,
+		nextFileId:    nextFileId,
+		nextIndexId:   nextIndexId,
+		undoLogFileId: undoLogFileId,
+		tableMeta:     newTableMeta(bp, page.NewId(catalogFileId, tableMetaPageNumber)),
+		indexMeta:     newIndexMeta(bp, page.NewId(catalogFileId, indexMetaPageNumber)),
+		indexKeyColumnMeta: newIndexKeyColumnMeta(
+			bp, page.NewId(catalogFileId, indexKeyColumnMetaPageNumber),
+		),
+		columnMeta:     newColumnMeta(bp, page.NewId(catalogFileId, columnMetaPageNumber)),
+		constraintMeta: newConstraintMeta(bp, page.NewId(catalogFileId, constraintMetaPageNumber)),
+		userMeta:       newUserMeta(bp, page.NewId(catalogFileId, userMetaPageNumber)),
 	}, nil
 }
 
@@ -113,7 +125,7 @@ func CreateCatalog(bp *buffer.Pool) (*Catalog, error) {
 	if err != nil {
 		return nil, err
 	}
-	indexKeyColMeta, err := createIndexKeyColMeta(bp)
+	indexKeyColumnMeta, err := createIndexKeyColumnMeta(bp)
 	if err != nil {
 		return nil, err
 	}
@@ -136,27 +148,45 @@ func CreateCatalog(bp *buffer.Pool) (*Catalog, error) {
 	nextFileId++
 
 	copy(bufPageHeader.Page.Body[headerMagicNumberOffset:], catalogMagicNumber)
-	writePageNumber(bufPageHeader.Page.Body, headerTableMetaOffset, tableMeta.tree.MetaPageId().PageNumber)
-	writePageNumber(bufPageHeader.Page.Body, headerIndexMetaOffset, indexMeta.tree.MetaPageId().PageNumber)
-	writePageNumber(bufPageHeader.Page.Body, headerIndexKeyColMetaOffset, indexKeyColMeta.tree.MetaPageId().PageNumber)
-	writePageNumber(bufPageHeader.Page.Body, headerColumnMetaOffset, columnMeta.tree.MetaPageId().PageNumber)
-	writePageNumber(bufPageHeader.Page.Body, headerConstraintMetaOffset, constraintMeta.tree.MetaPageId().PageNumber)
-	writePageNumber(bufPageHeader.Page.Body, headerUserMetaOffset, userMeta.tree.MetaPageId().PageNumber)
+	writePageNumber(
+		bufPageHeader.Page.Body, headerTableMetaOffset,
+		tableMeta.tree.MetaPageId().PageNumber,
+	)
+	writePageNumber(
+		bufPageHeader.Page.Body, headerIndexMetaOffset,
+		indexMeta.tree.MetaPageId().PageNumber,
+	)
+	writePageNumber(
+		bufPageHeader.Page.Body, headerIndexKeyColumnMetaOffset,
+		indexKeyColumnMeta.tree.MetaPageId().PageNumber,
+	)
+	writePageNumber(
+		bufPageHeader.Page.Body, headerColumnMetaOffset,
+		columnMeta.tree.MetaPageId().PageNumber,
+	)
+	writePageNumber(
+		bufPageHeader.Page.Body, headerConstraintMetaOffset,
+		constraintMeta.tree.MetaPageId().PageNumber,
+	)
+	writePageNumber(
+		bufPageHeader.Page.Body, headerUserMetaOffset,
+		userMeta.tree.MetaPageId().PageNumber,
+	)
 	writeScalar(bufPageHeader.Page.Body, headerNextFileIdOffset, uint32(nextFileId))
 	writeScalar(bufPageHeader.Page.Body, headerNextIndexIdOffset, uint32(nextIndexId))
 	writeScalar(bufPageHeader.Page.Body, headerUndoLogFileIdOffset, uint32(undoLogFileId))
 
 	return &Catalog{
-		bufferPool:      bp,
-		nextFileId:      nextFileId,
-		nextIndexId:     nextIndexId,
-		UndoLogFileId:   undoLogFileId,
-		TableMeta:       tableMeta,
-		IndexMeta:       indexMeta,
-		IndexKeyColMeta: indexKeyColMeta,
-		ColumnMeta:      columnMeta,
-		ConstraintMeta:  constraintMeta,
-		UserMeta:        userMeta,
+		bufferPool:         bp,
+		nextFileId:         nextFileId,
+		nextIndexId:        nextIndexId,
+		undoLogFileId:      undoLogFileId,
+		tableMeta:          tableMeta,
+		indexMeta:          indexMeta,
+		indexKeyColumnMeta: indexKeyColumnMeta,
+		columnMeta:         columnMeta,
+		constraintMeta:     constraintMeta,
+		userMeta:           userMeta,
 	}, nil
 }
 

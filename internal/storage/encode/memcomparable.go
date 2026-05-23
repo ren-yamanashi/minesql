@@ -1,5 +1,7 @@
 package encode
 
+import "slices"
+
 const (
 	lengthInfoSize = 1
 	dataSize       = 8
@@ -13,12 +15,7 @@ func Encode(elements [][]byte, dest *[]byte) {
 	for _, element := range elements {
 		size := encodedSize(len(element))
 
-		// dest の容量が必要なサイズを満たしていない場合は拡張
-		if cap(*dest)-len(*dest) < size {
-			newData := make([]byte, len(*dest), len(*dest)+size)
-			copy(newData, *dest)
-			*dest = newData
-		}
+		*dest = slices.Grow(*dest, size)
 
 		encodeToMemcomparable(element, dest)
 	}
@@ -40,6 +37,9 @@ func Decode(src []byte, elements *[][]byte) {
 //   - size: エンコード前のバイト列のサイズ
 //   - 計測方法: size を 8 バイトずつに分割し、各ブロックに対して 9 バイトを割り当てる
 func encodedSize(size int) int {
+	if size == 0 {
+		return blockSize
+	}
 	return ((size + dataSize - 1) / dataSize) * blockSize
 }
 

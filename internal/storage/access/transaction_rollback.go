@@ -9,6 +9,8 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
+var errUnknownUndoRecordType = errors.New("unknown undo record type")
+
 // rollbackRecord は 1 つの Undo レコードに対応するロールバック操作を実行する
 func (t *TrxManager) rollbackRecord(record undo.Record) error {
 	fileId := record.TableFileId()
@@ -16,7 +18,7 @@ func (t *TrxManager) rollbackRecord(record undo.Record) error {
 	if err != nil {
 		return err
 	}
-	primaryTree := btree.NewTree(t.bufferPool, piRecord.MetaPageId)
+	primaryTree := btree.NewTree(t.bufferPool, piRecord.MetaPageId())
 
 	switch r := record.(type) {
 	case undo.InsertRecord:
@@ -26,7 +28,7 @@ func (t *TrxManager) rollbackRecord(record undo.Record) error {
 	case undo.UpdateRecord:
 		return t.rollbackUpdate(primaryTree, r, fileId)
 	default:
-		return errors.New("unknown undo record type")
+		return errUnknownUndoRecordType
 	}
 }
 
@@ -101,11 +103,11 @@ func (t *TrxManager) forEachSecondaryTree(
 		return err
 	}
 	for _, record := range records {
-		keyCols, err := fetchIndexKeyCol(t.catalog, record.IndexId)
+		keyCols, err := fetchIndexKeyColumn(t.catalog, record.IndexId())
 		if err != nil {
 			return err
 		}
-		tree := btree.NewTree(t.bufferPool, record.MetaPageId)
+		tree := btree.NewTree(t.bufferPool, record.MetaPageId())
 		if err := op(tree, keyCols); err != nil {
 			return err
 		}

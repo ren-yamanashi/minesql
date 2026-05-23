@@ -64,7 +64,7 @@ func (t *Tree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator
 	}
 }
 
-// FindByKey は指定されたキーで B+Tree を検索し、完全一致するレコードとその物理的な位置を返す (キーが見つからない場合は errKeyNotFound)
+// FindByKey は指定されたキーで B+Tree を検索し、完全一致するレコードとその物理的な位置を返す (キーが見つからない場合は ErrKeyNotFound)
 func (t *Tree) FindByKey(key []byte) (Record, RecordPosition, error) {
 	iter, err := t.Search(SearchModeKey{Key: key})
 	if err != nil {
@@ -79,10 +79,10 @@ func (t *Tree) FindByKey(key []byte) (Record, RecordPosition, error) {
 		return nil, RecordPosition{}, err
 	}
 	if !ok {
-		return nil, RecordPosition{}, errKeyNotFound
+		return nil, RecordPosition{}, ErrKeyNotFound
 	}
 	if !bytes.Equal(record.Key(), key) {
-		return nil, RecordPosition{}, errKeyNotFound
+		return nil, RecordPosition{}, ErrKeyNotFound
 	}
 	return record, position, nil
 }

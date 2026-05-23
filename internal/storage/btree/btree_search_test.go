@@ -107,7 +107,7 @@ func TestFindByKey(t *testing.T) {
 		assert.Equal(t, 0, position.SlotNum)
 	})
 
-	t.Run("存在しないキーの場合は errKeyNotFound を返す", func(t *testing.T) {
+	t.Run("存在しないキーの場合は ErrKeyNotFound を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateTree(bp, page.FileId(0))
@@ -117,10 +117,10 @@ func TestFindByKey(t *testing.T) {
 		_, _, err := bt.FindByKey([]byte{0xFF})
 
 		// THEN
-		assert.ErrorIs(t, err, errKeyNotFound)
+		assert.ErrorIs(t, err, ErrKeyNotFound)
 	})
 
-	t.Run("空の B+Tree の場合は errKeyNotFound を返す", func(t *testing.T) {
+	t.Run("空の B+Tree の場合は ErrKeyNotFound を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateTree(bp, page.FileId(0))
@@ -129,7 +129,7 @@ func TestFindByKey(t *testing.T) {
 		_, _, err := bt.FindByKey([]byte{0x10})
 
 		// THEN
-		assert.ErrorIs(t, err, errKeyNotFound)
+		assert.ErrorIs(t, err, ErrKeyNotFound)
 	})
 }
 
