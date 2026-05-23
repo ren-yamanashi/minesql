@@ -7,12 +7,12 @@ import (
 
 const (
 	FileIdSize    = 4
-	idSize        = FileIdSize * 2
-	maxFileId     = 0xFFFFFFFF
-	maxPageNumber = 0xFFFFFFFF
+	IdSize        = FileIdSize * 2
+	MaxFileId     = 0xFFFFFFFF
+	MaxPageNumber = 0xFFFFFFFF
 )
 
-var InvalidId = NewId(maxFileId, maxPageNumber)
+var InvalidId = NewId(MaxFileId, MaxPageNumber)
 
 type (
 	FileId     uint32
@@ -41,7 +41,7 @@ func (id Id) IsInvalid() bool {
 
 // ToBytes は Id をバイト列に変換する
 func (id Id) ToBytes() []byte {
-	data := make([]byte, idSize)
+	data := make([]byte, IdSize)
 	id.WriteTo(data, 0)
 	return data
 }
@@ -51,7 +51,7 @@ func (id Id) ToBytes() []byte {
 //   - offset: 書き込み開始位置
 func (id Id) WriteTo(data []byte, offset int) {
 	binary.BigEndian.PutUint32(data[offset:offset+FileIdSize], uint32(id.FileId))
-	binary.BigEndian.PutUint32(data[offset+FileIdSize:offset+idSize], uint32(id.PageNumber))
+	binary.BigEndian.PutUint32(data[offset+FileIdSize:offset+IdSize], uint32(id.PageNumber))
 }
 
 // ReadId は Id を指定位置から読み込む
@@ -59,15 +59,15 @@ func (id Id) WriteTo(data []byte, offset int) {
 //   - offset: Id が格納されている位置
 func ReadId(data []byte, offset int) Id {
 	fileId := binary.BigEndian.Uint32(data[offset : offset+FileIdSize])
-	pageNumber := binary.BigEndian.Uint32(data[offset+FileIdSize : offset+idSize])
+	pageNumber := binary.BigEndian.Uint32(data[offset+FileIdSize : offset+IdSize])
 	return NewId(FileId(fileId), PageNumber(pageNumber))
 }
 
 // RestoreId はバイト列から Id を復元する
 //   - data: Id を表す 8 バイトのバイト列
 func RestoreId(data []byte) (Id, error) {
-	if len(data) != idSize {
-		return InvalidId, fmt.Errorf("page id must be %d bytes, got %d", idSize, len(data))
+	if len(data) != IdSize {
+		return InvalidId, fmt.Errorf("page id must be %d bytes, got %d", IdSize, len(data))
 	}
 	return ReadId(data, 0), nil
 }

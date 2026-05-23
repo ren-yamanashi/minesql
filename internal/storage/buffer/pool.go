@@ -77,7 +77,7 @@ func (p *Pool) AllocatePageId(fileId page.FileId) (page.Id, error) {
 	if err != nil {
 		return page.InvalidId, err
 	}
-	return heapFile.AllocatePageId(), nil
+	return heapFile.AllocatePageId()
 }
 
 // RegisterHeapFile は BufferPool に HeapFile を登録する
