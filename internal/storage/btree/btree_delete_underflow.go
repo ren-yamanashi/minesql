@@ -10,7 +10,7 @@ import (
 
 // siblingInfo は兄弟ノードの情報を表す
 type siblingInfo struct {
-	pageId     page.PageId
+	pageId     page.Id
 	bufferPage *buffer.BufferPage
 	isLeft     bool // true: 兄弟ノードは左の兄弟ノード, false: 兄弟ノードは右の兄弟ノード
 }
@@ -186,7 +186,7 @@ func (bt *Btree) onBranchUnderflow(
 			if !parentBranch.Update(childSlotNum-1, updated) {
 				return false, errors.New("failed to update parent branch node key")
 			}
-			rightChildPageId, err := page.RestorePageId(siblingRecord.NonKey())
+			rightChildPageId, err := page.RestoreId(siblingRecord.NonKey())
 			if err != nil {
 				return false, err
 			}
@@ -203,7 +203,7 @@ func (bt *Btree) onBranchUnderflow(
 		}
 
 		siblingRecord := siblingBranch.Record(0)
-		rightChildPageId, err := page.RestorePageId(siblingRecord.NonKey())
+		rightChildPageId, err := page.RestoreId(siblingRecord.NonKey())
 		if err != nil {
 			return false, err
 		}
@@ -252,7 +252,7 @@ func (bt *Btree) onBranchUnderflow(
 //   - disappearing: マージにより消滅するリーフノード
 //   - survivor: マージ後に残るリーフノード
 //   - survivorPageId: survivor の PageId
-func (bt *Btree) relinkLeafAfterMerge(disappearing, survivor *LeafNode, survivorPageId page.PageId) error {
+func (bt *Btree) relinkLeafAfterMerge(disappearing, survivor *LeafNode, survivorPageId page.Id) error {
 	survivor.SetNextPageId(disappearing.NextPageId())
 	if nextPageId := disappearing.NextPageId(); !nextPageId.IsInvalid() {
 		defer bt.bufferPool.UnRefPage(nextPageId)
@@ -272,7 +272,7 @@ func (bt *Btree) relinkLeafAfterMerge(disappearing, survivor *LeafNode, survivor
 //   - childSlotNum: 子ノードのスロット番号
 func (bt *Btree) mergeRightSiblingFromParent(
 	parentBranch *BranchNode,
-	survivorPageId page.PageId,
+	survivorPageId page.Id,
 	childSlotNum int,
 ) (underflow bool, err error) {
 	// 兄弟が RightChild(右端) の場合、親の右端のレコードを削除し、RightChild を子ノードに更新

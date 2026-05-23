@@ -46,7 +46,7 @@ type Catalog struct {
 
 // NewCatalog は既存のカタログを開く
 func NewCatalog(bp *buffer.BufferPool) (*Catalog, error) {
-	headerPageId := page.NewPageId(catalogFileId, catalogHeaderPageNum)
+	headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
 	pageHeader, err := bp.GetReadPage(headerPageId)
 	if err != nil {
 		return nil, err
@@ -79,12 +79,12 @@ func NewCatalog(bp *buffer.BufferPool) (*Catalog, error) {
 		nextFileId:      nextFileId,
 		nextIndexId:     nextIndexId,
 		UndoLogFileId:   undoLogFileId,
-		TableMeta:       NewTableMeta(bp, page.NewPageId(catalogFileId, tableMetaPageNumber)),
-		IndexMeta:       NewIndexMeta(bp, page.NewPageId(catalogFileId, indexMetaPageNumber)),
-		IndexKeyColMeta: NewIndexKeyColMeta(bp, page.NewPageId(catalogFileId, indexKeyColMetaPageNumber)),
-		ColumnMeta:      NewColumnMeta(bp, page.NewPageId(catalogFileId, columnMetaPageNumber)),
-		ConstraintMeta:  NewConstraintMeta(bp, page.NewPageId(catalogFileId, constraintMetaPageNumber)),
-		UserMeta:        NewUserMeta(bp, page.NewPageId(catalogFileId, userMetaPageNumber)),
+		TableMeta:       NewTableMeta(bp, page.NewId(catalogFileId, tableMetaPageNumber)),
+		IndexMeta:       NewIndexMeta(bp, page.NewId(catalogFileId, indexMetaPageNumber)),
+		IndexKeyColMeta: NewIndexKeyColMeta(bp, page.NewId(catalogFileId, indexKeyColMetaPageNumber)),
+		ColumnMeta:      NewColumnMeta(bp, page.NewId(catalogFileId, columnMetaPageNumber)),
+		ConstraintMeta:  NewConstraintMeta(bp, page.NewId(catalogFileId, constraintMetaPageNumber)),
+		UserMeta:        NewUserMeta(bp, page.NewId(catalogFileId, userMetaPageNumber)),
 	}, nil
 }
 
@@ -182,7 +182,7 @@ func (c *Catalog) AllocateFileId() (page.FileId, error) {
 
 // persistScalar はヘッダーページの指定オフセットに uint32 値を書き込む
 func (c *Catalog) persistScalar(offset int, value uint32) error {
-	headerPageId := page.NewPageId(catalogFileId, catalogHeaderPageNum)
+	headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
 	pageHeader, err := c.bufferPool.GetWritePage(headerPageId)
 	if err != nil {
 		return err

@@ -116,7 +116,7 @@ func TestPageCleanerClean(t *testing.T) {
 		_ = env.bp.FlushAllPages()
 
 		// ダーティーページを作成
-		pgId := page.NewPageId(page.FileId(2), 0)
+		pgId := page.NewId(page.FileId(2), 0)
 		_, _ = env.bp.AddPage(pgId)
 		writePage, _ := env.bp.GetWritePage(pgId)
 		writePage.Body[0] = 0xAA
@@ -145,7 +145,7 @@ func TestPageCleanerClean(t *testing.T) {
 		_ = env.bp.FlushAllPages()
 
 		// ダーティーページを作成
-		pgId := page.NewPageId(page.FileId(2), 0)
+		pgId := page.NewId(page.FileId(2), 0)
 		_, _ = env.bp.AddPage(pgId)
 		_, _ = env.bp.GetWritePage(pgId)
 
@@ -180,7 +180,7 @@ func TestPageCleanerShouldFlush(t *testing.T) {
 		env := setupRecoveryTestEnv(t)
 		_ = env.bp.FlushAllPages()
 
-		pgId := page.NewPageId(page.FileId(2), 0)
+		pgId := page.NewId(page.FileId(2), 0)
 		_, _ = env.bp.AddPage(pgId)
 		_, _ = env.bp.GetWritePage(pgId)
 
@@ -200,7 +200,7 @@ func TestPageCleanerShouldFlush(t *testing.T) {
 		env := setupRecoveryTestEnv(t)
 		_ = env.bp.FlushAllPages()
 
-		pgId := page.NewPageId(page.FileId(2), 0)
+		pgId := page.NewId(page.FileId(2), 0)
 		_, _ = env.bp.AddPage(pgId)
 		_, _ = env.bp.GetWritePage(pgId)
 
@@ -220,7 +220,7 @@ func TestPageCleanerShouldFlush(t *testing.T) {
 		env := setupRecoveryTestEnv(t)
 		_ = env.bp.FlushAllPages()
 
-		pgId := page.NewPageId(page.FileId(2), 0)
+		pgId := page.NewId(page.FileId(2), 0)
 		_, _ = env.bp.AddPage(pgId)
 		_, _ = env.bp.GetWritePage(pgId)
 

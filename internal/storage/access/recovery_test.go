@@ -115,7 +115,7 @@ func TestExecute(t *testing.T) {
 		assert.NoError(t, err)
 
 		// COMMIT せずに Redo ログにページ変更だけ記録してフラッシュ
-		pgId := page.NewPageId(env.undoFileId, 0)
+		pgId := page.NewId(env.undoFileId, 0)
 		readPage, _ := env.bp.GetReadPage(pgId)
 		env.redoLog.AppendPageCopy(trxId, pgId, *readPage)
 		_ = env.redoLog.Flush()
@@ -187,7 +187,7 @@ func TestApplyRedoLog(t *testing.T) {
 		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
 
 		// ページを取得して、Page LSN に大きな値を書き込む
-		pgId := page.NewPageId(env.undoFileId, 0)
+		pgId := page.NewId(env.undoFileId, 0)
 		writePage, err := env.bp.GetWritePage(pgId)
 		assert.NoError(t, err)
 		originalData := make([]byte, page.PageSize)
@@ -241,7 +241,7 @@ func TestApplyRollback(t *testing.T) {
 		)
 
 		// trx1 は COMMIT 済み (Commit 内で Redo ログに記録される)、trx2 は未 COMMIT
-		pgId := page.NewPageId(env.undoFileId, 0)
+		pgId := page.NewId(env.undoFileId, 0)
 		readPage, _ := env.bp.GetReadPage(pgId)
 		env.redoLog.AppendPageCopy(trx2, pgId, *readPage)
 		_ = env.redoLog.Flush()

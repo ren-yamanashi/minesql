@@ -112,7 +112,7 @@ func TestIteratorAdvance(t *testing.T) {
 }
 
 // setupIteratorTestPage はテスト用のバッファプールとリーフページを作成する
-func setupIteratorTestPage(t *testing.T, setup func(ln *LeafNode)) (*buffer.BufferPool, page.PageId) {
+func setupIteratorTestPage(t *testing.T, setup func(ln *LeafNode)) (*buffer.BufferPool, page.Id) {
 	t.Helper()
 
 	bp := buffer.NewBufferPool(page.PageSize * 3)

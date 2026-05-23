@@ -67,7 +67,7 @@ func TestAllocatePageId(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.db")
 		hf, err := NewHeapFile(5, path)
 		assert.NoError(t, err)
-		defer func() { assert.NoError(t, hf.Close()) }()
+		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
 
 		// WHEN
 		id := hf.AllocatePageId()
@@ -82,7 +82,7 @@ func TestAllocatePageId(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.db")
 		hf, err := NewHeapFile(0, path)
 		assert.NoError(t, err)
-		defer func() { assert.NoError(t, hf.Close()) }()
+		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
 
 		// WHEN
 		id1 := hf.AllocatePageId()
@@ -102,7 +102,7 @@ func TestWrite(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.db")
 		hf, err := NewHeapFile(0, path)
 		assert.NoError(t, err)
-		defer func() { assert.NoError(t, hf.Close()) }()
+		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
 		data := newAlignedPage()
 		data[0] = 0xFF
 
@@ -118,7 +118,7 @@ func TestWrite(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.db")
 		hf, err := NewHeapFile(0, path)
 		assert.NoError(t, err)
-		defer func() { assert.NoError(t, hf.Close()) }()
+		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
 		data := make([]byte, 100)
 
 		// WHEN
@@ -135,7 +135,7 @@ func TestRead(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.db")
 		hf, err := NewHeapFile(0, path)
 		assert.NoError(t, err)
-		defer func() { assert.NoError(t, hf.Close()) }()
+		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
 		data := make([]byte, 100)
 
 		// WHEN
@@ -152,7 +152,7 @@ func TestWriteAndRead(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.db")
 		hf, err := NewHeapFile(0, path)
 		assert.NoError(t, err)
-		defer func() { assert.NoError(t, hf.Close()) }()
+		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
 		writeData := newAlignedPage()
 		writeData[0] = 0xAA
 		writeData[page.PageSize-1] = 0xBB
@@ -173,7 +173,7 @@ func TestWriteAndRead(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.db")
 		hf, err := NewHeapFile(0, path)
 		assert.NoError(t, err)
-		defer func() { assert.NoError(t, hf.Close()) }()
+		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
 		page0 := newAlignedPage()
 		page0[0] = 0x01
 		page1 := newAlignedPage()
@@ -201,7 +201,7 @@ func TestSync(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.db")
 		hf, err := NewHeapFile(0, path)
 		assert.NoError(t, err)
-		defer func() { assert.NoError(t, hf.Close()) }()
+		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
 
 		// WHEN
 		err = hf.Sync()

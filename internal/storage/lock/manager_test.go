@@ -338,7 +338,7 @@ func TestManagerGrantWaitingLocks(t *testing.T) {
 // testPos はテスト用の RecordPosition を作成する
 func testPos(pageNum page.PageNumber, slot int) btree.RecordPosition {
 	return btree.RecordPosition{
-		PageId:  page.NewPageId(page.FileId(1), pageNum),
+		PageId:  page.NewId(page.FileId(1), pageNum),
 		SlotNum: slot,
 	}
 }

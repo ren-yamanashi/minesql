@@ -6,12 +6,12 @@ import (
 )
 
 type BufferPage struct {
-	PageId  page.PageId
+	PageId  page.Id
 	Page    *page.Page
 	isDirty bool
 }
 
-func newBufferPage(pageId page.PageId) (*BufferPage, error) {
+func newBufferPage(pageId page.Id) (*BufferPage, error) {
 	p, err := page.NewPage(directio.AlignedBlock(page.PageSize))
 	if err != nil {
 		return nil, err

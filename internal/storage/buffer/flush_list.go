@@ -5,7 +5,7 @@ import (
 )
 
 type flushListNode struct {
-	pageId page.PageId // このノードが表すページの PageId
+	pageId page.Id // このノードが表すページの PageId
 	prev   *flushListNode
 	next   *flushListNode
 }
@@ -15,17 +15,17 @@ type flushList struct {
 	NumOfPage int            // リスト内のページ数
 	Head      *flushListNode // 最も古いダーティーページ
 	Tail      *flushListNode // 最も新しいダーティーページ
-	nodeMap   map[page.PageId]*flushListNode
+	nodeMap   map[page.Id]*flushListNode
 }
 
 func newFlushList() *flushList {
 	return &flushList{
-		nodeMap: make(map[page.PageId]*flushListNode),
+		nodeMap: make(map[page.Id]*flushListNode),
 	}
 }
 
 // add はページをフラッシュリストの末尾に追加する
-func (fl *flushList) add(pageId page.PageId) {
+func (fl *flushList) add(pageId page.Id) {
 	if _, exists := fl.nodeMap[pageId]; exists {
 		return
 	}
@@ -45,7 +45,7 @@ func (fl *flushList) add(pageId page.PageId) {
 }
 
 // delete はページをフラッシュリストから削除する
-func (fl *flushList) delete(pageId page.PageId) {
+func (fl *flushList) delete(pageId page.Id) {
 	node, exists := fl.nodeMap[pageId]
 	if !exists {
 		return
@@ -72,12 +72,12 @@ func (fl *flushList) clear() {
 	fl.Head = nil
 	fl.Tail = nil
 	fl.NumOfPage = 0
-	fl.nodeMap = make(map[page.PageId]*flushListNode)
+	fl.nodeMap = make(map[page.Id]*flushListNode)
 }
 
 // oldestPageIds は先頭 (最も古い) から n 件の PageId を返す
-func (fl *flushList) oldestPageIds(n int) []page.PageId {
-	result := make([]page.PageId, 0, n)
+func (fl *flushList) oldestPageIds(n int) []page.Id {
+	result := make([]page.Id, 0, n)
 	node := fl.Head
 	for node != nil && len(result) < n {
 		result = append(result, node.pageId)

@@ -97,7 +97,7 @@ func setupBtreeForTest(t *testing.T) (*Btree, *buffer.BufferPool) {
 }
 
 // setupTestLeafPage はテスト用のリーフページを作成し、PageId と Page を返す
-func setupTestLeafPage(t *testing.T, bp *buffer.BufferPool) (page.PageId, *page.Page) {
+func setupTestLeafPage(t *testing.T, bp *buffer.BufferPool) (page.Id, *page.Page) {
 	t.Helper()
 	pageId, err := bp.AllocatePageId(0)
 	assert.NoError(t, err)

@@ -12,7 +12,7 @@ import (
 )
 
 type newSecondaryIndexInput struct {
-	MetaPageId  page.PageId     // セカンダリインデックスの MetaPageId
+	MetaPageId  page.Id         // セカンダリインデックスの MetaPageId
 	PrimaryTree *btree.Btree    // プライマリインデックスの B+Tree
 	IndexId     catalog.IndexId // インデックス ID
 	IndexName   string          // インデックス名

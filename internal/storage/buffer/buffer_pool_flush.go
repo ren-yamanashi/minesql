@@ -10,7 +10,7 @@ func (bp *BufferPool) FlushAllPages() error {
 	var flushErr error
 
 	// 全ダーティーページをディスクに書き出す
-	bp.pageTable.forEach(func(pageId page.PageId, bufId BufferId) {
+	bp.pageTable.forEach(func(pageId page.Id, bufId BufferId) {
 		if flushErr != nil {
 			return
 		}

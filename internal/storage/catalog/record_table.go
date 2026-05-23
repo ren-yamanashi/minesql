@@ -9,12 +9,12 @@ import (
 )
 
 type TableRecord struct {
-	Name       string      // テーブル名
-	MetaPageId page.PageId // プライマリインデックスの B+Tree メタページ ID
-	NumOfCol   int         // カラム数
+	Name       string  // テーブル名
+	MetaPageId page.Id // プライマリインデックスの B+Tree メタページ ID
+	NumOfCol   int     // カラム数
 }
 
-func newTableRecord(name string, metaPageId page.PageId, numOfCol int) TableRecord {
+func newTableRecord(name string, metaPageId page.Id, numOfCol int) TableRecord {
 	return TableRecord{
 		Name:       name,
 		MetaPageId: metaPageId,
@@ -47,7 +47,7 @@ func decodeTableRecord(record btree.Record) TableRecord {
 	// nonKey = [metaPageId, numOfCol]
 	var nonKey [][]byte
 	encode.Decode(record.NonKey(), &nonKey)
-	metaPageId := page.ReadPageId(nonKey[0], 0)
+	metaPageId := page.ReadId(nonKey[0], 0)
 	numOfCol := int(binary.BigEndian.Uint32(nonKey[1]))
 
 	return newTableRecord(name, metaPageId, numOfCol)

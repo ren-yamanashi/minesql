@@ -10,7 +10,7 @@ type ConstraintMeta struct {
 	tree *btree.Btree // 制約メタデータが格納される B+Tree
 }
 
-func NewConstraintMeta(bp *buffer.BufferPool, metaPageId page.PageId) *ConstraintMeta {
+func NewConstraintMeta(bp *buffer.BufferPool, metaPageId page.Id) *ConstraintMeta {
 	return &ConstraintMeta{tree: btree.NewBtree(bp, metaPageId)}
 }
 

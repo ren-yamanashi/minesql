@@ -26,7 +26,7 @@ type IndexRecord struct {
 	Name       string      // インデックス名
 	IndexType  IndexType   // インデックス種類
 	NumOfCol   int         // インデックスを構成するカラム数
-	MetaPageId page.PageId // セカンダリ or プライマリインデックスの B+Tree メタページ ID
+	MetaPageId page.Id     // セカンダリ or プライマリインデックスの B+Tree メタページ ID
 }
 
 // encode は btree.Record にエンコードする
@@ -60,7 +60,7 @@ func decodeIndexRecord(record btree.Record) IndexRecord {
 	indexId := IndexId(binary.BigEndian.Uint32(nonKey[0]))
 	indexType := IndexType(nonKey[1][0])
 	numOfCol := int(binary.BigEndian.Uint32(nonKey[2]))
-	metaPageId := page.ReadPageId(nonKey[3], 0)
+	metaPageId := page.ReadId(nonKey[3], 0)
 
 	return IndexRecord{
 		FileId:     fileId,

@@ -14,11 +14,11 @@ var (
 
 type Btree struct {
 	bufferPool *buffer.BufferPool
-	MetaPageId page.PageId
+	MetaPageId page.Id
 }
 
 // NewBtree は既存の B+Tree を開く
-func NewBtree(bp *buffer.BufferPool, metaPageId page.PageId) *Btree {
+func NewBtree(bp *buffer.BufferPool, metaPageId page.Id) *Btree {
 	return &Btree{bufferPool: bp, MetaPageId: metaPageId}
 }
 

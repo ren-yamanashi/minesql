@@ -123,7 +123,7 @@ func (r *Recovery) collectUndoRecords(trxId lock.TrxId) ([]undo.Record, error) {
 	pageNum := page.PageNumber(0)
 	var records []undo.Record
 	for {
-		pageId := page.NewPageId(r.undoFileId, pageNum)
+		pageId := page.NewId(r.undoFileId, pageNum)
 		readPage, readErr := r.bufferPool.GetReadPage(pageId)
 		if readErr != nil {
 			// Undo ページチェーンの終端に達した場合は正常終了

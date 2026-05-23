@@ -38,12 +38,12 @@ func NewBufferPool(size int) *BufferPool {
 }
 
 // AllocatePageId は指定された FileId に対して新しい PageId を割り当てる
-func (bp *BufferPool) AllocatePageId(fileId page.FileId) (page.PageId, error) {
+func (bp *BufferPool) AllocatePageId(fileId page.FileId) (page.Id, error) {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
 	heapFile, err := bp.getHeapFile(fileId)
 	if err != nil {
-		return page.InvalidPageId, err
+		return page.InvalidId, err
 	}
 	return heapFile.AllocatePageId(), nil
 }
@@ -58,7 +58,7 @@ func (bp *BufferPool) RegisterHeapFile(fileId page.FileId, heapFile *file.HeapFi
 }
 
 // BUfferId は指定された pageId に対応するバッファページを取得する
-func (bp *BufferPool) BufferPage(pageId page.PageId) (*BufferPage, bool) {
+func (bp *BufferPool) BufferPage(pageId page.Id) (*BufferPage, bool) {
 	bp.mutex.RLock()
 	defer bp.mutex.RUnlock()
 	bufferId, ok := bp.pageTable[pageId]

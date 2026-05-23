@@ -13,7 +13,7 @@ func TestNewPageTable(t *testing.T) {
 		pt := newPageTable()
 
 		// THEN
-		_, exists := pt.getBufferId(page.NewPageId(0, 0))
+		_, exists := pt.getBufferId(page.NewId(0, 0))
 		assert.False(t, exists)
 	})
 }
@@ -22,7 +22,7 @@ func TestPageTableGetBufferId(t *testing.T) {
 	t.Run("存在する PageId の BufferId を取得できる", func(t *testing.T) {
 		// GIVEN
 		pt := newPageTable()
-		pageId := page.NewPageId(0, 1)
+		pageId := page.NewId(0, 1)
 		pt.add(pageId, BufferId(5))
 
 		// WHEN
@@ -38,7 +38,7 @@ func TestPageTableGetBufferId(t *testing.T) {
 		pt := newPageTable()
 
 		// WHEN
-		_, exists := pt.getBufferId(page.NewPageId(0, 99))
+		_, exists := pt.getBufferId(page.NewId(0, 99))
 
 		// THEN
 		assert.False(t, exists)
@@ -49,7 +49,7 @@ func TestPageTableAdd(t *testing.T) {
 	t.Run("エントリを追加すると取得できる", func(t *testing.T) {
 		// GIVEN
 		pt := newPageTable()
-		pageId := page.NewPageId(1, 0)
+		pageId := page.NewId(1, 0)
 
 		// WHEN
 		pt.add(pageId, BufferId(3))
@@ -63,7 +63,7 @@ func TestPageTableAdd(t *testing.T) {
 	t.Run("同じ PageId で追加すると BufferId が上書きされる", func(t *testing.T) {
 		// GIVEN
 		pt := newPageTable()
-		pageId := page.NewPageId(0, 1)
+		pageId := page.NewId(0, 1)
 		pt.add(pageId, BufferId(1))
 
 		// WHEN
@@ -79,8 +79,8 @@ func TestPageTableUpdate(t *testing.T) {
 	t.Run("追い出しページを削除し新しいページを追加する", func(t *testing.T) {
 		// GIVEN
 		pt := newPageTable()
-		evictId := page.NewPageId(0, 1)
-		newId := page.NewPageId(0, 2)
+		evictId := page.NewId(0, 1)
+		newId := page.NewId(0, 2)
 		pt.add(evictId, BufferId(0))
 
 		// WHEN
@@ -97,8 +97,8 @@ func TestPageTableUpdate(t *testing.T) {
 	t.Run("追い出しページの BufferId が一致しない場合は削除されない", func(t *testing.T) {
 		// GIVEN
 		pt := newPageTable()
-		evictId := page.NewPageId(0, 1)
-		newId := page.NewPageId(0, 2)
+		evictId := page.NewId(0, 1)
+		newId := page.NewId(0, 2)
 		pt.add(evictId, BufferId(0))
 
 		// WHEN
@@ -115,8 +115,8 @@ func TestPageTableUpdate(t *testing.T) {
 	t.Run("追い出しページが存在しない場合は新しいページだけ追加される", func(t *testing.T) {
 		// GIVEN
 		pt := newPageTable()
-		evictId := page.NewPageId(0, 1)
-		newId := page.NewPageId(0, 2)
+		evictId := page.NewId(0, 1)
+		newId := page.NewId(0, 2)
 
 		// WHEN
 		pt.update(evictId, newId, BufferId(0))
@@ -134,7 +134,7 @@ func TestPageTableDelete(t *testing.T) {
 	t.Run("存在する PageId を削除できる", func(t *testing.T) {
 		// GIVEN
 		pt := newPageTable()
-		pageId := page.NewPageId(0, 1)
+		pageId := page.NewId(0, 1)
 		pt.add(pageId, BufferId(0))
 
 		// WHEN
@@ -148,13 +148,13 @@ func TestPageTableDelete(t *testing.T) {
 	t.Run("存在しない PageId を削除しても何も起きない", func(t *testing.T) {
 		// GIVEN
 		pt := newPageTable()
-		pt.add(page.NewPageId(0, 1), BufferId(0))
+		pt.add(page.NewId(0, 1), BufferId(0))
 
 		// WHEN
-		pt.delete(page.NewPageId(0, 99))
+		pt.delete(page.NewId(0, 99))
 
 		// THEN
-		_, exists := pt.getBufferId(page.NewPageId(0, 1))
+		_, exists := pt.getBufferId(page.NewId(0, 1))
 		assert.True(t, exists)
 	})
 }
@@ -163,14 +163,14 @@ func TestPageTableForEach(t *testing.T) {
 	t.Run("全エントリに対してコールバックが実行される", func(t *testing.T) {
 		// GIVEN
 		pt := newPageTable()
-		id1 := page.NewPageId(0, 1)
-		id2 := page.NewPageId(0, 2)
+		id1 := page.NewId(0, 1)
+		id2 := page.NewId(0, 2)
 		pt.add(id1, BufferId(10))
 		pt.add(id2, BufferId(20))
 
 		// WHEN
-		visited := map[page.PageId]BufferId{}
-		pt.forEach(func(pageId page.PageId, bufferId BufferId) {
+		visited := map[page.Id]BufferId{}
+		pt.forEach(func(pageId page.Id, bufferId BufferId) {
 			visited[pageId] = bufferId
 		})
 
@@ -186,7 +186,7 @@ func TestPageTableForEach(t *testing.T) {
 
 		// WHEN
 		count := 0
-		pt.forEach(func(pageId page.PageId, bufferId BufferId) {
+		pt.forEach(func(pageId page.Id, bufferId BufferId) {
 			count++
 		})
 

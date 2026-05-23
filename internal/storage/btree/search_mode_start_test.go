@@ -33,7 +33,7 @@ func TestSearchModeStartChildPageId(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, page.NewPageId(0, 1), id)
+		assert.Equal(t, page.NewId(0, 1), id)
 	})
 }
 
@@ -57,6 +57,6 @@ func newSearchModeStartTestBranchNode() *BranchNode {
 		panic(err)
 	}
 	bn := NewBranchNode(pg)
-	_ = bn.Initialize([]byte{0x10}, page.NewPageId(0, 1), page.NewPageId(0, 2))
+	_ = bn.Initialize([]byte{0x10}, page.NewId(0, 1), page.NewId(0, 2))
 	return bn
 }

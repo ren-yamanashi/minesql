@@ -11,7 +11,7 @@ func TestMetaPageRootPageId(t *testing.T) {
 	t.Run("設定したルートページ ID を読み取れる", func(t *testing.T) {
 		// GIVEN
 		mp := newTestMetaPage()
-		expected := page.NewPageId(1, 10)
+		expected := page.NewId(1, 10)
 		mp.setRootPageId(expected)
 
 		// WHEN
@@ -54,13 +54,13 @@ func TestMetaPageSetRootPageId(t *testing.T) {
 	t.Run("ルートページ ID を上書きできる", func(t *testing.T) {
 		// GIVEN
 		mp := newTestMetaPage()
-		mp.setRootPageId(page.NewPageId(1, 10))
+		mp.setRootPageId(page.NewId(1, 10))
 
 		// WHEN
-		mp.setRootPageId(page.NewPageId(2, 20))
+		mp.setRootPageId(page.NewId(2, 20))
 
 		// THEN
-		assert.Equal(t, page.NewPageId(2, 20), mp.rootPageId())
+		assert.Equal(t, page.NewId(2, 20), mp.rootPageId())
 	})
 }
 
@@ -98,12 +98,12 @@ func TestMetaPageFieldsAreIndependent(t *testing.T) {
 		mp := newTestMetaPage()
 
 		// WHEN
-		mp.setRootPageId(page.NewPageId(0xAA, 0xBB))
+		mp.setRootPageId(page.NewId(0xAA, 0xBB))
 		mp.setLeafPageCount(100)
 		mp.setHeight(5)
 
 		// THEN
-		assert.Equal(t, page.NewPageId(0xAA, 0xBB), mp.rootPageId())
+		assert.Equal(t, page.NewId(0xAA, 0xBB), mp.rootPageId())
 		assert.Equal(t, uint64(100), mp.leafPageCount())
 		assert.Equal(t, uint64(5), mp.height())
 	})

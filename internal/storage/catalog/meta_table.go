@@ -10,7 +10,7 @@ type TableMeta struct {
 	tree *btree.Btree // テーブルメタデータが格納される B+Tree
 }
 
-func NewTableMeta(bp *buffer.BufferPool, metaPageId page.PageId) *TableMeta {
+func NewTableMeta(bp *buffer.BufferPool, metaPageId page.Id) *TableMeta {
 	return &TableMeta{tree: btree.NewBtree(bp, metaPageId)}
 }
 
@@ -35,7 +35,7 @@ func (tm *TableMeta) Search(mode SearchMode) (*TableIterator, error) {
 //   - name: テーブル名
 //   - metaPageId: プライマリインデックスの B+Tree メタページ ID
 //   - numOfCol: カラム数
-func (tm *TableMeta) Insert(name string, metaPageId page.PageId, numOfCol int) error {
+func (tm *TableMeta) Insert(name string, metaPageId page.Id, numOfCol int) error {
 	record := newTableRecord(name, metaPageId, numOfCol)
 	return tm.tree.Insert(record.encode())
 }

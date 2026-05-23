@@ -6,5 +6,5 @@ import (
 
 type SearchMode interface {
 	slotNum(ln *LeafNode) int
-	childPageId(bn *BranchNode) (page.PageId, error)
+	childPageId(bn *BranchNode) (page.Id, error)
 }

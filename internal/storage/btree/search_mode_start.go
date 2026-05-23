@@ -11,6 +11,6 @@ type SearchModeStart struct{}
 func (sm SearchModeStart) slotNum(ln *LeafNode) int { return 0 }
 
 // childPageId は先頭の子の PageId を取得する
-func (sm SearchModeStart) childPageId(bn *BranchNode) (page.PageId, error) {
+func (sm SearchModeStart) childPageId(bn *BranchNode) (page.Id, error) {
 	return bn.ChildPageId(0)
 }

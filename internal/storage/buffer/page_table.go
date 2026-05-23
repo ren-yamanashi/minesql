@@ -3,20 +3,20 @@ package buffer
 import "github.com/ren-yamanashi/minesql/internal/storage/page"
 
 // pageTable は PageId と BufferId の対応関係を管理するテーブル
-type pageTable map[page.PageId]BufferId
+type pageTable map[page.Id]BufferId
 
 func newPageTable() pageTable {
-	return make(map[page.PageId]BufferId)
+	return make(map[page.Id]BufferId)
 }
 
 // getBufferId は指定した pageId に対応するバッファページを返す
-func (pt pageTable) getBufferId(pageId page.PageId) (BufferId, bool) {
+func (pt pageTable) getBufferId(pageId page.Id) (BufferId, bool) {
 	bufId, exists := pt[pageId]
 	return bufId, exists
 }
 
 // add はページテーブルにエントリを追加する
-func (pt pageTable) add(pageId page.PageId, bufferId BufferId) {
+func (pt pageTable) add(pageId page.Id, bufferId BufferId) {
 	pt[pageId] = bufferId
 }
 
@@ -24,7 +24,7 @@ func (pt pageTable) add(pageId page.PageId, bufferId BufferId) {
 //   - evictPageId: 追い出されるページの PageId
 //   - newPageId: 追加されるページの PageId
 //   - bufferId: 追い出されるページが属する BufferId (新しいページも同じ bufferId になる)
-func (pt pageTable) update(evictPageId, newPageId page.PageId, bufferId BufferId) {
+func (pt pageTable) update(evictPageId, newPageId page.Id, bufferId BufferId) {
 	if oldBufferId, exists := pt[evictPageId]; exists && oldBufferId == bufferId {
 		delete(pt, evictPageId)
 	}
@@ -32,12 +32,12 @@ func (pt pageTable) update(evictPageId, newPageId page.PageId, bufferId BufferId
 }
 
 // delete は pageId に対応するエントリをテーブルから削除する
-func (pt pageTable) delete(pageId page.PageId) {
+func (pt pageTable) delete(pageId page.Id) {
 	delete(pt, pageId)
 }
 
 // forEach は全エントリに対してコールバックを実行する
-func (pt pageTable) forEach(fn func(pageId page.PageId, bufferId BufferId)) {
+func (pt pageTable) forEach(fn func(pageId page.Id, bufferId BufferId)) {
 	for pageId, bufferId := range pt {
 		fn(pageId, bufferId)
 	}

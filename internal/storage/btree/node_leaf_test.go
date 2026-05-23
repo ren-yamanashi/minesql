@@ -225,7 +225,7 @@ func TestLeafNodePrevPageId(t *testing.T) {
 		id := ln.PrevPageId()
 
 		// THEN
-		assert.Equal(t, page.InvalidPageId, id)
+		assert.Equal(t, page.InvalidId, id)
 	})
 }
 
@@ -238,7 +238,7 @@ func TestLeafNodeNextPageId(t *testing.T) {
 		id := ln.NextPageId()
 
 		// THEN
-		assert.Equal(t, page.InvalidPageId, id)
+		assert.Equal(t, page.InvalidId, id)
 	})
 }
 
@@ -246,7 +246,7 @@ func TestLeafNodeSetPrevPageId(t *testing.T) {
 	t.Run("前のリーフノードのページ ID を設定できる", func(t *testing.T) {
 		// GIVEN
 		ln := newTestLeafNode()
-		prevId := page.NewPageId(0, 5)
+		prevId := page.NewId(0, 5)
 
 		// WHEN
 		ln.SetPrevPageId(prevId)
@@ -260,7 +260,7 @@ func TestLeafNodeSetNextPageId(t *testing.T) {
 	t.Run("次のリーフノードのページ ID を設定できる", func(t *testing.T) {
 		// GIVEN
 		ln := newTestLeafNode()
-		nextId := page.NewPageId(0, 10)
+		nextId := page.NewId(0, 10)
 
 		// WHEN
 		ln.SetNextPageId(nextId)

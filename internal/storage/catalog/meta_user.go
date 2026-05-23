@@ -11,7 +11,7 @@ type UserMeta struct {
 }
 
 // NewUserMeta は既存のユーザーメタデータを開く
-func NewUserMeta(bp *buffer.BufferPool, metaPageId page.PageId) *UserMeta {
+func NewUserMeta(bp *buffer.BufferPool, metaPageId page.Id) *UserMeta {
 	return &UserMeta{tree: btree.NewBtree(bp, metaPageId)}
 }
 

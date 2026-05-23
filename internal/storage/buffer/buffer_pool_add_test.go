@@ -11,7 +11,7 @@ func TestAddPage(t *testing.T) {
 	t.Run("バッファプールに新しいページを追加できる", func(t *testing.T) {
 		// GIVEN
 		bp := NewBufferPool(page.PageSize * 2)
-		pageId := page.NewPageId(0, 0)
+		pageId := page.NewId(0, 0)
 
 		// WHEN
 		bufPage, err := bp.AddPage(pageId)
@@ -26,7 +26,7 @@ func TestAddPage(t *testing.T) {
 	t.Run("追加したページはキャッシュされている", func(t *testing.T) {
 		// GIVEN
 		bp := NewBufferPool(page.PageSize * 2)
-		pageId := page.NewPageId(0, 0)
+		pageId := page.NewId(0, 0)
 
 		// WHEN
 		_, err := bp.AddPage(pageId)
@@ -41,12 +41,12 @@ func TestAddPage(t *testing.T) {
 		bp := NewBufferPool(page.PageSize) // MaxNumOfPage=1
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
-		firstId := page.NewPageId(0, 0)
+		firstId := page.NewId(0, 0)
 		_, err := bp.AddPage(firstId)
 		assert.NoError(t, err)
 
 		// WHEN
-		secondId := page.NewPageId(0, 1)
+		secondId := page.NewId(0, 1)
 		bufPage, err := bp.AddPage(secondId)
 
 		// THEN
@@ -60,7 +60,7 @@ func TestAddPage(t *testing.T) {
 		bp := NewBufferPool(page.PageSize) // MaxNumOfPage=1
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
-		firstId := page.NewPageId(0, 0)
+		firstId := page.NewId(0, 0)
 		_, err := bp.AddPage(firstId)
 		assert.NoError(t, err)
 		_, err = bp.GetWritePage(firstId)
@@ -68,7 +68,7 @@ func TestAddPage(t *testing.T) {
 		assert.Equal(t, 1, bp.NumOfFlushListPage())
 
 		// WHEN
-		secondId := page.NewPageId(0, 1)
+		secondId := page.NewId(0, 1)
 		_, err = bp.AddPage(secondId) // ダーティーな firstId が追い出される
 		assert.NoError(t, err)
 

@@ -78,7 +78,7 @@ func TestAllocatePageId(t *testing.T) {
 
 		// THEN
 		assert.Error(t, err)
-		assert.Equal(t, page.InvalidPageId, id)
+		assert.Equal(t, page.InvalidId, id)
 	})
 }
 
@@ -104,7 +104,7 @@ func TestBufferPage(t *testing.T) {
 		bp := NewBufferPool(page.PageSize * 2)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
-		pageId := page.NewPageId(0, 0)
+		pageId := page.NewId(0, 0)
 		_, _ = bp.AddPage(pageId)
 
 		// WHEN
@@ -119,7 +119,7 @@ func TestBufferPage(t *testing.T) {
 	t.Run("未キャッシュの PageId は false を返す", func(t *testing.T) {
 		// GIVEN
 		bp := NewBufferPool(page.PageSize * 2)
-		pageId := page.NewPageId(0, 99)
+		pageId := page.NewId(0, 99)
 
 		// WHEN
 		bufPage, ok := bp.BufferPage(pageId)

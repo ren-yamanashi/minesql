@@ -65,7 +65,7 @@ func TestNewCatalog(t *testing.T) {
 		_, err := CreateCatalog(bp)
 		assert.NoError(t, err)
 
-		headerPageId := page.NewPageId(catalogFileId, catalogHeaderPageNum)
+		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
 		pageHeader, err := bp.GetWritePage(headerPageId)
 		assert.NoError(t, err)
 		copy(pageHeader.Body[headerMagicNumberOffset:], []byte("XXXX"))
@@ -112,7 +112,7 @@ func TestCreateCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		headerPageId := page.NewPageId(catalogFileId, catalogHeaderPageNum)
+		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
 		pageHeader, err := bp.GetReadPage(headerPageId)
 		assert.NoError(t, err)
 		defer bp.UnRefPage(headerPageId)
@@ -130,7 +130,7 @@ func TestCreateCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		headerPageId := page.NewPageId(catalogFileId, catalogHeaderPageNum)
+		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
 		pageHeader, err := bp.GetReadPage(headerPageId)
 		assert.NoError(t, err)
 		defer bp.UnRefPage(headerPageId)

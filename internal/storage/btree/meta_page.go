@@ -27,8 +27,8 @@ func newMetaPage(pg *page.Page) *metaPage {
 }
 
 // rootPageId はルートページ ID を読み取る
-func (mp *metaPage) rootPageId() page.PageId {
-	return page.ReadPageId(mp.data.Body, metaRootPageIdOffset)
+func (mp *metaPage) rootPageId() page.Id {
+	return page.ReadId(mp.data.Body, metaRootPageIdOffset)
 }
 
 // leafPageCount はリーフページ数を読み取る
@@ -42,7 +42,7 @@ func (mp *metaPage) height() uint64 {
 }
 
 // setRootPageId はルートページ ID を設定する
-func (mp *metaPage) setRootPageId(rootPageId page.PageId) {
+func (mp *metaPage) setRootPageId(rootPageId page.Id) {
 	rootPageId.WriteTo(mp.data.Body, metaRootPageIdOffset)
 }
 

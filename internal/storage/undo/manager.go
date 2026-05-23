@@ -21,7 +21,7 @@ type Manager struct {
 	bufferPool    *buffer.BufferPool
 	redoLog       *redo.Buffer
 	undoFileId    page.FileId            // Undo ファイルの FileId
-	currentPageId page.PageId            // 現在書き込み中の Undo ページ
+	currentPageId page.Id                // 現在書き込み中の Undo ページ
 	entries       map[lock.TrxId][]Entry // trxId → Entry[] のマップ
 }
 

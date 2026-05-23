@@ -11,7 +11,7 @@ func TestGetWritePage(t *testing.T) {
 	t.Run("取得したページがダーティーになる", func(t *testing.T) {
 		// GIVEN
 		bp := NewBufferPool(page.PageSize * 2)
-		pageId := page.NewPageId(0, 0)
+		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
 
@@ -28,7 +28,7 @@ func TestGetWritePage(t *testing.T) {
 	t.Run("既にダーティーなページを再取得してもフラッシュリストに重複追加されない", func(t *testing.T) {
 		// GIVEN
 		bp := NewBufferPool(page.PageSize * 2)
-		pageId := page.NewPageId(0, 0)
+		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
 		_, err = bp.GetWritePage(pageId)
@@ -45,7 +45,7 @@ func TestGetWritePage(t *testing.T) {
 	t.Run("書き込んだデータがフェッチ時に反映されている", func(t *testing.T) {
 		// GIVEN
 		bp := NewBufferPool(page.PageSize * 2)
-		pageId := page.NewPageId(0, 0)
+		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
 
@@ -65,7 +65,7 @@ func TestGetReadPage(t *testing.T) {
 	t.Run("キャッシュ済みのページを取得できる", func(t *testing.T) {
 		// GIVEN
 		bp := NewBufferPool(page.PageSize * 2)
-		pageId := page.NewPageId(0, 0)
+		pageId := page.NewId(0, 0)
 		addedPage, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
 		addedPage.Page.Body[0] = 0xCC
@@ -86,7 +86,7 @@ func TestGetReadPage(t *testing.T) {
 		writePageToDisk(t, hf, 0, 0xDD)
 
 		// WHEN
-		pageId := page.NewPageId(0, 0)
+		pageId := page.NewId(0, 0)
 		p, err := bp.GetReadPage(pageId)
 
 		// THEN
@@ -97,7 +97,7 @@ func TestGetReadPage(t *testing.T) {
 	t.Run("読み込み用なのでダーティーにならない", func(t *testing.T) {
 		// GIVEN
 		bp := NewBufferPool(page.PageSize * 2)
-		pageId := page.NewPageId(0, 0)
+		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
 
@@ -116,7 +116,7 @@ func TestFetchPage(t *testing.T) {
 	t.Run("キャッシュ済みのページを取得できる", func(t *testing.T) {
 		// GIVEN
 		bp := NewBufferPool(page.PageSize * 2)
-		pageId := page.NewPageId(0, 0)
+		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
 
@@ -136,7 +136,7 @@ func TestFetchPage(t *testing.T) {
 		writePageToDisk(t, hf, 0, 0xAB)
 
 		// WHEN
-		pageId := page.NewPageId(0, 0)
+		pageId := page.NewId(0, 0)
 		bufPage, err := bp.FetchPage(pageId)
 
 		// THEN
@@ -147,7 +147,7 @@ func TestFetchPage(t *testing.T) {
 	t.Run("同じページを 2 回フェッチしても同じデータが返る", func(t *testing.T) {
 		// GIVEN
 		bp := NewBufferPool(page.PageSize * 2)
-		pageId := page.NewPageId(0, 0)
+		pageId := page.NewId(0, 0)
 		addedPage, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
 		addedPage.Page.Body[0] = 0x42
@@ -168,7 +168,7 @@ func TestIsPageCached(t *testing.T) {
 	t.Run("キャッシュ済みのページに対して true を返す", func(t *testing.T) {
 		// GIVEN
 		bp := NewBufferPool(page.PageSize * 2)
-		pageId := page.NewPageId(0, 0)
+		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
 
@@ -184,7 +184,7 @@ func TestIsPageCached(t *testing.T) {
 		bp := NewBufferPool(page.PageSize * 2)
 
 		// WHEN
-		result := bp.IsPageCached(page.NewPageId(0, 99))
+		result := bp.IsPageCached(page.NewId(0, 99))
 
 		// THEN
 		assert.False(t, result)
@@ -197,9 +197,9 @@ func TestUnRefPage(t *testing.T) {
 		bp := NewBufferPool(page.PageSize * 2) // MaxNumOfPage=3
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
-		id0 := page.NewPageId(0, 0)
-		id1 := page.NewPageId(0, 1)
-		id2 := page.NewPageId(0, 2)
+		id0 := page.NewId(0, 0)
+		id1 := page.NewId(0, 1)
+		id2 := page.NewId(0, 2)
 		_, err := bp.AddPage(id0)
 		assert.NoError(t, err)
 		_, err = bp.AddPage(id1)
@@ -209,7 +209,7 @@ func TestUnRefPage(t *testing.T) {
 
 		// WHEN
 		bp.UnRefPage(id0)
-		newId := page.NewPageId(0, 3)
+		newId := page.NewId(0, 3)
 		_, err = bp.AddPage(newId)
 		assert.NoError(t, err)
 
@@ -221,12 +221,12 @@ func TestUnRefPage(t *testing.T) {
 	t.Run("キャッシュにないページを参照解除しても何も起きない", func(t *testing.T) {
 		// GIVEN
 		bp := NewBufferPool(page.PageSize * 2)
-		pageId := page.NewPageId(0, 0)
+		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
 
 		// WHEN / THEN (panic しない)
-		bp.UnRefPage(page.NewPageId(0, 99))
+		bp.UnRefPage(page.NewId(0, 99))
 		assert.True(t, bp.IsPageCached(pageId))
 	})
 }

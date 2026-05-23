@@ -5,14 +5,14 @@ import "github.com/ren-yamanashi/minesql/internal/storage/page"
 // AddPage はバッファプールに新しいページを追加する
 //
 // バッファプールに空きがある場合は新しいページを追加し、空きがない場合は古いページを新しいページに置き換える
-func (bp *BufferPool) AddPage(pageId page.PageId) (*BufferPage, error) {
+func (bp *BufferPool) AddPage(pageId page.Id) (*BufferPage, error) {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
 	return bp.addPage(pageId)
 }
 
 // addPage はバッファプールに新しいページを追加する
-func (bp *BufferPool) addPage(pageId page.PageId) (*BufferPage, error) {
+func (bp *BufferPool) addPage(pageId page.Id) (*BufferPage, error) {
 	// バッファプールに空きがある場合: 新しいバッファページを追加・ページテーブルを更新
 	if len(bp.bufferPages) < bp.MaxNumOfPage {
 		newBufPage, err := newBufferPage(pageId)

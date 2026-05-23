@@ -12,7 +12,7 @@ import (
 type HeapFile struct {
 	fileId     page.FileId // 管理対象ファイルの FileId
 	file       *os.File    // ヒープファイルのファイルディスクリプタ
-	nextPageId page.PageId // 次に採番する PageId
+	nextPageId page.Id     // 次に採番する PageId
 }
 
 func NewHeapFile(fileId page.FileId, path string) (*HeapFile, error) {
@@ -33,14 +33,14 @@ func NewHeapFile(fileId page.FileId, path string) (*HeapFile, error) {
 	return &HeapFile{
 		fileId:     fileId,
 		file:       file,
-		nextPageId: page.NewPageId(fileId, page.PageNumber(fileInfo.Size()/page.PageSize)),
+		nextPageId: page.NewId(fileId, page.PageNumber(fileInfo.Size()/page.PageSize)),
 	}, nil
 }
 
 // AllocatePageId は新しいページ ID を採番する
-func (hf *HeapFile) AllocatePageId() page.PageId {
+func (hf *HeapFile) AllocatePageId() page.Id {
 	id := hf.nextPageId
-	hf.nextPageId = page.NewPageId(hf.fileId, hf.nextPageId.PageNumber+1)
+	hf.nextPageId = page.NewId(hf.fileId, hf.nextPageId.PageNumber+1)
 	return id
 }
 

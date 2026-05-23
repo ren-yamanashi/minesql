@@ -24,7 +24,7 @@ func (bt *Btree) Search(mode SearchMode) (*Iterator, error) {
 }
 
 // searchRecursively は再帰的にノードを辿って該当のリーフノードを見つける
-func (bt *Btree) searchRecursively(nodePageId page.PageId, mode SearchMode) (*Iterator, error) {
+func (bt *Btree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator, error) {
 	bufPage, err := bt.bufferPool.FetchPage(nodePageId)
 	if err != nil {
 		return nil, err
@@ -88,7 +88,7 @@ func (bt *Btree) FindByKey(key []byte) (Record, RecordPosition, error) {
 }
 
 // LeafPageIds はブランチページのみ辿り、全リーフページの PageId を収集する
-func (bt *Btree) LeafPageIds() ([]page.PageId, error) {
+func (bt *Btree) LeafPageIds() ([]page.Id, error) {
 	pageMeta, err := bt.bufferPool.GetReadPage(bt.MetaPageId)
 	if err != nil {
 		return nil, err
@@ -100,14 +100,14 @@ func (bt *Btree) LeafPageIds() ([]page.PageId, error) {
 
 	// 高さ 1: ルートがリーフ
 	if height <= 1 {
-		return []page.PageId{rootPageId}, nil
+		return []page.Id{rootPageId}, nil
 	}
 
 	// 高さ 2 以上: ブランチノードを辿ってリーフの PageId を収集
 	// 幅優先でブランチレベルを 1 つずつ降りていく
-	currentLevel := []page.PageId{rootPageId}
+	currentLevel := []page.Id{rootPageId}
 	for range height - 1 {
-		var nextLevel []page.PageId
+		var nextLevel []page.Id
 		for _, nodePageId := range currentLevel {
 			pg, err := bt.bufferPool.GetReadPage(nodePageId)
 			if err != nil {

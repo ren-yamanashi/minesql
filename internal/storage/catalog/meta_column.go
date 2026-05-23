@@ -10,7 +10,7 @@ type ColumnMeta struct {
 	tree *btree.Btree // カラムメタデータが格納される B+Tree
 }
 
-func NewColumnMeta(bp *buffer.BufferPool, metaPageId page.PageId) *ColumnMeta {
+func NewColumnMeta(bp *buffer.BufferPool, metaPageId page.Id) *ColumnMeta {
 	return &ColumnMeta{tree: btree.NewBtree(bp, metaPageId)}
 }
 

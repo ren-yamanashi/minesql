@@ -19,7 +19,7 @@ type primaryIndex struct {
 }
 
 // newPrimaryIndex は既存のプライマリインデックスを開く
-func newPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, metaPageId page.PageId, pkCount int, lock *lock.Manager) *primaryIndex {
+func newPrimaryIndex(ct *catalog.Catalog, bp *buffer.BufferPool, metaPageId page.Id, pkCount int, lock *lock.Manager) *primaryIndex {
 	tree := btree.NewBtree(bp, metaPageId)
 	return &primaryIndex{
 		catalog: ct,

@@ -625,7 +625,7 @@ func writeRootInfo(w *strings.Builder, tree *Btree) {
 }
 
 // ノード情報を再帰的にログに書き出す
-func writeNodeInfo(w *strings.Builder, pageId page.PageId, depth int, tree *Btree) {
+func writeNodeInfo(w *strings.Builder, pageId page.Id, depth int, tree *Btree) {
 	pg, err := tree.bufferPool.GetReadPage(pageId)
 	if err != nil {
 		panic(err)
@@ -676,8 +676,8 @@ func writeTreeShape(w *strings.Builder, tree *Btree) {
 	}
 	result := make(map[int]*depthInfo)
 
-	var collect func(pageId page.PageId, depth int)
-	collect = func(pageId page.PageId, depth int) {
+	var collect func(pageId page.Id, depth int)
+	collect = func(pageId page.Id, depth int) {
 		pg, err := tree.bufferPool.GetReadPage(pageId)
 		if err != nil {
 			panic(err)

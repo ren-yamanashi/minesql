@@ -3,7 +3,7 @@ package buffer
 import "github.com/ren-yamanashi/minesql/internal/storage/page"
 
 // GetWritePage は書き込み用のページデータを取得する
-func (bp *BufferPool) GetWritePage(pageId page.PageId) (*page.Page, error) {
+func (bp *BufferPool) GetWritePage(pageId page.Id) (*page.Page, error) {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
 
@@ -21,7 +21,7 @@ func (bp *BufferPool) GetWritePage(pageId page.PageId) (*page.Page, error) {
 }
 
 // GetReadPage は読み込み用のページデータを取得する
-func (bp *BufferPool) GetReadPage(pageId page.PageId) (*page.Page, error) {
+func (bp *BufferPool) GetReadPage(pageId page.Id) (*page.Page, error) {
 	// ページがバッファプールにある場合は RLock で返す (LRU 更新不要な為)
 	bp.mutex.RLock()
 	if bufId, exists := bp.pageTable.getBufferId(pageId); exists {
@@ -43,14 +43,14 @@ func (bp *BufferPool) GetReadPage(pageId page.PageId) (*page.Page, error) {
 }
 
 // FetchPage は指定された pageId のバッファページを取得する
-func (bp *BufferPool) FetchPage(pageId page.PageId) (*BufferPage, error) {
+func (bp *BufferPool) FetchPage(pageId page.Id) (*BufferPage, error) {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
 	return bp.fetchPage(pageId)
 }
 
 // IsPageCached は指定ページがバッファプールに載っているかを返す
-func (bp *BufferPool) IsPageCached(pageId page.PageId) bool {
+func (bp *BufferPool) IsPageCached(pageId page.Id) bool {
 	bp.mutex.RLock()
 	defer bp.mutex.RUnlock()
 	_, ok := bp.pageTable.getBufferId(pageId)
@@ -58,7 +58,7 @@ func (bp *BufferPool) IsPageCached(pageId page.PageId) bool {
 }
 
 // UnRefPage は指定されたページの参照を解除し、優先的に追い出されるようにする
-func (bp *BufferPool) UnRefPage(pageId page.PageId) {
+func (bp *BufferPool) UnRefPage(pageId page.Id) {
 	bp.mutex.Lock()
 	defer bp.mutex.Unlock()
 	if bufferId, exists := bp.pageTable.getBufferId(pageId); exists {
@@ -67,7 +67,7 @@ func (bp *BufferPool) UnRefPage(pageId page.PageId) {
 }
 
 // fetchPage は指定されたページをバッファプールから取得する
-func (bp *BufferPool) fetchPage(pageId page.PageId) (*BufferPage, error) {
+func (bp *BufferPool) fetchPage(pageId page.Id) (*BufferPage, error) {
 	// ページがバッファプールにある場合
 	if bufferId, exists := bp.pageTable.getBufferId(pageId); exists {
 		bufferPage := &bp.bufferPages[bufferId]

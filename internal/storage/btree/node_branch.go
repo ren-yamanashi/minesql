@@ -37,7 +37,7 @@ func NewBranchNode(pg *page.Page) *BranchNode {
 //   - key: 最初のレコードのキー
 //   - leftChildPageId: 最初のレコードの非キーフィールド (左の子の PageId)
 //   - rightChildId: ヘッダーに設定する右の子の PageId
-func (bn *BranchNode) Initialize(key []byte, leftChildPageId, rightChildId page.PageId) error {
+func (bn *BranchNode) Initialize(key []byte, leftChildPageId, rightChildId page.Id) error {
 	bn.body.Initialize()
 
 	record := NewRecord([]byte{}, key, leftChildPageId.ToBytes())
@@ -158,21 +158,21 @@ func (bn *BranchNode) SearchSlotNum(key []byte) (int, bool) {
 }
 
 // ChildPageId は指定された slotNum に対応する子ページの PageId を取得する
-func (bn *BranchNode) ChildPageId(slotNum int) (page.PageId, error) {
+func (bn *BranchNode) ChildPageId(slotNum int) (page.Id, error) {
 	if slotNum == bn.NumRecords() {
-		return page.ReadPageId(bn.header[nodeHeaderSize:], branchRightChildOffset), nil
+		return page.ReadId(bn.header[nodeHeaderSize:], branchRightChildOffset), nil
 	}
 	record := bn.Record(slotNum)
-	return page.RestorePageId(record.NonKey())
+	return page.RestoreId(record.NonKey())
 }
 
 // RightChildPageId は右端の子の PageId を取得する
-func (bn *BranchNode) RightChildPageId() page.PageId {
-	return page.ReadPageId(bn.header[nodeHeaderSize:], branchRightChildOffset)
+func (bn *BranchNode) RightChildPageId() page.Id {
+	return page.ReadId(bn.header[nodeHeaderSize:], branchRightChildOffset)
 }
 
 // SetRightChildPageId は右端の子の PageId を設定する
-func (bn *BranchNode) SetRightChildPageId(pageId page.PageId) {
+func (bn *BranchNode) SetRightChildPageId(pageId page.Id) {
 	pageId.WriteTo(bn.header[nodeHeaderSize:], branchRightChildOffset)
 }
 
@@ -191,7 +191,7 @@ func (bn *BranchNode) IsHalfFull() bool {
 func (bn *BranchNode) fillRightChild() ([]byte, error) {
 	lastSlotNum := bn.NumRecords() - 1
 	record := bn.Record(lastSlotNum)
-	rightChild, err := page.RestorePageId(record.NonKey())
+	rightChild, err := page.RestoreId(record.NonKey())
 	if err != nil {
 		return nil, err
 	}

@@ -10,7 +10,7 @@ import (
 func TestNewBufferPage(t *testing.T) {
 	t.Run("指定した PageId で BufferPage を生成できる", func(t *testing.T) {
 		// GIVEN
-		pageId := page.NewPageId(1, 0)
+		pageId := page.NewId(1, 0)
 
 		// WHEN
 		bp, err := newBufferPage(pageId)
@@ -24,7 +24,7 @@ func TestNewBufferPage(t *testing.T) {
 
 	t.Run("生成した Page のサイズが PageSize と一致する", func(t *testing.T) {
 		// GIVEN
-		pageId := page.NewPageId(0, 0)
+		pageId := page.NewId(0, 0)
 
 		// WHEN
 		bp, err := newBufferPage(pageId)

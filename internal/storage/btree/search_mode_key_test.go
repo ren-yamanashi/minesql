@@ -48,7 +48,7 @@ func TestSearchModeKeyChildPageId(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, page.NewPageId(0, 1), id)
+		assert.Equal(t, page.NewId(0, 1), id)
 	})
 
 	t.Run("境界キーと一致するキーの場合は右の子の PageId を返す", func(t *testing.T) {
@@ -61,7 +61,7 @@ func TestSearchModeKeyChildPageId(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, page.NewPageId(0, 2), id)
+		assert.Equal(t, page.NewId(0, 2), id)
 	})
 
 	t.Run("キーが全レコードより大きい場合は右の子の PageId を返す", func(t *testing.T) {
@@ -74,7 +74,7 @@ func TestSearchModeKeyChildPageId(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, page.NewPageId(0, 2), id)
+		assert.Equal(t, page.NewId(0, 2), id)
 	})
 }
 
@@ -98,6 +98,6 @@ func newSearchModeKeyTestBranchNode() *BranchNode {
 		panic(err)
 	}
 	bn := NewBranchNode(pg)
-	_ = bn.Initialize([]byte{0x10}, page.NewPageId(0, 1), page.NewPageId(0, 2))
+	_ = bn.Initialize([]byte{0x10}, page.NewId(0, 1), page.NewId(0, 2))
 	return bn
 }

@@ -10,7 +10,7 @@ type IndexMeta struct {
 	tree *btree.Btree // インデックスメタデータが格納される B+Tree
 }
 
-func NewIndexMeta(bp *buffer.BufferPool, metaPageId page.PageId) *IndexMeta {
+func NewIndexMeta(bp *buffer.BufferPool, metaPageId page.Id) *IndexMeta {
 	return &IndexMeta{tree: btree.NewBtree(bp, metaPageId)}
 }
 

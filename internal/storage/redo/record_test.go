@@ -15,7 +15,7 @@ func TestRecordSerialize(t *testing.T) {
 			Lsn:    Lsn(1),
 			TrxId:  10,
 			Type:   RecordTypePageWrite,
-			PageId: page.NewPageId(page.FileId(2), page.PageNumber(3)),
+			PageId: page.NewId(page.FileId(2), page.PageNumber(3)),
 			Data:   *pg,
 		}
 
@@ -65,7 +65,7 @@ func TestDeserializeRecord(t *testing.T) {
 			Lsn:    Lsn(5),
 			TrxId:  42,
 			Type:   RecordTypePageWrite,
-			PageId: page.NewPageId(page.FileId(1), page.PageNumber(10)),
+			PageId: page.NewId(page.FileId(1), page.PageNumber(10)),
 			Data:   *pg,
 		}
 		buf := original.Serialize()
@@ -141,7 +141,7 @@ func TestDeserializeRecord(t *testing.T) {
 			Lsn:    Lsn(1),
 			TrxId:  1,
 			Type:   RecordTypePageWrite,
-			PageId: page.NewPageId(page.FileId(1), page.PageNumber(1)),
+			PageId: page.NewId(page.FileId(1), page.PageNumber(1)),
 			Data:   *pg,
 		}
 		buf := r.Serialize()

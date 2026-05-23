@@ -9,7 +9,7 @@ import (
 
 // RecordPosition はページ内のレコードの物理的な位置を示す
 type RecordPosition struct {
-	PageId  page.PageId
+	PageId  page.Id
 	SlotNum int
 }
 

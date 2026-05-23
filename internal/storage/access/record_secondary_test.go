@@ -335,7 +335,7 @@ func setupSecondaryTestCatalog(t *testing.T) *catalog.Catalog {
 	}
 
 	tableFileId := page.FileId(2)
-	dummyPageId := page.NewPageId(tableFileId, page.PageNumber(0))
+	dummyPageId := page.NewId(tableFileId, page.PageNumber(0))
 	_ = ct.TableMeta.Insert("users", dummyPageId, 3)
 	_ = ct.ColumnMeta.Insert(tableFileId, "id", 0)
 	_ = ct.ColumnMeta.Insert(tableFileId, "name", 1)

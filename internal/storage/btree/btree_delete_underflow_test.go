@@ -218,11 +218,11 @@ func TestDeleteUnderflow(t *testing.T) {
 		bt, bp := setupBtreeForTest(t)
 
 		childPageId, childBufPage := allocateTestPage(t, bp)
-		childBranch := initTestBranchNode(t, bp, childPageId, largeBranchKey(0x10), page.NewPageId(0, 100), page.NewPageId(0, 101))
+		childBranch := initTestBranchNode(t, bp, childPageId, largeBranchKey(0x10), page.NewId(0, 100), page.NewId(0, 101))
 		insertLargeBranchRecords(childBranch, 3, 0x20)
 
 		siblingPageId, _ := allocateTestPage(t, bp)
-		siblingBranch := initTestBranchNode(t, bp, siblingPageId, largeBranchKey(0x60), page.NewPageId(0, 200), page.NewPageId(0, 201))
+		siblingBranch := initTestBranchNode(t, bp, siblingPageId, largeBranchKey(0x60), page.NewId(0, 200), page.NewId(0, 201))
 		insertLargeBranchRecords(siblingBranch, 5, 0x70)
 
 		parentPageId, _ := allocateTestPage(t, bp)
@@ -247,11 +247,11 @@ func TestDeleteUnderflow(t *testing.T) {
 		bt, bp := setupBtreeForTest(t)
 
 		siblingPageId, _ := allocateTestPage(t, bp)
-		siblingBranch := initTestBranchNode(t, bp, siblingPageId, largeBranchKey(0x10), page.NewPageId(0, 200), page.NewPageId(0, 201))
+		siblingBranch := initTestBranchNode(t, bp, siblingPageId, largeBranchKey(0x10), page.NewId(0, 200), page.NewId(0, 201))
 		insertLargeBranchRecords(siblingBranch, 5, 0x20)
 
 		childPageId, childBufPage := allocateTestPage(t, bp)
-		childBranch := initTestBranchNode(t, bp, childPageId, largeBranchKey(0x80), page.NewPageId(0, 100), page.NewPageId(0, 101))
+		childBranch := initTestBranchNode(t, bp, childPageId, largeBranchKey(0x80), page.NewId(0, 100), page.NewId(0, 101))
 		insertLargeBranchRecords(childBranch, 3, 0x90)
 
 		parentPageId, _ := allocateTestPage(t, bp)
@@ -276,11 +276,11 @@ func TestDeleteUnderflow(t *testing.T) {
 		bt, bp := setupBtreeForTest(t)
 
 		siblingPageId, siblingBufPage := allocateTestPage(t, bp)
-		siblingBranch := initTestBranchNode(t, bp, siblingPageId, largeBranchKey(0x10), page.NewPageId(0, 200), page.NewPageId(0, 201))
+		siblingBranch := initTestBranchNode(t, bp, siblingPageId, largeBranchKey(0x10), page.NewId(0, 200), page.NewId(0, 201))
 		insertLargeBranchRecords(siblingBranch, 2, 0x20)
 
 		childPageId, childBufPage := allocateTestPage(t, bp)
-		initTestBranchNode(t, bp, childPageId, largeBranchKey(0x70), page.NewPageId(0, 100), page.NewPageId(0, 101))
+		initTestBranchNode(t, bp, childPageId, largeBranchKey(0x70), page.NewId(0, 100), page.NewId(0, 101))
 
 		parentPageId, _ := allocateTestPage(t, bp)
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x60}, siblingPageId, childPageId)
@@ -301,10 +301,10 @@ func TestDeleteUnderflow(t *testing.T) {
 		bt, bp := setupBtreeForTest(t)
 
 		childPageId, childBufPage := allocateTestPage(t, bp)
-		initTestBranchNode(t, bp, childPageId, largeBranchKey(0x10), page.NewPageId(0, 100), page.NewPageId(0, 101))
+		initTestBranchNode(t, bp, childPageId, largeBranchKey(0x10), page.NewId(0, 100), page.NewId(0, 101))
 
 		siblingPageId, _ := allocateTestPage(t, bp)
-		initTestBranchNode(t, bp, siblingPageId, largeBranchKey(0x60), page.NewPageId(0, 200), page.NewPageId(0, 201))
+		initTestBranchNode(t, bp, siblingPageId, largeBranchKey(0x60), page.NewId(0, 200), page.NewId(0, 201))
 
 		parentPageId, _ := allocateTestPage(t, bp)
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x50}, childPageId, siblingPageId)
@@ -325,13 +325,13 @@ func TestDeleteUnderflow(t *testing.T) {
 		bt, bp := setupBtreeForTest(t)
 
 		childPageId, childBufPage := allocateTestPage(t, bp)
-		initTestBranchNode(t, bp, childPageId, largeBranchKey(0x10), page.NewPageId(0, 100), page.NewPageId(0, 101))
+		initTestBranchNode(t, bp, childPageId, largeBranchKey(0x10), page.NewId(0, 100), page.NewId(0, 101))
 
 		siblingPageId, _ := allocateTestPage(t, bp)
-		initTestBranchNode(t, bp, siblingPageId, largeBranchKey(0x40), page.NewPageId(0, 200), page.NewPageId(0, 201))
+		initTestBranchNode(t, bp, siblingPageId, largeBranchKey(0x40), page.NewId(0, 200), page.NewId(0, 201))
 
 		otherPageId, _ := allocateTestPage(t, bp)
-		initTestBranchNode(t, bp, otherPageId, largeBranchKey(0xA0), page.NewPageId(0, 300), page.NewPageId(0, 301))
+		initTestBranchNode(t, bp, otherPageId, largeBranchKey(0xA0), page.NewId(0, 300), page.NewId(0, 301))
 
 		parentPageId, _ := allocateTestPage(t, bp)
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x30}, childPageId, otherPageId)
@@ -349,7 +349,7 @@ func TestDeleteUnderflow(t *testing.T) {
 }
 
 // allocateTestPage はテスト用にページを割り当ててバッファプールに追加する
-func allocateTestPage(t *testing.T, bp *buffer.BufferPool) (page.PageId, *buffer.BufferPage) {
+func allocateTestPage(t *testing.T, bp *buffer.BufferPool) (page.Id, *buffer.BufferPage) {
 	t.Helper()
 	pageId, err := bp.AllocatePageId(0)
 	assert.NoError(t, err)
@@ -359,7 +359,7 @@ func allocateTestPage(t *testing.T, bp *buffer.BufferPool) (page.PageId, *buffer
 }
 
 // initTestLeafNode はテスト用の初期化済みリーフノードを作成する
-func initTestLeafNode(t *testing.T, bp *buffer.BufferPool, pageId page.PageId) *LeafNode {
+func initTestLeafNode(t *testing.T, bp *buffer.BufferPool, pageId page.Id) *LeafNode {
 	t.Helper()
 	pg, err := bp.GetWritePage(pageId)
 	assert.NoError(t, err)
@@ -372,9 +372,9 @@ func initTestLeafNode(t *testing.T, bp *buffer.BufferPool, pageId page.PageId) *
 func initTestBranchNode(
 	t *testing.T,
 	bp *buffer.BufferPool,
-	pageId page.PageId,
+	pageId page.Id,
 	key []byte,
-	leftChild, rightChild page.PageId,
+	leftChild, rightChild page.Id,
 ) *BranchNode {
 	t.Helper()
 	pg, err := bp.GetWritePage(pageId)
@@ -401,7 +401,7 @@ func largeBranchKey(firstByte byte) []byte {
 func insertLargeBranchRecords(bn *BranchNode, count int, startKeyByte byte) {
 	for i := range count {
 		key := largeBranchKey(startKeyByte + byte(i)*0x10)
-		record := NewRecord([]byte{}, key, page.NewPageId(0, page.PageNumber(300+i)).ToBytes())
+		record := NewRecord([]byte{}, key, page.NewId(0, page.PageNumber(300+i)).ToBytes())
 		bn.Insert(bn.NumRecords(), record)
 	}
 }

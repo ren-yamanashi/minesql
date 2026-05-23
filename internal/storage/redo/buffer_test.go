@@ -29,7 +29,7 @@ func TestBufferAppendPageCopy(t *testing.T) {
 		pg := buildTestPage(t)
 
 		// WHEN
-		lsn := buf.AppendPageCopy(lock.TrxId(1), page.NewPageId(1, 1), *pg)
+		lsn := buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), *pg)
 
 		// THEN
 		assert.Equal(t, Lsn(1), lsn)
@@ -41,8 +41,8 @@ func TestBufferAppendPageCopy(t *testing.T) {
 		pg := buildTestPage(t)
 
 		// WHEN
-		lsn1 := buf.AppendPageCopy(lock.TrxId(1), page.NewPageId(1, 1), *pg)
-		lsn2 := buf.AppendPageCopy(lock.TrxId(1), page.NewPageId(1, 2), *pg)
+		lsn1 := buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), *pg)
+		lsn2 := buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 2), *pg)
 
 		// THEN
 		assert.Equal(t, Lsn(1), lsn1)
@@ -119,7 +119,7 @@ func TestBufferReadAll(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
 		pg := buildTestPage(t)
-		buf.AppendPageCopy(lock.TrxId(1), page.NewPageId(1, 1), *pg)
+		buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), *pg)
 		buf.AppendCommit(lock.TrxId(1))
 		_ = buf.Flush()
 
@@ -277,7 +277,7 @@ func TestBufferSize(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
 		pg := buildTestPage(t)
-		buf.AppendPageCopy(lock.TrxId(1), page.NewPageId(1, 1), *pg)
+		buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), *pg)
 
 		// WHEN
 		size, err := buf.Size()

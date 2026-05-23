@@ -31,8 +31,8 @@ type Record struct {
 	Lsn    Lsn
 	TrxId  lock.TrxId // 変更を行ったトランザクション ID
 	Type   RecordType
-	PageId page.PageId // 変更対象のページ (COMMIT/ROLLBACK の場合はゼロ値)
-	Data   page.Page   // 変更対象ページ全体のコピー (COMMIT/ROLLBACK の場合はゼロ値)
+	PageId page.Id   // 変更対象のページ (COMMIT/ROLLBACK の場合はゼロ値)
+	Data   page.Page // 変更対象ページ全体のコピー (COMMIT/ROLLBACK の場合はゼロ値)
 }
 
 // Serialize は Record をバイト列にシリアライズする
@@ -65,7 +65,7 @@ func DeserializeRecord(data []byte) (Record, int, error) {
 	lsn := Lsn(binary.BigEndian.Uint32(data[recordHeaderLsnOffset:recordHeaderTrxOffset]))
 	trxId := binary.BigEndian.Uint32(data[recordHeaderTrxOffset:recordHeaderRecordTypeOffset])
 	recordType := RecordType(data[recordHeaderRecordTypeOffset])
-	pageId := page.ReadPageId(data, recordHeaderPageIdOffset)
+	pageId := page.ReadId(data, recordHeaderPageIdOffset)
 	dataLen := int(binary.BigEndian.Uint16(data[recordHeaderDataLenOffset:recordHeaderSize]))
 	totalLen := recordHeaderSize + dataLen
 

@@ -39,8 +39,8 @@ func NewLeafNode(pg *page.Page) *LeafNode {
 //
 // 初期化時には、前後のリーフノードのポインタ (PageId) には無効値が設定される
 func (ln *LeafNode) Initialize() {
-	page.InvalidPageId.WriteTo(ln.header[nodeHeaderSize:], leafPrevPageIdOffset)
-	page.InvalidPageId.WriteTo(ln.header[nodeHeaderSize:], leafNextPageIdOffset)
+	page.InvalidId.WriteTo(ln.header[nodeHeaderSize:], leafPrevPageIdOffset)
+	page.InvalidId.WriteTo(ln.header[nodeHeaderSize:], leafNextPageIdOffset)
 	ln.body.Initialize()
 }
 
@@ -143,22 +143,22 @@ func (ln *LeafNode) SearchSlotNum(key []byte) (int, bool) {
 }
 
 // PrevPageId は前のリーフノードのページ ID を取得する
-func (ln *LeafNode) PrevPageId() page.PageId {
-	return page.ReadPageId(ln.header[nodeHeaderSize:], leafPrevPageIdOffset)
+func (ln *LeafNode) PrevPageId() page.Id {
+	return page.ReadId(ln.header[nodeHeaderSize:], leafPrevPageIdOffset)
 }
 
 // NextPageId は次のリーフノードのページ ID を取得する
-func (ln *LeafNode) NextPageId() page.PageId {
-	return page.ReadPageId(ln.header[nodeHeaderSize:], leafNextPageIdOffset)
+func (ln *LeafNode) NextPageId() page.Id {
+	return page.ReadId(ln.header[nodeHeaderSize:], leafNextPageIdOffset)
 }
 
 // SetPrevPageId は前のリーフノードのページ ID を設定する
-func (ln *LeafNode) SetPrevPageId(prevPageId page.PageId) {
+func (ln *LeafNode) SetPrevPageId(prevPageId page.Id) {
 	prevPageId.WriteTo(ln.header[nodeHeaderSize:], leafPrevPageIdOffset)
 }
 
 // SetNextPageId は次のリーフノードのページ ID を設定する
-func (ln *LeafNode) SetNextPageId(nextPageId page.PageId) {
+func (ln *LeafNode) SetNextPageId(nextPageId page.Id) {
 	nextPageId.WriteTo(ln.header[nodeHeaderSize:], leafNextPageIdOffset)
 }
 

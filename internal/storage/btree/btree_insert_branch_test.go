@@ -19,7 +19,7 @@ func TestInsertBranchOverflow(t *testing.T) {
 			branchNode,
 			1,
 			[]byte{0x20},
-			page.NewPageId(0, 10),
+			page.NewId(0, 10),
 		)
 
 		// THEN
@@ -40,7 +40,7 @@ func TestInsertBranchOverflow(t *testing.T) {
 			branchNode,
 			branchNode.NumRecords(),
 			[]byte{0xFF},
-			page.NewPageId(0, 99),
+			page.NewId(0, 99),
 		)
 
 		// THEN
@@ -60,7 +60,7 @@ func setupTestBranchNode(t *testing.T, bp *buffer.BufferPool) *BranchNode {
 	pg, err := bp.GetWritePage(pageId)
 	assert.NoError(t, err)
 	bn := NewBranchNode(pg)
-	err = bn.Initialize([]byte{0x10}, page.NewPageId(0, 1), page.NewPageId(0, 2))
+	err = bn.Initialize([]byte{0x10}, page.NewId(0, 1), page.NewId(0, 2))
 	assert.NoError(t, err)
 	return bn
 }
@@ -69,7 +69,7 @@ func setupTestBranchNode(t *testing.T, bp *buffer.BufferPool) *BranchNode {
 func fillBranchNodeUntilFull(bn *BranchNode) {
 	for i := range 1000 {
 		key := []byte{byte(i/256 + 0x11), byte(i % 256)}
-		record := NewRecord([]byte{}, key, page.NewPageId(0, page.PageNumber(i+10)).ToBytes())
+		record := NewRecord([]byte{}, key, page.NewId(0, page.PageNumber(i+10)).ToBytes())
 		if !bn.Insert(bn.NumRecords(), record) {
 			return
 		}

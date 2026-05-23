@@ -10,7 +10,7 @@ type IndexKeyColMeta struct {
 	tree *btree.Btree // インデックスキーカラムメタデータが格納される B+Tree
 }
 
-func NewIndexKeyColMeta(bp *buffer.BufferPool, metaPageId page.PageId) *IndexKeyColMeta {
+func NewIndexKeyColMeta(bp *buffer.BufferPool, metaPageId page.Id) *IndexKeyColMeta {
 	return &IndexKeyColMeta{tree: btree.NewBtree(bp, metaPageId)}
 }
 
