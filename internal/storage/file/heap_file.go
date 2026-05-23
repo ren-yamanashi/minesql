@@ -45,7 +45,6 @@ func (hf *HeapFile) AllocatePageId() page.Id {
 }
 
 // Read は指定された PageNumber のページデータを data に読み込む
-// (読み込んだデータは data に格納される)
 //   - pageNumber: 読み込み対象の PageNumber
 //   - data: 読み込み先
 func (hf *HeapFile) Read(pageNumber page.PageNumber, data []byte) error {

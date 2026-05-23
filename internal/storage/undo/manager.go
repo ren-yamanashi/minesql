@@ -91,7 +91,9 @@ func (m *Manager) CommittedEntries(committedTrxIds []lock.TrxId) []Entry {
 }
 
 // Discard は指定した trxId の Undo ログをすべて破棄する
-func (m *Manager) Discard(trxId lock.TrxId) { delete(m.entries, trxId) }
+func (m *Manager) Discard(trxId lock.TrxId) {
+	delete(m.entries, trxId)
+}
 
 // DiscardRecordType は指定した trxId の指定したレコードタイプの Undo レコードのみ破棄する
 func (m *Manager) DiscardRecordType(trxId lock.TrxId, recordType recordType) {

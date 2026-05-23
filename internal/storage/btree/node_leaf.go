@@ -6,12 +6,11 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
-const leafHeaderSize = 16
-
 // リーフノードヘッダー内のオフセット
 const (
-	leafPrevPageIdOffset = 0
-	leafNextPageIdOffset = 8
+	leafNodePrevPageIdOffset = 0
+	leafNodeNextPageIdOffset = 8
+	leafNodeHeaderSize       = 16
 )
 
 type leafNode struct {
@@ -26,7 +25,7 @@ type leafNode struct {
 func newLeafNode(pg *page.Page) *leafNode {
 	data := pg.Body
 	copy(data[0:nodeHeaderSize], nodeTypeLeaf)
-	headerSize := nodeHeaderSize + leafHeaderSize
+	headerSize := nodeHeaderSize + leafNodeHeaderSize
 	header := data[:headerSize]
 	body := newSlottedPage(data[headerSize:])
 	return &leafNode{
@@ -39,8 +38,8 @@ func newLeafNode(pg *page.Page) *leafNode {
 //
 // 初期化時には、ノードタイプヘッダーを設定し、前後のリーフノードのポインタ (PageId) には無効値が設定される
 func (ln *leafNode) initialize() {
-	page.InvalidId.WriteTo(ln.header[nodeHeaderSize:], leafPrevPageIdOffset)
-	page.InvalidId.WriteTo(ln.header[nodeHeaderSize:], leafNextPageIdOffset)
+	page.InvalidId.WriteTo(ln.header[nodeHeaderSize:], leafNodePrevPageIdOffset)
+	page.InvalidId.WriteTo(ln.header[nodeHeaderSize:], leafNodeNextPageIdOffset)
 	ln.body.initialize()
 }
 
@@ -144,22 +143,22 @@ func (ln *leafNode) searchSlotNum(key []byte) (int, bool) {
 
 // prevPageId は前のリーフノードのページ ID を取得する
 func (ln *leafNode) prevPageId() page.Id {
-	return page.ReadId(ln.header[nodeHeaderSize:], leafPrevPageIdOffset)
+	return page.ReadId(ln.header[nodeHeaderSize:], leafNodePrevPageIdOffset)
 }
 
 // nextPageId は次のリーフノードのページ ID を取得する
 func (ln *leafNode) nextPageId() page.Id {
-	return page.ReadId(ln.header[nodeHeaderSize:], leafNextPageIdOffset)
+	return page.ReadId(ln.header[nodeHeaderSize:], leafNodeNextPageIdOffset)
 }
 
 // setPrevPageId は前のリーフノードのページ ID を設定する
 func (ln *leafNode) setPrevPageId(prevPageId page.Id) {
-	prevPageId.WriteTo(ln.header[nodeHeaderSize:], leafPrevPageIdOffset)
+	prevPageId.WriteTo(ln.header[nodeHeaderSize:], leafNodePrevPageIdOffset)
 }
 
 // setNextPageId は次のリーフノードのページ ID を設定する
 func (ln *leafNode) setNextPageId(nextPageId page.Id) {
-	nextPageId.WriteTo(ln.header[nodeHeaderSize:], leafNextPageIdOffset)
+	nextPageId.WriteTo(ln.header[nodeHeaderSize:], leafNodeNextPageIdOffset)
 }
 
 // transferAllFrom は src のすべてのレコードを自分の末尾に転送する (src のレコードはすべて削除される)

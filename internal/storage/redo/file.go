@@ -177,7 +177,9 @@ func (f *file) clear() error {
 }
 
 // close は Redo ログファイルを閉じる
-func (f *file) close() error { return f.osFile.Close() }
+func (f *file) close() error {
+	return f.osFile.Close()
+}
 
 // size は Redo ログファイルの現在のサイズ (バイト数) を返す
 func (f *file) size() (int64, error) {

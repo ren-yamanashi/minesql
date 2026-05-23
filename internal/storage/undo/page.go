@@ -78,4 +78,6 @@ func (p *Page) setNextPageNumber(pn page.PageNumber) {
 }
 
 // freeSpace はボディ内の空き容量を返す
-func (p *Page) freeSpace() int { return len(p.body) - int(p.UsedBytes()) }
+func (p *Page) freeSpace() int {
+	return len(p.body) - int(p.UsedBytes())
+}

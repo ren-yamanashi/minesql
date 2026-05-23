@@ -203,7 +203,7 @@ func TestCopy(t *testing.T) {
 		assert.Equal(t, byte(0xFF), copied.Header[0])
 	})
 
-	t.Run("Header が nil の場合はゼロ値の Page を返す", func(t *testing.T) {
+	t.Run("data が nil の場合はゼロ値の Page を返す", func(t *testing.T) {
 		// GIVEN
 		pg := Page{}
 

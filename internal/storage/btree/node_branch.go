@@ -9,8 +9,8 @@ import (
 
 // ブランチノード内のオフセット
 const (
-	branchRightChildOffset = 0
-	branchHeaderSize       = 8
+	branchNodeRightChildOffset = 0
+	branchNodeHeaderSize       = 8
 )
 
 type branchNode struct {
@@ -23,8 +23,8 @@ type branchNode struct {
 
 func newBranchNode(pg *page.Page) *branchNode {
 	data := pg.Body
-	copy(data[branchRightChildOffset:nodeHeaderSize], nodeTypeBranch)
-	headerSize := nodeHeaderSize + branchHeaderSize
+	copy(data[branchNodeRightChildOffset:nodeHeaderSize], nodeTypeBranch)
+	headerSize := nodeHeaderSize + branchNodeHeaderSize
 	header := data[:headerSize]
 	body := newSlottedPage(data[headerSize:])
 	return &branchNode{
@@ -45,7 +45,7 @@ func (bn *branchNode) initialize(key []byte, leftChildPageId, rightChildId page.
 		return errors.New("new branch node must have space")
 	}
 
-	rightChildId.WriteTo(bn.header[nodeHeaderSize:], branchRightChildOffset)
+	rightChildId.WriteTo(bn.header[nodeHeaderSize:], branchNodeRightChildOffset)
 	return nil
 }
 
@@ -160,7 +160,7 @@ func (bn *branchNode) searchSlotNum(key []byte) (int, bool) {
 // childPageId は指定された slotNum に対応する子ページの PageId を取得する
 func (bn *branchNode) childPageId(slotNum int) (page.Id, error) {
 	if slotNum == bn.numRecords() {
-		return page.ReadId(bn.header[nodeHeaderSize:], branchRightChildOffset), nil
+		return page.ReadId(bn.header[nodeHeaderSize:], branchNodeRightChildOffset), nil
 	}
 	record := bn.record(slotNum)
 	return page.RestoreId(record.NonKey())
@@ -168,12 +168,12 @@ func (bn *branchNode) childPageId(slotNum int) (page.Id, error) {
 
 // rightChildPageId は右端の子の PageId を取得する
 func (bn *branchNode) rightChildPageId() page.Id {
-	return page.ReadId(bn.header[nodeHeaderSize:], branchRightChildOffset)
+	return page.ReadId(bn.header[nodeHeaderSize:], branchNodeRightChildOffset)
 }
 
 // setRightChildPageId は右端の子の PageId を設定する
 func (bn *branchNode) setRightChildPageId(pageId page.Id) {
-	pageId.WriteTo(bn.header[nodeHeaderSize:], branchRightChildOffset)
+	pageId.WriteTo(bn.header[nodeHeaderSize:], branchNodeRightChildOffset)
 }
 
 // transferAllFrom は src のすべてのレコードを自分の末尾に転送する (src のレコードはすべて削除される)
@@ -198,7 +198,7 @@ func (bn *branchNode) fillRightChild() ([]byte, error) {
 
 	key := bytes.Clone(record.Key())
 	bn.body.delete(lastSlotNum)
-	rightChild.WriteTo(bn.header[nodeHeaderSize:], branchRightChildOffset)
+	rightChild.WriteTo(bn.header[nodeHeaderSize:], branchNodeRightChildOffset)
 	return key, nil
 }
 

@@ -38,7 +38,9 @@ func (p Pointer) Encode() []byte {
 }
 
 // isNull は前バージョンが存在しないかどうかを返す
-func (p Pointer) isNull() bool { return p == NullPointer }
+func (p Pointer) isNull() bool {
+	return p == NullPointer
+}
 
 // DecodePointer はバイト列から Pointer をデコードする
 func DecodePointer(data []byte) (Pointer, error) {

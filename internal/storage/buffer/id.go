@@ -1,3 +1,3 @@
 package buffer
 
-type id uint64
+type id uint32

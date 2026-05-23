@@ -2,6 +2,7 @@ package page
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 )
 
@@ -41,12 +42,15 @@ func (p *Page) ToBytes() []byte {
 //
 // pg が nil データの場合はゼロ値の Page を返す
 func Copy(pg Page) Page {
-	if pg.Header == nil {
+	if pg.data == nil {
 		return Page{}
 	}
 	copied := make([]byte, Size)
 	copy(copied, pg.ToBytes())
-	p, _ := NewPage(copied)
+	p, err := NewPage(copied) // make([]byte, Size) でサイズ保証済みのため、ここでのエラーは不変条件違反を意味するので panic で良い
+	if err != nil {
+		panic(fmt.Sprintf("page: Copy failed: %v", err))
+	}
 	return *p
 }
 

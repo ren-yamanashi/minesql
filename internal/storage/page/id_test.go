@@ -31,18 +31,18 @@ func TestNewId(t *testing.T) {
 
 	t.Run("最大値で Id を生成できる", func(t *testing.T) {
 		// GIVEN / WHEN
-		pageId := NewId(MaxFileId, MaxPageNumber)
+		pageId := NewId(maxFileId, maxPageNumber)
 
 		// THEN
-		assert.Equal(t, FileId(MaxFileId), pageId.FileId)
-		assert.Equal(t, PageNumber(MaxPageNumber), pageId.PageNumber)
+		assert.Equal(t, FileId(maxFileId), pageId.FileId)
+		assert.Equal(t, PageNumber(maxPageNumber), pageId.PageNumber)
 	})
 }
 
 func TestIsInvalid(t *testing.T) {
 	t.Run("InvalidId と一致する場合 true を返す", func(t *testing.T) {
 		// GIVEN
-		pageId := NewId(MaxFileId, MaxPageNumber)
+		pageId := NewId(maxFileId, maxPageNumber)
 
 		// WHEN
 		result := pageId.IsInvalid()
@@ -90,7 +90,7 @@ func TestToBytes(t *testing.T) {
 
 	t.Run("最大値の Id を変換すると全て 0xFF になる", func(t *testing.T) {
 		// GIVEN
-		id := NewId(MaxFileId, MaxPageNumber)
+		id := NewId(maxFileId, maxPageNumber)
 
 		// WHEN
 		data := id.ToBytes()
