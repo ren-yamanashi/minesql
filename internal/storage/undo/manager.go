@@ -123,52 +123,62 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 
 	// ページが満杯の場合は、新しいページを割り当てる
 	if !bufPageUndo.append(serialized) {
-		newPageId, err := m.bufferPool.AllocatePageId(m.undoFileId)
+		ptr, err = m.switchToNewPage(trxId, bufPageUndo, serialized)
 		if err != nil {
 			return Pointer{}, err
 		}
-
-		// 現在のページに次のページへのリンクを設定
-		bufPageUndo.setNextPageNumber(newPageId.PageNumber)
-
-		// 旧ページの REDO ログを記録 (nextPageNumber の変更を反映)
-		if m.redoLog != nil {
-			oldPage, err := m.bufferPool.PageForRead(m.currentPageId)
-			if err != nil {
-				return Pointer{}, err
-			}
-			m.redoLog.AppendPageCopy(trxId, m.currentPageId, *oldPage.Data())
-		}
-
-		// 新しいページを初期化してレコードを追記
-		_, err = m.bufferPool.AddPage(newPageId)
-		if err != nil {
-			return Pointer{}, err
-		}
-		pageNewUndo, err := m.bufferPool.PageForWrite(newPageId)
-		if err != nil {
-			return Pointer{}, err
-		}
-		newBufPageUndo := NewPage(*pageNewUndo.Data())
-		newBufPageUndo.initialize()
-
-		ptr = Pointer{
-			pageNumber: newPageId.PageNumber,
-			offset:     0,
-		}
-		if !newBufPageUndo.append(serialized) {
-			return Pointer{}, errRecordTooLarge
-		}
-		m.currentPageId = newPageId
 	}
 
-	// Redo ログに Undo ページの変更を記録
-	if m.redoLog != nil {
-		pageUndo, err := m.bufferPool.PageForRead(m.currentPageId)
-		if err != nil {
-			return Pointer{}, err
-		}
-		m.redoLog.AppendPageCopy(trxId, m.currentPageId, *pageUndo.Data())
+	if err := m.appendRedoLog(trxId); err != nil {
+		return Pointer{}, err
 	}
 	return ptr, nil
+}
+
+// switchToNewPage は現在のページが満杯のとき、新しい Undo ページを割り当ててレコードを書き込む
+func (m *Manager) switchToNewPage(trxId lock.TrxId, currentPage *Page, serialized []byte) (Pointer, error) {
+	newPageId, err := m.bufferPool.AllocatePageId(m.undoFileId)
+	if err != nil {
+		return Pointer{}, err
+	}
+
+	// 現在のページに次のページへのリンクを設定
+	currentPage.setNextPageNumber(newPageId.PageNumber)
+
+	// 旧ページの Redo ログを記録 (nextPageNumber の変更を反映)
+	if err := m.appendRedoLog(trxId); err != nil {
+		return Pointer{}, err
+	}
+
+	// 新しいページを初期化してレコードを追記
+	_, err = m.bufferPool.AddPage(newPageId)
+	if err != nil {
+		return Pointer{}, err
+	}
+	pageNewUndo, err := m.bufferPool.PageForWrite(newPageId)
+	if err != nil {
+		return Pointer{}, err
+	}
+	newBufPageUndo := NewPage(*pageNewUndo.Data())
+	newBufPageUndo.initialize()
+
+	if !newBufPageUndo.append(serialized) {
+		return Pointer{}, errRecordTooLarge
+	}
+	m.currentPageId = newPageId
+
+	return NewPointer(newPageId.PageNumber, 0), nil
+}
+
+// appendRedoLog は現在の Undo ページの Redo ログを記録する
+func (m *Manager) appendRedoLog(trxId lock.TrxId) error {
+	if m.redoLog == nil {
+		return nil
+	}
+	pageUndo, err := m.bufferPool.PageForRead(m.currentPageId)
+	if err != nil {
+		return err
+	}
+	m.redoLog.AppendPageCopy(trxId, m.currentPageId, *pageUndo.Data())
+	return nil
 }
