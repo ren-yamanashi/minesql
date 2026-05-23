@@ -70,13 +70,13 @@ func (r *Recovery) applyRedoLog(records []redo.Record) error {
 		}
 
 		// Page LSN を比較し、すでに適用済みならスキップ
-		currentLsn := redo.Lsn(binary.BigEndian.Uint32(writePage.Header))
+		currentLsn := redo.Lsn(binary.BigEndian.Uint32(writePage.Page.Header))
 		if currentLsn >= rec.Lsn {
 			continue
 		}
 
 		// ページ全体のコピーで上書き
-		copy(writePage.ToBytes(), rec.Data.ToBytes())
+		copy(writePage.Page.ToBytes(), rec.Data.ToBytes())
 	}
 	return nil
 }
@@ -131,7 +131,7 @@ func (r *Recovery) collectUndoRecords(trxId lock.TrxId) ([]undo.Record, error) {
 			break
 		}
 
-		undoPage := undo.NewPage(*readPage)
+		undoPage := undo.NewPage(*readPage.Page)
 		offset := 0
 		for offset < int(undoPage.UsedBytes()) {
 			recordBytes := undoPage.RecordAt(offset)

@@ -31,7 +31,7 @@ func (bp *Pool) addPage(pageId page.Id) (*Page, error) {
 	victimBufPage := &bp.pages[victimBufId]
 
 	if victimBufPage.isDirty {
-		heapFile, err := bp.getHeapFile(victimBufPage.PageId.FileId)
+		heapFile, err := bp.heapFile(victimBufPage.PageId.FileId)
 		if err != nil {
 			return nil, err
 		}

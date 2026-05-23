@@ -65,7 +65,7 @@ func (bt *Btree) splitInsertLeaf(
 	if err != nil {
 		return nil, page.InvalidId, err
 	}
-	newLeaf := NewLeafNode(pageNewLeaf)
+	newLeaf := NewLeafNode(pageNewLeaf.Page)
 	overflowKey, err := leafNode.SplitInsert(newLeaf, record)
 	if err != nil {
 		return nil, page.InvalidId, err
@@ -85,7 +85,7 @@ func (bt *Btree) updatePrevLeafLink(prevLeafPageId, newNextPageId page.Id) error
 	if err != nil {
 		return err
 	}
-	prevLeaf := NewLeafNode(pagePrevLeaf)
+	prevLeaf := NewLeafNode(pagePrevLeaf.Page)
 	prevLeaf.SetNextPageId(newNextPageId)
 	return nil
 }

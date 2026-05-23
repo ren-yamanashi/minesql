@@ -39,7 +39,7 @@ func CreateBtree(bp *buffer.Pool, fileId page.FileId) (*Btree, error) {
 	if err != nil {
 		return nil, err
 	}
-	metaPage := newMetaPage(pageMeta)
+	metaPage := newMetaPage(pageMeta.Page)
 
 	// ルートリーフノード作成
 	rootNodePageId, err := bp.AllocatePageId(MetaPageId.FileId)
@@ -54,7 +54,7 @@ func CreateBtree(bp *buffer.Pool, fileId page.FileId) (*Btree, error) {
 	if err != nil {
 		return nil, err
 	}
-	rootLeaf := NewLeafNode(pageRoot)
+	rootLeaf := NewLeafNode(pageRoot.Page)
 	rootLeaf.Initialize()
 
 	// メタページの設定
@@ -72,7 +72,7 @@ func (bt *Btree) LeafPageCount() (uint64, error) {
 		return 0, err
 	}
 	defer bt.bufferPool.UnRefPage(bt.MetaPageId)
-	metaPage := newMetaPage(pageMeta)
+	metaPage := newMetaPage(pageMeta.Page)
 	return metaPage.leafPageCount(), nil
 }
 
@@ -83,6 +83,6 @@ func (bt *Btree) Height() (uint64, error) {
 		return 0, err
 	}
 	defer bt.bufferPool.UnRefPage(bt.MetaPageId)
-	metaPage := newMetaPage(pageMeta)
+	metaPage := newMetaPage(pageMeta.Page)
 	return metaPage.height(), nil
 }

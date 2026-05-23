@@ -14,12 +14,12 @@ func (bt *Btree) Update(record Record) error {
 	if err != nil {
 		return err
 	}
-	metaPage := newMetaPage(pageMeta)
+	metaPage := newMetaPage(pageMeta.Page)
 	defer bt.bufferPool.UnRefPage(bt.MetaPageId)
 
 	// ルートページ取得
 	rootPageId := metaPage.rootPageId()
-	rootBufPage, err := bt.bufferPool.BufferPage(rootPageId)
+	rootBufPage, err := bt.bufferPool.BufferPageForRead(rootPageId)
 	if err != nil {
 		return err
 	}
@@ -33,18 +33,18 @@ func (bt *Btree) updateRecursively(bufPage *buffer.Page, record Record) error {
 		return err
 	}
 
-	nodeType := GetNodeType(pg)
+	nodeType := GetNodeType(pg.Page)
 	switch {
 	// ブランチノードの場合: 子ノードに対して再帰実行する
 	case bytes.Equal(nodeType, NodeTypeBranch):
 		defer bt.bufferPool.UnRefPage(bufPage.PageId)
-		branchNode := NewBranchNode(pg)
+		branchNode := NewBranchNode(pg.Page)
 		mode := SearchModeKey{Key: record.Key()}
 		childPageId, err := mode.childPageId(branchNode)
 		if err != nil {
 			return err
 		}
-		childBufPage, err := bt.bufferPool.BufferPage(childPageId)
+		childBufPage, err := bt.bufferPool.BufferPageForRead(childPageId)
 		if err != nil {
 			return err
 		}
@@ -52,7 +52,7 @@ func (bt *Btree) updateRecursively(bufPage *buffer.Page, record Record) error {
 
 	// リーフノードの場合: そのまま更新する
 	case bytes.Equal(nodeType, NodeTypeLeaf):
-		leafNode := NewLeafNode(pg)
+		leafNode := NewLeafNode(pg.Page)
 		slotNum, found := leafNode.SearchSlotNum(record.Key())
 		if !found {
 			return ErrKeyNotFound

@@ -20,7 +20,7 @@ func (bp *Pool) FlushAllPages() error {
 			return
 		}
 
-		heapFile, err := bp.getHeapFile(pageId.FileId)
+		heapFile, err := bp.heapFile(pageId.FileId)
 		if err != nil {
 			flushErr = err
 			return
@@ -74,7 +74,7 @@ func (bp *Pool) FlushOldestPages(n int) error {
 			continue
 		}
 
-		heapFile, err := bp.getHeapFile(pid.FileId)
+		heapFile, err := bp.heapFile(pid.FileId)
 		if err != nil {
 			return err
 		}
@@ -88,7 +88,7 @@ func (bp *Pool) FlushOldestPages(n int) error {
 	}
 
 	for fileId := range syncHeapFiles {
-		heapFile, err := bp.getHeapFile(fileId)
+		heapFile, err := bp.heapFile(fileId)
 		if err != nil {
 			return err
 		}

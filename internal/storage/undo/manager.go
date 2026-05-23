@@ -35,11 +35,11 @@ func NewManager(bp *buffer.Pool, redo *redo.Buffer, undoFileId page.FileId) (*Ma
 	if err != nil {
 		return nil, err
 	}
-	pageUndo, err := bp.BufferPageForWrite(pageId)
+	bufPageUndo, err := bp.BufferPageForWrite(pageId)
 	if err != nil {
 		return nil, err
 	}
-	NewPage(*pageUndo).Initialize()
+	NewPage(*bufPageUndo.Page).Initialize()
 
 	return &Manager{
 		bufferPool:    bp,
@@ -125,19 +125,19 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 	if err != nil {
 		return Pointer{}, err
 	}
-	undoPage := NewPage(*pageUndo)
+	bufPageUndo := NewPage(*pageUndo.Page)
 
-	ptr := newPointer(m.currentPageId.PageNumber, undoPage.UsedBytes())
+	ptr := newPointer(m.currentPageId.PageNumber, bufPageUndo.UsedBytes())
 
 	// ページが満杯の場合は、新しいページを割り当てる
-	if !undoPage.Append(serialized) {
+	if !bufPageUndo.Append(serialized) {
 		newPageId, err := m.bufferPool.AllocatePageId(m.undoFileId)
 		if err != nil {
 			return Pointer{}, err
 		}
 
 		// 現在のページに次のページへのリンクを設定
-		undoPage.SetNextPageNumber(newPageId.PageNumber)
+		bufPageUndo.SetNextPageNumber(newPageId.PageNumber)
 
 		// 新しいページを初期化してレコードを追記
 		_, err = m.bufferPool.AddPage(newPageId)
@@ -148,14 +148,14 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 		if err != nil {
 			return Pointer{}, err
 		}
-		newUndoPage := NewPage(*pageNewUndo)
-		newUndoPage.Initialize()
+		newBufPageUndo := NewPage(*pageNewUndo.Page)
+		newBufPageUndo.Initialize()
 
 		ptr = Pointer{
 			PageNumber: newPageId.PageNumber,
 			Offset:     0,
 		}
-		if !newUndoPage.Append(serialized) {
+		if !newBufPageUndo.Append(serialized) {
 			return Pointer{}, errors.New("undo: record too large for a single page")
 		}
 		m.currentPageId = newPageId
@@ -167,7 +167,7 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 		if err != nil {
 			return Pointer{}, err
 		}
-		m.redoLog.AppendPageCopy(trxId, m.currentPageId, *pageUndo)
+		m.redoLog.AppendPageCopy(trxId, m.currentPageId, *pageUndo.Page)
 	}
 	return ptr, nil
 }

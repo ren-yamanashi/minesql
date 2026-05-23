@@ -66,9 +66,9 @@ func TestNewCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
-		pageHeader, err := bp.BufferPageForWrite(headerPageId)
+		bufPageHeader, err := bp.BufferPageForWrite(headerPageId)
 		assert.NoError(t, err)
-		copy(pageHeader.Body[headerMagicNumberOffset:], []byte("XXXX"))
+		copy(bufPageHeader.Page.Body[headerMagicNumberOffset:], []byte("XXXX"))
 		bp.UnRefPage(headerPageId)
 
 		// WHEN
@@ -113,12 +113,12 @@ func TestCreateCatalog(t *testing.T) {
 
 		// THEN
 		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
-		pageHeader, err := bp.BufferPageForRead(headerPageId)
+		bufPageHeader, err := bp.BufferPageForRead(headerPageId)
 		assert.NoError(t, err)
 		defer bp.UnRefPage(headerPageId)
 
 		magicEnd := headerMagicNumberOffset + len(catalogMagicNumber)
-		assert.Equal(t, catalogMagicNumber, pageHeader.Body[headerMagicNumberOffset:magicEnd])
+		assert.Equal(t, catalogMagicNumber, bufPageHeader.Page.Body[headerMagicNumberOffset:magicEnd])
 	})
 
 	t.Run("ヘッダーページにスカラー値が正しく書き込まれる", func(t *testing.T) {
@@ -131,13 +131,13 @@ func TestCreateCatalog(t *testing.T) {
 
 		// THEN
 		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
-		pageHeader, err := bp.BufferPageForRead(headerPageId)
+		bufPageHeader, err := bp.BufferPageForRead(headerPageId)
 		assert.NoError(t, err)
 		defer bp.UnRefPage(headerPageId)
 
-		nextFileId := page.FileId(binary.BigEndian.Uint32(pageHeader.Body[headerNextFileIdOffset : headerNextFileIdOffset+headerFieldSize]))
-		nextIndexId := IndexId(binary.BigEndian.Uint32(pageHeader.Body[headerNextIndexIdOffset : headerNextIndexIdOffset+headerFieldSize]))
-		undoLogFileId := page.FileId(binary.BigEndian.Uint32(pageHeader.Body[headerUndoLogFileIdOffset : headerUndoLogFileIdOffset+headerFieldSize]))
+		nextFileId := page.FileId(binary.BigEndian.Uint32(bufPageHeader.Page.Body[headerNextFileIdOffset : headerNextFileIdOffset+headerFieldSize]))
+		nextIndexId := IndexId(binary.BigEndian.Uint32(bufPageHeader.Page.Body[headerNextIndexIdOffset : headerNextIndexIdOffset+headerFieldSize]))
+		undoLogFileId := page.FileId(binary.BigEndian.Uint32(bufPageHeader.Page.Body[headerUndoLogFileIdOffset : headerUndoLogFileIdOffset+headerFieldSize]))
 
 		assert.Equal(t, page.FileId(2), nextFileId)
 		assert.Equal(t, IndexId(0), nextIndexId)

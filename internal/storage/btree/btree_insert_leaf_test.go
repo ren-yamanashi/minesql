@@ -103,9 +103,9 @@ func setupTestLeafPage(t *testing.T, bp *buffer.Pool) (page.Id, *page.Page) {
 	assert.NoError(t, err)
 	_, err = bp.AddPage(pageId)
 	assert.NoError(t, err)
-	pg, err := bp.BufferPageForWrite(pageId)
+	bufPage, err := bp.BufferPageForWrite(pageId)
 	assert.NoError(t, err)
-	ln := NewLeafNode(pg)
+	ln := NewLeafNode(bufPage.Page)
 	ln.Initialize()
-	return pageId, pg
+	return pageId, bufPage.Page
 }

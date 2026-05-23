@@ -453,37 +453,37 @@ Branch[keys=1]: [key_10]
 
 		// THEN: ブランチの境界キーと左右の子のキーの関係をログに出力
 		var w strings.Builder
-		pageMeta, err := tree.bufferPool.BufferPageForRead(tree.MetaPageId)
+		bufPageMeta, err := tree.bufferPool.BufferPageForRead(tree.MetaPageId)
 		require.NoError(t, err)
-		meta := newMetaPage(pageMeta)
+		meta := newMetaPage(bufPageMeta.Page)
 		rootPageId := meta.rootPageId()
 
-		pageRoot, err := tree.bufferPool.BufferPageForRead(rootPageId)
+		bufPageRoot, err := tree.bufferPool.BufferPageForRead(rootPageId)
 		require.NoError(t, err)
 
-		nodeType := GetNodeType(pageRoot)
+		nodeType := GetNodeType(bufPageRoot.Page)
 		if !bytes.Equal(nodeType, NodeTypeBranch) {
 			t.Skip("ルートがブランチではないためスキップ")
 		}
 
-		branch := NewBranchNode(pageRoot)
+		branch := NewBranchNode(bufPageRoot.Page)
 		for i := range branch.NumRecords() {
 			boundaryKey := string(branch.Record(i).Key())
 
 			// 左の子
 			leftPageId, err := branch.ChildPageId(i)
 			require.NoError(t, err)
-			pageLeaf, err := tree.bufferPool.BufferPageForRead(leftPageId)
+			bufPageLeaf, err := tree.bufferPool.BufferPageForRead(leftPageId)
 			require.NoError(t, err)
-			leftLeaf := NewLeafNode(pageLeaf)
+			leftLeaf := NewLeafNode(bufPageLeaf.Page)
 			lastLeftKey := string(leftLeaf.Record(leftLeaf.NumRecords() - 1).Key())
 
 			// 右の子
 			rightPageId, err := branch.ChildPageId(i + 1)
 			require.NoError(t, err)
-			pageRight, err := tree.bufferPool.BufferPageForRead(rightPageId)
+			bufPageRight, err := tree.bufferPool.BufferPageForRead(rightPageId)
 			require.NoError(t, err)
-			rightLeaf := NewLeafNode(pageRight)
+			rightLeaf := NewLeafNode(bufPageRight.Page)
 			firstRightKey := string(rightLeaf.Record(0).Key())
 
 			fmt.Fprintf(&w, "境界キー: %s\n", boundaryKey)
@@ -512,12 +512,12 @@ Branch[keys=1]: [key_10]
 
 			pageMeta, err := tree.bufferPool.BufferPageForRead(tree.MetaPageId)
 			require.NoError(t, err)
-			metaPage := newMetaPage(pageMeta)
-			rootPageId := metaPage.rootPageId()
+			bufPageMeta := newMetaPage(pageMeta.Page)
+			rootPageId := bufPageMeta.rootPageId()
 
-			pageRoot, err := tree.bufferPool.BufferPageForRead(rootPageId)
+			bufPageRoot, err := tree.bufferPool.BufferPageForRead(rootPageId)
 			require.NoError(t, err)
-			nodeType := GetNodeType(pageRoot)
+			nodeType := GetNodeType(bufPageRoot.Page)
 
 			var currentType string
 			switch {
@@ -617,11 +617,11 @@ func writeScanLog(w *strings.Builder, tree *Btree) {
 
 // ツリーのルートノード情報をログに書き出す (ノードタイプ, キー数, キー一覧)
 func writeRootInfo(w *strings.Builder, tree *Btree) {
-	pageMeta, err := tree.bufferPool.BufferPageForRead(tree.MetaPageId)
+	bufPageMeta, err := tree.bufferPool.BufferPageForRead(tree.MetaPageId)
 	if err != nil {
 		panic(err)
 	}
-	writeNodeInfo(w, newMetaPage(pageMeta).rootPageId(), 0, tree)
+	writeNodeInfo(w, newMetaPage(bufPageMeta.Page).rootPageId(), 0, tree)
 }
 
 // ノード情報を再帰的にログに書き出す
@@ -632,18 +632,18 @@ func writeNodeInfo(w *strings.Builder, pageId page.Id, depth int, tree *Btree) {
 	}
 
 	indent := strings.Repeat("  ", depth)
-	nodeType := GetNodeType(pg)
+	nodeType := GetNodeType(pg.Page)
 
 	switch {
 	case bytes.Equal(nodeType, NodeTypeLeaf):
-		leafNode := NewLeafNode(pg)
+		leafNode := NewLeafNode(pg.Page)
 		keys := make([]string, leafNode.NumRecords())
 		for i := range leafNode.NumRecords() {
 			keys[i] = string(leafNode.Record(i).Key())
 		}
 		fmt.Fprintf(w, "%sLeaf[keys=%d]: [%s]\n", indent, leafNode.NumRecords(), strings.Join(keys, ", "))
 	case bytes.Equal(nodeType, NodeTypeBranch):
-		branchNode := NewBranchNode(pg)
+		branchNode := NewBranchNode(pg.Page)
 		keys := make([]string, branchNode.NumRecords())
 		for i := range branchNode.NumRecords() {
 			keys[i] = string(branchNode.Record(i).Key())
@@ -666,7 +666,7 @@ func writeTreeShape(w *strings.Builder, tree *Btree) {
 	if err != nil {
 		panic(err)
 	}
-	metaPage := newMetaPage(pageMeta)
+	metaPage := newMetaPage(pageMeta.Page)
 	rootPageId := metaPage.rootPageId()
 
 	type depthInfo struct {
@@ -683,20 +683,20 @@ func writeTreeShape(w *strings.Builder, tree *Btree) {
 			panic(err)
 		}
 
-		nodeType := GetNodeType(pg)
+		nodeType := GetNodeType(pg.Page)
 		switch {
 		case bytes.Equal(nodeType, NodeTypeLeaf):
 			if _, ok := result[depth]; !ok {
 				result[depth] = &depthInfo{nodeType: "Leaf"}
 			}
-			leaf := NewLeafNode(pg)
+			leaf := NewLeafNode(pg.Page)
 			result[depth].count++
 			result[depth].totalKeys += leaf.NumRecords()
 		case bytes.Equal(nodeType, NodeTypeBranch):
 			if _, ok := result[depth]; !ok {
 				result[depth] = &depthInfo{nodeType: "Branch"}
 			}
-			branch := NewBranchNode(pg)
+			branch := NewBranchNode(pg.Page)
 			result[depth].count++
 			result[depth].totalKeys += branch.NumRecords()
 			for i := range branch.NumRecords() + 1 {

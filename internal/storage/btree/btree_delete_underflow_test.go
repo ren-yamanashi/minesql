@@ -363,7 +363,7 @@ func initTestLeafNode(t *testing.T, bp *buffer.Pool, pageId page.Id) *LeafNode {
 	t.Helper()
 	pg, err := bp.BufferPageForWrite(pageId)
 	assert.NoError(t, err)
-	leaf := NewLeafNode(pg)
+	leaf := NewLeafNode(pg.Page)
 	leaf.Initialize()
 	return leaf
 }
@@ -379,7 +379,7 @@ func initTestBranchNode(
 	t.Helper()
 	pg, err := bp.BufferPageForWrite(pageId)
 	assert.NoError(t, err)
-	branch := NewBranchNode(pg)
+	branch := NewBranchNode(pg.Page)
 	err = branch.Initialize(key, leftChild, rightChild)
 	assert.NoError(t, err)
 	return branch

@@ -28,7 +28,7 @@ func (iter *Iterator) Get() (Record, bool, error) {
 	if err != nil {
 		return NewRecord(nil, nil, nil), false, err
 	}
-	leaf := NewLeafNode(pg)
+	leaf := NewLeafNode(pg.Page)
 
 	if iter.slotNum < leaf.NumRecords() {
 		record := leaf.Record(iter.slotNum)
@@ -68,7 +68,7 @@ func (iter *Iterator) Advance() error {
 	if err != nil {
 		return err
 	}
-	leaf := NewLeafNode(pg)
+	leaf := NewLeafNode(pg.Page)
 
 	// 現在のページ内に、次のレコードがある場合
 	if iter.slotNum < leaf.NumRecords() {
@@ -91,7 +91,7 @@ func (iter *Iterator) Advance() error {
 	// 次のページに移動
 	oldPageId := iter.bufferPage.PageId
 	iter.bufferPool.UnRefPage(oldPageId)
-	nextPage, err := iter.bufferPool.BufferPage(nextPageId)
+	nextPage, err := iter.bufferPool.BufferPageForRead(nextPageId)
 	if err != nil {
 		return err
 	}

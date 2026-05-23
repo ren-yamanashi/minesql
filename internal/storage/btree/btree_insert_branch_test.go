@@ -59,7 +59,7 @@ func setupTestBranchNode(t *testing.T, bp *buffer.Pool) *BranchNode {
 	assert.NoError(t, err)
 	pg, err := bp.BufferPageForWrite(pageId)
 	assert.NoError(t, err)
-	bn := NewBranchNode(pg)
+	bn := NewBranchNode(pg.Page)
 	err = bn.Initialize([]byte{0x10}, page.NewId(0, 1), page.NewId(0, 2))
 	assert.NoError(t, err)
 	return bn

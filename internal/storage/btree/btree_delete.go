@@ -15,11 +15,11 @@ func (bt *Btree) Delete(key []byte) error {
 		return err
 	}
 	defer bt.bufferPool.UnRefPage(bt.MetaPageId)
-	metaPage := newMetaPage(pageMeta)
+	metaPage := newMetaPage(pageMeta.Page)
 
 	// ルートページを取得
 	rootPageId := metaPage.rootPageId()
-	rootPageBuf, err := bt.bufferPool.BufferPage(rootPageId)
+	rootPageBuf, err := bt.bufferPool.BufferPageForRead(rootPageId)
 	if err != nil {
 		return err
 	}
@@ -36,8 +36,8 @@ func (bt *Btree) Delete(key []byte) error {
 	if err != nil {
 		return err
 	}
-	if underflow && bytes.Equal(GetNodeType(pageRoot), NodeTypeBranch) {
-		branch := NewBranchNode(pageRoot)
+	if underflow && bytes.Equal(GetNodeType(pageRoot.Page), NodeTypeBranch) {
+		branch := NewBranchNode(pageRoot.Page)
 		if branch.NumRecords() == 0 {
 			isRootCollapsed = true
 		}
@@ -57,7 +57,7 @@ func (bt *Btree) Delete(key []byte) error {
 	}
 
 	// ルートノードの縮退が発生した場合
-	branchNode := NewBranchNode(pageRoot)
+	branchNode := NewBranchNode(pageRoot.Page)
 	newRootPageId := branchNode.RightChildPageId()
 	metaPage.setRootPageId(newRootPageId)
 	metaPage.setHeight(metaPage.height() - 1)
@@ -75,13 +75,13 @@ func (bt *Btree) deleteRecursively(bufPage *buffer.Page, key []byte) (underflow 
 	if err != nil {
 		return false, false, err
 	}
-	nodeType := GetNodeType(pg)
+	nodeType := GetNodeType(pg.Page)
 
 	switch {
 	// ブランチノードの場合: 子ノードに対して再帰実行する
 	case bytes.Equal(nodeType, NodeTypeBranch):
 		// 削除先の子ノードを取得
-		branchNode := NewBranchNode(pg)
+		branchNode := NewBranchNode(pg.Page)
 		childSlotNum, found := branchNode.SearchSlotNum(key)
 		if found {
 			childSlotNum++ // 境界キーと一致する場合、右の子に属する
@@ -90,7 +90,7 @@ func (bt *Btree) deleteRecursively(bufPage *buffer.Page, key []byte) (underflow 
 		if err != nil {
 			return false, false, err
 		}
-		childBufPage, err := bt.bufferPool.BufferPage(childPageId)
+		childBufPage, err := bt.bufferPool.BufferPageForRead(childPageId)
 		if err != nil {
 			return false, false, err
 		}
@@ -111,7 +111,7 @@ func (bt *Btree) deleteRecursively(bufPage *buffer.Page, key []byte) (underflow 
 
 	// リーフノードの場合: そのまま削除する
 	case bytes.Equal(nodeType, NodeTypeLeaf):
-		leafNode := NewLeafNode(pg)
+		leafNode := NewLeafNode(pg.Page)
 		slotNum, found := leafNode.SearchSlotNum(key)
 		if !found {
 			return false, false, ErrKeyNotFound

@@ -34,7 +34,7 @@ func (bt *Btree) deleteUnderflow(
 	}
 
 	// 兄弟ノードの取得
-	siblingBufPage, err := bt.bufferPool.BufferPage(sibling.pageId)
+	siblingBufPage, err := bt.bufferPool.BufferPageForRead(sibling.pageId)
 	if err != nil {
 		return false, false, err
 	}
@@ -48,7 +48,7 @@ func (bt *Btree) deleteUnderflow(
 	}
 
 	// リーフノードのアンダーフロー処理
-	if bytes.Equal(GetNodeType(childPage), NodeTypeLeaf) {
+	if bytes.Equal(GetNodeType(childPage.Page), NodeTypeLeaf) {
 		uf, lm, err := bt.onLeafUnderflow(branchNode, childBufPage, sibling, childSlotNum)
 		return uf, lm, err
 	}
@@ -80,8 +80,8 @@ func (bt *Btree) onLeafUnderflow(
 	if err != nil {
 		return false, false, err
 	}
-	childLeaf := NewLeafNode(pageChild)
-	siblingLeaf := NewLeafNode(pageSibling)
+	childLeaf := NewLeafNode(pageChild.Page)
+	siblingLeaf := NewLeafNode(pageSibling.Page)
 
 	// 兄弟からレコードを転送できる場合
 	if siblingLeaf.CanTransferRecord(sibling.isLeft) {
@@ -165,8 +165,8 @@ func (bt *Btree) onBranchUnderflow(
 	if err != nil {
 		return false, err
 	}
-	childBranch := NewBranchNode(pageChild)
-	siblingBranch := NewBranchNode(pageSibling)
+	childBranch := NewBranchNode(pageChild.Page)
+	siblingBranch := NewBranchNode(pageSibling.Page)
 
 	// 兄弟からレコードを転送できる場合
 	if siblingBranch.CanTransferRecord(sibling.isLeft) {
@@ -260,7 +260,7 @@ func (bt *Btree) relinkLeafAfterMerge(disappearing, survivor *LeafNode, survivor
 		if err != nil {
 			return err
 		}
-		nextLeaf := NewLeafNode(pageNext)
+		nextLeaf := NewLeafNode(pageNext.Page)
 		nextLeaf.SetPrevPageId(survivorPageId)
 	}
 	return nil

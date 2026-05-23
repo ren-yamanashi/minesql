@@ -15,7 +15,7 @@ func (bt *Btree) Search(mode SearchMode) (*Iterator, error) {
 		return nil, err
 	}
 	defer bt.bufferPool.UnRefPage(bt.MetaPageId)
-	metaPage := newMetaPage(pageMeta)
+	metaPage := newMetaPage(pageMeta.Page)
 
 	// ルートページ取得
 	rootPageId := metaPage.rootPageId()
@@ -25,7 +25,7 @@ func (bt *Btree) Search(mode SearchMode) (*Iterator, error) {
 
 // searchRecursively は再帰的にノードを辿って該当のリーフノードを見つける
 func (bt *Btree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator, error) {
-	bufPage, err := bt.bufferPool.BufferPage(nodePageId)
+	bufPage, err := bt.bufferPool.BufferPageForRead(nodePageId)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func (bt *Btree) LeafPageIds() ([]page.Id, error) {
 		return nil, err
 	}
 	defer bt.bufferPool.UnRefPage(bt.MetaPageId)
-	metaPage := newMetaPage(pageMeta)
+	metaPage := newMetaPage(pageMeta.Page)
 	rootPageId := metaPage.rootPageId()
 	height := metaPage.height()
 
@@ -114,7 +114,7 @@ func (bt *Btree) LeafPageIds() ([]page.Id, error) {
 				return nil, err
 			}
 			bt.bufferPool.UnRefPage(nodePageId)
-			branchNode := NewBranchNode(pg)
+			branchNode := NewBranchNode(pg.Page)
 
 			for idx := range branchNode.NumRecords() {
 				childPageId, err := branchNode.ChildPageId(idx)
