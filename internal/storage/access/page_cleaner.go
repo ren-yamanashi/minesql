@@ -118,6 +118,6 @@ func (pc *PageCleaner) shouldFlush() (bool, error) {
 	}
 
 	// ダーティーページ率
-	dirtyPct := numOfFlushListPage * 100 / pc.bufferPool.MaxNumOfPage
+	dirtyPct := numOfFlushListPage * 100 / pc.bufferPool.MaxPages()
 	return dirtyPct > pc.maxDirtyPagePct, nil
 }

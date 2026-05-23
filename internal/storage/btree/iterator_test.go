@@ -13,10 +13,10 @@ import (
 func TestIteratorGet(t *testing.T) {
 	t.Run("現在のスロットのレコードを取得できる", func(t *testing.T) {
 		// GIVEN
-		bp, pageId := setupIteratorTestPage(t, func(ln *LeafNode) {
-			ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
+		bp, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
+			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
-		bufPage, _ := bp.BufferPageForRead(pageId)
+		bufPage, _ := bp.PageForRead(pageId)
 		iter := NewIterator(bp, *bufPage, 0)
 
 		// WHEN
@@ -30,10 +30,10 @@ func TestIteratorGet(t *testing.T) {
 
 	t.Run("スロット番号がレコード数以上の場合は false を返す", func(t *testing.T) {
 		// GIVEN
-		bp, pageId := setupIteratorTestPage(t, func(ln *LeafNode) {
-			ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
+		bp, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
+			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
-		bufPage, _ := bp.BufferPageForRead(pageId)
+		bufPage, _ := bp.PageForRead(pageId)
 		iter := NewIterator(bp, *bufPage, 1)
 
 		// WHEN
@@ -48,11 +48,11 @@ func TestIteratorGet(t *testing.T) {
 func TestIteratorNext(t *testing.T) {
 	t.Run("レコードを取得して次に進む", func(t *testing.T) {
 		// GIVEN
-		bp, pageId := setupIteratorTestPage(t, func(ln *LeafNode) {
-			ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
-			ln.Insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
+		bp, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
+			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
+			ln.insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
 		})
-		bufPage, _ := bp.BufferPageForRead(pageId)
+		bufPage, _ := bp.PageForRead(pageId)
 		iter := NewIterator(bp, *bufPage, 0)
 
 		// WHEN
@@ -75,10 +75,10 @@ func TestIteratorNext(t *testing.T) {
 
 	t.Run("LastPosition が更新される", func(t *testing.T) {
 		// GIVEN
-		bp, pageId := setupIteratorTestPage(t, func(ln *LeafNode) {
-			ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
+		bp, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
+			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
-		bufPage, _ := bp.BufferPageForRead(pageId)
+		bufPage, _ := bp.PageForRead(pageId)
 		iter := NewIterator(bp, *bufPage, 0)
 
 		// WHEN
@@ -93,11 +93,11 @@ func TestIteratorNext(t *testing.T) {
 func TestIteratorAdvance(t *testing.T) {
 	t.Run("同一ページ内の次のスロットに進む", func(t *testing.T) {
 		// GIVEN
-		bp, pageId := setupIteratorTestPage(t, func(ln *LeafNode) {
-			ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
-			ln.Insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
+		bp, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
+			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
+			ln.insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
 		})
-		bufPage, _ := bp.BufferPageForRead(pageId)
+		bufPage, _ := bp.PageForRead(pageId)
 		iter := NewIterator(bp, *bufPage, 0)
 
 		// WHEN
@@ -112,7 +112,7 @@ func TestIteratorAdvance(t *testing.T) {
 }
 
 // setupIteratorTestPage はテスト用のバッファプールとリーフページを作成する
-func setupIteratorTestPage(t *testing.T, setup func(ln *LeafNode)) (*buffer.Pool, page.Id) {
+func setupIteratorTestPage(t *testing.T, setup func(ln *leafNode)) (*buffer.Pool, page.Id) {
 	t.Helper()
 
 	bp := buffer.NewPool(page.PageSize * 3)
@@ -128,8 +128,8 @@ func setupIteratorTestPage(t *testing.T, setup func(ln *LeafNode)) (*buffer.Pool
 	bufPage, err := bp.AddPage(pageId)
 	assert.NoError(t, err)
 
-	ln := NewLeafNode(bufPage.Page)
-	ln.Initialize()
+	ln := newLeafNode(bufPage.Page)
+	ln.initialize()
 	setup(ln)
 
 	return bp, pageId

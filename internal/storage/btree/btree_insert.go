@@ -11,7 +11,7 @@ import (
 // Insert は B+Tree にレコードを挿入する
 func (bt *Btree) Insert(record Record) error {
 	// メタページを取得
-	pageMeta, err := bt.bufferPool.BufferPageForWrite(bt.MetaPageId)
+	pageMeta, err := bt.bufferPool.PageForWrite(bt.MetaPageId)
 	if err != nil {
 		return err
 	}
@@ -20,7 +20,7 @@ func (bt *Btree) Insert(record Record) error {
 
 	// ルートページを取得
 	rootPageId := metaPage.rootPageId()
-	rootPageBuf, err := bt.bufferPool.BufferPageForRead(rootPageId)
+	rootPageBuf, err := bt.bufferPool.PageForRead(rootPageId)
 	if err != nil {
 		return err
 	}
@@ -54,12 +54,12 @@ func (bt *Btree) Insert(record Record) error {
 	if err != nil {
 		return err
 	}
-	pageNewRoot, err := bt.bufferPool.BufferPageForWrite(newRootPageId)
+	pageNewRoot, err := bt.bufferPool.PageForWrite(newRootPageId)
 	if err != nil {
 		return err
 	}
-	newRootBranch := NewBranchNode(pageNewRoot.Page)
-	err = newRootBranch.Initialize(overflowKey, overflowChildPageId, rootPageId)
+	newRootBranch := newBranchNode(pageNewRoot.Page)
+	err = newRootBranch.initialize(overflowKey, overflowChildPageId, rootPageId)
 	if err != nil {
 		return err
 	}
@@ -79,26 +79,26 @@ func (bt *Btree) insertRecursively(
 	bufPage *buffer.Page,
 	record Record,
 ) (overflowKey []byte, newPageId page.Id, isLeafSplit bool, err error) {
-	pg, err := bt.bufferPool.BufferPageForWrite(bufPage.PageId)
+	pg, err := bt.bufferPool.PageForWrite(bufPage.PageId)
 	if err != nil {
 		return nil, page.InvalidId, false, err
 	}
-	nodeType := GetNodeType(pg.Page)
+	nodeType := getNodeType(pg.Page)
 
 	switch {
 	// ブランチノードの場合: 子ノードに対して再帰実行する
-	case bytes.Equal(nodeType, NodeTypeBranch):
+	case bytes.Equal(nodeType, nodeTypeBranch):
 		// 挿入先の子ノードを取得
-		branchNode := NewBranchNode(pg.Page)
-		childSlotNum, found := branchNode.SearchSlotNum(record.Key())
+		branchNode := newBranchNode(pg.Page)
+		childSlotNum, found := branchNode.searchSlotNum(record.Key())
 		if found {
 			childSlotNum++ // 境界キーと一致する場合、右の子に属する
 		}
-		childPageId, err := branchNode.ChildPageId(childSlotNum)
+		childPageId, err := branchNode.childPageId(childSlotNum)
 		if err != nil {
 			return nil, page.InvalidId, false, err
 		}
-		childBufPage, err := bt.bufferPool.BufferPageForRead(childPageId)
+		childBufPage, err := bt.bufferPool.PageForRead(childPageId)
 		if err != nil {
 			return nil, page.InvalidId, false, err
 		}
@@ -126,7 +126,7 @@ func (bt *Btree) insertRecursively(
 		return overflowKey, newPageId, isLeafSplit, nil
 
 	// リーフノードの場合: そのまま挿入する
-	case bytes.Equal(nodeType, NodeTypeLeaf):
+	case bytes.Equal(nodeType, nodeTypeLeaf):
 		overflowKey, newPageId, err := bt.insertLeaf(bufPage.PageId, pg.Page, record)
 		if err != nil {
 			return nil, page.InvalidId, false, err

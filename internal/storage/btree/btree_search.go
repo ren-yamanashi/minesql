@@ -10,7 +10,7 @@ import (
 // Search は指定された検索モードで B+Tree を検索する
 func (bt *Btree) Search(mode SearchMode) (*Iterator, error) {
 	// メタページ取得
-	pageMeta, err := bt.bufferPool.BufferPageForRead(bt.MetaPageId)
+	pageMeta, err := bt.bufferPool.PageForRead(bt.MetaPageId)
 	if err != nil {
 		return nil, err
 	}
@@ -25,17 +25,17 @@ func (bt *Btree) Search(mode SearchMode) (*Iterator, error) {
 
 // searchRecursively は再帰的にノードを辿って該当のリーフノードを見つける
 func (bt *Btree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator, error) {
-	bufPage, err := bt.bufferPool.BufferPageForRead(nodePageId)
+	bufPage, err := bt.bufferPool.PageForRead(nodePageId)
 	if err != nil {
 		return nil, err
 	}
-	nodeType := GetNodeType(bufPage.Page)
+	nodeType := getNodeType(bufPage.Page)
 
 	switch {
 	// ブランチノードの場合、子ノードに対して再帰探索する
-	case bytes.Equal(nodeType, NodeTypeBranch):
+	case bytes.Equal(nodeType, nodeTypeBranch):
 		defer bt.bufferPool.UnRefPage(nodePageId)
-		branchNode := NewBranchNode(bufPage.Page)
+		branchNode := newBranchNode(bufPage.Page)
 		childPageId, err := mode.childPageId(branchNode)
 		if err != nil {
 			return nil, err
@@ -43,15 +43,15 @@ func (bt *Btree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterat
 		return bt.searchRecursively(childPageId, mode)
 
 	// リーフノードの場合、検索モードに応じて探索する
-	case bytes.Equal(nodeType, NodeTypeLeaf):
-		leafNode := NewLeafNode(bufPage.Page)
+	case bytes.Equal(nodeType, nodeTypeLeaf):
+		leafNode := newLeafNode(bufPage.Page)
 		slotNum := mode.slotNum(leafNode)
 		iter := NewIterator(bt.bufferPool, *bufPage, slotNum)
 		// 検索対象のキーが現在のリーフノードの末端のレコードより大きい場合、次のリーフノードに進める
 		// 例: リーフノードに (1, ...), (3, ...), (5, ...) のレコードが格納されている場合に、キー 6 を検索したいときなど
 		// (この場合 SearchSlotNum は NumRecords と等しい値を返す)
 		// この場合、次のリーフノードに進めてからイテレータを返す
-		if leafNode.NumRecords() == slotNum {
+		if leafNode.numRecords() == slotNum {
 			err := iter.Advance()
 			if err != nil {
 				return nil, err
@@ -89,7 +89,7 @@ func (bt *Btree) FindByKey(key []byte) (Record, RecordPosition, error) {
 
 // LeafPageIds はブランチページのみ辿り、全リーフページの PageId を収集する
 func (bt *Btree) LeafPageIds() ([]page.Id, error) {
-	pageMeta, err := bt.bufferPool.BufferPageForRead(bt.MetaPageId)
+	pageMeta, err := bt.bufferPool.PageForRead(bt.MetaPageId)
 	if err != nil {
 		return nil, err
 	}
@@ -109,21 +109,21 @@ func (bt *Btree) LeafPageIds() ([]page.Id, error) {
 	for range height - 1 {
 		var nextLevel []page.Id
 		for _, nodePageId := range currentLevel {
-			pg, err := bt.bufferPool.BufferPageForRead(nodePageId)
+			pg, err := bt.bufferPool.PageForRead(nodePageId)
 			if err != nil {
 				return nil, err
 			}
 			bt.bufferPool.UnRefPage(nodePageId)
-			branchNode := NewBranchNode(pg.Page)
+			branchNode := newBranchNode(pg.Page)
 
-			for idx := range branchNode.NumRecords() {
-				childPageId, err := branchNode.ChildPageId(idx)
+			for idx := range branchNode.numRecords() {
+				childPageId, err := branchNode.childPageId(idx)
 				if err != nil {
 					return nil, err
 				}
 				nextLevel = append(nextLevel, childPageId)
 			}
-			nextLevel = append(nextLevel, branchNode.RightChildPageId())
+			nextLevel = append(nextLevel, branchNode.rightChildPageId())
 		}
 		currentLevel = nextLevel
 	}

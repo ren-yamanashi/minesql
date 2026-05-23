@@ -23,7 +23,7 @@ type siblingInfo struct {
 //   - underflow: 親ブランチノードがアンダーフローしたか
 //   - isLeafMerged: リーフノードのマージが発生したか
 func (bt *Btree) deleteUnderflow(
-	branchNode *BranchNode,
+	branchNode *branchNode,
 	childBufPage *buffer.Page,
 	childSlotNum int,
 ) (underflow bool, isLeafMerged bool, err error) {
@@ -34,7 +34,7 @@ func (bt *Btree) deleteUnderflow(
 	}
 
 	// 兄弟ノードの取得
-	siblingBufPage, err := bt.bufferPool.BufferPageForRead(sibling.pageId)
+	siblingBufPage, err := bt.bufferPool.PageForRead(sibling.pageId)
 	if err != nil {
 		return false, false, err
 	}
@@ -42,13 +42,13 @@ func (bt *Btree) deleteUnderflow(
 	defer bt.bufferPool.UnRefPage(sibling.pageId)
 
 	// 子ノードの取得
-	childPage, err := bt.bufferPool.BufferPageForRead(childBufPage.PageId)
+	childPage, err := bt.bufferPool.PageForRead(childBufPage.PageId)
 	if err != nil {
 		return false, false, err
 	}
 
 	// リーフノードのアンダーフロー処理
-	if bytes.Equal(GetNodeType(childPage.Page), NodeTypeLeaf) {
+	if bytes.Equal(getNodeType(childPage.Page), nodeTypeLeaf) {
 		uf, lm, err := bt.onLeafUnderflow(branchNode, childBufPage, sibling, childSlotNum)
 		return uf, lm, err
 	}
@@ -67,49 +67,49 @@ func (bt *Btree) deleteUnderflow(
 //   - underflow: 親ブランチノードがアンダーフローしたか
 //   - isLeafMerged: リーフノードのマージが発生したか
 func (bt *Btree) onLeafUnderflow(
-	parentBranch *BranchNode,
+	parentBranch *branchNode,
 	childBufPage *buffer.Page,
 	sibling siblingInfo,
 	childSlotNum int,
 ) (underflow bool, isLeafMerged bool, err error) {
-	pageChild, err := bt.bufferPool.BufferPageForWrite(childBufPage.PageId)
+	pageChild, err := bt.bufferPool.PageForWrite(childBufPage.PageId)
 	if err != nil {
 		return false, false, err
 	}
-	pageSibling, err := bt.bufferPool.BufferPageForWrite(sibling.pageId)
+	pageSibling, err := bt.bufferPool.PageForWrite(sibling.pageId)
 	if err != nil {
 		return false, false, err
 	}
-	childLeaf := NewLeafNode(pageChild.Page)
-	siblingLeaf := NewLeafNode(pageSibling.Page)
+	childLeaf := newLeafNode(pageChild.Page)
+	siblingLeaf := newLeafNode(pageSibling.Page)
 
 	// 兄弟からレコードを転送できる場合
-	if siblingLeaf.CanTransferRecord(sibling.isLeft) {
+	if siblingLeaf.canTransferRecord(sibling.isLeft) {
 		// 左の兄弟から転送: 左の兄弟の末尾を自分の先頭へ
 		if sibling.isLeft {
-			lastSlotNum := siblingLeaf.NumRecords() - 1
-			siblingRecord := siblingLeaf.Record(lastSlotNum)
-			if !childLeaf.Insert(0, siblingRecord) {
+			lastSlotNum := siblingLeaf.numRecords() - 1
+			siblingRecord := siblingLeaf.record(lastSlotNum)
+			if !childLeaf.insert(0, siblingRecord) {
 				return false, false, errors.New("new leaf node must have space")
 			}
-			siblingLeaf.Delete(lastSlotNum)
-			parentRecord := parentBranch.Record(childSlotNum - 1)
-			updated := NewRecord(parentRecord.Header(), childLeaf.Record(0).Key(), parentRecord.NonKey())
-			if !parentBranch.Update(childSlotNum-1, updated) {
+			siblingLeaf.delete(lastSlotNum)
+			parentRecord := parentBranch.record(childSlotNum - 1)
+			updated := NewRecord(parentRecord.Header(), childLeaf.record(0).Key(), parentRecord.NonKey())
+			if !parentBranch.update(childSlotNum-1, updated) {
 				return false, false, errors.New("failed to update parent branch node key")
 			}
 			return false, false, nil
 		}
 
 		// 右の兄弟から転送: 右の兄弟の先頭を末尾へ
-		siblingRecord := siblingLeaf.Record(0)
-		if !childLeaf.Insert(childLeaf.NumRecords(), siblingRecord) {
+		siblingRecord := siblingLeaf.record(0)
+		if !childLeaf.insert(childLeaf.numRecords(), siblingRecord) {
 			return false, false, errors.New("new leaf node must have space")
 		}
-		siblingLeaf.Delete(0)
-		parentRecord := parentBranch.Record(childSlotNum)
-		updated := NewRecord(parentRecord.Header(), siblingLeaf.Record(0).Key(), parentRecord.NonKey())
-		if !parentBranch.Update(childSlotNum, updated) {
+		siblingLeaf.delete(0)
+		parentRecord := parentBranch.record(childSlotNum)
+		updated := NewRecord(parentRecord.Header(), siblingLeaf.record(0).Key(), parentRecord.NonKey())
+		if !parentBranch.update(childSlotNum, updated) {
 			return false, false, errors.New("failed to update parent branch node key")
 		}
 		return false, false, nil
@@ -118,20 +118,20 @@ func (bt *Btree) onLeafUnderflow(
 	// 兄弟からレコードを転送できない場合
 	// 左の兄弟とマージ: 子(RightChild)のレコードを全て兄弟(左)に移動 (兄弟が残る)
 	if sibling.isLeft {
-		if !siblingLeaf.TransferAllFrom(childLeaf) {
+		if !siblingLeaf.transferAllFrom(childLeaf) {
 			return false, false, nil // ノードの容量を超えてマージ不可の場合はアンダーフローを許容する
 		}
 		if err := bt.relinkLeafAfterMerge(childLeaf, siblingLeaf, sibling.bufferPage.PageId); err != nil {
 			return false, false, err
 		}
 		// 親の右端のレコードは不要になるので削除し、RightChild を兄弟ノードに更新
-		parentBranch.Delete(parentBranch.NumRecords() - 1)
-		parentBranch.SetRightChildPageId(sibling.bufferPage.PageId)
-		return !parentBranch.IsHalfFull(), true, nil
+		parentBranch.delete(parentBranch.numRecords() - 1)
+		parentBranch.setRightChildPageId(sibling.bufferPage.PageId)
+		return !parentBranch.isHalfFull(), true, nil
 	}
 
 	// 右の兄弟とマージ: 兄弟(右)のレコードをすべて子(左)に移動 (子が残る)
-	if !childLeaf.TransferAllFrom(siblingLeaf) {
+	if !childLeaf.transferAllFrom(siblingLeaf) {
 		return false, false, nil // ノードの容量を超えてマージ不可の場合はアンダーフローを許容する
 	}
 	if err := bt.relinkLeafAfterMerge(siblingLeaf, childLeaf, childBufPage.PageId); err != nil {
@@ -152,98 +152,98 @@ func (bt *Btree) onLeafUnderflow(
 //   - childSlotNum: childBufPage が親ブランチノードの子ノードの中で何番目か
 //   - return: (アンダーフローが発生したかどうか, リーフマージが発生したかどうか)
 func (bt *Btree) onBranchUnderflow(
-	parentBranch *BranchNode,
+	parentBranch *branchNode,
 	childBufPage *buffer.Page,
 	sibling siblingInfo,
 	childSlotNum int,
 ) (underflow bool, err error) {
-	pageChild, err := bt.bufferPool.BufferPageForWrite(childBufPage.PageId)
+	pageChild, err := bt.bufferPool.PageForWrite(childBufPage.PageId)
 	if err != nil {
 		return false, err
 	}
-	pageSibling, err := bt.bufferPool.BufferPageForWrite(sibling.pageId)
+	pageSibling, err := bt.bufferPool.PageForWrite(sibling.pageId)
 	if err != nil {
 		return false, err
 	}
-	childBranch := NewBranchNode(pageChild.Page)
-	siblingBranch := NewBranchNode(pageSibling.Page)
+	childBranch := newBranchNode(pageChild.Page)
+	siblingBranch := newBranchNode(pageSibling.Page)
 
 	// 兄弟からレコードを転送できる場合
-	if siblingBranch.CanTransferRecord(sibling.isLeft) {
+	if siblingBranch.canTransferRecord(sibling.isLeft) {
 		// 左の兄弟から転送: 親の境界キーを子の先頭に下ろし、兄弟の末尾キーを親に上げる
 		if sibling.isLeft {
-			parentRecord := parentBranch.Record(childSlotNum - 1)
-			siblingRightChild := siblingBranch.RightChildPageId()
+			parentRecord := parentBranch.record(childSlotNum - 1)
+			siblingRightChild := siblingBranch.rightChildPageId()
 			record := NewRecord([]byte{}, parentRecord.Key(), siblingRightChild.ToBytes())
-			if !childBranch.Insert(0, record) {
+			if !childBranch.insert(0, record) {
 				return false, errors.New("new branch node must have space")
 			}
 
-			lastSlotNum := siblingBranch.NumRecords() - 1
-			siblingRecord := siblingBranch.Record(lastSlotNum)
-			existingRecord := parentBranch.Record(childSlotNum - 1)
+			lastSlotNum := siblingBranch.numRecords() - 1
+			siblingRecord := siblingBranch.record(lastSlotNum)
+			existingRecord := parentBranch.record(childSlotNum - 1)
 			updated := NewRecord(existingRecord.Header(), siblingRecord.Key(), existingRecord.NonKey())
-			if !parentBranch.Update(childSlotNum-1, updated) {
+			if !parentBranch.update(childSlotNum-1, updated) {
 				return false, errors.New("failed to update parent branch node key")
 			}
 			rightChildPageId, err := page.RestoreId(siblingRecord.NonKey())
 			if err != nil {
 				return false, err
 			}
-			siblingBranch.SetRightChildPageId(rightChildPageId)
-			siblingBranch.Delete(lastSlotNum)
+			siblingBranch.setRightChildPageId(rightChildPageId)
+			siblingBranch.delete(lastSlotNum)
 			return false, nil
 		}
 
 		// 右の兄弟から転送: 親の境界キーを子の末尾に下ろし、兄弟の先頭キーを親に上げる
-		parentRecord := parentBranch.Record(childSlotNum)
-		record := NewRecord([]byte{}, parentRecord.Key(), childBranch.RightChildPageId().ToBytes())
-		if !childBranch.Insert(childBranch.NumRecords(), record) {
+		parentRecord := parentBranch.record(childSlotNum)
+		record := NewRecord([]byte{}, parentRecord.Key(), childBranch.rightChildPageId().ToBytes())
+		if !childBranch.insert(childBranch.numRecords(), record) {
 			return false, errors.New("new branch node must have space")
 		}
 
-		siblingRecord := siblingBranch.Record(0)
+		siblingRecord := siblingBranch.record(0)
 		rightChildPageId, err := page.RestoreId(siblingRecord.NonKey())
 		if err != nil {
 			return false, err
 		}
-		childBranch.SetRightChildPageId(rightChildPageId)
-		existingRecord := parentBranch.Record(childSlotNum)
+		childBranch.setRightChildPageId(rightChildPageId)
+		existingRecord := parentBranch.record(childSlotNum)
 		updated := NewRecord(existingRecord.Header(), siblingRecord.Key(), existingRecord.NonKey())
-		if !parentBranch.Update(childSlotNum, updated) {
+		if !parentBranch.update(childSlotNum, updated) {
 			return false, errors.New("failed to update parent branch node key")
 		}
-		siblingBranch.Delete(0)
+		siblingBranch.delete(0)
 		return false, nil
 	}
 
 	// 兄弟からレコードを転送できない場合
 	// 左の兄弟とマージ: 子(RightChild)のレコードをすべて兄弟(左)に移動 (兄弟が残る)
 	if sibling.isLeft {
-		parentRecord := parentBranch.Record(parentBranch.NumRecords() - 1)
-		siblingRightChildPageId := siblingBranch.RightChildPageId()
+		parentRecord := parentBranch.record(parentBranch.numRecords() - 1)
+		siblingRightChildPageId := siblingBranch.rightChildPageId()
 		record := NewRecord([]byte{}, parentRecord.Key(), siblingRightChildPageId.ToBytes())
-		if !siblingBranch.Insert(siblingBranch.NumRecords(), record) {
+		if !siblingBranch.insert(siblingBranch.numRecords(), record) {
 			return false, errors.New("new branch node must have space")
 		}
-		siblingBranch.TransferAllFrom(childBranch)
-		siblingBranch.SetRightChildPageId(childBranch.RightChildPageId())
+		siblingBranch.transferAllFrom(childBranch)
+		siblingBranch.setRightChildPageId(childBranch.rightChildPageId())
 		// 親の右端のレコードは不要になるので削除し、RightChild を兄弟ノードに更新
-		parentBranch.Delete(parentBranch.NumRecords() - 1)
-		parentBranch.SetRightChildPageId(sibling.bufferPage.PageId)
-		return !parentBranch.IsHalfFull(), nil
+		parentBranch.delete(parentBranch.numRecords() - 1)
+		parentBranch.setRightChildPageId(sibling.bufferPage.PageId)
+		return !parentBranch.isHalfFull(), nil
 	}
 
 	// 右の兄弟とマージ: 兄弟(右)のレコードをすべて子(左)に移動 (子が残る)
-	parentRecord := parentBranch.Record(childSlotNum)
-	childRightChildPageId := childBranch.RightChildPageId()
+	parentRecord := parentBranch.record(childSlotNum)
+	childRightChildPageId := childBranch.rightChildPageId()
 	record := NewRecord([]byte{}, parentRecord.Key(), childRightChildPageId.ToBytes())
-	if !childBranch.Insert(childBranch.NumRecords(), record) {
+	if !childBranch.insert(childBranch.numRecords(), record) {
 		return false, errors.New("new branch node must have space")
 	}
 
-	childBranch.TransferAllFrom(siblingBranch)
-	childBranch.SetRightChildPageId(siblingBranch.RightChildPageId())
+	childBranch.transferAllFrom(siblingBranch)
+	childBranch.setRightChildPageId(siblingBranch.rightChildPageId())
 
 	return bt.mergeRightSiblingFromParent(parentBranch, childBufPage.PageId, childSlotNum)
 }
@@ -252,16 +252,16 @@ func (bt *Btree) onBranchUnderflow(
 //   - disappearing: マージにより消滅するリーフノード
 //   - survivor: マージ後に残るリーフノード
 //   - survivorPageId: survivor の PageId
-func (bt *Btree) relinkLeafAfterMerge(disappearing, survivor *LeafNode, survivorPageId page.Id) error {
-	survivor.SetNextPageId(disappearing.NextPageId())
-	if nextPageId := disappearing.NextPageId(); !nextPageId.IsInvalid() {
+func (bt *Btree) relinkLeafAfterMerge(disappearing, survivor *leafNode, survivorPageId page.Id) error {
+	survivor.setNextPageId(disappearing.nextPageId())
+	if nextPageId := disappearing.nextPageId(); !nextPageId.IsInvalid() {
 		defer bt.bufferPool.UnRefPage(nextPageId)
-		pageNext, err := bt.bufferPool.BufferPageForWrite(nextPageId)
+		pageNext, err := bt.bufferPool.PageForWrite(nextPageId)
 		if err != nil {
 			return err
 		}
-		nextLeaf := NewLeafNode(pageNext.Page)
-		nextLeaf.SetPrevPageId(survivorPageId)
+		nextLeaf := newLeafNode(pageNext.Page)
+		nextLeaf.setPrevPageId(survivorPageId)
 	}
 	return nil
 }
@@ -271,34 +271,34 @@ func (bt *Btree) relinkLeafAfterMerge(disappearing, survivor *LeafNode, survivor
 //   - survivorPageId: マージ後に残るノードの PageId
 //   - childSlotNum: 子ノードのスロット番号
 func (bt *Btree) mergeRightSiblingFromParent(
-	parentBranch *BranchNode,
+	parentBranch *branchNode,
 	survivorPageId page.Id,
 	childSlotNum int,
 ) (underflow bool, err error) {
 	// 兄弟が RightChild(右端) の場合、親の右端のレコードを削除し、RightChild を子ノードに更新
-	if childSlotNum+1 == parentBranch.NumRecords() {
-		parentBranch.Delete(parentBranch.NumRecords() - 1)
-		parentBranch.SetRightChildPageId(survivorPageId)
-		return !parentBranch.IsHalfFull(), nil
+	if childSlotNum+1 == parentBranch.numRecords() {
+		parentBranch.delete(parentBranch.numRecords() - 1)
+		parentBranch.setRightChildPageId(survivorPageId)
+		return !parentBranch.isHalfFull(), nil
 	}
 
 	// 兄弟が RightChild(右端) でない場合、キーを更新してから削除
-	childRecord := parentBranch.Record(childSlotNum)
-	nextRecord := parentBranch.Record(childSlotNum + 1)
+	childRecord := parentBranch.record(childSlotNum)
+	nextRecord := parentBranch.record(childSlotNum + 1)
 	updated := NewRecord(childRecord.Header(), nextRecord.Key(), childRecord.NonKey())
-	if !parentBranch.Update(childSlotNum, updated) {
+	if !parentBranch.update(childSlotNum, updated) {
 		return false, errors.New("failed to update parent branch node key")
 	}
-	parentBranch.Delete(childSlotNum + 1)
-	return !parentBranch.IsHalfFull(), nil
+	parentBranch.delete(childSlotNum + 1)
+	return !parentBranch.isHalfFull(), nil
 }
 
 // findSibling は転送・マージ対象の兄弟ノードを決定する
-func (bt *Btree) findSibling(branchNode *BranchNode, childSlotNum int) (siblingInfo, error) {
-	if childSlotNum < branchNode.NumRecords() {
-		siblingPageId, err := branchNode.ChildPageId(childSlotNum + 1)
+func (bt *Btree) findSibling(branchNode *branchNode, childSlotNum int) (siblingInfo, error) {
+	if childSlotNum < branchNode.numRecords() {
+		siblingPageId, err := branchNode.childPageId(childSlotNum + 1)
 		return siblingInfo{pageId: siblingPageId, isLeft: false}, err
 	}
-	siblingPageId, err := branchNode.ChildPageId(childSlotNum - 1)
+	siblingPageId, err := branchNode.childPageId(childSlotNum - 1)
 	return siblingInfo{pageId: siblingPageId, isLeft: true}, err
 }

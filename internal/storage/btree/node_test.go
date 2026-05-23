@@ -11,26 +11,26 @@ func TestGetNodeType(t *testing.T) {
 	t.Run("リーフノードのタイプを取得できる", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, page.PageSize)
-		copy(data[page.PageHeaderSize:page.PageHeaderSize+8], NodeTypeLeaf)
+		copy(data[page.PageHeaderSize:page.PageHeaderSize+8], nodeTypeLeaf)
 		pg, _ := page.NewPage(data)
 
 		// WHEN
-		result := GetNodeType(pg)
+		result := getNodeType(pg)
 
 		// THEN
-		assert.Equal(t, NodeTypeLeaf, result)
+		assert.Equal(t, nodeTypeLeaf, result)
 	})
 
 	t.Run("ブランチノードのタイプを取得できる", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, page.PageSize)
-		copy(data[page.PageHeaderSize:page.PageHeaderSize+8], NodeTypeBranch)
+		copy(data[page.PageHeaderSize:page.PageHeaderSize+8], nodeTypeBranch)
 		pg, _ := page.NewPage(data)
 
 		// WHEN
-		result := GetNodeType(pg)
+		result := getNodeType(pg)
 
 		// THEN
-		assert.Equal(t, NodeTypeBranch, result)
+		assert.Equal(t, nodeTypeBranch, result)
 	})
 }

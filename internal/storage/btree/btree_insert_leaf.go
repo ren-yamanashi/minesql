@@ -12,14 +12,14 @@ import (
 //   - overflowKey: 分割時の境界キー (分割なしの場合は nil)
 //   - newPageId: 分割で作られたリーフノードの PageId (分割なしの場合は InvalidPageId)
 func (bt *Btree) insertLeaf(leafPageId page.Id, leafPage *page.Page, record Record) (overflowKey []byte, newPageId page.Id, err error) {
-	leafNode := NewLeafNode(leafPage)
-	slotNum, found := leafNode.SearchSlotNum(record.Key())
+	leafNode := newLeafNode(leafPage)
+	slotNum, found := leafNode.searchSlotNum(record.Key())
 	if found {
 		return nil, page.InvalidId, ErrDuplicateKey
 	}
 
 	// リーフノードに挿入できた場合は終了
-	if leafNode.Insert(slotNum, record) {
+	if leafNode.insert(slotNum, record) {
 		return nil, page.InvalidId, nil
 	}
 
@@ -34,10 +34,10 @@ func (bt *Btree) insertLeaf(leafPageId page.Id, leafPage *page.Page, record Reco
 //   - return: 境界キー, 新しいリーフノードの PageId
 func (bt *Btree) splitInsertLeaf(
 	leafPageId page.Id,
-	leafNode *LeafNode,
+	leafNode *leafNode,
 	record Record,
 ) ([]byte, page.Id, error) {
-	prevLeafPageId := leafNode.PrevPageId()
+	prevLeafPageId := leafNode.prevPageId()
 	if !prevLeafPageId.IsInvalid() {
 		defer bt.bufferPool.UnRefPage(prevLeafPageId)
 	}
@@ -61,31 +61,31 @@ func (bt *Btree) splitInsertLeaf(
 	}
 
 	// 新しいリーフノードに分割挿入
-	pageNewLeaf, err := bt.bufferPool.BufferPageForWrite(newLeafPageId)
+	pageNewLeaf, err := bt.bufferPool.PageForWrite(newLeafPageId)
 	if err != nil {
 		return nil, page.InvalidId, err
 	}
-	newLeaf := NewLeafNode(pageNewLeaf.Page)
-	overflowKey, err := leafNode.SplitInsert(newLeaf, record)
+	newLeaf := newLeafNode(pageNewLeaf.Page)
+	overflowKey, err := leafNode.splitInsert(newLeaf, record)
 	if err != nil {
 		return nil, page.InvalidId, err
 	}
 
 	// ポインタを更新
-	newLeaf.SetNextPageId(leafPageId)
-	newLeaf.SetPrevPageId(prevLeafPageId)
-	leafNode.SetPrevPageId(newLeafPageId)
+	newLeaf.setNextPageId(leafPageId)
+	newLeaf.setPrevPageId(prevLeafPageId)
+	leafNode.setPrevPageId(newLeafPageId)
 
 	return overflowKey, newLeafPageId, nil
 }
 
 // updatePrevLeafLink は前のリーフノードの nextPageId を更新する
 func (bt *Btree) updatePrevLeafLink(prevLeafPageId, newNextPageId page.Id) error {
-	pagePrevLeaf, err := bt.bufferPool.BufferPageForWrite(prevLeafPageId)
+	pagePrevLeaf, err := bt.bufferPool.PageForWrite(prevLeafPageId)
 	if err != nil {
 		return err
 	}
-	prevLeaf := NewLeafNode(pagePrevLeaf.Page)
-	prevLeaf.SetNextPageId(newNextPageId)
+	prevLeaf := newLeafNode(pagePrevLeaf.Page)
+	prevLeaf.setNextPageId(newNextPageId)
 	return nil
 }

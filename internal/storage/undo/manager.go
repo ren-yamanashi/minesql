@@ -35,7 +35,7 @@ func NewManager(bp *buffer.Pool, redo *redo.Buffer, undoFileId page.FileId) (*Ma
 	if err != nil {
 		return nil, err
 	}
-	bufPageUndo, err := bp.BufferPageForWrite(pageId)
+	bufPageUndo, err := bp.PageForWrite(pageId)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +121,7 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 	undoNum := UndoNumber(len(m.entries[trxId]))
 	serialized := record.Serialize(trxId, undoNum)
 
-	pageUndo, err := m.bufferPool.BufferPageForWrite(m.currentPageId)
+	pageUndo, err := m.bufferPool.PageForWrite(m.currentPageId)
 	if err != nil {
 		return Pointer{}, err
 	}
@@ -144,7 +144,7 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 		if err != nil {
 			return Pointer{}, err
 		}
-		pageNewUndo, err := m.bufferPool.BufferPageForWrite(newPageId)
+		pageNewUndo, err := m.bufferPool.PageForWrite(newPageId)
 		if err != nil {
 			return Pointer{}, err
 		}
@@ -163,7 +163,7 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 
 	// Redo ログに Undo ページの変更を記録
 	if m.redoLog != nil {
-		pageUndo, err := m.bufferPool.BufferPageForRead(m.currentPageId)
+		pageUndo, err := m.bufferPool.PageForRead(m.currentPageId)
 		if err != nil {
 			return Pointer{}, err
 		}

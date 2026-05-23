@@ -15,15 +15,15 @@ func TestDeleteUnderflow(t *testing.T) {
 
 		childPageId, childBufPage := allocateTestPage(t, bp)
 		childLeaf := initTestLeafNode(t, bp, childPageId)
-		childLeaf.Insert(0, largeLeafRecord(0x10))
-		childLeaf.Insert(1, largeLeafRecord(0x15))
+		childLeaf.insert(0, largeLeafRecord(0x10))
+		childLeaf.insert(1, largeLeafRecord(0x15))
 
 		siblingPageId, _ := allocateTestPage(t, bp)
 		siblingLeaf := initTestLeafNode(t, bp, siblingPageId)
-		siblingLeaf.Insert(0, largeLeafRecord(0x20))
-		siblingLeaf.Insert(1, largeLeafRecord(0x30))
-		siblingLeaf.Insert(2, largeLeafRecord(0x40))
-		siblingLeaf.Insert(3, largeLeafRecord(0x50))
+		siblingLeaf.insert(0, largeLeafRecord(0x20))
+		siblingLeaf.insert(1, largeLeafRecord(0x30))
+		siblingLeaf.insert(2, largeLeafRecord(0x40))
+		siblingLeaf.insert(3, largeLeafRecord(0x50))
 
 		parentPageId, _ := allocateTestPage(t, bp)
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x20}, childPageId, siblingPageId)
@@ -35,11 +35,11 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.NoError(t, err)
 		assert.False(t, underflow)
 		assert.False(t, isLeafMerged)
-		assert.Equal(t, 3, childLeaf.NumRecords())
-		assert.Equal(t, 3, siblingLeaf.NumRecords())
-		assert.Equal(t, []byte{0x20}, childLeaf.Record(2).Key())
-		assert.Equal(t, []byte{0x30}, siblingLeaf.Record(0).Key())
-		childPageIdAfter, err := parentBranch.ChildPageId(0)
+		assert.Equal(t, 3, childLeaf.numRecords())
+		assert.Equal(t, 3, siblingLeaf.numRecords())
+		assert.Equal(t, []byte{0x20}, childLeaf.record(2).Key())
+		assert.Equal(t, []byte{0x30}, siblingLeaf.record(0).Key())
+		childPageIdAfter, err := parentBranch.childPageId(0)
 		assert.NoError(t, err)
 		assert.Equal(t, childPageId, childPageIdAfter)
 	})
@@ -50,15 +50,15 @@ func TestDeleteUnderflow(t *testing.T) {
 
 		siblingPageId, _ := allocateTestPage(t, bp)
 		siblingLeaf := initTestLeafNode(t, bp, siblingPageId)
-		siblingLeaf.Insert(0, largeLeafRecord(0x10))
-		siblingLeaf.Insert(1, largeLeafRecord(0x20))
-		siblingLeaf.Insert(2, largeLeafRecord(0x30))
-		siblingLeaf.Insert(3, largeLeafRecord(0x40))
+		siblingLeaf.insert(0, largeLeafRecord(0x10))
+		siblingLeaf.insert(1, largeLeafRecord(0x20))
+		siblingLeaf.insert(2, largeLeafRecord(0x30))
+		siblingLeaf.insert(3, largeLeafRecord(0x40))
 
 		childPageId, childBufPage := allocateTestPage(t, bp)
 		childLeaf := initTestLeafNode(t, bp, childPageId)
-		childLeaf.Insert(0, largeLeafRecord(0x50))
-		childLeaf.Insert(1, largeLeafRecord(0x60))
+		childLeaf.insert(0, largeLeafRecord(0x50))
+		childLeaf.insert(1, largeLeafRecord(0x60))
 
 		parentPageId, _ := allocateTestPage(t, bp)
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x50}, siblingPageId, childPageId)
@@ -70,11 +70,11 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.NoError(t, err)
 		assert.False(t, underflow)
 		assert.False(t, isLeafMerged)
-		assert.Equal(t, 3, childLeaf.NumRecords())
-		assert.Equal(t, 3, siblingLeaf.NumRecords())
-		assert.Equal(t, []byte{0x40}, childLeaf.Record(0).Key())
-		assert.Equal(t, []byte{0x30}, siblingLeaf.Record(2).Key())
-		siblingPageIdAfter, err := parentBranch.ChildPageId(0)
+		assert.Equal(t, 3, childLeaf.numRecords())
+		assert.Equal(t, 3, siblingLeaf.numRecords())
+		assert.Equal(t, []byte{0x40}, childLeaf.record(0).Key())
+		assert.Equal(t, []byte{0x30}, siblingLeaf.record(2).Key())
+		siblingPageIdAfter, err := parentBranch.childPageId(0)
 		assert.NoError(t, err)
 		assert.Equal(t, siblingPageId, siblingPageIdAfter)
 	})
@@ -85,19 +85,19 @@ func TestDeleteUnderflow(t *testing.T) {
 
 		siblingPageId, siblingBufPage := allocateTestPage(t, bp)
 		siblingLeaf := initTestLeafNode(t, bp, siblingPageId)
-		siblingLeaf.Insert(0, largeLeafRecord(0x10))
-		siblingLeaf.Insert(1, largeLeafRecord(0x20))
-		siblingLeaf.Insert(2, largeLeafRecord(0x30))
+		siblingLeaf.insert(0, largeLeafRecord(0x10))
+		siblingLeaf.insert(1, largeLeafRecord(0x20))
+		siblingLeaf.insert(2, largeLeafRecord(0x30))
 
 		childPageId, childBufPage := allocateTestPage(t, bp)
 		childLeaf := initTestLeafNode(t, bp, childPageId)
-		childLeaf.Insert(0, largeLeafRecord(0x50))
+		childLeaf.insert(0, largeLeafRecord(0x50))
 
 		// child の次のリーフを作成 (マージ後にリンク更新されることを検証)
 		nextPageId, _ := allocateTestPage(t, bp)
 		nextLeaf := initTestLeafNode(t, bp, nextPageId)
-		childLeaf.SetNextPageId(nextPageId)
-		nextLeaf.SetPrevPageId(childPageId)
+		childLeaf.setNextPageId(nextPageId)
+		nextLeaf.setPrevPageId(childPageId)
 
 		parentPageId, _ := allocateTestPage(t, bp)
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x50}, siblingPageId, childPageId)
@@ -109,11 +109,11 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, underflow)
 		assert.True(t, isLeafMerged)
-		assert.Equal(t, 4, siblingLeaf.NumRecords())
-		assert.Equal(t, 0, parentBranch.NumRecords())
-		assert.Equal(t, siblingBufPage.PageId, parentBranch.RightChildPageId())
-		assert.Equal(t, nextPageId, siblingLeaf.NextPageId())
-		assert.Equal(t, siblingBufPage.PageId, nextLeaf.PrevPageId())
+		assert.Equal(t, 4, siblingLeaf.numRecords())
+		assert.Equal(t, 0, parentBranch.numRecords())
+		assert.Equal(t, siblingBufPage.PageId, parentBranch.rightChildPageId())
+		assert.Equal(t, nextPageId, siblingLeaf.nextPageId())
+		assert.Equal(t, siblingBufPage.PageId, nextLeaf.prevPageId())
 	})
 
 	t.Run("リーフノードのアンダーフロー: 右の兄弟とマージ (兄弟が RightChild)", func(t *testing.T) {
@@ -122,18 +122,18 @@ func TestDeleteUnderflow(t *testing.T) {
 
 		childPageId, childBufPage := allocateTestPage(t, bp)
 		childLeaf := initTestLeafNode(t, bp, childPageId)
-		childLeaf.Insert(0, largeLeafRecord(0x10))
+		childLeaf.insert(0, largeLeafRecord(0x10))
 
 		siblingPageId, _ := allocateTestPage(t, bp)
 		siblingLeaf := initTestLeafNode(t, bp, siblingPageId)
-		siblingLeaf.Insert(0, largeLeafRecord(0x20))
-		siblingLeaf.Insert(1, largeLeafRecord(0x30))
-		siblingLeaf.Insert(2, largeLeafRecord(0x40))
+		siblingLeaf.insert(0, largeLeafRecord(0x20))
+		siblingLeaf.insert(1, largeLeafRecord(0x30))
+		siblingLeaf.insert(2, largeLeafRecord(0x40))
 
 		nextPageId, _ := allocateTestPage(t, bp)
 		nextLeaf := initTestLeafNode(t, bp, nextPageId)
-		siblingLeaf.SetNextPageId(nextPageId)
-		nextLeaf.SetPrevPageId(siblingPageId)
+		siblingLeaf.setNextPageId(nextPageId)
+		nextLeaf.setPrevPageId(siblingPageId)
 
 		parentPageId, _ := allocateTestPage(t, bp)
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x20}, childPageId, siblingPageId)
@@ -145,11 +145,11 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, underflow)
 		assert.True(t, isLeafMerged)
-		assert.Equal(t, 4, childLeaf.NumRecords())
-		assert.Equal(t, 0, parentBranch.NumRecords())
-		assert.Equal(t, childBufPage.PageId, parentBranch.RightChildPageId())
-		assert.Equal(t, nextPageId, childLeaf.NextPageId())
-		assert.Equal(t, childBufPage.PageId, nextLeaf.PrevPageId())
+		assert.Equal(t, 4, childLeaf.numRecords())
+		assert.Equal(t, 0, parentBranch.numRecords())
+		assert.Equal(t, childBufPage.PageId, parentBranch.rightChildPageId())
+		assert.Equal(t, nextPageId, childLeaf.nextPageId())
+		assert.Equal(t, childBufPage.PageId, nextLeaf.prevPageId())
 	})
 
 	t.Run("リーフノードのアンダーフロー: 右の兄弟とマージ (兄弟が RightChild でない)", func(t *testing.T) {
@@ -158,20 +158,20 @@ func TestDeleteUnderflow(t *testing.T) {
 
 		childPageId, childBufPage := allocateTestPage(t, bp)
 		childLeaf := initTestLeafNode(t, bp, childPageId)
-		childLeaf.Insert(0, largeLeafRecord(0x10))
+		childLeaf.insert(0, largeLeafRecord(0x10))
 
 		siblingPageId, _ := allocateTestPage(t, bp)
 		siblingLeaf := initTestLeafNode(t, bp, siblingPageId)
-		siblingLeaf.Insert(0, largeLeafRecord(0x20))
-		siblingLeaf.Insert(1, largeLeafRecord(0x30))
-		siblingLeaf.Insert(2, largeLeafRecord(0x40))
+		siblingLeaf.insert(0, largeLeafRecord(0x20))
+		siblingLeaf.insert(1, largeLeafRecord(0x30))
+		siblingLeaf.insert(2, largeLeafRecord(0x40))
 
 		otherPageId, _ := allocateTestPage(t, bp)
 		initTestLeafNode(t, bp, otherPageId)
 
 		parentPageId, _ := allocateTestPage(t, bp)
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x20}, childPageId, otherPageId)
-		parentBranch.Insert(1, NewRecord([]byte{}, []byte{0x50}, siblingPageId.ToBytes()))
+		parentBranch.insert(1, NewRecord([]byte{}, []byte{0x50}, siblingPageId.ToBytes()))
 
 		// WHEN (childSlotNum=0, sibling=slot1, RightChild=otherPageId)
 		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 0)
@@ -180,8 +180,8 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, underflow)
 		assert.True(t, isLeafMerged)
-		assert.Equal(t, 4, childLeaf.NumRecords())
-		assert.Equal(t, 1, parentBranch.NumRecords())
+		assert.Equal(t, 4, childLeaf.numRecords())
+		assert.Equal(t, 1, parentBranch.numRecords())
 	})
 
 	t.Run("リーフノードのアンダーフロー: 転送不可かつマージ不可の場合はアンダーフローを許容する", func(t *testing.T) {
@@ -190,14 +190,14 @@ func TestDeleteUnderflow(t *testing.T) {
 
 		childPageId, childBufPage := allocateTestPage(t, bp)
 		childLeaf := initTestLeafNode(t, bp, childPageId)
-		childLeaf.Insert(0, largeLeafRecord(0x10))
-		childLeaf.Insert(1, largeLeafRecord(0x15))
+		childLeaf.insert(0, largeLeafRecord(0x10))
+		childLeaf.insert(1, largeLeafRecord(0x15))
 
 		siblingPageId, _ := allocateTestPage(t, bp)
 		siblingLeaf := initTestLeafNode(t, bp, siblingPageId)
-		siblingLeaf.Insert(0, largeLeafRecord(0x20))
-		siblingLeaf.Insert(1, largeLeafRecord(0x30))
-		siblingLeaf.Insert(2, largeLeafRecord(0x40))
+		siblingLeaf.insert(0, largeLeafRecord(0x20))
+		siblingLeaf.insert(1, largeLeafRecord(0x30))
+		siblingLeaf.insert(2, largeLeafRecord(0x40))
 
 		parentPageId, _ := allocateTestPage(t, bp)
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x20}, childPageId, siblingPageId)
@@ -209,8 +209,8 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.NoError(t, err)
 		assert.False(t, underflow)
 		assert.False(t, isLeafMerged)
-		assert.Equal(t, 2, childLeaf.NumRecords())
-		assert.Equal(t, 3, siblingLeaf.NumRecords())
+		assert.Equal(t, 2, childLeaf.numRecords())
+		assert.Equal(t, 3, siblingLeaf.numRecords())
 	})
 
 	t.Run("ブランチノードのアンダーフロー: 右の兄弟からレコードを転送", func(t *testing.T) {
@@ -228,8 +228,8 @@ func TestDeleteUnderflow(t *testing.T) {
 		parentPageId, _ := allocateTestPage(t, bp)
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x55}, childPageId, siblingPageId)
 
-		childNumBefore := childBranch.NumRecords()
-		siblingNumBefore := siblingBranch.NumRecords()
+		childNumBefore := childBranch.numRecords()
+		siblingNumBefore := siblingBranch.numRecords()
 
 		// WHEN
 		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 0)
@@ -238,8 +238,8 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.NoError(t, err)
 		assert.False(t, underflow)
 		assert.False(t, isLeafMerged)
-		assert.Equal(t, childNumBefore+1, childBranch.NumRecords())
-		assert.Equal(t, siblingNumBefore-1, siblingBranch.NumRecords())
+		assert.Equal(t, childNumBefore+1, childBranch.numRecords())
+		assert.Equal(t, siblingNumBefore-1, siblingBranch.numRecords())
 	})
 
 	t.Run("ブランチノードのアンダーフロー: 左の兄弟からレコードを転送", func(t *testing.T) {
@@ -257,8 +257,8 @@ func TestDeleteUnderflow(t *testing.T) {
 		parentPageId, _ := allocateTestPage(t, bp)
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x70}, siblingPageId, childPageId)
 
-		childNumBefore := childBranch.NumRecords()
-		siblingNumBefore := siblingBranch.NumRecords()
+		childNumBefore := childBranch.numRecords()
+		siblingNumBefore := siblingBranch.numRecords()
 
 		// WHEN (childSlotNum = NumRecords = 1 → 左の兄弟が選ばれる)
 		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 1)
@@ -267,8 +267,8 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.NoError(t, err)
 		assert.False(t, underflow)
 		assert.False(t, isLeafMerged)
-		assert.Equal(t, childNumBefore+1, childBranch.NumRecords())
-		assert.Equal(t, siblingNumBefore-1, siblingBranch.NumRecords())
+		assert.Equal(t, childNumBefore+1, childBranch.numRecords())
+		assert.Equal(t, siblingNumBefore-1, siblingBranch.numRecords())
 	})
 
 	t.Run("ブランチノードのアンダーフロー: 左の兄弟とマージ", func(t *testing.T) {
@@ -292,8 +292,8 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, underflow)
 		assert.False(t, isLeafMerged)
-		assert.Equal(t, 0, parentBranch.NumRecords())
-		assert.Equal(t, siblingBufPage.PageId, parentBranch.RightChildPageId())
+		assert.Equal(t, 0, parentBranch.numRecords())
+		assert.Equal(t, siblingBufPage.PageId, parentBranch.rightChildPageId())
 	})
 
 	t.Run("ブランチノードのアンダーフロー: 右の兄弟とマージ (兄弟が RightChild)", func(t *testing.T) {
@@ -316,8 +316,8 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, underflow)
 		assert.False(t, isLeafMerged)
-		assert.Equal(t, 0, parentBranch.NumRecords())
-		assert.Equal(t, childBufPage.PageId, parentBranch.RightChildPageId())
+		assert.Equal(t, 0, parentBranch.numRecords())
+		assert.Equal(t, childBufPage.PageId, parentBranch.rightChildPageId())
 	})
 
 	t.Run("ブランチノードのアンダーフロー: 右の兄弟とマージ (兄弟が RightChild でない)", func(t *testing.T) {
@@ -335,7 +335,7 @@ func TestDeleteUnderflow(t *testing.T) {
 
 		parentPageId, _ := allocateTestPage(t, bp)
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x30}, childPageId, otherPageId)
-		parentBranch.Insert(1, NewRecord([]byte{}, []byte{0x70}, siblingPageId.ToBytes()))
+		parentBranch.insert(1, NewRecord([]byte{}, []byte{0x70}, siblingPageId.ToBytes()))
 
 		// WHEN (childSlotNum=0, sibling=slot1, RightChild=otherPageId)
 		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 0)
@@ -344,7 +344,7 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, underflow)
 		assert.False(t, isLeafMerged)
-		assert.Equal(t, 1, parentBranch.NumRecords())
+		assert.Equal(t, 1, parentBranch.numRecords())
 	})
 }
 
@@ -359,12 +359,12 @@ func allocateTestPage(t *testing.T, bp *buffer.Pool) (page.Id, *buffer.Page) {
 }
 
 // initTestLeafNode はテスト用の初期化済みリーフノードを作成する
-func initTestLeafNode(t *testing.T, bp *buffer.Pool, pageId page.Id) *LeafNode {
+func initTestLeafNode(t *testing.T, bp *buffer.Pool, pageId page.Id) *leafNode {
 	t.Helper()
-	pg, err := bp.BufferPageForWrite(pageId)
+	pg, err := bp.PageForWrite(pageId)
 	assert.NoError(t, err)
-	leaf := NewLeafNode(pg.Page)
-	leaf.Initialize()
+	leaf := newLeafNode(pg.Page)
+	leaf.initialize()
 	return leaf
 }
 
@@ -375,12 +375,12 @@ func initTestBranchNode(
 	pageId page.Id,
 	key []byte,
 	leftChild, rightChild page.Id,
-) *BranchNode {
+) *branchNode {
 	t.Helper()
-	pg, err := bp.BufferPageForWrite(pageId)
+	pg, err := bp.PageForWrite(pageId)
 	assert.NoError(t, err)
-	branch := NewBranchNode(pg.Page)
-	err = branch.Initialize(key, leftChild, rightChild)
+	branch := newBranchNode(pg.Page)
+	err = branch.initialize(key, leftChild, rightChild)
 	assert.NoError(t, err)
 	return branch
 }
@@ -398,10 +398,10 @@ func largeBranchKey(firstByte byte) []byte {
 }
 
 // insertLargeBranchRecords はブランチノードに指定数の大きいレコードを追加する
-func insertLargeBranchRecords(bn *BranchNode, count int, startKeyByte byte) {
+func insertLargeBranchRecords(bn *branchNode, count int, startKeyByte byte) {
 	for i := range count {
 		key := largeBranchKey(startKeyByte + byte(i)*0x10)
 		record := NewRecord([]byte{}, key, page.NewId(0, page.PageNumber(300+i)).ToBytes())
-		bn.Insert(bn.NumRecords(), record)
+		bn.insert(bn.numRecords(), record)
 	}
 }

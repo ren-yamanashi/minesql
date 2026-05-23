@@ -11,8 +11,8 @@ func TestSearchModeKeySlotNum(t *testing.T) {
 	t.Run("キーが存在する場合はそのスロット番号を返す", func(t *testing.T) {
 		// GIVEN
 		ln := newSearchModeKeyTestLeafNode()
-		ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{}))
-		ln.Insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{}))
+		ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{}))
+		ln.insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{}))
 		sm := SearchModeKey{Key: []byte{0x20}}
 
 		// WHEN
@@ -25,8 +25,8 @@ func TestSearchModeKeySlotNum(t *testing.T) {
 	t.Run("キーが存在しない場合は挿入位置を返す", func(t *testing.T) {
 		// GIVEN
 		ln := newSearchModeKeyTestLeafNode()
-		ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{}))
-		ln.Insert(1, NewRecord([]byte{0x01}, []byte{0x30}, []byte{}))
+		ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{}))
+		ln.insert(1, NewRecord([]byte{0x01}, []byte{0x30}, []byte{}))
 		sm := SearchModeKey{Key: []byte{0x20}}
 
 		// WHEN
@@ -79,25 +79,25 @@ func TestSearchModeKeyChildPageId(t *testing.T) {
 }
 
 // newSearchModeKeyTestLeafNode はテスト用の初期化済み LeafNode を作成する
-func newSearchModeKeyTestLeafNode() *LeafNode {
+func newSearchModeKeyTestLeafNode() *leafNode {
 	data := make([]byte, page.PageSize)
 	pg, err := page.NewPage(data)
 	if err != nil {
 		panic(err)
 	}
-	ln := NewLeafNode(pg)
-	ln.Initialize()
+	ln := newLeafNode(pg)
+	ln.initialize()
 	return ln
 }
 
 // newSearchModeKeyTestBranchNode はテスト用の初期化済み BranchNode を作成する
-func newSearchModeKeyTestBranchNode() *BranchNode {
+func newSearchModeKeyTestBranchNode() *branchNode {
 	data := make([]byte, page.PageSize)
 	pg, err := page.NewPage(data)
 	if err != nil {
 		panic(err)
 	}
-	bn := NewBranchNode(pg)
-	_ = bn.Initialize([]byte{0x10}, page.NewId(0, 1), page.NewId(0, 2))
+	bn := newBranchNode(pg)
+	_ = bn.initialize([]byte{0x10}, page.NewId(0, 1), page.NewId(0, 2))
 	return bn
 }

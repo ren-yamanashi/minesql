@@ -10,7 +10,7 @@ import (
 // Update は B+Tree の特定のノードの値を更新する
 func (bt *Btree) Update(record Record) error {
 	// メタページを取得
-	pageMeta, err := bt.bufferPool.BufferPageForRead(bt.MetaPageId)
+	pageMeta, err := bt.bufferPool.PageForRead(bt.MetaPageId)
 	if err != nil {
 		return err
 	}
@@ -19,7 +19,7 @@ func (bt *Btree) Update(record Record) error {
 
 	// ルートページ取得
 	rootPageId := metaPage.rootPageId()
-	rootBufPage, err := bt.bufferPool.BufferPageForRead(rootPageId)
+	rootBufPage, err := bt.bufferPool.PageForRead(rootPageId)
 	if err != nil {
 		return err
 	}
@@ -28,36 +28,36 @@ func (bt *Btree) Update(record Record) error {
 
 // updateRecursively は再起的にノードを辿ってレコードを更新する
 func (bt *Btree) updateRecursively(bufPage *buffer.Page, record Record) error {
-	pg, err := bt.bufferPool.BufferPageForWrite(bufPage.PageId)
+	pg, err := bt.bufferPool.PageForWrite(bufPage.PageId)
 	if err != nil {
 		return err
 	}
 
-	nodeType := GetNodeType(pg.Page)
+	nodeType := getNodeType(pg.Page)
 	switch {
 	// ブランチノードの場合: 子ノードに対して再帰実行する
-	case bytes.Equal(nodeType, NodeTypeBranch):
+	case bytes.Equal(nodeType, nodeTypeBranch):
 		defer bt.bufferPool.UnRefPage(bufPage.PageId)
-		branchNode := NewBranchNode(pg.Page)
+		branchNode := newBranchNode(pg.Page)
 		mode := SearchModeKey{Key: record.Key()}
 		childPageId, err := mode.childPageId(branchNode)
 		if err != nil {
 			return err
 		}
-		childBufPage, err := bt.bufferPool.BufferPageForRead(childPageId)
+		childBufPage, err := bt.bufferPool.PageForRead(childPageId)
 		if err != nil {
 			return err
 		}
 		return bt.updateRecursively(childBufPage, record)
 
 	// リーフノードの場合: そのまま更新する
-	case bytes.Equal(nodeType, NodeTypeLeaf):
-		leafNode := NewLeafNode(pg.Page)
-		slotNum, found := leafNode.SearchSlotNum(record.Key())
+	case bytes.Equal(nodeType, nodeTypeLeaf):
+		leafNode := newLeafNode(pg.Page)
+		slotNum, found := leafNode.searchSlotNum(record.Key())
 		if !found {
 			return ErrKeyNotFound
 		}
-		if !leafNode.Update(slotNum, record) {
+		if !leafNode.update(slotNum, record) {
 			return errors.New("failed to update record")
 		}
 		return nil

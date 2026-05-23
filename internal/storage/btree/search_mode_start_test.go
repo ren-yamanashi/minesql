@@ -11,7 +11,7 @@ func TestSearchModeStartSlotNum(t *testing.T) {
 	t.Run("常に 0 を返す", func(t *testing.T) {
 		// GIVEN
 		ln := newSearchModeStartTestLeafNode()
-		ln.Insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{}))
+		ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{}))
 		sm := SearchModeStart{}
 
 		// WHEN
@@ -38,25 +38,25 @@ func TestSearchModeStartChildPageId(t *testing.T) {
 }
 
 // newSearchModeStartTestLeafNode はテスト用の初期化済み LeafNode を作成する
-func newSearchModeStartTestLeafNode() *LeafNode {
+func newSearchModeStartTestLeafNode() *leafNode {
 	data := make([]byte, page.PageSize)
 	pg, err := page.NewPage(data)
 	if err != nil {
 		panic(err)
 	}
-	ln := NewLeafNode(pg)
-	ln.Initialize()
+	ln := newLeafNode(pg)
+	ln.initialize()
 	return ln
 }
 
 // newSearchModeStartTestBranchNode はテスト用の初期化済み BranchNode を作成する
-func newSearchModeStartTestBranchNode() *BranchNode {
+func newSearchModeStartTestBranchNode() *branchNode {
 	data := make([]byte, page.PageSize)
 	pg, err := page.NewPage(data)
 	if err != nil {
 		panic(err)
 	}
-	bn := NewBranchNode(pg)
-	_ = bn.Initialize([]byte{0x10}, page.NewId(0, 1), page.NewId(0, 2))
+	bn := newBranchNode(pg)
+	_ = bn.initialize([]byte{0x10}, page.NewId(0, 1), page.NewId(0, 2))
 	return bn
 }

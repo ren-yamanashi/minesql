@@ -5,13 +5,13 @@ package btree
 //   - key: 探索するキー
 //   - 見つかった場合: (要素のインデックス, true)
 //   - 見つからなかった場合: (挿入すべき位置のインデックス, false)
-func binarySearch(node Node, key []byte) (int, bool) {
+func binarySearch(node node, key []byte) (int, bool) {
 	var left int
-	right := node.NumRecords()
+	right := node.numRecords()
 
 	for left < right {
 		mid := left + (right-left)/2
-		record := node.Record(mid) // "1ノード=1ページ" であるため、`mid=slotNum` として該当のレコードを取得可能
+		record := node.record(mid) // "1ノード=1ページ" であるため、`mid=slotNum` として該当のレコードを取得可能
 
 		switch record.CompareKey(key) {
 		case 0:

@@ -14,65 +14,65 @@ const (
 	leafNextPageIdOffset = 8
 )
 
-type LeafNode struct {
+type leafNode struct {
 	// ノードタイプヘッダー + リーフノードヘッダー
 	//   - header[0:8]: ノードタイプ
 	//   - header[8:16]: prev PageId
 	//   - header[16:24]: next PageId
 	header []byte
-	body   *SlottedPage
+	body   *slottedPage
 }
 
-func NewLeafNode(pg *page.Page) *LeafNode {
+func newLeafNode(pg *page.Page) *leafNode {
 	data := pg.Body
-	copy(data[0:8], NodeTypeLeaf)
+	copy(data[0:8], nodeTypeLeaf)
 	headerSize := nodeHeaderSize + leafHeaderSize
 	header := data[:headerSize]
-	body := NewSlottedPage(data[headerSize:])
-	return &LeafNode{
+	body := newSlottedPage(data[headerSize:])
+	return &leafNode{
 		header: header,
 		body:   body,
 	}
 }
 
-// Initialize はリーフノードを初期化する
+// initialize はリーフノードを初期化する
 //
 // 初期化時には、前後のリーフノードのポインタ (PageId) には無効値が設定される
-func (ln *LeafNode) Initialize() {
+func (ln *leafNode) initialize() {
 	page.InvalidId.WriteTo(ln.header[nodeHeaderSize:], leafPrevPageIdOffset)
 	page.InvalidId.WriteTo(ln.header[nodeHeaderSize:], leafNextPageIdOffset)
-	ln.body.Initialize()
+	ln.body.initialize()
 }
 
-// Insert はレコードを挿入する
+// insert はレコードを挿入する
 //   - slotNum: 挿入先のスロット番号
 //   - record: 挿入するレコード
 //   - return: 挿入に成功した場合は true
-func (ln *LeafNode) Insert(slotNum int, record Record) bool {
+func (ln *leafNode) insert(slotNum int, record Record) bool {
 	recordBytes := record.ToBytes()
 	if len(recordBytes) > ln.maxRecordSize() {
 		return false
 	}
-	return ln.body.Insert(slotNum, recordBytes)
+	return ln.body.insert(slotNum, recordBytes)
 }
 
-// SplitInsert はリーフノードを分割しながらレコードを挿入する
+// splitInsert はリーフノードを分割しながらレコードを挿入する
 //   - newLeaf: 分割後の新しいリーフノード (小さい方のレコードが格納される)
 //   - newRecord: 挿入するレコード
 //   - return: 古いノード (=右の子) の最小キー (=親ブランチノードの境界キー)
-func (ln *LeafNode) SplitInsert(newLeaf *LeafNode, newRecord Record) ([]byte, error) {
-	newLeaf.Initialize()
+func (ln *leafNode) splitInsert(newLeaf *leafNode, newRecord Record) ([]byte, error) {
+	newLeaf.initialize()
 	for {
-		if newLeaf.IsHalfFull() {
-			slotNum, _ := ln.SearchSlotNum(newRecord.Key())
-			if !ln.Insert(slotNum, newRecord) {
+		if newLeaf.isHalfFull() {
+			slotNum, _ := ln.searchSlotNum(newRecord.Key())
+			if !ln.insert(slotNum, newRecord) {
 				return nil, errors.New("old leaf node must have space")
 			}
 			break
 		}
 
 		// `古いノードの先頭レコードのキー < 挿入対象のキー` の場合
-		if ln.Record(0).CompareKey(newRecord.Key()) < 0 {
+		if ln.record(0).CompareKey(newRecord.Key()) < 0 {
 			if err := ln.transfer(newLeaf); err != nil {
 				return nil, err
 			}
@@ -80,114 +80,114 @@ func (ln *LeafNode) SplitInsert(newLeaf *LeafNode, newRecord Record) ([]byte, er
 		}
 
 		// `古いノードの先頭レコードのキー >= 挿入対象のキー` の場合
-		if !newLeaf.Insert(newLeaf.NumRecords(), newRecord) {
+		if !newLeaf.insert(newLeaf.numRecords(), newRecord) {
 			return nil, errors.New("new leaf node must have space")
 		}
-		for !newLeaf.IsHalfFull() {
+		for !newLeaf.isHalfFull() {
 			if err := ln.transfer(newLeaf); err != nil {
 				return nil, err
 			}
 		}
 		break
 	}
-	return ln.Record(0).Key(), nil
+	return ln.record(0).Key(), nil
 }
 
-// Delete はレコードを削除する
-func (ln *LeafNode) Delete(slotNum int) {
-	ln.body.Delete(slotNum)
+// delete はレコードを削除する
+func (ln *leafNode) delete(slotNum int) {
+	ln.body.delete(slotNum)
 }
 
-// Update は指定されたスロットのレコードを更新する
+// update は指定されたスロットのレコードを更新する
 //   - slotNum: 更新するレコードのスロット番号
 //   - record: 新しいレコード (key は変更されない前提)
-func (ln *LeafNode) Update(slotNum int, record Record) bool {
-	return ln.body.Update(slotNum, record.ToBytes())
+func (ln *leafNode) update(slotNum int, record Record) bool {
+	return ln.body.update(slotNum, record.ToBytes())
 }
 
-// NumRecords はレコード数を取得する
-func (ln *LeafNode) NumRecords() int {
-	return ln.body.NumSlots()
+// numRecords はレコード数を取得する
+func (ln *leafNode) numRecords() int {
+	return ln.body.numSlots()
 }
 
-// CanTransferRecord は兄弟ノードにレコードを転送できるか判定する
+// canTransferRecord は兄弟ノードにレコードを転送できるか判定する
 //   - toRight: true の場合は右の兄弟に転送する
 //   - return: 転送後も半分以上埋まっている場合は true を返す
-func (ln *LeafNode) CanTransferRecord(toRight bool) bool {
-	if ln.NumRecords() <= 1 {
+func (ln *leafNode) canTransferRecord(toRight bool) bool {
+	if ln.numRecords() <= 1 {
 		return false
 	}
 
 	// 右の兄弟に転送する場合は末尾レコード、左の兄弟に転送する場合は先頭レコードが転送対象
 	var targetIndex int
 	if toRight {
-		targetIndex = ln.NumRecords() - 1
+		targetIndex = ln.numRecords() - 1
 	}
-	targetRecordData := ln.body.Cell(targetIndex)
+	targetRecordData := ln.body.cell(targetIndex)
 	targetRecordSize := len(targetRecordData)
 
-	freeSpaceAfterTransfer := ln.body.FreeSpace() + targetRecordSize + pointerSize
-	return 2*freeSpaceAfterTransfer < ln.body.Capacity()
+	freeSpaceAfterTransfer := ln.body.freeSpace() + targetRecordSize + slottedPagePointerSize
+	return 2*freeSpaceAfterTransfer < ln.body.capacity()
 }
 
-// Record は指定されたスロット番号のレコードを取得する
-func (ln *LeafNode) Record(slotNum int) Record {
-	return recordFromBytes(ln.body.Cell(slotNum))
+// record は指定されたスロット番号のレコードを取得する
+func (ln *leafNode) record(slotNum int) Record {
+	return recordFromBytes(ln.body.cell(slotNum))
 }
 
-// SearchSlotNum は指定された key に対応するスロット番号を検索する
+// searchSlotNum は指定された key に対応するスロット番号を検索する
 //   - 見つかった場合: (スロット番号, true)
 //   - 見つからなかった場合: (0, false)
-func (ln *LeafNode) SearchSlotNum(key []byte) (int, bool) {
+func (ln *leafNode) searchSlotNum(key []byte) (int, bool) {
 	return binarySearch(ln, key)
 }
 
-// PrevPageId は前のリーフノードのページ ID を取得する
-func (ln *LeafNode) PrevPageId() page.Id {
+// prevPageId は前のリーフノードのページ ID を取得する
+func (ln *leafNode) prevPageId() page.Id {
 	return page.ReadId(ln.header[nodeHeaderSize:], leafPrevPageIdOffset)
 }
 
-// NextPageId は次のリーフノードのページ ID を取得する
-func (ln *LeafNode) NextPageId() page.Id {
+// nextPageId は次のリーフノードのページ ID を取得する
+func (ln *leafNode) nextPageId() page.Id {
 	return page.ReadId(ln.header[nodeHeaderSize:], leafNextPageIdOffset)
 }
 
-// SetPrevPageId は前のリーフノードのページ ID を設定する
-func (ln *LeafNode) SetPrevPageId(prevPageId page.Id) {
+// setPrevPageId は前のリーフノードのページ ID を設定する
+func (ln *leafNode) setPrevPageId(prevPageId page.Id) {
 	prevPageId.WriteTo(ln.header[nodeHeaderSize:], leafPrevPageIdOffset)
 }
 
-// SetNextPageId は次のリーフノードのページ ID を設定する
-func (ln *LeafNode) SetNextPageId(nextPageId page.Id) {
+// setNextPageId は次のリーフノードのページ ID を設定する
+func (ln *leafNode) setNextPageId(nextPageId page.Id) {
 	nextPageId.WriteTo(ln.header[nodeHeaderSize:], leafNextPageIdOffset)
 }
 
-// TransferAllFrom は src のすべてのレコードを自分の末尾に転送する (src のレコードはすべて削除される)
-func (ln *LeafNode) TransferAllFrom(src *LeafNode) bool {
-	return src.body.TransferAllTo(ln.body)
+// transferAllFrom は src のすべてのレコードを自分の末尾に転送する (src のレコードはすべて削除される)
+func (ln *leafNode) transferAllFrom(src *leafNode) bool {
+	return src.body.transferAllTo(ln.body)
 }
 
-// IsHalfFull はリーフノードが半分以上埋まっているかどうかを判定する
-func (ln *LeafNode) IsHalfFull() bool {
-	return 2*ln.body.FreeSpace() < ln.body.Capacity()
+// isHalfFull はリーフノードが半分以上埋まっているかどうかを判定する
+func (ln *leafNode) isHalfFull() bool {
+	return 2*ln.body.freeSpace() < ln.body.capacity()
 }
 
 // maxRecordSize は自身のノードに格納できる最大のレコードサイズを返す
-func (ln *LeafNode) maxRecordSize() int {
+func (ln *leafNode) maxRecordSize() int {
 	// /2: ノード分割時に各ノードが半分以上埋まることを保証するため、1 レコードは容量の半分以下でなければならない
 	// -pointerSize: Slotted Page ではレコードごとに pointer が必要なため、その分を差し引く
-	return ln.body.Capacity()/2 - pointerSize
+	return ln.body.capacity()/2 - slottedPagePointerSize
 }
 
 // transfer は先頭のレコードを別のリーフノードに移動する
-func (ln *LeafNode) transfer(dest *LeafNode) error {
-	nextIndex := dest.NumRecords()
-	data := ln.body.Cell(0)
+func (ln *leafNode) transfer(dest *leafNode) error {
+	nextIndex := dest.numRecords()
+	data := ln.body.cell(0)
 
-	if !dest.body.Insert(nextIndex, data) {
+	if !dest.body.insert(nextIndex, data) {
 		return errors.New("no space in dest leaf node")
 	}
 
-	ln.body.Delete(0)
+	ln.body.delete(0)
 	return nil
 }

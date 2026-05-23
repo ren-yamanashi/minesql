@@ -129,12 +129,12 @@ func newMockNode(keys [][]byte) *mockNode {
 	return &mockNode{records: records}
 }
 
-func (m *mockNode) NumRecords() int                    { return len(m.records) }
-func (m *mockNode) Record(slotNum int) Record          { return m.records[slotNum] }
-func (m *mockNode) Insert(_ int, _ Record) bool        { return false }
-func (m *mockNode) Delete(_ int)                       {}
-func (m *mockNode) CanTransferRecord(_ bool) bool      { return false }
+func (m *mockNode) numRecords() int                    { return len(m.records) }
+func (m *mockNode) record(slotNum int) Record          { return m.records[slotNum] }
+func (m *mockNode) insert(_ int, _ Record) bool        { return false }
+func (m *mockNode) delete(_ int)                       {}
+func (m *mockNode) canTransferRecord(_ bool) bool      { return false }
 func (m *mockNode) Body() []byte                       { return nil }
-func (m *mockNode) SearchSlotNum(_ []byte) (int, bool) { return 0, false }
-func (m *mockNode) IsHalfFull() bool                   { return false }
+func (m *mockNode) searchSlotNum(_ []byte) (int, bool) { return 0, false }
+func (m *mockNode) isHalfFull() bool                   { return false }
 func (m *mockNode) maxRecordSize() int                 { return 0 }

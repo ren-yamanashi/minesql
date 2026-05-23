@@ -36,10 +36,10 @@ func TestInsertLeaf(t *testing.T) {
 		_, _, _ = bt.insertLeaf(pageId, pg, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 
 		// THEN
-		leafNode := NewLeafNode(pg)
-		assert.Equal(t, 2, leafNode.NumRecords())
-		assert.Equal(t, []byte{0x10}, leafNode.Record(0).Key())
-		assert.Equal(t, []byte{0x20}, leafNode.Record(1).Key())
+		leafNode := newLeafNode(pg)
+		assert.Equal(t, 2, leafNode.numRecords())
+		assert.Equal(t, []byte{0x10}, leafNode.record(0).Key())
+		assert.Equal(t, []byte{0x20}, leafNode.record(1).Key())
 	})
 
 	t.Run("重複キーの場合は ErrDuplicateKey を返す", func(t *testing.T) {
@@ -103,9 +103,9 @@ func setupTestLeafPage(t *testing.T, bp *buffer.Pool) (page.Id, *page.Page) {
 	assert.NoError(t, err)
 	_, err = bp.AddPage(pageId)
 	assert.NoError(t, err)
-	bufPage, err := bp.BufferPageForWrite(pageId)
+	bufPage, err := bp.PageForWrite(pageId)
 	assert.NoError(t, err)
-	ln := NewLeafNode(bufPage.Page)
-	ln.Initialize()
+	ln := newLeafNode(bufPage.Page)
+	ln.initialize()
 	return pageId, bufPage.Page
 }

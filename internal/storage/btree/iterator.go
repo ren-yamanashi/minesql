@@ -24,14 +24,14 @@ func NewIterator(bufPool *buffer.Pool, bufPage buffer.Page, slotNum int) *Iterat
 
 // Get は現在参照しているリーフノードのレコードを取得
 func (iter *Iterator) Get() (Record, bool, error) {
-	pg, err := iter.bufferPool.BufferPageForRead(iter.bufferPage.PageId)
+	pg, err := iter.bufferPool.PageForRead(iter.bufferPage.PageId)
 	if err != nil {
 		return NewRecord(nil, nil, nil), false, err
 	}
-	leaf := NewLeafNode(pg.Page)
+	leaf := newLeafNode(pg.Page)
 
-	if iter.slotNum < leaf.NumRecords() {
-		record := leaf.Record(iter.slotNum)
+	if iter.slotNum < leaf.numRecords() {
+		record := leaf.record(iter.slotNum)
 		header := bytes.Clone(record.Header())
 		key := bytes.Clone(record.Key())
 		nonKey := bytes.Clone(record.NonKey())
@@ -64,24 +64,24 @@ func (iter *Iterator) Next() (Record, bool, error) {
 
 // Advance は次のレコードに進む
 func (iter *Iterator) Advance() error {
-	pg, err := iter.bufferPool.BufferPageForRead(iter.bufferPage.PageId)
+	pg, err := iter.bufferPool.PageForRead(iter.bufferPage.PageId)
 	if err != nil {
 		return err
 	}
-	leaf := NewLeafNode(pg.Page)
+	leaf := newLeafNode(pg.Page)
 
 	// 現在のページ内に、次のレコードがある場合
-	if iter.slotNum < leaf.NumRecords() {
+	if iter.slotNum < leaf.numRecords() {
 		iter.slotNum++
 	}
 
 	// まだ現在のページ内にレコードがある場合
-	if iter.slotNum < leaf.NumRecords() {
+	if iter.slotNum < leaf.numRecords() {
 		return nil
 	}
 
 	// 現在のページのレコードを全て読み終えた場合
-	nextPageId := leaf.NextPageId()
+	nextPageId := leaf.nextPageId()
 
 	// 次のページがなければ何もしない
 	if nextPageId.IsInvalid() {
@@ -91,7 +91,7 @@ func (iter *Iterator) Advance() error {
 	// 次のページに移動
 	oldPageId := iter.bufferPage.PageId
 	iter.bufferPool.UnRefPage(oldPageId)
-	nextPage, err := iter.bufferPool.BufferPageForRead(nextPageId)
+	nextPage, err := iter.bufferPool.PageForRead(nextPageId)
 	if err != nil {
 		return err
 	}

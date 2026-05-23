@@ -6,13 +6,13 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPointerRange(t *testing.T) {
+func TestPointerBounds(t *testing.T) {
 	t.Run("開始位置と終了位置を返す", func(t *testing.T) {
 		// GIVEN
 		p := newPointer(10, 5)
 
 		// WHEN
-		start, end := p.Range()
+		start, end := p.bounds()
 
 		// THEN
 		assert.Equal(t, 10, start)
@@ -24,7 +24,7 @@ func TestPointerRange(t *testing.T) {
 		p := newPointer(0, 8)
 
 		// WHEN
-		start, end := p.Range()
+		start, end := p.bounds()
 
 		// THEN
 		assert.Equal(t, 0, start)
@@ -36,7 +36,7 @@ func TestPointerRange(t *testing.T) {
 		p := newPointer(100, 0)
 
 		// WHEN
-		start, end := p.Range()
+		start, end := p.bounds()
 
 		// THEN
 		assert.Equal(t, 100, start)

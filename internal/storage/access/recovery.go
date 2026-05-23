@@ -64,7 +64,7 @@ func (r *Recovery) applyRedoLog(records []redo.Record) error {
 		}
 
 		// Redo レコードの PageId から変更ページ取得
-		writePage, err := r.bufferPool.BufferPageForWrite(rec.PageId)
+		writePage, err := r.bufferPool.PageForWrite(rec.PageId)
 		if err != nil {
 			return err
 		}
@@ -124,7 +124,7 @@ func (r *Recovery) collectUndoRecords(trxId lock.TrxId) ([]undo.Record, error) {
 	var records []undo.Record
 	for {
 		pageId := page.NewId(r.undoFileId, pageNum)
-		readPage, readErr := r.bufferPool.BufferPageForRead(pageId)
+		readPage, readErr := r.bufferPool.PageForRead(pageId)
 		if readErr != nil {
 			// Undo ページチェーンの終端に達した場合は正常終了
 			// GetReadPage はページが存在しない場合もエラーを返すため、先頭ページの読み取り失敗はチェーンが空であることを意味する

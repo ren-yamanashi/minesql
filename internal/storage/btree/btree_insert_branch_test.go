@@ -26,7 +26,7 @@ func TestInsertBranchOverflow(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Nil(t, overflowKey)
 		assert.True(t, newPageId.IsInvalid())
-		assert.Equal(t, 2, branchNode.NumRecords())
+		assert.Equal(t, 2, branchNode.numRecords())
 	})
 
 	t.Run("ブランチノードが満杯の場合は分割される", func(t *testing.T) {
@@ -38,7 +38,7 @@ func TestInsertBranchOverflow(t *testing.T) {
 		// WHEN
 		overflowKey, newPageId, err := bt.insertBranchOverflow(
 			branchNode,
-			branchNode.NumRecords(),
+			branchNode.numRecords(),
 			[]byte{0xFF},
 			page.NewId(0, 99),
 		)
@@ -51,26 +51,26 @@ func TestInsertBranchOverflow(t *testing.T) {
 }
 
 // setupTestBranchNode はテスト用の初期化済みブランチノードを作成する
-func setupTestBranchNode(t *testing.T, bp *buffer.Pool) *BranchNode {
+func setupTestBranchNode(t *testing.T, bp *buffer.Pool) *branchNode {
 	t.Helper()
 	pageId, err := bp.AllocatePageId(0)
 	assert.NoError(t, err)
 	_, err = bp.AddPage(pageId)
 	assert.NoError(t, err)
-	pg, err := bp.BufferPageForWrite(pageId)
+	pg, err := bp.PageForWrite(pageId)
 	assert.NoError(t, err)
-	bn := NewBranchNode(pg.Page)
-	err = bn.Initialize([]byte{0x10}, page.NewId(0, 1), page.NewId(0, 2))
+	bn := newBranchNode(pg.Page)
+	err = bn.initialize([]byte{0x10}, page.NewId(0, 1), page.NewId(0, 2))
 	assert.NoError(t, err)
 	return bn
 }
 
 // fillBranchNodeUntilFull はブランチノードを Insert が失敗するまで埋める
-func fillBranchNodeUntilFull(bn *BranchNode) {
+func fillBranchNodeUntilFull(bn *branchNode) {
 	for i := range 1000 {
 		key := []byte{byte(i/256 + 0x11), byte(i % 256)}
 		record := NewRecord([]byte{}, key, page.NewId(0, page.PageNumber(i+10)).ToBytes())
-		if !bn.Insert(bn.NumRecords(), record) {
+		if !bn.insert(bn.numRecords(), record) {
 			return
 		}
 	}

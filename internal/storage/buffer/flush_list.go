@@ -12,9 +12,9 @@ type flushListNode struct {
 
 // flushList はダーティーページをダーティーになった順に管理する双方向リンクリスト
 type flushList struct {
-	NumOfPage int            // リスト内のページ数
-	Head      *flushListNode // 最も古いダーティーページ
-	Tail      *flushListNode // 最も新しいダーティーページ
+	numOfPage int            // リスト内のページ数
+	head      *flushListNode // 最も古いダーティーページ
+	tail      *flushListNode // 最も新しいダーティーページ
 	nodeMap   map[page.Id]*flushListNode
 }
 
@@ -33,15 +33,15 @@ func (fl *flushList) add(pageId page.Id) {
 	node := &flushListNode{pageId: pageId}
 	fl.nodeMap[pageId] = node
 
-	if fl.Tail == nil {
-		fl.Head = node
-		fl.Tail = node
+	if fl.tail == nil {
+		fl.head = node
+		fl.tail = node
 	} else {
-		node.prev = fl.Tail
-		fl.Tail.next = node
-		fl.Tail = node
+		node.prev = fl.tail
+		fl.tail.next = node
+		fl.tail = node
 	}
-	fl.NumOfPage++
+	fl.numOfPage++
 }
 
 // delete はページをフラッシュリストから削除する
@@ -54,31 +54,31 @@ func (fl *flushList) delete(pageId page.Id) {
 	if node.prev != nil {
 		node.prev.next = node.next
 	} else {
-		fl.Head = node.next
+		fl.head = node.next
 	}
 
 	if node.next != nil {
 		node.next.prev = node.prev
 	} else {
-		fl.Tail = node.prev
+		fl.tail = node.prev
 	}
 
 	delete(fl.nodeMap, pageId)
-	fl.NumOfPage--
+	fl.numOfPage--
 }
 
 // clear はフラッシュリスト全体をクリアする
 func (fl *flushList) clear() {
-	fl.Head = nil
-	fl.Tail = nil
-	fl.NumOfPage = 0
+	fl.head = nil
+	fl.tail = nil
+	fl.numOfPage = 0
 	fl.nodeMap = make(map[page.Id]*flushListNode)
 }
 
 // oldestPageIds は先頭 (最も古い) から n 件の PageId を返す
 func (fl *flushList) oldestPageIds(n int) []page.Id {
 	result := make([]page.Id, 0, n)
-	node := fl.Head
+	node := fl.head
 	for node != nil && len(result) < n {
 		result = append(result, node.pageId)
 		node = node.next
