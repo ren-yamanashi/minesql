@@ -39,7 +39,7 @@ func TestAddPage(t *testing.T) {
 
 	t.Run("バッファプールが満杯の場合ページを追い出して追加する", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size) // MaxNumOfPage=1
+		bp := NewPool(page.Size)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		firstId := page.NewId(0, 0)
@@ -59,7 +59,7 @@ func TestAddPage(t *testing.T) {
 
 	t.Run("ダーティーページの追い出し時にフラッシュリストから削除される", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size) // MaxNumOfPage=1
+		bp := NewPool(page.Size)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		firstId := page.NewId(0, 0)

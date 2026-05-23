@@ -11,7 +11,7 @@ import (
 )
 
 func TestNewPool(t *testing.T) {
-	t.Run("サイズが PageSize 以下の場合 maxNumOfPage が 1 になる", func(t *testing.T) {
+	t.Run("サイズが PageSize 以下の場合 maxPages が 1 になる", func(t *testing.T) {
 		// GIVEN / WHEN
 		bp := NewPool(page.Size)
 
@@ -19,7 +19,7 @@ func TestNewPool(t *testing.T) {
 		assert.Equal(t, 1, bp.maxPages)
 	})
 
-	t.Run("サイズが PageSize より大きい場合 maxNumOfPage が算出される", func(t *testing.T) {
+	t.Run("サイズが PageSize より大きい場合 maxPages が算出される", func(t *testing.T) {
 		// GIVEN / WHEN
 		bp := NewPool(page.Size * 3)
 
@@ -27,7 +27,7 @@ func TestNewPool(t *testing.T) {
 		assert.Equal(t, 3, bp.maxPages)
 	})
 
-	t.Run("サイズが 0 の場合 maxNumOfPage が 1 になる", func(t *testing.T) {
+	t.Run("サイズが 0 の場合 maxPages が 1 になる", func(t *testing.T) {
 		// GIVEN / WHEN
 		bp := NewPool(0)
 

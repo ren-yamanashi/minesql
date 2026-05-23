@@ -51,7 +51,7 @@ func TestFlushAllPages(t *testing.T) {
 
 	t.Run("フラッシュ後にデータがディスクに永続化されている", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size) // MaxNumOfPage=1
+		bp := NewPool(page.Size)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
