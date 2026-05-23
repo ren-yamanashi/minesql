@@ -437,7 +437,7 @@ func setupCreateTestEnv(t *testing.T) *createTestEnv {
 	}
 	t.Cleanup(func() { _ = catalogHf.Close() })
 
-	bp := buffer.NewPool(page.PageSize * 50)
+	bp := buffer.NewPool(page.Size * 50)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
 	ct, err := catalog.CreateCatalog(bp)
@@ -517,7 +517,7 @@ func setupCreateTableTestEnv(t *testing.T) *createTableTestEnv {
 	}
 	t.Cleanup(func() { _ = catalogHf.Close() })
 
-	bp := buffer.NewPool(page.PageSize * 50)
+	bp := buffer.NewPool(page.Size * 50)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
 	_, err = catalog.CreateCatalog(bp)

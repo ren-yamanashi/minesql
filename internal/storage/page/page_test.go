@@ -9,22 +9,22 @@ import (
 func TestNewPage(t *testing.T) {
 	t.Run("4KB のデータから Page を生成できる", func(t *testing.T) {
 		// GIVEN
-		data := make([]byte, PageSize)
+		data := make([]byte, Size)
 		data[0] = 0x01
-		data[PageHeaderSize] = 0x02
+		data[HeaderSize] = 0x02
 
 		// WHEN
 		p, err := NewPage(data)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, data[:PageHeaderSize], p.Header)
-		assert.Equal(t, data[PageHeaderSize:], p.Body)
+		assert.Equal(t, data[:HeaderSize], p.Header)
+		assert.Equal(t, data[HeaderSize:], p.Body)
 	})
 
 	t.Run("Header はデータの先頭 4 バイトを参照する", func(t *testing.T) {
 		// GIVEN
-		data := make([]byte, PageSize)
+		data := make([]byte, Size)
 		data[0] = 0xAA
 		data[1] = 0xBB
 		data[2] = 0xCC
@@ -41,21 +41,21 @@ func TestNewPage(t *testing.T) {
 
 	t.Run("Body はヘッダー以降のデータを参照する", func(t *testing.T) {
 		// GIVEN
-		data := make([]byte, PageSize)
-		data[PageHeaderSize] = 0xFF
+		data := make([]byte, Size)
+		data[HeaderSize] = 0xFF
 
 		// WHEN
 		p, err := NewPage(data)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, PageSize-PageHeaderSize, len(p.Body))
+		assert.Equal(t, Size-HeaderSize, len(p.Body))
 		assert.Equal(t, byte(0xFF), p.Body[0])
 	})
 
 	t.Run("データサイズが 4KB 未満の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		data := make([]byte, PageSize-1)
+		data := make([]byte, Size-1)
 
 		// WHEN
 		p, err := NewPage(data)
@@ -67,7 +67,7 @@ func TestNewPage(t *testing.T) {
 
 	t.Run("データサイズが 4KB 超過の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		data := make([]byte, PageSize+1)
+		data := make([]byte, Size+1)
 
 		// WHEN
 		p, err := NewPage(data)
@@ -102,23 +102,23 @@ func TestNewPage(t *testing.T) {
 func TestPageToBytes(t *testing.T) {
 	t.Run("Header と Body を結合したバイト列を返す", func(t *testing.T) {
 		// GIVEN
-		data := make([]byte, PageSize)
+		data := make([]byte, Size)
 		data[0] = 0xAA
-		data[PageHeaderSize] = 0xBB
+		data[HeaderSize] = 0xBB
 		p, _ := NewPage(data)
 
 		// WHEN
 		result := p.ToBytes()
 
 		// THEN
-		assert.Equal(t, PageSize, len(result))
+		assert.Equal(t, Size, len(result))
 		assert.Equal(t, byte(0xAA), result[0])
-		assert.Equal(t, byte(0xBB), result[PageHeaderSize])
+		assert.Equal(t, byte(0xBB), result[HeaderSize])
 	})
 
 	t.Run("NewPage で生成した Page を ToBytes で変換すると元のデータと一致する", func(t *testing.T) {
 		// GIVEN
-		data := make([]byte, PageSize)
+		data := make([]byte, Size)
 		for i := range data {
 			data[i] = byte(i % 256)
 		}
@@ -133,13 +133,13 @@ func TestPageToBytes(t *testing.T) {
 
 	t.Run("ToBytes は元のデータと同じメモリ領域を返す", func(t *testing.T) {
 		// GIVEN
-		data := make([]byte, PageSize)
+		data := make([]byte, Size)
 		p, _ := NewPage(data)
 
 		// WHEN
 		result := p.ToBytes()
 		result[0] = 0xFF
-		result[PageHeaderSize] = 0xEE
+		result[HeaderSize] = 0xEE
 
 		// THEN
 		assert.Equal(t, byte(0xFF), p.Header[0])
@@ -148,7 +148,7 @@ func TestPageToBytes(t *testing.T) {
 
 	t.Run("Header への書き込みが ToBytes の結果に反映される", func(t *testing.T) {
 		// GIVEN
-		data := make([]byte, PageSize)
+		data := make([]byte, Size)
 		p, _ := NewPage(data)
 
 		// WHEN
@@ -161,7 +161,7 @@ func TestPageToBytes(t *testing.T) {
 
 	t.Run("Body への書き込みが ToBytes の結果に反映される", func(t *testing.T) {
 		// GIVEN
-		data := make([]byte, PageSize)
+		data := make([]byte, Size)
 		p, _ := NewPage(data)
 
 		// WHEN
@@ -169,14 +169,14 @@ func TestPageToBytes(t *testing.T) {
 		result := p.ToBytes()
 
 		// THEN
-		assert.Equal(t, byte(0xEE), result[PageHeaderSize])
+		assert.Equal(t, byte(0xEE), result[HeaderSize])
 	})
 }
 
 func TestCheckPageSize(t *testing.T) {
 	t.Run("PageSize と一致する場合 nil を返す", func(t *testing.T) {
 		// GIVEN
-		data := make([]byte, PageSize)
+		data := make([]byte, Size)
 
 		// WHEN
 		err := CheckPageSize(data)

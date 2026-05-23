@@ -111,7 +111,7 @@ func TestMetaPageFieldsAreIndependent(t *testing.T) {
 
 // newTestMetaPage はテスト用のメタページを作成する
 func newTestMetaPage() *metaPage {
-	data := make([]byte, page.PageSize)
+	data := make([]byte, page.Size)
 	pg, _ := page.NewPage(data)
 	return newMetaPage(pg)
 }

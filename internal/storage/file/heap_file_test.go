@@ -10,7 +10,7 @@ import (
 )
 
 func newAlignedPage() []byte {
-	return directio.AlignedBlock(page.PageSize)
+	return directio.AlignedBlock(page.Size)
 }
 
 func TestNewHeapFile(t *testing.T) {
@@ -183,7 +183,7 @@ func TestWriteAndRead(t *testing.T) {
 		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
 		writeData := newAlignedPage()
 		writeData[0] = 0xAA
-		writeData[page.PageSize-1] = 0xBB
+		writeData[page.Size-1] = 0xBB
 		assert.NoError(t, hf.Write(0, writeData))
 
 		// WHEN
@@ -193,7 +193,7 @@ func TestWriteAndRead(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, byte(0xAA), readData[0])
-		assert.Equal(t, byte(0xBB), readData[page.PageSize-1])
+		assert.Equal(t, byte(0xBB), readData[page.Size-1])
 	})
 
 	t.Run("複数ページに書き込んで各ページを正しく読み込める", func(t *testing.T) {

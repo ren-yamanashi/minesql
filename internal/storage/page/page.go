@@ -6,11 +6,11 @@ import (
 )
 
 const (
-	PageSize       = 4096
-	PageHeaderSize = 4
+	Size       = 4096
+	HeaderSize = 4
 )
 
-var ErrInvalidDataSize = errors.New("data size must be " + strconv.Itoa(PageSize) + " bytes")
+var ErrInvalidDataSize = errors.New("data size must be " + strconv.Itoa(Size) + " bytes")
 
 // Page は 4KB のページ
 //   - ヘッダー: 先頭 4 バイト
@@ -27,8 +27,8 @@ func NewPage(data []byte) (*Page, error) {
 	}
 	return &Page{
 		data:   data,
-		Header: data[:PageHeaderSize], //nolint:gosec // CheckPageSize で len(data) == PageSize を検証済み
-		Body:   data[PageHeaderSize:], //nolint:gosec // CheckPageSize で len(data) == PageSize を検証済み
+		Header: data[:HeaderSize], //nolint:gosec // CheckPageSize で len(data) == PageSize を検証済み
+		Body:   data[HeaderSize:], //nolint:gosec // CheckPageSize で len(data) == PageSize を検証済み
 	}, nil
 }
 
@@ -39,7 +39,7 @@ func (p *Page) ToBytes() []byte {
 
 // CheckPageSize は data が 4KB であるかを確認する
 func CheckPageSize(data []byte) error {
-	if len(data) != PageSize {
+	if len(data) != Size {
 		return ErrInvalidDataSize
 	}
 	return nil

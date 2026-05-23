@@ -31,7 +31,7 @@ func TestNewPage(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, page.PageSize-page.PageHeaderSize, len(bp.Page.Body))
-		assert.Equal(t, page.PageHeaderSize, len(bp.Page.Header))
+		assert.Equal(t, page.Size-page.HeaderSize, len(bp.Page.Body))
+		assert.Equal(t, page.HeaderSize, len(bp.Page.Header))
 	})
 }

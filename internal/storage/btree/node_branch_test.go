@@ -396,7 +396,7 @@ func TestBranchNodeIsHalfFull(t *testing.T) {
 
 // newUninitializedBranchNode は未初期化の BranchNode を作成する
 func newUninitializedBranchNode() *branchNode {
-	pg, err := page.NewPage(make([]byte, page.PageSize))
+	pg, err := page.NewPage(make([]byte, page.Size))
 	if err != nil {
 		panic(err)
 	}

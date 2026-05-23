@@ -325,7 +325,7 @@ func TestFreeSpace(t *testing.T) {
 // newTestPage はテスト用の page.Page を作成する
 func newTestPage(t *testing.T) *page.Page {
 	t.Helper()
-	data := make([]byte, page.PageSize)
+	data := make([]byte, page.Size)
 	pg, err := page.NewPage(data)
 	if err != nil {
 		t.Fatalf("page.Page の作成に失敗: %v", err)

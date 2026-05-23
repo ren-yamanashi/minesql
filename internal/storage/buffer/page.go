@@ -12,7 +12,7 @@ type Page struct {
 }
 
 func newPage(pageId page.Id) (*Page, error) {
-	p, err := page.NewPage(directio.AlignedBlock(page.PageSize))
+	p, err := page.NewPage(directio.AlignedBlock(page.Size))
 	if err != nil {
 		return nil, err
 	}

@@ -737,7 +737,7 @@ func setupBtree(t *testing.T) *Tree {
 	if err != nil {
 		t.Fatalf("HeapFile の作成に失敗: %v", err)
 	}
-	bp := buffer.NewPool(page.PageSize * 10)
+	bp := buffer.NewPool(page.Size * 10)
 	bp.RegisterHeapFile(fileId, heapFile)
 
 	bt, err := CreateTree(bp, fileId)

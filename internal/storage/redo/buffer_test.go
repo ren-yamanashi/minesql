@@ -284,7 +284,7 @@ func TestBufferSize(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, int64(fileHeaderSize+recordHeaderSize+page.PageSize), size)
+		assert.Equal(t, int64(fileHeaderSize+recordHeaderSize+page.Size), size)
 	})
 
 	t.Run("フラッシュ後はファイルサイズのみ返す", func(t *testing.T) {

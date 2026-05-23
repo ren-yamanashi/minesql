@@ -100,7 +100,7 @@ func TestIteratorAdvance(t *testing.T) {
 func setupIteratorTestPage(t *testing.T, setup func(ln *leafNode)) (*buffer.Pool, page.Id) {
 	t.Helper()
 
-	bp := buffer.NewPool(page.PageSize * 3)
+	bp := buffer.NewPool(page.Size * 3)
 	path := filepath.Join(t.TempDir(), "test.db")
 	hf, err := file.NewHeapFile(0, path)
 	assert.NoError(t, err)

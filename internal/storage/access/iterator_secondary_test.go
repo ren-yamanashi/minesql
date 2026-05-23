@@ -188,7 +188,7 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	}
 	t.Cleanup(func() { _ = dataHf.Close() })
 
-	bp := buffer.NewPool(page.PageSize * 50)
+	bp := buffer.NewPool(page.Size * 50)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 	bp.RegisterHeapFile(page.FileId(2), dataHf)
 

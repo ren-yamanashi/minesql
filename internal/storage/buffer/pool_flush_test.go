@@ -10,7 +10,7 @@ import (
 func TestFlushAllPages(t *testing.T) {
 	t.Run("ダーティーページがディスクに書き出されクリーンになる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.PageSize * 2)
+		bp := NewPool(page.Size * 2)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
@@ -32,7 +32,7 @@ func TestFlushAllPages(t *testing.T) {
 
 	t.Run("フラッシュ後にフラッシュリストがクリアされる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.PageSize * 2)
+		bp := NewPool(page.Size * 2)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
@@ -51,7 +51,7 @@ func TestFlushAllPages(t *testing.T) {
 
 	t.Run("フラッシュ後にデータがディスクに永続化されている", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.PageSize) // MaxNumOfPage=1
+		bp := NewPool(page.Size) // MaxNumOfPage=1
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
@@ -76,7 +76,7 @@ func TestFlushAllPages(t *testing.T) {
 
 	t.Run("ダーティーページがない場合もエラーにならない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.PageSize * 2)
+		bp := NewPool(page.Size * 2)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 
@@ -91,7 +91,7 @@ func TestFlushAllPages(t *testing.T) {
 func TestFlushOldestPages(t *testing.T) {
 	t.Run("指定した件数のダーティーページをフラッシュする", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.PageSize * 3)
+		bp := NewPool(page.Size * 3)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		id0 := page.NewId(0, 0)
@@ -115,7 +115,7 @@ func TestFlushOldestPages(t *testing.T) {
 
 	t.Run("フラッシュリストが空の場合何もしない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.PageSize * 2)
+		bp := NewPool(page.Size * 2)
 
 		// WHEN
 		err := bp.FlushOldestPages(10)
@@ -126,7 +126,7 @@ func TestFlushOldestPages(t *testing.T) {
 
 	t.Run("フラッシュしたページがクリーンになる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.PageSize * 2)
+		bp := NewPool(page.Size * 2)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
@@ -149,7 +149,7 @@ func TestFlushOldestPages(t *testing.T) {
 func TestFlushListPageCount(t *testing.T) {
 	t.Run("ダーティーページの数を返す", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.PageSize * 3)
+		bp := NewPool(page.Size * 3)
 		_, err := bp.AddPage(page.NewId(0, 0))
 		assert.NoError(t, err)
 		_, err = bp.AddPage(page.NewId(0, 1))
@@ -168,7 +168,7 @@ func TestFlushListPageCount(t *testing.T) {
 
 	t.Run("ダーティーページがない場合 0 を返す", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.PageSize)
+		bp := NewPool(page.Size)
 
 		// WHEN
 		size := bp.FlushListPageCount()
@@ -181,7 +181,7 @@ func TestFlushListPageCount(t *testing.T) {
 func TestForEachDirtyPage(t *testing.T) {
 	t.Run("ダーティーページごとにコールバックが実行される", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.PageSize * 3)
+		bp := NewPool(page.Size * 3)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		id0 := page.NewId(0, 0)
@@ -205,7 +205,7 @@ func TestForEachDirtyPage(t *testing.T) {
 
 	t.Run("フラッシュリストが空の場合コールバックが呼ばれない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.PageSize * 2)
+		bp := NewPool(page.Size * 2)
 
 		// WHEN
 		called := false
@@ -219,7 +219,7 @@ func TestForEachDirtyPage(t *testing.T) {
 
 	t.Run("コールバック内でページの Header を読み取れる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.PageSize * 2)
+		bp := NewPool(page.Size * 2)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)

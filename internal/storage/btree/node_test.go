@@ -10,8 +10,8 @@ import (
 func TestNodeType(t *testing.T) {
 	t.Run("リーフノードのタイプを取得できる", func(t *testing.T) {
 		// GIVEN
-		data := make([]byte, page.PageSize)
-		copy(data[page.PageHeaderSize:page.PageHeaderSize+8], nodeTypeLeaf)
+		data := make([]byte, page.Size)
+		copy(data[page.HeaderSize:page.HeaderSize+8], nodeTypeLeaf)
 		pg, _ := page.NewPage(data)
 
 		// WHEN
@@ -23,8 +23,8 @@ func TestNodeType(t *testing.T) {
 
 	t.Run("ブランチノードのタイプを取得できる", func(t *testing.T) {
 		// GIVEN
-		data := make([]byte, page.PageSize)
-		copy(data[page.PageHeaderSize:page.PageHeaderSize+8], nodeTypeBranch)
+		data := make([]byte, page.Size)
+		copy(data[page.HeaderSize:page.HeaderSize+8], nodeTypeBranch)
 		pg, _ := page.NewPage(data)
 
 		// WHEN

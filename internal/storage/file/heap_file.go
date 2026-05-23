@@ -33,7 +33,7 @@ func NewHeapFile(fileId page.FileId, path string) (*HeapFile, error) {
 	return &HeapFile{
 		fileId:     fileId,
 		file:       file,
-		nextPageId: page.NewId(fileId, page.PageNumber(fileInfo.Size()/page.PageSize)),
+		nextPageId: page.NewId(fileId, page.PageNumber(fileInfo.Size()/page.Size)),
 	}, nil
 }
 
@@ -75,7 +75,7 @@ func (hf *HeapFile) Write(pageNumber page.PageNumber, data []byte) error {
 	if err != nil {
 		return err
 	}
-	if n != page.PageSize {
+	if n != page.Size {
 		return io.ErrShortWrite
 	}
 	return nil
@@ -93,7 +93,7 @@ func (hf *HeapFile) Close() error {
 
 // seek は PageNumber で指定されたページの先頭にシークする
 func (hf *HeapFile) seek(pageNumber page.PageNumber) error {
-	offset := int64(page.PageSize) * int64(pageNumber)
+	offset := int64(page.Size) * int64(pageNumber)
 	_, err := hf.file.Seek(offset, io.SeekStart)
 	return err
 }

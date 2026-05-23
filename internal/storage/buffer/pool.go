@@ -20,10 +20,10 @@ type Pool struct {
 
 func NewPool(size int) *Pool {
 	var maxNumOfPage int
-	if size <= page.PageSize {
+	if size <= page.Size {
 		maxNumOfPage = 1
 	} else {
-		maxNumOfPage = (size / page.PageSize) + 1
+		maxNumOfPage = (size / page.Size) + 1
 	}
 	return &Pool{
 		files:     make(map[page.FileId]*file.HeapFile),

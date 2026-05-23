@@ -23,7 +23,7 @@ func TestRecordSerialize(t *testing.T) {
 		buf := r.Serialize()
 
 		// THEN
-		assert.Equal(t, recordHeaderSize+page.PageSize, len(buf))
+		assert.Equal(t, recordHeaderSize+page.Size, len(buf))
 	})
 
 	t.Run("COMMIT レコードをシリアライズできる", func(t *testing.T) {
@@ -177,7 +177,7 @@ func TestDeserializeRecord(t *testing.T) {
 // buildTestPage はテスト用の 4KB ページを作成する
 func buildTestPage(t *testing.T) *page.Page {
 	t.Helper()
-	data := make([]byte, page.PageSize)
+	data := make([]byte, page.Size)
 	// テストデータを書き込み
 	for i := range data {
 		data[i] = byte(i % 256)

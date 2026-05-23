@@ -80,7 +80,7 @@ func TestSearchModeKeyChildPageId(t *testing.T) {
 
 // newSearchModeKeyTestLeafNode はテスト用の初期化済み LeafNode を作成する
 func newSearchModeKeyTestLeafNode() *leafNode {
-	data := make([]byte, page.PageSize)
+	data := make([]byte, page.Size)
 	pg, err := page.NewPage(data)
 	if err != nil {
 		panic(err)
@@ -92,7 +92,7 @@ func newSearchModeKeyTestLeafNode() *leafNode {
 
 // newSearchModeKeyTestBranchNode はテスト用の初期化済み BranchNode を作成する
 func newSearchModeKeyTestBranchNode() *branchNode {
-	data := make([]byte, page.PageSize)
+	data := make([]byte, page.Size)
 	pg, err := page.NewPage(data)
 	if err != nil {
 		panic(err)

@@ -190,7 +190,7 @@ func TestApplyRedoLog(t *testing.T) {
 		pgId := page.NewId(env.undoFileId, 0)
 		writePage, err := env.bp.PageForWrite(pgId)
 		assert.NoError(t, err)
-		originalData := make([]byte, page.PageSize)
+		originalData := make([]byte, page.Size)
 		copy(originalData, writePage.Page.ToBytes())
 
 		// Redo レコードの LSN=1、Page LSN=10 → スキップされるはず
@@ -200,8 +200,8 @@ func TestApplyRedoLog(t *testing.T) {
 		writePage.Page.Header[3] = 10 // Page LSN = 10
 
 		// LSN=1 のページ変更レコードを Redo ログに記録
-		newPageData := make([]byte, page.PageSize)
-		newPageData[page.PageHeaderSize] = 0xFF // body の先頭を変える
+		newPageData := make([]byte, page.Size)
+		newPageData[page.HeaderSize] = 0xFF // body の先頭を変える
 		newPage, _ := page.NewPage(newPageData)
 		env.redoLog.AppendPageCopy(lock.TrxId(1), pgId, *newPage)
 		_ = env.redoLog.Flush()

@@ -78,7 +78,7 @@ func TestInsertLeaf(t *testing.T) {
 // setupBtreeBufferPool はテスト用のバッファプールを作成する
 func setupBtreeBufferPool(t *testing.T) *buffer.Pool {
 	t.Helper()
-	bp := buffer.NewPool(page.PageSize * 20)
+	bp := buffer.NewPool(page.Size * 20)
 	path := filepath.Join(t.TempDir(), "test.db")
 	hf, err := file.NewHeapFile(0, path)
 	assert.NoError(t, err)

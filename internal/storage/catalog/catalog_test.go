@@ -14,7 +14,7 @@ import (
 func TestNewCatalog(t *testing.T) {
 	t.Run("HeapFile が未登録の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		bp := buffer.NewPool(page.PageSize * 20)
+		bp := buffer.NewPool(page.Size * 20)
 
 		// WHEN
 		_, err := NewCatalog(bp)
@@ -82,7 +82,7 @@ func TestNewCatalog(t *testing.T) {
 func TestCreateCatalog(t *testing.T) {
 	t.Run("HeapFile が未登録の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		bp := buffer.NewPool(page.PageSize * 20)
+		bp := buffer.NewPool(page.Size * 20)
 
 		// WHEN
 		_, err := CreateCatalog(bp)
@@ -227,7 +227,7 @@ func setupCatalogTestBufferPool(t *testing.T) *buffer.Pool {
 		t.Fatalf("HeapFile の作成に失敗: %v", err)
 	}
 	t.Cleanup(func() { _ = hf.Close() })
-	bp := buffer.NewPool(page.PageSize * 20)
+	bp := buffer.NewPool(page.Size * 20)
 	bp.RegisterHeapFile(fileId, hf)
 	return bp
 }

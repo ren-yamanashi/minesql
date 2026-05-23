@@ -239,7 +239,7 @@ func TestPageCleanerShouldFlush(t *testing.T) {
 // buildRedoTestPage はテスト用の page.Page を作成する
 func buildRedoTestPage(t *testing.T) *page.Page {
 	t.Helper()
-	data := make([]byte, page.PageSize)
+	data := make([]byte, page.Size)
 	for i := range data {
 		data[i] = byte(i % 256)
 	}
