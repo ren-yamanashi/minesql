@@ -81,6 +81,20 @@ func TestManagerLock(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("Exclusive 保持中に Shared を要求してもロックがダウングレードされない", func(t *testing.T) {
+		// GIVEN
+		m := newManagerWithShortTimeout()
+		pos := testPos(1, 0)
+		_ = m.Lock(1, pos, Exclusive)
+		_ = m.Lock(1, pos, Shared)
+
+		// WHEN
+		err := m.Lock(2, pos, Shared)
+
+		// THEN
+		assert.ErrorIs(t, err, ErrTimeout)
+	})
+
 	t.Run("異なるトランザクションが同一レコードに Shared ロックを取得できる", func(t *testing.T) {
 		// GIVEN
 		m := NewManager()
