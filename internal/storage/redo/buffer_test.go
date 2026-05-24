@@ -11,10 +11,10 @@ import (
 func TestNewBuffer(t *testing.T) {
 	t.Run("Buffer を作成できる", func(t *testing.T) {
 		// GIVEN
-		setupRedoTestDir(t)
+		dir := t.TempDir()
 
 		// WHEN
-		buf, err := NewBuffer()
+		buf, err := NewBuffer(dir)
 
 		// THEN
 		assert.NoError(t, err)
@@ -27,29 +27,31 @@ func TestNewBuffer(t *testing.T) {
 		buf := setupTestBuffer(t)
 
 		// WHEN
-		lsn := buf.AppendCommit(lock.TrxId(1))
+		lsn, err := buf.AppendCommit(lock.TrxId(1))
 
 		// THEN
+		assert.NoError(t, err)
 		assert.Equal(t, Lsn(1), lsn)
 	})
 
 	t.Run("フラッシュ済みレコードがある場合はその次から採番される", func(t *testing.T) {
 		// GIVEN
-		setupRedoTestDir(t)
-		buf1, err := NewBuffer()
+		dir := t.TempDir()
+		buf1, err := NewBuffer(dir)
 		assert.NoError(t, err)
-		buf1.AppendCommit(lock.TrxId(1)) // LSN=1
-		buf1.AppendCommit(lock.TrxId(2)) // LSN=2
+		_, _ = buf1.AppendCommit(lock.TrxId(1)) // LSN=1
+		_, _ = buf1.AppendCommit(lock.TrxId(2)) // LSN=2
 		_ = buf1.Flush()
 		_ = buf1.Close()
 
 		// WHEN
-		buf2, err := NewBuffer()
+		buf2, err := NewBuffer(dir)
 		assert.NoError(t, err)
 		t.Cleanup(func() { _ = buf2.Close() })
-		lsn := buf2.AppendCommit(lock.TrxId(3))
+		lsn, err := buf2.AppendCommit(lock.TrxId(3))
 
 		// THEN
+		assert.NoError(t, err)
 		assert.Equal(t, Lsn(3), lsn)
 	})
 }
@@ -61,9 +63,10 @@ func TestBufferAppendPageCopy(t *testing.T) {
 		pg := buildTestPage(t)
 
 		// WHEN
-		lsn := buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), *pg)
+		lsn, err := buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), *pg)
 
 		// THEN
+		assert.NoError(t, err)
 		assert.Equal(t, Lsn(1), lsn)
 	})
 
@@ -73,8 +76,10 @@ func TestBufferAppendPageCopy(t *testing.T) {
 		pg := buildTestPage(t)
 
 		// WHEN
-		lsn1 := buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), *pg)
-		lsn2 := buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 2), *pg)
+		lsn1, err := buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), *pg)
+		assert.NoError(t, err)
+		lsn2, err := buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 2), *pg)
+		assert.NoError(t, err)
 
 		// THEN
 		assert.Equal(t, Lsn(1), lsn1)
@@ -88,9 +93,10 @@ func TestBufferAppendCommit(t *testing.T) {
 		buf := setupTestBuffer(t)
 
 		// WHEN
-		lsn := buf.AppendCommit(lock.TrxId(1))
+		lsn, err := buf.AppendCommit(lock.TrxId(1))
 
 		// THEN
+		assert.NoError(t, err)
 		assert.Equal(t, Lsn(1), lsn)
 	})
 }
@@ -101,9 +107,10 @@ func TestBufferAppendRollback(t *testing.T) {
 		buf := setupTestBuffer(t)
 
 		// WHEN
-		lsn := buf.AppendRollback(lock.TrxId(1))
+		lsn, err := buf.AppendRollback(lock.TrxId(1))
 
 		// THEN
+		assert.NoError(t, err)
 		assert.Equal(t, Lsn(1), lsn)
 	})
 }
@@ -113,8 +120,8 @@ func TestBufferReadFrom(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
 		pg := buildTestPage(t)
-		buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), *pg)
-		buf.AppendCommit(lock.TrxId(1))
+		_, _ = buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), *pg)
+		_, _ = buf.AppendCommit(lock.TrxId(1))
 		_ = buf.Flush()
 
 		// WHEN
@@ -130,9 +137,9 @@ func TestBufferReadFrom(t *testing.T) {
 	t.Run("指定 LSN より大きいレコードだけ返す", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
-		buf.AppendCommit(lock.TrxId(1)) // LSN=1
-		buf.AppendCommit(lock.TrxId(2)) // LSN=2
-		buf.AppendCommit(lock.TrxId(3)) // LSN=3
+		_, _ = buf.AppendCommit(lock.TrxId(1)) // LSN=1
+		_, _ = buf.AppendCommit(lock.TrxId(2)) // LSN=2
+		_, _ = buf.AppendCommit(lock.TrxId(3)) // LSN=3
 		_ = buf.Flush()
 
 		// WHEN
@@ -148,7 +155,7 @@ func TestBufferReadFrom(t *testing.T) {
 	t.Run("全レコードが指定 LSN 以下の場合 空を返す", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
-		buf.AppendCommit(lock.TrxId(1)) // LSN=1
+		_, _ = buf.AppendCommit(lock.TrxId(1)) // LSN=1
 		_ = buf.Flush()
 
 		// WHEN
@@ -175,14 +182,14 @@ func TestBufferSetCheckpointLsn(t *testing.T) {
 
 	t.Run("更新した値がファイルに永続化される", func(t *testing.T) {
 		// GIVEN
-		setupRedoTestDir(t)
-		buf1, err := NewBuffer()
+		dir := t.TempDir()
+		buf1, err := NewBuffer(dir)
 		assert.NoError(t, err)
 		_ = buf1.SetCheckpointLsn(Lsn(20))
 		_ = buf1.Close()
 
 		// WHEN
-		buf2, err := NewBuffer()
+		buf2, err := NewBuffer(dir)
 		assert.NoError(t, err)
 		t.Cleanup(func() { _ = buf2.Close() })
 
@@ -219,8 +226,8 @@ func TestBufferFlushedLsn(t *testing.T) {
 	t.Run("フラッシュ後は最後のレコードの LSN を返す", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
-		buf.AppendCommit(lock.TrxId(1)) // LSN=1
-		buf.AppendCommit(lock.TrxId(2)) // LSN=2
+		_, _ = buf.AppendCommit(lock.TrxId(1)) // LSN=1
+		_, _ = buf.AppendCommit(lock.TrxId(2)) // LSN=2
 		_ = buf.Flush()
 
 		// WHEN
@@ -235,7 +242,7 @@ func TestBufferFlush(t *testing.T) {
 	t.Run("バッファのレコードをディスクに書き込む", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
-		buf.AppendCommit(lock.TrxId(1))
+		_, _ = buf.AppendCommit(lock.TrxId(1))
 
 		// WHEN
 		err := buf.Flush()
@@ -259,21 +266,22 @@ func TestBufferFlush(t *testing.T) {
 	t.Run("フラッシュ後にバッファが空になる", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
-		buf.AppendCommit(lock.TrxId(1))
+		_, _ = buf.AppendCommit(lock.TrxId(1))
 
 		// WHEN
 		_ = buf.Flush()
 
 		// THEN
 		assert.Empty(t, buf.records)
+		assert.Equal(t, 0, buf.pendingSize)
 	})
 
 	t.Run("フラッシュしたレコードが ReadFrom で読み取れる", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
 		pg := buildTestPage(t)
-		buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), *pg)
-		buf.AppendCommit(lock.TrxId(1))
+		_, _ = buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), *pg)
+		_, _ = buf.AppendCommit(lock.TrxId(1))
 
 		// WHEN
 		_ = buf.Flush()
@@ -291,7 +299,7 @@ func TestBufferClear(t *testing.T) {
 	t.Run("クリア後にレコードが空になる", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
-		buf.AppendCommit(lock.TrxId(1))
+		_, _ = buf.AppendCommit(lock.TrxId(1))
 		_ = buf.Flush()
 
 		// WHEN
@@ -307,7 +315,7 @@ func TestBufferClear(t *testing.T) {
 	t.Run("クリア後に FlushedLsn が 0 になる", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
-		buf.AppendCommit(lock.TrxId(1))
+		_, _ = buf.AppendCommit(lock.TrxId(1))
 		_ = buf.Flush()
 
 		// WHEN
@@ -321,8 +329,8 @@ func TestBufferClear(t *testing.T) {
 func TestBufferClose(t *testing.T) {
 	t.Run("Close 後にファイルが閉じられる", func(t *testing.T) {
 		// GIVEN
-		setupRedoTestDir(t)
-		buf, err := NewBuffer()
+		dir := t.TempDir()
+		buf, err := NewBuffer(dir)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -337,9 +345,9 @@ func TestBufferTruncateBefore(t *testing.T) {
 	t.Run("指定 LSN 以前のレコードが削除される", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
-		buf.AppendCommit(lock.TrxId(1)) // LSN=1
-		buf.AppendCommit(lock.TrxId(2)) // LSN=2
-		buf.AppendCommit(lock.TrxId(3)) // LSN=3
+		_, _ = buf.AppendCommit(lock.TrxId(1)) // LSN=1
+		_, _ = buf.AppendCommit(lock.TrxId(2)) // LSN=2
+		_, _ = buf.AppendCommit(lock.TrxId(3)) // LSN=3
 		_ = buf.Flush()
 
 		// WHEN
@@ -356,8 +364,8 @@ func TestBufferTruncateBefore(t *testing.T) {
 	t.Run("全レコードの LSN 以上を指定すると全て削除される", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
-		buf.AppendCommit(lock.TrxId(1)) // LSN=1
-		buf.AppendCommit(lock.TrxId(2)) // LSN=2
+		_, _ = buf.AppendCommit(lock.TrxId(1)) // LSN=1
+		_, _ = buf.AppendCommit(lock.TrxId(2)) // LSN=2
 		_ = buf.Flush()
 
 		// WHEN
@@ -387,7 +395,7 @@ func TestBufferSize(t *testing.T) {
 	t.Run("COMMIT レコード追加後はバッファサイズが加算される", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
-		buf.AppendCommit(lock.TrxId(1))
+		_, _ = buf.AppendCommit(lock.TrxId(1))
 
 		// WHEN
 		size, err := buf.Size()
@@ -401,7 +409,7 @@ func TestBufferSize(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
 		pg := buildTestPage(t)
-		buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), *pg)
+		_, _ = buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), *pg)
 
 		// WHEN
 		size, err := buf.Size()
@@ -414,7 +422,7 @@ func TestBufferSize(t *testing.T) {
 	t.Run("フラッシュ後はファイルサイズのみ返す", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
-		buf.AppendCommit(lock.TrxId(1))
+		_, _ = buf.AppendCommit(lock.TrxId(1))
 		_ = buf.Flush()
 
 		// WHEN
@@ -428,9 +436,9 @@ func TestBufferSize(t *testing.T) {
 	t.Run("バッファとファイル両方にレコードがある場合は合算される", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
-		buf.AppendCommit(lock.TrxId(1)) // LSN=1 → バッファ → フラッシュ
+		_, _ = buf.AppendCommit(lock.TrxId(1)) // LSN=1 → バッファ → フラッシュ
 		_ = buf.Flush()
-		buf.AppendCommit(lock.TrxId(2)) // LSN=2 → バッファに残る
+		_, _ = buf.AppendCommit(lock.TrxId(2)) // LSN=2 → バッファに残る
 
 		// WHEN
 		size, err := buf.Size()
@@ -446,8 +454,8 @@ func TestBufferSize(t *testing.T) {
 // setupTestBuffer はテスト用の Buffer を作成する
 func setupTestBuffer(t *testing.T) *Buffer {
 	t.Helper()
-	setupRedoTestDir(t)
-	buf, err := NewBuffer()
+	dir := t.TempDir()
+	buf, err := NewBuffer(dir)
 	if err != nil {
 		t.Fatalf("Buffer の作成に失敗: %v", err)
 	}

@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	Size       = 4096
+	Size       = 4 * 1024 // 4KB
 	HeaderSize = 4
 )
 
@@ -52,6 +52,11 @@ func Copy(pg Page) Page {
 		panic(fmt.Sprintf("page: Copy failed: %v", err))
 	}
 	return *p
+}
+
+// IsZero は Page がゼロ値かどうかを判定する
+func (p *Page) IsZero() bool {
+	return p.data == nil
 }
 
 // CheckPageSize は data が 4KB であるかを確認する

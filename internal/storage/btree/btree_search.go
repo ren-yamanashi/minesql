@@ -106,7 +106,7 @@ func (t *Tree) leafPageIds() ([]page.Id, error) {
 	// 幅優先でブランチレベルを 1 つずつ降りていく
 	currentLevel := []page.Id{rootPageId}
 	for range height - 1 {
-		nextLevel := []page.Id{}
+		var nextLevel []page.Id
 		for _, nodePageId := range currentLevel {
 			pg, err := t.bufferPool.PageForRead(nodePageId)
 			if err != nil {

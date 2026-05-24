@@ -9,11 +9,11 @@ import (
 	"path/filepath"
 
 	"github.com/ncw/directio"
-	"github.com/ren-yamanashi/minesql/internal/storage/config"
 )
 
 const (
 	filename                      = "redo.log"
+	tmpFilename                   = "redo.log.tmp"
 	fileHeaderFlushedLsnOffset    = 0
 	fileHeaderCheckpointLsnOffset = 4
 	fileHeaderReservedAreaOffset  = 8
@@ -22,13 +22,14 @@ const (
 
 type file struct {
 	osFile        *os.File // Redo ログファイルのファイルディスクリプタ
+	filePath      string   // Redo ログファイルのパス
 	flushedLsn    Lsn      // ディスクにフラッシュ済みの最大 LSN
 	checkpointLsn Lsn      // チェックポイント LSN (この LSN 以前の Redo レコードは不要)
 }
 
 // newFile は redo.log ファイルを開く (存在しない場合は新規作成する)
-func newFile() (*file, error) {
-	filePath := filepath.Join(config.BaseDir, filename)
+func newFile(baseDir string) (*file, error) {
+	filePath := filepath.Join(baseDir, filename)
 	// read-write モードで開き、存在しない場合は作成する
 	// (os.O_DIRECT は directio.OpenFile 内で設定される)
 	osFile, err := directio.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0666)
@@ -36,7 +37,7 @@ func newFile() (*file, error) {
 		return nil, fmt.Errorf("redo: failed to open log file: %w", err)
 	}
 
-	f := &file{osFile: osFile}
+	f := &file{osFile: osFile, filePath: filePath}
 
 	// ファイルヘッダーから FlushedLSN と CheckpointLSN を読み取る
 	stat, err := osFile.Stat()
@@ -79,12 +80,19 @@ func (f *file) readRecords(lsn Lsn) ([]Record, error) {
 		return nil, err
 	}
 
-	records := []Record{}
+	var records []Record
 	offset := 0
 	for offset < len(body) {
 		record, readBytesNum, err := DeserializeRecord(body[offset:])
 		if err != nil {
-			break // 末尾の不完全レコードはクラッシュ時に発生しうるため無視する
+			// 末尾の不完全レコードとデータ破損を区別する
+			remaining := len(body) - offset
+			if remaining >= recordHeaderSize {
+				return nil, fmt.Errorf("redo: corrupted record at offset %d: %w", offset, err)
+			}
+			// ヘッダーサイズ未満の残りデータは、Write 途中のクラッシュで書きかけになったレコード
+			// リカバリ時にこのデータは上書きされるため、無視して問題ない
+			break
 		}
 		offset += readBytesNum
 		if record.lsn <= lsn {
@@ -101,29 +109,48 @@ func (f *file) flushRecords(records []Record) error {
 		return nil
 	}
 
+	// 書き込み前のファイルサイズを記録 (部分書き込み時のロールバック用)
+	originalSize, err := f.size()
+	if err != nil {
+		return err
+	}
+
 	if _, err := f.osFile.Seek(0, io.SeekEnd); err != nil {
 		return err
 	}
 
 	for _, record := range records {
 		if _, err := f.osFile.Write(record.Serialize()); err != nil {
+			// 部分書き込みをロールバック
+			_ = f.osFile.Truncate(originalSize)
 			return err
 		}
 	}
 
 	if err := f.osFile.Sync(); err != nil {
+		_ = f.osFile.Truncate(originalSize)
 		return err
 	}
 
 	// Flushed LSN を更新してヘッダーに書き込み
+	prevFlushedLsn := f.flushedLsn
 	f.flushedLsn = records[len(records)-1].lsn
-	return f.writeHeader()
+	if err := f.writeHeader(); err != nil {
+		f.flushedLsn = prevFlushedLsn
+		return err
+	}
+	return nil
 }
 
 // setCheckpointLsn はチェックポイント LSN を更新し、ヘッダーに書き込む
 func (f *file) setCheckpointLsn(lsn Lsn) error {
+	prev := f.checkpointLsn
 	f.checkpointLsn = lsn
-	return f.writeHeader()
+	if err := f.writeHeader(); err != nil {
+		f.checkpointLsn = prev
+		return err
+	}
+	return nil
 }
 
 // truncateBefore は指定 LSN 以前のレコードをファイルから切り詰める
@@ -133,34 +160,71 @@ func (f *file) truncateBefore(lsn Lsn) error {
 		return err
 	}
 
-	// ファイルをヘッダーだけの状態にする
-	if err := f.osFile.Truncate(fileHeaderSize); err != nil {
-		return err
-	}
-	if _, err := f.osFile.Seek(fileHeaderSize, io.SeekStart); err != nil {
-		return err
-	}
-
-	// 指定 LSN より大きいレコードだけ書き直す
+	// 残すべきレコードと最終 LSN を決定
 	var lastLsn Lsn
+	var remaining []Record
 	for _, rec := range records {
 		if rec.lsn <= lsn {
 			continue
 		}
-		if _, err := f.osFile.Write(rec.Serialize()); err != nil {
-			return err
-		}
+		remaining = append(remaining, rec)
 		lastLsn = rec.lsn
 	}
 
-	if err := f.osFile.Sync(); err != nil {
+	// 一時ファイルにヘッダー + 残レコードを書き込む
+	tmpPath := filepath.Join(filepath.Dir(f.filePath), tmpFilename)
+	if err := f.writeTmpFile(tmpPath, max(lastLsn, lsn), remaining); err != nil {
+		_ = os.Remove(tmpPath)
 		return err
 	}
 
-	// flushedLsn を更新してヘッダーに書き込む
-	// 全レコードが切り詰められた場合でも、指定 LSN までは処理済みなので lsn を下限とする
+	// 現在のファイルを閉じて置換
+	// 原子性を確保するため、一時ファイルに書き出してから置換する
+	if err := f.osFile.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := os.Rename(tmpPath, f.filePath); err != nil {
+		// 置換失敗時: 元ファイルを再オープン
+		f.osFile, _ = directio.OpenFile(f.filePath, os.O_RDWR, 0666)
+		_ = os.Remove(tmpPath)
+		return err
+	}
+
+	// 新しいファイルを開き直す
+	osFile, err := directio.OpenFile(f.filePath, os.O_RDWR, 0666)
+	if err != nil {
+		return fmt.Errorf("redo: failed to reopen log file after truncate: %w", err)
+	}
+	f.osFile = osFile
 	f.flushedLsn = max(lastLsn, lsn)
-	return f.writeHeader()
+	return nil
+}
+
+// writeTmpFile は一時ファイルにヘッダーとレコードを書き込む
+func (f *file) writeTmpFile(tmpPath string, flushedLsn Lsn, records []Record) error {
+	tmpFile, err := os.Create(tmpPath)
+	if err != nil {
+		return err
+	}
+	defer tmpFile.Close()
+
+	// ヘッダーを書き込み
+	header := make([]byte, fileHeaderSize)
+	binary.BigEndian.PutUint32(header[fileHeaderFlushedLsnOffset:fileHeaderCheckpointLsnOffset], uint32(flushedLsn))
+	binary.BigEndian.PutUint32(header[fileHeaderCheckpointLsnOffset:fileHeaderReservedAreaOffset], uint32(f.checkpointLsn))
+	if _, err := tmpFile.Write(header); err != nil {
+		return err
+	}
+
+	// レコードを書き込み
+	for _, rec := range records {
+		if _, err := tmpFile.Write(rec.Serialize()); err != nil {
+			return err
+		}
+	}
+
+	return tmpFile.Sync()
 }
 
 // clear は Redo ログファイルをクリアする

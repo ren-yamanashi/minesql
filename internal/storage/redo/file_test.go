@@ -1,10 +1,8 @@
 package redo
 
 import (
-	"os"
 	"testing"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -12,10 +10,10 @@ import (
 func TestNewFile(t *testing.T) {
 	t.Run("新規ファイルを作成できる", func(t *testing.T) {
 		// GIVEN
-		setupRedoTestDir(t)
+		dir := t.TempDir()
 
 		// WHEN
-		f, err := newFile()
+		f, err := newFile(dir)
 
 		// THEN
 		assert.NoError(t, err)
@@ -27,8 +25,8 @@ func TestNewFile(t *testing.T) {
 
 	t.Run("既存ファイルを開くとヘッダーが読み取られる", func(t *testing.T) {
 		// GIVEN
-		setupRedoTestDir(t)
-		f1, err := newFile()
+		dir := t.TempDir()
+		f1, err := newFile(dir)
 		assert.NoError(t, err)
 		pg := buildTestPage(t)
 		records := []Record{{lsn: Lsn(5), trxId: 1, recordType: RecordTypePageWrite, pageId: page.NewId(1, 1), data: *pg}}
@@ -37,7 +35,7 @@ func TestNewFile(t *testing.T) {
 		_ = f1.close()
 
 		// WHEN
-		f2, err := newFile()
+		f2, err := newFile(dir)
 
 		// THEN
 		assert.NoError(t, err)
@@ -47,15 +45,15 @@ func TestNewFile(t *testing.T) {
 
 	t.Run("既存ファイルから checkpointLsn も復元される", func(t *testing.T) {
 		// GIVEN
-		setupRedoTestDir(t)
-		f1, err := newFile()
+		dir := t.TempDir()
+		f1, err := newFile(dir)
 		assert.NoError(t, err)
 		err = f1.setCheckpointLsn(Lsn(10))
 		assert.NoError(t, err)
 		_ = f1.close()
 
 		// WHEN
-		f2, err := newFile()
+		f2, err := newFile(dir)
 
 		// THEN
 		assert.NoError(t, err)
@@ -117,7 +115,7 @@ func TestFileReadRecords(t *testing.T) {
 		assert.Empty(t, result)
 	})
 
-	t.Run("全レコードが指定 LSN 以下の場合。空を返す", func(t *testing.T) {
+	t.Run("全レコードが指定 LSN 以下の場合 空を返す", func(t *testing.T) {
 		// GIVEN
 		f := setupTestFile(t)
 		records := []Record{
@@ -221,15 +219,15 @@ func TestFileSetCheckpointLsn(t *testing.T) {
 
 	t.Run("更新した checkpointLsn がヘッダーに永続化される", func(t *testing.T) {
 		// GIVEN
-		setupRedoTestDir(t)
-		f1, err := newFile()
+		dir := t.TempDir()
+		f1, err := newFile(dir)
 		assert.NoError(t, err)
 		err = f1.setCheckpointLsn(Lsn(15))
 		assert.NoError(t, err)
 		_ = f1.close()
 
 		// WHEN
-		f2, err := newFile()
+		f2, err := newFile(dir)
 
 		// THEN
 		assert.NoError(t, err)
@@ -367,8 +365,8 @@ func TestFileClear(t *testing.T) {
 func TestFileClose(t *testing.T) {
 	t.Run("ファイルを閉じることができる", func(t *testing.T) {
 		// GIVEN
-		setupRedoTestDir(t)
-		f, err := newFile()
+		dir := t.TempDir()
+		f, err := newFile(dir)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -412,8 +410,8 @@ func TestFileSize(t *testing.T) {
 func TestFileWriteHeader(t *testing.T) {
 	t.Run("flushedLsn と checkpointLsn がヘッダーに書き込まれる", func(t *testing.T) {
 		// GIVEN
-		setupRedoTestDir(t)
-		f1, err := newFile()
+		dir := t.TempDir()
+		f1, err := newFile(dir)
 		assert.NoError(t, err)
 		f1.flushedLsn = Lsn(100)
 		f1.checkpointLsn = Lsn(50)
@@ -422,7 +420,7 @@ func TestFileWriteHeader(t *testing.T) {
 		_ = f1.close()
 
 		// WHEN
-		f2, err := newFile()
+		f2, err := newFile(dir)
 
 		// THEN
 		assert.NoError(t, err)
@@ -432,20 +430,11 @@ func TestFileWriteHeader(t *testing.T) {
 	})
 }
 
-// setupRedoTestDir は config.BaseDir ディレクトリを作成し、テスト終了時にディレクトリごと削除する
-func setupRedoTestDir(t *testing.T) {
-	t.Helper()
-	_ = os.MkdirAll(config.BaseDir, 0o750)
-	t.Cleanup(func() {
-		_ = os.RemoveAll(config.BaseDir)
-	})
-}
-
 // setupTestFile はテスト用の File を作成する
 func setupTestFile(t *testing.T) *file {
 	t.Helper()
-	setupRedoTestDir(t)
-	f, err := newFile()
+	dir := t.TempDir()
+	f, err := newFile(dir)
 	if err != nil {
 		t.Fatalf("File の作成に失敗: %v", err)
 	}

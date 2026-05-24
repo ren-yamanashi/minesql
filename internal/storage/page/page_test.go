@@ -216,6 +216,31 @@ func TestCopy(t *testing.T) {
 	})
 }
 
+func TestIsZero(t *testing.T) {
+	t.Run("ゼロ値の Page は true を返す", func(t *testing.T) {
+		// GIVEN
+		pg := Page{}
+
+		// WHEN
+		result := pg.IsZero()
+
+		// THEN
+		assert.True(t, result)
+	})
+
+	t.Run("NewPage で生成した Page は false を返す", func(t *testing.T) {
+		// GIVEN
+		data := make([]byte, Size)
+		pg, _ := NewPage(data)
+
+		// WHEN
+		result := pg.IsZero()
+
+		// THEN
+		assert.False(t, result)
+	})
+}
+
 func TestCheckPageSize(t *testing.T) {
 	t.Run("PageSize と一致する場合 nil を返す", func(t *testing.T) {
 		// GIVEN

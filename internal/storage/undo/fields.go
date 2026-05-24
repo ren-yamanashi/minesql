@@ -67,7 +67,7 @@ func (f Fields) ToRecord() (Record, error) {
 // Serialize は Undo レコードをバイト列にシリアライズする
 //   - return : prevLastTrxId (4B) + prevRollPtr (6B) + tableFileId (4B) + [numColumns (2B) + [colLen (2B) + colData]]...
 func (f Fields) Serialize() []byte {
-	data := []byte{}
+	var data []byte
 
 	// prevLastTrxId, prevRollPtr, tableFileId
 	data = binary.BigEndian.AppendUint32(data, uint32(f.prevLastTrxId))
@@ -147,7 +147,6 @@ func parseRecordBody(fields Fields, data []byte) (Fields, error) {
 	offset += page.FileIdSize
 
 	// columnSets
-	fields.columnSets = [][][]byte{}
 	remaining := data[offset:]
 	for len(remaining) > 0 {
 		columns, n, err := parseColumnSet(remaining)

@@ -150,6 +150,58 @@ func TestTableUpdate(t *testing.T) {
 		assert.Equal(t, "bob@example.com", emailResult.values[2])
 	})
 
+	t.Run("PK カラムを更新すると論理削除 + 新規挿入で処理される", func(t *testing.T) {
+		// GIVEN
+		table := setupTableWithRecord(t)
+		before := searchFirstPrimaryRecord(t, table)
+
+		// WHEN
+		err := table.Update(before, []string{"id"}, []string{"2"}, tableTrxId)
+
+		// THEN
+		assert.NoError(t, err)
+		// 旧 PK (id=1) は論理削除されているため、先頭レコードは新 PK (id=2)
+		updated := searchFirstPrimaryRecord(t, table)
+		assert.Equal(t, "2", updated.values[0])
+		assert.Equal(t, "Alice", updated.values[1])
+		assert.Equal(t, "alice@example.com", updated.values[2])
+	})
+
+	t.Run("PK カラムを同じ値で更新するとインプレース更新になる", func(t *testing.T) {
+		// GIVEN
+		table := setupTableWithRecord(t)
+		before := searchFirstPrimaryRecord(t, table)
+
+		// WHEN
+		err := table.Update(before, []string{"id", "name"}, []string{"1", "Bob"}, tableTrxId)
+
+		// THEN
+		assert.NoError(t, err)
+		updated := searchFirstPrimaryRecord(t, table)
+		assert.Equal(t, "1", updated.values[0])
+		assert.Equal(t, "Bob", updated.values[1])
+	})
+
+	t.Run("PK 更新時にセカンダリインデックスも更新される", func(t *testing.T) {
+		// GIVEN
+		table := setupTableWithRecord(t)
+		before := searchFirstPrimaryRecord(t, table)
+
+		// WHEN
+		err := table.Update(before, []string{"id"}, []string{"2"}, tableTrxId)
+
+		// THEN
+		assert.NoError(t, err)
+		// idx_name でレコードが見つかる
+		idxName := findSecondaryIndex(t, table, "idx_name")
+		iter, err := idxName.search(SearchModeStart{})
+		assert.NoError(t, err)
+		result, ok, err := iter.Next()
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, "Alice", result.values[1])
+	})
+
 	t.Run("更新後のレコードに rollPtr が設定される", func(t *testing.T) {
 		// GIVEN
 		table := setupTableWithRecord(t)
@@ -163,6 +215,47 @@ func TestTableUpdate(t *testing.T) {
 		updated := searchFirstPrimaryRecord(t, table)
 		// Undo ログが書かれ rollPtr が NullPointer ではなくなる
 		assert.NotEqual(t, undo.NullPointer(), updated.rollPtr)
+	})
+}
+
+func TestTableIsPrimaryKeyChanged(t *testing.T) {
+	t.Run("PK の値が異なる場合は true を返す", func(t *testing.T) {
+		// GIVEN
+		table := setupTableWithRecord(t)
+		before := searchFirstPrimaryRecord(t, table)
+		after, _ := before.update(tableTrxId, []string{"id"}, []string{"2"})
+
+		// WHEN
+		result := table.isPrimaryKeyChanged(before, after)
+
+		// THEN
+		assert.True(t, result)
+	})
+
+	t.Run("PK の値が同じ場合は false を返す", func(t *testing.T) {
+		// GIVEN
+		table := setupTableWithRecord(t)
+		before := searchFirstPrimaryRecord(t, table)
+		after, _ := before.update(tableTrxId, []string{"name"}, []string{"Bob"})
+
+		// WHEN
+		result := table.isPrimaryKeyChanged(before, after)
+
+		// THEN
+		assert.False(t, result)
+	})
+
+	t.Run("PK カラムを同じ値で更新した場合は false を返す", func(t *testing.T) {
+		// GIVEN
+		table := setupTableWithRecord(t)
+		before := searchFirstPrimaryRecord(t, table)
+		after, _ := before.update(tableTrxId, []string{"id"}, []string{"1"})
+
+		// WHEN
+		result := table.isPrimaryKeyChanged(before, after)
+
+		// THEN
+		assert.False(t, result)
 	})
 }
 
