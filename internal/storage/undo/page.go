@@ -87,3 +87,8 @@ func (p *Page) append(record []byte) bool {
 func (p *Page) setNextPageNumber(pn page.PageNumber) {
 	binary.BigEndian.PutUint32(p.header[headerNextPageNumberOffset:pageHeaderSize], uint32(pn))
 }
+
+// setUsedBytes は使用済みバイト数を設定する
+func (p *Page) setUsedBytes(n uint16) {
+	binary.BigEndian.PutUint16(p.header[headerUsedBytesOffset:headerNextPageNumberOffset], n)
+}

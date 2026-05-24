@@ -204,6 +204,31 @@ func TestFileFlushRecords(t *testing.T) {
 	})
 }
 
+func TestFileRollbackTo(t *testing.T) {
+	t.Run("指定サイズにファイルを切り詰めて Sync する", func(t *testing.T) {
+		// GIVEN
+		f := setupTestFile(t)
+		records := []Record{
+			{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit},
+			{lsn: Lsn(2), trxId: 2, recordType: RecordTypeCommit},
+		}
+		err := f.flushRecords(records)
+		assert.NoError(t, err)
+		sizeBefore, err := f.size()
+		assert.NoError(t, err)
+		assert.Greater(t, sizeBefore, int64(fileHeaderSize))
+
+		// WHEN
+		err = f.rollbackTo(fileHeaderSize)
+
+		// THEN
+		assert.NoError(t, err)
+		sizeAfter, err := f.size()
+		assert.NoError(t, err)
+		assert.Equal(t, int64(fileHeaderSize), sizeAfter)
+	})
+}
+
 func TestFileSetCheckpointLsn(t *testing.T) {
 	t.Run("checkpointLsn を更新できる", func(t *testing.T) {
 		// GIVEN

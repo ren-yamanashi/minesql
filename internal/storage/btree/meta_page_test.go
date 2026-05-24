@@ -62,6 +62,21 @@ func TestMetaPageSetRootPageId(t *testing.T) {
 		// THEN
 		assert.Equal(t, page.NewId(2, 20), mp.rootPageId())
 	})
+
+	t.Run("他フィールド (leafPageCount, height) への書き込みと独立に保持される", func(t *testing.T) {
+		// GIVEN
+		mp := newTestMetaPage()
+
+		// WHEN
+		mp.setRootPageId(page.NewId(0xAA, 0xBB))
+		mp.setLeafPageCount(100)
+		mp.setHeight(5)
+
+		// THEN
+		assert.Equal(t, page.NewId(0xAA, 0xBB), mp.rootPageId())
+		assert.Equal(t, uint64(100), mp.leafPageCount())
+		assert.Equal(t, uint64(5), mp.height())
+	})
 }
 
 func TestMetaPageSetLeafPageCount(t *testing.T) {
@@ -88,23 +103,6 @@ func TestMetaPageSetHeight(t *testing.T) {
 		mp.setHeight(5)
 
 		// THEN
-		assert.Equal(t, uint64(5), mp.height())
-	})
-}
-
-func TestMetaPageFieldsAreIndependent(t *testing.T) {
-	t.Run("各フィールドの書き込みが他のフィールドに影響しない", func(t *testing.T) {
-		// GIVEN
-		mp := newTestMetaPage()
-
-		// WHEN
-		mp.setRootPageId(page.NewId(0xAA, 0xBB))
-		mp.setLeafPageCount(100)
-		mp.setHeight(5)
-
-		// THEN
-		assert.Equal(t, page.NewId(0xAA, 0xBB), mp.rootPageId())
-		assert.Equal(t, uint64(100), mp.leafPageCount())
 		assert.Equal(t, uint64(5), mp.height())
 	})
 }

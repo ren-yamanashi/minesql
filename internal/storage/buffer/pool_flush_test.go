@@ -86,6 +86,30 @@ func TestFlushAllPages(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 	})
+
+	t.Run("ディスク I/O 失敗時は isDirty と flushList が更新されない", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size * 2)
+		hf := setupHeapFile(t, 0)
+		bp.RegisterHeapFile(0, hf)
+		pageId := page.NewId(0, 0)
+		_, err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+		_, err = bp.PageForWrite(pageId)
+		assert.NoError(t, err)
+		// 強制的に HeapFile を Close して I/O を失敗させる
+		_ = hf.Close()
+
+		// WHEN
+		err = bp.FlushAllPages()
+
+		// THEN
+		assert.Error(t, err)
+		bufPage, perr := bp.PageForRead(pageId)
+		assert.NoError(t, perr)
+		assert.True(t, bufPage.isDirty, "ディスクへ永続化されていないので isDirty が残るべき")
+		assert.Equal(t, 1, bp.FlushListPageCount(), "再フラッシュ可能なように flushList に残るべき")
+	})
 }
 
 func TestFlushOldestPages(t *testing.T) {
@@ -143,5 +167,29 @@ func TestFlushOldestPages(t *testing.T) {
 		bufPage, err := bp.PageForRead(pageId)
 		assert.NoError(t, err)
 		assert.False(t, bufPage.isDirty)
+	})
+
+	t.Run("ディスク I/O 失敗時は isDirty と flushList が更新されない", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size * 2)
+		hf := setupHeapFile(t, 0)
+		bp.RegisterHeapFile(0, hf)
+		pageId := page.NewId(0, 0)
+		_, err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+		_, err = bp.PageForWrite(pageId)
+		assert.NoError(t, err)
+		// 強制的に HeapFile を Close して I/O を失敗させる
+		_ = hf.Close()
+
+		// WHEN
+		err = bp.FlushOldestPages(1)
+
+		// THEN
+		assert.Error(t, err)
+		bufPage, perr := bp.PageForRead(pageId)
+		assert.NoError(t, perr)
+		assert.True(t, bufPage.isDirty, "ディスクへ永続化されていないので isDirty が残るべき")
+		assert.Equal(t, 1, bp.FlushListPageCount(), "再フラッシュ可能なように flushList に残るべき")
 	})
 }

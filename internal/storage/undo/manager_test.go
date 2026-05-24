@@ -73,6 +73,64 @@ func TestManagerAppend(t *testing.T) {
 		assert.Len(t, mgr.Records(lock.TrxId(1)), 1)
 		assert.Len(t, mgr.Records(lock.TrxId(2)), 1)
 	})
+
+	t.Run("複数 goroutine から Append しても map の同時書き込みが起きない", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		const numGoroutines = 10
+		const appendsPerGoroutine = 20
+
+		// WHEN
+		var wg sync.WaitGroup
+		for g := range numGoroutines {
+			trxId := lock.TrxId(g + 1)
+			wg.Go(func() {
+				for range appendsPerGoroutine {
+					r := NewInsertRecord(page.FileId(1), btree.Record{[]byte("data")})
+					_, err := mgr.Append(trxId, RecordTypeInsert, r)
+					assert.NoError(t, err)
+				}
+			})
+		}
+		wg.Wait()
+
+		// THEN
+		for g := range numGoroutines {
+			records := mgr.Records(lock.TrxId(g + 1))
+			assert.Len(t, records, appendsPerGoroutine)
+		}
+	})
+
+	t.Run("Append と Discard が並行実行されてもデータレースが起きない", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		const numAppenders = 5
+		const numDiscarders = 5
+		const opsPerGoroutine = 20
+
+		// WHEN
+		var wg sync.WaitGroup
+		for g := range numAppenders {
+			trxId := lock.TrxId(g + 1)
+			wg.Go(func() {
+				for range opsPerGoroutine {
+					r := NewInsertRecord(page.FileId(1), btree.Record{[]byte("data")})
+					_, _ = mgr.Append(trxId, RecordTypeInsert, r)
+				}
+			})
+		}
+		for g := range numDiscarders {
+			trxId := lock.TrxId(g + 1)
+			wg.Go(func() {
+				for range opsPerGoroutine {
+					mgr.Discard(trxId)
+				}
+			})
+		}
+		wg.Wait()
+
+		// THEN: パニックせず完了すれば OK (-race フラグでレースが検出されないこと)
+	})
 }
 
 func TestManagerRecords(t *testing.T) {
@@ -204,6 +262,39 @@ func TestManagerCommittedEntries(t *testing.T) {
 
 		// THEN
 		assert.Empty(t, entries)
+	})
+
+	t.Run("CommittedEntries と Append が並行実行されてもデータレースが起きない", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		const numGoroutines = 10
+		const opsPerGoroutine = 20
+		trxIds := make([]lock.TrxId, numGoroutines)
+		for i := range trxIds {
+			trxIds[i] = lock.TrxId(i + 1)
+		}
+
+		// WHEN
+		var wg sync.WaitGroup
+		for g := range numGoroutines {
+			trxId := lock.TrxId(g + 1)
+			wg.Go(func() {
+				for range opsPerGoroutine {
+					r := NewInsertRecord(page.FileId(1), btree.Record{[]byte("data")})
+					_, _ = mgr.Append(trxId, RecordTypeInsert, r)
+				}
+			})
+		}
+		for range numGoroutines {
+			wg.Go(func() {
+				for range opsPerGoroutine {
+					_ = mgr.CommittedEntries(trxIds)
+				}
+			})
+		}
+		wg.Wait()
+
+		// THEN: パニックせず完了すれば OK
 	})
 }
 
@@ -354,99 +445,6 @@ func TestManagerWriteToPage(t *testing.T) {
 		assert.NoError(t, err)
 		// 複数ページにまたがるため、最後の Pointer のページ番号は最初と異なるはず
 		assert.NotEqual(t, page.PageNumber(0), lastPtr.pageNumber)
-	})
-}
-
-func TestManagerConcurrency(t *testing.T) {
-	t.Run("複数 goroutine から Append しても map の同時書き込みが起きない", func(t *testing.T) {
-		// GIVEN
-		mgr := setupTestManager(t)
-		const numGoroutines = 10
-		const appendsPerGoroutine = 20
-
-		// WHEN: 異なる trxId から並行に Append する
-		var wg sync.WaitGroup
-		for g := range numGoroutines {
-			trxId := lock.TrxId(g + 1)
-			wg.Go(func() {
-				for range appendsPerGoroutine {
-					r := NewInsertRecord(page.FileId(1), btree.Record{[]byte("data")})
-					_, err := mgr.Append(trxId, RecordTypeInsert, r)
-					assert.NoError(t, err)
-				}
-			})
-		}
-		wg.Wait()
-
-		// THEN: 各 trxId に期待数のレコードが入っている
-		for g := range numGoroutines {
-			records := mgr.Records(lock.TrxId(g + 1))
-			assert.Len(t, records, appendsPerGoroutine)
-		}
-	})
-
-	t.Run("Append と Discard が並行実行されてもデータレースが起きない", func(t *testing.T) {
-		// GIVEN: purge スレッドが Discard を呼ぶシナリオを模倣
-		mgr := setupTestManager(t)
-		const numAppenders = 5
-		const numDiscarders = 5
-		const opsPerGoroutine = 20
-
-		// WHEN
-		var wg sync.WaitGroup
-		for g := range numAppenders {
-			trxId := lock.TrxId(g + 1)
-			wg.Go(func() {
-				for range opsPerGoroutine {
-					r := NewInsertRecord(page.FileId(1), btree.Record{[]byte("data")})
-					_, _ = mgr.Append(trxId, RecordTypeInsert, r)
-				}
-			})
-		}
-		for g := range numDiscarders {
-			trxId := lock.TrxId(g + 1)
-			wg.Go(func() {
-				for range opsPerGoroutine {
-					mgr.Discard(trxId)
-				}
-			})
-		}
-		wg.Wait()
-
-		// THEN: パニックせず完了すれば OK (-race フラグでレースが検出されないこと)
-	})
-
-	t.Run("CommittedEntries と Append が並行実行されてもデータレースが起きない", func(t *testing.T) {
-		// GIVEN
-		mgr := setupTestManager(t)
-		const numGoroutines = 10
-		const opsPerGoroutine = 20
-		trxIds := make([]lock.TrxId, numGoroutines)
-		for i := range trxIds {
-			trxIds[i] = lock.TrxId(i + 1)
-		}
-
-		// WHEN
-		var wg sync.WaitGroup
-		for g := range numGoroutines {
-			trxId := lock.TrxId(g + 1)
-			wg.Go(func() {
-				for range opsPerGoroutine {
-					r := NewInsertRecord(page.FileId(1), btree.Record{[]byte("data")})
-					_, _ = mgr.Append(trxId, RecordTypeInsert, r)
-				}
-			})
-		}
-		for range numGoroutines {
-			wg.Go(func() {
-				for range opsPerGoroutine {
-					_ = mgr.CommittedEntries(trxIds)
-				}
-			})
-		}
-		wg.Wait()
-
-		// THEN: パニックせず完了すれば OK
 	})
 }
 

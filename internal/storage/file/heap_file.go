@@ -20,7 +20,7 @@ func NewHeapFile(fileId page.FileId, path string) (heapFile *HeapFile, retErr er
 	file, err := directio.OpenFile(
 		path,
 		os.O_RDWR|os.O_CREATE, // read-write モードで開き、存在しない場合は作成する (※ os.O_DIRECT は directio.OpenFile 内で設定される)
-		0666,                  // パーミッション (rw-rw-rw-)(see: https://web.tku.ac.jp/~densan/local/permission/permission.htm)
+		0600,                  // パーミッション (rw-------) (see: https://web.tku.ac.jp/~densan/local/permission/permission.htm)
 	)
 	if err != nil {
 		return nil, err

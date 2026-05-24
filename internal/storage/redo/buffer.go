@@ -11,7 +11,7 @@ import (
 
 const maxBufferSize = 4 * 1024 * 1024 // 4MB
 
-var ErrLsnOverflow = errors.New("redo: LSN overflow")
+var ErrLsnOverflow = errors.New("redo: lsn overflow")
 
 type Buffer struct {
 	mutex       sync.Mutex
