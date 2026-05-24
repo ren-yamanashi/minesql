@@ -128,6 +128,21 @@ func TestRecordData(t *testing.T) {
 		// THEN
 		assert.True(t, got.IsZero())
 	})
+
+	t.Run("戻り値のページを変更しても元の Record に影響しない", func(t *testing.T) {
+		// GIVEN
+		pg := buildTestPage(t)
+		original := make([]byte, len(pg.Bytes()))
+		copy(original, pg.Bytes())
+		r := Record{data: pg}
+
+		// WHEN
+		got := r.Data()
+		got.Body()[0] = 0xFF
+
+		// THEN
+		assert.Equal(t, original, r.data.Bytes())
+	})
 }
 
 func TestRecordSerialize(t *testing.T) {

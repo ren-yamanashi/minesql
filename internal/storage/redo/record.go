@@ -43,7 +43,7 @@ func (r Record) Lsn() Lsn          { return r.lsn }
 func (r Record) TrxId() lock.TrxId { return r.trxId }
 func (r Record) Type() RecordType  { return r.recordType }
 func (r Record) PageId() page.Id   { return r.pageId }
-func (r Record) Data() *page.Page  { return r.data }
+func (r Record) Data() *page.Page  { return r.data.Copy() } // Record はログレコードとして不変であるべきため、内部ポインタを直接返さない
 
 func (r Record) Serialize() []byte {
 	var pageBytes []byte

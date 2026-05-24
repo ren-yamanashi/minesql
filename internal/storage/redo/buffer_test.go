@@ -129,6 +129,19 @@ func TestBufferAppendCommit(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, Lsn(1), lsn)
 	})
+
+	t.Run("COMMIT レコードの data フィールドは nil で保持される", func(t *testing.T) {
+		// GIVEN
+		buf := setupTestBuffer(t)
+
+		// WHEN
+		_, err := buf.AppendCommit(lock.TrxId(1))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Len(t, buf.records, 1)
+		assert.Nil(t, buf.records[0].data)
+	})
 }
 
 func TestBufferAppendRollback(t *testing.T) {
@@ -142,6 +155,19 @@ func TestBufferAppendRollback(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, Lsn(1), lsn)
+	})
+
+	t.Run("ROLLBACK レコードの data フィールドは nil で保持される", func(t *testing.T) {
+		// GIVEN
+		buf := setupTestBuffer(t)
+
+		// WHEN
+		_, err := buf.AppendRollback(lock.TrxId(1))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Len(t, buf.records, 1)
+		assert.Nil(t, buf.records[0].data)
 	})
 }
 
