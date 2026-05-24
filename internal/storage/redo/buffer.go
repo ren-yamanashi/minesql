@@ -142,12 +142,16 @@ func (b *Buffer) appendRecord(trxId lock.TrxId, rt RecordType, pageId page.Id, p
 		return 0, err
 	}
 
+	var data *page.Page
+	if !pg.IsZero() {
+		data = pg.Copy()
+	}
 	rec := Record{
 		lsn:        lsn,
 		trxId:      trxId,
 		recordType: rt,
 		pageId:     pageId,
-		data:       pg.Copy(),
+		data:       data,
 	}
 	b.records = append(b.records, rec)
 	b.pendingSize += rec.Size()

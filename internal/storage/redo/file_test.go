@@ -455,6 +455,27 @@ func TestFileWriteHeader(t *testing.T) {
 	})
 }
 
+func TestFsyncDir(t *testing.T) {
+	t.Run("存在するディレクトリの fsync が成功する", func(t *testing.T) {
+		// GIVEN
+		dir := t.TempDir()
+
+		// WHEN
+		err := fsyncDir(dir)
+
+		// THEN
+		assert.NoError(t, err)
+	})
+
+	t.Run("存在しないパスはエラーを返す", func(t *testing.T) {
+		// WHEN
+		err := fsyncDir("/nonexistent/path/that/does/not/exist")
+
+		// THEN
+		assert.Error(t, err)
+	})
+}
+
 // setupTestFile はテスト用の File を作成する
 func setupTestFile(t *testing.T) *file {
 	t.Helper()
