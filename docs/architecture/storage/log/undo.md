@@ -71,7 +71,7 @@ Undo ログレコードには操作前の状態 (before image) を記録する�
 
 | offset | サイズ | 項目 | 説明 |
 | --- | --- | --- | --- |
-| 0 | 4 バイト | prevLastModified | 上書き前の行の `lastModified` |
+| 0 | 4 バイト | prevLastTrxId | 上書き前の行の `lastTrxId` |
 | 4 | 6 バイト | prevRollPtr | 上書き前の行の `rollPtr` |
 | 10 | 4 バイト | FileId | テーブルの FileId |
 | 14 | 可変 | カラムセット | カラムセット (下記参照) |
