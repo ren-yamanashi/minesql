@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
@@ -309,7 +309,7 @@ func TestIntegrationCrashRecovery(t *testing.T) {
 // integrationEnv は統合テスト用の環境
 type integrationEnv struct {
 	bp      *buffer.Pool
-	ct      *catalog.Catalog
+	ct      *dictionary.Catalog
 	undoLog *undo.Manager
 	lockMgr *lock.Manager
 	redoLog *redo.Buffer
@@ -324,7 +324,7 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 	t.Cleanup(func() { _ = os.RemoveAll(config.BaseDir) })
 
 	// カタログ用 HeapFile (FileId=0)
-	catalogPath := filepath.Join(config.BaseDir, "catalog.db")
+	catalogPath := filepath.Join(config.BaseDir, "dictionary.db")
 	catalogHf, err := file.NewHeapFile(page.FileId(0), catalogPath)
 	if err != nil {
 		t.Fatalf("カタログ HeapFile の作成に失敗: %v", err)
@@ -334,7 +334,7 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 	bp := buffer.NewPool(page.Size * 50)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
-	ct, err := catalog.CreateCatalog(bp)
+	ct, err := dictionary.CreateCatalog(bp)
 	if err != nil {
 		t.Fatalf("Catalog の作成に失敗: %v", err)
 	}
@@ -381,7 +381,7 @@ func createUsersTable(t *testing.T, env *integrationEnv) *Table {
 		ColNames:  []string{"id", "name", "email"},
 		PkCount:   1,
 		Indexes: []CreateIndexInput{
-			{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: catalog.IndexTypeNonUnique},
+			{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: dictionary.IndexTypeNonUnique},
 		},
 	})
 	if err != nil {

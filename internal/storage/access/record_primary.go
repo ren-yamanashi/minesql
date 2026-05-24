@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
-	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -34,7 +34,7 @@ type PrimaryRecord struct {
 	values     []string
 }
 
-func NewPrimaryRecord(ct *catalog.Catalog, input NewPrimaryRecordInput) (*PrimaryRecord, error) {
+func NewPrimaryRecord(ct *dictionary.Catalog, input NewPrimaryRecordInput) (*PrimaryRecord, error) {
 	if len(input.colNames) != len(input.values) {
 		return nil, errColNameValueMismatch
 	}
@@ -44,13 +44,12 @@ func NewPrimaryRecord(ct *catalog.Catalog, input NewPrimaryRecordInput) (*Primar
 // Encode は btree.Record にエンコードする
 //   - 非キー領域: lastTrxId (4B) + rollPtr (6B) + 非キーカラム
 func (r *PrimaryRecord) Encode() btree.Record {
-	var key []byte
-	encode.Encode(stringToByteSlice(r.values[:r.pkCount]), &key)
+	key := encode.Encode(nil, stringToByteSlice(r.values[:r.pkCount]))
 
 	var nonKey []byte
 	nonKey = binary.BigEndian.AppendUint32(nonKey, uint32(r.lastTrxId))
 	nonKey = append(nonKey, r.rollPtr.Encode()...)
-	encode.Encode(stringToByteSlice(r.values[r.pkCount:]), &nonKey)
+	nonKey = encode.Encode(nonKey, stringToByteSlice(r.values[r.pkCount:]))
 
 	return btree.NewRecord([]byte{r.deleteMark}, key, nonKey)
 }
@@ -73,8 +72,8 @@ func (r *PrimaryRecord) SecondaryKey(keyCols map[string]int) []byte {
 
 	// SK + PK をエンコード
 	var key []byte
-	encode.Encode(stringToByteSlice(skValues), &key)
-	encode.Encode(stringToByteSlice(pkValues), &key)
+	key = encode.Encode(key, stringToByteSlice(skValues))
+	key = encode.Encode(key, stringToByteSlice(pkValues))
 	return key
 }
 
@@ -126,9 +125,11 @@ func (r *PrimaryRecord) setRollPtr(rollPtr undo.Pointer) {
 
 // DecodePrimaryRecord は btree.Record から PrimaryRecord にデコードする
 //   - 非キー領域: lastTrxId (4B) + rollPtr (6B) + 非キーカラム
-func DecodePrimaryRecord(record btree.Record, ct *catalog.Catalog, fileId page.FileId) (*PrimaryRecord, error) {
-	var values [][]byte
-	encode.Decode(record.Key(), &values)
+func DecodePrimaryRecord(record btree.Record, ct *dictionary.Catalog, fileId page.FileId) (*PrimaryRecord, error) {
+	values, err := encode.Decode(record.Key())
+	if err != nil {
+		return nil, err
+	}
 	pkCount := len(values)
 
 	// 非キー領域から lastTrxId と rollPtr を読み取る
@@ -147,7 +148,11 @@ func DecodePrimaryRecord(record btree.Record, ct *catalog.Catalog, fileId page.F
 	}
 
 	// 残りの非キー領域からカラムデータをデコード
-	encode.Decode(nonKey[systemFieldsSize:], &values)
+	nonKeyValues, err := encode.Decode(nonKey[systemFieldsSize:])
+	if err != nil {
+		return nil, err
+	}
+	values = append(values, nonKeyValues...)
 
 	colDefs, err := fetchColumnDefs(ct, fileId)
 	if err != nil {
@@ -173,7 +178,7 @@ func DecodePrimaryRecord(record btree.Record, ct *catalog.Catalog, fileId page.F
 }
 
 // sortPrimaryRecord はカラムメタデータを参照して、レコードをテーブル定義順に並び替える
-func sortPrimaryRecord(ct *catalog.Catalog, input NewPrimaryRecordInput) (*PrimaryRecord, error) {
+func sortPrimaryRecord(ct *dictionary.Catalog, input NewPrimaryRecordInput) (*PrimaryRecord, error) {
 	colDefs, err := fetchColumnDefs(ct, input.fileId)
 	if err != nil {
 		return nil, err
@@ -209,9 +214,9 @@ func sortPrimaryRecord(ct *catalog.Catalog, input NewPrimaryRecordInput) (*Prima
 }
 
 // fetchColumnDefs はカラムメタデータを検索し、カラム名 → テーブル定義上の位置のマップを返す
-func fetchColumnDefs(ct *catalog.Catalog, fileId page.FileId) (map[string]int, error) {
+func fetchColumnDefs(ct *dictionary.Catalog, fileId page.FileId) (map[string]int, error) {
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
-	iter, err := ct.ColumnMeta().Search(catalog.SearchModeKey{Key: [][]byte{fileIdBytes}})
+	iter, err := ct.ColumnMeta().Search(dictionary.SearchModeKey{Key: [][]byte{fileIdBytes}})
 	if err != nil {
 		return nil, err
 	}

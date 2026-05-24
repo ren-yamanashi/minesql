@@ -6,7 +6,7 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
@@ -24,7 +24,7 @@ type CreateConstraintInput struct {
 type CreateIndexInput struct {
 	IndexName string            // インデックス名
 	ColNames  []string          // インデックスを構成するカラム名 (構成順通り)
-	IndexType catalog.IndexType // インデックス種類
+	IndexType dictionary.IndexType // インデックス種類
 }
 
 type CreateTableInput struct {
@@ -42,7 +42,7 @@ func CreateTable(
 	lock *lock.Manager,
 	input CreateTableInput,
 ) (*Table, error) {
-	ct, err := catalog.NewCatalog(bp)
+	ct, err := dictionary.NewCatalog(bp)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func CreateTable(
 }
 
 // createTableFile はテーブルのファイルを作成する
-func createTableFile(ct *catalog.Catalog, bp *buffer.Pool, tableName string) (page.FileId, error) {
+func createTableFile(ct *dictionary.Catalog, bp *buffer.Pool, tableName string) (page.FileId, error) {
 	path := filepath.Join(config.BaseDir, fmt.Sprintf("%s.db", tableName))
 	fileId, err := ct.AllocateFileId()
 	if err != nil {
@@ -102,13 +102,13 @@ func createTableFile(ct *catalog.Catalog, bp *buffer.Pool, tableName string) (pa
 
 // registerTableMeta はテーブルメタ・インデックスメタ (プライマリ)・カラムメタをカタログに登録する
 func registerTableMeta(
-	ct *catalog.Catalog,
+	ct *dictionary.Catalog,
 	fileId page.FileId,
 	pi *primaryIndex,
 	input CreateTableInput,
 ) error {
 	// テーブルメタ
-	if err := ct.TableMeta().Insert(catalog.NewTableRecord(input.TableName, pi.tree.MetaPageId(), len(input.ColNames))); err != nil {
+	if err := ct.TableMeta().Insert(dictionary.NewTableMetaRecord(input.TableName, pi.tree.MetaPageId(), len(input.ColNames))); err != nil {
 		return err
 	}
 
@@ -117,11 +117,11 @@ func registerTableMeta(
 	if err != nil {
 		return err
 	}
-	err = ct.IndexMeta().Insert(catalog.NewIndexRecord(
+	err = ct.IndexMeta().Insert(dictionary.NewIndexMetaRecord(
 		fileId,
 		indexId,
-		catalog.PrimaryIndexName,
-		catalog.IndexTypePrimary,
+		dictionary.PrimaryIndexName,
+		dictionary.IndexTypePrimary,
 		input.PkCount,
 		pi.tree.MetaPageId(),
 	))
@@ -131,7 +131,7 @@ func registerTableMeta(
 
 	// カラムメタ
 	for i, col := range input.ColNames {
-		if err := ct.ColumnMeta().Insert(catalog.NewColumnRecord(fileId, col, i)); err != nil {
+		if err := ct.ColumnMeta().Insert(dictionary.NewColumnMetaRecord(fileId, col, i)); err != nil {
 			return err
 		}
 	}
@@ -140,7 +140,7 @@ func registerTableMeta(
 
 // createSecondaryIndexes はセカンダリインデックスを作成する
 func createSecondaryIndexes(
-	ct *catalog.Catalog,
+	ct *dictionary.Catalog,
 	bp *buffer.Pool,
 	fileId page.FileId,
 	pt *btree.Tree,
@@ -158,13 +158,13 @@ func createSecondaryIndexes(
 			PrimaryTree: pt,
 			IndexId:     indexId,
 			IndexName:   input.IndexName,
-			Unique:      input.IndexType == catalog.IndexTypeUnique,
+			Unique:      input.IndexType == dictionary.IndexTypeUnique,
 			Lock:        lock,
 		})
 		if err != nil {
 			return nil, err
 		}
-		err = ct.IndexMeta().Insert(catalog.NewIndexRecord(
+		err = ct.IndexMeta().Insert(dictionary.NewIndexMetaRecord(
 			fileId,
 			indexId,
 			input.IndexName,
@@ -177,7 +177,7 @@ func createSecondaryIndexes(
 		}
 
 		for i, keyCol := range input.ColNames {
-			if err := ct.IndexKeyColumnMeta().Insert(catalog.NewIndexKeyColumnRecord(indexId, keyCol, i)); err != nil {
+			if err := ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnMetaRecord(indexId, keyCol, i)); err != nil {
 				return nil, err
 			}
 		}
@@ -189,13 +189,13 @@ func createSecondaryIndexes(
 }
 
 // createConstraints は制約をカタログに登録する
-func createConstraints(ct *catalog.Catalog, fileId page.FileId, inputs []CreateConstraintInput) error {
+func createConstraints(ct *dictionary.Catalog, fileId page.FileId, inputs []CreateConstraintInput) error {
 	for _, input := range inputs {
 		refTable, err := fetchTable(ct, input.ReferenceTableName)
 		if err != nil {
 			return err
 		}
-		err = ct.ConstraintMeta().Insert(catalog.NewConstraintRecord(
+		err = ct.ConstraintMeta().Insert(dictionary.NewConstraintMetaRecord(
 			fileId,
 			input.ColumnName,
 			input.ConstraintName,

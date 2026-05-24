@@ -1,6 +1,7 @@
 package file
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"testing"
@@ -178,7 +179,7 @@ func TestRead(t *testing.T) {
 		err = hf.Read(0, data)
 
 		// THEN
-		assert.Error(t, err)
+		assert.ErrorIs(t, err, io.EOF)
 	})
 
 	t.Run("Close 済みのファイルから読み込むとエラーを返す", func(t *testing.T) {
@@ -281,37 +282,6 @@ func TestWrite(t *testing.T) {
 	})
 }
 
-func TestSync(t *testing.T) {
-	t.Run("エラーなく同期できる", func(t *testing.T) {
-		// GIVEN
-		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
-		assert.NoError(t, err)
-		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
-
-		// WHEN
-		err = hf.Sync()
-
-		// THEN
-		assert.NoError(t, err)
-	})
-}
-
-func TestClose(t *testing.T) {
-	t.Run("エラーなくファイルを閉じることができる", func(t *testing.T) {
-		// GIVEN
-		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
-		assert.NoError(t, err)
-
-		// WHEN
-		err = hf.Close()
-
-		// THEN
-		assert.NoError(t, err)
-	})
-}
-
 func TestWriteAndRead(t *testing.T) {
 	t.Run("書き込んだデータを正しく読み込める", func(t *testing.T) {
 		// GIVEN
@@ -358,5 +328,36 @@ func TestWriteAndRead(t *testing.T) {
 		assert.NoError(t, err1)
 		assert.Equal(t, byte(0x01), read0[0])
 		assert.Equal(t, byte(0x02), read1[0])
+	})
+}
+
+func TestSync(t *testing.T) {
+	t.Run("エラーなく同期できる", func(t *testing.T) {
+		// GIVEN
+		path := filepath.Join(t.TempDir(), "test.db")
+		hf, err := NewHeapFile(0, path)
+		assert.NoError(t, err)
+		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
+
+		// WHEN
+		err = hf.Sync()
+
+		// THEN
+		assert.NoError(t, err)
+	})
+}
+
+func TestClose(t *testing.T) {
+	t.Run("エラーなくファイルを閉じることができる", func(t *testing.T) {
+		// GIVEN
+		path := filepath.Join(t.TempDir(), "test.db")
+		hf, err := NewHeapFile(0, path)
+		assert.NoError(t, err)
+
+		// WHEN
+		err = hf.Close()
+
+		// THEN
+		assert.NoError(t, err)
 	})
 }

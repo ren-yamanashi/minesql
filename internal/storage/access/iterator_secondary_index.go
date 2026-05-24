@@ -2,20 +2,20 @@ package access
 
 import (
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
-	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 )
 
 type SecondaryIndexIterator struct {
 	indexName   string
 	iterator    *btree.Iterator
-	catalog     *catalog.Catalog
+	catalog     *dictionary.Catalog
 	primaryTree *btree.Tree // プライマリインデックスの B+Tree
 }
 
 func NewSecondaryIndexIterator(
 	indexName string,
 	iter *btree.Iterator,
-	ct *catalog.Catalog,
+	ct *dictionary.Catalog,
 	pt *btree.Tree,
 ) *SecondaryIndexIterator {
 	return &SecondaryIndexIterator{

@@ -119,15 +119,15 @@ func TestPrimaryRecordEncode(t *testing.T) {
 		// THEN
 		assert.Equal(t, []byte{0x00}, record.Header())
 
-		var decodedKey [][]byte
-		encode.Decode(record.Key(), &decodedKey)
+		decodedKey, err := encode.Decode(record.Key())
+		assert.NoError(t, err)
 		assert.Equal(t, [][]byte{[]byte("1")}, decodedKey)
 
 		// 非キー領域: lastTrxId (4B) + rollPtr (4B) + カラムデータ
 		nonKey := record.NonKey()
 		assert.True(t, len(nonKey) >= lock.TrxIdSize+undo.PointerSize)
-		var decodedNonKey [][]byte
-		encode.Decode(nonKey[lock.TrxIdSize+undo.PointerSize:], &decodedNonKey)
+		decodedNonKey, err := encode.Decode(nonKey[lock.TrxIdSize+undo.PointerSize:])
+		assert.NoError(t, err)
 		assert.Equal(t, [][]byte{[]byte("Alice"), []byte("alice@example.com")}, decodedNonKey)
 	})
 
@@ -160,13 +160,13 @@ func TestPrimaryRecordEncode(t *testing.T) {
 		record := pr.Encode()
 
 		// THEN
-		var decodedKey [][]byte
-		encode.Decode(record.Key(), &decodedKey)
+		decodedKey, err := encode.Decode(record.Key())
+		assert.NoError(t, err)
 		assert.Equal(t, [][]byte{[]byte("1"), []byte("Alice")}, decodedKey)
 
 		nonKey := record.NonKey()
-		var decodedNonKey [][]byte
-		encode.Decode(nonKey[lock.TrxIdSize+undo.PointerSize:], &decodedNonKey)
+		decodedNonKey, err := encode.Decode(nonKey[lock.TrxIdSize+undo.PointerSize:])
+		assert.NoError(t, err)
 		assert.Equal(t, [][]byte{[]byte("alice@example.com")}, decodedNonKey)
 	})
 
@@ -487,8 +487,7 @@ func TestDecodePrimaryRecord(t *testing.T) {
 	t.Run("非キー領域が短すぎる場合エラーを返す", func(t *testing.T) {
 		// GIVEN
 		ct := setupSecondaryTestCatalog(t)
-		var key []byte
-		encode.Encode([][]byte{[]byte("1")}, &key)
+		key := encode.Encode(nil, [][]byte{[]byte("1")})
 		// 非キー領域が空 (lastTrxId + rollPtr の 8B に満たない)
 		record := btree.NewRecord([]byte{0x00}, key, nil)
 
@@ -503,8 +502,7 @@ func TestDecodePrimaryRecord(t *testing.T) {
 	t.Run("カラム数が不一致の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
 		ct := setupSecondaryTestCatalog(t)
-		var key []byte
-		encode.Encode([][]byte{[]byte("1")}, &key)
+		key := encode.Encode(nil, [][]byte{[]byte("1")})
 		// lastTrxId + rollPtr だけでカラムデータなし → pkCount=1, カラム合計=1 (テーブル定義は 3)
 		nonKey := make([]byte, lock.TrxIdSize+undo.PointerSize)
 

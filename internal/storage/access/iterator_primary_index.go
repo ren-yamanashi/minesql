@@ -2,17 +2,17 @@ package access
 
 import (
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
-	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 type PrimaryIndexIterator struct {
 	iterator *btree.Iterator
-	catalog  *catalog.Catalog
+	catalog  *dictionary.Catalog
 	fileId   page.FileId
 }
 
-func NewPrimaryIndexIterator(iter *btree.Iterator, ct *catalog.Catalog, fileId page.FileId) *PrimaryIndexIterator {
+func NewPrimaryIndexIterator(iter *btree.Iterator, ct *dictionary.Catalog, fileId page.FileId) *PrimaryIndexIterator {
 	return &PrimaryIndexIterator{
 		fileId:   fileId,
 		catalog:  ct,

@@ -6,7 +6,7 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
@@ -162,7 +162,7 @@ func TestSecondaryIndexIteratorNextIndexOnly(t *testing.T) {
 
 // iteratorTestEnv はイテレータテスト用の環境
 type iteratorTestEnv struct {
-	ct            *catalog.Catalog
+	ct            *dictionary.Catalog
 	bp            *buffer.Pool
 	primaryTree   *btree.Tree
 	secondaryTree *btree.Tree
@@ -173,7 +173,7 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	t.Helper()
 
 	// カタログ用 HeapFile (FileId=0)
-	catalogPath := filepath.Join(t.TempDir(), "catalog.db")
+	catalogPath := filepath.Join(t.TempDir(), "dictionary.db")
 	catalogHf, err := file.NewHeapFile(page.FileId(0), catalogPath)
 	if err != nil {
 		t.Fatalf("カタログ HeapFile の作成に失敗: %v", err)
@@ -192,7 +192,7 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 	bp.RegisterHeapFile(page.FileId(2), dataHf)
 
-	ct, err := catalog.CreateCatalog(bp)
+	ct, err := dictionary.CreateCatalog(bp)
 	if err != nil {
 		t.Fatalf("Catalog の作成に失敗: %v", err)
 	}
@@ -200,19 +200,19 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	// テーブル定義: id:0, name:1, email:2
 	tableFileId := page.FileId(2)
 	dummyPageId := page.NewId(tableFileId, page.PageNumber(0))
-	_ = ct.TableMeta().Insert(catalog.NewTableRecord("users", dummyPageId, 3))
-	_ = ct.ColumnMeta().Insert(catalog.NewColumnRecord(tableFileId, "id", 0))
-	_ = ct.ColumnMeta().Insert(catalog.NewColumnRecord(tableFileId, "name", 1))
-	_ = ct.ColumnMeta().Insert(catalog.NewColumnRecord(tableFileId, "email", 2))
+	_ = ct.TableMeta().Insert(dictionary.NewTableRecord("users", dummyPageId, 3))
+	_ = ct.ColumnMeta().Insert(dictionary.NewColumnRecord(tableFileId, "id", 0))
+	_ = ct.ColumnMeta().Insert(dictionary.NewColumnRecord(tableFileId, "name", 1))
+	_ = ct.ColumnMeta().Insert(dictionary.NewColumnRecord(tableFileId, "email", 2))
 
 	// インデックス定義
-	indexId1 := catalog.IndexId(1)
-	_ = ct.IndexMeta().Insert(catalog.NewIndexRecord(tableFileId, indexId1, "idx_name", catalog.IndexTypeNonUnique, 1, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(catalog.NewIndexKeyColumnRecord(indexId1, "name", 0))
+	indexId1 := dictionary.IndexId(1)
+	_ = ct.IndexMeta().Insert(dictionary.NewIndexRecord(tableFileId, indexId1, "idx_name", dictionary.IndexTypeNonUnique, 1, dummyPageId))
+	_ = ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnRecord(indexId1, "name", 0))
 
-	indexId2 := catalog.IndexId(2)
-	_ = ct.IndexMeta().Insert(catalog.NewIndexRecord(tableFileId, indexId2, "idx_email", catalog.IndexTypeUnique, 1, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(catalog.NewIndexKeyColumnRecord(indexId2, "email", 0))
+	indexId2 := dictionary.IndexId(2)
+	_ = ct.IndexMeta().Insert(dictionary.NewIndexRecord(tableFileId, indexId2, "idx_email", dictionary.IndexTypeUnique, 1, dummyPageId))
+	_ = ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnRecord(indexId2, "email", 0))
 
 	// プライマリ B+Tree
 	primaryTree, err := btree.CreateTree(bp, tableFileId)

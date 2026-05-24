@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
@@ -227,7 +227,7 @@ func TestFetchReferencingConstraints(t *testing.T) {
 
 // fkTestEnv は FK テスト用の環境
 type fkTestEnv struct {
-	ct           *catalog.Catalog
+	ct           *dictionary.Catalog
 	bp           *buffer.Pool
 	parent       *Table // departments (id PK, name)
 	child        *Table // employees (id PK, name, dept_id FK -> departments.id)
@@ -247,7 +247,7 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 	_ = os.MkdirAll(config.BaseDir, 0o750)
 	t.Cleanup(func() { _ = os.RemoveAll(config.BaseDir) })
 
-	catalogPath := filepath.Join(t.TempDir(), "catalog.db")
+	catalogPath := filepath.Join(t.TempDir(), "dictionary.db")
 	catalogHf, err := file.NewHeapFile(page.FileId(0), catalogPath)
 	if err != nil {
 		t.Fatalf("カタログ HeapFile の作成に失敗: %v", err)
@@ -257,7 +257,7 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 	bp := buffer.NewPool(page.Size * 50)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
-	ct, err := catalog.CreateCatalog(bp)
+	ct, err := dictionary.CreateCatalog(bp)
 	if err != nil {
 		t.Fatalf("Catalog の作成に失敗: %v", err)
 	}
@@ -296,7 +296,7 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 		ColNames:  []string{"id", "name", "dept_id"},
 		PkCount:   1,
 		Indexes: []CreateIndexInput{
-			{IndexName: "idx_dept_id", ColNames: []string{"dept_id"}, IndexType: catalog.IndexTypeNonUnique},
+			{IndexName: "idx_dept_id", ColNames: []string{"dept_id"}, IndexType: dictionary.IndexTypeNonUnique},
 		},
 		Constraints: []CreateConstraintInput{
 			{

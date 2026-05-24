@@ -6,7 +6,7 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
@@ -16,7 +16,7 @@ import (
 type Table struct {
 	primaryIndex     *primaryIndex
 	secondaryIndexes []*secondaryIndex
-	catalog          *catalog.Catalog
+	catalog          *dictionary.Catalog
 	undoLog          *undo.Manager
 	lock             *lock.Manager
 	bufferPool       *buffer.Pool
@@ -25,7 +25,7 @@ type Table struct {
 // NewTable は既存のテーブルを開く
 func NewTable(
 	bp *buffer.Pool,
-	ct *catalog.Catalog,
+	ct *dictionary.Catalog,
 	undo *undo.Manager,
 	lock *lock.Manager,
 	name string,
@@ -57,25 +57,25 @@ func NewTable(
 }
 
 // fetchTable はテーブル名から TableRecord を取得する
-func fetchTable(ct *catalog.Catalog, name string) (catalog.TableRecord, error) {
-	iter, err := ct.TableMeta().Search(catalog.SearchModeKey{Key: [][]byte{[]byte(name)}})
+func fetchTable(ct *dictionary.Catalog, name string) (dictionary.TableMetaRecord, error) {
+	iter, err := ct.TableMeta().Search(dictionary.SearchModeKey{Key: [][]byte{[]byte(name)}})
 	if err != nil {
-		return catalog.TableRecord{}, err
+		return dictionary.TableMetaRecord{}, err
 	}
 	defer iter.Close()
 	record, ok, err := iter.Next()
 	if err != nil {
-		return catalog.TableRecord{}, err
+		return dictionary.TableMetaRecord{}, err
 	}
 	if !ok || record.Name() != name {
-		return catalog.TableRecord{}, fmt.Errorf("table %q not found", name)
+		return dictionary.TableMetaRecord{}, fmt.Errorf("table %q not found", name)
 	}
 	return record, nil
 }
 
 // fetchPrimaryIndex はカタログからプライマリインデックスを取得して PrimaryIndex を構築する
 func fetchPrimaryIndex(
-	ct *catalog.Catalog,
+	ct *dictionary.Catalog,
 	bp *buffer.Pool,
 	fileId page.FileId,
 	lock *lock.Manager,
@@ -88,29 +88,29 @@ func fetchPrimaryIndex(
 }
 
 // fetchPrimaryIndexRecord はカタログからプライマリインデックスの IndexRecord を取得する
-func fetchPrimaryIndexRecord(ct *catalog.Catalog, fileId page.FileId) (catalog.IndexRecord, error) {
+func fetchPrimaryIndexRecord(ct *dictionary.Catalog, fileId page.FileId) (dictionary.IndexMetaRecord, error) {
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
-	key := catalog.SearchModeKey{
-		Key: [][]byte{fileIdBytes, []byte(catalog.PrimaryIndexName)},
+	key := dictionary.SearchModeKey{
+		Key: [][]byte{fileIdBytes, []byte(dictionary.PrimaryIndexName)},
 	}
 	iter, err := ct.IndexMeta().Search(key)
 	if err != nil {
-		return catalog.IndexRecord{}, err
+		return dictionary.IndexMetaRecord{}, err
 	}
 	defer iter.Close()
 	record, ok, err := iter.Next()
 	if err != nil {
-		return catalog.IndexRecord{}, err
+		return dictionary.IndexMetaRecord{}, err
 	}
-	if !ok || record.FileId() != fileId || record.Name() != catalog.PrimaryIndexName {
-		return catalog.IndexRecord{}, fmt.Errorf("primary index not found for table (file %d)", fileId)
+	if !ok || record.FileId() != fileId || record.Name() != dictionary.PrimaryIndexName {
+		return dictionary.IndexMetaRecord{}, fmt.Errorf("primary index not found for table (file %d)", fileId)
 	}
 	return record, nil
 }
 
 // fetchSecondaryIndexes は指定テーブルのセカンダリインデックス一覧を返す
 func fetchSecondaryIndexes(
-	ct *catalog.Catalog,
+	ct *dictionary.Catalog,
 	bp *buffer.Pool,
 	fileId page.FileId,
 	pt *btree.Tree,
@@ -127,7 +127,7 @@ func fetchSecondaryIndexes(
 			PrimaryTree: pt,
 			IndexId:     record.IndexId(),
 			IndexName:   record.Name(),
-			Unique:      record.IndexType() == catalog.IndexTypeUnique,
+			Unique:      record.IndexType() == dictionary.IndexTypeUnique,
 			Lock:        lock,
 		})
 		indexes = append(indexes, index)
@@ -136,14 +136,14 @@ func fetchSecondaryIndexes(
 }
 
 // fetchSecondaryIndexRecords はカタログからセカンダリインデックスの IndexRecord 一覧を取得する
-func fetchSecondaryIndexRecords(ct *catalog.Catalog, fileId page.FileId) ([]catalog.IndexRecord, error) {
+func fetchSecondaryIndexRecords(ct *dictionary.Catalog, fileId page.FileId) ([]dictionary.IndexMetaRecord, error) {
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
-	iter, err := ct.IndexMeta().Search(catalog.SearchModeKey{Key: [][]byte{fileIdBytes}})
+	iter, err := ct.IndexMeta().Search(dictionary.SearchModeKey{Key: [][]byte{fileIdBytes}})
 	if err != nil {
 		return nil, err
 	}
 	defer iter.Close()
-	var records []catalog.IndexRecord
+	var records []dictionary.IndexMetaRecord
 	for {
 		record, ok, err := iter.Next()
 		if err != nil {
@@ -152,7 +152,7 @@ func fetchSecondaryIndexRecords(ct *catalog.Catalog, fileId page.FileId) ([]cata
 		if !ok || record.FileId() != fileId {
 			break
 		}
-		if record.Name() == catalog.PrimaryIndexName {
+		if record.Name() == dictionary.PrimaryIndexName {
 			continue
 		}
 		records = append(records, record)
@@ -173,7 +173,7 @@ func (t *Table) buildValMap(colNames, values []string) map[string]string {
 func (t *Table) isPrimaryKeyColumn(colName string) (bool, error) {
 	fileId := t.primaryIndex.tree.MetaPageId().FileId()
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
-	iter, err := t.catalog.ColumnMeta().Search(catalog.SearchModeKey{
+	iter, err := t.catalog.ColumnMeta().Search(dictionary.SearchModeKey{
 		Key: [][]byte{fileIdBytes, []byte(colName)},
 	})
 	if err != nil {

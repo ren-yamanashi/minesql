@@ -6,7 +6,7 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
@@ -14,18 +14,18 @@ import (
 type newSecondaryIndexInput struct {
 	MetaPageId  page.Id         // セカンダリインデックスの MetaPageId
 	PrimaryTree *btree.Tree     // プライマリインデックスの B+Tree
-	IndexId     catalog.IndexId // インデックス ID
+	IndexId     dictionary.IndexId // インデックス ID
 	IndexName   string          // インデックス名
 	Unique      bool            // ユニークインデックスか
 	Lock        *lock.Manager
 }
 
 type secondaryIndex struct {
-	catalog     *catalog.Catalog
+	catalog     *dictionary.Catalog
 	tree        *btree.Tree     // セカンダリインデックスの B+Tree
 	primaryTree *btree.Tree     // プライマリインデックスの B+Tree
 	fileId      page.FileId     // インデックスが属するテーブルの FileId
-	indexId     catalog.IndexId // インデックス ID
+	indexId     dictionary.IndexId // インデックス ID
 	indexName   string          // インデックス名
 	unique      bool            // ユニーク制約の有無
 	lock        *lock.Manager
@@ -33,7 +33,7 @@ type secondaryIndex struct {
 
 // newSecondaryIndex は既存のセカンダリインデックスを開く
 func newSecondaryIndex(
-	ct *catalog.Catalog,
+	ct *dictionary.Catalog,
 	bp *buffer.Pool,
 	input newSecondaryIndexInput,
 ) *secondaryIndex {
@@ -53,7 +53,7 @@ func newSecondaryIndex(
 type createSecondaryIndexInput struct {
 	FileId      page.FileId     // インデックスが属するテーブルの FileId
 	PrimaryTree *btree.Tree     // プライマリインデックスの B+Tree
-	IndexId     catalog.IndexId // インデックス ID
+	IndexId     dictionary.IndexId // インデックス ID
 	IndexName   string          // インデックス名
 	Unique      bool            // ユニークか
 	Lock        *lock.Manager
@@ -61,7 +61,7 @@ type createSecondaryIndexInput struct {
 
 // createSecondaryIndex は空のセカンダリインデックスを作成する
 func createSecondaryIndex(
-	ct *catalog.Catalog,
+	ct *dictionary.Catalog,
 	bp *buffer.Pool,
 	input createSecondaryIndexInput,
 ) (*secondaryIndex, error) {

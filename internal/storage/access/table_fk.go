@@ -8,7 +8,7 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
@@ -141,15 +141,15 @@ func (t *Table) checkChildRefsForUpdate(before, after *PrimaryRecord) error {
 }
 
 // fetchForeignKeys は自テーブル (子テーブル) の FK 制約一覧を返す
-func fetchForeignKeys(ct *catalog.Catalog, fileId page.FileId) ([]catalog.ConstraintRecord, error) {
+func fetchForeignKeys(ct *dictionary.Catalog, fileId page.FileId) ([]dictionary.ConstraintMetaRecord, error) {
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
-	iter, err := ct.ConstraintMeta().Search(catalog.SearchModeKey{Key: [][]byte{fileIdBytes}})
+	iter, err := ct.ConstraintMeta().Search(dictionary.SearchModeKey{Key: [][]byte{fileIdBytes}})
 	if err != nil {
 		return nil, err
 	}
 	defer iter.Close()
 
-	var fks []catalog.ConstraintRecord
+	var fks []dictionary.ConstraintMetaRecord
 	for {
 		record, ok, err := iter.Next()
 		if err != nil {
@@ -164,14 +164,14 @@ func fetchForeignKeys(ct *catalog.Catalog, fileId page.FileId) ([]catalog.Constr
 }
 
 // fetchReferencingConstraints は自テーブルを親として参照している FK 制約一覧を返す
-func fetchReferencingConstraints(ct *catalog.Catalog, fileId page.FileId) ([]catalog.ConstraintRecord, error) {
-	iter, err := ct.ConstraintMeta().Search(catalog.SearchModeStart{})
+func fetchReferencingConstraints(ct *dictionary.Catalog, fileId page.FileId) ([]dictionary.ConstraintMetaRecord, error) {
+	iter, err := ct.ConstraintMeta().Search(dictionary.SearchModeStart{})
 	if err != nil {
 		return nil, err
 	}
 	defer iter.Close()
 
-	var refs []catalog.ConstraintRecord
+	var refs []dictionary.ConstraintMetaRecord
 	for {
 		record, ok, err := iter.Next()
 		if err != nil {
@@ -190,7 +190,7 @@ func fetchReferencingConstraints(ct *catalog.Catalog, fileId page.FileId) ([]cat
 // checkParentRecordExists は参照先テーブルの PK に値が存在するか確認する
 func checkParentRecordExists(
 	bp *buffer.Pool,
-	ct *catalog.Catalog,
+	ct *dictionary.Catalog,
 	refFileId page.FileId,
 	value string,
 ) error {
@@ -200,8 +200,7 @@ func checkParentRecordExists(
 	}
 
 	tree := btree.NewTree(bp, indexRecord.MetaPageId())
-	var sk []byte
-	encode.Encode([][]byte{[]byte(value)}, &sk)
+	sk := encode.Encode(nil, [][]byte{[]byte(value)})
 
 	record, _, err := tree.FindByKey(sk)
 	if errors.Is(err, btree.ErrKeyNotFound) {
@@ -220,8 +219,8 @@ func checkParentRecordExists(
 // active なレコードを検索し、1 件でも存在すれば FK 違反エラーを返す。
 func checkChildRecordExists(
 	bp *buffer.Pool,
-	ct *catalog.Catalog,
-	constraint catalog.ConstraintRecord,
+	ct *dictionary.Catalog,
+	constraint dictionary.ConstraintMetaRecord,
 	value string,
 ) error {
 	indexRecord, err := findFKSecondaryIndex(ct, constraint)
@@ -235,23 +234,23 @@ func checkChildRecordExists(
 //
 // FK カラムがインデックスの先頭でない場合、prefix 検索で正しく該当レコードを抽出できないため除外する。
 func findFKSecondaryIndex(
-	ct *catalog.Catalog,
-	constraint catalog.ConstraintRecord,
-) (catalog.IndexRecord, error) {
+	ct *dictionary.Catalog,
+	constraint dictionary.ConstraintMetaRecord,
+) (dictionary.IndexMetaRecord, error) {
 	records, err := fetchSecondaryIndexRecords(ct, constraint.FileId())
 	if err != nil {
-		return catalog.IndexRecord{}, err
+		return dictionary.IndexMetaRecord{}, err
 	}
 	for _, indexRecord := range records {
 		keyCols, err := fetchIndexKeyColumn(ct, indexRecord.IndexId())
 		if err != nil {
-			return catalog.IndexRecord{}, err
+			return dictionary.IndexMetaRecord{}, err
 		}
 		if pos, ok := keyCols[constraint.ColumnName()]; ok && pos == 0 {
 			return indexRecord, nil
 		}
 	}
-	return catalog.IndexRecord{}, fmt.Errorf(
+	return dictionary.IndexMetaRecord{}, fmt.Errorf(
 		"access: no secondary index found for foreign key column %q",
 		constraint.ColumnName(),
 	)
@@ -260,12 +259,11 @@ func findFKSecondaryIndex(
 // hasActiveChildRecord は指定したセカンダリインデックスで value を先頭キーに持つ active なレコードが存在するかを確認する
 func hasActiveChildRecord(
 	bp *buffer.Pool,
-	indexRecord catalog.IndexRecord,
+	indexRecord dictionary.IndexMetaRecord,
 	value string,
 ) error {
 	tree := btree.NewTree(bp, indexRecord.MetaPageId())
-	var sk []byte
-	encode.Encode([][]byte{[]byte(value)}, &sk)
+	sk := encode.Encode(nil, [][]byte{[]byte(value)})
 
 	iter, err := tree.Search(btree.SearchModeKey{Key: sk})
 	if err != nil {

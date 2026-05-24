@@ -6,7 +6,7 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -120,8 +120,8 @@ func TestSecondaryRecordEncode(t *testing.T) {
 		// THEN
 		assert.Equal(t, []byte{0x00}, record.Header())
 
-		var decoded [][]byte
-		encode.Decode(record.Key(), &decoded)
+		decoded, err := encode.Decode(record.Key())
+		assert.NoError(t, err)
 		assert.Equal(t, [][]byte{[]byte("sk1"), []byte("pk1")}, decoded)
 
 		assert.Nil(t, record.NonKey())
@@ -139,8 +139,8 @@ func TestSecondaryRecordEncode(t *testing.T) {
 		record := sr.Encode()
 
 		// THEN
-		var decoded [][]byte
-		encode.Decode(record.Key(), &decoded)
+		decoded, err := encode.Decode(record.Key())
+		assert.NoError(t, err)
 		assert.Equal(t, [][]byte{[]byte("sk1"), []byte("sk2"), []byte("pk1")}, decoded)
 	})
 
@@ -171,8 +171,8 @@ func TestSecondaryRecordEncode(t *testing.T) {
 		record := sr.Encode()
 
 		// THEN
-		var decoded [][]byte
-		encode.Decode(record.Key(), &decoded)
+		decoded, err := encode.Decode(record.Key())
+		assert.NoError(t, err)
 		assert.Equal(t, [][]byte{[]byte("sk1"), []byte("pk1"), []byte("pk2")}, decoded)
 	})
 }
@@ -189,8 +189,7 @@ func TestSecondaryRecordEncodedSecondaryKey(t *testing.T) {
 		result := sr.encodedSecondaryKey()
 
 		// THEN
-		var expected []byte
-		encode.Encode([][]byte{[]byte("sk1")}, &expected)
+		expected := encode.Encode(nil, [][]byte{[]byte("sk1")})
 		assert.Equal(t, expected, result)
 	})
 
@@ -205,8 +204,7 @@ func TestSecondaryRecordEncodedSecondaryKey(t *testing.T) {
 		result := sr.encodedSecondaryKey()
 
 		// THEN
-		var expected []byte
-		encode.Encode([][]byte{[]byte("sk1"), []byte("sk2")}, &expected)
+		expected := encode.Encode(nil, [][]byte{[]byte("sk1"), []byte("sk2")})
 		assert.Equal(t, expected, result)
 	})
 }
@@ -316,7 +314,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 //   - idx_name: NonUnique, カラム (name:0)
 //   - idx_email: Unique, カラム (email:0)
 //   - idx_name_email: NonUnique, カラム (name:0, email:1)
-func setupSecondaryTestCatalog(t *testing.T) *catalog.Catalog {
+func setupSecondaryTestCatalog(t *testing.T) *dictionary.Catalog {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "secondary_test.db")
 	fileId := page.FileId(0)
@@ -328,35 +326,35 @@ func setupSecondaryTestCatalog(t *testing.T) *catalog.Catalog {
 	bp := buffer.NewPool(page.Size * 30)
 	bp.RegisterHeapFile(fileId, hf)
 
-	ct, err := catalog.CreateCatalog(bp)
+	ct, err := dictionary.CreateCatalog(bp)
 	if err != nil {
 		t.Fatalf("Catalog の作成に失敗: %v", err)
 	}
 
 	tableFileId := page.FileId(2)
 	dummyPageId := page.NewId(tableFileId, page.PageNumber(0))
-	_ = ct.TableMeta().Insert(catalog.NewTableRecord("users", dummyPageId, 3))
-	_ = ct.ColumnMeta().Insert(catalog.NewColumnRecord(tableFileId, "id", 0))
-	_ = ct.ColumnMeta().Insert(catalog.NewColumnRecord(tableFileId, "name", 1))
-	_ = ct.ColumnMeta().Insert(catalog.NewColumnRecord(tableFileId, "email", 2))
+	_ = ct.TableMeta().Insert(dictionary.NewTableRecord("users", dummyPageId, 3))
+	_ = ct.ColumnMeta().Insert(dictionary.NewColumnRecord(tableFileId, "id", 0))
+	_ = ct.ColumnMeta().Insert(dictionary.NewColumnRecord(tableFileId, "name", 1))
+	_ = ct.ColumnMeta().Insert(dictionary.NewColumnRecord(tableFileId, "email", 2))
 
 	// PRIMARY: プライマリインデックス, カラム (id)
-	indexId0 := catalog.IndexId(0)
-	_ = ct.IndexMeta().Insert(catalog.NewIndexRecord(tableFileId, indexId0, catalog.PrimaryIndexName, catalog.IndexTypePrimary, 1, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(catalog.NewIndexKeyColumnRecord(indexId0, "id", 0))
+	indexId0 := dictionary.IndexId(0)
+	_ = ct.IndexMeta().Insert(dictionary.NewIndexRecord(tableFileId, indexId0, dictionary.PrimaryIndexName, dictionary.IndexTypePrimary, 1, dummyPageId))
+	_ = ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnRecord(indexId0, "id", 0))
 
-	indexId1 := catalog.IndexId(1)
-	_ = ct.IndexMeta().Insert(catalog.NewIndexRecord(tableFileId, indexId1, "idx_name", catalog.IndexTypeNonUnique, 1, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(catalog.NewIndexKeyColumnRecord(indexId1, "name", 0))
+	indexId1 := dictionary.IndexId(1)
+	_ = ct.IndexMeta().Insert(dictionary.NewIndexRecord(tableFileId, indexId1, "idx_name", dictionary.IndexTypeNonUnique, 1, dummyPageId))
+	_ = ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnRecord(indexId1, "name", 0))
 
-	indexId2 := catalog.IndexId(2)
-	_ = ct.IndexMeta().Insert(catalog.NewIndexRecord(tableFileId, indexId2, "idx_email", catalog.IndexTypeUnique, 1, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(catalog.NewIndexKeyColumnRecord(indexId2, "email", 0))
+	indexId2 := dictionary.IndexId(2)
+	_ = ct.IndexMeta().Insert(dictionary.NewIndexRecord(tableFileId, indexId2, "idx_email", dictionary.IndexTypeUnique, 1, dummyPageId))
+	_ = ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnRecord(indexId2, "email", 0))
 
-	indexId3 := catalog.IndexId(3)
-	_ = ct.IndexMeta().Insert(catalog.NewIndexRecord(tableFileId, indexId3, "idx_name_email", catalog.IndexTypeNonUnique, 2, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(catalog.NewIndexKeyColumnRecord(indexId3, "name", 0))
-	_ = ct.IndexKeyColumnMeta().Insert(catalog.NewIndexKeyColumnRecord(indexId3, "email", 1))
+	indexId3 := dictionary.IndexId(3)
+	_ = ct.IndexMeta().Insert(dictionary.NewIndexRecord(tableFileId, indexId3, "idx_name_email", dictionary.IndexTypeNonUnique, 2, dummyPageId))
+	_ = ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnRecord(indexId3, "name", 0))
+	_ = ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnRecord(indexId3, "email", 1))
 
 	return ct
 }

@@ -5,13 +5,13 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 type primaryIndex struct {
-	catalog *catalog.Catalog
+	catalog *dictionary.Catalog
 	tree    *btree.Tree // プライマリインデックスの B+Tree
 	pkCount int         // プライマリキーのカラム数
 	lock    *lock.Manager
@@ -19,7 +19,7 @@ type primaryIndex struct {
 
 // newPrimaryIndex は既存のプライマリインデックスを開く
 func newPrimaryIndex(
-	ct *catalog.Catalog,
+	ct *dictionary.Catalog,
 	bp *buffer.Pool,
 	metaPageId page.Id,
 	pkCount int,
@@ -36,7 +36,7 @@ func newPrimaryIndex(
 
 // createPrimaryIndex は空のプライマリインデックスを作成する
 func createPrimaryIndex(
-	ct *catalog.Catalog,
+	ct *dictionary.Catalog,
 	bp *buffer.Pool,
 	fileId page.FileId,
 	pkCount int,

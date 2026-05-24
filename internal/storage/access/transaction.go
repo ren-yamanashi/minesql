@@ -5,7 +5,7 @@ import (
 	"sync"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
@@ -24,14 +24,14 @@ type TrxManager struct {
 	redoLog      *redo.Buffer
 	lock         *lock.Manager
 	bufferPool   *buffer.Pool
-	catalog      *catalog.Catalog
+	catalog      *dictionary.Catalog
 	transactions map[lock.TrxId]trxState
 	readViews    map[lock.TrxId]*readView // トランザクションごとの ReadView キャッシュ
 	nextTrxId    lock.TrxId               // 次に払い出すトランザクション ID
 }
 
 func NewTrxManager(
-	ct *catalog.Catalog,
+	ct *dictionary.Catalog,
 	undo *undo.Manager,
 	redo *redo.Buffer,
 	lockMgr *lock.Manager,
