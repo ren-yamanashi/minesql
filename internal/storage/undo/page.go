@@ -51,6 +51,11 @@ func (p *Page) NextPageNumber() page.PageNumber {
 	return page.PageNumber(binary.BigEndian.Uint32(p.header[headerNextPageNumberOffset:pageHeaderSize]))
 }
 
+// FreeSpace はボディ内の空き容量を返す
+func (p *Page) FreeSpace() int {
+	return len(p.body) - int(p.UsedBytes())
+}
+
 // initialize は Undo ページを初期化する
 func (p *Page) initialize() {
 	binary.BigEndian.PutUint16(p.header[headerUsedBytesOffset:headerNextPageNumberOffset], 0) // usedBytes
@@ -73,9 +78,4 @@ func (p *Page) append(record []byte) bool {
 // setNextPageNumber は次の UNDO ページの PageNumber を設定する
 func (p *Page) setNextPageNumber(pn page.PageNumber) {
 	binary.BigEndian.PutUint32(p.header[headerNextPageNumberOffset:pageHeaderSize], uint32(pn))
-}
-
-// freeSpace はボディ内の空き容量を返す
-func (p *Page) freeSpace() int {
-	return len(p.body) - int(p.UsedBytes())
 }

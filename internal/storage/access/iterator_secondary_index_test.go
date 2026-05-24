@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestSecondaryIteratorNext(t *testing.T) {
+func TestSecondaryIndexIteratorNext(t *testing.T) {
 	t.Run("セカンダリインデックス経由でプライマリレコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		env := setupIteratorTestEnv(t)
@@ -110,7 +110,7 @@ func TestSecondaryIteratorNext(t *testing.T) {
 	})
 }
 
-func TestSecondaryIteratorNextIndexOnly(t *testing.T) {
+func TestSecondaryIndexIteratorNextIndexOnly(t *testing.T) {
 	t.Run("セカンダリインデックスのレコードのみを取得できる", func(t *testing.T) {
 		// GIVEN
 		env := setupIteratorTestEnv(t)
@@ -241,7 +241,7 @@ func insertPrimaryRecord(t *testing.T, env *iteratorTestEnv, deleteMark byte, co
 	if err != nil {
 		t.Fatalf("PrimaryRecord の作成に失敗: %v", err)
 	}
-	if err := env.primaryTree.Insert(pr.encode()); err != nil {
+	if err := env.primaryTree.Insert(pr.Encode()); err != nil {
 		t.Fatalf("プライマリレコードの挿入に失敗: %v", err)
 	}
 }
@@ -266,18 +266,18 @@ func insertSecondaryRecordWithDeleteMark(t *testing.T, env *iteratorTestEnv, del
 	if err != nil {
 		t.Fatalf("SecondaryRecord の作成に失敗: %v", err)
 	}
-	if err := env.secondaryTree.Insert(sr.encode()); err != nil {
+	if err := env.secondaryTree.Insert(sr.Encode()); err != nil {
 		t.Fatalf("セカンダリレコードの挿入に失敗: %v", err)
 	}
 }
 
 // searchSecondaryIndex はセカンダリ B+Tree を先頭から検索してイテレータを返す
-func searchSecondaryIndex(t *testing.T, env *iteratorTestEnv) *SecondaryIterator {
+func searchSecondaryIndex(t *testing.T, env *iteratorTestEnv) *SecondaryIndexIterator {
 	t.Helper()
 	mode := SearchModeStart{}
-	iter, err := env.secondaryTree.Search(mode.encode())
+	iter, err := env.secondaryTree.Search(mode.Encode())
 	if err != nil {
 		t.Fatalf("セカンダリインデックスの検索に失敗: %v", err)
 	}
-	return NewSecondaryIterator("idx_name", iter, env.ct, env.primaryTree)
+	return NewSecondaryIndexIterator("idx_name", iter, env.ct, env.primaryTree)
 }

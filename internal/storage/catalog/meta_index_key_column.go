@@ -7,7 +7,7 @@ import (
 )
 
 type IndexKeyColumnMeta struct {
-	tree *btree.Tree // インデックスキーカラムメタデータが格納される B+Tree
+	tree *btree.Tree
 }
 
 func NewIndexKeyColumnMeta(bp *buffer.Pool, metaPageId page.Id) *IndexKeyColumnMeta {
@@ -22,16 +22,14 @@ func CreateIndexKeyColumnMeta(bp *buffer.Pool) (*IndexKeyColumnMeta, error) {
 	return &IndexKeyColumnMeta{tree: tree}, nil
 }
 
-// Search は指定した検索モードでメタデータを検索し、イテレータを返す
 func (kcm *IndexKeyColumnMeta) Search(mode SearchMode) (*IndexKeyColumnIterator, error) {
-	iter, err := kcm.tree.Search(mode.encode())
+	iter, err := kcm.tree.Search(mode.Encode())
 	if err != nil {
 		return nil, err
 	}
 	return NewIndexKeyColumnIterator(iter), nil
 }
 
-// Insert はレコードを挿入する
 func (kcm *IndexKeyColumnMeta) Insert(record IndexKeyColumnRecord) error {
-	return kcm.tree.Insert(record.encode())
+	return kcm.tree.Insert(record.Encode())
 }

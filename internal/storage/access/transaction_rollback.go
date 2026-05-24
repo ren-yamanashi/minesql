@@ -37,12 +37,12 @@ func (t *TrxManager) rollbackInsert(primaryTree *btree.Tree, record undo.InsertR
 	if err := primaryTree.Delete(record.Record().Key()); err != nil {
 		return err
 	}
-	primaryRecord, err := decodePrimaryRecord(record.Record(), t.catalog, fileId)
+	primaryRecord, err := DecodePrimaryRecord(record.Record(), t.catalog, fileId)
 	if err != nil {
 		return err
 	}
 	return t.forEachSecondaryTree(fileId, func(tree *btree.Tree, keyCols map[string]int) error {
-		key := primaryRecord.secondaryKey(keyCols)
+		key := primaryRecord.SecondaryKey(keyCols)
 		return tree.Delete(key)
 	})
 }
@@ -53,12 +53,12 @@ func (t *TrxManager) rollbackDelete(primaryTree *btree.Tree, record undo.DeleteR
 	if err := primaryTree.Update(record.Record()); err != nil {
 		return err
 	}
-	primaryRecord, err := decodePrimaryRecord(record.Record(), t.catalog, fileId)
+	primaryRecord, err := DecodePrimaryRecord(record.Record(), t.catalog, fileId)
 	if err != nil {
 		return err
 	}
 	return t.forEachSecondaryTree(fileId, func(tree *btree.Tree, keyCols map[string]int) error {
-		key := primaryRecord.secondaryKey(keyCols)
+		key := primaryRecord.SecondaryKey(keyCols)
 		restored := btree.NewRecord([]byte{0}, key, nil) // header: deleteMark(0), key: sk+pk, nonKey: nil
 		return tree.Update(restored)
 	})
@@ -69,17 +69,17 @@ func (t *TrxManager) rollbackUpdate(primaryTree *btree.Tree, record undo.UpdateR
 	if err := primaryTree.Update(record.PrevRecord()); err != nil {
 		return err
 	}
-	prevPrimaryRecord, err := decodePrimaryRecord(record.PrevRecord(), t.catalog, fileId)
+	prevPrimaryRecord, err := DecodePrimaryRecord(record.PrevRecord(), t.catalog, fileId)
 	if err != nil {
 		return err
 	}
-	newPrimaryRecord, err := decodePrimaryRecord(record.NewRecord(), t.catalog, fileId)
+	newPrimaryRecord, err := DecodePrimaryRecord(record.NewRecord(), t.catalog, fileId)
 	if err != nil {
 		return err
 	}
 	return t.forEachSecondaryTree(fileId, func(tree *btree.Tree, keyCols map[string]int) error {
-		oldKey := prevPrimaryRecord.secondaryKey(keyCols)
-		newKey := newPrimaryRecord.secondaryKey(keyCols)
+		oldKey := prevPrimaryRecord.SecondaryKey(keyCols)
+		newKey := newPrimaryRecord.SecondaryKey(keyCols)
 		// SK が変わってない場合はスキップ
 		if bytes.Equal(oldKey, newKey) {
 			return nil

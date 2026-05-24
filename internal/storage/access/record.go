@@ -8,5 +8,5 @@ var (
 )
 
 type Record interface {
-	encode() btree.Record
+	Encode() btree.Record
 }

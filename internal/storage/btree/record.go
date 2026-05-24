@@ -27,17 +27,9 @@ func (r Record) Header() []byte { return r[0] }
 func (r Record) Key() []byte    { return r[1] }
 func (r Record) NonKey() []byte { return r[2] }
 
-// compareKey はレコードのキーと指定されたキーを比較する
-//   - -1: record.Key < otherKey
-//   - 0:  record.Key == otherKey
-//   - 1:  record.Key > otherKey
-func (r Record) compareKey(otherKey []byte) int {
-	return bytes.Compare(r[1], otherKey)
-}
-
-// toBytes はレコードをバイト列にシリアライズする
+// ToBytes はレコードをバイト列にシリアライズする
 //   - フォーマット: [headerSize(2B)][keySize(2B)][header][key][nonKey]
-func (r Record) toBytes() []byte {
+func (r Record) ToBytes() []byte {
 	headerLen := len(r[0])
 	keyLen := len(r[1])
 	nonKeyLen := len(r[2])
@@ -54,6 +46,14 @@ func (r Record) toBytes() []byte {
 	copy(data[offset:], r[2])
 
 	return data
+}
+
+// compareKey はレコードのキーと指定されたキーを比較する
+//   - -1: record.Key < otherKey
+//   - 0:  record.Key == otherKey
+//   - 1:  record.Key > otherKey
+func (r Record) compareKey(otherKey []byte) int {
+	return bytes.Compare(r[1], otherKey)
 }
 
 // recordFromBytes はバイト列からレコードを復元する

@@ -180,7 +180,7 @@ func TestRecordSerialize(t *testing.T) {
 	})
 }
 
-func TestRecordSerializedSize(t *testing.T) {
+func TestRecordSize(t *testing.T) {
 	t.Run("ページ変更レコードはヘッダー + ページサイズを返す", func(t *testing.T) {
 		// GIVEN
 		pg := buildTestPage(t)
@@ -193,7 +193,7 @@ func TestRecordSerializedSize(t *testing.T) {
 		}
 
 		// WHEN
-		size := r.serializedSize()
+		size := r.Size()
 
 		// THEN
 		assert.Equal(t, recordHeaderSize+page.Size, size)
@@ -208,7 +208,7 @@ func TestRecordSerializedSize(t *testing.T) {
 		}
 
 		// WHEN
-		size := r.serializedSize()
+		size := r.Size()
 
 		// THEN
 		assert.Equal(t, recordHeaderSize, size)
@@ -226,7 +226,7 @@ func TestRecordSerializedSize(t *testing.T) {
 		}
 
 		// WHEN
-		size := r.serializedSize()
+		size := r.Size()
 		serialized := r.Serialize()
 
 		// THEN
@@ -248,7 +248,7 @@ func TestDeserializeRecord(t *testing.T) {
 		buf := original.Serialize()
 
 		// WHEN
-		decoded, readBytes, err := deserializeRecord(buf)
+		decoded, readBytes, err := DeserializeRecord(buf)
 
 		// THEN
 		assert.NoError(t, err)
@@ -272,7 +272,7 @@ func TestDeserializeRecord(t *testing.T) {
 		buf := original.Serialize()
 
 		// WHEN
-		decoded, readBytes, err := deserializeRecord(buf)
+		decoded, readBytes, err := DeserializeRecord(buf)
 
 		// THEN
 		assert.NoError(t, err)
@@ -292,7 +292,7 @@ func TestDeserializeRecord(t *testing.T) {
 		buf := original.Serialize()
 
 		// WHEN
-		decoded, readBytes, err := deserializeRecord(buf)
+		decoded, readBytes, err := DeserializeRecord(buf)
 
 		// THEN
 		assert.NoError(t, err)
@@ -307,7 +307,7 @@ func TestDeserializeRecord(t *testing.T) {
 		data := make([]byte, recordHeaderSize-1)
 
 		// WHEN
-		_, _, err := deserializeRecord(data)
+		_, _, err := DeserializeRecord(data)
 
 		// THEN
 		assert.ErrorIs(t, err, ErrInvalidRecord)
@@ -328,7 +328,7 @@ func TestDeserializeRecord(t *testing.T) {
 		truncated := buf[:recordHeaderSize+10]
 
 		// WHEN
-		_, _, err := deserializeRecord(truncated)
+		_, _, err := DeserializeRecord(truncated)
 
 		// THEN
 		assert.ErrorIs(t, err, ErrInvalidRecord)
@@ -341,13 +341,13 @@ func TestDeserializeRecord(t *testing.T) {
 		buf := append(r1.Serialize(), r2.Serialize()...)
 
 		// WHEN
-		decoded, readBytes, err := deserializeRecord(buf)
+		decoded, readBytes, err := DeserializeRecord(buf)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, Lsn(1), decoded.Lsn())
 		// readBytes で 2 件目の開始位置が分かる
-		decoded2, _, err := deserializeRecord(buf[readBytes:])
+		decoded2, _, err := DeserializeRecord(buf[readBytes:])
 		assert.NoError(t, err)
 		assert.Equal(t, Lsn(2), decoded2.Lsn())
 	})
@@ -359,7 +359,7 @@ func TestDeserializeRecord(t *testing.T) {
 		buf[recordHeaderRecordTypeOffset] = 0
 
 		// WHEN
-		_, _, err := deserializeRecord(buf)
+		_, _, err := DeserializeRecord(buf)
 
 		// THEN
 		assert.ErrorIs(t, err, ErrInvalidRecord)
@@ -372,7 +372,7 @@ func TestDeserializeRecord(t *testing.T) {
 		buf[recordHeaderRecordTypeOffset] = 255
 
 		// WHEN
-		_, _, err := deserializeRecord(buf)
+		_, _, err := DeserializeRecord(buf)
 
 		// THEN
 		assert.ErrorIs(t, err, ErrInvalidRecord)
@@ -383,7 +383,7 @@ func TestDeserializeRecord(t *testing.T) {
 		data := []byte{}
 
 		// WHEN
-		_, _, err := deserializeRecord(data)
+		_, _, err := DeserializeRecord(data)
 
 		// THEN
 		assert.ErrorIs(t, err, ErrInvalidRecord)

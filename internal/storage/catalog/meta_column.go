@@ -7,7 +7,7 @@ import (
 )
 
 type ColumnMeta struct {
-	tree *btree.Tree // カラムメタデータが格納される B+Tree
+	tree *btree.Tree
 }
 
 func NewColumnMeta(bp *buffer.Pool, metaPageId page.Id) *ColumnMeta {
@@ -22,16 +22,14 @@ func CreateColumnMeta(bp *buffer.Pool) (*ColumnMeta, error) {
 	return &ColumnMeta{tree: tree}, nil
 }
 
-// Search は指定した検索モードでメタデータを検索し、イテレータを返す
 func (cm *ColumnMeta) Search(mode SearchMode) (*ColumnIterator, error) {
-	iter, err := cm.tree.Search(mode.encode())
+	iter, err := cm.tree.Search(mode.Encode())
 	if err != nil {
 		return nil, err
 	}
 	return NewColumnIterator(iter), nil
 }
 
-// Insert はレコードを挿入する
 func (cm *ColumnMeta) Insert(record ColumnRecord) error {
-	return cm.tree.Insert(record.encode())
+	return cm.tree.Insert(record.Encode())
 }

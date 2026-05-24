@@ -10,7 +10,6 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
 
-// PageCleaner はバックグラウンドでのダーティーページのフラッシュを管理する
 type PageCleaner struct {
 	bufferPool      *buffer.Pool
 	redoLog         *redo.Buffer
@@ -36,7 +35,6 @@ func NewPageCleaner(bp *buffer.Pool, redo *redo.Buffer, redoMaxSize int, maxDirt
 	}
 }
 
-// Start はバックグラウンド goroutine を起動する
 func (pc *PageCleaner) Start() {
 	if !pc.isRunning.CompareAndSwap(false, true) {
 		return
@@ -48,7 +46,6 @@ func (pc *PageCleaner) Start() {
 	go pc.loop()
 }
 
-// Stop はバックグラウンド goroutine を停止し、終了を待つ
 func (pc *PageCleaner) Stop() {
 	pc.stopOnce.Do(func() {
 		if !pc.isRunning.Load() {

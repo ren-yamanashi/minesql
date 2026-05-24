@@ -128,7 +128,7 @@ func (b *Buffer) Size() (int64, error) {
 
 	var bufferSize int
 	for _, record := range b.records {
-		bufferSize += record.serializedSize()
+		bufferSize += record.Size()
 	}
 
 	return fileSize + int64(bufferSize), nil

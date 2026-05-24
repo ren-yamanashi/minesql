@@ -78,7 +78,7 @@ func TestConstraintRecordEncode(t *testing.T) {
 		cr := NewConstraintRecord(page.FileId(1), "id", "PRIMARY", page.FileId(0), "")
 
 		// WHEN
-		record := cr.encode()
+		record := cr.Encode()
 
 		// THEN
 		assert.NotNil(t, record.Key())
@@ -91,8 +91,8 @@ func TestConstraintRecordEncode(t *testing.T) {
 		original := NewConstraintRecord(page.FileId(1), "id", "PRIMARY", page.FileId(0), "")
 
 		// WHEN
-		record := original.encode()
-		decoded := decodeConstraintRecord(record)
+		record := original.Encode()
+		decoded := DecodeConstraintRecord(record)
 
 		// THEN
 		assert.Equal(t, original.FileId(), decoded.FileId())
@@ -107,8 +107,8 @@ func TestConstraintRecordEncode(t *testing.T) {
 		original := NewConstraintRecord(page.FileId(2), "user_id", "fk_orders_users", page.FileId(1), "id")
 
 		// WHEN
-		record := original.encode()
-		decoded := decodeConstraintRecord(record)
+		record := original.Encode()
+		decoded := DecodeConstraintRecord(record)
 
 		// THEN
 		assert.Equal(t, page.FileId(2), decoded.FileId())
@@ -123,8 +123,8 @@ func TestConstraintRecordEncode(t *testing.T) {
 		original := NewConstraintRecord(page.FileId(1), "email", "idx_email", page.FileId(0), "")
 
 		// WHEN
-		record := original.encode()
-		decoded := decodeConstraintRecord(record)
+		record := original.Encode()
+		decoded := DecodeConstraintRecord(record)
 
 		// THEN
 		assert.Equal(t, "email", decoded.ColumnName())
@@ -138,8 +138,8 @@ func TestConstraintRecordEncode(t *testing.T) {
 		original := NewConstraintRecord(page.FileId(0), "col", "pk", page.FileId(0), "")
 
 		// WHEN
-		record := original.encode()
-		decoded := decodeConstraintRecord(record)
+		record := original.Encode()
+		decoded := DecodeConstraintRecord(record)
 
 		// THEN
 		assert.Equal(t, page.FileId(0), decoded.FileId())
@@ -151,10 +151,10 @@ func TestDecodeConstraintRecord(t *testing.T) {
 	t.Run("エンコード済みレコードから FileId とカラム名と制約名を復元できる", func(t *testing.T) {
 		// GIVEN
 		cr := NewConstraintRecord(page.FileId(42), "name", "uq_name", page.FileId(0), "")
-		record := cr.encode()
+		record := cr.Encode()
 
 		// WHEN
-		decoded := decodeConstraintRecord(record)
+		decoded := DecodeConstraintRecord(record)
 
 		// THEN
 		assert.Equal(t, page.FileId(42), decoded.FileId())
@@ -165,10 +165,10 @@ func TestDecodeConstraintRecord(t *testing.T) {
 	t.Run("エンコード済みレコードから参照先テーブルとカラムを復元できる", func(t *testing.T) {
 		// GIVEN
 		cr := NewConstraintRecord(page.FileId(3), "dept_id", "fk_dept", page.FileId(5), "id")
-		record := cr.encode()
+		record := cr.Encode()
 
 		// WHEN
-		decoded := decodeConstraintRecord(record)
+		decoded := DecodeConstraintRecord(record)
 
 		// THEN
 		assert.Equal(t, page.FileId(5), decoded.ReferenceTableFileId())

@@ -19,8 +19,8 @@ func (t *Table) Update(currentRecord *PrimaryRecord, colNames, values []string, 
 	// Undo ログを更新
 	undoRecord := undo.NewUpdateRecord(
 		t.primaryIndex.fileId(),
-		currentRecord.encode(),
-		newRecord.encode(),
+		currentRecord.Encode(),
+		newRecord.Encode(),
 		currentRecord.lastTrxId,
 		currentRecord.rollPtr,
 	)

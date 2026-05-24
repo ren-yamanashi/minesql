@@ -9,7 +9,6 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
-// ヘッダーページ内のオフセット
 const (
 	headerMagicNumberOffset        = 0
 	headerTableMetaOffset          = 4
@@ -21,7 +20,7 @@ const (
 	headerNextFileIdOffset         = 28
 	headerNextIndexIdOffset        = 32
 	headerUndoLogFileIdOffset      = 36
-	headerFieldSize                = 4 // 各フィールドのバイト数
+	headerFieldSize                = 4
 )
 
 var (

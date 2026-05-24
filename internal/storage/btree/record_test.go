@@ -23,48 +23,13 @@ func TestNewRecord(t *testing.T) {
 	})
 }
 
-func TestCompareKey(t *testing.T) {
-	t.Run("キーが一致する場合は 0 を返す", func(t *testing.T) {
-		// GIVEN
-		r := NewRecord([]byte{0x00}, []byte{0x01, 0x02}, []byte{})
-
-		// WHEN
-		result := r.compareKey([]byte{0x01, 0x02})
-
-		// THEN
-		assert.Equal(t, 0, result)
-	})
-
-	t.Run("キーが小さい場合は -1 を返す", func(t *testing.T) {
-		// GIVEN
-		r := NewRecord([]byte{0x00}, []byte{0x01}, []byte{})
-
-		// WHEN
-		result := r.compareKey([]byte{0x02})
-
-		// THEN
-		assert.Equal(t, -1, result)
-	})
-
-	t.Run("キーが大きい場合は 1 を返す", func(t *testing.T) {
-		// GIVEN
-		r := NewRecord([]byte{0x00}, []byte{0x02}, []byte{})
-
-		// WHEN
-		result := r.compareKey([]byte{0x01})
-
-		// THEN
-		assert.Equal(t, 1, result)
-	})
-}
-
 func TestToBytes(t *testing.T) {
 	t.Run("シリアライズしたバイト列から復元できる", func(t *testing.T) {
 		// GIVEN
 		r := NewRecord([]byte{0x01}, []byte{0x02, 0x03}, []byte{0x04, 0x05, 0x06})
 
 		// WHEN
-		data := r.toBytes()
+		data := r.ToBytes()
 		restored := recordFromBytes(data)
 
 		// THEN
@@ -78,7 +43,7 @@ func TestToBytes(t *testing.T) {
 		r := NewRecord([]byte{0x01}, []byte{0x02}, []byte{})
 
 		// WHEN
-		data := r.toBytes()
+		data := r.ToBytes()
 		restored := recordFromBytes(data)
 
 		// THEN
@@ -92,7 +57,7 @@ func TestToBytes(t *testing.T) {
 		key := []byte{0xCC, 0xDD, 0xEE}
 
 		// WHEN
-		data := NewRecord(header, key, []byte{}).toBytes()
+		data := NewRecord(header, key, []byte{}).ToBytes()
 
 		// THEN
 		assert.Equal(t, byte(0), data[0])
@@ -125,5 +90,40 @@ func TestToBytes(t *testing.T) {
 		assert.Nil(t, r.Header())
 		assert.Nil(t, r.Key())
 		assert.Nil(t, r.NonKey())
+	})
+}
+
+func TestCompareKey(t *testing.T) {
+	t.Run("キーが一致する場合は 0 を返す", func(t *testing.T) {
+		// GIVEN
+		r := NewRecord([]byte{0x00}, []byte{0x01, 0x02}, []byte{})
+
+		// WHEN
+		result := r.compareKey([]byte{0x01, 0x02})
+
+		// THEN
+		assert.Equal(t, 0, result)
+	})
+
+	t.Run("キーが小さい場合は -1 を返す", func(t *testing.T) {
+		// GIVEN
+		r := NewRecord([]byte{0x00}, []byte{0x01}, []byte{})
+
+		// WHEN
+		result := r.compareKey([]byte{0x02})
+
+		// THEN
+		assert.Equal(t, -1, result)
+	})
+
+	t.Run("キーが大きい場合は 1 を返す", func(t *testing.T) {
+		// GIVEN
+		r := NewRecord([]byte{0x00}, []byte{0x02}, []byte{})
+
+		// WHEN
+		result := r.compareKey([]byte{0x01})
+
+		// THEN
+		assert.Equal(t, 1, result)
 	})
 }

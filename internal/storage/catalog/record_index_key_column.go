@@ -25,8 +25,7 @@ func (kcr IndexKeyColumnRecord) IndexId() IndexId { return kcr.indexId }
 func (kcr IndexKeyColumnRecord) Name() string     { return kcr.name }
 func (kcr IndexKeyColumnRecord) Position() int    { return kcr.position }
 
-// encode は btree.Record にエンコードする
-func (kcr IndexKeyColumnRecord) encode() btree.Record {
+func (kcr IndexKeyColumnRecord) Encode() btree.Record {
 	// key = indexId + name
 	var key []byte
 	indexId := binary.BigEndian.AppendUint32(nil, uint32(kcr.indexId))
@@ -40,8 +39,7 @@ func (kcr IndexKeyColumnRecord) encode() btree.Record {
 	return btree.NewRecord(nil, key, nonKey)
 }
 
-// decodeIndexKeyColumnRecord は btree.Record から indexKeyColRecord にデコードする
-func decodeIndexKeyColumnRecord(record btree.Record) IndexKeyColumnRecord {
+func DecodeIndexKeyColumnRecord(record btree.Record) IndexKeyColumnRecord {
 	// key = [indexId, name]
 	var key [][]byte
 	encode.Decode(record.Key(), &key)

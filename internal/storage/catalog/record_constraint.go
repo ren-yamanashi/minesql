@@ -38,8 +38,7 @@ func (cr ConstraintRecord) ConstraintName() string            { return cr.constr
 func (cr ConstraintRecord) ReferenceTableFileId() page.FileId { return cr.referenceTableFileId }
 func (cr ConstraintRecord) ReferenceColumnName() string       { return cr.referenceColumnName }
 
-// encode は btree.Record にエンコードする
-func (cr ConstraintRecord) encode() btree.Record {
+func (cr ConstraintRecord) Encode() btree.Record {
 	// key = fileId + colName + constraintName
 	var key []byte
 	fileId := binary.BigEndian.AppendUint32(nil, uint32(cr.fileId))
@@ -53,8 +52,7 @@ func (cr ConstraintRecord) encode() btree.Record {
 	return btree.NewRecord(nil, key, nonKey)
 }
 
-// decodeConstraintRecord は btree.Record から constraintRecord にデコードする
-func decodeConstraintRecord(record btree.Record) ConstraintRecord {
+func DecodeConstraintRecord(record btree.Record) ConstraintRecord {
 	// key = [fileId, colName, constraintName]
 	var key [][]byte
 	encode.Decode(record.Key(), &key)

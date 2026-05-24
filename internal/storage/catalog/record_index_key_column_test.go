@@ -51,7 +51,7 @@ func TestIndexKeyColumnRecordEncode(t *testing.T) {
 		kcr := NewIndexKeyColumnRecord(IndexId(1), "name", 0)
 
 		// WHEN
-		record := kcr.encode()
+		record := kcr.Encode()
 
 		// THEN
 		assert.NotNil(t, record.Key())
@@ -64,8 +64,8 @@ func TestIndexKeyColumnRecordEncode(t *testing.T) {
 		original := NewIndexKeyColumnRecord(IndexId(10), "email", 2)
 
 		// WHEN
-		record := original.encode()
-		decoded := decodeIndexKeyColumnRecord(record)
+		record := original.Encode()
+		decoded := DecodeIndexKeyColumnRecord(record)
 
 		// THEN
 		assert.Equal(t, original.IndexId(), decoded.IndexId())
@@ -78,8 +78,8 @@ func TestIndexKeyColumnRecordEncode(t *testing.T) {
 		original := NewIndexKeyColumnRecord(IndexId(5), "id", 0)
 
 		// WHEN
-		record := original.encode()
-		decoded := decodeIndexKeyColumnRecord(record)
+		record := original.Encode()
+		decoded := DecodeIndexKeyColumnRecord(record)
 
 		// THEN
 		assert.Equal(t, IndexId(5), decoded.IndexId())
@@ -92,8 +92,8 @@ func TestIndexKeyColumnRecordEncode(t *testing.T) {
 		original := NewIndexKeyColumnRecord(IndexId(0), "col", 3)
 
 		// WHEN
-		record := original.encode()
-		decoded := decodeIndexKeyColumnRecord(record)
+		record := original.Encode()
+		decoded := DecodeIndexKeyColumnRecord(record)
 
 		// THEN
 		assert.Equal(t, IndexId(0), decoded.IndexId())
@@ -106,10 +106,10 @@ func TestDecodeIndexKeyColumnRecord(t *testing.T) {
 	t.Run("エンコード済みレコードからインデックス ID とカラム名を復元できる", func(t *testing.T) {
 		// GIVEN
 		kcr := NewIndexKeyColumnRecord(IndexId(42), "age", 5)
-		record := kcr.encode()
+		record := kcr.Encode()
 
 		// WHEN
-		decoded := decodeIndexKeyColumnRecord(record)
+		decoded := DecodeIndexKeyColumnRecord(record)
 
 		// THEN
 		assert.Equal(t, IndexId(42), decoded.IndexId())
@@ -119,10 +119,10 @@ func TestDecodeIndexKeyColumnRecord(t *testing.T) {
 	t.Run("エンコード済みレコードからカラム位置を復元できる", func(t *testing.T) {
 		// GIVEN
 		kcr := NewIndexKeyColumnRecord(IndexId(1), "status", 7)
-		record := kcr.encode()
+		record := kcr.Encode()
 
 		// WHEN
-		decoded := decodeIndexKeyColumnRecord(record)
+		decoded := DecodeIndexKeyColumnRecord(record)
 
 		// THEN
 		assert.Equal(t, 7, decoded.Position())

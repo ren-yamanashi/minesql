@@ -54,7 +54,7 @@ func (bn *branchNode) initialize(key []byte, leftChildPageId, rightChildId page.
 //   - record: 挿入するレコード
 //   - return: 挿入に成功した場合は true
 func (bn *branchNode) insert(slotNum int, record Record) bool {
-	recordBytes := record.toBytes()
+	recordBytes := record.ToBytes()
 	if len(recordBytes) > bn.maxRecordSize() {
 		return false
 	}
@@ -118,7 +118,7 @@ func (bn *branchNode) delete(slotNum int) {
 //   - slotNum: 更新するレコードのスロット番号
 //   - record: 新しいレコード
 func (bn *branchNode) update(slotNum int, record Record) bool {
-	return bn.body.update(slotNum, record.toBytes())
+	return bn.body.update(slotNum, record.ToBytes())
 }
 
 // numRecords はレコード数を取得する

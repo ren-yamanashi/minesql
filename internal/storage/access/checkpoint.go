@@ -8,7 +8,6 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
 
-// Checkpoint はチェックポイントの実行を管理する
 type Checkpoint struct {
 	bufferPool *buffer.Pool
 	redoLog    *redo.Buffer
@@ -18,7 +17,6 @@ func NewCheckpoint(bp *buffer.Pool, redo *redo.Buffer) *Checkpoint {
 	return &Checkpoint{bufferPool: bp, redoLog: redo}
 }
 
-// Execute はチェックポイントを実行する
 func (c *Checkpoint) Execute() error {
 	minLsn := c.minPageLsn()
 	checkpointLsn := c.redoLog.FlushedLsn()

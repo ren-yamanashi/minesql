@@ -11,7 +11,7 @@ func TestPageId(t *testing.T) {
 	t.Run("設定された PageId を返す", func(t *testing.T) {
 		// GIVEN
 		pageId := page.NewId(1, 2)
-		bp, err := newPage(pageId)
+		bp, err := NewPage(pageId)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -26,7 +26,7 @@ func TestData(t *testing.T) {
 	t.Run("Page のデータを返す", func(t *testing.T) {
 		// GIVEN
 		pageId := page.NewId(0, 0)
-		bp, err := newPage(pageId)
+		bp, err := NewPage(pageId)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -45,7 +45,7 @@ func TestNewPage(t *testing.T) {
 		pageId := page.NewId(1, 0)
 
 		// WHEN
-		bp, err := newPage(pageId)
+		bp, err := NewPage(pageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -59,7 +59,7 @@ func TestNewPage(t *testing.T) {
 		pageId := page.NewId(0, 0)
 
 		// WHEN
-		bp, err := newPage(pageId)
+		bp, err := NewPage(pageId)
 
 		// THEN
 		assert.NoError(t, err)

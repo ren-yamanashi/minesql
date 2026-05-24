@@ -24,5 +24,5 @@ func (iki *IndexKeyColumnIterator) Next() (IndexKeyColumnRecord, bool, error) {
 	if !ok {
 		return IndexKeyColumnRecord{}, false, nil
 	}
-	return decodeIndexKeyColumnRecord(record), true, nil
+	return DecodeIndexKeyColumnRecord(record), true, nil
 }

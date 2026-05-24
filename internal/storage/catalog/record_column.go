@@ -26,8 +26,7 @@ func (cr ColumnRecord) FileId() page.FileId { return cr.fileId }
 func (cr ColumnRecord) Name() string        { return cr.name }
 func (cr ColumnRecord) Position() int       { return cr.position }
 
-// encode は btree.Record にエンコードする
-func (cr ColumnRecord) encode() btree.Record {
+func (cr ColumnRecord) Encode() btree.Record {
 	// key = fileId + name
 	var key []byte
 	fileId := binary.BigEndian.AppendUint32(nil, uint32(cr.fileId))
@@ -41,8 +40,7 @@ func (cr ColumnRecord) encode() btree.Record {
 	return btree.NewRecord(nil, key, nonKey)
 }
 
-// decodeColumnRecord は btree.Record から columnRecord にデコードする
-func decodeColumnRecord(record btree.Record) ColumnRecord {
+func DecodeColumnRecord(record btree.Record) ColumnRecord {
 	// key = [fileId, name]
 	var key [][]byte
 	encode.Decode(record.Key(), &key)

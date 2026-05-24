@@ -26,8 +26,7 @@ func (tr TableRecord) Name() string        { return tr.name }
 func (tr TableRecord) MetaPageId() page.Id { return tr.metaPageId }
 func (tr TableRecord) ColumnCount() int    { return tr.columnCount }
 
-// encode は btree.Record にエンコードする
-func (tr TableRecord) encode() btree.Record {
+func (tr TableRecord) Encode() btree.Record {
 	// key = name
 	var key []byte
 	encode.Encode([][]byte{[]byte(tr.name)}, &key)
@@ -41,8 +40,7 @@ func (tr TableRecord) encode() btree.Record {
 	return btree.NewRecord(nil, key, nonKey)
 }
 
-// decodeTableRecord は btree.Record から TableRecord にデコードする
-func decodeTableRecord(record btree.Record) TableRecord {
+func DecodeTableRecord(record btree.Record) TableRecord {
 	// key = [name]
 	var key [][]byte
 	encode.Decode(record.Key(), &key)

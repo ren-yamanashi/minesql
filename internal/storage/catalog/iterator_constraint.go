@@ -24,5 +24,5 @@ func (ci *ConstraintIterator) Next() (ConstraintRecord, bool, error) {
 	if !ok {
 		return ConstraintRecord{}, false, nil
 	}
-	return decodeConstraintRecord(record), true, nil
+	return DecodeConstraintRecord(record), true, nil
 }

@@ -4,6 +4,6 @@ import "github.com/ren-yamanashi/minesql/internal/storage/btree"
 
 type SearchModeStart struct{}
 
-func (SearchModeStart) encode() btree.SearchMode {
+func (SearchModeStart) Encode() btree.SearchMode {
 	return btree.SearchModeStart{}
 }

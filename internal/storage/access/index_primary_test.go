@@ -163,7 +163,7 @@ func TestPrimaryIndexInsert(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		// 同一トランザクションで既に排他ロックを保持しているので再取得は成功する
-		encodedRecord := record.encode()
+		encodedRecord := record.Encode()
 		_, pos, err := pi.tree.FindByKey(encodedRecord.Key())
 		assert.NoError(t, err)
 		err = pi.lock.Lock(testTrxId, pos, lock.Exclusive)

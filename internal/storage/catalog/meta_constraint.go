@@ -7,7 +7,7 @@ import (
 )
 
 type ConstraintMeta struct {
-	tree *btree.Tree // 制約メタデータが格納される B+Tree
+	tree *btree.Tree
 }
 
 func NewConstraintMeta(bp *buffer.Pool, metaPageId page.Id) *ConstraintMeta {
@@ -22,16 +22,14 @@ func CreateConstraintMeta(bp *buffer.Pool) (*ConstraintMeta, error) {
 	return &ConstraintMeta{tree: tree}, nil
 }
 
-// Search は指定した検索モードでメタデータを検索し、イテレータを返す
 func (cm *ConstraintMeta) Search(mode SearchMode) (*ConstraintIterator, error) {
-	iter, err := cm.tree.Search(mode.encode())
+	iter, err := cm.tree.Search(mode.Encode())
 	if err != nil {
 		return nil, err
 	}
 	return NewConstraintIterator(iter), nil
 }
 
-// Insert はレコードを挿入する
 func (cm *ConstraintMeta) Insert(record ConstraintRecord) error {
-	return cm.tree.Insert(record.encode())
+	return cm.tree.Insert(record.Encode())
 }

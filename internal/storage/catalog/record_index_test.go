@@ -92,7 +92,7 @@ func TestIndexRecordEncode(t *testing.T) {
 		ir := NewIndexRecord(page.FileId(1), IndexId(10), "idx_name", IndexTypeNonUnique, 2, page.NewId(page.FileId(1), page.PageNumber(0)))
 
 		// WHEN
-		record := ir.encode()
+		record := ir.Encode()
 
 		// THEN
 		assert.NotNil(t, record.Key())
@@ -105,8 +105,8 @@ func TestIndexRecordEncode(t *testing.T) {
 		original := NewIndexRecord(page.FileId(1), IndexId(1), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0)))
 
 		// WHEN
-		record := original.encode()
-		decoded := decodeIndexRecord(record)
+		record := original.Encode()
+		decoded := DecodeIndexRecord(record)
 
 		// THEN
 		assert.Equal(t, original.FileId(), decoded.FileId())
@@ -122,8 +122,8 @@ func TestIndexRecordEncode(t *testing.T) {
 		original := NewIndexRecord(page.FileId(2), IndexId(5), "idx_email", IndexTypeUnique, 1, page.NewId(page.FileId(2), page.PageNumber(0)))
 
 		// WHEN
-		record := original.encode()
-		decoded := decodeIndexRecord(record)
+		record := original.Encode()
+		decoded := DecodeIndexRecord(record)
 
 		// THEN
 		assert.Equal(t, original.FileId(), decoded.FileId())
@@ -138,8 +138,8 @@ func TestIndexRecordEncode(t *testing.T) {
 		original := NewIndexRecord(page.FileId(3), IndexId(20), "idx_age", IndexTypeNonUnique, 1, page.NewId(page.FileId(3), page.PageNumber(0)))
 
 		// WHEN
-		record := original.encode()
-		decoded := decodeIndexRecord(record)
+		record := original.Encode()
+		decoded := DecodeIndexRecord(record)
 
 		// THEN
 		assert.Equal(t, original.FileId(), decoded.FileId())
@@ -154,8 +154,8 @@ func TestIndexRecordEncode(t *testing.T) {
 		original := NewIndexRecord(page.FileId(1), IndexId(3), "idx_composite", IndexTypeNonUnique, 3, page.NewId(page.FileId(1), page.PageNumber(0)))
 
 		// WHEN
-		record := original.encode()
-		decoded := decodeIndexRecord(record)
+		record := original.Encode()
+		decoded := DecodeIndexRecord(record)
 
 		// THEN
 		assert.Equal(t, 3, decoded.ColumnCount())
@@ -166,8 +166,8 @@ func TestIndexRecordEncode(t *testing.T) {
 		original := NewIndexRecord(page.FileId(0), IndexId(0), "idx", IndexTypePrimary, 1, page.NewId(page.FileId(0), page.PageNumber(0)))
 
 		// WHEN
-		record := original.encode()
-		decoded := decodeIndexRecord(record)
+		record := original.Encode()
+		decoded := DecodeIndexRecord(record)
 
 		// THEN
 		assert.Equal(t, page.FileId(0), decoded.FileId())
@@ -181,8 +181,8 @@ func TestIndexRecordEncode(t *testing.T) {
 		original := NewIndexRecord(page.FileId(1), IndexId(1), "idx_test", IndexTypePrimary, 1, metaPageId)
 
 		// WHEN
-		record := original.encode()
-		decoded := decodeIndexRecord(record)
+		record := original.Encode()
+		decoded := DecodeIndexRecord(record)
 
 		// THEN
 		assert.Equal(t, metaPageId, decoded.MetaPageId())
@@ -193,10 +193,10 @@ func TestDecodeIndexRecord(t *testing.T) {
 	t.Run("エンコード済みレコードから FileId とインデックス ID を復元できる", func(t *testing.T) {
 		// GIVEN
 		ir := NewIndexRecord(page.FileId(42), IndexId(100), "idx_test", IndexTypeUnique, 2, page.NewId(page.FileId(42), page.PageNumber(0)))
-		record := ir.encode()
+		record := ir.Encode()
 
 		// WHEN
-		decoded := decodeIndexRecord(record)
+		decoded := DecodeIndexRecord(record)
 
 		// THEN
 		assert.Equal(t, page.FileId(42), decoded.FileId())
@@ -206,10 +206,10 @@ func TestDecodeIndexRecord(t *testing.T) {
 	t.Run("エンコード済みレコードからインデックス名と種類とカラム数を復元できる", func(t *testing.T) {
 		// GIVEN
 		ir := NewIndexRecord(page.FileId(1), IndexId(1), "idx_composite", IndexTypeNonUnique, 3, page.NewId(page.FileId(1), page.PageNumber(0)))
-		record := ir.encode()
+		record := ir.Encode()
 
 		// WHEN
-		decoded := decodeIndexRecord(record)
+		decoded := DecodeIndexRecord(record)
 
 		// THEN
 		assert.Equal(t, "idx_composite", decoded.Name())

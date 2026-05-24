@@ -15,7 +15,6 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
-// Purge はバックグラウンドで不要な論理削除済みレコードと Undo ログを破棄する
 type Purge struct {
 	bufferPool  *buffer.Pool
 	transaction *TrxManager
@@ -37,7 +36,6 @@ func NewPurge(bp *buffer.Pool, trx *TrxManager, undoLog *undo.Manager) *Purge {
 	}
 }
 
-// Start はバックグラウンド goroutine を起動する
 func (p *Purge) Start() {
 	if !p.isRunning.CompareAndSwap(false, true) {
 		return
@@ -49,7 +47,6 @@ func (p *Purge) Start() {
 	go p.loop()
 }
 
-// Stop はバックグラウンド goroutine を停止し、終了を待つ
 func (p *Purge) Stop() {
 	p.stopOnce.Do(func() {
 		if !p.isRunning.Load() {
@@ -150,7 +147,7 @@ func (p *Purge) deletePrimaryRecord(fileId page.FileId, record btree.Record) err
 
 // deleteSecondaryRecords は指定されたプライマリインデックスのレコードに対応するセカンダリインデックスの論理削除済みレコードを物理削除する
 func (p *Purge) deleteSecondaryRecords(fileId page.FileId, record btree.Record) error {
-	prevRec, err := decodePrimaryRecord(record, p.transaction.catalog, fileId)
+	prevRec, err := DecodePrimaryRecord(record, p.transaction.catalog, fileId)
 	if err != nil {
 		return err
 	}
@@ -165,7 +162,7 @@ func (p *Purge) deleteSecondaryRecords(fileId page.FileId, record btree.Record) 
 		if err != nil {
 			return err
 		}
-		sk := prevRec.secondaryKey(keyCols)
+		sk := prevRec.SecondaryKey(keyCols)
 		tree := btree.NewTree(p.bufferPool, siRecord.MetaPageId())
 
 		// キーが存在し、deleteMark=1 の場合のみ物理削除

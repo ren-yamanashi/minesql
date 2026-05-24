@@ -6,28 +6,27 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
-// PrimaryIterator はプライマリインデックスを辿るイテレータ
-type PrimaryIterator struct {
+type PrimaryIndexIterator struct {
 	iterator *btree.Iterator
 	catalog  *catalog.Catalog
 	fileId   page.FileId
 }
 
-func NewPrimaryIterator(iter *btree.Iterator, ct *catalog.Catalog, fileId page.FileId) *PrimaryIterator {
-	return &PrimaryIterator{
+func NewPrimaryIndexIterator(iter *btree.Iterator, ct *catalog.Catalog, fileId page.FileId) *PrimaryIndexIterator {
+	return &PrimaryIndexIterator{
 		fileId:   fileId,
 		catalog:  ct,
 		iterator: iter,
 	}
 }
 
-func (pi *PrimaryIterator) Close() {
+func (pi *PrimaryIndexIterator) Close() {
 	pi.iterator.Close()
 }
 
 // Next はデコード済みの次の可視レコードを返す
 //   - return: レコード, データがあるか
-func (pi *PrimaryIterator) Next() (*PrimaryRecord, bool, error) {
+func (pi *PrimaryIndexIterator) Next() (*PrimaryRecord, bool, error) {
 	for {
 		record, ok, err := pi.iterator.Next()
 		if err != nil {
@@ -42,7 +41,7 @@ func (pi *PrimaryIterator) Next() (*PrimaryRecord, bool, error) {
 			continue
 		}
 
-		result, err := decodePrimaryRecord(record, pi.catalog, pi.fileId)
+		result, err := DecodePrimaryRecord(record, pi.catalog, pi.fileId)
 		if err != nil {
 			return nil, false, err
 		}

@@ -6,7 +6,6 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 )
 
-// readView はトランザクションの可視性判定に使用するスナップショット
 type readView struct {
 	trxId        lock.TrxId   // 自身の TrxId
 	upLimitId    lock.TrxId   // アクティブトランザクションの最小の TrxId (これ未満は確実にコミット済みで可視)
@@ -27,7 +26,6 @@ func newReadView(trxId lock.TrxId, activeTrxIds []lock.TrxId, nextTrxId lock.Trx
 	}
 }
 
-// isVisible は指定された trxId のレコードが可視かどうか判定する
 func (rv *readView) isVisible(recordTrxId lock.TrxId) bool {
 	if recordTrxId == rv.trxId {
 		return true

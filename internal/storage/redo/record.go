@@ -61,7 +61,7 @@ func (r *Record) Serialize() []byte {
 	return buf
 }
 
-func (r *Record) serializedSize() int {
+func (r *Record) Size() int {
 	dataSize := 0
 	if r.data.Header != nil {
 		dataSize = len(r.data.ToBytes())
@@ -69,9 +69,9 @@ func (r *Record) serializedSize() int {
 	return recordHeaderSize + dataSize
 }
 
-// deserializeRecord はバイト列から Record をデシリアライズする
+// DeserializeRecord はバイト列から Record をデシリアライズする
 //   - return: デシリアライズした Record, 読み取ったバイト数, エラー
-func deserializeRecord(data []byte) (Record, int, error) {
+func DeserializeRecord(data []byte) (Record, int, error) {
 	if len(data) < recordHeaderSize {
 		return Record{}, 0, ErrInvalidRecord
 	}

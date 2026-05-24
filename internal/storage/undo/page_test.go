@@ -329,7 +329,7 @@ func TestPageFreeSpace(t *testing.T) {
 		bodySize := len(undoPage.body)
 
 		// WHEN
-		free := undoPage.freeSpace()
+		free := undoPage.FreeSpace()
 
 		// THEN
 		assert.Equal(t, bodySize, free)
@@ -343,7 +343,7 @@ func TestPageFreeSpace(t *testing.T) {
 		_ = undoPage.append([]byte{0x01, 0x02, 0x03})
 
 		// WHEN
-		free := undoPage.freeSpace()
+		free := undoPage.FreeSpace()
 
 		// THEN
 		assert.Equal(t, bodySize-3, free)
@@ -356,7 +356,7 @@ func TestPageFreeSpace(t *testing.T) {
 		_ = undoPage.append(make([]byte, len(undoPage.body)))
 
 		// WHEN
-		free := undoPage.freeSpace()
+		free := undoPage.FreeSpace()
 
 		// THEN
 		assert.Equal(t, 0, free)

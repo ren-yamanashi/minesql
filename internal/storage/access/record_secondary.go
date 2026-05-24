@@ -19,7 +19,6 @@ type NewSecondaryRecordInput struct {
 	pk         []string // プライマリキー
 }
 
-// SecondaryRecord はセカンダリインデックスレコード
 type SecondaryRecord struct {
 	deleteMark byte
 	colNames   []string // インデックスを構成するカラム名のリスト
@@ -34,26 +33,20 @@ func NewSecondaryRecord(ct *catalog.Catalog, input NewSecondaryRecordInput) (*Se
 	return sortSecondaryRecord(ct, input)
 }
 
-// encode は btree.Record にエンコードする
-// キー領域は SK + PK を連結したもの
-func (r *SecondaryRecord) encode() btree.Record {
+func (r *SecondaryRecord) Encode() btree.Record {
 	var key []byte
 	encode.Encode(stringToByteSlice(r.values), &key)
 	encode.Encode(stringToByteSlice(r.pk), &key)
 	return btree.NewRecord([]byte{r.deleteMark}, key, nil)
 }
 
-// encodedSecondaryKey はエンコード済みのセカンダリキーを返す
-//
-// B+Tree 上のキー (SK + PK) ではなく SK のみ
 func (r *SecondaryRecord) encodedSecondaryKey() []byte {
 	var sk []byte
 	encode.Encode(stringToByteSlice(r.values), &sk)
 	return sk
 }
 
-// decodeSecondaryRecord は btree.Record から SecondaryRecord にデコードする
-func decodeSecondaryRecord(
+func DecodeSecondaryRecord(
 	record btree.Record,
 	ct *catalog.Catalog,
 	fileId page.FileId,

@@ -22,6 +22,29 @@ func (t *Tree) Search(mode SearchMode) (*Iterator, error) {
 	return t.searchRecursively(rootPageId, mode)
 }
 
+// FindByKey は指定されたキーで B+Tree を検索し、完全一致するレコードとその物理的な位置を返す (キーが見つからない場合は ErrKeyNotFound)
+func (t *Tree) FindByKey(key []byte) (Record, RecordPosition, error) {
+	iter, err := t.Search(SearchModeKey{Key: key})
+	if err != nil {
+		return nil, RecordPosition{}, err
+	}
+	position := RecordPosition{
+		PageId:  iter.bufferPage.PageId(),
+		SlotNum: iter.slotNum,
+	}
+	record, ok, err := iter.Get()
+	if err != nil {
+		return nil, RecordPosition{}, err
+	}
+	if !ok {
+		return nil, RecordPosition{}, ErrKeyNotFound
+	}
+	if !bytes.Equal(record.Key(), key) {
+		return nil, RecordPosition{}, ErrKeyNotFound
+	}
+	return record, position, nil
+}
+
 // searchRecursively は再帰的にノードを辿って該当のリーフノードを見つける
 func (t *Tree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator, error) {
 	bufPage, err := t.bufferPool.PageForRead(nodePageId)
@@ -61,29 +84,6 @@ func (t *Tree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator
 	default:
 		return nil, errUnknownNodeType
 	}
-}
-
-// FindByKey は指定されたキーで B+Tree を検索し、完全一致するレコードとその物理的な位置を返す (キーが見つからない場合は ErrKeyNotFound)
-func (t *Tree) FindByKey(key []byte) (Record, RecordPosition, error) {
-	iter, err := t.Search(SearchModeKey{Key: key})
-	if err != nil {
-		return nil, RecordPosition{}, err
-	}
-	position := RecordPosition{
-		PageId:  iter.bufferPage.PageId(),
-		SlotNum: iter.slotNum,
-	}
-	record, ok, err := iter.Get()
-	if err != nil {
-		return nil, RecordPosition{}, err
-	}
-	if !ok {
-		return nil, RecordPosition{}, ErrKeyNotFound
-	}
-	if !bytes.Equal(record.Key(), key) {
-		return nil, RecordPosition{}, ErrKeyNotFound
-	}
-	return record, position, nil
 }
 
 // leafPageIds はブランチページのみ辿り、全リーフページの PageId を収集する

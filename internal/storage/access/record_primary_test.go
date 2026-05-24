@@ -107,6 +107,155 @@ func TestNewPrimaryRecord(t *testing.T) {
 	})
 }
 
+func TestPrimaryRecordEncode(t *testing.T) {
+	t.Run("プライマリキーと非キーカラムをエンコードしたレコードを返す", func(t *testing.T) {
+		// GIVEN
+		ct := setupSecondaryTestCatalog(t)
+		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "alice@example.com"}})
+
+		// WHEN
+		record := pr.Encode()
+
+		// THEN
+		assert.Equal(t, []byte{0x00}, record.Header())
+
+		var decodedKey [][]byte
+		encode.Decode(record.Key(), &decodedKey)
+		assert.Equal(t, [][]byte{[]byte("1")}, decodedKey)
+
+		// 非キー領域: lastTrxId (4B) + rollPtr (4B) + カラムデータ
+		nonKey := record.NonKey()
+		assert.True(t, len(nonKey) >= lock.TrxIdSize+undo.PointerSize)
+		var decodedNonKey [][]byte
+		encode.Decode(nonKey[lock.TrxIdSize+undo.PointerSize:], &decodedNonKey)
+		assert.Equal(t, [][]byte{[]byte("Alice"), []byte("alice@example.com")}, decodedNonKey)
+	})
+
+	t.Run("非キー領域の先頭に lastTrxId と rollPtr がエンコードされる", func(t *testing.T) {
+		// GIVEN
+		ct := setupSecondaryTestCatalog(t)
+		rollPtr := testUndoPointer(3, 64)
+		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{
+			fileId: page.FileId(2), pkCount: 1, deleteMark: 0,
+			lastTrxId: 100, rollPtr: rollPtr,
+			colNames: []string{"id", "name", "email"},
+			values:   []string{"1", "Alice", "a@b.com"},
+		})
+
+		// WHEN
+		record := pr.Encode()
+
+		// THEN
+		nonKey := record.NonKey()
+		assert.Equal(t, uint32(100), binary.BigEndian.Uint32(nonKey[:lock.TrxIdSize]))
+		assert.Equal(t, rollPtr.Encode(), nonKey[lock.TrxIdSize:lock.TrxIdSize+undo.PointerSize])
+	})
+
+	t.Run("複合プライマリキーを正しくエンコードする", func(t *testing.T) {
+		// GIVEN
+		ct := setupSecondaryTestCatalog(t)
+		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 2, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "alice@example.com"}})
+
+		// WHEN
+		record := pr.Encode()
+
+		// THEN
+		var decodedKey [][]byte
+		encode.Decode(record.Key(), &decodedKey)
+		assert.Equal(t, [][]byte{[]byte("1"), []byte("Alice")}, decodedKey)
+
+		nonKey := record.NonKey()
+		var decodedNonKey [][]byte
+		encode.Decode(nonKey[lock.TrxIdSize+undo.PointerSize:], &decodedNonKey)
+		assert.Equal(t, [][]byte{[]byte("alice@example.com")}, decodedNonKey)
+	})
+
+	t.Run("削除マークがヘッダーに設定される", func(t *testing.T) {
+		// GIVEN
+		ct := setupSecondaryTestCatalog(t)
+		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 1, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "a@b.com"}})
+
+		// WHEN
+		record := pr.Encode()
+
+		// THEN
+		assert.Equal(t, []byte{0x01}, record.Header())
+	})
+}
+
+func TestPrimaryRecordSecondaryKey(t *testing.T) {
+	t.Run("primaryRecord から SK+PK キーを構築できる", func(t *testing.T) {
+		// GIVEN
+		record := &PrimaryRecord{
+			pkCount:  1,
+			colNames: []string{"id", "name", "email"},
+			values:   []string{"1", "Alice", "alice@example.com"},
+		}
+		keyCols := map[string]int{"name": 0}
+
+		// WHEN
+		key := record.SecondaryKey(keyCols)
+
+		// THEN
+		assert.NotEmpty(t, key)
+	})
+
+	t.Run("同じ入力に対して同じキーを返す", func(t *testing.T) {
+		// GIVEN
+		record := &PrimaryRecord{
+			pkCount:  1,
+			colNames: []string{"id", "name"},
+			values:   []string{"1", "Alice"},
+		}
+		keyCols := map[string]int{"name": 0}
+
+		// WHEN
+		key1 := record.SecondaryKey(keyCols)
+		key2 := record.SecondaryKey(keyCols)
+
+		// THEN
+		assert.Equal(t, key1, key2)
+	})
+
+	t.Run("異なる SK 値に対して異なるキーを返す", func(t *testing.T) {
+		// GIVEN
+		record1 := &PrimaryRecord{
+			pkCount:  1,
+			colNames: []string{"id", "name"},
+			values:   []string{"1", "Alice"},
+		}
+		record2 := &PrimaryRecord{
+			pkCount:  1,
+			colNames: []string{"id", "name"},
+			values:   []string{"1", "Bob"},
+		}
+		keyCols := map[string]int{"name": 0}
+
+		// WHEN
+		key1 := record1.SecondaryKey(keyCols)
+		key2 := record2.SecondaryKey(keyCols)
+
+		// THEN
+		assert.NotEqual(t, key1, key2)
+	})
+
+	t.Run("複合セカンダリキーを正しくエンコードする", func(t *testing.T) {
+		// GIVEN
+		record := &PrimaryRecord{
+			pkCount:  1,
+			colNames: []string{"id", "name", "email"},
+			values:   []string{"1", "Alice", "alice@example.com"},
+		}
+		keyCols := map[string]int{"email": 0, "name": 1}
+
+		// WHEN
+		key := record.SecondaryKey(keyCols)
+
+		// THEN
+		assert.NotEmpty(t, key)
+	})
+}
+
 func TestPrimaryRecordUpdate(t *testing.T) {
 	t.Run("指定したカラムの値だけ更新した新しいレコードを返す", func(t *testing.T) {
 		// GIVEN
@@ -255,160 +404,11 @@ func TestPrimaryRecordSetRollPtr(t *testing.T) {
 		pr.setRollPtr(newPtr)
 
 		// WHEN
-		record := pr.encode()
+		record := pr.Encode()
 
 		// THEN
 		nonKey := record.NonKey()
 		assert.Equal(t, newPtr.Encode(), nonKey[lock.TrxIdSize:lock.TrxIdSize+undo.PointerSize])
-	})
-}
-
-func TestPrimaryRecordSecondaryKey(t *testing.T) {
-	t.Run("primaryRecord から SK+PK キーを構築できる", func(t *testing.T) {
-		// GIVEN
-		record := &PrimaryRecord{
-			pkCount:  1,
-			colNames: []string{"id", "name", "email"},
-			values:   []string{"1", "Alice", "alice@example.com"},
-		}
-		keyCols := map[string]int{"name": 0}
-
-		// WHEN
-		key := record.secondaryKey(keyCols)
-
-		// THEN
-		assert.NotEmpty(t, key)
-	})
-
-	t.Run("同じ入力に対して同じキーを返す", func(t *testing.T) {
-		// GIVEN
-		record := &PrimaryRecord{
-			pkCount:  1,
-			colNames: []string{"id", "name"},
-			values:   []string{"1", "Alice"},
-		}
-		keyCols := map[string]int{"name": 0}
-
-		// WHEN
-		key1 := record.secondaryKey(keyCols)
-		key2 := record.secondaryKey(keyCols)
-
-		// THEN
-		assert.Equal(t, key1, key2)
-	})
-
-	t.Run("異なる SK 値に対して異なるキーを返す", func(t *testing.T) {
-		// GIVEN
-		record1 := &PrimaryRecord{
-			pkCount:  1,
-			colNames: []string{"id", "name"},
-			values:   []string{"1", "Alice"},
-		}
-		record2 := &PrimaryRecord{
-			pkCount:  1,
-			colNames: []string{"id", "name"},
-			values:   []string{"1", "Bob"},
-		}
-		keyCols := map[string]int{"name": 0}
-
-		// WHEN
-		key1 := record1.secondaryKey(keyCols)
-		key2 := record2.secondaryKey(keyCols)
-
-		// THEN
-		assert.NotEqual(t, key1, key2)
-	})
-
-	t.Run("複合セカンダリキーを正しくエンコードする", func(t *testing.T) {
-		// GIVEN
-		record := &PrimaryRecord{
-			pkCount:  1,
-			colNames: []string{"id", "name", "email"},
-			values:   []string{"1", "Alice", "alice@example.com"},
-		}
-		keyCols := map[string]int{"email": 0, "name": 1}
-
-		// WHEN
-		key := record.secondaryKey(keyCols)
-
-		// THEN
-		assert.NotEmpty(t, key)
-	})
-}
-
-func TestPrimaryRecordEncode(t *testing.T) {
-	t.Run("プライマリキーと非キーカラムをエンコードしたレコードを返す", func(t *testing.T) {
-		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "alice@example.com"}})
-
-		// WHEN
-		record := pr.encode()
-
-		// THEN
-		assert.Equal(t, []byte{0x00}, record.Header())
-
-		var decodedKey [][]byte
-		encode.Decode(record.Key(), &decodedKey)
-		assert.Equal(t, [][]byte{[]byte("1")}, decodedKey)
-
-		// 非キー領域: lastTrxId (4B) + rollPtr (4B) + カラムデータ
-		nonKey := record.NonKey()
-		assert.True(t, len(nonKey) >= lock.TrxIdSize+undo.PointerSize)
-		var decodedNonKey [][]byte
-		encode.Decode(nonKey[lock.TrxIdSize+undo.PointerSize:], &decodedNonKey)
-		assert.Equal(t, [][]byte{[]byte("Alice"), []byte("alice@example.com")}, decodedNonKey)
-	})
-
-	t.Run("非キー領域の先頭に lastTrxId と rollPtr がエンコードされる", func(t *testing.T) {
-		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		rollPtr := testUndoPointer(3, 64)
-		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{
-			fileId: page.FileId(2), pkCount: 1, deleteMark: 0,
-			lastTrxId: 100, rollPtr: rollPtr,
-			colNames: []string{"id", "name", "email"},
-			values:   []string{"1", "Alice", "a@b.com"},
-		})
-
-		// WHEN
-		record := pr.encode()
-
-		// THEN
-		nonKey := record.NonKey()
-		assert.Equal(t, uint32(100), binary.BigEndian.Uint32(nonKey[:lock.TrxIdSize]))
-		assert.Equal(t, rollPtr.Encode(), nonKey[lock.TrxIdSize:lock.TrxIdSize+undo.PointerSize])
-	})
-
-	t.Run("複合プライマリキーを正しくエンコードする", func(t *testing.T) {
-		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 2, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "alice@example.com"}})
-
-		// WHEN
-		record := pr.encode()
-
-		// THEN
-		var decodedKey [][]byte
-		encode.Decode(record.Key(), &decodedKey)
-		assert.Equal(t, [][]byte{[]byte("1"), []byte("Alice")}, decodedKey)
-
-		nonKey := record.NonKey()
-		var decodedNonKey [][]byte
-		encode.Decode(nonKey[lock.TrxIdSize+undo.PointerSize:], &decodedNonKey)
-		assert.Equal(t, [][]byte{[]byte("alice@example.com")}, decodedNonKey)
-	})
-
-	t.Run("削除マークがヘッダーに設定される", func(t *testing.T) {
-		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 1, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "a@b.com"}})
-
-		// WHEN
-		record := pr.encode()
-
-		// THEN
-		assert.Equal(t, []byte{0x01}, record.Header())
 	})
 }
 
@@ -417,10 +417,10 @@ func TestDecodePrimaryRecord(t *testing.T) {
 		// GIVEN
 		ct := setupSecondaryTestCatalog(t)
 		original, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "alice@example.com"}})
-		encoded := original.encode()
+		encoded := original.Encode()
 
 		// WHEN
-		decoded, err := decodePrimaryRecord(encoded, ct, page.FileId(2))
+		decoded, err := DecodePrimaryRecord(encoded, ct, page.FileId(2))
 
 		// THEN
 		assert.NoError(t, err)
@@ -440,10 +440,10 @@ func TestDecodePrimaryRecord(t *testing.T) {
 			colNames: []string{"id", "name", "email"},
 			values:   []string{"1", "Alice", "a@b.com"},
 		})
-		encoded := original.encode()
+		encoded := original.Encode()
 
 		// WHEN
-		decoded, err := decodePrimaryRecord(encoded, ct, page.FileId(2))
+		decoded, err := DecodePrimaryRecord(encoded, ct, page.FileId(2))
 
 		// THEN
 		assert.NoError(t, err)
@@ -460,10 +460,10 @@ func TestDecodePrimaryRecord(t *testing.T) {
 			colNames: []string{"id", "name", "email"},
 			values:   []string{"1", "Alice", "a@b.com"},
 		})
-		encoded := original.encode()
+		encoded := original.Encode()
 
 		// WHEN
-		decoded, err := decodePrimaryRecord(encoded, ct, page.FileId(2))
+		decoded, err := DecodePrimaryRecord(encoded, ct, page.FileId(2))
 
 		// THEN
 		assert.NoError(t, err)
@@ -474,10 +474,10 @@ func TestDecodePrimaryRecord(t *testing.T) {
 		// GIVEN
 		ct := setupSecondaryTestCatalog(t)
 		original, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 1, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "a@b.com"}})
-		encoded := original.encode()
+		encoded := original.Encode()
 
 		// WHEN
-		decoded, err := decodePrimaryRecord(encoded, ct, page.FileId(2))
+		decoded, err := DecodePrimaryRecord(encoded, ct, page.FileId(2))
 
 		// THEN
 		assert.NoError(t, err)
@@ -493,7 +493,7 @@ func TestDecodePrimaryRecord(t *testing.T) {
 		record := btree.NewRecord([]byte{0x00}, key, nil)
 
 		// WHEN
-		_, err := decodePrimaryRecord(record, ct, page.FileId(2))
+		_, err := DecodePrimaryRecord(record, ct, page.FileId(2))
 
 		// THEN
 		assert.Error(t, err)
@@ -511,7 +511,7 @@ func TestDecodePrimaryRecord(t *testing.T) {
 		record := btree.NewRecord([]byte{0x00}, key, nonKey)
 
 		// WHEN
-		_, err := decodePrimaryRecord(record, ct, page.FileId(2))
+		_, err := DecodePrimaryRecord(record, ct, page.FileId(2))
 
 		// THEN
 		assert.Error(t, err)

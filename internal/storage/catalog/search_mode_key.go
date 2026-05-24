@@ -9,7 +9,7 @@ type SearchModeKey struct {
 	Key [][]byte
 }
 
-func (k SearchModeKey) encode() btree.SearchMode {
+func (k SearchModeKey) Encode() btree.SearchMode {
 	var key []byte
 	encode.Encode(k.Key, &key)
 	return btree.SearchModeKey{Key: key}

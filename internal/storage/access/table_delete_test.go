@@ -82,10 +82,10 @@ func TestTableSoftDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// 論理削除済みレコードを直接 B+Tree から取得して rollPtr を確認
-		encodedRecord := record.encode()
+		encodedRecord := record.Encode()
 		existing, _, err := table.primaryIndex.tree.FindByKey(encodedRecord.Key())
 		assert.NoError(t, err)
-		decoded, err := decodePrimaryRecord(existing, table.catalog, table.primaryIndex.fileId())
+		decoded, err := DecodePrimaryRecord(existing, table.catalog, table.primaryIndex.fileId())
 		assert.NoError(t, err)
 		assert.NotEqual(t, undo.NullPointer, decoded.rollPtr)
 	})

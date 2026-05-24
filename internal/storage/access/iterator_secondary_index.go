@@ -5,21 +5,20 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
 )
 
-// SecondaryIterator はセカンダリインデックスを辿るイテレータ
-type SecondaryIterator struct {
+type SecondaryIndexIterator struct {
 	indexName   string
 	iterator    *btree.Iterator
 	catalog     *catalog.Catalog
 	primaryTree *btree.Tree // プライマリインデックスの B+Tree
 }
 
-func NewSecondaryIterator(
+func NewSecondaryIndexIterator(
 	indexName string,
 	iter *btree.Iterator,
 	ct *catalog.Catalog,
 	pt *btree.Tree,
-) *SecondaryIterator {
-	return &SecondaryIterator{
+) *SecondaryIndexIterator {
+	return &SecondaryIndexIterator{
 		indexName:   indexName,
 		iterator:    iter,
 		catalog:     ct,
@@ -27,14 +26,14 @@ func NewSecondaryIterator(
 	}
 }
 
-func (si *SecondaryIterator) Close() {
+func (si *SecondaryIndexIterator) Close() {
 	si.iterator.Close()
 }
 
 // Next はセカンダリインデックスから次の結果を返す
 // (secondary-index -> primary-index の順で検索する)
 //   - return: 検索結果, データがあるか
-func (si *SecondaryIterator) Next() (*PrimaryRecord, bool, error) {
+func (si *SecondaryIndexIterator) Next() (*PrimaryRecord, bool, error) {
 	for {
 		secondaryRecord, err := si.nextVisibleSecondaryRecord()
 		if err != nil {
@@ -45,12 +44,12 @@ func (si *SecondaryIterator) Next() (*PrimaryRecord, bool, error) {
 		}
 
 		// PrimaryIterator を使用してレコード検索
-		iter, err := si.primaryTree.Search(SearchModeKey{Key: stringToByteSlice(secondaryRecord.pk)}.encode())
+		iter, err := si.primaryTree.Search(SearchModeKey{Key: stringToByteSlice(secondaryRecord.pk)}.Encode())
 		if err != nil {
 			return nil, false, err
 		}
 
-		pi := NewPrimaryIterator(iter, si.catalog, si.primaryTree.MetaPageId().FileId)
+		pi := NewPrimaryIndexIterator(iter, si.catalog, si.primaryTree.MetaPageId().FileId)
 		result, found, err := pi.Next()
 		pi.Close()
 		if err != nil {
@@ -65,7 +64,7 @@ func (si *SecondaryIterator) Next() (*PrimaryRecord, bool, error) {
 
 // NextIndexOnly はセカンダリインデックスのみを検索して次の結果を返す
 //   - return: 検索結果, データがあるか
-func (si *SecondaryIterator) NextIndexOnly() (*SecondaryRecord, bool, error) {
+func (si *SecondaryIndexIterator) NextIndexOnly() (*SecondaryRecord, bool, error) {
 	record, err := si.nextVisibleSecondaryRecord()
 	if err != nil {
 		return nil, false, err
@@ -77,7 +76,7 @@ func (si *SecondaryIterator) NextIndexOnly() (*SecondaryRecord, bool, error) {
 }
 
 // nextVisibleSecondaryRecord は削除済みレコードをスキップして次の可視セカンダリレコードを返す
-func (si *SecondaryIterator) nextVisibleSecondaryRecord() (*SecondaryRecord, error) {
+func (si *SecondaryIndexIterator) nextVisibleSecondaryRecord() (*SecondaryRecord, error) {
 	for {
 		record, ok, err := si.iterator.Next()
 		if err != nil {
@@ -92,6 +91,6 @@ func (si *SecondaryIterator) nextVisibleSecondaryRecord() (*SecondaryRecord, err
 			continue
 		}
 
-		return decodeSecondaryRecord(record, si.catalog, si.primaryTree.MetaPageId().FileId, si.indexName)
+		return DecodeSecondaryRecord(record, si.catalog, si.primaryTree.MetaPageId().FileId, si.indexName)
 	}
 }

@@ -10,14 +10,16 @@ import (
 
 type (
 	IndexId   uint32
-	IndexType byte
+	IndexType int
 )
 
+const PrimaryIndexName = "PRIMARY"
+
 const (
-	IndexTypePrimary   IndexType = 1
-	IndexTypeUnique    IndexType = 2
-	IndexTypeNonUnique IndexType = 3
-	PrimaryIndexName             = "PRIMARY"
+	indexTypeUnknown IndexType = iota
+	IndexTypePrimary
+	IndexTypeUnique
+	IndexTypeNonUnique
 )
 
 type IndexRecord struct {
@@ -54,8 +56,7 @@ func (ir IndexRecord) IndexType() IndexType { return ir.indexType }
 func (ir IndexRecord) ColumnCount() int     { return ir.columnCount }
 func (ir IndexRecord) MetaPageId() page.Id  { return ir.metaPageId }
 
-// encode は btree.Record にエンコードする
-func (ir IndexRecord) encode() btree.Record {
+func (ir IndexRecord) Encode() btree.Record {
 	// key = fileId + name
 	var key []byte
 	fileId := binary.BigEndian.AppendUint32(nil, uint32(ir.fileId))
@@ -71,8 +72,7 @@ func (ir IndexRecord) encode() btree.Record {
 	return btree.NewRecord(nil, key, nonKey)
 }
 
-// decodeIndexRecord は btree.Record から IndexRecord にデコードする
-func decodeIndexRecord(record btree.Record) IndexRecord {
+func DecodeIndexRecord(record btree.Record) IndexRecord {
 	// key = [fileId, name]
 	var key [][]byte
 	encode.Decode(record.Key(), &key)

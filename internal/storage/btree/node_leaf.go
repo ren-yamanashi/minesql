@@ -49,7 +49,7 @@ func (ln *leafNode) initialize() {
 //   - record: 挿入するレコード
 //   - return: 挿入に成功した場合は true
 func (ln *leafNode) insert(slotNum int, record Record) bool {
-	recordBytes := record.toBytes()
+	recordBytes := record.ToBytes()
 	if len(recordBytes) > ln.maxRecordSize() {
 		return false
 	}
@@ -102,7 +102,7 @@ func (ln *leafNode) delete(slotNum int) {
 //   - slotNum: 更新するレコードのスロット番号
 //   - record: 新しいレコード (key は変更されない前提)
 func (ln *leafNode) update(slotNum int, record Record) bool {
-	return ln.body.update(slotNum, record.toBytes())
+	return ln.body.update(slotNum, record.ToBytes())
 }
 
 // numRecords はレコード数を取得する

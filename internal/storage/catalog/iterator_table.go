@@ -24,5 +24,5 @@ func (ti *TableIterator) Next() (TableRecord, bool, error) {
 	if !ok {
 		return TableRecord{}, false, nil
 	}
-	return decodeTableRecord(record), true, nil
+	return DecodeTableRecord(record), true, nil
 }

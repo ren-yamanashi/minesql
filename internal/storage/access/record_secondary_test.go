@@ -115,7 +115,7 @@ func TestSecondaryRecordEncode(t *testing.T) {
 		}
 
 		// WHEN
-		record := sr.encode()
+		record := sr.Encode()
 
 		// THEN
 		assert.Equal(t, []byte{0x00}, record.Header())
@@ -136,7 +136,7 @@ func TestSecondaryRecordEncode(t *testing.T) {
 		}
 
 		// WHEN
-		record := sr.encode()
+		record := sr.Encode()
 
 		// THEN
 		var decoded [][]byte
@@ -153,7 +153,7 @@ func TestSecondaryRecordEncode(t *testing.T) {
 		}
 
 		// WHEN
-		record := sr.encode()
+		record := sr.Encode()
 
 		// THEN
 		assert.Equal(t, []byte{0x01}, record.Header())
@@ -168,7 +168,7 @@ func TestSecondaryRecordEncode(t *testing.T) {
 		}
 
 		// WHEN
-		record := sr.encode()
+		record := sr.Encode()
 
 		// THEN
 		var decoded [][]byte
@@ -224,10 +224,10 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 			pk:         []string{"1"},
 		})
 		assert.NoError(t, err)
-		encoded := original.encode()
+		encoded := original.Encode()
 
 		// WHEN
-		decoded, err := decodeSecondaryRecord(encoded, ct, page.FileId(2), "idx_name")
+		decoded, err := DecodeSecondaryRecord(encoded, ct, page.FileId(2), "idx_name")
 
 		// THEN
 		assert.NoError(t, err)
@@ -249,10 +249,10 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 			pk:         []string{"1"},
 		})
 		assert.NoError(t, err)
-		encoded := original.encode()
+		encoded := original.Encode()
 
 		// WHEN
-		decoded, err := decodeSecondaryRecord(encoded, ct, page.FileId(2), "idx_name")
+		decoded, err := DecodeSecondaryRecord(encoded, ct, page.FileId(2), "idx_name")
 
 		// THEN
 		assert.NoError(t, err)
@@ -271,10 +271,10 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 			pk:         []string{"1"},
 		})
 		assert.NoError(t, err)
-		encoded := original.encode()
+		encoded := original.Encode()
 
 		// WHEN
-		decoded, err := decodeSecondaryRecord(encoded, ct, page.FileId(2), "idx_name_email")
+		decoded, err := DecodeSecondaryRecord(encoded, ct, page.FileId(2), "idx_name_email")
 
 		// THEN
 		assert.NoError(t, err)
@@ -289,7 +289,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 		record := btree.NewRecord([]byte{0x00}, nil, nil)
 
 		// WHEN
-		_, err := decodeSecondaryRecord(record, ct, page.FileId(2), "idx_name")
+		_, err := DecodeSecondaryRecord(record, ct, page.FileId(2), "idx_name")
 
 		// THEN
 		assert.Error(t, err)
@@ -302,7 +302,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 		record := btree.NewRecord([]byte{0x00}, []byte{}, nil)
 
 		// WHEN
-		_, err := decodeSecondaryRecord(record, ct, page.FileId(2), "nonexistent")
+		_, err := DecodeSecondaryRecord(record, ct, page.FileId(2), "nonexistent")
 
 		// THEN
 		assert.Error(t, err)

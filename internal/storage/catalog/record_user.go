@@ -23,8 +23,7 @@ func (ur UserRecord) Username() string   { return ur.username }
 func (ur UserRecord) Host() string       { return ur.host }
 func (ur UserRecord) AuthString() []byte { return ur.authString }
 
-// encode は btree.Record にエンコードする
-func (ur UserRecord) encode() btree.Record {
+func (ur UserRecord) Encode() btree.Record {
 	// key = username
 	var key []byte
 	encode.Encode([][]byte{[]byte(ur.username)}, &key)
@@ -36,8 +35,7 @@ func (ur UserRecord) encode() btree.Record {
 	return btree.NewRecord(nil, key, nonKey)
 }
 
-// decodeUserRecord は btree.Record から userRecord にデコードする
-func decodeUserRecord(record btree.Record) UserRecord {
+func DecodeUserRecord(record btree.Record) UserRecord {
 	// key = [username]
 	var key [][]byte
 	encode.Decode(record.Key(), &key)

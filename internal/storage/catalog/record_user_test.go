@@ -52,7 +52,7 @@ func TestUserRecordEncode(t *testing.T) {
 		ur := NewUserRecord("alice", "localhost", []byte("authdata"))
 
 		// WHEN
-		record := ur.encode()
+		record := ur.Encode()
 
 		// THEN
 		assert.NotNil(t, record.Key())
@@ -65,8 +65,8 @@ func TestUserRecordEncode(t *testing.T) {
 		original := NewUserRecord("bob", "192.168.1.1", []byte{0xAB, 0xCD, 0xEF})
 
 		// WHEN
-		record := original.encode()
-		decoded := decodeUserRecord(record)
+		record := original.Encode()
+		decoded := DecodeUserRecord(record)
 
 		// THEN
 		assert.Equal(t, original.Username(), decoded.Username())
@@ -83,8 +83,8 @@ func TestUserRecordEncode(t *testing.T) {
 		original := NewUserRecord("user", "%", authString)
 
 		// WHEN
-		record := original.encode()
-		decoded := decodeUserRecord(record)
+		record := original.Encode()
+		decoded := DecodeUserRecord(record)
 
 		// THEN
 		assert.Equal(t, original.Username(), decoded.Username())
@@ -97,8 +97,8 @@ func TestUserRecordEncode(t *testing.T) {
 		original := NewUserRecord("root", "%", []byte("secret"))
 
 		// WHEN
-		record := original.encode()
-		decoded := decodeUserRecord(record)
+		record := original.Encode()
+		decoded := DecodeUserRecord(record)
 
 		// THEN
 		assert.Equal(t, "root", decoded.Username())
@@ -110,10 +110,10 @@ func TestDecodeUserRecord(t *testing.T) {
 	t.Run("エンコード済みレコードからユーザー名を復元できる", func(t *testing.T) {
 		// GIVEN
 		ur := NewUserRecord("alice", "localhost", []byte("auth"))
-		record := ur.encode()
+		record := ur.Encode()
 
 		// WHEN
-		decoded := decodeUserRecord(record)
+		decoded := DecodeUserRecord(record)
 
 		// THEN
 		assert.Equal(t, "alice", decoded.Username())
@@ -122,10 +122,10 @@ func TestDecodeUserRecord(t *testing.T) {
 	t.Run("エンコード済みレコードからホスト名と認証文字列を復元できる", func(t *testing.T) {
 		// GIVEN
 		ur := NewUserRecord("bob", "10.0.0.1", []byte{0x01, 0x02, 0x03})
-		record := ur.encode()
+		record := ur.Encode()
 
 		// WHEN
-		decoded := decodeUserRecord(record)
+		decoded := DecodeUserRecord(record)
 
 		// THEN
 		assert.Equal(t, "10.0.0.1", decoded.Host())

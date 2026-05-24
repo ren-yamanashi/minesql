@@ -14,7 +14,7 @@ type Page struct {
 func (p *Page) PageId() page.Id  { return p.pageId }
 func (p *Page) Data() *page.Page { return p.data }
 
-func newPage(pageId page.Id) (*Page, error) {
+func NewPage(pageId page.Id) (*Page, error) {
 	p, err := page.NewPage(directio.AlignedBlock(page.Size))
 	if err != nil {
 		return nil, err

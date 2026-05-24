@@ -24,5 +24,5 @@ func (ii *IndexIterator) Next() (IndexRecord, bool, error) {
 	if !ok {
 		return IndexRecord{}, false, nil
 	}
-	return decodeIndexRecord(record), true, nil
+	return DecodeIndexRecord(record), true, nil
 }

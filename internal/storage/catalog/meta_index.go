@@ -7,7 +7,7 @@ import (
 )
 
 type IndexMeta struct {
-	tree *btree.Tree // インデックスメタデータが格納される B+Tree
+	tree *btree.Tree
 }
 
 func NewIndexMeta(bp *buffer.Pool, metaPageId page.Id) *IndexMeta {
@@ -22,16 +22,14 @@ func CreateIndexMeta(bp *buffer.Pool) (*IndexMeta, error) {
 	return &IndexMeta{tree: tree}, nil
 }
 
-// Search は指定した検索モードでメタデータを検索し、イテレータを返す
 func (im *IndexMeta) Search(mode SearchMode) (*IndexIterator, error) {
-	iter, err := im.tree.Search(mode.encode())
+	iter, err := im.tree.Search(mode.Encode())
 	if err != nil {
 		return nil, err
 	}
 	return NewIndexIterator(iter), nil
 }
 
-// Insert はレコードを挿入する
 func (im *IndexMeta) Insert(record IndexRecord) error {
-	return im.tree.Insert(record.encode())
+	return im.tree.Insert(record.Encode())
 }

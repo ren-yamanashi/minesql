@@ -52,7 +52,7 @@ func TestColumnRecordEncode(t *testing.T) {
 		cr := NewColumnRecord(page.FileId(1), "name", 0)
 
 		// WHEN
-		record := cr.encode()
+		record := cr.Encode()
 
 		// THEN
 		assert.NotNil(t, record.Key())
@@ -65,8 +65,8 @@ func TestColumnRecordEncode(t *testing.T) {
 		original := NewColumnRecord(page.FileId(1), "email", 2)
 
 		// WHEN
-		record := original.encode()
-		decoded := decodeColumnRecord(record)
+		record := original.Encode()
+		decoded := DecodeColumnRecord(record)
 
 		// THEN
 		assert.Equal(t, original.FileId(), decoded.FileId())
@@ -79,8 +79,8 @@ func TestColumnRecordEncode(t *testing.T) {
 		original := NewColumnRecord(page.FileId(2), "id", 0)
 
 		// WHEN
-		record := original.encode()
-		decoded := decodeColumnRecord(record)
+		record := original.Encode()
+		decoded := DecodeColumnRecord(record)
 
 		// THEN
 		assert.Equal(t, page.FileId(2), decoded.FileId())
@@ -93,8 +93,8 @@ func TestColumnRecordEncode(t *testing.T) {
 		original := NewColumnRecord(page.FileId(0), "col", 5)
 
 		// WHEN
-		record := original.encode()
-		decoded := decodeColumnRecord(record)
+		record := original.Encode()
+		decoded := DecodeColumnRecord(record)
 
 		// THEN
 		assert.Equal(t, page.FileId(0), decoded.FileId())
@@ -107,8 +107,8 @@ func TestColumnRecordEncode(t *testing.T) {
 		original := NewColumnRecord(page.FileId(3), "very_long_column_name_for_testing", 10)
 
 		// WHEN
-		record := original.encode()
-		decoded := decodeColumnRecord(record)
+		record := original.Encode()
+		decoded := DecodeColumnRecord(record)
 
 		// THEN
 		assert.Equal(t, "very_long_column_name_for_testing", decoded.Name())
@@ -119,10 +119,10 @@ func TestDecodeColumnRecord(t *testing.T) {
 	t.Run("エンコード済みレコードから FileId とカラム名を復元できる", func(t *testing.T) {
 		// GIVEN
 		cr := NewColumnRecord(page.FileId(42), "age", 3)
-		record := cr.encode()
+		record := cr.Encode()
 
 		// WHEN
-		decoded := decodeColumnRecord(record)
+		decoded := DecodeColumnRecord(record)
 
 		// THEN
 		assert.Equal(t, page.FileId(42), decoded.FileId())
@@ -132,10 +132,10 @@ func TestDecodeColumnRecord(t *testing.T) {
 	t.Run("エンコード済みレコードからカラム位置を復元できる", func(t *testing.T) {
 		// GIVEN
 		cr := NewColumnRecord(page.FileId(1), "status", 7)
-		record := cr.encode()
+		record := cr.Encode()
 
 		// WHEN
-		decoded := decodeColumnRecord(record)
+		decoded := DecodeColumnRecord(record)
 
 		// THEN
 		assert.Equal(t, 7, decoded.Position())

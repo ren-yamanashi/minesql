@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestPrimaryIteratorNext(t *testing.T) {
+func TestPrimaryIndexIteratorNext(t *testing.T) {
 	t.Run("プライマリレコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		env := setupIteratorTestEnv(t)
@@ -98,12 +98,12 @@ func TestPrimaryIteratorNext(t *testing.T) {
 }
 
 // searchPrimaryIndex はプライマリ B+Tree を先頭から検索してイテレータを返す
-func searchPrimaryIndex(t *testing.T, env *iteratorTestEnv) *PrimaryIterator {
+func searchPrimaryIndex(t *testing.T, env *iteratorTestEnv) *PrimaryIndexIterator {
 	t.Helper()
 	mode := SearchModeStart{}
-	iter, err := env.primaryTree.Search(mode.encode())
+	iter, err := env.primaryTree.Search(mode.Encode())
 	if err != nil {
 		t.Fatalf("プライマリインデックスの検索に失敗: %v", err)
 	}
-	return NewPrimaryIterator(iter, env.ct, page.FileId(2))
+	return NewPrimaryIndexIterator(iter, env.ct, page.FileId(2))
 }

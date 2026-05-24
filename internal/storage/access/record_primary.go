@@ -25,7 +25,6 @@ type NewPrimaryRecordInput struct {
 	values     []string // テーブルを構成するカラム値のリスト (lastTrxId, rollPtr は含まない)
 }
 
-// PrimaryRecord はプライマリインデックスレコード
 type PrimaryRecord struct {
 	pkCount    int
 	deleteMark byte
@@ -40,6 +39,43 @@ func NewPrimaryRecord(ct *catalog.Catalog, input NewPrimaryRecordInput) (*Primar
 		return nil, errColNameValueMismatch
 	}
 	return sortPrimaryRecord(ct, input)
+}
+
+// Encode は btree.Record にエンコードする
+//   - 非キー領域: lastTrxId (4B) + rollPtr (6B) + 非キーカラム
+func (r *PrimaryRecord) Encode() btree.Record {
+	var key []byte
+	encode.Encode(stringToByteSlice(r.values[:r.pkCount]), &key)
+
+	var nonKey []byte
+	nonKey = binary.BigEndian.AppendUint32(nonKey, uint32(r.lastTrxId))
+	nonKey = append(nonKey, r.rollPtr.Encode()...)
+	encode.Encode(stringToByteSlice(r.values[r.pkCount:]), &nonKey)
+
+	return btree.NewRecord([]byte{r.deleteMark}, key, nonKey)
+}
+
+// SecondaryKey はセカンダリインデックスの B+Tree キー (SK+PK) を構築する
+func (r *PrimaryRecord) SecondaryKey(keyCols map[string]int) []byte {
+	valMap := make(map[string]string, len(r.colNames))
+	for i, name := range r.colNames {
+		valMap[name] = r.values[i]
+	}
+
+	// SK をインデックス定義順に取得
+	skValues := make([]string, len(keyCols))
+	for name, pos := range keyCols {
+		skValues[pos] = valMap[name]
+	}
+
+	// PK を取得
+	pkValues := r.values[:r.pkCount]
+
+	// SK + PK をエンコード
+	var key []byte
+	encode.Encode(stringToByteSlice(skValues), &key)
+	encode.Encode(stringToByteSlice(pkValues), &key)
+	return key
 }
 
 // update は指定されたカラムの値を更新した新しい PrimaryRecord を返す
@@ -88,46 +124,9 @@ func (r *PrimaryRecord) setRollPtr(rollPtr undo.Pointer) {
 	r.rollPtr = rollPtr
 }
 
-// secondaryKey はセカンダリインデックスの B+Tree キー (SK+PK) を構築する
-func (r *PrimaryRecord) secondaryKey(keyCols map[string]int) []byte {
-	valMap := make(map[string]string, len(r.colNames))
-	for i, name := range r.colNames {
-		valMap[name] = r.values[i]
-	}
-
-	// SK をインデックス定義順に取得
-	skValues := make([]string, len(keyCols))
-	for name, pos := range keyCols {
-		skValues[pos] = valMap[name]
-	}
-
-	// PK を取得
-	pkValues := r.values[:r.pkCount]
-
-	// SK + PK をエンコード
-	var key []byte
-	encode.Encode(stringToByteSlice(skValues), &key)
-	encode.Encode(stringToByteSlice(pkValues), &key)
-	return key
-}
-
-// encode は btree.Record にエンコードする
+// DecodePrimaryRecord は btree.Record から PrimaryRecord にデコードする
 //   - 非キー領域: lastTrxId (4B) + rollPtr (6B) + 非キーカラム
-func (r *PrimaryRecord) encode() btree.Record {
-	var key []byte
-	encode.Encode(stringToByteSlice(r.values[:r.pkCount]), &key)
-
-	var nonKey []byte
-	nonKey = binary.BigEndian.AppendUint32(nonKey, uint32(r.lastTrxId))
-	nonKey = append(nonKey, r.rollPtr.Encode()...)
-	encode.Encode(stringToByteSlice(r.values[r.pkCount:]), &nonKey)
-
-	return btree.NewRecord([]byte{r.deleteMark}, key, nonKey)
-}
-
-// decodePrimaryRecord は btree.Record から PrimaryRecord にデコードする
-//   - 非キー領域: lastTrxId (4B) + rollPtr (6B) + 非キーカラム
-func decodePrimaryRecord(record btree.Record, ct *catalog.Catalog, fileId page.FileId) (*PrimaryRecord, error) {
+func DecodePrimaryRecord(record btree.Record, ct *catalog.Catalog, fileId page.FileId) (*PrimaryRecord, error) {
 	var values [][]byte
 	encode.Decode(record.Key(), &values)
 	pkCount := len(values)

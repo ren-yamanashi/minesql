@@ -24,5 +24,5 @@ func (ui *UserIterator) Next() (UserRecord, bool, error) {
 	if !ok {
 		return UserRecord{}, false, nil
 	}
-	return decodeUserRecord(record), true, nil
+	return DecodeUserRecord(record), true, nil
 }

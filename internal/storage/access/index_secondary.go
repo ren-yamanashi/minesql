@@ -20,7 +20,6 @@ type newSecondaryIndexInput struct {
 	Lock        *lock.Manager
 }
 
-// secondaryIndex はセカンダリインデックスへのアクセスを提供する
 type secondaryIndex struct {
 	catalog     *catalog.Catalog
 	tree        *btree.Tree     // セカンダリインデックスの B+Tree
@@ -83,12 +82,12 @@ func createSecondaryIndex(
 }
 
 // search は指定した検索モードでインデックスを検索し、イテレータを返す
-func (si *secondaryIndex) search(mode SearchMode) (*SecondaryIterator, error) {
-	iter, err := si.tree.Search(mode.encode())
+func (si *secondaryIndex) search(mode SearchMode) (*SecondaryIndexIterator, error) {
+	iter, err := si.tree.Search(mode.Encode())
 	if err != nil {
 		return nil, err
 	}
-	return NewSecondaryIterator(si.indexName, iter, si.catalog, si.primaryTree), nil
+	return NewSecondaryIndexIterator(si.indexName, iter, si.catalog, si.primaryTree), nil
 }
 
 // insert は行を挿入する
@@ -100,7 +99,7 @@ func (si *secondaryIndex) insert(record *SecondaryRecord, trxId lock.TrxId) erro
 			return err
 		}
 	}
-	encodedRecord := record.encode()
+	encodedRecord := record.Encode()
 
 	// 挿入
 	err := si.tree.Insert(encodedRecord)
@@ -134,7 +133,7 @@ func (si *secondaryIndex) insert(record *SecondaryRecord, trxId lock.TrxId) erro
 // delete は行を物理削除する
 func (si *secondaryIndex) delete(record *SecondaryRecord, trxId lock.TrxId) error {
 	// 排他ロックを取得
-	encodedRecord := record.encode()
+	encodedRecord := record.Encode()
 	_, pos, err := si.tree.FindByKey(encodedRecord.Key())
 	if err != nil {
 		return err
@@ -150,7 +149,7 @@ func (si *secondaryIndex) delete(record *SecondaryRecord, trxId lock.TrxId) erro
 // softDelete は行を論理削除する
 func (si *secondaryIndex) softDelete(record *SecondaryRecord, trxId lock.TrxId) error {
 	// 排他ロックを取得
-	encodedRecord := record.encode()
+	encodedRecord := record.Encode()
 	_, pos, err := si.tree.FindByKey(encodedRecord.Key())
 	if err != nil {
 		return err
@@ -172,7 +171,7 @@ func (si *secondaryIndex) softDelete(record *SecondaryRecord, trxId lock.TrxId) 
 	if err != nil {
 		return err
 	}
-	return si.tree.Update(deleted.encode())
+	return si.tree.Update(deleted.Encode())
 }
 
 // leafPageCount はリーフページ数を取得する

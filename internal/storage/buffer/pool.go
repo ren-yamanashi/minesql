@@ -43,7 +43,6 @@ func (p *Pool) PageForWrite(pageId page.Id) (*Page, error) {
 		return nil, err
 	}
 
-	// 書き込み用なのでダーティーページとして扱う
 	if !bufPage.isDirty {
 		bufPage.isDirty = true
 		p.flushList.add(pageId)
@@ -92,6 +91,27 @@ func (p *Pool) MaxPages() int {
 	p.mu.RLock()
 	defer p.mu.RUnlock()
 	return p.maxPages
+}
+
+// FlushListPageCount はフラッシュリスト内のページ数を返す
+func (p *Pool) FlushListPageCount() int {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.flushList.pageCount
+}
+
+// ForEachDirtyPage はフラッシュリスト内の全ダーティーページに対してコールバックを実行する
+func (p *Pool) ForEachDirtyPage(fn func(pg *page.Page)) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	p.flushList.forEach(func(pageId page.Id) {
+		bufId, ok := p.pageTable.bufferId(pageId)
+		if !ok {
+			return
+		}
+		fn(p.pages[bufId].data)
+	})
 }
 
 // heapFile は指定された FileId に対応する HeapFile を取得する

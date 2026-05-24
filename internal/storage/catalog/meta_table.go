@@ -7,7 +7,7 @@ import (
 )
 
 type TableMeta struct {
-	tree *btree.Tree // テーブルメタデータが格納される B+Tree
+	tree *btree.Tree
 }
 
 func NewTableMeta(bp *buffer.Pool, metaPageId page.Id) *TableMeta {
@@ -22,16 +22,14 @@ func CreateTableMeta(bp *buffer.Pool) (*TableMeta, error) {
 	return &TableMeta{tree: tree}, nil
 }
 
-// Search は指定した検索モードでメタデータを検索し、イテレータを返す
 func (tm *TableMeta) Search(mode SearchMode) (*TableIterator, error) {
-	iter, err := tm.tree.Search(mode.encode())
+	iter, err := tm.tree.Search(mode.Encode())
 	if err != nil {
 		return nil, err
 	}
 	return NewTableIterator(iter), nil
 }
 
-// Insert はレコードを挿入する
 func (tm *TableMeta) Insert(record TableRecord) error {
-	return tm.tree.Insert(record.encode())
+	return tm.tree.Insert(record.Encode())
 }

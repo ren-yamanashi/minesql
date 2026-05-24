@@ -271,6 +271,100 @@ func TestMaxPages(t *testing.T) {
 	})
 }
 
+func TestFlushListPageCount(t *testing.T) {
+	t.Run("ダーティーページの数を返す", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size * 3)
+		_, err := bp.AddPage(page.NewId(0, 0))
+		assert.NoError(t, err)
+		_, err = bp.AddPage(page.NewId(0, 1))
+		assert.NoError(t, err)
+		_, err = bp.PageForWrite(page.NewId(0, 0))
+		assert.NoError(t, err)
+		_, err = bp.PageForWrite(page.NewId(0, 1))
+		assert.NoError(t, err)
+
+		// WHEN
+		size := bp.FlushListPageCount()
+
+		// THEN
+		assert.Equal(t, 2, size)
+	})
+
+	t.Run("ダーティーページがない場合 0 を返す", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size)
+
+		// WHEN
+		size := bp.FlushListPageCount()
+
+		// THEN
+		assert.Equal(t, 0, size)
+	})
+}
+
+func TestForEachDirtyPage(t *testing.T) {
+	t.Run("ダーティーページごとにコールバックが実行される", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size * 3)
+		hf := setupHeapFile(t, 0)
+		bp.RegisterHeapFile(0, hf)
+		id0 := page.NewId(0, 0)
+		id1 := page.NewId(0, 1)
+		_, _ = bp.AddPage(id0)
+		_, _ = bp.AddPage(id1)
+		p0, _ := bp.PageForWrite(id0)
+		p0.data.Body[0] = 0xAA
+		p1, _ := bp.PageForWrite(id1)
+		p1.data.Body[0] = 0xBB
+
+		// WHEN
+		var pages []*page.Page
+		bp.ForEachDirtyPage(func(pg *page.Page) {
+			pages = append(pages, pg)
+		})
+
+		// THEN
+		assert.Len(t, pages, 2)
+	})
+
+	t.Run("フラッシュリストが空の場合コールバックが呼ばれない", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size * 2)
+
+		// WHEN
+		called := false
+		bp.ForEachDirtyPage(func(pg *page.Page) {
+			called = true
+		})
+
+		// THEN
+		assert.False(t, called)
+	})
+
+	t.Run("コールバック内でページの Header を読み取れる", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size * 2)
+		hf := setupHeapFile(t, 0)
+		bp.RegisterHeapFile(0, hf)
+		pageId := page.NewId(0, 0)
+		_, _ = bp.AddPage(pageId)
+		p, _ := bp.PageForWrite(pageId)
+		p.data.Header[0] = 0x12
+		p.data.Header[1] = 0x34
+
+		// WHEN
+		var header []byte
+		bp.ForEachDirtyPage(func(pg *page.Page) {
+			header = pg.Header
+		})
+
+		// THEN
+		assert.Equal(t, byte(0x12), header[0])
+		assert.Equal(t, byte(0x34), header[1])
+	})
+}
+
 func setupHeapFile(t *testing.T, fileId page.FileId) *file.HeapFile {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.db")

@@ -24,5 +24,5 @@ func (ci *ColumnIterator) Next() (ColumnRecord, bool, error) {
 	if !ok {
 		return ColumnRecord{}, false, nil
 	}
-	return decodeColumnRecord(record), true, nil
+	return DecodeColumnRecord(record), true, nil
 }
