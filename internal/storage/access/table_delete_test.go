@@ -87,7 +87,7 @@ func TestTableSoftDelete(t *testing.T) {
 		assert.NoError(t, err)
 		decoded, err := DecodePrimaryRecord(existing, table.catalog, table.primaryIndex.fileId())
 		assert.NoError(t, err)
-		assert.NotEqual(t, undo.NullPointer, decoded.rollPtr)
+		assert.NotEqual(t, undo.NullPointer(), decoded.rollPtr)
 	})
 
 	t.Run("存在しないレコードを論理削除するとエラーを返す", func(t *testing.T) {
@@ -98,7 +98,7 @@ func TestTableSoftDelete(t *testing.T) {
 		fakeRecord := &PrimaryRecord{
 			pkCount:    1,
 			deleteMark: 0,
-			rollPtr:    undo.NullPointer,
+			rollPtr:    undo.NullPointer(),
 			colNames:   []string{"id", "name", "email"},
 			values:     []string{"999", "Nobody", "nobody@example.com"},
 		}
@@ -204,7 +204,7 @@ func TestTableDelete(t *testing.T) {
 		fakeRecord := &PrimaryRecord{
 			pkCount:    1,
 			deleteMark: 0,
-			rollPtr:    undo.NullPointer,
+			rollPtr:    undo.NullPointer(),
 			colNames:   []string{"id", "name", "email"},
 			values:     []string{"999", "Nobody", "nobody@example.com"},
 		}

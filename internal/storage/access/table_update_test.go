@@ -162,7 +162,7 @@ func TestTableUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		updated := searchFirstPrimaryRecord(t, table)
 		// Undo ログが書かれ rollPtr が NullPointer ではなくなる
-		assert.NotEqual(t, undo.NullPointer, updated.rollPtr)
+		assert.NotEqual(t, undo.NullPointer(), updated.rollPtr)
 	})
 }
 

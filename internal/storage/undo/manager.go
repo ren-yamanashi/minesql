@@ -13,10 +13,14 @@ import (
 var errRecordTooLarge = errors.New("undo: record too large for a single page")
 
 type Entry struct {
-	TrxId      lock.TrxId
-	RecordType RecordType
-	Record     Record
+	trxId      lock.TrxId
+	recordType RecordType
+	record     Record
 }
+
+func (e Entry) TrxId() lock.TrxId      { return e.trxId }
+func (e Entry) RecordType() RecordType { return e.recordType }
+func (e Entry) Record() Record         { return e.record }
 
 type Manager struct {
 	bufferPool    *buffer.Pool
@@ -26,7 +30,7 @@ type Manager struct {
 	entries       map[lock.TrxId][]Entry // trxId → Entry[] のマップ
 }
 
-func NewManager(bp *buffer.Pool, redo *redo.Buffer, undoFileId page.FileId) (*Manager, error) {
+func NewManager(bp *buffer.Pool, redoLog *redo.Buffer, undoFileId page.FileId) (*Manager, error) {
 	// Undo ページを割り当て
 	pageId, err := bp.AllocatePageId(undoFileId)
 	if err != nil {
@@ -44,7 +48,7 @@ func NewManager(bp *buffer.Pool, redo *redo.Buffer, undoFileId page.FileId) (*Ma
 
 	return &Manager{
 		bufferPool:    bp,
-		redoLog:       redo,
+		redoLog:       redoLog,
 		undoFileId:    undoFileId,
 		currentPageId: pageId,
 		entries:       make(map[lock.TrxId][]Entry),
@@ -58,9 +62,9 @@ func (m *Manager) Append(trxId lock.TrxId, recordType RecordType, record Record)
 		return Pointer{}, err
 	}
 	m.entries[trxId] = append(m.entries[trxId], Entry{
-		TrxId:      trxId,
-		RecordType: recordType,
-		Record:     record,
+		trxId:      trxId,
+		recordType: recordType,
+		record:     record,
 	})
 	return ptr, nil
 }
@@ -73,7 +77,7 @@ func (m *Manager) Records(trxId lock.TrxId) []Record {
 	}
 	records := make([]Record, len(entries))
 	for i, e := range entries {
-		records[i] = e.Record
+		records[i] = e.record
 	}
 	return records
 }
@@ -97,7 +101,7 @@ func (m *Manager) Discard(trxId lock.TrxId) {
 func (m *Manager) DiscardRecordType(trxId lock.TrxId, recordType RecordType) {
 	entries := m.entries[trxId]
 	kept := slices.DeleteFunc(entries, func(e Entry) bool {
-		return e.RecordType == recordType
+		return e.recordType == recordType
 	})
 	if len(kept) == 0 {
 		delete(m.entries, trxId)

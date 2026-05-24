@@ -386,10 +386,10 @@ func TestPrimaryRecordSetRollPtr(t *testing.T) {
 		})
 
 		// WHEN
-		pr.setRollPtr(undo.NullPointer)
+		pr.setRollPtr(undo.NullPointer())
 
 		// THEN
-		assert.Equal(t, undo.NullPointer, pr.rollPtr)
+		assert.Equal(t, undo.NullPointer(), pr.rollPtr)
 	})
 
 	t.Run("setRollPtr 後の Encode に反映される", func(t *testing.T) {
@@ -456,7 +456,7 @@ func TestDecodePrimaryRecord(t *testing.T) {
 		ct := setupSecondaryTestCatalog(t)
 		original, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{
 			fileId: page.FileId(2), pkCount: 1, deleteMark: 0,
-			lastTrxId: 0, rollPtr: undo.NullPointer,
+			lastTrxId: 0, rollPtr: undo.NullPointer(),
 			colNames: []string{"id", "name", "email"},
 			values:   []string{"1", "Alice", "a@b.com"},
 		})
@@ -467,7 +467,7 @@ func TestDecodePrimaryRecord(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, undo.NullPointer, decoded.rollPtr)
+		assert.Equal(t, undo.NullPointer(), decoded.rollPtr)
 	})
 
 	t.Run("削除マーク付きレコードをデコードできる", func(t *testing.T) {

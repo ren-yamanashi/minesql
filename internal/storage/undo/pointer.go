@@ -9,15 +9,11 @@ import (
 
 const (
 	pageNumberOffset = 0
-	dataOffsetOffset = 4
+	offsetOffset     = 4
 	PointerSize      = 6 // PageNumber(4) + Offset(2)
 )
 
-var (
-	// NullPointer は前バージョンが存在しないことを示す
-	NullPointer           = Pointer{pageNumber: 0xFFFFFFFF, offset: 0xFFFF}
-	ErrInvalidPointerData = errors.New("undo: data size must be at least 6 bytes to decode pointer")
-)
+var ErrInvalidPointerData = errors.New("undo: data size must be at least 6 bytes to decode pointer")
 
 type Pointer struct {
 	pageNumber page.PageNumber // Undo ページのページ番号
@@ -30,21 +26,26 @@ func NewPointer(pageNum page.PageNumber, offset uint16) Pointer {
 
 func (p Pointer) Encode() []byte {
 	buf := make([]byte, PointerSize)
-	binary.BigEndian.PutUint32(buf[pageNumberOffset:dataOffsetOffset], uint32(p.pageNumber))
-	binary.BigEndian.PutUint16(buf[dataOffsetOffset:PointerSize], p.offset)
+	binary.BigEndian.PutUint32(buf[pageNumberOffset:offsetOffset], uint32(p.pageNumber))
+	binary.BigEndian.PutUint16(buf[offsetOffset:PointerSize], p.offset)
 	return buf
 }
 
 func (p Pointer) IsNull() bool {
-	return p == NullPointer
+	return p.pageNumber == 0xFFFFFFFF && p.offset == 0xFFFF
 }
 
 func DecodePointer(data []byte) (Pointer, error) {
 	if len(data) < PointerSize {
-		return NullPointer, ErrInvalidPointerData
+		return NullPointer(), ErrInvalidPointerData
 	}
 	return Pointer{
-		pageNumber: page.PageNumber(binary.BigEndian.Uint32(data[pageNumberOffset:dataOffsetOffset])),
-		offset:     binary.BigEndian.Uint16(data[dataOffsetOffset:PointerSize]),
+		pageNumber: page.PageNumber(binary.BigEndian.Uint32(data[pageNumberOffset:offsetOffset])),
+		offset:     binary.BigEndian.Uint16(data[offsetOffset:PointerSize]),
 	}, nil
+}
+
+// NullPointer は前バージョンが存在しないことを示す Pointer
+func NullPointer() Pointer {
+	return Pointer{pageNumber: 0xFFFFFFFF, offset: 0xFFFF}
 }

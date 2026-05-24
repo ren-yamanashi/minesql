@@ -44,7 +44,7 @@ func TestManagerAppend(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
 		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("Alice")})
-		r2 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("Bob")}, 1, NullPointer)
+		r2 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("Bob")}, 1, NullPointer())
 
 		// WHEN
 		ptr1, err1 := mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
@@ -92,7 +92,7 @@ func TestManagerRecords(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
 		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("first")})
-		r2 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("second")}, 1, NullPointer)
+		r2 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("second")}, 1, NullPointer())
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r2)
 
@@ -132,8 +132,8 @@ func TestManagerCommittedEntries(t *testing.T) {
 	t.Run("指定したトランザクションのエントリを返す", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r1 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer)
-		r2 := NewUpdateRecord(page.FileId(1), btree.Record{[]byte("old")}, btree.Record{[]byte("new")}, 1, NullPointer)
+		r1 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer())
+		r2 := NewUpdateRecord(page.FileId(1), btree.Record{[]byte("old")}, btree.Record{[]byte("new")}, 1, NullPointer())
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r1)
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeUpdate, r2)
 
@@ -142,17 +142,17 @@ func TestManagerCommittedEntries(t *testing.T) {
 
 		// THEN
 		assert.Len(t, entries, 2)
-		assert.Equal(t, lock.TrxId(1), entries[0].TrxId)
-		assert.Equal(t, RecordTypeDelete, entries[0].RecordType)
-		assert.Equal(t, lock.TrxId(1), entries[1].TrxId)
-		assert.Equal(t, RecordTypeUpdate, entries[1].RecordType)
+		assert.Equal(t, lock.TrxId(1), entries[0].TrxId())
+		assert.Equal(t, RecordTypeDelete, entries[0].RecordType())
+		assert.Equal(t, lock.TrxId(1), entries[1].TrxId())
+		assert.Equal(t, RecordTypeUpdate, entries[1].RecordType())
 	})
 
 	t.Run("複数トランザクションのエントリをまとめて返す", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r1 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer)
-		r2 := NewUpdateRecord(page.FileId(1), btree.Record{[]byte("old")}, btree.Record{[]byte("new")}, 2, NullPointer)
+		r1 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer())
+		r2 := NewUpdateRecord(page.FileId(1), btree.Record{[]byte("old")}, btree.Record{[]byte("new")}, 2, NullPointer())
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r1)
 		_, _ = mgr.Append(lock.TrxId(2), RecordTypeUpdate, r2)
 
@@ -161,15 +161,15 @@ func TestManagerCommittedEntries(t *testing.T) {
 
 		// THEN
 		assert.Len(t, entries, 2)
-		assert.Equal(t, lock.TrxId(1), entries[0].TrxId)
-		assert.Equal(t, lock.TrxId(2), entries[1].TrxId)
+		assert.Equal(t, lock.TrxId(1), entries[0].TrxId())
+		assert.Equal(t, lock.TrxId(2), entries[1].TrxId())
 	})
 
 	t.Run("指定していないトランザクションのエントリは含まれない", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r1 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer)
-		r2 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("b")}, 2, NullPointer)
+		r1 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer())
+		r2 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("b")}, 2, NullPointer())
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r1)
 		_, _ = mgr.Append(lock.TrxId(2), RecordTypeDelete, r2)
 
@@ -178,7 +178,7 @@ func TestManagerCommittedEntries(t *testing.T) {
 
 		// THEN
 		assert.Len(t, entries, 1)
-		assert.Equal(t, lock.TrxId(1), entries[0].TrxId)
+		assert.Equal(t, lock.TrxId(1), entries[0].TrxId())
 	})
 
 	t.Run("該当するエントリがない場合空のスライスを返す", func(t *testing.T) {
@@ -195,7 +195,7 @@ func TestManagerCommittedEntries(t *testing.T) {
 	t.Run("空のトランザクション ID リストでは空のスライスを返す", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer)
+		r := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer())
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r)
 
 		// WHEN
@@ -255,7 +255,7 @@ func TestManagerDiscardRecordType(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
 		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("inserted")})
-		r2 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("deleted")}, 1, NullPointer)
+		r2 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("deleted")}, 1, NullPointer())
 		r3 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("inserted2")})
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r2)
@@ -289,7 +289,7 @@ func TestManagerDiscardRecordType(t *testing.T) {
 	t.Run("対象タイプが存在しない場合はレコードが変わらない", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		r := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer)
+		r := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer())
 		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r)
 
 		// WHEN

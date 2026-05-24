@@ -29,7 +29,7 @@ func TestPageRecord(t *testing.T) {
 			trxId:       1,
 			undoNum:     0,
 			recordType:  RecordTypeInsert,
-			prevRollPtr: NullPointer,
+			prevRollPtr: NullPointer(),
 			tableFileId: 1,
 			columnSets:  [][][]byte{{[]byte("data")}},
 		}
@@ -76,12 +76,12 @@ func TestPageRecord(t *testing.T) {
 		undoPage.initialize()
 		f1 := &Fields{
 			trxId: 1, undoNum: 0, recordType: RecordTypeInsert,
-			prevRollPtr: NullPointer, tableFileId: 1,
+			prevRollPtr: NullPointer(), tableFileId: 1,
 			columnSets: [][][]byte{{[]byte("first")}},
 		}
 		f2 := &Fields{
 			trxId: 2, undoNum: 1, recordType: RecordTypeDelete,
-			prevRollPtr: NullPointer, tableFileId: 1,
+			prevRollPtr: NullPointer(), tableFileId: 1,
 			columnSets: [][][]byte{{[]byte("second")}},
 		}
 		s1 := f1.Serialize()
@@ -107,7 +107,7 @@ func TestPageRecord(t *testing.T) {
 			trxId:       1,
 			undoNum:     0,
 			recordType:  RecordTypeInsert,
-			prevRollPtr: NullPointer,
+			prevRollPtr: NullPointer(),
 			tableFileId: 1,
 			columnSets:  [][][]byte{{make([]byte, len(undoPage.body))}},
 		}

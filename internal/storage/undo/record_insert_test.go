@@ -21,7 +21,7 @@ func TestNewInsertRecord(t *testing.T) {
 		assert.Equal(t, page.FileId(5), ir.tableFileId)
 		assert.Equal(t, record, ir.Record())
 		assert.Equal(t, lock.TrxId(0), ir.prevLastTrxId)
-		assert.Equal(t, NullPointer, ir.prevRollPtr)
+		assert.Equal(t, NullPointer(), ir.prevRollPtr)
 	})
 
 	t.Run("空のレコードで作成できる", func(t *testing.T) {
@@ -34,7 +34,7 @@ func TestNewInsertRecord(t *testing.T) {
 		// THEN
 		assert.Empty(t, ir.Record())
 		assert.Equal(t, lock.TrxId(0), ir.prevLastTrxId)
-		assert.Equal(t, NullPointer, ir.prevRollPtr)
+		assert.Equal(t, NullPointer(), ir.prevRollPtr)
 	})
 }
 
@@ -92,7 +92,7 @@ func TestInsertRecordSerialize(t *testing.T) {
 		assert.Equal(t, UndoNumber(2), fields.undoNum)
 		assert.Equal(t, RecordTypeInsert, fields.recordType)
 		assert.Equal(t, lock.TrxId(0), fields.prevLastTrxId)
-		assert.Equal(t, NullPointer, fields.prevRollPtr)
+		assert.Equal(t, NullPointer(), fields.prevRollPtr)
 		assert.Equal(t, page.FileId(5), fields.tableFileId)
 		assert.Len(t, fields.columnSets, 1)
 		assert.Equal(t, [][]byte(record), fields.columnSets[0])

@@ -350,7 +350,7 @@ func buildTestPrimaryRecord(t *testing.T, pi *primaryIndex, id, name, email stri
 		fileId:     pi.tree.MetaPageId().FileId,
 		pkCount:    pi.pkCount,
 		deleteMark: 0,
-		rollPtr:    undo.NullPointer,
+		rollPtr:    undo.NullPointer(),
 		colNames:   []string{"id", "name", "email"},
 		values:     []string{id, name, email},
 	})

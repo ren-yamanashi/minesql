@@ -165,7 +165,7 @@ func TestTableInsert(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		record := searchFirstPrimaryRecord(t, table)
-		assert.NotEqual(t, undo.NullPointer, record.rollPtr)
+		assert.NotEqual(t, undo.NullPointer(), record.rollPtr)
 	})
 
 	t.Run("ユニークセカンダリインデックスに重複値を挿入するとエラーを返す", func(t *testing.T) {

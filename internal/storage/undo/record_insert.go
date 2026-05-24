@@ -18,7 +18,7 @@ func NewInsertRecord(tableFileId page.FileId, record btree.Record) InsertRecord 
 		tableFileId:   tableFileId,
 		record:        record,
 		prevLastTrxId: 0,
-		prevRollPtr:   NullPointer,
+		prevRollPtr:   NullPointer(),
 	}
 }
 

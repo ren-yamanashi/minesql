@@ -99,11 +99,11 @@ func (p *Purge) purge() error {
 
 // purgeEntry は 1 つの Undo エントリに対応するパージ操作を実行する
 func (p *Purge) purgeEntry(entry undo.Entry) error {
-	switch entry.RecordType {
+	switch entry.RecordType() {
 	case undo.RecordTypeDelete:
-		return p.purgeDelete(entry.Record)
+		return p.purgeDelete(entry.Record())
 	case undo.RecordTypeUpdate:
-		return p.purgeUpdate(entry.Record)
+		return p.purgeUpdate(entry.Record())
 	default:
 		return nil
 	}

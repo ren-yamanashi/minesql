@@ -33,10 +33,10 @@ func TestNewUpdateRecord(t *testing.T) {
 		newRecord := btree.Record{[]byte("b")}
 
 		// WHEN
-		ur := NewUpdateRecord(page.FileId(1), prevRecord, newRecord, 0, NullPointer)
+		ur := NewUpdateRecord(page.FileId(1), prevRecord, newRecord, 0, NullPointer())
 
 		// THEN
-		assert.Equal(t, NullPointer, ur.prevRollPtr)
+		assert.Equal(t, NullPointer(), ur.prevRollPtr)
 		assert.Equal(t, lock.TrxId(0), ur.prevLastTrxId)
 	})
 }
@@ -44,7 +44,7 @@ func TestNewUpdateRecord(t *testing.T) {
 func TestUpdateRecordTableFileId(t *testing.T) {
 	t.Run("コンストラクタで指定した FileId を返す", func(t *testing.T) {
 		// GIVEN
-		ur := NewUpdateRecord(page.FileId(5), btree.Record{[]byte("a")}, btree.Record{[]byte("b")}, 0, NullPointer)
+		ur := NewUpdateRecord(page.FileId(5), btree.Record{[]byte("a")}, btree.Record{[]byte("b")}, 0, NullPointer())
 
 		// WHEN
 		result := ur.TableFileId()
@@ -59,7 +59,7 @@ func TestUpdateRecordPrevRecord(t *testing.T) {
 		// GIVEN
 		prevRecord := btree.Record{[]byte("old_name"), []byte("old_email")}
 		newRecord := btree.Record{[]byte("new_name"), []byte("new_email")}
-		ur := NewUpdateRecord(page.FileId(5), prevRecord, newRecord, 100, NullPointer)
+		ur := NewUpdateRecord(page.FileId(5), prevRecord, newRecord, 100, NullPointer())
 
 		// WHEN
 		result := ur.PrevRecord()
@@ -70,7 +70,7 @@ func TestUpdateRecordPrevRecord(t *testing.T) {
 
 	t.Run("空のレコードを返す", func(t *testing.T) {
 		// GIVEN
-		ur := NewUpdateRecord(page.FileId(1), btree.Record{}, btree.Record{[]byte("b")}, 0, NullPointer)
+		ur := NewUpdateRecord(page.FileId(1), btree.Record{}, btree.Record{[]byte("b")}, 0, NullPointer())
 
 		// WHEN
 		result := ur.PrevRecord()
@@ -85,7 +85,7 @@ func TestUpdateRecordNewRecord(t *testing.T) {
 		// GIVEN
 		prevRecord := btree.Record{[]byte("old_name"), []byte("old_email")}
 		newRecord := btree.Record{[]byte("new_name"), []byte("new_email")}
-		ur := NewUpdateRecord(page.FileId(5), prevRecord, newRecord, 100, NullPointer)
+		ur := NewUpdateRecord(page.FileId(5), prevRecord, newRecord, 100, NullPointer())
 
 		// WHEN
 		result := ur.NewRecord()
@@ -96,7 +96,7 @@ func TestUpdateRecordNewRecord(t *testing.T) {
 
 	t.Run("空のレコードを返す", func(t *testing.T) {
 		// GIVEN
-		ur := NewUpdateRecord(page.FileId(1), btree.Record{[]byte("a")}, btree.Record{}, 0, NullPointer)
+		ur := NewUpdateRecord(page.FileId(1), btree.Record{[]byte("a")}, btree.Record{}, 0, NullPointer())
 
 		// WHEN
 		result := ur.NewRecord()
@@ -133,7 +133,7 @@ func TestUpdateRecordSerialize(t *testing.T) {
 
 	t.Run("Record interface を満たす", func(t *testing.T) {
 		// GIVEN
-		ur := NewUpdateRecord(page.FileId(1), btree.Record{[]byte("a")}, btree.Record{[]byte("b")}, 0, NullPointer)
+		ur := NewUpdateRecord(page.FileId(1), btree.Record{[]byte("a")}, btree.Record{[]byte("b")}, 0, NullPointer())
 
 		// WHEN
 		var r Record = ur
@@ -147,7 +147,7 @@ func TestUpdateRecordSerialize(t *testing.T) {
 		// GIVEN
 		prevRecord := btree.Record{[]byte{}}
 		newRecord := btree.Record{[]byte{}}
-		ur := NewUpdateRecord(page.FileId(1), prevRecord, newRecord, 0, NullPointer)
+		ur := NewUpdateRecord(page.FileId(1), prevRecord, newRecord, 0, NullPointer())
 
 		// WHEN
 		buf := ur.Serialize(1, 0)
@@ -162,7 +162,7 @@ func TestUpdateRecordSerialize(t *testing.T) {
 
 	t.Run("大きい TrxId でシリアライズできる", func(t *testing.T) {
 		// GIVEN
-		ur := NewUpdateRecord(page.FileId(1), btree.Record{[]byte("a")}, btree.Record{[]byte("b")}, lock.TrxId(0xFFFFFFFF), NullPointer)
+		ur := NewUpdateRecord(page.FileId(1), btree.Record{[]byte("a")}, btree.Record{[]byte("b")}, lock.TrxId(0xFFFFFFFF), NullPointer())
 
 		// WHEN
 		buf := ur.Serialize(lock.TrxId(0xFFFFFFFE), UndoNumber(0xFFFFFFFD))

@@ -76,13 +76,13 @@ func TestFieldsPrevRollPtr(t *testing.T) {
 
 	t.Run("NullPointer を返す", func(t *testing.T) {
 		// GIVEN
-		f := &Fields{prevRollPtr: NullPointer}
+		f := &Fields{prevRollPtr: NullPointer()}
 
 		// WHEN
 		result := f.prevRollPtr
 
 		// THEN
-		assert.Equal(t, NullPointer, result)
+		assert.Equal(t, NullPointer(), result)
 	})
 }
 
@@ -186,7 +186,7 @@ func TestFieldsSerialize(t *testing.T) {
 			undoNum:       0,
 			recordType:    RecordTypeDelete,
 			prevLastTrxId: 0,
-			prevRollPtr:   NullPointer,
+			prevRollPtr:   NullPointer(),
 			tableFileId:   page.FileId(1),
 			columnSets:    [][][]byte{{}},
 		}
@@ -205,7 +205,7 @@ func TestFieldsSerialize(t *testing.T) {
 			undoNum:       0,
 			recordType:    RecordTypeInsert,
 			prevLastTrxId: 0,
-			prevRollPtr:   NullPointer,
+			prevRollPtr:   NullPointer(),
 			tableFileId:   page.FileId(1),
 			columnSets:    [][][]byte{},
 		}
@@ -272,7 +272,7 @@ func TestDeserializeFields(t *testing.T) {
 			undoNum:       0,
 			recordType:    RecordTypeDelete,
 			prevLastTrxId: 0,
-			prevRollPtr:   NullPointer,
+			prevRollPtr:   NullPointer(),
 			tableFileId:   page.FileId(1),
 			columnSets:    [][][]byte{{[]byte("data")}},
 		}
@@ -283,7 +283,7 @@ func TestDeserializeFields(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, NullPointer, restored.prevRollPtr)
+		assert.Equal(t, NullPointer(), restored.prevRollPtr)
 	})
 
 	t.Run("大きい TrxId でラウンドトリップできる", func(t *testing.T) {
@@ -316,7 +316,7 @@ func TestDeserializeFields(t *testing.T) {
 			undoNum:       0,
 			recordType:    RecordTypeInsert,
 			prevLastTrxId: 0,
-			prevRollPtr:   NullPointer,
+			prevRollPtr:   NullPointer(),
 			tableFileId:   page.FileId(1),
 			columnSets:    [][][]byte{},
 		}
@@ -337,7 +337,7 @@ func TestDeserializeFields(t *testing.T) {
 			undoNum:       0,
 			recordType:    RecordTypeInsert,
 			prevLastTrxId: 0,
-			prevRollPtr:   NullPointer,
+			prevRollPtr:   NullPointer(),
 			tableFileId:   page.FileId(1),
 			columnSets:    [][][]byte{{[]byte{}, []byte("data"), []byte{}}},
 		}
@@ -360,7 +360,7 @@ func TestDeserializeFields(t *testing.T) {
 				undoNum:       0,
 				recordType:    rt,
 				prevLastTrxId: 0,
-				prevRollPtr:   NullPointer,
+				prevRollPtr:   NullPointer(),
 				tableFileId:   page.FileId(1),
 				columnSets:    [][][]byte{{[]byte("data")}},
 			}
@@ -403,7 +403,7 @@ func TestDeserializeFields(t *testing.T) {
 			trxId:       1,
 			undoNum:     0,
 			recordType:  RecordTypeInsert,
-			prevRollPtr: NullPointer,
+			prevRollPtr: NullPointer(),
 			tableFileId: page.FileId(1),
 			columnSets:  [][][]byte{{[]byte("data")}},
 		}
@@ -433,7 +433,7 @@ func TestDeserializeFields(t *testing.T) {
 		// GIVEN: prevLastTrxId + prevRollPtr (8B) は足りるが FileId (4B) が不足
 		var data []byte
 		data = binary.BigEndian.AppendUint32(data, 100)
-		data = append(data, NullPointer.Encode()...)
+		data = append(data, NullPointer().Encode()...)
 		buf := buildRawBuffer(1, 0, RecordTypeInsert, data)
 
 		// WHEN
@@ -447,7 +447,7 @@ func TestDeserializeFields(t *testing.T) {
 		// GIVEN: 固定フィールドは正常だがカラムセット領域が 1 バイトしかない
 		var data []byte
 		data = binary.BigEndian.AppendUint32(data, 100)       // prevLastTrxId
-		data = append(data, NullPointer.Encode()...)          // prevRollPtr
+		data = append(data, NullPointer().Encode()...)        // prevRollPtr
 		data = binary.BigEndian.AppendUint32(data, uint32(1)) // tableFileId
 		data = append(data, 0x01)                             // 1 バイト (columnCountSize 未満)
 		buf := buildRawBuffer(1, 0, RecordTypeInsert, data)
@@ -463,7 +463,7 @@ func TestDeserializeFields(t *testing.T) {
 		// GIVEN: numCols = 2 だがカラムデータが 1 つもない
 		var data []byte
 		data = binary.BigEndian.AppendUint32(data, 100)       // prevLastTrxId
-		data = append(data, NullPointer.Encode()...)          // prevRollPtr
+		data = append(data, NullPointer().Encode()...)        // prevRollPtr
 		data = binary.BigEndian.AppendUint32(data, uint32(1)) // tableFileId
 		data = binary.BigEndian.AppendUint16(data, 2)         // numCols = 2
 		buf := buildRawBuffer(1, 0, RecordTypeInsert, data)
@@ -479,7 +479,7 @@ func TestDeserializeFields(t *testing.T) {
 		// GIVEN: numCols = 1, colLen = 100 だが実データがない
 		var data []byte
 		data = binary.BigEndian.AppendUint32(data, 100)       // prevLastTrxId
-		data = append(data, NullPointer.Encode()...)          // prevRollPtr
+		data = append(data, NullPointer().Encode()...)        // prevRollPtr
 		data = binary.BigEndian.AppendUint32(data, uint32(1)) // tableFileId
 		data = binary.BigEndian.AppendUint16(data, 1)         // numCols = 1
 		data = binary.BigEndian.AppendUint16(data, 100)       // colLen = 100
@@ -501,7 +501,7 @@ func TestFieldsToRecord(t *testing.T) {
 			undoNum:       0,
 			recordType:    RecordTypeInsert,
 			prevLastTrxId: 0,
-			prevRollPtr:   NullPointer,
+			prevRollPtr:   NullPointer(),
 			tableFileId:   page.FileId(5),
 			columnSets:    [][][]byte{{[]byte("alice"), []byte("bob")}},
 		}

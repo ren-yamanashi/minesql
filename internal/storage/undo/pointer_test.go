@@ -54,7 +54,7 @@ func TestPointerEncode(t *testing.T) {
 
 	t.Run("NullPointer をエンコードできる", func(t *testing.T) {
 		// GIVEN
-		p := NullPointer
+		p := NullPointer()
 
 		// WHEN
 		buf := p.Encode()
@@ -79,7 +79,7 @@ func TestPointerEncode(t *testing.T) {
 func TestPointerIsNull(t *testing.T) {
 	t.Run("NullPointer は true を返す", func(t *testing.T) {
 		// GIVEN
-		p := NullPointer
+		p := NullPointer()
 
 		// WHEN
 		result := p.IsNull()
@@ -138,14 +138,14 @@ func TestDecodePointer(t *testing.T) {
 
 	t.Run("NullPointer のラウンドトリップ", func(t *testing.T) {
 		// GIVEN
-		buf := NullPointer.Encode()
+		buf := NullPointer().Encode()
 
 		// WHEN
 		decoded, err := DecodePointer(buf)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, NullPointer, decoded)
+		assert.Equal(t, NullPointer(), decoded)
 		assert.True(t, decoded.IsNull())
 	})
 

@@ -169,3 +169,35 @@ SELECT id, username FROM users WHERE username = 'alice';
 Project (id, username)
   └── IndexScan (username = 'alice', index-only)
 ```
+
+### ツリー図
+
+- 一部のエグゼキュータは子ノードを持ち、子ノードからデータを受け取って処理する
+- リーフノード: 子を持たず、自身でストレージ層にアクセスしてデータを取得・操作する
+- ブランチノード: 子ノードを通じてデータを受け取り、その結果を加工・操作する
+
+```txt
+Executor
+  │
+  ├── TableScan          (リーフノード: テーブル全体を走査する)
+  ├── IndexScan          (リーフノード: セカンダリインデックスを利用して検索する)
+  │
+  ├── NestedLoopJoin     (ブランチノード: 左の各行に対して右の Executor を生成し、結合する)
+  │     └── InnerExecutor
+  ├── Filter             (ブランチノード: InnerExecutor の結果から条件に合う行だけを返す)
+  │     └── InnerExecutor
+  ├── Union              (ブランチノード: 複数の InnerExecutor の結果を結合し、重複を除去する)
+  │     ├── InnerExecutor1
+  │     ├── InnerExecutor2
+  │     └── ...
+  ├── Project            (ブランチノード: InnerExecutor の結果から特定のカラムだけを取り出す)
+  │     └── InnerExecutor
+  │
+  ├── Delete             (ブランチノード: InnerExecutor の結果を元にレコードを削除する)
+  │     └── InnerExecutor
+  ├── Update             (ブランチノード: InnerExecutor の結果を元にレコードを更新する)
+  │     └── InnerExecutor
+  │
+  ├── Insert             (リーフノード: レコードを追加する)
+  └── CreateTable        (リーフノード: テーブルを作成する)
+```
