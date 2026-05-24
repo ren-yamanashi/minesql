@@ -7,16 +7,11 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 )
 
-type SetColumn struct {
-	colNames []string
-	value    []string
-}
-
 type Update struct {
 	trxId         lock.TrxId
 	table         *access.Table
 	innerIterator RowIterator
-	setColumn     SetColumn // SET 句の内容
+	setColumn     Column // SET 句の内容
 }
 
 func NewUpdate(trxId lock.TrxId, table *access.Table, inner RowIterator) *Update {
@@ -39,7 +34,7 @@ func (u *Update) Execute() (int, error) {
 		}
 		switch r := record.(type) {
 		case *access.PrimaryRecord:
-			if err := u.table.Update(r, u.setColumn.colNames, u.setColumn.value, u.trxId); err != nil {
+			if err := u.table.Update(r, u.setColumn.colNames, u.setColumn.values, u.trxId); err != nil {
 				return 0, err
 			}
 			affected++
