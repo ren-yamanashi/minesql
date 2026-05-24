@@ -32,20 +32,20 @@ type Record struct {
 	lsn        Lsn
 	trxId      lock.TrxId // 変更を行ったトランザクション ID
 	recordType RecordType
-	pageId     page.Id   // 変更対象のページ (COMMIT/ROLLBACK の場合はゼロ値)
-	data       page.Page // 変更対象ページ全体のコピー (COMMIT/ROLLBACK の場合はゼロ値)
+	pageId     page.Id    // 変更対象のページ (COMMIT/ROLLBACK の場合はゼロ値)
+	data       *page.Page // 変更対象ページのコピー (COMMIT/ROLLBACK の場合は nil)
 }
 
 func (r Record) Lsn() Lsn          { return r.lsn }
 func (r Record) TrxId() lock.TrxId { return r.trxId }
 func (r Record) Type() RecordType  { return r.recordType }
 func (r Record) PageId() page.Id   { return r.pageId }
-func (r Record) Data() page.Page   { return r.data }
+func (r Record) Data() *page.Page  { return r.data }
 
 func (r Record) Serialize() []byte {
 	var pageBytes []byte
 	if !r.data.IsZero() {
-		pageBytes = r.data.ToBytes()
+		pageBytes = r.data.Bytes()
 	}
 	dataLen := len(pageBytes)
 	buf := make([]byte, recordHeaderSize+dataLen)
@@ -53,7 +53,7 @@ func (r Record) Serialize() []byte {
 	binary.BigEndian.PutUint32(buf[recordHeaderLsnOffset:recordHeaderTrxOffset], uint32(r.lsn))
 	binary.BigEndian.PutUint32(buf[recordHeaderTrxOffset:recordHeaderRecordTypeOffset], uint32(r.trxId))
 	buf[recordHeaderRecordTypeOffset] = byte(r.recordType)
-	r.pageId.WriteTo(buf, recordHeaderPageIdOffset)
+	r.pageId.WriteAt(buf, recordHeaderPageIdOffset)
 	binary.BigEndian.PutUint16(buf[recordHeaderDataLenOffset:recordHeaderSize], uint16(dataLen))
 
 	copy(buf[recordHeaderSize:], pageBytes)
@@ -90,7 +90,7 @@ func DeserializeRecord(data []byte) (Record, int, error) {
 	}
 
 	// ページデータがある場合のみデコード (COMMIT/ROLLBACK はページデータなし)
-	var pg page.Page
+	var pg *page.Page
 	if dataLen > 0 {
 		recordData := make([]byte, dataLen)
 		copy(recordData, data[recordHeaderSize:recordHeaderSize+dataLen])
@@ -98,7 +98,7 @@ func DeserializeRecord(data []byte) (Record, int, error) {
 		if err != nil {
 			return Record{}, 0, err
 		}
-		pg = *p
+		pg = p
 	}
 
 	return Record{

@@ -18,7 +18,7 @@ func TestFlushAllPages(t *testing.T) {
 		assert.NoError(t, err)
 		p, err := bp.PageForWrite(pageId)
 		assert.NoError(t, err)
-		p.data.Body[0] = 0xAA
+		p.data.Body()[0] = 0xAA
 
 		// WHEN
 		err = bp.FlushAllPages()
@@ -59,7 +59,7 @@ func TestFlushAllPages(t *testing.T) {
 		assert.NoError(t, err)
 		p, err := bp.PageForWrite(pageId)
 		assert.NoError(t, err)
-		p.data.Body[0] = 0xBB
+		p.data.Body()[0] = 0xBB
 		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 
@@ -71,7 +71,7 @@ func TestFlushAllPages(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, byte(0xBB), reloaded.data.Body[0])
+		assert.Equal(t, byte(0xBB), reloaded.data.Body()[0])
 	})
 
 	t.Run("ダーティーページがない場合もエラーにならない", func(t *testing.T) {
