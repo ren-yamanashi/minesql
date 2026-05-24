@@ -2,6 +2,7 @@ package redo
 
 import (
 	"math"
+	"sync"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
@@ -553,6 +554,36 @@ func TestBufferSize(t *testing.T) {
 		// ファイルヘッダー + フラッシュ済みレコード 1 件 + バッファ内レコード 1 件
 		expected := int64(fileHeaderSize + recordHeaderSize + recordHeaderSize)
 		assert.Equal(t, expected, size)
+	})
+}
+
+func TestBufferConcurrentAppend(t *testing.T) {
+	t.Run("複数 goroutine からの追加でも LSN が重複しない", func(t *testing.T) {
+		// GIVEN
+		buf := setupTestBuffer(t)
+		const n = 100
+		lsns := make([]Lsn, n)
+		var wg sync.WaitGroup
+
+		// WHEN
+		for i := range n {
+			wg.Add(1)
+			go func(i int) {
+				defer wg.Done()
+				lsn, err := buf.AppendCommit(lock.TrxId(uint32(i + 1)))
+				assert.NoError(t, err)
+				lsns[i] = lsn
+			}(i)
+		}
+		wg.Wait()
+
+		// THEN
+		seen := make(map[Lsn]bool, n)
+		for _, lsn := range lsns {
+			assert.False(t, seen[lsn], "LSN %d が重複している", lsn)
+			seen[lsn] = true
+		}
+		assert.Len(t, seen, n)
 	})
 }
 

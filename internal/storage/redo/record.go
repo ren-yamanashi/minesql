@@ -81,7 +81,9 @@ func DeserializeRecord(data []byte) (Record, int, error) {
 	lsn := Lsn(binary.BigEndian.Uint32(data[recordHeaderLsnOffset:recordHeaderTrxOffset]))
 	trxId := lock.TrxId(binary.BigEndian.Uint32(data[recordHeaderTrxOffset:recordHeaderRecordTypeOffset]))
 	recordType := RecordType(data[recordHeaderRecordTypeOffset])
-	if recordType <= recordTypeUnknown || recordType > RecordTypeRollback {
+	switch recordType {
+	case RecordTypePageWrite, RecordTypeCommit, RecordTypeRollback:
+	default:
 		return Record{}, 0, ErrInvalidRecord
 	}
 	pageId := page.ReadId(data, recordHeaderPageIdOffset)

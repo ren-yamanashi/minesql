@@ -28,6 +28,13 @@ type file struct {
 // newFile は redo.log ファイルを開く (存在しない場合は新規作成する)
 func newFile(baseDir string) (*file, error) {
 	filePath := filepath.Join(baseDir, filename)
+
+	// 前回の truncateBefore が rename 前にクラッシュした場合の残骸を掃除する
+	tmpPath := filepath.Join(baseDir, tmpFilename)
+	if err := os.Remove(tmpPath); err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("redo: failed to remove stale tmp file: %w", err)
+	}
+
 	// read-write モードで開き、存在しない場合は作成する
 	osFile, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0600) //nolint:gosec // 内部で生成したパスを使用
 	if err != nil {
@@ -175,6 +182,8 @@ func (f *file) truncateBefore(lsn Lsn) error {
 	}
 
 	// 一時ファイルにヘッダー + 残レコードを書き込む
+	// ヘッダーの flushedLsn は max(lastLsn, lsn) を使う:
+	// 切り詰めても次回採番する LSN が後退しないように、現在の最大 LSN を下限として固定する
 	tmpPath := filepath.Join(filepath.Dir(f.filePath), tmpFilename)
 	if err := f.writeTmpFile(tmpPath, max(lastLsn, lsn), remaining); err != nil {
 		_ = os.Remove(tmpPath)

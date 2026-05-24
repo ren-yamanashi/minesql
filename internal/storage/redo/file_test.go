@@ -1,6 +1,8 @@
 package redo
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -59,6 +61,23 @@ func TestNewFile(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, Lsn(10), f2.checkpointLsn)
 		_ = f2.close()
+	})
+
+	t.Run("起動時に残存する tmpfile が削除される", func(t *testing.T) {
+		// GIVEN
+		dir := t.TempDir()
+		tmpPath := filepath.Join(dir, tmpFilename)
+		err := os.WriteFile(tmpPath, []byte("stale tmp content"), 0600)
+		assert.NoError(t, err)
+
+		// WHEN
+		f, err := newFile(dir)
+
+		// THEN
+		assert.NoError(t, err)
+		_, statErr := os.Stat(tmpPath)
+		assert.True(t, os.IsNotExist(statErr), "tmpfile が削除されていない")
+		_ = f.close()
 	})
 }
 

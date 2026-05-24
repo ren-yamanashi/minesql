@@ -1,6 +1,7 @@
 package redo
 
 import (
+	"encoding/binary"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
@@ -192,6 +193,24 @@ func TestRecordSerialize(t *testing.T) {
 
 		// THEN
 		assert.Equal(t, recordHeaderSize, len(buf))
+	})
+
+	t.Run("ヘッダーのバイト配置がオフセット定数通りである", func(t *testing.T) {
+		// GIVEN
+		r := Record{
+			lsn:        Lsn(0x01020304),
+			trxId:      lock.TrxId(0x05060708),
+			recordType: RecordTypeCommit,
+		}
+
+		// WHEN
+		buf := r.Serialize()
+
+		// THEN
+		assert.Equal(t, uint32(0x01020304), binary.BigEndian.Uint32(buf[recordHeaderLsnOffset:recordHeaderTrxOffset]))
+		assert.Equal(t, uint32(0x05060708), binary.BigEndian.Uint32(buf[recordHeaderTrxOffset:recordHeaderRecordTypeOffset]))
+		assert.Equal(t, byte(RecordTypeCommit), buf[recordHeaderRecordTypeOffset])
+		assert.Equal(t, uint16(0), binary.BigEndian.Uint16(buf[recordHeaderDataLenOffset:recordHeaderSize]))
 	})
 }
 
