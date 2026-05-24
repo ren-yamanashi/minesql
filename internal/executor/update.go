@@ -15,35 +15,37 @@ type SetColumn struct {
 type Update struct {
 	trxId         lock.TrxId
 	table         *access.Table
-	innerExecutor Executor
+	innerIterator RowIterator
 	setColumn     SetColumn // SET 句の内容
 }
 
-func NewUpdate(trxId lock.TrxId, table *access.Table, inner Executor) *Update {
+func NewUpdate(trxId lock.TrxId, table *access.Table, inner RowIterator) *Update {
 	return &Update{
 		trxId:         trxId,
 		table:         table,
-		innerExecutor: inner,
+		innerIterator: inner,
 	}
 }
 
-func (u *Update) Next() (access.Record, error) {
+func (u *Update) Execute() (int, error) {
+	var affected int
 	for {
-		record, err := u.innerExecutor.Next()
+		record, ok, err := u.innerIterator.Next()
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
-		if record == nil {
+		if !ok {
 			break
 		}
 		switch r := record.(type) {
 		case *access.PrimaryRecord:
 			if err := u.table.Update(r, u.setColumn.colNames, u.setColumn.value, u.trxId); err != nil {
-				return nil, err
+				return 0, err
 			}
+			affected++
 		default:
-			return nil, errors.New("invalid record type")
+			return 0, errors.New("invalid record type")
 		}
 	}
-	return nil, nil
+	return affected, nil
 }

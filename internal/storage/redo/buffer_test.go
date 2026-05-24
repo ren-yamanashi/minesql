@@ -324,6 +324,37 @@ func TestBufferClear(t *testing.T) {
 		// THEN
 		assert.Equal(t, Lsn(0), buf.FlushedLsn())
 	})
+
+	t.Run("未フラッシュレコードがある状態でクリアするとバッファもリセットされる", func(t *testing.T) {
+		// GIVEN
+		buf := setupTestBuffer(t)
+		_, _ = buf.AppendCommit(lock.TrxId(1)) // フラッシュせずバッファに残す
+		_, _ = buf.AppendCommit(lock.TrxId(2))
+
+		// WHEN
+		err := buf.Clear()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Empty(t, buf.records)
+		assert.Equal(t, 0, buf.pendingSize)
+	})
+
+	t.Run("クリア後の LSN は 1 から再採番される", func(t *testing.T) {
+		// GIVEN
+		buf := setupTestBuffer(t)
+		_, _ = buf.AppendCommit(lock.TrxId(1)) // LSN=1
+		_, _ = buf.AppendCommit(lock.TrxId(2)) // LSN=2
+		_ = buf.Flush()
+		_ = buf.Clear()
+
+		// WHEN
+		lsn, err := buf.AppendCommit(lock.TrxId(3))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, Lsn(1), lsn)
+	})
 }
 
 func TestBufferClose(t *testing.T) {

@@ -10,34 +10,36 @@ import (
 type Delete struct {
 	trxId         lock.TrxId
 	table         *access.Table
-	innerExecutor Executor
+	innerIterator RowIterator
 }
 
-func NewDelete(trxId lock.TrxId, table *access.Table, inner Executor) *Delete {
+func NewDelete(trxId lock.TrxId, table *access.Table, inner RowIterator) *Delete {
 	return &Delete{
 		trxId:         trxId,
 		table:         table,
-		innerExecutor: inner,
+		innerIterator: inner,
 	}
 }
 
-func (d *Delete) Next() (access.Record, error) {
+func (d *Delete) Execute() (int, error) {
+	var affected int
 	for {
-		record, err := d.innerExecutor.Next()
+		record, ok, err := d.innerIterator.Next()
 		if err != nil {
-			return nil, err
+			return 0, err
 		}
-		if record == nil {
+		if !ok {
 			break
 		}
 		switch r := record.(type) {
 		case *access.PrimaryRecord:
 			if err := d.table.SoftDelete(r, d.trxId); err != nil {
-				return nil, err
+				return 0, err
 			}
+			affected++
 		default:
-			return nil, errors.New("invalid record type")
+			return 0, errors.New("invalid record type")
 		}
 	}
-	return nil, nil
+	return affected, nil
 }

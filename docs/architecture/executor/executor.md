@@ -170,6 +170,19 @@ Project (id, username)
   └── IndexScan (username = 'alice', index-only)
 ```
 
+### エグゼキュータの分類
+
+エグゼキュータは役割に応じて 2 つに分類される
+
+| 分類 | 役割 |
+| --- | --- |
+| 行取得系 | 行を 1 行ずつ返すイテレータ |
+| 変更系 | クエリを実行し、影響行数を返す |
+
+- 行取得系は SELECT 系の行取得を実行するノード
+- 変更系は DELETE, UPDATE, INSERT, CREATE TABLE など、行を返さずに変更を実行するノード
+  - DELETE や UPDATE は内部に行取得系のエグゼキュータを持ち、イテレートしながら変更を適用して影響行数を返す (以下ツリー図参照)
+
 ### ツリー図
 
 - 一部のエグゼキュータは子ノードを持ち、子ノードからデータを受け取って処理する
@@ -177,27 +190,29 @@ Project (id, username)
 - ブランチノード: 子ノードを通じてデータを受け取り、その結果を加工・操作する
 
 ```txt
-Executor
+行取得系 (行を返す)
   │
-  ├── TableScan          (リーフノード: テーブル全体を走査する)
-  ├── IndexScan          (リーフノード: セカンダリインデックスを利用して検索する)
+  ├── TableScan          (リーフノード)
+  ├── IndexScan          (リーフノード)
   │
-  ├── NestedLoopJoin     (ブランチノード: 左の各行に対して右の Executor を生成し、結合する)
-  │     └── InnerExecutor
-  ├── Filter             (ブランチノード: InnerExecutor の結果から条件に合う行だけを返す)
-  │     └── InnerExecutor
-  ├── Union              (ブランチノード: 複数の InnerExecutor の結果を結合し、重複を除去する)
-  │     ├── InnerExecutor1
-  │     ├── InnerExecutor2
+  ├── NestedLoopJoin     (ブランチノード)
+  │     └── 子ノード
+  ├── Filter             (ブランチノード)
+  │     └── 子ノード
+  ├── Union              (ブランチノード)
+  │     ├── 子ノード
+  │     ├── 子ノード
   │     └── ...
-  ├── Project            (ブランチノード: InnerExecutor の結果から特定のカラムだけを取り出す)
-  │     └── InnerExecutor
+  └── Project            (ブランチノード)
+        └── 子ノード
+
+変更系 (影響行数を返す)
   │
-  ├── Delete             (ブランチノード: InnerExecutor の結果を元にレコードを削除する)
-  │     └── InnerExecutor
-  ├── Update             (ブランチノード: InnerExecutor の結果を元にレコードを更新する)
-  │     └── InnerExecutor
+  ├── Delete             (ブランチノード)
+  │     └── 子ノード
+  ├── Update             (ブランチノード)
+  │     └── 子ノード
   │
-  ├── Insert             (リーフノード: レコードを追加する)
-  └── CreateTable        (リーフノード: テーブルを作成する)
+  ├── Insert             (リーフノード)
+  └── CreateTable        (リーフノード)
 ```

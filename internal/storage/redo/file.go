@@ -122,13 +122,17 @@ func (f *file) flushRecords(records []Record) error {
 	for _, record := range records {
 		if _, err := f.osFile.Write(record.Serialize()); err != nil {
 			// 部分書き込みをロールバック
-			_ = f.osFile.Truncate(originalSize)
+			if truncErr := f.osFile.Truncate(originalSize); truncErr != nil {
+				return errors.Join(err, truncErr)
+			}
 			return err
 		}
 	}
 
 	if err := f.osFile.Sync(); err != nil {
-		_ = f.osFile.Truncate(originalSize)
+		if truncErr := f.osFile.Truncate(originalSize); truncErr != nil {
+			return errors.Join(err, truncErr)
+		}
 		return err
 	}
 
@@ -186,8 +190,14 @@ func (f *file) truncateBefore(lsn Lsn) error {
 	}
 	if err := os.Rename(tmpPath, f.filePath); err != nil {
 		// 置換失敗時: 元ファイルを再オープン
-		f.osFile, _ = directio.OpenFile(f.filePath, os.O_RDWR, 0666)
+		// 再オープンに失敗すると f.osFile が無効なまま残り、以降の操作で
+		// nil/closed fd を触ってしまうため、両方のエラーをまとめて返す
+		reopened, reopenErr := directio.OpenFile(f.filePath, os.O_RDWR, 0666)
 		_ = os.Remove(tmpPath)
+		if reopenErr != nil {
+			return errors.Join(err, reopenErr)
+		}
+		f.osFile = reopened
 		return err
 	}
 
@@ -215,8 +225,10 @@ func (f *file) writeTmpFile(tmpPath string, flushedLsn Lsn, records []Record) (r
 
 	// ヘッダーを書き込み
 	header := make([]byte, fileHeaderSize)
-	binary.BigEndian.PutUint32(header[fileHeaderFlushedLsnOffset:fileHeaderCheckpointLsnOffset], uint32(flushedLsn))
-	binary.BigEndian.PutUint32(header[fileHeaderCheckpointLsnOffset:fileHeaderReservedAreaOffset], uint32(f.checkpointLsn))
+	flushedSlice := header[fileHeaderFlushedLsnOffset:fileHeaderCheckpointLsnOffset]
+	binary.BigEndian.PutUint32(flushedSlice, uint32(flushedLsn))
+	checkpointSlice := header[fileHeaderCheckpointLsnOffset:fileHeaderReservedAreaOffset]
+	binary.BigEndian.PutUint32(checkpointSlice, uint32(f.checkpointLsn))
 	if _, err := tmpFile.Write(header); err != nil {
 		return err
 	}
