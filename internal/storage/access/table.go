@@ -169,6 +169,28 @@ func (t *Table) buildValMap(colNames, values []string) map[string]string {
 	return m
 }
 
+// isPrimaryKeyColumn は指定したカラム名がプライマリキーのカラムかどうかを返す
+func (t *Table) isPrimaryKeyColumn(colName string) (bool, error) {
+	fileId := t.primaryIndex.tree.MetaPageId().FileId
+	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
+	iter, err := t.catalog.ColumnMeta().Search(catalog.SearchModeKey{
+		Key: [][]byte{fileIdBytes, []byte(colName)},
+	})
+	if err != nil {
+		return false, err
+	}
+	defer iter.Close()
+
+	col, ok, err := iter.Next()
+	if err != nil {
+		return false, err
+	}
+	if !ok || col.FileId() != fileId || col.Name() != colName {
+		return false, nil
+	}
+	return col.Position() < t.primaryIndex.pkCount, nil
+}
+
 // extractPrimaryKey はテーブル定義順のカラム値からプライマリキー部分を抽出する
 func (t *Table) extractPrimaryKey(values []string) []string {
 	pk := make([]string, t.primaryIndex.pkCount)

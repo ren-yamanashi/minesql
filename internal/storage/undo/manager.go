@@ -71,7 +71,7 @@ func (m *Manager) Records(trxId lock.TrxId) []Record {
 // CommittedEntries はコミット済みトランザクションの Undo エントリを返す
 // (INSERT のエントリはコミット時に破棄済みのため、UPDATE/DELETE のみ含まれる)
 func (m *Manager) CommittedEntries(committedTrxIds []lock.TrxId) []Entry {
-	result := []Entry{}
+	var result []Entry
 	for _, trxId := range committedTrxIds {
 		result = append(result, m.entries[trxId]...)
 	}
@@ -167,6 +167,8 @@ func (m *Manager) appendRedoLog(trxId lock.TrxId) error {
 	if err != nil {
 		return err
 	}
-	m.redoLog.AppendPageCopy(trxId, m.currentPageId, *pageUndo.Data())
+	if _, err := m.redoLog.AppendPageCopy(trxId, m.currentPageId, *pageUndo.Data()); err != nil {
+		return err
+	}
 	return nil
 }

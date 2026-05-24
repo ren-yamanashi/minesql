@@ -92,6 +92,50 @@ func TestTableBuildValMap(t *testing.T) {
 	})
 }
 
+func TestTableIsPrimaryKeyColumn(t *testing.T) {
+	t.Run("プライマリキーのカラムに対して true を返す", func(t *testing.T) {
+		// GIVEN
+		env := setupTableTestEnv(t)
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		assert.NoError(t, err)
+
+		// WHEN
+		result, err := table.isPrimaryKeyColumn("id")
+
+		// THEN
+		assert.NoError(t, err)
+		assert.True(t, result)
+	})
+
+	t.Run("非プライマリキーのカラムに対して false を返す", func(t *testing.T) {
+		// GIVEN
+		env := setupTableTestEnv(t)
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		assert.NoError(t, err)
+
+		// WHEN
+		result, err := table.isPrimaryKeyColumn("name")
+
+		// THEN
+		assert.NoError(t, err)
+		assert.False(t, result)
+	})
+
+	t.Run("存在しないカラム名に対して false を返す", func(t *testing.T) {
+		// GIVEN
+		env := setupTableTestEnv(t)
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		assert.NoError(t, err)
+
+		// WHEN
+		result, err := table.isPrimaryKeyColumn("nonexistent")
+
+		// THEN
+		assert.NoError(t, err)
+		assert.False(t, result)
+	})
+}
+
 func TestTableExtractPrimaryKey(t *testing.T) {
 	t.Run("テーブル定義順の先頭からプライマリキーを抽出する", func(t *testing.T) {
 		// GIVEN
@@ -223,6 +267,11 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 		env.primaryTree.MetaPageId(),
 	))
 	_ = env.ct.IndexKeyColumnMeta().Insert(catalog.NewIndexKeyColumnRecord(piIndexId, "id", 0))
+
+	// カラムメタデータ
+	_ = env.ct.ColumnMeta().Insert(catalog.NewColumnRecord(fileId, "id", 0))
+	_ = env.ct.ColumnMeta().Insert(catalog.NewColumnRecord(fileId, "name", 1))
+	_ = env.ct.ColumnMeta().Insert(catalog.NewColumnRecord(fileId, "email", 2))
 
 	// セカンダリインデックス idx_name のメタデータ (B+Tree は secondaryTree を再利用)
 	siNameId := catalog.IndexId(1)

@@ -281,7 +281,7 @@ func setupRecoveryTestEnv(t *testing.T) *recoveryTestEnv {
 	_ = os.MkdirAll(config.BaseDir, 0o750)
 	t.Cleanup(func() { _ = os.RemoveAll(config.BaseDir) })
 
-	redoLog, err := redo.NewBuffer()
+	redoLog, err := redo.NewBuffer(config.BaseDir)
 	if err != nil {
 		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
 	}

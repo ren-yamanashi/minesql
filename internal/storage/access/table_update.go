@@ -5,18 +5,25 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
-// Update はテーブルの行をインプレース更新する
-//   - currentRecord: 更新前のレコード (executor が Search で取得したもの)
-//   - colNames: 更新するカラム名 (SET 句の対象)
-//   - values: 更新後の値
+// Update はテーブルの行を更新する
+//   - PK カラムが更新対象に含まれない場合はインプレース更新を行う
+//   - PK カラムが更新対象に含まれる場合は論理削除 + 新規挿入で実現する
 func (t *Table) Update(currentRecord *PrimaryRecord, colNames, values []string, trxId lock.TrxId) error {
-	// 更新後のレコードを生成
 	newRecord, err := currentRecord.update(trxId, colNames, values)
 	if err != nil {
 		return err
 	}
 
-	// Undo ログを更新
+	if t.isPrimaryKeyChanged(currentRecord, newRecord) {
+		// PK が変わる場合は論理削除 + 新規挿入 (Undo ログはそれぞれの public method 内で記録)
+		if err := t.SoftDelete(currentRecord, trxId); err != nil {
+			return err
+		}
+		return t.Insert(newRecord.colNames, newRecord.values, trxId)
+	}
+
+	// PK が変わらない場合はインプレース更新
+	// Undo ログを記録
 	undoRecord := undo.NewUpdateRecord(
 		t.primaryIndex.fileId(),
 		currentRecord.Encode(),
@@ -87,6 +94,17 @@ func (t *Table) updateSecondaryIndexes(
 		}
 	}
 	return nil
+}
+
+// isPrimaryKeyChanged は更新前後でプライマリキーの値が変わるかどうかを判定する
+func (t *Table) isPrimaryKeyChanged(before, after *PrimaryRecord) bool {
+	pkCount := t.primaryIndex.pkCount
+	for i := range pkCount {
+		if before.values[i] != after.values[i] {
+			return true
+		}
+	}
+	return false
 }
 
 // isIndexAffected はインデックスを構成するカラムが更新対象に含まれるか判定する

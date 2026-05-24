@@ -36,15 +36,15 @@ type Record struct {
 	data       page.Page // 変更対象ページ全体のコピー (COMMIT/ROLLBACK の場合はゼロ値)
 }
 
-func (r *Record) Lsn() Lsn          { return r.lsn }
-func (r *Record) TrxId() lock.TrxId { return r.trxId }
-func (r *Record) Type() RecordType  { return r.recordType }
-func (r *Record) PageId() page.Id   { return r.pageId }
-func (r *Record) Data() page.Page   { return r.data }
+func (r Record) Lsn() Lsn          { return r.lsn }
+func (r Record) TrxId() lock.TrxId { return r.trxId }
+func (r Record) Type() RecordType  { return r.recordType }
+func (r Record) PageId() page.Id   { return r.pageId }
+func (r Record) Data() page.Page   { return r.data }
 
-func (r *Record) Serialize() []byte {
-	pageBytes := []byte{}
-	if r.data.Header != nil {
+func (r Record) Serialize() []byte {
+	var pageBytes []byte
+	if !r.data.IsZero() {
 		pageBytes = r.data.ToBytes()
 	}
 	dataLen := len(pageBytes)
@@ -61,12 +61,11 @@ func (r *Record) Serialize() []byte {
 	return buf
 }
 
-func (r *Record) Size() int {
-	dataSize := 0
-	if r.data.Header != nil {
-		dataSize = len(r.data.ToBytes())
+func (r Record) Size() int {
+	if !r.data.IsZero() {
+		return recordHeaderSize + page.Size
 	}
-	return recordHeaderSize + dataSize
+	return recordHeaderSize
 }
 
 // DeserializeRecord はバイト列から Record をデシリアライズする

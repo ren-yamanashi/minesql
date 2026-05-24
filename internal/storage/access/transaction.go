@@ -61,7 +61,9 @@ func (t *TrxManager) Begin() lock.TrxId {
 // Commit はトランザクションをコミットし、ロックを開放して Undo ログを破棄する
 func (t *TrxManager) Commit(trxId lock.TrxId) error {
 	// Redo ログに Commit レコードを記録してフラッシュ
-	t.redoLog.AppendCommit(trxId)
+	if _, err := t.redoLog.AppendCommit(trxId); err != nil {
+		return err
+	}
 	if err := t.redoLog.Flush(); err != nil {
 		return err
 	}
@@ -92,7 +94,9 @@ func (t *TrxManager) Rollback(trxId lock.TrxId) error {
 	}()
 
 	// Redo ログに Rollback レコードを記録 (フラッシュなし)
-	t.redoLog.AppendRollback(trxId)
+	if _, err := t.redoLog.AppendRollback(trxId); err != nil {
+		return err
+	}
 
 	records := t.undoLog.Records(trxId)
 	for _, r := range slices.Backward(records) {

@@ -349,7 +349,7 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 	t.Cleanup(func() { _ = undoHf.Close() })
 	bp.RegisterHeapFile(undoFileId, undoHf)
 
-	redoLog, err := redo.NewBuffer()
+	redoLog, err := redo.NewBuffer(config.BaseDir)
 	if err != nil {
 		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
 	}
