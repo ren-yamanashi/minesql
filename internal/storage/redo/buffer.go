@@ -133,6 +133,10 @@ func (b *Buffer) Size() (int64, error) {
 // appendRecord は新しい Redo レコードをバッファに追加し、対応する LSN を返す
 // バッファサイズが上限を超えた場合は自動的にフラッシュする
 func (b *Buffer) appendRecord(trxId lock.TrxId, rt RecordType, pageId page.Id, pg *page.Page) (Lsn, error) {
+	prevNextLsn := b.nextLsn
+	prevPendingSize := b.pendingSize
+	prevRecordsLen := len(b.records)
+
 	lsn, err := b.allocateLsn()
 	if err != nil {
 		return 0, err
@@ -151,6 +155,9 @@ func (b *Buffer) appendRecord(trxId lock.TrxId, rt RecordType, pageId page.Id, p
 	// バッファサイズが上限を超えた場合は自動フラッシュ
 	if b.pendingSize >= maxBufferSize {
 		if err := b.flush(); err != nil {
+			b.records = b.records[:prevRecordsLen]
+			b.pendingSize = prevPendingSize
+			b.nextLsn = prevNextLsn
 			return 0, err
 		}
 	}

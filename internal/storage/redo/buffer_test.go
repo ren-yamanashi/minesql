@@ -85,6 +85,36 @@ func TestBufferAppendPageCopy(t *testing.T) {
 		assert.Equal(t, Lsn(1), lsn1)
 		assert.Equal(t, Lsn(2), lsn2)
 	})
+
+	t.Run("自動フラッシュ失敗時に追加レコード分の状態がロールバックされる", func(t *testing.T) {
+		// GIVEN
+		buf := setupTestBuffer(t)
+		pg := buildTestPage(t)
+		const recordSize = recordHeaderSize + page.Size
+		// 自動フラッシュ閾値を超えない件数までバッファに詰める
+		fillCount := maxBufferSize / recordSize
+		for range fillCount {
+			_, err := buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), pg)
+			assert.NoError(t, err)
+		}
+		// この時点でまだフラッシュは発動していないことを確認
+		assert.Equal(t, Lsn(0), buf.FlushedLsn())
+		nextLsnBefore := buf.nextLsn
+		pendingBefore := buf.pendingSize
+		recordsLenBefore := len(buf.records)
+		// 強制的に osFile を閉じて以降の flushRecords を失敗させる
+		_ = buf.logFile.osFile.Close()
+
+		// WHEN: 次の 1 件で自動フラッシュが発動し失敗する
+		lsn, err := buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), pg)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Equal(t, Lsn(0), lsn)
+		assert.Equal(t, nextLsnBefore, buf.nextLsn)
+		assert.Equal(t, pendingBefore, buf.pendingSize)
+		assert.Equal(t, recordsLenBefore, len(buf.records))
+	})
 }
 
 func TestBufferAppendCommit(t *testing.T) {
