@@ -65,32 +65,6 @@ func TestRecordBytes(t *testing.T) {
 		assert.Equal(t, byte(0), data[2])
 		assert.Equal(t, byte(3), data[3]) // keySize = 3
 	})
-
-	t.Run("データが 4 バイト未満の場合は nil レコードを返す", func(t *testing.T) {
-		// GIVEN
-		data := []byte{0x00, 0x01}
-
-		// WHEN
-		r := recordFromBytes(data)
-
-		// THEN
-		assert.Nil(t, r.Header())
-		assert.Nil(t, r.Key())
-		assert.Nil(t, r.NonKey())
-	})
-
-	t.Run("データ長がヘッダーとキーの合計より短い場合は nil レコードを返す", func(t *testing.T) {
-		// GIVEN
-		data := []byte{0x00, 0x02, 0x00, 0x03, 0xFF} // headerSize=2, keySize=3 だが残り 1 バイトしかない
-
-		// WHEN
-		r := recordFromBytes(data)
-
-		// THEN
-		assert.Nil(t, r.Header())
-		assert.Nil(t, r.Key())
-		assert.Nil(t, r.NonKey())
-	})
 }
 
 func TestCompareKey(t *testing.T) {
@@ -125,5 +99,33 @@ func TestCompareKey(t *testing.T) {
 
 		// THEN
 		assert.Equal(t, 1, result)
+	})
+}
+
+func TestRecordFromBytes(t *testing.T) {
+	t.Run("データが 4 バイト未満の場合は nil レコードを返す", func(t *testing.T) {
+		// GIVEN
+		data := []byte{0x00, 0x01}
+
+		// WHEN
+		r := recordFromBytes(data)
+
+		// THEN
+		assert.Nil(t, r.Header())
+		assert.Nil(t, r.Key())
+		assert.Nil(t, r.NonKey())
+	})
+
+	t.Run("データ長がヘッダーとキーの合計より短い場合は nil レコードを返す", func(t *testing.T) {
+		// GIVEN
+		data := []byte{0x00, 0x02, 0x00, 0x03, 0xFF} // headerSize=2, keySize=3 だが残り 1 バイトしかない
+
+		// WHEN
+		r := recordFromBytes(data)
+
+		// THEN
+		assert.Nil(t, r.Header())
+		assert.Nil(t, r.Key())
+		assert.Nil(t, r.NonKey())
 	})
 }

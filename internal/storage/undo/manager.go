@@ -75,7 +75,6 @@ func (m *Manager) Records(trxId lock.TrxId) []Record {
 }
 
 // CommittedEntries はコミット済みトランザクションの Undo エントリを返す
-// (INSERT のエントリはコミット時に破棄済みのため、UPDATE/DELETE のみ含まれる)
 func (m *Manager) CommittedEntries(committedTrxIds []lock.TrxId) []Entry {
 	m.mu.Lock()
 	defer m.mu.Unlock()

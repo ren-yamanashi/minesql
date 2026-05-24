@@ -136,6 +136,42 @@ func TestEncode(t *testing.T) {
 		expected := []byte{1, 2, 3, 4, 5, 6, 7, 8, 8}
 		assert.Equal(t, expected, dst)
 	})
+
+	t.Run("エンコード後のバイト列がソート順を保つ (先頭バイトが異なる)", func(t *testing.T) {
+		// GIVEN
+		a := Encode(nil, [][]byte{{1, 0}})
+		b := Encode(nil, [][]byte{{2, 0}})
+
+		// THEN
+		assert.Less(t, string(a), string(b))
+	})
+
+	t.Run("エンコード後のバイト列がソート順を保つ (短いプレフィックスは小さい)", func(t *testing.T) {
+		// GIVEN: a は b のプレフィックス
+		a := Encode(nil, [][]byte{{0x01}})
+		b := Encode(nil, [][]byte{{0x01, 0x00}})
+
+		// THEN: 短い方が小さい
+		assert.Less(t, string(a), string(b))
+	})
+
+	t.Run("エンコード後のバイト列がソート順を保つ (ブロック境界をまたぐ)", func(t *testing.T) {
+		// GIVEN: 8 バイトちょうど vs 9 バイト
+		a := Encode(nil, [][]byte{{1, 2, 3, 4, 5, 6, 7, 8}})
+		b := Encode(nil, [][]byte{{1, 2, 3, 4, 5, 6, 7, 8, 0}})
+
+		// THEN: 短い方が小さい
+		assert.Less(t, string(a), string(b))
+	})
+
+	t.Run("エンコード後のバイト列がソート順を保つ (空 vs 1 バイト)", func(t *testing.T) {
+		// GIVEN
+		a := Encode(nil, [][]byte{{}})
+		b := Encode(nil, [][]byte{{0x00}})
+
+		// THEN: 空の方が小さい
+		assert.Less(t, string(a), string(b))
+	})
 }
 
 func TestDecode(t *testing.T) {
@@ -296,41 +332,5 @@ func TestDecode(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, original, decoded)
-	})
-
-	t.Run("エンコード後のバイト列がソート順を保つ (先頭バイトが異なる)", func(t *testing.T) {
-		// GIVEN
-		a := Encode(nil, [][]byte{{1, 0}})
-		b := Encode(nil, [][]byte{{2, 0}})
-
-		// THEN
-		assert.Less(t, string(a), string(b))
-	})
-
-	t.Run("エンコード後のバイト列がソート順を保つ (短いプレフィックスは小さい)", func(t *testing.T) {
-		// GIVEN: a は b のプレフィックス
-		a := Encode(nil, [][]byte{{0x01}})
-		b := Encode(nil, [][]byte{{0x01, 0x00}})
-
-		// THEN: 短い方が小さい
-		assert.Less(t, string(a), string(b))
-	})
-
-	t.Run("エンコード後のバイト列がソート順を保つ (ブロック境界をまたぐ)", func(t *testing.T) {
-		// GIVEN: 8 バイトちょうど vs 9 バイト
-		a := Encode(nil, [][]byte{{1, 2, 3, 4, 5, 6, 7, 8}})
-		b := Encode(nil, [][]byte{{1, 2, 3, 4, 5, 6, 7, 8, 0}})
-
-		// THEN: 短い方が小さい
-		assert.Less(t, string(a), string(b))
-	})
-
-	t.Run("エンコード後のバイト列がソート順を保つ (空 vs 1 バイト)", func(t *testing.T) {
-		// GIVEN
-		a := Encode(nil, [][]byte{{}})
-		b := Encode(nil, [][]byte{{0x00}})
-
-		// THEN: 空の方が小さい
-		assert.Less(t, string(a), string(b))
 	})
 }
