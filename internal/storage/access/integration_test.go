@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/config"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -256,7 +256,7 @@ func TestIntegrationCrashRecovery(t *testing.T) {
 		undoPageId := page.NewId(env.ct.UndoLogFileId(), 0)
 		readPage, err := env.bp.PageForRead(undoPageId)
 		assert.NoError(t, err)
-		env.redoLog.AppendPageCopy(trxId, undoPageId, readPage.Data())
+		_, _ = env.redoLog.AppendPageCopy(trxId, undoPageId, readPage.Data())
 		err = env.redoLog.Flush()
 		assert.NoError(t, err)
 
@@ -324,7 +324,7 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 	t.Cleanup(func() { _ = os.RemoveAll(config.BaseDir) })
 
 	// カタログ用 HeapFile (FileId=0)
-	catalogPath := filepath.Join(config.BaseDir, "dictionary.db")
+	catalogPath := filepath.Join(config.BaseDir, "catalog.db")
 	catalogHf, err := file.NewHeapFile(page.FileId(0), catalogPath)
 	if err != nil {
 		t.Fatalf("カタログ HeapFile の作成に失敗: %v", err)

@@ -125,7 +125,7 @@ func TestPageCleanerClean(t *testing.T) {
 		pc := NewPageCleaner(env.bp, env.redoLog, 100, 90)
 		for range 10 {
 			pg := buildRedoTestPage(t)
-			env.redoLog.AppendPageCopy(lock.TrxId(1), pgId, pg)
+			_, _ = env.redoLog.AppendPageCopy(lock.TrxId(1), pgId, pg)
 		}
 		_ = env.redoLog.Flush()
 

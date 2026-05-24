@@ -12,22 +12,22 @@ import (
 )
 
 type newSecondaryIndexInput struct {
-	MetaPageId  page.Id         // セカンダリインデックスの MetaPageId
-	PrimaryTree *btree.Tree     // プライマリインデックスの B+Tree
+	MetaPageId  page.Id            // セカンダリインデックスの MetaPageId
+	PrimaryTree *btree.Tree        // プライマリインデックスの B+Tree
 	IndexId     dictionary.IndexId // インデックス ID
-	IndexName   string          // インデックス名
-	Unique      bool            // ユニークインデックスか
+	IndexName   string             // インデックス名
+	Unique      bool               // ユニークインデックスか
 	Lock        *lock.Manager
 }
 
 type secondaryIndex struct {
 	catalog     *dictionary.Catalog
-	tree        *btree.Tree     // セカンダリインデックスの B+Tree
-	primaryTree *btree.Tree     // プライマリインデックスの B+Tree
-	fileId      page.FileId     // インデックスが属するテーブルの FileId
+	tree        *btree.Tree        // セカンダリインデックスの B+Tree
+	primaryTree *btree.Tree        // プライマリインデックスの B+Tree
+	fileId      page.FileId        // インデックスが属するテーブルの FileId
 	indexId     dictionary.IndexId // インデックス ID
-	indexName   string          // インデックス名
-	unique      bool            // ユニーク制約の有無
+	indexName   string             // インデックス名
+	unique      bool               // ユニーク制約の有無
 	lock        *lock.Manager
 }
 
@@ -51,11 +51,11 @@ func newSecondaryIndex(
 }
 
 type createSecondaryIndexInput struct {
-	FileId      page.FileId     // インデックスが属するテーブルの FileId
-	PrimaryTree *btree.Tree     // プライマリインデックスの B+Tree
+	FileId      page.FileId        // インデックスが属するテーブルの FileId
+	PrimaryTree *btree.Tree        // プライマリインデックスの B+Tree
 	IndexId     dictionary.IndexId // インデックス ID
-	IndexName   string          // インデックス名
-	Unique      bool            // ユニークか
+	IndexName   string             // インデックス名
+	Unique      bool               // ユニークか
 	Lock        *lock.Manager
 }
 

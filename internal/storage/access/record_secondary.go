@@ -134,19 +134,19 @@ func sortSecondaryRecord(ct *dictionary.Catalog, input NewSecondaryRecordInput) 
 }
 
 // fetchIndex はインデックスメタデータを検索し、指定された名前のインデックスレコードを返す
-func fetchIndex(ct *dictionary.Catalog, fileId page.FileId, indexName string) (dictionary.IndexRecord, error) {
+func fetchIndex(ct *dictionary.Catalog, fileId page.FileId, indexName string) (dictionary.IndexMetaRecord, error) {
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
 	iter, err := ct.IndexMeta().Search(dictionary.SearchModeKey{Key: [][]byte{fileIdBytes, []byte(indexName)}})
 	if err != nil {
-		return dictionary.IndexRecord{}, err
+		return dictionary.IndexMetaRecord{}, err
 	}
 	defer iter.Close()
 	indexRecord, ok, err := iter.Next()
 	if err != nil {
-		return dictionary.IndexRecord{}, err
+		return dictionary.IndexMetaRecord{}, err
 	}
 	if !ok || indexRecord.FileId() != fileId || indexRecord.Name() != indexName {
-		return dictionary.IndexRecord{}, fmt.Errorf("index %q not found", indexName)
+		return dictionary.IndexMetaRecord{}, fmt.Errorf("index %q not found", indexName)
 	}
 	return indexRecord, nil
 }

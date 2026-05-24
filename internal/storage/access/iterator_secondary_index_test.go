@@ -173,7 +173,7 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	t.Helper()
 
 	// カタログ用 HeapFile (FileId=0)
-	catalogPath := filepath.Join(t.TempDir(), "dictionary.db")
+	catalogPath := filepath.Join(t.TempDir(), "catalog.db")
 	catalogHf, err := file.NewHeapFile(page.FileId(0), catalogPath)
 	if err != nil {
 		t.Fatalf("カタログ HeapFile の作成に失敗: %v", err)
@@ -200,19 +200,19 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	// テーブル定義: id:0, name:1, email:2
 	tableFileId := page.FileId(2)
 	dummyPageId := page.NewId(tableFileId, page.PageNumber(0))
-	_ = ct.TableMeta().Insert(dictionary.NewTableRecord("users", dummyPageId, 3))
-	_ = ct.ColumnMeta().Insert(dictionary.NewColumnRecord(tableFileId, "id", 0))
-	_ = ct.ColumnMeta().Insert(dictionary.NewColumnRecord(tableFileId, "name", 1))
-	_ = ct.ColumnMeta().Insert(dictionary.NewColumnRecord(tableFileId, "email", 2))
+	_ = ct.TableMeta().Insert(dictionary.NewTableMetaRecord("users", dummyPageId, 3))
+	_ = ct.ColumnMeta().Insert(dictionary.NewColumnMetaRecord(tableFileId, "id", 0))
+	_ = ct.ColumnMeta().Insert(dictionary.NewColumnMetaRecord(tableFileId, "name", 1))
+	_ = ct.ColumnMeta().Insert(dictionary.NewColumnMetaRecord(tableFileId, "email", 2))
 
 	// インデックス定義
 	indexId1 := dictionary.IndexId(1)
-	_ = ct.IndexMeta().Insert(dictionary.NewIndexRecord(tableFileId, indexId1, "idx_name", dictionary.IndexTypeNonUnique, 1, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnRecord(indexId1, "name", 0))
+	_ = ct.IndexMeta().Insert(dictionary.NewIndexMetaRecord(tableFileId, indexId1, "idx_name", dictionary.IndexTypeNonUnique, 1, dummyPageId))
+	_ = ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnMetaRecord(indexId1, "name", 0))
 
 	indexId2 := dictionary.IndexId(2)
-	_ = ct.IndexMeta().Insert(dictionary.NewIndexRecord(tableFileId, indexId2, "idx_email", dictionary.IndexTypeUnique, 1, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnRecord(indexId2, "email", 0))
+	_ = ct.IndexMeta().Insert(dictionary.NewIndexMetaRecord(tableFileId, indexId2, "idx_email", dictionary.IndexTypeUnique, 1, dummyPageId))
+	_ = ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnMetaRecord(indexId2, "email", 0))
 
 	// プライマリ B+Tree
 	primaryTree, err := btree.CreateTree(bp, tableFileId)

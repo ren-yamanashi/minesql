@@ -27,7 +27,7 @@ func TestCheckpointExecute(t *testing.T) {
 	t.Run("ダーティーページがない場合 FlushedLsn がチェックポイント LSN になる", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		env.redoLog.AppendCommit(lock.TrxId(1))
+		_, _ = env.redoLog.AppendCommit(lock.TrxId(1))
 		_ = env.redoLog.Flush()
 		cp := NewCheckpoint(env.bp, env.redoLog)
 
@@ -45,8 +45,8 @@ func TestCheckpointExecute(t *testing.T) {
 		// セットアップで作られたダーティーページをクリア
 		_ = env.bp.FlushAllPages()
 
-		env.redoLog.AppendCommit(lock.TrxId(1)) // LSN=1
-		env.redoLog.AppendCommit(lock.TrxId(2)) // LSN=2
+		_, _ = env.redoLog.AppendCommit(lock.TrxId(1)) // LSN=1
+		_, _ = env.redoLog.AppendCommit(lock.TrxId(2)) // LSN=2
 		env.redoLog.AppendCommit(lock.TrxId(3)) // LSN=3
 		_ = env.redoLog.Flush()
 
@@ -72,8 +72,8 @@ func TestCheckpointExecute(t *testing.T) {
 		env := setupRecoveryTestEnv(t)
 		_ = env.bp.FlushAllPages()
 
-		env.redoLog.AppendCommit(lock.TrxId(1)) // LSN=1
-		env.redoLog.AppendCommit(lock.TrxId(2)) // LSN=2
+		_, _ = env.redoLog.AppendCommit(lock.TrxId(1)) // LSN=1
+		_, _ = env.redoLog.AppendCommit(lock.TrxId(2)) // LSN=2
 		env.redoLog.AppendCommit(lock.TrxId(3)) // LSN=3
 		_ = env.redoLog.Flush()
 
@@ -104,8 +104,8 @@ func TestCheckpointExecute(t *testing.T) {
 		env := setupRecoveryTestEnv(t)
 		_ = env.bp.FlushAllPages()
 
-		env.redoLog.AppendCommit(lock.TrxId(1)) // LSN=1
-		env.redoLog.AppendCommit(lock.TrxId(2)) // LSN=2
+		_, _ = env.redoLog.AppendCommit(lock.TrxId(1)) // LSN=1
+		_, _ = env.redoLog.AppendCommit(lock.TrxId(2)) // LSN=2
 		_ = env.redoLog.Flush()
 
 		// Page LSN=5 のダーティーページ

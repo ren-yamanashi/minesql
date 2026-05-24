@@ -7,29 +7,23 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 )
 
-type SetColumn struct {
-	colNames []string
-	value    []string
-}
-
-type Update struct {
+type Delete struct {
 	trxId         lock.TrxId
 	table         *access.Table
 	innerExecutor Executor
-	setColumn     SetColumn // SET 句の内容
 }
 
-func NewUpdate(trxId lock.TrxId, table *access.Table, inner Executor) *Update {
-	return &Update{
+func NewDelete(trxId lock.TrxId, table *access.Table, inner Executor) *Delete {
+	return &Delete{
 		trxId:         trxId,
 		table:         table,
 		innerExecutor: inner,
 	}
 }
 
-func (u *Update) Next() (access.Record, error) {
+func (d *Delete) Next() (access.Record, error) {
 	for {
-		record, err := u.innerExecutor.Next()
+		record, err := d.innerExecutor.Next()
 		if err != nil {
 			return nil, err
 		}
@@ -38,7 +32,7 @@ func (u *Update) Next() (access.Record, error) {
 		}
 		switch r := record.(type) {
 		case *access.PrimaryRecord:
-			if err := u.table.Update(r, u.setColumn.colNames, u.setColumn.value, u.trxId); err != nil {
+			if err := d.table.SoftDelete(r, d.trxId); err != nil {
 				return nil, err
 			}
 		default:

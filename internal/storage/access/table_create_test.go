@@ -7,8 +7,8 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/catalog"
 	"github.com/ren-yamanashi/minesql/internal/storage/config"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -25,7 +25,7 @@ func TestCreateTable(t *testing.T) {
 			ColNames:  []string{"id", "name", "email"},
 			PkCount:   1,
 			Indexes: []CreateIndexInput{
-				{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: catalog.IndexTypeNonUnique},
+				{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: dictionary.IndexTypeNonUnique},
 			},
 		}
 
@@ -49,7 +49,7 @@ func TestCreateTable(t *testing.T) {
 			ColNames:  []string{"id", "name", "email"},
 			PkCount:   1,
 			Indexes: []CreateIndexInput{
-				{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: catalog.IndexTypeNonUnique},
+				{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: dictionary.IndexTypeNonUnique},
 			},
 		}
 		table, err := CreateTable(env.bp, env.undoLog, env.lockMgr, input)
@@ -91,7 +91,7 @@ func TestCreateTable(t *testing.T) {
 			ColNames:  []string{"id", "name", "dept_id"},
 			PkCount:   1,
 			Indexes: []CreateIndexInput{
-				{IndexName: "idx_dept_id", ColNames: []string{"dept_id"}, IndexType: catalog.IndexTypeNonUnique},
+				{IndexName: "idx_dept_id", ColNames: []string{"dept_id"}, IndexType: dictionary.IndexTypeNonUnique},
 			},
 			Constraints: []CreateConstraintInput{
 				{
@@ -118,8 +118,8 @@ func TestCreateTable(t *testing.T) {
 			ColNames:  []string{"id", "name", "email"},
 			PkCount:   1,
 			Indexes: []CreateIndexInput{
-				{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: catalog.IndexTypeNonUnique},
-				{IndexName: "idx_email", ColNames: []string{"email"}, IndexType: catalog.IndexTypeUnique},
+				{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: dictionary.IndexTypeNonUnique},
+				{IndexName: "idx_email", ColNames: []string{"email"}, IndexType: dictionary.IndexTypeUnique},
 			},
 		}
 
@@ -250,8 +250,8 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		// GIVEN
 		env := setupCreateTestEnvWithTable(t)
 		inputs := []CreateIndexInput{
-			{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: catalog.IndexTypeNonUnique},
-			{IndexName: "idx_email", ColNames: []string{"email"}, IndexType: catalog.IndexTypeUnique},
+			{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: dictionary.IndexTypeNonUnique},
+			{IndexName: "idx_email", ColNames: []string{"email"}, IndexType: dictionary.IndexTypeUnique},
 		}
 
 		// WHEN
@@ -273,7 +273,7 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		// GIVEN
 		env := setupCreateTestEnvWithTable(t)
 		inputs := []CreateIndexInput{
-			{IndexName: "idx_email", ColNames: []string{"email"}, IndexType: catalog.IndexTypeUnique},
+			{IndexName: "idx_email", ColNames: []string{"email"}, IndexType: dictionary.IndexTypeUnique},
 		}
 
 		// WHEN
@@ -288,7 +288,7 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		// GIVEN
 		env := setupCreateTestEnvWithTable(t)
 		inputs := []CreateIndexInput{
-			{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: catalog.IndexTypeNonUnique},
+			{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: dictionary.IndexTypeNonUnique},
 		}
 
 		// WHEN
@@ -303,7 +303,7 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		// GIVEN
 		env := setupCreateTestEnvWithTable(t)
 		inputs := []CreateIndexInput{
-			{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: catalog.IndexTypeNonUnique},
+			{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: dictionary.IndexTypeNonUnique},
 		}
 		_, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, inputs)
 		assert.NoError(t, err)
@@ -382,7 +382,7 @@ func TestCreateConstraints(t *testing.T) {
 
 // createTestEnv は Create テスト用の基本環境
 type createTestEnv struct {
-	ct      *catalog.Catalog
+	ct      *dictionary.Catalog
 	bp      *buffer.Pool
 	fileId  page.FileId
 	lockMgr *lock.Manager
@@ -390,7 +390,7 @@ type createTestEnv struct {
 
 // createTestEnvWithTable はテーブル作成済みの Create テスト用環境
 type createTestEnvWithTable struct {
-	ct          *catalog.Catalog
+	ct          *dictionary.Catalog
 	bp          *buffer.Pool
 	fileId      page.FileId
 	primaryTree *btree.Tree
@@ -411,7 +411,7 @@ func setupCreateTestEnv(t *testing.T) *createTestEnv {
 	bp := buffer.NewPool(page.Size * 50)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
-	ct, err := catalog.CreateCatalog(bp)
+	ct, err := dictionary.CreateCatalog(bp)
 	if err != nil {
 		t.Fatalf("Catalog の作成に失敗: %v", err)
 	}
@@ -491,7 +491,7 @@ func setupCreateTableTestEnv(t *testing.T) *createTableTestEnv {
 	bp := buffer.NewPool(page.Size * 50)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
-	_, err = catalog.CreateCatalog(bp)
+	_, err = dictionary.CreateCatalog(bp)
 	if err != nil {
 		t.Fatalf("Catalog の作成に失敗: %v", err)
 	}

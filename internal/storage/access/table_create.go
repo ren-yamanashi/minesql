@@ -6,8 +6,8 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/config"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -22,8 +22,8 @@ type CreateConstraintInput struct {
 }
 
 type CreateIndexInput struct {
-	IndexName string            // インデックス名
-	ColNames  []string          // インデックスを構成するカラム名 (構成順通り)
+	IndexName string               // インデックス名
+	ColNames  []string             // インデックスを構成するカラム名 (構成順通り)
 	IndexType dictionary.IndexType // インデックス種類
 }
 

@@ -117,7 +117,7 @@ func TestRecoveryExecute(t *testing.T) {
 		// COMMIT せずに Redo ログにページ変更だけ記録してフラッシュ
 		pgId := page.NewId(env.undoFileId, 0)
 		readPage, _ := env.bp.PageForRead(pgId)
-		env.redoLog.AppendPageCopy(trxId, pgId, readPage.Data())
+		_, _ = env.redoLog.AppendPageCopy(trxId, pgId, readPage.Data())
 		_ = env.redoLog.Flush()
 
 		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
@@ -169,7 +169,7 @@ func TestRecoveryExecute(t *testing.T) {
 		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
 
 		// ROLLBACK レコードが Redo ログにある
-		env.redoLog.AppendRollback(lock.TrxId(1))
+		_, _ = env.redoLog.AppendRollback(lock.TrxId(1))
 		_ = env.redoLog.Flush()
 
 		// WHEN

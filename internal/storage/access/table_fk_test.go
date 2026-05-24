@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/config"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -247,7 +247,7 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 	_ = os.MkdirAll(config.BaseDir, 0o750)
 	t.Cleanup(func() { _ = os.RemoveAll(config.BaseDir) })
 
-	catalogPath := filepath.Join(t.TempDir(), "dictionary.db")
+	catalogPath := filepath.Join(t.TempDir(), "catalog.db")
 	catalogHf, err := file.NewHeapFile(page.FileId(0), catalogPath)
 	if err != nil {
 		t.Fatalf("カタログ HeapFile の作成に失敗: %v", err)
