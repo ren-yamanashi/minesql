@@ -21,13 +21,12 @@ type request struct {
 // state は特定のレコードのロック状態
 type state struct {
 	holders   map[TrxId]Mode // 現在のロック保持者 → ロックモードのマップ
-	waitQueue []*request     // ロックを待機しているトランザクションの待機キュー
+	waitQueue []request      // ロックを待機しているトランザクションの待機キュー
 }
 
 func newState() *state {
 	return &state{
-		holders:   make(map[TrxId]Mode),
-		waitQueue: []*request{},
+		holders: make(map[TrxId]Mode),
 	}
 }
 
@@ -63,6 +62,10 @@ func (s *state) canGrant(trxId TrxId, mode Mode) bool {
 
 	// 既にロックを保持している場合
 	if m == mode {
+		return true
+	}
+	// Exclusive 保持中の Shared 要求は Exclusive が Shared を包含するため付与可能
+	if m == Exclusive && mode == Shared {
 		return true
 	}
 	// Shared -> Exclusive の昇格は他の保持者がいなければ可能

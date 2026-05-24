@@ -60,7 +60,7 @@ flowchart TD
 
 - 「既に適切なロックを保持しているか」の判定
   - 以下のいずれかに該当する場合は、ロックを再取得する必要がない
-    - 既に Exclusive Lock を保持している婆愛
+    - 既に Exclusive Lock を保持している場合 (Exclusive は Shared を包含するため、Shared の要求も満たす)
     - 既に Shared Lock を保持していて、Shared Lock を要求している場合
 
 - 「競合がないか」の判定

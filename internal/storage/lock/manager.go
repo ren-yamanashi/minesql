@@ -15,7 +15,7 @@ var ErrTimeout = errors.New("lock wait timeout")
 // Manager は行レベルロックを管理する
 type Manager struct {
 	lockTable map[btree.RecordPosition]*state  // レコード位置 → ロック状態のマップ
-	mutex     sync.Mutex                       // lockTable への同時アクセスを防ぐための mutex
+	mu        sync.Mutex                       // lockTable への同時アクセスを防ぐための mutex
 	heldLocks map[TrxId][]btree.RecordPosition // トランザクションごとのロック保持レコードリスト
 	cond      *sync.Cond                       // ロックの状態変化を待ち受けるための条件変数
 	timeout   time.Duration                    // ロック取得のタイムアウト値
@@ -27,7 +27,7 @@ func NewManager() *Manager {
 		heldLocks: make(map[TrxId][]btree.RecordPosition),
 		timeout:   config.LockWaitTimeout,
 	}
-	lm.cond = sync.NewCond(&lm.mutex)
+	lm.cond = sync.NewCond(&lm.mu)
 	return lm
 }
 
@@ -35,8 +35,8 @@ func NewManager() *Manager {
 //   - 競合がなければ即座にロックを付与する
 //   - 競合がある場合は待機キューに追加し、ロックが付与されるかタイムアウトするまで待機する
 func (m *Manager) Lock(trxId TrxId, pos btree.RecordPosition, mode Mode) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	state, exists := m.lockTable[pos]
 	if !exists {
@@ -44,29 +44,22 @@ func (m *Manager) Lock(trxId TrxId, pos btree.RecordPosition, mode Mode) error {
 		m.lockTable[pos] = state
 	}
 
-	// 既に適切なロックを保持している場合
-	held, alreadyHolds := state.holders[trxId]
-	isAlreadySatisfied := alreadyHolds && (held == Exclusive || mode == Shared)
-	if isAlreadySatisfied {
-		return nil
-	}
-
-	// 競合がない場合
+	// 競合がない場合 (既に適切なロックを保持している場合も含む)
 	if state.canGrant(trxId, mode) {
 		state.holders[trxId] = mode
-		m.appendRecordHeldLock(trxId, pos)
+		m.addHeldLock(trxId, pos)
 		return nil
 	}
 
 	// 競合がある場合
-	state.waitQueue = append(state.waitQueue, &request{trxId: trxId, mode: mode})
+	state.waitQueue = append(state.waitQueue, request{trxId: trxId, mode: mode})
 
 	timedOut := false
 	timer := time.AfterFunc(m.timeout, func() {
-		m.mutex.Lock()
+		m.mu.Lock()
 		timedOut = true
 		m.cond.Broadcast()
-		m.mutex.Unlock()
+		m.mu.Unlock()
 	})
 	defer timer.Stop()
 
@@ -75,7 +68,7 @@ func (m *Manager) Lock(trxId TrxId, pos btree.RecordPosition, mode Mode) error {
 		held, exists := state.holders[trxId]
 		isGranted := exists && (held == Exclusive || mode == Shared)
 		if isGranted {
-			m.appendRecordHeldLock(trxId, pos)
+			m.addHeldLock(trxId, pos)
 			return nil
 		}
 		if timedOut {
@@ -88,8 +81,8 @@ func (m *Manager) Lock(trxId TrxId, pos btree.RecordPosition, mode Mode) error {
 
 // Release は指定したトランザクションが保持しているすべてのロックを解放する
 func (m *Manager) Release(trxId TrxId) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	for _, pos := range m.heldLocks[trxId] {
 		state, exists := m.lockTable[pos]
@@ -144,8 +137,8 @@ func (m *Manager) grantWaitingLocks(state *state) {
 	}
 }
 
-// appendRecordHeldLock は、指定したトランザクションのロック保持リストにレコードを登録する
-func (m *Manager) appendRecordHeldLock(trxId TrxId, pos btree.RecordPosition) {
+// addHeldLock は指定したトランザクションのロック保持リストにレコード位置を追加する
+func (m *Manager) addHeldLock(trxId TrxId, pos btree.RecordPosition) {
 	if slices.Contains(m.heldLocks[trxId], pos) {
 		return
 	}
@@ -154,7 +147,7 @@ func (m *Manager) appendRecordHeldLock(trxId TrxId, pos btree.RecordPosition) {
 
 // removeFromWaitQueue は待機キューから指定したトランザクションのリクエストを削除する
 func (m *Manager) removeFromWaitQueue(state *state, trxId TrxId) {
-	state.waitQueue = slices.DeleteFunc(state.waitQueue, func(r *request) bool {
+	state.waitQueue = slices.DeleteFunc(state.waitQueue, func(r request) bool {
 		return r.trxId == trxId
 	})
 }

@@ -153,11 +153,9 @@ func TestManagerLock(t *testing.T) {
 
 		var wg sync.WaitGroup
 		var lockErr error
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			lockErr = m.Lock(2, pos, Exclusive)
-		}()
+		})
 
 		// WHEN
 		time.Sleep(10 * time.Millisecond)
@@ -258,12 +256,12 @@ func TestManagerRelease(t *testing.T) {
 		m.Release(1)
 
 		// THEN
-		m.mutex.Lock()
+		m.mu.Lock()
 		state := m.lockTable[pos]
 		assert.Equal(t, Shared, state.holders[2])
 		_, hasTrx1 := state.holders[1]
 		assert.False(t, hasTrx1)
-		m.mutex.Unlock()
+		m.mu.Unlock()
 	})
 
 	t.Run("最後の Shared 保持者を解放すると待機中の Exclusive が付与される", func(t *testing.T) {
@@ -275,11 +273,9 @@ func TestManagerRelease(t *testing.T) {
 
 		var wg sync.WaitGroup
 		var lockErr error
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			lockErr = m.Lock(3, pos, Exclusive)
-		}()
+		})
 		time.Sleep(10 * time.Millisecond)
 
 		// WHEN
@@ -299,15 +295,12 @@ func TestManagerRelease(t *testing.T) {
 
 		var wg sync.WaitGroup
 		var err2, err3 error
-		wg.Add(2)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			err2 = m.Lock(2, pos, Shared)
-		}()
-		go func() {
-			defer wg.Done()
+		})
+		wg.Go(func() {
 			err3 = m.Lock(3, pos, Shared)
-		}()
+		})
 
 		// WHEN
 		time.Sleep(10 * time.Millisecond)
@@ -325,7 +318,7 @@ func TestManagerGrantWaitingLocks(t *testing.T) {
 		// GIVEN
 		m := NewManager()
 		s := newState()
-		s.waitQueue = []*request{
+		s.waitQueue = []request{
 			{trxId: 1, mode: Shared},
 			{trxId: 2, mode: Shared},
 			{trxId: 3, mode: Exclusive},
@@ -345,7 +338,7 @@ func TestManagerGrantWaitingLocks(t *testing.T) {
 		// GIVEN
 		m := NewManager()
 		s := newState()
-		s.waitQueue = []*request{
+		s.waitQueue = []request{
 			{trxId: 1, mode: Exclusive},
 		}
 
@@ -361,7 +354,7 @@ func TestManagerGrantWaitingLocks(t *testing.T) {
 		// GIVEN
 		m := NewManager()
 		s := newState()
-		s.waitQueue = []*request{
+		s.waitQueue = []request{
 			{trxId: 1, mode: Exclusive},
 			{trxId: 2, mode: Shared},
 		}
@@ -393,7 +386,7 @@ func TestManagerGrantWaitingLocks(t *testing.T) {
 		m := NewManager()
 		s := newState()
 		s.holders[1] = Shared
-		s.waitQueue = []*request{
+		s.waitQueue = []request{
 			{trxId: 2, mode: Shared},
 		}
 
@@ -410,7 +403,7 @@ func TestManagerGrantWaitingLocks(t *testing.T) {
 		m := NewManager()
 		s := newState()
 		s.holders[1] = Shared
-		s.waitQueue = []*request{
+		s.waitQueue = []request{
 			{trxId: 1, mode: Exclusive},
 		}
 
@@ -427,7 +420,7 @@ func TestManagerGrantWaitingLocks(t *testing.T) {
 		m := NewManager()
 		s := newState()
 		s.holders[1] = Exclusive
-		s.waitQueue = []*request{
+		s.waitQueue = []request{
 			{trxId: 2, mode: Exclusive},
 		}
 
@@ -445,7 +438,7 @@ func TestManagerGrantWaitingLocks(t *testing.T) {
 		m := NewManager()
 		s := newState()
 		s.holders[1] = Exclusive
-		s.waitQueue = []*request{
+		s.waitQueue = []request{
 			{trxId: 2, mode: Shared},
 		}
 

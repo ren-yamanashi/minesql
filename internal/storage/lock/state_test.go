@@ -214,7 +214,7 @@ func TestCanGrant(t *testing.T) {
 	t.Run("待機キューに待機者がいる場合は新規の Shared を付与できない", func(t *testing.T) {
 		// GIVEN
 		s := newState()
-		s.waitQueue = append(s.waitQueue, &request{trxId: 2, mode: Exclusive})
+		s.waitQueue = append(s.waitQueue, request{trxId: 2, mode: Exclusive})
 
 		// WHEN
 		result := s.canGrant(1, Shared)
@@ -223,7 +223,7 @@ func TestCanGrant(t *testing.T) {
 		assert.False(t, result)
 	})
 
-	t.Run("自身が Exclusive を保持中に Shared を要求すると付与できない", func(t *testing.T) {
+	t.Run("自身が Exclusive を保持中に Shared を要求すると付与できる", func(t *testing.T) {
 		// GIVEN
 		s := newState()
 		s.holders[1] = Exclusive
@@ -232,6 +232,6 @@ func TestCanGrant(t *testing.T) {
 		result := s.canGrant(1, Shared)
 
 		// THEN
-		assert.False(t, result)
+		assert.True(t, result)
 	})
 }
