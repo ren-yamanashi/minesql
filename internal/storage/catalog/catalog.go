@@ -61,26 +61,26 @@ func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
 	defer bp.UnrefPage(headerPageId)
 
 	magicEnd := headerMagicNumberOffset + len(catalogMagicNumber)
-	if !bytes.Equal(bufPageHeader.Data().Body[headerMagicNumberOffset:magicEnd], catalogMagicNumber) {
+	if !bytes.Equal(bufPageHeader.Data().Body()[headerMagicNumberOffset:magicEnd], catalogMagicNumber) {
 		return nil, errInvalidCatalogFile
 	}
 
-	tableMetaPageNumber := readPageNumber(bufPageHeader.Data().Body, headerTableMetaOffset)
-	indexMetaPageNumber := readPageNumber(bufPageHeader.Data().Body, headerIndexMetaOffset)
+	tableMetaPageNumber := readPageNumber(bufPageHeader.Data().Body(), headerTableMetaOffset)
+	indexMetaPageNumber := readPageNumber(bufPageHeader.Data().Body(), headerIndexMetaOffset)
 	indexKeyColumnMetaPageNumber := readPageNumber(
-		bufPageHeader.Data().Body, headerIndexKeyColumnMetaOffset,
+		bufPageHeader.Data().Body(), headerIndexKeyColumnMetaOffset,
 	)
-	columnMetaPageNumber := readPageNumber(bufPageHeader.Data().Body, headerColumnMetaOffset)
-	constraintMetaPageNumber := readPageNumber(bufPageHeader.Data().Body, headerConstraintMetaOffset)
-	userMetaPageNumber := readPageNumber(bufPageHeader.Data().Body, headerUserMetaOffset)
+	columnMetaPageNumber := readPageNumber(bufPageHeader.Data().Body(), headerColumnMetaOffset)
+	constraintMetaPageNumber := readPageNumber(bufPageHeader.Data().Body(), headerConstraintMetaOffset)
+	userMetaPageNumber := readPageNumber(bufPageHeader.Data().Body(), headerUserMetaOffset)
 	nextFileId := page.FileId(binary.BigEndian.Uint32(
-		bufPageHeader.Data().Body[headerNextFileIdOffset : headerNextFileIdOffset+headerFieldSize],
+		bufPageHeader.Data().Body()[headerNextFileIdOffset : headerNextFileIdOffset+headerFieldSize],
 	))
 	nextIndexId := IndexId(binary.BigEndian.Uint32(
-		bufPageHeader.Data().Body[headerNextIndexIdOffset : headerNextIndexIdOffset+headerFieldSize],
+		bufPageHeader.Data().Body()[headerNextIndexIdOffset : headerNextIndexIdOffset+headerFieldSize],
 	))
 	undoLogFileId := page.FileId(binary.BigEndian.Uint32(
-		bufPageHeader.Data().Body[headerUndoLogFileIdOffset : headerUndoLogFileIdOffset+headerFieldSize],
+		bufPageHeader.Data().Body()[headerUndoLogFileIdOffset : headerUndoLogFileIdOffset+headerFieldSize],
 	))
 
 	return &Catalog{
@@ -146,34 +146,34 @@ func CreateCatalog(bp *buffer.Pool) (*Catalog, error) {
 	undoLogFileId := nextFileId // Undo ログ用の FileId を採番
 	nextFileId++
 
-	copy(bufPageHeader.Data().Body[headerMagicNumberOffset:], catalogMagicNumber)
+	copy(bufPageHeader.Data().Body()[headerMagicNumberOffset:], catalogMagicNumber)
 	writePageNumber(
-		bufPageHeader.Data().Body, headerTableMetaOffset,
-		tableMeta.tree.MetaPageId().PageNumber,
+		bufPageHeader.Data().Body(), headerTableMetaOffset,
+		tableMeta.tree.MetaPageId().PageNumber(),
 	)
 	writePageNumber(
-		bufPageHeader.Data().Body, headerIndexMetaOffset,
-		indexMeta.tree.MetaPageId().PageNumber,
+		bufPageHeader.Data().Body(), headerIndexMetaOffset,
+		indexMeta.tree.MetaPageId().PageNumber(),
 	)
 	writePageNumber(
-		bufPageHeader.Data().Body, headerIndexKeyColumnMetaOffset,
-		indexKeyColumnMeta.tree.MetaPageId().PageNumber,
+		bufPageHeader.Data().Body(), headerIndexKeyColumnMetaOffset,
+		indexKeyColumnMeta.tree.MetaPageId().PageNumber(),
 	)
 	writePageNumber(
-		bufPageHeader.Data().Body, headerColumnMetaOffset,
-		columnMeta.tree.MetaPageId().PageNumber,
+		bufPageHeader.Data().Body(), headerColumnMetaOffset,
+		columnMeta.tree.MetaPageId().PageNumber(),
 	)
 	writePageNumber(
-		bufPageHeader.Data().Body, headerConstraintMetaOffset,
-		constraintMeta.tree.MetaPageId().PageNumber,
+		bufPageHeader.Data().Body(), headerConstraintMetaOffset,
+		constraintMeta.tree.MetaPageId().PageNumber(),
 	)
 	writePageNumber(
-		bufPageHeader.Data().Body, headerUserMetaOffset,
-		userMeta.tree.MetaPageId().PageNumber,
+		bufPageHeader.Data().Body(), headerUserMetaOffset,
+		userMeta.tree.MetaPageId().PageNumber(),
 	)
-	writeScalar(bufPageHeader.Data().Body, headerNextFileIdOffset, uint32(nextFileId))
-	writeScalar(bufPageHeader.Data().Body, headerNextIndexIdOffset, uint32(nextIndexId))
-	writeScalar(bufPageHeader.Data().Body, headerUndoLogFileIdOffset, uint32(undoLogFileId))
+	writeScalar(bufPageHeader.Data().Body(), headerNextFileIdOffset, uint32(nextFileId))
+	writeScalar(bufPageHeader.Data().Body(), headerNextIndexIdOffset, uint32(nextIndexId))
+	writeScalar(bufPageHeader.Data().Body(), headerUndoLogFileIdOffset, uint32(undoLogFileId))
 
 	return &Catalog{
 		bufferPool:         bp,
@@ -219,7 +219,7 @@ func (c *Catalog) persistScalar(offset int, value uint32) error {
 		return err
 	}
 	defer c.bufferPool.UnrefPage(headerPageId)
-	writeScalar(bufPageHeader.Data().Body, offset, value)
+	writeScalar(bufPageHeader.Data().Body(), offset, value)
 	return nil
 }
 

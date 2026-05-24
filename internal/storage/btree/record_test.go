@@ -23,13 +23,13 @@ func TestNewRecord(t *testing.T) {
 	})
 }
 
-func TestToBytes(t *testing.T) {
+func TestRecordBytes(t *testing.T) {
 	t.Run("シリアライズしたバイト列から復元できる", func(t *testing.T) {
 		// GIVEN
 		r := NewRecord([]byte{0x01}, []byte{0x02, 0x03}, []byte{0x04, 0x05, 0x06})
 
 		// WHEN
-		data := r.ToBytes()
+		data := r.Bytes()
 		restored := recordFromBytes(data)
 
 		// THEN
@@ -43,7 +43,7 @@ func TestToBytes(t *testing.T) {
 		r := NewRecord([]byte{0x01}, []byte{0x02}, []byte{})
 
 		// WHEN
-		data := r.ToBytes()
+		data := r.Bytes()
 		restored := recordFromBytes(data)
 
 		// THEN
@@ -57,7 +57,7 @@ func TestToBytes(t *testing.T) {
 		key := []byte{0xCC, 0xDD, 0xEE}
 
 		// WHEN
-		data := NewRecord(header, key, []byte{}).ToBytes()
+		data := NewRecord(header, key, []byte{}).Bytes()
 
 		// THEN
 		assert.Equal(t, byte(0), data[0])

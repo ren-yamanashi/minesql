@@ -18,11 +18,11 @@ func (t *Tree) insertBranchOverflow(
 	overflowKey []byte,
 	overflowChildPageId page.Id,
 ) (overflow []byte, newPageId page.Id, err error) {
-	overflowRecord := NewRecord([]byte{}, overflowKey, overflowChildPageId.ToBytes())
+	overflowRecord := NewRecord([]byte{}, overflowKey, overflowChildPageId.Bytes())
 
 	// ブランチノードに挿入できた場合は終了
 	if branchNode.insert(childSlotNum, overflowRecord) {
-		return nil, page.InvalidId, nil
+		return nil, page.InvalidId(), nil
 	}
 
 	// ブランチノードが満杯の場合は分割
@@ -37,24 +37,24 @@ func (t *Tree) splitInsertBranch(
 	branchNode *branchNode,
 	record Record,
 ) ([]byte, page.Id, error) {
-	newBranchPageId, err := t.bufferPool.AllocatePageId(t.MetaPageId().FileId)
+	newBranchPageId, err := t.bufferPool.AllocatePageId(t.MetaPageId().FileId())
 	if err != nil {
-		return nil, page.InvalidId, err
+		return nil, page.InvalidId(), err
 	}
 	_, err = t.bufferPool.AddPage(newBranchPageId)
 	if err != nil {
-		return nil, page.InvalidId, err
+		return nil, page.InvalidId(), err
 	}
 	defer t.bufferPool.UnrefPage(newBranchPageId)
 
 	pageNewBranch, err := t.bufferPool.PageForWrite(newBranchPageId)
 	if err != nil {
-		return nil, page.InvalidId, err
+		return nil, page.InvalidId(), err
 	}
 	newBranch := newBranchNode(pageNewBranch.Data())
 	overflowKey, err := branchNode.splitInsert(newBranch, record)
 	if err != nil {
-		return nil, page.InvalidId, err
+		return nil, page.InvalidId(), err
 	}
 
 	return overflowKey, newBranchPageId, nil

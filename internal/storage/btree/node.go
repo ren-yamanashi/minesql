@@ -27,5 +27,5 @@ type node interface {
 
 // ページデータからノードタイプを取得する
 func nodeType(pg *page.Page) string {
-	return string(pg.Body[:nodeHeaderSize])
+	return string(pg.Body()[:nodeHeaderSize])
 }

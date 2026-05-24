@@ -44,7 +44,7 @@ func (t *Tree) Insert(record Record) error {
 	}
 
 	// ルートノードの分割が発生した場合
-	newRootPageId, err := t.bufferPool.AllocatePageId(t.MetaPageId().FileId)
+	newRootPageId, err := t.bufferPool.AllocatePageId(t.MetaPageId().FileId())
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (t *Tree) insertRecursively(
 ) (overflowKey []byte, newPageId page.Id, isLeafSplit bool, err error) {
 	pg, err := t.bufferPool.PageForWrite(bufPage.PageId())
 	if err != nil {
-		return nil, page.InvalidId, false, err
+		return nil, page.InvalidId(), false, err
 	}
 	defer t.bufferPool.UnrefPage(bufPage.PageId())
 	nt := nodeType(pg.Data())
@@ -95,21 +95,21 @@ func (t *Tree) insertRecursively(
 		}
 		childPageId, err := branchNode.childPageId(childSlotNum)
 		if err != nil {
-			return nil, page.InvalidId, false, err
+			return nil, page.InvalidId(), false, err
 		}
 		childBufPage, err := t.bufferPool.PageForRead(childPageId)
 		if err != nil {
-			return nil, page.InvalidId, false, err
+			return nil, page.InvalidId(), false, err
 		}
 		defer t.bufferPool.UnrefPage(childPageId)
 		// 子ノードに対して挿入処理を再帰的に実行
 		overflowKeyFromChild, overflowChildPageId, isLeafSplit, err := t.insertRecursively(childBufPage, record)
 		if err != nil {
-			return nil, page.InvalidId, false, err
+			return nil, page.InvalidId(), false, err
 		}
 		// 子ノードが分割されなかった場合、終了
 		if overflowChildPageId.IsInvalid() {
-			return nil, page.InvalidId, isLeafSplit, nil
+			return nil, page.InvalidId(), isLeafSplit, nil
 		}
 		// 子ノードが分割された場合、ブランチノードにオーバーフローレコードを挿入
 		overflowKey, newPageId, err := t.insertBranchOverflow(
@@ -119,7 +119,7 @@ func (t *Tree) insertRecursively(
 			overflowChildPageId,
 		)
 		if err != nil {
-			return nil, page.InvalidId, isLeafSplit, err
+			return nil, page.InvalidId(), isLeafSplit, err
 		}
 		return overflowKey, newPageId, isLeafSplit, nil
 
@@ -127,12 +127,12 @@ func (t *Tree) insertRecursively(
 	case nodeTypeLeaf:
 		overflowKey, newPageId, err := t.insertLeaf(bufPage.PageId(), pg.Data(), record)
 		if err != nil {
-			return nil, page.InvalidId, false, err
+			return nil, page.InvalidId(), false, err
 		}
 		isSplit := !newPageId.IsInvalid()
 		return overflowKey, newPageId, isSplit, nil
 
 	default:
-		return nil, page.InvalidId, false, errUnknownNodeType
+		return nil, page.InvalidId(), false, errUnknownNodeType
 	}
 }

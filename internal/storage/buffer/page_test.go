@@ -34,8 +34,8 @@ func TestData(t *testing.T) {
 
 		// THEN
 		assert.NotNil(t, result)
-		assert.Equal(t, page.Size-page.HeaderSize, len(result.Body))
-		assert.Equal(t, page.HeaderSize, len(result.Header))
+		assert.Equal(t, page.Size-page.HeaderSize, len(result.Body()))
+		assert.Equal(t, page.HeaderSize, len(result.Header()))
 	})
 }
 
@@ -63,7 +63,7 @@ func TestNewPage(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, page.Size-page.HeaderSize, len(bp.data.Body))
-		assert.Equal(t, page.HeaderSize, len(bp.data.Header))
+		assert.Equal(t, page.Size-page.HeaderSize, len(bp.data.Body()))
+		assert.Equal(t, page.HeaderSize, len(bp.data.Header()))
 	})
 }

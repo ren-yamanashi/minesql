@@ -28,30 +28,30 @@ func newMetaPage(pg *page.Page) *metaPage {
 
 // rootPageId はルートページ ID を読み取る
 func (mp *metaPage) rootPageId() page.Id {
-	return page.ReadId(mp.data.Body, metaRootPageIdOffset)
+	return page.ReadId(mp.data.Body(), metaRootPageIdOffset)
 }
 
 // leafPageCount はリーフページ数を読み取る
 func (mp *metaPage) leafPageCount() uint64 {
-	return binary.BigEndian.Uint64(mp.data.Body[metaLeafPageCountOffset : metaLeafPageCountOffset+8])
+	return binary.BigEndian.Uint64(mp.data.Body()[metaLeafPageCountOffset : metaLeafPageCountOffset+8])
 }
 
 // height は B+Tree の高さを読み取る
 func (mp *metaPage) height() uint64 {
-	return binary.BigEndian.Uint64(mp.data.Body[metaHeightOffset : metaHeightOffset+8])
+	return binary.BigEndian.Uint64(mp.data.Body()[metaHeightOffset : metaHeightOffset+8])
 }
 
 // setRootPageId はルートページ ID を設定する
 func (mp *metaPage) setRootPageId(rootPageId page.Id) {
-	rootPageId.WriteTo(mp.data.Body, metaRootPageIdOffset)
+	rootPageId.WriteAt(mp.data.Body(), metaRootPageIdOffset)
 }
 
 // setLeafPageCount はリーフページ数を設定する
 func (mp *metaPage) setLeafPageCount(count uint64) {
-	binary.BigEndian.PutUint64(mp.data.Body[metaLeafPageCountOffset:metaLeafPageCountOffset+8], count)
+	binary.BigEndian.PutUint64(mp.data.Body()[metaLeafPageCountOffset:metaLeafPageCountOffset+8], count)
 }
 
 // setHeight は B+Tree の高さを設定する
 func (mp *metaPage) setHeight(h uint64) {
-	binary.BigEndian.PutUint64(mp.data.Body[metaHeightOffset:metaHeightOffset+8], h)
+	binary.BigEndian.PutUint64(mp.data.Body()[metaHeightOffset:metaHeightOffset+8], h)
 }

@@ -18,7 +18,7 @@ type Page struct {
 }
 
 func NewPage(pg page.Page) *Page {
-	body := pg.Body
+	body := pg.Body()
 	return &Page{
 		header: body[:pageHeaderSize],
 		body:   body[pageHeaderSize:],

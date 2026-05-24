@@ -7,6 +7,11 @@ import (
 
 // SoftDelete はテーブルの行を論理削除する
 func (t *Table) SoftDelete(record *PrimaryRecord, trxId lock.TrxId) error {
+	// FK チェック
+	if err := t.checkForeignKeysForDelete(record); err != nil {
+		return err
+	}
+
 	// Undo ログを更新
 	undoRecord := undo.NewDeleteRecord(t.primaryIndex.fileId(), record.Encode(), record.lastTrxId, record.rollPtr)
 	ptr, err := t.undoLog.Append(trxId, undo.RecordTypeDelete, undoRecord)

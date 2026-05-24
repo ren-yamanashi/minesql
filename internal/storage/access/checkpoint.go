@@ -34,7 +34,7 @@ func (c *Checkpoint) minPageLsn() redo.Lsn {
 	var minLsn redo.Lsn
 	first := true
 	c.bufferPool.ForEachDirtyPage(func(pg *page.Page) {
-		lsn := redo.Lsn(binary.BigEndian.Uint32(pg.Header))
+		lsn := redo.Lsn(binary.BigEndian.Uint32(pg.Header()))
 		if first || lsn < minLsn {
 			minLsn = lsn
 			first = false

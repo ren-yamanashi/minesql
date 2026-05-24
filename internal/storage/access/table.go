@@ -35,7 +35,7 @@ func NewTable(
 		return nil, err
 	}
 
-	fileId := table.MetaPageId().FileId
+	fileId := table.MetaPageId().FileId()
 	pi, err := fetchPrimaryIndex(ct, bp, fileId, lock)
 	if err != nil {
 		return nil, err
@@ -171,7 +171,7 @@ func (t *Table) buildValMap(colNames, values []string) map[string]string {
 
 // isPrimaryKeyColumn は指定したカラム名がプライマリキーのカラムかどうかを返す
 func (t *Table) isPrimaryKeyColumn(colName string) (bool, error) {
-	fileId := t.primaryIndex.tree.MetaPageId().FileId
+	fileId := t.primaryIndex.tree.MetaPageId().FileId()
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
 	iter, err := t.catalog.ColumnMeta().Search(catalog.SearchModeKey{
 		Key: [][]byte{fileIdBytes, []byte(colName)},

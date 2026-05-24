@@ -69,7 +69,7 @@ func setupTestBranchNode(t *testing.T, bp *buffer.Pool) *branchNode {
 func fillBranchNodeUntilFull(bn *branchNode) {
 	for i := range 1000 {
 		key := []byte{byte(i/256 + 0x11), byte(i % 256)}
-		record := NewRecord([]byte{}, key, page.NewId(0, page.PageNumber(i+10)).ToBytes())
+		record := NewRecord([]byte{}, key, page.NewId(0, page.PageNumber(i+10)).Bytes())
 		if !bn.insert(bn.numRecords(), record) {
 			return
 		}

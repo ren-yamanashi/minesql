@@ -216,6 +216,20 @@ func TestTableUpdate(t *testing.T) {
 		// Undo ログが書かれ rollPtr が NullPointer ではなくなる
 		assert.NotEqual(t, undo.NullPointer(), updated.rollPtr)
 	})
+
+	t.Run("FK カラムを存在しない値に更新すると ErrForeignKeyViolation を返す", func(t *testing.T) {
+		// GIVEN
+		env := setupFKTestEnv(t)
+		_ = env.parent.Insert([]string{"id", "name"}, []string{"1", "Sales"}, fkTrxId)
+		_ = env.child.Insert([]string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"}, fkTrxId)
+		record := searchFirstPrimaryRecord(t, env.child)
+
+		// WHEN
+		err := env.child.Update(record, []string{"dept_id"}, []string{"999"}, fkTrxId)
+
+		// THEN
+		assert.ErrorIs(t, err, ErrForeignKeyViolation)
+	})
 }
 
 func TestTableIsPrimaryKeyChanged(t *testing.T) {

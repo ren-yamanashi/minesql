@@ -31,13 +31,13 @@ func (p *Pool) addPage(pageId page.Id) (*Page, error) {
 	victimBufPage := &p.pages[victimBufId]
 
 	if victimBufPage.isDirty {
-		heapFile, err := p.heapFile(victimBufPage.pageId.FileId)
+		heapFile, err := p.heapFile(victimBufPage.pageId.FileId())
 		if err != nil {
 			p.lru.undoEvict(victimBufId)
 			return nil, err
 		}
 
-		err = heapFile.Write(victimBufPage.pageId.PageNumber, victimBufPage.data.ToBytes())
+		err = heapFile.Write(victimBufPage.pageId.PageNumber(), victimBufPage.data.Bytes())
 		if err != nil {
 			p.lru.undoEvict(victimBufId)
 			return nil, err

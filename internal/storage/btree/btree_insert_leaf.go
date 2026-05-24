@@ -19,12 +19,12 @@ func (t *Tree) insertLeaf(
 	leafNode := newLeafNode(leafPage)
 	slotNum, found := leafNode.searchSlotNum(record.Key())
 	if found {
-		return nil, page.InvalidId, ErrDuplicateKey
+		return nil, page.InvalidId(), ErrDuplicateKey
 	}
 
 	// リーフノードに挿入できた場合は終了
 	if leafNode.insert(slotNum, record) {
-		return nil, page.InvalidId, nil
+		return nil, page.InvalidId(), nil
 	}
 
 	// リーフノードが満杯の場合は分割
@@ -47,32 +47,32 @@ func (t *Tree) splitInsertLeaf(
 	}
 
 	// 新しいリーフノードを作成
-	newLeafPageId, err := t.bufferPool.AllocatePageId(t.MetaPageId().FileId)
+	newLeafPageId, err := t.bufferPool.AllocatePageId(t.MetaPageId().FileId())
 	if err != nil {
-		return nil, page.InvalidId, err
+		return nil, page.InvalidId(), err
 	}
 	_, err = t.bufferPool.AddPage(newLeafPageId)
 	if err != nil {
-		return nil, page.InvalidId, err
+		return nil, page.InvalidId(), err
 	}
 	defer t.bufferPool.UnrefPage(newLeafPageId)
 
 	// 前のリーフノードが存在する場合は、nextPageId を新しいリーフノードの PageId に更新
 	if !prevLeafPageId.IsInvalid() {
 		if err := t.updatePrevLeafLink(prevLeafPageId, newLeafPageId); err != nil {
-			return nil, page.InvalidId, err
+			return nil, page.InvalidId(), err
 		}
 	}
 
 	// 新しいリーフノードに分割挿入
 	pageNewLeaf, err := t.bufferPool.PageForWrite(newLeafPageId)
 	if err != nil {
-		return nil, page.InvalidId, err
+		return nil, page.InvalidId(), err
 	}
 	newLeaf := newLeafNode(pageNewLeaf.Data())
 	overflowKey, err := leafNode.splitInsert(newLeaf, record)
 	if err != nil {
-		return nil, page.InvalidId, err
+		return nil, page.InvalidId(), err
 	}
 
 	// ポインタを更新

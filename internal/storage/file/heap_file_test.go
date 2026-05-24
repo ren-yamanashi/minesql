@@ -46,8 +46,8 @@ func TestNewHeapFile(t *testing.T) {
 		t.Cleanup(func() { assert.NoError(t, hf2.Close()) })
 		nextId, err := hf2.AllocatePageId()
 		assert.NoError(t, err)
-		assert.Equal(t, page.FileId(1), nextId.FileId)
-		assert.Equal(t, page.PageNumber(2), nextId.PageNumber)
+		assert.Equal(t, page.FileId(1), nextId.FileId())
+		assert.Equal(t, page.PageNumber(2), nextId.PageNumber())
 	})
 
 	t.Run("ファイルサイズがページサイズの倍数でない場合エラーを返す", func(t *testing.T) {
@@ -94,8 +94,8 @@ func TestAllocatePageId(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, page.FileId(5), id.FileId)
-		assert.Equal(t, page.PageNumber(0), id.PageNumber)
+		assert.Equal(t, page.FileId(5), id.FileId())
+		assert.Equal(t, page.PageNumber(0), id.PageNumber())
 	})
 
 	t.Run("連続で採番すると PageNumber がインクリメントされる", func(t *testing.T) {
@@ -114,9 +114,9 @@ func TestAllocatePageId(t *testing.T) {
 		assert.NoError(t, err1)
 		assert.NoError(t, err2)
 		assert.NoError(t, err3)
-		assert.Equal(t, page.PageNumber(0), id1.PageNumber)
-		assert.Equal(t, page.PageNumber(1), id2.PageNumber)
-		assert.Equal(t, page.PageNumber(2), id3.PageNumber)
+		assert.Equal(t, page.PageNumber(0), id1.PageNumber())
+		assert.Equal(t, page.PageNumber(1), id2.PageNumber())
+		assert.Equal(t, page.PageNumber(2), id3.PageNumber())
 	})
 
 	t.Run("PageNumber が上限に達している場合エラーを返す", func(t *testing.T) {
@@ -132,7 +132,7 @@ func TestAllocatePageId(t *testing.T) {
 
 		// THEN
 		assert.Error(t, err)
-		assert.Equal(t, page.InvalidId, id)
+		assert.Equal(t, page.InvalidId(), id)
 	})
 }
 

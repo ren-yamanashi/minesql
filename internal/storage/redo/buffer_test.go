@@ -63,7 +63,7 @@ func TestBufferAppendPageCopy(t *testing.T) {
 		pg := buildTestPage(t)
 
 		// WHEN
-		lsn, err := buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), *pg)
+		lsn, err := buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), pg)
 
 		// THEN
 		assert.NoError(t, err)
@@ -76,9 +76,9 @@ func TestBufferAppendPageCopy(t *testing.T) {
 		pg := buildTestPage(t)
 
 		// WHEN
-		lsn1, err := buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), *pg)
+		lsn1, err := buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), pg)
 		assert.NoError(t, err)
-		lsn2, err := buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 2), *pg)
+		lsn2, err := buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 2), pg)
 		assert.NoError(t, err)
 
 		// THEN
@@ -120,7 +120,7 @@ func TestBufferReadFrom(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
 		pg := buildTestPage(t)
-		_, _ = buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), *pg)
+		_, _ = buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), pg)
 		_, _ = buf.AppendCommit(lock.TrxId(1))
 		_ = buf.Flush()
 
@@ -280,7 +280,7 @@ func TestBufferFlush(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
 		pg := buildTestPage(t)
-		_, _ = buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), *pg)
+		_, _ = buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), pg)
 		_, _ = buf.AppendCommit(lock.TrxId(1))
 
 		// WHEN
@@ -409,7 +409,7 @@ func TestBufferSize(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
 		pg := buildTestPage(t)
-		_, _ = buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), *pg)
+		_, _ = buf.AppendPageCopy(lock.TrxId(1), page.NewId(1, 1), pg)
 
 		// WHEN
 		size, err := buf.Size()

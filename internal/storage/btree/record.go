@@ -27,9 +27,9 @@ func (r Record) Header() []byte { return r[0] }
 func (r Record) Key() []byte    { return r[1] }
 func (r Record) NonKey() []byte { return r[2] }
 
-// ToBytes はレコードをバイト列にシリアライズする
+// Bytes はレコードをバイト列にシリアライズする
 //   - フォーマット: [headerSize(2B)][keySize(2B)][header][key][nonKey]
-func (r Record) ToBytes() []byte {
+func (r Record) Bytes() []byte {
 	headerLen := len(r[0])
 	keyLen := len(r[1])
 	nonKeyLen := len(r[2])

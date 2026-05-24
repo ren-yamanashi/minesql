@@ -29,7 +29,7 @@ func TestNewFile(t *testing.T) {
 		f1, err := newFile(dir)
 		assert.NoError(t, err)
 		pg := buildTestPage(t)
-		records := []Record{{lsn: Lsn(5), trxId: 1, recordType: RecordTypePageWrite, pageId: page.NewId(1, 1), data: *pg}}
+		records := []Record{{lsn: Lsn(5), trxId: 1, recordType: RecordTypePageWrite, pageId: page.NewId(1, 1), data: pg}}
 		err = f1.flushRecords(records)
 		assert.NoError(t, err)
 		_ = f1.close()
@@ -68,7 +68,7 @@ func TestFileReadRecords(t *testing.T) {
 		f := setupTestFile(t)
 		pg := buildTestPage(t)
 		records := []Record{
-			{lsn: Lsn(1), trxId: 1, recordType: RecordTypePageWrite, pageId: page.NewId(1, 1), data: *pg},
+			{lsn: Lsn(1), trxId: 1, recordType: RecordTypePageWrite, pageId: page.NewId(1, 1), data: pg},
 			{lsn: Lsn(2), trxId: 1, recordType: RecordTypeCommit},
 		}
 		_ = f.flushRecords(records)
@@ -137,7 +137,7 @@ func TestFileReadRecords(t *testing.T) {
 		f := setupTestFile(t)
 		pg := buildTestPage(t)
 		records := []Record{
-			{lsn: Lsn(1), trxId: 1, recordType: RecordTypePageWrite, pageId: page.NewId(2, 3), data: *pg},
+			{lsn: Lsn(1), trxId: 1, recordType: RecordTypePageWrite, pageId: page.NewId(2, 3), data: pg},
 		}
 		_ = f.flushRecords(records)
 
@@ -150,7 +150,7 @@ func TestFileReadRecords(t *testing.T) {
 		assert.Equal(t, RecordTypePageWrite, result[0].Type())
 		assert.Equal(t, page.NewId(2, 3), result[0].PageId())
 		resultData := result[0].Data()
-		assert.Equal(t, pg.ToBytes(), resultData.ToBytes())
+		assert.Equal(t, pg.Bytes(), resultData.Bytes())
 	})
 }
 
@@ -160,7 +160,7 @@ func TestFileFlushRecords(t *testing.T) {
 		f := setupTestFile(t)
 		pg := buildTestPage(t)
 		records := []Record{
-			{lsn: Lsn(1), trxId: 1, recordType: RecordTypePageWrite, pageId: page.NewId(1, 1), data: *pg},
+			{lsn: Lsn(1), trxId: 1, recordType: RecordTypePageWrite, pageId: page.NewId(1, 1), data: pg},
 			{lsn: Lsn(2), trxId: 1, recordType: RecordTypeCommit},
 		}
 

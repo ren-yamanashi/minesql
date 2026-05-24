@@ -52,11 +52,11 @@ func NewHeapFile(fileId page.FileId, path string) (heapFile *HeapFile, retErr er
 //
 // PageNumber が上限に達している場合はエラーを返す
 func (hf *HeapFile) AllocatePageId() (page.Id, error) {
-	if hf.nextPageId.PageNumber >= page.MaxPageNumber {
-		return page.InvalidId, fmt.Errorf("file %d: page number limit reached", hf.fileId)
+	if hf.nextPageId.PageNumber() >= page.MaxPageNumber {
+		return page.InvalidId(), fmt.Errorf("file %d: page number limit reached", hf.fileId)
 	}
 	id := hf.nextPageId
-	hf.nextPageId = page.NewId(hf.fileId, hf.nextPageId.PageNumber+1)
+	hf.nextPageId = page.NewId(hf.fileId, hf.nextPageId.PageNumber()+1)
 	return id, nil
 }
 
@@ -65,7 +65,7 @@ func (hf *HeapFile) AllocatePageId() (page.Id, error) {
 //   - data: 読み込み先
 //   - return: ページが存在しない場合は io.EOF、途中までしか読めなかった場合は io.ErrUnexpectedEOF
 func (hf *HeapFile) Read(pageNumber page.PageNumber, data []byte) error {
-	if err := page.CheckPageSize(data); err != nil {
+	if err := page.CheckSize(data); err != nil {
 		return err
 	}
 	if err := hf.seek(pageNumber); err != nil {
@@ -80,7 +80,7 @@ func (hf *HeapFile) Read(pageNumber page.PageNumber, data []byte) error {
 //   - pageNumber: 書き込み対象の PageNumber
 //   - data: 書き込むデータ
 func (hf *HeapFile) Write(pageNumber page.PageNumber, data []byte) error {
-	if err := page.CheckPageSize(data); err != nil {
+	if err := page.CheckSize(data); err != nil {
 		return err
 	}
 	if err := hf.seek(pageNumber); err != nil {

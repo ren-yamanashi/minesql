@@ -68,7 +68,7 @@ func TestNewCatalog(t *testing.T) {
 		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
 		bufPageHeader, err := bp.PageForWrite(headerPageId)
 		assert.NoError(t, err)
-		copy(bufPageHeader.Data().Body[headerMagicNumberOffset:], []byte("XXXX"))
+		copy(bufPageHeader.Data().Body()[headerMagicNumberOffset:], []byte("XXXX"))
 		bp.UnrefPage(headerPageId)
 
 		// WHEN
@@ -118,7 +118,7 @@ func TestCreateCatalog(t *testing.T) {
 		defer bp.UnrefPage(headerPageId)
 
 		magicEnd := headerMagicNumberOffset + len(catalogMagicNumber)
-		assert.Equal(t, catalogMagicNumber, bufPageHeader.Data().Body[headerMagicNumberOffset:magicEnd])
+		assert.Equal(t, catalogMagicNumber, bufPageHeader.Data().Body()[headerMagicNumberOffset:magicEnd])
 	})
 
 	t.Run("ヘッダーページにスカラー値が正しく書き込まれる", func(t *testing.T) {
@@ -135,9 +135,9 @@ func TestCreateCatalog(t *testing.T) {
 		assert.NoError(t, err)
 		defer bp.UnrefPage(headerPageId)
 
-		nextFileId := page.FileId(binary.BigEndian.Uint32(bufPageHeader.Data().Body[headerNextFileIdOffset : headerNextFileIdOffset+headerFieldSize]))
-		nextIndexId := IndexId(binary.BigEndian.Uint32(bufPageHeader.Data().Body[headerNextIndexIdOffset : headerNextIndexIdOffset+headerFieldSize]))
-		undoLogFileId := page.FileId(binary.BigEndian.Uint32(bufPageHeader.Data().Body[headerUndoLogFileIdOffset : headerUndoLogFileIdOffset+headerFieldSize]))
+		nextFileId := page.FileId(binary.BigEndian.Uint32(bufPageHeader.Data().Body()[headerNextFileIdOffset : headerNextFileIdOffset+headerFieldSize]))
+		nextIndexId := IndexId(binary.BigEndian.Uint32(bufPageHeader.Data().Body()[headerNextIndexIdOffset : headerNextIndexIdOffset+headerFieldSize]))
+		undoLogFileId := page.FileId(binary.BigEndian.Uint32(bufPageHeader.Data().Body()[headerUndoLogFileIdOffset : headerUndoLogFileIdOffset+headerFieldSize]))
 
 		assert.Equal(t, page.FileId(2), nextFileId)
 		assert.Equal(t, IndexId(0), nextIndexId)

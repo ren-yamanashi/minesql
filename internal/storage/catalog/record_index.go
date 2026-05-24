@@ -66,7 +66,7 @@ func (ir IndexRecord) Encode() btree.Record {
 	var nonKey []byte
 	indexId := binary.BigEndian.AppendUint32(nil, uint32(ir.indexId))
 	numOfCol := binary.BigEndian.AppendUint32(nil, uint32(ir.columnCount))
-	metaPageIdBytes := ir.metaPageId.ToBytes()
+	metaPageIdBytes := ir.metaPageId.Bytes()
 	encode.Encode([][]byte{indexId, {byte(ir.indexType)}, numOfCol, metaPageIdBytes}, &nonKey)
 
 	return btree.NewRecord(nil, key, nonKey)

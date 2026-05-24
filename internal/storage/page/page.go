@@ -3,7 +3,6 @@ package page
 import (
 	"errors"
 	"fmt"
-	"strconv"
 )
 
 const (
@@ -11,58 +10,56 @@ const (
 	HeaderSize = 4
 )
 
-var ErrInvalidDataSize = errors.New("data size must be " + strconv.Itoa(Size) + " bytes")
+var ErrInvalidDataSize = errors.New("invalid page data size")
 
 // Page は 4KB のページ
 //   - ヘッダー: 先頭 4 バイト
 //   - ボディ: 残りバイト
 type Page struct {
 	data   []byte
-	Header []byte
-	Body   []byte
+	header []byte
+	body   []byte
 }
 
 func NewPage(data []byte) (*Page, error) {
-	if err := CheckPageSize(data); err != nil {
+	if err := CheckSize(data); err != nil {
 		return nil, err
 	}
 	return &Page{
 		data:   data,
-		Header: data[:HeaderSize], //nolint:gosec // CheckPageSize で len(data) == PageSize を検証済み
-		Body:   data[HeaderSize:], //nolint:gosec // CheckPageSize で len(data) == PageSize を検証済み
+		header: data[:HeaderSize], //nolint:gosec // CheckSize で len(data) == Size を検証済み
+		body:   data[HeaderSize:], //nolint:gosec // CheckSize で len(data) == Size を検証済み
 	}, nil
 }
 
-// ToBytes はページ全体のバイト列を返す
-func (p *Page) ToBytes() []byte {
-	return p.data
-}
+func (p *Page) Header() []byte { return p.header }
+func (p *Page) Body() []byte   { return p.body }
+func (p *Page) Bytes() []byte  { return p.data }
 
 // Copy はページのデータを新しいメモリ領域にコピーした Page を返す
-//
-// pg が nil データの場合はゼロ値の Page を返す
-func Copy(pg Page) Page {
-	if pg.data == nil {
-		return Page{}
+func (p *Page) Copy() *Page {
+	if p == nil || p.IsZero() {
+		return &Page{}
 	}
 	copied := make([]byte, Size)
-	copy(copied, pg.ToBytes())
-	p, err := NewPage(copied) // make([]byte, Size) でサイズ保証済みのため、ここでのエラーは不変条件違反を意味するので panic で良い
+	copy(copied, p.data)
+	// make([]byte, Size) でサイズ保証済みのため、ここでのエラーは不変条件違反を意味するので panic で良い
+	newPage, err := NewPage(copied)
 	if err != nil {
 		panic(fmt.Sprintf("page: Copy failed: %v", err))
 	}
-	return *p
+	return newPage
 }
 
 // IsZero は Page がゼロ値かどうかを判定する
 func (p *Page) IsZero() bool {
-	return p.data == nil
+	return p == nil || p.data == nil
 }
 
-// CheckPageSize は data が 4KB であるかを確認する
-func CheckPageSize(data []byte) error {
+// CheckSize は data が Size バイトであるかを確認する
+func CheckSize(data []byte) error {
 	if len(data) != Size {
-		return ErrInvalidDataSize
+		return fmt.Errorf("%w: must be %d bytes, got %d", ErrInvalidDataSize, Size, len(data))
 	}
 	return nil
 }

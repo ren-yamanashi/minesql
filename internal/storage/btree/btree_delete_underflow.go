@@ -167,7 +167,7 @@ func (t *Tree) onBranchUnderflow(
 		if sibling.isLeft {
 			parentRecord := parentBranch.record(childSlotNum - 1)
 			siblingRightChild := siblingBranch.rightChildPageId()
-			record := NewRecord([]byte{}, parentRecord.Key(), siblingRightChild.ToBytes())
+			record := NewRecord([]byte{}, parentRecord.Key(), siblingRightChild.Bytes())
 			if !childBranch.insert(0, record) {
 				return false, errors.New("new branch node must have space")
 			}
@@ -190,7 +190,7 @@ func (t *Tree) onBranchUnderflow(
 
 		// 右の兄弟から転送: 親の境界キーを子の末尾に下ろし、兄弟の先頭キーを親に上げる
 		parentRecord := parentBranch.record(childSlotNum)
-		record := NewRecord([]byte{}, parentRecord.Key(), childBranch.rightChildPageId().ToBytes())
+		record := NewRecord([]byte{}, parentRecord.Key(), childBranch.rightChildPageId().Bytes())
 		if !childBranch.insert(childBranch.numRecords(), record) {
 			return false, errors.New("new branch node must have space")
 		}
@@ -215,7 +215,7 @@ func (t *Tree) onBranchUnderflow(
 	if sibling.isLeft {
 		parentRecord := parentBranch.record(parentBranch.numRecords() - 1)
 		siblingRightChildPageId := siblingBranch.rightChildPageId()
-		record := NewRecord([]byte{}, parentRecord.Key(), siblingRightChildPageId.ToBytes())
+		record := NewRecord([]byte{}, parentRecord.Key(), siblingRightChildPageId.Bytes())
 		if !siblingBranch.insert(siblingBranch.numRecords(), record) {
 			return false, errors.New("new branch node must have space")
 		}
@@ -230,7 +230,7 @@ func (t *Tree) onBranchUnderflow(
 	// 右の兄弟とマージ: 兄弟(右)のレコードをすべて子(左)に移動 (子が残る)
 	parentRecord := parentBranch.record(childSlotNum)
 	childRightChildPageId := childBranch.rightChildPageId()
-	record := NewRecord([]byte{}, parentRecord.Key(), childRightChildPageId.ToBytes())
+	record := NewRecord([]byte{}, parentRecord.Key(), childRightChildPageId.Bytes())
 	if !childBranch.insert(childBranch.numRecords(), record) {
 		return false, errors.New("new branch node must have space")
 	}

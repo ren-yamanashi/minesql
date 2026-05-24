@@ -22,7 +22,7 @@ type branchNode struct {
 }
 
 func newBranchNode(pg *page.Page) *branchNode {
-	data := pg.Body
+	data := pg.Body()
 	headerSize := nodeHeaderSize + branchNodeHeaderSize
 	header := data[:headerSize]
 	body := newSlottedPage(data[headerSize:])
@@ -40,12 +40,12 @@ func (bn *branchNode) initialize(key []byte, leftChildPageId, rightChildId page.
 	copy(bn.header[:nodeHeaderSize], nodeTypeBranch)
 	bn.body.initialize()
 
-	record := NewRecord([]byte{}, key, leftChildPageId.ToBytes())
+	record := NewRecord([]byte{}, key, leftChildPageId.Bytes())
 	if !bn.insert(0, record) {
 		return errors.New("new branch node must have space")
 	}
 
-	rightChildId.WriteTo(bn.header[nodeHeaderSize:], branchNodeRightChildOffset)
+	rightChildId.WriteAt(bn.header[nodeHeaderSize:], branchNodeRightChildOffset)
 	return nil
 }
 
@@ -54,7 +54,7 @@ func (bn *branchNode) initialize(key []byte, leftChildPageId, rightChildId page.
 //   - record: 挿入するレコード
 //   - return: 挿入に成功した場合は true
 func (bn *branchNode) insert(slotNum int, record Record) bool {
-	recordBytes := record.ToBytes()
+	recordBytes := record.Bytes()
 	if len(recordBytes) > bn.maxRecordSize() {
 		return false
 	}
@@ -118,7 +118,7 @@ func (bn *branchNode) delete(slotNum int) {
 //   - slotNum: 更新するレコードのスロット番号
 //   - record: 新しいレコード
 func (bn *branchNode) update(slotNum int, record Record) bool {
-	return bn.body.update(slotNum, record.ToBytes())
+	return bn.body.update(slotNum, record.Bytes())
 }
 
 // numRecords はレコード数を取得する
@@ -174,7 +174,7 @@ func (bn *branchNode) rightChildPageId() page.Id {
 
 // setRightChildPageId は右端の子の PageId を設定する
 func (bn *branchNode) setRightChildPageId(pageId page.Id) {
-	pageId.WriteTo(bn.header[nodeHeaderSize:], branchNodeRightChildOffset)
+	pageId.WriteAt(bn.header[nodeHeaderSize:], branchNodeRightChildOffset)
 }
 
 // transferAllFrom は src のすべてのレコードを自分の末尾に転送する (src のレコードはすべて削除される)
@@ -199,7 +199,7 @@ func (bn *branchNode) fillRightChild() ([]byte, error) {
 
 	key := bytes.Clone(record.Key())
 	bn.body.delete(lastSlotNum)
-	rightChild.WriteTo(bn.header[nodeHeaderSize:], branchNodeRightChildOffset)
+	rightChild.WriteAt(bn.header[nodeHeaderSize:], branchNodeRightChildOffset)
 	return key, nil
 }
 

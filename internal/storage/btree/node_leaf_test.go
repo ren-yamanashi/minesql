@@ -25,7 +25,7 @@ func TestLeafNodeInsert(t *testing.T) {
 		// GIVEN
 		ln := newTestLeafNode()
 		maxSize := ln.maxRecordSize()
-		largeData := make([]byte, maxSize) // ToBytes で 4 バイト追加されるため超過する
+		largeData := make([]byte, maxSize) // Bytes で 4 バイト追加されるため超過する
 
 		// WHEN
 		ok := ln.insert(0, NewRecord([]byte{}, []byte{}, largeData))
@@ -225,7 +225,7 @@ func TestLeafNodePrevPageId(t *testing.T) {
 		id := ln.prevPageId()
 
 		// THEN
-		assert.Equal(t, page.InvalidId, id)
+		assert.Equal(t, page.InvalidId(), id)
 	})
 }
 
@@ -238,7 +238,7 @@ func TestLeafNodeNextPageId(t *testing.T) {
 		id := ln.nextPageId()
 
 		// THEN
-		assert.Equal(t, page.InvalidId, id)
+		assert.Equal(t, page.InvalidId(), id)
 	})
 }
 

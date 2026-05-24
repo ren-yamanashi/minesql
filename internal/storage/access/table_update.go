@@ -23,6 +23,11 @@ func (t *Table) Update(currentRecord *PrimaryRecord, colNames, values []string, 
 	}
 
 	// PK が変わらない場合はインプレース更新
+	// FK チェック
+	if err := t.checkForeignKeysForUpdate(currentRecord, newRecord); err != nil {
+		return err
+	}
+
 	// Undo ログを記録
 	undoRecord := undo.NewUpdateRecord(
 		t.primaryIndex.fileId(),

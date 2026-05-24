@@ -109,13 +109,13 @@ func TestRecordData(t *testing.T) {
 	t.Run("設定したページデータを返す", func(t *testing.T) {
 		// GIVEN
 		pg := buildTestPage(t)
-		r := Record{data: *pg}
+		r := Record{data: pg}
 
 		// WHEN
 		got := r.Data()
 
 		// THEN
-		assert.Equal(t, pg.ToBytes(), got.ToBytes())
+		assert.Equal(t, pg.Bytes(), got.Bytes())
 	})
 
 	t.Run("データなしの場合はゼロ値のページを返す", func(t *testing.T) {
@@ -126,7 +126,7 @@ func TestRecordData(t *testing.T) {
 		got := r.Data()
 
 		// THEN
-		assert.Nil(t, got.Header)
+		assert.True(t, got.IsZero())
 	})
 }
 
@@ -139,7 +139,7 @@ func TestRecordSerialize(t *testing.T) {
 			trxId:      10,
 			recordType: RecordTypePageWrite,
 			pageId:     page.NewId(page.FileId(2), page.PageNumber(3)),
-			data:       *pg,
+			data:       pg,
 		}
 
 		// WHEN
@@ -189,7 +189,7 @@ func TestRecordSize(t *testing.T) {
 			trxId:      10,
 			recordType: RecordTypePageWrite,
 			pageId:     page.NewId(page.FileId(2), page.PageNumber(3)),
-			data:       *pg,
+			data:       pg,
 		}
 
 		// WHEN
@@ -222,7 +222,7 @@ func TestRecordSize(t *testing.T) {
 			trxId:      10,
 			recordType: RecordTypePageWrite,
 			pageId:     page.NewId(page.FileId(2), page.PageNumber(3)),
-			data:       *pg,
+			data:       pg,
 		}
 
 		// WHEN
@@ -243,7 +243,7 @@ func TestDeserializeRecord(t *testing.T) {
 			trxId:      42,
 			recordType: RecordTypePageWrite,
 			pageId:     page.NewId(page.FileId(1), page.PageNumber(10)),
-			data:       *pg,
+			data:       pg,
 		}
 		buf := original.Serialize()
 
@@ -259,7 +259,7 @@ func TestDeserializeRecord(t *testing.T) {
 		assert.Equal(t, original.PageId(), decoded.PageId())
 		originalData := original.Data()
 		decodedData := decoded.Data()
-		assert.Equal(t, originalData.ToBytes(), decodedData.ToBytes())
+		assert.Equal(t, originalData.Bytes(), decodedData.Bytes())
 	})
 
 	t.Run("COMMIT レコードのラウンドトリップ", func(t *testing.T) {
@@ -321,7 +321,7 @@ func TestDeserializeRecord(t *testing.T) {
 			trxId:      1,
 			recordType: RecordTypePageWrite,
 			pageId:     page.NewId(page.FileId(1), page.PageNumber(1)),
-			data:       *pg,
+			data:       pg,
 		}
 		buf := r.Serialize()
 		// データ部分を切り詰めてデータ長と実データを不一致にする

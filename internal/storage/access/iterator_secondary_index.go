@@ -49,7 +49,7 @@ func (si *SecondaryIndexIterator) Next() (*PrimaryRecord, bool, error) {
 			return nil, false, err
 		}
 
-		pi := NewPrimaryIndexIterator(iter, si.catalog, si.primaryTree.MetaPageId().FileId)
+		pi := NewPrimaryIndexIterator(iter, si.catalog, si.primaryTree.MetaPageId().FileId())
 		result, found, err := pi.Next()
 		pi.Close()
 		if err != nil {
@@ -91,6 +91,6 @@ func (si *SecondaryIndexIterator) nextVisibleSecondaryRecord() (*SecondaryRecord
 			continue
 		}
 
-		return DecodeSecondaryRecord(record, si.catalog, si.primaryTree.MetaPageId().FileId, si.indexName)
+		return DecodeSecondaryRecord(record, si.catalog, si.primaryTree.MetaPageId().FileId(), si.indexName)
 	}
 }

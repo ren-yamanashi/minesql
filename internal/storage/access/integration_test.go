@@ -256,7 +256,7 @@ func TestIntegrationCrashRecovery(t *testing.T) {
 		undoPageId := page.NewId(env.ct.UndoLogFileId(), 0)
 		readPage, err := env.bp.PageForRead(undoPageId)
 		assert.NoError(t, err)
-		env.redoLog.AppendPageCopy(trxId, undoPageId, *readPage.Data())
+		env.redoLog.AppendPageCopy(trxId, undoPageId, readPage.Data())
 		err = env.redoLog.Flush()
 		assert.NoError(t, err)
 

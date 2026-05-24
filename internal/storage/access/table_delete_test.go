@@ -131,6 +131,20 @@ func TestTableSoftDelete(t *testing.T) {
 		assert.Equal(t, "Bob", remaining.values[1])
 		assert.Equal(t, "bob@example.com", remaining.values[2])
 	})
+
+	t.Run("子テーブルから参照されているレコードの論理削除は ErrForeignKeyViolation を返す", func(t *testing.T) {
+		// GIVEN
+		env := setupFKTestEnv(t)
+		_ = env.parent.Insert([]string{"id", "name"}, []string{"1", "Sales"}, fkTrxId)
+		_ = env.child.Insert([]string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"}, fkTrxId)
+		record := searchFirstPrimaryRecord(t, env.parent)
+
+		// WHEN
+		err := env.parent.SoftDelete(record, fkTrxId)
+
+		// THEN
+		assert.ErrorIs(t, err, ErrForeignKeyViolation)
+	})
 }
 
 func TestTableDelete(t *testing.T) {

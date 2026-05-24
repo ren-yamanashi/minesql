@@ -199,7 +199,7 @@ func createConstraints(ct *catalog.Catalog, fileId page.FileId, inputs []CreateC
 			fileId,
 			input.ColumnName,
 			input.ConstraintName,
-			refTable.MetaPageId().FileId,
+			refTable.MetaPageId().FileId(),
 			input.ReferenceColumnName,
 		))
 		if err != nil {

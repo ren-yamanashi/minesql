@@ -20,13 +20,13 @@ func (p *Pool) FlushAllPages() error {
 			return
 		}
 
-		heapFile, err := p.heapFile(pageId.FileId)
+		heapFile, err := p.heapFile(pageId.FileId())
 		if err != nil {
 			flushErr = err
 			return
 		}
 
-		err = heapFile.Write(pageId.PageNumber, bufPage.data.ToBytes())
+		err = heapFile.Write(pageId.PageNumber(), bufPage.data.Bytes())
 		if err != nil {
 			flushErr = err
 			return
@@ -74,17 +74,17 @@ func (p *Pool) FlushOldestPages(n int) error {
 			continue
 		}
 
-		heapFile, err := p.heapFile(pid.FileId)
+		heapFile, err := p.heapFile(pid.FileId())
 		if err != nil {
 			return err
 		}
-		if err := heapFile.Write(pid.PageNumber, bufPage.data.ToBytes()); err != nil {
+		if err := heapFile.Write(pid.PageNumber(), bufPage.data.Bytes()); err != nil {
 			return err
 		}
 
 		bufPage.isDirty = false
 		p.flushList.delete(pid)
-		filesToSync[pid.FileId] = struct{}{}
+		filesToSync[pid.FileId()] = struct{}{}
 	}
 
 	for fileId := range filesToSync {

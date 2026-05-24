@@ -70,14 +70,14 @@ func (r *Recovery) applyRedoLog(records []redo.Record) error {
 		}
 
 		// Page LSN を比較し、すでに適用済みならスキップ
-		currentLsn := redo.Lsn(binary.BigEndian.Uint32(writePage.Data().Header))
+		currentLsn := redo.Lsn(binary.BigEndian.Uint32(writePage.Data().Header()))
 		if currentLsn >= rec.Lsn() {
 			continue
 		}
 
 		// ページ全体のコピーで上書き
 		recData := rec.Data()
-		copy(writePage.Data().ToBytes(), recData.ToBytes())
+		copy(writePage.Data().Bytes(), recData.Bytes())
 	}
 	return nil
 }

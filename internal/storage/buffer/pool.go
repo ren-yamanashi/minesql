@@ -72,7 +72,7 @@ func (p *Pool) AllocatePageId(fileId page.FileId) (page.Id, error) {
 	defer p.mu.Unlock()
 	heapFile, err := p.heapFile(fileId)
 	if err != nil {
-		return page.InvalidId, err
+		return page.InvalidId(), err
 	}
 	return heapFile.AllocatePageId()
 }
@@ -139,12 +139,12 @@ func (p *Pool) page(pageId page.Id) (*Page, error) {
 	}
 
 	// ディスク上のファイルからページを読み込む
-	heapFile, err := p.heapFile(pageId.FileId)
+	heapFile, err := p.heapFile(pageId.FileId())
 	if err != nil {
 		p.pageTable.delete(pageId)
 		return nil, err
 	}
-	err = heapFile.Read(pageId.PageNumber, bufPage.data.ToBytes())
+	err = heapFile.Read(pageId.PageNumber(), bufPage.data.Bytes())
 	if err != nil {
 		p.pageTable.delete(pageId)
 		return nil, err

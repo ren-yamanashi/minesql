@@ -16,8 +16,8 @@ func TestNewId(t *testing.T) {
 		pageId := NewId(fileId, pageNumber)
 
 		// THEN
-		assert.Equal(t, fileId, pageId.FileId)
-		assert.Equal(t, pageNumber, pageId.PageNumber)
+		assert.Equal(t, fileId, pageId.FileId())
+		assert.Equal(t, pageNumber, pageId.PageNumber())
 	})
 
 	t.Run("ゼロ値で Id を生成できる", func(t *testing.T) {
@@ -25,8 +25,8 @@ func TestNewId(t *testing.T) {
 		pageId := NewId(0, 0)
 
 		// THEN
-		assert.Equal(t, FileId(0), pageId.FileId)
-		assert.Equal(t, PageNumber(0), pageId.PageNumber)
+		assert.Equal(t, FileId(0), pageId.FileId())
+		assert.Equal(t, PageNumber(0), pageId.PageNumber())
 	})
 
 	t.Run("最大値で Id を生成できる", func(t *testing.T) {
@@ -34,8 +34,8 @@ func TestNewId(t *testing.T) {
 		pageId := NewId(MaxFileId, MaxPageNumber)
 
 		// THEN
-		assert.Equal(t, FileId(MaxFileId), pageId.FileId)
-		assert.Equal(t, PageNumber(MaxPageNumber), pageId.PageNumber)
+		assert.Equal(t, FileId(MaxFileId), pageId.FileId())
+		assert.Equal(t, PageNumber(MaxPageNumber), pageId.PageNumber())
 	})
 }
 
@@ -63,13 +63,13 @@ func TestIsInvalid(t *testing.T) {
 	})
 }
 
-func TestIdToBytes(t *testing.T) {
+func TestIdBytes(t *testing.T) {
 	t.Run("BigEndian で 8 バイトのバイト列に変換できる", func(t *testing.T) {
 		// GIVEN
 		id := NewId(0x00000001, 0x00000002)
 
 		// WHEN
-		data := id.ToBytes()
+		data := id.Bytes()
 
 		// THEN
 		expected := []byte{0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02}
@@ -81,7 +81,7 @@ func TestIdToBytes(t *testing.T) {
 		id := NewId(0, 0)
 
 		// WHEN
-		data := id.ToBytes()
+		data := id.Bytes()
 
 		// THEN
 		expected := make([]byte, 8)
@@ -93,7 +93,7 @@ func TestIdToBytes(t *testing.T) {
 		id := NewId(MaxFileId, MaxPageNumber)
 
 		// WHEN
-		data := id.ToBytes()
+		data := id.Bytes()
 
 		// THEN
 		expected := []byte{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF}
@@ -101,7 +101,7 @@ func TestIdToBytes(t *testing.T) {
 	})
 }
 
-func TestWriteTo(t *testing.T) {
+func TestWriteAt(t *testing.T) {
 	t.Run("指定した offset の位置に Id を書き込める", func(t *testing.T) {
 		// GIVEN
 		pageId := NewId(0x00000001, 0x00000002)
@@ -109,7 +109,7 @@ func TestWriteTo(t *testing.T) {
 		offset := 4
 
 		// WHEN
-		pageId.WriteTo(data, offset)
+		pageId.WriteAt(data, offset)
 
 		// THEN
 		expected := []byte{0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02}
@@ -122,7 +122,7 @@ func TestWriteTo(t *testing.T) {
 		data := make([]byte, 8)
 
 		// WHEN
-		pageId.WriteTo(data, 0)
+		pageId.WriteAt(data, 0)
 
 		// THEN
 		expected := []byte{0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02}
@@ -136,7 +136,7 @@ func TestWriteTo(t *testing.T) {
 		offset := 4
 
 		// WHEN
-		pageId.WriteTo(data, offset)
+		pageId.WriteAt(data, offset)
 
 		// THEN
 		assert.Equal(t, []byte{0xAA, 0xBB, 0xCC, 0xDD}, data[:4])
@@ -158,8 +158,8 @@ func TestReadId(t *testing.T) {
 		pageId := ReadId(data, offset)
 
 		// THEN
-		assert.Equal(t, FileId(3), pageId.FileId)
-		assert.Equal(t, PageNumber(7), pageId.PageNumber)
+		assert.Equal(t, FileId(3), pageId.FileId())
+		assert.Equal(t, PageNumber(7), pageId.PageNumber())
 	})
 
 	t.Run("offset 0 の位置から Id を読み込める", func(t *testing.T) {
@@ -173,8 +173,8 @@ func TestReadId(t *testing.T) {
 		pageId := ReadId(data, 0)
 
 		// THEN
-		assert.Equal(t, FileId(5), pageId.FileId)
-		assert.Equal(t, PageNumber(10), pageId.PageNumber)
+		assert.Equal(t, FileId(5), pageId.FileId())
+		assert.Equal(t, PageNumber(10), pageId.PageNumber())
 	})
 }
 
@@ -182,7 +182,7 @@ func TestRestoreId(t *testing.T) {
 	t.Run("8 バイトのデータから Id を復元できる", func(t *testing.T) {
 		// GIVEN
 		original := NewId(10, 20)
-		data := original.ToBytes()
+		data := original.Bytes()
 
 		// WHEN
 		restored, err := RestoreId(data)
@@ -201,7 +201,7 @@ func TestRestoreId(t *testing.T) {
 
 		// THEN
 		assert.Error(t, err)
-		assert.Equal(t, InvalidId, pageId)
+		assert.Equal(t, InvalidId(), pageId)
 	})
 
 	t.Run("データ長が 8 バイト超過の場合エラーを返す", func(t *testing.T) {
@@ -213,7 +213,7 @@ func TestRestoreId(t *testing.T) {
 
 		// THEN
 		assert.Error(t, err)
-		assert.Equal(t, InvalidId, pageId)
+		assert.Equal(t, InvalidId(), pageId)
 	})
 
 	t.Run("空データの場合エラーを返す", func(t *testing.T) {
@@ -225,18 +225,18 @@ func TestRestoreId(t *testing.T) {
 
 		// THEN
 		assert.Error(t, err)
-		assert.Equal(t, InvalidId, pageId)
+		assert.Equal(t, InvalidId(), pageId)
 	})
 }
 
 func TestWriteAndReadId(t *testing.T) {
-	t.Run("WriteTo で書き込んだ Id を ReadId で復元できる", func(t *testing.T) {
+	t.Run("WriteAt で書き込んだ Id を ReadId で復元できる", func(t *testing.T) {
 		// GIVEN
 		original := NewId(0xDEADBEEF, 0xCAFEBABE)
 		data := make([]byte, 8)
 
 		// WHEN
-		original.WriteTo(data, 0)
+		original.WriteAt(data, 0)
 		restored := ReadId(data, 0)
 
 		// THEN

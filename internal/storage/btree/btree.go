@@ -43,7 +43,7 @@ func CreateTree(bp *buffer.Pool, fileId page.FileId) (*Tree, error) {
 	metaPage := newMetaPage(pageMeta.Data())
 
 	// ルートリーフノード作成
-	rootNodePageId, err := bp.AllocatePageId(metaPageId.FileId)
+	rootNodePageId, err := bp.AllocatePageId(metaPageId.FileId())
 	if err != nil {
 		return nil, err
 	}

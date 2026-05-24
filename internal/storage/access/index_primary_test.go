@@ -347,7 +347,7 @@ func setupTestPrimaryIndex(t *testing.T) *primaryIndex {
 func buildTestPrimaryRecord(t *testing.T, pi *primaryIndex, id, name, email string) *PrimaryRecord {
 	t.Helper()
 	pr, err := NewPrimaryRecord(pi.catalog, NewPrimaryRecordInput{
-		fileId:     pi.tree.MetaPageId().FileId,
+		fileId:     pi.tree.MetaPageId().FileId(),
 		pkCount:    pi.pkCount,
 		deleteMark: 0,
 		rollPtr:    undo.NullPointer(),

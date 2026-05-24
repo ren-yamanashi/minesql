@@ -46,7 +46,7 @@ func TestBranchNodeInsert(t *testing.T) {
 		largeKey := make([]byte, maxSize)
 
 		// WHEN
-		ok := bn.insert(1, NewRecord([]byte{}, largeKey, page.NewId(0, 1).ToBytes()))
+		ok := bn.insert(1, NewRecord([]byte{}, largeKey, page.NewId(0, 1).Bytes()))
 
 		// THEN
 		assert.False(t, ok)
@@ -412,5 +412,5 @@ func newTestBranchNode() *branchNode {
 
 // newBranchRecord はブランチノード用のレコードを作成する
 func newBranchRecord(key []byte, childPageId page.Id) Record {
-	return NewRecord([]byte{}, key, childPageId.ToBytes())
+	return NewRecord([]byte{}, key, childPageId.Bytes())
 }

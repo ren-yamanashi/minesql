@@ -7,6 +7,11 @@ import (
 
 // Insert はテーブルに行を挿入する
 func (t *Table) Insert(colNames []string, values []string, trxId lock.TrxId) error {
+	// FK チェック
+	if err := t.checkForeignKeysForInsert(colNames, values); err != nil {
+		return err
+	}
+
 	record, err := NewPrimaryRecord(t.catalog, NewPrimaryRecordInput{
 		fileId:     t.primaryIndex.fileId(),
 		pkCount:    t.primaryIndex.pkCount,

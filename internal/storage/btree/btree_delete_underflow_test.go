@@ -171,7 +171,7 @@ func TestDeleteUnderflow(t *testing.T) {
 
 		parentPageId, _ := allocateTestPage(t, bp)
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x20}, childPageId, otherPageId)
-		parentBranch.insert(1, NewRecord([]byte{}, []byte{0x50}, siblingPageId.ToBytes()))
+		parentBranch.insert(1, NewRecord([]byte{}, []byte{0x50}, siblingPageId.Bytes()))
 
 		// WHEN (childSlotNum=0, sibling=slot1, RightChild=otherPageId)
 		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 0)
@@ -335,7 +335,7 @@ func TestDeleteUnderflow(t *testing.T) {
 
 		parentPageId, _ := allocateTestPage(t, bp)
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x30}, childPageId, otherPageId)
-		parentBranch.insert(1, NewRecord([]byte{}, []byte{0x70}, siblingPageId.ToBytes()))
+		parentBranch.insert(1, NewRecord([]byte{}, []byte{0x70}, siblingPageId.Bytes()))
 
 		// WHEN (childSlotNum=0, sibling=slot1, RightChild=otherPageId)
 		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 0)
@@ -401,7 +401,7 @@ func largeBranchKey(firstByte byte) []byte {
 func insertLargeBranchRecords(bn *branchNode, count int, startKeyByte byte) {
 	for i := range count {
 		key := largeBranchKey(startKeyByte + byte(i)*0x10)
-		record := NewRecord([]byte{}, key, page.NewId(0, page.PageNumber(300+i)).ToBytes())
+		record := NewRecord([]byte{}, key, page.NewId(0, page.PageNumber(300+i)).Bytes())
 		bn.insert(bn.numRecords(), record)
 	}
 }

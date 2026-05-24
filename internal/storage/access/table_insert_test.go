@@ -182,4 +182,15 @@ func TestTableInsert(t *testing.T) {
 		// THEN
 		assert.Error(t, err)
 	})
+
+	t.Run("FK 制約に違反する挿入は ErrForeignKeyViolation を返す", func(t *testing.T) {
+		// GIVEN
+		env := setupFKTestEnv(t)
+
+		// WHEN
+		err := env.child.Insert([]string{"id", "name", "dept_id"}, []string{"1", "Alice", "999"}, fkTrxId)
+
+		// THEN
+		assert.ErrorIs(t, err, ErrForeignKeyViolation)
+	})
 }

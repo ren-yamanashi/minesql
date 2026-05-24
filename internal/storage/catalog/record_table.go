@@ -33,7 +33,7 @@ func (tr TableRecord) Encode() btree.Record {
 
 	// nonKey = metaPageId + numOfCol
 	var nonKey []byte
-	metaPageIdBytes := tr.metaPageId.ToBytes()
+	metaPageIdBytes := tr.metaPageId.Bytes()
 	numOfCol := binary.BigEndian.AppendUint32(nil, uint32(tr.columnCount))
 	encode.Encode([][]byte{metaPageIdBytes, numOfCol}, &nonKey)
 

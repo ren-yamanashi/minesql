@@ -81,12 +81,12 @@ func TestPageForWrite(t *testing.T) {
 		// WHEN
 		p, err := bp.PageForWrite(pageId)
 		assert.NoError(t, err)
-		p.data.Body[0] = 0xAA
+		p.data.Body()[0] = 0xAA
 
 		// THEN
 		fetched, err := bp.PageForRead(pageId)
 		assert.NoError(t, err)
-		assert.Equal(t, byte(0xAA), fetched.data.Body[0])
+		assert.Equal(t, byte(0xAA), fetched.data.Body()[0])
 	})
 }
 
@@ -119,7 +119,7 @@ func TestPageForRead(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, byte(0xAB), bufPage.data.Body[0])
+		assert.Equal(t, byte(0xAB), bufPage.data.Body()[0])
 	})
 
 	t.Run("同じページを 2 回フェッチしても同じデータが返る", func(t *testing.T) {
@@ -128,7 +128,7 @@ func TestPageForRead(t *testing.T) {
 		pageId := page.NewId(0, 0)
 		addedPage, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
-		addedPage.data.Body[0] = 0x42
+		addedPage.data.Body()[0] = 0x42
 
 		// WHEN
 		bufPage1, err := bp.PageForRead(pageId)
@@ -137,8 +137,8 @@ func TestPageForRead(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		assert.Equal(t, byte(0x42), bufPage1.data.Body[0])
-		assert.Equal(t, byte(0x42), bufPage2.data.Body[0])
+		assert.Equal(t, byte(0x42), bufPage1.data.Body()[0])
+		assert.Equal(t, byte(0x42), bufPage2.data.Body()[0])
 	})
 }
 
@@ -197,8 +197,8 @@ func TestAllocatePageId(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, page.FileId(5), id.FileId)
-		assert.Equal(t, page.PageNumber(0), id.PageNumber)
+		assert.Equal(t, page.FileId(5), id.FileId())
+		assert.Equal(t, page.PageNumber(0), id.PageNumber())
 	})
 
 	t.Run("連続で割り当てると PageNumber がインクリメントされる", func(t *testing.T) {
@@ -214,8 +214,8 @@ func TestAllocatePageId(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		assert.Equal(t, page.PageNumber(0), id1.PageNumber)
-		assert.Equal(t, page.PageNumber(1), id2.PageNumber)
+		assert.Equal(t, page.PageNumber(0), id1.PageNumber())
+		assert.Equal(t, page.PageNumber(1), id2.PageNumber())
 	})
 
 	t.Run("未登録の FileId の場合エラーを返す", func(t *testing.T) {
@@ -227,7 +227,7 @@ func TestAllocatePageId(t *testing.T) {
 
 		// THEN
 		assert.Error(t, err)
-		assert.Equal(t, page.InvalidId, id)
+		assert.Equal(t, page.InvalidId(), id)
 	})
 }
 
@@ -314,9 +314,9 @@ func TestForEachDirtyPage(t *testing.T) {
 		_, _ = bp.AddPage(id0)
 		_, _ = bp.AddPage(id1)
 		p0, _ := bp.PageForWrite(id0)
-		p0.data.Body[0] = 0xAA
+		p0.data.Body()[0] = 0xAA
 		p1, _ := bp.PageForWrite(id1)
-		p1.data.Body[0] = 0xBB
+		p1.data.Body()[0] = 0xBB
 
 		// WHEN
 		var pages []*page.Page
@@ -350,13 +350,13 @@ func TestForEachDirtyPage(t *testing.T) {
 		pageId := page.NewId(0, 0)
 		_, _ = bp.AddPage(pageId)
 		p, _ := bp.PageForWrite(pageId)
-		p.data.Header[0] = 0x12
-		p.data.Header[1] = 0x34
+		p.data.Header()[0] = 0x12
+		p.data.Header()[1] = 0x34
 
 		// WHEN
 		var header []byte
 		bp.ForEachDirtyPage(func(pg *page.Page) {
-			header = pg.Header
+			header = pg.Header()
 		})
 
 		// THEN

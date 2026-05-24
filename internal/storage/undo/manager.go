@@ -107,7 +107,7 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 	}
 	bufPageUndo := NewPage(*pageUndo.Data())
 
-	ptr := NewPointer(m.currentPageId.PageNumber, bufPageUndo.UsedBytes())
+	ptr := NewPointer(m.currentPageId.PageNumber(), bufPageUndo.UsedBytes())
 
 	// ページが満杯の場合は、新しいページを割り当てる
 	if !bufPageUndo.append(serialized) {
@@ -131,7 +131,7 @@ func (m *Manager) switchToNewPage(trxId lock.TrxId, currentPage *Page, serialize
 	}
 
 	// 現在のページに次のページへのリンクを設定
-	currentPage.setNextPageNumber(newPageId.PageNumber)
+	currentPage.setNextPageNumber(newPageId.PageNumber())
 
 	// 旧ページの Redo ログを記録 (nextPageNumber の変更を反映)
 	if err := m.appendRedoLog(trxId); err != nil {
@@ -155,7 +155,7 @@ func (m *Manager) switchToNewPage(trxId lock.TrxId, currentPage *Page, serialize
 	}
 	m.currentPageId = newPageId
 
-	return NewPointer(newPageId.PageNumber, 0), nil
+	return NewPointer(newPageId.PageNumber(), 0), nil
 }
 
 // appendRedoLog は現在の Undo ページの Redo ログを記録する
@@ -167,7 +167,7 @@ func (m *Manager) appendRedoLog(trxId lock.TrxId) error {
 	if err != nil {
 		return err
 	}
-	if _, err := m.redoLog.AppendPageCopy(trxId, m.currentPageId, *pageUndo.Data()); err != nil {
+	if _, err := m.redoLog.AppendPageCopy(trxId, m.currentPageId, pageUndo.Data()); err != nil {
 		return err
 	}
 	return nil

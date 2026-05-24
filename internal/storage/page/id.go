@@ -6,13 +6,14 @@ import (
 )
 
 const (
-	FileIdSize    = 4
-	IdSize        = FileIdSize * 2
-	MaxFileId     = 0xFFFFFFFF
-	MaxPageNumber = 0xFFFFFFFF
+	FileIdSize = 4
+	IdSize     = FileIdSize * 2
 )
 
-var InvalidId = NewId(MaxFileId, MaxPageNumber)
+const (
+	MaxFileId     FileId     = 0xFFFFFFFF
+	MaxPageNumber PageNumber = 0xFFFFFFFF
+)
 
 type (
 	FileId     uint32
@@ -23,35 +24,35 @@ type (
 //   - FileId: 先頭 4 バイト
 //   - PageNumber: 次の 4 バイト
 type Id struct {
-	FileId     FileId
-	PageNumber PageNumber
+	fileId     FileId
+	pageNumber PageNumber
 }
 
 func NewId(fileId FileId, pageNumber PageNumber) Id {
 	return Id{
-		FileId:     fileId,
-		PageNumber: pageNumber,
+		fileId:     fileId,
+		pageNumber: pageNumber,
 	}
 }
 
-// IsInvalid はこの Id が無効かどうかを判定する
-func (id Id) IsInvalid() bool {
-	return id == InvalidId
-}
+func InvalidId() Id                  { return NewId(MaxFileId, MaxPageNumber) }
+func (id Id) FileId() FileId         { return id.fileId }
+func (id Id) PageNumber() PageNumber { return id.pageNumber }
+func (id Id) IsInvalid() bool        { return id == InvalidId() }
 
-// ToBytes は Id をバイト列に変換する
-func (id Id) ToBytes() []byte {
+// Bytes は Id をバイト列に変換する
+func (id Id) Bytes() []byte {
 	data := make([]byte, IdSize)
-	id.WriteTo(data, 0)
+	id.WriteAt(data, 0)
 	return data
 }
 
-// WriteTo は Id を指定位置に書き込む
+// WriteAt は Id を指定位置に書き込む
 //   - data: データ全体
 //   - offset: 書き込み開始位置
-func (id Id) WriteTo(data []byte, offset int) {
-	binary.BigEndian.PutUint32(data[offset:offset+FileIdSize], uint32(id.FileId))
-	binary.BigEndian.PutUint32(data[offset+FileIdSize:offset+IdSize], uint32(id.PageNumber))
+func (id Id) WriteAt(data []byte, offset int) {
+	binary.BigEndian.PutUint32(data[offset:offset+FileIdSize], uint32(id.fileId))
+	binary.BigEndian.PutUint32(data[offset+FileIdSize:offset+IdSize], uint32(id.pageNumber))
 }
 
 // ReadId は Id を指定位置から読み込む
@@ -67,7 +68,7 @@ func ReadId(data []byte, offset int) Id {
 //   - data: Id を表す 8 バイトのバイト列
 func RestoreId(data []byte) (Id, error) {
 	if len(data) != IdSize {
-		return InvalidId, fmt.Errorf("page id must be %d bytes, got %d", IdSize, len(data))
+		return InvalidId(), fmt.Errorf("page id must be %d bytes, got %d", IdSize, len(data))
 	}
 	return ReadId(data, 0), nil
 }
