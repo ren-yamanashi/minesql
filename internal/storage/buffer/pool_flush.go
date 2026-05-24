@@ -1,6 +1,10 @@
 package buffer
 
-import "github.com/ren-yamanashi/minesql/internal/storage/page"
+import (
+	"errors"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
+)
 
 // FlushAllPages はバッファプール内のすべてのダーティーページをフラッシュする
 func (p *Pool) FlushAllPages() error {
@@ -8,6 +12,9 @@ func (p *Pool) FlushAllPages() error {
 	defer p.mu.Unlock()
 
 	var flushErr error
+
+	// Sync 成功後に状態を更新するため Write 成功したページを一時保持する
+	var pendingPages []*Page
 
 	// 全ダーティーページをディスクに書き出す
 	p.pageTable.forEach(func(pageId page.Id, bufId id) {
@@ -31,19 +38,27 @@ func (p *Pool) FlushAllPages() error {
 			flushErr = err
 			return
 		}
-		bufPage.isDirty = false
+		pendingPages = append(pendingPages, bufPage)
 	})
 	if flushErr != nil {
 		return flushErr
 	}
 
-	p.flushList.clear()
-
+	// 全 file の Sync を試行してエラーを集約する (途中失敗で残ファイルの fsync がスキップされないように)
+	var syncErr error
 	for _, hf := range p.files {
 		if err := hf.Sync(); err != nil {
-			return err
+			syncErr = errors.Join(syncErr, err)
 		}
 	}
+	if syncErr != nil {
+		return syncErr
+	}
+
+	for _, bp := range pendingPages {
+		bp.isDirty = false
+	}
+	p.flushList.clear()
 
 	return nil
 }
@@ -60,6 +75,10 @@ func (p *Pool) FlushOldestPages(n int) error {
 
 	// フラッシュ対象のディスクを記録する (後でまとめて Sync するため)
 	filesToSync := make(map[page.FileId]struct{})
+
+	// Sync 成功後に状態を更新するため Write 成功したページを一時保持する
+	var pendingPageIds []page.Id
+	var pendingBufPages []*Page
 
 	// 対象のダーティーページをディスクに書き出す
 	for _, pid := range pageIds {
@@ -82,8 +101,8 @@ func (p *Pool) FlushOldestPages(n int) error {
 			return err
 		}
 
-		bufPage.isDirty = false
-		p.flushList.delete(pid)
+		pendingPageIds = append(pendingPageIds, pid)
+		pendingBufPages = append(pendingBufPages, bufPage)
 		filesToSync[pid.FileId()] = struct{}{}
 	}
 
@@ -95,6 +114,11 @@ func (p *Pool) FlushOldestPages(n int) error {
 		if err := heapFile.Sync(); err != nil {
 			return err
 		}
+	}
+
+	for i, pid := range pendingPageIds {
+		pendingBufPages[i].isDirty = false
+		p.flushList.delete(pid)
 	}
 
 	return nil

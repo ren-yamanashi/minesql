@@ -119,40 +119,30 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 	}
 	bufPageUndo := NewPage(*pageUndo.Data())
 
-	ptr := NewPointer(m.currentPageId.PageNumber(), bufPageUndo.UsedBytes())
-
-	// ページが満杯の場合は、新しいページを割り当てる
-	if !bufPageUndo.append(serialized) {
-		ptr, err = m.switchToNewPage(trxId, bufPageUndo, serialized)
-		if err != nil {
-			return Pointer{}, err
-		}
+	// ページが満杯の場合は新しいページに切り替える (switchToNewPage 内で Redo 記録まで完了)
+	if bufPageUndo.FreeSpace() < len(serialized) {
+		return m.switchToNewPage(trxId, bufPageUndo, serialized)
 	}
 
+	prevUsedBytes := bufPageUndo.UsedBytes()
+	if !bufPageUndo.append(serialized) {
+		return Pointer{}, ErrRecordTooLarge
+	}
 	if err := m.appendRedoLog(trxId); err != nil {
+		bufPageUndo.setUsedBytes(prevUsedBytes)
 		return Pointer{}, err
 	}
-	return ptr, nil
+	return NewPointer(m.currentPageId.PageNumber(), prevUsedBytes), nil
 }
 
 // switchToNewPage は現在のページが満杯のとき、新しい Undo ページを割り当ててレコードを書き込む
 func (m *Manager) switchToNewPage(trxId lock.TrxId, currentPage *Page, serialized []byte) (Pointer, error) {
+	// 新しいページを先に確保し、レコードを書き込む (旧ページに何も書き込む前に)
 	newPageId, err := m.bufferPool.AllocatePageId(m.fileId)
 	if err != nil {
 		return Pointer{}, err
 	}
-
-	// 現在のページに次のページへのリンクを設定
-	currentPage.setNextPageNumber(newPageId.PageNumber())
-
-	// 旧ページの Redo ログを記録 (nextPageNumber の変更を反映)
-	if err := m.appendRedoLog(trxId); err != nil {
-		return Pointer{}, err
-	}
-
-	// 新しいページを初期化してレコードを追記
-	_, err = m.bufferPool.AddPage(newPageId)
-	if err != nil {
+	if _, err := m.bufferPool.AddPage(newPageId); err != nil {
 		return Pointer{}, err
 	}
 	pageNewUndo, err := m.bufferPool.PageForWrite(newPageId)
@@ -160,11 +150,29 @@ func (m *Manager) switchToNewPage(trxId lock.TrxId, currentPage *Page, serialize
 		return Pointer{}, err
 	}
 	newBufPageUndo := CreatePage(*pageNewUndo.Data())
-
 	if !newBufPageUndo.append(serialized) {
 		return Pointer{}, ErrRecordTooLarge
 	}
+
+	// 旧ページに次のページへのリンクを設定
+	prevNextPageNumber := currentPage.NextPageNumber()
+	currentPage.setNextPageNumber(newPageId.PageNumber())
+
+	// 旧ページの Redo ログを記録 (nextPageNumber の変更を反映)
+	if err := m.appendRedoLog(trxId); err != nil {
+		currentPage.setNextPageNumber(prevNextPageNumber)
+		return Pointer{}, err
+	}
+
+	// currentPageId を新ページに切り替えて新ページの Redo を記録
+	prevCurrentPageId := m.currentPageId
 	m.currentPageId = newPageId
+	if err := m.appendRedoLog(trxId); err != nil {
+		m.currentPageId = prevCurrentPageId
+		currentPage.setNextPageNumber(prevNextPageNumber)
+		newBufPageUndo.setUsedBytes(0)
+		return Pointer{}, err
+	}
 
 	return NewPointer(newPageId.PageNumber(), 0), nil
 }

@@ -7,8 +7,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-
-	"github.com/ncw/directio"
 )
 
 const (
@@ -31,8 +29,7 @@ type file struct {
 func newFile(baseDir string) (*file, error) {
 	filePath := filepath.Join(baseDir, filename)
 	// read-write モードで開き、存在しない場合は作成する
-	// (os.O_DIRECT は directio.OpenFile 内で設定される)
-	osFile, err := directio.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0666)
+	osFile, err := os.OpenFile(filePath, os.O_RDWR|os.O_CREATE, 0600) //nolint:gosec // 内部で生成したパスを使用
 	if err != nil {
 		return nil, fmt.Errorf("redo: failed to open log file: %w", err)
 	}
@@ -122,18 +119,12 @@ func (f *file) flushRecords(records []Record) error {
 	for _, record := range records {
 		if _, err := f.osFile.Write(record.Serialize()); err != nil {
 			// 部分書き込みをロールバック
-			if truncErr := f.osFile.Truncate(originalSize); truncErr != nil {
-				return errors.Join(err, truncErr)
-			}
-			return err
+			return errors.Join(err, f.rollbackTo(originalSize))
 		}
 	}
 
 	if err := f.osFile.Sync(); err != nil {
-		if truncErr := f.osFile.Truncate(originalSize); truncErr != nil {
-			return errors.Join(err, truncErr)
-		}
-		return err
+		return errors.Join(err, f.rollbackTo(originalSize))
 	}
 
 	// Flushed LSN を更新してヘッダーに書き込み
@@ -141,9 +132,17 @@ func (f *file) flushRecords(records []Record) error {
 	f.flushedLsn = records[len(records)-1].lsn
 	if err := f.writeHeader(); err != nil {
 		f.flushedLsn = prevFlushedLsn
-		return err
+		return errors.Join(err, f.rollbackTo(originalSize))
 	}
 	return nil
+}
+
+// rollbackTo はファイルを指定サイズに切り戻して fsync する
+func (f *file) rollbackTo(size int64) error {
+	if err := f.osFile.Truncate(size); err != nil {
+		return err
+	}
+	return f.osFile.Sync()
 }
 
 // setCheckpointLsn はチェックポイント LSN を更新し、ヘッダーに書き込む
@@ -189,10 +188,8 @@ func (f *file) truncateBefore(lsn Lsn) error {
 		return err
 	}
 	if err := os.Rename(tmpPath, f.filePath); err != nil {
-		// 置換失敗時: 元ファイルを再オープン
-		// 再オープンに失敗すると f.osFile が無効なまま残り、以降の操作で
-		// nil/closed fd を触ってしまうため、両方のエラーをまとめて返す
-		reopened, reopenErr := directio.OpenFile(f.filePath, os.O_RDWR, 0666)
+		// 置換失敗時は元ファイルを再オープン
+		reopened, reopenErr := os.OpenFile(f.filePath, os.O_RDWR, 0600)
 		_ = os.Remove(tmpPath)
 		if reopenErr != nil {
 			return errors.Join(err, reopenErr)
@@ -201,19 +198,30 @@ func (f *file) truncateBefore(lsn Lsn) error {
 		return err
 	}
 
-	// 新しいファイルを開き直す
-	osFile, err := directio.OpenFile(f.filePath, os.O_RDWR, 0666)
-	if err != nil {
-		return fmt.Errorf("redo: failed to reopen log file after truncate: %w", err)
+	// rename の永続化のため親ディレクトリを fsync
+	// fsync が失敗しても rename 自体は完了しているため、置換後のファイルを開き直す
+	fsyncErr := fsyncDir(filepath.Dir(f.filePath))
+
+	osFile, openErr := os.OpenFile(f.filePath, os.O_RDWR, 0600)
+	if openErr != nil {
+		reopenErr := fmt.Errorf("redo: failed to reopen log file after truncate: %w", openErr)
+		if fsyncErr != nil {
+			return errors.Join(fsyncErr, reopenErr)
+		}
+		return reopenErr
 	}
 	f.osFile = osFile
+
+	if fsyncErr != nil {
+		return fsyncErr
+	}
 	f.flushedLsn = max(lastLsn, lsn)
 	return nil
 }
 
 // writeTmpFile は一時ファイルにヘッダーとレコードを書き込む
 func (f *file) writeTmpFile(tmpPath string, flushedLsn Lsn, records []Record) (retErr error) {
-	tmpFile, err := os.Create(tmpPath) //nolint:gosec // 内部で生成したパスを使用
+	tmpFile, err := os.OpenFile(tmpPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600) //nolint:gosec // 内部で生成したパスを使用
 	if err != nil {
 		return err
 	}
@@ -281,4 +289,17 @@ func (f *file) writeHeader() error {
 		return err
 	}
 	return f.osFile.Sync()
+}
+
+// fsyncDir はディレクトリの fsync を行う (rename 等のメタデータ操作を永続化するため)
+func fsyncDir(dir string) error {
+	d, err := os.Open(dir) //nolint:gosec // 内部で生成したパスを使用
+	if err != nil {
+		return err
+	}
+	if err := d.Sync(); err != nil {
+		_ = d.Close()
+		return err
+	}
+	return d.Close()
 }
