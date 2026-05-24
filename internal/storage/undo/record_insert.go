@@ -28,7 +28,7 @@ func (ir InsertRecord) Record() btree.Record     { return ir.record }
 func (ir InsertRecord) Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte {
 	fields := Fields{
 		trxId:         trxId,
-		undoNum:       undoNum,
+		undoNumber:    undoNum,
 		recordType:    RecordTypeInsert,
 		prevLastTrxId: ir.prevLastTrxId,
 		prevRollPtr:   ir.prevRollPtr,

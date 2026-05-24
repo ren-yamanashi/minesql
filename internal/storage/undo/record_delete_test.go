@@ -90,7 +90,7 @@ func TestDeleteRecordSerialize(t *testing.T) {
 		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(10), fields.trxId)
-		assert.Equal(t, UndoNumber(2), fields.undoNum)
+		assert.Equal(t, UndoNumber(2), fields.undoNumber)
 		assert.Equal(t, RecordTypeDelete, fields.recordType)
 		assert.Equal(t, lock.TrxId(100), fields.prevLastTrxId)
 		assert.Equal(t, rollPtr, fields.prevRollPtr)
@@ -137,7 +137,7 @@ func TestDeleteRecordSerialize(t *testing.T) {
 		fields, err := DeserializeFields(buf)
 		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(0xFFFFFFFE), fields.trxId)
-		assert.Equal(t, UndoNumber(0xFFFFFFFD), fields.undoNum)
+		assert.Equal(t, UndoNumber(0xFFFFFFFD), fields.undoNumber)
 		assert.Equal(t, lock.TrxId(0xFFFFFFFF), fields.prevLastTrxId)
 	})
 }

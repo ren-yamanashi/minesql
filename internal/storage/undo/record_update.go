@@ -36,7 +36,7 @@ func (ur UpdateRecord) NewRecord() btree.Record  { return ur.newRecord }
 func (ur UpdateRecord) Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte {
 	fields := Fields{
 		trxId:         trxId,
-		undoNum:       undoNum,
+		undoNumber:    undoNum,
 		recordType:    RecordTypeUpdate,
 		prevLastTrxId: ur.prevLastTrxId,
 		prevRollPtr:   ur.prevRollPtr,

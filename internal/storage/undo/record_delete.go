@@ -33,7 +33,7 @@ func (dr DeleteRecord) Record() btree.Record     { return dr.record }
 func (dr DeleteRecord) Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte {
 	fields := Fields{
 		trxId:         trxId,
-		undoNum:       undoNum,
+		undoNumber:    undoNum,
 		recordType:    RecordTypeDelete,
 		prevLastTrxId: dr.prevLastTrxId,
 		prevRollPtr:   dr.prevRollPtr,
