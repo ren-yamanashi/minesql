@@ -35,12 +35,10 @@ func NewId(fileId FileId, pageNumber PageNumber) Id {
 	}
 }
 
-func InvalidId() Id                  { return NewId(MaxFileId, MaxPageNumber) }
 func (id Id) FileId() FileId         { return id.fileId }
 func (id Id) PageNumber() PageNumber { return id.pageNumber }
 func (id Id) IsInvalid() bool        { return id == InvalidId() }
 
-// Bytes は Id をバイト列に変換する
 func (id Id) Bytes() []byte {
 	data := make([]byte, IdSize)
 	id.WriteAt(data, 0)
@@ -71,4 +69,9 @@ func RestoreId(data []byte) (Id, error) {
 		return InvalidId(), fmt.Errorf("page id must be %d bytes, got %d", IdSize, len(data))
 	}
 	return ReadId(data, 0), nil
+}
+
+// InvalidId は不正値を示す Id
+func InvalidId() Id {
+	return NewId(MaxFileId, MaxPageNumber)
 }

@@ -20,6 +20,49 @@ func TestNewPage(t *testing.T) {
 	})
 }
 
+func TestCreatePage(t *testing.T) {
+	t.Run("新規 Undo ページを作成できる", func(t *testing.T) {
+		// GIVEN
+		pg := newTestPage(t)
+
+		// WHEN
+		undoPage := CreatePage(*pg)
+
+		// THEN
+		assert.NotNil(t, undoPage)
+	})
+
+	t.Run("作成時にヘッダーが初期化される", func(t *testing.T) {
+		// GIVEN
+		pg := newTestPage(t)
+
+		// WHEN
+		undoPage := CreatePage(*pg)
+
+		// THEN
+		assert.Equal(t, uint16(0), undoPage.UsedBytes())
+		assert.Equal(t, page.PageNumber(0), undoPage.NextPageNumber())
+	})
+
+	t.Run("既存のヘッダー値が上書きされる", func(t *testing.T) {
+		// GIVEN: 既存ヘッダーに非ゼロ値が入っているページ
+		pg := newTestPage(t)
+		existing := NewPage(*pg)
+		existing.initialize()
+		_ = existing.append(make([]byte, 100))
+		existing.setNextPageNumber(page.PageNumber(42))
+		assert.NotEqual(t, uint16(0), existing.UsedBytes())
+		assert.Equal(t, page.PageNumber(42), existing.NextPageNumber())
+
+		// WHEN
+		undoPage := CreatePage(*pg)
+
+		// THEN: ヘッダーがゼロクリアされる
+		assert.Equal(t, uint16(0), undoPage.UsedBytes())
+		assert.Equal(t, page.PageNumber(0), undoPage.NextPageNumber())
+	})
+}
+
 func TestPageRecord(t *testing.T) {
 	t.Run("Append したレコードを読み取れる", func(t *testing.T) {
 		// GIVEN

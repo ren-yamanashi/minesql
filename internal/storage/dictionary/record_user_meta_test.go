@@ -1,4 +1,4 @@
-package catalog
+package dictionary
 
 import (
 	"testing"
@@ -6,10 +6,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUserRecordUsername(t *testing.T) {
+func TestUserMetaRecordUsername(t *testing.T) {
 	t.Run("コンストラクタで指定したユーザー名を返す", func(t *testing.T) {
 		// GIVEN
-		ur := NewUserRecord("alice", "localhost", []byte("authdata"))
+		ur := NewUserMetaRecord("alice", "localhost", []byte("authdata"))
 
 		// WHEN
 		got := ur.Username()
@@ -19,10 +19,10 @@ func TestUserRecordUsername(t *testing.T) {
 	})
 }
 
-func TestUserRecordHost(t *testing.T) {
+func TestUserMetaRecordHost(t *testing.T) {
 	t.Run("コンストラクタで指定したホスト名を返す", func(t *testing.T) {
 		// GIVEN
-		ur := NewUserRecord("alice", "localhost", []byte("authdata"))
+		ur := NewUserMetaRecord("alice", "localhost", []byte("authdata"))
 
 		// WHEN
 		got := ur.Host()
@@ -32,11 +32,11 @@ func TestUserRecordHost(t *testing.T) {
 	})
 }
 
-func TestUserRecordAuthString(t *testing.T) {
+func TestUserMetaRecordAuthString(t *testing.T) {
 	t.Run("コンストラクタで指定した認証文字列を返す", func(t *testing.T) {
 		// GIVEN
 		authString := []byte{0xAB, 0xCD, 0xEF}
-		ur := NewUserRecord("alice", "localhost", authString)
+		ur := NewUserMetaRecord("alice", "localhost", authString)
 
 		// WHEN
 		got := ur.AuthString()
@@ -46,10 +46,10 @@ func TestUserRecordAuthString(t *testing.T) {
 	})
 }
 
-func TestUserRecordEncode(t *testing.T) {
+func TestUserMetaRecordEncode(t *testing.T) {
 	t.Run("ユーザーレコードをエンコードできる", func(t *testing.T) {
 		// GIVEN
-		ur := NewUserRecord("alice", "localhost", []byte("authdata"))
+		ur := NewUserMetaRecord("alice", "localhost", []byte("authdata"))
 
 		// WHEN
 		record := ur.Encode()
@@ -62,11 +62,12 @@ func TestUserRecordEncode(t *testing.T) {
 
 	t.Run("エンコードした結果をデコードすると元のデータに戻る", func(t *testing.T) {
 		// GIVEN
-		original := NewUserRecord("bob", "192.168.1.1", []byte{0xAB, 0xCD, 0xEF})
+		original := NewUserMetaRecord("bob", "192.168.1.1", []byte{0xAB, 0xCD, 0xEF})
 
 		// WHEN
 		record := original.Encode()
-		decoded := DecodeUserRecord(record)
+		decoded, err := DecodeUserMetaRecord(record)
+		assert.NoError(t, err)
 
 		// THEN
 		assert.Equal(t, original.Username(), decoded.Username())
@@ -80,11 +81,12 @@ func TestUserRecordEncode(t *testing.T) {
 		for i := range 32 {
 			authString[i] = byte(i)
 		}
-		original := NewUserRecord("user", "%", authString)
+		original := NewUserMetaRecord("user", "%", authString)
 
 		// WHEN
 		record := original.Encode()
-		decoded := DecodeUserRecord(record)
+		decoded, err := DecodeUserMetaRecord(record)
+		assert.NoError(t, err)
 
 		// THEN
 		assert.Equal(t, original.Username(), decoded.Username())
@@ -94,11 +96,12 @@ func TestUserRecordEncode(t *testing.T) {
 
 	t.Run("ホスト名がワイルドカードの場合も正しくエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
-		original := NewUserRecord("root", "%", []byte("secret"))
+		original := NewUserMetaRecord("root", "%", []byte("secret"))
 
 		// WHEN
 		record := original.Encode()
-		decoded := DecodeUserRecord(record)
+		decoded, err := DecodeUserMetaRecord(record)
+		assert.NoError(t, err)
 
 		// THEN
 		assert.Equal(t, "root", decoded.Username())
@@ -106,14 +109,15 @@ func TestUserRecordEncode(t *testing.T) {
 	})
 }
 
-func TestDecodeUserRecord(t *testing.T) {
+func TestDecodeUserMetaRecord(t *testing.T) {
 	t.Run("エンコード済みレコードからユーザー名を復元できる", func(t *testing.T) {
 		// GIVEN
-		ur := NewUserRecord("alice", "localhost", []byte("auth"))
+		ur := NewUserMetaRecord("alice", "localhost", []byte("auth"))
 		record := ur.Encode()
 
 		// WHEN
-		decoded := DecodeUserRecord(record)
+		decoded, err := DecodeUserMetaRecord(record)
+		assert.NoError(t, err)
 
 		// THEN
 		assert.Equal(t, "alice", decoded.Username())
@@ -121,11 +125,12 @@ func TestDecodeUserRecord(t *testing.T) {
 
 	t.Run("エンコード済みレコードからホスト名と認証文字列を復元できる", func(t *testing.T) {
 		// GIVEN
-		ur := NewUserRecord("bob", "10.0.0.1", []byte{0x01, 0x02, 0x03})
+		ur := NewUserMetaRecord("bob", "10.0.0.1", []byte{0x01, 0x02, 0x03})
 		record := ur.Encode()
 
 		// WHEN
-		decoded := DecodeUserRecord(record)
+		decoded, err := DecodeUserMetaRecord(record)
+		assert.NoError(t, err)
 
 		// THEN
 		assert.Equal(t, "10.0.0.1", decoded.Host())

@@ -8,7 +8,10 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
-type RecordType int
+type (
+	Lsn        uint32 // Lsn はログシーケンス番号 (Redo ログレコードを一意に識別するための番号)
+	RecordType int
+)
 
 const (
 	recordTypeUnknown RecordType = iota

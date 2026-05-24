@@ -32,33 +32,17 @@ func (f Fields) ToRecord() (Record, error) {
 		if len(f.columnSets) < 1 {
 			return nil, ErrInvalidRecord
 		}
-		return InsertRecord{
-			tableFileId:   f.tableFileId,
-			record:        f.columnSets[0],
-			prevLastTrxId: f.prevLastTrxId,
-			prevRollPtr:   f.prevRollPtr,
-		}, nil
+		return NewInsertRecord(f.tableFileId, f.columnSets[0]), nil
 	case RecordTypeDelete:
 		if len(f.columnSets) < 1 {
 			return nil, ErrInvalidRecord
 		}
-		return DeleteRecord{
-			tableFileId:   f.tableFileId,
-			record:        f.columnSets[0],
-			prevLastTrxId: f.prevLastTrxId,
-			prevRollPtr:   f.prevRollPtr,
-		}, nil
+		return NewDeleteRecord(f.tableFileId, f.columnSets[0], f.prevLastTrxId, f.prevRollPtr), nil
 	case RecordTypeUpdate:
 		if len(f.columnSets) < 2 {
 			return nil, ErrInvalidRecord
 		}
-		return UpdateRecord{
-			tableFileId:   f.tableFileId,
-			prevRecord:    f.columnSets[0],
-			newRecord:     f.columnSets[1],
-			prevLastTrxId: f.prevLastTrxId,
-			prevRollPtr:   f.prevRollPtr,
-		}, nil
+		return NewUpdateRecord(f.tableFileId, f.columnSets[0], f.columnSets[1], f.prevLastTrxId, f.prevRollPtr), nil
 	default:
 		return nil, ErrInvalidRecord
 	}

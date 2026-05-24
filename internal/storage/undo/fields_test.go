@@ -214,7 +214,6 @@ func TestFieldsSerialize(t *testing.T) {
 		buf := f.Serialize()
 
 		// THEN
-		// ヘッダー (11B) + prevLastTrxId (4B) + prevRollPtr (4B) + tableFileId (4B) = 23B
 		assert.Equal(t, recordHeaderSize+lock.TrxIdSize+PointerSize+page.FileIdSize, len(buf))
 	})
 }
@@ -418,7 +417,7 @@ func TestDeserializeFields(t *testing.T) {
 	})
 
 	t.Run("データ部が prevFields に満たない場合エラーを返す", func(t *testing.T) {
-		// GIVEN: prevLastTrxId (4B) + prevRollPtr (4B) = 8B 必要だが 4B しかない
+		// GIVEN
 		data := make([]byte, 4)
 		buf := buildRawBuffer(1, 0, RecordTypeInsert, data)
 
@@ -430,7 +429,7 @@ func TestDeserializeFields(t *testing.T) {
 	})
 
 	t.Run("データ部が FileId に満たない場合エラーを返す", func(t *testing.T) {
-		// GIVEN: prevLastTrxId + prevRollPtr (8B) は足りるが FileId (4B) が不足
+		// GIVEN
 		var data []byte
 		data = binary.BigEndian.AppendUint32(data, 100)
 		data = append(data, NullPointer().Encode()...)

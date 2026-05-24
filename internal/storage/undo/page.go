@@ -17,12 +17,20 @@ type Page struct {
 	body   []byte
 }
 
+// NewPage は既存の Undo ページを開く
 func NewPage(pg page.Page) *Page {
 	body := pg.Body()
 	return &Page{
 		header: body[:pageHeaderSize],
 		body:   body[pageHeaderSize:],
 	}
+}
+
+// CreatePage は新規 Undo ページを作成する
+func CreatePage(pg page.Page) *Page {
+	p := NewPage(pg)
+	p.initialize()
+	return p
 }
 
 // Record はボティ内の指定 offset のレコードを読み取る

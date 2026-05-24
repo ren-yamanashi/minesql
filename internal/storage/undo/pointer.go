@@ -39,13 +39,12 @@ func DecodePointer(data []byte) (Pointer, error) {
 	if len(data) < PointerSize {
 		return NullPointer(), ErrInvalidPointerData
 	}
-	return Pointer{
-		pageNumber: page.PageNumber(binary.BigEndian.Uint32(data[pageNumberOffset:offsetOffset])),
-		offset:     binary.BigEndian.Uint16(data[offsetOffset:PointerSize]),
-	}, nil
+	pageNumber := page.PageNumber(binary.BigEndian.Uint32(data[pageNumberOffset:offsetOffset]))
+	offset := binary.BigEndian.Uint16(data[offsetOffset:PointerSize])
+	return NewPointer(pageNumber, offset), nil
 }
 
 // NullPointer は前バージョンが存在しないことを示す Pointer
 func NullPointer() Pointer {
-	return Pointer{pageNumber: 0xFFFFFFFF, offset: 0xFFFF}
+	return NewPointer(0xFFFFFFFF, 0xFFFF)
 }
