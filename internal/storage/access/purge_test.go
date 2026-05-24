@@ -220,9 +220,7 @@ func TestPurgePurgeEntry(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
 		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog)
-		entry := undo.Entry{
-			RecordType: undo.RecordTypeInsert,
-		}
+		entry := undo.NewEntry(0, undo.RecordTypeInsert, nil)
 
 		// WHEN
 		err := p.purgeEntry(entry)

@@ -10,17 +10,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
 
-var errRecordTooLarge = errors.New("undo: record too large for a single page")
-
-type Entry struct {
-	trxId      lock.TrxId
-	recordType RecordType
-	record     Record
-}
-
-func (e Entry) TrxId() lock.TrxId      { return e.trxId }
-func (e Entry) RecordType() RecordType { return e.recordType }
-func (e Entry) Record() Record         { return e.record }
+var ErrRecordTooLarge = errors.New("undo: record too large for a single page")
 
 type Manager struct {
 	bufferPool    *buffer.Pool
@@ -61,11 +51,7 @@ func (m *Manager) Append(trxId lock.TrxId, recordType RecordType, record Record)
 	if err != nil {
 		return Pointer{}, err
 	}
-	m.entries[trxId] = append(m.entries[trxId], Entry{
-		trxId:      trxId,
-		recordType: recordType,
-		record:     record,
-	})
+	m.entries[trxId] = append(m.entries[trxId], NewEntry(trxId, recordType, record))
 	return ptr, nil
 }
 
@@ -165,7 +151,7 @@ func (m *Manager) switchToNewPage(trxId lock.TrxId, currentPage *Page, serialize
 	newBufPageUndo.initialize()
 
 	if !newBufPageUndo.append(serialized) {
-		return Pointer{}, errRecordTooLarge
+		return Pointer{}, ErrRecordTooLarge
 	}
 	m.currentPageId = newPageId
 

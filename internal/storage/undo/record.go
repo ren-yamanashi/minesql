@@ -29,6 +29,12 @@ const (
 
 var ErrInvalidRecord = errors.New("undo: invalid record")
 
+var (
+	_ Record = (*UpdateRecord)(nil)
+	_ Record = (*InsertRecord)(nil)
+	_ Record = (*DeleteRecord)(nil)
+)
+
 type Record interface {
 	TableFileId() page.FileId
 	Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte
