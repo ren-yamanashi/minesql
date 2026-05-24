@@ -47,7 +47,7 @@ func TestCheckpointExecute(t *testing.T) {
 
 		_, _ = env.redoLog.AppendCommit(lock.TrxId(1)) // LSN=1
 		_, _ = env.redoLog.AppendCommit(lock.TrxId(2)) // LSN=2
-		env.redoLog.AppendCommit(lock.TrxId(3)) // LSN=3
+		_, _ = env.redoLog.AppendCommit(lock.TrxId(3)) // LSN=3
 		_ = env.redoLog.Flush()
 
 		// ダーティーページを作り Page LSN=3 を設定
@@ -74,7 +74,7 @@ func TestCheckpointExecute(t *testing.T) {
 
 		_, _ = env.redoLog.AppendCommit(lock.TrxId(1)) // LSN=1
 		_, _ = env.redoLog.AppendCommit(lock.TrxId(2)) // LSN=2
-		env.redoLog.AppendCommit(lock.TrxId(3)) // LSN=3
+		_, _ = env.redoLog.AppendCommit(lock.TrxId(3)) // LSN=3
 		_ = env.redoLog.Flush()
 
 		// Page LSN=2 のダーティーページ → チェックポイント LSN = 1

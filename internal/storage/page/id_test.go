@@ -34,8 +34,8 @@ func TestNewId(t *testing.T) {
 		pageId := NewId(MaxFileId, MaxPageNumber)
 
 		// THEN
-		assert.Equal(t, FileId(MaxFileId), pageId.FileId())
-		assert.Equal(t, PageNumber(MaxPageNumber), pageId.PageNumber())
+		assert.Equal(t, MaxFileId, pageId.FileId())
+		assert.Equal(t, MaxPageNumber, pageId.PageNumber())
 	})
 }
 

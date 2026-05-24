@@ -54,7 +54,7 @@ func TestNewHeapFile(t *testing.T) {
 	t.Run("ファイルサイズがページサイズの倍数でない場合エラーを返す", func(t *testing.T) {
 		// GIVEN
 		path := filepath.Join(t.TempDir(), "test.db")
-		f, err := os.Create(path)
+		f, err := os.Create(path) //nolint:gosec // テスト用ファイル作成
 		assert.NoError(t, err)
 		_, err = f.Write(make([]byte, page.Size+1)) // ページサイズ + 1 バイト
 		assert.NoError(t, err)

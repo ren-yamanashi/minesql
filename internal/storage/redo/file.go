@@ -202,12 +202,16 @@ func (f *file) truncateBefore(lsn Lsn) error {
 }
 
 // writeTmpFile は一時ファイルにヘッダーとレコードを書き込む
-func (f *file) writeTmpFile(tmpPath string, flushedLsn Lsn, records []Record) error {
-	tmpFile, err := os.Create(tmpPath)
+func (f *file) writeTmpFile(tmpPath string, flushedLsn Lsn, records []Record) (retErr error) {
+	tmpFile, err := os.Create(tmpPath) //nolint:gosec // 内部で生成したパスを使用
 	if err != nil {
 		return err
 	}
-	defer tmpFile.Close()
+	defer func() {
+		if closeErr := tmpFile.Close(); closeErr != nil && retErr == nil {
+			retErr = closeErr
+		}
+	}()
 
 	// ヘッダーを書き込み
 	header := make([]byte, fileHeaderSize)

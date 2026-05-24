@@ -43,7 +43,7 @@ func TestRecoveryNeedsRecovery(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
 		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
-		env.redoLog.AppendCommit(lock.TrxId(1))
+		_, _ = env.redoLog.AppendCommit(lock.TrxId(1))
 		_ = env.redoLog.Flush()
 
 		// WHEN
@@ -58,7 +58,7 @@ func TestRecoveryNeedsRecovery(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
 		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
-		env.redoLog.AppendCommit(lock.TrxId(1)) // LSN=1
+		_, _ = env.redoLog.AppendCommit(lock.TrxId(1)) // LSN=1
 		_ = env.redoLog.Flush()
 		_ = env.redoLog.SetCheckpointLsn(redo.Lsn(1))
 
@@ -150,7 +150,7 @@ func TestRecoveryExecute(t *testing.T) {
 	t.Run("Execute 後に Redo ログがクリアされる", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		env.redoLog.AppendCommit(lock.TrxId(1))
+		_, _ = env.redoLog.AppendCommit(lock.TrxId(1))
 		_ = env.redoLog.Flush()
 		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
 
@@ -203,7 +203,7 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 		newPageData := make([]byte, page.Size)
 		newPageData[page.HeaderSize] = 0xFF // body の先頭を変える
 		newPage, _ := page.NewPage(newPageData)
-		env.redoLog.AppendPageCopy(lock.TrxId(1), pgId, newPage)
+		_, _ = env.redoLog.AppendPageCopy(lock.TrxId(1), pgId, newPage)
 		_ = env.redoLog.Flush()
 
 		records, _ := env.redoLog.ReadFrom(redo.Lsn(0))
@@ -243,7 +243,7 @@ func TestRecoveryApplyRollback(t *testing.T) {
 		// trx1 は COMMIT 済み (Commit 内で Redo ログに記録される)、trx2 は未 COMMIT
 		pgId := page.NewId(env.undoFileId, 0)
 		readPage, _ := env.bp.PageForRead(pgId)
-		env.redoLog.AppendPageCopy(trx2, pgId, readPage.Data())
+		_, _ = env.redoLog.AppendPageCopy(trx2, pgId, readPage.Data())
 		_ = env.redoLog.Flush()
 
 		records, _ := env.redoLog.ReadFrom(redo.Lsn(0))
