@@ -202,6 +202,25 @@ func TestFileFlushRecords(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, result, 2)
 	})
+
+	t.Run("writeHeader 失敗時にメモリ上の flushedLsn が旧値に戻る", func(t *testing.T) {
+		// GIVEN
+		f := setupTestFile(t)
+		initial := []Record{{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit}}
+		err := f.flushRecords(initial)
+		assert.NoError(t, err)
+		prevFlushedLsn := f.flushedLsn
+		// 以降の書き込みを失敗させるため osFile を閉じる
+		_ = f.osFile.Close()
+
+		// WHEN
+		records := []Record{{lsn: Lsn(2), trxId: 2, recordType: RecordTypeCommit}}
+		err = f.flushRecords(records)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Equal(t, prevFlushedLsn, f.flushedLsn)
+	})
 }
 
 func TestFileRollbackTo(t *testing.T) {
@@ -396,6 +415,19 @@ func TestFileClose(t *testing.T) {
 
 		// WHEN
 		err = f.close()
+
+		// THEN
+		assert.NoError(t, err)
+	})
+
+	t.Run("osFile が nil の場合エラーを返さない", func(t *testing.T) {
+		// GIVEN
+		f := setupTestFile(t)
+		_ = f.osFile.Close()
+		f.osFile = nil
+
+		// WHEN
+		err := f.close()
 
 		// THEN
 		assert.NoError(t, err)

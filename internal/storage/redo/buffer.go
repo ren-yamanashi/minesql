@@ -26,6 +26,9 @@ func NewBuffer(baseDir string) (*Buffer, error) {
 	if err != nil {
 		return nil, err
 	}
+	if file.flushedLsn == math.MaxUint32 {
+		return nil, errors.Join(ErrLsnOverflow, file.close())
+	}
 	// クラッシュリカバリ時: フラッシュ済み LSN の次から採番を再開する
 	nextLsn := file.flushedLsn + 1
 	return &Buffer{

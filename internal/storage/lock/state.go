@@ -59,7 +59,6 @@ func (s *state) canGrant(trxId TrxId, mode Mode) bool {
 	if !exists {
 		return s.isCompatible(mode) && len(s.waitQueue) == 0
 	}
-
 	// 既にロックを保持している場合
 	if m == mode {
 		return true

@@ -132,7 +132,7 @@ func (f *file) flushRecords(records []Record) error {
 	f.flushedLsn = records[len(records)-1].lsn
 	if err := f.writeHeader(); err != nil {
 		f.flushedLsn = prevFlushedLsn
-		return errors.Join(err, f.rollbackTo(originalSize))
+		return errors.Join(err, f.writeHeader(), f.rollbackTo(originalSize))
 	}
 	return nil
 }
@@ -192,6 +192,7 @@ func (f *file) truncateBefore(lsn Lsn) error {
 		reopened, reopenErr := os.OpenFile(f.filePath, os.O_RDWR, 0600)
 		_ = os.Remove(tmpPath)
 		if reopenErr != nil {
+			f.osFile = nil
 			return errors.Join(err, reopenErr)
 		}
 		f.osFile = reopened
@@ -204,6 +205,7 @@ func (f *file) truncateBefore(lsn Lsn) error {
 
 	osFile, openErr := os.OpenFile(f.filePath, os.O_RDWR, 0600)
 	if openErr != nil {
+		f.osFile = nil
 		reopenErr := fmt.Errorf("redo: failed to reopen log file after truncate: %w", openErr)
 		if fsyncErr != nil {
 			return errors.Join(fsyncErr, reopenErr)
@@ -266,6 +268,9 @@ func (f *file) clear() error {
 
 // close は Redo ログファイルを閉じる
 func (f *file) close() error {
+	if f.osFile == nil {
+		return nil
+	}
 	return f.osFile.Close()
 }
 

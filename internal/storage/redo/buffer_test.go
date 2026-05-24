@@ -1,6 +1,7 @@
 package redo
 
 import (
+	"math"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
@@ -53,6 +54,23 @@ func TestNewBuffer(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, Lsn(3), lsn)
+	})
+
+	t.Run("flushedLsn が MaxUint32 の場合は ErrLsnOverflow を返す", func(t *testing.T) {
+		// GIVEN
+		dir := t.TempDir()
+		f, err := newFile(dir)
+		assert.NoError(t, err)
+		f.flushedLsn = math.MaxUint32
+		err = f.writeHeader()
+		assert.NoError(t, err)
+		_ = f.close()
+
+		// WHEN
+		_, err = NewBuffer(dir)
+
+		// THEN
+		assert.ErrorIs(t, err, ErrLsnOverflow)
 	})
 }
 
