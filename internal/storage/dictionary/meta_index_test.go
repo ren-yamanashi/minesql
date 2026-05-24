@@ -22,43 +22,6 @@ func TestCreateIndexMeta(t *testing.T) {
 	})
 }
 
-func TestIndexMetaInsert(t *testing.T) {
-	t.Run("インデックスメタデータを挿入できる", func(t *testing.T) {
-		// GIVEN
-		im := setupTestIndexMeta(t)
-
-		// WHEN
-		err := im.Insert(NewIndexMetaRecord(page.FileId(1), IndexId(1), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
-
-		// THEN
-		assert.NoError(t, err)
-	})
-
-	t.Run("同じ FileId + インデックス名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
-		// GIVEN
-		im := setupTestIndexMeta(t)
-		_ = im.Insert(NewIndexMetaRecord(page.FileId(1), IndexId(1), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
-
-		// WHEN
-		err := im.Insert(NewIndexMetaRecord(page.FileId(1), IndexId(2), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
-
-		// THEN
-		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
-	})
-
-	t.Run("異なるインデックス名であれば同じテーブルに複数挿入できる", func(t *testing.T) {
-		// GIVEN
-		im := setupTestIndexMeta(t)
-		_ = im.Insert(NewIndexMetaRecord(page.FileId(1), IndexId(1), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
-
-		// WHEN
-		err := im.Insert(NewIndexMetaRecord(page.FileId(1), IndexId(2), "idx_email", IndexTypeUnique, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
-
-		// THEN
-		assert.NoError(t, err)
-	})
-}
-
 func TestIndexMetaSearch(t *testing.T) {
 	t.Run("SearchModeStart で全件スキャンできる", func(t *testing.T) {
 		// GIVEN
@@ -107,6 +70,43 @@ func TestIndexMetaSearch(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.False(t, ok)
+	})
+}
+
+func TestIndexMetaInsert(t *testing.T) {
+	t.Run("インデックスメタデータを挿入できる", func(t *testing.T) {
+		// GIVEN
+		im := setupTestIndexMeta(t)
+
+		// WHEN
+		err := im.Insert(NewIndexMetaRecord(page.FileId(1), IndexId(1), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
+
+		// THEN
+		assert.NoError(t, err)
+	})
+
+	t.Run("同じ FileId + インデックス名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
+		// GIVEN
+		im := setupTestIndexMeta(t)
+		_ = im.Insert(NewIndexMetaRecord(page.FileId(1), IndexId(1), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
+
+		// WHEN
+		err := im.Insert(NewIndexMetaRecord(page.FileId(1), IndexId(2), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
+
+		// THEN
+		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
+	})
+
+	t.Run("異なるインデックス名であれば同じテーブルに複数挿入できる", func(t *testing.T) {
+		// GIVEN
+		im := setupTestIndexMeta(t)
+		_ = im.Insert(NewIndexMetaRecord(page.FileId(1), IndexId(1), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
+
+		// WHEN
+		err := im.Insert(NewIndexMetaRecord(page.FileId(1), IndexId(2), "idx_email", IndexTypeUnique, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
+
+		// THEN
+		assert.NoError(t, err)
 	})
 }
 

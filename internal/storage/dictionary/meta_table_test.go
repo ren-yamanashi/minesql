@@ -22,43 +22,6 @@ func TestCreateTableMeta(t *testing.T) {
 	})
 }
 
-func TestTableMetaInsert(t *testing.T) {
-	t.Run("テーブルメタデータを挿入できる", func(t *testing.T) {
-		// GIVEN
-		tm := setupTestTableMeta(t)
-
-		// WHEN
-		err := tm.Insert(NewTableMetaRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
-
-		// THEN
-		assert.NoError(t, err)
-	})
-
-	t.Run("同じテーブル名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
-		// GIVEN
-		tm := setupTestTableMeta(t)
-		_ = tm.Insert(NewTableMetaRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
-
-		// WHEN
-		err := tm.Insert(NewTableMetaRecord("users", page.NewId(page.FileId(2), page.PageNumber(0)), 5))
-
-		// THEN
-		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
-	})
-
-	t.Run("異なるテーブル名であれば複数挿入できる", func(t *testing.T) {
-		// GIVEN
-		tm := setupTestTableMeta(t)
-		_ = tm.Insert(NewTableMetaRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
-
-		// WHEN
-		err := tm.Insert(NewTableMetaRecord("orders", page.NewId(page.FileId(2), page.PageNumber(0)), 5))
-
-		// THEN
-		assert.NoError(t, err)
-	})
-}
-
 func TestTableMetaSearch(t *testing.T) {
 	t.Run("SearchModeStart で全件スキャンできる", func(t *testing.T) {
 		// GIVEN
@@ -104,6 +67,43 @@ func TestTableMetaSearch(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.False(t, ok)
+	})
+}
+
+func TestTableMetaInsert(t *testing.T) {
+	t.Run("テーブルメタデータを挿入できる", func(t *testing.T) {
+		// GIVEN
+		tm := setupTestTableMeta(t)
+
+		// WHEN
+		err := tm.Insert(NewTableMetaRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
+
+		// THEN
+		assert.NoError(t, err)
+	})
+
+	t.Run("同じテーブル名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
+		// GIVEN
+		tm := setupTestTableMeta(t)
+		_ = tm.Insert(NewTableMetaRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
+
+		// WHEN
+		err := tm.Insert(NewTableMetaRecord("users", page.NewId(page.FileId(2), page.PageNumber(0)), 5))
+
+		// THEN
+		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
+	})
+
+	t.Run("異なるテーブル名であれば複数挿入できる", func(t *testing.T) {
+		// GIVEN
+		tm := setupTestTableMeta(t)
+		_ = tm.Insert(NewTableMetaRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
+
+		// WHEN
+		err := tm.Insert(NewTableMetaRecord("orders", page.NewId(page.FileId(2), page.PageNumber(0)), 5))
+
+		// THEN
+		assert.NoError(t, err)
 	})
 }
 

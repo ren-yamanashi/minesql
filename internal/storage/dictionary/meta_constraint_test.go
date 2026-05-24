@@ -22,54 +22,6 @@ func TestCreateConstraintMeta(t *testing.T) {
 	})
 }
 
-func TestConstraintMetaInsert(t *testing.T) {
-	t.Run("主キー制約を挿入できる", func(t *testing.T) {
-		// GIVEN
-		cm := setupTestConstraintMeta(t)
-
-		// WHEN
-		err := cm.Insert(NewConstraintMetaRecord(page.FileId(1), "id", "PRIMARY", page.FileId(0), ""))
-
-		// THEN
-		assert.NoError(t, err)
-	})
-
-	t.Run("外部キー制約を挿入できる", func(t *testing.T) {
-		// GIVEN
-		cm := setupTestConstraintMeta(t)
-
-		// WHEN
-		err := cm.Insert(NewConstraintMetaRecord(page.FileId(2), "user_id", "fk_orders_users", page.FileId(1), "id"))
-
-		// THEN
-		assert.NoError(t, err)
-	})
-
-	t.Run("同じ FileId + カラム名 + 制約名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
-		// GIVEN
-		cm := setupTestConstraintMeta(t)
-		_ = cm.Insert(NewConstraintMetaRecord(page.FileId(1), "id", "PRIMARY", page.FileId(0), ""))
-
-		// WHEN
-		err := cm.Insert(NewConstraintMetaRecord(page.FileId(1), "id", "PRIMARY", page.FileId(0), ""))
-
-		// THEN
-		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
-	})
-
-	t.Run("同じカラムに異なる制約名であれば複数挿入できる", func(t *testing.T) {
-		// GIVEN
-		cm := setupTestConstraintMeta(t)
-		_ = cm.Insert(NewConstraintMetaRecord(page.FileId(1), "email", "PRIMARY", page.FileId(0), ""))
-
-		// WHEN
-		err := cm.Insert(NewConstraintMetaRecord(page.FileId(1), "email", "idx_email", page.FileId(0), ""))
-
-		// THEN
-		assert.NoError(t, err)
-	})
-}
-
 func TestConstraintMetaSearch(t *testing.T) {
 	t.Run("SearchModeStart で全件スキャンできる", func(t *testing.T) {
 		// GIVEN
@@ -119,6 +71,54 @@ func TestConstraintMetaSearch(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.False(t, ok)
+	})
+}
+
+func TestConstraintMetaInsert(t *testing.T) {
+	t.Run("主キー制約を挿入できる", func(t *testing.T) {
+		// GIVEN
+		cm := setupTestConstraintMeta(t)
+
+		// WHEN
+		err := cm.Insert(NewConstraintMetaRecord(page.FileId(1), "id", "PRIMARY", page.FileId(0), ""))
+
+		// THEN
+		assert.NoError(t, err)
+	})
+
+	t.Run("外部キー制約を挿入できる", func(t *testing.T) {
+		// GIVEN
+		cm := setupTestConstraintMeta(t)
+
+		// WHEN
+		err := cm.Insert(NewConstraintMetaRecord(page.FileId(2), "user_id", "fk_orders_users", page.FileId(1), "id"))
+
+		// THEN
+		assert.NoError(t, err)
+	})
+
+	t.Run("同じ FileId + カラム名 + 制約名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
+		// GIVEN
+		cm := setupTestConstraintMeta(t)
+		_ = cm.Insert(NewConstraintMetaRecord(page.FileId(1), "id", "PRIMARY", page.FileId(0), ""))
+
+		// WHEN
+		err := cm.Insert(NewConstraintMetaRecord(page.FileId(1), "id", "PRIMARY", page.FileId(0), ""))
+
+		// THEN
+		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
+	})
+
+	t.Run("同じカラムに異なる制約名であれば複数挿入できる", func(t *testing.T) {
+		// GIVEN
+		cm := setupTestConstraintMeta(t)
+		_ = cm.Insert(NewConstraintMetaRecord(page.FileId(1), "email", "PRIMARY", page.FileId(0), ""))
+
+		// WHEN
+		err := cm.Insert(NewConstraintMetaRecord(page.FileId(1), "email", "idx_email", page.FileId(0), ""))
+
+		// THEN
+		assert.NoError(t, err)
 	})
 }
 

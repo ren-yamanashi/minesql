@@ -179,25 +179,6 @@ func TestCreateCatalog(t *testing.T) {
 	})
 }
 
-func TestAllocateFileId(t *testing.T) {
-	t.Run("FileId を採番するたびにインクリメントされる", func(t *testing.T) {
-		// GIVEN
-		bp := setupCatalogTestBufferPool(t)
-		ct, err := CreateCatalog(bp)
-		assert.NoError(t, err)
-
-		// WHEN
-		id1, err := ct.AllocateFileId()
-		assert.NoError(t, err)
-		id2, err := ct.AllocateFileId()
-		assert.NoError(t, err)
-
-		// THEN
-		assert.Equal(t, page.FileId(2), id1)
-		assert.Equal(t, page.FileId(3), id2)
-	})
-}
-
 func TestAllocateIndexId(t *testing.T) {
 	t.Run("IndexId を採番するたびにインクリメントされる", func(t *testing.T) {
 		// GIVEN
@@ -214,6 +195,25 @@ func TestAllocateIndexId(t *testing.T) {
 		// THEN
 		assert.Equal(t, IndexId(1), id1)
 		assert.Equal(t, IndexId(2), id2)
+	})
+}
+
+func TestAllocateFileId(t *testing.T) {
+	t.Run("FileId を採番するたびにインクリメントされる", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+		ct, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+
+		// WHEN
+		id1, err := ct.AllocateFileId()
+		assert.NoError(t, err)
+		id2, err := ct.AllocateFileId()
+		assert.NoError(t, err)
+
+		// THEN
+		assert.Equal(t, page.FileId(2), id1)
+		assert.Equal(t, page.FileId(3), id2)
 	})
 }
 

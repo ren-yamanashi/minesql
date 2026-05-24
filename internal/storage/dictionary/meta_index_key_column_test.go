@@ -21,43 +21,6 @@ func TestCreateIndexKeyColumnMeta(t *testing.T) {
 	})
 }
 
-func TestIndexKeyColumnMetaInsert(t *testing.T) {
-	t.Run("インデックスキーカラムメタデータを挿入できる", func(t *testing.T) {
-		// GIVEN
-		kcm := setupTestIndexKeyColumnMeta(t)
-
-		// WHEN
-		err := kcm.Insert(NewIndexKeyColumnMetaRecord(IndexId(1), "name", 1))
-
-		// THEN
-		assert.NoError(t, err)
-	})
-
-	t.Run("同じインデックス ID + カラム名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
-		// GIVEN
-		kcm := setupTestIndexKeyColumnMeta(t)
-		_ = kcm.Insert(NewIndexKeyColumnMetaRecord(IndexId(1), "name", 1))
-
-		// WHEN
-		err := kcm.Insert(NewIndexKeyColumnMetaRecord(IndexId(1), "name", 2))
-
-		// THEN
-		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
-	})
-
-	t.Run("同じインデックス ID でもカラム名が異なれば複数挿入できる", func(t *testing.T) {
-		// GIVEN
-		kcm := setupTestIndexKeyColumnMeta(t)
-		_ = kcm.Insert(NewIndexKeyColumnMetaRecord(IndexId(1), "name", 1))
-
-		// WHEN
-		err := kcm.Insert(NewIndexKeyColumnMetaRecord(IndexId(1), "age", 2))
-
-		// THEN
-		assert.NoError(t, err)
-	})
-}
-
 func TestIndexKeyColumnMetaSearch(t *testing.T) {
 	t.Run("SearchModeStart で全件スキャンできる", func(t *testing.T) {
 		// GIVEN
@@ -103,6 +66,43 @@ func TestIndexKeyColumnMetaSearch(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.False(t, ok)
+	})
+}
+
+func TestIndexKeyColumnMetaInsert(t *testing.T) {
+	t.Run("インデックスキーカラムメタデータを挿入できる", func(t *testing.T) {
+		// GIVEN
+		kcm := setupTestIndexKeyColumnMeta(t)
+
+		// WHEN
+		err := kcm.Insert(NewIndexKeyColumnMetaRecord(IndexId(1), "name", 1))
+
+		// THEN
+		assert.NoError(t, err)
+	})
+
+	t.Run("同じインデックス ID + カラム名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
+		// GIVEN
+		kcm := setupTestIndexKeyColumnMeta(t)
+		_ = kcm.Insert(NewIndexKeyColumnMetaRecord(IndexId(1), "name", 1))
+
+		// WHEN
+		err := kcm.Insert(NewIndexKeyColumnMetaRecord(IndexId(1), "name", 2))
+
+		// THEN
+		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
+	})
+
+	t.Run("同じインデックス ID でもカラム名が異なれば複数挿入できる", func(t *testing.T) {
+		// GIVEN
+		kcm := setupTestIndexKeyColumnMeta(t)
+		_ = kcm.Insert(NewIndexKeyColumnMetaRecord(IndexId(1), "name", 1))
+
+		// WHEN
+		err := kcm.Insert(NewIndexKeyColumnMetaRecord(IndexId(1), "age", 2))
+
+		// THEN
+		assert.NoError(t, err)
 	})
 }
 

@@ -22,43 +22,6 @@ func TestCreateColumnMeta(t *testing.T) {
 	})
 }
 
-func TestColumnMetaInsert(t *testing.T) {
-	t.Run("カラムメタデータを挿入できる", func(t *testing.T) {
-		// GIVEN
-		cm := setupTestColumnMeta(t)
-
-		// WHEN
-		err := cm.Insert(NewColumnMetaRecord(page.FileId(1), "name", 0))
-
-		// THEN
-		assert.NoError(t, err)
-	})
-
-	t.Run("同じ FileId + カラム名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
-		// GIVEN
-		cm := setupTestColumnMeta(t)
-		_ = cm.Insert(NewColumnMetaRecord(page.FileId(1), "name", 0))
-
-		// WHEN
-		err := cm.Insert(NewColumnMetaRecord(page.FileId(1), "name", 1))
-
-		// THEN
-		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
-	})
-
-	t.Run("同じテーブルに異なるカラム名であれば複数挿入できる", func(t *testing.T) {
-		// GIVEN
-		cm := setupTestColumnMeta(t)
-		_ = cm.Insert(NewColumnMetaRecord(page.FileId(1), "id", 0))
-
-		// WHEN
-		err := cm.Insert(NewColumnMetaRecord(page.FileId(1), "name", 1))
-
-		// THEN
-		assert.NoError(t, err)
-	})
-}
-
 func TestColumnMetaSearch(t *testing.T) {
 	t.Run("SearchModeStart で全件スキャンできる", func(t *testing.T) {
 		// GIVEN
@@ -104,6 +67,43 @@ func TestColumnMetaSearch(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.False(t, ok)
+	})
+}
+
+func TestColumnMetaInsert(t *testing.T) {
+	t.Run("カラムメタデータを挿入できる", func(t *testing.T) {
+		// GIVEN
+		cm := setupTestColumnMeta(t)
+
+		// WHEN
+		err := cm.Insert(NewColumnMetaRecord(page.FileId(1), "name", 0))
+
+		// THEN
+		assert.NoError(t, err)
+	})
+
+	t.Run("同じ FileId + カラム名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
+		// GIVEN
+		cm := setupTestColumnMeta(t)
+		_ = cm.Insert(NewColumnMetaRecord(page.FileId(1), "name", 0))
+
+		// WHEN
+		err := cm.Insert(NewColumnMetaRecord(page.FileId(1), "name", 1))
+
+		// THEN
+		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
+	})
+
+	t.Run("同じテーブルに異なるカラム名であれば複数挿入できる", func(t *testing.T) {
+		// GIVEN
+		cm := setupTestColumnMeta(t)
+		_ = cm.Insert(NewColumnMetaRecord(page.FileId(1), "id", 0))
+
+		// WHEN
+		err := cm.Insert(NewColumnMetaRecord(page.FileId(1), "name", 1))
+
+		// THEN
+		assert.NoError(t, err)
 	})
 }
 

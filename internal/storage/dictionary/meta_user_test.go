@@ -25,31 +25,6 @@ func TestCreateUserMeta(t *testing.T) {
 	})
 }
 
-func TestUserMetaInsert(t *testing.T) {
-	t.Run("ユーザーを挿入できる", func(t *testing.T) {
-		// GIVEN
-		um := setupTestUserMeta(t)
-
-		// WHEN
-		err := um.Insert(NewUserMetaRecord("alice", "localhost", []byte("auth123")))
-
-		// THEN
-		assert.NoError(t, err)
-	})
-
-	t.Run("同じユーザー名を重複挿入すると ErrDuplicateKey を返す", func(t *testing.T) {
-		// GIVEN
-		um := setupTestUserMeta(t)
-		_ = um.Insert(NewUserMetaRecord("alice", "localhost", []byte("auth1")))
-
-		// WHEN
-		err := um.Insert(NewUserMetaRecord("alice", "%", []byte("auth2")))
-
-		// THEN
-		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
-	})
-}
-
 func TestUserMetaSearch(t *testing.T) {
 	t.Run("SearchModeStart で全件スキャンできる", func(t *testing.T) {
 		// GIVEN
@@ -113,6 +88,31 @@ func TestUserMetaSearch(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.False(t, ok)
+	})
+}
+
+func TestUserMetaInsert(t *testing.T) {
+	t.Run("ユーザーを挿入できる", func(t *testing.T) {
+		// GIVEN
+		um := setupTestUserMeta(t)
+
+		// WHEN
+		err := um.Insert(NewUserMetaRecord("alice", "localhost", []byte("auth123")))
+
+		// THEN
+		assert.NoError(t, err)
+	})
+
+	t.Run("同じユーザー名を重複挿入すると ErrDuplicateKey を返す", func(t *testing.T) {
+		// GIVEN
+		um := setupTestUserMeta(t)
+		_ = um.Insert(NewUserMetaRecord("alice", "localhost", []byte("auth1")))
+
+		// WHEN
+		err := um.Insert(NewUserMetaRecord("alice", "%", []byte("auth2")))
+
+		// THEN
+		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
 	})
 }
 

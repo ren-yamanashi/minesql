@@ -6,6 +6,40 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestUserIteratorClose(t *testing.T) {
+	t.Run("検索結果のイテレータを Close できる", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+		ct, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+		err = ct.UserMeta().Insert(NewUserMetaRecord("testuser", "%", []byte("authstring")))
+		assert.NoError(t, err)
+
+		iter, err := ct.UserMeta().Search(SearchModeStart{})
+		assert.NoError(t, err)
+
+		// WHEN
+		// THEN
+		_, _, _ = iter.Next()
+		iter.Close()
+
+	})
+
+	t.Run("イテレーション前に Close できる", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+		ct, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+
+		iter, err := ct.UserMeta().Search(SearchModeStart{})
+		assert.NoError(t, err)
+
+		// WHEN
+		// THEN
+		iter.Close()
+	})
+}
+
 func TestUserIteratorNext(t *testing.T) {
 	t.Run("レコードを順に取得できる", func(t *testing.T) {
 		// GIVEN
@@ -49,39 +83,5 @@ func TestUserIteratorNext(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.False(t, ok)
-	})
-}
-
-func TestUserIteratorClose(t *testing.T) {
-	t.Run("検索結果のイテレータを Close できる", func(t *testing.T) {
-		// GIVEN
-		bp := setupCatalogTestBufferPool(t)
-		ct, err := CreateCatalog(bp)
-		assert.NoError(t, err)
-		err = ct.UserMeta().Insert(NewUserMetaRecord("testuser", "%", []byte("authstring")))
-		assert.NoError(t, err)
-
-		iter, err := ct.UserMeta().Search(SearchModeStart{})
-		assert.NoError(t, err)
-
-		// WHEN
-		// THEN
-		_, _, _ = iter.Next()
-		iter.Close()
-
-	})
-
-	t.Run("イテレーション前に Close できる", func(t *testing.T) {
-		// GIVEN
-		bp := setupCatalogTestBufferPool(t)
-		ct, err := CreateCatalog(bp)
-		assert.NoError(t, err)
-
-		iter, err := ct.UserMeta().Search(SearchModeStart{})
-		assert.NoError(t, err)
-
-		// WHEN
-		// THEN
-		iter.Close()
 	})
 }
