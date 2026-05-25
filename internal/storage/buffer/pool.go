@@ -9,27 +9,32 @@ import (
 )
 
 type Pool struct {
-	mu        sync.RWMutex
-	files     map[page.FileId]*file.HeapFile
-	pages     []Page
-	pageTable pageTable
-	flushList *flushList
-	lru       *lru
-	maxPages  int // バッファプールの最大バッファページ数
+	mu          sync.RWMutex
+	files       map[page.FileId]*file.HeapFile
+	pages       []Page
+	pageTable   pageTable
+	flushList   *flushList
+	lru         *lru
+	maxPages    int    // バッファプールの最大バッファページ数
+	onAllPinned func() // 全ページが Pin/dirty で追い出し不可な状態を解消するための callback (e.g. ページクリーナーにフラッシュ依頼)
 }
 
-func NewPool(size int) *Pool {
+// NewPool はバッファプールを生成する
+//   - size: バッファプール全体のバイトサイズ。最低 1 ページ確保される
+//   - onAllPinned: 追い出し候補が全て Pin/dirty な状態を解消するための callback
+func NewPool(size int, onAllPinned func()) *Pool {
 	maxPages := 1
 	if size > page.Size {
 		maxPages = (size + page.Size - 1) / page.Size
 	}
 	return &Pool{
-		files:     make(map[page.FileId]*file.HeapFile),
-		pages:     make([]Page, 0, maxPages),
-		pageTable: newPageTable(),
-		flushList: newFlushList(),
-		lru:       newLru(maxPages),
-		maxPages:  maxPages,
+		files:       make(map[page.FileId]*file.HeapFile),
+		pages:       make([]Page, 0, maxPages),
+		pageTable:   newPageTable(),
+		flushList:   newFlushList(),
+		lru:         newLru(maxPages),
+		maxPages:    maxPages,
+		onAllPinned: onAllPinned,
 	}
 }
 
@@ -47,6 +52,7 @@ func (p *Pool) PageForWrite(pageId page.Id) (*Page, error) {
 		bufPage.isDirty = true
 		p.flushList.add(pageId)
 	}
+	bufPage.pinCount++
 	return bufPage, nil
 }
 
@@ -54,15 +60,22 @@ func (p *Pool) PageForWrite(pageId page.Id) (*Page, error) {
 func (p *Pool) PageForRead(pageId page.Id) (*Page, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	return p.page(pageId)
+	bufPage, err := p.page(pageId)
+	if err != nil {
+		return nil, err
+	}
+	bufPage.pinCount++
+	return bufPage, nil
 }
 
-// UnrefPage は指定されたページの参照を解除し、優先的に追い出されるようにする
-func (p *Pool) UnrefPage(pageId page.Id) {
+// Unpin は指定されたページの Pin カウントをデクリメントする
+func (p *Pool) Unpin(pageId page.Id) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	if bufferId, exists := p.pageTable.bufferId(pageId); exists {
-		p.lru.delete(bufferId)
+		if p.pages[bufferId].pinCount > 0 {
+			p.pages[bufferId].pinCount--
+		}
 	}
 }
 

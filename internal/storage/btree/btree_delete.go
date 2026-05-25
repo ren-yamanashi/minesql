@@ -11,7 +11,7 @@ func (t *Tree) Delete(key []byte) error {
 	if err != nil {
 		return err
 	}
-	defer t.bufferPool.UnrefPage(t.MetaPageId())
+	defer t.bufferPool.Unpin(t.MetaPageId())
 	metaPage := newMetaPage(pageMeta.Data())
 
 	// ルートページを取得
@@ -20,6 +20,7 @@ func (t *Tree) Delete(key []byte) error {
 	if err != nil {
 		return err
 	}
+	defer t.bufferPool.Unpin(rootPageId)
 
 	// 再帰的に削除
 	underflow, isLeafMerged, err := t.deleteRecursively(bufPageRoot, key)
@@ -29,13 +30,8 @@ func (t *Tree) Delete(key []byte) error {
 
 	// ルートノードがブランチノードで、子が 1 つになった場合 (=ブランチノード1, リーフノード1 になった場合)、子をルートにする
 	var isRootCollapsed bool
-	pageRoot, err := t.bufferPool.PageForRead(bufPageRoot.PageId())
-	if err != nil {
-		return err
-	}
-	defer t.bufferPool.UnrefPage(bufPageRoot.PageId())
-	if underflow && nodeType(pageRoot.Data()) == nodeTypeBranch {
-		branch := newBranchNode(pageRoot.Data())
+	if underflow && nodeType(bufPageRoot.Data()) == nodeTypeBranch {
+		branch := newBranchNode(bufPageRoot.Data())
 		if branch.numRecords() == 0 {
 			isRootCollapsed = true
 		}
@@ -55,7 +51,7 @@ func (t *Tree) Delete(key []byte) error {
 	}
 
 	// ルートノードの縮退が発生した場合
-	branchNode := newBranchNode(pageRoot.Data())
+	branchNode := newBranchNode(bufPageRoot.Data())
 	newRootPageId := branchNode.rightChildPageId()
 	metaPage.setRootPageId(newRootPageId)
 	metaPage.setHeight(metaPage.height() - 1)
@@ -73,7 +69,7 @@ func (t *Tree) deleteRecursively(bufPage *buffer.Page, key []byte) (underflow bo
 	if err != nil {
 		return false, false, err
 	}
-	defer t.bufferPool.UnrefPage(bufPage.PageId())
+	defer t.bufferPool.Unpin(bufPage.PageId())
 	nt := nodeType(pg.Data())
 
 	switch nt {
@@ -93,7 +89,7 @@ func (t *Tree) deleteRecursively(bufPage *buffer.Page, key []byte) (underflow bo
 		if err != nil {
 			return false, false, err
 		}
-		defer t.bufferPool.UnrefPage(childPageId)
+		defer t.bufferPool.Unpin(childPageId)
 
 		// 子ノードに対して削除処理を再帰的に実行
 		underflow, isLeafMerged, err := t.deleteRecursively(childBufPage, key)

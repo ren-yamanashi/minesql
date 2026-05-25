@@ -18,7 +18,7 @@ func TestIteratorClose(t *testing.T) {
 		// WHEN
 		iter.Close()
 
-		// THEN: Close 後も Get でレコードを取得できる (UnrefPage は LRU のヒントであり、ページデータは引き続きアクセス可能)
+		// THEN
 		record, ok, err := iter.Get()
 		assert.NoError(t, err)
 		assert.True(t, ok)

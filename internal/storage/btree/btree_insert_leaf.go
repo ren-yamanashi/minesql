@@ -42,9 +42,6 @@ func (t *Tree) splitInsertLeaf(
 	record Record,
 ) ([]byte, page.Id, error) {
 	prevLeafPageId := leafNode.prevPageId()
-	if !prevLeafPageId.IsInvalid() {
-		defer t.bufferPool.UnrefPage(prevLeafPageId)
-	}
 
 	// 新しいリーフノードを作成
 	newLeafPageId, err := t.bufferPool.AllocatePageId(t.MetaPageId().FileId())
@@ -55,13 +52,14 @@ func (t *Tree) splitInsertLeaf(
 	if err != nil {
 		return nil, page.InvalidId(), err
 	}
-	defer t.bufferPool.UnrefPage(newLeafPageId)
+	defer t.bufferPool.Unpin(newLeafPageId)
 
 	// 前のリーフノードが存在する場合は、nextPageId を新しいリーフノードの PageId に更新
 	if !prevLeafPageId.IsInvalid() {
 		if err := t.updatePrevLeafLink(prevLeafPageId, newLeafPageId); err != nil {
 			return nil, page.InvalidId(), err
 		}
+		defer t.bufferPool.Unpin(prevLeafPageId)
 	}
 
 	// 新しいリーフノードに分割挿入

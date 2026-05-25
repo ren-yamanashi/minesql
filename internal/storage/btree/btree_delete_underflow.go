@@ -31,14 +31,14 @@ func (t *Tree) deleteUnderflow(
 	if err != nil {
 		return false, false, err
 	}
-	defer t.bufferPool.UnrefPage(sibling.pageId)
+	defer t.bufferPool.Unpin(sibling.pageId)
 
 	// 子ノードの取得
 	childPage, err := t.bufferPool.PageForRead(childBufPage.PageId())
 	if err != nil {
 		return false, false, err
 	}
-	defer t.bufferPool.UnrefPage(childBufPage.PageId())
+	defer t.bufferPool.Unpin(childBufPage.PageId())
 
 	// リーフノードのアンダーフロー処理
 	if nodeType(childPage.Data()) == nodeTypeLeaf {
@@ -69,10 +69,12 @@ func (t *Tree) onLeafUnderflow(
 	if err != nil {
 		return false, false, err
 	}
+	defer t.bufferPool.Unpin(childBufPage.PageId())
 	pageSibling, err := t.bufferPool.PageForWrite(sibling.pageId)
 	if err != nil {
 		return false, false, err
 	}
+	defer t.bufferPool.Unpin(sibling.pageId)
 	childLeaf := newLeafNode(pageChild.Data())
 	siblingLeaf := newLeafNode(pageSibling.Data())
 
@@ -154,10 +156,12 @@ func (t *Tree) onBranchUnderflow(
 	if err != nil {
 		return false, err
 	}
+	defer t.bufferPool.Unpin(childBufPage.PageId())
 	pageSibling, err := t.bufferPool.PageForWrite(sibling.pageId)
 	if err != nil {
 		return false, err
 	}
+	defer t.bufferPool.Unpin(sibling.pageId)
 	childBranch := newBranchNode(pageChild.Data())
 	siblingBranch := newBranchNode(pageSibling.Data())
 
@@ -219,7 +223,12 @@ func (t *Tree) onBranchUnderflow(
 		if !siblingBranch.insert(siblingBranch.numRecords(), record) {
 			return false, errors.New("new branch node must have space")
 		}
-		siblingBranch.transferAllFrom(childBranch)
+		if !siblingBranch.transferAllFrom(childBranch) {
+			// ノードの容量を超えてマージ不可の場合はアンダーフローを許容する
+			// 直前に末尾へ挿入した境界キーレコードを取り消し、ノードを元の状態に戻す
+			siblingBranch.delete(siblingBranch.numRecords() - 1)
+			return false, nil
+		}
 		siblingBranch.setRightChildPageId(childBranch.rightChildPageId())
 		// 親の右端のレコードは不要になるので削除し、RightChild を兄弟ノードに更新
 		parentBranch.delete(parentBranch.numRecords() - 1)
@@ -235,7 +244,12 @@ func (t *Tree) onBranchUnderflow(
 		return false, errors.New("new branch node must have space")
 	}
 
-	childBranch.transferAllFrom(siblingBranch)
+	if !childBranch.transferAllFrom(siblingBranch) {
+		// ノードの容量を超えてマージ不可の場合はアンダーフローを許容する
+		// 直前に末尾へ挿入した境界キーレコードを取り消し、ノードを元の状態に戻す
+		childBranch.delete(childBranch.numRecords() - 1)
+		return false, nil
+	}
 	childBranch.setRightChildPageId(siblingBranch.rightChildPageId())
 
 	return t.mergeRightSiblingFromParent(parentBranch, childBufPage.PageId(), childSlotNum)
@@ -248,7 +262,7 @@ func (t *Tree) onBranchUnderflow(
 func (t *Tree) relinkLeafAfterMerge(disappearing, survivor *leafNode, survivorPageId page.Id) error {
 	survivor.setNextPageId(disappearing.nextPageId())
 	if nextPageId := disappearing.nextPageId(); !nextPageId.IsInvalid() {
-		defer t.bufferPool.UnrefPage(nextPageId)
+		defer t.bufferPool.Unpin(nextPageId)
 		pageNext, err := t.bufferPool.PageForWrite(nextPageId)
 		if err != nil {
 			return err

@@ -13,7 +13,7 @@ import (
 func TestNewPool(t *testing.T) {
 	t.Run("サイズが PageSize 以下の場合 maxPages が 1 になる", func(t *testing.T) {
 		// GIVEN / WHEN
-		bp := NewPool(page.Size)
+		bp := NewPool(page.Size, nil)
 
 		// THEN
 		assert.Equal(t, 1, bp.maxPages)
@@ -21,7 +21,7 @@ func TestNewPool(t *testing.T) {
 
 	t.Run("サイズが PageSize より大きい場合 maxPages が算出される", func(t *testing.T) {
 		// GIVEN / WHEN
-		bp := NewPool(page.Size * 3)
+		bp := NewPool(page.Size*3, nil)
 
 		// THEN
 		assert.Equal(t, 3, bp.maxPages)
@@ -29,7 +29,7 @@ func TestNewPool(t *testing.T) {
 
 	t.Run("サイズが 0 の場合 maxPages が 1 になる", func(t *testing.T) {
 		// GIVEN / WHEN
-		bp := NewPool(0)
+		bp := NewPool(0, nil)
 
 		// THEN
 		assert.Equal(t, 1, bp.maxPages)
@@ -39,7 +39,7 @@ func TestNewPool(t *testing.T) {
 func TestPageForWrite(t *testing.T) {
 	t.Run("取得したページがダーティーになる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 2)
+		bp := NewPool(page.Size*2, nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -56,7 +56,7 @@ func TestPageForWrite(t *testing.T) {
 
 	t.Run("既にダーティーなページを再取得してもフラッシュリストに重複追加されない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 2)
+		bp := NewPool(page.Size*2, nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -73,7 +73,7 @@ func TestPageForWrite(t *testing.T) {
 
 	t.Run("書き込んだデータがフェッチ時に反映されている", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 2)
+		bp := NewPool(page.Size*2, nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -88,12 +88,27 @@ func TestPageForWrite(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, byte(0xAA), fetched.data.Body()[0])
 	})
+
+	t.Run("呼び出すと pinCount がインクリメントされる", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*2, nil)
+		pageId := page.NewId(0, 0)
+		_, err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+
+		// WHEN
+		bufPage, err := bp.PageForWrite(pageId)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 1, bufPage.pinCount)
+	})
 }
 
 func TestPageForRead(t *testing.T) {
 	t.Run("キャッシュ済みのページを取得できる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 2)
+		bp := NewPool(page.Size*2, nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -108,7 +123,7 @@ func TestPageForRead(t *testing.T) {
 
 	t.Run("キャッシュにないページをディスクから読み込める", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 2)
+		bp := NewPool(page.Size*2, nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		writePageToDisk(t, hf, 0, 0xAB)
@@ -124,7 +139,7 @@ func TestPageForRead(t *testing.T) {
 
 	t.Run("同じページを 2 回フェッチしても同じデータが返る", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 2)
+		bp := NewPool(page.Size*2, nil)
 		pageId := page.NewId(0, 0)
 		addedPage, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -140,46 +155,71 @@ func TestPageForRead(t *testing.T) {
 		assert.Equal(t, byte(0x42), bufPage1.data.Body()[0])
 		assert.Equal(t, byte(0x42), bufPage2.data.Body()[0])
 	})
-}
 
-func TestUnrefPage(t *testing.T) {
-	t.Run("参照解除したページが優先的に追い出される", func(t *testing.T) {
+	t.Run("呼び出すと pinCount がインクリメントされる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 3)
-		hf := setupHeapFile(t, 0)
-		bp.RegisterHeapFile(0, hf)
-		id0 := page.NewId(0, 0)
-		id1 := page.NewId(0, 1)
-		id2 := page.NewId(0, 2)
-		_, err := bp.AddPage(id0)
-		assert.NoError(t, err)
-		_, err = bp.AddPage(id1)
-		assert.NoError(t, err)
-		_, err = bp.AddPage(id2)
+		bp := NewPool(page.Size*2, nil)
+		pageId := page.NewId(0, 0)
+		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
 
 		// WHEN
-		bp.UnrefPage(id0)
-		newId := page.NewId(0, 3)
-		_, err = bp.AddPage(newId)
-		assert.NoError(t, err)
+		bufPage, err := bp.PageForRead(pageId)
 
 		// THEN
-		_, cached := bp.pageTable.bufferId(id0)
-		assert.False(t, cached)
-		_, cached = bp.pageTable.bufferId(newId)
-		assert.True(t, cached)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, bufPage.pinCount)
+	})
+}
+
+func TestUnpin(t *testing.T) {
+	t.Run("Unpin 後に pinCount が減る", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*2, nil)
+		pageId := page.NewId(0, 0)
+		_, err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+		bufPage, err := bp.PageForRead(pageId)
+		assert.NoError(t, err)
+		assert.Equal(t, 1, bufPage.pinCount)
+
+		// WHEN
+		bp.Unpin(pageId)
+
+		// THEN
+		bufId, _ := bp.pageTable.bufferId(pageId)
+		assert.Equal(t, 0, bp.pages[bufId].pinCount)
 	})
 
-	t.Run("キャッシュにないページを参照解除しても何も起きない", func(t *testing.T) {
+	t.Run("複数回 Pin したページは Unpin と同数の解放が必要", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 2)
+		bp := NewPool(page.Size*2, nil)
+		pageId := page.NewId(0, 0)
+		_, err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+		_, err = bp.PageForRead(pageId)
+		assert.NoError(t, err)
+		_, err = bp.PageForRead(pageId)
+		assert.NoError(t, err)
+		bufId, _ := bp.pageTable.bufferId(pageId)
+		assert.Equal(t, 2, bp.pages[bufId].pinCount)
+
+		// WHEN
+		bp.Unpin(pageId)
+
+		// THEN
+		assert.Equal(t, 1, bp.pages[bufId].pinCount)
+	})
+
+	t.Run("キャッシュにないページを Unpin しても何も起きない", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*2, nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
 
 		// WHEN / THEN (panic しない)
-		bp.UnrefPage(page.NewId(0, 99))
+		bp.Unpin(page.NewId(0, 99))
 		_, cached := bp.pageTable.bufferId(pageId)
 		assert.True(t, cached)
 	})
@@ -188,7 +228,7 @@ func TestUnrefPage(t *testing.T) {
 func TestAllocatePageId(t *testing.T) {
 	t.Run("新しい PageId を割り当てられる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size)
+		bp := NewPool(page.Size, nil)
 		hf := setupHeapFile(t, 5)
 		bp.RegisterHeapFile(5, hf)
 
@@ -203,7 +243,7 @@ func TestAllocatePageId(t *testing.T) {
 
 	t.Run("連続で割り当てると PageNumber がインクリメントされる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size)
+		bp := NewPool(page.Size, nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 
@@ -220,7 +260,7 @@ func TestAllocatePageId(t *testing.T) {
 
 	t.Run("未登録の FileId の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size)
+		bp := NewPool(page.Size, nil)
 
 		// WHEN
 		id, err := bp.AllocatePageId(99)
@@ -234,7 +274,7 @@ func TestAllocatePageId(t *testing.T) {
 func TestRegisterHeapFile(t *testing.T) {
 	t.Run("HeapFile を登録すると取得できる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size)
+		bp := NewPool(page.Size, nil)
 		hf := setupHeapFile(t, 1)
 
 		// WHEN
@@ -250,7 +290,7 @@ func TestRegisterHeapFile(t *testing.T) {
 func TestMaxPages(t *testing.T) {
 	t.Run("バッファプールの最大ページ数を返す", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 3)
+		bp := NewPool(page.Size*3, nil)
 
 		// WHEN
 		result := bp.MaxPages()
@@ -261,7 +301,7 @@ func TestMaxPages(t *testing.T) {
 
 	t.Run("最小サイズの場合 1 を返す", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(0)
+		bp := NewPool(0, nil)
 
 		// WHEN
 		result := bp.MaxPages()
@@ -274,7 +314,7 @@ func TestMaxPages(t *testing.T) {
 func TestFlushListPageCount(t *testing.T) {
 	t.Run("ダーティーページの数を返す", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 3)
+		bp := NewPool(page.Size*3, nil)
 		_, err := bp.AddPage(page.NewId(0, 0))
 		assert.NoError(t, err)
 		_, err = bp.AddPage(page.NewId(0, 1))
@@ -293,7 +333,7 @@ func TestFlushListPageCount(t *testing.T) {
 
 	t.Run("ダーティーページがない場合 0 を返す", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size)
+		bp := NewPool(page.Size, nil)
 
 		// WHEN
 		size := bp.FlushListPageCount()
@@ -306,7 +346,7 @@ func TestFlushListPageCount(t *testing.T) {
 func TestForEachDirtyPage(t *testing.T) {
 	t.Run("ダーティーページごとにコールバックが実行される", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 3)
+		bp := NewPool(page.Size*3, nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		id0 := page.NewId(0, 0)
@@ -330,7 +370,7 @@ func TestForEachDirtyPage(t *testing.T) {
 
 	t.Run("フラッシュリストが空の場合コールバックが呼ばれない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 2)
+		bp := NewPool(page.Size*2, nil)
 
 		// WHEN
 		called := false
@@ -344,7 +384,7 @@ func TestForEachDirtyPage(t *testing.T) {
 
 	t.Run("コールバック内でページの Header を読み取れる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 2)
+		bp := NewPool(page.Size*2, nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)

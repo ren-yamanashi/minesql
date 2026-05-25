@@ -6,9 +6,10 @@ import (
 )
 
 type Page struct {
-	pageId  page.Id
-	data    *page.Page
-	isDirty bool
+	pageId   page.Id
+	data     *page.Page
+	isDirty  bool
+	pinCount int
 }
 
 func (p *Page) PageId() page.Id  { return p.pageId }
@@ -20,8 +21,9 @@ func NewPage(pageId page.Id) (*Page, error) {
 		return nil, err
 	}
 	return &Page{
-		pageId:  pageId,
-		data:    p,
-		isDirty: false,
+		pageId:   pageId,
+		data:     p,
+		isDirty:  false,
+		pinCount: 0,
 	}, nil
 }

@@ -94,13 +94,58 @@ func TestIteratorAdvance(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, []byte{0x20}, record.Key())
 	})
+
+	t.Run("現在のページを読み終えたら次のページに遷移する", func(t *testing.T) {
+		// GIVEN
+		bp := newTestBufferPool(page.Size * 3)
+		path := filepath.Join(t.TempDir(), "test.db")
+		hf, err := file.NewHeapFile(0, path)
+		assert.NoError(t, err)
+		t.Cleanup(func() { _ = hf.Close() })
+		bp.RegisterHeapFile(0, hf)
+
+		firstId, err := bp.AllocatePageId(0)
+		assert.NoError(t, err)
+		secondId, err := bp.AllocatePageId(0)
+		assert.NoError(t, err)
+
+		firstPage, err := bp.AddPage(firstId)
+		assert.NoError(t, err)
+		firstLeaf := newLeafNode(firstPage.Data())
+		firstLeaf.initialize()
+		firstLeaf.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
+		firstLeaf.setNextPageId(secondId)
+
+		secondPage, err := bp.AddPage(secondId)
+		assert.NoError(t, err)
+		secondLeaf := newLeafNode(secondPage.Data())
+		secondLeaf.initialize()
+		secondLeaf.insert(0, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
+
+		bufPage, err := bp.PageForRead(firstId)
+		assert.NoError(t, err)
+		iter := NewIterator(bp, *bufPage, 0)
+
+		// WHEN
+		err = iter.Advance()
+
+		// THEN
+		assert.NoError(t, err)
+		record, ok, _ := iter.Get()
+		assert.True(t, ok)
+		assert.Equal(t, []byte{0x20}, record.Key())
+		assert.Equal(t, secondId, iter.bufferPage.PageId())
+
+		// 遷移後も Close で Pin を解放できる (パニックしない)
+		assert.NotPanics(t, func() { iter.Close() })
+	})
 }
 
 // setupIteratorTestPage はテスト用のバッファプールとリーフページを作成する
 func setupIteratorTestPage(t *testing.T, setup func(ln *leafNode)) (*buffer.Pool, page.Id) {
 	t.Helper()
 
-	bp := buffer.NewPool(page.Size * 3)
+	bp := newTestBufferPool(page.Size * 3)
 	path := filepath.Join(t.TempDir(), "test.db")
 	hf, err := file.NewHeapFile(0, path)
 	assert.NoError(t, err)

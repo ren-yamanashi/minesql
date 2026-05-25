@@ -12,7 +12,7 @@ func (t *Tree) Insert(record Record) error {
 	if err != nil {
 		return err
 	}
-	defer t.bufferPool.UnrefPage(t.MetaPageId())
+	defer t.bufferPool.Unpin(t.MetaPageId())
 	metaPage := newMetaPage(pageMeta.Data())
 
 	// ルートページを取得
@@ -21,7 +21,7 @@ func (t *Tree) Insert(record Record) error {
 	if err != nil {
 		return err
 	}
-	defer t.bufferPool.UnrefPage(rootPageId)
+	defer t.bufferPool.Unpin(rootPageId)
 
 	// 再帰的に挿入
 	overflowKey, overflowChildPageId, isLeafSplit, err := t.insertRecursively(rootPageBuf, record)
@@ -56,6 +56,7 @@ func (t *Tree) Insert(record Record) error {
 	if err != nil {
 		return err
 	}
+	defer t.bufferPool.Unpin(newRootPageId)
 	newRootBranch := newBranchNode(pageNewRoot.Data())
 	err = newRootBranch.initialize(overflowKey, overflowChildPageId, rootPageId)
 	if err != nil {
@@ -81,7 +82,7 @@ func (t *Tree) insertRecursively(
 	if err != nil {
 		return nil, page.InvalidId(), false, err
 	}
-	defer t.bufferPool.UnrefPage(bufPage.PageId())
+	defer t.bufferPool.Unpin(bufPage.PageId())
 	nt := nodeType(pg.Data())
 
 	switch nt {
@@ -101,7 +102,7 @@ func (t *Tree) insertRecursively(
 		if err != nil {
 			return nil, page.InvalidId(), false, err
 		}
-		defer t.bufferPool.UnrefPage(childPageId)
+		defer t.bufferPool.Unpin(childPageId)
 		// 子ノードに対して挿入処理を再帰的に実行
 		overflowKeyFromChild, overflowChildPageId, isLeafSplit, err := t.insertRecursively(childBufPage, record)
 		if err != nil {

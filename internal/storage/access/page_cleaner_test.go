@@ -7,6 +7,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewPageCleaner(t *testing.T) {
@@ -21,6 +22,76 @@ func TestNewPageCleaner(t *testing.T) {
 		assert.NotNil(t, pc)
 		assert.Equal(t, 1024*1024, pc.redoLogMaxSize)
 		assert.Equal(t, 90, pc.maxDirtyPagePct)
+	})
+}
+
+func TestPageCleanerRequestFlush(t *testing.T) {
+	t.Run("RequestFlush を呼ぶとダーティーページがフラッシュされる", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		_ = env.bp.FlushAllPages()
+
+		pgId := page.NewId(page.FileId(2), 0)
+		_, _ = env.bp.AddPage(pgId)
+		writePage, _ := env.bp.PageForWrite(pgId)
+		writePage.Data().Body()[0] = 0xAA
+		env.bp.Unpin(pgId)
+
+		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 0)
+		pc.Start()
+		defer pc.Stop()
+		before := env.bp.FlushListPageCount()
+		assert.Positive(t, before)
+
+		// WHEN
+		pc.RequestFlush()
+
+		// THEN
+		assert.Eventually(t, func() bool {
+			return env.bp.FlushListPageCount() < before
+		}, 500*time.Millisecond, 5*time.Millisecond)
+	})
+
+	t.Run("閾値未満でも RequestFlush 経由でフラッシュされる", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		_ = env.bp.FlushAllPages()
+
+		pgId := page.NewId(page.FileId(2), 0)
+		_, _ = env.bp.AddPage(pgId)
+		writePage, _ := env.bp.PageForWrite(pgId)
+		writePage.Data().Body()[0] = 0xAA
+		env.bp.Unpin(pgId)
+
+		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 90)
+		shouldFlush, err := pc.shouldFlush()
+		require.NoError(t, err)
+		require.False(t, shouldFlush)
+		pc.Start()
+		defer pc.Stop()
+		before := env.bp.FlushListPageCount()
+		assert.Positive(t, before)
+
+		// WHEN
+		pc.RequestFlush()
+
+		// THEN
+		assert.Eventually(t, func() bool {
+			return env.bp.FlushListPageCount() < before
+		}, 500*time.Millisecond, 5*time.Millisecond)
+	})
+
+	t.Run("連続で RequestFlush を呼んでもブロックしない", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 90)
+
+		// WHEN / THEN
+		assert.NotPanics(t, func() {
+			for range 100 {
+				pc.RequestFlush()
+			}
+		})
 	})
 }
 
@@ -157,6 +228,48 @@ func TestPageCleanerClean(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
+	})
+}
+
+func TestPageCleanerFlush(t *testing.T) {
+	t.Run("閾値を超えていなくてもダーティーページがあればフラッシュする", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		_ = env.bp.FlushAllPages()
+
+		pgId := page.NewId(page.FileId(2), 0)
+		_, _ = env.bp.AddPage(pgId)
+		writePage, _ := env.bp.PageForWrite(pgId)
+		writePage.Data().Body()[0] = 0xAA
+		env.bp.Unpin(pgId)
+
+		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 90)
+		shouldFlush, err := pc.shouldFlush()
+		require.NoError(t, err)
+		require.False(t, shouldFlush)
+		before := env.bp.FlushListPageCount()
+		assert.Positive(t, before)
+
+		// WHEN
+		err = pc.flush()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Less(t, env.bp.FlushListPageCount(), before)
+	})
+
+	t.Run("ダーティーページがない場合は何もしない", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		_ = env.bp.FlushAllPages()
+		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 90)
+
+		// WHEN
+		err := pc.flush()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Zero(t, env.bp.FlushListPageCount())
 	})
 }
 

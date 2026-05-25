@@ -52,6 +52,7 @@ func TestNewPage(t *testing.T) {
 		assert.Equal(t, pageId, bp.pageId)
 		assert.NotNil(t, bp.data)
 		assert.False(t, bp.isDirty)
+		assert.Equal(t, 0, bp.pinCount)
 	})
 
 	t.Run("生成した Page のサイズが PageSize と一致する", func(t *testing.T) {

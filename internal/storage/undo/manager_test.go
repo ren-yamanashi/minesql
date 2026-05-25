@@ -458,7 +458,7 @@ func setupTestBufferPool(t *testing.T) *buffer.Pool {
 	}
 	t.Cleanup(func() { _ = hf.Close() })
 
-	bp := buffer.NewPool(page.Size * 20)
+	bp := buffer.NewPool(page.Size*20, nil)
 	bp.RegisterHeapFile(page.FileId(1), hf)
 	return bp
 }

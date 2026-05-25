@@ -408,7 +408,7 @@ func setupCreateTestEnv(t *testing.T) *createTestEnv {
 	}
 	t.Cleanup(func() { _ = catalogHf.Close() })
 
-	bp := buffer.NewPool(page.Size * 50)
+	bp := buffer.NewPool(page.Size*50, nil)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
 	ct, err := dictionary.CreateCatalog(bp)
@@ -488,7 +488,7 @@ func setupCreateTableTestEnv(t *testing.T) *createTableTestEnv {
 	}
 	t.Cleanup(func() { _ = catalogHf.Close() })
 
-	bp := buffer.NewPool(page.Size * 50)
+	bp := buffer.NewPool(page.Size*50, nil)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
 	_, err = dictionary.CreateCatalog(bp)

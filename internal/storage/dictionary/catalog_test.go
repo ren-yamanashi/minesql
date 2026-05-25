@@ -14,7 +14,7 @@ import (
 func TestNewCatalog(t *testing.T) {
 	t.Run("HeapFile が未登録の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		bp := buffer.NewPool(page.Size * 20)
+		bp := buffer.NewPool(page.Size*20, nil)
 
 		// WHEN
 		_, err := NewCatalog(bp)
@@ -69,7 +69,7 @@ func TestNewCatalog(t *testing.T) {
 		bufPageHeader, err := bp.PageForWrite(headerPageId)
 		assert.NoError(t, err)
 		copy(bufPageHeader.Data().Body()[headerMagicNumberOffset:], []byte("XXXX"))
-		bp.UnrefPage(headerPageId)
+		bp.Unpin(headerPageId)
 
 		// WHEN
 		_, err = NewCatalog(bp)
@@ -82,7 +82,7 @@ func TestNewCatalog(t *testing.T) {
 func TestCreateCatalog(t *testing.T) {
 	t.Run("HeapFile が未登録の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		bp := buffer.NewPool(page.Size * 20)
+		bp := buffer.NewPool(page.Size*20, nil)
 
 		// WHEN
 		_, err := CreateCatalog(bp)
@@ -115,7 +115,7 @@ func TestCreateCatalog(t *testing.T) {
 		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
 		bufPageHeader, err := bp.PageForRead(headerPageId)
 		assert.NoError(t, err)
-		defer bp.UnrefPage(headerPageId)
+		defer bp.Unpin(headerPageId)
 
 		magicEnd := headerMagicNumberOffset + len(catalogMagicNumber)
 		assert.Equal(t, catalogMagicNumber, bufPageHeader.Data().Body()[headerMagicNumberOffset:magicEnd])
@@ -133,7 +133,7 @@ func TestCreateCatalog(t *testing.T) {
 		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
 		bufPageHeader, err := bp.PageForRead(headerPageId)
 		assert.NoError(t, err)
-		defer bp.UnrefPage(headerPageId)
+		defer bp.Unpin(headerPageId)
 
 		nextFileId := page.FileId(binary.BigEndian.Uint32(bufPageHeader.Data().Body()[headerNextFileIdOffset : headerNextFileIdOffset+headerFieldSize]))
 		nextIndexId := IndexId(binary.BigEndian.Uint32(bufPageHeader.Data().Body()[headerNextIndexIdOffset : headerNextIndexIdOffset+headerFieldSize]))
@@ -227,7 +227,7 @@ func setupCatalogTestBufferPool(t *testing.T) *buffer.Pool {
 		t.Fatalf("HeapFile の作成に失敗: %v", err)
 	}
 	t.Cleanup(func() { _ = hf.Close() })
-	bp := buffer.NewPool(page.Size * 20)
+	bp := buffer.NewPool(page.Size*20, nil)
 	bp.RegisterHeapFile(fileId, hf)
 	return bp
 }

@@ -58,7 +58,7 @@ func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer bp.UnrefPage(headerPageId)
+	defer bp.Unpin(headerPageId)
 
 	magicEnd := headerMagicNumberOffset + len(catalogMagicNumber)
 	if !bytes.Equal(bufPageHeader.Data().Body()[headerMagicNumberOffset:magicEnd], catalogMagicNumber) {
@@ -109,7 +109,7 @@ func CreateCatalog(bp *buffer.Pool) (*Catalog, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer bp.UnrefPage(headerPageId)
+	defer bp.Unpin(headerPageId)
 
 	bufPageHeader, err := bp.PageForWrite(headerPageId)
 	if err != nil {
@@ -218,7 +218,7 @@ func (c *Catalog) persistScalar(offset int, value uint32) error {
 	if err != nil {
 		return err
 	}
-	defer c.bufferPool.UnrefPage(headerPageId)
+	defer c.bufferPool.Unpin(headerPageId)
 	writeScalar(bufPageHeader.Data().Body(), offset, value)
 	return nil
 }

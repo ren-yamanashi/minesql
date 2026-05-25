@@ -10,7 +10,7 @@ import (
 func TestFlushAllPages(t *testing.T) {
 	t.Run("ダーティーページがディスクに書き出されクリーンになる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 2)
+		bp := NewPool(page.Size*2, nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
@@ -32,7 +32,7 @@ func TestFlushAllPages(t *testing.T) {
 
 	t.Run("フラッシュ後にフラッシュリストがクリアされる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 2)
+		bp := NewPool(page.Size*2, nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
@@ -51,7 +51,7 @@ func TestFlushAllPages(t *testing.T) {
 
 	t.Run("フラッシュ後にデータがディスクに永続化されている", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size)
+		bp := NewPool(page.Size, nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
@@ -62,6 +62,7 @@ func TestFlushAllPages(t *testing.T) {
 		p.data.Body()[0] = 0xBB
 		err = bp.FlushAllPages()
 		assert.NoError(t, err)
+		bp.Unpin(pageId)
 
 		// WHEN
 		otherId := page.NewId(0, 1)
@@ -76,7 +77,7 @@ func TestFlushAllPages(t *testing.T) {
 
 	t.Run("ダーティーページがない場合もエラーにならない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 2)
+		bp := NewPool(page.Size*2, nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 
@@ -89,7 +90,7 @@ func TestFlushAllPages(t *testing.T) {
 
 	t.Run("ディスク I/O 失敗時は isDirty と flushList が更新されない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 2)
+		bp := NewPool(page.Size*2, nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
@@ -115,7 +116,7 @@ func TestFlushAllPages(t *testing.T) {
 func TestFlushOldestPages(t *testing.T) {
 	t.Run("指定した件数のダーティーページをフラッシュする", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 3)
+		bp := NewPool(page.Size*3, nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		id0 := page.NewId(0, 0)
@@ -139,7 +140,7 @@ func TestFlushOldestPages(t *testing.T) {
 
 	t.Run("フラッシュリストが空の場合何もしない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 2)
+		bp := NewPool(page.Size*2, nil)
 
 		// WHEN
 		err := bp.FlushOldestPages(10)
@@ -150,7 +151,7 @@ func TestFlushOldestPages(t *testing.T) {
 
 	t.Run("フラッシュしたページがクリーンになる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 2)
+		bp := NewPool(page.Size*2, nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
@@ -171,7 +172,7 @@ func TestFlushOldestPages(t *testing.T) {
 
 	t.Run("ディスク I/O 失敗時は isDirty と flushList が更新されない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size * 2)
+		bp := NewPool(page.Size*2, nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)

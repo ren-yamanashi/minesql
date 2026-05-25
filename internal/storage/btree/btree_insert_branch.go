@@ -45,7 +45,7 @@ func (t *Tree) splitInsertBranch(
 	if err != nil {
 		return nil, page.InvalidId(), err
 	}
-	defer t.bufferPool.UnrefPage(newBranchPageId)
+	defer t.bufferPool.Unpin(newBranchPageId)
 
 	pageNewBranch, err := t.bufferPool.PageForWrite(newBranchPageId)
 	if err != nil {

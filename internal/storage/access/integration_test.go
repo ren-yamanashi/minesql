@@ -331,7 +331,7 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 	}
 	t.Cleanup(func() { _ = catalogHf.Close() })
 
-	bp := buffer.NewPool(page.Size * 50)
+	bp := buffer.NewPool(page.Size*50, nil)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
 	ct, err := dictionary.CreateCatalog(bp)

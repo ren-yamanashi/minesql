@@ -13,7 +13,7 @@ func (t *Tree) Search(mode SearchMode) (*Iterator, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer t.bufferPool.UnrefPage(t.MetaPageId())
+	defer t.bufferPool.Unpin(t.MetaPageId())
 	metaPage := newMetaPage(pageMeta.Data())
 
 	// ルートページ取得
@@ -28,6 +28,7 @@ func (t *Tree) FindByKey(key []byte) (Record, RecordPosition, error) {
 	if err != nil {
 		return nil, RecordPosition{}, err
 	}
+	defer iter.Close()
 	position := RecordPosition{
 		PageId:  iter.bufferPage.PageId(),
 		SlotNum: iter.slotNum,
@@ -56,7 +57,7 @@ func (t *Tree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator
 	switch nt {
 	// ブランチノードの場合、子ノードに対して再帰探索する
 	case nodeTypeBranch:
-		defer t.bufferPool.UnrefPage(nodePageId)
+		defer t.bufferPool.Unpin(nodePageId)
 		branchNode := newBranchNode(bufPage.Data())
 		childPageId, err := mode.childPageId(branchNode)
 		if err != nil {
@@ -76,12 +77,14 @@ func (t *Tree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator
 		if leafNode.numRecords() == slotNum {
 			err := iter.Advance()
 			if err != nil {
+				iter.Close()
 				return nil, err
 			}
 		}
 		return iter, nil
 
 	default:
+		t.bufferPool.Unpin(nodePageId)
 		return nil, errUnknownNodeType
 	}
 }
@@ -92,7 +95,7 @@ func (t *Tree) leafPageIds() ([]page.Id, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer t.bufferPool.UnrefPage(t.MetaPageId())
+	defer t.bufferPool.Unpin(t.MetaPageId())
 	metaPage := newMetaPage(pageMeta.Data())
 	rootPageId := metaPage.rootPageId()
 	height := metaPage.height()
@@ -122,7 +125,7 @@ func (t *Tree) leafPageIds() ([]page.Id, error) {
 				nextLevel = append(nextLevel, childPageId)
 			}
 			nextLevel = append(nextLevel, branchNode.rightChildPageId())
-			t.bufferPool.UnrefPage(nodePageId)
+			t.bufferPool.Unpin(nodePageId)
 		}
 		currentLevel = nextLevel
 	}

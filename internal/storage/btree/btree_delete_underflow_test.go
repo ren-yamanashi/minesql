@@ -346,6 +346,35 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.False(t, isLeafMerged)
 		assert.Equal(t, 1, parentBranch.numRecords())
 	})
+
+	t.Run("ブランチノードのアンダーフロー: 転送不可かつマージ不可の場合はアンダーフローを許容する", func(t *testing.T) {
+		// GIVEN
+		bt, bp := setupBtreeForTest(t)
+
+		childPageId, childBufPage := allocateTestPage(t, bp)
+		childBranch := initTestBranchNode(t, bp, childPageId, largeBranchKey(0x10), page.NewId(0, 100), page.NewId(0, 101))
+		insertLargeBranchRecords(childBranch, 4, 0x20)
+
+		siblingPageId, _ := allocateTestPage(t, bp)
+		siblingBranch := initTestBranchNode(t, bp, siblingPageId, largeBranchKey(0x60), page.NewId(0, 200), page.NewId(0, 201))
+		insertLargeBranchRecords(siblingBranch, 4, 0x70)
+
+		parentPageId, _ := allocateTestPage(t, bp)
+		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x55}, childPageId, siblingPageId)
+
+		childNumBefore := childBranch.numRecords()
+		siblingNumBefore := siblingBranch.numRecords()
+
+		// WHEN
+		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 0)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.False(t, underflow)
+		assert.False(t, isLeafMerged)
+		assert.Equal(t, childNumBefore, childBranch.numRecords())
+		assert.Equal(t, siblingNumBefore, siblingBranch.numRecords())
+	})
 }
 
 // allocateTestPage はテスト用にページを割り当ててバッファプールに追加する

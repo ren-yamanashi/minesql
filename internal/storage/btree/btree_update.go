@@ -14,7 +14,7 @@ func (t *Tree) Update(record Record) error {
 		return err
 	}
 	metaPage := newMetaPage(pageMeta.Data())
-	defer t.bufferPool.UnrefPage(t.MetaPageId())
+	defer t.bufferPool.Unpin(t.MetaPageId())
 
 	// ルートページ取得
 	rootPageId := metaPage.rootPageId()
@@ -22,7 +22,7 @@ func (t *Tree) Update(record Record) error {
 	if err != nil {
 		return err
 	}
-	defer t.bufferPool.UnrefPage(rootPageId)
+	defer t.bufferPool.Unpin(rootPageId)
 	return t.updateRecursively(rootBufPage, record)
 }
 
@@ -32,7 +32,7 @@ func (t *Tree) updateRecursively(bufPage *buffer.Page, record Record) error {
 	if err != nil {
 		return err
 	}
-	defer t.bufferPool.UnrefPage(bufPage.PageId())
+	defer t.bufferPool.Unpin(bufPage.PageId())
 
 	nt := nodeType(pg.Data())
 	switch nt {
@@ -48,6 +48,7 @@ func (t *Tree) updateRecursively(bufPage *buffer.Page, record Record) error {
 		if err != nil {
 			return err
 		}
+		defer t.bufferPool.Unpin(childPageId)
 		return t.updateRecursively(childBufPage, record)
 
 	// リーフノードの場合: そのまま更新する

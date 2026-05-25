@@ -9,7 +9,7 @@ import (
 // Iterator は B+Tree のリーフノードを走査する
 type Iterator struct {
 	bufferPool *buffer.Pool
-	bufferPage buffer.Page // 現在参照しているバッファページ
+	bufferPage buffer.Page // 現在参照しているバッファページ (Pin 済み)
 	slotNum    int         // 現在参照されているスロット番号
 }
 
@@ -21,18 +21,14 @@ func NewIterator(bufPool *buffer.Pool, bufPage buffer.Page, slotNum int) *Iterat
 	}
 }
 
-// Close はイテレータが保持しているバッファページの参照を解放する
+// Close はイテレータが保持しているバッファページの Pin を解放する
 func (it *Iterator) Close() {
-	it.bufferPool.UnrefPage(it.bufferPage.PageId())
+	it.bufferPool.Unpin(it.bufferPage.PageId())
 }
 
 // Get は現在参照しているリーフノードのレコードを取得
 func (it *Iterator) Get() (Record, bool, error) {
-	pg, err := it.bufferPool.PageForRead(it.bufferPage.PageId())
-	if err != nil {
-		return NewRecord(nil, nil, nil), false, err
-	}
-	leaf := newLeafNode(pg.Data())
+	leaf := newLeafNode(it.bufferPage.Data())
 
 	if it.slotNum < leaf.numRecords() {
 		record := leaf.record(it.slotNum)
@@ -48,7 +44,7 @@ func (it *Iterator) Get() (Record, bool, error) {
 func (it *Iterator) Next() (Record, bool, error) {
 	record, ok, err := it.Get()
 	if err != nil {
-		return nil, false, err
+		return NewRecord(nil, nil, nil), false, err
 	}
 	if !ok {
 		return NewRecord(nil, nil, nil), false, nil
@@ -63,11 +59,7 @@ func (it *Iterator) Next() (Record, bool, error) {
 
 // Advance は次のレコードに進む
 func (it *Iterator) Advance() error {
-	pg, err := it.bufferPool.PageForRead(it.bufferPage.PageId())
-	if err != nil {
-		return err
-	}
-	leaf := newLeafNode(pg.Data())
+	leaf := newLeafNode(it.bufferPage.Data())
 
 	// 現在のページ内に、次のレコードがある場合
 	if it.slotNum < leaf.numRecords() {
@@ -89,11 +81,11 @@ func (it *Iterator) Advance() error {
 
 	// 次のページに移動
 	oldPageId := it.bufferPage.PageId()
-	it.bufferPool.UnrefPage(oldPageId)
 	nextPage, err := it.bufferPool.PageForRead(nextPageId)
 	if err != nil {
 		return err
 	}
+	it.bufferPool.Unpin(oldPageId)
 
 	it.bufferPage = *nextPage
 	it.slotNum = 0

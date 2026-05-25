@@ -323,7 +323,7 @@ func setupSecondaryTestCatalog(t *testing.T) *dictionary.Catalog {
 		t.Fatalf("HeapFile の作成に失敗: %v", err)
 	}
 	t.Cleanup(func() { _ = hf.Close() })
-	bp := buffer.NewPool(page.Size * 30)
+	bp := buffer.NewPool(page.Size*30, nil)
 	bp.RegisterHeapFile(fileId, hf)
 
 	ct, err := dictionary.CreateCatalog(bp)
