@@ -166,7 +166,10 @@ func setup() (*btree.Tree, func()) {
 	}
 	cleanup := func() { _ = os.RemoveAll(tmpDir) }
 
-	bp := buffer.NewPool(page.Size * 10)
+	var bp *buffer.Pool
+	bp = buffer.NewPool(page.Size*10, func() {
+		_ = bp.FlushOldestPages(bp.FlushListPageCount())
+	})
 	fileId := page.FileId(1)
 
 	dm, err := file.NewHeapFile(fileId, filepath.Join(tmpDir, "example.db"))

@@ -454,11 +454,13 @@ Branch[keys=1]: [key_10]
 		var w strings.Builder
 		bufPageMeta, err := tree.bufferPool.PageForRead(tree.metaPageId)
 		require.NoError(t, err)
+		defer tree.bufferPool.Unpin(tree.metaPageId)
 		meta := newMetaPage(bufPageMeta.Data())
 		rootPageId := meta.rootPageId()
 
 		bufPageRoot, err := tree.bufferPool.PageForRead(rootPageId)
 		require.NoError(t, err)
+		defer tree.bufferPool.Unpin(rootPageId)
 
 		nodeType := nodeType(bufPageRoot.Data())
 		if nodeType != nodeTypeBranch {
@@ -488,6 +490,9 @@ Branch[keys=1]: [key_10]
 			fmt.Fprintf(&w, "境界キー: %s\n", boundaryKey)
 			fmt.Fprintf(&w, "  左の子の末尾キー: %s (< 境界キー: %v)\n", lastLeftKey, lastLeftKey < boundaryKey)
 			fmt.Fprintf(&w, "  右の子の先頭キー: %s (>= 境界キー: %v)\n", firstRightKey, firstRightKey >= boundaryKey)
+
+			tree.bufferPool.Unpin(leftPageId)
+			tree.bufferPool.Unpin(rightPageId)
 		}
 
 		expected := `境界キー: key_10
@@ -517,6 +522,8 @@ Branch[keys=1]: [key_10]
 			bufPageRoot, err := tree.bufferPool.PageForRead(rootPageId)
 			require.NoError(t, err)
 			nodeType := nodeType(bufPageRoot.Data())
+			tree.bufferPool.Unpin(tree.metaPageId)
+			tree.bufferPool.Unpin(rootPageId)
 
 			var currentType string
 			switch nodeType {
@@ -620,6 +627,7 @@ func writeRootInfo(w *strings.Builder, tree *Tree) {
 	if err != nil {
 		panic(err)
 	}
+	defer tree.bufferPool.Unpin(tree.metaPageId)
 	writeNodeInfo(w, newMetaPage(bufPageMeta.Data()).rootPageId(), 0, tree)
 }
 
@@ -629,6 +637,7 @@ func writeNodeInfo(w *strings.Builder, pageId page.Id, depth int, tree *Tree) {
 	if err != nil {
 		panic(err)
 	}
+	defer tree.bufferPool.Unpin(pageId)
 
 	indent := strings.Repeat("  ", depth)
 	nodeType := nodeType(pg.Data())
@@ -665,6 +674,7 @@ func writeTreeShape(w *strings.Builder, tree *Tree) {
 	if err != nil {
 		panic(err)
 	}
+	defer tree.bufferPool.Unpin(tree.metaPageId)
 	metaPage := newMetaPage(pageMeta.Data())
 	rootPageId := metaPage.rootPageId()
 
@@ -681,6 +691,7 @@ func writeTreeShape(w *strings.Builder, tree *Tree) {
 		if err != nil {
 			panic(err)
 		}
+		defer tree.bufferPool.Unpin(pageId)
 
 		nodeType := nodeType(pg.Data())
 		switch nodeType {
@@ -726,6 +737,17 @@ func (bt *Tree) mustInsert(key, value string) {
 	}
 }
 
+// newTestBufferPool は全ページが dirty/pin で追い出し不可になったときに古いダーティーページを
+// フラッシュして追い出し候補を確保する callback 付きのバッファプールを生成する
+// (本番では page_cleaner がこの役割を担うが、テストでは page_cleaner を持たないため)
+func newTestBufferPool(size int) *buffer.Pool {
+	var bp *buffer.Pool
+	bp = buffer.NewPool(size, func() {
+		_ = bp.FlushOldestPages(bp.FlushListPageCount())
+	})
+	return bp
+}
+
 // setupBtree はテスト用の B+Tree をセットアップする
 func setupBtree(t *testing.T) *Tree {
 	t.Helper()
@@ -736,7 +758,7 @@ func setupBtree(t *testing.T) *Tree {
 	if err != nil {
 		t.Fatalf("HeapFile の作成に失敗: %v", err)
 	}
-	bp := buffer.NewPool(page.Size * 10)
+	bp := newTestBufferPool(page.Size * 10)
 	bp.RegisterHeapFile(fileId, heapFile)
 
 	bt, err := CreateTree(bp, fileId)
