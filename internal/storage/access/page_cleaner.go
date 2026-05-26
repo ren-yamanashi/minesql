@@ -20,6 +20,7 @@ type PageCleaner struct {
 	ticker          *time.Ticker
 	done            chan struct{}
 	stopped         chan struct{} // goroutine 終了通知用
+	flushRequest    chan struct{} // バッファプールが追い出し候補を確保できないときのフラッシュ通知
 	stopOnce        sync.Once
 	isRunning       atomic.Bool
 }
@@ -32,6 +33,15 @@ func NewPageCleaner(bp *buffer.Pool, redo *redo.Buffer, redoMaxSize int, maxDirt
 		redoLogMaxSize:  redoMaxSize,
 		maxDirtyPagePct: maxDirtyPct,
 		interval:        1 * time.Second,
+		flushRequest:    make(chan struct{}, 1),
+	}
+}
+
+// RequestFlush はバッファプールが追い出し候補を確保できないときに即時フラッシュを発火させる
+func (pc *PageCleaner) RequestFlush() {
+	select {
+	case pc.flushRequest <- struct{}{}:
+	default:
 	}
 }
 
@@ -42,6 +52,7 @@ func (pc *PageCleaner) Start() {
 	pc.ticker = time.NewTicker(pc.interval)
 	pc.done = make(chan struct{})
 	pc.stopped = make(chan struct{})
+	pc.flushRequest = make(chan struct{}, 1)
 	pc.stopOnce = sync.Once{}
 	go pc.loop()
 }
@@ -69,17 +80,30 @@ func (pc *PageCleaner) loop() {
 			if err := pc.clean(); err != nil {
 				log.Printf("page cleaner: %v", err)
 			}
+		case <-pc.flushRequest:
+			// 追い出し詰まりを解消するため、閾値に関わらずダーティーページがあればフラッシュする
+			if err := pc.flush(); err != nil {
+				log.Printf("page cleaner: %v", err)
+			}
 		}
 	}
 }
 
-// clean はフラッシュの必要がある場合にフラッシュリストの古いページからフラッシュし、チェックポイントを実行する
+// clean は閾値を超えている場合にフラッシュリストの古いページからフラッシュし、チェックポイントを実行する
 func (pc *PageCleaner) clean() error {
 	shouldFlush, err := pc.shouldFlush()
 	if err != nil {
 		return err
 	}
 	if !shouldFlush {
+		return nil
+	}
+	return pc.flush()
+}
+
+// flush はダーティーページが存在する場合に、Redo ログ→データページの順でフラッシュし、チェックポイントを実行する
+func (pc *PageCleaner) flush() error {
+	if pc.bufferPool.FlushListPageCount() == 0 {
 		return nil
 	}
 

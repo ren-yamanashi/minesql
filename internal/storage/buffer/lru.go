@@ -60,22 +60,21 @@ func (l *lru) access(bufferId id) {
 }
 
 // evict は追い出すページの BufferId を返す
-func (l *lru) evict() id {
-	victim := l.tail
-	victim.isUnused = true
-	return victim.bufferId
+func (l *lru) evict(canEvict func(bufferId id) bool) (id, error) {
+	for node := l.tail; node != nil; node = node.prev {
+		if !canEvict(node.bufferId) {
+			continue
+		}
+		node.isUnused = true
+		return node.bufferId, nil
+	}
+	return 0, ErrAllPagesUnevictable
 }
 
 // undoEvict は evict の結果を取り消し、ノードを元の状態に戻す
 func (l *lru) undoEvict(bufferId id) {
 	node := l.nodeMap[bufferId]
 	node.isUnused = false
-}
-
-// delete はページの参照を解除し、優先的に追い出されるようにする
-func (l *lru) delete(bufferId id) {
-	node := l.nodeMap[bufferId]
-	l.moveToOldTail(node)
 }
 
 // moveToMidpoint はノードを midpoint (OldSublist の先頭) に配置する
@@ -104,22 +103,6 @@ func (l *lru) moveToNewHead(node *lruNode) {
 	l.detach(node)
 	l.prependToHead(node)
 	l.newLen++
-}
-
-// moveToOldTail はノードを OldSublist の末尾に移動する
-func (l *lru) moveToOldTail(node *lruNode) {
-	if l.tail == node {
-		if !node.isOld {
-			node.isOld = true
-			l.newLen--
-			l.oldLen++
-		}
-		return
-	}
-	l.detach(node)
-	l.insertToTail(node)
-	node.isOld = true
-	l.oldLen++
 }
 
 // rebalance は NewSublist が最大長を超えた場合、midpoint を前方に移動して NewSublist の末尾ノードを OldSublist に降格する
