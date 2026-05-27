@@ -29,6 +29,7 @@
 | --- | --- |
 | Shared (S) | 読み取り。複数の操作が同時に保持できる |
 | Exclusive (X) | 書き込み。1 つの操作のみが保持できる |
+| Shared-Exclusive (SX) | 後で Exclusive へ昇格しうる読み取り。他の Shared とは同時に保持できるが、他の SX や Exclusive とは競合する |
 
 ## Pin とラッチのライフタイムの違い
 
