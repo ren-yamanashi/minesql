@@ -65,6 +65,11 @@
 - Page LSN はそのページに最後に適用された Redo ログレコードの LSN を記録する
 - クラッシュリカバリ時、Redo ログレコードの LSN がページの Page LSN 以下であれば、そのレコードは適用済みなのでスキップする
 
+## mini-transaction の区切り
+
+- 1 つの操作 ([mini-transaction](../buffer/latch.md#mini-transaction)) が複数ページを変更することがある (例えば B+Tree の[ノード分割](../btree/btree-insert.md)は親ノードと分割前後のリーフノードを変更する)
+- その複数のページ変更レコードは 1 つの mini-transaction としてまとまり、Redo ログには mini-transaction の終わりを示す区切りを記録する
+
 ## 書き込みフロー
 
 データ変更時とコミット時で、Redo ログの書き込みタイミングが異なる
