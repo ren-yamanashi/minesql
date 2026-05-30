@@ -16,7 +16,7 @@ func (t *Table) Insert(colNames []string, values []string, trxId lock.TrxId) err
 		return err
 	}
 
-	record, err := NewPrimaryRecord(t.catalog, NewPrimaryRecordInput{
+	record, err := NewPrimaryRecord(t.catalog, t.bufferPool, NewPrimaryRecordInput{
 		fileId:     t.primaryIndex.fileId(),
 		pkCount:    t.primaryIndex.pkCount,
 		deleteMark: 0,
@@ -48,7 +48,7 @@ func (t *Table) insertSecondaryIndexes(mtr *buffer.Mtr, colNames, values []strin
 	pk := t.extractPrimaryKey(values)
 
 	for _, si := range t.secondaryIndexes {
-		keyCols, err := fetchIndexKeyColumn(t.catalog, si.indexId)
+		keyCols, err := fetchIndexKeyColumn(t.catalog, t.bufferPool, si.indexId)
 		if err != nil {
 			return err
 		}

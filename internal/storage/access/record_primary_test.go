@@ -15,10 +15,10 @@ import (
 func TestNewPrimaryRecord(t *testing.T) {
 	t.Run("カタログを参照してテーブル定義順に並び替えたレコードを返す", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t) // id:0, name:1, email:2
+		ct, bp := setupSecondaryTestCatalog(t) // id:0, name:1, email:2
 
 		// WHEN
-		pr, err := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"email", "name", "id"}, values: []string{"alice@example.com", "Alice", "1"}})
+		pr, err := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"email", "name", "id"}, values: []string{"alice@example.com", "Alice", "1"}})
 
 		// THEN
 		assert.NoError(t, err)
@@ -30,11 +30,11 @@ func TestNewPrimaryRecord(t *testing.T) {
 
 	t.Run("lastTrxId と rollPtr が設定される", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
+		ct, bp := setupSecondaryTestCatalog(t)
 		rollPtr := testUndoPointer(3, 64)
 
 		// WHEN
-		pr, err := NewPrimaryRecord(ct, NewPrimaryRecordInput{
+		pr, err := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{
 			fileId: page.FileId(2), pkCount: 1, deleteMark: 0,
 			lastTrxId: 100, rollPtr: rollPtr,
 			colNames: []string{"id", "name", "email"},
@@ -49,10 +49,10 @@ func TestNewPrimaryRecord(t *testing.T) {
 
 	t.Run("カラム名と値の数が一致しない場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
+		ct, bp := setupSecondaryTestCatalog(t)
 
 		// WHEN
-		_, err := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name"}, values: []string{"1"}})
+		_, err := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name"}, values: []string{"1"}})
 
 		// THEN
 		assert.Error(t, err)
@@ -60,10 +60,10 @@ func TestNewPrimaryRecord(t *testing.T) {
 
 	t.Run("カラム数がテーブル定義と一致しない場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
+		ct, bp := setupSecondaryTestCatalog(t)
 
 		// WHEN
-		_, err := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id"}, values: []string{"1"}})
+		_, err := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id"}, values: []string{"1"}})
 
 		// THEN
 		assert.Error(t, err)
@@ -72,10 +72,10 @@ func TestNewPrimaryRecord(t *testing.T) {
 
 	t.Run("存在しないカラム名を指定するとエラーを返す", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
+		ct, bp := setupSecondaryTestCatalog(t)
 
 		// WHEN
-		_, err := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "nonexistent"}, values: []string{"1", "Alice", "x"}})
+		_, err := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "nonexistent"}, values: []string{"1", "Alice", "x"}})
 
 		// THEN
 		assert.Error(t, err)
@@ -84,10 +84,10 @@ func TestNewPrimaryRecord(t *testing.T) {
 
 	t.Run("重複カラム名を指定するとエラーを返す", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
+		ct, bp := setupSecondaryTestCatalog(t)
 
 		// WHEN
-		_, err := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "id", "name"}, values: []string{"1", "2", "Alice"}})
+		_, err := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "id", "name"}, values: []string{"1", "2", "Alice"}})
 
 		// THEN
 		assert.Error(t, err)
@@ -96,10 +96,10 @@ func TestNewPrimaryRecord(t *testing.T) {
 
 	t.Run("削除マークが設定される", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
+		ct, bp := setupSecondaryTestCatalog(t)
 
 		// WHEN
-		pr, err := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 1, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "a@b.com"}})
+		pr, err := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 1, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "a@b.com"}})
 
 		// THEN
 		assert.NoError(t, err)
@@ -110,8 +110,8 @@ func TestNewPrimaryRecord(t *testing.T) {
 func TestPrimaryRecordEncode(t *testing.T) {
 	t.Run("プライマリキーと非キーカラムをエンコードしたレコードを返す", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "alice@example.com"}})
+		ct, bp := setupSecondaryTestCatalog(t)
+		pr, _ := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "alice@example.com"}})
 
 		// WHEN
 		record := pr.Encode()
@@ -133,9 +133,9 @@ func TestPrimaryRecordEncode(t *testing.T) {
 
 	t.Run("非キー領域の先頭に lastTrxId と rollPtr がエンコードされる", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
+		ct, bp := setupSecondaryTestCatalog(t)
 		rollPtr := testUndoPointer(3, 64)
-		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{
+		pr, _ := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{
 			fileId: page.FileId(2), pkCount: 1, deleteMark: 0,
 			lastTrxId: 100, rollPtr: rollPtr,
 			colNames: []string{"id", "name", "email"},
@@ -153,8 +153,8 @@ func TestPrimaryRecordEncode(t *testing.T) {
 
 	t.Run("複合プライマリキーを正しくエンコードする", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 2, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "alice@example.com"}})
+		ct, bp := setupSecondaryTestCatalog(t)
+		pr, _ := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 2, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "alice@example.com"}})
 
 		// WHEN
 		record := pr.Encode()
@@ -172,8 +172,8 @@ func TestPrimaryRecordEncode(t *testing.T) {
 
 	t.Run("削除マークがヘッダーに設定される", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 1, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "a@b.com"}})
+		ct, bp := setupSecondaryTestCatalog(t)
+		pr, _ := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 1, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "a@b.com"}})
 
 		// WHEN
 		record := pr.Encode()
@@ -259,8 +259,8 @@ func TestPrimaryRecordSecondaryKey(t *testing.T) {
 func TestPrimaryRecordUpdate(t *testing.T) {
 	t.Run("指定したカラムの値だけ更新した新しいレコードを返す", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "alice@example.com"}})
+		ct, bp := setupSecondaryTestCatalog(t)
+		pr, _ := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "alice@example.com"}})
 
 		// WHEN
 		updated, err := pr.update(10, []string{"name"}, []string{"Bob"})
@@ -273,9 +273,9 @@ func TestPrimaryRecordUpdate(t *testing.T) {
 
 	t.Run("更新後のレコードに新しい trxId が設定され rollPtr は元の値が保持される", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
+		ct, bp := setupSecondaryTestCatalog(t)
 		rollPtr := testUndoPointer(5, 128)
-		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{
+		pr, _ := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{
 			fileId: page.FileId(2), pkCount: 1, deleteMark: 0,
 			lastTrxId: 10, rollPtr: rollPtr,
 			colNames: []string{"id", "name", "email"},
@@ -293,8 +293,8 @@ func TestPrimaryRecordUpdate(t *testing.T) {
 
 	t.Run("元のレコードは変更されない", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "alice@example.com"}})
+		ct, bp := setupSecondaryTestCatalog(t)
+		pr, _ := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "alice@example.com"}})
 
 		// WHEN
 		_, err := pr.update(10, []string{"name"}, []string{"Bob"})
@@ -306,8 +306,8 @@ func TestPrimaryRecordUpdate(t *testing.T) {
 
 	t.Run("複数カラムを同時に更新できる", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "alice@example.com"}})
+		ct, bp := setupSecondaryTestCatalog(t)
+		pr, _ := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "alice@example.com"}})
 
 		// WHEN
 		updated, err := pr.update(10, []string{"name", "email"}, []string{"Bob", "bob@example.com"})
@@ -319,8 +319,8 @@ func TestPrimaryRecordUpdate(t *testing.T) {
 
 	t.Run("カラム名と値の数が一致しない場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "a@b.com"}})
+		ct, bp := setupSecondaryTestCatalog(t)
+		pr, _ := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "a@b.com"}})
 
 		// WHEN
 		_, err := pr.update(10, []string{"name", "email"}, []string{"Bob"})
@@ -331,8 +331,8 @@ func TestPrimaryRecordUpdate(t *testing.T) {
 
 	t.Run("存在しないカラム名を指定するとエラーを返す", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "a@b.com"}})
+		ct, bp := setupSecondaryTestCatalog(t)
+		pr, _ := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "a@b.com"}})
 
 		// WHEN
 		_, err := pr.update(10, []string{"nonexistent"}, []string{"val"})
@@ -344,8 +344,8 @@ func TestPrimaryRecordUpdate(t *testing.T) {
 
 	t.Run("重複カラム名を指定するとエラーを返す", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "a@b.com"}})
+		ct, bp := setupSecondaryTestCatalog(t)
+		pr, _ := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "a@b.com"}})
 
 		// WHEN
 		_, err := pr.update(10, []string{"name", "name"}, []string{"Bob", "Charlie"})
@@ -359,8 +359,8 @@ func TestPrimaryRecordUpdate(t *testing.T) {
 func TestPrimaryRecordSetRollPtr(t *testing.T) {
 	t.Run("rollPtr を設定できる", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{
+		ct, bp := setupSecondaryTestCatalog(t)
+		pr, _ := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{
 			fileId: page.FileId(2), pkCount: 1, deleteMark: 0,
 			colNames: []string{"id", "name", "email"},
 			values:   []string{"1", "Alice", "a@b.com"},
@@ -377,8 +377,8 @@ func TestPrimaryRecordSetRollPtr(t *testing.T) {
 
 	t.Run("NullPointer を設定できる", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{
+		ct, bp := setupSecondaryTestCatalog(t)
+		pr, _ := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{
 			fileId: page.FileId(2), pkCount: 1, deleteMark: 0,
 			rollPtr:  testUndoPointer(1, 10),
 			colNames: []string{"id", "name", "email"},
@@ -394,8 +394,8 @@ func TestPrimaryRecordSetRollPtr(t *testing.T) {
 
 	t.Run("setRollPtr 後の Encode に反映される", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		pr, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{
+		ct, bp := setupSecondaryTestCatalog(t)
+		pr, _ := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{
 			fileId: page.FileId(2), pkCount: 1, deleteMark: 0,
 			colNames: []string{"id", "name", "email"},
 			values:   []string{"1", "Alice", "a@b.com"},
@@ -415,12 +415,12 @@ func TestPrimaryRecordSetRollPtr(t *testing.T) {
 func TestDecodePrimaryRecord(t *testing.T) {
 	t.Run("エンコードしたレコードをデコードすると元のデータに戻る", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		original, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "alice@example.com"}})
+		ct, bp := setupSecondaryTestCatalog(t)
+		original, _ := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 0, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "alice@example.com"}})
 		encoded := original.Encode()
 
 		// WHEN
-		decoded, err := DecodePrimaryRecord(encoded, ct, page.FileId(2))
+		decoded, err := DecodePrimaryRecord(encoded, ct, bp, page.FileId(2))
 
 		// THEN
 		assert.NoError(t, err)
@@ -432,9 +432,9 @@ func TestDecodePrimaryRecord(t *testing.T) {
 
 	t.Run("lastTrxId と rollPtr がデコードされる", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
+		ct, bp := setupSecondaryTestCatalog(t)
 		rollPtr := testUndoPointer(5, 128)
-		original, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{
+		original, _ := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{
 			fileId: page.FileId(2), pkCount: 1, deleteMark: 0,
 			lastTrxId: 42, rollPtr: rollPtr,
 			colNames: []string{"id", "name", "email"},
@@ -443,7 +443,7 @@ func TestDecodePrimaryRecord(t *testing.T) {
 		encoded := original.Encode()
 
 		// WHEN
-		decoded, err := DecodePrimaryRecord(encoded, ct, page.FileId(2))
+		decoded, err := DecodePrimaryRecord(encoded, ct, bp, page.FileId(2))
 
 		// THEN
 		assert.NoError(t, err)
@@ -453,8 +453,8 @@ func TestDecodePrimaryRecord(t *testing.T) {
 
 	t.Run("NullPointer のラウンドトリップ", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		original, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{
+		ct, bp := setupSecondaryTestCatalog(t)
+		original, _ := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{
 			fileId: page.FileId(2), pkCount: 1, deleteMark: 0,
 			lastTrxId: 0, rollPtr: undo.NullPointer(),
 			colNames: []string{"id", "name", "email"},
@@ -463,7 +463,7 @@ func TestDecodePrimaryRecord(t *testing.T) {
 		encoded := original.Encode()
 
 		// WHEN
-		decoded, err := DecodePrimaryRecord(encoded, ct, page.FileId(2))
+		decoded, err := DecodePrimaryRecord(encoded, ct, bp, page.FileId(2))
 
 		// THEN
 		assert.NoError(t, err)
@@ -472,12 +472,12 @@ func TestDecodePrimaryRecord(t *testing.T) {
 
 	t.Run("削除マーク付きレコードをデコードできる", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		original, _ := NewPrimaryRecord(ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 1, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "a@b.com"}})
+		ct, bp := setupSecondaryTestCatalog(t)
+		original, _ := NewPrimaryRecord(ct, bp, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: 1, colNames: []string{"id", "name", "email"}, values: []string{"1", "Alice", "a@b.com"}})
 		encoded := original.Encode()
 
 		// WHEN
-		decoded, err := DecodePrimaryRecord(encoded, ct, page.FileId(2))
+		decoded, err := DecodePrimaryRecord(encoded, ct, bp, page.FileId(2))
 
 		// THEN
 		assert.NoError(t, err)
@@ -486,13 +486,13 @@ func TestDecodePrimaryRecord(t *testing.T) {
 
 	t.Run("非キー領域が短すぎる場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
+		ct, bp := setupSecondaryTestCatalog(t)
 		key := encode.Encode(nil, [][]byte{[]byte("1")})
 		// 非キー領域が空 (lastTrxId + rollPtr の 8B に満たない)
 		record := btree.NewRecord([]byte{0x00}, key, nil)
 
 		// WHEN
-		_, err := DecodePrimaryRecord(record, ct, page.FileId(2))
+		_, err := DecodePrimaryRecord(record, ct, bp, page.FileId(2))
 
 		// THEN
 		assert.Error(t, err)
@@ -501,7 +501,7 @@ func TestDecodePrimaryRecord(t *testing.T) {
 
 	t.Run("カラム数が不一致の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
+		ct, bp := setupSecondaryTestCatalog(t)
 		key := encode.Encode(nil, [][]byte{[]byte("1")})
 		// lastTrxId + rollPtr だけでカラムデータなし → pkCount=1, カラム合計=1 (テーブル定義は 3)
 		nonKey := make([]byte, lock.TrxIdSize+undo.PointerSize)
@@ -509,7 +509,7 @@ func TestDecodePrimaryRecord(t *testing.T) {
 		record := btree.NewRecord([]byte{0x00}, key, nonKey)
 
 		// WHEN
-		_, err := DecodePrimaryRecord(record, ct, page.FileId(2))
+		_, err := DecodePrimaryRecord(record, ct, bp, page.FileId(2))
 
 		// THEN
 		assert.Error(t, err)

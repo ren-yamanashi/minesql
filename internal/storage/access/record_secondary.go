@@ -27,11 +27,11 @@ type SecondaryRecord struct {
 	pk         []string // プライマリキー
 }
 
-func NewSecondaryRecord(ct *dictionary.Catalog, input NewSecondaryRecordInput) (*SecondaryRecord, error) {
+func NewSecondaryRecord(ct *dictionary.Catalog, bp *buffer.Pool, input NewSecondaryRecordInput) (*SecondaryRecord, error) {
 	if len(input.colNames) != len(input.values) {
 		return nil, errColNameValueMismatch
 	}
-	return sortSecondaryRecord(ct, input)
+	return sortSecondaryRecord(ct, bp, input)
 }
 
 func (r *SecondaryRecord) Encode() btree.Record {
@@ -48,14 +48,15 @@ func (r *SecondaryRecord) encodedSecondaryKey() []byte {
 func DecodeSecondaryRecord(
 	record btree.Record,
 	ct *dictionary.Catalog,
+	bp *buffer.Pool,
 	fileId page.FileId,
 	indexName string,
 ) (*SecondaryRecord, error) {
-	index, err := fetchIndex(ct, fileId, indexName)
+	index, err := fetchIndex(ct, bp, fileId, indexName)
 	if err != nil {
 		return nil, err
 	}
-	keyCols, err := fetchIndexKeyColumn(ct, index.IndexId())
+	keyCols, err := fetchIndexKeyColumn(ct, bp, index.IndexId())
 	if err != nil {
 		return nil, err
 	}
@@ -94,12 +95,12 @@ func DecodeSecondaryRecord(
 }
 
 // sortSecondaryRecord はメタデータを参照して、レコードをインデックス定義順に並び替える
-func sortSecondaryRecord(ct *dictionary.Catalog, input NewSecondaryRecordInput) (*SecondaryRecord, error) {
-	index, err := fetchIndex(ct, input.fileId, input.indexName)
+func sortSecondaryRecord(ct *dictionary.Catalog, bp *buffer.Pool, input NewSecondaryRecordInput) (*SecondaryRecord, error) {
+	index, err := fetchIndex(ct, bp, input.fileId, input.indexName)
 	if err != nil {
 		return nil, err
 	}
-	keyCols, err := fetchIndexKeyColumn(ct, index.IndexId())
+	keyCols, err := fetchIndexKeyColumn(ct, bp, index.IndexId())
 	if err != nil {
 		return nil, err
 	}
@@ -135,8 +136,8 @@ func sortSecondaryRecord(ct *dictionary.Catalog, input NewSecondaryRecordInput) 
 }
 
 // fetchIndex はインデックスメタデータを検索し、指定された名前のインデックスレコードを返す
-func fetchIndex(ct *dictionary.Catalog, fileId page.FileId, indexName string) (dictionary.IndexMetaRecord, error) {
-	mtr := buffer.NewMtr(ct.BufferPool())
+func fetchIndex(ct *dictionary.Catalog, bp *buffer.Pool, fileId page.FileId, indexName string) (dictionary.IndexMetaRecord, error) {
+	mtr := buffer.NewMtr(bp)
 	defer mtr.UnpinAll()
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
 	iter, err := ct.IndexMeta().Search(mtr, dictionary.SearchModeKey{Key: [][]byte{fileIdBytes, []byte(indexName)}})
@@ -155,8 +156,8 @@ func fetchIndex(ct *dictionary.Catalog, fileId page.FileId, indexName string) (d
 }
 
 // fetchIndexKeyColumn はインデックスキーカラムメタデータを検索し、カラム名 → インデックス上のカラム位置のマップを返す
-func fetchIndexKeyColumn(ct *dictionary.Catalog, indexId dictionary.IndexId) (map[string]int, error) {
-	mtr := buffer.NewMtr(ct.BufferPool())
+func fetchIndexKeyColumn(ct *dictionary.Catalog, bp *buffer.Pool, indexId dictionary.IndexId) (map[string]int, error) {
+	mtr := buffer.NewMtr(bp)
 	defer mtr.UnpinAll()
 	indexIdBytes := binary.BigEndian.AppendUint32(nil, uint32(indexId))
 	keyColMetaIter, err := ct.IndexKeyColumnMeta().Search(mtr, dictionary.SearchModeKey{Key: [][]byte{indexIdBytes}})

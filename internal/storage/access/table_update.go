@@ -73,7 +73,7 @@ func (t *Table) updateSecondaryIndexes(
 	pk := t.extractPrimaryKey(before.values)
 
 	for _, si := range t.secondaryIndexes {
-		keyCols, err := fetchIndexKeyColumn(t.catalog, si.indexId)
+		keyCols, err := fetchIndexKeyColumn(t.catalog, t.bufferPool, si.indexId)
 		if err != nil {
 			return err
 		}

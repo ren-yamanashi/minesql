@@ -18,7 +18,7 @@ func (t *TrxManager) rollbackRecord(record undo.Record) error {
 	defer mtr.UnpinAll()
 
 	fileId := record.TableFileId()
-	piRecord, err := fetchPrimaryIndexRecord(t.catalog, fileId)
+	piRecord, err := fetchPrimaryIndexRecord(t.catalog, t.bufferPool, fileId)
 	if err != nil {
 		return err
 	}
@@ -41,7 +41,7 @@ func (t *TrxManager) rollbackInsert(mtr *buffer.Mtr, primaryTree *btree.Tree, re
 	if err := primaryTree.Delete(mtr, record.Record().Key()); err != nil {
 		return err
 	}
-	primaryRecord, err := DecodePrimaryRecord(record.Record(), t.catalog, fileId)
+	primaryRecord, err := DecodePrimaryRecord(record.Record(), t.catalog, t.bufferPool, fileId)
 	if err != nil {
 		return err
 	}
@@ -57,7 +57,7 @@ func (t *TrxManager) rollbackDelete(mtr *buffer.Mtr, primaryTree *btree.Tree, re
 	if err := primaryTree.Update(mtr, record.Record()); err != nil {
 		return err
 	}
-	primaryRecord, err := DecodePrimaryRecord(record.Record(), t.catalog, fileId)
+	primaryRecord, err := DecodePrimaryRecord(record.Record(), t.catalog, t.bufferPool, fileId)
 	if err != nil {
 		return err
 	}
@@ -73,11 +73,11 @@ func (t *TrxManager) rollbackUpdate(mtr *buffer.Mtr, primaryTree *btree.Tree, re
 	if err := primaryTree.Update(mtr, record.PrevRecord()); err != nil {
 		return err
 	}
-	prevPrimaryRecord, err := DecodePrimaryRecord(record.PrevRecord(), t.catalog, fileId)
+	prevPrimaryRecord, err := DecodePrimaryRecord(record.PrevRecord(), t.catalog, t.bufferPool, fileId)
 	if err != nil {
 		return err
 	}
-	newPrimaryRecord, err := DecodePrimaryRecord(record.NewRecord(), t.catalog, fileId)
+	newPrimaryRecord, err := DecodePrimaryRecord(record.NewRecord(), t.catalog, t.bufferPool, fileId)
 	if err != nil {
 		return err
 	}
@@ -102,12 +102,12 @@ func (t *TrxManager) forEachSecondaryTree(
 	fileId page.FileId,
 	op func(tree *btree.Tree, keyCols map[string]int) error,
 ) error {
-	records, err := fetchSecondaryIndexRecords(t.catalog, fileId)
+	records, err := fetchSecondaryIndexRecords(t.catalog, t.bufferPool, fileId)
 	if err != nil {
 		return err
 	}
 	for _, record := range records {
-		keyCols, err := fetchIndexKeyColumn(t.catalog, record.IndexId())
+		keyCols, err := fetchIndexKeyColumn(t.catalog, t.bufferPool, record.IndexId())
 		if err != nil {
 			return err
 		}

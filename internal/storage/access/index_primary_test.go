@@ -62,7 +62,7 @@ func TestPrimaryIndexSearch(t *testing.T) {
 	t.Run("全件スキャンでレコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.catalog.BufferPool())
+		mtr := buffer.NewMtr(pi.bufferPool)
 		defer mtr.UnpinAll()
 		record := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
 		_ = pi.insert(mtr, record, testTrxId)
@@ -81,7 +81,7 @@ func TestPrimaryIndexSearch(t *testing.T) {
 	t.Run("空のインデックスを検索するとデータなしを返す", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.catalog.BufferPool())
+		mtr := buffer.NewMtr(pi.bufferPool)
 		defer mtr.UnpinAll()
 
 		// WHEN
@@ -100,7 +100,7 @@ func TestPrimaryIndexInsert(t *testing.T) {
 	t.Run("レコードを挿入できる", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.catalog.BufferPool())
+		mtr := buffer.NewMtr(pi.bufferPool)
 		defer mtr.UnpinAll()
 		record := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
 
@@ -114,7 +114,7 @@ func TestPrimaryIndexInsert(t *testing.T) {
 	t.Run("同一プライマリキーの重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.catalog.BufferPool())
+		mtr := buffer.NewMtr(pi.bufferPool)
 		defer mtr.UnpinAll()
 		r1 := buildTestPrimaryRecord(t, pi, "1", "Alice", "a@example.com")
 		_ = pi.insert(mtr, r1, testTrxId)
@@ -130,7 +130,7 @@ func TestPrimaryIndexInsert(t *testing.T) {
 	t.Run("異なるプライマリキーであれば複数挿入できる", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.catalog.BufferPool())
+		mtr := buffer.NewMtr(pi.bufferPool)
 		defer mtr.UnpinAll()
 		r1 := buildTestPrimaryRecord(t, pi, "1", "Alice", "a@example.com")
 		_ = pi.insert(mtr, r1, testTrxId)
@@ -146,7 +146,7 @@ func TestPrimaryIndexInsert(t *testing.T) {
 	t.Run("論理削除済みの同一キーがある場合は上書きできる", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.catalog.BufferPool())
+		mtr := buffer.NewMtr(pi.bufferPool)
 		defer mtr.UnpinAll()
 		r1 := buildTestPrimaryRecord(t, pi, "1", "Alice", "a@example.com")
 		_ = pi.insert(mtr, r1, testTrxId)
@@ -168,7 +168,7 @@ func TestPrimaryIndexInsert(t *testing.T) {
 	t.Run("挿入後に排他ロックが取得される", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.catalog.BufferPool())
+		mtr := buffer.NewMtr(pi.bufferPool)
 		defer mtr.UnpinAll()
 		record := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
 
@@ -190,7 +190,7 @@ func TestPrimaryIndexDelete(t *testing.T) {
 	t.Run("レコードを物理削除できる", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.catalog.BufferPool())
+		mtr := buffer.NewMtr(pi.bufferPool)
 		defer mtr.UnpinAll()
 		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
 		_ = pi.insert(mtr, r, testTrxId)
@@ -213,7 +213,7 @@ func TestPrimaryIndexDelete(t *testing.T) {
 	t.Run("存在しないレコードの削除はエラーを返す", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.catalog.BufferPool())
+		mtr := buffer.NewMtr(pi.bufferPool)
 		defer mtr.UnpinAll()
 		pr := buildTestPrimaryRecord(t, pi, "999", "Nobody", "no@example.com")
 
@@ -229,7 +229,7 @@ func TestPrimaryIndexSoftDelete(t *testing.T) {
 	t.Run("レコードを論理削除できる", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.catalog.BufferPool())
+		mtr := buffer.NewMtr(pi.bufferPool)
 		defer mtr.UnpinAll()
 		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
 		_ = pi.insert(mtr, r, testTrxId)
@@ -252,7 +252,7 @@ func TestPrimaryIndexSoftDelete(t *testing.T) {
 	t.Run("論理削除後に再挿入できる", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.catalog.BufferPool())
+		mtr := buffer.NewMtr(pi.bufferPool)
 		defer mtr.UnpinAll()
 		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
 		_ = pi.insert(mtr, r, testTrxId)
@@ -275,7 +275,7 @@ func TestPrimaryIndexUpdate(t *testing.T) {
 	t.Run("レコードをインプレース更新できる", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.catalog.BufferPool())
+		mtr := buffer.NewMtr(pi.bufferPool)
 		defer mtr.UnpinAll()
 		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
 		_ = pi.insert(mtr, r, testTrxId)
@@ -301,7 +301,7 @@ func TestPrimaryIndexUpdate(t *testing.T) {
 	t.Run("存在しないカラムで更新するとエラーを返す", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.catalog.BufferPool())
+		mtr := buffer.NewMtr(pi.bufferPool)
 		defer mtr.UnpinAll()
 		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "a@example.com")
 		_ = pi.insert(mtr, r, testTrxId)
@@ -373,7 +373,7 @@ func setupTestPrimaryIndex(t *testing.T) *primaryIndex {
 // buildTestPrimaryRecord はテスト用の PrimaryRecord (id, name, email) を構築する
 func buildTestPrimaryRecord(t *testing.T, pi *primaryIndex, id, name, email string) *PrimaryRecord {
 	t.Helper()
-	pr, err := NewPrimaryRecord(pi.catalog, NewPrimaryRecordInput{
+	pr, err := NewPrimaryRecord(pi.catalog, pi.bufferPool, NewPrimaryRecordInput{
 		fileId:     pi.tree.MetaPageId().FileId(),
 		pkCount:    pi.pkCount,
 		deleteMark: 0,

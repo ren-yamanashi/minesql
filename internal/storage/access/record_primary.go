@@ -35,11 +35,11 @@ type PrimaryRecord struct {
 	values     []string
 }
 
-func NewPrimaryRecord(ct *dictionary.Catalog, input NewPrimaryRecordInput) (*PrimaryRecord, error) {
+func NewPrimaryRecord(ct *dictionary.Catalog, bp *buffer.Pool, input NewPrimaryRecordInput) (*PrimaryRecord, error) {
 	if len(input.colNames) != len(input.values) {
 		return nil, errColNameValueMismatch
 	}
-	return sortPrimaryRecord(ct, input)
+	return sortPrimaryRecord(ct, bp, input)
 }
 
 // Encode は btree.Record にエンコードする
@@ -126,7 +126,7 @@ func (r *PrimaryRecord) setRollPtr(rollPtr undo.Pointer) {
 
 // DecodePrimaryRecord は btree.Record から PrimaryRecord にデコードする
 //   - 非キー領域: lastTrxId (4B) + rollPtr (6B) + 非キーカラム
-func DecodePrimaryRecord(record btree.Record, ct *dictionary.Catalog, fileId page.FileId) (*PrimaryRecord, error) {
+func DecodePrimaryRecord(record btree.Record, ct *dictionary.Catalog, bp *buffer.Pool, fileId page.FileId) (*PrimaryRecord, error) {
 	values, err := encode.Decode(record.Key())
 	if err != nil {
 		return nil, err
@@ -155,7 +155,7 @@ func DecodePrimaryRecord(record btree.Record, ct *dictionary.Catalog, fileId pag
 	}
 	values = append(values, nonKeyValues...)
 
-	colDefs, err := fetchColumnDefs(ct, fileId)
+	colDefs, err := fetchColumnDefs(ct, bp, fileId)
 	if err != nil {
 		return nil, err
 	}
@@ -179,8 +179,8 @@ func DecodePrimaryRecord(record btree.Record, ct *dictionary.Catalog, fileId pag
 }
 
 // sortPrimaryRecord はカラムメタデータを参照して、レコードをテーブル定義順に並び替える
-func sortPrimaryRecord(ct *dictionary.Catalog, input NewPrimaryRecordInput) (*PrimaryRecord, error) {
-	colDefs, err := fetchColumnDefs(ct, input.fileId)
+func sortPrimaryRecord(ct *dictionary.Catalog, bp *buffer.Pool, input NewPrimaryRecordInput) (*PrimaryRecord, error) {
+	colDefs, err := fetchColumnDefs(ct, bp, input.fileId)
 	if err != nil {
 		return nil, err
 	}
@@ -215,8 +215,8 @@ func sortPrimaryRecord(ct *dictionary.Catalog, input NewPrimaryRecordInput) (*Pr
 }
 
 // fetchColumnDefs はカラムメタデータを検索し、カラム名 → テーブル定義上の位置のマップを返す
-func fetchColumnDefs(ct *dictionary.Catalog, fileId page.FileId) (map[string]int, error) {
-	mtr := buffer.NewMtr(ct.BufferPool())
+func fetchColumnDefs(ct *dictionary.Catalog, bp *buffer.Pool, fileId page.FileId) (map[string]int, error) {
+	mtr := buffer.NewMtr(bp)
 	defer mtr.UnpinAll()
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
 	iter, err := ct.ColumnMeta().Search(mtr, dictionary.SearchModeKey{Key: [][]byte{fileIdBytes}})

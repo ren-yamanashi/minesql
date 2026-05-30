@@ -22,6 +22,7 @@ type newSecondaryIndexInput struct {
 
 type secondaryIndex struct {
 	catalog     *dictionary.Catalog
+	bufferPool  *buffer.Pool
 	tree        *btree.Tree        // セカンダリインデックスの B+Tree
 	primaryTree *btree.Tree        // プライマリインデックスの B+Tree
 	fileId      page.FileId        // インデックスが属するテーブルの FileId
@@ -40,6 +41,7 @@ func newSecondaryIndex(
 	tree := btree.NewTree(bp, input.MetaPageId)
 	return &secondaryIndex{
 		catalog:     ct,
+		bufferPool:  bp,
 		tree:        tree,
 		primaryTree: input.PrimaryTree,
 		fileId:      input.PrimaryTree.MetaPageId().FileId(),
@@ -71,6 +73,7 @@ func createSecondaryIndex(
 	}
 	return &secondaryIndex{
 		catalog:     ct,
+		bufferPool:  bp,
 		tree:        tree,
 		primaryTree: input.PrimaryTree,
 		fileId:      input.PrimaryTree.MetaPageId().FileId(),
@@ -87,7 +90,7 @@ func (si *secondaryIndex) search(mtr *buffer.Mtr, mode SearchMode) (*SecondaryIn
 	if err != nil {
 		return nil, err
 	}
-	return NewSecondaryIndexIterator(si.indexName, iter, si.catalog, si.primaryTree), nil
+	return NewSecondaryIndexIterator(si.indexName, iter, si.catalog, si.bufferPool, si.primaryTree), nil
 }
 
 // insert は行を挿入する
@@ -160,7 +163,7 @@ func (si *secondaryIndex) softDelete(mtr *buffer.Mtr, record *SecondaryRecord, t
 
 	// 論理削除
 	// deleteMark を 1 にしたレコードで上書き
-	deleted, err := NewSecondaryRecord(si.catalog, NewSecondaryRecordInput{
+	deleted, err := NewSecondaryRecord(si.catalog, si.bufferPool, NewSecondaryRecordInput{
 		fileId:     si.fileId,
 		deleteMark: 1,
 		indexName:  si.indexName,

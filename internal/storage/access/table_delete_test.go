@@ -92,7 +92,7 @@ func TestTableSoftDelete(t *testing.T) {
 		defer mtr.UnpinAll()
 		existing, _, err := table.primaryIndex.tree.FindByKey(mtr, encodedRecord.Key())
 		assert.NoError(t, err)
-		decoded, err := DecodePrimaryRecord(existing, table.catalog, table.primaryIndex.fileId())
+		decoded, err := DecodePrimaryRecord(existing, table.catalog, table.bufferPool, table.primaryIndex.fileId())
 		assert.NoError(t, err)
 		assert.NotEqual(t, undo.NullPointer(), decoded.rollPtr)
 	})

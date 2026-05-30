@@ -30,7 +30,7 @@ func NewTable(
 	lock *lock.Manager,
 	name string,
 ) (*Table, error) {
-	table, err := fetchTable(ct, name)
+	table, err := fetchTable(ct, bp, name)
 	if err != nil {
 		return nil, err
 	}
@@ -57,8 +57,8 @@ func NewTable(
 }
 
 // fetchTable はテーブル名から TableRecord を取得する
-func fetchTable(ct *dictionary.Catalog, name string) (dictionary.TableMetaRecord, error) {
-	mtr := buffer.NewMtr(ct.BufferPool())
+func fetchTable(ct *dictionary.Catalog, bp *buffer.Pool, name string) (dictionary.TableMetaRecord, error) {
+	mtr := buffer.NewMtr(bp)
 	defer mtr.UnpinAll()
 	iter, err := ct.TableMeta().Search(mtr, dictionary.SearchModeKey{Key: [][]byte{[]byte(name)}})
 	if err != nil {
@@ -82,7 +82,7 @@ func fetchPrimaryIndex(
 	fileId page.FileId,
 	lock *lock.Manager,
 ) (*primaryIndex, error) {
-	record, err := fetchPrimaryIndexRecord(ct, fileId)
+	record, err := fetchPrimaryIndexRecord(ct, bp, fileId)
 	if err != nil {
 		return nil, err
 	}
@@ -90,8 +90,8 @@ func fetchPrimaryIndex(
 }
 
 // fetchPrimaryIndexRecord はカタログからプライマリインデックスの IndexRecord を取得する
-func fetchPrimaryIndexRecord(ct *dictionary.Catalog, fileId page.FileId) (dictionary.IndexMetaRecord, error) {
-	mtr := buffer.NewMtr(ct.BufferPool())
+func fetchPrimaryIndexRecord(ct *dictionary.Catalog, bp *buffer.Pool, fileId page.FileId) (dictionary.IndexMetaRecord, error) {
+	mtr := buffer.NewMtr(bp)
 	defer mtr.UnpinAll()
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
 	key := dictionary.SearchModeKey{
@@ -120,7 +120,7 @@ func fetchSecondaryIndexes(
 	pt *btree.Tree,
 	lock *lock.Manager,
 ) ([]*secondaryIndex, error) {
-	records, err := fetchSecondaryIndexRecords(ct, fileId)
+	records, err := fetchSecondaryIndexRecords(ct, bp, fileId)
 	if err != nil {
 		return nil, err
 	}
@@ -140,8 +140,8 @@ func fetchSecondaryIndexes(
 }
 
 // fetchSecondaryIndexRecords はカタログからセカンダリインデックスの IndexRecord 一覧を取得する
-func fetchSecondaryIndexRecords(ct *dictionary.Catalog, fileId page.FileId) ([]dictionary.IndexMetaRecord, error) {
-	mtr := buffer.NewMtr(ct.BufferPool())
+func fetchSecondaryIndexRecords(ct *dictionary.Catalog, bp *buffer.Pool, fileId page.FileId) ([]dictionary.IndexMetaRecord, error) {
+	mtr := buffer.NewMtr(bp)
 	defer mtr.UnpinAll()
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
 	iter, err := ct.IndexMeta().Search(mtr, dictionary.SearchModeKey{Key: [][]byte{fileIdBytes}})
@@ -219,7 +219,7 @@ func (t *Table) extractSecondaryKey(keyCols map[string]int, valMap map[string]st
 
 // buildSecondaryRecord はセカンダリインデックス用のレコードを構築する
 func (t *Table) buildSecondaryRecord(si *secondaryIndex, skColNames, skValues, pk []string) (*SecondaryRecord, error) {
-	return NewSecondaryRecord(t.catalog, NewSecondaryRecordInput{
+	return NewSecondaryRecord(t.catalog, t.bufferPool, NewSecondaryRecordInput{
 		fileId:     si.fileId,
 		deleteMark: 0,
 		indexName:  si.indexName,

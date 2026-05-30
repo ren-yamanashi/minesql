@@ -208,17 +208,17 @@ func TestRegisterTableMeta(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		err = registerTableMeta(env.ct, env.fileId, pi, input)
+		err = registerTableMeta(env.ct, env.bp, env.fileId, pi, input)
 
 		// THEN
 		assert.NoError(t, err)
 
-		tableRecord, err := fetchTable(env.ct, "users")
+		tableRecord, err := fetchTable(env.ct, env.bp, "users")
 		assert.NoError(t, err)
 		assert.Equal(t, "users", tableRecord.Name())
 		assert.Equal(t, 3, tableRecord.ColumnCount())
 
-		colDefs, err := fetchColumnDefs(env.ct, env.fileId)
+		colDefs, err := fetchColumnDefs(env.ct, env.bp, env.fileId)
 		assert.NoError(t, err)
 		assert.Equal(t, 3, len(colDefs))
 		assert.Equal(t, 0, colDefs["id"])
@@ -236,11 +236,11 @@ func TestRegisterTableMeta(t *testing.T) {
 		}
 		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr)
 		assert.NoError(t, err)
-		err = registerTableMeta(env.ct, env.fileId, pi, input)
+		err = registerTableMeta(env.ct, env.bp, env.fileId, pi, input)
 		assert.NoError(t, err)
 
 		// WHEN
-		err = registerTableMeta(env.ct, env.fileId, pi, input)
+		err = registerTableMeta(env.ct, env.bp, env.fileId, pi, input)
 
 		// THEN
 		assert.Error(t, err)
@@ -344,7 +344,7 @@ func TestCreateConstraints(t *testing.T) {
 		}
 
 		// WHEN
-		err := createConstraints(env.ct, env.fileId, inputs)
+		err := createConstraints(env.ct, env.bp, env.fileId, inputs)
 
 		// THEN
 		assert.NoError(t, err)
@@ -363,7 +363,7 @@ func TestCreateConstraints(t *testing.T) {
 		}
 
 		// WHEN
-		err := createConstraints(env.ct, env.fileId, inputs)
+		err := createConstraints(env.ct, env.bp, env.fileId, inputs)
 
 		// THEN
 		assert.Error(t, err)
@@ -375,7 +375,7 @@ func TestCreateConstraints(t *testing.T) {
 		env := setupCreateTestEnvWithTable(t)
 
 		// WHEN
-		err := createConstraints(env.ct, env.fileId, nil)
+		err := createConstraints(env.ct, env.bp, env.fileId, nil)
 
 		// THEN
 		assert.NoError(t, err)
@@ -455,7 +455,7 @@ func setupCreateTestEnvWithTable(t *testing.T) *createTestEnvWithTable {
 	if err != nil {
 		t.Fatalf("プライマリインデックスの作成に失敗: %v", err)
 	}
-	if err := registerTableMeta(env.ct, env.fileId, pi, input); err != nil {
+	if err := registerTableMeta(env.ct, env.bp, env.fileId, pi, input); err != nil {
 		t.Fatalf("テーブルメタの登録に失敗: %v", err)
 	}
 

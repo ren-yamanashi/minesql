@@ -108,5 +108,5 @@ func searchPrimaryIndex(t *testing.T, env *iteratorTestEnv) *PrimaryIndexIterato
 	if err != nil {
 		t.Fatalf("プライマリインデックスの検索に失敗: %v", err)
 	}
-	return NewPrimaryIndexIterator(iter, env.ct, page.FileId(2))
+	return NewPrimaryIndexIterator(iter, env.ct, env.bp, page.FileId(2))
 }

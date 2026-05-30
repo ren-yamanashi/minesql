@@ -139,7 +139,7 @@ func (p *Purge) purgeUpdate(record undo.Record) error {
 func (p *Purge) deletePrimaryRecord(fileId page.FileId, record btree.Record) error {
 	mtr := buffer.NewMtr(p.bufferPool)
 	defer mtr.UnpinAll()
-	piRecord, err := fetchPrimaryIndexRecord(p.transaction.catalog, fileId)
+	piRecord, err := fetchPrimaryIndexRecord(p.transaction.catalog, p.bufferPool, fileId)
 	if err != nil {
 		return err
 	}
@@ -151,18 +151,18 @@ func (p *Purge) deletePrimaryRecord(fileId page.FileId, record btree.Record) err
 func (p *Purge) deleteSecondaryRecords(fileId page.FileId, record btree.Record) error {
 	mtr := buffer.NewMtr(p.bufferPool)
 	defer mtr.UnpinAll()
-	prevRec, err := DecodePrimaryRecord(record, p.transaction.catalog, fileId)
+	prevRec, err := DecodePrimaryRecord(record, p.transaction.catalog, p.bufferPool, fileId)
 	if err != nil {
 		return err
 	}
 
-	siRecords, err := fetchSecondaryIndexRecords(p.transaction.catalog, fileId)
+	siRecords, err := fetchSecondaryIndexRecords(p.transaction.catalog, p.bufferPool, fileId)
 	if err != nil {
 		return err
 	}
 
 	for _, siRecord := range siRecords {
-		keyCols, err := fetchIndexKeyColumn(p.transaction.catalog, siRecord.IndexId())
+		keyCols, err := fetchIndexKeyColumn(p.transaction.catalog, p.bufferPool, siRecord.IndexId())
 		if err != nil {
 			return err
 		}

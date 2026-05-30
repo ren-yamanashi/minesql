@@ -60,7 +60,7 @@ func CreateTable(
 	}
 
 	// テーブルメタ・カラムメタをカタログに登録
-	if err := registerTableMeta(ct, fileId, pi, input); err != nil {
+	if err := registerTableMeta(ct, bp, fileId, pi, input); err != nil {
 		return nil, err
 	}
 
@@ -71,7 +71,7 @@ func CreateTable(
 	}
 
 	// 制約作成
-	if err := createConstraints(ct, fileId, input.Constraints); err != nil {
+	if err := createConstraints(ct, bp, fileId, input.Constraints); err != nil {
 		return nil, err
 	}
 
@@ -103,11 +103,12 @@ func createTableFile(ct *dictionary.Catalog, bp *buffer.Pool, tableName string) 
 // registerTableMeta はテーブルメタ・インデックスメタ (プライマリ)・カラムメタをカタログに登録する
 func registerTableMeta(
 	ct *dictionary.Catalog,
+	bp *buffer.Pool,
 	fileId page.FileId,
 	pi *primaryIndex,
 	input CreateTableInput,
 ) error {
-	mtr := buffer.NewMtr(ct.BufferPool())
+	mtr := buffer.NewMtr(bp)
 	defer mtr.UnpinAll()
 
 	// テーブルメタ
@@ -150,7 +151,7 @@ func createSecondaryIndexes(
 	lock *lock.Manager,
 	inputs []CreateIndexInput,
 ) ([]*secondaryIndex, error) {
-	mtr := buffer.NewMtr(ct.BufferPool())
+	mtr := buffer.NewMtr(bp)
 	defer mtr.UnpinAll()
 
 	indexes := make([]*secondaryIndex, 0, len(inputs))
@@ -195,11 +196,11 @@ func createSecondaryIndexes(
 }
 
 // createConstraints は制約をカタログに登録する
-func createConstraints(ct *dictionary.Catalog, fileId page.FileId, inputs []CreateConstraintInput) error {
-	mtr := buffer.NewMtr(ct.BufferPool())
+func createConstraints(ct *dictionary.Catalog, bp *buffer.Pool, fileId page.FileId, inputs []CreateConstraintInput) error {
+	mtr := buffer.NewMtr(bp)
 	defer mtr.UnpinAll()
 	for _, input := range inputs {
-		refTable, err := fetchTable(ct, input.ReferenceTableName)
+		refTable, err := fetchTable(ct, bp, input.ReferenceTableName)
 		if err != nil {
 			return err
 		}

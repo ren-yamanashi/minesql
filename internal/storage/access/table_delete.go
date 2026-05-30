@@ -62,7 +62,7 @@ func (t *Table) forEachSecondaryRecord(record *PrimaryRecord, op func(*secondary
 	pk := t.extractPrimaryKey(record.values)
 
 	for _, si := range t.secondaryIndexes {
-		keyCols, err := fetchIndexKeyColumn(t.catalog, si.indexId)
+		keyCols, err := fetchIndexKeyColumn(t.catalog, t.bufferPool, si.indexId)
 		if err != nil {
 			return err
 		}

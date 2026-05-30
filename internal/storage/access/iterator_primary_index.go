@@ -2,21 +2,24 @@ package access
 
 import (
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 type PrimaryIndexIterator struct {
-	iterator *btree.Iterator
-	catalog  *dictionary.Catalog
-	fileId   page.FileId
+	iterator   *btree.Iterator
+	catalog    *dictionary.Catalog
+	bufferPool *buffer.Pool
+	fileId     page.FileId
 }
 
-func NewPrimaryIndexIterator(iter *btree.Iterator, ct *dictionary.Catalog, fileId page.FileId) *PrimaryIndexIterator {
+func NewPrimaryIndexIterator(iter *btree.Iterator, ct *dictionary.Catalog, bp *buffer.Pool, fileId page.FileId) *PrimaryIndexIterator {
 	return &PrimaryIndexIterator{
-		fileId:   fileId,
-		catalog:  ct,
-		iterator: iter,
+		fileId:     fileId,
+		catalog:    ct,
+		bufferPool: bp,
+		iterator:   iter,
 	}
 }
 
@@ -41,7 +44,7 @@ func (pi *PrimaryIndexIterator) Next() (*PrimaryRecord, bool, error) {
 			continue
 		}
 
-		result, err := DecodePrimaryRecord(record, pi.catalog, pi.fileId)
+		result, err := DecodePrimaryRecord(record, pi.catalog, pi.bufferPool, pi.fileId)
 		if err != nil {
 			return nil, false, err
 		}

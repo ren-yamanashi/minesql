@@ -177,7 +177,7 @@ func TestFetchForeignKeys(t *testing.T) {
 		env := setupFKTestEnv(t)
 
 		// WHEN
-		fks, err := fetchForeignKeys(env.ct, env.childFileId)
+		fks, err := fetchForeignKeys(env.ct, env.bp, env.childFileId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -190,7 +190,7 @@ func TestFetchForeignKeys(t *testing.T) {
 		env := setupFKTestEnv(t)
 
 		// WHEN
-		fks, err := fetchForeignKeys(env.ct, env.parentFileId)
+		fks, err := fetchForeignKeys(env.ct, env.bp, env.parentFileId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -204,7 +204,7 @@ func TestFetchReferencingConstraints(t *testing.T) {
 		env := setupFKTestEnv(t)
 
 		// WHEN
-		refs, err := fetchReferencingConstraints(env.ct, env.parentFileId)
+		refs, err := fetchReferencingConstraints(env.ct, env.bp, env.parentFileId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -217,7 +217,7 @@ func TestFetchReferencingConstraints(t *testing.T) {
 		env := setupFKTestEnv(t)
 
 		// WHEN
-		refs, err := fetchReferencingConstraints(env.ct, env.childFileId)
+		refs, err := fetchReferencingConstraints(env.ct, env.bp, env.childFileId)
 
 		// THEN
 		assert.NoError(t, err)

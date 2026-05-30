@@ -11,10 +11,11 @@ import (
 )
 
 type primaryIndex struct {
-	catalog *dictionary.Catalog
-	tree    *btree.Tree // プライマリインデックスの B+Tree
-	pkCount int         // プライマリキーのカラム数
-	lock    *lock.Manager
+	catalog    *dictionary.Catalog
+	bufferPool *buffer.Pool
+	tree       *btree.Tree // プライマリインデックスの B+Tree
+	pkCount    int         // プライマリキーのカラム数
+	lock       *lock.Manager
 }
 
 // newPrimaryIndex は既存のプライマリインデックスを開く
@@ -27,10 +28,11 @@ func newPrimaryIndex(
 ) *primaryIndex {
 	tree := btree.NewTree(bp, metaPageId)
 	return &primaryIndex{
-		catalog: ct,
-		tree:    tree,
-		pkCount: pkCount,
-		lock:    lock,
+		catalog:    ct,
+		bufferPool: bp,
+		tree:       tree,
+		pkCount:    pkCount,
+		lock:       lock,
 	}
 }
 
@@ -47,10 +49,11 @@ func createPrimaryIndex(
 		return nil, err
 	}
 	return &primaryIndex{
-		catalog: ct,
-		tree:    tree,
-		pkCount: pkCount,
-		lock:    lock,
+		catalog:    ct,
+		bufferPool: bp,
+		tree:       tree,
+		pkCount:    pkCount,
+		lock:       lock,
 	}, nil
 }
 
@@ -60,7 +63,7 @@ func (pi *primaryIndex) search(mtr *buffer.Mtr, mode SearchMode) (*PrimaryIndexI
 	if err != nil {
 		return nil, err
 	}
-	return NewPrimaryIndexIterator(iter, pi.catalog, pi.tree.MetaPageId().FileId()), nil
+	return NewPrimaryIndexIterator(iter, pi.catalog, pi.bufferPool, pi.tree.MetaPageId().FileId()), nil
 }
 
 // insert は行を挿入する
@@ -127,7 +130,7 @@ func (pi *primaryIndex) softDelete(mtr *buffer.Mtr, record *PrimaryRecord, trxId
 
 	// 論理削除
 	// deleteMark を 1 にしたレコードで上書き
-	deleted, err := NewPrimaryRecord(pi.catalog, NewPrimaryRecordInput{
+	deleted, err := NewPrimaryRecord(pi.catalog, pi.bufferPool, NewPrimaryRecordInput{
 		fileId:     pi.tree.MetaPageId().FileId(),
 		pkCount:    record.pkCount,
 		deleteMark: 1,

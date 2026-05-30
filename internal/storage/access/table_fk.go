@@ -19,7 +19,7 @@ var ErrForeignKeyViolation = errors.New("access: foreign key constraint violatio
 //
 // 自テーブルが FK を持つ場合、挿入する値が参照先テーブルの PK に存在するか確認する
 func (t *Table) checkForeignKeysForInsert(colNames, values []string) error {
-	fks, err := fetchForeignKeys(t.catalog, t.primaryIndex.fileId())
+	fks, err := fetchForeignKeys(t.catalog, t.bufferPool, t.primaryIndex.fileId())
 	if err != nil {
 		return err
 	}
@@ -46,7 +46,7 @@ func (t *Table) checkForeignKeysForInsert(colNames, values []string) error {
 // 自テーブルが親テーブルとして参照されている場合に、
 // 削除する値が参照元テーブルから参照されていないか確認する
 func (t *Table) checkForeignKeysForDelete(record *PrimaryRecord) error {
-	refs, err := fetchReferencingConstraints(t.catalog, t.primaryIndex.fileId())
+	refs, err := fetchReferencingConstraints(t.catalog, t.bufferPool, t.primaryIndex.fileId())
 	if err != nil {
 		return err
 	}
@@ -83,7 +83,7 @@ func (t *Table) checkForeignKeysForUpdate(before, after *PrimaryRecord) error {
 // checkParentRefsForUpdate は自テーブルを参照する FK の参照先カラム値が変わった場合に、
 // 旧値が参照元から参照されていないかを確認する
 func (t *Table) checkParentRefsForUpdate(before, after *PrimaryRecord) error {
-	refs, err := fetchReferencingConstraints(t.catalog, t.primaryIndex.fileId())
+	refs, err := fetchReferencingConstraints(t.catalog, t.bufferPool, t.primaryIndex.fileId())
 	if err != nil {
 		return err
 	}
@@ -113,7 +113,7 @@ func (t *Table) checkParentRefsForUpdate(before, after *PrimaryRecord) error {
 // checkChildRefsForUpdate は自テーブルの FK カラムの値が変わった場合に、
 // 新値が参照先テーブルの PK に存在するかを確認する。
 func (t *Table) checkChildRefsForUpdate(before, after *PrimaryRecord) error {
-	fks, err := fetchForeignKeys(t.catalog, t.primaryIndex.fileId())
+	fks, err := fetchForeignKeys(t.catalog, t.bufferPool, t.primaryIndex.fileId())
 	if err != nil {
 		return err
 	}
@@ -141,8 +141,8 @@ func (t *Table) checkChildRefsForUpdate(before, after *PrimaryRecord) error {
 }
 
 // fetchForeignKeys は自テーブル (子テーブル) の FK 制約一覧を返す
-func fetchForeignKeys(ct *dictionary.Catalog, fileId page.FileId) ([]dictionary.ConstraintMetaRecord, error) {
-	mtr := buffer.NewMtr(ct.BufferPool())
+func fetchForeignKeys(ct *dictionary.Catalog, bp *buffer.Pool, fileId page.FileId) ([]dictionary.ConstraintMetaRecord, error) {
+	mtr := buffer.NewMtr(bp)
 	defer mtr.UnpinAll()
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
 	iter, err := ct.ConstraintMeta().Search(mtr, dictionary.SearchModeKey{Key: [][]byte{fileIdBytes}})
@@ -166,8 +166,8 @@ func fetchForeignKeys(ct *dictionary.Catalog, fileId page.FileId) ([]dictionary.
 }
 
 // fetchReferencingConstraints は自テーブルを親として参照している FK 制約一覧を返す
-func fetchReferencingConstraints(ct *dictionary.Catalog, fileId page.FileId) ([]dictionary.ConstraintMetaRecord, error) {
-	mtr := buffer.NewMtr(ct.BufferPool())
+func fetchReferencingConstraints(ct *dictionary.Catalog, bp *buffer.Pool, fileId page.FileId) ([]dictionary.ConstraintMetaRecord, error) {
+	mtr := buffer.NewMtr(bp)
 	defer mtr.UnpinAll()
 	iter, err := ct.ConstraintMeta().Search(mtr, dictionary.SearchModeStart{})
 	if err != nil {
@@ -198,7 +198,7 @@ func checkParentRecordExists(
 	refFileId page.FileId,
 	value string,
 ) error {
-	indexRecord, err := fetchPrimaryIndexRecord(ct, refFileId)
+	indexRecord, err := fetchPrimaryIndexRecord(ct, bp, refFileId)
 	if err != nil {
 		return err
 	}
@@ -229,7 +229,7 @@ func checkChildRecordExists(
 	constraint dictionary.ConstraintMetaRecord,
 	value string,
 ) error {
-	indexRecord, err := findFKSecondaryIndex(ct, constraint)
+	indexRecord, err := findFKSecondaryIndex(ct, bp, constraint)
 	if err != nil {
 		return err
 	}
@@ -241,14 +241,15 @@ func checkChildRecordExists(
 // FK カラムがインデックスの先頭でない場合、prefix 検索で正しく該当レコードを抽出できないため除外する。
 func findFKSecondaryIndex(
 	ct *dictionary.Catalog,
+	bp *buffer.Pool,
 	constraint dictionary.ConstraintMetaRecord,
 ) (dictionary.IndexMetaRecord, error) {
-	records, err := fetchSecondaryIndexRecords(ct, constraint.FileId())
+	records, err := fetchSecondaryIndexRecords(ct, bp, constraint.FileId())
 	if err != nil {
 		return dictionary.IndexMetaRecord{}, err
 	}
 	for _, indexRecord := range records {
-		keyCols, err := fetchIndexKeyColumn(ct, indexRecord.IndexId())
+		keyCols, err := fetchIndexKeyColumn(ct, bp, indexRecord.IndexId())
 		if err != nil {
 			return dictionary.IndexMetaRecord{}, err
 		}

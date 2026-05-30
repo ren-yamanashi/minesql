@@ -10,6 +10,7 @@ type SecondaryIndexIterator struct {
 	indexName   string
 	iterator    *btree.Iterator
 	catalog     *dictionary.Catalog
+	bufferPool  *buffer.Pool
 	primaryTree *btree.Tree // プライマリインデックスの B+Tree
 }
 
@@ -17,12 +18,14 @@ func NewSecondaryIndexIterator(
 	indexName string,
 	iter *btree.Iterator,
 	ct *dictionary.Catalog,
+	bp *buffer.Pool,
 	pt *btree.Tree,
 ) *SecondaryIndexIterator {
 	return &SecondaryIndexIterator{
 		indexName:   indexName,
 		iterator:    iter,
 		catalog:     ct,
+		bufferPool:  bp,
 		primaryTree: pt,
 	}
 }
@@ -45,14 +48,14 @@ func (si *SecondaryIndexIterator) Next() (*PrimaryRecord, bool, error) {
 		}
 
 		// PrimaryIterator を使用してレコード検索
-		mtr := buffer.NewMtr(si.catalog.BufferPool())
+		mtr := buffer.NewMtr(si.bufferPool)
 		iter, err := si.primaryTree.Search(mtr, SearchModeKey{Key: stringToByteSlice(secondaryRecord.pk)}.Encode())
 		if err != nil {
 			mtr.UnpinAll()
 			return nil, false, err
 		}
 
-		pi := NewPrimaryIndexIterator(iter, si.catalog, si.primaryTree.MetaPageId().FileId())
+		pi := NewPrimaryIndexIterator(iter, si.catalog, si.bufferPool, si.primaryTree.MetaPageId().FileId())
 		result, found, err := pi.Next()
 		pi.Close()
 		mtr.UnpinAll()
@@ -95,6 +98,6 @@ func (si *SecondaryIndexIterator) nextVisibleSecondaryRecord() (*SecondaryRecord
 			continue
 		}
 
-		return DecodeSecondaryRecord(record, si.catalog, si.primaryTree.MetaPageId().FileId(), si.indexName)
+		return DecodeSecondaryRecord(record, si.catalog, si.bufferPool, si.primaryTree.MetaPageId().FileId(), si.indexName)
 	}
 }

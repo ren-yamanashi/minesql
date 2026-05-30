@@ -65,7 +65,7 @@ func TestSecondaryIndexSearch(t *testing.T) {
 	t.Run("全件スキャンでレコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
-		mtr := buffer.NewMtr(si.catalog.BufferPool())
+		mtr := buffer.NewMtr(si.bufferPool)
 		defer mtr.UnpinAll()
 		r := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
 		_ = si.insert(mtr, r, testSecondaryTrxId)
@@ -86,7 +86,7 @@ func TestSecondaryIndexInsert(t *testing.T) {
 	t.Run("セカンダリインデックスにレコードを挿入できる", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
-		mtr := buffer.NewMtr(si.catalog.BufferPool())
+		mtr := buffer.NewMtr(si.bufferPool)
 		defer mtr.UnpinAll()
 		record := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
 
@@ -100,7 +100,7 @@ func TestSecondaryIndexInsert(t *testing.T) {
 	t.Run("同一キー (SK+PK) の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
-		mtr := buffer.NewMtr(si.catalog.BufferPool())
+		mtr := buffer.NewMtr(si.bufferPool)
 		defer mtr.UnpinAll()
 		r1 := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
 		_ = si.insert(mtr, r1, testSecondaryTrxId)
@@ -116,7 +116,7 @@ func TestSecondaryIndexInsert(t *testing.T) {
 	t.Run("非ユニークインデックスでは異なる PK で同じ SK を挿入できる", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
-		mtr := buffer.NewMtr(si.catalog.BufferPool())
+		mtr := buffer.NewMtr(si.bufferPool)
 		defer mtr.UnpinAll()
 		r1 := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
 		_ = si.insert(mtr, r1, testSecondaryTrxId)
@@ -132,7 +132,7 @@ func TestSecondaryIndexInsert(t *testing.T) {
 	t.Run("ユニークインデックスでは同じ SK の挿入は ErrDuplicateKey を返す", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_email", true)
-		mtr := buffer.NewMtr(si.catalog.BufferPool())
+		mtr := buffer.NewMtr(si.bufferPool)
 		defer mtr.UnpinAll()
 		r1 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"1"})
 		_ = si.insert(mtr, r1, testSecondaryTrxId)
@@ -148,7 +148,7 @@ func TestSecondaryIndexInsert(t *testing.T) {
 	t.Run("ユニークインデックスで論理削除済みの SK と同じ値は挿入できる", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_email", true)
-		mtr := buffer.NewMtr(si.catalog.BufferPool())
+		mtr := buffer.NewMtr(si.bufferPool)
 		defer mtr.UnpinAll()
 		r1 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"1"})
 		err := si.insert(mtr, r1, testSecondaryTrxId)
@@ -175,7 +175,7 @@ func TestSecondaryIndexInsert(t *testing.T) {
 	t.Run("論理削除済みの同一キー (SK+PK) がある場合は上書きできる", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
-		mtr := buffer.NewMtr(si.catalog.BufferPool())
+		mtr := buffer.NewMtr(si.bufferPool)
 		defer mtr.UnpinAll()
 		r1 := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
 		err := si.insert(mtr, r1, testSecondaryTrxId)
@@ -202,7 +202,7 @@ func TestSecondaryIndexInsert(t *testing.T) {
 	t.Run("挿入後に排他ロックが取得される", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
-		mtr := buffer.NewMtr(si.catalog.BufferPool())
+		mtr := buffer.NewMtr(si.bufferPool)
 		defer mtr.UnpinAll()
 		record := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
 
@@ -224,7 +224,7 @@ func TestSecondaryIndexDelete(t *testing.T) {
 	t.Run("レコードを物理削除できる", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
-		mtr := buffer.NewMtr(si.catalog.BufferPool())
+		mtr := buffer.NewMtr(si.bufferPool)
 		defer mtr.UnpinAll()
 		r := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
 		_ = si.insert(mtr, r, testSecondaryTrxId)
@@ -247,7 +247,7 @@ func TestSecondaryIndexDelete(t *testing.T) {
 	t.Run("存在しないレコードの削除はエラーを返す", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
-		mtr := buffer.NewMtr(si.catalog.BufferPool())
+		mtr := buffer.NewMtr(si.bufferPool)
 		defer mtr.UnpinAll()
 		sr := &SecondaryRecord{
 			colNames: []string{"name"},
@@ -267,7 +267,7 @@ func TestSecondaryIndexSoftDelete(t *testing.T) {
 	t.Run("レコードを論理削除できる", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
-		mtr := buffer.NewMtr(si.catalog.BufferPool())
+		mtr := buffer.NewMtr(si.bufferPool)
 		defer mtr.UnpinAll()
 		r := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
 		_ = si.insert(mtr, r, testSecondaryTrxId)
@@ -290,7 +290,7 @@ func TestSecondaryIndexSoftDelete(t *testing.T) {
 	t.Run("論理削除後に再挿入できる", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
-		mtr := buffer.NewMtr(si.catalog.BufferPool())
+		mtr := buffer.NewMtr(si.bufferPool)
 		defer mtr.UnpinAll()
 		r := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
 		_ = si.insert(mtr, r, testSecondaryTrxId)
@@ -341,7 +341,7 @@ func TestSecondaryIndexCheckUnique(t *testing.T) {
 	t.Run("重複がない場合はエラーを返さない", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_email", true)
-		mtr := buffer.NewMtr(si.catalog.BufferPool())
+		mtr := buffer.NewMtr(si.bufferPool)
 		defer mtr.UnpinAll()
 		sr := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"1"})
 
@@ -355,7 +355,7 @@ func TestSecondaryIndexCheckUnique(t *testing.T) {
 	t.Run("同じ SK のレコードが存在する場合は ErrDuplicateKey を返す", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_email", true)
-		mtr := buffer.NewMtr(si.catalog.BufferPool())
+		mtr := buffer.NewMtr(si.bufferPool)
 		defer mtr.UnpinAll()
 		r1 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"1"})
 		_ = si.insert(mtr, r1, testSecondaryTrxId)
@@ -371,7 +371,7 @@ func TestSecondaryIndexCheckUnique(t *testing.T) {
 	t.Run("論理削除済みの同じ SK のレコードが存在する場合はエラーを返さない", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_email", true)
-		mtr := buffer.NewMtr(si.catalog.BufferPool())
+		mtr := buffer.NewMtr(si.bufferPool)
 		defer mtr.UnpinAll()
 		r1 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"1"})
 		_ = si.insert(mtr, r1, testSecondaryTrxId)
@@ -412,7 +412,7 @@ func setupTestSecondaryIndex(t *testing.T, indexName string, unique bool) *secon
 // buildTestSecondaryRecord はテスト用の SecondaryRecord を構築する
 func buildTestSecondaryRecord(t *testing.T, si *secondaryIndex, colNames, values, pk []string) *SecondaryRecord {
 	t.Helper()
-	sr, err := NewSecondaryRecord(si.catalog, NewSecondaryRecordInput{
+	sr, err := NewSecondaryRecord(si.catalog, si.bufferPool, NewSecondaryRecordInput{
 		fileId:     si.fileId,
 		deleteMark: 0,
 		indexName:  si.indexName,

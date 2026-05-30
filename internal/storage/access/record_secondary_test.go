@@ -16,10 +16,10 @@ import (
 func TestNewSecondaryRecord(t *testing.T) {
 	t.Run("カタログを参照してインデックス定義順に並び替えたレコードを返す", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
+		ct, bp := setupSecondaryTestCatalog(t)
 
 		// WHEN
-		sr, err := NewSecondaryRecord(ct, NewSecondaryRecordInput{
+		sr, err := NewSecondaryRecord(ct, bp, NewSecondaryRecordInput{
 			fileId:     page.FileId(2),
 			deleteMark: 0,
 			indexName:  "idx_name",
@@ -38,10 +38,10 @@ func TestNewSecondaryRecord(t *testing.T) {
 
 	t.Run("カラム名と値の数が一致しない場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
+		ct, bp := setupSecondaryTestCatalog(t)
 
 		// WHEN
-		_, err := NewSecondaryRecord(ct, NewSecondaryRecordInput{
+		_, err := NewSecondaryRecord(ct, bp, NewSecondaryRecordInput{
 			fileId:    page.FileId(2),
 			indexName: "idx_name",
 			colNames:  []string{"name", "extra"},
@@ -55,10 +55,10 @@ func TestNewSecondaryRecord(t *testing.T) {
 
 	t.Run("存在しないカラム名を指定するとエラーを返す", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
+		ct, bp := setupSecondaryTestCatalog(t)
 
 		// WHEN
-		_, err := NewSecondaryRecord(ct, NewSecondaryRecordInput{
+		_, err := NewSecondaryRecord(ct, bp, NewSecondaryRecordInput{
 			fileId:    page.FileId(2),
 			indexName: "idx_name",
 			colNames:  []string{"nonexistent"},
@@ -72,10 +72,10 @@ func TestNewSecondaryRecord(t *testing.T) {
 
 	t.Run("重複カラム名を指定するとエラーを返す", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
+		ct, bp := setupSecondaryTestCatalog(t)
 
 		// WHEN
-		_, err := NewSecondaryRecord(ct, NewSecondaryRecordInput{
+		_, err := NewSecondaryRecord(ct, bp, NewSecondaryRecordInput{
 			fileId:    page.FileId(2),
 			indexName: "idx_name_email",
 			colNames:  []string{"name", "name"},
@@ -89,10 +89,10 @@ func TestNewSecondaryRecord(t *testing.T) {
 
 	t.Run("カラム数がインデックス定義と一致しない場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
+		ct, bp := setupSecondaryTestCatalog(t)
 
 		// WHEN
-		_, err := NewSecondaryRecord(ct, NewSecondaryRecordInput{
+		_, err := NewSecondaryRecord(ct, bp, NewSecondaryRecordInput{
 			fileId:    page.FileId(2),
 			indexName: "idx_name",
 			colNames:  []string{"name", "email"},
@@ -212,8 +212,8 @@ func TestSecondaryRecordEncodedSecondaryKey(t *testing.T) {
 func TestDecodeSecondaryRecord(t *testing.T) {
 	t.Run("エンコードしたレコードをデコードすると元のデータに戻る", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		original, err := NewSecondaryRecord(ct, NewSecondaryRecordInput{
+		ct, bp := setupSecondaryTestCatalog(t)
+		original, err := NewSecondaryRecord(ct, bp, NewSecondaryRecordInput{
 			fileId:     page.FileId(2),
 			deleteMark: 0,
 			indexName:  "idx_name",
@@ -225,7 +225,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 		encoded := original.Encode()
 
 		// WHEN
-		decoded, err := DecodeSecondaryRecord(encoded, ct, page.FileId(2), "idx_name")
+		decoded, err := DecodeSecondaryRecord(encoded, ct, bp, page.FileId(2), "idx_name")
 
 		// THEN
 		assert.NoError(t, err)
@@ -237,8 +237,8 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 
 	t.Run("削除マーク付きレコードをデコードできる", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		original, err := NewSecondaryRecord(ct, NewSecondaryRecordInput{
+		ct, bp := setupSecondaryTestCatalog(t)
+		original, err := NewSecondaryRecord(ct, bp, NewSecondaryRecordInput{
 			fileId:     page.FileId(2),
 			deleteMark: 1,
 			indexName:  "idx_name",
@@ -250,7 +250,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 		encoded := original.Encode()
 
 		// WHEN
-		decoded, err := DecodeSecondaryRecord(encoded, ct, page.FileId(2), "idx_name")
+		decoded, err := DecodeSecondaryRecord(encoded, ct, bp, page.FileId(2), "idx_name")
 
 		// THEN
 		assert.NoError(t, err)
@@ -259,8 +259,8 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 
 	t.Run("複合セカンダリキーのレコードをデコードできる", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
-		original, err := NewSecondaryRecord(ct, NewSecondaryRecordInput{
+		ct, bp := setupSecondaryTestCatalog(t)
+		original, err := NewSecondaryRecord(ct, bp, NewSecondaryRecordInput{
 			fileId:     page.FileId(2),
 			deleteMark: 0,
 			indexName:  "idx_name_email",
@@ -272,7 +272,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 		encoded := original.Encode()
 
 		// WHEN
-		decoded, err := DecodeSecondaryRecord(encoded, ct, page.FileId(2), "idx_name_email")
+		decoded, err := DecodeSecondaryRecord(encoded, ct, bp, page.FileId(2), "idx_name_email")
 
 		// THEN
 		assert.NoError(t, err)
@@ -283,11 +283,11 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 
 	t.Run("デコードされたキーの長さがインデックスカラム数未満の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
+		ct, bp := setupSecondaryTestCatalog(t)
 		record := btree.NewRecord([]byte{0x00}, nil, nil)
 
 		// WHEN
-		_, err := DecodeSecondaryRecord(record, ct, page.FileId(2), "idx_name")
+		_, err := DecodeSecondaryRecord(record, ct, bp, page.FileId(2), "idx_name")
 
 		// THEN
 		assert.Error(t, err)
@@ -296,11 +296,11 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 
 	t.Run("存在しないインデックス名を指定するとエラーを返す", func(t *testing.T) {
 		// GIVEN
-		ct := setupSecondaryTestCatalog(t)
+		ct, bp := setupSecondaryTestCatalog(t)
 		record := btree.NewRecord([]byte{0x00}, []byte{}, nil)
 
 		// WHEN
-		_, err := DecodeSecondaryRecord(record, ct, page.FileId(2), "nonexistent")
+		_, err := DecodeSecondaryRecord(record, ct, bp, page.FileId(2), "nonexistent")
 
 		// THEN
 		assert.Error(t, err)
@@ -314,7 +314,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 //   - idx_name: NonUnique, カラム (name:0)
 //   - idx_email: Unique, カラム (email:0)
 //   - idx_name_email: NonUnique, カラム (name:0, email:1)
-func setupSecondaryTestCatalog(t *testing.T) *dictionary.Catalog {
+func setupSecondaryTestCatalog(t *testing.T) (*dictionary.Catalog, *buffer.Pool) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "secondary_test.db")
 	fileId := page.FileId(0)
@@ -358,5 +358,5 @@ func setupSecondaryTestCatalog(t *testing.T) *dictionary.Catalog {
 	_ = ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(indexId3, "name", 0))
 	_ = ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(indexId3, "email", 1))
 
-	return ct
+	return ct, bp
 }

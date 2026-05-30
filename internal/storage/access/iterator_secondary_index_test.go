@@ -239,7 +239,7 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 // insertPrimaryRecord はプライマリ B+Tree にレコードを挿入する (pkCount=1)
 func insertPrimaryRecord(t *testing.T, env *iteratorTestEnv, deleteMark byte, colNames, values []string) {
 	t.Helper()
-	pr, err := NewPrimaryRecord(env.ct, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: deleteMark, colNames: colNames, values: values})
+	pr, err := NewPrimaryRecord(env.ct, env.bp, NewPrimaryRecordInput{fileId: page.FileId(2), pkCount: 1, deleteMark: deleteMark, colNames: colNames, values: values})
 	if err != nil {
 		t.Fatalf("PrimaryRecord の作成に失敗: %v", err)
 	}
@@ -259,7 +259,7 @@ func insertSecondaryRecord(t *testing.T, env *iteratorTestEnv, colNames, values,
 // insertSecondaryRecordWithDeleteMark はセカンダリ B+Tree に指定した deleteMark でレコードを挿入する
 func insertSecondaryRecordWithDeleteMark(t *testing.T, env *iteratorTestEnv, deleteMark byte, colNames, values, pk []string) {
 	t.Helper()
-	sr, err := NewSecondaryRecord(env.ct, NewSecondaryRecordInput{
+	sr, err := NewSecondaryRecord(env.ct, env.bp, NewSecondaryRecordInput{
 		fileId:     page.FileId(2),
 		deleteMark: deleteMark,
 		indexName:  "idx_name",
@@ -287,5 +287,5 @@ func searchSecondaryIndex(t *testing.T, env *iteratorTestEnv) *SecondaryIndexIte
 	if err != nil {
 		t.Fatalf("セカンダリインデックスの検索に失敗: %v", err)
 	}
-	return NewSecondaryIndexIterator("idx_name", iter, env.ct, env.primaryTree)
+	return NewSecondaryIndexIterator("idx_name", iter, env.ct, env.bp, env.primaryTree)
 }
