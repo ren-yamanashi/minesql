@@ -22,14 +22,14 @@ func CreateIndexMeta(bp *buffer.Pool) (*IndexMeta, error) {
 	return &IndexMeta{tree: tree}, nil
 }
 
-func (im *IndexMeta) Search(mode SearchMode) (*IndexIterator, error) {
-	iter, err := im.tree.Search(mode.Encode())
+func (im *IndexMeta) Search(mtr *buffer.Mtr, mode SearchMode) (*IndexIterator, error) {
+	iter, err := im.tree.Search(mtr, mode.Encode())
 	if err != nil {
 		return nil, err
 	}
 	return NewIndexIterator(iter), nil
 }
 
-func (im *IndexMeta) Insert(record IndexMetaRecord) error {
-	return im.tree.Insert(record.Encode())
+func (im *IndexMeta) Insert(mtr *buffer.Mtr, record IndexMetaRecord) error {
+	return im.tree.Insert(mtr, record.Encode())
 }

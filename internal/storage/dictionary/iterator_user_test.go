@@ -3,6 +3,7 @@ package dictionary
 import (
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -12,10 +13,12 @@ func TestUserIteratorClose(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 		ct, err := CreateCatalog(bp)
 		assert.NoError(t, err)
-		err = ct.UserMeta().Insert(NewUserMetaRecord("testuser", "%", []byte("authstring")))
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		err = ct.UserMeta().Insert(mtr, NewUserMetaRecord("testuser", "%", []byte("authstring")))
 		assert.NoError(t, err)
 
-		iter, err := ct.UserMeta().Search(SearchModeStart{})
+		iter, err := ct.UserMeta().Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 
 		// WHEN
@@ -30,8 +33,10 @@ func TestUserIteratorClose(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 		ct, err := CreateCatalog(bp)
 		assert.NoError(t, err)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
 
-		iter, err := ct.UserMeta().Search(SearchModeStart{})
+		iter, err := ct.UserMeta().Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 
 		// WHEN
@@ -43,10 +48,12 @@ func TestUserIteratorClose(t *testing.T) {
 func TestUserIteratorNext(t *testing.T) {
 	t.Run("レコードを順に取得できる", func(t *testing.T) {
 		// GIVEN
-		um := setupTestUserMeta(t)
-		_ = um.Insert(NewUserMetaRecord("alice", "localhost", []byte("auth1")))
-		_ = um.Insert(NewUserMetaRecord("bob", "%", []byte("auth2")))
-		iter, err := um.Search(SearchModeStart{})
+		um, bp := setupTestUserMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		_ = um.Insert(mtr, NewUserMetaRecord("alice", "localhost", []byte("auth1")))
+		_ = um.Insert(mtr, NewUserMetaRecord("bob", "%", []byte("auth2")))
+		iter, err := um.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter.Close()
 
@@ -72,8 +79,10 @@ func TestUserIteratorNext(t *testing.T) {
 
 	t.Run("空のメタデータの場合は false を返す", func(t *testing.T) {
 		// GIVEN
-		um := setupTestUserMeta(t)
-		iter, err := um.Search(SearchModeStart{})
+		um, bp := setupTestUserMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		iter, err := um.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter.Close()
 

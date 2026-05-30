@@ -3,6 +3,7 @@ package dictionary
 import (
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -10,9 +11,11 @@ import (
 func TestIndexIteratorClose(t *testing.T) {
 	t.Run("検索結果のイテレータを Close できる", func(t *testing.T) {
 		// GIVEN
-		im := setupTestIndexMeta(t)
-		_ = im.Insert(NewIndexMetaRecord(page.FileId(1), IndexId(1), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
-		iter, err := im.Search(SearchModeStart{})
+		im, bp := setupTestIndexMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		_ = im.Insert(mtr, NewIndexMetaRecord(page.FileId(1), IndexId(1), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
+		iter, err := im.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 
 		// WHEN
@@ -24,8 +27,10 @@ func TestIndexIteratorClose(t *testing.T) {
 
 	t.Run("イテレーション前に Close できる", func(t *testing.T) {
 		// GIVEN
-		im := setupTestIndexMeta(t)
-		iter, err := im.Search(SearchModeStart{})
+		im, bp := setupTestIndexMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		iter, err := im.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 
 		// WHEN
@@ -37,10 +42,12 @@ func TestIndexIteratorClose(t *testing.T) {
 func TestIndexIteratorNext(t *testing.T) {
 	t.Run("レコードを順に取得できる", func(t *testing.T) {
 		// GIVEN
-		im := setupTestIndexMeta(t)
-		_ = im.Insert(NewIndexMetaRecord(page.FileId(1), IndexId(1), "PRIMARY", IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
-		_ = im.Insert(NewIndexMetaRecord(page.FileId(1), IndexId(2), "idx_name", IndexTypeNonUnique, 2, page.NewId(page.FileId(1), page.PageNumber(0))))
-		iter, err := im.Search(SearchModeStart{})
+		im, bp := setupTestIndexMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		_ = im.Insert(mtr, NewIndexMetaRecord(page.FileId(1), IndexId(1), "PRIMARY", IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
+		_ = im.Insert(mtr, NewIndexMetaRecord(page.FileId(1), IndexId(2), "idx_name", IndexTypeNonUnique, 2, page.NewId(page.FileId(1), page.PageNumber(0))))
+		iter, err := im.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter.Close()
 
@@ -71,8 +78,10 @@ func TestIndexIteratorNext(t *testing.T) {
 
 	t.Run("空のメタデータの場合は false を返す", func(t *testing.T) {
 		// GIVEN
-		im := setupTestIndexMeta(t)
-		iter, err := im.Search(SearchModeStart{})
+		im, bp := setupTestIndexMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		iter, err := im.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter.Close()
 

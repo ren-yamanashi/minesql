@@ -58,7 +58,9 @@ func NewTable(
 
 // fetchTable はテーブル名から TableRecord を取得する
 func fetchTable(ct *dictionary.Catalog, name string) (dictionary.TableMetaRecord, error) {
-	iter, err := ct.TableMeta().Search(dictionary.SearchModeKey{Key: [][]byte{[]byte(name)}})
+	mtr := buffer.NewMtr(ct.BufferPool())
+	defer mtr.UnpinAll()
+	iter, err := ct.TableMeta().Search(mtr, dictionary.SearchModeKey{Key: [][]byte{[]byte(name)}})
 	if err != nil {
 		return dictionary.TableMetaRecord{}, err
 	}
@@ -89,11 +91,13 @@ func fetchPrimaryIndex(
 
 // fetchPrimaryIndexRecord はカタログからプライマリインデックスの IndexRecord を取得する
 func fetchPrimaryIndexRecord(ct *dictionary.Catalog, fileId page.FileId) (dictionary.IndexMetaRecord, error) {
+	mtr := buffer.NewMtr(ct.BufferPool())
+	defer mtr.UnpinAll()
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
 	key := dictionary.SearchModeKey{
 		Key: [][]byte{fileIdBytes, []byte(dictionary.PrimaryIndexName)},
 	}
-	iter, err := ct.IndexMeta().Search(key)
+	iter, err := ct.IndexMeta().Search(mtr, key)
 	if err != nil {
 		return dictionary.IndexMetaRecord{}, err
 	}
@@ -137,8 +141,10 @@ func fetchSecondaryIndexes(
 
 // fetchSecondaryIndexRecords はカタログからセカンダリインデックスの IndexRecord 一覧を取得する
 func fetchSecondaryIndexRecords(ct *dictionary.Catalog, fileId page.FileId) ([]dictionary.IndexMetaRecord, error) {
+	mtr := buffer.NewMtr(ct.BufferPool())
+	defer mtr.UnpinAll()
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
-	iter, err := ct.IndexMeta().Search(dictionary.SearchModeKey{Key: [][]byte{fileIdBytes}})
+	iter, err := ct.IndexMeta().Search(mtr, dictionary.SearchModeKey{Key: [][]byte{fileIdBytes}})
 	if err != nil {
 		return nil, err
 	}
@@ -171,9 +177,11 @@ func (t *Table) buildValMap(colNames, values []string) map[string]string {
 
 // isPrimaryKeyColumn は指定したカラム名がプライマリキーのカラムかどうかを返す
 func (t *Table) isPrimaryKeyColumn(colName string) (bool, error) {
+	mtr := buffer.NewMtr(t.bufferPool)
+	defer mtr.UnpinAll()
 	fileId := t.primaryIndex.tree.MetaPageId().FileId()
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
-	iter, err := t.catalog.ColumnMeta().Search(dictionary.SearchModeKey{
+	iter, err := t.catalog.ColumnMeta().Search(mtr, dictionary.SearchModeKey{
 		Key: [][]byte{fileIdBytes, []byte(colName)},
 	})
 	if err != nil {

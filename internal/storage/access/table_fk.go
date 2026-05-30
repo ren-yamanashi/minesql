@@ -142,8 +142,10 @@ func (t *Table) checkChildRefsForUpdate(before, after *PrimaryRecord) error {
 
 // fetchForeignKeys は自テーブル (子テーブル) の FK 制約一覧を返す
 func fetchForeignKeys(ct *dictionary.Catalog, fileId page.FileId) ([]dictionary.ConstraintMetaRecord, error) {
+	mtr := buffer.NewMtr(ct.BufferPool())
+	defer mtr.UnpinAll()
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
-	iter, err := ct.ConstraintMeta().Search(dictionary.SearchModeKey{Key: [][]byte{fileIdBytes}})
+	iter, err := ct.ConstraintMeta().Search(mtr, dictionary.SearchModeKey{Key: [][]byte{fileIdBytes}})
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +167,9 @@ func fetchForeignKeys(ct *dictionary.Catalog, fileId page.FileId) ([]dictionary.
 
 // fetchReferencingConstraints は自テーブルを親として参照している FK 制約一覧を返す
 func fetchReferencingConstraints(ct *dictionary.Catalog, fileId page.FileId) ([]dictionary.ConstraintMetaRecord, error) {
-	iter, err := ct.ConstraintMeta().Search(dictionary.SearchModeStart{})
+	mtr := buffer.NewMtr(ct.BufferPool())
+	defer mtr.UnpinAll()
+	iter, err := ct.ConstraintMeta().Search(mtr, dictionary.SearchModeStart{})
 	if err != nil {
 		return nil, err
 	}
@@ -199,10 +203,12 @@ func checkParentRecordExists(
 		return err
 	}
 
+	mtr := buffer.NewMtr(bp)
+	defer mtr.UnpinAll()
 	tree := btree.NewTree(bp, indexRecord.MetaPageId())
 	sk := encode.Encode(nil, [][]byte{[]byte(value)})
 
-	record, _, err := tree.FindByKey(sk)
+	record, _, err := tree.FindByKey(mtr, sk)
 	if errors.Is(err, btree.ErrKeyNotFound) {
 		return ErrForeignKeyViolation
 	}
@@ -262,10 +268,12 @@ func hasActiveChildRecord(
 	indexRecord dictionary.IndexMetaRecord,
 	value string,
 ) error {
+	mtr := buffer.NewMtr(bp)
+	defer mtr.UnpinAll()
 	tree := btree.NewTree(bp, indexRecord.MetaPageId())
 	sk := encode.Encode(nil, [][]byte{[]byte(value)})
 
-	iter, err := tree.Search(btree.SearchModeKey{Key: sk})
+	iter, err := tree.Search(mtr, btree.SearchModeKey{Key: sk})
 	if err != nil {
 		return err
 	}

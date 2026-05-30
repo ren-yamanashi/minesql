@@ -22,14 +22,14 @@ func CreateConstraintMeta(bp *buffer.Pool) (*ConstraintMeta, error) {
 	return &ConstraintMeta{tree: tree}, nil
 }
 
-func (cm *ConstraintMeta) Search(mode SearchMode) (*ConstraintIterator, error) {
-	iter, err := cm.tree.Search(mode.Encode())
+func (cm *ConstraintMeta) Search(mtr *buffer.Mtr, mode SearchMode) (*ConstraintIterator, error) {
+	iter, err := cm.tree.Search(mtr, mode.Encode())
 	if err != nil {
 		return nil, err
 	}
 	return NewConstraintIterator(iter), nil
 }
 
-func (cm *ConstraintMeta) Insert(record ConstraintMetaRecord) error {
-	return cm.tree.Insert(record.Encode())
+func (cm *ConstraintMeta) Insert(mtr *buffer.Mtr, record ConstraintMetaRecord) error {
+	return cm.tree.Insert(mtr, record.Encode())
 }

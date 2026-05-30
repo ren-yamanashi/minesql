@@ -5,25 +5,25 @@ import (
 )
 
 // Delete は B+Tree からレコードを削除する
-func (t *Tree) Delete(key []byte) error {
+func (t *Tree) Delete(mtr *buffer.Mtr, key []byte) error {
 	// メタページを取得
-	pageMeta, err := t.bufferPool.PageForWrite(t.MetaPageId())
+	pageMeta, err := mtr.PageForWrite(t.MetaPageId())
 	if err != nil {
 		return err
 	}
-	defer t.bufferPool.Unpin(t.MetaPageId())
+	defer mtr.Unpin(t.MetaPageId())
 	metaPage := newMetaPage(pageMeta.Data())
 
 	// ルートページを取得
 	rootPageId := metaPage.rootPageId()
-	bufPageRoot, err := t.bufferPool.PageForRead(rootPageId)
+	bufPageRoot, err := mtr.PageForRead(rootPageId)
 	if err != nil {
 		return err
 	}
-	defer t.bufferPool.Unpin(rootPageId)
+	defer mtr.Unpin(rootPageId)
 
 	// 再帰的に削除
-	underflow, isLeafMerged, err := t.deleteRecursively(bufPageRoot, key)
+	underflow, isLeafMerged, err := t.deleteRecursively(mtr, bufPageRoot, key)
 	if err != nil {
 		return err
 	}
@@ -64,12 +64,12 @@ func (t *Tree) Delete(key []byte) error {
 //   - return:
 //   - underflow: アンダーフローが発生したか
 //   - isLeafMerged: リーフノードのマージが発生したか
-func (t *Tree) deleteRecursively(bufPage *buffer.Page, key []byte) (underflow bool, isLeafMerged bool, err error) {
-	pg, err := t.bufferPool.PageForWrite(bufPage.PageId())
+func (t *Tree) deleteRecursively(mtr *buffer.Mtr, bufPage *buffer.Page, key []byte) (underflow bool, isLeafMerged bool, err error) {
+	pg, err := mtr.PageForWrite(bufPage.PageId())
 	if err != nil {
 		return false, false, err
 	}
-	defer t.bufferPool.Unpin(bufPage.PageId())
+	defer mtr.Unpin(bufPage.PageId())
 	nt := nodeType(pg.Data())
 
 	switch nt {
@@ -85,14 +85,14 @@ func (t *Tree) deleteRecursively(bufPage *buffer.Page, key []byte) (underflow bo
 		if err != nil {
 			return false, false, err
 		}
-		childBufPage, err := t.bufferPool.PageForRead(childPageId)
+		childBufPage, err := mtr.PageForRead(childPageId)
 		if err != nil {
 			return false, false, err
 		}
-		defer t.bufferPool.Unpin(childPageId)
+		defer mtr.Unpin(childPageId)
 
 		// 子ノードに対して削除処理を再帰的に実行
-		underflow, isLeafMerged, err := t.deleteRecursively(childBufPage, key)
+		underflow, isLeafMerged, err := t.deleteRecursively(mtr, childBufPage, key)
 		if err != nil {
 			return false, false, err
 		}
@@ -101,7 +101,7 @@ func (t *Tree) deleteRecursively(bufPage *buffer.Page, key []byte) (underflow bo
 			return false, isLeafMerged, nil
 		}
 		// 子ノードがアンダーフローした場合、兄弟ノードとマージ
-		uf, lm, err := t.deleteUnderflow(branchNode, childBufPage, childSlotNum)
+		uf, lm, err := t.deleteUnderflow(mtr, branchNode, childBufPage, childSlotNum)
 		return uf, isLeafMerged || lm, err
 
 	// リーフノードの場合: そのまま削除する

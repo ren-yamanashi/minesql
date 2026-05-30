@@ -3,6 +3,7 @@ package dictionary
 import (
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -10,9 +11,11 @@ import (
 func TestConstraintIteratorClose(t *testing.T) {
 	t.Run("検索結果のイテレータを Close できる", func(t *testing.T) {
 		// GIVEN
-		cm := setupTestConstraintMeta(t)
-		_ = cm.Insert(NewConstraintMetaRecord(page.FileId(1), "id", "PRIMARY", page.FileId(0), ""))
-		iter, err := cm.Search(SearchModeStart{})
+		cm, bp := setupTestConstraintMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		_ = cm.Insert(mtr, NewConstraintMetaRecord(page.FileId(1), "id", "PRIMARY", page.FileId(0), ""))
+		iter, err := cm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 
 		// WHEN
@@ -24,8 +27,10 @@ func TestConstraintIteratorClose(t *testing.T) {
 
 	t.Run("イテレーション前に Close できる", func(t *testing.T) {
 		// GIVEN
-		cm := setupTestConstraintMeta(t)
-		iter, err := cm.Search(SearchModeStart{})
+		cm, bp := setupTestConstraintMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		iter, err := cm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 
 		// WHEN
@@ -37,10 +42,12 @@ func TestConstraintIteratorClose(t *testing.T) {
 func TestConstraintIteratorNext(t *testing.T) {
 	t.Run("レコードを順に取得できる", func(t *testing.T) {
 		// GIVEN
-		cm := setupTestConstraintMeta(t)
-		_ = cm.Insert(NewConstraintMetaRecord(page.FileId(1), "id", "PRIMARY", page.FileId(0), ""))
-		_ = cm.Insert(NewConstraintMetaRecord(page.FileId(2), "user_id", "fk_orders_users", page.FileId(1), "id"))
-		iter, err := cm.Search(SearchModeStart{})
+		cm, bp := setupTestConstraintMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		_ = cm.Insert(mtr, NewConstraintMetaRecord(page.FileId(1), "id", "PRIMARY", page.FileId(0), ""))
+		_ = cm.Insert(mtr, NewConstraintMetaRecord(page.FileId(2), "user_id", "fk_orders_users", page.FileId(1), "id"))
+		iter, err := cm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter.Close()
 
@@ -72,8 +79,10 @@ func TestConstraintIteratorNext(t *testing.T) {
 
 	t.Run("空のメタデータの場合は false を返す", func(t *testing.T) {
 		// GIVEN
-		cm := setupTestConstraintMeta(t)
-		iter, err := cm.Search(SearchModeStart{})
+		cm, bp := setupTestConstraintMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		iter, err := cm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter.Close()
 

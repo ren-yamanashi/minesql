@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -25,12 +26,14 @@ func TestCreateTableMeta(t *testing.T) {
 func TestTableMetaSearch(t *testing.T) {
 	t.Run("SearchModeStart で全件スキャンできる", func(t *testing.T) {
 		// GIVEN
-		tm := setupTestTableMeta(t)
-		_ = tm.Insert(NewTableMetaRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
-		_ = tm.Insert(NewTableMetaRecord("orders", page.NewId(page.FileId(2), page.PageNumber(0)), 5))
+		tm, bp := setupTestTableMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		_ = tm.Insert(mtr, NewTableMetaRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
+		_ = tm.Insert(mtr, NewTableMetaRecord("orders", page.NewId(page.FileId(2), page.PageNumber(0)), 5))
 
 		// WHEN
-		iter, err := tm.Search(SearchModeStart{})
+		iter, err := tm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 
 		r1, ok1, err1 := iter.Next()
@@ -56,10 +59,12 @@ func TestTableMetaSearch(t *testing.T) {
 
 	t.Run("空のメタデータを検索するとレコードが返らない", func(t *testing.T) {
 		// GIVEN
-		tm := setupTestTableMeta(t)
+		tm, bp := setupTestTableMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		iter, err := tm.Search(SearchModeStart{})
+		iter, err := tm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 
 		_, ok, err := iter.Next()
@@ -73,10 +78,12 @@ func TestTableMetaSearch(t *testing.T) {
 func TestTableMetaInsert(t *testing.T) {
 	t.Run("テーブルメタデータを挿入できる", func(t *testing.T) {
 		// GIVEN
-		tm := setupTestTableMeta(t)
+		tm, bp := setupTestTableMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		err := tm.Insert(NewTableMetaRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
+		err := tm.Insert(mtr, NewTableMetaRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
 
 		// THEN
 		assert.NoError(t, err)
@@ -84,11 +91,13 @@ func TestTableMetaInsert(t *testing.T) {
 
 	t.Run("同じテーブル名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
 		// GIVEN
-		tm := setupTestTableMeta(t)
-		_ = tm.Insert(NewTableMetaRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
+		tm, bp := setupTestTableMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		_ = tm.Insert(mtr, NewTableMetaRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
 
 		// WHEN
-		err := tm.Insert(NewTableMetaRecord("users", page.NewId(page.FileId(2), page.PageNumber(0)), 5))
+		err := tm.Insert(mtr, NewTableMetaRecord("users", page.NewId(page.FileId(2), page.PageNumber(0)), 5))
 
 		// THEN
 		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
@@ -96,11 +105,13 @@ func TestTableMetaInsert(t *testing.T) {
 
 	t.Run("異なるテーブル名であれば複数挿入できる", func(t *testing.T) {
 		// GIVEN
-		tm := setupTestTableMeta(t)
-		_ = tm.Insert(NewTableMetaRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
+		tm, bp := setupTestTableMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		_ = tm.Insert(mtr, NewTableMetaRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
 
 		// WHEN
-		err := tm.Insert(NewTableMetaRecord("orders", page.NewId(page.FileId(2), page.PageNumber(0)), 5))
+		err := tm.Insert(mtr, NewTableMetaRecord("orders", page.NewId(page.FileId(2), page.PageNumber(0)), 5))
 
 		// THEN
 		assert.NoError(t, err)
@@ -108,12 +119,12 @@ func TestTableMetaInsert(t *testing.T) {
 }
 
 // setupTestTableMeta はテスト用の TableMeta を作成する
-func setupTestTableMeta(t *testing.T) *TableMeta {
+func setupTestTableMeta(t *testing.T) (*TableMeta, *buffer.Pool) {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
 	tm, err := CreateTableMeta(bp)
 	if err != nil {
 		t.Fatalf("TableMeta の作成に失敗: %v", err)
 	}
-	return tm
+	return tm, bp
 }

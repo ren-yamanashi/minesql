@@ -82,8 +82,8 @@ func createSecondaryIndex(
 }
 
 // search は指定した検索モードでインデックスを検索し、イテレータを返す
-func (si *secondaryIndex) search(mode SearchMode) (*SecondaryIndexIterator, error) {
-	iter, err := si.tree.Search(mode.Encode())
+func (si *secondaryIndex) search(mtr *buffer.Mtr, mode SearchMode) (*SecondaryIndexIterator, error) {
+	iter, err := si.tree.Search(mtr, mode.Encode())
 	if err != nil {
 		return nil, err
 	}
@@ -93,19 +93,19 @@ func (si *secondaryIndex) search(mode SearchMode) (*SecondaryIndexIterator, erro
 // insert は行を挿入する
 //   - unique index の場合かつセカンダリキーの重複があるとエラー
 //   - 論理削除済みの同一キー (SK + PK) が存在する場合は上書きする
-func (si *secondaryIndex) insert(record *SecondaryRecord, trxId lock.TrxId) error {
+func (si *secondaryIndex) insert(mtr *buffer.Mtr, record *SecondaryRecord, trxId lock.TrxId) error {
 	if si.unique {
-		if err := si.checkUnique(record); err != nil {
+		if err := si.checkUnique(mtr, record); err != nil {
 			return err
 		}
 	}
 	encodedRecord := record.Encode()
 
 	// 挿入
-	err := si.tree.Insert(encodedRecord)
+	err := si.tree.Insert(mtr, encodedRecord)
 	// 重複キーエラーの場合、既存のレコードが論理削除済みか確認
 	if errors.Is(err, btree.ErrDuplicateKey) {
-		existing, _, findErr := si.tree.FindByKey(encodedRecord.Key())
+		existing, _, findErr := si.tree.FindByKey(mtr, encodedRecord.Key())
 		if findErr != nil {
 			return findErr
 		}
@@ -115,7 +115,7 @@ func (si *secondaryIndex) insert(record *SecondaryRecord, trxId lock.TrxId) erro
 			return btree.ErrDuplicateKey
 		}
 		// 論理削除済みの場合は上書き
-		if updateErr := si.tree.Update(encodedRecord); updateErr != nil {
+		if updateErr := si.tree.Update(mtr, encodedRecord); updateErr != nil {
 			return updateErr
 		}
 	} else if err != nil {
@@ -123,7 +123,7 @@ func (si *secondaryIndex) insert(record *SecondaryRecord, trxId lock.TrxId) erro
 	}
 
 	// 排他ロックを取得
-	_, pos, err := si.tree.FindByKey(encodedRecord.Key())
+	_, pos, err := si.tree.FindByKey(mtr, encodedRecord.Key())
 	if err != nil {
 		return err
 	}
@@ -131,10 +131,10 @@ func (si *secondaryIndex) insert(record *SecondaryRecord, trxId lock.TrxId) erro
 }
 
 // delete は行を物理削除する
-func (si *secondaryIndex) delete(record *SecondaryRecord, trxId lock.TrxId) error {
+func (si *secondaryIndex) delete(mtr *buffer.Mtr, record *SecondaryRecord, trxId lock.TrxId) error {
 	// 排他ロックを取得
 	encodedRecord := record.Encode()
-	_, pos, err := si.tree.FindByKey(encodedRecord.Key())
+	_, pos, err := si.tree.FindByKey(mtr, encodedRecord.Key())
 	if err != nil {
 		return err
 	}
@@ -143,14 +143,14 @@ func (si *secondaryIndex) delete(record *SecondaryRecord, trxId lock.TrxId) erro
 	}
 
 	// 物理削除
-	return si.tree.Delete(encodedRecord.Key())
+	return si.tree.Delete(mtr, encodedRecord.Key())
 }
 
 // softDelete は行を論理削除する
-func (si *secondaryIndex) softDelete(record *SecondaryRecord, trxId lock.TrxId) error {
+func (si *secondaryIndex) softDelete(mtr *buffer.Mtr, record *SecondaryRecord, trxId lock.TrxId) error {
 	// 排他ロックを取得
 	encodedRecord := record.Encode()
-	_, pos, err := si.tree.FindByKey(encodedRecord.Key())
+	_, pos, err := si.tree.FindByKey(mtr, encodedRecord.Key())
 	if err != nil {
 		return err
 	}
@@ -171,7 +171,7 @@ func (si *secondaryIndex) softDelete(record *SecondaryRecord, trxId lock.TrxId) 
 	if err != nil {
 		return err
 	}
-	return si.tree.Update(deleted.Encode())
+	return si.tree.Update(mtr, deleted.Encode())
 }
 
 // leafPageCount はリーフページ数を取得する
@@ -186,10 +186,10 @@ func (si *secondaryIndex) height() (uint64, error) {
 
 // checkUnique は record のセカンダリキーに対して active なレコードが存在するか確認する
 //   - return: 存在する場合は ErrDuplicateKey
-func (si *secondaryIndex) checkUnique(sr *SecondaryRecord) error {
+func (si *secondaryIndex) checkUnique(mtr *buffer.Mtr, sr *SecondaryRecord) error {
 	encodedSk := sr.encodedSecondaryKey()
 	// セカンダリインデックスのキーは SK+PK の構成であり、SK のみで SearchModeKey を使うと SK 以上の最初のキーの位置に着地する
-	iter, err := si.tree.Search(btree.SearchModeKey{Key: encodedSk})
+	iter, err := si.tree.Search(mtr, btree.SearchModeKey{Key: encodedSk})
 	if err != nil {
 		return err
 	}

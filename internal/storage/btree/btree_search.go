@@ -3,28 +3,29 @@ package btree
 import (
 	"bytes"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 // Search は指定された検索モードで B+Tree を検索する
-func (t *Tree) Search(mode SearchMode) (*Iterator, error) {
+func (t *Tree) Search(mtr *buffer.Mtr, mode SearchMode) (*Iterator, error) {
 	// メタページ取得
-	pageMeta, err := t.bufferPool.PageForRead(t.MetaPageId())
+	pageMeta, err := mtr.PageForRead(t.MetaPageId())
 	if err != nil {
 		return nil, err
 	}
-	defer t.bufferPool.Unpin(t.MetaPageId())
+	defer mtr.Unpin(t.MetaPageId())
 	metaPage := newMetaPage(pageMeta.Data())
 
 	// ルートページ取得
 	rootPageId := metaPage.rootPageId()
 
-	return t.searchRecursively(rootPageId, mode)
+	return t.searchRecursively(mtr, rootPageId, mode)
 }
 
 // FindByKey は指定されたキーで B+Tree を検索し、完全一致するレコードとその物理的な位置を返す (キーが見つからない場合は ErrKeyNotFound)
-func (t *Tree) FindByKey(key []byte) (Record, RecordPosition, error) {
-	iter, err := t.Search(SearchModeKey{Key: key})
+func (t *Tree) FindByKey(mtr *buffer.Mtr, key []byte) (Record, RecordPosition, error) {
+	iter, err := t.Search(mtr, SearchModeKey{Key: key})
 	if err != nil {
 		return nil, RecordPosition{}, err
 	}
@@ -47,8 +48,8 @@ func (t *Tree) FindByKey(key []byte) (Record, RecordPosition, error) {
 }
 
 // searchRecursively は再帰的にノードを辿って該当のリーフノードを見つける
-func (t *Tree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator, error) {
-	bufPage, err := t.bufferPool.PageForRead(nodePageId)
+func (t *Tree) searchRecursively(mtr *buffer.Mtr, nodePageId page.Id, mode SearchMode) (*Iterator, error) {
+	bufPage, err := mtr.PageForRead(nodePageId)
 	if err != nil {
 		return nil, err
 	}
@@ -57,19 +58,21 @@ func (t *Tree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator
 	switch nt {
 	// ブランチノードの場合、子ノードに対して再帰探索する
 	case nodeTypeBranch:
-		defer t.bufferPool.Unpin(nodePageId)
+		defer mtr.Unpin(nodePageId)
 		branchNode := newBranchNode(bufPage.Data())
 		childPageId, err := mode.childPageId(branchNode)
 		if err != nil {
 			return nil, err
 		}
-		return t.searchRecursively(childPageId, mode)
+		return t.searchRecursively(mtr, childPageId, mode)
 
 	// リーフノードの場合、検索モードに応じて探索する
 	case nodeTypeLeaf:
 		leafNode := newLeafNode(bufPage.Data())
 		slotNum := mode.slotNum(leafNode)
 		iter := NewIterator(t.bufferPool, *bufPage, slotNum)
+		// リーフの Pin は走査側 (Iterator) が引き継ぐため、mtr の管理から外す
+		mtr.Detach(nodePageId)
 		// 検索対象のキーが現在のリーフノードの末端のレコードより大きい場合、次のリーフノードに進める
 		// 例: リーフノードに (1, ...), (3, ...), (5, ...) のレコードが格納されている場合に、キー 6 を検索したいときなど
 		// (この場合 SearchSlotNum は NumRecords と等しい値を返す)
@@ -84,18 +87,19 @@ func (t *Tree) searchRecursively(nodePageId page.Id, mode SearchMode) (*Iterator
 		return iter, nil
 
 	default:
-		t.bufferPool.Unpin(nodePageId)
+		mtr.Unpin(nodePageId)
 		return nil, errUnknownNodeType
 	}
 }
 
 // leafPageIds はブランチページのみ辿り、全リーフページの PageId を収集する
 func (t *Tree) leafPageIds() ([]page.Id, error) {
-	pageMeta, err := t.bufferPool.PageForRead(t.MetaPageId())
+	mtr := buffer.NewMtr(t.bufferPool)
+	defer mtr.UnpinAll()
+	pageMeta, err := mtr.PageForRead(t.MetaPageId())
 	if err != nil {
 		return nil, err
 	}
-	defer t.bufferPool.Unpin(t.MetaPageId())
 	metaPage := newMetaPage(pageMeta.Data())
 	rootPageId := metaPage.rootPageId()
 	height := metaPage.height()
@@ -111,7 +115,7 @@ func (t *Tree) leafPageIds() ([]page.Id, error) {
 	for range height - 1 {
 		var nextLevel []page.Id
 		for _, nodePageId := range currentLevel {
-			pg, err := t.bufferPool.PageForRead(nodePageId)
+			pg, err := mtr.PageForRead(nodePageId)
 			if err != nil {
 				return nil, err
 			}
@@ -125,7 +129,7 @@ func (t *Tree) leafPageIds() ([]page.Id, error) {
 				nextLevel = append(nextLevel, childPageId)
 			}
 			nextLevel = append(nextLevel, branchNode.rightChildPageId())
-			t.bufferPool.Unpin(nodePageId)
+			mtr.Unpin(nodePageId)
 		}
 		currentLevel = nextLevel
 	}

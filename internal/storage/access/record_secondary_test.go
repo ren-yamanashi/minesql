@@ -333,28 +333,30 @@ func setupSecondaryTestCatalog(t *testing.T) *dictionary.Catalog {
 
 	tableFileId := page.FileId(2)
 	dummyPageId := page.NewId(tableFileId, page.PageNumber(0))
-	_ = ct.TableMeta().Insert(dictionary.NewTableMetaRecord("users", dummyPageId, 3))
-	_ = ct.ColumnMeta().Insert(dictionary.NewColumnMetaRecord(tableFileId, "id", 0))
-	_ = ct.ColumnMeta().Insert(dictionary.NewColumnMetaRecord(tableFileId, "name", 1))
-	_ = ct.ColumnMeta().Insert(dictionary.NewColumnMetaRecord(tableFileId, "email", 2))
+	mtr := buffer.NewMtr(bp)
+	defer mtr.UnpinAll()
+	_ = ct.TableMeta().Insert(mtr, dictionary.NewTableMetaRecord("users", dummyPageId, 3))
+	_ = ct.ColumnMeta().Insert(mtr, dictionary.NewColumnMetaRecord(tableFileId, "id", 0))
+	_ = ct.ColumnMeta().Insert(mtr, dictionary.NewColumnMetaRecord(tableFileId, "name", 1))
+	_ = ct.ColumnMeta().Insert(mtr, dictionary.NewColumnMetaRecord(tableFileId, "email", 2))
 
 	// PRIMARY: プライマリインデックス, カラム (id)
 	indexId0 := dictionary.IndexId(0)
-	_ = ct.IndexMeta().Insert(dictionary.NewIndexMetaRecord(tableFileId, indexId0, dictionary.PrimaryIndexName, dictionary.IndexTypePrimary, 1, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnMetaRecord(indexId0, "id", 0))
+	_ = ct.IndexMeta().Insert(mtr, dictionary.NewIndexMetaRecord(tableFileId, indexId0, dictionary.PrimaryIndexName, dictionary.IndexTypePrimary, 1, dummyPageId))
+	_ = ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(indexId0, "id", 0))
 
 	indexId1 := dictionary.IndexId(1)
-	_ = ct.IndexMeta().Insert(dictionary.NewIndexMetaRecord(tableFileId, indexId1, "idx_name", dictionary.IndexTypeNonUnique, 1, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnMetaRecord(indexId1, "name", 0))
+	_ = ct.IndexMeta().Insert(mtr, dictionary.NewIndexMetaRecord(tableFileId, indexId1, "idx_name", dictionary.IndexTypeNonUnique, 1, dummyPageId))
+	_ = ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(indexId1, "name", 0))
 
 	indexId2 := dictionary.IndexId(2)
-	_ = ct.IndexMeta().Insert(dictionary.NewIndexMetaRecord(tableFileId, indexId2, "idx_email", dictionary.IndexTypeUnique, 1, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnMetaRecord(indexId2, "email", 0))
+	_ = ct.IndexMeta().Insert(mtr, dictionary.NewIndexMetaRecord(tableFileId, indexId2, "idx_email", dictionary.IndexTypeUnique, 1, dummyPageId))
+	_ = ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(indexId2, "email", 0))
 
 	indexId3 := dictionary.IndexId(3)
-	_ = ct.IndexMeta().Insert(dictionary.NewIndexMetaRecord(tableFileId, indexId3, "idx_name_email", dictionary.IndexTypeNonUnique, 2, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnMetaRecord(indexId3, "name", 0))
-	_ = ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnMetaRecord(indexId3, "email", 1))
+	_ = ct.IndexMeta().Insert(mtr, dictionary.NewIndexMetaRecord(tableFileId, indexId3, "idx_name_email", dictionary.IndexTypeNonUnique, 2, dummyPageId))
+	_ = ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(indexId3, "name", 0))
+	_ = ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(indexId3, "email", 1))
 
 	return ct
 }

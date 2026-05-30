@@ -107,8 +107,11 @@ func registerTableMeta(
 	pi *primaryIndex,
 	input CreateTableInput,
 ) error {
+	mtr := buffer.NewMtr(ct.BufferPool())
+	defer mtr.UnpinAll()
+
 	// テーブルメタ
-	if err := ct.TableMeta().Insert(dictionary.NewTableMetaRecord(input.TableName, pi.tree.MetaPageId(), len(input.ColNames))); err != nil {
+	if err := ct.TableMeta().Insert(mtr, dictionary.NewTableMetaRecord(input.TableName, pi.tree.MetaPageId(), len(input.ColNames))); err != nil {
 		return err
 	}
 
@@ -117,7 +120,7 @@ func registerTableMeta(
 	if err != nil {
 		return err
 	}
-	err = ct.IndexMeta().Insert(dictionary.NewIndexMetaRecord(
+	err = ct.IndexMeta().Insert(mtr, dictionary.NewIndexMetaRecord(
 		fileId,
 		indexId,
 		dictionary.PrimaryIndexName,
@@ -131,7 +134,7 @@ func registerTableMeta(
 
 	// カラムメタ
 	for i, col := range input.ColNames {
-		if err := ct.ColumnMeta().Insert(dictionary.NewColumnMetaRecord(fileId, col, i)); err != nil {
+		if err := ct.ColumnMeta().Insert(mtr, dictionary.NewColumnMetaRecord(fileId, col, i)); err != nil {
 			return err
 		}
 	}
@@ -147,6 +150,9 @@ func createSecondaryIndexes(
 	lock *lock.Manager,
 	inputs []CreateIndexInput,
 ) ([]*secondaryIndex, error) {
+	mtr := buffer.NewMtr(ct.BufferPool())
+	defer mtr.UnpinAll()
+
 	indexes := make([]*secondaryIndex, 0, len(inputs))
 	for _, input := range inputs {
 		indexId, err := ct.AllocateIndexId()
@@ -164,7 +170,7 @@ func createSecondaryIndexes(
 		if err != nil {
 			return nil, err
 		}
-		err = ct.IndexMeta().Insert(dictionary.NewIndexMetaRecord(
+		err = ct.IndexMeta().Insert(mtr, dictionary.NewIndexMetaRecord(
 			fileId,
 			indexId,
 			input.IndexName,
@@ -177,7 +183,7 @@ func createSecondaryIndexes(
 		}
 
 		for i, keyCol := range input.ColNames {
-			if err := ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnMetaRecord(indexId, keyCol, i)); err != nil {
+			if err := ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(indexId, keyCol, i)); err != nil {
 				return nil, err
 			}
 		}
@@ -190,12 +196,14 @@ func createSecondaryIndexes(
 
 // createConstraints は制約をカタログに登録する
 func createConstraints(ct *dictionary.Catalog, fileId page.FileId, inputs []CreateConstraintInput) error {
+	mtr := buffer.NewMtr(ct.BufferPool())
+	defer mtr.UnpinAll()
 	for _, input := range inputs {
 		refTable, err := fetchTable(ct, input.ReferenceTableName)
 		if err != nil {
 			return err
 		}
-		err = ct.ConstraintMeta().Insert(dictionary.NewConstraintMetaRecord(
+		err = ct.ConstraintMeta().Insert(mtr, dictionary.NewConstraintMetaRecord(
 			fileId,
 			input.ColumnName,
 			input.ConstraintName,

@@ -3,15 +3,18 @@ package dictionary
 import (
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestIndexKeyColumnIteratorClose(t *testing.T) {
 	t.Run("検索結果のイテレータを Close できる", func(t *testing.T) {
 		// GIVEN
-		kcm := setupTestIndexKeyColumnMeta(t)
-		_ = kcm.Insert(NewIndexKeyColumnMetaRecord(IndexId(1), "name", 1))
-		iter, err := kcm.Search(SearchModeStart{})
+		kcm, bp := setupTestIndexKeyColumnMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		_ = kcm.Insert(mtr, NewIndexKeyColumnMetaRecord(IndexId(1), "name", 1))
+		iter, err := kcm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 
 		// WHEN
@@ -23,8 +26,10 @@ func TestIndexKeyColumnIteratorClose(t *testing.T) {
 
 	t.Run("イテレーション前に Close できる", func(t *testing.T) {
 		// GIVEN
-		kcm := setupTestIndexKeyColumnMeta(t)
-		iter, err := kcm.Search(SearchModeStart{})
+		kcm, bp := setupTestIndexKeyColumnMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		iter, err := kcm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 
 		// WHEN
@@ -36,10 +41,12 @@ func TestIndexKeyColumnIteratorClose(t *testing.T) {
 func TestIndexKeyColumnIteratorNext(t *testing.T) {
 	t.Run("レコードを順に取得できる", func(t *testing.T) {
 		// GIVEN
-		kcm := setupTestIndexKeyColumnMeta(t)
-		_ = kcm.Insert(NewIndexKeyColumnMetaRecord(IndexId(1), "name", 1))
-		_ = kcm.Insert(NewIndexKeyColumnMetaRecord(IndexId(1), "age", 2))
-		iter, err := kcm.Search(SearchModeStart{})
+		kcm, bp := setupTestIndexKeyColumnMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		_ = kcm.Insert(mtr, NewIndexKeyColumnMetaRecord(IndexId(1), "name", 1))
+		_ = kcm.Insert(mtr, NewIndexKeyColumnMetaRecord(IndexId(1), "age", 2))
+		iter, err := kcm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter.Close()
 
@@ -66,8 +73,10 @@ func TestIndexKeyColumnIteratorNext(t *testing.T) {
 
 	t.Run("空のメタデータの場合は false を返す", func(t *testing.T) {
 		// GIVEN
-		kcm := setupTestIndexKeyColumnMeta(t)
-		iter, err := kcm.Search(SearchModeStart{})
+		kcm, bp := setupTestIndexKeyColumnMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		iter, err := kcm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter.Close()
 

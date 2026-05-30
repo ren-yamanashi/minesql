@@ -3,6 +3,7 @@ package dictionary
 import (
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -10,9 +11,11 @@ import (
 func TestColumnIteratorClose(t *testing.T) {
 	t.Run("検索結果のイテレータを Close できる", func(t *testing.T) {
 		// GIVEN
-		cm := setupTestColumnMeta(t)
-		_ = cm.Insert(NewColumnMetaRecord(page.FileId(1), "id", 0))
-		iter, err := cm.Search(SearchModeStart{})
+		cm, bp := setupTestColumnMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		_ = cm.Insert(mtr, NewColumnMetaRecord(page.FileId(1), "id", 0))
+		iter, err := cm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 
 		// WHEN
@@ -24,8 +27,10 @@ func TestColumnIteratorClose(t *testing.T) {
 
 	t.Run("イテレーション前に Close できる", func(t *testing.T) {
 		// GIVEN
-		cm := setupTestColumnMeta(t)
-		iter, err := cm.Search(SearchModeStart{})
+		cm, bp := setupTestColumnMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		iter, err := cm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 
 		// WHEN
@@ -37,10 +42,12 @@ func TestColumnIteratorClose(t *testing.T) {
 func TestColumnIteratorNext(t *testing.T) {
 	t.Run("レコードを順に取得できる", func(t *testing.T) {
 		// GIVEN
-		cm := setupTestColumnMeta(t)
-		_ = cm.Insert(NewColumnMetaRecord(page.FileId(1), "id", 0))
-		_ = cm.Insert(NewColumnMetaRecord(page.FileId(1), "name", 1))
-		iter, err := cm.Search(SearchModeStart{})
+		cm, bp := setupTestColumnMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		_ = cm.Insert(mtr, NewColumnMetaRecord(page.FileId(1), "id", 0))
+		_ = cm.Insert(mtr, NewColumnMetaRecord(page.FileId(1), "name", 1))
+		iter, err := cm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter.Close()
 
@@ -67,8 +74,10 @@ func TestColumnIteratorNext(t *testing.T) {
 
 	t.Run("空のメタデータの場合は false を返す", func(t *testing.T) {
 		// GIVEN
-		cm := setupTestColumnMeta(t)
-		iter, err := cm.Search(SearchModeStart{})
+		cm, bp := setupTestColumnMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		iter, err := cm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter.Close()
 

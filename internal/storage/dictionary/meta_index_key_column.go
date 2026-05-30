@@ -22,14 +22,14 @@ func CreateIndexKeyColumnMeta(bp *buffer.Pool) (*IndexKeyColumnMeta, error) {
 	return &IndexKeyColumnMeta{tree: tree}, nil
 }
 
-func (kcm *IndexKeyColumnMeta) Search(mode SearchMode) (*IndexKeyColumnIterator, error) {
-	iter, err := kcm.tree.Search(mode.Encode())
+func (kcm *IndexKeyColumnMeta) Search(mtr *buffer.Mtr, mode SearchMode) (*IndexKeyColumnIterator, error) {
+	iter, err := kcm.tree.Search(mtr, mode.Encode())
 	if err != nil {
 		return nil, err
 	}
 	return NewIndexKeyColumnIterator(iter), nil
 }
 
-func (kcm *IndexKeyColumnMeta) Insert(record IndexKeyColumnMetaRecord) error {
-	return kcm.tree.Insert(record.Encode())
+func (kcm *IndexKeyColumnMeta) Insert(mtr *buffer.Mtr, record IndexKeyColumnMetaRecord) error {
+	return kcm.tree.Insert(mtr, record.Encode())
 }

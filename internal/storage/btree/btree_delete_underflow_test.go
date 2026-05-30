@@ -29,7 +29,9 @@ func TestDeleteUnderflow(t *testing.T) {
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x20}, childPageId, siblingPageId)
 
 		// WHEN
-		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 0)
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0)
 
 		// THEN
 		assert.NoError(t, err)
@@ -64,7 +66,9 @@ func TestDeleteUnderflow(t *testing.T) {
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x50}, siblingPageId, childPageId)
 
 		// WHEN (childSlotNum = NumRecords = 1 → 左の兄弟が選ばれる)
-		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 1)
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 1)
 
 		// THEN
 		assert.NoError(t, err)
@@ -103,7 +107,9 @@ func TestDeleteUnderflow(t *testing.T) {
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x50}, siblingPageId, childPageId)
 
 		// WHEN (childSlotNum = NumRecords = 1 → 左の兄弟が選ばれる)
-		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 1)
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 1)
 
 		// THEN
 		assert.NoError(t, err)
@@ -139,7 +145,9 @@ func TestDeleteUnderflow(t *testing.T) {
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x20}, childPageId, siblingPageId)
 
 		// WHEN
-		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 0)
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0)
 
 		// THEN
 		assert.NoError(t, err)
@@ -174,7 +182,9 @@ func TestDeleteUnderflow(t *testing.T) {
 		parentBranch.insert(1, NewRecord([]byte{}, []byte{0x50}, siblingPageId.Bytes()))
 
 		// WHEN (childSlotNum=0, sibling=slot1, RightChild=otherPageId)
-		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 0)
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0)
 
 		// THEN
 		assert.NoError(t, err)
@@ -203,7 +213,9 @@ func TestDeleteUnderflow(t *testing.T) {
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x20}, childPageId, siblingPageId)
 
 		// WHEN (sibling は 3 レコードで転送不可、child は 2 レコードで合計 5 レコード分はマージ不可)
-		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 0)
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0)
 
 		// THEN
 		assert.NoError(t, err)
@@ -232,7 +244,9 @@ func TestDeleteUnderflow(t *testing.T) {
 		siblingNumBefore := siblingBranch.numRecords()
 
 		// WHEN
-		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 0)
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0)
 
 		// THEN
 		assert.NoError(t, err)
@@ -261,7 +275,9 @@ func TestDeleteUnderflow(t *testing.T) {
 		siblingNumBefore := siblingBranch.numRecords()
 
 		// WHEN (childSlotNum = NumRecords = 1 → 左の兄弟が選ばれる)
-		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 1)
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 1)
 
 		// THEN
 		assert.NoError(t, err)
@@ -286,7 +302,9 @@ func TestDeleteUnderflow(t *testing.T) {
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x60}, siblingPageId, childPageId)
 
 		// WHEN (childSlotNum = NumRecords = 1 → 左の兄弟が選ばれる)
-		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 1)
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 1)
 
 		// THEN
 		assert.NoError(t, err)
@@ -310,7 +328,9 @@ func TestDeleteUnderflow(t *testing.T) {
 		parentBranch := initTestBranchNode(t, bp, parentPageId, []byte{0x50}, childPageId, siblingPageId)
 
 		// WHEN (childSlotNum=0, sibling=RightChild → childSlotNum+1 == NumRecords)
-		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 0)
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0)
 
 		// THEN
 		assert.NoError(t, err)
@@ -338,7 +358,9 @@ func TestDeleteUnderflow(t *testing.T) {
 		parentBranch.insert(1, NewRecord([]byte{}, []byte{0x70}, siblingPageId.Bytes()))
 
 		// WHEN (childSlotNum=0, sibling=slot1, RightChild=otherPageId)
-		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 0)
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0)
 
 		// THEN
 		assert.NoError(t, err)
@@ -366,7 +388,9 @@ func TestDeleteUnderflow(t *testing.T) {
 		siblingNumBefore := siblingBranch.numRecords()
 
 		// WHEN
-		underflow, isLeafMerged, err := bt.deleteUnderflow(parentBranch, childBufPage, 0)
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0)
 
 		// THEN
 		assert.NoError(t, err)

@@ -55,8 +55,8 @@ func createPrimaryIndex(
 }
 
 // search は指定した検索モードでテーブルを検索し、イテレータを返す
-func (pi *primaryIndex) search(mode SearchMode) (*PrimaryIndexIterator, error) {
-	iter, err := pi.tree.Search(mode.Encode())
+func (pi *primaryIndex) search(mtr *buffer.Mtr, mode SearchMode) (*PrimaryIndexIterator, error) {
+	iter, err := pi.tree.Search(mtr, mode.Encode())
 	if err != nil {
 		return nil, err
 	}
@@ -65,14 +65,14 @@ func (pi *primaryIndex) search(mode SearchMode) (*PrimaryIndexIterator, error) {
 
 // insert は行を挿入する
 // (論理削除済みの同一キーが存在する場合は上書きする)
-func (pi *primaryIndex) insert(record *PrimaryRecord, trxId lock.TrxId) error {
+func (pi *primaryIndex) insert(mtr *buffer.Mtr, record *PrimaryRecord, trxId lock.TrxId) error {
 	// 挿入
 	encodedRecord := record.Encode()
-	err := pi.tree.Insert(encodedRecord)
+	err := pi.tree.Insert(mtr, encodedRecord)
 
 	// 重複キーエラーの場合、既存のレコードが論理削除済みか確認
 	if errors.Is(err, btree.ErrDuplicateKey) {
-		existing, _, findErr := pi.tree.FindByKey(encodedRecord.Key())
+		existing, _, findErr := pi.tree.FindByKey(mtr, encodedRecord.Key())
 		if findErr != nil {
 			return findErr
 		}
@@ -82,7 +82,7 @@ func (pi *primaryIndex) insert(record *PrimaryRecord, trxId lock.TrxId) error {
 			return btree.ErrDuplicateKey
 		}
 		// 論理削除済みの場合は上書き
-		if updateErr := pi.tree.Update(encodedRecord); updateErr != nil {
+		if updateErr := pi.tree.Update(mtr, encodedRecord); updateErr != nil {
 			return updateErr
 		}
 	} else if err != nil {
@@ -90,7 +90,7 @@ func (pi *primaryIndex) insert(record *PrimaryRecord, trxId lock.TrxId) error {
 	}
 
 	// 排他ロックを取得
-	_, pos, err := pi.tree.FindByKey(encodedRecord.Key())
+	_, pos, err := pi.tree.FindByKey(mtr, encodedRecord.Key())
 	if err != nil {
 		return err
 	}
@@ -98,10 +98,10 @@ func (pi *primaryIndex) insert(record *PrimaryRecord, trxId lock.TrxId) error {
 }
 
 // delete は 行を物理削除する
-func (pi *primaryIndex) delete(record *PrimaryRecord, trxId lock.TrxId) error {
+func (pi *primaryIndex) delete(mtr *buffer.Mtr, record *PrimaryRecord, trxId lock.TrxId) error {
 	// 排他ロックを取得
 	encodedRecord := record.Encode()
-	_, pos, err := pi.tree.FindByKey(encodedRecord.Key())
+	_, pos, err := pi.tree.FindByKey(mtr, encodedRecord.Key())
 	if err != nil {
 		return err
 	}
@@ -110,14 +110,14 @@ func (pi *primaryIndex) delete(record *PrimaryRecord, trxId lock.TrxId) error {
 	}
 
 	// 物理削除
-	return pi.tree.Delete(encodedRecord.Key())
+	return pi.tree.Delete(mtr, encodedRecord.Key())
 }
 
 // softDelete は行を論理削除する
-func (pi *primaryIndex) softDelete(record *PrimaryRecord, trxId lock.TrxId) error {
+func (pi *primaryIndex) softDelete(mtr *buffer.Mtr, record *PrimaryRecord, trxId lock.TrxId) error {
 	// 排他ロックを取得
 	encodedRecord := record.Encode()
-	_, pos, err := pi.tree.FindByKey(encodedRecord.Key())
+	_, pos, err := pi.tree.FindByKey(mtr, encodedRecord.Key())
 	if err != nil {
 		return err
 	}
@@ -139,14 +139,14 @@ func (pi *primaryIndex) softDelete(record *PrimaryRecord, trxId lock.TrxId) erro
 	if err != nil {
 		return err
 	}
-	return pi.tree.Update(deleted.Encode())
+	return pi.tree.Update(mtr, deleted.Encode())
 }
 
 // update は行を更新する
-func (pi *primaryIndex) update(newRecord *PrimaryRecord, trxId lock.TrxId) error {
+func (pi *primaryIndex) update(mtr *buffer.Mtr, newRecord *PrimaryRecord, trxId lock.TrxId) error {
 	// 排他ロックを取得
 	encodedRecord := newRecord.Encode()
-	_, pos, err := pi.tree.FindByKey(encodedRecord.Key())
+	_, pos, err := pi.tree.FindByKey(mtr, encodedRecord.Key())
 	if err != nil {
 		return err
 	}
@@ -155,7 +155,7 @@ func (pi *primaryIndex) update(newRecord *PrimaryRecord, trxId lock.TrxId) error
 	}
 
 	// 更新
-	return pi.tree.Update(encodedRecord)
+	return pi.tree.Update(mtr, encodedRecord)
 }
 
 // fileId はテーブルの fileId を返す

@@ -15,7 +15,10 @@ func TestInsertBranchOverflow(t *testing.T) {
 		branchNode := setupTestBranchNode(t, bp)
 
 		// WHEN
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
 		overflowKey, newPageId, err := bt.insertBranchOverflow(
+			mtr,
 			branchNode,
 			1,
 			[]byte{0x20},
@@ -36,7 +39,10 @@ func TestInsertBranchOverflow(t *testing.T) {
 		fillBranchNodeUntilFull(branchNode)
 
 		// WHEN
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
 		overflowKey, newPageId, err := bt.insertBranchOverflow(
+			mtr,
 			branchNode,
 			branchNode.numRecords(),
 			[]byte{0xFF},

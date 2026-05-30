@@ -1,12 +1,16 @@
 package access
 
 import (
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
 // Insert はテーブルに行を挿入する
 func (t *Table) Insert(colNames []string, values []string, trxId lock.TrxId) error {
+	mtr := buffer.NewMtr(t.bufferPool)
+	defer mtr.UnpinAll()
+
 	// FK チェック
 	if err := t.checkForeignKeysForInsert(colNames, values); err != nil {
 		return err
@@ -32,14 +36,14 @@ func (t *Table) Insert(colNames []string, values []string, trxId lock.TrxId) err
 	record.setRollPtr(ptr)
 
 	// レコード挿入
-	if err := t.primaryIndex.insert(record, trxId); err != nil {
+	if err := t.primaryIndex.insert(mtr, record, trxId); err != nil {
 		return err
 	}
-	return t.insertSecondaryIndexes(record.colNames, record.values, trxId)
+	return t.insertSecondaryIndexes(mtr, record.colNames, record.values, trxId)
 }
 
 // insertSecondaryIndexes は全セカンダリインデックスにレコードを挿入する
-func (t *Table) insertSecondaryIndexes(colNames, values []string, trxId lock.TrxId) error {
+func (t *Table) insertSecondaryIndexes(mtr *buffer.Mtr, colNames, values []string, trxId lock.TrxId) error {
 	valMap := t.buildValMap(colNames, values)
 	pk := t.extractPrimaryKey(values)
 
@@ -53,7 +57,7 @@ func (t *Table) insertSecondaryIndexes(colNames, values []string, trxId lock.Trx
 		if err != nil {
 			return err
 		}
-		if err := si.insert(record, trxId); err != nil {
+		if err := si.insert(mtr, record, trxId); err != nil {
 			return err
 		}
 	}

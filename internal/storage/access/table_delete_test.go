@@ -3,6 +3,7 @@ package access
 import (
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 	"github.com/stretchr/testify/assert"
 )
@@ -18,7 +19,9 @@ func TestTableSoftDelete(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		iter, err := table.primaryIndex.search(SearchModeStart{})
+		mtr := buffer.NewMtr(table.bufferPool)
+		defer mtr.UnpinAll()
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -35,14 +38,16 @@ func TestTableSoftDelete(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
+		mtr := buffer.NewMtr(table.bufferPool)
+		defer mtr.UnpinAll()
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.search(SearchModeStart{})
+		nameIter, err := idxName.search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		_, ok, err := nameIter.Next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
-		emailIter, err := idxEmail.search(SearchModeStart{})
+		emailIter, err := idxEmail.search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		_, ok, err = emailIter.Next()
 		assert.NoError(t, err)
@@ -83,7 +88,9 @@ func TestTableSoftDelete(t *testing.T) {
 
 		// 論理削除済みレコードを直接 B+Tree から取得して rollPtr を確認
 		encodedRecord := record.Encode()
-		existing, _, err := table.primaryIndex.tree.FindByKey(encodedRecord.Key())
+		mtr := buffer.NewMtr(table.bufferPool)
+		defer mtr.UnpinAll()
+		existing, _, err := table.primaryIndex.tree.FindByKey(mtr, encodedRecord.Key())
 		assert.NoError(t, err)
 		decoded, err := DecodePrimaryRecord(existing, table.catalog, table.primaryIndex.fileId())
 		assert.NoError(t, err)
@@ -158,7 +165,9 @@ func TestTableDelete(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		iter, err := table.primaryIndex.search(SearchModeStart{})
+		mtr := buffer.NewMtr(table.bufferPool)
+		defer mtr.UnpinAll()
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -175,14 +184,16 @@ func TestTableDelete(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
+		mtr := buffer.NewMtr(table.bufferPool)
+		defer mtr.UnpinAll()
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.search(SearchModeStart{})
+		nameIter, err := idxName.search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		_, ok, err := nameIter.Next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
-		emailIter, err := idxEmail.search(SearchModeStart{})
+		emailIter, err := idxEmail.search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		_, ok, err = emailIter.Next()
 		assert.NoError(t, err)

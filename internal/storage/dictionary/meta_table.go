@@ -22,14 +22,14 @@ func CreateTableMeta(bp *buffer.Pool) (*TableMeta, error) {
 	return &TableMeta{tree: tree}, nil
 }
 
-func (tm *TableMeta) Search(mode SearchMode) (*TableIterator, error) {
-	iter, err := tm.tree.Search(mode.Encode())
+func (tm *TableMeta) Search(mtr *buffer.Mtr, mode SearchMode) (*TableIterator, error) {
+	iter, err := tm.tree.Search(mtr, mode.Encode())
 	if err != nil {
 		return nil, err
 	}
 	return NewTableIterator(iter), nil
 }
 
-func (tm *TableMeta) Insert(record TableMetaRecord) error {
-	return tm.tree.Insert(record.Encode())
+func (tm *TableMeta) Insert(mtr *buffer.Mtr, record TableMetaRecord) error {
+	return tm.tree.Insert(mtr, record.Encode())
 }

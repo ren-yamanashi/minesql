@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 	"github.com/stretchr/testify/assert"
@@ -125,7 +126,9 @@ func TestPurgePurge(t *testing.T) {
 
 		// 論理削除してコミット
 		trx2 := env.trxManager.Begin()
-		iter, _ := table.primaryIndex.search(SearchModeStart{})
+		mtr := buffer.NewMtr(env.bp)
+		defer mtr.UnpinAll()
+		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{})
 		record, _, _ := iter.Next()
 		_ = table.SoftDelete(record, trx2)
 		_ = env.trxManager.Commit(trx2)
@@ -136,7 +139,7 @@ func TestPurgePurge(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		// B+Tree から物理的にレコードが削除されている
-		treeIter, _ := table.primaryIndex.tree.Search(btree.SearchModeStart{})
+		treeIter, _ := table.primaryIndex.tree.Search(mtr, btree.SearchModeStart{})
 		_, ok, _ := treeIter.Get()
 		assert.False(t, ok)
 	})
@@ -158,7 +161,9 @@ func TestPurgePurge(t *testing.T) {
 
 		// name を更新してコミット (セカンダリインデックスの SK が変わる)
 		trx2 := env.trxManager.Begin()
-		iter, _ := table.primaryIndex.search(SearchModeStart{})
+		mtr := buffer.NewMtr(env.bp)
+		defer mtr.UnpinAll()
+		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{})
 		record, _, _ := iter.Next()
 		_ = table.Update(record, []string{"name"}, []string{"Bob"}, trx2)
 		_ = env.trxManager.Commit(trx2)
@@ -169,7 +174,7 @@ func TestPurgePurge(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		// プライマリインデックスのレコードは残っている (UPDATE はインプレース)
-		iter2, _ := table.primaryIndex.search(SearchModeStart{})
+		iter2, _ := table.primaryIndex.search(mtr, SearchModeStart{})
 		updated, ok, _ := iter2.Next()
 		assert.True(t, ok)
 		assert.Equal(t, "Bob", updated.values[1])
@@ -192,7 +197,9 @@ func TestPurgePurge(t *testing.T) {
 
 		// 論理削除用のトランザクションを開始
 		trx2 := env.trxManager.Begin()
-		iter, _ := table.primaryIndex.search(SearchModeStart{})
+		mtr := buffer.NewMtr(env.bp)
+		defer mtr.UnpinAll()
+		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{})
 		record, _, _ := iter.Next()
 		_ = table.SoftDelete(record, trx2)
 
@@ -209,7 +216,7 @@ func TestPurgePurge(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		// trx3 の ReadView が trx2 を参照しうるためパージされず、レコードが残っている
-		treeIter, _ := table.primaryIndex.tree.Search(btree.SearchModeStart{})
+		treeIter, _ := table.primaryIndex.tree.Search(mtr, btree.SearchModeStart{})
 		_, ok, _ := treeIter.Get()
 		assert.True(t, ok)
 	})

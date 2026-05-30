@@ -200,19 +200,21 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	// テーブル定義: id:0, name:1, email:2
 	tableFileId := page.FileId(2)
 	dummyPageId := page.NewId(tableFileId, page.PageNumber(0))
-	_ = ct.TableMeta().Insert(dictionary.NewTableMetaRecord("users", dummyPageId, 3))
-	_ = ct.ColumnMeta().Insert(dictionary.NewColumnMetaRecord(tableFileId, "id", 0))
-	_ = ct.ColumnMeta().Insert(dictionary.NewColumnMetaRecord(tableFileId, "name", 1))
-	_ = ct.ColumnMeta().Insert(dictionary.NewColumnMetaRecord(tableFileId, "email", 2))
+	mtr := buffer.NewMtr(bp)
+	defer mtr.UnpinAll()
+	_ = ct.TableMeta().Insert(mtr, dictionary.NewTableMetaRecord("users", dummyPageId, 3))
+	_ = ct.ColumnMeta().Insert(mtr, dictionary.NewColumnMetaRecord(tableFileId, "id", 0))
+	_ = ct.ColumnMeta().Insert(mtr, dictionary.NewColumnMetaRecord(tableFileId, "name", 1))
+	_ = ct.ColumnMeta().Insert(mtr, dictionary.NewColumnMetaRecord(tableFileId, "email", 2))
 
 	// インデックス定義
 	indexId1 := dictionary.IndexId(1)
-	_ = ct.IndexMeta().Insert(dictionary.NewIndexMetaRecord(tableFileId, indexId1, "idx_name", dictionary.IndexTypeNonUnique, 1, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnMetaRecord(indexId1, "name", 0))
+	_ = ct.IndexMeta().Insert(mtr, dictionary.NewIndexMetaRecord(tableFileId, indexId1, "idx_name", dictionary.IndexTypeNonUnique, 1, dummyPageId))
+	_ = ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(indexId1, "name", 0))
 
 	indexId2 := dictionary.IndexId(2)
-	_ = ct.IndexMeta().Insert(dictionary.NewIndexMetaRecord(tableFileId, indexId2, "idx_email", dictionary.IndexTypeUnique, 1, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnMetaRecord(indexId2, "email", 0))
+	_ = ct.IndexMeta().Insert(mtr, dictionary.NewIndexMetaRecord(tableFileId, indexId2, "idx_email", dictionary.IndexTypeUnique, 1, dummyPageId))
+	_ = ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(indexId2, "email", 0))
 
 	// プライマリ B+Tree
 	primaryTree, err := btree.CreateTree(bp, tableFileId)
@@ -241,7 +243,9 @@ func insertPrimaryRecord(t *testing.T, env *iteratorTestEnv, deleteMark byte, co
 	if err != nil {
 		t.Fatalf("PrimaryRecord の作成に失敗: %v", err)
 	}
-	if err := env.primaryTree.Insert(pr.Encode()); err != nil {
+	mtr := buffer.NewMtr(env.bp)
+	defer mtr.UnpinAll()
+	if err := env.primaryTree.Insert(mtr, pr.Encode()); err != nil {
 		t.Fatalf("プライマリレコードの挿入に失敗: %v", err)
 	}
 }
@@ -266,7 +270,9 @@ func insertSecondaryRecordWithDeleteMark(t *testing.T, env *iteratorTestEnv, del
 	if err != nil {
 		t.Fatalf("SecondaryRecord の作成に失敗: %v", err)
 	}
-	if err := env.secondaryTree.Insert(sr.Encode()); err != nil {
+	mtr := buffer.NewMtr(env.bp)
+	defer mtr.UnpinAll()
+	if err := env.secondaryTree.Insert(mtr, sr.Encode()); err != nil {
 		t.Fatalf("セカンダリレコードの挿入に失敗: %v", err)
 	}
 }
@@ -275,7 +281,9 @@ func insertSecondaryRecordWithDeleteMark(t *testing.T, env *iteratorTestEnv, del
 func searchSecondaryIndex(t *testing.T, env *iteratorTestEnv) *SecondaryIndexIterator {
 	t.Helper()
 	mode := SearchModeStart{}
-	iter, err := env.secondaryTree.Search(mode.Encode())
+	mtr := buffer.NewMtr(env.bp)
+	defer mtr.UnpinAll()
+	iter, err := env.secondaryTree.Search(mtr, mode.Encode())
 	if err != nil {
 		t.Fatalf("セカンダリインデックスの検索に失敗: %v", err)
 	}

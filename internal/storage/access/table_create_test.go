@@ -64,7 +64,9 @@ func TestCreateTable(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		iter, err := table.primaryIndex.search(SearchModeStart{})
+		mtr := buffer.NewMtr(env.bp)
+		defer mtr.UnpinAll()
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)

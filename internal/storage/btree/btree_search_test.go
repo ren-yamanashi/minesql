@@ -3,6 +3,7 @@ package btree
 import (
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -14,9 +15,11 @@ func TestSearch(t *testing.T) {
 		bt, _ := CreateTree(bp, page.FileId(0))
 		insertRecordToBtree(t, bt, []byte{0x10}, []byte{0xAA})
 		insertRecordToBtree(t, bt, []byte{0x20}, []byte{0xBB})
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		iter, err := bt.Search(SearchModeStart{})
+		iter, err := bt.Search(mtr, SearchModeStart{})
 
 		// THEN
 		assert.NoError(t, err)
@@ -31,9 +34,11 @@ func TestSearch(t *testing.T) {
 		bt, _ := CreateTree(bp, page.FileId(0))
 		insertRecordToBtree(t, bt, []byte{0x10}, []byte{0xAA})
 		insertRecordToBtree(t, bt, []byte{0x20}, []byte{0xBB})
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		iter, err := bt.Search(SearchModeKey{Key: []byte{0x20}})
+		iter, err := bt.Search(mtr, SearchModeKey{Key: []byte{0x20}})
 
 		// THEN
 		assert.NoError(t, err)
@@ -47,9 +52,11 @@ func TestSearch(t *testing.T) {
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateTree(bp, page.FileId(0))
 		insertRecordToBtree(t, bt, []byte{0x10}, []byte{0xAA})
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		iter, err := bt.Search(SearchModeKey{Key: []byte{0xFF}})
+		iter, err := bt.Search(mtr, SearchModeKey{Key: []byte{0xFF}})
 
 		// THEN
 		assert.NoError(t, err)
@@ -61,9 +68,11 @@ func TestSearch(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		iter, err := bt.Search(SearchModeStart{})
+		iter, err := bt.Search(mtr, SearchModeStart{})
 
 		// THEN
 		assert.NoError(t, err)
@@ -79,9 +88,11 @@ func TestFindByKey(t *testing.T) {
 		bt, _ := CreateTree(bp, page.FileId(0))
 		insertRecordToBtree(t, bt, []byte{0x10}, []byte{0xAA})
 		insertRecordToBtree(t, bt, []byte{0x20}, []byte{0xBB})
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		record, position, err := bt.FindByKey([]byte{0x20})
+		record, position, err := bt.FindByKey(mtr, []byte{0x20})
 
 		// THEN
 		assert.NoError(t, err)
@@ -97,9 +108,11 @@ func TestFindByKey(t *testing.T) {
 		bt, _ := CreateTree(bp, page.FileId(0))
 		insertRecordToBtree(t, bt, []byte{0x10}, []byte{0xAA})
 		insertRecordToBtree(t, bt, []byte{0x20}, []byte{0xBB})
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		record, position, err := bt.FindByKey([]byte{0x10})
+		record, position, err := bt.FindByKey(mtr, []byte{0x10})
 
 		// THEN
 		assert.NoError(t, err)
@@ -112,9 +125,11 @@ func TestFindByKey(t *testing.T) {
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateTree(bp, page.FileId(0))
 		insertRecordToBtree(t, bt, []byte{0x10}, []byte{0xAA})
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		_, _, err := bt.FindByKey([]byte{0xFF})
+		_, _, err := bt.FindByKey(mtr, []byte{0xFF})
 
 		// THEN
 		assert.ErrorIs(t, err, ErrKeyNotFound)
@@ -124,9 +139,11 @@ func TestFindByKey(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		_, _, err := bt.FindByKey([]byte{0x10})
+		_, _, err := bt.FindByKey(mtr, []byte{0x10})
 
 		// THEN
 		assert.ErrorIs(t, err, ErrKeyNotFound)
@@ -151,10 +168,12 @@ func TestLeafPageIds(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
 		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
 		nonKey := make([]byte, 1500)
-		_ = bt.Insert(NewRecord([]byte{}, []byte{0x01}, nonKey))
-		_ = bt.Insert(NewRecord([]byte{}, []byte{0x02}, nonKey))
-		_ = bt.Insert(NewRecord([]byte{}, []byte{0x03}, nonKey))
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x01}, nonKey))
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x02}, nonKey))
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x03}, nonKey))
 		height, _ := bt.Height()
 		assert.Equal(t, uint64(2), height)
 		leafCount, _ := bt.LeafPageCount()

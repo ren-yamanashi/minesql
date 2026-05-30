@@ -137,16 +137,20 @@ func (p *Purge) purgeUpdate(record undo.Record) error {
 
 // deletePrimaryRecord はプライマリレコードを物理削除する
 func (p *Purge) deletePrimaryRecord(fileId page.FileId, record btree.Record) error {
+	mtr := buffer.NewMtr(p.bufferPool)
+	defer mtr.UnpinAll()
 	piRecord, err := fetchPrimaryIndexRecord(p.transaction.catalog, fileId)
 	if err != nil {
 		return err
 	}
 	primaryTree := btree.NewTree(p.bufferPool, piRecord.MetaPageId())
-	return primaryTree.Delete(record.Key())
+	return primaryTree.Delete(mtr, record.Key())
 }
 
 // deleteSecondaryRecords は指定されたプライマリインデックスのレコードに対応するセカンダリインデックスの論理削除済みレコードを物理削除する
 func (p *Purge) deleteSecondaryRecords(fileId page.FileId, record btree.Record) error {
+	mtr := buffer.NewMtr(p.bufferPool)
+	defer mtr.UnpinAll()
 	prevRec, err := DecodePrimaryRecord(record, p.transaction.catalog, fileId)
 	if err != nil {
 		return err
@@ -166,7 +170,7 @@ func (p *Purge) deleteSecondaryRecords(fileId page.FileId, record btree.Record) 
 		tree := btree.NewTree(p.bufferPool, siRecord.MetaPageId())
 
 		// キーが存在し、deleteMark=1 の場合のみ物理削除
-		existing, _, err := tree.FindByKey(sk)
+		existing, _, err := tree.FindByKey(mtr, sk)
 		if errors.Is(err, btree.ErrKeyNotFound) {
 			continue
 		}
@@ -176,7 +180,7 @@ func (p *Purge) deleteSecondaryRecords(fileId page.FileId, record btree.Record) 
 		if existing.Header()[0] == 0 {
 			continue
 		}
-		if err := tree.Delete(sk); err != nil {
+		if err := tree.Delete(mtr, sk); err != nil {
 			return err
 		}
 	}

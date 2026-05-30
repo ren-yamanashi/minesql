@@ -22,14 +22,14 @@ func CreateColumnMeta(bp *buffer.Pool) (*ColumnMeta, error) {
 	return &ColumnMeta{tree: tree}, nil
 }
 
-func (cm *ColumnMeta) Search(mode SearchMode) (*ColumnIterator, error) {
-	iter, err := cm.tree.Search(mode.Encode())
+func (cm *ColumnMeta) Search(mtr *buffer.Mtr, mode SearchMode) (*ColumnIterator, error) {
+	iter, err := cm.tree.Search(mtr, mode.Encode())
 	if err != nil {
 		return nil, err
 	}
 	return NewColumnIterator(iter), nil
 }
 
-func (cm *ColumnMeta) Insert(record ColumnMetaRecord) error {
-	return cm.tree.Insert(record.Encode())
+func (cm *ColumnMeta) Insert(mtr *buffer.Mtr, record ColumnMetaRecord) error {
+	return cm.tree.Insert(mtr, record.Encode())
 }

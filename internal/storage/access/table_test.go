@@ -253,12 +253,15 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 
 	fileId := page.FileId(2)
 
+	mtr := buffer.NewMtr(env.bp)
+	defer mtr.UnpinAll()
+
 	// テーブルメタデータ (MetaPageId としてプライマリ B+Tree の MetaPageId を使用)
-	_ = env.ct.TableMeta().Insert(dictionary.NewTableMetaRecord("users", env.primaryTree.MetaPageId(), 3))
+	_ = env.ct.TableMeta().Insert(mtr, dictionary.NewTableMetaRecord("users", env.primaryTree.MetaPageId(), 3))
 
 	// プライマリインデックスメタデータ
 	piIndexId := dictionary.IndexId(0)
-	_ = env.ct.IndexMeta().Insert(dictionary.NewIndexMetaRecord(
+	_ = env.ct.IndexMeta().Insert(mtr, dictionary.NewIndexMetaRecord(
 		fileId,
 		piIndexId,
 		dictionary.PrimaryIndexName,
@@ -266,16 +269,16 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 		1,
 		env.primaryTree.MetaPageId(),
 	))
-	_ = env.ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnMetaRecord(piIndexId, "id", 0))
+	_ = env.ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(piIndexId, "id", 0))
 
 	// カラムメタデータ
-	_ = env.ct.ColumnMeta().Insert(dictionary.NewColumnMetaRecord(fileId, "id", 0))
-	_ = env.ct.ColumnMeta().Insert(dictionary.NewColumnMetaRecord(fileId, "name", 1))
-	_ = env.ct.ColumnMeta().Insert(dictionary.NewColumnMetaRecord(fileId, "email", 2))
+	_ = env.ct.ColumnMeta().Insert(mtr, dictionary.NewColumnMetaRecord(fileId, "id", 0))
+	_ = env.ct.ColumnMeta().Insert(mtr, dictionary.NewColumnMetaRecord(fileId, "name", 1))
+	_ = env.ct.ColumnMeta().Insert(mtr, dictionary.NewColumnMetaRecord(fileId, "email", 2))
 
 	// セカンダリインデックス idx_name のメタデータ (B+Tree は secondaryTree を再利用)
 	siNameId := dictionary.IndexId(1)
-	_ = env.ct.IndexMeta().Insert(dictionary.NewIndexMetaRecord(
+	_ = env.ct.IndexMeta().Insert(mtr, dictionary.NewIndexMetaRecord(
 		fileId,
 		siNameId,
 		"idx_name",
@@ -283,7 +286,7 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 		1,
 		env.secondaryTree.MetaPageId(),
 	))
-	_ = env.ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnMetaRecord(siNameId, "name", 0))
+	_ = env.ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(siNameId, "name", 0))
 
 	// セカンダリインデックス idx_email のメタデータ (新しい B+Tree が必要)
 	siEmailTree, err := btree.CreateTree(env.bp, fileId)
@@ -291,7 +294,7 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 		t.Fatalf("idx_email B+Tree の作成に失敗: %v", err)
 	}
 	siEmailId := dictionary.IndexId(2)
-	_ = env.ct.IndexMeta().Insert(dictionary.NewIndexMetaRecord(
+	_ = env.ct.IndexMeta().Insert(mtr, dictionary.NewIndexMetaRecord(
 		fileId,
 		siEmailId,
 		"idx_email",
@@ -299,7 +302,7 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 		1,
 		siEmailTree.MetaPageId(),
 	))
-	_ = env.ct.IndexKeyColumnMeta().Insert(dictionary.NewIndexKeyColumnMetaRecord(siEmailId, "email", 0))
+	_ = env.ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(siEmailId, "email", 0))
 
 	return &tableTestEnv{
 		ct:      env.ct,
@@ -332,7 +335,9 @@ func setupTableTestEnvWithoutPrimaryIndex(t *testing.T) *tableTestEnv {
 	lockMgr := lock.NewManager()
 
 	// テーブルメタデータのみ登録 (プライマリインデックスなし)
-	_ = env.ct.TableMeta().Insert(dictionary.NewTableMetaRecord("orders", env.primaryTree.MetaPageId(), 2))
+	mtr := buffer.NewMtr(env.bp)
+	defer mtr.UnpinAll()
+	_ = env.ct.TableMeta().Insert(mtr, dictionary.NewTableMetaRecord("orders", env.primaryTree.MetaPageId(), 2))
 
 	return &tableTestEnv{
 		ct:      env.ct,

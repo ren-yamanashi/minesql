@@ -1,6 +1,7 @@
 package access
 
 import (
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
@@ -23,6 +24,9 @@ func (t *Table) Update(currentRecord *PrimaryRecord, colNames, values []string, 
 	}
 
 	// PK が変わらない場合はインプレース更新
+	mtr := buffer.NewMtr(t.bufferPool)
+	defer mtr.UnpinAll()
+
 	// FK チェック
 	if err := t.checkForeignKeysForUpdate(currentRecord, newRecord); err != nil {
 		return err
@@ -43,15 +47,16 @@ func (t *Table) Update(currentRecord *PrimaryRecord, colNames, values []string, 
 	newRecord.setRollPtr(ptr)
 
 	// レコード更新
-	if err := t.primaryIndex.update(newRecord, trxId); err != nil {
+	if err := t.primaryIndex.update(mtr, newRecord, trxId); err != nil {
 		return err
 	}
-	return t.updateSecondaryIndexes(currentRecord, colNames, values, trxId)
+	return t.updateSecondaryIndexes(mtr, currentRecord, colNames, values, trxId)
 }
 
 // updateSecondaryIndexes はセカンダリインデックスを更新する
 // インデックスを構成するカラムの値が変更される場合のみ、論理削除 + 新規挿入で更新する
 func (t *Table) updateSecondaryIndexes(
+	mtr *buffer.Mtr,
 	before *PrimaryRecord,
 	updateColNames, updateValues []string,
 	trxId lock.TrxId,
@@ -84,7 +89,7 @@ func (t *Table) updateSecondaryIndexes(
 		if err != nil {
 			return err
 		}
-		if err := si.softDelete(oldSr, trxId); err != nil {
+		if err := si.softDelete(mtr, oldSr, trxId); err != nil {
 			return err
 		}
 
@@ -94,7 +99,7 @@ func (t *Table) updateSecondaryIndexes(
 		if err != nil {
 			return err
 		}
-		if err := si.insert(record, trxId); err != nil {
+		if err := si.insert(mtr, record, trxId); err != nil {
 			return err
 		}
 	}

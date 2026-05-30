@@ -94,7 +94,9 @@ func TestRecoveryExecute(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		// レコードが残っている (ロールバックされていない)
-		iter, err := table.primaryIndex.search(SearchModeStart{})
+		mtr := buffer.NewMtr(env.bp)
+		defer mtr.UnpinAll()
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -128,7 +130,9 @@ func TestRecoveryExecute(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		// レコードがロールバックされている
-		iter, err := table.primaryIndex.search(SearchModeStart{})
+		mtr := buffer.NewMtr(env.bp)
+		defer mtr.UnpinAll()
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -255,7 +259,9 @@ func TestRecoveryApplyRollback(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		// trx1 のレコード ("Alice") は残り、trx2 のレコード ("Bob") はロールバックされる
-		iter, _ := table.primaryIndex.search(SearchModeStart{})
+		mtr := buffer.NewMtr(env.bp)
+		defer mtr.UnpinAll()
+		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{})
 		record, ok, _ := iter.Next()
 		assert.True(t, ok)
 		assert.Equal(t, "1", record.values[0])

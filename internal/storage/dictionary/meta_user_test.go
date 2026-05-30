@@ -28,12 +28,14 @@ func TestCreateUserMeta(t *testing.T) {
 func TestUserMetaSearch(t *testing.T) {
 	t.Run("SearchModeStart で全件スキャンできる", func(t *testing.T) {
 		// GIVEN
-		um := setupTestUserMeta(t)
-		_ = um.Insert(NewUserMetaRecord("alice", "localhost", []byte("auth1")))
-		_ = um.Insert(NewUserMetaRecord("bob", "%", []byte("auth2")))
+		um, bp := setupTestUserMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		_ = um.Insert(mtr, NewUserMetaRecord("alice", "localhost", []byte("auth1")))
+		_ = um.Insert(mtr, NewUserMetaRecord("bob", "%", []byte("auth2")))
 
 		// WHEN
-		iter, err := um.Search(SearchModeStart{})
+		iter, err := um.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 
 		r1, ok1, err1 := iter.Next()
@@ -57,12 +59,14 @@ func TestUserMetaSearch(t *testing.T) {
 
 	t.Run("SearchModeKey で指定したユーザーを検索できる", func(t *testing.T) {
 		// GIVEN
-		um := setupTestUserMeta(t)
-		_ = um.Insert(NewUserMetaRecord("alice", "localhost", []byte("auth1")))
-		_ = um.Insert(NewUserMetaRecord("bob", "%", []byte("auth2")))
+		um, bp := setupTestUserMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		_ = um.Insert(mtr, NewUserMetaRecord("alice", "localhost", []byte("auth1")))
+		_ = um.Insert(mtr, NewUserMetaRecord("bob", "%", []byte("auth2")))
 
 		// WHEN
-		iter, err := um.Search(SearchModeKey{Key: [][]byte{[]byte("bob")}})
+		iter, err := um.Search(mtr, SearchModeKey{Key: [][]byte{[]byte("bob")}})
 		assert.NoError(t, err)
 
 		r, ok, err := iter.Next()
@@ -77,10 +81,12 @@ func TestUserMetaSearch(t *testing.T) {
 
 	t.Run("空のメタデータを検索するとレコードが返らない", func(t *testing.T) {
 		// GIVEN
-		um := setupTestUserMeta(t)
+		um, bp := setupTestUserMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		iter, err := um.Search(SearchModeStart{})
+		iter, err := um.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 
 		_, ok, err := iter.Next()
@@ -94,10 +100,12 @@ func TestUserMetaSearch(t *testing.T) {
 func TestUserMetaInsert(t *testing.T) {
 	t.Run("ユーザーを挿入できる", func(t *testing.T) {
 		// GIVEN
-		um := setupTestUserMeta(t)
+		um, bp := setupTestUserMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		err := um.Insert(NewUserMetaRecord("alice", "localhost", []byte("auth123")))
+		err := um.Insert(mtr, NewUserMetaRecord("alice", "localhost", []byte("auth123")))
 
 		// THEN
 		assert.NoError(t, err)
@@ -105,11 +113,13 @@ func TestUserMetaInsert(t *testing.T) {
 
 	t.Run("同じユーザー名を重複挿入すると ErrDuplicateKey を返す", func(t *testing.T) {
 		// GIVEN
-		um := setupTestUserMeta(t)
-		_ = um.Insert(NewUserMetaRecord("alice", "localhost", []byte("auth1")))
+		um, bp := setupTestUserMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		_ = um.Insert(mtr, NewUserMetaRecord("alice", "localhost", []byte("auth1")))
 
 		// WHEN
-		err := um.Insert(NewUserMetaRecord("alice", "%", []byte("auth2")))
+		err := um.Insert(mtr, NewUserMetaRecord("alice", "%", []byte("auth2")))
 
 		// THEN
 		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
@@ -117,14 +127,14 @@ func TestUserMetaInsert(t *testing.T) {
 }
 
 // setupTestUserMeta はテスト用の UserMeta を作成する
-func setupTestUserMeta(t *testing.T) *UserMeta {
+func setupTestUserMeta(t *testing.T) (*UserMeta, *buffer.Pool) {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
 	um, err := CreateUserMeta(bp)
 	if err != nil {
 		t.Fatalf("UserMeta の作成に失敗: %v", err)
 	}
-	return um
+	return um, bp
 }
 
 // setupDictTestBufferPool は dictionary テスト用のバッファプールを作成する

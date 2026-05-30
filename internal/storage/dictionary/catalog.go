@@ -43,6 +43,7 @@ type Catalog struct {
 	userMeta           *UserMeta
 }
 
+func (c *Catalog) BufferPool() *buffer.Pool                { return c.bufferPool }
 func (c *Catalog) UndoLogFileId() page.FileId              { return c.undoLogFileId }
 func (c *Catalog) TableMeta() *TableMeta                   { return c.tableMeta }
 func (c *Catalog) IndexMeta() *IndexMeta                   { return c.indexMeta }

@@ -13,20 +13,22 @@ import (
 )
 
 func ExampleTree_Insert() {
-	tree, cleanup := setup()
+	tree, bp, cleanup := setup()
 	defer cleanup()
 
 	// データを挿入
 	fruits := []string{"cherry", "apple", "banana", "date", "elderberry"}
 	for _, fruit := range fruits {
 		record := btree.NewRecord(nil, []byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
-		if err := tree.Insert(record); err != nil {
+		mtr := buffer.NewMtr(bp)
+		if err := tree.Insert(mtr, record); err != nil {
 			panic(err)
 		}
+		mtr.UnpinAll()
 	}
 
 	// 全データをスキャン (キー昇順で取得)
-	printAll(tree)
+	printAll(tree, bp)
 
 	// Output:
 	//   key=apple        value=a x 100
@@ -38,23 +40,27 @@ func ExampleTree_Insert() {
 }
 
 func ExampleTree_Search() {
-	tree, cleanup := setup()
+	tree, bp, cleanup := setup()
 	defer cleanup()
 
 	// データを挿入
 	for _, fruit := range []string{"apple", "banana", "cherry", "grape", "lemon"} {
 		record := btree.NewRecord(nil, []byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
-		if err := tree.Insert(record); err != nil {
+		mtr := buffer.NewMtr(bp)
+		if err := tree.Insert(mtr, record); err != nil {
 			panic(err)
 		}
+		mtr.UnpinAll()
 	}
 
 	// キーで検索
 	for _, key := range []string{"grape", "lemon", "watermelon"} {
-		iter, err := tree.Search(btree.SearchModeKey{Key: []byte(key)})
+		mtr := buffer.NewMtr(bp)
+		iter, err := tree.Search(mtr, btree.SearchModeKey{Key: []byte(key)})
 		if err != nil {
 			panic(err)
 		}
+		mtr.UnpinAll()
 
 		record, ok, err := iter.Get()
 		if err != nil {
@@ -74,32 +80,38 @@ func ExampleTree_Search() {
 }
 
 func ExampleTree_Delete() {
-	tree, cleanup := setup()
+	tree, bp, cleanup := setup()
 	defer cleanup()
 
 	// データを挿入
 	for _, fruit := range []string{"apple", "banana", "cherry", "date", "elderberry"} {
 		record := btree.NewRecord(nil, []byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
-		if err := tree.Insert(record); err != nil {
+		mtr := buffer.NewMtr(bp)
+		if err := tree.Insert(mtr, record); err != nil {
 			panic(err)
 		}
+		mtr.UnpinAll()
 	}
 
 	fmt.Println("=== 削除前 ===")
-	printAll(tree)
+	printAll(tree, bp)
 
 	// 一部のキーを削除
 	for _, key := range []string{"banana", "date"} {
-		if err := tree.Delete([]byte(key)); err != nil {
+		mtr := buffer.NewMtr(bp)
+		if err := tree.Delete(mtr, []byte(key)); err != nil {
 			panic(err)
 		}
+		mtr.UnpinAll()
 	}
 
 	fmt.Println("=== 削除後 ===")
-	printAll(tree)
+	printAll(tree, bp)
 
 	// 存在しないキーを削除するとエラー
-	err := tree.Delete([]byte("banana"))
+	mtr := buffer.NewMtr(bp)
+	err := tree.Delete(mtr, []byte("banana"))
+	mtr.UnpinAll()
 	fmt.Printf("存在しないキーの削除: %v\n", err)
 
 	// Output:
@@ -119,30 +131,36 @@ func ExampleTree_Delete() {
 }
 
 func ExampleTree_Update() {
-	tree, cleanup := setup()
+	tree, bp, cleanup := setup()
 	defer cleanup()
 
 	// データを挿入
 	for _, fruit := range []string{"apple", "banana", "cherry"} {
 		record := btree.NewRecord(nil, []byte(fruit), []byte(strings.Repeat(string(fruit[0]), 100)))
-		if err := tree.Insert(record); err != nil {
+		mtr := buffer.NewMtr(bp)
+		if err := tree.Insert(mtr, record); err != nil {
 			panic(err)
 		}
+		mtr.UnpinAll()
 	}
 
 	fmt.Println("=== 更新前 ===")
-	printAll(tree)
+	printAll(tree, bp)
 
 	// value を更新
-	if err := tree.Update(btree.NewRecord(nil, []byte("banana"), []byte(strings.Repeat("X", 50)))); err != nil {
+	updateMtr := buffer.NewMtr(bp)
+	if err := tree.Update(updateMtr, btree.NewRecord(nil, []byte("banana"), []byte(strings.Repeat("X", 50)))); err != nil {
 		panic(err)
 	}
+	updateMtr.UnpinAll()
 
 	fmt.Println("=== 更新後 ===")
-	printAll(tree)
+	printAll(tree, bp)
 
 	// 存在しないキーを更新するとエラー
-	err := tree.Update(btree.NewRecord(nil, []byte("mango"), []byte("value")))
+	mtr := buffer.NewMtr(bp)
+	err := tree.Update(mtr, btree.NewRecord(nil, []byte("mango"), []byte("value")))
+	mtr.UnpinAll()
 	fmt.Printf("存在しないキーの更新: %v\n", err)
 
 	// Output:
@@ -159,7 +177,7 @@ func ExampleTree_Update() {
 	// 存在しないキーの更新: key not found
 }
 
-func setup() (*btree.Tree, func()) {
+func setup() (*btree.Tree, *buffer.Pool, func()) {
 	tmpDir, err := os.MkdirTemp("", "btree_example")
 	if err != nil {
 		panic(err)
@@ -183,12 +201,14 @@ func setup() (*btree.Tree, func()) {
 		panic(err)
 	}
 
-	return tree, cleanup
+	return tree, bp, cleanup
 }
 
 // printAll は B+Tree の全データを表示する
-func printAll(tree *btree.Tree) {
-	iter, err := tree.Search(btree.SearchModeStart{})
+func printAll(tree *btree.Tree, bp *buffer.Pool) {
+	mtr := buffer.NewMtr(bp)
+	defer mtr.UnpinAll()
+	iter, err := tree.Search(mtr, btree.SearchModeStart{})
 	if err != nil {
 		panic(err)
 	}

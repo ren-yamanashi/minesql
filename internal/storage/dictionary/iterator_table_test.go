@@ -3,6 +3,7 @@ package dictionary
 import (
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -10,9 +11,11 @@ import (
 func TestTableIteratorClose(t *testing.T) {
 	t.Run("検索結果のイテレータを Close できる", func(t *testing.T) {
 		// GIVEN
-		tm := setupTestTableMeta(t)
-		_ = tm.Insert(NewTableMetaRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
-		iter, err := tm.Search(SearchModeStart{})
+		tm, bp := setupTestTableMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		_ = tm.Insert(mtr, NewTableMetaRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
+		iter, err := tm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 
 		// WHEN
@@ -24,8 +27,10 @@ func TestTableIteratorClose(t *testing.T) {
 
 	t.Run("イテレーション前に Close できる", func(t *testing.T) {
 		// GIVEN
-		tm := setupTestTableMeta(t)
-		iter, err := tm.Search(SearchModeStart{})
+		tm, bp := setupTestTableMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		iter, err := tm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 
 		// WHEN
@@ -37,10 +42,12 @@ func TestTableIteratorClose(t *testing.T) {
 func TestTableIteratorNext(t *testing.T) {
 	t.Run("レコードを順に取得できる", func(t *testing.T) {
 		// GIVEN
-		tm := setupTestTableMeta(t)
-		_ = tm.Insert(NewTableMetaRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
-		_ = tm.Insert(NewTableMetaRecord("orders", page.NewId(page.FileId(2), page.PageNumber(0)), 5))
-		iter, err := tm.Search(SearchModeStart{})
+		tm, bp := setupTestTableMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		_ = tm.Insert(mtr, NewTableMetaRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
+		_ = tm.Insert(mtr, NewTableMetaRecord("orders", page.NewId(page.FileId(2), page.PageNumber(0)), 5))
+		iter, err := tm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter.Close()
 
@@ -68,8 +75,10 @@ func TestTableIteratorNext(t *testing.T) {
 
 	t.Run("空のメタデータの場合は false を返す", func(t *testing.T) {
 		// GIVEN
-		tm := setupTestTableMeta(t)
-		iter, err := tm.Search(SearchModeStart{})
+		tm, bp := setupTestTableMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		iter, err := tm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter.Close()
 

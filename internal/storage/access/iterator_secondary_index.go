@@ -2,6 +2,7 @@ package access
 
 import (
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 )
 
@@ -44,14 +45,17 @@ func (si *SecondaryIndexIterator) Next() (*PrimaryRecord, bool, error) {
 		}
 
 		// PrimaryIterator を使用してレコード検索
-		iter, err := si.primaryTree.Search(SearchModeKey{Key: stringToByteSlice(secondaryRecord.pk)}.Encode())
+		mtr := buffer.NewMtr(si.catalog.BufferPool())
+		iter, err := si.primaryTree.Search(mtr, SearchModeKey{Key: stringToByteSlice(secondaryRecord.pk)}.Encode())
 		if err != nil {
+			mtr.UnpinAll()
 			return nil, false, err
 		}
 
 		pi := NewPrimaryIndexIterator(iter, si.catalog, si.primaryTree.MetaPageId().FileId())
 		result, found, err := pi.Next()
 		pi.Close()
+		mtr.UnpinAll()
 		if err != nil {
 			return nil, false, err
 		}

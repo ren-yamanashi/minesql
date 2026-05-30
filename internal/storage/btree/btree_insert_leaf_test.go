@@ -18,7 +18,9 @@ func TestInsertLeaf(t *testing.T) {
 		record := NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA})
 
 		// WHEN
-		overflowKey, newPageId, err := bt.insertLeaf(pageId, pg, record)
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		overflowKey, newPageId, err := bt.insertLeaf(mtr, pageId, pg, record)
 
 		// THEN
 		assert.NoError(t, err)
@@ -32,8 +34,10 @@ func TestInsertLeaf(t *testing.T) {
 		pageId, pg := setupTestLeafPage(t, bp)
 
 		// WHEN
-		_, _, _ = bt.insertLeaf(pageId, pg, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
-		_, _, _ = bt.insertLeaf(pageId, pg, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		_, _, _ = bt.insertLeaf(mtr, pageId, pg, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
+		_, _, _ = bt.insertLeaf(mtr, pageId, pg, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 
 		// THEN
 		leafNode := newLeafNode(pg)
@@ -46,10 +50,12 @@ func TestInsertLeaf(t *testing.T) {
 		// GIVEN
 		bt, bp := setupBtreeForTest(t)
 		pageId, pg := setupTestLeafPage(t, bp)
-		_, _, _ = bt.insertLeaf(pageId, pg, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		_, _, _ = bt.insertLeaf(mtr, pageId, pg, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
-		_, _, err := bt.insertLeaf(pageId, pg, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xBB}))
+		_, _, err := bt.insertLeaf(mtr, pageId, pg, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xBB}))
 
 		// THEN
 		assert.ErrorIs(t, err, ErrDuplicateKey)
@@ -60,13 +66,15 @@ func TestInsertLeaf(t *testing.T) {
 		bt, bp := setupBtreeForTest(t)
 		pageId, pg := setupTestLeafPage(t, bp)
 		nonKey := make([]byte, 1500)
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
 		for i := range 2 {
 			key := []byte{byte(i + 1)}
-			_, _, _ = bt.insertLeaf(pageId, pg, NewRecord([]byte{0x01}, key, nonKey))
+			_, _, _ = bt.insertLeaf(mtr, pageId, pg, NewRecord([]byte{0x01}, key, nonKey))
 		}
 
 		// WHEN
-		overflowKey, newPageId, err := bt.insertLeaf(pageId, pg, NewRecord([]byte{0x01}, []byte{0xFF}, nonKey))
+		overflowKey, newPageId, err := bt.insertLeaf(mtr, pageId, pg, NewRecord([]byte{0x01}, []byte{0xFF}, nonKey))
 
 		// THEN
 		assert.NoError(t, err)

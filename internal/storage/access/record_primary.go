@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
@@ -215,8 +216,10 @@ func sortPrimaryRecord(ct *dictionary.Catalog, input NewPrimaryRecordInput) (*Pr
 
 // fetchColumnDefs はカラムメタデータを検索し、カラム名 → テーブル定義上の位置のマップを返す
 func fetchColumnDefs(ct *dictionary.Catalog, fileId page.FileId) (map[string]int, error) {
+	mtr := buffer.NewMtr(ct.BufferPool())
+	defer mtr.UnpinAll()
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
-	iter, err := ct.ColumnMeta().Search(dictionary.SearchModeKey{Key: [][]byte{fileIdBytes}})
+	iter, err := ct.ColumnMeta().Search(mtr, dictionary.SearchModeKey{Key: [][]byte{fileIdBytes}})
 	if err != nil {
 		return nil, err
 	}

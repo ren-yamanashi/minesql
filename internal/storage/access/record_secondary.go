@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -135,8 +136,10 @@ func sortSecondaryRecord(ct *dictionary.Catalog, input NewSecondaryRecordInput) 
 
 // fetchIndex はインデックスメタデータを検索し、指定された名前のインデックスレコードを返す
 func fetchIndex(ct *dictionary.Catalog, fileId page.FileId, indexName string) (dictionary.IndexMetaRecord, error) {
+	mtr := buffer.NewMtr(ct.BufferPool())
+	defer mtr.UnpinAll()
 	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
-	iter, err := ct.IndexMeta().Search(dictionary.SearchModeKey{Key: [][]byte{fileIdBytes, []byte(indexName)}})
+	iter, err := ct.IndexMeta().Search(mtr, dictionary.SearchModeKey{Key: [][]byte{fileIdBytes, []byte(indexName)}})
 	if err != nil {
 		return dictionary.IndexMetaRecord{}, err
 	}
@@ -153,8 +156,10 @@ func fetchIndex(ct *dictionary.Catalog, fileId page.FileId, indexName string) (d
 
 // fetchIndexKeyColumn はインデックスキーカラムメタデータを検索し、カラム名 → インデックス上のカラム位置のマップを返す
 func fetchIndexKeyColumn(ct *dictionary.Catalog, indexId dictionary.IndexId) (map[string]int, error) {
+	mtr := buffer.NewMtr(ct.BufferPool())
+	defer mtr.UnpinAll()
 	indexIdBytes := binary.BigEndian.AppendUint32(nil, uint32(indexId))
-	keyColMetaIter, err := ct.IndexKeyColumnMeta().Search(dictionary.SearchModeKey{Key: [][]byte{indexIdBytes}})
+	keyColMetaIter, err := ct.IndexKeyColumnMeta().Search(mtr, dictionary.SearchModeKey{Key: [][]byte{indexIdBytes}})
 	if err != nil {
 		return nil, err
 	}

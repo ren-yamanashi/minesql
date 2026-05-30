@@ -22,14 +22,14 @@ func CreateUserMeta(bp *buffer.Pool) (*UserMeta, error) {
 	return &UserMeta{tree: tree}, nil
 }
 
-func (um *UserMeta) Search(mode SearchMode) (*UserIterator, error) {
-	iter, err := um.tree.Search(mode.Encode())
+func (um *UserMeta) Search(mtr *buffer.Mtr, mode SearchMode) (*UserIterator, error) {
+	iter, err := um.tree.Search(mtr, mode.Encode())
 	if err != nil {
 		return nil, err
 	}
 	return NewUserIterator(iter), nil
 }
 
-func (um *UserMeta) Insert(record UserMetaRecord) error {
-	return um.tree.Insert(record.Encode())
+func (um *UserMeta) Insert(mtr *buffer.Mtr, record UserMetaRecord) error {
+	return um.tree.Insert(mtr, record.Encode())
 }

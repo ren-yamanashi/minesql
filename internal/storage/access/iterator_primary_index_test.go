@@ -3,6 +3,7 @@ package access
 import (
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -101,7 +102,9 @@ func TestPrimaryIndexIteratorNext(t *testing.T) {
 func searchPrimaryIndex(t *testing.T, env *iteratorTestEnv) *PrimaryIndexIterator {
 	t.Helper()
 	mode := SearchModeStart{}
-	iter, err := env.primaryTree.Search(mode.Encode())
+	mtr := buffer.NewMtr(env.bp)
+	defer mtr.UnpinAll()
+	iter, err := env.primaryTree.Search(mtr, mode.Encode())
 	if err != nil {
 		t.Fatalf("プライマリインデックスの検索に失敗: %v", err)
 	}

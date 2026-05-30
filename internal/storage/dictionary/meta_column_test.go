@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -25,12 +26,14 @@ func TestCreateColumnMeta(t *testing.T) {
 func TestColumnMetaSearch(t *testing.T) {
 	t.Run("SearchModeStart で全件スキャンできる", func(t *testing.T) {
 		// GIVEN
-		cm := setupTestColumnMeta(t)
-		_ = cm.Insert(NewColumnMetaRecord(page.FileId(1), "id", 0))
-		_ = cm.Insert(NewColumnMetaRecord(page.FileId(1), "name", 1))
+		cm, bp := setupTestColumnMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		_ = cm.Insert(mtr, NewColumnMetaRecord(page.FileId(1), "id", 0))
+		_ = cm.Insert(mtr, NewColumnMetaRecord(page.FileId(1), "name", 1))
 
 		// WHEN
-		iter, err := cm.Search(SearchModeStart{})
+		iter, err := cm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 
 		r1, ok1, err1 := iter.Next()
@@ -56,10 +59,12 @@ func TestColumnMetaSearch(t *testing.T) {
 
 	t.Run("空のメタデータを検索するとレコードが返らない", func(t *testing.T) {
 		// GIVEN
-		cm := setupTestColumnMeta(t)
+		cm, bp := setupTestColumnMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		iter, err := cm.Search(SearchModeStart{})
+		iter, err := cm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 
 		_, ok, err := iter.Next()
@@ -73,10 +78,12 @@ func TestColumnMetaSearch(t *testing.T) {
 func TestColumnMetaInsert(t *testing.T) {
 	t.Run("カラムメタデータを挿入できる", func(t *testing.T) {
 		// GIVEN
-		cm := setupTestColumnMeta(t)
+		cm, bp := setupTestColumnMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		err := cm.Insert(NewColumnMetaRecord(page.FileId(1), "name", 0))
+		err := cm.Insert(mtr, NewColumnMetaRecord(page.FileId(1), "name", 0))
 
 		// THEN
 		assert.NoError(t, err)
@@ -84,11 +91,13 @@ func TestColumnMetaInsert(t *testing.T) {
 
 	t.Run("同じ FileId + カラム名の重複挿入は ErrDuplicateKey を返す", func(t *testing.T) {
 		// GIVEN
-		cm := setupTestColumnMeta(t)
-		_ = cm.Insert(NewColumnMetaRecord(page.FileId(1), "name", 0))
+		cm, bp := setupTestColumnMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		_ = cm.Insert(mtr, NewColumnMetaRecord(page.FileId(1), "name", 0))
 
 		// WHEN
-		err := cm.Insert(NewColumnMetaRecord(page.FileId(1), "name", 1))
+		err := cm.Insert(mtr, NewColumnMetaRecord(page.FileId(1), "name", 1))
 
 		// THEN
 		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
@@ -96,11 +105,13 @@ func TestColumnMetaInsert(t *testing.T) {
 
 	t.Run("同じテーブルに異なるカラム名であれば複数挿入できる", func(t *testing.T) {
 		// GIVEN
-		cm := setupTestColumnMeta(t)
-		_ = cm.Insert(NewColumnMetaRecord(page.FileId(1), "id", 0))
+		cm, bp := setupTestColumnMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		_ = cm.Insert(mtr, NewColumnMetaRecord(page.FileId(1), "id", 0))
 
 		// WHEN
-		err := cm.Insert(NewColumnMetaRecord(page.FileId(1), "name", 1))
+		err := cm.Insert(mtr, NewColumnMetaRecord(page.FileId(1), "name", 1))
 
 		// THEN
 		assert.NoError(t, err)
@@ -108,12 +119,12 @@ func TestColumnMetaInsert(t *testing.T) {
 }
 
 // setupTestColumnMeta はテスト用の ColumnMeta を作成する
-func setupTestColumnMeta(t *testing.T) *ColumnMeta {
+func setupTestColumnMeta(t *testing.T) (*ColumnMeta, *buffer.Pool) {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
 	cm, err := CreateColumnMeta(bp)
 	if err != nil {
 		t.Fatalf("ColumnMeta の作成に失敗: %v", err)
 	}
-	return cm
+	return cm, bp
 }

@@ -1,6 +1,7 @@
 package btree
 
 import (
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
@@ -13,6 +14,7 @@ import (
 //   - overflow: 分割時の境界キー (分割なしの場合は nil)
 //   - newPageId: 分割で作られたブランチノードの PageId (分割なしの場合は InvalidPageId)
 func (t *Tree) insertBranchOverflow(
+	mtr *buffer.Mtr,
 	branchNode *branchNode,
 	childSlotNum int,
 	overflowKey []byte,
@@ -26,7 +28,7 @@ func (t *Tree) insertBranchOverflow(
 	}
 
 	// ブランチノードが満杯の場合は分割
-	return t.splitInsertBranch(branchNode, overflowRecord)
+	return t.splitInsertBranch(mtr, branchNode, overflowRecord)
 }
 
 // splitInsertBranch はブランチノードを分割してレコードを挿入する
@@ -34,6 +36,7 @@ func (t *Tree) insertBranchOverflow(
 //   - record: 挿入するレコード
 //   - return: 境界キー, 新しいブランチノードの PageId
 func (t *Tree) splitInsertBranch(
+	mtr *buffer.Mtr,
 	branchNode *branchNode,
 	record Record,
 ) ([]byte, page.Id, error) {
@@ -45,9 +48,9 @@ func (t *Tree) splitInsertBranch(
 	if err != nil {
 		return nil, page.InvalidId(), err
 	}
-	defer t.bufferPool.Unpin(newBranchPageId)
+	defer mtr.Unpin(newBranchPageId)
 
-	pageNewBranch, err := t.bufferPool.PageForWrite(newBranchPageId)
+	pageNewBranch, err := mtr.PageForWrite(newBranchPageId)
 	if err != nil {
 		return nil, page.InvalidId(), err
 	}

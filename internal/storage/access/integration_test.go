@@ -106,7 +106,9 @@ func TestIntegrationCommit(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		iter, err := table.primaryIndex.search(SearchModeStart{})
+		mtr := buffer.NewMtr(env.bp)
+		defer mtr.UnpinAll()
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -133,7 +135,9 @@ func TestIntegrationRollback(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		iter, err := table.primaryIndex.search(SearchModeStart{})
+		mtr := buffer.NewMtr(env.bp)
+		defer mtr.UnpinAll()
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -198,7 +202,9 @@ func TestIntegrationMultipleTransactions(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		iter, err := table.primaryIndex.search(SearchModeStart{})
+		mtr := buffer.NewMtr(env.bp)
+		defer mtr.UnpinAll()
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 
 		r1, ok, err := iter.Next()
@@ -266,7 +272,9 @@ func TestIntegrationCrashRecovery(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		iter, err := table.primaryIndex.search(SearchModeStart{})
+		mtr := buffer.NewMtr(env.bp)
+		defer mtr.UnpinAll()
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)

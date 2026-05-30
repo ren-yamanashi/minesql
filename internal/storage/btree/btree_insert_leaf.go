@@ -1,6 +1,7 @@
 package btree
 
 import (
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
@@ -12,6 +13,7 @@ import (
 //   - overflowKey: 分割時の境界キー (分割なしの場合は nil)
 //   - newPageId: 分割で作られたリーフノードの PageId (分割なしの場合は InvalidPageId)
 func (t *Tree) insertLeaf(
+	mtr *buffer.Mtr,
 	leafPageId page.Id,
 	leafPage *page.Page,
 	record Record,
@@ -28,7 +30,7 @@ func (t *Tree) insertLeaf(
 	}
 
 	// リーフノードが満杯の場合は分割
-	return t.splitInsertLeaf(leafPageId, leafNode, record)
+	return t.splitInsertLeaf(mtr, leafPageId, leafNode, record)
 }
 
 // splitInsertLeaf はリーフノードを分割してレコードを挿入する
@@ -37,6 +39,7 @@ func (t *Tree) insertLeaf(
 //   - record: 挿入するレコード
 //   - return: 境界キー, 新しいリーフノードの PageId
 func (t *Tree) splitInsertLeaf(
+	mtr *buffer.Mtr,
 	leafPageId page.Id,
 	leafNode *leafNode,
 	record Record,
@@ -52,18 +55,18 @@ func (t *Tree) splitInsertLeaf(
 	if err != nil {
 		return nil, page.InvalidId(), err
 	}
-	defer t.bufferPool.Unpin(newLeafPageId)
+	defer mtr.Unpin(newLeafPageId)
 
 	// 前のリーフノードが存在する場合は、nextPageId を新しいリーフノードの PageId に更新
 	if !prevLeafPageId.IsInvalid() {
-		if err := t.updatePrevLeafLink(prevLeafPageId, newLeafPageId); err != nil {
+		if err := t.updatePrevLeafLink(mtr, prevLeafPageId, newLeafPageId); err != nil {
 			return nil, page.InvalidId(), err
 		}
-		defer t.bufferPool.Unpin(prevLeafPageId)
+		defer mtr.Unpin(prevLeafPageId)
 	}
 
 	// 新しいリーフノードに分割挿入
-	pageNewLeaf, err := t.bufferPool.PageForWrite(newLeafPageId)
+	pageNewLeaf, err := mtr.PageForWrite(newLeafPageId)
 	if err != nil {
 		return nil, page.InvalidId(), err
 	}
@@ -82,8 +85,8 @@ func (t *Tree) splitInsertLeaf(
 }
 
 // updatePrevLeafLink は前のリーフノードの nextPageId を更新する
-func (t *Tree) updatePrevLeafLink(prevLeafPageId, newNextPageId page.Id) error {
-	pagePrevLeaf, err := t.bufferPool.PageForWrite(prevLeafPageId)
+func (t *Tree) updatePrevLeafLink(mtr *buffer.Mtr, prevLeafPageId, newNextPageId page.Id) error {
+	pagePrevLeaf, err := mtr.PageForWrite(prevLeafPageId)
 	if err != nil {
 		return err
 	}

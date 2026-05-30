@@ -1,12 +1,16 @@
 package access
 
 import (
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
 // SoftDelete はテーブルの行を論理削除する
 func (t *Table) SoftDelete(record *PrimaryRecord, trxId lock.TrxId) error {
+	mtr := buffer.NewMtr(t.bufferPool)
+	defer mtr.UnpinAll()
+
 	// FK チェック
 	if err := t.checkForeignKeysForDelete(record); err != nil {
 		return err
@@ -21,32 +25,34 @@ func (t *Table) SoftDelete(record *PrimaryRecord, trxId lock.TrxId) error {
 	record.setRollPtr(ptr)
 
 	// レコード削除
-	if err := t.primaryIndex.softDelete(record, trxId); err != nil {
+	if err := t.primaryIndex.softDelete(mtr, record, trxId); err != nil {
 		return err
 	}
-	return t.softDeleteSecondaryIndexes(record, trxId)
+	return t.softDeleteSecondaryIndexes(mtr, record, trxId)
 }
 
 // Delete はテーブルの行を物理削除する
 // (物理削除は DML 操作では行われないので、Undo ログの作成はしない)
 func (t *Table) Delete(record *PrimaryRecord, trxId lock.TrxId) error {
-	if err := t.primaryIndex.delete(record, trxId); err != nil {
+	mtr := buffer.NewMtr(t.bufferPool)
+	defer mtr.UnpinAll()
+	if err := t.primaryIndex.delete(mtr, record, trxId); err != nil {
 		return err
 	}
-	return t.deleteSecondaryIndexes(record, trxId)
+	return t.deleteSecondaryIndexes(mtr, record, trxId)
 }
 
 // softDeleteSecondaryIndexes は全セカンダリインデックスのレコードを論理削除する
-func (t *Table) softDeleteSecondaryIndexes(record *PrimaryRecord, trxId lock.TrxId) error {
+func (t *Table) softDeleteSecondaryIndexes(mtr *buffer.Mtr, record *PrimaryRecord, trxId lock.TrxId) error {
 	return t.forEachSecondaryRecord(record, func(si *secondaryIndex, sr *SecondaryRecord) error {
-		return si.softDelete(sr, trxId)
+		return si.softDelete(mtr, sr, trxId)
 	})
 }
 
 // deleteSecondaryIndexes は全セカンダリインデックスのレコードを物理削除する
-func (t *Table) deleteSecondaryIndexes(record *PrimaryRecord, trxId lock.TrxId) error {
+func (t *Table) deleteSecondaryIndexes(mtr *buffer.Mtr, record *PrimaryRecord, trxId lock.TrxId) error {
 	return t.forEachSecondaryRecord(record, func(si *secondaryIndex, sr *SecondaryRecord) error {
-		return si.delete(sr, trxId)
+		return si.delete(mtr, sr, trxId)
 	})
 }
 

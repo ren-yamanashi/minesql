@@ -3,6 +3,7 @@ package btree
 import (
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -12,14 +13,16 @@ func TestUpdate(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateTree(bp, page.FileId(0))
-		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
-		err := bt.Update(NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
+		err := bt.Update(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
 
 		// THEN
 		assert.NoError(t, err)
-		record, _, err := bt.FindByKey([]byte{0x10})
+		record, _, err := bt.FindByKey(mtr, []byte{0x10})
 		assert.NoError(t, err)
 		assert.Equal(t, []byte{0xBB}, record.NonKey())
 	})
@@ -28,10 +31,12 @@ func TestUpdate(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateTree(bp, page.FileId(0))
-		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
-		err := bt.Update(NewRecord([]byte{}, []byte{0xFF}, []byte{0xBB}))
+		err := bt.Update(mtr, NewRecord([]byte{}, []byte{0xFF}, []byte{0xBB}))
 
 		// THEN
 		assert.ErrorIs(t, err, ErrKeyNotFound)
@@ -41,9 +46,11 @@ func TestUpdate(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		err := bt.Update(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		err := bt.Update(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// THEN
 		assert.ErrorIs(t, err, ErrKeyNotFound)
@@ -53,20 +60,22 @@ func TestUpdate(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateTree(bp, page.FileId(0))
-		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
-		_ = bt.Insert(NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
 
 		// WHEN
-		err := bt.Update(NewRecord([]byte{}, []byte{0x10}, []byte{0xFF}))
+		err := bt.Update(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xFF}))
 
 		// THEN
 		assert.NoError(t, err)
-		record, _, err := bt.FindByKey([]byte{0x10})
+		record, _, err := bt.FindByKey(mtr, []byte{0x10})
 		assert.NoError(t, err)
 		assert.Equal(t, []byte{0x10}, record.Key())
 		assert.Equal(t, []byte{0xFF}, record.NonKey())
 		// 他のレコードに影響がないことを確認
-		other, _, err := bt.FindByKey([]byte{0x20})
+		other, _, err := bt.FindByKey(mtr, []byte{0x20})
 		assert.NoError(t, err)
 		assert.Equal(t, []byte{0xBB}, other.NonKey())
 	})
@@ -75,21 +84,23 @@ func TestUpdate(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
 		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
 		nonKey := make([]byte, 1500)
-		_ = bt.Insert(NewRecord([]byte{}, []byte{0x01}, nonKey))
-		_ = bt.Insert(NewRecord([]byte{}, []byte{0x02}, nonKey))
-		_ = bt.Insert(NewRecord([]byte{}, []byte{0x03}, nonKey))
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x01}, nonKey))
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x02}, nonKey))
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x03}, nonKey))
 		height, _ := bt.Height()
 		assert.Equal(t, uint64(2), height)
 
 		// WHEN
 		newNonKey := make([]byte, 1500)
 		newNonKey[0] = 0xFF
-		err := bt.Update(NewRecord([]byte{}, []byte{0x01}, newNonKey))
+		err := bt.Update(mtr, NewRecord([]byte{}, []byte{0x01}, newNonKey))
 
 		// THEN
 		assert.NoError(t, err)
-		record, _, err := bt.FindByKey([]byte{0x01})
+		record, _, err := bt.FindByKey(mtr, []byte{0x01})
 		assert.NoError(t, err)
 		assert.Equal(t, byte(0xFF), record.NonKey()[0])
 	})
@@ -98,13 +109,15 @@ func TestUpdate(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
 		nonKey := make([]byte, 1500)
-		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, nonKey))
-		_ = bt.Insert(NewRecord([]byte{}, []byte{0x20}, nonKey))
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, nonKey))
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x20}, nonKey))
 
 		// WHEN (ページの空き容量を超える nonKey で更新)
 		hugeNonKey := make([]byte, 3000)
-		err := bt.Update(NewRecord([]byte{}, []byte{0x10}, hugeNonKey))
+		err := bt.Update(mtr, NewRecord([]byte{}, []byte{0x10}, hugeNonKey))
 
 		// THEN
 		assert.Error(t, err)
@@ -114,15 +127,17 @@ func TestUpdate(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := CreateTree(bp, page.FileId(0))
-		_ = bt.Insert(NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
-		_ = bt.Update(NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
-		err := bt.Update(NewRecord([]byte{}, []byte{0x10}, []byte{0xCC}))
+		_ = bt.Update(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
+		err := bt.Update(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xCC}))
 
 		// THEN
 		assert.NoError(t, err)
-		record, _, err := bt.FindByKey([]byte{0x10})
+		record, _, err := bt.FindByKey(mtr, []byte{0x10})
 		assert.NoError(t, err)
 		assert.Equal(t, []byte{0xCC}, record.NonKey())
 	})

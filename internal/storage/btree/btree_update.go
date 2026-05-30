@@ -7,32 +7,32 @@ import (
 )
 
 // Update は B+Tree の特定のノードの値を更新する
-func (t *Tree) Update(record Record) error {
+func (t *Tree) Update(mtr *buffer.Mtr, record Record) error {
 	// メタページを取得
-	pageMeta, err := t.bufferPool.PageForRead(t.MetaPageId())
+	pageMeta, err := mtr.PageForRead(t.MetaPageId())
 	if err != nil {
 		return err
 	}
 	metaPage := newMetaPage(pageMeta.Data())
-	defer t.bufferPool.Unpin(t.MetaPageId())
+	defer mtr.Unpin(t.MetaPageId())
 
 	// ルートページ取得
 	rootPageId := metaPage.rootPageId()
-	rootBufPage, err := t.bufferPool.PageForRead(rootPageId)
+	rootBufPage, err := mtr.PageForRead(rootPageId)
 	if err != nil {
 		return err
 	}
-	defer t.bufferPool.Unpin(rootPageId)
-	return t.updateRecursively(rootBufPage, record)
+	defer mtr.Unpin(rootPageId)
+	return t.updateRecursively(mtr, rootBufPage, record)
 }
 
 // updateRecursively は再帰的にノードを辿ってレコードを更新する
-func (t *Tree) updateRecursively(bufPage *buffer.Page, record Record) error {
-	pg, err := t.bufferPool.PageForWrite(bufPage.PageId())
+func (t *Tree) updateRecursively(mtr *buffer.Mtr, bufPage *buffer.Page, record Record) error {
+	pg, err := mtr.PageForWrite(bufPage.PageId())
 	if err != nil {
 		return err
 	}
-	defer t.bufferPool.Unpin(bufPage.PageId())
+	defer mtr.Unpin(bufPage.PageId())
 
 	nt := nodeType(pg.Data())
 	switch nt {
@@ -44,12 +44,12 @@ func (t *Tree) updateRecursively(bufPage *buffer.Page, record Record) error {
 		if err != nil {
 			return err
 		}
-		childBufPage, err := t.bufferPool.PageForRead(childPageId)
+		childBufPage, err := mtr.PageForRead(childPageId)
 		if err != nil {
 			return err
 		}
-		defer t.bufferPool.Unpin(childPageId)
-		return t.updateRecursively(childBufPage, record)
+		defer mtr.Unpin(childPageId)
+		return t.updateRecursively(mtr, childBufPage, record)
 
 	// リーフノードの場合: そのまま更新する
 	case nodeTypeLeaf:
