@@ -17,7 +17,7 @@ func TestIteratorGet(t *testing.T) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
 		bufPage, _ := tree.bufferPool.PageForRead(pageId)
-		iter := NewIterator(tree, *bufPage, 0)
+		iter := NewIterator(tree, bufPage, 0)
 
 		// WHEN
 		record, ok, err := iter.Get()
@@ -34,7 +34,7 @@ func TestIteratorGet(t *testing.T) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
 		bufPage, _ := tree.bufferPool.PageForRead(pageId)
-		iter := NewIterator(tree, *bufPage, 1)
+		iter := NewIterator(tree, bufPage, 1)
 
 		// WHEN
 		_, ok, err := iter.Get()
@@ -53,7 +53,7 @@ func TestIteratorNext(t *testing.T) {
 			ln.insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
 		})
 		bufPage, _ := tree.bufferPool.PageForRead(pageId)
-		iter := NewIterator(tree, *bufPage, 0)
+		iter := NewIterator(tree, bufPage, 0)
 
 		// WHEN
 		record1, ok1, err1 := iter.Next()
@@ -83,7 +83,7 @@ func TestIteratorAdvance(t *testing.T) {
 			ln.insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
 		})
 		bufPage, _ := tree.bufferPool.PageForRead(pageId)
-		iter := NewIterator(tree, *bufPage, 0)
+		iter := NewIterator(tree, bufPage, 0)
 
 		// WHEN
 		err := iter.Advance()
@@ -127,7 +127,7 @@ func TestIteratorAdvance(t *testing.T) {
 
 		bufPage, err := bp.PageForRead(firstId)
 		assert.NoError(t, err)
-		iter := NewIterator(tree, *bufPage, 0)
+		iter := NewIterator(tree, bufPage, 0)
 
 		// WHEN
 		err = iter.Advance()
@@ -152,7 +152,7 @@ func TestIteratorTracksLastKeyAndModifyCount(t *testing.T) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
 		bufPage, _ := tree.bufferPool.PageForRead(pageId)
-		iter := NewIterator(tree, *bufPage, 0)
+		iter := NewIterator(tree, bufPage, 0)
 		assert.Nil(t, iter.lastKey)
 
 		// WHEN
@@ -181,6 +181,34 @@ func TestIteratorRefetchByKey(t *testing.T) {
 
 		// WHEN
 		err := iter.refetchByKey([]byte{0x10})
+
+		// THEN
+		assert.NoError(t, err)
+		record, ok, err := iter.Get()
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, []byte{0x20}, record.Key())
+	})
+
+	t.Run("modifyCount 変化後の Advance は二重インクリメントしない", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x30}, []byte{0xCC}))
+		iter, _ := bt.Search(mtr, SearchModeStart{})
+		defer iter.Close()
+		_, _, _ = iter.Get() // lastKey = 0x10
+		// 別 Mtr で同一リーフを更新し modifyCount を進める
+		otherMtr := buffer.NewMtr(bt.bufferPool)
+		_ = bt.Update(otherMtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xFF}))
+		otherMtr.UnpinAll()
+
+		// WHEN
+		err := iter.Advance()
 
 		// THEN
 		assert.NoError(t, err)

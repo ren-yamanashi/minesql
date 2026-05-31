@@ -82,7 +82,7 @@ func (t *Tree) searchRecursively(mtr *buffer.Mtr, rootPageId page.Id, mode Searc
 		case nodeTypeLeaf:
 			leafNode := newLeafNode(currentBufPage.Data())
 			slotNum := mode.slotNum(leafNode)
-			iter := NewIterator(t, *currentBufPage, slotNum)
+			iter := NewIterator(t, currentBufPage, slotNum)
 			// リーフの Pin は走査側 (Iterator) が引き継ぐため、mtr の管理から外す
 			mtr.Detach(currentPageId)
 			// 検索対象のキーが現在のリーフノードの末端のレコードより大きい場合、次のリーフノードに進める
