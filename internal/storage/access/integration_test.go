@@ -513,15 +513,18 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 		assert.Equal(t, writers*(insertPerWriter-1), count)
 	})
 
-	t.Run("並行 Commit と単独の未 Commit が混在してもリカバリで整合性が保たれる", func(t *testing.T) {
+	t.Run("並行 Commit と並行 未 Commit が混在してもリカバリで整合性が保たれる", func(t *testing.T) {
 		// GIVEN
 		env := setupIntegrationEnv(t)
 		_ = createUsersTable(t, env)
 		const committedWorkers = 3
+		const uncommittedWorkers = 3
 		const opsPerWorker = 3
 
-		// WHEN: 複数 worker が並行に Commit する
+		// WHEN: Commit ワーカーと未 Commit ワーカーが並行に動く
 		var wg sync.WaitGroup
+
+		// Commit ワーカー: Begin -> Insert -> Commit を繰り返す
 		for w := range committedWorkers {
 			wg.Add(1)
 			go func(workerId int) {
@@ -539,16 +542,28 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 				}
 			}(w)
 		}
+
+		// 未 Commit ワーカー: Begin -> Insert したまま Commit せず終了 (= クラッシュ相当)
+		// 行ロックはクラッシュで揮発する想定だが lockMgr はプロセス内で揮発しないため、明示解放する
+		for w := range uncommittedWorkers {
+			wg.Add(1)
+			go func(workerId int) {
+				defer wg.Done()
+				table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
+				for j := range opsPerWorker {
+					trxId := env.trxMgr.Begin()
+					key := fmt.Sprintf("9%03d", workerId*opsPerWorker+j+1)
+					_ = table.Insert(
+						[]string{"id", "name", "email"},
+						[]string{key, fmt.Sprintf("nc%d-%d", workerId, j), fmt.Sprintf("nc%d-%d@example.com", workerId, j)},
+						trxId,
+					)
+					env.lockMgr.Release(trxId)
+				}
+			}(w)
+		}
 		wg.Wait()
 
-		// 並行 Commit 完了後、単独で未 Commit の Insert を行う (= クラッシュ相当)
-		uncommittedTable, _ := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
-		uncommittedTrxId := env.trxMgr.Begin()
-		_ = uncommittedTable.Insert(
-			[]string{"id", "name", "email"},
-			[]string{"9999", "uncommitted", "uncommitted@example.com"},
-			uncommittedTrxId,
-		)
 		_ = env.redoLog.Flush()
 
 		// クラッシュリカバリ実行
@@ -556,7 +571,7 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 		err := r.Execute()
 		assert.NoError(t, err)
 
-		// THEN: 並行 Commit 済みの挿入のみ残り、未 Commit はロールバックされている
+		// THEN: Commit 済みの挿入のみ残り、未 Commit はロールバックされている
 		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
