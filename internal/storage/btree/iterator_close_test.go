@@ -9,11 +9,11 @@ import (
 func TestIteratorClose(t *testing.T) {
 	t.Run("作成直後のイテレータを Close できる", func(t *testing.T) {
 		// GIVEN
-		bp, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
+		tree, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
-		bufPage, _ := bp.PageForRead(pageId)
-		iter := NewIterator(bp, *bufPage, 0)
+		bufPage, _ := tree.bufferPool.PageForRead(pageId)
+		iter := NewIterator(tree, *bufPage, 0)
 
 		// WHEN
 		iter.Close()
@@ -27,12 +27,12 @@ func TestIteratorClose(t *testing.T) {
 
 	t.Run("イテレーション途中で Close できる", func(t *testing.T) {
 		// GIVEN
-		bp, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
+		tree, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 			ln.insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
 		})
-		bufPage, _ := bp.PageForRead(pageId)
-		iter := NewIterator(bp, *bufPage, 0)
+		bufPage, _ := tree.bufferPool.PageForRead(pageId)
+		iter := NewIterator(tree, *bufPage, 0)
 
 		// WHEN
 		_, _, _ = iter.Next()
@@ -43,11 +43,11 @@ func TestIteratorClose(t *testing.T) {
 
 	t.Run("全レコード読み取り後に Close できる", func(t *testing.T) {
 		// GIVEN
-		bp, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
+		tree, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
-		bufPage, _ := bp.PageForRead(pageId)
-		iter := NewIterator(bp, *bufPage, 0)
+		bufPage, _ := tree.bufferPool.PageForRead(pageId)
+		iter := NewIterator(tree, *bufPage, 0)
 
 		// WHEN
 		_, _, _ = iter.Next()

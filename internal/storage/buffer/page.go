@@ -14,8 +14,10 @@ type Page struct {
 	modifyCount uint64 // X ラッチ取得時に増加する更新カウンタ (順次走査の位置復元判定用)
 }
 
-func (p *Page) PageId() page.Id  { return p.pageId }
-func (p *Page) Data() *page.Page { return p.data }
+func (p *Page) PageId() page.Id     { return p.pageId }
+func (p *Page) Data() *page.Page    { return p.data }
+func (p *Page) Latch() *RWLatch     { return p.latch }
+func (p *Page) ModifyCount() uint64 { return p.modifyCount }
 
 func NewPage(pageId page.Id) (*Page, error) {
 	p, err := page.NewPage(directio.AlignedBlock(page.Size))

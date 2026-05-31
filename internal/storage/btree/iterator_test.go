@@ -13,11 +13,11 @@ import (
 func TestIteratorGet(t *testing.T) {
 	t.Run("現在のスロットのレコードを取得できる", func(t *testing.T) {
 		// GIVEN
-		bp, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
+		tree, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
-		bufPage, _ := bp.PageForRead(pageId)
-		iter := NewIterator(bp, *bufPage, 0)
+		bufPage, _ := tree.bufferPool.PageForRead(pageId)
+		iter := NewIterator(tree, *bufPage, 0)
 
 		// WHEN
 		record, ok, err := iter.Get()
@@ -30,11 +30,11 @@ func TestIteratorGet(t *testing.T) {
 
 	t.Run("スロット番号がレコード数以上の場合は false を返す", func(t *testing.T) {
 		// GIVEN
-		bp, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
+		tree, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
-		bufPage, _ := bp.PageForRead(pageId)
-		iter := NewIterator(bp, *bufPage, 1)
+		bufPage, _ := tree.bufferPool.PageForRead(pageId)
+		iter := NewIterator(tree, *bufPage, 1)
 
 		// WHEN
 		_, ok, err := iter.Get()
@@ -48,12 +48,12 @@ func TestIteratorGet(t *testing.T) {
 func TestIteratorNext(t *testing.T) {
 	t.Run("レコードを取得して次に進む", func(t *testing.T) {
 		// GIVEN
-		bp, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
+		tree, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 			ln.insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
 		})
-		bufPage, _ := bp.PageForRead(pageId)
-		iter := NewIterator(bp, *bufPage, 0)
+		bufPage, _ := tree.bufferPool.PageForRead(pageId)
+		iter := NewIterator(tree, *bufPage, 0)
 
 		// WHEN
 		record1, ok1, err1 := iter.Next()
@@ -78,12 +78,12 @@ func TestIteratorNext(t *testing.T) {
 func TestIteratorAdvance(t *testing.T) {
 	t.Run("同一ページ内の次のスロットに進む", func(t *testing.T) {
 		// GIVEN
-		bp, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
+		tree, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 			ln.insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
 		})
-		bufPage, _ := bp.PageForRead(pageId)
-		iter := NewIterator(bp, *bufPage, 0)
+		bufPage, _ := tree.bufferPool.PageForRead(pageId)
+		iter := NewIterator(tree, *bufPage, 0)
 
 		// WHEN
 		err := iter.Advance()
@@ -97,12 +97,15 @@ func TestIteratorAdvance(t *testing.T) {
 
 	t.Run("現在のページを読み終えたら次のページに遷移する", func(t *testing.T) {
 		// GIVEN
-		bp := newTestBufferPool(page.Size * 3)
+		bp := newTestBufferPool(page.Size * 10)
 		path := filepath.Join(t.TempDir(), "test.db")
 		hf, err := file.NewHeapFile(0, path)
 		assert.NoError(t, err)
 		t.Cleanup(func() { _ = hf.Close() })
 		bp.RegisterHeapFile(0, hf)
+
+		tree, err := CreateTree(bp, 0)
+		assert.NoError(t, err)
 
 		firstId, err := bp.AllocatePageId(0)
 		assert.NoError(t, err)
@@ -124,7 +127,7 @@ func TestIteratorAdvance(t *testing.T) {
 
 		bufPage, err := bp.PageForRead(firstId)
 		assert.NoError(t, err)
-		iter := NewIterator(bp, *bufPage, 0)
+		iter := NewIterator(tree, *bufPage, 0)
 
 		// WHEN
 		err = iter.Advance()
@@ -142,15 +145,90 @@ func TestIteratorAdvance(t *testing.T) {
 }
 
 // setupIteratorTestPage はテスト用のバッファプールとリーフページを作成する
-func setupIteratorTestPage(t *testing.T, setup func(ln *leafNode)) (*buffer.Pool, page.Id) {
+func TestIteratorTracksLastKeyAndModifyCount(t *testing.T) {
+	t.Run("Get 呼び出し後に lastKey と modifyCountSnap が更新される", func(t *testing.T) {
+		// GIVEN
+		tree, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
+			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
+		})
+		bufPage, _ := tree.bufferPool.PageForRead(pageId)
+		iter := NewIterator(tree, *bufPage, 0)
+		assert.Nil(t, iter.lastKey)
+
+		// WHEN
+		_, ok, err := iter.Get()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, []byte{0x10}, iter.lastKey)
+		assert.Equal(t, bufPage.ModifyCount(), iter.modifyCountSnap)
+	})
+}
+
+func TestIteratorRefetchByKey(t *testing.T) {
+	t.Run("lastKey が残っているとき次のスロットに進む", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
+		iter, _ := bt.Search(mtr, SearchModeStart{})
+		defer iter.Close()
+		_, _, _ = iter.Get() // lastKey = 0x10
+
+		// WHEN
+		err := iter.refetchByKey([]byte{0x10})
+
+		// THEN
+		assert.NoError(t, err)
+		record, ok, err := iter.Get()
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, []byte{0x20}, record.Key())
+	})
+
+	t.Run("lastKey が削除されているとき同じ slotNum をそのまま使う", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
+		iter, _ := bt.Search(mtr, SearchModeStart{})
+		defer iter.Close()
+		_, _, _ = iter.Get()
+		// 0x10 を削除して lastKey 不在の状態を作る
+		_ = bt.Delete(mtr, []byte{0x10})
+
+		// WHEN
+		err := iter.refetchByKey([]byte{0x10})
+
+		// THEN
+		assert.NoError(t, err)
+		record, ok, err := iter.Get()
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, []byte{0x20}, record.Key())
+	})
+}
+
+func setupIteratorTestPage(t *testing.T, setup func(ln *leafNode)) (*Tree, page.Id) {
 	t.Helper()
 
-	bp := newTestBufferPool(page.Size * 3)
+	bp := newTestBufferPool(page.Size * 10)
 	path := filepath.Join(t.TempDir(), "test.db")
 	hf, err := file.NewHeapFile(0, path)
 	assert.NoError(t, err)
 	t.Cleanup(func() { _ = hf.Close() })
 	bp.RegisterHeapFile(0, hf)
+
+	// refetch 経路に必要な Tree (テストでは modifyCount を進めないため Search は呼ばれない)
+	tree, err := CreateTree(bp, 0)
+	assert.NoError(t, err)
 
 	pageId, err := bp.AllocatePageId(0)
 	assert.NoError(t, err)
@@ -162,5 +240,5 @@ func setupIteratorTestPage(t *testing.T, setup func(ln *leafNode)) (*buffer.Pool
 	ln.initialize()
 	setup(ln)
 
-	return bp, pageId
+	return tree, pageId
 }
