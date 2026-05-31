@@ -38,7 +38,7 @@
 ### Redo ログレコード
 
 - 各レコードは可変長で、先頭から順に隙間なく詰めて記録する
-- レコードの種別は以下の 3 つ:
+- レコードの種別は以下の 5 つ:
   1. ページ変更
      - データページや Undo ページへの変更を示す
      - 変更内容としてページ全体のコピー (4096 バイト) を持つ
@@ -48,13 +48,19 @@
   3. ROLLBACK
      - トランザクションのロールバックを示す
      - 変更内容は持たない
+  4. mini-transaction 開始
+     - 1 つの mini-transaction の開始を示す境界マーカー
+     - 変更内容は持たない
+  5. mini-transaction 終了
+     - 1 つの mini-transaction の終了を示す境界マーカー (開始マーカーと対になる)
+     - 変更内容は持たない
 - ページ変更レコードの「変更内容」には、差分ではなくページ全体のコピーを記録する。リカバリ時はページをそのまま上書きする
   - 設計背景: [ADR: Redo ログのページ変更記録方式](../../../adr/0001.Redoログのページ変更記録方式.md)
 
 | offset | バイト数 | 項目 | 説明 |
 | 0 | 4 | [LSN](../../../about/durability.md#log-sequence-number-lsn) | このレコードの LSN |
 | 4 | 4 | TrxId | 変更を行ったトランザクション ID |
-| 8 | 1 | レコード種別 | 操作種別 (ページ変更, COMMIT, ROLLBACK) |
+| 8 | 1 | レコード種別 | 操作種別 (ページ変更, COMMIT, ROLLBACK, mini-transaction 開始, mini-transaction 終了) |
 | 9 | 8 | PageId | 変更対象ページの PageId |
 | 17 | 2 | データ長 | 変更内容のバイト数 |
 | 19 | 可変 | 変更内容 | レコード種別に応じたデータ |
@@ -68,7 +74,9 @@
 ## mini-transaction の区切り
 
 - 1 つの操作 ([mini-transaction](../buffer/latch.md#mini-transaction)) が複数ページを変更することがある (例えば B+Tree の[ノード分割](../btree/btree-insert.md)は親ノードと分割前後のリーフノードを変更する)
-- その複数のページ変更レコードは 1 つの mini-transaction としてまとまり、Redo ログには mini-transaction の終わりを示す区切りを記録する
+- その複数のページ変更レコードを 1 つのまとまりとして識別できるよう、Redo ログには mini-transaction の開始マーカーと終了マーカーを記録する
+- 開始マーカーと終了マーカーの間に位置するページ変更レコード群が、1 つの mini-transaction に属するページ変更となる
+- クラッシュリカバリ時には、開始マーカーに対応する終了マーカーが存在する mini-transaction のみを適用し、終了マーカーを欠く mini-transaction (= 書き出し途中でクラッシュした mini-transaction) は破棄する
 
 ## 書き込みフロー
 
