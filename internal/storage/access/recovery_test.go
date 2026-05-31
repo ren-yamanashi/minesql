@@ -221,6 +221,111 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 		readPage, _ := env.bp.PageForRead(pgId)
 		assert.NotEqual(t, byte(0xFF), readPage.Data().Body()[0])
 	})
+
+	t.Run("完全な mtr のページ変更は適用される", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		pgId := page.NewId(env.undoFileId, 0)
+
+		// MtrStart, PageWrite, MtrEnd を順に記録
+		_, _ = env.redoLog.AppendMtrStart(lock.TrxId(1))
+		newPageData := make([]byte, page.Size)
+		newPageData[page.HeaderSize] = 0xAA
+		newPage, _ := page.NewPage(newPageData)
+		_, _ = env.redoLog.AppendPageCopy(lock.TrxId(1), pgId, newPage)
+		_, _ = env.redoLog.AppendMtrEnd(lock.TrxId(1))
+		_ = env.redoLog.Flush()
+		records, _ := env.redoLog.ReadFrom(redo.Lsn(0))
+
+		// WHEN
+		err := r.applyRedoLog(records)
+
+		// THEN
+		assert.NoError(t, err)
+		readPage, _ := env.bp.PageForRead(pgId)
+		assert.Equal(t, byte(0xAA), readPage.Data().Body()[0])
+	})
+
+	t.Run("MtrEnd を欠く mtr のページ変更は破棄される", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		pgId := page.NewId(env.undoFileId, 0)
+
+		// MtrStart, PageWrite だけ (MtrEnd なし)
+		_, _ = env.redoLog.AppendMtrStart(lock.TrxId(1))
+		newPageData := make([]byte, page.Size)
+		newPageData[page.HeaderSize] = 0xBB
+		newPage, _ := page.NewPage(newPageData)
+		_, _ = env.redoLog.AppendPageCopy(lock.TrxId(1), pgId, newPage)
+		_ = env.redoLog.Flush()
+		records, _ := env.redoLog.ReadFrom(redo.Lsn(0))
+
+		// WHEN
+		err := r.applyRedoLog(records)
+
+		// THEN
+		assert.NoError(t, err)
+		readPage, _ := env.bp.PageForRead(pgId)
+		assert.NotEqual(t, byte(0xBB), readPage.Data().Body()[0])
+	})
+
+	t.Run("mtr 境界に囲まれていないページ変更は適用される (移行期間)", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		pgId := page.NewId(env.undoFileId, 0)
+
+		newPageData := make([]byte, page.Size)
+		newPageData[page.HeaderSize] = 0xCC
+		newPage, _ := page.NewPage(newPageData)
+		_, _ = env.redoLog.AppendPageCopy(lock.TrxId(1), pgId, newPage)
+		_ = env.redoLog.Flush()
+		records, _ := env.redoLog.ReadFrom(redo.Lsn(0))
+
+		// WHEN
+		err := r.applyRedoLog(records)
+
+		// THEN
+		assert.NoError(t, err)
+		readPage, _ := env.bp.PageForRead(pgId)
+		assert.Equal(t, byte(0xCC), readPage.Data().Body()[0])
+	})
+
+	t.Run("複数の mtr が交互に並んでも完全な mtr だけが適用される", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		completePgId := page.NewId(env.undoFileId, 0)
+		incompletePgId := page.NewId(env.undoFileId, 1)
+		_, _ = env.bp.AddPage(incompletePgId)
+
+		// 別 trxId の mtr が交互: T1 完全 / T2 不完全 (MtrEnd なし)
+		_, _ = env.redoLog.AppendMtrStart(lock.TrxId(1))
+		_, _ = env.redoLog.AppendMtrStart(lock.TrxId(2))
+		completeData := make([]byte, page.Size)
+		completeData[page.HeaderSize] = 0xAA
+		completePg, _ := page.NewPage(completeData)
+		_, _ = env.redoLog.AppendPageCopy(lock.TrxId(1), completePgId, completePg)
+		incompleteData := make([]byte, page.Size)
+		incompleteData[page.HeaderSize] = 0xBB
+		incompletePg, _ := page.NewPage(incompleteData)
+		_, _ = env.redoLog.AppendPageCopy(lock.TrxId(2), incompletePgId, incompletePg)
+		_, _ = env.redoLog.AppendMtrEnd(lock.TrxId(1))
+		_ = env.redoLog.Flush()
+		records, _ := env.redoLog.ReadFrom(redo.Lsn(0))
+
+		// WHEN
+		err := r.applyRedoLog(records)
+
+		// THEN
+		assert.NoError(t, err)
+		completePage, _ := env.bp.PageForRead(completePgId)
+		assert.Equal(t, byte(0xAA), completePage.Data().Body()[0])
+		incompletePage, _ := env.bp.PageForRead(incompletePgId)
+		assert.NotEqual(t, byte(0xBB), incompletePage.Data().Body()[0])
+	})
 }
 
 func TestRecoveryApplyRollback(t *testing.T) {

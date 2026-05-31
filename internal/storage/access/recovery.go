@@ -56,29 +56,52 @@ func (r *Recovery) Execute() error {
 	return r.redoLog.Clear()
 }
 
-// applyRedoLog は Redo ログを先頭からスキャンし、ページ変更レコードを順に適用する
+// applyRedoLog は Redo ログを先頭からスキャンし、ページ変更レコードを適用する
 func (r *Recovery) applyRedoLog(records []redo.Record) error {
+	pendingByTrx := make(map[lock.TrxId][]redo.Record)
+	inMtrByTrx := make(map[lock.TrxId]bool)
+
 	for _, rec := range records {
-		if rec.Type() != redo.RecordTypePageWrite {
-			continue
+		switch rec.Type() {
+		case redo.RecordTypeMtrStart:
+			inMtrByTrx[rec.TrxId()] = true
+			pendingByTrx[rec.TrxId()] = nil
+		case redo.RecordTypeMtrEnd:
+			if !inMtrByTrx[rec.TrxId()] {
+				continue
+			}
+			for _, pending := range pendingByTrx[rec.TrxId()] {
+				if err := r.applyPageWrite(pending); err != nil {
+					return err
+				}
+			}
+			delete(pendingByTrx, rec.TrxId())
+			delete(inMtrByTrx, rec.TrxId())
+		case redo.RecordTypePageWrite:
+			if inMtrByTrx[rec.TrxId()] {
+				pendingByTrx[rec.TrxId()] = append(pendingByTrx[rec.TrxId()], rec)
+				continue
+			}
+			if err := r.applyPageWrite(rec); err != nil {
+				return err
+			}
 		}
-
-		// Redo レコードの PageId から変更ページ取得
-		writePage, err := r.bufferPool.PageForWrite(rec.PageId())
-		if err != nil {
-			return err
-		}
-
-		// Page LSN を比較し、すでに適用済みならスキップ
-		currentLsn := redo.Lsn(binary.BigEndian.Uint32(writePage.Data().Header()))
-		if currentLsn >= rec.Lsn() {
-			continue
-		}
-
-		// ページ全体のコピーで上書き
-		recData := rec.Data()
-		copy(writePage.Data().Bytes(), recData.Bytes())
 	}
+	return nil
+}
+
+// applyPageWrite は 1 件のページ変更レコードを適用する
+func (r *Recovery) applyPageWrite(rec redo.Record) error {
+	writePage, err := r.bufferPool.PageForWrite(rec.PageId())
+	if err != nil {
+		return err
+	}
+	currentLsn := redo.Lsn(binary.BigEndian.Uint32(writePage.Data().Header()))
+	if currentLsn >= rec.Lsn() {
+		return nil
+	}
+	recData := rec.Data()
+	copy(writePage.Data().Bytes(), recData.Bytes())
 	return nil
 }
 
