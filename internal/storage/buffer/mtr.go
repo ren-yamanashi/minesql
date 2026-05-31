@@ -6,19 +6,28 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
-// Mtr は 1 つの原子的なページ操作で獲得した Pin とラッチをまとめ、操作の完了時に一括解放するスコープ (mini-transaction)
-//   - 同じ Mtr 内で同一ページを再取得する場合は再帰的に扱い、ラッチは実体として 1 つだけ保持する
-//   - 同じ Mtr が S 取得済みのページを X 要求した場合は S を解放してから X を取り直す (隙間で他者が X を取りうる)
-type Mtr struct {
-	pool   *Pool
-	pinned []pinnedEntry
-}
-
+// pinnedEntry は Mtr が保持中の 1 ページ分の Pin とページラッチの記録
 type pinnedEntry struct {
 	pageId    page.Id
 	mode      LatchMode
 	bufPage   *Page
 	skipLatch bool // 同一 Mtr 内の再帰取得で実体ラッチを取り直さなかったエントリ
+}
+
+// heldLatchEntry は Mtr が保持中の 1 つの任意 RWLatch の記録
+type heldLatchEntry struct {
+	latch *RWLatch
+	mode  LatchMode
+}
+
+// Mtr は 1 つの原子的なページ操作で獲得した Pin とラッチをまとめ、操作の完了時に一括解放するスコープ (mini-transaction)
+//   - 同じ Mtr 内で同一ページを再取得する場合は再帰的に扱い、ラッチは実体として 1 つだけ保持する
+//   - 同じ Mtr が S 取得済みのページを X 要求した場合は S を解放してから X を取り直す (隙間で他者が X を取りうる)
+//   - Pin に紐づかない任意の RWLatch (B+Tree レベルなど) も同スコープで管理する
+type Mtr struct {
+	pool        *Pool
+	pinned      []pinnedEntry
+	heldLatches []heldLatchEntry
 }
 
 func NewMtr(pool *Pool) *Mtr {
@@ -105,11 +114,51 @@ func (m *Mtr) UnpinAll() {
 		m.pool.Unpin(entry.pageId)
 	}
 	m.pinned = nil
+	for i := len(m.heldLatches) - 1; i >= 0; i-- {
+		entry := m.heldLatches[i]
+		entry.latch.Unlock(entry.mode)
+	}
+	m.heldLatches = nil
+}
+
+// LockShared は任意の RWLatch を Shared で取得し、Mtr スコープに記録する
+func (m *Mtr) LockShared(l *RWLatch) {
+	l.LockShared()
+	m.heldLatches = append(m.heldLatches, heldLatchEntry{latch: l, mode: LatchShared})
+}
+
+// LockSharedExclusive は任意の RWLatch を Shared-Exclusive で取得し、Mtr スコープに記録する
+func (m *Mtr) LockSharedExclusive(l *RWLatch) {
+	l.LockSharedExclusive()
+	m.heldLatches = append(m.heldLatches, heldLatchEntry{latch: l, mode: LatchSharedExclusive})
+}
+
+// LockExclusive は任意の RWLatch を Exclusive で取得し、Mtr スコープに記録する
+func (m *Mtr) LockExclusive(l *RWLatch) {
+	l.LockExclusive()
+	m.heldLatches = append(m.heldLatches, heldLatchEntry{latch: l, mode: LatchExclusive})
+}
+
+// UnlockLatch は指定 RWLatch を 1 件 (LIFO 末尾) 解放する
+func (m *Mtr) UnlockLatch(l *RWLatch) {
+	for i := len(m.heldLatches) - 1; i >= 0; i-- {
+		if m.heldLatches[i].latch == l {
+			entry := m.heldLatches[i]
+			m.heldLatches = slices.Delete(m.heldLatches, i, i+1)
+			entry.latch.Unlock(entry.mode)
+			return
+		}
+	}
 }
 
 // PinnedCount はスコープに記録されている Pin の数を返す
 func (m *Mtr) PinnedCount() int {
 	return len(m.pinned)
+}
+
+// HeldLatchCount はスコープに記録されている任意ラッチの数を返す (リーク検出用)
+func (m *Mtr) HeldLatchCount() int {
+	return len(m.heldLatches)
 }
 
 // findHolder は同一ページに対する実体ラッチ保持エントリのインデックスとモードを返す。無ければ (-1, 0) を返す
