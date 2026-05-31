@@ -48,10 +48,11 @@ func NewManager(bp *buffer.Pool, redoLog *redo.Buffer, fileId page.FileId) (*Man
 }
 
 // Append は指定した trxId の Undo ログにレコードを追加し、書き込み先の Pointer を返す
-func (m *Manager) Append(trxId lock.TrxId, recordType RecordType, record Record) (Pointer, error) {
+//   - mtr は呼び出し側 (access の Insert/Update/SoftDelete) が確保したものを引き継ぎ、Undo ページの latch / Pin を同一スコープで管理する
+func (m *Manager) Append(mtr *buffer.Mtr, trxId lock.TrxId, recordType RecordType, record Record) (Pointer, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	ptr, err := m.writeToPage(trxId, record)
+	ptr, err := m.writeToPage(mtr, trxId, record)
 	if err != nil {
 		return Pointer{}, err
 	}
@@ -108,11 +109,11 @@ func (m *Manager) DiscardRecordType(trxId lock.TrxId, recordType RecordType) {
 }
 
 // writeToPage は Undo レコードを Undo ページに書き込み、書き込み先の Pointer を返す
-func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) {
+func (m *Manager) writeToPage(mtr *buffer.Mtr, trxId lock.TrxId, record Record) (Pointer, error) {
 	undoNum := UndoNumber(len(m.entries[trxId]))
 	serialized := record.Serialize(trxId, undoNum)
 
-	pageUndo, err := m.bufferPool.PageForWrite(m.currentPageId)
+	pageUndo, err := mtr.PageForWrite(m.currentPageId)
 	if err != nil {
 		return Pointer{}, err
 	}
@@ -120,14 +121,14 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 
 	// ページが満杯の場合は新しいページに切り替える (switchToNewPage 内で Redo 記録まで完了)
 	if bufPageUndo.FreeSpace() < len(serialized) {
-		return m.switchToNewPage(trxId, bufPageUndo, serialized)
+		return m.switchToNewPage(mtr, trxId, bufPageUndo, serialized)
 	}
 
 	prevUsedBytes := bufPageUndo.UsedBytes()
 	if !bufPageUndo.append(serialized) {
 		return Pointer{}, ErrRecordTooLarge
 	}
-	if err := m.appendRedoLog(trxId); err != nil {
+	if err := m.appendRedoLog(mtr, trxId); err != nil {
 		bufPageUndo.setUsedBytes(prevUsedBytes)
 		return Pointer{}, err
 	}
@@ -135,7 +136,7 @@ func (m *Manager) writeToPage(trxId lock.TrxId, record Record) (Pointer, error) 
 }
 
 // switchToNewPage は現在のページが満杯のとき、新しい Undo ページを割り当ててレコードを書き込む
-func (m *Manager) switchToNewPage(trxId lock.TrxId, currentPage *Page, serialized []byte) (Pointer, error) {
+func (m *Manager) switchToNewPage(mtr *buffer.Mtr, trxId lock.TrxId, currentPage *Page, serialized []byte) (Pointer, error) {
 	// 新しいページを先に確保し、レコードを書き込む (旧ページに何も書き込む前に)
 	newPageId, err := m.bufferPool.AllocatePageId(m.fileId)
 	if err != nil {
@@ -144,7 +145,7 @@ func (m *Manager) switchToNewPage(trxId lock.TrxId, currentPage *Page, serialize
 	if _, err := m.bufferPool.AddPage(newPageId); err != nil {
 		return Pointer{}, err
 	}
-	pageNewUndo, err := m.bufferPool.PageForWrite(newPageId)
+	pageNewUndo, err := mtr.PageForWrite(newPageId)
 	if err != nil {
 		return Pointer{}, err
 	}
@@ -158,7 +159,7 @@ func (m *Manager) switchToNewPage(trxId lock.TrxId, currentPage *Page, serialize
 	currentPage.setNextPageNumber(newPageId.PageNumber())
 
 	// 旧ページの Redo ログを記録 (nextPageNumber の変更を反映)
-	if err := m.appendRedoLog(trxId); err != nil {
+	if err := m.appendRedoLog(mtr, trxId); err != nil {
 		currentPage.setNextPageNumber(prevNextPageNumber)
 		return Pointer{}, err
 	}
@@ -166,7 +167,7 @@ func (m *Manager) switchToNewPage(trxId lock.TrxId, currentPage *Page, serialize
 	// currentPageId を新ページに切り替えて新ページの Redo を記録
 	prevCurrentPageId := m.currentPageId
 	m.currentPageId = newPageId
-	if err := m.appendRedoLog(trxId); err != nil {
+	if err := m.appendRedoLog(mtr, trxId); err != nil {
 		m.currentPageId = prevCurrentPageId
 		currentPage.setNextPageNumber(prevNextPageNumber)
 		newBufPageUndo.setUsedBytes(0)
@@ -177,11 +178,12 @@ func (m *Manager) switchToNewPage(trxId lock.TrxId, currentPage *Page, serialize
 }
 
 // appendRedoLog は現在の Undo ページの Redo ログを記録する
-func (m *Manager) appendRedoLog(trxId lock.TrxId) error {
+//   - 呼び出し側が currentPageId に対して既に X latch を取得済みであることを前提とする (mtr.PageForRead は同一ページの再取得を skipLatch で扱う)
+func (m *Manager) appendRedoLog(mtr *buffer.Mtr, trxId lock.TrxId) error {
 	if m.redoLog == nil {
 		return nil
 	}
-	pageUndo, err := m.bufferPool.PageForRead(m.currentPageId)
+	pageUndo, err := mtr.PageForRead(m.currentPageId)
 	if err != nil {
 		return err
 	}

@@ -34,7 +34,7 @@ func TestManagerAppend(t *testing.T) {
 		record := NewInsertRecord(page.FileId(1), btree.Record{[]byte("Alice")})
 
 		// WHEN
-		ptr, err := mgr.Append(lock.TrxId(1), RecordTypeInsert, record)
+		ptr, err := appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, record)
 
 		// THEN
 		assert.NoError(t, err)
@@ -48,8 +48,8 @@ func TestManagerAppend(t *testing.T) {
 		r2 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("Bob")}, 1, NullPointer())
 
 		// WHEN
-		ptr1, err1 := mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
-		ptr2, err2 := mgr.Append(lock.TrxId(1), RecordTypeDelete, r2)
+		ptr1, err1 := appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r1)
+		ptr2, err2 := appendForTest(t, mgr, lock.TrxId(1), RecordTypeDelete, r2)
 
 		// THEN
 		assert.NoError(t, err1)
@@ -64,8 +64,8 @@ func TestManagerAppend(t *testing.T) {
 		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("Bob")})
 
 		// WHEN
-		_, err1 := mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
-		_, err2 := mgr.Append(lock.TrxId(2), RecordTypeInsert, r2)
+		_, err1 := appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r1)
+		_, err2 := appendForTest(t, mgr, lock.TrxId(2), RecordTypeInsert, r2)
 
 		// THEN
 		assert.NoError(t, err1)
@@ -87,7 +87,7 @@ func TestManagerAppend(t *testing.T) {
 			wg.Go(func() {
 				for range appendsPerGoroutine {
 					r := NewInsertRecord(page.FileId(1), btree.Record{[]byte("data")})
-					_, err := mgr.Append(trxId, RecordTypeInsert, r)
+					_, err := appendForTest(t, mgr, trxId, RecordTypeInsert, r)
 					assert.NoError(t, err)
 				}
 			})
@@ -115,7 +115,7 @@ func TestManagerAppend(t *testing.T) {
 			wg.Go(func() {
 				for range opsPerGoroutine {
 					r := NewInsertRecord(page.FileId(1), btree.Record{[]byte("data")})
-					_, _ = mgr.Append(trxId, RecordTypeInsert, r)
+					_, _ = appendForTest(t, mgr, trxId, RecordTypeInsert, r)
 				}
 			})
 		}
@@ -138,7 +138,7 @@ func TestManagerRecords(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
 		r := NewInsertRecord(page.FileId(1), btree.Record{[]byte("Alice")})
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r)
 
 		// WHEN
 		records := mgr.Records(lock.TrxId(1))
@@ -152,8 +152,8 @@ func TestManagerRecords(t *testing.T) {
 		mgr := setupTestManager(t)
 		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("first")})
 		r2 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("second")}, 1, NullPointer())
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r2)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r1)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeDelete, r2)
 
 		// WHEN
 		records := mgr.Records(lock.TrxId(1))
@@ -177,7 +177,7 @@ func TestManagerRecords(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
 		r := NewInsertRecord(page.FileId(1), btree.Record{[]byte("Alice")})
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r)
 
 		// WHEN
 		records := mgr.Records(lock.TrxId(2))
@@ -193,8 +193,8 @@ func TestManagerCommittedEntries(t *testing.T) {
 		mgr := setupTestManager(t)
 		r1 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer())
 		r2 := NewUpdateRecord(page.FileId(1), btree.Record{[]byte("old")}, btree.Record{[]byte("new")}, 1, NullPointer())
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r1)
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeUpdate, r2)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeDelete, r1)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeUpdate, r2)
 
 		// WHEN
 		entries := mgr.CommittedEntries([]lock.TrxId{1})
@@ -212,8 +212,8 @@ func TestManagerCommittedEntries(t *testing.T) {
 		mgr := setupTestManager(t)
 		r1 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer())
 		r2 := NewUpdateRecord(page.FileId(1), btree.Record{[]byte("old")}, btree.Record{[]byte("new")}, 2, NullPointer())
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r1)
-		_, _ = mgr.Append(lock.TrxId(2), RecordTypeUpdate, r2)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeDelete, r1)
+		_, _ = appendForTest(t, mgr, lock.TrxId(2), RecordTypeUpdate, r2)
 
 		// WHEN
 		entries := mgr.CommittedEntries([]lock.TrxId{1, 2})
@@ -229,8 +229,8 @@ func TestManagerCommittedEntries(t *testing.T) {
 		mgr := setupTestManager(t)
 		r1 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer())
 		r2 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("b")}, 2, NullPointer())
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r1)
-		_, _ = mgr.Append(lock.TrxId(2), RecordTypeDelete, r2)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeDelete, r1)
+		_, _ = appendForTest(t, mgr, lock.TrxId(2), RecordTypeDelete, r2)
 
 		// WHEN
 		entries := mgr.CommittedEntries([]lock.TrxId{1})
@@ -255,7 +255,7 @@ func TestManagerCommittedEntries(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
 		r := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer())
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeDelete, r)
 
 		// WHEN
 		entries := mgr.CommittedEntries([]lock.TrxId{})
@@ -281,7 +281,7 @@ func TestManagerCommittedEntries(t *testing.T) {
 			wg.Go(func() {
 				for range opsPerGoroutine {
 					r := NewInsertRecord(page.FileId(1), btree.Record{[]byte("data")})
-					_, _ = mgr.Append(trxId, RecordTypeInsert, r)
+					_, _ = appendForTest(t, mgr, trxId, RecordTypeInsert, r)
 				}
 			})
 		}
@@ -304,8 +304,8 @@ func TestManagerDiscard(t *testing.T) {
 		mgr := setupTestManager(t)
 		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("first")})
 		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("second")})
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r2)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r1)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r2)
 
 		// WHEN
 		mgr.Discard(lock.TrxId(1))
@@ -319,8 +319,8 @@ func TestManagerDiscard(t *testing.T) {
 		mgr := setupTestManager(t)
 		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("trx1")})
 		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("trx2")})
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
-		_, _ = mgr.Append(lock.TrxId(2), RecordTypeInsert, r2)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r1)
+		_, _ = appendForTest(t, mgr, lock.TrxId(2), RecordTypeInsert, r2)
 
 		// WHEN
 		mgr.Discard(lock.TrxId(1))
@@ -349,9 +349,9 @@ func TestManagerDiscardRecordType(t *testing.T) {
 		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("inserted")})
 		r2 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("deleted")}, 1, NullPointer())
 		r3 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("inserted2")})
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r2)
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r3)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r1)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeDelete, r2)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r3)
 
 		// WHEN
 		mgr.DiscardRecordType(lock.TrxId(1), RecordTypeInsert)
@@ -368,8 +368,8 @@ func TestManagerDiscardRecordType(t *testing.T) {
 		mgr := setupTestManager(t)
 		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("a")})
 		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("b")})
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r2)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r1)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r2)
 
 		// WHEN
 		mgr.DiscardRecordType(lock.TrxId(1), RecordTypeInsert)
@@ -382,7 +382,7 @@ func TestManagerDiscardRecordType(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
 		r := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("a")}, 1, NullPointer())
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeDelete, r)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeDelete, r)
 
 		// WHEN
 		mgr.DiscardRecordType(lock.TrxId(1), RecordTypeInsert)
@@ -397,8 +397,8 @@ func TestManagerDiscardRecordType(t *testing.T) {
 		mgr := setupTestManager(t)
 		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("trx1")})
 		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("trx2")})
-		_, _ = mgr.Append(lock.TrxId(1), RecordTypeInsert, r1)
-		_, _ = mgr.Append(lock.TrxId(2), RecordTypeInsert, r2)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r1)
+		_, _ = appendForTest(t, mgr, lock.TrxId(2), RecordTypeInsert, r2)
 
 		// WHEN
 		mgr.DiscardRecordType(lock.TrxId(1), RecordTypeInsert)
@@ -435,7 +435,7 @@ func TestManagerWriteToPage(t *testing.T) {
 		var err error
 		for i := range 20 {
 			r := NewInsertRecord(page.FileId(1), btree.Record{bigData})
-			lastPtr, err = mgr.Append(lock.TrxId(1), RecordTypeInsert, r)
+			lastPtr, err = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r)
 			if err != nil {
 				t.Fatalf("Append %d に失敗: %v", i, err)
 			}
@@ -472,4 +472,13 @@ func setupTestManager(t *testing.T) *Manager {
 		t.Fatalf("Manager の作成に失敗: %v", err)
 	}
 	return mgr
+}
+
+// appendForTest は 1 回の Append を独立した mtr スコープで実行するヘルパー
+//   - Manager の Append は呼び出し側 (= access) の mtr を引き継ぐ設計のため、テストでは 1 件単位で mtr を生成 / 解放する
+func appendForTest(t *testing.T, mgr *Manager, trxId lock.TrxId, recordType RecordType, record Record) (Pointer, error) {
+	t.Helper()
+	mtr := buffer.NewMtr(mgr.bufferPool)
+	defer mtr.UnpinAll()
+	return mgr.Append(mtr, trxId, recordType, record)
 }

@@ -23,7 +23,7 @@ func (t *Table) SoftDelete(record *PrimaryRecord, trxId lock.TrxId) error {
 
 	// Undo ログを更新
 	undoRecord := undo.NewDeleteRecord(t.primaryIndex.fileId(), record.Encode(), record.lastTrxId, record.rollPtr)
-	ptr, err := t.undoLog.Append(trxId, undo.RecordTypeDelete, undoRecord)
+	ptr, err := t.undoLog.Append(mtr, trxId, undo.RecordTypeDelete, undoRecord)
 	if err != nil {
 		return err
 	}

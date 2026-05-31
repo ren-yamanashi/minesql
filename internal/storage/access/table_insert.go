@@ -34,7 +34,7 @@ func (t *Table) Insert(colNames []string, values []string, trxId lock.TrxId) err
 
 	// Undo ログを更新
 	undoRecord := undo.NewInsertRecord(t.primaryIndex.fileId(), record.Encode())
-	ptr, err := t.undoLog.Append(trxId, undo.RecordTypeInsert, undoRecord)
+	ptr, err := t.undoLog.Append(mtr, trxId, undo.RecordTypeInsert, undoRecord)
 	if err != nil {
 		return err
 	}
