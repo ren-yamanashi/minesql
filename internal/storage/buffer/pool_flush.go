@@ -3,123 +3,156 @@ package buffer
 import (
 	"errors"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
+type flushTask struct {
+	pageId   page.Id
+	bufPage  *Page
+	heapFile *file.HeapFile
+}
+
 // FlushAllPages はバッファプール内のすべてのダーティーページをフラッシュする
 func (p *Pool) FlushAllPages() error {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	var flushErr error
-
-	// Sync 成功後に状態を更新するため Write 成功したページを一時保持する
-	var pendingPages []*Page
-
-	// 全ダーティーページをディスクに書き出す
-	p.pageTable.forEach(func(pageId page.Id, bufId id) {
-		if flushErr != nil {
-			return
-		}
-
-		bufPage := &p.pages[bufId]
-		if !bufPage.isDirty {
-			return
-		}
-
-		heapFile, err := p.heapFile(pageId.FileId())
-		if err != nil {
-			flushErr = err
-			return
-		}
-
-		err = heapFile.Write(pageId.PageNumber(), bufPage.data.Bytes())
-		if err != nil {
-			flushErr = err
-			return
-		}
-		pendingPages = append(pendingPages, bufPage)
-	})
-	if flushErr != nil {
-		return flushErr
+	tasks, files, err := p.collectAllFlushTasks()
+	if err != nil {
+		return err
 	}
-
-	// 全 file の Sync を試行してエラーを集約する (途中失敗で残ファイルの fsync がスキップされないように)
-	var syncErr error
-	for _, hf := range p.files {
-		if err := hf.Sync(); err != nil {
-			syncErr = errors.Join(syncErr, err)
-		}
-	}
-	if syncErr != nil {
-		return syncErr
-	}
-
-	for _, bp := range pendingPages {
-		bp.isDirty = false
-	}
-	p.flushList.clear()
-
-	return nil
+	return p.runFlush(tasks, files)
 }
 
 // FlushOldestPages はフラッシュリストの先頭から n ページをディスクにフラッシュする
 func (p *Pool) FlushOldestPages(n int) error {
+	tasks, files, err := p.collectOldestFlushTasks(n)
+	if err != nil {
+		return err
+	}
+	return p.runFlush(tasks, files)
+}
+
+// collectAllFlushTasks は全ダーティーページからフラッシュ対象を集める
+func (p *Pool) collectAllFlushTasks() ([]flushTask, []*file.HeapFile, error) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	var tasks []flushTask
+	var collectErr error
+	p.pageTable.forEach(func(pageId page.Id, bufId id) {
+		if collectErr != nil {
+			return
+		}
+		bufPage := &p.pages[bufId]
+		if !bufPage.isDirty {
+			return
+		}
+		hf, err := p.heapFile(pageId.FileId())
+		if err != nil {
+			collectErr = err
+			return
+		}
+		tasks = append(tasks, flushTask{pageId: pageId, bufPage: bufPage, heapFile: hf})
+	})
+	if collectErr != nil {
+		return nil, nil, collectErr
+	}
+
+	files := make([]*file.HeapFile, 0, len(p.files))
+	for _, hf := range p.files {
+		files = append(files, hf)
+	}
+	return tasks, files, nil
+}
+
+// collectOldestFlushTasks はフラッシュリストの先頭から n ページのフラッシュ対象を集める
+func (p *Pool) collectOldestFlushTasks(n int) ([]flushTask, []*file.HeapFile, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
 	pageIds := p.flushList.oldestPageIds(n)
 	if len(pageIds) == 0 {
-		return nil
+		return nil, nil, nil
 	}
 
-	// フラッシュ対象のディスクを記録する (後でまとめて Sync するため)
-	filesToSync := make(map[page.FileId]struct{})
-
-	// Sync 成功後に状態を更新するため Write 成功したページを一時保持する
-	var pendingPageIds []page.Id
-	var pendingBufPages []*Page
-
-	// 対象のダーティーページをディスクに書き出す
+	var tasks []flushTask
+	filesSet := make(map[page.FileId]*file.HeapFile)
 	for _, pid := range pageIds {
 		bufId, exists := p.pageTable.bufferId(pid)
 		if !exists {
 			continue
 		}
-
 		bufPage := &p.pages[bufId]
 		if !bufPage.isDirty {
 			p.flushList.delete(pid)
 			continue
 		}
-
-		heapFile, err := p.heapFile(pid.FileId())
+		hf, err := p.heapFile(pid.FileId())
 		if err != nil {
-			return err
+			return nil, nil, err
 		}
-		if err := heapFile.Write(pid.PageNumber(), bufPage.data.Bytes()); err != nil {
-			return err
-		}
-
-		pendingPageIds = append(pendingPageIds, pid)
-		pendingBufPages = append(pendingBufPages, bufPage)
-		filesToSync[pid.FileId()] = struct{}{}
+		tasks = append(tasks, flushTask{pageId: pid, bufPage: bufPage, heapFile: hf})
+		filesSet[pid.FileId()] = hf
 	}
 
-	for fileId := range filesToSync {
-		heapFile, err := p.heapFile(fileId)
-		if err != nil {
-			return err
+	files := make([]*file.HeapFile, 0, len(filesSet))
+	for _, hf := range filesSet {
+		files = append(files, hf)
+	}
+	return tasks, files, nil
+}
+
+// runFlush は収集済みのフラッシュタスクを実行する
+//   - 各ページに対し Exclusive ラッチの試取得を行い、他者が保持中のページはスキップ (flushList に残り次回再試行)
+//   - これにより同一 goroutine が保持中のページに対する self-deadlock を避けつつ、torn flush を防ぐ
+//   - 並行性のさらなる改善 (Shared ラッチで書き込み並行を許容) は段階 3 で導入する
+func (p *Pool) runFlush(tasks []flushTask, files []*file.HeapFile) error {
+	if len(tasks) == 0 {
+		return nil
+	}
+
+	var lockedTasks []flushTask
+	for _, task := range tasks {
+		if task.bufPage.latch.TryLockExclusive() {
+			lockedTasks = append(lockedTasks, task)
 		}
-		if err := heapFile.Sync(); err != nil {
+	}
+	if len(lockedTasks) == 0 {
+		return nil
+	}
+
+	unlockAll := func() {
+		for _, t := range lockedTasks {
+			t.bufPage.latch.Unlock(LatchExclusive)
+		}
+	}
+
+	for _, task := range lockedTasks {
+		if err := task.heapFile.Write(task.pageId.PageNumber(), task.bufPage.data.Bytes()); err != nil {
+			unlockAll()
 			return err
 		}
 	}
 
-	for i, pid := range pendingPageIds {
-		pendingBufPages[i].isDirty = false
-		p.flushList.delete(pid)
+	var syncErr error
+	for _, hf := range files {
+		if err := hf.Sync(); err != nil {
+			syncErr = errors.Join(syncErr, err)
+		}
+	}
+	if syncErr != nil {
+		unlockAll()
+		return syncErr
 	}
 
+	// isDirty 解除と latch 解放は同じ p.mu 区間内で行う
+	// 解除後の evict はバッファスロットを上書きするため、その間に p.mu 外で latch 解放しようとすると
+	// 解放中の latch フィールド読み取りと race する
+	p.mu.Lock()
+	for _, task := range lockedTasks {
+		task.bufPage.isDirty = false
+		p.flushList.delete(task.pageId)
+	}
+	unlockAll()
+	p.mu.Unlock()
 	return nil
 }

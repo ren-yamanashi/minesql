@@ -6,10 +6,12 @@ import (
 )
 
 type Page struct {
-	pageId   page.Id
-	data     *page.Page
-	isDirty  bool
-	pinCount int
+	pageId      page.Id
+	data        *page.Page
+	isDirty     bool
+	pinCount    int
+	latch       *RWLatch
+	modifyCount uint64 // X ラッチ取得時に増加する更新カウンタ (順次走査の位置復元判定用)
 }
 
 func (p *Page) PageId() page.Id  { return p.pageId }
@@ -25,5 +27,6 @@ func NewPage(pageId page.Id) (*Page, error) {
 		data:     p,
 		isDirty:  false,
 		pinCount: 0,
+		latch:    NewRWLatch(),
 	}, nil
 }

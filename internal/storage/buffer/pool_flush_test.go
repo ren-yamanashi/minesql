@@ -111,6 +111,31 @@ func TestFlushAllPages(t *testing.T) {
 		assert.True(t, bufPage.isDirty, "ディスクへ永続化されていないので isDirty が残るべき")
 		assert.Equal(t, 1, bp.FlushListPageCount(), "再フラッシュ可能なように flushList に残るべき")
 	})
+
+	t.Run("X ラッチ保持中のページはスキップされ flushList に残る", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*2, nil)
+		hf := setupHeapFile(t, 0)
+		bp.RegisterHeapFile(0, hf)
+		pageId := page.NewId(0, 0)
+		_, err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+		_, err = bp.PageForWrite(pageId)
+		assert.NoError(t, err)
+		// Mtr 経由で X ラッチを保持中の状態を模擬
+		mtr := NewMtr(bp)
+		_, err = mtr.PageForWrite(pageId)
+		assert.NoError(t, err)
+
+		// WHEN
+		err = bp.FlushAllPages()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.True(t, bp.pages[0].isDirty, "X 保持中はフラッシュされないので isDirty のまま")
+		assert.Equal(t, 1, bp.FlushListPageCount(), "X 保持中ページは flushList に残る")
+		mtr.UnpinAll()
+	})
 }
 
 func TestFlushOldestPages(t *testing.T) {
