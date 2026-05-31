@@ -73,6 +73,16 @@ func (sp *slottedPage) delete(index int) {
 	binary.BigEndian.PutUint16(sp.data[0:2], uint16(numSlots-1))
 }
 
+// canResize は index のスロットを newSize にリサイズできるかを返す
+func (sp *slottedPage) canResize(index int, newSize int) bool {
+	pointer := sp.pointerAt(index)
+	sizeIncrease := newSize - int(pointer.size)
+	if sizeIncrease <= 0 {
+		return true
+	}
+	return sizeIncrease <= sp.freeSpace()
+}
+
 // update は指定されたインデックスのデータを新しいデータに更新する
 //   - index: 更新対象のデータが格納されている Slot のインデックス
 //   - data: 更新後のデータ

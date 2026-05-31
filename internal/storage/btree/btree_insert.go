@@ -7,7 +7,7 @@ import (
 
 // Insert は B+Tree にレコードを挿入する
 func (t *Tree) Insert(mtr *buffer.Mtr, record Record) error {
-	needsPessimistic, err := t.tryInsertOptimistic(mtr, record)
+	needsPessimistic, err := t.insertOptimistic(mtr, record)
 	if err != nil {
 		return err
 	}
@@ -15,6 +15,44 @@ func (t *Tree) Insert(mtr *buffer.Mtr, record Record) error {
 		return nil
 	}
 	return t.insertPessimistic(mtr, record)
+}
+
+// insertOptimistic は楽観モードで挿入を試みる
+//   - 分割が必要と判明した場合は (true, nil) を返し、呼び出し側に悲観モードへの切り替えを促す
+func (t *Tree) insertOptimistic(mtr *buffer.Mtr, record Record) (needsPessimistic bool, err error) {
+	mtr.LockShared(t.latch)
+	defer mtr.UnlockLatch(t.latch)
+
+	pageMeta, err := mtr.PageForRead(t.MetaPageId())
+	if err != nil {
+		return false, err
+	}
+	defer mtr.Unpin(t.MetaPageId())
+	metaPage := newMetaPage(pageMeta.Data())
+
+	rootPageId := metaPage.rootPageId()
+	leafPageId, err := t.descendToLeafShared(mtr, rootPageId, record.Key())
+	if err != nil {
+		return false, err
+	}
+
+	leafBufPage, err := mtr.PageForWrite(leafPageId)
+	if err != nil {
+		return false, err
+	}
+	defer mtr.Unpin(leafPageId)
+
+	leafNode := newLeafNode(leafBufPage.Data())
+	if !leafNode.canFit(record) {
+		return true, nil
+	}
+
+	slotNum, found := leafNode.searchSlotNum(record.Key())
+	if found {
+		return false, ErrDuplicateKey
+	}
+	leafNode.insert(slotNum, record)
+	return false, nil
 }
 
 // insertPessimistic は悲観モードで挿入する
@@ -80,6 +118,47 @@ func (t *Tree) insertPessimistic(mtr *buffer.Mtr, record Record) error {
 	metaPage.setRootPageId(newRootPageId)
 	metaPage.setHeight(metaPage.height() + 1)
 	return nil
+}
+
+// descendToLeafShared は指定キーに対応するリーフページの PageId を返す
+//   - 戻り時点で Mtr にこの経路の Pin は残らない
+//   - 呼び出し側は返り値の PageId に対して必要なラッチを取り直す前提
+func (t *Tree) descendToLeafShared(mtr *buffer.Mtr, rootPageId page.Id, key []byte) (page.Id, error) {
+	currentPageId := rootPageId
+	currentBufPage, err := mtr.PageForRead(currentPageId)
+	if err != nil {
+		return page.InvalidId(), err
+	}
+	for {
+		nt := nodeType(currentBufPage.Data())
+		switch nt {
+		case nodeTypeLeaf:
+			mtr.Unpin(currentPageId)
+			return currentPageId, nil
+		case nodeTypeBranch:
+			branchNode := newBranchNode(currentBufPage.Data())
+			childSlotNum, found := branchNode.searchSlotNum(key)
+			if found {
+				childSlotNum++
+			}
+			childPageId, err := branchNode.childPageId(childSlotNum)
+			if err != nil {
+				mtr.Unpin(currentPageId)
+				return page.InvalidId(), err
+			}
+			childBufPage, err := mtr.PageForRead(childPageId)
+			if err != nil {
+				mtr.Unpin(currentPageId)
+				return page.InvalidId(), err
+			}
+			mtr.Unpin(currentPageId)
+			currentPageId = childPageId
+			currentBufPage = childBufPage
+		default:
+			mtr.Unpin(currentPageId)
+			return page.InvalidId(), errUnknownNodeType
+		}
+	}
 }
 
 // insertRecursively は再帰的にノードを辿ってレコードを挿入する

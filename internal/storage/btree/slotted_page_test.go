@@ -6,6 +6,31 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestSlottedPageHasSpaceFor(t *testing.T) {
+	t.Run("ポインタ込みで収まるサイズなら true を返す", func(t *testing.T) {
+		// GIVEN
+		sp := newTestSlottedPage(64) // header(8) + usable(56)
+
+		// WHEN
+		ok := sp.hasSpaceFor(50) // pointer(4) + data(50) = 54 <= 56
+
+		// THEN
+		assert.True(t, ok)
+	})
+
+	t.Run("ポインタ込みで超過するサイズなら false を返す", func(t *testing.T) {
+		// GIVEN
+		sp := newTestSlottedPage(20) // header(8) + usable(12)
+		sp.insert(0, []byte{1, 2, 3, 4})
+
+		// WHEN
+		ok := sp.hasSpaceFor(2) // pointer(4) + data(2) = 6 > 残り 4
+
+		// THEN
+		assert.False(t, ok)
+	})
+}
+
 func TestSlottedPageInsert(t *testing.T) {
 	t.Run("データを挿入できる", func(t *testing.T) {
 		// GIVEN
@@ -92,6 +117,56 @@ func TestSlottedPageDelete(t *testing.T) {
 		// THEN
 		assert.Equal(t, 1, sp.numSlots())
 		assert.Equal(t, []byte{0x01}, sp.cell(0))
+	})
+}
+
+func TestSlottedPageCanResize(t *testing.T) {
+	t.Run("サイズ縮小なら true を返す", func(t *testing.T) {
+		// GIVEN
+		sp := newTestSlottedPage(64)
+		sp.insert(0, []byte{0x01, 0x02, 0x03, 0x04})
+
+		// WHEN
+		ok := sp.canResize(0, 2)
+
+		// THEN
+		assert.True(t, ok)
+	})
+
+	t.Run("サイズが同じなら true を返す", func(t *testing.T) {
+		// GIVEN
+		sp := newTestSlottedPage(64)
+		sp.insert(0, []byte{0x01, 0x02, 0x03, 0x04})
+
+		// WHEN
+		ok := sp.canResize(0, 4)
+
+		// THEN
+		assert.True(t, ok)
+	})
+
+	t.Run("サイズ増加分が空き領域に収まるなら true を返す", func(t *testing.T) {
+		// GIVEN
+		sp := newTestSlottedPage(64)
+		sp.insert(0, []byte{0x01, 0x02})
+
+		// WHEN
+		ok := sp.canResize(0, 8) // 増加分 6 <= 空き
+
+		// THEN
+		assert.True(t, ok)
+	})
+
+	t.Run("サイズ増加分が空き領域を超えるなら false を返す", func(t *testing.T) {
+		// GIVEN
+		sp := newTestSlottedPage(20) // header(8) + usable(12)
+		sp.insert(0, []byte{0x01, 0x02})
+
+		// WHEN
+		ok := sp.canResize(0, 10) // 増加分 8 > 残り 6
+
+		// THEN
+		assert.False(t, ok)
 	})
 }
 

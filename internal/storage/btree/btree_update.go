@@ -8,6 +8,58 @@ import (
 
 // Update は B+Tree の特定のノードの値を更新する
 func (t *Tree) Update(mtr *buffer.Mtr, record Record) error {
+	needsPessimistic, err := t.updateOptimistic(mtr, record)
+	if err != nil {
+		return err
+	}
+	if !needsPessimistic {
+		return nil
+	}
+	return t.updatePessimistic(mtr, record)
+}
+
+// updateOptimistic は楽観モードで更新を試みる
+//   - サイズ増加でリーフに収まらない場合は (true, nil) を返し、呼び出し側に悲観モードへの切り替えを促す
+func (t *Tree) updateOptimistic(mtr *buffer.Mtr, record Record) (needsPessimistic bool, err error) {
+	mtr.LockShared(t.latch)
+	defer mtr.UnlockLatch(t.latch)
+
+	pageMeta, err := mtr.PageForRead(t.MetaPageId())
+	if err != nil {
+		return false, err
+	}
+	defer mtr.Unpin(t.MetaPageId())
+	metaPage := newMetaPage(pageMeta.Data())
+
+	rootPageId := metaPage.rootPageId()
+	leafPageId, err := t.descendToLeafShared(mtr, rootPageId, record.Key())
+	if err != nil {
+		return false, err
+	}
+
+	leafBufPage, err := mtr.PageForWrite(leafPageId)
+	if err != nil {
+		return false, err
+	}
+	defer mtr.Unpin(leafPageId)
+
+	leafNode := newLeafNode(leafBufPage.Data())
+	slotNum, found := leafNode.searchSlotNum(record.Key())
+	if !found {
+		return false, ErrKeyNotFound
+	}
+	if !leafNode.canFitUpdate(slotNum, record) {
+		return true, nil
+	}
+	leafNode.update(slotNum, record)
+	return false, nil
+}
+
+// updatePessimistic は悲観モードで更新する
+func (t *Tree) updatePessimistic(mtr *buffer.Mtr, record Record) error {
+	mtr.LockSharedExclusive(t.latch)
+	defer mtr.UnlockLatch(t.latch)
+
 	// メタページを取得
 	pageMeta, err := mtr.PageForRead(t.MetaPageId())
 	if err != nil {

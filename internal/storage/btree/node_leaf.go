@@ -114,6 +114,15 @@ func (ln *leafNode) update(slotNum int, record Record) bool {
 	return ln.body.update(slotNum, record.Bytes())
 }
 
+// canFitUpdate は指定スロットの record を新しい record に更新できるかを返す
+func (ln *leafNode) canFitUpdate(slotNum int, record Record) bool {
+	recordBytes := record.Bytes()
+	if len(recordBytes) > ln.maxRecordSize() {
+		return false
+	}
+	return ln.body.canResize(slotNum, len(recordBytes))
+}
+
 // numRecords はレコード数を取得する
 func (ln *leafNode) numRecords() int {
 	return ln.body.numSlots()

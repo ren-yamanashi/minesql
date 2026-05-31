@@ -36,6 +36,50 @@ func TestLeafNodeInsert(t *testing.T) {
 	})
 }
 
+func TestLeafNodeCanFit(t *testing.T) {
+	t.Run("空のリーフでサイズ内なら true を返す", func(t *testing.T) {
+		// GIVEN
+		ln := newTestLeafNode()
+		record := NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA})
+
+		// WHEN
+		ok := ln.canFit(record)
+
+		// THEN
+		assert.True(t, ok)
+	})
+
+	t.Run("maxRecordSize を超えるレコードは false を返す", func(t *testing.T) {
+		// GIVEN
+		ln := newTestLeafNode()
+		maxSize := ln.maxRecordSize()
+		largeData := make([]byte, maxSize) // Bytes で 4 バイト追加されるため超過する
+
+		// WHEN
+		ok := ln.canFit(NewRecord([]byte{}, []byte{}, largeData))
+
+		// THEN
+		assert.False(t, ok)
+	})
+
+	t.Run("空き領域が不足している場合は false を返す", func(t *testing.T) {
+		// GIVEN
+		ln := newTestLeafNode()
+		padding := make([]byte, 300)
+		for i := 0; ; i++ {
+			if !ln.insert(i, NewRecord([]byte{}, []byte{byte(i)}, padding)) {
+				break
+			}
+		}
+
+		// WHEN
+		ok := ln.canFit(NewRecord([]byte{}, []byte{0xFF}, padding))
+
+		// THEN
+		assert.False(t, ok)
+	})
+}
+
 func TestLeafNodeSplitInsert(t *testing.T) {
 	t.Run("挿入キーが先頭キーより大きい場合に分割できる", func(t *testing.T) {
 		// GIVEN
@@ -129,6 +173,74 @@ func TestLeafNodeUpdate(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, []byte{0x02}, ln.record(0).Header())
 		assert.Equal(t, []byte{0xBB, 0xCC}, ln.record(0).NonKey())
+	})
+}
+
+func TestLeafNodeCanFitUpdate(t *testing.T) {
+	t.Run("サイズが変わらないなら true を返す", func(t *testing.T) {
+		// GIVEN
+		ln := newTestLeafNode()
+		ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
+
+		// WHEN
+		ok := ln.canFitUpdate(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xBB}))
+
+		// THEN
+		assert.True(t, ok)
+	})
+
+	t.Run("サイズが減るなら true を返す", func(t *testing.T) {
+		// GIVEN
+		ln := newTestLeafNode()
+		ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA, 0xBB, 0xCC}))
+
+		// WHEN
+		ok := ln.canFitUpdate(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
+
+		// THEN
+		assert.True(t, ok)
+	})
+
+	t.Run("サイズ増加分が空き領域に収まるなら true を返す", func(t *testing.T) {
+		// GIVEN
+		ln := newTestLeafNode()
+		ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
+
+		// WHEN
+		ok := ln.canFitUpdate(0, NewRecord([]byte{0x01}, []byte{0x10}, make([]byte, 100)))
+
+		// THEN
+		assert.True(t, ok)
+	})
+
+	t.Run("空き領域が不足している場合は false を返す", func(t *testing.T) {
+		// GIVEN
+		ln := newTestLeafNode()
+		padding := make([]byte, 200)
+		for i := range 18 {
+			ln.insert(i, NewRecord([]byte{0x01}, []byte{byte(i)}, padding))
+		}
+		hugePadding := make([]byte, 4000)
+
+		// WHEN
+		ok := ln.canFitUpdate(0, NewRecord([]byte{0x01}, []byte{0x00}, hugePadding))
+
+		// THEN
+		assert.False(t, ok)
+	})
+
+	t.Run("maxRecordSize を超えるレコードは false を返す", func(t *testing.T) {
+		// GIVEN
+		ln := newTestLeafNode()
+		ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
+		maxSize := ln.maxRecordSize()
+		largeData := make([]byte, maxSize)
+
+		// WHEN
+		ok := ln.canFitUpdate(0, NewRecord([]byte{}, []byte{}, largeData))
+
+		// THEN
+		assert.False(t, ok)
 	})
 }
 

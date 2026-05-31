@@ -142,3 +142,113 @@ func TestUpdate(t *testing.T) {
 		assert.Equal(t, []byte{0xCC}, record.NonKey())
 	})
 }
+
+func TestUpdateOptimistic(t *testing.T) {
+	t.Run("サイズが収まる場合は needsPessimistic=false で更新が完了する", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+
+		// WHEN
+		needsPessimistic, err := bt.updateOptimistic(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.False(t, needsPessimistic)
+		record, _, err := bt.FindByKey(mtr, []byte{0x10})
+		assert.NoError(t, err)
+		assert.Equal(t, []byte{0xBB}, record.NonKey())
+	})
+
+	t.Run("サイズが収まらない場合は needsPessimistic=true を返し更新しない", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		nonKey := make([]byte, 1500)
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, nonKey))
+
+		// WHEN
+		hugeNonKey := make([]byte, 3000)
+		needsPessimistic, err := bt.updateOptimistic(mtr, NewRecord([]byte{}, []byte{0x10}, hugeNonKey))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.True(t, needsPessimistic)
+		record, _, err := bt.FindByKey(mtr, []byte{0x10})
+		assert.NoError(t, err)
+		assert.Equal(t, 1500, len(record.NonKey()))
+	})
+
+	t.Run("存在しないキーは ErrKeyNotFound を返す", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+
+		// WHEN
+		_, err := bt.updateOptimistic(mtr, NewRecord([]byte{}, []byte{0xFF}, []byte{0xBB}))
+
+		// THEN
+		assert.ErrorIs(t, err, ErrKeyNotFound)
+	})
+
+	t.Run("完了後に Pin と Tree ラッチが残らない", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+
+		// WHEN
+		_, err := bt.updateOptimistic(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 0, mtr.PinnedCount())
+		assert.Equal(t, 0, mtr.HeldLatchCount())
+	})
+}
+
+func TestUpdatePessimistic(t *testing.T) {
+	t.Run("Tree SX ラッチを取得して更新できる", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+
+		// WHEN
+		err := bt.updatePessimistic(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
+
+		// THEN
+		assert.NoError(t, err)
+		record, _, err := bt.FindByKey(mtr, []byte{0x10})
+		assert.NoError(t, err)
+		assert.Equal(t, []byte{0xBB}, record.NonKey())
+	})
+
+	t.Run("完了後に Pin と Tree ラッチが残らない", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+
+		// WHEN
+		err := bt.updatePessimistic(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 0, mtr.PinnedCount())
+		assert.Equal(t, 0, mtr.HeldLatchCount())
+	})
+}
