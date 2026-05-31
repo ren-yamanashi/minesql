@@ -48,7 +48,7 @@ func (m *Manager) Lock(trxId TrxId, pos btree.RecordPosition, mode Mode) error {
 	if state.canGrant(trxId, mode) {
 		// 既存保持モードが要求モードより強い (Exclusive を保持中に Shared 要求) 場合は上書きしない
 		held, exists := state.holders[trxId]
-		if !exists || !(held == Exclusive && mode == Shared) {
+		if !exists || held != Exclusive || mode != Shared {
 			state.holders[trxId] = mode
 		}
 		m.addHeldLock(trxId, pos)
