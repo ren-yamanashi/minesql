@@ -107,6 +107,14 @@ func (ln *leafNode) delete(slotNum int) {
 	ln.body.delete(slotNum)
 }
 
+// canDeleteWithoutUnderflow は指定スロットを削除してもノードが半分以上埋まったままかを返す
+func (ln *leafNode) canDeleteWithoutUnderflow(slotNum int) bool {
+	recordSize := len(ln.record(slotNum).Bytes())
+	used := ln.body.capacity() - ln.body.freeSpace()
+	afterDelete := used - slottedPagePointerSize - recordSize
+	return afterDelete > ln.body.capacity()/2
+}
+
 // update は指定されたスロットのレコードを更新する
 //   - slotNum: 更新するレコードのスロット番号
 //   - record: 新しいレコード (key は変更されない前提)

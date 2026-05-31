@@ -6,6 +6,60 @@ import (
 
 // Delete は B+Tree からレコードを削除する
 func (t *Tree) Delete(mtr *buffer.Mtr, key []byte) error {
+	needsPessimistic, err := t.deleteOptimistic(mtr, key)
+	if err != nil {
+		return err
+	}
+	if !needsPessimistic {
+		return nil
+	}
+	return t.deletePessimistic(mtr, key)
+}
+
+// deleteOptimistic は楽観モードで削除を試みる
+//   - 削除によりアンダーフローが起こる可能性がある場合は (true, nil) を返し、呼び出し側に悲観モードへの切り替えを促す
+func (t *Tree) deleteOptimistic(mtr *buffer.Mtr, key []byte) (needsPessimistic bool, err error) {
+	mtr.LockShared(t.latch)
+	defer mtr.UnlockLatch(t.latch)
+
+	pageMeta, err := mtr.PageForRead(t.MetaPageId())
+	if err != nil {
+		return false, err
+	}
+	defer mtr.Unpin(t.MetaPageId())
+	metaPage := newMetaPage(pageMeta.Data())
+
+	rootPageId := metaPage.rootPageId()
+	height := metaPage.height()
+	leafPageId, err := t.descendToLeafShared(mtr, rootPageId, key)
+	if err != nil {
+		return false, err
+	}
+
+	leafBufPage, err := mtr.PageForWrite(leafPageId)
+	if err != nil {
+		return false, err
+	}
+	defer mtr.Unpin(leafPageId)
+
+	leafNode := newLeafNode(leafBufPage.Data())
+	slotNum, found := leafNode.searchSlotNum(key)
+	if !found {
+		return false, ErrKeyNotFound
+	}
+	// 高さ 1 (ルート = リーフ) ならアンダーフローしても構造変更は起こらないので常に楽観で完了する
+	if height >= 2 && !leafNode.canDeleteWithoutUnderflow(slotNum) {
+		return true, nil
+	}
+	leafNode.delete(slotNum)
+	return false, nil
+}
+
+// deletePessimistic は悲観モードで削除する
+func (t *Tree) deletePessimistic(mtr *buffer.Mtr, key []byte) error {
+	mtr.LockSharedExclusive(t.latch)
+	defer mtr.UnlockLatch(t.latch)
+
 	// メタページを取得
 	pageMeta, err := mtr.PageForWrite(t.MetaPageId())
 	if err != nil {

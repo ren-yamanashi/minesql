@@ -159,6 +159,49 @@ func TestLeafNodeDelete(t *testing.T) {
 	})
 }
 
+func TestLeafNodeCanDeleteWithoutUnderflow(t *testing.T) {
+	t.Run("削除後も半分以上埋まっているなら true を返す", func(t *testing.T) {
+		// GIVEN
+		ln := newTestLeafNode()
+		padding := make([]byte, 200)
+		// 半分以上埋まる程度まで挿入
+		for i := range 15 {
+			ln.insert(i, NewRecord([]byte{0x01}, []byte{byte(i)}, padding))
+		}
+
+		// WHEN
+		ok := ln.canDeleteWithoutUnderflow(0)
+
+		// THEN
+		assert.True(t, ok)
+	})
+
+	t.Run("削除後に半分以下になるなら false を返す", func(t *testing.T) {
+		// GIVEN
+		ln := newTestLeafNode()
+		padding := make([]byte, 200)
+		// 半分ぎりぎりで埋める
+		for i := 0; ; i++ {
+			if !ln.insert(i, NewRecord([]byte{0x01}, []byte{byte(i)}, padding)) {
+				break
+			}
+			if !ln.isHalfFull() {
+				break
+			}
+		}
+		// 1 件削除しても半分以下にならないギリギリ状態を確保するため数件追加で削除
+		for ln.numRecords() > 0 && ln.canDeleteWithoutUnderflow(0) {
+			ln.delete(0)
+		}
+
+		// WHEN
+		ok := ln.canDeleteWithoutUnderflow(0)
+
+		// THEN
+		assert.False(t, ok)
+	})
+}
+
 func TestLeafNodeUpdate(t *testing.T) {
 	t.Run("レコードを更新できる", func(t *testing.T) {
 		// GIVEN

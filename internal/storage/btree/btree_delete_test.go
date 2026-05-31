@@ -178,3 +178,114 @@ func TestDelete(t *testing.T) {
 		assert.Equal(t, heightBefore, heightAfter)
 	})
 }
+
+func TestDeleteOptimistic(t *testing.T) {
+	t.Run("高さ 1 ではアンダーフローしても needsPessimistic=false で削除が完了する", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+
+		// WHEN
+		needsPessimistic, err := bt.deleteOptimistic(mtr, []byte{0x10})
+
+		// THEN
+		assert.NoError(t, err)
+		assert.False(t, needsPessimistic)
+		_, _, err = bt.FindByKey(mtr, []byte{0x10})
+		assert.ErrorIs(t, err, ErrKeyNotFound)
+	})
+
+	t.Run("存在しないキーは ErrKeyNotFound を返す", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+
+		// WHEN
+		_, err := bt.deleteOptimistic(mtr, []byte{0xFF})
+
+		// THEN
+		assert.ErrorIs(t, err, ErrKeyNotFound)
+	})
+
+	t.Run("高さ 2 以上でアンダーフロー見込みなら needsPessimistic=true を返し削除しない", func(t *testing.T) {
+		// GIVEN: 高さ 2 のツリーを作り、左リーフを 1 件だけ残してアンダーフロー寸前にする
+		bp := setupBtreeBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		nonKey := make([]byte, 1500)
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x01}, nonKey))
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x02}, nonKey))
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x03}, nonKey))
+		height, _ := bt.Height()
+		assert.Equal(t, uint64(2), height)
+
+		// WHEN
+		needsPessimistic, err := bt.deleteOptimistic(mtr, []byte{0x01})
+
+		// THEN
+		assert.NoError(t, err)
+		assert.True(t, needsPessimistic)
+		// 楽観モードで失敗したのでレコードは残っている
+		_, _, err = bt.FindByKey(mtr, []byte{0x01})
+		assert.NoError(t, err)
+	})
+
+	t.Run("完了後に Pin と Tree ラッチが残らない", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+
+		// WHEN
+		_, err := bt.deleteOptimistic(mtr, []byte{0x10})
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 0, mtr.PinnedCount())
+		assert.Equal(t, 0, mtr.HeldLatchCount())
+	})
+}
+
+func TestDeletePessimistic(t *testing.T) {
+	t.Run("Tree SX ラッチを取得して削除できる", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+
+		// WHEN
+		err := bt.deletePessimistic(mtr, []byte{0x10})
+
+		// THEN
+		assert.NoError(t, err)
+		_, _, err = bt.FindByKey(mtr, []byte{0x10})
+		assert.ErrorIs(t, err, ErrKeyNotFound)
+	})
+
+	t.Run("完了後に Pin と Tree ラッチが残らない", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+
+		// WHEN
+		err := bt.deletePessimistic(mtr, []byte{0x10})
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 0, mtr.PinnedCount())
+		assert.Equal(t, 0, mtr.HeldLatchCount())
+	})
+}
