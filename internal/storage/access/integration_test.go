@@ -1,8 +1,10 @@
 package access
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
@@ -375,6 +377,220 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 		redoLog: redoLog,
 		trxMgr:  trxMgr,
 	}
+}
+
+func TestIntegrationConcurrentStress(t *testing.T) {
+	t.Run("並行 Insert がデータレースなく完了し件数が一致する", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		_ = createUsersTable(t, env)
+		const workers = 4
+		const opsPerWorker = 5
+
+		// WHEN
+		var wg sync.WaitGroup
+		for w := range workers {
+			wg.Add(1)
+			go func(workerId int) {
+				defer wg.Done()
+				table, err := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
+				if err != nil {
+					return
+				}
+				for j := range opsPerWorker {
+					trxId := env.trxMgr.Begin()
+					key := fmt.Sprintf("%04d", workerId*opsPerWorker+j+1)
+					name := fmt.Sprintf("user_%d_%d", workerId, j)
+					email := fmt.Sprintf("u%d-%d@example.com", workerId, j)
+					_ = table.Insert([]string{"id", "name", "email"}, []string{key, name, email}, trxId)
+					_ = env.trxMgr.Commit(trxId)
+				}
+			}(w)
+		}
+		wg.Wait()
+
+		// THEN: 全件挿入されている
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
+		assert.NoError(t, err)
+		mtr := buffer.NewMtr(env.bp)
+		defer mtr.UnpinAll()
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
+		assert.NoError(t, err)
+		defer iter.Close()
+		count := 0
+		for {
+			_, ok, err := iter.Next()
+			assert.NoError(t, err)
+			if !ok {
+				break
+			}
+			count++
+		}
+		assert.Equal(t, workers*opsPerWorker, count)
+	})
+
+	t.Run("並行 Insert / Update / Delete / Search がデータレースなく完了する", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		_ = createUsersTable(t, env)
+		const writers = 3
+		const insertPerWriter = 4 // 各 writer が 4 件挿入、1 件 update、1 件 delete
+
+		// WHEN
+		var wg sync.WaitGroup
+		for w := range writers {
+			wg.Add(1)
+			go func(workerId int) {
+				defer wg.Done()
+				table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
+				keyOf := func(j int) string {
+					return fmt.Sprintf("%04d", workerId*insertPerWriter+j+1)
+				}
+				// Insert
+				for j := range insertPerWriter {
+					trxId := env.trxMgr.Begin()
+					_ = table.Insert(
+						[]string{"id", "name", "email"},
+						[]string{keyOf(j), fmt.Sprintf("u%d-%d", workerId, j), fmt.Sprintf("u%d-%d@example.com", workerId, j)},
+						trxId,
+					)
+					_ = env.trxMgr.Commit(trxId)
+				}
+				// Update: 1 件目の name を更新
+				trxId := env.trxMgr.Begin()
+				if rec := findRecordByPk(t, env, table, keyOf(0)); rec != nil {
+					_ = table.Update(rec, []string{"name"}, []string{"updated"}, trxId)
+				}
+				_ = env.trxMgr.Commit(trxId)
+				// SoftDelete: 最後の 1 件
+				trxId = env.trxMgr.Begin()
+				if rec := findRecordByPk(t, env, table, keyOf(insertPerWriter-1)); rec != nil {
+					_ = table.SoftDelete(rec, trxId)
+				}
+				_ = env.trxMgr.Commit(trxId)
+			}(w)
+		}
+		// Search reader (writer の操作中に並行して全件 scan を繰り返す)
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
+			for range 10 {
+				mtr := buffer.NewMtr(env.bp)
+				iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
+				if err != nil {
+					mtr.UnpinAll()
+					continue
+				}
+				for {
+					_, ok, err := iter.Next()
+					if err != nil || !ok {
+						break
+					}
+				}
+				iter.Close()
+				mtr.UnpinAll()
+			}
+		}()
+		wg.Wait()
+
+		// THEN: 物理削除はされていないので最終的な scan で各 worker が SoftDelete した分はスキップされる
+		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
+		mtr := buffer.NewMtr(env.bp)
+		defer mtr.UnpinAll()
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
+		assert.NoError(t, err)
+		defer iter.Close()
+		count := 0
+		for {
+			_, ok, err := iter.Next()
+			assert.NoError(t, err)
+			if !ok {
+				break
+			}
+			count++
+		}
+		assert.Equal(t, writers*(insertPerWriter-1), count)
+	})
+
+	t.Run("並行 Commit と単独の未 Commit が混在してもリカバリで整合性が保たれる", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		_ = createUsersTable(t, env)
+		const committedWorkers = 3
+		const opsPerWorker = 3
+
+		// WHEN: 複数 worker が並行に Commit する
+		var wg sync.WaitGroup
+		for w := range committedWorkers {
+			wg.Add(1)
+			go func(workerId int) {
+				defer wg.Done()
+				table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
+				for j := range opsPerWorker {
+					trxId := env.trxMgr.Begin()
+					key := fmt.Sprintf("%04d", workerId*opsPerWorker+j+1)
+					_ = table.Insert(
+						[]string{"id", "name", "email"},
+						[]string{key, fmt.Sprintf("u%d-%d", workerId, j), fmt.Sprintf("u%d-%d@example.com", workerId, j)},
+						trxId,
+					)
+					_ = env.trxMgr.Commit(trxId)
+				}
+			}(w)
+		}
+		wg.Wait()
+
+		// 並行 Commit 完了後、単独で未 Commit の Insert を行う (= クラッシュ相当)
+		uncommittedTable, _ := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
+		uncommittedTrxId := env.trxMgr.Begin()
+		_ = uncommittedTable.Insert(
+			[]string{"id", "name", "email"},
+			[]string{"9999", "uncommitted", "uncommitted@example.com"},
+			uncommittedTrxId,
+		)
+		_ = env.redoLog.Flush()
+
+		// クラッシュリカバリ実行
+		r := NewRecovery(env.redoLog, env.bp, env.trxMgr, env.ct.UndoLogFileId())
+		err := r.Execute()
+		assert.NoError(t, err)
+
+		// THEN: 並行 Commit 済みの挿入のみ残り、未 Commit はロールバックされている
+		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
+		mtr := buffer.NewMtr(env.bp)
+		defer mtr.UnpinAll()
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
+		assert.NoError(t, err)
+		defer iter.Close()
+		count := 0
+		for {
+			_, ok, err := iter.Next()
+			assert.NoError(t, err)
+			if !ok {
+				break
+			}
+			count++
+		}
+		assert.Equal(t, committedWorkers*opsPerWorker, count)
+	})
+}
+
+// findRecordByPk は指定 PK のレコードを取得する (見つからなければ nil)
+func findRecordByPk(t *testing.T, env *integrationEnv, table *Table, pk string) *PrimaryRecord {
+	t.Helper()
+	mtr := buffer.NewMtr(env.bp)
+	defer mtr.UnpinAll()
+	iter, err := table.primaryIndex.search(mtr, SearchModeKey{Key: [][]byte{[]byte(pk)}})
+	if err != nil {
+		return nil
+	}
+	defer iter.Close()
+	rec, ok, err := iter.Next()
+	if err != nil || !ok {
+		return nil
+	}
+	return rec
 }
 
 // createUsersTable は統合テスト用の users テーブルを作成する
