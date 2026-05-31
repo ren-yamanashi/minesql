@@ -56,34 +56,24 @@ func (r *Recovery) Execute() error {
 	return r.redoLog.Clear()
 }
 
-// applyRedoLog は Redo ログを先頭からスキャンし、ページ変更レコードを適用する
+// applyRedoLog は Redo ログを先頭からスキャンし、完全な mini-transaction のページ変更を適用する
 func (r *Recovery) applyRedoLog(records []redo.Record) error {
 	pendingByTrx := make(map[lock.TrxId][]redo.Record)
-	inMtrByTrx := make(map[lock.TrxId]bool)
 
 	for _, rec := range records {
 		switch rec.Type() {
 		case redo.RecordTypeMtrStart:
-			inMtrByTrx[rec.TrxId()] = true
 			pendingByTrx[rec.TrxId()] = nil
 		case redo.RecordTypeMtrEnd:
-			if !inMtrByTrx[rec.TrxId()] {
-				continue
-			}
 			for _, pending := range pendingByTrx[rec.TrxId()] {
 				if err := r.applyPageWrite(pending); err != nil {
 					return err
 				}
 			}
 			delete(pendingByTrx, rec.TrxId())
-			delete(inMtrByTrx, rec.TrxId())
 		case redo.RecordTypePageWrite:
-			if inMtrByTrx[rec.TrxId()] {
-				pendingByTrx[rec.TrxId()] = append(pendingByTrx[rec.TrxId()], rec)
-				continue
-			}
-			if err := r.applyPageWrite(rec); err != nil {
-				return err
+			if pending, ok := pendingByTrx[rec.TrxId()]; ok {
+				pendingByTrx[rec.TrxId()] = append(pending, rec)
 			}
 		}
 	}

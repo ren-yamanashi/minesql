@@ -114,10 +114,7 @@ func TestRecoveryExecute(t *testing.T) {
 		)
 		assert.NoError(t, err)
 
-		// COMMIT せずに Redo ログにページ変更だけ記録してフラッシュ
-		pgId := page.NewId(env.undoFileId, 0)
-		readPage, _ := env.bp.PageForRead(pgId)
-		_, _ = env.redoLog.AppendPageCopy(trxId, pgId, readPage.Data())
+		// COMMIT せずに Redo ログをフラッシュ (Insert 由来の mtr 内ページ変更は既に記録されている)
 		_ = env.redoLog.Flush()
 
 		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
@@ -201,11 +198,13 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 		writePage.Data().Header()[2] = 0
 		writePage.Data().Header()[3] = 10 // Page LSN = 10
 
-		// LSN=1 のページ変更レコードを Redo ログに記録
+		// LSN=1 のページ変更レコードを mtr 境界で囲んで Redo ログに記録
 		newPageData := make([]byte, page.Size)
 		newPageData[page.HeaderSize] = 0xFF // body の先頭を変える
 		newPage, _ := page.NewPage(newPageData)
+		_, _ = env.redoLog.AppendMtrStart(lock.TrxId(1))
 		_, _ = env.redoLog.AppendPageCopy(lock.TrxId(1), pgId, newPage)
+		_, _ = env.redoLog.AppendMtrEnd(lock.TrxId(1))
 		_ = env.redoLog.Flush()
 
 		records, _ := env.redoLog.ReadFrom(redo.Lsn(0))
@@ -269,7 +268,7 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 		assert.NotEqual(t, byte(0xBB), readPage.Data().Body()[0])
 	})
 
-	t.Run("mtr 境界に囲まれていないページ変更は適用される (移行期間)", func(t *testing.T) {
+	t.Run("mtr 境界に囲まれていないページ変更は無視される", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
 		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
@@ -288,7 +287,7 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		readPage, _ := env.bp.PageForRead(pgId)
-		assert.Equal(t, byte(0xCC), readPage.Data().Body()[0])
+		assert.NotEqual(t, byte(0xCC), readPage.Data().Body()[0])
 	})
 
 	t.Run("複数の mtr が交互に並んでも完全な mtr だけが適用される", func(t *testing.T) {

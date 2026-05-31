@@ -258,11 +258,7 @@ func TestIntegrationCrashRecovery(t *testing.T) {
 		)
 		assert.NoError(t, err)
 
-		// Commit せずに Redo ログにページ変更を記録してフラッシュ (クラッシュを模擬)
-		undoPageId := page.NewId(env.ct.UndoLogFileId(), 0)
-		readPage, err := env.bp.PageForRead(undoPageId)
-		assert.NoError(t, err)
-		_, _ = env.redoLog.AppendPageCopy(trxId, undoPageId, readPage.Data())
+		// Commit せずに Redo ログをフラッシュ (クラッシュを模擬)
 		err = env.redoLog.Flush()
 		assert.NoError(t, err)
 
