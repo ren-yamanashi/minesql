@@ -7,6 +7,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
+// flushTask は 1 ページ分のフラッシュ対象
 type flushTask struct {
 	pageId   page.Id
 	bufPage  *Page
