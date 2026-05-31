@@ -8,7 +8,11 @@ import (
 )
 
 // Search は指定された検索モードで B+Tree を検索する
+//   - 探索パス全体を Tree レベルの Shared ラッチで保護し、降下中は親→子の latch coupling でページラッチを持ち替える
 func (t *Tree) Search(mtr *buffer.Mtr, mode SearchMode) (*Iterator, error) {
+	mtr.LockShared(t.latch)
+	defer mtr.UnlockLatch(t.latch)
+
 	// メタページ取得
 	pageMeta, err := mtr.PageForRead(t.MetaPageId())
 	if err != nil {
@@ -47,48 +51,58 @@ func (t *Tree) FindByKey(mtr *buffer.Mtr, key []byte) (Record, RecordPosition, e
 	return record, position, nil
 }
 
-// searchRecursively は再帰的にノードを辿って該当のリーフノードを見つける
-func (t *Tree) searchRecursively(mtr *buffer.Mtr, nodePageId page.Id, mode SearchMode) (*Iterator, error) {
-	bufPage, err := mtr.PageForRead(nodePageId)
+// searchRecursively はノードを辿って該当のリーフノードを見つける
+//   - latch coupling: 子のページラッチを取得してから親のラッチを解放することで、降下中に親の構造が変わってしまうのを防ぐ
+func (t *Tree) searchRecursively(mtr *buffer.Mtr, rootPageId page.Id, mode SearchMode) (*Iterator, error) {
+	currentPageId := rootPageId
+	currentBufPage, err := mtr.PageForRead(currentPageId)
 	if err != nil {
 		return nil, err
 	}
-	nt := nodeType(bufPage.Data())
 
-	switch nt {
-	// ブランチノードの場合、子ノードに対して再帰探索する
-	case nodeTypeBranch:
-		defer mtr.Unpin(nodePageId)
-		branchNode := newBranchNode(bufPage.Data())
-		childPageId, err := mode.childPageId(branchNode)
-		if err != nil {
-			return nil, err
-		}
-		return t.searchRecursively(mtr, childPageId, mode)
-
-	// リーフノードの場合、検索モードに応じて探索する
-	case nodeTypeLeaf:
-		leafNode := newLeafNode(bufPage.Data())
-		slotNum := mode.slotNum(leafNode)
-		iter := NewIterator(t.bufferPool, *bufPage, slotNum)
-		// リーフの Pin は走査側 (Iterator) が引き継ぐため、mtr の管理から外す
-		mtr.Detach(nodePageId)
-		// 検索対象のキーが現在のリーフノードの末端のレコードより大きい場合、次のリーフノードに進める
-		// 例: リーフノードに (1, ...), (3, ...), (5, ...) のレコードが格納されている場合に、キー 6 を検索したいときなど
-		// (この場合 SearchSlotNum は NumRecords と等しい値を返す)
-		// この場合、次のリーフノードに進めてからイテレータを返す
-		if leafNode.numRecords() == slotNum {
-			err := iter.Advance()
+	for {
+		nt := nodeType(currentBufPage.Data())
+		switch nt {
+		case nodeTypeBranch:
+			branchNode := newBranchNode(currentBufPage.Data())
+			childPageId, err := mode.childPageId(branchNode)
 			if err != nil {
-				iter.Close()
+				mtr.Unpin(currentPageId)
 				return nil, err
 			}
-		}
-		return iter, nil
+			// 子のラッチを取得してから親を解放することで、降下中に親の構造が変わるのを防ぐ
+			childBufPage, err := mtr.PageForRead(childPageId)
+			if err != nil {
+				mtr.Unpin(currentPageId)
+				return nil, err
+			}
+			mtr.Unpin(currentPageId)
+			currentPageId = childPageId
+			currentBufPage = childBufPage
 
-	default:
-		mtr.Unpin(nodePageId)
-		return nil, errUnknownNodeType
+		// リーフノードに到達: 検索モードに応じて探索する
+		case nodeTypeLeaf:
+			leafNode := newLeafNode(currentBufPage.Data())
+			slotNum := mode.slotNum(leafNode)
+			iter := NewIterator(t.bufferPool, *currentBufPage, slotNum)
+			// リーフの Pin は走査側 (Iterator) が引き継ぐため、mtr の管理から外す
+			mtr.Detach(currentPageId)
+			// 検索対象のキーが現在のリーフノードの末端のレコードより大きい場合、次のリーフノードに進める
+			// 例: リーフノードに (1, ...), (3, ...), (5, ...) のレコードが格納されている場合に、キー 6 を検索したいときなど
+			// (この場合 SearchSlotNum は NumRecords と等しい値を返す)
+			// この場合、次のリーフノードに進めてからイテレータを返す
+			if leafNode.numRecords() == slotNum {
+				if err := iter.Advance(); err != nil {
+					iter.Close()
+					return nil, err
+				}
+			}
+			return iter, nil
+
+		default:
+			mtr.Unpin(currentPageId)
+			return nil, errUnknownNodeType
+		}
 	}
 }
 
