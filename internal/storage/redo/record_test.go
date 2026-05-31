@@ -336,6 +336,46 @@ func TestDeserializeRecord(t *testing.T) {
 		assert.Equal(t, original.Type(), decoded.Type())
 	})
 
+	t.Run("MtrStart レコードのラウンドトリップ", func(t *testing.T) {
+		// GIVEN
+		original := Record{
+			lsn:        Lsn(8),
+			trxId:      42,
+			recordType: RecordTypeMtrStart,
+		}
+		buf := original.Serialize()
+
+		// WHEN
+		decoded, readBytes, err := DeserializeRecord(buf)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, len(buf), readBytes)
+		assert.Equal(t, original.Lsn(), decoded.Lsn())
+		assert.Equal(t, original.TrxId(), decoded.TrxId())
+		assert.Equal(t, original.Type(), decoded.Type())
+	})
+
+	t.Run("MtrEnd レコードのラウンドトリップ", func(t *testing.T) {
+		// GIVEN
+		original := Record{
+			lsn:        Lsn(9),
+			trxId:      42,
+			recordType: RecordTypeMtrEnd,
+		}
+		buf := original.Serialize()
+
+		// WHEN
+		decoded, readBytes, err := DeserializeRecord(buf)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, len(buf), readBytes)
+		assert.Equal(t, original.Lsn(), decoded.Lsn())
+		assert.Equal(t, original.TrxId(), decoded.TrxId())
+		assert.Equal(t, original.Type(), decoded.Type())
+	})
+
 	t.Run("ヘッダーサイズ未満のデータはエラーを返す", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, recordHeaderSize-1)

@@ -58,6 +58,20 @@ func (b *Buffer) AppendRollback(trxId lock.TrxId) (Lsn, error) {
 	return b.appendRecord(trxId, RecordTypeRollback, page.Id{}, nil)
 }
 
+// AppendMtrStart は mini-transaction の開始マーカーを Redo ログバッファに記録する
+func (b *Buffer) AppendMtrStart(trxId lock.TrxId) (Lsn, error) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	return b.appendRecord(trxId, RecordTypeMtrStart, page.Id{}, nil)
+}
+
+// AppendMtrEnd は mini-transaction の終了マーカーを Redo ログバッファに記録する
+func (b *Buffer) AppendMtrEnd(trxId lock.TrxId) (Lsn, error) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	return b.appendRecord(trxId, RecordTypeMtrEnd, page.Id{}, nil)
+}
+
 // ReadFrom は指定 LSN より大きい LSN を持つレコードを読み込む
 func (b *Buffer) ReadFrom(lsn Lsn) ([]Record, error) {
 	b.mutex.Lock()

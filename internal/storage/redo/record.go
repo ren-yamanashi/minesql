@@ -18,6 +18,8 @@ const (
 	RecordTypePageWrite
 	RecordTypeCommit
 	RecordTypeRollback
+	RecordTypeMtrStart // 1 つの mini-transaction の開始マーカー
+	RecordTypeMtrEnd   // 1 つの mini-transaction の終了マーカー (MtrStart と対応するペア)
 )
 
 const (
@@ -82,7 +84,7 @@ func DeserializeRecord(data []byte) (Record, int, error) {
 	trxId := lock.TrxId(binary.BigEndian.Uint32(data[recordHeaderTrxOffset:recordHeaderRecordTypeOffset]))
 	recordType := RecordType(data[recordHeaderRecordTypeOffset])
 	switch recordType {
-	case RecordTypePageWrite, RecordTypeCommit, RecordTypeRollback:
+	case RecordTypePageWrite, RecordTypeCommit, RecordTypeRollback, RecordTypeMtrStart, RecordTypeMtrEnd:
 	default:
 		return Record{}, 0, ErrInvalidRecord
 	}

@@ -218,6 +218,40 @@ func TestBufferAppendRollback(t *testing.T) {
 	})
 }
 
+func TestBufferAppendMtrStart(t *testing.T) {
+	t.Run("MtrStart レコードを追加できる", func(t *testing.T) {
+		// GIVEN
+		buf := setupTestBuffer(t)
+
+		// WHEN
+		lsn, err := buf.AppendMtrStart(lock.TrxId(1))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, Lsn(1), lsn)
+		assert.Len(t, buf.records, 1)
+		assert.Equal(t, RecordTypeMtrStart, buf.records[0].recordType)
+		assert.Nil(t, buf.records[0].data)
+	})
+}
+
+func TestBufferAppendMtrEnd(t *testing.T) {
+	t.Run("MtrEnd レコードを追加できる", func(t *testing.T) {
+		// GIVEN
+		buf := setupTestBuffer(t)
+
+		// WHEN
+		lsn, err := buf.AppendMtrEnd(lock.TrxId(1))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, Lsn(1), lsn)
+		assert.Len(t, buf.records, 1)
+		assert.Equal(t, RecordTypeMtrEnd, buf.records[0].recordType)
+		assert.Nil(t, buf.records[0].data)
+	})
+}
+
 func TestBufferReadFrom(t *testing.T) {
 	t.Run("LSN 0 を指定すると全レコードを返す", func(t *testing.T) {
 		// GIVEN
