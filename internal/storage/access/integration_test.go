@@ -23,7 +23,7 @@ func TestIntegrationCreateTable(t *testing.T) {
 		_ = createUsersTable(t, env)
 
 		// WHEN
-		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, "users")
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
 
 		// THEN
 		assert.NoError(t, err)
@@ -384,7 +384,7 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 // createUsersTable は統合テスト用の users テーブルを作成する
 func createUsersTable(t *testing.T, env *integrationEnv) *Table {
 	t.Helper()
-	table, err := CreateTable(env.bp, env.undoLog, env.lockMgr, CreateTableInput{
+	table, err := CreateTable(env.bp, env.undoLog, env.lockMgr, env.redoLog, CreateTableInput{
 		TableName: "users",
 		ColNames:  []string{"id", "name", "email"},
 		PkCount:   1,

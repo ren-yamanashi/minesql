@@ -571,7 +571,7 @@ func setupTestRedoLog(t *testing.T) *redo.Buffer {
 // setupTableForTrxTest は TrxManager のロールバックテスト用に Table を構築する
 func setupTableForTrxTest(t *testing.T, tm *TrxManager) *Table {
 	t.Helper()
-	table, err := NewTable(tm.bufferPool, tm.catalog, tm.undoLog, tm.lock, "users")
+	table, err := NewTable(tm.bufferPool, tm.catalog, tm.undoLog, tm.lock, tm.redoLog, "users")
 	if err != nil {
 		t.Fatalf("Table の作成に失敗: %v", err)
 	}

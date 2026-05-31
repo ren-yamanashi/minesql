@@ -1,11 +1,9 @@
 package access
 
 import (
-	"os"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
@@ -388,22 +386,12 @@ type recoveryTestEnv struct {
 func setupRecoveryTestEnv(t *testing.T) *recoveryTestEnv {
 	t.Helper()
 
-	// Redo ログ用ディレクトリ
-	_ = os.MkdirAll(config.BaseDir, 0o750)
-	t.Cleanup(func() { _ = os.RemoveAll(config.BaseDir) })
-
-	redoLog, err := redo.NewBuffer(config.BaseDir)
-	if err != nil {
-		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
-	}
-	t.Cleanup(func() { _ = redoLog.Clear() })
-
 	env := setupTableTestEnv(t)
-	trxManager := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp)
+	trxManager := NewTrxManager(env.ct, env.undoLog, env.redoLog, env.lock, env.bp)
 
 	return &recoveryTestEnv{
 		bp:         env.bp,
-		redoLog:    redoLog,
+		redoLog:    env.redoLog,
 		trxManager: trxManager,
 		undoFileId: page.FileId(3),
 	}
@@ -412,7 +400,7 @@ func setupRecoveryTestEnv(t *testing.T) *recoveryTestEnv {
 // setupTableForRecoveryTest はリカバリテスト用に Table を構築する
 func setupTableForRecoveryTest(t *testing.T, env *recoveryTestEnv) *Table {
 	t.Helper()
-	table, err := NewTable(env.bp, env.trxManager.catalog, env.trxManager.undoLog, env.trxManager.lock, "users")
+	table, err := NewTable(env.bp, env.trxManager.catalog, env.trxManager.undoLog, env.trxManager.lock, env.redoLog, "users")
 	if err != nil {
 		t.Fatalf("Table の作成に失敗: %v", err)
 	}

@@ -13,7 +13,7 @@ func TestTableInsert(t *testing.T) {
 	t.Run("テーブルにレコードを挿入できる", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 		assert.NoError(t, err)
 
 		// WHEN
@@ -107,7 +107,7 @@ func TestTableInsert(t *testing.T) {
 	t.Run("カラム数が不足しているとエラーを返す", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 		assert.NoError(t, err)
 
 		// WHEN
@@ -124,7 +124,7 @@ func TestTableInsert(t *testing.T) {
 	t.Run("カラム順がテーブル定義順と異なる場合でもセカンダリインデックスに正しい PK が格納される", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 		assert.NoError(t, err)
 
 		// WHEN (テーブル定義順: id, name, email だが name, email, id の順で指定)
@@ -157,7 +157,7 @@ func TestTableInsert(t *testing.T) {
 	t.Run("挿入後に rollPtr が設定される", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 		assert.NoError(t, err)
 
 		// WHEN

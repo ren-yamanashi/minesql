@@ -12,6 +12,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 	"github.com/stretchr/testify/assert"
 )
@@ -30,7 +31,7 @@ func TestCreateTable(t *testing.T) {
 		}
 
 		// WHEN
-		table, err := CreateTable(env.bp, env.undoLog, env.lockMgr, input)
+		table, err := CreateTable(env.bp, env.undoLog, env.lockMgr, env.redoLog, input)
 
 		// THEN
 		assert.NoError(t, err)
@@ -52,7 +53,7 @@ func TestCreateTable(t *testing.T) {
 				{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: dictionary.IndexTypeNonUnique},
 			},
 		}
-		table, err := CreateTable(env.bp, env.undoLog, env.lockMgr, input)
+		table, err := CreateTable(env.bp, env.undoLog, env.lockMgr, env.redoLog, input)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -84,7 +85,7 @@ func TestCreateTable(t *testing.T) {
 			ColNames:  []string{"id", "name"},
 			PkCount:   1,
 		}
-		_, err := CreateTable(env.bp, env.undoLog, env.lockMgr, refInput)
+		_, err := CreateTable(env.bp, env.undoLog, env.lockMgr, env.redoLog, refInput)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -104,7 +105,7 @@ func TestCreateTable(t *testing.T) {
 				},
 			},
 		}
-		table, err := CreateTable(env.bp, env.undoLog, env.lockMgr, input)
+		table, err := CreateTable(env.bp, env.undoLog, env.lockMgr, env.redoLog, input)
 
 		// THEN
 		assert.NoError(t, err)
@@ -126,7 +127,7 @@ func TestCreateTable(t *testing.T) {
 		}
 
 		// WHEN
-		table, err := CreateTable(env.bp, env.undoLog, env.lockMgr, input)
+		table, err := CreateTable(env.bp, env.undoLog, env.lockMgr, env.redoLog, input)
 
 		// THEN
 		assert.NoError(t, err)
@@ -151,7 +152,7 @@ func TestCreateTable(t *testing.T) {
 		}
 
 		// WHEN
-		_, err := CreateTable(env.bp, env.undoLog, env.lockMgr, input)
+		_, err := CreateTable(env.bp, env.undoLog, env.lockMgr, env.redoLog, input)
 
 		// THEN
 		assert.Error(t, err)
@@ -167,7 +168,7 @@ func TestCreateTable(t *testing.T) {
 		}
 
 		// WHEN
-		table, err := CreateTable(env.bp, env.undoLog, env.lockMgr, input)
+		table, err := CreateTable(env.bp, env.undoLog, env.lockMgr, env.redoLog, input)
 
 		// THEN
 		assert.NoError(t, err)
@@ -473,6 +474,7 @@ type createTableTestEnv struct {
 	bp      *buffer.Pool
 	undoLog *undo.Manager
 	lockMgr *lock.Manager
+	redoLog *redo.Buffer
 }
 
 // setupCreateTableTestEnv は CreateTable の統合テスト用環境を構築する
@@ -512,11 +514,18 @@ func setupCreateTableTestEnv(t *testing.T) *createTableTestEnv {
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
 	}
 
+	redoLog, err := redo.NewBuffer(config.BaseDir)
+	if err != nil {
+		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = redoLog.Clear() })
+
 	lockMgr := lock.NewManager()
 
 	return &createTableTestEnv{
 		bp:      bp,
 		undoLog: undoMgr,
 		lockMgr: lockMgr,
+		redoLog: redoLog,
 	}
 }

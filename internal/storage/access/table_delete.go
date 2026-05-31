@@ -8,6 +8,11 @@ import (
 
 // SoftDelete はテーブルの行を論理削除する
 func (t *Table) SoftDelete(record *PrimaryRecord, trxId lock.TrxId) error {
+	if _, err := t.redoLog.AppendMtrStart(trxId); err != nil {
+		return err
+	}
+	defer func() { _, _ = t.redoLog.AppendMtrEnd(trxId) }()
+
 	mtr := buffer.NewMtr(t.bufferPool)
 	defer mtr.UnpinAll()
 
@@ -34,6 +39,11 @@ func (t *Table) SoftDelete(record *PrimaryRecord, trxId lock.TrxId) error {
 // Delete はテーブルの行を物理削除する
 // (物理削除は DML 操作では行われないので、Undo ログの作成はしない)
 func (t *Table) Delete(record *PrimaryRecord, trxId lock.TrxId) error {
+	if _, err := t.redoLog.AppendMtrStart(trxId); err != nil {
+		return err
+	}
+	defer func() { _, _ = t.redoLog.AppendMtrEnd(trxId) }()
+
 	mtr := buffer.NewMtr(t.bufferPool)
 	defer mtr.UnpinAll()
 	if err := t.primaryIndex.delete(mtr, record, trxId); err != nil {

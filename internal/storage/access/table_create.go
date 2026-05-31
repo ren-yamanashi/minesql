@@ -11,6 +11,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
@@ -40,6 +41,7 @@ func CreateTable(
 	bp *buffer.Pool,
 	undo *undo.Manager,
 	lock *lock.Manager,
+	redoLog *redo.Buffer,
 	input CreateTableInput,
 ) (*Table, error) {
 	ct, err := dictionary.NewCatalog(bp)
@@ -82,6 +84,7 @@ func CreateTable(
 		undoLog:          undo,
 		lock:             lock,
 		bufferPool:       bp,
+		redoLog:          redoLog,
 	}, nil
 }
 

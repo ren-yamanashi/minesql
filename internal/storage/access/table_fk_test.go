@@ -11,6 +11,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 	"github.com/stretchr/testify/assert"
 )
@@ -277,10 +278,16 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
 	}
 
+	redoLog, err := redo.NewBuffer(config.BaseDir)
+	if err != nil {
+		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = redoLog.Clear() })
+
 	lockMgr := lock.NewManager()
 
 	// 親テーブル: departments
-	parentTable, err := CreateTable(bp, undoMgr, lockMgr, CreateTableInput{
+	parentTable, err := CreateTable(bp, undoMgr, lockMgr, redoLog, CreateTableInput{
 		TableName: "departments",
 		ColNames:  []string{"id", "name"},
 		PkCount:   1,
@@ -291,7 +298,7 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 	parentFileId := parentTable.primaryIndex.fileId()
 
 	// 子テーブル: employees (FK: dept_id -> departments.id)
-	childTable, err := CreateTable(bp, undoMgr, lockMgr, CreateTableInput{
+	childTable, err := CreateTable(bp, undoMgr, lockMgr, redoLog, CreateTableInput{
 		TableName: "employees",
 		ColNames:  []string{"id", "name", "dept_id"},
 		PkCount:   1,

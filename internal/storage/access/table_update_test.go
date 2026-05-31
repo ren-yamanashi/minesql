@@ -288,7 +288,7 @@ func TestTableIsIndexAffected(t *testing.T) {
 	t.Run("インデックスカラムが更新対象に含まれる場合は true を返す", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 		keyCols := map[string]int{"name": 0}
 		updatedCols := map[string]string{"name": "Bob"}
 
@@ -302,7 +302,7 @@ func TestTableIsIndexAffected(t *testing.T) {
 	t.Run("インデックスカラムが更新対象に含まれない場合は false を返す", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 		keyCols := map[string]int{"name": 0}
 		updatedCols := map[string]string{"email": "new@example.com"}
 
@@ -316,7 +316,7 @@ func TestTableIsIndexAffected(t *testing.T) {
 	t.Run("空の keyCols では false を返す", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 		keyCols := map[string]int{}
 		updatedCols := map[string]string{"name": "Bob"}
 
@@ -332,7 +332,7 @@ func TestTableIsIndexAffected(t *testing.T) {
 func setupTableWithRecord(t *testing.T) *Table {
 	t.Helper()
 	env := setupTableTestEnv(t)
-	table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+	table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 	if err != nil {
 		t.Fatalf("Table の作成に失敗: %v", err)
 	}

@@ -9,6 +9,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
@@ -20,6 +21,7 @@ type Table struct {
 	undoLog          *undo.Manager
 	lock             *lock.Manager
 	bufferPool       *buffer.Pool
+	redoLog          *redo.Buffer
 }
 
 // NewTable は既存のテーブルを開く
@@ -28,6 +30,7 @@ func NewTable(
 	ct *dictionary.Catalog,
 	undo *undo.Manager,
 	lock *lock.Manager,
+	redoLog *redo.Buffer,
 	name string,
 ) (*Table, error) {
 	table, err := fetchTable(ct, bp, name)
@@ -53,6 +56,7 @@ func NewTable(
 		undoLog:          undo,
 		lock:             lock,
 		bufferPool:       bp,
+		redoLog:          redoLog,
 	}, nil
 }
 

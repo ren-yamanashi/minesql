@@ -100,7 +100,7 @@ func TestTableSoftDelete(t *testing.T) {
 	t.Run("存在しないレコードを論理削除するとエラーを返す", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 		assert.NoError(t, err)
 		fakeRecord := &PrimaryRecord{
 			pkCount:    1,
@@ -224,7 +224,7 @@ func TestTableDelete(t *testing.T) {
 	t.Run("存在しないレコードを物理削除するとエラーを返す", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 		assert.NoError(t, err)
 		fakeRecord := &PrimaryRecord{
 			pkCount:    1,

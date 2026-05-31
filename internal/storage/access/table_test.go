@@ -1,15 +1,18 @@
 package access
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 	"github.com/stretchr/testify/assert"
 )
@@ -20,7 +23,7 @@ func TestNewTable(t *testing.T) {
 		env := setupTableTestEnv(t)
 
 		// WHEN
-		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 
 		// THEN
 		assert.NoError(t, err)
@@ -33,7 +36,7 @@ func TestNewTable(t *testing.T) {
 		env := setupTableTestEnv(t)
 
 		// WHEN
-		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 
 		// THEN
 		assert.NoError(t, err)
@@ -45,7 +48,7 @@ func TestNewTable(t *testing.T) {
 		env := setupTableTestEnv(t)
 
 		// WHEN
-		_, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "nonexistent")
+		_, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "nonexistent")
 
 		// THEN
 		assert.Error(t, err)
@@ -57,7 +60,7 @@ func TestNewTable(t *testing.T) {
 		env := setupTableTestEnvWithoutPrimaryIndex(t)
 
 		// WHEN
-		_, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "orders")
+		_, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "orders")
 
 		// THEN
 		assert.Error(t, err)
@@ -69,7 +72,7 @@ func TestTableBuildValMap(t *testing.T) {
 	t.Run("カラム名と値のマップを構築できる", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 
 		// WHEN
 		m := table.buildValMap([]string{"id", "name"}, []string{"1", "Alice"})
@@ -82,7 +85,7 @@ func TestTableBuildValMap(t *testing.T) {
 	t.Run("空のスライスでは空のマップを返す", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 
 		// WHEN
 		m := table.buildValMap([]string{}, []string{})
@@ -96,7 +99,7 @@ func TestTableIsPrimaryKeyColumn(t *testing.T) {
 	t.Run("プライマリキーのカラムに対して true を返す", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 		assert.NoError(t, err)
 
 		// WHEN
@@ -110,7 +113,7 @@ func TestTableIsPrimaryKeyColumn(t *testing.T) {
 	t.Run("非プライマリキーのカラムに対して false を返す", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 		assert.NoError(t, err)
 
 		// WHEN
@@ -124,7 +127,7 @@ func TestTableIsPrimaryKeyColumn(t *testing.T) {
 	t.Run("存在しないカラム名に対して false を返す", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 		assert.NoError(t, err)
 
 		// WHEN
@@ -140,7 +143,7 @@ func TestTableExtractPrimaryKey(t *testing.T) {
 	t.Run("テーブル定義順の先頭からプライマリキーを抽出する", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 
 		// WHEN
 		pk := table.extractPrimaryKey([]string{"1", "Alice", "alice@example.com"})
@@ -154,7 +157,7 @@ func TestTableExtractSecondaryKey(t *testing.T) {
 	t.Run("keyCols と valMap からインデックス定義順の SK を抽出する", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 		valMap := table.buildValMap(
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
@@ -172,7 +175,7 @@ func TestTableExtractSecondaryKey(t *testing.T) {
 	t.Run("複数カラムのセカンダリキーを定義順で抽出する", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 		valMap := table.buildValMap(
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
@@ -192,7 +195,7 @@ func TestTableBuildSecondaryRecord(t *testing.T) {
 	t.Run("セカンダリインデックス用のレコードを構築できる", func(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
-		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, "users")
+		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 
 		var si *secondaryIndex
 		for _, s := range table.secondaryIndexes {
@@ -220,6 +223,7 @@ type tableTestEnv struct {
 	bp      *buffer.Pool
 	lock    *lock.Manager
 	undoLog *undo.Manager
+	redoLog *redo.Buffer
 }
 
 // setupTableTestEnv は NewTable テスト用の環境を構築する
@@ -248,6 +252,15 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 	if err != nil {
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
 	}
+
+	// Redo ログ用ディレクトリ
+	_ = os.MkdirAll(config.BaseDir, 0o750)
+	t.Cleanup(func() { _ = os.RemoveAll(config.BaseDir) })
+	redoLog, err := redo.NewBuffer(config.BaseDir)
+	if err != nil {
+		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = redoLog.Clear() })
 
 	lockMgr := lock.NewManager()
 
@@ -309,6 +322,7 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 		bp:      env.bp,
 		lock:    lockMgr,
 		undoLog: undoMgr,
+		redoLog: redoLog,
 	}
 }
 
@@ -332,6 +346,15 @@ func setupTableTestEnvWithoutPrimaryIndex(t *testing.T) *tableTestEnv {
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
 	}
 
+	// Redo ログ
+	_ = os.MkdirAll(config.BaseDir, 0o750)
+	t.Cleanup(func() { _ = os.RemoveAll(config.BaseDir) })
+	redoLog, err := redo.NewBuffer(config.BaseDir)
+	if err != nil {
+		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = redoLog.Clear() })
+
 	lockMgr := lock.NewManager()
 
 	// テーブルメタデータのみ登録 (プライマリインデックスなし)
@@ -344,5 +367,6 @@ func setupTableTestEnvWithoutPrimaryIndex(t *testing.T) *tableTestEnv {
 		bp:      env.bp,
 		lock:    lockMgr,
 		undoLog: undoMgr,
+		redoLog: redoLog,
 	}
 }

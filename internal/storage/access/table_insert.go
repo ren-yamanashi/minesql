@@ -8,6 +8,11 @@ import (
 
 // Insert はテーブルに行を挿入する
 func (t *Table) Insert(colNames []string, values []string, trxId lock.TrxId) error {
+	if _, err := t.redoLog.AppendMtrStart(trxId); err != nil {
+		return err
+	}
+	defer func() { _, _ = t.redoLog.AppendMtrEnd(trxId) }()
+
 	mtr := buffer.NewMtr(t.bufferPool)
 	defer mtr.UnpinAll()
 

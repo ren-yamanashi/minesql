@@ -16,12 +16,17 @@ func (t *Table) Update(currentRecord *PrimaryRecord, colNames, values []string, 
 	}
 
 	if t.isPrimaryKeyChanged(currentRecord, newRecord) {
-		// PK が変わる場合は論理削除 + 新規挿入 (Undo ログはそれぞれの public method 内で記録)
+		// PK が変わる場合は論理削除 + 新規挿入 (それぞれの操作内で mtr 境界が記録される)
 		if err := t.SoftDelete(currentRecord, trxId); err != nil {
 			return err
 		}
 		return t.Insert(newRecord.colNames, newRecord.values, trxId)
 	}
+
+	if _, err := t.redoLog.AppendMtrStart(trxId); err != nil {
+		return err
+	}
+	defer func() { _, _ = t.redoLog.AppendMtrEnd(trxId) }()
 
 	// PK が変わらない場合はインプレース更新
 	mtr := buffer.NewMtr(t.bufferPool)
