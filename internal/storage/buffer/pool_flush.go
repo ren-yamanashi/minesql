@@ -103,9 +103,7 @@ func (p *Pool) collectOldestFlushTasks(n int) ([]flushTask, []*file.HeapFile, er
 }
 
 // runFlush は収集済みのフラッシュタスクを実行する
-//   - 各ページに対し Exclusive ラッチの試取得を行い、他者が保持中のページはスキップ (flushList に残り次回再試行)
-//   - これにより同一 goroutine が保持中のページに対する self-deadlock を避けつつ、torn flush を防ぐ
-//   - 並行性のさらなる改善 (Shared ラッチで書き込み並行を許容) は段階 3 で導入する
+//   - 他者がページの Exclusive ラッチを保持中の場合はそのページをスキップし、flushList に残して次回再試行する
 func (p *Pool) runFlush(tasks []flushTask, files []*file.HeapFile) error {
 	if len(tasks) == 0 {
 		return nil

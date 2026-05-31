@@ -8,7 +8,6 @@ import (
 )
 
 // Search は指定された検索モードで B+Tree を検索する
-//   - 探索パス全体を Tree レベルの Shared ラッチで保護し、降下中は親→子の latch coupling でページラッチを持ち替える
 func (t *Tree) Search(mtr *buffer.Mtr, mode SearchMode) (*Iterator, error) {
 	mtr.LockShared(t.latch)
 	defer mtr.UnlockLatch(t.latch)
@@ -52,7 +51,6 @@ func (t *Tree) FindByKey(mtr *buffer.Mtr, key []byte) (Record, RecordPosition, e
 }
 
 // searchRecursively はノードを辿って該当のリーフノードを見つける
-//   - latch coupling: 子のページラッチを取得してから親のラッチを解放することで、降下中に親の構造が変わってしまうのを防ぐ
 func (t *Tree) searchRecursively(mtr *buffer.Mtr, rootPageId page.Id, mode SearchMode) (*Iterator, error) {
 	currentPageId := rootPageId
 	currentBufPage, err := mtr.PageForRead(currentPageId)

@@ -56,6 +56,15 @@ func (ln *leafNode) insert(slotNum int, record Record) bool {
 	return ln.body.insert(slotNum, recordBytes)
 }
 
+// canFit は record を分割せずにこのリーフノードに挿入できるかを返す
+func (ln *leafNode) canFit(record Record) bool {
+	recordBytes := record.Bytes()
+	if len(recordBytes) > ln.maxRecordSize() {
+		return false
+	}
+	return ln.body.hasSpaceFor(len(recordBytes))
+}
+
 // splitInsert はリーフノードを分割しながらレコードを挿入する
 //   - newLeaf: 分割後の新しいリーフノード (小さい方のレコードが格納される)
 //   - newRecord: 挿入するレコード

@@ -169,3 +169,116 @@ func TestInsert(t *testing.T) {
 		assert.Equal(t, heightBefore, heightAfter)
 	})
 }
+
+func TestInsertOptimistic(t *testing.T) {
+	t.Run("分割不要なら needsPessimistic=false で挿入が完了する", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+
+		// WHEN
+		needsPessimistic, err := bt.insertOptimistic(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.False(t, needsPessimistic)
+		record, _, err := bt.FindByKey(mtr, []byte{0x10})
+		assert.NoError(t, err)
+		assert.Equal(t, []byte{0xAA}, record.NonKey())
+	})
+
+	t.Run("リーフが満杯なら needsPessimistic=true を返し挿入しない", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		nonKey := make([]byte, 1500)
+		_, err := bt.insertOptimistic(mtr, NewRecord([]byte{}, []byte{0x01}, nonKey))
+		assert.NoError(t, err)
+		_, err = bt.insertOptimistic(mtr, NewRecord([]byte{}, []byte{0x02}, nonKey))
+		assert.NoError(t, err)
+
+		// WHEN
+		needsPessimistic, err := bt.insertOptimistic(mtr, NewRecord([]byte{}, []byte{0x03}, nonKey))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.True(t, needsPessimistic)
+		// 楽観モードで失敗したので 0x03 は未挿入
+		_, _, err = bt.FindByKey(mtr, []byte{0x03})
+		assert.ErrorIs(t, err, ErrKeyNotFound)
+	})
+
+	t.Run("完了後に Pin と Tree ラッチが残らない", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+
+		// WHEN
+		_, err := bt.insertOptimistic(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 0, mtr.PinnedCount())
+		assert.Equal(t, 0, mtr.HeldLatchCount())
+	})
+
+	t.Run("重複キーは ErrDuplicateKey を返す", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		_, err := bt.insertOptimistic(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		assert.NoError(t, err)
+
+		// WHEN
+		_, err = bt.insertOptimistic(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
+
+		// THEN
+		assert.ErrorIs(t, err, ErrDuplicateKey)
+	})
+}
+
+func TestInsertPessimistic(t *testing.T) {
+	t.Run("Tree SX ラッチを取得し分割込みで挿入できる", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		nonKey := make([]byte, 1500)
+		_ = bt.insertPessimistic(mtr, NewRecord([]byte{}, []byte{0x01}, nonKey))
+		_ = bt.insertPessimistic(mtr, NewRecord([]byte{}, []byte{0x02}, nonKey))
+		countBefore, _ := bt.LeafPageCount()
+
+		// WHEN
+		err := bt.insertPessimistic(mtr, NewRecord([]byte{}, []byte{0x03}, nonKey))
+
+		// THEN
+		assert.NoError(t, err)
+		countAfter, _ := bt.LeafPageCount()
+		assert.Equal(t, countBefore+1, countAfter)
+	})
+
+	t.Run("完了後に Pin と Tree ラッチが残らない", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+
+		// WHEN
+		err := bt.insertPessimistic(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, 0, mtr.PinnedCount())
+		assert.Equal(t, 0, mtr.HeldLatchCount())
+	})
+}

@@ -21,8 +21,7 @@ type heldLatchEntry struct {
 }
 
 // Mtr は 1 つの原子的なページ操作で獲得した Pin とラッチをまとめ、操作の完了時に一括解放するスコープ (mini-transaction)
-//   - 同じ Mtr 内で同一ページを再取得する場合は再帰的に扱い、ラッチは実体として 1 つだけ保持する
-//   - 同じ Mtr が S 取得済みのページを X 要求した場合は S を解放してから X を取り直す (隙間で他者が X を取りうる)
+//   - 同じ Mtr 内で同一ページを再取得しても安全 (重複取得はまとめて扱われる)
 //   - Pin に紐づかない任意の RWLatch (B+Tree レベルなど) も同スコープで管理する
 type Mtr struct {
 	pool        *Pool
@@ -53,9 +52,8 @@ func (m *Mtr) PageForRead(pageId page.Id) (*Page, error) {
 	return bufPage, nil
 }
 
-// PageForWrite は書き込み用のバッファページを取得し、Exclusive ラッチを取得して更新カウンタを進め、Pin をスコープに記録する
-//   - 同一 Mtr が既に X を保持していれば実体ラッチは取らない (再帰)
-//   - 同一 Mtr が S を保持していれば S を解放して X を取り直し、既存エントリも実体上は X 保持に置き換える
+// PageForWrite は書き込み用のバッファページを取得し、Exclusive ラッチと Pin をスコープに記録する
+//   - 同一 Mtr 内で S 取得済みのページを X 要求した場合は S を解放して X を取り直す (隙間で他者が X を取りうる)
 func (m *Mtr) PageForWrite(pageId page.Id) (*Page, error) {
 	bufPage, err := m.pool.PageForWrite(pageId)
 	if err != nil {

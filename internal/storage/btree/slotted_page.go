@@ -18,6 +18,11 @@ func newSlottedPage(data []byte) *slottedPage {
 	return &slottedPage{data: data}
 }
 
+// hasSpaceFor は指定サイズの追加データが空き領域に収まるかを返す
+func (sp *slottedPage) hasSpaceFor(dataSize int) bool {
+	return sp.freeSpace() >= slottedPagePointerSize+dataSize
+}
+
 // insert は指定されたインデックスにサイズ分のデータを挿入する
 //   - index: 挿入するスロットのインデックス
 //   - data: 挿入するデータ

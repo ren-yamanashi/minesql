@@ -7,6 +7,21 @@ import (
 
 // Insert は B+Tree にレコードを挿入する
 func (t *Tree) Insert(mtr *buffer.Mtr, record Record) error {
+	needsPessimistic, err := t.tryInsertOptimistic(mtr, record)
+	if err != nil {
+		return err
+	}
+	if !needsPessimistic {
+		return nil
+	}
+	return t.insertPessimistic(mtr, record)
+}
+
+// insertPessimistic は悲観モードで挿入する
+func (t *Tree) insertPessimistic(mtr *buffer.Mtr, record Record) error {
+	mtr.LockSharedExclusive(t.latch)
+	defer mtr.UnlockLatch(t.latch)
+
 	// メタページを取得
 	pageMeta, err := mtr.PageForWrite(t.MetaPageId())
 	if err != nil {
