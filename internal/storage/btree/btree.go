@@ -16,11 +16,16 @@ var (
 type Tree struct {
 	bufferPool *buffer.Pool
 	metaPageId page.Id
+	latch      *buffer.RWLatch // B+Tree 構造そのものに対する短期排他用のラッチ
 }
 
 // NewTree は既存の B+Tree を開く
 func NewTree(bp *buffer.Pool, metaPageId page.Id) *Tree {
-	return &Tree{bufferPool: bp, metaPageId: metaPageId}
+	return &Tree{
+		bufferPool: bp,
+		metaPageId: metaPageId,
+		latch:      buffer.NewRWLatch(),
+	}
 }
 
 // CreateTree は新しい B+Tree を作成する

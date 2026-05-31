@@ -36,6 +36,18 @@ func TestNewTree(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(1), count)
 	})
+
+	t.Run("NewTree でツリーラッチが初期化される", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		created, _ := CreateTree(bp, page.FileId(0))
+
+		// WHEN
+		bt := NewTree(bp, created.MetaPageId())
+
+		// THEN
+		assert.NotNil(t, bt.latch)
+	})
 }
 
 func TestCreateTree(t *testing.T) {
@@ -77,6 +89,35 @@ func TestCreateTree(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, uint64(1), height)
+	})
+
+	t.Run("CreateTree でツリーラッチが初期化される", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+
+		// WHEN
+		bt, err := CreateTree(bp, page.FileId(0))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.NotNil(t, bt.latch)
+	})
+}
+
+func TestTreeLatchUsableViaMtr(t *testing.T) {
+	t.Run("ツリーラッチを Mtr 経由で取得・解放できる", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bp)
+
+		// WHEN
+		mtr.LockShared(bt.latch)
+
+		// THEN
+		assert.Equal(t, 1, mtr.HeldLatchCount())
+		mtr.UnpinAll()
+		assert.Equal(t, 0, mtr.HeldLatchCount())
 	})
 }
 

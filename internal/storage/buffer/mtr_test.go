@@ -421,6 +421,113 @@ func TestMtrRecursiveAcquisition(t *testing.T) {
 	})
 }
 
+func TestMtrLockShared(t *testing.T) {
+	t.Run("任意の RWLatch を Shared で取得しスコープに記録する", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*3, nil)
+		mtr := NewMtr(bp)
+		l := NewRWLatch()
+
+		// WHEN
+		mtr.LockShared(l)
+
+		// THEN
+		assert.Equal(t, 1, mtr.HeldLatchCount())
+		assert.Equal(t, 1, l.sharedCnt)
+		mtr.UnpinAll()
+	})
+}
+
+func TestMtrLockSharedExclusive(t *testing.T) {
+	t.Run("任意の RWLatch を Shared-Exclusive で取得しスコープに記録する", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*3, nil)
+		mtr := NewMtr(bp)
+		l := NewRWLatch()
+
+		// WHEN
+		mtr.LockSharedExclusive(l)
+
+		// THEN
+		assert.Equal(t, 1, mtr.HeldLatchCount())
+		assert.True(t, l.sxHeld)
+		mtr.UnpinAll()
+	})
+}
+
+func TestMtrLockExclusive(t *testing.T) {
+	t.Run("任意の RWLatch を Exclusive で取得しスコープに記録する", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*3, nil)
+		mtr := NewMtr(bp)
+		l := NewRWLatch()
+
+		// WHEN
+		mtr.LockExclusive(l)
+
+		// THEN
+		assert.Equal(t, 1, mtr.HeldLatchCount())
+		assert.True(t, l.xHeld)
+		mtr.UnpinAll()
+	})
+}
+
+func TestMtrUnlockLatch(t *testing.T) {
+	t.Run("指定 RWLatch を解放しスコープから除外する", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*3, nil)
+		mtr := NewMtr(bp)
+		l := NewRWLatch()
+		mtr.LockExclusive(l)
+
+		// WHEN
+		mtr.UnlockLatch(l)
+
+		// THEN
+		assert.Equal(t, 0, mtr.HeldLatchCount())
+		assert.False(t, l.xHeld)
+	})
+
+	t.Run("複数の RWLatch を取得しても LIFO で個別解放できる", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*3, nil)
+		mtr := NewMtr(bp)
+		l1 := NewRWLatch()
+		l2 := NewRWLatch()
+		mtr.LockExclusive(l1)
+		mtr.LockShared(l2)
+
+		// WHEN
+		mtr.UnlockLatch(l2)
+
+		// THEN
+		assert.Equal(t, 1, mtr.HeldLatchCount())
+		assert.True(t, l1.xHeld)
+		assert.Equal(t, 0, l2.sharedCnt)
+		mtr.UnpinAll()
+	})
+}
+
+func TestMtrUnpinAllReleasesHeldLatches(t *testing.T) {
+	t.Run("UnpinAll で任意ラッチも全て解放される", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*3, nil)
+		mtr := NewMtr(bp)
+		l1 := NewRWLatch()
+		l2 := NewRWLatch()
+		mtr.LockShared(l1)
+		mtr.LockExclusive(l2)
+
+		// WHEN
+		mtr.UnpinAll()
+
+		// THEN
+		assert.Equal(t, 0, mtr.HeldLatchCount())
+		assert.Equal(t, 0, l1.sharedCnt)
+		assert.False(t, l2.xHeld)
+	})
+}
+
 // pinCountOf は指定ページの現在の pinCount を返す
 func pinCountOf(bp *Pool, pageId page.Id) int {
 	bufId, ok := bp.pageTable.bufferId(pageId)
