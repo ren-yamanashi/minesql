@@ -104,6 +104,12 @@ func (si *secondaryIndex) insert(mtr *buffer.Mtr, record *SecondaryRecord, trxId
 	}
 	encodedRecord := record.Encode()
 
+	// 排他ロックを取得
+	rowKey := lock.RowKey{MetaPageId: si.tree.MetaPageId(), Key: encodedRecord.Key()}
+	if err := si.lock.Lock(trxId, rowKey, lock.Exclusive); err != nil {
+		return err
+	}
+
 	// 挿入
 	err := si.tree.Insert(mtr, encodedRecord)
 	// 重複キーエラーの場合、既存のレコードが論理削除済みか確認
@@ -118,30 +124,18 @@ func (si *secondaryIndex) insert(mtr *buffer.Mtr, record *SecondaryRecord, trxId
 			return btree.ErrDuplicateKey
 		}
 		// 論理削除済みの場合は上書き
-		if updateErr := si.tree.Update(mtr, encodedRecord); updateErr != nil {
-			return updateErr
-		}
-	} else if err != nil {
-		return err
+		return si.tree.Update(mtr, encodedRecord)
 	}
-
-	// 排他ロックを取得
-	_, pos, err := si.tree.FindByKey(mtr, encodedRecord.Key())
-	if err != nil {
-		return err
-	}
-	return si.lock.Lock(trxId, pos, lock.Exclusive)
+	return err
 }
 
 // delete は行を物理削除する
 func (si *secondaryIndex) delete(mtr *buffer.Mtr, record *SecondaryRecord, trxId lock.TrxId) error {
-	// 排他ロックを取得
 	encodedRecord := record.Encode()
-	_, pos, err := si.tree.FindByKey(mtr, encodedRecord.Key())
-	if err != nil {
-		return err
-	}
-	if err := si.lock.Lock(trxId, pos, lock.Exclusive); err != nil {
+
+	// 排他ロックを取得
+	rowKey := lock.RowKey{MetaPageId: si.tree.MetaPageId(), Key: encodedRecord.Key()}
+	if err := si.lock.Lock(trxId, rowKey, lock.Exclusive); err != nil {
 		return err
 	}
 
@@ -151,13 +145,11 @@ func (si *secondaryIndex) delete(mtr *buffer.Mtr, record *SecondaryRecord, trxId
 
 // softDelete は行を論理削除する
 func (si *secondaryIndex) softDelete(mtr *buffer.Mtr, record *SecondaryRecord, trxId lock.TrxId) error {
-	// 排他ロックを取得
 	encodedRecord := record.Encode()
-	_, pos, err := si.tree.FindByKey(mtr, encodedRecord.Key())
-	if err != nil {
-		return err
-	}
-	if err := si.lock.Lock(trxId, pos, lock.Exclusive); err != nil {
+
+	// 排他ロックを取得
+	rowKey := lock.RowKey{MetaPageId: si.tree.MetaPageId(), Key: encodedRecord.Key()}
+	if err := si.lock.Lock(trxId, rowKey, lock.Exclusive); err != nil {
 		return err
 	}
 

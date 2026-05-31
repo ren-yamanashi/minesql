@@ -213,9 +213,8 @@ func TestSecondaryIndexInsert(t *testing.T) {
 		assert.NoError(t, err)
 		// 別トランザクションが同じレコードに排他ロックを取得しようとするとタイムアウト
 		encodedRecord := record.Encode()
-		_, pos, err := si.tree.FindByKey(mtr, encodedRecord.Key())
-		assert.NoError(t, err)
-		err = si.lock.Lock(lock.TrxId(999), pos, lock.Exclusive)
+		rowKey := lock.RowKey{MetaPageId: si.tree.MetaPageId(), Key: encodedRecord.Key()}
+		err = si.lock.Lock(lock.TrxId(999), rowKey, lock.Exclusive)
 		assert.ErrorIs(t, err, lock.ErrTimeout)
 	})
 }

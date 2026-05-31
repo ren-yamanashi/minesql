@@ -179,9 +179,8 @@ func TestPrimaryIndexInsert(t *testing.T) {
 		assert.NoError(t, err)
 		// 同一トランザクションで既に排他ロックを保持しているので再取得は成功する
 		encodedRecord := record.Encode()
-		_, pos, err := pi.tree.FindByKey(mtr, encodedRecord.Key())
-		assert.NoError(t, err)
-		err = pi.lock.Lock(testTrxId, pos, lock.Exclusive)
+		rowKey := lock.RowKey{MetaPageId: pi.tree.MetaPageId(), Key: encodedRecord.Key()}
+		err = pi.lock.Lock(testTrxId, rowKey, lock.Exclusive)
 		assert.NoError(t, err)
 	})
 }

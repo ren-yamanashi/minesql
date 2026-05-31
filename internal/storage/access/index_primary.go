@@ -69,10 +69,16 @@ func (pi *primaryIndex) search(mtr *buffer.Mtr, mode SearchMode) (*PrimaryIndexI
 // insert は行を挿入する
 // (論理削除済みの同一キーが存在する場合は上書きする)
 func (pi *primaryIndex) insert(mtr *buffer.Mtr, record *PrimaryRecord, trxId lock.TrxId) error {
-	// 挿入
 	encodedRecord := record.Encode()
-	err := pi.tree.Insert(mtr, encodedRecord)
 
+	// 排他ロックを取得
+	rowKey := lock.RowKey{MetaPageId: pi.tree.MetaPageId(), Key: encodedRecord.Key()}
+	if err := pi.lock.Lock(trxId, rowKey, lock.Exclusive); err != nil {
+		return err
+	}
+
+	// 挿入
+	err := pi.tree.Insert(mtr, encodedRecord)
 	// 重複キーエラーの場合、既存のレコードが論理削除済みか確認
 	if errors.Is(err, btree.ErrDuplicateKey) {
 		existing, _, findErr := pi.tree.FindByKey(mtr, encodedRecord.Key())
@@ -85,30 +91,18 @@ func (pi *primaryIndex) insert(mtr *buffer.Mtr, record *PrimaryRecord, trxId loc
 			return btree.ErrDuplicateKey
 		}
 		// 論理削除済みの場合は上書き
-		if updateErr := pi.tree.Update(mtr, encodedRecord); updateErr != nil {
-			return updateErr
-		}
-	} else if err != nil {
-		return err
+		return pi.tree.Update(mtr, encodedRecord)
 	}
-
-	// 排他ロックを取得
-	_, pos, err := pi.tree.FindByKey(mtr, encodedRecord.Key())
-	if err != nil {
-		return err
-	}
-	return pi.lock.Lock(trxId, pos, lock.Exclusive)
+	return err
 }
 
 // delete は 行を物理削除する
 func (pi *primaryIndex) delete(mtr *buffer.Mtr, record *PrimaryRecord, trxId lock.TrxId) error {
-	// 排他ロックを取得
 	encodedRecord := record.Encode()
-	_, pos, err := pi.tree.FindByKey(mtr, encodedRecord.Key())
-	if err != nil {
-		return err
-	}
-	if err := pi.lock.Lock(trxId, pos, lock.Exclusive); err != nil {
+
+	// 排他ロックを取得
+	rowKey := lock.RowKey{MetaPageId: pi.tree.MetaPageId(), Key: encodedRecord.Key()}
+	if err := pi.lock.Lock(trxId, rowKey, lock.Exclusive); err != nil {
 		return err
 	}
 
@@ -118,13 +112,11 @@ func (pi *primaryIndex) delete(mtr *buffer.Mtr, record *PrimaryRecord, trxId loc
 
 // softDelete は行を論理削除する
 func (pi *primaryIndex) softDelete(mtr *buffer.Mtr, record *PrimaryRecord, trxId lock.TrxId) error {
-	// 排他ロックを取得
 	encodedRecord := record.Encode()
-	_, pos, err := pi.tree.FindByKey(mtr, encodedRecord.Key())
-	if err != nil {
-		return err
-	}
-	if err := pi.lock.Lock(trxId, pos, lock.Exclusive); err != nil {
+
+	// 排他ロックを取得
+	rowKey := lock.RowKey{MetaPageId: pi.tree.MetaPageId(), Key: encodedRecord.Key()}
+	if err := pi.lock.Lock(trxId, rowKey, lock.Exclusive); err != nil {
 		return err
 	}
 
@@ -147,13 +139,11 @@ func (pi *primaryIndex) softDelete(mtr *buffer.Mtr, record *PrimaryRecord, trxId
 
 // update は行を更新する
 func (pi *primaryIndex) update(mtr *buffer.Mtr, newRecord *PrimaryRecord, trxId lock.TrxId) error {
-	// 排他ロックを取得
 	encodedRecord := newRecord.Encode()
-	_, pos, err := pi.tree.FindByKey(mtr, encodedRecord.Key())
-	if err != nil {
-		return err
-	}
-	if err := pi.lock.Lock(trxId, pos, lock.Exclusive); err != nil {
+
+	// 排他ロックを取得
+	rowKey := lock.RowKey{MetaPageId: pi.tree.MetaPageId(), Key: encodedRecord.Key()}
+	if err := pi.lock.Lock(trxId, rowKey, lock.Exclusive); err != nil {
 		return err
 	}
 
