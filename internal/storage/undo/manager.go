@@ -48,7 +48,6 @@ func NewManager(bp *buffer.Pool, redoLog *redo.Buffer, fileId page.FileId) (*Man
 }
 
 // Append は指定した trxId の Undo ログにレコードを追加し、書き込み先の Pointer を返す
-//   - mtr は呼び出し側 (access の Insert/Update/SoftDelete) が確保したものを引き継ぎ、Undo ページの latch / Pin を同一スコープで管理する
 func (m *Manager) Append(mtr *buffer.Mtr, trxId lock.TrxId, recordType RecordType, record Record) (Pointer, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -178,7 +177,7 @@ func (m *Manager) switchToNewPage(mtr *buffer.Mtr, trxId lock.TrxId, currentPage
 }
 
 // appendRedoLog は現在の Undo ページの Redo ログを記録する
-//   - 呼び出し側が currentPageId に対して既に X latch を取得済みであることを前提とする (mtr.PageForRead は同一ページの再取得を skipLatch で扱う)
+//   - 呼び出し側が currentPageId に対して既に X latch を取得済みであることを前提とする
 func (m *Manager) appendRedoLog(mtr *buffer.Mtr, trxId lock.TrxId) error {
 	if m.redoLog == nil {
 		return nil
