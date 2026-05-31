@@ -1,12 +1,12 @@
 package lock
 
 import (
+	"encoding/binary"
 	"os"
 	"sync"
 	"testing"
 	"time"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
@@ -34,7 +34,7 @@ func TestManagerLock(t *testing.T) {
 	t.Run("Shared ロックを取得できる", func(t *testing.T) {
 		// GIVEN
 		m := NewManager()
-		pos := testPos(1, 0)
+		pos := testRowKey(1, 0)
 
 		// WHEN
 		err := m.Lock(1, pos, Shared)
@@ -46,7 +46,7 @@ func TestManagerLock(t *testing.T) {
 	t.Run("Exclusive ロックを取得できる", func(t *testing.T) {
 		// GIVEN
 		m := NewManager()
-		pos := testPos(1, 0)
+		pos := testRowKey(1, 0)
 
 		// WHEN
 		err := m.Lock(1, pos, Exclusive)
@@ -58,7 +58,7 @@ func TestManagerLock(t *testing.T) {
 	t.Run("同一トランザクションが同一レコードに Shared を 2 回要求しても成功する", func(t *testing.T) {
 		// GIVEN
 		m := NewManager()
-		pos := testPos(1, 0)
+		pos := testRowKey(1, 0)
 		_ = m.Lock(1, pos, Shared)
 
 		// WHEN
@@ -71,7 +71,7 @@ func TestManagerLock(t *testing.T) {
 	t.Run("同一トランザクションが Exclusive 保持中に Shared を要求しても成功する", func(t *testing.T) {
 		// GIVEN
 		m := NewManager()
-		pos := testPos(1, 0)
+		pos := testRowKey(1, 0)
 		_ = m.Lock(1, pos, Exclusive)
 
 		// WHEN
@@ -84,7 +84,7 @@ func TestManagerLock(t *testing.T) {
 	t.Run("Exclusive 保持中に Shared を要求してもロックがダウングレードされない", func(t *testing.T) {
 		// GIVEN
 		m := newManagerWithShortTimeout()
-		pos := testPos(1, 0)
+		pos := testRowKey(1, 0)
 		_ = m.Lock(1, pos, Exclusive)
 		_ = m.Lock(1, pos, Shared)
 
@@ -98,7 +98,7 @@ func TestManagerLock(t *testing.T) {
 	t.Run("異なるトランザクションが同一レコードに Shared ロックを取得できる", func(t *testing.T) {
 		// GIVEN
 		m := NewManager()
-		pos := testPos(1, 0)
+		pos := testRowKey(1, 0)
 		_ = m.Lock(1, pos, Shared)
 
 		// WHEN
@@ -111,10 +111,10 @@ func TestManagerLock(t *testing.T) {
 	t.Run("異なるレコードには競合せず Exclusive ロックを取得できる", func(t *testing.T) {
 		// GIVEN
 		m := NewManager()
-		_ = m.Lock(1, testPos(1, 0), Exclusive)
+		_ = m.Lock(1, testRowKey(1, 0), Exclusive)
 
 		// WHEN
-		err := m.Lock(2, testPos(1, 1), Exclusive)
+		err := m.Lock(2, testRowKey(1, 1), Exclusive)
 
 		// THEN
 		assert.NoError(t, err)
@@ -123,7 +123,7 @@ func TestManagerLock(t *testing.T) {
 	t.Run("Shared 保持中に他トランザクションが Exclusive を要求するとタイムアウトする", func(t *testing.T) {
 		// GIVEN
 		m := newManagerWithShortTimeout()
-		pos := testPos(1, 0)
+		pos := testRowKey(1, 0)
 		_ = m.Lock(1, pos, Shared)
 
 		// WHEN
@@ -136,7 +136,7 @@ func TestManagerLock(t *testing.T) {
 	t.Run("Exclusive 保持中に他トランザクションが Shared を要求するとタイムアウトする", func(t *testing.T) {
 		// GIVEN
 		m := newManagerWithShortTimeout()
-		pos := testPos(1, 0)
+		pos := testRowKey(1, 0)
 		_ = m.Lock(1, pos, Exclusive)
 
 		// WHEN
@@ -149,7 +149,7 @@ func TestManagerLock(t *testing.T) {
 	t.Run("Exclusive 保持中に他トランザクションが Exclusive を要求するとタイムアウトする", func(t *testing.T) {
 		// GIVEN
 		m := newManagerWithShortTimeout()
-		pos := testPos(1, 0)
+		pos := testRowKey(1, 0)
 		_ = m.Lock(1, pos, Exclusive)
 
 		// WHEN
@@ -162,7 +162,7 @@ func TestManagerLock(t *testing.T) {
 	t.Run("ロック解放後に待機中のトランザクションがロックを取得できる", func(t *testing.T) {
 		// GIVEN
 		m := NewManager()
-		pos := testPos(1, 0)
+		pos := testRowKey(1, 0)
 		_ = m.Lock(1, pos, Exclusive)
 
 		var wg sync.WaitGroup
@@ -183,7 +183,7 @@ func TestManagerLock(t *testing.T) {
 	t.Run("Shared→Exclusive の昇格ができる", func(t *testing.T) {
 		// GIVEN
 		m := NewManager()
-		pos := testPos(1, 0)
+		pos := testRowKey(1, 0)
 		_ = m.Lock(1, pos, Shared)
 
 		// WHEN
@@ -196,7 +196,7 @@ func TestManagerLock(t *testing.T) {
 	t.Run("他のトランザクションも Shared を保持している場合は Shared→Exclusive の昇格がタイムアウトする", func(t *testing.T) {
 		// GIVEN
 		m := newManagerWithShortTimeout()
-		pos := testPos(1, 0)
+		pos := testRowKey(1, 0)
 		_ = m.Lock(1, pos, Shared)
 		_ = m.Lock(2, pos, Shared)
 
@@ -210,7 +210,7 @@ func TestManagerLock(t *testing.T) {
 	t.Run("同一トランザクションが Exclusive 保持中に Exclusive を再要求しても成功する", func(t *testing.T) {
 		// GIVEN
 		m := NewManager()
-		pos := testPos(1, 0)
+		pos := testRowKey(1, 0)
 		_ = m.Lock(1, pos, Exclusive)
 
 		// WHEN
@@ -219,13 +219,49 @@ func TestManagerLock(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 	})
+
+	t.Run("同じ MetaPageId で異なる Key は競合しない", func(t *testing.T) {
+		// GIVEN
+		m := NewManager()
+		_ = m.Lock(1, testRowKey(1, 100), Exclusive)
+
+		// WHEN
+		err := m.Lock(2, testRowKey(1, 200), Exclusive)
+
+		// THEN
+		assert.NoError(t, err)
+	})
+
+	t.Run("異なる MetaPageId で同じ Key は競合しない", func(t *testing.T) {
+		// GIVEN
+		m := NewManager()
+		_ = m.Lock(1, testRowKey(1, 100), Exclusive)
+
+		// WHEN
+		err := m.Lock(2, testRowKey(2, 100), Exclusive)
+
+		// THEN
+		assert.NoError(t, err)
+	})
+
+	t.Run("同じ MetaPageId と同じ Key を持つ別 RowKey は同一のロックとして扱う", func(t *testing.T) {
+		// GIVEN
+		m := newManagerWithShortTimeout()
+		_ = m.Lock(1, testRowKey(1, 100), Exclusive)
+
+		// WHEN
+		err := m.Lock(2, testRowKey(1, 100), Exclusive)
+
+		// THEN
+		assert.ErrorIs(t, err, ErrTimeout)
+	})
 }
 
 func TestManagerRelease(t *testing.T) {
 	t.Run("ロックを解放するとロックテーブルからエントリが削除される", func(t *testing.T) {
 		// GIVEN
 		m := NewManager()
-		pos := testPos(1, 0)
+		pos := testRowKey(1, 0)
 		_ = m.Lock(1, pos, Exclusive)
 
 		// WHEN
@@ -239,8 +275,8 @@ func TestManagerRelease(t *testing.T) {
 	t.Run("複数レコードのロックを一括解放できる", func(t *testing.T) {
 		// GIVEN
 		m := NewManager()
-		_ = m.Lock(1, testPos(1, 0), Exclusive)
-		_ = m.Lock(1, testPos(1, 1), Shared)
+		_ = m.Lock(1, testRowKey(1, 0), Exclusive)
+		_ = m.Lock(1, testRowKey(1, 1), Shared)
 
 		// WHEN
 		m.Release(1)
@@ -262,7 +298,7 @@ func TestManagerRelease(t *testing.T) {
 	t.Run("Shared ロック保持者の 1 人を解放しても他の保持者のロックは維持される", func(t *testing.T) {
 		// GIVEN
 		m := NewManager()
-		pos := testPos(1, 0)
+		pos := testRowKey(1, 0)
 		_ = m.Lock(1, pos, Shared)
 		_ = m.Lock(2, pos, Shared)
 
@@ -271,7 +307,7 @@ func TestManagerRelease(t *testing.T) {
 
 		// THEN
 		m.mu.Lock()
-		state := m.lockTable[pos]
+		state := m.lockTable[newRowLockKey(pos)]
 		assert.Equal(t, Shared, state.holders[2])
 		_, hasTrx1 := state.holders[1]
 		assert.False(t, hasTrx1)
@@ -281,7 +317,7 @@ func TestManagerRelease(t *testing.T) {
 	t.Run("最後の Shared 保持者を解放すると待機中の Exclusive が付与される", func(t *testing.T) {
 		// GIVEN
 		m := NewManager()
-		pos := testPos(1, 0)
+		pos := testRowKey(1, 0)
 		_ = m.Lock(1, pos, Shared)
 		_ = m.Lock(2, pos, Shared)
 
@@ -304,7 +340,7 @@ func TestManagerRelease(t *testing.T) {
 	t.Run("解放後に待機キューの Shared ロックが連続して付与される", func(t *testing.T) {
 		// GIVEN
 		m := NewManager()
-		pos := testPos(1, 0)
+		pos := testRowKey(1, 0)
 		_ = m.Lock(1, pos, Exclusive)
 
 		var wg sync.WaitGroup
@@ -465,11 +501,15 @@ func TestManagerGrantWaitingLocks(t *testing.T) {
 	})
 }
 
-// testPos はテスト用の RecordPosition を作成する
-func testPos(pageNum page.PageNumber, slot int) btree.RecordPosition {
-	return btree.RecordPosition{
-		PageId:  page.NewId(page.FileId(1), pageNum),
-		SlotNum: slot,
+// testRowKey はテスト用の RowKey を作成する
+//   - metaPageNum: 行を含むインデックスのメタページ番号
+//   - keyVal: 行のキー (4 バイトの uint32 として埋め込まれる)
+func testRowKey(metaPageNum page.PageNumber, keyVal uint32) RowKey {
+	key := make([]byte, 4)
+	binary.BigEndian.PutUint32(key, keyVal)
+	return RowKey{
+		MetaPageId: page.NewId(page.FileId(1), metaPageNum),
+		Key:        key,
 	}
 }
 

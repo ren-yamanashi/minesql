@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/config"
 )
 
@@ -14,17 +13,17 @@ var ErrTimeout = errors.New("lock wait timeout")
 
 // Manager は行レベルロックを管理する
 type Manager struct {
-	lockTable map[btree.RecordPosition]*state  // レコード位置 → ロック状態のマップ
-	mu        sync.Mutex                       // lockTable への同時アクセスを防ぐための mutex
-	heldLocks map[TrxId][]btree.RecordPosition // トランザクションごとのロック保持レコードリスト
-	cond      *sync.Cond                       // ロックの状態変化を待ち受けるための条件変数
-	timeout   time.Duration                    // ロック取得のタイムアウト値
+	lockTable map[rowLockKey]*state  // 行ロック識別子 → ロック状態のマップ
+	mu        sync.Mutex             // lockTable への同時アクセスを防ぐための mutex
+	heldLocks map[TrxId][]rowLockKey // トランザクションごとのロック保持リスト
+	cond      *sync.Cond             // ロックの状態変化を待ち受けるための条件変数
+	timeout   time.Duration          // ロック取得のタイムアウト値
 }
 
 func NewManager() *Manager {
 	lm := &Manager{
-		lockTable: make(map[btree.RecordPosition]*state),
-		heldLocks: make(map[TrxId][]btree.RecordPosition),
+		lockTable: make(map[rowLockKey]*state),
+		heldLocks: make(map[TrxId][]rowLockKey),
 		timeout:   config.LockWaitTimeout,
 	}
 	lm.cond = sync.NewCond(&lm.mu)
@@ -34,14 +33,15 @@ func NewManager() *Manager {
 // Lock は指定した行に対してロックを取得する
 //   - 競合がなければ即座にロックを付与する
 //   - 競合がある場合は待機キューに追加し、ロックが付与されるかタイムアウトするまで待機する
-func (m *Manager) Lock(trxId TrxId, pos btree.RecordPosition, mode Mode) error {
+func (m *Manager) Lock(trxId TrxId, rowKey RowKey, mode Mode) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	state, exists := m.lockTable[pos]
+	key := newRowLockKey(rowKey)
+	state, exists := m.lockTable[key]
 	if !exists {
 		state = newState()
-		m.lockTable[pos] = state
+		m.lockTable[key] = state
 	}
 
 	// 競合がない場合 (既に適切なロックを保持している場合も含む)
@@ -51,7 +51,7 @@ func (m *Manager) Lock(trxId TrxId, pos btree.RecordPosition, mode Mode) error {
 		if !exists || held != Exclusive || mode != Shared {
 			state.holders[trxId] = mode
 		}
-		m.addHeldLock(trxId, pos)
+		m.addHeldLock(trxId, key)
 		return nil
 	}
 
@@ -72,7 +72,7 @@ func (m *Manager) Lock(trxId TrxId, pos btree.RecordPosition, mode Mode) error {
 		held, exists := state.holders[trxId]
 		isGranted := exists && (held == Exclusive || mode == Shared)
 		if isGranted {
-			m.addHeldLock(trxId, pos)
+			m.addHeldLock(trxId, key)
 			return nil
 		}
 		if timedOut {
@@ -88,8 +88,8 @@ func (m *Manager) Release(trxId TrxId) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	for _, pos := range m.heldLocks[trxId] {
-		state, exists := m.lockTable[pos]
+	for _, key := range m.heldLocks[trxId] {
+		state, exists := m.lockTable[key]
 		if !exists {
 			continue
 		}
@@ -98,7 +98,7 @@ func (m *Manager) Release(trxId TrxId) {
 
 		// 保持者が誰もいなければ削除
 		if len(state.holders) == 0 && len(state.waitQueue) == 0 {
-			delete(m.lockTable, pos)
+			delete(m.lockTable, key)
 		}
 	}
 
@@ -141,12 +141,12 @@ func (m *Manager) grantWaitingLocks(state *state) {
 	}
 }
 
-// addHeldLock は指定したトランザクションのロック保持リストにレコード位置を追加する
-func (m *Manager) addHeldLock(trxId TrxId, pos btree.RecordPosition) {
-	if slices.Contains(m.heldLocks[trxId], pos) {
+// addHeldLock は指定したトランザクションのロック保持リストに行ロック識別子を追加する
+func (m *Manager) addHeldLock(trxId TrxId, key rowLockKey) {
+	if slices.Contains(m.heldLocks[trxId], key) {
 		return
 	}
-	m.heldLocks[trxId] = append(m.heldLocks[trxId], pos)
+	m.heldLocks[trxId] = append(m.heldLocks[trxId], key)
 }
 
 // removeFromWaitQueue は待機キューから指定したトランザクションのリクエストを削除する
