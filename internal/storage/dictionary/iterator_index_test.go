@@ -14,7 +14,14 @@ func TestIndexIteratorClose(t *testing.T) {
 		im, bp := setupTestIndexMeta(t)
 		mtr := buffer.NewMtr(bp)
 		defer mtr.UnpinAll()
-		_ = im.Insert(mtr, NewIndexMetaRecord(page.FileId(1), IndexId(1), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
+		_ = im.Insert(mtr, NewIndexMetaRecord(
+			page.FileId(1),
+			IndexId(1),
+			PrimaryIndexName,
+			IndexTypePrimary,
+			1,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		))
 		iter, err := im.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 
@@ -45,8 +52,22 @@ func TestIndexIteratorNext(t *testing.T) {
 		im, bp := setupTestIndexMeta(t)
 		mtr := buffer.NewMtr(bp)
 		defer mtr.UnpinAll()
-		_ = im.Insert(mtr, NewIndexMetaRecord(page.FileId(1), IndexId(1), "PRIMARY", IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
-		_ = im.Insert(mtr, NewIndexMetaRecord(page.FileId(1), IndexId(2), "idx_name", IndexTypeNonUnique, 2, page.NewId(page.FileId(1), page.PageNumber(0))))
+		_ = im.Insert(mtr, NewIndexMetaRecord(
+			page.FileId(1),
+			IndexId(1),
+			"PRIMARY",
+			IndexTypePrimary,
+			1,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		))
+		_ = im.Insert(mtr, NewIndexMetaRecord(
+			page.FileId(1),
+			IndexId(2),
+			"idx_name",
+			IndexTypeNonUnique,
+			2,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		))
 		iter, err := im.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter.Close()

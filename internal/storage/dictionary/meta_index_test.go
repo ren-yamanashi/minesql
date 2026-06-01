@@ -29,8 +29,22 @@ func TestIndexMetaSearch(t *testing.T) {
 		im, bp := setupTestIndexMeta(t)
 		mtr := buffer.NewMtr(bp)
 		defer mtr.UnpinAll()
-		_ = im.Insert(mtr, NewIndexMetaRecord(page.FileId(1), IndexId(1), "PRIMARY", IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
-		_ = im.Insert(mtr, NewIndexMetaRecord(page.FileId(1), IndexId(2), "idx_name", IndexTypeNonUnique, 2, page.NewId(page.FileId(1), page.PageNumber(0))))
+		_ = im.Insert(mtr, NewIndexMetaRecord(
+			page.FileId(1),
+			IndexId(1),
+			"PRIMARY",
+			IndexTypePrimary,
+			1,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		))
+		_ = im.Insert(mtr, NewIndexMetaRecord(
+			page.FileId(1),
+			IndexId(2),
+			"idx_name",
+			IndexTypeNonUnique,
+			2,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		))
 
 		// THEN: インデックス名でソートされる
 		iter, err := im.Search(mtr, SearchModeStart{})
@@ -86,7 +100,14 @@ func TestIndexMetaInsert(t *testing.T) {
 		defer mtr.UnpinAll()
 
 		// WHEN
-		err := im.Insert(mtr, NewIndexMetaRecord(page.FileId(1), IndexId(1), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
+		err := im.Insert(mtr, NewIndexMetaRecord(
+			page.FileId(1),
+			IndexId(1),
+			PrimaryIndexName,
+			IndexTypePrimary,
+			1,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		))
 
 		// THEN
 		assert.NoError(t, err)
@@ -97,10 +118,24 @@ func TestIndexMetaInsert(t *testing.T) {
 		im, bp := setupTestIndexMeta(t)
 		mtr := buffer.NewMtr(bp)
 		defer mtr.UnpinAll()
-		_ = im.Insert(mtr, NewIndexMetaRecord(page.FileId(1), IndexId(1), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
+		_ = im.Insert(mtr, NewIndexMetaRecord(
+			page.FileId(1),
+			IndexId(1),
+			PrimaryIndexName,
+			IndexTypePrimary,
+			1,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		))
 
 		// WHEN
-		err := im.Insert(mtr, NewIndexMetaRecord(page.FileId(1), IndexId(2), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
+		err := im.Insert(mtr, NewIndexMetaRecord(
+			page.FileId(1),
+			IndexId(2),
+			PrimaryIndexName,
+			IndexTypePrimary,
+			1,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		))
 
 		// THEN
 		assert.ErrorIs(t, err, btree.ErrDuplicateKey)
@@ -111,10 +146,24 @@ func TestIndexMetaInsert(t *testing.T) {
 		im, bp := setupTestIndexMeta(t)
 		mtr := buffer.NewMtr(bp)
 		defer mtr.UnpinAll()
-		_ = im.Insert(mtr, NewIndexMetaRecord(page.FileId(1), IndexId(1), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
+		_ = im.Insert(mtr, NewIndexMetaRecord(
+			page.FileId(1),
+			IndexId(1),
+			PrimaryIndexName,
+			IndexTypePrimary,
+			1,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		))
 
 		// WHEN
-		err := im.Insert(mtr, NewIndexMetaRecord(page.FileId(1), IndexId(2), "idx_email", IndexTypeUnique, 1, page.NewId(page.FileId(1), page.PageNumber(0))))
+		err := im.Insert(mtr, NewIndexMetaRecord(
+			page.FileId(1),
+			IndexId(2),
+			"idx_email",
+			IndexTypeUnique,
+			1,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		))
 
 		// THEN
 		assert.NoError(t, err)

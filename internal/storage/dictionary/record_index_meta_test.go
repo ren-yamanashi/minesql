@@ -10,7 +10,14 @@ import (
 func TestIndexMetaRecordFileId(t *testing.T) {
 	t.Run("コンストラクタで指定した FileId を返す", func(t *testing.T) {
 		// GIVEN
-		ir := NewIndexMetaRecord(page.FileId(1), IndexId(10), "idx_name", IndexTypeNonUnique, 2, page.NewId(page.FileId(1), page.PageNumber(0)))
+		ir := NewIndexMetaRecord(
+			page.FileId(1),
+			IndexId(10),
+			"idx_name",
+			IndexTypeNonUnique,
+			2,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		)
 
 		// WHEN
 		got := ir.FileId()
@@ -23,7 +30,14 @@ func TestIndexMetaRecordFileId(t *testing.T) {
 func TestIndexMetaRecordIndexId(t *testing.T) {
 	t.Run("コンストラクタで指定したインデックス ID を返す", func(t *testing.T) {
 		// GIVEN
-		ir := NewIndexMetaRecord(page.FileId(1), IndexId(10), "idx_name", IndexTypeNonUnique, 2, page.NewId(page.FileId(1), page.PageNumber(0)))
+		ir := NewIndexMetaRecord(
+			page.FileId(1),
+			IndexId(10),
+			"idx_name",
+			IndexTypeNonUnique,
+			2,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		)
 
 		// WHEN
 		got := ir.IndexId()
@@ -36,7 +50,14 @@ func TestIndexMetaRecordIndexId(t *testing.T) {
 func TestIndexMetaRecordName(t *testing.T) {
 	t.Run("コンストラクタで指定したインデックス名を返す", func(t *testing.T) {
 		// GIVEN
-		ir := NewIndexMetaRecord(page.FileId(1), IndexId(10), "idx_name", IndexTypeNonUnique, 2, page.NewId(page.FileId(1), page.PageNumber(0)))
+		ir := NewIndexMetaRecord(
+			page.FileId(1),
+			IndexId(10),
+			"idx_name",
+			IndexTypeNonUnique,
+			2,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		)
 
 		// WHEN
 		got := ir.Name()
@@ -49,7 +70,14 @@ func TestIndexMetaRecordName(t *testing.T) {
 func TestIndexMetaRecordIndexType(t *testing.T) {
 	t.Run("コンストラクタで指定したインデックス種類を返す", func(t *testing.T) {
 		// GIVEN
-		ir := NewIndexMetaRecord(page.FileId(1), IndexId(10), "idx_name", IndexTypeNonUnique, 2, page.NewId(page.FileId(1), page.PageNumber(0)))
+		ir := NewIndexMetaRecord(
+			page.FileId(1),
+			IndexId(10),
+			"idx_name",
+			IndexTypeNonUnique,
+			2,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		)
 
 		// WHEN
 		got := ir.IndexType()
@@ -62,7 +90,14 @@ func TestIndexMetaRecordIndexType(t *testing.T) {
 func TestIndexMetaRecordColumnCount(t *testing.T) {
 	t.Run("コンストラクタで指定したカラム数を返す", func(t *testing.T) {
 		// GIVEN
-		ir := NewIndexMetaRecord(page.FileId(1), IndexId(10), "idx_name", IndexTypeNonUnique, 2, page.NewId(page.FileId(1), page.PageNumber(0)))
+		ir := NewIndexMetaRecord(
+			page.FileId(1),
+			IndexId(10),
+			"idx_name",
+			IndexTypeNonUnique,
+			2,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		)
 
 		// WHEN
 		got := ir.ColumnCount()
@@ -89,7 +124,14 @@ func TestIndexMetaRecordMetaPageId(t *testing.T) {
 func TestIndexMetaRecordEncode(t *testing.T) {
 	t.Run("インデックスレコードをエンコードできる", func(t *testing.T) {
 		// GIVEN
-		ir := NewIndexMetaRecord(page.FileId(1), IndexId(10), "idx_name", IndexTypeNonUnique, 2, page.NewId(page.FileId(1), page.PageNumber(0)))
+		ir := NewIndexMetaRecord(
+			page.FileId(1),
+			IndexId(10),
+			"idx_name",
+			IndexTypeNonUnique,
+			2,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		)
 
 		// WHEN
 		record := ir.Encode()
@@ -102,7 +144,14 @@ func TestIndexMetaRecordEncode(t *testing.T) {
 
 	t.Run("プライマリインデックスをエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
-		original := NewIndexMetaRecord(page.FileId(1), IndexId(1), PrimaryIndexName, IndexTypePrimary, 1, page.NewId(page.FileId(1), page.PageNumber(0)))
+		original := NewIndexMetaRecord(
+			page.FileId(1),
+			IndexId(1),
+			PrimaryIndexName,
+			IndexTypePrimary,
+			1,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		)
 
 		// WHEN
 		record := original.Encode()
@@ -120,7 +169,14 @@ func TestIndexMetaRecordEncode(t *testing.T) {
 
 	t.Run("ユニークインデックスをエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
-		original := NewIndexMetaRecord(page.FileId(2), IndexId(5), "idx_email", IndexTypeUnique, 1, page.NewId(page.FileId(2), page.PageNumber(0)))
+		original := NewIndexMetaRecord(
+			page.FileId(2),
+			IndexId(5),
+			"idx_email",
+			IndexTypeUnique,
+			1,
+			page.NewId(page.FileId(2), page.PageNumber(0)),
+		)
 
 		// WHEN
 		record := original.Encode()
@@ -137,7 +193,14 @@ func TestIndexMetaRecordEncode(t *testing.T) {
 
 	t.Run("非ユニークインデックスをエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
-		original := NewIndexMetaRecord(page.FileId(3), IndexId(20), "idx_age", IndexTypeNonUnique, 1, page.NewId(page.FileId(3), page.PageNumber(0)))
+		original := NewIndexMetaRecord(
+			page.FileId(3),
+			IndexId(20),
+			"idx_age",
+			IndexTypeNonUnique,
+			1,
+			page.NewId(page.FileId(3), page.PageNumber(0)),
+		)
 
 		// WHEN
 		record := original.Encode()
@@ -154,7 +217,14 @@ func TestIndexMetaRecordEncode(t *testing.T) {
 
 	t.Run("複合インデックスのカラム数をエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
-		original := NewIndexMetaRecord(page.FileId(1), IndexId(3), "idx_composite", IndexTypeNonUnique, 3, page.NewId(page.FileId(1), page.PageNumber(0)))
+		original := NewIndexMetaRecord(
+			page.FileId(1),
+			IndexId(3),
+			"idx_composite",
+			IndexTypeNonUnique,
+			3,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		)
 
 		// WHEN
 		record := original.Encode()
@@ -167,7 +237,14 @@ func TestIndexMetaRecordEncode(t *testing.T) {
 
 	t.Run("FileId と IndexId が 0 の場合も正しくエンコード・デコードできる", func(t *testing.T) {
 		// GIVEN
-		original := NewIndexMetaRecord(page.FileId(0), IndexId(0), "idx", IndexTypePrimary, 1, page.NewId(page.FileId(0), page.PageNumber(0)))
+		original := NewIndexMetaRecord(
+			page.FileId(0),
+			IndexId(0),
+			"idx",
+			IndexTypePrimary,
+			1,
+			page.NewId(page.FileId(0), page.PageNumber(0)),
+		)
 
 		// WHEN
 		record := original.Encode()
@@ -198,7 +275,14 @@ func TestIndexMetaRecordEncode(t *testing.T) {
 func TestDecodeIndexMetaRecord(t *testing.T) {
 	t.Run("エンコード済みレコードから FileId とインデックス ID を復元できる", func(t *testing.T) {
 		// GIVEN
-		ir := NewIndexMetaRecord(page.FileId(42), IndexId(100), "idx_test", IndexTypeUnique, 2, page.NewId(page.FileId(42), page.PageNumber(0)))
+		ir := NewIndexMetaRecord(
+			page.FileId(42),
+			IndexId(100),
+			"idx_test",
+			IndexTypeUnique,
+			2,
+			page.NewId(page.FileId(42), page.PageNumber(0)),
+		)
 		record := ir.Encode()
 
 		// WHEN
@@ -212,7 +296,14 @@ func TestDecodeIndexMetaRecord(t *testing.T) {
 
 	t.Run("エンコード済みレコードからインデックス名と種類とカラム数を復元できる", func(t *testing.T) {
 		// GIVEN
-		ir := NewIndexMetaRecord(page.FileId(1), IndexId(1), "idx_composite", IndexTypeNonUnique, 3, page.NewId(page.FileId(1), page.PageNumber(0)))
+		ir := NewIndexMetaRecord(
+			page.FileId(1),
+			IndexId(1),
+			"idx_composite",
+			IndexTypeNonUnique,
+			3,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		)
 		record := ir.Encode()
 
 		// WHEN

@@ -135,9 +135,13 @@ func TestCreateCatalog(t *testing.T) {
 		assert.NoError(t, err)
 		defer bp.Unpin(headerPageId)
 
-		nextFileId := page.FileId(binary.BigEndian.Uint32(bufPageHeader.Data().Body()[headerNextFileIdOffset : headerNextFileIdOffset+headerFieldSize]))
-		nextIndexId := IndexId(binary.BigEndian.Uint32(bufPageHeader.Data().Body()[headerNextIndexIdOffset : headerNextIndexIdOffset+headerFieldSize]))
-		undoLogFileId := page.FileId(binary.BigEndian.Uint32(bufPageHeader.Data().Body()[headerUndoLogFileIdOffset : headerUndoLogFileIdOffset+headerFieldSize]))
+		body := bufPageHeader.Data().Body()
+		nextFileIdBytes := body[headerNextFileIdOffset : headerNextFileIdOffset+headerFieldSize]
+		nextIndexIdBytes := body[headerNextIndexIdOffset : headerNextIndexIdOffset+headerFieldSize]
+		undoLogFileIdBytes := body[headerUndoLogFileIdOffset : headerUndoLogFileIdOffset+headerFieldSize]
+		nextFileId := page.FileId(binary.BigEndian.Uint32(nextFileIdBytes))
+		nextIndexId := IndexId(binary.BigEndian.Uint32(nextIndexIdBytes))
+		undoLogFileId := page.FileId(binary.BigEndian.Uint32(undoLogFileIdBytes))
 
 		assert.Equal(t, page.FileId(2), nextFileId)
 		assert.Equal(t, IndexId(1), nextIndexId)
