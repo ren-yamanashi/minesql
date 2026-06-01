@@ -176,6 +176,19 @@ func TestReadId(t *testing.T) {
 		assert.Equal(t, FileId(5), pageId.FileId())
 		assert.Equal(t, PageNumber(10), pageId.PageNumber())
 	})
+
+	t.Run("WriteAt で書き込んだ Id を復元できる", func(t *testing.T) {
+		// GIVEN
+		original := NewId(0xDEADBEEF, 0xCAFEBABE)
+		data := make([]byte, 8)
+
+		// WHEN
+		original.WriteAt(data, 0)
+		restored := ReadId(data, 0)
+
+		// THEN
+		assert.Equal(t, original, restored)
+	})
 }
 
 func TestRestoreId(t *testing.T) {
@@ -226,20 +239,5 @@ func TestRestoreId(t *testing.T) {
 		// THEN
 		assert.Error(t, err)
 		assert.Equal(t, InvalidId(), pageId)
-	})
-}
-
-func TestWriteAndReadId(t *testing.T) {
-	t.Run("WriteAt で書き込んだ Id を ReadId で復元できる", func(t *testing.T) {
-		// GIVEN
-		original := NewId(0xDEADBEEF, 0xCAFEBABE)
-		data := make([]byte, 8)
-
-		// WHEN
-		original.WriteAt(data, 0)
-		restored := ReadId(data, 0)
-
-		// THEN
-		assert.Equal(t, original, restored)
 	})
 }
