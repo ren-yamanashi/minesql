@@ -196,6 +196,53 @@ func TestRead(t *testing.T) {
 		// THEN
 		assert.Error(t, err)
 	})
+
+	t.Run("書き込んだデータを正しく読み込める", func(t *testing.T) {
+		// GIVEN
+		path := filepath.Join(t.TempDir(), "test.db")
+		hf, err := NewHeapFile(0, path)
+		assert.NoError(t, err)
+		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
+		writeData := newAlignedPage()
+		writeData[0] = 0xAA
+		writeData[page.Size-1] = 0xBB
+		assert.NoError(t, hf.Write(0, writeData))
+
+		// WHEN
+		readData := newAlignedPage()
+		err = hf.Read(0, readData)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, byte(0xAA), readData[0])
+		assert.Equal(t, byte(0xBB), readData[page.Size-1])
+	})
+
+	t.Run("複数ページに書き込んで各ページを正しく読み込める", func(t *testing.T) {
+		// GIVEN
+		path := filepath.Join(t.TempDir(), "test.db")
+		hf, err := NewHeapFile(0, path)
+		assert.NoError(t, err)
+		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
+		page0 := newAlignedPage()
+		page0[0] = 0x01
+		page1 := newAlignedPage()
+		page1[0] = 0x02
+		assert.NoError(t, hf.Write(0, page0))
+		assert.NoError(t, hf.Write(1, page1))
+
+		// WHEN
+		read0 := newAlignedPage()
+		read1 := newAlignedPage()
+		err0 := hf.Read(0, read0)
+		err1 := hf.Read(1, read1)
+
+		// THEN
+		assert.NoError(t, err0)
+		assert.NoError(t, err1)
+		assert.Equal(t, byte(0x01), read0[0])
+		assert.Equal(t, byte(0x02), read1[0])
+	})
 }
 
 func TestWrite(t *testing.T) {
@@ -279,55 +326,6 @@ func TestWrite(t *testing.T) {
 
 		// THEN
 		assert.Error(t, err)
-	})
-}
-
-func TestWriteAndRead(t *testing.T) {
-	t.Run("書き込んだデータを正しく読み込める", func(t *testing.T) {
-		// GIVEN
-		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
-		assert.NoError(t, err)
-		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
-		writeData := newAlignedPage()
-		writeData[0] = 0xAA
-		writeData[page.Size-1] = 0xBB
-		assert.NoError(t, hf.Write(0, writeData))
-
-		// WHEN
-		readData := newAlignedPage()
-		err = hf.Read(0, readData)
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, byte(0xAA), readData[0])
-		assert.Equal(t, byte(0xBB), readData[page.Size-1])
-	})
-
-	t.Run("複数ページに書き込んで各ページを正しく読み込める", func(t *testing.T) {
-		// GIVEN
-		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
-		assert.NoError(t, err)
-		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
-		page0 := newAlignedPage()
-		page0[0] = 0x01
-		page1 := newAlignedPage()
-		page1[0] = 0x02
-		assert.NoError(t, hf.Write(0, page0))
-		assert.NoError(t, hf.Write(1, page1))
-
-		// WHEN
-		read0 := newAlignedPage()
-		read1 := newAlignedPage()
-		err0 := hf.Read(0, read0)
-		err1 := hf.Read(1, read1)
-
-		// THEN
-		assert.NoError(t, err0)
-		assert.NoError(t, err1)
-		assert.Equal(t, byte(0x01), read0[0])
-		assert.Equal(t, byte(0x02), read1[0])
 	})
 }
 
