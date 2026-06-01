@@ -6,7 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIsCompatible(t *testing.T) {
+func TestStateIsCompatible(t *testing.T) {
 	t.Run("保持者がいない場合は Shared と互換性がある", func(t *testing.T) {
 		// GIVEN
 		s := newState()
@@ -103,7 +103,7 @@ func TestIsCompatible(t *testing.T) {
 	})
 }
 
-func TestCanGrant(t *testing.T) {
+func TestStateCanGrant(t *testing.T) {
 	t.Run("保持者も待機者もいない場合は Shared を付与できる", func(t *testing.T) {
 		// GIVEN
 		s := newState()
