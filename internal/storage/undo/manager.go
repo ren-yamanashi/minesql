@@ -135,7 +135,12 @@ func (m *Manager) writeToPage(mtr *buffer.Mtr, trxId lock.TrxId, record Record) 
 }
 
 // switchToNewPage は現在のページが満杯のとき、新しい Undo ページを割り当ててレコードを書き込む
-func (m *Manager) switchToNewPage(mtr *buffer.Mtr, trxId lock.TrxId, currentPage *Page, serialized []byte) (Pointer, error) {
+func (m *Manager) switchToNewPage(
+	mtr *buffer.Mtr,
+	trxId lock.TrxId,
+	currentPage *Page,
+	serialized []byte,
+) (Pointer, error) {
 	// 新しいページを先に確保し、レコードを書き込む (旧ページに何も書き込む前に)
 	newPageId, err := m.bufferPool.AllocatePageId(m.fileId)
 	if err != nil {

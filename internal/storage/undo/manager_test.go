@@ -476,7 +476,13 @@ func setupTestManager(t *testing.T) *Manager {
 
 // appendForTest は 1 回の Append を独立した mtr スコープで実行するヘルパー
 //   - Manager の Append は呼び出し側 (= access) の mtr を引き継ぐ設計のため、テストでは 1 件単位で mtr を生成 / 解放する
-func appendForTest(t *testing.T, mgr *Manager, trxId lock.TrxId, recordType RecordType, record Record) (Pointer, error) {
+func appendForTest(
+	t *testing.T,
+	mgr *Manager,
+	trxId lock.TrxId,
+	recordType RecordType,
+	record Record,
+) (Pointer, error) {
 	t.Helper()
 	mtr := buffer.NewMtr(mgr.bufferPool)
 	defer mtr.UnpinAll()

@@ -30,9 +30,9 @@ const (
 var ErrInvalidRecord = errors.New("undo: invalid record")
 
 var (
-	_ Record = (*UpdateRecord)(nil)
-	_ Record = (*InsertRecord)(nil)
-	_ Record = (*DeleteRecord)(nil)
+	_ Record = UpdateRecord{}
+	_ Record = InsertRecord{}
+	_ Record = DeleteRecord{}
 )
 
 type Record interface {

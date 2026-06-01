@@ -162,7 +162,13 @@ func TestUpdateRecordSerialize(t *testing.T) {
 
 	t.Run("大きい TrxId でシリアライズできる", func(t *testing.T) {
 		// GIVEN
-		ur := NewUpdateRecord(page.FileId(1), btree.Record{[]byte("a")}, btree.Record{[]byte("b")}, lock.TrxId(0xFFFFFFFF), NullPointer())
+		ur := NewUpdateRecord(
+			page.FileId(1),
+			btree.Record{[]byte("a")},
+			btree.Record{[]byte("b")},
+			lock.TrxId(0xFFFFFFFF),
+			NullPointer(),
+		)
 
 		// WHEN
 		buf := ur.Serialize(lock.TrxId(0xFFFFFFFE), UndoNumber(0xFFFFFFFD))
