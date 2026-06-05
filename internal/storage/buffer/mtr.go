@@ -64,13 +64,11 @@ func (m *Mtr) PageForWrite(pageId page.Id) (*Page, error) {
 	switch {
 	case idx < 0:
 		bufPage.latch.LockExclusive()
-		bufPage.modifyCount++
 	case holderMode == LatchExclusive:
 		skipLatch = true
 	case holderMode == LatchShared:
 		bufPage.latch.Unlock(LatchShared)
 		bufPage.latch.LockExclusive()
-		bufPage.modifyCount++
 		// 既存エントリを X 保持の実体エントリへ昇格させる
 		m.pinned[idx].mode = LatchExclusive
 		skipLatch = true

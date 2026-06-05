@@ -53,6 +53,7 @@ func (p *Pool) PageForWrite(pageId page.Id) (*Page, error) {
 		p.flushList.add(pageId)
 	}
 	bufPage.pinCount++
+	bufPage.modifyCount++
 	return bufPage, nil
 }
 

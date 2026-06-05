@@ -60,6 +60,65 @@ func TestRWLatchLockShared(t *testing.T) {
 	})
 }
 
+func TestRWLatchLockSharedExclusive(t *testing.T) {
+	t.Run("Shared 保持中でも SX を取得できる", func(t *testing.T) {
+		// GIVEN
+		l := NewRWLatch()
+		l.LockShared()
+
+		// WHEN
+		l.LockSharedExclusive()
+
+		// THEN
+		assert.True(t, l.sxHeld)
+		assert.Equal(t, 1, l.sharedCnt)
+		l.Unlock(LatchSharedExclusive)
+		l.Unlock(LatchShared)
+	})
+
+	t.Run("SX 同士は競合する", func(t *testing.T) {
+		// GIVEN
+		l := NewRWLatch()
+		l.LockSharedExclusive()
+		acquired := atomic.Bool{}
+
+		// WHEN
+		go func() {
+			l.LockSharedExclusive()
+			acquired.Store(true)
+		}()
+		time.Sleep(20 * time.Millisecond)
+		blockedBeforeUnlock := acquired.Load()
+		l.Unlock(LatchSharedExclusive)
+
+		// THEN
+		assert.False(t, blockedBeforeUnlock)
+		assert.Eventually(t, acquired.Load, time.Second, 5*time.Millisecond)
+		l.Unlock(LatchSharedExclusive)
+	})
+
+	t.Run("SX 保持中は Exclusive 取得がブロックされる", func(t *testing.T) {
+		// GIVEN
+		l := NewRWLatch()
+		l.LockSharedExclusive()
+		acquired := atomic.Bool{}
+
+		// WHEN
+		go func() {
+			l.LockExclusive()
+			acquired.Store(true)
+		}()
+		time.Sleep(20 * time.Millisecond)
+		blockedBeforeUnlock := acquired.Load()
+		l.Unlock(LatchSharedExclusive)
+
+		// THEN
+		assert.False(t, blockedBeforeUnlock)
+		assert.Eventually(t, acquired.Load, time.Second, 5*time.Millisecond)
+		l.Unlock(LatchExclusive)
+	})
+}
+
 func TestRWLatchLockExclusive(t *testing.T) {
 	t.Run("競合なしで即座に取得できる", func(t *testing.T) {
 		// GIVEN
@@ -127,78 +186,118 @@ func TestRWLatchLockExclusive(t *testing.T) {
 	})
 }
 
-func TestRWLatchLockSharedExclusive(t *testing.T) {
-	t.Run("Shared 保持中でも SX を取得できる", func(t *testing.T) {
+func TestRWLatchTryLockShared(t *testing.T) {
+	t.Run("競合がなければ取得して true を返す", func(t *testing.T) {
+		// GIVEN
+		l := NewRWLatch()
+
+		// WHEN
+		ok := l.TryLockShared()
+
+		// THEN
+		assert.True(t, ok)
+		assert.Equal(t, 1, l.sharedCnt)
+		l.Unlock(LatchShared)
+	})
+
+	t.Run("X 保持中は false を返し、ラッチは取得しない", func(t *testing.T) {
+		// GIVEN
+		l := NewRWLatch()
+		l.LockExclusive()
+
+		// WHEN
+		ok := l.TryLockShared()
+
+		// THEN
+		assert.False(t, ok)
+		assert.Equal(t, 0, l.sharedCnt)
+		l.Unlock(LatchExclusive)
+	})
+
+	t.Run("S 保持中の TryLockShared は並行取得できる", func(t *testing.T) {
 		// GIVEN
 		l := NewRWLatch()
 		l.LockShared()
 
 		// WHEN
-		l.LockSharedExclusive()
+		ok := l.TryLockShared()
 
 		// THEN
-		assert.True(t, l.sxHeld)
-		assert.Equal(t, 1, l.sharedCnt)
-		l.Unlock(LatchSharedExclusive)
+		assert.True(t, ok)
+		assert.Equal(t, 2, l.sharedCnt)
+		l.Unlock(LatchShared)
 		l.Unlock(LatchShared)
 	})
 
-	t.Run("SX 同士は競合する", func(t *testing.T) {
+	t.Run("待機者がいる場合は並ばず false を返す", func(t *testing.T) {
 		// GIVEN
 		l := NewRWLatch()
-		l.LockSharedExclusive()
-		acquired := atomic.Bool{}
+		l.LockShared()
+		go func() { l.LockExclusive() }() // X 待機者を 1 件作る
+		time.Sleep(20 * time.Millisecond)
 
 		// WHEN
-		go func() {
-			l.LockSharedExclusive()
-			acquired.Store(true)
-		}()
-		time.Sleep(20 * time.Millisecond)
-		blockedBeforeUnlock := acquired.Load()
-		l.Unlock(LatchSharedExclusive)
+		ok := l.TryLockShared()
 
 		// THEN
-		assert.False(t, blockedBeforeUnlock)
-		assert.Eventually(t, acquired.Load, time.Second, 5*time.Millisecond)
-		l.Unlock(LatchSharedExclusive)
+		assert.False(t, ok)
+		l.Unlock(LatchShared)
+	})
+}
+
+func TestRWLatchTryLockExclusive(t *testing.T) {
+	t.Run("競合がなければ取得して true を返す", func(t *testing.T) {
+		// GIVEN
+		l := NewRWLatch()
+
+		// WHEN
+		ok := l.TryLockExclusive()
+
+		// THEN
+		assert.True(t, ok)
+		assert.True(t, l.xHeld)
+		l.Unlock(LatchExclusive)
 	})
 
-	t.Run("SX 保持中は Exclusive 取得がブロックされる", func(t *testing.T) {
+	t.Run("S 保持中は false を返す", func(t *testing.T) {
 		// GIVEN
 		l := NewRWLatch()
-		l.LockSharedExclusive()
-		acquired := atomic.Bool{}
+		l.LockShared()
 
 		// WHEN
-		go func() {
-			l.LockExclusive()
-			acquired.Store(true)
-		}()
-		time.Sleep(20 * time.Millisecond)
-		blockedBeforeUnlock := acquired.Load()
-		l.Unlock(LatchSharedExclusive)
+		ok := l.TryLockExclusive()
 
 		// THEN
-		assert.False(t, blockedBeforeUnlock)
-		assert.Eventually(t, acquired.Load, time.Second, 5*time.Millisecond)
+		assert.False(t, ok)
+		assert.False(t, l.xHeld)
+		l.Unlock(LatchShared)
+	})
+
+	t.Run("X 保持中は false を返す", func(t *testing.T) {
+		// GIVEN
+		l := NewRWLatch()
+		l.LockExclusive()
+
+		// WHEN
+		ok := l.TryLockExclusive()
+
+		// THEN
+		assert.False(t, ok)
 		l.Unlock(LatchExclusive)
 	})
 }
 
-func TestRWLatchUnlockGrantsWaiters(t *testing.T) {
+func TestRWLatchUnlock(t *testing.T) {
 	t.Run("X 解放時に複数の待機 Shared を一括 grant する", func(t *testing.T) {
 		// GIVEN
 		l := NewRWLatch()
 		l.LockExclusive()
 		const waiters = 4
 		var wg sync.WaitGroup
-		wg.Add(waiters)
 		for range waiters {
-			go func() {
+			wg.Go(func() {
 				l.LockShared()
-				wg.Done()
-			}()
+			})
 		}
 		time.Sleep(20 * time.Millisecond)
 

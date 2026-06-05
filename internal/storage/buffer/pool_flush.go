@@ -9,9 +9,10 @@ import (
 
 // flushTask は 1 ページ分のフラッシュ対象
 type flushTask struct {
-	pageId   page.Id
-	bufPage  *Page
-	heapFile *file.HeapFile
+	pageId      page.Id
+	bufPage     *Page
+	heapFile    *file.HeapFile
+	modifyCount uint64 // 収集時点の値。Sync 後に変化していたら並行書き込み中とみなし isDirty 解除をスキップする
 }
 
 // FlushAllPages はバッファプール内のすべてのダーティーページをフラッシュする
@@ -52,7 +53,12 @@ func (p *Pool) collectAllFlushTasks() ([]flushTask, []*file.HeapFile, error) {
 			collectErr = err
 			return
 		}
-		tasks = append(tasks, flushTask{pageId: pageId, bufPage: bufPage, heapFile: hf})
+		tasks = append(tasks, flushTask{
+			pageId:      pageId,
+			bufPage:     bufPage,
+			heapFile:    hf,
+			modifyCount: bufPage.modifyCount,
+		})
 	})
 	if collectErr != nil {
 		return nil, nil, collectErr
@@ -91,7 +97,12 @@ func (p *Pool) collectOldestFlushTasks(n int) ([]flushTask, []*file.HeapFile, er
 		if err != nil {
 			return nil, nil, err
 		}
-		tasks = append(tasks, flushTask{pageId: pid, bufPage: bufPage, heapFile: hf})
+		tasks = append(tasks, flushTask{
+			pageId:      pid,
+			bufPage:     bufPage,
+			heapFile:    hf,
+			modifyCount: bufPage.modifyCount,
+		})
 		filesSet[pid.FileId()] = hf
 	}
 
@@ -111,7 +122,7 @@ func (p *Pool) runFlush(tasks []flushTask, files []*file.HeapFile) error {
 
 	var lockedTasks []flushTask
 	for _, task := range tasks {
-		if task.bufPage.latch.TryLockExclusive() {
+		if task.bufPage.latch.TryLockShared() {
 			lockedTasks = append(lockedTasks, task)
 		}
 	}
@@ -121,7 +132,7 @@ func (p *Pool) runFlush(tasks []flushTask, files []*file.HeapFile) error {
 
 	unlockAll := func() {
 		for _, t := range lockedTasks {
-			t.bufPage.latch.Unlock(LatchExclusive)
+			t.bufPage.latch.Unlock(LatchShared)
 		}
 	}
 
@@ -148,6 +159,11 @@ func (p *Pool) runFlush(tasks []flushTask, files []*file.HeapFile) error {
 	// 解放中の latch フィールド読み取りと race する
 	p.mu.Lock()
 	for _, task := range lockedTasks {
+		// ラッチ取得後に modifyCount が変化していれば、ラッチ解放後に書き込まれる予定があるため
+		// isDirty を維持し flushList に残す (次回フラッシュで再度書き出す)
+		if task.modifyCount != task.bufPage.modifyCount {
+			continue
+		}
 		task.bufPage.isDirty = false
 		p.flushList.delete(task.pageId)
 	}

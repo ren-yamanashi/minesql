@@ -405,6 +405,11 @@ func TestForEachDirtyPage(t *testing.T) {
 	})
 }
 
+const (
+	concurrentWorkers    = 4
+	concurrentIterations = 50
+)
+
 func setupHeapFile(t *testing.T, fileId page.FileId) *file.HeapFile {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.db")

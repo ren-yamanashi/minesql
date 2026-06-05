@@ -42,6 +42,17 @@ func (l *RWLatch) LockSharedExclusive() { l.lock(LatchSharedExclusive) }
 // LockExclusive は Exclusive モードでラッチを取得する
 func (l *RWLatch) LockExclusive() { l.lock(LatchExclusive) }
 
+// TryLockShared は即時に Shared ラッチの取得を試み、取得できたら true を返す
+func (l *RWLatch) TryLockShared() bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if len(l.waitQueue) > 0 || !l.isCompatible(LatchShared) {
+		return false
+	}
+	l.acquire(LatchShared)
+	return true
+}
+
 // TryLockExclusive は即時に Exclusive ラッチの取得を試み、取得できたら true を返す
 //   - 待機キューに既に他者がいる場合や保持中の他者がいる場合は false を返し並ばない
 func (l *RWLatch) TryLockExclusive() bool {

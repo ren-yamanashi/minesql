@@ -1,6 +1,7 @@
 package buffer
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -134,6 +135,160 @@ func TestFlushAllPages(t *testing.T) {
 		assert.NoError(t, err)
 		assert.True(t, bp.pages[0].isDirty, "X 保持中はフラッシュされないので isDirty のまま")
 		assert.Equal(t, 1, bp.FlushListPageCount(), "X 保持中ページは flushList に残る")
+		mtr.UnpinAll()
+	})
+
+	t.Run("Flush と Writer が並行してもデータレースを起こさない", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*4, nil)
+		hf := setupHeapFile(t, 0)
+		bp.RegisterHeapFile(0, hf)
+		pageId := page.NewId(0, 0)
+		_, err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+
+		// WHEN
+		var wg sync.WaitGroup
+		for i := range concurrentWorkers {
+			v := byte(i + 1)
+			wg.Go(func() {
+				for range concurrentIterations {
+					mtr := NewMtr(bp)
+					bufPage, err := mtr.PageForWrite(pageId)
+					if err == nil {
+						bufPage.data.Body()[0] = v
+					}
+					mtr.UnpinAll()
+				}
+			})
+		}
+		wg.Go(func() {
+			for range concurrentIterations {
+				_ = bp.FlushAllPages()
+			}
+		})
+		wg.Wait()
+
+		// THEN
+		mtr := NewMtr(bp)
+		bufPage, err := mtr.PageForRead(pageId)
+		assert.NoError(t, err)
+		assert.Equal(t, uint64(concurrentWorkers*concurrentIterations), bufPage.modifyCount)
+		mtr.UnpinAll()
+	})
+
+	t.Run("フラッシュ中の並行書き込みは次回フラッシュで永続化される (lost-update が起きない)", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*4, nil)
+		hf := setupHeapFile(t, 0)
+		bp.RegisterHeapFile(0, hf)
+		pageId := page.NewId(0, 0)
+		_, err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+
+		// WHEN
+		var wg sync.WaitGroup
+		for i := range concurrentWorkers {
+			v := byte(i + 1)
+			wg.Go(func() {
+				for range concurrentIterations {
+					mtr := NewMtr(bp)
+					bufPage, err := mtr.PageForWrite(pageId)
+					if err == nil {
+						bufPage.data.Body()[0] = v
+					}
+					mtr.UnpinAll()
+				}
+			})
+		}
+		wg.Go(func() {
+			for range concurrentIterations {
+				_ = bp.FlushAllPages()
+			}
+		})
+		wg.Wait()
+
+		// 最終フラッシュでメモリ上の最新内容を確実にディスクへ永続化する
+		err = bp.FlushAllPages()
+		assert.NoError(t, err)
+
+		// THEN
+		mtr := NewMtr(bp)
+		bufPage, err := mtr.PageForRead(pageId)
+		assert.NoError(t, err)
+		memVal := bufPage.data.Body()[0]
+		mtr.UnpinAll()
+
+		bp2 := NewPool(page.Size*2, nil)
+		bp2.RegisterHeapFile(0, hf)
+		bufPage2, err := bp2.PageForRead(pageId)
+		assert.NoError(t, err)
+		diskVal := bufPage2.data.Body()[0]
+		bp2.Unpin(pageId)
+
+		assert.Equal(t, memVal, diskVal, "メモリの最終書き込みがディスクに反映されている")
+	})
+
+	t.Run("複数ページに対する Reader/Writer/Flusher の混在ワークロードがデータレースを起こさない", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*8, nil)
+		hf := setupHeapFile(t, 0)
+		bp.RegisterHeapFile(0, hf)
+		pageIds := []page.Id{
+			page.NewId(0, 0),
+			page.NewId(0, 1),
+			page.NewId(0, 2),
+		}
+		for _, pid := range pageIds {
+			_, err := bp.AddPage(pid)
+			assert.NoError(t, err)
+		}
+
+		// WHEN
+		var wg sync.WaitGroup
+		for i := range concurrentWorkers {
+			v := byte(i + 1)
+			wg.Go(func() {
+				for j := range concurrentIterations {
+					pid := pageIds[j%len(pageIds)]
+					mtr := NewMtr(bp)
+					bufPage, err := mtr.PageForWrite(pid)
+					if err == nil {
+						bufPage.data.Body()[0] = v
+					}
+					mtr.UnpinAll()
+				}
+			})
+		}
+		for range concurrentWorkers {
+			wg.Go(func() {
+				for j := range concurrentIterations {
+					pid := pageIds[j%len(pageIds)]
+					mtr := NewMtr(bp)
+					bufPage, err := mtr.PageForRead(pid)
+					if err == nil {
+						_ = bufPage.data.Body()[0]
+					}
+					mtr.UnpinAll()
+				}
+			})
+		}
+		wg.Go(func() {
+			for range concurrentIterations {
+				_ = bp.FlushAllPages()
+			}
+		})
+		wg.Wait()
+
+		// THEN
+		var totalModifyCount uint64
+		mtr := NewMtr(bp)
+		for _, pid := range pageIds {
+			bufPage, err := mtr.PageForRead(pid)
+			assert.NoError(t, err)
+			totalModifyCount += bufPage.modifyCount
+		}
+		assert.Equal(t, uint64(concurrentWorkers*concurrentIterations), totalModifyCount)
 		mtr.UnpinAll()
 	})
 }

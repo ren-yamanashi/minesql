@@ -11,7 +11,7 @@ type Page struct {
 	isDirty     bool
 	pinCount    int
 	latch       *RWLatch
-	modifyCount uint64 // X ラッチ取得時に増加する更新カウンタ (順次走査の位置復元判定用)
+	modifyCount uint64 // 書き込みのたびに増加する更新カウンタ
 }
 
 func (p *Page) PageId() page.Id     { return p.pageId }
