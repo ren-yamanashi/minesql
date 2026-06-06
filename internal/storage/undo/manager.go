@@ -23,16 +23,17 @@ type Manager struct {
 }
 
 func NewManager(bp *buffer.Pool, redoLog *redo.Buffer, fileId page.FileId) (*Manager, error) {
-	// Undo ページを割り当て
+	mtr := buffer.NewMtr(bp)
+	defer mtr.UnpinAll()
+
 	pageId, err := bp.AllocatePageId(fileId)
 	if err != nil {
 		return nil, err
 	}
-	_, err = bp.AddPage(pageId)
-	if err != nil {
+	if _, err := bp.AddPage(pageId); err != nil {
 		return nil, err
 	}
-	bufPageUndo, err := bp.PageForWrite(pageId)
+	bufPageUndo, err := mtr.PageForWrite(pageId)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +128,7 @@ func (m *Manager) writeToPage(mtr *buffer.Mtr, trxId lock.TrxId, record Record) 
 	if !bufPageUndo.append(serialized) {
 		return Pointer{}, ErrRecordTooLarge
 	}
-	if err := m.appendRedoLog(mtr, trxId); err != nil {
+	if err := m.appendRedoLog(mtr, trxId, m.currentPageId); err != nil {
 		bufPageUndo.setUsedBytes(prevUsedBytes)
 		return Pointer{}, err
 	}
@@ -141,7 +142,6 @@ func (m *Manager) switchToNewPage(
 	currentPage *Page,
 	serialized []byte,
 ) (Pointer, error) {
-	// 新しいページを先に確保し、レコードを書き込む (旧ページに何も書き込む前に)
 	newPageId, err := m.bufferPool.AllocatePageId(m.fileId)
 	if err != nil {
 		return Pointer{}, err
@@ -158,40 +158,32 @@ func (m *Manager) switchToNewPage(
 		return Pointer{}, ErrRecordTooLarge
 	}
 
-	// 旧ページに次のページへのリンクを設定
+	if err := m.appendRedoLog(mtr, trxId, newPageId); err != nil {
+		return Pointer{}, err
+	}
+
 	prevNextPageNumber := currentPage.NextPageNumber()
 	currentPage.setNextPageNumber(newPageId.PageNumber())
-
-	// 旧ページの Redo ログを記録 (nextPageNumber の変更を反映)
-	if err := m.appendRedoLog(mtr, trxId); err != nil {
+	if err := m.appendRedoLog(mtr, trxId, m.currentPageId); err != nil {
 		currentPage.setNextPageNumber(prevNextPageNumber)
 		return Pointer{}, err
 	}
 
-	// currentPageId を新ページに切り替えて新ページの Redo を記録
-	prevCurrentPageId := m.currentPageId
 	m.currentPageId = newPageId
-	if err := m.appendRedoLog(mtr, trxId); err != nil {
-		m.currentPageId = prevCurrentPageId
-		currentPage.setNextPageNumber(prevNextPageNumber)
-		newBufPageUndo.setUsedBytes(0)
-		return Pointer{}, err
-	}
-
 	return NewPointer(newPageId.PageNumber(), 0), nil
 }
 
-// appendRedoLog は現在の Undo ページの Redo ログを記録する
-//   - 呼び出し側が currentPageId に対して既に X latch を取得済みであることを前提とする
-func (m *Manager) appendRedoLog(mtr *buffer.Mtr, trxId lock.TrxId) error {
+// appendRedoLog は指定された Undo ページの Redo ログを記録する
+//   - 呼び出し側が pageId に対して既に X latch を取得済みであることを前提とする
+func (m *Manager) appendRedoLog(mtr *buffer.Mtr, trxId lock.TrxId, pageId page.Id) error {
 	if m.redoLog == nil {
 		return nil
 	}
-	pageUndo, err := mtr.PageForRead(m.currentPageId)
+	pageUndo, err := mtr.PageForRead(pageId)
 	if err != nil {
 		return err
 	}
-	if _, err := m.redoLog.AppendPageCopy(trxId, m.currentPageId, pageUndo.Data()); err != nil {
+	if _, err := m.redoLog.AppendPageCopy(trxId, pageId, pageUndo.Data()); err != nil {
 		return err
 	}
 	return nil

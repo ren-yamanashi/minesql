@@ -82,11 +82,13 @@ func (r *Recovery) applyRedoLog(records []redo.Record) error {
 
 // applyPageWrite は 1 件のページ変更レコードを適用する
 func (r *Recovery) applyPageWrite(rec redo.Record) error {
-	writePage, err := r.bufferPool.PageForWrite(rec.PageId())
+	mtr := buffer.NewMtr(r.bufferPool)
+	defer mtr.UnpinAll()
+
+	writePage, err := mtr.PageForWrite(rec.PageId())
 	if err != nil {
 		return err
 	}
-	defer r.bufferPool.Unpin(rec.PageId())
 	currentLsn := redo.Lsn(binary.BigEndian.Uint32(writePage.Data().Header()))
 	if currentLsn >= rec.Lsn() {
 		return nil
@@ -139,45 +141,53 @@ func (r *Recovery) collectUndoRecords(trxId lock.TrxId) ([]undo.Record, error) {
 	var records []undo.Record
 	for {
 		pageId := page.NewId(r.undoFileId, pageNum)
-		readPage, readErr := r.bufferPool.PageForRead(pageId)
-		if readErr != nil {
-			// Undo ページチェーンの終端に達した場合は正常終了
-			// PageForRead はページが存在しない場合もエラーを返すため、先頭ページの読み取り失敗はチェーンが空であることを意味する
-			break
+		nextPageNum, ok, err := r.collectFromUndoPage(pageId, trxId, &records)
+		if err != nil {
+			return nil, err
 		}
-
-		undoPage := undo.NewPage(*readPage.Data())
-		offset := 0
-		for offset < int(undoPage.UsedBytes()) {
-			recordBytes := undoPage.Record(offset)
-			if recordBytes == nil {
-				break
-			}
-
-			fields, deserializeErr := undo.DeserializeFields(recordBytes)
-			if deserializeErr != nil {
-				r.bufferPool.Unpin(pageId)
-				return nil, deserializeErr
-			}
-
-			if fields.TrxId() == trxId {
-				record, toRecordErr := fields.ToRecord()
-				if toRecordErr != nil {
-					r.bufferPool.Unpin(pageId)
-					return nil, toRecordErr
-				}
-				records = append(records, record)
-			}
-			offset += len(recordBytes)
-		}
-
-		nextPageNum := undoPage.NextPageNumber()
-		r.bufferPool.Unpin(pageId)
-		if nextPageNum == 0 {
+		if !ok || nextPageNum == 0 {
 			break
 		}
 		pageNum = nextPageNum
 	}
+	return records, nil
+}
 
-	return records, nil //nolint:nilerr // readErr はページ未存在を示し、チェーン終端として正常扱い
+// collectFromUndoPage は 1 つの Undo ページから指定トランザクションのレコードを抽出し、次ページ番号を返す
+//   - ok=false: ページが存在せずチェーン終端に達したことを示す
+func (r *Recovery) collectFromUndoPage(
+	pageId page.Id,
+	trxId lock.TrxId,
+	records *[]undo.Record,
+) (page.PageNumber, bool, error) {
+	mtr := buffer.NewMtr(r.bufferPool)
+	defer mtr.UnpinAll()
+
+	readPage, err := mtr.PageForRead(pageId)
+	if err != nil {
+		return 0, false, nil
+	}
+
+	undoPage := undo.NewPage(*readPage.Data())
+	offset := 0
+	for offset < int(undoPage.UsedBytes()) {
+		recordBytes := undoPage.Record(offset)
+		if recordBytes == nil {
+			break
+		}
+		fields, err := undo.DeserializeFields(recordBytes)
+		if err != nil {
+			return 0, false, err
+		}
+		offset += len(recordBytes)
+		if fields.TrxId() != trxId {
+			continue
+		}
+		record, err := fields.ToRecord()
+		if err != nil {
+			return 0, false, err
+		}
+		*records = append(*records, record)
+	}
+	return undoPage.NextPageNumber(), true, nil
 }
