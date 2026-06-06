@@ -3,6 +3,7 @@ package undo
 import (
 	"encoding/binary"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
@@ -13,22 +14,25 @@ const (
 )
 
 type Page struct {
-	header []byte
-	body   []byte
+	// header / body は bufPage.Data().Body() への読み取りビュー (書き込みは bufPage の API 経由で行う必要がある)
+	header  []byte
+	body    []byte
+	bufPage *buffer.Page
 }
 
 // NewPage は既存の Undo ページを開く
-func NewPage(pg page.Page) *Page {
-	body := pg.Body()
+func NewPage(bufPage *buffer.Page) *Page {
+	body := bufPage.Data().Body()
 	return &Page{
-		header: body[:pageHeaderSize],
-		body:   body[pageHeaderSize:],
+		header:  body[:pageHeaderSize],
+		body:    body[pageHeaderSize:],
+		bufPage: bufPage,
 	}
 }
 
 // CreatePage は新規 Undo ページを作成する
-func CreatePage(pg page.Page) *Page {
-	p := NewPage(pg)
+func CreatePage(bufPage *buffer.Page) *Page {
+	p := NewPage(bufPage)
 	p.initialize()
 	return p
 }
@@ -66,8 +70,10 @@ func (p *Page) FreeSpace() int {
 
 // initialize は Undo ページを初期化する
 func (p *Page) initialize() {
-	binary.BigEndian.PutUint16(p.header[headerUsedBytesOffset:headerNextPageNumberOffset], 0) // usedBytes
-	binary.BigEndian.PutUint32(p.header[headerNextPageNumberOffset:pageHeaderSize], 0)        // nextPageNumber
+	var buf [pageHeaderSize]byte
+	binary.BigEndian.PutUint16(buf[headerUsedBytesOffset:headerNextPageNumberOffset], 0)
+	binary.BigEndian.PutUint32(buf[headerNextPageNumberOffset:pageHeaderSize], 0)
+	p.bufPage.WriteBodyAt(0, buf[:])
 }
 
 // append は Undo レコードをボディに追加する
@@ -78,17 +84,21 @@ func (p *Page) append(record []byte) bool {
 	if used+len(record) > len(p.body) {
 		return false
 	}
-	copy(p.body[used:], record)
-	binary.BigEndian.PutUint16(p.header[headerUsedBytesOffset:headerNextPageNumberOffset], uint16(used+len(record)))
+	p.bufPage.WriteBodyAt(pageHeaderSize+used, record)
+	p.setUsedBytes(uint16(used + len(record)))
 	return true
 }
 
 // setNextPageNumber は次の UNDO ページの PageNumber を設定する
 func (p *Page) setNextPageNumber(pn page.PageNumber) {
-	binary.BigEndian.PutUint32(p.header[headerNextPageNumberOffset:pageHeaderSize], uint32(pn))
+	var buf [4]byte
+	binary.BigEndian.PutUint32(buf[:], uint32(pn))
+	p.bufPage.WriteBodyAt(headerNextPageNumberOffset, buf[:])
 }
 
 // setUsedBytes は使用済みバイト数を設定する
 func (p *Page) setUsedBytes(n uint16) {
-	binary.BigEndian.PutUint16(p.header[headerUsedBytesOffset:headerNextPageNumberOffset], n)
+	var buf [2]byte
+	binary.BigEndian.PutUint16(buf[:], n)
+	p.bufPage.WriteBodyAt(headerUsedBytesOffset, buf[:])
 }

@@ -40,7 +40,7 @@ func NewManager(bp *buffer.Pool, redoLog *redo.Buffer, fileId page.FileId) (*Man
 	if err != nil {
 		return nil, err
 	}
-	CreatePage(*bufPageUndo.Data())
+	CreatePage(bufPageUndo)
 
 	return &Manager{
 		bufferPool:    bp,
@@ -90,7 +90,7 @@ func (m *Manager) LookupByPointer(mtr *buffer.Mtr, ptr Pointer) (Record, error) 
 	if err != nil {
 		return nil, err
 	}
-	undoPage := NewPage(*pageUndo.Data())
+	undoPage := NewPage(pageUndo)
 
 	recordBytes := undoPage.Record(int(ptr.offset))
 	if recordBytes == nil {
@@ -145,7 +145,7 @@ func (m *Manager) writeToPage(mtr *buffer.Mtr, trxId lock.TrxId, record Record) 
 	if err != nil {
 		return Pointer{}, err
 	}
-	bufPageUndo := NewPage(*pageUndo.Data())
+	bufPageUndo := NewPage(pageUndo)
 
 	// ページが満杯の場合は新しいページに切り替える (switchToNewPage 内で Redo 記録まで完了)
 	if bufPageUndo.FreeSpace() < len(serialized) {
@@ -181,7 +181,7 @@ func (m *Manager) switchToNewPage(
 	if err != nil {
 		return Pointer{}, err
 	}
-	newBufPageUndo := CreatePage(*pageNewUndo.Data())
+	newBufPageUndo := CreatePage(pageNewUndo)
 	if !newBufPageUndo.append(serialized) {
 		return Pointer{}, ErrRecordTooLarge
 	}

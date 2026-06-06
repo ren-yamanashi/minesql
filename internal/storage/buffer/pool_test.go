@@ -36,8 +36,8 @@ func TestNewPool(t *testing.T) {
 	})
 }
 
-func TestPageForWrite(t *testing.T) {
-	t.Run("取得したページがダーティーになる", func(t *testing.T) {
+func TestPage(t *testing.T) {
+	t.Run("取得した直後はダーティーにならない", func(t *testing.T) {
 		// GIVEN
 		bp := NewPool(page.Size*2, nil)
 		pageId := page.NewId(0, 0)
@@ -45,67 +45,13 @@ func TestPageForWrite(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		_, err = bp.PageForWrite(pageId)
+		bufPage, err := bp.Page(pageId)
 
 		// THEN
 		assert.NoError(t, err)
-		bufPage, err := bp.PageForRead(pageId)
-		assert.NoError(t, err)
-		assert.True(t, bufPage.isDirty)
+		assert.False(t, bufPage.isDirty)
 	})
 
-	t.Run("既にダーティーなページを再取得してもフラッシュリストに重複追加されない", func(t *testing.T) {
-		// GIVEN
-		bp := NewPool(page.Size*2, nil)
-		pageId := page.NewId(0, 0)
-		_, err := bp.AddPage(pageId)
-		assert.NoError(t, err)
-		_, err = bp.PageForWrite(pageId)
-		assert.NoError(t, err)
-
-		// WHEN
-		_, err = bp.PageForWrite(pageId)
-		assert.NoError(t, err)
-
-		// THEN
-		assert.Equal(t, 1, bp.flushList.pageCount)
-	})
-
-	t.Run("書き込んだデータがフェッチ時に反映されている", func(t *testing.T) {
-		// GIVEN
-		bp := NewPool(page.Size*2, nil)
-		pageId := page.NewId(0, 0)
-		_, err := bp.AddPage(pageId)
-		assert.NoError(t, err)
-
-		// WHEN
-		p, err := bp.PageForWrite(pageId)
-		assert.NoError(t, err)
-		p.data.Body()[0] = 0xAA
-
-		// THEN
-		fetched, err := bp.PageForRead(pageId)
-		assert.NoError(t, err)
-		assert.Equal(t, byte(0xAA), fetched.data.Body()[0])
-	})
-
-	t.Run("呼び出すと pinCount がインクリメントされる", func(t *testing.T) {
-		// GIVEN
-		bp := NewPool(page.Size*2, nil)
-		pageId := page.NewId(0, 0)
-		_, err := bp.AddPage(pageId)
-		assert.NoError(t, err)
-
-		// WHEN
-		bufPage, err := bp.PageForWrite(pageId)
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, 1, bufPage.pinCount)
-	})
-}
-
-func TestPageForRead(t *testing.T) {
 	t.Run("キャッシュ済みのページを取得できる", func(t *testing.T) {
 		// GIVEN
 		bp := NewPool(page.Size*2, nil)
@@ -114,7 +60,7 @@ func TestPageForRead(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bufPage, err := bp.PageForRead(pageId)
+		bufPage, err := bp.Page(pageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -130,7 +76,7 @@ func TestPageForRead(t *testing.T) {
 
 		// WHEN
 		pageId := page.NewId(0, 0)
-		bufPage, err := bp.PageForRead(pageId)
+		bufPage, err := bp.Page(pageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -143,12 +89,12 @@ func TestPageForRead(t *testing.T) {
 		pageId := page.NewId(0, 0)
 		addedPage, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
-		addedPage.data.Body()[0] = 0x42
+		addedPage.WriteBodyAt(0, []byte{0x42})
 
 		// WHEN
-		bufPage1, err := bp.PageForRead(pageId)
+		bufPage1, err := bp.Page(pageId)
 		assert.NoError(t, err)
-		bufPage2, err := bp.PageForRead(pageId)
+		bufPage2, err := bp.Page(pageId)
 		assert.NoError(t, err)
 
 		// THEN
@@ -164,11 +110,28 @@ func TestPageForRead(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		bufPage, err := bp.PageForRead(pageId)
+		bufPage, err := bp.Page(pageId)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, 1, bufPage.pinCount)
+	})
+
+	t.Run("MarkModified を複数回呼んでもフラッシュリストに重複追加されない", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*2, nil)
+		pageId := page.NewId(0, 0)
+		_, err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+		p, err := bp.Page(pageId)
+		assert.NoError(t, err)
+
+		// WHEN
+		p.MarkModified()
+		p.MarkModified()
+
+		// THEN
+		assert.Equal(t, 1, bp.flushList.pageCount)
 	})
 }
 
@@ -179,7 +142,7 @@ func TestUnpin(t *testing.T) {
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
-		bufPage, err := bp.PageForRead(pageId)
+		bufPage, err := bp.Page(pageId)
 		assert.NoError(t, err)
 		assert.Equal(t, 1, bufPage.pinCount)
 
@@ -197,9 +160,9 @@ func TestUnpin(t *testing.T) {
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
-		_, err = bp.PageForRead(pageId)
+		_, err = bp.Page(pageId)
 		assert.NoError(t, err)
-		_, err = bp.PageForRead(pageId)
+		_, err = bp.Page(pageId)
 		assert.NoError(t, err)
 		bufId, _ := bp.pageTable.bufferId(pageId)
 		assert.Equal(t, 2, bp.pages[bufId].pinCount)
@@ -319,10 +282,12 @@ func TestFlushListPageCount(t *testing.T) {
 		assert.NoError(t, err)
 		_, err = bp.AddPage(page.NewId(0, 1))
 		assert.NoError(t, err)
-		_, err = bp.PageForWrite(page.NewId(0, 0))
+		p0, err := bp.Page(page.NewId(0, 0))
 		assert.NoError(t, err)
-		_, err = bp.PageForWrite(page.NewId(0, 1))
+		p0.MarkModified()
+		p1, err := bp.Page(page.NewId(0, 1))
 		assert.NoError(t, err)
+		p1.MarkModified()
 
 		// WHEN
 		size := bp.FlushListPageCount()
@@ -353,10 +318,12 @@ func TestForEachDirtyPage(t *testing.T) {
 		id1 := page.NewId(0, 1)
 		_, _ = bp.AddPage(id0)
 		_, _ = bp.AddPage(id1)
-		p0, _ := bp.PageForWrite(id0)
+		p0, _ := bp.Page(id0)
 		p0.data.Body()[0] = 0xAA
-		p1, _ := bp.PageForWrite(id1)
+		p0.MarkModified()
+		p1, _ := bp.Page(id1)
 		p1.data.Body()[0] = 0xBB
+		p1.MarkModified()
 
 		// WHEN
 		var pages []*page.Page
@@ -389,9 +356,10 @@ func TestForEachDirtyPage(t *testing.T) {
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
 		_, _ = bp.AddPage(pageId)
-		p, _ := bp.PageForWrite(pageId)
+		p, _ := bp.Page(pageId)
 		p.data.Header()[0] = 0x12
 		p.data.Header()[1] = 0x34
+		p.MarkModified()
 
 		// WHEN
 		var header []byte

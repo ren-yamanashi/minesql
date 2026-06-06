@@ -202,6 +202,22 @@ func TestWriteBodyAt(t *testing.T) {
 			bp.WriteBodyAt(0, oversized)
 		})
 	})
+
+	t.Run("書き込んだ内容が Pool 経由で再フェッチしても反映されている", func(t *testing.T) {
+		// GIVEN
+		pool := NewPool(page.Size, nil)
+		pageId := page.NewId(0, 0)
+		bp, err := pool.AddPage(pageId)
+		assert.NoError(t, err)
+		bp.WriteBodyAt(0, []byte{0xAA})
+
+		// WHEN
+		fetched, err := pool.Page(pageId)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, byte(0xAA), fetched.data.Body()[0])
+	})
 }
 
 func TestNewPage(t *testing.T) {

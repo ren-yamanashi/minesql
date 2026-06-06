@@ -148,34 +148,21 @@ func CreateCatalog(bp *buffer.Pool) (*Catalog, error) {
 	undoLogFileId := nextFileId  // Undo ログ用の FileId を採番
 	nextFileId++
 
-	copy(bufPageHeader.Data().Body()[headerMagicNumberOffset:], catalogMagicNumber)
+	bufPageHeader.WriteBodyAt(headerMagicNumberOffset, catalogMagicNumber)
+	writePageNumber(bufPageHeader, headerTableMetaOffset, tableMeta.tree.MetaPageId().PageNumber())
+	writePageNumber(bufPageHeader, headerIndexMetaOffset, indexMeta.tree.MetaPageId().PageNumber())
 	writePageNumber(
-		bufPageHeader.Data().Body(), headerTableMetaOffset,
-		tableMeta.tree.MetaPageId().PageNumber(),
-	)
-	writePageNumber(
-		bufPageHeader.Data().Body(), headerIndexMetaOffset,
-		indexMeta.tree.MetaPageId().PageNumber(),
-	)
-	writePageNumber(
-		bufPageHeader.Data().Body(), headerIndexKeyColumnMetaOffset,
+		bufPageHeader, headerIndexKeyColumnMetaOffset,
 		indexKeyColumnMeta.tree.MetaPageId().PageNumber(),
 	)
+	writePageNumber(bufPageHeader, headerColumnMetaOffset, columnMeta.tree.MetaPageId().PageNumber())
 	writePageNumber(
-		bufPageHeader.Data().Body(), headerColumnMetaOffset,
-		columnMeta.tree.MetaPageId().PageNumber(),
+		bufPageHeader, headerConstraintMetaOffset, constraintMeta.tree.MetaPageId().PageNumber(),
 	)
-	writePageNumber(
-		bufPageHeader.Data().Body(), headerConstraintMetaOffset,
-		constraintMeta.tree.MetaPageId().PageNumber(),
-	)
-	writePageNumber(
-		bufPageHeader.Data().Body(), headerUserMetaOffset,
-		userMeta.tree.MetaPageId().PageNumber(),
-	)
-	writeScalar(bufPageHeader.Data().Body(), headerNextFileIdOffset, uint32(nextFileId))
-	writeScalar(bufPageHeader.Data().Body(), headerNextIndexIdOffset, uint32(nextIndexId))
-	writeScalar(bufPageHeader.Data().Body(), headerUndoLogFileIdOffset, uint32(undoLogFileId))
+	writePageNumber(bufPageHeader, headerUserMetaOffset, userMeta.tree.MetaPageId().PageNumber())
+	writeScalar(bufPageHeader, headerNextFileIdOffset, uint32(nextFileId))
+	writeScalar(bufPageHeader, headerNextIndexIdOffset, uint32(nextIndexId))
+	writeScalar(bufPageHeader, headerUndoLogFileIdOffset, uint32(undoLogFileId))
 
 	return &Catalog{
 		bufferPool:         bp,
@@ -223,13 +210,15 @@ func (c *Catalog) persistScalar(offset int, value uint32) error {
 	if err != nil {
 		return err
 	}
-	writeScalar(bufPageHeader.Data().Body(), offset, value)
+	writeScalar(bufPageHeader, offset, value)
 	return nil
 }
 
 // writeScalar はヘッダーページの指定オフセットに uint32 値を書き込む
-func writeScalar(body []byte, offset int, value uint32) {
-	binary.BigEndian.PutUint32(body[offset:offset+headerFieldSize], value)
+func writeScalar(bp *buffer.Page, offset int, value uint32) {
+	buf := make([]byte, headerFieldSize)
+	binary.BigEndian.PutUint32(buf, value)
+	bp.WriteBodyAt(offset, buf)
 }
 
 // readPageNumber はヘッダーページの指定オフセットから PageNumber を読み取る
@@ -238,6 +227,6 @@ func readPageNumber(body []byte, offset int) page.PageNumber {
 }
 
 // writePageNumber はヘッダーページの指定オフセットに PageNumber を書き込む
-func writePageNumber(body []byte, offset int, pn page.PageNumber) {
-	binary.BigEndian.PutUint32(body[offset:offset+headerFieldSize], uint32(pn))
+func writePageNumber(bp *buffer.Page, offset int, pn page.PageNumber) {
+	writeScalar(bp, offset, uint32(pn))
 }
