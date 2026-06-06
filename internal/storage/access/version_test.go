@@ -19,7 +19,7 @@ func TestResolvePrevVersion(t *testing.T) {
 		record := newTestPrimaryRecord(t, env.iter, "1", "Alice", "a@example.com", lock.TrxId(10), undo.NullPointer())
 
 		// WHEN
-		prev, err := resolvePrevVersion(env.mtr(), env.undoLog, env.iter.ct, env.iter.bp, page.FileId(2), record)
+		prev, err := env.resolve(record)
 
 		// THEN
 		assert.NoError(t, err)
@@ -35,7 +35,7 @@ func TestResolvePrevVersion(t *testing.T) {
 		current.setRollPtr(ptr)
 
 		// WHEN
-		prev, err := resolvePrevVersion(env.mtr(), env.undoLog, env.iter.ct, env.iter.bp, page.FileId(2), current)
+		prev, err := env.resolve(current)
 
 		// THEN
 		assert.NoError(t, err)
@@ -54,7 +54,7 @@ func TestResolvePrevVersion(t *testing.T) {
 		newRecord.setRollPtr(ptr)
 
 		// WHEN
-		prev, err := resolvePrevVersion(env.mtr(), env.undoLog, env.iter.ct, env.iter.bp, page.FileId(2), newRecord)
+		prev, err := env.resolve(newRecord)
 
 		// THEN
 		assert.NoError(t, err)
@@ -78,7 +78,7 @@ func TestResolvePrevVersion(t *testing.T) {
 		deletedRecord.setRollPtr(ptr)
 
 		// WHEN
-		prev, err := resolvePrevVersion(env.mtr(), env.undoLog, env.iter.ct, env.iter.bp, page.FileId(2), deletedRecord)
+		prev, err := env.resolve(deletedRecord)
 
 		// THEN
 		assert.NoError(t, err)
@@ -111,21 +111,21 @@ func TestResolvePrevVersion(t *testing.T) {
 		v3.setRollPtr(ptrUpdate2)
 
 		// WHEN: 1 段遡る
-		prev1, err := resolvePrevVersion(env.mtr(), env.undoLog, env.iter.ct, env.iter.bp, page.FileId(2), v3)
+		prev1, err := env.resolve(v3)
 		assert.NoError(t, err)
 		assert.NotNil(t, prev1)
 		assert.Equal(t, []string{"1", "v2", "a@example.com"}, prev1.values)
 		assert.Equal(t, lock.TrxId(2), prev1.lastTrxId)
 
 		// WHEN: もう 1 段遡る
-		prev2, err := resolvePrevVersion(env.mtr(), env.undoLog, env.iter.ct, env.iter.bp, page.FileId(2), prev1)
+		prev2, err := env.resolve(prev1)
 		assert.NoError(t, err)
 		assert.NotNil(t, prev2)
 		assert.Equal(t, []string{"1", "v1", "a@example.com"}, prev2.values)
 		assert.Equal(t, lock.TrxId(1), prev2.lastTrxId)
 
 		// WHEN: もう 1 段遡ると終端
-		prev3, err := resolvePrevVersion(env.mtr(), env.undoLog, env.iter.ct, env.iter.bp, page.FileId(2), prev2)
+		prev3, err := env.resolve(prev2)
 
 		// THEN
 		assert.NoError(t, err)
@@ -141,6 +141,17 @@ type versionTestEnv struct {
 
 func (e *versionTestEnv) mtr() *buffer.Mtr {
 	return buffer.NewMtr(e.iter.bp)
+}
+
+func (e *versionTestEnv) resolve(record *PrimaryRecord) (*PrimaryRecord, error) {
+	return resolvePrevVersion(resolvePrevVersionInput{
+		mtr:        e.mtr(),
+		undoLog:    e.undoLog,
+		catalog:    e.iter.ct,
+		bufferPool: e.iter.bp,
+		fileId:     page.FileId(2),
+		record:     record,
+	})
 }
 
 // setupVersionTestEnv は version テスト用の環境を構築する
