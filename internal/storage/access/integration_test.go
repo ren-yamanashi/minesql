@@ -110,7 +110,7 @@ func TestIntegrationCommit(t *testing.T) {
 		assert.NoError(t, err)
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -139,7 +139,7 @@ func TestIntegrationRollback(t *testing.T) {
 		assert.NoError(t, err)
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -206,7 +206,7 @@ func TestIntegrationMultipleTransactions(t *testing.T) {
 		// THEN
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 
 		r1, ok, err := iter.Next()
@@ -272,7 +272,7 @@ func TestIntegrationCrashRecovery(t *testing.T) {
 		assert.NoError(t, err)
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -414,7 +414,7 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 		assert.NoError(t, err)
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		defer iter.Close()
 		count := 0
@@ -477,7 +477,7 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 			table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
 			for range 10 {
 				mtr := buffer.NewMtr(env.bp)
-				iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
+				iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 				if err != nil {
 					mtr.UnpinAll()
 					continue
@@ -498,7 +498,7 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		defer iter.Close()
 		count := 0
@@ -575,7 +575,7 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		defer iter.Close()
 		count := 0
@@ -596,7 +596,7 @@ func findRecordByPk(t *testing.T, env *integrationEnv, table *Table, pk string) 
 	t.Helper()
 	mtr := buffer.NewMtr(env.bp)
 	defer mtr.UnpinAll()
-	iter, err := table.primaryIndex.search(mtr, SearchModeKey{Key: [][]byte{[]byte(pk)}})
+	iter, err := table.primaryIndex.search(mtr, SearchModeKey{Key: [][]byte{[]byte(pk)}}, nil)
 	if err != nil {
 		return nil
 	}
