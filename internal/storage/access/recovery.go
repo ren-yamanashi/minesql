@@ -93,9 +93,7 @@ func (r *Recovery) applyPageWrite(rec redo.Record) error {
 	if currentLsn >= rec.Lsn() {
 		return nil
 	}
-	recData := rec.Data()
-	copy(writePage.Data().Bytes(), recData.Bytes())
-	writePage.MarkModified()
+	writePage.OverwritePage(rec.Data().Bytes())
 	return nil
 }
 

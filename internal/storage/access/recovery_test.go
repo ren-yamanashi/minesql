@@ -187,16 +187,13 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 
 		// ページを取得して、Page LSN に大きな値を書き込む
 		pgId := page.NewId(env.undoFileId, 0)
-		writePage, err := env.bp.PageForWrite(pgId)
+		writePage, err := env.bp.Page(pgId)
 		assert.NoError(t, err)
 		originalData := make([]byte, page.Size)
 		copy(originalData, writePage.Data().Bytes())
 
 		// Redo レコードの LSN=1、Page LSN=10 → スキップされるはず
-		writePage.Data().Header()[0] = 0
-		writePage.Data().Header()[1] = 0
-		writePage.Data().Header()[2] = 0
-		writePage.Data().Header()[3] = 10 // Page LSN = 10
+		writePage.WriteHeaderAt(0, []byte{0, 0, 0, 10})
 
 		// LSN=1 のページ変更レコードを mtr 境界で囲んで Redo ログに記録
 		newPageData := make([]byte, page.Size)
@@ -215,7 +212,7 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		// ページが上書きされていないことを確認 (body の先頭は 0xFF ではない)
-		readPage, _ := env.bp.PageForRead(pgId)
+		readPage, _ := env.bp.Page(pgId)
 		assert.NotEqual(t, byte(0xFF), readPage.Data().Body()[0])
 	})
 
@@ -240,7 +237,7 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		readPage, _ := env.bp.PageForRead(pgId)
+		readPage, _ := env.bp.Page(pgId)
 		assert.Equal(t, byte(0xAA), readPage.Data().Body()[0])
 	})
 
@@ -264,7 +261,7 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		readPage, _ := env.bp.PageForRead(pgId)
+		readPage, _ := env.bp.Page(pgId)
 		assert.NotEqual(t, byte(0xBB), readPage.Data().Body()[0])
 	})
 
@@ -286,7 +283,7 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		readPage, _ := env.bp.PageForRead(pgId)
+		readPage, _ := env.bp.Page(pgId)
 		assert.NotEqual(t, byte(0xCC), readPage.Data().Body()[0])
 	})
 
@@ -318,9 +315,9 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		completePage, _ := env.bp.PageForRead(completePgId)
+		completePage, _ := env.bp.Page(completePgId)
 		assert.Equal(t, byte(0xAA), completePage.Data().Body()[0])
-		incompletePage, _ := env.bp.PageForRead(incompletePgId)
+		incompletePage, _ := env.bp.Page(incompletePgId)
 		assert.NotEqual(t, byte(0xBB), incompletePage.Data().Body()[0])
 	})
 }
@@ -348,7 +345,7 @@ func TestRecoveryApplyRollback(t *testing.T) {
 
 		// trx1 は COMMIT 済み (Commit 内で Redo ログに記録される)、trx2 は未 COMMIT
 		pgId := page.NewId(env.undoFileId, 0)
-		readPage, _ := env.bp.PageForRead(pgId)
+		readPage, _ := env.bp.Page(pgId)
 		_, _ = env.redoLog.AppendPageCopy(trx2, pgId, readPage.Data())
 		_ = env.redoLog.Flush()
 

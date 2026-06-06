@@ -414,7 +414,7 @@ func allocateTestPage(t *testing.T, bp *buffer.Pool) (page.Id, *buffer.Page) {
 // initTestLeafNode はテスト用の初期化済みリーフノードを作成する
 func initTestLeafNode(t *testing.T, bp *buffer.Pool, pageId page.Id) *leafNode {
 	t.Helper()
-	pg, err := bp.PageForWrite(pageId)
+	pg, err := bp.Page(pageId)
 	assert.NoError(t, err)
 	leaf := newLeafNode(pg)
 	leaf.initialize()
@@ -430,7 +430,7 @@ func initTestBranchNode(
 	leftChild, rightChild page.Id,
 ) *branchNode {
 	t.Helper()
-	pg, err := bp.PageForWrite(pageId)
+	pg, err := bp.Page(pageId)
 	assert.NoError(t, err)
 	branch := newBranchNode(pg)
 	err = branch.initialize(key, leftChild, rightChild)

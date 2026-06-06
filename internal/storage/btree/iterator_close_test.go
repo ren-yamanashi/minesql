@@ -12,7 +12,7 @@ func TestIteratorClose(t *testing.T) {
 		tree, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
-		bufPage, _ := tree.bufferPool.PageForRead(pageId)
+		bufPage, _ := tree.bufferPool.Page(pageId)
 		iter := NewIterator(tree, bufPage, 0)
 
 		// WHEN
@@ -31,7 +31,7 @@ func TestIteratorClose(t *testing.T) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 			ln.insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
 		})
-		bufPage, _ := tree.bufferPool.PageForRead(pageId)
+		bufPage, _ := tree.bufferPool.Page(pageId)
 		iter := NewIterator(tree, bufPage, 0)
 
 		// WHEN
@@ -46,7 +46,7 @@ func TestIteratorClose(t *testing.T) {
 		tree, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
-		bufPage, _ := tree.bufferPool.PageForRead(pageId)
+		bufPage, _ := tree.bufferPool.Page(pageId)
 		iter := NewIterator(tree, bufPage, 0)
 
 		// WHEN

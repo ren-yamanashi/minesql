@@ -99,7 +99,7 @@ func (it *Iterator) Advance() error {
 	}
 
 	oldPageId := it.bufferPage.PageId()
-	nextPage, err := it.tree.bufferPool.PageForRead(nextPageId)
+	nextPage, err := it.tree.bufferPool.Page(nextPageId)
 	if err != nil {
 		return err
 	}

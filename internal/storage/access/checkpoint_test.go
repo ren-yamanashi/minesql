@@ -53,9 +53,11 @@ func TestCheckpointExecute(t *testing.T) {
 		// ダーティーページを作り Page LSN=3 を設定
 		pgId := page.NewId(page.FileId(2), 0)
 		_, _ = env.bp.AddPage(pgId)
-		writePage, err := env.bp.PageForWrite(pgId)
+		writePage, err := env.bp.Page(pgId)
 		assert.NoError(t, err)
-		binary.BigEndian.PutUint32(writePage.Data().Header(), 3)
+		var lsnBuf [4]byte
+		binary.BigEndian.PutUint32(lsnBuf[:], 3)
+		writePage.WriteHeaderAt(0, lsnBuf[:])
 
 		cp := NewCheckpoint(env.bp, env.redoLog)
 
@@ -80,9 +82,11 @@ func TestCheckpointExecute(t *testing.T) {
 		// Page LSN=2 のダーティーページ → チェックポイント LSN = 1
 		pgId := page.NewId(page.FileId(2), 0)
 		_, _ = env.bp.AddPage(pgId)
-		writePage, err := env.bp.PageForWrite(pgId)
+		writePage, err := env.bp.Page(pgId)
 		assert.NoError(t, err)
-		binary.BigEndian.PutUint32(writePage.Data().Header(), 2)
+		var lsnBuf [4]byte
+		binary.BigEndian.PutUint32(lsnBuf[:], 2)
+		writePage.WriteHeaderAt(0, lsnBuf[:])
 
 		cp := NewCheckpoint(env.bp, env.redoLog)
 
@@ -111,16 +115,20 @@ func TestCheckpointExecute(t *testing.T) {
 		// Page LSN=5 のダーティーページ
 		pgId1 := page.NewId(page.FileId(2), 0)
 		_, _ = env.bp.AddPage(pgId1)
-		writePage1, err := env.bp.PageForWrite(pgId1)
+		writePage1, err := env.bp.Page(pgId1)
 		assert.NoError(t, err)
-		binary.BigEndian.PutUint32(writePage1.Data().Header(), 5)
+		var lsnBuf1 [4]byte
+		binary.BigEndian.PutUint32(lsnBuf1[:], 5)
+		writePage1.WriteHeaderAt(0, lsnBuf1[:])
 
 		// Page LSN=2 のダーティーページ (こちらが最小)
 		pgId2 := page.NewId(page.FileId(2), 1)
 		_, _ = env.bp.AddPage(pgId2)
-		writePage2, err := env.bp.PageForWrite(pgId2)
+		writePage2, err := env.bp.Page(pgId2)
 		assert.NoError(t, err)
-		binary.BigEndian.PutUint32(writePage2.Data().Header(), 2)
+		var lsnBuf2 [4]byte
+		binary.BigEndian.PutUint32(lsnBuf2[:], 2)
+		writePage2.WriteHeaderAt(0, lsnBuf2[:])
 
 		cp := NewCheckpoint(env.bp, env.redoLog)
 

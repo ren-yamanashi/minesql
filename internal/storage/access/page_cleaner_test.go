@@ -33,8 +33,8 @@ func TestPageCleanerRequestFlush(t *testing.T) {
 
 		pgId := page.NewId(page.FileId(2), 0)
 		_, _ = env.bp.AddPage(pgId)
-		writePage, _ := env.bp.PageForWrite(pgId)
-		writePage.Data().Body()[0] = 0xAA
+		writePage, _ := env.bp.Page(pgId)
+		writePage.WriteBodyAt(0, []byte{0xAA})
 		env.bp.Unpin(pgId)
 
 		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 0)
@@ -59,8 +59,8 @@ func TestPageCleanerRequestFlush(t *testing.T) {
 
 		pgId := page.NewId(page.FileId(2), 0)
 		_, _ = env.bp.AddPage(pgId)
-		writePage, _ := env.bp.PageForWrite(pgId)
-		writePage.Data().Body()[0] = 0xAA
+		writePage, _ := env.bp.Page(pgId)
+		writePage.WriteBodyAt(0, []byte{0xAA})
 		env.bp.Unpin(pgId)
 
 		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 90)
@@ -189,8 +189,8 @@ func TestPageCleanerClean(t *testing.T) {
 		// ダーティーページを作成
 		pgId := page.NewId(page.FileId(2), 0)
 		_, _ = env.bp.AddPage(pgId)
-		writePage, _ := env.bp.PageForWrite(pgId)
-		writePage.Data().Body()[0] = 0xAA
+		writePage, _ := env.bp.Page(pgId)
+		writePage.WriteBodyAt(0, []byte{0xAA})
 
 		// Redo ログに大量のレコードを追加して閾値 (100 バイト) を超えさせる
 		pc := NewPageCleaner(env.bp, env.redoLog, 100, 90)
@@ -218,7 +218,8 @@ func TestPageCleanerClean(t *testing.T) {
 		// ダーティーページを作成
 		pgId := page.NewId(page.FileId(2), 0)
 		_, _ = env.bp.AddPage(pgId)
-		_, _ = env.bp.PageForWrite(pgId)
+		wp, _ := env.bp.Page(pgId)
+		wp.MarkModified()
 
 		// maxDirtyPct=0 にすると 1 ページでも閾値超過
 		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 0)
@@ -239,8 +240,8 @@ func TestPageCleanerFlush(t *testing.T) {
 
 		pgId := page.NewId(page.FileId(2), 0)
 		_, _ = env.bp.AddPage(pgId)
-		writePage, _ := env.bp.PageForWrite(pgId)
-		writePage.Data().Body()[0] = 0xAA
+		writePage, _ := env.bp.Page(pgId)
+		writePage.WriteBodyAt(0, []byte{0xAA})
 		env.bp.Unpin(pgId)
 
 		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 90)
@@ -295,7 +296,8 @@ func TestPageCleanerShouldFlush(t *testing.T) {
 
 		pgId := page.NewId(page.FileId(2), 0)
 		_, _ = env.bp.AddPage(pgId)
-		_, _ = env.bp.PageForWrite(pgId)
+		wp, _ := env.bp.Page(pgId)
+		wp.MarkModified()
 
 		// 閾値を大きくして超えないようにする
 		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 90)
@@ -315,7 +317,8 @@ func TestPageCleanerShouldFlush(t *testing.T) {
 
 		pgId := page.NewId(page.FileId(2), 0)
 		_, _ = env.bp.AddPage(pgId)
-		_, _ = env.bp.PageForWrite(pgId)
+		wp, _ := env.bp.Page(pgId)
+		wp.MarkModified()
 
 		// 閾値を極小に設定
 		pc := NewPageCleaner(env.bp, env.redoLog, 1, 90)
@@ -335,7 +338,8 @@ func TestPageCleanerShouldFlush(t *testing.T) {
 
 		pgId := page.NewId(page.FileId(2), 0)
 		_, _ = env.bp.AddPage(pgId)
-		_, _ = env.bp.PageForWrite(pgId)
+		wp, _ := env.bp.Page(pgId)
+		wp.MarkModified()
 
 		// ダーティーページ率の閾値を 0 に設定
 		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 0)

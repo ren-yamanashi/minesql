@@ -16,7 +16,7 @@ func TestIteratorGet(t *testing.T) {
 		tree, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
-		bufPage, _ := tree.bufferPool.PageForRead(pageId)
+		bufPage, _ := tree.bufferPool.Page(pageId)
 		iter := NewIterator(tree, bufPage, 0)
 
 		// WHEN
@@ -33,7 +33,7 @@ func TestIteratorGet(t *testing.T) {
 		tree, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
-		bufPage, _ := tree.bufferPool.PageForRead(pageId)
+		bufPage, _ := tree.bufferPool.Page(pageId)
 		iter := NewIterator(tree, bufPage, 1)
 
 		// WHEN
@@ -52,7 +52,7 @@ func TestIteratorNext(t *testing.T) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 			ln.insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
 		})
-		bufPage, _ := tree.bufferPool.PageForRead(pageId)
+		bufPage, _ := tree.bufferPool.Page(pageId)
 		iter := NewIterator(tree, bufPage, 0)
 
 		// WHEN
@@ -82,7 +82,7 @@ func TestIteratorAdvance(t *testing.T) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 			ln.insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
 		})
-		bufPage, _ := tree.bufferPool.PageForRead(pageId)
+		bufPage, _ := tree.bufferPool.Page(pageId)
 		iter := NewIterator(tree, bufPage, 0)
 
 		// WHEN
@@ -125,7 +125,7 @@ func TestIteratorAdvance(t *testing.T) {
 		secondLeaf.initialize()
 		secondLeaf.insert(0, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
 
-		bufPage, err := bp.PageForRead(firstId)
+		bufPage, err := bp.Page(firstId)
 		assert.NoError(t, err)
 		iter := NewIterator(tree, bufPage, 0)
 
@@ -151,7 +151,7 @@ func TestIteratorTracksLastKeyAndModifyCount(t *testing.T) {
 		tree, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
-		bufPage, _ := tree.bufferPool.PageForRead(pageId)
+		bufPage, _ := tree.bufferPool.Page(pageId)
 		iter := NewIterator(tree, bufPage, 0)
 		assert.Nil(t, iter.lastKey)
 

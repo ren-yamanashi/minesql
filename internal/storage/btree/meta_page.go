@@ -45,18 +45,19 @@ func (mp *metaPage) height() uint64 {
 
 // setRootPageId はルートページ ID を設定する
 func (mp *metaPage) setRootPageId(rootPageId page.Id) {
-	rootPageId.WriteAt(mp.data.Body(), metaRootPageIdOffset)
-	mp.bufPage.MarkModified()
+	mp.bufPage.WriteBodyAt(metaRootPageIdOffset, rootPageId.Bytes())
 }
 
 // setLeafPageCount はリーフページ数を設定する
 func (mp *metaPage) setLeafPageCount(count uint64) {
-	binary.BigEndian.PutUint64(mp.data.Body()[metaLeafPageCountOffset:metaLeafPageCountOffset+8], count)
-	mp.bufPage.MarkModified()
+	var buf [8]byte
+	binary.BigEndian.PutUint64(buf[:], count)
+	mp.bufPage.WriteBodyAt(metaLeafPageCountOffset, buf[:])
 }
 
 // setHeight は B+Tree の高さを設定する
 func (mp *metaPage) setHeight(h uint64) {
-	binary.BigEndian.PutUint64(mp.data.Body()[metaHeightOffset:metaHeightOffset+8], h)
-	mp.bufPage.MarkModified()
+	var buf [8]byte
+	binary.BigEndian.PutUint64(buf[:], h)
+	mp.bufPage.WriteBodyAt(metaHeightOffset, buf[:])
 }
