@@ -38,4 +38,7 @@ var (
 type Record interface {
 	TableFileId() page.FileId
 	Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte
+	PrevLastTrxId() lock.TrxId
+	PrevRollPtr() Pointer
+	RecordType() RecordType
 }

@@ -29,9 +29,12 @@ func NewUpdateRecord(
 	}
 }
 
-func (ur UpdateRecord) TableFileId() page.FileId { return ur.tableFileId }
-func (ur UpdateRecord) PrevRecord() btree.Record { return ur.prevRecord }
-func (ur UpdateRecord) NewRecord() btree.Record  { return ur.newRecord }
+func (ur UpdateRecord) TableFileId() page.FileId  { return ur.tableFileId }
+func (ur UpdateRecord) PrevRecord() btree.Record  { return ur.prevRecord }
+func (ur UpdateRecord) NewRecord() btree.Record   { return ur.newRecord }
+func (ur UpdateRecord) PrevLastTrxId() lock.TrxId { return ur.prevLastTrxId }
+func (ur UpdateRecord) PrevRollPtr() Pointer      { return ur.prevRollPtr }
+func (ur UpdateRecord) RecordType() RecordType    { return RecordTypeUpdate }
 
 func (ur UpdateRecord) Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte {
 	fields := Fields{

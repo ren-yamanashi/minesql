@@ -94,7 +94,7 @@ func TestRecoveryExecute(t *testing.T) {
 		// レコードが残っている (ロールバックされていない)
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -127,7 +127,7 @@ func TestRecoveryExecute(t *testing.T) {
 		// レコードがロールバックされている
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -363,7 +363,7 @@ func TestRecoveryApplyRollback(t *testing.T) {
 		// trx1 のレコード ("Alice") は残り、trx2 のレコード ("Bob") はロールバックされる
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
-		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{})
+		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		record, ok, _ := iter.Next()
 		assert.True(t, ok)
 		assert.Equal(t, "1", record.values[0])

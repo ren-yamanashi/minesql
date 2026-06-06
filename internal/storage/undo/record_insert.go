@@ -22,8 +22,11 @@ func NewInsertRecord(tableFileId page.FileId, record btree.Record) InsertRecord 
 	}
 }
 
-func (ir InsertRecord) TableFileId() page.FileId { return ir.tableFileId }
-func (ir InsertRecord) Record() btree.Record     { return ir.record }
+func (ir InsertRecord) TableFileId() page.FileId  { return ir.tableFileId }
+func (ir InsertRecord) Record() btree.Record      { return ir.record }
+func (ir InsertRecord) PrevLastTrxId() lock.TrxId { return ir.prevLastTrxId }
+func (ir InsertRecord) PrevRollPtr() Pointer      { return ir.prevRollPtr }
+func (ir InsertRecord) RecordType() RecordType    { return RecordTypeInsert }
 
 func (ir InsertRecord) Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte {
 	fields := Fields{

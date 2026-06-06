@@ -8,7 +8,9 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -287,5 +289,60 @@ func searchSecondaryIndex(t *testing.T, env *iteratorTestEnv) *SecondaryIndexIte
 	if err != nil {
 		t.Fatalf("セカンダリインデックスの検索に失敗: %v", err)
 	}
-	return NewSecondaryIndexIterator("idx_name", iter, env.ct, env.bp, env.primaryTree)
+	return NewSecondaryIndexIterator("idx_name", iter, env.ct, env.bp, env.primaryTree, nil, nil)
+}
+
+func TestSecondaryIndexIteratorNextWithReadView(t *testing.T) {
+	t.Run("readView 経由でプライマリレコードを取得できる", func(t *testing.T) {
+		// GIVEN
+		env := setupMVCCTestEnv(t)
+		insertPrimaryRecordWithMvcc(t, env, lock.TrxId(1), undo.NullPointer(), "1", "Alice", "a@example.com")
+		insertSecondaryRecord(t, env.iter, []string{"name"}, []string{"Alice"}, []string{"1"})
+
+		rv := newReadView(lock.TrxId(2), nil, lock.TrxId(2))
+		iter := searchSecondaryIndexWithReadView(t, env, rv)
+		defer iter.Close()
+
+		// WHEN
+		result, ok, err := iter.Next()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, "Alice", result.values[1])
+	})
+
+	t.Run("プライマリの最新が不可視なら Undo 遡及で旧値を返す", func(t *testing.T) {
+		// GIVEN
+		env := setupMVCCTestEnv(t)
+		insertedRecord := insertPrimaryRecordWithMvcc(t, env, lock.TrxId(1), undo.NullPointer(), "1", "Alice", "a@example.com")
+		updateUndo := undo.NewUpdateRecord(page.FileId(2), insertedRecord.Encode(), btree.Record{}, lock.TrxId(1), undo.NullPointer())
+		ptr := env.appendUndo(t, lock.TrxId(3), undo.RecordTypeUpdate, updateUndo)
+		updatePrimaryRecordWithMvcc(t, env, lock.TrxId(3), ptr, "1", "Bob", "a@example.com")
+		insertSecondaryRecord(t, env.iter, []string{"name"}, []string{"Alice"}, []string{"1"})
+
+		rv := newReadView(lock.TrxId(2), []lock.TrxId{lock.TrxId(3)}, lock.TrxId(4))
+		iter := searchSecondaryIndexWithReadView(t, env, rv)
+		defer iter.Close()
+
+		// WHEN
+		result, ok, err := iter.Next()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, "Alice", result.values[1])
+	})
+}
+
+// searchSecondaryIndexWithReadView は readView 付きでセカンダリイテレータを返す
+func searchSecondaryIndexWithReadView(t *testing.T, env *mvccTestEnv, rv *readView) *SecondaryIndexIterator {
+	t.Helper()
+	mtr := buffer.NewMtr(env.iter.bp)
+	t.Cleanup(func() { mtr.UnpinAll() })
+	iter, err := env.iter.secondaryTree.Search(mtr, SearchModeStart{}.Encode())
+	if err != nil {
+		t.Fatalf("セカンダリインデックスの検索に失敗: %v", err)
+	}
+	return NewSecondaryIndexIterator("idx_name", iter, env.iter.ct, env.iter.bp, env.iter.primaryTree, rv, env.undoLog)
 }

@@ -4,6 +4,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
+	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
 type SecondaryIndexIterator struct {
@@ -12,6 +13,8 @@ type SecondaryIndexIterator struct {
 	catalog     *dictionary.Catalog
 	bufferPool  *buffer.Pool
 	primaryTree *btree.Tree // プライマリインデックスの B+Tree
+	readView    *readView   // nil の場合は可視性判定をスキップする
+	undoLog     *undo.Manager
 }
 
 func NewSecondaryIndexIterator(
@@ -20,6 +23,8 @@ func NewSecondaryIndexIterator(
 	ct *dictionary.Catalog,
 	bp *buffer.Pool,
 	pt *btree.Tree,
+	readView *readView,
+	undoLog *undo.Manager,
 ) *SecondaryIndexIterator {
 	return &SecondaryIndexIterator{
 		indexName:   indexName,
@@ -27,6 +32,8 @@ func NewSecondaryIndexIterator(
 		catalog:     ct,
 		bufferPool:  bp,
 		primaryTree: pt,
+		readView:    readView,
+		undoLog:     undoLog,
 	}
 }
 
@@ -55,7 +62,7 @@ func (si *SecondaryIndexIterator) Next() (*PrimaryRecord, bool, error) {
 			return nil, false, err
 		}
 
-		pi := NewPrimaryIndexIterator(iter, si.catalog, si.bufferPool, si.primaryTree.MetaPageId().FileId())
+		pi := NewPrimaryIndexIterator(iter, si.catalog, si.bufferPool, si.primaryTree.MetaPageId().FileId(), si.readView, si.undoLog, mtr)
 		result, found, err := pi.Next()
 		pi.Close()
 		mtr.UnpinAll()

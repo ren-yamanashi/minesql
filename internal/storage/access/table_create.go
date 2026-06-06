@@ -56,7 +56,7 @@ func CreateTable(
 	}
 
 	// プライマリインデックス作成
-	pi, err := createPrimaryIndex(ct, bp, fileId, input.PkCount, lock)
+	pi, err := createPrimaryIndex(ct, bp, fileId, input.PkCount, lock, undo)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func CreateTable(
 	}
 
 	// セカンダリインデックス作成
-	sis, err := createSecondaryIndexes(ct, bp, fileId, pi.tree, lock, input.Indexes)
+	sis, err := createSecondaryIndexes(ct, bp, fileId, pi.tree, lock, undo, input.Indexes)
 	if err != nil {
 		return nil, err
 	}
@@ -152,6 +152,7 @@ func createSecondaryIndexes(
 	fileId page.FileId,
 	pt *btree.Tree,
 	lock *lock.Manager,
+	undoLog *undo.Manager,
 	inputs []CreateIndexInput,
 ) ([]*secondaryIndex, error) {
 	mtr := buffer.NewMtr(bp)
@@ -170,6 +171,7 @@ func createSecondaryIndexes(
 			IndexName:   input.IndexName,
 			Unique:      input.IndexType == dictionary.IndexTypeUnique,
 			Lock:        lock,
+			UndoLog:     undoLog,
 		})
 		if err != nil {
 			return nil, err

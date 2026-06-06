@@ -142,7 +142,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		// レコードが存在しないことを確認
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -164,7 +164,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		trxId2 := tm.Begin()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
-		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{})
+		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
 		err := table.SoftDelete(record, trxId2)
 		assert.NoError(t, err)
@@ -176,7 +176,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		assert.NoError(t, err)
 
 		// レコードが復元されていることを確認
-		iter2, err := table.primaryIndex.search(mtr, SearchModeStart{})
+		iter2, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		restored, ok, err := iter2.Next()
 		assert.NoError(t, err)
@@ -199,7 +199,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		trxId2 := tm.Begin()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
-		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{})
+		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
 		err := table.Update(record, []string{"name"}, []string{"Bob"}, trxId2)
 		assert.NoError(t, err)
@@ -211,7 +211,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		assert.NoError(t, err)
 
 		// 旧レコードに復元されていることを確認
-		iter2, err := table.primaryIndex.search(mtr, SearchModeStart{})
+		iter2, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		restored, ok, err := iter2.Next()
 		assert.NoError(t, err)
@@ -241,7 +241,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.search(mtr, SearchModeStart{})
+		nameIter, err := idxName.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err := nameIter.Next()
 		assert.NoError(t, err)
@@ -249,7 +249,7 @@ func TestTrxManagerRollback(t *testing.T) {
 
 		// idx_email からも削除されている
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
-		emailIter, err := idxEmail.search(mtr, SearchModeStart{})
+		emailIter, err := idxEmail.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err = emailIter.Next()
 		assert.NoError(t, err)
@@ -271,7 +271,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		trxId2 := tm.Begin()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
-		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{})
+		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
 		err := table.SoftDelete(record, trxId2)
 		assert.NoError(t, err)
@@ -282,7 +282,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.search(mtr, SearchModeStart{})
+		nameIter, err := idxName.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		nameResult, ok, err := nameIter.Next()
 		assert.NoError(t, err)
@@ -305,7 +305,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		trxId2 := tm.Begin()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
-		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{})
+		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
 		// name を変更 → idx_name の SK が変わる
 		err := table.Update(record, []string{"name"}, []string{"Bob"}, trxId2)
@@ -317,7 +317,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.search(mtr, SearchModeStart{})
+		nameIter, err := idxName.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		nameResult, ok, err := nameIter.Next()
 		assert.NoError(t, err)
@@ -340,7 +340,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		trxId2 := tm.Begin()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
-		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{})
+		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
 		// email を変更 → idx_name の SK は変わらない
 		err := table.Update(record, []string{"email"}, []string{"new@example.com"}, trxId2)
@@ -352,7 +352,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.search(mtr, SearchModeStart{})
+		nameIter, err := idxName.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		nameResult, ok, err := nameIter.Next()
 		assert.NoError(t, err)

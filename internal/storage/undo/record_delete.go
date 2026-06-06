@@ -27,8 +27,11 @@ func NewDeleteRecord(
 	}
 }
 
-func (dr DeleteRecord) TableFileId() page.FileId { return dr.tableFileId }
-func (dr DeleteRecord) Record() btree.Record     { return dr.record }
+func (dr DeleteRecord) TableFileId() page.FileId  { return dr.tableFileId }
+func (dr DeleteRecord) Record() btree.Record      { return dr.record }
+func (dr DeleteRecord) PrevLastTrxId() lock.TrxId { return dr.prevLastTrxId }
+func (dr DeleteRecord) PrevRollPtr() Pointer      { return dr.prevRollPtr }
+func (dr DeleteRecord) RecordType() RecordType    { return RecordTypeDelete }
 
 func (dr DeleteRecord) Serialize(trxId lock.TrxId, undoNum UndoNumber) []byte {
 	fields := Fields{

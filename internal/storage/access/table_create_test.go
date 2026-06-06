@@ -67,7 +67,7 @@ func TestCreateTable(t *testing.T) {
 		assert.NoError(t, err)
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{})
+		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		record, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -205,7 +205,7 @@ func TestRegisterTableMeta(t *testing.T) {
 			ColNames:  []string{"id", "name", "email"},
 			PkCount:   1,
 		}
-		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr)
+		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr, nil)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -235,7 +235,7 @@ func TestRegisterTableMeta(t *testing.T) {
 			ColNames:  []string{"id", "name"},
 			PkCount:   1,
 		}
-		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr)
+		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr, nil)
 		assert.NoError(t, err)
 		err = registerTableMeta(env.ct, env.bp, env.fileId, pi, input)
 		assert.NoError(t, err)
@@ -258,7 +258,7 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		}
 
 		// WHEN
-		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, inputs)
+		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, inputs)
 
 		// THEN
 		assert.NoError(t, err)
@@ -280,7 +280,7 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		}
 
 		// WHEN
-		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, inputs)
+		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, inputs)
 
 		// THEN
 		assert.NoError(t, err)
@@ -295,7 +295,7 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		}
 
 		// WHEN
-		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, inputs)
+		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, inputs)
 
 		// THEN
 		assert.NoError(t, err)
@@ -308,11 +308,11 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		inputs := []CreateIndexInput{
 			{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: dictionary.IndexTypeNonUnique},
 		}
-		_, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, inputs)
+		_, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, inputs)
 		assert.NoError(t, err)
 
 		// WHEN
-		_, err = createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, inputs)
+		_, err = createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, inputs)
 
 		// THEN
 		assert.Error(t, err)
@@ -323,7 +323,7 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		env := setupCreateTestEnvWithTable(t)
 
 		// WHEN
-		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil)
+		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, nil)
 
 		// THEN
 		assert.NoError(t, err)
@@ -452,7 +452,7 @@ func setupCreateTestEnvWithTable(t *testing.T) *createTestEnvWithTable {
 		ColNames:  []string{"id", "name", "email"},
 		PkCount:   1,
 	}
-	pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr)
+	pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr, nil)
 	if err != nil {
 		t.Fatalf("プライマリインデックスの作成に失敗: %v", err)
 	}

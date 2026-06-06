@@ -18,11 +18,11 @@ func TestNewPrimaryIndex(t *testing.T) {
 		// GIVEN
 		env := setupIteratorTestEnv(t)
 		lockMgr := lock.NewManager()
-		created, err := createPrimaryIndex(env.ct, env.bp, page.FileId(2), 1, lockMgr)
+		created, err := createPrimaryIndex(env.ct, env.bp, page.FileId(2), 1, lockMgr, nil)
 		assert.NoError(t, err)
 
 		// WHEN
-		pi := newPrimaryIndex(env.ct, env.bp, created.tree.MetaPageId(), 1, lockMgr)
+		pi := newPrimaryIndex(env.ct, env.bp, created.tree.MetaPageId(), 1, lockMgr, nil)
 
 		// THEN
 		assert.NotNil(t, pi)
@@ -36,7 +36,7 @@ func TestCreatePrimaryIndex(t *testing.T) {
 		lockMgr := lock.NewManager()
 
 		// WHEN
-		pi, err := createPrimaryIndex(env.ct, env.bp, page.FileId(2), 1, lockMgr)
+		pi, err := createPrimaryIndex(env.ct, env.bp, page.FileId(2), 1, lockMgr, nil)
 
 		// THEN
 		assert.NoError(t, err)
@@ -50,7 +50,7 @@ func TestCreatePrimaryIndex(t *testing.T) {
 		lockMgr := lock.NewManager()
 
 		// WHEN
-		pi, err := createPrimaryIndex(env.ct, env.bp, page.FileId(2), 2, lockMgr)
+		pi, err := createPrimaryIndex(env.ct, env.bp, page.FileId(2), 2, lockMgr, nil)
 
 		// THEN
 		assert.NoError(t, err)
@@ -68,7 +68,7 @@ func TestPrimaryIndexSearch(t *testing.T) {
 		_ = pi.insert(mtr, record, testTrxId)
 
 		// WHEN
-		iter, err := pi.search(mtr, SearchModeStart{})
+		iter, err := pi.search(mtr, SearchModeStart{}, nil)
 
 		// THEN
 		assert.NoError(t, err)
@@ -85,7 +85,7 @@ func TestPrimaryIndexSearch(t *testing.T) {
 		defer mtr.UnpinAll()
 
 		// WHEN
-		iter, err := pi.search(mtr, SearchModeStart{})
+		iter, err := pi.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 
 		_, ok, err := iter.Next()
@@ -152,7 +152,7 @@ func TestPrimaryIndexInsert(t *testing.T) {
 		_ = pi.insert(mtr, r1, testTrxId)
 
 		// 論理削除
-		iter, _ := pi.search(mtr, SearchModeStart{})
+		iter, _ := pi.search(mtr, SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
 		_ = pi.softDelete(mtr, record, testTrxId)
 
@@ -194,7 +194,7 @@ func TestPrimaryIndexDelete(t *testing.T) {
 		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
 		_ = pi.insert(mtr, r, testTrxId)
 
-		iter, _ := pi.search(mtr, SearchModeStart{})
+		iter, _ := pi.search(mtr, SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
 
 		// WHEN
@@ -204,7 +204,7 @@ func TestPrimaryIndexDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// 削除後は取得できない
-		iter2, _ := pi.search(mtr, SearchModeStart{})
+		iter2, _ := pi.search(mtr, SearchModeStart{}, nil)
 		_, ok, _ := iter2.Next()
 		assert.False(t, ok)
 	})
@@ -233,7 +233,7 @@ func TestPrimaryIndexSoftDelete(t *testing.T) {
 		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
 		_ = pi.insert(mtr, r, testTrxId)
 
-		iter, _ := pi.search(mtr, SearchModeStart{})
+		iter, _ := pi.search(mtr, SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
 
 		// WHEN
@@ -243,7 +243,7 @@ func TestPrimaryIndexSoftDelete(t *testing.T) {
 		assert.NoError(t, err)
 
 		// 論理削除後は検索でスキップされる
-		iter2, _ := pi.search(mtr, SearchModeStart{})
+		iter2, _ := pi.search(mtr, SearchModeStart{}, nil)
 		_, ok, _ := iter2.Next()
 		assert.False(t, ok)
 	})
@@ -256,7 +256,7 @@ func TestPrimaryIndexSoftDelete(t *testing.T) {
 		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
 		_ = pi.insert(mtr, r, testTrxId)
 
-		iter, _ := pi.search(mtr, SearchModeStart{})
+		iter, _ := pi.search(mtr, SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
 		_ = pi.softDelete(mtr, record, testTrxId)
 
@@ -279,7 +279,7 @@ func TestPrimaryIndexUpdate(t *testing.T) {
 		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
 		_ = pi.insert(mtr, r, testTrxId)
 
-		iter, _ := pi.search(mtr, SearchModeStart{})
+		iter, _ := pi.search(mtr, SearchModeStart{}, nil)
 		current, _, _ := iter.Next()
 		newRecord, _ := current.update(testTrxId, []string{"name"}, []string{"Bob"})
 
@@ -290,7 +290,7 @@ func TestPrimaryIndexUpdate(t *testing.T) {
 		assert.NoError(t, err)
 
 		// 更新後の値を確認
-		iter2, _ := pi.search(mtr, SearchModeStart{})
+		iter2, _ := pi.search(mtr, SearchModeStart{}, nil)
 		updated, ok, _ := iter2.Next()
 		assert.True(t, ok)
 		assert.Equal(t, "Bob", updated.values[1])
@@ -305,7 +305,7 @@ func TestPrimaryIndexUpdate(t *testing.T) {
 		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "a@example.com")
 		_ = pi.insert(mtr, r, testTrxId)
 
-		iter, _ := pi.search(mtr, SearchModeStart{})
+		iter, _ := pi.search(mtr, SearchModeStart{}, nil)
 		current, _, _ := iter.Next()
 
 		// WHEN
@@ -362,7 +362,7 @@ func setupTestPrimaryIndex(t *testing.T) *primaryIndex {
 	t.Helper()
 	env := setupIteratorTestEnv(t)
 	lockMgr := lock.NewManager()
-	pi, err := createPrimaryIndex(env.ct, env.bp, page.FileId(2), 1, lockMgr)
+	pi, err := createPrimaryIndex(env.ct, env.bp, page.FileId(2), 1, lockMgr, nil)
 	if err != nil {
 		t.Fatalf("PrimaryIndex の作成に失敗: %v", err)
 	}
