@@ -9,6 +9,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
 type newSecondaryIndexInput struct {
@@ -18,6 +19,7 @@ type newSecondaryIndexInput struct {
 	IndexName   string             // インデックス名
 	Unique      bool               // ユニークインデックスか
 	Lock        *lock.Manager
+	UndoLog     *undo.Manager
 }
 
 type secondaryIndex struct {
@@ -30,6 +32,7 @@ type secondaryIndex struct {
 	indexName   string             // インデックス名
 	unique      bool               // ユニーク制約の有無
 	lock        *lock.Manager
+	undoLog     *undo.Manager
 }
 
 // newSecondaryIndex は既存のセカンダリインデックスを開く
@@ -49,6 +52,7 @@ func newSecondaryIndex(
 		indexName:   input.IndexName,
 		unique:      input.Unique,
 		lock:        input.Lock,
+		undoLog:     input.UndoLog,
 	}
 }
 
@@ -59,6 +63,7 @@ type createSecondaryIndexInput struct {
 	IndexName   string             // インデックス名
 	Unique      bool               // ユニークか
 	Lock        *lock.Manager
+	UndoLog     *undo.Manager
 }
 
 // createSecondaryIndex は空のセカンダリインデックスを作成する
@@ -81,16 +86,18 @@ func createSecondaryIndex(
 		indexName:   input.IndexName,
 		unique:      input.Unique,
 		lock:        input.Lock,
+		undoLog:     input.UndoLog,
 	}, nil
 }
 
 // search は指定した検索モードでインデックスを検索し、イテレータを返す
-func (si *secondaryIndex) search(mtr *buffer.Mtr, mode SearchMode) (*SecondaryIndexIterator, error) {
+//   - readView が非 nil の場合は MVCC の可視性判定 + Undo 遡及を行う
+func (si *secondaryIndex) search(mtr *buffer.Mtr, mode SearchMode, readView *readView) (*SecondaryIndexIterator, error) {
 	iter, err := si.tree.Search(mtr, mode.Encode())
 	if err != nil {
 		return nil, err
 	}
-	return NewSecondaryIndexIterator(si.indexName, iter, si.catalog, si.bufferPool, si.primaryTree), nil
+	return NewSecondaryIndexIterator(si.indexName, iter, si.catalog, si.bufferPool, si.primaryTree, readView, si.undoLog), nil
 }
 
 // insert は行を挿入する

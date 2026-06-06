@@ -11,7 +11,10 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
 
-var ErrRecordTooLarge = errors.New("undo: record too large for a single page")
+var (
+	ErrRecordTooLarge = errors.New("undo: record too large for a single page")
+	ErrNullPointer    = errors.New("undo: null pointer")
+)
 
 type Manager struct {
 	mu            sync.Mutex
@@ -73,6 +76,31 @@ func (m *Manager) Records(trxId lock.TrxId) []Record {
 		records[i] = e.record
 	}
 	return records
+}
+
+// LookupByPointer は Undo ポインタが指す Undo レコードを返す
+//   - ptr が NullPointer の場合は ErrNullPointer を返す
+func (m *Manager) LookupByPointer(mtr *buffer.Mtr, ptr Pointer) (Record, error) {
+	if ptr.IsNull() {
+		return nil, ErrNullPointer
+	}
+
+	pageId := page.NewId(m.fileId, ptr.pageNumber)
+	pageUndo, err := mtr.PageForRead(pageId)
+	if err != nil {
+		return nil, err
+	}
+	undoPage := NewPage(*pageUndo.Data())
+
+	recordBytes := undoPage.Record(int(ptr.offset))
+	if recordBytes == nil {
+		return nil, ErrInvalidRecord
+	}
+	fields, err := DeserializeFields(recordBytes)
+	if err != nil {
+		return nil, err
+	}
+	return fields.ToRecord()
 }
 
 // CommittedEntries はコミット済みトランザクションの Undo エントリを返す

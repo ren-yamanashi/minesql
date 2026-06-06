@@ -24,150 +24,30 @@ type Table struct {
 	redoLog          *redo.Buffer
 }
 
-// NewTable は既存のテーブルを開く
-func NewTable(
-	bp *buffer.Pool,
-	ct *dictionary.Catalog,
-	undo *undo.Manager,
-	lock *lock.Manager,
-	redoLog *redo.Buffer,
-	name string,
-) (*Table, error) {
-	table, err := fetchTable(ct, bp, name)
-	if err != nil {
-		return nil, err
-	}
-
-	fileId := table.MetaPageId().FileId()
-	pi, err := fetchPrimaryIndex(ct, bp, fileId, lock)
-	if err != nil {
-		return nil, err
-	}
-
-	sis, err := fetchSecondaryIndexes(ct, bp, fileId, pi.tree, lock)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Table{
-		primaryIndex:     pi,
-		secondaryIndexes: sis,
-		catalog:          ct,
-		undoLog:          undo,
-		lock:             lock,
-		bufferPool:       bp,
-		redoLog:          redoLog,
-	}, nil
+// Search は指定したトランザクションでプライマリインデックスを検索する
+//   - trxMgr から ReadView を取得 (REPEATABLE READ のため最初の呼び出し時に作成しキャッシュ)
+//   - 返ったイテレータは Consistent Read を実行する
+func (t *Table) Search(trxMgr *TrxManager, trxId lock.TrxId, mtr *buffer.Mtr, mode SearchMode) (*PrimaryIndexIterator, error) {
+	readView := trxMgr.CreateReadView(trxId)
+	return t.primaryIndex.search(mtr, mode, readView)
 }
 
-// fetchTable はテーブル名から TableRecord を取得する
-func fetchTable(ct *dictionary.Catalog, bp *buffer.Pool, name string) (dictionary.TableMetaRecord, error) {
-	mtr := buffer.NewMtr(bp)
-	defer mtr.UnpinAll()
-	iter, err := ct.TableMeta().Search(mtr, dictionary.SearchModeKey{Key: [][]byte{[]byte(name)}})
-	if err != nil {
-		return dictionary.TableMetaRecord{}, err
-	}
-	defer iter.Close()
-	record, ok, err := iter.Next()
-	if err != nil {
-		return dictionary.TableMetaRecord{}, err
-	}
-	if !ok || record.Name() != name {
-		return dictionary.TableMetaRecord{}, fmt.Errorf("table %q not found", name)
-	}
-	return record, nil
-}
-
-// fetchPrimaryIndex はカタログからプライマリインデックスを取得して PrimaryIndex を構築する
-func fetchPrimaryIndex(
-	ct *dictionary.Catalog,
-	bp *buffer.Pool,
-	fileId page.FileId,
-	lock *lock.Manager,
-) (*primaryIndex, error) {
-	record, err := fetchPrimaryIndexRecord(ct, bp, fileId)
-	if err != nil {
-		return nil, err
-	}
-	return newPrimaryIndex(ct, bp, record.MetaPageId(), record.ColumnCount(), lock), nil
-}
-
-// fetchPrimaryIndexRecord はカタログからプライマリインデックスの IndexRecord を取得する
-func fetchPrimaryIndexRecord(ct *dictionary.Catalog, bp *buffer.Pool, fileId page.FileId) (dictionary.IndexMetaRecord, error) {
-	mtr := buffer.NewMtr(bp)
-	defer mtr.UnpinAll()
-	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
-	key := dictionary.SearchModeKey{
-		Key: [][]byte{fileIdBytes, []byte(dictionary.PrimaryIndexName)},
-	}
-	iter, err := ct.IndexMeta().Search(mtr, key)
-	if err != nil {
-		return dictionary.IndexMetaRecord{}, err
-	}
-	defer iter.Close()
-	record, ok, err := iter.Next()
-	if err != nil {
-		return dictionary.IndexMetaRecord{}, err
-	}
-	if !ok || record.FileId() != fileId || record.Name() != dictionary.PrimaryIndexName {
-		return dictionary.IndexMetaRecord{}, fmt.Errorf("primary index not found for table (file %d)", fileId)
-	}
-	return record, nil
-}
-
-// fetchSecondaryIndexes は指定テーブルのセカンダリインデックス一覧を返す
-func fetchSecondaryIndexes(
-	ct *dictionary.Catalog,
-	bp *buffer.Pool,
-	fileId page.FileId,
-	pt *btree.Tree,
-	lock *lock.Manager,
-) ([]*secondaryIndex, error) {
-	records, err := fetchSecondaryIndexRecords(ct, bp, fileId)
-	if err != nil {
-		return nil, err
-	}
-	indexes := make([]*secondaryIndex, 0, len(records))
-	for _, record := range records {
-		index := newSecondaryIndex(ct, bp, newSecondaryIndexInput{
-			MetaPageId:  record.MetaPageId(),
-			PrimaryTree: pt,
-			IndexId:     record.IndexId(),
-			IndexName:   record.Name(),
-			Unique:      record.IndexType() == dictionary.IndexTypeUnique,
-			Lock:        lock,
-		})
-		indexes = append(indexes, index)
-	}
-	return indexes, nil
-}
-
-// fetchSecondaryIndexRecords はカタログからセカンダリインデックスの IndexRecord 一覧を取得する
-func fetchSecondaryIndexRecords(ct *dictionary.Catalog, bp *buffer.Pool, fileId page.FileId) ([]dictionary.IndexMetaRecord, error) {
-	mtr := buffer.NewMtr(bp)
-	defer mtr.UnpinAll()
-	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
-	iter, err := ct.IndexMeta().Search(mtr, dictionary.SearchModeKey{Key: [][]byte{fileIdBytes}})
-	if err != nil {
-		return nil, err
-	}
-	defer iter.Close()
-	var records []dictionary.IndexMetaRecord
-	for {
-		record, ok, err := iter.Next()
-		if err != nil {
-			return nil, err
-		}
-		if !ok || record.FileId() != fileId {
+// SearchSecondary は指定したセカンダリインデックスを検索する
+//   - 指定したインデックス名が存在しない場合はエラー
+//   - 可視性判定はプライマリ側に伝搬される (詳細はセカンダリイテレータを参照)
+func (t *Table) SearchSecondary(trxMgr *TrxManager, trxId lock.TrxId, mtr *buffer.Mtr, indexName string, mode SearchMode) (*SecondaryIndexIterator, error) {
+	var target *secondaryIndex
+	for _, si := range t.secondaryIndexes {
+		if si.indexName == indexName {
+			target = si
 			break
 		}
-		if record.Name() == dictionary.PrimaryIndexName {
-			continue
-		}
-		records = append(records, record)
 	}
-	return records, nil
+	if target == nil {
+		return nil, fmt.Errorf("secondary index %q not found", indexName)
+	}
+	readView := trxMgr.CreateReadView(trxId)
+	return target.search(mtr, mode, readView)
 }
 
 // buildValMap はカラム名 → 値のマップを構築する
@@ -231,4 +111,153 @@ func (t *Table) buildSecondaryRecord(si *secondaryIndex, skColNames, skValues, p
 		values:     skValues,
 		pk:         pk,
 	})
+}
+
+// NewTable は既存のテーブルを開く
+func NewTable(
+	bp *buffer.Pool,
+	ct *dictionary.Catalog,
+	undo *undo.Manager,
+	lock *lock.Manager,
+	redoLog *redo.Buffer,
+	name string,
+) (*Table, error) {
+	table, err := fetchTable(ct, bp, name)
+	if err != nil {
+		return nil, err
+	}
+
+	fileId := table.MetaPageId().FileId()
+	pi, err := fetchPrimaryIndex(ct, bp, fileId, lock, undo)
+	if err != nil {
+		return nil, err
+	}
+
+	sis, err := fetchSecondaryIndexes(ct, bp, fileId, pi.tree, lock, undo)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Table{
+		primaryIndex:     pi,
+		secondaryIndexes: sis,
+		catalog:          ct,
+		undoLog:          undo,
+		lock:             lock,
+		bufferPool:       bp,
+		redoLog:          redoLog,
+	}, nil
+}
+
+// fetchTable はテーブル名から TableRecord を取得する
+func fetchTable(ct *dictionary.Catalog, bp *buffer.Pool, name string) (dictionary.TableMetaRecord, error) {
+	mtr := buffer.NewMtr(bp)
+	defer mtr.UnpinAll()
+	iter, err := ct.TableMeta().Search(mtr, dictionary.SearchModeKey{Key: [][]byte{[]byte(name)}})
+	if err != nil {
+		return dictionary.TableMetaRecord{}, err
+	}
+	defer iter.Close()
+	record, ok, err := iter.Next()
+	if err != nil {
+		return dictionary.TableMetaRecord{}, err
+	}
+	if !ok || record.Name() != name {
+		return dictionary.TableMetaRecord{}, fmt.Errorf("table %q not found", name)
+	}
+	return record, nil
+}
+
+// fetchPrimaryIndex はカタログからプライマリインデックスを取得して PrimaryIndex を構築する
+func fetchPrimaryIndex(
+	ct *dictionary.Catalog,
+	bp *buffer.Pool,
+	fileId page.FileId,
+	lock *lock.Manager,
+	undoLog *undo.Manager,
+) (*primaryIndex, error) {
+	record, err := fetchPrimaryIndexRecord(ct, bp, fileId)
+	if err != nil {
+		return nil, err
+	}
+	return newPrimaryIndex(ct, bp, record.MetaPageId(), record.ColumnCount(), lock, undoLog), nil
+}
+
+// fetchPrimaryIndexRecord はカタログからプライマリインデックスの IndexRecord を取得する
+func fetchPrimaryIndexRecord(ct *dictionary.Catalog, bp *buffer.Pool, fileId page.FileId) (dictionary.IndexMetaRecord, error) {
+	mtr := buffer.NewMtr(bp)
+	defer mtr.UnpinAll()
+	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
+	key := dictionary.SearchModeKey{
+		Key: [][]byte{fileIdBytes, []byte(dictionary.PrimaryIndexName)},
+	}
+	iter, err := ct.IndexMeta().Search(mtr, key)
+	if err != nil {
+		return dictionary.IndexMetaRecord{}, err
+	}
+	defer iter.Close()
+	record, ok, err := iter.Next()
+	if err != nil {
+		return dictionary.IndexMetaRecord{}, err
+	}
+	if !ok || record.FileId() != fileId || record.Name() != dictionary.PrimaryIndexName {
+		return dictionary.IndexMetaRecord{}, fmt.Errorf("primary index not found for table (file %d)", fileId)
+	}
+	return record, nil
+}
+
+// fetchSecondaryIndexes は指定テーブルのセカンダリインデックス一覧を返す
+func fetchSecondaryIndexes(
+	ct *dictionary.Catalog,
+	bp *buffer.Pool,
+	fileId page.FileId,
+	pt *btree.Tree,
+	lock *lock.Manager,
+	undoLog *undo.Manager,
+) ([]*secondaryIndex, error) {
+	records, err := fetchSecondaryIndexRecords(ct, bp, fileId)
+	if err != nil {
+		return nil, err
+	}
+	indexes := make([]*secondaryIndex, 0, len(records))
+	for _, record := range records {
+		index := newSecondaryIndex(ct, bp, newSecondaryIndexInput{
+			MetaPageId:  record.MetaPageId(),
+			PrimaryTree: pt,
+			IndexId:     record.IndexId(),
+			IndexName:   record.Name(),
+			Unique:      record.IndexType() == dictionary.IndexTypeUnique,
+			Lock:        lock,
+			UndoLog:     undoLog,
+		})
+		indexes = append(indexes, index)
+	}
+	return indexes, nil
+}
+
+// fetchSecondaryIndexRecords はカタログからセカンダリインデックスの IndexRecord 一覧を取得する
+func fetchSecondaryIndexRecords(ct *dictionary.Catalog, bp *buffer.Pool, fileId page.FileId) ([]dictionary.IndexMetaRecord, error) {
+	mtr := buffer.NewMtr(bp)
+	defer mtr.UnpinAll()
+	fileIdBytes := binary.BigEndian.AppendUint32(nil, uint32(fileId))
+	iter, err := ct.IndexMeta().Search(mtr, dictionary.SearchModeKey{Key: [][]byte{fileIdBytes}})
+	if err != nil {
+		return nil, err
+	}
+	defer iter.Close()
+	var records []dictionary.IndexMetaRecord
+	for {
+		record, ok, err := iter.Next()
+		if err != nil {
+			return nil, err
+		}
+		if !ok || record.FileId() != fileId {
+			break
+		}
+		if record.Name() == dictionary.PrimaryIndexName {
+			continue
+		}
+		records = append(records, record)
+	}
+	return records, nil
 }
