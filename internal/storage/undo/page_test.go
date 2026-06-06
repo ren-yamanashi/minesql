@@ -322,6 +322,20 @@ func TestPageAppend(t *testing.T) {
 		assert.Equal(t, uint16(5), undoPage.UsedBytes())
 	})
 
+	t.Run("追加成功時に bufPage の modifyCount が進む", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.initialize()
+		before := undoPage.bufPage.ModifyCount()
+
+		// WHEN
+		ok := undoPage.append([]byte{0x01, 0x02, 0x03})
+
+		// THEN
+		assert.True(t, ok)
+		assert.Greater(t, undoPage.bufPage.ModifyCount(), before)
+	})
+
 	t.Run("空き不足の場合 false を返す", func(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)

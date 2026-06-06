@@ -64,6 +64,18 @@ func TestMetaPageSetRootPageId(t *testing.T) {
 		assert.Equal(t, page.NewId(2, 20), mp.rootPageId())
 	})
 
+	t.Run("呼び出すと bufPage の modifyCount が進む", func(t *testing.T) {
+		// GIVEN
+		mp := newTestMetaPage()
+		before := mp.bufPage.ModifyCount()
+
+		// WHEN
+		mp.setRootPageId(page.NewId(1, 10))
+
+		// THEN
+		assert.Greater(t, mp.bufPage.ModifyCount(), before)
+	})
+
 	t.Run("他フィールド (leafPageCount, height) への書き込みと独立に保持される", func(t *testing.T) {
 		// GIVEN
 		mp := newTestMetaPage()

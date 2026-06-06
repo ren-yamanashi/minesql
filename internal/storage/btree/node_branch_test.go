@@ -52,6 +52,20 @@ func TestBranchNodeInsert(t *testing.T) {
 		// THEN
 		assert.False(t, ok)
 	})
+
+	t.Run("挿入成功時に bufPage の modifyCount が進む", func(t *testing.T) {
+		// GIVEN
+		bn := newTestBranchNode()
+		before := bn.bufPage.ModifyCount()
+		record := newBranchRecord([]byte{0x20}, page.NewId(0, 10))
+
+		// WHEN
+		ok := bn.insert(1, record)
+
+		// THEN
+		assert.True(t, ok)
+		assert.Greater(t, bn.bufPage.ModifyCount(), before)
+	})
 }
 
 func TestBranchNodeSplitInsert(t *testing.T) {

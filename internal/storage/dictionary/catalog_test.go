@@ -181,6 +181,22 @@ func TestCreateCatalog(t *testing.T) {
 		assert.False(t, catalog.constraintMeta.tree.MetaPageId().IsInvalid())
 		assert.False(t, catalog.userMeta.tree.MetaPageId().IsInvalid())
 	})
+
+	t.Run("書き込んだヘッダーページがフラッシュ対象になる", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+
+		// WHEN
+		_, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+
+		// THEN
+		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		bufPageHeader, err := bp.Page(headerPageId)
+		assert.NoError(t, err)
+		defer bp.Unpin(headerPageId)
+		assert.Greater(t, bufPageHeader.ModifyCount(), uint64(0))
+	})
 }
 
 func TestAllocateIndexId(t *testing.T) {
@@ -200,6 +216,28 @@ func TestAllocateIndexId(t *testing.T) {
 		assert.Equal(t, IndexId(1), id1)
 		assert.Equal(t, IndexId(2), id2)
 	})
+
+	t.Run("採番後にヘッダーページがダーティーになる", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+		ct, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		bufPageHeader, err := bp.Page(headerPageId)
+		assert.NoError(t, err)
+		before := bufPageHeader.ModifyCount()
+		bp.Unpin(headerPageId)
+
+		// WHEN
+		_, err = ct.AllocateIndexId()
+		assert.NoError(t, err)
+
+		// THEN
+		bufPageHeaderAfter, err := bp.Page(headerPageId)
+		assert.NoError(t, err)
+		defer bp.Unpin(headerPageId)
+		assert.Greater(t, bufPageHeaderAfter.ModifyCount(), before)
+	})
 }
 
 func TestAllocateFileId(t *testing.T) {
@@ -218,6 +256,28 @@ func TestAllocateFileId(t *testing.T) {
 		// THEN
 		assert.Equal(t, page.FileId(2), id1)
 		assert.Equal(t, page.FileId(3), id2)
+	})
+
+	t.Run("採番後にヘッダーページがダーティーになる", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+		ct, err := CreateCatalog(bp)
+		assert.NoError(t, err)
+		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		bufPageHeader, err := bp.Page(headerPageId)
+		assert.NoError(t, err)
+		before := bufPageHeader.ModifyCount()
+		bp.Unpin(headerPageId)
+
+		// WHEN
+		_, err = ct.AllocateFileId()
+		assert.NoError(t, err)
+
+		// THEN
+		bufPageHeaderAfter, err := bp.Page(headerPageId)
+		assert.NoError(t, err)
+		defer bp.Unpin(headerPageId)
+		assert.Greater(t, bufPageHeaderAfter.ModifyCount(), before)
 	})
 }
 

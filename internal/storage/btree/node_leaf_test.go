@@ -35,6 +35,20 @@ func TestLeafNodeInsert(t *testing.T) {
 		assert.False(t, ok)
 		assert.Equal(t, 0, ln.numRecords())
 	})
+
+	t.Run("挿入成功時に bufPage の modifyCount が進む", func(t *testing.T) {
+		// GIVEN
+		ln := newTestLeafNode()
+		before := ln.bufPage.ModifyCount()
+		record := NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA})
+
+		// WHEN
+		ok := ln.insert(0, record)
+
+		// THEN
+		assert.True(t, ok)
+		assert.Greater(t, ln.bufPage.ModifyCount(), before)
+	})
 }
 
 func TestLeafNodeCanFit(t *testing.T) {
