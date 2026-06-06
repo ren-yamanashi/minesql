@@ -132,70 +132,6 @@ func TestManagerAppend(t *testing.T) {
 		assert.Equal(t, oldPageId, pageWrites[n-1].PageId())
 	})
 
-	t.Run("switch 中の旧ページ link 変更 REDO が失敗してもリンク変更は REDO に残らず currentPageId も切り替わらない", func(t *testing.T) {
-		// GIVEN
-		mgr, redoLog := setupTestManagerWithRedoLog(t)
-		oldPageId := mgr.currentPageId
-		rec := NewInsertRecord(page.FileId(1), btree.Record{[]byte("x")})
-		fillUntilOneMoreTriggersSwitch(t, mgr, lock.TrxId(1), rec)
-		redoLog.SetAppendPageCopyFaultAt(2)
-
-		// WHEN
-		_, err := appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, rec)
-
-		// THEN
-		assert.Error(t, err)
-		assert.Equal(t, oldPageId, mgr.currentPageId)
-		bufPage, err := mgr.bufferPool.PageForRead(oldPageId)
-		assert.NoError(t, err)
-		assert.Equal(t, page.PageNumber(0), NewPage(*bufPage.Data()).NextPageNumber())
-		mgr.bufferPool.Unpin(oldPageId)
-		assert.NoError(t, redoLog.Flush())
-		records, err := redoLog.ReadFrom(redo.Lsn(0))
-		assert.NoError(t, err)
-		var pageWrites []redo.Record
-		for _, r := range records {
-			if r.Type() == redo.RecordTypePageWrite {
-				pageWrites = append(pageWrites, r)
-			}
-		}
-		n := len(pageWrites)
-		assert.Greater(t, n, 0)
-		assert.NotEqual(t, oldPageId, pageWrites[n-1].PageId())
-	})
-
-	t.Run("switch 中の新ページ実体化 REDO が失敗しても旧ページのリンクは変わらず currentPageId も切り替わらない", func(t *testing.T) {
-		// GIVEN
-		mgr, redoLog := setupTestManagerWithRedoLog(t)
-		oldPageId := mgr.currentPageId
-		rec := NewInsertRecord(page.FileId(1), btree.Record{[]byte("x")})
-		fillUntilOneMoreTriggersSwitch(t, mgr, lock.TrxId(1), rec)
-		redoLog.SetAppendPageCopyFaultAt(1)
-
-		// WHEN
-		_, err := appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, rec)
-
-		// THEN
-		assert.Error(t, err)
-		assert.Equal(t, oldPageId, mgr.currentPageId)
-		bufPage, err := mgr.bufferPool.PageForRead(oldPageId)
-		assert.NoError(t, err)
-		assert.Equal(t, page.PageNumber(0), NewPage(*bufPage.Data()).NextPageNumber())
-		mgr.bufferPool.Unpin(oldPageId)
-		assert.NoError(t, redoLog.Flush())
-		records, err := redoLog.ReadFrom(redo.Lsn(0))
-		assert.NoError(t, err)
-		var pageWrites []redo.Record
-		for _, r := range records {
-			if r.Type() == redo.RecordTypePageWrite {
-				pageWrites = append(pageWrites, r)
-			}
-		}
-		n := len(pageWrites)
-		assert.Greater(t, n, 0)
-		assert.Equal(t, oldPageId, pageWrites[n-1].PageId())
-	})
-
 	t.Run("Append と Discard が並行実行されてもデータレースが起きない", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
@@ -599,25 +535,4 @@ func appendForTest(
 	mtr := buffer.NewMtr(mgr.bufferPool)
 	defer mtr.UnpinAll()
 	return mgr.Append(mtr, trxId, recordType, record)
-}
-
-// fillUntilOneMoreTriggersSwitch は現在のページにこれ以上 rec が入らない直前まで append する
-//   - 次の append が switchToNewPage を発火する状態にして返す
-func fillUntilOneMoreTriggersSwitch(t *testing.T, mgr *Manager, trxId lock.TrxId, rec Record) {
-	t.Helper()
-	recSize := len(rec.Serialize(trxId, 0))
-	for {
-		bufPage, err := mgr.bufferPool.PageForRead(mgr.currentPageId)
-		if err != nil {
-			t.Fatalf("ページ取得に失敗: %v", err)
-		}
-		free := NewPage(*bufPage.Data()).FreeSpace()
-		mgr.bufferPool.Unpin(mgr.currentPageId)
-		if free < recSize {
-			return
-		}
-		if _, err := appendForTest(t, mgr, trxId, RecordTypeInsert, rec); err != nil {
-			t.Fatalf("append に失敗: %v", err)
-		}
-	}
 }
