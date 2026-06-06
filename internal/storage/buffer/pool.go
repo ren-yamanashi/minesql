@@ -38,35 +38,27 @@ func NewPool(size int, onAllPinned func()) *Pool {
 	}
 }
 
-// PageForWrite は書き込み用のバッファページを取得する
-func (p *Pool) PageForWrite(pageId page.Id) (*Page, error) {
+// Page は指定されたページをバッファプールから取得し、Pin する
+func (p *Pool) Page(pageId page.Id) (*Page, error) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-
 	bufPage, err := p.page(pageId)
 	if err != nil {
 		return nil, err
 	}
-
-	if !bufPage.isDirty {
-		bufPage.isDirty = true
-		p.flushList.add(pageId)
-	}
 	bufPage.pinCount++
-	bufPage.modifyCount++
 	return bufPage, nil
 }
 
-// PageForRead は読み込み用のバッファページを取得する
-func (p *Pool) PageForRead(pageId page.Id) (*Page, error) {
+// markDirty はページ内容が変更されたことを記録する (Page.MarkModified からのみ呼ばれる)
+func (p *Pool) markDirty(bufPage *Page) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	bufPage, err := p.page(pageId)
-	if err != nil {
-		return nil, err
+	if !bufPage.isDirty {
+		bufPage.isDirty = true
+		p.flushList.add(bufPage.pageId)
 	}
-	bufPage.pinCount++
-	return bufPage, nil
+	bufPage.modifyCount++
 }
 
 // Unpin は指定されたページの Pin カウントをデクリメントする

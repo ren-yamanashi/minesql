@@ -3,6 +3,7 @@ package btree
 import (
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -469,11 +470,12 @@ func TestLeafNodeIsHalfFull(t *testing.T) {
 
 // newTestLeafNode は初期化済みの LeafNode を作成する
 func newTestLeafNode() *leafNode {
-	pg, err := page.NewPage(make([]byte, page.Size))
+	pool := buffer.NewPool(page.Size, nil)
+	bufPage, err := pool.AddPage(page.NewId(0, 0))
 	if err != nil {
 		panic(err)
 	}
-	ln := newLeafNode(pg)
+	ln := newLeafNode(bufPage)
 	ln.initialize()
 	return ln
 }

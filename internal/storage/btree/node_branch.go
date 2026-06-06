@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
@@ -14,21 +15,23 @@ const (
 )
 
 type branchNode struct {
-	// ノードタイプヘッダー + ブランチノードヘッダー
+	// ノードタイプヘッダー + ブランチノードヘッダーの読み取りビュー (書き込みは bufPage の API 経由で行う必要がある)
 	//   - header[0:8]: ノードタイプ
 	//   - header[8:16]: 右の子の PageId
-	header []byte
-	body   *slottedPage
+	header  []byte
+	body    *slottedPage
+	bufPage *buffer.Page
 }
 
-func newBranchNode(pg *page.Page) *branchNode {
-	data := pg.Body()
+func newBranchNode(bufPage *buffer.Page) *branchNode {
+	data := bufPage.Data().Body()
 	headerSize := nodeHeaderSize + branchNodeHeaderSize
 	header := data[:headerSize]
-	body := newSlottedPage(data[headerSize:])
+	body := newSlottedPage(bufPage, headerSize)
 	return &branchNode{
-		header: header,
-		body:   body,
+		header:  header,
+		body:    body,
+		bufPage: bufPage,
 	}
 }
 
@@ -37,7 +40,7 @@ func newBranchNode(pg *page.Page) *branchNode {
 //   - leftChildPageId: 最初のレコードの非キーフィールド (左の子の PageId)
 //   - rightChildId: ヘッダーに設定する右の子の PageId
 func (bn *branchNode) initialize(key []byte, leftChildPageId, rightChildId page.Id) error {
-	copy(bn.header[:nodeHeaderSize], nodeTypeBranch)
+	bn.bufPage.WriteBodyAt(0, []byte(nodeTypeBranch))
 	bn.body.initialize()
 
 	record := NewRecord([]byte{}, key, leftChildPageId.Bytes())
@@ -45,7 +48,7 @@ func (bn *branchNode) initialize(key []byte, leftChildPageId, rightChildId page.
 		return errors.New("new branch node must have space")
 	}
 
-	rightChildId.WriteAt(bn.header[nodeHeaderSize:], branchNodeRightChildOffset)
+	bn.bufPage.WriteBodyAt(nodeHeaderSize+branchNodeRightChildOffset, rightChildId.Bytes())
 	return nil
 }
 
@@ -66,7 +69,7 @@ func (bn *branchNode) insert(slotNum int, record Record) bool {
 //   - newRecord: 挿入するレコード
 //   - return: 新しいブランチノードの最小キー
 func (bn *branchNode) splitInsert(newBranch *branchNode, newRecord Record) ([]byte, error) {
-	copy(newBranch.header[:nodeHeaderSize], nodeTypeBranch)
+	newBranch.bufPage.WriteBodyAt(0, []byte(nodeTypeBranch))
 	newBranch.body.initialize()
 	for {
 		// newBranch が十分に埋まったら、挿入対象のレコードを古いノードに挿入
@@ -174,7 +177,7 @@ func (bn *branchNode) rightChildPageId() page.Id {
 
 // setRightChildPageId は右端の子の PageId を設定する
 func (bn *branchNode) setRightChildPageId(pageId page.Id) {
-	pageId.WriteAt(bn.header[nodeHeaderSize:], branchNodeRightChildOffset)
+	bn.bufPage.WriteBodyAt(nodeHeaderSize+branchNodeRightChildOffset, pageId.Bytes())
 }
 
 // transferAllFrom は src のすべてのレコードを自分の末尾に転送する (src のレコードはすべて削除される)
@@ -199,7 +202,7 @@ func (bn *branchNode) fillRightChild() ([]byte, error) {
 
 	key := bytes.Clone(record.Key())
 	bn.body.delete(lastSlotNum)
-	rightChild.WriteAt(bn.header[nodeHeaderSize:], branchNodeRightChildOffset)
+	bn.bufPage.WriteBodyAt(nodeHeaderSize+branchNodeRightChildOffset, rightChild.Bytes())
 	return key, nil
 }
 

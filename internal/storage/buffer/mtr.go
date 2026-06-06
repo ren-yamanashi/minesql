@@ -35,7 +35,7 @@ func NewMtr(pool *Pool) *Mtr {
 
 // PageForRead は読み込み用のバッファページを取得し、Shared ラッチと Pin をスコープに記録する
 func (m *Mtr) PageForRead(pageId page.Id) (*Page, error) {
-	bufPage, err := m.pool.PageForRead(pageId)
+	bufPage, err := m.pool.Page(pageId)
 	if err != nil {
 		return nil, err
 	}
@@ -55,7 +55,7 @@ func (m *Mtr) PageForRead(pageId page.Id) (*Page, error) {
 // PageForWrite は書き込み用のバッファページを取得し、Exclusive ラッチと Pin をスコープに記録する
 //   - 同一 Mtr 内で S 取得済みのページを X 要求した場合は S を解放して X を取り直す (隙間で他者が X を取りうる)
 func (m *Mtr) PageForWrite(pageId page.Id) (*Page, error) {
-	bufPage, err := m.pool.PageForWrite(pageId)
+	bufPage, err := m.pool.Page(pageId)
 	if err != nil {
 		return nil, err
 	}

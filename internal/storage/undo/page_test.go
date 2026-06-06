@@ -3,17 +3,18 @@ package undo
 import (
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewPage(t *testing.T) {
-	t.Run("page.Page から Undo ページを作成できる", func(t *testing.T) {
+	t.Run("buffer.Page から Undo ページを作成できる", func(t *testing.T) {
 		// GIVEN
-		pg := newTestPage(t)
+		bufPage := newTestBufferPage(t)
 
 		// WHEN
-		undoPage := NewPage(*pg)
+		undoPage := NewPage(bufPage)
 
 		// THEN
 		assert.NotNil(t, undoPage)
@@ -23,10 +24,10 @@ func TestNewPage(t *testing.T) {
 func TestCreatePage(t *testing.T) {
 	t.Run("新規 Undo ページを作成できる", func(t *testing.T) {
 		// GIVEN
-		pg := newTestPage(t)
+		bufPage := newTestBufferPage(t)
 
 		// WHEN
-		undoPage := CreatePage(*pg)
+		undoPage := CreatePage(bufPage)
 
 		// THEN
 		assert.NotNil(t, undoPage)
@@ -34,10 +35,10 @@ func TestCreatePage(t *testing.T) {
 
 	t.Run("作成時にヘッダーが初期化される", func(t *testing.T) {
 		// GIVEN
-		pg := newTestPage(t)
+		bufPage := newTestBufferPage(t)
 
 		// WHEN
-		undoPage := CreatePage(*pg)
+		undoPage := CreatePage(bufPage)
 
 		// THEN
 		assert.Equal(t, uint16(0), undoPage.UsedBytes())
@@ -46,8 +47,8 @@ func TestCreatePage(t *testing.T) {
 
 	t.Run("既存のヘッダー値が上書きされる", func(t *testing.T) {
 		// GIVEN: 既存ヘッダーに非ゼロ値が入っているページ
-		pg := newTestPage(t)
-		existing := NewPage(*pg)
+		bufPage := newTestBufferPage(t)
+		existing := NewPage(bufPage)
 		existing.initialize()
 		_ = existing.append(make([]byte, 100))
 		existing.setNextPageNumber(page.PageNumber(42))
@@ -55,7 +56,7 @@ func TestCreatePage(t *testing.T) {
 		assert.Equal(t, page.PageNumber(42), existing.NextPageNumber())
 
 		// WHEN
-		undoPage := CreatePage(*pg)
+		undoPage := CreatePage(bufPage)
 
 		// THEN: ヘッダーがゼロクリアされる
 		assert.Equal(t, uint16(0), undoPage.UsedBytes())
@@ -406,20 +407,20 @@ func TestPageSetNextPageNumber(t *testing.T) {
 	})
 }
 
-// newTestPage はテスト用の page.Page を作成する
-func newTestPage(t *testing.T) *page.Page {
+// newTestBufferPage はテスト用の buffer.Page を作成する
+func newTestBufferPage(t *testing.T) *buffer.Page {
 	t.Helper()
-	data := make([]byte, page.Size)
-	pg, err := page.NewPage(data)
+	pool := buffer.NewPool(page.Size, nil)
+	bufPage, err := pool.AddPage(page.NewId(0, 0))
 	if err != nil {
-		t.Fatalf("page.Page の作成に失敗: %v", err)
+		t.Fatalf("buffer.Page の作成に失敗: %v", err)
 	}
-	return pg
+	return bufPage
 }
 
 // newTestUndoPage はテスト用の初期化済み Undo Page を作成する
 func newTestUndoPage(t *testing.T) *Page {
 	t.Helper()
-	pg := newTestPage(t)
-	return NewPage(*pg)
+	bufPage := newTestBufferPage(t)
+	return NewPage(bufPage)
 }

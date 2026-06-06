@@ -3,6 +3,8 @@ package btree
 import (
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -405,9 +407,19 @@ func TestSlottedPageInitialize(t *testing.T) {
 }
 
 // newTestSlottedPage は初期化済みの SlottedPage を作成する
+//   - size: SlottedPage の総バイト数 (ヘッダー + ポインタ + セル領域)
+//
+// bufPage 全体 (page.Size) のうち末尾 size バイトを SlottedPage として割り当て、
+// 任意サイズで slottedPage のロジックを検証できるようにする
 func newTestSlottedPage(size int) *slottedPage {
-	data := make([]byte, size)
-	sp := newSlottedPage(data)
+	pool := buffer.NewPool(page.Size, nil)
+	bufPage, err := pool.AddPage(page.NewId(0, 0))
+	if err != nil {
+		panic(err)
+	}
+	bodySize := page.Size - page.HeaderSize
+	bodyOffset := bodySize - size
+	sp := newSlottedPage(bufPage, bodyOffset)
 	sp.initialize()
 	return sp
 }

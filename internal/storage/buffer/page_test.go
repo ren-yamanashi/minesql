@@ -61,6 +61,149 @@ func TestMarkModified(t *testing.T) {
 	})
 }
 
+func TestOverwritePage(t *testing.T) {
+	t.Run("src でページ全体を上書きし isDirty/modifyCount を更新する", func(t *testing.T) {
+		// GIVEN
+		pool := NewPool(page.Size, nil)
+		pageId := page.NewId(0, 0)
+		bp, err := pool.AddPage(pageId)
+		assert.NoError(t, err)
+		before := bp.modifyCount
+		src := make([]byte, page.Size)
+		for i := range src {
+			src[i] = byte(i % 256)
+		}
+
+		// WHEN
+		bp.OverwritePage(src)
+
+		// THEN
+		assert.Equal(t, src, bp.data.Bytes())
+		assert.True(t, bp.isDirty)
+		assert.Equal(t, before+1, bp.modifyCount)
+	})
+
+	t.Run("src の長さが page.Size と一致しないと panic する", func(t *testing.T) {
+		// GIVEN
+		pool := NewPool(page.Size, nil)
+		pageId := page.NewId(0, 0)
+		bp, err := pool.AddPage(pageId)
+		assert.NoError(t, err)
+		short := make([]byte, page.Size-1)
+
+		// WHEN / THEN
+		assert.Panics(t, func() {
+			bp.OverwritePage(short)
+		})
+	})
+}
+
+func TestWriteHeaderAt(t *testing.T) {
+	t.Run("ヘッダー先頭から src を書き込み isDirty/modifyCount を更新する", func(t *testing.T) {
+		// GIVEN
+		pool := NewPool(page.Size, nil)
+		pageId := page.NewId(0, 0)
+		bp, err := pool.AddPage(pageId)
+		assert.NoError(t, err)
+		before := bp.modifyCount
+		src := []byte{0xDE, 0xAD, 0xBE, 0xEF}
+
+		// WHEN
+		bp.WriteHeaderAt(0, src)
+
+		// THEN
+		assert.Equal(t, src, bp.data.Header())
+		assert.True(t, bp.isDirty)
+		assert.Equal(t, before+1, bp.modifyCount)
+	})
+
+	t.Run("オフセット指定で部分書き込みできる", func(t *testing.T) {
+		// GIVEN
+		pool := NewPool(page.Size, nil)
+		pageId := page.NewId(0, 0)
+		bp, err := pool.AddPage(pageId)
+		assert.NoError(t, err)
+		src := []byte{0xAB, 0xCD}
+
+		// WHEN
+		bp.WriteHeaderAt(1, src)
+
+		// THEN
+		assert.Equal(t, byte(0x00), bp.data.Header()[0])
+		assert.Equal(t, byte(0xAB), bp.data.Header()[1])
+		assert.Equal(t, byte(0xCD), bp.data.Header()[2])
+	})
+
+	t.Run("範囲外書き込みで panic する", func(t *testing.T) {
+		// GIVEN
+		pool := NewPool(page.Size, nil)
+		pageId := page.NewId(0, 0)
+		bp, err := pool.AddPage(pageId)
+		assert.NoError(t, err)
+		oversized := make([]byte, page.HeaderSize+1)
+
+		// WHEN
+		// THEN
+		assert.Panics(t, func() {
+			bp.WriteHeaderAt(0, oversized)
+		})
+	})
+}
+
+func TestWriteBodyAt(t *testing.T) {
+	t.Run("ボディに src を書き込み isDirty/modifyCount を更新する", func(t *testing.T) {
+		// GIVEN
+		pool := NewPool(page.Size, nil)
+		pageId := page.NewId(0, 0)
+		bp, err := pool.AddPage(pageId)
+		assert.NoError(t, err)
+		before := bp.modifyCount
+		src := []byte{0x01, 0x02, 0x03, 0x04}
+
+		// WHEN
+		bp.WriteBodyAt(0, src)
+
+		// THEN
+		assert.Equal(t, src, bp.data.Body()[:4])
+		assert.True(t, bp.isDirty)
+		assert.Equal(t, before+1, bp.modifyCount)
+	})
+
+	t.Run("オフセット指定で部分書き込みできる", func(t *testing.T) {
+		// GIVEN
+		pool := NewPool(page.Size, nil)
+		pageId := page.NewId(0, 0)
+		bp, err := pool.AddPage(pageId)
+		assert.NoError(t, err)
+		src := []byte{0xFF, 0xEE}
+
+		// WHEN
+		bp.WriteBodyAt(10, src)
+
+		// THEN
+		assert.Equal(t, byte(0xFF), bp.data.Body()[10])
+		assert.Equal(t, byte(0xEE), bp.data.Body()[11])
+		assert.Equal(t, byte(0x00), bp.data.Body()[9])
+		assert.Equal(t, byte(0x00), bp.data.Body()[12])
+	})
+
+	t.Run("範囲外書き込みで panic する", func(t *testing.T) {
+		// GIVEN
+		pool := NewPool(page.Size, nil)
+		pageId := page.NewId(0, 0)
+		bp, err := pool.AddPage(pageId)
+		assert.NoError(t, err)
+		bodySize := page.Size - page.HeaderSize
+		oversized := make([]byte, bodySize+1)
+
+		// WHEN
+		// THEN
+		assert.Panics(t, func() {
+			bp.WriteBodyAt(0, oversized)
+		})
+	})
+}
+
 func TestNewPage(t *testing.T) {
 	t.Run("指定した PageId で Page を生成できる", func(t *testing.T) {
 		// GIVEN

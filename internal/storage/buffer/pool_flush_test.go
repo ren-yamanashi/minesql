@@ -17,7 +17,7 @@ func TestFlushAllPages(t *testing.T) {
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
-		p, err := bp.PageForWrite(pageId)
+		p, err := bp.Page(pageId)
 		assert.NoError(t, err)
 		p.data.Body()[0] = 0xAA
 		p.MarkModified()
@@ -27,7 +27,7 @@ func TestFlushAllPages(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		bufPage, err := bp.PageForRead(pageId)
+		bufPage, err := bp.Page(pageId)
 		assert.NoError(t, err)
 		assert.False(t, bufPage.isDirty)
 	})
@@ -40,7 +40,7 @@ func TestFlushAllPages(t *testing.T) {
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
-		p, err := bp.PageForWrite(pageId)
+		p, err := bp.Page(pageId)
 		assert.NoError(t, err)
 		p.MarkModified()
 
@@ -60,7 +60,7 @@ func TestFlushAllPages(t *testing.T) {
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
-		p, err := bp.PageForWrite(pageId)
+		p, err := bp.Page(pageId)
 		assert.NoError(t, err)
 		p.data.Body()[0] = 0xBB
 		p.MarkModified()
@@ -72,7 +72,7 @@ func TestFlushAllPages(t *testing.T) {
 		otherId := page.NewId(0, 1)
 		_, err = bp.AddPage(otherId)
 		assert.NoError(t, err)
-		reloaded, err := bp.PageForRead(pageId)
+		reloaded, err := bp.Page(pageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -100,8 +100,9 @@ func TestFlushAllPages(t *testing.T) {
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
-		_, err = bp.PageForWrite(pageId)
+		p, err := bp.Page(pageId)
 		assert.NoError(t, err)
+		p.MarkModified()
 		// 強制的に HeapFile を Close して I/O を失敗させる
 		_ = hf.Close()
 
@@ -110,7 +111,7 @@ func TestFlushAllPages(t *testing.T) {
 
 		// THEN
 		assert.Error(t, err)
-		bufPage, perr := bp.PageForRead(pageId)
+		bufPage, perr := bp.Page(pageId)
 		assert.NoError(t, perr)
 		assert.True(t, bufPage.isDirty, "ディスクへ永続化されていないので isDirty が残るべき")
 		assert.Equal(t, 1, bp.FlushListPageCount(), "再フラッシュ可能なように flushList に残るべき")
@@ -124,8 +125,9 @@ func TestFlushAllPages(t *testing.T) {
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
-		_, err = bp.PageForWrite(pageId)
+		p, err := bp.Page(pageId)
 		assert.NoError(t, err)
+		p.MarkModified()
 		// Mtr 経由で X ラッチを保持中の状態を模擬
 		mtr := NewMtr(bp)
 		_, err = mtr.PageForWrite(pageId)
@@ -226,7 +228,7 @@ func TestFlushAllPages(t *testing.T) {
 
 		bp2 := NewPool(page.Size*2, nil)
 		bp2.RegisterHeapFile(0, hf)
-		bufPage2, err := bp2.PageForRead(pageId)
+		bufPage2, err := bp2.Page(pageId)
 		assert.NoError(t, err)
 		diskVal := bufPage2.data.Body()[0]
 		bp2.Unpin(pageId)
@@ -311,10 +313,12 @@ func TestFlushOldestPages(t *testing.T) {
 		assert.NoError(t, err)
 		_, err = bp.AddPage(id1)
 		assert.NoError(t, err)
-		_, err = bp.PageForWrite(id0)
+		p0, err := bp.Page(id0)
 		assert.NoError(t, err)
-		_, err = bp.PageForWrite(id1)
+		p0.MarkModified()
+		p1, err := bp.Page(id1)
 		assert.NoError(t, err)
+		p1.MarkModified()
 
 		// WHEN
 		err = bp.FlushOldestPages(1)
@@ -343,15 +347,16 @@ func TestFlushOldestPages(t *testing.T) {
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
-		_, err = bp.PageForWrite(pageId)
+		p, err := bp.Page(pageId)
 		assert.NoError(t, err)
+		p.MarkModified()
 
 		// WHEN
 		err = bp.FlushOldestPages(1)
 		assert.NoError(t, err)
 
 		// THEN
-		bufPage, err := bp.PageForRead(pageId)
+		bufPage, err := bp.Page(pageId)
 		assert.NoError(t, err)
 		assert.False(t, bufPage.isDirty)
 	})
@@ -364,8 +369,9 @@ func TestFlushOldestPages(t *testing.T) {
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
-		_, err = bp.PageForWrite(pageId)
+		p, err := bp.Page(pageId)
 		assert.NoError(t, err)
+		p.MarkModified()
 		// 強制的に HeapFile を Close して I/O を失敗させる
 		_ = hf.Close()
 
@@ -374,7 +380,7 @@ func TestFlushOldestPages(t *testing.T) {
 
 		// THEN
 		assert.Error(t, err)
-		bufPage, perr := bp.PageForRead(pageId)
+		bufPage, perr := bp.Page(pageId)
 		assert.NoError(t, perr)
 		assert.True(t, bufPage.isDirty, "ディスクへ永続化されていないので isDirty が残るべき")
 		assert.Equal(t, 1, bp.FlushListPageCount(), "再フラッシュ可能なように flushList に残るべき")

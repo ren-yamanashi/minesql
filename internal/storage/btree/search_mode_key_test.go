@@ -3,6 +3,7 @@ package btree
 import (
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -80,24 +81,24 @@ func TestSearchModeKeyChildPageId(t *testing.T) {
 
 // newSearchModeKeyTestLeafNode はテスト用の初期化済み LeafNode を作成する
 func newSearchModeKeyTestLeafNode() *leafNode {
-	data := make([]byte, page.Size)
-	pg, err := page.NewPage(data)
+	pool := buffer.NewPool(page.Size, nil)
+	bufPage, err := pool.AddPage(page.NewId(0, 0))
 	if err != nil {
 		panic(err)
 	}
-	ln := newLeafNode(pg)
+	ln := newLeafNode(bufPage)
 	ln.initialize()
 	return ln
 }
 
 // newSearchModeKeyTestBranchNode はテスト用の初期化済み BranchNode を作成する
 func newSearchModeKeyTestBranchNode() *branchNode {
-	data := make([]byte, page.Size)
-	pg, err := page.NewPage(data)
+	pool := buffer.NewPool(page.Size, nil)
+	bufPage, err := pool.AddPage(page.NewId(0, 0))
 	if err != nil {
 		panic(err)
 	}
-	bn := newBranchNode(pg)
+	bn := newBranchNode(bufPage)
 	_ = bn.initialize([]byte{0x10}, page.NewId(0, 1), page.NewId(0, 2))
 	return bn
 }

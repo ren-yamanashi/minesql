@@ -2,6 +2,8 @@ package btree
 
 import (
 	"encoding/binary"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 )
 
 // Slotted Page のヘッダーサイズ
@@ -11,11 +13,18 @@ import (
 const slottedPageHeaderSize = 8
 
 type slottedPage struct {
-	data []byte
+	// bufPage.Data().Body()[bodyOffset:] の読み取りビュー (書き込みは bufPage の API 経由で行う必要がある)
+	data       []byte
+	bufPage    *buffer.Page
+	bodyOffset int
 }
 
-func newSlottedPage(data []byte) *slottedPage {
-	return &slottedPage{data: data}
+func newSlottedPage(bufPage *buffer.Page, bodyOffset int) *slottedPage {
+	return &slottedPage{
+		data:       bufPage.Data().Body()[bodyOffset:],
+		bufPage:    bufPage,
+		bodyOffset: bodyOffset,
+	}
 }
 
 // hasSpaceFor は指定サイズの追加データが空き領域に収まるかを返す
@@ -37,15 +46,15 @@ func (sp *slottedPage) insert(index int, data []byte) bool {
 	numSlots := sp.numSlots()
 	freeSpaceOffset := int(binary.BigEndian.Uint16(sp.data[2:4]))
 	newFreeSpaceOffset := freeSpaceOffset - size
-	binary.BigEndian.PutUint16(sp.data[0:2], uint16(numSlots+1))
-	binary.BigEndian.PutUint16(sp.data[2:4], uint16(newFreeSpaceOffset))
+	sp.writeUint16At(0, uint16(numSlots+1))
+	sp.writeUint16At(2, uint16(newFreeSpaceOffset))
 
 	// データを挿入するポインタの index がスロット数より小さい場合は、ポインタ配列をシフト (index 以降を右にずらす)
 	if index < numSlots {
 		src := slottedPageHeaderSize + index*slottedPagePointerSize // コピー元の開始位置
 		dest := src + slottedPagePointerSize                        // コピー先の開始位置
 		copySize := (numSlots - index) * slottedPagePointerSize
-		copy(sp.data[dest:dest+copySize], sp.data[src:src+copySize])
+		sp.copyWithin(dest, src, copySize)
 	}
 
 	// pointer, cell の追加
@@ -53,7 +62,7 @@ func (sp *slottedPage) insert(index int, data []byte) bool {
 		uint16(newFreeSpaceOffset),
 		uint16(size),
 	))
-	copy(sp.cell(index), data)
+	sp.writeBytesAt(newFreeSpaceOffset, data)
 	return true
 }
 
@@ -67,10 +76,10 @@ func (sp *slottedPage) delete(index int) {
 		src := slottedPageHeaderSize + (index+1)*slottedPagePointerSize // コピー元の開始位置
 		dest := slottedPageHeaderSize + index*slottedPagePointerSize    // コピー先の開始位置
 		copySize := (numSlots - index - 1) * slottedPagePointerSize
-		copy(sp.data[dest:dest+copySize], sp.data[src:src+copySize])
+		sp.copyWithin(dest, src, copySize)
 	}
 
-	binary.BigEndian.PutUint16(sp.data[0:2], uint16(numSlots-1))
+	sp.writeUint16At(0, uint16(numSlots-1))
 }
 
 // canResize は index のスロットを newSize にリサイズできるかを返す
@@ -91,7 +100,8 @@ func (sp *slottedPage) update(index int, data []byte) bool {
 	if !sp.resize(index, len(data)) {
 		return false
 	}
-	copy(sp.cell(index), data)
+	pointer := sp.pointerAt(index)
+	sp.writeBytesAt(int(pointer.offset), data)
 	return true
 }
 
@@ -118,10 +128,10 @@ func (sp *slottedPage) resize(index int, newSize int) bool {
 	shiftStart := freeOffset
 	shiftEnd := oldFreeOffset
 	newFreeOffset := freeOffset - sizeIncrease
-	copy(sp.data[newFreeOffset:newFreeOffset+(shiftEnd-shiftStart)], sp.data[shiftStart:shiftEnd])
+	sp.copyWithin(newFreeOffset, shiftStart, shiftEnd-shiftStart)
 
 	// freeSpaceOffset を更新
-	binary.BigEndian.PutUint16(sp.data[2:4], uint16(newFreeOffset))
+	sp.writeUint16At(2, uint16(newFreeOffset))
 
 	// 影響を受けるポインタのオフセットを更新
 	for i := range sp.numSlots() {
@@ -170,12 +180,12 @@ func (sp *slottedPage) transferAllTo(dest *slottedPage) bool {
 		srcData := sp.cell(i)
 		dataSize := len(srcData)
 		destFreeOffset -= dataSize
-		copy(dest.data[destFreeOffset:destFreeOffset+dataSize], srcData)
+		dest.writeBytesAt(destFreeOffset, srcData)
 		dest.setPointer(destNumSlots+i, newPointer(uint16(destFreeOffset), uint16(dataSize)))
 	}
 
-	binary.BigEndian.PutUint16(dest.data[0:2], uint16(destNumSlots+srcNumSlots))
-	binary.BigEndian.PutUint16(dest.data[2:4], uint16(destFreeOffset))
+	dest.writeUint16At(0, uint16(destNumSlots+srcNumSlots))
+	dest.writeUint16At(2, uint16(destFreeOffset))
 	sp.initialize()
 	return true
 }
@@ -206,9 +216,11 @@ func (sp *slottedPage) cell(index int) []byte {
 
 // initialize は Slotted Page を初期化する
 func (sp *slottedPage) initialize() {
-	binary.BigEndian.PutUint16(sp.data[0:2], 0)
-	binary.BigEndian.PutUint16(sp.data[2:4], uint16(len(sp.data)))
-	binary.BigEndian.PutUint32(sp.data[4:8], 0)
+	var buf [slottedPageHeaderSize]byte
+	binary.BigEndian.PutUint16(buf[0:2], 0)
+	binary.BigEndian.PutUint16(buf[2:4], uint16(len(sp.data)))
+	binary.BigEndian.PutUint32(buf[4:8], 0)
+	sp.writeBytesAt(0, buf[:])
 }
 
 // pointerAt は指定されたインデックスのポインタを取得する
@@ -223,6 +235,31 @@ func (sp *slottedPage) pointerAt(index int) pointer {
 // setPointer は指定されたインデックスのポインタを設定する
 func (sp *slottedPage) setPointer(index int, p pointer) {
 	base := slottedPageHeaderSize + index*slottedPagePointerSize
-	binary.BigEndian.PutUint16(sp.data[base:base+2], p.offset) // offset
-	binary.BigEndian.PutUint16(sp.data[base+2:base+4], p.size) // size
+	var buf [slottedPagePointerSize]byte
+	binary.BigEndian.PutUint16(buf[0:2], p.offset)
+	binary.BigEndian.PutUint16(buf[2:4], p.size)
+	sp.writeBytesAt(base, buf[:])
+}
+
+// writeUint16At は data の offset に uint16 値を書き込む
+func (sp *slottedPage) writeUint16At(offset int, v uint16) {
+	var buf [2]byte
+	binary.BigEndian.PutUint16(buf[:], v)
+	sp.bufPage.WriteBodyAt(sp.bodyOffset+offset, buf[:])
+}
+
+// writeBytesAt は data の offset に src を書き込む
+func (sp *slottedPage) writeBytesAt(offset int, src []byte) {
+	sp.bufPage.WriteBodyAt(sp.bodyOffset+offset, src)
+}
+
+// copyWithin は同一スロッテッドページ内で n バイトを src から dest へコピーする
+//   - 範囲がオーバーラップしていても安全に動作する
+func (sp *slottedPage) copyWithin(dest, src, n int) {
+	if n == 0 {
+		return
+	}
+	tmp := make([]byte, n)
+	copy(tmp, sp.data[src:src+n])
+	sp.bufPage.WriteBodyAt(sp.bodyOffset+dest, tmp)
 }

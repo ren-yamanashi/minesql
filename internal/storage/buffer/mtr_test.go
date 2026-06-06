@@ -78,16 +78,15 @@ func TestMtrPageForWrite(t *testing.T) {
 		mtr := NewMtr(bp)
 
 		// WHEN
-		bufPage, err := mtr.PageForWrite(pageId)
+		_, err = mtr.PageForWrite(pageId)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.True(t, bufPage.isDirty)
 		assert.Equal(t, 1, pinCountOf(bp, pageId))
 		assert.Equal(t, 1, mtr.PinnedCount())
 	})
 
-	t.Run("呼び出すたびに更新カウンタが進む", func(t *testing.T) {
+	t.Run("PageForWrite を呼ぶだけでは更新カウンタは進まない", func(t *testing.T) {
 		// GIVEN
 		bp := NewPool(page.Size*3, nil)
 		pageId := page.NewId(0, 0)
@@ -96,29 +95,7 @@ func TestMtrPageForWrite(t *testing.T) {
 		mtr := NewMtr(bp)
 
 		// WHEN
-		bufPage1, err := mtr.PageForWrite(pageId)
-		assert.NoError(t, err)
-		count1 := bufPage1.modifyCount
-		mtr.Unpin(pageId)
-		bufPage2, err := mtr.PageForWrite(pageId)
-		assert.NoError(t, err)
-		count2 := bufPage2.modifyCount
-
-		// THEN
-		assert.Equal(t, uint64(1), count1)
-		assert.Equal(t, uint64(2), count2)
-	})
-
-	t.Run("PageForRead では更新カウンタが進まない", func(t *testing.T) {
-		// GIVEN
-		bp := NewPool(page.Size*3, nil)
-		pageId := page.NewId(0, 0)
-		_, err := bp.AddPage(pageId)
-		assert.NoError(t, err)
-		mtr := NewMtr(bp)
-
-		// WHEN
-		bufPage, err := mtr.PageForRead(pageId)
+		bufPage, err := mtr.PageForWrite(pageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -204,6 +181,7 @@ func TestMtrPageForWrite(t *testing.T) {
 					bufPage, err := mtr.PageForWrite(pageId)
 					if err == nil {
 						bufPage.data.Body()[0] = v
+						bufPage.MarkModified()
 					}
 					mtr.UnpinAll()
 				}

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
@@ -15,22 +16,24 @@ const (
 )
 
 type leafNode struct {
-	// ノードタイプヘッダー + リーフノードヘッダー
+	// ノードタイプヘッダー + リーフノードヘッダーの読み取りビュー (書き込みは bufPage の API 経由で行う必要がある)
 	//   - header[0:8]: ノードタイプ
 	//   - header[8:16]: prev PageId
 	//   - header[16:24]: next PageId
-	header []byte
-	body   *slottedPage
+	header  []byte
+	body    *slottedPage
+	bufPage *buffer.Page
 }
 
-func newLeafNode(pg *page.Page) *leafNode {
-	data := pg.Body()
+func newLeafNode(bufPage *buffer.Page) *leafNode {
+	data := bufPage.Data().Body()
 	headerSize := nodeHeaderSize + leafNodeHeaderSize
 	header := data[:headerSize]
-	body := newSlottedPage(data[headerSize:])
+	body := newSlottedPage(bufPage, headerSize)
 	return &leafNode{
-		header: header,
-		body:   body,
+		header:  header,
+		body:    body,
+		bufPage: bufPage,
 	}
 }
 
@@ -38,9 +41,10 @@ func newLeafNode(pg *page.Page) *leafNode {
 //
 // 初期化時には、ノードタイプヘッダーを設定し、前後のリーフノードのポインタ (PageId) には無効値が設定される
 func (ln *leafNode) initialize() {
-	copy(ln.header[:nodeHeaderSize], nodeTypeLeaf)
-	page.InvalidId().WriteAt(ln.header[nodeHeaderSize:], leafNodePrevPageIdOffset)
-	page.InvalidId().WriteAt(ln.header[nodeHeaderSize:], leafNodeNextPageIdOffset)
+	ln.bufPage.WriteBodyAt(0, []byte(nodeTypeLeaf))
+	invalidId := page.InvalidId().Bytes()
+	ln.bufPage.WriteBodyAt(nodeHeaderSize+leafNodePrevPageIdOffset, invalidId)
+	ln.bufPage.WriteBodyAt(nodeHeaderSize+leafNodeNextPageIdOffset, invalidId)
 	ln.body.initialize()
 }
 
@@ -180,12 +184,12 @@ func (ln *leafNode) nextPageId() page.Id {
 
 // setPrevPageId は前のリーフノードのページ ID を設定する
 func (ln *leafNode) setPrevPageId(prevPageId page.Id) {
-	prevPageId.WriteAt(ln.header[nodeHeaderSize:], leafNodePrevPageIdOffset)
+	ln.bufPage.WriteBodyAt(nodeHeaderSize+leafNodePrevPageIdOffset, prevPageId.Bytes())
 }
 
 // setNextPageId は次のリーフノードのページ ID を設定する
 func (ln *leafNode) setNextPageId(nextPageId page.Id) {
-	nextPageId.WriteAt(ln.header[nodeHeaderSize:], leafNodeNextPageIdOffset)
+	ln.bufPage.WriteBodyAt(nodeHeaderSize+leafNodeNextPageIdOffset, nextPageId.Bytes())
 }
 
 // transferAllFrom は src のすべてのレコードを自分の末尾に転送する (src のレコードはすべて削除される)

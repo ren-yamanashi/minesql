@@ -3,6 +3,7 @@ package btree
 import (
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -396,11 +397,12 @@ func TestBranchNodeIsHalfFull(t *testing.T) {
 
 // newUninitializedBranchNode は未初期化の BranchNode を作成する
 func newUninitializedBranchNode() *branchNode {
-	pg, err := page.NewPage(make([]byte, page.Size))
+	pool := buffer.NewPool(page.Size, nil)
+	bufPage, err := pool.AddPage(page.NewId(0, 0))
 	if err != nil {
 		panic(err)
 	}
-	return newBranchNode(pg)
+	return newBranchNode(bufPage)
 }
 
 // newTestBranchNode は初期化済みの BranchNode を作成する (レコード 1 つ、key=0x10)

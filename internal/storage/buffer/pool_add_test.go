@@ -85,7 +85,7 @@ func TestAddPage(t *testing.T) {
 		bp.RegisterHeapFile(0, hf)
 		_, err := bp.AddPage(firstId)
 		assert.NoError(t, err)
-		_, err = bp.PageForRead(firstId)
+		_, err = bp.Page(firstId)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -116,7 +116,7 @@ func TestAddPage(t *testing.T) {
 		bp.RegisterHeapFile(0, hf)
 		_, err := bp.AddPage(firstId)
 		assert.NoError(t, err)
-		_, err = bp.PageForWrite(firstId)
+		_, err = bp.Page(firstId)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -136,7 +136,7 @@ func TestAddPage(t *testing.T) {
 		firstId := page.NewId(0, 0)
 		_, err := bp.AddPage(firstId)
 		assert.NoError(t, err)
-		_, err = bp.PageForRead(firstId)
+		_, err = bp.Page(firstId)
 		assert.NoError(t, err)
 
 		// WHEN

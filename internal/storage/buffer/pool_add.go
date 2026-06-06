@@ -37,7 +37,7 @@ func (p *Pool) addPage(pageId page.Id) (*Page, error) {
 
 	// バッファプールに空きがある場合: 新しいバッファページを追加・ページテーブルを更新
 	if len(p.pages) < p.maxPages {
-		newBufPage, err := NewPage(pageId)
+		newBufPage, err := NewPage(pageId, p)
 		if err != nil {
 			return nil, err
 		}
@@ -65,7 +65,7 @@ func (p *Pool) addPage(pageId page.Id) (*Page, error) {
 	victimBufPage := &p.pages[victimBufId]
 
 	// 新しいページを先に確保し、失敗時に pageTable / pages が変更されていない状態を保つ
-	newBufPage, err := NewPage(pageId)
+	newBufPage, err := NewPage(pageId, p)
 	if err != nil {
 		p.lru.undoEvict(victimBufId)
 		return nil, err
