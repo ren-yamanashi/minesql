@@ -10,6 +10,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -99,6 +100,36 @@ func TestManagerAppend(t *testing.T) {
 			records := mgr.Records(lock.TrxId(g + 1))
 			assert.Len(t, records, appendsPerGoroutine)
 		}
+	})
+
+	t.Run("ページ満杯時の switch では新ページ実体化の REDO がリンク変更 REDO より前に出る", func(t *testing.T) {
+		// GIVEN
+		mgr, redoLog := setupTestManagerWithRedoLog(t)
+		oldPageId := mgr.currentPageId
+		rec := NewInsertRecord(page.FileId(1), btree.Record{[]byte("x")})
+
+		// WHEN
+		for mgr.currentPageId == oldPageId {
+			_, err := appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, rec)
+			assert.NoError(t, err)
+		}
+		newPageId := mgr.currentPageId
+		assert.NoError(t, redoLog.Flush())
+		records, err := redoLog.ReadFrom(redo.Lsn(0))
+		assert.NoError(t, err)
+		var pageWrites []redo.Record
+		for _, r := range records {
+			if r.Type() == redo.RecordTypePageWrite {
+				pageWrites = append(pageWrites, r)
+			}
+		}
+
+		// THEN
+		assert.NotEqual(t, oldPageId, newPageId)
+		n := len(pageWrites)
+		assert.GreaterOrEqual(t, n, 2)
+		assert.Equal(t, newPageId, pageWrites[n-2].PageId())
+		assert.Equal(t, oldPageId, pageWrites[n-1].PageId())
 	})
 
 	t.Run("Append と Discard が並行実行されてもデータレースが起きない", func(t *testing.T) {
@@ -472,6 +503,23 @@ func setupTestManager(t *testing.T) *Manager {
 		t.Fatalf("Manager の作成に失敗: %v", err)
 	}
 	return mgr
+}
+
+// setupTestManagerWithRedoLog はテスト用の Manager を実 redoLog 付きで作成する
+//   - REDO ログの内容を検証したいテスト用
+func setupTestManagerWithRedoLog(t *testing.T) (*Manager, *redo.Buffer) {
+	t.Helper()
+	bp := setupTestBufferPool(t)
+	redoLog, err := redo.NewBuffer(t.TempDir())
+	if err != nil {
+		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = redoLog.Close() })
+	mgr, err := NewManager(bp, redoLog, page.FileId(1))
+	if err != nil {
+		t.Fatalf("Manager の作成に失敗: %v", err)
+	}
+	return mgr, redoLog
 }
 
 // appendForTest は 1 回の Append を独立した mtr スコープで実行するヘルパー

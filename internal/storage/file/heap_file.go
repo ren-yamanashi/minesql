@@ -49,8 +49,7 @@ func NewHeapFile(fileId page.FileId, path string) (heapFile *HeapFile, retErr er
 }
 
 // AllocatePageId は新しいページ ID を採番する
-//
-// PageNumber が上限に達している場合はエラーを返す
+//   - PageNumber が上限に達している場合はエラーを返す
 func (hf *HeapFile) AllocatePageId() (page.Id, error) {
 	if hf.nextPageId.PageNumber() >= page.MaxPageNumber {
 		return page.InvalidId(), fmt.Errorf("file %d: page number limit reached", hf.fileId)

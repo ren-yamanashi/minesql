@@ -105,8 +105,7 @@ func CreateCatalog(bp *buffer.Pool) (*Catalog, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = bp.AddPage(headerPageId)
-	if err != nil {
+	if _, err := bp.AddPage(headerPageId); err != nil {
 		return nil, err
 	}
 	defer bp.Unpin(headerPageId)

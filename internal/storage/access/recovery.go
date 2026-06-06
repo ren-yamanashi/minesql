@@ -86,6 +86,7 @@ func (r *Recovery) applyPageWrite(rec redo.Record) error {
 	if err != nil {
 		return err
 	}
+	defer r.bufferPool.Unpin(rec.PageId())
 	currentLsn := redo.Lsn(binary.BigEndian.Uint32(writePage.Data().Header()))
 	if currentLsn >= rec.Lsn() {
 		return nil
@@ -141,7 +142,7 @@ func (r *Recovery) collectUndoRecords(trxId lock.TrxId) ([]undo.Record, error) {
 		readPage, readErr := r.bufferPool.PageForRead(pageId)
 		if readErr != nil {
 			// Undo ページチェーンの終端に達した場合は正常終了
-			// GetReadPage はページが存在しない場合もエラーを返すため、先頭ページの読み取り失敗はチェーンが空であることを意味する
+			// PageForRead はページが存在しない場合もエラーを返すため、先頭ページの読み取り失敗はチェーンが空であることを意味する
 			break
 		}
 
@@ -155,12 +156,14 @@ func (r *Recovery) collectUndoRecords(trxId lock.TrxId) ([]undo.Record, error) {
 
 			fields, deserializeErr := undo.DeserializeFields(recordBytes)
 			if deserializeErr != nil {
+				r.bufferPool.Unpin(pageId)
 				return nil, deserializeErr
 			}
 
 			if fields.TrxId() == trxId {
 				record, toRecordErr := fields.ToRecord()
 				if toRecordErr != nil {
+					r.bufferPool.Unpin(pageId)
 					return nil, toRecordErr
 				}
 				records = append(records, record)
@@ -169,6 +172,7 @@ func (r *Recovery) collectUndoRecords(trxId lock.TrxId) ([]undo.Record, error) {
 		}
 
 		nextPageNum := undoPage.NextPageNumber()
+		r.bufferPool.Unpin(pageId)
 		if nextPageNum == 0 {
 			break
 		}
