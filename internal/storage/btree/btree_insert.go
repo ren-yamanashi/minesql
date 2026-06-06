@@ -28,7 +28,7 @@ func (t *Tree) insertOptimistic(mtr *buffer.Mtr, record Record) (needsPessimisti
 		return false, err
 	}
 	defer mtr.Unpin(t.MetaPageId())
-	metaPage := newMetaPage(pageMeta.Data())
+	metaPage := newMetaPage(pageMeta)
 
 	rootPageId := metaPage.rootPageId()
 	leafPageId, err := t.descendToLeafShared(mtr, rootPageId, record.Key())
@@ -42,7 +42,7 @@ func (t *Tree) insertOptimistic(mtr *buffer.Mtr, record Record) (needsPessimisti
 	}
 	defer mtr.Unpin(leafPageId)
 
-	leafNode := newLeafNode(leafBufPage.Data())
+	leafNode := newLeafNode(leafBufPage)
 	if !leafNode.canFit(record) {
 		return true, nil
 	}
@@ -66,7 +66,7 @@ func (t *Tree) insertPessimistic(mtr *buffer.Mtr, record Record) error {
 		return err
 	}
 	defer mtr.Unpin(t.MetaPageId())
-	metaPage := newMetaPage(pageMeta.Data())
+	metaPage := newMetaPage(pageMeta)
 
 	// ルートページを取得
 	rootPageId := metaPage.rootPageId()
@@ -110,7 +110,7 @@ func (t *Tree) insertPessimistic(mtr *buffer.Mtr, record Record) error {
 		return err
 	}
 	defer mtr.Unpin(newRootPageId)
-	newRootBranch := newBranchNode(pageNewRoot.Data())
+	newRootBranch := newBranchNode(pageNewRoot)
 	err = newRootBranch.initialize(overflowKey, overflowChildPageId, rootPageId)
 	if err != nil {
 		return err
@@ -136,7 +136,7 @@ func (t *Tree) descendToLeafShared(mtr *buffer.Mtr, rootPageId page.Id, key []by
 			mtr.Unpin(currentPageId)
 			return currentPageId, nil
 		case nodeTypeBranch:
-			branchNode := newBranchNode(currentBufPage.Data())
+			branchNode := newBranchNode(currentBufPage)
 			childSlotNum, found := branchNode.searchSlotNum(key)
 			if found {
 				childSlotNum++
@@ -184,7 +184,7 @@ func (t *Tree) insertRecursively(
 	// ブランチノードの場合: 子ノードに対して再帰実行する
 	case nodeTypeBranch:
 		// 挿入先の子ノードを取得
-		branchNode := newBranchNode(pg.Data())
+		branchNode := newBranchNode(pg)
 		childSlotNum, found := branchNode.searchSlotNum(record.Key())
 		if found {
 			childSlotNum++ // 境界キーと一致する場合、右の子に属する
@@ -222,7 +222,7 @@ func (t *Tree) insertRecursively(
 
 	// リーフノードの場合: そのまま挿入する
 	case nodeTypeLeaf:
-		overflowKey, newPageId, err := t.insertLeaf(mtr, bufPage.PageId(), pg.Data(), record)
+		overflowKey, newPageId, err := t.insertLeaf(mtr, bufPage.PageId(), pg, record)
 		if err != nil {
 			return nil, page.InvalidId(), false, err
 		}

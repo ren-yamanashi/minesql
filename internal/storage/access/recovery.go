@@ -95,6 +95,7 @@ func (r *Recovery) applyPageWrite(rec redo.Record) error {
 	}
 	recData := rec.Data()
 	copy(writePage.Data().Bytes(), recData.Bytes())
+	writePage.MarkModified()
 	return nil
 }
 
@@ -168,7 +169,7 @@ func (r *Recovery) collectFromUndoPage(
 		return 0, false, nil
 	}
 
-	undoPage := undo.NewPage(*readPage.Data())
+	undoPage := undo.NewPage(readPage)
 	offset := 0
 	for offset < int(undoPage.UsedBytes()) {
 		recordBytes := undoPage.Record(offset)

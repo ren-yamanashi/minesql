@@ -7,7 +7,7 @@ import (
 
 // insertLeaf はリーフノードにレコードを挿入する
 //   - leafPageId: 挿入先のリーフノードの PageId
-//   - leafPage: 挿入先のリーフノードのページデータ
+//   - leafBufPage: 挿入先のリーフノードのバッファページ
 //   - record: 挿入するレコード
 //   - return:
 //   - overflowKey: 分割時の境界キー (分割なしの場合は nil)
@@ -15,10 +15,10 @@ import (
 func (t *Tree) insertLeaf(
 	mtr *buffer.Mtr,
 	leafPageId page.Id,
-	leafPage *page.Page,
+	leafBufPage *buffer.Page,
 	record Record,
 ) (overflowKey []byte, newPageId page.Id, err error) {
-	leafNode := newLeafNode(leafPage)
+	leafNode := newLeafNode(leafBufPage)
 	slotNum, found := leafNode.searchSlotNum(record.Key())
 	if found {
 		return nil, page.InvalidId(), ErrDuplicateKey
@@ -70,7 +70,7 @@ func (t *Tree) splitInsertLeaf(
 	if err != nil {
 		return nil, page.InvalidId(), err
 	}
-	newLeaf := newLeafNode(pageNewLeaf.Data())
+	newLeaf := newLeafNode(pageNewLeaf)
 	overflowKey, err := leafNode.splitInsert(newLeaf, record)
 	if err != nil {
 		return nil, page.InvalidId(), err
@@ -90,7 +90,7 @@ func (t *Tree) updatePrevLeafLink(mtr *buffer.Mtr, prevLeafPageId, newNextPageId
 	if err != nil {
 		return err
 	}
-	prevLeaf := newLeafNode(pagePrevLeaf.Data())
+	prevLeaf := newLeafNode(pagePrevLeaf)
 	prevLeaf.setNextPageId(newNextPageId)
 	return nil
 }

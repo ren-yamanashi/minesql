@@ -20,6 +20,7 @@ func TestFlushAllPages(t *testing.T) {
 		p, err := bp.PageForWrite(pageId)
 		assert.NoError(t, err)
 		p.data.Body()[0] = 0xAA
+		p.MarkModified()
 
 		// WHEN
 		err = bp.FlushAllPages()
@@ -39,8 +40,9 @@ func TestFlushAllPages(t *testing.T) {
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
-		_, err = bp.PageForWrite(pageId)
+		p, err := bp.PageForWrite(pageId)
 		assert.NoError(t, err)
+		p.MarkModified()
 
 		// WHEN
 		err = bp.FlushAllPages()
@@ -61,6 +63,7 @@ func TestFlushAllPages(t *testing.T) {
 		p, err := bp.PageForWrite(pageId)
 		assert.NoError(t, err)
 		p.data.Body()[0] = 0xBB
+		p.MarkModified()
 		err = bp.FlushAllPages()
 		assert.NoError(t, err)
 		bp.Unpin(pageId)
@@ -157,6 +160,7 @@ func TestFlushAllPages(t *testing.T) {
 					bufPage, err := mtr.PageForWrite(pageId)
 					if err == nil {
 						bufPage.data.Body()[0] = v
+						bufPage.MarkModified()
 					}
 					mtr.UnpinAll()
 				}
@@ -196,6 +200,7 @@ func TestFlushAllPages(t *testing.T) {
 					bufPage, err := mtr.PageForWrite(pageId)
 					if err == nil {
 						bufPage.data.Body()[0] = v
+						bufPage.MarkModified()
 					}
 					mtr.UnpinAll()
 				}
@@ -255,6 +260,7 @@ func TestFlushAllPages(t *testing.T) {
 					bufPage, err := mtr.PageForWrite(pid)
 					if err == nil {
 						bufPage.data.Body()[0] = v
+						bufPage.MarkModified()
 					}
 					mtr.UnpinAll()
 				}

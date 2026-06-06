@@ -77,8 +77,8 @@ func (t *Tree) onLeafUnderflow(
 		return false, false, err
 	}
 	defer mtr.Unpin(sibling.pageId)
-	childLeaf := newLeafNode(pageChild.Data())
-	siblingLeaf := newLeafNode(pageSibling.Data())
+	childLeaf := newLeafNode(pageChild)
+	siblingLeaf := newLeafNode(pageSibling)
 
 	// 兄弟からレコードを転送できる場合
 	if siblingLeaf.canTransferRecord(sibling.isLeft) {
@@ -165,8 +165,8 @@ func (t *Tree) onBranchUnderflow(
 		return false, err
 	}
 	defer mtr.Unpin(sibling.pageId)
-	childBranch := newBranchNode(pageChild.Data())
-	siblingBranch := newBranchNode(pageSibling.Data())
+	childBranch := newBranchNode(pageChild)
+	siblingBranch := newBranchNode(pageSibling)
 
 	// 兄弟からレコードを転送できる場合
 	if siblingBranch.canTransferRecord(sibling.isLeft) {
@@ -270,7 +270,7 @@ func (t *Tree) relinkLeafAfterMerge(mtr *buffer.Mtr, disappearing, survivor *lea
 		if err != nil {
 			return err
 		}
-		nextLeaf := newLeafNode(pageNext.Data())
+		nextLeaf := newLeafNode(pageNext)
 		nextLeaf.setPrevPageId(survivorPageId)
 	}
 	return nil

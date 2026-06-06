@@ -3,6 +3,7 @@ package btree
 import (
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -109,7 +110,10 @@ func TestMetaPageSetHeight(t *testing.T) {
 
 // newTestMetaPage はテスト用のメタページを作成する
 func newTestMetaPage() *metaPage {
-	data := make([]byte, page.Size)
-	pg, _ := page.NewPage(data)
-	return newMetaPage(pg)
+	pool := buffer.NewPool(page.Size, nil)
+	bufPage, err := pool.AddPage(page.NewId(0, 0))
+	if err != nil {
+		panic(err)
+	}
+	return newMetaPage(bufPage)
 }

@@ -29,7 +29,7 @@ func (t *Tree) updateOptimistic(mtr *buffer.Mtr, record Record) (needsPessimisti
 		return false, err
 	}
 	defer mtr.Unpin(t.MetaPageId())
-	metaPage := newMetaPage(pageMeta.Data())
+	metaPage := newMetaPage(pageMeta)
 
 	rootPageId := metaPage.rootPageId()
 	leafPageId, err := t.descendToLeafShared(mtr, rootPageId, record.Key())
@@ -43,7 +43,7 @@ func (t *Tree) updateOptimistic(mtr *buffer.Mtr, record Record) (needsPessimisti
 	}
 	defer mtr.Unpin(leafPageId)
 
-	leafNode := newLeafNode(leafBufPage.Data())
+	leafNode := newLeafNode(leafBufPage)
 	slotNum, found := leafNode.searchSlotNum(record.Key())
 	if !found {
 		return false, ErrKeyNotFound
@@ -65,7 +65,7 @@ func (t *Tree) updatePessimistic(mtr *buffer.Mtr, record Record) error {
 	if err != nil {
 		return err
 	}
-	metaPage := newMetaPage(pageMeta.Data())
+	metaPage := newMetaPage(pageMeta)
 	defer mtr.Unpin(t.MetaPageId())
 
 	// ルートページ取得
@@ -90,7 +90,7 @@ func (t *Tree) updateRecursively(mtr *buffer.Mtr, bufPage *buffer.Page, record R
 	switch nt {
 	// ブランチノードの場合: 子ノードに対して再帰実行する
 	case nodeTypeBranch:
-		branchNode := newBranchNode(pg.Data())
+		branchNode := newBranchNode(pg)
 		mode := SearchModeKey{Key: record.Key()}
 		childPageId, err := mode.childPageId(branchNode)
 		if err != nil {
@@ -105,7 +105,7 @@ func (t *Tree) updateRecursively(mtr *buffer.Mtr, bufPage *buffer.Page, record R
 
 	// リーフノードの場合: そのまま更新する
 	case nodeTypeLeaf:
-		leafNode := newLeafNode(pg.Data())
+		leafNode := newLeafNode(pg)
 		slotNum, found := leafNode.searchSlotNum(record.Key())
 		if !found {
 			return ErrKeyNotFound

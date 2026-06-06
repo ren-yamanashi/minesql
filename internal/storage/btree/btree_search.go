@@ -18,7 +18,7 @@ func (t *Tree) Search(mtr *buffer.Mtr, mode SearchMode) (*Iterator, error) {
 		return nil, err
 	}
 	defer mtr.Unpin(t.MetaPageId())
-	metaPage := newMetaPage(pageMeta.Data())
+	metaPage := newMetaPage(pageMeta)
 
 	// ルートページ取得
 	rootPageId := metaPage.rootPageId()
@@ -62,7 +62,7 @@ func (t *Tree) searchRecursively(mtr *buffer.Mtr, rootPageId page.Id, mode Searc
 		nt := nodeType(currentBufPage.Data())
 		switch nt {
 		case nodeTypeBranch:
-			branchNode := newBranchNode(currentBufPage.Data())
+			branchNode := newBranchNode(currentBufPage)
 			childPageId, err := mode.childPageId(branchNode)
 			if err != nil {
 				mtr.Unpin(currentPageId)
@@ -80,7 +80,7 @@ func (t *Tree) searchRecursively(mtr *buffer.Mtr, rootPageId page.Id, mode Searc
 
 		// リーフノードに到達: 検索モードに応じて探索する
 		case nodeTypeLeaf:
-			leafNode := newLeafNode(currentBufPage.Data())
+			leafNode := newLeafNode(currentBufPage)
 			slotNum := mode.slotNum(leafNode)
 			iter := NewIterator(t, currentBufPage, slotNum)
 			// リーフの Pin は走査側 (Iterator) が引き継ぐため、mtr の管理から外す
@@ -112,7 +112,7 @@ func (t *Tree) leafPageIds() ([]page.Id, error) {
 	if err != nil {
 		return nil, err
 	}
-	metaPage := newMetaPage(pageMeta.Data())
+	metaPage := newMetaPage(pageMeta)
 	rootPageId := metaPage.rootPageId()
 	height := metaPage.height()
 
@@ -131,7 +131,7 @@ func (t *Tree) leafPageIds() ([]page.Id, error) {
 			if err != nil {
 				return nil, err
 			}
-			branchNode := newBranchNode(pg.Data())
+			branchNode := newBranchNode(pg)
 
 			for idx := range branchNode.numRecords() {
 				childPageId, err := branchNode.childPageId(idx)

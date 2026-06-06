@@ -54,7 +54,7 @@ func (t *Tree) splitInsertBranch(
 	if err != nil {
 		return nil, page.InvalidId(), err
 	}
-	newBranch := newBranchNode(pageNewBranch.Data())
+	newBranch := newBranchNode(pageNewBranch)
 	overflowKey, err := branchNode.splitInsert(newBranch, record)
 	if err != nil {
 		return nil, page.InvalidId(), err

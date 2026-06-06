@@ -41,7 +41,7 @@ func (it *Iterator) Get() (Record, bool, error) {
 	it.bufferPage.Latch().LockShared()
 	defer it.bufferPage.Latch().Unlock(buffer.LatchShared)
 
-	leaf := newLeafNode(it.bufferPage.Data())
+	leaf := newLeafNode(it.bufferPage)
 	if it.slotNum >= leaf.numRecords() {
 		return NewRecord(nil, nil, nil), false, nil
 	}
@@ -82,7 +82,7 @@ func (it *Iterator) Advance() error {
 	}
 
 	it.bufferPage.Latch().LockShared()
-	leaf := newLeafNode(it.bufferPage.Data())
+	leaf := newLeafNode(it.bufferPage)
 	if it.slotNum < leaf.numRecords() {
 		it.slotNum++
 	}
@@ -144,7 +144,7 @@ func (it *Iterator) refetchByKey(key []byte) error {
 	}
 
 	iter.bufferPage.Latch().LockShared()
-	newLeaf := newLeafNode(iter.bufferPage.Data())
+	newLeaf := newLeafNode(iter.bufferPage)
 	var newSlot int
 	if iter.slotNum < newLeaf.numRecords() && bytes.Equal(newLeaf.record(iter.slotNum).Key(), key) {
 		newSlot = iter.slotNum + 1

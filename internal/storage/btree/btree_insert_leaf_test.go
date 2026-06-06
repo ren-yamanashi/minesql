@@ -104,8 +104,8 @@ func setupBtreeForTest(t *testing.T) (*Tree, *buffer.Pool) {
 	return bt, bp
 }
 
-// setupTestLeafPage はテスト用のリーフページを作成し、PageId と Page を返す
-func setupTestLeafPage(t *testing.T, bp *buffer.Pool) (page.Id, *page.Page) {
+// setupTestLeafPage はテスト用のリーフページを作成し、PageId と BufferPage を返す
+func setupTestLeafPage(t *testing.T, bp *buffer.Pool) (page.Id, *buffer.Page) {
 	t.Helper()
 	pageId, err := bp.AllocatePageId(0)
 	assert.NoError(t, err)
@@ -113,7 +113,7 @@ func setupTestLeafPage(t *testing.T, bp *buffer.Pool) (page.Id, *page.Page) {
 	assert.NoError(t, err)
 	bufPage, err := bp.PageForWrite(pageId)
 	assert.NoError(t, err)
-	ln := newLeafNode(bufPage.Data())
+	ln := newLeafNode(bufPage)
 	ln.initialize()
-	return pageId, bufPage.Data()
+	return pageId, bufPage
 }

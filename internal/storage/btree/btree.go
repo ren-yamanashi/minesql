@@ -48,7 +48,7 @@ func CreateTree(bp *buffer.Pool, fileId page.FileId) (*Tree, error) {
 	if err != nil {
 		return nil, err
 	}
-	metaPage := newMetaPage(pageMeta.Data())
+	metaPage := newMetaPage(pageMeta)
 
 	// ルートリーフノード作成
 	rootNodePageId, err := bp.AllocatePageId(metaPageId.FileId())
@@ -63,7 +63,7 @@ func CreateTree(bp *buffer.Pool, fileId page.FileId) (*Tree, error) {
 	if err != nil {
 		return nil, err
 	}
-	rootLeaf := newLeafNode(pageRoot.Data())
+	rootLeaf := newLeafNode(pageRoot)
 	rootLeaf.initialize()
 
 	// メタページの設定
@@ -82,7 +82,7 @@ func (t *Tree) LeafPageCount() (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	metaPage := newMetaPage(pageMeta.Data())
+	metaPage := newMetaPage(pageMeta)
 	return metaPage.leafPageCount(), nil
 }
 
@@ -94,7 +94,7 @@ func (t *Tree) Height() (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	metaPage := newMetaPage(pageMeta.Data())
+	metaPage := newMetaPage(pageMeta)
 	return metaPage.height(), nil
 }
 

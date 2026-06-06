@@ -196,12 +196,12 @@ func insertRecordToBtree(t *testing.T, bt *Tree, key, nonKey []byte) {
 	t.Helper()
 	pageMeta, err := bt.bufferPool.PageForRead(bt.MetaPageId())
 	assert.NoError(t, err)
-	mp := newMetaPage(pageMeta.Data())
+	mp := newMetaPage(pageMeta)
 	rootPageId := mp.rootPageId()
 
 	pg, err := bt.bufferPool.PageForWrite(rootPageId)
 	assert.NoError(t, err)
-	ln := newLeafNode(pg.Data())
+	ln := newLeafNode(pg)
 	slotNum, _ := ln.searchSlotNum(key)
 	ln.insert(slotNum, NewRecord([]byte{}, key, nonKey))
 }

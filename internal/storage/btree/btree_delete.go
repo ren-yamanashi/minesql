@@ -27,7 +27,7 @@ func (t *Tree) deleteOptimistic(mtr *buffer.Mtr, key []byte) (needsPessimistic b
 		return false, err
 	}
 	defer mtr.Unpin(t.MetaPageId())
-	metaPage := newMetaPage(pageMeta.Data())
+	metaPage := newMetaPage(pageMeta)
 
 	rootPageId := metaPage.rootPageId()
 	height := metaPage.height()
@@ -42,7 +42,7 @@ func (t *Tree) deleteOptimistic(mtr *buffer.Mtr, key []byte) (needsPessimistic b
 	}
 	defer mtr.Unpin(leafPageId)
 
-	leafNode := newLeafNode(leafBufPage.Data())
+	leafNode := newLeafNode(leafBufPage)
 	slotNum, found := leafNode.searchSlotNum(key)
 	if !found {
 		return false, ErrKeyNotFound
@@ -66,7 +66,7 @@ func (t *Tree) deletePessimistic(mtr *buffer.Mtr, key []byte) error {
 		return err
 	}
 	defer mtr.Unpin(t.MetaPageId())
-	metaPage := newMetaPage(pageMeta.Data())
+	metaPage := newMetaPage(pageMeta)
 
 	// ルートページを取得
 	rootPageId := metaPage.rootPageId()
@@ -85,7 +85,7 @@ func (t *Tree) deletePessimistic(mtr *buffer.Mtr, key []byte) error {
 	// ルートノードがブランチノードで、子が 1 つになった場合 (=ブランチノード1, リーフノード1 になった場合)、子をルートにする
 	var isRootCollapsed bool
 	if underflow && nodeType(bufPageRoot.Data()) == nodeTypeBranch {
-		branch := newBranchNode(bufPageRoot.Data())
+		branch := newBranchNode(bufPageRoot)
 		if branch.numRecords() == 0 {
 			isRootCollapsed = true
 		}
@@ -105,7 +105,7 @@ func (t *Tree) deletePessimistic(mtr *buffer.Mtr, key []byte) error {
 	}
 
 	// ルートノードの縮退が発生した場合
-	branchNode := newBranchNode(bufPageRoot.Data())
+	branchNode := newBranchNode(bufPageRoot)
 	newRootPageId := branchNode.rightChildPageId()
 	metaPage.setRootPageId(newRootPageId)
 	metaPage.setHeight(metaPage.height() - 1)
@@ -130,7 +130,7 @@ func (t *Tree) deleteRecursively(mtr *buffer.Mtr, bufPage *buffer.Page, key []by
 	// ブランチノードの場合: 子ノードに対して再帰実行する
 	case nodeTypeBranch:
 		// 削除先の子ノードを取得
-		branchNode := newBranchNode(pg.Data())
+		branchNode := newBranchNode(pg)
 		childSlotNum, found := branchNode.searchSlotNum(key)
 		if found {
 			childSlotNum++ // 境界キーと一致する場合、右の子に属する
@@ -160,7 +160,7 @@ func (t *Tree) deleteRecursively(mtr *buffer.Mtr, bufPage *buffer.Page, key []by
 
 	// リーフノードの場合: そのまま削除する
 	case nodeTypeLeaf:
-		leafNode := newLeafNode(pg.Data())
+		leafNode := newLeafNode(pg)
 		slotNum, found := leafNode.searchSlotNum(key)
 		if !found {
 			return false, false, ErrKeyNotFound

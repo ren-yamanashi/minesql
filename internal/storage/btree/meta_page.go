@@ -3,6 +3,7 @@ package btree
 import (
 	"encoding/binary"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
@@ -18,12 +19,13 @@ const (
 //   - offset 8-15:  リーフページ数 (8 バイト)
 //   - offset 16-23: B+Tree の高さ (8 バイト)
 type metaPage struct {
-	data *page.Page
+	data    *page.Page
+	bufPage *buffer.Page // 書き込み API で MarkModified を自動呼び出しするためのバックポインタ
 }
 
 // newMetaPage は既存のメタページを開く
-func newMetaPage(pg *page.Page) *metaPage {
-	return &metaPage{data: pg}
+func newMetaPage(bufPage *buffer.Page) *metaPage {
+	return &metaPage{data: bufPage.Data(), bufPage: bufPage}
 }
 
 // rootPageId はルートページ ID を読み取る
@@ -44,14 +46,17 @@ func (mp *metaPage) height() uint64 {
 // setRootPageId はルートページ ID を設定する
 func (mp *metaPage) setRootPageId(rootPageId page.Id) {
 	rootPageId.WriteAt(mp.data.Body(), metaRootPageIdOffset)
+	mp.bufPage.MarkModified()
 }
 
 // setLeafPageCount はリーフページ数を設定する
 func (mp *metaPage) setLeafPageCount(count uint64) {
 	binary.BigEndian.PutUint64(mp.data.Body()[metaLeafPageCountOffset:metaLeafPageCountOffset+8], count)
+	mp.bufPage.MarkModified()
 }
 
 // setHeight は B+Tree の高さを設定する
 func (mp *metaPage) setHeight(h uint64) {
 	binary.BigEndian.PutUint64(mp.data.Body()[metaHeightOffset:metaHeightOffset+8], h)
+	mp.bufPage.MarkModified()
 }

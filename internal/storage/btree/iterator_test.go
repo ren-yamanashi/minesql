@@ -114,14 +114,14 @@ func TestIteratorAdvance(t *testing.T) {
 
 		firstPage, err := bp.AddPage(firstId)
 		assert.NoError(t, err)
-		firstLeaf := newLeafNode(firstPage.Data())
+		firstLeaf := newLeafNode(firstPage)
 		firstLeaf.initialize()
 		firstLeaf.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		firstLeaf.setNextPageId(secondId)
 
 		secondPage, err := bp.AddPage(secondId)
 		assert.NoError(t, err)
-		secondLeaf := newLeafNode(secondPage.Data())
+		secondLeaf := newLeafNode(secondPage)
 		secondLeaf.initialize()
 		secondLeaf.insert(0, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
 
@@ -264,7 +264,7 @@ func setupIteratorTestPage(t *testing.T, setup func(ln *leafNode)) (*Tree, page.
 	bufPage, err := bp.AddPage(pageId)
 	assert.NoError(t, err)
 
-	ln := newLeafNode(bufPage.Data())
+	ln := newLeafNode(bufPage)
 	ln.initialize()
 	setup(ln)
 
