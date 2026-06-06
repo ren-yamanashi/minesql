@@ -53,12 +53,14 @@ func (c *Catalog) UserMeta() *UserMeta                     { return c.userMeta }
 
 // NewCatalog は既存のカタログを開く
 func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
+	mtr := buffer.NewMtr(bp)
+	defer mtr.UnpinAll()
+
 	headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
-	bufPageHeader, err := bp.PageForRead(headerPageId)
+	bufPageHeader, err := mtr.PageForRead(headerPageId)
 	if err != nil {
 		return nil, err
 	}
-	defer bp.Unpin(headerPageId)
 
 	magicEnd := headerMagicNumberOffset + len(catalogMagicNumber)
 	if !bytes.Equal(bufPageHeader.Data().Body()[headerMagicNumberOffset:magicEnd], catalogMagicNumber) {
@@ -101,6 +103,9 @@ func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
 
 // CreateCatalog はカタログを新規作成する
 func CreateCatalog(bp *buffer.Pool) (*Catalog, error) {
+	mtr := buffer.NewMtr(bp)
+	defer mtr.UnpinAll()
+
 	headerPageId, err := bp.AllocatePageId(catalogFileId)
 	if err != nil {
 		return nil, err
@@ -108,9 +113,7 @@ func CreateCatalog(bp *buffer.Pool) (*Catalog, error) {
 	if _, err := bp.AddPage(headerPageId); err != nil {
 		return nil, err
 	}
-	defer bp.Unpin(headerPageId)
-
-	bufPageHeader, err := bp.PageForWrite(headerPageId)
+	bufPageHeader, err := mtr.PageForWrite(headerPageId)
 	if err != nil {
 		return nil, err
 	}
@@ -212,12 +215,14 @@ func (c *Catalog) AllocateFileId() (page.FileId, error) {
 
 // persistScalar はヘッダーページの指定オフセットに uint32 値を書き込む
 func (c *Catalog) persistScalar(offset int, value uint32) error {
+	mtr := buffer.NewMtr(c.bufferPool)
+	defer mtr.UnpinAll()
+
 	headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
-	bufPageHeader, err := c.bufferPool.PageForWrite(headerPageId)
+	bufPageHeader, err := mtr.PageForWrite(headerPageId)
 	if err != nil {
 		return err
 	}
-	defer c.bufferPool.Unpin(headerPageId)
 	writeScalar(bufPageHeader.Data().Body(), offset, value)
 	return nil
 }
