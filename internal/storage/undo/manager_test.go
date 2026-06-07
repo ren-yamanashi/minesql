@@ -218,6 +218,135 @@ func TestManagerRecords(t *testing.T) {
 	})
 }
 
+func TestManagerLookupByPointer(t *testing.T) {
+	t.Run("Insert レコードを Pointer から取得できる", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		original := NewInsertRecord(page.FileId(1), btree.Record{[]byte("alice")})
+		ptr, err := appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, original)
+		assert.NoError(t, err)
+
+		// WHEN
+		got, err := lookupForTest(t, mgr, ptr)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, RecordTypeInsert, got.RecordType())
+		assert.Equal(t, lock.TrxId(0), got.PrevLastTrxId())
+		assert.True(t, got.PrevRollPtr().IsNull())
+		ir, ok := got.(InsertRecord)
+		assert.True(t, ok)
+		assert.Equal(t, original.Record(), ir.Record())
+	})
+
+	t.Run("Update レコードを Pointer から取得できる", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		prev := btree.Record{[]byte("old")}
+		next := btree.Record{[]byte("new")}
+		prevTrxId := lock.TrxId(5)
+		prevPtr := NewPointer(7, 64)
+		original := NewUpdateRecord(page.FileId(1), prev, next, prevTrxId, prevPtr)
+		ptr, err := appendForTest(t, mgr, lock.TrxId(10), RecordTypeUpdate, original)
+		assert.NoError(t, err)
+
+		// WHEN
+		got, err := lookupForTest(t, mgr, ptr)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, RecordTypeUpdate, got.RecordType())
+		assert.Equal(t, prevTrxId, got.PrevLastTrxId())
+		assert.Equal(t, prevPtr, got.PrevRollPtr())
+		ur, ok := got.(UpdateRecord)
+		assert.True(t, ok)
+		assert.Equal(t, prev, ur.PrevRecord())
+		assert.Equal(t, next, ur.NewRecord())
+	})
+
+	t.Run("Delete レコードを Pointer から取得できる", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		row := btree.Record{[]byte("bob")}
+		prevTrxId := lock.TrxId(3)
+		prevPtr := NewPointer(4, 32)
+		original := NewDeleteRecord(page.FileId(1), row, prevTrxId, prevPtr)
+		ptr, err := appendForTest(t, mgr, lock.TrxId(8), RecordTypeDelete, original)
+		assert.NoError(t, err)
+
+		// WHEN
+		got, err := lookupForTest(t, mgr, ptr)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, RecordTypeDelete, got.RecordType())
+		assert.Equal(t, prevTrxId, got.PrevLastTrxId())
+		assert.Equal(t, prevPtr, got.PrevRollPtr())
+		dr, ok := got.(DeleteRecord)
+		assert.True(t, ok)
+		assert.Equal(t, row, dr.Record())
+	})
+
+	t.Run("NullPointer を渡すと ErrNullPointer", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+
+		// WHEN
+		_, err := lookupForTest(t, mgr, NullPointer())
+
+		// THEN
+		assert.ErrorIs(t, err, ErrNullPointer)
+	})
+
+	t.Run("同一ページに複数レコードを書いてそれぞれ正しく取得できる", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("first")})
+		r2 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("second")}, lock.TrxId(2), NullPointer())
+		ptr1, err := appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r1)
+		assert.NoError(t, err)
+		ptr2, err := appendForTest(t, mgr, lock.TrxId(1), RecordTypeDelete, r2)
+		assert.NoError(t, err)
+		assert.NotEqual(t, ptr1, ptr2)
+
+		// WHEN
+		got1, err1 := lookupForTest(t, mgr, ptr1)
+		got2, err2 := lookupForTest(t, mgr, ptr2)
+
+		// THEN
+		assert.NoError(t, err1)
+		assert.NoError(t, err2)
+		assert.Equal(t, RecordTypeInsert, got1.RecordType())
+		assert.Equal(t, RecordTypeDelete, got2.RecordType())
+	})
+
+	t.Run("ページ切替後のレコードも取得できる", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		bigData := make([]byte, 1000)
+		oldPageId := mgr.currentPageId
+		var lastPtr Pointer
+		var lastRecord InsertRecord
+		for mgr.currentPageId == oldPageId {
+			lastRecord = NewInsertRecord(page.FileId(1), btree.Record{bigData})
+			ptr, err := appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, lastRecord)
+			assert.NoError(t, err)
+			lastPtr = ptr
+		}
+		assert.NotEqual(t, oldPageId, mgr.currentPageId)
+
+		// WHEN
+		got, err := lookupForTest(t, mgr, lastPtr)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, RecordTypeInsert, got.RecordType())
+		ir, ok := got.(InsertRecord)
+		assert.True(t, ok)
+		assert.Equal(t, lastRecord.Record(), ir.Record())
+	})
+}
+
 func TestManagerCommittedEntries(t *testing.T) {
 	t.Run("指定したトランザクションのエントリを返す", func(t *testing.T) {
 		// GIVEN
@@ -365,7 +494,7 @@ func TestManagerDiscard(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
 
-		// WHEN (パニックしないことを確認)
+		// WHEN
 		mgr.Discard(lock.TrxId(999))
 
 		// THEN
@@ -443,7 +572,7 @@ func TestManagerDiscardRecordType(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
 
-		// WHEN (パニックしないことを確認)
+		// WHEN
 		mgr.DiscardRecordType(lock.TrxId(999), RecordTypeInsert)
 
 		// THEN
@@ -455,13 +584,12 @@ func TestManagerWriteToPage(t *testing.T) {
 	t.Run("ページが満杯になると新しいページに書き込まれる", func(t *testing.T) {
 		// GIVEN
 		mgr := setupTestManager(t)
-		// 大きなレコードを作成してページを埋める
 		bigData := make([]byte, 1000)
 		for i := range bigData {
 			bigData[i] = byte(i % 256)
 		}
 
-		// WHEN (ページサイズを超えるまで書き込む)
+		// WHEN
 		var lastPtr Pointer
 		var err error
 		for i := range 20 {
@@ -474,137 +602,7 @@ func TestManagerWriteToPage(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		// 複数ページにまたがるため、最後の Pointer のページ番号は最初と異なるはず
 		assert.NotEqual(t, page.PageNumber(0), lastPtr.pageNumber)
-	})
-}
-
-func TestManagerLookupByPointer(t *testing.T) {
-	t.Run("Insert レコードを Pointer から取得できる", func(t *testing.T) {
-		// GIVEN
-		mgr := setupTestManager(t)
-		original := NewInsertRecord(page.FileId(1), btree.Record{[]byte("alice")})
-		ptr, err := appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, original)
-		assert.NoError(t, err)
-
-		// WHEN
-		got, err := lookupForTest(t, mgr, ptr)
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, RecordTypeInsert, got.RecordType())
-		assert.Equal(t, lock.TrxId(0), got.PrevLastTrxId())
-		assert.True(t, got.PrevRollPtr().IsNull())
-		ir, ok := got.(InsertRecord)
-		assert.True(t, ok)
-		assert.Equal(t, original.Record(), ir.Record())
-	})
-
-	t.Run("Update レコードを Pointer から取得できる", func(t *testing.T) {
-		// GIVEN
-		mgr := setupTestManager(t)
-		prev := btree.Record{[]byte("old")}
-		next := btree.Record{[]byte("new")}
-		prevTrxId := lock.TrxId(5)
-		prevPtr := NewPointer(7, 64)
-		original := NewUpdateRecord(page.FileId(1), prev, next, prevTrxId, prevPtr)
-		ptr, err := appendForTest(t, mgr, lock.TrxId(10), RecordTypeUpdate, original)
-		assert.NoError(t, err)
-
-		// WHEN
-		got, err := lookupForTest(t, mgr, ptr)
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, RecordTypeUpdate, got.RecordType())
-		assert.Equal(t, prevTrxId, got.PrevLastTrxId())
-		assert.Equal(t, prevPtr, got.PrevRollPtr())
-		ur, ok := got.(UpdateRecord)
-		assert.True(t, ok)
-		assert.Equal(t, prev, ur.PrevRecord())
-		assert.Equal(t, next, ur.NewRecord())
-	})
-
-	t.Run("Delete レコードを Pointer から取得できる", func(t *testing.T) {
-		// GIVEN
-		mgr := setupTestManager(t)
-		row := btree.Record{[]byte("bob")}
-		prevTrxId := lock.TrxId(3)
-		prevPtr := NewPointer(4, 32)
-		original := NewDeleteRecord(page.FileId(1), row, prevTrxId, prevPtr)
-		ptr, err := appendForTest(t, mgr, lock.TrxId(8), RecordTypeDelete, original)
-		assert.NoError(t, err)
-
-		// WHEN
-		got, err := lookupForTest(t, mgr, ptr)
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, RecordTypeDelete, got.RecordType())
-		assert.Equal(t, prevTrxId, got.PrevLastTrxId())
-		assert.Equal(t, prevPtr, got.PrevRollPtr())
-		dr, ok := got.(DeleteRecord)
-		assert.True(t, ok)
-		assert.Equal(t, row, dr.Record())
-	})
-
-	t.Run("NullPointer を渡すと ErrNullPointer", func(t *testing.T) {
-		// GIVEN
-		mgr := setupTestManager(t)
-
-		// WHEN
-		_, err := lookupForTest(t, mgr, NullPointer())
-
-		// THEN
-		assert.ErrorIs(t, err, ErrNullPointer)
-	})
-
-	t.Run("同一ページに複数レコードを書いてそれぞれ正しく取得できる", func(t *testing.T) {
-		// GIVEN
-		mgr := setupTestManager(t)
-		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("first")})
-		r2 := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("second")}, lock.TrxId(2), NullPointer())
-		ptr1, err := appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r1)
-		assert.NoError(t, err)
-		ptr2, err := appendForTest(t, mgr, lock.TrxId(1), RecordTypeDelete, r2)
-		assert.NoError(t, err)
-		assert.NotEqual(t, ptr1, ptr2)
-
-		// WHEN
-		got1, err1 := lookupForTest(t, mgr, ptr1)
-		got2, err2 := lookupForTest(t, mgr, ptr2)
-
-		// THEN
-		assert.NoError(t, err1)
-		assert.NoError(t, err2)
-		assert.Equal(t, RecordTypeInsert, got1.RecordType())
-		assert.Equal(t, RecordTypeDelete, got2.RecordType())
-	})
-
-	t.Run("ページ切替後のレコードも取得できる", func(t *testing.T) {
-		// GIVEN
-		mgr := setupTestManager(t)
-		bigData := make([]byte, 1000)
-		oldPageId := mgr.currentPageId
-		var lastPtr Pointer
-		var lastRecord InsertRecord
-		for mgr.currentPageId == oldPageId {
-			lastRecord = NewInsertRecord(page.FileId(1), btree.Record{bigData})
-			ptr, err := appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, lastRecord)
-			assert.NoError(t, err)
-			lastPtr = ptr
-		}
-		assert.NotEqual(t, oldPageId, mgr.currentPageId)
-
-		// WHEN
-		got, err := lookupForTest(t, mgr, lastPtr)
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, RecordTypeInsert, got.RecordType())
-		ir, ok := got.(InsertRecord)
-		assert.True(t, ok)
-		assert.Equal(t, lastRecord.Record(), ir.Record())
 	})
 }
 

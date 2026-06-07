@@ -475,12 +475,12 @@ func TestDeserializeFields(t *testing.T) {
 	})
 
 	t.Run("カラムセット領域が columnCountSize 未満の場合エラーを返す", func(t *testing.T) {
-		// GIVEN: 固定フィールドは正常だがカラムセット領域が 1 バイトしかない
+		// GIVEN
 		var data []byte
-		data = binary.BigEndian.AppendUint32(data, 100)       // prevLastTrxId
-		data = append(data, NullPointer().Encode()...)        // prevRollPtr
-		data = binary.BigEndian.AppendUint32(data, uint32(1)) // tableFileId
-		data = append(data, 0x01)                             // 1 バイト (columnCountSize 未満)
+		data = binary.BigEndian.AppendUint32(data, 100)
+		data = append(data, NullPointer().Encode()...)
+		data = binary.BigEndian.AppendUint32(data, uint32(1))
+		data = append(data, 0x01)
 		buf := buildRawBuffer(1, 0, RecordTypeInsert, data)
 
 		// WHEN
@@ -491,12 +491,12 @@ func TestDeserializeFields(t *testing.T) {
 	})
 
 	t.Run("カラムデータ長ヘッダーが不足する場合エラーを返す", func(t *testing.T) {
-		// GIVEN: numCols = 2 だがカラムデータが 1 つもない
+		// GIVEN
 		var data []byte
-		data = binary.BigEndian.AppendUint32(data, 100)       // prevLastTrxId
-		data = append(data, NullPointer().Encode()...)        // prevRollPtr
-		data = binary.BigEndian.AppendUint32(data, uint32(1)) // tableFileId
-		data = binary.BigEndian.AppendUint16(data, 2)         // numCols = 2
+		data = binary.BigEndian.AppendUint32(data, 100)
+		data = append(data, NullPointer().Encode()...)
+		data = binary.BigEndian.AppendUint32(data, uint32(1))
+		data = binary.BigEndian.AppendUint16(data, 2)
 		buf := buildRawBuffer(1, 0, RecordTypeInsert, data)
 
 		// WHEN
@@ -507,13 +507,13 @@ func TestDeserializeFields(t *testing.T) {
 	})
 
 	t.Run("カラムデータ本体が不足する場合エラーを返す", func(t *testing.T) {
-		// GIVEN: numCols = 1, colLen = 100 だが実データがない
+		// GIVEN
 		var data []byte
-		data = binary.BigEndian.AppendUint32(data, 100)       // prevLastTrxId
-		data = append(data, NullPointer().Encode()...)        // prevRollPtr
-		data = binary.BigEndian.AppendUint32(data, uint32(1)) // tableFileId
-		data = binary.BigEndian.AppendUint16(data, 1)         // numCols = 1
-		data = binary.BigEndian.AppendUint16(data, 100)       // colLen = 100
+		data = binary.BigEndian.AppendUint32(data, 100)
+		data = append(data, NullPointer().Encode()...)
+		data = binary.BigEndian.AppendUint32(data, uint32(1))
+		data = binary.BigEndian.AppendUint16(data, 1)
+		data = binary.BigEndian.AppendUint16(data, 100)
 		buf := buildRawBuffer(1, 0, RecordTypeInsert, data)
 
 		// WHEN

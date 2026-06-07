@@ -209,7 +209,7 @@ func TestDecodePointer(t *testing.T) {
 	t.Run("PointerSize より長いデータでも先頭 6 バイトからデコードできる", func(t *testing.T) {
 		// GIVEN
 		original := Pointer{pageNumber: 5, offset: 128}
-		buf := append(original.Encode(), 0xFF, 0xFF) // 余分なデータ
+		buf := append(original.Encode(), 0xFF, 0xFF)
 
 		// WHEN
 		decoded, err := DecodePointer(buf)

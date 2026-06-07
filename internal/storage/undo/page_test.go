@@ -104,7 +104,6 @@ func TestPageRecord(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
 		undoPage.initialize()
-		// ボディ末尾から recordHeaderSize 未満の位置
 		offset := len(undoPage.body) - recordHeaderSize + 1
 
 		// WHEN
@@ -145,8 +144,6 @@ func TestPageRecord(t *testing.T) {
 		// GIVEN
 		undoPage := newTestUndoPage(t)
 		undoPage.initialize()
-		// ボディ先頭にヘッダーだけ書き込み、dataLen をボディサイズより大きい値に設定
-		// RecordAt は p.body[headerDataLenOffset:recordHeaderSize] から dataLen を読む (offset 非加算)
 		f := &Fields{
 			trxId:       1,
 			undoNumber:  0,
@@ -156,7 +153,6 @@ func TestPageRecord(t *testing.T) {
 			columnSets:  [][][]byte{{make([]byte, len(undoPage.body))}},
 		}
 		serialized := f.Serialize()
-		// ヘッダーだけコピー (本体は入りきらない)
 		copy(undoPage.body, serialized[:recordHeaderSize])
 
 		// WHEN
