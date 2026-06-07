@@ -145,20 +145,6 @@ func (t *TrxManager) OldestVisibleTrxId() lock.TrxId {
 	return limit
 }
 
-// activeTrxIds はアクティブなトランザクションの ID 一覧を返す
-func (t *TrxManager) activeTrxIds() []lock.TrxId {
-	t.mu.RLock()
-	defer t.mu.RUnlock()
-
-	var ids []lock.TrxId
-	for id, state := range t.transactions {
-		if state == trxStateActive {
-			ids = append(ids, id)
-		}
-	}
-	return ids
-}
-
 // InactiveTrxIds は完了済み (コミットまたはロールバック済み) のトランザクション ID 一覧を返す
 func (t *TrxManager) InactiveTrxIds() []lock.TrxId {
 	t.mu.RLock()
@@ -168,6 +154,20 @@ func (t *TrxManager) InactiveTrxIds() []lock.TrxId {
 	for trxId, state := range t.transactions {
 		if state == trxStateInactive {
 			ids = append(ids, trxId)
+		}
+	}
+	return ids
+}
+
+// activeTrxIds はアクティブなトランザクションの ID 一覧を返す
+func (t *TrxManager) activeTrxIds() []lock.TrxId {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	var ids []lock.TrxId
+	for id, state := range t.transactions {
+		if state == trxStateActive {
+			ids = append(ids, id)
 		}
 	}
 	return ids
