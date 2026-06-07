@@ -448,49 +448,6 @@ func TestTrxManagerOldestVisibleTrxId(t *testing.T) {
 	})
 }
 
-func TestTrxManagerActiveTrxIDs(t *testing.T) {
-	t.Run("アクティブなトランザクション ID を返す", func(t *testing.T) {
-		// GIVEN
-		tm := setupTrxManager(t)
-		id1 := tm.Begin()
-		_ = tm.Begin()
-
-		// WHEN
-		ids := tm.activeTrxIds()
-
-		// THEN
-		assert.Len(t, ids, 2)
-		assert.Contains(t, ids, id1)
-	})
-
-	t.Run("コミット済みトランザクションは含まれない", func(t *testing.T) {
-		// GIVEN
-		tm := setupTrxManager(t)
-		id1 := tm.Begin()
-		id2 := tm.Begin()
-		_ = tm.Commit(id1)
-
-		// WHEN
-		ids := tm.activeTrxIds()
-
-		// THEN
-		assert.Len(t, ids, 1)
-		assert.Contains(t, ids, id2)
-		assert.NotContains(t, ids, id1)
-	})
-
-	t.Run("アクティブなトランザクションがない場合は空を返す", func(t *testing.T) {
-		// GIVEN
-		tm := setupTrxManager(t)
-
-		// WHEN
-		ids := tm.activeTrxIds()
-
-		// THEN
-		assert.Empty(t, ids)
-	})
-}
-
 func TestTrxManagerInactiveTrxIds(t *testing.T) {
 	t.Run("コミット済みのトランザクション ID を返す", func(t *testing.T) {
 		// GIVEN
@@ -541,6 +498,49 @@ func TestTrxManagerInactiveTrxIds(t *testing.T) {
 
 		// WHEN
 		ids := tm.InactiveTrxIds()
+
+		// THEN
+		assert.Empty(t, ids)
+	})
+}
+
+func TestTrxManagerActiveTrxIDs(t *testing.T) {
+	t.Run("アクティブなトランザクション ID を返す", func(t *testing.T) {
+		// GIVEN
+		tm := setupTrxManager(t)
+		id1 := tm.Begin()
+		_ = tm.Begin()
+
+		// WHEN
+		ids := tm.activeTrxIds()
+
+		// THEN
+		assert.Len(t, ids, 2)
+		assert.Contains(t, ids, id1)
+	})
+
+	t.Run("コミット済みトランザクションは含まれない", func(t *testing.T) {
+		// GIVEN
+		tm := setupTrxManager(t)
+		id1 := tm.Begin()
+		id2 := tm.Begin()
+		_ = tm.Commit(id1)
+
+		// WHEN
+		ids := tm.activeTrxIds()
+
+		// THEN
+		assert.Len(t, ids, 1)
+		assert.Contains(t, ids, id2)
+		assert.NotContains(t, ids, id1)
+	})
+
+	t.Run("アクティブなトランザクションがない場合は空を返す", func(t *testing.T) {
+		// GIVEN
+		tm := setupTrxManager(t)
+
+		// WHEN
+		ids := tm.activeTrxIds()
 
 		// THEN
 		assert.Empty(t, ids)
