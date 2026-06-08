@@ -36,9 +36,7 @@
 ### スナップショット (Read View)
 
 - MVCC では、トランザクションが「どのデータが見えるか」を決定するためにスナップショット (Read View) を使用する
-- Read View はトランザクションごとに作られる
-- 現状は REPEATABLE READ のトランザクション分離レベルのみサポートしているため、Read View はトランザクション内で最初の Consistent Read を実行した時点で作成し、以降のステートメント (DML) で使い回す
-  - 補足: READ COMMITTED をサポートする場合は、ステートメントごとに Read View が作る必要がある (トランザクション分離レベルによって Read View の作成タイミングが違う)
+- Read View が持つ情報は以下のとおり
 
 | 項目 | 説明 |
 | --- | --- |
@@ -46,6 +44,8 @@
 | `mUpLimitId` | Read View の作成時点で、自分以外のアクティブなトランザクションの最小 trxId <br/> これ未満の trxId は確実にコミット済みで可視 |
 | `mLowLimitId` | Read View 作成時点で次に払い出される trxId <br/> これ以上の trxId は ReadView 作成後に開始されたため不可視 |
 | `mIds` | Read View 作成時点で、自分以外のアクティブ (未コミット) なトランザクション ID 一覧 |
+
+Read View の作成タイミング・保持責務・ライフサイクルは[トランザクション](./transaction.md#readview-の保持と作成)を参照
 
 ※ それぞれの変数名や意味などは InnoDB を参考\
 やや直感に反するが、`m_up_limit_id` が「可視範囲の上限」(= 最小のアクティブ trxId)、`m_low_limit_id` が「不可視範囲の下限」(= 次に払い出される trxId) を意味する\
