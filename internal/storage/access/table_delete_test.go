@@ -54,6 +54,26 @@ func TestTableSoftDelete(t *testing.T) {
 		assert.False(t, ok)
 	})
 
+	t.Run("SoftDelete 後、セカンダリレコードの lastTrxId に削除した trxId が記録される", func(t *testing.T) {
+		// GIVEN
+		table := setupTableWithRecord(t)
+		record := searchFirstPrimaryRecord(t, table)
+
+		// WHEN
+		err := table.SoftDelete(record, tableTrxId)
+
+		// THEN
+		assert.NoError(t, err)
+		nameRec := findSecondaryRecordByValue(t, table, "idx_name", "Alice")
+		emailRec := findSecondaryRecordByValue(t, table, "idx_email", "alice@example.com")
+		assert.NotNil(t, nameRec)
+		assert.Equal(t, byte(1), nameRec.deleteMark)
+		assert.Equal(t, tableTrxId, nameRec.lastTrxId)
+		assert.NotNil(t, emailRec)
+		assert.Equal(t, byte(1), emailRec.deleteMark)
+		assert.Equal(t, tableTrxId, emailRec.lastTrxId)
+	})
+
 	t.Run("論理削除後に同一プライマリキーで再挿入できる", func(t *testing.T) {
 		// GIVEN
 		table := setupTableWithRecord(t)

@@ -112,10 +112,11 @@ func (t *Table) extractSecondaryKey(keyCols map[string]int, valMap map[string]st
 }
 
 // buildSecondaryRecord はセカンダリインデックス用のレコードを構築する
-func (t *Table) buildSecondaryRecord(si *secondaryIndex, skColNames, skValues, pk []string) (*SecondaryRecord, error) {
+func (t *Table) buildSecondaryRecord(si *secondaryIndex, skColNames, skValues, pk []string, lastTrxId lock.TrxId) (*SecondaryRecord, error) {
 	return NewSecondaryRecord(t.catalog, t.bufferPool, NewSecondaryRecordInput{
 		fileId:     si.fileId,
 		deleteMark: 0,
+		lastTrxId:  lastTrxId,
 		indexName:  si.indexName,
 		colNames:   skColNames,
 		values:     skValues,

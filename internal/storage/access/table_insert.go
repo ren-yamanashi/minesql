@@ -58,7 +58,7 @@ func (t *Table) insertSecondaryIndexes(mtr *buffer.Mtr, colNames, values []strin
 			return err
 		}
 		skColNames, skValues := t.extractSecondaryKey(keyCols, valMap)
-		record, err := t.buildSecondaryRecord(si, skColNames, skValues, pk)
+		record, err := t.buildSecondaryRecord(si, skColNames, skValues, pk, trxId)
 		if err != nil {
 			return err
 		}

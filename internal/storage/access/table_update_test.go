@@ -48,6 +48,35 @@ func TestTableUpdate(t *testing.T) {
 		assert.Equal(t, "Bob", result.values[1])
 	})
 
+	t.Run("SK 変更 UPDATE 後、旧 SK と新 SK の両方の lastTrxId に UPDATE した trxId が記録される", func(t *testing.T) {
+		// GIVEN
+		table := setupTableWithRecord(t)
+		before := searchFirstPrimaryRecord(t, table)
+
+		// WHEN
+		err := table.Update(before, []string{"name"}, []string{"Bob"}, tableTrxId)
+
+		// THEN
+		assert.NoError(t, err)
+		records := fetchAllSecondaryRecords(t, table, "idx_name")
+		var oldRec, newRec *SecondaryRecord
+		for _, r := range records {
+			if r.values[0] == "Alice" {
+				oldRec = r
+				continue
+			}
+			if r.values[0] == "Bob" {
+				newRec = r
+			}
+		}
+		assert.NotNil(t, oldRec)
+		assert.Equal(t, byte(1), oldRec.deleteMark)
+		assert.Equal(t, tableTrxId, oldRec.lastTrxId)
+		assert.NotNil(t, newRec)
+		assert.Equal(t, byte(0), newRec.deleteMark)
+		assert.Equal(t, tableTrxId, newRec.lastTrxId)
+	})
+
 	t.Run("セカンダリインデックスに影響しないカラムの更新ではインデックスが変更されない", func(t *testing.T) {
 		// GIVEN
 		table := setupTableWithRecord(t)
@@ -374,5 +403,46 @@ func findSecondaryIndex(t *testing.T, table *Table, name string) *secondaryIndex
 		}
 	}
 	t.Fatalf("セカンダリインデックス %q が見つからない", name)
+	return nil
+}
+
+// fetchAllSecondaryRecords はセカンダリ B+Tree から削除マークを問わず全レコードを取得する
+func fetchAllSecondaryRecords(t *testing.T, table *Table, indexName string) []*SecondaryRecord {
+	t.Helper()
+	si := findSecondaryIndex(t, table, indexName)
+	mtr := buffer.NewMtr(table.bufferPool)
+	defer mtr.UnpinAll()
+	iter, err := si.tree.Search(mtr, SearchModeStart{}.Encode())
+	if err != nil {
+		t.Fatalf("セカンダリ B+Tree の検索に失敗: %v", err)
+	}
+	defer iter.Close()
+
+	var records []*SecondaryRecord
+	for {
+		record, ok, err := iter.Next()
+		if err != nil {
+			t.Fatalf("セカンダリレコードの取得に失敗: %v", err)
+		}
+		if !ok {
+			break
+		}
+		sr, err := DecodeSecondaryRecord(record, table.catalog, table.bufferPool, si.fileId, indexName)
+		if err != nil {
+			t.Fatalf("セカンダリレコードのデコードに失敗: %v", err)
+		}
+		records = append(records, sr)
+	}
+	return records
+}
+
+// findSecondaryRecordByValue は指定したセカンダリインデックスの中で values[0] が一致する最初のレコードを返す
+func findSecondaryRecordByValue(t *testing.T, table *Table, indexName, value string) *SecondaryRecord {
+	t.Helper()
+	for _, r := range fetchAllSecondaryRecords(t, table, indexName) {
+		if len(r.values) > 0 && r.values[0] == value {
+			return r
+		}
+	}
 	return nil
 }

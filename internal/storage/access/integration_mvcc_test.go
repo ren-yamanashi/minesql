@@ -173,6 +173,73 @@ func TestMVCCSecondaryVisibility(t *testing.T) {
 	})
 }
 
+func TestMVCCSecondaryIndexOnlyComplexScenario(t *testing.T) {
+	t.Run("INSERT → SK 変更 UPDATE → DELETE のシナリオで各時点の ReadView から NextIndexOnly が正しい結果を返す", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		table := createUsersTable(t, env)
+
+		t1 := env.trxMgr.Begin()
+		_ = table.Insert([]string{"id", "name", "email"}, []string{"1", "Alice", "alice@example.com"}, t1)
+		assert.NoError(t, env.trxMgr.Commit(t1))
+
+		r1 := env.trxMgr.Begin()
+		_ = env.trxMgr.CreateReadView(r1)
+
+		t2 := env.trxMgr.Begin()
+		latestForT2 := searchByPkForTrx(t, env, table, t2, "1")
+		assert.NoError(t, table.Update(latestForT2, []string{"name"}, []string{"Bob"}, t2))
+		assert.NoError(t, env.trxMgr.Commit(t2))
+
+		r2 := env.trxMgr.Begin()
+		_ = env.trxMgr.CreateReadView(r2)
+
+		t3 := env.trxMgr.Begin()
+		latestForT3 := searchByPkForTrx(t, env, table, t3, "1")
+		assert.NoError(t, table.SoftDelete(latestForT3, t3))
+		assert.NoError(t, env.trxMgr.Commit(t3))
+
+		r3 := env.trxMgr.Begin()
+		_ = env.trxMgr.CreateReadView(r3)
+
+		// WHEN
+		// THEN
+		r1Values := collectIndexOnlyValues(t, env, table, r1, "idx_name")
+		assert.Equal(t, []string{"Alice"}, r1Values)
+
+		r2Values := collectIndexOnlyValues(t, env, table, r2, "idx_name")
+		assert.Equal(t, []string{"Bob"}, r2Values)
+
+		r3Values := collectIndexOnlyValues(t, env, table, r3, "idx_name")
+		assert.Empty(t, r3Values)
+	})
+}
+
+// collectIndexOnlyValues は SearchSecondary 経由で NextIndexOnly を全件呼んで SK 先頭値のリストを返す
+func collectIndexOnlyValues(t *testing.T, env *integrationEnv, table *Table, trxId lock.TrxId, indexName string) []string {
+	t.Helper()
+	mtr := buffer.NewMtr(env.bp)
+	defer mtr.UnpinAll()
+	iter, err := table.SearchSecondary(env.trxMgr, trxId, mtr, indexName, SearchModeStart{})
+	if err != nil {
+		t.Fatalf("SearchSecondary に失敗: %v", err)
+	}
+	defer iter.Close()
+
+	var values []string
+	for {
+		rec, ok, err := iter.NextIndexOnly()
+		if err != nil {
+			t.Fatalf("NextIndexOnly に失敗: %v", err)
+		}
+		if !ok {
+			break
+		}
+		values = append(values, rec.values[0])
+	}
+	return values
+}
+
 func TestMVCCDeletedVisible(t *testing.T) {
 	t.Run("自トランザクションでコミット済みの DELETE は空", func(t *testing.T) {
 		// GIVEN

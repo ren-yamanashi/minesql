@@ -207,13 +207,14 @@ func TestTableBuildSecondaryRecord(t *testing.T) {
 		assert.NotNil(t, si)
 
 		// WHEN
-		sr, err := table.buildSecondaryRecord(si, []string{"name"}, []string{"Alice"}, []string{"1"})
+		sr, err := table.buildSecondaryRecord(si, []string{"name"}, []string{"Alice"}, []string{"1"}, lock.TrxId(1))
 
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, sr)
 		assert.Equal(t, []string{"Alice"}, sr.values)
 		assert.Equal(t, []string{"1"}, sr.pk)
+		assert.Equal(t, lock.TrxId(1), sr.lastTrxId)
 	})
 }
 

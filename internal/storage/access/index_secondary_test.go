@@ -414,6 +414,7 @@ func buildTestSecondaryRecord(t *testing.T, si *secondaryIndex, colNames, values
 	sr, err := NewSecondaryRecord(si.catalog, si.bufferPool, NewSecondaryRecordInput{
 		fileId:     si.fileId,
 		deleteMark: 0,
+		lastTrxId:  0,
 		indexName:  si.indexName,
 		colNames:   colNames,
 		values:     values,

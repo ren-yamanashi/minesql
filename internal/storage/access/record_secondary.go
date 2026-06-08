@@ -8,12 +8,20 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+)
+
+const (
+	secondaryHeaderSize       = 5
+	secondaryDeleteMarkOffset = 0
+	secondaryLastTrxIdOffset  = 1
 )
 
 type NewSecondaryRecordInput struct {
 	fileId     page.FileId
 	deleteMark byte
+	lastTrxId  lock.TrxId
 	indexName  string
 	colNames   []string // インデックスを構成するカラム名のリスト
 	values     []string // インデックスを構成するカラム値のリスト (SK)
@@ -22,6 +30,7 @@ type NewSecondaryRecordInput struct {
 
 type SecondaryRecord struct {
 	deleteMark byte
+	lastTrxId  lock.TrxId
 	colNames   []string // インデックスを構成するカラム名のリスト
 	values     []string // インデックスを構成するカラム値のリスト (SK)
 	pk         []string // プライマリキー
@@ -38,7 +47,12 @@ func (r *SecondaryRecord) Encode() btree.Record {
 	var key []byte
 	key = encode.Encode(key, stringToByteSlice(r.values))
 	key = encode.Encode(key, stringToByteSlice(r.pk))
-	return btree.NewRecord([]byte{r.deleteMark}, key, nil)
+
+	header := make([]byte, secondaryHeaderSize)
+	header[secondaryDeleteMarkOffset] = r.deleteMark
+	binary.BigEndian.PutUint32(header[secondaryLastTrxIdOffset:], uint32(r.lastTrxId))
+
+	return btree.NewRecord(header, key, nil)
 }
 
 func (r *SecondaryRecord) encodedSecondaryKey() []byte {
@@ -52,6 +66,11 @@ func DecodeSecondaryRecord(
 	fileId page.FileId,
 	indexName string,
 ) (*SecondaryRecord, error) {
+	header := record.Header()
+	if len(header) < secondaryHeaderSize {
+		return nil, fmt.Errorf("invalid secondary record header size: %d", len(header))
+	}
+
 	index, err := fetchIndex(ct, bp, fileId, indexName)
 	if err != nil {
 		return nil, err
@@ -86,8 +105,12 @@ func DecodeSecondaryRecord(
 		colNames[pos] = name
 	}
 
+	deleteMark := header[secondaryDeleteMarkOffset]
+	lastTrxId := lock.TrxId(binary.BigEndian.Uint32(header[secondaryLastTrxIdOffset : secondaryLastTrxIdOffset+4]))
+
 	return &SecondaryRecord{
-		deleteMark: record.Header()[0],
+		deleteMark: deleteMark,
+		lastTrxId:  lastTrxId,
 		colNames:   colNames,
 		values:     byteSliceToString(sk),
 		pk:         byteSliceToString(pk),
@@ -129,6 +152,7 @@ func sortSecondaryRecord(ct *dictionary.Catalog, bp *buffer.Pool, input NewSecon
 
 	return &SecondaryRecord{
 		deleteMark: input.deleteMark,
+		lastTrxId:  input.lastTrxId,
 		colNames:   sortedColNames,
 		values:     sortedValues,
 		pk:         input.pk,

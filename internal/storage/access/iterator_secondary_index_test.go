@@ -199,24 +199,7 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 		t.Fatalf("Catalog の作成に失敗: %v", err)
 	}
 
-	// テーブル定義: id:0, name:1, email:2
 	tableFileId := page.FileId(2)
-	dummyPageId := page.NewId(tableFileId, page.PageNumber(0))
-	mtr := buffer.NewMtr(bp)
-	defer mtr.UnpinAll()
-	_ = ct.TableMeta().Insert(mtr, dictionary.NewTableMetaRecord("users", dummyPageId, 3))
-	_ = ct.ColumnMeta().Insert(mtr, dictionary.NewColumnMetaRecord(tableFileId, "id", 0))
-	_ = ct.ColumnMeta().Insert(mtr, dictionary.NewColumnMetaRecord(tableFileId, "name", 1))
-	_ = ct.ColumnMeta().Insert(mtr, dictionary.NewColumnMetaRecord(tableFileId, "email", 2))
-
-	// インデックス定義
-	indexId1 := dictionary.IndexId(1)
-	_ = ct.IndexMeta().Insert(mtr, dictionary.NewIndexMetaRecord(tableFileId, indexId1, "idx_name", dictionary.IndexTypeNonUnique, 1, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(indexId1, "name", 0))
-
-	indexId2 := dictionary.IndexId(2)
-	_ = ct.IndexMeta().Insert(mtr, dictionary.NewIndexMetaRecord(tableFileId, indexId2, "idx_email", dictionary.IndexTypeUnique, 1, dummyPageId))
-	_ = ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(indexId2, "email", 0))
 
 	// プライマリ B+Tree
 	primaryTree, err := btree.CreateTree(bp, tableFileId)
@@ -229,6 +212,23 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	if err != nil {
 		t.Fatalf("セカンダリ B+Tree の作成に失敗: %v", err)
 	}
+
+	// テーブル定義: id:0, name:1, email:2
+	mtr := buffer.NewMtr(bp)
+	defer mtr.UnpinAll()
+	_ = ct.TableMeta().Insert(mtr, dictionary.NewTableMetaRecord("users", primaryTree.MetaPageId(), 3))
+	_ = ct.ColumnMeta().Insert(mtr, dictionary.NewColumnMetaRecord(tableFileId, "id", 0))
+	_ = ct.ColumnMeta().Insert(mtr, dictionary.NewColumnMetaRecord(tableFileId, "name", 1))
+	_ = ct.ColumnMeta().Insert(mtr, dictionary.NewColumnMetaRecord(tableFileId, "email", 2))
+
+	// インデックス定義
+	indexId1 := dictionary.IndexId(1)
+	_ = ct.IndexMeta().Insert(mtr, dictionary.NewIndexMetaRecord(tableFileId, indexId1, "idx_name", dictionary.IndexTypeNonUnique, 1, secondaryTree.MetaPageId()))
+	_ = ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(indexId1, "name", 0))
+
+	indexId2 := dictionary.IndexId(2)
+	_ = ct.IndexMeta().Insert(mtr, dictionary.NewIndexMetaRecord(tableFileId, indexId2, "idx_email", dictionary.IndexTypeUnique, 1, secondaryTree.MetaPageId()))
+	_ = ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(indexId2, "email", 0))
 
 	return &iteratorTestEnv{
 		ct:            ct,
@@ -261,9 +261,16 @@ func insertSecondaryRecord(t *testing.T, env *iteratorTestEnv, colNames, values,
 // insertSecondaryRecordWithDeleteMark はセカンダリ B+Tree に指定した deleteMark でレコードを挿入する
 func insertSecondaryRecordWithDeleteMark(t *testing.T, env *iteratorTestEnv, deleteMark byte, colNames, values, pk []string) {
 	t.Helper()
+	insertSecondaryRecordWithMvcc(t, env, deleteMark, 0, colNames, values, pk)
+}
+
+// insertSecondaryRecordWithMvcc はセカンダリ B+Tree に指定した deleteMark と lastTrxId でレコードを挿入する
+func insertSecondaryRecordWithMvcc(t *testing.T, env *iteratorTestEnv, deleteMark byte, lastTrxId lock.TrxId, colNames, values, pk []string) {
+	t.Helper()
 	sr, err := NewSecondaryRecord(env.ct, env.bp, NewSecondaryRecordInput{
 		fileId:     page.FileId(2),
 		deleteMark: deleteMark,
+		lastTrxId:  lastTrxId,
 		indexName:  "idx_name",
 		colNames:   colNames,
 		values:     values,
@@ -345,4 +352,141 @@ func searchSecondaryIndexWithReadView(t *testing.T, env *mvccTestEnv, rv *readVi
 		t.Fatalf("セカンダリインデックスの検索に失敗: %v", err)
 	}
 	return NewSecondaryIndexIterator("idx_name", iter, env.iter.ct, env.iter.bp, env.iter.primaryTree, rv, env.undoLog)
+}
+
+func TestSecondaryIndexIteratorNextIndexOnlyWithMVCC(t *testing.T) {
+	t.Run("INSERT を行った trx からは新規セカンダリレコードが見える", func(t *testing.T) {
+		// GIVEN
+		env := setupMVCCTestEnv(t)
+		insertSecondaryRecordWithMvcc(t, env.iter, 0, lock.TrxId(2), []string{"name"}, []string{"Alice"}, []string{"1"})
+
+		rv := newReadView(lock.TrxId(2), nil, lock.TrxId(3))
+		iter := searchSecondaryIndexWithReadView(t, env, rv)
+		defer iter.Close()
+
+		// WHEN
+		result, ok, err := iter.NextIndexOnly()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, []string{"Alice"}, result.values)
+	})
+
+	t.Run("INSERT を行った trx が不可視の別 trx からは新規セカンダリレコードが見えない", func(t *testing.T) {
+		// GIVEN
+		env := setupMVCCTestEnv(t)
+		insertSecondaryRecordWithMvcc(t, env.iter, 0, lock.TrxId(5), []string{"name"}, []string{"Alice"}, []string{"1"})
+
+		rv := newReadView(lock.TrxId(2), []lock.TrxId{lock.TrxId(5)}, lock.TrxId(6))
+		iter := searchSecondaryIndexWithReadView(t, env, rv)
+		defer iter.Close()
+
+		// WHEN
+		_, ok, err := iter.NextIndexOnly()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.False(t, ok)
+	})
+
+	t.Run("DELETE を行った trx からは削除済みセカンダリレコードが見えない", func(t *testing.T) {
+		// GIVEN
+		env := setupMVCCTestEnv(t)
+		insertSecondaryRecordWithMvcc(t, env.iter, 1, lock.TrxId(2), []string{"name"}, []string{"Alice"}, []string{"1"})
+
+		rv := newReadView(lock.TrxId(2), nil, lock.TrxId(3))
+		iter := searchSecondaryIndexWithReadView(t, env, rv)
+		defer iter.Close()
+
+		// WHEN
+		_, ok, err := iter.NextIndexOnly()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.False(t, ok)
+	})
+
+	t.Run("DELETE を行った trx が不可視の別 trx からは削除前のセカンダリレコードが PK 経路で見える", func(t *testing.T) {
+		// GIVEN
+		env := setupMVCCTestEnv(t)
+		inserted := insertPrimaryRecordWithMvcc(t, env, lock.TrxId(1), undo.NullPointer(), "1", "Alice", "a@example.com")
+		deleteUndo := undo.NewDeleteRecord(page.FileId(2), inserted.Encode(), lock.TrxId(1), undo.NullPointer())
+		ptr := env.appendUndo(t, lock.TrxId(5), undo.RecordTypeDelete, deleteUndo)
+		deleted, err := NewPrimaryRecord(env.iter.ct, env.iter.bp, NewPrimaryRecordInput{
+			fileId:     page.FileId(2),
+			pkCount:    1,
+			deleteMark: 1,
+			lastTrxId:  lock.TrxId(5),
+			rollPtr:    ptr,
+			colNames:   []string{"id", "name", "email"},
+			values:     []string{"1", "Alice", "a@example.com"},
+		})
+		assert.NoError(t, err)
+		mtr := buffer.NewMtr(env.iter.bp)
+		err = env.iter.primaryTree.Update(mtr, deleted.Encode())
+		mtr.UnpinAll()
+		assert.NoError(t, err)
+		insertSecondaryRecordWithMvcc(t, env.iter, 1, lock.TrxId(5), []string{"name"}, []string{"Alice"}, []string{"1"})
+
+		rv := newReadView(lock.TrxId(2), []lock.TrxId{lock.TrxId(5)}, lock.TrxId(6))
+		iter := searchSecondaryIndexWithReadView(t, env, rv)
+		defer iter.Close()
+
+		// WHEN
+		result, ok, err := iter.NextIndexOnly()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, []string{"Alice"}, result.values)
+	})
+}
+
+func TestSecondaryIndexIteratorPKPathFallback(t *testing.T) {
+	t.Run("SK 変更 UPDATE 後、新 Trx が不可視の trx から古い SK が見える", func(t *testing.T) {
+		// GIVEN
+		env := setupMVCCTestEnv(t)
+		inserted := insertPrimaryRecordWithMvcc(t, env, lock.TrxId(1), undo.NullPointer(), "1", "Alice", "a@example.com")
+		updateUndo := undo.NewUpdateRecord(page.FileId(2), inserted.Encode(), btree.Record{}, lock.TrxId(1), undo.NullPointer())
+		ptr := env.appendUndo(t, lock.TrxId(5), undo.RecordTypeUpdate, updateUndo)
+		updatePrimaryRecordWithMvcc(t, env, lock.TrxId(5), ptr, "1", "Bob", "a@example.com")
+		insertSecondaryRecordWithMvcc(t, env.iter, 1, lock.TrxId(5), []string{"name"}, []string{"Alice"}, []string{"1"})
+		insertSecondaryRecordWithMvcc(t, env.iter, 0, lock.TrxId(5), []string{"name"}, []string{"Bob"}, []string{"1"})
+
+		rv := newReadView(lock.TrxId(2), []lock.TrxId{lock.TrxId(5)}, lock.TrxId(6))
+		iter := searchSecondaryIndexWithReadView(t, env, rv)
+		defer iter.Close()
+
+		// WHEN
+		result, ok, err := iter.NextIndexOnly()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, []string{"Alice"}, result.values)
+	})
+
+	t.Run("SK 変更 UPDATE 後、新 Trx が可視の trx から古い SK が見えず新しい SK が見える", func(t *testing.T) {
+		// GIVEN
+		env := setupMVCCTestEnv(t)
+		inserted := insertPrimaryRecordWithMvcc(t, env, lock.TrxId(1), undo.NullPointer(), "1", "Alice", "a@example.com")
+		updateUndo := undo.NewUpdateRecord(page.FileId(2), inserted.Encode(), btree.Record{}, lock.TrxId(1), undo.NullPointer())
+		ptr := env.appendUndo(t, lock.TrxId(5), undo.RecordTypeUpdate, updateUndo)
+		updatePrimaryRecordWithMvcc(t, env, lock.TrxId(5), ptr, "1", "Bob", "a@example.com")
+		insertSecondaryRecordWithMvcc(t, env.iter, 1, lock.TrxId(5), []string{"name"}, []string{"Alice"}, []string{"1"})
+		insertSecondaryRecordWithMvcc(t, env.iter, 0, lock.TrxId(5), []string{"name"}, []string{"Bob"}, []string{"1"})
+
+		rv := newReadView(lock.TrxId(6), nil, lock.TrxId(7))
+		iter := searchSecondaryIndexWithReadView(t, env, rv)
+		defer iter.Close()
+
+		// WHEN
+		result, ok, err := iter.NextIndexOnly()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.Equal(t, []string{"Bob"}, result.values)
+	})
 }

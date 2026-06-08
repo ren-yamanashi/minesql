@@ -54,20 +54,20 @@ func (t *Table) Delete(record *PrimaryRecord, trxId lock.TrxId) error {
 
 // softDeleteSecondaryIndexes は全セカンダリインデックスのレコードを論理削除する
 func (t *Table) softDeleteSecondaryIndexes(mtr *buffer.Mtr, record *PrimaryRecord, trxId lock.TrxId) error {
-	return t.forEachSecondaryRecord(record, func(si *secondaryIndex, sr *SecondaryRecord) error {
+	return t.forEachSecondaryRecord(record, trxId, func(si *secondaryIndex, sr *SecondaryRecord) error {
 		return si.softDelete(mtr, sr, trxId)
 	})
 }
 
 // deleteSecondaryIndexes は全セカンダリインデックスのレコードを物理削除する
 func (t *Table) deleteSecondaryIndexes(mtr *buffer.Mtr, record *PrimaryRecord, trxId lock.TrxId) error {
-	return t.forEachSecondaryRecord(record, func(si *secondaryIndex, sr *SecondaryRecord) error {
+	return t.forEachSecondaryRecord(record, trxId, func(si *secondaryIndex, sr *SecondaryRecord) error {
 		return si.delete(mtr, sr, trxId)
 	})
 }
 
 // forEachSecondaryRecord は PrimaryRecord から各セカンダリインデックス用のレコードを構築し、コールバックを適用する
-func (t *Table) forEachSecondaryRecord(record *PrimaryRecord, op func(*secondaryIndex, *SecondaryRecord) error) error {
+func (t *Table) forEachSecondaryRecord(record *PrimaryRecord, trxId lock.TrxId, op func(*secondaryIndex, *SecondaryRecord) error) error {
 	valMap := t.buildValMap(record.colNames, record.values)
 	pk := t.extractPrimaryKey(record.values)
 
@@ -77,7 +77,7 @@ func (t *Table) forEachSecondaryRecord(record *PrimaryRecord, op func(*secondary
 			return err
 		}
 		skColNames, skValues := t.extractSecondaryKey(keyCols, valMap)
-		sr, err := t.buildSecondaryRecord(si, skColNames, skValues, pk)
+		sr, err := t.buildSecondaryRecord(si, skColNames, skValues, pk, trxId)
 		if err != nil {
 			return err
 		}

@@ -1,6 +1,7 @@
 package access
 
 import (
+	"encoding/binary"
 	"path/filepath"
 	"testing"
 
@@ -9,6 +10,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -22,6 +24,7 @@ func TestNewSecondaryRecord(t *testing.T) {
 		sr, err := NewSecondaryRecord(ct, bp, NewSecondaryRecordInput{
 			fileId:     page.FileId(2),
 			deleteMark: 0,
+			lastTrxId:  lock.TrxId(42),
 			indexName:  "idx_name",
 			colNames:   []string{"name"},
 			values:     []string{"Alice"},
@@ -34,6 +37,7 @@ func TestNewSecondaryRecord(t *testing.T) {
 		assert.Equal(t, []string{"Alice"}, sr.values)
 		assert.Equal(t, []string{"1"}, sr.pk)
 		assert.Equal(t, byte(0), sr.deleteMark)
+		assert.Equal(t, lock.TrxId(42), sr.lastTrxId)
 	})
 
 	t.Run("カラム名と値の数が一致しない場合エラーを返す", func(t *testing.T) {
@@ -110,6 +114,7 @@ func TestSecondaryRecordEncode(t *testing.T) {
 		// GIVEN
 		sr := &SecondaryRecord{
 			deleteMark: 0x00,
+			lastTrxId:  lock.TrxId(7),
 			values:     []string{"sk1"},
 			pk:         []string{"pk1"},
 		}
@@ -118,7 +123,10 @@ func TestSecondaryRecordEncode(t *testing.T) {
 		record := sr.Encode()
 
 		// THEN
-		assert.Equal(t, []byte{0x00}, record.Header())
+		expectedHeader := make([]byte, secondaryHeaderSize)
+		expectedHeader[secondaryDeleteMarkOffset] = 0x00
+		binary.BigEndian.PutUint32(expectedHeader[secondaryLastTrxIdOffset:], 7)
+		assert.Equal(t, expectedHeader, record.Header())
 
 		decoded, err := encode.Decode(record.Key())
 		assert.NoError(t, err)
@@ -156,7 +164,23 @@ func TestSecondaryRecordEncode(t *testing.T) {
 		record := sr.Encode()
 
 		// THEN
-		assert.Equal(t, []byte{0x01}, record.Header())
+		assert.Equal(t, byte(0x01), record.Header()[secondaryDeleteMarkOffset])
+	})
+
+	t.Run("lastTrxId がビッグエンディアン 4 byte でエンコードされる", func(t *testing.T) {
+		// GIVEN
+		sr := &SecondaryRecord{
+			deleteMark: 0x00,
+			lastTrxId:  lock.TrxId(0x01020304),
+			values:     []string{"sk1"},
+			pk:         []string{"pk1"},
+		}
+
+		// WHEN
+		record := sr.Encode()
+
+		// THEN
+		assert.Equal(t, []byte{0x01, 0x02, 0x03, 0x04}, record.Header()[secondaryLastTrxIdOffset:secondaryLastTrxIdOffset+4])
 	})
 
 	t.Run("複合プライマリキーを正しくエンコードする", func(t *testing.T) {
@@ -216,6 +240,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 		original, err := NewSecondaryRecord(ct, bp, NewSecondaryRecordInput{
 			fileId:     page.FileId(2),
 			deleteMark: 0,
+			lastTrxId:  lock.TrxId(99),
 			indexName:  "idx_name",
 			colNames:   []string{"name"},
 			values:     []string{"Alice"},
@@ -233,6 +258,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 		assert.Equal(t, original.values, decoded.values)
 		assert.Equal(t, original.pk, decoded.pk)
 		assert.Equal(t, original.deleteMark, decoded.deleteMark)
+		assert.Equal(t, original.lastTrxId, decoded.lastTrxId)
 	})
 
 	t.Run("削除マーク付きレコードをデコードできる", func(t *testing.T) {
@@ -284,7 +310,7 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 	t.Run("デコードされたキーの長さがインデックスカラム数未満の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
 		ct, bp := setupSecondaryTestCatalog(t)
-		record := btree.NewRecord([]byte{0x00}, nil, nil)
+		record := btree.NewRecord(make([]byte, secondaryHeaderSize), nil, nil)
 
 		// WHEN
 		_, err := DecodeSecondaryRecord(record, ct, bp, page.FileId(2), "idx_name")
@@ -297,13 +323,94 @@ func TestDecodeSecondaryRecord(t *testing.T) {
 	t.Run("存在しないインデックス名を指定するとエラーを返す", func(t *testing.T) {
 		// GIVEN
 		ct, bp := setupSecondaryTestCatalog(t)
-		record := btree.NewRecord([]byte{0x00}, []byte{}, nil)
+		record := btree.NewRecord(make([]byte, secondaryHeaderSize), []byte{}, nil)
 
 		// WHEN
 		_, err := DecodeSecondaryRecord(record, ct, bp, page.FileId(2), "nonexistent")
 
 		// THEN
 		assert.Error(t, err)
+	})
+}
+
+func TestSecondaryRecordEncodeDecodeRoundTrip(t *testing.T) {
+	t.Run("lastTrxId をセットして Encode と Decode を行うと元の値に戻る", func(t *testing.T) {
+		// GIVEN
+		ct, bp := setupSecondaryTestCatalog(t)
+		original, err := NewSecondaryRecord(ct, bp, NewSecondaryRecordInput{
+			fileId:     page.FileId(2),
+			deleteMark: 0,
+			lastTrxId:  lock.TrxId(0x12345678),
+			indexName:  "idx_name_email",
+			colNames:   []string{"name", "email"},
+			values:     []string{"Alice", "alice@example.com"},
+			pk:         []string{"1"},
+		})
+		assert.NoError(t, err)
+
+		// WHEN
+		encoded := original.Encode()
+		decoded, err := DecodeSecondaryRecord(encoded, ct, bp, page.FileId(2), "idx_name_email")
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, original.deleteMark, decoded.deleteMark)
+		assert.Equal(t, original.lastTrxId, decoded.lastTrxId)
+		assert.Equal(t, original.colNames, decoded.colNames)
+		assert.Equal(t, original.values, decoded.values)
+		assert.Equal(t, original.pk, decoded.pk)
+	})
+
+	t.Run("削除マーク付きで lastTrxId を保持できる", func(t *testing.T) {
+		// GIVEN
+		ct, bp := setupSecondaryTestCatalog(t)
+		original, err := NewSecondaryRecord(ct, bp, NewSecondaryRecordInput{
+			fileId:     page.FileId(2),
+			deleteMark: 1,
+			lastTrxId:  lock.TrxId(42),
+			indexName:  "idx_name",
+			colNames:   []string{"name"},
+			values:     []string{"Bob"},
+			pk:         []string{"2"},
+		})
+		assert.NoError(t, err)
+
+		// WHEN
+		encoded := original.Encode()
+		decoded, err := DecodeSecondaryRecord(encoded, ct, bp, page.FileId(2), "idx_name")
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, byte(1), decoded.deleteMark)
+		assert.Equal(t, lock.TrxId(42), decoded.lastTrxId)
+	})
+}
+
+func TestDecodeSecondaryRecordInvalidHeaderSize(t *testing.T) {
+	t.Run("ヘッダー長が 5 byte 未満の場合エラーを返す", func(t *testing.T) {
+		// GIVEN
+		ct, bp := setupSecondaryTestCatalog(t)
+		record := btree.NewRecord([]byte{0x00}, []byte{}, nil)
+
+		// WHEN
+		_, err := DecodeSecondaryRecord(record, ct, bp, page.FileId(2), "idx_name")
+
+		// THEN
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid secondary record header size")
+	})
+
+	t.Run("ヘッダーが空の場合エラーを返す", func(t *testing.T) {
+		// GIVEN
+		ct, bp := setupSecondaryTestCatalog(t)
+		record := btree.NewRecord(nil, []byte{}, nil)
+
+		// WHEN
+		_, err := DecodeSecondaryRecord(record, ct, bp, page.FileId(2), "idx_name")
+
+		// THEN
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid secondary record header size")
 	})
 }
 

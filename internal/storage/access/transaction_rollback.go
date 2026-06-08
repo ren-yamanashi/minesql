@@ -63,7 +63,7 @@ func (t *TrxManager) rollbackDelete(mtr *buffer.Mtr, primaryTree *btree.Tree, re
 	}
 	return t.forEachSecondaryTree(fileId, func(tree *btree.Tree, keyCols map[string]int) error {
 		key := primaryRecord.SecondaryKey(keyCols)
-		restored := btree.NewRecord([]byte{0}, key, nil) // header: deleteMark(0), key: sk+pk, nonKey: nil
+		restored := btree.NewRecord(make([]byte, secondaryHeaderSize), key, nil) // header: 5 byte zero-fill (deleteMark=0, lastTrxId=0), key: sk+pk, nonKey: nil
 		return tree.Update(mtr, restored)
 	})
 }
@@ -92,7 +92,7 @@ func (t *TrxManager) rollbackUpdate(mtr *buffer.Mtr, primaryTree *btree.Tree, re
 		if err := tree.Delete(mtr, newKey); err != nil {
 			return err
 		}
-		restored := btree.NewRecord([]byte{0}, oldKey, nil) // header: deleteMark(0), key: sk+pk, nonKey: nil
+		restored := btree.NewRecord(make([]byte, secondaryHeaderSize), oldKey, nil) // header: 5 byte zero-fill (deleteMark=0, lastTrxId=0), key: sk+pk, nonKey: nil
 		return tree.Update(mtr, restored)
 	})
 }

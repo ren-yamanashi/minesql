@@ -90,7 +90,7 @@ func (t *Table) updateSecondaryIndexes(
 
 		// 更新前のセカンダリキーで論理削除
 		beforeSkColNames, beforeSkValues := t.extractSecondaryKey(keyCols, oldValMap)
-		oldSr, err := t.buildSecondaryRecord(si, beforeSkColNames, beforeSkValues, pk)
+		oldSr, err := t.buildSecondaryRecord(si, beforeSkColNames, beforeSkValues, pk, trxId)
 		if err != nil {
 			return err
 		}
@@ -100,7 +100,7 @@ func (t *Table) updateSecondaryIndexes(
 
 		// 更新後のセカンダリキーで新規挿入
 		afterSkColNames, afterSkValues := t.extractSecondaryKey(keyCols, newValMap)
-		record, err := t.buildSecondaryRecord(si, afterSkColNames, afterSkValues, pk)
+		record, err := t.buildSecondaryRecord(si, afterSkColNames, afterSkValues, pk, trxId)
 		if err != nil {
 			return err
 		}

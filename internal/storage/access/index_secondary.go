@@ -165,6 +165,7 @@ func (si *secondaryIndex) softDelete(mtr *buffer.Mtr, record *SecondaryRecord, t
 	deleted, err := NewSecondaryRecord(si.catalog, si.bufferPool, NewSecondaryRecordInput{
 		fileId:     si.fileId,
 		deleteMark: 1,
+		lastTrxId:  trxId,
 		indexName:  si.indexName,
 		colNames:   record.colNames,
 		values:     record.values,

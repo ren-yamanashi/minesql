@@ -52,6 +52,23 @@ func TestTableInsert(t *testing.T) {
 		assert.Equal(t, "alice@example.com", emailResult.values[2])
 	})
 
+	t.Run("セカンダリインデックスの lastTrxId に挿入した trxId が記録される", func(t *testing.T) {
+		// GIVEN
+		table := setupTableWithRecord(t)
+
+		// WHEN
+		nameRec := findSecondaryRecordByValue(t, table, "idx_name", "Alice")
+		emailRec := findSecondaryRecordByValue(t, table, "idx_email", "alice@example.com")
+
+		// THEN
+		assert.NotNil(t, nameRec)
+		assert.Equal(t, byte(0), nameRec.deleteMark)
+		assert.Equal(t, tableTrxId, nameRec.lastTrxId)
+		assert.NotNil(t, emailRec)
+		assert.Equal(t, byte(0), emailRec.deleteMark)
+		assert.Equal(t, tableTrxId, emailRec.lastTrxId)
+	})
+
 	t.Run("異なるプライマリキーで複数レコードを挿入できる", func(t *testing.T) {
 		// GIVEN
 		table := setupTableWithRecord(t)
