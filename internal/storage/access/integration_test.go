@@ -41,16 +41,16 @@ func TestIntegrationCommit(t *testing.T) {
 		env := setupIntegrationEnv(t)
 		table := createUsersTable(t, env)
 
-		trxId := env.trxMgr.Begin()
+		trx := env.trxMgr.Begin()
 		err := table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trxId,
 		)
 		assert.NoError(t, err)
 
 		// WHEN
-		err = env.trxMgr.Commit(trxId)
+		err = env.trxMgr.Commit(trx)
 
 		// THEN
 		assert.NoError(t, err)
@@ -63,20 +63,20 @@ func TestIntegrationCommit(t *testing.T) {
 		env := setupIntegrationEnv(t)
 		table := createUsersTable(t, env)
 
-		trxId := env.trxMgr.Begin()
+		trx := env.trxMgr.Begin()
 		err := table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trxId,
 		)
 		assert.NoError(t, err)
 
 		before := searchFirstPrimaryRecord(t, table)
-		err = table.Update(before, []string{"name"}, []string{"Bob"}, trxId)
+		err = table.Update(trx, before, []string{"name"}, []string{"Bob"})
 		assert.NoError(t, err)
 
 		// WHEN
-		err = env.trxMgr.Commit(trxId)
+		err = env.trxMgr.Commit(trx)
 
 		// THEN
 		assert.NoError(t, err)
@@ -91,20 +91,20 @@ func TestIntegrationCommit(t *testing.T) {
 		env := setupIntegrationEnv(t)
 		table := createUsersTable(t, env)
 
-		trxId := env.trxMgr.Begin()
+		trx := env.trxMgr.Begin()
 		err := table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trxId,
 		)
 		assert.NoError(t, err)
 
 		record := searchFirstPrimaryRecord(t, table)
-		err = table.SoftDelete(record, trxId)
+		err = table.SoftDelete(trx, record)
 		assert.NoError(t, err)
 
 		// WHEN
-		err = env.trxMgr.Commit(trxId)
+		err = env.trxMgr.Commit(trx)
 
 		// THEN
 		assert.NoError(t, err)
@@ -124,16 +124,16 @@ func TestIntegrationRollback(t *testing.T) {
 		env := setupIntegrationEnv(t)
 		table := createUsersTable(t, env)
 
-		trxId := env.trxMgr.Begin()
+		trx := env.trxMgr.Begin()
 		err := table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trxId,
 		)
 		assert.NoError(t, err)
 
 		// WHEN
-		err = env.trxMgr.Rollback(trxId)
+		err = env.trxMgr.Rollback(trx)
 
 		// THEN
 		assert.NoError(t, err)
@@ -151,23 +151,23 @@ func TestIntegrationRollback(t *testing.T) {
 		env := setupIntegrationEnv(t)
 		table := createUsersTable(t, env)
 
-		trxId1 := env.trxMgr.Begin()
+		trx1 := env.trxMgr.Begin()
 		err := table.Insert(
+			trx1,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trxId1,
 		)
 		assert.NoError(t, err)
-		err = env.trxMgr.Commit(trxId1)
+		err = env.trxMgr.Commit(trx1)
 		assert.NoError(t, err)
 
-		trxId2 := env.trxMgr.Begin()
+		trx2 := env.trxMgr.Begin()
 		record := searchFirstPrimaryRecord(t, table)
-		err = table.Update(record, []string{"name"}, []string{"Bob"}, trxId2)
+		err = table.Update(trx2, record, []string{"name"}, []string{"Bob"})
 		assert.NoError(t, err)
 
 		// WHEN
-		err = env.trxMgr.Rollback(trxId2)
+		err = env.trxMgr.Rollback(trx2)
 
 		// THEN
 		assert.NoError(t, err)
@@ -182,25 +182,25 @@ func TestIntegrationMultipleTransactions(t *testing.T) {
 		env := setupIntegrationEnv(t)
 		table := createUsersTable(t, env)
 
-		trxId1 := env.trxMgr.Begin()
+		trx1 := env.trxMgr.Begin()
 		err := table.Insert(
+			trx1,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trxId1,
 		)
 		assert.NoError(t, err)
-		err = env.trxMgr.Commit(trxId1)
+		err = env.trxMgr.Commit(trx1)
 		assert.NoError(t, err)
 
 		// WHEN
-		trxId2 := env.trxMgr.Begin()
+		trx2 := env.trxMgr.Begin()
 		err = table.Insert(
+			trx2,
 			[]string{"id", "name", "email"},
 			[]string{"2", "Bob", "bob@example.com"},
-			trxId2,
 		)
 		assert.NoError(t, err)
-		err = env.trxMgr.Commit(trxId2)
+		err = env.trxMgr.Commit(trx2)
 		assert.NoError(t, err)
 
 		// THEN
@@ -227,14 +227,14 @@ func TestIntegrationCrashRecovery(t *testing.T) {
 		env := setupIntegrationEnv(t)
 		table := createUsersTable(t, env)
 
-		trxId := env.trxMgr.Begin()
+		trx := env.trxMgr.Begin()
 		err := table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trxId,
 		)
 		assert.NoError(t, err)
-		err = env.trxMgr.Commit(trxId)
+		err = env.trxMgr.Commit(trx)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -252,15 +252,14 @@ func TestIntegrationCrashRecovery(t *testing.T) {
 		env := setupIntegrationEnv(t)
 		table := createUsersTable(t, env)
 
-		trxId := env.trxMgr.Begin()
+		trx := env.trxMgr.Begin()
 		err := table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trxId,
 		)
 		assert.NoError(t, err)
 
-		// Commit せずに Redo ログをフラッシュ (クラッシュを模擬)
 		err = env.redoLog.Flush()
 		assert.NoError(t, err)
 
@@ -284,21 +283,21 @@ func TestIntegrationCrashRecovery(t *testing.T) {
 		env := setupIntegrationEnv(t)
 		table := createUsersTable(t, env)
 
-		trxId1 := env.trxMgr.Begin()
+		trx1 := env.trxMgr.Begin()
 		err := table.Insert(
+			trx1,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trxId1,
 		)
 		assert.NoError(t, err)
-		err = env.trxMgr.Commit(trxId1)
+		err = env.trxMgr.Commit(trx1)
 		assert.NoError(t, err)
 
-		trxId2 := env.trxMgr.Begin()
+		trx2 := env.trxMgr.Begin()
 		record := searchFirstPrimaryRecord(t, table)
-		err = table.Update(record, []string{"name"}, []string{"Bob"}, trxId2)
+		err = table.Update(trx2, record, []string{"name"}, []string{"Bob"})
 		assert.NoError(t, err)
-		err = env.trxMgr.Commit(trxId2)
+		err = env.trxMgr.Commit(trx2)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -398,12 +397,12 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 					return
 				}
 				for j := range opsPerWorker {
-					trxId := env.trxMgr.Begin()
+					trx := env.trxMgr.Begin()
 					key := fmt.Sprintf("%04d", workerId*opsPerWorker+j+1)
 					name := fmt.Sprintf("user_%d_%d", workerId, j)
 					email := fmt.Sprintf("u%d-%d@example.com", workerId, j)
-					_ = table.Insert([]string{"id", "name", "email"}, []string{key, name, email}, trxId)
-					_ = env.trxMgr.Commit(trxId)
+					_ = table.Insert(trx, []string{"id", "name", "email"}, []string{key, name, email})
+					_ = env.trxMgr.Commit(trx)
 				}
 			}(w)
 		}
@@ -446,28 +445,25 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 				keyOf := func(j int) string {
 					return fmt.Sprintf("%04d", workerId*insertPerWriter+j+1)
 				}
-				// Insert
 				for j := range insertPerWriter {
-					trxId := env.trxMgr.Begin()
+					trx := env.trxMgr.Begin()
 					_ = table.Insert(
+						trx,
 						[]string{"id", "name", "email"},
 						[]string{keyOf(j), fmt.Sprintf("u%d-%d", workerId, j), fmt.Sprintf("u%d-%d@example.com", workerId, j)},
-						trxId,
 					)
-					_ = env.trxMgr.Commit(trxId)
+					_ = env.trxMgr.Commit(trx)
 				}
-				// Update: 1 件目の name を更新
-				trxId := env.trxMgr.Begin()
+				trx := env.trxMgr.Begin()
 				if rec := findRecordByPk(t, env, table, keyOf(0)); rec != nil {
-					_ = table.Update(rec, []string{"name"}, []string{"updated"}, trxId)
+					_ = table.Update(trx, rec, []string{"name"}, []string{"updated"})
 				}
-				_ = env.trxMgr.Commit(trxId)
-				// SoftDelete: 最後の 1 件
-				trxId = env.trxMgr.Begin()
+				_ = env.trxMgr.Commit(trx)
+				trx = env.trxMgr.Begin()
 				if rec := findRecordByPk(t, env, table, keyOf(insertPerWriter-1)); rec != nil {
-					_ = table.SoftDelete(rec, trxId)
+					_ = table.SoftDelete(trx, rec)
 				}
-				_ = env.trxMgr.Commit(trxId)
+				_ = env.trxMgr.Commit(trx)
 			}(w)
 		}
 		// Search reader (writer の操作中に並行して全件 scan を繰り返す)
@@ -524,41 +520,38 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 		// WHEN: Commit ワーカーと未 Commit ワーカーが並行に動く
 		var wg sync.WaitGroup
 
-		// Commit ワーカー: Begin -> Insert -> Commit を繰り返す
 		for w := range committedWorkers {
 			wg.Add(1)
 			go func(workerId int) {
 				defer wg.Done()
 				table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
 				for j := range opsPerWorker {
-					trxId := env.trxMgr.Begin()
+					trx := env.trxMgr.Begin()
 					key := fmt.Sprintf("%04d", workerId*opsPerWorker+j+1)
 					_ = table.Insert(
+						trx,
 						[]string{"id", "name", "email"},
 						[]string{key, fmt.Sprintf("u%d-%d", workerId, j), fmt.Sprintf("u%d-%d@example.com", workerId, j)},
-						trxId,
 					)
-					_ = env.trxMgr.Commit(trxId)
+					_ = env.trxMgr.Commit(trx)
 				}
 			}(w)
 		}
 
-		// 未 Commit ワーカー: Begin -> Insert したまま Commit せず終了 (= クラッシュ相当)
-		// 行ロックはクラッシュで揮発する想定だが lockMgr はプロセス内で揮発しないため、明示解放する
 		for w := range uncommittedWorkers {
 			wg.Add(1)
 			go func(workerId int) {
 				defer wg.Done()
 				table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
 				for j := range opsPerWorker {
-					trxId := env.trxMgr.Begin()
+					trx := env.trxMgr.Begin()
 					key := fmt.Sprintf("9%03d", workerId*opsPerWorker+j+1)
 					_ = table.Insert(
+						trx,
 						[]string{"id", "name", "email"},
 						[]string{key, fmt.Sprintf("nc%d-%d", workerId, j), fmt.Sprintf("nc%d-%d@example.com", workerId, j)},
-						trxId,
 					)
-					env.lockMgr.Release(trxId)
+					env.lockMgr.Release(trx.trxId)
 				}
 			}(w)
 		}

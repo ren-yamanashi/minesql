@@ -16,16 +16,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const fkTrxId lock.TrxId = 1
-
 func TestTableCheckForeignKeysForInsert(t *testing.T) {
 	t.Run("FK の参照先に値が存在する場合、挿入が成功する", func(t *testing.T) {
 		// GIVEN
 		env := setupFKTestEnv(t)
-		_ = env.parent.Insert([]string{"id", "name"}, []string{"1", "Sales"}, fkTrxId)
+		fkTrx := env.trxMgr.Begin()
+		_ = env.parent.Insert(fkTrx, []string{"id", "name"}, []string{"1", "Sales"})
 
 		// WHEN
-		err := env.child.Insert([]string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"}, fkTrxId)
+		err := env.child.Insert(fkTrx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"})
 
 		// THEN
 		assert.NoError(t, err)
@@ -34,9 +33,10 @@ func TestTableCheckForeignKeysForInsert(t *testing.T) {
 	t.Run("FK の参照先に値が存在しない場合、ErrForeignKeyViolation を返す", func(t *testing.T) {
 		// GIVEN
 		env := setupFKTestEnv(t)
+		fkTrx := env.trxMgr.Begin()
 
 		// WHEN
-		err := env.child.Insert([]string{"id", "name", "dept_id"}, []string{"1", "Alice", "999"}, fkTrxId)
+		err := env.child.Insert(fkTrx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "999"})
 
 		// THEN
 		assert.ErrorIs(t, err, ErrForeignKeyViolation)
@@ -45,12 +45,13 @@ func TestTableCheckForeignKeysForInsert(t *testing.T) {
 	t.Run("FK の参照先が論理削除済みの場合、ErrForeignKeyViolation を返す", func(t *testing.T) {
 		// GIVEN
 		env := setupFKTestEnv(t)
-		_ = env.parent.Insert([]string{"id", "name"}, []string{"1", "Sales"}, fkTrxId)
+		fkTrx := env.trxMgr.Begin()
+		_ = env.parent.Insert(fkTrx, []string{"id", "name"}, []string{"1", "Sales"})
 		record := searchFirstPrimaryRecord(t, env.parent)
-		_ = env.parent.SoftDelete(record, fkTrxId)
+		_ = env.parent.SoftDelete(fkTrx, record)
 
 		// WHEN
-		err := env.child.Insert([]string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"}, fkTrxId)
+		err := env.child.Insert(fkTrx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"})
 
 		// THEN
 		assert.ErrorIs(t, err, ErrForeignKeyViolation)
@@ -59,9 +60,10 @@ func TestTableCheckForeignKeysForInsert(t *testing.T) {
 	t.Run("FK 制約のないテーブルでは FK チェックが行われない", func(t *testing.T) {
 		// GIVEN
 		env := setupFKTestEnv(t)
+		fkTrx := env.trxMgr.Begin()
 
-		// WHEN (FK を持たない親テーブルへの挿入)
-		err := env.parent.Insert([]string{"id", "name"}, []string{"1", "Sales"}, fkTrxId)
+		// WHEN
+		err := env.parent.Insert(fkTrx, []string{"id", "name"}, []string{"1", "Sales"})
 
 		// THEN
 		assert.NoError(t, err)
@@ -72,11 +74,12 @@ func TestTableCheckForeignKeysForDelete(t *testing.T) {
 	t.Run("子テーブルから参照されていないレコードの削除は成功する", func(t *testing.T) {
 		// GIVEN
 		env := setupFKTestEnv(t)
-		_ = env.parent.Insert([]string{"id", "name"}, []string{"1", "Sales"}, fkTrxId)
+		fkTrx := env.trxMgr.Begin()
+		_ = env.parent.Insert(fkTrx, []string{"id", "name"}, []string{"1", "Sales"})
 		record := searchFirstPrimaryRecord(t, env.parent)
 
 		// WHEN
-		err := env.parent.SoftDelete(record, fkTrxId)
+		err := env.parent.SoftDelete(fkTrx, record)
 
 		// THEN
 		assert.NoError(t, err)
@@ -85,12 +88,13 @@ func TestTableCheckForeignKeysForDelete(t *testing.T) {
 	t.Run("子テーブルから参照されているレコードの削除は ErrForeignKeyViolation を返す", func(t *testing.T) {
 		// GIVEN
 		env := setupFKTestEnv(t)
-		_ = env.parent.Insert([]string{"id", "name"}, []string{"1", "Sales"}, fkTrxId)
-		_ = env.child.Insert([]string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"}, fkTrxId)
+		fkTrx := env.trxMgr.Begin()
+		_ = env.parent.Insert(fkTrx, []string{"id", "name"}, []string{"1", "Sales"})
+		_ = env.child.Insert(fkTrx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"})
 		record := searchFirstPrimaryRecord(t, env.parent)
 
 		// WHEN
-		err := env.parent.SoftDelete(record, fkTrxId)
+		err := env.parent.SoftDelete(fkTrx, record)
 
 		// THEN
 		assert.ErrorIs(t, err, ErrForeignKeyViolation)
@@ -99,14 +103,15 @@ func TestTableCheckForeignKeysForDelete(t *testing.T) {
 	t.Run("子テーブルの参照レコードが論理削除済みの場合、親の削除は成功する", func(t *testing.T) {
 		// GIVEN
 		env := setupFKTestEnv(t)
-		_ = env.parent.Insert([]string{"id", "name"}, []string{"1", "Sales"}, fkTrxId)
-		_ = env.child.Insert([]string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"}, fkTrxId)
+		fkTrx := env.trxMgr.Begin()
+		_ = env.parent.Insert(fkTrx, []string{"id", "name"}, []string{"1", "Sales"})
+		_ = env.child.Insert(fkTrx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"})
 		childRecord := searchFirstPrimaryRecord(t, env.child)
-		_ = env.child.SoftDelete(childRecord, fkTrxId)
+		_ = env.child.SoftDelete(fkTrx, childRecord)
 		parentRecord := searchFirstPrimaryRecord(t, env.parent)
 
 		// WHEN
-		err := env.parent.SoftDelete(parentRecord, fkTrxId)
+		err := env.parent.SoftDelete(fkTrx, parentRecord)
 
 		// THEN
 		assert.NoError(t, err)
@@ -117,13 +122,14 @@ func TestTableCheckForeignKeysForUpdate(t *testing.T) {
 	t.Run("FK カラムを有効な値に更新する場合は成功する", func(t *testing.T) {
 		// GIVEN
 		env := setupFKTestEnv(t)
-		_ = env.parent.Insert([]string{"id", "name"}, []string{"1", "Sales"}, fkTrxId)
-		_ = env.parent.Insert([]string{"id", "name"}, []string{"2", "Engineering"}, fkTrxId)
-		_ = env.child.Insert([]string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"}, fkTrxId)
+		fkTrx := env.trxMgr.Begin()
+		_ = env.parent.Insert(fkTrx, []string{"id", "name"}, []string{"1", "Sales"})
+		_ = env.parent.Insert(fkTrx, []string{"id", "name"}, []string{"2", "Engineering"})
+		_ = env.child.Insert(fkTrx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"})
 		record := searchFirstPrimaryRecord(t, env.child)
 
 		// WHEN
-		err := env.child.Update(record, []string{"dept_id"}, []string{"2"}, fkTrxId)
+		err := env.child.Update(fkTrx, record, []string{"dept_id"}, []string{"2"})
 
 		// THEN
 		assert.NoError(t, err)
@@ -132,12 +138,13 @@ func TestTableCheckForeignKeysForUpdate(t *testing.T) {
 	t.Run("FK カラムを無効な値に更新する場合は ErrForeignKeyViolation を返す", func(t *testing.T) {
 		// GIVEN
 		env := setupFKTestEnv(t)
-		_ = env.parent.Insert([]string{"id", "name"}, []string{"1", "Sales"}, fkTrxId)
-		_ = env.child.Insert([]string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"}, fkTrxId)
+		fkTrx := env.trxMgr.Begin()
+		_ = env.parent.Insert(fkTrx, []string{"id", "name"}, []string{"1", "Sales"})
+		_ = env.child.Insert(fkTrx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"})
 		record := searchFirstPrimaryRecord(t, env.child)
 
 		// WHEN
-		err := env.child.Update(record, []string{"dept_id"}, []string{"999"}, fkTrxId)
+		err := env.child.Update(fkTrx, record, []string{"dept_id"}, []string{"999"})
 
 		// THEN
 		assert.ErrorIs(t, err, ErrForeignKeyViolation)
@@ -146,12 +153,13 @@ func TestTableCheckForeignKeysForUpdate(t *testing.T) {
 	t.Run("親テーブルの参照されている PK を更新すると ErrForeignKeyViolation を返す", func(t *testing.T) {
 		// GIVEN
 		env := setupFKTestEnv(t)
-		_ = env.parent.Insert([]string{"id", "name"}, []string{"1", "Sales"}, fkTrxId)
-		_ = env.child.Insert([]string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"}, fkTrxId)
+		fkTrx := env.trxMgr.Begin()
+		_ = env.parent.Insert(fkTrx, []string{"id", "name"}, []string{"1", "Sales"})
+		_ = env.child.Insert(fkTrx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"})
 		record := searchFirstPrimaryRecord(t, env.parent)
 
-		// WHEN (PK 更新 → SoftDelete + Insert に分岐 → SoftDelete で FK 違反)
-		err := env.parent.Update(record, []string{"id"}, []string{"2"}, fkTrxId)
+		// WHEN
+		err := env.parent.Update(fkTrx, record, []string{"id"}, []string{"2"})
 
 		// THEN
 		assert.ErrorIs(t, err, ErrForeignKeyViolation)
@@ -160,12 +168,13 @@ func TestTableCheckForeignKeysForUpdate(t *testing.T) {
 	t.Run("FK カラム以外のカラムのみ更新する場合は FK チェックが行われない", func(t *testing.T) {
 		// GIVEN
 		env := setupFKTestEnv(t)
-		_ = env.parent.Insert([]string{"id", "name"}, []string{"1", "Sales"}, fkTrxId)
-		_ = env.child.Insert([]string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"}, fkTrxId)
+		fkTrx := env.trxMgr.Begin()
+		_ = env.parent.Insert(fkTrx, []string{"id", "name"}, []string{"1", "Sales"})
+		_ = env.child.Insert(fkTrx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"})
 		record := searchFirstPrimaryRecord(t, env.child)
 
 		// WHEN
-		err := env.child.Update(record, []string{"name"}, []string{"Bob"}, fkTrxId)
+		err := env.child.Update(fkTrx, record, []string{"name"}, []string{"Bob"})
 
 		// THEN
 		assert.NoError(t, err)
@@ -234,6 +243,7 @@ type fkTestEnv struct {
 	child        *Table // employees (id PK, name, dept_id FK -> departments.id)
 	parentFileId page.FileId
 	childFileId  page.FileId
+	trxMgr       *TrxManager
 }
 
 // setupFKTestEnv は FK テスト用の環境を構築する
@@ -319,6 +329,8 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 	}
 	childFileId := childTable.primaryIndex.fileId()
 
+	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp)
+
 	return &fkTestEnv{
 		ct:           ct,
 		bp:           bp,
@@ -326,5 +338,6 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 		child:        childTable,
 		parentFileId: parentFileId,
 		childFileId:  childFileId,
+		trxMgr:       trxMgr,
 	}
 }

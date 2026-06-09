@@ -115,22 +115,20 @@ func TestPurgePurge(t *testing.T) {
 		table := setupTableForRecoveryTest(t, env)
 		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog)
 
-		// レコードを挿入してコミット
 		trx1 := env.trxManager.Begin()
 		_ = table.Insert(
+			trx1,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trx1,
 		)
 		_ = env.trxManager.Commit(trx1)
 
-		// 論理削除してコミット
 		trx2 := env.trxManager.Begin()
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
 		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
-		_ = table.SoftDelete(record, trx2)
+		_ = table.SoftDelete(trx2, record)
 		_ = env.trxManager.Commit(trx2)
 
 		// WHEN
@@ -150,22 +148,20 @@ func TestPurgePurge(t *testing.T) {
 		table := setupTableForRecoveryTest(t, env)
 		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog)
 
-		// レコードを挿入してコミット
 		trx1 := env.trxManager.Begin()
 		_ = table.Insert(
+			trx1,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trx1,
 		)
 		_ = env.trxManager.Commit(trx1)
 
-		// name を更新してコミット (セカンダリインデックスの SK が変わる)
 		trx2 := env.trxManager.Begin()
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
 		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
-		_ = table.Update(record, []string{"name"}, []string{"Bob"}, trx2)
+		_ = table.Update(trx2, record, []string{"name"}, []string{"Bob"})
 		_ = env.trxManager.Commit(trx2)
 
 		// WHEN
@@ -186,28 +182,24 @@ func TestPurgePurge(t *testing.T) {
 		table := setupTableForRecoveryTest(t, env)
 		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog)
 
-		// レコードを挿入してコミット
 		trx1 := env.trxManager.Begin()
 		_ = table.Insert(
+			trx1,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trx1,
 		)
 		_ = env.trxManager.Commit(trx1)
 
-		// 論理削除用のトランザクションを開始
 		trx2 := env.trxManager.Begin()
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
 		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
-		_ = table.SoftDelete(record, trx2)
+		_ = table.SoftDelete(trx2, record)
 
-		// trx2 がコミットする前に ReadView を作成 (trx2 はアクティブなので mIds に含まれる)
 		trx3 := env.trxManager.Begin()
-		_ = env.trxManager.CreateReadView(trx3)
+		_ = env.trxManager.EnsureReadView(trx3)
 
-		// trx2 をコミット
 		_ = env.trxManager.Commit(trx2)
 
 		// WHEN
@@ -242,34 +234,34 @@ func TestPurgePurgableTrxIds(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
 		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog)
-		id1 := env.trxManager.Begin()
-		id2 := env.trxManager.Begin()
-		_ = env.trxManager.Commit(id1)
-		_ = env.trxManager.Commit(id2)
+		trx1 := env.trxManager.Begin()
+		trx2 := env.trxManager.Begin()
+		_ = env.trxManager.Commit(trx1)
+		_ = env.trxManager.Commit(trx2)
 
 		// WHEN
 		ids := p.purgableTrxIds(lock.TrxId(2))
 
 		// THEN
 		assert.Len(t, ids, 2)
-		assert.Contains(t, ids, id1)
-		assert.Contains(t, ids, id2)
+		assert.Contains(t, ids, trx1.trxId)
+		assert.Contains(t, ids, trx2.trxId)
 	})
 
 	t.Run("パージ閾値以上のトランザクションは含まれない", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
 		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog)
-		id1 := env.trxManager.Begin()
-		_ = env.trxManager.Begin() // id2, Active
-		_ = env.trxManager.Commit(id1)
+		trx1 := env.trxManager.Begin()
+		_ = env.trxManager.Begin()
+		_ = env.trxManager.Commit(trx1)
 
 		// WHEN
 		ids := p.purgableTrxIds(lock.TrxId(1))
 
 		// THEN
 		assert.Len(t, ids, 1)
-		assert.Contains(t, ids, id1)
+		assert.Contains(t, ids, trx1.trxId)
 	})
 
 	t.Run("該当なしの場合は空を返す", func(t *testing.T) {

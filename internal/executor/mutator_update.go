@@ -4,19 +4,18 @@ import (
 	"errors"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/access"
-	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 )
 
 type Update struct {
-	trxId         lock.TrxId
+	trx           *access.Transaction
 	table         *access.Table
 	innerIterator RowIterator
 	setColumn     Column // SET 句の内容
 }
 
-func NewUpdate(trxId lock.TrxId, table *access.Table, inner RowIterator) *Update {
+func NewUpdate(trx *access.Transaction, table *access.Table, inner RowIterator) *Update {
 	return &Update{
-		trxId:         trxId,
+		trx:           trx,
 		table:         table,
 		innerIterator: inner,
 	}
@@ -34,7 +33,7 @@ func (u *Update) Execute() (int, error) {
 		}
 		switch r := record.(type) {
 		case *access.PrimaryRecord:
-			if err := u.table.Update(r, u.setColumn.colNames, u.setColumn.values, u.trxId); err != nil {
+			if err := u.table.Update(u.trx, r, u.setColumn.colNames, u.setColumn.values); err != nil {
 				return 0, err
 			}
 			affected++

@@ -31,10 +31,10 @@ func TestTrxManagerBegin(t *testing.T) {
 		tm := setupTrxManager(t)
 
 		// WHEN
-		trxId := tm.Begin()
+		trx := tm.Begin()
 
 		// THEN
-		assert.Equal(t, lock.TrxId(0), trxId)
+		assert.Equal(t, lock.TrxId(0), trx.trxId)
 	})
 
 	t.Run("連続して呼ぶとインクリメントされた ID を返す", func(t *testing.T) {
@@ -42,14 +42,14 @@ func TestTrxManagerBegin(t *testing.T) {
 		tm := setupTrxManager(t)
 
 		// WHEN
-		id1 := tm.Begin()
-		id2 := tm.Begin()
-		id3 := tm.Begin()
+		trx1 := tm.Begin()
+		trx2 := tm.Begin()
+		trx3 := tm.Begin()
 
 		// THEN
-		assert.Equal(t, lock.TrxId(0), id1)
-		assert.Equal(t, lock.TrxId(1), id2)
-		assert.Equal(t, lock.TrxId(2), id3)
+		assert.Equal(t, lock.TrxId(0), trx1.trxId)
+		assert.Equal(t, lock.TrxId(1), trx2.trxId)
+		assert.Equal(t, lock.TrxId(2), trx3.trxId)
 	})
 
 	t.Run("開始したトランザクションは Active になる", func(t *testing.T) {
@@ -57,10 +57,10 @@ func TestTrxManagerBegin(t *testing.T) {
 		tm := setupTrxManager(t)
 
 		// WHEN
-		trxId := tm.Begin()
+		trx := tm.Begin()
 
 		// THEN
-		assert.Equal(t, trxStateActive, tm.transactions[trxId])
+		assert.Equal(t, trxStateActive, tm.transactions[trx.trxId].state)
 	})
 }
 
@@ -68,28 +68,27 @@ func TestTrxManagerCommit(t *testing.T) {
 	t.Run("コミット後にトランザクションが Inactive になる", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		trxId := tm.Begin()
+		trx := tm.Begin()
 
 		// WHEN
-		err := tm.Commit(trxId)
+		err := tm.Commit(trx)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, trxStateInactive, tm.transactions[trxId])
+		assert.Equal(t, trxStateInactive, tm.transactions[trx.trxId].state)
 	})
 
-	t.Run("コミット後に ReadView が削除される", func(t *testing.T) {
+	t.Run("コミット後に ReadView がリセットされる", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		trxId := tm.Begin()
-		_ = tm.CreateReadView(trxId)
+		trx := tm.Begin()
+		_ = tm.EnsureReadView(trx)
 
 		// WHEN
-		_ = tm.Commit(trxId)
+		_ = tm.Commit(trx)
 
 		// THEN
-		_, ok := tm.readViews[trxId]
-		assert.False(t, ok)
+		assert.Nil(t, trx.readView)
 	})
 }
 
@@ -97,49 +96,47 @@ func TestTrxManagerRollback(t *testing.T) {
 	t.Run("Undo ログがないトランザクションをロールバックできる", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		trxId := tm.Begin()
+		trx := tm.Begin()
 
 		// WHEN
-		err := tm.Rollback(trxId)
+		err := tm.Rollback(trx)
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, trxStateInactive, tm.transactions[trxId])
+		assert.Equal(t, trxStateInactive, tm.transactions[trx.trxId].state)
 	})
 
-	t.Run("ロールバック後に ReadView が削除される", func(t *testing.T) {
+	t.Run("ロールバック後に ReadView がリセットされる", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		trxId := tm.Begin()
-		_ = tm.CreateReadView(trxId)
+		trx := tm.Begin()
+		_ = tm.EnsureReadView(trx)
 
 		// WHEN
-		_ = tm.Rollback(trxId)
+		_ = tm.Rollback(trx)
 
 		// THEN
-		_, ok := tm.readViews[trxId]
-		assert.False(t, ok)
+		assert.Nil(t, trx.readView)
 	})
 
 	t.Run("Insert のロールバックでレコードが物理削除される", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		trxId := tm.Begin()
+		trx := tm.Begin()
 		table := setupTableForTrxTest(t, tm)
 		err := table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trxId,
 		)
 		assert.NoError(t, err)
 
 		// WHEN
-		err = tm.Rollback(trxId)
+		err = tm.Rollback(trx)
 
 		// THEN
 		assert.NoError(t, err)
 
-		// レコードが存在しないことを確認
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
 		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
@@ -152,30 +149,29 @@ func TestTrxManagerRollback(t *testing.T) {
 	t.Run("SoftDelete のロールバックでレコードが復元される", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		trxId := tm.Begin()
+		trx := tm.Begin()
 		table := setupTableForTrxTest(t, tm)
 		_ = table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trxId,
 		)
-		_ = tm.Commit(trxId)
+		_ = tm.Commit(trx)
 
-		trxId2 := tm.Begin()
+		trx2 := tm.Begin()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
 		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
-		err := table.SoftDelete(record, trxId2)
+		err := table.SoftDelete(trx2, record)
 		assert.NoError(t, err)
 
 		// WHEN
-		err = tm.Rollback(trxId2)
+		err = tm.Rollback(trx2)
 
 		// THEN
 		assert.NoError(t, err)
 
-		// レコードが復元されていることを確認
 		iter2, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		restored, ok, err := iter2.Next()
@@ -187,30 +183,29 @@ func TestTrxManagerRollback(t *testing.T) {
 	t.Run("Update のロールバックで旧レコードに復元される", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		trxId := tm.Begin()
+		trx := tm.Begin()
 		table := setupTableForTrxTest(t, tm)
 		_ = table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trxId,
 		)
-		_ = tm.Commit(trxId)
+		_ = tm.Commit(trx)
 
-		trxId2 := tm.Begin()
+		trx2 := tm.Begin()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
 		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
-		err := table.Update(record, []string{"name"}, []string{"Bob"}, trxId2)
+		err := table.Update(trx2, record, []string{"name"}, []string{"Bob"})
 		assert.NoError(t, err)
 
 		// WHEN
-		err = tm.Rollback(trxId2)
+		err = tm.Rollback(trx2)
 
 		// THEN
 		assert.NoError(t, err)
 
-		// 旧レコードに復元されていることを確認
 		iter2, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		restored, ok, err := iter2.Next()
@@ -222,22 +217,21 @@ func TestTrxManagerRollback(t *testing.T) {
 	t.Run("Insert のロールバックでセカンダリインデックスからも物理削除される", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		trxId := tm.Begin()
+		trx := tm.Begin()
 		table := setupTableForTrxTest(t, tm)
 		err := table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trxId,
 		)
 		assert.NoError(t, err)
 
 		// WHEN
-		err = tm.Rollback(trxId)
+		err = tm.Rollback(trx)
 
 		// THEN
 		assert.NoError(t, err)
 
-		// idx_name からも削除されている
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
 		idxName := findSecondaryIndex(t, table, "idx_name")
@@ -247,7 +241,6 @@ func TestTrxManagerRollback(t *testing.T) {
 		assert.NoError(t, err)
 		assert.False(t, ok)
 
-		// idx_email からも削除されている
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
 		emailIter, err := idxEmail.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
@@ -259,25 +252,25 @@ func TestTrxManagerRollback(t *testing.T) {
 	t.Run("SoftDelete のロールバックでセカンダリインデックスも復元される", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		trxId := tm.Begin()
+		trx := tm.Begin()
 		table := setupTableForTrxTest(t, tm)
 		_ = table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trxId,
 		)
-		_ = tm.Commit(trxId)
+		_ = tm.Commit(trx)
 
-		trxId2 := tm.Begin()
+		trx2 := tm.Begin()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
 		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
-		err := table.SoftDelete(record, trxId2)
+		err := table.SoftDelete(trx2, record)
 		assert.NoError(t, err)
 
 		// WHEN
-		err = tm.Rollback(trxId2)
+		err = tm.Rollback(trx2)
 
 		// THEN
 		assert.NoError(t, err)
@@ -293,26 +286,25 @@ func TestTrxManagerRollback(t *testing.T) {
 	t.Run("SK が変わる Update のロールバックでセカンダリインデックスが復元される", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		trxId := tm.Begin()
+		trx := tm.Begin()
 		table := setupTableForTrxTest(t, tm)
 		_ = table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trxId,
 		)
-		_ = tm.Commit(trxId)
+		_ = tm.Commit(trx)
 
-		trxId2 := tm.Begin()
+		trx2 := tm.Begin()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
 		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
-		// name を変更 → idx_name の SK が変わる
-		err := table.Update(record, []string{"name"}, []string{"Bob"}, trxId2)
+		err := table.Update(trx2, record, []string{"name"}, []string{"Bob"})
 		assert.NoError(t, err)
 
 		// WHEN
-		err = tm.Rollback(trxId2)
+		err = tm.Rollback(trx2)
 
 		// THEN
 		assert.NoError(t, err)
@@ -328,26 +320,25 @@ func TestTrxManagerRollback(t *testing.T) {
 	t.Run("SK が変わらない Update のロールバックではセカンダリインデックスはそのまま", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		trxId := tm.Begin()
+		trx := tm.Begin()
 		table := setupTableForTrxTest(t, tm)
 		_ = table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trxId,
 		)
-		_ = tm.Commit(trxId)
+		_ = tm.Commit(trx)
 
-		trxId2 := tm.Begin()
+		trx2 := tm.Begin()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
 		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
-		// email を変更 → idx_name の SK は変わらない
-		err := table.Update(record, []string{"email"}, []string{"new@example.com"}, trxId2)
+		err := table.Update(trx2, record, []string{"email"}, []string{"new@example.com"})
 		assert.NoError(t, err)
 
 		// WHEN
-		err = tm.Rollback(trxId2)
+		err = tm.Rollback(trx2)
 
 		// THEN
 		assert.NoError(t, err)
@@ -361,28 +352,28 @@ func TestTrxManagerRollback(t *testing.T) {
 	})
 }
 
-func TestTrxManagerCreateReadView(t *testing.T) {
+func TestTrxManagerEnsureReadView(t *testing.T) {
 	t.Run("ReadView を作成できる", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		trxId := tm.Begin()
+		trx := tm.Begin()
 
 		// WHEN
-		rv := tm.CreateReadView(trxId)
+		rv := tm.EnsureReadView(trx)
 
 		// THEN
 		assert.NotNil(t, rv)
-		assert.Equal(t, trxId, rv.trxId)
+		assert.Equal(t, trx.trxId, rv.trxId)
 	})
 
 	t.Run("同一トランザクションで 2 回呼ぶとキャッシュされた ReadView を返す", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		trxId := tm.Begin()
+		trx := tm.Begin()
 
 		// WHEN
-		rv1 := tm.CreateReadView(trxId)
-		rv2 := tm.CreateReadView(trxId)
+		rv1 := tm.EnsureReadView(trx)
+		rv2 := tm.EnsureReadView(trx)
 
 		// THEN
 		assert.Same(t, rv1, rv2)
@@ -391,29 +382,29 @@ func TestTrxManagerCreateReadView(t *testing.T) {
 	t.Run("他のアクティブトランザクションが MIds に含まれる", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		id1 := tm.Begin()
-		id2 := tm.Begin()
+		trx1 := tm.Begin()
+		trx2 := tm.Begin()
 
 		// WHEN
-		rv := tm.CreateReadView(id2)
+		rv := tm.EnsureReadView(trx2)
 
 		// THEN
-		assert.Contains(t, rv.activeTrxIds, id1)
-		assert.NotContains(t, rv.activeTrxIds, id2)
+		assert.Contains(t, rv.activeTrxIds, trx1.trxId)
+		assert.NotContains(t, rv.activeTrxIds, trx2.trxId)
 	})
 
 	t.Run("コミット済みトランザクションは MIds に含まれない", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		id1 := tm.Begin()
-		_ = tm.Commit(id1)
-		id2 := tm.Begin()
+		trx1 := tm.Begin()
+		_ = tm.Commit(trx1)
+		trx2 := tm.Begin()
 
 		// WHEN
-		rv := tm.CreateReadView(id2)
+		rv := tm.EnsureReadView(trx2)
 
 		// THEN
-		assert.NotContains(t, rv.activeTrxIds, id1)
+		assert.NotContains(t, rv.activeTrxIds, trx1.trxId)
 	})
 }
 
@@ -421,7 +412,7 @@ func TestTrxManagerOldestVisibleTrxId(t *testing.T) {
 	t.Run("ReadView がない場合は nextTrxId を返す", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		_ = tm.Begin() // nextTrxId = 1
+		_ = tm.Begin()
 
 		// WHEN
 		oldest := tm.OldestVisibleTrxId()
@@ -433,17 +424,15 @@ func TestTrxManagerOldestVisibleTrxId(t *testing.T) {
 	t.Run("ReadView がある場合は MUpLimitId の最小値を返す", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		id1 := tm.Begin() // trxId=0
-		id2 := tm.Begin() // trxId=1
-		_ = tm.CreateReadView(id1)
-		_ = tm.CreateReadView(id2)
+		trx1 := tm.Begin()
+		trx2 := tm.Begin()
+		_ = tm.EnsureReadView(trx1)
+		_ = tm.EnsureReadView(trx2)
 
 		// WHEN
 		oldest := tm.OldestVisibleTrxId()
 
 		// THEN
-		// id1 の ReadView: MUpLimitId = min(activeTrxIds except id1) = id2 = 1
-		// id2 の ReadView: MUpLimitId = min(activeTrxIds except id2) = id1 = 0
 		assert.Equal(t, lock.TrxId(0), oldest)
 	})
 }
@@ -452,32 +441,32 @@ func TestTrxManagerInactiveTrxIds(t *testing.T) {
 	t.Run("コミット済みのトランザクション ID を返す", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		id1 := tm.Begin()
-		id2 := tm.Begin()
-		_ = tm.Commit(id1)
-		_ = tm.Commit(id2)
+		trx1 := tm.Begin()
+		trx2 := tm.Begin()
+		_ = tm.Commit(trx1)
+		_ = tm.Commit(trx2)
 
 		// WHEN
 		ids := tm.InactiveTrxIds()
 
 		// THEN
 		assert.Len(t, ids, 2)
-		assert.Contains(t, ids, id1)
-		assert.Contains(t, ids, id2)
+		assert.Contains(t, ids, trx1.trxId)
+		assert.Contains(t, ids, trx2.trxId)
 	})
 
 	t.Run("ロールバック済みのトランザクションも含まれる", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		id1 := tm.Begin()
-		_ = tm.Rollback(id1)
+		trx1 := tm.Begin()
+		_ = tm.Rollback(trx1)
 
 		// WHEN
 		ids := tm.InactiveTrxIds()
 
 		// THEN
 		assert.Len(t, ids, 1)
-		assert.Contains(t, ids, id1)
+		assert.Contains(t, ids, trx1.trxId)
 	})
 
 	t.Run("アクティブなトランザクションは含まれない", func(t *testing.T) {
@@ -508,7 +497,7 @@ func TestTrxManagerActiveTrxIDs(t *testing.T) {
 	t.Run("アクティブなトランザクション ID を返す", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		id1 := tm.Begin()
+		trx1 := tm.Begin()
 		_ = tm.Begin()
 
 		// WHEN
@@ -516,23 +505,23 @@ func TestTrxManagerActiveTrxIDs(t *testing.T) {
 
 		// THEN
 		assert.Len(t, ids, 2)
-		assert.Contains(t, ids, id1)
+		assert.Contains(t, ids, trx1.trxId)
 	})
 
 	t.Run("コミット済みトランザクションは含まれない", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
-		id1 := tm.Begin()
-		id2 := tm.Begin()
-		_ = tm.Commit(id1)
+		trx1 := tm.Begin()
+		trx2 := tm.Begin()
+		_ = tm.Commit(trx1)
 
 		// WHEN
 		ids := tm.activeTrxIds()
 
 		// THEN
 		assert.Len(t, ids, 1)
-		assert.Contains(t, ids, id2)
-		assert.NotContains(t, ids, id1)
+		assert.Contains(t, ids, trx2.trxId)
+		assert.NotContains(t, ids, trx1.trxId)
 	})
 
 	t.Run("アクティブなトランザクションがない場合は空を返す", func(t *testing.T) {

@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,17 +13,15 @@ func TestMVCCRepeatableRead(t *testing.T) {
 		env := setupIntegrationEnv(t)
 		table := createUsersTable(t, env)
 		trx1 := env.trxMgr.Begin()
-		_ = table.Insert([]string{"id", "name", "email"}, []string{"1", "alice", "alice@example.com"}, trx1)
+		_ = table.Insert(trx1, []string{"id", "name", "email"}, []string{"1", "alice", "alice@example.com"})
 		assert.NoError(t, env.trxMgr.Commit(trx1))
 
-		// trx2 が Read View を作成 (1 回目の Search で確定)
 		trx2 := env.trxMgr.Begin()
 		v1 := searchByPkForTrx(t, env, table, trx2, "1")
 		assert.Equal(t, "alice", v1.values[1])
 
-		// trx3 が UPDATE してコミット
 		trx3 := env.trxMgr.Begin()
-		assert.NoError(t, table.Update(v1, []string{"name"}, []string{"bob"}, trx3))
+		assert.NoError(t, table.Update(trx3, v1, []string{"name"}, []string{"bob"}))
 		assert.NoError(t, env.trxMgr.Commit(trx3))
 
 		// WHEN
@@ -46,16 +43,14 @@ func TestMVCCUncommittedInvisible(t *testing.T) {
 		env := setupIntegrationEnv(t)
 		table := createUsersTable(t, env)
 		trx1 := env.trxMgr.Begin()
-		_ = table.Insert([]string{"id", "name", "email"}, []string{"1", "alice", "alice@example.com"}, trx1)
+		_ = table.Insert(trx1, []string{"id", "name", "email"}, []string{"1", "alice", "alice@example.com"})
 		assert.NoError(t, env.trxMgr.Commit(trx1))
 
-		// trx2 を開始 (Read View はまだ未作成)
 		trx2 := env.trxMgr.Begin()
 
-		// trx3 が UPDATE (未コミット)
 		trx3 := env.trxMgr.Begin()
-		latest := searchByPkForTrx(t, env, table, trx3, "1") // trx3 自身では新値書き込み前に旧値が見える
-		assert.NoError(t, table.Update(latest, []string{"name"}, []string{"bob"}, trx3))
+		latest := searchByPkForTrx(t, env, table, trx3, "1")
+		assert.NoError(t, table.Update(trx3, latest, []string{"name"}, []string{"bob"}))
 
 		// WHEN
 		v := searchByPkForTrx(t, env, table, trx2, "1")
@@ -72,26 +67,22 @@ func TestMVCCMultiStepUndoTraversal(t *testing.T) {
 		env := setupIntegrationEnv(t)
 		table := createUsersTable(t, env)
 
-		// trx1: INSERT v1
 		trx1 := env.trxMgr.Begin()
-		_ = table.Insert([]string{"id", "name", "email"}, []string{"1", "v1", "v1@example.com"}, trx1)
+		_ = table.Insert(trx1, []string{"id", "name", "email"}, []string{"1", "v1", "v1@example.com"})
 		assert.NoError(t, env.trxMgr.Commit(trx1))
 
-		// trx2: UPDATE v1 → v2
 		trx2 := env.trxMgr.Begin()
 		v1 := searchByPkForTrx(t, env, table, trx2, "1")
-		assert.NoError(t, table.Update(v1, []string{"name"}, []string{"v2"}, trx2))
+		assert.NoError(t, table.Update(trx2, v1, []string{"name"}, []string{"v2"}))
 		assert.NoError(t, env.trxMgr.Commit(trx2))
 
-		// trxRead が Read View 作成 (v2 が見える状態)
 		trxRead := env.trxMgr.Begin()
 		atRead := searchByPkForTrx(t, env, table, trxRead, "1")
 		assert.Equal(t, "v2", atRead.values[1])
 
-		// trxLate: UPDATE v2 → v3 してコミット
 		trxLate := env.trxMgr.Begin()
 		latest := searchByPkForTrx(t, env, table, trxLate, "1")
-		assert.NoError(t, table.Update(latest, []string{"name"}, []string{"v3"}, trxLate))
+		assert.NoError(t, table.Update(trxLate, latest, []string{"name"}, []string{"v3"}))
 		assert.NoError(t, env.trxMgr.Commit(trxLate))
 
 		// WHEN
@@ -109,17 +100,15 @@ func TestMVCCInsertChainTerminal(t *testing.T) {
 		env := setupIntegrationEnv(t)
 		table := createUsersTable(t, env)
 
-		// trx1 が INSERT (未コミット)
 		trx1 := env.trxMgr.Begin()
-		_ = table.Insert([]string{"id", "name", "email"}, []string{"1", "alice", "alice@example.com"}, trx1)
+		_ = table.Insert(trx1, []string{"id", "name", "email"}, []string{"1", "alice", "alice@example.com"})
 
-		// trx2 を開始
 		trx2 := env.trxMgr.Begin()
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
 
 		// WHEN
-		iter, err := table.Search(env.trxMgr, trx2, mtr, SearchModeStart{})
+		iter, err := table.Search(trx2, mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter.Close()
 		_, ok, err := iter.Next()
@@ -137,14 +126,13 @@ func TestMVCCSecondaryVisibility(t *testing.T) {
 		table := createUsersTable(t, env)
 
 		trx1 := env.trxMgr.Begin()
-		_ = table.Insert([]string{"id", "name", "email"}, []string{"1", "alice", "alice@example.com"}, trx1)
+		_ = table.Insert(trx1, []string{"id", "name", "email"}, []string{"1", "alice", "alice@example.com"})
 		assert.NoError(t, env.trxMgr.Commit(trx1))
 
-		// trx2 が Read View を作成
 		trx2 := env.trxMgr.Begin()
 		mtr2 := buffer.NewMtr(env.bp)
 		defer mtr2.UnpinAll()
-		iter2, err := table.SearchSecondary(env.trxMgr, trx2, mtr2, "idx_name", SearchModeStart{})
+		iter2, err := table.SearchSecondary(trx2, mtr2, "idx_name", SearchModeStart{})
 		assert.NoError(t, err)
 		r1, ok, err := iter2.Next()
 		iter2.Close()
@@ -152,16 +140,15 @@ func TestMVCCSecondaryVisibility(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, "alice", r1.values[1])
 
-		// trx3 が name を更新してコミット
 		trx3 := env.trxMgr.Begin()
 		latest := searchByPkForTrx(t, env, table, trx3, "1")
-		assert.NoError(t, table.Update(latest, []string{"name"}, []string{"bob"}, trx3))
+		assert.NoError(t, table.Update(trx3, latest, []string{"name"}, []string{"bob"}))
 		assert.NoError(t, env.trxMgr.Commit(trx3))
 
 		// WHEN
 		mtrAgain := buffer.NewMtr(env.bp)
 		defer mtrAgain.UnpinAll()
-		iter3, err := table.SearchSecondary(env.trxMgr, trx2, mtrAgain, "idx_name", SearchModeStart{})
+		iter3, err := table.SearchSecondary(trx2, mtrAgain, "idx_name", SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter3.Close()
 		result, _, err := iter3.Next()
@@ -180,27 +167,27 @@ func TestMVCCSecondaryIndexOnlyComplexScenario(t *testing.T) {
 		table := createUsersTable(t, env)
 
 		t1 := env.trxMgr.Begin()
-		_ = table.Insert([]string{"id", "name", "email"}, []string{"1", "Alice", "alice@example.com"}, t1)
+		_ = table.Insert(t1, []string{"id", "name", "email"}, []string{"1", "Alice", "alice@example.com"})
 		assert.NoError(t, env.trxMgr.Commit(t1))
 
 		r1 := env.trxMgr.Begin()
-		_ = env.trxMgr.CreateReadView(r1)
+		_ = env.trxMgr.EnsureReadView(r1)
 
 		t2 := env.trxMgr.Begin()
 		latestForT2 := searchByPkForTrx(t, env, table, t2, "1")
-		assert.NoError(t, table.Update(latestForT2, []string{"name"}, []string{"Bob"}, t2))
+		assert.NoError(t, table.Update(t2, latestForT2, []string{"name"}, []string{"Bob"}))
 		assert.NoError(t, env.trxMgr.Commit(t2))
 
 		r2 := env.trxMgr.Begin()
-		_ = env.trxMgr.CreateReadView(r2)
+		_ = env.trxMgr.EnsureReadView(r2)
 
 		t3 := env.trxMgr.Begin()
 		latestForT3 := searchByPkForTrx(t, env, table, t3, "1")
-		assert.NoError(t, table.SoftDelete(latestForT3, t3))
+		assert.NoError(t, table.SoftDelete(t3, latestForT3))
 		assert.NoError(t, env.trxMgr.Commit(t3))
 
 		r3 := env.trxMgr.Begin()
-		_ = env.trxMgr.CreateReadView(r3)
+		_ = env.trxMgr.EnsureReadView(r3)
 
 		// WHEN
 		// THEN
@@ -216,11 +203,11 @@ func TestMVCCSecondaryIndexOnlyComplexScenario(t *testing.T) {
 }
 
 // collectIndexOnlyValues は SearchSecondary 経由で NextIndexOnly を全件呼んで SK 先頭値のリストを返す
-func collectIndexOnlyValues(t *testing.T, env *integrationEnv, table *Table, trxId lock.TrxId, indexName string) []string {
+func collectIndexOnlyValues(t *testing.T, env *integrationEnv, table *Table, trx *Transaction, indexName string) []string {
 	t.Helper()
 	mtr := buffer.NewMtr(env.bp)
 	defer mtr.UnpinAll()
-	iter, err := table.SearchSecondary(env.trxMgr, trxId, mtr, indexName, SearchModeStart{})
+	iter, err := table.SearchSecondary(trx, mtr, indexName, SearchModeStart{})
 	if err != nil {
 		t.Fatalf("SearchSecondary に失敗: %v", err)
 	}
@@ -246,12 +233,12 @@ func TestMVCCDeletedVisible(t *testing.T) {
 		env := setupIntegrationEnv(t)
 		table := createUsersTable(t, env)
 		trx1 := env.trxMgr.Begin()
-		_ = table.Insert([]string{"id", "name", "email"}, []string{"1", "alice", "alice@example.com"}, trx1)
+		_ = table.Insert(trx1, []string{"id", "name", "email"}, []string{"1", "alice", "alice@example.com"})
 		assert.NoError(t, env.trxMgr.Commit(trx1))
 
 		trx2 := env.trxMgr.Begin()
 		latest := searchByPkForTrx(t, env, table, trx2, "1")
-		assert.NoError(t, table.SoftDelete(latest, trx2))
+		assert.NoError(t, table.SoftDelete(trx2, latest))
 		assert.NoError(t, env.trxMgr.Commit(trx2))
 
 		// WHEN
@@ -263,12 +250,12 @@ func TestMVCCDeletedVisible(t *testing.T) {
 	})
 }
 
-// searchByPkForTrx は trxId 向けの ReadView で PK 検索を実行する
-func searchByPkForTrx(t *testing.T, env *integrationEnv, table *Table, trxId lock.TrxId, pk string) *PrimaryRecord {
+// searchByPkForTrx は trx 向けの ReadView で PK 検索を実行する
+func searchByPkForTrx(t *testing.T, env *integrationEnv, table *Table, trx *Transaction, pk string) *PrimaryRecord {
 	t.Helper()
 	mtr := buffer.NewMtr(env.bp)
 	defer mtr.UnpinAll()
-	iter, err := table.Search(env.trxMgr, trxId, mtr, SearchModeKey{Key: [][]byte{[]byte(pk)}})
+	iter, err := table.Search(trx, mtr, SearchModeKey{Key: [][]byte{[]byte(pk)}})
 	if err != nil {
 		t.Fatalf("Search に失敗: %v", err)
 	}

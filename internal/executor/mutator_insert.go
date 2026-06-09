@@ -2,18 +2,17 @@ package executor
 
 import (
 	"github.com/ren-yamanashi/minesql/internal/storage/access"
-	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 )
 
 type Insert struct {
-	trxId   lock.TrxId
+	trx     *access.Transaction
 	table   *access.Table
 	columns []Column
 }
 
-func NewInsert(trxId lock.TrxId, table *access.Table, columns []Column) *Insert {
+func NewInsert(trx *access.Transaction, table *access.Table, columns []Column) *Insert {
 	return &Insert{
-		trxId:   trxId,
+		trx:     trx,
 		table:   table,
 		columns: columns,
 	}
@@ -21,7 +20,7 @@ func NewInsert(trxId lock.TrxId, table *access.Table, columns []Column) *Insert 
 
 func (i *Insert) Execute() (int, error) {
 	for _, col := range i.columns {
-		if err := i.table.Insert(col.colNames, col.values, i.trxId); err != nil {
+		if err := i.table.Insert(i.trx, col.colNames, col.values); err != nil {
 			return 0, err
 		}
 	}

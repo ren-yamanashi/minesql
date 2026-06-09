@@ -12,32 +12,31 @@ func TestTableSearch(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
 		table := setupTableForTrxTest(t, tm)
-		trxId := tm.Begin()
+		trx := tm.Begin()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
 
 		// WHEN
-		_, err := table.Search(tm, trxId, mtr, SearchModeStart{})
+		_, err := table.Search(trx, mtr, SearchModeStart{})
 
 		// THEN
 		assert.NoError(t, err)
-		_, ok := tm.readViews[trxId]
-		assert.True(t, ok)
+		assert.NotNil(t, trx.readView)
 	})
 
 	t.Run("同一 trxId で複数回呼ぶと同じ ReadView を使い回す", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
 		table := setupTableForTrxTest(t, tm)
-		trxId := tm.Begin()
+		trx := tm.Begin()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
 
 		// WHEN
-		_, err1 := table.Search(tm, trxId, mtr, SearchModeStart{})
-		rv1 := tm.readViews[trxId]
-		_, err2 := table.Search(tm, trxId, mtr, SearchModeStart{})
-		rv2 := tm.readViews[trxId]
+		_, err1 := table.Search(trx, mtr, SearchModeStart{})
+		rv1 := trx.readView
+		_, err2 := table.Search(trx, mtr, SearchModeStart{})
+		rv2 := trx.readView
 
 		// THEN
 		assert.NoError(t, err1)
@@ -49,20 +48,20 @@ func TestTableSearch(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
 		table := setupTableForTrxTest(t, tm)
-		writeTrx := tm.Begin()
+		writeTx := tm.Begin()
 		_ = table.Insert(
+			writeTx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			writeTrx,
 		)
-		_ = tm.Commit(writeTrx)
+		_ = tm.Commit(writeTx)
 
-		readTrx := tm.Begin()
+		readTx := tm.Begin()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
 
 		// WHEN
-		iter, err := table.Search(tm, readTrx, mtr, SearchModeStart{})
+		iter, err := table.Search(readTx, mtr, SearchModeStart{})
 
 		// THEN
 		assert.NoError(t, err)
@@ -79,12 +78,12 @@ func TestTableSearchSecondary(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
 		table := setupTableForTrxTest(t, tm)
-		trxId := tm.Begin()
+		trx := tm.Begin()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
 
 		// WHEN
-		_, err := table.SearchSecondary(tm, trxId, mtr, "nonexistent", SearchModeStart{})
+		_, err := table.SearchSecondary(trx, mtr, "nonexistent", SearchModeStart{})
 
 		// THEN
 		assert.Error(t, err)
@@ -95,20 +94,20 @@ func TestTableSearchSecondary(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
 		table := setupTableForTrxTest(t, tm)
-		writeTrx := tm.Begin()
+		writeTx := tm.Begin()
 		_ = table.Insert(
+			writeTx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			writeTrx,
 		)
-		_ = tm.Commit(writeTrx)
+		_ = tm.Commit(writeTx)
 
-		readTrx := tm.Begin()
+		readTx := tm.Begin()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
 
 		// WHEN
-		iter, err := table.SearchSecondary(tm, readTrx, mtr, "idx_name", SearchModeStart{})
+		iter, err := table.SearchSecondary(readTx, mtr, "idx_name", SearchModeStart{})
 
 		// THEN
 		assert.NoError(t, err)

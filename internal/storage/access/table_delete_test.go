@@ -11,11 +11,12 @@ import (
 func TestTableSoftDelete(t *testing.T) {
 	t.Run("プライマリインデックスからレコードが論理削除される", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		record := searchFirstPrimaryRecord(t, table)
+		trx := tm.Begin()
 
 		// WHEN
-		err := table.SoftDelete(record, tableTrxId)
+		err := table.SoftDelete(trx, record)
 
 		// THEN
 		assert.NoError(t, err)
@@ -30,11 +31,12 @@ func TestTableSoftDelete(t *testing.T) {
 
 	t.Run("セカンダリインデックスからもレコードが論理削除される", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		record := searchFirstPrimaryRecord(t, table)
+		trx := tm.Begin()
 
 		// WHEN
-		err := table.SoftDelete(record, tableTrxId)
+		err := table.SoftDelete(trx, record)
 
 		// THEN
 		assert.NoError(t, err)
@@ -56,11 +58,12 @@ func TestTableSoftDelete(t *testing.T) {
 
 	t.Run("SoftDelete 後、セカンダリレコードの lastTrxId に削除した trxId が記録される", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		record := searchFirstPrimaryRecord(t, table)
+		trx := tm.Begin()
 
 		// WHEN
-		err := table.SoftDelete(record, tableTrxId)
+		err := table.SoftDelete(trx, record)
 
 		// THEN
 		assert.NoError(t, err)
@@ -68,24 +71,25 @@ func TestTableSoftDelete(t *testing.T) {
 		emailRec := findSecondaryRecordByValue(t, table, "idx_email", "alice@example.com")
 		assert.NotNil(t, nameRec)
 		assert.Equal(t, byte(1), nameRec.deleteMark)
-		assert.Equal(t, tableTrxId, nameRec.lastTrxId)
+		assert.Equal(t, trx.trxId, nameRec.lastTrxId)
 		assert.NotNil(t, emailRec)
 		assert.Equal(t, byte(1), emailRec.deleteMark)
-		assert.Equal(t, tableTrxId, emailRec.lastTrxId)
+		assert.Equal(t, trx.trxId, emailRec.lastTrxId)
 	})
 
 	t.Run("論理削除後に同一プライマリキーで再挿入できる", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		record := searchFirstPrimaryRecord(t, table)
-		err := table.SoftDelete(record, tableTrxId)
+		trx := tm.Begin()
+		err := table.SoftDelete(trx, record)
 		assert.NoError(t, err)
 
 		// WHEN
 		err = table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Bob", "bob@example.com"},
-			tableTrxId,
 		)
 
 		// THEN
@@ -97,16 +101,16 @@ func TestTableSoftDelete(t *testing.T) {
 
 	t.Run("論理削除後のレコードに rollPtr が設定される", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		record := searchFirstPrimaryRecord(t, table)
+		trx := tm.Begin()
 
 		// WHEN
-		err := table.SoftDelete(record, tableTrxId)
+		err := table.SoftDelete(trx, record)
 
 		// THEN
 		assert.NoError(t, err)
 
-		// 論理削除済みレコードを直接 B+Tree から取得して rollPtr を確認
 		encodedRecord := record.Encode()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
@@ -129,9 +133,10 @@ func TestTableSoftDelete(t *testing.T) {
 			colNames:   []string{"id", "name", "email"},
 			values:     []string{"999", "Nobody", "nobody@example.com"},
 		}
+		trx := env.trxMgr.Begin()
 
 		// WHEN
-		err = table.SoftDelete(fakeRecord, tableTrxId)
+		err = table.SoftDelete(trx, fakeRecord)
 
 		// THEN
 		assert.Error(t, err)
@@ -139,18 +144,19 @@ func TestTableSoftDelete(t *testing.T) {
 
 	t.Run("複数レコードのうち 1 件だけ論理削除できる", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
+		trx := tm.Begin()
 		err := table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"2", "Bob", "bob@example.com"},
-			tableTrxId,
 		)
 		assert.NoError(t, err)
 		alice := searchFirstPrimaryRecord(t, table)
 		assert.Equal(t, "Alice", alice.values[1])
 
 		// WHEN
-		err = table.SoftDelete(alice, tableTrxId)
+		err = table.SoftDelete(trx, alice)
 
 		// THEN
 		assert.NoError(t, err)
@@ -162,12 +168,13 @@ func TestTableSoftDelete(t *testing.T) {
 	t.Run("子テーブルから参照されているレコードの論理削除は ErrForeignKeyViolation を返す", func(t *testing.T) {
 		// GIVEN
 		env := setupFKTestEnv(t)
-		_ = env.parent.Insert([]string{"id", "name"}, []string{"1", "Sales"}, fkTrxId)
-		_ = env.child.Insert([]string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"}, fkTrxId)
+		fkTx := env.trxMgr.Begin()
+		_ = env.parent.Insert(fkTx, []string{"id", "name"}, []string{"1", "Sales"})
+		_ = env.child.Insert(fkTx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"})
 		record := searchFirstPrimaryRecord(t, env.parent)
 
 		// WHEN
-		err := env.parent.SoftDelete(record, fkTrxId)
+		err := env.parent.SoftDelete(fkTx, record)
 
 		// THEN
 		assert.ErrorIs(t, err, ErrForeignKeyViolation)
@@ -177,11 +184,12 @@ func TestTableSoftDelete(t *testing.T) {
 func TestTableDelete(t *testing.T) {
 	t.Run("プライマリインデックスからレコードが物理削除される", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		record := searchFirstPrimaryRecord(t, table)
+		trx := tm.Begin()
 
 		// WHEN
-		err := table.Delete(record, tableTrxId)
+		err := table.Delete(trx, record)
 
 		// THEN
 		assert.NoError(t, err)
@@ -196,11 +204,12 @@ func TestTableDelete(t *testing.T) {
 
 	t.Run("セカンダリインデックスからもレコードが物理削除される", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		record := searchFirstPrimaryRecord(t, table)
+		trx := tm.Begin()
 
 		// WHEN
-		err := table.Delete(record, tableTrxId)
+		err := table.Delete(trx, record)
 
 		// THEN
 		assert.NoError(t, err)
@@ -222,16 +231,17 @@ func TestTableDelete(t *testing.T) {
 
 	t.Run("物理削除後に同一プライマリキーで再挿入できる", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		record := searchFirstPrimaryRecord(t, table)
-		err := table.Delete(record, tableTrxId)
+		trx := tm.Begin()
+		err := table.Delete(trx, record)
 		assert.NoError(t, err)
 
 		// WHEN
 		err = table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Bob", "bob@example.com"},
-			tableTrxId,
 		)
 
 		// THEN
@@ -253,9 +263,10 @@ func TestTableDelete(t *testing.T) {
 			colNames:   []string{"id", "name", "email"},
 			values:     []string{"999", "Nobody", "nobody@example.com"},
 		}
+		trx := env.trxMgr.Begin()
 
 		// WHEN
-		err = table.Delete(fakeRecord, tableTrxId)
+		err = table.Delete(trx, fakeRecord)
 
 		// THEN
 		assert.Error(t, err)
@@ -263,18 +274,19 @@ func TestTableDelete(t *testing.T) {
 
 	t.Run("複数レコードのうち 1 件だけ物理削除できる", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
+		trx := tm.Begin()
 		err := table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"2", "Bob", "bob@example.com"},
-			tableTrxId,
 		)
 		assert.NoError(t, err)
 		alice := searchFirstPrimaryRecord(t, table)
 		assert.Equal(t, "Alice", alice.values[1])
 
 		// WHEN
-		err = table.Delete(alice, tableTrxId)
+		err = table.Delete(trx, alice)
 
 		// THEN
 		assert.NoError(t, err)

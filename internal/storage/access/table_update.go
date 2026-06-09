@@ -9,7 +9,8 @@ import (
 // Update はテーブルの行を更新する
 //   - PK カラムが更新対象に含まれない場合はインプレース更新を行う
 //   - PK カラムが更新対象に含まれる場合は論理削除 + 新規挿入で実現する
-func (t *Table) Update(currentRecord *PrimaryRecord, colNames, values []string, trxId lock.TrxId) error {
+func (t *Table) Update(trx *Transaction, currentRecord *PrimaryRecord, colNames, values []string) error {
+	trxId := trx.trxId
 	newRecord, err := currentRecord.update(trxId, colNames, values)
 	if err != nil {
 		return err
@@ -17,10 +18,10 @@ func (t *Table) Update(currentRecord *PrimaryRecord, colNames, values []string, 
 
 	if t.isPrimaryKeyChanged(currentRecord, newRecord) {
 		// PK が変わる場合は論理削除 + 新規挿入 (それぞれの操作内で mtr 境界が記録される)
-		if err := t.SoftDelete(currentRecord, trxId); err != nil {
+		if err := t.SoftDelete(trx, currentRecord); err != nil {
 			return err
 		}
-		return t.Insert(newRecord.colNames, newRecord.values, trxId)
+		return t.Insert(trx, newRecord.colNames, newRecord.values)
 	}
 
 	if _, err := t.redoLog.AppendMtrStart(trxId); err != nil {

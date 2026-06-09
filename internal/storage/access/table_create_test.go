@@ -55,12 +55,13 @@ func TestCreateTable(t *testing.T) {
 		}
 		table, err := CreateTable(env.bp, env.undoLog, env.lockMgr, env.redoLog, input)
 		assert.NoError(t, err)
+		trx := env.trxMgr.Begin()
 
 		// WHEN
 		err = table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			tableTrxId,
 		)
 
 		// THEN
@@ -475,6 +476,7 @@ type createTableTestEnv struct {
 	undoLog *undo.Manager
 	lockMgr *lock.Manager
 	redoLog *redo.Buffer
+	trxMgr  *TrxManager
 }
 
 // setupCreateTableTestEnv は CreateTable の統合テスト用環境を構築する
@@ -522,10 +524,17 @@ func setupCreateTableTestEnv(t *testing.T) *createTableTestEnv {
 
 	lockMgr := lock.NewManager()
 
+	ct, err := dictionary.NewCatalog(bp)
+	if err != nil {
+		t.Fatalf("Catalog の取得に失敗: %v", err)
+	}
+	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp)
+
 	return &createTableTestEnv{
 		bp:      bp,
 		undoLog: undoMgr,
 		lockMgr: lockMgr,
 		redoLog: redoLog,
+		trxMgr:  trxMgr,
 	}
 }

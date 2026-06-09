@@ -75,14 +75,14 @@ func TestRecoveryExecute(t *testing.T) {
 		env := setupRecoveryTestEnv(t)
 		table := setupTableForRecoveryTest(t, env)
 
-		trxId := env.trxManager.Begin()
+		trx := env.trxManager.Begin()
 		err := table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trxId,
 		)
 		assert.NoError(t, err)
-		_ = env.trxManager.Commit(trxId)
+		_ = env.trxManager.Commit(trx)
 
 		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
 
@@ -106,15 +106,14 @@ func TestRecoveryExecute(t *testing.T) {
 		env := setupRecoveryTestEnv(t)
 		table := setupTableForRecoveryTest(t, env)
 
-		trxId := env.trxManager.Begin()
+		trx := env.trxManager.Begin()
 		err := table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trxId,
 		)
 		assert.NoError(t, err)
 
-		// COMMIT せずに Redo ログをフラッシュ (Insert 由来の mtr 内ページ変更は既に記録されている)
 		_ = env.redoLog.Flush()
 
 		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
@@ -330,23 +329,22 @@ func TestRecoveryApplyRollback(t *testing.T) {
 
 		trx1 := env.trxManager.Begin()
 		_ = table.Insert(
+			trx1,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			trx1,
 		)
 		_ = env.trxManager.Commit(trx1)
 
 		trx2 := env.trxManager.Begin()
 		_ = table.Insert(
+			trx2,
 			[]string{"id", "name", "email"},
 			[]string{"2", "Bob", "bob@example.com"},
-			trx2,
 		)
 
-		// trx1 は COMMIT 済み (Commit 内で Redo ログに記録される)、trx2 は未 COMMIT
 		pgId := page.NewId(env.undoFileId, 0)
 		readPage, _ := env.bp.Page(pgId)
-		_, _ = env.redoLog.AppendPageCopy(trx2, pgId, readPage.Data())
+		_, _ = env.redoLog.AppendPageCopy(trx2.trxId, pgId, readPage.Data())
 		_ = env.redoLog.Flush()
 
 		records, _ := env.redoLog.ReadFrom(redo.Lsn(0))

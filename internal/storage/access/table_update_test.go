@@ -9,16 +9,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-const tableTrxId lock.TrxId = 1
-
 func TestTableUpdate(t *testing.T) {
 	t.Run("非キーカラムをインプレース更新できる", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		before := searchFirstPrimaryRecord(t, table)
+		trx := tm.Begin()
 
 		// WHEN
-		err := table.Update(before, []string{"name"}, []string{"Bob"}, tableTrxId)
+		err := table.Update(trx, before, []string{"name"}, []string{"Bob"})
 
 		// THEN
 		assert.NoError(t, err)
@@ -29,11 +28,12 @@ func TestTableUpdate(t *testing.T) {
 
 	t.Run("セカンダリインデックスのカラムを更新すると旧 SK が論理削除され新 SK が挿入される", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		before := searchFirstPrimaryRecord(t, table)
+		trx := tm.Begin()
 
 		// WHEN
-		err := table.Update(before, []string{"name"}, []string{"Bob"}, tableTrxId)
+		err := table.Update(trx, before, []string{"name"}, []string{"Bob"})
 
 		// THEN
 		assert.NoError(t, err)
@@ -50,11 +50,12 @@ func TestTableUpdate(t *testing.T) {
 
 	t.Run("SK 変更 UPDATE 後、旧 SK と新 SK の両方の lastTrxId に UPDATE した trxId が記録される", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		before := searchFirstPrimaryRecord(t, table)
+		trx := tm.Begin()
 
 		// WHEN
-		err := table.Update(before, []string{"name"}, []string{"Bob"}, tableTrxId)
+		err := table.Update(trx, before, []string{"name"}, []string{"Bob"})
 
 		// THEN
 		assert.NoError(t, err)
@@ -71,19 +72,20 @@ func TestTableUpdate(t *testing.T) {
 		}
 		assert.NotNil(t, oldRec)
 		assert.Equal(t, byte(1), oldRec.deleteMark)
-		assert.Equal(t, tableTrxId, oldRec.lastTrxId)
+		assert.Equal(t, trx.trxId, oldRec.lastTrxId)
 		assert.NotNil(t, newRec)
 		assert.Equal(t, byte(0), newRec.deleteMark)
-		assert.Equal(t, tableTrxId, newRec.lastTrxId)
+		assert.Equal(t, trx.trxId, newRec.lastTrxId)
 	})
 
 	t.Run("セカンダリインデックスに影響しないカラムの更新ではインデックスが変更されない", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		before := searchFirstPrimaryRecord(t, table)
+		trx := tm.Begin()
 
 		// WHEN
-		err := table.Update(before, []string{"email"}, []string{"new@example.com"}, tableTrxId)
+		err := table.Update(trx, before, []string{"email"}, []string{"new@example.com"})
 
 		// THEN
 		assert.NoError(t, err)
@@ -101,11 +103,12 @@ func TestTableUpdate(t *testing.T) {
 
 	t.Run("複数のセカンダリインデックスのうち影響するものだけが更新される", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		before := searchFirstPrimaryRecord(t, table)
+		trx := tm.Begin()
 
 		// WHEN
-		err := table.Update(before, []string{"name"}, []string{"Charlie"}, tableTrxId)
+		err := table.Update(trx, before, []string{"name"}, []string{"Charlie"})
 
 		// THEN
 		assert.NoError(t, err)
@@ -130,11 +133,12 @@ func TestTableUpdate(t *testing.T) {
 
 	t.Run("存在しないカラムで更新するとエラーを返す", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		before := searchFirstPrimaryRecord(t, table)
+		trx := tm.Begin()
 
 		// WHEN
-		err := table.Update(before, []string{"nonexistent"}, []string{"val"}, tableTrxId)
+		err := table.Update(trx, before, []string{"nonexistent"}, []string{"val"})
 
 		// THEN
 		assert.Error(t, err)
@@ -142,11 +146,12 @@ func TestTableUpdate(t *testing.T) {
 
 	t.Run("複数カラムを同時に更新できる", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		before := searchFirstPrimaryRecord(t, table)
+		trx := tm.Begin()
 
 		// WHEN
-		err := table.Update(before, []string{"name", "email"}, []string{"Bob", "bob@example.com"}, tableTrxId)
+		err := table.Update(trx, before, []string{"name", "email"}, []string{"Bob", "bob@example.com"})
 
 		// THEN
 		assert.NoError(t, err)
@@ -158,16 +163,16 @@ func TestTableUpdate(t *testing.T) {
 
 	t.Run("複数カラムの更新で全セカンダリインデックスが更新される", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		before := searchFirstPrimaryRecord(t, table)
+		trx := tm.Begin()
 
 		// WHEN
-		err := table.Update(before, []string{"name", "email"}, []string{"Bob", "bob@example.com"}, tableTrxId)
+		err := table.Update(trx, before, []string{"name", "email"}, []string{"Bob", "bob@example.com"})
 
 		// THEN
 		assert.NoError(t, err)
 
-		// idx_name が更新されている
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
 		idxName := findSecondaryIndex(t, table, "idx_name")
@@ -178,7 +183,6 @@ func TestTableUpdate(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, "Bob", nameResult.values[1])
 
-		// idx_email も更新されている
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
 		emailIter, err := idxEmail.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
@@ -190,15 +194,15 @@ func TestTableUpdate(t *testing.T) {
 
 	t.Run("PK カラムを更新すると論理削除 + 新規挿入で処理される", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		before := searchFirstPrimaryRecord(t, table)
+		trx := tm.Begin()
 
 		// WHEN
-		err := table.Update(before, []string{"id"}, []string{"2"}, tableTrxId)
+		err := table.Update(trx, before, []string{"id"}, []string{"2"})
 
 		// THEN
 		assert.NoError(t, err)
-		// 旧 PK (id=1) は論理削除されているため、先頭レコードは新 PK (id=2)
 		updated := searchFirstPrimaryRecord(t, table)
 		assert.Equal(t, "2", updated.values[0])
 		assert.Equal(t, "Alice", updated.values[1])
@@ -207,11 +211,12 @@ func TestTableUpdate(t *testing.T) {
 
 	t.Run("PK カラムを同じ値で更新するとインプレース更新になる", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		before := searchFirstPrimaryRecord(t, table)
+		trx := tm.Begin()
 
 		// WHEN
-		err := table.Update(before, []string{"id", "name"}, []string{"1", "Bob"}, tableTrxId)
+		err := table.Update(trx, before, []string{"id", "name"}, []string{"1", "Bob"})
 
 		// THEN
 		assert.NoError(t, err)
@@ -222,15 +227,15 @@ func TestTableUpdate(t *testing.T) {
 
 	t.Run("PK 更新時にセカンダリインデックスも更新される", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		before := searchFirstPrimaryRecord(t, table)
+		trx := tm.Begin()
 
 		// WHEN
-		err := table.Update(before, []string{"id"}, []string{"2"}, tableTrxId)
+		err := table.Update(trx, before, []string{"id"}, []string{"2"})
 
 		// THEN
 		assert.NoError(t, err)
-		// idx_name でレコードが見つかる
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
 		idxName := findSecondaryIndex(t, table, "idx_name")
@@ -244,28 +249,29 @@ func TestTableUpdate(t *testing.T) {
 
 	t.Run("更新後のレコードに rollPtr が設定される", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		before := searchFirstPrimaryRecord(t, table)
+		trx := tm.Begin()
 
 		// WHEN
-		err := table.Update(before, []string{"name"}, []string{"Bob"}, tableTrxId)
+		err := table.Update(trx, before, []string{"name"}, []string{"Bob"})
 
 		// THEN
 		assert.NoError(t, err)
 		updated := searchFirstPrimaryRecord(t, table)
-		// Undo ログが書かれ rollPtr が NullPointer ではなくなる
 		assert.NotEqual(t, undo.NullPointer(), updated.rollPtr)
 	})
 
 	t.Run("FK カラムを存在しない値に更新すると ErrForeignKeyViolation を返す", func(t *testing.T) {
 		// GIVEN
 		env := setupFKTestEnv(t)
-		_ = env.parent.Insert([]string{"id", "name"}, []string{"1", "Sales"}, fkTrxId)
-		_ = env.child.Insert([]string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"}, fkTrxId)
+		fkTx := env.trxMgr.Begin()
+		_ = env.parent.Insert(fkTx, []string{"id", "name"}, []string{"1", "Sales"})
+		_ = env.child.Insert(fkTx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"})
 		record := searchFirstPrimaryRecord(t, env.child)
 
 		// WHEN
-		err := env.child.Update(record, []string{"dept_id"}, []string{"999"}, fkTrxId)
+		err := env.child.Update(fkTx, record, []string{"dept_id"}, []string{"999"})
 
 		// THEN
 		assert.ErrorIs(t, err, ErrForeignKeyViolation)
@@ -275,9 +281,10 @@ func TestTableUpdate(t *testing.T) {
 func TestTableIsPrimaryKeyChanged(t *testing.T) {
 	t.Run("PK の値が異なる場合は true を返す", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		before := searchFirstPrimaryRecord(t, table)
-		after, _ := before.update(tableTrxId, []string{"id"}, []string{"2"})
+		trx := tm.Begin()
+		after, _ := before.update(trx.trxId, []string{"id"}, []string{"2"})
 
 		// WHEN
 		result := table.isPrimaryKeyChanged(before, after)
@@ -288,9 +295,10 @@ func TestTableIsPrimaryKeyChanged(t *testing.T) {
 
 	t.Run("PK の値が同じ場合は false を返す", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		before := searchFirstPrimaryRecord(t, table)
-		after, _ := before.update(tableTrxId, []string{"name"}, []string{"Bob"})
+		trx := tm.Begin()
+		after, _ := before.update(trx.trxId, []string{"name"}, []string{"Bob"})
 
 		// WHEN
 		result := table.isPrimaryKeyChanged(before, after)
@@ -301,9 +309,10 @@ func TestTableIsPrimaryKeyChanged(t *testing.T) {
 
 	t.Run("PK カラムを同じ値で更新した場合は false を返す", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
 		before := searchFirstPrimaryRecord(t, table)
-		after, _ := before.update(tableTrxId, []string{"id"}, []string{"1"})
+		trx := tm.Begin()
+		after, _ := before.update(trx.trxId, []string{"id"}, []string{"1"})
 
 		// WHEN
 		result := table.isPrimaryKeyChanged(before, after)
@@ -357,22 +366,27 @@ func TestTableIsIndexAffected(t *testing.T) {
 	})
 }
 
-// setupTableWithRecord はテーブルにレコード 1 件を挿入した状態の Table を返す
-func setupTableWithRecord(t *testing.T) *Table {
+// setupTableWithRecord はテーブルにレコード 1 件を挿入した状態の Table, TrxManager, 挿入に使った TrxId を返す
+func setupTableWithRecord(t *testing.T) (*Table, *TrxManager, lock.TrxId) {
 	t.Helper()
 	env := setupTableTestEnv(t)
 	table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 	if err != nil {
 		t.Fatalf("Table の作成に失敗: %v", err)
 	}
+	trx := env.trxMgr.Begin()
 	if err := table.Insert(
+		trx,
 		[]string{"id", "name", "email"},
 		[]string{"1", "Alice", "alice@example.com"},
-		tableTrxId,
 	); err != nil {
 		t.Fatalf("レコードの挿入に失敗: %v", err)
 	}
-	return table
+	insertedTrxId := trx.trxId
+	if err := env.trxMgr.Commit(trx); err != nil {
+		t.Fatalf("コミットに失敗: %v", err)
+	}
+	return table, env.trxMgr, insertedTrxId
 }
 
 // searchFirstPrimaryRecord はプライマリインデックスの先頭レコードを返す

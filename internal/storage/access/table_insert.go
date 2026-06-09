@@ -7,7 +7,8 @@ import (
 )
 
 // Insert はテーブルに行を挿入する
-func (t *Table) Insert(colNames []string, values []string, trxId lock.TrxId) error {
+func (t *Table) Insert(trx *Transaction, colNames []string, values []string) error {
+	trxId := trx.trxId
 	if _, err := t.redoLog.AppendMtrStart(trxId); err != nil {
 		return err
 	}

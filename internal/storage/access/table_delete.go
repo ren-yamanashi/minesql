@@ -7,7 +7,8 @@ import (
 )
 
 // SoftDelete はテーブルの行を論理削除する
-func (t *Table) SoftDelete(record *PrimaryRecord, trxId lock.TrxId) error {
+func (t *Table) SoftDelete(trx *Transaction, record *PrimaryRecord) error {
+	trxId := trx.trxId
 	if _, err := t.redoLog.AppendMtrStart(trxId); err != nil {
 		return err
 	}
@@ -38,7 +39,8 @@ func (t *Table) SoftDelete(record *PrimaryRecord, trxId lock.TrxId) error {
 
 // Delete はテーブルの行を物理削除する
 // (物理削除は DML 操作では行われないので、Undo ログの作成はしない)
-func (t *Table) Delete(record *PrimaryRecord, trxId lock.TrxId) error {
+func (t *Table) Delete(trx *Transaction, record *PrimaryRecord) error {
+	trxId := trx.trxId
 	if _, err := t.redoLog.AppendMtrStart(trxId); err != nil {
 		return err
 	}

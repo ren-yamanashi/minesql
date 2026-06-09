@@ -225,6 +225,7 @@ type tableTestEnv struct {
 	lock    *lock.Manager
 	undoLog *undo.Manager
 	redoLog *redo.Buffer
+	trxMgr  *TrxManager
 }
 
 // setupTableTestEnv は NewTable テスト用の環境を構築する
@@ -318,12 +319,15 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 	))
 	_ = env.ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(siEmailId, "email", 0))
 
+	trxMgr := NewTrxManager(env.ct, undoMgr, redoLog, lockMgr, env.bp)
+
 	return &tableTestEnv{
 		ct:      env.ct,
 		bp:      env.bp,
 		lock:    lockMgr,
 		undoLog: undoMgr,
 		redoLog: redoLog,
+		trxMgr:  trxMgr,
 	}
 }
 

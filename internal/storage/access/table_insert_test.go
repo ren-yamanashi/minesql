@@ -15,12 +15,13 @@ func TestTableInsert(t *testing.T) {
 		env := setupTableTestEnv(t)
 		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 		assert.NoError(t, err)
+		trx := env.trxMgr.Begin()
 
 		// WHEN
 		err = table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			tableTrxId,
 		)
 
 		// THEN
@@ -31,7 +32,7 @@ func TestTableInsert(t *testing.T) {
 
 	t.Run("セカンダリインデックスにも挿入される", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, _, _ := setupTableWithRecord(t)
 
 		// THEN
 		mtr := buffer.NewMtr(table.bufferPool)
@@ -54,7 +55,7 @@ func TestTableInsert(t *testing.T) {
 
 	t.Run("セカンダリインデックスの lastTrxId に挿入した trxId が記録される", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, _, insertedTrxId := setupTableWithRecord(t)
 
 		// WHEN
 		nameRec := findSecondaryRecordByValue(t, table, "idx_name", "Alice")
@@ -63,21 +64,22 @@ func TestTableInsert(t *testing.T) {
 		// THEN
 		assert.NotNil(t, nameRec)
 		assert.Equal(t, byte(0), nameRec.deleteMark)
-		assert.Equal(t, tableTrxId, nameRec.lastTrxId)
+		assert.Equal(t, insertedTrxId, nameRec.lastTrxId)
 		assert.NotNil(t, emailRec)
 		assert.Equal(t, byte(0), emailRec.deleteMark)
-		assert.Equal(t, tableTrxId, emailRec.lastTrxId)
+		assert.Equal(t, insertedTrxId, emailRec.lastTrxId)
 	})
 
 	t.Run("異なるプライマリキーで複数レコードを挿入できる", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
+		trx := tm.Begin()
 
 		// WHEN
 		err := table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"2", "Bob", "bob@example.com"},
-			tableTrxId,
 		)
 
 		// THEN
@@ -88,13 +90,14 @@ func TestTableInsert(t *testing.T) {
 
 	t.Run("同一プライマリキーで挿入すると ErrDuplicateKey を返す", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t)
+		table, tm, _ := setupTableWithRecord(t)
+		trx := tm.Begin()
 
 		// WHEN
 		err := table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Bob", "bob@example.com"},
-			tableTrxId,
 		)
 
 		// THEN
@@ -103,16 +106,17 @@ func TestTableInsert(t *testing.T) {
 
 	t.Run("論理削除済みの同一プライマリキーに再挿入できる", func(t *testing.T) {
 		// GIVEN
-		table := setupTableWithRecord(t) // id=1, Alice
+		table, tm, _ := setupTableWithRecord(t)
 		record := searchFirstPrimaryRecord(t, table)
-		err := table.SoftDelete(record, tableTrxId)
+		trx := tm.Begin()
+		err := table.SoftDelete(trx, record)
 		assert.NoError(t, err)
 
 		// WHEN
 		err = table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Charlie", "charlie@example.com"},
-			tableTrxId,
 		)
 
 		// THEN
@@ -126,12 +130,13 @@ func TestTableInsert(t *testing.T) {
 		env := setupTableTestEnv(t)
 		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 		assert.NoError(t, err)
+		trx := env.trxMgr.Begin()
 
 		// WHEN
 		err = table.Insert(
+			trx,
 			[]string{"id", "name"},
 			[]string{"1", "Alice"},
-			tableTrxId,
 		)
 
 		// THEN
@@ -143,22 +148,21 @@ func TestTableInsert(t *testing.T) {
 		env := setupTableTestEnv(t)
 		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 		assert.NoError(t, err)
+		trx := env.trxMgr.Begin()
 
-		// WHEN (テーブル定義順: id, name, email だが name, email, id の順で指定)
+		// WHEN
 		err = table.Insert(
+			trx,
 			[]string{"name", "email", "id"},
 			[]string{"Alice", "alice@example.com", "1"},
-			tableTrxId,
 		)
 
 		// THEN
 		assert.NoError(t, err)
 
-		// プライマリインデックスのレコードがテーブル定義順で格納されている
 		record := searchFirstPrimaryRecord(t, table)
 		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, record.values)
 
-		// セカンダリインデックスからプライマリキー "1" で検索できる
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
 		idxName := findSecondaryIndex(t, table, "idx_name")
@@ -176,12 +180,13 @@ func TestTableInsert(t *testing.T) {
 		env := setupTableTestEnv(t)
 		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lock, env.redoLog, "users")
 		assert.NoError(t, err)
+		trx := env.trxMgr.Begin()
 
 		// WHEN
 		err = table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"1", "Alice", "alice@example.com"},
-			tableTrxId,
 		)
 
 		// THEN
@@ -191,14 +196,15 @@ func TestTableInsert(t *testing.T) {
 	})
 
 	t.Run("ユニークセカンダリインデックスに重複値を挿入するとエラーを返す", func(t *testing.T) {
-		// GIVEN (idx_email は Unique)
-		table := setupTableWithRecord(t)
+		// GIVEN
+		table, tm, _ := setupTableWithRecord(t)
+		trx := tm.Begin()
 
-		// WHEN (email が重複)
+		// WHEN
 		err := table.Insert(
+			trx,
 			[]string{"id", "name", "email"},
 			[]string{"2", "Bob", "alice@example.com"},
-			tableTrxId,
 		)
 
 		// THEN
@@ -208,9 +214,10 @@ func TestTableInsert(t *testing.T) {
 	t.Run("FK 制約に違反する挿入は ErrForeignKeyViolation を返す", func(t *testing.T) {
 		// GIVEN
 		env := setupFKTestEnv(t)
+		fkTx := env.trxMgr.Begin()
 
 		// WHEN
-		err := env.child.Insert([]string{"id", "name", "dept_id"}, []string{"1", "Alice", "999"}, fkTrxId)
+		err := env.child.Insert(fkTx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "999"})
 
 		// THEN
 		assert.ErrorIs(t, err, ErrForeignKeyViolation)
