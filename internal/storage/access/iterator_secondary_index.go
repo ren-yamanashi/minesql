@@ -62,7 +62,7 @@ func (si *SecondaryIndexIterator) Next() (*PrimaryRecord, bool, error) {
 			return nil, false, err
 		}
 
-		pi := NewPrimaryIndexIterator(iter, si.catalog, si.bufferPool, si.primaryTree.MetaPageId().FileId(), si.readView, si.undoLog, mtr)
+		pi := NewPrimaryIndexIterator(iter, si.catalog, si.bufferPool, si.primaryTree.MetaPageId().FileId(), si.readView, si.undoLog)
 		result, found, err := pi.Next()
 		pi.Close()
 		mtr.UnpinAll()

@@ -3,7 +3,6 @@ package access
 import (
 	"testing"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,11 +12,9 @@ func TestTableSearch(t *testing.T) {
 		tm := setupTrxManager(t)
 		table := setupTableForTrxTest(t, tm)
 		trx := tm.Begin()
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
 
 		// WHEN
-		_, err := table.Search(trx, mtr, SearchModeStart{})
+		_, err := table.Search(trx, SearchModeStart{})
 
 		// THEN
 		assert.NoError(t, err)
@@ -29,13 +26,11 @@ func TestTableSearch(t *testing.T) {
 		tm := setupTrxManager(t)
 		table := setupTableForTrxTest(t, tm)
 		trx := tm.Begin()
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
 
 		// WHEN
-		_, err1 := table.Search(trx, mtr, SearchModeStart{})
+		_, err1 := table.Search(trx, SearchModeStart{})
 		rv1 := trx.readView
-		_, err2 := table.Search(trx, mtr, SearchModeStart{})
+		_, err2 := table.Search(trx, SearchModeStart{})
 		rv2 := trx.readView
 
 		// THEN
@@ -57,11 +52,9 @@ func TestTableSearch(t *testing.T) {
 		_ = tm.Commit(writeTx)
 
 		readTx := tm.Begin()
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
 
 		// WHEN
-		iter, err := table.Search(readTx, mtr, SearchModeStart{})
+		iter, err := table.Search(readTx, SearchModeStart{})
 
 		// THEN
 		assert.NoError(t, err)
@@ -79,11 +72,9 @@ func TestTableSearchSecondary(t *testing.T) {
 		tm := setupTrxManager(t)
 		table := setupTableForTrxTest(t, tm)
 		trx := tm.Begin()
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
 
 		// WHEN
-		_, err := table.SearchSecondary(trx, mtr, "nonexistent", SearchModeStart{})
+		_, err := table.SearchSecondary(trx, "nonexistent", SearchModeStart{})
 
 		// THEN
 		assert.Error(t, err)
@@ -103,11 +94,9 @@ func TestTableSearchSecondary(t *testing.T) {
 		_ = tm.Commit(writeTx)
 
 		readTx := tm.Begin()
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
 
 		// WHEN
-		iter, err := table.SearchSecondary(readTx, mtr, "idx_name", SearchModeStart{})
+		iter, err := table.SearchSecondary(readTx, "idx_name", SearchModeStart{})
 
 		// THEN
 		assert.NoError(t, err)

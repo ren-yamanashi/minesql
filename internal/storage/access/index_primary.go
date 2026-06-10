@@ -70,7 +70,7 @@ func (pi *primaryIndex) search(mtr *buffer.Mtr, mode SearchMode, readView *readV
 	if err != nil {
 		return nil, err
 	}
-	return NewPrimaryIndexIterator(iter, pi.catalog, pi.bufferPool, pi.tree.MetaPageId().FileId(), readView, pi.undoLog, mtr), nil
+	return NewPrimaryIndexIterator(iter, pi.catalog, pi.bufferPool, pi.tree.MetaPageId().FileId(), readView, pi.undoLog), nil
 }
 
 // insert は行を挿入する

@@ -113,7 +113,7 @@ func searchPrimaryIndex(t *testing.T, env *iteratorTestEnv) *PrimaryIndexIterato
 	if err != nil {
 		t.Fatalf("プライマリインデックスの検索に失敗: %v", err)
 	}
-	return NewPrimaryIndexIterator(iter, env.ct, env.bp, page.FileId(2), nil, nil, nil)
+	return NewPrimaryIndexIterator(iter, env.ct, env.bp, page.FileId(2), nil, nil)
 }
 
 func TestPrimaryIndexIteratorNextWithReadView(t *testing.T) {
@@ -339,14 +339,14 @@ func updatePrimaryRecordWithMvcc(t *testing.T, env *mvccTestEnv, trxId lock.TrxI
 }
 
 // searchPrimaryIndexWithReadView は readView 付きでイテレータを返す
-//   - mtr は呼び出し終了後の UnpinAll は t.Cleanup で行う (iter の Close と独立)
+//   - descent 用 mtr はヘルパー内で完結させ、リーフ Pin だけが Iterator に移譲される
 func searchPrimaryIndexWithReadView(t *testing.T, env *mvccTestEnv, rv *readView) *PrimaryIndexIterator {
 	t.Helper()
 	mtr := buffer.NewMtr(env.iter.bp)
-	t.Cleanup(func() { mtr.UnpinAll() })
+	defer mtr.UnpinAll()
 	iter, err := env.iter.primaryTree.Search(mtr, SearchModeStart{}.Encode())
 	if err != nil {
 		t.Fatalf("プライマリインデックスの検索に失敗: %v", err)
 	}
-	return NewPrimaryIndexIterator(iter, env.iter.ct, env.iter.bp, page.FileId(2), rv, env.undoLog, mtr)
+	return NewPrimaryIndexIterator(iter, env.iter.ct, env.iter.bp, page.FileId(2), rv, env.undoLog)
 }

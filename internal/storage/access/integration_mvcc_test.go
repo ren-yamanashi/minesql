@@ -3,7 +3,6 @@ package access
 import (
 	"testing"
 
-	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -104,11 +103,9 @@ func TestMVCCInsertChainTerminal(t *testing.T) {
 		_ = table.Insert(trx1, []string{"id", "name", "email"}, []string{"1", "alice", "alice@example.com"})
 
 		trx2 := env.trxMgr.Begin()
-		mtr := buffer.NewMtr(env.bp)
-		defer mtr.UnpinAll()
 
 		// WHEN
-		iter, err := table.Search(trx2, mtr, SearchModeStart{})
+		iter, err := table.Search(trx2, SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter.Close()
 		_, ok, err := iter.Next()
@@ -130,9 +127,7 @@ func TestMVCCSecondaryVisibility(t *testing.T) {
 		assert.NoError(t, env.trxMgr.Commit(trx1))
 
 		trx2 := env.trxMgr.Begin()
-		mtr2 := buffer.NewMtr(env.bp)
-		defer mtr2.UnpinAll()
-		iter2, err := table.SearchSecondary(trx2, mtr2, "idx_name", SearchModeStart{})
+		iter2, err := table.SearchSecondary(trx2, "idx_name", SearchModeStart{})
 		assert.NoError(t, err)
 		r1, ok, err := iter2.Next()
 		iter2.Close()
@@ -146,9 +141,7 @@ func TestMVCCSecondaryVisibility(t *testing.T) {
 		assert.NoError(t, env.trxMgr.Commit(trx3))
 
 		// WHEN
-		mtrAgain := buffer.NewMtr(env.bp)
-		defer mtrAgain.UnpinAll()
-		iter3, err := table.SearchSecondary(trx2, mtrAgain, "idx_name", SearchModeStart{})
+		iter3, err := table.SearchSecondary(trx2, "idx_name", SearchModeStart{})
 		assert.NoError(t, err)
 		defer iter3.Close()
 		result, _, err := iter3.Next()
@@ -203,11 +196,9 @@ func TestMVCCSecondaryIndexOnlyComplexScenario(t *testing.T) {
 }
 
 // collectIndexOnlyValues は SearchSecondary 経由で NextIndexOnly を全件呼んで SK 先頭値のリストを返す
-func collectIndexOnlyValues(t *testing.T, env *integrationEnv, table *Table, trx *Transaction, indexName string) []string {
+func collectIndexOnlyValues(t *testing.T, _ *integrationEnv, table *Table, trx *Transaction, indexName string) []string {
 	t.Helper()
-	mtr := buffer.NewMtr(env.bp)
-	defer mtr.UnpinAll()
-	iter, err := table.SearchSecondary(trx, mtr, indexName, SearchModeStart{})
+	iter, err := table.SearchSecondary(trx, indexName, SearchModeStart{})
 	if err != nil {
 		t.Fatalf("SearchSecondary に失敗: %v", err)
 	}
@@ -251,11 +242,9 @@ func TestMVCCDeletedVisible(t *testing.T) {
 }
 
 // searchByPkForTrx は trx 向けの ReadView で PK 検索を実行する
-func searchByPkForTrx(t *testing.T, env *integrationEnv, table *Table, trx *Transaction, pk string) *PrimaryRecord {
+func searchByPkForTrx(t *testing.T, _ *integrationEnv, table *Table, trx *Transaction, pk string) *PrimaryRecord {
 	t.Helper()
-	mtr := buffer.NewMtr(env.bp)
-	defer mtr.UnpinAll()
-	iter, err := table.Search(trx, mtr, SearchModeKey{Key: [][]byte{[]byte(pk)}})
+	iter, err := table.Search(trx, SearchModeKey{Key: [][]byte{[]byte(pk)}})
 	if err != nil {
 		t.Fatalf("Search に失敗: %v", err)
 	}

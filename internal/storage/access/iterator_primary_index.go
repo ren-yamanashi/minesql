@@ -15,7 +15,6 @@ type PrimaryIndexIterator struct {
 	fileId     page.FileId
 	readView   *readView     // nil 可。nil の場合は可視性判定をスキップし deleteMark のみで判定する
 	undoLog    *undo.Manager // readView が非 nil のとき必須
-	mtr        *buffer.Mtr   // readView が非 nil のとき必須 (Undo ページ取得用)
 }
 
 func NewPrimaryIndexIterator(
@@ -25,7 +24,6 @@ func NewPrimaryIndexIterator(
 	fileId page.FileId,
 	readView *readView,
 	undoLog *undo.Manager,
-	mtr *buffer.Mtr,
 ) *PrimaryIndexIterator {
 	return &PrimaryIndexIterator{
 		fileId:     fileId,
@@ -34,7 +32,6 @@ func NewPrimaryIndexIterator(
 		iterator:   iter,
 		readView:   readView,
 		undoLog:    undoLog,
-		mtr:        mtr,
 	}
 }
 
@@ -68,7 +65,9 @@ func (pi *PrimaryIndexIterator) Next() (*PrimaryRecord, bool, error) {
 			return current, true, nil
 		}
 
-		visible, err := pi.resolveVisible(current)
+		mtr := buffer.NewMtr(pi.bufferPool)
+		visible, err := pi.resolveVisible(current, mtr)
+		mtr.UnpinAll()
 		if err != nil {
 			return nil, false, err
 		}
@@ -83,13 +82,13 @@ func (pi *PrimaryIndexIterator) Next() (*PrimaryRecord, bool, error) {
 //   - 可視 (deleteMark=0)  → そのバージョン
 //   - 可視 (deleteMark=1)  → nil (削除済み)
 //   - チェーン終端まで遡って見つからない → nil
-func (pi *PrimaryIndexIterator) resolveVisible(record *PrimaryRecord) (*PrimaryRecord, error) {
+func (pi *PrimaryIndexIterator) resolveVisible(record *PrimaryRecord, mtr *buffer.Mtr) (*PrimaryRecord, error) {
 	current := record
 	for {
 		// 不可視 → Undo を辿って次のバージョンへ
 		if !pi.readView.isVisible(current.lastTrxId) {
 			prev, err := resolvePrevVersion(resolvePrevVersionInput{
-				mtr:        pi.mtr,
+				mtr:        mtr,
 				undoLog:    pi.undoLog,
 				catalog:    pi.catalog,
 				bufferPool: pi.bufferPool,
