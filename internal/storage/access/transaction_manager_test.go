@@ -26,7 +26,7 @@ func TestNewTrxManager(t *testing.T) {
 }
 
 func TestTrxManagerBegin(t *testing.T) {
-	t.Run("トランザクション ID を払い出す", func(t *testing.T) {
+	t.Run("最初のトランザクションには 1 が払い出される (0 は予約値として使われない)", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
 
@@ -34,7 +34,7 @@ func TestTrxManagerBegin(t *testing.T) {
 		trx := tm.Begin()
 
 		// THEN
-		assert.Equal(t, lock.TrxId(0), trx.trxId)
+		assert.Equal(t, lock.TrxId(1), trx.trxId)
 	})
 
 	t.Run("連続して呼ぶとインクリメントされた ID を返す", func(t *testing.T) {
@@ -47,9 +47,9 @@ func TestTrxManagerBegin(t *testing.T) {
 		trx3 := tm.Begin()
 
 		// THEN
-		assert.Equal(t, lock.TrxId(0), trx1.trxId)
-		assert.Equal(t, lock.TrxId(1), trx2.trxId)
-		assert.Equal(t, lock.TrxId(2), trx3.trxId)
+		assert.Equal(t, lock.TrxId(1), trx1.trxId)
+		assert.Equal(t, lock.TrxId(2), trx2.trxId)
+		assert.Equal(t, lock.TrxId(3), trx3.trxId)
 	})
 
 	t.Run("開始したトランザクションは Active になる", func(t *testing.T) {
@@ -418,7 +418,7 @@ func TestTrxManagerOldestVisibleTrxId(t *testing.T) {
 		oldest := tm.OldestVisibleTrxId()
 
 		// THEN
-		assert.Equal(t, lock.TrxId(1), oldest)
+		assert.Equal(t, lock.TrxId(2), oldest)
 	})
 
 	t.Run("ReadView がある場合は MUpLimitId の最小値を返す", func(t *testing.T) {
@@ -433,7 +433,7 @@ func TestTrxManagerOldestVisibleTrxId(t *testing.T) {
 		oldest := tm.OldestVisibleTrxId()
 
 		// THEN
-		assert.Equal(t, lock.TrxId(0), oldest)
+		assert.Equal(t, lock.TrxId(1), oldest)
 	})
 }
 

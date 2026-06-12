@@ -36,6 +36,7 @@ func NewTrxManager(
 		bufferPool:   bp,
 		catalog:      ct,
 		transactions: make(map[lock.TrxId]*Transaction),
+		nextTrxId:    1, // 0 は「未割り当て / 太古のコミット済み」の予約値のため使用しない
 	}
 }
 

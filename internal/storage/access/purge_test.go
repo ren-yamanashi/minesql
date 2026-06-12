@@ -281,7 +281,7 @@ func TestPurgePurgableTrxIds(t *testing.T) {
 		_ = env.trxManager.Commit(trx2)
 
 		// WHEN
-		ids := p.purgableTrxIds(lock.TrxId(2))
+		ids := p.purgableTrxIds(lock.TrxId(3))
 
 		// THEN
 		assert.Len(t, ids, 2)
@@ -298,7 +298,7 @@ func TestPurgePurgableTrxIds(t *testing.T) {
 		_ = env.trxManager.Commit(trx1)
 
 		// WHEN
-		ids := p.purgableTrxIds(lock.TrxId(1))
+		ids := p.purgableTrxIds(lock.TrxId(2))
 
 		// THEN
 		assert.Len(t, ids, 1)
