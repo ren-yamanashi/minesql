@@ -1,9 +1,12 @@
 package access
 
 import (
+	"bytes"
+
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
+	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
@@ -46,34 +49,101 @@ func (si *SecondaryIndexIterator) Close() {
 //   - return: 検索結果, データがあるか
 func (si *SecondaryIndexIterator) Next() (*PrimaryRecord, bool, error) {
 	for {
-		secondaryRecord, err := si.nextVisibleSecondaryRecord()
+		record, ok, err := si.iterator.Next()
 		if err != nil {
 			return nil, false, err
 		}
-		if secondaryRecord == nil {
+		if !ok {
 			return nil, false, nil
 		}
 
-		// PrimaryIterator を使用してレコード検索
-		mtr := buffer.NewMtr(si.bufferPool)
-		iter, err := si.primaryTree.Search(mtr, SearchModeKey{Key: stringToByteSlice(secondaryRecord.pk)}.Encode())
+		secRec, err := DecodeSecondaryRecord(record, si.catalog, si.bufferPool, si.primaryTree.MetaPageId().FileId(), si.indexName)
 		if err != nil {
-			mtr.UnpinAll()
 			return nil, false, err
+		}
+		if si.readView == nil && secRec.deleteMark == 1 {
+			continue
 		}
 
-		pi := NewPrimaryIndexIterator(iter, si.catalog, si.bufferPool, si.primaryTree.MetaPageId().FileId(), si.readView, si.undoLog)
-		result, found, err := pi.Next()
-		pi.Close()
-		mtr.UnpinAll()
+		result, err := si.resolvePrimaryVersion(secRec)
 		if err != nil {
 			return nil, false, err
 		}
-		if found {
-			return result, true, nil
+		if result == nil {
+			continue
 		}
-		// プライマリレコードが見つからない場合は次のセカンダリレコードに進む
+		return result, true, nil
 	}
+}
+
+// resolvePrimaryVersion はセカンダリレコードのプライマリキーで本体レコードを引き、Read View から見えるバージョンを返す
+//   - readView が nil の場合は deleteMark のみで判定する
+//   - 本体レコード不在 / 可視バージョンなし / 削除済み / SK 不一致の場合は nil を返す
+func (si *SecondaryIndexIterator) resolvePrimaryVersion(secRec *SecondaryRecord) (*PrimaryRecord, error) {
+	mtr := buffer.NewMtr(si.bufferPool)
+	defer mtr.UnpinAll()
+
+	primaryFileId := si.primaryTree.MetaPageId().FileId()
+	pkKey := encode.Encode(nil, stringToByteSlice(secRec.pk))
+	iter, err := si.primaryTree.Search(mtr, btree.SearchModeKey{Key: pkKey})
+	if err != nil {
+		return nil, err
+	}
+	defer iter.Close()
+
+	rec, ok, err := iter.Next()
+	if err != nil {
+		return nil, err
+	}
+	if !ok || !bytes.Equal(rec.Key(), pkKey) {
+		return nil, nil //nolint:nilnil // nil は「該当の PK レコードが存在しない」を表す
+	}
+
+	current, err := DecodePrimaryRecord(rec, si.catalog, si.bufferPool, primaryFileId)
+	if err != nil {
+		return nil, err
+	}
+	if si.readView == nil {
+		if current.deleteMark == 1 {
+			return nil, nil //nolint:nilnil // nil は「削除済み」を表す
+		}
+		return current, nil
+	}
+
+	ascended := false
+	for !si.readView.isVisible(current.lastTrxId) {
+		prev, err := resolvePrevVersion(resolvePrevVersionInput{
+			mtr:        mtr,
+			undoLog:    si.undoLog,
+			catalog:    si.catalog,
+			bufferPool: si.bufferPool,
+			fileId:     primaryFileId,
+			record:     current,
+		})
+		if err != nil {
+			return nil, err
+		}
+		if prev == nil {
+			return nil, nil //nolint:nilnil // nil は「Read View から見て存在しない」を表す
+		}
+		current = prev
+		ascended = true
+	}
+	if current.deleteMark == 1 {
+		return nil, nil //nolint:nilnil // nil は「Read View から見て削除済み」を表す
+	}
+
+	if !ascended && secRec.deleteMark == 0 {
+		return current, nil
+	}
+	skMatched, err := si.matchSecondaryKey(current, secRec)
+	if err != nil {
+		return nil, err
+	}
+	if !skMatched {
+		return nil, nil //nolint:nilnil // nil は「Read View から見て SK が一致しない」を表す
+	}
+	return current, nil
 }
 
 // NextIndexOnly はセカンダリインデックスのみを検索して次の結果を返す

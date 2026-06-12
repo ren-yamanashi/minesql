@@ -340,6 +340,157 @@ func TestSecondaryIndexIteratorNextWithReadView(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, "Alice", result.values[1])
 	})
+
+	t.Run("SK 変更 UPDATE 後の新しい Read View からは新キーの行が 1 行だけ返る", func(t *testing.T) {
+		// GIVEN
+		env := setupMVCCTestEnv(t)
+		inserted := insertPrimaryRecordWithMvcc(t, env, lock.TrxId(1), undo.NullPointer(), "1", "Alice", "a@example.com")
+		updateUndo := undo.NewUpdateRecord(page.FileId(2), inserted.Encode(), btree.Record{}, lock.TrxId(1), undo.NullPointer())
+		ptr := env.appendUndo(t, lock.TrxId(5), undo.RecordTypeUpdate, updateUndo)
+		updatePrimaryRecordWithMvcc(t, env, lock.TrxId(5), ptr, "1", "Bob", "a@example.com")
+		insertSecondaryRecordWithMvcc(t, env.iter, 1, lock.TrxId(5), []string{"name"}, []string{"Alice"}, []string{"1"})
+		insertSecondaryRecordWithMvcc(t, env.iter, 0, lock.TrxId(5), []string{"name"}, []string{"Bob"}, []string{"1"})
+
+		rv := newReadView(lock.TrxId(6), nil, lock.TrxId(7))
+		iter := searchSecondaryIndexWithReadView(t, env, rv)
+		defer iter.Close()
+
+		// WHEN
+		r1, ok1, err1 := iter.Next()
+		_, ok2, err2 := iter.Next()
+
+		// THEN
+		assert.NoError(t, err1)
+		assert.True(t, ok1)
+		assert.Equal(t, "Bob", r1.values[1])
+
+		assert.NoError(t, err2)
+		assert.False(t, ok2)
+	})
+
+	t.Run("SK 変更 UPDATE 前から開いていた Read View からは旧キーの行が 1 行だけ返る", func(t *testing.T) {
+		// GIVEN
+		env := setupMVCCTestEnv(t)
+		inserted := insertPrimaryRecordWithMvcc(t, env, lock.TrxId(1), undo.NullPointer(), "1", "Alice", "a@example.com")
+		updateUndo := undo.NewUpdateRecord(page.FileId(2), inserted.Encode(), btree.Record{}, lock.TrxId(1), undo.NullPointer())
+		ptr := env.appendUndo(t, lock.TrxId(5), undo.RecordTypeUpdate, updateUndo)
+		updatePrimaryRecordWithMvcc(t, env, lock.TrxId(5), ptr, "1", "Bob", "a@example.com")
+		insertSecondaryRecordWithMvcc(t, env.iter, 1, lock.TrxId(5), []string{"name"}, []string{"Alice"}, []string{"1"})
+		insertSecondaryRecordWithMvcc(t, env.iter, 0, lock.TrxId(5), []string{"name"}, []string{"Bob"}, []string{"1"})
+
+		rv := newReadView(lock.TrxId(2), []lock.TrxId{lock.TrxId(5)}, lock.TrxId(6))
+		iter := searchSecondaryIndexWithReadView(t, env, rv)
+		defer iter.Close()
+
+		// WHEN
+		r1, ok1, err1 := iter.Next()
+		_, ok2, err2 := iter.Next()
+
+		// THEN
+		assert.NoError(t, err1)
+		assert.True(t, ok1)
+		assert.Equal(t, "Alice", r1.values[1])
+
+		assert.NoError(t, err2)
+		assert.False(t, ok2)
+	})
+
+	t.Run("DELETE コミット後の新しい Read View からは行が見えない", func(t *testing.T) {
+		// GIVEN
+		env := setupMVCCTestEnv(t)
+		inserted := insertPrimaryRecordWithMvcc(t, env, lock.TrxId(1), undo.NullPointer(), "1", "Alice", "a@example.com")
+		deleteUndo := undo.NewDeleteRecord(page.FileId(2), inserted.Encode(), lock.TrxId(1), undo.NullPointer())
+		ptr := env.appendUndo(t, lock.TrxId(5), undo.RecordTypeDelete, deleteUndo)
+		deleted, err := NewPrimaryRecord(env.iter.ct, env.iter.bp, NewPrimaryRecordInput{
+			fileId:     page.FileId(2),
+			pkCount:    1,
+			deleteMark: 1,
+			lastTrxId:  lock.TrxId(5),
+			rollPtr:    ptr,
+			colNames:   []string{"id", "name", "email"},
+			values:     []string{"1", "Alice", "a@example.com"},
+		})
+		assert.NoError(t, err)
+		mtr := buffer.NewMtr(env.iter.bp)
+		err = env.iter.primaryTree.Update(mtr, deleted.Encode())
+		mtr.UnpinAll()
+		assert.NoError(t, err)
+		insertSecondaryRecordWithMvcc(t, env.iter, 1, lock.TrxId(5), []string{"name"}, []string{"Alice"}, []string{"1"})
+
+		rv := newReadView(lock.TrxId(6), nil, lock.TrxId(7))
+		iter := searchSecondaryIndexWithReadView(t, env, rv)
+		defer iter.Close()
+
+		// WHEN
+		_, ok, err := iter.Next()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.False(t, ok)
+	})
+
+	t.Run("DELETE 前から開いていた Read View からは削除前の行が見える", func(t *testing.T) {
+		// GIVEN
+		env := setupMVCCTestEnv(t)
+		inserted := insertPrimaryRecordWithMvcc(t, env, lock.TrxId(1), undo.NullPointer(), "1", "Alice", "a@example.com")
+		deleteUndo := undo.NewDeleteRecord(page.FileId(2), inserted.Encode(), lock.TrxId(1), undo.NullPointer())
+		ptr := env.appendUndo(t, lock.TrxId(5), undo.RecordTypeDelete, deleteUndo)
+		deleted, err := NewPrimaryRecord(env.iter.ct, env.iter.bp, NewPrimaryRecordInput{
+			fileId:     page.FileId(2),
+			pkCount:    1,
+			deleteMark: 1,
+			lastTrxId:  lock.TrxId(5),
+			rollPtr:    ptr,
+			colNames:   []string{"id", "name", "email"},
+			values:     []string{"1", "Alice", "a@example.com"},
+		})
+		assert.NoError(t, err)
+		mtr := buffer.NewMtr(env.iter.bp)
+		err = env.iter.primaryTree.Update(mtr, deleted.Encode())
+		mtr.UnpinAll()
+		assert.NoError(t, err)
+		insertSecondaryRecordWithMvcc(t, env.iter, 1, lock.TrxId(5), []string{"name"}, []string{"Alice"}, []string{"1"})
+
+		rv := newReadView(lock.TrxId(2), []lock.TrxId{lock.TrxId(5)}, lock.TrxId(6))
+		iter := searchSecondaryIndexWithReadView(t, env, rv)
+		defer iter.Close()
+
+		// WHEN
+		r1, ok1, err1 := iter.Next()
+		_, ok2, err2 := iter.Next()
+
+		// THEN
+		assert.NoError(t, err1)
+		assert.True(t, ok1)
+		assert.Equal(t, "Alice", r1.values[1])
+
+		assert.NoError(t, err2)
+		assert.False(t, ok2)
+	})
+
+	t.Run("セカンダリレコードに対応するプライマリレコードが存在しない場合はスキップして次に進む", func(t *testing.T) {
+		// GIVEN
+		env := setupMVCCTestEnv(t)
+		insertPrimaryRecordWithMvcc(t, env, lock.TrxId(1), undo.NullPointer(), "2", "Bob", "b@example.com")
+		insertSecondaryRecordWithMvcc(t, env.iter, 0, lock.TrxId(1), []string{"name"}, []string{"Alice"}, []string{"1"})
+		insertSecondaryRecordWithMvcc(t, env.iter, 0, lock.TrxId(1), []string{"name"}, []string{"Bob"}, []string{"2"})
+
+		rv := newReadView(lock.TrxId(2), nil, lock.TrxId(2))
+		iter := searchSecondaryIndexWithReadView(t, env, rv)
+		defer iter.Close()
+
+		// WHEN
+		r1, ok1, err1 := iter.Next()
+		_, ok2, err2 := iter.Next()
+
+		// THEN
+		assert.NoError(t, err1)
+		assert.True(t, ok1)
+		assert.Equal(t, "Bob", r1.values[1])
+
+		assert.NoError(t, err2)
+		assert.False(t, ok2)
+	})
 }
 
 // searchSecondaryIndexWithReadView は readView 付きでセカンダリイテレータを返す
