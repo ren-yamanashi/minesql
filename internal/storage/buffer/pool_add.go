@@ -97,6 +97,7 @@ func (p *Pool) evictWithRetry(pageId page.Id, canEvict func(bufId id) bool) (id,
 		if p.onAllPinned != nil {
 			p.onAllPinned()
 		}
+		_ = p.flushSinglePage()
 		time.Sleep(retryInterval)
 		p.mu.Lock()
 

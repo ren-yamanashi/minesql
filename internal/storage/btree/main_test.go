@@ -826,15 +826,11 @@ func (bt *Tree) mustInsert(key, value string) {
 	}
 }
 
-// newTestBufferPool は全ページが dirty/pin で追い出し不可になったときに古いダーティーページを
-// フラッシュして追い出し候補を確保する callback 付きのバッファプールを生成する
-// (本番では page_cleaner がこの役割を担うが、テストでは page_cleaner を持たないため)
+// newTestBufferPool はテスト用のバッファプールを生成する
+// 全ページが dirty/pin で追い出し不可になった場合の回復は、追い出す操作自身が実行する
+// 救済フラッシュに任せられるため、フラッシュ依頼先 (本番ではページクリーナー) は登録しない
 func newTestBufferPool(size int) *buffer.Pool {
-	var bp *buffer.Pool
-	bp = buffer.NewPool(size, func() {
-		_ = bp.FlushOldestPages(bp.FlushListPageCount())
-	})
-	return bp
+	return buffer.NewPool(size, nil)
 }
 
 // setupBtree はテスト用の B+Tree をセットアップする

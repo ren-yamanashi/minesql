@@ -130,6 +130,40 @@ func TestAddPage(t *testing.T) {
 		assert.False(t, cached, "flush 後の retry で追い出されたはず")
 	})
 
+	t.Run("X 保持中の最古ダーティーページがあっても救済フラッシュが別ページをクリーン化して成功する", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*2, nil)
+		hf := setupHeapFile(t, 0)
+		bp.RegisterHeapFile(0, hf)
+		id0 := page.NewId(0, 0)
+		id1 := page.NewId(0, 1)
+		_, err := bp.AddPage(id0)
+		assert.NoError(t, err)
+		mtr := NewMtr(bp)
+		p0, err := mtr.PageForWrite(id0)
+		assert.NoError(t, err)
+		p0.MarkModified()
+		_, err = bp.AddPage(id1)
+		assert.NoError(t, err)
+		p1, err := bp.Page(id1)
+		assert.NoError(t, err)
+		p1.MarkModified()
+		bp.Unpin(id1)
+
+		// WHEN
+		id2 := page.NewId(0, 2)
+		bufPage, err := bp.AddPage(id2)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, id2, bufPage.pageId)
+		_, cached := bp.pageTable.bufferId(id1)
+		assert.False(t, cached, "救済フラッシュでクリーン化された id1 が追い出されたはず")
+		_, cached = bp.pageTable.bufferId(id0)
+		assert.True(t, cached, "X 保持中の id0 はスキップされキャッシュに残るはず")
+		mtr.UnpinAll()
+	})
+
 	t.Run("回復手段がなく追い出し候補が見つからない場合は上限到達後エラーを返す", func(t *testing.T) {
 		// GIVEN
 		bp := NewPool(page.Size, nil)

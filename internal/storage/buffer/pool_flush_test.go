@@ -3,6 +3,7 @@ package buffer
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
@@ -117,7 +118,7 @@ func TestFlushAllPages(t *testing.T) {
 		assert.Equal(t, 1, bp.FlushListPageCount(), "再フラッシュ可能なように flushList に残るべき")
 	})
 
-	t.Run("X ラッチ保持中のページはスキップされ flushList に残る", func(t *testing.T) {
+	t.Run("X ラッチ保持中はフラッシュが完了せず、解放後に完了してクリーンになる", func(t *testing.T) {
 		// GIVEN
 		bp := NewPool(page.Size*2, nil)
 		hf := setupHeapFile(t, 0)
@@ -128,19 +129,33 @@ func TestFlushAllPages(t *testing.T) {
 		p, err := bp.Page(pageId)
 		assert.NoError(t, err)
 		p.MarkModified()
-		// Mtr 経由で X ラッチを保持中の状態を模擬
 		mtr := NewMtr(bp)
 		_, err = mtr.PageForWrite(pageId)
 		assert.NoError(t, err)
 
 		// WHEN
-		err = bp.FlushAllPages()
+		done := make(chan error, 1)
+		go func() {
+			done <- bp.FlushAllPages()
+		}()
 
 		// THEN
-		assert.NoError(t, err)
-		assert.True(t, bp.pages[0].isDirty, "X 保持中はフラッシュされないので isDirty のまま")
-		assert.Equal(t, 1, bp.FlushListPageCount(), "X 保持中ページは flushList に残る")
+		select {
+		case <-done:
+			t.Fatal("X ラッチ保持中はフラッシュが完了しないべき")
+		case <-time.After(50 * time.Millisecond):
+		}
 		mtr.UnpinAll()
+		select {
+		case err := <-done:
+			assert.NoError(t, err)
+		case <-time.After(5 * time.Second):
+			t.Fatal("X ラッチ解放後はフラッシュが完了するべき")
+		}
+		bufPage, err := bp.Page(pageId)
+		assert.NoError(t, err)
+		assert.False(t, bufPage.isDirty)
+		assert.Equal(t, 0, bp.FlushListPageCount())
 	})
 
 	t.Run("Flush と Writer が並行してもデータレースを起こさない", func(t *testing.T) {
@@ -384,5 +399,53 @@ func TestFlushOldestPages(t *testing.T) {
 		assert.NoError(t, perr)
 		assert.True(t, bufPage.isDirty, "ディスクへ永続化されていないので isDirty が残るべき")
 		assert.Equal(t, 1, bp.FlushListPageCount(), "再フラッシュ可能なように flushList に残るべき")
+	})
+
+	t.Run("X ラッチ保持ページでブロックされても処理済みのページは順次クリーンになる", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*3, nil)
+		hf := setupHeapFile(t, 0)
+		bp.RegisterHeapFile(0, hf)
+		id0 := page.NewId(0, 0)
+		id1 := page.NewId(0, 1)
+		_, err := bp.AddPage(id0)
+		assert.NoError(t, err)
+		_, err = bp.AddPage(id1)
+		assert.NoError(t, err)
+		p0, err := bp.Page(id0)
+		assert.NoError(t, err)
+		p0.MarkModified()
+		p1, err := bp.Page(id1)
+		assert.NoError(t, err)
+		p1.MarkModified()
+		mtr := NewMtr(bp)
+		_, err = mtr.PageForWrite(id1)
+		assert.NoError(t, err)
+
+		// WHEN
+		done := make(chan error, 1)
+		go func() {
+			done <- bp.FlushOldestPages(2)
+		}()
+
+		// THEN
+		assert.Eventually(t, func() bool {
+			return bp.FlushListPageCount() == 1
+		}, 5*time.Second, time.Millisecond, "ブロック前に処理した id0 はクリーン化され flushList から外れるべき")
+		select {
+		case <-done:
+			t.Fatal("X ラッチ保持中はフラッシュが完了しないべき")
+		case <-time.After(50 * time.Millisecond):
+		}
+		mtr.UnpinAll()
+		select {
+		case err := <-done:
+			assert.NoError(t, err)
+		case <-time.After(5 * time.Second):
+			t.Fatal("X ラッチ解放後はフラッシュが完了するべき")
+		}
+		assert.False(t, bp.pages[0].isDirty)
+		assert.False(t, bp.pages[1].isDirty)
+		assert.Equal(t, 0, bp.FlushListPageCount())
 	})
 }
