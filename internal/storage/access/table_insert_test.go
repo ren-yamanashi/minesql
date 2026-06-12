@@ -53,6 +53,18 @@ func TestTableInsert(t *testing.T) {
 		assert.Equal(t, "alice@example.com", emailResult.values[2])
 	})
 
+	t.Run("プライマリレコードの lastTrxId に挿入した trxId が記録される", func(t *testing.T) {
+		// GIVEN
+		table, _, insertedTrxId := setupTableWithRecord(t)
+
+		// WHEN
+		record := searchFirstPrimaryRecord(t, table)
+
+		// THEN
+		assert.Equal(t, byte(0), record.deleteMark)
+		assert.Equal(t, insertedTrxId, record.lastTrxId)
+	})
+
 	t.Run("セカンダリインデックスの lastTrxId に挿入した trxId が記録される", func(t *testing.T) {
 		// GIVEN
 		table, _, insertedTrxId := setupTableWithRecord(t)

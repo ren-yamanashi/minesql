@@ -142,6 +142,47 @@ func TestPurgePurge(t *testing.T) {
 		assert.False(t, ok)
 	})
 
+	t.Run("論理削除後に同一キーで再挿入された場合はパージで物理削除されない", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		table := setupTableForRecoveryTest(t, env)
+		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog)
+
+		trx1 := env.trxManager.Begin()
+		_ = table.Insert(
+			trx1,
+			[]string{"id", "name", "email"},
+			[]string{"1", "Alice", "alice@example.com"},
+		)
+		_ = env.trxManager.Commit(trx1)
+
+		trx2 := env.trxManager.Begin()
+		mtr := buffer.NewMtr(env.bp)
+		defer mtr.UnpinAll()
+		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		record, _, _ := iter.Next()
+		_ = table.SoftDelete(trx2, record)
+		_ = env.trxManager.Commit(trx2)
+
+		trx3 := env.trxManager.Begin()
+		_ = table.Insert(
+			trx3,
+			[]string{"id", "name", "email"},
+			[]string{"1", "Charlie", "charlie@example.com"},
+		)
+		_ = env.trxManager.Commit(trx3)
+
+		// WHEN
+		err := p.purge()
+
+		// THEN
+		assert.NoError(t, err)
+		iter2, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		reinserted, ok, _ := iter2.Next()
+		assert.True(t, ok)
+		assert.Equal(t, "Charlie", reinserted.values[1])
+	})
+
 	t.Run("UPDATE のパージでセカンダリインデックスの旧エントリが物理削除される", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)

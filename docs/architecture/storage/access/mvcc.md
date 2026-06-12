@@ -240,11 +240,12 @@ Read View の作成タイミング・保持責務・ライフサイクルは[ト
 
 ```mermaid
 flowchart TD
-    A[COMMIT 開始] --> B[Redo ログをフラッシュ]
-    B --> C[INSERT の Undo ログを破棄]
-    C --> D[アクティブトランザクションリストから自身を除去]
-    D --> E[保持している全てのロックを解放]
-    E --> F[COMMIT 完了]
+    A[COMMIT 開始] --> B[Redo ログに Commit レコードを追加]
+    B --> C[Redo ログをフラッシュ]
+    C --> D[保持している全てのロックを解放]
+    D --> E[INSERT の Undo ログを破棄]
+    E --> F[トランザクションを Inactive 状態へ遷移]
+    F --> G[COMMIT 完了]
 ```
 
 - INSERT の Undo ログは他のトランザクションが参照する必要がないため、コミット時に即座に破棄する
@@ -255,17 +256,18 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A[ROLLBACK 開始] --> B[Undo ログの末尾から逆順に辿る]
-    B --> C{Undo レコードの種類}
-    C -->|INSERT| D[挿入したレコードを物理削除]
-    C -->|UPDATE| E[更新前の値に復元]
-    C -->|DELETE| F[deleteMark を解除]
-    D --> G{残りの Undo レコードがあるか}
-    E --> G
-    F --> G
-    G -->|あり| B
-    G -->|なし| H[Undo ログを破棄]
-    H --> I[アクティブトランザクションリストから自身を除去]
-    I --> J[保持している全てのロックを解放]
-    J --> K[ROLLBACK 完了]
+    A[ROLLBACK 開始] --> B[Redo ログに Rollback レコードを追加 ※フラッシュなし]
+    B --> C[Undo ログの末尾から逆順に辿る]
+    C --> D{Undo レコードの種類}
+    D -->|INSERT| E[挿入したレコードを物理削除]
+    D -->|UPDATE| F[更新前の値に復元]
+    D -->|DELETE| G[deleteMark を解除]
+    E --> H{残りの Undo レコードがあるか}
+    F --> H
+    G --> H
+    H -->|あり| C
+    H -->|なし| I[保持している全てのロックを解放]
+    I --> J[Undo ログを破棄]
+    J --> K[トランザクションを Inactive 状態へ遷移]
+    K --> L[ROLLBACK 完了]
 ```

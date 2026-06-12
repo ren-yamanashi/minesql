@@ -26,6 +26,7 @@ func (t *Table) Insert(trx *Transaction, colNames []string, values []string) err
 		fileId:     t.primaryIndex.fileId(),
 		pkCount:    t.primaryIndex.pkCount,
 		deleteMark: 0,
+		lastTrxId:  trxId,
 		colNames:   colNames,
 		values:     values,
 	})

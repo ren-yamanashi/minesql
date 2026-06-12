@@ -144,6 +144,18 @@ func (p *Purge) deletePrimaryRecord(fileId page.FileId, record btree.Record) err
 		return err
 	}
 	primaryTree := btree.NewTree(p.bufferPool, piRecord.MetaPageId())
+
+	// キーが存在し、deleteMark=1 の場合のみ物理削除 (論理削除後に同一キーで再挿入された active な行を消さないため)
+	existing, _, err := primaryTree.FindByKey(mtr, record.Key())
+	if errors.Is(err, btree.ErrKeyNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if existing.Header()[0] == 0 {
+		return nil
+	}
 	return primaryTree.Delete(mtr, record.Key())
 }
 
