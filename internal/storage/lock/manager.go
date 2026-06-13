@@ -30,10 +30,12 @@ func NewManager() *Manager {
 	return lm
 }
 
-// Lock は指定した行に対してロックを取得する
-//   - 競合がなければ即座にロックを付与する
-//   - 競合がある場合は待機キューに追加し、ロックが付与されるかタイムアウトするまで待機する
-func (m *Manager) Lock(trxId TrxId, rowKey RowKey, mode Mode) error {
+// TryLock は指定した行に対してロックの即時付与を試みる
+//   - 即時付与できた場合は granted=true, handle=nil を返す
+//   - 競合する場合は待機キューに登録し、granted=false と待機ハンドルを返す
+//   - 即時付与の判定と待機キューへの登録を 1 つのロック区間で原子的に行うため、判定と登録の間に他トランザクションが割り込んで待機キューの順序が乱れることはない
+//   - 付与できなかった場合、呼び出し側はページラッチなどを解放してから handle.Wait で待機する
+func (m *Manager) TryLock(trxId TrxId, rowKey RowKey, mode Mode) (granted bool, handle *WaitHandle) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -52,35 +54,29 @@ func (m *Manager) Lock(trxId TrxId, rowKey RowKey, mode Mode) error {
 			state.holders[trxId] = mode
 		}
 		m.addHeldLock(trxId, key)
+		return true, nil
+	}
+
+	// 競合がある場合: 待機キューに登録して待機ハンドルを返す
+	state.waitQueue = append(state.waitQueue, request{trxId: trxId, mode: mode})
+	return false, &WaitHandle{
+		manager: m,
+		state:   state,
+		key:     key,
+		trxId:   trxId,
+		mode:    mode,
+	}
+}
+
+// Lock は指定した行に対してロックを取得する
+//   - 競合がなければ即座にロックを付与する
+//   - 競合がある場合は待機キューに追加し、ロックが付与されるかタイムアウトするまで待機する
+func (m *Manager) Lock(trxId TrxId, rowKey RowKey, mode Mode) error {
+	granted, handle := m.TryLock(trxId, rowKey, mode)
+	if granted {
 		return nil
 	}
-
-	// 競合がある場合
-	state.waitQueue = append(state.waitQueue, request{trxId: trxId, mode: mode})
-
-	timedOut := false
-	timer := time.AfterFunc(m.timeout, func() {
-		m.mu.Lock()
-		timedOut = true
-		m.cond.Broadcast()
-		m.mu.Unlock()
-	})
-	defer timer.Stop()
-
-	// ロックが付与されるかタイムアウトするまで待機
-	for {
-		held, exists := state.holders[trxId]
-		isGranted := exists && (held == Exclusive || mode == Shared)
-		if isGranted {
-			m.addHeldLock(trxId, key)
-			return nil
-		}
-		if timedOut {
-			m.removeFromWaitQueue(state, trxId)
-			return ErrTimeout
-		}
-		m.cond.Wait()
-	}
+	return handle.Wait()
 }
 
 // Release は指定したトランザクションが保持しているすべてのロックを解放する

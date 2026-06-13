@@ -47,7 +47,7 @@ func TestTableCheckForeignKeysForInsert(t *testing.T) {
 		env := setupFKTestEnv(t)
 		fkTrx := env.trxMgr.Begin()
 		_ = env.parent.Insert(fkTrx, []string{"id", "name"}, []string{"1", "Sales"})
-		record := searchFirstPrimaryRecord(t, env.parent)
+		record := currentReadFirst(t, env.parent, fkTrx)
 		_ = env.parent.SoftDelete(fkTrx, record)
 
 		// WHEN
@@ -76,7 +76,7 @@ func TestTableCheckForeignKeysForDelete(t *testing.T) {
 		env := setupFKTestEnv(t)
 		fkTrx := env.trxMgr.Begin()
 		_ = env.parent.Insert(fkTrx, []string{"id", "name"}, []string{"1", "Sales"})
-		record := searchFirstPrimaryRecord(t, env.parent)
+		record := currentReadFirst(t, env.parent, fkTrx)
 
 		// WHEN
 		err := env.parent.SoftDelete(fkTrx, record)
@@ -91,7 +91,7 @@ func TestTableCheckForeignKeysForDelete(t *testing.T) {
 		fkTrx := env.trxMgr.Begin()
 		_ = env.parent.Insert(fkTrx, []string{"id", "name"}, []string{"1", "Sales"})
 		_ = env.child.Insert(fkTrx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"})
-		record := searchFirstPrimaryRecord(t, env.parent)
+		record := currentReadFirst(t, env.parent, fkTrx)
 
 		// WHEN
 		err := env.parent.SoftDelete(fkTrx, record)
@@ -106,9 +106,9 @@ func TestTableCheckForeignKeysForDelete(t *testing.T) {
 		fkTrx := env.trxMgr.Begin()
 		_ = env.parent.Insert(fkTrx, []string{"id", "name"}, []string{"1", "Sales"})
 		_ = env.child.Insert(fkTrx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"})
-		childRecord := searchFirstPrimaryRecord(t, env.child)
+		childRecord := currentReadFirst(t, env.child, fkTrx)
 		_ = env.child.SoftDelete(fkTrx, childRecord)
-		parentRecord := searchFirstPrimaryRecord(t, env.parent)
+		parentRecord := currentReadFirst(t, env.parent, fkTrx)
 
 		// WHEN
 		err := env.parent.SoftDelete(fkTrx, parentRecord)
@@ -126,7 +126,7 @@ func TestTableCheckForeignKeysForUpdate(t *testing.T) {
 		_ = env.parent.Insert(fkTrx, []string{"id", "name"}, []string{"1", "Sales"})
 		_ = env.parent.Insert(fkTrx, []string{"id", "name"}, []string{"2", "Engineering"})
 		_ = env.child.Insert(fkTrx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"})
-		record := searchFirstPrimaryRecord(t, env.child)
+		record := currentReadFirst(t, env.child, fkTrx)
 
 		// WHEN
 		err := env.child.Update(fkTrx, record, []string{"dept_id"}, []string{"2"})
@@ -141,7 +141,7 @@ func TestTableCheckForeignKeysForUpdate(t *testing.T) {
 		fkTrx := env.trxMgr.Begin()
 		_ = env.parent.Insert(fkTrx, []string{"id", "name"}, []string{"1", "Sales"})
 		_ = env.child.Insert(fkTrx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"})
-		record := searchFirstPrimaryRecord(t, env.child)
+		record := currentReadFirst(t, env.child, fkTrx)
 
 		// WHEN
 		err := env.child.Update(fkTrx, record, []string{"dept_id"}, []string{"999"})
@@ -156,7 +156,7 @@ func TestTableCheckForeignKeysForUpdate(t *testing.T) {
 		fkTrx := env.trxMgr.Begin()
 		_ = env.parent.Insert(fkTrx, []string{"id", "name"}, []string{"1", "Sales"})
 		_ = env.child.Insert(fkTrx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"})
-		record := searchFirstPrimaryRecord(t, env.parent)
+		record := currentReadFirst(t, env.parent, fkTrx)
 
 		// WHEN
 		err := env.parent.Update(fkTrx, record, []string{"id"}, []string{"2"})
@@ -171,7 +171,7 @@ func TestTableCheckForeignKeysForUpdate(t *testing.T) {
 		fkTrx := env.trxMgr.Begin()
 		_ = env.parent.Insert(fkTrx, []string{"id", "name"}, []string{"1", "Sales"})
 		_ = env.child.Insert(fkTrx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"})
-		record := searchFirstPrimaryRecord(t, env.child)
+		record := currentReadFirst(t, env.child, fkTrx)
 
 		// WHEN
 		err := env.child.Update(fkTrx, record, []string{"name"}, []string{"Bob"})

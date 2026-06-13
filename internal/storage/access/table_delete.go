@@ -7,6 +7,7 @@ import (
 )
 
 // SoftDelete はテーブルの行を論理削除する
+//   - record は SearchForUpdate (Current Read) で取得した排他ロック済みの最新バージョンを渡すこと
 func (t *Table) SoftDelete(trx *Transaction, record *PrimaryRecord) error {
 	trxId := trx.trxId
 	if _, err := t.redoLog.AppendMtrStart(trxId); err != nil {

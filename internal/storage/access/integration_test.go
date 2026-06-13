@@ -71,7 +71,7 @@ func TestIntegrationCommit(t *testing.T) {
 		)
 		assert.NoError(t, err)
 
-		before := searchFirstPrimaryRecord(t, table)
+		before := currentReadFirst(t, table, trx)
 		err = table.Update(trx, before, []string{"name"}, []string{"Bob"})
 		assert.NoError(t, err)
 
@@ -99,7 +99,7 @@ func TestIntegrationCommit(t *testing.T) {
 		)
 		assert.NoError(t, err)
 
-		record := searchFirstPrimaryRecord(t, table)
+		record := currentReadFirst(t, table, trx)
 		err = table.SoftDelete(trx, record)
 		assert.NoError(t, err)
 
@@ -162,7 +162,7 @@ func TestIntegrationRollback(t *testing.T) {
 		assert.NoError(t, err)
 
 		trx2 := env.trxMgr.Begin()
-		record := searchFirstPrimaryRecord(t, table)
+		record := currentReadFirst(t, table, trx2)
 		err = table.Update(trx2, record, []string{"name"}, []string{"Bob"})
 		assert.NoError(t, err)
 
@@ -294,7 +294,7 @@ func TestIntegrationCrashRecovery(t *testing.T) {
 		assert.NoError(t, err)
 
 		trx2 := env.trxMgr.Begin()
-		record := searchFirstPrimaryRecord(t, table)
+		record := currentReadFirst(t, table, trx2)
 		err = table.Update(trx2, record, []string{"name"}, []string{"Bob"})
 		assert.NoError(t, err)
 		err = env.trxMgr.Commit(trx2)
@@ -455,12 +455,12 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 					_ = env.trxMgr.Commit(trx)
 				}
 				trx := env.trxMgr.Begin()
-				if rec := findRecordByPk(t, env, table, keyOf(0)); rec != nil {
+				if rec := currentReadByPk(t, table, trx, keyOf(0)); rec != nil {
 					_ = table.Update(trx, rec, []string{"name"}, []string{"updated"})
 				}
 				_ = env.trxMgr.Commit(trx)
 				trx = env.trxMgr.Begin()
-				if rec := findRecordByPk(t, env, table, keyOf(insertPerWriter-1)); rec != nil {
+				if rec := currentReadByPk(t, table, trx, keyOf(insertPerWriter-1)); rec != nil {
 					_ = table.SoftDelete(trx, rec)
 				}
 				_ = env.trxMgr.Commit(trx)
@@ -582,23 +582,6 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 		}
 		assert.Equal(t, committedWorkers*opsPerWorker, count)
 	})
-}
-
-// findRecordByPk は指定 PK のレコードを取得する (見つからなければ nil)
-func findRecordByPk(t *testing.T, env *integrationEnv, table *Table, pk string) *PrimaryRecord {
-	t.Helper()
-	mtr := buffer.NewMtr(env.bp)
-	defer mtr.UnpinAll()
-	iter, err := table.primaryIndex.search(mtr, SearchModeKey{Key: [][]byte{[]byte(pk)}}, nil)
-	if err != nil {
-		return nil
-	}
-	defer iter.Close()
-	rec, ok, err := iter.Next()
-	if err != nil || !ok {
-		return nil
-	}
-	return rec
 }
 
 // createUsersTable は統合テスト用の users テーブルを作成する

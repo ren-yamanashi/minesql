@@ -7,6 +7,7 @@ import (
 )
 
 // Update はテーブルの行を更新する
+//   - currentRecord は SearchForUpdate (Current Read) で取得した排他ロック済みの最新バージョンを渡すこと
 //   - PK カラムが更新対象に含まれない場合はインプレース更新を行う
 //   - PK カラムが更新対象に含まれる場合は論理削除 + 新規挿入で実現する
 func (t *Table) Update(trx *Transaction, currentRecord *PrimaryRecord, colNames, values []string) error {

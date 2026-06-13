@@ -161,8 +161,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		trx2 := tm.Begin()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
-		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
-		record, _, _ := iter.Next()
+		record := currentReadFirst(t, table, trx2)
 		err := table.SoftDelete(trx2, record)
 		assert.NoError(t, err)
 
@@ -195,8 +194,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		trx2 := tm.Begin()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
-		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
-		record, _, _ := iter.Next()
+		record := currentReadFirst(t, table, trx2)
 		err := table.Update(trx2, record, []string{"name"}, []string{"Bob"})
 		assert.NoError(t, err)
 
@@ -264,8 +262,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		trx2 := tm.Begin()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
-		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
-		record, _, _ := iter.Next()
+		record := currentReadFirst(t, table, trx2)
 		err := table.SoftDelete(trx2, record)
 		assert.NoError(t, err)
 
@@ -298,8 +295,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		trx2 := tm.Begin()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
-		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
-		record, _, _ := iter.Next()
+		record := currentReadFirst(t, table, trx2)
 		err := table.Update(trx2, record, []string{"name"}, []string{"Bob"})
 		assert.NoError(t, err)
 
@@ -332,8 +328,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		trx2 := tm.Begin()
 		mtr := buffer.NewMtr(table.bufferPool)
 		defer mtr.UnpinAll()
-		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
-		record, _, _ := iter.Next()
+		record := currentReadFirst(t, table, trx2)
 		err := table.Update(trx2, record, []string{"email"}, []string{"new@example.com"})
 		assert.NoError(t, err)
 

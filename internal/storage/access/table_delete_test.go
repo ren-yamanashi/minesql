@@ -12,8 +12,8 @@ func TestTableSoftDelete(t *testing.T) {
 	t.Run("プライマリインデックスからレコードが論理削除される", func(t *testing.T) {
 		// GIVEN
 		table, tm, _ := setupTableWithRecord(t)
-		record := searchFirstPrimaryRecord(t, table)
 		trx := tm.Begin()
+		record := currentReadFirst(t, table, trx)
 
 		// WHEN
 		err := table.SoftDelete(trx, record)
@@ -32,8 +32,8 @@ func TestTableSoftDelete(t *testing.T) {
 	t.Run("セカンダリインデックスからもレコードが論理削除される", func(t *testing.T) {
 		// GIVEN
 		table, tm, _ := setupTableWithRecord(t)
-		record := searchFirstPrimaryRecord(t, table)
 		trx := tm.Begin()
+		record := currentReadFirst(t, table, trx)
 
 		// WHEN
 		err := table.SoftDelete(trx, record)
@@ -59,8 +59,8 @@ func TestTableSoftDelete(t *testing.T) {
 	t.Run("SoftDelete 後、セカンダリレコードの lastTrxId に削除した trxId が記録される", func(t *testing.T) {
 		// GIVEN
 		table, tm, _ := setupTableWithRecord(t)
-		record := searchFirstPrimaryRecord(t, table)
 		trx := tm.Begin()
+		record := currentReadFirst(t, table, trx)
 
 		// WHEN
 		err := table.SoftDelete(trx, record)
@@ -80,8 +80,8 @@ func TestTableSoftDelete(t *testing.T) {
 	t.Run("論理削除後に同一プライマリキーで再挿入できる", func(t *testing.T) {
 		// GIVEN
 		table, tm, _ := setupTableWithRecord(t)
-		record := searchFirstPrimaryRecord(t, table)
 		trx := tm.Begin()
+		record := currentReadFirst(t, table, trx)
 		err := table.SoftDelete(trx, record)
 		assert.NoError(t, err)
 
@@ -102,8 +102,8 @@ func TestTableSoftDelete(t *testing.T) {
 	t.Run("論理削除後のレコードに rollPtr が設定される", func(t *testing.T) {
 		// GIVEN
 		table, tm, _ := setupTableWithRecord(t)
-		record := searchFirstPrimaryRecord(t, table)
 		trx := tm.Begin()
+		record := currentReadFirst(t, table, trx)
 
 		// WHEN
 		err := table.SoftDelete(trx, record)
@@ -152,7 +152,7 @@ func TestTableSoftDelete(t *testing.T) {
 			[]string{"2", "Bob", "bob@example.com"},
 		)
 		assert.NoError(t, err)
-		alice := searchFirstPrimaryRecord(t, table)
+		alice := currentReadFirst(t, table, trx)
 		assert.Equal(t, "Alice", alice.values[1])
 
 		// WHEN
@@ -171,7 +171,7 @@ func TestTableSoftDelete(t *testing.T) {
 		fkTx := env.trxMgr.Begin()
 		_ = env.parent.Insert(fkTx, []string{"id", "name"}, []string{"1", "Sales"})
 		_ = env.child.Insert(fkTx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"})
-		record := searchFirstPrimaryRecord(t, env.parent)
+		record := currentReadFirst(t, env.parent, fkTx)
 
 		// WHEN
 		err := env.parent.SoftDelete(fkTx, record)

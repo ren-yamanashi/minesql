@@ -20,7 +20,8 @@ func TestMVCCRepeatableRead(t *testing.T) {
 		assert.Equal(t, "alice", v1.values[1])
 
 		trx3 := env.trxMgr.Begin()
-		assert.NoError(t, table.Update(trx3, v1, []string{"name"}, []string{"bob"}))
+		target := currentReadByPk(t, table, trx3, "1")
+		assert.NoError(t, table.Update(trx3, target, []string{"name"}, []string{"bob"}))
 		assert.NoError(t, env.trxMgr.Commit(trx3))
 
 		// WHEN
@@ -48,7 +49,7 @@ func TestMVCCUncommittedInvisible(t *testing.T) {
 		trx2 := env.trxMgr.Begin()
 
 		trx3 := env.trxMgr.Begin()
-		latest := searchByPkForTrx(t, env, table, trx3, "1")
+		latest := currentReadByPk(t, table, trx3, "1")
 		assert.NoError(t, table.Update(trx3, latest, []string{"name"}, []string{"bob"}))
 
 		// WHEN
@@ -71,7 +72,7 @@ func TestMVCCMultiStepUndoTraversal(t *testing.T) {
 		assert.NoError(t, env.trxMgr.Commit(trx1))
 
 		trx2 := env.trxMgr.Begin()
-		v1 := searchByPkForTrx(t, env, table, trx2, "1")
+		v1 := currentReadByPk(t, table, trx2, "1")
 		assert.NoError(t, table.Update(trx2, v1, []string{"name"}, []string{"v2"}))
 		assert.NoError(t, env.trxMgr.Commit(trx2))
 
@@ -80,7 +81,7 @@ func TestMVCCMultiStepUndoTraversal(t *testing.T) {
 		assert.Equal(t, "v2", atRead.values[1])
 
 		trxLate := env.trxMgr.Begin()
-		latest := searchByPkForTrx(t, env, table, trxLate, "1")
+		latest := currentReadByPk(t, table, trxLate, "1")
 		assert.NoError(t, table.Update(trxLate, latest, []string{"name"}, []string{"v3"}))
 		assert.NoError(t, env.trxMgr.Commit(trxLate))
 
@@ -136,7 +137,7 @@ func TestMVCCSecondaryVisibility(t *testing.T) {
 		assert.Equal(t, "alice", r1.values[1])
 
 		trx3 := env.trxMgr.Begin()
-		latest := searchByPkForTrx(t, env, table, trx3, "1")
+		latest := currentReadByPk(t, table, trx3, "1")
 		assert.NoError(t, table.Update(trx3, latest, []string{"name"}, []string{"bob"}))
 		assert.NoError(t, env.trxMgr.Commit(trx3))
 
@@ -167,7 +168,7 @@ func TestMVCCSecondaryIndexOnlyComplexScenario(t *testing.T) {
 		_ = env.trxMgr.EnsureReadView(r1)
 
 		t2 := env.trxMgr.Begin()
-		latestForT2 := searchByPkForTrx(t, env, table, t2, "1")
+		latestForT2 := currentReadByPk(t, table, t2, "1")
 		assert.NoError(t, table.Update(t2, latestForT2, []string{"name"}, []string{"Bob"}))
 		assert.NoError(t, env.trxMgr.Commit(t2))
 
@@ -175,7 +176,7 @@ func TestMVCCSecondaryIndexOnlyComplexScenario(t *testing.T) {
 		_ = env.trxMgr.EnsureReadView(r2)
 
 		t3 := env.trxMgr.Begin()
-		latestForT3 := searchByPkForTrx(t, env, table, t3, "1")
+		latestForT3 := currentReadByPk(t, table, t3, "1")
 		assert.NoError(t, table.SoftDelete(t3, latestForT3))
 		assert.NoError(t, env.trxMgr.Commit(t3))
 
@@ -228,7 +229,7 @@ func TestMVCCDeletedVisible(t *testing.T) {
 		assert.NoError(t, env.trxMgr.Commit(trx1))
 
 		trx2 := env.trxMgr.Begin()
-		latest := searchByPkForTrx(t, env, table, trx2, "1")
+		latest := currentReadByPk(t, table, trx2, "1")
 		assert.NoError(t, table.SoftDelete(trx2, latest))
 		assert.NoError(t, env.trxMgr.Commit(trx2))
 

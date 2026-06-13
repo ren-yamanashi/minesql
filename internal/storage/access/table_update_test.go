@@ -13,8 +13,8 @@ func TestTableUpdate(t *testing.T) {
 	t.Run("非キーカラムをインプレース更新できる", func(t *testing.T) {
 		// GIVEN
 		table, tm, _ := setupTableWithRecord(t)
-		before := searchFirstPrimaryRecord(t, table)
 		trx := tm.Begin()
+		before := currentReadFirst(t, table, trx)
 
 		// WHEN
 		err := table.Update(trx, before, []string{"name"}, []string{"Bob"})
@@ -29,8 +29,8 @@ func TestTableUpdate(t *testing.T) {
 	t.Run("セカンダリインデックスのカラムを更新すると旧 SK が論理削除され新 SK が挿入される", func(t *testing.T) {
 		// GIVEN
 		table, tm, _ := setupTableWithRecord(t)
-		before := searchFirstPrimaryRecord(t, table)
 		trx := tm.Begin()
+		before := currentReadFirst(t, table, trx)
 
 		// WHEN
 		err := table.Update(trx, before, []string{"name"}, []string{"Bob"})
@@ -51,8 +51,8 @@ func TestTableUpdate(t *testing.T) {
 	t.Run("SK 変更 UPDATE 後、旧 SK と新 SK の両方の lastTrxId に UPDATE した trxId が記録される", func(t *testing.T) {
 		// GIVEN
 		table, tm, _ := setupTableWithRecord(t)
-		before := searchFirstPrimaryRecord(t, table)
 		trx := tm.Begin()
+		before := currentReadFirst(t, table, trx)
 
 		// WHEN
 		err := table.Update(trx, before, []string{"name"}, []string{"Bob"})
@@ -81,8 +81,8 @@ func TestTableUpdate(t *testing.T) {
 	t.Run("セカンダリインデックスに影響しないカラムの更新ではインデックスが変更されない", func(t *testing.T) {
 		// GIVEN
 		table, tm, _ := setupTableWithRecord(t)
-		before := searchFirstPrimaryRecord(t, table)
 		trx := tm.Begin()
+		before := currentReadFirst(t, table, trx)
 
 		// WHEN
 		err := table.Update(trx, before, []string{"email"}, []string{"new@example.com"})
@@ -104,8 +104,8 @@ func TestTableUpdate(t *testing.T) {
 	t.Run("複数のセカンダリインデックスのうち影響するものだけが更新される", func(t *testing.T) {
 		// GIVEN
 		table, tm, _ := setupTableWithRecord(t)
-		before := searchFirstPrimaryRecord(t, table)
 		trx := tm.Begin()
+		before := currentReadFirst(t, table, trx)
 
 		// WHEN
 		err := table.Update(trx, before, []string{"name"}, []string{"Charlie"})
@@ -134,8 +134,8 @@ func TestTableUpdate(t *testing.T) {
 	t.Run("存在しないカラムで更新するとエラーを返す", func(t *testing.T) {
 		// GIVEN
 		table, tm, _ := setupTableWithRecord(t)
-		before := searchFirstPrimaryRecord(t, table)
 		trx := tm.Begin()
+		before := currentReadFirst(t, table, trx)
 
 		// WHEN
 		err := table.Update(trx, before, []string{"nonexistent"}, []string{"val"})
@@ -147,8 +147,8 @@ func TestTableUpdate(t *testing.T) {
 	t.Run("複数カラムを同時に更新できる", func(t *testing.T) {
 		// GIVEN
 		table, tm, _ := setupTableWithRecord(t)
-		before := searchFirstPrimaryRecord(t, table)
 		trx := tm.Begin()
+		before := currentReadFirst(t, table, trx)
 
 		// WHEN
 		err := table.Update(trx, before, []string{"name", "email"}, []string{"Bob", "bob@example.com"})
@@ -164,8 +164,8 @@ func TestTableUpdate(t *testing.T) {
 	t.Run("複数カラムの更新で全セカンダリインデックスが更新される", func(t *testing.T) {
 		// GIVEN
 		table, tm, _ := setupTableWithRecord(t)
-		before := searchFirstPrimaryRecord(t, table)
 		trx := tm.Begin()
+		before := currentReadFirst(t, table, trx)
 
 		// WHEN
 		err := table.Update(trx, before, []string{"name", "email"}, []string{"Bob", "bob@example.com"})
@@ -195,8 +195,8 @@ func TestTableUpdate(t *testing.T) {
 	t.Run("PK カラムを更新すると論理削除 + 新規挿入で処理される", func(t *testing.T) {
 		// GIVEN
 		table, tm, _ := setupTableWithRecord(t)
-		before := searchFirstPrimaryRecord(t, table)
 		trx := tm.Begin()
+		before := currentReadFirst(t, table, trx)
 
 		// WHEN
 		err := table.Update(trx, before, []string{"id"}, []string{"2"})
@@ -212,8 +212,8 @@ func TestTableUpdate(t *testing.T) {
 	t.Run("PK カラムを同じ値で更新するとインプレース更新になる", func(t *testing.T) {
 		// GIVEN
 		table, tm, _ := setupTableWithRecord(t)
-		before := searchFirstPrimaryRecord(t, table)
 		trx := tm.Begin()
+		before := currentReadFirst(t, table, trx)
 
 		// WHEN
 		err := table.Update(trx, before, []string{"id", "name"}, []string{"1", "Bob"})
@@ -228,8 +228,8 @@ func TestTableUpdate(t *testing.T) {
 	t.Run("PK 更新時にセカンダリインデックスも更新される", func(t *testing.T) {
 		// GIVEN
 		table, tm, _ := setupTableWithRecord(t)
-		before := searchFirstPrimaryRecord(t, table)
 		trx := tm.Begin()
+		before := currentReadFirst(t, table, trx)
 
 		// WHEN
 		err := table.Update(trx, before, []string{"id"}, []string{"2"})
@@ -250,8 +250,8 @@ func TestTableUpdate(t *testing.T) {
 	t.Run("更新後のレコードに rollPtr が設定される", func(t *testing.T) {
 		// GIVEN
 		table, tm, _ := setupTableWithRecord(t)
-		before := searchFirstPrimaryRecord(t, table)
 		trx := tm.Begin()
+		before := currentReadFirst(t, table, trx)
 
 		// WHEN
 		err := table.Update(trx, before, []string{"name"}, []string{"Bob"})
@@ -268,7 +268,7 @@ func TestTableUpdate(t *testing.T) {
 		fkTx := env.trxMgr.Begin()
 		_ = env.parent.Insert(fkTx, []string{"id", "name"}, []string{"1", "Sales"})
 		_ = env.child.Insert(fkTx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"})
-		record := searchFirstPrimaryRecord(t, env.child)
+		record := currentReadFirst(t, env.child, fkTx)
 
 		// WHEN
 		err := env.child.Update(fkTx, record, []string{"dept_id"}, []string{"999"})

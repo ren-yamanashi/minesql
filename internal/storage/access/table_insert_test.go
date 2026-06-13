@@ -119,8 +119,8 @@ func TestTableInsert(t *testing.T) {
 	t.Run("論理削除済みの同一プライマリキーに再挿入できる", func(t *testing.T) {
 		// GIVEN
 		table, tm, _ := setupTableWithRecord(t)
-		record := searchFirstPrimaryRecord(t, table)
 		trx := tm.Begin()
+		record := currentReadFirst(t, table, trx)
 		err := table.SoftDelete(trx, record)
 		assert.NoError(t, err)
 

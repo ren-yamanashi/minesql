@@ -126,8 +126,7 @@ func TestPurgePurge(t *testing.T) {
 		trx2 := env.trxManager.Begin()
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
-		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
-		record, _, _ := iter.Next()
+		record := currentReadFirst(t, table, trx2)
 		_ = table.SoftDelete(trx2, record)
 		_ = env.trxManager.Commit(trx2)
 
@@ -159,8 +158,7 @@ func TestPurgePurge(t *testing.T) {
 		trx2 := env.trxManager.Begin()
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
-		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
-		record, _, _ := iter.Next()
+		record := currentReadFirst(t, table, trx2)
 		_ = table.SoftDelete(trx2, record)
 		_ = env.trxManager.Commit(trx2)
 
@@ -200,8 +198,7 @@ func TestPurgePurge(t *testing.T) {
 		trx2 := env.trxManager.Begin()
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
-		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
-		record, _, _ := iter.Next()
+		record := currentReadFirst(t, table, trx2)
 		_ = table.Update(trx2, record, []string{"name"}, []string{"Bob"})
 		_ = env.trxManager.Commit(trx2)
 
@@ -234,8 +231,7 @@ func TestPurgePurge(t *testing.T) {
 		trx2 := env.trxManager.Begin()
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
-		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
-		record, _, _ := iter.Next()
+		record := currentReadFirst(t, table, trx2)
 		_ = table.SoftDelete(trx2, record)
 
 		trx3 := env.trxManager.Begin()
