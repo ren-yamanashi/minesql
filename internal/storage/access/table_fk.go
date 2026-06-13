@@ -10,6 +10,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
@@ -18,7 +19,7 @@ var ErrForeignKeyViolation = errors.New("access: foreign key constraint violatio
 // checkForeignKeysForInsert は Insert 前に FK 制約チェックを行う
 //
 // 自テーブルが FK を持つ場合、挿入する値が参照先テーブルの PK に存在するか確認する
-func (t *Table) checkForeignKeysForInsert(colNames, values []string) error {
+func (t *Table) checkForeignKeysForInsert(trxId lock.TrxId, colNames, values []string) error {
 	fks, err := fetchForeignKeys(t.catalog, t.bufferPool, t.primaryIndex.fileId())
 	if err != nil {
 		return err
@@ -29,9 +30,8 @@ func (t *Table) checkForeignKeysForInsert(colNames, values []string) error {
 
 	valMap := t.buildValMap(colNames, values)
 	for _, fk := range fks {
-		if err := checkParentRecordExists(
-			t.bufferPool,
-			t.catalog,
+		if err := t.checkParentRecordExists(
+			trxId,
 			fk.ReferenceTableFileId(),
 			valMap[fk.ColumnName()],
 		); err != nil {
@@ -73,11 +73,11 @@ func (t *Table) checkForeignKeysForDelete(record *PrimaryRecord) error {
 // FK に関係するカラムの値が変わった制約のみチェックする
 //   - 親テーブルチェック: 旧値が参照元から参照されていないか
 //   - 子テーブルチェック: 新値が参照先に存在するか
-func (t *Table) checkForeignKeysForUpdate(before, after *PrimaryRecord) error {
+func (t *Table) checkForeignKeysForUpdate(trxId lock.TrxId, before, after *PrimaryRecord) error {
 	if err := t.checkParentRefsForUpdate(before, after); err != nil {
 		return err
 	}
-	return t.checkChildRefsForUpdate(before, after)
+	return t.checkChildRefsForUpdate(trxId, before, after)
 }
 
 // checkParentRefsForUpdate は自テーブルを参照する FK の参照先カラム値が変わった場合に、
@@ -112,7 +112,7 @@ func (t *Table) checkParentRefsForUpdate(before, after *PrimaryRecord) error {
 
 // checkChildRefsForUpdate は自テーブルの FK カラムの値が変わった場合に、
 // 新値が参照先テーブルの PK に存在するかを確認する。
-func (t *Table) checkChildRefsForUpdate(before, after *PrimaryRecord) error {
+func (t *Table) checkChildRefsForUpdate(trxId lock.TrxId, before, after *PrimaryRecord) error {
 	fks, err := fetchForeignKeys(t.catalog, t.bufferPool, t.primaryIndex.fileId())
 	if err != nil {
 		return err
@@ -128,9 +128,8 @@ func (t *Table) checkChildRefsForUpdate(before, after *PrimaryRecord) error {
 		if beforeMap[colName] == afterMap[colName] {
 			continue
 		}
-		if err := checkParentRecordExists(
-			t.bufferPool,
-			t.catalog,
+		if err := t.checkParentRecordExists(
+			trxId,
 			fk.ReferenceTableFileId(),
 			afterMap[colName],
 		); err != nil {
@@ -191,23 +190,26 @@ func fetchReferencingConstraints(ct *dictionary.Catalog, bp *buffer.Pool, fileId
 	return refs, nil
 }
 
-// checkParentRecordExists は参照先テーブルの PK に値が存在するか確認する
-func checkParentRecordExists(
-	bp *buffer.Pool,
-	ct *dictionary.Catalog,
-	refFileId page.FileId,
-	value string,
-) error {
-	indexRecord, err := fetchPrimaryIndexRecord(ct, bp, refFileId)
+// checkParentRecordExists は参照先 (親) テーブルの PK に値が存在するか確認する
+//   - 親 PK の行ロック識別子で共有ロックを取得してから、ロック保持下で存在 (削除済みでないこと) を確認する
+//   - 共有ロックは B+Tree のラッチ・Pin を保持しない状態で取得する (TOCTOU を避けるためロック取得を存在確認より前に行う)
+func (t *Table) checkParentRecordExists(trxId lock.TrxId, refFileId page.FileId, value string) error {
+	indexRecord, err := fetchPrimaryIndexRecord(t.catalog, t.bufferPool, refFileId)
 	if err != nil {
 		return err
 	}
 
-	mtr := buffer.NewMtr(bp)
-	defer mtr.UnpinAll()
-	tree := btree.NewTree(bp, indexRecord.MetaPageId())
+	// 親 PK で共有ロックを取得する (この時点で B+Tree のラッチ・Pin は未取得)
 	sk := encode.Encode(nil, [][]byte{[]byte(value)})
+	rowKey := lock.RowKey{MetaPageId: indexRecord.MetaPageId(), Key: sk}
+	if err := t.lock.Lock(trxId, rowKey, lock.Shared); err != nil {
+		return err
+	}
 
+	// 共有ロック保持下で親 B+Tree を検索し、存在し削除済みでないことを確認する
+	mtr := buffer.NewMtr(t.bufferPool)
+	defer mtr.UnpinAll()
+	tree := btree.NewTree(t.bufferPool, indexRecord.MetaPageId())
 	record, _, err := tree.FindByKey(mtr, sk)
 	if errors.Is(err, btree.ErrKeyNotFound) {
 		return ErrForeignKeyViolation

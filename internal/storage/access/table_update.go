@@ -34,8 +34,8 @@ func (t *Table) Update(trx *Transaction, currentRecord *PrimaryRecord, colNames,
 	mtr := buffer.NewMtr(t.bufferPool)
 	defer mtr.UnpinAll()
 
-	// FK チェック
-	if err := t.checkForeignKeysForUpdate(currentRecord, newRecord); err != nil {
+	// FK チェック (自テーブルの FK カラムが変わる場合は参照先の親レコードに共有ロックを取得する)
+	if err := t.checkForeignKeysForUpdate(trxId, currentRecord, newRecord); err != nil {
 		return err
 	}
 
