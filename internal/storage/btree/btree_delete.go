@@ -31,16 +31,11 @@ func (t *Tree) deleteOptimistic(mtr *buffer.Mtr, key []byte) (needsPessimistic b
 
 	rootPageId := metaPage.rootPageId()
 	height := metaPage.height()
-	leafPageId, err := t.descendToLeafShared(mtr, rootPageId, key)
+	leafBufPage, err := t.descendToLeafExclusive(mtr, rootPageId, height, key)
 	if err != nil {
 		return false, err
 	}
-
-	leafBufPage, err := mtr.PageForWrite(leafPageId)
-	if err != nil {
-		return false, err
-	}
-	defer mtr.Unpin(leafPageId)
+	defer mtr.Unpin(leafBufPage.PageId())
 
 	leafNode := newLeafNode(leafBufPage)
 	slotNum, found := leafNode.searchSlotNum(key)

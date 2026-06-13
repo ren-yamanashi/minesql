@@ -92,21 +92,30 @@ func (it *Iterator) Advance() error {
 		return nil
 	}
 	nextPageId := leaf.nextPageId()
-	it.bufferPage.Latch().Unlock(buffer.LatchShared)
 
 	if nextPageId.IsInvalid() {
+		it.bufferPage.Latch().Unlock(buffer.LatchShared)
 		return nil
 	}
 
-	oldPageId := it.bufferPage.PageId()
+	// ラッチカップリング: 手元のリーフの S を保持したまま次リーフを Pin して S を取り、
+	// 更新カウンタを記録してから手元のリーフを解放する (取得順序は左 → 右)
 	nextPage, err := it.tree.bufferPool.Page(nextPageId)
 	if err != nil {
+		it.bufferPage.Latch().Unlock(buffer.LatchShared)
 		return err
 	}
+	nextPage.Latch().LockShared()
+	nextModifyCount := nextPage.ModifyCount()
+
+	oldPageId := it.bufferPage.PageId()
+	it.bufferPage.Latch().Unlock(buffer.LatchShared)
 	it.tree.bufferPool.Unpin(oldPageId)
+	nextPage.Latch().Unlock(buffer.LatchShared)
+
 	it.bufferPage = nextPage
 	it.slotNum = 0
-	it.modifyCountSnap = it.bufferPage.ModifyCount()
+	it.modifyCountSnap = nextModifyCount
 	return nil
 }
 

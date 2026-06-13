@@ -11,6 +11,7 @@ var (
 	ErrDuplicateKey    = errors.New("duplicate key")
 	ErrKeyNotFound     = errors.New("key not found")
 	errUnknownNodeType = errors.New("btree: unknown node type")
+	errRecordTooLarge  = errors.New("btree: record exceeds max record size")
 )
 
 type Tree struct {

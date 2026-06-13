@@ -31,16 +31,12 @@ func (t *Tree) insertOptimistic(mtr *buffer.Mtr, record Record) (needsPessimisti
 	metaPage := newMetaPage(pageMeta)
 
 	rootPageId := metaPage.rootPageId()
-	leafPageId, err := t.descendToLeafShared(mtr, rootPageId, record.Key())
+	height := metaPage.height()
+	leafBufPage, err := t.descendToLeafExclusive(mtr, rootPageId, height, record.Key())
 	if err != nil {
 		return false, err
 	}
-
-	leafBufPage, err := mtr.PageForWrite(leafPageId)
-	if err != nil {
-		return false, err
-	}
-	defer mtr.Unpin(leafPageId)
+	defer mtr.Unpin(leafBufPage.PageId())
 
 	leafNode := newLeafNode(leafBufPage)
 	if !leafNode.canFit(record) {
@@ -68,8 +64,14 @@ func (t *Tree) insertPessimistic(mtr *buffer.Mtr, record Record) error {
 	defer mtr.Unpin(t.MetaPageId())
 	metaPage := newMetaPage(pageMeta)
 
+	return t.insertWithMetaUpdate(mtr, metaPage, record)
+}
+
+// insertWithMetaUpdate はルートから再帰的に挿入し、分割が発生した場合にメタページを更新する
+//   - 呼び出し側で B+Tree レベルの SX とメタページの Exclusive を保持していること
+func (t *Tree) insertWithMetaUpdate(mtr *buffer.Mtr, mp *metaPage, record Record) error {
 	// ルートページを取得
-	rootPageId := metaPage.rootPageId()
+	rootPageId := mp.rootPageId()
 	rootPageBuf, err := mtr.PageForRead(rootPageId)
 	if err != nil {
 		return err
@@ -90,7 +92,7 @@ func (t *Tree) insertPessimistic(mtr *buffer.Mtr, record Record) error {
 
 	// リーフノードの分割が発生した場合
 	if isLeafSplit {
-		metaPage.setLeafPageCount(metaPage.leafPageCount() + 1)
+		mp.setLeafPageCount(mp.leafPageCount() + 1)
 	}
 	if !isRootSplit {
 		return nil
@@ -115,49 +117,61 @@ func (t *Tree) insertPessimistic(mtr *buffer.Mtr, record Record) error {
 	if err != nil {
 		return err
 	}
-	metaPage.setRootPageId(newRootPageId)
-	metaPage.setHeight(metaPage.height() + 1)
+	mp.setRootPageId(newRootPageId)
+	mp.setHeight(mp.height() + 1)
 	return nil
 }
 
-// descendToLeafShared は指定キーに対応するリーフページの PageId を返す
-//   - 戻り時点で Mtr にこの経路の Pin は残らない
-//   - 呼び出し側は返り値の PageId に対して必要なラッチを取り直す前提
-func (t *Tree) descendToLeafShared(mtr *buffer.Mtr, rootPageId page.Id, key []byte) (page.Id, error) {
+// descendToLeafExclusive は指定キーに対応するリーフページを Exclusive ラッチ付きで返す
+//   - height: B+Tree の高さ (ルート = リーフ なら 1)。これにより、子がリーフ階層かどうかを子を読む前に判定する
+//   - 降下中はブランチノードを Shared で持ち替え、リーフの 1 つ上のブランチを処理する時点で子に Exclusive を取り、その後に親を解放する
+//   - 戻り値のバッファページは Exclusive ラッチと Pin を Mtr スコープに保持する。呼び出し側は使用後に Unpin する
+func (t *Tree) descendToLeafExclusive(mtr *buffer.Mtr, rootPageId page.Id, height uint64, key []byte) (*buffer.Page, error) {
+	// 高さ 1 (ルート = リーフ) の場合はルートに直接 Exclusive を取る
+	if height <= 1 {
+		return mtr.PageForWrite(rootPageId)
+	}
+
 	currentPageId := rootPageId
 	currentBufPage, err := mtr.PageForRead(currentPageId)
 	if err != nil {
-		return page.InvalidId(), err
+		return nil, err
 	}
+	// currentLevel はルートを height、リーフを 1 とする残り段数
+	currentLevel := height
 	for {
-		nt := nodeType(currentBufPage.Data())
-		switch nt {
-		case nodeTypeLeaf:
-			mtr.Unpin(currentPageId)
-			return currentPageId, nil
-		case nodeTypeBranch:
-			branchNode := newBranchNode(currentBufPage)
-			childSlotNum, found := branchNode.searchSlotNum(key)
-			if found {
-				childSlotNum++
-			}
-			childPageId, err := branchNode.childPageId(childSlotNum)
-			if err != nil {
-				mtr.Unpin(currentPageId)
-				return page.InvalidId(), err
-			}
-			childBufPage, err := mtr.PageForRead(childPageId)
-			if err != nil {
-				mtr.Unpin(currentPageId)
-				return page.InvalidId(), err
-			}
-			mtr.Unpin(currentPageId)
-			currentPageId = childPageId
-			currentBufPage = childBufPage
-		default:
-			mtr.Unpin(currentPageId)
-			return page.InvalidId(), errUnknownNodeType
+		branchNode := newBranchNode(currentBufPage)
+		childSlotNum, found := branchNode.searchSlotNum(key)
+		if found {
+			childSlotNum++
 		}
+		childPageId, err := branchNode.childPageId(childSlotNum)
+		if err != nil {
+			mtr.Unpin(currentPageId)
+			return nil, err
+		}
+
+		// 子がリーフ階層なら Exclusive を取り、親を解放して返す (親 S と子 X が一瞬重なる)
+		if currentLevel-1 == 1 {
+			leafBufPage, err := mtr.PageForWrite(childPageId)
+			if err != nil {
+				mtr.Unpin(currentPageId)
+				return nil, err
+			}
+			mtr.Unpin(currentPageId)
+			return leafBufPage, nil
+		}
+
+		// 子がまだブランチ階層なら Shared を取り、親を解放して降下を続ける
+		childBufPage, err := mtr.PageForRead(childPageId)
+		if err != nil {
+			mtr.Unpin(currentPageId)
+			return nil, err
+		}
+		mtr.Unpin(currentPageId)
+		currentPageId = childPageId
+		currentBufPage = childBufPage
+		currentLevel--
 	}
 }
 

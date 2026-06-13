@@ -141,6 +141,75 @@ func TestUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, []byte{0xCC}, record.NonKey())
 	})
+
+	t.Run("リーフに収まらない非キー更新がリーフ分割を起こして成功する", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		readRoot := func() page.Id {
+			m := buffer.NewMtr(bp)
+			defer m.UnpinAll()
+			pm, _ := m.PageForRead(bt.MetaPageId())
+			return newMetaPage(pm).rootPageId()
+		}
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, make([]byte, 1)))
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x20}, make([]byte, 2000)))
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x30}, make([]byte, 1500)))
+		heightBefore, _ := bt.Height()
+		leafCountBefore, _ := bt.LeafPageCount()
+		rootBefore := readRoot()
+		assert.Equal(t, uint64(1), heightBefore)
+		assert.Equal(t, uint64(1), leafCountBefore)
+
+		// WHEN
+		newNonKey := make([]byte, 2000)
+		newNonKey[0] = 0xFF
+		err := bt.Update(mtr, NewRecord([]byte{}, []byte{0x10}, newNonKey))
+
+		// THEN
+		assert.NoError(t, err)
+		updated, _, err := bt.FindByKey(mtr, []byte{0x10})
+		assert.NoError(t, err)
+		assert.Equal(t, 2000, len(updated.NonKey()))
+		assert.Equal(t, byte(0xFF), updated.NonKey()[0])
+		// 他のレコードが無傷であること
+		other20, _, err := bt.FindByKey(mtr, []byte{0x20})
+		assert.NoError(t, err)
+		assert.Equal(t, 2000, len(other20.NonKey()))
+		other30, _, err := bt.FindByKey(mtr, []byte{0x30})
+		assert.NoError(t, err)
+		assert.Equal(t, 1500, len(other30.NonKey()))
+		// リーフ分割とルート分割によりメタ情報が更新されていること
+		heightAfter, _ := bt.Height()
+		leafCountAfter, _ := bt.LeafPageCount()
+		assert.Equal(t, uint64(2), heightAfter)
+		assert.Equal(t, uint64(2), leafCountAfter)
+		assert.NotEqual(t, rootBefore, readRoot())
+	})
+
+	t.Run("更新後レコードが最大サイズを超える場合はエラーになり元のレコードが無傷で残る", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		original := make([]byte, 100)
+		original[0] = 0xAA
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, original))
+
+		// WHEN
+		hugeNonKey := make([]byte, 2100)
+		err := bt.Update(mtr, NewRecord([]byte{}, []byte{0x10}, hugeNonKey))
+
+		// THEN
+		assert.ErrorIs(t, err, errRecordTooLarge)
+		record, _, err := bt.FindByKey(mtr, []byte{0x10})
+		assert.NoError(t, err)
+		assert.Equal(t, 100, len(record.NonKey()))
+		assert.Equal(t, byte(0xAA), record.NonKey()[0])
+	})
 }
 
 func TestUpdateOptimistic(t *testing.T) {

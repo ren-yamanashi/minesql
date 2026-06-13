@@ -121,6 +121,44 @@ func TestTreeLatchUsableViaMtr(t *testing.T) {
 	})
 }
 
+func TestOptimisticHeight1(t *testing.T) {
+	t.Run("高さ 1 (ルート = リーフ) の木で楽観挿入・更新・削除ができる", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		bt, _ := CreateTree(bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		heightBefore, _ := bt.Height()
+		assert.Equal(t, uint64(1), heightBefore)
+
+		// WHEN: 楽観挿入
+		assert.NoError(t, bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA})))
+		assert.NoError(t, bt.Insert(mtr, NewRecord([]byte{}, []byte{0x20}, []byte{0xBB})))
+
+		// THEN: 挿入したレコードを検索できる
+		rec, _, err := bt.FindByKey(mtr, []byte{0x10})
+		assert.NoError(t, err)
+		assert.Equal(t, []byte{0xAA}, rec.NonKey())
+
+		// WHEN: 楽観更新
+		assert.NoError(t, bt.Update(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xCC})))
+
+		// THEN: 更新後の値で検索できる
+		updated, _, err := bt.FindByKey(mtr, []byte{0x10})
+		assert.NoError(t, err)
+		assert.Equal(t, []byte{0xCC}, updated.NonKey())
+
+		// WHEN: 楽観削除
+		assert.NoError(t, bt.Delete(mtr, []byte{0x20}))
+
+		// THEN: 削除したキーは見つからず、高さは 1 のまま
+		_, _, err = bt.FindByKey(mtr, []byte{0x20})
+		assert.ErrorIs(t, err, ErrKeyNotFound)
+		heightAfter, _ := bt.Height()
+		assert.Equal(t, uint64(1), heightAfter)
+	})
+}
+
 func TestLeafPageCount(t *testing.T) {
 	t.Run("リーフページ数を取得できる", func(t *testing.T) {
 		// GIVEN

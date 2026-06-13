@@ -1,8 +1,6 @@
 package btree
 
 import (
-	"errors"
-
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 )
 
@@ -32,16 +30,12 @@ func (t *Tree) updateOptimistic(mtr *buffer.Mtr, record Record) (needsPessimisti
 	metaPage := newMetaPage(pageMeta)
 
 	rootPageId := metaPage.rootPageId()
-	leafPageId, err := t.descendToLeafShared(mtr, rootPageId, record.Key())
+	height := metaPage.height()
+	leafBufPage, err := t.descendToLeafExclusive(mtr, rootPageId, height, record.Key())
 	if err != nil {
 		return false, err
 	}
-
-	leafBufPage, err := mtr.PageForWrite(leafPageId)
-	if err != nil {
-		return false, err
-	}
-	defer mtr.Unpin(leafPageId)
+	defer mtr.Unpin(leafBufPage.PageId())
 
 	leafNode := newLeafNode(leafBufPage)
 	slotNum, found := leafNode.searchSlotNum(record.Key())
@@ -56,66 +50,48 @@ func (t *Tree) updateOptimistic(mtr *buffer.Mtr, record Record) (needsPessimisti
 }
 
 // updatePessimistic は悲観モードで更新する
+//   - 更新後レコードがリーフに収まらない場合は、対象レコードを削除してから挿入の機構で挿入する
 func (t *Tree) updatePessimistic(mtr *buffer.Mtr, record Record) error {
 	mtr.LockSharedExclusive(t.latch)
 	defer mtr.UnlockLatch(t.latch)
 
 	// メタページを取得
-	pageMeta, err := mtr.PageForRead(t.MetaPageId())
+	pageMeta, err := mtr.PageForWrite(t.MetaPageId())
 	if err != nil {
 		return err
 	}
-	metaPage := newMetaPage(pageMeta)
 	defer mtr.Unpin(t.MetaPageId())
+	metaPage := newMetaPage(pageMeta)
 
-	// ルートページ取得
+	// リーフまで Exclusive で降下し、対象スロットを特定する
 	rootPageId := metaPage.rootPageId()
-	rootBufPage, err := mtr.PageForRead(rootPageId)
+	height := metaPage.height()
+	leafBufPage, err := t.descendToLeafExclusive(mtr, rootPageId, height, record.Key())
 	if err != nil {
 		return err
 	}
-	defer mtr.Unpin(rootPageId)
-	return t.updateRecursively(mtr, rootBufPage, record)
-}
-
-// updateRecursively は再帰的にノードを辿ってレコードを更新する
-func (t *Tree) updateRecursively(mtr *buffer.Mtr, bufPage *buffer.Page, record Record) error {
-	pg, err := mtr.PageForWrite(bufPage.PageId())
-	if err != nil {
-		return err
+	leafNode := newLeafNode(leafBufPage)
+	slotNum, found := leafNode.searchSlotNum(record.Key())
+	if !found {
+		mtr.Unpin(leafBufPage.PageId())
+		return ErrKeyNotFound
 	}
-	defer mtr.Unpin(bufPage.PageId())
 
-	nt := nodeType(pg.Data())
-	switch nt {
-	// ブランチノードの場合: 子ノードに対して再帰実行する
-	case nodeTypeBranch:
-		branchNode := newBranchNode(pg)
-		mode := SearchModeKey{Key: record.Key()}
-		childPageId, err := mode.childPageId(branchNode)
-		if err != nil {
-			return err
-		}
-		childBufPage, err := mtr.PageForRead(childPageId)
-		if err != nil {
-			return err
-		}
-		defer mtr.Unpin(childPageId)
-		return t.updateRecursively(mtr, childBufPage, record)
+	// 更新後レコードが最大レコードサイズを超える場合は、削除を行う前にエラーとする
+	if len(record.Bytes()) > leafNode.maxRecordSize() {
+		mtr.Unpin(leafBufPage.PageId())
+		return errRecordTooLarge
+	}
 
-	// リーフノードの場合: そのまま更新する
-	case nodeTypeLeaf:
-		leafNode := newLeafNode(pg)
-		slotNum, found := leafNode.searchSlotNum(record.Key())
-		if !found {
-			return ErrKeyNotFound
-		}
-		if !leafNode.update(slotNum, record) {
-			return errors.New("failed to update record")
-		}
+	// まずインプレース更新 (リサイズ) を試みる。収まればそれで完了
+	if leafNode.update(slotNum, record) {
+		mtr.Unpin(leafBufPage.PageId())
 		return nil
-
-	default:
-		return errUnknownNodeType
 	}
+
+	// 収まらない場合は対象レコードを削除してから、挿入の機構で挿入する (アンダーフロー処理は行わない)
+	leafNode.delete(slotNum)
+	mtr.Unpin(leafBufPage.PageId())
+
+	return t.insertWithMetaUpdate(mtr, metaPage, record)
 }
