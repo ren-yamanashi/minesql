@@ -3,6 +3,7 @@ data/
 .vscode/
 .claude/
 .agents/
+.Codex/
 AGENTS.md
 sandbox/
 coverage.*
