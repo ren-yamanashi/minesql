@@ -9,12 +9,7 @@ import (
 // Insert はテーブルに行を挿入する
 func (t *Table) Insert(trx *Transaction, colNames []string, values []string) error {
 	trxId := trx.trxId
-	if _, err := t.redoLog.AppendMtrStart(trxId); err != nil {
-		return err
-	}
-	defer func() { _, _ = t.redoLog.AppendMtrEnd(trxId) }()
-
-	mtr := buffer.NewMtr(t.bufferPool)
+	mtr := buffer.NewWriteMtr(t.bufferPool, trxId, t.redoLog)
 	defer mtr.UnpinAll()
 
 	// FK チェック (親レコードに共有ロックを取得する。挿入キーへの排他ロックより前に行うため順序は親 S → 子 X)
@@ -46,7 +41,10 @@ func (t *Table) Insert(trx *Transaction, colNames []string, values []string) err
 	if err := t.primaryIndex.insert(mtr, record, trxId); err != nil {
 		return err
 	}
-	return t.insertSecondaryIndexes(mtr, record.colNames, record.values, trxId)
+	if err := t.insertSecondaryIndexes(mtr, record.colNames, record.values, trxId); err != nil {
+		return err
+	}
+	return mtr.Commit()
 }
 
 // insertSecondaryIndexes は全セカンダリインデックスにレコードを挿入する

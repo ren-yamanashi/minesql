@@ -1,17 +1,21 @@
 package buffer
 
 import (
+	"encoding/binary"
 	"slices"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
 
 // pinnedEntry は Mtr が保持中の 1 ページ分の Pin とページラッチの記録
 type pinnedEntry struct {
-	pageId    page.Id
-	mode      LatchMode
-	bufPage   *Page
-	skipLatch bool // 同一 Mtr 内の再帰取得で実体ラッチを取り直さなかったエントリ
+	pageId      page.Id
+	mode        LatchMode
+	bufPage     *Page
+	skipLatch   bool   // 同一 Mtr 内の再帰取得で実体ラッチを取り直さなかったエントリ
+	modifyCount uint64 // X 取得時の更新カウンタ。解放時にこれと比較して変更を検出する
 }
 
 // heldLatchEntry は Mtr が保持中の 1 つの任意 RWLatch の記録
@@ -24,13 +28,23 @@ type heldLatchEntry struct {
 //   - 同じ Mtr 内で同一ページを再取得しても安全 (重複取得はまとめて扱われる)
 //   - Pin に紐づかない任意の RWLatch (B+Tree レベルなど) も同スコープで管理する
 type Mtr struct {
-	pool        *Pool
-	pinned      []pinnedEntry
-	heldLatches []heldLatchEntry
+	pool          *Pool
+	pinned        []pinnedEntry
+	heldLatches   []heldLatchEntry
+	trxId         lock.TrxId
+	redo          *redo.Buffer
+	hasLoggedPage bool  // この Mtr で 1 つでもページを Redo 記録したか
+	logErr        error // 記録中に発生した最初のエラー。発生後は記録を行わない
 }
 
 func NewMtr(pool *Pool) *Mtr {
 	return &Mtr{pool: pool}
+}
+
+// NewWriteMtr は書き込み用の Mtr を生成する
+//   - 変更ページを Unpin / Commit 時に Redo へ記録し Page LSN をスタンプする
+func NewWriteMtr(pool *Pool, trxId lock.TrxId, redoLog *redo.Buffer) *Mtr {
+	return &Mtr{pool: pool, trxId: trxId, redo: redoLog}
 }
 
 // PageForRead は読み込み用のバッファページを取得し、Shared ラッチと Pin をスコープに記録する
@@ -48,6 +62,7 @@ func (m *Mtr) PageForRead(pageId page.Id) (*Page, error) {
 	}
 	m.pinned = append(m.pinned, pinnedEntry{
 		pageId: pageId, mode: LatchShared, bufPage: bufPage, skipLatch: skipLatch,
+		modifyCount: bufPage.modifyCount,
 	})
 	return bufPage, nil
 }
@@ -69,20 +84,24 @@ func (m *Mtr) PageForWrite(pageId page.Id) (*Page, error) {
 	case holderMode == LatchShared:
 		bufPage.latch.Unlock(LatchShared)
 		bufPage.latch.LockExclusive()
-		// 既存エントリを X 保持の実体エントリへ昇格させる
+		// 既存エントリを X 保持の実体エントリへ昇格させ、X 取得時点の更新カウンタを基準にする
 		m.pinned[idx].mode = LatchExclusive
+		m.pinned[idx].modifyCount = bufPage.modifyCount
 		skipLatch = true
 	}
 	m.pinned = append(m.pinned, pinnedEntry{
 		pageId: pageId, mode: LatchExclusive, bufPage: bufPage, skipLatch: skipLatch,
+		modifyCount: bufPage.modifyCount,
 	})
 	return bufPage, nil
 }
 
 // Unpin は指定ページのラッチと Pin を解放し、スコープの記録から 1 件除外する
 //   - LIFO 順で削除するため、再帰取得の最後のエントリから順に解放される
+//   - ラッチ解放前に、変更済みであれば Redo へ記録し Page LSN をスタンプする
 func (m *Mtr) Unpin(pageId page.Id) {
 	if entry, ok := m.removePinned(pageId); ok {
+		m.logPageIfModified(entry)
 		if !entry.skipLatch {
 			entry.bufPage.latch.Unlock(entry.mode)
 		}
@@ -100,8 +119,35 @@ func (m *Mtr) Detach(pageId page.Id) {
 }
 
 // UnpinAll はスコープに記録された全ての Pin とラッチを解放する
+//   - 各ページはラッチ解放前に、変更済みであれば Redo へ記録し Page LSN をスタンプする
+//   - MtrEnd は書かないため、記録途中の Mtr はクラッシュリカバリ時に破棄される
 func (m *Mtr) UnpinAll() {
-	// LIFO 順で解放することで、実体ラッチを持つエントリ (最初に取得された) が最後に解放される
+	// LIFO 順で記録・解放することで、実体ラッチを持つエントリ (最初に取得された) が最後に解放される
+	for i := len(m.pinned) - 1; i >= 0; i-- {
+		m.logPageIfModified(m.pinned[i])
+	}
+	m.releaseAll()
+}
+
+// Commit は保持中の変更ページを Redo へ記録し、1 つでも記録していれば MtrEnd を書いてから全ラッチ・Pin を解放する
+//   - 記録中にエラーが発生した場合は MtrEnd を書かず、そのエラーを返す
+//   - 記録は LIFO 順で行うため、Undo ページ切替時の「新ページの実体 → 旧ページのリンク」順序が保たれる
+func (m *Mtr) Commit() error {
+	for i := len(m.pinned) - 1; i >= 0; i-- {
+		m.logPageIfModified(m.pinned[i])
+	}
+	if m.hasLoggedPage && m.logErr == nil {
+		if _, err := m.redo.AppendMtrEnd(m.trxId); err != nil {
+			m.logErr = err
+		}
+	}
+	err := m.logErr
+	m.releaseAll()
+	return err
+}
+
+// releaseAll は記録を行わず、スコープの全ラッチ・Pin を LIFO 順で解放する
+func (m *Mtr) releaseAll() {
 	for i := len(m.pinned) - 1; i >= 0; i-- {
 		entry := m.pinned[i]
 		if !entry.skipLatch {
@@ -115,6 +161,34 @@ func (m *Mtr) UnpinAll() {
 		entry.latch.Unlock(entry.mode)
 	}
 	m.heldLatches = nil
+}
+
+// logPageIfModified は X ラッチ保持中の変更済みページを Redo へ記録し、Page LSN をスタンプする
+//   - 読み取り専用 Mtr (redo 未設定)・実体ラッチ非保持・X 以外・未変更ページは記録しない
+//   - スタンプはページ全体コピーの前に行うため、コピーにそのレコード自身の LSN が含まれる
+func (m *Mtr) logPageIfModified(entry pinnedEntry) {
+	if m.redo == nil || m.logErr != nil || entry.skipLatch || entry.mode != LatchExclusive {
+		return
+	}
+	bufPage := entry.bufPage
+	if bufPage.modifyCount == entry.modifyCount {
+		return
+	}
+	if !m.hasLoggedPage {
+		if _, err := m.redo.AppendMtrStart(m.trxId); err != nil {
+			m.logErr = err
+			return
+		}
+		m.hasLoggedPage = true
+	}
+	_, err := m.redo.AppendPageWrite(m.trxId, entry.pageId, bufPage.data, func(lsn redo.Lsn) {
+		var b [page.HeaderSize]byte
+		binary.BigEndian.PutUint32(b[:], uint32(lsn))
+		bufPage.WriteHeaderAt(0, b[:])
+	})
+	if err != nil {
+		m.logErr = err
+	}
 }
 
 // LockShared は任意の RWLatch を Shared で取得し、Mtr スコープに記録する

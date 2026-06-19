@@ -283,7 +283,7 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 	t.Cleanup(func() { _ = undoHf.Close() })
 	bp.RegisterHeapFile(undoFileId, undoHf)
 
-	undoMgr, err := undo.NewManager(bp, nil, undoFileId)
+	undoMgr, err := undo.NewManager(bp, undoFileId)
 	if err != nil {
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
 	}

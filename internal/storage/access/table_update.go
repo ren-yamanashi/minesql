@@ -25,13 +25,8 @@ func (t *Table) Update(trx *Transaction, currentRecord *PrimaryRecord, colNames,
 		return t.Insert(trx, newRecord.colNames, newRecord.values)
 	}
 
-	if _, err := t.redoLog.AppendMtrStart(trxId); err != nil {
-		return err
-	}
-	defer func() { _, _ = t.redoLog.AppendMtrEnd(trxId) }()
-
 	// PK が変わらない場合はインプレース更新
-	mtr := buffer.NewMtr(t.bufferPool)
+	mtr := buffer.NewWriteMtr(t.bufferPool, trxId, t.redoLog)
 	defer mtr.UnpinAll()
 
 	// FK チェック (自テーブルの FK カラムが変わる場合は参照先の親レコードに共有ロックを取得する)
@@ -57,7 +52,10 @@ func (t *Table) Update(trx *Transaction, currentRecord *PrimaryRecord, colNames,
 	if err := t.primaryIndex.update(mtr, newRecord, trxId); err != nil {
 		return err
 	}
-	return t.updateSecondaryIndexes(mtr, currentRecord, colNames, values, trxId)
+	if err := t.updateSecondaryIndexes(mtr, currentRecord, colNames, values, trxId); err != nil {
+		return err
+	}
+	return mtr.Commit()
 }
 
 // updateSecondaryIndexes はセカンダリインデックスを更新する

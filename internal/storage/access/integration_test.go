@@ -1,6 +1,7 @@
 package access
 
 import (
+	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -115,6 +116,63 @@ func TestIntegrationCommit(t *testing.T) {
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
+	})
+}
+
+func TestIntegrationInsertLogsDataPageRedo(t *testing.T) {
+	t.Run("実 Insert でデータページが Redo 記録され Page LSN がスタンプされる", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		table := createUsersTable(t, env)
+		dataFileId := table.primaryIndex.fileId()
+
+		// WHEN
+		trx := env.trxMgr.Begin()
+		err := table.Insert(
+			trx,
+			[]string{"id", "name", "email"},
+			[]string{"1", "Alice", "alice@example.com"},
+		)
+		assert.NoError(t, err)
+
+		// THEN: 主キーインデックス (データページ) の PageWrite レコードが記録されている
+		assert.NoError(t, env.redoLog.Flush())
+		records, err := env.redoLog.ReadFrom(redo.Lsn(0))
+		assert.NoError(t, err)
+		undoFileId := env.ct.UndoLogFileId()
+		var dataWrite, firstUndo, firstData *redo.Record
+		for i := range records {
+			r := records[i]
+			if r.Type() != redo.RecordTypePageWrite {
+				continue
+			}
+			switch r.PageId().FileId() {
+			case dataFileId:
+				dataWrite = &records[i]
+				if firstData == nil {
+					firstData = &records[i]
+				}
+			case undoFileId:
+				if firstUndo == nil {
+					firstUndo = &records[i]
+				}
+			}
+		}
+		assert.NotNil(t, dataWrite, "データページの PageWrite レコードが記録されていない")
+
+		// THEN: Undo ページの Redo はデータページの Redo より前に記録される (WAL 耐久性順序)
+		assert.NotNil(t, firstUndo, "Undo ページの PageWrite レコードが記録されていない")
+		assert.NotNil(t, firstData)
+		assert.Less(t, firstUndo.Lsn(), firstData.Lsn())
+
+		// THEN: 該当データページの Page LSN がスタンプされ、レコードの LSN と一致する
+		mtr := buffer.NewMtr(env.bp)
+		defer mtr.UnpinAll()
+		bufPage, err := mtr.PageForRead(dataWrite.PageId())
+		assert.NoError(t, err)
+		pageLsn := redo.Lsn(binary.BigEndian.Uint32(bufPage.Data().Header()))
+		assert.NotEqual(t, redo.Lsn(0), pageLsn)
+		assert.Equal(t, dataWrite.Lsn(), pageLsn)
 	})
 }
 
@@ -360,7 +418,7 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 	}
 	t.Cleanup(func() { _ = redoLog.Clear() })
 
-	undoMgr, err := undo.NewManager(bp, redoLog, undoFileId)
+	undoMgr, err := undo.NewManager(bp, undoFileId)
 	if err != nil {
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
 	}

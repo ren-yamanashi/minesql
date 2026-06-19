@@ -10,12 +10,7 @@ import (
 //   - record は SearchForUpdate (Current Read) で取得した排他ロック済みの最新バージョンを渡すこと
 func (t *Table) SoftDelete(trx *Transaction, record *PrimaryRecord) error {
 	trxId := trx.trxId
-	if _, err := t.redoLog.AppendMtrStart(trxId); err != nil {
-		return err
-	}
-	defer func() { _, _ = t.redoLog.AppendMtrEnd(trxId) }()
-
-	mtr := buffer.NewMtr(t.bufferPool)
+	mtr := buffer.NewWriteMtr(t.bufferPool, trxId, t.redoLog)
 	defer mtr.UnpinAll()
 
 	// FK チェック
@@ -35,24 +30,25 @@ func (t *Table) SoftDelete(trx *Transaction, record *PrimaryRecord) error {
 	if err := t.primaryIndex.softDelete(mtr, record, trxId); err != nil {
 		return err
 	}
-	return t.softDeleteSecondaryIndexes(mtr, record, trxId)
+	if err := t.softDeleteSecondaryIndexes(mtr, record, trxId); err != nil {
+		return err
+	}
+	return mtr.Commit()
 }
 
 // Delete はテーブルの行を物理削除する
 // (物理削除は DML 操作では行われないので、Undo ログの作成はしない)
 func (t *Table) Delete(trx *Transaction, record *PrimaryRecord) error {
 	trxId := trx.trxId
-	if _, err := t.redoLog.AppendMtrStart(trxId); err != nil {
-		return err
-	}
-	defer func() { _, _ = t.redoLog.AppendMtrEnd(trxId) }()
-
-	mtr := buffer.NewMtr(t.bufferPool)
+	mtr := buffer.NewWriteMtr(t.bufferPool, trxId, t.redoLog)
 	defer mtr.UnpinAll()
 	if err := t.primaryIndex.delete(mtr, record, trxId); err != nil {
 		return err
 	}
-	return t.deleteSecondaryIndexes(mtr, record, trxId)
+	if err := t.deleteSecondaryIndexes(mtr, record, trxId); err != nil {
+		return err
+	}
+	return mtr.Commit()
 }
 
 // softDeleteSecondaryIndexes は全セカンダリインデックスのレコードを論理削除する

@@ -41,35 +41,44 @@ func NewBuffer(baseDir string) (*Buffer, error) {
 func (b *Buffer) AppendPageCopy(trxId lock.TrxId, pageId page.Id, pg *page.Page) (Lsn, error) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
-	return b.appendRecord(trxId, RecordTypePageWrite, pageId, pg)
+	return b.appendRecord(trxId, RecordTypePageWrite, pageId, pg, nil)
+}
+
+// AppendPageWrite はページ変更レコードを Redo ログバッファに記録する
+//   - stamp は採番した LSN を受け取りページヘッダーへ書き込むコールバックで、ページ全体コピーの前に呼ばれる
+//   - 呼び出し側は pageId に対して X latch を保持していること
+func (b *Buffer) AppendPageWrite(trxId lock.TrxId, pageId page.Id, pg *page.Page, stamp func(Lsn)) (Lsn, error) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	return b.appendRecord(trxId, RecordTypePageWrite, pageId, pg, stamp)
 }
 
 // AppendCommit は COMMIT レコードを Redo ログバッファに記録する
 func (b *Buffer) AppendCommit(trxId lock.TrxId) (Lsn, error) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
-	return b.appendRecord(trxId, RecordTypeCommit, page.Id{}, nil)
+	return b.appendRecord(trxId, RecordTypeCommit, page.Id{}, nil, nil)
 }
 
 // AppendRollback は ROLLBACK レコードを Redo ログバッファに記録する
 func (b *Buffer) AppendRollback(trxId lock.TrxId) (Lsn, error) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
-	return b.appendRecord(trxId, RecordTypeRollback, page.Id{}, nil)
+	return b.appendRecord(trxId, RecordTypeRollback, page.Id{}, nil, nil)
 }
 
 // AppendMtrStart は mini-transaction の開始マーカーを Redo ログバッファに記録する
 func (b *Buffer) AppendMtrStart(trxId lock.TrxId) (Lsn, error) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
-	return b.appendRecord(trxId, RecordTypeMtrStart, page.Id{}, nil)
+	return b.appendRecord(trxId, RecordTypeMtrStart, page.Id{}, nil, nil)
 }
 
 // AppendMtrEnd は mini-transaction の終了マーカーを Redo ログバッファに記録する
 func (b *Buffer) AppendMtrEnd(trxId lock.TrxId) (Lsn, error) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
-	return b.appendRecord(trxId, RecordTypeMtrEnd, page.Id{}, nil)
+	return b.appendRecord(trxId, RecordTypeMtrEnd, page.Id{}, nil, nil)
 }
 
 // ReadFrom は指定 LSN より大きい LSN を持つレコードを読み込む
@@ -149,7 +158,8 @@ func (b *Buffer) Size() (int64, error) {
 
 // appendRecord は新しい Redo レコードをバッファに追加し、対応する LSN を返す
 // バッファサイズが上限を超えた場合は自動的にフラッシュする
-func (b *Buffer) appendRecord(trxId lock.TrxId, rt RecordType, pageId page.Id, pg *page.Page) (Lsn, error) {
+//   - stamp が非 nil の場合、採番した LSN を渡して呼び出してから pg をコピーする (ページヘッダーへの Page LSN スタンプ用)
+func (b *Buffer) appendRecord(trxId lock.TrxId, rt RecordType, pageId page.Id, pg *page.Page, stamp func(Lsn)) (Lsn, error) {
 	prevNextLsn := b.nextLsn
 	prevPendingSize := b.pendingSize
 	prevRecordsLen := len(b.records)
@@ -157,6 +167,10 @@ func (b *Buffer) appendRecord(trxId lock.TrxId, rt RecordType, pageId page.Id, p
 	lsn, err := b.allocateLsn()
 	if err != nil {
 		return 0, err
+	}
+
+	if stamp != nil {
+		stamp(lsn)
 	}
 
 	var data *page.Page

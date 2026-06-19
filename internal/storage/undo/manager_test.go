@@ -20,7 +20,7 @@ func TestNewManager(t *testing.T) {
 		bp := setupTestBufferPool(t)
 
 		// WHEN
-		mgr, err := NewManager(bp, nil, page.FileId(1))
+		mgr, err := NewManager(bp, page.FileId(1))
 
 		// THEN
 		assert.NoError(t, err)
@@ -108,9 +108,9 @@ func TestManagerAppend(t *testing.T) {
 		oldPageId := mgr.currentPageId
 		rec := NewInsertRecord(page.FileId(1), btree.Record{[]byte("x")})
 
-		// WHEN
+		// WHEN: 書き込み Mtr 経由で Append + Commit を繰り返し、ページが切り替わるまで埋める
 		for mgr.currentPageId == oldPageId {
-			_, err := appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, rec)
+			_, err := appendAndCommit(t, mgr, redoLog, lock.TrxId(1), rec)
 			assert.NoError(t, err)
 		}
 		newPageId := mgr.currentPageId
@@ -124,7 +124,7 @@ func TestManagerAppend(t *testing.T) {
 			}
 		}
 
-		// THEN
+		// THEN: 切替を起こした Commit が新ページ→旧ページの順で記録する
 		assert.NotEqual(t, oldPageId, newPageId)
 		n := len(pageWrites)
 		assert.GreaterOrEqual(t, n, 2)
@@ -625,15 +625,15 @@ func setupTestBufferPool(t *testing.T) *buffer.Pool {
 func setupTestManager(t *testing.T) *Manager {
 	t.Helper()
 	bp := setupTestBufferPool(t)
-	mgr, err := NewManager(bp, nil, page.FileId(1))
+	mgr, err := NewManager(bp, page.FileId(1))
 	if err != nil {
 		t.Fatalf("Manager の作成に失敗: %v", err)
 	}
 	return mgr
 }
 
-// setupTestManagerWithRedoLog はテスト用の Manager を実 redoLog 付きで作成する
-//   - REDO ログの内容を検証したいテスト用
+// setupTestManagerWithRedoLog はテスト用の Manager と、書き込み Mtr で使う実 redoLog を作成する
+//   - Undo ページの変更を Redo 記録する書き込み Mtr の挙動を検証したいテスト用
 func setupTestManagerWithRedoLog(t *testing.T) (*Manager, *redo.Buffer) {
 	t.Helper()
 	bp := setupTestBufferPool(t)
@@ -642,7 +642,7 @@ func setupTestManagerWithRedoLog(t *testing.T) (*Manager, *redo.Buffer) {
 		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
 	}
 	t.Cleanup(func() { _ = redoLog.Close() })
-	mgr, err := NewManager(bp, redoLog, page.FileId(1))
+	mgr, err := NewManager(bp, page.FileId(1))
 	if err != nil {
 		t.Fatalf("Manager の作成に失敗: %v", err)
 	}
@@ -662,6 +662,25 @@ func appendForTest(
 	mtr := buffer.NewMtr(mgr.bufferPool)
 	defer mtr.UnpinAll()
 	return mgr.Append(mtr, trxId, recordType, record)
+}
+
+// appendAndCommit は書き込み Mtr で 1 回の Append + Commit を実行するヘルパー
+//   - Undo ページの変更が Mtr 経由で Redo 記録されることを検証するテスト用
+func appendAndCommit(
+	t *testing.T,
+	mgr *Manager,
+	redoLog *redo.Buffer,
+	trxId lock.TrxId,
+	record Record,
+) (Pointer, error) {
+	t.Helper()
+	mtr := buffer.NewWriteMtr(mgr.bufferPool, trxId, redoLog)
+	defer mtr.UnpinAll()
+	ptr, err := mgr.Append(mtr, trxId, RecordTypeInsert, record)
+	if err != nil {
+		return Pointer{}, err
+	}
+	return ptr, mtr.Commit()
 }
 
 // lookupForTest は LookupByPointer を独立した mtr スコープで実行するヘルパー

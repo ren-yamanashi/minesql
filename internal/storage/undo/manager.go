@@ -8,7 +8,6 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
-	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
 
 var (
@@ -19,13 +18,12 @@ var (
 type Manager struct {
 	mu            sync.Mutex
 	bufferPool    *buffer.Pool
-	redoLog       *redo.Buffer
 	fileId        page.FileId            // Undo ファイルの FileId
 	currentPageId page.Id                // 現在書き込み中の Undo ページ
 	entries       map[lock.TrxId][]Entry // trxId → Entry[] のマップ
 }
 
-func NewManager(bp *buffer.Pool, redoLog *redo.Buffer, fileId page.FileId) (*Manager, error) {
+func NewManager(bp *buffer.Pool, fileId page.FileId) (*Manager, error) {
 	mtr := buffer.NewMtr(bp)
 	defer mtr.UnpinAll()
 
@@ -44,7 +42,6 @@ func NewManager(bp *buffer.Pool, redoLog *redo.Buffer, fileId page.FileId) (*Man
 
 	return &Manager{
 		bufferPool:    bp,
-		redoLog:       redoLog,
 		fileId:        fileId,
 		currentPageId: pageId,
 		entries:       make(map[lock.TrxId][]Entry),
@@ -147,26 +144,26 @@ func (m *Manager) writeToPage(mtr *buffer.Mtr, trxId lock.TrxId, record Record) 
 	}
 	bufPageUndo := NewPage(pageUndo)
 
-	// ページが満杯の場合は新しいページに切り替える (switchToNewPage 内で Redo 記録まで完了)
+	// ページが満杯の場合は新しいページに切り替えてレコードを書き込む
 	if bufPageUndo.FreeSpace() < len(serialized) {
-		return m.switchToNewPage(mtr, trxId, bufPageUndo, serialized)
+		return m.switchToNewPage(mtr, bufPageUndo, serialized)
 	}
 
 	prevUsedBytes := bufPageUndo.UsedBytes()
 	if !bufPageUndo.append(serialized) {
 		return Pointer{}, ErrRecordTooLarge
 	}
-	if err := m.appendRedoLog(mtr, trxId, m.currentPageId); err != nil {
-		bufPageUndo.setUsedBytes(prevUsedBytes)
-		return Pointer{}, err
-	}
-	return NewPointer(m.currentPageId.PageNumber(), prevUsedBytes), nil
+	pageId := m.currentPageId
+	// データページ (この後 btree が変更する) より先に Undo ページの Redo を記録するためここで Unpin する
+	mtr.Unpin(pageId)
+	return NewPointer(pageId.PageNumber(), prevUsedBytes), nil
 }
 
 // switchToNewPage は現在のページが満杯のとき、新しい Undo ページを割り当ててレコードを書き込む
+//   - 新ページへの書き込み (実体) を先に行い、その後に旧ページの次ページリンクを更新する
+//   - 新ページ→旧ページの順で Unpin し、その順序で Redo 記録する (どちらもデータページより前に記録される)
 func (m *Manager) switchToNewPage(
 	mtr *buffer.Mtr,
-	trxId lock.TrxId,
 	currentPage *Page,
 	serialized []byte,
 ) (Pointer, error) {
@@ -186,33 +183,12 @@ func (m *Manager) switchToNewPage(
 		return Pointer{}, ErrRecordTooLarge
 	}
 
-	if err := m.appendRedoLog(mtr, trxId, newPageId); err != nil {
-		return Pointer{}, err
-	}
-
-	prevNextPageNumber := currentPage.NextPageNumber()
+	oldPageId := m.currentPageId
 	currentPage.setNextPageNumber(newPageId.PageNumber())
-	if err := m.appendRedoLog(mtr, trxId, m.currentPageId); err != nil {
-		currentPage.setNextPageNumber(prevNextPageNumber)
-		return Pointer{}, err
-	}
-
 	m.currentPageId = newPageId
-	return NewPointer(newPageId.PageNumber(), 0), nil
-}
 
-// appendRedoLog は指定された Undo ページの Redo ログを記録する
-//   - 呼び出し側が pageId に対して既に X latch を取得済みであることを前提とする
-func (m *Manager) appendRedoLog(mtr *buffer.Mtr, trxId lock.TrxId, pageId page.Id) error {
-	if m.redoLog == nil {
-		return nil
-	}
-	pageUndo, err := mtr.PageForRead(pageId)
-	if err != nil {
-		return err
-	}
-	if _, err := m.redoLog.AppendPageCopy(trxId, pageId, pageUndo.Data()); err != nil {
-		return err
-	}
-	return nil
+	// 新ページの実体 → 旧ページのリンク更新の順で記録する
+	mtr.Unpin(newPageId)
+	mtr.Unpin(oldPageId)
+	return NewPointer(newPageId.PageNumber(), 0), nil
 }
