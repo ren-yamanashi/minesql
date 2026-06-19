@@ -104,7 +104,7 @@ func TestIteratorAdvance(t *testing.T) {
 		t.Cleanup(func() { _ = hf.Close() })
 		bp.RegisterHeapFile(0, hf)
 
-		tree, err := CreateTree(bp, 0)
+		tree, err := createTreeForTest(t, bp, 0)
 		assert.NoError(t, err)
 
 		firstId, err := bp.AllocatePageId(0)
@@ -170,7 +170,7 @@ func TestIteratorRefetchByKey(t *testing.T) {
 	t.Run("lastKey が残っているとき次のスロットに進む", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -193,7 +193,7 @@ func TestIteratorRefetchByKey(t *testing.T) {
 	t.Run("modifyCount 変化後の Advance は二重インクリメントしない", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -221,7 +221,7 @@ func TestIteratorRefetchByKey(t *testing.T) {
 	t.Run("lastKey が削除されているとき同じ slotNum をそのまま使う", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -255,7 +255,7 @@ func setupIteratorTestPage(t *testing.T, setup func(ln *leafNode)) (*Tree, page.
 	bp.RegisterHeapFile(0, hf)
 
 	// refetch 経路に必要な Tree (テストでは modifyCount を進めないため Search は呼ばれない)
-	tree, err := CreateTree(bp, 0)
+	tree, err := createTreeForTest(t, bp, 0)
 	assert.NoError(t, err)
 
 	pageId, err := bp.AllocatePageId(0)

@@ -397,7 +397,13 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 	bp := buffer.NewPool(page.Size*50, nil)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
-	ct, err := dictionary.CreateCatalog(bp)
+	redoLog, err := redo.NewBuffer(config.BaseDir)
+	if err != nil {
+		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = redoLog.Clear() })
+
+	ct, err := dictionary.CreateCatalog(bp, redoLog)
 	if err != nil {
 		t.Fatalf("Catalog の作成に失敗: %v", err)
 	}
@@ -412,13 +418,7 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 	t.Cleanup(func() { _ = undoHf.Close() })
 	bp.RegisterHeapFile(undoFileId, undoHf)
 
-	redoLog, err := redo.NewBuffer(config.BaseDir)
-	if err != nil {
-		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
-	}
-	t.Cleanup(func() { _ = redoLog.Clear() })
-
-	undoMgr, err := undo.NewManager(bp, undoFileId)
+	undoMgr, err := undo.NewManager(bp, undoFileId, redoLog)
 	if err != nil {
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
 	}
@@ -679,7 +679,13 @@ func crashAndRecover(t *testing.T, prev *integrationEnv, tableNames []string) *i
 	t.Cleanup(func() { _ = catalogHf.Close() })
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
-	ct, err := dictionary.NewCatalog(bp)
+	redoLog, err := redo.NewBuffer(config.BaseDir)
+	if err != nil {
+		t.Fatalf("redo.Buffer の再オープンに失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = redoLog.Close() })
+
+	ct, err := dictionary.NewCatalog(bp, redoLog)
 	if err != nil {
 		t.Fatalf("Catalog の再オープンに失敗: %v", err)
 	}
@@ -708,13 +714,7 @@ func crashAndRecover(t *testing.T, prev *integrationEnv, tableNames []string) *i
 		bp.RegisterHeapFile(fileId, tableHf)
 	}
 
-	redoLog, err := redo.NewBuffer(config.BaseDir)
-	if err != nil {
-		t.Fatalf("redo.Buffer の再オープンに失敗: %v", err)
-	}
-	t.Cleanup(func() { _ = redoLog.Close() })
-
-	undoMgr, err := undo.NewManager(bp, undoFileId)
+	undoMgr, err := undo.NewManager(bp, undoFileId, redoLog)
 	if err != nil {
 		t.Fatalf("undo.Manager の再オープンに失敗: %v", err)
 	}

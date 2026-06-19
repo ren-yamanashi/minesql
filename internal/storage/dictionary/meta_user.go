@@ -3,7 +3,9 @@ package dictionary
 import (
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
 
 type UserMeta struct {
@@ -14,8 +16,8 @@ func NewUserMeta(bp *buffer.Pool, metaPageId page.Id) *UserMeta {
 	return &UserMeta{tree: btree.NewTree(bp, metaPageId)}
 }
 
-func CreateUserMeta(bp *buffer.Pool) (*UserMeta, error) {
-	tree, err := btree.CreateTree(bp, catalogFileId)
+func CreateUserMeta(bp *buffer.Pool, redoLog *redo.Buffer) (*UserMeta, error) {
+	tree, err := btree.CreateTree(bp, catalogFileId, redoLog, lock.SystemReservedTrxId)
 	if err != nil {
 		return nil, err
 	}

@@ -285,7 +285,7 @@ func setupMVCCTestEnv(t *testing.T) *mvccTestEnv {
 	t.Cleanup(func() { _ = undoHf.Close() })
 	iter.bp.RegisterHeapFile(page.FileId(3), undoHf)
 
-	undoMgr, err := undo.NewManager(iter.bp, page.FileId(3))
+	undoMgr, err := undo.NewManager(iter.bp, page.FileId(3), iter.redoLog)
 	if err != nil {
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
 	}

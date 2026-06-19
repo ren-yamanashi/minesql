@@ -13,9 +13,10 @@ func TestCreateColumnMeta(t *testing.T) {
 	t.Run("カラムメタデータを新規作成できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupDictTestBufferPool(t)
+		rl := setupDictTestRedoBuffer(t)
 
 		// WHEN
-		cm, err := CreateColumnMeta(bp)
+		cm, err := CreateColumnMeta(bp, rl)
 
 		// THEN
 		assert.NoError(t, err)
@@ -122,7 +123,7 @@ func TestColumnMetaInsert(t *testing.T) {
 func setupTestColumnMeta(t *testing.T) (*ColumnMeta, *buffer.Pool) {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
-	cm, err := CreateColumnMeta(bp)
+	cm, err := CreateColumnMeta(bp, setupDictTestRedoBuffer(t))
 	if err != nil {
 		t.Fatalf("ColumnMeta の作成に失敗: %v", err)
 	}

@@ -13,9 +13,10 @@ func TestCreateIndexMeta(t *testing.T) {
 	t.Run("インデックスメタデータを新規作成できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupDictTestBufferPool(t)
+		rl := setupDictTestRedoBuffer(t)
 
 		// WHEN
-		im, err := CreateIndexMeta(bp)
+		im, err := CreateIndexMeta(bp, rl)
 
 		// THEN
 		assert.NoError(t, err)
@@ -174,7 +175,7 @@ func TestIndexMetaInsert(t *testing.T) {
 func setupTestIndexMeta(t *testing.T) (*IndexMeta, *buffer.Pool) {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
-	im, err := CreateIndexMeta(bp)
+	im, err := CreateIndexMeta(bp, setupDictTestRedoBuffer(t))
 	if err != nil {
 		t.Fatalf("IndexMeta の作成に失敗: %v", err)
 	}

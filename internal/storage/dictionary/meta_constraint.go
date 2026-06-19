@@ -3,7 +3,9 @@ package dictionary
 import (
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
 
 type ConstraintMeta struct {
@@ -14,8 +16,8 @@ func NewConstraintMeta(bp *buffer.Pool, metaPageId page.Id) *ConstraintMeta {
 	return &ConstraintMeta{tree: btree.NewTree(bp, metaPageId)}
 }
 
-func CreateConstraintMeta(bp *buffer.Pool) (*ConstraintMeta, error) {
-	tree, err := btree.CreateTree(bp, catalogFileId)
+func CreateConstraintMeta(bp *buffer.Pool, redoLog *redo.Buffer) (*ConstraintMeta, error) {
+	tree, err := btree.CreateTree(bp, catalogFileId, redoLog, lock.SystemReservedTrxId)
 	if err != nil {
 		return nil, err
 	}

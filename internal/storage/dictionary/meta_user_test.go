@@ -8,6 +8,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -15,9 +16,10 @@ func TestCreateUserMeta(t *testing.T) {
 	t.Run("ユーザーメタデータを新規作成できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupDictTestBufferPool(t)
+		rl := setupDictTestRedoBuffer(t)
 
 		// WHEN
-		um, err := CreateUserMeta(bp)
+		um, err := CreateUserMeta(bp, rl)
 
 		// THEN
 		assert.NoError(t, err)
@@ -130,7 +132,7 @@ func TestUserMetaInsert(t *testing.T) {
 func setupTestUserMeta(t *testing.T) (*UserMeta, *buffer.Pool) {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
-	um, err := CreateUserMeta(bp)
+	um, err := CreateUserMeta(bp, setupDictTestRedoBuffer(t))
 	if err != nil {
 		t.Fatalf("UserMeta の作成に失敗: %v", err)
 	}
@@ -150,4 +152,15 @@ func setupDictTestBufferPool(t *testing.T) *buffer.Pool {
 	bp := buffer.NewPool(page.Size*10, nil)
 	bp.RegisterHeapFile(fileId, hf)
 	return bp
+}
+
+// setupDictTestRedoBuffer は dictionary テスト用の Redo バッファを作成する
+func setupDictTestRedoBuffer(t *testing.T) *redo.Buffer {
+	t.Helper()
+	rl, err := redo.NewBuffer(t.TempDir())
+	if err != nil {
+		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = rl.Close() })
+	return rl
 }

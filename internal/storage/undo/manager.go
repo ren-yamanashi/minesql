@@ -8,6 +8,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
 
 var (
@@ -23,22 +24,27 @@ type Manager struct {
 	entries       map[lock.TrxId][]Entry // trxId → Entry[] のマップ
 }
 
-func NewManager(bp *buffer.Pool, fileId page.FileId) (*Manager, error) {
-	mtr := buffer.NewMtr(bp)
-	defer mtr.UnpinAll()
+func NewManager(bp *buffer.Pool, fileId page.FileId, redoLog *redo.Buffer) (*Manager, error) {
+	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
 
 	pageId, err := bp.AllocatePageId(fileId)
 	if err != nil {
+		mtr.UnpinAll()
 		return nil, err
 	}
 	if _, err := bp.AddPage(pageId); err != nil {
+		mtr.UnpinAll()
 		return nil, err
 	}
 	bufPageUndo, err := mtr.PageForWrite(pageId)
 	if err != nil {
+		mtr.UnpinAll()
 		return nil, err
 	}
 	CreatePage(bufPageUndo)
+	if err := mtr.Commit(); err != nil {
+		return nil, err
+	}
 
 	return &Manager{
 		bufferPool:    bp,

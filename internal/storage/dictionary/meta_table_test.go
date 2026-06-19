@@ -13,9 +13,10 @@ func TestCreateTableMeta(t *testing.T) {
 	t.Run("テーブルメタデータを新規作成できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupDictTestBufferPool(t)
+		rl := setupDictTestRedoBuffer(t)
 
 		// WHEN
-		tm, err := CreateTableMeta(bp)
+		tm, err := CreateTableMeta(bp, rl)
 
 		// THEN
 		assert.NoError(t, err)
@@ -122,7 +123,7 @@ func TestTableMetaInsert(t *testing.T) {
 func setupTestTableMeta(t *testing.T) (*TableMeta, *buffer.Pool) {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
-	tm, err := CreateTableMeta(bp)
+	tm, err := CreateTableMeta(bp, setupDictTestRedoBuffer(t))
 	if err != nil {
 		t.Fatalf("TableMeta の作成に失敗: %v", err)
 	}

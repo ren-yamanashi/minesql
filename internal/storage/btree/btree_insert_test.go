@@ -12,7 +12,7 @@ func TestInsert(t *testing.T) {
 	t.Run("レコードを挿入できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 
@@ -29,7 +29,7 @@ func TestInsert(t *testing.T) {
 	t.Run("複数レコードをソート順に挿入できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 
@@ -55,7 +55,7 @@ func TestInsert(t *testing.T) {
 	t.Run("重複キーを挿入すると ErrDuplicateKey を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -70,7 +70,7 @@ func TestInsert(t *testing.T) {
 	t.Run("リーフノードの分割が発生すると leafPageCount がインクリメントされる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		nonKey := make([]byte, 1500)
@@ -90,7 +90,7 @@ func TestInsert(t *testing.T) {
 	t.Run("ルートノードの分割が発生すると height がインクリメントされる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		nonKey := make([]byte, 1500)
@@ -111,7 +111,7 @@ func TestInsert(t *testing.T) {
 	t.Run("分割後も全レコードを検索できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		nonKey := make([]byte, 1500)
@@ -131,7 +131,7 @@ func TestInsert(t *testing.T) {
 	t.Run("境界キーと同じキーを挿入すると正しい子ノードで重複検出される", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		nonKey := make([]byte, 1500)
@@ -151,7 +151,7 @@ func TestInsert(t *testing.T) {
 	t.Run("分割が発生しない場合はメタデータが変わらない", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -174,7 +174,7 @@ func TestInsertOptimistic(t *testing.T) {
 	t.Run("分割不要なら needsPessimistic=false で挿入が完了する", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 
@@ -192,7 +192,7 @@ func TestInsertOptimistic(t *testing.T) {
 	t.Run("リーフが満杯なら needsPessimistic=true を返し挿入しない", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		nonKey := make([]byte, 1500)
@@ -215,7 +215,7 @@ func TestInsertOptimistic(t *testing.T) {
 	t.Run("完了後に Pin と Tree ラッチが残らない", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 
@@ -231,7 +231,7 @@ func TestInsertOptimistic(t *testing.T) {
 	t.Run("重複キーは ErrDuplicateKey を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_, err := bt.insertOptimistic(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -249,7 +249,7 @@ func TestInsertPessimistic(t *testing.T) {
 	t.Run("Tree SX ラッチを取得し分割込みで挿入できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		nonKey := make([]byte, 1500)
@@ -269,7 +269,7 @@ func TestInsertPessimistic(t *testing.T) {
 	t.Run("完了後に Pin と Tree ラッチが残らない", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 

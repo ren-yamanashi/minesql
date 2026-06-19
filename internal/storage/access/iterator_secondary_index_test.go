@@ -10,6 +10,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 	"github.com/stretchr/testify/assert"
 )
@@ -168,6 +169,7 @@ type iteratorTestEnv struct {
 	bp            *buffer.Pool
 	primaryTree   *btree.Tree
 	secondaryTree *btree.Tree
+	redoLog       *redo.Buffer
 }
 
 // setupIteratorTestEnv はセカンダリイテレータのテスト用環境を構築する
@@ -194,7 +196,13 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 	bp.RegisterHeapFile(page.FileId(2), dataHf)
 
-	ct, err := dictionary.CreateCatalog(bp)
+	redoLog, err := redo.NewBuffer(t.TempDir())
+	if err != nil {
+		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = redoLog.Close() })
+
+	ct, err := dictionary.CreateCatalog(bp, redoLog)
 	if err != nil {
 		t.Fatalf("Catalog の作成に失敗: %v", err)
 	}
@@ -202,13 +210,13 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	tableFileId := page.FileId(2)
 
 	// プライマリ B+Tree
-	primaryTree, err := btree.CreateTree(bp, tableFileId)
+	primaryTree, err := btree.CreateTree(bp, tableFileId, redoLog, lock.SystemReservedTrxId)
 	if err != nil {
 		t.Fatalf("プライマリ B+Tree の作成に失敗: %v", err)
 	}
 
 	// セカンダリ B+Tree
-	secondaryTree, err := btree.CreateTree(bp, tableFileId)
+	secondaryTree, err := btree.CreateTree(bp, tableFileId, redoLog, lock.SystemReservedTrxId)
 	if err != nil {
 		t.Fatalf("セカンダリ B+Tree の作成に失敗: %v", err)
 	}
@@ -235,6 +243,7 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 		bp:            bp,
 		primaryTree:   primaryTree,
 		secondaryTree: secondaryTree,
+		redoLog:       redoLog,
 	}
 }
 

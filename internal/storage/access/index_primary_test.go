@@ -18,7 +18,7 @@ func TestNewPrimaryIndex(t *testing.T) {
 		// GIVEN
 		env := setupIteratorTestEnv(t)
 		lockMgr := lock.NewManager()
-		created, err := createPrimaryIndex(env.ct, env.bp, page.FileId(2), 1, lockMgr, nil)
+		created, err := createPrimaryIndex(env.ct, env.bp, page.FileId(2), 1, lockMgr, nil, env.redoLog)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -36,7 +36,7 @@ func TestCreatePrimaryIndex(t *testing.T) {
 		lockMgr := lock.NewManager()
 
 		// WHEN
-		pi, err := createPrimaryIndex(env.ct, env.bp, page.FileId(2), 1, lockMgr, nil)
+		pi, err := createPrimaryIndex(env.ct, env.bp, page.FileId(2), 1, lockMgr, nil, env.redoLog)
 
 		// THEN
 		assert.NoError(t, err)
@@ -50,7 +50,7 @@ func TestCreatePrimaryIndex(t *testing.T) {
 		lockMgr := lock.NewManager()
 
 		// WHEN
-		pi, err := createPrimaryIndex(env.ct, env.bp, page.FileId(2), 2, lockMgr, nil)
+		pi, err := createPrimaryIndex(env.ct, env.bp, page.FileId(2), 2, lockMgr, nil, env.redoLog)
 
 		// THEN
 		assert.NoError(t, err)
@@ -362,7 +362,7 @@ func setupTestPrimaryIndex(t *testing.T) *primaryIndex {
 	t.Helper()
 	env := setupIteratorTestEnv(t)
 	lockMgr := lock.NewManager()
-	pi, err := createPrimaryIndex(env.ct, env.bp, page.FileId(2), 1, lockMgr, nil)
+	pi, err := createPrimaryIndex(env.ct, env.bp, page.FileId(2), 1, lockMgr, nil, env.redoLog)
 	if err != nil {
 		t.Fatalf("PrimaryIndex の作成に失敗: %v", err)
 	}

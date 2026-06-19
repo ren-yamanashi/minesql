@@ -9,7 +9,9 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
 
 func ExampleTree_Insert() {
@@ -196,9 +198,20 @@ func setup() (*btree.Tree, *buffer.Pool, func()) {
 	}
 	bp.RegisterHeapFile(fileId, dm)
 
-	tree, err := btree.CreateTree(bp, fileId)
+	rl, err := redo.NewBuffer(tmpDir)
 	if err != nil {
 		panic(err)
+	}
+
+	tree, err := btree.CreateTree(bp, fileId, rl, lock.SystemReservedTrxId)
+	if err != nil {
+		panic(err)
+	}
+
+	prevCleanup := cleanup
+	cleanup = func() {
+		_ = rl.Close()
+		prevCleanup()
 	}
 
 	return tree, bp, cleanup

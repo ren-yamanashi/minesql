@@ -9,6 +9,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
@@ -64,6 +65,7 @@ type createSecondaryIndexInput struct {
 	Unique      bool               // ユニークか
 	Lock        *lock.Manager
 	UndoLog     *undo.Manager
+	RedoLog     *redo.Buffer
 }
 
 // createSecondaryIndex は空のセカンダリインデックスを作成する
@@ -72,7 +74,7 @@ func createSecondaryIndex(
 	bp *buffer.Pool,
 	input createSecondaryIndexInput,
 ) (*secondaryIndex, error) {
-	tree, err := btree.CreateTree(bp, input.FileId)
+	tree, err := btree.CreateTree(bp, input.FileId, input.RedoLog, lock.SystemReservedTrxId)
 	if err != nil {
 		return nil, err
 	}

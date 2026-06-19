@@ -13,9 +13,10 @@ func TestCreateConstraintMeta(t *testing.T) {
 	t.Run("制約メタデータを新規作成できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupDictTestBufferPool(t)
+		rl := setupDictTestRedoBuffer(t)
 
 		// WHEN
-		cm, err := CreateConstraintMeta(bp)
+		cm, err := CreateConstraintMeta(bp, rl)
 
 		// THEN
 		assert.NoError(t, err)
@@ -139,7 +140,7 @@ func TestConstraintMetaInsert(t *testing.T) {
 func setupTestConstraintMeta(t *testing.T) (*ConstraintMeta, *buffer.Pool) {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
-	cm, err := CreateConstraintMeta(bp)
+	cm, err := CreateConstraintMeta(bp, setupDictTestRedoBuffer(t))
 	if err != nil {
 		t.Fatalf("ConstraintMeta の作成に失敗: %v", err)
 	}

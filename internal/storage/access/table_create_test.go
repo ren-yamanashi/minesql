@@ -206,11 +206,11 @@ func TestRegisterTableMeta(t *testing.T) {
 			ColNames:  []string{"id", "name", "email"},
 			PkCount:   1,
 		}
-		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr, nil)
+		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr, nil, env.redoLog)
 		assert.NoError(t, err)
 
 		// WHEN
-		err = registerTableMeta(env.ct, env.bp, env.fileId, pi, input)
+		err = registerTableMeta(env.ct, env.bp, env.fileId, pi, input, env.redoLog)
 
 		// THEN
 		assert.NoError(t, err)
@@ -236,13 +236,13 @@ func TestRegisterTableMeta(t *testing.T) {
 			ColNames:  []string{"id", "name"},
 			PkCount:   1,
 		}
-		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr, nil)
+		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr, nil, env.redoLog)
 		assert.NoError(t, err)
-		err = registerTableMeta(env.ct, env.bp, env.fileId, pi, input)
+		err = registerTableMeta(env.ct, env.bp, env.fileId, pi, input, env.redoLog)
 		assert.NoError(t, err)
 
 		// WHEN
-		err = registerTableMeta(env.ct, env.bp, env.fileId, pi, input)
+		err = registerTableMeta(env.ct, env.bp, env.fileId, pi, input, env.redoLog)
 
 		// THEN
 		assert.Error(t, err)
@@ -259,7 +259,7 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		}
 
 		// WHEN
-		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, inputs)
+		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
 
 		// THEN
 		assert.NoError(t, err)
@@ -281,7 +281,7 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		}
 
 		// WHEN
-		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, inputs)
+		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
 
 		// THEN
 		assert.NoError(t, err)
@@ -296,7 +296,7 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		}
 
 		// WHEN
-		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, inputs)
+		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
 
 		// THEN
 		assert.NoError(t, err)
@@ -309,11 +309,11 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		inputs := []CreateIndexInput{
 			{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: dictionary.IndexTypeNonUnique},
 		}
-		_, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, inputs)
+		_, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
 		assert.NoError(t, err)
 
 		// WHEN
-		_, err = createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, inputs)
+		_, err = createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
 
 		// THEN
 		assert.Error(t, err)
@@ -324,7 +324,7 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		env := setupCreateTestEnvWithTable(t)
 
 		// WHEN
-		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, nil)
+		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, nil)
 
 		// THEN
 		assert.NoError(t, err)
@@ -346,7 +346,7 @@ func TestCreateConstraints(t *testing.T) {
 		}
 
 		// WHEN
-		err := createConstraints(env.ct, env.bp, env.fileId, inputs)
+		err := createConstraints(env.ct, env.bp, env.fileId, inputs, env.redoLog)
 
 		// THEN
 		assert.NoError(t, err)
@@ -365,7 +365,7 @@ func TestCreateConstraints(t *testing.T) {
 		}
 
 		// WHEN
-		err := createConstraints(env.ct, env.bp, env.fileId, inputs)
+		err := createConstraints(env.ct, env.bp, env.fileId, inputs, env.redoLog)
 
 		// THEN
 		assert.Error(t, err)
@@ -377,7 +377,7 @@ func TestCreateConstraints(t *testing.T) {
 		env := setupCreateTestEnvWithTable(t)
 
 		// WHEN
-		err := createConstraints(env.ct, env.bp, env.fileId, nil)
+		err := createConstraints(env.ct, env.bp, env.fileId, nil, env.redoLog)
 
 		// THEN
 		assert.NoError(t, err)
@@ -390,6 +390,7 @@ type createTestEnv struct {
 	bp      *buffer.Pool
 	fileId  page.FileId
 	lockMgr *lock.Manager
+	redoLog *redo.Buffer
 }
 
 // createTestEnvWithTable はテーブル作成済みの Create テスト用環境
@@ -399,6 +400,7 @@ type createTestEnvWithTable struct {
 	fileId      page.FileId
 	primaryTree *btree.Tree
 	lockMgr     *lock.Manager
+	redoLog     *redo.Buffer
 }
 
 // setupCreateTestEnv はカタログとバッファプールのみの環境を構築する
@@ -415,7 +417,13 @@ func setupCreateTestEnv(t *testing.T) *createTestEnv {
 	bp := buffer.NewPool(page.Size*50, nil)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
-	ct, err := dictionary.CreateCatalog(bp)
+	redoLog, err := redo.NewBuffer(t.TempDir())
+	if err != nil {
+		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = redoLog.Close() })
+
+	ct, err := dictionary.CreateCatalog(bp, redoLog)
 	if err != nil {
 		t.Fatalf("Catalog の作成に失敗: %v", err)
 	}
@@ -440,6 +448,7 @@ func setupCreateTestEnv(t *testing.T) *createTestEnv {
 		bp:      bp,
 		fileId:  fileId,
 		lockMgr: lockMgr,
+		redoLog: redoLog,
 	}
 }
 
@@ -453,11 +462,11 @@ func setupCreateTestEnvWithTable(t *testing.T) *createTestEnvWithTable {
 		ColNames:  []string{"id", "name", "email"},
 		PkCount:   1,
 	}
-	pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr, nil)
+	pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr, nil, env.redoLog)
 	if err != nil {
 		t.Fatalf("プライマリインデックスの作成に失敗: %v", err)
 	}
-	if err := registerTableMeta(env.ct, env.bp, env.fileId, pi, input); err != nil {
+	if err := registerTableMeta(env.ct, env.bp, env.fileId, pi, input, env.redoLog); err != nil {
 		t.Fatalf("テーブルメタの登録に失敗: %v", err)
 	}
 
@@ -467,6 +476,7 @@ func setupCreateTestEnvWithTable(t *testing.T) *createTestEnvWithTable {
 		fileId:      env.fileId,
 		primaryTree: pi.tree,
 		lockMgr:     env.lockMgr,
+		redoLog:     env.redoLog,
 	}
 }
 
@@ -497,7 +507,13 @@ func setupCreateTableTestEnv(t *testing.T) *createTableTestEnv {
 	bp := buffer.NewPool(page.Size*50, nil)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
-	_, err = dictionary.CreateCatalog(bp)
+	redoLog, err := redo.NewBuffer(config.BaseDir)
+	if err != nil {
+		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = redoLog.Clear() })
+
+	_, err = dictionary.CreateCatalog(bp, redoLog)
 	if err != nil {
 		t.Fatalf("Catalog の作成に失敗: %v", err)
 	}
@@ -511,20 +527,14 @@ func setupCreateTableTestEnv(t *testing.T) *createTableTestEnv {
 	t.Cleanup(func() { _ = undoHf.Close() })
 	bp.RegisterHeapFile(page.FileId(1), undoHf)
 
-	undoMgr, err := undo.NewManager(bp, page.FileId(1))
+	undoMgr, err := undo.NewManager(bp, page.FileId(1), redoLog)
 	if err != nil {
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
 	}
 
-	redoLog, err := redo.NewBuffer(config.BaseDir)
-	if err != nil {
-		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
-	}
-	t.Cleanup(func() { _ = redoLog.Clear() })
-
 	lockMgr := lock.NewManager()
 
-	ct, err := dictionary.NewCatalog(bp)
+	ct, err := dictionary.NewCatalog(bp, redoLog)
 	if err != nil {
 		t.Fatalf("Catalog の取得に失敗: %v", err)
 	}

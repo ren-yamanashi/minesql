@@ -8,7 +8,9 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -846,9 +848,26 @@ func setupBtree(t *testing.T) *Tree {
 	bp := newTestBufferPool(page.Size * 10)
 	bp.RegisterHeapFile(fileId, heapFile)
 
-	bt, err := CreateTree(bp, fileId)
+	bt, err := CreateTree(bp, fileId, newTestRedoBuffer(t), lock.SystemReservedTrxId)
 	if err != nil {
 		t.Fatalf("B+Tree の作成に失敗: %v", err)
 	}
 	return bt
+}
+
+// newTestRedoBuffer はテスト用の Redo バッファを生成する
+func newTestRedoBuffer(t *testing.T) *redo.Buffer {
+	t.Helper()
+	rl, err := redo.NewBuffer(t.TempDir())
+	if err != nil {
+		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = rl.Close() })
+	return rl
+}
+
+// createTreeForTest はテスト用に CreateTree を呼ぶラッパー (Redo バッファとシステム trxId を内部で用意)
+func createTreeForTest(t *testing.T, bp *buffer.Pool, fileId page.FileId) (*Tree, error) {
+	t.Helper()
+	return CreateTree(bp, fileId, newTestRedoBuffer(t), lock.SystemReservedTrxId)
 }

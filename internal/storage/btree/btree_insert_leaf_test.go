@@ -99,7 +99,7 @@ func setupBtreeBufferPool(t *testing.T) *buffer.Pool {
 func setupBtreeForTest(t *testing.T) (*Tree, *buffer.Pool) {
 	t.Helper()
 	bp := setupBtreeBufferPool(t)
-	bt, err := CreateTree(bp, page.FileId(0))
+	bt, err := createTreeForTest(t, bp, page.FileId(0))
 	assert.NoError(t, err)
 	return bt, bp
 }

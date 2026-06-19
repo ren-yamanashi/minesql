@@ -12,7 +12,7 @@ func TestDelete(t *testing.T) {
 	t.Run("レコードを削除できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -33,7 +33,7 @@ func TestDelete(t *testing.T) {
 	t.Run("存在しないキーを削除すると ErrKeyNotFound を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -48,7 +48,7 @@ func TestDelete(t *testing.T) {
 	t.Run("空の B+Tree から削除すると ErrKeyNotFound を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 
@@ -62,7 +62,7 @@ func TestDelete(t *testing.T) {
 	t.Run("削除後にリーフマージが発生すると leafPageCount がデクリメントされる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		nonKey := make([]byte, 1500)
@@ -84,7 +84,7 @@ func TestDelete(t *testing.T) {
 	t.Run("削除後にルート縮退が発生すると height がデクリメントされる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		nonKey := make([]byte, 1500)
@@ -106,7 +106,7 @@ func TestDelete(t *testing.T) {
 	t.Run("全レコードを削除できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -128,7 +128,7 @@ func TestDelete(t *testing.T) {
 	t.Run("ブランチノード経由で削除してもアンダーフローしない場合は isLeafMerged が false", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		nonKey := make([]byte, 1500)
@@ -158,7 +158,7 @@ func TestDelete(t *testing.T) {
 	t.Run("削除後もアンダーフローしない場合はメタデータが変わらない", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -183,7 +183,7 @@ func TestDeleteOptimistic(t *testing.T) {
 	t.Run("高さ 1 ではアンダーフローしても needsPessimistic=false で削除が完了する", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -201,7 +201,7 @@ func TestDeleteOptimistic(t *testing.T) {
 	t.Run("存在しないキーは ErrKeyNotFound を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 
@@ -215,7 +215,7 @@ func TestDeleteOptimistic(t *testing.T) {
 	t.Run("高さ 2 以上でアンダーフロー見込みなら needsPessimistic=true を返し削除しない", func(t *testing.T) {
 		// GIVEN: 高さ 2 のツリーを作り、左リーフを 1 件だけ残してアンダーフロー寸前にする
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		nonKey := make([]byte, 1500)
@@ -239,7 +239,7 @@ func TestDeleteOptimistic(t *testing.T) {
 	t.Run("完了後に Pin と Tree ラッチが残らない", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -258,7 +258,7 @@ func TestDeletePessimistic(t *testing.T) {
 	t.Run("Tree SX ラッチを取得して削除できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -275,7 +275,7 @@ func TestDeletePessimistic(t *testing.T) {
 	t.Run("完了後に Pin と Tree ラッチが残らない", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))

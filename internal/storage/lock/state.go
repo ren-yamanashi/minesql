@@ -7,6 +7,11 @@ type (
 
 const TrxIdSize = 4
 
+// SystemReservedTrxId は DDL や起動時初期化で使用するシステム予約のトランザクション ID
+//   - ユーザー採番との衝突を防ぐため、TrxId の最大値を予約値として確保する
+//   - ユーザー採番は 1 から始まり順に増分するため、この最大値に到達することは現実的にない
+const SystemReservedTrxId TrxId = ^TrxId(0)
+
 const (
 	modeUnknown Mode = iota
 	Shared

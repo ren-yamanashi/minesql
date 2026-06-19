@@ -12,7 +12,7 @@ func TestSearch(t *testing.T) {
 	t.Run("SearchModeStart で先頭からイテレータを取得できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		insertRecordToBtree(t, bt, []byte{0x10}, []byte{0xAA})
 		insertRecordToBtree(t, bt, []byte{0x20}, []byte{0xBB})
 		mtr := buffer.NewMtr(bt.bufferPool)
@@ -31,7 +31,7 @@ func TestSearch(t *testing.T) {
 	t.Run("SearchModeKey で指定したキーからイテレータを取得できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		insertRecordToBtree(t, bt, []byte{0x10}, []byte{0xAA})
 		insertRecordToBtree(t, bt, []byte{0x20}, []byte{0xBB})
 		mtr := buffer.NewMtr(bt.bufferPool)
@@ -50,7 +50,7 @@ func TestSearch(t *testing.T) {
 	t.Run("SearchModeKey で全レコードより大きいキーを指定した場合はレコードなしのイテレータを返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		insertRecordToBtree(t, bt, []byte{0x10}, []byte{0xAA})
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
@@ -67,7 +67,7 @@ func TestSearch(t *testing.T) {
 	t.Run("空の B+Tree で SearchModeStart を実行するとレコードなしのイテレータを返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 
@@ -85,7 +85,7 @@ func TestFindByKey(t *testing.T) {
 	t.Run("存在するキーのレコードと位置を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		insertRecordToBtree(t, bt, []byte{0x10}, []byte{0xAA})
 		insertRecordToBtree(t, bt, []byte{0x20}, []byte{0xBB})
 		mtr := buffer.NewMtr(bt.bufferPool)
@@ -105,7 +105,7 @@ func TestFindByKey(t *testing.T) {
 	t.Run("先頭のキーを検索できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		insertRecordToBtree(t, bt, []byte{0x10}, []byte{0xAA})
 		insertRecordToBtree(t, bt, []byte{0x20}, []byte{0xBB})
 		mtr := buffer.NewMtr(bt.bufferPool)
@@ -123,7 +123,7 @@ func TestFindByKey(t *testing.T) {
 	t.Run("存在しないキーの場合は ErrKeyNotFound を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		insertRecordToBtree(t, bt, []byte{0x10}, []byte{0xAA})
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
@@ -138,7 +138,7 @@ func TestFindByKey(t *testing.T) {
 	t.Run("空の B+Tree の場合は ErrKeyNotFound を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 
@@ -154,7 +154,7 @@ func TestLeafPageIds(t *testing.T) {
 	t.Run("高さ 1 の場合はルートページの PageId を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 
 		// WHEN
 		pageIds, err := bt.leafPageIds()
@@ -167,7 +167,7 @@ func TestLeafPageIds(t *testing.T) {
 	t.Run("高さ 2 以上の場合はブランチノードを辿って全リーフの PageId を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		nonKey := make([]byte, 1500)

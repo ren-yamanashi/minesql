@@ -1,6 +1,7 @@
 package access
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
@@ -175,34 +176,24 @@ func TestCheckpointExecute(t *testing.T) {
 }
 
 func TestCheckpointExecuteWithFuzzyFlushAndRecovery(t *testing.T) {
-	t.Run("一部フラッシュ → Checkpoint で前進 → クラッシュ → Recovery で残りが復元される", func(t *testing.T) {
-		// FIXME(7d): 7d で以下の 2 点を解決した後に有効化する。
-		// (1) 現シナリオは同じテーブルへの 3 件 Insert で同一 leaf / undo / secondary leaf
-		//     ページを繰り返し変更するため、3 ページとも最初の MtrStart LSN を oldest として
-		//     共有してしまい、FlushOldestPages(1) しても残ページの oldest が変わらず
-		//     checkpointLsn が前進しない。複数の独立した mtr で異なるページを変更する
-		//     シナリオへ再設計する必要がある (例: 別テーブルを使う / テーブル作成と Insert を
-		//     分離する)。
-		// (2) DDL 経路 (CreateCatalog / persistScalar / registerTableMeta / btree.CreateTree /
-		//     undo.NewManager) は読み取り専用 Mtr で書き込みを行い、Redo に記録されない。
-		//     Recovery でカタログヘッダーやメタテーブルの変更が復元されないデータロス問題が
-		//     残る。NewWriteMtr 経由に置換する必要がある (C2 を緑にする条件ではないが、独立した
-		//     深刻問題のため 7d でまとめて対処)。
-		t.Skip("FIXME(7d): C2 シナリオ再設計 + DDL の Redo 化 完了後に有効化")
-
+	t.Run("複数テーブルへの独立 Insert → 一部フラッシュ → Checkpoint で前進 → クラッシュ → Recovery で全件復元される", func(t *testing.T) {
 		// GIVEN
 		env := setupIntegrationEnv(t)
-		_ = createUsersTable(t, env)
+		tableNames := []string{"users", "products", "orders"}
+		for _, name := range tableNames {
+			_, err := CreateTable(env.bp, env.undoLog, env.lockMgr, env.redoLog, CreateTableInput{
+				TableName: name,
+				ColNames:  []string{"id", "name"},
+				PkCount:   1,
+			})
+			assert.NoError(t, err)
+		}
 		flushBaseline(t, env)
-		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
-		assert.NoError(t, err)
-		for _, row := range [][]string{
-			{"1", "Alice", "alice@example.com"},
-			{"2", "Bob", "bob@example.com"},
-			{"3", "Carol", "carol@example.com"},
-		} {
+		for i, name := range tableNames {
+			table, err := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, name)
+			assert.NoError(t, err)
 			trx := env.trxMgr.Begin()
-			err = table.Insert(trx, []string{"id", "name", "email"}, row)
+			err = table.Insert(trx, []string{"id", "name"}, []string{"1", fmt.Sprintf("row-%d", i)})
 			assert.NoError(t, err)
 			err = env.trxMgr.Commit(trx)
 			assert.NoError(t, err)
@@ -220,26 +211,23 @@ func TestCheckpointExecuteWithFuzzyFlushAndRecovery(t *testing.T) {
 
 		// THEN
 		assert.Greater(t, env.redoLog.CheckpointLsn(), checkpointBefore)
-		env2 := crashAndRecover(t, env, []string{"users"})
+		env2 := crashAndRecover(t, env, tableNames)
 		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId())
 		assert.NoError(t, r.Execute())
 
-		table2, err := NewTable(env2.bp, env2.ct, env2.undoLog, env2.lockMgr, env2.redoLog, "users")
-		assert.NoError(t, err)
-		mtr := buffer.NewMtr(env2.bp)
-		defer mtr.UnpinAll()
-		iter, err := table2.primaryIndex.search(mtr, SearchModeStart{}, nil)
-		assert.NoError(t, err)
-		var ids []string
-		for {
+		for i, name := range tableNames {
+			table2, err := NewTable(env2.bp, env2.ct, env2.undoLog, env2.lockMgr, env2.redoLog, name)
+			assert.NoError(t, err)
+			mtr := buffer.NewMtr(env2.bp)
+			iter, err := table2.primaryIndex.search(mtr, SearchModeStart{}, nil)
+			assert.NoError(t, err)
 			rec, ok, err := iter.Next()
 			assert.NoError(t, err)
-			if !ok {
-				break
-			}
-			ids = append(ids, rec.values[0])
+			assert.True(t, ok, "テーブル %q のレコードが見つからない", name)
+			assert.Equal(t, "1", rec.values[0])
+			assert.Equal(t, fmt.Sprintf("row-%d", i), rec.values[1])
+			mtr.UnpinAll()
 		}
-		assert.Equal(t, []string{"1", "2", "3"}, ids)
 	})
 }
 

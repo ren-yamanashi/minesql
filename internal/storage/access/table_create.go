@@ -39,12 +39,12 @@ type CreateTableInput struct {
 // CreateTable はテーブルを新規作成する
 func CreateTable(
 	bp *buffer.Pool,
-	undo *undo.Manager,
-	lock *lock.Manager,
+	undoLog *undo.Manager,
+	lockMgr *lock.Manager,
 	redoLog *redo.Buffer,
 	input CreateTableInput,
 ) (*Table, error) {
-	ct, err := dictionary.NewCatalog(bp)
+	ct, err := dictionary.NewCatalog(bp, redoLog)
 	if err != nil {
 		return nil, err
 	}
@@ -56,24 +56,24 @@ func CreateTable(
 	}
 
 	// プライマリインデックス作成
-	pi, err := createPrimaryIndex(ct, bp, fileId, input.PkCount, lock, undo)
+	pi, err := createPrimaryIndex(ct, bp, fileId, input.PkCount, lockMgr, undoLog, redoLog)
 	if err != nil {
 		return nil, err
 	}
 
 	// テーブルメタ・カラムメタをカタログに登録
-	if err := registerTableMeta(ct, bp, fileId, pi, input); err != nil {
+	if err := registerTableMeta(ct, bp, fileId, pi, input, redoLog); err != nil {
 		return nil, err
 	}
 
 	// セカンダリインデックス作成
-	sis, err := createSecondaryIndexes(ct, bp, fileId, pi.tree, lock, undo, input.Indexes)
+	sis, err := createSecondaryIndexes(ct, bp, fileId, pi.tree, lockMgr, undoLog, redoLog, input.Indexes)
 	if err != nil {
 		return nil, err
 	}
 
 	// 制約作成
-	if err := createConstraints(ct, bp, fileId, input.Constraints); err != nil {
+	if err := createConstraints(ct, bp, fileId, input.Constraints, redoLog); err != nil {
 		return nil, err
 	}
 
@@ -81,8 +81,8 @@ func CreateTable(
 		primaryIndex:     pi,
 		secondaryIndexes: sis,
 		catalog:          ct,
-		undoLog:          undo,
-		lock:             lock,
+		undoLog:          undoLog,
+		lock:             lockMgr,
 		bufferPool:       bp,
 		redoLog:          redoLog,
 	}, nil
@@ -104,24 +104,27 @@ func createTableFile(ct *dictionary.Catalog, bp *buffer.Pool, tableName string) 
 }
 
 // registerTableMeta はテーブルメタ・インデックスメタ (プライマリ)・カラムメタをカタログに登録する
+//   - 内部のページ書き込みはシステム予約 trxId で Redo に記録する
 func registerTableMeta(
 	ct *dictionary.Catalog,
 	bp *buffer.Pool,
 	fileId page.FileId,
 	pi *primaryIndex,
 	input CreateTableInput,
+	redoLog *redo.Buffer,
 ) error {
-	mtr := buffer.NewMtr(bp)
-	defer mtr.UnpinAll()
+	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
 
 	// テーブルメタ
 	if err := ct.TableMeta().Insert(mtr, dictionary.NewTableMetaRecord(input.TableName, pi.tree.MetaPageId(), len(input.ColNames))); err != nil {
+		mtr.UnpinAll()
 		return err
 	}
 
 	// インデックスメタ
 	indexId, err := ct.AllocateIndexId()
 	if err != nil {
+		mtr.UnpinAll()
 		return err
 	}
 	err = ct.IndexMeta().Insert(mtr, dictionary.NewIndexMetaRecord(
@@ -133,35 +136,39 @@ func registerTableMeta(
 		pi.tree.MetaPageId(),
 	))
 	if err != nil {
+		mtr.UnpinAll()
 		return err
 	}
 
 	// カラムメタ
 	for i, col := range input.ColNames {
 		if err := ct.ColumnMeta().Insert(mtr, dictionary.NewColumnMetaRecord(fileId, col, i)); err != nil {
+			mtr.UnpinAll()
 			return err
 		}
 	}
-	return nil
+	return mtr.Commit()
 }
 
 // createSecondaryIndexes はセカンダリインデックスを作成する
+//   - 内部のページ書き込みはシステム予約 trxId で Redo に記録する
 func createSecondaryIndexes(
 	ct *dictionary.Catalog,
 	bp *buffer.Pool,
 	fileId page.FileId,
 	pt *btree.Tree,
-	lock *lock.Manager,
+	lockMgr *lock.Manager,
 	undoLog *undo.Manager,
+	redoLog *redo.Buffer,
 	inputs []CreateIndexInput,
 ) ([]*secondaryIndex, error) {
-	mtr := buffer.NewMtr(bp)
-	defer mtr.UnpinAll()
+	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
 
 	indexes := make([]*secondaryIndex, 0, len(inputs))
 	for _, input := range inputs {
 		indexId, err := ct.AllocateIndexId()
 		if err != nil {
+			mtr.UnpinAll()
 			return nil, err
 		}
 		index, err := createSecondaryIndex(ct, bp, createSecondaryIndexInput{
@@ -170,10 +177,12 @@ func createSecondaryIndexes(
 			IndexId:     indexId,
 			IndexName:   input.IndexName,
 			Unique:      input.IndexType == dictionary.IndexTypeUnique,
-			Lock:        lock,
+			Lock:        lockMgr,
 			UndoLog:     undoLog,
+			RedoLog:     redoLog,
 		})
 		if err != nil {
+			mtr.UnpinAll()
 			return nil, err
 		}
 		err = ct.IndexMeta().Insert(mtr, dictionary.NewIndexMetaRecord(
@@ -185,11 +194,13 @@ func createSecondaryIndexes(
 			index.tree.MetaPageId(),
 		))
 		if err != nil {
+			mtr.UnpinAll()
 			return nil, err
 		}
 
 		for i, keyCol := range input.ColNames {
 			if err := ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(indexId, keyCol, i)); err != nil {
+				mtr.UnpinAll()
 				return nil, err
 			}
 		}
@@ -197,16 +208,20 @@ func createSecondaryIndexes(
 		indexes = append(indexes, index)
 	}
 
+	if err := mtr.Commit(); err != nil {
+		return nil, err
+	}
 	return indexes, nil
 }
 
 // createConstraints は制約をカタログに登録する
-func createConstraints(ct *dictionary.Catalog, bp *buffer.Pool, fileId page.FileId, inputs []CreateConstraintInput) error {
-	mtr := buffer.NewMtr(bp)
-	defer mtr.UnpinAll()
+//   - 内部のページ書き込みはシステム予約 trxId で Redo に記録する
+func createConstraints(ct *dictionary.Catalog, bp *buffer.Pool, fileId page.FileId, inputs []CreateConstraintInput, redoLog *redo.Buffer) error {
+	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
 	for _, input := range inputs {
 		refTable, err := fetchTable(ct, bp, input.ReferenceTableName)
 		if err != nil {
+			mtr.UnpinAll()
 			return err
 		}
 		err = ct.ConstraintMeta().Insert(mtr, dictionary.NewConstraintMetaRecord(
@@ -217,8 +232,9 @@ func createConstraints(ct *dictionary.Catalog, bp *buffer.Pool, fileId page.File
 			input.ReferenceColumnName,
 		))
 		if err != nil {
+			mtr.UnpinAll()
 			return err
 		}
 	}
-	return nil
+	return mtr.Commit()
 }

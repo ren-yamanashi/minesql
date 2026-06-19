@@ -268,7 +268,12 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 	bp := buffer.NewPool(page.Size*50, nil)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
-	ct, err := dictionary.CreateCatalog(bp)
+	redoLog, err := redo.NewBuffer(config.BaseDir)
+	if err != nil {
+		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
+	}
+
+	ct, err := dictionary.CreateCatalog(bp, redoLog)
 	if err != nil {
 		t.Fatalf("Catalog の作成に失敗: %v", err)
 	}
@@ -283,14 +288,9 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 	t.Cleanup(func() { _ = undoHf.Close() })
 	bp.RegisterHeapFile(undoFileId, undoHf)
 
-	undoMgr, err := undo.NewManager(bp, undoFileId)
+	undoMgr, err := undo.NewManager(bp, undoFileId, redoLog)
 	if err != nil {
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
-	}
-
-	redoLog, err := redo.NewBuffer(config.BaseDir)
-	if err != nil {
-		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
 	}
 	t.Cleanup(func() { _ = redoLog.Clear() })
 

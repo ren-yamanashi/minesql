@@ -12,7 +12,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("レコードの非キーを更新できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -30,7 +30,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("存在しないキーを更新すると ErrKeyNotFound を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -45,7 +45,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("空の B+Tree で更新すると ErrKeyNotFound を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 
@@ -59,7 +59,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("更新後もキーは変わらない", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -83,7 +83,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("ブランチノードを経由してリーフノードのレコードを更新できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		nonKey := make([]byte, 1500)
@@ -108,7 +108,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("非キーのサイズが大きすぎて更新できない場合はエラーを返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		nonKey := make([]byte, 1500)
@@ -126,7 +126,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("同じレコードを複数回更新できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -145,7 +145,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("リーフに収まらない非キー更新がリーフ分割を起こして成功する", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		readRoot := func() page.Id {
@@ -192,7 +192,7 @@ func TestUpdate(t *testing.T) {
 	t.Run("更新後レコードが最大サイズを超える場合はエラーになり元のレコードが無傷で残る", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		original := make([]byte, 100)
@@ -216,7 +216,7 @@ func TestUpdateOptimistic(t *testing.T) {
 	t.Run("サイズが収まる場合は needsPessimistic=false で更新が完了する", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -235,7 +235,7 @@ func TestUpdateOptimistic(t *testing.T) {
 	t.Run("サイズが収まらない場合は needsPessimistic=true を返し更新しない", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		nonKey := make([]byte, 1500)
@@ -256,7 +256,7 @@ func TestUpdateOptimistic(t *testing.T) {
 	t.Run("存在しないキーは ErrKeyNotFound を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 
@@ -270,7 +270,7 @@ func TestUpdateOptimistic(t *testing.T) {
 	t.Run("完了後に Pin と Tree ラッチが残らない", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -289,7 +289,7 @@ func TestUpdatePessimistic(t *testing.T) {
 	t.Run("Tree SX ラッチを取得して更新できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
@@ -307,7 +307,7 @@ func TestUpdatePessimistic(t *testing.T) {
 	t.Run("完了後に Pin と Tree ラッチが残らない", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))

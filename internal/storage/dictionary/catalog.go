@@ -6,7 +6,9 @@ import (
 	"errors"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
 
 const (
@@ -32,6 +34,7 @@ var (
 
 type Catalog struct {
 	bufferPool         *buffer.Pool
+	redoLog            *redo.Buffer // DDL (persistScalar / table_create 等) を Redo に記録するための参照
 	nextFileId         page.FileId
 	nextIndexId        IndexId
 	undoLogFileId      page.FileId
@@ -52,7 +55,8 @@ func (c *Catalog) ConstraintMeta() *ConstraintMeta         { return c.constraint
 func (c *Catalog) UserMeta() *UserMeta                     { return c.userMeta }
 
 // NewCatalog は既存のカタログを開く
-func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
+//   - redoLog: 後の DDL (persistScalar / table_create 経由) を Redo に記録するために保持する
+func NewCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 	mtr := buffer.NewMtr(bp)
 	defer mtr.UnpinAll()
 
@@ -87,6 +91,7 @@ func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
 
 	return &Catalog{
 		bufferPool:    bp,
+		redoLog:       redoLog,
 		nextFileId:    nextFileId,
 		nextIndexId:   nextIndexId,
 		undoLogFileId: undoLogFileId,
@@ -102,44 +107,54 @@ func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
 }
 
 // CreateCatalog はカタログを新規作成する
-func CreateCatalog(bp *buffer.Pool) (*Catalog, error) {
-	mtr := buffer.NewMtr(bp)
-	defer mtr.UnpinAll()
+//   - redoLog: ヘッダー初期化と各メタテーブル作成を Redo に記録するために使う
+//   - 内部のページ書き込みはシステム予約 trxId で記録する
+func CreateCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
+	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
 
 	headerPageId, err := bp.AllocatePageId(catalogFileId)
 	if err != nil {
+		mtr.UnpinAll()
 		return nil, err
 	}
 	if _, err := bp.AddPage(headerPageId); err != nil {
+		mtr.UnpinAll()
 		return nil, err
 	}
 	bufPageHeader, err := mtr.PageForWrite(headerPageId)
 	if err != nil {
+		mtr.UnpinAll()
 		return nil, err
 	}
 
-	tableMeta, err := CreateTableMeta(bp)
+	tableMeta, err := CreateTableMeta(bp, redoLog)
 	if err != nil {
+		mtr.UnpinAll()
 		return nil, err
 	}
-	indexMeta, err := CreateIndexMeta(bp)
+	indexMeta, err := CreateIndexMeta(bp, redoLog)
 	if err != nil {
+		mtr.UnpinAll()
 		return nil, err
 	}
-	indexKeyColumnMeta, err := CreateIndexKeyColumnMeta(bp)
+	indexKeyColumnMeta, err := CreateIndexKeyColumnMeta(bp, redoLog)
 	if err != nil {
+		mtr.UnpinAll()
 		return nil, err
 	}
-	columnMeta, err := CreateColumnMeta(bp)
+	columnMeta, err := CreateColumnMeta(bp, redoLog)
 	if err != nil {
+		mtr.UnpinAll()
 		return nil, err
 	}
-	constraintMeta, err := CreateConstraintMeta(bp)
+	constraintMeta, err := CreateConstraintMeta(bp, redoLog)
 	if err != nil {
+		mtr.UnpinAll()
 		return nil, err
 	}
-	userMeta, err := CreateUserMeta(bp)
+	userMeta, err := CreateUserMeta(bp, redoLog)
 	if err != nil {
+		mtr.UnpinAll()
 		return nil, err
 	}
 
@@ -164,8 +179,13 @@ func CreateCatalog(bp *buffer.Pool) (*Catalog, error) {
 	writeScalar(bufPageHeader, headerNextIndexIdOffset, uint32(nextIndexId))
 	writeScalar(bufPageHeader, headerUndoLogFileIdOffset, uint32(undoLogFileId))
 
+	if err := mtr.Commit(); err != nil {
+		return nil, err
+	}
+
 	return &Catalog{
 		bufferPool:         bp,
+		redoLog:            redoLog,
 		nextFileId:         nextFileId,
 		nextIndexId:        nextIndexId,
 		undoLogFileId:      undoLogFileId,
@@ -200,18 +220,19 @@ func (c *Catalog) AllocateFileId() (page.FileId, error) {
 	return id, nil
 }
 
-// persistScalar はヘッダーページの指定オフセットに uint32 値を書き込む
+// persistScalar はヘッダーページの指定オフセットに uint32 値を書き込み Redo へ記録する
+//   - システム予約 trxId で記録される
 func (c *Catalog) persistScalar(offset int, value uint32) error {
-	mtr := buffer.NewMtr(c.bufferPool)
-	defer mtr.UnpinAll()
+	mtr := buffer.NewWriteMtr(c.bufferPool, lock.SystemReservedTrxId, c.redoLog)
 
 	headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
 	bufPageHeader, err := mtr.PageForWrite(headerPageId)
 	if err != nil {
+		mtr.UnpinAll()
 		return err
 	}
 	writeScalar(bufPageHeader, offset, value)
-	return nil
+	return mtr.Commit()
 }
 
 // writeScalar はヘッダーページの指定オフセットに uint32 値を書き込む

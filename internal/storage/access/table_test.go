@@ -1,13 +1,11 @@
 package access
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
@@ -240,6 +238,7 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 
 	// setupIteratorTestEnv と同じバッファプール + カタログを使う
 	env := setupIteratorTestEnv(t)
+	redoLog := env.redoLog
 
 	// Undo 用 HeapFile (FileId=3)
 	undoPath := filepath.Join(t.TempDir(), "undo.db")
@@ -250,19 +249,10 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 	t.Cleanup(func() { _ = undoHf.Close() })
 	env.bp.RegisterHeapFile(page.FileId(3), undoHf)
 
-	undoMgr, err := undo.NewManager(env.bp, page.FileId(3))
+	undoMgr, err := undo.NewManager(env.bp, page.FileId(3), redoLog)
 	if err != nil {
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
 	}
-
-	// Redo ログ用ディレクトリ
-	_ = os.MkdirAll(config.BaseDir, 0o750)
-	t.Cleanup(func() { _ = os.RemoveAll(config.BaseDir) })
-	redoLog, err := redo.NewBuffer(config.BaseDir)
-	if err != nil {
-		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
-	}
-	t.Cleanup(func() { _ = redoLog.Clear() })
 
 	lockMgr := lock.NewManager()
 
@@ -304,7 +294,7 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 	_ = env.ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(siNameId, "name", 0))
 
 	// セカンダリインデックス idx_email のメタデータ (新しい B+Tree が必要)
-	siEmailTree, err := btree.CreateTree(env.bp, fileId)
+	siEmailTree, err := btree.CreateTree(env.bp, fileId, redoLog, lock.SystemReservedTrxId)
 	if err != nil {
 		t.Fatalf("idx_email B+Tree の作成に失敗: %v", err)
 	}
@@ -336,6 +326,7 @@ func setupTableTestEnvWithoutPrimaryIndex(t *testing.T) *tableTestEnv {
 	t.Helper()
 
 	env := setupIteratorTestEnv(t)
+	redoLog := env.redoLog
 
 	// Undo 用 HeapFile (FileId=3)
 	undoPath := filepath.Join(t.TempDir(), "undo.db")
@@ -346,19 +337,10 @@ func setupTableTestEnvWithoutPrimaryIndex(t *testing.T) *tableTestEnv {
 	t.Cleanup(func() { _ = undoHf.Close() })
 	env.bp.RegisterHeapFile(page.FileId(3), undoHf)
 
-	undoMgr, err := undo.NewManager(env.bp, page.FileId(3))
+	undoMgr, err := undo.NewManager(env.bp, page.FileId(3), redoLog)
 	if err != nil {
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
 	}
-
-	// Redo ログ
-	_ = os.MkdirAll(config.BaseDir, 0o750)
-	t.Cleanup(func() { _ = os.RemoveAll(config.BaseDir) })
-	redoLog, err := redo.NewBuffer(config.BaseDir)
-	if err != nil {
-		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
-	}
-	t.Cleanup(func() { _ = redoLog.Clear() })
 
 	lockMgr := lock.NewManager()
 

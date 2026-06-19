@@ -18,9 +18,12 @@ func TestNewManager(t *testing.T) {
 	t.Run("Manager を作成できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupTestBufferPool(t)
+		redoLog, err := redo.NewBuffer(t.TempDir())
+		assert.NoError(t, err)
+		t.Cleanup(func() { _ = redoLog.Close() })
 
 		// WHEN
-		mgr, err := NewManager(bp, page.FileId(1))
+		mgr, err := NewManager(bp, page.FileId(1), redoLog)
 
 		// THEN
 		assert.NoError(t, err)
@@ -625,7 +628,12 @@ func setupTestBufferPool(t *testing.T) *buffer.Pool {
 func setupTestManager(t *testing.T) *Manager {
 	t.Helper()
 	bp := setupTestBufferPool(t)
-	mgr, err := NewManager(bp, page.FileId(1))
+	redoLog, err := redo.NewBuffer(t.TempDir())
+	if err != nil {
+		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = redoLog.Close() })
+	mgr, err := NewManager(bp, page.FileId(1), redoLog)
 	if err != nil {
 		t.Fatalf("Manager の作成に失敗: %v", err)
 	}
@@ -642,7 +650,7 @@ func setupTestManagerWithRedoLog(t *testing.T) (*Manager, *redo.Buffer) {
 		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
 	}
 	t.Cleanup(func() { _ = redoLog.Close() })
-	mgr, err := NewManager(bp, page.FileId(1))
+	mgr, err := NewManager(bp, page.FileId(1), redoLog)
 	if err != nil {
 		t.Fatalf("Manager の作成に失敗: %v", err)
 	}

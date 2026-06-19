@@ -12,6 +12,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -433,7 +434,13 @@ func setupSecondaryTestCatalog(t *testing.T) (*dictionary.Catalog, *buffer.Pool)
 	bp := buffer.NewPool(page.Size*30, nil)
 	bp.RegisterHeapFile(fileId, hf)
 
-	ct, err := dictionary.CreateCatalog(bp)
+	rl, err := redo.NewBuffer(t.TempDir())
+	if err != nil {
+		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = rl.Close() })
+
+	ct, err := dictionary.CreateCatalog(bp, rl)
 	if err != nil {
 		t.Fatalf("Catalog の作成に失敗: %v", err)
 	}

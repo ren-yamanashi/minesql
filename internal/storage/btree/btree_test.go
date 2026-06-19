@@ -14,7 +14,7 @@ func TestNewTree(t *testing.T) {
 	t.Run("既存の B+Tree を開ける", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		created, _ := CreateTree(bp, page.FileId(0))
+		created, _ := createTreeForTest(t, bp, page.FileId(0))
 
 		// WHEN
 		bt := NewTree(bp, created.MetaPageId())
@@ -26,7 +26,7 @@ func TestNewTree(t *testing.T) {
 	t.Run("NewTree で開いた B+Tree のメタデータを読み取れる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		created, _ := CreateTree(bp, page.FileId(0))
+		created, _ := createTreeForTest(t, bp, page.FileId(0))
 
 		// WHEN
 		bt := NewTree(bp, created.MetaPageId())
@@ -40,7 +40,7 @@ func TestNewTree(t *testing.T) {
 	t.Run("NewTree でツリーラッチが初期化される", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		created, _ := CreateTree(bp, page.FileId(0))
+		created, _ := createTreeForTest(t, bp, page.FileId(0))
 
 		// WHEN
 		bt := NewTree(bp, created.MetaPageId())
@@ -56,7 +56,7 @@ func TestCreateTree(t *testing.T) {
 		bp := setupBtreeTestBufferPool(t)
 
 		// WHEN
-		bt, err := CreateTree(bp, page.FileId(0))
+		bt, err := createTreeForTest(t, bp, page.FileId(0))
 
 		// THEN
 		assert.NoError(t, err)
@@ -68,7 +68,7 @@ func TestCreateTree(t *testing.T) {
 		bp := setupBtreeTestBufferPool(t)
 
 		// WHEN
-		bt, err := CreateTree(bp, page.FileId(0))
+		bt, err := createTreeForTest(t, bp, page.FileId(0))
 		assert.NoError(t, err)
 		count, err := bt.LeafPageCount()
 
@@ -82,7 +82,7 @@ func TestCreateTree(t *testing.T) {
 		bp := setupBtreeTestBufferPool(t)
 
 		// WHEN
-		bt, err := CreateTree(bp, page.FileId(0))
+		bt, err := createTreeForTest(t, bp, page.FileId(0))
 		assert.NoError(t, err)
 		height, err := bt.Height()
 
@@ -96,7 +96,7 @@ func TestCreateTree(t *testing.T) {
 		bp := setupBtreeTestBufferPool(t)
 
 		// WHEN
-		bt, err := CreateTree(bp, page.FileId(0))
+		bt, err := createTreeForTest(t, bp, page.FileId(0))
 
 		// THEN
 		assert.NoError(t, err)
@@ -108,7 +108,7 @@ func TestTreeLatchUsableViaMtr(t *testing.T) {
 	t.Run("ツリーラッチを Mtr 経由で取得・解放できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bp)
 
 		// WHEN
@@ -125,7 +125,7 @@ func TestOptimisticHeight1(t *testing.T) {
 	t.Run("高さ 1 (ルート = リーフ) の木で楽観挿入・更新・削除ができる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		heightBefore, _ := bt.Height()
@@ -163,7 +163,7 @@ func TestLeafPageCount(t *testing.T) {
 	t.Run("リーフページ数を取得できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 
 		// WHEN
 		count, err := bt.LeafPageCount()
@@ -178,7 +178,7 @@ func TestHeight(t *testing.T) {
 	t.Run("B+Tree の高さを取得できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
-		bt, _ := CreateTree(bp, page.FileId(0))
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 
 		// WHEN
 		height, err := bt.Height()

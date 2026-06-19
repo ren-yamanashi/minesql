@@ -3,7 +3,9 @@ package dictionary
 import (
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
 
 type TableMeta struct {
@@ -14,8 +16,8 @@ func NewTableMeta(bp *buffer.Pool, metaPageId page.Id) *TableMeta {
 	return &TableMeta{tree: btree.NewTree(bp, metaPageId)}
 }
 
-func CreateTableMeta(bp *buffer.Pool) (*TableMeta, error) {
-	tree, err := btree.CreateTree(bp, catalogFileId)
+func CreateTableMeta(bp *buffer.Pool, redoLog *redo.Buffer) (*TableMeta, error) {
+	tree, err := btree.CreateTree(bp, catalogFileId, redoLog, lock.SystemReservedTrxId)
 	if err != nil {
 		return nil, err
 	}

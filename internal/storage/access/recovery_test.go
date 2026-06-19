@@ -384,6 +384,25 @@ func setupRecoveryTestEnv(t *testing.T) *recoveryTestEnv {
 	env := setupTableTestEnv(t)
 	trxManager := NewTrxManager(env.ct, env.undoLog, env.redoLog, env.lock, env.bp)
 
+	// DDL 経由で生じたダーティーページと Redo レコードをクリーンな状態にする
+	// (Recovery / Checkpoint テストは「初期状態 = ダーティーページなし・Redo 空」を前提とする)
+	if err := env.bp.FlushAllPages(); err != nil {
+		t.Fatalf("FlushAllPages に失敗: %v", err)
+	}
+	if err := env.redoLog.Clear(); err != nil {
+		t.Fatalf("redoLog.Clear に失敗: %v", err)
+	}
+
+	// applyRedoLog テストは undo page (FileId 3, PageNumber 0) の Page LSN がリセット済みであることを前提とするため、
+	// DDL でスタンプされた Page LSN を 0 に戻す
+	resetMtr := buffer.NewMtr(env.bp)
+	defer resetMtr.UnpinAll()
+	pg, err := resetMtr.PageForWrite(page.NewId(page.FileId(3), 0))
+	if err != nil {
+		t.Fatalf("undo page の取得に失敗: %v", err)
+	}
+	pg.WriteHeaderAt(0, []byte{0, 0, 0, 0})
+
 	return &recoveryTestEnv{
 		bp:         env.bp,
 		redoLog:    env.redoLog,
