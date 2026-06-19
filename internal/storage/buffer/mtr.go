@@ -33,8 +33,9 @@ type Mtr struct {
 	heldLatches   []heldLatchEntry
 	trxId         lock.TrxId
 	redo          *redo.Buffer
-	hasLoggedPage bool  // この Mtr で 1 つでもページを Redo 記録したか
-	logErr        error // 記録中に発生した最初のエラー。発生後は記録を行わない
+	mtrStartLsn   redo.Lsn // この Mtr が最初に記録した MtrStart の LSN (= ダーティ化開始 LSN)。未採番時は 0
+	hasLoggedPage bool     // この Mtr で 1 つでもページを Redo 記録したか
+	logErr        error    // 記録中に発生した最初のエラー。発生後は記録を行わない
 }
 
 func NewMtr(pool *Pool) *Mtr {
@@ -166,6 +167,7 @@ func (m *Mtr) releaseAll() {
 // logPageIfModified は X ラッチ保持中の変更済みページを Redo へ記録し、Page LSN をスタンプする
 //   - 読み取り専用 Mtr (redo 未設定)・実体ラッチ非保持・X 以外・未変更ページは記録しない
 //   - スタンプはページ全体コピーの前に行うため、コピーにそのレコード自身の LSN が含まれる
+//   - MtrStart 採番直後に bufPage.markDirtyFromLsn(mtrStartLsn) を呼び、ダーティ化開始 LSN を記録する
 func (m *Mtr) logPageIfModified(entry pinnedEntry) {
 	if m.redo == nil || m.logErr != nil || entry.skipLatch || entry.mode != LatchExclusive {
 		return
@@ -175,12 +177,15 @@ func (m *Mtr) logPageIfModified(entry pinnedEntry) {
 		return
 	}
 	if !m.hasLoggedPage {
-		if _, err := m.redo.AppendMtrStart(m.trxId); err != nil {
+		lsn, err := m.redo.AppendMtrStart(m.trxId)
+		if err != nil {
 			m.logErr = err
 			return
 		}
+		m.mtrStartLsn = lsn
 		m.hasLoggedPage = true
 	}
+	bufPage.markDirtyFromLsn(m.mtrStartLsn)
 	_, err := m.redo.AppendPageWrite(m.trxId, entry.pageId, bufPage.data, func(lsn redo.Lsn) {
 		var b [page.HeaderSize]byte
 		binary.BigEndian.PutUint32(b[:], uint32(lsn))

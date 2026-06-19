@@ -6,6 +6,7 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
 
 type Pool struct {
@@ -117,6 +118,20 @@ func (p *Pool) ForEachDirtyPage(fn func(pg *page.Page)) {
 			return
 		}
 		fn(p.pages[bufId].data)
+	})
+}
+
+// ForEachDirtyOldestLsn はフラッシュリスト内の全ダーティーページの「最初にダーティ化した時の LSN」を順に渡す
+func (p *Pool) ForEachDirtyOldestLsn(fn func(lsn redo.Lsn)) {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+
+	p.flushList.forEach(func(pageId page.Id) {
+		bufId, ok := p.pageTable.bufferId(pageId)
+		if !ok {
+			return
+		}
+		fn(p.pages[bufId].oldestModificationLsn)
 	})
 }
 

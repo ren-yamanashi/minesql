@@ -1,7 +1,6 @@
 package access
 
 import (
-	"encoding/binary"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
@@ -40,10 +39,9 @@ func TestCheckpointExecute(t *testing.T) {
 		assert.Equal(t, env.redoLog.FlushedLsn(), env.redoLog.CheckpointLsn())
 	})
 
-	t.Run("ダーティーページがある場合 最小 Page LSN - 1 がチェックポイント LSN になる", func(t *testing.T) {
+	t.Run("ダーティーページがある場合 最小ダーティ化開始 LSN - 1 がチェックポイント LSN になる", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		// セットアップで作られたダーティーページをクリア
 		_ = env.bp.FlushAllPages()
 
 		_, _ = env.redoLog.AppendCommit(lock.TrxId(1)) // LSN=1
@@ -51,14 +49,14 @@ func TestCheckpointExecute(t *testing.T) {
 		_, _ = env.redoLog.AppendCommit(lock.TrxId(3)) // LSN=3
 		_ = env.redoLog.Flush()
 
-		// ダーティーページを作り Page LSN=3 を設定
 		pgId := page.NewId(page.FileId(2), 0)
 		_, _ = env.bp.AddPage(pgId)
-		writePage, err := env.bp.Page(pgId)
+		mtr := buffer.NewWriteMtr(env.bp, lock.TrxId(1), env.redoLog)
+		bufPage, err := mtr.PageForWrite(pgId)
 		assert.NoError(t, err)
-		var lsnBuf [4]byte
-		binary.BigEndian.PutUint32(lsnBuf[:], 3)
-		writePage.WriteHeaderAt(0, lsnBuf[:])
+		bufPage.WriteBodyAt(0, []byte{1})
+		assert.NoError(t, mtr.Commit())
+		mtrStartLsn := firstMtrStartLsn(t, env.redoLog)
 
 		cp := NewCheckpoint(env.bp, env.redoLog)
 
@@ -67,7 +65,7 @@ func TestCheckpointExecute(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, redo.Lsn(2), env.redoLog.CheckpointLsn())
+		assert.Equal(t, mtrStartLsn-1, env.redoLog.CheckpointLsn())
 	})
 
 	t.Run("チェックポイント LSN 以前の Redo レコードが切り詰められる", func(t *testing.T) {
@@ -76,18 +74,16 @@ func TestCheckpointExecute(t *testing.T) {
 		_ = env.bp.FlushAllPages()
 
 		_, _ = env.redoLog.AppendCommit(lock.TrxId(1)) // LSN=1
-		_, _ = env.redoLog.AppendCommit(lock.TrxId(2)) // LSN=2
-		_, _ = env.redoLog.AppendCommit(lock.TrxId(3)) // LSN=3
 		_ = env.redoLog.Flush()
 
-		// Page LSN=2 のダーティーページ → チェックポイント LSN = 1
 		pgId := page.NewId(page.FileId(2), 0)
 		_, _ = env.bp.AddPage(pgId)
-		writePage, err := env.bp.Page(pgId)
+		mtr := buffer.NewWriteMtr(env.bp, lock.TrxId(1), env.redoLog)
+		bufPage, err := mtr.PageForWrite(pgId)
 		assert.NoError(t, err)
-		var lsnBuf [4]byte
-		binary.BigEndian.PutUint32(lsnBuf[:], 2)
-		writePage.WriteHeaderAt(0, lsnBuf[:])
+		bufPage.WriteBodyAt(0, []byte{1})
+		assert.NoError(t, mtr.Commit())
+		mtrStartLsn := firstMtrStartLsn(t, env.redoLog)
 
 		cp := NewCheckpoint(env.bp, env.redoLog)
 
@@ -96,40 +92,35 @@ func TestCheckpointExecute(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		// LSN=1 が切り詰められ、LSN=2, 3 が残る
+		// checkpointLsn = mtrStartLsn - 1 以前のレコードが消える
 		records, err := env.redoLog.ReadFrom(redo.Lsn(0))
 		assert.NoError(t, err)
-		assert.Len(t, records, 2)
-		assert.Equal(t, redo.Lsn(2), records[0].Lsn())
-		assert.Equal(t, redo.Lsn(3), records[1].Lsn())
+		for _, r := range records {
+			assert.Greater(t, r.Lsn(), mtrStartLsn-1)
+		}
 	})
 
-	t.Run("複数のダーティーページがある場合 最小の Page LSN が使われる", func(t *testing.T) {
+	t.Run("複数のダーティーページがある場合 最小のダーティ化開始 LSN が使われる", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
 		_ = env.bp.FlushAllPages()
 
-		_, _ = env.redoLog.AppendCommit(lock.TrxId(1)) // LSN=1
-		_, _ = env.redoLog.AppendCommit(lock.TrxId(2)) // LSN=2
-		_ = env.redoLog.Flush()
-
-		// Page LSN=5 のダーティーページ
 		pgId1 := page.NewId(page.FileId(2), 0)
 		_, _ = env.bp.AddPage(pgId1)
-		writePage1, err := env.bp.Page(pgId1)
+		mtr1 := buffer.NewWriteMtr(env.bp, lock.TrxId(1), env.redoLog)
+		bufPage1, err := mtr1.PageForWrite(pgId1)
 		assert.NoError(t, err)
-		var lsnBuf1 [4]byte
-		binary.BigEndian.PutUint32(lsnBuf1[:], 5)
-		writePage1.WriteHeaderAt(0, lsnBuf1[:])
+		bufPage1.WriteBodyAt(0, []byte{1})
+		assert.NoError(t, mtr1.Commit())
+		firstMtrStart := firstMtrStartLsn(t, env.redoLog)
 
-		// Page LSN=2 のダーティーページ (こちらが最小)
 		pgId2 := page.NewId(page.FileId(2), 1)
 		_, _ = env.bp.AddPage(pgId2)
-		writePage2, err := env.bp.Page(pgId2)
+		mtr2 := buffer.NewWriteMtr(env.bp, lock.TrxId(1), env.redoLog)
+		bufPage2, err := mtr2.PageForWrite(pgId2)
 		assert.NoError(t, err)
-		var lsnBuf2 [4]byte
-		binary.BigEndian.PutUint32(lsnBuf2[:], 2)
-		writePage2.WriteHeaderAt(0, lsnBuf2[:])
+		bufPage2.WriteBodyAt(0, []byte{2})
+		assert.NoError(t, mtr2.Commit())
 
 		cp := NewCheckpoint(env.bp, env.redoLog)
 
@@ -138,7 +129,7 @@ func TestCheckpointExecute(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, redo.Lsn(1), env.redoLog.CheckpointLsn())
+		assert.Equal(t, firstMtrStart-1, env.redoLog.CheckpointLsn())
 	})
 
 	t.Run("Redo ログが空でもエラーにならない", func(t *testing.T) {
@@ -153,7 +144,7 @@ func TestCheckpointExecute(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("実 Insert で生じたダーティーページの最小 Page LSN - 1 がチェックポイント LSN になる", func(t *testing.T) {
+	t.Run("実 Insert で生じたダーティーページの最小ダーティ化開始 LSN - 1 がチェックポイント LSN になる", func(t *testing.T) {
 		// GIVEN
 		env := setupIntegrationEnv(t)
 		_ = createUsersTable(t, env)
@@ -170,7 +161,7 @@ func TestCheckpointExecute(t *testing.T) {
 		err = env.trxMgr.Commit(trx)
 		assert.NoError(t, err)
 
-		minLsn := dirtyMinPageLsn(env.bp)
+		minLsn := dirtyMinOldestLsn(env.bp)
 		assert.NotEqual(t, redo.Lsn(0), minLsn)
 
 		// WHEN
@@ -185,11 +176,19 @@ func TestCheckpointExecute(t *testing.T) {
 
 func TestCheckpointExecuteWithFuzzyFlushAndRecovery(t *testing.T) {
 	t.Run("一部フラッシュ → Checkpoint で前進 → クラッシュ → Recovery で残りが復元される", func(t *testing.T) {
-		// FIXME(7c): 7c で oldest_modification LSN を導入した後に有効化する
-		// 現状の Checkpoint は Page LSN (newest_modification 相当) を minPageLsn として使うため、
-		// 同一ページが繰り返し変更されると checkpointLsn が前進しすぎて Redo が truncate され、
-		// 未フラッシュページのデータがロスする
-		t.Skip("FIXME(7c): oldest_modification LSN 導入後に有効化")
+		// FIXME(7d): 7d で以下の 2 点を解決した後に有効化する。
+		// (1) 現シナリオは同じテーブルへの 3 件 Insert で同一 leaf / undo / secondary leaf
+		//     ページを繰り返し変更するため、3 ページとも最初の MtrStart LSN を oldest として
+		//     共有してしまい、FlushOldestPages(1) しても残ページの oldest が変わらず
+		//     checkpointLsn が前進しない。複数の独立した mtr で異なるページを変更する
+		//     シナリオへ再設計する必要がある (例: 別テーブルを使う / テーブル作成と Insert を
+		//     分離する)。
+		// (2) DDL 経路 (CreateCatalog / persistScalar / registerTableMeta / btree.CreateTree /
+		//     undo.NewManager) は読み取り専用 Mtr で書き込みを行い、Redo に記録されない。
+		//     Recovery でカタログヘッダーやメタテーブルの変更が復元されないデータロス問題が
+		//     残る。NewWriteMtr 経由に置換する必要がある (C2 を緑にする条件ではないが、独立した
+		//     深刻問題のため 7d でまとめて対処)。
+		t.Skip("FIXME(7d): C2 シナリオ再設計 + DDL の Redo 化 完了後に有効化")
 
 		// GIVEN
 		env := setupIntegrationEnv(t)
@@ -244,16 +243,30 @@ func TestCheckpointExecuteWithFuzzyFlushAndRecovery(t *testing.T) {
 	})
 }
 
-// dirtyMinPageLsn はバッファプール内ダーティーページの最小 Page LSN を取得する
-func dirtyMinPageLsn(bp *buffer.Pool) redo.Lsn {
+// dirtyMinOldestLsn はバッファプール内ダーティーページの最小ダーティ化開始 LSN を取得する
+func dirtyMinOldestLsn(bp *buffer.Pool) redo.Lsn {
 	var minLsn redo.Lsn
 	first := true
-	bp.ForEachDirtyPage(func(pg *page.Page) {
-		lsn := redo.Lsn(binary.BigEndian.Uint32(pg.Header()))
+	bp.ForEachDirtyOldestLsn(func(lsn redo.Lsn) {
 		if first || lsn < minLsn {
 			minLsn = lsn
 			first = false
 		}
 	})
 	return minLsn
+}
+
+// firstMtrStartLsn は Redo ログの先頭の MtrStart レコードの LSN を取得する
+func firstMtrStartLsn(t *testing.T, rl *redo.Buffer) redo.Lsn {
+	t.Helper()
+	assert.NoError(t, rl.Flush())
+	records, err := rl.ReadFrom(redo.Lsn(0))
+	assert.NoError(t, err)
+	for _, r := range records {
+		if r.Type() == redo.RecordTypeMtrStart {
+			return r.Lsn()
+		}
+	}
+	t.Fatalf("MtrStart レコードが見つからない")
+	return redo.Lsn(0)
 }

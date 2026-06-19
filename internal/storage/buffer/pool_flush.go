@@ -144,11 +144,12 @@ func (p *Pool) flushAndClean(task flushTask) error {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 	// 収集時点から modifyCount が変化していれば並行書き込みがあったため
-	// isDirty を維持し flushList に残す (次回フラッシュで再度書き出す)
+	// isDirty・oldestModificationLsn を維持し flushList に残す (次回フラッシュで再度書き出す)
 	if task.modifyCount != task.bufPage.modifyCount {
 		return nil
 	}
 	task.bufPage.isDirty = false
+	task.bufPage.oldestModificationLsn = 0
 	p.flushList.delete(task.pageId)
 	return nil
 }

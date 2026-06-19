@@ -5,16 +5,18 @@ import (
 
 	"github.com/ncw/directio"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
 
 type Page struct {
-	pageId      page.Id
-	data        *page.Page
-	isDirty     bool
-	pinCount    int
-	latch       *RWLatch
-	modifyCount uint64 // 書き込みのたびに増加する更新カウンタ
-	pool        *Pool  // markDirty で flushList と isDirty を更新するためのバックポインタ
+	pageId                page.Id
+	data                  *page.Page
+	isDirty               bool
+	pinCount              int
+	latch                 *RWLatch
+	modifyCount           uint64   // 書き込みのたびに増加する更新カウンタ
+	oldestModificationLsn redo.Lsn // 最初にダーティ化した時の mtr 開始マーカー LSN。クリーン時は 0
+	pool                  *Pool    // markDirty で flushList と isDirty を更新するためのバックポインタ
 }
 
 func (p *Page) PageId() page.Id     { return p.pageId }
@@ -26,6 +28,16 @@ func (p *Page) ModifyCount() uint64 { return p.modifyCount }
 //   - 呼び出し側は X ラッチを保持中であることが前提
 func (p *Page) MarkModified() {
 	p.pool.markDirty(p)
+}
+
+// markDirtyFromLsn は「最初にダーティ化した時の LSN」を設定する
+//   - oldestModificationLsn が 0 (= クリーン状態) のときのみ lsn を設定する
+//   - 既に非 0 (= 既にダーティ) なら何もしない (最初の値を保持)
+//   - 呼び出し側は X ラッチを保持中であることが前提
+func (p *Page) markDirtyFromLsn(lsn redo.Lsn) {
+	if p.oldestModificationLsn == 0 {
+		p.oldestModificationLsn = lsn
+	}
 }
 
 // OverwritePage はページ全体を src で上書きし、書き込み完了を通知する

@@ -1,10 +1,7 @@
 package access
 
 import (
-	"encoding/binary"
-
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
 
@@ -18,7 +15,7 @@ func NewCheckpoint(bp *buffer.Pool, redo *redo.Buffer) *Checkpoint {
 }
 
 func (c *Checkpoint) Execute() error {
-	minLsn := c.minPageLsn()
+	minLsn := c.minOldestModificationLsn()
 	checkpointLsn := c.redoLog.FlushedLsn()
 	if minLsn > 0 {
 		checkpointLsn = minLsn - 1
@@ -29,12 +26,11 @@ func (c *Checkpoint) Execute() error {
 	return c.redoLog.TruncateBefore(checkpointLsn)
 }
 
-// minPageLsn はフラッシュリスト内の全ダーティーページの最小 Page LSN を返す
-func (c *Checkpoint) minPageLsn() redo.Lsn {
+// minOldestModificationLsn はフラッシュリスト内の全ダーティーページの「最初にダーティ化した時の LSN」の最小を返す
+func (c *Checkpoint) minOldestModificationLsn() redo.Lsn {
 	var minLsn redo.Lsn
 	first := true
-	c.bufferPool.ForEachDirtyPage(func(pg *page.Page) {
-		lsn := redo.Lsn(binary.BigEndian.Uint32(pg.Header()))
+	c.bufferPool.ForEachDirtyOldestLsn(func(lsn redo.Lsn) {
 		if first || lsn < minLsn {
 			minLsn = lsn
 			first = false
