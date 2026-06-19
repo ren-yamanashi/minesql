@@ -8,6 +8,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,7 +18,7 @@ func TestNewCatalog(t *testing.T) {
 		bp := buffer.NewPool(page.Size*20, nil)
 
 		// WHEN
-		_, err := NewCatalog(bp)
+		_, err := NewCatalog(bp, newCatalogTestRedoBuffer(t))
 
 		// THEN
 		assert.Error(t, err)
@@ -26,11 +27,11 @@ func TestNewCatalog(t *testing.T) {
 	t.Run("CreateCatalog で作成したカタログを開ける", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
-		_, err := CreateCatalog(bp)
+		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
 		assert.NoError(t, err)
 
 		// WHEN
-		catalog, err := NewCatalog(bp)
+		catalog, err := NewCatalog(bp, newCatalogTestRedoBuffer(t))
 
 		// THEN
 		assert.NoError(t, err)
@@ -43,11 +44,11 @@ func TestNewCatalog(t *testing.T) {
 	t.Run("6 つのメタデータのページ ID が復元される", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
-		created, err := CreateCatalog(bp)
+		created, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
 		assert.NoError(t, err)
 
 		// WHEN
-		opened, err := NewCatalog(bp)
+		opened, err := NewCatalog(bp, newCatalogTestRedoBuffer(t))
 
 		// THEN
 		assert.NoError(t, err)
@@ -62,7 +63,7 @@ func TestNewCatalog(t *testing.T) {
 	t.Run("マジックナンバーが不正な場合 errInvalidCatalogFile を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
-		_, err := CreateCatalog(bp)
+		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
 		assert.NoError(t, err)
 
 		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
@@ -72,7 +73,7 @@ func TestNewCatalog(t *testing.T) {
 		bp.Unpin(headerPageId)
 
 		// WHEN
-		_, err = NewCatalog(bp)
+		_, err = NewCatalog(bp, newCatalogTestRedoBuffer(t))
 
 		// THEN
 		assert.ErrorIs(t, err, errInvalidCatalogFile)
@@ -85,7 +86,7 @@ func TestCreateCatalog(t *testing.T) {
 		bp := buffer.NewPool(page.Size*20, nil)
 
 		// WHEN
-		_, err := CreateCatalog(bp)
+		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
 
 		// THEN
 		assert.Error(t, err)
@@ -96,7 +97,7 @@ func TestCreateCatalog(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 
 		// WHEN
-		catalog, err := CreateCatalog(bp)
+		catalog, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
 
 		// THEN
 		assert.NoError(t, err)
@@ -108,7 +109,7 @@ func TestCreateCatalog(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 
 		// WHEN
-		_, err := CreateCatalog(bp)
+		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
 		assert.NoError(t, err)
 
 		// THEN
@@ -126,7 +127,7 @@ func TestCreateCatalog(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 
 		// WHEN
-		_, err := CreateCatalog(bp)
+		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
 		assert.NoError(t, err)
 
 		// THEN
@@ -153,7 +154,7 @@ func TestCreateCatalog(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 
 		// WHEN
-		catalog, err := CreateCatalog(bp)
+		catalog, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
 
 		// THEN
 		assert.NoError(t, err)
@@ -170,7 +171,7 @@ func TestCreateCatalog(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 
 		// WHEN
-		catalog, err := CreateCatalog(bp)
+		catalog, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
 
 		// THEN
 		assert.NoError(t, err)
@@ -187,7 +188,7 @@ func TestCreateCatalog(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 
 		// WHEN
-		_, err := CreateCatalog(bp)
+		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
 		assert.NoError(t, err)
 
 		// THEN
@@ -203,7 +204,7 @@ func TestAllocateIndexId(t *testing.T) {
 	t.Run("IndexId を採番するたびにインクリメントされる", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
-		ct, err := CreateCatalog(bp)
+		ct, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
 		assert.NoError(t, err)
 
 		// WHEN
@@ -220,7 +221,7 @@ func TestAllocateIndexId(t *testing.T) {
 	t.Run("採番後にヘッダーページがダーティーになる", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
-		ct, err := CreateCatalog(bp)
+		ct, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
 		assert.NoError(t, err)
 		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
 		bufPageHeader, err := bp.Page(headerPageId)
@@ -244,7 +245,7 @@ func TestAllocateFileId(t *testing.T) {
 	t.Run("FileId を採番するたびにインクリメントされる", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
-		ct, err := CreateCatalog(bp)
+		ct, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
 		assert.NoError(t, err)
 
 		// WHEN
@@ -261,7 +262,7 @@ func TestAllocateFileId(t *testing.T) {
 	t.Run("採番後にヘッダーページがダーティーになる", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
-		ct, err := CreateCatalog(bp)
+		ct, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
 		assert.NoError(t, err)
 		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
 		bufPageHeader, err := bp.Page(headerPageId)
@@ -294,4 +295,15 @@ func setupCatalogTestBufferPool(t *testing.T) *buffer.Pool {
 	bp := buffer.NewPool(page.Size*20, nil)
 	bp.RegisterHeapFile(fileId, hf)
 	return bp
+}
+
+// newCatalogTestRedoBuffer はカタログテスト用の Redo バッファを作成する
+func newCatalogTestRedoBuffer(t *testing.T) *redo.Buffer {
+	t.Helper()
+	rl, err := redo.NewBuffer(t.TempDir())
+	if err != nil {
+		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = rl.Close() })
+	return rl
 }

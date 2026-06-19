@@ -8,24 +8,17 @@ import (
 )
 
 func TestSystemReservedTrxId(t *testing.T) {
-	t.Run("予約値は TrxId 型の最大値である", func(t *testing.T) {
+	t.Run("ユーザー採番と衝突しない値が予約されている", func(t *testing.T) {
 		// GIVEN
-		// WHEN
-		// THEN
-		assert.Equal(t, TrxId(math.MaxUint32), SystemReservedTrxId)
-	})
+		userInitialTrxId := TrxId(1)
+		unassignedTrxId := TrxId(0)
 
-	t.Run("予約値は 0 ではない (未割り当てを示すゼロ値と区別される)", func(t *testing.T) {
-		// GIVEN
 		// WHEN
-		// THEN
-		assert.NotEqual(t, TrxId(0), SystemReservedTrxId)
-	})
+		reserved := SystemReservedTrxId
 
-	t.Run("予約値はユーザー採番開始値 1 と異なる", func(t *testing.T) {
-		// GIVEN
-		// WHEN
 		// THEN
-		assert.NotEqual(t, TrxId(1), SystemReservedTrxId)
+		assert.Equal(t, TrxId(math.MaxUint32), reserved)
+		assert.NotEqual(t, unassignedTrxId, reserved)
+		assert.NotEqual(t, userInitialTrxId, reserved)
 	})
 }

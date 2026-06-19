@@ -11,7 +11,7 @@ func TestUserIteratorClose(t *testing.T) {
 	t.Run("検索結果のイテレータを Close できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
-		ct, err := CreateCatalog(bp)
+		ct, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
 		assert.NoError(t, err)
 		mtr := buffer.NewMtr(bp)
 		defer mtr.UnpinAll()
@@ -31,7 +31,7 @@ func TestUserIteratorClose(t *testing.T) {
 	t.Run("イテレーション前に Close できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
-		ct, err := CreateCatalog(bp)
+		ct, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
 		assert.NoError(t, err)
 		mtr := buffer.NewMtr(bp)
 		defer mtr.UnpinAll()

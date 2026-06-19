@@ -176,7 +176,7 @@ func TestCheckpointExecute(t *testing.T) {
 }
 
 func TestCheckpointExecuteWithFuzzyFlushAndRecovery(t *testing.T) {
-	t.Run("複数テーブルへの独立 Insert → 一部フラッシュ → Checkpoint で前進 → クラッシュ → Recovery で全件復元される", func(t *testing.T) {
+	t.Run("複数テーブルへの独立 Insert を一部フラッシュ後の Checkpoint で前進させクラッシュ後のリカバリで全件復元できる", func(t *testing.T) {
 		// GIVEN
 		env := setupIntegrationEnv(t)
 		tableNames := []string{"users", "products", "orders"}
