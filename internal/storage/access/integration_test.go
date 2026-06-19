@@ -658,3 +658,76 @@ func createUsersTable(t *testing.T, env *integrationEnv) *Table {
 	}
 	return table
 }
+
+// crashAndRecover はインメモリ状態 (バッファプール / トランザクションマネージャ / ロックマネージャ /
+// REDO バッファ / UNDO マネージャ / カタログ) を破棄し、HeapFile と Redo ログファイルの
+// ディスク内容のみを保持したまま新しい環境を構築する。クラッシュ → 再起動をシミュレートする。
+//   - 旧 env のリソースは Close しない (テスト終了時の Cleanup でまとめて解放される)
+//   - 呼び出し側は事前に prev.redoLog.Flush() を呼んでログをディスクに同期しておくこと
+//   - tableNames は再オープン対象のテーブル名 (CreateTable で作成した <name>.db を再オープン)
+func crashAndRecover(t *testing.T, prev *integrationEnv, tableNames []string) *integrationEnv {
+	t.Helper()
+	_ = prev // 旧 env はテスト終了時の Cleanup でまとめて解放されるため、ここでは参照しない
+
+	bp := buffer.NewPool(page.Size*50, nil)
+
+	catalogPath := filepath.Join(config.BaseDir, "catalog.db")
+	catalogHf, err := file.NewHeapFile(page.FileId(0), catalogPath)
+	if err != nil {
+		t.Fatalf("カタログ HeapFile の再オープンに失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = catalogHf.Close() })
+	bp.RegisterHeapFile(page.FileId(0), catalogHf)
+
+	ct, err := dictionary.NewCatalog(bp)
+	if err != nil {
+		t.Fatalf("Catalog の再オープンに失敗: %v", err)
+	}
+
+	undoFileId := ct.UndoLogFileId()
+	undoPath := filepath.Join(config.BaseDir, "undo.db")
+	undoHf, err := file.NewHeapFile(undoFileId, undoPath)
+	if err != nil {
+		t.Fatalf("Undo HeapFile の再オープンに失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = undoHf.Close() })
+	bp.RegisterHeapFile(undoFileId, undoHf)
+
+	for _, name := range tableNames {
+		record, err := fetchTable(ct, bp, name)
+		if err != nil {
+			t.Fatalf("テーブル %q の取得に失敗: %v", name, err)
+		}
+		fileId := record.MetaPageId().FileId()
+		tablePath := filepath.Join(config.BaseDir, fmt.Sprintf("%s.db", name))
+		tableHf, err := file.NewHeapFile(fileId, tablePath)
+		if err != nil {
+			t.Fatalf("テーブル %q の HeapFile 再オープンに失敗: %v", name, err)
+		}
+		t.Cleanup(func() { _ = tableHf.Close() })
+		bp.RegisterHeapFile(fileId, tableHf)
+	}
+
+	redoLog, err := redo.NewBuffer(config.BaseDir)
+	if err != nil {
+		t.Fatalf("redo.Buffer の再オープンに失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = redoLog.Close() })
+
+	undoMgr, err := undo.NewManager(bp, undoFileId)
+	if err != nil {
+		t.Fatalf("undo.Manager の再オープンに失敗: %v", err)
+	}
+
+	lockMgr := lock.NewManager()
+	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp)
+
+	return &integrationEnv{
+		bp:      bp,
+		ct:      ct,
+		undoLog: undoMgr,
+		lockMgr: lockMgr,
+		redoLog: redoLog,
+		trxMgr:  trxMgr,
+	}
+}

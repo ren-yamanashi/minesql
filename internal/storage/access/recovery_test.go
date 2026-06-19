@@ -1,6 +1,7 @@
 package access
 
 import (
+	"encoding/binary"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
@@ -399,4 +400,240 @@ func setupTableForRecoveryTest(t *testing.T, env *recoveryTestEnv) *Table {
 		t.Fatalf("Table の作成に失敗: %v", err)
 	}
 	return table
+}
+
+func TestRecoveryExecuteRestoresCommittedInsertFromRedo(t *testing.T) {
+	t.Run("ディスク未反映の Commit 済み Insert がリカバリで復元される", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		_ = createUsersTable(t, env)
+		flushBaseline(t, env)
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
+		assert.NoError(t, err)
+
+		trx := env.trxMgr.Begin()
+		err = table.Insert(
+			trx,
+			[]string{"id", "name", "email"},
+			[]string{"1", "Alice", "alice@example.com"},
+		)
+		assert.NoError(t, err)
+		err = env.trxMgr.Commit(trx)
+		assert.NoError(t, err)
+		assert.NoError(t, env.redoLog.Flush())
+
+		// WHEN
+		env2 := crashAndRecover(t, env, []string{"users"})
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId())
+		err = r.Execute()
+
+		// THEN
+		assert.NoError(t, err)
+		table2, err := NewTable(env2.bp, env2.ct, env2.undoLog, env2.lockMgr, env2.redoLog, "users")
+		assert.NoError(t, err)
+		record := searchFirstPrimaryRecord(t, table2)
+		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, record.values)
+	})
+}
+
+func TestRecoveryExecuteSkipsAlreadyAppliedPagesByPageLsn(t *testing.T) {
+	t.Run("ディスクに反映済みのページは Page LSN により上書きされない", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		_ = createUsersTable(t, env)
+		flushBaseline(t, env)
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
+		assert.NoError(t, err)
+
+		trx := env.trxMgr.Begin()
+		err = table.Insert(
+			trx,
+			[]string{"id", "name", "email"},
+			[]string{"1", "Alice", "alice@example.com"},
+		)
+		assert.NoError(t, err)
+		err = env.trxMgr.Commit(trx)
+		assert.NoError(t, err)
+		assert.NoError(t, env.redoLog.Flush())
+		assert.NoError(t, env.bp.FlushAllPages())
+
+		dataFileId := table.primaryIndex.fileId()
+		dataPageId, beforeBytes, beforeLsn := snapshotLatestPageWrite(t, env, dataFileId)
+		assert.NotEqual(t, redo.Lsn(0), beforeLsn)
+
+		// WHEN
+		env2 := crashAndRecover(t, env, []string{"users"})
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId())
+		err = r.Execute()
+
+		// THEN
+		assert.NoError(t, err)
+		afterBytes, afterLsn := readPageBytes(t, env2.bp, dataPageId)
+		assert.Equal(t, beforeLsn, afterLsn)
+		assert.Equal(t, beforeBytes, afterBytes)
+	})
+}
+
+func TestRecoveryExecuteDiscardsIncompleteMtr(t *testing.T) {
+	t.Run("MtrEnd 無しの不完全 mtr は Recovery で適用されない", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		_ = createUsersTable(t, env)
+		flushBaseline(t, env)
+
+		catalogPageId := page.NewId(page.FileId(0), page.PageNumber(0))
+		beforeBytes, beforeLsn := readPageBytes(t, env.bp, catalogPageId)
+
+		broken := makeBrokenPage(t)
+		trxId := lock.TrxId(99)
+		_, err := env.redoLog.AppendMtrStart(trxId)
+		assert.NoError(t, err)
+		_, err = env.redoLog.AppendPageCopy(trxId, catalogPageId, broken)
+		assert.NoError(t, err)
+		assert.NoError(t, env.redoLog.Flush())
+
+		// WHEN
+		env2 := crashAndRecover(t, env, []string{"users"})
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId())
+		err = r.Execute()
+
+		// THEN
+		assert.NoError(t, err)
+		afterBytes, afterLsn := readPageBytes(t, env2.bp, catalogPageId)
+		assert.Equal(t, beforeLsn, afterLsn)
+		assert.Equal(t, beforeBytes, afterBytes)
+	})
+}
+
+func TestRecoveryExecuteRollbacksMultipleInsertsInOneTransaction(t *testing.T) {
+	t.Run("未 Commit の複数 Insert はクラッシュ後すべてロールバックされる", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		_ = createUsersTable(t, env)
+		flushBaseline(t, env)
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
+		assert.NoError(t, err)
+
+		trx := env.trxMgr.Begin()
+		for _, row := range [][]string{
+			{"1", "Alice", "alice@example.com"},
+			{"2", "Bob", "bob@example.com"},
+			{"3", "Carol", "carol@example.com"},
+		} {
+			err = table.Insert(trx, []string{"id", "name", "email"}, row)
+			assert.NoError(t, err)
+		}
+		assert.NoError(t, env.redoLog.Flush())
+		assert.NoError(t, env.bp.FlushAllPages())
+
+		// WHEN
+		env2 := crashAndRecover(t, env, []string{"users"})
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId())
+		err = r.Execute()
+
+		// THEN
+		assert.NoError(t, err)
+		table2, err := NewTable(env2.bp, env2.ct, env2.undoLog, env2.lockMgr, env2.redoLog, "users")
+		assert.NoError(t, err)
+		mtr := buffer.NewMtr(env2.bp)
+		defer mtr.UnpinAll()
+		iter, err := table2.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		assert.NoError(t, err)
+		_, ok, err := iter.Next()
+		assert.NoError(t, err)
+		assert.False(t, ok)
+	})
+}
+
+func TestRecoveryExecuteRollbacksUncommittedUpdateAfterCommittedInsert(t *testing.T) {
+	t.Run("Commit 済み Insert 後の未 Commit Update がクラッシュ後にロールバックされる", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		_ = createUsersTable(t, env)
+		flushBaseline(t, env)
+		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
+		assert.NoError(t, err)
+
+		trx1 := env.trxMgr.Begin()
+		err = table.Insert(
+			trx1,
+			[]string{"id", "name", "email"},
+			[]string{"1", "Alice", "alice@example.com"},
+		)
+		assert.NoError(t, err)
+		err = env.trxMgr.Commit(trx1)
+		assert.NoError(t, err)
+
+		trx2 := env.trxMgr.Begin()
+		record := currentReadFirst(t, table, trx2)
+		err = table.Update(trx2, record, []string{"name"}, []string{"Bob"})
+		assert.NoError(t, err)
+		assert.NoError(t, env.redoLog.Flush())
+		assert.NoError(t, env.bp.FlushAllPages())
+
+		// WHEN
+		env2 := crashAndRecover(t, env, []string{"users"})
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId())
+		err = r.Execute()
+
+		// THEN
+		assert.NoError(t, err)
+		table2, err := NewTable(env2.bp, env2.ct, env2.undoLog, env2.lockMgr, env2.redoLog, "users")
+		assert.NoError(t, err)
+		restored := searchFirstPrimaryRecord(t, table2)
+		assert.Equal(t, "Alice", restored.values[1])
+	})
+}
+
+// snapshotLatestPageWrite は指定 FileId の最後の PageWrite レコードの PageId・現在のバイト列・Page LSN を返す
+func snapshotLatestPageWrite(t *testing.T, env *integrationEnv, fileId page.FileId) (page.Id, []byte, redo.Lsn) {
+	t.Helper()
+	records, err := env.redoLog.ReadFrom(redo.Lsn(0))
+	assert.NoError(t, err)
+	var target page.Id
+	for _, rec := range records {
+		if rec.Type() != redo.RecordTypePageWrite {
+			continue
+		}
+		if rec.PageId().FileId() != fileId {
+			continue
+		}
+		target = rec.PageId()
+	}
+	assert.NotEqual(t, page.Id{}, target)
+	data, lsn := readPageBytes(t, env.bp, target)
+	return target, data, lsn
+}
+
+// readPageBytes は指定 PageId のページ全体のバイト列と Page LSN を取得する
+func readPageBytes(t *testing.T, bp *buffer.Pool, pageId page.Id) ([]byte, redo.Lsn) {
+	t.Helper()
+	mtr := buffer.NewMtr(bp)
+	defer mtr.UnpinAll()
+	bufPage, err := mtr.PageForRead(pageId)
+	assert.NoError(t, err)
+	bytes := make([]byte, page.Size)
+	copy(bytes, bufPage.Data().Bytes())
+	lsn := redo.Lsn(binary.BigEndian.Uint32(bufPage.Data().Header()))
+	return bytes, lsn
+}
+
+// makeBrokenPage はテストで「不完全 mtr に詰める異常な内容のページ」を生成する
+func makeBrokenPage(t *testing.T) *page.Page {
+	t.Helper()
+	data := make([]byte, page.Size)
+	for i := range data {
+		data[i] = 0xFF
+	}
+	pg, err := page.NewPage(data)
+	assert.NoError(t, err)
+	return pg
+}
+
+// flushBaseline はテーブル作成完了直後のベース状態を、Redo ログと全データページを揃ってディスクへ
+// フラッシュすることで保存する。クラッシュシミュレーションのテストでベース構造を再オープン可能にする
+func flushBaseline(t *testing.T, env *integrationEnv) {
+	t.Helper()
+	assert.NoError(t, env.redoLog.Flush())
+	assert.NoError(t, env.bp.FlushAllPages())
 }
