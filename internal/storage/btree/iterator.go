@@ -9,20 +9,24 @@ import (
 // Iterator は B+Tree のリーフノードを走査する
 //   - 走査の生存期間中はバッファページの Pin を保持する
 //   - フェッチごとに短期の Shared ラッチを取り、解放後の更新を更新カウンタで検知する
-//   - 更新が検知されたら直前に読んだキーで位置を取り直す
+//   - 直前に読んだキーがあればそのキーで、初回 Get 前であれば走査開始時の SearchMode で位置を取り直す
 type Iterator struct {
 	tree            *Tree
 	bufferPage      *buffer.Page
 	slotNum         int
+	searchMode      SearchMode
 	lastKey         []byte
 	modifyCountSnap uint64
 }
 
-func NewIterator(tree *Tree, bufPage *buffer.Page, slotNum int) *Iterator {
+// NewIterator は Tree.Search で得たリーフページ・スロット位置・降下時の SearchMode を引き継いだ Iterator を返す
+//   - searchMode: 初回 Get 前にページが変更された場合、ここに渡したモードで再降下して位置を取り直す
+func NewIterator(tree *Tree, bufPage *buffer.Page, slotNum int, searchMode SearchMode) *Iterator {
 	return &Iterator{
 		tree:            tree,
 		bufferPage:      bufPage,
 		slotNum:         slotNum,
+		searchMode:      searchMode,
 		modifyCountSnap: bufPage.ModifyCount(),
 	}
 }
@@ -130,14 +134,40 @@ func (it *Iterator) checkAndRefetch() (refetched bool, err error) {
 		return false, nil
 	}
 	if it.lastKey == nil {
-		// 走査開始直後はキーがないのでスナップショットだけ進める
-		it.modifyCountSnap = current
-		return false, nil
+		// まだ 1 件も読んでいないので、走査開始時の SearchMode で再降下して位置を取り直す
+		if err := it.refetchBySearchMode(); err != nil {
+			return false, err
+		}
+		return true, nil
 	}
 	if err := it.refetchByKey(it.lastKey); err != nil {
 		return false, err
 	}
 	return true, nil
+}
+
+// refetchBySearchMode は走査開始時の SearchMode で Tree.Search を再実行し、リーフと開始スロットを取り直す
+//   - lastKey == nil (= 初回 Get 前) からの再位置付けに使う
+func (it *Iterator) refetchBySearchMode() error {
+	mtr := buffer.NewMtr(it.tree.bufferPool)
+	defer mtr.UnpinAll()
+
+	iter, err := it.tree.Search(mtr, it.searchMode)
+	if err != nil {
+		return err
+	}
+
+	iter.bufferPage.Latch().LockShared()
+	newSlot := iter.slotNum
+	newModifyCount := iter.bufferPage.ModifyCount()
+	iter.bufferPage.Latch().Unlock(buffer.LatchShared)
+
+	// 既存の Pin を解放し、Tree.Search が確保した新リーフの Pin を引き継ぐ
+	it.tree.bufferPool.Unpin(it.bufferPage.PageId())
+	it.bufferPage = iter.bufferPage
+	it.slotNum = newSlot
+	it.modifyCountSnap = newModifyCount
+	return nil
 }
 
 // refetchByKey は指定キーで Tree.Search を再実行し、リーフと「次の未読位置」を取り直す

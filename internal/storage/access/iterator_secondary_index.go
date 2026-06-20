@@ -2,6 +2,7 @@ package access
 
 import (
 	"bytes"
+	"errors"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
@@ -205,18 +206,13 @@ func (si *SecondaryIndexIterator) resolveViaPrimary(secRec *SecondaryRecord) (*S
 	defer mtr.UnpinAll()
 
 	primaryFileId := si.primaryTree.MetaPageId().FileId()
-	iter, err := si.primaryTree.Search(mtr, SearchModeKey{Key: stringToByteSlice(secRec.pk)}.Encode())
-	if err != nil {
-		return nil, err
-	}
-	defer iter.Close()
-
-	rec, ok, err := iter.Next()
-	if err != nil {
-		return nil, err
-	}
-	if !ok {
+	pkKey := encode.Encode(nil, stringToByteSlice(secRec.pk))
+	rec, _, err := si.primaryTree.FindByKey(mtr, pkKey)
+	if errors.Is(err, btree.ErrKeyNotFound) {
 		return nil, nil //nolint:nilnil // nil は「該当の PK レコードが存在しない」を表す
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	current, err := DecodePrimaryRecord(rec, si.catalog, si.bufferPool, primaryFileId)

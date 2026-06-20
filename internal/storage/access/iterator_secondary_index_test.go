@@ -649,4 +649,26 @@ func TestSecondaryIndexIteratorPKPathFallback(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, []string{"Bob"}, result.values)
 	})
+
+	t.Run("孤立 SK の PK が primary に存在しない場合、lower bound で別 PK のレコードを誤取得しない", func(t *testing.T) {
+		// GIVEN
+		env := setupMVCCTestEnv(t)
+		// primary には PK="2" の Alice のみ存在 (TrxId=1: 可視)。PK="1" は存在しない (孤立 SK の参照先)
+		insertPrimaryRecordWithMvcc(t, env, lock.TrxId(1), undo.NullPointer(), "2", "Alice", "a@example.com")
+		// secondary に PK="1" の Alice (TrxId=5: 不可視) を挿入。primary に PK="1" がないため「孤立 SK」となる
+		insertSecondaryRecordWithMvcc(t, env.iter, 0, lock.TrxId(5), []string{"name"}, []string{"Alice"}, []string{"1"})
+
+		rv := newReadView(lock.TrxId(2), []lock.TrxId{lock.TrxId(5)}, lock.TrxId(6))
+		iter := searchSecondaryIndexWithReadView(t, env, rv)
+		defer iter.Close()
+
+		// WHEN
+		_, ok, err := iter.NextIndexOnly()
+
+		// THEN
+		// lower bound で PK="2" の Alice に着地すると SK 値が一致してしまうので、完全一致確認なしでは secRec が誤って可視扱いになる。
+		// FindByKey の完全一致確認により ErrKeyNotFound で nil に倒れることを検証する
+		assert.NoError(t, err)
+		assert.False(t, ok)
+	})
 }
