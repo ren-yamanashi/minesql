@@ -32,7 +32,7 @@ stateDiagram-v2
 1. 新しいトランザクション ID を払い出す
 2. アクティブトランザクション一覧に当該トランザクションを Active 状態として登録する
 
-トランザクション開始時点では、[ReadView](./mvcc.md#readview) は作成されない (後述)
+トランザクション開始時点では、[ReadView](./mvcc.md#スナップショット-read-view) は作成されない (後述)
 
 ### Commit (コミット)
 
@@ -140,7 +140,7 @@ flowchart TB
 | INSERT | 即破棄 (他トランザクションが Undo チェーンを辿る必要がないため) | 全破棄 |
 | UPDATE / DELETE | パージで回収されるまで保持 | 全破棄 |
 
-UPDATE / DELETE の Undo レコードを残す理由は、他のトランザクションの ReadView から[バージョンチェーン](./mvcc.md#バージョンチェーン)を辿るために必要だから。回収のタイミングについては[パージ](./purge.md)を参照
+UPDATE / DELETE の Undo レコードを残す理由は、他のトランザクションの ReadView から[Undo チェーン](./mvcc.md#undo-チェーン遡及)を辿るために必要だから。回収のタイミングについては[パージ](./purge.md)を参照
 
 ## クラッシュ時のトランザクション扱い
 
