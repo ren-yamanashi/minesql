@@ -18,7 +18,7 @@ func TestNewTrxManager(t *testing.T) {
 
 		// WHEN
 		redoLog := setupTestRedoLog(t)
-		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp)
+		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, 1, nil)
 
 		// THEN
 		assert.NotNil(t, tm)
@@ -61,6 +61,19 @@ func TestTrxManagerBegin(t *testing.T) {
 
 		// THEN
 		assert.Equal(t, trxStateActive, tm.transactions[trx.trxId].state)
+	})
+
+	t.Run("initialNextTrxId で指定した値から払い出される", func(t *testing.T) {
+		// GIVEN
+		env := setupTableTestEnv(t)
+		redoLog := setupTestRedoLog(t)
+		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, 101, nil)
+
+		// WHEN
+		trx := tm.Begin()
+
+		// THEN
+		assert.Equal(t, lock.TrxId(101), trx.trxId)
 	})
 }
 
@@ -345,6 +358,77 @@ func TestTrxManagerRollback(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, "Alice", nameResult.values[1])
 	})
+
+	t.Run("Rollback レコードは Undo 逆適用に伴う Redo レコードの後に書かれる", func(t *testing.T) {
+		// GIVEN
+		tm := setupTrxManager(t)
+		trx := tm.Begin()
+		table := setupTableForTrxTest(t, tm)
+		_ = table.Insert(
+			trx,
+			[]string{"id", "name", "email"},
+			[]string{"1", "Alice", "alice@example.com"},
+		)
+		_ = tm.Commit(trx)
+
+		trx2 := tm.Begin()
+		mtrPre := buffer.NewMtr(table.bufferPool)
+		record := currentReadFirst(t, table, trx2)
+		mtrPre.UnpinAll()
+		err := table.Update(trx2, record, []string{"name"}, []string{"Bob"})
+		assert.NoError(t, err)
+
+		// WHEN
+		err = tm.Rollback(trx2)
+		assert.NoError(t, err)
+		err = tm.redoLog.Flush()
+		assert.NoError(t, err)
+		records, err := tm.redoLog.ReadFrom(0)
+		assert.NoError(t, err)
+
+		// THEN
+		var rollbackIdx, lastTrx2RollbackPageWriteIdx int
+		rollbackIdx, lastTrx2RollbackPageWriteIdx = -1, -1
+		for i, r := range records {
+			if r.TrxId() != trx2.trxId {
+				continue
+			}
+			switch r.Type() {
+			case redo.RecordTypeRollback:
+				rollbackIdx = i
+			case redo.RecordTypePageWrite:
+				lastTrx2RollbackPageWriteIdx = i
+			}
+		}
+		assert.NotEqual(t, -1, rollbackIdx, "Rollback レコードが Redo に書かれている")
+		assert.NotEqual(t, -1, lastTrx2RollbackPageWriteIdx, "Undo 逆適用に伴う PageWrite が Redo に書かれている")
+		assert.Less(t, lastTrx2RollbackPageWriteIdx, rollbackIdx, "Rollback レコードは Undo 逆適用に伴う PageWrite の後に書かれる")
+		assert.Equal(t, redo.RecordTypeRollback, records[len(records)-1].Type(), "Redo の末尾は Rollback レコード")
+	})
+
+	t.Run("Undo がないトランザクションの Rollback でも Rollback レコードが書かれる", func(t *testing.T) {
+		// GIVEN
+		tm := setupTrxManager(t)
+		trx := tm.Begin()
+
+		// WHEN
+		err := tm.Rollback(trx)
+		assert.NoError(t, err)
+		err = tm.redoLog.Flush()
+		assert.NoError(t, err)
+		records, err := tm.redoLog.ReadFrom(0)
+		assert.NoError(t, err)
+
+		// THEN
+		var found bool
+		for _, r := range records {
+			if r.TrxId() == trx.trxId && r.Type() == redo.RecordTypeRollback {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "Undo がない Rollback でも Rollback レコードが書かれる")
+	})
 }
 
 func TestTrxManagerEnsureReadView(t *testing.T) {
@@ -536,7 +620,7 @@ func setupTrxManager(t *testing.T) *TrxManager {
 	t.Helper()
 	env := setupTableTestEnv(t)
 	redoLog := setupTestRedoLog(t)
-	return NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp)
+	return NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, 1, nil)
 }
 
 // setupTestRedoLog はテスト用の redo.Buffer を作成する

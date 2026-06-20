@@ -97,7 +97,7 @@ func TestIteratorAdvance(t *testing.T) {
 
 	t.Run("現在のページを読み終えたら次のページに遷移する", func(t *testing.T) {
 		// GIVEN
-		bp := newTestBufferPool(page.Size * 10)
+		bp := newTestBufferPool(t, page.Size*10)
 		path := filepath.Join(t.TempDir(), "test.db")
 		hf, err := file.NewHeapFile(0, path)
 		assert.NoError(t, err)
@@ -247,7 +247,7 @@ func TestIteratorRefetchByKey(t *testing.T) {
 func setupIteratorTestPage(t *testing.T, setup func(ln *leafNode)) (*Tree, page.Id) {
 	t.Helper()
 
-	bp := newTestBufferPool(page.Size * 10)
+	bp := newTestBufferPool(t, page.Size*10)
 	path := filepath.Join(t.TempDir(), "test.db")
 	hf, err := file.NewHeapFile(0, path)
 	assert.NoError(t, err)

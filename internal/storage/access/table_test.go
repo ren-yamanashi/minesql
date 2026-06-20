@@ -309,7 +309,7 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 	))
 	_ = env.ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(siEmailId, "email", 0))
 
-	trxMgr := NewTrxManager(env.ct, undoMgr, redoLog, lockMgr, env.bp)
+	trxMgr := NewTrxManager(env.ct, undoMgr, redoLog, lockMgr, env.bp, 1, nil)
 
 	return &tableTestEnv{
 		ct:      env.ct,

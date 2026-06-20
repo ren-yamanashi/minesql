@@ -279,7 +279,16 @@ func newRedoAndPool(t *testing.T) (*redo.Buffer, *Pool) {
 	rl, err := redo.NewBuffer(t.TempDir())
 	assert.NoError(t, err)
 	t.Cleanup(func() { _ = rl.Close() })
-	return rl, NewPool(page.Size*4, nil)
+	return rl, NewPool(page.Size*4, rl, nil)
+}
+
+// newTestRedoLog はテスト用の redo.Buffer を生成する
+func newTestRedoLog(t *testing.T) *redo.Buffer {
+	t.Helper()
+	rl, err := redo.NewBuffer(t.TempDir())
+	assert.NoError(t, err)
+	t.Cleanup(func() { _ = rl.Close() })
+	return rl
 }
 
 // addPage はバッファプールに新しいページを追加し、その PageId を返す

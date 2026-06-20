@@ -431,14 +431,15 @@ func setupSecondaryTestCatalog(t *testing.T) (*dictionary.Catalog, *buffer.Pool)
 		t.Fatalf("HeapFile の作成に失敗: %v", err)
 	}
 	t.Cleanup(func() { _ = hf.Close() })
-	bp := buffer.NewPool(page.Size*30, nil)
-	bp.RegisterHeapFile(fileId, hf)
 
 	rl, err := redo.NewBuffer(t.TempDir())
 	if err != nil {
 		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
 	}
 	t.Cleanup(func() { _ = rl.Close() })
+
+	bp := buffer.NewPool(page.Size*30, rl, nil)
+	bp.RegisterHeapFile(fileId, hf)
 
 	ct, err := dictionary.CreateCatalog(bp, rl)
 	if err != nil {

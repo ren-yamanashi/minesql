@@ -13,7 +13,7 @@ import (
 func TestNewPool(t *testing.T) {
 	t.Run("サイズが PageSize 以下の場合 maxPages が 1 になる", func(t *testing.T) {
 		// GIVEN / WHEN
-		bp := NewPool(page.Size, nil)
+		bp := NewPool(page.Size, newTestRedoLog(t), nil)
 
 		// THEN
 		assert.Equal(t, 1, bp.maxPages)
@@ -21,7 +21,7 @@ func TestNewPool(t *testing.T) {
 
 	t.Run("サイズが PageSize より大きい場合 maxPages が算出される", func(t *testing.T) {
 		// GIVEN / WHEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 
 		// THEN
 		assert.Equal(t, 3, bp.maxPages)
@@ -29,7 +29,7 @@ func TestNewPool(t *testing.T) {
 
 	t.Run("サイズが 0 の場合 maxPages が 1 になる", func(t *testing.T) {
 		// GIVEN / WHEN
-		bp := NewPool(0, nil)
+		bp := NewPool(0, newTestRedoLog(t), nil)
 
 		// THEN
 		assert.Equal(t, 1, bp.maxPages)
@@ -39,7 +39,7 @@ func TestNewPool(t *testing.T) {
 func TestPage(t *testing.T) {
 	t.Run("取得した直後はダーティーにならない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -54,7 +54,7 @@ func TestPage(t *testing.T) {
 
 	t.Run("キャッシュ済みのページを取得できる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -69,7 +69,7 @@ func TestPage(t *testing.T) {
 
 	t.Run("キャッシュにないページをディスクから読み込める", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		writePageToDisk(t, hf, 0, 0xAB)
@@ -85,7 +85,7 @@ func TestPage(t *testing.T) {
 
 	t.Run("同じページを 2 回フェッチしても同じデータが返る", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		addedPage, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -104,7 +104,7 @@ func TestPage(t *testing.T) {
 
 	t.Run("呼び出すと pinCount がインクリメントされる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -119,7 +119,7 @@ func TestPage(t *testing.T) {
 
 	t.Run("MarkModified を複数回呼んでもフラッシュリストに重複追加されない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -138,7 +138,7 @@ func TestPage(t *testing.T) {
 func TestUnpin(t *testing.T) {
 	t.Run("Unpin 後に pinCount が減る", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -156,7 +156,7 @@ func TestUnpin(t *testing.T) {
 
 	t.Run("複数回 Pin したページは Unpin と同数の解放が必要", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -176,7 +176,7 @@ func TestUnpin(t *testing.T) {
 
 	t.Run("キャッシュにないページを Unpin しても何も起きない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -191,7 +191,7 @@ func TestUnpin(t *testing.T) {
 func TestAllocatePageId(t *testing.T) {
 	t.Run("新しい PageId を割り当てられる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size, nil)
+		bp := NewPool(page.Size, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 5)
 		bp.RegisterHeapFile(5, hf)
 
@@ -206,7 +206,7 @@ func TestAllocatePageId(t *testing.T) {
 
 	t.Run("連続で割り当てると PageNumber がインクリメントされる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size, nil)
+		bp := NewPool(page.Size, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 
@@ -223,7 +223,7 @@ func TestAllocatePageId(t *testing.T) {
 
 	t.Run("未登録の FileId の場合エラーを返す", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size, nil)
+		bp := NewPool(page.Size, newTestRedoLog(t), nil)
 
 		// WHEN
 		id, err := bp.AllocatePageId(99)
@@ -237,7 +237,7 @@ func TestAllocatePageId(t *testing.T) {
 func TestRegisterHeapFile(t *testing.T) {
 	t.Run("HeapFile を登録すると取得できる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size, nil)
+		bp := NewPool(page.Size, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 1)
 
 		// WHEN
@@ -253,7 +253,7 @@ func TestRegisterHeapFile(t *testing.T) {
 func TestMaxPages(t *testing.T) {
 	t.Run("バッファプールの最大ページ数を返す", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 
 		// WHEN
 		result := bp.MaxPages()
@@ -264,7 +264,7 @@ func TestMaxPages(t *testing.T) {
 
 	t.Run("最小サイズの場合 1 を返す", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(0, nil)
+		bp := NewPool(0, newTestRedoLog(t), nil)
 
 		// WHEN
 		result := bp.MaxPages()
@@ -277,7 +277,7 @@ func TestMaxPages(t *testing.T) {
 func TestFlushListPageCount(t *testing.T) {
 	t.Run("ダーティーページの数を返す", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		_, err := bp.AddPage(page.NewId(0, 0))
 		assert.NoError(t, err)
 		_, err = bp.AddPage(page.NewId(0, 1))
@@ -298,7 +298,7 @@ func TestFlushListPageCount(t *testing.T) {
 
 	t.Run("ダーティーページがない場合 0 を返す", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size, nil)
+		bp := NewPool(page.Size, newTestRedoLog(t), nil)
 
 		// WHEN
 		size := bp.FlushListPageCount()
@@ -311,7 +311,7 @@ func TestFlushListPageCount(t *testing.T) {
 func TestForEachDirtyPage(t *testing.T) {
 	t.Run("ダーティーページごとにコールバックが実行される", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		id0 := page.NewId(0, 0)
@@ -337,7 +337,7 @@ func TestForEachDirtyPage(t *testing.T) {
 
 	t.Run("フラッシュリストが空の場合コールバックが呼ばれない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 
 		// WHEN
 		called := false
@@ -351,7 +351,7 @@ func TestForEachDirtyPage(t *testing.T) {
 
 	t.Run("コールバック内でページの Header を読み取れる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)

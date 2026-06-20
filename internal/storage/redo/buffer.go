@@ -88,6 +88,60 @@ func (b *Buffer) ReadFrom(lsn Lsn) ([]Record, error) {
 	return b.logFile.readRecords(lsn)
 }
 
+// MaxUserTrxId は Redo ログ全体を走査し、出現するユーザートランザクション ID の最大値を返す
+//   - システム予約トランザクション ID と Purge 予約トランザクション ID は除外する
+//   - ユーザートランザクションが 1 件も見つからない場合は 0 を返す
+func (b *Buffer) MaxUserTrxId() (lock.TrxId, error) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	records, err := b.logFile.readRecords(0)
+	if err != nil {
+		return 0, err
+	}
+	var maxId lock.TrxId
+	for _, r := range records {
+		id := r.trxId
+		if id == lock.SystemReservedTrxId || id == lock.PurgeReservedTrxId {
+			continue
+		}
+		if id > maxId {
+			maxId = id
+		}
+	}
+	return maxId, nil
+}
+
+// CompletedUserTrxIds は Redo ログ全体を走査し、COMMIT または ROLLBACK レコードを持つユーザートランザクション ID 一覧を返す
+//   - システム予約トランザクション ID と Purge 予約トランザクション ID は除外する
+//   - 完了済みトランザクションが 1 件もない場合は nil を返す
+func (b *Buffer) CompletedUserTrxIds() ([]lock.TrxId, error) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	records, err := b.logFile.readRecords(0)
+	if err != nil {
+		return nil, err
+	}
+	completed := make(map[lock.TrxId]struct{})
+	for _, r := range records {
+		if r.recordType != RecordTypeCommit && r.recordType != RecordTypeRollback {
+			continue
+		}
+		id := r.trxId
+		if id == lock.SystemReservedTrxId || id == lock.PurgeReservedTrxId {
+			continue
+		}
+		completed[id] = struct{}{}
+	}
+	if len(completed) == 0 {
+		return nil, nil
+	}
+	ids := make([]lock.TrxId, 0, len(completed))
+	for id := range completed {
+		ids = append(ids, id)
+	}
+	return ids, nil
+}
+
 // SetCheckpointLsn はチェックポイント LSN を更新し、ヘッダーに書き込む
 func (b *Buffer) SetCheckpointLsn(lsn Lsn) error {
 	b.mutex.Lock()

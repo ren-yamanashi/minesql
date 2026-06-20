@@ -16,14 +16,16 @@ type Pool struct {
 	pageTable   pageTable
 	flushList   *flushList
 	lru         *lru
-	maxPages    int    // バッファプールの最大バッファページ数
-	onAllPinned func() // 全ページが Pin/dirty で追い出し不可な状態を解消するための callback (e.g. ページクリーナーにフラッシュ依頼)
+	maxPages    int          // バッファプールの最大バッファページ数
+	onAllPinned func()       // 全ページが Pin/dirty で追い出し不可な状態を解消するための callback (e.g. ページクリーナーにフラッシュ依頼)
+	redoLog     *redo.Buffer // データページ書き出し前に Redo を flush するための参照 (WAL 規律担保)
 }
 
 // NewPool はバッファプールを生成する
 //   - size: バッファプール全体のバイトサイズ。最低 1 ページ確保される
+//   - redoLog: データページ書き出し前の Redo flush に使う (nil 不可)
 //   - onAllPinned: 追い出し候補が全て Pin/dirty な状態を解消するための callback
-func NewPool(size int, onAllPinned func()) *Pool {
+func NewPool(size int, redoLog *redo.Buffer, onAllPinned func()) *Pool {
 	maxPages := 1
 	if size > page.Size {
 		maxPages = (size + page.Size - 1) / page.Size
@@ -36,6 +38,7 @@ func NewPool(size int, onAllPinned func()) *Pool {
 		lru:         newLru(maxPages),
 		maxPages:    maxPages,
 		onAllPinned: onAllPinned,
+		redoLog:     redoLog,
 	}
 }
 

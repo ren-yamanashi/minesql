@@ -831,8 +831,9 @@ func (bt *Tree) mustInsert(key, value string) {
 // newTestBufferPool はテスト用のバッファプールを生成する
 // 全ページが dirty/pin で追い出し不可になった場合の回復は、追い出す操作自身が実行する
 // 救済フラッシュに任せられるため、フラッシュ依頼先 (本番ではページクリーナー) は登録しない
-func newTestBufferPool(size int) *buffer.Pool {
-	return buffer.NewPool(size, nil)
+func newTestBufferPool(t *testing.T, size int) *buffer.Pool {
+	t.Helper()
+	return buffer.NewPool(size, newTestRedoBuffer(t), nil)
 }
 
 // setupBtree はテスト用の B+Tree をセットアップする
@@ -845,7 +846,7 @@ func setupBtree(t *testing.T) *Tree {
 	if err != nil {
 		t.Fatalf("HeapFile の作成に失敗: %v", err)
 	}
-	bp := newTestBufferPool(page.Size * 10)
+	bp := newTestBufferPool(t, page.Size*10)
 	bp.RegisterHeapFile(fileId, heapFile)
 
 	bt, err := CreateTree(bp, fileId, newTestRedoBuffer(t), lock.SystemReservedTrxId)

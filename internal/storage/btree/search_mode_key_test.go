@@ -11,7 +11,7 @@ import (
 func TestSearchModeKeySlotNum(t *testing.T) {
 	t.Run("キーが存在する場合はそのスロット番号を返す", func(t *testing.T) {
 		// GIVEN
-		ln := newSearchModeKeyTestLeafNode()
+		ln := newSearchModeKeyTestLeafNode(t)
 		ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{}))
 		ln.insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{}))
 		sm := SearchModeKey{Key: []byte{0x20}}
@@ -25,7 +25,7 @@ func TestSearchModeKeySlotNum(t *testing.T) {
 
 	t.Run("キーが存在しない場合は挿入位置を返す", func(t *testing.T) {
 		// GIVEN
-		ln := newSearchModeKeyTestLeafNode()
+		ln := newSearchModeKeyTestLeafNode(t)
 		ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{}))
 		ln.insert(1, NewRecord([]byte{0x01}, []byte{0x30}, []byte{}))
 		sm := SearchModeKey{Key: []byte{0x20}}
@@ -41,7 +41,7 @@ func TestSearchModeKeySlotNum(t *testing.T) {
 func TestSearchModeKeyChildPageId(t *testing.T) {
 	t.Run("境界キーより小さいキーの場合は左の子の PageId を返す", func(t *testing.T) {
 		// GIVEN
-		bn := newSearchModeKeyTestBranchNode()
+		bn := newSearchModeKeyTestBranchNode(t)
 		sm := SearchModeKey{Key: []byte{0x05}}
 
 		// WHEN
@@ -54,7 +54,7 @@ func TestSearchModeKeyChildPageId(t *testing.T) {
 
 	t.Run("境界キーと一致するキーの場合は右の子の PageId を返す", func(t *testing.T) {
 		// GIVEN
-		bn := newSearchModeKeyTestBranchNode()
+		bn := newSearchModeKeyTestBranchNode(t)
 		sm := SearchModeKey{Key: []byte{0x10}}
 
 		// WHEN
@@ -67,7 +67,7 @@ func TestSearchModeKeyChildPageId(t *testing.T) {
 
 	t.Run("キーが全レコードより大きい場合は右の子の PageId を返す", func(t *testing.T) {
 		// GIVEN
-		bn := newSearchModeKeyTestBranchNode()
+		bn := newSearchModeKeyTestBranchNode(t)
 		sm := SearchModeKey{Key: []byte{0xFF}}
 
 		// WHEN
@@ -80,8 +80,9 @@ func TestSearchModeKeyChildPageId(t *testing.T) {
 }
 
 // newSearchModeKeyTestLeafNode はテスト用の初期化済み LeafNode を作成する
-func newSearchModeKeyTestLeafNode() *leafNode {
-	pool := buffer.NewPool(page.Size, nil)
+func newSearchModeKeyTestLeafNode(t *testing.T) *leafNode {
+	t.Helper()
+	pool := buffer.NewPool(page.Size, newTestRedoBuffer(t), nil)
 	bufPage, err := pool.AddPage(page.NewId(0, 0))
 	if err != nil {
 		panic(err)
@@ -92,8 +93,9 @@ func newSearchModeKeyTestLeafNode() *leafNode {
 }
 
 // newSearchModeKeyTestBranchNode はテスト用の初期化済み BranchNode を作成する
-func newSearchModeKeyTestBranchNode() *branchNode {
-	pool := buffer.NewPool(page.Size, nil)
+func newSearchModeKeyTestBranchNode(t *testing.T) *branchNode {
+	t.Helper()
+	pool := buffer.NewPool(page.Size, newTestRedoBuffer(t), nil)
 	bufPage, err := pool.AddPage(page.NewId(0, 0))
 	if err != nil {
 		panic(err)

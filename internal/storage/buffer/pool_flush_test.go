@@ -12,7 +12,7 @@ import (
 func TestFlushAllPages(t *testing.T) {
 	t.Run("ダーティーページがディスクに書き出されクリーンになる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
@@ -35,7 +35,7 @@ func TestFlushAllPages(t *testing.T) {
 
 	t.Run("フラッシュ後にフラッシュリストがクリアされる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
@@ -55,7 +55,7 @@ func TestFlushAllPages(t *testing.T) {
 
 	t.Run("フラッシュ後にデータがディスクに永続化されている", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size, nil)
+		bp := NewPool(page.Size, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
@@ -82,7 +82,7 @@ func TestFlushAllPages(t *testing.T) {
 
 	t.Run("ダーティーページがない場合もエラーにならない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 
@@ -95,7 +95,7 @@ func TestFlushAllPages(t *testing.T) {
 
 	t.Run("ディスク I/O 失敗時は isDirty と flushList が更新されない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
@@ -120,7 +120,7 @@ func TestFlushAllPages(t *testing.T) {
 
 	t.Run("X ラッチ保持中はフラッシュが完了せず、解放後に完了してクリーンになる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
@@ -160,7 +160,7 @@ func TestFlushAllPages(t *testing.T) {
 
 	t.Run("Flush と Writer が並行してもデータレースを起こさない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*4, nil)
+		bp := NewPool(page.Size*4, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
@@ -200,7 +200,7 @@ func TestFlushAllPages(t *testing.T) {
 
 	t.Run("フラッシュ中の並行書き込みは次回フラッシュで永続化される (lost-update が起きない)", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*4, nil)
+		bp := NewPool(page.Size*4, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
@@ -241,7 +241,7 @@ func TestFlushAllPages(t *testing.T) {
 		memVal := bufPage.data.Body()[0]
 		mtr.UnpinAll()
 
-		bp2 := NewPool(page.Size*2, nil)
+		bp2 := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		bp2.RegisterHeapFile(0, hf)
 		bufPage2, err := bp2.Page(pageId)
 		assert.NoError(t, err)
@@ -253,7 +253,7 @@ func TestFlushAllPages(t *testing.T) {
 
 	t.Run("複数ページに対する Reader/Writer/Flusher の混在ワークロードがデータレースを起こさない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*8, nil)
+		bp := NewPool(page.Size*8, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageIds := []page.Id{
@@ -319,7 +319,7 @@ func TestFlushAllPages(t *testing.T) {
 func TestFlushOldestPages(t *testing.T) {
 	t.Run("指定した件数のダーティーページをフラッシュする", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		id0 := page.NewId(0, 0)
@@ -345,7 +345,7 @@ func TestFlushOldestPages(t *testing.T) {
 
 	t.Run("フラッシュリストが空の場合何もしない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 
 		// WHEN
 		err := bp.FlushOldestPages(10)
@@ -356,7 +356,7 @@ func TestFlushOldestPages(t *testing.T) {
 
 	t.Run("フラッシュしたページがクリーンになる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
@@ -378,7 +378,7 @@ func TestFlushOldestPages(t *testing.T) {
 
 	t.Run("ディスク I/O 失敗時は isDirty と flushList が更新されない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
@@ -403,7 +403,7 @@ func TestFlushOldestPages(t *testing.T) {
 
 	t.Run("X ラッチ保持ページでブロックされても処理済みのページは順次クリーンになる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		id0 := page.NewId(0, 0)

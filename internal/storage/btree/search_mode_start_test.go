@@ -11,7 +11,7 @@ import (
 func TestSearchModeStartSlotNum(t *testing.T) {
 	t.Run("常に 0 を返す", func(t *testing.T) {
 		// GIVEN
-		ln := newSearchModeStartTestLeafNode()
+		ln := newSearchModeStartTestLeafNode(t)
 		ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{}))
 		sm := SearchModeStart{}
 
@@ -26,7 +26,7 @@ func TestSearchModeStartSlotNum(t *testing.T) {
 func TestSearchModeStartChildPageId(t *testing.T) {
 	t.Run("先頭の子の PageId を返す", func(t *testing.T) {
 		// GIVEN
-		bn := newSearchModeStartTestBranchNode()
+		bn := newSearchModeStartTestBranchNode(t)
 		sm := SearchModeStart{}
 
 		// WHEN
@@ -39,8 +39,9 @@ func TestSearchModeStartChildPageId(t *testing.T) {
 }
 
 // newSearchModeStartTestLeafNode はテスト用の初期化済み LeafNode を作成する
-func newSearchModeStartTestLeafNode() *leafNode {
-	pool := buffer.NewPool(page.Size, nil)
+func newSearchModeStartTestLeafNode(t *testing.T) *leafNode {
+	t.Helper()
+	pool := buffer.NewPool(page.Size, newTestRedoBuffer(t), nil)
 	bufPage, err := pool.AddPage(page.NewId(0, 0))
 	if err != nil {
 		panic(err)
@@ -51,8 +52,9 @@ func newSearchModeStartTestLeafNode() *leafNode {
 }
 
 // newSearchModeStartTestBranchNode はテスト用の初期化済み BranchNode を作成する
-func newSearchModeStartTestBranchNode() *branchNode {
-	pool := buffer.NewPool(page.Size, nil)
+func newSearchModeStartTestBranchNode(t *testing.T) *branchNode {
+	t.Helper()
+	pool := buffer.NewPool(page.Size, newTestRedoBuffer(t), nil)
 	bufPage, err := pool.AddPage(page.NewId(0, 0))
 	if err != nil {
 		panic(err)

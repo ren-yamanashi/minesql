@@ -11,7 +11,7 @@ import (
 func TestForEachDirtyOldestLsn(t *testing.T) {
 	t.Run("ダーティーページが無い場合はコールバックが呼ばれない", func(t *testing.T) {
 		// GIVEN
-		pool := NewPool(page.Size*4, nil)
+		pool := NewPool(page.Size*4, newTestRedoLog(t), nil)
 
 		// WHEN
 		var collected []redo.Lsn
@@ -25,7 +25,7 @@ func TestForEachDirtyOldestLsn(t *testing.T) {
 
 	t.Run("ダーティ化順に oldestModificationLsn が渡される", func(t *testing.T) {
 		// GIVEN
-		pool := NewPool(page.Size*4, nil)
+		pool := NewPool(page.Size*4, newTestRedoLog(t), nil)
 		ids := []page.Id{page.NewId(1, 0), page.NewId(1, 1), page.NewId(1, 2)}
 		lsns := []redo.Lsn{10, 20, 30}
 		for i, id := range ids {
@@ -47,7 +47,7 @@ func TestForEachDirtyOldestLsn(t *testing.T) {
 
 	t.Run("同じページに対して markDirtyFromLsn が複数回呼ばれても最初の LSN を返す", func(t *testing.T) {
 		// GIVEN
-		pool := NewPool(page.Size*2, nil)
+		pool := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		pageId := page.NewId(1, 0)
 		bp, err := pool.AddPage(pageId)
 		assert.NoError(t, err)

@@ -186,8 +186,13 @@ func setup() (*btree.Tree, *buffer.Pool, func()) {
 	}
 	cleanup := func() { _ = os.RemoveAll(tmpDir) }
 
+	rl, err := redo.NewBuffer(tmpDir)
+	if err != nil {
+		panic(err)
+	}
+
 	var bp *buffer.Pool
-	bp = buffer.NewPool(page.Size*10, func() {
+	bp = buffer.NewPool(page.Size*10, rl, func() {
 		_ = bp.FlushOldestPages(bp.FlushListPageCount())
 	})
 	fileId := page.FileId(1)
@@ -197,11 +202,6 @@ func setup() (*btree.Tree, *buffer.Pool, func()) {
 		panic(err)
 	}
 	bp.RegisterHeapFile(fileId, dm)
-
-	rl, err := redo.NewBuffer(tmpDir)
-	if err != nil {
-		panic(err)
-	}
 
 	tree, err := btree.CreateTree(bp, fileId, rl, lock.SystemReservedTrxId)
 	if err != nil {

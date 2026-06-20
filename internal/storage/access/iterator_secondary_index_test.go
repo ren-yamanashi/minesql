@@ -192,15 +192,15 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	}
 	t.Cleanup(func() { _ = dataHf.Close() })
 
-	bp := buffer.NewPool(page.Size*50, nil)
-	bp.RegisterHeapFile(page.FileId(0), catalogHf)
-	bp.RegisterHeapFile(page.FileId(2), dataHf)
-
 	redoLog, err := redo.NewBuffer(t.TempDir())
 	if err != nil {
 		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
 	}
 	t.Cleanup(func() { _ = redoLog.Close() })
+
+	bp := buffer.NewPool(page.Size*50, redoLog, nil)
+	bp.RegisterHeapFile(page.FileId(0), catalogHf)
+	bp.RegisterHeapFile(page.FileId(2), dataHf)
 
 	ct, err := dictionary.CreateCatalog(bp, redoLog)
 	if err != nil {

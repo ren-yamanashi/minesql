@@ -11,7 +11,7 @@ import (
 func TestMetaPageRootPageId(t *testing.T) {
 	t.Run("設定したルートページ ID を読み取れる", func(t *testing.T) {
 		// GIVEN
-		mp := newTestMetaPage()
+		mp := newTestMetaPage(t)
 		expected := page.NewId(1, 10)
 		mp.setRootPageId(expected)
 
@@ -26,7 +26,7 @@ func TestMetaPageRootPageId(t *testing.T) {
 func TestMetaPageLeafPageCount(t *testing.T) {
 	t.Run("設定したリーフページ数を読み取れる", func(t *testing.T) {
 		// GIVEN
-		mp := newTestMetaPage()
+		mp := newTestMetaPage(t)
 		mp.setLeafPageCount(42)
 
 		// WHEN
@@ -40,7 +40,7 @@ func TestMetaPageLeafPageCount(t *testing.T) {
 func TestMetaPageHeight(t *testing.T) {
 	t.Run("設定した高さを読み取れる", func(t *testing.T) {
 		// GIVEN
-		mp := newTestMetaPage()
+		mp := newTestMetaPage(t)
 		mp.setHeight(3)
 
 		// WHEN
@@ -54,7 +54,7 @@ func TestMetaPageHeight(t *testing.T) {
 func TestMetaPageSetRootPageId(t *testing.T) {
 	t.Run("ルートページ ID を上書きできる", func(t *testing.T) {
 		// GIVEN
-		mp := newTestMetaPage()
+		mp := newTestMetaPage(t)
 		mp.setRootPageId(page.NewId(1, 10))
 
 		// WHEN
@@ -66,7 +66,7 @@ func TestMetaPageSetRootPageId(t *testing.T) {
 
 	t.Run("呼び出すと bufPage の modifyCount が進む", func(t *testing.T) {
 		// GIVEN
-		mp := newTestMetaPage()
+		mp := newTestMetaPage(t)
 		before := mp.bufPage.ModifyCount()
 
 		// WHEN
@@ -78,7 +78,7 @@ func TestMetaPageSetRootPageId(t *testing.T) {
 
 	t.Run("他フィールド (leafPageCount, height) への書き込みと独立に保持される", func(t *testing.T) {
 		// GIVEN
-		mp := newTestMetaPage()
+		mp := newTestMetaPage(t)
 
 		// WHEN
 		mp.setRootPageId(page.NewId(0xAA, 0xBB))
@@ -95,7 +95,7 @@ func TestMetaPageSetRootPageId(t *testing.T) {
 func TestMetaPageSetLeafPageCount(t *testing.T) {
 	t.Run("リーフページ数を上書きできる", func(t *testing.T) {
 		// GIVEN
-		mp := newTestMetaPage()
+		mp := newTestMetaPage(t)
 		mp.setLeafPageCount(10)
 
 		// WHEN
@@ -109,7 +109,7 @@ func TestMetaPageSetLeafPageCount(t *testing.T) {
 func TestMetaPageSetHeight(t *testing.T) {
 	t.Run("高さを上書きできる", func(t *testing.T) {
 		// GIVEN
-		mp := newTestMetaPage()
+		mp := newTestMetaPage(t)
 		mp.setHeight(1)
 
 		// WHEN
@@ -121,8 +121,9 @@ func TestMetaPageSetHeight(t *testing.T) {
 }
 
 // newTestMetaPage はテスト用のメタページを作成する
-func newTestMetaPage() *metaPage {
-	pool := buffer.NewPool(page.Size, nil)
+func newTestMetaPage(t *testing.T) *metaPage {
+	t.Helper()
+	pool := buffer.NewPool(page.Size, newTestRedoBuffer(t), nil)
 	bufPage, err := pool.AddPage(page.NewId(0, 0))
 	if err != nil {
 		panic(err)

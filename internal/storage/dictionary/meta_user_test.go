@@ -149,7 +149,7 @@ func setupDictTestBufferPool(t *testing.T) *buffer.Pool {
 		t.Fatalf("HeapFile の作成に失敗: %v", err)
 	}
 	t.Cleanup(func() { _ = hf.Close() })
-	bp := buffer.NewPool(page.Size*10, nil)
+	bp := buffer.NewPool(page.Size*10, setupDictTestRedoBuffer(t), nil)
 	bp.RegisterHeapFile(fileId, hf)
 	return bp
 }

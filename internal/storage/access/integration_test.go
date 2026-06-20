@@ -475,14 +475,14 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 	}
 	t.Cleanup(func() { _ = catalogHf.Close() })
 
-	bp := buffer.NewPool(page.Size*50, nil)
-	bp.RegisterHeapFile(page.FileId(0), catalogHf)
-
 	redoLog, err := redo.NewBuffer(config.BaseDir)
 	if err != nil {
 		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
 	}
 	t.Cleanup(func() { _ = redoLog.Clear() })
+
+	bp := buffer.NewPool(page.Size*50, redoLog, nil)
+	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
 	ct, err := dictionary.CreateCatalog(bp, redoLog)
 	if err != nil {
@@ -505,7 +505,7 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 	}
 
 	lockMgr := lock.NewManager()
-	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp)
+	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, 1, nil)
 
 	return &integrationEnv{
 		bp:      bp,
@@ -750,7 +750,13 @@ func crashAndRecover(t *testing.T, prev *integrationEnv, tableNames []string) *i
 	t.Helper()
 	_ = prev // 旧 env はテスト終了時の Cleanup でまとめて解放されるため、ここでは参照しない
 
-	bp := buffer.NewPool(page.Size*50, nil)
+	redoLog, err := redo.NewBuffer(config.BaseDir)
+	if err != nil {
+		t.Fatalf("redo.Buffer の再オープンに失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = redoLog.Close() })
+
+	bp := buffer.NewPool(page.Size*50, redoLog, nil)
 
 	catalogPath := filepath.Join(config.BaseDir, "catalog.db")
 	catalogHf, err := file.NewHeapFile(page.FileId(0), catalogPath)
@@ -759,12 +765,6 @@ func crashAndRecover(t *testing.T, prev *integrationEnv, tableNames []string) *i
 	}
 	t.Cleanup(func() { _ = catalogHf.Close() })
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
-
-	redoLog, err := redo.NewBuffer(config.BaseDir)
-	if err != nil {
-		t.Fatalf("redo.Buffer の再オープンに失敗: %v", err)
-	}
-	t.Cleanup(func() { _ = redoLog.Close() })
 
 	ct, err := dictionary.NewCatalog(bp, redoLog)
 	if err != nil {
@@ -795,13 +795,28 @@ func crashAndRecover(t *testing.T, prev *integrationEnv, tableNames []string) *i
 		bp.RegisterHeapFile(fileId, tableHf)
 	}
 
-	undoMgr, err := undo.NewManager(bp, undoFileId, redoLog)
+	maxTrxId, err := redoLog.MaxUserTrxId()
 	if err != nil {
-		t.Fatalf("undo.Manager の再オープンに失敗: %v", err)
+		t.Fatalf("MaxUserTrxId の取得に失敗: %v", err)
+	}
+	completedTrxIds, err := redoLog.CompletedUserTrxIds()
+	if err != nil {
+		t.Fatalf("CompletedUserTrxIds の取得に失敗: %v", err)
 	}
 
 	lockMgr := lock.NewManager()
-	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp)
+	// Recovery 中は undoMgr の entries を参照しないので、Recovery 実行用の仮の TrxManager を空 undoMgr 抜きで構成する
+	tempTrxMgr := NewTrxManager(ct, nil, redoLog, lockMgr, bp, maxTrxId+1, completedTrxIds)
+	r := NewRecovery(redoLog, bp, tempTrxMgr, undoFileId)
+	if err := r.Execute(); err != nil {
+		t.Fatalf("Recovery.Execute に失敗: %v", err)
+	}
+
+	undoMgr, err := undo.OpenManager(bp, undoFileId)
+	if err != nil {
+		t.Fatalf("undo.Manager の再オープンに失敗: %v", err)
+	}
+	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, maxTrxId+1, completedTrxIds)
 
 	return &integrationEnv{
 		bp:      bp,

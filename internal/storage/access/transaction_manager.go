@@ -28,16 +28,31 @@ func NewTrxManager(
 	redo *redo.Buffer,
 	lockMgr *lock.Manager,
 	bp *buffer.Pool,
+	initialNextTrxId lock.TrxId,
+	initialInactiveTrxIds []lock.TrxId,
 ) *TrxManager {
-	return &TrxManager{
+	// 0 は「未割り当て / 太古のコミット済み」の予約値のため、最小でも 1 から採番する
+	if initialNextTrxId == 0 {
+		initialNextTrxId = 1
+	}
+	transactions := make(map[lock.TrxId]*Transaction)
+	tm := &TrxManager{
 		undoLog:      undo,
 		redoLog:      redo,
 		lock:         lockMgr,
 		bufferPool:   bp,
 		catalog:      ct,
-		transactions: make(map[lock.TrxId]*Transaction),
-		nextTrxId:    1, // 0 は「未割り当て / 太古のコミット済み」の予約値のため使用しない
+		transactions: transactions,
+		nextTrxId:    initialNextTrxId,
 	}
+	for _, trxId := range initialInactiveTrxIds {
+		transactions[trxId] = &Transaction{
+			trxId: trxId,
+			state: trxStateInactive,
+			tm:    tm,
+		}
+	}
+	return tm
 }
 
 // Begin は新しいトランザクションを開始し、Transaction オブジェクトを返す
@@ -90,11 +105,6 @@ func (t *TrxManager) Rollback(trx *Transaction) error {
 		t.mu.Unlock()
 	}()
 
-	// Redo ログに Rollback レコードを記録 (フラッシュなし)
-	if _, err := t.redoLog.AppendRollback(trx.trxId); err != nil {
-		return err
-	}
-
 	records := t.undoLog.Records(trx.trxId)
 	for _, r := range slices.Backward(records) {
 		mtr := buffer.NewWriteMtr(t.bufferPool, trx.trxId, t.redoLog)
@@ -105,6 +115,10 @@ func (t *TrxManager) Rollback(trx *Transaction) error {
 		if err := mtr.Commit(); err != nil {
 			return err
 		}
+	}
+
+	if _, err := t.redoLog.AppendRollback(trx.trxId); err != nil {
+		return err
 	}
 	return nil
 }

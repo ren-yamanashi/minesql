@@ -414,14 +414,14 @@ func setupCreateTestEnv(t *testing.T) *createTestEnv {
 	}
 	t.Cleanup(func() { _ = catalogHf.Close() })
 
-	bp := buffer.NewPool(page.Size*50, nil)
-	bp.RegisterHeapFile(page.FileId(0), catalogHf)
-
 	redoLog, err := redo.NewBuffer(t.TempDir())
 	if err != nil {
 		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
 	}
 	t.Cleanup(func() { _ = redoLog.Close() })
+
+	bp := buffer.NewPool(page.Size*50, redoLog, nil)
+	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
 	ct, err := dictionary.CreateCatalog(bp, redoLog)
 	if err != nil {
@@ -504,14 +504,14 @@ func setupCreateTableTestEnv(t *testing.T) *createTableTestEnv {
 	}
 	t.Cleanup(func() { _ = catalogHf.Close() })
 
-	bp := buffer.NewPool(page.Size*50, nil)
-	bp.RegisterHeapFile(page.FileId(0), catalogHf)
-
 	redoLog, err := redo.NewBuffer(config.BaseDir)
 	if err != nil {
 		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
 	}
 	t.Cleanup(func() { _ = redoLog.Clear() })
+
+	bp := buffer.NewPool(page.Size*50, redoLog, nil)
+	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
 	_, err = dictionary.CreateCatalog(bp, redoLog)
 	if err != nil {
@@ -538,7 +538,7 @@ func setupCreateTableTestEnv(t *testing.T) *createTableTestEnv {
 	if err != nil {
 		t.Fatalf("Catalog の取得に失敗: %v", err)
 	}
-	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp)
+	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, 1, nil)
 
 	return &createTableTestEnv{
 		bp:      bp,

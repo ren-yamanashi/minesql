@@ -103,6 +103,12 @@ func (p *Pool) collectOldestFlushTasks(n int) ([]flushTask, error) {
 //   - 他者がページの Exclusive ラッチを保持中の場合は、その解放を待ってから書き出す
 //   - エラー時は当該ページ以降を未処理のまま即 return する (次回フラッシュで再試行される)
 func (p *Pool) runFlush(tasks []flushTask) error {
+	if len(tasks) == 0 {
+		return nil
+	}
+	if err := p.flushRedoBeforeData(); err != nil {
+		return err
+	}
 	for _, task := range tasks {
 		task.bufPage.latch.LockShared()
 		if err := p.flushAndClean(task); err != nil {
@@ -120,6 +126,12 @@ func (p *Pool) flushSinglePage() error {
 	if err != nil {
 		return err
 	}
+	if len(tasks) == 0 {
+		return nil
+	}
+	if err := p.flushRedoBeforeData(); err != nil {
+		return err
+	}
 	for _, task := range tasks {
 		if !task.bufPage.latch.TryLockShared() {
 			continue
@@ -127,6 +139,11 @@ func (p *Pool) flushSinglePage() error {
 		return p.flushAndClean(task)
 	}
 	return nil
+}
+
+// flushRedoBeforeData はデータページ書き出し前に Redo ログをディスクへ flush する (WAL 規律)
+func (p *Pool) flushRedoBeforeData() error {
+	return p.redoLog.Flush()
 }
 
 // flushAndClean は Shared ラッチ取得済みのタスク 1 件を「書き出し → Sync → クリーン化」する

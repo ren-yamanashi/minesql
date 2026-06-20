@@ -10,7 +10,7 @@ import (
 func TestPageId(t *testing.T) {
 	t.Run("設定された PageId を返す", func(t *testing.T) {
 		// GIVEN
-		pool := NewPool(page.Size, nil)
+		pool := NewPool(page.Size, newTestRedoLog(t), nil)
 		pageId := page.NewId(1, 2)
 		bp, err := NewPage(pageId, pool)
 		assert.NoError(t, err)
@@ -26,7 +26,7 @@ func TestPageId(t *testing.T) {
 func TestData(t *testing.T) {
 	t.Run("Page のデータを返す", func(t *testing.T) {
 		// GIVEN
-		pool := NewPool(page.Size, nil)
+		pool := NewPool(page.Size, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		bp, err := NewPage(pageId, pool)
 		assert.NoError(t, err)
@@ -44,7 +44,7 @@ func TestData(t *testing.T) {
 func TestMarkModified(t *testing.T) {
 	t.Run("呼び出すたびに modifyCount が 1 増え isDirty が立つ", func(t *testing.T) {
 		// GIVEN
-		pool := NewPool(page.Size, nil)
+		pool := NewPool(page.Size, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		bp, err := pool.AddPage(pageId)
 		assert.NoError(t, err)
@@ -64,7 +64,7 @@ func TestMarkModified(t *testing.T) {
 func TestOverwritePage(t *testing.T) {
 	t.Run("src でページ全体を上書きし isDirty/modifyCount を更新する", func(t *testing.T) {
 		// GIVEN
-		pool := NewPool(page.Size, nil)
+		pool := NewPool(page.Size, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		bp, err := pool.AddPage(pageId)
 		assert.NoError(t, err)
@@ -85,7 +85,7 @@ func TestOverwritePage(t *testing.T) {
 
 	t.Run("src の長さが page.Size と一致しないと panic する", func(t *testing.T) {
 		// GIVEN
-		pool := NewPool(page.Size, nil)
+		pool := NewPool(page.Size, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		bp, err := pool.AddPage(pageId)
 		assert.NoError(t, err)
@@ -101,7 +101,7 @@ func TestOverwritePage(t *testing.T) {
 func TestWriteHeaderAt(t *testing.T) {
 	t.Run("ヘッダー先頭から src を書き込み isDirty/modifyCount を更新する", func(t *testing.T) {
 		// GIVEN
-		pool := NewPool(page.Size, nil)
+		pool := NewPool(page.Size, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		bp, err := pool.AddPage(pageId)
 		assert.NoError(t, err)
@@ -119,7 +119,7 @@ func TestWriteHeaderAt(t *testing.T) {
 
 	t.Run("オフセット指定で部分書き込みできる", func(t *testing.T) {
 		// GIVEN
-		pool := NewPool(page.Size, nil)
+		pool := NewPool(page.Size, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		bp, err := pool.AddPage(pageId)
 		assert.NoError(t, err)
@@ -136,7 +136,7 @@ func TestWriteHeaderAt(t *testing.T) {
 
 	t.Run("範囲外書き込みで panic する", func(t *testing.T) {
 		// GIVEN
-		pool := NewPool(page.Size, nil)
+		pool := NewPool(page.Size, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		bp, err := pool.AddPage(pageId)
 		assert.NoError(t, err)
@@ -153,7 +153,7 @@ func TestWriteHeaderAt(t *testing.T) {
 func TestWriteBodyAt(t *testing.T) {
 	t.Run("ボディに src を書き込み isDirty/modifyCount を更新する", func(t *testing.T) {
 		// GIVEN
-		pool := NewPool(page.Size, nil)
+		pool := NewPool(page.Size, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		bp, err := pool.AddPage(pageId)
 		assert.NoError(t, err)
@@ -171,7 +171,7 @@ func TestWriteBodyAt(t *testing.T) {
 
 	t.Run("オフセット指定で部分書き込みできる", func(t *testing.T) {
 		// GIVEN
-		pool := NewPool(page.Size, nil)
+		pool := NewPool(page.Size, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		bp, err := pool.AddPage(pageId)
 		assert.NoError(t, err)
@@ -189,7 +189,7 @@ func TestWriteBodyAt(t *testing.T) {
 
 	t.Run("範囲外書き込みで panic する", func(t *testing.T) {
 		// GIVEN
-		pool := NewPool(page.Size, nil)
+		pool := NewPool(page.Size, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		bp, err := pool.AddPage(pageId)
 		assert.NoError(t, err)
@@ -205,7 +205,7 @@ func TestWriteBodyAt(t *testing.T) {
 
 	t.Run("書き込んだ内容が Pool 経由で再フェッチしても反映されている", func(t *testing.T) {
 		// GIVEN
-		pool := NewPool(page.Size, nil)
+		pool := NewPool(page.Size, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		bp, err := pool.AddPage(pageId)
 		assert.NoError(t, err)
@@ -223,7 +223,7 @@ func TestWriteBodyAt(t *testing.T) {
 func TestNewPage(t *testing.T) {
 	t.Run("指定した PageId で Page を生成できる", func(t *testing.T) {
 		// GIVEN
-		pool := NewPool(page.Size, nil)
+		pool := NewPool(page.Size, newTestRedoLog(t), nil)
 		pageId := page.NewId(1, 0)
 
 		// WHEN
@@ -241,7 +241,7 @@ func TestNewPage(t *testing.T) {
 
 	t.Run("生成した Page のサイズが PageSize と一致する", func(t *testing.T) {
 		// GIVEN
-		pool := NewPool(page.Size, nil)
+		pool := NewPool(page.Size, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 
 		// WHEN

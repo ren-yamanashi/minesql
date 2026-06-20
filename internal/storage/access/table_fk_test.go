@@ -265,13 +265,13 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 	}
 	t.Cleanup(func() { _ = catalogHf.Close() })
 
-	bp := buffer.NewPool(page.Size*50, nil)
-	bp.RegisterHeapFile(page.FileId(0), catalogHf)
-
 	redoLog, err := redo.NewBuffer(config.BaseDir)
 	if err != nil {
 		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
 	}
+
+	bp := buffer.NewPool(page.Size*50, redoLog, nil)
+	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
 	ct, err := dictionary.CreateCatalog(bp, redoLog)
 	if err != nil {
@@ -329,7 +329,7 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 	}
 	childFileId := childTable.primaryIndex.fileId()
 
-	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp)
+	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, 1, nil)
 
 	return &fkTestEnv{
 		ct:           ct,

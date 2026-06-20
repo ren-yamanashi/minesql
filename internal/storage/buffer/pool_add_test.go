@@ -11,7 +11,7 @@ import (
 func TestAddPage(t *testing.T) {
 	t.Run("バッファプールに新しいページを追加できる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 
 		// WHEN
@@ -26,7 +26,7 @@ func TestAddPage(t *testing.T) {
 
 	t.Run("追加したページはキャッシュされている", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 
 		// WHEN
@@ -40,7 +40,7 @@ func TestAddPage(t *testing.T) {
 
 	t.Run("AddPage は pin を増やさない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 
 		// WHEN
@@ -53,7 +53,7 @@ func TestAddPage(t *testing.T) {
 
 	t.Run("バッファプールが満杯の場合ページを追い出して追加する", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size, nil)
+		bp := NewPool(page.Size, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		firstId := page.NewId(0, 0)
@@ -80,7 +80,7 @@ func TestAddPage(t *testing.T) {
 			callCount.Add(1)
 			go bp.Unpin(firstId)
 		}
-		bp = NewPool(page.Size, onAllPinned)
+		bp = NewPool(page.Size, newTestRedoLog(t), onAllPinned)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		_, err := bp.AddPage(firstId)
@@ -111,7 +111,7 @@ func TestAddPage(t *testing.T) {
 				_ = bp.FlushAllPages()
 			}()
 		}
-		bp = NewPool(page.Size, onAllPinned)
+		bp = NewPool(page.Size, newTestRedoLog(t), onAllPinned)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		_, err := bp.AddPage(firstId)
@@ -132,7 +132,7 @@ func TestAddPage(t *testing.T) {
 
 	t.Run("X 保持中の最古ダーティーページがあっても救済フラッシュが別ページをクリーン化して成功する", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		id0 := page.NewId(0, 0)
@@ -166,7 +166,7 @@ func TestAddPage(t *testing.T) {
 
 	t.Run("回復手段がなく追い出し候補が見つからない場合は上限到達後エラーを返す", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size, nil)
+		bp := NewPool(page.Size, newTestRedoLog(t), nil)
 		firstId := page.NewId(0, 0)
 		_, err := bp.AddPage(firstId)
 		assert.NoError(t, err)

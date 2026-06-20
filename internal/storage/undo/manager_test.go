@@ -17,10 +17,10 @@ import (
 func TestNewManager(t *testing.T) {
 	t.Run("Manager を作成できる", func(t *testing.T) {
 		// GIVEN
-		bp := setupTestBufferPool(t)
 		redoLog, err := redo.NewBuffer(t.TempDir())
 		assert.NoError(t, err)
 		t.Cleanup(func() { _ = redoLog.Close() })
+		bp := setupTestBufferPool(t, redoLog)
 
 		// WHEN
 		mgr, err := NewManager(bp, page.FileId(1), redoLog)
@@ -610,7 +610,7 @@ func TestManagerWriteToPage(t *testing.T) {
 }
 
 // setupTestBufferPool はテスト用の BufferPool を作成する (Undo ファイル用 FileId=1)
-func setupTestBufferPool(t *testing.T) *buffer.Pool {
+func setupTestBufferPool(t *testing.T, redoLog *redo.Buffer) *buffer.Pool {
 	t.Helper()
 	undoPath := filepath.Join(t.TempDir(), "undo.db")
 	hf, err := file.NewHeapFile(page.FileId(1), undoPath)
@@ -619,7 +619,7 @@ func setupTestBufferPool(t *testing.T) *buffer.Pool {
 	}
 	t.Cleanup(func() { _ = hf.Close() })
 
-	bp := buffer.NewPool(page.Size*20, nil)
+	bp := buffer.NewPool(page.Size*20, redoLog, nil)
 	bp.RegisterHeapFile(page.FileId(1), hf)
 	return bp
 }
@@ -627,12 +627,12 @@ func setupTestBufferPool(t *testing.T) *buffer.Pool {
 // setupTestManager はテスト用の Manager を作成する
 func setupTestManager(t *testing.T) *Manager {
 	t.Helper()
-	bp := setupTestBufferPool(t)
 	redoLog, err := redo.NewBuffer(t.TempDir())
 	if err != nil {
 		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
 	}
 	t.Cleanup(func() { _ = redoLog.Close() })
+	bp := setupTestBufferPool(t, redoLog)
 	mgr, err := NewManager(bp, page.FileId(1), redoLog)
 	if err != nil {
 		t.Fatalf("Manager の作成に失敗: %v", err)
@@ -644,12 +644,12 @@ func setupTestManager(t *testing.T) *Manager {
 //   - Undo ページの変更を Redo 記録する書き込み Mtr の挙動を検証したいテスト用
 func setupTestManagerWithRedoLog(t *testing.T) (*Manager, *redo.Buffer) {
 	t.Helper()
-	bp := setupTestBufferPool(t)
 	redoLog, err := redo.NewBuffer(t.TempDir())
 	if err != nil {
 		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
 	}
 	t.Cleanup(func() { _ = redoLog.Close() })
+	bp := setupTestBufferPool(t, redoLog)
 	mgr, err := NewManager(bp, page.FileId(1), redoLog)
 	if err != nil {
 		t.Fatalf("Manager の作成に失敗: %v", err)

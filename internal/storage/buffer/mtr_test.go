@@ -12,7 +12,7 @@ import (
 func TestNewMtr(t *testing.T) {
 	t.Run("生成直後は記録している Pin が無い", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 
 		// WHEN
 		mtr := NewMtr(bp)
@@ -25,7 +25,7 @@ func TestNewMtr(t *testing.T) {
 func TestMtrPageForRead(t *testing.T) {
 	t.Run("ページを取得すると Pin が増えスコープに記録される", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -43,7 +43,7 @@ func TestMtrPageForRead(t *testing.T) {
 
 	t.Run("同 Mtr 内の X 取得後の S 要求はスキップされる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -71,7 +71,7 @@ func TestMtrPageForRead(t *testing.T) {
 func TestMtrPageForWrite(t *testing.T) {
 	t.Run("ページを取得すると Pin が増えスコープに記録される", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -88,7 +88,7 @@ func TestMtrPageForWrite(t *testing.T) {
 
 	t.Run("PageForWrite を呼ぶだけでは更新カウンタは進まない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -104,7 +104,7 @@ func TestMtrPageForWrite(t *testing.T) {
 
 	t.Run("同 Mtr 内の再帰 X 取得はラッチを取り直さない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -134,7 +134,7 @@ func TestMtrPageForWrite(t *testing.T) {
 
 	t.Run("複数の Mtr が同一ページへ並行に書き込んでもデータレースを起こさない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*4, nil)
+		bp := NewPool(page.Size*4, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -166,7 +166,7 @@ func TestMtrPageForWrite(t *testing.T) {
 
 	t.Run("並行する Reader と Writer がデータレースを起こさない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*4, nil)
+		bp := NewPool(page.Size*4, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -211,7 +211,7 @@ func TestMtrPageForWrite(t *testing.T) {
 
 	t.Run("同 Mtr 内の S 取得後の X 要求は S を解放して X に昇格する", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -253,7 +253,7 @@ func TestMtrPageForWrite(t *testing.T) {
 func TestMtrUnpin(t *testing.T) {
 	t.Run("Pin を解放し記録から除外する", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -271,7 +271,7 @@ func TestMtrUnpin(t *testing.T) {
 
 	t.Run("Unpin 後は別の Mtr が X ラッチを取得できる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -301,7 +301,7 @@ func TestMtrUnpin(t *testing.T) {
 func TestMtrDetach(t *testing.T) {
 	t.Run("記録から除外するが Pin は解放しない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -319,7 +319,7 @@ func TestMtrDetach(t *testing.T) {
 
 	t.Run("Detach 後は別の Mtr が X ラッチを取得できる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -350,7 +350,7 @@ func TestMtrDetach(t *testing.T) {
 func TestMtrUnpinAll(t *testing.T) {
 	t.Run("記録した全ての Pin を解放する", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		pageId1 := page.NewId(0, 0)
 		pageId2 := page.NewId(0, 1)
 		_, err := bp.AddPage(pageId1)
@@ -374,7 +374,7 @@ func TestMtrUnpinAll(t *testing.T) {
 
 	t.Run("Detach したページは解放対象に含まれない", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		pageId1 := page.NewId(0, 0)
 		pageId2 := page.NewId(0, 1)
 		_, err := bp.AddPage(pageId1)
@@ -398,7 +398,7 @@ func TestMtrUnpinAll(t *testing.T) {
 
 	t.Run("UnpinAll 後は別の Mtr が X ラッチを取得できる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		pageId := page.NewId(0, 0)
 		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
@@ -426,7 +426,7 @@ func TestMtrUnpinAll(t *testing.T) {
 
 	t.Run("任意ラッチも全て解放される", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		mtr := NewMtr(bp)
 		l1 := NewRWLatch()
 		l2 := NewRWLatch()
@@ -446,7 +446,7 @@ func TestMtrUnpinAll(t *testing.T) {
 func TestMtrLockShared(t *testing.T) {
 	t.Run("任意の RWLatch を Shared で取得しスコープに記録する", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		mtr := NewMtr(bp)
 		l := NewRWLatch()
 
@@ -463,7 +463,7 @@ func TestMtrLockShared(t *testing.T) {
 func TestMtrLockSharedExclusive(t *testing.T) {
 	t.Run("任意の RWLatch を Shared-Exclusive で取得しスコープに記録する", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		mtr := NewMtr(bp)
 		l := NewRWLatch()
 
@@ -480,7 +480,7 @@ func TestMtrLockSharedExclusive(t *testing.T) {
 func TestMtrLockExclusive(t *testing.T) {
 	t.Run("任意の RWLatch を Exclusive で取得しスコープに記録する", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		mtr := NewMtr(bp)
 		l := NewRWLatch()
 
@@ -497,7 +497,7 @@ func TestMtrLockExclusive(t *testing.T) {
 func TestMtrUnlockLatch(t *testing.T) {
 	t.Run("指定 RWLatch を解放しスコープから除外する", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		mtr := NewMtr(bp)
 		l := NewRWLatch()
 		mtr.LockExclusive(l)
@@ -512,7 +512,7 @@ func TestMtrUnlockLatch(t *testing.T) {
 
 	t.Run("複数の RWLatch を取得しても LIFO で個別解放できる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		mtr := NewMtr(bp)
 		l1 := NewRWLatch()
 		l2 := NewRWLatch()
@@ -533,7 +533,7 @@ func TestMtrUnlockLatch(t *testing.T) {
 func TestMtrPinnedCount(t *testing.T) {
 	t.Run("複数ページの取得で件数が増える", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		pageId1 := page.NewId(0, 0)
 		pageId2 := page.NewId(0, 1)
 		_, err := bp.AddPage(pageId1)
@@ -554,7 +554,7 @@ func TestMtrPinnedCount(t *testing.T) {
 
 	t.Run("解放すると件数が減る", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		pageId1 := page.NewId(0, 0)
 		pageId2 := page.NewId(0, 1)
 		_, err := bp.AddPage(pageId1)
@@ -578,7 +578,7 @@ func TestMtrPinnedCount(t *testing.T) {
 func TestMtrHeldLatchCount(t *testing.T) {
 	t.Run("Lock 系で件数が増え UnlockLatch / UnpinAll で減る", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*3, nil)
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
 		mtr := NewMtr(bp)
 		l1 := NewRWLatch()
 		l2 := NewRWLatch()

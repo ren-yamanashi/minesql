@@ -5,6 +5,7 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -420,7 +421,12 @@ func TestPageSetNextPageNumber(t *testing.T) {
 // newTestBufferPage はテスト用の buffer.Page を作成する
 func newTestBufferPage(t *testing.T) *buffer.Page {
 	t.Helper()
-	pool := buffer.NewPool(page.Size, nil)
+	rl, err := redo.NewBuffer(t.TempDir())
+	if err != nil {
+		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = rl.Close() })
+	pool := buffer.NewPool(page.Size, rl, nil)
 	bufPage, err := pool.AddPage(page.NewId(0, 0))
 	if err != nil {
 		t.Fatalf("buffer.Page の作成に失敗: %v", err)

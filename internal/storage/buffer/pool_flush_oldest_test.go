@@ -11,7 +11,7 @@ import (
 func TestFlushAndCleanResetsOldestModificationLsn(t *testing.T) {
 	t.Run("フラッシュ後に isDirty=false かつ oldestModificationLsn=0 になる", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
@@ -31,7 +31,7 @@ func TestFlushAndCleanResetsOldestModificationLsn(t *testing.T) {
 
 	t.Run("並行書き込みで modifyCount が変化していた場合は oldestModificationLsn を維持する", func(t *testing.T) {
 		// GIVEN
-		bp := NewPool(page.Size*2, nil)
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 0)
 		bp.RegisterHeapFile(0, hf)
 		pageId := page.NewId(0, 0)
