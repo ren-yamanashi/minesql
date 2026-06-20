@@ -17,6 +17,11 @@ const SystemReservedTrxId TrxId = ^TrxId(0)
 //   - ユーザー採番との衝突を防ぐため、TrxId の最大値 - 1 を予約値として確保する
 const PurgeReservedTrxId TrxId = ^TrxId(0) - 1
 
+// DDLReservedTrxId は DDL 操作で使用する予約トランザクション ID
+//   - SystemReservedTrxId / PurgeReservedTrxId とは別の値を確保し、用途を分離する
+//   - ユーザー採番との衝突を防ぐため、TrxId の最大値 - 2 を予約値として確保する
+const DDLReservedTrxId TrxId = ^TrxId(0) - 2
+
 const (
 	modeUnknown Mode = iota
 	Shared
