@@ -49,3 +49,10 @@
   - 参考: https://lwn.net/Articles/457667/
   > I/O operations performed against files opened with O_DIRECT bypass the kernel's page cache, writing directly to the storage. Recall that the storage may itself store the data in a write-back cache, so fsync() is still required for files opened with O_DIRECT in order to save the data to stable storage. The O_DIRECT flag is only relevant for the system I/O API.
   - そのため、サーバーのプロセス停止時などには `Sync()` を呼び出す方針としている
+
+### ファイルの削除
+
+- 指定された FileId に対応するヒープファイルを物理的に削除する
+- この経路は [DDL](../access/ddl.md) のロールバックでのみ呼び出される。通常のテーブル操作 (INSERT / UPDATE / DELETE) はファイル削除を起こさない
+- 削除に先立って、バッファプール内に該当 FileId のキャッシュページが残っている場合はそれらを無効化 (=ダーティーであっても書き戻さず破棄) する。残ったまま削除すると、後続の LRU 追い出しが削除済みのファイルディスクリプタに書き戻そうとして整合性が壊れるため
+- 削除されたファイルが使用していた FileId は再利用しない (詳細: [カタログ - ヘッダーページ](../dictionary/catalog.md#ヘッダーページ))
