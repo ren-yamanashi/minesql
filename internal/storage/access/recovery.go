@@ -120,6 +120,8 @@ func (r *Recovery) applyRollback(records []redo.Record) error {
 }
 
 // rollbackTrx は指定トランザクションの Undo レコードを逆順に適用してロールバックする
+//   - Recovery 中の Undo 逆適用は読み取り Mtr で行い、Commit せず UnpinAll で終わる
+//     ことで Redo に MtrStart も MtrEnd も書かない (= Redo を発生させない)
 func (r *Recovery) rollbackTrx(trxId lock.TrxId) error {
 	undoRecords, err := r.collectUndoRecords(trxId)
 	if err != nil {
@@ -127,9 +129,12 @@ func (r *Recovery) rollbackTrx(trxId lock.TrxId) error {
 	}
 	// Undo レコードを逆順に適用する (最後の操作から順に取り消す)
 	for _, record := range slices.Backward(undoRecords) {
-		if err := r.transaction.rollbackRecord(record); err != nil {
+		mtr := buffer.NewMtr(r.bufferPool)
+		if err := r.transaction.rollbackRecord(mtr, record); err != nil {
+			mtr.UnpinAll()
 			return err
 		}
+		mtr.UnpinAll()
 	}
 	return nil
 }

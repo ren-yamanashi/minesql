@@ -322,6 +322,39 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 	})
 }
 
+func TestRecoveryApplyRollbackDoesNotEmitRedo(t *testing.T) {
+	t.Run("Recovery 中の Rollback で Redo に MtrStart / MtrEnd / PageWrite が追加されない", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		table := setupTableForRecoveryTest(t, env)
+
+		trx := env.trxManager.Begin()
+		err := table.Insert(
+			trx,
+			[]string{"id", "name", "email"},
+			[]string{"1", "Alice", "alice@example.com"},
+		)
+		assert.NoError(t, err)
+		assert.NoError(t, env.redoLog.Flush())
+
+		beforeRecords, err := env.redoLog.ReadFrom(redo.Lsn(0))
+		assert.NoError(t, err)
+
+		recovery := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		records, err := env.redoLog.ReadFrom(env.redoLog.CheckpointLsn())
+		assert.NoError(t, err)
+
+		// WHEN
+		err = recovery.applyRollback(records)
+
+		// THEN
+		assert.NoError(t, err)
+		afterRecords, err := env.redoLog.ReadFrom(redo.Lsn(0))
+		assert.NoError(t, err)
+		assert.Equal(t, len(beforeRecords), len(afterRecords), "Recovery 中の Rollback で Redo に追記があってはならない")
+	})
+}
+
 func TestRecoveryApplyRollback(t *testing.T) {
 	t.Run("COMMIT 済みと未 COMMIT が混在する場合は未 COMMIT のみロールバック", func(t *testing.T) {
 		// GIVEN

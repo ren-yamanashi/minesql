@@ -13,10 +13,9 @@ import (
 var errUnknownUndoRecordType = errors.New("unknown undo record type")
 
 // rollbackRecord は 1 つの Undo レコードに対応するロールバック操作を実行する
-func (t *TrxManager) rollbackRecord(record undo.Record) error {
-	mtr := buffer.NewMtr(t.bufferPool)
-	defer mtr.UnpinAll()
-
+//   - mtr のライフサイクル (Commit / UnpinAll) は呼び出し側が管理する
+//   - 通常運用時は書き込み Mtr を、Recovery 中は読み取り Mtr を渡すことで Redo 記録の有無を切り替える
+func (t *TrxManager) rollbackRecord(mtr *buffer.Mtr, record undo.Record) error {
 	fileId := record.TableFileId()
 	piRecord, err := fetchPrimaryIndexRecord(t.catalog, t.bufferPool, fileId)
 	if err != nil {

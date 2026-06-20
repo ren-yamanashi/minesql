@@ -12,6 +12,11 @@ const TrxIdSize = 4
 //   - ユーザー採番は 1 から始まり順に増分するため、この最大値に到達することは現実的にない
 const SystemReservedTrxId TrxId = ^TrxId(0)
 
+// PurgeReservedTrxId はパージのバックグラウンド物理削除で使用する予約トランザクション ID
+//   - SystemReservedTrxId とは別の値を確保し、用途を分離する
+//   - ユーザー採番との衝突を防ぐため、TrxId の最大値 - 1 を予約値として確保する
+const PurgeReservedTrxId TrxId = ^TrxId(0) - 1
+
 const (
 	modeUnknown Mode = iota
 	Shared

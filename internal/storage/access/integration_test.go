@@ -8,6 +8,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
@@ -366,6 +367,86 @@ func TestIntegrationCrashRecovery(t *testing.T) {
 		assert.NoError(t, err)
 		updated := searchFirstPrimaryRecord(t, table)
 		assert.Equal(t, "Bob", updated.values[1])
+	})
+}
+
+func TestIntegrationCrashRecoveryAfterPurge(t *testing.T) {
+	t.Run("Purge 実行後にクラッシュしても物理削除された古バージョンは復活しない", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		table := createUsersTable(t, env)
+		flushBaseline(t, env)
+
+		trx1 := env.trxMgr.Begin()
+		err := table.Insert(
+			trx1,
+			[]string{"id", "name", "email"},
+			[]string{"1", "Alice", "alice@example.com"},
+		)
+		assert.NoError(t, err)
+		assert.NoError(t, env.trxMgr.Commit(trx1))
+
+		trx2 := env.trxMgr.Begin()
+		record := currentReadFirst(t, table, trx2)
+		assert.NoError(t, table.SoftDelete(trx2, record))
+		assert.NoError(t, env.trxMgr.Commit(trx2))
+
+		p := NewPurge(env.bp, env.trxMgr, env.undoLog, env.redoLog)
+		assert.NoError(t, p.purge())
+		assert.NoError(t, env.redoLog.Flush())
+
+		// WHEN
+		env2 := crashAndRecover(t, env, []string{"users"})
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId())
+		err = r.Execute()
+
+		// THEN
+		assert.NoError(t, err)
+		table2, err := NewTable(env2.bp, env2.ct, env2.undoLog, env2.lockMgr, env2.redoLog, "users")
+		assert.NoError(t, err)
+		mtr := buffer.NewMtr(env2.bp)
+		defer mtr.UnpinAll()
+		iter, err := table2.primaryIndex.tree.Search(mtr, btree.SearchModeStart{})
+		assert.NoError(t, err)
+		_, ok, err := iter.Get()
+		assert.NoError(t, err)
+		assert.False(t, ok)
+	})
+}
+
+func TestIntegrationCrashRecoveryAfterRollback(t *testing.T) {
+	t.Run("通常 Rollback 後にクラッシュしてもロールバック結果が保たれる", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		table := createUsersTable(t, env)
+		flushBaseline(t, env)
+
+		trx1 := env.trxMgr.Begin()
+		err := table.Insert(
+			trx1,
+			[]string{"id", "name", "email"},
+			[]string{"1", "Alice", "alice@example.com"},
+		)
+		assert.NoError(t, err)
+		assert.NoError(t, env.trxMgr.Commit(trx1))
+
+		trx2 := env.trxMgr.Begin()
+		record := currentReadFirst(t, table, trx2)
+		assert.NoError(t, table.Update(trx2, record, []string{"name"}, []string{"Bob"}))
+		assert.NoError(t, env.trxMgr.Rollback(trx2))
+		assert.NoError(t, env.redoLog.Flush())
+
+		// WHEN
+		env2 := crashAndRecover(t, env, []string{"users"})
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId())
+		err = r.Execute()
+
+		// THEN
+		assert.NoError(t, err)
+		table2, err := NewTable(env2.bp, env2.ct, env2.undoLog, env2.lockMgr, env2.redoLog, "users")
+		assert.NoError(t, err)
+		restored := searchFirstPrimaryRecord(t, table2)
+		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, restored.values)
 	})
 }
 

@@ -97,7 +97,12 @@ func (t *TrxManager) Rollback(trx *Transaction) error {
 
 	records := t.undoLog.Records(trx.trxId)
 	for _, r := range slices.Backward(records) {
-		if err := t.rollbackRecord(r); err != nil {
+		mtr := buffer.NewWriteMtr(t.bufferPool, trx.trxId, t.redoLog)
+		if err := t.rollbackRecord(mtr, r); err != nil {
+			mtr.UnpinAll()
+			return err
+		}
+		if err := mtr.Commit(); err != nil {
 			return err
 		}
 	}
