@@ -45,7 +45,8 @@ func (t *Table) checkForeignKeysForInsert(trxId lock.TrxId, colNames, values []s
 //
 // 自テーブルが親テーブルとして参照されている場合に、
 // 削除する値が参照元テーブルから参照されていないか確認する
-func (t *Table) checkForeignKeysForDelete(record *PrimaryRecord) error {
+//   - trxId は子側セカンダリレコードに対する親トランザクションの共有ロック取得に使う
+func (t *Table) checkForeignKeysForDelete(trxId lock.TrxId, record *PrimaryRecord) error {
 	refs, err := fetchReferencingConstraints(t.catalog, t.bufferPool, t.primaryIndex.fileId())
 	if err != nil {
 		return err
@@ -59,6 +60,8 @@ func (t *Table) checkForeignKeysForDelete(record *PrimaryRecord) error {
 		if err := checkChildRecordExists(
 			t.bufferPool,
 			t.catalog,
+			t.lock,
+			trxId,
 			ref,
 			valMap[ref.ReferenceColumnName()],
 		); err != nil {
@@ -74,7 +77,7 @@ func (t *Table) checkForeignKeysForDelete(record *PrimaryRecord) error {
 //   - 親テーブルチェック: 旧値が参照元から参照されていないか
 //   - 子テーブルチェック: 新値が参照先に存在するか
 func (t *Table) checkForeignKeysForUpdate(trxId lock.TrxId, before, after *PrimaryRecord) error {
-	if err := t.checkParentRefsForUpdate(before, after); err != nil {
+	if err := t.checkParentRefsForUpdate(trxId, before, after); err != nil {
 		return err
 	}
 	return t.checkChildRefsForUpdate(trxId, before, after)
@@ -82,7 +85,8 @@ func (t *Table) checkForeignKeysForUpdate(trxId lock.TrxId, before, after *Prima
 
 // checkParentRefsForUpdate は自テーブルを参照する FK の参照先カラム値が変わった場合に、
 // 旧値が参照元から参照されていないかを確認する
-func (t *Table) checkParentRefsForUpdate(before, after *PrimaryRecord) error {
+//   - trxId は子側セカンダリレコードに対する親トランザクションの共有ロック取得に使う
+func (t *Table) checkParentRefsForUpdate(trxId lock.TrxId, before, after *PrimaryRecord) error {
 	refs, err := fetchReferencingConstraints(t.catalog, t.bufferPool, t.primaryIndex.fileId())
 	if err != nil {
 		return err
@@ -101,6 +105,8 @@ func (t *Table) checkParentRefsForUpdate(before, after *PrimaryRecord) error {
 		if err := checkChildRecordExists(
 			t.bufferPool,
 			t.catalog,
+			t.lock,
+			trxId,
 			ref,
 			beforeMap[colName],
 		); err != nil {
@@ -225,9 +231,12 @@ func (t *Table) checkParentRecordExists(trxId lock.TrxId, refFileId page.FileId,
 
 // checkChildRecordExists は参照元テーブルの FK カラムに対応するセカンダリインデックスから
 // active なレコードを検索し、1 件でも存在すれば FK 違反エラーを返す。
+//   - 各子側セカンダリレコードに親トランザクションの共有ロックを取り、ロック取得後の最新状態で再評価する
 func checkChildRecordExists(
 	bp *buffer.Pool,
 	ct *dictionary.Catalog,
+	lockMgr *lock.Manager,
+	trxId lock.TrxId,
 	constraint dictionary.ConstraintMetaRecord,
 	value string,
 ) error {
@@ -235,7 +244,7 @@ func checkChildRecordExists(
 	if err != nil {
 		return err
 	}
-	return hasActiveChildRecord(bp, indexRecord, value)
+	return hasActiveChildRecord(bp, lockMgr, trxId, indexRecord, value)
 }
 
 // findFKSecondaryIndex は FK カラムが先頭カラム (position 0) として含まれるセカンダリインデックスを返す
@@ -266,8 +275,12 @@ func findFKSecondaryIndex(
 }
 
 // hasActiveChildRecord は指定したセカンダリインデックスで value を先頭キーに持つ active なレコードが存在するかを確認する
+//   - 各候補レコードに対して親トランザクションの共有ロックを取得し、子側で進行中の論理削除 / 更新が完了するまで待つ
+//   - ロック取得後に最新のレコード状態を取り直して再評価する (取得待ち中に物理削除されている場合はスキップ)
 func hasActiveChildRecord(
 	bp *buffer.Pool,
+	lockMgr *lock.Manager,
+	trxId lock.TrxId,
 	indexRecord dictionary.IndexMetaRecord,
 	value string,
 ) error {
@@ -293,7 +306,24 @@ func hasActiveChildRecord(
 		if !bytes.HasPrefix(existing.Key(), sk) {
 			return nil
 		}
-		if existing.Header()[0] != 1 {
+
+		rowKey := lock.RowKey{MetaPageId: indexRecord.MetaPageId(), Key: existing.Key()}
+		if err := lockMgr.Lock(trxId, rowKey, lock.Shared); err != nil {
+			return err
+		}
+
+		// ロック取得後に最新状態を取り直して deleteMark を再評価する
+		latest, _, findErr := tree.FindByKey(mtr, existing.Key())
+		if errors.Is(findErr, btree.ErrKeyNotFound) {
+			if err := iter.Advance(); err != nil {
+				return err
+			}
+			continue
+		}
+		if findErr != nil {
+			return findErr
+		}
+		if latest.Header()[0] != 1 {
 			return ErrForeignKeyViolation
 		}
 		if err := iter.Advance(); err != nil {

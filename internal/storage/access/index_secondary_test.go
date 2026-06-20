@@ -1,6 +1,7 @@
 package access
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
@@ -387,6 +388,117 @@ func TestSecondaryIndexCheckUnique(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
+	})
+}
+
+func TestSecondaryIndexUniqueSkLock(t *testing.T) {
+	t.Run("UNIQUE インデックスで同じ SK 異なる PK の並行 INSERT は SK 単位ロックで直列化される", func(t *testing.T) {
+		// GIVEN
+		si := setupTestSecondaryIndex(t, "idx_email", true)
+		mtr := buffer.NewMtr(si.bufferPool)
+		defer mtr.UnpinAll()
+		r1 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"1"})
+		err := si.insert(mtr, r1, lock.TrxId(1))
+		assert.NoError(t, err)
+
+		// WHEN
+		var err2 error
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			mtr2 := buffer.NewMtr(si.bufferPool)
+			defer mtr2.UnpinAll()
+			r2 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"2"})
+			err2 = si.insert(mtr2, r2, lock.TrxId(2))
+		}()
+		wg.Wait()
+
+		// THEN
+		assert.ErrorIs(t, err2, lock.ErrTimeout)
+	})
+
+	t.Run("UNIQUE インデックスで未コミット softDelete された SK と同じ SK の挿入は SK 単位ロックで待機する", func(t *testing.T) {
+		// GIVEN
+		si := setupTestSecondaryIndex(t, "idx_email", true)
+		mtr := buffer.NewMtr(si.bufferPool)
+		defer mtr.UnpinAll()
+		r1 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"1"})
+		err := si.insert(mtr, r1, lock.TrxId(1))
+		assert.NoError(t, err)
+
+		iter, _ := si.search(mtr, SearchModeStart{}, nil)
+		record, _, _ := iter.NextIndexOnly()
+		err = si.softDelete(mtr, record, lock.TrxId(1))
+		assert.NoError(t, err)
+
+		// WHEN
+		var err2 error
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			mtr2 := buffer.NewMtr(si.bufferPool)
+			defer mtr2.UnpinAll()
+			r2 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"2"})
+			err2 = si.insert(mtr2, r2, lock.TrxId(2))
+		}()
+		wg.Wait()
+
+		// THEN
+		assert.ErrorIs(t, err2, lock.ErrTimeout)
+	})
+
+	t.Run("softDelete を行った trx がロックを解放すると、別 trx が同じ SK で挿入を完了できる", func(t *testing.T) {
+		// GIVEN
+		si := setupTestSecondaryIndex(t, "idx_email", true)
+		mtr := buffer.NewMtr(si.bufferPool)
+		defer mtr.UnpinAll()
+		r1 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"1"})
+		err := si.insert(mtr, r1, lock.TrxId(1))
+		assert.NoError(t, err)
+		iter, _ := si.search(mtr, SearchModeStart{}, nil)
+		record, _, _ := iter.NextIndexOnly()
+		err = si.softDelete(mtr, record, lock.TrxId(1))
+		assert.NoError(t, err)
+
+		// trx 1 が保持する全ロック (SK+PK 単位 / SK 単位の両方) を解放
+		si.lock.Release(lock.TrxId(1))
+
+		// WHEN
+		mtr2 := buffer.NewMtr(si.bufferPool)
+		defer mtr2.UnpinAll()
+		r2 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"2"})
+		err2 := si.insert(mtr2, r2, lock.TrxId(2))
+
+		// THEN
+		assert.NoError(t, err2)
+	})
+
+	t.Run("非 UNIQUE インデックスでは同じ SK 異なる PK の並行 INSERT が直列化されない", func(t *testing.T) {
+		// GIVEN
+		si := setupTestSecondaryIndex(t, "idx_name", false)
+		mtr := buffer.NewMtr(si.bufferPool)
+		defer mtr.UnpinAll()
+		r1 := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
+		err := si.insert(mtr, r1, lock.TrxId(1))
+		assert.NoError(t, err)
+
+		// WHEN
+		var err2 error
+		var wg sync.WaitGroup
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			mtr2 := buffer.NewMtr(si.bufferPool)
+			defer mtr2.UnpinAll()
+			r2 := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"2"})
+			err2 = si.insert(mtr2, r2, lock.TrxId(2))
+		}()
+		wg.Wait()
+
+		// THEN
+		assert.NoError(t, err2)
 	})
 }
 

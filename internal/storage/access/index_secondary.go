@@ -107,6 +107,12 @@ func (si *secondaryIndex) search(mtr *buffer.Mtr, mode SearchMode, readView *rea
 //   - 論理削除済みの同一キー (SK + PK) が存在する場合は上書きする
 func (si *secondaryIndex) insert(mtr *buffer.Mtr, record *SecondaryRecord, trxId lock.TrxId) error {
 	if si.unique {
+		// ユニーク制約の重複確認の直前に SK 単位の排他ロックを取り、
+		// 同じ SK で異なる PK を持つ並行 INSERT / 未コミット論理削除との競合を直列化する
+		uniqueRowKey := lock.RowKey{MetaPageId: si.tree.MetaPageId(), Key: record.encodedSecondaryKey()}
+		if err := si.lock.Lock(trxId, uniqueRowKey, lock.Exclusive); err != nil {
+			return err
+		}
 		if err := si.checkUnique(mtr, record); err != nil {
 			return err
 		}
@@ -155,6 +161,14 @@ func (si *secondaryIndex) delete(mtr *buffer.Mtr, record *SecondaryRecord, trxId
 // softDelete は行を論理削除する
 func (si *secondaryIndex) softDelete(mtr *buffer.Mtr, record *SecondaryRecord, trxId lock.TrxId) error {
 	encodedRecord := record.Encode()
+
+	if si.unique {
+		// 並行 INSERT との直列化のため、SK 単位の排他ロックも併用する
+		uniqueRowKey := lock.RowKey{MetaPageId: si.tree.MetaPageId(), Key: record.encodedSecondaryKey()}
+		if err := si.lock.Lock(trxId, uniqueRowKey, lock.Exclusive); err != nil {
+			return err
+		}
+	}
 
 	// 排他ロックを取得
 	rowKey := lock.RowKey{MetaPageId: si.tree.MetaPageId(), Key: encodedRecord.Key()}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/config"
+	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/stretchr/testify/assert"
@@ -406,6 +407,52 @@ func TestTrxManagerRollback(t *testing.T) {
 		assert.Equal(t, redo.RecordTypeRollback, records[len(records)-1].Type(), "Redo の末尾は Rollback レコード")
 	})
 
+	t.Run("Rollback 成功時に Undo が破棄され state が Inactive になる", func(t *testing.T) {
+		// GIVEN
+		tm := setupTrxManager(t)
+		trx := tm.Begin()
+		table := setupTableForTrxTest(t, tm)
+		err := table.Insert(
+			trx,
+			[]string{"id", "name", "email"},
+			[]string{"1", "Alice", "alice@example.com"},
+		)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, tm.undoLog.Records(trx.trxId))
+
+		// WHEN
+		err = tm.Rollback(trx)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, trxStateInactive, tm.transactions[trx.trxId].state)
+		assert.Empty(t, tm.undoLog.Records(trx.trxId))
+	})
+
+	t.Run("Rollback 途中でエラーが返った場合、state は Active のまま Undo も保持される", func(t *testing.T) {
+		// GIVEN
+		tm := setupTrxManager(t)
+		trx := tm.Begin()
+		table := setupTableForTrxTest(t, tm)
+		err := table.Insert(
+			trx,
+			[]string{"id", "name", "email"},
+			[]string{"1", "Alice", "alice@example.com"},
+		)
+		assert.NoError(t, err)
+
+		// primary tree のレコードを直接物理削除して、Rollback の rollbackInsert を失敗させる
+		breakPrimaryRecord(t, tm, table, "1")
+
+		// WHEN
+		err = tm.Rollback(trx)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Equal(t, trxStateActive, tm.transactions[trx.trxId].state)
+		assert.NotEmpty(t, tm.undoLog.Records(trx.trxId))
+	})
+
 	t.Run("Undo がないトランザクションの Rollback でも Rollback レコードが書かれる", func(t *testing.T) {
 		// GIVEN
 		tm := setupTrxManager(t)
@@ -634,6 +681,20 @@ func setupTestRedoLog(t *testing.T) *redo.Buffer {
 	}
 	t.Cleanup(func() { _ = redoLog.Clear() })
 	return redoLog
+}
+
+// breakPrimaryRecord はテスト用に、テーブルのプライマリインデックスから指定 PK のレコードを直接物理削除する
+//   - Rollback の rollbackInsert を意図的に失敗させるためのヘルパー
+func breakPrimaryRecord(t *testing.T, tm *TrxManager, table *Table, pk string) {
+	t.Helper()
+	key := encode.Encode(nil, [][]byte{[]byte(pk)})
+	mtr := buffer.NewWriteMtr(tm.bufferPool, lock.SystemReservedTrxId, tm.redoLog)
+	if err := table.primaryIndex.tree.Delete(mtr, key); err != nil {
+		t.Fatalf("primary tree からの直接削除に失敗: %v", err)
+	}
+	if err := mtr.Commit(); err != nil {
+		t.Fatalf("mtr の Commit に失敗: %v", err)
+	}
 }
 
 // setupTableForTrxTest は TrxManager のロールバックテスト用に Table を構築する

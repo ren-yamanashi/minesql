@@ -93,18 +93,10 @@ func (t *TrxManager) Commit(trx *Transaction) error {
 	return nil
 }
 
-// Rollback は Undo ログを逆順に適用してトランザクションをロールバックし、ロックを開放する
+// Rollback は Undo ログを逆順に適用してトランザクションをロールバックし、成功時のみロックと Undo を解放する
+//   - エラーを返した場合、トランザクションは Active のまま、ロックと Undo は保持される
+//   - 通常運用での再試行はサポートしない。中途状態の解消は再起動時のクラッシュリカバリで行う
 func (t *TrxManager) Rollback(trx *Transaction) error {
-	defer func() {
-		t.lock.Release(trx.trxId)
-		t.undoLog.Discard(trx.trxId)
-
-		t.mu.Lock()
-		trx.state = trxStateInactive
-		trx.readView = nil
-		t.mu.Unlock()
-	}()
-
 	records := t.undoLog.Records(trx.trxId)
 	for _, r := range slices.Backward(records) {
 		mtr := buffer.NewWriteMtr(t.bufferPool, trx.trxId, t.redoLog)
@@ -120,6 +112,15 @@ func (t *TrxManager) Rollback(trx *Transaction) error {
 	if _, err := t.redoLog.AppendRollback(trx.trxId); err != nil {
 		return err
 	}
+
+	t.lock.Release(trx.trxId)
+	t.undoLog.Discard(trx.trxId)
+
+	t.mu.Lock()
+	trx.state = trxStateInactive
+	trx.readView = nil
+	t.mu.Unlock()
+
 	return nil
 }
 
