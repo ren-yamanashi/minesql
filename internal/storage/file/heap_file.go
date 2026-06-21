@@ -13,6 +13,7 @@ import (
 type HeapFile struct {
 	fileId     page.FileId // 管理対象ファイルの FileId
 	file       *os.File    // ヒープファイルのファイルディスクリプタ
+	path       string      // ヒープファイルのパス
 	nextPageId page.Id     // 次に採番する PageId
 }
 
@@ -44,8 +45,14 @@ func NewHeapFile(fileId page.FileId, path string) (heapFile *HeapFile, retErr er
 	return &HeapFile{
 		fileId:     fileId,
 		file:       file,
+		path:       path,
 		nextPageId: page.NewId(fileId, page.PageNumber(fileSize/int64(page.Size))),
 	}, nil
+}
+
+// Path はヒープファイルのパスを返す
+func (hf *HeapFile) Path() string {
+	return hf.path
 }
 
 // AllocatePageId は新しいページ ID を採番する

@@ -219,6 +219,38 @@ func TestEvict(t *testing.T) {
 	})
 }
 
+func TestMarkUnused(t *testing.T) {
+	t.Run("使用中のノードを未使用扱いに戻せる", func(t *testing.T) {
+		// GIVEN
+		lru := newLru(4)
+		lru.access(0)
+		assert.False(t, lru.nodeMap[0].isUnused)
+
+		// WHEN
+		lru.markUnused(0)
+
+		// THEN
+		assert.True(t, lru.nodeMap[0].isUnused)
+	})
+
+	t.Run("markUnused 後の再アクセスは midpoint に配置される", func(t *testing.T) {
+		// GIVEN
+		lru := newLru(8)
+		lru.access(0)
+		lru.access(0) // Old → New head
+		lru.markUnused(0)
+
+		// WHEN
+		lru.access(0)
+
+		// THEN
+		node := lru.nodeMap[0]
+		assert.False(t, node.isUnused)
+		assert.True(t, node.isOld)
+		assert.Equal(t, lru.midpoint, node)
+	})
+}
+
 func TestUndoEvict(t *testing.T) {
 	alwaysTrue := func(_ id) bool { return true }
 

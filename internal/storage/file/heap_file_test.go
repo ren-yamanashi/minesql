@@ -82,6 +82,36 @@ func TestNewHeapFile(t *testing.T) {
 	})
 }
 
+func TestPath(t *testing.T) {
+	t.Run("コンストラクタに渡したパスを返す", func(t *testing.T) {
+		// GIVEN
+		path := filepath.Join(t.TempDir(), "test.db")
+		hf, err := NewHeapFile(0, path)
+		assert.NoError(t, err)
+		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
+
+		// WHEN
+		got := hf.Path()
+
+		// THEN
+		assert.Equal(t, path, got)
+	})
+
+	t.Run("Close 済みでもパスを返す", func(t *testing.T) {
+		// GIVEN
+		path := filepath.Join(t.TempDir(), "test.db")
+		hf, err := NewHeapFile(0, path)
+		assert.NoError(t, err)
+		assert.NoError(t, hf.Close())
+
+		// WHEN
+		got := hf.Path()
+
+		// THEN
+		assert.Equal(t, path, got)
+	})
+}
+
 func TestAllocatePageId(t *testing.T) {
 	t.Run("空ファイルの場合 PageNumber 0 から採番される", func(t *testing.T) {
 		// GIVEN

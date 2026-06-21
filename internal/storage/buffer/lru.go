@@ -77,6 +77,12 @@ func (l *lru) undoEvict(bufferId id) {
 	node.isUnused = false
 }
 
+// markUnused は指定 bufferId のノードを未使用扱いに戻す
+func (l *lru) markUnused(bufferId id) {
+	node := l.nodeMap[bufferId]
+	node.isUnused = true
+}
+
 // moveToMidpoint はノードを midpoint (OldSublist の先頭) に配置する
 func (l *lru) moveToMidpoint(node *lruNode) {
 	if node == l.midpoint {
