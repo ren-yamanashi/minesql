@@ -16,14 +16,22 @@ type Recovery struct {
 	bufferPool  *buffer.Pool
 	transaction *TrxManager
 	undoFileId  page.FileId // Undo ログの FileId
+	ddlManager  *undo.DDLManager
 }
 
-func NewRecovery(redo *redo.Buffer, bp *buffer.Pool, trx *TrxManager, undoFileId page.FileId) *Recovery {
+func NewRecovery(
+	redo *redo.Buffer,
+	bp *buffer.Pool,
+	trx *TrxManager,
+	undoFileId page.FileId,
+	ddlManager *undo.DDLManager,
+) *Recovery {
 	return &Recovery{
 		redoLog:     redo,
 		bufferPool:  bp,
 		transaction: trx,
 		undoFileId:  undoFileId,
+		ddlManager:  ddlManager,
 	}
 }
 
@@ -48,6 +56,9 @@ func (r *Recovery) Execute() error {
 		return err
 	}
 	if err := r.applyRollback(records); err != nil {
+		return err
+	}
+	if err := r.applyDDLRollback(records); err != nil {
 		return err
 	}
 	if err := r.bufferPool.FlushAllPages(); err != nil {
@@ -137,6 +148,45 @@ func (r *Recovery) rollbackTrx(trxId lock.TrxId) error {
 		mtr.UnpinAll()
 	}
 	return nil
+}
+
+// applyDDLRollback は DDL 予約 ID で書かれた未完了 DDL を取り消す
+//   - Redo に DDL 予約 ID の Commit / Rollback レコードが無い場合のみ実行する
+func (r *Recovery) applyDDLRollback(records []redo.Record) error {
+	isActive := false
+	isCompleted := false
+	for _, rec := range records {
+		if rec.TrxId() != lock.DDLReservedTrxId {
+			continue
+		}
+		isActive = true
+		if rec.Type() == redo.RecordTypeCommit || rec.Type() == redo.RecordTypeRollback {
+			isCompleted = true
+		}
+	}
+	if !isActive || isCompleted {
+		return nil
+	}
+
+	scanMtr := buffer.NewMtr(r.bufferPool)
+	defer scanMtr.UnpinAll()
+	ddlRecords, err := r.ddlManager.ReverseScan(scanMtr)
+	if err != nil {
+		return err
+	}
+
+	for _, record := range ddlRecords {
+		mtr := buffer.NewMtr(r.bufferPool)
+		if err := r.transaction.applyDDLRollbackRecord(mtr, record); err != nil {
+			mtr.UnpinAll()
+			return err
+		}
+		mtr.UnpinAll()
+	}
+
+	clearMtr := buffer.NewMtr(r.bufferPool)
+	defer clearMtr.UnpinAll()
+	return r.ddlManager.Clear(clearMtr)
 }
 
 // collectUndoRecords は Undo ページを走査して指定トランザクションのレコードを収集する

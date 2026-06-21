@@ -3,6 +3,7 @@ package access
 import (
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
+	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
 // BeginDDL は DDL 用 Transaction を払い出す
@@ -41,13 +42,18 @@ func (t *TrxManager) commitDDL(trx *Transaction) error {
 	return nil
 }
 
+// applyDDLRollbackRecord は DDL Undo レコード 1 件を取り消す
+//   - mtr のライフサイクル (Commit / UnpinAll) は呼び出し側が管理する
+//   - 通常運用時は書き込み Mtr を、 Recovery 中は読み取り Mtr を渡すことで Redo 記録の有無を切り替える
+func (t *TrxManager) applyDDLRollbackRecord(mtr *buffer.Mtr, record undo.DDLRecord) error {
+	return NewDDLRollbacker(t.bufferPool, t.catalog).Rollback(mtr, record)
+}
+
 // rollbackDDL は DDL Transaction の Rollback 処理を行う
-//   - DDL Undo 領域コンテナを ReverseScan し、 DDLRollbacker で各 record を逆順適用する
+//   - DDL Undo 領域コンテナを ReverseScan し、 各 record を逆順適用する
 //   - 適用後にコンテナの中身をクリアし、 Redo に Rollback レコードを追加する
 //   - 各 record の適用は独立 mtr (= 1 record = 1 mtr) で行い、 record ごとに永続境界を作る
 func (t *TrxManager) rollbackDDL(trx *Transaction) error {
-	rollbacker := NewDDLRollbacker(t.bufferPool, t.catalog)
-
 	scanMtr := buffer.NewMtr(t.bufferPool)
 	defer scanMtr.UnpinAll()
 	records, err := t.catalog.DDLManager().ReverseScan(scanMtr)
@@ -57,7 +63,7 @@ func (t *TrxManager) rollbackDDL(trx *Transaction) error {
 
 	for _, record := range records {
 		mtr := buffer.NewWriteMtr(t.bufferPool, trx.trxId, t.redoLog)
-		if err := rollbacker.Rollback(mtr, record); err != nil {
+		if err := t.applyDDLRollbackRecord(mtr, record); err != nil {
 			mtr.UnpinAll()
 			return err
 		}

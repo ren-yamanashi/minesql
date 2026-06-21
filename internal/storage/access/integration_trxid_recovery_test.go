@@ -30,7 +30,7 @@ func TestIntegrationTrxIdRecovery(t *testing.T) {
 
 		// WHEN
 		env2 := crashAndRecover(t, env, []string{"users"})
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
 		assert.NoError(t, r.Execute())
 
 		// THEN
@@ -57,7 +57,7 @@ func TestIntegrationTrxIdRecovery(t *testing.T) {
 
 		// WHEN
 		env2 := crashAndRecover(t, env, []string{"users"})
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
 		assert.NoError(t, r.Execute())
 
 		table2, err := NewTable(env2.bp, env2.ct, env2.undoLog, env2.lockMgr, env2.redoLog, "users")

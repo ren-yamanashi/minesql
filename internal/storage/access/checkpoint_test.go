@@ -212,7 +212,7 @@ func TestCheckpointExecuteWithFuzzyFlushAndRecovery(t *testing.T) {
 		// THEN
 		assert.Greater(t, env.redoLog.CheckpointLsn(), checkpointBefore)
 		env2 := crashAndRecover(t, env, tableNames)
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
 		assert.NoError(t, r.Execute())
 
 		for i, name := range tableNames {

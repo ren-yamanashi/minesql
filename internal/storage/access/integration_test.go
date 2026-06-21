@@ -297,7 +297,7 @@ func TestIntegrationCrashRecovery(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		r := NewRecovery(env.redoLog, env.bp, env.trxMgr, env.ct.UndoLogFileId())
+		r := NewRecovery(env.redoLog, env.bp, env.trxMgr, env.ct.UndoLogFileId(), env.ct.DDLManager())
 		err = r.Execute()
 
 		// THEN
@@ -323,7 +323,7 @@ func TestIntegrationCrashRecovery(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		r := NewRecovery(env.redoLog, env.bp, env.trxMgr, env.ct.UndoLogFileId())
+		r := NewRecovery(env.redoLog, env.bp, env.trxMgr, env.ct.UndoLogFileId(), env.ct.DDLManager())
 		err = r.Execute()
 
 		// THEN
@@ -360,7 +360,7 @@ func TestIntegrationCrashRecovery(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		r := NewRecovery(env.redoLog, env.bp, env.trxMgr, env.ct.UndoLogFileId())
+		r := NewRecovery(env.redoLog, env.bp, env.trxMgr, env.ct.UndoLogFileId(), env.ct.DDLManager())
 		err = r.Execute()
 
 		// THEN
@@ -397,7 +397,7 @@ func TestIntegrationCrashRecoveryAfterPurge(t *testing.T) {
 
 		// WHEN
 		env2 := crashAndRecover(t, env, []string{"users"})
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
 		err = r.Execute()
 
 		// THEN
@@ -438,7 +438,7 @@ func TestIntegrationCrashRecoveryAfterRollback(t *testing.T) {
 
 		// WHEN
 		env2 := crashAndRecover(t, env, []string{"users"})
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
 		err = r.Execute()
 
 		// THEN
@@ -699,7 +699,7 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 		_ = env.redoLog.Flush()
 
 		// クラッシュリカバリ実行
-		r := NewRecovery(env.redoLog, env.bp, env.trxMgr, env.ct.UndoLogFileId())
+		r := NewRecovery(env.redoLog, env.bp, env.trxMgr, env.ct.UndoLogFileId(), env.ct.DDLManager())
 		err := r.Execute()
 		assert.NoError(t, err)
 
@@ -807,7 +807,7 @@ func crashAndRecover(t *testing.T, prev *integrationEnv, tableNames []string) *i
 	lockMgr := lock.NewManager()
 	// Recovery 中は undoMgr の entries を参照しないので、Recovery 実行用の仮の TrxManager を空 undoMgr 抜きで構成する
 	tempTrxMgr := NewTrxManager(ct, nil, redoLog, lockMgr, bp, maxTrxId+1, completedTrxIds)
-	r := NewRecovery(redoLog, bp, tempTrxMgr, undoFileId)
+	r := NewRecovery(redoLog, bp, tempTrxMgr, undoFileId, ct.DDLManager())
 	if err := r.Execute(); err != nil {
 		t.Fatalf("Recovery.Execute に失敗: %v", err)
 	}

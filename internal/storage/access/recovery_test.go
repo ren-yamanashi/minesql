@@ -2,12 +2,16 @@ package access
 
 import (
 	"encoding/binary"
+	"os"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
+	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -17,7 +21,7 @@ func TestNewRecovery(t *testing.T) {
 		env := setupRecoveryTestEnv(t)
 
 		// WHEN
-		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
 
 		// THEN
 		assert.NotNil(t, r)
@@ -28,7 +32,7 @@ func TestRecoveryNeedsRecovery(t *testing.T) {
 	t.Run("Redo ログが空の場合はリカバリ不要", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
 
 		// WHEN
 		needs, err := r.NeedsRecovery()
@@ -41,7 +45,7 @@ func TestRecoveryNeedsRecovery(t *testing.T) {
 	t.Run("COMMIT 済みの Redo ログがある場合はリカバリが必要", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
 		_, _ = env.redoLog.AppendCommit(lock.TrxId(1))
 		_ = env.redoLog.Flush()
 
@@ -56,7 +60,7 @@ func TestRecoveryNeedsRecovery(t *testing.T) {
 	t.Run("チェックポイント LSN 以前のレコードしかない場合はリカバリ不要", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
 		_, _ = env.redoLog.AppendCommit(lock.TrxId(1)) // LSN=1
 		_ = env.redoLog.Flush()
 		_ = env.redoLog.SetCheckpointLsn(redo.Lsn(1))
@@ -85,7 +89,7 @@ func TestRecoveryExecute(t *testing.T) {
 		assert.NoError(t, err)
 		_ = env.trxManager.Commit(trx)
 
-		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
 
 		// WHEN
 		err = r.Execute()
@@ -117,7 +121,7 @@ func TestRecoveryExecute(t *testing.T) {
 
 		_ = env.redoLog.Flush()
 
-		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
 
 		// WHEN
 		err = r.Execute()
@@ -137,7 +141,7 @@ func TestRecoveryExecute(t *testing.T) {
 	t.Run("Redo ログが空の場合でもエラーにならない", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
 
 		// WHEN
 		err := r.Execute()
@@ -151,7 +155,7 @@ func TestRecoveryExecute(t *testing.T) {
 		env := setupRecoveryTestEnv(t)
 		_, _ = env.redoLog.AppendCommit(lock.TrxId(1))
 		_ = env.redoLog.Flush()
-		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
 
 		// WHEN
 		_ = r.Execute()
@@ -165,7 +169,7 @@ func TestRecoveryExecute(t *testing.T) {
 	t.Run("ROLLBACK 済みトランザクションは再ロールバックされない", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
 
 		// ROLLBACK レコードが Redo ログにある
 		_, _ = env.redoLog.AppendRollback(lock.TrxId(1))
@@ -183,7 +187,7 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 	t.Run("Page LSN がレコードの LSN 以上ならスキップされる", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
 
 		// ページを取得して、Page LSN に大きな値を書き込む
 		pgId := page.NewId(env.undoFileId, 0)
@@ -219,7 +223,7 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 	t.Run("完全な mtr のページ変更は適用される", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
 		pgId := page.NewId(env.undoFileId, 0)
 
 		// MtrStart, PageWrite, MtrEnd を順に記録
@@ -244,7 +248,7 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 	t.Run("MtrEnd を欠く mtr のページ変更は破棄される", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
 		pgId := page.NewId(env.undoFileId, 0)
 
 		// MtrStart, PageWrite だけ (MtrEnd なし)
@@ -268,7 +272,7 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 	t.Run("mtr 境界に囲まれていないページ変更は無視される", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
 		pgId := page.NewId(env.undoFileId, 0)
 
 		newPageData := make([]byte, page.Size)
@@ -290,7 +294,7 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 	t.Run("複数の mtr が交互に並んでも完全な mtr だけが適用される", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
 		completePgId := page.NewId(env.undoFileId, 0)
 		incompletePgId := page.NewId(env.undoFileId, 1)
 		_, _ = env.bp.AddPage(incompletePgId)
@@ -340,7 +344,7 @@ func TestRecoveryApplyRollbackDoesNotEmitRedo(t *testing.T) {
 		beforeRecords, err := env.redoLog.ReadFrom(redo.Lsn(0))
 		assert.NoError(t, err)
 
-		recovery := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		recovery := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
 		records, err := env.redoLog.ReadFrom(env.redoLog.CheckpointLsn())
 		assert.NoError(t, err)
 
@@ -382,7 +386,7 @@ func TestRecoveryApplyRollback(t *testing.T) {
 		_ = env.redoLog.Flush()
 
 		records, _ := env.redoLog.ReadFrom(redo.Lsn(0))
-		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
 
 		// WHEN
 		err := r.applyRollback(records)
@@ -408,6 +412,7 @@ type recoveryTestEnv struct {
 	redoLog    *redo.Buffer
 	trxManager *TrxManager
 	undoFileId page.FileId
+	ddlManager *undo.DDLManager
 }
 
 // setupRecoveryTestEnv はリカバリテスト用の環境を構築する
@@ -441,6 +446,7 @@ func setupRecoveryTestEnv(t *testing.T) *recoveryTestEnv {
 		redoLog:    env.redoLog,
 		trxManager: trxManager,
 		undoFileId: page.FileId(3),
+		ddlManager: env.ct.DDLManager(),
 	}
 }
 
@@ -476,7 +482,7 @@ func TestRecoveryExecuteRestoresCommittedInsertFromRedo(t *testing.T) {
 
 		// WHEN
 		env2 := crashAndRecover(t, env, []string{"users"})
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
 		err = r.Execute()
 
 		// THEN
@@ -515,7 +521,7 @@ func TestRecoveryExecuteSkipsAlreadyAppliedPagesByPageLsn(t *testing.T) {
 
 		// WHEN
 		env2 := crashAndRecover(t, env, []string{"users"})
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
 		err = r.Execute()
 
 		// THEN
@@ -546,7 +552,7 @@ func TestRecoveryExecuteDiscardsIncompleteMtr(t *testing.T) {
 
 		// WHEN
 		env2 := crashAndRecover(t, env, []string{"users"})
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
 		err = r.Execute()
 
 		// THEN
@@ -580,7 +586,7 @@ func TestRecoveryExecuteRollbacksMultipleInsertsInOneTransaction(t *testing.T) {
 
 		// WHEN
 		env2 := crashAndRecover(t, env, []string{"users"})
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
 		err = r.Execute()
 
 		// THEN
@@ -625,7 +631,7 @@ func TestRecoveryExecuteRollbacksUncommittedUpdateAfterCommittedInsert(t *testin
 
 		// WHEN
 		env2 := crashAndRecover(t, env, []string{"users"})
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
 		err = r.Execute()
 
 		// THEN
@@ -688,4 +694,223 @@ func flushBaseline(t *testing.T, env *integrationEnv) {
 	t.Helper()
 	assert.NoError(t, env.redoLog.Flush())
 	assert.NoError(t, env.bp.FlushAllPages())
+}
+
+func TestRecoveryApplyDDLRollback(t *testing.T) {
+	t.Run("AllocateFileIdUndo のみが積まれた状態で物理ファイルが削除される", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		targetFileId := page.FileId(99)
+		targetPath := registerDDLRollbackerHeapFile(t, env.bp, targetFileId)
+		appendDDLUndoForRecovery(t, env, undo.NewDDLRecord(
+			undo.DDLRecordTypeAllocateFileId,
+			undo.NewAllocateFileIdUndoRecord(targetFileId).Serialize(),
+		))
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
+
+		// WHEN
+		err := r.Execute()
+
+		// THEN
+		assert.NoError(t, err)
+		_, statErr := os.Stat(targetPath)
+		assert.True(t, os.IsNotExist(statErr))
+	})
+
+	t.Run("CreateBTreeUndo で対象 B+Tree のページが解放される", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		createMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		tree, err := btree.CreateTree(env.bp, page.FileId(2), createMtr)
+		assert.NoError(t, err)
+		assert.NoError(t, createMtr.Commit())
+		assert.NoError(t, env.bp.FlushAllPages())
+		assert.NoError(t, env.redoLog.Clear())
+
+		pageIds := collectTreePageIds(t, env.bp, tree)
+		appendDDLUndoForRecovery(t, env, undo.NewDDLRecord(
+			undo.DDLRecordTypeCreateBTree,
+			undo.NewCreateBTreeUndoRecord(tree.MetaPageId()).Serialize(),
+		))
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
+
+		// WHEN
+		err = r.Execute()
+
+		// THEN
+		assert.NoError(t, err)
+		head := readDDLFreeListHead(t, env.bp, env.trxManager.catalog.FreeListMapPageId(), page.FileId(2))
+		assert.Equal(t, pageIds[0].PageNumber(), head)
+		assert.GreaterOrEqual(t, len(pageIds), 2)
+	})
+
+	t.Run("AllocateFileIdUndo + CreateBTreeUndo + MetaInsertUndo の組合せで物理基盤と Meta が全て取り消される", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		targetFileId := page.FileId(101)
+		targetPath := registerDDLRollbackerHeapFile(t, env.bp, targetFileId)
+
+		createMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		tree, err := btree.CreateTree(env.bp, page.FileId(2), createMtr)
+		assert.NoError(t, err)
+		assert.NoError(t, createMtr.Commit())
+
+		newTable := dictionary.NewTableMetaRecord("ddl_target", tree.MetaPageId(), 3)
+		insertMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		assert.NoError(t, env.trxManager.catalog.TableMeta().Insert(insertMtr, newTable))
+		assert.NoError(t, insertMtr.Commit())
+		assert.NoError(t, env.bp.FlushAllPages())
+		assert.NoError(t, env.redoLog.Clear())
+
+		appendDDLUndoForRecovery(t, env,
+			undo.NewDDLRecord(
+				undo.DDLRecordTypeAllocateFileId,
+				undo.NewAllocateFileIdUndoRecord(targetFileId).Serialize(),
+			),
+			undo.NewDDLRecord(
+				undo.DDLRecordTypeCreateBTree,
+				undo.NewCreateBTreeUndoRecord(tree.MetaPageId()).Serialize(),
+			),
+			undo.NewDDLRecord(
+				undo.DDLRecordTypeMetaInsert,
+				undo.NewMetaInsertUndoRecord(undo.MetaTableTypeTable, newTable.Encode().Key()).Serialize(),
+			),
+		)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
+
+		// WHEN
+		err = r.Execute()
+
+		// THEN
+		assert.NoError(t, err)
+		_, statErr := os.Stat(targetPath)
+		assert.True(t, os.IsNotExist(statErr))
+		assertTableMetaRecordAbsent(t, env, "ddl_target")
+	})
+
+	t.Run("Recovery 完了後に DDL Undo 領域が空になる", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		targetFileId := page.FileId(102)
+		registerDDLRollbackerHeapFile(t, env.bp, targetFileId)
+		appendDDLUndoForRecovery(t, env, undo.NewDDLRecord(
+			undo.DDLRecordTypeAllocateFileId,
+			undo.NewAllocateFileIdUndoRecord(targetFileId).Serialize(),
+		))
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
+
+		// WHEN
+		err := r.Execute()
+
+		// THEN
+		assert.NoError(t, err)
+		scanMtr := buffer.NewMtr(env.bp)
+		defer scanMtr.UnpinAll()
+		remaining, err := env.ddlManager.ReverseScan(scanMtr)
+		assert.NoError(t, err)
+		assert.Empty(t, remaining)
+	})
+
+	t.Run("複数 record が逆順に適用される", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		firstFileId := page.FileId(110)
+		firstPath := registerDDLRollbackerHeapFile(t, env.bp, firstFileId)
+		secondFileId := page.FileId(111)
+		secondPath := registerDDLRollbackerHeapFile(t, env.bp, secondFileId)
+		appendDDLUndoForRecovery(t, env,
+			undo.NewDDLRecord(
+				undo.DDLRecordTypeAllocateFileId,
+				undo.NewAllocateFileIdUndoRecord(firstFileId).Serialize(),
+			),
+			undo.NewDDLRecord(
+				undo.DDLRecordTypeAllocateFileId,
+				undo.NewAllocateFileIdUndoRecord(secondFileId).Serialize(),
+			),
+		)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
+
+		// WHEN
+		err := r.Execute()
+
+		// THEN
+		assert.NoError(t, err)
+		_, firstStatErr := os.Stat(firstPath)
+		assert.True(t, os.IsNotExist(firstStatErr))
+		_, secondStatErr := os.Stat(secondPath)
+		assert.True(t, os.IsNotExist(secondStatErr))
+	})
+
+	t.Run("DDLReservedTrxId が COMMIT 完了している場合は何もしない", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		targetFileId := page.FileId(120)
+		targetPath := registerDDLRollbackerHeapFile(t, env.bp, targetFileId)
+		appendDDLUndoForRecovery(t, env, undo.NewDDLRecord(
+			undo.DDLRecordTypeAllocateFileId,
+			undo.NewAllocateFileIdUndoRecord(targetFileId).Serialize(),
+		))
+		_, err := env.redoLog.AppendCommit(lock.DDLReservedTrxId)
+		assert.NoError(t, err)
+		assert.NoError(t, env.redoLog.Flush())
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
+
+		// WHEN
+		err = r.Execute()
+
+		// THEN
+		assert.NoError(t, err)
+		_, statErr := os.Stat(targetPath)
+		assert.NoError(t, statErr)
+	})
+
+	t.Run("DDLReservedTrxId が Redo log に登場しない場合は何もしない", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		_, err := env.redoLog.AppendCommit(lock.TrxId(1))
+		assert.NoError(t, err)
+		assert.NoError(t, env.redoLog.Flush())
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
+
+		// WHEN
+		err = r.Execute()
+
+		// THEN
+		assert.NoError(t, err)
+	})
+}
+
+// appendDDLUndoForRecovery は DDL Undo 領域に records を積み、 Redo に DDLReservedTrxId のレコードを残す
+//   - Recovery の applyDDLRollback を発動させる条件 (= DDLReservedTrxId が active かつ未 completed) を成立させる
+func appendDDLUndoForRecovery(t *testing.T, env *recoveryTestEnv, records ...undo.DDLRecord) {
+	t.Helper()
+	for _, rec := range records {
+		mtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+		if err := env.ddlManager.Append(mtr, rec); err != nil {
+			mtr.UnpinAll()
+			t.Fatalf("DDLManager.Append に失敗: %v", err)
+		}
+		if err := mtr.Commit(); err != nil {
+			t.Fatalf("Commit に失敗: %v", err)
+		}
+	}
+	if err := env.redoLog.Flush(); err != nil {
+		t.Fatalf("redoLog.Flush に失敗: %v", err)
+	}
+}
+
+func assertTableMetaRecordAbsent(t *testing.T, env *recoveryTestEnv, tableName string) {
+	t.Helper()
+	mtr := buffer.NewMtr(env.bp)
+	defer mtr.UnpinAll()
+	iter, err := env.trxManager.catalog.TableMeta().Search(mtr, dictionary.SearchModeStart{})
+	assert.NoError(t, err)
+	for {
+		record, ok, err := iter.Next()
+		assert.NoError(t, err)
+		if !ok {
+			return
+		}
+		assert.NotEqual(t, tableName, record.Name())
+	}
 }
