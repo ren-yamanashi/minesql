@@ -39,6 +39,21 @@ func TestNewCatalog(t *testing.T) {
 		assert.Equal(t, page.FileId(2), catalog.nextFileId)
 		assert.Equal(t, IndexId(1), catalog.nextIndexId)
 		assert.Equal(t, page.FileId(1), catalog.undoLogFileId)
+		assert.False(t, catalog.freeListMapPageId.IsInvalid())
+	})
+
+	t.Run("CreateCatalog 時の freeListMapPageId を NewCatalog で復元できる", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+		created, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		assert.NoError(t, err)
+
+		// WHEN
+		opened, err := NewCatalog(bp, newCatalogTestRedoBuffer(t))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, created.freeListMapPageId, opened.freeListMapPageId)
 	})
 
 	t.Run("6 つのメタデータのページ ID が復元される", func(t *testing.T) {
@@ -147,6 +162,44 @@ func TestCreateCatalog(t *testing.T) {
 		assert.Equal(t, page.FileId(2), nextFileId)
 		assert.Equal(t, IndexId(1), nextIndexId)
 		assert.Equal(t, page.FileId(1), undoLogFileId)
+	})
+
+	t.Run("ヘッダーページにフリーリストマップページの PageNumber が書き込まれる", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+
+		// WHEN
+		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		assert.NoError(t, err)
+
+		// THEN
+		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		bufPageHeader, err := bp.Page(headerPageId)
+		assert.NoError(t, err)
+		defer bp.Unpin(headerPageId)
+
+		body := bufPageHeader.Data().Body()
+		freeListMapPageNumber := readPageNumber(body, headerFreeListMapPageNumberOffset)
+		assert.NotEqual(t, page.MaxPageNumber, freeListMapPageNumber)
+	})
+
+	t.Run("オフセット 40 (DDL Undo 領域) は未書き込みのまま", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+
+		// WHEN
+		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		assert.NoError(t, err)
+
+		// THEN
+		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		bufPageHeader, err := bp.Page(headerPageId)
+		assert.NoError(t, err)
+		defer bp.Unpin(headerPageId)
+
+		body := bufPageHeader.Data().Body()
+		ddlUndoBytes := body[40 : 40+headerFieldSize]
+		assert.Equal(t, []byte{0, 0, 0, 0}, ddlUndoBytes)
 	})
 
 	t.Run("6 つのメタデータが初期化される", func(t *testing.T) {

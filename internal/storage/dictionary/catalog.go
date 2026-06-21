@@ -12,17 +12,18 @@ import (
 )
 
 const (
-	headerMagicNumberOffset        = 0
-	headerTableMetaOffset          = 4
-	headerIndexMetaOffset          = 8
-	headerIndexKeyColumnMetaOffset = 12
-	headerColumnMetaOffset         = 16
-	headerConstraintMetaOffset     = 20
-	headerUserMetaOffset           = 24
-	headerNextFileIdOffset         = 28
-	headerNextIndexIdOffset        = 32
-	headerUndoLogFileIdOffset      = 36
-	headerFieldSize                = 4
+	headerMagicNumberOffset           = 0
+	headerTableMetaOffset             = 4
+	headerIndexMetaOffset             = 8
+	headerIndexKeyColumnMetaOffset    = 12
+	headerColumnMetaOffset            = 16
+	headerConstraintMetaOffset        = 20
+	headerUserMetaOffset              = 24
+	headerNextFileIdOffset            = 28
+	headerNextIndexIdOffset           = 32
+	headerUndoLogFileIdOffset         = 36
+	headerFreeListMapPageNumberOffset = 44
+	headerFieldSize                   = 4
 )
 
 var (
@@ -38,6 +39,7 @@ type Catalog struct {
 	nextFileId         page.FileId
 	nextIndexId        IndexId
 	undoLogFileId      page.FileId
+	freeListMapPageId  page.Id
 	tableMeta          *TableMeta
 	indexMeta          *IndexMeta
 	indexKeyColumnMeta *IndexKeyColumnMeta
@@ -47,6 +49,7 @@ type Catalog struct {
 }
 
 func (c *Catalog) UndoLogFileId() page.FileId              { return c.undoLogFileId }
+func (c *Catalog) FreeListMapPageId() page.Id              { return c.freeListMapPageId }
 func (c *Catalog) TableMeta() *TableMeta                   { return c.tableMeta }
 func (c *Catalog) IndexMeta() *IndexMeta                   { return c.indexMeta }
 func (c *Catalog) IndexKeyColumnMeta() *IndexKeyColumnMeta { return c.indexKeyColumnMeta }
@@ -88,15 +91,17 @@ func NewCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 	undoLogFileId := page.FileId(binary.BigEndian.Uint32(
 		bufPageHeader.Data().Body()[headerUndoLogFileIdOffset : headerUndoLogFileIdOffset+headerFieldSize],
 	))
+	freeListMapPageNumber := readPageNumber(bufPageHeader.Data().Body(), headerFreeListMapPageNumberOffset)
 
 	return &Catalog{
-		bufferPool:    bp,
-		redoLog:       redoLog,
-		nextFileId:    nextFileId,
-		nextIndexId:   nextIndexId,
-		undoLogFileId: undoLogFileId,
-		tableMeta:     NewTableMeta(bp, page.NewId(catalogFileId, tableMetaPageNumber)),
-		indexMeta:     NewIndexMeta(bp, page.NewId(catalogFileId, indexMetaPageNumber)),
+		bufferPool:        bp,
+		redoLog:           redoLog,
+		nextFileId:        nextFileId,
+		nextIndexId:       nextIndexId,
+		undoLogFileId:     undoLogFileId,
+		freeListMapPageId: page.NewId(catalogFileId, freeListMapPageNumber),
+		tableMeta:         NewTableMeta(bp, page.NewId(catalogFileId, tableMetaPageNumber)),
+		indexMeta:         NewIndexMeta(bp, page.NewId(catalogFileId, indexMetaPageNumber)),
 		indexKeyColumnMeta: NewIndexKeyColumnMeta(
 			bp, page.NewId(catalogFileId, indexKeyColumnMetaPageNumber),
 		),
@@ -158,6 +163,22 @@ func CreateCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 		return nil, err
 	}
 
+	freeListMapPageId, err := bp.AllocatePageId(catalogFileId)
+	if err != nil {
+		mtr.UnpinAll()
+		return nil, err
+	}
+	if _, err := bp.AddPage(freeListMapPageId); err != nil {
+		mtr.UnpinAll()
+		return nil, err
+	}
+	freeListMapBufPage, err := mtr.PageForWrite(freeListMapPageId)
+	if err != nil {
+		mtr.UnpinAll()
+		return nil, err
+	}
+	buffer.InitializeFreeListMapPage(freeListMapBufPage)
+
 	nextFileId := page.FileId(1) // FileId(0) はカタログ用なので 1 から開始
 	nextIndexId := IndexId(1)    // IndexId(0) は無効値として予約
 	undoLogFileId := nextFileId  // Undo ログ用の FileId を採番
@@ -178,6 +199,7 @@ func CreateCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 	writeScalar(bufPageHeader, headerNextFileIdOffset, uint32(nextFileId))
 	writeScalar(bufPageHeader, headerNextIndexIdOffset, uint32(nextIndexId))
 	writeScalar(bufPageHeader, headerUndoLogFileIdOffset, uint32(undoLogFileId))
+	writePageNumber(bufPageHeader, headerFreeListMapPageNumberOffset, freeListMapPageId.PageNumber())
 
 	if err := mtr.Commit(); err != nil {
 		return nil, err
@@ -189,6 +211,7 @@ func CreateCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 		nextFileId:         nextFileId,
 		nextIndexId:        nextIndexId,
 		undoLogFileId:      undoLogFileId,
+		freeListMapPageId:  freeListMapPageId,
 		tableMeta:          tableMeta,
 		indexMeta:          indexMeta,
 		indexKeyColumnMeta: indexKeyColumnMeta,

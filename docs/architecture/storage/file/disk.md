@@ -50,6 +50,17 @@
   > I/O operations performed against files opened with O_DIRECT bypass the kernel's page cache, writing directly to the storage. Recall that the storage may itself store the data in a write-back cache, so fsync() is still required for files opened with O_DIRECT in order to save the data to stable storage. The O_DIRECT flag is only relevant for the system I/O API.
   - そのため、サーバーのプロセス停止時などには `Sync()` を呼び出す方針としている
 
+### ページの解放
+
+- ファイル内のページを「解放済み」としてマークし、再利用可能にするための経路
+- この経路は [DDL](../access/ddl.md) のロールバック (B+Tree 解放、DDL Undo 専用領域のクリア) で呼び出される。通常のテーブル操作 (INSERT / UPDATE / DELETE) はページ解放を起こさない
+- ファイルごとに「解放されたページの単方向リンクリスト」を持つ
+  - 解放対象ページの先頭に「次の解放ページの PageNumber」を書き込み、前の先頭につなぎ替える
+  - 各ファイルのフリーリスト先頭 PageNumber は、[カタログヘッダー](../dictionary/catalog.md#ヘッダーページ) から到達できる「ファイル別フリーリストマップページ」が `FileId → 先頭 PageNumber` の対応を保持する
+  - チェーンの末尾は無効値で表現する
+- ファイル先頭にはヘッダーページを置かず、現状の「ファイル = ページの固定長配列」という構造を維持する。フリーリストの参照ポイントはファイル外 (カタログヘッダー → マップページ) から到達させる
+- ページの再採番 (= 解放済みページからの再利用) は本経路では行わない。新規ページの採番は引き続き末尾追加で行い、解放はリストへの追加までを担う
+
 ### ファイルの削除
 
 - 指定された FileId に対応するヒープファイルを物理的に削除する
