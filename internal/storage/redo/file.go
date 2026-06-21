@@ -23,6 +23,7 @@ type file struct {
 	filePath      string   // Redo ログファイルのパス
 	flushedLsn    Lsn      // ディスクにフラッシュ済みの最大 LSN
 	checkpointLsn Lsn      // チェックポイント LSN (この LSN 以前の Redo レコードは不要)
+	validEnd      int64    // 次回追記の起点となる有効レコード末尾オフセット (不完全末尾の端数バイトは含まない)
 }
 
 // newFile は redo.log ファイルを開く (存在しない場合は新規作成する)
@@ -59,6 +60,7 @@ func newFile(baseDir string) (*file, error) {
 		f.flushedLsn = Lsn(binary.BigEndian.Uint32(flushedBytes))
 		checkpointBytes := header[fileHeaderCheckpointLsnOffset:fileHeaderReservedAreaOffset]
 		f.checkpointLsn = Lsn(binary.BigEndian.Uint32(checkpointBytes))
+		f.validEnd = stat.Size()
 		return f, nil
 	}
 
@@ -66,6 +68,7 @@ func newFile(baseDir string) (*file, error) {
 	if err := f.writeHeader(); err != nil {
 		return nil, errors.Join(err, osFile.Close())
 	}
+	f.validEnd = fileHeaderSize
 	return f, nil
 }
 
@@ -95,7 +98,8 @@ func (f *file) readRecords(lsn Lsn) ([]Record, error) {
 				return nil, fmt.Errorf("redo: corrupted record at offset %d: %w", offset, err)
 			}
 			// ヘッダーサイズ未満の残りデータは、Write 途中のクラッシュで書きかけになったレコード
-			// リカバリ時にこのデータは上書きされるため、無視して問題ない
+			// 次回追記でこの端数を上書きするため、 有効末尾オフセットをここで記録する
+			f.validEnd = int64(fileHeaderSize + offset)
 			break
 		}
 		offset += readBytesNum
@@ -118,27 +122,35 @@ func (f *file) flushRecords(records []Record) error {
 	if err != nil {
 		return err
 	}
+	prevValidEnd := f.validEnd
 
-	if _, err := f.osFile.Seek(0, io.SeekEnd); err != nil {
+	if _, err := f.osFile.Seek(f.validEnd, io.SeekStart); err != nil {
 		return err
 	}
 
+	written := int64(0)
 	for _, record := range records {
-		if _, err := f.osFile.Write(record.Serialize()); err != nil {
+		n, err := f.osFile.Write(record.Serialize())
+		if err != nil {
+			f.validEnd = prevValidEnd
 			// 部分書き込みをロールバック
 			return errors.Join(err, f.rollbackTo(originalSize))
 		}
+		written += int64(n)
 	}
 
 	if err := f.osFile.Sync(); err != nil {
+		f.validEnd = prevValidEnd
 		return errors.Join(err, f.rollbackTo(originalSize))
 	}
 
 	// Flushed LSN を更新してヘッダーに書き込み
 	prevFlushedLsn := f.flushedLsn
 	f.flushedLsn = records[len(records)-1].lsn
+	f.validEnd = prevValidEnd + written
 	if err := f.writeHeader(); err != nil {
 		f.flushedLsn = prevFlushedLsn
+		f.validEnd = prevValidEnd
 		return errors.Join(err, f.writeHeader(), f.rollbackTo(originalSize))
 	}
 	return nil
@@ -227,6 +239,11 @@ func (f *file) truncateBefore(lsn Lsn) error {
 		return fsyncErr
 	}
 	f.flushedLsn = max(lastLsn, lsn)
+	stat, err := f.osFile.Stat()
+	if err != nil {
+		return err
+	}
+	f.validEnd = stat.Size()
 	return nil
 }
 
@@ -272,6 +289,7 @@ func (f *file) clear() error {
 	}
 	f.flushedLsn = 0
 	f.checkpointLsn = 0
+	f.validEnd = fileHeaderSize
 	return f.writeHeader()
 }
 

@@ -527,6 +527,79 @@ func TestFsyncDir(t *testing.T) {
 	})
 }
 
+func TestFileIncompleteTailRecord(t *testing.T) {
+	t.Run("不完全末尾がある状態で追記すると端数が新レコードで上書きされる", func(t *testing.T) {
+		// GIVEN
+		dir := t.TempDir()
+		f1, err := newFile(dir)
+		assert.NoError(t, err)
+		err = f1.flushRecords([]Record{{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit}})
+		assert.NoError(t, err)
+		validTailSize, err := f1.size()
+		assert.NoError(t, err)
+		_ = f1.close()
+
+		osFile, err := os.OpenFile(filepath.Join(dir, filename), os.O_RDWR, 0600) //nolint:gosec // テストで生成した一時ディレクトリのパスを使用
+		assert.NoError(t, err)
+		fragment := []byte{0xAB, 0xCD, 0xEF}
+		_, err = osFile.WriteAt(fragment, validTailSize)
+		assert.NoError(t, err)
+		_ = osFile.Close()
+
+		// WHEN
+		f2, err := newFile(dir)
+		assert.NoError(t, err)
+		_, err = f2.readRecords(Lsn(0))
+		assert.NoError(t, err)
+		err = f2.flushRecords([]Record{{lsn: Lsn(2), trxId: 2, recordType: RecordTypeCommit}})
+		assert.NoError(t, err)
+		_ = f2.close()
+
+		// THEN
+		f3, err := newFile(dir)
+		assert.NoError(t, err)
+		result, err := f3.readRecords(Lsn(0))
+		assert.NoError(t, err)
+		assert.Len(t, result, 2)
+		assert.Equal(t, Lsn(1), result[0].Lsn())
+		assert.Equal(t, Lsn(2), result[1].Lsn())
+		_ = f3.close()
+	})
+
+	t.Run("不完全末尾を上書きした後のファイルサイズに端数が残らない", func(t *testing.T) {
+		// GIVEN
+		dir := t.TempDir()
+		f1, err := newFile(dir)
+		assert.NoError(t, err)
+		err = f1.flushRecords([]Record{{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit}})
+		assert.NoError(t, err)
+		validTailSize, err := f1.size()
+		assert.NoError(t, err)
+		_ = f1.close()
+
+		osFile, err := os.OpenFile(filepath.Join(dir, filename), os.O_RDWR, 0600) //nolint:gosec // テストで生成した一時ディレクトリのパスを使用
+		assert.NoError(t, err)
+		_, err = osFile.WriteAt([]byte{0xAB, 0xCD, 0xEF}, validTailSize)
+		assert.NoError(t, err)
+		_ = osFile.Close()
+
+		// WHEN
+		f2, err := newFile(dir)
+		assert.NoError(t, err)
+		_, err = f2.readRecords(Lsn(0))
+		assert.NoError(t, err)
+		err = f2.flushRecords([]Record{{lsn: Lsn(2), trxId: 2, recordType: RecordTypeCommit}})
+		assert.NoError(t, err)
+		sizeAfterAppend, err := f2.size()
+		assert.NoError(t, err)
+		_ = f2.close()
+
+		// THEN
+		expectedSize := validTailSize + int64(recordHeaderSize)
+		assert.Equal(t, expectedSize, sizeAfterAppend)
+	})
+}
+
 // setupTestFile はテスト用の File を作成する
 func setupTestFile(t *testing.T) *file {
 	t.Helper()
