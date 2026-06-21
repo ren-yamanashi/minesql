@@ -209,6 +209,187 @@ func TestDDLRollbackerRollback(t *testing.T) {
 	})
 }
 
+func TestDDLRollbackerRollbackIdempotent(t *testing.T) {
+	t.Run("DDLRecordTypeCreateBTree の Rollback を 2 回連続実行してもエラーにならない", func(t *testing.T) {
+		// GIVEN
+		env := setupDDLRollbackerTestEnv(t)
+		createMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		tree, err := btree.CreateTree(env.bp, page.FileId(2), createMtr)
+		assert.NoError(t, err)
+		assert.NoError(t, createMtr.Commit())
+		rollbacker := NewDDLRollbacker(env.bp, env.ct)
+		record := undo.NewDDLRecord(
+			undo.DDLRecordTypeCreateBTree,
+			undo.NewCreateBTreeUndoRecord(tree.MetaPageId()).Serialize(),
+		)
+		firstMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+		assert.NoError(t, rollbacker.Rollback(firstMtr, record))
+		assert.NoError(t, firstMtr.Commit())
+		firstHead := readDDLFreeListHead(t, env.bp, env.ct.FreeListMapPageId(), page.FileId(2))
+
+		// WHEN
+		secondMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+		err = rollbacker.Rollback(secondMtr, record)
+		assert.NoError(t, secondMtr.Commit())
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, firstHead, readDDLFreeListHead(t, env.bp, env.ct.FreeListMapPageId(), page.FileId(2)))
+	})
+
+	t.Run("DDLRecordTypeMetaInsert (TableMeta) の Rollback を 2 回連続実行してもエラーにならない", func(t *testing.T) {
+		// GIVEN
+		env := setupDDLRollbackerTestEnv(t)
+		insertedRecord := dictionary.NewTableMetaRecord("users", page.NewId(page.FileId(2), page.PageNumber(0)), 3)
+		insertTableMeta(t, env, insertedRecord)
+		rollbacker := NewDDLRollbacker(env.bp, env.ct)
+		record := undo.NewDDLRecord(
+			undo.DDLRecordTypeMetaInsert,
+			undo.NewMetaInsertUndoRecord(undo.MetaTableTypeTable, insertedRecord.Encode().Key()).Serialize(),
+		)
+		firstMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+		assert.NoError(t, rollbacker.Rollback(firstMtr, record))
+		assert.NoError(t, firstMtr.Commit())
+
+		// WHEN
+		secondMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+		err := rollbacker.Rollback(secondMtr, record)
+		assert.NoError(t, secondMtr.Commit())
+
+		// THEN
+		assert.NoError(t, err)
+		assertTableMetaEmpty(t, env)
+	})
+
+	t.Run("DDLRecordTypeMetaInsert (IndexMeta) の Rollback を 2 回連続実行してもエラーにならない", func(t *testing.T) {
+		// GIVEN
+		env := setupDDLRollbackerTestEnv(t)
+		insertedRecord := dictionary.NewIndexMetaRecord(
+			page.FileId(2),
+			dictionary.IndexId(1),
+			dictionary.PrimaryIndexName,
+			dictionary.IndexTypePrimary,
+			1,
+			page.NewId(page.FileId(2), page.PageNumber(0)),
+		)
+		insertIndexMeta(t, env, insertedRecord)
+		rollbacker := NewDDLRollbacker(env.bp, env.ct)
+		record := undo.NewDDLRecord(
+			undo.DDLRecordTypeMetaInsert,
+			undo.NewMetaInsertUndoRecord(undo.MetaTableTypeIndex, insertedRecord.Encode().Key()).Serialize(),
+		)
+		firstMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+		assert.NoError(t, rollbacker.Rollback(firstMtr, record))
+		assert.NoError(t, firstMtr.Commit())
+
+		// WHEN
+		secondMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+		err := rollbacker.Rollback(secondMtr, record)
+		assert.NoError(t, secondMtr.Commit())
+
+		// THEN
+		assert.NoError(t, err)
+		assertIndexMetaEmpty(t, env)
+	})
+
+	t.Run("DDLRecordTypeMetaInsert (IndexKeyColumnMeta) の Rollback を 2 回連続実行してもエラーにならない", func(t *testing.T) {
+		// GIVEN
+		env := setupDDLRollbackerTestEnv(t)
+		insertedRecord := dictionary.NewIndexKeyColumnMetaRecord(dictionary.IndexId(1), "id", 0)
+		insertIndexKeyColumnMeta(t, env, insertedRecord)
+		rollbacker := NewDDLRollbacker(env.bp, env.ct)
+		record := undo.NewDDLRecord(
+			undo.DDLRecordTypeMetaInsert,
+			undo.NewMetaInsertUndoRecord(undo.MetaTableTypeIndexKeyColumn, insertedRecord.Encode().Key()).Serialize(),
+		)
+		firstMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+		assert.NoError(t, rollbacker.Rollback(firstMtr, record))
+		assert.NoError(t, firstMtr.Commit())
+
+		// WHEN
+		secondMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+		err := rollbacker.Rollback(secondMtr, record)
+		assert.NoError(t, secondMtr.Commit())
+
+		// THEN
+		assert.NoError(t, err)
+		assertIndexKeyColumnMetaEmpty(t, env)
+	})
+
+	t.Run("DDLRecordTypeMetaInsert (ColumnMeta) の Rollback を 2 回連続実行してもエラーにならない", func(t *testing.T) {
+		// GIVEN
+		env := setupDDLRollbackerTestEnv(t)
+		insertedRecord := dictionary.NewColumnMetaRecord(page.FileId(2), "name", 0)
+		insertColumnMeta(t, env, insertedRecord)
+		rollbacker := NewDDLRollbacker(env.bp, env.ct)
+		record := undo.NewDDLRecord(
+			undo.DDLRecordTypeMetaInsert,
+			undo.NewMetaInsertUndoRecord(undo.MetaTableTypeColumn, insertedRecord.Encode().Key()).Serialize(),
+		)
+		firstMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+		assert.NoError(t, rollbacker.Rollback(firstMtr, record))
+		assert.NoError(t, firstMtr.Commit())
+
+		// WHEN
+		secondMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+		err := rollbacker.Rollback(secondMtr, record)
+		assert.NoError(t, secondMtr.Commit())
+
+		// THEN
+		assert.NoError(t, err)
+		assertColumnMetaEmpty(t, env)
+	})
+
+	t.Run("DDLRecordTypeMetaInsert (ConstraintMeta) の Rollback を 2 回連続実行してもエラーにならない", func(t *testing.T) {
+		// GIVEN
+		env := setupDDLRollbackerTestEnv(t)
+		insertedRecord := dictionary.NewConstraintMetaRecord(page.FileId(2), "id", "PRIMARY", page.FileId(0), "")
+		insertConstraintMeta(t, env, insertedRecord)
+		rollbacker := NewDDLRollbacker(env.bp, env.ct)
+		record := undo.NewDDLRecord(
+			undo.DDLRecordTypeMetaInsert,
+			undo.NewMetaInsertUndoRecord(undo.MetaTableTypeConstraint, insertedRecord.Encode().Key()).Serialize(),
+		)
+		firstMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+		assert.NoError(t, rollbacker.Rollback(firstMtr, record))
+		assert.NoError(t, firstMtr.Commit())
+
+		// WHEN
+		secondMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+		err := rollbacker.Rollback(secondMtr, record)
+		assert.NoError(t, secondMtr.Commit())
+
+		// THEN
+		assert.NoError(t, err)
+		assertConstraintMetaEmpty(t, env)
+	})
+
+	t.Run("DDLRecordTypeAllocateFileId の Rollback を 2 回連続実行してもエラーにならない", func(t *testing.T) {
+		// GIVEN
+		env := setupDDLRollbackerTestEnv(t)
+		targetFileId := page.FileId(99)
+		targetPath := registerDDLRollbackerHeapFile(t, env.bp, targetFileId)
+		rollbacker := NewDDLRollbacker(env.bp, env.ct)
+		record := undo.NewDDLRecord(
+			undo.DDLRecordTypeAllocateFileId,
+			undo.NewAllocateFileIdUndoRecord(targetFileId).Serialize(),
+		)
+		firstMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+		assert.NoError(t, rollbacker.Rollback(firstMtr, record))
+		assert.NoError(t, firstMtr.Commit())
+
+		// WHEN
+		secondMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+		err := rollbacker.Rollback(secondMtr, record)
+		assert.NoError(t, secondMtr.Commit())
+
+		// THEN
+		assert.NoError(t, err)
+		_, statErr := os.Stat(targetPath)
+		assert.True(t, os.IsNotExist(statErr))
+	})
+}
+
 // ddlRollbackerTestEnv は DDLRollbacker テスト用の最小環境
 type ddlRollbackerTestEnv struct {
 	bp      *buffer.Pool

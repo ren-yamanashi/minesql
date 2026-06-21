@@ -83,7 +83,7 @@ func TestDeleteFile(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("未登録の FileId を削除しようとするとエラーを返す", func(t *testing.T) {
+	t.Run("未登録の FileId に対する DeleteFile は no-op で nil を返す", func(t *testing.T) {
 		// GIVEN
 		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 
@@ -91,7 +91,22 @@ func TestDeleteFile(t *testing.T) {
 		err := bp.DeleteFile(page.FileId(99))
 
 		// THEN
-		assert.Error(t, err)
+		assert.NoError(t, err)
+	})
+
+	t.Run("DeleteFile を 2 回連続で呼んでもエラーにならない", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
+		fileId := page.FileId(7)
+		registerDeletableHeapFile(t, bp, fileId)
+
+		// WHEN
+		firstErr := bp.DeleteFile(fileId)
+		secondErr := bp.DeleteFile(fileId)
+
+		// THEN
+		assert.NoError(t, firstErr)
+		assert.NoError(t, secondErr)
 	})
 
 	t.Run("削除済み FileId に対する AllocatePageId はエラーを返す", func(t *testing.T) {

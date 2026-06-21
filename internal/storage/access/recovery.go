@@ -2,6 +2,8 @@ package access
 
 import (
 	"encoding/binary"
+	"errors"
+	"io"
 	"slices"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
@@ -92,11 +94,18 @@ func (r *Recovery) applyRedoLog(records []redo.Record) error {
 }
 
 // applyPageWrite は 1 件のページ変更レコードを適用する
+//   - 対象ページが disk に存在しない場合は buffer pool に空ページを確保してから上書きする
 func (r *Recovery) applyPageWrite(rec redo.Record) error {
 	mtr := buffer.NewMtr(r.bufferPool)
 	defer mtr.UnpinAll()
 
 	writePage, err := mtr.PageForWrite(rec.PageId())
+	if errors.Is(err, io.EOF) {
+		if _, addErr := r.bufferPool.AddPage(rec.PageId()); addErr != nil {
+			return addErr
+		}
+		writePage, err = mtr.PageForWrite(rec.PageId())
+	}
 	if err != nil {
 		return err
 	}

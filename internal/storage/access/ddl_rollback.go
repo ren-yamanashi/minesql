@@ -1,6 +1,7 @@
 package access
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
@@ -39,17 +40,34 @@ func (r *DDLRollbacker) Rollback(mtr *buffer.Mtr, record undo.DDLRecord) error {
 
 // rollbackCreateBTree は B+Tree 作成を取り消す
 //   - payload から MetaPageId を復元し、 配下の全ページを子→親 (= 末尾要素から先頭要素) の順に Deallocate する
+//   - 既にファイル丸ごと削除済み、 もしくはメタページがフリーリストに含まれている (= 既に解放済み) の場合は何もしない
 func (r *DDLRollbacker) rollbackCreateBTree(mtr *buffer.Mtr, payload []byte) error {
 	record, err := undo.DeserializeCreateBTreeUndoRecord(payload)
 	if err != nil {
 		return err
 	}
-	tree := btree.NewTree(r.bufferPool, record.MetaPageId())
+	metaPageId := record.MetaPageId()
+	if !r.bufferPool.HasHeapFile(metaPageId.FileId()) {
+		return nil
+	}
+	freeListMapPageId := r.catalog.FreeListMapPageId()
+	if _, err := mtr.PageForWrite(freeListMapPageId); err != nil {
+		return err
+	}
+	defer mtr.Unpin(freeListMapPageId)
+
+	inFreeList, err := r.bufferPool.IsPageInFileFreeList(mtr, freeListMapPageId, metaPageId)
+	if err != nil {
+		return err
+	}
+	if inFreeList {
+		return nil
+	}
+	tree := btree.NewTree(r.bufferPool, metaPageId)
 	pageIds, err := tree.AllPageIds(mtr)
 	if err != nil {
 		return err
 	}
-	freeListMapPageId := r.catalog.FreeListMapPageId()
 	for i := len(pageIds) - 1; i >= 0; i-- {
 		if err := r.bufferPool.Deallocate(mtr, freeListMapPageId, pageIds[i]); err != nil {
 			return err
@@ -60,31 +78,38 @@ func (r *DDLRollbacker) rollbackCreateBTree(mtr *buffer.Mtr, payload []byte) err
 
 // rollbackMetaInsert はカタログ Meta テーブルへの挿入を取り消す
 //   - payload から MetaTableType + 主キーを復元し、 対応する Meta テーブルの Delete を呼ぶ
+//   - 該当キーが既に存在しない (= 既に削除済み) の場合は何もしない
 func (r *DDLRollbacker) rollbackMetaInsert(mtr *buffer.Mtr, payload []byte) error {
 	record, err := undo.DeserializeMetaInsertUndoRecord(payload)
 	if err != nil {
 		return err
 	}
 	key := record.Key()
+	var deleteErr error
 	switch record.MetaTableType() {
 	case undo.MetaTableTypeTable:
-		return r.catalog.TableMeta().Delete(mtr, key)
+		deleteErr = r.catalog.TableMeta().Delete(mtr, key)
 	case undo.MetaTableTypeIndex:
-		return r.catalog.IndexMeta().Delete(mtr, key)
+		deleteErr = r.catalog.IndexMeta().Delete(mtr, key)
 	case undo.MetaTableTypeIndexKeyColumn:
-		return r.catalog.IndexKeyColumnMeta().Delete(mtr, key)
+		deleteErr = r.catalog.IndexKeyColumnMeta().Delete(mtr, key)
 	case undo.MetaTableTypeColumn:
-		return r.catalog.ColumnMeta().Delete(mtr, key)
+		deleteErr = r.catalog.ColumnMeta().Delete(mtr, key)
 	case undo.MetaTableTypeConstraint:
-		return r.catalog.ConstraintMeta().Delete(mtr, key)
+		deleteErr = r.catalog.ConstraintMeta().Delete(mtr, key)
 	default:
 		return fmt.Errorf("access: unknown meta table type: %s", record.MetaTableType())
 	}
+	if errors.Is(deleteErr, btree.ErrKeyNotFound) {
+		return nil
+	}
+	return deleteErr
 }
 
 // rollbackAllocateFileId は物理ファイル確保を取り消す
 //   - payload から FileId を復元し、 該当の物理ファイルを削除する
 //   - nextFileId は単調増加放置するため、 ここでは更新しない
+//   - 2 回目の Rollback でも安全 (= 冪等)
 func (r *DDLRollbacker) rollbackAllocateFileId(_ *buffer.Mtr, payload []byte) error {
 	record, err := undo.DeserializeAllocateFileIdUndoRecord(payload)
 	if err != nil {
