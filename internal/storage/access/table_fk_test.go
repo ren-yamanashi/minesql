@@ -295,9 +295,10 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 	t.Cleanup(func() { _ = redoLog.Clear() })
 
 	lockMgr := lock.NewManager()
+	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, 1, nil)
 
 	// 親テーブル: departments
-	parentTable, err := CreateTable(bp, undoMgr, lockMgr, redoLog, CreateTableInput{
+	parentTable, err := CreateTable(trxMgr, CreateTableInput{
 		TableName: "departments",
 		ColNames:  []string{"id", "name"},
 		PkCount:   1,
@@ -308,7 +309,7 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 	parentFileId := parentTable.primaryIndex.fileId()
 
 	// 子テーブル: employees (FK: dept_id -> departments.id)
-	childTable, err := CreateTable(bp, undoMgr, lockMgr, redoLog, CreateTableInput{
+	childTable, err := CreateTable(trxMgr, CreateTableInput{
 		TableName: "employees",
 		ColNames:  []string{"id", "name", "dept_id"},
 		PkCount:   1,
@@ -328,8 +329,6 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 		t.Fatalf("employees テーブルの作成に失敗: %v", err)
 	}
 	childFileId := childTable.primaryIndex.fileId()
-
-	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, 1, nil)
 
 	return &fkTestEnv{
 		ct:           ct,

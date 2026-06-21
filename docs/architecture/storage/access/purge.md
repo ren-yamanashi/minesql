@@ -86,7 +86,7 @@ flowchart TD
 ## パージ対象外の Undo
 
 - [DDL](./ddl.md) で書き出される DDL Undo はパージ対象に含めない。DDL Undo は MVCC の旧バージョン管理に関与せず、他トランザクションの ReadView から参照されることがないため、パージ可否の判定 (ReadView ベース) が意味を持たない
-- DDL Undo は通常 Undo とは別の専用領域に書かれ、当該 DDL の COMMIT 時に即時物理破棄される。パージ走査の対象 (History List) には載らず、パージ閾値の進行を待たない
+- DDL Undo は通常 Undo とは別の永続コンテナ (DDL 専用領域) に書かれ、当該 DDL の COMMIT 時にコンテナの中身 (= エントリ列) が即時物理破棄される (コンテナ自体は永続)。パージ走査の対象 (History List) には載らず、パージ閾値の進行を待たない
 - パージはユーザートランザクションの Undo (= 通常 Undo) のみを駆動源とし、DDL Undo の寿命管理は DDL 自身が担う
 
 ## クラッシュ耐性

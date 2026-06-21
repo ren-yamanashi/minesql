@@ -72,24 +72,18 @@ func TestNewCatalog(t *testing.T) {
 		assert.Equal(t, created.ddlUndoRootPageId, opened.ddlUndoRootPageId)
 	})
 
-	t.Run("ヘッダーの DDL Undo 先頭 PageNumber が無効値の場合 ddlUndoRootPageId は page.InvalidId() に復元される", func(t *testing.T) {
+	t.Run("DDLManager が常に non-nil で復元される", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
 		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
 		assert.NoError(t, err)
-
-		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
-		bufPageHeader, err := bp.Page(headerPageId)
-		assert.NoError(t, err)
-		writePageNumber(bufPageHeader, headerDDLUndoRootPageNumberOffset, page.MaxPageNumber)
-		bp.Unpin(headerPageId)
 
 		// WHEN
 		opened, err := NewCatalog(bp, newCatalogTestRedoBuffer(t))
 
 		// THEN
 		assert.NoError(t, err)
-		assert.True(t, opened.ddlUndoRootPageId.IsInvalid())
+		assert.NotNil(t, opened.DDLManager())
 	})
 
 	t.Run("6 つのメタデータのページ ID が復元される", func(t *testing.T) {
@@ -408,26 +402,33 @@ func TestSetDDLUndoRootPageId(t *testing.T) {
 		assert.Equal(t, newPageId.PageNumber(), pn)
 	})
 
-	t.Run("page.InvalidId() を渡すとヘッダーに無効値が書かれ内部状態も無効化される", func(t *testing.T) {
+}
+
+func TestDDLManager(t *testing.T) {
+	t.Run("CreateCatalog 直後の DDLManager が non-nil", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
+
+		// WHEN
 		ct, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
 		assert.NoError(t, err)
 
-		// WHEN
-		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
-		err = ct.SetDDLUndoRootPageId(mtr, page.InvalidId())
+		// THEN
+		assert.NotNil(t, ct.DDLManager())
+	})
+
+	t.Run("NewCatalog で開いた DDLManager が non-nil", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
 		assert.NoError(t, err)
-		assert.NoError(t, mtr.Commit())
+
+		// WHEN
+		opened, err := NewCatalog(bp, newCatalogTestRedoBuffer(t))
+		assert.NoError(t, err)
 
 		// THEN
-		assert.True(t, ct.ddlUndoRootPageId.IsInvalid())
-		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
-		bufPageHeader, err := bp.Page(headerPageId)
-		assert.NoError(t, err)
-		defer bp.Unpin(headerPageId)
-		pn := readPageNumber(bufPageHeader.Data().Body(), headerDDLUndoRootPageNumberOffset)
-		assert.Equal(t, page.MaxPageNumber, pn)
+		assert.NotNil(t, opened.DDLManager())
 	})
 }
 

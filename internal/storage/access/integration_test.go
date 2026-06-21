@@ -726,7 +726,7 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 // createUsersTable は統合テスト用の users テーブルを作成する
 func createUsersTable(t *testing.T, env *integrationEnv) *Table {
 	t.Helper()
-	table, err := CreateTable(env.bp, env.undoLog, env.lockMgr, env.redoLog, CreateTableInput{
+	table, err := CreateTable(env.trxMgr, CreateTableInput{
 		TableName: "users",
 		ColNames:  []string{"id", "name", "email"},
 		PkCount:   1,

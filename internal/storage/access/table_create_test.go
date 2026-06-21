@@ -31,7 +31,7 @@ func TestCreateTable(t *testing.T) {
 		}
 
 		// WHEN
-		table, err := CreateTable(env.bp, env.undoLog, env.lockMgr, env.redoLog, input)
+		table, err := CreateTable(env.trxMgr, input)
 
 		// THEN
 		assert.NoError(t, err)
@@ -53,7 +53,7 @@ func TestCreateTable(t *testing.T) {
 				{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: dictionary.IndexTypeNonUnique},
 			},
 		}
-		table, err := CreateTable(env.bp, env.undoLog, env.lockMgr, env.redoLog, input)
+		table, err := CreateTable(env.trxMgr, input)
 		assert.NoError(t, err)
 		trx := env.trxMgr.Begin()
 
@@ -86,7 +86,7 @@ func TestCreateTable(t *testing.T) {
 			ColNames:  []string{"id", "name"},
 			PkCount:   1,
 		}
-		_, err := CreateTable(env.bp, env.undoLog, env.lockMgr, env.redoLog, refInput)
+		_, err := CreateTable(env.trxMgr, refInput)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -106,7 +106,7 @@ func TestCreateTable(t *testing.T) {
 				},
 			},
 		}
-		table, err := CreateTable(env.bp, env.undoLog, env.lockMgr, env.redoLog, input)
+		table, err := CreateTable(env.trxMgr, input)
 
 		// THEN
 		assert.NoError(t, err)
@@ -128,7 +128,7 @@ func TestCreateTable(t *testing.T) {
 		}
 
 		// WHEN
-		table, err := CreateTable(env.bp, env.undoLog, env.lockMgr, env.redoLog, input)
+		table, err := CreateTable(env.trxMgr, input)
 
 		// THEN
 		assert.NoError(t, err)
@@ -153,7 +153,7 @@ func TestCreateTable(t *testing.T) {
 		}
 
 		// WHEN
-		_, err := CreateTable(env.bp, env.undoLog, env.lockMgr, env.redoLog, input)
+		_, err := CreateTable(env.trxMgr, input)
 
 		// THEN
 		assert.Error(t, err)
@@ -169,12 +169,84 @@ func TestCreateTable(t *testing.T) {
 		}
 
 		// WHEN
-		table, err := CreateTable(env.bp, env.undoLog, env.lockMgr, env.redoLog, input)
+		table, err := CreateTable(env.trxMgr, input)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, table)
 		assert.Empty(t, table.secondaryIndexes)
+	})
+
+	t.Run("成功時に DDL Undo 領域の中身がクリアされる", func(t *testing.T) {
+		// GIVEN
+		env := setupCreateTableTestEnv(t)
+		input := CreateTableInput{
+			TableName: "users",
+			ColNames:  []string{"id", "name"},
+			PkCount:   1,
+		}
+
+		// WHEN
+		_, err := CreateTable(env.trxMgr, input)
+		assert.NoError(t, err)
+
+		// THEN
+		mtr := buffer.NewMtr(env.bp)
+		defer mtr.UnpinAll()
+		records, err := env.trxMgr.catalog.DDLManager().ReverseScan(mtr)
+		assert.NoError(t, err)
+		assert.Empty(t, records)
+	})
+
+	t.Run("成功時に DDLUndoRootPageId は変わらない (= 永続コンテナ型)", func(t *testing.T) {
+		// GIVEN
+		env := setupCreateTableTestEnv(t)
+		before := env.trxMgr.catalog.DDLUndoRootPageId()
+		input := CreateTableInput{
+			TableName: "users",
+			ColNames:  []string{"id", "name"},
+			PkCount:   1,
+		}
+
+		// WHEN
+		_, err := CreateTable(env.trxMgr, input)
+		assert.NoError(t, err)
+
+		// THEN
+		assert.Equal(t, before, env.trxMgr.catalog.DDLUndoRootPageId())
+	})
+
+	t.Run("制約参照先テーブルなしで失敗するとテーブルが残らない", func(t *testing.T) {
+		// GIVEN
+		env := setupCreateTableTestEnv(t)
+		input := CreateTableInput{
+			TableName: "employees",
+			ColNames:  []string{"id", "dept_id"},
+			PkCount:   1,
+			Constraints: []CreateConstraintInput{
+				{
+					ColumnName:          "dept_id",
+					ConstraintName:      "fk_dept",
+					ReferenceTableName:  "nonexistent",
+					ReferenceColumnName: "id",
+				},
+			},
+		}
+
+		// WHEN
+		_, err := CreateTable(env.trxMgr, input)
+		assert.Error(t, err)
+
+		// THEN: テーブルメタが残らない
+		_, fetchErr := fetchTable(env.trxMgr.catalog, env.bp, "employees")
+		assert.Error(t, fetchErr)
+
+		// THEN: DDL Undo 領域がクリア済み
+		mtr := buffer.NewMtr(env.bp)
+		defer mtr.UnpinAll()
+		records, err := env.trxMgr.catalog.DDLManager().ReverseScan(mtr)
+		assert.NoError(t, err)
+		assert.Empty(t, records)
 	})
 }
 
@@ -264,10 +336,8 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		}
 
 		// WHEN
-		mtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
-		sis, err := createSecondaryIndexes(mtr, env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
+		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
 		assert.NoError(t, err)
-		assert.NoError(t, mtr.Commit())
 
 		// THEN
 		assert.Len(t, sis, 2)
@@ -287,10 +357,8 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		}
 
 		// WHEN
-		mtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
-		sis, err := createSecondaryIndexes(mtr, env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
+		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
 		assert.NoError(t, err)
-		assert.NoError(t, mtr.Commit())
 
 		// THEN
 		assert.True(t, sis[0].unique)
@@ -304,10 +372,8 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		}
 
 		// WHEN
-		mtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
-		sis, err := createSecondaryIndexes(mtr, env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
+		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
 		assert.NoError(t, err)
-		assert.NoError(t, mtr.Commit())
 
 		// THEN
 		assert.False(t, sis[0].unique)
@@ -319,15 +385,11 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		inputs := []CreateIndexInput{
 			{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: dictionary.IndexTypeNonUnique},
 		}
-		firstMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
-		_, err := createSecondaryIndexes(firstMtr, env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
+		_, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
 		assert.NoError(t, err)
-		assert.NoError(t, firstMtr.Commit())
 
 		// WHEN
-		secondMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
-		_, err = createSecondaryIndexes(secondMtr, env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
-		secondMtr.UnpinAll()
+		_, err = createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
 
 		// THEN
 		assert.Error(t, err)
@@ -338,10 +400,8 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		env := setupCreateTestEnvWithTable(t)
 
 		// WHEN
-		mtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
-		sis, err := createSecondaryIndexes(mtr, env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, nil)
+		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, nil)
 		assert.NoError(t, err)
-		assert.NoError(t, mtr.Commit())
 
 		// THEN
 		assert.Empty(t, sis)

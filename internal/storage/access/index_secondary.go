@@ -9,7 +9,6 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
-	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
@@ -65,22 +64,19 @@ type createSecondaryIndexInput struct {
 	Unique      bool               // ユニークか
 	Lock        *lock.Manager
 	UndoLog     *undo.Manager
-	RedoLog     *redo.Buffer
 }
 
 // createSecondaryIndex は空のセカンダリインデックスを作成する
+//   - mtr: B+Tree 作成と後続の DDL Undo Append / Meta Insert を同一スコープで記録する Mtr。 Commit は呼び出し側
+//   - 対応する CreateBTreeUndo は呼び出し側 (= createSecondaryIndexes) が同じ mtr に Append する
 func createSecondaryIndex(
+	mtr *buffer.Mtr,
 	ct *dictionary.Catalog,
 	bp *buffer.Pool,
 	input createSecondaryIndexInput,
 ) (*secondaryIndex, error) {
-	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, input.RedoLog)
 	tree, err := btree.CreateTree(bp, input.FileId, mtr)
 	if err != nil {
-		mtr.UnpinAll()
-		return nil, err
-	}
-	if err := mtr.Commit(); err != nil {
 		return nil, err
 	}
 	return &secondaryIndex{

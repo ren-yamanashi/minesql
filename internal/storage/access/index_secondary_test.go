@@ -18,7 +18,8 @@ func TestNewSecondaryIndex(t *testing.T) {
 		// GIVEN
 		env := setupIteratorTestEnv(t)
 		lockMgr := lock.NewManager()
-		created, err := createSecondaryIndex(env.ct, env.bp, createSecondaryIndexInput{
+		mtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+		created, err := createSecondaryIndex(mtr, env.ct, env.bp, createSecondaryIndexInput{
 			FileId:      page.FileId(2),
 			PrimaryTree: env.primaryTree,
 			IndexName:   "idx_name",
@@ -26,6 +27,7 @@ func TestNewSecondaryIndex(t *testing.T) {
 			Lock:        lockMgr,
 		})
 		assert.NoError(t, err)
+		assert.NoError(t, mtr.Commit())
 
 		// WHEN
 		si := newSecondaryIndex(env.ct, env.bp, newSecondaryIndexInput{
@@ -48,13 +50,15 @@ func TestCreateSecondaryIndex(t *testing.T) {
 		lockMgr := lock.NewManager()
 
 		// WHEN
-		si, err := createSecondaryIndex(env.ct, env.bp, createSecondaryIndexInput{
+		mtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+		si, err := createSecondaryIndex(mtr, env.ct, env.bp, createSecondaryIndexInput{
 			FileId:      page.FileId(2),
 			PrimaryTree: env.primaryTree,
 			IndexName:   "idx_name",
 			Unique:      false,
 			Lock:        lockMgr,
 		})
+		assert.NoError(t, mtr.Commit())
 
 		// THEN
 		assert.NoError(t, err)
@@ -507,7 +511,8 @@ func setupTestSecondaryIndex(t *testing.T, indexName string, unique bool) *secon
 	t.Helper()
 	env := setupIteratorTestEnv(t)
 	lockMgr := lock.NewManager()
-	si, err := createSecondaryIndex(env.ct, env.bp, createSecondaryIndexInput{
+	mtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+	si, err := createSecondaryIndex(mtr, env.ct, env.bp, createSecondaryIndexInput{
 		FileId:      page.FileId(2),
 		PrimaryTree: env.primaryTree,
 		IndexName:   indexName,
@@ -515,7 +520,11 @@ func setupTestSecondaryIndex(t *testing.T, indexName string, unique bool) *secon
 		Lock:        lockMgr,
 	})
 	if err != nil {
+		mtr.UnpinAll()
 		t.Fatalf("SecondaryIndex の作成に失敗: %v", err)
+	}
+	if err := mtr.Commit(); err != nil {
+		t.Fatalf("mtr.Commit に失敗: %v", err)
 	}
 	return si
 }

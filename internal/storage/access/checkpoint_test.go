@@ -181,7 +181,7 @@ func TestCheckpointExecuteWithFuzzyFlushAndRecovery(t *testing.T) {
 		env := setupIntegrationEnv(t)
 		tableNames := []string{"users", "products", "orders"}
 		for _, name := range tableNames {
-			_, err := CreateTable(env.bp, env.undoLog, env.lockMgr, env.redoLog, CreateTableInput{
+			_, err := CreateTable(env.trxMgr, CreateTableInput{
 				TableName: name,
 				ColNames:  []string{"id", "name"},
 				PkCount:   1,

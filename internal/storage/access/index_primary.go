@@ -42,6 +42,7 @@ func newPrimaryIndex(
 }
 
 // createPrimaryIndex は空のプライマリインデックスを作成する
+//   - B+Tree 作成と CreateBTreeUndo 書き込みを同一 mtr で原子的に行う
 func createPrimaryIndex(
 	ct *dictionary.Catalog,
 	bp *buffer.Pool,
@@ -51,9 +52,17 @@ func createPrimaryIndex(
 	undoLog *undo.Manager,
 	redoLog *redo.Buffer,
 ) (*primaryIndex, error) {
-	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+	mtr := buffer.NewWriteMtr(bp, lock.DDLReservedTrxId, redoLog)
 	tree, err := btree.CreateTree(bp, fileId, mtr)
 	if err != nil {
+		mtr.UnpinAll()
+		return nil, err
+	}
+	undoRecord := undo.NewDDLRecord(
+		undo.DDLRecordTypeCreateBTree,
+		undo.NewCreateBTreeUndoRecord(tree.MetaPageId()).Serialize(),
+	)
+	if err := ct.DDLManager().Append(mtr, undoRecord); err != nil {
 		mtr.UnpinAll()
 		return nil, err
 	}

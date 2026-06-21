@@ -174,22 +174,27 @@ func TestDDLManagerReverseScan(t *testing.T) {
 }
 
 func TestDDLManagerClear(t *testing.T) {
-	t.Run("単一ページの専用領域を Clear するとそのページがフリーリストに積まれる", func(t *testing.T) {
+	t.Run("単一ページの専用領域を Clear すると root が残り中身が空になる", func(t *testing.T) {
 		// GIVEN
 		mgr, redoLog := setupDDLManager(t)
 		rootPageId := mgr.rootPageId
-		freeListMapPageId := mgr.freeListMapPageId
 		appendDDLRecord(t, mgr, redoLog, NewDDLRecord(DDLRecordTypeCreateBTree, []byte{0x01}))
 
 		// WHEN
 		clearDDL(t, mgr, redoLog)
 
 		// THEN
-		head := readFreeListHead(t, mgr.bufferPool, freeListMapPageId, page.FileId(0))
-		assert.Equal(t, rootPageId.PageNumber(), head)
+		assert.Equal(t, rootPageId, mgr.rootPageId)
+		assert.Equal(t, rootPageId, mgr.currentPageId)
+		bufPage, err := mgr.bufferPool.Page(rootPageId)
+		assert.NoError(t, err)
+		defer mgr.bufferPool.Unpin(rootPageId)
+		rootDDLPage := NewPage(bufPage)
+		assert.Equal(t, uint16(0), rootDDLPage.UsedBytes())
+		assert.Equal(t, page.PageNumber(0), rootDDLPage.NextPageNumber())
 	})
 
-	t.Run("複数ページの専用領域を Clear すると全ページがフリーリストに積まれる", func(t *testing.T) {
+	t.Run("複数ページの専用領域を Clear すると中間ページのみフリーリストに積まれ root は残る", func(t *testing.T) {
 		// GIVEN
 		mgr, redoLog := setupDDLManager(t)
 		rootPageId := mgr.rootPageId
@@ -202,36 +207,38 @@ func TestDDLManagerClear(t *testing.T) {
 		clearDDL(t, mgr, redoLog)
 
 		// THEN
+		assert.Equal(t, rootPageId, mgr.rootPageId)
+		assert.Equal(t, rootPageId, mgr.currentPageId)
 		head := readFreeListHead(t, mgr.bufferPool, freeListMapPageId, page.FileId(0))
-		assert.Equal(t, rootPageId.PageNumber(), head)
-		next := readFreeListNext(t, mgr.bufferPool, rootPageId)
-		assert.Equal(t, tailPageId.PageNumber(), next)
+		assert.Equal(t, tailPageId.PageNumber(), head)
 	})
 
-	t.Run("Clear 後に内部状態が無効値に戻る", func(t *testing.T) {
-		// GIVEN
-		mgr, redoLog := setupDDLManager(t)
-
-		// WHEN
-		clearDDL(t, mgr, redoLog)
-
-		// THEN
-		assert.True(t, mgr.rootPageId.IsInvalid())
-		assert.True(t, mgr.currentPageId.IsInvalid())
-	})
-
-	t.Run("Clear で解放したページが freeListMap の先頭に積まれる", func(t *testing.T) {
+	t.Run("Clear 後に内部状態が root にリセットされる", func(t *testing.T) {
 		// GIVEN
 		mgr, redoLog := setupDDLManager(t)
 		rootPageId := mgr.rootPageId
-		freeListMapPageId := mgr.freeListMapPageId
 
 		// WHEN
 		clearDDL(t, mgr, redoLog)
 
 		// THEN
-		head := readFreeListHead(t, mgr.bufferPool, freeListMapPageId, page.FileId(0))
-		assert.Equal(t, rootPageId.PageNumber(), head)
+		assert.Equal(t, rootPageId, mgr.rootPageId)
+		assert.Equal(t, rootPageId, mgr.currentPageId)
+	})
+
+	t.Run("Clear 後も同じ DDLManager で Append 可能", func(t *testing.T) {
+		// GIVEN
+		mgr, redoLog := setupDDLManager(t)
+		appendDDLRecord(t, mgr, redoLog, NewDDLRecord(DDLRecordTypeCreateBTree, []byte("first")))
+		clearDDL(t, mgr, redoLog)
+
+		// WHEN
+		appendDDLRecord(t, mgr, redoLog, NewDDLRecord(DDLRecordTypeMetaInsert, []byte("after-clear")))
+		records := reverseScanDDL(t, mgr)
+
+		// THEN
+		assert.Len(t, records, 1)
+		assert.Equal(t, []byte("after-clear"), records[0].payload)
 	})
 }
 
@@ -366,15 +373,4 @@ func readFreeListHead(t *testing.T, bp *buffer.Pool, freeListMapPageId page.Id, 
 		return page.PageNumber(binary.BigEndian.Uint32(body[offset+4 : offset+8]))
 	}
 	return page.MaxPageNumber
-}
-
-// readFreeListNext は解放済みページの先頭 4 バイトに格納された次ページ PageNumber を読み取る
-func readFreeListNext(t *testing.T, bp *buffer.Pool, pageId page.Id) page.PageNumber {
-	t.Helper()
-	bufPage, err := bp.Page(pageId)
-	if err != nil {
-		t.Fatalf("解放済みページの取得に失敗: %v", err)
-	}
-	defer bp.Unpin(pageId)
-	return page.PageNumber(binary.BigEndian.Uint32(bufPage.Data().Body()[0:4]))
 }

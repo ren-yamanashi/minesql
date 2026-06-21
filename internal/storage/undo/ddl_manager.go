@@ -114,15 +114,15 @@ func (m *DDLManager) ReverseScan(mtr *buffer.Mtr) ([]DDLRecord, error) {
 	return records, nil
 }
 
-// Clear は DDLManager が管理する専用ページ列の全ページを Pool.Deallocate で解放する
-//   - 呼び出し側は同じ mtr 内で catalog.SetDDLUndoRootPageId(mtr, page.InvalidId()) を呼んで
-//     ヘッダーを無効値に戻すこと
-//   - Clear 後は内部状態 (先頭・末尾 PageId) が page.InvalidId() に戻り、 同 DDLManager での Append は失敗する
+// Clear は DDLManager が管理する DDL Undo 領域コンテナの中身を空にする
+//   - root ページは残し (= 永続コンテナ)、 中間ページ (= root の next 以降) があれば逆順で Pool.Deallocate する
+//   - root ページの UsedBytes と NextPageNumber を 0 にリセットし、 次回 Append で再利用可能にする
+//   - 内部状態 currentPageId は rootPageId に戻る
+//   - 全ての書き込みは mtr 経由 (Redo に記録される)
 func (m *DDLManager) Clear(mtr *buffer.Mtr) error {
-	var pageIds []page.Id
+	var intermediatePageIds []page.Id
 	pageId := m.rootPageId
 	for {
-		pageIds = append(pageIds, pageId)
 		bufPage, err := mtr.PageForRead(pageId)
 		if err != nil {
 			return err
@@ -134,16 +134,23 @@ func (m *DDLManager) Clear(mtr *buffer.Mtr) error {
 			break
 		}
 		pageId = page.NewId(m.fileId, nextPN)
+		intermediatePageIds = append(intermediatePageIds, pageId)
 	}
 
-	for i := len(pageIds) - 1; i >= 0; i-- {
-		if err := m.bufferPool.Deallocate(mtr, m.freeListMapPageId, pageIds[i]); err != nil {
+	for i := len(intermediatePageIds) - 1; i >= 0; i-- {
+		if err := m.bufferPool.Deallocate(mtr, m.freeListMapPageId, intermediatePageIds[i]); err != nil {
 			return err
 		}
 	}
 
-	m.rootPageId = page.InvalidId()
-	m.currentPageId = page.InvalidId()
+	rootBufPage, err := mtr.PageForWrite(m.rootPageId)
+	if err != nil {
+		return err
+	}
+	CreatePage(rootBufPage)
+	mtr.Unpin(m.rootPageId)
+
+	m.currentPageId = m.rootPageId
 	return nil
 }
 
