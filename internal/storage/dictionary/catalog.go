@@ -22,6 +22,7 @@ const (
 	headerNextFileIdOffset            = 28
 	headerNextIndexIdOffset           = 32
 	headerUndoLogFileIdOffset         = 36
+	headerDDLUndoRootPageNumberOffset = 40
 	headerFreeListMapPageNumberOffset = 44
 	headerFieldSize                   = 4
 )
@@ -39,6 +40,7 @@ type Catalog struct {
 	nextFileId         page.FileId
 	nextIndexId        IndexId
 	undoLogFileId      page.FileId
+	ddlUndoRootPageId  page.Id
 	freeListMapPageId  page.Id
 	tableMeta          *TableMeta
 	indexMeta          *IndexMeta
@@ -91,6 +93,7 @@ func NewCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 	undoLogFileId := page.FileId(binary.BigEndian.Uint32(
 		bufPageHeader.Data().Body()[headerUndoLogFileIdOffset : headerUndoLogFileIdOffset+headerFieldSize],
 	))
+	ddlUndoRootPageNumber := readPageNumber(bufPageHeader.Data().Body(), headerDDLUndoRootPageNumberOffset)
 	freeListMapPageNumber := readPageNumber(bufPageHeader.Data().Body(), headerFreeListMapPageNumberOffset)
 
 	return &Catalog{
@@ -99,6 +102,7 @@ func NewCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 		nextFileId:        nextFileId,
 		nextIndexId:       nextIndexId,
 		undoLogFileId:     undoLogFileId,
+		ddlUndoRootPageId: ddlUndoRootPageIdFromPageNumber(ddlUndoRootPageNumber),
 		freeListMapPageId: page.NewId(catalogFileId, freeListMapPageNumber),
 		tableMeta:         NewTableMeta(bp, page.NewId(catalogFileId, tableMetaPageNumber)),
 		indexMeta:         NewIndexMeta(bp, page.NewId(catalogFileId, indexMetaPageNumber)),
@@ -179,6 +183,12 @@ func CreateCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 	}
 	buffer.InitializeFreeListMapPage(freeListMapBufPage)
 
+	ddlUndoRootPageId, err := allocateAndInitializeDDLUndoRootPage(mtr, bp)
+	if err != nil {
+		mtr.UnpinAll()
+		return nil, err
+	}
+
 	nextFileId := page.FileId(1) // FileId(0) はカタログ用なので 1 から開始
 	nextIndexId := IndexId(1)    // IndexId(0) は無効値として予約
 	undoLogFileId := nextFileId  // Undo ログ用の FileId を採番
@@ -199,6 +209,7 @@ func CreateCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 	writeScalar(bufPageHeader, headerNextFileIdOffset, uint32(nextFileId))
 	writeScalar(bufPageHeader, headerNextIndexIdOffset, uint32(nextIndexId))
 	writeScalar(bufPageHeader, headerUndoLogFileIdOffset, uint32(undoLogFileId))
+	writePageNumber(bufPageHeader, headerDDLUndoRootPageNumberOffset, ddlUndoRootPageId.PageNumber())
 	writePageNumber(bufPageHeader, headerFreeListMapPageNumberOffset, freeListMapPageId.PageNumber())
 
 	if err := mtr.Commit(); err != nil {
@@ -211,6 +222,7 @@ func CreateCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 		nextFileId:         nextFileId,
 		nextIndexId:        nextIndexId,
 		undoLogFileId:      undoLogFileId,
+		ddlUndoRootPageId:  ddlUndoRootPageId,
 		freeListMapPageId:  freeListMapPageId,
 		tableMeta:          tableMeta,
 		indexMeta:          indexMeta,

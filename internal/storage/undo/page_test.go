@@ -65,6 +65,84 @@ func TestCreatePage(t *testing.T) {
 	})
 }
 
+func TestPageBodyAt(t *testing.T) {
+	t.Run("ボディの指定範囲を読み取れる", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.initialize()
+		_ = undoPage.append([]byte{0x10, 0x20, 0x30, 0x40, 0x50})
+
+		// WHEN
+		result := undoPage.BodyAt(1, 3)
+
+		// THEN
+		assert.Equal(t, []byte{0x20, 0x30, 0x40}, result)
+	})
+
+	t.Run("offset 0 から length 0 で空 slice を返す", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.initialize()
+
+		// WHEN
+		result := undoPage.BodyAt(0, 0)
+
+		// THEN
+		assert.NotNil(t, result)
+		assert.Len(t, result, 0)
+	})
+
+	t.Run("ボディサイズちょうどの範囲を読み取れる", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.initialize()
+		bodySize := len(undoPage.body)
+
+		// WHEN
+		result := undoPage.BodyAt(0, bodySize)
+
+		// THEN
+		assert.Len(t, result, bodySize)
+	})
+
+	t.Run("ボディサイズを超える範囲は nil を返す", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.initialize()
+		bodySize := len(undoPage.body)
+
+		// WHEN
+		result := undoPage.BodyAt(0, bodySize+1)
+
+		// THEN
+		assert.Nil(t, result)
+	})
+
+	t.Run("負の offset は nil を返す", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.initialize()
+
+		// WHEN
+		result := undoPage.BodyAt(-1, 1)
+
+		// THEN
+		assert.Nil(t, result)
+	})
+
+	t.Run("負の length は nil を返す", func(t *testing.T) {
+		// GIVEN
+		undoPage := newTestUndoPage(t)
+		undoPage.initialize()
+
+		// WHEN
+		result := undoPage.BodyAt(0, -1)
+
+		// THEN
+		assert.Nil(t, result)
+	})
+}
+
 func TestPageRecord(t *testing.T) {
 	t.Run("Append したレコードを読み取れる", func(t *testing.T) {
 		// GIVEN

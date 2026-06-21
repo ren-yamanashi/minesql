@@ -7,6 +7,7 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/stretchr/testify/assert"
@@ -40,6 +41,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.Equal(t, IndexId(1), catalog.nextIndexId)
 		assert.Equal(t, page.FileId(1), catalog.undoLogFileId)
 		assert.False(t, catalog.freeListMapPageId.IsInvalid())
+		assert.False(t, catalog.ddlUndoRootPageId.IsInvalid())
 	})
 
 	t.Run("CreateCatalog 時の freeListMapPageId を NewCatalog で復元できる", func(t *testing.T) {
@@ -54,6 +56,40 @@ func TestNewCatalog(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, created.freeListMapPageId, opened.freeListMapPageId)
+	})
+
+	t.Run("CreateCatalog 時の ddlUndoRootPageId を NewCatalog で復元できる", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+		created, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		assert.NoError(t, err)
+
+		// WHEN
+		opened, err := NewCatalog(bp, newCatalogTestRedoBuffer(t))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, created.ddlUndoRootPageId, opened.ddlUndoRootPageId)
+	})
+
+	t.Run("ヘッダーの DDL Undo 先頭 PageNumber が無効値の場合 ddlUndoRootPageId は page.InvalidId() に復元される", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		assert.NoError(t, err)
+
+		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		bufPageHeader, err := bp.Page(headerPageId)
+		assert.NoError(t, err)
+		writePageNumber(bufPageHeader, headerDDLUndoRootPageNumberOffset, page.MaxPageNumber)
+		bp.Unpin(headerPageId)
+
+		// WHEN
+		opened, err := NewCatalog(bp, newCatalogTestRedoBuffer(t))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.True(t, opened.ddlUndoRootPageId.IsInvalid())
 	})
 
 	t.Run("6 つのメタデータのページ ID が復元される", func(t *testing.T) {
@@ -183,7 +219,7 @@ func TestCreateCatalog(t *testing.T) {
 		assert.NotEqual(t, page.MaxPageNumber, freeListMapPageNumber)
 	})
 
-	t.Run("オフセット 40 (DDL Undo 領域) は未書き込みのまま", func(t *testing.T) {
+	t.Run("ヘッダーページに DDL Undo 先頭ページの PageNumber が書き込まれる", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
 
@@ -198,8 +234,9 @@ func TestCreateCatalog(t *testing.T) {
 		defer bp.Unpin(headerPageId)
 
 		body := bufPageHeader.Data().Body()
-		ddlUndoBytes := body[40 : 40+headerFieldSize]
-		assert.Equal(t, []byte{0, 0, 0, 0}, ddlUndoBytes)
+		ddlUndoRootPN := readPageNumber(body, headerDDLUndoRootPageNumberOffset)
+		assert.NotEqual(t, page.MaxPageNumber, ddlUndoRootPN)
+		assert.NotEqual(t, page.PageNumber(0), ddlUndoRootPN)
 	})
 
 	t.Run("6 つのメタデータが初期化される", func(t *testing.T) {
@@ -332,6 +369,53 @@ func TestAllocateFileId(t *testing.T) {
 		assert.NoError(t, err)
 		defer bp.Unpin(headerPageId)
 		assert.Greater(t, bufPageHeaderAfter.ModifyCount(), before)
+	})
+}
+
+func TestSetDDLUndoRootPageId(t *testing.T) {
+	t.Run("PageId を書き換えるとヘッダーと内部状態が更新される", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+		ct, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		assert.NoError(t, err)
+		newPageId := page.NewId(catalogFileId, page.PageNumber(123))
+
+		// WHEN
+		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
+		err = ct.SetDDLUndoRootPageId(mtr, newPageId)
+		assert.NoError(t, err)
+		assert.NoError(t, mtr.Commit())
+
+		// THEN
+		assert.Equal(t, newPageId, ct.ddlUndoRootPageId)
+		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		bufPageHeader, err := bp.Page(headerPageId)
+		assert.NoError(t, err)
+		defer bp.Unpin(headerPageId)
+		pn := readPageNumber(bufPageHeader.Data().Body(), headerDDLUndoRootPageNumberOffset)
+		assert.Equal(t, newPageId.PageNumber(), pn)
+	})
+
+	t.Run("page.InvalidId() を渡すとヘッダーに無効値が書かれ内部状態も無効化される", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+		ct, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		assert.NoError(t, err)
+
+		// WHEN
+		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
+		err = ct.SetDDLUndoRootPageId(mtr, page.InvalidId())
+		assert.NoError(t, err)
+		assert.NoError(t, mtr.Commit())
+
+		// THEN
+		assert.True(t, ct.ddlUndoRootPageId.IsInvalid())
+		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		bufPageHeader, err := bp.Page(headerPageId)
+		assert.NoError(t, err)
+		defer bp.Unpin(headerPageId)
+		pn := readPageNumber(bufPageHeader.Data().Body(), headerDDLUndoRootPageNumberOffset)
+		assert.Equal(t, page.MaxPageNumber, pn)
 	})
 }
 

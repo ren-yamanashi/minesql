@@ -37,6 +37,16 @@ func CreatePage(bufPage *buffer.Page) *Page {
 	return p
 }
 
+// BodyAt はボディの [offset, offset+length) のバイト範囲を返す
+//   - 範囲がボディサイズを超える場合は nil を返す
+//   - 戻り値はボディの内部 slice なので、 書き込みは行わず読み取り専用で扱うこと
+func (p *Page) BodyAt(offset, length int) []byte {
+	if offset < 0 || length < 0 || offset+length > len(p.body) {
+		return nil
+	}
+	return p.body[offset : offset+length]
+}
+
 // Record はボティ内の指定 offset のレコードを読み取る
 func (p *Page) Record(offset int) []byte {
 	if offset >= len(p.body) {
