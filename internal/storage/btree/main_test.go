@@ -849,7 +849,7 @@ func setupBtree(t *testing.T) *Tree {
 	bp := newTestBufferPool(t, page.Size*10)
 	bp.RegisterHeapFile(fileId, heapFile)
 
-	bt, err := CreateTree(bp, fileId, newTestRedoBuffer(t), lock.SystemReservedTrxId)
+	bt, err := createTreeForTest(t, bp, fileId)
 	if err != nil {
 		t.Fatalf("B+Tree の作成に失敗: %v", err)
 	}
@@ -870,5 +870,14 @@ func newTestRedoBuffer(t *testing.T) *redo.Buffer {
 // createTreeForTest はテスト用に CreateTree を呼ぶラッパー (Redo バッファとシステム trxId を内部で用意)
 func createTreeForTest(t *testing.T, bp *buffer.Pool, fileId page.FileId) (*Tree, error) {
 	t.Helper()
-	return CreateTree(bp, fileId, newTestRedoBuffer(t), lock.SystemReservedTrxId)
+	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+	tree, err := CreateTree(bp, fileId, mtr)
+	if err != nil {
+		mtr.UnpinAll()
+		return nil, err
+	}
+	if err := mtr.Commit(); err != nil {
+		return nil, err
+	}
+	return tree, nil
 }

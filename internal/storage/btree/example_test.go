@@ -203,8 +203,13 @@ func setup() (*btree.Tree, *buffer.Pool, func()) {
 	}
 	bp.RegisterHeapFile(fileId, dm)
 
-	tree, err := btree.CreateTree(bp, fileId, rl, lock.SystemReservedTrxId)
+	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, rl)
+	tree, err := btree.CreateTree(bp, fileId, mtr)
 	if err != nil {
+		mtr.UnpinAll()
+		panic(err)
+	}
+	if err := mtr.Commit(); err != nil {
 		panic(err)
 	}
 

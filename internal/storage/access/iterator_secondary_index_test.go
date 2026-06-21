@@ -210,15 +210,25 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	tableFileId := page.FileId(2)
 
 	// プライマリ B+Tree
-	primaryTree, err := btree.CreateTree(bp, tableFileId, redoLog, lock.SystemReservedTrxId)
+	primaryMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+	primaryTree, err := btree.CreateTree(bp, tableFileId, primaryMtr)
 	if err != nil {
+		primaryMtr.UnpinAll()
 		t.Fatalf("プライマリ B+Tree の作成に失敗: %v", err)
+	}
+	if err := primaryMtr.Commit(); err != nil {
+		t.Fatalf("プライマリ B+Tree Commit に失敗: %v", err)
 	}
 
 	// セカンダリ B+Tree
-	secondaryTree, err := btree.CreateTree(bp, tableFileId, redoLog, lock.SystemReservedTrxId)
+	secondaryMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+	secondaryTree, err := btree.CreateTree(bp, tableFileId, secondaryMtr)
 	if err != nil {
+		secondaryMtr.UnpinAll()
 		t.Fatalf("セカンダリ B+Tree の作成に失敗: %v", err)
+	}
+	if err := secondaryMtr.Commit(); err != nil {
+		t.Fatalf("セカンダリ B+Tree Commit に失敗: %v", err)
 	}
 
 	// テーブル定義: id:0, name:1, email:2

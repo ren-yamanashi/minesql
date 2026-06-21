@@ -74,8 +74,13 @@ func createSecondaryIndex(
 	bp *buffer.Pool,
 	input createSecondaryIndexInput,
 ) (*secondaryIndex, error) {
-	tree, err := btree.CreateTree(bp, input.FileId, input.RedoLog, lock.SystemReservedTrxId)
+	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, input.RedoLog)
+	tree, err := btree.CreateTree(bp, input.FileId, mtr)
 	if err != nil {
+		mtr.UnpinAll()
+		return nil, err
+	}
+	if err := mtr.Commit(); err != nil {
 		return nil, err
 	}
 	return &secondaryIndex{

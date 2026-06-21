@@ -17,8 +17,13 @@ func NewUserMeta(bp *buffer.Pool, metaPageId page.Id) *UserMeta {
 }
 
 func CreateUserMeta(bp *buffer.Pool, redoLog *redo.Buffer) (*UserMeta, error) {
-	tree, err := btree.CreateTree(bp, catalogFileId, redoLog, lock.SystemReservedTrxId)
+	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+	tree, err := btree.CreateTree(bp, catalogFileId, mtr)
 	if err != nil {
+		mtr.UnpinAll()
+		return nil, err
+	}
+	if err := mtr.Commit(); err != nil {
 		return nil, err
 	}
 	return &UserMeta{tree: tree}, nil

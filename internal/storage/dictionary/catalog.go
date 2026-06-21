@@ -234,10 +234,11 @@ func CreateCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 }
 
 // AllocateIndexId は IndexId を採番し、ヘッダーページに永続化する
-func (c *Catalog) AllocateIndexId() (IndexId, error) {
+//   - mtr: 採番結果の書き込みを記録する Mtr。Commit は呼び出し側
+func (c *Catalog) AllocateIndexId(mtr *buffer.Mtr) (IndexId, error) {
 	id := c.nextIndexId
 	c.nextIndexId++
-	if err := c.persistScalar(headerNextIndexIdOffset, uint32(c.nextIndexId)); err != nil {
+	if err := c.persistScalar(mtr, headerNextIndexIdOffset, uint32(c.nextIndexId)); err != nil {
 		c.nextIndexId-- // rollback
 		return 0, err
 	}
@@ -245,29 +246,27 @@ func (c *Catalog) AllocateIndexId() (IndexId, error) {
 }
 
 // AllocateFileId は FileId を採番し、ヘッダーページに永続化する
-func (c *Catalog) AllocateFileId() (page.FileId, error) {
+//   - mtr: 採番結果の書き込みを記録する Mtr。Commit は呼び出し側
+func (c *Catalog) AllocateFileId(mtr *buffer.Mtr) (page.FileId, error) {
 	id := c.nextFileId
 	c.nextFileId++
-	if err := c.persistScalar(headerNextFileIdOffset, uint32(c.nextFileId)); err != nil {
+	if err := c.persistScalar(mtr, headerNextFileIdOffset, uint32(c.nextFileId)); err != nil {
 		c.nextFileId-- // rollback
 		return 0, err
 	}
 	return id, nil
 }
 
-// persistScalar はヘッダーページの指定オフセットに uint32 値を書き込み Redo へ記録する
-//   - システム予約 trxId で記録される
-func (c *Catalog) persistScalar(offset int, value uint32) error {
-	mtr := buffer.NewWriteMtr(c.bufferPool, lock.SystemReservedTrxId, c.redoLog)
-
+// persistScalar はヘッダーページの指定オフセットに uint32 値を書き込む
+//   - mtr: 書き込みを記録する Mtr。Commit は呼び出し側
+func (c *Catalog) persistScalar(mtr *buffer.Mtr, offset int, value uint32) error {
 	headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
 	bufPageHeader, err := mtr.PageForWrite(headerPageId)
 	if err != nil {
-		mtr.UnpinAll()
 		return err
 	}
 	writeScalar(bufPageHeader, offset, value)
-	return mtr.Commit()
+	return nil
 }
 
 // writeScalar はヘッダーページの指定オフセットに uint32 値を書き込む

@@ -51,8 +51,13 @@ func createPrimaryIndex(
 	undoLog *undo.Manager,
 	redoLog *redo.Buffer,
 ) (*primaryIndex, error) {
-	tree, err := btree.CreateTree(bp, fileId, redoLog, lock.SystemReservedTrxId)
+	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+	tree, err := btree.CreateTree(bp, fileId, mtr)
 	if err != nil {
+		mtr.UnpinAll()
+		return nil, err
+	}
+	if err := mtr.Commit(); err != nil {
 		return nil, err
 	}
 	return &primaryIndex{

@@ -4,9 +4,7 @@ import (
 	"errors"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
-	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
 
 var (
@@ -32,26 +30,20 @@ func NewTree(bp *buffer.Pool, metaPageId page.Id) *Tree {
 }
 
 // CreateTree は新しい B+Tree を作成する
-//   - redoLog / trxId: メタページ・ルートリーフ初期化を Redo に記録するための書き込み Mtr 用
-func CreateTree(bp *buffer.Pool, fileId page.FileId, redoLog *redo.Buffer, trxId lock.TrxId) (*Tree, error) {
-	mtr := buffer.NewWriteMtr(bp, trxId, redoLog)
-
+//   - mtr: メタページ・ルートリーフ初期化を記録する書き込み Mtr。Commit は呼び出し側
+func CreateTree(bp *buffer.Pool, fileId page.FileId, mtr *buffer.Mtr) (*Tree, error) {
 	metaPageId, err := bp.AllocatePageId(fileId)
 	if err != nil {
-		mtr.UnpinAll()
 		return nil, err
 	}
 
 	// メタページ作成
-	_, err = bp.AddPage(metaPageId)
-	if err != nil {
-		mtr.UnpinAll()
+	if _, err := bp.AddPage(metaPageId); err != nil {
 		return nil, err
 	}
 
 	pageMeta, err := mtr.PageForWrite(metaPageId)
 	if err != nil {
-		mtr.UnpinAll()
 		return nil, err
 	}
 	metaPage := newMetaPage(pageMeta)
@@ -59,17 +51,13 @@ func CreateTree(bp *buffer.Pool, fileId page.FileId, redoLog *redo.Buffer, trxId
 	// ルートリーフノード作成
 	rootNodePageId, err := bp.AllocatePageId(metaPageId.FileId())
 	if err != nil {
-		mtr.UnpinAll()
 		return nil, err
 	}
-	_, err = bp.AddPage(rootNodePageId)
-	if err != nil {
-		mtr.UnpinAll()
+	if _, err := bp.AddPage(rootNodePageId); err != nil {
 		return nil, err
 	}
 	pageRoot, err := mtr.PageForWrite(rootNodePageId)
 	if err != nil {
-		mtr.UnpinAll()
 		return nil, err
 	}
 	rootLeaf := newLeafNode(pageRoot)
@@ -79,10 +67,6 @@ func CreateTree(bp *buffer.Pool, fileId page.FileId, redoLog *redo.Buffer, trxId
 	metaPage.setRootPageId(rootNodePageId)
 	metaPage.setLeafPageCount(1)
 	metaPage.setHeight(1)
-
-	if err := mtr.Commit(); err != nil {
-		return nil, err
-	}
 
 	return NewTree(bp, metaPageId), nil
 }

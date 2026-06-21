@@ -294,14 +294,17 @@ func TestAllocateIndexId(t *testing.T) {
 	t.Run("IndexId を採番するたびにインクリメントされる", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
-		ct, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		redoLog := newCatalogTestRedoBuffer(t)
+		ct, err := CreateCatalog(bp, redoLog)
 		assert.NoError(t, err)
 
 		// WHEN
-		id1, err := ct.AllocateIndexId()
+		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		id1, err := ct.AllocateIndexId(mtr)
 		assert.NoError(t, err)
-		id2, err := ct.AllocateIndexId()
+		id2, err := ct.AllocateIndexId(mtr)
 		assert.NoError(t, err)
+		assert.NoError(t, mtr.Commit())
 
 		// THEN
 		assert.Equal(t, IndexId(1), id1)
@@ -311,7 +314,8 @@ func TestAllocateIndexId(t *testing.T) {
 	t.Run("採番後にヘッダーページがダーティーになる", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
-		ct, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		redoLog := newCatalogTestRedoBuffer(t)
+		ct, err := CreateCatalog(bp, redoLog)
 		assert.NoError(t, err)
 		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
 		bufPageHeader, err := bp.Page(headerPageId)
@@ -320,8 +324,10 @@ func TestAllocateIndexId(t *testing.T) {
 		bp.Unpin(headerPageId)
 
 		// WHEN
-		_, err = ct.AllocateIndexId()
+		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		_, err = ct.AllocateIndexId(mtr)
 		assert.NoError(t, err)
+		assert.NoError(t, mtr.Commit())
 
 		// THEN
 		bufPageHeaderAfter, err := bp.Page(headerPageId)
@@ -335,14 +341,17 @@ func TestAllocateFileId(t *testing.T) {
 	t.Run("FileId を採番するたびにインクリメントされる", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
-		ct, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		redoLog := newCatalogTestRedoBuffer(t)
+		ct, err := CreateCatalog(bp, redoLog)
 		assert.NoError(t, err)
 
 		// WHEN
-		id1, err := ct.AllocateFileId()
+		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		id1, err := ct.AllocateFileId(mtr)
 		assert.NoError(t, err)
-		id2, err := ct.AllocateFileId()
+		id2, err := ct.AllocateFileId(mtr)
 		assert.NoError(t, err)
+		assert.NoError(t, mtr.Commit())
 
 		// THEN
 		assert.Equal(t, page.FileId(2), id1)
@@ -352,7 +361,8 @@ func TestAllocateFileId(t *testing.T) {
 	t.Run("採番後にヘッダーページがダーティーになる", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
-		ct, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		redoLog := newCatalogTestRedoBuffer(t)
+		ct, err := CreateCatalog(bp, redoLog)
 		assert.NoError(t, err)
 		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
 		bufPageHeader, err := bp.Page(headerPageId)
@@ -361,8 +371,10 @@ func TestAllocateFileId(t *testing.T) {
 		bp.Unpin(headerPageId)
 
 		// WHEN
-		_, err = ct.AllocateFileId()
+		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		_, err = ct.AllocateFileId(mtr)
 		assert.NoError(t, err)
+		assert.NoError(t, mtr.Commit())
 
 		// THEN
 		bufPageHeaderAfter, err := bp.Page(headerPageId)

@@ -36,8 +36,10 @@ func TestDDLRollbackerRollback(t *testing.T) {
 	t.Run("DDLRecordTypeCreateBTree で対象 B+Tree の全ページを Deallocate する", func(t *testing.T) {
 		// GIVEN
 		env := setupDDLRollbackerTestEnv(t)
-		tree, err := btree.CreateTree(env.bp, page.FileId(2), env.redoLog, lock.SystemReservedTrxId)
+		createMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		tree, err := btree.CreateTree(env.bp, page.FileId(2), createMtr)
 		assert.NoError(t, err)
+		assert.NoError(t, createMtr.Commit())
 		pageIds := collectTreePageIds(t, env.bp, tree)
 		rollbacker := NewDDLRollbacker(env.bp, env.ct)
 		record := undo.NewDDLRecord(

@@ -294,9 +294,14 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 	_ = env.ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(siNameId, "name", 0))
 
 	// セカンダリインデックス idx_email のメタデータ (新しい B+Tree が必要)
-	siEmailTree, err := btree.CreateTree(env.bp, fileId, redoLog, lock.SystemReservedTrxId)
+	siEmailMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, redoLog)
+	siEmailTree, err := btree.CreateTree(env.bp, fileId, siEmailMtr)
 	if err != nil {
+		siEmailMtr.UnpinAll()
 		t.Fatalf("idx_email B+Tree の作成に失敗: %v", err)
+	}
+	if err := siEmailMtr.Commit(); err != nil {
+		t.Fatalf("idx_email B+Tree Commit に失敗: %v", err)
 	}
 	siEmailId := dictionary.IndexId(2)
 	_ = env.ct.IndexMeta().Insert(mtr, dictionary.NewIndexMetaRecord(

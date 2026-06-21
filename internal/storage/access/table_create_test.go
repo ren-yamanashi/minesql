@@ -189,7 +189,7 @@ func TestCreateTableFile(t *testing.T) {
 		})
 
 		// WHEN
-		fileId, err := createTableFile(env.ct, env.bp, "test_table")
+		fileId, err := createTableFile(env.ct, env.bp, env.redoLog, "test_table")
 
 		// THEN
 		assert.NoError(t, err)
@@ -210,11 +210,12 @@ func TestRegisterTableMeta(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		err = registerTableMeta(env.ct, env.bp, env.fileId, pi, input, env.redoLog)
+		mtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		err = registerTableMeta(mtr, env.ct, env.fileId, pi, input)
+		assert.NoError(t, err)
+		assert.NoError(t, mtr.Commit())
 
 		// THEN
-		assert.NoError(t, err)
-
 		tableRecord, err := fetchTable(env.ct, env.bp, "users")
 		assert.NoError(t, err)
 		assert.Equal(t, "users", tableRecord.Name())
@@ -238,11 +239,15 @@ func TestRegisterTableMeta(t *testing.T) {
 		}
 		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr, nil, env.redoLog)
 		assert.NoError(t, err)
-		err = registerTableMeta(env.ct, env.bp, env.fileId, pi, input, env.redoLog)
+		firstMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		err = registerTableMeta(firstMtr, env.ct, env.fileId, pi, input)
 		assert.NoError(t, err)
+		assert.NoError(t, firstMtr.Commit())
 
 		// WHEN
-		err = registerTableMeta(env.ct, env.bp, env.fileId, pi, input, env.redoLog)
+		secondMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		err = registerTableMeta(secondMtr, env.ct, env.fileId, pi, input)
+		secondMtr.UnpinAll()
 
 		// THEN
 		assert.Error(t, err)
@@ -259,12 +264,13 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		}
 
 		// WHEN
-		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
+		mtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		sis, err := createSecondaryIndexes(mtr, env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
+		assert.NoError(t, err)
+		assert.NoError(t, mtr.Commit())
 
 		// THEN
-		assert.NoError(t, err)
 		assert.Len(t, sis, 2)
-
 		names := map[string]bool{}
 		for _, si := range sis {
 			names[si.indexName] = true
@@ -281,10 +287,12 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		}
 
 		// WHEN
-		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
+		mtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		sis, err := createSecondaryIndexes(mtr, env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
+		assert.NoError(t, err)
+		assert.NoError(t, mtr.Commit())
 
 		// THEN
-		assert.NoError(t, err)
 		assert.True(t, sis[0].unique)
 	})
 
@@ -296,10 +304,12 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		}
 
 		// WHEN
-		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
+		mtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		sis, err := createSecondaryIndexes(mtr, env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
+		assert.NoError(t, err)
+		assert.NoError(t, mtr.Commit())
 
 		// THEN
-		assert.NoError(t, err)
 		assert.False(t, sis[0].unique)
 	})
 
@@ -309,11 +319,15 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		inputs := []CreateIndexInput{
 			{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: dictionary.IndexTypeNonUnique},
 		}
-		_, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
+		firstMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		_, err := createSecondaryIndexes(firstMtr, env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
 		assert.NoError(t, err)
+		assert.NoError(t, firstMtr.Commit())
 
 		// WHEN
-		_, err = createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
+		secondMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		_, err = createSecondaryIndexes(secondMtr, env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
+		secondMtr.UnpinAll()
 
 		// THEN
 		assert.Error(t, err)
@@ -324,10 +338,12 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		env := setupCreateTestEnvWithTable(t)
 
 		// WHEN
-		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, nil)
+		mtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		sis, err := createSecondaryIndexes(mtr, env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, nil)
+		assert.NoError(t, err)
+		assert.NoError(t, mtr.Commit())
 
 		// THEN
-		assert.NoError(t, err)
 		assert.Empty(t, sis)
 	})
 }
@@ -346,7 +362,10 @@ func TestCreateConstraints(t *testing.T) {
 		}
 
 		// WHEN
-		err := createConstraints(env.ct, env.bp, env.fileId, inputs, env.redoLog)
+		mtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		err := createConstraints(mtr, env.ct, env.bp, env.fileId, inputs)
+		assert.NoError(t, err)
+		assert.NoError(t, mtr.Commit())
 
 		// THEN
 		assert.NoError(t, err)
@@ -365,7 +384,9 @@ func TestCreateConstraints(t *testing.T) {
 		}
 
 		// WHEN
-		err := createConstraints(env.ct, env.bp, env.fileId, inputs, env.redoLog)
+		mtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		err := createConstraints(mtr, env.ct, env.bp, env.fileId, inputs)
+		mtr.UnpinAll()
 
 		// THEN
 		assert.Error(t, err)
@@ -377,7 +398,10 @@ func TestCreateConstraints(t *testing.T) {
 		env := setupCreateTestEnvWithTable(t)
 
 		// WHEN
-		err := createConstraints(env.ct, env.bp, env.fileId, nil, env.redoLog)
+		mtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		err := createConstraints(mtr, env.ct, env.bp, env.fileId, nil)
+		assert.NoError(t, err)
+		assert.NoError(t, mtr.Commit())
 
 		// THEN
 		assert.NoError(t, err)
@@ -430,9 +454,13 @@ func setupCreateTestEnv(t *testing.T) *createTestEnv {
 
 	// テスト用テーブルの HeapFile
 	dataPath := filepath.Join(t.TempDir(), "data.db")
-	fileId, err := ct.AllocateFileId()
+	allocMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+	fileId, err := ct.AllocateFileId(allocMtr)
 	if err != nil {
 		t.Fatalf("FileId の採番に失敗: %v", err)
+	}
+	if err := allocMtr.Commit(); err != nil {
+		t.Fatalf("FileId 採番の Commit に失敗: %v", err)
 	}
 	dataHf, err := file.NewHeapFile(fileId, dataPath)
 	if err != nil {
@@ -466,8 +494,12 @@ func setupCreateTestEnvWithTable(t *testing.T) *createTestEnvWithTable {
 	if err != nil {
 		t.Fatalf("プライマリインデックスの作成に失敗: %v", err)
 	}
-	if err := registerTableMeta(env.ct, env.bp, env.fileId, pi, input, env.redoLog); err != nil {
+	mtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+	if err := registerTableMeta(mtr, env.ct, env.fileId, pi, input); err != nil {
 		t.Fatalf("テーブルメタの登録に失敗: %v", err)
+	}
+	if err := mtr.Commit(); err != nil {
+		t.Fatalf("テーブルメタ Commit に失敗: %v", err)
 	}
 
 	return &createTestEnvWithTable{

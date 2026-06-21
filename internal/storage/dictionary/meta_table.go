@@ -17,8 +17,13 @@ func NewTableMeta(bp *buffer.Pool, metaPageId page.Id) *TableMeta {
 }
 
 func CreateTableMeta(bp *buffer.Pool, redoLog *redo.Buffer) (*TableMeta, error) {
-	tree, err := btree.CreateTree(bp, catalogFileId, redoLog, lock.SystemReservedTrxId)
+	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+	tree, err := btree.CreateTree(bp, catalogFileId, mtr)
 	if err != nil {
+		mtr.UnpinAll()
+		return nil, err
+	}
+	if err := mtr.Commit(); err != nil {
 		return nil, err
 	}
 	return &TableMeta{tree: tree}, nil
