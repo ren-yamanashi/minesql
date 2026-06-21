@@ -119,6 +119,42 @@ func TestColumnMetaInsert(t *testing.T) {
 	})
 }
 
+func TestColumnMetaDelete(t *testing.T) {
+	t.Run("Insert したレコードを Delete で削除できる", func(t *testing.T) {
+		// GIVEN
+		cm, bp := setupTestColumnMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		record := NewColumnMetaRecord(page.FileId(1), "name", 0)
+		_ = cm.Insert(mtr, record)
+
+		// WHEN
+		err := cm.Delete(mtr, record.Encode().Key())
+
+		// THEN
+		assert.NoError(t, err)
+		iter, err := cm.Search(mtr, SearchModeStart{})
+		assert.NoError(t, err)
+		_, ok, err := iter.Next()
+		assert.NoError(t, err)
+		assert.False(t, ok)
+	})
+
+	t.Run("存在しないキーの Delete は ErrKeyNotFound を返す", func(t *testing.T) {
+		// GIVEN
+		cm, bp := setupTestColumnMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		missing := NewColumnMetaRecord(page.FileId(99), "missing", 0)
+
+		// WHEN
+		err := cm.Delete(mtr, missing.Encode().Key())
+
+		// THEN
+		assert.ErrorIs(t, err, btree.ErrKeyNotFound)
+	})
+}
+
 // setupTestColumnMeta はテスト用の ColumnMeta を作成する
 func setupTestColumnMeta(t *testing.T) (*ColumnMeta, *buffer.Pool) {
 	t.Helper()

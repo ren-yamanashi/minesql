@@ -119,6 +119,42 @@ func TestTableMetaInsert(t *testing.T) {
 	})
 }
 
+func TestTableMetaDelete(t *testing.T) {
+	t.Run("Insert したレコードを Delete で削除できる", func(t *testing.T) {
+		// GIVEN
+		tm, bp := setupTestTableMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		record := NewTableMetaRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3)
+		_ = tm.Insert(mtr, record)
+
+		// WHEN
+		err := tm.Delete(mtr, record.Encode().Key())
+
+		// THEN
+		assert.NoError(t, err)
+		iter, err := tm.Search(mtr, SearchModeStart{})
+		assert.NoError(t, err)
+		_, ok, err := iter.Next()
+		assert.NoError(t, err)
+		assert.False(t, ok)
+	})
+
+	t.Run("存在しないキーの Delete は ErrKeyNotFound を返す", func(t *testing.T) {
+		// GIVEN
+		tm, bp := setupTestTableMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		missing := NewTableMetaRecord("missing", page.NewId(page.FileId(1), page.PageNumber(0)), 1)
+
+		// WHEN
+		err := tm.Delete(mtr, missing.Encode().Key())
+
+		// THEN
+		assert.ErrorIs(t, err, btree.ErrKeyNotFound)
+	})
+}
+
 // setupTestTableMeta はテスト用の TableMeta を作成する
 func setupTestTableMeta(t *testing.T) (*TableMeta, *buffer.Pool) {
 	t.Helper()

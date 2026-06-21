@@ -136,6 +136,42 @@ func TestConstraintMetaInsert(t *testing.T) {
 	})
 }
 
+func TestConstraintMetaDelete(t *testing.T) {
+	t.Run("Insert したレコードを Delete で削除できる", func(t *testing.T) {
+		// GIVEN
+		cm, bp := setupTestConstraintMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		record := NewConstraintMetaRecord(page.FileId(1), "id", "PRIMARY", page.FileId(0), "")
+		_ = cm.Insert(mtr, record)
+
+		// WHEN
+		err := cm.Delete(mtr, record.Encode().Key())
+
+		// THEN
+		assert.NoError(t, err)
+		iter, err := cm.Search(mtr, SearchModeStart{})
+		assert.NoError(t, err)
+		_, ok, err := iter.Next()
+		assert.NoError(t, err)
+		assert.False(t, ok)
+	})
+
+	t.Run("存在しないキーの Delete は ErrKeyNotFound を返す", func(t *testing.T) {
+		// GIVEN
+		cm, bp := setupTestConstraintMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		missing := NewConstraintMetaRecord(page.FileId(99), "missing", "missing", page.FileId(0), "")
+
+		// WHEN
+		err := cm.Delete(mtr, missing.Encode().Key())
+
+		// THEN
+		assert.ErrorIs(t, err, btree.ErrKeyNotFound)
+	})
+}
+
 // setupTestConstraintMeta はテスト用の ConstraintMeta を作成する
 func setupTestConstraintMeta(t *testing.T) (*ConstraintMeta, *buffer.Pool) {
 	t.Helper()

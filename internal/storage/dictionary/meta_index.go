@@ -35,3 +35,7 @@ func (im *IndexMeta) Search(mtr *buffer.Mtr, mode SearchMode) (*IndexIterator, e
 func (im *IndexMeta) Insert(mtr *buffer.Mtr, record IndexMetaRecord) error {
 	return im.tree.Insert(mtr, record.Encode())
 }
+
+func (im *IndexMeta) Delete(mtr *buffer.Mtr, key []byte) error {
+	return im.tree.Delete(mtr, key)
+}

@@ -35,3 +35,7 @@ func (kcm *IndexKeyColumnMeta) Search(mtr *buffer.Mtr, mode SearchMode) (*IndexK
 func (kcm *IndexKeyColumnMeta) Insert(mtr *buffer.Mtr, record IndexKeyColumnMetaRecord) error {
 	return kcm.tree.Insert(mtr, record.Encode())
 }
+
+func (kcm *IndexKeyColumnMeta) Delete(mtr *buffer.Mtr, key []byte) error {
+	return kcm.tree.Delete(mtr, key)
+}

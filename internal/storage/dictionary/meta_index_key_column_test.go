@@ -118,6 +118,42 @@ func TestIndexKeyColumnMetaInsert(t *testing.T) {
 	})
 }
 
+func TestIndexKeyColumnMetaDelete(t *testing.T) {
+	t.Run("Insert したレコードを Delete で削除できる", func(t *testing.T) {
+		// GIVEN
+		kcm, bp := setupTestIndexKeyColumnMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		record := NewIndexKeyColumnMetaRecord(IndexId(1), "name", 1)
+		_ = kcm.Insert(mtr, record)
+
+		// WHEN
+		err := kcm.Delete(mtr, record.Encode().Key())
+
+		// THEN
+		assert.NoError(t, err)
+		iter, err := kcm.Search(mtr, SearchModeStart{})
+		assert.NoError(t, err)
+		_, ok, err := iter.Next()
+		assert.NoError(t, err)
+		assert.False(t, ok)
+	})
+
+	t.Run("存在しないキーの Delete は ErrKeyNotFound を返す", func(t *testing.T) {
+		// GIVEN
+		kcm, bp := setupTestIndexKeyColumnMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		missing := NewIndexKeyColumnMetaRecord(IndexId(99), "missing", 0)
+
+		// WHEN
+		err := kcm.Delete(mtr, missing.Encode().Key())
+
+		// THEN
+		assert.ErrorIs(t, err, btree.ErrKeyNotFound)
+	})
+}
+
 // setupTestIndexKeyColumnMeta はテスト用の IndexKeyColumnMeta を作成する
 func setupTestIndexKeyColumnMeta(t *testing.T) (*IndexKeyColumnMeta, *buffer.Pool) {
 	t.Helper()

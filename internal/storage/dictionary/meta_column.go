@@ -35,3 +35,7 @@ func (cm *ColumnMeta) Search(mtr *buffer.Mtr, mode SearchMode) (*ColumnIterator,
 func (cm *ColumnMeta) Insert(mtr *buffer.Mtr, record ColumnMetaRecord) error {
 	return cm.tree.Insert(mtr, record.Encode())
 }
+
+func (cm *ColumnMeta) Delete(mtr *buffer.Mtr, key []byte) error {
+	return cm.tree.Delete(mtr, key)
+}

@@ -35,3 +35,7 @@ func (tm *TableMeta) Search(mtr *buffer.Mtr, mode SearchMode) (*TableIterator, e
 func (tm *TableMeta) Insert(mtr *buffer.Mtr, record TableMetaRecord) error {
 	return tm.tree.Insert(mtr, record.Encode())
 }
+
+func (tm *TableMeta) Delete(mtr *buffer.Mtr, key []byte) error {
+	return tm.tree.Delete(mtr, key)
+}

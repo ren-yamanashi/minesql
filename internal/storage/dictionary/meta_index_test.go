@@ -171,6 +171,56 @@ func TestIndexMetaInsert(t *testing.T) {
 	})
 }
 
+func TestIndexMetaDelete(t *testing.T) {
+	t.Run("Insert したレコードを Delete で削除できる", func(t *testing.T) {
+		// GIVEN
+		im, bp := setupTestIndexMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		record := NewIndexMetaRecord(
+			page.FileId(1),
+			IndexId(1),
+			PrimaryIndexName,
+			IndexTypePrimary,
+			1,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		)
+		_ = im.Insert(mtr, record)
+
+		// WHEN
+		err := im.Delete(mtr, record.Encode().Key())
+
+		// THEN
+		assert.NoError(t, err)
+		iter, err := im.Search(mtr, SearchModeStart{})
+		assert.NoError(t, err)
+		_, ok, err := iter.Next()
+		assert.NoError(t, err)
+		assert.False(t, ok)
+	})
+
+	t.Run("存在しないキーの Delete は ErrKeyNotFound を返す", func(t *testing.T) {
+		// GIVEN
+		im, bp := setupTestIndexMeta(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		missing := NewIndexMetaRecord(
+			page.FileId(99),
+			IndexId(0),
+			"missing",
+			IndexTypeNonUnique,
+			1,
+			page.NewId(page.FileId(1), page.PageNumber(0)),
+		)
+
+		// WHEN
+		err := im.Delete(mtr, missing.Encode().Key())
+
+		// THEN
+		assert.ErrorIs(t, err, btree.ErrKeyNotFound)
+	})
+}
+
 // setupTestIndexMeta はテスト用の IndexMeta を作成する
 func setupTestIndexMeta(t *testing.T) (*IndexMeta, *buffer.Pool) {
 	t.Helper()

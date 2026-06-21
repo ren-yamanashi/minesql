@@ -35,3 +35,7 @@ func (cm *ConstraintMeta) Search(mtr *buffer.Mtr, mode SearchMode) (*ConstraintI
 func (cm *ConstraintMeta) Insert(mtr *buffer.Mtr, record ConstraintMetaRecord) error {
 	return cm.tree.Insert(mtr, record.Encode())
 }
+
+func (cm *ConstraintMeta) Delete(mtr *buffer.Mtr, key []byte) error {
+	return cm.tree.Delete(mtr, key)
+}
