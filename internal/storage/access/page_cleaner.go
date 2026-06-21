@@ -25,11 +25,17 @@ type PageCleaner struct {
 	isRunning       atomic.Bool
 }
 
-func NewPageCleaner(bp *buffer.Pool, redo *redo.Buffer, redoMaxSize int, maxDirtyPct int) *PageCleaner {
+func NewPageCleaner(
+	bp *buffer.Pool,
+	redo *redo.Buffer,
+	trxMgr *TrxManager,
+	redoMaxSize int,
+	maxDirtyPct int,
+) *PageCleaner {
 	return &PageCleaner{
 		bufferPool:      bp,
 		redoLog:         redo,
-		checkpoint:      NewCheckpoint(bp, redo),
+		checkpoint:      NewCheckpoint(bp, redo, trxMgr),
 		redoLogMaxSize:  redoMaxSize,
 		maxDirtyPagePct: maxDirtyPct,
 		interval:        1 * time.Second,

@@ -63,6 +63,9 @@ func (r *Recovery) Execute() error {
 	if err := r.applyDDLRollback(records); err != nil {
 		return err
 	}
+	if err := r.transaction.PersistNextTrxIdToCatalog(); err != nil {
+		return err
+	}
 	if err := r.bufferPool.FlushAllPages(); err != nil {
 		return err
 	}

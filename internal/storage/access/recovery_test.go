@@ -2,6 +2,7 @@ package access
 
 import (
 	"encoding/binary"
+	"fmt"
 	"os"
 	"testing"
 
@@ -406,6 +407,34 @@ func TestRecoveryApplyRollback(t *testing.T) {
 	})
 }
 
+func TestRecoveryExecutePersistsNextTrxId(t *testing.T) {
+	t.Run("Execute 後にカタログヘッダーの nextTrxId が TrxManager の値に追従する", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		table := setupTableForRecoveryTest(t, env)
+		for i := 1; i <= 3; i++ {
+			trx := env.trxManager.Begin()
+			err := table.Insert(
+				trx,
+				[]string{"id", "name", "email"},
+				[]string{fmt.Sprintf("%d", i), fmt.Sprintf("user%d", i), fmt.Sprintf("u%d@example.com", i)},
+			)
+			assert.NoError(t, err)
+			assert.NoError(t, env.trxManager.Commit(trx))
+		}
+		assert.NoError(t, env.redoLog.Flush())
+		currentNext := env.trxManager.NextTrxId()
+		assert.Greater(t, currentNext, env.trxManager.catalog.NextTrxId(), "前提: TrxManager の方が先行している")
+
+		// WHEN
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
+		assert.NoError(t, r.Execute())
+
+		// THEN
+		assert.Equal(t, currentNext, env.trxManager.catalog.NextTrxId())
+	})
+}
+
 // recoveryTestEnv はリカバリテスト用の環境
 type recoveryTestEnv struct {
 	bp         *buffer.Pool
@@ -539,14 +568,14 @@ func TestRecoveryExecuteDiscardsIncompleteMtr(t *testing.T) {
 		_ = createUsersTable(t, env)
 		flushBaseline(t, env)
 
-		catalogPageId := page.NewId(page.FileId(0), page.PageNumber(0))
-		beforeBytes, beforeLsn := readPageBytes(t, env.bp, catalogPageId)
+		targetPageId := page.NewId(env.ct.UndoLogFileId(), page.PageNumber(0))
+		beforeBytes, beforeLsn := readPageBytes(t, env.bp, targetPageId)
 
 		broken := makeBrokenPage(t)
 		trxId := lock.TrxId(99)
 		_, err := env.redoLog.AppendMtrStart(trxId)
 		assert.NoError(t, err)
-		_, err = env.redoLog.AppendPageCopy(trxId, catalogPageId, broken)
+		_, err = env.redoLog.AppendPageCopy(trxId, targetPageId, broken)
 		assert.NoError(t, err)
 		assert.NoError(t, env.redoLog.Flush())
 
@@ -557,7 +586,7 @@ func TestRecoveryExecuteDiscardsIncompleteMtr(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		afterBytes, afterLsn := readPageBytes(t, env2.bp, catalogPageId)
+		afterBytes, afterLsn := readPageBytes(t, env2.bp, targetPageId)
 		assert.Equal(t, beforeLsn, afterLsn)
 		assert.Equal(t, beforeBytes, afterBytes)
 	})

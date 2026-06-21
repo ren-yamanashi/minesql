@@ -38,6 +38,63 @@ func TestIntegrationTrxIdRecovery(t *testing.T) {
 		assert.Greater(t, trxNext.trxId, lastTrxId)
 	})
 
+	t.Run("Checkpoint で Redo を切り詰めた後でも再起動で nextTrxId が復元される", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		table := createUsersTable(t, env)
+		flushBaseline(t, env)
+		var lastTrxId lock.TrxId
+		for i := 1; i <= 5; i++ {
+			trx := env.trxMgr.Begin()
+			lastTrxId = trx.trxId
+			err := table.Insert(
+				trx,
+				[]string{"id", "name", "email"},
+				[]string{fmt.Sprintf("%d", i), fmt.Sprintf("user%d", i), fmt.Sprintf("u%d@example.com", i)},
+			)
+			assert.NoError(t, err)
+			assert.NoError(t, env.trxMgr.Commit(trx))
+		}
+		assert.NoError(t, env.redoLog.Flush())
+		assert.NoError(t, env.bp.FlushAllPages())
+		cp := NewCheckpoint(env.bp, env.redoLog, env.trxMgr)
+		assert.NoError(t, cp.Execute())
+		assert.NoError(t, env.bp.FlushAllPages())
+
+		// WHEN
+		env2 := crashAndRecover(t, env, []string{"users"})
+
+		// THEN
+		trxNext := env2.trxMgr.Begin()
+		assert.Greater(t, trxNext.trxId, lastTrxId)
+	})
+
+	t.Run("Recovery 完了後はカタログヘッダーの nextTrxId が TrxManager の値に追従する", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		table := createUsersTable(t, env)
+		flushBaseline(t, env)
+		for i := 1; i <= 3; i++ {
+			trx := env.trxMgr.Begin()
+			err := table.Insert(
+				trx,
+				[]string{"id", "name", "email"},
+				[]string{fmt.Sprintf("%d", i), fmt.Sprintf("user%d", i), fmt.Sprintf("u%d@example.com", i)},
+			)
+			assert.NoError(t, err)
+			assert.NoError(t, env.trxMgr.Commit(trx))
+		}
+		assert.NoError(t, env.redoLog.Flush())
+
+		// WHEN
+		env2 := crashAndRecover(t, env, []string{"users"})
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
+		assert.NoError(t, r.Execute())
+
+		// THEN
+		assert.Equal(t, env2.trxMgr.NextTrxId(), env2.ct.NextTrxId())
+	})
+
 	t.Run("再起動後の ReadView が再起動前のコミット済みレコードを可視と判定する", func(t *testing.T) {
 		// GIVEN
 		env := setupIntegrationEnv(t)

@@ -381,9 +381,10 @@ func crashAndRecoverWithPendingFiles(
 	if err != nil {
 		t.Fatalf("CompletedUserTrxIds の取得に失敗: %v", err)
 	}
+	initialNextTrxId := max(ct.NextTrxId(), maxTrxId+1)
 
 	lockMgr := lock.NewManager()
-	tempTrxMgr := NewTrxManager(ct, nil, redoLog, lockMgr, bp, maxTrxId+1, completedTrxIds)
+	tempTrxMgr := NewTrxManager(ct, nil, redoLog, lockMgr, bp, initialNextTrxId, completedTrxIds)
 	r := NewRecovery(redoLog, bp, tempTrxMgr, undoFileId, ct.DDLManager())
 	if err := r.Execute(); err != nil {
 		t.Fatalf("Recovery.Execute に失敗: %v", err)
@@ -395,12 +396,13 @@ func crashAndRecoverWithPendingFiles(
 	if err != nil {
 		t.Fatalf("Catalog の再 open に失敗: %v", err)
 	}
+	refreshedNextTrxId := max(refreshedCt.NextTrxId(), maxTrxId+1)
 
 	undoMgr, err := undo.OpenManager(bp, undoFileId)
 	if err != nil {
 		t.Fatalf("undo.Manager の再オープンに失敗: %v", err)
 	}
-	trxMgr := NewTrxManager(refreshedCt, undoMgr, redoLog, lockMgr, bp, maxTrxId+1, completedTrxIds)
+	trxMgr := NewTrxManager(refreshedCt, undoMgr, redoLog, lockMgr, bp, refreshedNextTrxId, completedTrxIds)
 
 	return &integrationEnv{
 		bp:      bp,

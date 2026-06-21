@@ -25,6 +25,7 @@ const (
 	headerUndoLogFileIdOffset         = 36
 	headerDDLUndoRootPageNumberOffset = 40
 	headerFreeListMapPageNumberOffset = 44
+	headerNextTrxIdOffset             = 48
 	headerFieldSize                   = 4
 )
 
@@ -40,6 +41,7 @@ type Catalog struct {
 	redoLog            *redo.Buffer // DDL (persistScalar / table_create 等) を Redo に記録するための参照
 	nextFileId         page.FileId
 	nextIndexId        IndexId
+	nextTrxId          lock.TrxId
 	undoLogFileId      page.FileId
 	ddlUndoRootPageId  page.Id
 	ddlManager         *undo.DDLManager // DDL Undo 領域コンテナ。 CreateCatalog 以降サーバライフタイム中ずっと有効
@@ -54,6 +56,7 @@ type Catalog struct {
 
 func (c *Catalog) UndoLogFileId() page.FileId              { return c.undoLogFileId }
 func (c *Catalog) FreeListMapPageId() page.Id              { return c.freeListMapPageId }
+func (c *Catalog) NextTrxId() lock.TrxId                   { return c.nextTrxId }
 func (c *Catalog) TableMeta() *TableMeta                   { return c.tableMeta }
 func (c *Catalog) IndexMeta() *IndexMeta                   { return c.indexMeta }
 func (c *Catalog) IndexKeyColumnMeta() *IndexKeyColumnMeta { return c.indexKeyColumnMeta }
@@ -97,6 +100,9 @@ func NewCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 	))
 	ddlUndoRootPageNumber := readPageNumber(bufPageHeader.Data().Body(), headerDDLUndoRootPageNumberOffset)
 	freeListMapPageNumber := readPageNumber(bufPageHeader.Data().Body(), headerFreeListMapPageNumberOffset)
+	nextTrxId := lock.TrxId(binary.BigEndian.Uint32(
+		bufPageHeader.Data().Body()[headerNextTrxIdOffset : headerNextTrxIdOffset+headerFieldSize],
+	))
 
 	ddlUndoRootPageId := ddlUndoRootPageIdFromPageNumber(ddlUndoRootPageNumber)
 	freeListMapPageId := page.NewId(catalogFileId, freeListMapPageNumber)
@@ -110,6 +116,7 @@ func NewCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 		redoLog:           redoLog,
 		nextFileId:        nextFileId,
 		nextIndexId:       nextIndexId,
+		nextTrxId:         nextTrxId,
 		undoLogFileId:     undoLogFileId,
 		ddlUndoRootPageId: ddlUndoRootPageId,
 		ddlManager:        ddlManager,
@@ -201,6 +208,7 @@ func CreateCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 
 	nextFileId := page.FileId(1) // FileId(0) はカタログ用なので 1 から開始
 	nextIndexId := IndexId(1)    // IndexId(0) は無効値として予約
+	nextTrxId := lock.TrxId(1)   // 0 は予約値のため 1 から開始
 	undoLogFileId := nextFileId  // Undo ログ用の FileId を採番
 	nextFileId++
 
@@ -221,6 +229,7 @@ func CreateCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 	writeScalar(bufPageHeader, headerUndoLogFileIdOffset, uint32(undoLogFileId))
 	writePageNumber(bufPageHeader, headerDDLUndoRootPageNumberOffset, ddlUndoRootPageId.PageNumber())
 	writePageNumber(bufPageHeader, headerFreeListMapPageNumberOffset, freeListMapPageId.PageNumber())
+	writeScalar(bufPageHeader, headerNextTrxIdOffset, uint32(nextTrxId))
 
 	if err := mtr.Commit(); err != nil {
 		return nil, err
@@ -236,6 +245,7 @@ func CreateCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 		redoLog:            redoLog,
 		nextFileId:         nextFileId,
 		nextIndexId:        nextIndexId,
+		nextTrxId:          nextTrxId,
 		undoLogFileId:      undoLogFileId,
 		ddlUndoRootPageId:  ddlUndoRootPageId,
 		ddlManager:         ddlManager,
@@ -247,6 +257,16 @@ func CreateCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 		constraintMeta:     constraintMeta,
 		userMeta:           userMeta,
 	}, nil
+}
+
+// PersistNextTrxId は次に払い出すトランザクション ID をヘッダーページに永続化する
+//   - mtr: 書き込みを記録する Mtr。Commit は呼び出し側
+func (c *Catalog) PersistNextTrxId(mtr *buffer.Mtr, value lock.TrxId) error {
+	if err := c.persistScalar(mtr, headerNextTrxIdOffset, uint32(value)); err != nil {
+		return err
+	}
+	c.nextTrxId = value
+	return nil
 }
 
 // AllocateIndexId は IndexId を採番し、ヘッダーページに永続化する

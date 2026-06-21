@@ -17,7 +17,7 @@ func TestNewCheckpoint(t *testing.T) {
 		env := setupRecoveryTestEnv(t)
 
 		// WHEN
-		cp := NewCheckpoint(env.bp, env.redoLog)
+		cp := NewCheckpoint(env.bp, env.redoLog, env.trxManager)
 
 		// THEN
 		assert.NotNil(t, cp)
@@ -30,7 +30,7 @@ func TestCheckpointExecute(t *testing.T) {
 		env := setupRecoveryTestEnv(t)
 		_, _ = env.redoLog.AppendCommit(lock.TrxId(1))
 		_ = env.redoLog.Flush()
-		cp := NewCheckpoint(env.bp, env.redoLog)
+		cp := NewCheckpoint(env.bp, env.redoLog, env.trxManager)
 
 		// WHEN
 		err := cp.Execute()
@@ -59,7 +59,7 @@ func TestCheckpointExecute(t *testing.T) {
 		assert.NoError(t, mtr.Commit())
 		mtrStartLsn := firstMtrStartLsn(t, env.redoLog)
 
-		cp := NewCheckpoint(env.bp, env.redoLog)
+		cp := NewCheckpoint(env.bp, env.redoLog, env.trxManager)
 
 		// WHEN
 		err = cp.Execute()
@@ -86,7 +86,7 @@ func TestCheckpointExecute(t *testing.T) {
 		assert.NoError(t, mtr.Commit())
 		mtrStartLsn := firstMtrStartLsn(t, env.redoLog)
 
-		cp := NewCheckpoint(env.bp, env.redoLog)
+		cp := NewCheckpoint(env.bp, env.redoLog, env.trxManager)
 
 		// WHEN
 		err = cp.Execute()
@@ -123,7 +123,7 @@ func TestCheckpointExecute(t *testing.T) {
 		bufPage2.WriteBodyAt(0, []byte{2})
 		assert.NoError(t, mtr2.Commit())
 
-		cp := NewCheckpoint(env.bp, env.redoLog)
+		cp := NewCheckpoint(env.bp, env.redoLog, env.trxManager)
 
 		// WHEN
 		err = cp.Execute()
@@ -136,7 +136,7 @@ func TestCheckpointExecute(t *testing.T) {
 	t.Run("Redo ログが空でもエラーにならない", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		cp := NewCheckpoint(env.bp, env.redoLog)
+		cp := NewCheckpoint(env.bp, env.redoLog, env.trxManager)
 
 		// WHEN
 		err := cp.Execute()
@@ -166,12 +166,56 @@ func TestCheckpointExecute(t *testing.T) {
 		assert.NotEqual(t, redo.Lsn(0), minLsn)
 
 		// WHEN
-		cp := NewCheckpoint(env.bp, env.redoLog)
+		cp := NewCheckpoint(env.bp, env.redoLog, env.trxMgr)
 		err = cp.Execute()
 
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, minLsn-1, env.redoLog.CheckpointLsn())
+	})
+}
+
+func TestCheckpointPersistsNextTrxId(t *testing.T) {
+	t.Run("Execute 後にカタログヘッダーの nextTrxId が TrxManager の値に追従する", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		_ = createUsersTable(t, env)
+		flushBaseline(t, env)
+		trx := env.trxMgr.Begin()
+		assert.NoError(t, env.trxMgr.Commit(trx))
+		currentNext := env.trxMgr.NextTrxId()
+		assert.Greater(t, currentNext, env.ct.NextTrxId(), "前提: TrxManager の方が先行している")
+
+		// WHEN
+		cp := NewCheckpoint(env.bp, env.redoLog, env.trxMgr)
+		assert.NoError(t, cp.Execute())
+
+		// THEN
+		assert.Equal(t, currentNext, env.ct.NextTrxId())
+	})
+
+	t.Run("ヘッダー値と TrxManager の値が一致していれば Execute はヘッダーを書き換えない", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		_ = createUsersTable(t, env)
+		flushBaseline(t, env)
+		mtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		assert.NoError(t, env.ct.PersistNextTrxId(mtr, env.trxMgr.NextTrxId()))
+		assert.NoError(t, mtr.Commit())
+		assert.NoError(t, env.bp.FlushAllPages())
+		headerPageId := page.NewId(page.FileId(0), page.PageNumber(0))
+		beforePage, _ := env.bp.Page(headerPageId)
+		beforeModify := beforePage.ModifyCount()
+		env.bp.Unpin(headerPageId)
+
+		// WHEN
+		cp := NewCheckpoint(env.bp, env.redoLog, env.trxMgr)
+		assert.NoError(t, cp.Execute())
+
+		// THEN
+		afterPage, _ := env.bp.Page(headerPageId)
+		defer env.bp.Unpin(headerPageId)
+		assert.Equal(t, beforeModify, afterPage.ModifyCount())
 	})
 }
 
@@ -206,7 +250,7 @@ func TestCheckpointExecuteWithFuzzyFlushAndRecovery(t *testing.T) {
 		// WHEN
 		assert.NoError(t, env.bp.FlushOldestPages(1))
 		assert.Greater(t, flushListBefore, env.bp.FlushListPageCount())
-		cp := NewCheckpoint(env.bp, env.redoLog)
+		cp := NewCheckpoint(env.bp, env.redoLog, env.trxMgr)
 		assert.NoError(t, cp.Execute())
 
 		// THEN

@@ -175,6 +175,29 @@ func (t *TrxManager) OldestVisibleTrxId() lock.TrxId {
 	return limit
 }
 
+// NextTrxId は次に払い出すトランザクション ID を返す
+func (t *TrxManager) NextTrxId() lock.TrxId {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+	return t.nextTrxId
+}
+
+// PersistNextTrxIdToCatalog は現在の nextTrxId をカタログヘッダーへ永続化する
+//   - catalog 側の永続値と一致していれば no-op
+//   - 呼び出し側で mtr を生成する必要なし
+func (t *TrxManager) PersistNextTrxIdToCatalog() error {
+	current := t.NextTrxId()
+	if t.catalog.NextTrxId() == current {
+		return nil
+	}
+	mtr := buffer.NewWriteMtr(t.bufferPool, lock.SystemReservedTrxId, t.redoLog)
+	if err := t.catalog.PersistNextTrxId(mtr, current); err != nil {
+		mtr.UnpinAll()
+		return err
+	}
+	return mtr.Commit()
+}
+
 // InactiveTrxIds は完了済み (コミットまたはロールバック済み) のトランザクション ID 一覧を返す
 func (t *TrxManager) InactiveTrxIds() []lock.TrxId {
 	t.mu.RLock()

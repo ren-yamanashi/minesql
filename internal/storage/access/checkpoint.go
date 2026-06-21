@@ -8,13 +8,18 @@ import (
 type Checkpoint struct {
 	bufferPool *buffer.Pool
 	redoLog    *redo.Buffer
+	trxMgr     *TrxManager
 }
 
-func NewCheckpoint(bp *buffer.Pool, redo *redo.Buffer) *Checkpoint {
-	return &Checkpoint{bufferPool: bp, redoLog: redo}
+func NewCheckpoint(bp *buffer.Pool, redo *redo.Buffer, trxMgr *TrxManager) *Checkpoint {
+	return &Checkpoint{bufferPool: bp, redoLog: redo, trxMgr: trxMgr}
 }
 
 func (c *Checkpoint) Execute() error {
+	if err := c.trxMgr.PersistNextTrxIdToCatalog(); err != nil {
+		return err
+	}
+
 	minLsn := c.minOldestModificationLsn()
 	checkpointLsn := c.redoLog.FlushedLsn()
 	if minLsn > 0 {

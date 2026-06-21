@@ -16,7 +16,7 @@ func TestNewPageCleaner(t *testing.T) {
 		env := setupRecoveryTestEnv(t)
 
 		// WHEN
-		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 90)
+		pc := NewPageCleaner(env.bp, env.redoLog, env.trxManager, 1024*1024, 90)
 
 		// THEN
 		assert.NotNil(t, pc)
@@ -37,7 +37,7 @@ func TestPageCleanerRequestFlush(t *testing.T) {
 		writePage.WriteBodyAt(0, []byte{0xAA})
 		env.bp.Unpin(pgId)
 
-		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 0)
+		pc := NewPageCleaner(env.bp, env.redoLog, env.trxManager, 1024*1024, 0)
 		pc.Start()
 		defer pc.Stop()
 		before := env.bp.FlushListPageCount()
@@ -63,7 +63,7 @@ func TestPageCleanerRequestFlush(t *testing.T) {
 		writePage.WriteBodyAt(0, []byte{0xAA})
 		env.bp.Unpin(pgId)
 
-		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 90)
+		pc := NewPageCleaner(env.bp, env.redoLog, env.trxManager, 1024*1024, 90)
 		shouldFlush, err := pc.shouldFlush()
 		require.NoError(t, err)
 		require.False(t, shouldFlush)
@@ -84,7 +84,7 @@ func TestPageCleanerRequestFlush(t *testing.T) {
 	t.Run("連続で RequestFlush を呼んでもブロックしない", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 90)
+		pc := NewPageCleaner(env.bp, env.redoLog, env.trxManager, 1024*1024, 90)
 
 		// WHEN / THEN
 		assert.NotPanics(t, func() {
@@ -99,7 +99,7 @@ func TestPageCleanerStartStop(t *testing.T) {
 	t.Run("Start と Stop が正常に動作する", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 90)
+		pc := NewPageCleaner(env.bp, env.redoLog, env.trxManager, 1024*1024, 90)
 
 		// WHEN
 		pc.Start()
@@ -113,7 +113,7 @@ func TestPageCleanerStartStop(t *testing.T) {
 	t.Run("Stop を二重呼び出ししてもパニックしない", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 90)
+		pc := NewPageCleaner(env.bp, env.redoLog, env.trxManager, 1024*1024, 90)
 		pc.Start()
 		time.Sleep(10 * time.Millisecond)
 
@@ -127,7 +127,7 @@ func TestPageCleanerStartStop(t *testing.T) {
 	t.Run("Start せずに Stop してもパニックしない", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 90)
+		pc := NewPageCleaner(env.bp, env.redoLog, env.trxManager, 1024*1024, 90)
 
 		// WHEN / THEN
 		assert.NotPanics(t, func() {
@@ -138,7 +138,7 @@ func TestPageCleanerStartStop(t *testing.T) {
 	t.Run("Start を二重呼び出しすると最初の goroutine が維持される", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 90)
+		pc := NewPageCleaner(env.bp, env.redoLog, env.trxManager, 1024*1024, 90)
 		pc.Start()
 
 		// WHEN
@@ -153,7 +153,7 @@ func TestPageCleanerStartStop(t *testing.T) {
 	t.Run("Stop 後に再度 Start できる", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 90)
+		pc := NewPageCleaner(env.bp, env.redoLog, env.trxManager, 1024*1024, 90)
 		pc.Start()
 		pc.Stop()
 
@@ -172,7 +172,7 @@ func TestPageCleanerClean(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
 		_ = env.bp.FlushAllPages()
-		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 90)
+		pc := NewPageCleaner(env.bp, env.redoLog, env.trxManager, 1024*1024, 90)
 
 		// WHEN
 		err := pc.clean()
@@ -193,7 +193,7 @@ func TestPageCleanerClean(t *testing.T) {
 		writePage.WriteBodyAt(0, []byte{0xAA})
 
 		// Redo ログに大量のレコードを追加して閾値 (100 バイト) を超えさせる
-		pc := NewPageCleaner(env.bp, env.redoLog, 100, 90)
+		pc := NewPageCleaner(env.bp, env.redoLog, env.trxManager, 100, 90)
 		for range 10 {
 			pg := buildRedoTestPage(t)
 			_, _ = env.redoLog.AppendPageCopy(lock.TrxId(1), pgId, pg)
@@ -222,7 +222,7 @@ func TestPageCleanerClean(t *testing.T) {
 		wp.MarkModified()
 
 		// maxDirtyPct=0 にすると 1 ページでも閾値超過
-		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 0)
+		pc := NewPageCleaner(env.bp, env.redoLog, env.trxManager, 1024*1024, 0)
 
 		// WHEN
 		err := pc.clean()
@@ -244,7 +244,7 @@ func TestPageCleanerFlush(t *testing.T) {
 		writePage.WriteBodyAt(0, []byte{0xAA})
 		env.bp.Unpin(pgId)
 
-		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 90)
+		pc := NewPageCleaner(env.bp, env.redoLog, env.trxManager, 1024*1024, 90)
 		shouldFlush, err := pc.shouldFlush()
 		require.NoError(t, err)
 		require.False(t, shouldFlush)
@@ -263,7 +263,7 @@ func TestPageCleanerFlush(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
 		_ = env.bp.FlushAllPages()
-		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 90)
+		pc := NewPageCleaner(env.bp, env.redoLog, env.trxManager, 1024*1024, 90)
 
 		// WHEN
 		err := pc.flush()
@@ -279,7 +279,7 @@ func TestPageCleanerShouldFlush(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
 		_ = env.bp.FlushAllPages()
-		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 90)
+		pc := NewPageCleaner(env.bp, env.redoLog, env.trxManager, 1024*1024, 90)
 
 		// WHEN
 		result, err := pc.shouldFlush()
@@ -300,7 +300,7 @@ func TestPageCleanerShouldFlush(t *testing.T) {
 		wp.MarkModified()
 
 		// 閾値を大きくして超えないようにする
-		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 90)
+		pc := NewPageCleaner(env.bp, env.redoLog, env.trxManager, 1024*1024, 90)
 
 		// WHEN
 		result, err := pc.shouldFlush()
@@ -321,7 +321,7 @@ func TestPageCleanerShouldFlush(t *testing.T) {
 		wp.MarkModified()
 
 		// 閾値を極小に設定
-		pc := NewPageCleaner(env.bp, env.redoLog, 1, 90)
+		pc := NewPageCleaner(env.bp, env.redoLog, env.trxManager, 1, 90)
 
 		// WHEN
 		result, err := pc.shouldFlush()
@@ -342,7 +342,7 @@ func TestPageCleanerShouldFlush(t *testing.T) {
 		wp.MarkModified()
 
 		// ダーティーページ率の閾値を 0 に設定
-		pc := NewPageCleaner(env.bp, env.redoLog, 1024*1024, 0)
+		pc := NewPageCleaner(env.bp, env.redoLog, env.trxManager, 1024*1024, 0)
 
 		// WHEN
 		result, err := pc.shouldFlush()

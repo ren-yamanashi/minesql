@@ -106,6 +106,42 @@ func TestTrxManagerCommit(t *testing.T) {
 	})
 }
 
+func TestTrxManagerPersistNextTrxIdToCatalog(t *testing.T) {
+	t.Run("catalog の値と一致していれば no-op (ヘッダーページに書き込まない)", func(t *testing.T) {
+		// GIVEN
+		env := setupTableTestEnv(t)
+		redoLog := setupTestRedoLog(t)
+		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.ct.NextTrxId(), nil)
+		before := env.ct.NextTrxId()
+
+		// WHEN
+		err := tm.PersistNextTrxIdToCatalog()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, before, env.ct.NextTrxId())
+	})
+
+	t.Run("TrxManager 側が先行していれば catalog の永続値が追従する", func(t *testing.T) {
+		// GIVEN
+		env := setupTableTestEnv(t)
+		redoLog := setupTestRedoLog(t)
+		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.ct.NextTrxId(), nil)
+		_ = tm.Begin()
+		_ = tm.Begin()
+		_ = tm.Begin()
+		current := tm.NextTrxId()
+		assert.Greater(t, current, env.ct.NextTrxId(), "前提: TrxManager が先行している")
+
+		// WHEN
+		err := tm.PersistNextTrxIdToCatalog()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, current, env.ct.NextTrxId())
+	})
+}
+
 func TestTrxManagerRollback(t *testing.T) {
 	t.Run("Undo ログがないトランザクションをロールバックできる", func(t *testing.T) {
 		// GIVEN

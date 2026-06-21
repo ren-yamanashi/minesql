@@ -378,6 +378,84 @@ func TestAllocateFileId(t *testing.T) {
 	})
 }
 
+func TestPersistNextTrxId(t *testing.T) {
+	t.Run("CreateCatalog 直後は nextTrxId が 1 で初期化される", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+
+		// WHEN
+		ct, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, lock.TrxId(1), ct.NextTrxId())
+	})
+
+	t.Run("CreateCatalog 直後のヘッダーページに nextTrxId が永続化される", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+
+		// WHEN
+		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		assert.NoError(t, err)
+
+		// THEN
+		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		bufPageHeader, err := bp.Page(headerPageId)
+		assert.NoError(t, err)
+		defer bp.Unpin(headerPageId)
+		body := bufPageHeader.Data().Body()
+		stored := lock.TrxId(binary.BigEndian.Uint32(
+			body[headerNextTrxIdOffset : headerNextTrxIdOffset+headerFieldSize],
+		))
+		assert.Equal(t, lock.TrxId(1), stored)
+	})
+
+	t.Run("PersistNextTrxId 後にヘッダーと内部状態が更新される", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+		redoLog := newCatalogTestRedoBuffer(t)
+		ct, err := CreateCatalog(bp, redoLog)
+		assert.NoError(t, err)
+
+		// WHEN
+		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		err = ct.PersistNextTrxId(mtr, lock.TrxId(42))
+		assert.NoError(t, err)
+		assert.NoError(t, mtr.Commit())
+
+		// THEN
+		assert.Equal(t, lock.TrxId(42), ct.NextTrxId())
+		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		bufPageHeader, err := bp.Page(headerPageId)
+		assert.NoError(t, err)
+		defer bp.Unpin(headerPageId)
+		body := bufPageHeader.Data().Body()
+		stored := lock.TrxId(binary.BigEndian.Uint32(
+			body[headerNextTrxIdOffset : headerNextTrxIdOffset+headerFieldSize],
+		))
+		assert.Equal(t, lock.TrxId(42), stored)
+	})
+
+	t.Run("PersistNextTrxId 後の NewCatalog で永続値が復元される", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+		redoLog := newCatalogTestRedoBuffer(t)
+		ct, err := CreateCatalog(bp, redoLog)
+		assert.NoError(t, err)
+		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		assert.NoError(t, ct.PersistNextTrxId(mtr, lock.TrxId(123)))
+		assert.NoError(t, mtr.Commit())
+
+		// WHEN
+		opened, err := NewCatalog(bp, newCatalogTestRedoBuffer(t))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, lock.TrxId(123), opened.NextTrxId())
+	})
+}
+
 func TestSetDDLUndoRootPageId(t *testing.T) {
 	t.Run("PageId を書き換えるとヘッダーと内部状態が更新される", func(t *testing.T) {
 		// GIVEN
