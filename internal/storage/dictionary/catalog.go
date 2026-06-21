@@ -9,6 +9,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
+	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
 const (
@@ -41,6 +42,7 @@ type Catalog struct {
 	nextIndexId        IndexId
 	undoLogFileId      page.FileId
 	ddlUndoRootPageId  page.Id
+	ddlManager         *undo.DDLManager // DDL Undo 領域コンテナ。 CreateCatalog 以降サーバライフタイム中ずっと有効
 	freeListMapPageId  page.Id
 	tableMeta          *TableMeta
 	indexMeta          *IndexMeta
@@ -96,14 +98,22 @@ func NewCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 	ddlUndoRootPageNumber := readPageNumber(bufPageHeader.Data().Body(), headerDDLUndoRootPageNumberOffset)
 	freeListMapPageNumber := readPageNumber(bufPageHeader.Data().Body(), headerFreeListMapPageNumberOffset)
 
+	ddlUndoRootPageId := ddlUndoRootPageIdFromPageNumber(ddlUndoRootPageNumber)
+	freeListMapPageId := page.NewId(catalogFileId, freeListMapPageNumber)
+	ddlManager, err := undo.NewDDLManager(bp, catalogFileId, ddlUndoRootPageId, freeListMapPageId)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Catalog{
 		bufferPool:        bp,
 		redoLog:           redoLog,
 		nextFileId:        nextFileId,
 		nextIndexId:       nextIndexId,
 		undoLogFileId:     undoLogFileId,
-		ddlUndoRootPageId: ddlUndoRootPageIdFromPageNumber(ddlUndoRootPageNumber),
-		freeListMapPageId: page.NewId(catalogFileId, freeListMapPageNumber),
+		ddlUndoRootPageId: ddlUndoRootPageId,
+		ddlManager:        ddlManager,
+		freeListMapPageId: freeListMapPageId,
 		tableMeta:         NewTableMeta(bp, page.NewId(catalogFileId, tableMetaPageNumber)),
 		indexMeta:         NewIndexMeta(bp, page.NewId(catalogFileId, indexMetaPageNumber)),
 		indexKeyColumnMeta: NewIndexKeyColumnMeta(
@@ -216,6 +226,11 @@ func CreateCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 		return nil, err
 	}
 
+	ddlManager, err := undo.NewDDLManager(bp, catalogFileId, ddlUndoRootPageId, freeListMapPageId)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Catalog{
 		bufferPool:         bp,
 		redoLog:            redoLog,
@@ -223,6 +238,7 @@ func CreateCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 		nextIndexId:        nextIndexId,
 		undoLogFileId:      undoLogFileId,
 		ddlUndoRootPageId:  ddlUndoRootPageId,
+		ddlManager:         ddlManager,
 		freeListMapPageId:  freeListMapPageId,
 		tableMeta:          tableMeta,
 		indexMeta:          indexMeta,
@@ -235,11 +251,11 @@ func CreateCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 
 // AllocateIndexId は IndexId を採番し、ヘッダーページに永続化する
 //   - mtr: 採番結果の書き込みを記録する Mtr。Commit は呼び出し側
+//   - persistScalar 失敗時も nextIndexId は in-memory のインクリメント済み (= 単調増加放置、 ID は再利用しない)
 func (c *Catalog) AllocateIndexId(mtr *buffer.Mtr) (IndexId, error) {
 	id := c.nextIndexId
 	c.nextIndexId++
 	if err := c.persistScalar(mtr, headerNextIndexIdOffset, uint32(c.nextIndexId)); err != nil {
-		c.nextIndexId-- // rollback
 		return 0, err
 	}
 	return id, nil
@@ -247,11 +263,11 @@ func (c *Catalog) AllocateIndexId(mtr *buffer.Mtr) (IndexId, error) {
 
 // AllocateFileId は FileId を採番し、ヘッダーページに永続化する
 //   - mtr: 採番結果の書き込みを記録する Mtr。Commit は呼び出し側
+//   - persistScalar 失敗時も nextFileId は in-memory のインクリメント済み (= 単調増加放置、 ID は再利用しない)
 func (c *Catalog) AllocateFileId(mtr *buffer.Mtr) (page.FileId, error) {
 	id := c.nextFileId
 	c.nextFileId++
 	if err := c.persistScalar(mtr, headerNextFileIdOffset, uint32(c.nextFileId)); err != nil {
-		c.nextFileId-- // rollback
 		return 0, err
 	}
 	return id, nil

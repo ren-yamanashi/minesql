@@ -71,7 +71,12 @@ func (t *TrxManager) Begin() *Transaction {
 }
 
 // Commit はトランザクションをコミットし、ロックを開放して Undo ログを破棄する
+//   - DDLReservedTrxId の場合は DDL 専用 Commit (= DDL Undo 領域の中身クリア + Commit Redo)
 func (t *TrxManager) Commit(trx *Transaction) error {
+	if trx.trxId == lock.DDLReservedTrxId {
+		return t.commitDDL(trx)
+	}
+
 	// Redo ログに Commit レコードを記録してフラッシュ
 	if _, err := t.redoLog.AppendCommit(trx.trxId); err != nil {
 		return err
@@ -96,7 +101,12 @@ func (t *TrxManager) Commit(trx *Transaction) error {
 // Rollback は Undo ログを逆順に適用してトランザクションをロールバックし、成功時のみロックと Undo を解放する
 //   - エラーを返した場合、トランザクションは Active のまま、ロックと Undo は保持される
 //   - 通常運用での再試行はサポートしない。中途状態の解消は再起動時のクラッシュリカバリで行う
+//   - DDLReservedTrxId の場合は DDL 専用 Rollback (= DDL Undo 逆順適用 + 領域の中身クリア + Rollback Redo)
 func (t *TrxManager) Rollback(trx *Transaction) error {
+	if trx.trxId == lock.DDLReservedTrxId {
+		return t.rollbackDDL(trx)
+	}
+
 	records := t.undoLog.Records(trx.trxId)
 	for _, r := range slices.Backward(records) {
 		mtr := buffer.NewWriteMtr(t.bufferPool, trx.trxId, t.redoLog)
