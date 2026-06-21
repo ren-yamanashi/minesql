@@ -449,7 +449,7 @@ func setupRecoveryTestEnv(t *testing.T) *recoveryTestEnv {
 	t.Helper()
 
 	env := setupTableTestEnv(t)
-	trxManager := NewTrxManager(env.ct, env.undoLog, env.redoLog, env.lock, env.bp, 1, nil)
+	trxManager := NewTrxManager(env.ct, env.undoLog, env.redoLog, env.lock, env.bp, 1)
 
 	// DDL 経由で生じたダーティーページと Redo レコードをクリーンな状態にする
 	// (Recovery / Checkpoint テストは「初期状態 = ダーティーページなし・Redo 空」を前提とする)

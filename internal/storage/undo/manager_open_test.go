@@ -67,6 +67,83 @@ func TestOpenManagerRestoreMultipleTrx(t *testing.T) {
 	})
 }
 
+func TestHistoryTrxIds(t *testing.T) {
+	t.Run("Undo を持たない Manager は空集合を返す", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+
+		// WHEN
+		ids := mgr.HistoryTrxIds()
+
+		// THEN
+		assert.Empty(t, ids)
+	})
+
+	t.Run("UPDATE / DELETE 種別の Undo を持つ trxId が収集される", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		deleteRec := NewDeleteRecord(page.FileId(1), btree.Record{[]byte("Alice")}, 0, NullPointer())
+		updateRec := NewUpdateRecord(
+			page.FileId(1),
+			btree.Record{[]byte("Bob")},
+			btree.Record{[]byte("Bobby")},
+			0, NullPointer(),
+		)
+		_, err := appendForTest(t, mgr, lock.TrxId(10), RecordTypeDelete, deleteRec)
+		assert.NoError(t, err)
+		_, err = appendForTest(t, mgr, lock.TrxId(20), RecordTypeUpdate, updateRec)
+		assert.NoError(t, err)
+		opened, err := OpenManager(mgr.bufferPool, mgr.fileId)
+		assert.NoError(t, err)
+
+		// WHEN
+		ids := opened.HistoryTrxIds()
+
+		// THEN
+		assert.ElementsMatch(t, []lock.TrxId{10, 20}, ids)
+	})
+
+	t.Run("INSERT 種別のみを持つ trxId は収集されない", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		insertRec := NewInsertRecord(page.FileId(1), btree.Record{[]byte("Alice")})
+		_, err := appendForTest(t, mgr, lock.TrxId(30), RecordTypeInsert, insertRec)
+		assert.NoError(t, err)
+		opened, err := OpenManager(mgr.bufferPool, mgr.fileId)
+		assert.NoError(t, err)
+
+		// WHEN
+		ids := opened.HistoryTrxIds()
+
+		// THEN
+		assert.Empty(t, ids)
+	})
+
+	t.Run("UPDATE と INSERT を併せ持つ trxId は 1 回だけ収集される", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		insertRec := NewInsertRecord(page.FileId(1), btree.Record{[]byte("Alice")})
+		updateRec := NewUpdateRecord(
+			page.FileId(1),
+			btree.Record{[]byte("Bob")},
+			btree.Record{[]byte("Bobby")},
+			0, NullPointer(),
+		)
+		_, err := appendForTest(t, mgr, lock.TrxId(40), RecordTypeInsert, insertRec)
+		assert.NoError(t, err)
+		_, err = appendForTest(t, mgr, lock.TrxId(40), RecordTypeUpdate, updateRec)
+		assert.NoError(t, err)
+		opened, err := OpenManager(mgr.bufferPool, mgr.fileId)
+		assert.NoError(t, err)
+
+		// WHEN
+		ids := opened.HistoryTrxIds()
+
+		// THEN
+		assert.Equal(t, []lock.TrxId{40}, ids)
+	})
+}
+
 func TestOpenManagerCurrentPageIdIsLastPage(t *testing.T) {
 	t.Run("currentPageId は最後の Undo ページを指す", func(t *testing.T) {
 		// GIVEN

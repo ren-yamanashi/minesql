@@ -24,12 +24,11 @@ type TrxManager struct {
 
 func NewTrxManager(
 	ct *dictionary.Catalog,
-	undo *undo.Manager,
-	redo *redo.Buffer,
+	undoLog *undo.Manager,
+	redoLog *redo.Buffer,
 	lockMgr *lock.Manager,
 	bp *buffer.Pool,
 	initialNextTrxId lock.TrxId,
-	initialInactiveTrxIds []lock.TrxId,
 ) *TrxManager {
 	// 0 は「未割り当て / 太古のコミット済み」の予約値のため、最小でも 1 から採番する
 	if initialNextTrxId == 0 {
@@ -37,19 +36,21 @@ func NewTrxManager(
 	}
 	transactions := make(map[lock.TrxId]*Transaction)
 	tm := &TrxManager{
-		undoLog:      undo,
-		redoLog:      redo,
+		undoLog:      undoLog,
+		redoLog:      redoLog,
 		lock:         lockMgr,
 		bufferPool:   bp,
 		catalog:      ct,
 		transactions: transactions,
 		nextTrxId:    initialNextTrxId,
 	}
-	for _, trxId := range initialInactiveTrxIds {
-		transactions[trxId] = &Transaction{
-			trxId: trxId,
-			state: trxStateInactive,
-			tm:    tm,
+	if undoLog != nil {
+		for _, trxId := range undoLog.HistoryTrxIds() {
+			transactions[trxId] = &Transaction{
+				trxId: trxId,
+				state: trxStateInactive,
+				tm:    tm,
+			}
 		}
 	}
 	return tm

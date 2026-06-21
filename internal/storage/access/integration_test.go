@@ -505,7 +505,7 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 	}
 
 	lockMgr := lock.NewManager()
-	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, 1, nil)
+	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, 1)
 
 	return &integrationEnv{
 		bp:      bp,
@@ -799,15 +799,11 @@ func crashAndRecover(t *testing.T, prev *integrationEnv, tableNames []string) *i
 	if err != nil {
 		t.Fatalf("MaxUserTrxId の取得に失敗: %v", err)
 	}
-	completedTrxIds, err := redoLog.CompletedUserTrxIds()
-	if err != nil {
-		t.Fatalf("CompletedUserTrxIds の取得に失敗: %v", err)
-	}
 	initialNextTrxId := max(ct.NextTrxId(), maxTrxId+1)
 
 	lockMgr := lock.NewManager()
 	// Recovery 中は undoMgr の entries を参照しないので、Recovery 実行用の仮の TrxManager を空 undoMgr 抜きで構成する
-	tempTrxMgr := NewTrxManager(ct, nil, redoLog, lockMgr, bp, initialNextTrxId, completedTrxIds)
+	tempTrxMgr := NewTrxManager(ct, nil, redoLog, lockMgr, bp, initialNextTrxId)
 	r := NewRecovery(redoLog, bp, tempTrxMgr, undoFileId, ct.DDLManager())
 	if err := r.Execute(); err != nil {
 		t.Fatalf("Recovery.Execute に失敗: %v", err)
@@ -817,7 +813,7 @@ func crashAndRecover(t *testing.T, prev *integrationEnv, tableNames []string) *i
 	if err != nil {
 		t.Fatalf("undo.Manager の再オープンに失敗: %v", err)
 	}
-	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, initialNextTrxId, completedTrxIds)
+	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, initialNextTrxId)
 
 	return &integrationEnv{
 		bp:      bp,

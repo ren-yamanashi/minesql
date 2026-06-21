@@ -295,7 +295,7 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 	t.Cleanup(func() { _ = redoLog.Clear() })
 
 	lockMgr := lock.NewManager()
-	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, 1, nil)
+	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, 1)
 
 	// 親テーブル: departments
 	parentTable, err := CreateTable(trxMgr, CreateTableInput{

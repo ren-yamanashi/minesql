@@ -630,7 +630,7 @@ func setupCreateTableTestEnv(t *testing.T) *createTableTestEnv {
 	if err != nil {
 		t.Fatalf("Catalog の取得に失敗: %v", err)
 	}
-	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, 1, nil)
+	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, 1)
 
 	return &createTableTestEnv{
 		bp:      bp,

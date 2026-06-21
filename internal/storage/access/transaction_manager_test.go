@@ -19,7 +19,7 @@ func TestNewTrxManager(t *testing.T) {
 
 		// WHEN
 		redoLog := setupTestRedoLog(t)
-		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, 1, nil)
+		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, 1)
 
 		// THEN
 		assert.NotNil(t, tm)
@@ -68,7 +68,7 @@ func TestTrxManagerBegin(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
 		redoLog := setupTestRedoLog(t)
-		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, 101, nil)
+		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, 101)
 
 		// WHEN
 		trx := tm.Begin()
@@ -111,7 +111,7 @@ func TestTrxManagerPersistNextTrxIdToCatalog(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
 		redoLog := setupTestRedoLog(t)
-		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.ct.NextTrxId(), nil)
+		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.ct.NextTrxId())
 		before := env.ct.NextTrxId()
 
 		// WHEN
@@ -126,7 +126,7 @@ func TestTrxManagerPersistNextTrxIdToCatalog(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
 		redoLog := setupTestRedoLog(t)
-		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.ct.NextTrxId(), nil)
+		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.ct.NextTrxId())
 		_ = tm.Begin()
 		_ = tm.Begin()
 		_ = tm.Begin()
@@ -703,7 +703,7 @@ func setupTrxManager(t *testing.T) *TrxManager {
 	t.Helper()
 	env := setupTableTestEnv(t)
 	redoLog := setupTestRedoLog(t)
-	return NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, 1, nil)
+	return NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, 1)
 }
 
 // setupTestRedoLog はテスト用の redo.Buffer を作成する

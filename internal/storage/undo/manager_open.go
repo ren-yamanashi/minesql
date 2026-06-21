@@ -32,6 +32,24 @@ func OpenManager(bp *buffer.Pool, fileId page.FileId) (*Manager, error) {
 	}
 }
 
+// HistoryTrxIds は Undo ページ上に UPDATE / DELETE 種別の Undo を持つトランザクション ID を返す
+//   - 起動時にパージ駆動源となる「完了済みかつ未パージ」 のトランザクション集合を再構築する用途
+//   - INSERT 種別は History List から外れているため除外する
+func (m *Manager) HistoryTrxIds() []lock.TrxId {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	result := make([]lock.TrxId, 0, len(m.entries))
+	for trxId, entries := range m.entries {
+		for _, e := range entries {
+			if e.RecordType() == RecordTypeUpdate || e.RecordType() == RecordTypeDelete {
+				result = append(result, trxId)
+				break
+			}
+		}
+	}
+	return result
+}
+
 // restoreFromPage は 1 つの Undo ページを走査して entries に積み、次ページ番号を返す
 func (m *Manager) restoreFromPage(pageId page.Id) (page.PageNumber, error) {
 	bufPage, err := m.bufferPool.Page(pageId)
