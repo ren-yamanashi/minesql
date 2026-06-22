@@ -46,6 +46,9 @@ func (p *Pool) collectAllFlushTasks() ([]flushTask, error) {
 		if !bufPage.isDirty {
 			return
 		}
+		if bufPage.pinCount > 0 {
+			return
+		}
 		hf, err := p.heapFile(pageId.FileId())
 		if err != nil {
 			collectErr = err
@@ -83,6 +86,10 @@ func (p *Pool) collectOldestFlushTasks(n int) ([]flushTask, error) {
 		bufPage := &p.pages[bufId]
 		if !bufPage.isDirty {
 			p.flushList.delete(pid)
+			continue
+		}
+		if bufPage.pinCount > 0 {
+			// Pin 解放後の次回フラッシュで再評価するため flushList には残す
 			continue
 		}
 		hf, err := p.heapFile(pid.FileId())

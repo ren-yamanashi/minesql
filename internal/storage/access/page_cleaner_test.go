@@ -191,6 +191,7 @@ func TestPageCleanerClean(t *testing.T) {
 		_, _ = env.bp.AddPage(pgId)
 		writePage, _ := env.bp.Page(pgId)
 		writePage.WriteBodyAt(0, []byte{0xAA})
+		env.bp.Unpin(pgId)
 
 		// Redo ログに大量のレコードを追加して閾値 (100 バイト) を超えさせる
 		pc := NewPageCleaner(env.bp, env.redoLog, env.trxManager, 100, 90)
