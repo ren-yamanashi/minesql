@@ -19,6 +19,7 @@ var (
 type Manager struct {
 	mu            sync.Mutex
 	bufferPool    *buffer.Pool
+	redoLog       *redo.Buffer           // Undo 書き込みの mini-transaction が記録する Redo ログ参照
 	fileId        page.FileId            // Undo ファイルの FileId
 	currentPageId page.Id                // 現在書き込み中の Undo ページ
 	entries       map[lock.TrxId][]Entry // trxId → Entry[] のマップ
@@ -48,6 +49,7 @@ func NewManager(bp *buffer.Pool, fileId page.FileId, redoLog *redo.Buffer) (*Man
 
 	return &Manager{
 		bufferPool:    bp,
+		redoLog:       redoLog,
 		fileId:        fileId,
 		currentPageId: pageId,
 		entries:       make(map[lock.TrxId][]Entry),
@@ -55,11 +57,19 @@ func NewManager(bp *buffer.Pool, fileId page.FileId, redoLog *redo.Buffer) (*Man
 }
 
 // Append は指定した trxId の Undo ログにレコードを追加し、書き込み先の Pointer を返す
-func (m *Manager) Append(mtr *buffer.Mtr, trxId lock.TrxId, recordType RecordType, record Record) (Pointer, error) {
+//   - Undo ページ書き込みは Undo 専用の mini-transaction として独立して commit される
+//   - 呼び出し側のデータ操作 mini-transaction は、返された Pointer をレコードに記録するだけでよい
+func (m *Manager) Append(trxId lock.TrxId, recordType RecordType, record Record) (Pointer, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	mtr := buffer.NewWriteMtr(m.bufferPool, trxId, m.redoLog)
 	ptr, err := m.writeToPage(mtr, trxId, record)
 	if err != nil {
+		mtr.UnpinAll()
+		return Pointer{}, err
+	}
+	if err := mtr.Commit(); err != nil {
 		return Pointer{}, err
 	}
 	m.entries[trxId] = append(m.entries[trxId], NewEntry(trxId, recordType, record))
@@ -159,15 +169,10 @@ func (m *Manager) writeToPage(mtr *buffer.Mtr, trxId lock.TrxId, record Record) 
 	if !bufPageUndo.append(serialized) {
 		return Pointer{}, ErrRecordTooLarge
 	}
-	pageId := m.currentPageId
-	// データページ (この後 btree が変更する) より先に Undo ページの Redo を記録するためここで Unpin する
-	mtr.Unpin(pageId)
-	return NewPointer(pageId.PageNumber(), prevUsedBytes), nil
+	return NewPointer(m.currentPageId.PageNumber(), prevUsedBytes), nil
 }
 
 // switchToNewPage は現在のページが満杯のとき、新しい Undo ページを割り当ててレコードを書き込む
-//   - 新ページへの書き込み (実体) を先に行い、その後に旧ページの次ページリンクを更新する
-//   - 新ページ→旧ページの順で Unpin し、その順序で Redo 記録する (どちらもデータページより前に記録される)
 func (m *Manager) switchToNewPage(
 	mtr *buffer.Mtr,
 	currentPage *Page,
@@ -189,12 +194,8 @@ func (m *Manager) switchToNewPage(
 		return Pointer{}, ErrRecordTooLarge
 	}
 
-	oldPageId := m.currentPageId
 	currentPage.setNextPageNumber(newPageId.PageNumber())
 	m.currentPageId = newPageId
 
-	// 新ページの実体 → 旧ページのリンク更新の順で記録する
-	mtr.Unpin(newPageId)
-	mtr.Unpin(oldPageId)
 	return NewPointer(newPageId.PageNumber(), 0), nil
 }

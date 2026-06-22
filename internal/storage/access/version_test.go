@@ -195,9 +195,7 @@ func newTestPrimaryRecord(t *testing.T, env *iteratorTestEnv, id, name, email st
 // appendUndoForTest は Undo レコードを Append して Pointer を返す
 func (e *versionTestEnv) appendUndo(t *testing.T, trxId lock.TrxId, recordType undo.RecordType, record undo.Record) undo.Pointer {
 	t.Helper()
-	mtr := buffer.NewMtr(e.iter.bp)
-	defer mtr.UnpinAll()
-	ptr, err := e.undoLog.Append(mtr, trxId, recordType, record)
+	ptr, err := e.undoLog.Append(trxId, recordType, record)
 	if err != nil {
 		t.Fatalf("undo Append に失敗: %v", err)
 	}

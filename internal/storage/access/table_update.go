@@ -42,7 +42,7 @@ func (t *Table) Update(trx *Transaction, currentRecord *PrimaryRecord, colNames,
 		currentRecord.lastTrxId,
 		currentRecord.rollPtr,
 	)
-	ptr, err := t.undoLog.Append(mtr, trxId, undo.RecordTypeUpdate, undoRecord)
+	ptr, err := t.undoLog.Append(trxId, undo.RecordTypeUpdate, undoRecord)
 	if err != nil {
 		return err
 	}

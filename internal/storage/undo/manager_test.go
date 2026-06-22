@@ -105,15 +105,88 @@ func TestManagerAppend(t *testing.T) {
 		}
 	})
 
+	t.Run("Append は独立した mini-transaction として MtrStart + PageWrite + MtrEnd を REDO に記録する", func(t *testing.T) {
+		// GIVEN
+		mgr, redoLog := setupTestManagerWithRedoLog(t)
+		assert.NoError(t, redoLog.Flush())
+		baseLsn := redoLog.FlushedLsn()
+		rec := NewInsertRecord(page.FileId(1), btree.Record{[]byte("data")})
+
+		// WHEN
+		_, err := mgr.Append(lock.TrxId(1), RecordTypeInsert, rec)
+		assert.NoError(t, err)
+
+		// THEN
+		assert.NoError(t, redoLog.Flush())
+		records, err := redoLog.ReadFrom(baseLsn)
+		assert.NoError(t, err)
+		var types []redo.RecordType
+		for _, r := range records {
+			types = append(types, r.Type())
+		}
+		assert.Equal(t, []redo.RecordType{
+			redo.RecordTypeMtrStart,
+			redo.RecordTypePageWrite,
+			redo.RecordTypeMtrEnd,
+		}, types)
+	})
+
+	t.Run("Append の REDO は後続のデータ操作 mini-transaction の REDO より前に位置する", func(t *testing.T) {
+		// GIVEN
+		mgr, redoLog := setupTestManagerWithRedoLog(t)
+		dataFileId := page.FileId(2)
+		dataPath := filepath.Join(t.TempDir(), "data.db")
+		dataHf, err := file.NewHeapFile(dataFileId, dataPath)
+		assert.NoError(t, err)
+		t.Cleanup(func() { _ = dataHf.Close() })
+		mgr.bufferPool.RegisterHeapFile(dataFileId, dataHf)
+		dataPageId, err := mgr.bufferPool.AllocatePageId(dataFileId)
+		assert.NoError(t, err)
+		_, err = mgr.bufferPool.AddPage(dataPageId)
+		assert.NoError(t, err)
+		assert.NoError(t, redoLog.Flush())
+		baseLsn := redoLog.FlushedLsn()
+		rec := NewInsertRecord(page.FileId(1), btree.Record{[]byte("x")})
+
+		// WHEN
+		_, err = mgr.Append(lock.TrxId(1), RecordTypeInsert, rec)
+		assert.NoError(t, err)
+		dataMtr := buffer.NewWriteMtr(mgr.bufferPool, lock.TrxId(1), redoLog)
+		dataPage, err := dataMtr.PageForWrite(dataPageId)
+		assert.NoError(t, err)
+		dataPage.WriteBodyAt(0, []byte{0xFF})
+		assert.NoError(t, dataMtr.Commit())
+
+		// THEN
+		assert.NoError(t, redoLog.Flush())
+		records, err := redoLog.ReadFrom(baseLsn)
+		assert.NoError(t, err)
+		var firstUndoLsn, firstDataLsn redo.Lsn
+		for _, r := range records {
+			if r.Type() != redo.RecordTypePageWrite {
+				continue
+			}
+			if r.PageId() == dataPageId && firstDataLsn == 0 {
+				firstDataLsn = r.Lsn()
+			}
+			if r.PageId().FileId() == page.FileId(1) && firstUndoLsn == 0 {
+				firstUndoLsn = r.Lsn()
+			}
+		}
+		assert.NotZero(t, firstUndoLsn)
+		assert.NotZero(t, firstDataLsn)
+		assert.Less(t, firstUndoLsn, firstDataLsn)
+	})
+
 	t.Run("ページ満杯時の switch では新ページ実体化の REDO がリンク変更 REDO より前に出る", func(t *testing.T) {
 		// GIVEN
 		mgr, redoLog := setupTestManagerWithRedoLog(t)
 		oldPageId := mgr.currentPageId
 		rec := NewInsertRecord(page.FileId(1), btree.Record{[]byte("x")})
 
-		// WHEN: 書き込み Mtr 経由で Append + Commit を繰り返し、ページが切り替わるまで埋める
+		// WHEN: Append を繰り返し、 ページが切り替わるまで埋める
 		for mgr.currentPageId == oldPageId {
-			_, err := appendAndCommit(t, mgr, redoLog, lock.TrxId(1), rec)
+			_, err := appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, rec)
 			assert.NoError(t, err)
 		}
 		newPageId := mgr.currentPageId
@@ -133,6 +206,28 @@ func TestManagerAppend(t *testing.T) {
 		assert.GreaterOrEqual(t, n, 2)
 		assert.Equal(t, newPageId, pageWrites[n-2].PageId())
 		assert.Equal(t, oldPageId, pageWrites[n-1].PageId())
+	})
+
+	t.Run("Append が ErrRecordTooLarge で失敗してもラッチと Pin がリークしない", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		oldPageId := mgr.currentPageId
+		huge := make([]byte, page.Size)
+		hugeRec := NewInsertRecord(page.FileId(1), btree.Record{huge})
+
+		// WHEN
+		_, err := mgr.Append(lock.TrxId(1), RecordTypeInsert, hugeRec)
+
+		// THEN
+		assert.ErrorIs(t, err, ErrRecordTooLarge)
+		probe := buffer.NewMtr(mgr.bufferPool)
+		_, perr := probe.PageForWrite(oldPageId)
+		assert.NoError(t, perr)
+		assert.Equal(t, 1, probe.PinnedCount())
+		probe.UnpinAll()
+		smallRec := NewInsertRecord(page.FileId(1), btree.Record{[]byte("small")})
+		_, err = mgr.Append(lock.TrxId(1), RecordTypeInsert, smallRec)
+		assert.NoError(t, err)
 	})
 
 	t.Run("Append と Discard が並行実行されてもデータレースが起きない", func(t *testing.T) {
@@ -657,8 +752,7 @@ func setupTestManagerWithRedoLog(t *testing.T) (*Manager, *redo.Buffer) {
 	return mgr, redoLog
 }
 
-// appendForTest は 1 回の Append を独立した mtr スコープで実行するヘルパー
-//   - Manager の Append は呼び出し側 (= access) の mtr を引き継ぐ設計のため、テストでは 1 件単位で mtr を生成 / 解放する
+// appendForTest は 1 回の Append を実行するヘルパー
 func appendForTest(
 	t *testing.T,
 	mgr *Manager,
@@ -667,28 +761,7 @@ func appendForTest(
 	record Record,
 ) (Pointer, error) {
 	t.Helper()
-	mtr := buffer.NewMtr(mgr.bufferPool)
-	defer mtr.UnpinAll()
-	return mgr.Append(mtr, trxId, recordType, record)
-}
-
-// appendAndCommit は書き込み Mtr で 1 回の Append + Commit を実行するヘルパー
-//   - Undo ページの変更が Mtr 経由で Redo 記録されることを検証するテスト用
-func appendAndCommit(
-	t *testing.T,
-	mgr *Manager,
-	redoLog *redo.Buffer,
-	trxId lock.TrxId,
-	record Record,
-) (Pointer, error) {
-	t.Helper()
-	mtr := buffer.NewWriteMtr(mgr.bufferPool, trxId, redoLog)
-	defer mtr.UnpinAll()
-	ptr, err := mgr.Append(mtr, trxId, RecordTypeInsert, record)
-	if err != nil {
-		return Pointer{}, err
-	}
-	return ptr, mtr.Commit()
+	return mgr.Append(trxId, recordType, record)
 }
 
 // lookupForTest は LookupByPointer を独立した mtr スコープで実行するヘルパー
