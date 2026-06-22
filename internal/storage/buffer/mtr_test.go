@@ -296,6 +296,60 @@ func TestMtrUnpin(t *testing.T) {
 		}
 		m2.UnpinAll()
 	})
+
+	t.Run("変更ありの X ラッチを mtr 途中で Unpin すると panic する", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
+		pageId := page.NewId(0, 0)
+		_, err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+		mtr := NewMtr(bp)
+		bufPage, err := mtr.PageForWrite(pageId)
+		assert.NoError(t, err)
+		bufPage.MarkModified()
+
+		// WHEN
+		// THEN
+		assert.Panics(t, func() {
+			mtr.Unpin(pageId)
+		})
+
+		mtr.UnpinAll()
+	})
+
+	t.Run("変更なしの X ラッチの mtr 途中 Unpin は panic しない", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
+		pageId := page.NewId(0, 0)
+		_, err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+		mtr := NewMtr(bp)
+		_, err = mtr.PageForWrite(pageId)
+		assert.NoError(t, err)
+
+		// WHEN
+		// THEN
+		assert.NotPanics(t, func() {
+			mtr.Unpin(pageId)
+		})
+	})
+
+	t.Run("S ラッチの mtr 途中 Unpin は panic しない", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
+		pageId := page.NewId(0, 0)
+		_, err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+		mtr := NewMtr(bp)
+		_, err = mtr.PageForRead(pageId)
+		assert.NoError(t, err)
+
+		// WHEN
+		// THEN
+		assert.NotPanics(t, func() {
+			mtr.Unpin(pageId)
+		})
+	})
 }
 
 func TestMtrDetach(t *testing.T) {
@@ -344,6 +398,45 @@ func TestMtrDetach(t *testing.T) {
 		}
 		m2.UnpinAll()
 		bp.Unpin(pageId) // m1.Detach 由来の Pin を解放
+	})
+
+	t.Run("変更ありの X ラッチを mtr 途中で Detach すると panic する", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
+		pageId := page.NewId(0, 0)
+		_, err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+		mtr := NewMtr(bp)
+		bufPage, err := mtr.PageForWrite(pageId)
+		assert.NoError(t, err)
+		bufPage.MarkModified()
+
+		// WHEN
+		// THEN
+		assert.Panics(t, func() {
+			mtr.Detach(pageId)
+		})
+
+		mtr.UnpinAll()
+	})
+
+	t.Run("変更なしの X ラッチの mtr 途中 Detach は panic しない", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
+		pageId := page.NewId(0, 0)
+		_, err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+		mtr := NewMtr(bp)
+		_, err = mtr.PageForWrite(pageId)
+		assert.NoError(t, err)
+
+		// WHEN
+		// THEN
+		assert.NotPanics(t, func() {
+			mtr.Detach(pageId)
+		})
+
+		bp.Unpin(pageId)
 	})
 }
 

@@ -2,6 +2,7 @@ package buffer
 
 import (
 	"encoding/binary"
+	"fmt"
 	"slices"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
@@ -100,8 +101,10 @@ func (m *Mtr) PageForWrite(pageId page.Id) (*Page, error) {
 // Unpin は指定ページのラッチと Pin を解放し、スコープの記録から 1 件除外する
 //   - LIFO 順で削除するため、再帰取得の最後のエントリから順に解放される
 //   - ラッチ解放前に、変更済みであれば Redo へ記録し Page LSN をスタンプする
+//   - 変更ありの X ラッチを保持中のページを指定すると panic する
 func (m *Mtr) Unpin(pageId page.Id) {
 	if entry, ok := m.removePinned(pageId); ok {
+		m.assertReleasable(entry)
 		m.logPageIfModified(entry)
 		if !entry.skipLatch {
 			entry.bufPage.latch.Unlock(entry.mode)
@@ -111,12 +114,27 @@ func (m *Mtr) Unpin(pageId page.Id) {
 }
 
 // Detach はラッチを解放しスコープの記録から指定ページを 1 件除外する。Pin は解放しない (走査などへ所有権を移譲する用)
+//   - 変更ありの X ラッチを保持中のページを指定すると panic する
 func (m *Mtr) Detach(pageId page.Id) {
 	if entry, ok := m.removePinned(pageId); ok {
+		m.assertReleasable(entry)
 		if !entry.skipLatch {
 			entry.bufPage.latch.Unlock(entry.mode)
 		}
 	}
+}
+
+// assertReleasable は変更ありの X ラッチを mtr 途中で解放しようとした場合に panic する
+//   - 一括解放経路 (UnpinAll / Commit) は本チェックを経由しないため、 mtr 完了時の解放は許容される
+//   - skipLatch なエントリ (= 同一ページの再帰取得) と非 X モードのエントリは検証対象外
+func (m *Mtr) assertReleasable(entry pinnedEntry) {
+	if entry.skipLatch || entry.mode != LatchExclusive {
+		return
+	}
+	if entry.bufPage.modifyCount == entry.modifyCount {
+		return
+	}
+	panic(fmt.Sprintf("buffer: mtr cannot release modified X-latch in mid-mtr (pageId=%v); release via mtr.Commit or mtr.UnpinAll", entry.pageId))
 }
 
 // UnpinAll はスコープに記録された全ての Pin とラッチを解放する

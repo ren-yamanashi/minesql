@@ -109,36 +109,6 @@ func TestMtrCommitStampsPageLsn(t *testing.T) {
 	})
 }
 
-func TestMtrUnpinLogsBeforeRelease(t *testing.T) {
-	t.Run("個別 Unpin の時点で変更ページが記録され Commit で二重記録されない", func(t *testing.T) {
-		// GIVEN
-		rl, bp := newRedoAndPool(t)
-		pageId := addPage(t, bp, 0, 0)
-		mtr := NewWriteMtr(bp, lock.TrxId(1), rl)
-		bufPage, err := mtr.PageForWrite(pageId)
-		assert.NoError(t, err)
-		bufPage.WriteBodyAt(0, []byte{9})
-
-		// WHEN: Commit 前の Unpin で記録される
-		mtr.Unpin(pageId)
-
-		// THEN: MtrEnd 前だが PageWrite は既に記録済み
-		afterUnpin := readRedoRecords(t, rl)
-		assert.Equal(t, []redo.RecordType{
-			redo.RecordTypeMtrStart, redo.RecordTypePageWrite,
-		}, recordTypes(afterUnpin))
-
-		// WHEN: Commit で MtrEnd のみ追加され、二重記録しない
-		assert.NoError(t, mtr.Commit())
-
-		// THEN
-		all := readRedoRecords(t, rl)
-		assert.Equal(t, []redo.RecordType{
-			redo.RecordTypeMtrStart, redo.RecordTypePageWrite, redo.RecordTypeMtrEnd,
-		}, recordTypes(all))
-	})
-}
-
 func TestMtrCommitStampsOldestModificationFromMtrStart(t *testing.T) {
 	t.Run("初回 Commit で oldestModificationLsn が MtrStart の LSN になる", func(t *testing.T) {
 		// GIVEN
