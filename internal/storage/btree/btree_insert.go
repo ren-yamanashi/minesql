@@ -36,7 +36,6 @@ func (t *Tree) insertOptimistic(mtr *buffer.Mtr, record Record) (needsPessimisti
 	if err != nil {
 		return false, err
 	}
-	defer mtr.Unpin(leafBufPage.PageId())
 
 	leafNode := newLeafNode(leafBufPage)
 	if !leafNode.canFit(record) {
@@ -61,7 +60,6 @@ func (t *Tree) insertPessimistic(mtr *buffer.Mtr, record Record) error {
 	if err != nil {
 		return err
 	}
-	defer mtr.Unpin(t.MetaPageId())
 	metaPage := newMetaPage(pageMeta)
 
 	return t.insertWithMetaUpdate(mtr, metaPage, record)
@@ -76,7 +74,6 @@ func (t *Tree) insertWithMetaUpdate(mtr *buffer.Mtr, mp *metaPage, record Record
 	if err != nil {
 		return err
 	}
-	defer mtr.Unpin(rootPageId)
 
 	// 再帰的に挿入
 	overflowKey, overflowChildPageId, isLeafSplit, err := t.insertRecursively(mtr, rootPageBuf, record)
@@ -111,7 +108,6 @@ func (t *Tree) insertWithMetaUpdate(mtr *buffer.Mtr, mp *metaPage, record Record
 	if err != nil {
 		return err
 	}
-	defer mtr.Unpin(newRootPageId)
 	newRootBranch := newBranchNode(pageNewRoot)
 	err = newRootBranch.initialize(overflowKey, overflowChildPageId, rootPageId)
 	if err != nil {

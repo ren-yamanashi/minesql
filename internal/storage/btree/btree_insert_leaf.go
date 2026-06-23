@@ -55,14 +55,12 @@ func (t *Tree) splitInsertLeaf(
 	if err != nil {
 		return nil, page.InvalidId(), err
 	}
-	defer mtr.Unpin(newLeafPageId)
 
 	// 前のリーフノードが存在する場合は、nextPageId を新しいリーフノードの PageId に更新
 	if !prevLeafPageId.IsInvalid() {
 		if err := t.updatePrevLeafLink(mtr, prevLeafPageId, newLeafPageId); err != nil {
 			return nil, page.InvalidId(), err
 		}
-		defer mtr.Unpin(prevLeafPageId)
 	}
 
 	// 新しいリーフノードに分割挿入
