@@ -69,7 +69,7 @@ func TestDelete(t *testing.T) {
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x01}, nonKey))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x02}, nonKey))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x03}, nonKey))
-		countBefore, _ := bt.LeafPageCount()
+		countBefore, _ := bt.LeafPageCount(mtr)
 		assert.Equal(t, uint64(2), countBefore)
 
 		// WHEN
@@ -77,7 +77,7 @@ func TestDelete(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		countAfter, _ := bt.LeafPageCount()
+		countAfter, _ := bt.LeafPageCount(mtr)
 		assert.Equal(t, countBefore-1, countAfter)
 	})
 
@@ -91,7 +91,7 @@ func TestDelete(t *testing.T) {
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x01}, nonKey))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x02}, nonKey))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x03}, nonKey))
-		heightBefore, _ := bt.Height()
+		heightBefore, _ := bt.Height(mtr)
 		assert.Equal(t, uint64(2), heightBefore)
 
 		// WHEN
@@ -99,7 +99,7 @@ func TestDelete(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		heightAfter, _ := bt.Height()
+		heightAfter, _ := bt.Height(mtr)
 		assert.Equal(t, heightBefore-1, heightAfter)
 	})
 
@@ -136,16 +136,16 @@ func TestDelete(t *testing.T) {
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x02}, nonKey))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x03}, nonKey))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x04}, nonKey))
-		height, _ := bt.Height()
+		height, _ := bt.Height(mtr)
 		assert.Equal(t, uint64(2), height)
-		countBefore, _ := bt.LeafPageCount()
+		countBefore, _ := bt.LeafPageCount(mtr)
 
 		// WHEN
 		err := bt.Delete(mtr, []byte{0x02})
 
 		// THEN
 		assert.NoError(t, err)
-		countAfter, _ := bt.LeafPageCount()
+		countAfter, _ := bt.LeafPageCount(mtr)
 		assert.Equal(t, countBefore, countAfter)
 		_, _, err = bt.FindByKey(mtr, []byte{0x01})
 		assert.NoError(t, err)
@@ -164,16 +164,16 @@ func TestDelete(t *testing.T) {
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x30}, []byte{0xCC}))
-		countBefore, _ := bt.LeafPageCount()
-		heightBefore, _ := bt.Height()
+		countBefore, _ := bt.LeafPageCount(mtr)
+		heightBefore, _ := bt.Height(mtr)
 
 		// WHEN
 		err := bt.Delete(mtr, []byte{0x20})
 
 		// THEN
 		assert.NoError(t, err)
-		countAfter, _ := bt.LeafPageCount()
-		heightAfter, _ := bt.Height()
+		countAfter, _ := bt.LeafPageCount(mtr)
+		heightAfter, _ := bt.Height(mtr)
 		assert.Equal(t, countBefore, countAfter)
 		assert.Equal(t, heightBefore, heightAfter)
 	})
@@ -222,7 +222,7 @@ func TestDeleteOptimistic(t *testing.T) {
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x01}, nonKey))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x02}, nonKey))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x03}, nonKey))
-		height, _ := bt.Height()
+		height, _ := bt.Height(mtr)
 		assert.Equal(t, uint64(2), height)
 
 		// WHEN

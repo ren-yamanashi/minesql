@@ -180,11 +180,13 @@ func (pi *primaryIndex) fileId() page.FileId {
 }
 
 // leafPageCount はリーフページ数を取得する
-func (pi *primaryIndex) leafPageCount() (uint64, error) {
-	return pi.tree.LeafPageCount()
+//   - mtr: メタページの S-latch / Pin を保持する mini-transaction。 解放は呼び出し側
+func (pi *primaryIndex) leafPageCount(mtr *buffer.Mtr) (uint64, error) {
+	return pi.tree.LeafPageCount(mtr)
 }
 
 // height はツリーの高さを取得する
-func (pi *primaryIndex) height() (uint64, error) {
-	return pi.tree.Height()
+//   - mtr: メタページの S-latch / Pin を保持する mini-transaction。 解放は呼び出し側
+func (pi *primaryIndex) height(mtr *buffer.Mtr) (uint64, error) {
+	return pi.tree.Height(mtr)
 }

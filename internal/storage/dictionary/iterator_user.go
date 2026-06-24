@@ -10,11 +10,6 @@ func NewUserIterator(iter *btree.Iterator) *UserIterator {
 	return &UserIterator{iterator: iter}
 }
 
-// Close はイテレータが保持しているバッファページの参照を解放する
-func (ui *UserIterator) Close() {
-	ui.iterator.Close()
-}
-
 // Next はユーザーメタデータから次の結果を返す
 func (ui *UserIterator) Next() (UserMetaRecord, bool, error) {
 	record, ok, err := ui.iterator.Next()

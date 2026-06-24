@@ -16,8 +16,10 @@ func TestIteratorGet(t *testing.T) {
 		tree, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
+		mtr := buffer.NewMtr(tree.bufferPool)
+		defer mtr.UnpinAll()
 		bufPage, _ := tree.bufferPool.Page(pageId)
-		iter := NewIterator(tree, bufPage, 0, SearchModeStart{})
+		iter := NewIterator(tree, mtr, bufPage, 0, SearchModeStart{})
 
 		// WHEN
 		record, ok, err := iter.Get()
@@ -33,8 +35,10 @@ func TestIteratorGet(t *testing.T) {
 		tree, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
+		mtr := buffer.NewMtr(tree.bufferPool)
+		defer mtr.UnpinAll()
 		bufPage, _ := tree.bufferPool.Page(pageId)
-		iter := NewIterator(tree, bufPage, 1, SearchModeStart{})
+		iter := NewIterator(tree, mtr, bufPage, 1, SearchModeStart{})
 
 		// WHEN
 		_, ok, err := iter.Get()
@@ -52,8 +56,10 @@ func TestIteratorNext(t *testing.T) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 			ln.insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
 		})
+		mtr := buffer.NewMtr(tree.bufferPool)
+		defer mtr.UnpinAll()
 		bufPage, _ := tree.bufferPool.Page(pageId)
-		iter := NewIterator(tree, bufPage, 0, SearchModeStart{})
+		iter := NewIterator(tree, mtr, bufPage, 0, SearchModeStart{})
 
 		// WHEN
 		record1, ok1, err1 := iter.Next()
@@ -82,8 +88,10 @@ func TestIteratorAdvance(t *testing.T) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 			ln.insert(1, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
 		})
+		mtr := buffer.NewMtr(tree.bufferPool)
+		defer mtr.UnpinAll()
 		bufPage, _ := tree.bufferPool.Page(pageId)
-		iter := NewIterator(tree, bufPage, 0, SearchModeStart{})
+		iter := NewIterator(tree, mtr, bufPage, 0, SearchModeStart{})
 
 		// WHEN
 		err := iter.Advance()
@@ -125,9 +133,11 @@ func TestIteratorAdvance(t *testing.T) {
 		secondLeaf.initialize()
 		secondLeaf.insert(0, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
 
-		bufPage, err := bp.Page(firstId)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+		bufPage, err := mtr.PageForRead(firstId)
 		assert.NoError(t, err)
-		iter := NewIterator(tree, bufPage, 0, SearchModeStart{})
+		iter := NewIterator(tree, mtr, bufPage, 0, SearchModeStart{})
 
 		// WHEN
 		err = iter.Advance()
@@ -138,9 +148,6 @@ func TestIteratorAdvance(t *testing.T) {
 		assert.True(t, ok)
 		assert.Equal(t, []byte{0x20}, record.Key())
 		assert.Equal(t, secondId, iter.bufferPage.PageId())
-
-		// 遷移後も Close で Pin を解放できる (パニックしない)
-		assert.NotPanics(t, func() { iter.Close() })
 	})
 }
 
@@ -151,8 +158,10 @@ func TestIteratorTracksLastKeyAndModifyCount(t *testing.T) {
 		tree, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
 			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
 		})
+		mtr := buffer.NewMtr(tree.bufferPool)
+		defer mtr.UnpinAll()
 		bufPage, _ := tree.bufferPool.Page(pageId)
-		iter := NewIterator(tree, bufPage, 0, SearchModeStart{})
+		iter := NewIterator(tree, mtr, bufPage, 0, SearchModeStart{})
 		assert.Nil(t, iter.lastKey)
 
 		// WHEN
@@ -176,7 +185,6 @@ func TestIteratorRefetchByKey(t *testing.T) {
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
 		iter, _ := bt.Search(mtr, SearchModeStart{})
-		defer iter.Close()
 		_, _, _ = iter.Get() // lastKey = 0x10
 
 		// WHEN
@@ -200,7 +208,6 @@ func TestIteratorRefetchByKey(t *testing.T) {
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x30}, []byte{0xCC}))
 		iter, _ := bt.Search(mtr, SearchModeStart{})
-		defer iter.Close()
 		_, _, _ = iter.Get() // lastKey = 0x10
 		// 別 Mtr で同一リーフを更新し modifyCount を進める
 		otherMtr := buffer.NewMtr(bt.bufferPool)
@@ -227,7 +234,6 @@ func TestIteratorRefetchByKey(t *testing.T) {
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
 		iter, _ := bt.Search(mtr, SearchModeStart{})
-		defer iter.Close()
 		_, _, _ = iter.Get()
 		// 0x10 を削除して lastKey 不在の状態を作る
 		_ = bt.Delete(mtr, []byte{0x10})
@@ -258,7 +264,6 @@ func TestIteratorRefetchBySearchMode(t *testing.T) {
 		defer searchMtr.UnpinAll()
 		iter, err := bt.Search(searchMtr, SearchModeKey{Key: []byte{0x20}})
 		assert.NoError(t, err)
-		defer iter.Close()
 
 		// 初回 Get 前に 0x10 と 0x20 の間にキーを挿入し、0x20 のスロット位置をずらす
 		insertMtr := buffer.NewMtr(bt.bufferPool)
@@ -286,7 +291,6 @@ func TestIteratorRefetchBySearchMode(t *testing.T) {
 		defer searchMtr.UnpinAll()
 		iter, err := bt.Search(searchMtr, SearchModeStart{})
 		assert.NoError(t, err)
-		defer iter.Close()
 		snapBefore := iter.modifyCountSnap
 
 		// 初回 Get 前に新しい先頭となる 0x10 を挿入する
@@ -330,4 +334,40 @@ func setupIteratorTestPage(t *testing.T, setup func(ln *leafNode)) (*Tree, page.
 	setup(ln)
 
 	return tree, pageId
+}
+
+func TestIteratorMtr(t *testing.T) {
+	t.Run("Mtr getter は NewIterator に渡した mtr を返す", func(t *testing.T) {
+		// GIVEN
+		tree, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
+			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
+		})
+		mtr := buffer.NewMtr(tree.bufferPool)
+		defer mtr.UnpinAll()
+		bufPage, _ := tree.bufferPool.Page(pageId)
+
+		// WHEN
+		iter := NewIterator(tree, mtr, bufPage, 0, SearchModeStart{})
+
+		// THEN
+		assert.Same(t, mtr, iter.Mtr())
+	})
+}
+
+func TestIteratorBufferPageId(t *testing.T) {
+	t.Run("BufferPageId getter は現在参照しているリーフページの ID を返す", func(t *testing.T) {
+		// GIVEN
+		tree, pageId := setupIteratorTestPage(t, func(ln *leafNode) {
+			ln.insert(0, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
+		})
+		mtr := buffer.NewMtr(tree.bufferPool)
+		defer mtr.UnpinAll()
+		bufPage, _ := tree.bufferPool.Page(pageId)
+
+		// WHEN
+		iter := NewIterator(tree, mtr, bufPage, 0, SearchModeStart{})
+
+		// THEN
+		assert.Equal(t, pageId, iter.BufferPageId())
+	})
 }

@@ -7,37 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIndexKeyColumnIteratorClose(t *testing.T) {
-	t.Run("検索結果のイテレータを Close できる", func(t *testing.T) {
-		// GIVEN
-		kcm, bp := setupTestIndexKeyColumnMeta(t)
-		mtr := buffer.NewMtr(bp)
-		defer mtr.UnpinAll()
-		_ = kcm.Insert(mtr, NewIndexKeyColumnMetaRecord(IndexId(1), "name", 1))
-		iter, err := kcm.Search(mtr, SearchModeStart{})
-		assert.NoError(t, err)
-
-		// WHEN
-		// THEN
-		_, _, _ = iter.Next()
-		iter.Close()
-
-	})
-
-	t.Run("イテレーション前に Close できる", func(t *testing.T) {
-		// GIVEN
-		kcm, bp := setupTestIndexKeyColumnMeta(t)
-		mtr := buffer.NewMtr(bp)
-		defer mtr.UnpinAll()
-		iter, err := kcm.Search(mtr, SearchModeStart{})
-		assert.NoError(t, err)
-
-		// WHEN
-		// THEN
-		iter.Close()
-	})
-}
-
 func TestIndexKeyColumnIteratorNext(t *testing.T) {
 	t.Run("レコードを順に取得できる", func(t *testing.T) {
 		// GIVEN
@@ -48,7 +17,6 @@ func TestIndexKeyColumnIteratorNext(t *testing.T) {
 		_ = kcm.Insert(mtr, NewIndexKeyColumnMetaRecord(IndexId(1), "age", 2))
 		iter, err := kcm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
-		defer iter.Close()
 
 		// WHEN
 		r1, ok1, err1 := iter.Next()
@@ -78,7 +46,6 @@ func TestIndexKeyColumnIteratorNext(t *testing.T) {
 		defer mtr.UnpinAll()
 		iter, err := kcm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
-		defer iter.Close()
 
 		// WHEN
 		_, ok, err := iter.Next()

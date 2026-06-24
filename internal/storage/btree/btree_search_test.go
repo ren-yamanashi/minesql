@@ -155,9 +155,11 @@ func TestLeafPageIds(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := createTreeForTest(t, bp, page.FileId(0))
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		pageIds, err := bt.leafPageIds()
+		pageIds, err := bt.leafPageIds(mtr)
 
 		// THEN
 		assert.NoError(t, err)
@@ -174,12 +176,12 @@ func TestLeafPageIds(t *testing.T) {
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x01}, nonKey))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x02}, nonKey))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x03}, nonKey))
-		height, _ := bt.Height()
+		height, _ := bt.Height(mtr)
 		assert.Equal(t, uint64(2), height)
-		leafCount, _ := bt.LeafPageCount()
+		leafCount, _ := bt.LeafPageCount(mtr)
 
 		// WHEN
-		pageIds, err := bt.leafPageIds()
+		pageIds, err := bt.leafPageIds(mtr)
 
 		// THEN
 		assert.NoError(t, err)

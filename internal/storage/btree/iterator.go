@@ -4,14 +4,15 @@ import (
 	"bytes"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 // Iterator は B+Tree のリーフノードを走査する
-//   - 走査の生存期間中はバッファページの Pin を保持する
-//   - フェッチごとに短期の Shared ラッチを取り、解放後の更新を更新カウンタで検知する
+//   - リーフページの Pin と Shared ラッチは Mtr が保持し、Mtr の完了時に一括解放される
 //   - 直前に読んだキーがあればそのキーで、初回 Get 前であれば走査開始時の SearchMode で位置を取り直す
 type Iterator struct {
 	tree            *Tree
+	mtr             *buffer.Mtr
 	bufferPage      *buffer.Page
 	slotNum         int
 	searchMode      SearchMode
@@ -21,9 +22,11 @@ type Iterator struct {
 
 // NewIterator は Tree.Search で得たリーフページ・スロット位置・降下時の SearchMode を引き継いだ Iterator を返す
 //   - searchMode: 初回 Get 前にページが変更された場合、ここに渡したモードで再降下して位置を取り直す
-func NewIterator(tree *Tree, bufPage *buffer.Page, slotNum int, searchMode SearchMode) *Iterator {
+//   - mtr: リーフページの Pin と Shared ラッチを保持し続ける Mtr。 Iterator の生存期間中は同じ Mtr を使う
+func NewIterator(tree *Tree, mtr *buffer.Mtr, bufPage *buffer.Page, slotNum int, searchMode SearchMode) *Iterator {
 	return &Iterator{
 		tree:            tree,
+		mtr:             mtr,
 		bufferPage:      bufPage,
 		slotNum:         slotNum,
 		searchMode:      searchMode,
@@ -31,9 +34,15 @@ func NewIterator(tree *Tree, bufPage *buffer.Page, slotNum int, searchMode Searc
 	}
 }
 
-// Close はイテレータが保持しているバッファページの Pin を解放する
-func (it *Iterator) Close() {
-	it.tree.bufferPool.Unpin(it.bufferPage.PageId())
+// Mtr は Iterator が保持する mini-transaction を返す
+func (it *Iterator) Mtr() *buffer.Mtr {
+	return it.mtr
+}
+
+// BufferPageId は現在 Iterator が参照しているリーフページの ID を返す
+//   - 呼び出し側が Pin を明示解放するときに mtr.Unpin の引数として使う
+func (it *Iterator) BufferPageId() page.Id {
+	return it.bufferPage.PageId()
 }
 
 // Get は現在参照しているリーフノードのレコードを取得する
@@ -41,9 +50,6 @@ func (it *Iterator) Get() (Record, bool, error) {
 	if _, err := it.checkAndRefetch(); err != nil {
 		return NewRecord(nil, nil, nil), false, err
 	}
-
-	it.bufferPage.Latch().LockShared()
-	defer it.bufferPage.Latch().Unlock(buffer.LatchShared)
 
 	leaf := newLeafNode(it.bufferPage)
 	if it.slotNum >= leaf.numRecords() {
@@ -85,51 +91,38 @@ func (it *Iterator) Advance() error {
 		return nil
 	}
 
-	it.bufferPage.Latch().LockShared()
 	leaf := newLeafNode(it.bufferPage)
 	if it.slotNum < leaf.numRecords() {
 		it.slotNum++
 	}
 	if it.slotNum < leaf.numRecords() {
 		it.modifyCountSnap = it.bufferPage.ModifyCount()
-		it.bufferPage.Latch().Unlock(buffer.LatchShared)
 		return nil
 	}
 	nextPageId := leaf.nextPageId()
-
 	if nextPageId.IsInvalid() {
-		it.bufferPage.Latch().Unlock(buffer.LatchShared)
 		return nil
 	}
 
-	// ラッチカップリング: 手元のリーフの S を保持したまま次リーフを Pin して S を取り、
-	// 更新カウンタを記録してから手元のリーフを解放する (取得順序は左 → 右)
-	nextPage, err := it.tree.bufferPool.Page(nextPageId)
+	// ラッチカップリング: 手元のリーフの S を保持したまま次リーフを Mtr 経由で取得し、
+	// 取得後に手元のリーフを Mtr.Unpin で解放する (取得順序は左 → 右)
+	nextPage, err := it.mtr.PageForRead(nextPageId)
 	if err != nil {
-		it.bufferPage.Latch().Unlock(buffer.LatchShared)
 		return err
 	}
-	nextPage.Latch().LockShared()
-	nextModifyCount := nextPage.ModifyCount()
-
 	oldPageId := it.bufferPage.PageId()
-	it.bufferPage.Latch().Unlock(buffer.LatchShared)
-	it.tree.bufferPool.Unpin(oldPageId)
-	nextPage.Latch().Unlock(buffer.LatchShared)
+	it.mtr.Unpin(oldPageId)
 
 	it.bufferPage = nextPage
 	it.slotNum = 0
-	it.modifyCountSnap = nextModifyCount
+	it.modifyCountSnap = nextPage.ModifyCount()
 	return nil
 }
 
 // checkAndRefetch は更新カウンタを照合し、変化があれば直前に読んだキーで位置を取り直す
 //   - 戻り値 refetched: refetchByKey を実行した場合 true。呼び出し側はこれを見て二重インクリメントを避ける
 func (it *Iterator) checkAndRefetch() (refetched bool, err error) {
-	it.bufferPage.Latch().LockShared()
 	current := it.bufferPage.ModifyCount()
-	it.bufferPage.Latch().Unlock(buffer.LatchShared)
-
 	if current == it.modifyCountSnap {
 		return false, nil
 	}
@@ -149,24 +142,17 @@ func (it *Iterator) checkAndRefetch() (refetched bool, err error) {
 // refetchBySearchMode は走査開始時の SearchMode で Tree.Search を再実行し、リーフと開始スロットを取り直す
 //   - lastKey == nil (= 初回 Get 前) からの再位置付けに使う
 func (it *Iterator) refetchBySearchMode() error {
-	mtr := buffer.NewMtr(it.tree.bufferPool)
-	defer mtr.UnpinAll()
-
-	iter, err := it.tree.Search(mtr, it.searchMode)
+	oldPageId := it.bufferPage.PageId()
+	iter, err := it.tree.Search(it.mtr, it.searchMode)
 	if err != nil {
 		return err
 	}
 
-	iter.bufferPage.Latch().LockShared()
-	newSlot := iter.slotNum
-	newModifyCount := iter.bufferPage.ModifyCount()
-	iter.bufferPage.Latch().Unlock(buffer.LatchShared)
-
-	// 既存の Pin を解放し、Tree.Search が確保した新リーフの Pin を引き継ぐ
-	it.tree.bufferPool.Unpin(it.bufferPage.PageId())
+	// 古いリーフの Pin を解放し、 Tree.Search が確保した新リーフに切り替える
+	it.mtr.Unpin(oldPageId)
 	it.bufferPage = iter.bufferPage
-	it.slotNum = newSlot
-	it.modifyCountSnap = newModifyCount
+	it.slotNum = iter.slotNum
+	it.modifyCountSnap = iter.bufferPage.ModifyCount()
 	return nil
 }
 
@@ -174,15 +160,12 @@ func (it *Iterator) refetchBySearchMode() error {
 //   - lastKey が削除されている場合は新しい位置のレコードがそのまま「次の未読」となる
 //   - lastKey が残っている場合は既読位置の次のスロットへ進める
 func (it *Iterator) refetchByKey(key []byte) error {
-	mtr := buffer.NewMtr(it.tree.bufferPool)
-	defer mtr.UnpinAll()
-
-	iter, err := it.tree.Search(mtr, SearchModeKey{Key: key})
+	oldPageId := it.bufferPage.PageId()
+	iter, err := it.tree.Search(it.mtr, SearchModeKey{Key: key})
 	if err != nil {
 		return err
 	}
 
-	iter.bufferPage.Latch().LockShared()
 	newLeaf := newLeafNode(iter.bufferPage)
 	var newSlot int
 	if iter.slotNum < newLeaf.numRecords() && bytes.Equal(newLeaf.record(iter.slotNum).Key(), key) {
@@ -190,13 +173,11 @@ func (it *Iterator) refetchByKey(key []byte) error {
 	} else {
 		newSlot = iter.slotNum
 	}
-	newModifyCount := iter.bufferPage.ModifyCount()
-	iter.bufferPage.Latch().Unlock(buffer.LatchShared)
 
-	// 既存の Pin を解放し、Tree.Search が確保した新リーフの Pin を引き継ぐ
-	it.tree.bufferPool.Unpin(it.bufferPage.PageId())
+	// 古いリーフの Pin を解放し、 Tree.Search が確保した新リーフに切り替える
+	it.mtr.Unpin(oldPageId)
 	it.bufferPage = iter.bufferPage
 	it.slotNum = newSlot
-	it.modifyCountSnap = newModifyCount
+	it.modifyCountSnap = iter.bufferPage.ModifyCount()
 	return nil
 }

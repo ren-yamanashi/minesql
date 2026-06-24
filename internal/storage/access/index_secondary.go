@@ -195,13 +195,15 @@ func (si *secondaryIndex) softDelete(mtr *buffer.Mtr, record *SecondaryRecord, t
 }
 
 // leafPageCount はリーフページ数を取得する
-func (si *secondaryIndex) leafPageCount() (uint64, error) {
-	return si.tree.LeafPageCount()
+//   - mtr: メタページの S-latch / Pin を保持する mini-transaction。 解放は呼び出し側
+func (si *secondaryIndex) leafPageCount(mtr *buffer.Mtr) (uint64, error) {
+	return si.tree.LeafPageCount(mtr)
 }
 
 // height はツリーの高さを取得する
-func (si *secondaryIndex) height() (uint64, error) {
-	return si.tree.Height()
+//   - mtr: メタページの S-latch / Pin を保持する mini-transaction。 解放は呼び出し側
+func (si *secondaryIndex) height(mtr *buffer.Mtr) (uint64, error) {
+	return si.tree.Height(mtr)
 }
 
 // checkUnique は record のセカンダリキーに対して active なレコードが存在するか確認する
@@ -213,7 +215,6 @@ func (si *secondaryIndex) checkUnique(mtr *buffer.Mtr, sr *SecondaryRecord) erro
 	if err != nil {
 		return err
 	}
-	defer iter.Close()
 
 	for {
 		existing, ok, err := iter.Get()

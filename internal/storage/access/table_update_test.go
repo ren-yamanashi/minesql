@@ -430,7 +430,6 @@ func fetchAllSecondaryRecords(t *testing.T, table *Table, indexName string) []*S
 	if err != nil {
 		t.Fatalf("セカンダリ B+Tree の検索に失敗: %v", err)
 	}
-	defer iter.Close()
 
 	var records []*SecondaryRecord
 	for {

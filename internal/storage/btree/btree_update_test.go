@@ -90,7 +90,7 @@ func TestUpdate(t *testing.T) {
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x01}, nonKey))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x02}, nonKey))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x03}, nonKey))
-		height, _ := bt.Height()
+		height, _ := bt.Height(mtr)
 		assert.Equal(t, uint64(2), height)
 
 		// WHEN
@@ -157,8 +157,8 @@ func TestUpdate(t *testing.T) {
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, make([]byte, 1)))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x20}, make([]byte, 2000)))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x30}, make([]byte, 1500)))
-		heightBefore, _ := bt.Height()
-		leafCountBefore, _ := bt.LeafPageCount()
+		heightBefore, _ := bt.Height(mtr)
+		leafCountBefore, _ := bt.LeafPageCount(mtr)
 		rootBefore := readRoot()
 		assert.Equal(t, uint64(1), heightBefore)
 		assert.Equal(t, uint64(1), leafCountBefore)
@@ -182,8 +182,8 @@ func TestUpdate(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 1500, len(other30.NonKey()))
 		// リーフ分割とルート分割によりメタ情報が更新されていること
-		heightAfter, _ := bt.Height()
-		leafCountAfter, _ := bt.LeafPageCount()
+		heightAfter, _ := bt.Height(mtr)
+		leafCountAfter, _ := bt.LeafPageCount(mtr)
 		assert.Equal(t, uint64(2), heightAfter)
 		assert.Equal(t, uint64(2), leafCountAfter)
 		assert.NotEqual(t, rootBefore, readRoot())

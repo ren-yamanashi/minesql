@@ -70,7 +70,6 @@ func (c *currentReadCursor) firstRecord(mtr *buffer.Mtr, mode SearchMode) (btree
 	if err != nil {
 		return nil, false, err
 	}
-	defer iter.Close()
 	return iter.Get()
 }
 

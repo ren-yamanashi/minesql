@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/stretchr/testify/assert"
 )
@@ -121,9 +122,11 @@ func TestIntegrationTrxIdRecovery(t *testing.T) {
 		assert.NoError(t, err)
 
 		trxNext := env2.trxMgr.Begin()
+		mtr := buffer.NewMtr(table2.bufferPool)
+		defer mtr.UnpinAll()
 
 		// THEN
-		iter, err := table2.Search(trxNext, SearchModeStart{})
+		iter, err := table2.Search(mtr, trxNext, SearchModeStart{})
 		assert.NoError(t, err)
 		visible := 0
 		for {

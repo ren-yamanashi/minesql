@@ -8,37 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestTableIteratorClose(t *testing.T) {
-	t.Run("検索結果のイテレータを Close できる", func(t *testing.T) {
-		// GIVEN
-		tm, bp := setupTestTableMeta(t)
-		mtr := buffer.NewMtr(bp)
-		defer mtr.UnpinAll()
-		_ = tm.Insert(mtr, NewTableMetaRecord("users", page.NewId(page.FileId(1), page.PageNumber(0)), 3))
-		iter, err := tm.Search(mtr, SearchModeStart{})
-		assert.NoError(t, err)
-
-		// WHEN
-		// THEN
-		_, _, _ = iter.Next()
-		iter.Close()
-
-	})
-
-	t.Run("イテレーション前に Close できる", func(t *testing.T) {
-		// GIVEN
-		tm, bp := setupTestTableMeta(t)
-		mtr := buffer.NewMtr(bp)
-		defer mtr.UnpinAll()
-		iter, err := tm.Search(mtr, SearchModeStart{})
-		assert.NoError(t, err)
-
-		// WHEN
-		// THEN
-		iter.Close()
-	})
-}
-
 func TestTableIteratorNext(t *testing.T) {
 	t.Run("レコードを順に取得できる", func(t *testing.T) {
 		// GIVEN
@@ -49,7 +18,6 @@ func TestTableIteratorNext(t *testing.T) {
 		_ = tm.Insert(mtr, NewTableMetaRecord("orders", page.NewId(page.FileId(2), page.PageNumber(0)), 5))
 		iter, err := tm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
-		defer iter.Close()
 
 		// WHEN
 		r1, ok1, err1 := iter.Next()
@@ -80,7 +48,6 @@ func TestTableIteratorNext(t *testing.T) {
 		defer mtr.UnpinAll()
 		iter, err := tm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
-		defer iter.Close()
 
 		// WHEN
 		_, ok, err := iter.Next()

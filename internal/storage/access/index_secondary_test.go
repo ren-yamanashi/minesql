@@ -317,9 +317,11 @@ func TestSecondaryIndexLeafPageCount(t *testing.T) {
 	t.Run("リーフページ数を取得できる", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
+		mtr := buffer.NewMtr(si.bufferPool)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		count, err := si.leafPageCount()
+		count, err := si.leafPageCount(mtr)
 
 		// THEN
 		assert.NoError(t, err)
@@ -331,9 +333,11 @@ func TestSecondaryIndexHeight(t *testing.T) {
 	t.Run("ツリーの高さを取得できる", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
+		mtr := buffer.NewMtr(si.bufferPool)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		height, err := si.height()
+		height, err := si.height(mtr)
 
 		// THEN
 		assert.NoError(t, err)

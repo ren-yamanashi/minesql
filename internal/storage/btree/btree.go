@@ -72,9 +72,8 @@ func CreateTree(bp *buffer.Pool, fileId page.FileId, mtr *buffer.Mtr) (*Tree, er
 }
 
 // LeafPageCount はメタページからリーフページ数を取得する
-func (t *Tree) LeafPageCount() (uint64, error) {
-	mtr := buffer.NewMtr(t.bufferPool)
-	defer mtr.UnpinAll()
+//   - mtr: メタページの S-latch / Pin を保持する mini-transaction。 解放は呼び出し側
+func (t *Tree) LeafPageCount(mtr *buffer.Mtr) (uint64, error) {
 	pageMeta, err := mtr.PageForRead(t.metaPageId)
 	if err != nil {
 		return 0, err
@@ -84,9 +83,8 @@ func (t *Tree) LeafPageCount() (uint64, error) {
 }
 
 // Height はメタページから B+Tree の高さを取得する
-func (t *Tree) Height() (uint64, error) {
-	mtr := buffer.NewMtr(t.bufferPool)
-	defer mtr.UnpinAll()
+//   - mtr: メタページの S-latch / Pin を保持する mini-transaction。 解放は呼び出し側
+func (t *Tree) Height(mtr *buffer.Mtr) (uint64, error) {
 	pageMeta, err := mtr.PageForRead(t.metaPageId)
 	if err != nil {
 		return 0, err

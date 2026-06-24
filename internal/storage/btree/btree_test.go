@@ -28,9 +28,12 @@ func TestNewTree(t *testing.T) {
 		bp := setupBtreeTestBufferPool(t)
 		created, _ := createTreeForTest(t, bp, page.FileId(0))
 
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
+
 		// WHEN
 		bt := NewTree(bp, created.MetaPageId())
-		count, err := bt.LeafPageCount()
+		count, err := bt.LeafPageCount(mtr)
 
 		// THEN
 		assert.NoError(t, err)
@@ -66,11 +69,13 @@ func TestCreateTree(t *testing.T) {
 	t.Run("作成後のリーフページ数は 1 になる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
 
 		// WHEN
 		bt, err := createTreeForTest(t, bp, page.FileId(0))
 		assert.NoError(t, err)
-		count, err := bt.LeafPageCount()
+		count, err := bt.LeafPageCount(mtr)
 
 		// THEN
 		assert.NoError(t, err)
@@ -80,11 +85,13 @@ func TestCreateTree(t *testing.T) {
 	t.Run("作成後の高さは 1 になる", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
 
 		// WHEN
 		bt, err := createTreeForTest(t, bp, page.FileId(0))
 		assert.NoError(t, err)
-		height, err := bt.Height()
+		height, err := bt.Height(mtr)
 
 		// THEN
 		assert.NoError(t, err)
@@ -128,7 +135,7 @@ func TestOptimisticHeight1(t *testing.T) {
 		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
-		heightBefore, _ := bt.Height()
+		heightBefore, _ := bt.Height(mtr)
 		assert.Equal(t, uint64(1), heightBefore)
 
 		// WHEN: 楽観挿入
@@ -154,7 +161,7 @@ func TestOptimisticHeight1(t *testing.T) {
 		// THEN: 削除したキーは見つからず、高さは 1 のまま
 		_, _, err = bt.FindByKey(mtr, []byte{0x20})
 		assert.ErrorIs(t, err, ErrKeyNotFound)
-		heightAfter, _ := bt.Height()
+		heightAfter, _ := bt.Height(mtr)
 		assert.Equal(t, uint64(1), heightAfter)
 	})
 }
@@ -164,9 +171,11 @@ func TestLeafPageCount(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := createTreeForTest(t, bp, page.FileId(0))
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		count, err := bt.LeafPageCount()
+		count, err := bt.LeafPageCount(mtr)
 
 		// THEN
 		assert.NoError(t, err)
@@ -179,9 +188,11 @@ func TestHeight(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := createTreeForTest(t, bp, page.FileId(0))
+		mtr := buffer.NewMtr(bp)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		height, err := bt.Height()
+		height, err := bt.Height(mtr)
 
 		// THEN
 		assert.NoError(t, err)

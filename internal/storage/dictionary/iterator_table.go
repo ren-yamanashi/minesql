@@ -10,11 +10,6 @@ func NewTableIterator(iter *btree.Iterator) *TableIterator {
 	return &TableIterator{iterator: iter}
 }
 
-// Close はイテレータが保持しているバッファページの参照を解放する
-func (ti *TableIterator) Close() {
-	ti.iterator.Close()
-}
-
 // Next はテーブルメタデータから次の結果を返す
 func (ti *TableIterator) Next() (TableMetaRecord, bool, error) {
 	record, ok, err := ti.iterator.Next()

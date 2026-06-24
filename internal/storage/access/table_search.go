@@ -7,9 +7,8 @@ import (
 )
 
 // Search は指定したトランザクションでプライマリインデックスを検索する
-func (t *Table) Search(trx *Transaction, mode SearchMode) (*PrimaryIndexIterator, error) {
-	mtr := buffer.NewMtr(t.bufferPool)
-	defer mtr.UnpinAll()
+//   - mtr: 走査結果のイテレータがリーフ Pin / S-latch を保持し続ける mini-transaction。 呼び出し側で UnpinAll / Commit する
+func (t *Table) Search(mtr *buffer.Mtr, trx *Transaction, mode SearchMode) (*PrimaryIndexIterator, error) {
 	readView := trx.tm.EnsureReadView(trx)
 	return t.primaryIndex.search(mtr, mode, readView)
 }
@@ -26,7 +25,8 @@ func (t *Table) SearchForUpdate(trx *Transaction, mode SearchMode) (*PrimaryReco
 // SearchSecondary は指定したセカンダリインデックスを検索する
 //   - 指定したインデックス名が存在しない場合はエラー
 //   - 可視性判定はプライマリ側に伝搬される (詳細はセカンダリイテレータを参照)
-func (t *Table) SearchSecondary(trx *Transaction, indexName string, mode SearchMode) (*SecondaryIndexIterator, error) {
+//   - mtr: 走査結果のイテレータがリーフ Pin / S-latch を保持し続ける mini-transaction。 呼び出し側で UnpinAll / Commit する
+func (t *Table) SearchSecondary(mtr *buffer.Mtr, trx *Transaction, indexName string, mode SearchMode) (*SecondaryIndexIterator, error) {
 	var target *secondaryIndex
 	for _, si := range t.secondaryIndexes {
 		if si.indexName == indexName {
@@ -37,8 +37,6 @@ func (t *Table) SearchSecondary(trx *Transaction, indexName string, mode SearchM
 	if target == nil {
 		return nil, fmt.Errorf("secondary index %q not found", indexName)
 	}
-	mtr := buffer.NewMtr(t.bufferPool)
-	defer mtr.UnpinAll()
 	readView := trx.tm.EnsureReadView(trx)
 	return target.search(mtr, mode, readView)
 }

@@ -10,11 +10,6 @@ func NewConstraintIterator(iter *btree.Iterator) *ConstraintIterator {
 	return &ConstraintIterator{iterator: iter}
 }
 
-// Close はイテレータが保持しているバッファページの参照を解放する
-func (ci *ConstraintIterator) Close() {
-	ci.iterator.Close()
-}
-
 // Next は制約メタデータから次の結果を返す
 func (ci *ConstraintIterator) Next() (ConstraintMetaRecord, bool, error) {
 	record, ok, err := ci.iterator.Next()

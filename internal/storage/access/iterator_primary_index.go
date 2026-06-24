@@ -35,10 +35,6 @@ func NewPrimaryIndexIterator(
 	}
 }
 
-func (pi *PrimaryIndexIterator) Close() {
-	pi.iterator.Close()
-}
-
 // Next はデコード済みの次の可視レコードを返す
 //   - readView が nil の場合は deleteMark のみで判定する従来動作
 //   - readView が非 nil の場合は MVCC の可視性判定 + Undo 遡及を行う
@@ -65,9 +61,7 @@ func (pi *PrimaryIndexIterator) Next() (*PrimaryRecord, bool, error) {
 			return current, true, nil
 		}
 
-		mtr := buffer.NewMtr(pi.bufferPool)
-		visible, err := pi.resolveVisible(current, mtr)
-		mtr.UnpinAll()
+		visible, err := pi.resolveVisible(current, pi.iterator.Mtr())
 		if err != nil {
 			return nil, false, err
 		}

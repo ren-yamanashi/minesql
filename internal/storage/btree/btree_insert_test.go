@@ -76,14 +76,14 @@ func TestInsert(t *testing.T) {
 		nonKey := make([]byte, 1500)
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x01}, nonKey))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x02}, nonKey))
-		countBefore, _ := bt.LeafPageCount()
+		countBefore, _ := bt.LeafPageCount(mtr)
 
 		// WHEN
 		err := bt.Insert(mtr, NewRecord([]byte{}, []byte{0x03}, nonKey))
 
 		// THEN
 		assert.NoError(t, err)
-		countAfter, _ := bt.LeafPageCount()
+		countAfter, _ := bt.LeafPageCount(mtr)
 		assert.Equal(t, countBefore+1, countAfter)
 	})
 
@@ -96,7 +96,7 @@ func TestInsert(t *testing.T) {
 		nonKey := make([]byte, 1500)
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x01}, nonKey))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x02}, nonKey))
-		heightBefore, _ := bt.Height()
+		heightBefore, _ := bt.Height(mtr)
 		assert.Equal(t, uint64(1), heightBefore)
 
 		// WHEN
@@ -104,7 +104,7 @@ func TestInsert(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		heightAfter, _ := bt.Height()
+		heightAfter, _ := bt.Height(mtr)
 		assert.Equal(t, heightBefore+1, heightAfter)
 	})
 
@@ -138,7 +138,7 @@ func TestInsert(t *testing.T) {
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x01}, nonKey))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x02}, nonKey))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x03}, nonKey))
-		height, _ := bt.Height()
+		height, _ := bt.Height(mtr)
 		assert.Equal(t, uint64(2), height)
 
 		// WHEN
@@ -155,16 +155,16 @@ func TestInsert(t *testing.T) {
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
-		countBefore, _ := bt.LeafPageCount()
-		heightBefore, _ := bt.Height()
+		countBefore, _ := bt.LeafPageCount(mtr)
+		heightBefore, _ := bt.Height(mtr)
 
 		// WHEN
 		err := bt.Insert(mtr, NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
 
 		// THEN
 		assert.NoError(t, err)
-		countAfter, _ := bt.LeafPageCount()
-		heightAfter, _ := bt.Height()
+		countAfter, _ := bt.LeafPageCount(mtr)
+		heightAfter, _ := bt.Height(mtr)
 		assert.Equal(t, countBefore, countAfter)
 		assert.Equal(t, heightBefore, heightAfter)
 	})
@@ -255,14 +255,14 @@ func TestInsertPessimistic(t *testing.T) {
 		nonKey := make([]byte, 1500)
 		_ = bt.insertPessimistic(mtr, NewRecord([]byte{}, []byte{0x01}, nonKey))
 		_ = bt.insertPessimistic(mtr, NewRecord([]byte{}, []byte{0x02}, nonKey))
-		countBefore, _ := bt.LeafPageCount()
+		countBefore, _ := bt.LeafPageCount(mtr)
 
 		// WHEN
 		err := bt.insertPessimistic(mtr, NewRecord([]byte{}, []byte{0x03}, nonKey))
 
 		// THEN
 		assert.NoError(t, err)
-		countAfter, _ := bt.LeafPageCount()
+		countAfter, _ := bt.LeafPageCount(mtr)
 		assert.Equal(t, countBefore+1, countAfter)
 	})
 

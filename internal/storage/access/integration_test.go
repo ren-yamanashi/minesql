@@ -554,7 +554,6 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 		defer mtr.UnpinAll()
 		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
-		defer iter.Close()
 		count := 0
 		for {
 			_, ok, err := iter.Next()
@@ -623,7 +622,6 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 						break
 					}
 				}
-				iter.Close()
 				mtr.UnpinAll()
 			}
 		}()
@@ -635,7 +633,6 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 		defer mtr.UnpinAll()
 		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
-		defer iter.Close()
 		count := 0
 		for {
 			_, ok, err := iter.Next()
@@ -709,7 +706,6 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 		defer mtr.UnpinAll()
 		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
 		assert.NoError(t, err)
-		defer iter.Close()
 		count := 0
 		for {
 			_, ok, err := iter.Next()

@@ -81,7 +81,6 @@ func (t *Table) isPrimaryKeyColumn(colName string) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer iter.Close()
 
 	col, ok, err := iter.Next()
 	if err != nil {
@@ -132,7 +131,6 @@ func fetchTable(ct *dictionary.Catalog, bp *buffer.Pool, name string) (dictionar
 	if err != nil {
 		return dictionary.TableMetaRecord{}, err
 	}
-	defer iter.Close()
 	record, ok, err := iter.Next()
 	if err != nil {
 		return dictionary.TableMetaRecord{}, err
@@ -170,7 +168,6 @@ func fetchPrimaryIndexRecord(ct *dictionary.Catalog, bp *buffer.Pool, fileId pag
 	if err != nil {
 		return dictionary.IndexMetaRecord{}, err
 	}
-	defer iter.Close()
 	record, ok, err := iter.Next()
 	if err != nil {
 		return dictionary.IndexMetaRecord{}, err
@@ -219,7 +216,6 @@ func fetchSecondaryIndexRecords(ct *dictionary.Catalog, bp *buffer.Pool, fileId 
 	if err != nil {
 		return nil, err
 	}
-	defer iter.Close()
 	var records []dictionary.IndexMetaRecord
 	for {
 		record, ok, err := iter.Next()

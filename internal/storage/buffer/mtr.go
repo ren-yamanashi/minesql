@@ -37,6 +37,7 @@ type Mtr struct {
 	mtrStartLsn   redo.Lsn // この Mtr が最初に記録した MtrStart の LSN (= ダーティ化開始 LSN)。未採番時は 0
 	hasLoggedPage bool     // この Mtr で 1 つでもページを Redo 記録したか
 	logErr        error    // 記録中に発生した最初のエラー。発生後は記録を行わない
+	released      bool     // Commit / UnpinAll で立つ。立った後にページ取得を要求すると panic する
 }
 
 func NewMtr(pool *Pool) *Mtr {
@@ -50,7 +51,11 @@ func NewWriteMtr(pool *Pool, trxId lock.TrxId, redoLog *redo.Buffer) *Mtr {
 }
 
 // PageForRead は読み込み用のバッファページを取得し、Shared ラッチと Pin をスコープに記録する
+//   - 既に Commit / UnpinAll で解放された Mtr に対して呼ぶと panic する
 func (m *Mtr) PageForRead(pageId page.Id) (*Page, error) {
+	if m.released {
+		panic("buffer: mtr already released, cannot acquire page after Commit/UnpinAll")
+	}
 	bufPage, err := m.pool.Page(pageId)
 	if err != nil {
 		return nil, err
@@ -71,7 +76,11 @@ func (m *Mtr) PageForRead(pageId page.Id) (*Page, error) {
 
 // PageForWrite は書き込み用のバッファページを取得し、Exclusive ラッチと Pin をスコープに記録する
 //   - 同一 Mtr 内で S 取得済みのページを X 要求した場合は S を解放して X を取り直す (隙間で他者が X を取りうる)
+//   - 既に Commit / UnpinAll で解放された Mtr に対して呼ぶと panic する
 func (m *Mtr) PageForWrite(pageId page.Id) (*Page, error) {
+	if m.released {
+		panic("buffer: mtr already released, cannot acquire page after Commit/UnpinAll")
+	}
 	bufPage, err := m.pool.Page(pageId)
 	if err != nil {
 		return nil, err
@@ -113,17 +122,6 @@ func (m *Mtr) Unpin(pageId page.Id) {
 	}
 }
 
-// Detach はラッチを解放しスコープの記録から指定ページを 1 件除外する。Pin は解放しない (走査などへ所有権を移譲する用)
-//   - 変更ありの X ラッチを保持中のページを指定すると panic する
-func (m *Mtr) Detach(pageId page.Id) {
-	if entry, ok := m.removePinned(pageId); ok {
-		m.assertReleasable(entry)
-		if !entry.skipLatch {
-			entry.bufPage.latch.Unlock(entry.mode)
-		}
-	}
-}
-
 // assertReleasable は変更ありの X ラッチを mtr 途中で解放しようとした場合に panic する
 //   - 一括解放経路 (UnpinAll / Commit) は本チェックを経由しないため、 mtr 完了時の解放は許容される
 //   - skipLatch なエントリ (= 同一ページの再帰取得) と非 X モードのエントリは検証対象外
@@ -140,17 +138,20 @@ func (m *Mtr) assertReleasable(entry pinnedEntry) {
 // UnpinAll はスコープに記録された全ての Pin とラッチを解放する
 //   - 各ページはラッチ解放前に、変更済みであれば Redo へ記録し Page LSN をスタンプする
 //   - MtrEnd は書かないため、記録途中の Mtr はクラッシュリカバリ時に破棄される
+//   - 解放後に PageForRead / PageForWrite を呼ぶと panic する
 func (m *Mtr) UnpinAll() {
 	// LIFO 順で記録・解放することで、実体ラッチを持つエントリ (最初に取得された) が最後に解放される
 	for i := len(m.pinned) - 1; i >= 0; i-- {
 		m.logPageIfModified(m.pinned[i])
 	}
 	m.releaseAll()
+	m.released = true
 }
 
 // Commit は保持中の変更ページを Redo へ記録し、1 つでも記録していれば MtrEnd を書いてから全ラッチ・Pin を解放する
 //   - 記録中にエラーが発生した場合は MtrEnd を書かず、そのエラーを返す
 //   - 記録は LIFO 順で行うため、Undo ページ切替時の「新ページの実体 → 旧ページのリンク」順序が保たれる
+//   - 解放後に PageForRead / PageForWrite を呼ぶと panic する
 func (m *Mtr) Commit() error {
 	for i := len(m.pinned) - 1; i >= 0; i-- {
 		m.logPageIfModified(m.pinned[i])
@@ -162,6 +163,7 @@ func (m *Mtr) Commit() error {
 	}
 	err := m.logErr
 	m.releaseAll()
+	m.released = true
 	return err
 }
 

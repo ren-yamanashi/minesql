@@ -41,10 +41,6 @@ func NewSecondaryIndexIterator(
 	}
 }
 
-func (si *SecondaryIndexIterator) Close() {
-	si.iterator.Close()
-}
-
 // Next はセカンダリインデックスから次の結果を返す
 // (secondary-index -> primary-index の順で検索する)
 //   - return: 検索結果, データがあるか
@@ -81,8 +77,7 @@ func (si *SecondaryIndexIterator) Next() (*PrimaryRecord, bool, error) {
 //   - readView が nil の場合は deleteMark のみで判定する
 //   - 本体レコード不在 / 可視バージョンなし / 削除済み / SK 不一致の場合は nil を返す
 func (si *SecondaryIndexIterator) resolvePrimaryVersion(secRec *SecondaryRecord) (*PrimaryRecord, error) {
-	mtr := buffer.NewMtr(si.bufferPool)
-	defer mtr.UnpinAll()
+	mtr := si.iterator.Mtr()
 
 	primaryFileId := si.primaryTree.MetaPageId().FileId()
 	pkKey := encode.Encode(nil, stringToByteSlice(secRec.pk))
@@ -90,9 +85,9 @@ func (si *SecondaryIndexIterator) resolvePrimaryVersion(secRec *SecondaryRecord)
 	if err != nil {
 		return nil, err
 	}
-	defer iter.Close()
+	defer mtr.Unpin(iter.BufferPageId())
 
-	rec, ok, err := iter.Next()
+	rec, ok, err := iter.Get()
 	if err != nil {
 		return nil, err
 	}
@@ -202,18 +197,18 @@ func (si *SecondaryIndexIterator) nextVisibleSecondaryRecord() (*SecondaryRecord
 //   - 一致時: secRec を返す (Read View から見て SK が一致するバージョンが存在)
 //   - 不一致時 / チェーン終端時 / PK レコード不在時: nil を返す
 func (si *SecondaryIndexIterator) resolveViaPrimary(secRec *SecondaryRecord) (*SecondaryRecord, error) {
-	mtr := buffer.NewMtr(si.bufferPool)
-	defer mtr.UnpinAll()
+	mtr := si.iterator.Mtr()
 
 	primaryFileId := si.primaryTree.MetaPageId().FileId()
 	pkKey := encode.Encode(nil, stringToByteSlice(secRec.pk))
-	rec, _, err := si.primaryTree.FindByKey(mtr, pkKey)
+	rec, position, err := si.primaryTree.FindByKey(mtr, pkKey)
 	if errors.Is(err, btree.ErrKeyNotFound) {
 		return nil, nil //nolint:nilnil // nil は「該当の PK レコードが存在しない」を表す
 	}
 	if err != nil {
 		return nil, err
 	}
+	defer mtr.Unpin(position.PageId)
 
 	current, err := DecodePrimaryRecord(rec, si.catalog, si.bufferPool, primaryFileId)
 	if err != nil {

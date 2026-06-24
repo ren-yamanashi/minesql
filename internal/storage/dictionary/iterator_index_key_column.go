@@ -10,11 +10,6 @@ func NewIndexKeyColumnIterator(iter *btree.Iterator) *IndexKeyColumnIterator {
 	return &IndexKeyColumnIterator{iterator: iter}
 }
 
-// Close はイテレータが保持しているバッファページの参照を解放する
-func (iki *IndexKeyColumnIterator) Close() {
-	iki.iterator.Close()
-}
-
 // Next はインデックスキーカラムメタデータから次の結果を返す
 func (iki *IndexKeyColumnIterator) Next() (IndexKeyColumnMetaRecord, bool, error) {
 	record, ok, err := iki.iterator.Next()

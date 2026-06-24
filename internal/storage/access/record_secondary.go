@@ -168,7 +168,6 @@ func fetchIndex(ct *dictionary.Catalog, bp *buffer.Pool, fileId page.FileId, ind
 	if err != nil {
 		return dictionary.IndexMetaRecord{}, err
 	}
-	defer iter.Close()
 	indexRecord, ok, err := iter.Next()
 	if err != nil {
 		return dictionary.IndexMetaRecord{}, err
@@ -188,7 +187,6 @@ func fetchIndexKeyColumn(ct *dictionary.Catalog, bp *buffer.Pool, indexId dictio
 	if err != nil {
 		return nil, err
 	}
-	defer keyColMetaIter.Close()
 
 	keyCols := map[string]int{}
 	for {

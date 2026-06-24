@@ -3,6 +3,7 @@ package access
 import (
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -12,9 +13,11 @@ func TestTableSearch(t *testing.T) {
 		tm := setupTrxManager(t)
 		table := setupTableForTrxTest(t, tm)
 		trx := tm.Begin()
+		mtr := buffer.NewMtr(table.bufferPool)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		_, err := table.Search(trx, SearchModeStart{})
+		_, err := table.Search(mtr, trx, SearchModeStart{})
 
 		// THEN
 		assert.NoError(t, err)
@@ -26,11 +29,15 @@ func TestTableSearch(t *testing.T) {
 		tm := setupTrxManager(t)
 		table := setupTableForTrxTest(t, tm)
 		trx := tm.Begin()
+		mtr1 := buffer.NewMtr(table.bufferPool)
+		defer mtr1.UnpinAll()
+		mtr2 := buffer.NewMtr(table.bufferPool)
+		defer mtr2.UnpinAll()
 
 		// WHEN
-		_, err1 := table.Search(trx, SearchModeStart{})
+		_, err1 := table.Search(mtr1, trx, SearchModeStart{})
 		rv1 := trx.readView
-		_, err2 := table.Search(trx, SearchModeStart{})
+		_, err2 := table.Search(mtr2, trx, SearchModeStart{})
 		rv2 := trx.readView
 
 		// THEN
@@ -52,13 +59,14 @@ func TestTableSearch(t *testing.T) {
 		_ = tm.Commit(writeTx)
 
 		readTx := tm.Begin()
+		mtr := buffer.NewMtr(table.bufferPool)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		iter, err := table.Search(readTx, SearchModeStart{})
+		iter, err := table.Search(mtr, readTx, SearchModeStart{})
 
 		// THEN
 		assert.NoError(t, err)
-		defer iter.Close()
 		result, ok, err := iter.Next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
@@ -72,9 +80,11 @@ func TestTableSearchSecondary(t *testing.T) {
 		tm := setupTrxManager(t)
 		table := setupTableForTrxTest(t, tm)
 		trx := tm.Begin()
+		mtr := buffer.NewMtr(table.bufferPool)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		_, err := table.SearchSecondary(trx, "nonexistent", SearchModeStart{})
+		_, err := table.SearchSecondary(mtr, trx, "nonexistent", SearchModeStart{})
 
 		// THEN
 		assert.Error(t, err)
@@ -94,13 +104,14 @@ func TestTableSearchSecondary(t *testing.T) {
 		_ = tm.Commit(writeTx)
 
 		readTx := tm.Begin()
+		mtr := buffer.NewMtr(table.bufferPool)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		iter, err := table.SearchSecondary(readTx, "idx_name", SearchModeStart{})
+		iter, err := table.SearchSecondary(mtr, readTx, "idx_name", SearchModeStart{})
 
 		// THEN
 		assert.NoError(t, err)
-		defer iter.Close()
 		result, ok, err := iter.Next()
 		assert.NoError(t, err)
 		assert.True(t, ok)

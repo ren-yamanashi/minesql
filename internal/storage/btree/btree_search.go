@@ -32,7 +32,6 @@ func (t *Tree) FindByKey(mtr *buffer.Mtr, key []byte) (Record, RecordPosition, e
 	if err != nil {
 		return nil, RecordPosition{}, err
 	}
-	defer iter.Close()
 	position := RecordPosition{
 		PageId:  iter.bufferPage.PageId(),
 		SlotNum: iter.slotNum,
@@ -82,16 +81,13 @@ func (t *Tree) searchRecursively(mtr *buffer.Mtr, rootPageId page.Id, mode Searc
 		case nodeTypeLeaf:
 			leafNode := newLeafNode(currentBufPage)
 			slotNum := mode.slotNum(leafNode)
-			iter := NewIterator(t, currentBufPage, slotNum, mode)
-			// リーフの Pin は走査側 (Iterator) が引き継ぐため、mtr の管理から外す
-			mtr.Detach(currentPageId)
+			iter := NewIterator(t, mtr, currentBufPage, slotNum, mode)
 			// 検索対象のキーが現在のリーフノードの末端のレコードより大きい場合、次のリーフノードに進める
 			// 例: リーフノードに (1, ...), (3, ...), (5, ...) のレコードが格納されている場合に、キー 6 を検索したいときなど
 			// (この場合 SearchSlotNum は NumRecords と等しい値を返す)
 			// この場合、次のリーフノードに進めてからイテレータを返す
 			if leafNode.numRecords() == slotNum {
 				if err := iter.Advance(); err != nil {
-					iter.Close()
 					return nil, err
 				}
 			}
@@ -105,9 +101,8 @@ func (t *Tree) searchRecursively(mtr *buffer.Mtr, rootPageId page.Id, mode Searc
 }
 
 // leafPageIds はブランチページのみ辿り、全リーフページの PageId を収集する
-func (t *Tree) leafPageIds() ([]page.Id, error) {
-	mtr := buffer.NewMtr(t.bufferPool)
-	defer mtr.UnpinAll()
+//   - mtr: 走査ページの S-latch / Pin を保持する mini-transaction。 解放は呼び出し側
+func (t *Tree) leafPageIds(mtr *buffer.Mtr) ([]page.Id, error) {
 	pageMeta, err := mtr.PageForRead(t.MetaPageId())
 	if err != nil {
 		return nil, err

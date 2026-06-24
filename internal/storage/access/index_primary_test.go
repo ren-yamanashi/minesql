@@ -333,9 +333,11 @@ func TestPrimaryIndexLeafPageCount(t *testing.T) {
 	t.Run("リーフページ数を取得できる", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
+		mtr := buffer.NewMtr(pi.bufferPool)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		count, err := pi.leafPageCount()
+		count, err := pi.leafPageCount(mtr)
 
 		// THEN
 		assert.NoError(t, err)
@@ -347,9 +349,11 @@ func TestPrimaryIndexHeight(t *testing.T) {
 	t.Run("ツリーの高さを取得できる", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
+		mtr := buffer.NewMtr(pi.bufferPool)
+		defer mtr.UnpinAll()
 
 		// WHEN
-		height, err := pi.height()
+		height, err := pi.height(mtr)
 
 		// THEN
 		assert.NoError(t, err)

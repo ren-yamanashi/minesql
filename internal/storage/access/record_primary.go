@@ -223,7 +223,6 @@ func fetchColumnDefs(ct *dictionary.Catalog, bp *buffer.Pool, fileId page.FileId
 	if err != nil {
 		return nil, err
 	}
-	defer iter.Close()
 
 	colDefs := map[string]int{}
 	for {

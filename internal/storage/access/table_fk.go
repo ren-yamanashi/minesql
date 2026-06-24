@@ -154,7 +154,6 @@ func fetchForeignKeys(ct *dictionary.Catalog, bp *buffer.Pool, fileId page.FileI
 	if err != nil {
 		return nil, err
 	}
-	defer iter.Close()
 
 	var fks []dictionary.ConstraintMetaRecord
 	for {
@@ -178,7 +177,6 @@ func fetchReferencingConstraints(ct *dictionary.Catalog, bp *buffer.Pool, fileId
 	if err != nil {
 		return nil, err
 	}
-	defer iter.Close()
 
 	var refs []dictionary.ConstraintMetaRecord
 	for {
@@ -293,7 +291,6 @@ func hasActiveChildRecord(
 	if err != nil {
 		return err
 	}
-	defer iter.Close()
 
 	for {
 		existing, ok, err := iter.Get()

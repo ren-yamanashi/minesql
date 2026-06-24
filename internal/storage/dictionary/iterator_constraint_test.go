@@ -8,37 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestConstraintIteratorClose(t *testing.T) {
-	t.Run("検索結果のイテレータを Close できる", func(t *testing.T) {
-		// GIVEN
-		cm, bp := setupTestConstraintMeta(t)
-		mtr := buffer.NewMtr(bp)
-		defer mtr.UnpinAll()
-		_ = cm.Insert(mtr, NewConstraintMetaRecord(page.FileId(1), "id", "PRIMARY", page.FileId(0), ""))
-		iter, err := cm.Search(mtr, SearchModeStart{})
-		assert.NoError(t, err)
-
-		// WHEN
-		// THEN
-		_, _, _ = iter.Next()
-		iter.Close()
-
-	})
-
-	t.Run("イテレーション前に Close できる", func(t *testing.T) {
-		// GIVEN
-		cm, bp := setupTestConstraintMeta(t)
-		mtr := buffer.NewMtr(bp)
-		defer mtr.UnpinAll()
-		iter, err := cm.Search(mtr, SearchModeStart{})
-		assert.NoError(t, err)
-
-		// WHEN
-		// THEN
-		iter.Close()
-	})
-}
-
 func TestConstraintIteratorNext(t *testing.T) {
 	t.Run("レコードを順に取得できる", func(t *testing.T) {
 		// GIVEN
@@ -49,7 +18,6 @@ func TestConstraintIteratorNext(t *testing.T) {
 		_ = cm.Insert(mtr, NewConstraintMetaRecord(page.FileId(2), "user_id", "fk_orders_users", page.FileId(1), "id"))
 		iter, err := cm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
-		defer iter.Close()
 
 		// WHEN
 		r1, ok1, err1 := iter.Next()
@@ -84,7 +52,6 @@ func TestConstraintIteratorNext(t *testing.T) {
 		defer mtr.UnpinAll()
 		iter, err := cm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
-		defer iter.Close()
 
 		// WHEN
 		_, ok, err := iter.Next()

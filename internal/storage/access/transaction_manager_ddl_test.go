@@ -234,7 +234,6 @@ func assertColumnMetaAbsent(t *testing.T, tm *TrxManager, fileId page.FileId, co
 	if err != nil {
 		t.Fatalf("ColumnMeta Search に失敗: %v", err)
 	}
-	defer iter.Close()
 	for {
 		record, ok, err := iter.Next()
 		if err != nil {

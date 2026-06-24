@@ -670,21 +670,22 @@ func TestBtreeNoPinLeak(t *testing.T) {
 		assert.Equal(t, 0, mtr.PinnedCount())
 	})
 
-	t.Run("Search 完了後に Pin と Tree ラッチが残らない", func(t *testing.T) {
+	t.Run("Search 完了時点で Tree ラッチが解放され、リーフ Pin だけが mtr に残る", func(t *testing.T) {
 		// GIVEN
 		tree := setupBtree(t)
 		tree.mustInsert("apple", strings.Repeat("a", 100))
 
 		// WHEN
 		mtr := buffer.NewMtr(tree.bufferPool)
-		defer mtr.UnpinAll()
-		iter, err := tree.Search(mtr, SearchModeKey{Key: []byte("apple")})
+		_, err := tree.Search(mtr, SearchModeKey{Key: []byte("apple")})
 		require.NoError(t, err)
-		iter.Close()
 
 		// THEN
-		assert.Equal(t, 0, mtr.PinnedCount())
+		assert.Equal(t, 1, mtr.PinnedCount())
 		assert.Equal(t, 0, mtr.HeldLatchCount())
+
+		mtr.UnpinAll()
+		assert.Equal(t, 0, mtr.PinnedCount())
 	})
 }
 

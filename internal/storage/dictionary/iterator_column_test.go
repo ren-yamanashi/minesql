@@ -8,37 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestColumnIteratorClose(t *testing.T) {
-	t.Run("検索結果のイテレータを Close できる", func(t *testing.T) {
-		// GIVEN
-		cm, bp := setupTestColumnMeta(t)
-		mtr := buffer.NewMtr(bp)
-		defer mtr.UnpinAll()
-		_ = cm.Insert(mtr, NewColumnMetaRecord(page.FileId(1), "id", 0))
-		iter, err := cm.Search(mtr, SearchModeStart{})
-		assert.NoError(t, err)
-
-		// WHEN
-		_, _, _ = iter.Next()
-		iter.Close()
-
-		// THEN: パニックせずに Close できる
-	})
-
-	t.Run("イテレーション前に Close できる", func(t *testing.T) {
-		// GIVEN
-		cm, bp := setupTestColumnMeta(t)
-		mtr := buffer.NewMtr(bp)
-		defer mtr.UnpinAll()
-		iter, err := cm.Search(mtr, SearchModeStart{})
-		assert.NoError(t, err)
-
-		// WHEN
-		// THEN
-		iter.Close()
-	})
-}
-
 func TestColumnIteratorNext(t *testing.T) {
 	t.Run("レコードを順に取得できる", func(t *testing.T) {
 		// GIVEN
@@ -49,7 +18,6 @@ func TestColumnIteratorNext(t *testing.T) {
 		_ = cm.Insert(mtr, NewColumnMetaRecord(page.FileId(1), "name", 1))
 		iter, err := cm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
-		defer iter.Close()
 
 		// WHEN
 		r1, ok1, err1 := iter.Next()
@@ -79,7 +47,6 @@ func TestColumnIteratorNext(t *testing.T) {
 		defer mtr.UnpinAll()
 		iter, err := cm.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
-		defer iter.Close()
 
 		// WHEN
 		_, ok, err := iter.Next()

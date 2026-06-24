@@ -7,44 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUserIteratorClose(t *testing.T) {
-	t.Run("検索結果のイテレータを Close できる", func(t *testing.T) {
-		// GIVEN
-		bp := setupCatalogTestBufferPool(t)
-		ct, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
-		assert.NoError(t, err)
-		mtr := buffer.NewMtr(bp)
-		defer mtr.UnpinAll()
-		err = ct.UserMeta().Insert(mtr, NewUserMetaRecord("testuser", "%", []byte("authstring")))
-		assert.NoError(t, err)
-
-		iter, err := ct.UserMeta().Search(mtr, SearchModeStart{})
-		assert.NoError(t, err)
-
-		// WHEN
-		// THEN
-		_, _, _ = iter.Next()
-		iter.Close()
-
-	})
-
-	t.Run("イテレーション前に Close できる", func(t *testing.T) {
-		// GIVEN
-		bp := setupCatalogTestBufferPool(t)
-		ct, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
-		assert.NoError(t, err)
-		mtr := buffer.NewMtr(bp)
-		defer mtr.UnpinAll()
-
-		iter, err := ct.UserMeta().Search(mtr, SearchModeStart{})
-		assert.NoError(t, err)
-
-		// WHEN
-		// THEN
-		iter.Close()
-	})
-}
-
 func TestUserIteratorNext(t *testing.T) {
 	t.Run("レコードを順に取得できる", func(t *testing.T) {
 		// GIVEN
@@ -55,7 +17,6 @@ func TestUserIteratorNext(t *testing.T) {
 		_ = um.Insert(mtr, NewUserMetaRecord("bob", "%", []byte("auth2")))
 		iter, err := um.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
-		defer iter.Close()
 
 		// WHEN
 		r1, ok1, err1 := iter.Next()
@@ -84,7 +45,6 @@ func TestUserIteratorNext(t *testing.T) {
 		defer mtr.UnpinAll()
 		iter, err := um.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
-		defer iter.Close()
 
 		// WHEN
 		_, ok, err := iter.Next()

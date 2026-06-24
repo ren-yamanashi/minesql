@@ -39,14 +39,12 @@ func TestAllPageIds(t *testing.T) {
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x01}, nonKey))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x02}, nonKey))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x03}, nonKey))
-		height, _ := bt.Height()
+		height, _ := bt.Height(mtr)
 		assert.Equal(t, uint64(2), height)
-		leafCount, _ := bt.LeafPageCount()
+		leafCount, _ := bt.LeafPageCount(mtr)
 
 		// WHEN
-		writeMtr := buffer.NewWriteMtr(bt.bufferPool, lock.SystemReservedTrxId, newTestRedoBuffer(t))
-		defer writeMtr.UnpinAll()
-		ids, err := bt.AllPageIds(writeMtr)
+		ids, err := bt.AllPageIds(mtr)
 
 		// THEN
 		assert.NoError(t, err)
@@ -70,17 +68,15 @@ func TestAllPageIds(t *testing.T) {
 		for i := range 30 {
 			_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{byte(i)}, nonKey))
 		}
-		height, _ := bt.Height()
+		height, _ := bt.Height(mtr)
 		assert.GreaterOrEqual(t, height, uint64(2))
 
 		// WHEN
-		writeMtr := buffer.NewWriteMtr(bt.bufferPool, lock.SystemReservedTrxId, newTestRedoBuffer(t))
-		defer writeMtr.UnpinAll()
-		ids, err := bt.AllPageIds(writeMtr)
+		ids, err := bt.AllPageIds(mtr)
 
 		// THEN
 		assert.NoError(t, err)
-		leafCount, _ := bt.LeafPageCount()
+		leafCount, _ := bt.LeafPageCount(mtr)
 		// 全ページ数 >= メタ + ルート + リーフ数
 		assert.GreaterOrEqual(t, len(ids), 2+int(leafCount))
 		assert.Equal(t, bt.MetaPageId(), ids[0])
@@ -102,13 +98,13 @@ func TestAllPageIds(t *testing.T) {
 			_ = bt.Insert(mtr, NewRecord([]byte{}, key, nonKey))
 			mtr.UnpinAll()
 		}
-		height, _ := bt.Height()
-		assert.GreaterOrEqual(t, height, uint64(3))
-		leafCount, _ := bt.LeafPageCount()
-
-		// WHEN
 		writeMtr := buffer.NewWriteMtr(bt.bufferPool, lock.SystemReservedTrxId, newTestRedoBuffer(t))
 		defer writeMtr.UnpinAll()
+		height, _ := bt.Height(writeMtr)
+		assert.GreaterOrEqual(t, height, uint64(3))
+		leafCount, _ := bt.LeafPageCount(writeMtr)
+
+		// WHEN
 		ids, err := bt.AllPageIds(writeMtr)
 
 		// THEN
@@ -129,9 +125,7 @@ func TestAllPageIds(t *testing.T) {
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x20}, []byte{0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB, 0xBB}))
 
 		// WHEN
-		writeMtr := buffer.NewWriteMtr(bt.bufferPool, lock.SystemReservedTrxId, newTestRedoBuffer(t))
-		defer writeMtr.UnpinAll()
-		ids, err := bt.AllPageIds(writeMtr)
+		ids, err := bt.AllPageIds(mtr)
 
 		// THEN
 		assert.NoError(t, err)
@@ -152,14 +146,12 @@ func TestAllPageIds(t *testing.T) {
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x03}, nonKey))
 
 		// WHEN
-		writeMtr := buffer.NewWriteMtr(bt.bufferPool, lock.SystemReservedTrxId, newTestRedoBuffer(t))
-		defer writeMtr.UnpinAll()
-		ids, err := bt.AllPageIds(writeMtr)
+		ids, err := bt.AllPageIds(mtr)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, bt.MetaPageId(), ids[0])
-		leafIds, leafErr := bt.leafPageIds()
+		leafIds, leafErr := bt.leafPageIds(mtr)
 		assert.NoError(t, leafErr)
 		tail := ids[len(ids)-len(leafIds):]
 		assertSamePageIdSet(t, leafIds, tail)

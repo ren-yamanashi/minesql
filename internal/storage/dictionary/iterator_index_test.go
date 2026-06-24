@@ -8,44 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestIndexIteratorClose(t *testing.T) {
-	t.Run("検索結果のイテレータを Close できる", func(t *testing.T) {
-		// GIVEN
-		im, bp := setupTestIndexMeta(t)
-		mtr := buffer.NewMtr(bp)
-		defer mtr.UnpinAll()
-		_ = im.Insert(mtr, NewIndexMetaRecord(
-			page.FileId(1),
-			IndexId(1),
-			PrimaryIndexName,
-			IndexTypePrimary,
-			1,
-			page.NewId(page.FileId(1), page.PageNumber(0)),
-		))
-		iter, err := im.Search(mtr, SearchModeStart{})
-		assert.NoError(t, err)
-
-		// WHEN
-		// THEN
-		_, _, _ = iter.Next()
-		iter.Close()
-
-	})
-
-	t.Run("イテレーション前に Close できる", func(t *testing.T) {
-		// GIVEN
-		im, bp := setupTestIndexMeta(t)
-		mtr := buffer.NewMtr(bp)
-		defer mtr.UnpinAll()
-		iter, err := im.Search(mtr, SearchModeStart{})
-		assert.NoError(t, err)
-
-		// WHEN
-		// THEN
-		iter.Close()
-	})
-}
-
 func TestIndexIteratorNext(t *testing.T) {
 	t.Run("レコードを順に取得できる", func(t *testing.T) {
 		// GIVEN
@@ -70,7 +32,6 @@ func TestIndexIteratorNext(t *testing.T) {
 		))
 		iter, err := im.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
-		defer iter.Close()
 
 		// WHEN
 		r1, ok1, err1 := iter.Next()
@@ -104,7 +65,6 @@ func TestIndexIteratorNext(t *testing.T) {
 		defer mtr.UnpinAll()
 		iter, err := im.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
-		defer iter.Close()
 
 		// WHEN
 		_, ok, err := iter.Next()
