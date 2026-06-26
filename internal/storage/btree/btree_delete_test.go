@@ -236,19 +236,19 @@ func TestDeleteOptimistic(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("完了後に Pin と Tree ラッチが残らない", func(t *testing.T) {
+	t.Run("完了後 mtr.UnpinAll で Pin と Tree ラッチが解放される", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
-		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
 		_, err := bt.deleteOptimistic(mtr, []byte{0x10})
+		assert.NoError(t, err)
 
 		// THEN
-		assert.NoError(t, err)
+		mtr.UnpinAll()
 		assert.Equal(t, 0, mtr.PinnedCount())
 		assert.Equal(t, 0, mtr.HeldLatchCount())
 	})
@@ -272,19 +272,19 @@ func TestDeletePessimistic(t *testing.T) {
 		assert.ErrorIs(t, err, ErrKeyNotFound)
 	})
 
-	t.Run("完了後に Pin と Tree ラッチが残らない", func(t *testing.T) {
+	t.Run("完了後 mtr.UnpinAll で Pin と Tree ラッチが解放される", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
-		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
 		err := bt.deletePessimistic(mtr, []byte{0x10})
+		assert.NoError(t, err)
 
 		// THEN
-		assert.NoError(t, err)
+		mtr.UnpinAll()
 		assert.Equal(t, 0, mtr.PinnedCount())
 		assert.Equal(t, 0, mtr.HeldLatchCount())
 	})

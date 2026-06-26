@@ -35,7 +35,6 @@ func (t *Tree) updateOptimistic(mtr *buffer.Mtr, record Record) (needsPessimisti
 	if err != nil {
 		return false, err
 	}
-	defer mtr.Unpin(leafBufPage.PageId())
 
 	leafNode := newLeafNode(leafBufPage)
 	slotNum, found := leafNode.searchSlotNum(record.Key())

@@ -187,7 +187,6 @@ func (t *Tree) insertRecursively(
 	if err != nil {
 		return nil, page.InvalidId(), false, err
 	}
-	defer mtr.Unpin(bufPage.PageId())
 	nt := nodeType(pg.Data())
 
 	switch nt {

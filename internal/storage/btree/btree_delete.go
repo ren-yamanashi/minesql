@@ -35,7 +35,6 @@ func (t *Tree) deleteOptimistic(mtr *buffer.Mtr, key []byte) (needsPessimistic b
 	if err != nil {
 		return false, err
 	}
-	defer mtr.Unpin(leafBufPage.PageId())
 
 	leafNode := newLeafNode(leafBufPage)
 	slotNum, found := leafNode.searchSlotNum(key)

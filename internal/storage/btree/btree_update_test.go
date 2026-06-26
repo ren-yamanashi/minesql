@@ -149,9 +149,7 @@ func TestUpdate(t *testing.T) {
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
 		readRoot := func() page.Id {
-			m := buffer.NewMtr(bp)
-			defer m.UnpinAll()
-			pm, _ := m.PageForRead(bt.MetaPageId())
+			pm, _ := mtr.PageForRead(bt.MetaPageId())
 			return newMetaPage(pm).rootPageId()
 		}
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, make([]byte, 1)))
@@ -267,19 +265,19 @@ func TestUpdateOptimistic(t *testing.T) {
 		assert.ErrorIs(t, err, ErrKeyNotFound)
 	})
 
-	t.Run("完了後に Pin と Tree ラッチが残らない", func(t *testing.T) {
+	t.Run("完了後 mtr.UnpinAll で Pin と Tree ラッチが解放される", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
-		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
 		_, err := bt.updateOptimistic(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
+		assert.NoError(t, err)
 
 		// THEN
-		assert.NoError(t, err)
+		mtr.UnpinAll()
 		assert.Equal(t, 0, mtr.PinnedCount())
 		assert.Equal(t, 0, mtr.HeldLatchCount())
 	})
@@ -304,19 +302,19 @@ func TestUpdatePessimistic(t *testing.T) {
 		assert.Equal(t, []byte{0xBB}, record.NonKey())
 	})
 
-	t.Run("完了後に Pin と Tree ラッチが残らない", func(t *testing.T) {
+	t.Run("完了後 mtr.UnpinAll で Pin と Tree ラッチが解放される", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
-		defer mtr.UnpinAll()
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
 
 		// WHEN
 		err := bt.updatePessimistic(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xBB}))
+		assert.NoError(t, err)
 
 		// THEN
-		assert.NoError(t, err)
+		mtr.UnpinAll()
 		assert.Equal(t, 0, mtr.PinnedCount())
 		assert.Equal(t, 0, mtr.HeldLatchCount())
 	})

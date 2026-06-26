@@ -208,11 +208,8 @@ func TestIteratorRefetchByKey(t *testing.T) {
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
 		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x30}, []byte{0xCC}))
 		iter, _ := bt.Search(mtr, SearchModeStart{})
-		_, _, _ = iter.Get() // lastKey = 0x10
-		// 別 Mtr で同一リーフを更新し modifyCount を進める
-		otherMtr := buffer.NewMtr(bt.bufferPool)
-		_ = bt.Update(otherMtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xFF}))
-		otherMtr.UnpinAll()
+		_, _, _ = iter.Get()
+		_ = bt.Update(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xFF}))
 
 		// WHEN
 		err := iter.Advance()
@@ -255,20 +252,15 @@ func TestIteratorRefetchBySearchMode(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
 		bt, _ := createTreeForTest(t, bp, page.FileId(0))
-		setupMtr := buffer.NewMtr(bt.bufferPool)
-		_ = bt.Insert(setupMtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
-		_ = bt.Insert(setupMtr, NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
-		setupMtr.UnpinAll()
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
 
-		searchMtr := buffer.NewMtr(bt.bufferPool)
-		defer searchMtr.UnpinAll()
-		iter, err := bt.Search(searchMtr, SearchModeKey{Key: []byte{0x20}})
+		iter, err := bt.Search(mtr, SearchModeKey{Key: []byte{0x20}})
 		assert.NoError(t, err)
 
-		// 初回 Get 前に 0x10 と 0x20 の間にキーを挿入し、0x20 のスロット位置をずらす
-		insertMtr := buffer.NewMtr(bt.bufferPool)
-		_ = bt.Insert(insertMtr, NewRecord([]byte{}, []byte{0x15}, []byte{0xCC}))
-		insertMtr.UnpinAll()
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x15}, []byte{0xCC}))
 
 		// WHEN
 		record, ok, err := iter.Get()
@@ -283,20 +275,15 @@ func TestIteratorRefetchBySearchMode(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeBufferPool(t)
 		bt, _ := createTreeForTest(t, bp, page.FileId(0))
-		setupMtr := buffer.NewMtr(bt.bufferPool)
-		_ = bt.Insert(setupMtr, NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
-		setupMtr.UnpinAll()
+		mtr := buffer.NewMtr(bt.bufferPool)
+		defer mtr.UnpinAll()
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x20}, []byte{0xBB}))
 
-		searchMtr := buffer.NewMtr(bt.bufferPool)
-		defer searchMtr.UnpinAll()
-		iter, err := bt.Search(searchMtr, SearchModeStart{})
+		iter, err := bt.Search(mtr, SearchModeStart{})
 		assert.NoError(t, err)
 		snapBefore := iter.modifyCountSnap
 
-		// 初回 Get 前に新しい先頭となる 0x10 を挿入する
-		insertMtr := buffer.NewMtr(bt.bufferPool)
-		_ = bt.Insert(insertMtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xCC}))
-		insertMtr.UnpinAll()
+		_ = bt.Insert(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xCC}))
 
 		// WHEN
 		record, ok, err := iter.Get()

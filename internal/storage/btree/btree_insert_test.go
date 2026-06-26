@@ -212,18 +212,18 @@ func TestInsertOptimistic(t *testing.T) {
 		assert.ErrorIs(t, err, ErrKeyNotFound)
 	})
 
-	t.Run("完了後に Pin と Tree ラッチが残らない", func(t *testing.T) {
+	t.Run("完了後 mtr.UnpinAll で Pin と Tree ラッチが解放される", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
-		defer mtr.UnpinAll()
 
 		// WHEN
 		_, err := bt.insertOptimistic(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		assert.NoError(t, err)
 
 		// THEN
-		assert.NoError(t, err)
+		mtr.UnpinAll()
 		assert.Equal(t, 0, mtr.PinnedCount())
 		assert.Equal(t, 0, mtr.HeldLatchCount())
 	})
@@ -266,18 +266,18 @@ func TestInsertPessimistic(t *testing.T) {
 		assert.Equal(t, countBefore+1, countAfter)
 	})
 
-	t.Run("完了後に Pin と Tree ラッチが残らない", func(t *testing.T) {
+	t.Run("完了後 mtr.UnpinAll で Pin と Tree ラッチが解放される", func(t *testing.T) {
 		// GIVEN
 		bp := setupBtreeTestBufferPool(t)
 		bt, _ := createTreeForTest(t, bp, page.FileId(0))
 		mtr := buffer.NewMtr(bt.bufferPool)
-		defer mtr.UnpinAll()
 
 		// WHEN
 		err := bt.insertPessimistic(mtr, NewRecord([]byte{}, []byte{0x10}, []byte{0xAA}))
+		assert.NoError(t, err)
 
 		// THEN
-		assert.NoError(t, err)
+		mtr.UnpinAll()
 		assert.Equal(t, 0, mtr.PinnedCount())
 		assert.Equal(t, 0, mtr.HeldLatchCount())
 	})

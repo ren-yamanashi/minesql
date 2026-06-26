@@ -48,7 +48,6 @@ func (t *Tree) splitInsertBranch(
 	if err != nil {
 		return nil, page.InvalidId(), err
 	}
-	defer mtr.Unpin(newBranchPageId)
 
 	pageNewBranch, err := mtr.PageForWrite(newBranchPageId)
 	if err != nil {

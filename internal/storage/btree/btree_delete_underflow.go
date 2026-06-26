@@ -32,14 +32,12 @@ func (t *Tree) deleteUnderflow(
 	if err != nil {
 		return false, false, err
 	}
-	defer mtr.Unpin(sibling.pageId)
 
 	// 子ノードの取得
 	childPage, err := mtr.PageForRead(childBufPage.PageId())
 	if err != nil {
 		return false, false, err
 	}
-	defer mtr.Unpin(childBufPage.PageId())
 
 	// リーフノードのアンダーフロー処理
 	if nodeType(childPage.Data()) == nodeTypeLeaf {
@@ -265,7 +263,6 @@ func (t *Tree) onBranchUnderflow(
 func (t *Tree) relinkLeafAfterMerge(mtr *buffer.Mtr, disappearing, survivor *leafNode, survivorPageId page.Id) error {
 	survivor.setNextPageId(disappearing.nextPageId())
 	if nextPageId := disappearing.nextPageId(); !nextPageId.IsInvalid() {
-		defer mtr.Unpin(nextPageId)
 		pageNext, err := mtr.PageForWrite(nextPageId)
 		if err != nil {
 			return err

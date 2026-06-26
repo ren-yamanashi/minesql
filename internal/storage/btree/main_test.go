@@ -34,7 +34,9 @@ func TestBtreeInsertAndScan(t *testing.T) {
 
 		// THEN
 		var w strings.Builder
-		writeScanLog(&w, tree)
+		scanMtr := buffer.NewMtr(tree.bufferPool)
+		defer scanMtr.UnpinAll()
+		writeScanLog(&w, tree, scanMtr)
 
 		expected := `  key=apple, value=a x 200
   key=banana, value=b x 200
@@ -74,7 +76,9 @@ func TestBtreeInsertAndScan(t *testing.T) {
 
 		// THEN
 		var w strings.Builder
-		writeScanLog(&w, tree)
+		scanMtr := buffer.NewMtr(tree.bufferPool)
+		defer scanMtr.UnpinAll()
+		writeScanLog(&w, tree, scanMtr)
 
 		expected := `  key=apple, value=a x 200
   key=banana, value=b x 200
@@ -100,7 +104,7 @@ func TestBtreeInsertAndScan(t *testing.T) {
 
 		// THEN
 		var w strings.Builder
-		writeScanLog(&w, tree)
+		writeScanLog(&w, tree, mtr)
 
 		expected := `  key=apple, value=a x 200
   key=cherry, value=c x 200
@@ -179,11 +183,11 @@ func TestBtreeDeleteIntegration(t *testing.T) {
 
 		// WHEN
 		var w strings.Builder
-		fmt.Fprintln(&w, "=== 挿入後 ===")
-		writeScanLog(&w, tree)
-
 		mtr := buffer.NewMtr(tree.bufferPool)
 		defer mtr.UnpinAll()
+		fmt.Fprintln(&w, "=== 挿入後 ===")
+		writeScanLog(&w, tree, mtr)
+
 		for _, key := range []string{"banana", "elderberry", "grape"} {
 			err := tree.Delete(mtr, []byte(key))
 			require.NoError(t, err)
@@ -191,7 +195,7 @@ func TestBtreeDeleteIntegration(t *testing.T) {
 		}
 
 		fmt.Fprintln(&w, "=== 削除後 ===")
-		writeScanLog(&w, tree)
+		writeScanLog(&w, tree, mtr)
 
 		// THEN
 		expected := `=== 挿入後 ===
@@ -254,7 +258,7 @@ Delete: grape
 
 		// THEN
 		var w strings.Builder
-		writeScanLog(&w, tree)
+		writeScanLog(&w, tree, mtr)
 
 		expected := `  key=apple, value=a x 100
   key=blueberry, value=b x 100
@@ -275,15 +279,15 @@ func TestBtreeUpdateIntegration(t *testing.T) {
 
 		// WHEN
 		var w strings.Builder
-		fmt.Fprintln(&w, "=== 更新前 ===")
-		writeScanLog(&w, tree)
-
 		mtr := buffer.NewMtr(tree.bufferPool)
 		defer mtr.UnpinAll()
+		fmt.Fprintln(&w, "=== 更新前 ===")
+		writeScanLog(&w, tree, mtr)
+
 		require.NoError(t, tree.Update(mtr, NewRecord(nil, []byte("banana"), []byte(strings.Repeat("X", 50)))))
 
 		fmt.Fprintln(&w, "=== 更新後 ===")
-		writeScanLog(&w, tree)
+		writeScanLog(&w, tree, mtr)
 
 		// THEN
 		expected := `=== 更新前 ===
@@ -315,7 +319,7 @@ func TestBtreeUpdateIntegration(t *testing.T) {
 
 		// THEN
 		var w strings.Builder
-		writeScanLog(&w, tree)
+		writeScanLog(&w, tree, mtr)
 
 		expected := `  key=avocado, value=a x 100
   key=banana, value=b x 100
@@ -357,7 +361,7 @@ func TestBtreeUpdateIntegration(t *testing.T) {
 		}
 
 		fmt.Fprintln(&w, "=== 最終状態 ===")
-		writeScanLog(&w, tree)
+		writeScanLog(&w, tree, mtr)
 
 		// THEN
 		expected := `Update #1: len=59
@@ -582,7 +586,7 @@ func TestBtreeCRUDLifecycle(t *testing.T) {
 		tree.mustInsert("banana", strings.Repeat("b", 100))
 		tree.mustInsert("cherry", strings.Repeat("c", 100))
 		fmt.Fprintln(&w, "=== Insert 後 ===")
-		writeScanLog(&w, tree)
+		writeScanLog(&w, tree, mtr)
 
 		// Search (FindByKey)
 		record, _, err := tree.FindByKey(mtr, []byte("banana"))
@@ -592,12 +596,12 @@ func TestBtreeCRUDLifecycle(t *testing.T) {
 		// Update
 		require.NoError(t, tree.Update(mtr, NewRecord(nil, []byte("banana"), []byte(strings.Repeat("X", 50)))))
 		fmt.Fprintln(&w, "=== Update 後 ===")
-		writeScanLog(&w, tree)
+		writeScanLog(&w, tree, mtr)
 
 		// Delete
 		require.NoError(t, tree.Delete(mtr, []byte("banana")))
 		fmt.Fprintln(&w, "=== Delete 後 ===")
-		writeScanLog(&w, tree)
+		writeScanLog(&w, tree, mtr)
 
 		// FindByKey で削除済みキーが見つからない
 		_, _, err = tree.FindByKey(mtr, []byte("banana"))
@@ -625,36 +629,36 @@ FindByKey(banana): key not found
 }
 
 func TestBtreeNoPinLeak(t *testing.T) {
-	t.Run("Insert 完了後に Pin が残らない", func(t *testing.T) {
+	t.Run("Insert 完了後 mtr.UnpinAll で Pin が解放される", func(t *testing.T) {
 		// GIVEN
 		tree := setupBtree(t)
 
 		// WHEN
 		mtr := buffer.NewMtr(tree.bufferPool)
-		defer mtr.UnpinAll()
 		err := tree.Insert(mtr, NewRecord(nil, []byte("apple"), []byte(strings.Repeat("a", 100))))
+		require.NoError(t, err)
 
 		// THEN
-		require.NoError(t, err)
+		mtr.UnpinAll()
 		assert.Equal(t, 0, mtr.PinnedCount())
 	})
 
-	t.Run("Update 完了後に Pin が残らない", func(t *testing.T) {
+	t.Run("Update 完了後 mtr.UnpinAll で Pin が解放される", func(t *testing.T) {
 		// GIVEN
 		tree := setupBtree(t)
 		tree.mustInsert("apple", strings.Repeat("a", 100))
 
 		// WHEN
 		mtr := buffer.NewMtr(tree.bufferPool)
-		defer mtr.UnpinAll()
 		err := tree.Update(mtr, NewRecord(nil, []byte("apple"), []byte(strings.Repeat("b", 100))))
+		require.NoError(t, err)
 
 		// THEN
-		require.NoError(t, err)
+		mtr.UnpinAll()
 		assert.Equal(t, 0, mtr.PinnedCount())
 	})
 
-	t.Run("Delete 完了後に Pin が残らない", func(t *testing.T) {
+	t.Run("Delete 完了後 mtr.UnpinAll で Pin が解放される", func(t *testing.T) {
 		// GIVEN
 		tree := setupBtree(t)
 		tree.mustInsert("apple", strings.Repeat("a", 100))
@@ -662,11 +666,11 @@ func TestBtreeNoPinLeak(t *testing.T) {
 
 		// WHEN
 		mtr := buffer.NewMtr(tree.bufferPool)
-		defer mtr.UnpinAll()
 		err := tree.Delete(mtr, []byte("apple"))
+		require.NoError(t, err)
 
 		// THEN
-		require.NoError(t, err)
+		mtr.UnpinAll()
 		assert.Equal(t, 0, mtr.PinnedCount())
 	})
 
@@ -690,9 +694,7 @@ func TestBtreeNoPinLeak(t *testing.T) {
 }
 
 // B+Tree の全データをスキャンし、key=..., value=... 形式でログに書き出す
-func writeScanLog(w *strings.Builder, tree *Tree) {
-	mtr := buffer.NewMtr(tree.bufferPool)
-	defer mtr.UnpinAll()
+func writeScanLog(w *strings.Builder, tree *Tree, mtr *buffer.Mtr) {
 	iter, err := tree.Search(mtr, SearchModeStart{})
 	if err != nil {
 		panic(err)
