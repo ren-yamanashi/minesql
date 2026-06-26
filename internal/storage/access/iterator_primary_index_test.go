@@ -198,8 +198,8 @@ func TestPrimaryIndexIteratorNextWithReadView(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		updateMtr := buffer.NewMtr(env.iter.bp)
-		defer updateMtr.UnpinAll()
 		assert.NoError(t, env.iter.primaryTree.Update(updateMtr, deleted.Encode()))
+		updateMtr.UnpinAll()
 
 		rv := newReadView(lock.TrxId(2), nil, lock.TrxId(2))
 		iter, mtr := searchPrimaryIndexWithReadView(t, env, rv)

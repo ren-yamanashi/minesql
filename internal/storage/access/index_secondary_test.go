@@ -472,6 +472,7 @@ func TestSecondaryIndexUniqueSkLock(t *testing.T) {
 
 		// trx 1 が保持する全ロック (SK+PK 単位 / SK 単位の両方) を解放
 		si.lock.Release(lock.TrxId(1))
+		mtr.UnpinAll()
 
 		// WHEN
 		mtr2 := buffer.NewMtr(si.bufferPool)
@@ -491,6 +492,7 @@ func TestSecondaryIndexUniqueSkLock(t *testing.T) {
 		r1 := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
 		err := si.insert(mtr, r1, lock.TrxId(1))
 		assert.NoError(t, err)
+		mtr.UnpinAll()
 
 		// WHEN
 		var err2 error

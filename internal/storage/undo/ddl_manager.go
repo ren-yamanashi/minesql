@@ -77,7 +77,6 @@ func (m *DDLManager) Append(mtr *buffer.Mtr, record DDLRecord) error {
 	if !ddlPage.append(serialized) {
 		return ErrRecordTooLarge
 	}
-	mtr.Unpin(m.currentPageId)
 	return nil
 }
 
@@ -148,7 +147,6 @@ func (m *DDLManager) Clear(mtr *buffer.Mtr) error {
 		return err
 	}
 	CreatePage(rootBufPage)
-	mtr.Unpin(m.rootPageId)
 
 	m.currentPageId = m.rootPageId
 	return nil
@@ -177,11 +175,8 @@ func (m *DDLManager) switchToNewPage(
 		return ErrRecordTooLarge
 	}
 
-	oldPageId := m.currentPageId
 	currentPage.setNextPageNumber(newPageId.PageNumber())
 	m.currentPageId = newPageId
 
-	mtr.Unpin(newPageId)
-	mtr.Unpin(oldPageId)
 	return nil
 }
