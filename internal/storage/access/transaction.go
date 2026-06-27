@@ -1,7 +1,11 @@
 package access
 
 import (
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
+	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
 type trxState int
@@ -11,14 +15,30 @@ const (
 	trxStateInactive
 )
 
-// Transaction はトランザクションの状態を保持する
+// Transaction はトランザクションの状態と参照するストレージリソースを保持する
 //   - trxId: トランザクション ID (Begin 時に払い出される)
 //   - state: Active / Inactive
 //   - readView: 最初の Consistent Read 時に作成。それまで nil
 //   - tm: 自分を生成した TrxManager への参照
+//   - bufferPool / redoLog / lockMgr / undoLog / catalog: トランザクションが操作する各リソース
 type Transaction struct {
-	trxId    lock.TrxId
-	state    trxState
-	readView *readView
-	tm       *TrxManager
+	trxId      lock.TrxId
+	state      trxState
+	readView   *readView
+	tm         *TrxManager
+	bufferPool *buffer.Pool
+	redoLog    *redo.Buffer
+	lockMgr    *lock.Manager
+	undoLog    *undo.Manager
+	catalog    *dictionary.Catalog
+}
+
+// NewMtr は書き込み用の mtr を払い出す
+func (t *Transaction) NewMtr() *buffer.Mtr {
+	return buffer.NewWriteMtr(t.bufferPool, t.trxId, t.redoLog)
+}
+
+// NewReadMtr は読み取り用の mtr を払い出す
+func (t *Transaction) NewReadMtr() *buffer.Mtr {
+	return buffer.NewMtr(t.bufferPool)
 }

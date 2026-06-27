@@ -76,6 +76,62 @@ func TestTrxManagerBegin(t *testing.T) {
 		// THEN
 		assert.Equal(t, lock.TrxId(101), trx.trxId)
 	})
+
+	t.Run("払い出された Transaction が TrxManager と同一の resource 参照を持つ", func(t *testing.T) {
+		// GIVEN
+		env := setupTableTestEnv(t)
+		redoLog := setupTestRedoLog(t)
+		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, 1)
+
+		// WHEN
+		trx := tm.Begin()
+
+		// THEN
+		assert.Same(t, tm.bufferPool, trx.bufferPool)
+		assert.Same(t, tm.redoLog, trx.redoLog)
+		assert.Same(t, tm.lock, trx.lockMgr)
+		assert.Same(t, tm.undoLog, trx.undoLog)
+		assert.Same(t, tm.catalog, trx.catalog)
+	})
+}
+
+func TestNewTrxManagerRestoresInactiveTransaction(t *testing.T) {
+	t.Run("HistoryTrxIds から復元される Inactive Transaction が TrxManager と同一の resource 参照を持つ", func(t *testing.T) {
+		// GIVEN
+		env := setupTableTestEnv(t)
+		redoLog := setupTestRedoLog(t)
+		tm1 := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, 1)
+		table := setupTableForTrxTest(t, tm1)
+		trx1 := tm1.Begin()
+		err := table.Insert(
+			trx1,
+			[]string{"id", "name", "email"},
+			[]string{"1", "Alice", "alice@example.com"},
+		)
+		assert.NoError(t, err)
+		assert.NoError(t, tm1.Commit(trx1))
+
+		trx2 := tm1.Begin()
+		record := currentReadFirst(t, table, trx2)
+		err = table.Update(trx2, record, []string{"name"}, []string{"Bob"})
+		assert.NoError(t, err)
+		assert.NoError(t, tm1.Commit(trx2))
+
+		assert.Contains(t, env.undoLog.HistoryTrxIds(), trx2.trxId, "前提: UPDATE Undo を持つ trxId が HistoryTrxIds に含まれる")
+
+		// WHEN
+		tm2 := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, tm1.NextTrxId())
+
+		// THEN
+		restored, ok := tm2.transactions[trx2.trxId]
+		assert.True(t, ok, "HistoryTrxIds の trxId が transactions に復元される")
+		assert.Equal(t, trxStateInactive, restored.state)
+		assert.Same(t, tm2.bufferPool, restored.bufferPool)
+		assert.Same(t, tm2.redoLog, restored.redoLog)
+		assert.Same(t, tm2.lock, restored.lockMgr)
+		assert.Same(t, tm2.undoLog, restored.undoLog)
+		assert.Same(t, tm2.catalog, restored.catalog)
+	})
 }
 
 func TestTrxManagerCommit(t *testing.T) {

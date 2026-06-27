@@ -25,6 +25,21 @@ func TestTrxManagerBeginDDL(t *testing.T) {
 		assert.Equal(t, lock.DDLReservedTrxId, ddlTrx.trxId)
 		assert.Equal(t, trxStateActive, ddlTrx.state)
 	})
+
+	t.Run("払い出された Transaction が TrxManager と同一の resource 参照を持つ", func(t *testing.T) {
+		// GIVEN
+		tm := setupTrxManager(t)
+
+		// WHEN
+		ddlTrx := tm.BeginDDL()
+
+		// THEN
+		assert.Same(t, tm.bufferPool, ddlTrx.bufferPool)
+		assert.Same(t, tm.redoLog, ddlTrx.redoLog)
+		assert.Same(t, tm.lock, ddlTrx.lockMgr)
+		assert.Same(t, tm.undoLog, ddlTrx.undoLog)
+		assert.Same(t, tm.catalog, ddlTrx.catalog)
+	})
 }
 
 func TestTrxManagerCommitDDL(t *testing.T) {

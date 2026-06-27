@@ -11,9 +11,14 @@ import (
 //   - 並行 DDL は想定しないため、 同時に複数の DDL Transaction を保持できない
 func (t *TrxManager) BeginDDL() *Transaction {
 	return &Transaction{
-		trxId: lock.DDLReservedTrxId,
-		state: trxStateActive,
-		tm:    t,
+		trxId:      lock.DDLReservedTrxId,
+		state:      trxStateActive,
+		tm:         t,
+		bufferPool: t.bufferPool,
+		redoLog:    t.redoLog,
+		lockMgr:    t.lock,
+		undoLog:    t.undoLog,
+		catalog:    t.catalog,
 	}
 }
 

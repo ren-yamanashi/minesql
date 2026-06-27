@@ -47,9 +47,14 @@ func NewTrxManager(
 	if undoLog != nil {
 		for _, trxId := range undoLog.HistoryTrxIds() {
 			transactions[trxId] = &Transaction{
-				trxId: trxId,
-				state: trxStateInactive,
-				tm:    tm,
+				trxId:      trxId,
+				state:      trxStateInactive,
+				tm:         tm,
+				bufferPool: bp,
+				redoLog:    redoLog,
+				lockMgr:    lockMgr,
+				undoLog:    undoLog,
+				catalog:    ct,
 			}
 		}
 	}
@@ -63,9 +68,14 @@ func (t *TrxManager) Begin() *Transaction {
 
 	trxId := t.allocateTrxId()
 	trx := &Transaction{
-		trxId: trxId,
-		state: trxStateActive,
-		tm:    t,
+		trxId:      trxId,
+		state:      trxStateActive,
+		tm:         t,
+		bufferPool: t.bufferPool,
+		redoLog:    t.redoLog,
+		lockMgr:    t.lock,
+		undoLog:    t.undoLog,
+		catalog:    t.catalog,
 	}
 	t.transactions[trxId] = trx
 	return trx
