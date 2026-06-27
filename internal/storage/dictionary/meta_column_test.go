@@ -5,6 +5,7 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -16,7 +17,9 @@ func TestCreateColumnMeta(t *testing.T) {
 		rl := setupDictTestRedoBuffer(t)
 
 		// WHEN
-		cm, err := CreateColumnMeta(bp, rl)
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, rl)
+		cm, err := CreateColumnMeta(ctMtr)
+		_ = ctMtr.Commit()
 
 		// THEN
 		assert.NoError(t, err)
@@ -159,7 +162,9 @@ func TestColumnMetaDelete(t *testing.T) {
 func setupTestColumnMeta(t *testing.T) (*ColumnMeta, *buffer.Pool) {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
-	cm, err := CreateColumnMeta(bp, setupDictTestRedoBuffer(t))
+	ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, setupDictTestRedoBuffer(t))
+	cm, err := CreateColumnMeta(ctMtr)
+	_ = ctMtr.Commit()
 	if err != nil {
 		t.Fatalf("ColumnMeta の作成に失敗: %v", err)
 	}

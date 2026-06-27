@@ -16,10 +16,12 @@ import (
 func TestNewDDLManager(t *testing.T) {
 	t.Run("空の DDL Undo 領域を開ける", func(t *testing.T) {
 		// GIVEN
-		bp, freeListMapPageId, rootPageId, _ := setupDDLTestEnv(t)
+		bp, freeListMapPageId, rootPageId, redoLog := setupDDLTestEnv(t)
 
 		// WHEN
-		mgr, err := NewDDLManager(bp, page.FileId(0), rootPageId, freeListMapPageId)
+		openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		mgr, err := NewDDLManager(openMtr, page.FileId(0), rootPageId, freeListMapPageId)
+		_ = openMtr.Commit()
 
 		// THEN
 		assert.NoError(t, err)
@@ -29,10 +31,12 @@ func TestNewDDLManager(t *testing.T) {
 
 	t.Run("rootPageId に無効値を渡すと ErrInvalidDDLUndoRoot を返す", func(t *testing.T) {
 		// GIVEN
-		bp, freeListMapPageId, _, _ := setupDDLTestEnv(t)
+		bp, freeListMapPageId, _, redoLog := setupDDLTestEnv(t)
 
 		// WHEN
-		mgr, err := NewDDLManager(bp, page.FileId(0), page.InvalidId(), freeListMapPageId)
+		openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		mgr, err := NewDDLManager(openMtr, page.FileId(0), page.InvalidId(), freeListMapPageId)
+		_ = openMtr.Commit()
 
 		// THEN
 		assert.Nil(t, mgr)
@@ -42,14 +46,18 @@ func TestNewDDLManager(t *testing.T) {
 	t.Run("複数ページに渡る DDL Undo 領域から末尾ページを特定できる", func(t *testing.T) {
 		// GIVEN
 		bp, freeListMapPageId, rootPageId, redoLog := setupDDLTestEnv(t)
-		mgr, err := NewDDLManager(bp, page.FileId(0), rootPageId, freeListMapPageId)
+		openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		mgr, err := NewDDLManager(openMtr, page.FileId(0), rootPageId, freeListMapPageId)
+		_ = openMtr.Commit()
 		assert.NoError(t, err)
 		fillUntilPageSwitch(t, mgr, redoLog)
 		tailPageId := mgr.currentPageId
 		assert.NotEqual(t, rootPageId, tailPageId)
 
 		// WHEN
-		opened, err := NewDDLManager(bp, page.FileId(0), rootPageId, freeListMapPageId)
+		openMtr2 := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		opened, err := NewDDLManager(openMtr2, page.FileId(0), rootPageId, freeListMapPageId)
+		_ = openMtr2.Commit()
 
 		// THEN
 		assert.NoError(t, err)
@@ -299,9 +307,14 @@ func setupDDLTestEnv(t *testing.T) (*buffer.Pool, page.Id, page.Id, *redo.Buffer
 func setupDDLManager(t *testing.T) (*DDLManager, *redo.Buffer) {
 	t.Helper()
 	bp, freeListMapPageId, rootPageId, redoLog := setupDDLTestEnv(t)
-	mgr, err := NewDDLManager(bp, page.FileId(0), rootPageId, freeListMapPageId)
+	openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+	mgr, err := NewDDLManager(openMtr, page.FileId(0), rootPageId, freeListMapPageId)
 	if err != nil {
+		openMtr.UnpinAll()
 		t.Fatalf("DDLManager の作成に失敗: %v", err)
+	}
+	if err := openMtr.Commit(); err != nil {
+		t.Fatalf("DDLManager Commit に失敗: %v", err)
 	}
 	return mgr, redoLog
 }

@@ -27,7 +27,7 @@ func (t *TrxManager) BeginDDL() *Transaction {
 //   - 永続コンテナ型のため、 コンテナ自体 (= root ページ) は残る
 func (t *TrxManager) commitDDL(trx *Transaction) error {
 	mtr := buffer.NewWriteMtr(t.bufferPool, trx.trxId, t.redoLog)
-	if err := t.catalog.DDLManager().Clear(mtr); err != nil {
+	if err := t.ddlManager.Clear(mtr); err != nil {
 		mtr.UnpinAll()
 		return err
 	}
@@ -61,7 +61,7 @@ func (t *TrxManager) applyDDLRollbackRecord(mtr *buffer.Mtr, record undo.DDLReco
 func (t *TrxManager) rollbackDDL(trx *Transaction) error {
 	scanMtr := buffer.NewMtr(t.bufferPool)
 	defer scanMtr.UnpinAll()
-	records, err := t.catalog.DDLManager().ReverseScan(scanMtr)
+	records, err := t.ddlManager.ReverseScan(scanMtr)
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func (t *TrxManager) rollbackDDL(trx *Transaction) error {
 	}
 
 	clearMtr := buffer.NewWriteMtr(t.bufferPool, trx.trxId, t.redoLog)
-	if err := t.catalog.DDLManager().Clear(clearMtr); err != nil {
+	if err := t.ddlManager.Clear(clearMtr); err != nil {
 		clearMtr.UnpinAll()
 		return err
 	}

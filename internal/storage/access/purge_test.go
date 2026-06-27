@@ -17,7 +17,7 @@ func TestNewPurge(t *testing.T) {
 		env := setupRecoveryTestEnv(t)
 
 		// WHEN
-		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog, env.redoLog)
+		p := NewPurge(env.trxManager)
 
 		// THEN
 		assert.NotNil(t, p)
@@ -28,7 +28,7 @@ func TestPurgeStartStop(t *testing.T) {
 	t.Run("Start と Stop が正常に動作する", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog, env.redoLog)
+		p := NewPurge(env.trxManager)
 
 		// WHEN
 		p.Start()
@@ -42,7 +42,7 @@ func TestPurgeStartStop(t *testing.T) {
 	t.Run("Stop を二重呼び出ししてもパニックしない", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog, env.redoLog)
+		p := NewPurge(env.trxManager)
 		p.Start()
 		time.Sleep(10 * time.Millisecond)
 
@@ -56,7 +56,7 @@ func TestPurgeStartStop(t *testing.T) {
 	t.Run("Start せずに Stop してもパニックしない", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog, env.redoLog)
+		p := NewPurge(env.trxManager)
 
 		// WHEN / THEN
 		assert.NotPanics(t, func() {
@@ -67,7 +67,7 @@ func TestPurgeStartStop(t *testing.T) {
 	t.Run("Start を二重呼び出しすると最初の goroutine が維持される", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog, env.redoLog)
+		p := NewPurge(env.trxManager)
 		p.Start()
 
 		// WHEN
@@ -82,7 +82,7 @@ func TestPurgeStartStop(t *testing.T) {
 	t.Run("Stop 後に再度 Start できる", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog, env.redoLog)
+		p := NewPurge(env.trxManager)
 		p.Start()
 		p.Stop()
 
@@ -100,7 +100,7 @@ func TestPurgePurge(t *testing.T) {
 	t.Run("パージ対象がない場合エラーにならない", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog, env.redoLog)
+		p := NewPurge(env.trxManager)
 
 		// WHEN
 		err := p.purge()
@@ -113,7 +113,7 @@ func TestPurgePurge(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
 		table := setupTableForRecoveryTest(t, env)
-		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog, env.redoLog)
+		p := NewPurge(env.trxManager)
 
 		trx1 := env.trxManager.Begin()
 		_ = table.Insert(
@@ -145,7 +145,7 @@ func TestPurgePurge(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
 		table := setupTableForRecoveryTest(t, env)
-		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog, env.redoLog)
+		p := NewPurge(env.trxManager)
 
 		trx1 := env.trxManager.Begin()
 		_ = table.Insert(
@@ -185,7 +185,7 @@ func TestPurgePurge(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
 		table := setupTableForRecoveryTest(t, env)
-		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog, env.redoLog)
+		p := NewPurge(env.trxManager)
 
 		trx1 := env.trxManager.Begin()
 		_ = table.Insert(
@@ -218,7 +218,7 @@ func TestPurgePurge(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
 		table := setupTableForRecoveryTest(t, env)
-		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog, env.redoLog)
+		p := NewPurge(env.trxManager)
 
 		trx1 := env.trxManager.Begin()
 		_ = table.Insert(
@@ -255,7 +255,7 @@ func TestPurgePurgeEntry(t *testing.T) {
 	t.Run("INSERT タイプのエントリは何もせず正常終了する", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog, env.redoLog)
+		p := NewPurge(env.trxManager)
 		entry := undo.NewEntry(0, undo.RecordTypeInsert, nil)
 
 		// WHEN
@@ -270,7 +270,7 @@ func TestPurgePurgableTrxIds(t *testing.T) {
 	t.Run("パージ閾値未満の完了済みトランザクション ID を返す", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog, env.redoLog)
+		p := NewPurge(env.trxManager)
 		trx1 := env.trxManager.Begin()
 		trx2 := env.trxManager.Begin()
 		_ = env.trxManager.Commit(trx1)
@@ -288,7 +288,7 @@ func TestPurgePurgableTrxIds(t *testing.T) {
 	t.Run("パージ閾値以上のトランザクションは含まれない", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog, env.redoLog)
+		p := NewPurge(env.trxManager)
 		trx1 := env.trxManager.Begin()
 		_ = env.trxManager.Begin()
 		_ = env.trxManager.Commit(trx1)
@@ -304,7 +304,7 @@ func TestPurgePurgableTrxIds(t *testing.T) {
 	t.Run("該当なしの場合は空を返す", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
-		p := NewPurge(env.bp, env.trxManager, env.trxManager.undoLog, env.redoLog)
+		p := NewPurge(env.trxManager)
 
 		// WHEN
 		ids := p.purgableTrxIds(lock.TrxId(10))

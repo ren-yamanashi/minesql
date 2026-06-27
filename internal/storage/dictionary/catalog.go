@@ -8,8 +8,6 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
-	"github.com/ren-yamanashi/minesql/internal/storage/redo"
-	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
 const (
@@ -29,22 +27,21 @@ const (
 	headerFieldSize                   = 4
 )
 
+// CatalogFileId はカタログヘッダーが置かれる FileId (= DB 全体で固定値)
+var CatalogFileId = page.FileId(0)
+
 var (
-	catalogFileId         = page.FileId(0)
 	catalogHeaderPageNum  = page.PageNumber(0)
 	errInvalidCatalogFile = errors.New("invalid database catalog file: magic number mismatch")
 	catalogMagicNumber    = []byte("MINE")
 )
 
 type Catalog struct {
-	bufferPool         *buffer.Pool
-	redoLog            *redo.Buffer // DDL (persistScalar / table_create 等) を Redo に記録するための参照
 	nextFileId         page.FileId
 	nextIndexId        IndexId
 	nextTrxId          lock.TrxId
 	undoLogFileId      page.FileId
 	ddlUndoRootPageId  page.Id
-	ddlManager         *undo.DDLManager // DDL Undo 領域コンテナ。 CreateCatalog 以降サーバライフタイム中ずっと有効
 	freeListMapPageId  page.Id
 	tableMeta          *TableMeta
 	indexMeta          *IndexMeta
@@ -65,12 +62,12 @@ func (c *Catalog) ConstraintMeta() *ConstraintMeta         { return c.constraint
 func (c *Catalog) UserMeta() *UserMeta                     { return c.userMeta }
 
 // NewCatalog は既存のカタログを開く
-//   - redoLog: 後の DDL (persistScalar / table_create 経由) を Redo に記録するために保持する
-func NewCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
+//   - bp: メタテーブルの B+Tree が紐づくバッファプール
+func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
 	mtr := buffer.NewMtr(bp)
 	defer mtr.UnpinAll()
 
-	headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+	headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
 	bufPageHeader, err := mtr.PageForRead(headerPageId)
 	if err != nil {
 		return nil, err
@@ -105,104 +102,84 @@ func NewCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 	))
 
 	ddlUndoRootPageId := ddlUndoRootPageIdFromPageNumber(ddlUndoRootPageNumber)
-	freeListMapPageId := page.NewId(catalogFileId, freeListMapPageNumber)
-	ddlManager, err := undo.NewDDLManager(bp, catalogFileId, ddlUndoRootPageId, freeListMapPageId)
-	if err != nil {
-		return nil, err
-	}
+	freeListMapPageId := page.NewId(CatalogFileId, freeListMapPageNumber)
 
 	return &Catalog{
-		bufferPool:        bp,
-		redoLog:           redoLog,
 		nextFileId:        nextFileId,
 		nextIndexId:       nextIndexId,
 		nextTrxId:         nextTrxId,
 		undoLogFileId:     undoLogFileId,
 		ddlUndoRootPageId: ddlUndoRootPageId,
-		ddlManager:        ddlManager,
 		freeListMapPageId: freeListMapPageId,
-		tableMeta:         NewTableMeta(bp, page.NewId(catalogFileId, tableMetaPageNumber)),
-		indexMeta:         NewIndexMeta(bp, page.NewId(catalogFileId, indexMetaPageNumber)),
+		tableMeta:         NewTableMeta(bp, page.NewId(CatalogFileId, tableMetaPageNumber)),
+		indexMeta:         NewIndexMeta(bp, page.NewId(CatalogFileId, indexMetaPageNumber)),
 		indexKeyColumnMeta: NewIndexKeyColumnMeta(
-			bp, page.NewId(catalogFileId, indexKeyColumnMetaPageNumber),
+			bp, page.NewId(CatalogFileId, indexKeyColumnMetaPageNumber),
 		),
-		columnMeta:     NewColumnMeta(bp, page.NewId(catalogFileId, columnMetaPageNumber)),
-		constraintMeta: NewConstraintMeta(bp, page.NewId(catalogFileId, constraintMetaPageNumber)),
-		userMeta:       NewUserMeta(bp, page.NewId(catalogFileId, userMetaPageNumber)),
+		columnMeta:     NewColumnMeta(bp, page.NewId(CatalogFileId, columnMetaPageNumber)),
+		constraintMeta: NewConstraintMeta(bp, page.NewId(CatalogFileId, constraintMetaPageNumber)),
+		userMeta:       NewUserMeta(bp, page.NewId(CatalogFileId, userMetaPageNumber)),
 	}, nil
 }
 
 // CreateCatalog はカタログを新規作成する
-//   - redoLog: ヘッダー初期化と各メタテーブル作成を Redo に記録するために使う
-//   - 内部のページ書き込みはシステム予約 trxId で記録する
-func CreateCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
-	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+//   - mtr: ヘッダー初期化と各メタテーブル作成を記録する Mtr。Commit / UnpinAll は呼び出し側
+//   - mtr の trxId に応じた Redo が記録される (= ブートストラップでは SystemReservedTrxId)
+func CreateCatalog(mtr *buffer.Mtr) (*Catalog, error) {
+	bp := mtr.Pool()
 
-	headerPageId, err := bp.AllocatePageId(catalogFileId)
+	headerPageId, err := bp.AllocatePageId(CatalogFileId)
 	if err != nil {
-		mtr.UnpinAll()
 		return nil, err
 	}
 	if _, err := bp.AddPage(headerPageId); err != nil {
-		mtr.UnpinAll()
 		return nil, err
 	}
 	bufPageHeader, err := mtr.PageForWrite(headerPageId)
 	if err != nil {
-		mtr.UnpinAll()
 		return nil, err
 	}
 
-	tableMeta, err := CreateTableMeta(bp, redoLog)
+	tableMeta, err := CreateTableMeta(mtr)
 	if err != nil {
-		mtr.UnpinAll()
 		return nil, err
 	}
-	indexMeta, err := CreateIndexMeta(bp, redoLog)
+	indexMeta, err := CreateIndexMeta(mtr)
 	if err != nil {
-		mtr.UnpinAll()
 		return nil, err
 	}
-	indexKeyColumnMeta, err := CreateIndexKeyColumnMeta(bp, redoLog)
+	indexKeyColumnMeta, err := CreateIndexKeyColumnMeta(mtr)
 	if err != nil {
-		mtr.UnpinAll()
 		return nil, err
 	}
-	columnMeta, err := CreateColumnMeta(bp, redoLog)
+	columnMeta, err := CreateColumnMeta(mtr)
 	if err != nil {
-		mtr.UnpinAll()
 		return nil, err
 	}
-	constraintMeta, err := CreateConstraintMeta(bp, redoLog)
+	constraintMeta, err := CreateConstraintMeta(mtr)
 	if err != nil {
-		mtr.UnpinAll()
 		return nil, err
 	}
-	userMeta, err := CreateUserMeta(bp, redoLog)
+	userMeta, err := CreateUserMeta(mtr)
 	if err != nil {
-		mtr.UnpinAll()
 		return nil, err
 	}
 
-	freeListMapPageId, err := bp.AllocatePageId(catalogFileId)
+	freeListMapPageId, err := bp.AllocatePageId(CatalogFileId)
 	if err != nil {
-		mtr.UnpinAll()
 		return nil, err
 	}
 	if _, err := bp.AddPage(freeListMapPageId); err != nil {
-		mtr.UnpinAll()
 		return nil, err
 	}
 	freeListMapBufPage, err := mtr.PageForWrite(freeListMapPageId)
 	if err != nil {
-		mtr.UnpinAll()
 		return nil, err
 	}
 	buffer.InitializeFreeListMapPage(freeListMapBufPage)
 
 	ddlUndoRootPageId, err := allocateAndInitializeDDLUndoRootPage(mtr, bp)
 	if err != nil {
-		mtr.UnpinAll()
 		return nil, err
 	}
 
@@ -231,24 +208,12 @@ func CreateCatalog(bp *buffer.Pool, redoLog *redo.Buffer) (*Catalog, error) {
 	writePageNumber(bufPageHeader, headerFreeListMapPageNumberOffset, freeListMapPageId.PageNumber())
 	writeScalar(bufPageHeader, headerNextTrxIdOffset, uint32(nextTrxId))
 
-	if err := mtr.Commit(); err != nil {
-		return nil, err
-	}
-
-	ddlManager, err := undo.NewDDLManager(bp, catalogFileId, ddlUndoRootPageId, freeListMapPageId)
-	if err != nil {
-		return nil, err
-	}
-
 	return &Catalog{
-		bufferPool:         bp,
-		redoLog:            redoLog,
 		nextFileId:         nextFileId,
 		nextIndexId:        nextIndexId,
 		nextTrxId:          nextTrxId,
 		undoLogFileId:      undoLogFileId,
 		ddlUndoRootPageId:  ddlUndoRootPageId,
-		ddlManager:         ddlManager,
 		freeListMapPageId:  freeListMapPageId,
 		tableMeta:          tableMeta,
 		indexMeta:          indexMeta,
@@ -296,7 +261,7 @@ func (c *Catalog) AllocateFileId(mtr *buffer.Mtr) (page.FileId, error) {
 // persistScalar はヘッダーページの指定オフセットに uint32 値を書き込む
 //   - mtr: 書き込みを記録する Mtr。Commit は呼び出し側
 func (c *Catalog) persistScalar(mtr *buffer.Mtr, offset int, value uint32) error {
-	headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+	headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
 	bufPageHeader, err := mtr.PageForWrite(headerPageId)
 	if err != nil {
 		return err

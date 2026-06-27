@@ -18,8 +18,10 @@ type TrxManager struct {
 	lock         *lock.Manager
 	bufferPool   *buffer.Pool
 	catalog      *dictionary.Catalog
+	ddlManager   *undo.DDLManager
 	transactions map[lock.TrxId]*Transaction
-	nextTrxId    lock.TrxId // 次に払い出すトランザクション ID
+	nextTrxId    lock.TrxId   // 次に払い出すトランザクション ID
+	systemTrx    *Transaction // System 予約 trxId を持つ Transaction (transactions map には登録しない)
 }
 
 func NewTrxManager(
@@ -28,6 +30,7 @@ func NewTrxManager(
 	redoLog *redo.Buffer,
 	lockMgr *lock.Manager,
 	bp *buffer.Pool,
+	ddlManager *undo.DDLManager,
 	initialNextTrxId lock.TrxId,
 ) *TrxManager {
 	// 0 は「未割り当て / 太古のコミット済み」の予約値のため、最小でも 1 から採番する
@@ -41,8 +44,19 @@ func NewTrxManager(
 		lock:         lockMgr,
 		bufferPool:   bp,
 		catalog:      ct,
+		ddlManager:   ddlManager,
 		transactions: transactions,
 		nextTrxId:    initialNextTrxId,
+	}
+	tm.systemTrx = &Transaction{
+		trxId:      lock.SystemReservedTrxId,
+		state:      trxStateActive,
+		tm:         tm,
+		bufferPool: bp,
+		redoLog:    redoLog,
+		lockMgr:    lockMgr,
+		undoLog:    undoLog,
+		catalog:    ct,
 	}
 	if undoLog != nil {
 		for _, trxId := range undoLog.HistoryTrxIds() {
@@ -201,7 +215,7 @@ func (t *TrxManager) PersistNextTrxIdToCatalog() error {
 	if t.catalog.NextTrxId() == current {
 		return nil
 	}
-	mtr := buffer.NewWriteMtr(t.bufferPool, lock.SystemReservedTrxId, t.redoLog)
+	mtr := t.systemTrx.NewMtr()
 	if err := t.catalog.PersistNextTrxId(mtr, current); err != nil {
 		mtr.UnpinAll()
 		return err

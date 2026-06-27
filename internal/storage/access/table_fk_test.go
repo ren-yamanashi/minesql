@@ -273,9 +273,14 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 	bp := buffer.NewPool(page.Size*50, redoLog, nil)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
-	ct, err := dictionary.CreateCatalog(bp, redoLog)
+	catalogMtr := newBootstrapMtr(bp, redoLog)
+	ct, err := dictionary.CreateCatalog(catalogMtr)
 	if err != nil {
+		catalogMtr.UnpinAll()
 		t.Fatalf("Catalog の作成に失敗: %v", err)
+	}
+	if err := catalogMtr.Commit(); err != nil {
+		t.Fatalf("Catalog Commit に失敗: %v", err)
 	}
 
 	// Undo 用 HeapFile
@@ -288,14 +293,29 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 	t.Cleanup(func() { _ = undoHf.Close() })
 	bp.RegisterHeapFile(undoFileId, undoHf)
 
-	undoMgr, err := undo.NewManager(bp, undoFileId, redoLog)
+	undoMtr := newBootstrapMtr(bp, redoLog)
+	undoMgr, err := undo.NewManager(undoMtr, undoFileId)
 	if err != nil {
+		undoMtr.UnpinAll()
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
+	}
+	if err := undoMtr.Commit(); err != nil {
+		t.Fatalf("undo.Manager Commit に失敗: %v", err)
 	}
 	t.Cleanup(func() { _ = redoLog.Clear() })
 
+	ddlMtr := newBootstrapMtr(bp, redoLog)
+	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId(), ct.FreeListMapPageId())
+	if err != nil {
+		ddlMtr.UnpinAll()
+		t.Fatalf("undo.DDLManager の作成に失敗: %v", err)
+	}
+	if err := ddlMtr.Commit(); err != nil {
+		t.Fatalf("undo.DDLManager Commit に失敗: %v", err)
+	}
+
 	lockMgr := lock.NewManager()
-	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, 1)
+	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, ddlMgr, 1)
 
 	// 親テーブル: departments
 	parentTable, err := CreateTable(trxMgr, CreateTableInput{

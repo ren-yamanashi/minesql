@@ -40,12 +40,12 @@ func TestIntegrationUndoRecoveryPurge(t *testing.T) {
 
 		// WHEN
 		env2 := crashAndRecover(t, env, []string{"users"})
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ddlMgr)
 		assert.NoError(t, r.Execute())
 
 		table2, err := NewTable(env2.bp, env2.ct, env2.undoLog, env2.lockMgr, env2.redoLog, "users")
 		assert.NoError(t, err)
-		p := NewPurge(env2.bp, env2.trxMgr, env2.undoLog, env2.redoLog)
+		p := NewPurge(env2.trxMgr)
 		assert.NoError(t, p.purge())
 
 		// THEN
@@ -82,7 +82,7 @@ func TestIntegrationUndoRecoveryPurge(t *testing.T) {
 
 		// WHEN
 		env2 := crashAndRecover(t, env, []string{"users"})
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ddlMgr)
 		assert.NoError(t, r.Execute())
 
 		// THEN
@@ -108,7 +108,7 @@ func TestIntegrationUndoRecoveryPurge(t *testing.T) {
 
 		// WHEN
 		env2 := crashAndRecover(t, env, []string{"users"})
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ddlMgr)
 		assert.NoError(t, r.Execute())
 
 		// THEN
@@ -175,7 +175,7 @@ func TestIntegrationIncompleteMtrRecovery(t *testing.T) {
 		require.NoError(t, env.redoLog.Flush())
 
 		env2 := crashAndRecover(t, env, []string{"users"})
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ddlMgr)
 		require.NoError(t, r.Execute())
 
 		// THEN

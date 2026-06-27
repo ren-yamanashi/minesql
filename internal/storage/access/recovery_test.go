@@ -449,7 +449,7 @@ func setupRecoveryTestEnv(t *testing.T) *recoveryTestEnv {
 	t.Helper()
 
 	env := setupTableTestEnv(t)
-	trxManager := NewTrxManager(env.ct, env.undoLog, env.redoLog, env.lock, env.bp, 1)
+	trxManager := NewTrxManager(env.ct, env.undoLog, env.redoLog, env.lock, env.bp, env.trxMgr.ddlManager, 1)
 
 	// DDL 経由で生じたダーティーページと Redo レコードをクリーンな状態にする
 	// (Recovery / Checkpoint テストは「初期状態 = ダーティーページなし・Redo 空」を前提とする)
@@ -475,7 +475,7 @@ func setupRecoveryTestEnv(t *testing.T) *recoveryTestEnv {
 		redoLog:    env.redoLog,
 		trxManager: trxManager,
 		undoFileId: page.FileId(3),
-		ddlManager: env.ct.DDLManager(),
+		ddlManager: env.trxMgr.ddlManager,
 	}
 }
 
@@ -511,7 +511,7 @@ func TestRecoveryExecuteRestoresCommittedInsertFromRedo(t *testing.T) {
 
 		// WHEN
 		env2 := crashAndRecover(t, env, []string{"users"})
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ddlMgr)
 		err = r.Execute()
 
 		// THEN
@@ -550,7 +550,7 @@ func TestRecoveryExecuteSkipsAlreadyAppliedPagesByPageLsn(t *testing.T) {
 
 		// WHEN
 		env2 := crashAndRecover(t, env, []string{"users"})
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ddlMgr)
 		err = r.Execute()
 
 		// THEN
@@ -581,7 +581,7 @@ func TestRecoveryExecuteDiscardsIncompleteMtr(t *testing.T) {
 
 		// WHEN
 		env2 := crashAndRecover(t, env, []string{"users"})
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ddlMgr)
 		err = r.Execute()
 
 		// THEN
@@ -615,7 +615,7 @@ func TestRecoveryExecuteRollbacksMultipleInsertsInOneTransaction(t *testing.T) {
 
 		// WHEN
 		env2 := crashAndRecover(t, env, []string{"users"})
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ddlMgr)
 		err = r.Execute()
 
 		// THEN
@@ -660,7 +660,7 @@ func TestRecoveryExecuteRollbacksUncommittedUpdateAfterCommittedInsert(t *testin
 
 		// WHEN
 		env2 := crashAndRecover(t, env, []string{"users"})
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ddlMgr)
 		err = r.Execute()
 
 		// THEN

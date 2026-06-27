@@ -5,6 +5,7 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -16,7 +17,9 @@ func TestCreateConstraintMeta(t *testing.T) {
 		rl := setupDictTestRedoBuffer(t)
 
 		// WHEN
-		cm, err := CreateConstraintMeta(bp, rl)
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, rl)
+		cm, err := CreateConstraintMeta(ctMtr)
+		_ = ctMtr.Commit()
 
 		// THEN
 		assert.NoError(t, err)
@@ -176,7 +179,9 @@ func TestConstraintMetaDelete(t *testing.T) {
 func setupTestConstraintMeta(t *testing.T) (*ConstraintMeta, *buffer.Pool) {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
-	cm, err := CreateConstraintMeta(bp, setupDictTestRedoBuffer(t))
+	ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, setupDictTestRedoBuffer(t))
+	cm, err := CreateConstraintMeta(ctMtr)
+	_ = ctMtr.Commit()
 	if err != nil {
 		t.Fatalf("ConstraintMeta の作成に失敗: %v", err)
 	}

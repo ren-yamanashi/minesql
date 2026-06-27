@@ -8,7 +8,6 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
-	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
@@ -44,16 +43,12 @@ func newPrimaryIndex(
 // createPrimaryIndex は空のプライマリインデックスを作成する
 //   - B+Tree 作成と CreateBTreeUndo 書き込みを同一 mtr で原子的に行う
 func createPrimaryIndex(
-	ct *dictionary.Catalog,
-	bp *buffer.Pool,
+	ddlTrx *Transaction,
 	fileId page.FileId,
 	pkCount int,
-	lockMgr *lock.Manager,
-	undoLog *undo.Manager,
-	redoLog *redo.Buffer,
 ) (*primaryIndex, error) {
-	mtr := buffer.NewWriteMtr(bp, lock.DDLReservedTrxId, redoLog)
-	tree, err := btree.CreateTree(bp, fileId, mtr)
+	mtr := ddlTrx.NewMtr()
+	tree, err := btree.CreateTree(ddlTrx.bufferPool, fileId, mtr)
 	if err != nil {
 		mtr.UnpinAll()
 		return nil, err
@@ -62,7 +57,7 @@ func createPrimaryIndex(
 		undo.DDLRecordTypeCreateBTree,
 		undo.NewCreateBTreeUndoRecord(tree.MetaPageId()).Serialize(),
 	)
-	if err := ct.DDLManager().Append(mtr, undoRecord); err != nil {
+	if err := ddlTrx.DDLManager().Append(mtr, undoRecord); err != nil {
 		mtr.UnpinAll()
 		return nil, err
 	}
@@ -70,12 +65,12 @@ func createPrimaryIndex(
 		return nil, err
 	}
 	return &primaryIndex{
-		catalog:    ct,
-		bufferPool: bp,
+		catalog:    ddlTrx.catalog,
+		bufferPool: ddlTrx.bufferPool,
 		tree:       tree,
 		pkCount:    pkCount,
-		lock:       lockMgr,
-		undoLog:    undoLog,
+		lock:       ddlTrx.lockMgr,
+		undoLog:    ddlTrx.undoLog,
 	}, nil
 }
 

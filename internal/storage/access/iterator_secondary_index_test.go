@@ -178,6 +178,8 @@ type iteratorTestEnv struct {
 	primaryTree   *btree.Tree
 	secondaryTree *btree.Tree
 	redoLog       *redo.Buffer
+	ddlMgr        *undo.DDLManager
+	trxMgr        *TrxManager
 }
 
 // setupIteratorTestEnv はセカンダリイテレータのテスト用環境を構築する
@@ -210,9 +212,24 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 	bp.RegisterHeapFile(page.FileId(2), dataHf)
 
-	ct, err := dictionary.CreateCatalog(bp, redoLog)
+	ctMtr := newBootstrapMtr(bp, redoLog)
+	ct, err := dictionary.CreateCatalog(ctMtr)
 	if err != nil {
+		ctMtr.UnpinAll()
 		t.Fatalf("Catalog の作成に失敗: %v", err)
+	}
+	if err := ctMtr.Commit(); err != nil {
+		t.Fatalf("Catalog Commit に失敗: %v", err)
+	}
+
+	ddlMtr := newBootstrapMtr(bp, redoLog)
+	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId(), ct.FreeListMapPageId())
+	if err != nil {
+		ddlMtr.UnpinAll()
+		t.Fatalf("undo.DDLManager の作成に失敗: %v", err)
+	}
+	if err := ddlMtr.Commit(); err != nil {
+		t.Fatalf("undo.DDLManager Commit に失敗: %v", err)
 	}
 
 	tableFileId := page.FileId(2)
@@ -256,12 +273,17 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	_ = ct.IndexMeta().Insert(mtr, dictionary.NewIndexMetaRecord(tableFileId, indexId2, "idx_email", dictionary.IndexTypeUnique, 1, secondaryTree.MetaPageId()))
 	_ = ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(indexId2, "email", 0))
 
+	envLockMgr := lock.NewManager()
+	trxMgr := NewTrxManager(ct, nil, redoLog, envLockMgr, bp, ddlMgr, 1)
+
 	return &iteratorTestEnv{
 		ct:            ct,
 		bp:            bp,
 		primaryTree:   primaryTree,
 		secondaryTree: secondaryTree,
 		redoLog:       redoLog,
+		ddlMgr:        ddlMgr,
+		trxMgr:        trxMgr,
 	}
 }
 

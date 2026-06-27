@@ -19,7 +19,7 @@ func TestNewCatalog(t *testing.T) {
 		bp := buffer.NewPool(page.Size*20, newCatalogTestRedoBuffer(t), nil)
 
 		// WHEN
-		_, err := NewCatalog(bp, newCatalogTestRedoBuffer(t))
+		_, err := NewCatalog(bp)
 
 		// THEN
 		assert.Error(t, err)
@@ -28,11 +28,13 @@ func TestNewCatalog(t *testing.T) {
 	t.Run("CreateCatalog で作成したカタログを開ける", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
-		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
+		_, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 		assert.NoError(t, err)
 
 		// WHEN
-		catalog, err := NewCatalog(bp, newCatalogTestRedoBuffer(t))
+		catalog, err := NewCatalog(bp)
 
 		// THEN
 		assert.NoError(t, err)
@@ -47,11 +49,13 @@ func TestNewCatalog(t *testing.T) {
 	t.Run("CreateCatalog 時の freeListMapPageId を NewCatalog で復元できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
-		created, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
+		created, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 		assert.NoError(t, err)
 
 		// WHEN
-		opened, err := NewCatalog(bp, newCatalogTestRedoBuffer(t))
+		opened, err := NewCatalog(bp)
 
 		// THEN
 		assert.NoError(t, err)
@@ -61,39 +65,29 @@ func TestNewCatalog(t *testing.T) {
 	t.Run("CreateCatalog 時の ddlUndoRootPageId を NewCatalog で復元できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
-		created, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
+		created, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 		assert.NoError(t, err)
 
 		// WHEN
-		opened, err := NewCatalog(bp, newCatalogTestRedoBuffer(t))
+		opened, err := NewCatalog(bp)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, created.ddlUndoRootPageId, opened.ddlUndoRootPageId)
 	})
 
-	t.Run("DDLManager が常に non-nil で復元される", func(t *testing.T) {
-		// GIVEN
-		bp := setupCatalogTestBufferPool(t)
-		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
-		assert.NoError(t, err)
-
-		// WHEN
-		opened, err := NewCatalog(bp, newCatalogTestRedoBuffer(t))
-
-		// THEN
-		assert.NoError(t, err)
-		assert.NotNil(t, opened.DDLManager())
-	})
-
 	t.Run("6 つのメタデータのページ ID が復元される", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
-		created, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
+		created, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 		assert.NoError(t, err)
 
 		// WHEN
-		opened, err := NewCatalog(bp, newCatalogTestRedoBuffer(t))
+		opened, err := NewCatalog(bp)
 
 		// THEN
 		assert.NoError(t, err)
@@ -108,17 +102,19 @@ func TestNewCatalog(t *testing.T) {
 	t.Run("マジックナンバーが不正な場合 errInvalidCatalogFile を返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
-		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
+		_, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 		assert.NoError(t, err)
 
-		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
 		bufPageHeader, err := bp.Page(headerPageId)
 		assert.NoError(t, err)
 		bufPageHeader.WriteBodyAt(headerMagicNumberOffset, []byte("XXXX"))
 		bp.Unpin(headerPageId)
 
 		// WHEN
-		_, err = NewCatalog(bp, newCatalogTestRedoBuffer(t))
+		_, err = NewCatalog(bp)
 
 		// THEN
 		assert.ErrorIs(t, err, errInvalidCatalogFile)
@@ -131,7 +127,9 @@ func TestCreateCatalog(t *testing.T) {
 		bp := buffer.NewPool(page.Size*20, newCatalogTestRedoBuffer(t), nil)
 
 		// WHEN
-		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
+		_, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 
 		// THEN
 		assert.Error(t, err)
@@ -142,7 +140,9 @@ func TestCreateCatalog(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 
 		// WHEN
-		catalog, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
+		catalog, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 
 		// THEN
 		assert.NoError(t, err)
@@ -154,11 +154,13 @@ func TestCreateCatalog(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 
 		// WHEN
-		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
+		_, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 		assert.NoError(t, err)
 
 		// THEN
-		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
 		bufPageHeader, err := bp.Page(headerPageId)
 		assert.NoError(t, err)
 		defer bp.Unpin(headerPageId)
@@ -172,11 +174,13 @@ func TestCreateCatalog(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 
 		// WHEN
-		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
+		_, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 		assert.NoError(t, err)
 
 		// THEN
-		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
 		bufPageHeader, err := bp.Page(headerPageId)
 		assert.NoError(t, err)
 		defer bp.Unpin(headerPageId)
@@ -199,11 +203,13 @@ func TestCreateCatalog(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 
 		// WHEN
-		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
+		_, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 		assert.NoError(t, err)
 
 		// THEN
-		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
 		bufPageHeader, err := bp.Page(headerPageId)
 		assert.NoError(t, err)
 		defer bp.Unpin(headerPageId)
@@ -218,11 +224,13 @@ func TestCreateCatalog(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 
 		// WHEN
-		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
+		_, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 		assert.NoError(t, err)
 
 		// THEN
-		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
 		bufPageHeader, err := bp.Page(headerPageId)
 		assert.NoError(t, err)
 		defer bp.Unpin(headerPageId)
@@ -238,7 +246,9 @@ func TestCreateCatalog(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 
 		// WHEN
-		catalog, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
+		catalog, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 
 		// THEN
 		assert.NoError(t, err)
@@ -255,7 +265,9 @@ func TestCreateCatalog(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 
 		// WHEN
-		catalog, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
+		catalog, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 
 		// THEN
 		assert.NoError(t, err)
@@ -272,11 +284,13 @@ func TestCreateCatalog(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 
 		// WHEN
-		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
+		_, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 		assert.NoError(t, err)
 
 		// THEN
-		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
 		bufPageHeader, err := bp.Page(headerPageId)
 		assert.NoError(t, err)
 		defer bp.Unpin(headerPageId)
@@ -289,7 +303,9 @@ func TestAllocateIndexId(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
 		redoLog := newCatalogTestRedoBuffer(t)
-		ct, err := CreateCatalog(bp, redoLog)
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		ct, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 		assert.NoError(t, err)
 
 		// WHEN
@@ -309,9 +325,11 @@ func TestAllocateIndexId(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
 		redoLog := newCatalogTestRedoBuffer(t)
-		ct, err := CreateCatalog(bp, redoLog)
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		ct, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 		assert.NoError(t, err)
-		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
 		bufPageHeader, err := bp.Page(headerPageId)
 		assert.NoError(t, err)
 		before := bufPageHeader.ModifyCount()
@@ -336,7 +354,9 @@ func TestAllocateFileId(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
 		redoLog := newCatalogTestRedoBuffer(t)
-		ct, err := CreateCatalog(bp, redoLog)
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		ct, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 		assert.NoError(t, err)
 
 		// WHEN
@@ -356,9 +376,11 @@ func TestAllocateFileId(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
 		redoLog := newCatalogTestRedoBuffer(t)
-		ct, err := CreateCatalog(bp, redoLog)
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		ct, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 		assert.NoError(t, err)
-		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
 		bufPageHeader, err := bp.Page(headerPageId)
 		assert.NoError(t, err)
 		before := bufPageHeader.ModifyCount()
@@ -384,7 +406,9 @@ func TestPersistNextTrxId(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 
 		// WHEN
-		ct, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
+		ct, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 
 		// THEN
 		assert.NoError(t, err)
@@ -396,11 +420,13 @@ func TestPersistNextTrxId(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 
 		// WHEN
-		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
+		_, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 		assert.NoError(t, err)
 
 		// THEN
-		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
 		bufPageHeader, err := bp.Page(headerPageId)
 		assert.NoError(t, err)
 		defer bp.Unpin(headerPageId)
@@ -415,7 +441,9 @@ func TestPersistNextTrxId(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
 		redoLog := newCatalogTestRedoBuffer(t)
-		ct, err := CreateCatalog(bp, redoLog)
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		ct, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 		assert.NoError(t, err)
 
 		// WHEN
@@ -426,7 +454,7 @@ func TestPersistNextTrxId(t *testing.T) {
 
 		// THEN
 		assert.Equal(t, lock.TrxId(42), ct.NextTrxId())
-		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
 		bufPageHeader, err := bp.Page(headerPageId)
 		assert.NoError(t, err)
 		defer bp.Unpin(headerPageId)
@@ -441,14 +469,16 @@ func TestPersistNextTrxId(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
 		redoLog := newCatalogTestRedoBuffer(t)
-		ct, err := CreateCatalog(bp, redoLog)
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		ct, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 		assert.NoError(t, err)
 		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
 		assert.NoError(t, ct.PersistNextTrxId(mtr, lock.TrxId(123)))
 		assert.NoError(t, mtr.Commit())
 
 		// WHEN
-		opened, err := NewCatalog(bp, newCatalogTestRedoBuffer(t))
+		opened, err := NewCatalog(bp)
 
 		// THEN
 		assert.NoError(t, err)
@@ -460,9 +490,11 @@ func TestSetDDLUndoRootPageId(t *testing.T) {
 	t.Run("PageId を書き換えるとヘッダーと内部状態が更新される", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
-		ct, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
+		ct, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
 		assert.NoError(t, err)
-		newPageId := page.NewId(catalogFileId, page.PageNumber(123))
+		newPageId := page.NewId(CatalogFileId, page.PageNumber(123))
 
 		// WHEN
 		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
@@ -472,7 +504,7 @@ func TestSetDDLUndoRootPageId(t *testing.T) {
 
 		// THEN
 		assert.Equal(t, newPageId, ct.ddlUndoRootPageId)
-		headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
 		bufPageHeader, err := bp.Page(headerPageId)
 		assert.NoError(t, err)
 		defer bp.Unpin(headerPageId)
@@ -480,34 +512,6 @@ func TestSetDDLUndoRootPageId(t *testing.T) {
 		assert.Equal(t, newPageId.PageNumber(), pn)
 	})
 
-}
-
-func TestDDLManager(t *testing.T) {
-	t.Run("CreateCatalog 直後の DDLManager が non-nil", func(t *testing.T) {
-		// GIVEN
-		bp := setupCatalogTestBufferPool(t)
-
-		// WHEN
-		ct, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
-		assert.NoError(t, err)
-
-		// THEN
-		assert.NotNil(t, ct.DDLManager())
-	})
-
-	t.Run("NewCatalog で開いた DDLManager が non-nil", func(t *testing.T) {
-		// GIVEN
-		bp := setupCatalogTestBufferPool(t)
-		_, err := CreateCatalog(bp, newCatalogTestRedoBuffer(t))
-		assert.NoError(t, err)
-
-		// WHEN
-		opened, err := NewCatalog(bp, newCatalogTestRedoBuffer(t))
-		assert.NoError(t, err)
-
-		// THEN
-		assert.NotNil(t, opened.DDLManager())
-	})
 }
 
 // setupCatalogTestBufferPool はカタログテスト用のバッファプールを作成する

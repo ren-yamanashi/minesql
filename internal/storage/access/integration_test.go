@@ -297,7 +297,7 @@ func TestIntegrationCrashRecovery(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		r := NewRecovery(env.redoLog, env.bp, env.trxMgr, env.ct.UndoLogFileId(), env.ct.DDLManager())
+		r := NewRecovery(env.redoLog, env.bp, env.trxMgr, env.ct.UndoLogFileId(), env.ddlMgr)
 		err = r.Execute()
 
 		// THEN
@@ -323,7 +323,7 @@ func TestIntegrationCrashRecovery(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		r := NewRecovery(env.redoLog, env.bp, env.trxMgr, env.ct.UndoLogFileId(), env.ct.DDLManager())
+		r := NewRecovery(env.redoLog, env.bp, env.trxMgr, env.ct.UndoLogFileId(), env.ddlMgr)
 		err = r.Execute()
 
 		// THEN
@@ -360,7 +360,7 @@ func TestIntegrationCrashRecovery(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		r := NewRecovery(env.redoLog, env.bp, env.trxMgr, env.ct.UndoLogFileId(), env.ct.DDLManager())
+		r := NewRecovery(env.redoLog, env.bp, env.trxMgr, env.ct.UndoLogFileId(), env.ddlMgr)
 		err = r.Execute()
 
 		// THEN
@@ -391,13 +391,13 @@ func TestIntegrationCrashRecoveryAfterPurge(t *testing.T) {
 		assert.NoError(t, table.SoftDelete(trx2, record))
 		assert.NoError(t, env.trxMgr.Commit(trx2))
 
-		p := NewPurge(env.bp, env.trxMgr, env.undoLog, env.redoLog)
+		p := NewPurge(env.trxMgr)
 		assert.NoError(t, p.purge())
 		assert.NoError(t, env.redoLog.Flush())
 
 		// WHEN
 		env2 := crashAndRecover(t, env, []string{"users"})
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ddlMgr)
 		err = r.Execute()
 
 		// THEN
@@ -438,7 +438,7 @@ func TestIntegrationCrashRecoveryAfterRollback(t *testing.T) {
 
 		// WHEN
 		env2 := crashAndRecover(t, env, []string{"users"})
-		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ct.DDLManager())
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ddlMgr)
 		err = r.Execute()
 
 		// THEN
@@ -458,6 +458,7 @@ type integrationEnv struct {
 	lockMgr *lock.Manager
 	redoLog *redo.Buffer
 	trxMgr  *TrxManager
+	ddlMgr  *undo.DDLManager
 }
 
 // setupIntegrationEnv は CreateTable + TrxManager を使った統合テスト用環境を構築する
@@ -484,9 +485,14 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 	bp := buffer.NewPool(page.Size*50, redoLog, nil)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
-	ct, err := dictionary.CreateCatalog(bp, redoLog)
+	catalogMtr := newBootstrapMtr(bp, redoLog)
+	ct, err := dictionary.CreateCatalog(catalogMtr)
 	if err != nil {
+		catalogMtr.UnpinAll()
 		t.Fatalf("Catalog の作成に失敗: %v", err)
+	}
+	if err := catalogMtr.Commit(); err != nil {
+		t.Fatalf("Catalog Commit に失敗: %v", err)
 	}
 
 	// Undo 用 HeapFile (catalog が採番した FileId を使用)
@@ -499,13 +505,28 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 	t.Cleanup(func() { _ = undoHf.Close() })
 	bp.RegisterHeapFile(undoFileId, undoHf)
 
-	undoMgr, err := undo.NewManager(bp, undoFileId, redoLog)
+	undoMtr := newBootstrapMtr(bp, redoLog)
+	undoMgr, err := undo.NewManager(undoMtr, undoFileId)
 	if err != nil {
+		undoMtr.UnpinAll()
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
+	}
+	if err := undoMtr.Commit(); err != nil {
+		t.Fatalf("undo.Manager Commit に失敗: %v", err)
+	}
+
+	ddlMtr := newBootstrapMtr(bp, redoLog)
+	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId(), ct.FreeListMapPageId())
+	if err != nil {
+		ddlMtr.UnpinAll()
+		t.Fatalf("undo.DDLManager の作成に失敗: %v", err)
+	}
+	if err := ddlMtr.Commit(); err != nil {
+		t.Fatalf("undo.DDLManager Commit に失敗: %v", err)
 	}
 
 	lockMgr := lock.NewManager()
-	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, 1)
+	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, ddlMgr, 1)
 
 	return &integrationEnv{
 		bp:      bp,
@@ -514,6 +535,7 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 		lockMgr: lockMgr,
 		redoLog: redoLog,
 		trxMgr:  trxMgr,
+		ddlMgr:  ddlMgr,
 	}
 }
 
@@ -696,7 +718,7 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 		_ = env.redoLog.Flush()
 
 		// クラッシュリカバリ実行
-		r := NewRecovery(env.redoLog, env.bp, env.trxMgr, env.ct.UndoLogFileId(), env.ct.DDLManager())
+		r := NewRecovery(env.redoLog, env.bp, env.trxMgr, env.ct.UndoLogFileId(), env.ddlMgr)
 		err := r.Execute()
 		assert.NoError(t, err)
 
@@ -762,7 +784,7 @@ func crashAndRecover(t *testing.T, prev *integrationEnv, tableNames []string) *i
 	t.Cleanup(func() { _ = catalogHf.Close() })
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
-	ct, err := dictionary.NewCatalog(bp, redoLog)
+	ct, err := dictionary.NewCatalog(bp)
 	if err != nil {
 		t.Fatalf("Catalog の再オープンに失敗: %v", err)
 	}
@@ -797,10 +819,20 @@ func crashAndRecover(t *testing.T, prev *integrationEnv, tableNames []string) *i
 	}
 	initialNextTrxId := max(ct.NextTrxId(), maxTrxId+1)
 
+	ddlMtr := newBootstrapMtr(bp, redoLog)
+	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId(), ct.FreeListMapPageId())
+	if err != nil {
+		ddlMtr.UnpinAll()
+		t.Fatalf("undo.DDLManager の再オープンに失敗: %v", err)
+	}
+	if err := ddlMtr.Commit(); err != nil {
+		t.Fatalf("undo.DDLManager Commit に失敗: %v", err)
+	}
+
 	lockMgr := lock.NewManager()
 	// Recovery 中は undoMgr の entries を参照しないので、Recovery 実行用の仮の TrxManager を空 undoMgr 抜きで構成する
-	tempTrxMgr := NewTrxManager(ct, nil, redoLog, lockMgr, bp, initialNextTrxId)
-	r := NewRecovery(redoLog, bp, tempTrxMgr, undoFileId, ct.DDLManager())
+	tempTrxMgr := NewTrxManager(ct, nil, redoLog, lockMgr, bp, ddlMgr, initialNextTrxId)
+	r := NewRecovery(redoLog, bp, tempTrxMgr, undoFileId, ddlMgr)
 	if err := r.Execute(); err != nil {
 		t.Fatalf("Recovery.Execute に失敗: %v", err)
 	}
@@ -809,7 +841,7 @@ func crashAndRecover(t *testing.T, prev *integrationEnv, tableNames []string) *i
 	if err != nil {
 		t.Fatalf("undo.Manager の再オープンに失敗: %v", err)
 	}
-	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, initialNextTrxId)
+	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, ddlMgr, initialNextTrxId)
 
 	return &integrationEnv{
 		bp:      bp,
@@ -818,5 +850,6 @@ func crashAndRecover(t *testing.T, prev *integrationEnv, tableNames []string) *i
 		lockMgr: lockMgr,
 		redoLog: redoLog,
 		trxMgr:  trxMgr,
+		ddlMgr:  ddlMgr,
 	}
 }

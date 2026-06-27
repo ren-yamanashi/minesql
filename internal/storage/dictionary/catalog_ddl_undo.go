@@ -8,15 +8,10 @@ import (
 
 func (c *Catalog) DDLUndoRootPageId() page.Id { return c.ddlUndoRootPageId }
 
-// DDLManager は DDL Undo 領域コンテナを返す
-//   - CreateCatalog 以降サーバライフタイム中ずっと non-nil
-//   - DDL Commit / Rollback で内部の中身はクリアされるが、 コンテナインスタンス自体は同じものを使い回す
-func (c *Catalog) DDLManager() *undo.DDLManager { return c.ddlManager }
-
 // SetDDLUndoRootPageId はヘッダーページの DDL Undo 先頭 PageNumber を更新する
 //   - 書き込みは mtr 経由で行われ Redo に記録される
 func (c *Catalog) SetDDLUndoRootPageId(mtr *buffer.Mtr, pageId page.Id) error {
-	headerPageId := page.NewId(catalogFileId, catalogHeaderPageNum)
+	headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
 	bufPageHeader, err := mtr.PageForWrite(headerPageId)
 	if err != nil {
 		return err
@@ -33,13 +28,13 @@ func ddlUndoRootPageIdFromPageNumber(pn page.PageNumber) page.Id {
 	if pn == page.MaxPageNumber {
 		return page.InvalidId()
 	}
-	return page.NewId(catalogFileId, pn)
+	return page.NewId(CatalogFileId, pn)
 }
 
 // allocateAndInitializeDDLUndoRootPage は DDL Undo 専用領域の先頭ページを新規確保し、 空の Undo ページとして初期化する
 //   - 呼び出し側はエラー時に mtr.UnpinAll() を行う既存パターンに従う
 func allocateAndInitializeDDLUndoRootPage(mtr *buffer.Mtr, bp *buffer.Pool) (page.Id, error) {
-	pageId, err := bp.AllocatePageId(catalogFileId)
+	pageId, err := bp.AllocatePageId(CatalogFileId)
 	if err != nil {
 		return page.InvalidId(), err
 	}

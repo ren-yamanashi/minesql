@@ -9,33 +9,25 @@ import (
 	"time"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
-	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
-	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
 type Purge struct {
-	bufferPool  *buffer.Pool
-	transaction *TrxManager
-	undoLog     *undo.Manager
-	redoLog     *redo.Buffer
-	interval    time.Duration
-	ticker      *time.Ticker
-	done        chan struct{}
-	stopped     chan struct{}
-	stopOnce    sync.Once
-	isRunning   atomic.Bool
+	purgeTrx  *Transaction
+	interval  time.Duration
+	ticker    *time.Ticker
+	done      chan struct{}
+	stopped   chan struct{}
+	stopOnce  sync.Once
+	isRunning atomic.Bool
 }
 
-func NewPurge(bp *buffer.Pool, trx *TrxManager, undoLog *undo.Manager, redoLog *redo.Buffer) *Purge {
+func NewPurge(tm *TrxManager) *Purge {
 	return &Purge{
-		bufferPool:  bp,
-		transaction: trx,
-		undoLog:     undoLog,
-		redoLog:     redoLog,
-		interval:    1 * time.Second,
+		purgeTrx: tm.BeginPurge(),
+		interval: 1 * time.Second,
 	}
 }
 
@@ -79,14 +71,14 @@ func (p *Purge) loop() {
 
 // purge はパージ閾値を算出し、Undo ログを走査してパージを実行する
 func (p *Purge) purge() error {
-	purgeLimit := p.transaction.OldestVisibleTrxId()
+	purgeLimit := p.purgeTrx.tm.OldestVisibleTrxId()
 	purgableTrxIds := p.purgableTrxIds(purgeLimit)
 	if len(purgableTrxIds) == 0 {
 		return nil
 	}
 
 	// 論理削除済みレコードの物理削除
-	entries := p.undoLog.CommittedEntries(purgableTrxIds)
+	entries := p.purgeTrx.undoLog.CommittedEntries(purgableTrxIds)
 	for _, entry := range entries {
 		if err := p.purgeEntry(entry); err != nil {
 			return err
@@ -95,7 +87,7 @@ func (p *Purge) purge() error {
 
 	// パージ済みの Undo ログを破棄
 	for _, trxId := range purgableTrxIds {
-		p.undoLog.Discard(trxId)
+		p.purgeTrx.undoLog.Discard(trxId)
 	}
 	return nil
 }
@@ -140,13 +132,14 @@ func (p *Purge) purgeUpdate(record undo.Record) error {
 
 // deletePrimaryRecord はプライマリレコードを物理削除する
 func (p *Purge) deletePrimaryRecord(fileId page.FileId, record btree.Record) error {
-	mtr := buffer.NewWriteMtr(p.bufferPool, lock.PurgeReservedTrxId, p.redoLog)
-	piRecord, err := fetchPrimaryIndexRecord(p.transaction.catalog, p.bufferPool, fileId)
+	mtr := p.purgeTrx.NewMtr()
+	bp := p.purgeTrx.bufferPool
+	piRecord, err := fetchPrimaryIndexRecord(p.purgeTrx.catalog, bp, fileId)
 	if err != nil {
 		mtr.UnpinAll()
 		return err
 	}
-	primaryTree := btree.NewTree(p.bufferPool, piRecord.MetaPageId())
+	primaryTree := btree.NewTree(bp, piRecord.MetaPageId())
 
 	// キーが存在し、deleteMark=1 の場合のみ物理削除 (論理削除後に同一キーで再挿入された active な行を消さないため)
 	existing, _, err := primaryTree.FindByKey(mtr, record.Key())
@@ -171,27 +164,28 @@ func (p *Purge) deletePrimaryRecord(fileId page.FileId, record btree.Record) err
 
 // deleteSecondaryRecords は指定されたプライマリインデックスのレコードに対応するセカンダリインデックスの論理削除済みレコードを物理削除する
 func (p *Purge) deleteSecondaryRecords(fileId page.FileId, record btree.Record) error {
-	mtr := buffer.NewWriteMtr(p.bufferPool, lock.PurgeReservedTrxId, p.redoLog)
-	prevRec, err := DecodePrimaryRecord(record, p.transaction.catalog, p.bufferPool, fileId)
+	mtr := p.purgeTrx.NewMtr()
+	bp := p.purgeTrx.bufferPool
+	prevRec, err := DecodePrimaryRecord(record, p.purgeTrx.catalog, bp, fileId)
 	if err != nil {
 		mtr.UnpinAll()
 		return err
 	}
 
-	siRecords, err := fetchSecondaryIndexRecords(p.transaction.catalog, p.bufferPool, fileId)
+	siRecords, err := fetchSecondaryIndexRecords(p.purgeTrx.catalog, bp, fileId)
 	if err != nil {
 		mtr.UnpinAll()
 		return err
 	}
 
 	for _, siRecord := range siRecords {
-		keyCols, err := fetchIndexKeyColumn(p.transaction.catalog, p.bufferPool, siRecord.IndexId())
+		keyCols, err := fetchIndexKeyColumn(p.purgeTrx.catalog, bp, siRecord.IndexId())
 		if err != nil {
 			mtr.UnpinAll()
 			return err
 		}
 		sk := prevRec.SecondaryKey(keyCols)
-		tree := btree.NewTree(p.bufferPool, siRecord.MetaPageId())
+		tree := btree.NewTree(bp, siRecord.MetaPageId())
 
 		// キーが存在し、deleteMark=1 の場合のみ物理削除
 		existing, _, err := tree.FindByKey(mtr, sk)
@@ -216,7 +210,7 @@ func (p *Purge) deleteSecondaryRecords(fileId page.FileId, record btree.Record) 
 // purgableTrxIds は完了済みトランザクションのうち purgeLimit 未満の ID を返す
 func (p *Purge) purgableTrxIds(purgeLimit lock.TrxId) []lock.TrxId {
 	var ids []lock.TrxId
-	for _, trxId := range p.transaction.InactiveTrxIds() {
+	for _, trxId := range p.purgeTrx.tm.InactiveTrxIds() {
 		if trxId < purgeLimit {
 			ids = append(ids, trxId)
 		}

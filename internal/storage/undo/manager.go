@@ -25,31 +25,26 @@ type Manager struct {
 	entries       map[lock.TrxId][]Entry // trxId → Entry[] のマップ
 }
 
-func NewManager(bp *buffer.Pool, fileId page.FileId, redoLog *redo.Buffer) (*Manager, error) {
-	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-
+// NewManager は Undo ログ用の先頭ページを 1 枚確保して Manager を返す
+//   - mtr: 先頭ページの初期化を記録する Mtr。Commit / UnpinAll は呼び出し側
+func NewManager(mtr *buffer.Mtr, fileId page.FileId) (*Manager, error) {
+	bp := mtr.Pool()
 	pageId, err := bp.AllocatePageId(fileId)
 	if err != nil {
-		mtr.UnpinAll()
 		return nil, err
 	}
 	if _, err := bp.AddPage(pageId); err != nil {
-		mtr.UnpinAll()
 		return nil, err
 	}
 	bufPageUndo, err := mtr.PageForWrite(pageId)
 	if err != nil {
-		mtr.UnpinAll()
 		return nil, err
 	}
 	CreatePage(bufPageUndo)
-	if err := mtr.Commit(); err != nil {
-		return nil, err
-	}
 
 	return &Manager{
 		bufferPool:    bp,
-		redoLog:       redoLog,
+		redoLog:       mtr.Redo(),
 		fileId:        fileId,
 		currentPageId: pageId,
 		entries:       make(map[lock.TrxId][]Entry),

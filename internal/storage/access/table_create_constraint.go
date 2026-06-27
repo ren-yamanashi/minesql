@@ -10,7 +10,14 @@ import (
 // createConstraints は制約をカタログに登録する
 //   - mtr: 登録の書き込みを記録する Mtr。Commit は呼び出し側
 //   - 各 Insert 直後に対応する MetaInsertUndo を Append する
-func createConstraints(mtr *buffer.Mtr, ct *dictionary.Catalog, bp *buffer.Pool, fileId page.FileId, inputs []CreateConstraintInput) error {
+func createConstraints(
+	ddlTrx *Transaction,
+	mtr *buffer.Mtr,
+	fileId page.FileId,
+	inputs []CreateConstraintInput,
+) error {
+	ct := ddlTrx.catalog
+	bp := ddlTrx.bufferPool
 	for _, input := range inputs {
 		refTable, err := fetchTable(ct, bp, input.ReferenceTableName)
 		if err != nil {
@@ -27,7 +34,7 @@ func createConstraints(mtr *buffer.Mtr, ct *dictionary.Catalog, bp *buffer.Pool,
 		if err := ct.ConstraintMeta().Insert(mtr, constraintRecord); err != nil {
 			return err
 		}
-		if err := appendMetaInsertUndo(mtr, ct, undo.MetaTableTypeConstraint, constraintKey); err != nil {
+		if err := appendMetaInsertUndo(ddlTrx, mtr, undo.MetaTableTypeConstraint, constraintKey); err != nil {
 			return err
 		}
 	}

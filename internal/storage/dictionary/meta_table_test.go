@@ -5,6 +5,7 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -16,7 +17,9 @@ func TestCreateTableMeta(t *testing.T) {
 		rl := setupDictTestRedoBuffer(t)
 
 		// WHEN
-		tm, err := CreateTableMeta(bp, rl)
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, rl)
+		tm, err := CreateTableMeta(ctMtr)
+		_ = ctMtr.Commit()
 
 		// THEN
 		assert.NoError(t, err)
@@ -159,7 +162,9 @@ func TestTableMetaDelete(t *testing.T) {
 func setupTestTableMeta(t *testing.T) (*TableMeta, *buffer.Pool) {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
-	tm, err := CreateTableMeta(bp, setupDictTestRedoBuffer(t))
+	ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, setupDictTestRedoBuffer(t))
+	tm, err := CreateTableMeta(ctMtr)
+	_ = ctMtr.Commit()
 	if err != nil {
 		t.Fatalf("TableMeta の作成に失敗: %v", err)
 	}

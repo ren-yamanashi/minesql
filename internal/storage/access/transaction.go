@@ -42,3 +42,9 @@ func (t *Transaction) NewMtr() *buffer.Mtr {
 func (t *Transaction) NewReadMtr() *buffer.Mtr {
 	return buffer.NewMtr(t.bufferPool)
 }
+
+// DDLManager は Transaction が属する TrxManager の ddlManager を返す
+//   - DDL 経路 (= BeginDDL で払い出された Transaction) からの利用を想定
+func (t *Transaction) DDLManager() *undo.DDLManager {
+	return t.tm.ddlManager
+}

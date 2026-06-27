@@ -249,9 +249,14 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 	t.Cleanup(func() { _ = undoHf.Close() })
 	env.bp.RegisterHeapFile(page.FileId(3), undoHf)
 
-	undoMgr, err := undo.NewManager(env.bp, page.FileId(3), redoLog)
+	undoBootstrapMtr := newBootstrapMtr(env.bp, redoLog)
+	undoMgr, err := undo.NewManager(undoBootstrapMtr, page.FileId(3))
 	if err != nil {
+		undoBootstrapMtr.UnpinAll()
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
+	}
+	if err := undoBootstrapMtr.Commit(); err != nil {
+		t.Fatalf("undo.Manager Commit に失敗: %v", err)
 	}
 
 	lockMgr := lock.NewManager()
@@ -314,7 +319,7 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 	))
 	_ = env.ct.IndexKeyColumnMeta().Insert(mtr, dictionary.NewIndexKeyColumnMetaRecord(siEmailId, "email", 0))
 
-	trxMgr := NewTrxManager(env.ct, undoMgr, redoLog, lockMgr, env.bp, 1)
+	trxMgr := NewTrxManager(env.ct, undoMgr, redoLog, lockMgr, env.bp, env.ddlMgr, 1)
 
 	return &tableTestEnv{
 		ct:      env.ct,
@@ -342,9 +347,14 @@ func setupTableTestEnvWithoutPrimaryIndex(t *testing.T) *tableTestEnv {
 	t.Cleanup(func() { _ = undoHf.Close() })
 	env.bp.RegisterHeapFile(page.FileId(3), undoHf)
 
-	undoMgr, err := undo.NewManager(env.bp, page.FileId(3), redoLog)
+	undoBootstrapMtr := newBootstrapMtr(env.bp, redoLog)
+	undoMgr, err := undo.NewManager(undoBootstrapMtr, page.FileId(3))
 	if err != nil {
+		undoBootstrapMtr.UnpinAll()
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
+	}
+	if err := undoBootstrapMtr.Commit(); err != nil {
+		t.Fatalf("undo.Manager Commit に失敗: %v", err)
 	}
 
 	lockMgr := lock.NewManager()

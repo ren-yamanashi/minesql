@@ -425,9 +425,14 @@ func setupDDLRollbackerTestEnv(t *testing.T) *ddlRollbackerTestEnv {
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 	bp.RegisterHeapFile(page.FileId(2), dataHf)
 
-	ct, err := dictionary.CreateCatalog(bp, redoLog)
+	catalogMtr := newBootstrapMtr(bp, redoLog)
+	ct, err := dictionary.CreateCatalog(catalogMtr)
 	if err != nil {
+		catalogMtr.UnpinAll()
 		t.Fatalf("Catalog の作成に失敗: %v", err)
+	}
+	if err := catalogMtr.Commit(); err != nil {
+		t.Fatalf("Catalog Commit に失敗: %v", err)
 	}
 
 	return &ddlRollbackerTestEnv{bp: bp, ct: ct, redoLog: redoLog}

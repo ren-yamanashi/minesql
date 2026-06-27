@@ -19,10 +19,118 @@ func TestNewTrxManager(t *testing.T) {
 
 		// WHEN
 		redoLog := setupTestRedoLog(t)
-		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, 1)
+		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.trxMgr.ddlManager, 1)
 
 		// THEN
 		assert.NotNil(t, tm)
+	})
+}
+
+func TestNewTrxManagerSystemTrx(t *testing.T) {
+	t.Run("systemTrx が SystemReservedTrxId / Active / 全 5 resource 同一参照で生成される", func(t *testing.T) {
+		// GIVEN
+		env := setupTableTestEnv(t)
+		redoLog := setupTestRedoLog(t)
+
+		// WHEN
+		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.trxMgr.ddlManager, 1)
+
+		// THEN
+		assert.NotNil(t, tm.systemTrx)
+		assert.Equal(t, lock.SystemReservedTrxId, tm.systemTrx.trxId)
+		assert.Equal(t, trxStateActive, tm.systemTrx.state)
+		assert.Same(t, tm.bufferPool, tm.systemTrx.bufferPool)
+		assert.Same(t, tm.redoLog, tm.systemTrx.redoLog)
+		assert.Same(t, tm.lock, tm.systemTrx.lockMgr)
+		assert.Same(t, tm.undoLog, tm.systemTrx.undoLog)
+		assert.Same(t, tm.catalog, tm.systemTrx.catalog)
+	})
+}
+
+func TestNewTrxManagerSystemTrxNotInMap(t *testing.T) {
+	t.Run("systemTrx が transactions map に登録されない", func(t *testing.T) {
+		// GIVEN
+		env := setupTableTestEnv(t)
+		redoLog := setupTestRedoLog(t)
+
+		// WHEN
+		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.trxMgr.ddlManager, 1)
+
+		// THEN
+		_, exists := tm.transactions[lock.SystemReservedTrxId]
+		assert.False(t, exists)
+	})
+}
+
+func TestNewTrxManagerDDLManager(t *testing.T) {
+	t.Run("ddlManager が引数と同一参照で保持される", func(t *testing.T) {
+		// GIVEN
+		env := setupTableTestEnv(t)
+		redoLog := setupTestRedoLog(t)
+
+		// WHEN
+		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.trxMgr.ddlManager, 1)
+
+		// THEN
+		assert.Same(t, env.trxMgr.ddlManager, tm.ddlManager)
+	})
+}
+
+func TestTrxManagerBeginPurge(t *testing.T) {
+	t.Run("BeginPurge が PurgeReservedTrxId の Transaction を返し map に登録されない", func(t *testing.T) {
+		// GIVEN
+		env := setupTableTestEnv(t)
+		redoLog := setupTestRedoLog(t)
+		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.trxMgr.ddlManager, 1)
+
+		// WHEN
+		purgeTrx := tm.BeginPurge()
+
+		// THEN
+		assert.Equal(t, lock.PurgeReservedTrxId, purgeTrx.trxId)
+		assert.Equal(t, trxStateActive, purgeTrx.state)
+		assert.Same(t, tm.bufferPool, purgeTrx.bufferPool)
+		assert.Same(t, tm.redoLog, purgeTrx.redoLog)
+		assert.Same(t, tm.lock, purgeTrx.lockMgr)
+		assert.Same(t, tm.undoLog, purgeTrx.undoLog)
+		assert.Same(t, tm.catalog, purgeTrx.catalog)
+		_, exists := tm.transactions[lock.PurgeReservedTrxId]
+		assert.False(t, exists)
+	})
+}
+
+func TestNewPurgePurgeTrx(t *testing.T) {
+	t.Run("NewPurge で生成された purgeTrx が BeginPurge 相当の状態", func(t *testing.T) {
+		// GIVEN
+		env := setupTableTestEnv(t)
+
+		// WHEN
+		p := NewPurge(env.trxMgr)
+
+		// THEN
+		assert.Equal(t, lock.PurgeReservedTrxId, p.purgeTrx.trxId)
+		assert.Equal(t, trxStateActive, p.purgeTrx.state)
+		assert.Same(t, env.trxMgr.bufferPool, p.purgeTrx.bufferPool)
+		assert.Same(t, env.trxMgr.redoLog, p.purgeTrx.redoLog)
+		assert.Same(t, env.trxMgr.lock, p.purgeTrx.lockMgr)
+		assert.Same(t, env.trxMgr.undoLog, p.purgeTrx.undoLog)
+		assert.Same(t, env.trxMgr.catalog, p.purgeTrx.catalog)
+		_, exists := env.trxMgr.transactions[lock.PurgeReservedTrxId]
+		assert.False(t, exists)
+	})
+}
+
+func TestTransactionDDLManager(t *testing.T) {
+	t.Run("Transaction.DDLManager が TrxManager の ddlManager と同一参照を返す", func(t *testing.T) {
+		// GIVEN
+		env := setupTableTestEnv(t)
+		ddlTrx := env.trxMgr.BeginDDL()
+
+		// WHEN
+		got := ddlTrx.DDLManager()
+
+		// THEN
+		assert.Same(t, env.trxMgr.ddlManager, got)
 	})
 }
 
@@ -68,7 +176,7 @@ func TestTrxManagerBegin(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
 		redoLog := setupTestRedoLog(t)
-		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, 101)
+		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.trxMgr.ddlManager, 101)
 
 		// WHEN
 		trx := tm.Begin()
@@ -81,7 +189,7 @@ func TestTrxManagerBegin(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
 		redoLog := setupTestRedoLog(t)
-		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, 1)
+		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.trxMgr.ddlManager, 1)
 
 		// WHEN
 		trx := tm.Begin()
@@ -100,7 +208,7 @@ func TestNewTrxManagerRestoresInactiveTransaction(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
 		redoLog := setupTestRedoLog(t)
-		tm1 := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, 1)
+		tm1 := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.trxMgr.ddlManager, 1)
 		table := setupTableForTrxTest(t, tm1)
 		trx1 := tm1.Begin()
 		err := table.Insert(
@@ -120,7 +228,7 @@ func TestNewTrxManagerRestoresInactiveTransaction(t *testing.T) {
 		assert.Contains(t, env.undoLog.HistoryTrxIds(), trx2.trxId, "前提: UPDATE Undo を持つ trxId が HistoryTrxIds に含まれる")
 
 		// WHEN
-		tm2 := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, tm1.NextTrxId())
+		tm2 := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.trxMgr.ddlManager, tm1.NextTrxId())
 
 		// THEN
 		restored, ok := tm2.transactions[trx2.trxId]
@@ -167,7 +275,7 @@ func TestTrxManagerPersistNextTrxIdToCatalog(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
 		redoLog := setupTestRedoLog(t)
-		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.ct.NextTrxId())
+		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.trxMgr.ddlManager, env.ct.NextTrxId())
 		before := env.ct.NextTrxId()
 
 		// WHEN
@@ -182,7 +290,7 @@ func TestTrxManagerPersistNextTrxIdToCatalog(t *testing.T) {
 		// GIVEN
 		env := setupTableTestEnv(t)
 		redoLog := setupTestRedoLog(t)
-		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.ct.NextTrxId())
+		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.trxMgr.ddlManager, env.ct.NextTrxId())
 		_ = tm.Begin()
 		_ = tm.Begin()
 		_ = tm.Begin()
@@ -759,7 +867,7 @@ func setupTrxManager(t *testing.T) *TrxManager {
 	t.Helper()
 	env := setupTableTestEnv(t)
 	redoLog := setupTestRedoLog(t)
-	return NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, 1)
+	return NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.trxMgr.ddlManager, 1)
 }
 
 // setupTestRedoLog はテスト用の redo.Buffer を作成する

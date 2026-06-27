@@ -189,7 +189,7 @@ func appendSampleDDLUndo(t *testing.T, tm *TrxManager) {
 		undo.DDLRecordTypeAllocateFileId,
 		undo.NewAllocateFileIdUndoRecord(99).Serialize(),
 	)
-	if err := tm.catalog.DDLManager().Append(mtr, record); err != nil {
+	if err := tm.ddlManager.Append(mtr, record); err != nil {
 		t.Fatalf("DDL Undo Append に失敗: %v", err)
 	}
 	if err := mtr.Commit(); err != nil {
@@ -202,7 +202,7 @@ func assertDDLUndoCount(t *testing.T, tm *TrxManager, expected int) {
 	t.Helper()
 	mtr := buffer.NewMtr(tm.bufferPool)
 	defer mtr.UnpinAll()
-	records, err := tm.catalog.DDLManager().ReverseScan(mtr)
+	records, err := tm.ddlManager.ReverseScan(mtr)
 	if err != nil {
 		t.Fatalf("ReverseScan に失敗: %v", err)
 	}
@@ -230,7 +230,7 @@ func appendMetaInsertSample(t *testing.T, tm *TrxManager) page.FileId {
 		mtr.UnpinAll()
 		t.Fatalf("ColumnMeta Insert に失敗: %v", err)
 	}
-	if err := appendMetaInsertUndo(mtr, tm.catalog, undo.MetaTableTypeColumn, colKey); err != nil {
+	if err := appendMetaInsertUndo(tm.systemTrx, mtr, undo.MetaTableTypeColumn, colKey); err != nil {
 		mtr.UnpinAll()
 		t.Fatalf("MetaInsertUndo Append に失敗: %v", err)
 	}
@@ -277,7 +277,7 @@ func appendCreateBTreeSample(t *testing.T, tm *TrxManager, fileId page.FileId) *
 		undo.DDLRecordTypeCreateBTree,
 		undo.NewCreateBTreeUndoRecord(tree.MetaPageId()).Serialize(),
 	)
-	if err := tm.catalog.DDLManager().Append(mtr, record); err != nil {
+	if err := tm.ddlManager.Append(mtr, record); err != nil {
 		mtr.UnpinAll()
 		t.Fatalf("CreateBTreeUndo Append に失敗: %v", err)
 	}
@@ -295,7 +295,7 @@ func appendAllocateFileIdUndoForTest(t *testing.T, tm *TrxManager, fileId page.F
 		undo.DDLRecordTypeAllocateFileId,
 		undo.NewAllocateFileIdUndoRecord(fileId).Serialize(),
 	)
-	if err := tm.catalog.DDLManager().Append(mtr, record); err != nil {
+	if err := tm.ddlManager.Append(mtr, record); err != nil {
 		mtr.UnpinAll()
 		t.Fatalf("AllocateFileIdUndo Append に失敗: %v", err)
 	}

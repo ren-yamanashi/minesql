@@ -23,7 +23,9 @@ func TestNewManager(t *testing.T) {
 		bp := setupTestBufferPool(t, redoLog)
 
 		// WHEN
-		mgr, err := NewManager(bp, page.FileId(1), redoLog)
+		openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		mgr, err := NewManager(openMtr, page.FileId(1))
+		_ = openMtr.Commit()
 
 		// THEN
 		assert.NoError(t, err)
@@ -728,9 +730,14 @@ func setupTestManager(t *testing.T) *Manager {
 	}
 	t.Cleanup(func() { _ = redoLog.Close() })
 	bp := setupTestBufferPool(t, redoLog)
-	mgr, err := NewManager(bp, page.FileId(1), redoLog)
+	openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+	mgr, err := NewManager(openMtr, page.FileId(1))
 	if err != nil {
+		openMtr.UnpinAll()
 		t.Fatalf("Manager の作成に失敗: %v", err)
+	}
+	if err := openMtr.Commit(); err != nil {
+		t.Fatalf("Manager Commit に失敗: %v", err)
 	}
 	return mgr
 }
@@ -745,9 +752,14 @@ func setupTestManagerWithRedoLog(t *testing.T) (*Manager, *redo.Buffer) {
 	}
 	t.Cleanup(func() { _ = redoLog.Close() })
 	bp := setupTestBufferPool(t, redoLog)
-	mgr, err := NewManager(bp, page.FileId(1), redoLog)
+	openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+	mgr, err := NewManager(openMtr, page.FileId(1))
 	if err != nil {
+		openMtr.UnpinAll()
 		t.Fatalf("Manager の作成に失敗: %v", err)
+	}
+	if err := openMtr.Commit(); err != nil {
+		t.Fatalf("Manager Commit に失敗: %v", err)
 	}
 	return mgr, redoLog
 }

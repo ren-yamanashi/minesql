@@ -5,6 +5,7 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -15,7 +16,9 @@ func TestCreateIndexKeyColumnMeta(t *testing.T) {
 		rl := setupDictTestRedoBuffer(t)
 
 		// WHEN
-		kcm, err := CreateIndexKeyColumnMeta(bp, rl)
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, rl)
+		kcm, err := CreateIndexKeyColumnMeta(ctMtr)
+		_ = ctMtr.Commit()
 
 		// THEN
 		assert.NoError(t, err)
@@ -158,7 +161,9 @@ func TestIndexKeyColumnMetaDelete(t *testing.T) {
 func setupTestIndexKeyColumnMeta(t *testing.T) (*IndexKeyColumnMeta, *buffer.Pool) {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
-	kcm, err := CreateIndexKeyColumnMeta(bp, setupDictTestRedoBuffer(t))
+	ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, setupDictTestRedoBuffer(t))
+	kcm, err := CreateIndexKeyColumnMeta(ctMtr)
+	_ = ctMtr.Commit()
 	if err != nil {
 		t.Fatalf("IndexKeyColumnMeta の作成に失敗: %v", err)
 	}

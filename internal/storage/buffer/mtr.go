@@ -50,6 +50,17 @@ func NewWriteMtr(pool *Pool, trxId lock.TrxId, redoLog *redo.Buffer) *Mtr {
 	return &Mtr{pool: pool, trxId: trxId, redo: redoLog}
 }
 
+// Pool は Mtr が紐づくバッファプールを返す
+func (m *Mtr) Pool() *Pool {
+	return m.pool
+}
+
+// Redo は Mtr が紐づく redo ログバッファを返す
+//   - 読み取り専用 Mtr (= NewMtr で生成) では nil を返す
+func (m *Mtr) Redo() *redo.Buffer {
+	return m.redo
+}
+
 // PageForRead は読み込み用のバッファページを取得し、Shared ラッチと Pin をスコープに記録する
 //   - 既に Commit / UnpinAll で解放された Mtr に対して呼ぶと panic する
 func (m *Mtr) PageForRead(pageId page.Id) (*Page, error) {

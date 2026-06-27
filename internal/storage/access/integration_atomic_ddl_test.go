@@ -178,7 +178,7 @@ type pendingTableFile struct {
 //   - 戻り値: 確保した FileId と物理ファイルのパス
 func createTableUntilFileId(t *testing.T, env *integrationEnv, name string) (page.FileId, string) {
 	t.Helper()
-	fileId, err := createTableFile(env.ct, env.bp, env.redoLog, name)
+	fileId, err := createTableFile(env.trxMgr.BeginDDL(), name)
 	if err != nil {
 		t.Fatalf("createTableFile に失敗: %v", err)
 	}
@@ -189,7 +189,7 @@ func createTableUntilFileId(t *testing.T, env *integrationEnv, name string) (pag
 func createTableUntilPrimary(t *testing.T, env *integrationEnv, name string, pkCount int) (page.FileId, string, *primaryIndex) {
 	t.Helper()
 	fileId, tablePath := createTableUntilFileId(t, env, name)
-	pi, err := createPrimaryIndex(env.ct, env.bp, fileId, pkCount, env.lockMgr, env.undoLog, env.redoLog)
+	pi, err := createPrimaryIndex(env.trxMgr.BeginDDL(), fileId, pkCount)
 	if err != nil {
 		t.Fatalf("createPrimaryIndex に失敗: %v", err)
 	}
@@ -252,7 +252,7 @@ func createTableUntilSecondaryN(
 	fileId, tablePath, pi := createTableUntilPartialMeta(t, env, name, pkCount, colNames, len(colNames))
 	secondaries := make([]*secondaryIndex, 0, secondaryCount)
 	for i := range secondaryCount {
-		si, err := buildOneSecondaryIndex(env.ct, env.bp, fileId, pi.tree, env.lockMgr, env.undoLog, env.redoLog, indexes[i])
+		si, err := buildOneSecondaryIndex(env.trxMgr.BeginDDL(), fileId, pi.tree, indexes[i])
 		if err != nil {
 			t.Fatalf("buildOneSecondaryIndex に失敗: %v", err)
 		}
@@ -279,7 +279,7 @@ func insertMetaWithDDLUndo(
 		undo.DDLRecordTypeMetaInsert,
 		undo.NewMetaInsertUndoRecord(metaTableType, key).Serialize(),
 	)
-	if err := env.ct.DDLManager().Append(mtr, record); err != nil {
+	if err := env.trxMgr.ddlManager.Append(mtr, record); err != nil {
 		mtr.UnpinAll()
 		t.Fatalf("DDLManager.Append に失敗: %v", err)
 	}
@@ -332,7 +332,7 @@ func crashAndRecoverWithPendingFiles(
 	t.Cleanup(func() { _ = catalogHf.Close() })
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
-	ct, err := dictionary.NewCatalog(bp, redoLog)
+	ct, err := dictionary.NewCatalog(bp)
 	if err != nil {
 		t.Fatalf("Catalog の再オープンに失敗: %v", err)
 	}
@@ -379,26 +379,46 @@ func crashAndRecoverWithPendingFiles(
 	}
 	initialNextTrxId := max(ct.NextTrxId(), maxTrxId+1)
 
+	ddlMtr := newBootstrapMtr(bp, redoLog)
+	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId(), ct.FreeListMapPageId())
+	if err != nil {
+		ddlMtr.UnpinAll()
+		t.Fatalf("undo.DDLManager の再オープンに失敗: %v", err)
+	}
+	if err := ddlMtr.Commit(); err != nil {
+		t.Fatalf("undo.DDLManager Commit に失敗: %v", err)
+	}
+
 	lockMgr := lock.NewManager()
-	tempTrxMgr := NewTrxManager(ct, nil, redoLog, lockMgr, bp, initialNextTrxId)
-	r := NewRecovery(redoLog, bp, tempTrxMgr, undoFileId, ct.DDLManager())
+	tempTrxMgr := NewTrxManager(ct, nil, redoLog, lockMgr, bp, ddlMgr, initialNextTrxId)
+	r := NewRecovery(redoLog, bp, tempTrxMgr, undoFileId, ddlMgr)
 	if err := r.Execute(); err != nil {
 		t.Fatalf("Recovery.Execute に失敗: %v", err)
 	}
 
 	// Recovery の Redo Replay でヘッダーページの nextFileId / nextIndexId が更新されるが、
 	// Recovery 前に作った ct はそれらを in-memory に反映しないため、 再 open して最新値を読み直す
-	refreshedCt, err := dictionary.NewCatalog(bp, redoLog)
+	refreshedCt, err := dictionary.NewCatalog(bp)
 	if err != nil {
 		t.Fatalf("Catalog の再 open に失敗: %v", err)
 	}
 	refreshedNextTrxId := max(refreshedCt.NextTrxId(), maxTrxId+1)
 
+	refreshedDdlMtr := newBootstrapMtr(bp, redoLog)
+	refreshedDdlMgr, err := undo.NewDDLManager(refreshedDdlMtr, dictionary.CatalogFileId, refreshedCt.DDLUndoRootPageId(), refreshedCt.FreeListMapPageId())
+	if err != nil {
+		refreshedDdlMtr.UnpinAll()
+		t.Fatalf("undo.DDLManager の再 open に失敗: %v", err)
+	}
+	if err := refreshedDdlMtr.Commit(); err != nil {
+		t.Fatalf("undo.DDLManager Commit に失敗: %v", err)
+	}
+
 	undoMgr, err := undo.OpenManager(bp, undoFileId)
 	if err != nil {
 		t.Fatalf("undo.Manager の再オープンに失敗: %v", err)
 	}
-	trxMgr := NewTrxManager(refreshedCt, undoMgr, redoLog, lockMgr, bp, refreshedNextTrxId)
+	trxMgr := NewTrxManager(refreshedCt, undoMgr, redoLog, lockMgr, bp, refreshedDdlMgr, refreshedNextTrxId)
 
 	return &integrationEnv{
 		bp:      bp,
@@ -407,6 +427,7 @@ func crashAndRecoverWithPendingFiles(
 		lockMgr: lockMgr,
 		redoLog: redoLog,
 		trxMgr:  trxMgr,
+		ddlMgr:  refreshedDdlMgr,
 	}
 }
 
@@ -414,7 +435,7 @@ func assertDDLUndoEmpty(t *testing.T, env *integrationEnv) {
 	t.Helper()
 	mtr := buffer.NewMtr(env.bp)
 	defer mtr.UnpinAll()
-	records, err := env.ct.DDLManager().ReverseScan(mtr)
+	records, err := env.trxMgr.ddlManager.ReverseScan(mtr)
 	assert.NoError(t, err)
 	assert.Empty(t, records)
 }

@@ -23,11 +23,11 @@ type DDLManager struct {
 }
 
 // NewDDLManager は既存の DDL Undo 専用領域を開く
+//   - mtr: 紐づくバッファプールを取得するための Mtr
 //   - rootPageId: カタログヘッダーが指す DDL Undo 先頭ページ ID。 無効値が渡されると ErrInvalidDDLUndoRoot を返す
 //   - freeListMapPageId: Clear 時に Pool.Deallocate へ渡すフリーリストマップページ ID
-//   - 先頭ページから next リンクを辿って末尾ページを currentPageId に設定する
 func NewDDLManager(
-	bp *buffer.Pool,
+	mtr *buffer.Mtr,
 	fileId page.FileId,
 	rootPageId page.Id,
 	freeListMapPageId page.Id,
@@ -35,6 +35,7 @@ func NewDDLManager(
 	if rootPageId.IsInvalid() {
 		return nil, ErrInvalidDDLUndoRoot
 	}
+	bp := mtr.Pool()
 	m := &DDLManager{
 		bufferPool:        bp,
 		fileId:            fileId,

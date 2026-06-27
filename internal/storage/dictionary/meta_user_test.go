@@ -7,6 +7,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/stretchr/testify/assert"
@@ -19,7 +20,9 @@ func TestCreateUserMeta(t *testing.T) {
 		rl := setupDictTestRedoBuffer(t)
 
 		// WHEN
-		um, err := CreateUserMeta(bp, rl)
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, rl)
+		um, err := CreateUserMeta(ctMtr)
+		_ = ctMtr.Commit()
 
 		// THEN
 		assert.NoError(t, err)
@@ -132,7 +135,9 @@ func TestUserMetaInsert(t *testing.T) {
 func setupTestUserMeta(t *testing.T) (*UserMeta, *buffer.Pool) {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
-	um, err := CreateUserMeta(bp, setupDictTestRedoBuffer(t))
+	ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, setupDictTestRedoBuffer(t))
+	um, err := CreateUserMeta(ctMtr)
+	_ = ctMtr.Commit()
 	if err != nil {
 		t.Fatalf("UserMeta の作成に失敗: %v", err)
 	}

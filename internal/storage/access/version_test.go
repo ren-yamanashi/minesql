@@ -167,9 +167,14 @@ func setupVersionTestEnv(t *testing.T) *versionTestEnv {
 	t.Cleanup(func() { _ = undoHf.Close() })
 	iter.bp.RegisterHeapFile(page.FileId(3), undoHf)
 
-	undoMgr, err := undo.NewManager(iter.bp, page.FileId(3), iter.redoLog)
+	undoBootstrapMtr := newBootstrapMtr(iter.bp, iter.redoLog)
+	undoMgr, err := undo.NewManager(undoBootstrapMtr, page.FileId(3))
 	if err != nil {
+		undoBootstrapMtr.UnpinAll()
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
+	}
+	if err := undoBootstrapMtr.Commit(); err != nil {
+		t.Fatalf("undo.Manager Commit に失敗: %v", err)
 	}
 	return &versionTestEnv{iter: iter, undoLog: undoMgr}
 }

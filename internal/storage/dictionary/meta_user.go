@@ -3,9 +3,7 @@ package dictionary
 import (
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
-	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
 
 type UserMeta struct {
@@ -16,14 +14,11 @@ func NewUserMeta(bp *buffer.Pool, metaPageId page.Id) *UserMeta {
 	return &UserMeta{tree: btree.NewTree(bp, metaPageId)}
 }
 
-func CreateUserMeta(bp *buffer.Pool, redoLog *redo.Buffer) (*UserMeta, error) {
-	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-	tree, err := btree.CreateTree(bp, catalogFileId, mtr)
+// CreateUserMeta はユーザーメタ用の B+Tree を mtr 配下で新規作成する
+//   - mtr.Commit / mtr.UnpinAll は呼び出し側で行う
+func CreateUserMeta(mtr *buffer.Mtr) (*UserMeta, error) {
+	tree, err := btree.CreateTree(mtr.Pool(), CatalogFileId, mtr)
 	if err != nil {
-		mtr.UnpinAll()
-		return nil, err
-	}
-	if err := mtr.Commit(); err != nil {
 		return nil, err
 	}
 	return &UserMeta{tree: tree}, nil

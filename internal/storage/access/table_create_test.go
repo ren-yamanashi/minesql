@@ -193,7 +193,7 @@ func TestCreateTable(t *testing.T) {
 		// THEN
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
-		records, err := env.trxMgr.catalog.DDLManager().ReverseScan(mtr)
+		records, err := env.trxMgr.ddlManager.ReverseScan(mtr)
 		assert.NoError(t, err)
 		assert.Empty(t, records)
 	})
@@ -244,7 +244,7 @@ func TestCreateTable(t *testing.T) {
 		// THEN: DDL Undo 領域がクリア済み
 		mtr := buffer.NewMtr(env.bp)
 		defer mtr.UnpinAll()
-		records, err := env.trxMgr.catalog.DDLManager().ReverseScan(mtr)
+		records, err := env.trxMgr.ddlManager.ReverseScan(mtr)
 		assert.NoError(t, err)
 		assert.Empty(t, records)
 	})
@@ -261,7 +261,7 @@ func TestCreateTableFile(t *testing.T) {
 		})
 
 		// WHEN
-		fileId, err := createTableFile(env.ct, env.bp, env.redoLog, "test_table")
+		fileId, err := createTableFile(env.trxMgr.BeginDDL(), "test_table")
 
 		// THEN
 		assert.NoError(t, err)
@@ -278,12 +278,13 @@ func TestRegisterTableMeta(t *testing.T) {
 			ColNames:  []string{"id", "name", "email"},
 			PkCount:   1,
 		}
-		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr, nil, env.redoLog)
+		ddlTrx := env.trxMgr.BeginDDL()
+		pi, err := createPrimaryIndex(ddlTrx, env.fileId, input.PkCount)
 		assert.NoError(t, err)
 
 		// WHEN
-		mtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
-		err = registerTableMeta(mtr, env.ct, env.fileId, pi, input)
+		mtr := ddlTrx.NewMtr()
+		err = registerTableMeta(ddlTrx, mtr, env.fileId, pi, input)
 		assert.NoError(t, err)
 		assert.NoError(t, mtr.Commit())
 
@@ -309,16 +310,17 @@ func TestRegisterTableMeta(t *testing.T) {
 			ColNames:  []string{"id", "name"},
 			PkCount:   1,
 		}
-		pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr, nil, env.redoLog)
+		ddlTrx := env.trxMgr.BeginDDL()
+		pi, err := createPrimaryIndex(ddlTrx, env.fileId, input.PkCount)
 		assert.NoError(t, err)
-		firstMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
-		err = registerTableMeta(firstMtr, env.ct, env.fileId, pi, input)
+		firstMtr := ddlTrx.NewMtr()
+		err = registerTableMeta(ddlTrx, firstMtr, env.fileId, pi, input)
 		assert.NoError(t, err)
 		assert.NoError(t, firstMtr.Commit())
 
 		// WHEN
-		secondMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
-		err = registerTableMeta(secondMtr, env.ct, env.fileId, pi, input)
+		secondMtr := ddlTrx.NewMtr()
+		err = registerTableMeta(ddlTrx, secondMtr, env.fileId, pi, input)
 		secondMtr.UnpinAll()
 
 		// THEN
@@ -336,7 +338,7 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		}
 
 		// WHEN
-		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
+		sis, err := createSecondaryIndexes(env.trxMgr.BeginDDL(), env.fileId, env.primaryTree, inputs)
 		assert.NoError(t, err)
 
 		// THEN
@@ -357,7 +359,7 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		}
 
 		// WHEN
-		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
+		sis, err := createSecondaryIndexes(env.trxMgr.BeginDDL(), env.fileId, env.primaryTree, inputs)
 		assert.NoError(t, err)
 
 		// THEN
@@ -372,7 +374,7 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		}
 
 		// WHEN
-		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
+		sis, err := createSecondaryIndexes(env.trxMgr.BeginDDL(), env.fileId, env.primaryTree, inputs)
 		assert.NoError(t, err)
 
 		// THEN
@@ -385,11 +387,11 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		inputs := []CreateIndexInput{
 			{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: dictionary.IndexTypeNonUnique},
 		}
-		_, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
+		_, err := createSecondaryIndexes(env.trxMgr.BeginDDL(), env.fileId, env.primaryTree, inputs)
 		assert.NoError(t, err)
 
 		// WHEN
-		_, err = createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, inputs)
+		_, err = createSecondaryIndexes(env.trxMgr.BeginDDL(), env.fileId, env.primaryTree, inputs)
 
 		// THEN
 		assert.Error(t, err)
@@ -400,7 +402,7 @@ func TestCreateSecondaryIndexes(t *testing.T) {
 		env := setupCreateTestEnvWithTable(t)
 
 		// WHEN
-		sis, err := createSecondaryIndexes(env.ct, env.bp, env.fileId, env.primaryTree, env.lockMgr, nil, env.redoLog, nil)
+		sis, err := createSecondaryIndexes(env.trxMgr.BeginDDL(), env.fileId, env.primaryTree, nil)
 		assert.NoError(t, err)
 
 		// THEN
@@ -422,8 +424,9 @@ func TestCreateConstraints(t *testing.T) {
 		}
 
 		// WHEN
-		mtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
-		err := createConstraints(mtr, env.ct, env.bp, env.fileId, inputs)
+		ddlTrx := env.trxMgr.BeginDDL()
+		mtr := ddlTrx.NewMtr()
+		err := createConstraints(ddlTrx, mtr, env.fileId, inputs)
 		assert.NoError(t, err)
 		assert.NoError(t, mtr.Commit())
 
@@ -444,8 +447,9 @@ func TestCreateConstraints(t *testing.T) {
 		}
 
 		// WHEN
-		mtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
-		err := createConstraints(mtr, env.ct, env.bp, env.fileId, inputs)
+		ddlTrx := env.trxMgr.BeginDDL()
+		mtr := ddlTrx.NewMtr()
+		err := createConstraints(ddlTrx, mtr, env.fileId, inputs)
 		mtr.UnpinAll()
 
 		// THEN
@@ -458,8 +462,9 @@ func TestCreateConstraints(t *testing.T) {
 		env := setupCreateTestEnvWithTable(t)
 
 		// WHEN
-		mtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
-		err := createConstraints(mtr, env.ct, env.bp, env.fileId, nil)
+		ddlTrx := env.trxMgr.BeginDDL()
+		mtr := ddlTrx.NewMtr()
+		err := createConstraints(ddlTrx, mtr, env.fileId, nil)
 		assert.NoError(t, err)
 		assert.NoError(t, mtr.Commit())
 
@@ -475,6 +480,7 @@ type createTestEnv struct {
 	fileId  page.FileId
 	lockMgr *lock.Manager
 	redoLog *redo.Buffer
+	trxMgr  *TrxManager
 }
 
 // createTestEnvWithTable はテーブル作成済みの Create テスト用環境
@@ -485,6 +491,7 @@ type createTestEnvWithTable struct {
 	primaryTree *btree.Tree
 	lockMgr     *lock.Manager
 	redoLog     *redo.Buffer
+	trxMgr      *TrxManager
 }
 
 // setupCreateTestEnv はカタログとバッファプールのみの環境を構築する
@@ -507,9 +514,14 @@ func setupCreateTestEnv(t *testing.T) *createTestEnv {
 	bp := buffer.NewPool(page.Size*50, redoLog, nil)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
-	ct, err := dictionary.CreateCatalog(bp, redoLog)
+	catalogMtr := newBootstrapMtr(bp, redoLog)
+	ct, err := dictionary.CreateCatalog(catalogMtr)
 	if err != nil {
+		catalogMtr.UnpinAll()
 		t.Fatalf("Catalog の作成に失敗: %v", err)
+	}
+	if err := catalogMtr.Commit(); err != nil {
+		t.Fatalf("Catalog Commit に失敗: %v", err)
 	}
 
 	// テスト用テーブルの HeapFile
@@ -529,7 +541,18 @@ func setupCreateTestEnv(t *testing.T) *createTestEnv {
 	t.Cleanup(func() { _ = dataHf.Close() })
 	bp.RegisterHeapFile(fileId, dataHf)
 
+	ddlMtr := newBootstrapMtr(bp, redoLog)
+	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId(), ct.FreeListMapPageId())
+	if err != nil {
+		ddlMtr.UnpinAll()
+		t.Fatalf("undo.DDLManager の作成に失敗: %v", err)
+	}
+	if err := ddlMtr.Commit(); err != nil {
+		t.Fatalf("undo.DDLManager Commit に失敗: %v", err)
+	}
+
 	lockMgr := lock.NewManager()
+	trxMgr := NewTrxManager(ct, nil, redoLog, lockMgr, bp, ddlMgr, 1)
 
 	return &createTestEnv{
 		ct:      ct,
@@ -537,6 +560,7 @@ func setupCreateTestEnv(t *testing.T) *createTestEnv {
 		fileId:  fileId,
 		lockMgr: lockMgr,
 		redoLog: redoLog,
+		trxMgr:  trxMgr,
 	}
 }
 
@@ -550,12 +574,13 @@ func setupCreateTestEnvWithTable(t *testing.T) *createTestEnvWithTable {
 		ColNames:  []string{"id", "name", "email"},
 		PkCount:   1,
 	}
-	pi, err := createPrimaryIndex(env.ct, env.bp, env.fileId, input.PkCount, env.lockMgr, nil, env.redoLog)
+	ddlTrx := env.trxMgr.BeginDDL()
+	pi, err := createPrimaryIndex(ddlTrx, env.fileId, input.PkCount)
 	if err != nil {
 		t.Fatalf("プライマリインデックスの作成に失敗: %v", err)
 	}
-	mtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
-	if err := registerTableMeta(mtr, env.ct, env.fileId, pi, input); err != nil {
+	mtr := ddlTrx.NewMtr()
+	if err := registerTableMeta(ddlTrx, mtr, env.fileId, pi, input); err != nil {
 		t.Fatalf("テーブルメタの登録に失敗: %v", err)
 	}
 	if err := mtr.Commit(); err != nil {
@@ -569,6 +594,7 @@ func setupCreateTestEnvWithTable(t *testing.T) *createTestEnvWithTable {
 		primaryTree: pi.tree,
 		lockMgr:     env.lockMgr,
 		redoLog:     env.redoLog,
+		trxMgr:      env.trxMgr,
 	}
 }
 
@@ -605,9 +631,14 @@ func setupCreateTableTestEnv(t *testing.T) *createTableTestEnv {
 	bp := buffer.NewPool(page.Size*50, redoLog, nil)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
-	_, err = dictionary.CreateCatalog(bp, redoLog)
+	catalogMtr := newBootstrapMtr(bp, redoLog)
+	_, err = dictionary.CreateCatalog(catalogMtr)
 	if err != nil {
+		catalogMtr.UnpinAll()
 		t.Fatalf("Catalog の作成に失敗: %v", err)
+	}
+	if err := catalogMtr.Commit(); err != nil {
+		t.Fatalf("Catalog Commit に失敗: %v", err)
 	}
 
 	// Undo 用 HeapFile
@@ -619,18 +650,32 @@ func setupCreateTableTestEnv(t *testing.T) *createTableTestEnv {
 	t.Cleanup(func() { _ = undoHf.Close() })
 	bp.RegisterHeapFile(page.FileId(1), undoHf)
 
-	undoMgr, err := undo.NewManager(bp, page.FileId(1), redoLog)
+	undoMtr := newBootstrapMtr(bp, redoLog)
+	undoMgr, err := undo.NewManager(undoMtr, page.FileId(1))
 	if err != nil {
+		undoMtr.UnpinAll()
 		t.Fatalf("undo.Manager の作成に失敗: %v", err)
+	}
+	if err := undoMtr.Commit(); err != nil {
+		t.Fatalf("undo.Manager Commit に失敗: %v", err)
 	}
 
 	lockMgr := lock.NewManager()
 
-	ct, err := dictionary.NewCatalog(bp, redoLog)
+	ct, err := dictionary.NewCatalog(bp)
 	if err != nil {
 		t.Fatalf("Catalog の取得に失敗: %v", err)
 	}
-	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, 1)
+	ddlMtr := newBootstrapMtr(bp, redoLog)
+	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId(), ct.FreeListMapPageId())
+	if err != nil {
+		ddlMtr.UnpinAll()
+		t.Fatalf("undo.DDLManager の作成に失敗: %v", err)
+	}
+	if err := ddlMtr.Commit(); err != nil {
+		t.Fatalf("undo.DDLManager Commit に失敗: %v", err)
+	}
+	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, ddlMgr, 1)
 
 	return &createTableTestEnv{
 		bp:      bp,

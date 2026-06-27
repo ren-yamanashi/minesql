@@ -3,7 +3,6 @@ package access
 import (
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
-	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
@@ -40,27 +39,21 @@ func CreateTable(tm *TrxManager, input CreateTableInput) (table *Table, err erro
 		}
 	}()
 
-	bp := tm.bufferPool
-	redoLog := tm.redoLog
-	lockMgr := tm.lock
-	undoLog := tm.undoLog
-	ct := tm.catalog
-
 	// ファイル作成 + AllocateFileIdUndo
-	fileId, err := createTableFile(ct, bp, redoLog, input.TableName)
+	fileId, err := createTableFile(ddlTrx, input.TableName)
 	if err != nil {
 		return nil, err
 	}
 
 	// プライマリインデックス作成 + CreateBTreeUndo
-	pi, err := createPrimaryIndex(ct, bp, fileId, input.PkCount, lockMgr, undoLog, redoLog)
+	pi, err := createPrimaryIndex(ddlTrx, fileId, input.PkCount)
 	if err != nil {
 		return nil, err
 	}
 
 	// テーブルメタ・インデックスメタ・カラムメタの登録 + MetaInsertUndo
-	registerMtr := buffer.NewWriteMtr(bp, lock.DDLReservedTrxId, redoLog)
-	if err = registerTableMeta(registerMtr, ct, fileId, pi, input); err != nil {
+	registerMtr := ddlTrx.NewMtr()
+	if err = registerTableMeta(ddlTrx, registerMtr, fileId, pi, input); err != nil {
 		registerMtr.UnpinAll()
 		return nil, err
 	}
@@ -69,14 +62,14 @@ func CreateTable(tm *TrxManager, input CreateTableInput) (table *Table, err erro
 	}
 
 	// セカンダリインデックス作成 + 各種 DDL Undo (= 各セカンダリ 1 mtr で atomic)
-	sis, err := createSecondaryIndexes(ct, bp, fileId, pi.tree, lockMgr, undoLog, redoLog, input.Indexes)
+	sis, err := createSecondaryIndexes(ddlTrx, fileId, pi.tree, input.Indexes)
 	if err != nil {
 		return nil, err
 	}
 
 	// 制約登録 + MetaInsertUndo
-	constraintsMtr := buffer.NewWriteMtr(bp, lock.DDLReservedTrxId, redoLog)
-	if err = createConstraints(constraintsMtr, ct, bp, fileId, input.Constraints); err != nil {
+	constraintsMtr := ddlTrx.NewMtr()
+	if err = createConstraints(ddlTrx, constraintsMtr, fileId, input.Constraints); err != nil {
 		constraintsMtr.UnpinAll()
 		return nil, err
 	}
@@ -91,20 +84,20 @@ func CreateTable(tm *TrxManager, input CreateTableInput) (table *Table, err erro
 	table = &Table{
 		primaryIndex:     pi,
 		secondaryIndexes: sis,
-		catalog:          ct,
-		undoLog:          undoLog,
-		lock:             lockMgr,
-		bufferPool:       bp,
-		redoLog:          redoLog,
+		catalog:          ddlTrx.catalog,
+		undoLog:          ddlTrx.undoLog,
+		lock:             ddlTrx.lockMgr,
+		bufferPool:       ddlTrx.bufferPool,
+		redoLog:          ddlTrx.redoLog,
 	}
 	return table, nil
 }
 
 // appendMetaInsertUndo はカタログ Meta テーブルへの 1 件の Insert を取り消すための MetaInsertUndo を Append する
-func appendMetaInsertUndo(mtr *buffer.Mtr, ct *dictionary.Catalog, metaTableType undo.MetaTableType, key []byte) error {
+func appendMetaInsertUndo(ddlTrx *Transaction, mtr *buffer.Mtr, metaTableType undo.MetaTableType, key []byte) error {
 	record := undo.NewDDLRecord(
 		undo.DDLRecordTypeMetaInsert,
 		undo.NewMetaInsertUndoRecord(metaTableType, key).Serialize(),
 	)
-	return ct.DDLManager().Append(mtr, record)
+	return ddlTrx.DDLManager().Append(mtr, record)
 }

@@ -11,19 +11,20 @@ import (
 //   - mtr: 登録の書き込みを記録する Mtr。Commit は呼び出し側
 //   - 各 Insert 直後に対応する MetaInsertUndo を Append する
 func registerTableMeta(
+	ddlTrx *Transaction,
 	mtr *buffer.Mtr,
-	ct *dictionary.Catalog,
 	fileId page.FileId,
 	pi *primaryIndex,
 	input CreateTableInput,
 ) error {
+	ct := ddlTrx.catalog
 	// テーブルメタ
 	tableRecord := dictionary.NewTableMetaRecord(input.TableName, pi.tree.MetaPageId(), len(input.ColNames))
 	tableKey := tableRecord.Encode().Key()
 	if err := ct.TableMeta().Insert(mtr, tableRecord); err != nil {
 		return err
 	}
-	if err := appendMetaInsertUndo(mtr, ct, undo.MetaTableTypeTable, tableKey); err != nil {
+	if err := appendMetaInsertUndo(ddlTrx, mtr, undo.MetaTableTypeTable, tableKey); err != nil {
 		return err
 	}
 
@@ -44,7 +45,7 @@ func registerTableMeta(
 	if err := ct.IndexMeta().Insert(mtr, indexRecord); err != nil {
 		return err
 	}
-	if err := appendMetaInsertUndo(mtr, ct, undo.MetaTableTypeIndex, indexKey); err != nil {
+	if err := appendMetaInsertUndo(ddlTrx, mtr, undo.MetaTableTypeIndex, indexKey); err != nil {
 		return err
 	}
 
@@ -55,7 +56,7 @@ func registerTableMeta(
 		if err := ct.ColumnMeta().Insert(mtr, colRecord); err != nil {
 			return err
 		}
-		if err := appendMetaInsertUndo(mtr, ct, undo.MetaTableTypeColumn, colKey); err != nil {
+		if err := appendMetaInsertUndo(ddlTrx, mtr, undo.MetaTableTypeColumn, colKey); err != nil {
 			return err
 		}
 	}
