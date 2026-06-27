@@ -26,7 +26,7 @@ func (t *TrxManager) BeginDDL() *Transaction {
 //   - DDL Undo 領域コンテナの中身をクリアし、 Redo に Commit レコードを追加してフラッシュする
 //   - 永続コンテナ型のため、 コンテナ自体 (= root ページ) は残る
 func (t *TrxManager) commitDDL(trx *Transaction) error {
-	mtr := buffer.NewWriteMtr(t.bufferPool, trx.trxId, t.redoLog)
+	mtr := trx.NewMtr()
 	if err := t.ddlManager.Clear(mtr); err != nil {
 		mtr.UnpinAll()
 		return err
@@ -59,7 +59,7 @@ func (t *TrxManager) applyDDLRollbackRecord(mtr *buffer.Mtr, record undo.DDLReco
 //   - 適用後にコンテナの中身をクリアし、 Redo に Rollback レコードを追加する
 //   - 各 record の適用は独立 mtr (= 1 record = 1 mtr) で行い、 record ごとに永続境界を作る
 func (t *TrxManager) rollbackDDL(trx *Transaction) error {
-	scanMtr := buffer.NewMtr(t.bufferPool)
+	scanMtr := trx.NewReadMtr()
 	defer scanMtr.UnpinAll()
 	records, err := t.ddlManager.ReverseScan(scanMtr)
 	if err != nil {
@@ -67,7 +67,7 @@ func (t *TrxManager) rollbackDDL(trx *Transaction) error {
 	}
 
 	for _, record := range records {
-		mtr := buffer.NewWriteMtr(t.bufferPool, trx.trxId, t.redoLog)
+		mtr := trx.NewMtr()
 		if err := t.applyDDLRollbackRecord(mtr, record); err != nil {
 			mtr.UnpinAll()
 			return err
@@ -77,7 +77,7 @@ func (t *TrxManager) rollbackDDL(trx *Transaction) error {
 		}
 	}
 
-	clearMtr := buffer.NewWriteMtr(t.bufferPool, trx.trxId, t.redoLog)
+	clearMtr := trx.NewMtr()
 	if err := t.ddlManager.Clear(clearMtr); err != nil {
 		clearMtr.UnpinAll()
 		return err
