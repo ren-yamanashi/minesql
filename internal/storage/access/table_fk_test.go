@@ -185,9 +185,10 @@ func TestFetchForeignKeys(t *testing.T) {
 	t.Run("FK 制約がある場合、制約一覧を返す", func(t *testing.T) {
 		// GIVEN
 		env := setupFKTestEnv(t)
+		parentTrx := env.trxMgr.Begin()
 
 		// WHEN
-		fks, err := fetchForeignKeys(env.ct, env.bp, env.childFileId)
+		fks, err := fetchForeignKeys(parentTrx, env.childFileId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -198,9 +199,10 @@ func TestFetchForeignKeys(t *testing.T) {
 	t.Run("FK 制約がない場合、空のスライスを返す", func(t *testing.T) {
 		// GIVEN
 		env := setupFKTestEnv(t)
+		parentTrx := env.trxMgr.Begin()
 
 		// WHEN
-		fks, err := fetchForeignKeys(env.ct, env.bp, env.parentFileId)
+		fks, err := fetchForeignKeys(parentTrx, env.parentFileId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -212,9 +214,10 @@ func TestFetchReferencingConstraints(t *testing.T) {
 	t.Run("親として参照されている場合、制約一覧を返す", func(t *testing.T) {
 		// GIVEN
 		env := setupFKTestEnv(t)
+		parentTrx := env.trxMgr.Begin()
 
 		// WHEN
-		refs, err := fetchReferencingConstraints(env.ct, env.bp, env.parentFileId)
+		refs, err := fetchReferencingConstraints(parentTrx, env.parentFileId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -225,9 +228,10 @@ func TestFetchReferencingConstraints(t *testing.T) {
 	t.Run("親として参照されていない場合、空のスライスを返す", func(t *testing.T) {
 		// GIVEN
 		env := setupFKTestEnv(t)
+		parentTrx := env.trxMgr.Begin()
 
 		// WHEN
-		refs, err := fetchReferencingConstraints(env.ct, env.bp, env.childFileId)
+		refs, err := fetchReferencingConstraints(parentTrx, env.childFileId)
 
 		// THEN
 		assert.NoError(t, err)

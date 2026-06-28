@@ -14,7 +14,7 @@ func (t *Table) SoftDelete(trx *Transaction, record *PrimaryRecord) error {
 	defer mtr.UnpinAll()
 
 	// FK チェック
-	if err := t.checkForeignKeysForDelete(trxId, record); err != nil {
+	if err := t.checkForeignKeysForDelete(trx, record); err != nil {
 		return err
 	}
 

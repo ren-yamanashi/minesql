@@ -13,7 +13,7 @@ func (t *Table) Insert(trx *Transaction, colNames []string, values []string) err
 	defer mtr.UnpinAll()
 
 	// FK チェック (親レコードに共有ロックを取得する。挿入キーへの排他ロックより前に行うため順序は親 S → 子 X)
-	if err := t.checkForeignKeysForInsert(trxId, colNames, values); err != nil {
+	if err := t.checkForeignKeysForInsert(trx, colNames, values); err != nil {
 		return err
 	}
 

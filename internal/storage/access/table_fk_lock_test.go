@@ -116,8 +116,6 @@ func TestForeignKeyParentDeleteChildLock(t *testing.T) {
 	})
 
 	t.Run("子 SoftDelete の Rollback 後に親 DELETE が active 復活した子行を検出して FK 違反になる", func(t *testing.T) {
-		t.Skip("並行 FK 検査の mtr 設計問題: goroutine 側 SoftDelete が FK 検査で子側 latch を保持したまま lock 待ち、 main thread の Rollback が同じ latch を取得できず lock 解放が遅延 → parent SoftDelete が lock timeout する。 別途設計レビューで対応予定")
-
 		// GIVEN
 		env := setupFKTestEnv(t)
 		setupTx := env.trxMgr.Begin()

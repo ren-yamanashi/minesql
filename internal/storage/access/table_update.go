@@ -30,7 +30,7 @@ func (t *Table) Update(trx *Transaction, currentRecord *PrimaryRecord, colNames,
 	defer mtr.UnpinAll()
 
 	// FK チェック (自テーブルの FK カラムが変わる場合は参照先の親レコードに共有ロックを取得する)
-	if err := t.checkForeignKeysForUpdate(trxId, currentRecord, newRecord); err != nil {
+	if err := t.checkForeignKeysForUpdate(trx, currentRecord, newRecord); err != nil {
 		return err
 	}
 
