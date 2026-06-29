@@ -1,10 +1,12 @@
 package access
 
 import (
+	"os"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/stretchr/testify/assert"
 )
@@ -177,5 +179,42 @@ func TestForeignKeyParentDeleteChildLock(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, parentDeleteErr)
+	})
+}
+
+func TestConcurrentFKCheckNoDeadlock(t *testing.T) {
+	t.Run("子 SoftDelete の Rollback と並行する親 SoftDelete が反復実行で deadlock しない", func(t *testing.T) {
+		const iterations = 10
+		for range iterations {
+			// GIVEN
+			_ = os.RemoveAll(config.BaseDir)
+			env := setupFKTestEnv(t)
+			setupTx := env.trxMgr.Begin()
+			_ = env.parent.Insert(setupTx, []string{"id", "name"}, []string{"1", "Sales"})
+			_ = env.child.Insert(setupTx, []string{"id", "name", "dept_id"}, []string{"1", "Alice", "1"})
+			assert.NoError(t, env.trxMgr.Commit(setupTx))
+
+			childDeleter := env.trxMgr.Begin()
+			childRec, found, err := env.child.SearchForUpdate(childDeleter, SearchModeKey{Key: [][]byte{[]byte("1")}})
+			assert.NoError(t, err)
+			assert.True(t, found)
+			assert.NoError(t, env.child.SoftDelete(childDeleter, childRec))
+
+			// WHEN
+			var wg sync.WaitGroup
+			var parentDeleteErr error
+			wg.Go(func() {
+				parentDeleter := env.trxMgr.Begin()
+				parentRec, _, err := env.parent.SearchForUpdate(parentDeleter, SearchModeKey{Key: [][]byte{[]byte("1")}})
+				assert.NoError(t, err)
+				parentDeleteErr = env.parent.SoftDelete(parentDeleter, parentRec)
+			})
+			time.Sleep(10 * time.Millisecond)
+			assert.NoError(t, env.trxMgr.Rollback(childDeleter))
+			wg.Wait()
+
+			// THEN
+			assert.ErrorIs(t, parentDeleteErr, ErrForeignKeyViolation)
+		}
 	})
 }

@@ -125,3 +125,25 @@ func TestIsVisible(t *testing.T) {
 		assert.False(t, emptyRv.isVisible(11)) // lowLimitId 以上
 	})
 }
+
+func TestReservedTrxIdNotInReadView(t *testing.T) {
+	t.Run("予約 trxId は ReadView の activeTrxIds 集合に含まれない", func(t *testing.T) {
+		// GIVEN
+		env := setupTableTestEnv(t)
+		tm := env.trxMgr
+		_ = tm.Begin()
+		_ = tm.Begin()
+		_ = tm.Begin()
+		_ = tm.BeginPurge()
+		_ = tm.BeginDDL()
+
+		// WHEN
+		observer := tm.Begin()
+		rv := tm.EnsureReadView(observer)
+
+		// THEN
+		assert.NotContains(t, rv.activeTrxIds, lock.SystemReservedTrxId)
+		assert.NotContains(t, rv.activeTrxIds, lock.PurgeReservedTrxId)
+		assert.NotContains(t, rv.activeTrxIds, lock.DDLReservedTrxId)
+	})
+}
