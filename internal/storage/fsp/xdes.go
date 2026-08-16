@@ -3,6 +3,7 @@ package fsp
 import (
 	"encoding/binary"
 	"fmt"
+	"math/bits"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/flst"
@@ -74,6 +75,27 @@ func (x xdesEntry) isAllUsed() bool {
 		}
 	}
 	return true
+}
+
+// firstFreePos は extent 内で最も小さいページ位置の free bit の位置を返す
+//   - 空きがない場合は -1 を返す
+func (x xdesEntry) firstFreePos() int {
+	for i, b := range x.bitmap() {
+		if b == 0 {
+			continue
+		}
+		return i*8 + bits.TrailingZeros8(b)
+	}
+	return -1
+}
+
+// freePageCount は extent 内の free bit の総数を返す
+func (x xdesEntry) freePageCount() int {
+	n := 0
+	for _, b := range x.bitmap() {
+		n += bits.OnesCount8(b)
+	}
+	return n
 }
 
 // flstNodeAddress は自身の flst node のアドレスを返す

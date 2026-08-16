@@ -30,6 +30,7 @@ func TestLayoutConstants(t *testing.T) {
 		assert.Equal(t, 256, extentPageCount)
 		assert.Equal(t, 4096, descriptorPageStride)
 		assert.Equal(t, 16, descriptorEntriesPerPage)
+		assert.Equal(t, 4, freeAddExtents)
 	})
 
 	t.Run("xdes エントリのレイアウト定数", func(t *testing.T) {

@@ -269,6 +269,146 @@ func TestXdesEntryIsAllUsed(t *testing.T) {
 	})
 }
 
+func TestXdesEntryFirstFreePos(t *testing.T) {
+	t.Run("初期化直後は最下位のページ位置 0 を返す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableEntry(t, mtr, 0)
+		entry.initialize()
+
+		// WHEN
+		got := entry.firstFreePos()
+
+		// THEN
+		assert.Equal(t, 0, got)
+		commitMtr(t, mtr)
+	})
+
+	t.Run("先頭のページ位置を used にすると次の free ページ位置を返す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableEntry(t, mtr, 0)
+		entry.initialize()
+		entry.setPageFree(0, false)
+
+		// WHEN
+		got := entry.firstFreePos()
+
+		// THEN
+		assert.Equal(t, 1, got)
+		commitMtr(t, mtr)
+	})
+
+	t.Run("最終ページ位置 255 のみ free の場合は 255 を返す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableEntry(t, mtr, 0)
+		entry.initialize()
+		for pos := range extentPageCount - 1 {
+			entry.setPageFree(pos, false)
+		}
+
+		// WHEN
+		got := entry.firstFreePos()
+
+		// THEN
+		assert.Equal(t, extentPageCount-1, got)
+		commitMtr(t, mtr)
+	})
+
+	t.Run("byte 境界を跨ぐ位置 (8) が free の場合はその位置を返す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableEntry(t, mtr, 0)
+		entry.initialize()
+		for pos := range 8 {
+			entry.setPageFree(pos, false)
+		}
+
+		// WHEN
+		got := entry.firstFreePos()
+
+		// THEN
+		assert.Equal(t, 8, got)
+		commitMtr(t, mtr)
+	})
+
+	t.Run("全ページ used の場合は -1 を返す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableEntry(t, mtr, 0)
+		entry.initialize()
+		for pos := range extentPageCount {
+			entry.setPageFree(pos, false)
+		}
+
+		// WHEN
+		got := entry.firstFreePos()
+
+		// THEN
+		assert.Equal(t, -1, got)
+		commitMtr(t, mtr)
+	})
+}
+
+func TestXdesEntryFreePageCount(t *testing.T) {
+	t.Run("初期化直後は extent 内ページ数と一致する", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableEntry(t, mtr, 0)
+		entry.initialize()
+
+		// WHEN
+		got := entry.freePageCount()
+
+		// THEN
+		assert.Equal(t, extentPageCount, got)
+		commitMtr(t, mtr)
+	})
+
+	t.Run("used にした分だけ減る", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableEntry(t, mtr, 0)
+		entry.initialize()
+		entry.setPageFree(0, false)
+		entry.setPageFree(5, false)
+		entry.setPageFree(extentPageCount-1, false)
+
+		// WHEN
+		got := entry.freePageCount()
+
+		// THEN
+		assert.Equal(t, extentPageCount-3, got)
+		commitMtr(t, mtr)
+	})
+
+	t.Run("全ページ used で 0", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableEntry(t, mtr, 0)
+		entry.initialize()
+		for pos := range extentPageCount {
+			entry.setPageFree(pos, false)
+		}
+
+		// WHEN
+		got := entry.freePageCount()
+
+		// THEN
+		assert.Equal(t, 0, got)
+		commitMtr(t, mtr)
+	})
+}
+
 func TestXdesEntryFlstNodeAddress(t *testing.T) {
 	t.Run("エントリインデックスからボディ相対の node アドレスを返す", func(t *testing.T) {
 		// GIVEN

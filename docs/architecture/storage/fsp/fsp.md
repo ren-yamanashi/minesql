@@ -98,6 +98,7 @@ FREE / FREE_FRAG / FULL_FRAG の 3 リストは、ページ上に置かれた ba
 3. FREE リストも空なら、fill によって新しい extent を初期化してから 1 へ戻る
 
 - 割り当てたページの free bit を使用中に変え、FREE_FRAG リスト内の使用中ページ数を加算する。割り当てによって extent が満杯になった場合は FULL_FRAG リストへ遷移させる
+  - FULL_FRAG リストへ遷移させる際には、FREE_FRAG リスト内の使用中ページ数から遷移した extent のページ数を減算する (この使用中ページ数は FREE_FRAG リスト内のページのみを数える定義のため)
 - bitmap の探索を最下位 bit から行うことで、割り当て順は決定的になる
 
 ## fill とフリーリミット

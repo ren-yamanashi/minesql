@@ -1,0 +1,196 @@
+package fsp
+
+import (
+	"testing"
+
+	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/flst"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+func TestAllocatePage(t *testing.T) {
+	t.Run("初期化直後の最初の割り当ては page 1 を返し以降 2 3 と続く", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		require.NoError(t, InitHeader(mtr, testFileId))
+		commitMtr(t, mtr)
+
+		// WHEN
+		pageIds := allocateN(t, bp, redoLog, 3)
+
+		// THEN
+		assert.Equal(t, page.NewId(testFileId, 1), pageIds[0])
+		assert.Equal(t, page.NewId(testFileId, 2), pageIds[1])
+		assert.Equal(t, page.NewId(testFileId, 3), pageIds[2])
+	})
+
+	t.Run("page 0 は割り当て結果に現れない", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		require.NoError(t, InitHeader(mtr, testFileId))
+		commitMtr(t, mtr)
+
+		// WHEN
+		pageIds := allocateN(t, bp, redoLog, extentPageCount)
+
+		// THEN
+		for _, pid := range pageIds {
+			assert.NotEqual(t, page.PageNumber(0), pid.PageNumber())
+		}
+	})
+
+	t.Run("extent 0 の割り当て可能 255 ページを使い切ると FULL_FRAG へ遷移し次の割り当ては次 extent の先頭になる", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		require.NoError(t, InitHeader(mtr, testFileId))
+		commitMtr(t, mtr)
+
+		// WHEN
+		pageIds := allocateN(t, bp, redoLog, extentPageCount-1)
+		nextId := allocateOne(t, bp, redoLog)
+
+		// THEN
+		assert.Equal(t, page.NewId(testFileId, page.PageNumber(extentPageCount-1)), pageIds[extentPageCount-2])
+		assert.Equal(t, page.NewId(testFileId, page.PageNumber(extentPageCount)), nextId)
+		readMtr := buffer.NewMtr(bp)
+		defer readMtr.UnpinAll()
+		bufPage, err := readMtr.PageForRead(page.NewId(testFileId, 0))
+		require.NoError(t, err)
+		h := header{bufPage: bufPage}
+		fullLen, err := flst.Length(readMtr, testFileId, h.fullFragListBase())
+		require.NoError(t, err)
+		assert.Equal(t, uint32(1), fullLen)
+		assert.Equal(t, uint32(1), h.fragNUsed())
+	})
+
+	t.Run("FREE_FRAG と FREE が空でも fill が発動して割り当てが継続する", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		require.NoError(t, InitHeader(mtr, testFileId))
+		commitMtr(t, mtr)
+
+		// WHEN
+		allocateN(t, bp, redoLog, 5*extentPageCount+1)
+
+		// THEN
+		readMtr := buffer.NewMtr(bp)
+		defer readMtr.UnpinAll()
+		bufPage, err := readMtr.PageForRead(page.NewId(testFileId, 0))
+		require.NoError(t, err)
+		h := header{bufPage: bufPage}
+		assert.Equal(t, page.PageNumber(9*extentPageCount), h.freeLimit())
+		assert.Equal(t, uint32(9*extentPageCount), h.size())
+	})
+
+	t.Run("割り当て 5000 ページで予約ページ (page 0 / page 4096) を返さず重複もない", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		require.NoError(t, InitHeader(mtr, testFileId))
+		commitMtr(t, mtr)
+
+		// WHEN
+		const count = 5000
+		pageIds := allocateN(t, bp, redoLog, count)
+
+		// THEN
+		seen := make(map[page.PageNumber]bool, count)
+		for _, pid := range pageIds {
+			pn := pid.PageNumber()
+			assert.NotEqual(t, page.PageNumber(0), pn)
+			assert.NotEqual(t, page.PageNumber(descriptorPageStride), pn)
+			assert.False(t, seen[pn], "重複した PageNumber: %d", pn)
+			seen[pn] = true
+		}
+		assert.Len(t, seen, count)
+	})
+
+	t.Run("記述子ページ 2 枚目 (page 4096) の予約領域 108 バイトはゼロ", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		require.NoError(t, InitHeader(mtr, testFileId))
+		commitMtr(t, mtr)
+
+		// WHEN
+		allocateN(t, bp, redoLog, 5000)
+
+		// THEN
+		readMtr := buffer.NewMtr(bp)
+		defer readMtr.UnpinAll()
+		bufPage, err := readMtr.PageForRead(page.NewId(testFileId, descriptorPageStride))
+		require.NoError(t, err)
+		reserved := bufPage.Data().Body()[:headerSize]
+		assert.Equal(t, make([]byte, headerSize), reserved)
+	})
+}
+
+func TestLoadEntryByNodeAddress(t *testing.T) {
+	t.Run("整列した node アドレスから対応する index のエントリが復元される", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		defer commitMtr(t, mtr)
+		addr := flst.Address{PageNumber: 0, Offset: uint16(headerSize + 3*xdesEntrySize + xdesFlstNodeOffset)}
+
+		// WHEN
+		entry, err := loadEntryByNodeAddress(mtr, testFileId, addr)
+
+		// THEN
+		require.NoError(t, err)
+		assert.Equal(t, 3, entry.index)
+		assert.Equal(t, page.PageNumber(0), entry.bufPage.PageId().PageNumber())
+	})
+
+	t.Run("範囲外の Offset は panic する", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		defer commitMtr(t, mtr)
+		belowRange := flst.Address{PageNumber: 0, Offset: uint16(headerSize + xdesFlstNodeOffset - xdesEntrySize)}
+		aboveRange := flst.Address{PageNumber: 0, Offset: uint16(headerSize + descriptorEntriesPerPage*xdesEntrySize + xdesFlstNodeOffset)}
+
+		// THEN
+		assert.Panics(t, func() { _, _ = loadEntryByNodeAddress(mtr, testFileId, belowRange) })
+		assert.Panics(t, func() { _, _ = loadEntryByNodeAddress(mtr, testFileId, aboveRange) })
+	})
+
+	t.Run("範囲内 index に丸まる非整列の Offset は panic する", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		defer commitMtr(t, mtr)
+		misaligned := flst.Address{PageNumber: 0, Offset: uint16(headerSize + xdesFlstNodeOffset + 1)}
+
+		// THEN
+		assert.Panics(t, func() { _, _ = loadEntryByNodeAddress(mtr, testFileId, misaligned) })
+	})
+}
+
+// allocateN は count 個のページを 1 個ずつ独立の mtr で割り当て、返された PageId のスライスを返す
+func allocateN(t *testing.T, bp *buffer.Pool, redoLog *redo.Buffer, count int) []page.Id {
+	t.Helper()
+	ids := make([]page.Id, 0, count)
+	for range count {
+		ids = append(ids, allocateOne(t, bp, redoLog))
+	}
+	return ids
+}
+
+// allocateOne は 1 ページ割り当て、返された PageId を返す
+func allocateOne(t *testing.T, bp *buffer.Pool, redoLog *redo.Buffer) page.Id {
+	t.Helper()
+	mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+	id, err := AllocatePage(mtr, testFileId)
+	require.NoError(t, err)
+	commitMtr(t, mtr)
+	return id
+}

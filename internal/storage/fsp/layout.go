@@ -26,6 +26,9 @@ const (
 // extentPageCount は 1 extent を構成するページ数 (= 1 MiB / ページサイズ)
 const extentPageCount = (1 << 20) / page.Size
 
+// freeAddExtents は fill 1 回で FREE リストへ追加する extent 数
+const freeAddExtents = 4
+
 const (
 	// descriptorPageStride は記述子ページの配置間隔 (ページ数)
 	descriptorPageStride = page.Size
