@@ -188,52 +188,6 @@ func TestUnpin(t *testing.T) {
 	})
 }
 
-func TestAllocatePageId(t *testing.T) {
-	t.Run("新しい PageId を割り当てられる", func(t *testing.T) {
-		// GIVEN
-		bp := NewPool(page.Size, newTestRedoLog(t), nil)
-		hf := setupHeapFile(t, 5)
-		bp.RegisterHeapFile(5, hf)
-
-		// WHEN
-		id, err := bp.AllocatePageId(5)
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, page.FileId(5), id.FileId())
-		assert.Equal(t, page.PageNumber(0), id.PageNumber())
-	})
-
-	t.Run("連続で割り当てると PageNumber がインクリメントされる", func(t *testing.T) {
-		// GIVEN
-		bp := NewPool(page.Size, newTestRedoLog(t), nil)
-		hf := setupHeapFile(t, 0)
-		bp.RegisterHeapFile(0, hf)
-
-		// WHEN
-		id1, err := bp.AllocatePageId(0)
-		assert.NoError(t, err)
-		id2, err := bp.AllocatePageId(0)
-		assert.NoError(t, err)
-
-		// THEN
-		assert.Equal(t, page.PageNumber(0), id1.PageNumber())
-		assert.Equal(t, page.PageNumber(1), id2.PageNumber())
-	})
-
-	t.Run("未登録の FileId の場合エラーを返す", func(t *testing.T) {
-		// GIVEN
-		bp := NewPool(page.Size, newTestRedoLog(t), nil)
-
-		// WHEN
-		id, err := bp.AllocatePageId(99)
-
-		// THEN
-		assert.Error(t, err)
-		assert.Equal(t, page.InvalidId(), id)
-	})
-}
-
 func TestRegisterHeapFile(t *testing.T) {
 	t.Run("HeapFile を登録すると取得できる", func(t *testing.T) {
 		// GIVEN
@@ -381,7 +335,7 @@ const (
 func setupHeapFile(t *testing.T, fileId page.FileId) *file.HeapFile {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "test.db")
-	hf, err := file.NewHeapFile(fileId, path)
+	hf, err := file.NewHeapFile(path)
 	assert.NoError(t, err)
 	t.Cleanup(func() { _ = hf.Close() })
 	return hf

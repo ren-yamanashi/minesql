@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
@@ -32,7 +33,7 @@ func NewTree(bp *buffer.Pool, metaPageId page.Id) *Tree {
 // CreateTree は新しい B+Tree を作成する
 //   - mtr: メタページ・ルートリーフ初期化を記録する書き込み Mtr。Commit は呼び出し側
 func CreateTree(bp *buffer.Pool, fileId page.FileId, mtr *buffer.Mtr) (*Tree, error) {
-	metaPageId, err := bp.AllocatePageId(fileId)
+	metaPageId, err := fsp.AllocatePage(mtr, fileId)
 	if err != nil {
 		return nil, err
 	}
@@ -49,7 +50,7 @@ func CreateTree(bp *buffer.Pool, fileId page.FileId, mtr *buffer.Mtr) (*Tree, er
 	metaPage := newMetaPage(pageMeta)
 
 	// ルートリーフノード作成
-	rootNodePageId, err := bp.AllocatePageId(metaPageId.FileId())
+	rootNodePageId, err := fsp.AllocatePage(mtr, metaPageId.FileId())
 	if err != nil {
 		return nil, err
 	}

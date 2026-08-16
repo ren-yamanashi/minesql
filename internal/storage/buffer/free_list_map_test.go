@@ -144,7 +144,7 @@ func setupFreeListMapTestPool(t *testing.T) (*Pool, *redo.Buffer) {
 	bp := NewPool(page.Size*8, rl, nil)
 
 	path := filepath.Join(t.TempDir(), "freelistmap_test.db")
-	hf, err := file.NewHeapFile(page.FileId(0), path)
+	hf, err := file.NewHeapFile(path)
 	assert.NoError(t, err)
 	t.Cleanup(func() { _ = hf.Close() })
 	bp.RegisterHeapFile(page.FileId(0), hf)
@@ -164,9 +164,8 @@ func newFreeListMapTestRedoBuffer(t *testing.T) *redo.Buffer {
 
 func allocateFreshPage(t *testing.T, bp *Pool, fileId page.FileId) *Page {
 	t.Helper()
-	pageId, err := bp.AllocatePageId(fileId)
-	assert.NoError(t, err)
-	_, err = bp.AddPage(pageId)
+	pageId := page.NewId(fileId, 0)
+	_, err := bp.AddPage(pageId)
 	assert.NoError(t, err)
 	mtr := NewWriteMtr(bp, lock.SystemReservedTrxId, newFreeListMapTestRedoBuffer(t))
 	bufPage, err := mtr.PageForWrite(pageId)

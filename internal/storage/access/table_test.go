@@ -242,7 +242,7 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 
 	// Undo 用 HeapFile (FileId=3)
 	undoPath := filepath.Join(t.TempDir(), "undo.db")
-	undoHf, err := file.NewHeapFile(page.FileId(3), undoPath)
+	undoHf, err := file.NewHeapFile(undoPath)
 	if err != nil {
 		t.Fatalf("Undo HeapFile の作成に失敗: %v", err)
 	}
@@ -340,7 +340,7 @@ func setupTableTestEnvWithoutPrimaryIndex(t *testing.T) *tableTestEnv {
 
 	// Undo 用 HeapFile (FileId=3)
 	undoPath := filepath.Join(t.TempDir(), "undo.db")
-	undoHf, err := file.NewHeapFile(page.FileId(3), undoPath)
+	undoHf, err := file.NewHeapFile(undoPath)
 	if err != nil {
 		t.Fatalf("Undo HeapFile の作成に失敗: %v", err)
 	}

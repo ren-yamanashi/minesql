@@ -9,6 +9,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
@@ -197,12 +198,20 @@ func setup() (*btree.Tree, *buffer.Pool, func()) {
 	})
 	fileId := page.FileId(1)
 
-	dm, err := file.NewHeapFile(fileId, filepath.Join(tmpDir, "example.db"))
+	dm, err := file.NewHeapFile(filepath.Join(tmpDir, "example.db"))
 	if err != nil {
 		panic(err)
 	}
 	bp.RegisterHeapFile(fileId, dm)
 
+	initMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, rl)
+	if err := fsp.InitHeader(initMtr, fileId); err != nil {
+		initMtr.UnpinAll()
+		panic(err)
+	}
+	if err := initMtr.Commit(); err != nil {
+		panic(err)
+	}
 	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, rl)
 	tree, err := btree.CreateTree(bp, fileId, mtr)
 	if err != nil {

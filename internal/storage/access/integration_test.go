@@ -470,7 +470,7 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 
 	// カタログ用 HeapFile (FileId=0)
 	catalogPath := filepath.Join(config.BaseDir, "catalog.db")
-	catalogHf, err := file.NewHeapFile(page.FileId(0), catalogPath)
+	catalogHf, err := file.NewHeapFile(catalogPath)
 	if err != nil {
 		t.Fatalf("カタログ HeapFile の作成に失敗: %v", err)
 	}
@@ -498,7 +498,7 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 	// Undo 用 HeapFile (catalog が採番した FileId を使用)
 	undoFileId := ct.UndoLogFileId()
 	undoPath := filepath.Join(config.BaseDir, "undo.db")
-	undoHf, err := file.NewHeapFile(undoFileId, undoPath)
+	undoHf, err := file.NewHeapFile(undoPath)
 	if err != nil {
 		t.Fatalf("Undo HeapFile の作成に失敗: %v", err)
 	}
@@ -777,7 +777,7 @@ func crashAndRecover(t *testing.T, prev *integrationEnv, tableNames []string) *i
 	bp := buffer.NewPool(page.Size*50, redoLog, nil)
 
 	catalogPath := filepath.Join(config.BaseDir, "catalog.db")
-	catalogHf, err := file.NewHeapFile(page.FileId(0), catalogPath)
+	catalogHf, err := file.NewHeapFile(catalogPath)
 	if err != nil {
 		t.Fatalf("カタログ HeapFile の再オープンに失敗: %v", err)
 	}
@@ -791,7 +791,7 @@ func crashAndRecover(t *testing.T, prev *integrationEnv, tableNames []string) *i
 
 	undoFileId := ct.UndoLogFileId()
 	undoPath := filepath.Join(config.BaseDir, "undo.db")
-	undoHf, err := file.NewHeapFile(undoFileId, undoPath)
+	undoHf, err := file.NewHeapFile(undoPath)
 	if err != nil {
 		t.Fatalf("Undo HeapFile の再オープンに失敗: %v", err)
 	}
@@ -805,7 +805,7 @@ func crashAndRecover(t *testing.T, prev *integrationEnv, tableNames []string) *i
 		}
 		fileId := record.MetaPageId().FileId()
 		tablePath := filepath.Join(config.BaseDir, fmt.Sprintf("%s.db", name))
-		tableHf, err := file.NewHeapFile(fileId, tablePath)
+		tableHf, err := file.NewHeapFile(tablePath)
 		if err != nil {
 			t.Fatalf("テーブル %q の HeapFile 再オープンに失敗: %v", name, err)
 		}

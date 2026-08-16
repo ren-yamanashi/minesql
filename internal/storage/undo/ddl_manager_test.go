@@ -7,6 +7,7 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
@@ -136,12 +137,22 @@ func TestDDLManagerAppend(t *testing.T) {
 			}
 		}
 
-		// THEN
+		// THEN: 新ページの実体化 REDO が旧ページのリンク変更 REDO より前に出る
+		//       (2 つの間には fsp ヘッダー更新の記録が挟まる)
 		assert.NotEqual(t, oldPageId, newPageId)
-		n := len(pageWrites)
-		assert.GreaterOrEqual(t, n, 2)
-		assert.Equal(t, newPageId, pageWrites[n-2].PageId())
-		assert.Equal(t, oldPageId, pageWrites[n-1].PageId())
+		assert.GreaterOrEqual(t, len(pageWrites), 2)
+		newIdx, oldIdx := -1, -1
+		for i, r := range pageWrites {
+			if r.PageId() == newPageId {
+				newIdx = i
+			}
+			if r.PageId() == oldPageId {
+				oldIdx = i
+			}
+		}
+		assert.NotEqual(t, -1, newIdx)
+		assert.NotEqual(t, -1, oldIdx)
+		assert.Less(t, newIdx, oldIdx)
 	})
 }
 
@@ -261,7 +272,7 @@ func setupDDLTestEnv(t *testing.T) (*buffer.Pool, page.Id, page.Id, *redo.Buffer
 
 	fileId := page.FileId(0)
 	path := filepath.Join(t.TempDir(), "ddl_undo_test.db")
-	hf, err := file.NewHeapFile(fileId, path)
+	hf, err := file.NewHeapFile(path)
 	if err != nil {
 		t.Fatalf("HeapFile の作成に失敗: %v", err)
 	}
@@ -270,8 +281,16 @@ func setupDDLTestEnv(t *testing.T) (*buffer.Pool, page.Id, page.Id, *redo.Buffer
 	bp := buffer.NewPool(page.Size*20, redoLog, nil)
 	bp.RegisterHeapFile(fileId, hf)
 
+	initMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+	if err := fsp.InitHeader(initMtr, fileId); err != nil {
+		t.Fatalf("fsp.InitHeader に失敗: %v", err)
+	}
+	if err := initMtr.Commit(); err != nil {
+		t.Fatalf("InitHeader Mtr の Commit に失敗: %v", err)
+	}
+
 	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-	freeListMapPageId, err := bp.AllocatePageId(fileId)
+	freeListMapPageId, err := fsp.AllocatePage(mtr, fileId)
 	if err != nil {
 		t.Fatalf("freeListMap ページの確保に失敗: %v", err)
 	}
@@ -284,7 +303,7 @@ func setupDDLTestEnv(t *testing.T) (*buffer.Pool, page.Id, page.Id, *redo.Buffer
 	}
 	buffer.InitializeFreeListMapPage(freeListMapBufPage)
 
-	rootPageId, err := bp.AllocatePageId(fileId)
+	rootPageId, err := fsp.AllocatePage(mtr, fileId)
 	if err != nil {
 		t.Fatalf("DDL Undo root ページの確保に失敗: %v", err)
 	}

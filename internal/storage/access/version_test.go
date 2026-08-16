@@ -160,7 +160,7 @@ func setupVersionTestEnv(t *testing.T) *versionTestEnv {
 	iter := setupIteratorTestEnv(t)
 
 	undoPath := filepath.Join(t.TempDir(), "undo.db")
-	undoHf, err := file.NewHeapFile(page.FileId(3), undoPath)
+	undoHf, err := file.NewHeapFile(undoPath)
 	if err != nil {
 		t.Fatalf("Undo HeapFile の作成に失敗: %v", err)
 	}

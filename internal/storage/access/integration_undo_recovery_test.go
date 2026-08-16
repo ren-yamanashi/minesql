@@ -189,7 +189,7 @@ func TestIntegrationIncompleteMtrRecovery(t *testing.T) {
 //   - direct I/O のアライメント制約に従い directio.AlignedBlock で読み込みバッファを確保する
 func readPageBytesFromDisk(t *testing.T, fileId page.FileId, filename string, pageNumber page.PageNumber) []byte {
 	t.Helper()
-	hf, err := file.NewHeapFile(fileId, filepath.Join(config.BaseDir, filename))
+	hf, err := file.NewHeapFile(filepath.Join(config.BaseDir, filename))
 	if err != nil {
 		t.Fatalf("HeapFile の再オープンに失敗: %v", err)
 	}

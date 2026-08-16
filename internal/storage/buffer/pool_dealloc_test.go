@@ -18,7 +18,7 @@ func TestDeallocate(t *testing.T) {
 		bp, mapPageId := setupDeallocTestEnv(t)
 		targetFileId := page.FileId(2)
 		registerHeapFile(t, bp, targetFileId)
-		freed := allocatePageInFile(t, bp, targetFileId)
+		freed := allocatePageInFile(t, bp, targetFileId, 0)
 
 		// WHEN
 		mtr := NewWriteMtr(bp, lock.SystemReservedTrxId, newDeallocTestRedoBuffer(t))
@@ -36,8 +36,8 @@ func TestDeallocate(t *testing.T) {
 		bp, mapPageId := setupDeallocTestEnv(t)
 		targetFileId := page.FileId(2)
 		registerHeapFile(t, bp, targetFileId)
-		first := allocatePageInFile(t, bp, targetFileId)
-		second := allocatePageInFile(t, bp, targetFileId)
+		first := allocatePageInFile(t, bp, targetFileId, 0)
+		second := allocatePageInFile(t, bp, targetFileId, 1)
 
 		// WHEN
 		mtr1 := NewWriteMtr(bp, lock.SystemReservedTrxId, newDeallocTestRedoBuffer(t))
@@ -63,8 +63,8 @@ func TestDeallocate(t *testing.T) {
 		fileIdB := page.FileId(3)
 		registerHeapFile(t, bp, fileIdA)
 		registerHeapFile(t, bp, fileIdB)
-		freedA := allocatePageInFile(t, bp, fileIdA)
-		freedB := allocatePageInFile(t, bp, fileIdB)
+		freedA := allocatePageInFile(t, bp, fileIdA, 0)
+		freedB := allocatePageInFile(t, bp, fileIdB, 0)
 
 		// WHEN
 		mtr := NewWriteMtr(bp, lock.SystemReservedTrxId, newDeallocTestRedoBuffer(t))
@@ -76,32 +76,13 @@ func TestDeallocate(t *testing.T) {
 		assert.Equal(t, freedA.PageNumber(), readHeadPageNumber(t, bp, mapPageId, fileIdA))
 		assert.Equal(t, freedB.PageNumber(), readHeadPageNumber(t, bp, mapPageId, fileIdB))
 	})
-
-	t.Run("解放後も AllocatePageId は単調増加で動く", func(t *testing.T) {
-		// GIVEN
-		bp, mapPageId := setupDeallocTestEnv(t)
-		targetFileId := page.FileId(2)
-		registerHeapFile(t, bp, targetFileId)
-		freed := allocatePageInFile(t, bp, targetFileId)
-		mtr := NewWriteMtr(bp, lock.SystemReservedTrxId, newDeallocTestRedoBuffer(t))
-		assert.NoError(t, bp.Deallocate(mtr, mapPageId, freed))
-		assert.NoError(t, mtr.Commit())
-
-		// WHEN
-		nextId, err := bp.AllocatePageId(targetFileId)
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, freed.PageNumber()+1, nextId.PageNumber())
-	})
 }
 
 func setupDeallocTestEnv(t *testing.T) (*Pool, page.Id) {
 	t.Helper()
 	bp, _ := setupFreeListMapTestPool(t)
-	mapPageId, err := bp.AllocatePageId(page.FileId(0))
-	assert.NoError(t, err)
-	_, err = bp.AddPage(mapPageId)
+	mapPageId := page.NewId(page.FileId(0), 0)
+	_, err := bp.AddPage(mapPageId)
 	assert.NoError(t, err)
 	mtr := NewWriteMtr(bp, lock.SystemReservedTrxId, newDeallocTestRedoBuffer(t))
 	bufPage, err := mtr.PageForWrite(mapPageId)
@@ -124,17 +105,16 @@ func newDeallocTestRedoBuffer(t *testing.T) *redo.Buffer {
 func registerHeapFile(t *testing.T, bp *Pool, fileId page.FileId) {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "dealloc_test.db")
-	hf, err := file.NewHeapFile(fileId, path)
+	hf, err := file.NewHeapFile(path)
 	assert.NoError(t, err)
 	t.Cleanup(func() { _ = hf.Close() })
 	bp.RegisterHeapFile(fileId, hf)
 }
 
-func allocatePageInFile(t *testing.T, bp *Pool, fileId page.FileId) page.Id {
+func allocatePageInFile(t *testing.T, bp *Pool, fileId page.FileId, pageNumber page.PageNumber) page.Id {
 	t.Helper()
-	pageId, err := bp.AllocatePageId(fileId)
-	assert.NoError(t, err)
-	_, err = bp.AddPage(pageId)
+	pageId := page.NewId(fileId, pageNumber)
+	_, err := bp.AddPage(pageId)
 	assert.NoError(t, err)
 	return pageId
 }

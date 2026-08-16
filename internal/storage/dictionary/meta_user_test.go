@@ -7,6 +7,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
@@ -145,17 +146,26 @@ func setupTestUserMeta(t *testing.T) (*UserMeta, *buffer.Pool) {
 }
 
 // setupDictTestBufferPool は dictionary テスト用のバッファプールを作成する
+//   - Create*Meta が要求する FSP ヘッダーを事前に初期化する (カタログ作成経路の InitHeader 相当)
 func setupDictTestBufferPool(t *testing.T) *buffer.Pool {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "dict_test.db")
 	fileId := page.FileId(0)
-	hf, err := file.NewHeapFile(fileId, path)
+	hf, err := file.NewHeapFile(path)
 	if err != nil {
 		t.Fatalf("HeapFile の作成に失敗: %v", err)
 	}
 	t.Cleanup(func() { _ = hf.Close() })
-	bp := buffer.NewPool(page.Size*10, setupDictTestRedoBuffer(t), nil)
+	rl := setupDictTestRedoBuffer(t)
+	bp := buffer.NewPool(page.Size*10, rl, nil)
 	bp.RegisterHeapFile(fileId, hf)
+	initMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, rl)
+	if err := fsp.InitHeader(initMtr, fileId); err != nil {
+		t.Fatalf("fsp.InitHeader に失敗: %v", err)
+	}
+	if err := initMtr.Commit(); err != nil {
+		t.Fatalf("InitHeader Mtr の Commit に失敗: %v", err)
+	}
 	return bp
 }
 

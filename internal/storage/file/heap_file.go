@@ -11,13 +11,11 @@ import (
 )
 
 type HeapFile struct {
-	fileId     page.FileId // 管理対象ファイルの FileId
-	file       *os.File    // ヒープファイルのファイルディスクリプタ
-	path       string      // ヒープファイルのパス
-	nextPageId page.Id     // 次に採番する PageId
+	file *os.File // ヒープファイルのファイルディスクリプタ
+	path string   // ヒープファイルのパス
 }
 
-func NewHeapFile(fileId page.FileId, path string) (heapFile *HeapFile, retErr error) {
+func NewHeapFile(path string) (heapFile *HeapFile, retErr error) {
 	file, err := directio.OpenFile(
 		path,
 		os.O_RDWR|os.O_CREATE, // read-write モードで開き、存在しない場合は作成する (※ os.O_DIRECT は directio.OpenFile 内で設定される)
@@ -43,27 +41,14 @@ func NewHeapFile(fileId page.FileId, path string) (heapFile *HeapFile, retErr er
 	}
 
 	return &HeapFile{
-		fileId:     fileId,
-		file:       file,
-		path:       path,
-		nextPageId: page.NewId(fileId, page.PageNumber(fileSize/int64(page.Size))),
+		file: file,
+		path: path,
 	}, nil
 }
 
 // Path はヒープファイルのパスを返す
 func (hf *HeapFile) Path() string {
 	return hf.path
-}
-
-// AllocatePageId は新しいページ ID を採番する
-//   - PageNumber が上限に達している場合はエラーを返す
-func (hf *HeapFile) AllocatePageId() (page.Id, error) {
-	if hf.nextPageId.PageNumber() >= page.MaxPageNumber {
-		return page.InvalidId(), fmt.Errorf("file %d: page number limit reached", hf.fileId)
-	}
-	id := hf.nextPageId
-	hf.nextPageId = page.NewId(hf.fileId, hf.nextPageId.PageNumber()+1)
-	return id, nil
 }
 
 // Read は指定された PageNumber のページデータを data に読み込む

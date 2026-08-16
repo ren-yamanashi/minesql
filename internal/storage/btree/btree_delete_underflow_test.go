@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -404,8 +406,10 @@ func TestDeleteUnderflow(t *testing.T) {
 // allocateTestPage はテスト用にページを割り当ててバッファプールに追加する
 func allocateTestPage(t *testing.T, bp *buffer.Pool) (page.Id, *buffer.Page) {
 	t.Helper()
-	pageId, err := bp.AllocatePageId(0)
+	allocMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+	pageId, err := fsp.AllocatePage(allocMtr, page.FileId(0))
 	assert.NoError(t, err)
+	assert.NoError(t, allocMtr.Commit())
 	bufPage, err := bp.AddPage(pageId)
 	assert.NoError(t, err)
 	return pageId, bufPage

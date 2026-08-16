@@ -21,34 +21,12 @@ func TestNewHeapFile(t *testing.T) {
 		path := filepath.Join(t.TempDir(), "test.db")
 
 		// WHEN
-		hf, err := NewHeapFile(0, path)
+		hf, err := NewHeapFile(path)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, hf)
 		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
-	})
-
-	t.Run("既存データがあるファイルを開くと nextPageId がページ数から算出される", func(t *testing.T) {
-		// GIVEN
-		path := filepath.Join(t.TempDir(), "test.db")
-		hf1, err := NewHeapFile(1, path)
-		assert.NoError(t, err)
-		data := newAlignedPage()
-		assert.NoError(t, hf1.Write(0, data))
-		assert.NoError(t, hf1.Write(1, data))
-		assert.NoError(t, hf1.Close())
-
-		// WHEN
-		hf2, err := NewHeapFile(1, path)
-
-		// THEN
-		assert.NoError(t, err)
-		t.Cleanup(func() { assert.NoError(t, hf2.Close()) })
-		nextId, err := hf2.AllocatePageId()
-		assert.NoError(t, err)
-		assert.Equal(t, page.FileId(1), nextId.FileId())
-		assert.Equal(t, page.PageNumber(2), nextId.PageNumber())
 	})
 
 	t.Run("ファイルサイズがページサイズの倍数でない場合エラーを返す", func(t *testing.T) {
@@ -61,7 +39,7 @@ func TestNewHeapFile(t *testing.T) {
 		assert.NoError(t, f.Close())
 
 		// WHEN
-		hf, err := NewHeapFile(0, path)
+		hf, err := NewHeapFile(path)
 
 		// THEN
 		assert.Error(t, err)
@@ -74,7 +52,7 @@ func TestNewHeapFile(t *testing.T) {
 		path := "/nonexistent/dir/test.db"
 
 		// WHEN
-		hf, err := NewHeapFile(0, path)
+		hf, err := NewHeapFile(path)
 
 		// THEN
 		assert.Error(t, err)
@@ -86,7 +64,7 @@ func TestPath(t *testing.T) {
 	t.Run("コンストラクタに渡したパスを返す", func(t *testing.T) {
 		// GIVEN
 		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
+		hf, err := NewHeapFile(path)
 		assert.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
 
@@ -100,7 +78,7 @@ func TestPath(t *testing.T) {
 	t.Run("Close 済みでもパスを返す", func(t *testing.T) {
 		// GIVEN
 		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
+		hf, err := NewHeapFile(path)
 		assert.NoError(t, err)
 		assert.NoError(t, hf.Close())
 
@@ -112,66 +90,11 @@ func TestPath(t *testing.T) {
 	})
 }
 
-func TestAllocatePageId(t *testing.T) {
-	t.Run("空ファイルの場合 PageNumber 0 から採番される", func(t *testing.T) {
-		// GIVEN
-		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(5, path)
-		assert.NoError(t, err)
-		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
-
-		// WHEN
-		id, err := hf.AllocatePageId()
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, page.FileId(5), id.FileId())
-		assert.Equal(t, page.PageNumber(0), id.PageNumber())
-	})
-
-	t.Run("連続で採番すると PageNumber がインクリメントされる", func(t *testing.T) {
-		// GIVEN
-		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
-		assert.NoError(t, err)
-		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
-
-		// WHEN
-		id1, err1 := hf.AllocatePageId()
-		id2, err2 := hf.AllocatePageId()
-		id3, err3 := hf.AllocatePageId()
-
-		// THEN
-		assert.NoError(t, err1)
-		assert.NoError(t, err2)
-		assert.NoError(t, err3)
-		assert.Equal(t, page.PageNumber(0), id1.PageNumber())
-		assert.Equal(t, page.PageNumber(1), id2.PageNumber())
-		assert.Equal(t, page.PageNumber(2), id3.PageNumber())
-	})
-
-	t.Run("PageNumber が上限に達している場合エラーを返す", func(t *testing.T) {
-		// GIVEN
-		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
-		assert.NoError(t, err)
-		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
-		hf.nextPageId = page.NewId(0, page.MaxPageNumber)
-
-		// WHEN
-		id, err := hf.AllocatePageId()
-
-		// THEN
-		assert.Error(t, err)
-		assert.Equal(t, page.InvalidId(), id)
-	})
-}
-
 func TestRead(t *testing.T) {
 	t.Run("データサイズが PageSize でない場合エラーを返す", func(t *testing.T) {
 		// GIVEN
 		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
+		hf, err := NewHeapFile(path)
 		assert.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
 		data := make([]byte, 100)
@@ -186,7 +109,7 @@ func TestRead(t *testing.T) {
 	t.Run("nil データの場合エラーを返す", func(t *testing.T) {
 		// GIVEN
 		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
+		hf, err := NewHeapFile(path)
 		assert.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
 
@@ -200,7 +123,7 @@ func TestRead(t *testing.T) {
 	t.Run("存在しないページを読み込むと EOF エラーを返す", func(t *testing.T) {
 		// GIVEN
 		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
+		hf, err := NewHeapFile(path)
 		assert.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
 		data := newAlignedPage()
@@ -215,7 +138,7 @@ func TestRead(t *testing.T) {
 	t.Run("Close 済みのファイルから読み込むとエラーを返す", func(t *testing.T) {
 		// GIVEN
 		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
+		hf, err := NewHeapFile(path)
 		assert.NoError(t, err)
 		assert.NoError(t, hf.Close())
 		data := newAlignedPage()
@@ -230,7 +153,7 @@ func TestRead(t *testing.T) {
 	t.Run("書き込んだデータを正しく読み込める", func(t *testing.T) {
 		// GIVEN
 		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
+		hf, err := NewHeapFile(path)
 		assert.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
 		writeData := newAlignedPage()
@@ -251,7 +174,7 @@ func TestRead(t *testing.T) {
 	t.Run("複数ページに書き込んで各ページを正しく読み込める", func(t *testing.T) {
 		// GIVEN
 		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
+		hf, err := NewHeapFile(path)
 		assert.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
 		page0 := newAlignedPage()
@@ -279,7 +202,7 @@ func TestWrite(t *testing.T) {
 	t.Run("PageSize のデータを書き込める", func(t *testing.T) {
 		// GIVEN
 		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
+		hf, err := NewHeapFile(path)
 		assert.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
 		data := newAlignedPage()
@@ -295,7 +218,7 @@ func TestWrite(t *testing.T) {
 	t.Run("データサイズが PageSize でない場合エラーを返す", func(t *testing.T) {
 		// GIVEN
 		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
+		hf, err := NewHeapFile(path)
 		assert.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
 		data := make([]byte, 100)
@@ -310,7 +233,7 @@ func TestWrite(t *testing.T) {
 	t.Run("nil データの場合エラーを返す", func(t *testing.T) {
 		// GIVEN
 		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
+		hf, err := NewHeapFile(path)
 		assert.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
 
@@ -324,7 +247,7 @@ func TestWrite(t *testing.T) {
 	t.Run("同じページに上書きできる", func(t *testing.T) {
 		// GIVEN
 		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
+		hf, err := NewHeapFile(path)
 		assert.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
 		data1 := newAlignedPage()
@@ -346,7 +269,7 @@ func TestWrite(t *testing.T) {
 	t.Run("Close 済みのファイルに書き込むとエラーを返す", func(t *testing.T) {
 		// GIVEN
 		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
+		hf, err := NewHeapFile(path)
 		assert.NoError(t, err)
 		assert.NoError(t, hf.Close())
 		data := newAlignedPage()
@@ -363,7 +286,7 @@ func TestSync(t *testing.T) {
 	t.Run("エラーなく同期できる", func(t *testing.T) {
 		// GIVEN
 		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
+		hf, err := NewHeapFile(path)
 		assert.NoError(t, err)
 		t.Cleanup(func() { assert.NoError(t, hf.Close()) })
 
@@ -379,7 +302,7 @@ func TestClose(t *testing.T) {
 	t.Run("エラーなくファイルを閉じることができる", func(t *testing.T) {
 		// GIVEN
 		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := NewHeapFile(0, path)
+		hf, err := NewHeapFile(path)
 		assert.NoError(t, err)
 
 		// WHEN

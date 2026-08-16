@@ -203,7 +203,7 @@ func (r *Recovery) applyDDLRollback(records []redo.Record) error {
 
 // collectUndoRecords は Undo ページを走査して指定トランザクションのレコードを収集する
 func (r *Recovery) collectUndoRecords(trxId lock.TrxId) ([]undo.Record, error) {
-	pageNum := page.PageNumber(0)
+	pageNum := page.PageNumber(1)
 	var records []undo.Record
 	for {
 		pageId := page.NewId(r.undoFileId, pageNum)

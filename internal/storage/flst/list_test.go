@@ -413,7 +413,7 @@ func setupTest(t *testing.T, pageNumbers ...page.PageNumber) (*buffer.Pool, *red
 	}
 	t.Cleanup(func() { _ = redoLog.Close() })
 	path := filepath.Join(t.TempDir(), "test.db")
-	hf, err := file.NewHeapFile(testFileId, path)
+	hf, err := file.NewHeapFile(path)
 	if err != nil {
 		t.Fatalf("HeapFile の作成に失敗: %v", err)
 	}

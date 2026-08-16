@@ -2,10 +2,12 @@ package undo
 
 import (
 	"errors"
+	"fmt"
 	"slices"
 	"sync"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
@@ -25,13 +27,20 @@ type Manager struct {
 	entries       map[lock.TrxId][]Entry // trxId → Entry[] のマップ
 }
 
-// NewManager は Undo ログ用の先頭ページを 1 枚確保して Manager を返す
-//   - mtr: 先頭ページの初期化を記録する Mtr。Commit / UnpinAll は呼び出し側
+// NewManager は Undo ファイルの FSP ヘッダーを初期化し、先頭ページを 1 枚確保して Manager を返す
+//   - mtr: FSP ヘッダー初期化と先頭ページ初期化を記録する Mtr。Commit / UnpinAll は呼び出し側
+//   - 先頭ページは PageNumber == 1 で確保される
 func NewManager(mtr *buffer.Mtr, fileId page.FileId) (*Manager, error) {
+	if err := fsp.InitHeader(mtr, fileId); err != nil {
+		return nil, err
+	}
 	bp := mtr.Pool()
-	pageId, err := bp.AllocatePageId(fileId)
+	pageId, err := fsp.AllocatePage(mtr, fileId)
 	if err != nil {
 		return nil, err
+	}
+	if pageId.PageNumber() != 1 {
+		panic(fmt.Sprintf("undo: first allocated page must be PageNumber 1, got %d", pageId.PageNumber()))
 	}
 	if _, err := bp.AddPage(pageId); err != nil {
 		return nil, err
@@ -173,7 +182,7 @@ func (m *Manager) switchToNewPage(
 	currentPage *Page,
 	serialized []byte,
 ) (Pointer, error) {
-	newPageId, err := m.bufferPool.AllocatePageId(m.fileId)
+	newPageId, err := fsp.AllocatePage(mtr, m.fileId)
 	if err != nil {
 		return Pointer{}, err
 	}

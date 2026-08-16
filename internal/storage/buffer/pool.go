@@ -76,17 +76,6 @@ func (p *Pool) Unpin(pageId page.Id) {
 	}
 }
 
-// AllocatePageId は指定された FileId に対して新しい PageId を割り当てる
-func (p *Pool) AllocatePageId(fileId page.FileId) (page.Id, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	heapFile, err := p.heapFile(fileId)
-	if err != nil {
-		return page.InvalidId(), err
-	}
-	return heapFile.AllocatePageId()
-}
-
 // RegisterHeapFile は BufferPool に HeapFile を登録する
 //   - fileId: 登録する HeapFile に対応する FileId
 //   - heapFile: 登録する HeapFile

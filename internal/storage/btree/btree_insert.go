@@ -2,6 +2,7 @@ package btree
 
 import (
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
@@ -96,7 +97,7 @@ func (t *Tree) insertWithMetaUpdate(mtr *buffer.Mtr, mp *metaPage, record Record
 	}
 
 	// ルートノードの分割が発生した場合
-	newRootPageId, err := t.bufferPool.AllocatePageId(t.MetaPageId().FileId())
+	newRootPageId, err := fsp.AllocatePage(mtr, t.MetaPageId().FileId())
 	if err != nil {
 		return err
 	}

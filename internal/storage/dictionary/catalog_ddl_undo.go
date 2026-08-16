@@ -2,6 +2,7 @@ package dictionary
 
 import (
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
@@ -34,7 +35,7 @@ func ddlUndoRootPageIdFromPageNumber(pn page.PageNumber) page.Id {
 // allocateAndInitializeDDLUndoRootPage は DDL Undo 専用領域の先頭ページを新規確保し、 空の Undo ページとして初期化する
 //   - 呼び出し側はエラー時に mtr.UnpinAll() を行う既存パターンに従う
 func allocateAndInitializeDDLUndoRootPage(mtr *buffer.Mtr, bp *buffer.Pool) (page.Id, error) {
-	pageId, err := bp.AllocatePageId(CatalogFileId)
+	pageId, err := fsp.AllocatePage(mtr, CatalogFileId)
 	if err != nil {
 		return page.InvalidId(), err
 	}

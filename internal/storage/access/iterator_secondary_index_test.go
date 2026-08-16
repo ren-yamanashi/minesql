@@ -8,6 +8,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
@@ -188,7 +189,7 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 
 	// カタログ用 HeapFile (FileId=0)
 	catalogPath := filepath.Join(t.TempDir(), "catalog.db")
-	catalogHf, err := file.NewHeapFile(page.FileId(0), catalogPath)
+	catalogHf, err := file.NewHeapFile(catalogPath)
 	if err != nil {
 		t.Fatalf("カタログ HeapFile の作成に失敗: %v", err)
 	}
@@ -196,7 +197,7 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 
 	// テーブルデータ用 HeapFile (FileId=2)
 	dataPath := filepath.Join(t.TempDir(), "data.db")
-	dataHf, err := file.NewHeapFile(page.FileId(2), dataPath)
+	dataHf, err := file.NewHeapFile(dataPath)
 	if err != nil {
 		t.Fatalf("データ HeapFile の作成に失敗: %v", err)
 	}
@@ -211,6 +212,15 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	bp := buffer.NewPool(page.Size*50, redoLog, nil)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 	bp.RegisterHeapFile(page.FileId(2), dataHf)
+
+	dataInitMtr := newBootstrapMtr(bp, redoLog)
+	if err := fsp.InitHeader(dataInitMtr, page.FileId(2)); err != nil {
+		dataInitMtr.UnpinAll()
+		t.Fatalf("データファイルの FSP ヘッダー初期化に失敗: %v", err)
+	}
+	if err := dataInitMtr.Commit(); err != nil {
+		t.Fatalf("データファイルの FSP ヘッダー Commit に失敗: %v", err)
+	}
 
 	ctMtr := newBootstrapMtr(bp, redoLog)
 	ct, err := dictionary.CreateCatalog(ctMtr)

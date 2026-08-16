@@ -263,7 +263,7 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 	t.Cleanup(func() { _ = os.RemoveAll(config.BaseDir) })
 
 	catalogPath := filepath.Join(t.TempDir(), "catalog.db")
-	catalogHf, err := file.NewHeapFile(page.FileId(0), catalogPath)
+	catalogHf, err := file.NewHeapFile(catalogPath)
 	if err != nil {
 		t.Fatalf("カタログ HeapFile の作成に失敗: %v", err)
 	}
@@ -290,7 +290,7 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 	// Undo 用 HeapFile
 	undoFileId := ct.UndoLogFileId()
 	undoPath := filepath.Join(config.BaseDir, "undo.db")
-	undoHf, err := file.NewHeapFile(undoFileId, undoPath)
+	undoHf, err := file.NewHeapFile(undoPath)
 	if err != nil {
 		t.Fatalf("Undo HeapFile の作成に失敗: %v", err)
 	}

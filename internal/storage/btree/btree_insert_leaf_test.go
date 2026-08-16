@@ -6,6 +6,8 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -88,7 +90,7 @@ func setupBtreeBufferPool(t *testing.T) *buffer.Pool {
 	t.Helper()
 	bp := newTestBufferPool(t, page.Size*20)
 	path := filepath.Join(t.TempDir(), "test.db")
-	hf, err := file.NewHeapFile(0, path)
+	hf, err := file.NewHeapFile(path)
 	assert.NoError(t, err)
 	t.Cleanup(func() { _ = hf.Close() })
 	bp.RegisterHeapFile(0, hf)
@@ -107,8 +109,10 @@ func setupBtreeForTest(t *testing.T) (*Tree, *buffer.Pool) {
 // setupTestLeafPage はテスト用のリーフページを作成し、PageId と BufferPage を返す
 func setupTestLeafPage(t *testing.T, bp *buffer.Pool) (page.Id, *buffer.Page) {
 	t.Helper()
-	pageId, err := bp.AllocatePageId(0)
+	allocMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+	pageId, err := fsp.AllocatePage(allocMtr, page.FileId(0))
 	assert.NoError(t, err)
+	assert.NoError(t, allocMtr.Commit())
 	_, err = bp.AddPage(pageId)
 	assert.NoError(t, err)
 	bufPage, err := bp.Page(pageId)

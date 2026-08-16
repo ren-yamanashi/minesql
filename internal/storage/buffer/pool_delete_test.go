@@ -16,9 +16,8 @@ func TestDeleteFile(t *testing.T) {
 		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		fileId := page.FileId(7)
 		path := registerDeletableHeapFile(t, bp, fileId)
-		pageId, err := bp.AllocatePageId(fileId)
-		assert.NoError(t, err)
-		_, err = bp.AddPage(pageId)
+		pageId := page.NewId(fileId, 0)
+		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -50,9 +49,8 @@ func TestDeleteFile(t *testing.T) {
 		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		fileId := page.FileId(7)
 		registerDeletableHeapFile(t, bp, fileId)
-		pageId, err := bp.AllocatePageId(fileId)
-		assert.NoError(t, err)
-		_, err = bp.AddPage(pageId)
+		pageId := page.NewId(fileId, 0)
+		_, err := bp.AddPage(pageId)
 		assert.NoError(t, err)
 		bufPage, err := bp.Page(pageId)
 		assert.NoError(t, err)
@@ -109,31 +107,16 @@ func TestDeleteFile(t *testing.T) {
 		assert.NoError(t, secondErr)
 	})
 
-	t.Run("削除済み FileId に対する AllocatePageId はエラーを返す", func(t *testing.T) {
-		// GIVEN
-		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
-		fileId := page.FileId(7)
-		registerDeletableHeapFile(t, bp, fileId)
-		assert.NoError(t, bp.DeleteFile(fileId))
-
-		// WHEN
-		_, err := bp.AllocatePageId(fileId)
-
-		// THEN
-		assert.Error(t, err)
-	})
-
 	t.Run("削除済み FileId に対する Page はエラーを返す", func(t *testing.T) {
 		// GIVEN
 		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		fileId := page.FileId(7)
 		registerDeletableHeapFile(t, bp, fileId)
-		pageId, err := bp.AllocatePageId(fileId)
-		assert.NoError(t, err)
+		pageId := page.NewId(fileId, 0)
 		assert.NoError(t, bp.DeleteFile(fileId))
 
 		// WHEN
-		_, err = bp.Page(pageId)
+		_, err := bp.Page(pageId)
 
 		// THEN
 		assert.Error(t, err)
@@ -144,17 +127,15 @@ func TestDeleteFile(t *testing.T) {
 		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 		droppedFileId := page.FileId(7)
 		registerDeletableHeapFile(t, bp, droppedFileId)
-		droppedPageId, err := bp.AllocatePageId(droppedFileId)
-		assert.NoError(t, err)
-		_, err = bp.AddPage(droppedPageId)
+		droppedPageId := page.NewId(droppedFileId, 0)
+		_, err := bp.AddPage(droppedPageId)
 		assert.NoError(t, err)
 		assert.NoError(t, bp.DeleteFile(droppedFileId))
 
 		// WHEN
 		newFileId := page.FileId(8)
 		registerDeletableHeapFile(t, bp, newFileId)
-		newPageId, err := bp.AllocatePageId(newFileId)
-		assert.NoError(t, err)
+		newPageId := page.NewId(newFileId, 0)
 		_, err = bp.AddPage(newPageId)
 		assert.NoError(t, err)
 
@@ -167,7 +148,7 @@ func TestDeleteFile(t *testing.T) {
 func registerDeletableHeapFile(t *testing.T, bp *Pool, fileId page.FileId) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "delete_test.db")
-	hf, err := file.NewHeapFile(fileId, path)
+	hf, err := file.NewHeapFile(path)
 	assert.NoError(t, err)
 	bp.RegisterHeapFile(fileId, hf)
 	return path

@@ -1,40 +1,35 @@
 package dictionary
 
 import (
-	"bytes"
 	"encoding/binary"
-	"errors"
+	"fmt"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 const (
-	headerMagicNumberOffset           = 0
-	headerTableMetaOffset             = 4
-	headerIndexMetaOffset             = 8
-	headerIndexKeyColumnMetaOffset    = 12
-	headerColumnMetaOffset            = 16
-	headerConstraintMetaOffset        = 20
-	headerUserMetaOffset              = 24
-	headerNextFileIdOffset            = 28
-	headerNextIndexIdOffset           = 32
-	headerUndoLogFileIdOffset         = 36
-	headerDDLUndoRootPageNumberOffset = 40
-	headerFreeListMapPageNumberOffset = 44
-	headerNextTrxIdOffset             = 48
+	headerTableMetaOffset             = 0
+	headerIndexMetaOffset             = 4
+	headerIndexKeyColumnMetaOffset    = 8
+	headerColumnMetaOffset            = 12
+	headerConstraintMetaOffset        = 16
+	headerUserMetaOffset              = 20
+	headerNextFileIdOffset            = 24
+	headerNextIndexIdOffset           = 28
+	headerUndoLogFileIdOffset         = 32
+	headerDDLUndoRootPageNumberOffset = 36
+	headerFreeListMapPageNumberOffset = 40
+	headerNextTrxIdOffset             = 44
 	headerFieldSize                   = 4
 )
 
 // CatalogFileId はカタログヘッダーが置かれる FileId (= DB 全体で固定値)
 var CatalogFileId = page.FileId(0)
 
-var (
-	catalogHeaderPageNum  = page.PageNumber(0)
-	errInvalidCatalogFile = errors.New("invalid database catalog file: magic number mismatch")
-	catalogMagicNumber    = []byte("MINE")
-)
+var catalogHeaderPageNum = page.PageNumber(1)
 
 type Catalog struct {
 	nextFileId         page.FileId
@@ -67,15 +62,14 @@ func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
 	mtr := buffer.NewMtr(bp)
 	defer mtr.UnpinAll()
 
+	if err := fsp.ValidateHeader(mtr, CatalogFileId); err != nil {
+		return nil, err
+	}
+
 	headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
 	bufPageHeader, err := mtr.PageForRead(headerPageId)
 	if err != nil {
 		return nil, err
-	}
-
-	magicEnd := headerMagicNumberOffset + len(catalogMagicNumber)
-	if !bytes.Equal(bufPageHeader.Data().Body()[headerMagicNumberOffset:magicEnd], catalogMagicNumber) {
-		return nil, errInvalidCatalogFile
 	}
 
 	tableMetaPageNumber := readPageNumber(bufPageHeader.Data().Body(), headerTableMetaOffset)
@@ -123,14 +117,21 @@ func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
 }
 
 // CreateCatalog はカタログを新規作成する
-//   - mtr: ヘッダー初期化と各メタテーブル作成を記録する Mtr。Commit / UnpinAll は呼び出し側
+//   - mtr: FSP ヘッダー初期化・ヘッダーページ確保・各メタテーブル作成を記録する Mtr。Commit / UnpinAll は呼び出し側
 //   - mtr の trxId に応じた Redo が記録される (= ブートストラップでは SystemReservedTrxId)
+//   - ヘッダーページは PageNumber == 1 で確保される
 func CreateCatalog(mtr *buffer.Mtr) (*Catalog, error) {
 	bp := mtr.Pool()
 
-	headerPageId, err := bp.AllocatePageId(CatalogFileId)
+	if err := fsp.InitHeader(mtr, CatalogFileId); err != nil {
+		return nil, err
+	}
+	headerPageId, err := fsp.AllocatePage(mtr, CatalogFileId)
 	if err != nil {
 		return nil, err
+	}
+	if headerPageId.PageNumber() != catalogHeaderPageNum {
+		panic(fmt.Sprintf("dictionary: catalog header page must be PageNumber %d, got %d", catalogHeaderPageNum, headerPageId.PageNumber()))
 	}
 	if _, err := bp.AddPage(headerPageId); err != nil {
 		return nil, err
@@ -165,7 +166,7 @@ func CreateCatalog(mtr *buffer.Mtr) (*Catalog, error) {
 		return nil, err
 	}
 
-	freeListMapPageId, err := bp.AllocatePageId(CatalogFileId)
+	freeListMapPageId, err := fsp.AllocatePage(mtr, CatalogFileId)
 	if err != nil {
 		return nil, err
 	}
@@ -189,7 +190,6 @@ func CreateCatalog(mtr *buffer.Mtr) (*Catalog, error) {
 	undoLogFileId := nextFileId  // Undo ログ用の FileId を採番
 	nextFileId++
 
-	bufPageHeader.WriteBodyAt(headerMagicNumberOffset, catalogMagicNumber)
 	writePageNumber(bufPageHeader, headerTableMetaOffset, tableMeta.tree.MetaPageId().PageNumber())
 	writePageNumber(bufPageHeader, headerIndexMetaOffset, indexMeta.tree.MetaPageId().PageNumber())
 	writePageNumber(

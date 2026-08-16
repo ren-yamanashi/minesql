@@ -8,6 +8,7 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
@@ -845,7 +846,7 @@ func setupBtree(t *testing.T) *Tree {
 	tmpdir := t.TempDir()
 	path := filepath.Join(tmpdir, "btree_test.db")
 	fileId := page.FileId(0)
-	heapFile, err := file.NewHeapFile(fileId, path)
+	heapFile, err := file.NewHeapFile(path)
 	if err != nil {
 		t.Fatalf("HeapFile の作成に失敗: %v", err)
 	}
@@ -871,8 +872,17 @@ func newTestRedoBuffer(t *testing.T) *redo.Buffer {
 }
 
 // createTreeForTest はテスト用に CreateTree を呼ぶラッパー (Redo バッファとシステム trxId を内部で用意)
+//   - CreateTree が要求する FSP ヘッダーを事前に初期化する (テーブル作成経路の InitHeader 相当)
 func createTreeForTest(t *testing.T, bp *buffer.Pool, fileId page.FileId) (*Tree, error) {
 	t.Helper()
+	initMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+	if err := fsp.InitHeader(initMtr, fileId); err != nil {
+		initMtr.UnpinAll()
+		return nil, err
+	}
+	if err := initMtr.Commit(); err != nil {
+		return nil, err
+	}
 	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
 	tree, err := CreateTree(bp, fileId, mtr)
 	if err != nil {

@@ -73,6 +73,71 @@ func TestInitHeader(t *testing.T) {
 	})
 }
 
+func TestValidateHeader(t *testing.T) {
+	t.Run("初期化済み page 0 と FileId が一致する場合は nil を返す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		if err := InitHeader(mtr, testFileId); err != nil {
+			t.Fatalf("InitHeader に失敗: %v", err)
+		}
+		commitMtr(t, mtr)
+
+		// WHEN
+		readMtr := buffer.NewMtr(bp)
+		defer readMtr.UnpinAll()
+		err := ValidateHeader(readMtr, testFileId)
+
+		// THEN
+		assert.NoError(t, err)
+	})
+
+	t.Run("magic 不一致の場合は magic mismatch エラーを返す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		writeMtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		bufPage, err := writeMtr.PageForWrite(page.NewId(testFileId, 0))
+		if err != nil {
+			t.Fatalf("PageForWrite に失敗: %v", err)
+		}
+		bufPage.WriteBodyAt(headerMagicOffset, []byte("XXXX"))
+		commitMtr(t, writeMtr)
+
+		// WHEN
+		readMtr := buffer.NewMtr(bp)
+		defer readMtr.UnpinAll()
+		err = ValidateHeader(readMtr, testFileId)
+
+		// THEN
+		assert.ErrorContains(t, err, "magic mismatch")
+	})
+
+	t.Run("FileId 不一致の場合は FileId mismatch エラーを返す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t)
+		initMtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		if err := InitHeader(initMtr, testFileId); err != nil {
+			t.Fatalf("InitHeader に失敗: %v", err)
+		}
+		commitMtr(t, initMtr)
+		overwriteMtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		bufPage, err := overwriteMtr.PageForWrite(page.NewId(testFileId, 0))
+		if err != nil {
+			t.Fatalf("PageForWrite に失敗: %v", err)
+		}
+		header{bufPage: bufPage}.setFileId(page.FileId(uint32(testFileId) + 1))
+		commitMtr(t, overwriteMtr)
+
+		// WHEN
+		readMtr := buffer.NewMtr(bp)
+		defer readMtr.UnpinAll()
+		err = ValidateHeader(readMtr, testFileId)
+
+		// THEN
+		assert.ErrorContains(t, err, "FileId mismatch")
+	})
+}
+
 // setupTest はテスト用の BufferPool と Redo バッファを作成し、指定した PageNumber のゼロ埋めページを用意する
 func setupTest(t *testing.T, pageNumbers ...page.PageNumber) (*buffer.Pool, *redo.Buffer) {
 	t.Helper()
@@ -82,7 +147,7 @@ func setupTest(t *testing.T, pageNumbers ...page.PageNumber) (*buffer.Pool, *red
 	}
 	t.Cleanup(func() { _ = redoLog.Close() })
 	path := filepath.Join(t.TempDir(), "test.db")
-	hf, err := file.NewHeapFile(testFileId, path)
+	hf, err := file.NewHeapFile(path)
 	if err != nil {
 		t.Fatalf("HeapFile の作成に失敗: %v", err)
 	}

@@ -426,7 +426,7 @@ func setupSecondaryTestCatalog(t *testing.T) (*dictionary.Catalog, *buffer.Pool)
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "secondary_test.db")
 	fileId := page.FileId(0)
-	hf, err := file.NewHeapFile(fileId, path)
+	hf, err := file.NewHeapFile(path)
 	if err != nil {
 		t.Fatalf("HeapFile の作成に失敗: %v", err)
 	}

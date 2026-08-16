@@ -325,7 +325,7 @@ func crashAndRecoverWithPendingFiles(
 	bp := buffer.NewPool(page.Size*50, redoLog, nil)
 
 	catalogPath := filepath.Join(config.BaseDir, "catalog.db")
-	catalogHf, err := file.NewHeapFile(page.FileId(0), catalogPath)
+	catalogHf, err := file.NewHeapFile(catalogPath)
 	if err != nil {
 		t.Fatalf("カタログ HeapFile の再オープンに失敗: %v", err)
 	}
@@ -339,7 +339,7 @@ func crashAndRecoverWithPendingFiles(
 
 	undoFileId := ct.UndoLogFileId()
 	undoPath := filepath.Join(config.BaseDir, "undo.db")
-	undoHf, err := file.NewHeapFile(undoFileId, undoPath)
+	undoHf, err := file.NewHeapFile(undoPath)
 	if err != nil {
 		t.Fatalf("Undo HeapFile の再オープンに失敗: %v", err)
 	}
@@ -353,7 +353,7 @@ func crashAndRecoverWithPendingFiles(
 		}
 		fileId := record.MetaPageId().FileId()
 		tablePath := filepath.Join(config.BaseDir, fmt.Sprintf("%s.db", name))
-		tableHf, err := file.NewHeapFile(fileId, tablePath)
+		tableHf, err := file.NewHeapFile(tablePath)
 		if err != nil {
 			t.Fatalf("テーブル %q の HeapFile 再オープンに失敗: %v", name, err)
 		}
@@ -365,7 +365,7 @@ func crashAndRecoverWithPendingFiles(
 		if _, err := os.Stat(pending.path); os.IsNotExist(err) {
 			continue
 		}
-		pendingHf, err := file.NewHeapFile(pending.fileId, pending.path)
+		pendingHf, err := file.NewHeapFile(pending.path)
 		if err != nil {
 			t.Fatalf("pending HeapFile %q の再オープンに失敗: %v", pending.path, err)
 		}

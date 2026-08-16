@@ -17,7 +17,7 @@ func OpenManager(bp *buffer.Pool, fileId page.FileId) (*Manager, error) {
 		entries:    make(map[lock.TrxId][]Entry),
 	}
 
-	pageNum := page.PageNumber(0)
+	pageNum := page.PageNumber(1)
 	for {
 		pageId := page.NewId(fileId, pageNum)
 		nextPageNum, err := m.restoreFromPage(pageId)

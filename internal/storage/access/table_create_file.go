@@ -6,6 +6,7 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
@@ -32,10 +33,18 @@ func createTableFile(ddlTrx *Transaction, tableName string) (page.FileId, error)
 	if err := mtr.Commit(); err != nil {
 		return 0, err
 	}
-	hp, err := file.NewHeapFile(fileId, path)
+	hp, err := file.NewHeapFile(path)
 	if err != nil {
 		return 0, err
 	}
 	ddlTrx.bufferPool.RegisterHeapFile(fileId, hp)
+	initMtr := ddlTrx.NewMtr()
+	if err := fsp.InitHeader(initMtr, fileId); err != nil {
+		initMtr.UnpinAll()
+		return 0, err
+	}
+	if err := initMtr.Commit(); err != nil {
+		return 0, err
+	}
 	return fileId, nil
 }

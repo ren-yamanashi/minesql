@@ -54,7 +54,7 @@ func TestIsPageInFileFreeList(t *testing.T) {
 		bp, mapPageId := setupDeallocTestEnv(t)
 		fileId := page.FileId(2)
 		registerHeapFile(t, bp, fileId)
-		notFreed := allocatePageInFile(t, bp, fileId)
+		notFreed := allocatePageInFile(t, bp, fileId, 0)
 
 		// WHEN
 		mtr := NewMtr(bp)
@@ -71,7 +71,7 @@ func TestIsPageInFileFreeList(t *testing.T) {
 		bp, mapPageId := setupDeallocTestEnv(t)
 		fileId := page.FileId(2)
 		registerHeapFile(t, bp, fileId)
-		freed := allocatePageInFile(t, bp, fileId)
+		freed := allocatePageInFile(t, bp, fileId, 0)
 		writeMtr := NewWriteMtr(bp, lock.SystemReservedTrxId, newDeallocTestRedoBuffer(t))
 		assert.NoError(t, bp.Deallocate(writeMtr, mapPageId, freed))
 		assert.NoError(t, writeMtr.Commit())
@@ -91,8 +91,8 @@ func TestIsPageInFileFreeList(t *testing.T) {
 		bp, mapPageId := setupDeallocTestEnv(t)
 		fileId := page.FileId(2)
 		registerHeapFile(t, bp, fileId)
-		first := allocatePageInFile(t, bp, fileId)
-		second := allocatePageInFile(t, bp, fileId)
+		first := allocatePageInFile(t, bp, fileId, 0)
+		second := allocatePageInFile(t, bp, fileId, 1)
 		writeMtr := NewWriteMtr(bp, lock.SystemReservedTrxId, newDeallocTestRedoBuffer(t))
 		assert.NoError(t, bp.Deallocate(writeMtr, mapPageId, first))
 		assert.NoError(t, bp.Deallocate(writeMtr, mapPageId, second))
@@ -113,7 +113,7 @@ func TestIsPageInFileFreeList(t *testing.T) {
 		bp, mapPageId := setupDeallocTestEnv(t)
 		fileId := page.FileId(2)
 		registerHeapFile(t, bp, fileId)
-		target := allocatePageInFile(t, bp, fileId)
+		target := allocatePageInFile(t, bp, fileId, 0)
 
 		// WHEN
 		mtr := NewMtr(bp)

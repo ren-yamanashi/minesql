@@ -2,6 +2,7 @@ package btree
 
 import (
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
@@ -47,7 +48,7 @@ func (t *Tree) splitInsertLeaf(
 	prevLeafPageId := leafNode.prevPageId()
 
 	// 新しいリーフノードを作成
-	newLeafPageId, err := t.bufferPool.AllocatePageId(t.MetaPageId().FileId())
+	newLeafPageId, err := fsp.AllocatePage(mtr, t.MetaPageId().FileId())
 	if err != nil {
 		return nil, page.InvalidId(), err
 	}

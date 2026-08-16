@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
@@ -160,7 +161,7 @@ func (m *DDLManager) switchToNewPage(
 	currentPage *Page,
 	serialized []byte,
 ) error {
-	newPageId, err := m.bufferPool.AllocatePageId(m.fileId)
+	newPageId, err := fsp.AllocatePage(mtr, m.fileId)
 	if err != nil {
 		return err
 	}

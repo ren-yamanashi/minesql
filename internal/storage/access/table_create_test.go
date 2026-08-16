@@ -10,6 +10,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
@@ -499,7 +500,7 @@ func setupCreateTestEnv(t *testing.T) *createTestEnv {
 	t.Helper()
 
 	catalogPath := filepath.Join(t.TempDir(), "catalog.db")
-	catalogHf, err := file.NewHeapFile(page.FileId(0), catalogPath)
+	catalogHf, err := file.NewHeapFile(catalogPath)
 	if err != nil {
 		t.Fatalf("カタログ HeapFile の作成に失敗: %v", err)
 	}
@@ -534,12 +535,21 @@ func setupCreateTestEnv(t *testing.T) *createTestEnv {
 	if err := allocMtr.Commit(); err != nil {
 		t.Fatalf("FileId 採番の Commit に失敗: %v", err)
 	}
-	dataHf, err := file.NewHeapFile(fileId, dataPath)
+	dataHf, err := file.NewHeapFile(dataPath)
 	if err != nil {
 		t.Fatalf("データ HeapFile の作成に失敗: %v", err)
 	}
 	t.Cleanup(func() { _ = dataHf.Close() })
 	bp.RegisterHeapFile(fileId, dataHf)
+
+	dataInitMtr := newBootstrapMtr(bp, redoLog)
+	if err := fsp.InitHeader(dataInitMtr, fileId); err != nil {
+		dataInitMtr.UnpinAll()
+		t.Fatalf("データファイルの FSP ヘッダー初期化に失敗: %v", err)
+	}
+	if err := dataInitMtr.Commit(); err != nil {
+		t.Fatalf("データファイルの FSP ヘッダー Commit に失敗: %v", err)
+	}
 
 	ddlMtr := newBootstrapMtr(bp, redoLog)
 	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId(), ct.FreeListMapPageId())
@@ -616,7 +626,7 @@ func setupCreateTableTestEnv(t *testing.T) *createTableTestEnv {
 	t.Cleanup(func() { _ = os.RemoveAll(config.BaseDir) })
 
 	catalogPath := filepath.Join(t.TempDir(), "catalog.db")
-	catalogHf, err := file.NewHeapFile(page.FileId(0), catalogPath)
+	catalogHf, err := file.NewHeapFile(catalogPath)
 	if err != nil {
 		t.Fatalf("カタログ HeapFile の作成に失敗: %v", err)
 	}
@@ -643,7 +653,7 @@ func setupCreateTableTestEnv(t *testing.T) *createTableTestEnv {
 
 	// Undo 用 HeapFile
 	undoPath := filepath.Join(t.TempDir(), "undo.db")
-	undoHf, err := file.NewHeapFile(page.FileId(1), undoPath)
+	undoHf, err := file.NewHeapFile(undoPath)
 	if err != nil {
 		t.Fatalf("Undo HeapFile の作成に失敗: %v", err)
 	}

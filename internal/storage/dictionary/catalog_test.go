@@ -99,7 +99,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.Equal(t, created.userMeta.tree.MetaPageId(), opened.userMeta.tree.MetaPageId())
 	})
 
-	t.Run("マジックナンバーが不正な場合 errInvalidCatalogFile を返す", func(t *testing.T) {
+	t.Run("page 0 の FSP マジックナンバーが不正な場合はエラーを返す", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
@@ -107,34 +107,21 @@ func TestNewCatalog(t *testing.T) {
 		_ = ctMtr.Commit()
 		assert.NoError(t, err)
 
-		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
-		bufPageHeader, err := bp.Page(headerPageId)
+		fspHeaderPageId := page.NewId(CatalogFileId, page.PageNumber(0))
+		bufPageFsp, err := bp.Page(fspHeaderPageId)
 		assert.NoError(t, err)
-		bufPageHeader.WriteBodyAt(headerMagicNumberOffset, []byte("XXXX"))
-		bp.Unpin(headerPageId)
+		bufPageFsp.WriteBodyAt(0, []byte("XXXX"))
+		bp.Unpin(fspHeaderPageId)
 
 		// WHEN
 		_, err = NewCatalog(bp)
 
 		// THEN
-		assert.ErrorIs(t, err, errInvalidCatalogFile)
+		assert.ErrorContains(t, err, "magic mismatch")
 	})
 }
 
 func TestCreateCatalog(t *testing.T) {
-	t.Run("HeapFile が未登録の場合エラーを返す", func(t *testing.T) {
-		// GIVEN
-		bp := buffer.NewPool(page.Size*20, newCatalogTestRedoBuffer(t), nil)
-
-		// WHEN
-		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
-		_, err := CreateCatalog(ctMtr)
-		_ = ctMtr.Commit()
-
-		// THEN
-		assert.Error(t, err)
-	})
-
 	t.Run("カタログを新規作成できる", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
@@ -149,7 +136,7 @@ func TestCreateCatalog(t *testing.T) {
 		assert.NotNil(t, catalog)
 	})
 
-	t.Run("ヘッダーページにマジックナンバーが書き込まれる", func(t *testing.T) {
+	t.Run("page 0 の FSP ヘッダーにマジックナンバーが書き込まれる", func(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
 
@@ -160,13 +147,11 @@ func TestCreateCatalog(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
-		bufPageHeader, err := bp.Page(headerPageId)
+		fspHeaderPageId := page.NewId(CatalogFileId, page.PageNumber(0))
+		bufPageFsp, err := bp.Page(fspHeaderPageId)
 		assert.NoError(t, err)
-		defer bp.Unpin(headerPageId)
-
-		magicEnd := headerMagicNumberOffset + len(catalogMagicNumber)
-		assert.Equal(t, catalogMagicNumber, bufPageHeader.Data().Body()[headerMagicNumberOffset:magicEnd])
+		defer bp.Unpin(fspHeaderPageId)
+		assert.Equal(t, []byte("MINE"), bufPageFsp.Data().Body()[0:4])
 	})
 
 	t.Run("ヘッダーページにスカラー値が正しく書き込まれる", func(t *testing.T) {
@@ -519,7 +504,7 @@ func setupCatalogTestBufferPool(t *testing.T) *buffer.Pool {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "catalog_test.db")
 	fileId := page.FileId(0)
-	hf, err := file.NewHeapFile(fileId, path)
+	hf, err := file.NewHeapFile(path)
 	if err != nil {
 		t.Fatalf("HeapFile の作成に失敗: %v", err)
 	}

@@ -6,6 +6,8 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -107,7 +109,7 @@ func TestIteratorAdvance(t *testing.T) {
 		// GIVEN
 		bp := newTestBufferPool(t, page.Size*10)
 		path := filepath.Join(t.TempDir(), "test.db")
-		hf, err := file.NewHeapFile(0, path)
+		hf, err := file.NewHeapFile(path)
 		assert.NoError(t, err)
 		t.Cleanup(func() { _ = hf.Close() })
 		bp.RegisterHeapFile(0, hf)
@@ -115,10 +117,12 @@ func TestIteratorAdvance(t *testing.T) {
 		tree, err := createTreeForTest(t, bp, 0)
 		assert.NoError(t, err)
 
-		firstId, err := bp.AllocatePageId(0)
+		allocMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+		firstId, err := fsp.AllocatePage(allocMtr, page.FileId(0))
 		assert.NoError(t, err)
-		secondId, err := bp.AllocatePageId(0)
+		secondId, err := fsp.AllocatePage(allocMtr, page.FileId(0))
 		assert.NoError(t, err)
+		assert.NoError(t, allocMtr.Commit())
 
 		firstPage, err := bp.AddPage(firstId)
 		assert.NoError(t, err)
@@ -301,7 +305,7 @@ func setupIteratorTestPage(t *testing.T, setup func(ln *leafNode)) (*Tree, page.
 
 	bp := newTestBufferPool(t, page.Size*10)
 	path := filepath.Join(t.TempDir(), "test.db")
-	hf, err := file.NewHeapFile(0, path)
+	hf, err := file.NewHeapFile(path)
 	assert.NoError(t, err)
 	t.Cleanup(func() { _ = hf.Close() })
 	bp.RegisterHeapFile(0, hf)
@@ -310,8 +314,10 @@ func setupIteratorTestPage(t *testing.T, setup func(ln *leafNode)) (*Tree, page.
 	tree, err := createTreeForTest(t, bp, 0)
 	assert.NoError(t, err)
 
-	pageId, err := bp.AllocatePageId(0)
+	allocMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+	pageId, err := fsp.AllocatePage(allocMtr, page.FileId(0))
 	assert.NoError(t, err)
+	assert.NoError(t, allocMtr.Commit())
 
 	bufPage, err := bp.AddPage(pageId)
 	assert.NoError(t, err)

@@ -162,7 +162,7 @@ func newLargeBtreeTestBufferPool(t *testing.T) *buffer.Pool {
 	t.Helper()
 	bp := newTestBufferPool(t, page.Size*200)
 	path := filepath.Join(t.TempDir(), "test_large.db")
-	hf, err := file.NewHeapFile(0, path)
+	hf, err := file.NewHeapFile(path)
 	assert.NoError(t, err)
 	t.Cleanup(func() { _ = hf.Close() })
 	bp.RegisterHeapFile(0, hf)

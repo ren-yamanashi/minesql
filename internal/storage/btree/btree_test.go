@@ -205,7 +205,7 @@ func setupBtreeTestBufferPool(t *testing.T) *buffer.Pool {
 	t.Helper()
 	bp := newTestBufferPool(t, page.Size*10)
 	path := filepath.Join(t.TempDir(), "test.db")
-	hf, err := file.NewHeapFile(0, path)
+	hf, err := file.NewHeapFile(path)
 	assert.NoError(t, err)
 	t.Cleanup(func() { _ = hf.Close() })
 	bp.RegisterHeapFile(0, hf)
