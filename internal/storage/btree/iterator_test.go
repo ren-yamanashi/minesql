@@ -10,6 +10,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIteratorGet(t *testing.T) {
@@ -362,5 +363,129 @@ func TestIteratorBufferPageId(t *testing.T) {
 
 		// THEN
 		assert.Equal(t, pageId, iter.BufferPageId())
+	})
+}
+
+func TestIteratorConcurrentMerge(t *testing.T) {
+	t.Run("隣接 leaf が merge で解放されても Advance で全レコードを読み切れる", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeBufferPool(t)
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
+		insertMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+		nonKey := make([]byte, 1500)
+		keys := []byte{0x01, 0x02, 0x03, 0x04, 0x05}
+		for _, k := range keys {
+			require.NoError(t, bt.Insert(insertMtr, NewRecord([]byte{}, []byte{k}, nonKey)))
+		}
+		require.NoError(t, insertMtr.Commit())
+
+		iterMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+		defer iterMtr.UnpinAll()
+		iter, err := bt.Search(iterMtr, SearchModeStart{})
+		require.NoError(t, err)
+
+		first, ok, err := iter.Next()
+		require.NoError(t, err)
+		require.True(t, ok)
+		assert.Equal(t, []byte{0x01}, first.Key())
+
+		// WHEN
+		require.NoError(t, bt.Delete(iterMtr, []byte{0x05}))
+
+		// THEN
+		var readKeys []byte
+		for {
+			r, ok, err := iter.Next()
+			require.NoError(t, err)
+			if !ok {
+				break
+			}
+			readKeys = append(readKeys, r.Key()[0])
+		}
+		assert.Equal(t, []byte{0x02, 0x03, 0x04}, readKeys)
+	})
+
+	t.Run("merge で解放されたページが再割り当てされ中身が変わっても refetch が正しく再位置付けする", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeBufferPool(t)
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
+		insertMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+		nonKey := make([]byte, 1500)
+		keys := []byte{0x01, 0x02, 0x03, 0x04, 0x05}
+		for _, k := range keys {
+			require.NoError(t, bt.Insert(insertMtr, NewRecord([]byte{}, []byte{k}, nonKey)))
+		}
+		require.NoError(t, insertMtr.Commit())
+
+		iterMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+		defer iterMtr.UnpinAll()
+		iter, err := bt.Search(iterMtr, SearchModeStart{})
+		require.NoError(t, err)
+
+		first, ok, err := iter.Next()
+		require.NoError(t, err)
+		require.True(t, ok)
+		assert.Equal(t, []byte{0x01}, first.Key())
+
+		// WHEN
+		require.NoError(t, bt.Delete(iterMtr, []byte{0x05}))
+		require.NoError(t, bt.Insert(iterMtr, NewRecord([]byte{}, []byte{0x99}, nonKey)))
+
+		// THEN
+		var readKeys []byte
+		for {
+			r, ok, err := iter.Next()
+			require.NoError(t, err)
+			if !ok {
+				break
+			}
+			readKeys = append(readKeys, r.Key()[0])
+		}
+		assert.Equal(t, []byte{0x02, 0x03, 0x04, 0x99}, readKeys)
+	})
+
+	t.Run("走査中の leaf 自体が merge で survivor に吸収されても refetch が survivor 上のレコードへ再位置付けする", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeBufferPool(t)
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
+		insertMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+		nonKey := make([]byte, 1500)
+		keys := []byte{0x01, 0x02, 0x03}
+		for _, k := range keys {
+			require.NoError(t, bt.Insert(insertMtr, NewRecord([]byte{}, []byte{k}, nonKey)))
+		}
+		require.NoError(t, insertMtr.Commit())
+
+		iterMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+		defer iterMtr.UnpinAll()
+		iter, err := bt.Search(iterMtr, SearchModeKey{Key: []byte{0x02}})
+		require.NoError(t, err)
+
+		second, ok, err := iter.Next()
+		require.NoError(t, err)
+		require.True(t, ok)
+		assert.Equal(t, []byte{0x02}, second.Key())
+
+		iterLeafPageIdBefore := iter.BufferPageId()
+
+		// WHEN
+		require.NoError(t, bt.Delete(iterMtr, []byte{0x03}))
+
+		isFree, err := fsp.IsPageFree(iterMtr, iterLeafPageIdBefore)
+		require.NoError(t, err)
+		require.True(t, isFree)
+
+		// THEN
+		var readKeys []byte
+		for {
+			r, ok, err := iter.Next()
+			require.NoError(t, err)
+			if !ok {
+				break
+			}
+			readKeys = append(readKeys, r.Key()[0])
+		}
+		assert.Empty(t, readKeys)
+		assert.NotEqual(t, iterLeafPageIdBefore, iter.BufferPageId())
 	})
 }

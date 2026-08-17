@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
@@ -69,12 +70,10 @@ func (t *Tree) onLeafUnderflow(
 	if err != nil {
 		return false, false, err
 	}
-	defer mtr.Unpin(childBufPage.PageId())
 	pageSibling, err := mtr.PageForWrite(sibling.pageId)
 	if err != nil {
 		return false, false, err
 	}
-	defer mtr.Unpin(sibling.pageId)
 	childLeaf := newLeafNode(pageChild)
 	siblingLeaf := newLeafNode(pageSibling)
 
@@ -122,6 +121,9 @@ func (t *Tree) onLeafUnderflow(
 		// 親の右端のレコードは不要になるので削除し、RightChild を兄弟ノードに更新
 		parentBranch.delete(parentBranch.numRecords() - 1)
 		parentBranch.setRightChildPageId(sibling.bufferPage.PageId())
+		if err := fsp.FreePage(mtr, childBufPage.PageId()); err != nil {
+			return false, false, err
+		}
 		return !parentBranch.isHalfFull(), true, nil
 	}
 
@@ -135,6 +137,9 @@ func (t *Tree) onLeafUnderflow(
 
 	uf, err := t.mergeRightSiblingFromParent(parentBranch, childBufPage.PageId(), childSlotNum)
 	if err != nil {
+		return false, false, err
+	}
+	if err := fsp.FreePage(mtr, sibling.pageId); err != nil {
 		return false, false, err
 	}
 	return uf, true, nil
@@ -157,12 +162,10 @@ func (t *Tree) onBranchUnderflow(
 	if err != nil {
 		return false, err
 	}
-	defer mtr.Unpin(childBufPage.PageId())
 	pageSibling, err := mtr.PageForWrite(sibling.pageId)
 	if err != nil {
 		return false, err
 	}
-	defer mtr.Unpin(sibling.pageId)
 	childBranch := newBranchNode(pageChild)
 	siblingBranch := newBranchNode(pageSibling)
 
@@ -234,6 +237,9 @@ func (t *Tree) onBranchUnderflow(
 		// 親の右端のレコードは不要になるので削除し、RightChild を兄弟ノードに更新
 		parentBranch.delete(parentBranch.numRecords() - 1)
 		parentBranch.setRightChildPageId(sibling.bufferPage.PageId())
+		if err := fsp.FreePage(mtr, childBufPage.PageId()); err != nil {
+			return false, err
+		}
 		return !parentBranch.isHalfFull(), nil
 	}
 
@@ -253,7 +259,14 @@ func (t *Tree) onBranchUnderflow(
 	}
 	childBranch.setRightChildPageId(siblingBranch.rightChildPageId())
 
-	return t.mergeRightSiblingFromParent(parentBranch, childBufPage.PageId(), childSlotNum)
+	uf, err := t.mergeRightSiblingFromParent(parentBranch, childBufPage.PageId(), childSlotNum)
+	if err != nil {
+		return false, err
+	}
+	if err := fsp.FreePage(mtr, sibling.pageId); err != nil {
+		return false, err
+	}
+	return uf, nil
 }
 
 // relinkLeafAfterMerge は消滅するリーフノードのリンクを残るリーフノードに繋ぎ直す

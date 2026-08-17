@@ -122,6 +122,9 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.Equal(t, siblingBufPage.PageId(), parentBranch.rightChildPageId())
 		assert.Equal(t, nextPageId, siblingLeaf.nextPageId())
 		assert.Equal(t, siblingBufPage.PageId(), nextLeaf.prevPageId())
+		isFree, err := fsp.IsPageFree(mtr, childPageId)
+		assert.NoError(t, err)
+		assert.True(t, isFree)
 	})
 
 	t.Run("リーフノードのアンダーフロー: 右の兄弟とマージ (兄弟が RightChild)", func(t *testing.T) {
@@ -160,6 +163,9 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.Equal(t, childBufPage.PageId(), parentBranch.rightChildPageId())
 		assert.Equal(t, nextPageId, childLeaf.nextPageId())
 		assert.Equal(t, childBufPage.PageId(), nextLeaf.prevPageId())
+		isFree, err := fsp.IsPageFree(mtr, siblingPageId)
+		assert.NoError(t, err)
+		assert.True(t, isFree)
 	})
 
 	t.Run("リーフノードのアンダーフロー: 右の兄弟とマージ (兄弟が RightChild でない)", func(t *testing.T) {
@@ -194,6 +200,9 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.True(t, isLeafMerged)
 		assert.Equal(t, 4, childLeaf.numRecords())
 		assert.Equal(t, 1, parentBranch.numRecords())
+		isFree, err := fsp.IsPageFree(mtr, siblingPageId)
+		assert.NoError(t, err)
+		assert.True(t, isFree)
 	})
 
 	t.Run("リーフノードのアンダーフロー: 転送不可かつマージ不可の場合はアンダーフローを許容する", func(t *testing.T) {
@@ -314,6 +323,9 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.False(t, isLeafMerged)
 		assert.Equal(t, 0, parentBranch.numRecords())
 		assert.Equal(t, siblingBufPage.PageId(), parentBranch.rightChildPageId())
+		isFree, err := fsp.IsPageFree(mtr, childPageId)
+		assert.NoError(t, err)
+		assert.True(t, isFree)
 	})
 
 	t.Run("ブランチノードのアンダーフロー: 右の兄弟とマージ (兄弟が RightChild)", func(t *testing.T) {
@@ -340,6 +352,9 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.False(t, isLeafMerged)
 		assert.Equal(t, 0, parentBranch.numRecords())
 		assert.Equal(t, childBufPage.PageId(), parentBranch.rightChildPageId())
+		isFree, err := fsp.IsPageFree(mtr, siblingPageId)
+		assert.NoError(t, err)
+		assert.True(t, isFree)
 	})
 
 	t.Run("ブランチノードのアンダーフロー: 右の兄弟とマージ (兄弟が RightChild でない)", func(t *testing.T) {
@@ -369,6 +384,9 @@ func TestDeleteUnderflow(t *testing.T) {
 		assert.True(t, underflow)
 		assert.False(t, isLeafMerged)
 		assert.Equal(t, 1, parentBranch.numRecords())
+		isFree, err := fsp.IsPageFree(mtr, siblingPageId)
+		assert.NoError(t, err)
+		assert.True(t, isFree)
 	})
 
 	t.Run("ブランチノードのアンダーフロー: 転送不可かつマージ不可の場合はアンダーフローを許容する", func(t *testing.T) {

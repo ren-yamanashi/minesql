@@ -26,7 +26,7 @@ func AllocatePage(mtr *buffer.Mtr, fileId page.FileId) (page.Id, error) {
 	}
 	willBeFull := entry.freePageCount() == 1
 	if willBeFull {
-		if err := touchFreeFragToFullFragPages(mtr, fileId, h, entry); err != nil {
+		if err := touchTransitionPages(mtr, fileId, entry, h.fullFragListBase()); err != nil {
 			return page.InvalidId(), err
 		}
 	}
@@ -82,7 +82,7 @@ func transitionFreeToFreeFrag(mtr *buffer.Mtr, fileId page.FileId, h header, nod
 }
 
 // transitionFreeFragToFullFrag は満杯になった extent を FREE_FRAG から FULL_FRAG へ移動させ FRAG_N_USED を減算する
-//   - 呼び出し前に touchFreeFragToFullFragPages で全ページを取得済みであることを前提とする
+//   - 呼び出し前に touchTransitionPages で全ページを取得済みであることを前提とする
 func transitionFreeFragToFullFrag(mtr *buffer.Mtr, fileId page.FileId, h header, entry xdesEntry) {
 	nodeAddr := entry.flstNodeAddress()
 	if err := flst.Remove(mtr, fileId, h.freeFragListBase(), nodeAddr); err != nil {
@@ -93,40 +93,6 @@ func transitionFreeFragToFullFrag(mtr *buffer.Mtr, fileId page.FileId, h header,
 		panicOnPostWriteFlstErr(err)
 	}
 	h.setFragNUsed(h.fragNUsed() - uint32(extentPageCount))
-}
-
-// touchFreeFragToFullFragPages は満杯遷移で必要になる全ページを事前取得する
-//   - FREE_FRAG リスト上の entry の前後 node と FULL_FRAG リストの旧末尾を対象とする
-func touchFreeFragToFullFragPages(mtr *buffer.Mtr, fileId page.FileId, h header, entry xdesEntry) error {
-	nodeAddr := entry.flstNodeAddress()
-	prev, err := flst.Prev(mtr, fileId, nodeAddr)
-	if err != nil {
-		return err
-	}
-	if !prev.IsInvalid() {
-		if _, err := mtr.PageForWrite(page.NewId(fileId, prev.PageNumber)); err != nil {
-			return err
-		}
-	}
-	next, err := flst.Next(mtr, fileId, nodeAddr)
-	if err != nil {
-		return err
-	}
-	if !next.IsInvalid() {
-		if _, err := mtr.PageForWrite(page.NewId(fileId, next.PageNumber)); err != nil {
-			return err
-		}
-	}
-	last, err := flst.Last(mtr, fileId, h.fullFragListBase())
-	if err != nil {
-		return err
-	}
-	if !last.IsInvalid() {
-		if _, err := mtr.PageForWrite(page.NewId(fileId, last.PageNumber)); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // panicOnPostWriteFlstErr は不可分単位の書き込み開始後に flst 呼び出しが失敗した場合の到達不能 assert

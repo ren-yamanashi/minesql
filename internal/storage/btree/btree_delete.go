@@ -2,6 +2,7 @@ package btree
 
 import (
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 )
 
 // Delete は B+Tree からレコードを削除する
@@ -59,7 +60,6 @@ func (t *Tree) deletePessimistic(mtr *buffer.Mtr, key []byte) error {
 	if err != nil {
 		return err
 	}
-	defer mtr.Unpin(t.MetaPageId())
 	metaPage := newMetaPage(pageMeta)
 
 	// ルートページを取得
@@ -68,7 +68,6 @@ func (t *Tree) deletePessimistic(mtr *buffer.Mtr, key []byte) error {
 	if err != nil {
 		return err
 	}
-	defer mtr.Unpin(rootPageId)
 
 	// 再帰的に削除
 	underflow, isLeafMerged, err := t.deleteRecursively(mtr, bufPageRoot, key)
@@ -103,7 +102,7 @@ func (t *Tree) deletePessimistic(mtr *buffer.Mtr, key []byte) error {
 	newRootPageId := branchNode.rightChildPageId()
 	metaPage.setRootPageId(newRootPageId)
 	metaPage.setHeight(metaPage.height() - 1)
-	return nil
+	return fsp.FreePage(mtr, bufPageRoot.PageId())
 }
 
 // deleteRecursively は再帰的にノードを辿ってレコードを削除する
@@ -117,7 +116,6 @@ func (t *Tree) deleteRecursively(mtr *buffer.Mtr, bufPage *buffer.Page, key []by
 	if err != nil {
 		return false, false, err
 	}
-	defer mtr.Unpin(bufPage.PageId())
 	nt := nodeType(pg.Data())
 
 	switch nt {

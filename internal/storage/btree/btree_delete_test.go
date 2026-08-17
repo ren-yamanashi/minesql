@@ -4,8 +4,11 @@ import (
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDelete(t *testing.T) {
@@ -287,5 +290,105 @@ func TestDeletePessimistic(t *testing.T) {
 		mtr.UnpinAll()
 		assert.Equal(t, 0, mtr.PinnedCount())
 		assert.Equal(t, 0, mtr.HeldLatchCount())
+	})
+}
+
+func TestDeleteFreshMtr(t *testing.T) {
+	t.Run("Insert とは別の mtr で Delete してリーフマージが起きても panic しない", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeBufferPool(t)
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
+		insertMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+		nonKey := make([]byte, 1500)
+		require.NoError(t, bt.Insert(insertMtr, NewRecord([]byte{}, []byte{0x01}, nonKey)))
+		require.NoError(t, bt.Insert(insertMtr, NewRecord([]byte{}, []byte{0x02}, nonKey)))
+		require.NoError(t, bt.Insert(insertMtr, NewRecord([]byte{}, []byte{0x03}, nonKey)))
+		require.NoError(t, insertMtr.Commit())
+
+		deleteMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+		defer deleteMtr.UnpinAll()
+		countBefore, err := bt.LeafPageCount(deleteMtr)
+		require.NoError(t, err)
+		assert.Equal(t, uint64(2), countBefore)
+
+		// WHEN
+		err = bt.Delete(deleteMtr, []byte{0x03})
+
+		// THEN
+		assert.NoError(t, err)
+		countAfter, err := bt.LeafPageCount(deleteMtr)
+		require.NoError(t, err)
+		assert.Equal(t, countBefore-1, countAfter)
+	})
+
+	t.Run("Insert とは別の mtr で Delete してルート縮退が起きても panic しない", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeBufferPool(t)
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
+		insertMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+		nonKey := make([]byte, 1500)
+		require.NoError(t, bt.Insert(insertMtr, NewRecord([]byte{}, []byte{0x01}, nonKey)))
+		require.NoError(t, bt.Insert(insertMtr, NewRecord([]byte{}, []byte{0x02}, nonKey)))
+		require.NoError(t, bt.Insert(insertMtr, NewRecord([]byte{}, []byte{0x03}, nonKey)))
+		require.NoError(t, insertMtr.Commit())
+
+		deleteMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+		defer deleteMtr.UnpinAll()
+		heightBefore, err := bt.Height(deleteMtr)
+		require.NoError(t, err)
+		assert.Equal(t, uint64(2), heightBefore)
+
+		// WHEN
+		err = bt.Delete(deleteMtr, []byte{0x03})
+
+		// THEN
+		assert.NoError(t, err)
+		heightAfter, err := bt.Height(deleteMtr)
+		require.NoError(t, err)
+		assert.Equal(t, heightBefore-1, heightAfter)
+	})
+
+	t.Run("ルート縮退後に旧 root が free になり後続の AllocatePage で再利用される", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeBufferPool(t)
+		bt, _ := createTreeForTest(t, bp, page.FileId(0))
+		insertMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+		nonKey := make([]byte, 1500)
+		require.NoError(t, bt.Insert(insertMtr, NewRecord([]byte{}, []byte{0x01}, nonKey)))
+		require.NoError(t, bt.Insert(insertMtr, NewRecord([]byte{}, []byte{0x02}, nonKey)))
+		require.NoError(t, bt.Insert(insertMtr, NewRecord([]byte{}, []byte{0x03}, nonKey)))
+		require.NoError(t, insertMtr.Commit())
+
+		readMtr := buffer.NewMtr(bp)
+		pageMeta, err := readMtr.PageForRead(bt.MetaPageId())
+		require.NoError(t, err)
+		oldRootPageId := newMetaPage(pageMeta).rootPageId()
+		readMtr.UnpinAll()
+
+		deleteMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+		require.NoError(t, bt.Delete(deleteMtr, []byte{0x03}))
+		require.NoError(t, deleteMtr.Commit())
+
+		// WHEN
+		checkMtr := buffer.NewMtr(bp)
+		isFree, err := fsp.IsPageFree(checkMtr, oldRootPageId)
+		checkMtr.UnpinAll()
+
+		// THEN
+		require.NoError(t, err)
+		assert.True(t, isFree)
+
+		reused := false
+		for range 4 {
+			allocMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+			pageId, err := fsp.AllocatePage(allocMtr, page.FileId(0))
+			require.NoError(t, err)
+			require.NoError(t, allocMtr.Commit())
+			if pageId == oldRootPageId {
+				reused = true
+				break
+			}
+		}
+		assert.True(t, reused)
 	})
 }
