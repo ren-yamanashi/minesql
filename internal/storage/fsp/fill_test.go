@@ -151,4 +151,25 @@ func TestFill(t *testing.T) {
 		h := header{bufPage: bufPage}
 		assert.Equal(t, uint32(2), h.fragNUsed())
 	})
+
+	t.Run("フリーリミットが sentinel 近傍にあると extent 初期化前に容量枯渇 error が返る", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t)
+		initMtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		require.NoError(t, InitHeader(initMtr, testFileId))
+		commitMtr(t, initMtr)
+		setupMtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		p0, err := setupMtr.PageForWrite(page.NewId(testFileId, 0))
+		require.NoError(t, err)
+		header{bufPage: p0}.setFreeLimit(page.MaxPageNumber - page.PageNumber(extentPageCount) + 1)
+		commitMtr(t, setupMtr)
+
+		// WHEN
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		defer mtr.UnpinAll()
+		err = fill(mtr, testFileId)
+
+		// THEN
+		assert.Error(t, err)
+	})
 }

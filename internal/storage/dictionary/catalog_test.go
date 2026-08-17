@@ -42,24 +42,7 @@ func TestNewCatalog(t *testing.T) {
 		assert.Equal(t, page.FileId(2), catalog.nextFileId)
 		assert.Equal(t, IndexId(1), catalog.nextIndexId)
 		assert.Equal(t, page.FileId(1), catalog.undoLogFileId)
-		assert.False(t, catalog.freeListMapPageId.IsInvalid())
 		assert.False(t, catalog.ddlUndoRootPageId.IsInvalid())
-	})
-
-	t.Run("CreateCatalog 時の freeListMapPageId を NewCatalog で復元できる", func(t *testing.T) {
-		// GIVEN
-		bp := setupCatalogTestBufferPool(t)
-		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
-		created, err := CreateCatalog(ctMtr)
-		_ = ctMtr.Commit()
-		assert.NoError(t, err)
-
-		// WHEN
-		opened, err := NewCatalog(bp)
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, created.freeListMapPageId, opened.freeListMapPageId)
 	})
 
 	t.Run("CreateCatalog 時の ddlUndoRootPageId を NewCatalog で復元できる", func(t *testing.T) {
@@ -181,27 +164,6 @@ func TestCreateCatalog(t *testing.T) {
 		assert.Equal(t, page.FileId(2), nextFileId)
 		assert.Equal(t, IndexId(1), nextIndexId)
 		assert.Equal(t, page.FileId(1), undoLogFileId)
-	})
-
-	t.Run("ヘッダーページにフリーリストマップページの PageNumber が書き込まれる", func(t *testing.T) {
-		// GIVEN
-		bp := setupCatalogTestBufferPool(t)
-
-		// WHEN
-		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
-		_, err := CreateCatalog(ctMtr)
-		_ = ctMtr.Commit()
-		assert.NoError(t, err)
-
-		// THEN
-		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
-		bufPageHeader, err := bp.Page(headerPageId)
-		assert.NoError(t, err)
-		defer bp.Unpin(headerPageId)
-
-		body := bufPageHeader.Data().Body()
-		freeListMapPageNumber := readPageNumber(body, headerFreeListMapPageNumberOffset)
-		assert.NotEqual(t, page.MaxPageNumber, freeListMapPageNumber)
 	})
 
 	t.Run("ヘッダーページに DDL Undo 先頭ページの PageNumber が書き込まれる", func(t *testing.T) {

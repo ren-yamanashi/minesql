@@ -17,11 +17,11 @@ import (
 func TestNewDDLManager(t *testing.T) {
 	t.Run("空の DDL Undo 領域を開ける", func(t *testing.T) {
 		// GIVEN
-		bp, freeListMapPageId, rootPageId, redoLog := setupDDLTestEnv(t)
+		bp, rootPageId, redoLog := setupDDLTestEnv(t)
 
 		// WHEN
 		openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-		mgr, err := NewDDLManager(openMtr, page.FileId(0), rootPageId, freeListMapPageId)
+		mgr, err := NewDDLManager(openMtr, page.FileId(0), rootPageId)
 		_ = openMtr.Commit()
 
 		// THEN
@@ -32,11 +32,11 @@ func TestNewDDLManager(t *testing.T) {
 
 	t.Run("rootPageId に無効値を渡すと ErrInvalidDDLUndoRoot を返す", func(t *testing.T) {
 		// GIVEN
-		bp, freeListMapPageId, _, redoLog := setupDDLTestEnv(t)
+		bp, _, redoLog := setupDDLTestEnv(t)
 
 		// WHEN
 		openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-		mgr, err := NewDDLManager(openMtr, page.FileId(0), page.InvalidId(), freeListMapPageId)
+		mgr, err := NewDDLManager(openMtr, page.FileId(0), page.InvalidId())
 		_ = openMtr.Commit()
 
 		// THEN
@@ -46,9 +46,9 @@ func TestNewDDLManager(t *testing.T) {
 
 	t.Run("複数ページに渡る DDL Undo 領域から末尾ページを特定できる", func(t *testing.T) {
 		// GIVEN
-		bp, freeListMapPageId, rootPageId, redoLog := setupDDLTestEnv(t)
+		bp, rootPageId, redoLog := setupDDLTestEnv(t)
 		openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-		mgr, err := NewDDLManager(openMtr, page.FileId(0), rootPageId, freeListMapPageId)
+		mgr, err := NewDDLManager(openMtr, page.FileId(0), rootPageId)
 		_ = openMtr.Commit()
 		assert.NoError(t, err)
 		fillUntilPageSwitch(t, mgr, redoLog)
@@ -57,7 +57,7 @@ func TestNewDDLManager(t *testing.T) {
 
 		// WHEN
 		openMtr2 := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-		opened, err := NewDDLManager(openMtr2, page.FileId(0), rootPageId, freeListMapPageId)
+		opened, err := NewDDLManager(openMtr2, page.FileId(0), rootPageId)
 		_ = openMtr2.Commit()
 
 		// THEN
@@ -213,11 +213,10 @@ func TestDDLManagerClear(t *testing.T) {
 		assert.Equal(t, page.PageNumber(0), rootDDLPage.NextPageNumber())
 	})
 
-	t.Run("複数ページの専用領域を Clear すると中間ページのみフリーリストに積まれ root は残る", func(t *testing.T) {
+	t.Run("複数ページの専用領域を Clear すると中間ページが解放され root は残る", func(t *testing.T) {
 		// GIVEN
 		mgr, redoLog := setupDDLManager(t)
 		rootPageId := mgr.rootPageId
-		freeListMapPageId := mgr.freeListMapPageId
 		fillUntilPageSwitch(t, mgr, redoLog)
 		tailPageId := mgr.currentPageId
 		assert.NotEqual(t, rootPageId, tailPageId)
@@ -228,8 +227,11 @@ func TestDDLManagerClear(t *testing.T) {
 		// THEN
 		assert.Equal(t, rootPageId, mgr.rootPageId)
 		assert.Equal(t, rootPageId, mgr.currentPageId)
-		head := readFreeListHead(t, mgr.bufferPool, freeListMapPageId, page.FileId(0))
-		assert.Equal(t, tailPageId.PageNumber(), head)
+		readMtr := buffer.NewMtr(mgr.bufferPool)
+		defer readMtr.UnpinAll()
+		isFree, err := fsp.IsPageFree(readMtr, tailPageId)
+		assert.NoError(t, err)
+		assert.True(t, isFree)
 	})
 
 	t.Run("Clear 後に内部状態が root にリセットされる", func(t *testing.T) {
@@ -261,8 +263,8 @@ func TestDDLManagerClear(t *testing.T) {
 	})
 }
 
-// setupDDLTestEnv は DDLManager テスト用に buffer.Pool / freeListMap / DDL Undo root を作る
-func setupDDLTestEnv(t *testing.T) (*buffer.Pool, page.Id, page.Id, *redo.Buffer) {
+// setupDDLTestEnv は DDLManager テスト用に buffer.Pool / DDL Undo root を作る
+func setupDDLTestEnv(t *testing.T) (*buffer.Pool, page.Id, *redo.Buffer) {
 	t.Helper()
 	redoLog, err := redo.NewBuffer(t.TempDir())
 	if err != nil {
@@ -290,19 +292,6 @@ func setupDDLTestEnv(t *testing.T) (*buffer.Pool, page.Id, page.Id, *redo.Buffer
 	}
 
 	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-	freeListMapPageId, err := fsp.AllocatePage(mtr, fileId)
-	if err != nil {
-		t.Fatalf("freeListMap ページの確保に失敗: %v", err)
-	}
-	if _, err := bp.AddPage(freeListMapPageId); err != nil {
-		t.Fatalf("freeListMap ページの追加に失敗: %v", err)
-	}
-	freeListMapBufPage, err := mtr.PageForWrite(freeListMapPageId)
-	if err != nil {
-		t.Fatalf("freeListMap ページの書き込み準備に失敗: %v", err)
-	}
-	buffer.InitializeFreeListMapPage(freeListMapBufPage)
-
 	rootPageId, err := fsp.AllocatePage(mtr, fileId)
 	if err != nil {
 		t.Fatalf("DDL Undo root ページの確保に失敗: %v", err)
@@ -319,15 +308,15 @@ func setupDDLTestEnv(t *testing.T) (*buffer.Pool, page.Id, page.Id, *redo.Buffer
 		t.Fatalf("セットアップ Mtr の Commit に失敗: %v", err)
 	}
 
-	return bp, freeListMapPageId, rootPageId, redoLog
+	return bp, rootPageId, redoLog
 }
 
 // setupDDLManager は初期化済みの DDLManager と redo.Buffer を作る
 func setupDDLManager(t *testing.T) (*DDLManager, *redo.Buffer) {
 	t.Helper()
-	bp, freeListMapPageId, rootPageId, redoLog := setupDDLTestEnv(t)
+	bp, rootPageId, redoLog := setupDDLTestEnv(t)
 	openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-	mgr, err := NewDDLManager(openMtr, page.FileId(0), rootPageId, freeListMapPageId)
+	mgr, err := NewDDLManager(openMtr, page.FileId(0), rootPageId)
 	if err != nil {
 		openMtr.UnpinAll()
 		t.Fatalf("DDLManager の作成に失敗: %v", err)
@@ -384,25 +373,4 @@ func fillUntilPageSwitch(t *testing.T, mgr *DDLManager, redoLog *redo.Buffer) {
 	for mgr.currentPageId == oldPageId {
 		appendDDLRecord(t, mgr, redoLog, NewDDLRecord(DDLRecordTypeMetaInsert, bigPayload))
 	}
-}
-
-// readFreeListHead は freeListMap ページから指定 FileId のフリーリスト先頭 PageNumber を読み取る
-func readFreeListHead(t *testing.T, bp *buffer.Pool, freeListMapPageId page.Id, fileId page.FileId) page.PageNumber {
-	t.Helper()
-	bufPage, err := bp.Page(freeListMapPageId)
-	if err != nil {
-		t.Fatalf("freeListMap ページの取得に失敗: %v", err)
-	}
-	defer bp.Unpin(freeListMapPageId)
-	body := bufPage.Data().Body()
-	count := binary.BigEndian.Uint32(body[0:4])
-	for i := range int(count) {
-		offset := 4 + i*8
-		entryFileId := page.FileId(binary.BigEndian.Uint32(body[offset : offset+4]))
-		if entryFileId != fileId {
-			continue
-		}
-		return page.PageNumber(binary.BigEndian.Uint32(body[offset+4 : offset+8]))
-	}
-	return page.MaxPageNumber
 }

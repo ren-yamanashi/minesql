@@ -19,7 +19,11 @@ func InitBase(mtr *buffer.Mtr, fileId page.FileId, base Address) error {
 }
 
 // AddFirst はリストの先頭に node を追加する
+//   - base と node のアドレスが同じ場合は panic する
 func AddFirst(mtr *buffer.Mtr, fileId page.FileId, base, node Address) error {
+	if base == node {
+		panic("flst: base and node must be different addresses")
+	}
 	basePage, err := pageForWrite(mtr, fileId, base)
 	if err != nil {
 		return err
@@ -48,7 +52,11 @@ func AddFirst(mtr *buffer.Mtr, fileId page.FileId, base, node Address) error {
 }
 
 // AddLast はリストの末尾に node を追加する
+//   - base と node のアドレスが同じ場合は panic する
 func AddLast(mtr *buffer.Mtr, fileId page.FileId, base, node Address) error {
+	if base == node {
+		panic("flst: base and node must be different addresses")
+	}
 	basePage, err := pageForWrite(mtr, fileId, base)
 	if err != nil {
 		return err

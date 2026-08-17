@@ -131,9 +131,8 @@ func TestTrxManagerRollbackDDL(t *testing.T) {
 		err := tm.Rollback(ddlTrx)
 		assert.NoError(t, err)
 
-		// THEN: 子→親の順で解放されるため、 最後に積まれた pageIds[0] (= メタページ) が freeListMap の head に来る
-		head := readDDLFreeListHead(t, tm.bufferPool, tm.catalog.FreeListMapPageId(), treeFileId)
-		assert.Equal(t, pageIds[0].PageNumber(), head)
+		// THEN: 全ページが解放される
+		assertAllPagesFree(t, tm.bufferPool, pageIds)
 	})
 
 	t.Run("Rollback で MetaInsertUndo の Meta レコードが物理削除される", func(t *testing.T) {

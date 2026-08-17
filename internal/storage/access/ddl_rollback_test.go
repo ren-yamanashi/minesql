@@ -1,7 +1,6 @@
 package access
 
 import (
-	"encoding/binary"
 	"os"
 	"path/filepath"
 	"testing"
@@ -34,7 +33,7 @@ func TestNewDDLRollbacker(t *testing.T) {
 }
 
 func TestDDLRollbackerRollback(t *testing.T) {
-	t.Run("DDLRecordTypeCreateBTree で対象 B+Tree の全ページを Deallocate する", func(t *testing.T) {
+	t.Run("DDLRecordTypeCreateBTree で対象 B+Tree の全ページを解放し次の割り当てで再利用される", func(t *testing.T) {
 		// GIVEN
 		env := setupDDLRollbackerTestEnv(t)
 		createMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
@@ -54,10 +53,14 @@ func TestDDLRollbackerRollback(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NoError(t, mtr.Commit())
 
-		// THEN: 子→親の順で解放されるため最後に積まれた pageIds[0] (= メタページ) が head に来る
-		head := readDDLFreeListHead(t, env.bp, env.ct.FreeListMapPageId(), page.FileId(2))
-		assert.Equal(t, pageIds[0].PageNumber(), head)
+		// THEN: 全ページが解放され、次の割り当てで解放ページが再利用される
+		assertAllPagesFree(t, env.bp, pageIds)
 		assert.GreaterOrEqual(t, len(pageIds), 2)
+		reallocMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		reused, err := fsp.AllocatePage(reallocMtr, page.FileId(2))
+		assert.NoError(t, err)
+		assert.NoError(t, reallocMtr.Commit())
+		assert.Contains(t, pageIds, reused)
 	})
 
 	t.Run("DDLRecordTypeMetaInsert で TableMeta の Delete が呼ばれる", func(t *testing.T) {
@@ -218,6 +221,7 @@ func TestDDLRollbackerRollbackIdempotent(t *testing.T) {
 		tree, err := btree.CreateTree(env.bp, page.FileId(2), createMtr)
 		assert.NoError(t, err)
 		assert.NoError(t, createMtr.Commit())
+		pageIds := collectTreePageIds(t, env.bp, tree)
 		rollbacker := NewDDLRollbacker(env.bp, env.ct)
 		record := undo.NewDDLRecord(
 			undo.DDLRecordTypeCreateBTree,
@@ -226,7 +230,7 @@ func TestDDLRollbackerRollbackIdempotent(t *testing.T) {
 		firstMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
 		assert.NoError(t, rollbacker.Rollback(firstMtr, record))
 		assert.NoError(t, firstMtr.Commit())
-		firstHead := readDDLFreeListHead(t, env.bp, env.ct.FreeListMapPageId(), page.FileId(2))
+		assertAllPagesFree(t, env.bp, pageIds)
 
 		// WHEN
 		secondMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
@@ -235,7 +239,7 @@ func TestDDLRollbackerRollbackIdempotent(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		assert.Equal(t, firstHead, readDDLFreeListHead(t, env.bp, env.ct.FreeListMapPageId(), page.FileId(2)))
+		assertAllPagesFree(t, env.bp, pageIds)
 	})
 
 	t.Run("DDLRecordTypeMetaInsert (TableMeta) の Rollback を 2 回連続実行してもエラーにならない", func(t *testing.T) {
@@ -587,22 +591,18 @@ func registerDDLRollbackerHeapFile(t *testing.T, bp *buffer.Pool, fileId page.Fi
 	return path
 }
 
-func readDDLFreeListHead(t *testing.T, bp *buffer.Pool, freeListMapPageId page.Id, fileId page.FileId) page.PageNumber {
+// assertAllPagesFree は与えられた PageId 群が fsp 的に全て free であることを検証する
+func assertAllPagesFree(t *testing.T, bp *buffer.Pool, pageIds []page.Id) {
 	t.Helper()
-	bufPage, err := bp.Page(freeListMapPageId)
-	if err != nil {
-		t.Fatalf("freeListMap ページの取得に失敗: %v", err)
-	}
-	defer bp.Unpin(freeListMapPageId)
-	body := bufPage.Data().Body()
-	count := binary.BigEndian.Uint32(body[0:4])
-	for i := range int(count) {
-		offset := 4 + i*8
-		entryFileId := page.FileId(binary.BigEndian.Uint32(body[offset : offset+4]))
-		if entryFileId != fileId {
-			continue
+	mtr := buffer.NewMtr(bp)
+	defer mtr.UnpinAll()
+	for _, pid := range pageIds {
+		isFree, err := fsp.IsPageFree(mtr, pid)
+		if err != nil {
+			t.Fatalf("IsPageFree に失敗: %v", err)
 		}
-		return page.PageNumber(binary.BigEndian.Uint32(body[offset+4 : offset+8]))
+		if !isFree {
+			t.Fatalf("page %v が解放されていない", pid)
+		}
 	}
-	return page.MaxPageNumber
 }

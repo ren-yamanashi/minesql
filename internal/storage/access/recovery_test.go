@@ -768,8 +768,7 @@ func TestRecoveryApplyDDLRollback(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		head := readDDLFreeListHead(t, env.bp, env.trxManager.catalog.FreeListMapPageId(), page.FileId(2))
-		assert.Equal(t, pageIds[0].PageNumber(), head)
+		assertAllPagesFree(t, env.bp, pageIds)
 		assert.GreaterOrEqual(t, len(pageIds), 2)
 	})
 

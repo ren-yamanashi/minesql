@@ -21,8 +21,7 @@ const (
 	headerNextIndexIdOffset           = 28
 	headerUndoLogFileIdOffset         = 32
 	headerDDLUndoRootPageNumberOffset = 36
-	headerFreeListMapPageNumberOffset = 40
-	headerNextTrxIdOffset             = 44
+	headerNextTrxIdOffset             = 40
 	headerFieldSize                   = 4
 )
 
@@ -37,7 +36,6 @@ type Catalog struct {
 	nextTrxId          lock.TrxId
 	undoLogFileId      page.FileId
 	ddlUndoRootPageId  page.Id
-	freeListMapPageId  page.Id
 	tableMeta          *TableMeta
 	indexMeta          *IndexMeta
 	indexKeyColumnMeta *IndexKeyColumnMeta
@@ -47,7 +45,6 @@ type Catalog struct {
 }
 
 func (c *Catalog) UndoLogFileId() page.FileId              { return c.undoLogFileId }
-func (c *Catalog) FreeListMapPageId() page.Id              { return c.freeListMapPageId }
 func (c *Catalog) NextTrxId() lock.TrxId                   { return c.nextTrxId }
 func (c *Catalog) TableMeta() *TableMeta                   { return c.tableMeta }
 func (c *Catalog) IndexMeta() *IndexMeta                   { return c.indexMeta }
@@ -90,13 +87,11 @@ func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
 		bufPageHeader.Data().Body()[headerUndoLogFileIdOffset : headerUndoLogFileIdOffset+headerFieldSize],
 	))
 	ddlUndoRootPageNumber := readPageNumber(bufPageHeader.Data().Body(), headerDDLUndoRootPageNumberOffset)
-	freeListMapPageNumber := readPageNumber(bufPageHeader.Data().Body(), headerFreeListMapPageNumberOffset)
 	nextTrxId := lock.TrxId(binary.BigEndian.Uint32(
 		bufPageHeader.Data().Body()[headerNextTrxIdOffset : headerNextTrxIdOffset+headerFieldSize],
 	))
 
 	ddlUndoRootPageId := ddlUndoRootPageIdFromPageNumber(ddlUndoRootPageNumber)
-	freeListMapPageId := page.NewId(CatalogFileId, freeListMapPageNumber)
 
 	return &Catalog{
 		nextFileId:        nextFileId,
@@ -104,7 +99,6 @@ func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
 		nextTrxId:         nextTrxId,
 		undoLogFileId:     undoLogFileId,
 		ddlUndoRootPageId: ddlUndoRootPageId,
-		freeListMapPageId: freeListMapPageId,
 		tableMeta:         NewTableMeta(bp, page.NewId(CatalogFileId, tableMetaPageNumber)),
 		indexMeta:         NewIndexMeta(bp, page.NewId(CatalogFileId, indexMetaPageNumber)),
 		indexKeyColumnMeta: NewIndexKeyColumnMeta(
@@ -166,19 +160,6 @@ func CreateCatalog(mtr *buffer.Mtr) (*Catalog, error) {
 		return nil, err
 	}
 
-	freeListMapPageId, err := fsp.AllocatePage(mtr, CatalogFileId)
-	if err != nil {
-		return nil, err
-	}
-	if _, err := bp.AddPage(freeListMapPageId); err != nil {
-		return nil, err
-	}
-	freeListMapBufPage, err := mtr.PageForWrite(freeListMapPageId)
-	if err != nil {
-		return nil, err
-	}
-	buffer.InitializeFreeListMapPage(freeListMapBufPage)
-
 	ddlUndoRootPageId, err := allocateAndInitializeDDLUndoRootPage(mtr, bp)
 	if err != nil {
 		return nil, err
@@ -205,7 +186,6 @@ func CreateCatalog(mtr *buffer.Mtr) (*Catalog, error) {
 	writeScalar(bufPageHeader, headerNextIndexIdOffset, uint32(nextIndexId))
 	writeScalar(bufPageHeader, headerUndoLogFileIdOffset, uint32(undoLogFileId))
 	writePageNumber(bufPageHeader, headerDDLUndoRootPageNumberOffset, ddlUndoRootPageId.PageNumber())
-	writePageNumber(bufPageHeader, headerFreeListMapPageNumberOffset, freeListMapPageId.PageNumber())
 	writeScalar(bufPageHeader, headerNextTrxIdOffset, uint32(nextTrxId))
 
 	return &Catalog{
@@ -214,7 +194,6 @@ func CreateCatalog(mtr *buffer.Mtr) (*Catalog, error) {
 		nextTrxId:          nextTrxId,
 		undoLogFileId:      undoLogFileId,
 		ddlUndoRootPageId:  ddlUndoRootPageId,
-		freeListMapPageId:  freeListMapPageId,
 		tableMeta:          tableMeta,
 		indexMeta:          indexMeta,
 		indexKeyColumnMeta: indexKeyColumnMeta,

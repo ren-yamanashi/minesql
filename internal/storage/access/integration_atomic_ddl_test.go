@@ -380,7 +380,7 @@ func crashAndRecoverWithPendingFiles(
 	initialNextTrxId := max(ct.NextTrxId(), maxTrxId+1)
 
 	ddlMtr := newBootstrapMtr(bp, redoLog)
-	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId(), ct.FreeListMapPageId())
+	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId())
 	if err != nil {
 		ddlMtr.UnpinAll()
 		t.Fatalf("undo.DDLManager の再オープンに失敗: %v", err)
@@ -405,7 +405,7 @@ func crashAndRecoverWithPendingFiles(
 	refreshedNextTrxId := max(refreshedCt.NextTrxId(), maxTrxId+1)
 
 	refreshedDdlMtr := newBootstrapMtr(bp, redoLog)
-	refreshedDdlMgr, err := undo.NewDDLManager(refreshedDdlMtr, dictionary.CatalogFileId, refreshedCt.DDLUndoRootPageId(), refreshedCt.FreeListMapPageId())
+	refreshedDdlMgr, err := undo.NewDDLManager(refreshedDdlMtr, dictionary.CatalogFileId, refreshedCt.DDLUndoRootPageId())
 	if err != nil {
 		refreshedDdlMtr.UnpinAll()
 		t.Fatalf("undo.DDLManager の再 open に失敗: %v", err)

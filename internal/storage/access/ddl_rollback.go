@@ -7,12 +7,13 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
 // DDLRollbacker は DDL Undo レコードを物理基盤を経由して取り消す
 //   - bufferPool: ページ解放・物理ファイル削除のために共有する
-//   - catalog: Meta テーブル削除と freeListMap ページ ID 取得のために共有する
+//   - catalog: Meta テーブル削除のために共有する
 type DDLRollbacker struct {
 	bufferPool *buffer.Pool
 	catalog    *dictionary.Catalog
@@ -39,8 +40,8 @@ func (r *DDLRollbacker) Rollback(mtr *buffer.Mtr, record undo.DDLRecord) error {
 }
 
 // rollbackCreateBTree は B+Tree 作成を取り消す
-//   - payload から MetaPageId を復元し、 配下の全ページを子→親 (= 末尾要素から先頭要素) の順に Deallocate する
-//   - 既にファイル丸ごと削除済み、 もしくはメタページがフリーリストに含まれている (= 既に解放済み) の場合は何もしない
+//   - payload から MetaPageId を復元し、 配下の全ページを子→親 (= 末尾要素から先頭要素) の順に解放する
+//   - 既にファイル丸ごと削除済み、 もしくはメタページが既に解放済みの場合は何もしない
 func (r *DDLRollbacker) rollbackCreateBTree(mtr *buffer.Mtr, payload []byte) error {
 	record, err := undo.DeserializeCreateBTreeUndoRecord(payload)
 	if err != nil {
@@ -50,17 +51,11 @@ func (r *DDLRollbacker) rollbackCreateBTree(mtr *buffer.Mtr, payload []byte) err
 	if !r.bufferPool.HasHeapFile(metaPageId.FileId()) {
 		return nil
 	}
-	freeListMapPageId := r.catalog.FreeListMapPageId()
-	if _, err := mtr.PageForWrite(freeListMapPageId); err != nil {
-		return err
-	}
-	defer mtr.Unpin(freeListMapPageId)
-
-	inFreeList, err := r.bufferPool.IsPageInFileFreeList(mtr, freeListMapPageId, metaPageId)
+	isFree, err := fsp.IsPageFree(mtr, metaPageId)
 	if err != nil {
 		return err
 	}
-	if inFreeList {
+	if isFree {
 		return nil
 	}
 	tree := btree.NewTree(r.bufferPool, metaPageId)
@@ -69,7 +64,7 @@ func (r *DDLRollbacker) rollbackCreateBTree(mtr *buffer.Mtr, payload []byte) err
 		return err
 	}
 	for i := len(pageIds) - 1; i >= 0; i-- {
-		if err := r.bufferPool.Deallocate(mtr, freeListMapPageId, pageIds[i]); err != nil {
+		if err := fsp.FreePage(mtr, pageIds[i]); err != nil {
 			return err
 		}
 	}

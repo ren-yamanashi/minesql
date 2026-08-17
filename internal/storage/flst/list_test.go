@@ -75,6 +75,20 @@ func TestAddFirst(t *testing.T) {
 		assert.Equal(t, []Address{a, b}, collectBackward(t, bp, base))
 		assert.Equal(t, uint32(2), listLength(t, bp, base))
 	})
+
+	t.Run("base と node が同一アドレスの場合は panic する", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		base := Address{PageNumber: 0, Offset: 0}
+		setupList(t, bp, redoLog, base)
+
+		// THEN
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		defer mtr.UnpinAll()
+		assert.Panics(t, func() {
+			_ = AddFirst(mtr, testFileId, base, base)
+		})
+	})
 }
 
 func TestAddLast(t *testing.T) {
@@ -145,6 +159,20 @@ func TestAddLast(t *testing.T) {
 		assert.Equal(t, []Address{a, b, c}, collectForward(t, bp, base))
 		assert.Equal(t, []Address{c, b, a}, collectBackward(t, bp, base))
 		assert.Equal(t, uint32(3), listLength(t, bp, base))
+	})
+
+	t.Run("base と node が同一アドレスの場合は panic する", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		base := Address{PageNumber: 0, Offset: 0}
+		setupList(t, bp, redoLog, base)
+
+		// THEN
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		defer mtr.UnpinAll()
+		assert.Panics(t, func() {
+			_ = AddLast(mtr, testFileId, base, base)
+		})
 	})
 }
 

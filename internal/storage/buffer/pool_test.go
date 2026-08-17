@@ -204,6 +204,46 @@ func TestRegisterHeapFile(t *testing.T) {
 	})
 }
 
+func TestHasHeapFile(t *testing.T) {
+	t.Run("登録されている FileId に対しては true を返す", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size, newTestRedoLog(t), nil)
+		hf := setupHeapFile(t, 5)
+		bp.RegisterHeapFile(5, hf)
+
+		// WHEN
+		ok := bp.HasHeapFile(5)
+
+		// THEN
+		assert.True(t, ok)
+	})
+
+	t.Run("登録されていない FileId に対しては false を返す", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size, newTestRedoLog(t), nil)
+
+		// WHEN
+		ok := bp.HasHeapFile(99)
+
+		// THEN
+		assert.False(t, ok)
+	})
+
+	t.Run("DeleteFile 後の FileId に対しては false を返す", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size, newTestRedoLog(t), nil)
+		hf := setupHeapFile(t, 5)
+		bp.RegisterHeapFile(5, hf)
+		assert.NoError(t, bp.DeleteFile(5))
+
+		// WHEN
+		ok := bp.HasHeapFile(5)
+
+		// THEN
+		assert.False(t, ok)
+	})
+}
+
 func TestMaxPages(t *testing.T) {
 	t.Run("バッファプールの最大ページ数を返す", func(t *testing.T) {
 		// GIVEN

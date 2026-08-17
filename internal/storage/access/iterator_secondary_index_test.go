@@ -233,7 +233,7 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	}
 
 	ddlMtr := newBootstrapMtr(bp, redoLog)
-	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId(), ct.FreeListMapPageId())
+	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId())
 	if err != nil {
 		ddlMtr.UnpinAll()
 		t.Fatalf("undo.DDLManager の作成に失敗: %v", err)

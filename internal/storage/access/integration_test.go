@@ -516,7 +516,7 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 	}
 
 	ddlMtr := newBootstrapMtr(bp, redoLog)
-	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId(), ct.FreeListMapPageId())
+	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId())
 	if err != nil {
 		ddlMtr.UnpinAll()
 		t.Fatalf("undo.DDLManager の作成に失敗: %v", err)
@@ -820,7 +820,7 @@ func crashAndRecover(t *testing.T, prev *integrationEnv, tableNames []string) *i
 	initialNextTrxId := max(ct.NextTrxId(), maxTrxId+1)
 
 	ddlMtr := newBootstrapMtr(bp, redoLog)
-	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId(), ct.FreeListMapPageId())
+	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId())
 	if err != nil {
 		ddlMtr.UnpinAll()
 		t.Fatalf("undo.DDLManager の再オープンに失敗: %v", err)

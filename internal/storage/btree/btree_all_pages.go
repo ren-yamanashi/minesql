@@ -7,7 +7,7 @@ import (
 
 // AllPageIds は B+Tree 配下の全ページ (メタページ + 内部ノード + リーフ) の PageId を BFS 順に返す
 //   - mtr: 各ページを X ラッチで保持する書き込み用 Mtr (呼び出し側で生成・解放する)
-//   - 戻り順: 親階層 → 子階層 (= メタページ先頭、リーフ末尾)。 解放時は逆順に Deallocate する想定
+//   - 戻り順: 親階層 → 子階層 (= メタページ先頭、リーフ末尾)。 解放時は逆順に解放する想定
 func (t *Tree) AllPageIds(mtr *buffer.Mtr) ([]page.Id, error) {
 	metaBufPage, err := mtr.PageForWrite(t.MetaPageId())
 	if err != nil {

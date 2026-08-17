@@ -16,32 +16,28 @@ var ErrInvalidDDLUndoRoot = errors.New("undo: invalid ddl undo root page id")
 //   - 通常 Undo Manager と並列構造 (= 別の型として独立)
 //   - 並行 DDL は想定しないため内部に mutex を持たない (= 単一スレッドで逐次操作される前提)
 type DDLManager struct {
-	bufferPool        *buffer.Pool
-	fileId            page.FileId
-	freeListMapPageId page.Id
-	rootPageId        page.Id
-	currentPageId     page.Id
+	bufferPool    *buffer.Pool
+	fileId        page.FileId
+	rootPageId    page.Id
+	currentPageId page.Id
 }
 
 // NewDDLManager は既存の DDL Undo 専用領域を開く
 //   - mtr: 紐づくバッファプールを取得するための Mtr
 //   - rootPageId: カタログヘッダーが指す DDL Undo 先頭ページ ID。 無効値が渡されると ErrInvalidDDLUndoRoot を返す
-//   - freeListMapPageId: Clear 時に Pool.Deallocate へ渡すフリーリストマップページ ID
 func NewDDLManager(
 	mtr *buffer.Mtr,
 	fileId page.FileId,
 	rootPageId page.Id,
-	freeListMapPageId page.Id,
 ) (*DDLManager, error) {
 	if rootPageId.IsInvalid() {
 		return nil, ErrInvalidDDLUndoRoot
 	}
 	bp := mtr.Pool()
 	m := &DDLManager{
-		bufferPool:        bp,
-		fileId:            fileId,
-		freeListMapPageId: freeListMapPageId,
-		rootPageId:        rootPageId,
+		bufferPool: bp,
+		fileId:     fileId,
+		rootPageId: rootPageId,
 	}
 	pageId := rootPageId
 	for {
@@ -116,7 +112,7 @@ func (m *DDLManager) ReverseScan(mtr *buffer.Mtr) ([]DDLRecord, error) {
 }
 
 // Clear は DDLManager が管理する DDL Undo 領域コンテナの中身を空にする
-//   - root ページは残し (= 永続コンテナ)、 中間ページ (= root の next 以降) があれば逆順で Pool.Deallocate する
+//   - root ページは残し (= 永続コンテナ)、 中間ページ (= root の next 以降) があれば逆順で解放する
 //   - root ページの UsedBytes と NextPageNumber を 0 にリセットし、 次回 Append で再利用可能にする
 //   - 内部状態 currentPageId は rootPageId に戻る
 //   - 全ての書き込みは mtr 経由 (Redo に記録される)
@@ -139,7 +135,7 @@ func (m *DDLManager) Clear(mtr *buffer.Mtr) error {
 	}
 
 	for i := len(intermediatePageIds) - 1; i >= 0; i-- {
-		if err := m.bufferPool.Deallocate(mtr, m.freeListMapPageId, intermediatePageIds[i]); err != nil {
+		if err := fsp.FreePage(mtr, intermediatePageIds[i]); err != nil {
 			return err
 		}
 	}

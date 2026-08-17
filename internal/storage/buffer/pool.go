@@ -85,6 +85,14 @@ func (p *Pool) RegisterHeapFile(fileId page.FileId, heapFile *file.HeapFile) {
 	p.files[fileId] = heapFile
 }
 
+// HasHeapFile は指定 FileId が現在 BufferPool に登録されているかを返す
+func (p *Pool) HasHeapFile(fileId page.FileId) bool {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	_, ok := p.files[fileId]
+	return ok
+}
+
 // MaxPages はバッファプールの最大バッファページ数を返す
 func (p *Pool) MaxPages() int {
 	p.mu.RLock()
