@@ -6,16 +6,19 @@
 - extent (連続した固定数のページのまとまり) 単位でファイル内の空間を管理し、解放されたページの再利用を実現する
 - 全ファイル (カタログ / Undo ログ / テーブル) の先頭ページ (page 0) に FSP ヘッダーと extent 記述子の配列を置く
 - ページの割り当て・解放は FSP ヘッダーと extent 記述子への読み書きとして行われ、通常運用ではこれらの変更も他のページ変更と同様に [Redo ログ](../log/redo.md)へ記録される
+- ページの利用者はいずれも [file segment (inode)](fseg.md) に属する。本ドキュメントは空間全体の単ページ割り当て・解放を扱い、segment に属するページの割り当て・解放は [fseg.md](fseg.md) を参照
 
 ## 予約ページマップ
 
 | page | 用途 | 適用範囲 |
 | --- | --- | --- |
 | 0 | FSP ヘッダー + extent 記述子配列 | 全ファイル |
-| 1 | カタログヘッダー (詳細: [カタログ - ヘッダーページ](../dictionary/catalog.md#ヘッダーページ)) | カタログファイルのみ |
+| 1 | 最初の inode ページ (詳細: [file segment (inode) - inode ページ](fseg.md#inode-ページ)) | 全ファイル |
+| 2 | カタログヘッダー (詳細: [カタログ - ヘッダーページ](../dictionary/catalog.md#ヘッダーページ)) | カタログファイルのみ |
 
 - extent 記述子を格納するページ (以下「記述子ページ」) は 4,096 ページごとに反復して配置され、page 0 が最初の記述子ページを兼ねる
 - 2 枚目以降の記述子ページも先頭に FSP ヘッダーと同じ大きさの領域を予約するが、ヘッダーとして使用するのは page 0 のみで、2 枚目以降の予約領域はゼロ埋めされる
+- 追加の inode ページは、既存の inode ページの全スロットが使用中になり新しい segment を作る必要が生じた時点で、通常の単ページ割り当てで確保される (詳細: [file segment (inode) - inode ページ](fseg.md#inode-ページ))
 
 ## FSP ヘッダー
 
@@ -31,9 +34,9 @@ page 0 のボディ先頭に置かれる。構成は以下 (オフセットは�
 | 20 | 16 | FREE リストの base node |
 | 36 | 16 | FREE_FRAG リストの base node |
 | 52 | 16 | FULL_FRAG リストの base node |
-| 68 | 8 | 将来のセグメント管理のための予約 (0 固定) |
-| 76 | 16 | 将来のセグメント管理のための予約 (0 固定) |
-| 92 | 16 | 将来のセグメント管理のための予約 (0 固定) |
+| 68 | 8 | 次に割り当てる segment id (詳細: [file segment (inode) - segment の作成](fseg.md#segment-の作成)) |
+| 76 | 16 | SEG_INODES_FULL リストの base node (詳細: [file segment (inode) - inode ページ](fseg.md#inode-ページ)) |
+| 92 | 16 | SEG_INODES_FREE リストの base node (詳細: [file segment (inode) - inode ページ](fseg.md#inode-ページ)) |
 
 - マジックナンバーを全ファイルの page 0 に置くことで、ファイル単独でファイル種別を判定できる
 - FileId をファイル内に格納するのは、「ファイル内に FileId を格納しない」という従来方針からの転換。ファイルメタをファイル先頭で自己完結させる本設計の趣旨に従う (詳細: [ディスク - ファイル](../file/disk.md#ファイル))
@@ -50,9 +53,9 @@ page 0 のボディ先頭に置かれる。構成は以下 (オフセットは�
 
 | オフセット | バイト数 | 内容 |
 | --- | --- | --- |
-| 0 | 8 | 将来のセグメント管理のための予約 (0 固定) |
+| 0 | 8 | 所属 segment の id (XDES_ID。segment 非帰属の状態では 0。詳細: [file segment (inode) - extent の状態拡張](fseg.md#extent-の状態拡張)) |
 | 8 | 12 | 所属リストの node |
-| 20 | 4 | 状態 (NOT_INITED = 0 / FREE = 1 / FREE_FRAG = 2 / FULL_FRAG = 3) |
+| 20 | 4 | 状態 (NOT_INITED = 0 / FREE = 1 / FREE_FRAG = 2 / FULL_FRAG = 3 / XDES_FSEG = 4 / XDES_FSEG_FRAG = 5) |
 | 24 | 32 | ページごとの free bit を並べた bitmap (1 bit/ページ × 256 ページ) |
 
 - 記述子ページ内の記述子配列は、予約されたヘッダー領域 (108 バイト) の直後から始まる。1 枚の記述子ページには 16 エントリ (= 4,096 ページ / 256 ページ) が並ぶ
@@ -62,7 +65,7 @@ page 0 のボディ先頭に置かれる。構成は以下 (オフセットは�
 
 ## 状態機械
 
-extent は以下の 4 状態のいずれかを取る
+extent は以下の 6 状態のいずれかを取る
 
 | 状態 | 意味 |
 | --- | --- |
@@ -70,6 +73,8 @@ extent は以下の 4 状態のいずれかを取る
 | FREE | 全ページが free で、FREE リストに属する |
 | FREE_FRAG | 一部のページが使用中で、FREE_FRAG リストに属する。単ページ割り当ての対象 |
 | FULL_FRAG | 全ページが使用中で、FULL_FRAG リストに属する。割り当ての探索対象から外れる |
+| XDES_FSEG | ある segment が専有する extent。segment 側の 3 リスト (FREE / NOT_FULL / FULL) のいずれかに属する (詳細: [file segment (inode) - extent の状態拡張](fseg.md#extent-の状態拡張)) |
+| XDES_FSEG_FRAG | 記述子ページを先頭に含む extent を segment に貸し出している状態 (詳細: [file segment (inode) - extent の状態拡張](fseg.md#extent-の状態拡張)) |
 
 状態遷移とその契機は以下
 
@@ -78,6 +83,10 @@ extent は以下の 4 状態のいずれかを取る
 - FREE_FRAG → FULL_FRAG: 割り当てによって extent 内の全ページが使用中になったとき
 - FULL_FRAG → FREE_FRAG: 解放によって満杯の extent に空きページが生まれたとき
 - FREE_FRAG → FREE: 解放によって extent 内の全ページが free に戻ったとき
+- FREE → XDES_FSEG: segment 経由の割り当てで FREE リストから extent が segment に組み込まれたとき
+- XDES_FSEG → FREE: segment 経由の解放で extent が全 free に戻り、segment から空間の FREE リストへ返却されたとき
+- FREE_FRAG → XDES_FSEG_FRAG: 記述子ページを含む extent を segment へ lease したとき
+- XDES_FSEG_FRAG → FREE_FRAG: lease された extent を segment から空間の FREE_FRAG リストへ返却したとき
 
 記述子ページを含む extent は、fill の時点で先頭ページが使用中になるため、FREE リストには積まれず FREE_FRAG リストへ登録される (状態は NOT_INITED → FREE → FREE_FRAG と 2 段で遷移する) (詳細: [fill とフリーリミット](#fill-とフリーリミット))
 
@@ -90,6 +99,8 @@ FREE / FREE_FRAG / FULL_FRAG の 3 リストは、ページ上に置かれた ba
 - アドレス (6 バイト): PageNumber (4 バイト) + ボディ先頭からの相対オフセット (2 バイト)
 
 ## ページ割り当て
+
+本節は空間直接の単ページ割り当てを扱う。segment 経由の割り当てのうち frag ページの確保は、本節の単ページ割り当てを供給元として利用する (詳細: [file segment (inode) - ページ割り当て](fseg.md#ページ割り当て))。inode ページの確保も本節の単ページ割り当てで行われる
 
 単ページの割り当ては以下の順で空きを探す
 
@@ -107,15 +118,23 @@ FREE / FREE_FRAG / FULL_FRAG の 3 リストは、ページ上に置かれた ba
 - fill はフリーリミットの位置から extent の記述子を順に初期化してフリーリミットを進め、FREE リストへ 4 extent を追加した時点で止まる。ファイルの論理ページ数がフリーリミットに満たない場合は論理ページ数も拡張する
 - 予約ページの保護: 先頭がページサイズ (4,096 ページ) 境界にある extent (= 記述子ページを含む extent。page 0 を含む extent 0 もこれに該当する) は、先頭 1 ページ (= 記述子ページ。extent 0 では page 0) を使用中にして FREE_FRAG リストへ積み、使用中ページ数を加算する。FREE リストへ追加する 4 extent のカウントには含めない
   - これにより page 0 と記述子ページは通常の割り当てで払い出されない
+- 記述子ページを含む extent は、予約分 (= 先頭 1 ページ) 以外の全ページが空きに戻ったとき、segment への lease (= XDES_FSEG_FRAG 状態) として扱える (詳細: [file segment (inode) - extent の状態拡張](fseg.md#extent-の状態拡張))
 
-## カタログヘッダーページの確保
+## bootstrap 時の決定的配置
 
-- カタログファイルの page 1 (カタログヘッダー) は、カタログ初期化時に FSP ヘッダーの初期化直後の最初のページ割り当てで確保する
-- 最初の割り当てが決定的に page 1 を返すことは、以下の 2 つの前提から導かれる
+- カタログファイルの page 2 (カタログヘッダー) は、カタログ初期化時に決定的な bootstrap 順序で確保する
+- bootstrap の順序と各ページの決定的な PageNumber は以下
+  1. カタログヘッダー segment を新規作成する。segment の作成が SEG_INODES_FREE の空を検知して inode ページを 1 枚新規確保する。この inode ページが page 1 になる
+  2. カタログヘッダー segment の最初のページ (= segment 自身からの最初の[単ページ割り当て](#ページ割り当て)) が page 2 になり、そこにカタログヘッダーを書き込む
+- これらの PageNumber が決定的に定まるのは、以下の 3 つの前提から
   - fill の保護規則により、初期化直後の extent 0 は「page 0 のみ使用中」の FREE_FRAG である
   - bitmap の空き探索は最下位 bit から行われる
+  - segment 経由の割り当ても、使用ページ数 128 未満の間は空間直接の単ページ割り当てを供給元として使う (詳細: [file segment (inode) - ページ割り当て](fseg.md#ページ割り当て))
+- Undo ログファイルも同じ bootstrap 順序に従い、page 1 = 最初の inode ページ、page 2 = Undo チェーンの先頭ページ (= Undo チェーンを含む segment の最初のページ) となる
 
 ## ページ解放
+
+本節は空間直接の単ページ解放を扱う。segment の frag ページの解放は [file segment (inode) - ページ解放](fseg.md#ページ解放) の内部で本節の単ページ解放へ到達する。専有 extent 内のページの解放は fseg 側で extent の bitmap と状態を直接更新する
 
 - 対象ページの free bit を free に戻し、FREE_FRAG リスト内の使用中ページ数を減算する
 - extent の状態を遷移させる: FULL_FRAG に属していた extent は FREE_FRAG へ、全ページが free になった extent は FREE_FRAG から FREE へ移す

@@ -69,7 +69,7 @@ DDL 中の永続操作 3 種に対応して、DDL Undo にも 3 種類の取消�
 
 | 種類 | 取消対象 | Rollback 時の論理 |
 | --- | --- | --- |
-| B+Tree 解放 Undo | 新規作成された B+Tree | B+Tree のメタページから走査して全ページを解放する |
+| B+Tree 解放 Undo | 新規作成された B+Tree | B+Tree を構成する 2 つの segment を step 型で解放する。leaf segment を解放してから非リーフ segment を解放し、非リーフ segment の最後のページ (= メタページ) の解放で木全体の解放が完了する (詳細: [file segment (inode) - segment の解放](../fsp/fseg.md#segment-の解放)) |
 | メタテーブル削除 Undo | カタログメタテーブルへの 1 レコード追加 | 該当メタテーブルから当該レコードを物理削除する |
 | 物理ファイル削除 Undo | 新規確保された FileId とそれに対応する物理ファイル | バッファプール内の該当ページを追い出した上で、物理ファイルを削除する |
 

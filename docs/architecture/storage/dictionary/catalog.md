@@ -15,8 +15,9 @@
 
 ### ヘッダーページ
 
-- カタログファイルの page 1 をヘッダーページとしている
-  - page 0 は全ファイル共通の FSP ヘッダーが占めるため (詳細: [ファイル空間管理 - 予約ページマップ](../fsp/fsp.md#予約ページマップ))
+- カタログファイルの page 2 をヘッダーページとしている
+  - page 0 は全ファイル共通の FSP ヘッダー、page 1 は最初の inode ページが占めるため (詳細: [ファイル空間管理 - 予約ページマップ](../fsp/fsp.md#予約ページマップ))
+- ヘッダーページはカタログヘッダー segment の最初のページとして確保され、そこに segment header が置かれる (詳細: [file segment (inode) - 利用者ごとの segment 構成](../fsp/fseg.md#利用者ごとの-segment-構成))
 - ヘッダーページの構成は以下
 
 | オフセット | バイト数 | 説明 |
@@ -32,6 +33,7 @@
 | 32 | 4 | Undo ログファイル用の FileId |
 | 36 | 4 | DDL Undo 専用領域コンテナの先頭ページの PageNumber (カタログ初期化時に確保され、 サーバライフタイム中ずっと有効) |
 | 40 | 4 | 次に払い出すトランザクション ID (1 から開始、 0 は予約値) |
+| 44 | 6 | カタログヘッダー segment の segment header (詳細: [file segment (inode) - segment header](../fsp/fseg.md#segment-header)) |
 
 - カタログファイルを開くときのファイル種別と FileId の検証は、page 0 の FSP ヘッダーに置かれたマジックナンバーと FileId の照合で行う (詳細: [ファイル空間管理 - FSP ヘッダー](../fsp/fsp.md#fsp-ヘッダー))
 
