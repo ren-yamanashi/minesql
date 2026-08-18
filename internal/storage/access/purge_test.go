@@ -1,14 +1,18 @@
 package access
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewPurge(t *testing.T) {
@@ -249,6 +253,80 @@ func TestPurgePurge(t *testing.T) {
 		_, ok, _ := treeIter.Get()
 		assert.True(t, ok)
 	})
+
+	t.Run("purge 経由の merge で解放されたページが後続の AllocatePage で再利用される", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		table := setupTableForRecoveryTest(t, env)
+		p := NewPurge(env.trxManager)
+
+		longSuffix := strings.Repeat("a", 1500)
+		trx1 := env.trxManager.Begin()
+		for _, id := range []string{"1", "2", "3"} {
+			require.NoError(t, table.Insert(
+				trx1,
+				[]string{"id", "name", "email"},
+				[]string{id, "u" + id, id + "-" + longSuffix + "@example.com"},
+			))
+		}
+		require.NoError(t, env.trxManager.Commit(trx1))
+
+		pageIdsBefore := collectTreePageIds(t, env.bp, table.primaryIndex.tree)
+
+		trx2 := env.trxManager.Begin()
+		for _, id := range []string{"1", "2", "3"} {
+			record := currentReadByPk(t, table, trx2, id)
+			require.NotNil(t, record)
+			require.NoError(t, table.SoftDelete(trx2, record))
+		}
+		require.NoError(t, env.trxManager.Commit(trx2))
+
+		// WHEN
+		err := p.purge()
+
+		// THEN
+		require.NoError(t, err)
+		pageIdsAfter := collectTreePageIds(t, env.bp, table.primaryIndex.tree)
+		assert.Less(t, len(pageIdsAfter), len(pageIdsBefore))
+
+		freed := diffPageIds(pageIdsBefore, pageIdsAfter)
+		require.NotEmpty(t, freed)
+		assertAllPagesFree(t, env.bp, freed)
+
+		minFreed := minPageId(freed)
+		fileId := table.primaryIndex.fileId()
+		allocMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		allocated, err := fsp.AllocatePage(allocMtr, fileId)
+		require.NoError(t, err)
+		require.NoError(t, allocMtr.Commit())
+		assert.Equal(t, minFreed, allocated)
+	})
+}
+
+// diffPageIds は before に含まれ after に含まれない PageId を返す
+func diffPageIds(before, after []page.Id) []page.Id {
+	afterSet := make(map[page.Id]struct{}, len(after))
+	for _, pid := range after {
+		afterSet[pid] = struct{}{}
+	}
+	var diff []page.Id
+	for _, pid := range before {
+		if _, ok := afterSet[pid]; !ok {
+			diff = append(diff, pid)
+		}
+	}
+	return diff
+}
+
+// minPageId は PageNumber が最小の PageId を返す
+func minPageId(pageIds []page.Id) page.Id {
+	minId := pageIds[0]
+	for _, pid := range pageIds[1:] {
+		if pid.PageNumber() < minId.PageNumber() {
+			minId = pid
+		}
+	}
+	return minId
 }
 
 func TestPurgePurgeEntry(t *testing.T) {

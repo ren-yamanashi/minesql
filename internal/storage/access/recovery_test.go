@@ -4,16 +4,21 @@ import (
 	"encoding/binary"
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewRecovery(t *testing.T) {
@@ -669,6 +674,128 @@ func TestRecoveryExecuteRollbacksUncommittedUpdateAfterCommittedInsert(t *testin
 		assert.NoError(t, err)
 		restored := searchFirstPrimaryRecord(t, table2)
 		assert.Equal(t, "Alice", restored.values[1])
+	})
+}
+
+func TestRecoveryExecuteRestoresFspStateAfterPurgeFreesPage(t *testing.T) {
+	t.Run("purge 経由の解放 → crash → recovery で FSP 状態が復元される", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		table := createUsersTable(t, env)
+		flushBaseline(t, env)
+
+		longSuffix := strings.Repeat("a", 1500)
+		trx1 := env.trxMgr.Begin()
+		for _, id := range []string{"1", "2", "3"} {
+			require.NoError(t, table.Insert(
+				trx1,
+				[]string{"id", "name", "email"},
+				[]string{id, "u" + id, id + "-" + longSuffix + "@example.com"},
+			))
+		}
+		require.NoError(t, env.trxMgr.Commit(trx1))
+
+		pageIdsBefore := collectTreePageIds(t, env.bp, table.primaryIndex.tree)
+
+		trx2 := env.trxMgr.Begin()
+		for _, id := range []string{"1", "2", "3"} {
+			record := currentReadByPk(t, table, trx2, id)
+			require.NotNil(t, record)
+			require.NoError(t, table.SoftDelete(trx2, record))
+		}
+		require.NoError(t, env.trxMgr.Commit(trx2))
+
+		p := NewPurge(env.trxMgr)
+		require.NoError(t, p.purge())
+		require.NoError(t, env.redoLog.Flush())
+
+		pageIdsAfter := collectTreePageIds(t, env.bp, table.primaryIndex.tree)
+		freed := diffPageIds(pageIdsBefore, pageIdsAfter)
+		require.NotEmpty(t, freed)
+
+		fileId := table.primaryIndex.fileId()
+		fspHeaderPageId := page.NewId(fileId, 0)
+		beforeHeaderBytes, _ := readPageBytes(t, env.bp, fspHeaderPageId)
+
+		// WHEN
+		env2 := crashAndRecover(t, env, []string{"users"})
+
+		// THEN
+		afterHeaderBytes, _ := readPageBytes(t, env2.bp, fspHeaderPageId)
+		assert.Equal(t, beforeHeaderBytes, afterHeaderBytes)
+		assertAllPagesFree(t, env2.bp, freed)
+
+		minFreed := minPageId(freed)
+		allocMtr := buffer.NewWriteMtr(env2.bp, lock.SystemReservedTrxId, env2.redoLog)
+		allocated, err := fsp.AllocatePage(allocMtr, fileId)
+		require.NoError(t, err)
+		require.NoError(t, allocMtr.Commit())
+		assert.Equal(t, minFreed, allocated)
+	})
+}
+
+func TestRecoveryExecuteRestoresSecondDescriptorPage(t *testing.T) {
+	t.Run("記述子ページ 2 枚目がディスク未存在の状態から recovery で復元される", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		table := createUsersTable(t, env)
+		flushBaseline(t, env)
+		fileId := table.primaryIndex.fileId()
+
+		var targetToFree page.Id
+	outer:
+		for {
+			allocMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+			for range 100 {
+				pid, err := fsp.AllocatePage(allocMtr, fileId)
+				require.NoError(t, err)
+				if pid.PageNumber() >= 4096 {
+					targetToFree = pid
+					require.NoError(t, allocMtr.Commit())
+					break outer
+				}
+			}
+			require.NoError(t, allocMtr.Commit())
+		}
+
+		freeMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		require.NoError(t, fsp.FreePage(freeMtr, targetToFree))
+		require.NoError(t, freeMtr.Commit())
+		require.NoError(t, env.redoLog.Flush())
+
+		fspHeaderPageId := page.NewId(fileId, 0)
+		secondDescriptorPageId := page.NewId(fileId, 4096)
+		beforePage0Bytes, _ := readPageBytes(t, env.bp, fspHeaderPageId)
+		beforePage4096Bytes, _ := readPageBytes(t, env.bp, secondDescriptorPageId)
+
+		usersPath := filepath.Join(config.BaseDir, "users.db")
+		stat, err := os.Stat(usersPath)
+		require.NoError(t, err)
+		secondPageOffset := int64(secondDescriptorPageId.PageNumber()) * int64(page.Size)
+		require.Less(t, stat.Size(), secondPageOffset,
+			"crash 時点で page 4096 がディスク未存在である前提が成立していない (fileSize=%d, offset=%d)",
+			stat.Size(), secondPageOffset)
+
+		// WHEN
+		env2 := crashAndRecover(t, env, []string{"users"})
+
+		// THEN
+		afterPage0Bytes, _ := readPageBytes(t, env2.bp, fspHeaderPageId)
+		afterPage4096Bytes, _ := readPageBytes(t, env2.bp, secondDescriptorPageId)
+		assert.Equal(t, beforePage0Bytes, afterPage0Bytes)
+		assert.Equal(t, beforePage4096Bytes, afterPage4096Bytes)
+
+		checkMtr := buffer.NewMtr(env2.bp)
+		isFree, err := fsp.IsPageFree(checkMtr, targetToFree)
+		checkMtr.UnpinAll()
+		require.NoError(t, err)
+		assert.True(t, isFree)
+
+		allocMtr := buffer.NewWriteMtr(env2.bp, lock.SystemReservedTrxId, env2.redoLog)
+		allocated, err := fsp.AllocatePage(allocMtr, fileId)
+		require.NoError(t, err)
+		require.NoError(t, allocMtr.Commit())
+		assert.Equal(t, targetToFree, allocated)
 	})
 }
 
