@@ -25,8 +25,14 @@ func InitHeader(mtr *buffer.Mtr, fileId page.FileId) error {
 	h.setSize(1)
 	h.setFreeLimit(0)
 	h.setFragNUsed(0)
-	h.clearReserved()
-	bases := []flst.Address{h.freeListBase(), h.freeFragListBase(), h.fullFragListBase()}
+	h.setSegId(1)
+	bases := []flst.Address{
+		h.freeListBase(),
+		h.freeFragListBase(),
+		h.fullFragListBase(),
+		h.segInodesFullBase(),
+		h.segInodesFreeBase(),
+	}
 	for _, base := range bases {
 		if err := flst.InitBase(mtr, fileId, base); err != nil {
 			return err

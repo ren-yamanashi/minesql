@@ -42,6 +42,27 @@ func TestLayoutConstants(t *testing.T) {
 		assert.Equal(t, 56, xdesEntrySize)
 		assert.Equal(t, 32, xdesBitmapSize)
 	})
+
+	t.Run("inode ページのレイアウト定数", func(t *testing.T) {
+		// THEN
+		assert.Equal(t, 0, inodePageNodeOffset)
+		assert.Equal(t, 12, inodeArrOffset)
+		assert.Equal(t, "SEGI", inodeMagicValue)
+	})
+
+	t.Run("inode エントリのレイアウト定数", func(t *testing.T) {
+		// THEN
+		assert.Equal(t, 0, inodeSegIdOffset)
+		assert.Equal(t, 8, inodeNotFullNUsedOffset)
+		assert.Equal(t, 12, inodeFreeListOffset)
+		assert.Equal(t, 28, inodeNotFullListOffset)
+		assert.Equal(t, 44, inodeFullListOffset)
+		assert.Equal(t, 60, inodeMagicOffset)
+		assert.Equal(t, 64, inodeFragArrOffset)
+		assert.Equal(t, 128, inodeFragSlotCount)
+		assert.Equal(t, 576, inodeEntrySize)
+		assert.Equal(t, 7, inodeEntriesPerPage)
+	})
 }
 
 func TestDescriptorPageNumber(t *testing.T) {

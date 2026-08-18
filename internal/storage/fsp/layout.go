@@ -17,9 +17,9 @@ const (
 	headerFreeListOffset      = 20
 	headerFreeFragListOffset  = 36
 	headerFullFragListOffset  = 52
-	headerSegIdOffset         = 68 // セグメント管理のための予約 (0 固定)
-	headerSegInodesFullOffset = 76 // セグメント管理のための予約 (0 固定)
-	headerSegInodesFreeOffset = 92 // セグメント管理のための予約 (0 固定)
+	headerSegIdOffset         = 68 // 次に割り当てる segment id
+	headerSegInodesFullOffset = 76 // SEG_INODES_FULL リストの base node
+	headerSegInodesFreeOffset = 92 // SEG_INODES_FREE リストの base node
 	headerSize                = 108
 )
 
@@ -46,6 +46,29 @@ const (
 	xdesStateOffset    = 20
 	xdesBitmapOffset   = 24
 	xdesEntrySize      = xdesBitmapOffset + xdesBitmapSize
+)
+
+// inode ページ (body 先頭からの相対値)
+const (
+	inodePageNodeOffset = 0  // SEG_INODES リスト連結用 node (12 バイト)
+	inodeArrOffset      = 12 // inode エントリ配列の開始位置
+)
+
+// inodeMagicValue は使用中の inode エントリに書かれる破損検出用マジックナンバー
+const inodeMagicValue = "SEGI"
+
+// inode エントリ (エントリ先頭からの相対値、計 576 バイト)
+const (
+	inodeSegIdOffset        = 0
+	inodeNotFullNUsedOffset = 8
+	inodeFreeListOffset     = 12
+	inodeNotFullListOffset  = 28
+	inodeFullListOffset     = 44
+	inodeMagicOffset        = 60
+	inodeFragArrOffset      = 64
+	inodeFragSlotCount      = extentPageCount / 2
+	inodeEntrySize          = inodeFragArrOffset + 4*inodeFragSlotCount
+	inodeEntriesPerPage     = (page.Size - page.HeaderSize - inodeArrOffset) / inodeEntrySize
 )
 
 // descriptorPageNumber は pageNumber を担当する記述子ページの PageNumber を返す

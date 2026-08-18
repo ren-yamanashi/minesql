@@ -40,10 +40,10 @@ func TestInitHeader(t *testing.T) {
 		assert.Equal(t, uint32(1), h.size())
 		assert.Equal(t, page.PageNumber(0), h.freeLimit())
 		assert.Equal(t, uint32(0), h.fragNUsed())
-		assert.Equal(t, make([]byte, headerSize-headerSegIdOffset), bufPage.Data().Body()[headerSegIdOffset:headerSize])
+		assert.Equal(t, uint64(1), h.segId())
 	})
 
-	t.Run("3 リストが空リストとして初期化される", func(t *testing.T) {
+	t.Run("5 リストが空リストとして初期化される", func(t *testing.T) {
 		// GIVEN
 		bp, redoLog := setupTest(t)
 
@@ -58,7 +58,13 @@ func TestInitHeader(t *testing.T) {
 		readMtr := buffer.NewMtr(bp)
 		defer readMtr.UnpinAll()
 		h := header{}
-		bases := []flst.Address{h.freeListBase(), h.freeFragListBase(), h.fullFragListBase()}
+		bases := []flst.Address{
+			h.freeListBase(),
+			h.freeFragListBase(),
+			h.fullFragListBase(),
+			h.segInodesFullBase(),
+			h.segInodesFreeBase(),
+		}
 		for _, base := range bases {
 			length, err := flst.Length(readMtr, testFileId, base)
 			assert.NoError(t, err)

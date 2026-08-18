@@ -194,22 +194,58 @@ func TestHeaderFullFragListBase(t *testing.T) {
 	})
 }
 
-func TestHeaderClearReserved(t *testing.T) {
-	t.Run("予約領域全体がゼロ埋めされる", func(t *testing.T) {
+func TestHeaderSegId(t *testing.T) {
+	t.Run("setSegId で書き込んだ segment id を読み取れる", func(t *testing.T) {
 		// GIVEN
 		h, mtr := setupHeader(t)
-		junk := make([]byte, headerSize-headerSegIdOffset)
-		for i := range junk {
-			junk[i] = 0xAB
-		}
-		h.bufPage.WriteBodyAt(headerSegIdOffset, junk)
+		h.setSegId(42)
 
 		// WHEN
-		h.clearReserved()
+		got := h.segId()
 
 		// THEN
-		assert.Equal(t, make([]byte, headerSize-headerSegIdOffset), h.bufPage.Data().Body()[headerSegIdOffset:headerSize])
+		assert.Equal(t, uint64(42), got)
 		commitMtr(t, mtr)
+	})
+}
+
+func TestHeaderSetSegId(t *testing.T) {
+	t.Run("書き込んだ segment id が segId で復元できる", func(t *testing.T) {
+		// GIVEN
+		h, mtr := setupHeader(t)
+
+		// WHEN
+		h.setSegId(42)
+
+		// THEN
+		assert.Equal(t, uint64(42), h.segId())
+		commitMtr(t, mtr)
+	})
+}
+
+func TestHeaderSegInodesFullBase(t *testing.T) {
+	t.Run("SEG_INODES_FULL リストの base node アドレスは page 0 の offset 76 を指す", func(t *testing.T) {
+		// GIVEN
+		h := header{}
+
+		// WHEN
+		got := h.segInodesFullBase()
+
+		// THEN
+		assert.Equal(t, flst.Address{PageNumber: 0, Offset: 76}, got)
+	})
+}
+
+func TestHeaderSegInodesFreeBase(t *testing.T) {
+	t.Run("SEG_INODES_FREE リストの base node アドレスは page 0 の offset 92 を指す", func(t *testing.T) {
+		// GIVEN
+		h := header{}
+
+		// WHEN
+		got := h.segInodesFreeBase()
+
+		// THEN
+		assert.Equal(t, flst.Address{PageNumber: 0, Offset: 92}, got)
 	})
 }
 
