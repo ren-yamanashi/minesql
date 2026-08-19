@@ -33,6 +33,12 @@ func TestLayoutConstants(t *testing.T) {
 		assert.Equal(t, 4, freeAddExtents)
 	})
 
+	t.Run("segment 向けフリーリスト先読みの定数", func(t *testing.T) {
+		// THEN
+		assert.Equal(t, 40, segFillReservedExtents)
+		assert.Equal(t, 4, segFillAddExtents)
+	})
+
 	t.Run("xdes エントリのレイアウト定数", func(t *testing.T) {
 		// THEN
 		assert.Equal(t, 0, xdesIdOffset)

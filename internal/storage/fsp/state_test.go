@@ -14,18 +14,24 @@ func TestExtentStateString(t *testing.T) {
 		assert.Equal(t, "FREE", stateFree.String())
 		assert.Equal(t, "FREE_FRAG", stateFreeFrag.String())
 		assert.Equal(t, "FULL_FRAG", stateFullFrag.String())
+		assert.Equal(t, "XDES_FSEG", stateFseg.String())
+		assert.Equal(t, "XDES_FSEG_FRAG", stateFsegFrag.String())
 		assert.Equal(t, "extentState(9)", extentState(9).String())
 	})
 }
 
 func TestAssertStateTransition(t *testing.T) {
-	states := []extentState{stateNotInited, stateFree, stateFreeFrag, stateFullFrag}
+	states := []extentState{stateNotInited, stateFree, stateFreeFrag, stateFullFrag, stateFseg, stateFsegFrag}
 	allowed := map[[2]extentState]bool{
 		{stateNotInited, stateFree}:    true,
 		{stateFree, stateFreeFrag}:     true,
 		{stateFreeFrag, stateFullFrag}: true,
 		{stateFullFrag, stateFreeFrag}: true,
 		{stateFreeFrag, stateFree}:     true,
+		{stateFree, stateFseg}:         true,
+		{stateFseg, stateFree}:         true,
+		{stateFreeFrag, stateFsegFrag}: true,
+		{stateFsegFrag, stateFreeFrag}: true,
 	}
 	for _, from := range states {
 		for _, to := range states {

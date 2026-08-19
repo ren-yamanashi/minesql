@@ -1,6 +1,7 @@
 package fsp
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
@@ -171,5 +172,6 @@ func TestFill(t *testing.T) {
 
 		// THEN
 		assert.Error(t, err)
+		assert.True(t, errors.Is(err, errCapacityExhausted))
 	})
 }

@@ -14,14 +14,18 @@ func CreateSegment(mtr *buffer.Mtr, fileId page.FileId, headerOffset uint16) (pa
 	if err != nil {
 		return page.InvalidId(), err
 	}
-	firstPageId, err := AllocatePage(mtr, fileId)
+	headerPage, err := mtr.PageForWrite(page.NewId(fileId, 0))
+	if err != nil {
+		return page.InvalidId(), err
+	}
+	h := header{bufPage: headerPage}
+	firstPageId, err := allocatePageInSegment(mtr, fileId, h, entry)
 	if err != nil {
 		return page.InvalidId(), err
 	}
 	if _, err := mtr.Pool().AddPage(firstPageId); err != nil {
 		return page.InvalidId(), err
 	}
-	entry.setFragSlot(0, firstPageId.PageNumber())
 	if err := writeSegmentHeader(mtr, firstPageId, headerOffset, entry.address()); err != nil {
 		return page.InvalidId(), err
 	}

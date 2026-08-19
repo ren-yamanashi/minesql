@@ -133,6 +133,71 @@ func TestAllocatePage(t *testing.T) {
 	})
 }
 
+func TestAllocateExtent(t *testing.T) {
+	t.Run("FREE リスト先頭の extent が取り出されリストから外れる", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t)
+		initFsp(t, bp, redoLog)
+		fillMtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		require.NoError(t, fill(fillMtr, testFileId))
+		commitMtr(t, fillMtr)
+		beforeMtr := buffer.NewMtr(bp)
+		beforePage, err := beforeMtr.PageForRead(page.NewId(testFileId, 0))
+		require.NoError(t, err)
+		beforeH := header{bufPage: beforePage}
+		beforeLen, err := flst.Length(beforeMtr, testFileId, beforeH.freeListBase())
+		require.NoError(t, err)
+		beforeFirst, err := flst.First(beforeMtr, testFileId, beforeH.freeListBase())
+		require.NoError(t, err)
+		beforeMtr.UnpinAll()
+
+		// WHEN
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		headerPage, err := mtr.PageForWrite(page.NewId(testFileId, 0))
+		require.NoError(t, err)
+		h := header{bufPage: headerPage}
+		entry, err := allocateExtent(mtr, testFileId, h)
+		require.NoError(t, err)
+		commitMtr(t, mtr)
+
+		// THEN
+		assert.Equal(t, beforeFirst.PageNumber, entry.flstNodeAddress().PageNumber)
+		assert.Equal(t, beforeFirst.Offset, entry.flstNodeAddress().Offset)
+		readMtr := buffer.NewMtr(bp)
+		defer readMtr.UnpinAll()
+		readPage, err := readMtr.PageForRead(page.NewId(testFileId, 0))
+		require.NoError(t, err)
+		readH := header{bufPage: readPage}
+		afterLen, err := flst.Length(readMtr, testFileId, readH.freeListBase())
+		require.NoError(t, err)
+		assert.Equal(t, beforeLen-1, afterLen)
+	})
+
+	t.Run("FREE 空時は fill で補充してから取り出す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t)
+		initFsp(t, bp, redoLog)
+
+		// WHEN
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		headerPage, err := mtr.PageForWrite(page.NewId(testFileId, 0))
+		require.NoError(t, err)
+		h := header{bufPage: headerPage}
+		entry, err := allocateExtent(mtr, testFileId, h)
+		require.NoError(t, err)
+		commitMtr(t, mtr)
+
+		// THEN
+		readMtr := buffer.NewMtr(bp)
+		defer readMtr.UnpinAll()
+		readPage, err := readMtr.PageForRead(page.NewId(testFileId, 0))
+		require.NoError(t, err)
+		readH := header{bufPage: readPage}
+		assert.Equal(t, page.PageNumber(5*extentPageCount), readH.freeLimit())
+		assert.Equal(t, page.PageNumber(0), entry.bufPage.PageId().PageNumber())
+	})
+}
+
 func TestLoadEntryByNodeAddress(t *testing.T) {
 	t.Run("整列した node アドレスから対応する index のエントリが復元される", func(t *testing.T) {
 		// GIVEN

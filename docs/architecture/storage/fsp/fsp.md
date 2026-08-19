@@ -129,7 +129,7 @@ FREE / FREE_FRAG / FULL_FRAG の 3 リストは、ページ上に置かれた ba
 - これらの PageNumber が決定的に定まるのは、以下の 3 つの前提から
   - fill の保護規則により、初期化直後の extent 0 は「page 0 のみ使用中」の FREE_FRAG である
   - bitmap の空き探索は最下位 bit から行われる
-  - segment 経由の割り当ても、使用ページ数 128 未満の間は空間直接の単ページ割り当てを供給元として使う (詳細: [file segment (inode) - ページ割り当て](fseg.md#ページ割り当て))
+  - segment 経由の割り当ても、保有 extent に空きページがなく使用ページ数が 128 未満の間は、空間直接の単ページ割り当てを供給元として使う (詳細: [file segment (inode) - ページ割り当て](fseg.md#ページ割り当て))
 - Undo ログファイルも同じ bootstrap 順序に従い、page 1 = 最初の inode ページ、page 2 = Undo チェーンの先頭ページ (= Undo チェーンを含む segment の最初のページ) となる
 
 ## ページ解放

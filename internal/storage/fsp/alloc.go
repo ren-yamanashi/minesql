@@ -39,6 +39,30 @@ func AllocatePage(mtr *buffer.Mtr, fileId page.FileId) (page.Id, error) {
 	return page.NewId(fileId, pageNumber), nil
 }
 
+// allocateExtent は空間の FREE リストから extent を 1 つ取り出して返す
+//   - FREE が空なら fill で補充する。取り出した extent はどのリストにも属さない状態で返る (状態・id の設定は呼び出し側の責務)
+func allocateExtent(mtr *buffer.Mtr, fileId page.FileId, h header) (xdesEntry, error) {
+	for {
+		first, err := flst.First(mtr, fileId, h.freeListBase())
+		if err != nil {
+			return xdesEntry{}, err
+		}
+		if !first.IsInvalid() {
+			entry, err := loadEntryByNodeAddress(mtr, fileId, first)
+			if err != nil {
+				return xdesEntry{}, err
+			}
+			if err := flst.Remove(mtr, fileId, h.freeListBase(), first); err != nil {
+				return xdesEntry{}, err
+			}
+			return entry, nil
+		}
+		if err := fill(mtr, fileId); err != nil {
+			return xdesEntry{}, err
+		}
+	}
+}
+
 // prepareAllocationExtent は割り当てに使う FREE_FRAG リスト先頭 extent を用意して返す
 func prepareAllocationExtent(mtr *buffer.Mtr, fileId page.FileId, h header) (xdesEntry, error) {
 	for {

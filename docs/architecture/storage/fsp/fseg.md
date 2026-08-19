@@ -67,14 +67,17 @@ segment の新規作成は以下の順で行う
 
 segment に対するページ割り当ては、以下の順で払い出しページを決める
 
-1. 使用ページ数 (= frag array の使用中 slot 数 + 専有 extent 中の使用中ページ数) が 128 未満なら、[単ページ割り当て](fsp.md#ページ割り当て)を空間側に依頼し、得られた PageNumber を frag array の空き slot に記録する
-2. 使用ページ数が 128 以上なら、segment の NOT_FULL リストの先頭 extent、なければ FREE リストの先頭 extent を選び、その extent の bitmap の最下位 free bit を割り当てる。割り当てによる extent のリスト間遷移 (FREE → NOT_FULL、NOT_FULL → FULL) を反映する
-3. NOT_FULL / FREE のいずれも空の場合は、空間から新しい extent を確保して XDES_FSEG (= segment 専有) 状態にし、この segment の FREE リストに繋いでから 2 に戻る
+1. segment の NOT_FULL リストの先頭 extent、なければ FREE リストの先頭 extent を選び、その extent の bitmap の最下位 free bit を割り当てる。割り当てによる extent のリスト間遷移 (FREE → NOT_FULL、NOT_FULL → FULL) を反映する
+2. NOT_FULL / FREE のいずれも空で、使用ページ数 (= frag array の使用中 slot 数 + 専有 extent 中の使用中ページ数) が 128 未満なら、[単ページ割り当て](fsp.md#ページ割り当て)を空間側に依頼し、得られた PageNumber を frag array の空き slot に記録する
+3. NOT_FULL / FREE のいずれも空で、使用ページ数が 128 以上なら、以下の順で extent を 1 つ獲得してから 1 に戻る
+   1. 空間の FREE_FRAG リストの末尾 extent が lease 可能 (= 記述子ページを先頭に含み、予約分以外の全ページが空き) なら、その extent を XDES_FSEG_FRAG 状態にして segment の NOT_FULL リストの末尾に繋ぎ、予約分のページ数を NOT_FULL_N_USED に計上する
+   2. lease できなければ、空間から新しい extent を確保して XDES_FSEG (= segment 専有) 状態にし、segment の FREE リストに繋ぐ。このとき segment が予約している総ページ数 (= frag ページ数 + FREE / NOT_FULL / FULL の全 extent のページ数) が 40 extent 相当以上なら、続けて extent を最大 4 つ先読み確保して FREE リストに繋ぐ (フリーリスト先読み)
 
-- フリーリスト先読み: segment が予約している総ページ数 (= frag ページ数 + FREE / NOT_FULL / FULL の全 extent のページ数) が 40 extent 相当以上で、かつ FREE リストが空のとき、空間から extent を最大 4 つ先読み確保して FREE に繋ぐ
+- 保有 extent の空きページを最優先するのは、segment が既に予約した領域を使い切ってから空間の新規領域に手を伸ばすため
+- フリーリスト先読みは補充のみを目的とし、空間の容量枯渇で extent を確保できない場合はそこで打ち切る (そのときの割り当て自体は失敗しない)
 - 割り当ての探索順 (NOT_FULL → FREE、最下位 free bit) は決定的で、呼び出し側からの位置ヒントを受け取らない。分割の局所性は「同じ segment に属する extent 内でページを確保する」という配置規則から得る
 - 使用ページ数 128 の閾値は inode エントリの frag slot 数と同じ値で、「frag array が満杯になる直前まで単ページ割り当てで済ませ、以降は extent 専有に切り替える」比率に対応する
-- 手順 1 で空間側から得られたページは、そのまま segment に属する frag ページ扱いになる。そのページを含む extent の状態 (FREE_FRAG / FULL_FRAG) は空間側の遷移規則に従う
+- 手順 2 で空間側から得られたページは、そのまま segment に属する frag ページ扱いになる。そのページを含む extent の状態 (FREE_FRAG / FULL_FRAG) は空間側の遷移規則に従う
 
 ## extent の状態拡張
 

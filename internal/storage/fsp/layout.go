@@ -29,6 +29,12 @@ const extentPageCount = (1 << 20) / page.Size
 // freeAddExtents は fill 1 回で FREE リストへ追加する extent 数
 const freeAddExtents = 4
 
+// segFillReservedExtents はフリーリスト先読みを行う予約総ページ数の閾値 (extent 数)
+const segFillReservedExtents = 40
+
+// segFillAddExtents はフリーリスト先読み 1 回で segment の FREE リストへ追加する最大 extent 数
+const segFillAddExtents = 4
+
 const (
 	// descriptorPageStride は記述子ページの配置間隔 (ページ数)
 	descriptorPageStride = page.Size
@@ -41,7 +47,7 @@ const xdesBitmapSize = extentPageCount / 8
 
 // xdes エントリ (計 56 バイト) 内のオフセット (エントリ先頭からの相対値)
 const (
-	xdesIdOffset       = 0 // セグメント管理のための予約 (0 固定)
+	xdesIdOffset       = 0 // 所属 segment の id (segment 非帰属では 0)
 	xdesFlstNodeOffset = 8
 	xdesStateOffset    = 20
 	xdesBitmapOffset   = 24

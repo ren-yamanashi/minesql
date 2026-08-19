@@ -289,6 +289,59 @@ func TestInodeEntryFirstFreeFragSlot(t *testing.T) {
 	})
 }
 
+func TestInodeEntryFragPageCount(t *testing.T) {
+	t.Run("初期化直後は 0 を返す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 1)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableInodeEntry(t, mtr, 1, 0)
+		entry.initializeEntry(1)
+
+		// WHEN
+		got := entry.fragPageCount()
+
+		// THEN
+		assert.Equal(t, 0, got)
+		commitMtr(t, mtr)
+	})
+
+	t.Run("途中まで slot を埋めた分だけ増える", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 1)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableInodeEntry(t, mtr, 1, 0)
+		entry.initializeEntry(1)
+		entry.setFragSlot(0, page.PageNumber(10))
+		entry.setFragSlot(3, page.PageNumber(20))
+		entry.setFragSlot(5, page.PageNumber(30))
+
+		// WHEN
+		got := entry.fragPageCount()
+
+		// THEN
+		assert.Equal(t, 3, got)
+		commitMtr(t, mtr)
+	})
+
+	t.Run("全 slot を埋めると inodeFragSlotCount を返す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 1)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableInodeEntry(t, mtr, 1, 0)
+		entry.initializeEntry(1)
+		for i := range inodeFragSlotCount {
+			entry.setFragSlot(i, page.PageNumber(i+1))
+		}
+
+		// WHEN
+		got := entry.fragPageCount()
+
+		// THEN
+		assert.Equal(t, inodeFragSlotCount, got)
+		commitMtr(t, mtr)
+	})
+}
+
 func TestInodeEntryAddress(t *testing.T) {
 	t.Run("エントリインデックスからボディ相対のエントリアドレスを返す", func(t *testing.T) {
 		// GIVEN

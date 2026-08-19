@@ -29,6 +29,120 @@ func TestXdesEntryOffset(t *testing.T) {
 	})
 }
 
+func TestXdesEntrySegmentId(t *testing.T) {
+	t.Run("setSegmentId で書き込んだ id を読み取れる", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableEntry(t, mtr, 0)
+		entry.setSegmentId(42)
+
+		// WHEN
+		got := entry.segmentId()
+
+		// THEN
+		assert.Equal(t, uint64(42), got)
+		commitMtr(t, mtr)
+	})
+
+	t.Run("初期化直後は 0 を返す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableEntry(t, mtr, 0)
+		entry.initialize()
+
+		// WHEN
+		got := entry.segmentId()
+
+		// THEN
+		assert.Equal(t, uint64(0), got)
+		commitMtr(t, mtr)
+	})
+}
+
+func TestXdesEntrySetSegmentId(t *testing.T) {
+	t.Run("書き込んだ id が segmentId で復元できる", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableEntry(t, mtr, 0)
+
+		// WHEN
+		entry.setSegmentId(99)
+
+		// THEN
+		assert.Equal(t, uint64(99), entry.segmentId())
+		commitMtr(t, mtr)
+	})
+}
+
+func TestXdesEntryIsLeasable(t *testing.T) {
+	t.Run("記述子ページを先頭に含み先頭 1 ページのみ使用中の extent は true を返す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableEntry(t, mtr, 0)
+		entry.initialize()
+		entry.setPageFree(0, false)
+
+		// WHEN
+		got := entry.isLeasable()
+
+		// THEN
+		assert.True(t, got)
+		commitMtr(t, mtr)
+	})
+
+	t.Run("記述子ページを先頭に含まない extent は false を返す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableEntry(t, mtr, 1)
+		entry.initialize()
+		entry.setPageFree(0, false)
+
+		// WHEN
+		got := entry.isLeasable()
+
+		// THEN
+		assert.False(t, got)
+		commitMtr(t, mtr)
+	})
+
+	t.Run("先頭ページが free の場合は false を返す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableEntry(t, mtr, 0)
+		entry.initialize()
+
+		// WHEN
+		got := entry.isLeasable()
+
+		// THEN
+		assert.False(t, got)
+		commitMtr(t, mtr)
+	})
+
+	t.Run("予約分以外に使用中ページがある場合は false を返す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableEntry(t, mtr, 0)
+		entry.initialize()
+		entry.setPageFree(0, false)
+		entry.setPageFree(5, false)
+
+		// WHEN
+		got := entry.isLeasable()
+
+		// THEN
+		assert.False(t, got)
+		commitMtr(t, mtr)
+	})
+}
+
 func TestXdesEntryState(t *testing.T) {
 	t.Run("初期化前は NOT_INITED を返す", func(t *testing.T) {
 		// GIVEN

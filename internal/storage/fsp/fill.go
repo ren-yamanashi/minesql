@@ -1,12 +1,16 @@
 package fsp
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/flst"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
+
+// errCapacityExhausted はファイルの容量枯渇により extent を初期化できないことを表す
+var errCapacityExhausted = errors.New("fsp: file capacity exhausted")
 
 // fill はフリーリミットから extent の記述子を順に初期化し、FREE リストへ freeAddExtents 個追加した時点で停止する
 //   - 記述子ページを含む extent は FREE_FRAG リストへ積まれ、freeAddExtents のカウント対象にはならない
@@ -23,7 +27,7 @@ func fill(mtr *buffer.Mtr, fileId page.FileId) error {
 	for added < freeAddExtents {
 		firstPage := freeLimit
 		if firstPage > page.MaxPageNumber-page.PageNumber(extentPageCount) {
-			return fmt.Errorf("fsp: file capacity exhausted: cannot allocate extent starting at page %d", firstPage)
+			return fmt.Errorf("%w: cannot allocate extent starting at page %d", errCapacityExhausted, firstPage)
 		}
 		descrPageNum := descriptorPageNumber(firstPage)
 		containsDescriptor := firstPage == descrPageNum

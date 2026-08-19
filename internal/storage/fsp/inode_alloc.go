@@ -39,8 +39,6 @@ func allocateInodeEntry(mtr *buffer.Mtr, fileId page.FileId, h header) (inodeEnt
 
 // loadInodeEntryByAddress はエントリアドレスから対応する inodeEntry を復元する
 //   - offset が inode エントリ配列の境界に整合しない場合は panic する
-//
-//nolint:unparam // fileId is part of the accessor API and receives arbitrary file ids from external callers
 func loadInodeEntryByAddress(mtr *buffer.Mtr, fileId page.FileId, addr flst.Address) (inodeEntry, error) {
 	bufPage, err := mtr.PageForWrite(page.NewId(fileId, addr.PageNumber))
 	if err != nil {

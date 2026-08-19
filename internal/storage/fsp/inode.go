@@ -111,6 +111,17 @@ func (e inodeEntry) firstFreeFragSlot() int {
 	return -1
 }
 
+// fragPageCount は frag array の使用中 slot 数を返す
+func (e inodeEntry) fragPageCount() int {
+	n := 0
+	for i := range inodeFragSlotCount {
+		if e.fragSlot(i) != page.MaxPageNumber {
+			n++
+		}
+	}
+	return n
+}
+
 // address は自エントリのアドレスを返す (= segment header に書かれる値)
 func (e inodeEntry) address() flst.Address {
 	return flst.Address{

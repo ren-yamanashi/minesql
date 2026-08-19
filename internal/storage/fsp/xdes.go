@@ -20,6 +20,37 @@ func (x xdesEntry) offset() int {
 	return headerSize + x.index*xdesEntrySize
 }
 
+// segmentId は所属 segment の id を読み取る (0 = segment 非帰属)
+func (x xdesEntry) segmentId() uint64 {
+	body := x.bufPage.Data().Body()
+	off := x.offset() + xdesIdOffset
+	return binary.BigEndian.Uint64(body[off : off+8])
+}
+
+// setSegmentId は所属 segment の id を設定する
+func (x xdesEntry) setSegmentId(v uint64) {
+	var buf [8]byte
+	binary.BigEndian.PutUint64(buf[:], v)
+	x.bufPage.WriteBodyAt(x.offset()+xdesIdOffset, buf[:])
+}
+
+// isLeasable は extent が lease 可能 (= 記述子ページを先頭に含み、先頭 1 ページのみ使用中で他は全 free) かを返す
+func (x xdesEntry) isLeasable() bool {
+	firstPage := extentFirstPageNumber(x)
+	if int(firstPage)%descriptorPageStride != 0 {
+		return false
+	}
+	if x.isPageFree(0) {
+		return false
+	}
+	for pos := 1; pos < extentPageCount; pos++ {
+		if !x.isPageFree(pos) {
+			return false
+		}
+	}
+	return true
+}
+
 // state は extent の状態を読み取る
 func (x xdesEntry) state() extentState {
 	body := x.bufPage.Data().Body()

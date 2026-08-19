@@ -10,6 +10,8 @@ const (
 	stateFree      extentState = 1
 	stateFreeFrag  extentState = 2
 	stateFullFrag  extentState = 3
+	stateFseg      extentState = 4
+	stateFsegFrag  extentState = 5
 )
 
 func (s extentState) String() string {
@@ -22,6 +24,10 @@ func (s extentState) String() string {
 		return "FREE_FRAG"
 	case stateFullFrag:
 		return "FULL_FRAG"
+	case stateFseg:
+		return "XDES_FSEG"
+	case stateFsegFrag:
+		return "XDES_FSEG_FRAG"
 	default:
 		return fmt.Sprintf("extentState(%d)", uint32(s))
 	}
@@ -41,7 +47,11 @@ func isAllowedStateTransition(from, to extentState) bool {
 		from == stateFree && to == stateFreeFrag,
 		from == stateFreeFrag && to == stateFullFrag,
 		from == stateFullFrag && to == stateFreeFrag,
-		from == stateFreeFrag && to == stateFree:
+		from == stateFreeFrag && to == stateFree,
+		from == stateFree && to == stateFseg,
+		from == stateFseg && to == stateFree,
+		from == stateFreeFrag && to == stateFsegFrag,
+		from == stateFsegFrag && to == stateFreeFrag:
 		return true
 	default:
 		return false
