@@ -177,6 +177,23 @@ func TestInodeEntrySetMagic(t *testing.T) {
 	})
 }
 
+func TestInodeEntryClearMagic(t *testing.T) {
+	t.Run("setMagic 後の状態からゼロ埋めできる", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 1)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableInodeEntry(t, mtr, 1, 0)
+		entry.setMagic()
+
+		// WHEN
+		entry.clearMagic()
+
+		// THEN
+		assert.Equal(t, [4]byte{0, 0, 0, 0}, entry.magic())
+		commitMtr(t, mtr)
+	})
+}
+
 func TestInodeEntryFragSlot(t *testing.T) {
 	t.Run("setFragSlot で書き込んだ PageNumber を読み取れる", func(t *testing.T) {
 		// GIVEN
@@ -282,6 +299,57 @@ func TestInodeEntryFirstFreeFragSlot(t *testing.T) {
 
 		// WHEN
 		got := entry.firstFreeFragSlot()
+
+		// THEN
+		assert.Equal(t, -1, got)
+		commitMtr(t, mtr)
+	})
+}
+
+func TestInodeEntryLastUsedFragSlot(t *testing.T) {
+	t.Run("slot 0 のみ使用中なら 0 を返す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 1)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableInodeEntry(t, mtr, 1, 0)
+		entry.initializeEntry(1)
+		entry.setFragSlot(0, page.PageNumber(10))
+
+		// WHEN
+		got := entry.lastUsedFragSlot()
+
+		// THEN
+		assert.Equal(t, 0, got)
+		commitMtr(t, mtr)
+	})
+
+	t.Run("途中の slot のみ使用中なら最大 index を返す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 1)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableInodeEntry(t, mtr, 1, 0)
+		entry.initializeEntry(1)
+		entry.setFragSlot(0, page.PageNumber(10))
+		entry.setFragSlot(3, page.PageNumber(20))
+		entry.setFragSlot(5, page.PageNumber(30))
+
+		// WHEN
+		got := entry.lastUsedFragSlot()
+
+		// THEN
+		assert.Equal(t, 5, got)
+		commitMtr(t, mtr)
+	})
+
+	t.Run("全 slot が未使用なら -1 を返す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 1)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableInodeEntry(t, mtr, 1, 0)
+		entry.initializeEntry(1)
+
+		// WHEN
+		got := entry.lastUsedFragSlot()
 
 		// THEN
 		assert.Equal(t, -1, got)

@@ -231,6 +231,146 @@ func TestIsPageFree(t *testing.T) {
 	})
 }
 
+func TestFreeExtentToSpace(t *testing.T) {
+	t.Run("XDES_FSEG は空間 FREE リスト末尾へ戻り segment id が 0 になり全ページが free になる", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t)
+		initFsp(t, bp, redoLog)
+		fillOnce(t, bp, redoLog)
+		freeBefore, _ := readListLengths(t, bp)
+		fsegEntryAddr := detachFreeExtentAsFseg(t, bp, redoLog, 42)
+
+		// WHEN
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		headerPage, err := mtr.PageForWrite(page.NewId(testFileId, 0))
+		require.NoError(t, err)
+		h := header{bufPage: headerPage}
+		x, err := loadEntryByNodeAddress(mtr, testFileId, fsegEntryAddr)
+		require.NoError(t, err)
+		require.NoError(t, freeExtentToSpace(mtr, testFileId, h, x))
+		commitMtr(t, mtr)
+
+		// THEN
+		readMtr := buffer.NewMtr(bp)
+		defer readMtr.UnpinAll()
+		readPage, err := readMtr.PageForRead(page.NewId(testFileId, 0))
+		require.NoError(t, err)
+		readH := header{bufPage: readPage}
+		freeLen, err := flst.Length(readMtr, testFileId, readH.freeListBase())
+		require.NoError(t, err)
+		assert.Equal(t, freeBefore, freeLen)
+		last, err := flst.Last(readMtr, testFileId, readH.freeListBase())
+		require.NoError(t, err)
+		assert.Equal(t, fsegEntryAddr, last)
+		returned, err := loadEntryByNodeAddress(readMtr, testFileId, last)
+		require.NoError(t, err)
+		assert.Equal(t, stateFree, returned.state())
+		assert.Equal(t, uint64(0), returned.segmentId())
+		assert.True(t, returned.isAllFree())
+	})
+
+	t.Run("XDES_FSEG_FRAG は空間 FREE_FRAG リスト末尾へ戻り予約分が使用中で FRAG_N_USED が 1 加算される", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t)
+		initFsp(t, bp, redoLog)
+		fillOnce(t, bp, redoLog)
+		fragBefore := readFragNUsed(t, bp)
+		fsegFragEntryAddr := detachFreeFragExtentAsFsegFrag(t, bp, redoLog, 99)
+
+		// WHEN
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		headerPage, err := mtr.PageForWrite(page.NewId(testFileId, 0))
+		require.NoError(t, err)
+		h := header{bufPage: headerPage}
+		x, err := loadEntryByNodeAddress(mtr, testFileId, fsegFragEntryAddr)
+		require.NoError(t, err)
+		require.NoError(t, freeExtentToSpace(mtr, testFileId, h, x))
+		commitMtr(t, mtr)
+
+		// THEN
+		readMtr := buffer.NewMtr(bp)
+		defer readMtr.UnpinAll()
+		readPage, err := readMtr.PageForRead(page.NewId(testFileId, 0))
+		require.NoError(t, err)
+		readH := header{bufPage: readPage}
+		last, err := flst.Last(readMtr, testFileId, readH.freeFragListBase())
+		require.NoError(t, err)
+		assert.Equal(t, fsegFragEntryAddr, last)
+		returned, err := loadEntryByNodeAddress(readMtr, testFileId, last)
+		require.NoError(t, err)
+		assert.Equal(t, stateFreeFrag, returned.state())
+		assert.Equal(t, uint64(0), returned.segmentId())
+		assert.False(t, returned.isPageFree(0))
+		for pos := 1; pos < extentPageCount; pos++ {
+			assert.True(t, returned.isPageFree(pos))
+		}
+		assert.Equal(t, fragBefore, readH.fragNUsed())
+	})
+
+	t.Run("stateFseg / stateFsegFrag 以外の状態は panic する", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		require.NoError(t, InitHeader(mtr, testFileId))
+		entry := writableEntry(t, mtr, 0)
+		entry.initialize()
+		entry.setState(stateFreeFrag)
+		headerPage, err := mtr.PageForWrite(page.NewId(testFileId, 0))
+		require.NoError(t, err)
+		h := header{bufPage: headerPage}
+
+		// THEN
+		assert.Panics(t, func() { _ = freeExtentToSpace(mtr, testFileId, h, entry) })
+		commitMtr(t, mtr)
+	})
+}
+
+// fillOnce は 1 回の fill を独立の mtr で実行する
+func fillOnce(t *testing.T, bp *buffer.Pool, redoLog *redo.Buffer) {
+	t.Helper()
+	mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+	require.NoError(t, fill(mtr, testFileId))
+	commitMtr(t, mtr)
+}
+
+// detachFreeExtentAsFseg は空間 FREE 先頭 extent を取り出して XDES_FSEG 状態にし segment id を設定する
+//   - segment 側リストへは繋がず、宙に浮いた状態で node アドレスを返す
+func detachFreeExtentAsFseg(t *testing.T, bp *buffer.Pool, redoLog *redo.Buffer, segId uint64) flst.Address {
+	t.Helper()
+	mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+	headerPage, err := mtr.PageForWrite(page.NewId(testFileId, 0))
+	require.NoError(t, err)
+	h := header{bufPage: headerPage}
+	x, err := allocateExtent(mtr, testFileId, h)
+	require.NoError(t, err)
+	x.setSegmentId(segId)
+	x.setState(stateFseg)
+	commitMtr(t, mtr)
+	return x.flstNodeAddress()
+}
+
+// detachFreeFragExtentAsFsegFrag は記述子ページを含む FREE_FRAG extent を lease して XDES_FSEG_FRAG 状態にする
+//   - segment 側リストへは繋がず、宙に浮いた状態で node アドレスを返す
+func detachFreeFragExtentAsFsegFrag(t *testing.T, bp *buffer.Pool, redoLog *redo.Buffer, segId uint64) flst.Address {
+	t.Helper()
+	mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+	headerPage, err := mtr.PageForWrite(page.NewId(testFileId, 0))
+	require.NoError(t, err)
+	h := header{bufPage: headerPage}
+	last, err := flst.Last(mtr, testFileId, h.freeFragListBase())
+	require.NoError(t, err)
+	require.False(t, last.IsInvalid())
+	x, err := loadEntryByNodeAddress(mtr, testFileId, last)
+	require.NoError(t, err)
+	require.True(t, x.isLeasable())
+	require.NoError(t, flst.Remove(mtr, testFileId, h.freeFragListBase(), last))
+	h.setFragNUsed(h.fragNUsed() - 1)
+	x.setSegmentId(segId)
+	x.setState(stateFsegFrag)
+	commitMtr(t, mtr)
+	return x.flstNodeAddress()
+}
+
 // initFsp は FSP ヘッダーを初期化し 1 つの Mtr でコミットする
 func initFsp(t *testing.T, bp *buffer.Pool, redoLog *redo.Buffer) {
 	t.Helper()

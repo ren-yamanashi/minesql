@@ -113,13 +113,14 @@ segment に属するページの解放は、以下の判定でルートが分か
 
 segment 全体の解放は step 型で行う。1 回の呼び出し (= 1 step) は以下のいずれか 1 単位のみを解放する
 
-- extent 1 つを丸ごと解放する: segment の FULL リスト先頭、なければ NOT_FULL リスト先頭、なければ FREE リスト先頭の順で選び、その extent 全ページを free にして空間の FREE リストへ返却する
+- extent 1 つを丸ごと解放する: segment の FULL リスト先頭、なければ NOT_FULL リスト先頭、なければ FREE リスト先頭の順で選び、その extent 全ページを free にして空間の FREE リストへ返却する。lease された extent の場合は予約分の使用中ページ数を残したまま FREE_FRAG に戻す
 - frag ページ 1 枚を解放する: frag array の末尾 slot から順に取り出し、そのページを[単ページ解放](#ページ解放)する
 
 3 つの extent リストと frag array のすべてが空になったら、inode エントリの segment id を 0 に戻して未使用スロット化する。inode ページの状態 (SEG_INODES_FREE / SEG_INODES_FULL 間の遷移、空になった場合のページ解放) を反映して完了
 
 - 呼び出し側は完了マーカーを検出するまで step を繰り返す。1 step あたりの mini-transaction サイズが有界になるため、1 回の mini-transaction で数百ページを解放してログが肥大化することを防ぐ
 - 冪等性: 解放が完了した segment への再呼び出しは、inode が既に解放済みであることの検出により、新たな解放を行わず完了を報告する。これによりリカバリ経由での再呼び出しが二重解放にならない
+- 解放済みの検出は、再呼び出しが起こる文脈 (リカバリ中の DDL 巻き戻し) では並行して新しい segment が作られないことを前提とする。解放済みの inode スロットが別の segment に再利用された場合の同一性までは検出しない
 - B+Tree の解放順序: leaf segment を最後まで step 解放してから、非リーフ segment を step 解放する。非リーフ segment の最後の 1 ページはメタページであるため、木全体の解放はメタページの解放で終わる
 
 ## 利用者ごとの segment 構成

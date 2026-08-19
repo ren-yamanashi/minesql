@@ -84,6 +84,11 @@ func (e inodeEntry) setMagic() {
 	e.bufPage.WriteBodyAt(e.offset()+inodeMagicOffset, []byte(inodeMagicValue))
 }
 
+// clearMagic は破損検出用マジックナンバーをゼロ埋めする
+func (e inodeEntry) clearMagic() {
+	e.bufPage.WriteBodyAt(e.offset()+inodeMagicOffset, make([]byte, 4))
+}
+
 // fragSlot は frag array 内の slot i の PageNumber を読み取る
 //   - i が範囲外の場合は panic する (以下の frag slot 操作も同様)
 func (e inodeEntry) fragSlot(i int) page.PageNumber {
@@ -105,6 +110,16 @@ func (e inodeEntry) setFragSlot(i int, pn page.PageNumber) {
 func (e inodeEntry) firstFreeFragSlot() int {
 	for i := range inodeFragSlotCount {
 		if e.fragSlot(i) == page.MaxPageNumber {
+			return i
+		}
+	}
+	return -1
+}
+
+// lastUsedFragSlot は使用中 slot の最大 index を返す (すべて未使用なら -1)
+func (e inodeEntry) lastUsedFragSlot() int {
+	for i := inodeFragSlotCount - 1; i >= 0; i-- {
+		if e.fragSlot(i) != page.MaxPageNumber {
 			return i
 		}
 	}

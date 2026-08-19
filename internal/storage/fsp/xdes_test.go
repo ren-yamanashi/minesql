@@ -299,6 +299,45 @@ func TestXdesEntrySetPageFree(t *testing.T) {
 	})
 }
 
+func TestXdesEntrySetAllPagesFree(t *testing.T) {
+	t.Run("全ページ used の状態から全ページ free に戻せる", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableEntry(t, mtr, 0)
+		entry.initialize()
+		for pos := range extentPageCount {
+			entry.setPageFree(pos, false)
+		}
+
+		// WHEN
+		entry.setAllPagesFree()
+
+		// THEN
+		assert.True(t, entry.isAllFree())
+		assert.Equal(t, extentPageCount, entry.freePageCount())
+		commitMtr(t, mtr)
+	})
+
+	t.Run("一部 used の状態から全ページ free に戻せる", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t, 0)
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		entry := writableEntry(t, mtr, 0)
+		entry.initialize()
+		entry.setPageFree(0, false)
+		entry.setPageFree(5, false)
+		entry.setPageFree(extentPageCount-1, false)
+
+		// WHEN
+		entry.setAllPagesFree()
+
+		// THEN
+		assert.True(t, entry.isAllFree())
+		commitMtr(t, mtr)
+	})
+}
+
 func TestXdesEntryIsAllFree(t *testing.T) {
 	t.Run("初期化直後は全ページ free で true", func(t *testing.T) {
 		// GIVEN

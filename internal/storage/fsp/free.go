@@ -149,3 +149,44 @@ func transitionFreeFragToFree(mtr *buffer.Mtr, fileId page.FileId, h header, ent
 		panicOnPostWriteFlstErr(err)
 	}
 }
+
+// freeExtentToSpace は segment から返却された extent を空間のリストへ戻す
+//   - XDES_FSEG は全ページを free 化して FREE リストへ、XDES_FSEG_FRAG は予約分 (先頭 1 ページ) を
+//     使用中に戻して FREE_FRAG リストの末尾へ繋ぎ、FRAG_N_USED に予約分 1 を加算する
+//   - 呼び出し前提: extent は segment 側リストから除去済みであること
+func freeExtentToSpace(mtr *buffer.Mtr, fileId page.FileId, h header, x xdesEntry) error {
+	state := x.state()
+	if state != stateFseg && state != stateFsegFrag {
+		panic(fmt.Sprintf("fsp: cannot return extent to space in state %s", state))
+	}
+	var destBase flst.Address
+	if state == stateFseg {
+		destBase = h.freeListBase()
+	} else {
+		destBase = h.freeFragListBase()
+	}
+	last, err := flst.Last(mtr, fileId, destBase)
+	if err != nil {
+		return err
+	}
+	if !last.IsInvalid() {
+		if _, err := mtr.PageForWrite(page.NewId(fileId, last.PageNumber)); err != nil {
+			return err
+		}
+	}
+	x.setSegmentId(0)
+	x.setAllPagesFree()
+	if state == stateFseg {
+		x.setState(stateFree)
+	} else {
+		x.setPageFree(0, false)
+		x.setState(stateFreeFrag)
+	}
+	if err := flst.AddLast(mtr, fileId, destBase, x.flstNodeAddress()); err != nil {
+		panicOnPostWriteFlstErr(err)
+	}
+	if state == stateFsegFrag {
+		h.setFragNUsed(h.fragNUsed() + 1)
+	}
+	return nil
+}

@@ -88,6 +88,15 @@ func (x xdesEntry) setPageFree(pos int, free bool) {
 	x.bufPage.WriteBodyAt(byteOffset, []byte{b})
 }
 
+// setAllPagesFree は extent 内の全ページの free bit を free に設定する
+func (x xdesEntry) setAllPagesFree() {
+	bitmap := make([]byte, xdesBitmapSize)
+	for i := range bitmap {
+		bitmap[i] = 0xFF
+	}
+	x.bufPage.WriteBodyAt(x.offset()+xdesBitmapOffset, bitmap)
+}
+
 // isAllFree は extent 内の全ページが free かどうかを返す
 func (x xdesEntry) isAllFree() bool {
 	for _, b := range x.bitmap() {
@@ -146,11 +155,7 @@ func (x xdesEntry) initialize() {
 	flst.InvalidAddress().WriteAt(node[:], 6) // next
 	x.bufPage.WriteBodyAt(x.offset()+xdesFlstNodeOffset, node[:])
 	x.setState(stateFree)
-	bitmap := make([]byte, xdesBitmapSize)
-	for i := range bitmap {
-		bitmap[i] = 0xFF
-	}
-	x.bufPage.WriteBodyAt(x.offset()+xdesBitmapOffset, bitmap)
+	x.setAllPagesFree()
 }
 
 func (x xdesEntry) bitmap() []byte {
