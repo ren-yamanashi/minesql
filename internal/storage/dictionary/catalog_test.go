@@ -7,6 +7,8 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/flst"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
@@ -224,6 +226,33 @@ func TestCreateCatalog(t *testing.T) {
 		assert.False(t, catalog.columnMeta.tree.MetaPageId().IsInvalid())
 		assert.False(t, catalog.constraintMeta.tree.MetaPageId().IsInvalid())
 		assert.False(t, catalog.userMeta.tree.MetaPageId().IsInvalid())
+	})
+
+	t.Run("ヘッダーページは PageNumber 2 に配置される (page 1 = 最初の inode ページ)", func(t *testing.T) {
+		// GIVEN
+		bp := setupCatalogTestBufferPool(t)
+
+		// WHEN
+		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
+		_, err := CreateCatalog(ctMtr)
+		_ = ctMtr.Commit()
+		assert.NoError(t, err)
+
+		// THEN
+		assert.Equal(t, page.PageNumber(2), catalogHeaderPageNum)
+		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
+		bufPageHeader, err := bp.Page(headerPageId)
+		assert.NoError(t, err)
+		defer bp.Unpin(headerPageId)
+		assert.NotNil(t, bufPageHeader)
+		readMtr := buffer.NewMtr(bp)
+		defer readMtr.UnpinAll()
+		addr, err := fsp.ReadSegmentHeader(
+			readMtr, CatalogFileId,
+			flst.Address{PageNumber: catalogHeaderPageNum, Offset: headerSegmentHeaderOffset},
+		)
+		assert.NoError(t, err)
+		assert.Equal(t, page.PageNumber(1), addr.PageNumber)
 	})
 
 	t.Run("書き込んだヘッダーページがフラッシュ対象になる", func(t *testing.T) {

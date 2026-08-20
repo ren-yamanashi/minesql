@@ -20,7 +20,7 @@ func TestOpenManagerEmpty(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Empty(t, opened.entries)
-		assert.Equal(t, page.NewId(mgr.fileId, 1), opened.currentPageId)
+		assert.Equal(t, page.NewId(mgr.fileId, ChainHeadPageNumber), opened.currentPageId)
 	})
 }
 
@@ -157,7 +157,7 @@ func TestOpenManagerCurrentPageIdIsLastPage(t *testing.T) {
 			_, err := appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, largeRecord)
 			assert.NoError(t, err)
 		}
-		startPageId := page.NewId(mgr.fileId, 1)
+		startPageId := page.NewId(mgr.fileId, ChainHeadPageNumber)
 		assert.NotEqual(t, startPageId, mgr.currentPageId, "事前条件: 新規ページが割り当てられている")
 
 		// WHEN

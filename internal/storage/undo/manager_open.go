@@ -17,7 +17,7 @@ func OpenManager(bp *buffer.Pool, fileId page.FileId) (*Manager, error) {
 		entries:    make(map[lock.TrxId][]Entry),
 	}
 
-	pageNum := page.PageNumber(1)
+	pageNum := ChainHeadPageNumber
 	for {
 		pageId := page.NewId(fileId, pageNum)
 		nextPageNum, err := m.restoreFromPage(pageId)
@@ -56,7 +56,7 @@ func (m *Manager) restoreFromPage(pageId page.Id) (page.PageNumber, error) {
 	}
 	defer m.bufferPool.Unpin(pageId)
 
-	undoPage := NewPage(bufPage)
+	undoPage := openUndoPage(bufPage, pageId)
 	offset := 0
 	for offset < int(undoPage.UsedBytes()) {
 		recordBytes := undoPage.Record(offset)

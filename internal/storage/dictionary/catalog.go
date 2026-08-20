@@ -8,6 +8,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
 const (
@@ -22,13 +23,14 @@ const (
 	headerUndoLogFileIdOffset         = 32
 	headerDDLUndoRootPageNumberOffset = 36
 	headerNextTrxIdOffset             = 40
+	headerSegmentHeaderOffset         = 44
 	headerFieldSize                   = 4
 )
 
 // CatalogFileId はカタログヘッダーが置かれる FileId (= DB 全体で固定値)
 var CatalogFileId = page.FileId(0)
 
-var catalogHeaderPageNum = page.PageNumber(1)
+var catalogHeaderPageNum = page.PageNumber(2)
 
 type Catalog struct {
 	nextFileId         page.FileId
@@ -113,22 +115,17 @@ func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
 // CreateCatalog はカタログを新規作成する
 //   - mtr: FSP ヘッダー初期化・ヘッダーページ確保・各メタテーブル作成を記録する Mtr。Commit / UnpinAll は呼び出し側
 //   - mtr の trxId に応じた Redo が記録される (= ブートストラップでは SystemReservedTrxId)
-//   - ヘッダーページは PageNumber == 1 で確保される
+//   - ヘッダーページは PageNumber == catalogHeaderPageNum で確保される
 func CreateCatalog(mtr *buffer.Mtr) (*Catalog, error) {
-	bp := mtr.Pool()
-
 	if err := fsp.InitHeader(mtr, CatalogFileId); err != nil {
 		return nil, err
 	}
-	headerPageId, err := fsp.AllocatePage(mtr, CatalogFileId)
+	headerPageId, err := fsp.CreateSegment(mtr, CatalogFileId, headerSegmentHeaderOffset)
 	if err != nil {
 		return nil, err
 	}
 	if headerPageId.PageNumber() != catalogHeaderPageNum {
 		panic(fmt.Sprintf("dictionary: catalog header page must be PageNumber %d, got %d", catalogHeaderPageNum, headerPageId.PageNumber()))
-	}
-	if _, err := bp.AddPage(headerPageId); err != nil {
-		return nil, err
 	}
 	bufPageHeader, err := mtr.PageForWrite(headerPageId)
 	if err != nil {
@@ -160,7 +157,7 @@ func CreateCatalog(mtr *buffer.Mtr) (*Catalog, error) {
 		return nil, err
 	}
 
-	ddlUndoRootPageId, err := allocateAndInitializeDDLUndoRootPage(mtr, bp)
+	ddlUndoRootPageId, err := undo.CreateChainRoot(mtr, CatalogFileId)
 	if err != nil {
 		return nil, err
 	}

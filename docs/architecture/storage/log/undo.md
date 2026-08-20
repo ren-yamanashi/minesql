@@ -106,11 +106,24 @@ Undo ページへの書き込みは、 対応するデータ操作の mini-trans
 - Undo チェーン全体は 1 つの [file segment (inode)](../fsp/fseg.md) に属し、チェーンの追加ページはこの segment からの[ページ割り当て](../fsp/fseg.md#ページ割り当て)で払い出される。segment header はチェーン先頭ページ (= segment の最初のページ) に置かれる (詳細: [file segment (inode) - 利用者ごとの segment 構成](../fsp/fseg.md#利用者ごとの-segment-構成))
   - Undo ログファイルの bootstrap 順序により、チェーン先頭ページの PageNumber は 2 になる (page 0 = FSP ヘッダー、page 1 = 最初の inode ページ。詳細: [ファイル空間管理 - bootstrap 時の決定的配置](../fsp/fsp.md#bootstrap-時の決定的配置))
 
+後続ページのレイアウト
+
 | 領域 | バイト数 | 説明 |
 | --- | --- | --- |
 | ヘッダー | 2 | ボディ部分の使用済みバイト数 |
 | ヘッダー | 4 | 次の Undo ページの PageNumber |
 | ボディ | 可変 | Undo レコードが先頭に順から詰められる |
+
+チェーン先頭ページのレイアウト
+
+| 領域 | バイト数 | 説明 |
+| --- | --- | --- |
+| ヘッダー | 2 | ボディ部分の使用済みバイト数 |
+| ヘッダー | 4 | 次の Undo ページの PageNumber |
+| ヘッダー | 6 | チェーン全体を含む segment の [segment header](../fsp/fseg.md#segment-header) |
+| ボディ | 可変 | Undo レコードが先頭に順から詰められる |
+
+- チェーン先頭ページの segment header 領域は、後続ページには存在しない。チェーンの拡張・解放はこの segment header を経由する
 
 ```txt
 | ヘッダー | レコード#0 | レコード#1 | レコード#2 | 空き ... |

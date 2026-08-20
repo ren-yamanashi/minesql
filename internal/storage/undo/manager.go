@@ -27,29 +27,21 @@ type Manager struct {
 	entries       map[lock.TrxId][]Entry // trxId → Entry[] のマップ
 }
 
-// NewManager は Undo ファイルの FSP ヘッダーを初期化し、先頭ページを 1 枚確保して Manager を返す
-//   - mtr: FSP ヘッダー初期化と先頭ページ初期化を記録する Mtr。Commit / UnpinAll は呼び出し側
-//   - 先頭ページは PageNumber == 1 で確保される
+// NewManager は Undo ファイルの FSP ヘッダーを初期化し、 チェーン先頭ページを 1 枚確保して Manager を返す
+//   - mtr: FSP ヘッダー初期化とチェーン先頭ページの segment 作成を記録する Mtr。Commit / UnpinAll は呼び出し側
+//   - 先頭ページは PageNumber == ChainHeadPageNumber で確保される
 func NewManager(mtr *buffer.Mtr, fileId page.FileId) (*Manager, error) {
 	if err := fsp.InitHeader(mtr, fileId); err != nil {
 		return nil, err
 	}
 	bp := mtr.Pool()
-	pageId, err := fsp.AllocatePage(mtr, fileId)
+	pageId, err := CreateChainRoot(mtr, fileId)
 	if err != nil {
 		return nil, err
 	}
-	if pageId.PageNumber() != 1 {
-		panic(fmt.Sprintf("undo: first allocated page must be PageNumber 1, got %d", pageId.PageNumber()))
+	if pageId.PageNumber() != ChainHeadPageNumber {
+		panic(fmt.Sprintf("undo: chain head page must be PageNumber %d, got %d", ChainHeadPageNumber, pageId.PageNumber()))
 	}
-	if _, err := bp.AddPage(pageId); err != nil {
-		return nil, err
-	}
-	bufPageUndo, err := mtr.PageForWrite(pageId)
-	if err != nil {
-		return nil, err
-	}
-	CreatePage(bufPageUndo)
 
 	return &Manager{
 		bufferPool:    bp,
@@ -107,7 +99,7 @@ func (m *Manager) LookupByPointer(mtr *buffer.Mtr, ptr Pointer) (Record, error) 
 	if err != nil {
 		return nil, err
 	}
-	undoPage := NewPage(pageUndo)
+	undoPage := openUndoPage(pageUndo, pageId)
 
 	recordBytes := undoPage.Record(int(ptr.offset))
 	if recordBytes == nil {
@@ -162,7 +154,7 @@ func (m *Manager) writeToPage(mtr *buffer.Mtr, trxId lock.TrxId, record Record) 
 	if err != nil {
 		return Pointer{}, err
 	}
-	bufPageUndo := NewPage(pageUndo)
+	bufPageUndo := openUndoPage(pageUndo, m.currentPageId)
 
 	// ページが満杯の場合は新しいページに切り替えてレコードを書き込む
 	if bufPageUndo.FreeSpace() < len(serialized) {
@@ -182,7 +174,8 @@ func (m *Manager) switchToNewPage(
 	currentPage *Page,
 	serialized []byte,
 ) (Pointer, error) {
-	newPageId, err := fsp.AllocatePage(mtr, m.fileId)
+	rootHeaderAt := chainRootHeaderAt(page.NewId(m.fileId, ChainHeadPageNumber))
+	newPageId, err := fsp.AllocateSegmentPage(mtr, m.fileId, rootHeaderAt)
 	if err != nil {
 		return Pointer{}, err
 	}
@@ -202,4 +195,12 @@ func (m *Manager) switchToNewPage(
 	m.currentPageId = newPageId
 
 	return NewPointer(newPageId.PageNumber(), 0), nil
+}
+
+// openUndoPage は pageId のチェーン内位置 (先頭 or 後続) に応じた undo.Page ビューを返す
+func openUndoPage(bufPage *buffer.Page, pageId page.Id) *Page {
+	if pageId.PageNumber() == ChainHeadPageNumber {
+		return NewFirstPage(bufPage)
+	}
+	return NewPage(bufPage)
 }

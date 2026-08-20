@@ -115,7 +115,7 @@ func TestDDLManagerAppend(t *testing.T) {
 		bufPage, err := mgr.bufferPool.Page(oldPageId)
 		assert.NoError(t, err)
 		defer mgr.bufferPool.Unpin(oldPageId)
-		oldDDLPage := NewPage(bufPage)
+		oldDDLPage := NewFirstPage(bufPage)
 		assert.Equal(t, mgr.currentPageId.PageNumber(), oldDDLPage.NextPageNumber())
 	})
 
@@ -208,7 +208,7 @@ func TestDDLManagerClear(t *testing.T) {
 		bufPage, err := mgr.bufferPool.Page(rootPageId)
 		assert.NoError(t, err)
 		defer mgr.bufferPool.Unpin(rootPageId)
-		rootDDLPage := NewPage(bufPage)
+		rootDDLPage := NewFirstPage(bufPage)
 		assert.Equal(t, uint16(0), rootDDLPage.UsedBytes())
 		assert.Equal(t, page.PageNumber(0), rootDDLPage.NextPageNumber())
 	})
@@ -261,6 +261,24 @@ func TestDDLManagerClear(t *testing.T) {
 		assert.Len(t, records, 1)
 		assert.Equal(t, []byte("after-clear"), records[0].payload)
 	})
+
+	t.Run("複数ページ Append → Clear → 再度ページ切替まで Append できる", func(t *testing.T) {
+		// GIVEN
+		mgr, redoLog := setupDDLManager(t)
+		rootPageId := mgr.rootPageId
+		fillUntilPageSwitch(t, mgr, redoLog)
+		assert.NotEqual(t, rootPageId, mgr.currentPageId)
+
+		// WHEN
+		clearDDL(t, mgr, redoLog)
+		assert.Equal(t, rootPageId, mgr.currentPageId)
+		fillUntilPageSwitch(t, mgr, redoLog)
+
+		// THEN
+		assert.NotEqual(t, rootPageId, mgr.currentPageId)
+		records := reverseScanDDL(t, mgr)
+		assert.NotEmpty(t, records)
+	})
 }
 
 // setupDDLTestEnv は DDLManager テスト用に buffer.Pool / DDL Undo root を作る
@@ -292,18 +310,10 @@ func setupDDLTestEnv(t *testing.T) (*buffer.Pool, page.Id, *redo.Buffer) {
 	}
 
 	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-	rootPageId, err := fsp.AllocatePage(mtr, fileId)
+	rootPageId, err := CreateChainRoot(mtr, fileId)
 	if err != nil {
-		t.Fatalf("DDL Undo root ページの確保に失敗: %v", err)
+		t.Fatalf("DDL Undo チェーン先頭ページの確保に失敗: %v", err)
 	}
-	if _, err := bp.AddPage(rootPageId); err != nil {
-		t.Fatalf("DDL Undo root ページの追加に失敗: %v", err)
-	}
-	rootBufPage, err := mtr.PageForWrite(rootPageId)
-	if err != nil {
-		t.Fatalf("DDL Undo root ページの書き込み準備に失敗: %v", err)
-	}
-	CreatePage(rootBufPage)
 	if err := mtr.Commit(); err != nil {
 		t.Fatalf("セットアップ Mtr の Commit に失敗: %v", err)
 	}

@@ -209,7 +209,7 @@ func (r *Recovery) applyDDLRollback(records []redo.Record) error {
 
 // collectUndoRecords は Undo ページを走査して指定トランザクションのレコードを収集する
 func (r *Recovery) collectUndoRecords(trxId lock.TrxId) ([]undo.Record, error) {
-	pageNum := page.PageNumber(1)
+	pageNum := undo.ChainHeadPageNumber
 	var records []undo.Record
 	for {
 		pageId := page.NewId(r.undoFileId, pageNum)
@@ -240,7 +240,7 @@ func (r *Recovery) collectFromUndoPage(
 		return 0, false, nil
 	}
 
-	undoPage := undo.NewPage(readPage)
+	undoPage := openUndoPageForCollect(readPage, pageId)
 	offset := 0
 	for offset < int(undoPage.UsedBytes()) {
 		recordBytes := undoPage.Record(offset)
@@ -262,4 +262,13 @@ func (r *Recovery) collectFromUndoPage(
 		*records = append(*records, record)
 	}
 	return undoPage.NextPageNumber(), true, nil
+}
+
+// openUndoPageForCollect は走査対象ページのチェーン内位置に応じた undo.Page ビューを返す
+//   - 通常 Undo ファイルではチェーン先頭ページは undo.ChainHeadPageNumber
+func openUndoPageForCollect(bufPage *buffer.Page, pageId page.Id) *undo.Page {
+	if pageId.PageNumber() == undo.ChainHeadPageNumber {
+		return undo.NewFirstPage(bufPage)
+	}
+	return undo.NewPage(bufPage)
 }

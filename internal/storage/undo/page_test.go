@@ -4,9 +4,13 @@ import (
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/flst"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewPage(t *testing.T) {
@@ -62,6 +66,76 @@ func TestCreatePage(t *testing.T) {
 		// THEN: ヘッダーがゼロクリアされる
 		assert.Equal(t, uint16(0), undoPage.UsedBytes())
 		assert.Equal(t, page.PageNumber(0), undoPage.NextPageNumber())
+	})
+}
+
+func TestNewFirstPage(t *testing.T) {
+	t.Run("buffer.Page から先頭ページを開ける", func(t *testing.T) {
+		// GIVEN
+		bufPage := newTestBufferPage(t)
+
+		// WHEN
+		undoPage := NewFirstPage(bufPage)
+
+		// THEN
+		assert.NotNil(t, undoPage)
+	})
+
+	t.Run("先頭ページの body 開始は 12 バイト目 (= segment header 分ずれる)", func(t *testing.T) {
+		// GIVEN
+		bufPage := newTestBufferPage(t)
+
+		// WHEN
+		firstPage := NewFirstPage(bufPage)
+		followerPage := NewPage(bufPage)
+
+		// THEN
+		assert.Equal(t, len(followerPage.body)-6, len(firstPage.body))
+	})
+}
+
+func TestCreateFirstPage(t *testing.T) {
+	t.Run("初期化後は UsedBytes と NextPageNumber が 0", func(t *testing.T) {
+		// GIVEN
+		bufPage := newTestBufferPage(t)
+
+		// WHEN
+		firstPage := CreateFirstPage(bufPage)
+
+		// THEN
+		assert.Equal(t, uint16(0), firstPage.UsedBytes())
+		assert.Equal(t, page.PageNumber(0), firstPage.NextPageNumber())
+	})
+
+	t.Run("初期化は segment header 領域 (body offset 6-11) を書き換えない", func(t *testing.T) {
+		// GIVEN: segment header 領域に検出用の値を書き込んでおく
+		bufPage := newTestBufferPage(t)
+		marker := []byte{0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF}
+		bufPage.WriteBodyAt(firstPageSegmentHeaderOffset, marker)
+
+		// WHEN
+		_ = CreateFirstPage(bufPage)
+
+		// THEN
+		body := bufPage.Data().Body()
+		assert.Equal(t, marker, body[firstPageSegmentHeaderOffset:firstPageHeaderSize])
+	})
+
+	t.Run("先頭ページに append / Record / FreeSpace が正しく動く", func(t *testing.T) {
+		// GIVEN
+		bufPage := newTestBufferPage(t)
+		firstPage := CreateFirstPage(bufPage)
+		bodySize := len(firstPage.body)
+		record := []byte{0x01, 0x02, 0x03, 0x04}
+
+		// WHEN
+		ok := firstPage.append(record)
+
+		// THEN
+		assert.True(t, ok)
+		assert.Equal(t, uint16(len(record)), firstPage.UsedBytes())
+		assert.Equal(t, bodySize-len(record), firstPage.FreeSpace())
+		assert.Equal(t, record, firstPage.BodyAt(0, len(record)))
 	})
 }
 
@@ -494,6 +568,85 @@ func TestPageSetNextPageNumber(t *testing.T) {
 		// THEN
 		assert.Equal(t, page.PageNumber(20), undoPage.NextPageNumber())
 	})
+}
+
+func TestCreateChainRoot(t *testing.T) {
+	t.Run("新規 undo ファイルで呼ぶと ChainHeadPageNumber を返す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupChainRootTestEnv(t)
+		initMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		require.NoError(t, fsp.InitHeader(initMtr, page.FileId(1)))
+		require.NoError(t, initMtr.Commit())
+
+		// WHEN
+		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		rootPageId, err := CreateChainRoot(mtr, page.FileId(1))
+		require.NoError(t, err)
+		require.NoError(t, mtr.Commit())
+
+		// THEN
+		assert.Equal(t, ChainHeadPageNumber, rootPageId.PageNumber())
+	})
+
+	t.Run("先頭ページの segment header が inode エントリを指す", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupChainRootTestEnv(t)
+		initMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		require.NoError(t, fsp.InitHeader(initMtr, page.FileId(1)))
+		require.NoError(t, initMtr.Commit())
+
+		// WHEN
+		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		rootPageId, err := CreateChainRoot(mtr, page.FileId(1))
+		require.NoError(t, err)
+		require.NoError(t, mtr.Commit())
+
+		// THEN: segment header は page 1 の inode ページを指す
+		readMtr := buffer.NewMtr(bp)
+		defer readMtr.UnpinAll()
+		addr, err := fsp.ReadSegmentHeader(
+			readMtr, page.FileId(1),
+			flst.Address{PageNumber: rootPageId.PageNumber(), Offset: firstPageSegmentHeaderOffset},
+		)
+		require.NoError(t, err)
+		assert.Equal(t, page.PageNumber(1), addr.PageNumber)
+	})
+
+	t.Run("チェーン先頭ページが frag slot に登録される (= segment に属する)", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupChainRootTestEnv(t)
+		initMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		require.NoError(t, fsp.InitHeader(initMtr, page.FileId(1)))
+		require.NoError(t, initMtr.Commit())
+
+		// WHEN
+		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		rootPageId, err := CreateChainRoot(mtr, page.FileId(1))
+		require.NoError(t, err)
+		require.NoError(t, mtr.Commit())
+
+		// THEN: 追加ページを AllocateSegmentPage で確保できる (= segment header が有効に働く)
+		allocMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		newPageId, err := fsp.AllocateSegmentPage(
+			allocMtr, page.FileId(1),
+			flst.Address{PageNumber: rootPageId.PageNumber(), Offset: firstPageSegmentHeaderOffset},
+		)
+		require.NoError(t, err)
+		require.NoError(t, allocMtr.Commit())
+		assert.NotEqual(t, rootPageId, newPageId)
+	})
+}
+
+// setupChainRootTestEnv は CreateChainRoot テスト用の buffer.Pool と redo.Buffer を作成する
+func setupChainRootTestEnv(t *testing.T) (*buffer.Pool, *redo.Buffer) {
+	t.Helper()
+	redoLog, err := redo.NewBuffer(t.TempDir())
+	if err != nil {
+		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = redoLog.Close() })
+	bp := setupTestBufferPool(t, redoLog)
+	return bp, redoLog
 }
 
 // newTestBufferPage はテスト用の buffer.Page を作成する

@@ -4,35 +4,66 @@ import (
 	"encoding/binary"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/flst"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
 const (
-	headerUsedBytesOffset      = 0
-	headerNextPageNumberOffset = 2
-	pageHeaderSize             = 6 // UsedBytes(2) + NextPageNum(4)
+	headerUsedBytesOffset        = 0
+	headerNextPageNumberOffset   = 2
+	pageHeaderSize               = 6  // UsedBytes(2) + NextPageNum(4)
+	firstPageSegmentHeaderOffset = 6  // チェーン先頭ページの segment header 開始オフセット
+	firstPageHeaderSize          = 12 // UsedBytes(2) + NextPageNum(4) + segment header(6)
 )
+
+// ChainHeadPageNumber は Undo チェーンの先頭ページの PageNumber
+//   - Undo ファイルの bootstrap 順序 (page 0 = FSP ヘッダー、 page 1 = 最初の inode ページ、 page 2 = チェーン先頭) の帰結
+const ChainHeadPageNumber = page.PageNumber(2)
 
 type Page struct {
 	// header / body は bufPage.Data().Body() への読み取りビュー (書き込みは bufPage の API 経由で行う必要がある)
-	header  []byte
-	body    []byte
-	bufPage *buffer.Page
+	// bodyStart はページボディ先頭から body slice の先頭までのバイト数 (後続ページ = 6、 先頭ページ = 12)
+	header    []byte
+	body      []byte
+	bodyStart int
+	bufPage   *buffer.Page
 }
 
-// NewPage は既存の Undo ページを開く
+// NewPage は既存の Undo ページを開く (チェーンの後続ページ用)
 func NewPage(bufPage *buffer.Page) *Page {
 	body := bufPage.Data().Body()
 	return &Page{
-		header:  body[:pageHeaderSize],
-		body:    body[pageHeaderSize:],
-		bufPage: bufPage,
+		header:    body[:pageHeaderSize],
+		body:      body[pageHeaderSize:],
+		bodyStart: pageHeaderSize,
+		bufPage:   bufPage,
 	}
 }
 
-// CreatePage は新規 Undo ページを作成する
+// CreatePage は新規 Undo ページを作成する (チェーンの後続ページ用)
 func CreatePage(bufPage *buffer.Page) *Page {
 	p := NewPage(bufPage)
+	p.initialize()
+	return p
+}
+
+// NewFirstPage は Undo チェーンの先頭ページを開く
+//   - 先頭ページのボディは body offset 6 に segment header 領域が予約され、 レコード領域はその後ろから始まる
+func NewFirstPage(bufPage *buffer.Page) *Page {
+	body := bufPage.Data().Body()
+	return &Page{
+		header:    body[:pageHeaderSize],
+		body:      body[firstPageHeaderSize:],
+		bodyStart: firstPageHeaderSize,
+		bufPage:   bufPage,
+	}
+}
+
+// CreateFirstPage は Undo チェーンの先頭ページを新規初期化する
+//   - segment header 領域 (offset 6-11) には書き込まない
+func CreateFirstPage(bufPage *buffer.Page) *Page {
+	p := NewFirstPage(bufPage)
 	p.initialize()
 	return p
 }
@@ -94,7 +125,7 @@ func (p *Page) append(record []byte) bool {
 	if used+len(record) > len(p.body) {
 		return false
 	}
-	p.bufPage.WriteBodyAt(pageHeaderSize+used, record)
+	p.bufPage.WriteBodyAt(p.bodyStart+used, record)
 	p.setUsedBytes(uint16(used + len(record)))
 	return true
 }
@@ -111,4 +142,25 @@ func (p *Page) setUsedBytes(n uint16) {
 	var buf [2]byte
 	binary.BigEndian.PutUint16(buf[:], n)
 	p.bufPage.WriteBodyAt(headerUsedBytesOffset, buf[:])
+}
+
+// CreateChainRoot は Undo チェーン全体を管理する segment を新規作成し、 チェーン先頭ページの PageId を返す
+//   - mtr: segment 作成と先頭ページ初期化を記録する Mtr。 Commit / UnpinAll は呼び出し側
+//   - fileId: Undo チェーンを配置するファイルの FileId
+func CreateChainRoot(mtr *buffer.Mtr, fileId page.FileId) (page.Id, error) {
+	pageId, err := fsp.CreateSegment(mtr, fileId, firstPageSegmentHeaderOffset)
+	if err != nil {
+		return page.InvalidId(), err
+	}
+	bufPage, err := mtr.PageForWrite(pageId)
+	if err != nil {
+		return page.InvalidId(), err
+	}
+	CreateFirstPage(bufPage)
+	return pageId, nil
+}
+
+// chainRootHeaderAt はチェーン先頭ページ上の segment header のアドレスを返す
+func chainRootHeaderAt(rootPageId page.Id) flst.Address {
+	return flst.Address{PageNumber: rootPageId.PageNumber(), Offset: firstPageSegmentHeaderOffset}
 }

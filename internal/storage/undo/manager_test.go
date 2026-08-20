@@ -32,6 +32,23 @@ func TestNewManager(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, mgr)
 	})
+
+	t.Run("チェーン先頭ページの PageNumber は ChainHeadPageNumber", func(t *testing.T) {
+		// GIVEN
+		redoLog, err := redo.NewBuffer(t.TempDir())
+		assert.NoError(t, err)
+		t.Cleanup(func() { _ = redoLog.Close() })
+		bp := setupTestBufferPool(t, redoLog)
+
+		// WHEN
+		openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+		mgr, err := NewManager(openMtr, page.FileId(1))
+		assert.NoError(t, err)
+		_ = openMtr.Commit()
+
+		// THEN
+		assert.Equal(t, ChainHeadPageNumber, mgr.currentPageId.PageNumber())
+	})
 }
 
 func TestManagerAppend(t *testing.T) {

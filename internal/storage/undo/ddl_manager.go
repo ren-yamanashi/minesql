@@ -45,7 +45,7 @@ func NewDDLManager(
 		if err != nil {
 			return nil, err
 		}
-		ddlPage := NewPage(bufPage)
+		ddlPage := openDDLPage(bufPage, pageId, rootPageId)
 		nextPN := ddlPage.NextPageNumber()
 		bp.Unpin(pageId)
 		if nextPN == 0 {
@@ -66,7 +66,7 @@ func (m *DDLManager) Append(mtr *buffer.Mtr, record DDLRecord) error {
 	if err != nil {
 		return err
 	}
-	ddlPage := NewPage(pageUndo)
+	ddlPage := openDDLPage(pageUndo, m.currentPageId, m.rootPageId)
 
 	if ddlPage.FreeSpace() < len(serialized) {
 		return m.switchToNewPage(mtr, ddlPage, serialized)
@@ -88,7 +88,7 @@ func (m *DDLManager) ReverseScan(mtr *buffer.Mtr) ([]DDLRecord, error) {
 		if err != nil {
 			return nil, err
 		}
-		ddlPage := NewPage(bufPage)
+		ddlPage := openDDLPage(bufPage, pageId, m.rootPageId)
 		used := int(ddlPage.UsedBytes())
 		offset := 0
 		for offset < used {
@@ -124,7 +124,7 @@ func (m *DDLManager) Clear(mtr *buffer.Mtr) error {
 		if err != nil {
 			return err
 		}
-		ddlPage := NewPage(bufPage)
+		ddlPage := openDDLPage(bufPage, pageId, m.rootPageId)
 		nextPN := ddlPage.NextPageNumber()
 		mtr.Unpin(pageId)
 		if nextPN == 0 {
@@ -134,8 +134,9 @@ func (m *DDLManager) Clear(mtr *buffer.Mtr) error {
 		intermediatePageIds = append(intermediatePageIds, pageId)
 	}
 
+	rootHeaderAt := chainRootHeaderAt(m.rootPageId)
 	for i := len(intermediatePageIds) - 1; i >= 0; i-- {
-		if err := fsp.FreePage(mtr, intermediatePageIds[i]); err != nil {
+		if err := fsp.FreeSegmentPage(mtr, rootHeaderAt, intermediatePageIds[i]); err != nil {
 			return err
 		}
 	}
@@ -144,7 +145,7 @@ func (m *DDLManager) Clear(mtr *buffer.Mtr) error {
 	if err != nil {
 		return err
 	}
-	CreatePage(rootBufPage)
+	CreateFirstPage(rootBufPage)
 
 	m.currentPageId = m.rootPageId
 	return nil
@@ -157,7 +158,7 @@ func (m *DDLManager) switchToNewPage(
 	currentPage *Page,
 	serialized []byte,
 ) error {
-	newPageId, err := fsp.AllocatePage(mtr, m.fileId)
+	newPageId, err := fsp.AllocateSegmentPage(mtr, m.fileId, chainRootHeaderAt(m.rootPageId))
 	if err != nil {
 		return err
 	}
@@ -177,4 +178,12 @@ func (m *DDLManager) switchToNewPage(
 	m.currentPageId = newPageId
 
 	return nil
+}
+
+// openDDLPage は DDL チェーン内位置 (rootPageId かそれ以外か) に応じた undo.Page ビューを返す
+func openDDLPage(bufPage *buffer.Page, pageId, rootPageId page.Id) *Page {
+	if pageId == rootPageId {
+		return NewFirstPage(bufPage)
+	}
+	return NewPage(bufPage)
 }
