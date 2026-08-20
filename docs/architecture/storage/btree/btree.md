@@ -11,8 +11,23 @@
 
 ## B+Tree の作成
 
-- 新しい B+Tree を作成する際は、まず空の[リーフノード](./node-leaf.md)を 1 つ作成し、そのノードをルートノードとして設定する
-- また[メタページ](./meta-page.md)も作成し、ルートノードのページ ID をメタページに保存する
+新しい B+Tree の作成は以下の順で行う
+
+1. 非リーフ [segment](../fsp/fseg.md#利用者ごとの-segment-構成) を[作成](../fsp/fseg.md#segment-の作成)する。segment の最初のページが[メタページ](./meta-page.md)になり、そのページに非リーフ segment header を置く
+2. leaf [segment](../fsp/fseg.md#利用者ごとの-segment-構成) を[作成](../fsp/fseg.md#segment-の作成)し、leaf segment header をメタページに書き込む (leaf segment の最初のページは確保しない)
+3. leaf segment から 1 ページを[割り当て](../fsp/fseg.md#ページ割り当て)、そのページを空の[リーフノード](./node-leaf.md)として初期化し、メタページにルートノードとして記録する
+
+- メタページに書かれた 2 本の segment header は、木の生存中不変となる (詳細: [メタページ](./meta-page.md))
+- 分岐ノードのページ、およびメタページは非リーフ segment に属し、リーフノードのページは leaf segment に属する。ルートノードの帰属もノード種別で決まる (root の特別扱いはしない)
+
+## B+Tree の解放
+
+- 木全体の解放は step 型で行い、1 回の呼び出し (= 1 step) は 1 mini-transaction で完了する単位のみを進める
+- 解放順序は以下 (詳細: [file segment (inode) - segment の解放](../fsp/fseg.md#segment-の解放))
+  1. leaf segment を最後まで step 解放する
+  2. 非リーフ segment を step 解放する。非リーフ segment の最後のページはメタページであるため、メタページの解放で木全体の解放が完了する
+- 呼び出し側は完了マーカーを検出するまで step を繰り返す
+- 冪等性: 木全体が解放済みの場合、再呼び出しは新たな解放を行わず完了を報告する。これによりリカバリ経由での再呼び出しが二重解放にならない
 
 ## ノードの検索
 

@@ -6,8 +6,12 @@ import (
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/flst"
+	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewTree(t *testing.T) {
@@ -108,6 +112,38 @@ func TestCreateTree(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, bt.latch)
+	})
+
+	t.Run("CreateTree でメタページに 2 本の segment header が書かれ root リーフが leaf segment に属する", func(t *testing.T) {
+		// GIVEN
+		bp := setupBtreeTestBufferPool(t)
+		bt, err := createTreeForTest(t, bp, page.FileId(0))
+		require.NoError(t, err)
+
+		// WHEN: メタページ上の 2 本の segment header アドレスを読む
+		readMtr := buffer.NewMtr(bp)
+		leafHeader := flst.Address{PageNumber: bt.MetaPageId().PageNumber(), Offset: metaLeafSegmentHeaderOffset}
+		branchHeader := flst.Address{PageNumber: bt.MetaPageId().PageNumber(), Offset: metaBranchSegmentHeaderOffset}
+		leafSegAddr, err := fsp.ReadSegmentHeader(readMtr, page.FileId(0), leafHeader)
+		require.NoError(t, err)
+		branchSegAddr, err := fsp.ReadSegmentHeader(readMtr, page.FileId(0), branchHeader)
+		require.NoError(t, err)
+		metaPageForRead, err := readMtr.PageForRead(bt.MetaPageId())
+		require.NoError(t, err)
+		rootPageId := newMetaPage(metaPageForRead).rootPageId()
+		readMtr.UnpinAll()
+
+		// THEN: 2 本の segment header は有効かつ相異なる
+		assert.False(t, leafSegAddr.IsInvalid())
+		assert.False(t, branchSegAddr.IsInvalid())
+		assert.NotEqual(t, leafSegAddr, branchSegAddr)
+
+		// WHEN: root リーフを leaf segment 経由で解放できる (= leaf segment 帰属の検証)
+		freeMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+
+		// THEN: leaf segment に属さないページなら panic するため、エラーなく解放できることが帰属を示す
+		require.NoError(t, fsp.FreeSegmentPage(freeMtr, leafHeader, rootPageId))
+		require.NoError(t, freeMtr.Commit())
 	})
 }
 

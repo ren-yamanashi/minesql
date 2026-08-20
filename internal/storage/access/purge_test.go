@@ -259,6 +259,7 @@ func TestPurgePurge(t *testing.T) {
 		env := setupRecoveryTestEnv(t)
 		table := setupTableForRecoveryTest(t, env)
 		p := NewPurge(env.trxManager)
+		fileId := table.primaryIndex.fileId()
 
 		longSuffix := strings.Repeat("a", 1500)
 		trx1 := env.trxManager.Begin()
@@ -271,7 +272,7 @@ func TestPurgePurge(t *testing.T) {
 		}
 		require.NoError(t, env.trxManager.Commit(trx1))
 
-		pageIdsBefore := collectTreePageIds(t, env.bp, table.primaryIndex.tree)
+		usedBefore := collectUsedPageNumbers(t, env.bp, fileId)
 
 		trx2 := env.trxManager.Begin()
 		for _, id := range []string{"1", "2", "3"} {
@@ -286,47 +287,45 @@ func TestPurgePurge(t *testing.T) {
 
 		// THEN
 		require.NoError(t, err)
-		pageIdsAfter := collectTreePageIds(t, env.bp, table.primaryIndex.tree)
-		assert.Less(t, len(pageIdsAfter), len(pageIdsBefore))
+		usedAfter := collectUsedPageNumbers(t, env.bp, fileId)
+		assert.Less(t, len(usedAfter), len(usedBefore))
 
-		freed := diffPageIds(pageIdsBefore, pageIdsAfter)
+		freed := diffPageNumbers(usedBefore, usedAfter)
 		require.NotEmpty(t, freed)
-		assertAllPagesFree(t, env.bp, freed)
 
-		minFreed := minPageId(freed)
-		fileId := table.primaryIndex.fileId()
+		minFreed := minPageNumber(freed)
 		allocMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
 		allocated, err := fsp.AllocatePage(allocMtr, fileId)
 		require.NoError(t, err)
 		require.NoError(t, allocMtr.Commit())
-		assert.Equal(t, minFreed, allocated)
+		assert.Equal(t, minFreed, allocated.PageNumber())
 	})
 }
 
-// diffPageIds は before に含まれ after に含まれない PageId を返す
-func diffPageIds(before, after []page.Id) []page.Id {
-	afterSet := make(map[page.Id]struct{}, len(after))
-	for _, pid := range after {
-		afterSet[pid] = struct{}{}
+// diffPageNumbers は before に含まれ after に含まれない PageNumber を返す
+func diffPageNumbers(before, after []page.PageNumber) []page.PageNumber {
+	afterSet := make(map[page.PageNumber]struct{}, len(after))
+	for _, pn := range after {
+		afterSet[pn] = struct{}{}
 	}
-	var diff []page.Id
-	for _, pid := range before {
-		if _, ok := afterSet[pid]; !ok {
-			diff = append(diff, pid)
+	var diff []page.PageNumber
+	for _, pn := range before {
+		if _, ok := afterSet[pn]; !ok {
+			diff = append(diff, pn)
 		}
 	}
 	return diff
 }
 
-// minPageId は PageNumber が最小の PageId を返す
-func minPageId(pageIds []page.Id) page.Id {
-	minId := pageIds[0]
-	for _, pid := range pageIds[1:] {
-		if pid.PageNumber() < minId.PageNumber() {
-			minId = pid
+// minPageNumber は最小の PageNumber を返す
+func minPageNumber(pageNumbers []page.PageNumber) page.PageNumber {
+	minVal := pageNumbers[0]
+	for _, pn := range pageNumbers[1:] {
+		if pn < minVal {
+			minVal = pn
 		}
 	}
-	return minId
+	return minVal
 }
 
 func TestPurgePurgeEntry(t *testing.T) {

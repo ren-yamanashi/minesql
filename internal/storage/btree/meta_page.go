@@ -9,15 +9,19 @@ import (
 
 // メタページ内のオフセット
 const (
-	metaRootPageIdOffset    = 0
-	metaLeafPageCountOffset = 8
-	metaHeightOffset        = 16
+	metaRootPageIdOffset          = 0
+	metaLeafPageCountOffset       = 8
+	metaHeightOffset              = 16
+	metaLeafSegmentHeaderOffset   = 24
+	metaBranchSegmentHeaderOffset = 30
 )
 
 // メタページ
-//   - offset 0-7:   ルートページ ID (8 バイト)
-//   - offset 8-15:  リーフページ数 (8 バイト)
-//   - offset 16-23: B+Tree の高さ (8 バイト)
+//   - offset  0-7:   ルートページ ID (8 バイト)
+//   - offset  8-15:  リーフページ数 (8 バイト)
+//   - offset 16-23:  B+Tree の高さ (8 バイト)
+//   - offset 24-29:  leaf segment header (6 バイト)
+//   - offset 30-35:  非リーフ segment header (6 バイト)
 type metaPage struct {
 	data    *page.Page
 	bufPage *buffer.Page // 書き込み API で MarkModified を自動呼び出しするためのバックポインタ

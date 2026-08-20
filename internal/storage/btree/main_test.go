@@ -694,6 +694,47 @@ func TestBtreeNoPinLeak(t *testing.T) {
 	})
 }
 
+// collectAllPageIds は B+Tree 配下の全ページ (メタページ + 内部ノード + リーフ) の PageId を
+// BFS 順 (親階層 → 子階層) で返す。メタページ先頭、リーフ末尾になる
+func collectAllPageIds(t *testing.T, tree *Tree, mtr *buffer.Mtr) []page.Id {
+	t.Helper()
+	metaBufPage, err := mtr.PageForWrite(tree.MetaPageId())
+	require.NoError(t, err)
+	metaPage := newMetaPage(metaBufPage)
+	rootPageId := metaPage.rootPageId()
+	height := metaPage.height()
+	mtr.Unpin(tree.MetaPageId())
+
+	result := []page.Id{tree.MetaPageId()}
+
+	currentLevel := []page.Id{rootPageId}
+	for range max(height, 1) - 1 {
+		var nextLevel []page.Id
+		for _, nodePageId := range currentLevel {
+			pg, err := mtr.PageForWrite(nodePageId)
+			require.NoError(t, err)
+			branchNode := newBranchNode(pg)
+			for idx := range branchNode.numRecords() {
+				childPageId, err := branchNode.childPageId(idx)
+				require.NoError(t, err)
+				nextLevel = append(nextLevel, childPageId)
+			}
+			nextLevel = append(nextLevel, branchNode.rightChildPageId())
+			result = append(result, nodePageId)
+			mtr.Unpin(nodePageId)
+		}
+		currentLevel = nextLevel
+	}
+
+	for _, leafPageId := range currentLevel {
+		_, err := mtr.PageForWrite(leafPageId)
+		require.NoError(t, err)
+		result = append(result, leafPageId)
+		mtr.Unpin(leafPageId)
+	}
+	return result
+}
+
 // B+Tree の全データをスキャンし、key=..., value=... 形式でログに書き出す
 func writeScanLog(w *strings.Builder, tree *Tree, mtr *buffer.Mtr) {
 	iter, err := tree.Search(mtr, SearchModeStart{})

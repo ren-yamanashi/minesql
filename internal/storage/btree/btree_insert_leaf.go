@@ -48,7 +48,7 @@ func (t *Tree) splitInsertLeaf(
 	prevLeafPageId := leafNode.prevPageId()
 
 	// 新しいリーフノードを作成
-	newLeafPageId, err := fsp.AllocatePage(mtr, t.MetaPageId().FileId())
+	newLeafPageId, err := fsp.AllocateSegmentPage(mtr, t.MetaPageId().FileId(), t.leafSegmentHeaderAt())
 	if err != nil {
 		return nil, page.InvalidId(), err
 	}

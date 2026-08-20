@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/flst"
 	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
@@ -33,13 +34,8 @@ func NewTree(bp *buffer.Pool, metaPageId page.Id) *Tree {
 // CreateTree は新しい B+Tree を作成する
 //   - mtr: メタページ・ルートリーフ初期化を記録する書き込み Mtr。Commit は呼び出し側
 func CreateTree(bp *buffer.Pool, fileId page.FileId, mtr *buffer.Mtr) (*Tree, error) {
-	metaPageId, err := fsp.AllocatePage(mtr, fileId)
+	metaPageId, err := fsp.CreateSegment(mtr, fileId, metaBranchSegmentHeaderOffset)
 	if err != nil {
-		return nil, err
-	}
-
-	// メタページ作成
-	if _, err := bp.AddPage(metaPageId); err != nil {
 		return nil, err
 	}
 
@@ -49,8 +45,12 @@ func CreateTree(bp *buffer.Pool, fileId page.FileId, mtr *buffer.Mtr) (*Tree, er
 	}
 	metaPage := newMetaPage(pageMeta)
 
-	// ルートリーフノード作成
-	rootNodePageId, err := fsp.AllocatePage(mtr, metaPageId.FileId())
+	leafHeaderAt := flst.Address{PageNumber: metaPageId.PageNumber(), Offset: metaLeafSegmentHeaderOffset}
+	if err := fsp.CreateSegmentAt(mtr, fileId, leafHeaderAt); err != nil {
+		return nil, err
+	}
+
+	rootNodePageId, err := fsp.AllocateSegmentPage(mtr, fileId, leafHeaderAt)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +64,6 @@ func CreateTree(bp *buffer.Pool, fileId page.FileId, mtr *buffer.Mtr) (*Tree, er
 	rootLeaf := newLeafNode(pageRoot)
 	rootLeaf.initialize()
 
-	// メタページの設定
 	metaPage.setRootPageId(rootNodePageId)
 	metaPage.setLeafPageCount(1)
 	metaPage.setHeight(1)
@@ -97,4 +96,14 @@ func (t *Tree) Height(mtr *buffer.Mtr) (uint64, error) {
 // MetaPageId は B+Tree のメタページの PageId を返す
 func (t *Tree) MetaPageId() page.Id {
 	return t.metaPageId
+}
+
+// leafSegmentHeaderAt は leaf segment header のアドレスを返す
+func (t *Tree) leafSegmentHeaderAt() flst.Address {
+	return flst.Address{PageNumber: t.metaPageId.PageNumber(), Offset: metaLeafSegmentHeaderOffset}
+}
+
+// branchSegmentHeaderAt は非リーフ segment header のアドレスを返す
+func (t *Tree) branchSegmentHeaderAt() flst.Address {
+	return flst.Address{PageNumber: t.metaPageId.PageNumber(), Offset: metaBranchSegmentHeaderOffset}
 }

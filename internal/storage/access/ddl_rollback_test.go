@@ -33,14 +33,14 @@ func TestNewDDLRollbacker(t *testing.T) {
 }
 
 func TestDDLRollbackerRollback(t *testing.T) {
-	t.Run("DDLRecordTypeCreateBTree で対象 B+Tree の全ページを解放し次の割り当てで再利用される", func(t *testing.T) {
+	t.Run("DDLRecordTypeCreateBTree で対象 B+Tree の全ページを解放し次の割り当てで解放ページが再利用される", func(t *testing.T) {
 		// GIVEN
 		env := setupDDLRollbackerTestEnv(t)
 		createMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
 		tree, err := btree.CreateTree(env.bp, page.FileId(2), createMtr)
 		assert.NoError(t, err)
 		assert.NoError(t, createMtr.Commit())
-		pageIds := collectTreePageIds(t, env.bp, tree)
+		usedBefore := collectUsedPageNumbers(t, env.bp, page.FileId(2))
 		rollbacker := NewDDLRollbacker(env.bp, env.ct)
 		record := undo.NewDDLRecord(
 			undo.DDLRecordTypeCreateBTree,
@@ -48,19 +48,15 @@ func TestDDLRollbackerRollback(t *testing.T) {
 		)
 
 		// WHEN
-		mtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		err = rollbacker.Rollback(mtr, record)
-		assert.NoError(t, err)
-		assert.NoError(t, mtr.Commit())
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
 
-		// THEN: 全ページが解放され、次の割り当てで解放ページが再利用される
-		assertAllPagesFree(t, env.bp, pageIds)
-		assert.GreaterOrEqual(t, len(pageIds), 2)
+		// THEN: 使用中は予約ページのみ + 次の割り当てが解放済み範囲のページ番号になる
+		assertFileUsedPagesAreReservedOnly(t, env.bp, page.FileId(2))
 		reallocMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
 		reused, err := fsp.AllocatePage(reallocMtr, page.FileId(2))
 		assert.NoError(t, err)
 		assert.NoError(t, reallocMtr.Commit())
-		assert.Contains(t, pageIds, reused)
+		assert.Contains(t, usedBefore, reused.PageNumber())
 	})
 
 	t.Run("DDLRecordTypeMetaInsert で TableMeta の Delete が呼ばれる", func(t *testing.T) {
@@ -75,10 +71,7 @@ func TestDDLRollbackerRollback(t *testing.T) {
 		)
 
 		// WHEN
-		mtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		err := rollbacker.Rollback(mtr, record)
-		assert.NoError(t, err)
-		assert.NoError(t, mtr.Commit())
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
 
 		// THEN
 		assertTableMetaEmpty(t, env)
@@ -103,10 +96,7 @@ func TestDDLRollbackerRollback(t *testing.T) {
 		)
 
 		// WHEN
-		mtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		err := rollbacker.Rollback(mtr, record)
-		assert.NoError(t, err)
-		assert.NoError(t, mtr.Commit())
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
 
 		// THEN
 		assertIndexMetaEmpty(t, env)
@@ -124,10 +114,7 @@ func TestDDLRollbackerRollback(t *testing.T) {
 		)
 
 		// WHEN
-		mtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		err := rollbacker.Rollback(mtr, record)
-		assert.NoError(t, err)
-		assert.NoError(t, mtr.Commit())
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
 
 		// THEN
 		assertIndexKeyColumnMetaEmpty(t, env)
@@ -145,10 +132,7 @@ func TestDDLRollbackerRollback(t *testing.T) {
 		)
 
 		// WHEN
-		mtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		err := rollbacker.Rollback(mtr, record)
-		assert.NoError(t, err)
-		assert.NoError(t, mtr.Commit())
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
 
 		// THEN
 		assertColumnMetaEmpty(t, env)
@@ -166,10 +150,7 @@ func TestDDLRollbackerRollback(t *testing.T) {
 		)
 
 		// WHEN
-		mtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		err := rollbacker.Rollback(mtr, record)
-		assert.NoError(t, err)
-		assert.NoError(t, mtr.Commit())
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
 
 		// THEN
 		assertConstraintMetaEmpty(t, env)
@@ -187,10 +168,7 @@ func TestDDLRollbackerRollback(t *testing.T) {
 		)
 
 		// WHEN
-		mtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		err := rollbacker.Rollback(mtr, record)
-		assert.NoError(t, err)
-		assert.NoError(t, mtr.Commit())
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
 
 		// THEN
 		_, statErr := os.Stat(targetPath)
@@ -206,7 +184,7 @@ func TestDDLRollbackerRollback(t *testing.T) {
 		// WHEN
 		mtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
 		defer mtr.UnpinAll()
-		err := rollbacker.Rollback(mtr, invalid)
+		_, err := rollbacker.Rollback(mtr, invalid)
 
 		// THEN
 		assert.Error(t, err)
@@ -221,25 +199,19 @@ func TestDDLRollbackerRollbackIdempotent(t *testing.T) {
 		tree, err := btree.CreateTree(env.bp, page.FileId(2), createMtr)
 		assert.NoError(t, err)
 		assert.NoError(t, createMtr.Commit())
-		pageIds := collectTreePageIds(t, env.bp, tree)
 		rollbacker := NewDDLRollbacker(env.bp, env.ct)
 		record := undo.NewDDLRecord(
 			undo.DDLRecordTypeCreateBTree,
 			undo.NewCreateBTreeUndoRecord(tree.MetaPageId()).Serialize(),
 		)
-		firstMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		assert.NoError(t, rollbacker.Rollback(firstMtr, record))
-		assert.NoError(t, firstMtr.Commit())
-		assertAllPagesFree(t, env.bp, pageIds)
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
+		assertFileUsedPagesAreReservedOnly(t, env.bp, page.FileId(2))
 
 		// WHEN
-		secondMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		err = rollbacker.Rollback(secondMtr, record)
-		assert.NoError(t, secondMtr.Commit())
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
 
 		// THEN
-		assert.NoError(t, err)
-		assertAllPagesFree(t, env.bp, pageIds)
+		assertFileUsedPagesAreReservedOnly(t, env.bp, page.FileId(2))
 	})
 
 	t.Run("DDLRecordTypeMetaInsert (TableMeta) の Rollback を 2 回連続実行してもエラーにならない", func(t *testing.T) {
@@ -252,17 +224,12 @@ func TestDDLRollbackerRollbackIdempotent(t *testing.T) {
 			undo.DDLRecordTypeMetaInsert,
 			undo.NewMetaInsertUndoRecord(undo.MetaTableTypeTable, insertedRecord.Encode().Key()).Serialize(),
 		)
-		firstMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		assert.NoError(t, rollbacker.Rollback(firstMtr, record))
-		assert.NoError(t, firstMtr.Commit())
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
 
 		// WHEN
-		secondMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		err := rollbacker.Rollback(secondMtr, record)
-		assert.NoError(t, secondMtr.Commit())
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
 
 		// THEN
-		assert.NoError(t, err)
 		assertTableMetaEmpty(t, env)
 	})
 
@@ -283,17 +250,12 @@ func TestDDLRollbackerRollbackIdempotent(t *testing.T) {
 			undo.DDLRecordTypeMetaInsert,
 			undo.NewMetaInsertUndoRecord(undo.MetaTableTypeIndex, insertedRecord.Encode().Key()).Serialize(),
 		)
-		firstMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		assert.NoError(t, rollbacker.Rollback(firstMtr, record))
-		assert.NoError(t, firstMtr.Commit())
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
 
 		// WHEN
-		secondMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		err := rollbacker.Rollback(secondMtr, record)
-		assert.NoError(t, secondMtr.Commit())
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
 
 		// THEN
-		assert.NoError(t, err)
 		assertIndexMetaEmpty(t, env)
 	})
 
@@ -307,17 +269,12 @@ func TestDDLRollbackerRollbackIdempotent(t *testing.T) {
 			undo.DDLRecordTypeMetaInsert,
 			undo.NewMetaInsertUndoRecord(undo.MetaTableTypeIndexKeyColumn, insertedRecord.Encode().Key()).Serialize(),
 		)
-		firstMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		assert.NoError(t, rollbacker.Rollback(firstMtr, record))
-		assert.NoError(t, firstMtr.Commit())
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
 
 		// WHEN
-		secondMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		err := rollbacker.Rollback(secondMtr, record)
-		assert.NoError(t, secondMtr.Commit())
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
 
 		// THEN
-		assert.NoError(t, err)
 		assertIndexKeyColumnMetaEmpty(t, env)
 	})
 
@@ -331,17 +288,12 @@ func TestDDLRollbackerRollbackIdempotent(t *testing.T) {
 			undo.DDLRecordTypeMetaInsert,
 			undo.NewMetaInsertUndoRecord(undo.MetaTableTypeColumn, insertedRecord.Encode().Key()).Serialize(),
 		)
-		firstMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		assert.NoError(t, rollbacker.Rollback(firstMtr, record))
-		assert.NoError(t, firstMtr.Commit())
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
 
 		// WHEN
-		secondMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		err := rollbacker.Rollback(secondMtr, record)
-		assert.NoError(t, secondMtr.Commit())
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
 
 		// THEN
-		assert.NoError(t, err)
 		assertColumnMetaEmpty(t, env)
 	})
 
@@ -355,17 +307,12 @@ func TestDDLRollbackerRollbackIdempotent(t *testing.T) {
 			undo.DDLRecordTypeMetaInsert,
 			undo.NewMetaInsertUndoRecord(undo.MetaTableTypeConstraint, insertedRecord.Encode().Key()).Serialize(),
 		)
-		firstMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		assert.NoError(t, rollbacker.Rollback(firstMtr, record))
-		assert.NoError(t, firstMtr.Commit())
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
 
 		// WHEN
-		secondMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		err := rollbacker.Rollback(secondMtr, record)
-		assert.NoError(t, secondMtr.Commit())
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
 
 		// THEN
-		assert.NoError(t, err)
 		assertConstraintMetaEmpty(t, env)
 	})
 
@@ -379,17 +326,12 @@ func TestDDLRollbackerRollbackIdempotent(t *testing.T) {
 			undo.DDLRecordTypeAllocateFileId,
 			undo.NewAllocateFileIdUndoRecord(targetFileId).Serialize(),
 		)
-		firstMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		assert.NoError(t, rollbacker.Rollback(firstMtr, record))
-		assert.NoError(t, firstMtr.Commit())
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
 
 		// WHEN
-		secondMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-		err := rollbacker.Rollback(secondMtr, record)
-		assert.NoError(t, secondMtr.Commit())
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
 
 		// THEN
-		assert.NoError(t, err)
 		_, statErr := os.Stat(targetPath)
 		assert.True(t, os.IsNotExist(statErr))
 	})
@@ -452,16 +394,57 @@ func setupDDLRollbackerTestEnv(t *testing.T) *ddlRollbackerTestEnv {
 	return &ddlRollbackerTestEnv{bp: bp, ct: ct, redoLog: redoLog}
 }
 
-// collectTreePageIds は対象 B+Tree の全ページ ID を AllPageIds で取得する
-func collectTreePageIds(t *testing.T, bp *buffer.Pool, tree *btree.Tree) []page.Id {
+// rollbackDDLUntilDone は Rollback を done まで独立 mtr で繰り返し、CreateBTree の step 型に対応する
+func rollbackDDLUntilDone(t *testing.T, bp *buffer.Pool, redoLog *redo.Buffer, rollbacker *DDLRollbacker, record undo.DDLRecord) {
 	t.Helper()
+	const maxSteps = 10000
+	for step := range maxSteps {
+		mtr := buffer.NewWriteMtr(bp, lock.DDLReservedTrxId, redoLog)
+		done, err := rollbacker.Rollback(mtr, record)
+		if err != nil {
+			mtr.UnpinAll()
+			t.Fatalf("Rollback に失敗: %v", err)
+		}
+		if err := mtr.Commit(); err != nil {
+			t.Fatalf("Commit に失敗: %v", err)
+		}
+		if done {
+			return
+		}
+		if step == maxSteps-1 {
+			t.Fatalf("Rollback が %d step 経っても完了しない", maxSteps)
+		}
+	}
+}
+
+// assertFileUsedPagesAreReservedOnly はファイル全域を fsp.IsPageFree で走査し、
+// 使用中ページが FSP ヘッダー (page 0) のみであることを検証する
+//   - 対象ファイルは「1 tree だけを作成 → その tree を全解放した」状態であることを前提とする
+//   - tree 解放後は inode ページ内の全スロットが空になり、inode ページ自体も単ページ解放される
+func assertFileUsedPagesAreReservedOnly(t *testing.T, bp *buffer.Pool, fileId page.FileId) {
+	t.Helper()
+	used := collectUsedPageNumbers(t, bp, fileId)
+	assert.Equal(t, []page.PageNumber{0}, used)
+}
+
+// collectUsedPageNumbers はファイル全域を fsp.IsPageFree で走査し、使用中ページの PageNumber を昇順で返す
+//   - 走査範囲は先頭 4,096 ページ (テストで使うファイルサイズを十分に覆う。フリーリミット以上は fsp 側で常に free)
+func collectUsedPageNumbers(t *testing.T, bp *buffer.Pool, fileId page.FileId) []page.PageNumber {
+	t.Helper()
+	const maxPageNumber = page.PageNumber(4096)
 	mtr := buffer.NewMtr(bp)
 	defer mtr.UnpinAll()
-	pageIds, err := tree.AllPageIds(mtr)
-	if err != nil {
-		t.Fatalf("AllPageIds に失敗: %v", err)
+	var used []page.PageNumber
+	for pn := page.PageNumber(0); pn < maxPageNumber; pn++ {
+		isFree, err := fsp.IsPageFree(mtr, page.NewId(fileId, pn))
+		if err != nil {
+			t.Fatalf("IsPageFree に失敗 (pageNumber=%d): %v", pn, err)
+		}
+		if !isFree {
+			used = append(used, pn)
+		}
 	}
-	return pageIds
+	return used
 }
 
 func insertTableMeta(t *testing.T, env *ddlRollbackerTestEnv, record dictionary.TableMetaRecord) {
@@ -591,18 +574,16 @@ func registerDDLRollbackerHeapFile(t *testing.T, bp *buffer.Pool, fileId page.Fi
 	return path
 }
 
-// assertAllPagesFree は与えられた PageId 群が fsp 的に全て free であることを検証する
-func assertAllPagesFree(t *testing.T, bp *buffer.Pool, pageIds []page.Id) {
+// assertPageFree は指定 PageId が fsp 的に free であることを検証する
+func assertPageFree(t *testing.T, bp *buffer.Pool, id page.Id) {
 	t.Helper()
 	mtr := buffer.NewMtr(bp)
 	defer mtr.UnpinAll()
-	for _, pid := range pageIds {
-		isFree, err := fsp.IsPageFree(mtr, pid)
-		if err != nil {
-			t.Fatalf("IsPageFree に失敗: %v", err)
-		}
-		if !isFree {
-			t.Fatalf("page %v が解放されていない", pid)
-		}
+	isFree, err := fsp.IsPageFree(mtr, id)
+	if err != nil {
+		t.Fatalf("IsPageFree に失敗: %v", err)
+	}
+	if !isFree {
+		t.Fatalf("page %v が解放されていない", id)
 	}
 }

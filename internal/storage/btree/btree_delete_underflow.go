@@ -121,7 +121,7 @@ func (t *Tree) onLeafUnderflow(
 		// 親の右端のレコードは不要になるので削除し、RightChild を兄弟ノードに更新
 		parentBranch.delete(parentBranch.numRecords() - 1)
 		parentBranch.setRightChildPageId(sibling.bufferPage.PageId())
-		if err := fsp.FreePage(mtr, childBufPage.PageId()); err != nil {
+		if err := fsp.FreeSegmentPage(mtr, t.leafSegmentHeaderAt(), childBufPage.PageId()); err != nil {
 			return false, false, err
 		}
 		return !parentBranch.isHalfFull(), true, nil
@@ -139,7 +139,7 @@ func (t *Tree) onLeafUnderflow(
 	if err != nil {
 		return false, false, err
 	}
-	if err := fsp.FreePage(mtr, sibling.pageId); err != nil {
+	if err := fsp.FreeSegmentPage(mtr, t.leafSegmentHeaderAt(), sibling.pageId); err != nil {
 		return false, false, err
 	}
 	return uf, true, nil
@@ -237,7 +237,7 @@ func (t *Tree) onBranchUnderflow(
 		// 親の右端のレコードは不要になるので削除し、RightChild を兄弟ノードに更新
 		parentBranch.delete(parentBranch.numRecords() - 1)
 		parentBranch.setRightChildPageId(sibling.bufferPage.PageId())
-		if err := fsp.FreePage(mtr, childBufPage.PageId()); err != nil {
+		if err := fsp.FreeSegmentPage(mtr, t.branchSegmentHeaderAt(), childBufPage.PageId()); err != nil {
 			return false, err
 		}
 		return !parentBranch.isHalfFull(), nil
@@ -263,7 +263,7 @@ func (t *Tree) onBranchUnderflow(
 	if err != nil {
 		return false, err
 	}
-	if err := fsp.FreePage(mtr, sibling.pageId); err != nil {
+	if err := fsp.FreeSegmentPage(mtr, t.branchSegmentHeaderAt(), sibling.pageId); err != nil {
 		return false, err
 	}
 	return uf, nil

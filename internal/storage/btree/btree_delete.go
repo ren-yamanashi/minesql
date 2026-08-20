@@ -102,7 +102,7 @@ func (t *Tree) deletePessimistic(mtr *buffer.Mtr, key []byte) error {
 	newRootPageId := branchNode.rightChildPageId()
 	metaPage.setRootPageId(newRootPageId)
 	metaPage.setHeight(metaPage.height() - 1)
-	return fsp.FreePage(mtr, bufPageRoot.PageId())
+	return fsp.FreeSegmentPage(mtr, t.branchSegmentHeaderAt(), bufPageRoot.PageId())
 }
 
 // deleteRecursively は再帰的にノードを辿ってレコードを削除する

@@ -97,7 +97,7 @@ func (t *Tree) insertWithMetaUpdate(mtr *buffer.Mtr, mp *metaPage, record Record
 	}
 
 	// ルートノードの分割が発生した場合
-	newRootPageId, err := fsp.AllocatePage(mtr, t.MetaPageId().FileId())
+	newRootPageId, err := fsp.AllocateSegmentPage(mtr, t.MetaPageId().FileId(), t.branchSegmentHeaderAt())
 	if err != nil {
 		return err
 	}

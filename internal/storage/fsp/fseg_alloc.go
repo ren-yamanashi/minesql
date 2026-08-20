@@ -9,6 +9,11 @@ import (
 // AllocateSegmentPage は headerAt の segment header が指す segment にページを 1 つ割り当て、その PageId を返す
 //   - xdes / リスト / inode の更新までを行う。バッファページの作成と内容初期化は呼び出し側の責務
 func AllocateSegmentPage(mtr *buffer.Mtr, fileId page.FileId, headerAt flst.Address) (page.Id, error) {
+	headerPage, err := mtr.PageForWrite(page.NewId(fileId, 0))
+	if err != nil {
+		return page.InvalidId(), err
+	}
+	h := header{bufPage: headerPage}
 	entryAddr, err := ReadSegmentHeader(mtr, fileId, headerAt)
 	if err != nil {
 		return page.InvalidId(), err
@@ -17,11 +22,6 @@ func AllocateSegmentPage(mtr *buffer.Mtr, fileId page.FileId, headerAt flst.Addr
 	if err != nil {
 		return page.InvalidId(), err
 	}
-	headerPage, err := mtr.PageForWrite(page.NewId(fileId, 0))
-	if err != nil {
-		return page.InvalidId(), err
-	}
-	h := header{bufPage: headerPage}
 	return allocatePageInSegment(mtr, fileId, h, entry)
 }
 

@@ -7,7 +7,6 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
-	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 )
 
@@ -23,52 +22,36 @@ func NewDDLRollbacker(bp *buffer.Pool, catalog *dictionary.Catalog) *DDLRollback
 	return &DDLRollbacker{bufferPool: bp, catalog: catalog}
 }
 
-// Rollback は DDL Undo レコード 1 件を取り消す
-//   - record.RecordType() で分岐し、 種別ごとの取消処理を呼ぶ
-//   - 全ての書き込みは mtr 経由で行われ Redo に記録される
-func (r *DDLRollbacker) Rollback(mtr *buffer.Mtr, record undo.DDLRecord) error {
+// Rollback は DDL Undo レコードの取り消しを 1 単位進める
+//   - 取り消しが完了した場合は true を返す。CreateBTree 以外のレコードは常に 1 回で完了する
+//   - CreateBTree は B+Tree の step 解放 1 単位を進めるため、呼び出し側は true が返るまで
+//     新しい mtr で繰り返す
+func (r *DDLRollbacker) Rollback(mtr *buffer.Mtr, record undo.DDLRecord) (bool, error) {
 	switch record.RecordType() {
 	case undo.DDLRecordTypeCreateBTree:
 		return r.rollbackCreateBTree(mtr, record.Payload())
 	case undo.DDLRecordTypeMetaInsert:
-		return r.rollbackMetaInsert(mtr, record.Payload())
+		return true, r.rollbackMetaInsert(mtr, record.Payload())
 	case undo.DDLRecordTypeAllocateFileId:
-		return r.rollbackAllocateFileId(mtr, record.Payload())
+		return true, r.rollbackAllocateFileId(record.Payload())
 	default:
-		return fmt.Errorf("access: unknown DDL record type: %s", record.RecordType())
+		return true, fmt.Errorf("access: unknown DDL record type: %s", record.RecordType())
 	}
 }
 
-// rollbackCreateBTree は B+Tree 作成を取り消す
-//   - payload から MetaPageId を復元し、 配下の全ページを子→親 (= 末尾要素から先頭要素) の順に解放する
-//   - 既にファイル丸ごと削除済み、 もしくはメタページが既に解放済みの場合は何もしない
-func (r *DDLRollbacker) rollbackCreateBTree(mtr *buffer.Mtr, payload []byte) error {
+// rollbackCreateBTree は B+Tree 作成の取り消しを 1 単位進める
+//   - 既にファイル丸ごと削除済みの場合は完了として true を返す
+func (r *DDLRollbacker) rollbackCreateBTree(mtr *buffer.Mtr, payload []byte) (bool, error) {
 	record, err := undo.DeserializeCreateBTreeUndoRecord(payload)
 	if err != nil {
-		return err
+		return true, err
 	}
 	metaPageId := record.MetaPageId()
 	if !r.bufferPool.HasHeapFile(metaPageId.FileId()) {
-		return nil
-	}
-	isFree, err := fsp.IsPageFree(mtr, metaPageId)
-	if err != nil {
-		return err
-	}
-	if isFree {
-		return nil
+		return true, nil
 	}
 	tree := btree.NewTree(r.bufferPool, metaPageId)
-	pageIds, err := tree.AllPageIds(mtr)
-	if err != nil {
-		return err
-	}
-	for i := len(pageIds) - 1; i >= 0; i-- {
-		if err := fsp.FreePage(mtr, pageIds[i]); err != nil {
-			return err
-		}
-	}
-	return nil
+	return tree.FreeStep(mtr)
 }
 
 // rollbackMetaInsert はカタログ Meta テーブルへの挿入を取り消す
@@ -105,7 +88,7 @@ func (r *DDLRollbacker) rollbackMetaInsert(mtr *buffer.Mtr, payload []byte) erro
 //   - payload から FileId を復元し、 該当の物理ファイルを削除する
 //   - nextFileId は単調増加放置するため、 ここでは更新しない
 //   - 2 回目の Rollback でも安全 (= 冪等)
-func (r *DDLRollbacker) rollbackAllocateFileId(_ *buffer.Mtr, payload []byte) error {
+func (r *DDLRollbacker) rollbackAllocateFileId(payload []byte) error {
 	record, err := undo.DeserializeAllocateFileIdUndoRecord(payload)
 	if err != nil {
 		return err

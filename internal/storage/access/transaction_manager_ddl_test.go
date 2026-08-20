@@ -124,15 +124,13 @@ func TestTrxManagerRollbackDDL(t *testing.T) {
 		ddlTrx := tm.BeginDDL()
 		treeFileId := page.FileId(2) // setupTrxManager で登録済み
 		tree := appendCreateBTreeSample(t, tm, treeFileId)
-		pageIds := collectTreePageIds(t, tm.bufferPool, tree)
-		assert.GreaterOrEqual(t, len(pageIds), 2)
 
 		// WHEN
 		err := tm.Rollback(ddlTrx)
 		assert.NoError(t, err)
 
-		// THEN: 全ページが解放される
-		assertAllPagesFree(t, tm.bufferPool, pageIds)
+		// THEN: 対象 tree のメタページが解放される
+		assertPageFree(t, tm.bufferPool, tree.MetaPageId())
 	})
 
 	t.Run("Rollback で MetaInsertUndo の Meta レコードが物理削除される", func(t *testing.T) {

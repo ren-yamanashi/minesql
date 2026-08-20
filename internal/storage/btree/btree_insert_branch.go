@@ -41,7 +41,7 @@ func (t *Tree) splitInsertBranch(
 	branchNode *branchNode,
 	record Record,
 ) ([]byte, page.Id, error) {
-	newBranchPageId, err := fsp.AllocatePage(mtr, t.MetaPageId().FileId())
+	newBranchPageId, err := fsp.AllocateSegmentPage(mtr, t.MetaPageId().FileId(), t.branchSegmentHeaderAt())
 	if err != nil {
 		return nil, page.InvalidId(), err
 	}

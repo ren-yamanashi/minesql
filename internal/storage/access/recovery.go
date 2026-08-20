@@ -188,12 +188,18 @@ func (r *Recovery) applyDDLRollback(records []redo.Record) error {
 	}
 
 	for _, record := range ddlRecords {
-		mtr := buffer.NewMtr(r.bufferPool)
-		if err := r.transaction.applyDDLRollbackRecord(mtr, record); err != nil {
+		for {
+			mtr := buffer.NewMtr(r.bufferPool)
+			done, err := r.transaction.applyDDLRollbackRecord(mtr, record)
+			if err != nil {
+				mtr.UnpinAll()
+				return err
+			}
 			mtr.UnpinAll()
-			return err
+			if done {
+				break
+			}
 		}
-		mtr.UnpinAll()
 	}
 
 	clearMtr := buffer.NewMtr(r.bufferPool)

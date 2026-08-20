@@ -13,6 +13,11 @@ import (
 //   - 二重解放、segment に属さないページの解放は panic
 func FreeSegmentPage(mtr *buffer.Mtr, headerAt flst.Address, id page.Id) error {
 	fileId := id.FileId()
+	headerPage, err := mtr.PageForWrite(page.NewId(fileId, 0))
+	if err != nil {
+		return err
+	}
+	h := header{bufPage: headerPage}
 	entryAddr, err := ReadSegmentHeader(mtr, fileId, headerAt)
 	if err != nil {
 		return err
@@ -21,11 +26,6 @@ func FreeSegmentPage(mtr *buffer.Mtr, headerAt flst.Address, id page.Id) error {
 	if err != nil {
 		return err
 	}
-	headerPage, err := mtr.PageForWrite(page.NewId(fileId, 0))
-	if err != nil {
-		return err
-	}
-	h := header{bufPage: headerPage}
 	return freeSegmentPage(mtr, h, entry, id)
 }
 

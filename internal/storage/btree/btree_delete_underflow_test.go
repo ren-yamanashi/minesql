@@ -15,12 +15,12 @@ func TestDeleteUnderflow(t *testing.T) {
 		// GIVEN
 		bt, bp := setupBtreeForTest(t)
 
-		childPageId, childBufPage := allocateTestPage(t, bp)
+		childPageId, childBufPage := allocateTestPageInLeafSegment(t, bp, bt)
 		childLeaf := initTestLeafNode(t, bp, childPageId)
 		childLeaf.insert(0, largeLeafRecord(0x10))
 		childLeaf.insert(1, largeLeafRecord(0x15))
 
-		siblingPageId, _ := allocateTestPage(t, bp)
+		siblingPageId, _ := allocateTestPageInLeafSegment(t, bp, bt)
 		siblingLeaf := initTestLeafNode(t, bp, siblingPageId)
 		siblingLeaf.insert(0, largeLeafRecord(0x20))
 		siblingLeaf.insert(1, largeLeafRecord(0x30))
@@ -52,14 +52,14 @@ func TestDeleteUnderflow(t *testing.T) {
 		// GIVEN
 		bt, bp := setupBtreeForTest(t)
 
-		siblingPageId, _ := allocateTestPage(t, bp)
+		siblingPageId, _ := allocateTestPageInLeafSegment(t, bp, bt)
 		siblingLeaf := initTestLeafNode(t, bp, siblingPageId)
 		siblingLeaf.insert(0, largeLeafRecord(0x10))
 		siblingLeaf.insert(1, largeLeafRecord(0x20))
 		siblingLeaf.insert(2, largeLeafRecord(0x30))
 		siblingLeaf.insert(3, largeLeafRecord(0x40))
 
-		childPageId, childBufPage := allocateTestPage(t, bp)
+		childPageId, childBufPage := allocateTestPageInLeafSegment(t, bp, bt)
 		childLeaf := initTestLeafNode(t, bp, childPageId)
 		childLeaf.insert(0, largeLeafRecord(0x50))
 		childLeaf.insert(1, largeLeafRecord(0x60))
@@ -89,13 +89,13 @@ func TestDeleteUnderflow(t *testing.T) {
 		// GIVEN
 		bt, bp := setupBtreeForTest(t)
 
-		siblingPageId, siblingBufPage := allocateTestPage(t, bp)
+		siblingPageId, siblingBufPage := allocateTestPageInLeafSegment(t, bp, bt)
 		siblingLeaf := initTestLeafNode(t, bp, siblingPageId)
 		siblingLeaf.insert(0, largeLeafRecord(0x10))
 		siblingLeaf.insert(1, largeLeafRecord(0x20))
 		siblingLeaf.insert(2, largeLeafRecord(0x30))
 
-		childPageId, childBufPage := allocateTestPage(t, bp)
+		childPageId, childBufPage := allocateTestPageInLeafSegment(t, bp, bt)
 		childLeaf := initTestLeafNode(t, bp, childPageId)
 		childLeaf.insert(0, largeLeafRecord(0x50))
 
@@ -131,11 +131,11 @@ func TestDeleteUnderflow(t *testing.T) {
 		// GIVEN
 		bt, bp := setupBtreeForTest(t)
 
-		childPageId, childBufPage := allocateTestPage(t, bp)
+		childPageId, childBufPage := allocateTestPageInLeafSegment(t, bp, bt)
 		childLeaf := initTestLeafNode(t, bp, childPageId)
 		childLeaf.insert(0, largeLeafRecord(0x10))
 
-		siblingPageId, _ := allocateTestPage(t, bp)
+		siblingPageId, _ := allocateTestPageInLeafSegment(t, bp, bt)
 		siblingLeaf := initTestLeafNode(t, bp, siblingPageId)
 		siblingLeaf.insert(0, largeLeafRecord(0x20))
 		siblingLeaf.insert(1, largeLeafRecord(0x30))
@@ -172,11 +172,11 @@ func TestDeleteUnderflow(t *testing.T) {
 		// GIVEN
 		bt, bp := setupBtreeForTest(t)
 
-		childPageId, childBufPage := allocateTestPage(t, bp)
+		childPageId, childBufPage := allocateTestPageInLeafSegment(t, bp, bt)
 		childLeaf := initTestLeafNode(t, bp, childPageId)
 		childLeaf.insert(0, largeLeafRecord(0x10))
 
-		siblingPageId, _ := allocateTestPage(t, bp)
+		siblingPageId, _ := allocateTestPageInLeafSegment(t, bp, bt)
 		siblingLeaf := initTestLeafNode(t, bp, siblingPageId)
 		siblingLeaf.insert(0, largeLeafRecord(0x20))
 		siblingLeaf.insert(1, largeLeafRecord(0x30))
@@ -302,11 +302,11 @@ func TestDeleteUnderflow(t *testing.T) {
 		// GIVEN
 		bt, bp := setupBtreeForTest(t)
 
-		siblingPageId, siblingBufPage := allocateTestPage(t, bp)
+		siblingPageId, siblingBufPage := allocateTestPageInBranchSegment(t, bp, bt)
 		siblingBranch := initTestBranchNode(t, bp, siblingPageId, largeBranchKey(0x10), page.NewId(0, 200), page.NewId(0, 201))
 		insertLargeBranchRecords(siblingBranch, 2, 0x20)
 
-		childPageId, childBufPage := allocateTestPage(t, bp)
+		childPageId, childBufPage := allocateTestPageInBranchSegment(t, bp, bt)
 		initTestBranchNode(t, bp, childPageId, largeBranchKey(0x70), page.NewId(0, 100), page.NewId(0, 101))
 
 		parentPageId, _ := allocateTestPage(t, bp)
@@ -332,10 +332,10 @@ func TestDeleteUnderflow(t *testing.T) {
 		// GIVEN
 		bt, bp := setupBtreeForTest(t)
 
-		childPageId, childBufPage := allocateTestPage(t, bp)
+		childPageId, childBufPage := allocateTestPageInBranchSegment(t, bp, bt)
 		initTestBranchNode(t, bp, childPageId, largeBranchKey(0x10), page.NewId(0, 100), page.NewId(0, 101))
 
-		siblingPageId, _ := allocateTestPage(t, bp)
+		siblingPageId, _ := allocateTestPageInBranchSegment(t, bp, bt)
 		initTestBranchNode(t, bp, siblingPageId, largeBranchKey(0x60), page.NewId(0, 200), page.NewId(0, 201))
 
 		parentPageId, _ := allocateTestPage(t, bp)
@@ -361,10 +361,10 @@ func TestDeleteUnderflow(t *testing.T) {
 		// GIVEN
 		bt, bp := setupBtreeForTest(t)
 
-		childPageId, childBufPage := allocateTestPage(t, bp)
+		childPageId, childBufPage := allocateTestPageInBranchSegment(t, bp, bt)
 		initTestBranchNode(t, bp, childPageId, largeBranchKey(0x10), page.NewId(0, 100), page.NewId(0, 101))
 
-		siblingPageId, _ := allocateTestPage(t, bp)
+		siblingPageId, _ := allocateTestPageInBranchSegment(t, bp, bt)
 		initTestBranchNode(t, bp, siblingPageId, largeBranchKey(0x40), page.NewId(0, 200), page.NewId(0, 201))
 
 		otherPageId, _ := allocateTestPage(t, bp)
@@ -422,10 +422,37 @@ func TestDeleteUnderflow(t *testing.T) {
 }
 
 // allocateTestPage はテスト用にページを割り当ててバッファプールに追加する
+//   - この経路のページは segment に属さないため FreeSegmentPage の対象にはならない
 func allocateTestPage(t *testing.T, bp *buffer.Pool) (page.Id, *buffer.Page) {
 	t.Helper()
 	allocMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
 	pageId, err := fsp.AllocatePage(allocMtr, page.FileId(0))
+	assert.NoError(t, err)
+	assert.NoError(t, allocMtr.Commit())
+	bufPage, err := bp.AddPage(pageId)
+	assert.NoError(t, err)
+	return pageId, bufPage
+}
+
+// allocateTestPageInLeafSegment は tree の leaf segment 経由でページを確保する
+//   - onLeafUnderflow が FreeSegmentPage で解放するリーフノード用
+func allocateTestPageInLeafSegment(t *testing.T, bp *buffer.Pool, tree *Tree) (page.Id, *buffer.Page) {
+	t.Helper()
+	allocMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+	pageId, err := fsp.AllocateSegmentPage(allocMtr, tree.MetaPageId().FileId(), tree.leafSegmentHeaderAt())
+	assert.NoError(t, err)
+	assert.NoError(t, allocMtr.Commit())
+	bufPage, err := bp.AddPage(pageId)
+	assert.NoError(t, err)
+	return pageId, bufPage
+}
+
+// allocateTestPageInBranchSegment は tree の非リーフ segment 経由でページを確保する
+//   - onBranchUnderflow が FreeSegmentPage で解放するブランチノード用
+func allocateTestPageInBranchSegment(t *testing.T, bp *buffer.Pool, tree *Tree) (page.Id, *buffer.Page) {
+	t.Helper()
+	allocMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
+	pageId, err := fsp.AllocateSegmentPage(allocMtr, tree.MetaPageId().FileId(), tree.branchSegmentHeaderAt())
 	assert.NoError(t, err)
 	assert.NoError(t, allocMtr.Commit())
 	bufPage, err := bp.AddPage(pageId)

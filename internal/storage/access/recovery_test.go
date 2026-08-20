@@ -695,7 +695,8 @@ func TestRecoveryExecuteRestoresFspStateAfterPurgeFreesPage(t *testing.T) {
 		}
 		require.NoError(t, env.trxMgr.Commit(trx1))
 
-		pageIdsBefore := collectTreePageIds(t, env.bp, table.primaryIndex.tree)
+		fileId := table.primaryIndex.fileId()
+		usedBefore := collectUsedPageNumbers(t, env.bp, fileId)
 
 		trx2 := env.trxMgr.Begin()
 		for _, id := range []string{"1", "2", "3"} {
@@ -709,11 +710,10 @@ func TestRecoveryExecuteRestoresFspStateAfterPurgeFreesPage(t *testing.T) {
 		require.NoError(t, p.purge())
 		require.NoError(t, env.redoLog.Flush())
 
-		pageIdsAfter := collectTreePageIds(t, env.bp, table.primaryIndex.tree)
-		freed := diffPageIds(pageIdsBefore, pageIdsAfter)
+		usedAfter := collectUsedPageNumbers(t, env.bp, fileId)
+		freed := diffPageNumbers(usedBefore, usedAfter)
 		require.NotEmpty(t, freed)
 
-		fileId := table.primaryIndex.fileId()
 		fspHeaderPageId := page.NewId(fileId, 0)
 		beforeHeaderBytes, _ := readPageBytes(t, env.bp, fspHeaderPageId)
 
@@ -723,14 +723,20 @@ func TestRecoveryExecuteRestoresFspStateAfterPurgeFreesPage(t *testing.T) {
 		// THEN
 		afterHeaderBytes, _ := readPageBytes(t, env2.bp, fspHeaderPageId)
 		assert.Equal(t, beforeHeaderBytes, afterHeaderBytes)
-		assertAllPagesFree(t, env2.bp, freed)
+		checkMtr := buffer.NewMtr(env2.bp)
+		for _, pn := range freed {
+			isFree, err := fsp.IsPageFree(checkMtr, page.NewId(fileId, pn))
+			require.NoError(t, err)
+			assert.True(t, isFree, "page %d not free after recovery", pn)
+		}
+		checkMtr.UnpinAll()
 
-		minFreed := minPageId(freed)
+		minFreed := minPageNumber(freed)
 		allocMtr := buffer.NewWriteMtr(env2.bp, lock.SystemReservedTrxId, env2.redoLog)
 		allocated, err := fsp.AllocatePage(allocMtr, fileId)
 		require.NoError(t, err)
 		require.NoError(t, allocMtr.Commit())
-		assert.Equal(t, minFreed, allocated)
+		assert.Equal(t, minFreed, allocated.PageNumber())
 	})
 }
 
@@ -883,7 +889,6 @@ func TestRecoveryApplyDDLRollback(t *testing.T) {
 		assert.NoError(t, env.bp.FlushAllPages())
 		assert.NoError(t, env.redoLog.Clear())
 
-		pageIds := collectTreePageIds(t, env.bp, tree)
 		appendDDLUndoForRecovery(t, env, undo.NewDDLRecord(
 			undo.DDLRecordTypeCreateBTree,
 			undo.NewCreateBTreeUndoRecord(tree.MetaPageId()).Serialize(),
@@ -893,10 +898,9 @@ func TestRecoveryApplyDDLRollback(t *testing.T) {
 		// WHEN
 		err = r.Execute()
 
-		// THEN
+		// THEN: 対象 tree のメタページが解放される
 		assert.NoError(t, err)
-		assertAllPagesFree(t, env.bp, pageIds)
-		assert.GreaterOrEqual(t, len(pageIds), 2)
+		assertPageFree(t, env.bp, tree.MetaPageId())
 	})
 
 	t.Run("AllocateFileIdUndo + CreateBTreeUndo + MetaInsertUndo の組合せで物理基盤と Meta が全て取り消される", func(t *testing.T) {

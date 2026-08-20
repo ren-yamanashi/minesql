@@ -11,11 +11,19 @@ import (
 // FreeSegmentStep は segment の解放を 1 単位 (extent 1 つ、または frag ページ 1 枚) 進める
 //   - 解放が完了した (または既に完了していた) 場合は true を返す
 func FreeSegmentStep(mtr *buffer.Mtr, fileId page.FileId, headerAt flst.Address) (bool, error) {
-	done, err := IsPageFree(mtr, page.NewId(fileId, headerAt.PageNumber))
+	headerPage, err := mtr.PageForWrite(page.NewId(fileId, 0))
 	if err != nil {
 		return false, err
 	}
-	if done {
+	h := header{bufPage: headerPage}
+	if headerAt.PageNumber >= h.freeLimit() {
+		return true, nil
+	}
+	x, err := loadEntryByPageNumber(mtr, fileId, h, headerAt.PageNumber)
+	if err != nil {
+		return false, err
+	}
+	if x.isPageFree(int(headerAt.PageNumber % extentPageCount)) {
 		return true, nil
 	}
 	entryAddr, err := ReadSegmentHeader(mtr, fileId, headerAt)
@@ -29,17 +37,12 @@ func FreeSegmentStep(mtr *buffer.Mtr, fileId page.FileId, headerAt flst.Address)
 	if entry.segId() == 0 {
 		return true, nil
 	}
-	headerPage, err := mtr.PageForWrite(page.NewId(fileId, 0))
-	if err != nil {
-		return false, err
-	}
-	h := header{bufPage: headerPage}
-	x, ok, err := firstExtentOfSegment(mtr, fileId, entry)
+	firstX, ok, err := firstExtentOfSegment(mtr, fileId, entry)
 	if err != nil {
 		return false, err
 	}
 	if ok {
-		if err := freeWholeExtent(mtr, fileId, h, entry, x); err != nil {
+		if err := freeWholeExtent(mtr, fileId, h, entry, firstX); err != nil {
 			return false, err
 		}
 		return false, nil

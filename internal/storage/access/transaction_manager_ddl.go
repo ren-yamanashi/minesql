@@ -47,17 +47,18 @@ func (t *TrxManager) commitDDL(trx *Transaction) error {
 	return nil
 }
 
-// applyDDLRollbackRecord は DDL Undo レコード 1 件を取り消す
+// applyDDLRollbackRecord は DDL Undo レコードの取り消しを 1 単位進める
 //   - mtr のライフサイクル (Commit / UnpinAll) は呼び出し側が管理する
 //   - 通常運用時は書き込み Mtr を、 Recovery 中は読み取り Mtr を渡すことで Redo 記録の有無を切り替える
-func (t *TrxManager) applyDDLRollbackRecord(mtr *buffer.Mtr, record undo.DDLRecord) error {
+//   - CreateBTree は step 型のため、呼び出し側は true が返るまで新しい mtr で繰り返す
+func (t *TrxManager) applyDDLRollbackRecord(mtr *buffer.Mtr, record undo.DDLRecord) (bool, error) {
 	return NewDDLRollbacker(t.bufferPool, t.catalog).Rollback(mtr, record)
 }
 
 // rollbackDDL は DDL Transaction の Rollback 処理を行う
 //   - DDL Undo 領域コンテナを ReverseScan し、 各 record を逆順適用する
 //   - 適用後にコンテナの中身をクリアし、 Redo に Rollback レコードを追加する
-//   - 各 record の適用は独立 mtr (= 1 record = 1 mtr) で行い、 record ごとに永続境界を作る
+//   - 各 record の適用は独立 mtr (= 1 step = 1 mtr) で行い、step ごとに永続境界を作る
 func (t *TrxManager) rollbackDDL(trx *Transaction) error {
 	scanMtr := trx.NewReadMtr()
 	defer scanMtr.UnpinAll()
@@ -67,13 +68,19 @@ func (t *TrxManager) rollbackDDL(trx *Transaction) error {
 	}
 
 	for _, record := range records {
-		mtr := trx.NewMtr()
-		if err := t.applyDDLRollbackRecord(mtr, record); err != nil {
-			mtr.UnpinAll()
-			return err
-		}
-		if err := mtr.Commit(); err != nil {
-			return err
+		for {
+			mtr := trx.NewMtr()
+			done, err := t.applyDDLRollbackRecord(mtr, record)
+			if err != nil {
+				mtr.UnpinAll()
+				return err
+			}
+			if err := mtr.Commit(); err != nil {
+				return err
+			}
+			if done {
+				break
+			}
 		}
 	}
 
