@@ -442,11 +442,7 @@ func setupSecondaryTestCatalog(t *testing.T) (*dictionary.Catalog, *buffer.Pool)
 	bp.RegisterHeapFile(fileId, hf)
 
 	catalogMtr := newBootstrapMtr(bp, rl)
-	ct, err := dictionary.CreateCatalog(catalogMtr)
-	if err != nil {
-		catalogMtr.UnpinAll()
-		t.Fatalf("Catalog の作成に失敗: %v", err)
-	}
+	ct := dictionary.CreateCatalog(catalogMtr)
 	if err := catalogMtr.Commit(); err != nil {
 		t.Fatalf("Catalog Commit に失敗: %v", err)
 	}

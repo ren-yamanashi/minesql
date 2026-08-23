@@ -18,11 +18,10 @@ func TestCreateTableMeta(t *testing.T) {
 
 		// WHEN
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, rl)
-		tm, err := CreateTableMeta(ctMtr)
+		tm := CreateTableMeta(ctMtr)
 		_ = ctMtr.Commit()
 
 		// THEN
-		assert.NoError(t, err)
 		assert.False(t, tm.tree.MetaPageId().IsInvalid())
 	})
 }
@@ -163,10 +162,9 @@ func setupTestTableMeta(t *testing.T) (*TableMeta, *buffer.Pool) {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
 	ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, setupDictTestRedoBuffer(t))
-	tm, err := CreateTableMeta(ctMtr)
-	_ = ctMtr.Commit()
-	if err != nil {
-		t.Fatalf("TableMeta の作成に失敗: %v", err)
+	tm := CreateTableMeta(ctMtr)
+	if err := ctMtr.Commit(); err != nil {
+		t.Fatalf("TableMeta セットアップ Mtr の Commit に失敗: %v", err)
 	}
 	return tm, bp
 }

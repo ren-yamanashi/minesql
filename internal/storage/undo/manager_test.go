@@ -13,6 +13,7 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewManager(t *testing.T) {
@@ -25,11 +26,10 @@ func TestNewManager(t *testing.T) {
 
 		// WHEN
 		openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-		mgr, err := NewManager(openMtr, page.FileId(1))
+		mgr := NewManager(openMtr, page.FileId(1))
 		_ = openMtr.Commit()
 
 		// THEN
-		assert.NoError(t, err)
 		assert.NotNil(t, mgr)
 	})
 
@@ -42,8 +42,7 @@ func TestNewManager(t *testing.T) {
 
 		// WHEN
 		openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-		mgr, err := NewManager(openMtr, page.FileId(1))
-		assert.NoError(t, err)
+		mgr := NewManager(openMtr, page.FileId(1))
 		_ = openMtr.Commit()
 
 		// THEN
@@ -263,6 +262,63 @@ func TestManagerAppend(t *testing.T) {
 		smallRec := NewInsertRecord(page.FileId(1), btree.Record{[]byte("small")})
 		_, err = mgr.Append(lock.TrxId(1), RecordTypeInsert, smallRec)
 		assert.NoError(t, err)
+	})
+
+	t.Run("上限超過レコードの Append は書き込み前に ErrRecordTooLarge を返し redo に何も記録しない", func(t *testing.T) {
+		// GIVEN
+		mgr, redoLog := setupTestManagerWithRedoLog(t)
+		require.NoError(t, redoLog.Flush())
+		sizeBefore, err := redoLog.Size()
+		require.NoError(t, err)
+		huge := make([]byte, page.Size)
+		hugeRec := NewInsertRecord(page.FileId(1), btree.Record{huge})
+
+		// WHEN
+		_, err = mgr.Append(lock.TrxId(1), RecordTypeInsert, hugeRec)
+
+		// THEN
+		assert.ErrorIs(t, err, ErrRecordTooLarge)
+		require.NoError(t, redoLog.Flush())
+		sizeAfter, err := redoLog.Size()
+		require.NoError(t, err)
+		assert.Equal(t, sizeBefore, sizeAfter)
+	})
+
+	t.Run("switchToNewPage で新ページ AddPage が失敗すると割り当てが補償解放されて free に戻る", func(t *testing.T) {
+		// GIVEN: fsp 関連ページをプールにロードした後、次に払い出されるページ番号を割り当て → 即解放で予測し、
+		//        プールの残り空きスロットをダミー pin で埋めることで、次の Append の AddPage が決定的に失敗する状況を作る
+		mgr, redoLog := setupCompensationTestManager(t)
+		rec := NewInsertRecord(page.FileId(1), btree.Record{[]byte("x")})
+		for range 4 {
+			fillUntilPageSwitchInManager(t, mgr, rec)
+		}
+		fillCurrentPageAlmostFull(t, mgr, rec)
+		predictMtr := buffer.NewWriteMtr(mgr.bufferPool, lock.TrxId(1), redoLog)
+		predictedId, err := fsp.AllocateSegmentPage(predictMtr, page.FileId(1), chainRootHeaderAt(page.NewId(page.FileId(1), ChainHeadPageNumber)))
+		require.NoError(t, err)
+		require.NoError(t, fsp.FreeSegmentPage(predictMtr, chainRootHeaderAt(page.NewId(page.FileId(1), ChainHeadPageNumber)), predictedId))
+		require.NoError(t, predictMtr.Commit())
+		require.NoError(t, redoLog.Flush())
+		protected := pinAllWrittenPages(t, mgr.bufferPool, redoLog)
+		dummies := fillPoolWithDummyPages(t, mgr.bufferPool)
+		sizeBefore, err := redoLog.Size()
+		require.NoError(t, err)
+
+		// WHEN
+		_, appendErr := mgr.Append(lock.TrxId(1), RecordTypeInsert, rec)
+
+		// THEN
+		require.ErrorIs(t, appendErr, buffer.ErrAllPagesUnevictable)
+		unpinDummyPages(mgr.bufferPool, dummies)
+		unpinDummyPages(mgr.bufferPool, protected)
+		sizeAfter, err := redoLog.Size()
+		require.NoError(t, err)
+		assert.Greater(t, sizeAfter, sizeBefore, "割り当てと補償解放を含む mini-transaction が redo に記録されているはず")
+		readMtr := buffer.NewMtr(mgr.bufferPool)
+		defer readMtr.UnpinAll()
+		isFree, err := fsp.IsPageFree(readMtr, predictedId)
+		require.NoError(t, err)
+		assert.True(t, isFree, "補償解放によって %v は free に戻っているはず", predictedId)
 	})
 
 	t.Run("Append と Discard が並行実行されてもデータレースが起きない", func(t *testing.T) {
@@ -764,15 +820,30 @@ func setupTestManager(t *testing.T) *Manager {
 	t.Cleanup(func() { _ = redoLog.Close() })
 	bp := setupTestBufferPool(t, redoLog)
 	openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-	mgr, err := NewManager(openMtr, page.FileId(1))
-	if err != nil {
-		openMtr.UnpinAll()
-		t.Fatalf("Manager の作成に失敗: %v", err)
-	}
+	mgr := NewManager(openMtr, page.FileId(1))
 	if err := openMtr.Commit(); err != nil {
 		t.Fatalf("Manager Commit に失敗: %v", err)
 	}
 	return mgr
+}
+
+// setupCompensationTestManager はダミーページで埋める補償テスト用の Manager を作る
+//   - fsp が触りうる header / inode / xdes / lease 対象 extent 群と undo ページを十分に載せられる大きめのプール
+func setupCompensationTestManager(t *testing.T) (*Manager, *redo.Buffer) {
+	t.Helper()
+	redoLog, err := redo.NewBuffer(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = redoLog.Close() })
+	undoPath := filepath.Join(t.TempDir(), "undo.db")
+	hf, err := file.NewHeapFile(undoPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = hf.Close() })
+	bp := buffer.NewPool(page.Size*128, redoLog, nil)
+	bp.RegisterHeapFile(page.FileId(1), hf)
+	openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
+	mgr := NewManager(openMtr, page.FileId(1))
+	require.NoError(t, openMtr.Commit())
+	return mgr, redoLog
 }
 
 // setupTestManagerWithRedoLog はテスト用の Manager と、書き込み Mtr で使う実 redoLog を作成する
@@ -786,11 +857,7 @@ func setupTestManagerWithRedoLog(t *testing.T) (*Manager, *redo.Buffer) {
 	t.Cleanup(func() { _ = redoLog.Close() })
 	bp := setupTestBufferPool(t, redoLog)
 	openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-	mgr, err := NewManager(openMtr, page.FileId(1))
-	if err != nil {
-		openMtr.UnpinAll()
-		t.Fatalf("Manager の作成に失敗: %v", err)
-	}
+	mgr := NewManager(openMtr, page.FileId(1))
 	if err := openMtr.Commit(); err != nil {
 		t.Fatalf("Manager Commit に失敗: %v", err)
 	}
@@ -815,4 +882,94 @@ func lookupForTest(t *testing.T, mgr *Manager, ptr Pointer) (Record, error) {
 	mtr := buffer.NewMtr(mgr.bufferPool)
 	defer mtr.UnpinAll()
 	return mgr.LookupByPointer(mtr, ptr)
+}
+
+// fillUntilPageSwitchInManager は現ページが切り替わるまで rec を Append し続ける
+func fillUntilPageSwitchInManager(t *testing.T, mgr *Manager, rec Record) {
+	t.Helper()
+	oldPageId := mgr.currentPageId
+	for mgr.currentPageId == oldPageId {
+		_, err := mgr.Append(lock.TrxId(1), RecordTypeInsert, rec)
+		require.NoError(t, err)
+	}
+}
+
+// fillCurrentPageAlmostFull は現ページが切り替わる直前まで rec を Append する
+//   - 「次の 1 回の Append で切替が発火する」状態を作るため、切替を含まない範囲でループする
+func fillCurrentPageAlmostFull(t *testing.T, mgr *Manager, rec Record) {
+	t.Helper()
+	fixedPageId := mgr.currentPageId
+	for {
+		bufPage, err := mgr.bufferPool.Page(fixedPageId)
+		require.NoError(t, err)
+		remaining := openUndoPage(bufPage, fixedPageId).FreeSpace()
+		mgr.bufferPool.Unpin(fixedPageId)
+		serialized := rec.Serialize(lock.TrxId(1), UndoNumber(len(mgr.entries[lock.TrxId(1)])))
+		if remaining < len(serialized) {
+			return
+		}
+		_, err = mgr.Append(lock.TrxId(1), RecordTypeInsert, rec)
+		require.NoError(t, err)
+		if mgr.currentPageId != fixedPageId {
+			t.Fatalf("fillCurrentPageAlmostFull: 切替が想定より早く起きた")
+		}
+	}
+}
+
+// pinAllWrittenPages は事前 Append で書き込まれた PageId (Redo に現れた全て) を pin する
+//   - evict retry の flush 経路で clean 化 → 追い出されるのを防ぐため、テスト側で保持する
+//   - 呼び出し側は unpinDummyPages で解放する
+func pinAllWrittenPages(t *testing.T, bp *buffer.Pool, redoLog *redo.Buffer) []page.Id {
+	t.Helper()
+	require.NoError(t, redoLog.Flush())
+	records, err := redoLog.ReadFrom(redo.Lsn(0))
+	require.NoError(t, err)
+	seen := make(map[page.Id]bool)
+	var ids []page.Id
+	for _, r := range records {
+		if r.Type() != redo.RecordTypePageWrite {
+			continue
+		}
+		pid := r.PageId()
+		if seen[pid] {
+			continue
+		}
+		seen[pid] = true
+		if _, err := bp.Page(pid); err != nil {
+			continue
+		}
+		ids = append(ids, pid)
+	}
+	return ids
+}
+
+// fillPoolWithDummyPages はプールの残り空きスロットを未使用ページ番号の AddPage で埋め、pin を保持する
+//   - 呼び出し側は返された PageId 群を unpinDummyPages で解放する
+func fillPoolWithDummyPages(t *testing.T, bp *buffer.Pool) []page.Id {
+	t.Helper()
+	dummyFileId := page.FileId(99)
+	dummyPath := filepath.Join(t.TempDir(), "dummy.db")
+	hf, err := file.NewHeapFile(dummyPath)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = hf.Close() })
+	bp.RegisterHeapFile(dummyFileId, hf)
+	var ids []page.Id
+	for pn := page.PageNumber(0); ; pn++ {
+		pageId := page.NewId(dummyFileId, pn)
+		if _, err := bp.AddPage(pageId); err != nil {
+			require.ErrorIs(t, err, buffer.ErrAllPagesUnevictable)
+			return ids
+		}
+		if _, err := bp.Page(pageId); err != nil {
+			require.NoError(t, err)
+		}
+		ids = append(ids, pageId)
+	}
+}
+
+// unpinDummyPages は fillPoolWithDummyPages で保持した pin を解放する
+func unpinDummyPages(bp *buffer.Pool, ids []page.Id) {
+	for _, id := range ids {
+		bp.Unpin(id)
+	}
 }

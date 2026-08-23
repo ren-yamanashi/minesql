@@ -1,6 +1,8 @@
 package dictionary
 
 import (
+	"fmt"
+
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -16,12 +18,13 @@ func NewTableMeta(bp *buffer.Pool, metaPageId page.Id) *TableMeta {
 
 // CreateTableMeta はテーブルメタ用の B+Tree を mtr 配下で新規作成する
 //   - mtr.Commit / mtr.UnpinAll は呼び出し側で行う
-func CreateTableMeta(mtr *buffer.Mtr) (*TableMeta, error) {
+//   - bootstrap 経路のため、途中失敗はすべて panic で扱う
+func CreateTableMeta(mtr *buffer.Mtr) *TableMeta {
 	tree, err := btree.CreateTree(mtr.Pool(), CatalogFileId, mtr)
 	if err != nil {
-		return nil, err
+		panic(fmt.Sprintf("dictionary: bootstrap failed to create table meta tree: %v", err))
 	}
-	return &TableMeta{tree: tree}, nil
+	return &TableMeta{tree: tree}
 }
 
 func (tm *TableMeta) Search(mtr *buffer.Mtr, mode SearchMode) (*TableIterator, error) {

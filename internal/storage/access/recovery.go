@@ -202,9 +202,7 @@ func (r *Recovery) applyDDLRollback(records []redo.Record) error {
 		}
 	}
 
-	clearMtr := buffer.NewMtr(r.bufferPool)
-	defer clearMtr.UnpinAll()
-	return r.ddlManager.Clear(clearMtr)
+	return r.ddlManager.Clear(lock.DDLReservedTrxId, nil)
 }
 
 // collectUndoRecords は Undo ページを走査して指定トランザクションのレコードを収集する

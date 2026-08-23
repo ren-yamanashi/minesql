@@ -31,9 +31,8 @@ func TestNewCatalog(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
-		_, err := CreateCatalog(ctMtr)
+		_ = CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
-		assert.NoError(t, err)
 
 		// WHEN
 		catalog, err := NewCatalog(bp)
@@ -51,9 +50,8 @@ func TestNewCatalog(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
-		created, err := CreateCatalog(ctMtr)
+		created := CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
-		assert.NoError(t, err)
 
 		// WHEN
 		opened, err := NewCatalog(bp)
@@ -67,9 +65,8 @@ func TestNewCatalog(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
-		created, err := CreateCatalog(ctMtr)
+		created := CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
-		assert.NoError(t, err)
 
 		// WHEN
 		opened, err := NewCatalog(bp)
@@ -88,9 +85,8 @@ func TestNewCatalog(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
-		_, err := CreateCatalog(ctMtr)
+		_ = CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
-		assert.NoError(t, err)
 
 		fspHeaderPageId := page.NewId(CatalogFileId, page.PageNumber(0))
 		bufPageFsp, err := bp.Page(fspHeaderPageId)
@@ -113,11 +109,10 @@ func TestCreateCatalog(t *testing.T) {
 
 		// WHEN
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
-		catalog, err := CreateCatalog(ctMtr)
+		catalog := CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
 
 		// THEN
-		assert.NoError(t, err)
 		assert.NotNil(t, catalog)
 	})
 
@@ -127,9 +122,8 @@ func TestCreateCatalog(t *testing.T) {
 
 		// WHEN
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
-		_, err := CreateCatalog(ctMtr)
+		_ = CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
-		assert.NoError(t, err)
 
 		// THEN
 		fspHeaderPageId := page.NewId(CatalogFileId, page.PageNumber(0))
@@ -145,9 +139,8 @@ func TestCreateCatalog(t *testing.T) {
 
 		// WHEN
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
-		_, err := CreateCatalog(ctMtr)
+		_ = CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
-		assert.NoError(t, err)
 
 		// THEN
 		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
@@ -174,9 +167,8 @@ func TestCreateCatalog(t *testing.T) {
 
 		// WHEN
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
-		_, err := CreateCatalog(ctMtr)
+		_ = CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
-		assert.NoError(t, err)
 
 		// THEN
 		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
@@ -196,11 +188,10 @@ func TestCreateCatalog(t *testing.T) {
 
 		// WHEN
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
-		catalog, err := CreateCatalog(ctMtr)
+		catalog := CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
 
 		// THEN
-		assert.NoError(t, err)
 		assert.NotNil(t, catalog.tableMeta)
 		assert.NotNil(t, catalog.indexMeta)
 		assert.NotNil(t, catalog.indexKeyColumnMeta)
@@ -215,11 +206,10 @@ func TestCreateCatalog(t *testing.T) {
 
 		// WHEN
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
-		catalog, err := CreateCatalog(ctMtr)
+		catalog := CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
 
 		// THEN
-		assert.NoError(t, err)
 		assert.False(t, catalog.tableMeta.tree.MetaPageId().IsInvalid())
 		assert.False(t, catalog.indexMeta.tree.MetaPageId().IsInvalid())
 		assert.False(t, catalog.indexKeyColumnMeta.tree.MetaPageId().IsInvalid())
@@ -234,9 +224,8 @@ func TestCreateCatalog(t *testing.T) {
 
 		// WHEN
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
-		_, err := CreateCatalog(ctMtr)
+		_ = CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
-		assert.NoError(t, err)
 
 		// THEN
 		assert.Equal(t, page.PageNumber(2), catalogHeaderPageNum)
@@ -261,9 +250,8 @@ func TestCreateCatalog(t *testing.T) {
 
 		// WHEN
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
-		_, err := CreateCatalog(ctMtr)
+		_ = CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
-		assert.NoError(t, err)
 
 		// THEN
 		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
@@ -280,9 +268,8 @@ func TestAllocateIndexId(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 		redoLog := newCatalogTestRedoBuffer(t)
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-		ct, err := CreateCatalog(ctMtr)
+		ct := CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
-		assert.NoError(t, err)
 
 		// WHEN
 		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
@@ -302,9 +289,8 @@ func TestAllocateIndexId(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 		redoLog := newCatalogTestRedoBuffer(t)
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-		ct, err := CreateCatalog(ctMtr)
+		ct := CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
-		assert.NoError(t, err)
 		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
 		bufPageHeader, err := bp.Page(headerPageId)
 		assert.NoError(t, err)
@@ -331,9 +317,8 @@ func TestAllocateFileId(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 		redoLog := newCatalogTestRedoBuffer(t)
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-		ct, err := CreateCatalog(ctMtr)
+		ct := CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
-		assert.NoError(t, err)
 
 		// WHEN
 		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
@@ -353,9 +338,8 @@ func TestAllocateFileId(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 		redoLog := newCatalogTestRedoBuffer(t)
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-		ct, err := CreateCatalog(ctMtr)
+		ct := CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
-		assert.NoError(t, err)
 		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
 		bufPageHeader, err := bp.Page(headerPageId)
 		assert.NoError(t, err)
@@ -383,11 +367,10 @@ func TestPersistNextTrxId(t *testing.T) {
 
 		// WHEN
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
-		ct, err := CreateCatalog(ctMtr)
+		ct := CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
 
 		// THEN
-		assert.NoError(t, err)
 		assert.Equal(t, lock.TrxId(1), ct.NextTrxId())
 	})
 
@@ -397,9 +380,8 @@ func TestPersistNextTrxId(t *testing.T) {
 
 		// WHEN
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
-		_, err := CreateCatalog(ctMtr)
+		_ = CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
-		assert.NoError(t, err)
 
 		// THEN
 		headerPageId := page.NewId(CatalogFileId, catalogHeaderPageNum)
@@ -418,13 +400,12 @@ func TestPersistNextTrxId(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 		redoLog := newCatalogTestRedoBuffer(t)
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-		ct, err := CreateCatalog(ctMtr)
+		ct := CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
-		assert.NoError(t, err)
 
 		// WHEN
 		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-		err = ct.PersistNextTrxId(mtr, lock.TrxId(42))
+		err := ct.PersistNextTrxId(mtr, lock.TrxId(42))
 		assert.NoError(t, err)
 		assert.NoError(t, mtr.Commit())
 
@@ -446,9 +427,8 @@ func TestPersistNextTrxId(t *testing.T) {
 		bp := setupCatalogTestBufferPool(t)
 		redoLog := newCatalogTestRedoBuffer(t)
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-		ct, err := CreateCatalog(ctMtr)
+		ct := CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
-		assert.NoError(t, err)
 		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
 		assert.NoError(t, ct.PersistNextTrxId(mtr, lock.TrxId(123)))
 		assert.NoError(t, mtr.Commit())
@@ -467,14 +447,13 @@ func TestSetDDLUndoRootPageId(t *testing.T) {
 		// GIVEN
 		bp := setupCatalogTestBufferPool(t)
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
-		ct, err := CreateCatalog(ctMtr)
+		ct := CreateCatalog(ctMtr)
 		_ = ctMtr.Commit()
-		assert.NoError(t, err)
 		newPageId := page.NewId(CatalogFileId, page.PageNumber(123))
 
 		// WHEN
 		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newCatalogTestRedoBuffer(t))
-		err = ct.SetDDLUndoRootPageId(mtr, newPageId)
+		err := ct.SetDDLUndoRootPageId(mtr, newPageId)
 		assert.NoError(t, err)
 		assert.NoError(t, mtr.Commit())
 

@@ -580,8 +580,7 @@ func TestCreateChainRoot(t *testing.T) {
 
 		// WHEN
 		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-		rootPageId, err := CreateChainRoot(mtr, page.FileId(1))
-		require.NoError(t, err)
+		rootPageId := CreateChainRoot(mtr, page.FileId(1))
 		require.NoError(t, mtr.Commit())
 
 		// THEN
@@ -597,8 +596,7 @@ func TestCreateChainRoot(t *testing.T) {
 
 		// WHEN
 		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-		rootPageId, err := CreateChainRoot(mtr, page.FileId(1))
-		require.NoError(t, err)
+		rootPageId := CreateChainRoot(mtr, page.FileId(1))
 		require.NoError(t, mtr.Commit())
 
 		// THEN: segment header は page 1 の inode ページを指す
@@ -621,8 +619,7 @@ func TestCreateChainRoot(t *testing.T) {
 
 		// WHEN
 		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-		rootPageId, err := CreateChainRoot(mtr, page.FileId(1))
-		require.NoError(t, err)
+		rootPageId := CreateChainRoot(mtr, page.FileId(1))
 		require.NoError(t, mtr.Commit())
 
 		// THEN: 追加ページを AllocateSegmentPage で確保できる (= segment header が有効に働く)

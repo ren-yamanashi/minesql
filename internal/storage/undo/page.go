@@ -2,6 +2,7 @@ package undo
 
 import (
 	"encoding/binary"
+	"fmt"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/flst"
@@ -15,6 +16,8 @@ const (
 	pageHeaderSize               = 6  // UsedBytes(2) + NextPageNum(4)
 	firstPageSegmentHeaderOffset = 6  // チェーン先頭ページの segment header 開始オフセット
 	firstPageHeaderSize          = 12 // UsedBytes(2) + NextPageNum(4) + segment header(6)
+	// maxRecordSize は 1 つの Undo レコードが単一ページ (後続ページのボディ) に収まる最大バイト数
+	maxRecordSize = page.Size - page.HeaderSize - pageHeaderSize
 )
 
 // ChainHeadPageNumber は Undo チェーンの先頭ページの PageNumber
@@ -147,17 +150,18 @@ func (p *Page) setUsedBytes(n uint16) {
 // CreateChainRoot は Undo チェーン全体を管理する segment を新規作成し、 チェーン先頭ページの PageId を返す
 //   - mtr: segment 作成と先頭ページ初期化を記録する Mtr。 Commit / UnpinAll は呼び出し側
 //   - fileId: Undo チェーンを配置するファイルの FileId
-func CreateChainRoot(mtr *buffer.Mtr, fileId page.FileId) (page.Id, error) {
+//   - bootstrap 経路のため、途中失敗はすべて panic で扱う
+func CreateChainRoot(mtr *buffer.Mtr, fileId page.FileId) page.Id {
 	pageId, err := fsp.CreateSegment(mtr, fileId, firstPageSegmentHeaderOffset)
 	if err != nil {
-		return page.InvalidId(), err
+		panic(fmt.Sprintf("undo: bootstrap failed to create chain root segment: %v", err))
 	}
 	bufPage, err := mtr.PageForWrite(pageId)
 	if err != nil {
-		return page.InvalidId(), err
+		panic(fmt.Sprintf("undo: bootstrap failed to acquire chain root page: %v", err))
 	}
 	CreateFirstPage(bufPage)
-	return pageId, nil
+	return pageId
 }
 
 // chainRootHeaderAt はチェーン先頭ページ上の segment header のアドレスを返す

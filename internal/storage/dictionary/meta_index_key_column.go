@@ -1,6 +1,8 @@
 package dictionary
 
 import (
+	"fmt"
+
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -16,12 +18,13 @@ func NewIndexKeyColumnMeta(bp *buffer.Pool, metaPageId page.Id) *IndexKeyColumnM
 
 // CreateIndexKeyColumnMeta はインデックスキーカラムメタ用の B+Tree を mtr 配下で新規作成する
 //   - mtr.Commit / mtr.UnpinAll は呼び出し側で行う
-func CreateIndexKeyColumnMeta(mtr *buffer.Mtr) (*IndexKeyColumnMeta, error) {
+//   - bootstrap 経路のため、途中失敗はすべて panic で扱う
+func CreateIndexKeyColumnMeta(mtr *buffer.Mtr) *IndexKeyColumnMeta {
 	tree, err := btree.CreateTree(mtr.Pool(), CatalogFileId, mtr)
 	if err != nil {
-		return nil, err
+		panic(fmt.Sprintf("dictionary: bootstrap failed to create index key column meta tree: %v", err))
 	}
-	return &IndexKeyColumnMeta{tree: tree}, nil
+	return &IndexKeyColumnMeta{tree: tree}
 }
 
 func (kcm *IndexKeyColumnMeta) Search(mtr *buffer.Mtr, mode SearchMode) (*IndexKeyColumnIterator, error) {

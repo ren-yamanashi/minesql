@@ -516,11 +516,7 @@ func setupCreateTestEnv(t *testing.T) *createTestEnv {
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
 	catalogMtr := newBootstrapMtr(bp, redoLog)
-	ct, err := dictionary.CreateCatalog(catalogMtr)
-	if err != nil {
-		catalogMtr.UnpinAll()
-		t.Fatalf("Catalog の作成に失敗: %v", err)
-	}
+	ct := dictionary.CreateCatalog(catalogMtr)
 	if err := catalogMtr.Commit(); err != nil {
 		t.Fatalf("Catalog Commit に失敗: %v", err)
 	}
@@ -551,14 +547,9 @@ func setupCreateTestEnv(t *testing.T) *createTestEnv {
 		t.Fatalf("データファイルの FSP ヘッダー Commit に失敗: %v", err)
 	}
 
-	ddlMtr := newBootstrapMtr(bp, redoLog)
-	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId())
+	ddlMgr, err := undo.NewDDLManager(bp, dictionary.CatalogFileId, ct.DDLUndoRootPageId())
 	if err != nil {
-		ddlMtr.UnpinAll()
 		t.Fatalf("undo.DDLManager の作成に失敗: %v", err)
-	}
-	if err := ddlMtr.Commit(); err != nil {
-		t.Fatalf("undo.DDLManager Commit に失敗: %v", err)
 	}
 
 	lockMgr := lock.NewManager()
@@ -641,11 +632,7 @@ func setupCreateTableTestEnv(t *testing.T) *createTableTestEnv {
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
 	catalogMtr := newBootstrapMtr(bp, redoLog)
-	_, err = dictionary.CreateCatalog(catalogMtr)
-	if err != nil {
-		catalogMtr.UnpinAll()
-		t.Fatalf("Catalog の作成に失敗: %v", err)
-	}
+	_ = dictionary.CreateCatalog(catalogMtr)
 	if err := catalogMtr.Commit(); err != nil {
 		t.Fatalf("Catalog Commit に失敗: %v", err)
 	}
@@ -660,11 +647,7 @@ func setupCreateTableTestEnv(t *testing.T) *createTableTestEnv {
 	bp.RegisterHeapFile(page.FileId(1), undoHf)
 
 	undoMtr := newBootstrapMtr(bp, redoLog)
-	undoMgr, err := undo.NewManager(undoMtr, page.FileId(1))
-	if err != nil {
-		undoMtr.UnpinAll()
-		t.Fatalf("undo.Manager の作成に失敗: %v", err)
-	}
+	undoMgr := undo.NewManager(undoMtr, page.FileId(1))
 	if err := undoMtr.Commit(); err != nil {
 		t.Fatalf("undo.Manager Commit に失敗: %v", err)
 	}
@@ -675,14 +658,9 @@ func setupCreateTableTestEnv(t *testing.T) *createTableTestEnv {
 	if err != nil {
 		t.Fatalf("Catalog の取得に失敗: %v", err)
 	}
-	ddlMtr := newBootstrapMtr(bp, redoLog)
-	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId())
+	ddlMgr, err := undo.NewDDLManager(bp, dictionary.CatalogFileId, ct.DDLUndoRootPageId())
 	if err != nil {
-		ddlMtr.UnpinAll()
 		t.Fatalf("undo.DDLManager の作成に失敗: %v", err)
-	}
-	if err := ddlMtr.Commit(); err != nil {
-		t.Fatalf("undo.DDLManager Commit に失敗: %v", err)
 	}
 	trxMgr := NewTrxManager(ct, undoMgr, redoLog, lockMgr, bp, ddlMgr, 1)
 

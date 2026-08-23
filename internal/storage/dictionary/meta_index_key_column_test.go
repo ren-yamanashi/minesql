@@ -17,11 +17,10 @@ func TestCreateIndexKeyColumnMeta(t *testing.T) {
 
 		// WHEN
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, rl)
-		kcm, err := CreateIndexKeyColumnMeta(ctMtr)
+		kcm := CreateIndexKeyColumnMeta(ctMtr)
 		_ = ctMtr.Commit()
 
 		// THEN
-		assert.NoError(t, err)
 		assert.False(t, kcm.tree.MetaPageId().IsInvalid())
 	})
 }
@@ -162,10 +161,9 @@ func setupTestIndexKeyColumnMeta(t *testing.T) (*IndexKeyColumnMeta, *buffer.Poo
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
 	ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, setupDictTestRedoBuffer(t))
-	kcm, err := CreateIndexKeyColumnMeta(ctMtr)
-	_ = ctMtr.Commit()
-	if err != nil {
-		t.Fatalf("IndexKeyColumnMeta の作成に失敗: %v", err)
+	kcm := CreateIndexKeyColumnMeta(ctMtr)
+	if err := ctMtr.Commit(); err != nil {
+		t.Fatalf("IndexKeyColumnMeta セットアップ Mtr の Commit に失敗: %v", err)
 	}
 	return kcm, bp
 }

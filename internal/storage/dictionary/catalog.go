@@ -116,51 +116,31 @@ func NewCatalog(bp *buffer.Pool) (*Catalog, error) {
 //   - mtr: FSP ヘッダー初期化・ヘッダーページ確保・各メタテーブル作成を記録する Mtr。Commit / UnpinAll は呼び出し側
 //   - mtr の trxId に応じた Redo が記録される (= ブートストラップでは SystemReservedTrxId)
 //   - ヘッダーページは PageNumber == catalogHeaderPageNum で確保される
-func CreateCatalog(mtr *buffer.Mtr) (*Catalog, error) {
+//   - bootstrap 経路のため、途中失敗はすべて panic で扱う
+func CreateCatalog(mtr *buffer.Mtr) *Catalog {
 	if err := fsp.InitHeader(mtr, CatalogFileId); err != nil {
-		return nil, err
+		panic(fmt.Sprintf("dictionary: bootstrap failed to init catalog header: %v", err))
 	}
 	headerPageId, err := fsp.CreateSegment(mtr, CatalogFileId, headerSegmentHeaderOffset)
 	if err != nil {
-		return nil, err
+		panic(fmt.Sprintf("dictionary: bootstrap failed to create catalog header segment: %v", err))
 	}
 	if headerPageId.PageNumber() != catalogHeaderPageNum {
 		panic(fmt.Sprintf("dictionary: catalog header page must be PageNumber %d, got %d", catalogHeaderPageNum, headerPageId.PageNumber()))
 	}
 	bufPageHeader, err := mtr.PageForWrite(headerPageId)
 	if err != nil {
-		return nil, err
+		panic(fmt.Sprintf("dictionary: bootstrap failed to acquire catalog header page: %v", err))
 	}
 
-	tableMeta, err := CreateTableMeta(mtr)
-	if err != nil {
-		return nil, err
-	}
-	indexMeta, err := CreateIndexMeta(mtr)
-	if err != nil {
-		return nil, err
-	}
-	indexKeyColumnMeta, err := CreateIndexKeyColumnMeta(mtr)
-	if err != nil {
-		return nil, err
-	}
-	columnMeta, err := CreateColumnMeta(mtr)
-	if err != nil {
-		return nil, err
-	}
-	constraintMeta, err := CreateConstraintMeta(mtr)
-	if err != nil {
-		return nil, err
-	}
-	userMeta, err := CreateUserMeta(mtr)
-	if err != nil {
-		return nil, err
-	}
+	tableMeta := CreateTableMeta(mtr)
+	indexMeta := CreateIndexMeta(mtr)
+	indexKeyColumnMeta := CreateIndexKeyColumnMeta(mtr)
+	columnMeta := CreateColumnMeta(mtr)
+	constraintMeta := CreateConstraintMeta(mtr)
+	userMeta := CreateUserMeta(mtr)
 
-	ddlUndoRootPageId, err := undo.CreateChainRoot(mtr, CatalogFileId)
-	if err != nil {
-		return nil, err
-	}
+	ddlUndoRootPageId := undo.CreateChainRoot(mtr, CatalogFileId)
 
 	nextFileId := page.FileId(1) // FileId(0) はカタログ用なので 1 から開始
 	nextIndexId := IndexId(1)    // IndexId(0) は無効値として予約
@@ -197,7 +177,7 @@ func CreateCatalog(mtr *buffer.Mtr) (*Catalog, error) {
 		columnMeta:         columnMeta,
 		constraintMeta:     constraintMeta,
 		userMeta:           userMeta,
-	}, nil
+	}
 }
 
 // PersistNextTrxId は次に払い出すトランザクション ID をヘッダーページに永続化する

@@ -250,11 +250,7 @@ func setupTableTestEnv(t *testing.T) *tableTestEnv {
 	env.bp.RegisterHeapFile(page.FileId(3), undoHf)
 
 	undoBootstrapMtr := newBootstrapMtr(env.bp, redoLog)
-	undoMgr, err := undo.NewManager(undoBootstrapMtr, page.FileId(3))
-	if err != nil {
-		undoBootstrapMtr.UnpinAll()
-		t.Fatalf("undo.Manager の作成に失敗: %v", err)
-	}
+	undoMgr := undo.NewManager(undoBootstrapMtr, page.FileId(3))
 	if err := undoBootstrapMtr.Commit(); err != nil {
 		t.Fatalf("undo.Manager Commit に失敗: %v", err)
 	}
@@ -348,11 +344,7 @@ func setupTableTestEnvWithoutPrimaryIndex(t *testing.T) *tableTestEnv {
 	env.bp.RegisterHeapFile(page.FileId(3), undoHf)
 
 	undoBootstrapMtr := newBootstrapMtr(env.bp, redoLog)
-	undoMgr, err := undo.NewManager(undoBootstrapMtr, page.FileId(3))
-	if err != nil {
-		undoBootstrapMtr.UnpinAll()
-		t.Fatalf("undo.Manager の作成に失敗: %v", err)
-	}
+	undoMgr := undo.NewManager(undoBootstrapMtr, page.FileId(3))
 	if err := undoBootstrapMtr.Commit(); err != nil {
 		t.Fatalf("undo.Manager Commit に失敗: %v", err)
 	}

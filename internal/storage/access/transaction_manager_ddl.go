@@ -23,21 +23,16 @@ func (t *TrxManager) BeginDDL() *Transaction {
 }
 
 // commitDDL は DDL Transaction の Commit 処理を行う
-//   - DDL Undo 領域コンテナの中身をクリアし、 Redo に Commit レコードを追加してフラッシュする
+//   - Redo に Commit レコードを追加してフラッシュした後、 DDL Undo 領域コンテナの中身をクリアする
 //   - 永続コンテナ型のため、 コンテナ自体 (= root ページ) は残る
 func (t *TrxManager) commitDDL(trx *Transaction) error {
-	mtr := trx.NewMtr()
-	if err := t.ddlManager.Clear(mtr); err != nil {
-		mtr.UnpinAll()
-		return err
-	}
-	if err := mtr.Commit(); err != nil {
-		return err
-	}
 	if _, err := t.redoLog.AppendCommit(trx.trxId); err != nil {
 		return err
 	}
 	if err := t.redoLog.Flush(); err != nil {
+		return err
+	}
+	if err := t.ddlManager.Clear(trx.trxId, t.redoLog); err != nil {
 		return err
 	}
 
@@ -84,12 +79,7 @@ func (t *TrxManager) rollbackDDL(trx *Transaction) error {
 		}
 	}
 
-	clearMtr := trx.NewMtr()
-	if err := t.ddlManager.Clear(clearMtr); err != nil {
-		clearMtr.UnpinAll()
-		return err
-	}
-	if err := clearMtr.Commit(); err != nil {
+	if err := t.ddlManager.Clear(trx.trxId, t.redoLog); err != nil {
 		return err
 	}
 

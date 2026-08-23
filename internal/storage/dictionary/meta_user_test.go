@@ -22,11 +22,10 @@ func TestCreateUserMeta(t *testing.T) {
 
 		// WHEN
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, rl)
-		um, err := CreateUserMeta(ctMtr)
+		um := CreateUserMeta(ctMtr)
 		_ = ctMtr.Commit()
 
 		// THEN
-		assert.NoError(t, err)
 		assert.False(t, um.tree.MetaPageId().IsInvalid())
 	})
 }
@@ -137,10 +136,9 @@ func setupTestUserMeta(t *testing.T) (*UserMeta, *buffer.Pool) {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
 	ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, setupDictTestRedoBuffer(t))
-	um, err := CreateUserMeta(ctMtr)
-	_ = ctMtr.Commit()
-	if err != nil {
-		t.Fatalf("UserMeta の作成に失敗: %v", err)
+	um := CreateUserMeta(ctMtr)
+	if err := ctMtr.Commit(); err != nil {
+		t.Fatalf("UserMeta セットアップ Mtr の Commit に失敗: %v", err)
 	}
 	return um, bp
 }

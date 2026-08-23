@@ -30,15 +30,13 @@ type Manager struct {
 // NewManager は Undo ファイルの FSP ヘッダーを初期化し、 チェーン先頭ページを 1 枚確保して Manager を返す
 //   - mtr: FSP ヘッダー初期化とチェーン先頭ページの segment 作成を記録する Mtr。Commit / UnpinAll は呼び出し側
 //   - 先頭ページは PageNumber == ChainHeadPageNumber で確保される
-func NewManager(mtr *buffer.Mtr, fileId page.FileId) (*Manager, error) {
+//   - bootstrap 経路のため、途中失敗はすべて panic で扱う
+func NewManager(mtr *buffer.Mtr, fileId page.FileId) *Manager {
 	if err := fsp.InitHeader(mtr, fileId); err != nil {
-		return nil, err
+		panic(fmt.Sprintf("undo: bootstrap failed to init header: %v", err))
 	}
 	bp := mtr.Pool()
-	pageId, err := CreateChainRoot(mtr, fileId)
-	if err != nil {
-		return nil, err
-	}
+	pageId := CreateChainRoot(mtr, fileId)
 	if pageId.PageNumber() != ChainHeadPageNumber {
 		panic(fmt.Sprintf("undo: chain head page must be PageNumber %d, got %d", ChainHeadPageNumber, pageId.PageNumber()))
 	}
@@ -49,20 +47,29 @@ func NewManager(mtr *buffer.Mtr, fileId page.FileId) (*Manager, error) {
 		fileId:        fileId,
 		currentPageId: pageId,
 		entries:       make(map[lock.TrxId][]Entry),
-	}, nil
+	}
 }
 
 // Append は指定した trxId の Undo ログにレコードを追加し、書き込み先の Pointer を返す
 //   - Undo ページ書き込みは Undo 専用の mini-transaction として独立して commit される
 //   - 呼び出し側のデータ操作 mini-transaction は、返された Pointer をレコードに記録するだけでよい
+//   - 単一 Undo ページに収まらないサイズのレコードは書き込み開始前に ErrRecordTooLarge で拒否する
 func (m *Manager) Append(trxId lock.TrxId, recordType RecordType, record Record) (Pointer, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	undoNum := UndoNumber(len(m.entries[trxId]))
+	serialized := record.Serialize(trxId, undoNum)
+	if len(serialized) > maxRecordSize {
+		return Pointer{}, ErrRecordTooLarge
+	}
+
 	mtr := buffer.NewWriteMtr(m.bufferPool, trxId, m.redoLog)
-	ptr, err := m.writeToPage(mtr, trxId, record)
+	ptr, err := m.writeToPage(mtr, serialized)
 	if err != nil {
-		mtr.UnpinAll()
+		if commitErr := mtr.Commit(); commitErr != nil {
+			return Pointer{}, commitErr
+		}
 		return Pointer{}, err
 	}
 	if err := mtr.Commit(); err != nil {
@@ -145,11 +152,9 @@ func (m *Manager) DiscardRecordType(trxId lock.TrxId, recordType RecordType) {
 	}
 }
 
-// writeToPage は Undo レコードを Undo ページに書き込み、書き込み先の Pointer を返す
-func (m *Manager) writeToPage(mtr *buffer.Mtr, trxId lock.TrxId, record Record) (Pointer, error) {
-	undoNum := UndoNumber(len(m.entries[trxId]))
-	serialized := record.Serialize(trxId, undoNum)
-
+// writeToPage は事前検証済みの Undo レコードを Undo ページに書き込み、書き込み先の Pointer を返す
+//   - serialized は Append 冒頭で maxRecordSize 以下であることが確認済みでなければならない
+func (m *Manager) writeToPage(mtr *buffer.Mtr, serialized []byte) (Pointer, error) {
 	pageUndo, err := mtr.PageForWrite(m.currentPageId)
 	if err != nil {
 		return Pointer{}, err
@@ -163,12 +168,14 @@ func (m *Manager) writeToPage(mtr *buffer.Mtr, trxId lock.TrxId, record Record) 
 
 	prevUsedBytes := bufPageUndo.UsedBytes()
 	if !bufPageUndo.append(serialized) {
-		return Pointer{}, ErrRecordTooLarge
+		panic(fmt.Sprintf("undo: append to current page failed after free space check (pageId=%v, size=%d)", m.currentPageId, len(serialized)))
 	}
 	return NewPointer(m.currentPageId.PageNumber(), prevUsedBytes), nil
 }
 
 // switchToNewPage は現在のページが満杯のとき、新しい Undo ページを割り当ててレコードを書き込む
+//   - AddPage / PageForWrite に失敗した場合は割り当てを補償解放してから失敗を返す
+//   - 補償解放の途中でさらに失敗した場合は続行不能な二重障害として panic する
 func (m *Manager) switchToNewPage(
 	mtr *buffer.Mtr,
 	currentPage *Page,
@@ -180,15 +187,21 @@ func (m *Manager) switchToNewPage(
 		return Pointer{}, err
 	}
 	if _, err := m.bufferPool.AddPage(newPageId); err != nil {
+		if compErr := fsp.FreeSegmentPage(mtr, rootHeaderAt, newPageId); compErr != nil {
+			panic(fmt.Sprintf("undo: page compensation failed after undo page allocation: %v", compErr))
+		}
 		return Pointer{}, err
 	}
 	pageNewUndo, err := mtr.PageForWrite(newPageId)
 	if err != nil {
+		if compErr := fsp.FreeSegmentPage(mtr, rootHeaderAt, newPageId); compErr != nil {
+			panic(fmt.Sprintf("undo: page compensation failed after undo page allocation: %v", compErr))
+		}
 		return Pointer{}, err
 	}
 	newBufPageUndo := CreatePage(pageNewUndo)
 	if !newBufPageUndo.append(serialized) {
-		return Pointer{}, ErrRecordTooLarge
+		panic(fmt.Sprintf("undo: append to new page failed after size check (pageId=%v, size=%d)", newPageId, len(serialized)))
 	}
 
 	currentPage.setNextPageNumber(newPageId.PageNumber())

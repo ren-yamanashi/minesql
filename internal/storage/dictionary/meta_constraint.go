@@ -1,6 +1,8 @@
 package dictionary
 
 import (
+	"fmt"
+
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -16,12 +18,13 @@ func NewConstraintMeta(bp *buffer.Pool, metaPageId page.Id) *ConstraintMeta {
 
 // CreateConstraintMeta は制約メタ用の B+Tree を mtr 配下で新規作成する
 //   - mtr.Commit / mtr.UnpinAll は呼び出し側で行う
-func CreateConstraintMeta(mtr *buffer.Mtr) (*ConstraintMeta, error) {
+//   - bootstrap 経路のため、途中失敗はすべて panic で扱う
+func CreateConstraintMeta(mtr *buffer.Mtr) *ConstraintMeta {
 	tree, err := btree.CreateTree(mtr.Pool(), CatalogFileId, mtr)
 	if err != nil {
-		return nil, err
+		panic(fmt.Sprintf("dictionary: bootstrap failed to create constraint meta tree: %v", err))
 	}
-	return &ConstraintMeta{tree: tree}, nil
+	return &ConstraintMeta{tree: tree}
 }
 
 func (cm *ConstraintMeta) Search(mtr *buffer.Mtr, mode SearchMode) (*ConstraintIterator, error) {

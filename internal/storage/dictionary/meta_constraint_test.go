@@ -18,11 +18,10 @@ func TestCreateConstraintMeta(t *testing.T) {
 
 		// WHEN
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, rl)
-		cm, err := CreateConstraintMeta(ctMtr)
+		cm := CreateConstraintMeta(ctMtr)
 		_ = ctMtr.Commit()
 
 		// THEN
-		assert.NoError(t, err)
 		assert.False(t, cm.tree.MetaPageId().IsInvalid())
 	})
 }
@@ -180,10 +179,9 @@ func setupTestConstraintMeta(t *testing.T) (*ConstraintMeta, *buffer.Pool) {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
 	ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, setupDictTestRedoBuffer(t))
-	cm, err := CreateConstraintMeta(ctMtr)
-	_ = ctMtr.Commit()
-	if err != nil {
-		t.Fatalf("ConstraintMeta の作成に失敗: %v", err)
+	cm := CreateConstraintMeta(ctMtr)
+	if err := ctMtr.Commit(); err != nil {
+		t.Fatalf("ConstraintMeta セットアップ Mtr の Commit に失敗: %v", err)
 	}
 	return cm, bp
 }

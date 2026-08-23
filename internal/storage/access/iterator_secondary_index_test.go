@@ -223,23 +223,14 @@ func setupIteratorTestEnv(t *testing.T) *iteratorTestEnv {
 	}
 
 	ctMtr := newBootstrapMtr(bp, redoLog)
-	ct, err := dictionary.CreateCatalog(ctMtr)
-	if err != nil {
-		ctMtr.UnpinAll()
-		t.Fatalf("Catalog の作成に失敗: %v", err)
-	}
+	ct := dictionary.CreateCatalog(ctMtr)
 	if err := ctMtr.Commit(); err != nil {
 		t.Fatalf("Catalog Commit に失敗: %v", err)
 	}
 
-	ddlMtr := newBootstrapMtr(bp, redoLog)
-	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId())
+	ddlMgr, err := undo.NewDDLManager(bp, dictionary.CatalogFileId, ct.DDLUndoRootPageId())
 	if err != nil {
-		ddlMtr.UnpinAll()
 		t.Fatalf("undo.DDLManager の作成に失敗: %v", err)
-	}
-	if err := ddlMtr.Commit(); err != nil {
-		t.Fatalf("undo.DDLManager Commit に失敗: %v", err)
 	}
 
 	tableFileId := page.FileId(2)

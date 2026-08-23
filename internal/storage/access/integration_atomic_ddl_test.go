@@ -379,14 +379,9 @@ func crashAndRecoverWithPendingFiles(
 	}
 	initialNextTrxId := max(ct.NextTrxId(), maxTrxId+1)
 
-	ddlMtr := newBootstrapMtr(bp, redoLog)
-	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId())
+	ddlMgr, err := undo.NewDDLManager(bp, dictionary.CatalogFileId, ct.DDLUndoRootPageId())
 	if err != nil {
-		ddlMtr.UnpinAll()
 		t.Fatalf("undo.DDLManager の再オープンに失敗: %v", err)
-	}
-	if err := ddlMtr.Commit(); err != nil {
-		t.Fatalf("undo.DDLManager Commit に失敗: %v", err)
 	}
 
 	lockMgr := lock.NewManager()
@@ -404,14 +399,9 @@ func crashAndRecoverWithPendingFiles(
 	}
 	refreshedNextTrxId := max(refreshedCt.NextTrxId(), maxTrxId+1)
 
-	refreshedDdlMtr := newBootstrapMtr(bp, redoLog)
-	refreshedDdlMgr, err := undo.NewDDLManager(refreshedDdlMtr, dictionary.CatalogFileId, refreshedCt.DDLUndoRootPageId())
+	refreshedDdlMgr, err := undo.NewDDLManager(bp, dictionary.CatalogFileId, refreshedCt.DDLUndoRootPageId())
 	if err != nil {
-		refreshedDdlMtr.UnpinAll()
 		t.Fatalf("undo.DDLManager の再 open に失敗: %v", err)
-	}
-	if err := refreshedDdlMtr.Commit(); err != nil {
-		t.Fatalf("undo.DDLManager Commit に失敗: %v", err)
 	}
 
 	undoMgr, err := undo.OpenManager(bp, redoLog, undoFileId)

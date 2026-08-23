@@ -1,6 +1,8 @@
 package dictionary
 
 import (
+	"fmt"
+
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -16,12 +18,13 @@ func NewIndexMeta(bp *buffer.Pool, metaPageId page.Id) *IndexMeta {
 
 // CreateIndexMeta はインデックスメタ用の B+Tree を mtr 配下で新規作成する
 //   - mtr.Commit / mtr.UnpinAll は呼び出し側で行う
-func CreateIndexMeta(mtr *buffer.Mtr) (*IndexMeta, error) {
+//   - bootstrap 経路のため、途中失敗はすべて panic で扱う
+func CreateIndexMeta(mtr *buffer.Mtr) *IndexMeta {
 	tree, err := btree.CreateTree(mtr.Pool(), CatalogFileId, mtr)
 	if err != nil {
-		return nil, err
+		panic(fmt.Sprintf("dictionary: bootstrap failed to create index meta tree: %v", err))
 	}
-	return &IndexMeta{tree: tree}, nil
+	return &IndexMeta{tree: tree}
 }
 
 func (im *IndexMeta) Search(mtr *buffer.Mtr, mode SearchMode) (*IndexIterator, error) {

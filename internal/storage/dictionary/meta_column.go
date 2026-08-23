@@ -1,6 +1,8 @@
 package dictionary
 
 import (
+	"fmt"
+
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -16,12 +18,13 @@ func NewColumnMeta(bp *buffer.Pool, metaPageId page.Id) *ColumnMeta {
 
 // CreateColumnMeta はカラムメタ用の B+Tree を mtr 配下で新規作成する
 //   - mtr.Commit / mtr.UnpinAll は呼び出し側で行う
-func CreateColumnMeta(mtr *buffer.Mtr) (*ColumnMeta, error) {
+//   - bootstrap 経路のため、途中失敗はすべて panic で扱う
+func CreateColumnMeta(mtr *buffer.Mtr) *ColumnMeta {
 	tree, err := btree.CreateTree(mtr.Pool(), CatalogFileId, mtr)
 	if err != nil {
-		return nil, err
+		panic(fmt.Sprintf("dictionary: bootstrap failed to create column meta tree: %v", err))
 	}
-	return &ColumnMeta{tree: tree}, nil
+	return &ColumnMeta{tree: tree}
 }
 
 func (cm *ColumnMeta) Search(mtr *buffer.Mtr, mode SearchMode) (*ColumnIterator, error) {

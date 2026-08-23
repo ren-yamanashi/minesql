@@ -278,11 +278,7 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
 
 	catalogMtr := newBootstrapMtr(bp, redoLog)
-	ct, err := dictionary.CreateCatalog(catalogMtr)
-	if err != nil {
-		catalogMtr.UnpinAll()
-		t.Fatalf("Catalog の作成に失敗: %v", err)
-	}
+	ct := dictionary.CreateCatalog(catalogMtr)
 	if err := catalogMtr.Commit(); err != nil {
 		t.Fatalf("Catalog Commit に失敗: %v", err)
 	}
@@ -298,23 +294,14 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 	bp.RegisterHeapFile(undoFileId, undoHf)
 
 	undoMtr := newBootstrapMtr(bp, redoLog)
-	undoMgr, err := undo.NewManager(undoMtr, undoFileId)
-	if err != nil {
-		undoMtr.UnpinAll()
-		t.Fatalf("undo.Manager の作成に失敗: %v", err)
-	}
+	undoMgr := undo.NewManager(undoMtr, undoFileId)
 	if err := undoMtr.Commit(); err != nil {
 		t.Fatalf("undo.Manager Commit に失敗: %v", err)
 	}
 
-	ddlMtr := newBootstrapMtr(bp, redoLog)
-	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId())
+	ddlMgr, err := undo.NewDDLManager(bp, dictionary.CatalogFileId, ct.DDLUndoRootPageId())
 	if err != nil {
-		ddlMtr.UnpinAll()
 		t.Fatalf("undo.DDLManager の作成に失敗: %v", err)
-	}
-	if err := ddlMtr.Commit(); err != nil {
-		t.Fatalf("undo.DDLManager Commit に失敗: %v", err)
 	}
 
 	lockMgr := lock.NewManager()

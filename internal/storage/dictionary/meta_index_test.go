@@ -18,11 +18,10 @@ func TestCreateIndexMeta(t *testing.T) {
 
 		// WHEN
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, rl)
-		im, err := CreateIndexMeta(ctMtr)
+		im := CreateIndexMeta(ctMtr)
 		_ = ctMtr.Commit()
 
 		// THEN
-		assert.NoError(t, err)
 		assert.False(t, im.tree.MetaPageId().IsInvalid())
 	})
 }
@@ -229,10 +228,9 @@ func setupTestIndexMeta(t *testing.T) (*IndexMeta, *buffer.Pool) {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
 	ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, setupDictTestRedoBuffer(t))
-	im, err := CreateIndexMeta(ctMtr)
-	_ = ctMtr.Commit()
-	if err != nil {
-		t.Fatalf("IndexMeta の作成に失敗: %v", err)
+	im := CreateIndexMeta(ctMtr)
+	if err := ctMtr.Commit(); err != nil {
+		t.Fatalf("IndexMeta セットアップ Mtr の Commit に失敗: %v", err)
 	}
 	return im, bp
 }

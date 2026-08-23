@@ -382,11 +382,7 @@ func setupDDLRollbackerTestEnv(t *testing.T) *ddlRollbackerTestEnv {
 	}
 
 	catalogMtr := newBootstrapMtr(bp, redoLog)
-	ct, err := dictionary.CreateCatalog(catalogMtr)
-	if err != nil {
-		catalogMtr.UnpinAll()
-		t.Fatalf("Catalog の作成に失敗: %v", err)
-	}
+	ct := dictionary.CreateCatalog(catalogMtr)
 	if err := catalogMtr.Commit(); err != nil {
 		t.Fatalf("Catalog Commit に失敗: %v", err)
 	}

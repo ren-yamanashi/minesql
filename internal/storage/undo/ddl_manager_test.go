@@ -12,17 +12,16 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewDDLManager(t *testing.T) {
 	t.Run("空の DDL Undo 領域を開ける", func(t *testing.T) {
 		// GIVEN
-		bp, rootPageId, redoLog := setupDDLTestEnv(t)
+		bp, rootPageId, _ := setupDDLTestEnv(t)
 
 		// WHEN
-		openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-		mgr, err := NewDDLManager(openMtr, page.FileId(0), rootPageId)
-		_ = openMtr.Commit()
+		mgr, err := NewDDLManager(bp, page.FileId(0), rootPageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -32,12 +31,10 @@ func TestNewDDLManager(t *testing.T) {
 
 	t.Run("rootPageId に無効値を渡すと ErrInvalidDDLUndoRoot を返す", func(t *testing.T) {
 		// GIVEN
-		bp, _, redoLog := setupDDLTestEnv(t)
+		bp, _, _ := setupDDLTestEnv(t)
 
 		// WHEN
-		openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-		mgr, err := NewDDLManager(openMtr, page.FileId(0), page.InvalidId())
-		_ = openMtr.Commit()
+		mgr, err := NewDDLManager(bp, page.FileId(0), page.InvalidId())
 
 		// THEN
 		assert.Nil(t, mgr)
@@ -47,18 +44,14 @@ func TestNewDDLManager(t *testing.T) {
 	t.Run("複数ページに渡る DDL Undo 領域から末尾ページを特定できる", func(t *testing.T) {
 		// GIVEN
 		bp, rootPageId, redoLog := setupDDLTestEnv(t)
-		openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-		mgr, err := NewDDLManager(openMtr, page.FileId(0), rootPageId)
-		_ = openMtr.Commit()
+		mgr, err := NewDDLManager(bp, page.FileId(0), rootPageId)
 		assert.NoError(t, err)
 		fillUntilPageSwitch(t, mgr, redoLog)
 		tailPageId := mgr.currentPageId
 		assert.NotEqual(t, rootPageId, tailPageId)
 
 		// WHEN
-		openMtr2 := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-		opened, err := NewDDLManager(openMtr2, page.FileId(0), rootPageId)
-		_ = openMtr2.Commit()
+		opened, err := NewDDLManager(bp, page.FileId(0), rootPageId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -153,6 +146,27 @@ func TestDDLManagerAppend(t *testing.T) {
 		assert.NotEqual(t, -1, newIdx)
 		assert.NotEqual(t, -1, oldIdx)
 		assert.Less(t, newIdx, oldIdx)
+	})
+
+	t.Run("上限超過レコードの Append は書き込み前に ErrRecordTooLarge を返し redo に何も記録しない", func(t *testing.T) {
+		// GIVEN
+		mgr, redoLog := setupDDLManager(t)
+		require.NoError(t, redoLog.Flush())
+		sizeBefore, err := redoLog.Size()
+		require.NoError(t, err)
+		hugeRec := NewDDLRecord(DDLRecordTypeMetaInsert, make([]byte, page.Size))
+
+		// WHEN
+		mtr := buffer.NewWriteMtr(mgr.bufferPool, lock.DDLReservedTrxId, redoLog)
+		appendErr := mgr.Append(mtr, hugeRec)
+		mtr.UnpinAll()
+
+		// THEN
+		assert.ErrorIs(t, appendErr, ErrRecordTooLarge)
+		require.NoError(t, redoLog.Flush())
+		sizeAfter, err := redoLog.Size()
+		require.NoError(t, err)
+		assert.Equal(t, sizeBefore, sizeAfter)
 	})
 }
 
@@ -279,6 +293,59 @@ func TestDDLManagerClear(t *testing.T) {
 		records := reverseScanDDL(t, mgr)
 		assert.NotEmpty(t, records)
 	})
+
+	t.Run("複数ページの Clear は 1 ページ解放ごとに独立した mini-transaction として commit される", func(t *testing.T) {
+		// GIVEN
+		mgr, redoLog := setupDDLManager(t)
+		fillUntilPageSwitch(t, mgr, redoLog)
+		require.NoError(t, redoLog.Flush())
+		baseLsn := redoLog.FlushedLsn()
+
+		// WHEN
+		clearDDL(t, mgr, redoLog)
+
+		// THEN: root リセット (1 mtr) + 中間ページ解放 (N mtr) = 2 以上の MtrEnd が記録される
+		require.NoError(t, redoLog.Flush())
+		records, err := redoLog.ReadFrom(baseLsn)
+		require.NoError(t, err)
+		var mtrEndCount int
+		for _, r := range records {
+			if r.Type() == redo.RecordTypeMtrEnd {
+				mtrEndCount++
+			}
+		}
+		assert.GreaterOrEqual(t, mtrEndCount, 2)
+	})
+
+	t.Run("redoLog = nil の Clear は Redo に何も記録せずコンテナだけを空にする", func(t *testing.T) {
+		// GIVEN
+		mgr, redoLog := setupDDLManager(t)
+		rootPageId := mgr.rootPageId
+		fillUntilPageSwitch(t, mgr, redoLog)
+		tailPageId := mgr.currentPageId
+		require.NotEqual(t, rootPageId, tailPageId)
+		require.NoError(t, redoLog.Flush())
+		sizeBefore, err := redoLog.Size()
+		require.NoError(t, err)
+		flushedBefore := redoLog.FlushedLsn()
+
+		// WHEN
+		require.NoError(t, mgr.Clear(lock.DDLReservedTrxId, nil))
+
+		// THEN
+		require.NoError(t, redoLog.Flush())
+		sizeAfter, err := redoLog.Size()
+		require.NoError(t, err)
+		assert.Equal(t, sizeBefore, sizeAfter)
+		assert.Equal(t, flushedBefore, redoLog.FlushedLsn())
+		assert.Equal(t, rootPageId, mgr.currentPageId)
+		bufPage, err := mgr.bufferPool.Page(rootPageId)
+		require.NoError(t, err)
+		defer mgr.bufferPool.Unpin(rootPageId)
+		rootDDLPage := NewFirstPage(bufPage)
+		assert.Equal(t, uint16(0), rootDDLPage.UsedBytes())
+		assert.Equal(t, page.PageNumber(0), rootDDLPage.NextPageNumber())
+	})
 }
 
 // setupDDLTestEnv は DDLManager テスト用に buffer.Pool / DDL Undo root を作る
@@ -310,10 +377,7 @@ func setupDDLTestEnv(t *testing.T) (*buffer.Pool, page.Id, *redo.Buffer) {
 	}
 
 	mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-	rootPageId, err := CreateChainRoot(mtr, fileId)
-	if err != nil {
-		t.Fatalf("DDL Undo チェーン先頭ページの確保に失敗: %v", err)
-	}
+	rootPageId := CreateChainRoot(mtr, fileId)
 	if err := mtr.Commit(); err != nil {
 		t.Fatalf("セットアップ Mtr の Commit に失敗: %v", err)
 	}
@@ -325,14 +389,9 @@ func setupDDLTestEnv(t *testing.T) (*buffer.Pool, page.Id, *redo.Buffer) {
 func setupDDLManager(t *testing.T) (*DDLManager, *redo.Buffer) {
 	t.Helper()
 	bp, rootPageId, redoLog := setupDDLTestEnv(t)
-	openMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, redoLog)
-	mgr, err := NewDDLManager(openMtr, page.FileId(0), rootPageId)
+	mgr, err := NewDDLManager(bp, page.FileId(0), rootPageId)
 	if err != nil {
-		openMtr.UnpinAll()
 		t.Fatalf("DDLManager の作成に失敗: %v", err)
-	}
-	if err := openMtr.Commit(); err != nil {
-		t.Fatalf("DDLManager Commit に失敗: %v", err)
 	}
 	return mgr, redoLog
 }
@@ -362,16 +421,12 @@ func reverseScanDDL(t *testing.T, mgr *DDLManager) []DDLRecord {
 	return records
 }
 
-// clearDDL は Clear を書き込み Mtr + Commit で実行するヘルパー
+// clearDDL は Clear を実行するヘルパー
+//   - Clear は内部で「1 ページ解放 = 1 mtr」の write mtr を生成・commit する
 func clearDDL(t *testing.T, mgr *DDLManager, redoLog *redo.Buffer) {
 	t.Helper()
-	mtr := buffer.NewWriteMtr(mgr.bufferPool, lock.DDLReservedTrxId, redoLog)
-	defer mtr.UnpinAll()
-	if err := mgr.Clear(mtr); err != nil {
+	if err := mgr.Clear(lock.DDLReservedTrxId, redoLog); err != nil {
 		t.Fatalf("Clear に失敗: %v", err)
-	}
-	if err := mtr.Commit(); err != nil {
-		t.Fatalf("Commit に失敗: %v", err)
 	}
 }
 

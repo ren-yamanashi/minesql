@@ -18,11 +18,10 @@ func TestCreateColumnMeta(t *testing.T) {
 
 		// WHEN
 		ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, rl)
-		cm, err := CreateColumnMeta(ctMtr)
+		cm := CreateColumnMeta(ctMtr)
 		_ = ctMtr.Commit()
 
 		// THEN
-		assert.NoError(t, err)
 		assert.False(t, cm.tree.MetaPageId().IsInvalid())
 	})
 }
@@ -163,10 +162,9 @@ func setupTestColumnMeta(t *testing.T) (*ColumnMeta, *buffer.Pool) {
 	t.Helper()
 	bp := setupDictTestBufferPool(t)
 	ctMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, setupDictTestRedoBuffer(t))
-	cm, err := CreateColumnMeta(ctMtr)
-	_ = ctMtr.Commit()
-	if err != nil {
-		t.Fatalf("ColumnMeta の作成に失敗: %v", err)
+	cm := CreateColumnMeta(ctMtr)
+	if err := ctMtr.Commit(); err != nil {
+		t.Fatalf("ColumnMeta セットアップ Mtr の Commit に失敗: %v", err)
 	}
 	return cm, bp
 }

@@ -1,6 +1,8 @@
 package dictionary
 
 import (
+	"fmt"
+
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -16,12 +18,13 @@ func NewUserMeta(bp *buffer.Pool, metaPageId page.Id) *UserMeta {
 
 // CreateUserMeta はユーザーメタ用の B+Tree を mtr 配下で新規作成する
 //   - mtr.Commit / mtr.UnpinAll は呼び出し側で行う
-func CreateUserMeta(mtr *buffer.Mtr) (*UserMeta, error) {
+//   - bootstrap 経路のため、途中失敗はすべて panic で扱う
+func CreateUserMeta(mtr *buffer.Mtr) *UserMeta {
 	tree, err := btree.CreateTree(mtr.Pool(), CatalogFileId, mtr)
 	if err != nil {
-		return nil, err
+		panic(fmt.Sprintf("dictionary: bootstrap failed to create user meta tree: %v", err))
 	}
-	return &UserMeta{tree: tree}, nil
+	return &UserMeta{tree: tree}
 }
 
 func (um *UserMeta) Search(mtr *buffer.Mtr, mode SearchMode) (*UserIterator, error) {

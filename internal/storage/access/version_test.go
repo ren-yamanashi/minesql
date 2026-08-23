@@ -168,11 +168,7 @@ func setupVersionTestEnv(t *testing.T) *versionTestEnv {
 	iter.bp.RegisterHeapFile(page.FileId(3), undoHf)
 
 	undoBootstrapMtr := newBootstrapMtr(iter.bp, iter.redoLog)
-	undoMgr, err := undo.NewManager(undoBootstrapMtr, page.FileId(3))
-	if err != nil {
-		undoBootstrapMtr.UnpinAll()
-		t.Fatalf("undo.Manager の作成に失敗: %v", err)
-	}
+	undoMgr := undo.NewManager(undoBootstrapMtr, page.FileId(3))
 	if err := undoBootstrapMtr.Commit(); err != nil {
 		t.Fatalf("undo.Manager Commit に失敗: %v", err)
 	}
