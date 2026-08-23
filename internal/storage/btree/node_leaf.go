@@ -2,7 +2,6 @@ package btree
 
 import (
 	"bytes"
-	"errors"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -73,37 +72,33 @@ func (ln *leafNode) canFit(record Record) bool {
 //   - newLeaf: 分割後の新しいリーフノード (小さい方のレコードが格納される)
 //   - newRecord: 挿入するレコード
 //   - return: 古いノード (=右の子) の最小キー (=親ブランチノードの境界キー)
-func (ln *leafNode) splitInsert(newLeaf *leafNode, newRecord Record) ([]byte, error) {
+func (ln *leafNode) splitInsert(newLeaf *leafNode, newRecord Record) []byte {
 	newLeaf.initialize()
 	for {
 		if newLeaf.isHalfFull() {
 			slotNum, _ := ln.searchSlotNum(newRecord.Key())
 			if !ln.insert(slotNum, newRecord) {
-				return nil, errors.New("old leaf node must have space")
+				panic("btree: old leaf node must have space after split")
 			}
 			break
 		}
 
 		// `古いノードの先頭レコードのキー < 挿入対象のキー` の場合
 		if ln.record(0).compareKey(newRecord.Key()) < 0 {
-			if err := ln.transfer(newLeaf); err != nil {
-				return nil, err
-			}
+			ln.transfer(newLeaf)
 			continue
 		}
 
 		// `古いノードの先頭レコードのキー >= 挿入対象のキー` の場合
 		if !newLeaf.insert(newLeaf.numRecords(), newRecord) {
-			return nil, errors.New("new leaf node must have space")
+			panic("btree: new leaf node must have space for split target")
 		}
 		for !newLeaf.isHalfFull() {
-			if err := ln.transfer(newLeaf); err != nil {
-				return nil, err
-			}
+			ln.transfer(newLeaf)
 		}
 		break
 	}
-	return bytes.Clone(ln.record(0).Key()), nil
+	return bytes.Clone(ln.record(0).Key())
 }
 
 // delete はレコードを削除する
@@ -197,6 +192,11 @@ func (ln *leafNode) transferAllFrom(src *leafNode) bool {
 	return src.body.transferAllTo(ln.body)
 }
 
+// canMergeAllFrom は src の全レコードを自分の末尾に取り込めるかを、書き込まずに返す
+func (ln *leafNode) canMergeAllFrom(src *leafNode) bool {
+	return src.body.canTransferAllTo(ln.body)
+}
+
 // isHalfFull はリーフノードが半分以上埋まっているかどうかを判定する
 func (ln *leafNode) isHalfFull() bool {
 	return 2*ln.body.freeSpace() < ln.body.capacity()
@@ -210,14 +210,13 @@ func (ln *leafNode) maxRecordSize() int {
 }
 
 // transfer は先頭のレコードを別のリーフノードに移動する
-func (ln *leafNode) transfer(dest *leafNode) error {
+func (ln *leafNode) transfer(dest *leafNode) {
 	nextIndex := dest.numRecords()
 	data := ln.body.cell(0)
 
 	if !dest.body.insert(nextIndex, data) {
-		return errors.New("no space in dest leaf node")
+		panic("btree: dest leaf node must have space for transfer")
 	}
 
 	ln.body.delete(0)
-	return nil
 }

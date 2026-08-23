@@ -101,6 +101,6 @@ func newSearchModeKeyTestBranchNode(t *testing.T) *branchNode {
 		panic(err)
 	}
 	bn := newBranchNode(bufPage)
-	_ = bn.initialize([]byte{0x10}, page.NewId(0, 1), page.NewId(0, 2))
+	bn.initialize([]byte{0x10}, page.NewId(0, 1), page.NewId(0, 2))
 	return bn
 }

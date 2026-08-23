@@ -92,6 +92,11 @@ func (sp *slottedPage) canResize(index int, newSize int) bool {
 	return sizeIncrease <= sp.freeSpace()
 }
 
+// canUpdate は index のスロットを data で更新できるかを、書き込まずに返す
+func (sp *slottedPage) canUpdate(index int, data []byte) bool {
+	return sp.canResize(index, len(data))
+}
+
 // update は指定されたインデックスのデータを新しいデータに更新する
 //   - index: 更新対象のデータが格納されている Slot のインデックス
 //   - data: 更新後のデータ
@@ -151,6 +156,21 @@ func (sp *slottedPage) resize(index int, newSize int) bool {
 	sp.setPointer(index, pointer)
 
 	return true
+}
+
+// canTransferAllTo は自身のすべてのスロットを dest の末尾に転送できるかを、書き込まずに返す
+//   - dest の空き容量が不足している場合は false
+func (sp *slottedPage) canTransferAllTo(dest *slottedPage) bool {
+	srcNumSlots := sp.numSlots()
+	if srcNumSlots == 0 {
+		return true
+	}
+	var totalDataSize int
+	for i := range srcNumSlots {
+		totalDataSize += len(sp.cell(i))
+	}
+	requiredSpace := srcNumSlots*slottedPagePointerSize + totalDataSize
+	return dest.freeSpace() >= requiredSpace
 }
 
 // transferAllTo は自身のすべてのスロットを dest の末尾に転送する (自身のスロットはすべて削除される)

@@ -1,8 +1,9 @@
 package btree
 
 import (
+	"fmt"
+
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
@@ -63,12 +64,24 @@ func (t *Tree) insertPessimistic(mtr *buffer.Mtr, record Record) error {
 	}
 	metaPage := newMetaPage(pageMeta)
 
-	return t.insertWithMetaUpdate(mtr, metaPage, record)
+	// SMO で必要になる最大枚数を事前確保する (leaf 1 + branch height)
+	reserved, err := t.reservePages(mtr, metaPage.height())
+	if err != nil {
+		return err
+	}
+
+	if err := t.insertWithMetaUpdate(mtr, metaPage, record, reserved); err != nil {
+		t.releaseUnused(mtr, reserved)
+		return err
+	}
+	t.releaseUnused(mtr, reserved)
+	return nil
 }
 
 // insertWithMetaUpdate はルートから再帰的に挿入し、分割が発生した場合にメタページを更新する
 //   - 呼び出し側で B+Tree レベルの SX とメタページの Exclusive を保持していること
-func (t *Tree) insertWithMetaUpdate(mtr *buffer.Mtr, mp *metaPage, record Record) error {
+//   - reserved: 事前確保済みのページ集合。分割で必要になったページはここから取り出す
+func (t *Tree) insertWithMetaUpdate(mtr *buffer.Mtr, mp *metaPage, record Record, reserved *reservedPages) error {
 	// ルートページを取得
 	rootPageId := mp.rootPageId()
 	rootPageBuf, err := mtr.PageForRead(rootPageId)
@@ -77,7 +90,7 @@ func (t *Tree) insertWithMetaUpdate(mtr *buffer.Mtr, mp *metaPage, record Record
 	}
 
 	// 再帰的に挿入
-	overflowKey, overflowChildPageId, isLeafSplit, err := t.insertRecursively(mtr, rootPageBuf, record)
+	overflowKey, overflowChildPageId, isLeafSplit, err := t.insertRecursively(mtr, rootPageBuf, record, reserved)
 	if err != nil {
 		return err
 	}
@@ -97,23 +110,13 @@ func (t *Tree) insertWithMetaUpdate(mtr *buffer.Mtr, mp *metaPage, record Record
 	}
 
 	// ルートノードの分割が発生した場合
-	newRootPageId, err := fsp.AllocateSegmentPage(mtr, t.MetaPageId().FileId(), t.branchSegmentHeaderAt())
-	if err != nil {
-		return err
-	}
-	_, err = t.bufferPool.AddPage(newRootPageId)
-	if err != nil {
-		return err
-	}
+	newRootPageId := reserved.takeBranch()
 	pageNewRoot, err := mtr.PageForWrite(newRootPageId)
 	if err != nil {
-		return err
+		panic(fmt.Sprintf("btree: PageForWrite failed for reserved new root page (pageId=%v): %v", newRootPageId, err))
 	}
 	newRootBranch := newBranchNode(pageNewRoot)
-	err = newRootBranch.initialize(overflowKey, overflowChildPageId, rootPageId)
-	if err != nil {
-		return err
-	}
+	newRootBranch.initialize(overflowKey, overflowChildPageId, rootPageId)
 	mp.setRootPageId(newRootPageId)
 	mp.setHeight(mp.height() + 1)
 	return nil
@@ -175,6 +178,7 @@ func (t *Tree) descendToLeafExclusive(mtr *buffer.Mtr, rootPageId page.Id, heigh
 // insertRecursively は再帰的にノードを辿ってレコードを挿入する
 //   - bufPage: 挿入先のノードのバッファページ
 //   - record: 挿入するレコード
+//   - reserved: 事前確保済みのページ集合。分割で必要になったページはここから取り出す
 //   - return:
 //   - overflowKey: 分割時の境界キー (分割なしの場合は nil)
 //   - newPageId: 分割で作られたノードの PageId (分割なしの場合は InvalidPageId)
@@ -183,6 +187,7 @@ func (t *Tree) insertRecursively(
 	mtr *buffer.Mtr,
 	bufPage *buffer.Page,
 	record Record,
+	reserved *reservedPages,
 ) (overflowKey []byte, newPageId page.Id, isLeafSplit bool, err error) {
 	pg, err := mtr.PageForWrite(bufPage.PageId())
 	if err != nil {
@@ -209,7 +214,7 @@ func (t *Tree) insertRecursively(
 		}
 		defer mtr.Unpin(childPageId)
 		// 子ノードに対して挿入処理を再帰的に実行
-		overflowKeyFromChild, overflowChildPageId, isLeafSplit, err := t.insertRecursively(mtr, childBufPage, record)
+		overflowKeyFromChild, overflowChildPageId, isLeafSplit, err := t.insertRecursively(mtr, childBufPage, record, reserved)
 		if err != nil {
 			return nil, page.InvalidId(), false, err
 		}
@@ -218,21 +223,19 @@ func (t *Tree) insertRecursively(
 			return nil, page.InvalidId(), isLeafSplit, nil
 		}
 		// 子ノードが分割された場合、ブランチノードにオーバーフローレコードを挿入
-		overflowKey, newPageId, err := t.insertBranchOverflow(
+		overflowKey, newPageId := t.insertBranchOverflow(
 			mtr,
 			branchNode,
 			childSlotNum,
 			overflowKeyFromChild,
 			overflowChildPageId,
+			reserved,
 		)
-		if err != nil {
-			return nil, page.InvalidId(), isLeafSplit, err
-		}
 		return overflowKey, newPageId, isLeafSplit, nil
 
 	// リーフノードの場合: そのまま挿入する
 	case nodeTypeLeaf:
-		overflowKey, newPageId, err := t.insertLeaf(mtr, bufPage.PageId(), pg, record)
+		overflowKey, newPageId, err := t.insertLeaf(mtr, bufPage.PageId(), pg, record, reserved)
 		if err != nil {
 			return nil, page.InvalidId(), false, err
 		}
@@ -240,6 +243,6 @@ func (t *Tree) insertRecursively(
 		return overflowKey, newPageId, isSplit, nil
 
 	default:
-		return nil, page.InvalidId(), false, errUnknownNodeType
+		panic(fmt.Sprintf("btree: unknown node type %q at pageId=%v", nt, bufPage.PageId()))
 	}
 }

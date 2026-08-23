@@ -107,10 +107,9 @@ func TestLeafNodeSplitInsert(t *testing.T) {
 		newRecord := NewRecord([]byte{0x01}, []byte{0xFF}, padding)
 
 		// WHEN
-		key, err := ln.splitInsert(newLeaf, newRecord)
+		key := ln.splitInsert(newLeaf, newRecord)
 
 		// THEN
-		assert.NoError(t, err)
 		assert.NotNil(t, key)
 		assert.True(t, ln.numRecords() > 0)
 		assert.True(t, newLeaf.numRecords() > 0)
@@ -127,16 +126,15 @@ func TestLeafNodeSplitInsert(t *testing.T) {
 		newRecord := NewRecord([]byte{0x01}, []byte{0x00}, padding)
 
 		// WHEN
-		key, err := ln.splitInsert(newLeaf, newRecord)
+		key := ln.splitInsert(newLeaf, newRecord)
 
 		// THEN
-		assert.NoError(t, err)
 		assert.NotNil(t, key)
 		assert.True(t, ln.numRecords() > 0)
 		assert.True(t, newLeaf.numRecords() > 0)
 	})
 
-	t.Run("分割後に古いノードの容量が不足するとエラーを返す", func(t *testing.T) {
+	t.Run("分割後に古いノードの容量が不足すると panic する", func(t *testing.T) {
 		// GIVEN
 		ln := newTestLeafNode(t)
 		maxSize := ln.maxRecordSize()
@@ -151,12 +149,8 @@ func TestLeafNodeSplitInsert(t *testing.T) {
 		bigNonKey3[0] = 0x03
 		newRecord := NewRecord([]byte{0x01}, []byte{0x01, 0x01}, bigNonKey3)
 
-		// WHEN
-		key, err := ln.splitInsert(newLeaf, newRecord)
-
 		// THEN
-		assert.Error(t, err)
-		assert.Nil(t, key)
+		assert.Panics(t, func() { ln.splitInsert(newLeaf, newRecord) })
 	})
 }
 

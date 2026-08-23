@@ -16,10 +16,9 @@ func TestBranchNodeInitialize(t *testing.T) {
 		rightChild := page.NewId(0, 2)
 
 		// WHEN
-		err := bn.initialize([]byte{0x10}, leftChild, rightChild)
+		bn.initialize([]byte{0x10}, leftChild, rightChild)
 
 		// THEN
-		assert.NoError(t, err)
 		assert.Equal(t, 1, bn.numRecords())
 		assert.Equal(t, []byte{0x10}, bn.record(0).Key())
 		assert.Equal(t, rightChild, bn.rightChildPageId())
@@ -79,10 +78,9 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 		newRecord := newBranchRecord([]byte{0xFF}, page.NewId(0, 99))
 
 		// WHEN
-		key, err := bn.splitInsert(newBranch, newRecord)
+		key := bn.splitInsert(newBranch, newRecord)
 
 		// THEN
-		assert.NoError(t, err)
 		assert.NotNil(t, key)
 		assert.True(t, bn.numRecords() > 0)
 		assert.True(t, newBranch.numRecords() > 0)
@@ -91,7 +89,7 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 	t.Run("挿入キーが先頭キー以下の場合に分割できる", func(t *testing.T) {
 		// GIVEN
 		bn := newUninitializedBranchNode(t)
-		_ = bn.initialize([]byte{0x10}, page.NewId(0, 1), page.NewId(0, 2))
+		bn.initialize([]byte{0x10}, page.NewId(0, 1), page.NewId(0, 2))
 		for i := range 150 {
 			bn.insert(bn.numRecords(), newBranchRecord([]byte{byte(i/256 + 0x11), byte(i % 256)}, page.NewId(0, page.PageNumber(i+10))))
 		}
@@ -99,22 +97,21 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 		newRecord := newBranchRecord([]byte{0x01}, page.NewId(0, 99))
 
 		// WHEN
-		key, err := bn.splitInsert(newBranch, newRecord)
+		key := bn.splitInsert(newBranch, newRecord)
 
 		// THEN
-		assert.NoError(t, err)
 		assert.NotNil(t, key)
 		assert.True(t, bn.numRecords() > 0)
 		assert.True(t, newBranch.numRecords() > 0)
 	})
 
-	t.Run("分割後に古いノードの容量が不足するとエラーを返す", func(t *testing.T) {
+	t.Run("分割後に古いノードの容量が不足すると panic する", func(t *testing.T) {
 		// GIVEN
 		bn := newUninitializedBranchNode(t)
 		maxSize := bn.maxRecordSize()
 		bigKey := make([]byte, maxSize-12)
 		bigKey[0] = 0x01
-		_ = bn.initialize(bigKey, page.NewId(0, 1), page.NewId(0, 2))
+		bn.initialize(bigKey, page.NewId(0, 1), page.NewId(0, 2))
 		bigKey2 := make([]byte, maxSize-12)
 		bigKey2[0] = 0x02
 		bn.insert(bn.numRecords(), newBranchRecord(bigKey2, page.NewId(0, 10)))
@@ -124,21 +121,17 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 		bigKey3[1] = 0x01
 		newRecord := newBranchRecord(bigKey3, page.NewId(0, 99))
 
-		// WHEN
-		key, err := bn.splitInsert(newBranch, newRecord)
-
 		// THEN
-		assert.Error(t, err)
-		assert.Nil(t, key)
+		assert.Panics(t, func() { bn.splitInsert(newBranch, newRecord) })
 	})
 
-	t.Run("挿入キーが大きい場合に転送先の容量が不足するとエラーを返す", func(t *testing.T) {
+	t.Run("挿入キーが大きい場合に転送先の容量が不足すると panic する", func(t *testing.T) {
 		// GIVEN
 		bn := newUninitializedBranchNode(t)
 		maxSize := bn.maxRecordSize()
 		bigKey := make([]byte, maxSize-12)
 		bigKey[0] = 0x01
-		_ = bn.initialize(bigKey, page.NewId(0, 1), page.NewId(0, 2))
+		bn.initialize(bigKey, page.NewId(0, 1), page.NewId(0, 2))
 		bigKey2 := make([]byte, maxSize-12)
 		bigKey2[0] = 0x02
 		bn.insert(bn.numRecords(), newBranchRecord(bigKey2, page.NewId(0, 10)))
@@ -147,21 +140,17 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 		bigKey3[0] = 0x03
 		newRecord := newBranchRecord(bigKey3, page.NewId(0, 99))
 
-		// WHEN
-		key, err := bn.splitInsert(newBranch, newRecord)
-
 		// THEN
-		assert.Error(t, err)
-		assert.Nil(t, key)
+		assert.Panics(t, func() { bn.splitInsert(newBranch, newRecord) })
 	})
 
-	t.Run("挿入キーが小さく転送先に Insert できない場合はエラーを返す", func(t *testing.T) {
+	t.Run("挿入キーが小さく転送先に Insert できない場合は panic する", func(t *testing.T) {
 		// GIVEN
 		bn := newUninitializedBranchNode(t)
 		maxSize := bn.maxRecordSize()
 		bigKey := make([]byte, maxSize-12)
 		bigKey[0] = 0x10
-		_ = bn.initialize(bigKey, page.NewId(0, 1), page.NewId(0, 2))
+		bn.initialize(bigKey, page.NewId(0, 1), page.NewId(0, 2))
 		bigKey2 := make([]byte, maxSize-12)
 		bigKey2[0] = 0x20
 		bn.insert(bn.numRecords(), newBranchRecord(bigKey2, page.NewId(0, 10)))
@@ -170,21 +159,17 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 		bigKey3[0] = 0x01
 		newRecord := newBranchRecord(bigKey3, page.NewId(0, 99))
 
-		// WHEN
-		key, err := bn.splitInsert(newBranch, newRecord)
-
 		// THEN
-		assert.Error(t, err)
-		assert.Nil(t, key)
+		assert.Panics(t, func() { bn.splitInsert(newBranch, newRecord) })
 	})
 
-	t.Run("挿入キーが小さい場合に転送先の容量が不足するとエラーを返す", func(t *testing.T) {
+	t.Run("挿入キーが小さい場合に転送先の容量が不足すると panic する", func(t *testing.T) {
 		// GIVEN
 		bn := newUninitializedBranchNode(t)
 		maxSize := bn.maxRecordSize()
 		bigKey := make([]byte, maxSize-12)
 		bigKey[0] = 0x10
-		_ = bn.initialize(bigKey, page.NewId(0, 1), page.NewId(0, 2))
+		bn.initialize(bigKey, page.NewId(0, 1), page.NewId(0, 2))
 		bigKey2 := make([]byte, maxSize-12)
 		bigKey2[0] = 0x20
 		bn.insert(bn.numRecords(), newBranchRecord(bigKey2, page.NewId(0, 10)))
@@ -193,12 +178,8 @@ func TestBranchNodeSplitInsert(t *testing.T) {
 		bigKey3[0] = 0x05
 		newRecord := newBranchRecord(bigKey3, page.NewId(0, 99))
 
-		// WHEN
-		key, err := bn.splitInsert(newBranch, newRecord)
-
 		// THEN
-		assert.Error(t, err)
-		assert.Nil(t, key)
+		assert.Panics(t, func() { bn.splitInsert(newBranch, newRecord) })
 	})
 }
 
@@ -343,7 +324,7 @@ func TestBranchNodeRightChildPageId(t *testing.T) {
 		// GIVEN
 		rightChild := page.NewId(0, 2)
 		bn := newUninitializedBranchNode(t)
-		_ = bn.initialize([]byte{0x10}, page.NewId(0, 1), rightChild)
+		bn.initialize([]byte{0x10}, page.NewId(0, 1), rightChild)
 
 		// WHEN
 		id := bn.rightChildPageId()
@@ -424,7 +405,7 @@ func newUninitializedBranchNode(t *testing.T) *branchNode {
 func newTestBranchNode(t *testing.T) *branchNode {
 	t.Helper()
 	bn := newUninitializedBranchNode(t)
-	_ = bn.initialize([]byte{0x10}, page.NewId(0, 1), page.NewId(0, 2))
+	bn.initialize([]byte{0x10}, page.NewId(0, 1), page.NewId(0, 2))
 	return bn
 }
 

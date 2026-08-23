@@ -1,8 +1,9 @@
 package btree
 
 import (
+	"fmt"
+
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
-	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
@@ -10,6 +11,7 @@ import (
 //   - leafPageId: 挿入先のリーフノードの PageId
 //   - leafBufPage: 挿入先のリーフノードのバッファページ
 //   - record: 挿入するレコード
+//   - reserved: 事前確保済みのページ集合 (分割時に leaf ページを取り出す)
 //   - return:
 //   - overflowKey: 分割時の境界キー (分割なしの場合は nil)
 //   - newPageId: 分割で作られたリーフノードの PageId (分割なしの場合は InvalidPageId)
@@ -18,6 +20,7 @@ func (t *Tree) insertLeaf(
 	leafPageId page.Id,
 	leafBufPage *buffer.Page,
 	record Record,
+	reserved *reservedPages,
 ) (overflowKey []byte, newPageId page.Id, err error) {
 	leafNode := newLeafNode(leafBufPage)
 	slotNum, found := leafNode.searchSlotNum(record.Key())
@@ -31,65 +34,52 @@ func (t *Tree) insertLeaf(
 	}
 
 	// リーフノードが満杯の場合は分割
-	return t.splitInsertLeaf(mtr, leafPageId, leafNode, record)
+	return t.splitInsertLeaf(mtr, leafPageId, leafNode, record, reserved)
 }
 
 // splitInsertLeaf はリーフノードを分割してレコードを挿入する
 //   - leafPageId: 分割元のリーフノードの PageId
-//   - leafNode: 分割元のリーフノード
+//   - leaf: 分割元のリーフノード
 //   - record: 挿入するレコード
+//   - reserved: 事前確保済みのページ集合 (leaf ページを 1 枚取り出す)
 //   - return: 境界キー, 新しいリーフノードの PageId
 func (t *Tree) splitInsertLeaf(
 	mtr *buffer.Mtr,
 	leafPageId page.Id,
-	leafNode *leafNode,
+	leaf *leafNode,
 	record Record,
+	reserved *reservedPages,
 ) ([]byte, page.Id, error) {
-	prevLeafPageId := leafNode.prevPageId()
+	prevLeafPageId := leaf.prevPageId()
 
-	// 新しいリーフノードを作成
-	newLeafPageId, err := fsp.AllocateSegmentPage(mtr, t.MetaPageId().FileId(), t.leafSegmentHeaderAt())
-	if err != nil {
-		return nil, page.InvalidId(), err
-	}
-	_, err = t.bufferPool.AddPage(newLeafPageId)
-	if err != nil {
-		return nil, page.InvalidId(), err
-	}
-
-	// 前のリーフノードが存在する場合は、nextPageId を新しいリーフノードの PageId に更新
+	// 前のリーフノードは分割書き込みより前に触れておく (書き込み前 touch)
+	var prevLeaf *leafNode
 	if !prevLeafPageId.IsInvalid() {
-		if err := t.updatePrevLeafLink(mtr, prevLeafPageId, newLeafPageId); err != nil {
+		pagePrevLeaf, err := mtr.PageForWrite(prevLeafPageId)
+		if err != nil {
 			return nil, page.InvalidId(), err
 		}
+		prevLeaf = newLeafNode(pagePrevLeaf)
 	}
 
-	// 新しいリーフノードに分割挿入
+	// 事前確保済みの leaf ページを取り出す
+	newLeafPageId := reserved.takeLeaf()
 	pageNewLeaf, err := mtr.PageForWrite(newLeafPageId)
 	if err != nil {
-		return nil, page.InvalidId(), err
+		panic(fmt.Sprintf("btree: PageForWrite failed for reserved leaf page (pageId=%v): %v", newLeafPageId, err))
 	}
 	newLeaf := newLeafNode(pageNewLeaf)
-	overflowKey, err := leafNode.splitInsert(newLeaf, record)
-	if err != nil {
-		return nil, page.InvalidId(), err
-	}
 
-	// ポインタを更新
+	// 新しいリーフノードに分割挿入 (実体の書き込み)
+	overflowKey := leaf.splitInsert(newLeaf, record)
+
+	// 実体を書き終わったあとにリンクを更新する
 	newLeaf.setNextPageId(leafPageId)
 	newLeaf.setPrevPageId(prevLeafPageId)
-	leafNode.setPrevPageId(newLeafPageId)
+	leaf.setPrevPageId(newLeafPageId)
+	if prevLeaf != nil {
+		prevLeaf.setNextPageId(newLeafPageId)
+	}
 
 	return overflowKey, newLeafPageId, nil
-}
-
-// updatePrevLeafLink は前のリーフノードの nextPageId を更新する
-func (t *Tree) updatePrevLeafLink(mtr *buffer.Mtr, prevLeafPageId, newNextPageId page.Id) error {
-	pagePrevLeaf, err := mtr.PageForWrite(prevLeafPageId)
-	if err != nil {
-		return err
-	}
-	prevLeaf := newLeafNode(pagePrevLeaf)
-	prevLeaf.setNextPageId(newNextPageId)
-	return nil
 }

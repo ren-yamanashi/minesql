@@ -2,7 +2,7 @@ package btree
 
 import (
 	"bytes"
-	"errors"
+	"fmt"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -39,17 +39,16 @@ func newBranchNode(bufPage *buffer.Page) *branchNode {
 //   - key: 最初のレコードのキー
 //   - leftChildPageId: 最初のレコードの非キーフィールド (左の子の PageId)
 //   - rightChildId: ヘッダーに設定する右の子の PageId
-func (bn *branchNode) initialize(key []byte, leftChildPageId, rightChildId page.Id) error {
+func (bn *branchNode) initialize(key []byte, leftChildPageId, rightChildId page.Id) {
 	bn.bufPage.WriteBodyAt(0, []byte(nodeTypeBranch))
 	bn.body.initialize()
 
 	record := NewRecord([]byte{}, key, leftChildPageId.Bytes())
 	if !bn.insert(0, record) {
-		return errors.New("new branch node must have space")
+		panic("btree: new branch node must have space for initial record")
 	}
 
 	bn.bufPage.WriteBodyAt(nodeHeaderSize+branchNodeRightChildOffset, rightChildId.Bytes())
-	return nil
 }
 
 // insert はレコードを挿入する
@@ -68,46 +67,36 @@ func (bn *branchNode) insert(slotNum int, record Record) bool {
 //   - newBranch: 分割後の新しいブランチノード
 //   - newRecord: 挿入するレコード
 //   - return: 新しいブランチノードの最小キー
-func (bn *branchNode) splitInsert(newBranch *branchNode, newRecord Record) ([]byte, error) {
+func (bn *branchNode) splitInsert(newBranch *branchNode, newRecord Record) []byte {
 	newBranch.bufPage.WriteBodyAt(0, []byte(nodeTypeBranch))
 	newBranch.body.initialize()
 	for {
 		// newBranch が十分に埋まったら、挿入対象のレコードを古いノードに挿入
-		boundaryKey, ok, err := newBranch.tryExtractBoundaryKey()
-		if err != nil {
-			return nil, err
-		}
+		boundaryKey, ok := newBranch.tryExtractBoundaryKey()
 		if ok {
 			slotNum, _ := bn.searchSlotNum(newRecord.Key())
 			if !bn.insert(slotNum, newRecord) {
-				return nil, errors.New("old branch node must have space")
+				panic("btree: old branch node must have space after split")
 			}
-			return boundaryKey, nil
+			return boundaryKey
 		}
 
 		// `古いノードの先頭レコードのキー < 挿入対象のキー` の場合
 		if bn.record(0).compareKey(newRecord.Key()) < 0 {
-			if err := bn.transfer(newBranch); err != nil {
-				return nil, err
-			}
+			bn.transfer(newBranch)
 			continue
 		}
 
 		// `古いノードの先頭レコードのキー >= 挿入対象のキー` の場合
 		if !newBranch.insert(newBranch.numRecords(), newRecord) {
-			return nil, errors.New("new branch node must have space")
+			panic("btree: new branch node must have space for split target")
 		}
 		for {
-			boundaryKey, ok, err := newBranch.tryExtractBoundaryKey()
-			if err != nil {
-				return nil, err
-			}
+			boundaryKey, ok := newBranch.tryExtractBoundaryKey()
 			if ok {
-				return boundaryKey, nil
+				return boundaryKey
 			}
-			if err := bn.transfer(newBranch); err != nil {
-				return nil, err
-			}
+			bn.transfer(newBranch)
 		}
 	}
 }
@@ -122,6 +111,11 @@ func (bn *branchNode) delete(slotNum int) {
 //   - record: 新しいレコード
 func (bn *branchNode) update(slotNum int, record Record) bool {
 	return bn.body.update(slotNum, record.Bytes())
+}
+
+// canUpdate は指定されたスロットのレコードを新しいレコードに更新できるかを、書き込まずに返す
+func (bn *branchNode) canUpdate(slotNum int, record Record) bool {
+	return bn.body.canUpdate(slotNum, record.Bytes())
 }
 
 // numRecords はレコード数を取得する
@@ -192,40 +186,36 @@ func (bn *branchNode) isHalfFull() bool {
 
 // fillRightChild は右端の子の PageId を設定し、最後のレコードキーを返す (右端のレコードは削除される)
 //   - return: 取り出したキー
-func (bn *branchNode) fillRightChild() ([]byte, error) {
+func (bn *branchNode) fillRightChild() []byte {
 	lastSlotNum := bn.numRecords() - 1
 	record := bn.record(lastSlotNum)
 	rightChild, err := page.RestoreId(record.NonKey())
 	if err != nil {
-		return nil, err
+		panic(fmt.Sprintf("btree: corrupted branch record NonKey for right child page id: %v", err))
 	}
 
 	key := bytes.Clone(record.Key())
 	bn.body.delete(lastSlotNum)
 	bn.bufPage.WriteBodyAt(nodeHeaderSize+branchNodeRightChildOffset, rightChild.Bytes())
-	return key, nil
+	return key
 }
 
 // tryExtractBoundaryKey は末尾レコードを親ノードに伝播させる境界キーとして取り出せるか判定し、可能なら取り出す
 //   - return:
 //   - 取り出し後も半分以上の充填率を維持できる場合: 境界キー, true
 //   - 維持できない場合: nil, false
-func (bn *branchNode) tryExtractBoundaryKey() ([]byte, bool, error) {
+func (bn *branchNode) tryExtractBoundaryKey() ([]byte, bool) {
 	if bn.numRecords() < 2 {
-		return nil, false, nil
+		return nil, false
 	}
 
 	lastRecordSize := len(bn.body.cell(bn.numRecords() - 1))
 	freeSpaceAfter := bn.body.freeSpace() + lastRecordSize + slottedPagePointerSize
 	if 2*freeSpaceAfter >= bn.body.capacity() {
-		return nil, false, nil
+		return nil, false
 	}
 
-	key, err := bn.fillRightChild()
-	if err != nil {
-		return nil, false, err
-	}
-	return key, true, nil
+	return bn.fillRightChild(), true
 }
 
 // maxRecordSize は自身のノード内に格納できる最大のレコードサイズを返す
@@ -236,14 +226,13 @@ func (bn *branchNode) maxRecordSize() int {
 }
 
 // transfer は先頭のレコードを別のブランチノードに移動する
-func (bn *branchNode) transfer(dest *branchNode) error {
+func (bn *branchNode) transfer(dest *branchNode) {
 	nextIndex := dest.numRecords()
 	data := bn.body.cell(0)
 
 	if !dest.body.insert(nextIndex, data) {
-		return errors.New("no space in dest branch node")
+		panic("btree: dest branch node must have space for transfer")
 	}
 
 	bn.body.delete(0)
-	return nil
 }

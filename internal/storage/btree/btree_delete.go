@@ -1,6 +1,8 @@
 package btree
 
 import (
+	"fmt"
+
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 )
@@ -70,51 +72,41 @@ func (t *Tree) deletePessimistic(mtr *buffer.Mtr, key []byte) error {
 	}
 
 	// 再帰的に削除
-	underflow, isLeafMerged, err := t.deleteRecursively(mtr, bufPageRoot, key)
+	_, err = t.deleteRecursively(mtr, bufPageRoot, key, metaPage)
 	if err != nil {
 		return err
 	}
 
-	// ルートノードがブランチノードで、子が 1 つになった場合 (=ブランチノード1, リーフノード1 になった場合)、子をルートにする
-	var isRootCollapsed bool
-	if underflow && nodeType(bufPageRoot.Data()) == nodeTypeBranch {
-		branch := newBranchNode(bufPageRoot)
-		if branch.numRecords() == 0 {
-			isRootCollapsed = true
-		}
+	// ルートノードがブランチノードでレコード数が 0 になった場合、子をルートにする
+	if nodeType(bufPageRoot.Data()) != nodeTypeBranch {
+		return nil
 	}
-
-	// リーフマージもルート縮退も発生しなかった場合
-	if !isLeafMerged && !isRootCollapsed {
+	branch := newBranchNode(bufPageRoot)
+	if branch.numRecords() != 0 {
 		return nil
 	}
 
-	// リーフマージが発生した場合
-	if isLeafMerged {
-		metaPage.setLeafPageCount(metaPage.leafPageCount() - 1)
-	}
-	if !isRootCollapsed {
+	// 縮退確定後に旧ルートの解放を事前取得する。取得に失敗した場合は縮退を見送り、次回の削除で再試行する
+	plan, err := fsp.TouchFreeSegmentPage(mtr, t.branchSegmentHeaderAt(), rootPageId)
+	if err != nil {
 		return nil
 	}
-
-	// ルートノードの縮退が発生した場合
-	branchNode := newBranchNode(bufPageRoot)
-	newRootPageId := branchNode.rightChildPageId()
+	newRootPageId := branch.rightChildPageId()
 	metaPage.setRootPageId(newRootPageId)
 	metaPage.setHeight(metaPage.height() - 1)
-	return fsp.FreeSegmentPage(mtr, t.branchSegmentHeaderAt(), bufPageRoot.PageId())
+	fsp.WriteFreeSegmentPage(mtr, plan)
+	return nil
 }
 
 // deleteRecursively は再帰的にノードを辿ってレコードを削除する
 //   - bufPage: 削除先のノードのバッファページ
 //   - key: 削除するキー
-//   - return:
-//   - underflow: アンダーフローが発生したか
-//   - isLeafMerged: リーフノードのマージが発生したか
-func (t *Tree) deleteRecursively(mtr *buffer.Mtr, bufPage *buffer.Page, key []byte) (underflow bool, isLeafMerged bool, err error) {
+//   - metaPage: リーフマージ時に leafPageCount を減算するために引き渡す
+//   - return: underflow (アンダーフローが発生したか)
+func (t *Tree) deleteRecursively(mtr *buffer.Mtr, bufPage *buffer.Page, key []byte, metaPage *metaPage) (underflow bool, err error) {
 	pg, err := mtr.PageForWrite(bufPage.PageId())
 	if err != nil {
-		return false, false, err
+		return false, err
 	}
 	nt := nodeType(pg.Data())
 
@@ -129,38 +121,37 @@ func (t *Tree) deleteRecursively(mtr *buffer.Mtr, bufPage *buffer.Page, key []by
 		}
 		childPageId, err := branchNode.childPageId(childSlotNum)
 		if err != nil {
-			return false, false, err
+			return false, err
 		}
 		childBufPage, err := mtr.PageForRead(childPageId)
 		if err != nil {
-			return false, false, err
+			return false, err
 		}
 		defer mtr.Unpin(childPageId)
 
 		// 子ノードに対して削除処理を再帰的に実行
-		underflow, isLeafMerged, err := t.deleteRecursively(mtr, childBufPage, key)
+		underflow, err := t.deleteRecursively(mtr, childBufPage, key, metaPage)
 		if err != nil {
-			return false, false, err
+			return false, err
 		}
 		// 子ノードがアンダーフローしなかった場合、終了
 		if !underflow {
-			return false, isLeafMerged, nil
+			return false, nil
 		}
 		// 子ノードがアンダーフローした場合、兄弟ノードとマージ
-		uf, lm, err := t.deleteUnderflow(mtr, branchNode, childBufPage, childSlotNum)
-		return uf, isLeafMerged || lm, err
+		return t.deleteUnderflow(mtr, branchNode, childBufPage, childSlotNum, metaPage)
 
 	// リーフノードの場合: そのまま削除する
 	case nodeTypeLeaf:
 		leafNode := newLeafNode(pg)
 		slotNum, found := leafNode.searchSlotNum(key)
 		if !found {
-			return false, false, ErrKeyNotFound
+			return false, ErrKeyNotFound
 		}
 		leafNode.delete(slotNum)
-		return !leafNode.isHalfFull(), false, nil
+		return !leafNode.isHalfFull(), nil
 
 	default:
-		return false, false, errUnknownNodeType
+		panic(fmt.Sprintf("btree: unknown node type %q at pageId=%v", nt, bufPage.PageId()))
 	}
 }

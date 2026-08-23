@@ -92,5 +92,15 @@ func (t *Tree) updatePessimistic(mtr *buffer.Mtr, record Record) error {
 	leafNode.delete(slotNum)
 	mtr.Unpin(leafBufPage.PageId())
 
-	return t.insertWithMetaUpdate(mtr, metaPage, record)
+	// SMO で必要になる最大枚数を事前確保する
+	reserved, err := t.reservePages(mtr, metaPage.height())
+	if err != nil {
+		return err
+	}
+	if err := t.insertWithMetaUpdate(mtr, metaPage, record, reserved); err != nil {
+		t.releaseUnused(mtr, reserved)
+		return err
+	}
+	t.releaseUnused(mtr, reserved)
+	return nil
 }

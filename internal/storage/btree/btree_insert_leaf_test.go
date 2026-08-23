@@ -22,7 +22,8 @@ func TestInsertLeaf(t *testing.T) {
 		// WHEN
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
-		overflowKey, newPageId, err := bt.insertLeaf(mtr, pageId, pg, record)
+		reserved := reserveForTest(t, bt, mtr, 1)
+		overflowKey, newPageId, err := bt.insertLeaf(mtr, pageId, pg, record, reserved)
 
 		// THEN
 		assert.NoError(t, err)
@@ -38,8 +39,9 @@ func TestInsertLeaf(t *testing.T) {
 		// WHEN
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
-		_, _, _ = bt.insertLeaf(mtr, pageId, pg, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}))
-		_, _, _ = bt.insertLeaf(mtr, pageId, pg, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
+		reserved := reserveForTest(t, bt, mtr, 1)
+		_, _, _ = bt.insertLeaf(mtr, pageId, pg, NewRecord([]byte{0x01}, []byte{0x20}, []byte{0xBB}), reserved)
+		_, _, _ = bt.insertLeaf(mtr, pageId, pg, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}), reserved)
 
 		// THEN
 		leafNode := newLeafNode(pg)
@@ -54,10 +56,11 @@ func TestInsertLeaf(t *testing.T) {
 		pageId, pg := setupTestLeafPage(t, bp)
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
-		_, _, _ = bt.insertLeaf(mtr, pageId, pg, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}))
+		reserved := reserveForTest(t, bt, mtr, 1)
+		_, _, _ = bt.insertLeaf(mtr, pageId, pg, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xAA}), reserved)
 
 		// WHEN
-		_, _, err := bt.insertLeaf(mtr, pageId, pg, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xBB}))
+		_, _, err := bt.insertLeaf(mtr, pageId, pg, NewRecord([]byte{0x01}, []byte{0x10}, []byte{0xBB}), reserved)
 
 		// THEN
 		assert.ErrorIs(t, err, ErrDuplicateKey)
@@ -70,19 +73,30 @@ func TestInsertLeaf(t *testing.T) {
 		nonKey := make([]byte, 1500)
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
+		reserved := reserveForTest(t, bt, mtr, 1)
 		for i := range 2 {
 			key := []byte{byte(i + 1)}
-			_, _, _ = bt.insertLeaf(mtr, pageId, pg, NewRecord([]byte{0x01}, key, nonKey))
+			_, _, _ = bt.insertLeaf(mtr, pageId, pg, NewRecord([]byte{0x01}, key, nonKey), reserved)
 		}
 
 		// WHEN
-		overflowKey, newPageId, err := bt.insertLeaf(mtr, pageId, pg, NewRecord([]byte{0x01}, []byte{0xFF}, nonKey))
+		overflowKey, newPageId, err := bt.insertLeaf(mtr, pageId, pg, NewRecord([]byte{0x01}, []byte{0xFF}, nonKey), reserved)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.NotNil(t, overflowKey)
 		assert.False(t, newPageId.IsInvalid())
 	})
+}
+
+// reserveForTest はテスト用に reservePages を呼ぶ (エラー時は fail)
+func reserveForTest(t *testing.T, tree *Tree, mtr *buffer.Mtr, height uint64) *reservedPages {
+	t.Helper()
+	r, err := tree.reservePages(mtr, height)
+	if err != nil {
+		t.Fatalf("reservePages failed: %v", err)
+	}
+	return r
 }
 
 // setupBtreeBufferPool はテスト用のバッファプールを作成する

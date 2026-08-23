@@ -217,6 +217,158 @@ func freeSegmentPageOne(t *testing.T, bp *buffer.Pool, redoLog *redo.Buffer, hea
 	commitMtr(t, mtr)
 }
 
+func TestTouchAndWriteFreeSegmentPage(t *testing.T) {
+	t.Run("frag ページを touch + write の 2 フェーズで解放できる", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t)
+		initFsp(t, bp, redoLog)
+		firstPageId := createSegmentOne(t, bp, redoLog, 0)
+		headerAt := flst.Address{PageNumber: firstPageId.PageNumber(), Offset: 0}
+		fragPageId := allocateSegmentPageOne(t, bp, redoLog, headerAt)
+
+		// WHEN
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		plan, err := TouchFreeSegmentPage(mtr, headerAt, fragPageId)
+		require.NoError(t, err)
+		WriteFreeSegmentPage(mtr, plan)
+		commitMtr(t, mtr)
+
+		// THEN
+		entryAddr := readSegmentHeaderAt(t, bp, firstPageId, 0)
+		readMtr := buffer.NewMtr(bp)
+		defer readMtr.UnpinAll()
+		entry, err := loadInodeEntryByAddress(readMtr, testFileId, entryAddr)
+		require.NoError(t, err)
+		assert.Equal(t, page.MaxPageNumber, entry.fragSlot(1))
+		isFree, err := IsPageFree(readMtr, fragPageId)
+		require.NoError(t, err)
+		assert.True(t, isFree)
+	})
+
+	t.Run("専有 extent 内ページを touch + write の 2 フェーズで解放できる", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t)
+		initFsp(t, bp, redoLog)
+		firstPageId := createSegmentOne(t, bp, redoLog, 0)
+		headerAt := flst.Address{PageNumber: firstPageId.PageNumber(), Offset: 0}
+		fillFragArray(t, bp, redoLog, headerAt)
+		extentPageIds := allocateSegmentPageN(t, bp, redoLog, headerAt, 3)
+
+		// WHEN
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		plan, err := TouchFreeSegmentPage(mtr, headerAt, extentPageIds[1])
+		require.NoError(t, err)
+		WriteFreeSegmentPage(mtr, plan)
+		commitMtr(t, mtr)
+
+		// THEN
+		entryAddr := readSegmentHeaderAt(t, bp, firstPageId, 0)
+		readMtr := buffer.NewMtr(bp)
+		defer readMtr.UnpinAll()
+		entry, err := loadInodeEntryByAddress(readMtr, testFileId, entryAddr)
+		require.NoError(t, err)
+		assert.Equal(t, uint32(2), entry.notFullNUsed())
+	})
+
+	t.Run("FULL の extent 内ページの解放遷移を 2 フェーズで実行できる", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t)
+		initFsp(t, bp, redoLog)
+		firstPageId := createSegmentOne(t, bp, redoLog, 0)
+		headerAt := flst.Address{PageNumber: firstPageId.PageNumber(), Offset: 0}
+		fillFragArray(t, bp, redoLog, headerAt)
+		extentPageIds := allocateSegmentPageN(t, bp, redoLog, headerAt, extentPageCount)
+
+		// WHEN
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		plan, err := TouchFreeSegmentPage(mtr, headerAt, extentPageIds[10])
+		require.NoError(t, err)
+		WriteFreeSegmentPage(mtr, plan)
+		commitMtr(t, mtr)
+
+		// THEN
+		entryAddr := readSegmentHeaderAt(t, bp, firstPageId, 0)
+		readMtr := buffer.NewMtr(bp)
+		defer readMtr.UnpinAll()
+		entry, err := loadInodeEntryByAddress(readMtr, testFileId, entryAddr)
+		require.NoError(t, err)
+		fullLen, err := flst.Length(readMtr, testFileId, entry.fullListBase())
+		require.NoError(t, err)
+		assert.Equal(t, uint32(0), fullLen)
+		notFullLen, err := flst.Length(readMtr, testFileId, entry.notFullListBase())
+		require.NoError(t, err)
+		assert.Equal(t, uint32(1), notFullLen)
+		assert.Equal(t, uint32(extentPageCount-1), entry.notFullNUsed())
+	})
+
+	t.Run("Touch 後に Write を呼ばずに Commit しても解放されない", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t)
+		initFsp(t, bp, redoLog)
+		firstPageId := createSegmentOne(t, bp, redoLog, 0)
+		headerAt := flst.Address{PageNumber: firstPageId.PageNumber(), Offset: 0}
+		fragPageId := allocateSegmentPageOne(t, bp, redoLog, headerAt)
+
+		// WHEN
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		_, err := TouchFreeSegmentPage(mtr, headerAt, fragPageId)
+		require.NoError(t, err)
+		commitMtr(t, mtr)
+
+		// THEN
+		readMtr := buffer.NewMtr(bp)
+		defer readMtr.UnpinAll()
+		isFree, err := IsPageFree(readMtr, fragPageId)
+		require.NoError(t, err)
+		assert.False(t, isFree)
+	})
+
+	t.Run("Touch と Write の合成は FreeSegmentPage と同じ最終状態になる", func(t *testing.T) {
+		// GIVEN 2 つの同じ初期状態のプールを用意
+		bp1, redoLog1 := setupTest(t)
+		initFsp(t, bp1, redoLog1)
+		firstPageId1 := createSegmentOne(t, bp1, redoLog1, 0)
+		headerAt1 := flst.Address{PageNumber: firstPageId1.PageNumber(), Offset: 0}
+		fillFragArray(t, bp1, redoLog1, headerAt1)
+		extentIds1 := allocateSegmentPageN(t, bp1, redoLog1, headerAt1, extentPageCount)
+
+		bp2, redoLog2 := setupTest(t)
+		initFsp(t, bp2, redoLog2)
+		firstPageId2 := createSegmentOne(t, bp2, redoLog2, 0)
+		headerAt2 := flst.Address{PageNumber: firstPageId2.PageNumber(), Offset: 0}
+		fillFragArray(t, bp2, redoLog2, headerAt2)
+		extentIds2 := allocateSegmentPageN(t, bp2, redoLog2, headerAt2, extentPageCount)
+		require.Equal(t, extentIds1, extentIds2)
+
+		// WHEN 片方は FreeSegmentPage、もう片方は Touch + Write で解放
+		freeSegmentPageOne(t, bp1, redoLog1, headerAt1, extentIds1[10])
+		mtr2 := buffer.NewWriteMtr(bp2, lock.TrxId(1), redoLog2)
+		plan, err := TouchFreeSegmentPage(mtr2, headerAt2, extentIds2[10])
+		require.NoError(t, err)
+		WriteFreeSegmentPage(mtr2, plan)
+		commitMtr(t, mtr2)
+
+		// THEN 2 つの entry の状態が一致
+		readMtr1 := buffer.NewMtr(bp1)
+		defer readMtr1.UnpinAll()
+		readMtr2 := buffer.NewMtr(bp2)
+		defer readMtr2.UnpinAll()
+		entryAddr1 := readSegmentHeaderAt(t, bp1, firstPageId1, 0)
+		entryAddr2 := readSegmentHeaderAt(t, bp2, firstPageId2, 0)
+		entry1, err := loadInodeEntryByAddress(readMtr1, testFileId, entryAddr1)
+		require.NoError(t, err)
+		entry2, err := loadInodeEntryByAddress(readMtr2, testFileId, entryAddr2)
+		require.NoError(t, err)
+		assert.Equal(t, entry1.notFullNUsed(), entry2.notFullNUsed())
+		fullLen1, _ := flst.Length(readMtr1, testFileId, entry1.fullListBase())
+		fullLen2, _ := flst.Length(readMtr2, testFileId, entry2.fullListBase())
+		assert.Equal(t, fullLen1, fullLen2)
+		notFullLen1, _ := flst.Length(readMtr1, testFileId, entry1.notFullListBase())
+		notFullLen2, _ := flst.Length(readMtr2, testFileId, entry2.notFullListBase())
+		assert.Equal(t, notFullLen1, notFullLen2)
+	})
+}
+
 // allocateSegmentPageN は count 個のページを 1 個ずつ独立の mtr で割り当て、返された PageId のスライスを返す
 func allocateSegmentPageN(t *testing.T, bp *buffer.Pool, redoLog *redo.Buffer, headerAt flst.Address, count int) []page.Id {
 	t.Helper()

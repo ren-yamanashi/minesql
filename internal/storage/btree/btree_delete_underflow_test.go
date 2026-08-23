@@ -33,12 +33,14 @@ func TestDeleteUnderflow(t *testing.T) {
 		// WHEN
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
-		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0)
+		metaPage := loadMetaPageForTest(t, mtr, bt)
+		leafCountBefore := metaPage.leafPageCount()
+		underflow, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0, metaPage)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.False(t, underflow)
-		assert.False(t, isLeafMerged)
+		assert.Equal(t, leafCountBefore, metaPage.leafPageCount())
 		assert.Equal(t, 3, childLeaf.numRecords())
 		assert.Equal(t, 3, siblingLeaf.numRecords())
 		assert.Equal(t, []byte{0x20}, childLeaf.record(2).Key())
@@ -70,12 +72,14 @@ func TestDeleteUnderflow(t *testing.T) {
 		// WHEN (childSlotNum = NumRecords = 1 → 左の兄弟が選ばれる)
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
-		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 1)
+		metaPage := loadMetaPageForTest(t, mtr, bt)
+		leafCountBefore := metaPage.leafPageCount()
+		underflow, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 1, metaPage)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.False(t, underflow)
-		assert.False(t, isLeafMerged)
+		assert.Equal(t, leafCountBefore, metaPage.leafPageCount())
 		assert.Equal(t, 3, childLeaf.numRecords())
 		assert.Equal(t, 3, siblingLeaf.numRecords())
 		assert.Equal(t, []byte{0x40}, childLeaf.record(0).Key())
@@ -111,12 +115,14 @@ func TestDeleteUnderflow(t *testing.T) {
 		// WHEN (childSlotNum = NumRecords = 1 → 左の兄弟が選ばれる)
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
-		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 1)
+		metaPage := loadMetaPageForTest(t, mtr, bt)
+		leafCountBefore := metaPage.leafPageCount()
+		underflow, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 1, metaPage)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, underflow)
-		assert.True(t, isLeafMerged)
+		assert.Equal(t, leafCountBefore-1, metaPage.leafPageCount())
 		assert.Equal(t, 4, siblingLeaf.numRecords())
 		assert.Equal(t, 0, parentBranch.numRecords())
 		assert.Equal(t, siblingBufPage.PageId(), parentBranch.rightChildPageId())
@@ -152,12 +158,14 @@ func TestDeleteUnderflow(t *testing.T) {
 		// WHEN
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
-		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0)
+		metaPage := loadMetaPageForTest(t, mtr, bt)
+		leafCountBefore := metaPage.leafPageCount()
+		underflow, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0, metaPage)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, underflow)
-		assert.True(t, isLeafMerged)
+		assert.Equal(t, leafCountBefore-1, metaPage.leafPageCount())
 		assert.Equal(t, 4, childLeaf.numRecords())
 		assert.Equal(t, 0, parentBranch.numRecords())
 		assert.Equal(t, childBufPage.PageId(), parentBranch.rightChildPageId())
@@ -192,12 +200,14 @@ func TestDeleteUnderflow(t *testing.T) {
 		// WHEN (childSlotNum=0, sibling=slot1, RightChild=otherPageId)
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
-		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0)
+		metaPage := loadMetaPageForTest(t, mtr, bt)
+		leafCountBefore := metaPage.leafPageCount()
+		underflow, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0, metaPage)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, underflow)
-		assert.True(t, isLeafMerged)
+		assert.Equal(t, leafCountBefore-1, metaPage.leafPageCount())
 		assert.Equal(t, 4, childLeaf.numRecords())
 		assert.Equal(t, 1, parentBranch.numRecords())
 		isFree, err := fsp.IsPageFree(mtr, siblingPageId)
@@ -226,12 +236,14 @@ func TestDeleteUnderflow(t *testing.T) {
 		// WHEN (sibling は 3 レコードで転送不可、child は 2 レコードで合計 5 レコード分はマージ不可)
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
-		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0)
+		metaPage := loadMetaPageForTest(t, mtr, bt)
+		leafCountBefore := metaPage.leafPageCount()
+		underflow, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0, metaPage)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.False(t, underflow)
-		assert.False(t, isLeafMerged)
+		assert.Equal(t, leafCountBefore, metaPage.leafPageCount())
 		assert.Equal(t, 2, childLeaf.numRecords())
 		assert.Equal(t, 3, siblingLeaf.numRecords())
 	})
@@ -257,12 +269,14 @@ func TestDeleteUnderflow(t *testing.T) {
 		// WHEN
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
-		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0)
+		metaPage := loadMetaPageForTest(t, mtr, bt)
+		leafCountBefore := metaPage.leafPageCount()
+		underflow, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0, metaPage)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.False(t, underflow)
-		assert.False(t, isLeafMerged)
+		assert.Equal(t, leafCountBefore, metaPage.leafPageCount())
 		assert.Equal(t, childNumBefore+1, childBranch.numRecords())
 		assert.Equal(t, siblingNumBefore-1, siblingBranch.numRecords())
 	})
@@ -288,12 +302,14 @@ func TestDeleteUnderflow(t *testing.T) {
 		// WHEN (childSlotNum = NumRecords = 1 → 左の兄弟が選ばれる)
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
-		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 1)
+		metaPage := loadMetaPageForTest(t, mtr, bt)
+		leafCountBefore := metaPage.leafPageCount()
+		underflow, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 1, metaPage)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.False(t, underflow)
-		assert.False(t, isLeafMerged)
+		assert.Equal(t, leafCountBefore, metaPage.leafPageCount())
 		assert.Equal(t, childNumBefore+1, childBranch.numRecords())
 		assert.Equal(t, siblingNumBefore-1, siblingBranch.numRecords())
 	})
@@ -315,12 +331,14 @@ func TestDeleteUnderflow(t *testing.T) {
 		// WHEN (childSlotNum = NumRecords = 1 → 左の兄弟が選ばれる)
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
-		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 1)
+		metaPage := loadMetaPageForTest(t, mtr, bt)
+		leafCountBefore := metaPage.leafPageCount()
+		underflow, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 1, metaPage)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, underflow)
-		assert.False(t, isLeafMerged)
+		assert.Equal(t, leafCountBefore, metaPage.leafPageCount())
 		assert.Equal(t, 0, parentBranch.numRecords())
 		assert.Equal(t, siblingBufPage.PageId(), parentBranch.rightChildPageId())
 		isFree, err := fsp.IsPageFree(mtr, childPageId)
@@ -333,7 +351,7 @@ func TestDeleteUnderflow(t *testing.T) {
 		bt, bp := setupBtreeForTest(t)
 
 		childPageId, childBufPage := allocateTestPageInBranchSegment(t, bp, bt)
-		initTestBranchNode(t, bp, childPageId, largeBranchKey(0x10), page.NewId(0, 100), page.NewId(0, 101))
+		childBranch := initTestBranchNode(t, bp, childPageId, largeBranchKey(0x10), page.NewId(0, 100), page.NewId(0, 101))
 
 		siblingPageId, _ := allocateTestPageInBranchSegment(t, bp, bt)
 		initTestBranchNode(t, bp, siblingPageId, largeBranchKey(0x60), page.NewId(0, 200), page.NewId(0, 201))
@@ -344,14 +362,24 @@ func TestDeleteUnderflow(t *testing.T) {
 		// WHEN (childSlotNum=0, sibling=RightChild → childSlotNum+1 == NumRecords)
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
-		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0)
+		metaPage := loadMetaPageForTest(t, mtr, bt)
+		leafCountBefore := metaPage.leafPageCount()
+		underflow, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0, metaPage)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, underflow)
-		assert.False(t, isLeafMerged)
+		assert.Equal(t, leafCountBefore, metaPage.leafPageCount())
 		assert.Equal(t, 0, parentBranch.numRecords())
 		assert.Equal(t, childBufPage.PageId(), parentBranch.rightChildPageId())
+		assert.Equal(t, 3, childBranch.numRecords())
+		assert.Equal(t, largeBranchKey(0x10), childBranch.record(0).Key())
+		assert.Equal(t, page.NewId(0, 100).Bytes(), childBranch.record(0).NonKey())
+		assert.Equal(t, []byte{0x50}, childBranch.record(1).Key())
+		assert.Equal(t, page.NewId(0, 101).Bytes(), childBranch.record(1).NonKey())
+		assert.Equal(t, largeBranchKey(0x60), childBranch.record(2).Key())
+		assert.Equal(t, page.NewId(0, 200).Bytes(), childBranch.record(2).NonKey())
+		assert.Equal(t, page.NewId(0, 201), childBranch.rightChildPageId())
 		isFree, err := fsp.IsPageFree(mtr, siblingPageId)
 		assert.NoError(t, err)
 		assert.True(t, isFree)
@@ -362,7 +390,7 @@ func TestDeleteUnderflow(t *testing.T) {
 		bt, bp := setupBtreeForTest(t)
 
 		childPageId, childBufPage := allocateTestPageInBranchSegment(t, bp, bt)
-		initTestBranchNode(t, bp, childPageId, largeBranchKey(0x10), page.NewId(0, 100), page.NewId(0, 101))
+		childBranch := initTestBranchNode(t, bp, childPageId, largeBranchKey(0x10), page.NewId(0, 100), page.NewId(0, 101))
 
 		siblingPageId, _ := allocateTestPageInBranchSegment(t, bp, bt)
 		initTestBranchNode(t, bp, siblingPageId, largeBranchKey(0x40), page.NewId(0, 200), page.NewId(0, 201))
@@ -377,13 +405,23 @@ func TestDeleteUnderflow(t *testing.T) {
 		// WHEN (childSlotNum=0, sibling=slot1, RightChild=otherPageId)
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
-		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0)
+		metaPage := loadMetaPageForTest(t, mtr, bt)
+		leafCountBefore := metaPage.leafPageCount()
+		underflow, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0, metaPage)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.True(t, underflow)
-		assert.False(t, isLeafMerged)
+		assert.Equal(t, leafCountBefore, metaPage.leafPageCount())
 		assert.Equal(t, 1, parentBranch.numRecords())
+		assert.Equal(t, 3, childBranch.numRecords())
+		assert.Equal(t, largeBranchKey(0x10), childBranch.record(0).Key())
+		assert.Equal(t, page.NewId(0, 100).Bytes(), childBranch.record(0).NonKey())
+		assert.Equal(t, []byte{0x30}, childBranch.record(1).Key())
+		assert.Equal(t, page.NewId(0, 101).Bytes(), childBranch.record(1).NonKey())
+		assert.Equal(t, largeBranchKey(0x40), childBranch.record(2).Key())
+		assert.Equal(t, page.NewId(0, 200).Bytes(), childBranch.record(2).NonKey())
+		assert.Equal(t, page.NewId(0, 201), childBranch.rightChildPageId())
 		isFree, err := fsp.IsPageFree(mtr, siblingPageId)
 		assert.NoError(t, err)
 		assert.True(t, isFree)
@@ -410,15 +448,25 @@ func TestDeleteUnderflow(t *testing.T) {
 		// WHEN
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
-		underflow, isLeafMerged, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0)
+		metaPage := loadMetaPageForTest(t, mtr, bt)
+		leafCountBefore := metaPage.leafPageCount()
+		underflow, err := bt.deleteUnderflow(mtr, parentBranch, childBufPage, 0, metaPage)
 
 		// THEN
 		assert.NoError(t, err)
 		assert.False(t, underflow)
-		assert.False(t, isLeafMerged)
+		assert.Equal(t, leafCountBefore, metaPage.leafPageCount())
 		assert.Equal(t, childNumBefore, childBranch.numRecords())
 		assert.Equal(t, siblingNumBefore, siblingBranch.numRecords())
 	})
+}
+
+// loadMetaPageForTest はテスト内で mtr から metaPage を取得する
+func loadMetaPageForTest(t *testing.T, mtr *buffer.Mtr, tree *Tree) *metaPage {
+	t.Helper()
+	pg, err := mtr.PageForWrite(tree.MetaPageId())
+	assert.NoError(t, err)
+	return newMetaPage(pg)
 }
 
 // allocateTestPage はテスト用にページを割り当ててバッファプールに追加する
@@ -482,8 +530,7 @@ func initTestBranchNode(
 	pg, err := bp.Page(pageId)
 	assert.NoError(t, err)
 	branch := newBranchNode(pg)
-	err = branch.initialize(key, leftChild, rightChild)
-	assert.NoError(t, err)
+	branch.initialize(key, leftChild, rightChild)
 	return branch
 }
 

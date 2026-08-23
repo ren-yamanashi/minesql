@@ -19,16 +19,17 @@ func TestInsertBranchOverflow(t *testing.T) {
 		// WHEN
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
-		overflowKey, newPageId, err := bt.insertBranchOverflow(
+		reserved := reserveForTest(t, bt, mtr, 1)
+		overflowKey, newPageId := bt.insertBranchOverflow(
 			mtr,
 			branchNode,
 			1,
 			[]byte{0x20},
 			page.NewId(0, 10),
+			reserved,
 		)
 
 		// THEN
-		assert.NoError(t, err)
 		assert.Nil(t, overflowKey)
 		assert.True(t, newPageId.IsInvalid())
 		assert.Equal(t, 2, branchNode.numRecords())
@@ -43,16 +44,17 @@ func TestInsertBranchOverflow(t *testing.T) {
 		// WHEN
 		mtr := buffer.NewMtr(bt.bufferPool)
 		defer mtr.UnpinAll()
-		overflowKey, newPageId, err := bt.insertBranchOverflow(
+		reserved := reserveForTest(t, bt, mtr, 1)
+		overflowKey, newPageId := bt.insertBranchOverflow(
 			mtr,
 			branchNode,
 			branchNode.numRecords(),
 			[]byte{0xFF},
 			page.NewId(0, 99),
+			reserved,
 		)
 
 		// THEN
-		assert.NoError(t, err)
 		assert.NotNil(t, overflowKey)
 		assert.False(t, newPageId.IsInvalid())
 	})
@@ -70,8 +72,7 @@ func setupTestBranchNode(t *testing.T, bp *buffer.Pool) *branchNode {
 	pg, err := bp.Page(pageId)
 	assert.NoError(t, err)
 	bn := newBranchNode(pg)
-	err = bn.initialize([]byte{0x10}, page.NewId(0, 1), page.NewId(0, 2))
-	assert.NoError(t, err)
+	bn.initialize([]byte{0x10}, page.NewId(0, 1), page.NewId(0, 2))
 	return bn
 }
 
