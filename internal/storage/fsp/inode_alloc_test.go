@@ -1,9 +1,11 @@
 package fsp
 
 import (
+	"path/filepath"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
+	"github.com/ren-yamanashi/minesql/internal/storage/file"
 	"github.com/ren-yamanashi/minesql/internal/storage/flst"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -133,6 +135,30 @@ func TestAllocateInodeEntry(t *testing.T) {
 	})
 }
 
+func TestEnsureFreeInodePage(t *testing.T) {
+	t.Run("AllocatePage 後の AddPage 失敗時に割り当てが補償解放されて free に戻る", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := newTinyPoolTest(t)
+		initFsp(t, bp, redoLog)
+
+		// WHEN
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		headerPage, err := mtr.PageForWrite(page.NewId(testFileId, 0))
+		require.NoError(t, err)
+		ensureErr := ensureFreeInodePage(mtr, testFileId, header{bufPage: headerPage})
+		mtr.UnpinAll()
+
+		// THEN
+		require.Error(t, ensureErr)
+		assert.ErrorIs(t, ensureErr, buffer.ErrAllPagesUnevictable)
+		readMtr := buffer.NewMtr(bp)
+		defer readMtr.UnpinAll()
+		isFree, err := IsPageFree(readMtr, page.NewId(testFileId, 1))
+		require.NoError(t, err)
+		assert.True(t, isFree, "補償解放によって page 1 は free に戻っているはず")
+	})
+}
+
 func TestLoadInodeEntryByAddress(t *testing.T) {
 	t.Run("整列したアドレスから対応する index のエントリが復元される", func(t *testing.T) {
 		// GIVEN
@@ -197,4 +223,19 @@ func allocateInodeN(t *testing.T, bp *buffer.Pool, redoLog *redo.Buffer, count i
 		entries = append(entries, allocateInodeOne(t, bp, redoLog))
 	}
 	return entries
+}
+
+// newTinyPoolTest は maxPages = 1 のバッファプールでテスト環境を用意する
+//   - page 0 のみプールに収まる。以降の新規ページ AddPage は追い出し不可で ErrAllPagesUnevictable を返す
+func newTinyPoolTest(t *testing.T) (*buffer.Pool, *redo.Buffer) {
+	t.Helper()
+	redoLog, err := redo.NewBuffer(t.TempDir())
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = redoLog.Close() })
+	hf, err := file.NewHeapFile(filepath.Join(t.TempDir(), "test.db"))
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = hf.Close() })
+	bp := buffer.NewPool(page.Size, redoLog, nil)
+	bp.RegisterHeapFile(testFileId, hf)
+	return bp, redoLog
 }

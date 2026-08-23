@@ -53,6 +53,7 @@ func freeSegmentPage(mtr *buffer.Mtr, h header, entry inodeEntry, id page.Id) er
 
 // freeSegmentFragPage は frag array に登録されたページを解放する
 //   - id が frag array にない場合は panic (この segment に属さないページ)
+//   - slot 無効化の前に FreePage の touch フェーズを呼ぶことで、書き込み開始後の新規ページ取得を避ける
 func freeSegmentFragPage(mtr *buffer.Mtr, entry inodeEntry, id page.Id) error {
 	slot := -1
 	for i := range inodeFragSlotCount {
@@ -64,8 +65,13 @@ func freeSegmentFragPage(mtr *buffer.Mtr, entry inodeEntry, id page.Id) error {
 	if slot < 0 {
 		panic(fmt.Sprintf("fsp: page %d is not registered in segment frag array", id.PageNumber()))
 	}
+	plan, err := touchFreePage(mtr, id)
+	if err != nil {
+		return err
+	}
 	entry.setFragSlot(slot, page.MaxPageNumber)
-	return FreePage(mtr, id)
+	writeFreePage(mtr, id, plan)
+	return nil
 }
 
 // freeSegmentExtentPage は専有 extent 内のページを 1 枚解放する
@@ -115,7 +121,8 @@ func freeSegmentExtentPage(mtr *buffer.Mtr, fileId page.FileId, h header, entry 
 	if err := flst.Remove(mtr, fileId, entry.notFullListBase(), x.flstNodeAddress()); err != nil {
 		panicOnPostWriteFlstErr(err)
 	}
-	return freeExtentToSpace(mtr, fileId, h, x)
+	freeExtentToSpace(mtr, fileId, h, x)
+	return nil
 }
 
 // isReturnableAfterFree は 1 ページ解放後に extent を空間へ返却するかを返す

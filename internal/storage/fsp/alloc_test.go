@@ -1,6 +1,7 @@
 package fsp
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
@@ -111,6 +112,27 @@ func TestAllocatePage(t *testing.T) {
 			seen[pn] = true
 		}
 		assert.Len(t, seen, count)
+	})
+
+	t.Run("空間の容量が枯渇した場合 AllocatePage は書き込み前 errCapacityExhausted を返し redo に何も書かない", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t)
+		initFsp(t, bp, redoLog)
+		exhaustSpace(t, bp, redoLog)
+		sizeBefore, err := redoLog.Size()
+		require.NoError(t, err)
+
+		// WHEN
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		_, allocErr := AllocatePage(mtr, testFileId)
+		mtr.UnpinAll()
+
+		// THEN
+		assert.Error(t, allocErr)
+		assert.True(t, errors.Is(allocErr, errCapacityExhausted))
+		sizeAfter, err := redoLog.Size()
+		require.NoError(t, err)
+		assert.Equal(t, sizeBefore, sizeAfter)
 	})
 
 	t.Run("記述子ページ 2 枚目 (page 4096) の予約領域 108 バイトはゼロ", func(t *testing.T) {
@@ -258,4 +280,32 @@ func allocateOne(t *testing.T, bp *buffer.Pool, redoLog *redo.Buffer) page.Id {
 	require.NoError(t, err)
 	commitMtr(t, mtr)
 	return id
+}
+
+// exhaustSpace は freeLimit を sentinel 直下に押し上げ、FREE / FREE_FRAG リストを空にして
+// 以降の割り当てが必ず容量枯渇で失敗する状態にする
+func exhaustSpace(t *testing.T, bp *buffer.Pool, redoLog *redo.Buffer) {
+	t.Helper()
+	mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+	headerPage, err := mtr.PageForWrite(page.NewId(testFileId, 0))
+	require.NoError(t, err)
+	h := header{bufPage: headerPage}
+	for {
+		first, err := flst.First(mtr, testFileId, h.freeListBase())
+		require.NoError(t, err)
+		if first.IsInvalid() {
+			break
+		}
+		require.NoError(t, flst.Remove(mtr, testFileId, h.freeListBase(), first))
+	}
+	for {
+		first, err := flst.First(mtr, testFileId, h.freeFragListBase())
+		require.NoError(t, err)
+		if first.IsInvalid() {
+			break
+		}
+		require.NoError(t, flst.Remove(mtr, testFileId, h.freeFragListBase(), first))
+	}
+	h.setFreeLimit(page.MaxPageNumber - page.PageNumber(extentPageCount) + 1)
+	commitMtr(t, mtr)
 }

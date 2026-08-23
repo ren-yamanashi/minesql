@@ -1,6 +1,7 @@
 package fsp
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
@@ -114,6 +115,29 @@ func TestAllocateSegmentPage(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, uint32(1), fullLen)
 		assert.Equal(t, uint32(0), entry.notFullNUsed())
+	})
+
+	t.Run("空間の容量が枯渇した場合 AllocateSegmentPage は書き込み前 errCapacityExhausted を返し redo に何も書かない", func(t *testing.T) {
+		// GIVEN
+		bp, redoLog := setupTest(t)
+		initFsp(t, bp, redoLog)
+		firstPageId := createSegmentOne(t, bp, redoLog, 0)
+		headerAt := flst.Address{PageNumber: firstPageId.PageNumber(), Offset: 0}
+		exhaustSpace(t, bp, redoLog)
+		sizeBefore, err := redoLog.Size()
+		require.NoError(t, err)
+
+		// WHEN
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		_, allocErr := AllocateSegmentPage(mtr, testFileId, headerAt)
+		mtr.UnpinAll()
+
+		// THEN
+		assert.Error(t, allocErr)
+		assert.True(t, errors.Is(allocErr, errCapacityExhausted))
+		sizeAfter, err := redoLog.Size()
+		require.NoError(t, err)
+		assert.Equal(t, sizeBefore, sizeAfter)
 	})
 
 	t.Run("FREE から NOT_FULL への遷移も反映される", func(t *testing.T) {

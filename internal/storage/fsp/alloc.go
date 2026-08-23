@@ -41,6 +41,7 @@ func AllocatePage(mtr *buffer.Mtr, fileId page.FileId) (page.Id, error) {
 
 // allocateExtent は空間の FREE リストから extent を 1 つ取り出して返す
 //   - FREE が空なら fill で補充する。取り出した extent はどのリストにも属さない状態で返る (状態・id の設定は呼び出し側の責務)
+//   - fill 呼び出し後もフリーリミットが進まなかった場合 (容量枯渇) は errCapacityExhausted を返す
 func allocateExtent(mtr *buffer.Mtr, fileId page.FileId, h header) (xdesEntry, error) {
 	for {
 		first, err := flst.First(mtr, fileId, h.freeListBase())
@@ -57,13 +58,18 @@ func allocateExtent(mtr *buffer.Mtr, fileId page.FileId, h header) (xdesEntry, e
 			}
 			return entry, nil
 		}
+		limitBefore := h.freeLimit()
 		if err := fill(mtr, fileId); err != nil {
 			return xdesEntry{}, err
+		}
+		if h.freeLimit() == limitBefore {
+			return xdesEntry{}, fmt.Errorf("%w: FREE list empty and no extent could be initialized", errCapacityExhausted)
 		}
 	}
 }
 
 // prepareAllocationExtent は割り当てに使う FREE_FRAG リスト先頭 extent を用意して返す
+//   - fill 呼び出し後もフリーリミットが進まなかった場合 (容量枯渇) は errCapacityExhausted を返す
 func prepareAllocationExtent(mtr *buffer.Mtr, fileId page.FileId, h header) (xdesEntry, error) {
 	for {
 		first, err := flst.First(mtr, fileId, h.freeFragListBase())
@@ -83,8 +89,12 @@ func prepareAllocationExtent(mtr *buffer.Mtr, fileId page.FileId, h header) (xde
 			}
 			continue
 		}
+		limitBefore := h.freeLimit()
 		if err := fill(mtr, fileId); err != nil {
 			return xdesEntry{}, err
+		}
+		if h.freeLimit() == limitBefore {
+			return xdesEntry{}, fmt.Errorf("%w: FREE_FRAG and FREE lists empty and no extent could be initialized", errCapacityExhausted)
 		}
 	}
 }

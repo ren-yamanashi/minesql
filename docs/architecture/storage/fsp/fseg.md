@@ -55,13 +55,15 @@ segment header は、利用側ページに置く inode への参照。以下の 
 
 segment の新規作成は以下の順で行う
 
-1. [FSP ヘッダー](fsp.md#fsp-ヘッダー)の segment id カウンタから次の値を採番し、カウンタをインクリメントする
-2. SEG_INODES_FREE リストから inode エントリを 1 つ確保する。リストが空なら inode ページを 1 枚新規確保して SEG_INODES_FREE に追加してからエントリを取る
+1. SEG_INODES_FREE リストから inode エントリを 1 つ確保する。リストが空なら inode ページを 1 枚新規確保して SEG_INODES_FREE に追加してからエントリを取る
+2. [FSP ヘッダー](fsp.md#fsp-ヘッダー)の segment id カウンタから次の値を採番し、カウンタをインクリメントする
 3. inode エントリを初期化する: segment id を書き込み、3 つの extent リスト (FREE / NOT_FULL / FULL) の base node を空で初期化し、frag array の全 slot を未使用値で埋め、マジックナンバーを設定する
 4. 利用側から要求された場合は、この segment 自身から最初の 1 ページを[ページ割り当て](#ページ割り当て)で払い出し、そのページに segment header を書き込む
 
+- 手順 1 で inode ページを新規確保したとき、確保したページをバッファプールへ作成できない場合は、そのページ割り当てを補償解放してから失敗を返す
 - 手順 4 は、B+Tree の非リーフ segment とメタページの関係のように「segment の最初のページがそのまま segment header の置き場になる」利用者で使う
 - segment header を別 segment のページに置く利用者 (= B+Tree の leaf segment。segment header は非リーフ segment の最初のページであるメタページに置かれる) では、手順 4 を省き、後から segment header だけを書き込む
+- 手順 4 のページ割り当てが容量枯渇で失敗した場合は、手順 1 で確保した inode スロットを未使用に戻してから失敗を返す (segment id カウンタは戻さない)
 
 ## ページ割り当て
 
@@ -74,7 +76,7 @@ segment に対するページ割り当ては、以下の順で払い出しペー
    2. lease できなければ、空間から新しい extent を確保して XDES_FSEG (= segment 専有) 状態にし、segment の FREE リストに繋ぐ。このとき segment が予約している総ページ数 (= frag ページ数 + FREE / NOT_FULL / FULL の全 extent のページ数) が 40 extent 相当以上なら、続けて extent を最大 4 つ先読み確保して FREE リストに繋ぐ (フリーリスト先読み)
 
 - 保有 extent の空きページを最優先するのは、segment が既に予約した領域を使い切ってから空間の新規領域に手を伸ばすため
-- フリーリスト先読みは補充のみを目的とし、空間の容量枯渇で extent を確保できない場合はそこで打ち切る (そのときの割り当て自体は失敗しない)
+- フリーリスト先読みは補充の試行であり、途中で extent を確保できない場合はそこで打ち切る (先読みが失敗しても呼び出し元の割り当ては成功する)
 - 割り当ての探索順 (NOT_FULL → FREE、最下位 free bit) は決定的で、呼び出し側からの位置ヒントを受け取らない。分割の局所性は「同じ segment に属する extent 内でページを確保する」という配置規則から得る
 - 使用ページ数 128 の閾値は inode エントリの frag slot 数と同じ値で、「frag array が満杯になる直前まで単ページ割り当てで済ませ、以降は extent 専有に切り替える」比率に対応する
 - 手順 2 で空間側から得られたページは、そのまま segment に属する frag ページ扱いになる。そのページを含む extent の状態 (FREE_FRAG / FULL_FRAG) は空間側の遷移規則に従う

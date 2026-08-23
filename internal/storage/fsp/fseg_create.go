@@ -1,6 +1,8 @@
 package fsp
 
 import (
+	"fmt"
+
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/flst"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -9,25 +11,30 @@ import (
 // CreateSegment は新しい segment を作成し、segment 自身から最初の 1 ページを割り当てて
 // そのページの body 先頭から headerOffset の位置に segment header を書き込み、そのページの Id を返す
 //   - 割り当てたページはバッファプールに作成される。segment header 以外の内容初期化は呼び出し側の責務
+//   - 最初のページ割り当てに失敗した場合は、確保した inode スロットを解放してから失敗を返す
+//     (segment id カウンタは戻さない)
 func CreateSegment(mtr *buffer.Mtr, fileId page.FileId, headerOffset uint16) (page.Id, error) {
-	entry, err := createInode(mtr, fileId)
-	if err != nil {
-		return page.InvalidId(), err
-	}
 	headerPage, err := mtr.PageForWrite(page.NewId(fileId, 0))
 	if err != nil {
 		return page.InvalidId(), err
 	}
 	h := header{bufPage: headerPage}
-	firstPageId, err := allocatePageInSegment(mtr, fileId, h, entry)
+	entry, err := createInode(mtr, fileId)
 	if err != nil {
 		return page.InvalidId(), err
 	}
-	if _, err := mtr.Pool().AddPage(firstPageId); err != nil {
+	firstPageId, err := allocatePageInSegment(mtr, fileId, h, entry)
+	if err != nil {
+		if compErr := freeInodeEntry(mtr, fileId, h, entry); compErr != nil {
+			panic(fmt.Sprintf("fsp: inode compensation failed after CreateSegment first-page allocation: %v", compErr))
+		}
 		return page.InvalidId(), err
 	}
+	if _, err := mtr.Pool().AddPage(firstPageId); err != nil {
+		panic(fmt.Sprintf("fsp: pool AddPage failed for just-allocated first page (pageId=%v): %v", firstPageId, err))
+	}
 	if err := writeSegmentHeader(mtr, firstPageId, headerOffset, entry.address()); err != nil {
-		return page.InvalidId(), err
+		panic(fmt.Sprintf("fsp: writeSegmentHeader failed for just-allocated first page (pageId=%v): %v", firstPageId, err))
 	}
 	return firstPageId, nil
 }
@@ -35,11 +42,11 @@ func CreateSegment(mtr *buffer.Mtr, fileId page.FileId, headerOffset uint16) (pa
 // CreateSegmentAt は新しい segment を作成し、既存ページ上の headerAt に segment header を書き込む
 //   - 最初のページは割り当てない (segment header を別 segment のページに置く利用者向け)
 func CreateSegmentAt(mtr *buffer.Mtr, fileId page.FileId, headerAt flst.Address) error {
-	entry, err := createInode(mtr, fileId)
+	headerPage, err := mtr.PageForWrite(page.NewId(fileId, headerAt.PageNumber))
 	if err != nil {
 		return err
 	}
-	headerPage, err := mtr.PageForWrite(page.NewId(fileId, headerAt.PageNumber))
+	entry, err := createInode(mtr, fileId)
 	if err != nil {
 		return err
 	}
@@ -56,28 +63,29 @@ func ReadSegmentHeader(mtr *buffer.Mtr, fileId page.FileId, headerAt flst.Addres
 	return flst.ReadAddress(bufPage.Data().Body(), int(headerAt.Offset)), nil
 }
 
-// createInode は segment id を採番して inode スロットを確保し、初期化する
+// createInode は inode スロットを確保して初期化し、segment id を採番する
+//   - allocateInodeEntry が失敗した場合は segment id カウンタを進めずに失敗を返す
 func createInode(mtr *buffer.Mtr, fileId page.FileId) (inodeEntry, error) {
 	headerPage, err := mtr.PageForWrite(page.NewId(fileId, 0))
 	if err != nil {
 		return inodeEntry{}, err
 	}
 	h := header{bufPage: headerPage}
-	segId := h.segId()
-	h.setSegId(segId + 1)
 	entry, err := allocateInodeEntry(mtr, fileId, h)
 	if err != nil {
 		return inodeEntry{}, err
 	}
+	segId := h.segId()
+	h.setSegId(segId + 1)
 	entry.initializeEntry(segId)
 	if err := flst.InitBase(mtr, fileId, entry.freeListBase()); err != nil {
-		return inodeEntry{}, err
+		panicOnPostWriteFlstErr(err)
 	}
 	if err := flst.InitBase(mtr, fileId, entry.notFullListBase()); err != nil {
-		return inodeEntry{}, err
+		panicOnPostWriteFlstErr(err)
 	}
 	if err := flst.InitBase(mtr, fileId, entry.fullListBase()); err != nil {
-		return inodeEntry{}, err
+		panicOnPostWriteFlstErr(err)
 	}
 	return entry, nil
 }

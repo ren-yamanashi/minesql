@@ -7,6 +7,7 @@ import (
 )
 
 // freeInodeEntry は entry の inode スロットを未使用に戻し、inode ページのリスト状態を反映する
+//   - inode ページ自体を解放する場合は、スロット無効化の前に FreePage の touch フェーズを呼ぶ
 func freeInodeEntry(mtr *buffer.Mtr, fileId page.FileId, h header, entry inodeEntry) error {
 	inodePage := entry.bufPage
 	nodeAddr := flst.Address{PageNumber: inodePage.PageId().PageNumber(), Offset: inodePageNodeOffset}
@@ -21,6 +22,15 @@ func freeInodeEntry(mtr *buffer.Mtr, fileId page.FileId, h header, entry inodeEn
 			return err
 		}
 	}
+	var freePlan freePagePlan
+	inodePageId := page.NewId(fileId, inodePage.PageId().PageNumber())
+	if willFreePage {
+		plan, err := touchFreePage(mtr, inodePageId)
+		if err != nil {
+			return err
+		}
+		freePlan = plan
+	}
 	entry.setSegId(0)
 	entry.clearMagic()
 	if !willFreePage {
@@ -29,7 +39,8 @@ func freeInodeEntry(mtr *buffer.Mtr, fileId page.FileId, h header, entry inodeEn
 	if err := flst.Remove(mtr, fileId, h.segInodesFreeBase(), nodeAddr); err != nil {
 		panicOnPostWriteFlstErr(err)
 	}
-	return FreePage(mtr, page.NewId(fileId, inodePage.PageId().PageNumber()))
+	writeFreePage(mtr, inodePageId, freePlan)
+	return nil
 }
 
 // transitionInodePageFullToFree は全スロット使用中だった inode ページを SEG_INODES_FULL から SEG_INODES_FREE へ移動させる

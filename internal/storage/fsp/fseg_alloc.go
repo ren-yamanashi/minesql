@@ -27,21 +27,11 @@ func AllocateSegmentPage(mtr *buffer.Mtr, fileId page.FileId, headerAt flst.Addr
 
 // allocatePageInSegment は entry の segment にページを 1 つ割り当てる
 func allocatePageInSegment(mtr *buffer.Mtr, fileId page.FileId, h header, entry inodeEntry) (page.Id, error) {
-	for {
-		x, ok, err := pickAllocatableExtent(mtr, fileId, entry)
-		if err != nil {
-			return page.InvalidId(), err
-		}
-		if ok {
-			pos := x.firstFreePos()
-			if pos < 0 {
-				panic("fsp: segment extent on NOT_FULL/FREE has no free page")
-			}
-			if err := markSegmentPageUsed(mtr, fileId, entry, x, pos); err != nil {
-				return page.InvalidId(), err
-			}
-			return page.NewId(fileId, extentFirstPageNumber(x)+page.PageNumber(pos)), nil
-		}
+	x, ok, err := pickAllocatableExtent(mtr, fileId, entry)
+	if err != nil {
+		return page.InvalidId(), err
+	}
+	if !ok {
 		_, used, err := segmentReservedPages(mtr, fileId, entry)
 		if err != nil {
 			return page.InvalidId(), err
@@ -58,10 +48,19 @@ func allocatePageInSegment(mtr *buffer.Mtr, fileId page.FileId, h header, entry 
 			entry.setFragSlot(slot, pageId.PageNumber())
 			return pageId, nil
 		}
-		if err := acquireExtent(mtr, fileId, h, entry); err != nil {
+		x, err = acquireExtent(mtr, fileId, h, entry)
+		if err != nil {
 			return page.InvalidId(), err
 		}
 	}
+	pos := x.firstFreePos()
+	if pos < 0 {
+		panic("fsp: segment extent on NOT_FULL/FREE has no free page")
+	}
+	if err := markSegmentPageUsed(mtr, fileId, entry, x, pos); err != nil {
+		return page.InvalidId(), err
+	}
+	return page.NewId(fileId, extentFirstPageNumber(x)+page.PageNumber(pos)), nil
 }
 
 // pickAllocatableExtent は NOT_FULL 先頭 → FREE 先頭の順で割り当て対象 extent を返す (どちらも空なら ok = false)

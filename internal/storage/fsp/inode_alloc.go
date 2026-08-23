@@ -65,10 +65,16 @@ func ensureFreeInodePage(mtr *buffer.Mtr, fileId page.FileId, h header) error {
 		return err
 	}
 	if _, err := mtr.Pool().AddPage(pageId); err != nil {
+		if compErr := FreePage(mtr, pageId); compErr != nil {
+			panic(fmt.Sprintf("fsp: page compensation failed after inode page allocation: %v", compErr))
+		}
 		return err
 	}
 	inodePage, err := mtr.PageForWrite(pageId)
 	if err != nil {
+		if compErr := FreePage(mtr, pageId); compErr != nil {
+			panic(fmt.Sprintf("fsp: page compensation failed after inode page allocation: %v", compErr))
+		}
 		return err
 	}
 	for i := range inodeEntriesPerPage {
@@ -108,6 +114,15 @@ func hasAnotherFreeSlot(inodePage *buffer.Page, allocated int) bool {
 
 // transitionInodePageFreeToFull は全スロット使用中になった inode ページを SEG_INODES_FREE から SEG_INODES_FULL へ移動させる
 func transitionInodePageFreeToFull(mtr *buffer.Mtr, fileId page.FileId, h header, nodeAddr flst.Address) error {
+	last, err := flst.Last(mtr, fileId, h.segInodesFullBase())
+	if err != nil {
+		return err
+	}
+	if !last.IsInvalid() {
+		if _, err := mtr.PageForWrite(page.NewId(fileId, last.PageNumber)); err != nil {
+			return err
+		}
+	}
 	if err := flst.Remove(mtr, fileId, h.segInodesFreeBase(), nodeAddr); err != nil {
 		return err
 	}

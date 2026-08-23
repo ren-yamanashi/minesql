@@ -109,7 +109,8 @@ func freeWholeExtent(mtr *buffer.Mtr, fileId page.FileId, h header, entry inodeE
 	if err := flst.Remove(mtr, fileId, srcBase, x.flstNodeAddress()); err != nil {
 		panicOnPostWriteFlstErr(err)
 	}
-	return freeExtentToSpace(mtr, fileId, h, x)
+	freeExtentToSpace(mtr, fileId, h, x)
+	return nil
 }
 
 // segmentExtentSourceBase は x が所属している segment 側リストの base と、NOT_FULL の場合の使用中ページ数を返す

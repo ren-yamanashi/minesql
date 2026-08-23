@@ -106,6 +106,45 @@ func TestCreateSegment(t *testing.T) {
 		assert.Equal(t, uint32(0), entry.notFullNUsed())
 		assert.Equal(t, [4]byte{'S', 'E', 'G', 'I'}, entry.magic())
 	})
+
+	t.Run("最初のページ割り当てで空間が枯渇した場合 CreateSegment は inode スロットを補償解放して失敗を返す", func(t *testing.T) {
+		// GIVEN
+		// 事前に 1 segment を作って inode ページ・スロットを整えたうえで、空間だけを枯渇状態にする
+		bp, redoLog := setupTest(t)
+		initFsp(t, bp, redoLog)
+		firstCreated := createSegmentOne(t, bp, redoLog, 0)
+		firstEntryAddr := readSegmentHeaderAt(t, bp, firstCreated, 0)
+		exhaustSpace(t, bp, redoLog)
+		beforeSegId := readSegIdCounter(t, bp)
+
+		// WHEN
+		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
+		_, err := CreateSegment(mtr, testFileId, 0)
+		commitMtr(t, mtr)
+
+		// THEN
+		require.Error(t, err)
+		// segment id カウンタは進んだまま (補償で戻さない)
+		afterSegId := readSegIdCounter(t, bp)
+		assert.Equal(t, beforeSegId+1, afterSegId)
+		// 補償で確保したスロット (最初の CreateSegment が使う予定だった index=1) が未使用に戻っている
+		readMtr := buffer.NewMtr(bp)
+		defer readMtr.UnpinAll()
+		inodePage, err := readMtr.PageForRead(page.NewId(testFileId, firstEntryAddr.PageNumber))
+		require.NoError(t, err)
+		freedEntry := inodeEntry{bufPage: inodePage, index: 1}
+		assert.Equal(t, uint64(0), freedEntry.segId())
+	})
+}
+
+// readSegIdCounter は FSP ヘッダーの segment id カウンタを読み取る
+func readSegIdCounter(t *testing.T, bp *buffer.Pool) uint64 {
+	t.Helper()
+	mtr := buffer.NewMtr(bp)
+	defer mtr.UnpinAll()
+	bufPage, err := mtr.PageForRead(page.NewId(testFileId, 0))
+	require.NoError(t, err)
+	return header{bufPage: bufPage}.segId()
 }
 
 func TestCreateSegmentAt(t *testing.T) {

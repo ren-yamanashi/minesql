@@ -8,51 +8,24 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 )
 
+// freePagePlan は FreePage の書き込みフェーズが必要とする事前情報
+type freePagePlan struct {
+	h              header
+	entry          xdesEntry
+	pos            int
+	state          extentState
+	willBecomeFree bool
+}
+
 // FreePage は id のページを解放し、xdes / リスト / FRAG_N_USED を更新する
 //   - 解放対象ページの中身には書き込まない
 //   - 二重解放、FREE / NOT_INITED 状態への解放、フリーリミット以上のページ番号は panic
 func FreePage(mtr *buffer.Mtr, id page.Id) error {
-	fileId := id.FileId()
-	headerPage, err := mtr.PageForWrite(page.NewId(fileId, 0))
+	plan, err := touchFreePage(mtr, id)
 	if err != nil {
 		return err
 	}
-	h := header{bufPage: headerPage}
-	entry, err := loadEntryByPageNumber(mtr, fileId, h, id.PageNumber())
-	if err != nil {
-		return err
-	}
-	pos := int(id.PageNumber() % extentPageCount)
-	state := entry.state()
-	if state != stateFreeFrag && state != stateFullFrag {
-		panic(fmt.Sprintf("fsp: cannot free page in extent state %s (pageNumber=%d)", state, id.PageNumber()))
-	}
-	if entry.isPageFree(pos) {
-		panic(fmt.Sprintf("fsp: double free of page (pageNumber=%d)", id.PageNumber()))
-	}
-	willBecomeFree := state == stateFreeFrag && entry.freePageCount() == extentPageCount-1
-	switch {
-	case state == stateFullFrag:
-		if err := touchTransitionPages(mtr, fileId, entry, h.freeFragListBase()); err != nil {
-			return err
-		}
-	case willBecomeFree:
-		if err := touchTransitionPages(mtr, fileId, entry, h.freeListBase()); err != nil {
-			return err
-		}
-	}
-	entry.setPageFree(pos, true)
-	if state == stateFullFrag {
-		transitionFullFragToFreeFrag(mtr, fileId, h, entry)
-	} else {
-		if h.fragNUsed() == 0 {
-			panic("fsp: FRAG_N_USED underflow on free in FREE_FRAG extent")
-		}
-		h.setFragNUsed(h.fragNUsed() - 1)
-	}
-	if willBecomeFree {
-		transitionFreeFragToFree(mtr, fileId, h, entry)
-	}
+	writeFreePage(mtr, id, plan)
 	return nil
 }
 
@@ -74,6 +47,60 @@ func IsPageFree(mtr *buffer.Mtr, id page.Id) (bool, error) {
 	}
 	entry := xdesEntry{bufPage: descrPage, index: descriptorEntryIndex(id.PageNumber())}
 	return entry.isPageFree(int(id.PageNumber() % extentPageCount)), nil
+}
+
+// touchFreePage は FreePage の書き込みフェーズが必要とする全ページを pin し、遷移計画を返す
+//   - 状態 / bit を検査して二重解放や不正状態を panic で検出する
+//   - 呼び出し後は書き込み前のため、error return は mtr に変更を残さない
+func touchFreePage(mtr *buffer.Mtr, id page.Id) (freePagePlan, error) {
+	fileId := id.FileId()
+	headerPage, err := mtr.PageForWrite(page.NewId(fileId, 0))
+	if err != nil {
+		return freePagePlan{}, err
+	}
+	h := header{bufPage: headerPage}
+	entry, err := loadEntryByPageNumber(mtr, fileId, h, id.PageNumber())
+	if err != nil {
+		return freePagePlan{}, err
+	}
+	pos := int(id.PageNumber() % extentPageCount)
+	state := entry.state()
+	if state != stateFreeFrag && state != stateFullFrag {
+		panic(fmt.Sprintf("fsp: cannot free page in extent state %s (pageNumber=%d)", state, id.PageNumber()))
+	}
+	if entry.isPageFree(pos) {
+		panic(fmt.Sprintf("fsp: double free of page (pageNumber=%d)", id.PageNumber()))
+	}
+	willBecomeFree := state == stateFreeFrag && entry.freePageCount() == extentPageCount-1
+	switch {
+	case state == stateFullFrag:
+		if err := touchTransitionPages(mtr, fileId, entry, h.freeFragListBase()); err != nil {
+			return freePagePlan{}, err
+		}
+	case willBecomeFree:
+		if err := touchTransitionPages(mtr, fileId, entry, h.freeListBase()); err != nil {
+			return freePagePlan{}, err
+		}
+	}
+	return freePagePlan{h: h, entry: entry, pos: pos, state: state, willBecomeFree: willBecomeFree}, nil
+}
+
+// writeFreePage は touchFreePage で確定した計画に基づいて xdes / リスト / FRAG_N_USED を更新する
+//   - この段階では新規ページ取得を行わない (失敗する可能性がある操作は panic 変換される)
+func writeFreePage(mtr *buffer.Mtr, id page.Id, plan freePagePlan) {
+	fileId := id.FileId()
+	plan.entry.setPageFree(plan.pos, true)
+	if plan.state == stateFullFrag {
+		transitionFullFragToFreeFrag(mtr, fileId, plan.h, plan.entry)
+	} else {
+		if plan.h.fragNUsed() == 0 {
+			panic("fsp: FRAG_N_USED underflow on free in FREE_FRAG extent")
+		}
+		plan.h.setFragNUsed(plan.h.fragNUsed() - 1)
+	}
+	if plan.willBecomeFree {
+		transitionFreeFragToFree(mtr, fileId, plan.h, plan.entry)
+	}
 }
 
 // loadEntryByPageNumber は pageNumber を担当する xdesEntry を書き込み用に取得する
@@ -153,8 +180,9 @@ func transitionFreeFragToFree(mtr *buffer.Mtr, fileId page.FileId, h header, ent
 // freeExtentToSpace は segment から返却された extent を空間のリストへ戻す
 //   - XDES_FSEG は全ページを free 化して FREE リストへ、XDES_FSEG_FRAG は予約分 (先頭 1 ページ) を
 //     使用中に戻して FREE_FRAG リストの末尾へ繋ぎ、FRAG_N_USED に予約分 1 を加算する
-//   - 呼び出し前提: extent は segment 側リストから除去済みであること
-func freeExtentToSpace(mtr *buffer.Mtr, fileId page.FileId, h header, x xdesEntry) error {
+//   - 呼び出し前提: extent は segment 側リストから除去済みであり、遷移先リスト (freeListBase または
+//     freeFragListBase) の旧末尾ページは呼び出し側が touchTransitionPages 等で pin 済みであること
+func freeExtentToSpace(mtr *buffer.Mtr, fileId page.FileId, h header, x xdesEntry) {
 	state := x.state()
 	if state != stateFseg && state != stateFsegFrag {
 		panic(fmt.Sprintf("fsp: cannot return extent to space in state %s", state))
@@ -164,15 +192,6 @@ func freeExtentToSpace(mtr *buffer.Mtr, fileId page.FileId, h header, x xdesEntr
 		destBase = h.freeListBase()
 	} else {
 		destBase = h.freeFragListBase()
-	}
-	last, err := flst.Last(mtr, fileId, destBase)
-	if err != nil {
-		return err
-	}
-	if !last.IsInvalid() {
-		if _, err := mtr.PageForWrite(page.NewId(fileId, last.PageNumber)); err != nil {
-			return err
-		}
 	}
 	x.setSegmentId(0)
 	x.setAllPagesFree()
@@ -188,5 +207,4 @@ func freeExtentToSpace(mtr *buffer.Mtr, fileId page.FileId, h header, x xdesEntr
 	if state == stateFsegFrag {
 		h.setFragNUsed(h.fragNUsed() + 1)
 	}
-	return nil
 }

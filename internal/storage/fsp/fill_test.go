@@ -1,7 +1,6 @@
 package fsp
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
@@ -153,7 +152,7 @@ func TestFill(t *testing.T) {
 		assert.Equal(t, uint32(2), h.fragNUsed())
 	})
 
-	t.Run("フリーリミットが sentinel 近傍にあると extent 初期化前に容量枯渇 error が返る", func(t *testing.T) {
+	t.Run("フリーリミットが sentinel に張り付いた状態では fill は追加 0 個で正常終了しフリーリミットは進まない", func(t *testing.T) {
 		// GIVEN
 		bp, redoLog := setupTest(t)
 		initMtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
@@ -162,16 +161,44 @@ func TestFill(t *testing.T) {
 		setupMtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
 		p0, err := setupMtr.PageForWrite(page.NewId(testFileId, 0))
 		require.NoError(t, err)
-		header{bufPage: p0}.setFreeLimit(page.MaxPageNumber - page.PageNumber(extentPageCount) + 1)
+		exhaustedLimit := page.MaxPageNumber - page.PageNumber(extentPageCount) + 1
+		header{bufPage: p0}.setFreeLimit(exhaustedLimit)
 		commitMtr(t, setupMtr)
 
 		// WHEN
 		mtr := buffer.NewWriteMtr(bp, lock.TrxId(1), redoLog)
-		defer mtr.UnpinAll()
-		err = fill(mtr, testFileId)
+		require.NoError(t, fill(mtr, testFileId))
+		commitMtr(t, mtr)
 
 		// THEN
-		assert.Error(t, err)
-		assert.True(t, errors.Is(err, errCapacityExhausted))
+		readMtr := buffer.NewMtr(bp)
+		defer readMtr.UnpinAll()
+		bufPage, err := readMtr.PageForRead(page.NewId(testFileId, 0))
+		require.NoError(t, err)
+		assert.Equal(t, exhaustedLimit, header{bufPage: bufPage}.freeLimit())
+	})
+}
+
+func TestPlanFillExtents(t *testing.T) {
+	t.Run("sentinel 近傍で追加数を残容量分に切り詰める", func(t *testing.T) {
+		// GIVEN
+		freeLimit := page.MaxPageNumber - page.PageNumber(3*extentPageCount) + 1
+
+		// WHEN
+		plan := planFillExtents(freeLimit)
+
+		// THEN
+		assert.Len(t, plan, 2)
+	})
+
+	t.Run("sentinel に張り付いた freeLimit では空の予定を返す", func(t *testing.T) {
+		// GIVEN
+		freeLimit := page.MaxPageNumber - page.PageNumber(extentPageCount) + 1
+
+		// WHEN
+		plan := planFillExtents(freeLimit)
+
+		// THEN
+		assert.Empty(t, plan)
 	})
 }

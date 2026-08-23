@@ -247,7 +247,8 @@ func TestFreeExtentToSpace(t *testing.T) {
 		h := header{bufPage: headerPage}
 		x, err := loadEntryByNodeAddress(mtr, testFileId, fsegEntryAddr)
 		require.NoError(t, err)
-		require.NoError(t, freeExtentToSpace(mtr, testFileId, h, x))
+		require.NoError(t, touchDestBaseLast(mtr, h.freeListBase()))
+		freeExtentToSpace(mtr, testFileId, h, x)
 		commitMtr(t, mtr)
 
 		// THEN
@@ -284,7 +285,8 @@ func TestFreeExtentToSpace(t *testing.T) {
 		h := header{bufPage: headerPage}
 		x, err := loadEntryByNodeAddress(mtr, testFileId, fsegFragEntryAddr)
 		require.NoError(t, err)
-		require.NoError(t, freeExtentToSpace(mtr, testFileId, h, x))
+		require.NoError(t, touchDestBaseLast(mtr, h.freeFragListBase()))
+		freeExtentToSpace(mtr, testFileId, h, x)
 		commitMtr(t, mtr)
 
 		// THEN
@@ -320,7 +322,7 @@ func TestFreeExtentToSpace(t *testing.T) {
 		h := header{bufPage: headerPage}
 
 		// THEN
-		assert.Panics(t, func() { _ = freeExtentToSpace(mtr, testFileId, h, entry) })
+		assert.Panics(t, func() { freeExtentToSpace(mtr, testFileId, h, entry) })
 		commitMtr(t, mtr)
 	})
 }
@@ -410,4 +412,18 @@ func readListLengths(t *testing.T, bp *buffer.Pool) (uint32, uint32) {
 	freeFragLen, err := flst.Length(mtr, testFileId, h.freeFragListBase())
 	require.NoError(t, err)
 	return freeLen, freeFragLen
+}
+
+// touchDestBaseLast は destBase の旧末尾ノードのページを事前に pin する
+//   - freeExtentToSpace / freeWholeExtent の書き込み前提を満たすため
+func touchDestBaseLast(mtr *buffer.Mtr, destBase flst.Address) error {
+	last, err := flst.Last(mtr, testFileId, destBase)
+	if err != nil {
+		return err
+	}
+	if last.IsInvalid() {
+		return nil
+	}
+	_, err = mtr.PageForWrite(page.NewId(testFileId, last.PageNumber))
+	return err
 }

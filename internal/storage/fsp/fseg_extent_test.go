@@ -29,7 +29,8 @@ func TestAcquireExtent(t *testing.T) {
 		h := header{bufPage: headerPage}
 		entry, err := loadInodeEntryByAddress(mtr, testFileId, entryAddr)
 		require.NoError(t, err)
-		require.NoError(t, acquireExtent(mtr, testFileId, h, entry))
+		_, err = acquireExtent(mtr, testFileId, h, entry)
+		require.NoError(t, err)
 		commitMtr(t, mtr)
 
 		// THEN
@@ -70,7 +71,8 @@ func TestAcquireExtent(t *testing.T) {
 		h := header{bufPage: headerPage}
 		entry, err := loadInodeEntryByAddress(mtr, testFileId, entryAddr)
 		require.NoError(t, err)
-		require.NoError(t, acquireExtent(mtr, testFileId, h, entry))
+		_, err = acquireExtent(mtr, testFileId, h, entry)
+		require.NoError(t, err)
 		commitMtr(t, mtr)
 
 		// THEN
@@ -104,7 +106,8 @@ func TestAcquireExtent(t *testing.T) {
 		h := header{bufPage: headerPage}
 		entry, err := loadInodeEntryByAddress(mtr, testFileId, entryAddr)
 		require.NoError(t, err)
-		require.NoError(t, acquireExtent(mtr, testFileId, h, entry))
+		_, err = acquireExtent(mtr, testFileId, h, entry)
+		require.NoError(t, err)
 		commitMtr(t, mtr)
 
 		// THEN
@@ -134,7 +137,9 @@ func TestFillSegmentFreeList(t *testing.T) {
 		h := header{bufPage: headerPage}
 		entry, err := loadInodeEntryByAddress(mtr, testFileId, entryAddr)
 		require.NoError(t, err)
-		require.NoError(t, fillSegmentFreeList(mtr, testFileId, h, entry))
+		reserved, _, err := segmentReservedPages(mtr, testFileId, entry)
+		require.NoError(t, err)
+		fillSegmentFreeList(mtr, testFileId, h, entry, reserved)
 		commitMtr(t, mtr)
 
 		// THEN
@@ -161,7 +166,9 @@ func TestFillSegmentFreeList(t *testing.T) {
 		h := header{bufPage: headerPage}
 		entry, err := loadInodeEntryByAddress(mtr, testFileId, entryAddr)
 		require.NoError(t, err)
-		require.NoError(t, fillSegmentFreeList(mtr, testFileId, h, entry))
+		reserved, _, err := segmentReservedPages(mtr, testFileId, entry)
+		require.NoError(t, err)
+		fillSegmentFreeList(mtr, testFileId, h, entry, reserved)
 		commitMtr(t, mtr)
 
 		// THEN
@@ -195,11 +202,12 @@ func TestFillSegmentFreeList(t *testing.T) {
 		h := header{bufPage: headerPage}
 		entry, err := loadInodeEntryByAddress(mtr, testFileId, entryAddr)
 		require.NoError(t, err)
-		fillErr := fillSegmentFreeList(mtr, testFileId, h, entry)
+		reserved, _, err := segmentReservedPages(mtr, testFileId, entry)
+		require.NoError(t, err)
+		fillSegmentFreeList(mtr, testFileId, h, entry, reserved)
 		commitMtr(t, mtr)
 
 		// THEN
-		assert.NoError(t, fillErr)
 		readMtr := buffer.NewMtr(bp)
 		defer readMtr.UnpinAll()
 		readEntry, err := loadInodeEntryByAddress(readMtr, testFileId, entryAddr)
