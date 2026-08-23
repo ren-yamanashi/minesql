@@ -69,7 +69,7 @@ func (r *Recovery) Execute() error {
 	if err := r.bufferPool.FlushAllPages(); err != nil {
 		return err
 	}
-	return r.redoLog.Clear()
+	return NewCheckpoint(r.bufferPool, r.redoLog, r.transaction).Execute()
 }
 
 // applyRedoLog は Redo ログを先頭からスキャンし、完全な mini-transaction のページ変更を適用する

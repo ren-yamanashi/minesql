@@ -636,7 +636,6 @@ func setupCreateTableTestEnv(t *testing.T) *createTableTestEnv {
 	if err != nil {
 		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
 	}
-	t.Cleanup(func() { _ = redoLog.Clear() })
 
 	bp := buffer.NewPool(page.Size*50, redoLog, nil)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)

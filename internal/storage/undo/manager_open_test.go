@@ -15,7 +15,7 @@ func TestOpenManagerEmpty(t *testing.T) {
 		mgr := setupTestManager(t)
 
 		// WHEN
-		opened, err := OpenManager(mgr.bufferPool, mgr.fileId)
+		opened, err := OpenManager(mgr.bufferPool, mgr.redoLog, mgr.fileId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -33,7 +33,7 @@ func TestOpenManagerRestoreSingleTrx(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		opened, err := OpenManager(mgr.bufferPool, mgr.fileId)
+		opened, err := OpenManager(mgr.bufferPool, mgr.redoLog, mgr.fileId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -58,7 +58,7 @@ func TestOpenManagerRestoreMultipleTrx(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		opened, err := OpenManager(mgr.bufferPool, mgr.fileId)
+		opened, err := OpenManager(mgr.bufferPool, mgr.redoLog, mgr.fileId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -93,7 +93,7 @@ func TestHistoryTrxIds(t *testing.T) {
 		assert.NoError(t, err)
 		_, err = appendForTest(t, mgr, lock.TrxId(20), RecordTypeUpdate, updateRec)
 		assert.NoError(t, err)
-		opened, err := OpenManager(mgr.bufferPool, mgr.fileId)
+		opened, err := OpenManager(mgr.bufferPool, mgr.redoLog, mgr.fileId)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -109,7 +109,7 @@ func TestHistoryTrxIds(t *testing.T) {
 		insertRec := NewInsertRecord(page.FileId(1), btree.Record{[]byte("Alice")})
 		_, err := appendForTest(t, mgr, lock.TrxId(30), RecordTypeInsert, insertRec)
 		assert.NoError(t, err)
-		opened, err := OpenManager(mgr.bufferPool, mgr.fileId)
+		opened, err := OpenManager(mgr.bufferPool, mgr.redoLog, mgr.fileId)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -133,7 +133,7 @@ func TestHistoryTrxIds(t *testing.T) {
 		assert.NoError(t, err)
 		_, err = appendForTest(t, mgr, lock.TrxId(40), RecordTypeUpdate, updateRec)
 		assert.NoError(t, err)
-		opened, err := OpenManager(mgr.bufferPool, mgr.fileId)
+		opened, err := OpenManager(mgr.bufferPool, mgr.redoLog, mgr.fileId)
 		assert.NoError(t, err)
 
 		// WHEN
@@ -161,7 +161,7 @@ func TestOpenManagerCurrentPageIdIsLastPage(t *testing.T) {
 		assert.NotEqual(t, startPageId, mgr.currentPageId, "事前条件: 新規ページが割り当てられている")
 
 		// WHEN
-		opened, err := OpenManager(mgr.bufferPool, mgr.fileId)
+		opened, err := OpenManager(mgr.bufferPool, mgr.redoLog, mgr.fileId)
 
 		// THEN
 		assert.NoError(t, err)

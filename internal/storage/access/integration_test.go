@@ -480,7 +480,6 @@ func setupIntegrationEnv(t *testing.T) *integrationEnv {
 	if err != nil {
 		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
 	}
-	t.Cleanup(func() { _ = redoLog.Clear() })
 
 	bp := buffer.NewPool(page.Size*50, redoLog, nil)
 	bp.RegisterHeapFile(page.FileId(0), catalogHf)
@@ -837,7 +836,7 @@ func crashAndRecover(t *testing.T, prev *integrationEnv, tableNames []string) *i
 		t.Fatalf("Recovery.Execute に失敗: %v", err)
 	}
 
-	undoMgr, err := undo.OpenManager(bp, undoFileId)
+	undoMgr, err := undo.OpenManager(bp, redoLog, undoFileId)
 	if err != nil {
 		t.Fatalf("undo.Manager の再オープンに失敗: %v", err)
 	}

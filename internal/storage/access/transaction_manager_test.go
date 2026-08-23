@@ -879,7 +879,6 @@ func setupTestRedoLog(t *testing.T) *redo.Buffer {
 	if err != nil {
 		t.Fatalf("redo.Buffer の作成に失敗: %v", err)
 	}
-	t.Cleanup(func() { _ = redoLog.Clear() })
 	return redoLog
 }
 

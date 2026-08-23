@@ -279,20 +279,6 @@ func (f *file) writeTmpFile(tmpPath string, flushedLsn Lsn, records []Record) (r
 	return tmpFile.Sync()
 }
 
-// clear は Redo ログファイルをクリアする
-func (f *file) clear() error {
-	if err := f.osFile.Truncate(0); err != nil {
-		return err
-	}
-	if _, err := f.osFile.Seek(0, io.SeekStart); err != nil {
-		return err
-	}
-	f.flushedLsn = 0
-	f.checkpointLsn = 0
-	f.validEnd = fileHeaderSize
-	return f.writeHeader()
-}
-
 // close は Redo ログファイルを閉じる
 func (f *file) close() error {
 	if f.osFile == nil {

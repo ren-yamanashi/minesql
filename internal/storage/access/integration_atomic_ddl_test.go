@@ -414,7 +414,7 @@ func crashAndRecoverWithPendingFiles(
 		t.Fatalf("undo.DDLManager Commit に失敗: %v", err)
 	}
 
-	undoMgr, err := undo.OpenManager(bp, undoFileId)
+	undoMgr, err := undo.OpenManager(bp, redoLog, undoFileId)
 	if err != nil {
 		t.Fatalf("undo.Manager の再オープンに失敗: %v", err)
 	}

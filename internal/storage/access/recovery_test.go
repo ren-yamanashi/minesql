@@ -12,6 +12,8 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/dictionary"
+	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/flst"
 	"github.com/ren-yamanashi/minesql/internal/storage/fsp"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
@@ -67,9 +69,9 @@ func TestRecoveryNeedsRecovery(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
 		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
-		_, _ = env.redoLog.AppendCommit(lock.TrxId(1)) // LSN=1
+		commitLsn, _ := env.redoLog.AppendCommit(lock.TrxId(1))
 		_ = env.redoLog.Flush()
-		_ = env.redoLog.SetCheckpointLsn(redo.Lsn(1))
+		_ = env.redoLog.SetCheckpointLsn(commitLsn)
 
 		// WHEN
 		needs, err := r.NeedsRecovery()
@@ -156,7 +158,7 @@ func TestRecoveryExecute(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
-	t.Run("Execute 後に Redo ログがクリアされる", func(t *testing.T) {
+	t.Run("Execute 後に再リカバリが不要になる", func(t *testing.T) {
 		// GIVEN
 		env := setupRecoveryTestEnv(t)
 		_, _ = env.redoLog.AppendCommit(lock.TrxId(1))
@@ -195,24 +197,24 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 		env := setupRecoveryTestEnv(t)
 		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
 
-		// ページを取得して、Page LSN に大きな値を書き込む
 		pgId := page.NewId(env.undoFileId, 0)
 		writePage, err := env.bp.Page(pgId)
 		assert.NoError(t, err)
 		originalData := make([]byte, page.Size)
 		copy(originalData, writePage.Data().Bytes())
 
-		// Redo レコードの LSN=1、Page LSN=10 → スキップされるはず
-		writePage.WriteHeaderAt(0, []byte{0, 0, 0, 10})
-
-		// LSN=1 のページ変更レコードを mtr 境界で囲んで Redo ログに記録
+		// レコードの LSN より大きい値を Page LSN にセットしてスキップ条件を成立させる
 		newPageData := make([]byte, page.Size)
 		newPageData[page.HeaderSize] = 0xFF // body の先頭を変える
 		newPage, _ := page.NewPage(newPageData)
 		_, _ = env.redoLog.AppendMtrStart(lock.TrxId(1))
-		_, _ = env.redoLog.AppendPageCopy(lock.TrxId(1), pgId, newPage)
+		recLsn, _ := env.redoLog.AppendPageCopy(lock.TrxId(1), pgId, newPage)
 		_, _ = env.redoLog.AppendMtrEnd(lock.TrxId(1))
 		_ = env.redoLog.Flush()
+
+		var pageLsnHeader [4]byte
+		binary.BigEndian.PutUint32(pageLsnHeader[:], uint32(recLsn)+1)
+		writePage.WriteHeaderAt(0, pageLsnHeader[:])
 
 		records, _ := env.redoLog.ReadFrom(redo.Lsn(0))
 
@@ -456,24 +458,14 @@ func setupRecoveryTestEnv(t *testing.T) *recoveryTestEnv {
 	env := setupTableTestEnv(t)
 	trxManager := NewTrxManager(env.ct, env.undoLog, env.redoLog, env.lock, env.bp, env.trxMgr.ddlManager, 1)
 
-	// DDL 経由で生じたダーティーページと Redo レコードをクリーンな状態にする
-	// (Recovery / Checkpoint テストは「初期状態 = ダーティーページなし・Redo 空」を前提とする)
+	// DDL 経由で生じたダーティーページと未切り詰めの Redo レコードをクリーンな状態にする
+	// (Recovery / Checkpoint テストは「初期状態 = ダーティーページなし・チェックポイント以降に Redo なし」を前提とする)
 	if err := env.bp.FlushAllPages(); err != nil {
 		t.Fatalf("FlushAllPages に失敗: %v", err)
 	}
-	if err := env.redoLog.Clear(); err != nil {
-		t.Fatalf("redoLog.Clear に失敗: %v", err)
+	if err := NewCheckpoint(env.bp, env.redoLog, trxManager).Execute(); err != nil {
+		t.Fatalf("Checkpoint.Execute に失敗: %v", err)
 	}
-
-	// applyRedoLog テストは undo page (FileId 3, PageNumber 0) の Page LSN がリセット済みであることを前提とするため、
-	// DDL でスタンプされた Page LSN を 0 に戻す
-	resetMtr := buffer.NewMtr(env.bp)
-	defer resetMtr.UnpinAll()
-	pg, err := resetMtr.PageForWrite(page.NewId(page.FileId(3), 0))
-	if err != nil {
-		t.Fatalf("undo page の取得に失敗: %v", err)
-	}
-	pg.WriteHeaderAt(0, []byte{0, 0, 0, 0})
 
 	return &recoveryTestEnv{
 		bp:         env.bp,
@@ -887,7 +879,7 @@ func TestRecoveryApplyDDLRollback(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NoError(t, createMtr.Commit())
 		assert.NoError(t, env.bp.FlushAllPages())
-		assert.NoError(t, env.redoLog.Clear())
+		assert.NoError(t, NewCheckpoint(env.bp, env.redoLog, env.trxManager).Execute())
 
 		appendDDLUndoForRecovery(t, env, undo.NewDDLRecord(
 			undo.DDLRecordTypeCreateBTree,
@@ -919,7 +911,7 @@ func TestRecoveryApplyDDLRollback(t *testing.T) {
 		assert.NoError(t, env.trxManager.catalog.TableMeta().Insert(insertMtr, newTable))
 		assert.NoError(t, insertMtr.Commit())
 		assert.NoError(t, env.bp.FlushAllPages())
-		assert.NoError(t, env.redoLog.Clear())
+		assert.NoError(t, NewCheckpoint(env.bp, env.redoLog, env.trxManager).Execute())
 
 		appendDDLUndoForRecovery(t, env,
 			undo.NewDDLRecord(
@@ -1072,4 +1064,289 @@ func assertTableMetaRecordAbsent(t *testing.T, env *recoveryTestEnv, tableName s
 		}
 		assert.NotEqual(t, tableName, record.Name())
 	}
+}
+
+// B+Tree のメタページ内 segment header のオフセット (btree パッケージ内定数と一致させる)
+//   - リーフ segment header: メタページの body 先頭から 24 バイト目
+//   - 非リーフ segment header: メタページの body 先頭から 30 バイト目
+const (
+	btreeMetaLeafSegmentHeaderOffset   uint16 = 24
+	btreeMetaBranchSegmentHeaderOffset uint16 = 30
+)
+
+// readTreeSegmentHeaders は tree のメタページに置かれた 2 本の segment header を読み、
+// それぞれが指す inode エントリのアドレスを返す
+func readTreeSegmentHeaders(t *testing.T, bp *buffer.Pool, metaPageId page.Id) (flst.Address, flst.Address) {
+	t.Helper()
+	mtr := buffer.NewMtr(bp)
+	defer mtr.UnpinAll()
+	leafAt := flst.Address{PageNumber: metaPageId.PageNumber(), Offset: btreeMetaLeafSegmentHeaderOffset}
+	branchAt := flst.Address{PageNumber: metaPageId.PageNumber(), Offset: btreeMetaBranchSegmentHeaderOffset}
+	leafInode, err := fsp.ReadSegmentHeader(mtr, metaPageId.FileId(), leafAt)
+	if err != nil {
+		t.Fatalf("leaf segment header の読み取りに失敗: %v", err)
+	}
+	branchInode, err := fsp.ReadSegmentHeader(mtr, metaPageId.FileId(), branchAt)
+	if err != nil {
+		t.Fatalf("非リーフ segment header の読み取りに失敗: %v", err)
+	}
+	return leafInode, branchInode
+}
+
+// registerPersistentHeapFile は config.BaseDir 配下に fileName の物理ファイルを作り、fileId でバッファプールに登録する
+//   - crash & recover をまたいでも同じパスが残るため、pendingFiles として再オープンできる
+func registerPersistentHeapFile(t *testing.T, bp *buffer.Pool, fileId page.FileId, fileName string) string {
+	t.Helper()
+	if err := os.MkdirAll(config.BaseDir, 0o750); err != nil {
+		t.Fatalf("BaseDir の作成に失敗: %v", err)
+	}
+	path := filepath.Join(config.BaseDir, fileName)
+	hf, err := file.NewHeapFile(path)
+	if err != nil {
+		t.Fatalf("HeapFile の作成に失敗: %v", err)
+	}
+	t.Cleanup(func() { _ = hf.Close() })
+	bp.RegisterHeapFile(fileId, hf)
+	return path
+}
+
+// appendDDLUndoForIntegrationRecovery は integration 環境で DDL Undo 領域に records を積み、Redo に DDLReservedTrxId のレコードを残す
+//   - Recovery.applyDDLRollback を発動させる条件 (= DDLReservedTrxId が active かつ未 completed) を成立させる
+func appendDDLUndoForIntegrationRecovery(t *testing.T, env *integrationEnv, records ...undo.DDLRecord) {
+	t.Helper()
+	for _, rec := range records {
+		mtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+		if err := env.ddlMgr.Append(mtr, rec); err != nil {
+			mtr.UnpinAll()
+			t.Fatalf("DDLManager.Append に失敗: %v", err)
+		}
+		if err := mtr.Commit(); err != nil {
+			t.Fatalf("DDL Undo Commit に失敗: %v", err)
+		}
+	}
+	if err := env.redoLog.Flush(); err != nil {
+		t.Fatalf("redoLog.Flush に失敗: %v", err)
+	}
+}
+
+// createLargeTreeInIsolatedFile は指定 fileId 上に extent 獲得が発生する規模の B+Tree を作る
+//   - 128 frag slot を使い切って extent を専有する規模まで挿入する
+func createLargeTreeInIsolatedFile(t *testing.T, env *integrationEnv, fileId page.FileId, insertCount int) *btree.Tree {
+	t.Helper()
+	initMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+	if err := fsp.InitHeader(initMtr, fileId); err != nil {
+		initMtr.UnpinAll()
+		t.Fatalf("fsp.InitHeader に失敗: %v", err)
+	}
+	if err := initMtr.Commit(); err != nil {
+		t.Fatalf("fsp.InitHeader Commit に失敗: %v", err)
+	}
+	createMtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+	tree, err := btree.CreateTree(env.bp, fileId, createMtr)
+	if err != nil {
+		createMtr.UnpinAll()
+		t.Fatalf("btree.CreateTree に失敗: %v", err)
+	}
+	if err := createMtr.Commit(); err != nil {
+		t.Fatalf("btree.CreateTree Commit に失敗: %v", err)
+	}
+	value := make([]byte, 1500)
+	for i := range value {
+		value[i] = 'p'
+	}
+	for i := range insertCount {
+		mtr := buffer.NewWriteMtr(env.bp, lock.SystemReservedTrxId, env.redoLog)
+		key := []byte{byte(i / 256), byte(i % 256)}
+		if err := tree.Insert(mtr, btree.NewRecord([]byte{}, key, value)); err != nil {
+			mtr.UnpinAll()
+			t.Fatalf("btree.Insert に失敗 (i=%d): %v", i, err)
+		}
+		if err := mtr.Commit(); err != nil {
+			t.Fatalf("btree.Insert Commit に失敗 (i=%d): %v", i, err)
+		}
+	}
+	return tree
+}
+
+func TestRecoveryExecuteRollbacksExtentSizedBTreeCreation(t *testing.T) {
+	t.Run("extent 獲得が発生する規模の B+Tree の CreateBTreeUndo が recovery で完全に取り消される", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		flushBaseline(t, env)
+		targetFileId := page.FileId(99)
+		targetPath := registerPersistentHeapFile(t, env.bp, targetFileId, "extent_rollback.db")
+
+		tree := createLargeTreeInIsolatedFile(t, env, targetFileId, 300)
+		appendDDLUndoForIntegrationRecovery(t, env, undo.NewDDLRecord(
+			undo.DDLRecordTypeCreateBTree,
+			undo.NewCreateBTreeUndoRecord(tree.MetaPageId()).Serialize(),
+		))
+		require.NoError(t, env.redoLog.Flush())
+
+		// WHEN
+		env2 := crashAndRecoverWithPendingFiles(t, env, nil, []pendingTableFile{
+			{fileId: targetFileId, path: targetPath},
+		})
+
+		// THEN
+		used := collectUsedPageNumbers(t, env2.bp, targetFileId)
+		assert.Equal(t, []page.PageNumber{0}, used)
+		assertDDLUndoEmpty(t, env2)
+	})
+}
+
+func TestRecoveryExecuteResumesPartiallyFreedSegmentAndIsIdempotent(t *testing.T) {
+	t.Run("segment 解放途中で crash した状態から recovery が残りを解放し再 recovery でも状態が変わらない", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		flushBaseline(t, env)
+		targetFileId := page.FileId(100)
+		targetPath := registerPersistentHeapFile(t, env.bp, targetFileId, "partial_rollback.db")
+
+		tree := createLargeTreeInIsolatedFile(t, env, targetFileId, 300)
+		appendDDLUndoForIntegrationRecovery(t, env, undo.NewDDLRecord(
+			undo.DDLRecordTypeCreateBTree,
+			undo.NewCreateBTreeUndoRecord(tree.MetaPageId()).Serialize(),
+		))
+
+		const partialSteps = 3
+		for i := 0; i < partialSteps; i++ {
+			stepMtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+			done, err := tree.FreeStep(stepMtr)
+			require.NoError(t, err)
+			require.NoError(t, stepMtr.Commit())
+			require.False(t, done, "%d step 目で完了したため中間状態を作れない", i)
+		}
+		require.NoError(t, env.redoLog.Flush())
+
+		// WHEN
+		env2 := crashAndRecoverWithPendingFiles(t, env, nil, []pendingTableFile{
+			{fileId: targetFileId, path: targetPath},
+		})
+
+		// THEN
+		usedAfterFirst := collectUsedPageNumbers(t, env2.bp, targetFileId)
+		assert.Equal(t, []page.PageNumber{0}, usedAfterFirst)
+		assertDDLUndoEmpty(t, env2)
+
+		env3 := crashAndRecoverWithPendingFiles(t, env2, nil, []pendingTableFile{
+			{fileId: targetFileId, path: targetPath},
+		})
+		usedAfterSecond := collectUsedPageNumbers(t, env3.bp, targetFileId)
+		assert.Equal(t, usedAfterFirst, usedAfterSecond)
+		assertDDLUndoEmpty(t, env3)
+	})
+}
+
+func TestRecoveryExecuteRestoresUndoChainAndAllowsFurtherAppend(t *testing.T) {
+	t.Run("undo チェーンのページ拡張後の crash → recovery で全レコードが復元され追加 append で再拡張できる", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		_ = createUsersTable(t, env)
+		flushBaseline(t, env)
+
+		largeValue := make([]byte, 3000)
+		for i := range largeValue {
+			largeValue[i] = 'x'
+		}
+		trxId := lock.TrxId(500)
+		const initialAppendCount = 5
+		for i := 0; i < initialAppendCount; i++ {
+			rec := undo.NewInsertRecord(page.FileId(1), btree.Record{[]byte("k"), largeValue})
+			_, err := env.undoLog.Append(trxId, undo.RecordTypeInsert, rec)
+			require.NoError(t, err)
+		}
+		_, err := env.redoLog.AppendCommit(trxId)
+		require.NoError(t, err)
+		require.NoError(t, env.redoLog.Flush())
+
+		// WHEN
+		env2 := crashAndRecover(t, env, []string{"users"})
+
+		// THEN
+		restored := env2.undoLog.Records(trxId)
+		assert.Len(t, restored, initialAppendCount)
+
+		// recovery 後の Append は新しい trxId で行い、その trxId を COMMIT する
+		// (recovery 完了時のチェックポイントで redo が切り詰められるため、旧 trxId の COMMIT 履歴は次セッションへ持ち越されない)
+		newTrxId := lock.TrxId(501)
+		const additionalAppendCount = 5
+		for i := 0; i < additionalAppendCount; i++ {
+			rec := undo.NewInsertRecord(page.FileId(1), btree.Record{[]byte("k"), largeValue})
+			_, err := env2.undoLog.Append(newTrxId, undo.RecordTypeInsert, rec)
+			require.NoError(t, err)
+		}
+		after := env2.undoLog.Records(newTrxId)
+		assert.Len(t, after, additionalAppendCount)
+
+		_, err = env2.redoLog.AppendCommit(newTrxId)
+		require.NoError(t, err)
+		require.NoError(t, env2.redoLog.Flush())
+
+		env3 := crashAndRecover(t, env2, []string{"users"})
+
+		restoredOld := env3.undoLog.Records(trxId)
+		assert.Len(t, restoredOld, initialAppendCount)
+		restoredNew := env3.undoLog.Records(newTrxId)
+		assert.Len(t, restoredNew, additionalAppendCount)
+	})
+}
+
+func TestRecoveryExecuteRestoresSegmentStateAndContinuesTreeGrowth(t *testing.T) {
+	t.Run("SMO を伴う挿入後の crash → recovery で segment 状態が復元され追加 SMO と全キー検索が動く", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		table := createUsersTable(t, env)
+		flushBaseline(t, env)
+
+		longSuffix := strings.Repeat("v", 1500)
+		trx1 := env.trxMgr.Begin()
+		for i := 1; i <= 50; i++ {
+			require.NoError(t, table.Insert(
+				trx1,
+				[]string{"id", "name", "email"},
+				[]string{fmt.Sprintf("%04d", i), fmt.Sprintf("user%d", i), fmt.Sprintf("%d-%s@example.com", i, longSuffix)},
+			))
+		}
+		require.NoError(t, env.trxMgr.Commit(trx1))
+		require.NoError(t, env.redoLog.Flush())
+
+		metaPageId := table.primaryIndex.tree.MetaPageId()
+		leafInodeBefore, branchInodeBefore := readTreeSegmentHeaders(t, env.bp, metaPageId)
+
+		// WHEN
+		env2 := crashAndRecover(t, env, []string{"users"})
+
+		// THEN
+		leafInodeAfter, branchInodeAfter := readTreeSegmentHeaders(t, env2.bp, metaPageId)
+		assert.Equal(t, leafInodeBefore, leafInodeAfter)
+		assert.Equal(t, branchInodeBefore, branchInodeAfter)
+
+		table2, err := NewTable(env2.bp, env2.ct, env2.undoLog, env2.lockMgr, env2.redoLog, "users")
+		require.NoError(t, err)
+		trx2 := env2.trxMgr.Begin()
+		for i := 51; i <= 100; i++ {
+			require.NoError(t, table2.Insert(
+				trx2,
+				[]string{"id", "name", "email"},
+				[]string{fmt.Sprintf("%04d", i), fmt.Sprintf("user%d", i), fmt.Sprintf("%d-%s@example.com", i, longSuffix)},
+			))
+		}
+		require.NoError(t, env2.trxMgr.Commit(trx2))
+
+		scanMtr := buffer.NewMtr(env2.bp)
+		defer scanMtr.UnpinAll()
+		iter, err := table2.primaryIndex.search(scanMtr, SearchModeStart{}, nil)
+		require.NoError(t, err)
+		count := 0
+		for {
+			_, ok, err := iter.Next()
+			require.NoError(t, err)
+			if !ok {
+				break
+			}
+			count++
+		}
+		assert.Equal(t, 100, count)
+	})
 }

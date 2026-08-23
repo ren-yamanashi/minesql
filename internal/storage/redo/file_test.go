@@ -371,60 +371,6 @@ func TestFileTruncateBefore(t *testing.T) {
 	})
 }
 
-func TestFileClear(t *testing.T) {
-	t.Run("クリア後にレコードが空になる", func(t *testing.T) {
-		// GIVEN
-		f := setupTestFile(t)
-		records := []Record{
-			{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit},
-		}
-		_ = f.flushRecords(records)
-
-		// WHEN
-		err := f.clear()
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, Lsn(0), f.flushedLsn)
-		assert.Equal(t, Lsn(0), f.checkpointLsn)
-
-		result, err := f.readRecords(Lsn(0))
-		assert.NoError(t, err)
-		assert.Empty(t, result)
-	})
-
-	t.Run("checkpointLsn が設定されている状態からクリアすると 0 に戻る", func(t *testing.T) {
-		// GIVEN
-		f := setupTestFile(t)
-		_ = f.setCheckpointLsn(Lsn(20))
-		records := []Record{{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit}}
-		_ = f.flushRecords(records)
-
-		// WHEN
-		err := f.clear()
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, Lsn(0), f.flushedLsn)
-		assert.Equal(t, Lsn(0), f.checkpointLsn)
-	})
-
-	t.Run("クリア後にファイルサイズがヘッダーサイズになる", func(t *testing.T) {
-		// GIVEN
-		f := setupTestFile(t)
-		records := []Record{{lsn: Lsn(1), trxId: 1, recordType: RecordTypeCommit}}
-		_ = f.flushRecords(records)
-
-		// WHEN
-		_ = f.clear()
-
-		// THEN
-		size, err := f.size()
-		assert.NoError(t, err)
-		assert.Equal(t, int64(fileHeaderSize), size)
-	})
-}
-
 func TestFileClose(t *testing.T) {
 	t.Run("ファイルを閉じることができる", func(t *testing.T) {
 		// GIVEN

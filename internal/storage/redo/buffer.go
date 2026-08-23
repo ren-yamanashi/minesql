@@ -139,19 +139,6 @@ func (b *Buffer) Flush() error {
 	return b.flush()
 }
 
-// Clear は Redo ログをクリアする
-func (b *Buffer) Clear() error {
-	b.mutex.Lock()
-	defer b.mutex.Unlock()
-	if err := b.logFile.clear(); err != nil {
-		return err
-	}
-	b.records = nil
-	b.pendingSize = 0
-	b.nextLsn = 1
-	return nil
-}
-
 // Close はバッファが保持するファイルリソースを解放する
 func (b *Buffer) Close() error {
 	b.mutex.Lock()

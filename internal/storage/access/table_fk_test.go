@@ -306,7 +306,6 @@ func setupFKTestEnv(t *testing.T) *fkTestEnv {
 	if err := undoMtr.Commit(); err != nil {
 		t.Fatalf("undo.Manager Commit に失敗: %v", err)
 	}
-	t.Cleanup(func() { _ = redoLog.Clear() })
 
 	ddlMtr := newBootstrapMtr(bp, redoLog)
 	ddlMgr, err := undo.NewDDLManager(ddlMtr, dictionary.CatalogFileId, ct.DDLUndoRootPageId())

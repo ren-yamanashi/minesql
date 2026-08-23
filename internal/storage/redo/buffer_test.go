@@ -432,68 +432,6 @@ func TestBufferFlush(t *testing.T) {
 	})
 }
 
-func TestBufferClear(t *testing.T) {
-	t.Run("クリア後にレコードが空になる", func(t *testing.T) {
-		// GIVEN
-		buf := setupTestBuffer(t)
-		_, _ = buf.AppendCommit(lock.TrxId(1))
-		_ = buf.Flush()
-
-		// WHEN
-		err := buf.Clear()
-
-		// THEN
-		assert.NoError(t, err)
-		records, err := buf.ReadFrom(Lsn(0))
-		assert.NoError(t, err)
-		assert.Empty(t, records)
-	})
-
-	t.Run("クリア後に FlushedLsn が 0 になる", func(t *testing.T) {
-		// GIVEN
-		buf := setupTestBuffer(t)
-		_, _ = buf.AppendCommit(lock.TrxId(1))
-		_ = buf.Flush()
-
-		// WHEN
-		_ = buf.Clear()
-
-		// THEN
-		assert.Equal(t, Lsn(0), buf.FlushedLsn())
-	})
-
-	t.Run("未フラッシュレコードがある状態でクリアするとバッファもリセットされる", func(t *testing.T) {
-		// GIVEN
-		buf := setupTestBuffer(t)
-		_, _ = buf.AppendCommit(lock.TrxId(1)) // フラッシュせずバッファに残す
-		_, _ = buf.AppendCommit(lock.TrxId(2))
-
-		// WHEN
-		err := buf.Clear()
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Empty(t, buf.records)
-		assert.Equal(t, 0, buf.pendingSize)
-	})
-
-	t.Run("クリア後の LSN は 1 から再採番される", func(t *testing.T) {
-		// GIVEN
-		buf := setupTestBuffer(t)
-		_, _ = buf.AppendCommit(lock.TrxId(1)) // LSN=1
-		_, _ = buf.AppendCommit(lock.TrxId(2)) // LSN=2
-		_ = buf.Flush()
-		_ = buf.Clear()
-
-		// WHEN
-		lsn, err := buf.AppendCommit(lock.TrxId(3))
-
-		// THEN
-		assert.NoError(t, err)
-		assert.Equal(t, Lsn(1), lsn)
-	})
-}
-
 func TestBufferClose(t *testing.T) {
 	t.Run("Close 後にファイルが閉じられる", func(t *testing.T) {
 		// GIVEN
@@ -544,6 +482,24 @@ func TestBufferTruncateBefore(t *testing.T) {
 		records, err := buf.ReadFrom(Lsn(0))
 		assert.NoError(t, err)
 		assert.Empty(t, records)
+	})
+
+	t.Run("全レコード削除後も FlushedLsn は保持され次の採番は継続する", func(t *testing.T) {
+		// GIVEN
+		buf := setupTestBuffer(t)
+		_, _ = buf.AppendCommit(lock.TrxId(1)) // LSN=1
+		_, _ = buf.AppendCommit(lock.TrxId(2)) // LSN=2
+		_ = buf.Flush()
+
+		// WHEN
+		err := buf.TruncateBefore(Lsn(2))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, Lsn(2), buf.FlushedLsn())
+		nextLsn, err := buf.AppendCommit(lock.TrxId(3))
+		assert.NoError(t, err)
+		assert.Equal(t, Lsn(3), nextLsn)
 	})
 }
 

@@ -4,15 +4,18 @@ import (
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
 
 // OpenManager は既存の Undo ファイルを開き、各 Undo ページを走査して entries と currentPageId を復元する
 //   - 起動時のクラッシュリカバリ完了後に呼び出して、ディスク上の Undo レコードからメモリ状態を復元する用途
+//   - redoLog: 再構築後の Undo 書き込みを記録する Redo ログ参照
 //   - 各 Undo ページの先頭から順にレコードを読み、trxId 単位で entries に積み直す
 //   - NextPageNumber を辿った先頭ページから末尾ページまで走査し、末尾ページを currentPageId に設定する
-func OpenManager(bp *buffer.Pool, fileId page.FileId) (*Manager, error) {
+func OpenManager(bp *buffer.Pool, redoLog *redo.Buffer, fileId page.FileId) (*Manager, error) {
 	m := &Manager{
 		bufferPool: bp,
+		redoLog:    redoLog,
 		fileId:     fileId,
 		entries:    make(map[lock.TrxId][]Entry),
 	}
