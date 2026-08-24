@@ -166,6 +166,62 @@ func TestIntegrationAtomicDDLDoubleCrashRecoveryIsIdempotent(t *testing.T) {
 	})
 }
 
+func TestIntegrationAtomicDDLCrashWithOrphanUndo(t *testing.T) {
+	t.Run("undo 先行順序化の効果: メタ Insert 前に undo だけ書かれた状態でクラッシュしても孤児メタが残らない", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		flushBaseline(t, env)
+		colNames := []string{"id", "name", "email"}
+		fileId, tablePath, _ := createTableUntilPartialMeta(t, env, "users", 1, colNames, len(colNames))
+		orphanIndexId := allocateIndexIdInIsolatedMtr(t, env)
+		orphanIndexRecord := dictionary.NewIndexMetaRecord(
+			fileId,
+			orphanIndexId,
+			"idx_orphan",
+			dictionary.IndexTypeNonUnique,
+			1,
+			page.NewId(fileId, 0),
+		)
+		appendMetaInsertUndoInIsolatedMtr(t, env, undo.MetaTableTypeIndex, orphanIndexRecord.Encode().Key())
+		assert.NoError(t, env.redoLog.Flush())
+
+		// WHEN
+		env2 := crashAndRecoverWithPendingFiles(t, env, nil, []pendingTableFile{
+			{fileId: fileId, path: tablePath},
+		})
+
+		// THEN
+		_, statErr := os.Stat(tablePath)
+		assert.True(t, os.IsNotExist(statErr))
+		assertTableMetaAbsent(t, env2, "users")
+		assertIndexMetaAbsentForFile(t, env2, fileId)
+		assertColumnMetaAbsentForFile(t, env2, fileId)
+		assertDDLUndoEmpty(t, env2)
+	})
+}
+
+// appendMetaInsertUndoInIsolatedMtr は MetaInsertUndo を単独 mtr で Append・Commit する
+//   - 対応する Meta Insert は行わないため、 「undo だけ書かれた不整合状態」 を作れる
+func appendMetaInsertUndoInIsolatedMtr(
+	t *testing.T,
+	env *integrationEnv,
+	metaTableType undo.MetaTableType,
+	key []byte,
+) {
+	t.Helper()
+	mtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
+	record := undo.NewDDLRecord(
+		undo.DDLRecordTypeMetaInsert,
+		undo.NewMetaInsertUndoRecord(metaTableType, key).Serialize(),
+	)
+	if err := env.trxMgr.ddlManager.Append(mtr, record); err != nil {
+		t.Fatalf("DDLManager.Append に失敗: %v", err)
+	}
+	if err := mtr.Commit(); err != nil {
+		t.Fatalf("Commit に失敗: %v", err)
+	}
+}
+
 // pendingTableFile は CreateTable 途中で確保したテーブルファイルを表す
 //   - 「TableMeta に登録されていないが DDL Undo に AllocateFileIdUndo が残っている」状態の FileId とパスを保持し、
 //     再起動時の BufferPool に HeapFile を再 Register するために使う
@@ -433,10 +489,10 @@ func assertDDLUndoEmpty(t *testing.T, env *integrationEnv) {
 func assertNextFileIdGreaterThan(t *testing.T, env *integrationEnv, fileIdBefore page.FileId) {
 	t.Helper()
 	mtr := buffer.NewWriteMtr(env.bp, lock.DDLReservedTrxId, env.redoLog)
-	defer mtr.UnpinAll()
 	nextFileId, err := env.ct.AllocateFileId(mtr)
 	assert.NoError(t, err)
 	assert.Greater(t, nextFileId, fileIdBefore)
+	assert.NoError(t, mtr.Commit())
 }
 
 func assertTableMetaAbsent(t *testing.T, env *integrationEnv, name string) {

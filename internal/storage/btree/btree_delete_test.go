@@ -306,7 +306,6 @@ func TestDeleteFreshMtr(t *testing.T) {
 		require.NoError(t, insertMtr.Commit())
 
 		deleteMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
-		defer deleteMtr.UnpinAll()
 		countBefore, err := bt.LeafPageCount(deleteMtr)
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), countBefore)
@@ -319,6 +318,7 @@ func TestDeleteFreshMtr(t *testing.T) {
 		countAfter, err := bt.LeafPageCount(deleteMtr)
 		require.NoError(t, err)
 		assert.Equal(t, countBefore-1, countAfter)
+		require.NoError(t, deleteMtr.Commit())
 	})
 
 	t.Run("Insert とは別の mtr で Delete してルート縮退が起きても panic しない", func(t *testing.T) {
@@ -333,7 +333,6 @@ func TestDeleteFreshMtr(t *testing.T) {
 		require.NoError(t, insertMtr.Commit())
 
 		deleteMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
-		defer deleteMtr.UnpinAll()
 		heightBefore, err := bt.Height(deleteMtr)
 		require.NoError(t, err)
 		assert.Equal(t, uint64(2), heightBefore)
@@ -346,6 +345,7 @@ func TestDeleteFreshMtr(t *testing.T) {
 		heightAfter, err := bt.Height(deleteMtr)
 		require.NoError(t, err)
 		assert.Equal(t, heightBefore-1, heightAfter)
+		require.NoError(t, deleteMtr.Commit())
 	})
 
 	t.Run("ルート縮退後に旧 root が free になり後続の AllocatePage で再利用される", func(t *testing.T) {

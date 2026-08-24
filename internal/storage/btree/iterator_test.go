@@ -380,7 +380,6 @@ func TestIteratorConcurrentMerge(t *testing.T) {
 		require.NoError(t, insertMtr.Commit())
 
 		iterMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
-		defer iterMtr.UnpinAll()
 		iter, err := bt.Search(iterMtr, SearchModeStart{})
 		require.NoError(t, err)
 
@@ -403,6 +402,7 @@ func TestIteratorConcurrentMerge(t *testing.T) {
 			readKeys = append(readKeys, r.Key()[0])
 		}
 		assert.Equal(t, []byte{0x02, 0x03, 0x04}, readKeys)
+		require.NoError(t, iterMtr.Commit())
 	})
 
 	t.Run("merge で解放されたページが再割り当てされ中身が変わっても refetch が正しく再位置付けする", func(t *testing.T) {
@@ -418,7 +418,6 @@ func TestIteratorConcurrentMerge(t *testing.T) {
 		require.NoError(t, insertMtr.Commit())
 
 		iterMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
-		defer iterMtr.UnpinAll()
 		iter, err := bt.Search(iterMtr, SearchModeStart{})
 		require.NoError(t, err)
 
@@ -442,6 +441,7 @@ func TestIteratorConcurrentMerge(t *testing.T) {
 			readKeys = append(readKeys, r.Key()[0])
 		}
 		assert.Equal(t, []byte{0x02, 0x03, 0x04, 0x99}, readKeys)
+		require.NoError(t, iterMtr.Commit())
 	})
 
 	t.Run("走査中の leaf 自体が merge で survivor に吸収されても refetch が survivor 上のレコードへ再位置付けする", func(t *testing.T) {
@@ -457,7 +457,6 @@ func TestIteratorConcurrentMerge(t *testing.T) {
 		require.NoError(t, insertMtr.Commit())
 
 		iterMtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
-		defer iterMtr.UnpinAll()
 		iter, err := bt.Search(iterMtr, SearchModeKey{Key: []byte{0x02}})
 		require.NoError(t, err)
 
@@ -487,5 +486,6 @@ func TestIteratorConcurrentMerge(t *testing.T) {
 		}
 		assert.Empty(t, readKeys)
 		assert.NotEqual(t, iterLeafPageIdBefore, iter.BufferPageId())
+		require.NoError(t, iterMtr.Commit())
 	})
 }

@@ -146,7 +146,7 @@ func TestEnsureFreeInodePage(t *testing.T) {
 		headerPage, err := mtr.PageForWrite(page.NewId(testFileId, 0))
 		require.NoError(t, err)
 		ensureErr := ensureFreeInodePage(mtr, testFileId, header{bufPage: headerPage})
-		mtr.UnpinAll()
+		require.NoError(t, mtr.Commit())
 
 		// THEN
 		require.Error(t, ensureErr)

@@ -147,13 +147,19 @@ func (m *Mtr) assertReleasable(entry pinnedEntry) {
 }
 
 // UnpinAll はスコープに記録された全ての Pin とラッチを解放する
-//   - 各ページはラッチ解放前に、変更済みであれば Redo へ記録し Page LSN をスタンプする
-//   - MtrEnd は書かないため、記録途中の Mtr はクラッシュリカバリ時に破棄される
+//   - 書き込み mini-transaction (redo 付き) が変更ページを保持したまま呼ぶと panic する (変更を持つ場合は Commit すること)
 //   - 解放後に PageForRead / PageForWrite を呼ぶと panic する
 func (m *Mtr) UnpinAll() {
-	// LIFO 順で記録・解放することで、実体ラッチを持つエントリ (最初に取得された) が最後に解放される
-	for i := len(m.pinned) - 1; i >= 0; i-- {
-		m.logPageIfModified(m.pinned[i])
+	if m.redo != nil {
+		for i := len(m.pinned) - 1; i >= 0; i-- {
+			entry := m.pinned[i]
+			if entry.skipLatch || entry.mode != LatchExclusive {
+				continue
+			}
+			if entry.bufPage.modifyCount != entry.modifyCount {
+				panic(fmt.Sprintf("buffer: discarding mtr with modified page (pageId=%v); modified mtr must be committed", entry.pageId))
+			}
+		}
 	}
 	m.releaseAll()
 	m.released = true

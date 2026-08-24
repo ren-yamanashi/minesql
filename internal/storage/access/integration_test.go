@@ -450,6 +450,48 @@ func TestIntegrationCrashRecoveryAfterRollback(t *testing.T) {
 	})
 }
 
+func TestIntegrationCrashRecoveryAfterStatementRollback(t *testing.T) {
+	t.Run("Unique セカンダリの dup key で文レベル rollback した後クラッシュしてもプライマリ・セカンダリが整合する", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		table := createUsersTableWithUniqueEmail(t, env)
+		flushBaseline(t, env)
+
+		trx := env.trxMgr.Begin()
+		assert.NoError(t, table.Insert(
+			trx,
+			[]string{"id", "name", "email"},
+			[]string{"1", "Alice", "a@example.com"},
+		))
+		savepoint := trx.Savepoint()
+		dupErr := table.Insert(
+			trx,
+			[]string{"id", "name", "email"},
+			[]string{"2", "Bob", "a@example.com"},
+		)
+		assert.ErrorIs(t, dupErr, btree.ErrDuplicateKey)
+		assert.NoError(t, env.trxMgr.RollbackToSavepoint(trx, savepoint))
+		assert.NoError(t, env.trxMgr.Commit(trx))
+		assert.NoError(t, env.redoLog.Flush())
+
+		// WHEN
+		env2 := crashAndRecover(t, env, []string{"users"})
+		r := NewRecovery(env2.redoLog, env2.bp, env2.trxMgr, env2.ct.UndoLogFileId(), env2.ddlMgr)
+		assert.NoError(t, r.Execute())
+
+		// THEN
+		table2, err := NewTable(env2.bp, env2.ct, env2.undoLog, env2.lockMgr, env2.redoLog, "users")
+		assert.NoError(t, err)
+		primaryKeys := collectPrimaryKeys(t, table2)
+		assert.Equal(t, []string{"1"}, primaryKeys)
+
+		idxName := findSecondaryIndex(t, table2, "idx_name")
+		assert.Equal(t, [][2]string{{"Alice", "1"}}, collectSecondaryEntries(t, env2, idxName))
+		idxEmail := findSecondaryIndex(t, table2, "idx_email")
+		assert.Equal(t, [][2]string{{"a@example.com", "1"}}, collectSecondaryEntries(t, env2, idxEmail))
+	})
+}
+
 // integrationEnv は統合テスト用の環境
 type integrationEnv struct {
 	bp      *buffer.Pool
@@ -742,6 +784,68 @@ func createUsersTable(t *testing.T, env *integrationEnv) *Table {
 		t.Fatalf("users テーブルの作成に失敗: %v", err)
 	}
 	return table
+}
+
+// createUsersTableWithUniqueEmail は idx_email を Unique として持つ統合テスト用の users テーブルを作成する
+func createUsersTableWithUniqueEmail(t *testing.T, env *integrationEnv) *Table {
+	t.Helper()
+	table, err := CreateTable(env.trxMgr, CreateTableInput{
+		TableName: "users",
+		ColNames:  []string{"id", "name", "email"},
+		PkCount:   1,
+		Indexes: []CreateIndexInput{
+			{IndexName: "idx_name", ColNames: []string{"name"}, IndexType: dictionary.IndexTypeNonUnique},
+			{IndexName: "idx_email", ColNames: []string{"email"}, IndexType: dictionary.IndexTypeUnique},
+		},
+	})
+	if err != nil {
+		t.Fatalf("users テーブルの作成に失敗: %v", err)
+	}
+	return table
+}
+
+// collectPrimaryKeys はテーブルの全プライマリレコードから id カラム (先頭カラム) の値を集める
+func collectPrimaryKeys(t *testing.T, table *Table) []string {
+	t.Helper()
+	mtr := buffer.NewMtr(table.bufferPool)
+	defer mtr.UnpinAll()
+	iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+	if err != nil {
+		t.Fatalf("primaryIndex.search に失敗: %v", err)
+	}
+	var keys []string
+	for {
+		rec, ok, err := iter.Next()
+		if err != nil {
+			t.Fatalf("iter.Next に失敗: %v", err)
+		}
+		if !ok {
+			return keys
+		}
+		keys = append(keys, rec.values[0])
+	}
+}
+
+// collectSecondaryEntries は指定セカンダリインデックスの全エントリを (sk, pk) ペアの列で返す
+func collectSecondaryEntries(t *testing.T, env *integrationEnv, idx *secondaryIndex) [][2]string {
+	t.Helper()
+	mtr := buffer.NewMtr(env.bp)
+	defer mtr.UnpinAll()
+	iter, err := idx.search(mtr, SearchModeStart{}, nil)
+	if err != nil {
+		t.Fatalf("secondaryIndex.search に失敗: %v", err)
+	}
+	var entries [][2]string
+	for {
+		rec, ok, err := iter.NextIndexOnly()
+		if err != nil {
+			t.Fatalf("iter.NextIndexOnly に失敗: %v", err)
+		}
+		if !ok {
+			return entries
+		}
+		entries = append(entries, [2]string{rec.values[0], rec.pk[0]})
+	}
 }
 
 // crashAndRecover はインメモリ状態 (バッファプール / トランザクションマネージャ / ロックマネージャ /

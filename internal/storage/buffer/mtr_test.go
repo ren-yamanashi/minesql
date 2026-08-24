@@ -422,6 +422,56 @@ func TestMtrUnpinAll(t *testing.T) {
 		assert.Equal(t, 0, l1.sharedCnt)
 		assert.False(t, l2.xHeld)
 	})
+
+	t.Run("書き込み Mtr が変更ページを保持したまま呼ぶと panic する", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
+		pageId := page.NewId(0, 0)
+		_, err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+		mtr := NewWriteMtr(bp, 1, newTestRedoLog(t))
+		bufPage, err := mtr.PageForWrite(pageId)
+		assert.NoError(t, err)
+		bufPage.WriteBodyAt(0, []byte{0xAB})
+
+		// THEN
+		assert.Panics(t, func() { mtr.UnpinAll() })
+	})
+
+	t.Run("書き込み Mtr でも変更がなければ panic せず解放する", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
+		pageId := page.NewId(0, 0)
+		_, err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+		mtr := NewWriteMtr(bp, 1, newTestRedoLog(t))
+		_, err = mtr.PageForWrite(pageId)
+		assert.NoError(t, err)
+
+		// WHEN
+		assert.NotPanics(t, func() { mtr.UnpinAll() })
+
+		// THEN
+		assert.Equal(t, 0, pinCountOf(bp, pageId))
+		assert.Equal(t, 0, mtr.PinnedCount())
+	})
+
+	t.Run("Commit 後の呼び出しは何もしない", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
+		pageId := page.NewId(0, 0)
+		_, err := bp.AddPage(pageId)
+		assert.NoError(t, err)
+		mtr := NewWriteMtr(bp, 1, newTestRedoLog(t))
+		bufPage, err := mtr.PageForWrite(pageId)
+		assert.NoError(t, err)
+		bufPage.WriteBodyAt(0, []byte{0xCD})
+		assert.NoError(t, mtr.Commit())
+
+		// THEN
+		assert.NotPanics(t, func() { mtr.UnpinAll() })
+		assert.Equal(t, 0, pinCountOf(bp, pageId))
+	})
 }
 
 func TestMtrLockShared(t *testing.T) {

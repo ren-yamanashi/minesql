@@ -18,20 +18,20 @@ func TestReservePages(t *testing.T) {
 
 		// WHEN
 		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
-		defer mtr.UnpinAll()
 		reserved, err := bt.reservePages(mtr, 3)
 
 		// THEN
 		require.NoError(t, err)
 		assert.Equal(t, 1, len(reserved.leaf))
 		assert.Equal(t, 3, len(reserved.branch))
+		bt.releaseUnused(mtr, reserved)
+		require.NoError(t, mtr.Commit())
 	})
 
 	t.Run("takeLeaf / takeBranch は取り出したページを返す", func(t *testing.T) {
 		// GIVEN
 		bt, bp := setupBtreeForTest(t)
 		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
-		defer mtr.UnpinAll()
 		reserved, err := bt.reservePages(mtr, 2)
 		require.NoError(t, err)
 
@@ -46,6 +46,7 @@ func TestReservePages(t *testing.T) {
 		assert.False(t, branchId2.IsInvalid())
 		assert.Equal(t, 0, len(reserved.leaf))
 		assert.Equal(t, 0, len(reserved.branch))
+		require.NoError(t, mtr.Commit())
 	})
 
 	t.Run("takeLeaf は空の場合 panic する", func(t *testing.T) {
@@ -68,7 +69,6 @@ func TestReservePages(t *testing.T) {
 		// GIVEN
 		bt, bp := setupBtreeForTest(t)
 		mtr := buffer.NewWriteMtr(bp, lock.SystemReservedTrxId, newTestRedoBuffer(t))
-		defer mtr.UnpinAll()
 		reserved, err := bt.reservePages(mtr, 2)
 		require.NoError(t, err)
 		leafId := reserved.takeLeaf()
@@ -84,6 +84,7 @@ func TestReservePages(t *testing.T) {
 			require.NoError(t, err)
 			assert.True(t, isFree, "reserved branch page should be free after releaseUnused: %v", id)
 		}
+		require.NoError(t, mtr.Commit())
 	})
 
 	t.Run("悲観挿入で 1 リーフ分割した場合は未使用の branch ページが返却され LeafPageCount は 1 だけ増える", func(t *testing.T) {

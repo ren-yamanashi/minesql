@@ -322,7 +322,7 @@ func TestRegisterTableMeta(t *testing.T) {
 		// WHEN
 		secondMtr := ddlTrx.NewMtr()
 		err = registerTableMeta(ddlTrx, secondMtr, env.fileId, pi, input)
-		secondMtr.UnpinAll()
+		assert.NoError(t, secondMtr.Commit())
 
 		// THEN
 		assert.Error(t, err)
