@@ -7,10 +7,15 @@ import (
 )
 
 // Insert はテーブルに行を挿入する
-func (t *Table) Insert(trx *Transaction, colNames []string, values []string) error {
+//   - エラー時も mini-transaction は commit される。部分的な書き込み効果は呼び出し側が文レベル rollback で取り消すこと
+func (t *Table) Insert(trx *Transaction, colNames []string, values []string) (retErr error) {
 	trxId := trx.trxId
 	mtr := buffer.NewWriteMtr(t.bufferPool, trxId, t.redoLog)
-	defer mtr.UnpinAll()
+	defer func() {
+		if commitErr := mtr.Commit(); commitErr != nil && retErr == nil {
+			retErr = commitErr
+		}
+	}()
 
 	// FK チェック (親レコードに共有ロックを取得する。挿入キーへの排他ロックより前に行うため順序は親 S → 子 X)
 	if err := t.checkForeignKeysForInsert(trx, colNames, values); err != nil {
@@ -41,10 +46,7 @@ func (t *Table) Insert(trx *Transaction, colNames []string, values []string) err
 	if err := t.primaryIndex.insert(mtr, record, trxId); err != nil {
 		return err
 	}
-	if err := t.insertSecondaryIndexes(mtr, record.colNames, record.values, trxId); err != nil {
-		return err
-	}
-	return mtr.Commit()
+	return t.insertSecondaryIndexes(mtr, record.colNames, record.values, trxId)
 }
 
 // insertSecondaryIndexes は全セカンダリインデックスにレコードを挿入する

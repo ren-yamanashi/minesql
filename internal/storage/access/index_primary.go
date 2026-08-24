@@ -42,27 +42,26 @@ func newPrimaryIndex(
 
 // createPrimaryIndex は空のプライマリインデックスを作成する
 //   - B+Tree 作成と CreateBTreeUndo 書き込みを同一 mtr で原子的に行う
+//   - エラー時も mtr は commit される (既に書き込まれた分は DDL Undo 経由で取り消す)
 func createPrimaryIndex(
 	ddlTrx *Transaction,
 	fileId page.FileId,
 	pkCount int,
 ) (*primaryIndex, error) {
 	mtr := ddlTrx.NewMtr()
-	tree, err := btree.CreateTree(ddlTrx.bufferPool, fileId, mtr)
-	if err != nil {
-		mtr.UnpinAll()
-		return nil, err
+	tree, createErr := btree.CreateTree(ddlTrx.bufferPool, fileId, mtr)
+	if createErr == nil {
+		undoRecord := undo.NewDDLRecord(
+			undo.DDLRecordTypeCreateBTree,
+			undo.NewCreateBTreeUndoRecord(tree.MetaPageId()).Serialize(),
+		)
+		createErr = ddlTrx.DDLManager().Append(mtr, undoRecord)
 	}
-	undoRecord := undo.NewDDLRecord(
-		undo.DDLRecordTypeCreateBTree,
-		undo.NewCreateBTreeUndoRecord(tree.MetaPageId()).Serialize(),
-	)
-	if err := ddlTrx.DDLManager().Append(mtr, undoRecord); err != nil {
-		mtr.UnpinAll()
-		return nil, err
+	if commitErr := mtr.Commit(); commitErr != nil && createErr == nil {
+		createErr = commitErr
 	}
-	if err := mtr.Commit(); err != nil {
-		return nil, err
+	if createErr != nil {
+		return nil, createErr
 	}
 	return &primaryIndex{
 		catalog:    ddlTrx.catalog,

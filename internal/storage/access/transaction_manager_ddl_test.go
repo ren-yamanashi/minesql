@@ -85,6 +85,22 @@ func TestTrxManagerCommitDDL(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, trxStateInactive, ddlTrx.state)
 	})
+
+	t.Run("Clear が失敗しても状態は Inactive に遷移し error を返す", func(t *testing.T) {
+		// GIVEN: DDL Undo コンテナの chain 末尾ページ ID を存在しない値で拡張し、 Clear の collectChainPageIds で読み取り失敗を起こす
+		env := setupTableTestEnv(t)
+		redoLog := setupTestRedoLog(t)
+		tm := NewTrxManager(env.ct, env.undoLog, redoLog, env.lock, env.bp, env.trxMgr.ddlManager, 1)
+		ddlTrx := tm.BeginDDL()
+		corruptDDLUndoRootNextPageForTest(t, tm)
+
+		// WHEN
+		err := tm.Commit(ddlTrx)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Equal(t, trxStateInactive, ddlTrx.state)
+	})
 }
 
 func TestTrxManagerRollbackDDL(t *testing.T) {
@@ -296,6 +312,25 @@ func appendAllocateFileIdUndoForTest(t *testing.T, tm *TrxManager, fileId page.F
 		mtr.UnpinAll()
 		t.Fatalf("AllocateFileIdUndo Append に失敗: %v", err)
 	}
+	if err := mtr.Commit(); err != nil {
+		t.Fatalf("mtr.Commit に失敗: %v", err)
+	}
+}
+
+// corruptDDLUndoRootNextPageForTest は DDL Undo チェーン root ページの next PageNumber を存在しないページ番号で書き換える
+//   - collectChainPageIds がその存在しないページへの PageForRead で失敗し、 Clear が error を返す状況を作る
+func corruptDDLUndoRootNextPageForTest(t *testing.T, tm *TrxManager) {
+	t.Helper()
+	rootPageId := tm.catalog.DDLUndoRootPageId()
+	mtr := buffer.NewWriteMtr(tm.bufferPool, lock.SystemReservedTrxId, tm.redoLog)
+	bufPage, err := mtr.PageForWrite(rootPageId)
+	if err != nil {
+		mtr.UnpinAll()
+		t.Fatalf("DDL Undo root page の取得に失敗: %v", err)
+	}
+	// undo/page.go headerNextPageNumberOffset = 2, サイズ 4 バイト。 存在しないページ番号を大きめに設定
+	corrupted := [4]byte{0xFF, 0xFF, 0xFF, 0xFF}
+	bufPage.WriteBodyAt(2, corrupted[:])
 	if err := mtr.Commit(); err != nil {
 		t.Fatalf("mtr.Commit に失敗: %v", err)
 	}

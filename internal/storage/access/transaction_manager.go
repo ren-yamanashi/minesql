@@ -135,12 +135,12 @@ func (t *TrxManager) Rollback(trx *Transaction) error {
 	records := t.undoLog.Records(trx.trxId)
 	for _, r := range slices.Backward(records) {
 		mtr := buffer.NewWriteMtr(t.bufferPool, trx.trxId, t.redoLog)
-		if err := t.rollbackRecord(mtr, r); err != nil {
-			mtr.UnpinAll()
-			return err
+		rollbackErr := t.rollbackRecord(mtr, r)
+		if commitErr := mtr.Commit(); commitErr != nil && rollbackErr == nil {
+			rollbackErr = commitErr
 		}
-		if err := mtr.Commit(); err != nil {
-			return err
+		if rollbackErr != nil {
+			return rollbackErr
 		}
 	}
 
@@ -216,11 +216,11 @@ func (t *TrxManager) PersistNextTrxIdToCatalog() error {
 		return nil
 	}
 	mtr := t.systemTrx.NewMtr()
-	if err := t.catalog.PersistNextTrxId(mtr, current); err != nil {
-		mtr.UnpinAll()
-		return err
+	persistErr := t.catalog.PersistNextTrxId(mtr, current)
+	if commitErr := mtr.Commit(); commitErr != nil && persistErr == nil {
+		persistErr = commitErr
 	}
-	return mtr.Commit()
+	return persistErr
 }
 
 // InactiveTrxIds は完了済み (コミットまたはロールバック済み) のトランザクション ID 一覧を返す

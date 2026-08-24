@@ -10,7 +10,8 @@ import (
 //   - currentRecord は SearchForUpdate (Current Read) で取得した排他ロック済みの最新バージョンを渡すこと
 //   - PK カラムが更新対象に含まれない場合はインプレース更新を行う
 //   - PK カラムが更新対象に含まれる場合は論理削除 + 新規挿入で実現する
-func (t *Table) Update(trx *Transaction, currentRecord *PrimaryRecord, colNames, values []string) error {
+//   - エラー時も mini-transaction は commit される。部分的な書き込み効果は呼び出し側が文レベル rollback で取り消すこと
+func (t *Table) Update(trx *Transaction, currentRecord *PrimaryRecord, colNames, values []string) (retErr error) {
 	trxId := trx.trxId
 	newRecord, err := currentRecord.update(trxId, colNames, values)
 	if err != nil {
@@ -27,7 +28,11 @@ func (t *Table) Update(trx *Transaction, currentRecord *PrimaryRecord, colNames,
 
 	// PK が変わらない場合はインプレース更新
 	mtr := buffer.NewWriteMtr(t.bufferPool, trxId, t.redoLog)
-	defer mtr.UnpinAll()
+	defer func() {
+		if commitErr := mtr.Commit(); commitErr != nil && retErr == nil {
+			retErr = commitErr
+		}
+	}()
 
 	// FK チェック (自テーブルの FK カラムが変わる場合は参照先の親レコードに共有ロックを取得する)
 	if err := t.checkForeignKeysForUpdate(trx, currentRecord, newRecord); err != nil {
@@ -52,10 +57,7 @@ func (t *Table) Update(trx *Transaction, currentRecord *PrimaryRecord, colNames,
 	if err := t.primaryIndex.update(mtr, newRecord, trxId); err != nil {
 		return err
 	}
-	if err := t.updateSecondaryIndexes(mtr, currentRecord, colNames, values, trxId); err != nil {
-		return err
-	}
-	return mtr.Commit()
+	return t.updateSecondaryIndexes(mtr, currentRecord, colNames, values, trxId)
 }
 
 // updateSecondaryIndexes はセカンダリインデックスを更新する

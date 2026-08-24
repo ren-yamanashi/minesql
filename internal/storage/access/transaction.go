@@ -48,3 +48,9 @@ func (t *Transaction) NewReadMtr() *buffer.Mtr {
 func (t *Transaction) DDLManager() *undo.DDLManager {
 	return t.tm.ddlManager
 }
+
+// Savepoint は現時点の Undo 位置を返す
+//   - 呼び出し側は文の開始時に取得し、 その文が失敗した場合に RollbackToSavepoint へ渡す
+func (t *Transaction) Savepoint() int {
+	return t.undoLog.Count(t.trxId)
+}

@@ -3,6 +3,7 @@ package access
 import (
 	"bytes"
 	"errors"
+	"slices"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
@@ -11,6 +12,27 @@ import (
 )
 
 var errUnknownUndoRecordType = errors.New("unknown undo record type")
+
+// RollbackToSavepoint は savepoint 以降の Undo レコードを逆順に適用して文の効果だけを取り消す
+//   - savepoint は Transaction.Savepoint で取得した値
+//   - 全件成功後に savepoint 以降の Undo エントリを破棄する
+//   - ロックは解放しない (トランザクションは継続する)
+//   - エラーを返した場合、 savepoint 以降の Undo は保持される。 呼び出し側はトランザクション全体 Rollback を呼ぶこと
+func (t *TrxManager) RollbackToSavepoint(trx *Transaction, savepoint int) error {
+	records := t.undoLog.RecordsFrom(trx.trxId, savepoint)
+	for _, r := range slices.Backward(records) {
+		mtr := buffer.NewWriteMtr(t.bufferPool, trx.trxId, t.redoLog)
+		rollbackErr := t.rollbackRecord(mtr, r)
+		if commitErr := mtr.Commit(); commitErr != nil && rollbackErr == nil {
+			rollbackErr = commitErr
+		}
+		if rollbackErr != nil {
+			return rollbackErr
+		}
+	}
+	t.undoLog.DiscardFrom(trx.trxId, savepoint)
+	return nil
+}
 
 // rollbackRecord は 1 つの Undo レコードに対応するロールバック操作を実行する
 //   - mtr のライフサイクル (Commit / UnpinAll) は呼び出し側が管理する
@@ -36,8 +58,9 @@ func (t *TrxManager) rollbackRecord(mtr *buffer.Mtr, record undo.Record) error {
 }
 
 // rollbackInsert は Insert を取り消す (Primary, Secondary の物理削除)
+//   - 部分適用済みの状態への再実行を許容するため、対象キーが既に存在しない (ErrKeyNotFound) 場合は成功として扱う
 func (t *TrxManager) rollbackInsert(mtr *buffer.Mtr, primaryTree *btree.Tree, record undo.InsertRecord, fileId page.FileId) error {
-	if err := primaryTree.Delete(mtr, record.Record().Key()); err != nil {
+	if err := primaryTree.Delete(mtr, record.Record().Key()); err != nil && !errors.Is(err, btree.ErrKeyNotFound) {
 		return err
 	}
 	primaryRecord, err := DecodePrimaryRecord(record.Record(), t.catalog, t.bufferPool, fileId)
@@ -46,7 +69,10 @@ func (t *TrxManager) rollbackInsert(mtr *buffer.Mtr, primaryTree *btree.Tree, re
 	}
 	return t.forEachSecondaryTree(fileId, func(tree *btree.Tree, keyCols map[string]int) error {
 		key := primaryRecord.SecondaryKey(keyCols)
-		return tree.Delete(mtr, key)
+		if err := tree.Delete(mtr, key); err != nil && !errors.Is(err, btree.ErrKeyNotFound) {
+			return err
+		}
+		return nil
 	})
 }
 
@@ -68,6 +94,8 @@ func (t *TrxManager) rollbackDelete(mtr *buffer.Mtr, primaryTree *btree.Tree, re
 }
 
 // rollbackUpdate は Update を取り消す (Primary を旧レコードで上書き + Secondary 復元)
+//   - 部分適用済みの状態への再実行を許容するため、Secondary の新キー物理削除は ErrKeyNotFound を成功として扱う
+//   - Primary / Secondary の旧値上書きは同値再適用で自然に冪等
 func (t *TrxManager) rollbackUpdate(mtr *buffer.Mtr, primaryTree *btree.Tree, record undo.UpdateRecord, fileId page.FileId) error {
 	if err := primaryTree.Update(mtr, record.PrevRecord()); err != nil {
 		return err
@@ -88,7 +116,7 @@ func (t *TrxManager) rollbackUpdate(mtr *buffer.Mtr, primaryTree *btree.Tree, re
 			return nil
 		}
 		// 更新後の SK を物理削除し、更新前の SK を復元 (論理削除を元に戻す)
-		if err := tree.Delete(mtr, newKey); err != nil {
+		if err := tree.Delete(mtr, newKey); err != nil && !errors.Is(err, btree.ErrKeyNotFound) {
 			return err
 		}
 		restored := btree.NewRecord(make([]byte, secondaryHeaderSize), oldKey, nil) // header: 5 byte zero-fill (deleteMark=0, lastTrxId=0), key: sk+pk, nonKey: nil

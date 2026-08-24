@@ -94,6 +94,48 @@ func (m *Manager) Records(trxId lock.TrxId) []Record {
 	return records
 }
 
+// Count は指定した trxId の現在の Undo エントリ件数を返す
+//   - 文レベル rollback の savepoint 値として利用する
+func (m *Manager) Count(trxId lock.TrxId) int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.entries[trxId])
+}
+
+// RecordsFrom は指定した trxId の from 位置以降の Undo レコードを返す
+//   - from は Count で取得した savepoint 値。from が現在の件数と等しい / 大きい場合は nil
+func (m *Manager) RecordsFrom(trxId lock.TrxId, from int) []Record {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	entries := m.entries[trxId]
+	if from >= len(entries) {
+		return nil
+	}
+	tail := entries[from:]
+	records := make([]Record, len(tail))
+	for i, e := range tail {
+		records[i] = e.record
+	}
+	return records
+}
+
+// DiscardFrom は指定した trxId の from 位置以降の Undo エントリを破棄する
+//   - from が現在の件数と等しい / 大きい場合は no-op
+//   - 破棄後にエントリが 0 件になった場合はマップから当該 trxId を削除する
+func (m *Manager) DiscardFrom(trxId lock.TrxId, from int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	entries := m.entries[trxId]
+	if from >= len(entries) {
+		return
+	}
+	if from <= 0 {
+		delete(m.entries, trxId)
+		return
+	}
+	m.entries[trxId] = entries[:from]
+}
+
 // LookupByPointer は Undo ポインタが指す Undo レコードを返す
 //   - ptr が NullPointer の場合は ErrNullPointer を返す
 func (m *Manager) LookupByPointer(mtr *buffer.Mtr, ptr Pointer) (Record, error) {

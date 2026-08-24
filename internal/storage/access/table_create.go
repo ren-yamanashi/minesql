@@ -51,14 +51,14 @@ func CreateTable(tm *TrxManager, input CreateTableInput) (table *Table, err erro
 		return nil, err
 	}
 
-	// テーブルメタ・インデックスメタ・カラムメタの登録 + MetaInsertUndo
+	// MetaInsertUndo + テーブルメタ・インデックスメタ・カラムメタの登録
 	registerMtr := ddlTrx.NewMtr()
-	if err = registerTableMeta(ddlTrx, registerMtr, fileId, pi, input); err != nil {
-		registerMtr.UnpinAll()
-		return nil, err
+	registerErr := registerTableMeta(ddlTrx, registerMtr, fileId, pi, input)
+	if commitErr := registerMtr.Commit(); commitErr != nil && registerErr == nil {
+		registerErr = commitErr
 	}
-	if err = registerMtr.Commit(); err != nil {
-		return nil, err
+	if registerErr != nil {
+		return nil, registerErr
 	}
 
 	// セカンダリインデックス作成 + 各種 DDL Undo (= 各セカンダリ 1 mtr で atomic)
@@ -67,14 +67,14 @@ func CreateTable(tm *TrxManager, input CreateTableInput) (table *Table, err erro
 		return nil, err
 	}
 
-	// 制約登録 + MetaInsertUndo
+	// MetaInsertUndo + 制約登録
 	constraintsMtr := ddlTrx.NewMtr()
-	if err = createConstraints(ddlTrx, constraintsMtr, fileId, input.Constraints); err != nil {
-		constraintsMtr.UnpinAll()
-		return nil, err
+	constraintsErr := createConstraints(ddlTrx, constraintsMtr, fileId, input.Constraints)
+	if commitErr := constraintsMtr.Commit(); commitErr != nil && constraintsErr == nil {
+		constraintsErr = commitErr
 	}
-	if err = constraintsMtr.Commit(); err != nil {
-		return nil, err
+	if constraintsErr != nil {
+		return nil, constraintsErr
 	}
 
 	if err = tm.Commit(ddlTrx); err != nil {
@@ -94,6 +94,7 @@ func CreateTable(tm *TrxManager, input CreateTableInput) (table *Table, err erro
 }
 
 // appendMetaInsertUndo はカタログ Meta テーブルへの 1 件の Insert を取り消すための MetaInsertUndo を Append する
+//   - 呼び出しは対応する Insert より前に行う (write-ahead)
 func appendMetaInsertUndo(ddlTrx *Transaction, mtr *buffer.Mtr, metaTableType undo.MetaTableType, key []byte) error {
 	record := undo.NewDDLRecord(
 		undo.DDLRecordTypeMetaInsert,

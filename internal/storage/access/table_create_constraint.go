@@ -9,7 +9,7 @@ import (
 
 // createConstraints は制約をカタログに登録する
 //   - mtr: 登録の書き込みを記録する Mtr。Commit は呼び出し側
-//   - 各 Insert 直後に対応する MetaInsertUndo を Append する
+//   - 各 Insert より前に対応する MetaInsertUndo を Append する
 func createConstraints(
 	ddlTrx *Transaction,
 	mtr *buffer.Mtr,
@@ -31,10 +31,10 @@ func createConstraints(
 			input.ReferenceColumnName,
 		)
 		constraintKey := constraintRecord.Encode().Key()
-		if err := ct.ConstraintMeta().Insert(mtr, constraintRecord); err != nil {
+		if err := appendMetaInsertUndo(ddlTrx, mtr, undo.MetaTableTypeConstraint, constraintKey); err != nil {
 			return err
 		}
-		if err := appendMetaInsertUndo(ddlTrx, mtr, undo.MetaTableTypeConstraint, constraintKey); err != nil {
+		if err := ct.ConstraintMeta().Insert(mtr, constraintRecord); err != nil {
 			return err
 		}
 	}

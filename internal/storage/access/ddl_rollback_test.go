@@ -335,6 +335,23 @@ func TestDDLRollbackerRollbackIdempotent(t *testing.T) {
 		_, statErr := os.Stat(targetPath)
 		assert.True(t, os.IsNotExist(statErr))
 	})
+
+	t.Run("DDLRecordTypeMetaInsert の Rollback は対象キーが最初から存在しなくても成功する", func(t *testing.T) {
+		// GIVEN: Meta 挿入を行わずに、対応キーの Rollback だけを試みる (undo 先行順序で挿入前に失敗した状態を模擬)
+		env := setupDDLRollbackerTestEnv(t)
+		missingRecord := dictionary.NewTableMetaRecord("missing", page.NewId(page.FileId(2), page.PageNumber(0)), 1)
+		rollbacker := NewDDLRollbacker(env.bp, env.ct)
+		record := undo.NewDDLRecord(
+			undo.DDLRecordTypeMetaInsert,
+			undo.NewMetaInsertUndoRecord(undo.MetaTableTypeTable, missingRecord.Encode().Key()).Serialize(),
+		)
+
+		// WHEN
+		rollbackDDLUntilDone(t, env.bp, env.redoLog, rollbacker, record)
+
+		// THEN
+		assertTableMetaEmpty(t, env)
+	})
 }
 
 // ddlRollbackerTestEnv は DDLRollbacker テスト用の最小環境

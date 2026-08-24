@@ -8,10 +8,15 @@ import (
 
 // SoftDelete はテーブルの行を論理削除する
 //   - record は SearchForUpdate (Current Read) で取得した排他ロック済みの最新バージョンを渡すこと
-func (t *Table) SoftDelete(trx *Transaction, record *PrimaryRecord) error {
+//   - エラー時も mini-transaction は commit される。部分的な書き込み効果は呼び出し側が文レベル rollback で取り消すこと
+func (t *Table) SoftDelete(trx *Transaction, record *PrimaryRecord) (retErr error) {
 	trxId := trx.trxId
 	mtr := buffer.NewWriteMtr(t.bufferPool, trxId, t.redoLog)
-	defer mtr.UnpinAll()
+	defer func() {
+		if commitErr := mtr.Commit(); commitErr != nil && retErr == nil {
+			retErr = commitErr
+		}
+	}()
 
 	// FK チェック
 	if err := t.checkForeignKeysForDelete(trx, record); err != nil {
@@ -30,25 +35,24 @@ func (t *Table) SoftDelete(trx *Transaction, record *PrimaryRecord) error {
 	if err := t.primaryIndex.softDelete(mtr, record, trxId); err != nil {
 		return err
 	}
-	if err := t.softDeleteSecondaryIndexes(mtr, record, trxId); err != nil {
-		return err
-	}
-	return mtr.Commit()
+	return t.softDeleteSecondaryIndexes(mtr, record, trxId)
 }
 
 // Delete はテーブルの行を物理削除する
 // (物理削除は DML 操作では行われないので、Undo ログの作成はしない)
-func (t *Table) Delete(trx *Transaction, record *PrimaryRecord) error {
+//   - エラー時も mini-transaction は commit される
+func (t *Table) Delete(trx *Transaction, record *PrimaryRecord) (retErr error) {
 	trxId := trx.trxId
 	mtr := buffer.NewWriteMtr(t.bufferPool, trxId, t.redoLog)
-	defer mtr.UnpinAll()
+	defer func() {
+		if commitErr := mtr.Commit(); commitErr != nil && retErr == nil {
+			retErr = commitErr
+		}
+	}()
 	if err := t.primaryIndex.delete(mtr, record, trxId); err != nil {
 		return err
 	}
-	if err := t.deleteSecondaryIndexes(mtr, record, trxId); err != nil {
-		return err
-	}
-	return mtr.Commit()
+	return t.deleteSecondaryIndexes(mtr, record, trxId)
 }
 
 // softDeleteSecondaryIndexes は全セカンダリインデックスのレコードを論理削除する

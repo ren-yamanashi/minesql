@@ -4,11 +4,14 @@ import (
 	"os"
 	"testing"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/btree"
 	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/config"
 	"github.com/ren-yamanashi/minesql/internal/storage/encode"
 	"github.com/ren-yamanashi/minesql/internal/storage/lock"
+	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/ren-yamanashi/minesql/internal/storage/redo"
+	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -629,8 +632,8 @@ func TestTrxManagerRollback(t *testing.T) {
 		assert.Empty(t, tm.undoLog.Records(trx.trxId))
 	})
 
-	t.Run("Rollback 途中でエラーが返った場合、state は Active のまま Undo も保持される", func(t *testing.T) {
-		// GIVEN
+	t.Run("Insert の rollback は対象キーが既に存在しなくても成功する (冪等)", func(t *testing.T) {
+		// GIVEN: Insert 済みの行のプライマリレコードを直接物理削除し、既に取り消し済みの状態を再現する
 		tm := setupTrxManager(t)
 		trx := tm.Begin()
 		table := setupTableForTrxTest(t, tm)
@@ -640,17 +643,15 @@ func TestTrxManagerRollback(t *testing.T) {
 			[]string{"1", "Alice", "alice@example.com"},
 		)
 		assert.NoError(t, err)
-
-		// primary tree のレコードを直接物理削除して、Rollback の rollbackInsert を失敗させる
 		breakPrimaryRecord(t, tm, table, "1")
 
 		// WHEN
 		err = tm.Rollback(trx)
 
 		// THEN
-		assert.Error(t, err)
-		assert.Equal(t, trxStateActive, tm.transactions[trx.trxId].state)
-		assert.NotEmpty(t, tm.undoLog.Records(trx.trxId))
+		assert.NoError(t, err)
+		assert.Equal(t, trxStateInactive, tm.transactions[trx.trxId].state)
+		assert.Empty(t, tm.undoLog.Records(trx.trxId))
 	})
 
 	t.Run("Undo がないトランザクションの Rollback でも Rollback レコードが書かれる", func(t *testing.T) {
@@ -675,6 +676,26 @@ func TestTrxManagerRollback(t *testing.T) {
 			}
 		}
 		assert.True(t, found, "Undo がない Rollback でも Rollback レコードが書かれる")
+	})
+
+	t.Run("Rollback 途中で error が返ると state は Active のまま Undo も保持される", func(t *testing.T) {
+		// GIVEN: カタログに登録されていない fileId の InsertRecord を undoLog に Append する。
+		// rollbackRecord は fetchPrimaryIndexRecord でこの fileId を解決できず error を返す
+		tm := setupTrxManager(t)
+		trx := tm.Begin()
+		unknownFileId := page.FileId(9999)
+		undoRecord := undo.NewInsertRecord(unknownFileId, btree.Record{[]byte("dummy")})
+		_, err := tm.undoLog.Append(trx.trxId, undo.RecordTypeInsert, undoRecord)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, tm.undoLog.Records(trx.trxId), "前提: Undo レコードが保持されている")
+
+		// WHEN
+		err = tm.Rollback(trx)
+
+		// THEN
+		assert.Error(t, err)
+		assert.Equal(t, trxStateActive, tm.transactions[trx.trxId].state)
+		assert.NotEmpty(t, tm.undoLog.Records(trx.trxId), "Undo レコードは破棄されずに残る")
 	})
 }
 
@@ -883,7 +904,7 @@ func setupTestRedoLog(t *testing.T) *redo.Buffer {
 }
 
 // breakPrimaryRecord はテスト用に、テーブルのプライマリインデックスから指定 PK のレコードを直接物理削除する
-//   - Rollback の rollbackInsert を意図的に失敗させるためのヘルパー
+//   - rollback 逆適用が「既に取り消し済み」の状態を扱う経路を再現するためのヘルパー
 func breakPrimaryRecord(t *testing.T, tm *TrxManager, table *Table, pk string) {
 	t.Helper()
 	key := encode.Encode(nil, [][]byte{[]byte(pk)})

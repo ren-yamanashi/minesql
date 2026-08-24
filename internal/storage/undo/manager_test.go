@@ -407,6 +407,170 @@ func TestManagerRecords(t *testing.T) {
 	})
 }
 
+func TestManagerCount(t *testing.T) {
+	t.Run("レコードがない場合は 0 を返す", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+
+		// WHEN
+		count := mgr.Count(lock.TrxId(1))
+
+		// THEN
+		assert.Equal(t, 0, count)
+	})
+
+	t.Run("Append した件数を返す", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("a")})
+		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("b")})
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r1)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r2)
+
+		// WHEN
+		count := mgr.Count(lock.TrxId(1))
+
+		// THEN
+		assert.Equal(t, 2, count)
+	})
+
+	t.Run("別トランザクションのレコードは含まない", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		r := NewInsertRecord(page.FileId(1), btree.Record{[]byte("a")})
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r)
+
+		// WHEN
+		count := mgr.Count(lock.TrxId(2))
+
+		// THEN
+		assert.Equal(t, 0, count)
+	})
+}
+
+func TestManagerRecordsFrom(t *testing.T) {
+	t.Run("from 位置以降のレコードを返す", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("a")})
+		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("b")})
+		r3 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("c")})
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r1)
+		savepoint := mgr.Count(lock.TrxId(1))
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r2)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r3)
+
+		// WHEN
+		records := mgr.RecordsFrom(lock.TrxId(1), savepoint)
+
+		// THEN
+		assert.Len(t, records, 2)
+	})
+
+	t.Run("from が現在件数と等しい場合は nil", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		r := NewInsertRecord(page.FileId(1), btree.Record{[]byte("a")})
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r)
+		savepoint := mgr.Count(lock.TrxId(1))
+
+		// WHEN
+		records := mgr.RecordsFrom(lock.TrxId(1), savepoint)
+
+		// THEN
+		assert.Nil(t, records)
+	})
+
+	t.Run("from が現在件数より大きい場合は nil", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+
+		// WHEN
+		records := mgr.RecordsFrom(lock.TrxId(1), 100)
+
+		// THEN
+		assert.Nil(t, records)
+	})
+
+	t.Run("from = 0 で全件返す", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("a")})
+		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("b")})
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r1)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r2)
+
+		// WHEN
+		records := mgr.RecordsFrom(lock.TrxId(1), 0)
+
+		// THEN
+		assert.Len(t, records, 2)
+	})
+}
+
+func TestManagerDiscardFrom(t *testing.T) {
+	t.Run("from 位置以降のレコードのみ破棄される", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("a")})
+		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("b")})
+		r3 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("c")})
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r1)
+		savepoint := mgr.Count(lock.TrxId(1))
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r2)
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r3)
+
+		// WHEN
+		mgr.DiscardFrom(lock.TrxId(1), savepoint)
+
+		// THEN
+		assert.Equal(t, 1, mgr.Count(lock.TrxId(1)))
+	})
+
+	t.Run("from = 0 で全件破棄されエントリ自体が削除される", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		r := NewInsertRecord(page.FileId(1), btree.Record{[]byte("a")})
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r)
+
+		// WHEN
+		mgr.DiscardFrom(lock.TrxId(1), 0)
+
+		// THEN
+		assert.Nil(t, mgr.Records(lock.TrxId(1)))
+	})
+
+	t.Run("from が現在件数と等しい場合は no-op", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		r := NewInsertRecord(page.FileId(1), btree.Record{[]byte("a")})
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r)
+		savepoint := mgr.Count(lock.TrxId(1))
+
+		// WHEN
+		mgr.DiscardFrom(lock.TrxId(1), savepoint)
+
+		// THEN
+		assert.Equal(t, 1, mgr.Count(lock.TrxId(1)))
+	})
+
+	t.Run("別トランザクションのレコードには影響しない", func(t *testing.T) {
+		// GIVEN
+		mgr := setupTestManager(t)
+		r1 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("a")})
+		r2 := NewInsertRecord(page.FileId(1), btree.Record{[]byte("b")})
+		_, _ = appendForTest(t, mgr, lock.TrxId(1), RecordTypeInsert, r1)
+		_, _ = appendForTest(t, mgr, lock.TrxId(2), RecordTypeInsert, r2)
+
+		// WHEN
+		mgr.DiscardFrom(lock.TrxId(1), 0)
+
+		// THEN
+		assert.Nil(t, mgr.Records(lock.TrxId(1)))
+		assert.Equal(t, 1, mgr.Count(lock.TrxId(2)))
+	})
+}
+
 func TestManagerLookupByPointer(t *testing.T) {
 	t.Run("Insert レコードを Pointer から取得できる", func(t *testing.T) {
 		// GIVEN

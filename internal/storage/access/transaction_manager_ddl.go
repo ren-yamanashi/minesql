@@ -25,6 +25,8 @@ func (t *TrxManager) BeginDDL() *Transaction {
 // commitDDL は DDL Transaction の Commit 処理を行う
 //   - Redo に Commit レコードを追加してフラッシュした後、 DDL Undo 領域コンテナの中身をクリアする
 //   - 永続コンテナ型のため、 コンテナ自体 (= root ページ) は残る
+//   - Clear が失敗した場合も、 COMMIT レコード到達済みでトランザクションは完了扱いとし、
+//     状態を Inactive に遷移した上で Clear の error を返す (残った中身は次回リカバリ完了時にクリアされる)
 func (t *TrxManager) commitDDL(trx *Transaction) error {
 	if _, err := t.redoLog.AppendCommit(trx.trxId); err != nil {
 		return err
@@ -32,14 +34,12 @@ func (t *TrxManager) commitDDL(trx *Transaction) error {
 	if err := t.redoLog.Flush(); err != nil {
 		return err
 	}
-	if err := t.ddlManager.Clear(trx.trxId, t.redoLog); err != nil {
-		return err
-	}
+	clearErr := t.ddlManager.Clear(trx.trxId, t.redoLog)
 
 	t.mu.Lock()
 	trx.state = trxStateInactive
 	t.mu.Unlock()
-	return nil
+	return clearErr
 }
 
 // applyDDLRollbackRecord は DDL Undo レコードの取り消しを 1 単位進める
@@ -65,13 +65,12 @@ func (t *TrxManager) rollbackDDL(trx *Transaction) error {
 	for _, record := range records {
 		for {
 			mtr := trx.NewMtr()
-			done, err := t.applyDDLRollbackRecord(mtr, record)
-			if err != nil {
-				mtr.UnpinAll()
-				return err
+			done, applyErr := t.applyDDLRollbackRecord(mtr, record)
+			if commitErr := mtr.Commit(); commitErr != nil && applyErr == nil {
+				applyErr = commitErr
 			}
-			if err := mtr.Commit(); err != nil {
-				return err
+			if applyErr != nil {
+				return applyErr
 			}
 			if done {
 				break

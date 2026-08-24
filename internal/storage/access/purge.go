@@ -131,12 +131,17 @@ func (p *Purge) purgeUpdate(record undo.Record) error {
 }
 
 // deletePrimaryRecord はプライマリレコードを物理削除する
-func (p *Purge) deletePrimaryRecord(fileId page.FileId, record btree.Record) error {
+//   - エラー時も mtr は commit される (再 purge の冪等性が回復経路)
+func (p *Purge) deletePrimaryRecord(fileId page.FileId, record btree.Record) (retErr error) {
 	mtr := p.purgeTrx.NewMtr()
+	defer func() {
+		if commitErr := mtr.Commit(); commitErr != nil && retErr == nil {
+			retErr = commitErr
+		}
+	}()
 	bp := p.purgeTrx.bufferPool
 	piRecord, err := fetchPrimaryIndexRecord(p.purgeTrx.catalog, bp, fileId)
 	if err != nil {
-		mtr.UnpinAll()
 		return err
 	}
 	primaryTree := btree.NewTree(bp, piRecord.MetaPageId())
@@ -144,44 +149,40 @@ func (p *Purge) deletePrimaryRecord(fileId page.FileId, record btree.Record) err
 	// キーが存在し、deleteMark=1 の場合のみ物理削除 (論理削除後に同一キーで再挿入された active な行を消さないため)
 	existing, _, err := primaryTree.FindByKey(mtr, record.Key())
 	if errors.Is(err, btree.ErrKeyNotFound) {
-		mtr.UnpinAll()
 		return nil
 	}
 	if err != nil {
-		mtr.UnpinAll()
 		return err
 	}
 	if existing.Header()[0] == 0 {
-		mtr.UnpinAll()
 		return nil
 	}
-	if err := primaryTree.Delete(mtr, record.Key()); err != nil {
-		mtr.UnpinAll()
-		return err
-	}
-	return mtr.Commit()
+	return primaryTree.Delete(mtr, record.Key())
 }
 
 // deleteSecondaryRecords は指定されたプライマリインデックスのレコードに対応するセカンダリインデックスの論理削除済みレコードを物理削除する
-func (p *Purge) deleteSecondaryRecords(fileId page.FileId, record btree.Record) error {
+//   - エラー時も mtr は commit される (再 purge の冪等性が回復経路)
+func (p *Purge) deleteSecondaryRecords(fileId page.FileId, record btree.Record) (retErr error) {
 	mtr := p.purgeTrx.NewMtr()
+	defer func() {
+		if commitErr := mtr.Commit(); commitErr != nil && retErr == nil {
+			retErr = commitErr
+		}
+	}()
 	bp := p.purgeTrx.bufferPool
 	prevRec, err := DecodePrimaryRecord(record, p.purgeTrx.catalog, bp, fileId)
 	if err != nil {
-		mtr.UnpinAll()
 		return err
 	}
 
 	siRecords, err := fetchSecondaryIndexRecords(p.purgeTrx.catalog, bp, fileId)
 	if err != nil {
-		mtr.UnpinAll()
 		return err
 	}
 
 	for _, siRecord := range siRecords {
 		keyCols, err := fetchIndexKeyColumn(p.purgeTrx.catalog, bp, siRecord.IndexId())
 		if err != nil {
-			mtr.UnpinAll()
 			return err
 		}
 		sk := prevRec.SecondaryKey(keyCols)
@@ -193,18 +194,16 @@ func (p *Purge) deleteSecondaryRecords(fileId page.FileId, record btree.Record) 
 			continue
 		}
 		if err != nil {
-			mtr.UnpinAll()
 			return err
 		}
 		if existing.Header()[0] == 0 {
 			continue
 		}
 		if err := tree.Delete(mtr, sk); err != nil {
-			mtr.UnpinAll()
 			return err
 		}
 	}
-	return mtr.Commit()
+	return nil
 }
 
 // purgableTrxIds は完了済みトランザクションのうち purgeLimit 未満の ID を返す
