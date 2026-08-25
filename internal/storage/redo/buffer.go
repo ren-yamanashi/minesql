@@ -81,6 +81,14 @@ func (b *Buffer) AppendMtrEnd(trxId lock.TrxId) (Lsn, error) {
 	return b.appendRecord(trxId, RecordTypeMtrEnd, page.Id{}, nil, nil)
 }
 
+// AppendFileDelete はファイル削除レコードを Redo ログバッファに記録する
+//   - fileId: 削除対象の FileId (レコードのページ ID フィールドの FileId 部に格納される)
+func (b *Buffer) AppendFileDelete(trxId lock.TrxId, fileId page.FileId) (Lsn, error) {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	return b.appendRecord(trxId, RecordTypeFileDelete, page.NewId(fileId, 0), nil, nil)
+}
+
 // ReadFrom は指定 LSN より大きい LSN を持つレコードを読み込む
 func (b *Buffer) ReadFrom(lsn Lsn) ([]Record, error) {
 	b.mutex.Lock()
@@ -89,7 +97,7 @@ func (b *Buffer) ReadFrom(lsn Lsn) ([]Record, error) {
 }
 
 // MaxUserTrxId は Redo ログ全体を走査し、出現するユーザートランザクション ID の最大値を返す
-//   - システム予約トランザクション ID と Purge 予約トランザクション ID は除外する
+//   - 予約トランザクション ID (System / Purge / DDL) は除外する
 //   - ユーザートランザクションが 1 件も見つからない場合は 0 を返す
 func (b *Buffer) MaxUserTrxId() (lock.TrxId, error) {
 	b.mutex.Lock()
@@ -101,7 +109,7 @@ func (b *Buffer) MaxUserTrxId() (lock.TrxId, error) {
 	var maxId lock.TrxId
 	for _, r := range records {
 		id := r.trxId
-		if id == lock.SystemReservedTrxId || id == lock.PurgeReservedTrxId {
+		if id == lock.SystemReservedTrxId || id == lock.PurgeReservedTrxId || id == lock.DDLReservedTrxId {
 			continue
 		}
 		if id > maxId {

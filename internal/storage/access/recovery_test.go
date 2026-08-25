@@ -332,6 +332,42 @@ func TestRecoveryApplyRedoLog(t *testing.T) {
 		incompletePage, _ := env.bp.Page(incompletePgId)
 		assert.NotEqual(t, byte(0xBB), incompletePage.Data().Body()[0])
 	})
+
+	t.Run("FileDelete レコードがある場合は該当 FileId 宛の PageWrite がスキップされる", func(t *testing.T) {
+		// GIVEN
+		env := setupRecoveryTestEnv(t)
+		r := NewRecovery(env.redoLog, env.bp, env.trxManager, env.undoFileId, env.ddlManager)
+		keptPgId := page.NewId(env.undoFileId, 0)
+		deletedFileId := page.FileId(200)
+		deletedPgId := page.NewId(deletedFileId, 0)
+
+		// 削除対象 FileId 宛の完全 mtr (適用されるべきでない)
+		_, _ = env.redoLog.AppendMtrStart(lock.TrxId(1))
+		deletedData := make([]byte, page.Size)
+		deletedData[page.HeaderSize] = 0xDD
+		deletedPg, _ := page.NewPage(deletedData)
+		_, _ = env.redoLog.AppendPageCopy(lock.TrxId(1), deletedPgId, deletedPg)
+		_, _ = env.redoLog.AppendMtrEnd(lock.TrxId(1))
+		// 他 FileId 宛の完全 mtr (適用されるべき)
+		_, _ = env.redoLog.AppendMtrStart(lock.TrxId(2))
+		keptData := make([]byte, page.Size)
+		keptData[page.HeaderSize] = 0xEE
+		keptPg, _ := page.NewPage(keptData)
+		_, _ = env.redoLog.AppendPageCopy(lock.TrxId(2), keptPgId, keptPg)
+		_, _ = env.redoLog.AppendMtrEnd(lock.TrxId(2))
+		// FileDelete レコード (順序を問わずスキップされることを検証するため、後ろに置く)
+		_, _ = env.redoLog.AppendFileDelete(lock.DDLReservedTrxId, deletedFileId)
+		_ = env.redoLog.Flush()
+		records, _ := env.redoLog.ReadFrom(redo.Lsn(0))
+
+		// WHEN
+		err := r.applyRedoLog(records)
+
+		// THEN
+		assert.NoError(t, err)
+		keptPage, _ := env.bp.Page(keptPgId)
+		assert.Equal(t, byte(0xEE), keptPage.Data().Body()[0])
+	})
 }
 
 func TestRecoveryApplyRollbackDoesNotEmitRedo(t *testing.T) {

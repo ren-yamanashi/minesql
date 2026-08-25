@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
 	"github.com/stretchr/testify/assert"
 )
@@ -19,6 +20,32 @@ func TestNewMtr(t *testing.T) {
 
 		// THEN
 		assert.Equal(t, 0, mtr.PinnedCount())
+	})
+}
+
+func TestMtrTrxId(t *testing.T) {
+	t.Run("書き込み Mtr は生成時に指定した trxId を返す", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
+		mtr := NewWriteMtr(bp, lock.TrxId(42), newTestRedoLog(t))
+
+		// WHEN
+		got := mtr.TrxId()
+
+		// THEN
+		assert.Equal(t, lock.TrxId(42), got)
+	})
+
+	t.Run("読み取り専用 Mtr はゼロ値を返す", func(t *testing.T) {
+		// GIVEN
+		bp := NewPool(page.Size*3, newTestRedoLog(t), nil)
+		mtr := NewMtr(bp)
+
+		// WHEN
+		got := mtr.TrxId()
+
+		// THEN
+		assert.Equal(t, lock.TrxId(0), got)
 	})
 }
 

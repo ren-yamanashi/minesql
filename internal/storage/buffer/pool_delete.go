@@ -5,15 +5,30 @@ import (
 	"io/fs"
 	"os"
 
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 )
 
 // DeleteFile は指定 FileId に対応するヒープファイルを物理削除する
 //   - fileId: 削除対象の FileId
+//   - trxId: 削除を実行するトランザクション ID (redoLog が nil の場合は使用しない)
+//   - redoLog: 非 nil の場合、物理削除の前にファイル削除レコードを記録してフラッシュする。リカバリ経路では nil を渡す
 //   - 該当 FileId が未登録の場合・物理ファイルが既に存在しない場合は何もせず nil を返す (= idempotent、 Rollback / Recovery 経路で同じ FileId に対して複数回呼ばれても安全)
 //   - HeapFile の Close に失敗した場合・物理ファイル削除が ENOENT 以外で失敗した場合はエラー
 //   - Close 失敗時はキャッシュページが破棄され map エントリも物理ファイルも残った中途半端な状態となり、リトライ不可。呼び出し側は fatal として扱うこと
-func (p *Pool) DeleteFile(fileId page.FileId) error {
+func (p *Pool) DeleteFile(fileId page.FileId, trxId lock.TrxId, redoLog *redo.Buffer) error {
+	if !p.HasHeapFile(fileId) {
+		return nil
+	}
+	if redoLog != nil {
+		if _, err := redoLog.AppendFileDelete(trxId, fileId); err != nil {
+			return err
+		}
+		if err := redoLog.Flush(); err != nil {
+			return err
+		}
+	}
 	path, ok, err := p.detachFile(fileId)
 	if err != nil {
 		return err
@@ -21,7 +36,6 @@ func (p *Pool) DeleteFile(fileId page.FileId) error {
 	if !ok {
 		return nil
 	}
-
 	if err := os.Remove(path); err != nil {
 		if errors.Is(err, fs.ErrNotExist) {
 			return nil

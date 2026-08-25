@@ -61,6 +61,12 @@ func (m *Mtr) Redo() *redo.Buffer {
 	return m.redo
 }
 
+// TrxId は Mtr が紐づくトランザクション ID を返す
+//   - 読み取り専用 Mtr (= NewMtr で生成) ではゼロ値を返す
+func (m *Mtr) TrxId() lock.TrxId {
+	return m.trxId
+}
+
 // PageForRead は読み込み用のバッファページを取得し、Shared ラッチと Pin をスコープに記録する
 //   - 既に Commit / UnpinAll で解放された Mtr に対して呼ぶと panic する
 func (m *Mtr) PageForRead(pageId page.Id) (*Page, error) {

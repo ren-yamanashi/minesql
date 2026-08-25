@@ -376,6 +376,30 @@ func TestDeserializeRecord(t *testing.T) {
 		assert.Equal(t, original.Type(), decoded.Type())
 	})
 
+	t.Run("FileDelete レコードのラウンドトリップ", func(t *testing.T) {
+		// GIVEN
+		original := Record{
+			lsn:        Lsn(10),
+			trxId:      42,
+			recordType: RecordTypeFileDelete,
+			pageId:     page.NewId(page.FileId(7), page.PageNumber(0)),
+		}
+		buf := original.Serialize()
+
+		// WHEN
+		decoded, readBytes, err := DeserializeRecord(buf)
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, len(buf), readBytes)
+		assert.Equal(t, recordHeaderSize, len(buf))
+		assert.Equal(t, original.Lsn(), decoded.Lsn())
+		assert.Equal(t, original.TrxId(), decoded.TrxId())
+		assert.Equal(t, original.Type(), decoded.Type())
+		assert.Equal(t, page.FileId(7), decoded.PageId().FileId())
+		assert.True(t, decoded.Data().IsZero())
+	})
+
 	t.Run("ヘッダーサイズ未満のデータはエラーを返す", func(t *testing.T) {
 		// GIVEN
 		data := make([]byte, recordHeaderSize-1)

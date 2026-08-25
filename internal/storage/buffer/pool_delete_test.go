@@ -6,7 +6,9 @@ import (
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/file"
+	"github.com/ren-yamanashi/minesql/internal/storage/lock"
 	"github.com/ren-yamanashi/minesql/internal/storage/page"
+	"github.com/ren-yamanashi/minesql/internal/storage/redo"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,7 +23,7 @@ func TestDeleteFile(t *testing.T) {
 		assert.NoError(t, err)
 
 		// WHEN
-		err = bp.DeleteFile(fileId)
+		err = bp.DeleteFile(fileId, 0, nil)
 
 		// THEN
 		assert.NoError(t, err)
@@ -36,7 +38,7 @@ func TestDeleteFile(t *testing.T) {
 		registerDeletableHeapFile(t, bp, fileId)
 
 		// WHEN
-		err := bp.DeleteFile(fileId)
+		err := bp.DeleteFile(fileId, 0, nil)
 
 		// THEN
 		assert.NoError(t, err)
@@ -58,7 +60,7 @@ func TestDeleteFile(t *testing.T) {
 		assert.Equal(t, 1, bp.flushList.pageCount)
 
 		// WHEN
-		err = bp.DeleteFile(fileId)
+		err = bp.DeleteFile(fileId, 0, nil)
 
 		// THEN
 		assert.NoError(t, err)
@@ -75,7 +77,7 @@ func TestDeleteFile(t *testing.T) {
 		assert.NoError(t, os.Remove(path))
 
 		// WHEN
-		err := bp.DeleteFile(fileId)
+		err := bp.DeleteFile(fileId, 0, nil)
 
 		// THEN
 		assert.NoError(t, err)
@@ -86,7 +88,7 @@ func TestDeleteFile(t *testing.T) {
 		bp := NewPool(page.Size*2, newTestRedoLog(t), nil)
 
 		// WHEN
-		err := bp.DeleteFile(page.FileId(99))
+		err := bp.DeleteFile(page.FileId(99), 0, nil)
 
 		// THEN
 		assert.NoError(t, err)
@@ -99,8 +101,8 @@ func TestDeleteFile(t *testing.T) {
 		registerDeletableHeapFile(t, bp, fileId)
 
 		// WHEN
-		firstErr := bp.DeleteFile(fileId)
-		secondErr := bp.DeleteFile(fileId)
+		firstErr := bp.DeleteFile(fileId, 0, nil)
+		secondErr := bp.DeleteFile(fileId, 0, nil)
 
 		// THEN
 		assert.NoError(t, firstErr)
@@ -113,7 +115,7 @@ func TestDeleteFile(t *testing.T) {
 		fileId := page.FileId(7)
 		registerDeletableHeapFile(t, bp, fileId)
 		pageId := page.NewId(fileId, 0)
-		assert.NoError(t, bp.DeleteFile(fileId))
+		assert.NoError(t, bp.DeleteFile(fileId, 0, nil))
 
 		// WHEN
 		_, err := bp.Page(pageId)
@@ -130,7 +132,7 @@ func TestDeleteFile(t *testing.T) {
 		droppedPageId := page.NewId(droppedFileId, 0)
 		_, err := bp.AddPage(droppedPageId)
 		assert.NoError(t, err)
-		assert.NoError(t, bp.DeleteFile(droppedFileId))
+		assert.NoError(t, bp.DeleteFile(droppedFileId, 0, nil))
 
 		// WHEN
 		newFileId := page.FileId(8)
@@ -142,6 +144,49 @@ func TestDeleteFile(t *testing.T) {
 		// THEN
 		_, exists := bp.pageTable.bufferId(newPageId)
 		assert.True(t, exists)
+	})
+
+	t.Run("redoLog 付き削除で FileDelete レコードが記録される", func(t *testing.T) {
+		// GIVEN
+		redoLog := newTestRedoLog(t)
+		bp := NewPool(page.Size*2, redoLog, nil)
+		fileId := page.FileId(7)
+		registerDeletableHeapFile(t, bp, fileId)
+		trxId := lock.TrxId(42)
+
+		// WHEN
+		err := bp.DeleteFile(fileId, trxId, redoLog)
+
+		// THEN
+		assert.NoError(t, err)
+		records, err := redoLog.ReadFrom(redo.Lsn(0))
+		assert.NoError(t, err)
+		var found bool
+		for _, rec := range records {
+			if rec.Type() == redo.RecordTypeFileDelete && rec.PageId().FileId() == fileId && rec.TrxId() == trxId {
+				found = true
+				break
+			}
+		}
+		assert.True(t, found, "FileDelete レコードが redo に記録されていない")
+	})
+
+	t.Run("未登録 FileId への redoLog 付き削除では FileDelete レコードが記録されない", func(t *testing.T) {
+		// GIVEN
+		redoLog := newTestRedoLog(t)
+		bp := NewPool(page.Size*2, redoLog, nil)
+		trxId := lock.TrxId(42)
+
+		// WHEN
+		err := bp.DeleteFile(page.FileId(99), trxId, redoLog)
+
+		// THEN
+		assert.NoError(t, err)
+		records, err := redoLog.ReadFrom(redo.Lsn(0))
+		assert.NoError(t, err)
+		for _, rec := range records {
+			assert.NotEqual(t, redo.RecordTypeFileDelete, rec.Type())
+		}
 	})
 }
 

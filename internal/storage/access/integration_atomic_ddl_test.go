@@ -166,6 +166,28 @@ func TestIntegrationAtomicDDLDoubleCrashRecoveryIsIdempotent(t *testing.T) {
 	})
 }
 
+func TestIntegrationAtomicDDLRuntimeRollbackDeletesFileAndRecoveryStillSucceeds(t *testing.T) {
+	t.Run("実行時 DDL Rollback で物理ファイルが削除され、続くクラッシュ後の Recovery が成功する", func(t *testing.T) {
+		// GIVEN
+		env := setupIntegrationEnv(t)
+		flushBaseline(t, env)
+		fileId, tablePath, _ := createTableUntilPrimary(t, env, "users", 1)
+		assert.NoError(t, env.trxMgr.Rollback(env.trxMgr.BeginDDL()))
+		_, statErr := os.Stat(tablePath)
+		assert.True(t, os.IsNotExist(statErr))
+		assert.NoError(t, env.redoLog.Flush())
+
+		// WHEN
+		env2 := crashAndRecoverWithPendingFiles(t, env, nil, nil)
+
+		// THEN
+		_, statErr2 := os.Stat(tablePath)
+		assert.True(t, os.IsNotExist(statErr2))
+		assertDDLUndoEmpty(t, env2)
+		assertNextFileIdGreaterThan(t, env2, fileId)
+	})
+}
+
 func TestIntegrationAtomicDDLCrashWithOrphanUndo(t *testing.T) {
 	t.Run("undo 先行順序化の効果: メタ Insert 前に undo だけ書かれた状態でクラッシュしても孤児メタが残らない", func(t *testing.T) {
 		// GIVEN

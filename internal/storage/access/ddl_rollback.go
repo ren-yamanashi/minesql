@@ -33,7 +33,7 @@ func (r *DDLRollbacker) Rollback(mtr *buffer.Mtr, record undo.DDLRecord) (bool, 
 	case undo.DDLRecordTypeMetaInsert:
 		return true, r.rollbackMetaInsert(mtr, record.Payload())
 	case undo.DDLRecordTypeAllocateFileId:
-		return true, r.rollbackAllocateFileId(record.Payload())
+		return true, r.rollbackAllocateFileId(mtr, record.Payload())
 	default:
 		return true, fmt.Errorf("access: unknown DDL record type: %s", record.RecordType())
 	}
@@ -88,10 +88,10 @@ func (r *DDLRollbacker) rollbackMetaInsert(mtr *buffer.Mtr, payload []byte) erro
 //   - payload から FileId を復元し、 該当の物理ファイルを削除する
 //   - nextFileId は単調増加放置するため、 ここでは更新しない
 //   - 2 回目の Rollback でも安全 (= 冪等)
-func (r *DDLRollbacker) rollbackAllocateFileId(payload []byte) error {
+func (r *DDLRollbacker) rollbackAllocateFileId(mtr *buffer.Mtr, payload []byte) error {
 	record, err := undo.DeserializeAllocateFileIdUndoRecord(payload)
 	if err != nil {
 		return err
 	}
-	return r.bufferPool.DeleteFile(record.FileId())
+	return r.bufferPool.DeleteFile(record.FileId(), mtr.TrxId(), mtr.Redo())
 }

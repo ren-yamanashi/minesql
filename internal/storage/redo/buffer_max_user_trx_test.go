@@ -73,12 +73,31 @@ func TestMaxUserTrxId(t *testing.T) {
 		assert.Equal(t, lock.TrxId(7), maxId)
 	})
 
+	t.Run("DDL 予約トランザクション ID は除外する", func(t *testing.T) {
+		// GIVEN
+		buf := setupTestBuffer(t)
+		_, err := buf.AppendCommit(lock.TrxId(7))
+		assert.NoError(t, err)
+		_, err = buf.AppendCommit(lock.DDLReservedTrxId)
+		assert.NoError(t, err)
+		assert.NoError(t, buf.Flush())
+
+		// WHEN
+		maxId, err := buf.MaxUserTrxId()
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, lock.TrxId(7), maxId)
+	})
+
 	t.Run("予約 trxId のみの場合は 0 を返す", func(t *testing.T) {
 		// GIVEN
 		buf := setupTestBuffer(t)
 		_, err := buf.AppendCommit(lock.SystemReservedTrxId)
 		assert.NoError(t, err)
 		_, err = buf.AppendCommit(lock.PurgeReservedTrxId)
+		assert.NoError(t, err)
+		_, err = buf.AppendCommit(lock.DDLReservedTrxId)
 		assert.NoError(t, err)
 		assert.NoError(t, buf.Flush())
 

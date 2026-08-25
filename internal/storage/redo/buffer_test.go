@@ -252,6 +252,42 @@ func TestBufferAppendMtrEnd(t *testing.T) {
 	})
 }
 
+func TestBufferAppendFileDelete(t *testing.T) {
+	t.Run("FileDelete レコードを追加できる", func(t *testing.T) {
+		// GIVEN
+		buf := setupTestBuffer(t)
+
+		// WHEN
+		lsn, err := buf.AppendFileDelete(lock.TrxId(1), page.FileId(9))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Equal(t, Lsn(1), lsn)
+		assert.Len(t, buf.records, 1)
+		assert.Equal(t, RecordTypeFileDelete, buf.records[0].recordType)
+		assert.Equal(t, page.FileId(9), buf.records[0].pageId.FileId())
+		assert.Nil(t, buf.records[0].data)
+	})
+
+	t.Run("Flush 後の ReadFrom で読み出せる", func(t *testing.T) {
+		// GIVEN
+		buf := setupTestBuffer(t)
+		_, err := buf.AppendFileDelete(lock.TrxId(42), page.FileId(11))
+		assert.NoError(t, err)
+
+		// WHEN
+		assert.NoError(t, buf.Flush())
+		records, err := buf.ReadFrom(Lsn(0))
+
+		// THEN
+		assert.NoError(t, err)
+		assert.Len(t, records, 1)
+		assert.Equal(t, RecordTypeFileDelete, records[0].Type())
+		assert.Equal(t, lock.TrxId(42), records[0].TrxId())
+		assert.Equal(t, page.FileId(11), records[0].PageId().FileId())
+	})
+}
+
 func TestBufferReadFrom(t *testing.T) {
 	t.Run("LSN 0 を指定すると全レコードを返す", func(t *testing.T) {
 		// GIVEN

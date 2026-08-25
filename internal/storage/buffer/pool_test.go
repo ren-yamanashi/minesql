@@ -234,7 +234,7 @@ func TestHasHeapFile(t *testing.T) {
 		bp := NewPool(page.Size, newTestRedoLog(t), nil)
 		hf := setupHeapFile(t, 5)
 		bp.RegisterHeapFile(5, hf)
-		assert.NoError(t, bp.DeleteFile(5))
+		assert.NoError(t, bp.DeleteFile(5, 0, nil))
 
 		// WHEN
 		ok := bp.HasHeapFile(5)
