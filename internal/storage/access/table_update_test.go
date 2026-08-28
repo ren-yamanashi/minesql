@@ -37,10 +37,8 @@ func TestTableUpdate(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		iter, err := idxName.search(mtr, SearchModeStart{}, nil)
+		iter, err := idxName.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		result, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -89,10 +87,8 @@ func TestTableUpdate(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		iter, err := idxName.search(mtr, SearchModeStart{}, nil)
+		iter, err := idxName.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		result, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -112,17 +108,15 @@ func TestTableUpdate(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.search(mtr, SearchModeStart{}, nil)
+		nameIter, err := idxName.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		nameResult, ok, err := nameIter.Next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "Charlie", nameResult.values[1])
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
-		emailIter, err := idxEmail.search(mtr, SearchModeStart{}, nil)
+		emailIter, err := idxEmail.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		emailResult, ok, err := emailIter.Next()
 		assert.NoError(t, err)
@@ -173,10 +167,8 @@ func TestTableUpdate(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.search(mtr, SearchModeStart{}, nil)
+		nameIter, err := idxName.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		nameResult, ok, err := nameIter.Next()
 		assert.NoError(t, err)
@@ -184,7 +176,7 @@ func TestTableUpdate(t *testing.T) {
 		assert.Equal(t, "Bob", nameResult.values[1])
 
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
-		emailIter, err := idxEmail.search(mtr, SearchModeStart{}, nil)
+		emailIter, err := idxEmail.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		emailResult, ok, err := emailIter.Next()
 		assert.NoError(t, err)
@@ -236,10 +228,8 @@ func TestTableUpdate(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		iter, err := idxName.search(mtr, SearchModeStart{}, nil)
+		iter, err := idxName.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		result, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -392,9 +382,7 @@ func setupTableWithRecord(t *testing.T) (*Table, *TrxManager, lock.TrxId) {
 // searchFirstPrimaryRecord はプライマリインデックスの先頭レコードを返す
 func searchFirstPrimaryRecord(t *testing.T, table *Table) *PrimaryRecord {
 	t.Helper()
-	mtr := buffer.NewMtr(table.bufferPool)
-	defer mtr.UnpinAll()
-	iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+	iter, err := table.primaryIndex.search(SearchModeStart{}, nil)
 	if err != nil {
 		t.Fatalf("プライマリインデックスの検索に失敗: %v", err)
 	}

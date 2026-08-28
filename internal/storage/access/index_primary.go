@@ -75,8 +75,8 @@ func createPrimaryIndex(
 
 // search は指定した検索モードでテーブルを検索し、イテレータを返す
 //   - readView が非 nil の場合は MVCC の可視性判定 + Undo 遡及を行う
-func (pi *primaryIndex) search(mtr *buffer.Mtr, mode SearchMode, readView *readView) (*PrimaryIndexIterator, error) {
-	iter, err := pi.tree.Search(mtr, mode.Encode())
+func (pi *primaryIndex) search(mode SearchMode, readView *readView) (*PrimaryIndexIterator, error) {
+	iter, err := pi.tree.OpenScan(mode.Encode())
 	if err != nil {
 		return nil, err
 	}

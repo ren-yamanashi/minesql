@@ -105,9 +105,7 @@ func TestRecoveryExecute(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		// レコードが残っている (ロールバックされていない)
-		mtr := buffer.NewMtr(env.bp)
-		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter, err := table.primaryIndex.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -137,9 +135,7 @@ func TestRecoveryExecute(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		// レコードがロールバックされている
-		mtr := buffer.NewMtr(env.bp)
-		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter, err := table.primaryIndex.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -438,9 +434,7 @@ func TestRecoveryApplyRollback(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		// trx1 のレコード ("Alice") は残り、trx2 のレコード ("Bob") はロールバックされる
-		mtr := buffer.NewMtr(env.bp)
-		defer mtr.UnpinAll()
-		iter, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter, _ := table.primaryIndex.search(SearchModeStart{}, nil)
 		record, ok, _ := iter.Next()
 		assert.True(t, ok)
 		assert.Equal(t, "1", record.values[0])
@@ -655,9 +649,7 @@ func TestRecoveryExecuteRollbacksMultipleInsertsInOneTransaction(t *testing.T) {
 		assert.NoError(t, err)
 		table2, err := NewTable(env2.bp, env2.ct, env2.undoLog, env2.lockMgr, env2.redoLog, "users")
 		assert.NoError(t, err)
-		mtr := buffer.NewMtr(env2.bp)
-		defer mtr.UnpinAll()
-		iter, err := table2.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter, err := table2.primaryIndex.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -1370,9 +1362,7 @@ func TestRecoveryExecuteRestoresSegmentStateAndContinuesTreeGrowth(t *testing.T)
 		}
 		require.NoError(t, env2.trxMgr.Commit(trx2))
 
-		scanMtr := buffer.NewMtr(env2.bp)
-		defer scanMtr.UnpinAll()
-		iter, err := table2.primaryIndex.search(scanMtr, SearchModeStart{}, nil)
+		iter, err := table2.primaryIndex.search(SearchModeStart{}, nil)
 		require.NoError(t, err)
 		count := 0
 		for {

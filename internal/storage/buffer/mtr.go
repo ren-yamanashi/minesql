@@ -139,6 +139,19 @@ func (m *Mtr) Unpin(pageId page.Id) {
 	}
 }
 
+// TransferPin は指定ページのラッチを解放し、Pin を Mtr の管理から切り離して呼び出し側へ移譲する
+//   - 移譲後の Pin 解放は呼び出し側が Pool.Unpin で行う
+//   - 変更ありの X ラッチを保持中のページを指定すると panic する
+func (m *Mtr) TransferPin(pageId page.Id) {
+	if entry, ok := m.removePinned(pageId); ok {
+		m.assertReleasable(entry)
+		m.logPageIfModified(entry)
+		if !entry.skipLatch {
+			entry.bufPage.latch.Unlock(entry.mode)
+		}
+	}
+}
+
 // assertReleasable は変更ありの X ラッチを mtr 途中で解放しようとした場合に panic する
 //   - 一括解放経路 (UnpinAll / Commit) は本チェックを経由しないため、 mtr 完了時の解放は許容される
 //   - skipLatch なエントリ (= 同一ページの再帰取得) と非 X モードのエントリは検証対象外

@@ -71,12 +71,12 @@ func TestSecondaryIndexSearch(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
 		mtr := buffer.NewMtr(si.bufferPool)
-		defer mtr.UnpinAll()
 		r := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
 		_ = si.insert(mtr, r, testSecondaryTrxId)
+		mtr.UnpinAll()
 
 		// WHEN
-		iter, err := si.search(mtr, SearchModeStart{}, nil)
+		iter, err := si.search(SearchModeStart{}, nil)
 
 		// THEN
 		assert.NoError(t, err)
@@ -154,24 +154,29 @@ func TestSecondaryIndexInsert(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_email", true)
 		mtr := buffer.NewMtr(si.bufferPool)
-		defer mtr.UnpinAll()
 		r1 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"1"})
 		err := si.insert(mtr, r1, testSecondaryTrxId)
 		assert.NoError(t, err)
+		mtr.UnpinAll()
 
 		// 論理削除
-		iter, err := si.search(mtr, SearchModeStart{}, nil)
+		iter, err := si.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		record, ok, err := iter.NextIndexOnly()
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		err = si.softDelete(mtr, record, testSecondaryTrxId)
+		iter.Close()
+		softDeleteMtr := buffer.NewMtr(si.bufferPool)
+		err = si.softDelete(softDeleteMtr, record, testSecondaryTrxId)
 		assert.NoError(t, err)
+		softDeleteMtr.UnpinAll()
 
 		r2 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"2"})
 
 		// WHEN
-		err = si.insert(mtr, r2, testSecondaryTrxId)
+		reinsertMtr := buffer.NewMtr(si.bufferPool)
+		defer reinsertMtr.UnpinAll()
+		err = si.insert(reinsertMtr, r2, testSecondaryTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -181,24 +186,29 @@ func TestSecondaryIndexInsert(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
 		mtr := buffer.NewMtr(si.bufferPool)
-		defer mtr.UnpinAll()
 		r1 := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
 		err := si.insert(mtr, r1, testSecondaryTrxId)
 		assert.NoError(t, err)
+		mtr.UnpinAll()
 
 		// 論理削除
-		iter, err := si.search(mtr, SearchModeStart{}, nil)
+		iter, err := si.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		record, ok, err := iter.NextIndexOnly()
 		assert.NoError(t, err)
 		assert.True(t, ok)
-		err = si.softDelete(mtr, record, testSecondaryTrxId)
+		iter.Close()
+		softDeleteMtr := buffer.NewMtr(si.bufferPool)
+		err = si.softDelete(softDeleteMtr, record, testSecondaryTrxId)
 		assert.NoError(t, err)
+		softDeleteMtr.UnpinAll()
 
 		r2 := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
 
 		// WHEN
-		err = si.insert(mtr, r2, testSecondaryTrxId)
+		reinsertMtr := buffer.NewMtr(si.bufferPool)
+		defer reinsertMtr.UnpinAll()
+		err = si.insert(reinsertMtr, r2, testSecondaryTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -228,22 +238,25 @@ func TestSecondaryIndexDelete(t *testing.T) {
 	t.Run("レコードを物理削除できる", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
-		mtr := buffer.NewMtr(si.bufferPool)
-		defer mtr.UnpinAll()
+		insertMtr := buffer.NewMtr(si.bufferPool)
 		r := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
-		_ = si.insert(mtr, r, testSecondaryTrxId)
+		_ = si.insert(insertMtr, r, testSecondaryTrxId)
+		insertMtr.UnpinAll()
 
-		iter, _ := si.search(mtr, SearchModeStart{}, nil)
+		iter, _ := si.search(SearchModeStart{}, nil)
 		record, _, _ := iter.NextIndexOnly()
+		iter.Close()
 
 		// WHEN
-		err := si.delete(mtr, record, testSecondaryTrxId)
+		deleteMtr := buffer.NewMtr(si.bufferPool)
+		err := si.delete(deleteMtr, record, testSecondaryTrxId)
+		deleteMtr.UnpinAll()
 
 		// THEN
 		assert.NoError(t, err)
 
 		// 削除後は取得できない
-		iter2, _ := si.search(mtr, SearchModeStart{}, nil)
+		iter2, _ := si.search(SearchModeStart{}, nil)
 		_, ok, _ := iter2.NextIndexOnly()
 		assert.False(t, ok)
 	})
@@ -271,22 +284,25 @@ func TestSecondaryIndexSoftDelete(t *testing.T) {
 	t.Run("レコードを論理削除できる", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
-		mtr := buffer.NewMtr(si.bufferPool)
-		defer mtr.UnpinAll()
+		insertMtr := buffer.NewMtr(si.bufferPool)
 		r := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
-		_ = si.insert(mtr, r, testSecondaryTrxId)
+		_ = si.insert(insertMtr, r, testSecondaryTrxId)
+		insertMtr.UnpinAll()
 
-		iter, _ := si.search(mtr, SearchModeStart{}, nil)
+		iter, _ := si.search(SearchModeStart{}, nil)
 		record, _, _ := iter.NextIndexOnly()
+		iter.Close()
 
 		// WHEN
-		err := si.softDelete(mtr, record, testSecondaryTrxId)
+		softDeleteMtr := buffer.NewMtr(si.bufferPool)
+		err := si.softDelete(softDeleteMtr, record, testSecondaryTrxId)
+		softDeleteMtr.UnpinAll()
 
 		// THEN
 		assert.NoError(t, err)
 
 		// 論理削除後は検索でスキップされる
-		iter2, _ := si.search(mtr, SearchModeStart{}, nil)
+		iter2, _ := si.search(SearchModeStart{}, nil)
 		_, ok, _ := iter2.NextIndexOnly()
 		assert.False(t, ok)
 	})
@@ -294,19 +310,24 @@ func TestSecondaryIndexSoftDelete(t *testing.T) {
 	t.Run("論理削除後に再挿入できる", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_name", false)
-		mtr := buffer.NewMtr(si.bufferPool)
-		defer mtr.UnpinAll()
+		insertMtr := buffer.NewMtr(si.bufferPool)
 		r := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
-		_ = si.insert(mtr, r, testSecondaryTrxId)
+		_ = si.insert(insertMtr, r, testSecondaryTrxId)
+		insertMtr.UnpinAll()
 
-		iter, _ := si.search(mtr, SearchModeStart{}, nil)
+		iter, _ := si.search(SearchModeStart{}, nil)
 		record, _, _ := iter.NextIndexOnly()
-		_ = si.softDelete(mtr, record, testSecondaryTrxId)
+		iter.Close()
+		softDeleteMtr := buffer.NewMtr(si.bufferPool)
+		_ = si.softDelete(softDeleteMtr, record, testSecondaryTrxId)
+		softDeleteMtr.UnpinAll()
 
 		r2 := buildTestSecondaryRecord(t, si, []string{"name"}, []string{"Alice"}, []string{"1"})
 
 		// WHEN
-		err := si.insert(mtr, r2, testSecondaryTrxId)
+		reinsertMtr := buffer.NewMtr(si.bufferPool)
+		defer reinsertMtr.UnpinAll()
+		err := si.insert(reinsertMtr, r2, testSecondaryTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -379,20 +400,25 @@ func TestSecondaryIndexCheckUnique(t *testing.T) {
 	t.Run("論理削除済みの同じ SK のレコードが存在する場合はエラーを返さない", func(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_email", true)
-		mtr := buffer.NewMtr(si.bufferPool)
-		defer mtr.UnpinAll()
+		insertMtr := buffer.NewMtr(si.bufferPool)
 		r1 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"1"})
-		_ = si.insert(mtr, r1, testSecondaryTrxId)
+		_ = si.insert(insertMtr, r1, testSecondaryTrxId)
+		insertMtr.UnpinAll()
 
 		// 論理削除
-		iter, _ := si.search(mtr, SearchModeStart{}, nil)
+		iter, _ := si.search(SearchModeStart{}, nil)
 		record, _, _ := iter.NextIndexOnly()
-		_ = si.softDelete(mtr, record, testSecondaryTrxId)
+		iter.Close()
+		softDeleteMtr := buffer.NewMtr(si.bufferPool)
+		_ = si.softDelete(softDeleteMtr, record, testSecondaryTrxId)
+		softDeleteMtr.UnpinAll()
 
 		r2 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"2"})
 
 		// WHEN
-		err := si.checkUnique(mtr, r2)
+		checkMtr := buffer.NewMtr(si.bufferPool)
+		defer checkMtr.UnpinAll()
+		err := si.checkUnique(checkMtr, r2)
 
 		// THEN
 		assert.NoError(t, err)
@@ -430,14 +456,17 @@ func TestSecondaryIndexUniqueSkLock(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_email", true)
 		mtr := buffer.NewMtr(si.bufferPool)
-		defer mtr.UnpinAll()
 		r1 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"1"})
 		err := si.insert(mtr, r1, lock.TrxId(1))
 		assert.NoError(t, err)
+		mtr.UnpinAll()
 
-		iter, _ := si.search(mtr, SearchModeStart{}, nil)
+		iter, _ := si.search(SearchModeStart{}, nil)
 		record, _, _ := iter.NextIndexOnly()
-		err = si.softDelete(mtr, record, lock.TrxId(1))
+		iter.Close()
+		softDeleteMtr := buffer.NewMtr(si.bufferPool)
+		defer softDeleteMtr.UnpinAll()
+		err = si.softDelete(softDeleteMtr, record, lock.TrxId(1))
 		assert.NoError(t, err)
 
 		// WHEN
@@ -461,18 +490,21 @@ func TestSecondaryIndexUniqueSkLock(t *testing.T) {
 		// GIVEN
 		si := setupTestSecondaryIndex(t, "idx_email", true)
 		mtr := buffer.NewMtr(si.bufferPool)
-		defer mtr.UnpinAll()
 		r1 := buildTestSecondaryRecord(t, si, []string{"email"}, []string{"alice@example.com"}, []string{"1"})
 		err := si.insert(mtr, r1, lock.TrxId(1))
 		assert.NoError(t, err)
-		iter, _ := si.search(mtr, SearchModeStart{}, nil)
+		mtr.UnpinAll()
+
+		iter, _ := si.search(SearchModeStart{}, nil)
 		record, _, _ := iter.NextIndexOnly()
-		err = si.softDelete(mtr, record, lock.TrxId(1))
+		iter.Close()
+		softDeleteMtr := buffer.NewMtr(si.bufferPool)
+		err = si.softDelete(softDeleteMtr, record, lock.TrxId(1))
 		assert.NoError(t, err)
 
 		// trx 1 が保持する全ロック (SK+PK 単位 / SK 単位の両方) を解放
 		si.lock.Release(lock.TrxId(1))
-		mtr.UnpinAll()
+		softDeleteMtr.UnpinAll()
 
 		// WHEN
 		mtr2 := buffer.NewMtr(si.bufferPool)

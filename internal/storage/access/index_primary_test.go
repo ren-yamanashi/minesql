@@ -60,13 +60,13 @@ func TestPrimaryIndexSearch(t *testing.T) {
 	t.Run("全件スキャンでレコードを取得できる", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.bufferPool)
-		defer mtr.UnpinAll()
+		writeMtr := buffer.NewMtr(pi.bufferPool)
 		record := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
-		_ = pi.insert(mtr, record, testTrxId)
+		_ = pi.insert(writeMtr, record, testTrxId)
+		writeMtr.UnpinAll()
 
 		// WHEN
-		iter, err := pi.search(mtr, SearchModeStart{}, nil)
+		iter, err := pi.search(SearchModeStart{}, nil)
 
 		// THEN
 		assert.NoError(t, err)
@@ -79,11 +79,9 @@ func TestPrimaryIndexSearch(t *testing.T) {
 	t.Run("空のインデックスを検索するとデータなしを返す", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.bufferPool)
-		defer mtr.UnpinAll()
 
 		// WHEN
-		iter, err := pi.search(mtr, SearchModeStart{}, nil)
+		iter, err := pi.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 
 		_, ok, err := iter.Next()
@@ -144,20 +142,25 @@ func TestPrimaryIndexInsert(t *testing.T) {
 	t.Run("論理削除済みの同一キーがある場合は上書きできる", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.bufferPool)
-		defer mtr.UnpinAll()
+		insertMtr := buffer.NewMtr(pi.bufferPool)
 		r1 := buildTestPrimaryRecord(t, pi, "1", "Alice", "a@example.com")
-		_ = pi.insert(mtr, r1, testTrxId)
+		_ = pi.insert(insertMtr, r1, testTrxId)
+		insertMtr.UnpinAll()
 
 		// 論理削除
-		iter, _ := pi.search(mtr, SearchModeStart{}, nil)
+		iter, _ := pi.search(SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
-		_ = pi.softDelete(mtr, record, testTrxId)
+		iter.Close()
+		deleteMtr := buffer.NewMtr(pi.bufferPool)
+		_ = pi.softDelete(deleteMtr, record, testTrxId)
+		deleteMtr.UnpinAll()
 
 		r2 := buildTestPrimaryRecord(t, pi, "1", "Bob", "b@example.com")
 
 		// WHEN
-		err := pi.insert(mtr, r2, testTrxId)
+		reinsertMtr := buffer.NewMtr(pi.bufferPool)
+		defer reinsertMtr.UnpinAll()
+		err := pi.insert(reinsertMtr, r2, testTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -187,22 +190,25 @@ func TestPrimaryIndexDelete(t *testing.T) {
 	t.Run("レコードを物理削除できる", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.bufferPool)
-		defer mtr.UnpinAll()
+		insertMtr := buffer.NewMtr(pi.bufferPool)
 		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
-		_ = pi.insert(mtr, r, testTrxId)
+		_ = pi.insert(insertMtr, r, testTrxId)
+		insertMtr.UnpinAll()
 
-		iter, _ := pi.search(mtr, SearchModeStart{}, nil)
+		iter, _ := pi.search(SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
+		iter.Close()
 
 		// WHEN
-		err := pi.delete(mtr, record, testTrxId)
+		deleteMtr := buffer.NewMtr(pi.bufferPool)
+		err := pi.delete(deleteMtr, record, testTrxId)
+		deleteMtr.UnpinAll()
 
 		// THEN
 		assert.NoError(t, err)
 
 		// 削除後は取得できない
-		iter2, _ := pi.search(mtr, SearchModeStart{}, nil)
+		iter2, _ := pi.search(SearchModeStart{}, nil)
 		_, ok, _ := iter2.Next()
 		assert.False(t, ok)
 	})
@@ -226,22 +232,25 @@ func TestPrimaryIndexSoftDelete(t *testing.T) {
 	t.Run("レコードを論理削除できる", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.bufferPool)
-		defer mtr.UnpinAll()
+		insertMtr := buffer.NewMtr(pi.bufferPool)
 		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
-		_ = pi.insert(mtr, r, testTrxId)
+		_ = pi.insert(insertMtr, r, testTrxId)
+		insertMtr.UnpinAll()
 
-		iter, _ := pi.search(mtr, SearchModeStart{}, nil)
+		iter, _ := pi.search(SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
+		iter.Close()
 
 		// WHEN
-		err := pi.softDelete(mtr, record, testTrxId)
+		deleteMtr := buffer.NewMtr(pi.bufferPool)
+		err := pi.softDelete(deleteMtr, record, testTrxId)
+		deleteMtr.UnpinAll()
 
 		// THEN
 		assert.NoError(t, err)
 
 		// 論理削除後は検索でスキップされる
-		iter2, _ := pi.search(mtr, SearchModeStart{}, nil)
+		iter2, _ := pi.search(SearchModeStart{}, nil)
 		_, ok, _ := iter2.Next()
 		assert.False(t, ok)
 	})
@@ -249,19 +258,24 @@ func TestPrimaryIndexSoftDelete(t *testing.T) {
 	t.Run("論理削除後に再挿入できる", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.bufferPool)
-		defer mtr.UnpinAll()
+		insertMtr := buffer.NewMtr(pi.bufferPool)
 		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
-		_ = pi.insert(mtr, r, testTrxId)
+		_ = pi.insert(insertMtr, r, testTrxId)
+		insertMtr.UnpinAll()
 
-		iter, _ := pi.search(mtr, SearchModeStart{}, nil)
+		iter, _ := pi.search(SearchModeStart{}, nil)
 		record, _, _ := iter.Next()
-		_ = pi.softDelete(mtr, record, testTrxId)
+		iter.Close()
+		deleteMtr := buffer.NewMtr(pi.bufferPool)
+		_ = pi.softDelete(deleteMtr, record, testTrxId)
+		deleteMtr.UnpinAll()
 
 		r2 := buildTestPrimaryRecord(t, pi, "1", "Bob", "bob@example.com")
 
 		// WHEN
-		err := pi.insert(mtr, r2, testTrxId)
+		reinsertMtr := buffer.NewMtr(pi.bufferPool)
+		defer reinsertMtr.UnpinAll()
+		err := pi.insert(reinsertMtr, r2, testTrxId)
 
 		// THEN
 		assert.NoError(t, err)
@@ -272,23 +286,26 @@ func TestPrimaryIndexUpdate(t *testing.T) {
 	t.Run("レコードをインプレース更新できる", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.bufferPool)
-		defer mtr.UnpinAll()
+		insertMtr := buffer.NewMtr(pi.bufferPool)
 		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "alice@example.com")
-		_ = pi.insert(mtr, r, testTrxId)
+		_ = pi.insert(insertMtr, r, testTrxId)
+		insertMtr.UnpinAll()
 
-		iter, _ := pi.search(mtr, SearchModeStart{}, nil)
+		iter, _ := pi.search(SearchModeStart{}, nil)
 		current, _, _ := iter.Next()
+		iter.Close()
 		newRecord, _ := current.update(testTrxId, []string{"name"}, []string{"Bob"})
 
 		// WHEN
-		err := pi.update(mtr, newRecord, testTrxId)
+		updateMtr := buffer.NewMtr(pi.bufferPool)
+		err := pi.update(updateMtr, newRecord, testTrxId)
+		updateMtr.UnpinAll()
 
 		// THEN
 		assert.NoError(t, err)
 
 		// 更新後の値を確認
-		iter2, _ := pi.search(mtr, SearchModeStart{}, nil)
+		iter2, _ := pi.search(SearchModeStart{}, nil)
 		updated, ok, _ := iter2.Next()
 		assert.True(t, ok)
 		assert.Equal(t, "Bob", updated.values[1])
@@ -298,13 +315,14 @@ func TestPrimaryIndexUpdate(t *testing.T) {
 	t.Run("存在しないカラムで更新するとエラーを返す", func(t *testing.T) {
 		// GIVEN
 		pi := setupTestPrimaryIndex(t)
-		mtr := buffer.NewMtr(pi.bufferPool)
-		defer mtr.UnpinAll()
+		insertMtr := buffer.NewMtr(pi.bufferPool)
 		r := buildTestPrimaryRecord(t, pi, "1", "Alice", "a@example.com")
-		_ = pi.insert(mtr, r, testTrxId)
+		_ = pi.insert(insertMtr, r, testTrxId)
+		insertMtr.UnpinAll()
 
-		iter, _ := pi.search(mtr, SearchModeStart{}, nil)
+		iter, _ := pi.search(SearchModeStart{}, nil)
 		current, _, _ := iter.Next()
+		iter.Close()
 
 		// WHEN
 		_, err := current.update(testTrxId, []string{"nonexistent"}, []string{"val"})

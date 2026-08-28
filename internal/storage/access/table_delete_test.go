@@ -20,9 +20,7 @@ func TestTableSoftDelete(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter, err := table.primaryIndex.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -40,16 +38,14 @@ func TestTableSoftDelete(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.search(mtr, SearchModeStart{}, nil)
+		nameIter, err := idxName.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err := nameIter.Next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
-		emailIter, err := idxEmail.search(mtr, SearchModeStart{}, nil)
+		emailIter, err := idxEmail.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err = emailIter.Next()
 		assert.NoError(t, err)
@@ -193,9 +189,7 @@ func TestTableDelete(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter, err := table.primaryIndex.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -213,16 +207,14 @@ func TestTableDelete(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.search(mtr, SearchModeStart{}, nil)
+		nameIter, err := idxName.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err := nameIter.Next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
-		emailIter, err := idxEmail.search(mtr, SearchModeStart{}, nil)
+		emailIter, err := idxEmail.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err = emailIter.Next()
 		assert.NoError(t, err)

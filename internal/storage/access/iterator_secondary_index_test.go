@@ -23,8 +23,8 @@ func TestSecondaryIndexIteratorNext(t *testing.T) {
 		insertPrimaryRecord(t, env, 0, []string{"id", "name", "email"}, []string{"1", "Alice", "alice@example.com"})
 		insertSecondaryRecord(t, env, []string{"name"}, []string{"Alice"}, []string{"1"})
 
-		iter, mtr := searchSecondaryIndex(t, env)
-		defer mtr.UnpinAll()
+		iter := searchSecondaryIndex(t, env)
+		defer iter.Close()
 
 		// WHEN
 		result, ok, err := iter.Next()
@@ -43,8 +43,8 @@ func TestSecondaryIndexIteratorNext(t *testing.T) {
 		insertSecondaryRecord(t, env, []string{"name"}, []string{"Alice"}, []string{"1"})
 		insertSecondaryRecord(t, env, []string{"name"}, []string{"Bob"}, []string{"2"})
 
-		iter, mtr := searchSecondaryIndex(t, env)
-		defer mtr.UnpinAll()
+		iter := searchSecondaryIndex(t, env)
+		defer iter.Close()
 
 		// WHEN
 		r1, ok1, err1 := iter.Next()
@@ -72,8 +72,8 @@ func TestSecondaryIndexIteratorNext(t *testing.T) {
 		insertSecondaryRecord(t, env, []string{"name"}, []string{"Alice"}, []string{"1"})
 		insertSecondaryRecordWithDeleteMark(t, env, 1, []string{"name"}, []string{"Bob"}, []string{"2"})
 
-		iter, mtr := searchSecondaryIndex(t, env)
-		defer mtr.UnpinAll()
+		iter := searchSecondaryIndex(t, env)
+		defer iter.Close()
 
 		// WHEN
 		r1, ok1, err1 := iter.Next()
@@ -93,8 +93,8 @@ func TestSecondaryIndexIteratorNext(t *testing.T) {
 		env := setupIteratorTestEnv(t)
 		insertSecondaryRecord(t, env, []string{"name"}, []string{"Alice"}, []string{"999"})
 
-		iter, mtr := searchSecondaryIndex(t, env)
-		defer mtr.UnpinAll()
+		iter := searchSecondaryIndex(t, env)
+		defer iter.Close()
 
 		// WHEN
 		_, ok, err := iter.Next()
@@ -107,8 +107,8 @@ func TestSecondaryIndexIteratorNext(t *testing.T) {
 	t.Run("空のインデックスから取得するとデータなしを返す", func(t *testing.T) {
 		// GIVEN
 		env := setupIteratorTestEnv(t)
-		iter, mtr := searchSecondaryIndex(t, env)
-		defer mtr.UnpinAll()
+		iter := searchSecondaryIndex(t, env)
+		defer iter.Close()
 
 		// WHEN
 		_, ok, err := iter.Next()
@@ -125,8 +125,8 @@ func TestSecondaryIndexIteratorNextIndexOnly(t *testing.T) {
 		env := setupIteratorTestEnv(t)
 		insertSecondaryRecord(t, env, []string{"name"}, []string{"Alice"}, []string{"1"})
 
-		iter, mtr := searchSecondaryIndex(t, env)
-		defer mtr.UnpinAll()
+		iter := searchSecondaryIndex(t, env)
+		defer iter.Close()
 
 		// WHEN
 		result, ok, err := iter.NextIndexOnly()
@@ -145,8 +145,8 @@ func TestSecondaryIndexIteratorNextIndexOnly(t *testing.T) {
 		insertSecondaryRecordWithDeleteMark(t, env, 1, []string{"name"}, []string{"Alice"}, []string{"1"})
 		insertSecondaryRecord(t, env, []string{"name"}, []string{"Bob"}, []string{"2"})
 
-		iter, mtr := searchSecondaryIndex(t, env)
-		defer mtr.UnpinAll()
+		iter := searchSecondaryIndex(t, env)
+		defer iter.Close()
 
 		// WHEN
 		result, ok, err := iter.NextIndexOnly()
@@ -160,8 +160,8 @@ func TestSecondaryIndexIteratorNextIndexOnly(t *testing.T) {
 	t.Run("空のインデックスから取得するとデータなしを返す", func(t *testing.T) {
 		// GIVEN
 		env := setupIteratorTestEnv(t)
-		iter, mtr := searchSecondaryIndex(t, env)
-		defer mtr.UnpinAll()
+		iter := searchSecondaryIndex(t, env)
+		defer iter.Close()
 
 		// WHEN
 		_, ok, err := iter.NextIndexOnly()
@@ -336,18 +336,15 @@ func insertSecondaryRecordWithMvcc(t *testing.T, env *iteratorTestEnv, deleteMar
 	}
 }
 
-// searchSecondaryIndex はセカンダリ B+Tree を先頭から検索してイテレータと mtr を返す
-//   - 呼び出し側は defer mtr.UnpinAll() で解放する
-func searchSecondaryIndex(t *testing.T, env *iteratorTestEnv) (*SecondaryIndexIterator, *buffer.Mtr) {
+// searchSecondaryIndex はセカンダリ B+Tree の走査イテレータを返す
+//   - 呼び出し側は defer iter.Close() で解放する
+func searchSecondaryIndex(t *testing.T, env *iteratorTestEnv) *SecondaryIndexIterator {
 	t.Helper()
-	mode := SearchModeStart{}
-	mtr := buffer.NewMtr(env.bp)
-	iter, err := env.secondaryTree.Search(mtr, mode.Encode())
+	scanIter, err := env.secondaryTree.OpenScan(SearchModeStart{}.Encode())
 	if err != nil {
-		mtr.UnpinAll()
 		t.Fatalf("セカンダリインデックスの検索に失敗: %v", err)
 	}
-	return NewSecondaryIndexIterator("idx_name", iter, env.ct, env.bp, env.primaryTree, nil, nil), mtr
+	return NewSecondaryIndexIterator("idx_name", scanIter, env.ct, env.bp, env.primaryTree, nil, nil)
 }
 
 func TestSecondaryIndexIteratorNextWithReadView(t *testing.T) {
@@ -537,16 +534,16 @@ func TestSecondaryIndexIteratorNextWithReadView(t *testing.T) {
 	})
 }
 
-// searchSecondaryIndexWithReadView は readView 付きでセカンダリイテレータを返す
+// searchSecondaryIndexWithReadView は readView 付きでセカンダリ走査イテレータを返す
 func searchSecondaryIndexWithReadView(t *testing.T, env *mvccTestEnv, rv *readView) *SecondaryIndexIterator {
 	t.Helper()
-	mtr := buffer.NewMtr(env.iter.bp)
-	t.Cleanup(func() { mtr.UnpinAll() })
-	iter, err := env.iter.secondaryTree.Search(mtr, SearchModeStart{}.Encode())
+	scanIter, err := env.iter.secondaryTree.OpenScan(SearchModeStart{}.Encode())
 	if err != nil {
 		t.Fatalf("セカンダリインデックスの検索に失敗: %v", err)
 	}
-	return NewSecondaryIndexIterator("idx_name", iter, env.iter.ct, env.iter.bp, env.iter.primaryTree, rv, env.undoLog)
+	iter := NewSecondaryIndexIterator("idx_name", scanIter, env.iter.ct, env.iter.bp, env.iter.primaryTree, rv, env.undoLog)
+	t.Cleanup(iter.Close)
+	return iter
 }
 
 func TestSecondaryIndexIteratorNextIndexOnlyWithMVCC(t *testing.T) {

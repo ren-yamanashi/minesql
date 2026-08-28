@@ -9,7 +9,7 @@ import (
 )
 
 type PrimaryIndexIterator struct {
-	iterator   *btree.Iterator
+	iterator   *btree.ScanIterator
 	catalog    *dictionary.Catalog
 	bufferPool *buffer.Pool
 	fileId     page.FileId
@@ -18,7 +18,7 @@ type PrimaryIndexIterator struct {
 }
 
 func NewPrimaryIndexIterator(
-	iter *btree.Iterator,
+	iter *btree.ScanIterator,
 	ct *dictionary.Catalog,
 	bp *buffer.Pool,
 	fileId page.FileId,
@@ -35,41 +35,56 @@ func NewPrimaryIndexIterator(
 	}
 }
 
+// Close は走査を途中で打ち切るときに呼ぶ (終端到達時は自動解放されるため省略可)
+func (pi *PrimaryIndexIterator) Close() {
+	pi.iterator.Close()
+}
+
 // Next はデコード済みの次の可視レコードを返す
 //   - readView が nil の場合は deleteMark のみで判定する従来動作
 //   - readView が非 nil の場合は MVCC の可視性判定 + Undo 遡及を行う
 func (pi *PrimaryIndexIterator) Next() (*PrimaryRecord, bool, error) {
 	for {
-		record, ok, err := pi.iterator.Next()
+		rec, mtr, ok, err := pi.iterator.Next()
 		if err != nil {
 			return nil, false, err
 		}
 		if !ok {
 			return nil, false, nil
 		}
-
-		// readView=nil の場合は deleteMark のみで判定 (Undo 遡及なし)
-		if pi.readView == nil && record.Header()[0] == 1 {
-			continue
-		}
-
-		current, err := DecodePrimaryRecord(record, pi.catalog, pi.bufferPool, pi.fileId)
+		result, done, err := pi.resolveOne(rec, mtr)
+		mtr.UnpinAll()
 		if err != nil {
 			return nil, false, err
 		}
-		if pi.readView == nil {
-			return current, true, nil
+		if done {
+			return result, true, nil
 		}
-
-		visible, err := pi.resolveVisible(current, pi.iterator.Mtr())
-		if err != nil {
-			return nil, false, err
-		}
-		if visible == nil {
-			continue
-		}
-		return visible, true, nil
 	}
+}
+
+// resolveOne は 1 レコードについて可視性判定・Undo 遡及を行う
+//   - 戻り値 done=true のとき result が可視レコード、done=false のときは continue して次のレコードへ
+func (pi *PrimaryIndexIterator) resolveOne(record btree.Record, mtr *buffer.Mtr) (*PrimaryRecord, bool, error) {
+	if pi.readView == nil && record.Header()[0] == 1 {
+		return nil, false, nil
+	}
+	current, err := DecodePrimaryRecord(record, pi.catalog, pi.bufferPool, pi.fileId)
+	if err != nil {
+		return nil, false, err
+	}
+	if pi.readView == nil {
+		return current, true, nil
+	}
+
+	visible, err := pi.resolveVisible(current, mtr)
+	if err != nil {
+		return nil, false, err
+	}
+	if visible == nil {
+		return nil, false, nil
+	}
+	return visible, true, nil
 }
 
 // resolveVisible は可視性判定と Undo チェーン遡及を行い、Read View から見える行を返す

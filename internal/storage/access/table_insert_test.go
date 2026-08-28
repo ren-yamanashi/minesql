@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/ren-yamanashi/minesql/internal/storage/btree"
-	"github.com/ren-yamanashi/minesql/internal/storage/buffer"
 	"github.com/ren-yamanashi/minesql/internal/storage/undo"
 	"github.com/stretchr/testify/assert"
 )
@@ -35,17 +34,15 @@ func TestTableInsert(t *testing.T) {
 		table, _, _ := setupTableWithRecord(t)
 
 		// THEN
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.search(mtr, SearchModeStart{}, nil)
+		nameIter, err := idxName.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		nameResult, ok, err := nameIter.Next()
 		assert.NoError(t, err)
 		assert.True(t, ok)
 		assert.Equal(t, "Alice", nameResult.values[1])
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
-		emailIter, err := idxEmail.search(mtr, SearchModeStart{}, nil)
+		emailIter, err := idxEmail.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		emailResult, ok, err := emailIter.Next()
 		assert.NoError(t, err)
@@ -175,10 +172,8 @@ func TestTableInsert(t *testing.T) {
 		record := searchFirstPrimaryRecord(t, table)
 		assert.Equal(t, []string{"1", "Alice", "alice@example.com"}, record.values)
 
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.search(mtr, SearchModeStart{}, nil)
+		nameIter, err := idxName.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		nameResult, ok, err := nameIter.Next()
 		assert.NoError(t, err)

@@ -95,8 +95,8 @@ func createSecondaryIndex(
 
 // search は指定した検索モードでインデックスを検索し、イテレータを返す
 //   - readView が非 nil の場合は MVCC の可視性判定 + Undo 遡及を行う
-func (si *secondaryIndex) search(mtr *buffer.Mtr, mode SearchMode, readView *readView) (*SecondaryIndexIterator, error) {
-	iter, err := si.tree.Search(mtr, mode.Encode())
+func (si *secondaryIndex) search(mode SearchMode, readView *readView) (*SecondaryIndexIterator, error) {
+	iter, err := si.tree.OpenScan(mode.Encode())
 	if err != nil {
 		return nil, err
 	}

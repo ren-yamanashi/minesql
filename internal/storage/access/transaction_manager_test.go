@@ -354,9 +354,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter, err := table.primaryIndex.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -376,8 +374,6 @@ func TestTrxManagerRollback(t *testing.T) {
 		_ = tm.Commit(trx)
 
 		trx2 := tm.Begin()
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
 		record := currentReadFirst(t, table, trx2)
 		err := table.SoftDelete(trx2, record)
 		assert.NoError(t, err)
@@ -388,7 +384,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 
-		iter2, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter2, err := table.primaryIndex.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		restored, ok, err := iter2.Next()
 		assert.NoError(t, err)
@@ -409,8 +405,6 @@ func TestTrxManagerRollback(t *testing.T) {
 		_ = tm.Commit(trx)
 
 		trx2 := tm.Begin()
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
 		record := currentReadFirst(t, table, trx2)
 		err := table.Update(trx2, record, []string{"name"}, []string{"Bob"})
 		assert.NoError(t, err)
@@ -421,7 +415,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 
-		iter2, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter2, err := table.primaryIndex.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		restored, ok, err := iter2.Next()
 		assert.NoError(t, err)
@@ -447,17 +441,15 @@ func TestTrxManagerRollback(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.search(mtr, SearchModeStart{}, nil)
+		nameIter, err := idxName.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err := nameIter.Next()
 		assert.NoError(t, err)
 		assert.False(t, ok)
 
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
-		emailIter, err := idxEmail.search(mtr, SearchModeStart{}, nil)
+		emailIter, err := idxEmail.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err = emailIter.Next()
 		assert.NoError(t, err)
@@ -477,8 +469,6 @@ func TestTrxManagerRollback(t *testing.T) {
 		_ = tm.Commit(trx)
 
 		trx2 := tm.Begin()
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
 		record := currentReadFirst(t, table, trx2)
 		err := table.SoftDelete(trx2, record)
 		assert.NoError(t, err)
@@ -489,7 +479,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.search(mtr, SearchModeStart{}, nil)
+		nameIter, err := idxName.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		nameResult, ok, err := nameIter.Next()
 		assert.NoError(t, err)
@@ -510,8 +500,6 @@ func TestTrxManagerRollback(t *testing.T) {
 		_ = tm.Commit(trx)
 
 		trx2 := tm.Begin()
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
 		record := currentReadFirst(t, table, trx2)
 		err := table.Update(trx2, record, []string{"name"}, []string{"Bob"})
 		assert.NoError(t, err)
@@ -522,7 +510,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.search(mtr, SearchModeStart{}, nil)
+		nameIter, err := idxName.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		nameResult, ok, err := nameIter.Next()
 		assert.NoError(t, err)
@@ -543,8 +531,6 @@ func TestTrxManagerRollback(t *testing.T) {
 		_ = tm.Commit(trx)
 
 		trx2 := tm.Begin()
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
 		record := currentReadFirst(t, table, trx2)
 		err := table.Update(trx2, record, []string{"email"}, []string{"new@example.com"})
 		assert.NoError(t, err)
@@ -555,7 +541,7 @@ func TestTrxManagerRollback(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.search(mtr, SearchModeStart{}, nil)
+		nameIter, err := idxName.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		nameResult, ok, err := nameIter.Next()
 		assert.NoError(t, err)

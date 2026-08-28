@@ -262,15 +262,13 @@ func TestCheckpointExecuteWithFuzzyFlushAndRecovery(t *testing.T) {
 		for i, name := range tableNames {
 			table2, err := NewTable(env2.bp, env2.ct, env2.undoLog, env2.lockMgr, env2.redoLog, name)
 			assert.NoError(t, err)
-			mtr := buffer.NewMtr(env2.bp)
-			iter, err := table2.primaryIndex.search(mtr, SearchModeStart{}, nil)
+			iter, err := table2.primaryIndex.search(SearchModeStart{}, nil)
 			assert.NoError(t, err)
 			rec, ok, err := iter.Next()
 			assert.NoError(t, err)
 			assert.True(t, ok, "テーブル %q のレコードが見つからない", name)
 			assert.Equal(t, "1", rec.values[0])
 			assert.Equal(t, fmt.Sprintf("row-%d", i), rec.values[1])
-			mtr.UnpinAll()
 		}
 	})
 }

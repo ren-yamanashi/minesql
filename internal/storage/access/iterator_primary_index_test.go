@@ -19,8 +19,8 @@ func TestPrimaryIndexIteratorNext(t *testing.T) {
 		env := setupIteratorTestEnv(t)
 		insertPrimaryRecord(t, env, 0, []string{"id", "name", "email"}, []string{"1", "Alice", "alice@example.com"})
 
-		iter, mtr := searchPrimaryIndex(t, env)
-		defer mtr.UnpinAll()
+		iter := searchPrimaryIndex(t, env)
+		defer iter.Close()
 
 		// WHEN
 		result, ok, err := iter.Next()
@@ -38,8 +38,8 @@ func TestPrimaryIndexIteratorNext(t *testing.T) {
 		insertPrimaryRecord(t, env, 0, []string{"id", "name", "email"}, []string{"1", "Alice", "a@example.com"})
 		insertPrimaryRecord(t, env, 0, []string{"id", "name", "email"}, []string{"2", "Bob", "b@example.com"})
 
-		iter, mtr := searchPrimaryIndex(t, env)
-		defer mtr.UnpinAll()
+		iter := searchPrimaryIndex(t, env)
+		defer iter.Close()
 
 		// WHEN
 		r1, ok1, err1 := iter.Next()
@@ -65,8 +65,8 @@ func TestPrimaryIndexIteratorNext(t *testing.T) {
 		insertPrimaryRecord(t, env, 1, []string{"id", "name", "email"}, []string{"1", "Alice", "a@example.com"})
 		insertPrimaryRecord(t, env, 0, []string{"id", "name", "email"}, []string{"2", "Bob", "b@example.com"})
 
-		iter, mtr := searchPrimaryIndex(t, env)
-		defer mtr.UnpinAll()
+		iter := searchPrimaryIndex(t, env)
+		defer iter.Close()
 
 		// WHEN
 		result, ok, err := iter.Next()
@@ -82,8 +82,8 @@ func TestPrimaryIndexIteratorNext(t *testing.T) {
 		env := setupIteratorTestEnv(t)
 		insertPrimaryRecord(t, env, 1, []string{"id", "name", "email"}, []string{"1", "Alice", "a@example.com"})
 
-		iter, mtr := searchPrimaryIndex(t, env)
-		defer mtr.UnpinAll()
+		iter := searchPrimaryIndex(t, env)
+		defer iter.Close()
 
 		// WHEN
 		_, ok, err := iter.Next()
@@ -96,8 +96,8 @@ func TestPrimaryIndexIteratorNext(t *testing.T) {
 	t.Run("空のインデックスから取得するとデータなしを返す", func(t *testing.T) {
 		// GIVEN
 		env := setupIteratorTestEnv(t)
-		iter, mtr := searchPrimaryIndex(t, env)
-		defer mtr.UnpinAll()
+		iter := searchPrimaryIndex(t, env)
+		defer iter.Close()
 
 		// WHEN
 		_, ok, err := iter.Next()
@@ -108,18 +108,15 @@ func TestPrimaryIndexIteratorNext(t *testing.T) {
 	})
 }
 
-// searchPrimaryIndex はプライマリ B+Tree を先頭から検索してイテレータと mtr を返す
-//   - 呼び出し側は defer mtr.UnpinAll() で解放する
-func searchPrimaryIndex(t *testing.T, env *iteratorTestEnv) (*PrimaryIndexIterator, *buffer.Mtr) {
+// searchPrimaryIndex はプライマリ B+Tree の走査イテレータを返す
+//   - 呼び出し側は defer iter.Close() で解放する
+func searchPrimaryIndex(t *testing.T, env *iteratorTestEnv) *PrimaryIndexIterator {
 	t.Helper()
-	mode := SearchModeStart{}
-	mtr := buffer.NewMtr(env.bp)
-	iter, err := env.primaryTree.Search(mtr, mode.Encode())
+	scanIter, err := env.primaryTree.OpenScan(SearchModeStart{}.Encode())
 	if err != nil {
-		mtr.UnpinAll()
 		t.Fatalf("プライマリインデックスの検索に失敗: %v", err)
 	}
-	return NewPrimaryIndexIterator(iter, env.ct, env.bp, page.FileId(2), nil, nil), mtr
+	return NewPrimaryIndexIterator(scanIter, env.ct, env.bp, page.FileId(2), nil, nil)
 }
 
 func TestPrimaryIndexIteratorNextWithReadView(t *testing.T) {
@@ -128,8 +125,8 @@ func TestPrimaryIndexIteratorNextWithReadView(t *testing.T) {
 		env := setupMVCCTestEnv(t)
 		insertPrimaryRecordWithMvcc(t, env, lock.TrxId(1), undo.NullPointer(), "1", "Alice", "a@example.com")
 		rv := newReadView(lock.TrxId(2), nil, lock.TrxId(2))
-		iter, mtr := searchPrimaryIndexWithReadView(t, env, rv)
-		defer mtr.UnpinAll()
+		iter := searchPrimaryIndexWithReadView(t, env, rv)
+		defer iter.Close()
 
 		// WHEN
 		result, ok, err := iter.Next()
@@ -149,8 +146,8 @@ func TestPrimaryIndexIteratorNextWithReadView(t *testing.T) {
 		updatePrimaryRecordWithMvcc(t, env, lock.TrxId(3), ptr, "1", "Bob", "a@example.com")
 
 		rv := newReadView(lock.TrxId(2), []lock.TrxId{lock.TrxId(3)}, lock.TrxId(4))
-		iter, mtr := searchPrimaryIndexWithReadView(t, env, rv)
-		defer mtr.UnpinAll()
+		iter := searchPrimaryIndexWithReadView(t, env, rv)
+		defer iter.Close()
 
 		// WHEN
 		result, ok, err := iter.Next()
@@ -170,8 +167,8 @@ func TestPrimaryIndexIteratorNextWithReadView(t *testing.T) {
 		updatePrimaryRecordWithMvcc(t, env, lock.TrxId(3), ptr, "1", "Alice", "a@example.com")
 
 		rv := newReadView(lock.TrxId(2), []lock.TrxId{lock.TrxId(3)}, lock.TrxId(4))
-		iter, mtr := searchPrimaryIndexWithReadView(t, env, rv)
-		defer mtr.UnpinAll()
+		iter := searchPrimaryIndexWithReadView(t, env, rv)
+		defer iter.Close()
 
 		// WHEN
 		_, ok, err := iter.Next()
@@ -202,8 +199,8 @@ func TestPrimaryIndexIteratorNextWithReadView(t *testing.T) {
 		updateMtr.UnpinAll()
 
 		rv := newReadView(lock.TrxId(2), nil, lock.TrxId(2))
-		iter, mtr := searchPrimaryIndexWithReadView(t, env, rv)
-		defer mtr.UnpinAll()
+		iter := searchPrimaryIndexWithReadView(t, env, rv)
+		defer iter.Close()
 
 		// WHEN
 		_, ok, err := iter.Next()
@@ -248,8 +245,8 @@ func TestPrimaryIndexIteratorNextWithReadView(t *testing.T) {
 
 		// trx=4 の ReadView: trx=5 が unique で不可視 (lowLimitId=5)。trx=3 は完了 (active 外)
 		rv := newReadView(lock.TrxId(4), nil, lock.TrxId(5))
-		iter, mtr := searchPrimaryIndexWithReadView(t, env, rv)
-		defer mtr.UnpinAll()
+		iter := searchPrimaryIndexWithReadView(t, env, rv)
+		defer iter.Close()
 
 		// WHEN
 		result, ok, err := iter.Next()
@@ -343,15 +340,13 @@ func updatePrimaryRecordWithMvcc(t *testing.T, env *mvccTestEnv, trxId lock.TrxI
 	return pr
 }
 
-// searchPrimaryIndexWithReadView は readView 付きでイテレータと mtr を返す
-//   - 呼び出し側は defer mtr.UnpinAll() で解放する
-func searchPrimaryIndexWithReadView(t *testing.T, env *mvccTestEnv, rv *readView) (*PrimaryIndexIterator, *buffer.Mtr) {
+// searchPrimaryIndexWithReadView は readView 付きで走査イテレータを返す
+//   - 呼び出し側は defer iter.Close() で解放する
+func searchPrimaryIndexWithReadView(t *testing.T, env *mvccTestEnv, rv *readView) *PrimaryIndexIterator {
 	t.Helper()
-	mtr := buffer.NewMtr(env.iter.bp)
-	iter, err := env.iter.primaryTree.Search(mtr, SearchModeStart{}.Encode())
+	scanIter, err := env.iter.primaryTree.OpenScan(SearchModeStart{}.Encode())
 	if err != nil {
-		mtr.UnpinAll()
 		t.Fatalf("プライマリインデックスの検索に失敗: %v", err)
 	}
-	return NewPrimaryIndexIterator(iter, env.iter.ct, env.iter.bp, page.FileId(2), rv, env.undoLog), mtr
+	return NewPrimaryIndexIterator(scanIter, env.iter.ct, env.iter.bp, page.FileId(2), rv, env.undoLog)
 }

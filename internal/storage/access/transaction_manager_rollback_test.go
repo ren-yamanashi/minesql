@@ -33,9 +33,7 @@ func TestTrxManagerRollbackToSavepoint(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		assert.Equal(t, savepoint, trx.Savepoint())
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter, err := table.primaryIndex.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		var keys []string
 		for {
@@ -67,9 +65,7 @@ func TestTrxManagerRollbackToSavepoint(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Equal(t, 0, trx.Savepoint())
 		assert.Equal(t, trxStateActive, tm.transactions[trx.trxId].state)
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter, err := table.primaryIndex.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -188,8 +184,7 @@ func TestTrxManagerRollbackToSavepoint(t *testing.T) {
 		assert.NoError(t, env.trxMgr.RollbackToSavepoint(trx, savepoint))
 
 		// THEN
-		readMtr := buffer.NewMtr(table.bufferPool)
-		primaryIter, err := table.primaryIndex.search(readMtr, SearchModeStart{}, nil)
+		primaryIter, err := table.primaryIndex.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		var primaryKeys []string
 		for {
@@ -202,7 +197,7 @@ func TestTrxManagerRollbackToSavepoint(t *testing.T) {
 		}
 
 		idxName := findSecondaryIndex(t, table, "idx_name")
-		nameIter, err := idxName.search(readMtr, SearchModeStart{}, nil)
+		nameIter, err := idxName.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		type nameEntry struct{ sk, pk string }
 		var nameEntries []nameEntry
@@ -216,7 +211,7 @@ func TestTrxManagerRollbackToSavepoint(t *testing.T) {
 		}
 
 		idxEmail := findSecondaryIndex(t, table, "idx_email")
-		emailIter, err := idxEmail.search(readMtr, SearchModeStart{}, nil)
+		emailIter, err := idxEmail.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		type emailEntry struct{ sk, pk string }
 		var emailEntries []emailEntry
@@ -228,7 +223,6 @@ func TestTrxManagerRollbackToSavepoint(t *testing.T) {
 			}
 			emailEntries = append(emailEntries, emailEntry{sk: rec.values[0], pk: rec.pk[0]})
 		}
-		readMtr.UnpinAll()
 
 		assert.Equal(t, []string{"1"}, primaryKeys, "プライマリに PK=2 の残骸は残らない")
 		assert.Equal(t, []nameEntry{{sk: "Alice", pk: "1"}}, nameEntries, "idx_name に Bob+PK=2 の残骸は残らない")
@@ -275,9 +269,7 @@ func TestTrxManagerRollbackToSavepoint(t *testing.T) {
 		// THEN
 		assert.NoError(t, reapplyErr, "既に取り消し済みの Insert への再逆適用は成功する")
 		assert.NoError(t, commitErr)
-		mtr := buffer.NewMtr(table.bufferPool)
-		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter, err := table.primaryIndex.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		var keys []string
 		for {

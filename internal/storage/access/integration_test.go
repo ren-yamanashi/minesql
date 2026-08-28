@@ -110,9 +110,7 @@ func TestIntegrationCommit(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		mtr := buffer.NewMtr(env.bp)
-		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter, err := table.primaryIndex.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -196,9 +194,7 @@ func TestIntegrationRollback(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		mtr := buffer.NewMtr(env.bp)
-		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter, err := table.primaryIndex.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -263,9 +259,7 @@ func TestIntegrationMultipleTransactions(t *testing.T) {
 		assert.NoError(t, err)
 
 		// THEN
-		mtr := buffer.NewMtr(env.bp)
-		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter, err := table.primaryIndex.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 
 		r1, ok, err := iter.Next()
@@ -328,9 +322,7 @@ func TestIntegrationCrashRecovery(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		mtr := buffer.NewMtr(env.bp)
-		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter, err := table.primaryIndex.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		_, ok, err := iter.Next()
 		assert.NoError(t, err)
@@ -600,9 +592,7 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 		// THEN: 全件挿入されている
 		table, err := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
 		assert.NoError(t, err)
-		mtr := buffer.NewMtr(env.bp)
-		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter, err := table.primaryIndex.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		count := 0
 		for {
@@ -660,10 +650,8 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 			defer wg.Done()
 			table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
 			for range 10 {
-				mtr := buffer.NewMtr(env.bp)
-				iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+				iter, err := table.primaryIndex.search(SearchModeStart{}, nil)
 				if err != nil {
-					mtr.UnpinAll()
 					continue
 				}
 				for {
@@ -672,16 +660,14 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 						break
 					}
 				}
-				mtr.UnpinAll()
+				iter.Close()
 			}
 		}()
 		wg.Wait()
 
 		// THEN: 物理削除はされていないので最終的な scan で各 worker が SoftDelete した分はスキップされる
 		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
-		mtr := buffer.NewMtr(env.bp)
-		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter, err := table.primaryIndex.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		count := 0
 		for {
@@ -752,9 +738,7 @@ func TestIntegrationConcurrentStress(t *testing.T) {
 
 		// THEN: Commit 済みの挿入のみ残り、未 Commit はロールバックされている
 		table, _ := NewTable(env.bp, env.ct, env.undoLog, env.lockMgr, env.redoLog, "users")
-		mtr := buffer.NewMtr(env.bp)
-		defer mtr.UnpinAll()
-		iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter, err := table.primaryIndex.search(SearchModeStart{}, nil)
 		assert.NoError(t, err)
 		count := 0
 		for {
@@ -807,12 +791,11 @@ func createUsersTableWithUniqueEmail(t *testing.T, env *integrationEnv) *Table {
 // collectPrimaryKeys はテーブルの全プライマリレコードから id カラム (先頭カラム) の値を集める
 func collectPrimaryKeys(t *testing.T, table *Table) []string {
 	t.Helper()
-	mtr := buffer.NewMtr(table.bufferPool)
-	defer mtr.UnpinAll()
-	iter, err := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+	iter, err := table.primaryIndex.search(SearchModeStart{}, nil)
 	if err != nil {
 		t.Fatalf("primaryIndex.search に失敗: %v", err)
 	}
+	defer iter.Close()
 	var keys []string
 	for {
 		rec, ok, err := iter.Next()
@@ -827,14 +810,13 @@ func collectPrimaryKeys(t *testing.T, table *Table) []string {
 }
 
 // collectSecondaryEntries は指定セカンダリインデックスの全エントリを (sk, pk) ペアの列で返す
-func collectSecondaryEntries(t *testing.T, env *integrationEnv, idx *secondaryIndex) [][2]string {
+func collectSecondaryEntries(t *testing.T, _ *integrationEnv, idx *secondaryIndex) [][2]string {
 	t.Helper()
-	mtr := buffer.NewMtr(env.bp)
-	defer mtr.UnpinAll()
-	iter, err := idx.search(mtr, SearchModeStart{}, nil)
+	iter, err := idx.search(SearchModeStart{}, nil)
 	if err != nil {
 		t.Fatalf("secondaryIndex.search に失敗: %v", err)
 	}
+	defer iter.Close()
 	var entries [][2]string
 	for {
 		rec, ok, err := iter.NextIndexOnly()

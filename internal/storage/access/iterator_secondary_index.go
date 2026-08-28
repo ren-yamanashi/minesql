@@ -13,7 +13,7 @@ import (
 
 type SecondaryIndexIterator struct {
 	indexName   string
-	iterator    *btree.Iterator
+	iterator    *btree.ScanIterator
 	catalog     *dictionary.Catalog
 	bufferPool  *buffer.Pool
 	primaryTree *btree.Tree // プライマリインデックスの B+Tree
@@ -23,7 +23,7 @@ type SecondaryIndexIterator struct {
 
 func NewSecondaryIndexIterator(
 	indexName string,
-	iter *btree.Iterator,
+	iter *btree.ScanIterator,
 	ct *dictionary.Catalog,
 	bp *buffer.Pool,
 	pt *btree.Tree,
@@ -41,44 +41,59 @@ func NewSecondaryIndexIterator(
 	}
 }
 
+// Close は走査を途中で打ち切るときに呼ぶ (終端到達時は自動解放されるため省略可)
+func (si *SecondaryIndexIterator) Close() {
+	si.iterator.Close()
+}
+
 // Next はセカンダリインデックスから次の結果を返す
 // (secondary-index -> primary-index の順で検索する)
 //   - return: 検索結果, データがあるか
 func (si *SecondaryIndexIterator) Next() (*PrimaryRecord, bool, error) {
 	for {
-		record, ok, err := si.iterator.Next()
+		rec, mtr, ok, err := si.iterator.Next()
 		if err != nil {
 			return nil, false, err
 		}
 		if !ok {
 			return nil, false, nil
 		}
-
-		secRec, err := DecodeSecondaryRecord(record, si.catalog, si.bufferPool, si.primaryTree.MetaPageId().FileId(), si.indexName)
+		result, done, err := si.resolveNext(rec, mtr)
+		mtr.UnpinAll()
 		if err != nil {
 			return nil, false, err
 		}
-		if si.readView == nil && secRec.deleteMark == 1 {
-			continue
+		if done {
+			return result, true, nil
 		}
-
-		result, err := si.resolvePrimaryVersion(secRec)
-		if err != nil {
-			return nil, false, err
-		}
-		if result == nil {
-			continue
-		}
-		return result, true, nil
 	}
+}
+
+// resolveNext は 1 レコードについてデコード → プライマリ経由の解決までを 1 mtr 内で行う
+//   - done=true のとき result が可視の PrimaryRecord、done=false のときは continue
+func (si *SecondaryIndexIterator) resolveNext(rec btree.Record, mtr *buffer.Mtr) (*PrimaryRecord, bool, error) {
+	secRec, err := DecodeSecondaryRecord(rec, si.catalog, si.bufferPool, si.primaryTree.MetaPageId().FileId(), si.indexName)
+	if err != nil {
+		return nil, false, err
+	}
+	if si.readView == nil && secRec.deleteMark == 1 {
+		return nil, false, nil
+	}
+
+	result, err := si.resolvePrimaryVersion(secRec, mtr)
+	if err != nil {
+		return nil, false, err
+	}
+	if result == nil {
+		return nil, false, nil
+	}
+	return result, true, nil
 }
 
 // resolvePrimaryVersion はセカンダリレコードのプライマリキーで本体レコードを引き、Read View から見えるバージョンを返す
 //   - readView が nil の場合は deleteMark のみで判定する
 //   - 本体レコード不在 / 可視バージョンなし / 削除済み / SK 不一致の場合は nil を返す
-func (si *SecondaryIndexIterator) resolvePrimaryVersion(secRec *SecondaryRecord) (*PrimaryRecord, error) {
-	mtr := si.iterator.Mtr()
-
+func (si *SecondaryIndexIterator) resolvePrimaryVersion(secRec *SecondaryRecord, mtr *buffer.Mtr) (*PrimaryRecord, error) {
 	primaryFileId := si.primaryTree.MetaPageId().FileId()
 	pkKey := encode.Encode(nil, stringToByteSlice(secRec.pk))
 	iter, err := si.primaryTree.Search(mtr, btree.SearchModeKey{Key: pkKey})
@@ -145,60 +160,56 @@ func (si *SecondaryIndexIterator) resolvePrimaryVersion(secRec *SecondaryRecord)
 // NextIndexOnly はセカンダリインデックスのみを検索して次の結果を返す
 //   - return: 検索結果, データがあるか
 func (si *SecondaryIndexIterator) NextIndexOnly() (*SecondaryRecord, bool, error) {
-	record, err := si.nextVisibleSecondaryRecord()
+	for {
+		rec, mtr, ok, err := si.iterator.Next()
+		if err != nil {
+			return nil, false, err
+		}
+		if !ok {
+			return nil, false, nil
+		}
+		result, done, err := si.resolveNextIndexOnly(rec, mtr)
+		mtr.UnpinAll()
+		if err != nil {
+			return nil, false, err
+		}
+		if done {
+			return result, true, nil
+		}
+	}
+}
+
+// resolveNextIndexOnly は 1 レコードについて index-only 経路の解決を 1 mtr 内で行う
+//   - done=true のとき result が可視の SecondaryRecord、done=false のときは continue
+func (si *SecondaryIndexIterator) resolveNextIndexOnly(rec btree.Record, mtr *buffer.Mtr) (*SecondaryRecord, bool, error) {
+	secRec, err := DecodeSecondaryRecord(rec, si.catalog, si.bufferPool, si.primaryTree.MetaPageId().FileId(), si.indexName)
 	if err != nil {
 		return nil, false, err
 	}
-	if record == nil {
+
+	visible := si.readView == nil || si.readView.isVisible(secRec.lastTrxId)
+	if visible && secRec.deleteMark == 1 {
 		return nil, false, nil
 	}
-	return record, true, nil
-}
-
-// nextVisibleSecondaryRecord は次の可視セカンダリレコードを返す
-//   - readView が nil の場合は deleteMark のみで判定する
-//   - readView が非 nil の場合は lastTrxId で可視性判定し、不可視時は PK 経路フォールバックを行う
-func (si *SecondaryIndexIterator) nextVisibleSecondaryRecord() (*SecondaryRecord, error) {
-	for {
-		record, ok, err := si.iterator.Next()
-		if err != nil {
-			return nil, err
-		}
-		if !ok {
-			return nil, nil //nolint:nilnil // nil は、データなしを表す
-		}
-
-		secRec, err := DecodeSecondaryRecord(record, si.catalog, si.bufferPool, si.primaryTree.MetaPageId().FileId(), si.indexName)
-		if err != nil {
-			return nil, err
-		}
-
-		visible := si.readView == nil || si.readView.isVisible(secRec.lastTrxId)
-		if visible && secRec.deleteMark == 1 {
-			continue
-		}
-		if visible {
-			return secRec, nil
-		}
-
-		// 不可視 → PK 経路フォールバック
-		resolved, err := si.resolveViaPrimary(secRec)
-		if err != nil {
-			return nil, err
-		}
-		if resolved == nil {
-			continue
-		}
-		return resolved, nil
+	if visible {
+		return secRec, true, nil
 	}
+
+	// 不可視 → PK 経路フォールバック
+	resolved, err := si.resolveViaPrimary(secRec, mtr)
+	if err != nil {
+		return nil, false, err
+	}
+	if resolved == nil {
+		return nil, false, nil
+	}
+	return resolved, true, nil
 }
 
 // resolveViaPrimary は PK 経路フォールバックでセカンダリレコードの可視性を解決する
 //   - 一致時: secRec を返す (Read View から見て SK が一致するバージョンが存在)
 //   - 不一致時 / チェーン終端時 / PK レコード不在時: nil を返す
-func (si *SecondaryIndexIterator) resolveViaPrimary(secRec *SecondaryRecord) (*SecondaryRecord, error) {
-	mtr := si.iterator.Mtr()
-
+func (si *SecondaryIndexIterator) resolveViaPrimary(secRec *SecondaryRecord, mtr *buffer.Mtr) (*SecondaryRecord, error) {
 	primaryFileId := si.primaryTree.MetaPageId().FileId()
 	pkKey := encode.Encode(nil, stringToByteSlice(secRec.pk))
 	rec, position, err := si.primaryTree.FindByKey(mtr, pkKey)

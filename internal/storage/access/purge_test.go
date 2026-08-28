@@ -160,8 +160,6 @@ func TestPurgePurge(t *testing.T) {
 		_ = env.trxManager.Commit(trx1)
 
 		trx2 := env.trxManager.Begin()
-		mtr := buffer.NewMtr(env.bp)
-		defer mtr.UnpinAll()
 		record := currentReadFirst(t, table, trx2)
 		_ = table.SoftDelete(trx2, record)
 		_ = env.trxManager.Commit(trx2)
@@ -179,7 +177,7 @@ func TestPurgePurge(t *testing.T) {
 
 		// THEN
 		assert.NoError(t, err)
-		iter2, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter2, _ := table.primaryIndex.search(SearchModeStart{}, nil)
 		reinserted, ok, _ := iter2.Next()
 		assert.True(t, ok)
 		assert.Equal(t, "Charlie", reinserted.values[1])
@@ -200,8 +198,6 @@ func TestPurgePurge(t *testing.T) {
 		_ = env.trxManager.Commit(trx1)
 
 		trx2 := env.trxManager.Begin()
-		mtr := buffer.NewMtr(env.bp)
-		defer mtr.UnpinAll()
 		record := currentReadFirst(t, table, trx2)
 		_ = table.Update(trx2, record, []string{"name"}, []string{"Bob"})
 		_ = env.trxManager.Commit(trx2)
@@ -212,7 +208,7 @@ func TestPurgePurge(t *testing.T) {
 		// THEN
 		assert.NoError(t, err)
 		// プライマリインデックスのレコードは残っている (UPDATE はインプレース)
-		iter2, _ := table.primaryIndex.search(mtr, SearchModeStart{}, nil)
+		iter2, _ := table.primaryIndex.search(SearchModeStart{}, nil)
 		updated, ok, _ := iter2.Next()
 		assert.True(t, ok)
 		assert.Equal(t, "Bob", updated.values[1])
