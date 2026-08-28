@@ -83,6 +83,16 @@ func (pi *primaryIndex) search(mode SearchMode, readView *readView) (*PrimaryInd
 	return NewPrimaryIndexIterator(iter, pi.catalog, pi.bufferPool, pi.tree.MetaPageId().FileId(), readView, pi.undoLog), nil
 }
 
+// searchForUpdate は指定した検索モードで Current Read の走査イテレータを返す
+//   - 各行に排他ロックを取得しながら最新バージョンを返す
+func (pi *primaryIndex) searchForUpdate(mode SearchMode, trxId lock.TrxId) (*CurrentReadIterator, error) {
+	iter, err := pi.tree.OpenScan(mode.Encode())
+	if err != nil {
+		return nil, err
+	}
+	return newCurrentReadIterator(pi, trxId, iter), nil
+}
+
 // insert は行を挿入する
 // (論理削除済みの同一キーが存在する場合は上書きする)
 func (pi *primaryIndex) insert(mtr *buffer.Mtr, record *PrimaryRecord, trxId lock.TrxId) error {

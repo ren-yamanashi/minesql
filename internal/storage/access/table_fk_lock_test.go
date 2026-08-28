@@ -20,7 +20,7 @@ func TestForeignKeyInsertParentLock(t *testing.T) {
 		assert.NoError(t, env.trxMgr.Commit(setupTx))
 		// 親 id=1 を別トランザクションが Current Read で排他ロックして保持し続ける
 		holder := env.trxMgr.Begin()
-		_, found, err := env.parent.SearchForUpdate(holder, SearchModeKey{Key: [][]byte{[]byte("1")}})
+		_, found, err := searchForUpdateForKey(env.parent, holder, SearchModeKey{Key: [][]byte{[]byte("1")}})
 		assert.NoError(t, err)
 		assert.True(t, found)
 
@@ -40,7 +40,7 @@ func TestForeignKeyInsertParentLock(t *testing.T) {
 		assert.NoError(t, env.trxMgr.Commit(setupTx))
 		// holder が親 id=1 を Current Read で排他ロック (削除はしない)
 		holder := env.trxMgr.Begin()
-		_, found, err := env.parent.SearchForUpdate(holder, SearchModeKey{Key: [][]byte{[]byte("1")}})
+		_, found, err := searchForUpdateForKey(env.parent, holder, SearchModeKey{Key: [][]byte{[]byte("1")}})
 		assert.NoError(t, err)
 		assert.True(t, found)
 
@@ -68,7 +68,7 @@ func TestForeignKeyInsertParentLock(t *testing.T) {
 		assert.NoError(t, env.trxMgr.Commit(setupTx))
 		// deleter が親 id=1 を Current Read で排他ロックし論理削除する (未コミットで排他ロック保持)
 		deleter := env.trxMgr.Begin()
-		target, found, err := env.parent.SearchForUpdate(deleter, SearchModeKey{Key: [][]byte{[]byte("1")}})
+		target, found, err := searchForUpdateForKey(env.parent, deleter, SearchModeKey{Key: [][]byte{[]byte("1")}})
 		assert.NoError(t, err)
 		assert.True(t, found)
 		assert.NoError(t, env.parent.SoftDelete(deleter, target))
@@ -100,14 +100,14 @@ func TestForeignKeyParentDeleteChildLock(t *testing.T) {
 
 		// 子側で child id=1 を Current Read で排他ロックし論理削除する (未コミットで子側 SK+PK の X-Lock 保持)
 		childDeleter := env.trxMgr.Begin()
-		childRec, found, err := env.child.SearchForUpdate(childDeleter, SearchModeKey{Key: [][]byte{[]byte("1")}})
+		childRec, found, err := searchForUpdateForKey(env.child, childDeleter, SearchModeKey{Key: [][]byte{[]byte("1")}})
 		assert.NoError(t, err)
 		assert.True(t, found)
 		assert.NoError(t, env.child.SoftDelete(childDeleter, childRec))
 
 		// WHEN
 		parentDeleter := env.trxMgr.Begin()
-		parentRec, found, err := env.parent.SearchForUpdate(parentDeleter, SearchModeKey{Key: [][]byte{[]byte("1")}})
+		parentRec, found, err := searchForUpdateForKey(env.parent, parentDeleter, SearchModeKey{Key: [][]byte{[]byte("1")}})
 		assert.NoError(t, err)
 		assert.True(t, found)
 		// 親 SoftDelete の FK 検査が子側セカンダリレコードに S-Lock を取りに行くが、子側 X-Lock があるため待機 → タイムアウト
@@ -126,7 +126,7 @@ func TestForeignKeyParentDeleteChildLock(t *testing.T) {
 		assert.NoError(t, env.trxMgr.Commit(setupTx))
 
 		childDeleter := env.trxMgr.Begin()
-		childRec, found, err := env.child.SearchForUpdate(childDeleter, SearchModeKey{Key: [][]byte{[]byte("1")}})
+		childRec, found, err := searchForUpdateForKey(env.child, childDeleter, SearchModeKey{Key: [][]byte{[]byte("1")}})
 		assert.NoError(t, err)
 		assert.True(t, found)
 		assert.NoError(t, env.child.SoftDelete(childDeleter, childRec))
@@ -136,7 +136,7 @@ func TestForeignKeyParentDeleteChildLock(t *testing.T) {
 		var parentDeleteErr error
 		wg.Go(func() {
 			parentDeleter := env.trxMgr.Begin()
-			parentRec, _, err := env.parent.SearchForUpdate(parentDeleter, SearchModeKey{Key: [][]byte{[]byte("1")}})
+			parentRec, _, err := searchForUpdateForKey(env.parent, parentDeleter, SearchModeKey{Key: [][]byte{[]byte("1")}})
 			assert.NoError(t, err)
 			parentDeleteErr = env.parent.SoftDelete(parentDeleter, parentRec)
 		})
@@ -158,7 +158,7 @@ func TestForeignKeyParentDeleteChildLock(t *testing.T) {
 		assert.NoError(t, env.trxMgr.Commit(setupTx))
 
 		childDeleter := env.trxMgr.Begin()
-		childRec, found, err := env.child.SearchForUpdate(childDeleter, SearchModeKey{Key: [][]byte{[]byte("1")}})
+		childRec, found, err := searchForUpdateForKey(env.child, childDeleter, SearchModeKey{Key: [][]byte{[]byte("1")}})
 		assert.NoError(t, err)
 		assert.True(t, found)
 		assert.NoError(t, env.child.SoftDelete(childDeleter, childRec))
@@ -168,7 +168,7 @@ func TestForeignKeyParentDeleteChildLock(t *testing.T) {
 		var parentDeleteErr error
 		wg.Go(func() {
 			parentDeleter := env.trxMgr.Begin()
-			parentRec, _, err := env.parent.SearchForUpdate(parentDeleter, SearchModeKey{Key: [][]byte{[]byte("1")}})
+			parentRec, _, err := searchForUpdateForKey(env.parent, parentDeleter, SearchModeKey{Key: [][]byte{[]byte("1")}})
 			assert.NoError(t, err)
 			parentDeleteErr = env.parent.SoftDelete(parentDeleter, parentRec)
 		})
@@ -195,7 +195,7 @@ func TestConcurrentFKCheckNoDeadlock(t *testing.T) {
 			assert.NoError(t, env.trxMgr.Commit(setupTx))
 
 			childDeleter := env.trxMgr.Begin()
-			childRec, found, err := env.child.SearchForUpdate(childDeleter, SearchModeKey{Key: [][]byte{[]byte("1")}})
+			childRec, found, err := searchForUpdateForKey(env.child, childDeleter, SearchModeKey{Key: [][]byte{[]byte("1")}})
 			assert.NoError(t, err)
 			assert.True(t, found)
 			assert.NoError(t, env.child.SoftDelete(childDeleter, childRec))
@@ -205,7 +205,7 @@ func TestConcurrentFKCheckNoDeadlock(t *testing.T) {
 			var parentDeleteErr error
 			wg.Go(func() {
 				parentDeleter := env.trxMgr.Begin()
-				parentRec, _, err := env.parent.SearchForUpdate(parentDeleter, SearchModeKey{Key: [][]byte{[]byte("1")}})
+				parentRec, _, err := searchForUpdateForKey(env.parent, parentDeleter, SearchModeKey{Key: [][]byte{[]byte("1")}})
 				assert.NoError(t, err)
 				parentDeleteErr = env.parent.SoftDelete(parentDeleter, parentRec)
 			})
