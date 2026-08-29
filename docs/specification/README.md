@@ -6,10 +6,10 @@
 - コネクションハンドラー
 - コマンドディスパッチャ
 - SQL パーサー
+- データディクショナリ
 - プリペア
 - オプティマイザ
 - エグゼキュータ
-- データディクショナリ
 - ストレージエンジン
 
 ### 全体像
@@ -19,8 +19,8 @@ flowchart TB
     client["クライアント<br/>(MySQL Shell など)"]
 
     subgraph server["サーバー (mysqld)"]
-        conn["コネクションハンドラ<br/>handle_connection"]
-        dispatcher["コマンドディスパッチャ<br/>do_command / dispatch_command"]
+        conn["コネクションハンドラ<br/>Server::on_accept / Client::run"]
+        dispatcher["コマンドディスパッチャ<br/>Dispatcher::dispatch / dispatch_command"]
 
         subgraph sqlproc["SQL 文の処理"]
             parser["SQL パーサー<br/>parse_sql"]
@@ -35,8 +35,8 @@ flowchart TB
     end
 
     client -->|リクエスト| conn
-    conn -->|"コマンドループ (1 コマンドずつ)"| dispatcher
-    dispatcher -->|"SQL 文 (COM_QUERY)"| parser
+    conn -->|"メッセージループ (1 メッセージずつ)"| dispatcher
+    dispatcher -->|"SQL 文 (SQL_STMT_EXECUTE → COM_QUERY)"| parser
     parser -->|"AST (LEX ツリー)"| prepare
     prepare -->|解決済みクエリツリー| optimizer
     prepare -->|メタデータ参照| dict
@@ -53,87 +53,101 @@ flowchart TB
 flowchart TD
     client["クライアント"]
     j(( ))
-    protocol["プロトコル<br/>Protocol_classic"]
+    protocol["プロトコル<br/>X Protocol (Mysqlx)"]
 
     subgraph server["サーバー (mysqld)"]
-        conn["コネクションハンドラ<br/>handle_connection"]
-        dispatcher["コマンドディスパッチャ<br/>do_command"]
+        conn["コネクションハンドラ<br/>Client::run"]
+        dispatcher["コマンドディスパッチャ<br/>Dispatcher::dispatch"]
         executor["エグゼキュータ<br/>Query_expression::execute"]
     end
 
-    client <-->|パケット送受信| j
+    client <-->|メッセージ送受信| j
     j <--> server
     protocol -.- j
-    conn -->|ハンドシェイク・認証| protocol
-    dispatcher -->|"コマンド読み取り (get_command)"| protocol
+    conn -->|"セッション確立・認証、メッセージ読み取り"| protocol
+    dispatcher -->|エラー応答の送信| protocol
     executor -->|"結果セット送信 (1 行ずつ)"| protocol
 ```
 
 #### 機能
 
-- MySQL クライアント/サーバープロトコルの実装
-  - クライアントとの間で送受信するパケットの読み書き (フレーミング) を担う
-  - 接続確立時のハンドシェイクパケットの送信
-  - コマンドパケットの読み取り (先頭 1 バイトのコマンドコードの取り出し)
-  - 実行結果の送信 (OK / ERR / EOF パケットと、カラム定義 + 行データからなる結果セット)
+- X Protocol (protobuf ベースのクライアント/サーバープロトコル) の実装
+  - クライアントとの間で送受信するメッセージの読み書き (フレーミング) を担う
+  - メッセージは「4 バイトの長さ (リトルエンディアン) + 1 バイトのメッセージ種別 + protobuf でエンコードされたペイロード」で構成される
+  - メッセージシーケンスは常にクライアント側のメッセージ (`Mysqlx.ClientMessages`) から始まる
+  - セッション確立時は capability の交換 (`CON_CAPABILITIES_GET` / `CON_CAPABILITIES_SET`) と SASL 認証 (`SESS_AUTHENTICATE_START` / `SESS_AUTHENTICATE_CONTINUE`) を行う
+    - 認証メカニズムは `MYSQL41` / `PLAIN` / `SHA256_MEMORY` の 3 種
+  - SQL 文の実行要求は `SQL_STMT_EXECUTE` メッセージで送られる
+  - 実行結果はカラム定義 (`ColumnMetaData`) + 行データ (`Row`) + 終端 (`FetchDone`, `StmtExecuteOk`) の列で送信され、エラーは `Error` メッセージで通知される
 - 横断ドメイン
-  - コネクションハンドラー (ハンドシェイク)・コマンドディスパッチャ (コマンド読み取り)・エグゼキュータ (行送信) がそれぞれこのドメインを利用する
+  - コネクションハンドラー (セッション確立・認証とメッセージ読み取り)・コマンドディスパッチャ (エラー応答の送信)・エグゼキュータ (行送信) がそれぞれこのドメインを利用する
 
 #### 命名の由来
 
-- MySQL の公式用語 (MySQL Client/Server Protocol)
-  - ソースコード上も `Protocol` / `Protocol_classic` クラスがこの役割を担っているため
+- MySQL の公式用語 (X Protocol)
+  - ソースコード上も X Plugin (`plugin/x/`) がこのプロトコルを実装しており、protobuf メッセージ定義の namespace も `Mysqlx` であるため
 
 #### 参考
 
-- [`sql/protocol_classic.cc`](https://github.com/mysql/mysql-server/blob/8.4/sql/protocol_classic.cc) (`Protocol_classic::get_command`, `net_send_ok`, `net_send_error`, `net_send_eof`)
-- [`sql-common/net_serv.cc`](https://github.com/mysql/mysql-server/blob/8.4/sql-common/net_serv.cc) (パケットの低レベル読み書き)
-- [`sql/auth/sql_authentication.cc`](https://github.com/mysql/mysql-server/blob/8.4/sql/auth/sql_authentication.cc) (`send_server_handshake_packet`)
+- [`plugin/x/protocol/protobuf/mysqlx.proto`](https://github.com/mysql/mysql-server/blob/8.4/plugin/x/protocol/protobuf/mysqlx.proto) (メッセージ構造の定義と `ClientMessages` / `ServerMessages` の種別一覧)
+- [`plugin/x/protocol/protobuf/`](https://github.com/mysql/mysql-server/tree/8.4/plugin/x/protocol/protobuf) (`mysqlx_session.proto`, `mysqlx_sql.proto`, `mysqlx_resultset.proto` などメッセージ定義一式)
+- [`plugin/x/src/ngs/protocol_encoder.h`](https://github.com/mysql/mysql-server/blob/8.4/plugin/x/src/ngs/protocol_encoder.h) / [`plugin/x/src/ngs/protocol_decoder.cc`](https://github.com/mysql/mysql-server/blob/8.4/plugin/x/src/ngs/protocol_decoder.cc) (メッセージのエンコード / デコード実装)
+- [`plugin/x/src/server/authentication_container.cc`](https://github.com/mysql/mysql-server/blob/8.4/plugin/x/src/server/authentication_container.cc) (認証メカニズムの登録)
 
 ### コネクションハンドラー
 
 #### 機能
 
 - ネットワーク接続
-  - クライアントからの TCP 接続を受け付け、接続ごとの実行コンテキストを用意する
-  - 1 接続につき 1 OS スレッドを割り当てる (thread-per-connection)
-  - 接続が切れるまでコマンドループを回し、要求を 1 コマンドずつコマンドディスパッチャに渡す
+  - クライアントからの TCP 接続 (デフォルトポート 33060) / Unix ソケット接続を受け付け、接続ごとにクライアントオブジェクト (`Client`) を用意する
+  - 接続ごとのメッセージループ (`Client::run`) をタスクとしてワーカースレッドプール (`ngs::Scheduler_dynamic`) に投入する
+  - 接続が切れるまでメッセージを 1 つずつ読み取り、コマンドディスパッチャに渡す
 - ユーザー認証
-  - 接続確立時にハンドシェイクと認証を行う
+  - セッション確立時に capability の交換と SASL 認証を行う (メッセージの詳細はプロトコルの項を参照)
+  - アカウントの検証は `mysql.user` への内部クエリで行い、ユーザー名とホストの組で照合する
 - 権限管理
   - このユーザーがこのホストから接続してよいかを判定する
   - SQL 文単位の権限チェックは担当しない (プリペアの責務)
 
 #### 命名の由来
 
-- MySQL のソースコードで接続受け付けを担うクラスが `Connection_handler` であり (スレッド割り当て方式ごとに `Per_thread_connection_handler` などの実装がある)、ディレクトリ名も `sql/conn_handler/` であるため
+- 接続の受け付けと接続ごとの処理を担う役割の一般名
+  - X Protocol の接続受付は X Plugin 内の `Server::on_accept` が担い、接続ごとの処理は `Client` クラスが担う
+  - classic protocol 側で同じ役割を担う MySQL のクラス名が `Connection_handler` (`sql/conn_handler/`) であるため
 
 #### 参考
 
-- [MySQL Connection Handling and Scaling](https://dev.mysql.com/blog-archive/mysql-connection-handling-and-scaling/)
-- [`sql/conn_handler/connection_handler_per_thread.cc`](https://github.com/mysql/mysql-server/blob/8.4/sql/conn_handler/connection_handler_per_thread.cc) (`handle_connection`)
-- [`sql/sql_connect.cc`](https://github.com/mysql/mysql-server/blob/8.4/sql/sql_connect.cc) (`thd_prepare_connection` → `check_connection` → `acl_authenticate`)
+- [`plugin/x/src/server/server.cc`](https://github.com/mysql/mysql-server/blob/8.4/plugin/x/src/server/server.cc) (`Server::on_accept`)
+- [`plugin/x/src/client.cc`](https://github.com/mysql/mysql-server/blob/8.4/plugin/x/src/client.cc) (`Client::run`, `read_one_message_and_dispatch`)
+- [`plugin/x/src/ngs/scheduler.h`](https://github.com/mysql/mysql-server/blob/8.4/plugin/x/src/ngs/scheduler.h) (`Scheduler_dynamic`)
+- [`plugin/x/src/io/xpl_listener_tcp.cc`](https://github.com/mysql/mysql-server/blob/8.4/plugin/x/src/io/xpl_listener_tcp.cc) (`Listener_tcp`)
+- [`plugin/x/src/account_verification_handler.cc`](https://github.com/mysql/mysql-server/blob/8.4/plugin/x/src/account_verification_handler.cc) (`mysql.user` への認証クエリ)
 
 ### コマンドディスパッチャ
 
 #### 機能
 
-- コマンドの読み取りと振り分け
-  - `do_command` がネットワークからコマンド 1 個分のパケットを読み取り、`dispatch_command` が種別ごとに分岐する
-    - 種別 (= コマンドの種類) はパケットの先頭 1 バイトに入っているコマンドコードのことで、`enum_server_command` に定義されている (SQL 文の実行は `COM_QUERY`、他に `COM_PING`、`COM_QUIT`、`COM_STMT_PREPARE` など)
-  - MySQL プロトコルでは、接続確立後のクライアントの要求はすべて「コマンド」として送られる
+- メッセージの振り分け
+  - コネクションハンドラが読み取ったメッセージを、種別 (`Mysqlx.ClientMessages`) ごとに `Dispatcher::dispatch` が分岐する
+  - X Protocol では、接続確立後のクライアントの要求はすべて Mysqlx メッセージとして送られる
+- 内部コマンドへの変換
+  - SQL 文の実行要求 (`SQL_STMT_EXECUTE`) はサーバー内部のコマンド `COM_QUERY` に変換され、`dispatch_command` が種別ごとに分岐して SQL パーサー以降の処理に入る
+  - 内部コマンドの種別は `enum_server_command` に定義されている (`COM_QUERY` のほか `COM_INIT_DB`、`COM_RESET_CONNECTION` など)
 - コネクションハンドラと SQL パーサーの仲介
-  - SQL 文の実行 (`COM_QUERY`) は数あるコマンドの 1 種別にすぎず、この場合のみ SQL パーサー以降の処理に入る
+  - SQL 文の実行要求は数あるメッセージの 1 種別にすぎず、この場合のみ SQL パーサー以降の処理に入る
   - コネクションハンドラと SQL パーサーは直接つながっておらず、このモジュールが間を仲介する
 
 #### 命名の由来
 
-- 振り分けを行う MySQL の関数名 `dispatch_command` から
-  - プロトコル上の要求単位が「コマンド」であり、それを種別ごとに振り分ける (dispatch する) 役割のため
+- 振り分けを行う MySQL の関数・クラス名から (メッセージの振り分けが `Dispatcher`、内部コマンドの振り分けが `dispatch_command`)
+  - 要求を種別ごとに振り分ける (dispatch する) 役割のため
 
 #### 参考
 
-- [`sql/sql_parse.cc`](https://github.com/mysql/mysql-server/blob/8.4/sql/sql_parse.cc) (`do_command`, `dispatch_command`)
+- [`plugin/x/src/xpl_dispatcher.cc`](https://github.com/mysql/mysql-server/blob/8.4/plugin/x/src/xpl_dispatcher.cc) (`Dispatcher::dispatch`)
+- [`plugin/x/src/sql_data_context.cc`](https://github.com/mysql/mysql-server/blob/8.4/plugin/x/src/sql_data_context.cc) (`command_service_run_command` による `COM_QUERY` 実行)
+- [`sql/srv_session.cc`](https://github.com/mysql/mysql-server/blob/8.4/sql/srv_session.cc) (サービス経由のコマンド実行が `dispatch_command` に到達する)
+- [`sql/sql_parse.cc`](https://github.com/mysql/mysql-server/blob/8.4/sql/sql_parse.cc) (`dispatch_command`)
 - [`include/my_command.h`](https://github.com/mysql/mysql-server/blob/8.4/include/my_command.h) (`enum_server_command`)
 
 ### SQL パーサー
@@ -154,6 +168,29 @@ flowchart TD
 
 - [`sql/sql_yacc.yy`](https://github.com/mysql/mysql-server/blob/8.4/sql/sql_yacc.yy)
 - [`sql/sql_parse.cc`](https://github.com/mysql/mysql-server/blob/8.4/sql/sql_parse.cc) (`parse_sql`)
+
+### データディクショナリ
+
+#### 機能
+
+- メタデータの管理
+  - テーブル・カラム・インデックスなどの定義 (メタデータ) を永続化し、プリペアの名前解決などから参照させる
+  - ディクショナリテーブル自体が InnoDB 上のテーブルとして格納される (テーブル定義に `ENGINE=INNODB` が指定されている)
+  - メタデータオブジェクトの取得はキャッシュ (`sql/dd/cache/` の `Dictionary_client`) を経由する
+- DDL の実行
+  - CREATE TABLE (SELECT 部を伴わないもの) はパーサーを通った後、オプティマイザ・エグゼキュータを通らず `Sql_cmd_create_table::execute` → `mysql_create_table` が直接処理する
+
+#### 命名の由来
+
+- MySQL の公式用語 (data dictionary)
+  - ソースコード上も `sql/dd/` ディレクトリ (namespace `dd`) が該当するため
+
+#### 参考
+
+- [`sql/dd/impl/tables/`](https://github.com/mysql/mysql-server/tree/8.4/sql/dd/impl/tables) (ディクショナリテーブルの定義: `tables.h`, `columns.h`, `indexes.h` など)
+- [`sql/dd/cache/dictionary_client.h`](https://github.com/mysql/mysql-server/blob/8.4/sql/dd/cache/dictionary_client.h) (`Dictionary_client`)
+- [`sql/dd/impl/types/object_table_impl.cc`](https://github.com/mysql/mysql-server/blob/8.4/sql/dd/impl/types/object_table_impl.cc) (`ENGINE=INNODB` 指定)
+- [`sql/sql_cmd_ddl_table.cc`](https://github.com/mysql/mysql-server/blob/8.4/sql/sql_cmd_ddl_table.cc) (`Sql_cmd_create_table::execute`)
 
 ### プリペア
 
@@ -213,41 +250,19 @@ flowchart TD
 
 #### 命名の由来
 
-- RDB 一般の用語 (executor)。MySQL のソース上の対応は `Query_expression::execute` と `sql/iterators/` 配下のイテレータ群
+- RDB 一般の用語 (executor)
+  - MySQL のソース上の対応は `Query_expression::execute` と `sql/iterators/` 配下のイテレータ群
 
 #### 参考
 
 - [`sql/sql_union.cc`](https://github.com/mysql/mysql-server/blob/8.4/sql/sql_union.cc) (`Query_expression::execute`, `ExecuteIteratorQuery`)
 - [`sql/iterators/row_iterator.h`](https://github.com/mysql/mysql-server/blob/8.4/sql/iterators/row_iterator.h) (`RowIterator`)
 
-### データディクショナリ
-
-#### 機能
-
-- メタデータの管理
-  - テーブル・カラム・インデックスなどの定義 (メタデータ) を永続化し、プリペアの名前解決などから参照させる
-  - ディクショナリテーブル自体が InnoDB 上のテーブルとして格納される (テーブル定義に `ENGINE=INNODB` が指定されている)
-  - メタデータオブジェクトの取得はキャッシュ (`sql/dd/cache/` の `Dictionary_client`) を経由する
-- DDL の実行
-  - CREATE TABLE (SELECT 部を伴わないもの) はパーサーを通った後、オプティマイザ・エグゼキュータを通らず `Sql_cmd_create_table::execute` → `mysql_create_table` が直接処理する
-
-#### 命名の由来
-
-- MySQL の公式用語 (data dictionary)
-  - ソースコード上も `sql/dd/` ディレクトリ (namespace `dd`) が該当するため
-
-#### 参考
-
-- [`sql/dd/impl/tables/`](https://github.com/mysql/mysql-server/tree/8.4/sql/dd/impl/tables) (ディクショナリテーブルの定義: `tables.h`, `columns.h`, `indexes.h` など)
-- [`sql/dd/cache/dictionary_client.h`](https://github.com/mysql/mysql-server/blob/8.4/sql/dd/cache/dictionary_client.h) (`Dictionary_client`)
-- [`sql/dd/impl/types/object_table_impl.cc`](https://github.com/mysql/mysql-server/blob/8.4/sql/dd/impl/types/object_table_impl.cc) (`ENGINE=INNODB` 指定)
-- [`sql/sql_cmd_ddl_table.cc`](https://github.com/mysql/mysql-server/blob/8.4/sql/sql_cmd_ddl_table.cc) (`Sql_cmd_create_table::execute`)
-
 ### ストレージエンジン
 
 #### 機能
 
-- 行データの永続化と読み書き。以下の要素を含む:
+- 行データの永続化と読み書き
   - ディスク
   - バッファプール
   - ログ
@@ -262,7 +277,8 @@ flowchart TD
 
 #### 命名の由来
 
-- MySQL の公式用語 (storage engine)。`storage/` ディレクトリ配下には InnoDB のほか MyISAM、CSV、ARCHIVE などのエンジンが並び、差し替え可能な構造になっているため
+- MySQL の公式用語 (storage engine)
+  - `storage/` ディレクトリ配下には InnoDB のほか MyISAM、CSV、ARCHIVE などのエンジンが並び、差し替え可能な構造になっている
 
 #### 参考
 
