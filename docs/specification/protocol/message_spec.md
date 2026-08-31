@@ -180,6 +180,7 @@ capabilities {
 
 - 参照: [mysqlx_session.proto](https://github.com/mysql/mysql-server/blob/8.4/plugin/x/protocol/protobuf/mysqlx_session.proto)
 - `AuthenticateStart` で使いたい認証メカニズム (`mech_name`) を指定して認証を開始する
+  - フィールドは `mech_name` (必須) / `auth_data` / `initial_response` の 3 つ
 - メカニズムによっては `AuthenticateContinue` の往復で追加の認証データを交換する
 - 成功なら `AuthenticateOk`、失敗なら `Error` が返る
 - `mech_name` は `.proto` ファイル上は自由な文字列で、サポートされるメカニズムはサーバー実装側で決まる
@@ -199,6 +200,8 @@ capabilities {
 - `Session.Close` は現在のセッションを閉じて `Ok` が返る (接続は認証待ちに戻る)
   - 認証待ち状態で `AuthenticateStart` / `AuthenticateContinue` 以外のメッセージを送ると、`Connection.Close` であっても FATAL の `Error` (code 5000 "Invalid message") が返り接続が切断される
     - 参照: [plugin/x/src/session.cc](https://github.com/mysql/mysql-server/blob/8.4/plugin/x/src/session.cc) の `Session::handle_auth_message`
+  - 例外として、`session_connect_attrs` capability のみを含む `CapabilitiesSet` はこの状態でも受け付けられる (他の capability を含むと FATAL の `Error` が返る)
+    - 参照: [plugin/x/src/client.cc](https://github.com/mysql/mysql-server/blob/8.4/plugin/x/src/client.cc) の `Client::handle_session_connect_attr_set`
 - `Connection.Close` は接続自体を閉じる意思をサーバーへ伝え、サーバー側のセッション状態を破棄する
   - セッション中に送ると `Ok` ("bye!") が返り、サーバーが TCP 接続を切断する
 
@@ -212,6 +215,10 @@ capabilities {
 | `stmt` | `bytes` (必須) | 実行するステートメント |
 | `args` | `Mysqlx.Datatypes.Any` の repeated | ステートメント中のワイルドカードを置換する値 |
 | `compact_metadata` | `bool` (デフォルト `false`) | `true` なら `ColumnMetaData` を型情報 (`type`) のみに省略する |
+
+- `namespace` には `"sql"` (SQL 文の実行) のほかに `"mysqlx"` (管理コマンドの実行) がある
+  - `"mysqlx"` では `stmt` にコマンド名 (`ping`、`list_objects`、`create_collection` など) を指定し、classic protocol の `COM_PING` に相当する操作もこの名前空間の `ping` で表現される
+    - 参照: [plugin/x/src/admin_cmd_handler.cc](https://github.com/mysql/mysql-server/blob/8.4/plugin/x/src/admin_cmd_handler.cc) の `Admin_command_handler::Command_handler`
 
 #### 結果セットの構造
 
@@ -250,7 +257,8 @@ capabilities {
   - content_type
 - `original_name` / `original_table` はエイリアス適用前の名前で、素の名前と同じ場合サーバーは省略してよい (クライアント側で補完する)
 - `catalog` は MySQL にカタログの概念がないため意味を持たない (実測では固定値 `"def"` が入る)
-- `flags` は全型共通のビット (`NOT_NULL` 0x0010、`PRIMARY_KEY` 0x0020、`UNIQUE_KEY` 0x0040、`MULTIPLE_KEY` 0x0080、`AUTO_INCREMENT` 0x0100) と型別のビット (`UINT` の zerofill、`BYTES` の rightpad など、いずれも 0x0001) を持つ
+- `flags` は全型共通のビット (`NOT_NULL` 0x0010、`PRIMARY_KEY` 0x0020、`UNIQUE_KEY` 0x0040、`MULTIPLE_KEY` 0x0080、`AUTO_INCREMENT` 0x0100) と型別のビット (いずれも 0x0001) を持つ
+  - 型別のビットは `UINT` の zerofill、`DOUBLE` / `FLOAT` / `DECIMAL` の unsigned、`BYTES` の rightpad、`DATETIME` の is_timestamp
 - `content_type` は `BYTES` 型の中身のヒント (`GEOMETRY` = 1、`JSON` = 2、`XML` = 3) と `DATETIME` 型の中身のヒント (`DATE` = 1、`DATETIME` = 2) を表す (同ファイルの `ContentType_BYTES` / `ContentType_DATETIME`)
 - `compact_metadata` が要求された場合は `type` のみが設定される
 
@@ -306,7 +314,7 @@ capabilities {
 | 5 | `ServerHello` | X Protocol サーバーへの接続通知 |
 
 - `SessionStateChanged.param` の主な値: `CURRENT_SCHEMA` (1)、`ACCOUNT_EXPIRED` (2)、`GENERATED_INSERT_ID` (3)、`ROWS_AFFECTED` (4)、`ROWS_FOUND` (5)、`ROWS_MATCHED` (6)、`TRX_COMMITTED` (7)、`TRX_ROLLEDBACK` (9)、`PRODUCED_MESSAGE` (10)、`CLIENT_ID_ASSIGNED` (11)、`GENERATED_DOCUMENT_IDS` (12)
-- `ServerHello` は接続受付の直後にサーバーが送信する
+- `ServerHello` は接続受付の直後にサーバーが送信する (システム変数 `mysqlx_enable_hello_notice` で制御され、デフォルトで有効)
 
 ## その他の機能
 
@@ -326,6 +334,7 @@ capabilities {
   - 取得途中の状態はサーバーが `Resultset.FetchSuspended` で表す
 - 圧縮 (mysqlx_connection.proto の `Compression`)
   - 圧縮したメッセージ列を運ぶコンテナで、クライアント (種別 46)・サーバー (種別 19) の双方向で使われる
+  - 使用するアルゴリズムは認証前に capability `compression` で合意する
 
 ## 制限・注意点
 
