@@ -85,7 +85,8 @@ MySQL X Plugin は、従来の SQL 言語に加えて、ドキュメントスト
     - `doc` (JSON 型): ドキュメント全体をこの 1 カラムに入れる
     - `_id`: `doc` の `$._id` から抽出される生成カラムで、これが主キー
     - `_json_schema` + CHECK 制約: ドキュメントのスキーマ検証用
-  - 参照: [`create_collection` が発行する CREATE TABLE](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/admin_cmd_collection_handler.cc#L100-L113)
+  - 参照:
+    - [`create_collection` が発行する CREATE TABLE](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/admin_cmd_collection_handler.cc#L100-L113)
 
 ## 参考資料
 

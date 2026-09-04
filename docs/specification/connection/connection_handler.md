@@ -20,7 +20,7 @@
 
 - 認証メカニズムの中身 (チャレンジの生成、`mysql.user` との照合) -> セッションが認証ハンドラに委譲する
 - コマンド (SQL 実行、CRUD、管理コマンド) の実行 -> セッションのディスパッチャが受け取り、サーバーの SQL 層に委ねる
-- メッセージの形式と順序の規則は -> [プロトコル](../protocol/README.md) にて定義
+- メッセージの形式と順序の規則 -> [プロトコル](../protocol/README.md) で定義する
 
 ## 構成要素
 
@@ -52,7 +52,10 @@
 構成要素の処理を実行するスレッドは 2 種類ある
 
 - acceptor スレッド (スケジューラ名 `network`): listen ソケットのイベントループを回し、accept とタイマー (接続タイムアウトの監視、終了したワーカーの回収) を処理する
+  - `network` スケジューラが動かすループは acceptor だけではなく、Notice を配る broker のループも同じスケジューラで動く (acceptor スレッド = `network` スケジューラではない)
   - 参照:
+    - [module_mysqlx.cc のタスク登録](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/module_mysqlx.cc#L169-L170)
+    - [server.cc の start_tasks](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/server.cc#L138-L148)
     - [server_builder.cc](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/builder/server_builder.cc#L99-L100)
     - [socket_events.cc の loop](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/ngs/socket_events.cc#L171)
 - ワーカースレッド (スケジューラ名 `work`): 接続 1 本の処理全体 (受付後の初期化から切断まで) を 1 つのタスクとして実行する
@@ -86,8 +89,8 @@ sequenceDiagram
         W->>S: 実行
         W-->>C: 応答
     end
-    W->>S: 内部セッションを閉じる
     W->>W: 接続一覧から除去
+    W->>S: 内部セッションを閉じる (接続オブジェクトの破棄時)
 ```
 
 ## 処理の流れ
@@ -112,8 +115,8 @@ flowchart TD
         W1["内部セッションを用意し、ServerHello (Notice) を送る"] --> W2["認証 (capability の交換を含む)"]
         W2 -- "成功" --> W3["コマンド処理: 要求を読み (recv)、セッションに引き渡し、応答を返す (send)"]
         W3 -- "次の要求" --> W3
-        W3 -- "セッションを閉じる <br /> / リセット" --> W2
-        W2 -- "失敗 3 回 / 不正なメッセージ" --> W4["終了: ソケットを閉じ (close)、後始末して一覧から除去"]
+        W3 -- "セッションを閉じる <br /> / リセット (keep_open なし)" --> W2
+        W2 -- "認証失敗が上限に達した / 不正なメッセージ" --> W4["終了: ソケットを閉じ (close)、後始末して一覧から除去"]
         W3 -- "接続を閉じる / 致命的エラー" --> W4
     end
     S2 --> A1
@@ -124,10 +127,14 @@ flowchart TD
 ## 接続とセッションの状態遷移
 
 - 接続 (Client) の状態
-  - 受付済み (`accepted`): accept 直後で、capability の交換と認証の開始だけを受け付ける
+  - 生成直後 (`invalid`): acceptor スレッドが接続オブジェクトを作ってから、ワーカースレッドで受付処理が始まるまで
+  - 受付済み (`accepted`): 受付処理が済み、capability の交換、認証の開始、接続を閉じる要求を受け付ける (セッションのリセット要求は無視する)
   - 初回認証中 (`authenticating_first`): 認証のやり取りをセッションに転送している
   - 稼働中 (`running`): 認証済みで、コマンドをセッションに引き渡す
-  - 再認証待ち (`accepted_with_session`): セッションを閉じた後の状態で、接続属性の設定と認証だけを受け付ける
+  - セッション再生成後 (`accepted_with_session`): 一度セッションを閉じ、新しいセッションを用意した後の状態
+    - 接続属性の設定と認証を受け付け、再認証が成功した後はコマンドも受け付ける
+    - 再認証が成功しても接続の状態はこのままで、認証待ちか稼働中かはセッションの状態で判定される
+    - 接続の状態が稼働中であることを前提にした処理 (アイドル中の kill 検知、kill / シャットダウン時の警告 Notice) は働かず、未認証の接続だけを見る接続タイムアウトの対象にもならない
   - 終了中 (`closing`) → 終了 (`closed`): ソケットを閉じ、後始末をして接続一覧から消える
 - セッションの状態
   - 認証中 (`authenticating`): 認証メッセージだけを受け付ける
@@ -143,16 +150,23 @@ flowchart TD
 
 ```mermaid
 stateDiagram-v2
-    [*] --> accepted: 接続を受け付け (accept)
+    [*] --> invalid: 接続を受け付け (accept)
+    invalid --> accepted: 受付処理
+    invalid --> closing: 接続タイムアウト
     accepted --> authenticating_first: AuthenticateStart
     accepted --> closing: Connection.Close / 不正なメッセージ / 接続タイムアウト
     authenticating_first --> running: 認証成功
-    authenticating_first --> closing: 認証失敗 3 回 / 未知のメカニズム / 接続タイムアウト
+    authenticating_first --> closing: 認証失敗が上限に達した / 未知のメカニズム / 接続タイムアウト
     running --> accepted_with_session: Session.Close / Session.Reset (keep_open なし)
-    running --> closing: Connection.Close / タイムアウト / kill / 致命的エラー
-    accepted_with_session --> closing: 認証以外のメッセージ / 認証失敗 3 回
+    running --> closing: Connection.Close / タイムアウト / 致命的エラー
+    accepted_with_session --> accepted_with_session: 再認証成功 → コマンド処理 → Session.Close / Session.Reset (keep_open なし)
+    accepted_with_session --> closing: 認証前の不正なメッセージ / 認証失敗が上限に達した / Connection.Close / タイムアウト / 致命的エラー
     closing --> closed: 後始末
     closed --> [*]
+    note left of closing
+        kill とシャットダウンは、受付済み以降の
+        どの状態からも closing へ遷移する
+    end note
 ```
 
 (各状態での具体的な処理は [コネクションハンドラーの詳細仕様 - 接続のライフサイクル](./connection_handler_spec.md#接続のライフサイクル) を参照)
@@ -167,7 +181,7 @@ stateDiagram-v2
 - メッセージ長の上限: 過大なフレームを受け付けない
 - 接続数の上限: 同時接続数が上限に達したら受け付けない
 
-強制的に接続を閉じる経路は kill (管理コマンドによる他の接続の切断、または自分自身の切断) とサーバーのシャットダウンの 2 つで、いずれも終了中 (`closing`) への遷移に合流する
+強制的に接続を閉じる経路は kill (管理コマンドまたは `KILL` 文による他の接続の切断、または自分自身の切断) とサーバーのシャットダウンの 2 つで、いずれも終了中 (`closing`) への遷移に合流する
 
 ## 参考資料
 
