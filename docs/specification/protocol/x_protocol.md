@@ -53,15 +53,15 @@ X Protocol の周辺には名前の似た用語が 3 つあり、それぞれ層
 
 - メッセージの解釈
   - classic はメッセージの解釈が文脈に依存する
-    - ペイロードは独自のバイナリ形式で、応答の種類もペイロード先頭のマーカーバイトを「どのコマンドへの応答か」という文脈に応じて読み分ける必要があり、この読み分けを各言語のクライアントが手で実装することになる
+    - ペイロードは独自のバイナリ形式で、レスポンスの種類もペイロード先頭のマーカーバイトを「どのコマンドへのレスポンスか」という文脈に応じて読み分ける必要があり、この読み分けを各言語のクライアントが手で実装することになる
   - X プロトコルはメッセージの構造定義を `.proto` ファイルに集約し、フレームのヘッダに種別バイトを持たせた
     - これにより、どのメッセージも「種別を見て、対応する型としてデシリアライズする」という文脈に依存しない一様な処理で受信でき、エンコード・デコードの実装もコード生成で自動化できる
   - 参照:
     - [sql-common/net_serv.cc のパケット構造の doc コメント](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql-common/net_serv.cc#L338-L427)
     - [sql/protocol_classic.cc のコマンドフェーズの doc コメント](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/protocol_classic.cc#L155-L181)
-- 要求と応答の対応付け
-  - classic は 1 コマンド送って応答を受け取ってから次を送る前提で、コマンドのたびに往復の待ちが発生する
-  - X プロトコルはやり取りを「シーケンス」(= 1 つの要求 + それに続く応答の列) という単位で規定しており、応答を待たずに次の要求を送っても、応答の列が要求の順に返ることで対応関係が崩れない
+- リクエストとレスポンスの対応付け
+  - classic は 1 コマンド送ってレスポンスを受け取ってから次を送る前提で、コマンドのたびに往復の待ちが発生する
+  - X プロトコルはやり取りを「シーケンス」(= 1 つのリクエスト + それに続くレスポンスの列) という単位で規定しており、レスポンスを待たずに次のリクエストを送っても、レスポンスの列がリクエストの順に返ることで対応関係が崩れない
     - そのためパイプライン化ができ、往復のレイテンシを削減できる
   - 参照:
     - [mysqlx.proto の `@section messages_Message_Sequence`](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx.proto#L103-L118)
@@ -75,9 +75,9 @@ X Protocol の周辺には名前の似た用語が 3 つあり、それぞれ層
     - [include/mysql_com.h の zstd 圧縮フラグ](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/include/mysql_com.h#L699-L716)
     - [sql/auth/sql_authentication.cc の zstd レベルの追加フィールド](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/auth/sql_authentication.cc#L3226-L3230)
     - [include/mysql_com.h の 64 ビット拡張予約](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/include/mysql_com.h#L751-L755)
-- サーバー起点の通知
-  - classic でサーバーが自分から送るのは接続直後のハンドシェイクだけで、以降は要求への応答しか返せない
-  - X プロトコルは応答とは独立な通知 (Notice) を持つため、警告や状態変化をやり取りの途中でも運べる
+- サーバー起点の Notice
+  - classic でサーバーが自分から送るのは接続直後のハンドシェイクだけで、以降はリクエストへのレスポンスしか返せない
+  - X プロトコルはレスポンスとは独立な Notice を持つため、警告や状態変化をやり取りの途中でも運べる
   - 参照:
     - [mysqlx-protocol-comparison.dox の比較表 (out-of-band notifications)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/doc/mysqlx-protocol-comparison.dox#L38)
 - 接続直後の手順

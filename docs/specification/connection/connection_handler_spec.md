@@ -43,7 +43,7 @@
 - 受け入れ判定
   - サーバーが終了中なら拒否する
   - 現在の接続数が `mysqlx_max_connections` 以上なら拒否する (警告ログ、`Mysqlx_connections_rejected` を加算)
-  - 拒否した接続にはプロトコル上の応答を返さず、ソケットを閉じる
+  - 拒否した接続にはプロトコル上のレスポンスを返さず、ソケットを閉じる
   - 受理した接続は接続一覧に登録し (`Mysqlx_connections_accepted` を加算)、accept 時刻を記録する
   - 参照:
     - [server.cc の will_accept_client](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/server.cc#L325-L348)
@@ -168,19 +168,19 @@
   - 参照:
     - [client.cc の on_read_timeout](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L366-L369)
     - [update_counters](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L389-L407)
-- 書き込みタイムアウト (`mysqlx_write_timeout`、既定 60 秒): 応答の書き込みがブロックできる時間の上限
+- 書き込みタイムアウト (`mysqlx_write_timeout`、既定 60 秒): レスポンスの書き込みがブロックできる時間の上限
   - 超過はネットワークエラーとして切断する (`Mysqlx_aborted_clients` と `Mysqlx_connection_errors` を加算)
   - 参照:
     - [client.cc の on_network_error](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L375-L387)
-- 最大メッセージ長 (`mysqlx_max_allowed_packet`、既定 64 MB): フレームの `length` が超過していれば応答を返さずに切断する
+- 最大メッセージ長 (`mysqlx_max_allowed_packet`、既定 64 MB): フレームの `length` が超過していればレスポンスを返さずに切断する
   - 参照:
     - [protocol_decoder.cc の read_and_decode_impl](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/ngs/protocol_decoder.cc#L138-L188)
 - kill
   - 管理コマンド `kill_client` で他の接続を閉じられる (`Mysqlx_sessions_killed` を加算)
-    - 他の接続なら、要求元のセッションで対象の内部セッションに `KILL <id>` 文を実行してから接続を閉じる
-    - 自分自身なら、プラグイン内部のユーザーで別の内部セッションを開き、そこから自分の内部セッションに `KILL <id>` 文を実行してから閉じる (機構は同じ)
-    - 実体が `KILL` 文なので、classic protocol の接続から `KILL <id>` を実行した場合も同じ経路で閉じる
-    - `KILL QUERY` は実行中の文を止めるだけで、接続は閉じない
+    - 他の接続なら、リクエスト元のセッションで対象の内部セッションに `KILL <id>` ステートメントを実行してから接続を閉じる
+    - 自分自身なら、プラグイン内部のユーザーで別の内部セッションを開き、そこから自分の内部セッションに `KILL <id>` ステートメントを実行してから閉じる (機構は同じ)
+    - 実体が `KILL` ステートメントなので、classic protocol の接続から `KILL <id>` を実行した場合も同じ経路で閉じる
+    - `KILL QUERY` は実行中のステートメントを止めるだけで、接続は閉じない
   - 検知経路は 2 つ
     - アイドル中 (メッセージ待ち) の接続は、読み取り前のチェックで kill を検知して閉じる (接続の状態が `running` のときだけ)
     - メッセージを受け取った接続は、処理の前に KILL 済みかを確認し、`ER_QUERY_INTERRUPTED` の Fatal エラーを返して閉じる (セッション再生成後の接続はこちらだけ)
@@ -219,7 +219,7 @@
 | `mysqlx_wait_timeout` | 28800 | 非対話接続のアイドル上限秒数 (セッション変数) |
 | `mysqlx_interactive_timeout` | 28800 | 対話接続のアイドル上限秒数 |
 | `mysqlx_read_timeout` | 30 | メッセージ読み取りの上限秒数 (セッション変数) |
-| `mysqlx_write_timeout` | 60 | 応答書き込みの上限秒数 (セッション変数) |
+| `mysqlx_write_timeout` | 60 | レスポンス書き込みの上限秒数 (セッション変数) |
 | `mysqlx_enable_hello_notice` | ON | 接続直後に `ServerHello` を送るか |
 
 接続処理に関わるステータス変数 (定義は [status_variables.cc](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/variables/status_variables.cc#L376-L415))

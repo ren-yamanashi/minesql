@@ -15,10 +15,10 @@ sequenceDiagram
     Note over C,S: 1. 接続確立 (TCP 33060 / Unix ソケット)
     S-->>C: Notice: ServerHello
     Note over C,S: 2. capability ネゴシエーション (任意)
-    C->>S: capability 一覧の要求 (CapabilitiesGet)
+    C->>S: capability 一覧のリクエスト (CapabilitiesGet)
     S-->>C: capability 一覧 (Capabilities)
     C->>S: capability の変更 (CapabilitiesSet)
-    S-->>C: 成功応答 (Ok)
+    S-->>C: 成功レスポンス (Ok)
     Note over C,S: 3. 認証 (セッション確立)
     C->>S: 認証開始 (AuthenticateStart)
     opt メカニズムに応じた追加データ交換
@@ -29,7 +29,7 @@ sequenceDiagram
     Note over C,S: 4. コマンドフェーズ (SQL 実行など)
     Note over C,S: 5. 終了
     C->>S: 接続終了 (Connection.Close)
-    S-->>C: 成功応答 (Ok "bye!")
+    S-->>C: 成功レスポンス (Ok "bye!")
     Note over C,S: サーバーが TCP 接続を切断
 ```
 
@@ -42,7 +42,7 @@ sequenceDiagram
 
 - capability とは「この接続で何ができるか」を表す名前付きの設定値
   - 例: TLS を使うか、どの認証メカニズムが使えるか、どの圧縮アルゴリズムが使えるか
-- クライアントは capability の一覧を取得し、必要なら変更を要求する (例: TLS 接続への切り替え)
+- クライアントは capability の一覧を取得し、必要なら変更を求める (例: TLS 接続への切り替え)
 - この手続きは認証より前にだけ行える
   - 認証後に送ると、セッションのディスパッチャが扱えないメッセージとして通常の `Error` (`ER_UNKNOWN_COM_ERROR`) が返る
   - 参照:
@@ -53,34 +53,34 @@ sequenceDiagram
 
 - クライアントが使いたい認証メカニズムを指定して認証を開始する
 - メカニズムによっては追加の認証データの往復がある
-  - 例: チャレンジレスポンス方式では、サーバーから届いた課題に対してクライアントがパスワードから計算した応答を返す (パスワードそのものは送らない)
+  - 例: チャレンジレスポンス方式では、サーバーから届いた課題に対してクライアントがパスワードから計算したレスポンスを返す (パスワードそのものは送らない)
 - 認証が成功するとセッションが確立し、コマンドを送れるようになる
 
 ### 4. コマンドフェーズ
 
-- クライアントが SQL 実行などの要求を送り、サーバーの応答を受け取ることを繰り返す (詳細は後述の「SQL 実行の流れ」)
+- クライアントが SQL 実行などのリクエストを送り、サーバーのレスポンスを受け取ることを繰り返す (詳細は後述の「SQL 実行の流れ」)
 
 ### 5. 終了
 
-- クライアントが接続終了の意思を伝えると、サーバーは成功応答を返して TCP 接続を切断する
+- クライアントが接続終了の意思を伝えると、サーバーは成功レスポンスを返して TCP 接続を切断する
 - 接続を維持したままセッションだけを閉じ、再認証して同じ接続を使い回すこともできる
-  - セッションを閉じた後の接続は認証待ちの状態に戻り、認証以外の要求は基本的に受け付けない
+  - セッションを閉じた後の接続は認証待ちの状態に戻り、認証以外のリクエストは基本的に受け付けない
 
 ## メッセージのやり取りの規則
 
-- やり取りは「シーケンス」(= 最初の要求 + それに続く応答の列) という単位で進む
-- シーケンスは必ずクライアントからの要求 (認証開始、SQL 実行要求など) で開始される
+- やり取りは「シーケンス」(= 最初のリクエスト + それに続くレスポンスの列) という単位で進む
+- シーケンスは必ずクライアントからのリクエスト (認証開始、SQL 実行リクエストなど) で開始される
 - シーケンスの終わり方は 2 通り
-  - 応答の列が末尾まで届いて正常終了する
+  - レスポンスの列が末尾まで届いて正常終了する
   - サーバーがエラーを返して中断する
 - エラーには 2 段階の深刻度がある
   - 継続可能なエラー: 実行中のシーケンスは中断されるが、セッションは継続する
-  - 致命的なエラー: クライアントはサーバーが以降の要求を処理することを期待せず、接続を閉じるべき
-- クライアントは前の応答を待たずに次の要求を送ってよい (パイプライン化により往復のレイテンシを削減できる)
-- サーバーは要求への応答とは別に、通知を送ることがある
-- 通知には 2 つの種類がある
-  - 実行中のシーケンスに関する通知 (SQL 実行で発生した警告や影響行数など) で、シーケンスの途中に挟まれて送られるもの
-  - シーケンスとは無関係な通知 (接続直後の `ServerHello` など) で、いつでも送られうるもの
+  - 致命的なエラー: クライアントはサーバーが以降のリクエストを処理することを期待せず、接続を閉じるべき
+- クライアントは前のレスポンスを待たずに次のリクエストを送ってよい (パイプライン化により往復のレイテンシを削減できる)
+- サーバーはリクエストへのレスポンスとは別に、Notice を送ることがある
+- Notice には 2 つの種類がある
+  - 実行中のシーケンスに関する Notice (SQL 実行で発生した警告や Affected Rows など) で、シーケンスの途中に挟まれて送られるもの
+  - シーケンスとは無関係な Notice (接続直後の `ServerHello` など) で、いつでも送られうるもの
 - 参照:
   - [mysqlx.proto の `@section messages_Message_Sequence`](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx.proto#L103-L118)
   - [mysqlx.proto の Error の severity の説明](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx.proto#L257-L263)
@@ -88,11 +88,11 @@ sequenceDiagram
 
 ## SQL 実行の流れ
 
-- 1 つの SQL 実行要求に対して「カラム定義 → 行データ → 結果セットの終端 → 実行ステータスの通知 → 実行完了」という応答の列が返る
-- 実行により発生した警告や影響行数などの実行ステータスは、結果セットとは別の通知として届く
-- 結果セットを返さない文 (`INSERT` など) では `ColumnMetaData` / `Row` / `FetchDone` は送られず、通知と `StmtExecuteOk` だけが返る
-- 通知の内訳と順序
-  - `ROWS_AFFECTED` は文の種類によらず常に送られる
+- 1 つの SQL 実行リクエストに対して「カラム定義 → 行データ → リザルトセットの終端 → 実行ステータスの Notice → 実行完了」というレスポンスの列が返る
+- 実行により発生した警告や Affected Rows などの実行ステータスは、リザルトセットとは別の Notice として届く
+- リザルトセットを返さないステートメント (`INSERT` など) では `ColumnMetaData` / `Row` / `FetchDone` は送られず、Notice と `StmtExecuteOk` だけが返る
+- Notice の内訳と順序
+  - `ROWS_AFFECTED` はステートメントの種類によらず常に送られる
   - `GENERATED_INSERT_ID` は値が 0 より大きいときだけ、`PRODUCED_MESSAGE` はサーバーからのメッセージがあるときだけ送られる
   - 警告がある場合は、これらの前に警告の Notice がまとめて送られる
 - 参照:
@@ -104,14 +104,14 @@ sequenceDiagram
 sequenceDiagram
     participant C as クライアント
     participant S as サーバー
-    C->>S: SQL 実行要求 (StmtExecute: stmt = "SELECT ...")
+    C->>S: SQL 実行リクエスト (StmtExecute: stmt = "SELECT ...")
     loop カラム数分
         S-->>C: カラム定義 (ColumnMetaData)
     end
     loop 行数分
         S-->>C: 行データ (Row)
     end
-    S-->>C: 結果セットの終端 (FetchDone)
-    S-->>C: 影響行数の通知 (Notice: ROWS_AFFECTED)
+    S-->>C: リザルトセットの終端 (FetchDone)
+    S-->>C: Affected Rows の Notice (ROWS_AFFECTED)
     S-->>C: 実行完了 (StmtExecuteOk)
 ```

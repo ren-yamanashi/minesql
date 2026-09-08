@@ -9,10 +9,10 @@
 | [mysqlx.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx.proto) | `Mysqlx` | フレーム構造・メッセージシーケンス規則の説明 (doc コメント)、メッセージ種別 enum (`ClientMessages` / `ServerMessages`)、汎用の `Ok` / `Error` |
 | [mysqlx_connection.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_connection.proto) | `Mysqlx.Connection` | capability ネゴシエーション (`CapabilitiesGet` / `CapabilitiesSet` / `Capabilities`)、接続クローズ (`Close`)、圧縮 (`Compression`) |
 | [mysqlx_session.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_session.proto) | `Mysqlx.Session` | 認証 (`AuthenticateStart` / `AuthenticateContinue` / `AuthenticateOk`)、セッションのリセット (`Reset`) と終了 (`Close`) |
-| [mysqlx_sql.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_sql.proto) | `Mysqlx.Sql` | SQL 文の実行 (`StmtExecute` / `StmtExecuteOk`) |
-| [mysqlx_resultset.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_resultset.proto) | `Mysqlx.Resultset` | 結果セット (`ColumnMetaData` / `Row` / `FetchDone` 系)、行データのエンコーディング仕様 (doc コメント) |
+| [mysqlx_sql.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_sql.proto) | `Mysqlx.Sql` | SQL ステートメントの実行 (`StmtExecute` / `StmtExecuteOk`) |
+| [mysqlx_resultset.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_resultset.proto) | `Mysqlx.Resultset` | リザルトセット (`ColumnMetaData` / `Row` / `FetchDone` 系)、行データのエンコーディング仕様 (doc コメント) |
 | [mysqlx_datatypes.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_datatypes.proto) | `Mysqlx.Datatypes` | 汎用データ型 (`Scalar` / `Object` / `Array` / `Any`) |
-| [mysqlx_notice.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_notice.proto) | `Mysqlx.Notice` | サーバーからの通知 (`Frame` と 5 種類のペイロード) |
+| [mysqlx_notice.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_notice.proto) | `Mysqlx.Notice` | サーバーからの Notice (`Frame` と 5 種類のペイロード) |
 | [mysqlx_expect.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_expect.proto) | `Mysqlx.Expect` | Expect ブロック (パイプライン実行時の実行条件指定) |
 | [mysqlx_crud.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_crud.proto) | `Mysqlx.Crud` | CRUD 操作 (`Find` / `Insert` / `Update` / `Delete`、ビュー操作) |
 | [mysqlx_expr.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_expr.proto) | `Mysqlx.Expr` | 式ツリー (CRUD のフィルタ条件・射影などで使用) |
@@ -33,7 +33,7 @@
   - `Array`: 値 (`Any`) のリスト (JSON の配列に相当)
 - `Any` は `Scalar` / `Object` / `Array` のいずれか 1 つを保持する共用体
   - 任意の値を受け取るフィールドは、この `Any` 型 (`StmtExecute.args` や `Capability.value` など) か、単一値で足りる場合は `Scalar` 型 (Notice が運ぶ値など) で宣言されている
-- 実例として、capability ネゴシエーションの応答に含まれる `Capability.value` (`Any` 型) では以下のように使い分けられている
+- 実例として、capability ネゴシエーションのレスポンスに含まれる `Capability.value` (`Any` 型) では以下のように使い分けられている
   - `tls` や `client.interactive` のような単一の bool 値は `SCALAR`
   - `authentication.mechanisms` は文字列のリストなので `ARRAY`
   - `compression` は `algorithm` というキーを持つので `OBJECT` (その値はさらに `ARRAY`)
@@ -44,7 +44,7 @@
     - [client.cc の capabilities_configurator](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L199-L221)
     - [handler_connection_attributes.h](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/capabilities/handler_connection_attributes.h#L37-L39)
 
-<details><summary>実測: CapabilitiesGet の応答 (MySQL 8.0.39、TCP の非 TLS 接続)</summary>
+<details><summary>実測: CapabilitiesGet のレスポンス (MySQL 8.0.39、TCP の非 TLS 接続)</summary>
 
 ```txt
 capabilities {
@@ -181,7 +181,7 @@ capabilities {
 - 参照:
   - [mysqlx_connection.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_connection.proto)
 - `CapabilitiesGet`: サーバーがサポートする capability とその現在値の一覧 (`Capabilities`) を取得する
-- `CapabilitiesSet`: capability の変更を要求し、`Ok` または `Error` が返る (例: `tls: true` を送って TLS 接続へ切り替える)
+- `CapabilitiesSet`: capability の変更をリクエストし、`Ok` または `Error` が返る (例: `tls: true` を送って TLS 接続へ切り替える)
 - `Capabilities` は `Capability` (`name` 文字列 + `Mysqlx.Datatypes.Any` の値) のリスト
 
 ### 認証 (セッション確立)
@@ -199,7 +199,7 @@ capabilities {
       - [authentication_container.cc のメカニズム登録](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/authentication_container.cc#L37-L46)
       - [get_auth_handler / get_authentication_mechanisms](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/authentication_container.cc#L49-L80)
       - [connection_type.cc の is_secure_type](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/io/connection_type.cc#L58-L66)
-    - 例: `MYSQL41` はチャレンジレスポンス方式で、サーバーが `AuthenticateContinue` で送る 20 バイトの salt とパスワードから計算した応答を返す
+    - 例: `MYSQL41` はチャレンジレスポンス方式で、サーバーが `AuthenticateContinue` で送る 20 バイトの salt とパスワードから計算したレスポンスを返す
       - 参照:
         - [auth_challenge_response.h の doc コメント](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/auth_challenge_response.h#L55-L60)
         - [challenge_response_verification.cc の generate_salt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/challenge_response_verification.cc#L41-L45)
@@ -236,43 +236,43 @@ capabilities {
 
 | フィールド | 型 | 説明 |
 | --- | --- | --- |
-| `namespace` | `string` (デフォルト `"sql"`) | ステートメントを実行する名前空間 |
+| `namespace` | `string` (デフォルト `"sql"`) | ステートメントを実行する namespace |
 | `stmt` | `bytes` (必須) | 実行するステートメント |
-| `args` | `Mysqlx.Datatypes.Any` の repeated | ステートメント中のワイルドカードを置換する値 |
+| `args` | `Mysqlx.Datatypes.Any` の repeated | ステートメント中のプレースホルダ (`?`) を置き換える値 |
 | `compact_metadata` | `bool` (デフォルト `false`) | `true` なら `ColumnMetaData` を型情報 (`type`) のみに省略する |
 
-- `namespace` には `"sql"` (SQL 文の実行) のほかに `"mysqlx"` (管理コマンドの実行) がある
+- `namespace` には `"sql"` (SQL ステートメントの実行) のほかに `"mysqlx"` (管理コマンドの実行) がある
   - `"mysqlx"` では `stmt` にコマンド名を指定し、`args` には名前付き引数を持つ `Object` を 1 つ渡す
-    - classic protocol の `COM_PING` に相当する操作もこの名前空間の `ping` で表現される
+    - classic protocol の `COM_PING` に相当する操作もこの namespace の `ping` で表現される
     - コマンドは 14 個: `ping` / `list_clients` / `kill_client` / `create_collection` / `drop_collection` / `ensure_collection` / `modify_collection_options` / `get_collection_options` / `create_collection_index` / `drop_collection_index` / `list_objects` / `enable_notices` / `disable_notices` / `list_notices`
     - 参照:
       - [mysqlx-protocol-xplugin.dox の namespace の説明](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/doc/mysqlx-protocol-xplugin.dox#L36-L51)
       - [admin_cmd_handler.cc のコマンド表](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/admin_cmd_handler.cc#L96-L115)
 
-#### 結果セットの構造
+#### リザルトセットの構造
 
 - 参照:
   - [mysqlx_resultset.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_resultset.proto) (メッセージ列の規則は同ファイル冒頭の doc コメント)
-- 1 つの結果セットは 1 個以上の `ColumnMetaData` と 0 個以上の `Row` からなる
-- 各結果セットの後には以下のいずれかが続く
-  - `FetchDoneMoreResultsets`: さらに別の結果セットが続く (複数結果セットを返す `CALL` など)
-  - `FetchDoneMoreOutParams`: OUT パラメータの結果セットが続く
-  - `FetchDone`: 最後の結果セットが送信済み
-- `FetchSuspended` はカーソル使用時に結果セットの送信を中断した状態を表す
+- 1 つのリザルトセットは 1 個以上の `ColumnMetaData` と 0 個以上の `Row` からなる
+- 各リザルトセットの後には以下のいずれかが続く
+  - `FetchDoneMoreResultsets`: さらに別のリザルトセットが続く (複数リザルトセットを返す `CALL` など)
+  - `FetchDoneMoreOutParams`: OUT パラメータのリザルトセットが続く
+  - `FetchDone`: 最後のリザルトセットが送信済み
+- `FetchSuspended` はカーソル使用時にリザルトセットの送信を中断した状態を表す
 - doc コメントに記載されている例
-  - `INSERT` は通常結果セットを送らず `FetchDone` のみになる、とされている
-    - ただし実装は結果セットのメタデータを送った場合にしか `FetchDone` を送らないため、実際の `INSERT` への応答は通知と `StmtExecuteOk` だけで `FetchDone` は含まれない (doc コメントと実装の差)
+  - `INSERT` は通常リザルトセットを送らず `FetchDone` のみになる、とされている
+    - ただし実装はリザルトセットのメタデータを送った場合にしか `FetchDone` を送らないため、実際の `INSERT` へのレスポンスは Notice と `StmtExecuteOk` だけで `FetchDone` は含まれない (doc コメントと実装の差)
     - 参照:
       - [mysqlx_resultset.proto の doc コメント](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_resultset.proto#L90-L94)
       - [streaming_command_delegate.cc の start_result_metadata](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/streaming_command_delegate.cc#L125-L138)
       - [handle_ok](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/streaming_command_delegate.cc#L503-L523)
-  - `SELECT 1 LIMIT 0` は `ColumnMetaData` + `FetchDone` (空の結果セット) になる
+  - `SELECT 1 LIMIT 0` は `ColumnMetaData` + `FetchDone` (空のリザルトセット) になる
 
-#### 実行ステータスの通知
+#### 実行ステータスの Notice
 
-- 影響行数 (`ROWS_AFFECTED`) や生成された AUTO_INCREMENT 値 (`GENERATED_INSERT_ID`) は、結果セットとは別に Notice (`SessionStateChanged`) として届く
+- Affected Rows (`ROWS_AFFECTED`) や Last Insert ID (`GENERATED_INSERT_ID`) は、リザルトセットとは別に Notice (`SessionStateChanged`) として届く
 
-## 結果セットのエンコーディング
+## リザルトセットのエンコーディング
 
 ### ColumnMetaData
 
@@ -300,7 +300,7 @@ capabilities {
 - `flags` は全型共通のビット (`NOT_NULL` 0x0010、`PRIMARY_KEY` 0x0020、`UNIQUE_KEY` 0x0040、`MULTIPLE_KEY` 0x0080、`AUTO_INCREMENT` 0x0100) と型別のビット (いずれも 0x0001) を持つ
   - 型別のビットは `UINT` の zerofill、`DOUBLE` / `FLOAT` / `DECIMAL` の unsigned、`BYTES` の rightpad、`DATETIME` の is_timestamp
 - `content_type` は `BYTES` 型の中身のヒント (`GEOMETRY` = 1、`JSON` = 2、`XML` = 3) と `DATETIME` 型の中身のヒント (`DATE` = 1、`DATETIME` = 2) を表す (同ファイルの `ContentType_BYTES` / `ContentType_DATETIME`)
-- `compact_metadata` が要求された場合は `type` のみが設定される
+- `compact_metadata` が指定された場合は `type` のみが設定される
 
 ### Row
 
@@ -338,14 +338,14 @@ capabilities {
 - `severity = ERROR` は現在のメッセージシーケンスの中断を意味し、セッションは継続する
 - `severity = FATAL` の場合、クライアントはサーバーが以降のメッセージを処理することを期待せず、接続を閉じるべき
 
-## Notice (サーバーからの通知)
+## Notice
 
 - 参照:
   - [mysqlx_notice.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_notice.proto)
 - Notice は共通の外枠 `Frame` (`type` / `scope` / `payload`) で送られ、`payload` に `type` に応じたメッセージが入る
 - `scope` は `GLOBAL` (デフォルト) と `LOCAL` の 2 種類
-  - `LOCAL` は現在実行中のメッセージシーケンスに属する通知
-  - `GLOBAL` はシーケンスと無関係な通知
+  - `LOCAL` は現在実行中のメッセージシーケンスに属する Notice
+  - `GLOBAL` はシーケンスと無関係な Notice
 - アクティブなシーケンスがないときに `LOCAL` の Notice を受け取った場合、クライアントは無視すべき
 
 | `Frame.type` | ペイロードの型 | 内容 |
@@ -354,7 +354,7 @@ capabilities {
 | 2 | `SessionVariableChanged` | セッション変数の変更 (`param` + `Scalar` 値) |
 | 3 | `SessionStateChanged` | セッション内部状態の変化 (`param` + `Scalar` 値のリスト) |
 | 4 | `GroupReplicationStateChanged` | グループレプリケーションの状態変化 |
-| 5 | `ServerHello` | X Protocol サーバーへの接続通知 |
+| 5 | `ServerHello` | サーバーに接続したことを伝える Notice |
 
 - `SessionStateChanged.param` の主な値: `CURRENT_SCHEMA` (1)、`ACCOUNT_EXPIRED` (2)、`GENERATED_INSERT_ID` (3)、`ROWS_AFFECTED` (4)、`ROWS_FOUND` (5)、`ROWS_MATCHED` (6)、`TRX_COMMITTED` (7)、`TRX_ROLLEDBACK` (9)、`PRODUCED_MESSAGE` (10)、`CLIENT_ID_ASSIGNED` (11)、`GENERATED_DOCUMENT_IDS` (12)
 - `ServerHello` は接続受付の直後にサーバーが送信する (システム変数 `mysqlx_enable_hello_notice` で制御され、デフォルトで有効)
@@ -362,7 +362,7 @@ capabilities {
 ## その他の機能
 
 - CRUD (mysqlx_crud.proto + mysqlx_expr.proto)
-  - SQL 文を経由せずに `Find` / `Insert` / `Update` / `Delete` とビュー操作を直接表現する X DevAPI 用のメッセージ群
+  - SQL ステートメントを経由せずに `Find` / `Insert` / `Update` / `Delete` とビュー操作を直接表現する X DevAPI 用のメッセージ群
   - `DataModel` として `DOCUMENT` (ドキュメントストア) と `TABLE` の 2 モデルを持つ
   - フィルタ条件や射影は mysqlx_expr.proto の式ツリー (`Expr`) で表現する
 - Expect ブロック (mysqlx_expect.proto)
@@ -373,7 +373,7 @@ capabilities {
   - `Prepare` の対象は `Crud.Find` / `Insert` / `Update` / `Delete` / `Sql.StmtExecute` のいずれか
   - `Execute` で `args` を束縛して実行し、`Deallocate` で解放する
 - カーソル (mysqlx_cursor.proto)
-  - プリペアドステートメントの結果セットを `Open` / `Fetch` で分割取得する
+  - プリペアドステートメントのリザルトセットを `Open` / `Fetch` で分割取得する
   - 取得途中の状態はサーバーが `Resultset.FetchSuspended` で表す
 - 圧縮 (mysqlx_connection.proto の `Compression`)
   - 圧縮したメッセージ列を運ぶコンテナで、クライアント (種別 46)・サーバー (種別 19) の双方向で使われる
@@ -398,7 +398,7 @@ capabilities {
 - 認証前に送った `Session.Reset` は無視される
   - 参照:
     - [client.cc の handle_message](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L295-L298)
-- 未知の種別、または今の状態で扱えない種別のメッセージへの応答は、認証の前後で異なる
+- 未知の種別、または今の状態で扱えない種別のメッセージへのレスポンスは、認証の前後で異なる
   - 認証前: FATAL の `Error` (code 5000 `ER_X_BAD_MESSAGE` "Invalid message") が返り、接続が切断される
   - 認証後: 通常の `Error` (code 1047 `ER_UNKNOWN_COM_ERROR` "Unexpected message received") が返り、セッションは継続する
   - 参照:
