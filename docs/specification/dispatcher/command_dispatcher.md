@@ -22,8 +22,6 @@
 
 ### 担わないこと
 
-- 接続とセッションの状態管理、kill 済みの検知、`Session.Close` / `Connection.Close` / `Session.Reset` の処理
-  - セッションがディスパッチャに渡す前に処理するため ([connection/](../connection/README.md) を参照)
 - メッセージの形式とシーケンスの規則そのもの
   - [protocol/](../protocol/README.md) で定義し、ディスパッチャはそれを守る側であるため
 - SQL の解析・最適化・実行
