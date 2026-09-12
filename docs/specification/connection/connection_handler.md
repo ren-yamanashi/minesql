@@ -3,25 +3,20 @@
 - X Plugin (位置づけは [X Protocol](../protocol/x_protocol.md) 参照) のうち、接続の受付からセッションの確立・切断までを担う部分の仕様
 - メッセージの形式と通信の流れは [specification/protocol/](../protocol/README.md) を参照
 - コネクションハンドラーはサーバーの一部として動き、クライアントとの接点 (接続の受付、認証の進行、メッセージの読み書き) を担う
+- 本文の主張に対応する MySQL のソースは [connection_handler_spec.md の「論理モデルの主張とソースの対応」](./reference/connection_handler_spec.md#論理モデルの主張とソースの対応) にまとめる
 
 ## 責務
-
-### 担うこと
 
 - listen ソケットの準備と接続の受付 (TCP / Unix ソケット)
 - 接続数の上限管理と拒否
 - 接続ごとの処理スレッドの割り当て (ワーカースレッドプール)
 - 接続の状態管理 (受付 → 認証 → 稼働 → 終了) と、認証前に受け付けるメッセージの制限
+- TLS への切り替え (capability `tls` を `true` に設定されたら、同じ接続を TLS にし、以後は安全な接続として扱う)
 - 接続に紐づくセッションの生成・再生成 (接続受付時と、セッションを閉じた / リセットしたとき)
 - 認証 (メカニズムの進行、アカウント情報との照合、成功時の内部セッションの身元の確定)
   - [authentication.md](./authentication.md) を参照
 - タイムアウト監視 (接続確立・アイドル・読み取り・書き込み) と強制切断 (kill、シャットダウン)
 - 接続・セッション・スレッドに関する状態変数の更新
-
-### 担わないこと
-
-- コマンド (SQL 実行、CRUD、管理コマンド) の実行 -> セッションのディスパッチャが受け取り、サーバーの SQL 層に委ねる
-- メッセージの形式と順序の規則 -> [プロトコル](../protocol/README.md) で定義する
 
 ## 構成要素
 
@@ -30,23 +25,17 @@
 - サーバー (Server): X Plugin 内に 1 つ
   - 接続を受け入れるかどうかを決め、受け入れた接続の全体を把握する (接続数の上限判定、kill、シャットダウン時の一斉通知はこの把握に基づく)
   - 起動から終了までの稼働状態を持ち、終了中は新しい接続を受け入れない
-  - 参照:
-    - [server.h の State](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/server.h#L72-L77)
-    - [接続一覧 (client_list.cc)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/ngs/client_list.cc#L48-L88)
 - 接続 (Client): 受け付けた接続 1 本につき 1 つ生まれ、接続が閉じると消える
   - X Plugin はこれを Client と呼ぶ (ソース上で connection と呼ばれるのは、この下にあるソケットの抽象)
   - 接続上のバイト列をフレームとして読み書きし、接続の状態 (受付済み → 認証中 → 稼働中 → 終了) を管理する
   - 認証前のメッセージは自分で処理し、認証後はセッションに引き渡す
   - 常に 1 つのセッションを伴い、セッションが閉じられたら次のセッションを用意する
-  - 参照:
-    - [server_factory.cc の create_client](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/server_factory.cc#L36-L52)
 - セッション (Session): 接続の受付時に用意され、認証を経て利用可能になり、閉じられるまで続く
-  - 認証の進行を管理し、成功した利用者の身元を確定する (メカニズムごとの処理は認証ハンドラに委ねる、[authentication.md](./authentication.md) を参照)
+  - 認証の進行を管理し、成功した利用者の身元を確定する (メカニズムごとの処理は認証ハンドラに委ねる)
+    - [authentication.md](./authentication.md) を参照
   - その利用者としてコマンドを実行するための状態 (セッション変数、ユーザー変数、一時テーブルなど) を保持し、コマンドをディスパッチャに引き渡す
   - サーバーの内部セッションと 1 対 1 に対応し、生成と破棄のタイミングを共にする
     - 内部セッションとは、利用者の身元と実行状態 (セッション変数、一時テーブルなど) を持ち、その利用者として SQL を実行する SQL 層側の場 (実装上は THD にあたり、プラグイン向けの srv_session サービスで開閉する)
-  - 参照:
-    - [sql_data_context.cc の init](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sql_data_context.cc#L93-L125)
 
 ## スレッドモデル
 
@@ -54,18 +43,10 @@
 
 - acceptor スレッド (スケジューラ名 `network`): listen ソケットのイベントループを回し、accept とタイマー (接続タイムアウトの監視、終了したワーカーの回収) を処理する
   - `network` スケジューラが動かすループは acceptor だけではなく、Notice を配る broker のループも同じスケジューラで動く (acceptor スレッド = `network` スケジューラではない)
-  - 参照:
-    - [module_mysqlx.cc のタスク登録](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/module_mysqlx.cc#L169-L170)
-    - [server.cc の start_tasks](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/server.cc#L138-L148)
-    - [server_builder.cc](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/builder/server_builder.cc#L99-L100)
-    - [socket_events.cc の loop](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/ngs/socket_events.cc#L171)
 - ワーカースレッド (スケジューラ名 `work`): 接続 1 本の処理全体 (受付後の初期化から切断まで) を 1 つのタスクとして実行する
   - タスクは接続が閉じるまで終わらないため、接続 1 本がワーカースレッド 1 本を接続中ずっと占有する (thread-per-connection)
   - スレッドは同時接続数に応じて増減する動的なプールから割り当てられ、「プール」が効くのは切断後のアイドルスレッドを次の接続に再利用する局面 (classic protocol の thread cache に相当する役割)
   - したがって同時接続数の上限を決めるのは `mysqlx_max_connections` であり、`mysqlx_min_worker_threads` はスレッド数の上限ではない (増減の規則は [詳細仕様](./reference/connection_handler_spec.md#ワーカースレッドプール) を参照)
-  - 参照:
-    - [server_builder.cc](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/builder/server_builder.cc#L51-L53)
-    - [client.cc の run](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L606-L641)
 
 ```mermaid
 sequenceDiagram
@@ -145,9 +126,6 @@ flowchart TD
   - クライアントからのメッセージ: 認証の開始と成功、セッションを閉じる / リセットする、接続を閉じる
   - サーバー側の判断: タイムアウト、kill、シャットダウン、致命的エラー
   - どの経路も最終的には終了中 (`closing`) に合流し、後始末は 1 箇所で行われる
-- 参照:
-  - [interface/client.h の State](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/interface/client.h#L54-L62)
-  - [interface/session.h の State](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/interface/session.h#L49-L56)
 
 ```mermaid
 stateDiagram-v2

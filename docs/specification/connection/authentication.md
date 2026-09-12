@@ -4,6 +4,7 @@
   - 接続の状態遷移と、認証メッセージがセッションに届くまでの経路は [connection_handler.md](./connection_handler.md) を参照
   - メッセージの形式 (`AuthenticateStart` / `AuthenticateContinue` / `AuthenticateOk`) は [protocol/message_spec.md の認証](../protocol/message_spec.md#認証-セッション確立) を参照
 - 認証は MySQL でも接続処理の一部として (接続ごとのスレッド上で、セッション確立の段階で) 実行されるが、メカニズムの中身は状態管理とは別の部品が担うため、文書を分けている
+- 本文の主張に対応する MySQL のソースは [authentication_spec.md の「論理モデルの主張とソースの対応」](./reference/authentication_spec.md#論理モデルの主張とソースの対応) にまとめる
 
 ## 要件
 
@@ -12,31 +13,18 @@
   - 安全でない接続 (TLS なしの TCP): `MYSQL41` と `SHA256_MEMORY`
   - 安全な接続 (TLS または Unix ソケット): 上記に加えて `PLAIN`
   - 対応しないメカニズム名 (安全でない接続での `PLAIN` を含む) は FATAL の `Error` (`ER_NOT_SUPPORTED_AUTH_MODE`) で、接続は閉じられる
-  - 参照:
-    - [authentication_container.cc のメカニズム登録](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/authentication_container.cc#L37-L46)
-    - [get_auth_handler の接続種別による絞り込み](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/authentication_container.cc#L49-L68)
-    - [session.cc の未対応メカニズムの応答](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/session.cc#L155-L162)
 - 成功時は `SessionStateChanged` (`CLIENT_ID_ASSIGNED`) の Notice を送ってから `AuthenticateOk` を返し、セッションが利用可能になる
-  - 参照:
-    - [session.cc の on_auth_success](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/session.cc#L204-L214)
 - 失敗は 1 セッションにつき 3 回まで試せる
   - 3 回目の失敗の `Error` は FATAL になり、サーバーは認証を打ち切って接続を閉じる (途中で別のメカニズムに切り替えて試すことはできる)
-  - 参照:
-    - [session.cc の on_auth_failure_impl](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/session.cc#L222-L247)
-    - [session.h の k_max_auth_attempts](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/session.h#L125)
 - 認証に成功した接続は、その利用者としてコマンドを実行する (内部セッションの身元がその利用者になる)
 - パスワードそのものを送るのは `PLAIN` だけで、`MYSQL41` と `SHA256_MEMORY` はサーバーが送った salt とパスワードから計算した値を送る (安全でない接続で平文のパスワードが流れない)
 
 - `PLAIN` は成功時に SHA256 パスワードキャッシュにその利用者の値を入れ、`SHA256_MEMORY` はキャッシュに値がなければ失敗する
 - `MYSQL41` は `mysql_native_password` のアカウント専用で、`caching_sha2_password` のアカウントにはチャレンジを返したうえで access denied を返す (MySQL と同じ応答)
-  - したがって TCP からの初回のログインは「Unix ソケットで `PLAIN` → 以後は TCP で `SHA256_MEMORY`」の手順になる (MySQL 8.4 の既定と同じ)
+  - したがって TLS なしの TCP では初回に `PLAIN` を使えず、TLS 接続か Unix ソケットで一度 `PLAIN` を通したあとに `SHA256_MEMORY` で認証する (MySQL 8.4 の既定と同じ)
 - アカウントの認証プラグインは `caching_sha2_password` のみ
   - 認証文字列は `$A$005$` + 20 バイトの salt + ダイジェスト (SHA256 を 5000 回反復) の形式
   - `SHA256_MEMORY` の応答は `XOR(SHA256(password), SHA256(SHA256(SHA256(password)) + nonce))` で、サーバーはキャッシュにある `SHA256(SHA256(password))` からこれを検証する
-  - 参照:
-    - [mysql_native_password.cc のプラグイン宣言 (8.4 では既定で無効)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/auth/mysql_native_password.cc#L327-L343)
-    - [sha2_plain_verification.cc の認証文字列の分解](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sha2_plain_verification.cc#L55-L80)
-    - [i_sha2_password_common.h の scramble の形式](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/auth/i_sha2_password_common.h#L96-L97)
 - アカウント情報はシステムスキーマ `mysql` の `user` 表に置き、起動時の bootstrap でこの表と初期アカウントを作る ([ADR-0014](../adr/0014.スキーマを持つ.md))
 - 照合は、内部セッションの身元をシステムユーザーにして `mysql.user` を検索し、認証側で照合の計算を行い、成功したら SQL 層の API で身元を利用者に切り替える (MySQL と同じ手順で、詳細は [構成要素](#構成要素) と [処理の流れ](#処理の流れ) を参照)
 - 扱うアカウントは初期アカウントのみで、ホストは `%` (user@host のパターン照合は行わない)
@@ -56,7 +44,6 @@
 - アカウントの作成・変更・削除 -> 対象外 ([issue #120](https://github.com/ren-yamanashi/minesql/issues/120) の「アカウント作成 (初期アカウントのみサポート)」)
 - アカウントのロック、パスワードの期限、`offline_mode`、TLS 要件 (`require_secure_transport` とアカウントの `ssl_type`) の検査 -> 対象外 (アカウント管理・サーバーモード・TLS の機能に付随するため)
 - 認証後の権限の判定と ACL キャッシュ (user@host のパターン照合を含む) -> 対象外 (権限を入れるときの拡張点)
-- TLS 接続 -> 対象外
 
 ## 構成要素
 
@@ -64,29 +51,15 @@
   - 3 つのメカニズムは 2 種類の実装に対応する
     - チャレンジレスポンス型 (`MYSQL41`、`SHA256_MEMORY`): サーバーが 20 バイトの salt を送り、クライアントはパスワードのハッシュと salt から計算した値を返す
     - 1 往復型 (`PLAIN`): クライアントが最初のメッセージに資格情報をそのまま入れる
-  - 参照:
-    - [auth_challenge_response.h の Sasl_challenge_response_auth (やり取りの説明)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/auth_challenge_response.h#L42-L68)
-    - [auth_plain.cc の Sasl_plain_auth](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/auth_plain.cc#L49-L62)
 - 認証ハンドラの一覧 (Authentication_container): サーバーに 1 つ、メカニズム名と接続の種類 (安全かどうか) から認証ハンドラを作る
 - アカウント照合 (Account_verification_handler): 資格情報を「既定スキーマ \0 ユーザー名 \0 パスワード (または計算値)」に分解し、アカウント情報を取り出して照合する
   - 照合の計算はアカウントの認証プラグインの種類ごとの検証器が行う (`mysql_native_password` 用、`caching_sha2_password` 用、キャッシュ用など)
   - アカウント情報は内部セッションで `mysql.user` を検索して取る (認証文字列、プラグイン名、ロック状態、パスワードの期限、TLS の要件)
-  - 参照:
-    - [account_verification_handler.cc の authenticate (資格情報の分解)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/account_verification_handler.cc#L39-L70)
-    - [verify_account (照合と各種の検査)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/account_verification_handler.cc#L125-L181)
-    - [get_account_record (mysql.user の検索)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/account_verification_handler.cc#L183-L244)
 - SHA256 パスワードキャッシュ: サーバーに 1 つ、`SHA256_MEMORY` の照合に使う値 (パスワードの SHA256 の SHA256) を利用者ごとに保持する
   - 値が入るのは、その利用者が平文で照合できるメカニズム (`PLAIN` など) で一度成功したとき
   - 資格情報の変更・アカウントの改名や削除・`FLUSH PRIVILEGES` で消える (SQL 層の監査イベントを受けて消す)
   - したがって `SHA256_MEMORY` は「平文の認証を一度通した後の 2 回目以降」を速く安全にするためのメカニズムで、キャッシュが空なら失敗する
-  - 参照:
-    - [cache_based_verification.cc の照合](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/cache_based_verification.cc#L70-L91)
-    - [sha2_plain_verification.cc の成功時のキャッシュ登録](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sha2_plain_verification.cc#L81-L85)
-    - [module_cache.cc のキャッシュの消去](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/module_cache.cc#L82-L96)
 - 内部セッションの身元 (security context): 照合の間はシステムユーザー (`mysql.session`@`localhost`) として動き、成功したら認証した利用者に切り替え、既定スキーマの指定があればそれも設定する
-  - 参照:
-    - [sql_data_context.cc の authenticate_internal](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sql_data_context.cc#L257-L300)
-    - [switch_to_user](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sql_data_context.cc#L445-L499)
 
 ## 処理の流れ
 

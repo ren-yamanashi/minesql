@@ -3,6 +3,7 @@
 - X Plugin (位置づけは [X Protocol](../protocol/x_protocol.md) 参照) のうち、認証済みのセッションが受け取ったリクエストを種別ごとの処理に振り分け、SQL 層に実行を委ねて、レスポンスの列を終端まで送り返す部分の仕様
 - 要件は [x_plugin.md](../connection/x_plugin.md) の「クエリ / DML インターフェース」「SQL インターフェース」「リザルトセット・インターフェース」の項を参照
 - 接続とセッションの管理は [connection/](../connection/README.md)、メッセージの形式とシーケンスの規則は [protocol/](../protocol/README.md) を参照
+- 本文の主張に対応する MySQL のソースは [command_dispatcher_spec.md の「論理モデルの主張とソースの対応」](./reference/command_dispatcher_spec.md#論理モデルの主張とソースの対応) にまとめる
 
 ## 責務
 
@@ -36,8 +37,6 @@
 
 - ディスパッチャ (Dispatcher): セッションごとに 1 つ
   - リクエストを受け取り、Expect ブロックの判定を挟んで種別ごとの処理へ渡し、失敗したら `Error` を送る
-  - 参照:
-    - [xpl_dispatcher.h](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/xpl_dispatcher.h#L40-L60)
 - 種別ごとの処理 (ハンドラ)
   - SQL ステートメントの処理: `StmtExecute` を受け、namespace に応じて SQL の実行か管理コマンドの実行に分ける
   - 管理コマンドの処理: コマンド名を引き、引数を検証して実行する
@@ -45,11 +44,7 @@
 - 内部セッション: SQL 層側の実行の場 (定義は [connection/ の構成要素](../connection/connection_handler.md#構成要素) を参照)
   - ディスパッチャはここにステートメントの実行を依頼し、結果をコールバックで受け取る (classic のコマンド層は介さない、[ADR-0006](../adr/0006.classicのCOMコマンド層は作らない.md))
 - 結果の受け口 (デリゲート): 実行 1 回につき 1 つ作られ、SQL 層からのコールバック (列定義、行、完了、エラー) を受けてプロトコルのメッセージに変換して送る
-  - 参照:
-    - [ngs/command_delegate.h](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/ngs/command_delegate.h#L41-L80)
 - Expect スタック: セッションごとに 1 つ持つ、開いている Expect ブロックの入れ子
-  - 参照:
-    - [expect/expect_stack.cc](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/expect/expect_stack.cc#L34-L41)
 
 ## 実行モデル
 

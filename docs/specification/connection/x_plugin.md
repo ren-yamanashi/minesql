@@ -5,6 +5,8 @@ MySQL X Plugin は、従来の SQL 言語に加えて、ドキュメントスト
 - ドキュメントモデルのインターフェースは、MySQL の既存の SQL 機能の上のレイヤーとして実装される
 - プロトコルとクライアントライブラリは、プラグインによって実装されるハイレベルなインターフェースを提供する
 - このプラグインは、ドキュメントモデルのリクエストから SQL へのマッピングに必要なすべての処理を担う
+- 本文の主張に対応する MySQL のソースは [connection_handler_spec.md の「論理モデルの主張とソースの対応」](./reference/connection_handler_spec.md#論理モデルの主張とソースの対応) にまとめる
+- 以下の「要件」は WL#8338 に書かれた MySQL の X Plugin の要件の訳で、minesql がそのうちどれを採るかは [minesql での対応範囲](#minesql-での対応範囲) に示す
 
 ## 要件
 
@@ -85,8 +87,32 @@ MySQL X Plugin は、従来の SQL 言語に加えて、ドキュメントスト
     - `doc` (JSON 型): ドキュメント全体をこの 1 カラムに入れる
     - `_id`: `doc` の `$._id` から抽出される生成カラムで、これが主キー
     - `_json_schema` + CHECK 制約: ドキュメントのスキーマ検証用
-  - 参照:
-    - [`create_collection` が発行する CREATE TABLE](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/admin_cmd_collection_handler.cc#L100-L113)
+
+## minesql での対応範囲
+
+上の要件のうち、minesql が満たすものと満たさないもの。判断の理由は各 ADR を参照
+
+| 要件 | minesql | 備考 |
+| --- | --- | --- |
+| 一般的な要件: ドキュメント指向の CRUD、ドキュメントテーブルの作成、SQL を書かない操作 | 満たさない | ドキュメントモデルは実装しない ([ADR-0002](../adr/0002.ドキュメントモデルは実装しない.md)) |
+| 一般的な要件: 拡張 X Protocol の実装 | 満たす | X Protocol を話すサーバーとして作る ([ADR-0001](../adr/0001.実装対象はXProtocolを話すサーバー.md)) |
+| 接続: `CapabilitiesGet` / `CapabilitiesSet` | 満たす | [protocol/message_spec.md](../protocol/message_spec.md) の capability ネゴシエーション |
+| 接続: 他のセッションの kill、接続中のセッションの閲覧 | 満たす | 管理コマンド `kill_client` / `list_clients` ([ADR-0005](../adr/0005.管理コマンドは接続系とNotice系の6つを実装する.md)) と `KILL` ステートメント |
+| 接続: 拡張プロトコルに対応していないクライアントの適切な処理 | 満たす | 不正なメッセージへの応答 ([protocol/reference/x_plugin_behavior.md](../protocol/reference/x_plugin_behavior.md#不正なメッセージへの応答)) |
+| 接続: SSL 接続 | 満たす | capability `tls` で同じ接続を TLS に切り替える ([ADR-0016](../adr/0016.TLS接続を実装する.md))。クライアント証明書の検証は対象外 |
+| 認証: チャレンジ / レスポンス型の認証 | 満たす | `MYSQL41` と `SHA256_MEMORY` ([ADR-0015](../adr/0015.認証の方式.md)) |
+| 認証: `mysql.user` に従う | 満たす | システムスキーマ `mysql` の `user` 表を SQL で引いて照合する ([ADR-0014](../adr/0014.スキーマを持つ.md)、[ADR-0015](../adr/0015.認証の方式.md)) |
+| クエリ / DML: 従来の SQL コマンドの実行 | 満たす | 対応するステートメントは [parser/](../parser/README.md) |
+| クエリ / DML: ドキュメントモデルの CRUD コマンド | 満たさない | [ADR-0002](../adr/0002.ドキュメントモデルは実装しない.md) |
+| クエリ / DML: 成功時の OK メッセージと Affected Rows などのメタデータ | 満たす (GTID を除く) | `StmtExecuteOk` と実行ステータスの Notice。GTID はレプリケーションが対象外のため送らない |
+| SQL インターフェース、リザルトセット・インターフェース (メタデータと行、簡略版メタデータ) | 満たす | [protocol/message_spec.md](../protocol/message_spec.md) の SQL 実行とリザルトセットのエンコーディング |
+| ドキュメントテーブル・インターフェース、CRUD インターフェース (Insert / Find / Update / Delete) | 満たさない | リレーショナルテーブルに対する CRUD メッセージも含めて対象外 ([ADR-0002](../adr/0002.ドキュメントモデルは実装しない.md)) |
+| 非機能要件: MySQL のユーザーアカウントで認証 | 満たす (初期アカウントのみ) | アカウントの作成・変更は対象外 |
+| 非機能要件: 基本的なステータス監視 | 満たす | 接続・セッション・スレッドと実行に関する状態変数 |
+| 非機能要件: アカウント制限 (期限切れパスワード、ロック) への準拠 | 満たさない | [authentication.md の担わないこと](./authentication.md#担わないこと) |
+| 非機能要件: 手動作成したコレクションでの CRUD | 該当なし | ドキュメントモデルを持たない |
+| 非機能要件: mysqldump / mysql によるバックアップと復元 | 満たさない | これらのツールは classic protocol で接続するため ([ADR-0001](../adr/0001.実装対象はXProtocolを話すサーバー.md)) |
+| 非機能要件: 従来のプロトコルと同等のパフォーマンス | 要件にしない | 学習用の実装で、性能は目標に含めない |
 
 ## 参考資料
 

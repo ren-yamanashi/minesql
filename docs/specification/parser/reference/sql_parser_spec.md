@@ -748,3 +748,41 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 - 期待していたトークンの列挙 (goyacc の `yyErrorVerbose`) は文言に含めず、開発時の診断にだけ使う ([ideology.md](../../ideology.md))
 - 構文エラーの深刻度は `ERROR` で、セッションは継続する ([sql_parser.md のエラー](../sql_parser.md#エラー))
 - 名前の妥当性 (長さ、末尾の空白、存在) の誤りは構文エラーではなく、プリペアのエラーになる
+
+## 論理モデルの主張とソースの対応
+
+論理モデルの文書から移した、各主張に対応する MySQL のソースへの参照
+
+### [sql_parser.md](../sql_parser.md) より
+
+- 字句解析器 (lexer): 入力の文字列と読み取り位置を持ち、求められるたびに次のトークンを 1 つ返す
+  - [sql_lex.cc の my_sql_parser_lex / lex_one_token](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.cc#L1367-L1436)
+  - [sql_lex.h の Lex_input_stream](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.h#L3296-L3303)
+  - [lex.h のキーワード表](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/lex.h)
+- 構文解析器 (parser): 文法規則の集合で、トークン列から parse tree を組み立てる
+  - [sql_yacc.yy の宣言部](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L553-L567)
+  - [start_entry / sql_statement 規則](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2301-L2347)
+- parse tree (MySQL のみ): 構文解析の出力で、ステートメントの構造をそのまま写した一時的な Tree
+  - [parse_tree_node_base.h の Parse_tree_node_tmpl](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/parse_tree_node_base.h#L231-L330)
+  - [parse_tree_nodes.h の Parse_tree_root](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/parse_tree_nodes.h#L162-L175)
+  - [PT_select_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/parse_tree_nodes.h#L1880)
+- AST (名前解決に進める状態の Tree): MySQL では文脈化の出力、minesql では構文解析の出力で、プリペア・最適化・実行の各段階が同じ構造を使う
+  - [sql_lex.h の Query_expression](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.h#L626)
+  - [Query_block](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.h#L1167)
+  - [item.h の Item](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/item.h#L936)
+- 実行コマンド (`Sql_cmd`): ステートメント 1 つのプリペアと実行の手順を表すオブジェクト
+  - [parse_tree_nodes.cc の PT_select_stmt::make_cmd](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/parse_tree_nodes.cc#L761-L806)
+- MySQL では、ディスパッチャから渡されたステートメントを `dispatch_sql_command` が受け、`parse_sql` が字句解析から実行コマンドの生成までを行い、`mysql_execute_command` が実行コマンドを実行する
+  - [sql_parse.cc の dispatch_sql_command](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_parse.cc#L5275)
+  - [parse_sql](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_parse.cc#L7098)
+  - [mysql_execute_command](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_parse.cc#L2909)
+- ステートメントの規則: `sql_yacc.yy` の対応する規則を写す
+  - [select_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L9672)、[query_expression](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L9769)、[query_primary](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L9831)
+  - [insert_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13064)、[update_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13389)、[delete_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13445)
+  - [create_table_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L3217)
+  - [begin_stmt / commit / rollback](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L17255-L17299)
+- 式の階層と演算子の優先順位: `expr` → `bool_pri` → `predicate` → `bit_expr` → `simple_expr` の規則と、`%left` / `%right` の優先順位宣言を写す
+  - [式の規則](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L10077-L10351)
+  - [優先順位の宣言](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L1479-L1515)
+- 字句規則: 識別子と引用、文字列・数値リテラル、コメントの規則と、キーワードのうち識別子としても使える語の一覧
+  - [ident_keyword](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L15217)、[ident_keywords_unambiguous](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L15311)

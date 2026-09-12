@@ -197,3 +197,37 @@ capabilities {
 - 認証後に送った `CapabilitiesSet` も同じく通常の `Error` (code 1047) で拒否される
   - 参照:
     - [xpl_dispatcher.cc の dispatch](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/xpl_dispatcher.cc#L46-L119)
+
+## 論理モデルの主張とソースの対応
+
+論理モデルの文書から移した、各主張に対応する MySQL のソースへの参照
+
+### [communication_flow.md](../communication_flow.md) より
+
+- サーバーは接続を受け付けた時点で相手を知り、クライアントからのメッセージを待たずに `ServerHello` の Notice を送る
+  - [client.cc の Client::on_accept](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L450)
+  - [ServerHello の送信](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L487-L489)
+- この手続きは認証より前にだけ行える
+  - [xpl_dispatcher.cc の dispatch](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/xpl_dispatcher.cc#L46-L119)
+- SQL 実行の流れ (実行ステータスの Notice の内訳と順序)
+  - [streaming_command_delegate.cc の handle_ok](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/streaming_command_delegate.cc#L503-L523)
+  - [custom_command_delegates.cc の try_send_notices](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/custom_command_delegates.cc#L113-L128)
+  - [streaming_command_delegate.cc の defer_on_warning](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/streaming_command_delegate.cc#L556-L579)
+
+### [message_spec.md](../message_spec.md) より
+
+- `CapabilitiesSet`: capability の変更をリクエストし、`Ok` または `Error` が返る (例: `tls: true` を送って TLS 接続へ切り替える)
+  - [configurator.cc の存在しない名前の扱い](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/capabilities/configurator.cc#L91-L92)
+- MySQL 8.4 の X Plugin が持つ capability は 8 個
+  - [client.cc の capability の登録](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L202-L218)
+- MySQL 8.4 の X Plugin が登録するメカニズムは `MYSQL41`・`PLAIN`・`SHA256_MEMORY` の 3 種類で、`PLAIN` は安全な接続 (TLS または Unix ソケット) でのみ使える
+  - [authentication_container.cc のメカニズム登録](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/authentication_container.cc#L37-L46)
+  - [get_auth_handler / get_authentication_mechanisms](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/authentication_container.cc#L49-L80)
+  - [connection_type.cc の is_secure_type](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/io/connection_type.cc#L58-L66)
+- 例: `MYSQL41` はチャレンジレスポンス方式で、サーバーが `AuthenticateContinue` で送る 20 バイトの salt とパスワードから計算したレスポンスを返す
+  - [auth_challenge_response.h の doc コメント](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/auth_challenge_response.h#L55-L60)
+  - [challenge_response_verification.cc の generate_salt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/challenge_response_verification.cc#L41-L45)
+- `namespace` には `"sql"` (SQL ステートメントの実行) のほかに `"mysqlx"` (管理コマンドの実行) がある
+  - [admin_cmd_handler.cc のコマンド表](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/admin_cmd_handler.cc#L96-L115)
+- `catalog` は MySQL にカタログの概念がないため意味を持たず、MySQL は固定値 `"def"` を入れて送る (`compact_metadata` でない場合)
+  - [streaming_command_delegate.cc の field_metadata](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/streaming_command_delegate.cc#L309-L313)

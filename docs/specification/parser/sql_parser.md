@@ -2,6 +2,7 @@
 
 - SQL 層の入口として、SQL ステートメントの文字列を受け取り、次の段階 (プリペア = 名前解決と型決定) が扱える Tree に変換する部分の仕様
 - ディスパッチャがステートメントを SQL 層に渡すまでは [dispatcher/](../dispatcher/README.md) を参照
+- 本文の主張に対応する MySQL のソースは [sql_parser_spec.md の「論理モデルの主張とソースの対応」](./reference/sql_parser_spec.md#論理モデルの主張とソースの対応) にまとめる
 
 ## 責務
 
@@ -30,33 +31,16 @@
 - 字句解析器 (lexer): 入力の文字列と読み取り位置を持ち、求められるたびに次のトークンを 1 つ返す
   - キーワードと識別子の区別はキーワード表で行う
   - MySQL では手書きで、Bison が生成した構文解析器から呼ばれる
-  - 参照:
-    - [sql_lex.cc の my_sql_parser_lex / lex_one_token](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.cc#L1367-L1436)
-    - [sql_lex.h の Lex_input_stream](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.h#L3296-L3303)
-    - [lex.h のキーワード表](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/lex.h)
 - 構文解析器 (parser): 文法規則の集合で、トークン列から parse tree を組み立てる
   - MySQL では Bison の LALR(1) 文法 (`sql_yacc.yy`、約 18,000 行) から生成される
-  - 参照:
-    - [sql_yacc.yy の宣言部](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L553-L567)
-    - [start_entry / sql_statement 規則](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2301-L2347)
 - parse tree (MySQL のみ): 構文解析の出力で、ステートメントの構造をそのまま写した一時的な Tree
   - 文脈に依存しない (作る時点でテーブルやセッションの状態を見ない)
   - minesql はこれを持たず、構文解析の出力を直接 AST にする ([minesql での段階の切り方](#minesql-での段階の切り方) を参照)
   - 各ノードは `contextualize` を持ち、根のノードは実行コマンドを作る `make_cmd` を持つ
-  - 参照:
-    - [parse_tree_node_base.h の Parse_tree_node_tmpl](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/parse_tree_node_base.h#L231-L330)
-    - [parse_tree_nodes.h の Parse_tree_root](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/parse_tree_nodes.h#L162-L175)
-    - [PT_select_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/parse_tree_nodes.h#L1880)
 - AST (名前解決に進める状態の Tree): MySQL では文脈化の出力、minesql では構文解析の出力で、プリペア・最適化・実行の各段階が同じ構造を使う
   - クエリ式 (`Query_expression`)、クエリブロック (`Query_block`)、式の Tree (`Item`) からなり、`LEX` を根とする
-  - 参照:
-    - [sql_lex.h の Query_expression](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.h#L626)
-    - [Query_block](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.h#L1167)
-    - [item.h の Item](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/item.h#L936)
 - 実行コマンド (`Sql_cmd`): ステートメント 1 つのプリペアと実行の手順を表すオブジェクト
   - minesql でもパーサーの出口で AST を包んで作り、SQL 層の入口は `prepare` → `execute` を呼ぶだけにする (種別の switch を持たない)
-  - 参照:
-    - [parse_tree_nodes.cc の PT_select_stmt::make_cmd](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/parse_tree_nodes.cc#L761-L806)
 
 ## 処理の流れ
 
@@ -84,10 +68,6 @@ flowchart TD
 ```
 
 - MySQL では、ディスパッチャから渡されたステートメントを `dispatch_sql_command` が受け、`parse_sql` が字句解析から実行コマンドの生成までを行い、`mysql_execute_command` が実行コマンドを実行する
-  - 参照:
-    - [sql_parse.cc の dispatch_sql_command](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_parse.cc#L5275)
-    - [parse_sql](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_parse.cc#L7098)
-    - [mysql_execute_command](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_parse.cc#L2909)
 
 ## MySQL の設計の要点
 
@@ -100,27 +80,13 @@ flowchart TD
 - 新設計による解消: パーサーは文脈に依存しない parse tree を出すだけにし、文脈に依存する処理は文脈化の段階に寄せた
   - parse tree はただのオブジェクトの Tree なので、保存・復元・デバッグが容易になった
   - 文法が単純になり衝突が減り、構文エラーの位置も正確になった
-- 参照:
-  - [SQL parser refactoring in 5.7.4 LAB release](https://dev.mysql.com/blog-archive/sql-parser-refactoring-in-5-7-4-lab-release/)
-  - [WL#6707: Refactor MySQL server parser to build the AST in a natural "bottom-up" way](https://dev.mysql.com/worklog/task/?id=6707)
-  - [MySQL 8.0: Refactoring and Improving the Parser](https://dev.mysql.com/blog-archive/mysql-8-0-labs-refactoring-and-improving-the-parser/)
 
 ## minesql で対応する構文の方針
 
 - 対応するステートメント (SELECT / INSERT / UPDATE / DELETE / CREATE TABLE / トランザクション制御など) は、MySQL の構文規則にできるだけ従う ([ADR-0007](../adr/0007.SQLパーサーはMySQLの構文規則に従う.md))
   - ステートメントの規則: `sql_yacc.yy` の対応する規則を写す
-    - 参照:
-      - [select_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L9672)、[query_expression](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L9769)、[query_primary](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L9831)
-      - [insert_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13064)、[update_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13389)、[delete_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13445)
-      - [create_table_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L3217)
-      - [begin_stmt / commit / rollback](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L17255-L17299)
   - 式の階層と演算子の優先順位: `expr` → `bool_pri` → `predicate` → `bit_expr` → `simple_expr` の規則と、`%left` / `%right` の優先順位宣言を写す
-    - 参照:
-      - [式の規則](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L10077-L10351)
-      - [優先順位の宣言](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L1479-L1515)
   - 字句規則: 識別子と引用、文字列・数値リテラル、コメントの規則と、キーワードのうち識別子としても使える語の一覧
-    - 参照:
-      - [ident_keyword](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L15217)、[ident_keywords_unambiguous](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L15311)
 - 従わないもの ([ADR-0011](../adr/0011.文法に含める構文の範囲.md)、[ADR-0013](../adr/0013.sql_modeの既定値に固定し非推奨と無視される構文は採らない.md))
   - 実装しない機能に付随する構文 (`INTO OUTFILE`、インデックスヒント、オプティマイザヒント、パーティション句、ウィンドウ関数、CTE など) は受理せず、構文エラーにする
   - 後方互換のためだけの別表記 (例: 既定の `sql_mode` で `||` を OR と読む挙動) は採用しない
@@ -157,3 +123,9 @@ flowchart TD
 
 - 構文エラーはステートメント単位で報告され、セッションは継続する (ディスパッチャの深刻度では `ERROR`)
 - 名前解決の失敗 (存在しないテーブルや列) は構文エラーではなく、プリペアの段階のエラーになる
+
+## 参考資料
+
+- [SQL parser refactoring in 5.7.4 LAB release](https://dev.mysql.com/blog-archive/sql-parser-refactoring-in-5-7-4-lab-release/)
+- [WL#6707: Refactor MySQL server parser to build the AST in a natural "bottom-up" way](https://dev.mysql.com/worklog/task/?id=6707)
+- [MySQL 8.0: Refactoring and Improving the Parser](https://dev.mysql.com/blog-archive/mysql-8-0-labs-refactoring-and-improving-the-parser/)

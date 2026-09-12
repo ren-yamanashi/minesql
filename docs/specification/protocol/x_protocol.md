@@ -47,42 +47,25 @@ X Protocol の周辺には名前の似た用語が 3 つあり、それぞれ層
     - ペイロードは独自のバイナリ形式で、レスポンスの種類もペイロード先頭のマーカーバイトを「どのコマンドへのレスポンスか」という文脈に応じて読み分ける必要があり、この読み分けを各言語のクライアントが手で実装することになる
   - X Protocol はメッセージの構造定義を `.proto` ファイルに集約し、フレームのヘッダに種別バイトを持たせた
     - これにより、どのメッセージも「種別を見て、対応する型としてデシリアライズする」という文脈に依存しない一様な処理で受信でき、エンコード・デコードの実装もコード生成で自動化できる
-  - 参照:
-    - [sql-common/net_serv.cc のパケット構造の doc コメント](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql-common/net_serv.cc#L338-L427)
-    - [sql/protocol_classic.cc のコマンドフェーズの doc コメント](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/protocol_classic.cc#L155-L181)
 - リクエストとレスポンスの対応付け
   - classic は 1 コマンド送ってレスポンスを受け取ってから次を送る前提で、コマンドのたびに往復の待ちが発生する
   - X Protocol はやり取りを「シーケンス」(= 1 つのリクエスト + それに続くレスポンスの列) という単位で規定しており、レスポンスを待たずに次のリクエストを送っても、レスポンスの列がリクエストの順に返ることで対応関係が崩れない
     - そのためパイプライン化ができ、往復のレイテンシを削減できる
-  - 参照:
-    - [mysqlx.proto の `@section messages_Message_Sequence`](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx.proto#L103-L118)
-    - [mysqlx-protocol-implementation.dox の Pipelining](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/doc/mysqlx-protocol-implementation.dox#L68-L71)
 - capability の表現
   - classic の capability はハンドシェイクパケット内のビットフラグで、2 つの制約がある
     - ビットは真偽値しか表せないため、「どのアルゴリズムか」「レベルはいくつか」のような値を伝えるには、フラグと連動してハンドシェイクパケットに追加フィールドを差し込むフラグごとの個別の拡張が必要になる (実例: zstd 圧縮のレベルは、フラグが立っているときだけパケットに追加される 1 バイトで運ばれる)
     - 32 ビットしかなく、実際にほぼ枯渇している (bit 29 は「64 ビットへの拡張のための予約」になっている)
   - X Protocol は capability を「名前 + 型付きの値」の組として専用メッセージ (`CapabilitiesGet` / `CapabilitiesSet`) で交換するため、値や構造化データもそのまま運べ、新しい capability を名前の追加だけで導入できる
-  - 参照:
-    - [include/mysql_com.h の zstd 圧縮フラグ](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/include/mysql_com.h#L699-L716)
-    - [sql/auth/sql_authentication.cc の zstd レベルの追加フィールド](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/auth/sql_authentication.cc#L3226-L3230)
-    - [include/mysql_com.h の 64 ビット拡張予約](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/include/mysql_com.h#L751-L755)
 - サーバー起点の Notice
   - classic でサーバーが自分から送るのは接続直後のハンドシェイクだけで、以降はリクエストへのレスポンスしか返せない
   - X Protocol はレスポンスとは独立した Notice を持つため、警告や状態変化をやり取りの途中でも運べる
-  - 参照:
-    - [mysqlx-protocol-comparison.dox の比較表 (out-of-band notifications)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/doc/mysqlx-protocol-comparison.dox#L38)
 - 接続直後の手順
   - classic は接続直後の手順が「サーバー主導のハンドシェイクの中で capability 交換から認証まで一続きに行う」形に固定されている
   - X Protocol は接続直後の義務的な手続きがなく (サーバーは `ServerHello` の Notice を送るだけ)、capability ネゴシエーション (任意) も認証もクライアントが自分のタイミングで開始する
-  - 参照:
-    - [sql/auth/sql_authentication.cc の接続フェーズの doc コメント](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/auth/sql_authentication.cc#L127-L190)
-    - [mysqlx-protocol-lifecycle.dox の Stages of Session Setup](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/doc/mysqlx-protocol-lifecycle.dox#L118-L128)
 
 ## メッセージ構造 (フレーム)
 
 - すべてのメッセージは以下のフレーム構造で送受信される
-  - 参照:
-    - [mysqlx.proto 冒頭の doc コメント `@section messages_Message_Structure`](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx.proto#L48-L70)
 
 ```txt
 struct Message {
@@ -110,6 +93,14 @@ struct Message {
 - protobuf のシリアライズ結果は型情報を含まないため、受信側は `message_type` の値を見てペイロードをどの型としてデシリアライズするかを決める
   - 種別値とメッセージ型の対応表は `.proto` ファイルに定義されていて、同じ定義から生成したクライアントとサーバーの双方に最初から埋め込まれている (一覧と宣言のされ方は [message_spec.md のメッセージ種別の一覧](./message_spec.md#メッセージ種別の一覧) を参照)
 
-## 参考文献
+## 参考資料
 
-- https://dev.mysql.com/doc/dev/mysql-server/8.4.11/page_mysqlx_protocol.html
+- [MySQL Server Doxygen: X Protocol (8.4.11)](https://dev.mysql.com/doc/dev/mysql-server/8.4.11/page_mysqlx_protocol.html)
+- [sql-common/net_serv.cc のパケット構造の doc コメント](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql-common/net_serv.cc)
+- [sql/protocol_classic.cc のコマンドフェーズの doc コメント](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/protocol_classic.cc)
+- [mysqlx.proto の `@section messages_Message_Sequence`](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx.proto)
+- [mysqlx-protocol-implementation.dox の Pipelining](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/doc/mysqlx-protocol-implementation.dox)
+- [include/mysql_com.h の zstd 圧縮フラグ](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/include/mysql_com.h)
+- [sql/auth/sql_authentication.cc の zstd レベルの追加フィールド](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/auth/sql_authentication.cc)
+- [mysqlx-protocol-comparison.dox の比較表 (out-of-band notifications)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/doc/mysqlx-protocol-comparison.dox)
+- [mysqlx-protocol-lifecycle.dox の Stages of Session Setup](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/doc/mysqlx-protocol-lifecycle.dox)

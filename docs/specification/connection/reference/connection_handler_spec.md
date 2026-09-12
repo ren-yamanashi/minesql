@@ -237,3 +237,33 @@
     - [server.cc の accept 失敗時](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/server.cc#L361-L366)
     - [session.cc のデストラクタ](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/session.cc#L80-L100)
     - [protocol_monitor.cc の on_fatal_error_send](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/protocol_monitor.cc#L81-L85)
+
+## 論理モデルの主張とソースの対応
+
+論理モデルの文書から移した、各主張に対応する MySQL のソースへの参照
+
+### [connection_handler.md](../connection_handler.md) より
+
+- サーバー (Server): X Plugin 内に 1 つ
+  - [server.h の State](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/server.h#L72-L77)
+  - [接続一覧 (client_list.cc)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/ngs/client_list.cc#L48-L88)
+- 接続 (Client): 受け付けた接続 1 本につき 1 つ生まれ、接続が閉じると消える
+  - [server_factory.cc の create_client](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/server_factory.cc#L36-L52)
+- セッション (Session): 接続の受付時に用意され、認証を経て利用可能になり、閉じられるまで続く
+  - [sql_data_context.cc の init](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sql_data_context.cc#L93-L125)
+- acceptor スレッド (スケジューラ名 `network`): listen ソケットのイベントループを回し、accept とタイマー (接続タイムアウトの監視、終了したワーカーの回収) を処理する
+  - [module_mysqlx.cc のタスク登録](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/module_mysqlx.cc#L169-L170)
+  - [server.cc の start_tasks](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/server.cc#L138-L148)
+  - [server_builder.cc](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/builder/server_builder.cc#L99-L100)
+  - [socket_events.cc の loop](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/ngs/socket_events.cc#L171)
+- ワーカースレッド (スケジューラ名 `work`): 接続 1 本の処理全体 (受付後の初期化から切断まで) を 1 つのタスクとして実行する
+  - [server_builder.cc](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/builder/server_builder.cc#L51-L53)
+  - [client.cc の run](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L606-L641)
+- 接続とセッションの状態遷移 (接続とセッションの状態の定義)
+  - [interface/client.h の State](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/interface/client.h#L54-L62)
+  - [interface/session.h の State](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/interface/session.h#L49-L56)
+
+### [x_plugin.md](../x_plugin.md) より
+
+- ドキュメントテーブル (コレクション) というのは、JSON 型を部品として使った、特定の形のテーブル
+  - [`create_collection` が発行する CREATE TABLE](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/admin_cmd_collection_handler.cc#L100-L113)

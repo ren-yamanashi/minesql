@@ -11,3 +11,5 @@ X Plugin のコネクションハンドラーの仕様を以下の文書に分�
 - 実装時の参照資料 (読む順には含めない): [reference/connection_handler_spec.md](./reference/connection_handler_spec.md)
   - コネクションハンドラーの詳細仕様 (起動と接続の待ち受け、接続の受付、ワーカースレッドプール、接続のライフサイクル、タイムアウトと強制切断、設定変数とステータス変数)
   - 論理モデルと食い違う場合は論理モデルを正とし、そのドメインを実装する段階で更新する
+- 実装時の参照資料 (読む順には含めない): [reference/authentication_spec.md](./reference/authentication_spec.md)
+  - 認証の論理モデルの主張に対応する MySQL のソース

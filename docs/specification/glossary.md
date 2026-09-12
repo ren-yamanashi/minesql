@@ -19,6 +19,7 @@
 | Notice | 通知 | notice | サーバーが送る、リクエストへの直接のレスポンスではないメッセージ (`Mysqlx.Notice.Frame`) |
 | 警告 | ワーニング | warning | `Warning` 型の Notice の中身。「警告の Notice」と書く |
 | capability | 機能、ケイパビリティ | capability | 接続で何ができるかを表す名前つきの値 |
+| 安全な接続 | セキュア接続、暗号化接続 | secure connection (`Connection_type_helper::is_secure_type`) | TLS に切り替えた接続、または Unix ソケット接続。`PLAIN` 認証はここでだけ使える |
 | 認証メカニズム | 認証方式、認証プラグイン | authentication mechanism (`mech_name`) | `MYSQL41` / `PLAIN` / `SHA256_MEMORY` |
 | namespace | 名前空間 | namespace (`StmtExecute.namespace`) | `sql` / `mysqlx` |
 | 管理コマンド | アドミンコマンド | admin command | `mysqlx` namespace で実行するコマンド |

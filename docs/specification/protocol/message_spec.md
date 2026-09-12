@@ -4,6 +4,7 @@
 - ここに書くのは `.proto` ファイルが定める契約 (メッセージの定義、値の型、エンコーディング、種別の一覧) で、minesql はこれにそのまま従う
 - X Plugin の振る舞いの細部 (実測値、doc コメントと実装の差、状態ごとの例外的な応答) は [reference/x_plugin_behavior.md](./reference/x_plugin_behavior.md) に分けた
   - 契約ではないが、クライアントはこの振る舞いも前提にしうるため、minesql も互換の要件として同じ応答をする
+- X Plugin の実装 (`plugin/x/src`) への参照は [reference/x_plugin_behavior.md の「論理モデルの主張とソースの対応」](./reference/x_plugin_behavior.md#論理モデルの主張とソースの対応) にまとめる
 
 ## 型定義ファイルの構成
 
@@ -55,11 +56,8 @@
   - 存在しない名前を指定すると `Error` (`Capability '<名前>' doesn't exist`) になる
   - 参照:
     - [CapabilitiesSet の前提条件 (doc コメント)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_connection.proto#L74)
-    - [configurator.cc の存在しない名前の扱い](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/capabilities/configurator.cc#L91-L92)
 - `Capabilities` は `Capability` (`name` 文字列 + `Mysqlx.Datatypes.Any` の値) のリスト
 - MySQL 8.4 の X Plugin が持つ capability は 8 個
-  - 参照:
-    - [client.cc の capability の登録](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L202-L218)
 
 | 名前 | 値の型 | 設定 | 意味 |
 | --- | --- | --- | --- |
@@ -84,14 +82,7 @@
 - `mech_name` は `.proto` ファイル上は自由な文字列で、使えるメカニズムはサーバー実装側で決まる
   - MySQL 8.4 の X Plugin が登録するメカニズムは `MYSQL41`・`PLAIN`・`SHA256_MEMORY` の 3 種類で、`PLAIN` は安全な接続 (TLS または Unix ソケット) でのみ使える
     - `authentication.mechanisms` capability の一覧も安全な接続かどうかで切り替わる (安全でなければ `MYSQL41` と `SHA256_MEMORY` のみ)
-    - 参照:
-      - [authentication_container.cc のメカニズム登録](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/authentication_container.cc#L37-L46)
-      - [get_auth_handler / get_authentication_mechanisms](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/authentication_container.cc#L49-L80)
-      - [connection_type.cc の is_secure_type](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/io/connection_type.cc#L58-L66)
   - 例: `MYSQL41` はチャレンジレスポンス方式で、サーバーが `AuthenticateContinue` で送る 20 バイトの salt とパスワードから計算したレスポンスを返す
-    - 参照:
-      - [auth_challenge_response.h の doc コメント](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/auth_challenge_response.h#L55-L60)
-      - [challenge_response_verification.cc の generate_salt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/challenge_response_verification.cc#L41-L45)
 
 ## セッションと接続の終了・リセット
 
@@ -123,7 +114,6 @@
   - コマンドは 14 個 (`ping` / `list_clients` / `kill_client` / `create_collection` / `drop_collection` / `ensure_collection` / `modify_collection_options` / `get_collection_options` / `create_collection_index` / `drop_collection_index` / `list_objects` / `enable_notices` / `disable_notices` / `list_notices`) で、minesql が実装するのはコレクション系を除く 6 個 ([dispatcher/](../dispatcher/README.md))
   - 参照:
     - [mysqlx-protocol-xplugin.dox の namespace の説明](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/doc/mysqlx-protocol-xplugin.dox#L36-L51)
-    - [admin_cmd_handler.cc のコマンド表](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/admin_cmd_handler.cc#L96-L115)
 
 ### リザルトセットの構造
 
@@ -152,8 +142,6 @@
 - フィールドは `type` (必須)、`name`、`original_name`、`table`、`original_table`、`schema`、`catalog`、`collation`、`fractional_digits`、`length`、`flags`、`content_type`
 - `original_name` / `original_table` は別名を付ける前の名前で、素の名前と同じ場合サーバーは省略してよい (クライアント側で補完する)
 - `catalog` は MySQL にカタログの概念がないため意味を持たず、MySQL は固定値 `"def"` を入れて送る (`compact_metadata` でない場合)
-  - 参照:
-    - [streaming_command_delegate.cc の field_metadata](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/streaming_command_delegate.cc#L309-L313)
 - `flags` は全型共通のビット (`NOT_NULL` 0x0010、`PRIMARY_KEY` 0x0020、`UNIQUE_KEY` 0x0040、`MULTIPLE_KEY` 0x0080、`AUTO_INCREMENT` 0x0100) と型別のビット (いずれも 0x0001) を持つ
   - 型別のビットは `UINT` の zerofill、`DOUBLE` / `FLOAT` / `DECIMAL` の unsigned、`BYTES` の rightpad、`DATETIME` の is_timestamp
 - `content_type` は `BYTES` 型の中身のヒント (`GEOMETRY` = 1、`JSON` = 2、`XML` = 3) と `DATETIME` 型の中身のヒント (`DATE` = 1、`DATETIME` = 2) を表す (同ファイルの `ContentType_BYTES` / `ContentType_DATETIME`)

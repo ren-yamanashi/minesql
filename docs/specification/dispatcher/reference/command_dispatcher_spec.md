@@ -222,3 +222,16 @@
 - 送信: `Mysqlx_rows_sent` / `Mysqlx_messages_sent` / `Mysqlx_notice_warning_sent` / `Mysqlx_notice_other_sent` / `Mysqlx_notice_global_sent`
 - エラー: `Mysqlx_errors_sent` / `Mysqlx_errors_unknown_message_type`
 - 実装対象外の種別に対応するもの: `Mysqlx_crud_*` / `Mysqlx_prep_*` / `Mysqlx_cursor_*` / コレクション系と `list_objects` の `Mysqlx_stmt_*`
+
+## 論理モデルの主張とソースの対応
+
+論理モデルの文書から移した、各主張に対応する MySQL のソースへの参照
+
+### [command_dispatcher.md](../command_dispatcher.md) より
+
+- ディスパッチャ (Dispatcher): セッションごとに 1 つ
+  - [xpl_dispatcher.h](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/xpl_dispatcher.h#L40-L60)
+- 結果の受け口 (デリゲート): 実行 1 回につき 1 つ作られ、SQL 層からのコールバック (列定義、行、完了、エラー) を受けてプロトコルのメッセージに変換して送る
+  - [ngs/command_delegate.h](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/ngs/command_delegate.h#L41-L80)
+- Expect スタック: セッションごとに 1 つ持つ、開いている Expect ブロックの入れ子
+  - [expect/expect_stack.cc](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/expect/expect_stack.cc#L34-L41)

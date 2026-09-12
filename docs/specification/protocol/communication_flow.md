@@ -3,6 +3,7 @@
 以下、X Protocol の通信全体の流れ
 
 メッセージの形式 (フレーム構造) は [x_protocol.md](./x_protocol.md)、各メッセージの詳細な仕様は [message_spec.md](./message_spec.md) を参照
+- 本文の主張に対応する MySQL のソースは [x_plugin_behavior.md の「論理モデルの主張とソースの対応」](./reference/x_plugin_behavior.md#論理モデルの主張とソースの対応) にまとめる
 
 ## 全体像
 
@@ -40,9 +41,6 @@ sequenceDiagram
 - サーバーは接続を受け付けた時点で相手を知り、クライアントからのメッセージを待たずに `ServerHello` の Notice を送る
   - やり取りの開始そのものはクライアントの接続で、最初のメッセージだけがサーバー側から出る
   - これはリクエストへのレスポンスではなくシーケンスの外の Notice で、クライアントは読み飛ばしてもよい
-  - 参照:
-    - [client.cc の Client::on_accept](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L450)
-    - [ServerHello の送信](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L487-L489)
 
 ### 2. capability ネゴシエーション (任意)
 
@@ -51,9 +49,6 @@ sequenceDiagram
 - クライアントは capability の一覧を取得し、必要なら変更を求める (例: TLS 接続への切り替え)
 - この手続きは認証より前にだけ行える
   - 認証後に送ると、セッションのディスパッチャが扱えないメッセージとして通常の `Error` (`ER_UNKNOWN_COM_ERROR`) が返る
-  - 参照:
-    - [mysqlx_connection.proto の CapabilitiesSet の前提条件](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_connection.proto#L74)
-    - [xpl_dispatcher.cc の dispatch](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/xpl_dispatcher.cc#L46-L119)
 
 ### 3. 認証 (セッション確立)
 
@@ -94,10 +89,6 @@ sequenceDiagram
 - Notice には 2 つの種類がある
   - 実行中のシーケンスに関する Notice (SQL 実行で発生した警告や Affected Rows など) で、シーケンスの途中に挟まれて送られるもの
   - シーケンスとは無関係な Notice (接続直後の `ServerHello` など) で、いつでも送られうるもの
-- 参照:
-  - [mysqlx.proto の `@section messages_Message_Sequence`](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx.proto#L103-L118)
-  - [mysqlx.proto の Error の severity の説明](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx.proto#L257-L263)
-  - [mysqlx-protocol-lifecycle.dox の Stages of Session Setup](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/doc/mysqlx-protocol-lifecycle.dox#L118-L128)
 
 ## SQL 実行の流れ
 
@@ -108,10 +99,6 @@ sequenceDiagram
   - `ROWS_AFFECTED` はステートメントの種類によらず常に送られる
   - `GENERATED_INSERT_ID` は値が 0 より大きいときだけ、`PRODUCED_MESSAGE` はサーバーからのメッセージがあるときだけ送られる
   - 警告がある場合は、これらの前に警告の Notice がまとめて送られる
-- 参照:
-  - [streaming_command_delegate.cc の handle_ok](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/streaming_command_delegate.cc#L503-L523)
-  - [custom_command_delegates.cc の try_send_notices](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/custom_command_delegates.cc#L113-L128)
-  - [streaming_command_delegate.cc の defer_on_warning](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/streaming_command_delegate.cc#L556-L579)
 
 ```mermaid
 sequenceDiagram
@@ -128,3 +115,9 @@ sequenceDiagram
     S-->>C: Affected Rows の Notice (ROWS_AFFECTED)
     S-->>C: 実行完了 (StmtExecuteOk)
 ```
+
+## 参考資料
+
+- [mysqlx_connection.proto の CapabilitiesSet の前提条件](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_connection.proto)
+- [mysqlx.proto の `@section messages_Message_Sequence`](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx.proto)
+- [mysqlx-protocol-lifecycle.dox の Stages of Session Setup](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/doc/mysqlx-protocol-lifecycle.dox)
