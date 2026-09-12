@@ -31,7 +31,7 @@
 
 ## StmtExecute の処理
 
-- メッセージの定義は [mysqlx_sql.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_sql.proto#L38-L77)、フィールドの意味は [message_spec.md](../../protocol/reference/message_spec.md#sql-実行-sqlstmtexecute) を参照
+- メッセージの定義は [mysqlx_sql.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_sql.proto#L38-L77)、フィールドの意味は [message_spec.md](../../protocol/message_spec.md#sql-実行-sqlstmtexecute) を参照
 
 ### namespace の判定
 
@@ -53,7 +53,7 @@
   - 少ない場合は検査せず、残った `?` を含むステートメントがそのまま SQL 層に渡る (SQL 層の構文エラーになる)
 - 参照:
   - [sql_statement_builder.cc の build](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sql_statement_builder.cc#L37-L68)
-  - [query_formatter.cc のプレースホルダ探索](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/query_formatter.cc#L36-L130)
+  - [query_formatter.cc のプレースホルダ探索](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/query_formatter.cc#L39-L178)
   - [validate_next_tag / put_value_and_escape](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/query_formatter.cc#L217-L240)
 
 ### 実行とリザルトセットのストリーミング
@@ -61,7 +61,7 @@
 - 組み立てたステートメントを内部セッションで実行し、結果はコールバックで受け取る (仕組みは後述の「SQL 層での実行」)
   - `compact_metadata` が真なら、列定義は `type` だけを設定して送る
 - 列定義: SQL 層から列ごとの定義を受け取って `ColumnMetaData` に変換し、全列が揃った時点でまとめて送ってフラッシュする
-  - 変換の内容 (型の対応、フラグ、`catalog` の固定値 `"def"`) は [message_spec.md の ColumnMetaData](../../protocol/reference/message_spec.md#columnmetadata) を参照
+  - 変換の内容 (型の対応、フラグ、`catalog` の固定値 `"def"`) は [message_spec.md の ColumnMetaData](../../protocol/message_spec.md#columnmetadata) を参照
   - 送信に失敗した場合は SQL 層に `ER_IO_WRITE_ERROR` "Connection reset by peer" を報告して実行を中断する
 - 行: 1 行分の値を受け取るたびに `Row` を送る
   - 行を送るたびに接続の生存と kill を確認する (長いリザルトセットの途中でも kill やシャットダウンを検知できる)
@@ -92,7 +92,7 @@
   - [streaming_command_delegate.cc の defer_on_warning](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/streaming_command_delegate.cc#L556-L579)
   - [on_destruction](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/streaming_command_delegate.cc#L545-L554)
   - [notices.cc の send_warnings](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/notices.cc#L110-L118)
-  - [stmt_command_handler.cc の sql_stmt_execute](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/stmt_command_handler.cc#L55-L84)
+  - [stmt_command_handler.cc の sql_stmt_execute](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/stmt_command_handler.cc#L57-L85)
 
 ### エラー時の挙動
 
@@ -111,7 +111,7 @@
   - 引数の過不足や型違いは `Error` (`ER_X_CMD_INVALID_ARGUMENT`)
 - 参照:
   - [admin_cmd_handler.cc のコマンド表](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/admin_cmd_handler.cc#L96-L115)
-  - [Command_handler::execute](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/admin_cmd_handler.cc#L117-L130)
+  - [Command_handler::execute](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/admin_cmd_handler.cc#L117-L137)
   - [Admin_command_handler::execute](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/admin_cmd_handler.cc#L142-L155)
 
 | コマンド | 引数 | レスポンス |
@@ -165,11 +165,11 @@
   - `no_error` の中の条件なし: 条件なしのブロックが失敗を吸収し、外側は失敗しない
   - 条件なしの中の `no_error`: 内側は失敗するが、外側は影響を受けない
 - 参照:
-  - [expect_stack.cc の open](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/expect/expect_stack.cc#L43-L97)
-  - [close](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/expect/expect_stack.cc#L99-L113)
-  - [pre_client_stmt / post_client_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/expect/expect_stack.cc#L115-L148)
-  - [expect.cc の入れ子の意味論 (doc コメント)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/expect/expect.cc#L40-L130)
-  - [Expectation::set / unset](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/expect/expect.cc#L163-L212)
+  - [expect_stack.cc の open](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/expect/expect_stack.cc#L44-L92)
+  - [close](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/expect/expect_stack.cc#L94-L109)
+  - [pre_client_stmt / post_client_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/expect/expect_stack.cc#L111-L146)
+  - [expect.cc の入れ子の意味論 (doc コメント)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/expect/expect.cc#L40-L125)
+  - [Expectation::set / unset](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/expect/expect.cc#L164-L212)
   - [xpl_dispatcher.cc の on_expect_open / on_expect_close](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/xpl_dispatcher.cc#L122-L134)
 
 ## SQL 層での実行
@@ -214,7 +214,7 @@
 
 ## 状態変数
 
-ディスパッチャの処理に関わるステータス変数 (定義は [status_variables.cc](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/variables/status_variables.cc#L500-L850))
+ディスパッチャの処理に関わるステータス変数 (定義は [status_variables.cc](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/variables/status_variables.cc#L262-L369))
 
 - ステートメントの実行: `Mysqlx_stmt_execute_sql` / `Mysqlx_stmt_execute_mysqlx`
 - 管理コマンド: `Mysqlx_stmt_ping` / `Mysqlx_stmt_list_clients` / `Mysqlx_stmt_kill_client` / `Mysqlx_stmt_enable_notices` / `Mysqlx_stmt_disable_notices` / `Mysqlx_stmt_list_notices`

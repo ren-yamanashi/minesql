@@ -1,6 +1,6 @@
 # コマンドディスパッチャ (X Plugin)
 
-- X Plugin (位置づけは [X プロトコル](../protocol/x_protocol.md) 参照) のうち、認証済みのセッションが受け取ったリクエストを種別ごとの処理に振り分け、SQL 層に実行を委ねて、レスポンスの列を終端まで送り返す部分の仕様
+- X Plugin (位置づけは [X Protocol](../protocol/x_protocol.md) 参照) のうち、認証済みのセッションが受け取ったリクエストを種別ごとの処理に振り分け、SQL 層に実行を委ねて、レスポンスの列を終端まで送り返す部分の仕様
 - 要件は [x_plugin.md](../connection/x_plugin.md) の「クエリ / DML インターフェース」「SQL インターフェース」「リザルトセット・インターフェース」の項を参照
 - 接続とセッションの管理は [connection/](../connection/README.md)、メッセージの形式とシーケンスの規則は [protocol/](../protocol/README.md) を参照
 

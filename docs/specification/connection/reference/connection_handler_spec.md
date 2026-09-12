@@ -222,7 +222,7 @@
 | `mysqlx_write_timeout` | 60 | レスポンス書き込みの上限秒数 (セッション変数) |
 | `mysqlx_enable_hello_notice` | ON | 接続直後に `ServerHello` を送るか |
 
-接続処理に関わるステータス変数 (定義は [status_variables.cc](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/variables/status_variables.cc#L376-L415))
+接続処理に関わるステータス変数 (定義は [status_variables.cc](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/variables/status_variables.cc#L375-L415))
 
 - 接続: `Mysqlx_connections_accepted` / `Mysqlx_connections_closed` / `Mysqlx_connections_rejected` / `Mysqlx_connection_errors` / `Mysqlx_connection_accept_errors` / `Mysqlx_aborted_clients`
 - セッション: `Mysqlx_sessions` / `Mysqlx_sessions_accepted` / `Mysqlx_sessions_closed` / `Mysqlx_sessions_rejected` / `Mysqlx_sessions_killed` / `Mysqlx_sessions_fatal_error`

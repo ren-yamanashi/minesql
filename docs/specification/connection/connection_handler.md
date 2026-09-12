@@ -1,6 +1,6 @@
 # コネクションハンドラー (X Plugin)
 
-- X Plugin (位置づけは [X プロトコル](../protocol/x_protocol.md) 参照) のうち、接続の受付からセッションの確立・切断までを担う部分の仕様
+- X Plugin (位置づけは [X Protocol](../protocol/x_protocol.md) 参照) のうち、接続の受付からセッションの確立・切断までを担う部分の仕様
 - メッセージの形式と通信の流れは [specification/protocol/](../protocol/README.md) を参照
 - コネクションハンドラーはサーバーの一部として動き、クライアントとの接点 (接続の受付、認証の進行、メッセージの読み書き) を担う
 
