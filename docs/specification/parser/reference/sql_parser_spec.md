@@ -6,12 +6,12 @@
 
 ## 構文の範囲の決め方
 
-- 対象のステートメントは SELECT / INSERT / UPDATE / DELETE / CREATE TABLE / DROP TABLE / トランザクション制御 (BEGIN、START TRANSACTION、COMMIT、ROLLBACK) の 7 種
-  - MySQL の `simple_statement` (ステートメントの一覧) の選択肢のうち、この 7 種に対応するものだけを写す
+- 対象のステートメントは SELECT / INSERT / UPDATE / DELETE / CREATE TABLE / DROP TABLE / CREATE SCHEMA / DROP SCHEMA / USE / トランザクション制御 (BEGIN、START TRANSACTION、COMMIT、ROLLBACK) の 10 種
+  - MySQL の `simple_statement` (ステートメントの一覧) の選択肢のうち、この 10 種に対応するものだけを写す
   - 参照:
     - [simple_statement](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2403)
     - [select_stmt の選択肢](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2480)、[insert_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2460)、[update_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2537)、[delete_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2432)
-    - [create_table_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2430)、[drop_table_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2447)
+    - [create_table_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2430)、[drop_table_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2447)、[create (CREATE DATABASE を含む)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2425)、[drop_database_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2435)、[use](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2538)
     - [commit](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2424)、[rollback](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2478)、[start](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2531)、[begin_stmt (simple_statement_or_begin)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2397-L2400)
 - 写す単位は `sql_yacc.yy` の規則 (非終端記号) で、規則ごとに選択肢を「採用する / 外す」に分ける
   - 採用した選択肢は、規則の名前と並びを変えずに写す (規則末尾のアクションだけを minesql の AST ノードの生成に置き換える)
@@ -99,8 +99,8 @@
   - 識別子の直後の `.` に識別子の文字が続くとき、次の語はキーワードであっても識別子として読む (`t.key` を引用なしで書ける)
     - 参照:
       - [MY_LEX_IDENT_SEP と MY_LEX_IDENT_START](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.cc#L1625-L1639)
-  - 採用する形は `テーブル名.列名` (`ident '.' ident`) と `テーブル名.*` (`ident '.' '*'`) まで
-  - `スキーマ名.テーブル名` と `スキーマ名.テーブル名.列名` は外す (理由 B: minesql にスキーマがない)
+  - 採用する形は `テーブル名.列名`、`スキーマ名.テーブル名`、`スキーマ名.テーブル名.列名`、`テーブル名.*`、`スキーマ名.テーブル名.*` (MySQL の規則と同じ)
+    - スキーマを持つ判断 (2026-09-12) より前は「スキーマがない」を理由にスキーマ名の修飾を外していた
     - 参照:
       - [table_ident](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14924-L14939)
       - [simple_ident_q](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14911-L14922)
@@ -136,10 +136,10 @@
 
 | 使う場所 | 予約語 | 非予約語 (識別子にも使える) |
 | --- | --- | --- |
-| ステートメントの先頭と句 | `SELECT` `FROM` `WHERE` `INSERT` `INTO` `VALUES` `SET` `UPDATE` `DELETE` `CREATE` `DROP` `TABLE` | `BEGIN` `START` `TRANSACTION` `COMMIT` `ROLLBACK` `WORK` `TABLES` `VALUE` |
+| ステートメントの先頭と句 | `SELECT` `FROM` `WHERE` `INSERT` `INTO` `VALUES` `SET` `UPDATE` `DELETE` `CREATE` `DROP` `TABLE` `USE` | `BEGIN` `START` `TRANSACTION` `COMMIT` `ROLLBACK` `WORK` `TABLES` `VALUE` |
 | テーブル参照 | `AS` `JOIN` `INNER` `CROSS` `ON` | |
 | 式 | `AND` `OR` `XOR` `NOT` `IS` `TRUE` `FALSE` `IN` `BETWEEN` `LIKE` `DIV` `MOD` `CASE` `WHEN` `THEN` `ELSE` | `END` `ESCAPE` |
-| テーブル定義 | `IF` `EXISTS` `PRIMARY` `KEY` `UNIQUE` `INDEX` `FOREIGN` `REFERENCES` `CONSTRAINT` `RESTRICT` `NULL` `VARCHAR` `VARCHARACTER` `CHAR` `VARYING` | `NO` `ACTION` |
+| テーブルとスキーマの定義 | `IF` `EXISTS` `PRIMARY` `KEY` `UNIQUE` `INDEX` `FOREIGN` `REFERENCES` `CONSTRAINT` `RESTRICT` `NULL` `VARCHAR` `VARCHARACTER` `CHAR` `VARYING` `DATABASE` `SCHEMA` | `NO` `ACTION` |
 | ORDER BY / LIMIT / ロック読み取り / トランザクションのオプション | `ORDER` `BY` `ASC` `DESC` `LIMIT` `FOR` `LOCK` `WITH` | `OFFSET` `SHARE` `MODE` `CONSISTENT` `SNAPSHOT` |
 
 - 補足
@@ -148,6 +148,9 @@
     - 参照:
       - [lex.h の VARCHAR / VARCHARACTER](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/lex.h#L778-L779)
   - `TABLES` は `DROP TABLES` の同義語として使う (`table_or_tables` 規則)
+  - `SCHEMA` は MySQL のキーワード表で `DATABASE` と同じトークンに写される同義語で、minesql でも同じ扱いにする
+    - 参照:
+      - [lex.h の SCHEMA](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/lex.h#L607)
 
 ### リテラル
 
@@ -361,7 +364,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 
 | 選択肢 | minesql | 備考 |
 | --- | --- | --- |
-| `simple_ident` (`ident`、`ident '.' ident`) | 採用 | 3 部修飾 `ident '.' ident '.' ident` は外す (B) |
+| `simple_ident` (`ident`、`ident '.' ident`、`ident '.' ident '.' ident`) | 採用 | |
 | `function_call_keyword` / `function_call_nonkeyword` / `function_call_conflict` / `function_call_generic` | 外す | B (関数) |
 | `simple_expr COLLATE ident_or_text` | 外す | B |
 | `literal_or_null` | 一部 | `literal` のうち文字列、数値、`TRUE` / `FALSE` を採用し、`NULL` (A)、16 進・2 進・文字集合つき・日時のリテラル (B) を外す |
@@ -436,7 +439,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | [single_table](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11987-L11992) | `table_ident opt_table_alias` | `opt_use_partition` (A)、`opt_key_definition` (B: インデックスヒント)、`opt_tablesample_clause` (B) |
 | [single_table_parens](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11982-L11985)、[joined_table_parens](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11994-L11997) | 2 つずつすべて (括弧の入れ子) | |
 | [opt_table_alias](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L12305-L12308)、[opt_as](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L12300-L12303) | 省略、`[AS] ident` | |
-| [table_ident](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14924-L14939) | `ident` | `ident '.' ident` (B: スキーマ) |
+| [table_ident](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14924-L14939) | `ident`、`ident '.' ident` (スキーマ名で修飾) | |
 
 - WHERE 句: [opt_where_clause](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L12315-L12318) と [where_clause](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L12320-L12322) をそのまま写す
 - ORDER BY 句と LIMIT 句 (`query_expression` の末尾に置く)
@@ -646,6 +649,37 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | `PARTITION BY ...` | [opt_create_partitioning_etc](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6081-L6088) | A |
 | `[IGNORE \| REPLACE] [AS] SELECT ...` | [opt_duplicate_as_qe](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6090) | B |
 | `LIKE 元テーブル` / `(LIKE 元テーブル)` | [create_table_stmt の 3 番目と 4 番目](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L3217-L3248) | B |
+
+### CREATE SCHEMA
+
+| 規則 | 採用する選択肢 | 外す選択肢 |
+| --- | --- | --- |
+| [create](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L3269-L3284) | 1 番目を `CREATE DATABASE opt_if_not_exists ident` に縮めたもの (`SCHEMA` は字句解析で `DATABASE` と同じトークンになる) | `opt_create_database_options` (B: 文字集合・照合順序・暗号化の指定)、`create` 規則の他の選択肢 (ビュー、トリガー、ユーザー、ロールなど、B) |
+| [opt_if_not_exists](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6498-L6501) | 省略、`IF NOT EXISTS` | |
+
+- MySQL の `create` 規則は `CREATE DATABASE opt_if_not_exists ident` の直後に規則の途中のアクションを持つ古い書き方で、minesql は末尾のアクションで AST ノードを作る
+- 外した句と選択肢の一覧
+
+| 句 / 選択肢 | 規則 | 理由 |
+| --- | --- | --- |
+| `DEFAULT CHARACTER SET` / `DEFAULT COLLATE` / `DEFAULT ENCRYPTION` | [opt_create_database_options](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6463-L6471)、[create_database_option](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6473) | B |
+
+### DROP SCHEMA
+
+| 規則 | 採用する選択肢 | 外す選択肢 |
+| --- | --- | --- |
+| [drop_database_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L12762-L12771) | `DROP DATABASE if_exists ident` (`SCHEMA` は `DATABASE` と同じトークン) | |
+| [if_exists](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13021-L13024) | 省略、`IF EXISTS` | |
+
+### USE
+
+| 規則 | 採用する選択肢 | 外す選択肢 |
+| --- | --- | --- |
+| [use](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14368-L14379) | `USE ident` | |
+
+- MySQL の `use` 規則のアクションはストアドプログラムの中での `USE` を拒否する検査を持つが、minesql にはストアドプログラムがないので写さない
+- MySQL の X Plugin は `USE` の後に `CURRENT_SCHEMA` の Notice を送らない
+  - `plugin/x/src` を `CURRENT_SCHEMA` で検索して送信箇所がなく、Notice の定義に値だけがある状態
 
 ### DROP TABLE
 

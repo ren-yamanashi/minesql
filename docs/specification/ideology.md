@@ -79,7 +79,7 @@
   - 経緯: 当初は読みやすさから手書きの再帰下降を推奨したが、「MySQL の規則を写す」と「自動生成できる / 既存の仕組みに乗る」を優先事項として確定した時点で評価し直し、goyacc に変更した
 - SQL パーサーの文法には、minesql が実装していない機能の構文を含めず、構文エラーにする (2026-09-11 確定)
   - 含めるかどうかは「実装コスト」と「MySQL の仕組みを説明するうえでの重要度」で個別に判断する
-  - 含めないもの: GROUP BY / HAVING / 集約関数 / LEFT・RIGHT JOIN / UNION / NULL / 関数呼び出し / VARCHAR 以外の型 / TEMPORARY / スキーマ修飾 / テーブルオプション (issue #120 の「やらないこと」と一致)
+  - 含めないもの: GROUP BY / HAVING / 集約関数 / LEFT・RIGHT JOIN / UNION / NULL / 関数呼び出し / VARCHAR 以外の型 / TEMPORARY / テーブルオプション (issue #120 の「やらないこと」と一致)
   - 例外として含めるもの (2026-09-11 確定、issue #120 の「やらないこと」から ORDER BY と LIMIT を外した): SELECT の ORDER BY と LIMIT、`START TRANSACTION WITH CONSISTENT SNAPSHOT`、`SELECT ... FOR UPDATE` と `SELECT ... FOR SHARE` (同義語 `LOCK IN SHARE MODE`)
     - 理由: いずれも実装が小さく (LIMIT は件数のカウンタ、ORDER BY はインデックス順の走査かソートで満たす、CONSISTENT SNAPSHOT はトランザクション開始時の ReadView 作成、FOR UPDATE / FOR SHARE は読み取り時の排他ロック / 共有ロック)、クラスタ化インデックス・MVCC・ロックの説明に直結する
   - ファイルソート (ORDER BY をインデックスの順序で満たせないときのソートで、ソートバッファ内のソートと、収まらない場合のディスクへの書き出しとマージ) も実装する (2026-09-11 確定、issue #120 の「やらないこと」から外した)
@@ -100,13 +100,27 @@
 - 8.4 で非推奨の別表記 (`&&`、`||`、`!`、`$` で始まる識別子、`N'...'`、`BINARY expr`、`INSERT DELAYED`、`SQL_CALC_FOUND_ROWS`) と、MySQL 自身が読み飛ばす構文 (列定義内の `REFERENCES`、外部キーの `MATCH`、`DROP TABLE ... RESTRICT | CASCADE`) は採用しない (2026-09-11 確定)
   - 理由: 従っても挙動が変わらない、または将来の MySQL で消える構文に互換を保つ意味がない
 
+- スキーマ (データベース) を持つ (2026-09-12 確定)
+  - システムスキーマ `mysql` にシステム表 (`user`) を置き、利用者の表は利用者のスキーマに置く
+  - 既定スキーマは接続時の `AuthenticateStart.schema` で決まり、修飾のないテーブル名はそこで解決する
+  - `CREATE SCHEMA` / `DROP SCHEMA` (`DATABASE` と同義) と `USE` (既定スキーマの切り替え) も対象に含める
+  - 理由: 認証を MySQL と同じく `mysql.user` を SQL で引く形にするには、システム表と利用者の表を分ける名前空間が要るため
+    - あわせて本でスキーマとシステム表の関係を示せる
+  - 層ごとの分担
+    - パーサー: `スキーマ名.テーブル名` と `スキーマ名.テーブル名.列名` の修飾を受理し、`CREATE SCHEMA` の規則を写す (以前「スキーマがない」を理由に外していた修飾を採用に戻した)
+    - プリペア: 修飾のないテーブル名を既定スキーマで解決する
+    - データディクショナリ: スキーマを実体として持ち、表はスキーマに属する
+    - コネクションハンドラーと SQL 層: 接続時に既定スキーマを内部セッションに設定し、`USE` で切り替える
+- 認証 (2026-09-12 確定): メカニズムは `MYSQL41` / `PLAIN` / `SHA256_MEMORY` の 3 つ、認証プラグインは `caching_sha2_password` のみ、照合は SQL 層で `mysql.user` を引いて行い身元の切り替えは SQL 層の API、検査はパスワードの一致のみ、ACL キャッシュは権限を入れるときの拡張点
+  - 理由と層ごとの分担は [connection/authentication.md](./connection/authentication.md) の「minesql での判断」「層ごとの分担」に記録
+
 ## 文書の構成
 
 - 読む順で分ける: 概要 (位置づけ) → 論理モデル / 流れ (2026-09-12 変更: 詳細仕様は読む順に含めない)
   - ディレクトリごとに README を置き、読む順と各文書の内容を示す
   - protocol/: `x_protocol.md` (概要) → `communication_flow.md` (流れ) → `message_spec.md` (詳細)
     - `message_spec.md` は外部との契約 (メッセージ定義とエンコーディング) で minesql の判断で変わらないため、他の詳細仕様と違って読む順に含める (2026-09-12 確定)
-  - connection/: `x_plugin.md` (要件) → `connection_handler.md` (論理モデル)、詳細は `reference/connection_handler_spec.md`
+  - connection/: `x_plugin.md` (要件) → `connection_handler.md` (論理モデル) → `authentication.md` (認証)、詳細は `reference/connection_handler_spec.md`
   - parser/: `sql_parser.md` (論理モデル)、詳細は `reference/sql_parser_spec.md`
   - X Plugin 全体の要件 (`x_plugin.md`) は connection/ に置いたままにし、dispatcher/ からは connection/ の文書を参照する (2026-09-08 確定)
 - 論理モデル側に書くこと: 責務 (担うこと / 担わないこと)、構成要素 (状態と寿命を持ち振る舞いの主体となるもの)、実行モデル (スレッド)、処理の流れ、状態遷移、守る境界の種類

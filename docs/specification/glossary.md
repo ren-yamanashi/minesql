@@ -44,6 +44,9 @@
 | SQL 層 | コアサーバー、サーバー本体、SQL エンジン | | パーサー以降の、ステートメントを解析・最適化・実行する層 |
 | 内部セッション | THD、サーバーセッション | internal session (`srv_session`、実装上は THD) | 利用者の身元と実行状態を持ち、その利用者として SQL を実行する SQL 層側の場 |
 | データディクショナリ | 辞書、カタログ (単独では使わない)、メタデータストア | data dictionary (minesql の実装は `internal/storage/dictionary` の `Catalog`) | テーブル・列・インデックス・制約・ユーザーの定義を保持する場所。名前解決と型決定はここを引いて行う |
+| スキーマ | データベース (MySQL では `SCHEMA` と `DATABASE` は同義) | schema / database | 表の名前空間。システム表はシステムスキーマ `mysql` に置く |
+| 既定スキーマ | カレントスキーマ、デフォルトデータベース | default schema (`AuthenticateStart.schema`、Notice の `CURRENT_SCHEMA`) | 修飾のないテーブル名を解決するスキーマ。接続時に決まる |
+| システム表 | システムテーブル、メタデータテーブル | system table (`mysql.user` など) | サーバー自身が使う表。普通の表として同じストレージに置く |
 | ロック読み取り | ロック付き読み取り、ロッキングリード | locking read (`SELECT ... FOR UPDATE`) | 読んだ行にロックを取る SELECT。`FOR UPDATE` は排他ロック、`FOR SHARE` (同義語 `LOCK IN SHARE MODE`) は共有ロックを取る |
 
 ## 接続とディスパッチ
@@ -56,6 +59,9 @@
 | 接続 | コネクション、クライアント (X Plugin 内部の要素を指すとき) | connection (X Plugin の実装上は `Client`) | 受け付けた TCP / Unix ソケット接続 1 本と、それに対応するサーバー側の要素 |
 | セッション | | session (`Session`) | 認証を経て確立する、利用者としてコマンドを実行する文脈 |
 | コネクションハンドラー | 接続層、コネクションハンドラ | connection handler | 接続の受付からセッションの確立・切断までを担う部分 |
+| 認証ハンドラ | 認証プラグイン (X Plugin 側を指すとき)、SASL ハンドラ | authentication handler (`iface::Authentication`、`Sasl_*_auth`) | 認証メカニズム 1 つ分のやり取り (チャレンジの生成、応答の受け取り) を進める部品。`AuthenticateStart` ごとに作られる |
+| アカウント照合 | 認証チェック、資格情報の検証 | account verification (`Account_verification_handler`) | 資格情報をアカウント情報 (MySQL では `mysql.user`) と突き合わせる処理 |
+| SHA256 パスワードキャッシュ | パスワードキャッシュ | `SHA256_password_cache` | `SHA256_MEMORY` の照合に使う、利用者ごとのパスワードのハッシュを保持するサーバー内のキャッシュ |
 | コマンドディスパッチャ | ディスパッチャ (初出時)、コマンドディスパッチャー | command dispatcher (`Dispatcher`) | セッションが受け取ったリクエストを振り分け、SQL 層に委ねて、レスポンスを返す部分 |
 | 受け付ける / 受付 | accept する、アクセプト | accept | 接続を受け入れること。動詞は「受け付ける」、名詞は「受付」 |
 | 切断 | 接続を閉じる (曖昧なとき) | | TCP / Unix ソケット接続を閉じること。セッションを閉じることには使わない |
