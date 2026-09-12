@@ -64,7 +64,7 @@
 
 ## 処理の流れ
 
-リクエストを 1 つ受け取ってから終端を送るまでの流れ。各段階の条件とレスポンスは [コマンドディスパッチャの詳細仕様](./command_dispatcher_spec.md) を参照
+リクエストを 1 つ受け取ってから終端を送るまでの流れ。各段階の条件とレスポンスは [コマンドディスパッチャの詳細仕様](./reference/command_dispatcher_spec.md) を参照
 
 ```mermaid
 flowchart TD

@@ -1,6 +1,6 @@
 # コネクションハンドラーの詳細仕様 (X Plugin)
 
-- [connection_handler.md](./connection_handler.md) の論理モデルに対する詳細仕様
+- [connection_handler.md](../connection_handler.md) の論理モデルに対する詳細仕様
 - MySQL 8.4 (commit `aa461240`) の `plugin/x/src` を参照
 - 起動から終了までの時系列に沿って書く
 
@@ -79,7 +79,7 @@
 
 ## 接続のライフサイクル
 
-状態の定義と遷移図は [connection_handler.md の状態遷移](./connection_handler.md#接続とセッションの状態遷移) を参照。ここでは各状態での処理を書く
+状態の定義と遷移図は [connection_handler.md の状態遷移](../connection_handler.md#接続とセッションの状態遷移) を参照。ここでは各状態での処理を書く
 
 - ワーカースレッド上の処理の流れ
   1. 接続元アドレスの取得と名前解決

@@ -2,7 +2,7 @@
 
 以下、X プロトコルの通信全体の流れ
 
-メッセージの形式 (フレーム構造) は [x_protocol.md](./x_protocol.md)、各メッセージの詳細な仕様は [message_spec.md](./message_spec.md) を参照
+メッセージの形式 (フレーム構造) は [x_protocol.md](./x_protocol.md)、各メッセージの詳細な仕様は [message_spec.md](./reference/message_spec.md) を参照
 
 ## 全体像
 

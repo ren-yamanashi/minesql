@@ -61,7 +61,7 @@
 - ワーカースレッド (スケジューラ名 `work`): 接続 1 本の処理全体 (受付後の初期化から切断まで) を 1 つのタスクとして実行する
   - タスクは接続が閉じるまで終わらないため、接続 1 本がワーカースレッド 1 本を接続中ずっと占有する (thread-per-connection)
   - スレッドは同時接続数に応じて増減する動的なプールから割り当てられ、「プール」が効くのは切断後のアイドルスレッドを次の接続に再利用する局面 (classic protocol の thread cache に相当する役割)
-  - したがって同時接続数の上限を決めるのは `mysqlx_max_connections` であり、`mysqlx_min_worker_threads` はスレッド数の上限ではない (増減の規則は [詳細仕様](./connection_handler_spec.md#ワーカースレッドプール) を参照)
+  - したがって同時接続数の上限を決めるのは `mysqlx_max_connections` であり、`mysqlx_min_worker_threads` はスレッド数の上限ではない (増減の規則は [詳細仕様](./reference/connection_handler_spec.md#ワーカースレッドプール) を参照)
   - 参照:
     - [server_builder.cc](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/builder/server_builder.cc#L51-L53)
     - [client.cc の run](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L606-L641)
@@ -169,11 +169,11 @@ stateDiagram-v2
     end note
 ```
 
-(各状態での具体的な処理は [コネクションハンドラーの詳細仕様 - 接続のライフサイクル](./connection_handler_spec.md#接続のライフサイクル) を参照)
+(各状態での具体的な処理は [コネクションハンドラーの詳細仕様 - 接続のライフサイクル](./reference/connection_handler_spec.md#接続のライフサイクル) を参照)
 
 ## タイムアウトと上限の種類
 
-コネクションハンドラーが守る境界は次の 5 種類 (具体的な条件と既定値は [コネクションハンドラーの詳細仕様 - タイムアウトと強制切断](./connection_handler_spec.md#タイムアウトと強制切断) を参照)
+コネクションハンドラーが守る境界は次の 5 種類 (具体的な条件と既定値は [コネクションハンドラーの詳細仕様 - タイムアウトと強制切断](./reference/connection_handler_spec.md#タイムアウトと強制切断) を参照)
 
 - 接続確立の上限: 接続してから認証を終えるまでの時間に上限を設け、未認証の接続がスレッドを占有し続けるのを防ぐ
 - アイドルの上限: 次のリクエストを待つ時間に上限を設け、放置された接続を回収する (対話的な接続には別の上限を使う)

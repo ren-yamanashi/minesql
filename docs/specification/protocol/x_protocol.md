@@ -3,8 +3,6 @@
 ## 概要
 
 - MySQL の X プロトコルは MySQL 5.7.12 で導入された MySQL の次世代通信プロトコル
-  - 参照:
-    - [mysqlx.proto の doc コメント (MySQL Server 5.7.12 or higher)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx.proto#L321-L324)
 - デフォルトではポート 33060 で待機
 - MySQL 8.4 (LTS) の X プロトコルは、Protocol Buffers を使用してデータをシリアライズする
   - これにより、コンパクトなバイナリエンコーディングとプロトコルメッセージの明確に定義されたスキーマが提供され、言語間でのコネクタの実装が容易になる
@@ -21,7 +19,7 @@
 
 X Protocol の周辺には名前の似た用語が 3 つあり、それぞれ層が違う
 
-- X Protocol: プロトコル (通信規約)
+- X Protocol: プロトコル
   - TCP (既定ポート 33060) または Unix ソケット上を流れるフレーム + protobuf メッセージの規約
 - X Plugin: サーバー側の実装
   - X Protocol を待ち受けるサーバー側エンドポイントで、接続受付・capability・認証・Notice などのプロトコル処理全般を担う

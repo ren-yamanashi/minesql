@@ -1,6 +1,6 @@
 # コマンドディスパッチャの詳細仕様 (X Plugin)
 
-- [command_dispatcher.md](./command_dispatcher.md) の論理モデルに対する詳細仕様
+- [command_dispatcher.md](../command_dispatcher.md) の論理モデルに対する詳細仕様
 - MySQL 8.4 (commit `aa461240`) の `plugin/x/src` を参照
 - リクエストを受け取ってから終端を送るまでの順に書く
 
@@ -31,7 +31,7 @@
 
 ## StmtExecute の処理
 
-- メッセージの定義は [mysqlx_sql.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_sql.proto#L38-L77)、フィールドの意味は [message_spec.md](../protocol/message_spec.md#sql-実行-sqlstmtexecute) を参照
+- メッセージの定義は [mysqlx_sql.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_sql.proto#L38-L77)、フィールドの意味は [message_spec.md](../../protocol/reference/message_spec.md#sql-実行-sqlstmtexecute) を参照
 
 ### namespace の判定
 
@@ -61,7 +61,7 @@
 - 組み立てたステートメントを内部セッションで実行し、結果はコールバックで受け取る (仕組みは後述の「SQL 層での実行」)
   - `compact_metadata` が真なら、列定義は `type` だけを設定して送る
 - 列定義: SQL 層から列ごとの定義を受け取って `ColumnMetaData` に変換し、全列が揃った時点でまとめて送ってフラッシュする
-  - 変換の内容 (型の対応、フラグ、`catalog` の固定値 `"def"`) は [message_spec.md の ColumnMetaData](../protocol/message_spec.md#columnmetadata) を参照
+  - 変換の内容 (型の対応、フラグ、`catalog` の固定値 `"def"`) は [message_spec.md の ColumnMetaData](../../protocol/reference/message_spec.md#columnmetadata) を参照
   - 送信に失敗した場合は SQL 層に `ER_IO_WRITE_ERROR` "Connection reset by peer" を報告して実行を中断する
 - 行: 1 行分の値を受け取るたびに `Row` を送る
   - 行を送るたびに接続の生存と kill を確認する (長いリザルトセットの途中でも kill やシャットダウンを検知できる)
@@ -118,7 +118,7 @@
 | --- | --- | --- |
 | `ping` | なし | `StmtExecuteOk` のみ |
 | `list_clients` | なし | リザルトセット (`client_id` UINT、`user` BYTES、`host` BYTES、`sql_session` UINT) + `FetchDone` + `StmtExecuteOk` |
-| `kill_client` | `id` (uint、必須) | `StmtExecuteOk` のみ (対象の接続を閉じる挙動は [connection/ の kill](../connection/connection_handler_spec.md#タイムアウトと強制切断) を参照) |
+| `kill_client` | `id` (uint、必須) | `StmtExecuteOk` のみ (対象の接続を閉じる挙動は [connection/ の kill](../../connection/reference/connection_handler_spec.md#タイムアウトと強制切断) を参照) |
 | `enable_notices` | `notice` (文字列のリスト、必須) | `StmtExecuteOk` のみ |
 | `disable_notices` | `notice` (文字列のリスト、必須) | `StmtExecuteOk` のみ |
 | `list_notices` | なし | リザルトセット (`notice` BYTES、`enabled` SINT) + `FetchDone` + `StmtExecuteOk` |
@@ -207,7 +207,7 @@
 | SQL 層との連携の失敗 (実行の依頼自体が失敗、利用者の切り替えの失敗) | `ERROR` または `FATAL` | `ER_X_SERVICE_ERROR` |
 
 - `ERROR` ではシーケンスだけが中断され、セッションは次のリクエストを受け付ける
-- `FATAL` ではセッションが閉じられ、接続の終了処理に入る ([connection/ の接続のライフサイクル](../connection/connection_handler_spec.md#接続のライフサイクル))
+- `FATAL` ではセッションが閉じられ、接続の終了処理に入る ([connection/ の接続のライフサイクル](../../connection/reference/connection_handler_spec.md#接続のライフサイクル))
 - 参照:
   - [sql_data_context.cc の execute_server_command (KILL 時の格上げ)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sql_data_context.cc#L632-L658)
   - [switch_to_user (FATAL の `ER_X_SERVICE_ERROR`)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sql_data_context.cc#L445-L455)
