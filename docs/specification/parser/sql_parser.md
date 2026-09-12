@@ -81,7 +81,7 @@ flowchart TD
 
 ## minesql で対応する構文の方針
 
-- 対応するステートメント (SELECT / INSERT / UPDATE / DELETE / CREATE TABLE / トランザクション制御など) は、MySQL の構文規則にできるだけ従う ([ADR-0007](../adr/0007.SQLパーサーはMySQLの構文規則に従う.md))
+- 対応するステートメント (SELECT / INSERT / UPDATE / DELETE / CREATE TABLE / トランザクション制御 / アカウント文 / GRANT / REVOKE など) は、MySQL の構文規則にできるだけ従う ([ADR-0007](../adr/0007.SQLパーサーはMySQLの構文規則に従う.md))
   - ステートメントの規則: `sql_yacc.yy` の対応する規則を写す
   - 式の階層と演算子の優先順位: `expr` → `bool_pri` → `predicate` → `bit_expr` → `simple_expr` の規則と、`%left` / `%right` の優先順位宣言を写す
   - 字句規則: 識別子と引用、文字列・数値リテラル、コメントの規則と、キーワードのうち識別子としても使える語の一覧
