@@ -95,9 +95,9 @@ MySQL X Plugin は、従来の SQL 言語に加えて、ドキュメントスト
 | 要件 | minesql | 備考 |
 | --- | --- | --- |
 | 一般的な要件: ドキュメント指向の CRUD、ドキュメントテーブルの作成、SQL を書かない操作 | 満たさない | ドキュメントモデルは実装しない ([ADR-0002](../adr/0002.ドキュメントモデルは実装しない.md)) |
-| 一般的な要件: 拡張 X Protocol の実装 | 満たす | X Protocol を話すサーバーとして作る ([ADR-0001](../adr/0001.実装対象はXProtocolを話すサーバー.md)) |
+| 一般的な要件: 拡張 X Protocol の実装 | 満たす | X Protocol に従うサーバーとして作る ([ADR-0001](../adr/0001.実装対象はXProtocolに従うサーバー.md)) |
 | 接続: `CapabilitiesGet` / `CapabilitiesSet` | 満たす | [protocol/message_spec.md](../protocol/message_spec.md) の capability ネゴシエーション |
-| 接続: 他のセッションの kill、接続中のセッションの閲覧 | 満たす | 管理コマンド `kill_client` / `list_clients` ([ADR-0005](../adr/0005.管理コマンドは接続系とNotice系の6つを実装する.md)) と `KILL` ステートメント |
+| 接続: 他のセッションの kill、接続中のセッションの閲覧 | 満たす (同じアカウントの接続に限る) | 管理コマンド `kill_client` / `list_clients` ([ADR-0005](../adr/0005.管理コマンドは接続系とNotice系の6つを実装する.md)) と `KILL` ステートメント。`SUPER` に相当する権限を持たないため、他のアカウントの接続は見えず kill もできない ([ADR-0018](../adr/0018.権限は全体権限だけを持つ.md)) |
 | 接続: 拡張プロトコルに対応していないクライアントの適切な処理 | 満たす | 不正なメッセージへの応答 ([protocol/reference/x_plugin_behavior.md](../protocol/reference/x_plugin_behavior.md#不正なメッセージへの応答)) |
 | 接続: SSL 接続 | 満たす | capability `tls` で同じ接続を TLS に切り替える ([ADR-0016](../adr/0016.TLS接続を実装する.md))。クライアント証明書の検証は対象外 |
 | 認証: チャレンジ / レスポンス型の認証 | 満たす | `MYSQL41` と `SHA256_MEMORY` ([ADR-0015](../adr/0015.認証の方式.md)) |
@@ -107,11 +107,11 @@ MySQL X Plugin は、従来の SQL 言語に加えて、ドキュメントスト
 | クエリ / DML: 成功時の OK メッセージと Affected Rows などのメタデータ | 満たす (GTID を除く) | `StmtExecuteOk` と実行ステータスの Notice。GTID はレプリケーションが対象外のため送らない |
 | SQL インターフェース、リザルトセット・インターフェース (メタデータと行、簡略版メタデータ) | 満たす | [protocol/message_spec.md](../protocol/message_spec.md) の SQL 実行とリザルトセットのエンコーディング |
 | ドキュメントテーブル・インターフェース、CRUD インターフェース (Insert / Find / Update / Delete) | 満たさない | リレーショナルテーブルに対する CRUD メッセージも含めて対象外 ([ADR-0002](../adr/0002.ドキュメントモデルは実装しない.md)) |
-| 非機能要件: MySQL のユーザーアカウントで認証 | 満たす (初期アカウントのみ) | アカウントの作成・変更は対象外 |
+| 非機能要件: MySQL のユーザーアカウントで認証 | 満たす | アカウントは `CREATE USER` / `ALTER USER` / `DROP USER` で管理する ([ADR-0017](../adr/0017.アカウント文を対象に含める.md))。権限は全体権限のみ ([ADR-0018](../adr/0018.権限は全体権限だけを持つ.md)) |
 | 非機能要件: 基本的なステータス監視 | 満たす | 接続・セッション・スレッドと実行に関する状態変数 |
 | 非機能要件: アカウント制限 (期限切れパスワード、ロック) への準拠 | 満たさない | [authentication.md の担わないこと](./authentication.md#担わないこと) |
 | 非機能要件: 手動作成したコレクションでの CRUD | 該当なし | ドキュメントモデルを持たない |
-| 非機能要件: mysqldump / mysql によるバックアップと復元 | 満たさない | これらのツールは classic protocol で接続するため ([ADR-0001](../adr/0001.実装対象はXProtocolを話すサーバー.md)) |
+| 非機能要件: mysqldump / mysql によるバックアップと復元 | 満たさない | これらのツールは classic protocol で接続するため ([ADR-0001](../adr/0001.実装対象はXProtocolに従うサーバー.md)) |
 | 非機能要件: 従来のプロトコルと同等のパフォーマンス | 要件にしない | 学習用の実装で、性能は目標に含めない |
 
 ## 参考資料

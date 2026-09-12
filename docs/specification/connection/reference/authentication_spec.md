@@ -10,16 +10,17 @@
 
 ### [authentication.md](../authentication.md) より
 
-- 使えるメカニズムは接続の種類で変わる
+- 認証ハンドラの一覧 (Authentication_container): メカニズム名と接続の種類 (安全かどうか) から認証ハンドラを作り、一覧にないメカニズム名は FATAL の `Error` (`ER_NOT_SUPPORTED_AUTH_MODE`) になる
   - [authentication_container.cc のメカニズム登録](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/authentication_container.cc#L37-L46)
   - [get_auth_handler の接続種別による絞り込み](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/authentication_container.cc#L49-L68)
   - [session.cc の未対応メカニズムの応答](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/session.cc#L155-L162)
 - 成功時は `SessionStateChanged` (`CLIENT_ID_ASSIGNED`) の Notice を送ってから `AuthenticateOk` を返し、セッションが利用可能になる
   - [session.cc の on_auth_success](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/session.cc#L204-L214)
-- 失敗は 1 セッションにつき 3 回まで試せる
+- 失敗は 1 セッションにつき 3 回まで、3 回目の `Error` は FATAL で打ち切り、セッションを閉じた / リセットした後は新しいセッションになるため回数は 0 から数え直す (minesql での対応範囲の WL#10992 プロトコル実装の行)
   - [session.cc の on_auth_failure_impl](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/session.cc#L222-L247)
   - [session.h の k_max_auth_attempts](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/session.h#L125)
-- アカウントの認証プラグインは `caching_sha2_password` のみ
+  - [client.cc の on_session_reset (リセット時に新しいセッションを作る)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L524-L532)
+- アカウントの認証プラグインは `caching_sha2_password` のみで、認証文字列は `$A$005$` + 20 バイトの salt + ダイジェスト (SHA256 を 5000 回反復) の形式
   - [mysql_native_password.cc のプラグイン宣言 (8.4 では既定で無効)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/auth/mysql_native_password.cc#L327-L343)
   - [sha2_plain_verification.cc の認証文字列の分解](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sha2_plain_verification.cc#L55-L80)
   - [i_sha2_password_common.h の scramble の形式](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/auth/i_sha2_password_common.h#L96-L97)
@@ -30,6 +31,10 @@
   - [account_verification_handler.cc の authenticate (資格情報の分解)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/account_verification_handler.cc#L39-L70)
   - [verify_account (照合と各種の検査)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/account_verification_handler.cc#L125-L181)
   - [get_account_record (mysql.user の検索)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/account_verification_handler.cc#L183-L244)
+- `MYSQL41` は `caching_sha2_password` のアカウントとは照合が成り立たないため、チャレンジを返したうえで access denied になる
+  - [account_verification_handler.cc の verify_account (検証器はアカウントの認証プラグインで選ばれ、パスワード検査に失敗すると access denied)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/account_verification_handler.cc#L132-L148)
+- `PLAIN` はキャッシュに同じ値のエントリがあれば、認証文字列との照合を省いて成功にする
+  - [sha2_plain_verification.cc のキャッシュの先読み](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sha2_plain_verification.cc#L45-L49)
 - SHA256 パスワードキャッシュ: サーバーに 1 つ、`SHA256_MEMORY` の照合に使う値 (パスワードの SHA256 の SHA256) を利用者ごとに保持する
   - [cache_based_verification.cc の照合](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/cache_based_verification.cc#L70-L91)
   - [sha2_plain_verification.cc の成功時のキャッシュ登録](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sha2_plain_verification.cc#L81-L85)
@@ -37,3 +42,6 @@
 - 内部セッションの実行ユーザー (security context): 照合の間はシステムユーザー (`mysql.session`@`localhost`) として動き、成功したら認証した利用者に切り替え、既定スキーマの指定があればそれも設定する
   - [sql_data_context.cc の authenticate_internal](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sql_data_context.cc#L257-L300)
   - [switch_to_user](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sql_data_context.cc#L445-L499)
+- 成功時に、照合で読んだ `mysql.user` の行から全体権限を実行ユーザーに載せる (MySQL は ACL キャッシュから載せる)
+  - [sql_auth_cache.cc の acl_getroot (ログイン時に全体権限を実行ユーザーへ設定)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/auth/sql_auth_cache.cc#L1549-L1596)
+  - [security_context_imp.cc の security_context_lookup (X Plugin の switch_to_user が至る)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/server_component/security_context_imp.cc#L182)

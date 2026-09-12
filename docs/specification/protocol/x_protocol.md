@@ -22,15 +22,15 @@ X Protocol の周辺には名前の似た用語が 3 つあり、それぞれ層
   - TCP (既定ポート 33060) または Unix ソケット上を流れるフレーム + protobuf メッセージの規約
 - X Plugin: サーバー側の実装
   - X Protocol を待ち受けるサーバー側エンドポイントで、接続受付・capability・認証・Notice などのプロトコル処理全般を担う
-  - minesql が実装するのはこの層に相当する部分で、ドキュメントモデルは含めない ([ADR-0001](../adr/0001.実装対象はXProtocolを話すサーバー.md)、[ADR-0002](../adr/0002.ドキュメントモデルは実装しない.md))
+  - minesql が実装するのはこの層に相当する部分で、ドキュメントモデルは含めない ([ADR-0001](../adr/0001.実装対象はXProtocolに従うサーバー.md)、[ADR-0002](../adr/0002.ドキュメントモデルは実装しない.md))
   - 素の SQL 実行 (`StmtExecute`) に加えて、MySQL をドキュメントストアとして使うためのドキュメントモデルインターフェースを提供する
     - CRUD メッセージ (`Mysqlx.Crud.Find` / `Insert` / `Update` / `Delete`) や `create_collection` などの管理コマンドを、JSON 列を持つ通常の InnoDB テーブルに対する SQL に変換して実行する
     - JSON 型や JSON 関数は X Plugin ではなく MySQL サーバーが元々持つ機能であり、X Plugin が足しているのは「SQL を書かずにそれを操作できるプロトコル面」のみ
 - X DevAPI: クライアント側の API 仕様
-  - MySQL Shell や各言語の Connector が実装する API で、内部で X Protocol を話す
+  - MySQL Shell や各言語の Connector が実装する API で、内部で X Protocol を使って通信する
   - ドキュメント (コレクション) とリレーショナルテーブルの双方を、SQL を書かずにメソッドチェーン形式の CRUD で操作できる
     - コレクションへの操作は上記の CRUD メッセージとしてサーバーに送られる (= ドキュメントモデルインターフェースのクライアント側の入り口)
-  - X DevAPI を使わずに、`.proto` からコードを生成して X Protocol を直接話すこともできる
+  - X DevAPI を使わずに、`.proto` からコードを生成して X Protocol で直接通信することもできる
 
 ## 主な特徴
 
