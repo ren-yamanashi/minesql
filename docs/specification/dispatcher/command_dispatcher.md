@@ -28,7 +28,7 @@
 - SQL の解析・最適化・実行
   - SQL 層 (Parser 以降) で行うため
 - ドキュメントモデル (CRUD メッセージ、コレクション系の管理コマンド) と、プロトコルのプリペアドステートメント・カーソル
-  - 実装しないため (未対応のメッセージとしてエラーを返す)
+  - 実装しないため、未対応のメッセージとしてエラーを返す ([ADR-0002](../adr/0002.ドキュメントモデルは実装しない.md)、[ADR-0003](../adr/0003.プロトコルのプリペアドステートメントとカーソルは実装しない.md))
 
 ## 構成要素
 
@@ -43,7 +43,7 @@
   - 管理コマンドの処理: コマンド名を引き、引数を検証して実行する
   - Expect ブロックの処理: `Expect.Open` / `Expect.Close` でブロックを開閉する
 - 内部セッション: SQL 層側の実行の場 (定義は [connection/ の構成要素](../connection/connection_handler.md#構成要素) を参照)
-  - ディスパッチャはここにステートメントの実行を依頼し、結果をコールバックで受け取る
+  - ディスパッチャはここにステートメントの実行を依頼し、結果をコールバックで受け取る (classic のコマンド層は介さない、[ADR-0006](../adr/0006.classicのCOMコマンド層は作らない.md))
 - 結果の受け口 (デリゲート): 実行 1 回につき 1 つ作られ、SQL 層からのコールバック (列定義、行、完了、エラー) を受けてプロトコルのメッセージに変換して送る
   - 参照:
     - [ngs/command_delegate.h](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/ngs/command_delegate.h#L41-L80)
@@ -111,10 +111,10 @@ protocol/ の [メッセージのやり取りの規則](../protocol/communicatio
   - 内側のブロックは既定で外側の条件を引き継ぐ
 - 条件 `no_error` を持つブロック内でリクエストが失敗すると、そのブロックは失敗状態になり、`Expect.Close` までのすべてのリクエストと `Close` 自身が `Error` になる
 - 条件を持たないブロックは失敗を吸収し、外側の `no_error` ブロックまで失敗を伝えない
-- 実装する条件は `no_error` のみ (プロトコルの定義にある他の条件は機能検出向けとドキュメントモデル向けで、対象外)
+- 実装する条件は `no_error` のみ (プロトコルの定義にある他の条件は機能検出向けとドキュメントモデル向けで、対象外、[ADR-0004](../adr/0004.Expectブロックを実装する.md))
 
 ## 管理コマンド
 
 - `StmtExecute` の namespace `mysqlx` で、SQL ではなくコマンド名と名前付き引数を送る経路
-- 実装するのは接続と Notice に関する 6 つ: `ping`、`list_clients`、`kill_client`、`enable_notices`、`disable_notices`、`list_notices`
+- 実装するのは接続と Notice に関する 6 つ: `ping`、`list_clients`、`kill_client`、`enable_notices`、`disable_notices`、`list_notices` ([ADR-0005](../adr/0005.管理コマンドは接続系とNotice系の6つを実装する.md))
 - レスポンスは SQL ステートメントと同じ形 (リザルトセットがあれば列定義 → 行 → `FetchDone`、最後に `StmtExecuteOk`) で返す

@@ -7,7 +7,7 @@
 
 ## 要件
 
-- `AuthenticateStart` で指定された認証メカニズム (`MYSQL41` / `PLAIN` / `SHA256_MEMORY`) で認証し、成功なら `AuthenticateOk`、失敗なら `Error` (`ER_ACCESS_DENIED_ERROR`) を返す
+- `AuthenticateStart` で指定された認証メカニズム (`MYSQL41` / `PLAIN` / `SHA256_MEMORY`) で認証し、成功なら `AuthenticateOk`、失敗なら `Error` (`ER_ACCESS_DENIED_ERROR`) を返す ([ADR-0015](../adr/0015.認証の方式.md))
 - 使えるメカニズムは接続の種類で変わる
   - 安全でない接続 (TLS なしの TCP): `MYSQL41` と `SHA256_MEMORY`
   - 安全な接続 (TLS または Unix ソケット): 上記に加えて `PLAIN`
@@ -27,6 +27,20 @@
 - 認証に成功した接続は、その利用者としてコマンドを実行する (内部セッションの身元がその利用者になる)
 - パスワードそのものを送るのは `PLAIN` だけで、`MYSQL41` と `SHA256_MEMORY` はサーバーが送った salt とパスワードから計算した値を送る (安全でない接続で平文のパスワードが流れない)
 
+- `PLAIN` は成功時に SHA256 パスワードキャッシュにその利用者の値を入れ、`SHA256_MEMORY` はキャッシュに値がなければ失敗する
+- `MYSQL41` は `mysql_native_password` のアカウント専用で、`caching_sha2_password` のアカウントにはチャレンジを返したうえで access denied を返す (MySQL と同じ応答)
+  - したがって TCP からの初回のログインは「Unix ソケットで `PLAIN` → 以後は TCP で `SHA256_MEMORY`」の手順になる (MySQL 8.4 の既定と同じ)
+- アカウントの認証プラグインは `caching_sha2_password` のみ
+  - 認証文字列は `$A$005$` + 20 バイトの salt + ダイジェスト (SHA256 を 5000 回反復) の形式
+  - `SHA256_MEMORY` の応答は `XOR(SHA256(password), SHA256(SHA256(SHA256(password)) + nonce))` で、サーバーはキャッシュにある `SHA256(SHA256(password))` からこれを検証する
+  - 参照:
+    - [mysql_native_password.cc のプラグイン宣言 (8.4 では既定で無効)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/auth/mysql_native_password.cc#L327-L343)
+    - [sha2_plain_verification.cc の認証文字列の分解](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sha2_plain_verification.cc#L55-L80)
+    - [i_sha2_password_common.h の scramble の形式](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/auth/i_sha2_password_common.h#L96-L97)
+- アカウント情報はシステムスキーマ `mysql` の `user` 表に置き、起動時の bootstrap でこの表と初期アカウントを作る ([ADR-0014](../adr/0014.スキーマを持つ.md))
+- 照合は、内部セッションの身元をシステムユーザーにして `mysql.user` を検索し、認証側で照合の計算を行い、成功したら SQL 層の API で身元を利用者に切り替える (MySQL と同じ手順で、詳細は [構成要素](#構成要素) と [処理の流れ](#処理の流れ) を参照)
+- 扱うアカウントは初期アカウントのみで、ホストは `%` (user@host のパターン照合は行わない)
+
 ## 責務
 
 ### 担うこと
@@ -40,7 +54,9 @@
 
 - 認証メッセージの受け渡しと接続の状態遷移 -> [connection_handler.md](./connection_handler.md)
 - アカウントの作成・変更・削除 -> 対象外 ([issue #120](https://github.com/ren-yamanashi/minesql/issues/120) の「アカウント作成 (初期アカウントのみサポート)」)
-- 認証後の権限の検査 -> SQL 層の責務
+- アカウントのロック、パスワードの期限、`offline_mode`、TLS 要件 (`require_secure_transport` とアカウントの `ssl_type`) の検査 -> 対象外 (アカウント管理・サーバーモード・TLS の機能に付随するため)
+- 認証後の権限の判定と ACL キャッシュ (user@host のパターン照合を含む) -> 対象外 (権限を入れるときの拡張点)
+- TLS 接続 -> 対象外
 
 ## 構成要素
 
@@ -108,40 +124,6 @@ sequenceDiagram
   - `SHA256_MEMORY`: 応答は SHA256 に基づいて計算し、`mysql.user` ではなく SHA256 パスワードキャッシュの値と突き合わせる
   - `PLAIN`: 最初のメッセージの資格情報 (パスワードは平文) を、アカウントの認証プラグインに応じた検証器で突き合わせ、成功したら SHA256 パスワードキャッシュにも登録する
 - 照合の検査項目 (MySQL): パスワードの一致のほかに、アカウントのロック、パスワードの期限切れ (期限切れは接続を許すが SQL を制限する「サンドボックス」になりうる)、TLS の要件 (`require_secure_transport` とアカウントの `ssl_type`) を見る
-
-## minesql での判断 (2026-09-12 確定)
-
-- 認証メカニズムは `MYSQL41` / `PLAIN` / `SHA256_MEMORY` の 3 つを実装する
-  - 理由 1: 8.4 の既定 (`caching_sha2_password` のアカウント) では、3 つは独立した選択肢ではなく 1 組の仕組みになっている
-    - `PLAIN` は安全な接続でパスワードそのものを照合し、成功時に SHA256 パスワードキャッシュを埋める
-    - `SHA256_MEMORY` はどの接続でも使えるが、照合先がキャッシュなので `PLAIN` で一度成功した後にしか通らない
-    - `MYSQL41` は `mysql_native_password` のアカウント専用で、`caching_sha2_password` のアカウントには常に access denied を返す
-  - 理由 2: 公式クライアントの自動選択は、安全でない接続で `SHA256_MEMORY` → `MYSQL41` の順に試す
-    - `MYSQL41` がないとクライアントは MySQL と違う応答 (未対応メカニズムの FATAL) を受ける
-    - チャレンジレスポンスの実装は `SHA256_MEMORY` と共通なので、`MYSQL41` を持つ追加の手間は照合器 1 つ分
-  - 帰結: TCP からの初回のログインは「Unix ソケットで `PLAIN` → 以後は TCP で `SHA256_MEMORY`」という MySQL 8.4 と同じ手順になる (TLS は対象外のまま)
-- 認証プラグインは `caching_sha2_password` だけを持つ
-  - 理由: 8.4 の既定であり、`mysql_native_password` は 8.4 で既定無効 (プラグインの flags が `PLUGIN_OPT_DEFAULT_OFF`)、`sha256_password` は非推奨のため
-  - 認証文字列は `$A$005$` + 20 バイトの salt + ダイジェスト (SHA256 を 5000 回反復) の形式
-  - `SHA256_MEMORY` の応答は `XOR(SHA256(password), SHA256(SHA256(SHA256(password)) + nonce))` で、サーバーはキャッシュにある `SHA256(SHA256(password))` からこれを検証する
-  - 参照:
-    - [mysql_native_password.cc のプラグイン宣言](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/auth/mysql_native_password.cc#L327-L343)
-    - [sha2_plain_verification.cc の認証文字列の分解](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sha2_plain_verification.cc#L55-L80)
-    - [i_sha2_password_common.h の scramble の形式](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/auth/i_sha2_password_common.h#L96-L97)
-- 照合は MySQL と同じく SQL 層に問い合わせて行う
-  - 認証側は内部セッションの身元をシステムユーザーにして、システムスキーマ `mysql` の `user` 表を SELECT し、認証文字列とプラグイン名を取る
-  - 照合の計算は認証側で行い、成功したら SQL 層の API で内部セッションの身元を利用者に切り替える
-  - 理由: 本でアカウントの仕組みを示すため (システム表が普通の表であること、サーバー自身が SQL 層の利用者になること、身元の切り替えが SQL 層の状態であること、起動時に自分でシステム表を作ること)
-  - MySQL の ACL キャッシュ (user@host のパターン照合と権限の判定に使うメモリ上の表) は持たない
-    - 権限を入れるときの拡張点で、そのときにホストのパターン照合もそこへ移す
-  - 検討した代替: データディクショナリの利用者情報を直接引く案
-    - 実装は小さいが、上記の仕組みが本に現れないため採らなかった
-- 検査項目はパスワードの一致だけ
-  - ロック、パスワードの期限、`offline_mode`、TLS 要件は、アカウント管理・サーバーモード・TLS の機能に付随する検査なので持たない
-- アカウントは初期アカウントのみ (issue #120) で、ホストは `%` 固定 (パターン照合は ACL キャッシュと一緒に入れる)
-- 前提と依存
-  - スキーマを持つこと ([ideology.md](../ideology.md) の「目的とスコープ」) と、起動時の bootstrap でシステム表 `mysql.user` と初期アカウントを作ること
-  - 認証が SQL の実行経路 (パーサー → プリペア → 実行 → ストレージ) に依存するため、本の順序では SQL が動いてから認証を入れる (MySQL 自身も同じ依存を持つ)
 
 ## 層ごとの分担
 
