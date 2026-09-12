@@ -43,7 +43,8 @@
 | Last Insert ID | 生成された ID、自動採番値、auto-generated ID | `GENERATED_INSERT_ID` (X Protocol の Notice)、`last_insert_id` (classic の OK パケット)、`LAST_INSERT_ID()` | 直前のステートメントで AUTO_INCREMENT により生成された値。Notice の `SessionStateChanged` で送られる |
 | 実行ステータス | 実行結果の付帯情報 | (`ROWS_AFFECTED` / `GENERATED_INSERT_ID` / `PRODUCED_MESSAGE`) | リザルトセットとは別に Notice で届く、実行に関する情報の総称 |
 | SQL 層 | コアサーバー、サーバー本体、SQL エンジン | | パーサー以降の、ステートメントを解析・最適化・実行する層 |
-| 内部セッション | THD、サーバーセッション | internal session (`srv_session`、実装上は THD) | 利用者の身元と実行状態を持ち、その利用者として SQL を実行する SQL 層側の場 |
+| 内部セッション | THD、サーバーセッション | internal session (`srv_session`、実装上は THD) | 実行ユーザーと実行状態を持ち、その利用者として SQL を実行する SQL 層側の場 |
+| 実行ユーザー | 身元、セキュリティコンテキスト (MySQL の用語) | security context (`priv_user`) | 内部セッションが SQL を実行するときの利用者。認証の成功後に設定され、権限の判定や `CURRENT_USER()` の値になる |
 | データディクショナリ | 辞書、カタログ (単独では使わない)、メタデータストア | data dictionary (minesql の実装は `internal/storage/dictionary` の `Catalog`) | テーブル・列・インデックス・制約・ユーザーの定義を保持する場所。名前解決と型決定はここを引いて行う |
 | スキーマ | データベース (MySQL では `SCHEMA` と `DATABASE` は同義) | schema / database | 表の名前空間。システム表はシステムスキーマ `mysql` に置く |
 | 既定スキーマ | カレントスキーマ、デフォルトデータベース | default schema (`AuthenticateStart.schema`、Notice の `CURRENT_SCHEMA`) | 修飾のないテーブル名を解決するスキーマ。接続時に決まる |
