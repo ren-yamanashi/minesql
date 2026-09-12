@@ -74,7 +74,14 @@ sequenceDiagram
 
 ## メッセージのやり取りの規則
 
-- やり取りは「シーケンス」(= 最初のリクエスト + それに続くレスポンスの列) という単位で進む
+- やり取りは「シーケンス」という単位で進む
+  - シーケンスとは、クライアントが送る 1 つのリクエストと、それに続いて終端 (`StmtExecuteOk`、`Ok`、`AuthenticateOk`、`Error` など) に至るまでの一連のメッセージをひとまとまりにしたもの
+  - フレームやパケットの分割とは無関係で、「どのリクエストにどのメッセージが属するか」という意味の上の区切り
+  - 例: 
+    - `StmtExecute` (SELECT) を 1 つ送ると、`ColumnMetaData` × 列数 → `Row` × 行数 → `FetchDone` → Notice → `StmtExecuteOk` が返り、このリクエスト 1 つとレスポンス全部で 1 つのシーケンス
+    - `CapabilitiesGet` → `Capabilities` の 1 往復で 1 つのシーケンス
+    - `AuthenticateStart` から `AuthenticateOk` (または `Error`) までが 1 つのシーケンス
+      - 途中で `AuthenticateContinue` をクライアントが送り返す往復も同じシーケンスに含まれる
 - シーケンスは必ずクライアントからのリクエスト (認証開始、SQL 実行リクエストなど) で開始される
 - シーケンスの終わり方は 2 通り
   - レスポンスの列が末尾まで届いて正常終了する
