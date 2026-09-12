@@ -1,6 +1,9 @@
-# X プロトコルのメッセージ仕様
+# X Protocol のメッセージ仕様
 
-以下、X プロトコルの各メッセージの詳細仕様
+以下、X Protocol の各メッセージの詳細仕様
+
+- 前半 (型定義、各フェーズ、エンコーディング) は `.proto` ファイルが定める契約で、minesql はこれにそのまま従う
+- 後半 (制限・注意点、doc コメントと実装の差) は X Plugin の振る舞いの記録で、クライアントはこの振る舞いも前提にしうるため、minesql も互換の要件として同じ応答をする
 
 ## 型定義ファイルの構成
 
@@ -393,11 +396,11 @@ capabilities {
 - `.proto` ファイルは proto2 記法で書かれており、protobuf 3 系のツールで扱う場合も 2.x のルールが適用される
 - 長さ 0 のフレーム (ペイロードなし) には FATAL の `Error` (`ER_X_BAD_MESSAGE` "Messages without payload are not supported") が返り、接続が切断される (認証前の不正なメッセージと同じ扱い)
   - 参照:
-    - [protocol_decoder.cc の read_and_decode_impl](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/ngs/protocol_decoder.cc#L153-L155)
+    - [protocol_decoder.cc の read_and_decode_impl](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/ngs/protocol_decoder.cc#L154-L157)
     - [client.cc の run (デコードエラーを FATAL で返して切断)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L617-L624)
 - 認証前に送った `Session.Reset` は無視される
   - 参照:
-    - [client.cc の handle_message](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L295-L298)
+    - [client.cc の handle_message](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L296-L299)
 - 未知の種別、または今の状態で扱えない種別のメッセージへのレスポンスは、認証の前後で異なる
   - 認証前: FATAL の `Error` (code 5000 `ER_X_BAD_MESSAGE` "Invalid message") が返り、接続が切断される
   - 認証後: 通常の `Error` (code 1047 `ER_UNKNOWN_COM_ERROR` "Unexpected message received") が返り、セッションは継続する
@@ -406,6 +409,14 @@ capabilities {
     - [xpl_dispatcher.cc の dispatch](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/xpl_dispatcher.cc#L118-L119)
 
 ## メッセージ種別の一覧
+
+- `ClientMessages` / `ServerMessages` は「種別値とメッセージ型の対応表」を enum として定義したもの (protoc に定数生成と ID の一意性チェックをさせるための定義) で、通信路上を流れるデータではない
+  - クライアントとサーバーは同じ `.proto` ファイルからコードを生成してビルドされるため、この対応表は最初から双方のプログラムに埋め込まれている (通信で共有する必要がなく、接続時に 1 度送られる、といったこともない)
+  - 実行時に通信路上を流れるのは、各フレームの先頭に書き込まれる 1 バイトの種別値のみ
+- この対応表は `.proto` ファイル内では 2 段階で宣言されている
+  - [mysqlx.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx.proto) の enum が種別値と種別名を対応付けている (例: `CON_CAPABILITIES_GET = 1;`)
+  - 各メッセージ定義の末尾にある `option (client_message_id)` / `option (server_message_id)` が、そのメッセージ型と種別名を対応付けている (例: `message CapabilitiesGet { option (client_message_id) = CON_CAPABILITIES_GET; }`)
+  - この 2 つをつなぐことで「`CapabilitiesGet` ⇔ 種別値 1」という対応が得られる
 
 ### クライアント → サーバー (mysqlx.proto の `ClientMessages.Type`)
 

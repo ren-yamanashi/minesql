@@ -1,6 +1,6 @@
 # 仕様書の思想
 
-`docs/specification/` 配下の仕様書を書く / 読むときの前提となる方針。X プロトコルとコネクションハンドラーの仕様を整理する過程で確定した判断をまとめたもので、以後の仕様書にも同じ方針を適用する
+`docs/specification/` 配下の仕様書を書く / 読むときの前提となる方針。X Protocol とコネクションハンドラーの仕様を整理する過程で確定した判断をまとめたもので、以後の仕様書にも同じ方針を適用する
 
 - この文書は育てていくもので、今後の仕様整理の過程で新たに学んだ思想や、固まったスコープ (実装する / しないの判断) は、確定した時点でこの文書に追記する
 - 追記するときは、判断そのものだけでなく理由も書く (後から見返したときに、前提が変わっていないか判断できるようにするため)
@@ -104,7 +104,8 @@
 
 - 読む順で分ける: 概要 (位置づけ) → 論理モデル / 流れ (2026-09-12 変更: 詳細仕様は読む順に含めない)
   - ディレクトリごとに README を置き、読む順と各文書の内容を示す
-  - protocol/: `x_protocol.md` (概要) → `communication_flow.md` (流れ)、詳細は `reference/message_spec.md`
+  - protocol/: `x_protocol.md` (概要) → `communication_flow.md` (流れ) → `message_spec.md` (詳細)
+    - `message_spec.md` は外部との契約 (メッセージ定義とエンコーディング) で minesql の判断で変わらないため、他の詳細仕様と違って読む順に含める (2026-09-12 確定)
   - connection/: `x_plugin.md` (要件) → `connection_handler.md` (論理モデル)、詳細は `reference/connection_handler_spec.md`
   - parser/: `sql_parser.md` (論理モデル)、詳細は `reference/sql_parser_spec.md`
   - X Plugin 全体の要件 (`x_plugin.md`) は connection/ に置いたままにし、dispatcher/ からは connection/ の文書を参照する (2026-09-08 確定)
@@ -112,7 +113,8 @@
   - 数値・条件・カウンタ・ソースの細部は書かない
 - 詳細仕様側に書くこと: 時系列に沿った具体的な処理と条件、既定値、状態変数、設定変数の表
   - 主張ごとにソースの参照を付ける
-  - 詳細仕様 (`xxx_spec.md`) は `<domain>/reference/` に置き、README では「実装時の参照資料」として触れるだけで読む順に含めない (2026-09-12 確定)
+  - 詳細仕様のうち MySQL の実装内部の対応表 (connection / dispatcher / parser の `xxx_spec.md`) は `<domain>/reference/` に置き、README では「実装時の参照資料」として触れるだけで読む順に含めない (2026-09-12 確定)
+    - 外部との契約 (protocol の `message_spec.md`) は要件そのものなので、この扱いの対象外
   - 書く / 更新するのは、そのドメインを実装する段階にする
     - 要件と論理モデルが固まる前に書くと、判断が変わるたびに書き換えになるため (ORDER BY / LIMIT や FOR SHARE の判断で実際に起きた)
   - 論理モデルと食い違う場合は論理モデルを正とする

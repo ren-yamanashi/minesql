@@ -1,8 +1,8 @@
-# X プロトコルの通信の流れ
+# X Protocol の通信の流れ
 
-以下、X プロトコルの通信全体の流れ
+以下、X Protocol の通信全体の流れ
 
-メッセージの形式 (フレーム構造) は [x_protocol.md](./x_protocol.md)、各メッセージの詳細な仕様は [message_spec.md](./reference/message_spec.md) を参照
+メッセージの形式 (フレーム構造) は [x_protocol.md](./x_protocol.md)、各メッセージの詳細な仕様は [message_spec.md](./message_spec.md) を参照
 
 ## 全体像
 
@@ -12,8 +12,9 @@
 sequenceDiagram
     participant C as クライアント
     participant S as サーバー
-    Note over C,S: 1. 接続確立 (TCP 33060 / Unix ソケット)
-    S-->>C: Notice: ServerHello
+    C->>S: 接続 (TCP 33060 への connect、または Unix ソケット)
+    Note over C,S: 1. 接続確立 (サーバーが accept)
+    S-->>C: Notice: ServerHello (リクエストへのレスポンスではない)
     Note over C,S: 2. capability ネゴシエーション (任意)
     C->>S: capability 一覧のリクエスト (CapabilitiesGet)
     S-->>C: capability 一覧 (Capabilities)
@@ -35,8 +36,13 @@ sequenceDiagram
 
 ### 1. 接続確立
 
-- クライアントがサーバーの X プロトコル用ポート (デフォルト 33060) に TCP または Unix ソケットで接続する
-- サーバーは接続を受け付けるとすぐに `ServerHello` の Notice を送る
+- クライアントがサーバーの X Protocol 用ポート (既定では 33060) に TCP または Unix ソケットで接続する
+- サーバーは接続を受け付けた時点で相手を知り、クライアントからのメッセージを待たずに `ServerHello` の Notice を送る
+  - やり取りの開始そのものはクライアントの接続で、最初のメッセージだけがサーバー側から出る
+  - これはリクエストへのレスポンスではなくシーケンスの外の Notice で、クライアントは読み飛ばしてもよい
+  - 参照:
+    - [client.cc の Client::on_accept](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L450)
+    - [ServerHello の送信](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L487-L489)
 
 ### 2. capability ネゴシエーション (任意)
 
