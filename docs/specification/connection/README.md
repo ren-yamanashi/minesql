@@ -2,13 +2,10 @@
 
 ## 仕様
 
-X Plugin のコネクションハンドラーの仕様を以下の文書に分けて記述\
-「X Plugin の要件 → 論理モデル → 認証」の順で読むことを想定
-
-1. [x_plugin.md](./x_plugin.md): コネクションハンドラーを含む X Plugin 全体の要件
-2. [connection_handler.md](./connection_handler.md): コネクションハンドラーの論理モデル
+1. コネクションハンドラーを含む X Plugin 全体の要件: [x_plugin.md](./x_plugin.md)
+2. コネクションハンドラーの論理モデル: [connection_handler.md](./connection_handler.md)
    - 責務、処理の流れ、構成要素、スレッドモデル、接続とセッションの状態遷移、タイムアウトと上限の種類
-3. [authentication.md](./authentication.md): 認証
+3. 認証の論理モデル: [authentication.md](./authentication.md)
    - 責務、構成要素 (認証ハンドラ、アカウント照合、SHA256 パスワードキャッシュ、内部セッションの実行ユーザー)、処理の流れ、層ごとの分担、MySQL の要件と minesql での対応範囲
 
 ## その他 (実装時の参照資料)

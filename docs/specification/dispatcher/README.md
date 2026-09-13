@@ -2,10 +2,8 @@
 
 ## 仕様
 
-X Plugin のコマンドディスパッチャの仕様を以下の文書に記述\
-X Plugin 全体の要件は [connection/x_plugin.md](../connection/x_plugin.md) を参照
-
-1. [command_dispatcher.md](./command_dispatcher.md): コマンドディスパッチャの論理モデル
+1. コマンドディスパッチャを含む X Plugin 全体の要件: [connection/x_plugin.md](../connection/x_plugin.md)
+2. コマンドディスパッチャの論理モデル: [command_dispatcher.md](./command_dispatcher.md)
    - 責務、構成要素、実行モデル、処理の流れ、保証する規則、Expect ブロック、管理コマンド
 
 ## その他 (実装時の参照資料)
