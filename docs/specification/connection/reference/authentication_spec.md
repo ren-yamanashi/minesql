@@ -24,7 +24,7 @@
   - [mysql_native_password.cc のプラグイン宣言 (8.4 では既定で無効)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/auth/mysql_native_password.cc#L327-L343)
   - [sha2_plain_verification.cc の認証文字列の分解](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sha2_plain_verification.cc#L55-L80)
   - [i_sha2_password_common.h の scramble の形式](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/auth/i_sha2_password_common.h#L96-L97)
-- 認証ハンドラ (Authentication): `AuthenticateStart` のたびにメカニズムに対応するものが 1 つ作られ、成功または失敗で消える
+- 認証ハンドラ (Authentication): `AuthenticateStart` で指定された認証メカニズムに対応するものが 1 つ作られ、成功または失敗で消える
   - [auth_challenge_response.h の Sasl_challenge_response_auth (やり取りの説明)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/auth_challenge_response.h#L42-L68)
   - [auth_plain.cc の Sasl_plain_auth](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/auth_plain.cc#L49-L62)
 - アカウント照合 (Account_verification_handler): 資格情報を「既定スキーマ \0 ユーザー名 \0 パスワード (または計算値)」に分解し、アカウント情報を取り出して照合する
