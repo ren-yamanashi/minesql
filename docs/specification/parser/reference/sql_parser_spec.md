@@ -18,10 +18,10 @@
   - 外した選択肢は書かないので、その構文は構文エラーになる (MySQL は受理するので、その分だけ応答が異なる)
 - 外す理由は次の 7 つのどれかで、以降の表では記号で示す
   - A: [issue #120](https://github.com/ren-yamanashi/minesql/issues/120) の「やらないこと」に挙がっている機能の構文
-  - B: 対応する実装が minesql にない機能の構文 (何を含めないかは [ADR-0011](../../adr/0011.文法に含める構文の範囲.md))
+  - B: 対応する実装が minesql にない機能の構文 (何を含めないかは [SDR-0011](../../sdr/0011.文法に含める構文の範囲.md))
   - C: 8.4 で非推奨 (deprecated) になっている別表記
   - D: MySQL 自身が読み飛ばす、または挙動に影響しない構文
-  - E: `sql_mode` に依存する分岐のうち、8.4 の既定値では選ばれない側の挙動 ([ADR-0013](../../adr/0013.sql_modeの既定値に固定し非推奨と無視される構文は採らない.md))
+  - E: `sql_mode` に依存する分岐のうち、8.4 の既定値では選ばれない側の挙動 ([SDR-0013](../../sdr/0013.sql_modeの既定値に固定し非推奨と無視される構文は採らない.md))
   - F: 外した他の構文と組でしか意味を持たない構文
   - G: 標準 SQL にない MySQL 独自の別表記で、同じ意味の書き方が他にあるもの
 - 次の 4 つは、対応する機能とあわせて文法に含める
@@ -116,14 +116,14 @@
 
 - 判定の仕方: 識別子と同じ規則で語を切り出したあと、キーワード表を大文字小文字を区別せずに引く
   - 表にあればその語のトークンを返し、なければ識別子のトークンを返す
-  - MySQL は語の直後が `(` かどうかで関数名の表も引くが、minesql は関数呼び出しを文法に含めないため ([ADR-0011](../../adr/0011.文法に含める構文の範囲.md))、この区別を持たない
+  - MySQL は語の直後が `(` かどうかで関数名の表も引くが、minesql は関数呼び出しを文法に含めないため ([SDR-0011](../../sdr/0011.文法に含める構文の範囲.md))、この区別を持たない
   - 参照:
     - [find_keyword](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.cc#L905-L936)
     - [識別子の切り出し後のキーワード判定](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.cc#L1578-L1584)
     - [lex.h のキーワード表 symbols](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/lex.h#L61)
 - 表の範囲: minesql の文法に現れる語だけをキーワードにする
   - MySQL の予約語であっても minesql の文法に現れない語 (`WINDOW`、`CUBE` など) は、minesql では識別子として扱う
-    - この範囲にする理由は [ADR-0012](../../adr/0012.キーワード表は文法が使う語だけにする.md)
+    - この範囲にする理由は [SDR-0012](../../sdr/0012.キーワード表は文法が使う語だけにする.md)
 - 予約語と非予約語
   - MySQL では、キーワードのうち `ident_keyword` 規則に現れる語 (非予約語) は識別子としても使え、現れない語 (予約語) は引用しないと識別子に使えない
   - minesql でも同じ区分に従い、非予約語は `ident_keyword` 相当の規則で識別子として受理する
@@ -528,7 +528,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | [update_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13411-L13428)、[update_elem](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13430-L13436) | `,` 区切りの `simple_ident_nospvar '=' expr` | `:=` (B)、値の `DEFAULT` (B) |
 
 - MySQL は単一テーブルと複数テーブルの UPDATE を同じ規則 (`table_reference_list`) で受理し、後の段階で区別する
-  - minesql は複数テーブルの UPDATE を実装しないため ([ADR-0011](../../adr/0011.文法に含める構文の範囲.md))、テーブル参照の位置に `single_table` (`table_ident opt_table_alias`) を置く
+  - minesql は複数テーブルの UPDATE を実装しないため ([SDR-0011](../../sdr/0011.文法に含める構文の範囲.md))、テーブル参照の位置に `single_table` (`table_ident opt_table_alias`) を置く
 - 外した句と選択肢の一覧
 
 | 句 / 選択肢 | 規則 | 理由 |
@@ -596,7 +596,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 - 列定義内の `REFERENCES` について
   - MySQL の文法は列定義の末尾に `REFERENCES` 句を受理するが、アクションは `nullptr` を返して捨てており、外部キーにはならない
   - MySQL のマニュアルも「MySQL parses but ignores "inline `REFERENCES` specifications" (as defined in the SQL standard) where the references are defined as part of the column specification. MySQL accepts `REFERENCES` clauses only when specified as part of a separate `FOREIGN KEY` specification.」と説明している
-  - minesql では構文エラーにする ([ADR-0013](../../adr/0013.sql_modeの既定値に固定し非推奨と無視される構文は採らない.md))
+  - minesql では構文エラーにする ([SDR-0013](../../sdr/0013.sql_modeの既定値に固定し非推奨と無視される構文は採らない.md))
   - 参照:
     - [opt_references (`Currently we ignore FK references here`)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6793-L6800)
     - [CREATE TABLE Statement (MySQL 8.4 Reference Manual)](https://dev.mysql.com/doc/refman/8.4/en/create-table.html)

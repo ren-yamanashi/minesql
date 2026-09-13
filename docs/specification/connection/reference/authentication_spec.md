@@ -16,7 +16,7 @@
   - [session.cc の未対応メカニズムの応答](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/session.cc#L155-L162)
 - 成功時は `SessionStateChanged` (`CLIENT_ID_ASSIGNED`) の Notice を送ってから `AuthenticateOk` を返し、セッションが利用可能になる
   - [session.cc の on_auth_success](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/session.cc#L204-L214)
-- 失敗は 1 セッションにつき 3 回まで、3 回目の `Error` は FATAL で打ち切り、セッションを閉じた / リセットした後は新しいセッションになるため回数は 0 から数え直す (minesql での対応範囲の WL#10992 プロトコル実装の行)
+- 失敗は 1 セッションにつき 3 回まで、3 回目の `Error` は FATAL で打ち切り、セッションを閉じた / リセットした後は新しいセッションになるため回数は 0 から数え直す
   - [session.cc の on_auth_failure_impl](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/session.cc#L222-L247)
   - [session.h の k_max_auth_attempts](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/session.h#L125)
   - [client.cc の on_session_reset (リセット時に新しいセッションを作る)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L524-L532)
