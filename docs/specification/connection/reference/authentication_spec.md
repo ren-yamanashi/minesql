@@ -35,7 +35,7 @@
   - [account_verification_handler.cc の verify_account (検証器はアカウントの認証プラグインで選ばれ、パスワード検査に失敗すると access denied)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/account_verification_handler.cc#L132-L148)
 - `PLAIN` はキャッシュに同じ値のエントリがあれば、認証文字列との照合を省いて成功にする
   - [sha2_plain_verification.cc のキャッシュの先読み](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sha2_plain_verification.cc#L45-L49)
-- SHA256 パスワードキャッシュ: サーバーに 1 つ、`SHA256_MEMORY` の照合に使う値 (パスワードの SHA256 の SHA256) を利用者ごとに保持する
+- SHA256 パスワードキャッシュ: `SHA256_MEMORY` の照合に使う値 (パスワードの SHA256 の SHA256) を利用者ごとに保持し、全ての接続で共有する
   - [cache_based_verification.cc の照合](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/cache_based_verification.cc#L70-L91)
   - [sha2_plain_verification.cc の成功時のキャッシュ登録](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sha2_plain_verification.cc#L81-L85)
   - [module_cache.cc のキャッシュの消去](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/module_cache.cc#L82-L96)

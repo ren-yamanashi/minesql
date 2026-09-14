@@ -244,7 +244,7 @@
 
 ### [connection_handler.md](../connection_handler.md) より
 
-- サーバー (Server): X Plugin 内に 1 つ
+- サーバー (Server): 全ての接続で共有され、接続を受け入れるかどうかを決め、受け入れた接続の全体を把握する
   - [server.h の State](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/server.h#L72-L77)
   - [接続一覧 (client_list.cc)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/ngs/client_list.cc#L48-L88)
 - 接続 (Client): 受け付けた接続 1 本につき 1 つ生まれ、接続が閉じると消える
