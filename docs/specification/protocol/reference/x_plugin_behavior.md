@@ -179,8 +179,8 @@ capabilities {
     - [mysqlx_resultset.proto の catalog](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_resultset.proto#L526-L530)
     - [streaming_command_delegate.cc の field_metadata](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/streaming_command_delegate.cc#L309-L313)
 
-- WL#8338 の要件にある GTID
-  - WL#8338 は「成功時の OK メッセージに Affected Rows、GTID (有効な場合)、その他のメタデータを含める」を要件にしているが、X Protocol には GTID を運ぶ項目がない
+- [WL#8338](https://dev.mysql.com/worklog/task/?id=8338) の要件にある GTID
+  - [WL#8338](https://dev.mysql.com/worklog/task/?id=8338) は「成功時の OK メッセージに Affected Rows、GTID (有効な場合)、その他のメタデータを含める」を要件にしているが、X Protocol には GTID を運ぶ項目がない
     - `SessionStateChanged` の `Parameter` は `CURRENT_SCHEMA` から `GENERATED_DOCUMENT_IDS` までで、GTID に相当する値はなく、X Plugin のソースにも GTID を送る処理はない (`gtid` が現れるのは SQL 関数名の表だけ)
   - GTID を応答に載せる仕組みがあるのは classic protocol で、OK パケットのセッション状態トラッカー (`SESSION_TRACK_GTIDS`) をシステム変数 `session_track_gtids` で有効にしたときだけ
   - 参照:

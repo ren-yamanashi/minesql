@@ -6,7 +6,7 @@ MySQL X Plugin は、従来の SQL 言語に加えて、ドキュメントスト
 - プロトコルとクライアントライブラリは、プラグインによって実装されるハイレベルなインターフェースを提供する
 - このプラグインは、ドキュメントモデルのリクエストから SQL へのマッピングに必要なすべての処理を担う
 - 本文の主張に対応する MySQL のソースは [connection_handler_spec.md の「論理モデルの主張とソースの対応」](./reference/connection_handler_spec.md#論理モデルの主張とソースの対応) にまとめる
-- 以下の「要件」は WL#8338 に書かれた MySQL の X Plugin の要件の訳で、minesql がそのうちどれを採るかは [minesql での対応範囲](#minesql-での対応範囲) に示す
+- 以下の「要件」は [WL#8338](https://dev.mysql.com/worklog/task/?id=8338) に書かれた MySQL の X Plugin の要件の訳で、minesql がそのうちどれを採るかは [minesql での対応範囲](#minesql-での対応範囲) に示す
 
 ## 要件
 

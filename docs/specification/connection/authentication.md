@@ -136,7 +136,7 @@ sequenceDiagram
 
 ## 要件
 
-- `sha256_password` のアカウントに対する X Plugin の認証 (WL#9271)
+- `sha256_password` のアカウントに対する X Plugin の認証 ([WL#9271](https://dev.mysql.com/worklog/task/?id=9271))
   - 機能要件
     - 利用者は、新しい接続時またはセッションのリセット時に、`sha256_password` で識別される MySQL Server のアカウントに対して `PLAIN` メソッドによる認証を開始できなければならない
   - 認証全般に関する要件
@@ -148,7 +148,7 @@ sequenceDiagram
     - `sha256_password` で識別される MySQL アカウントに対する認証は、上記のいずれの失敗条件にも該当しない場合、成功しなければならない
     - 認証が成功した場合、パスワードが期限切れのアカウントを使っていることを、`Notice` で利用者に知らせる必要がある
 
-- メモリ上の SHA256 ストレージに対するチャレンジ / レスポンス認証 (WL#10992)
+- メモリ上の SHA256 ストレージに対するチャレンジ / レスポンス認証 ([WL#10992](https://dev.mysql.com/worklog/task/?id=10992))
   - 認証資格情報のキャッシュ
     - キャッシュの無効化が機能しない場合、`SHA256_MEMORY` による認証は失敗しなければならない
     - 安全な接続上の `PLAIN` による認証は、ユーザーアカウントと SHA256(SHA256(password)) をメモリ上の sha256 キャッシュに保存しなければならない
@@ -173,7 +173,7 @@ sequenceDiagram
   - libmysqlxclient
     - libmysqlxclient は、`SHA256_MEMORY` 認証メソッドに対応しなければならない
 
-- アカウントの認証プラグイン `caching_sha2_password` (WL#9591)
+- アカウントの認証プラグイン `caching_sha2_password` ([WL#9591](https://dev.mysql.com/worklog/task/?id=9591))
   - キャッシュの仕組みを使ってより高速に認証を行う、新しい認証プラグインを導入しなければならない
     - サーバー側の認証プラグイン `caching_sha2_password` を導入しなければならない
     - クライアント側の認証プラグイン `caching_sha2_password` を導入しなければならない
@@ -204,8 +204,8 @@ sequenceDiagram
 ### 認証メカニズムとアカウントの認証プラグインの対応について
 
 - 認証メカニズムは X Protocol 側の「やり取りの仕方」、認証プラグインはアカウント側の「パスワードの保存形式と照合の仕方」で、成り立つ組み合わせは決まっている
-- WL#9271 の時点の対応は次の表のとおりで、`PLAIN` は TLS を有効にした接続、または Unix ソケット接続でだけ使える
-  - WL#9271 は、`PLAIN` が安全な接続を要求するため、システム変数 `require_secure_transport` を考慮する必要がないとしている
+- [WL#9271](https://dev.mysql.com/worklog/task/?id=9271) の時点の対応は次の表のとおりで、`PLAIN` は TLS を有効にした接続、または Unix ソケット接続でだけ使える
+  - [WL#9271](https://dev.mysql.com/worklog/task/?id=9271) は、`PLAIN` が安全な接続を要求するため、システム変数 `require_secure_transport` を考慮する必要がないとしている
 
 | X Plugin の認証メカニズム | アカウントの認証プラグイン | TLS の要否 |
 | --- | --- | --- |
@@ -213,7 +213,7 @@ sequenceDiagram
 | `PLAIN` | `sha256_password` | 要 |
 | `MYSQL41` | `mysql_native_password` | 不要 |
 
-- WL#10992 で加わった `SHA256_MEMORY` は、アカウントの認証プラグインによらず、TLS の有無によらず、キャッシュで照合する
+- [WL#10992](https://dev.mysql.com/worklog/task/?id=10992) で加わった `SHA256_MEMORY` は、アカウントの認証プラグインによらず、TLS の有無によらず、キャッシュで照合する
 - `caching_sha2_password` のアカウントには、SSL 接続では `PLAIN`、非 SSL 接続では `SHA256_MEMORY` で認証する (MySQL 8.4 のマニュアル)
   - `caching_sha2_password` 自身が持つ認証キャッシュは X Plugin と共有されず、X Plugin は `SHA256_MEMORY` のために独自のキャッシュを持つ
   - 非 SSL の X Protocol 接続で認証する前に、そのアカウントは一度 SSL の X Protocol 接続で認証し、X Plugin のキャッシュにパスワードを供給しておく必要がある
