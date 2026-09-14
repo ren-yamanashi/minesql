@@ -10,7 +10,7 @@
 
 ### [authentication.md](../authentication.md) より
 
-- 認証ハンドラの一覧 (Authentication_container): メカニズム名と接続の種類 (安全かどうか) から認証ハンドラを作り、一覧にないメカニズム名は FATAL の `Error` (`ER_NOT_SUPPORTED_AUTH_MODE`) になる
+- 作れる認証メカニズムは接続の種類 (安全かどうか) で決まり、一覧にないメカニズム名は FATAL の `Error` (`ER_NOT_SUPPORTED_AUTH_MODE`) になる (MySQL ではこの一覧を Authentication_container が持つ)
   - [authentication_container.cc のメカニズム登録](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/authentication_container.cc#L37-L46)
   - [get_auth_handler の接続種別による絞り込み](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/authentication_container.cc#L49-L68)
   - [session.cc の未対応メカニズムの応答](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/session.cc#L155-L162)
