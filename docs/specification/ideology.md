@@ -39,18 +39,18 @@
   - ディレクトリごとに README を置き、読む順と各文書の内容を示す
   - protocol/: `x_protocol.md` (概要) → `communication_flow.md` (流れ) → `message_spec.md` (詳細)
     - `message_spec.md` は外部との契約 (メッセージ定義とエンコーディング) で MineSQL の判断で変わらないため、他の詳細仕様と違って読む順に含める (2026-09-12 確定)
-  - connection/: `x_plugin.md` (要件) → `connection_handler.md` (論理モデル) → `authentication.md` (認証)、詳細は `reference/connection_handler_spec.md`
-  - parser/: `sql_parser.md` (論理モデル)、詳細は `reference/sql_parser_spec.md`
+  - connection/: `x_plugin.md` (要件) → `connection_handler.md` (論理モデル) → `authentication.md` (認証)
+  - parser/: `sql_parser.md` (論理モデル)
   - X Plugin 全体の要件 (`x_plugin.md`) は connection/ に置いたままにし、dispatcher/ からは connection/ の文書を参照する (2026-09-08 確定)
 - 論理モデル側に書くこと: 責務 (担うこと / 担わないこと)、構成要素 (状態と寿命を持ち振る舞いの主体となるもの)、実行モデル (スレッド)、処理の流れ、状態遷移、守る境界の種類
   - 数値・条件・カウンタ・ソースの細部は書かない
   - ソースコードへの行番号つきのリンクは置かない (2026-09-12 確定)
-    - 主張の根拠は同じドメインの reference 文書の「論理モデルの主張とソースの対応」に置き、論理モデルからは冒頭で 1 度だけそこへ案内する
+    - 主張の根拠は同じドメインの reference 文書の「論理モデルの主張とソースの対応」に置く。論理モデルの側からは reference に触れない
     - MySQL の設計文書 (WL、公式ブログ、`.dox`) や外部資料は、文末の「参考資料」に行番号なしで列挙する
     - 理由: 論理の文書は読者が流れで読むもので、bullet ごとの permalink は書き手の証拠置き場になり読みを妨げる
 - 詳細仕様側に書くこと: 時系列に沿った具体的な処理と条件、既定値、状態変数、設定変数の表
   - 主張ごとにソースの参照を付ける (ソースへの permalink はこちらだけに置く)
-  - 詳細仕様のうち MySQL の実装内部の対応表 (connection / dispatcher / parser の `xxx_spec.md`) は `<domain>/reference/` に置き、README では「実装時の参照資料」として触れるだけで読む順に含めない (2026-09-12 確定)
+  - 詳細仕様のうち MySQL の実装内部の対応表 (connection / dispatcher / parser の `xxx_spec.md`) は `<domain>/reference/` に置き、その一覧は `<domain>/reference/README.md` に書く。ドメイン直下の README と論理モデルは reference に一切触れず、独立させる (2026-09-17 確定)
     - 外部との契約 (protocol の `message_spec.md`) は要件そのものなので、この扱いの対象外
   - 書く / 更新するのは、そのドメインを実装する段階にする
     - 要件と論理モデルが固まる前に書くと、判断が変わるたびに書き換えになるため (ORDER BY / LIMIT や FOR SHARE の判断で実際に起きた)
@@ -113,5 +113,5 @@
   - MySQL Shell や各言語の Connector が実装し、内部で X Protocol を使って通信する
 - コネクションハンドラー: X Plugin のうち、接続の受付からセッションの確立・切断までを担う部分
   - MineSQL では X Plugin 型のハンドラーを 1 つ作ればよく、classic 用のハンドラーに相当するものは不要
-- 内部セッション: 実行ユーザーと実行状態を持ち、その利用者として SQL を実行する SQL 層側の場
+- 内部セッション: SQL 層がセッションごとに持つ実行の文脈で、実行ユーザーと実行状態を保持する
   - 実装上は THD で、X Plugin のセッションと 1 対 1 に対応する

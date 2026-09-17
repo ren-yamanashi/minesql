@@ -2,9 +2,6 @@
 
 - X Protocol の各メッセージの詳細仕様
 - ここに書くのは `.proto` ファイルが定める契約 (メッセージの定義、値の型、エンコーディング、種別の一覧) で、MineSQL はこれにそのまま従う
-- X Plugin の振る舞いの細部 (実測値、doc コメントと実装の差、状態ごとの例外的な応答) は [reference/x_plugin_behavior.md](./reference/x_plugin_behavior.md) に記載
-  - 契約ではないが、クライアントはこの振る舞いも前提にしうるため、MineSQL も互換の要件として同じ応答をする
-- X Plugin の実装 (`plugin/x/src`) への参照は [reference/x_plugin_behavior.md の「論理モデルの主張とソースの対応」](./reference/x_plugin_behavior.md#論理モデルの主張とソースの対応) にまとめる
 
 ## 型定義ファイルの構成
 
@@ -44,7 +41,6 @@
   - `tls` や `client.interactive` のような単一の bool 値は `SCALAR`
   - `authentication.mechanisms` は文字列のリストなので `ARRAY`
   - `compression` は `algorithm` というキーを持つので `OBJECT` (その値はさらに `ARRAY`)
-  - 実際のレスポンス全体は [reference/x_plugin_behavior.md の実測値](./reference/x_plugin_behavior.md#capability-の実測値) を参照
 
 ## capability ネゴシエーション
 
@@ -76,7 +72,7 @@
   - [mysqlx_session.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_session.proto)
 - `AuthenticateStart` で使いたい認証メカニズム (`mech_name`) を指定して認証を開始する
   - フィールドは `mech_name` (必須) / `auth_data` / `initial_response` の 3 つ
-  - プロトコルとしての既定のメカニズムはなく、クライアントが必ず明示する (公式クライアントの自動選択の順序は [reference/x_plugin_behavior.md](./reference/x_plugin_behavior.md#公式クライアントの認証メカニズムの自動選択) を参照)
+  - プロトコルとしての既定のメカニズムはなく、クライアントが必ず明示する
 - メカニズムによっては `AuthenticateContinue` の往復で追加の認証データを交換する
 - 成功なら `AuthenticateOk`、失敗なら `Error` が返る
 - `mech_name` は `.proto` ファイル上は自由な文字列で、使えるメカニズムはサーバー実装側で決まる
@@ -93,7 +89,7 @@
   - `keep_open = true` なら認証済みのままセッションだけをリセットする
   - `keep_open = false` (既定) ならセッションを閉じ、再認証が必要になる
 - `Session.Close` は現在のセッションを閉じて `Ok` を返し、接続は再認証待ちに戻る
-  - 再認証待ちの接続が受け付けるのは認証のメッセージだけで、それ以外への応答は [reference/x_plugin_behavior.md](./reference/x_plugin_behavior.md#再認証待ちの接続が受け付けるメッセージ) を参照
+  - 再認証待ちの接続が受け付けるのは認証のメッセージだけ
 - `Connection.Close` は接続そのものを閉じる意思をサーバーへ伝える
   - サーバーはセッションの状態を破棄し、`Ok` ("bye!") を返してから接続を切断する
 
@@ -126,7 +122,7 @@
   - `FetchDone`: 最後のリザルトセットが送信済み
 - `FetchSuspended` はカーソル使用時にリザルトセットの送信を中断した状態を表す
 - リザルトセットを返さないステートメント (`INSERT` など) では `ColumnMetaData` / `Row` / `FetchDone` は送られず、Notice と `StmtExecuteOk` だけが返る
-  - doc コメントの記述とは異なる (詳細は [reference/x_plugin_behavior.md](./reference/x_plugin_behavior.md#doc-コメントと実装の差))
+  - doc コメントの記述とは異なる
 - `SELECT 1 LIMIT 0` のような空のリザルトセットは `ColumnMetaData` + `FetchDone` になる
 
 ### 実行ステータスの Notice

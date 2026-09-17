@@ -49,10 +49,11 @@
 | Last Insert ID | 生成された ID、自動採番値、auto-generated ID | `GENERATED_INSERT_ID` (X Protocol の Notice)、`last_insert_id` (classic の OK パケット)、`LAST_INSERT_ID()` | 直前のステートメントで AUTO_INCREMENT により生成された値。Notice の `SessionStateChanged` で送られる |
 | 実行ステータス | 実行結果の付帯情報 | (`ROWS_AFFECTED` / `GENERATED_INSERT_ID` / `PRODUCED_MESSAGE`) | リザルトセットとは別に Notice で届く、実行に関する情報の総称 |
 | SQL 層 | コアサーバー、サーバー本体、SQL エンジン | | SQL パーサーからエグゼキュータまで (ステートメントを解析・最適化・実行するモジュール群) の総称 |
-| 内部セッション | THD、サーバーセッション | internal session (`srv_session`、実装上は THD) | 実行ユーザーと実行状態を持ち、その利用者として SQL を実行する SQL 層側の場 |
+| 内部セッション | THD、サーバーセッション | internal session (`srv_session`、実装上は THD) | SQL 層がセッションごとに持つ実行の文脈。実行ユーザーと実行状態 (セッション変数、一時テーブルなど) を保持し、SQL はこの文脈で実行される |
 | 実行ユーザー | 身元、セキュリティコンテキスト (MySQL の用語) | security context (`priv_user`) | 内部セッションが SQL を実行するときの利用者。認証の成功後に設定され、権限の判定や `CURRENT_USER()` の値になる |
 | データディクショナリ | 辞書、カタログ (単独では使わない)、メタデータストア | data dictionary (MineSQL の実装は `internal/storage/dictionary` の `Catalog`) | テーブル・列・インデックス・制約・ユーザーの定義を保持する場所。名前解決と型決定はここを引いて行う |
 | スキーマ | データベース (MySQL では `SCHEMA` と `DATABASE` は同義) | schema / database | 表の名前空間。システム表はシステムスキーマ `mysql` に置く |
+| システムスキーマ | `mysql` データベース、mysql スキーマ | the mysql system schema | サーバー自身が使う表 (システム表) を置くスキーマ `mysql` のこと。MySQL のマニュアルが system schema と呼ぶのはこのスキーマで、監視用のビューを集めた `sys` スキーマや `information_schema` / `performance_schema` とは別物 |
 | 既定スキーマ | カレントスキーマ、デフォルトデータベース | default schema (`AuthenticateStart.schema`、Notice の `CURRENT_SCHEMA`) | 修飾のないテーブル名を解決するスキーマ。接続時に決まる |
 | システム表 | システムテーブル、メタデータテーブル | system table (`mysql.user` など) | サーバー自身が使う表。普通の表として同じストレージに置く |
 | ロック読み取り | ロック付き読み取り、ロッキングリード | locking read (`SELECT ... FOR UPDATE`) | 読んだ行にロックを取る SELECT。`FOR UPDATE` は排他ロック、`FOR SHARE` (同義語 `LOCK IN SHARE MODE`) は共有ロックを取る |

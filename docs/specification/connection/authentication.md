@@ -1,10 +1,6 @@
 # 認証 (X Plugin)
 
 - コネクションハンドラーのうち、接続をセッションとして使える状態にする「認証」の部分の仕様
-  - 接続の状態遷移と、認証メッセージがセッションに届くまでの経路は [connection_handler.md](./connection_handler.md) を参照
-  - メッセージの形式 (`AuthenticateStart` / `AuthenticateContinue` / `AuthenticateOk`) は [protocol/message_spec.md の認証](../protocol/message_spec.md#認証-セッション確立) を参照
-- 認証は MySQL でも接続処理の一部として (接続ごとのスレッド上で、セッション確立の段階で) 実行されるが、認証メカニズムの中身は状態管理とは別の部品が担うため、文書を分けている
-- 本文の主張に対応する MySQL のソースは [authentication_spec.md の「論理モデルの主張とソースの対応」](./reference/authentication_spec.md#論理モデルの主張とソースの対応) にまとめる
 
 ## 責務
 
@@ -15,7 +11,7 @@
 
 ## 構成要素
 
-認証に関わる構成要素は 4 つで、セッション ([connection_handler.md](./connection_handler.md)) がこれらを使って認証を進める
+認証に関わる構成要素は 4 つで、[セッション](./connection_handler.md#セッション-session) がこれらを使って認証を進める
 
 - 認証ハンドラ: 認証メカニズム 1 つ分のやり取り (チャレンジの生成、応答の受け取り) を進める
 - アカウント照合: 資格情報をアカウント情報と突き合わせ、成功したら実行ユーザーを切り替える
@@ -23,7 +19,7 @@
 - 内部セッションの実行ユーザー: 内部セッションが SQL を実行するときの利用者で、照合の間はシステムユーザー、成功後は認証した利用者になる
 
 ```mermaid
-flowchart LR
+flowchart TD
     S["セッション"] -->|"メカニズム名と接続の種類に応じて作る"| A["認証ハンドラ"]
     A -->|"資格情報"| V["アカウント照合"]
     V -->|"システムユーザーとして mysql.user を検索"| I["内部セッション<br/>(実行ユーザーを持つ)"]

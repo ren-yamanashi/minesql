@@ -3,7 +3,6 @@
 - X Plugin (位置づけは [X Protocol](../protocol/x_protocol.md) 参照) のうち、認証済みのセッションが受け取ったリクエストを種別ごとの処理に振り分け、SQL 層に実行を委ねて、レスポンスの列を終端まで送り返す部分の仕様
 - 要件は [x_plugin.md](../connection/x_plugin.md) の「クエリ / DML インターフェース」「SQL インターフェース」「リザルトセット・インターフェース」の項を参照
 - 接続とセッションの管理は [connection/](../connection/README.md)、メッセージの形式とシーケンスの規則は [protocol/](../protocol/README.md) を参照
-- 本文の主張に対応する MySQL のソースは [command_dispatcher_spec.md の「論理モデルの主張とソースの対応」](./reference/command_dispatcher_spec.md#論理モデルの主張とソースの対応) にまとめる
 
 ## 責務
 
@@ -31,14 +30,14 @@
 
 ## 構成要素
 
-状態と寿命を持ち、ディスパッチャの振る舞いの主体となるもの。いずれもセッションに属し、セッションと寿命を共にする
+状態と寿命を持ち、ディスパッチャの振る舞いの主体となるもの。いずれもセッションに属し、セッションとライフサイクルを共有する
 
 - ディスパッチャ (Dispatcher): リクエストを受け取り、Expect ブロックの判定を挟んで種別ごとの処理へ渡し、失敗したら `Error` を送る
 - 種別ごとの処理 (ハンドラ)
   - SQL ステートメントの処理: `StmtExecute` を受け、namespace に応じて SQL の実行か管理コマンドの実行に分ける
   - 管理コマンドの処理: コマンド名を引き、引数を検証して実行する
   - Expect ブロックの処理: `Expect.Open` / `Expect.Close` でブロックを開閉する
-- 内部セッション: SQL 層側の実行の場 (定義は [connection/ の構成要素](../connection/connection_handler.md#構成要素) を参照)
+- 内部セッション: SQL 層がセッションごとに持つ実行の文脈 (定義は [connection/ の構成要素](../connection/connection_handler.md#構成要素) を参照)
   - ディスパッチャはここにステートメントの実行を依頼し、結果をコールバックで受け取る (classic のコマンド層は介さない、[SDR-0006](../sdr/0006.classicのCOMコマンド層は作らない.md))
 - 結果の受け口 (デリゲート): 実行 1 回につき 1 つ作られ、SQL 層からのコールバック (列定義、行、完了、エラー) を受けてプロトコルのメッセージに変換して送る
 - Expect スタック: 開いている Expect ブロックの入れ子
@@ -56,7 +55,7 @@
 
 ## 処理の流れ
 
-リクエストを 1 つ受け取ってから終端を送るまでの流れ。各段階の条件とレスポンスは [コマンドディスパッチャの詳細仕様](./reference/command_dispatcher_spec.md) を参照
+リクエストを 1 つ受け取ってから終端を送るまでの流れ
 
 ```mermaid
 flowchart TD
