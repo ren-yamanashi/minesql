@@ -1,9 +1,9 @@
 # X Protocol のメッセージ仕様
 
 - X Protocol の各メッセージの詳細仕様
-- ここに書くのは `.proto` ファイルが定める契約 (メッセージの定義、値の型、エンコーディング、種別の一覧) で、minesql はこれにそのまま従う
-- X Plugin の振る舞いの細部 (実測値、doc コメントと実装の差、状態ごとの例外的な応答) は [reference/x_plugin_behavior.md](./reference/x_plugin_behavior.md) に分けた
-  - 契約ではないが、クライアントはこの振る舞いも前提にしうるため、minesql も互換の要件として同じ応答をする
+- ここに書くのは `.proto` ファイルが定める契約 (メッセージの定義、値の型、エンコーディング、種別の一覧) で、MineSQL はこれにそのまま従う
+- X Plugin の振る舞いの細部 (実測値、doc コメントと実装の差、状態ごとの例外的な応答) は [reference/x_plugin_behavior.md](./reference/x_plugin_behavior.md) に記載
+  - 契約ではないが、クライアントはこの振る舞いも前提にしうるため、MineSQL も互換の要件として同じ応答をする
 - X Plugin の実装 (`plugin/x/src`) への参照は [reference/x_plugin_behavior.md の「論理モデルの主張とソースの対応」](./reference/x_plugin_behavior.md#論理モデルの主張とソースの対応) にまとめる
 
 ## 型定義ファイルの構成
@@ -23,7 +23,7 @@
 | [mysqlx_prepare.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_prepare.proto) | `Mysqlx.Prepare` | プリペアドステートメント (`Prepare` / `Execute` / `Deallocate`) |
 | [mysqlx_cursor.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_cursor.proto) | `Mysqlx.Cursor` | カーソル (`Open` / `Fetch` / `Close`) |
 
-- 下 4 つ (crud / expr / prepare / cursor) のメッセージは minesql では実装しない ([ideology.md](../ideology.md) の「目的とスコープ」)
+- 下 4 つ (crud / expr / prepare / cursor) のメッセージは MineSQL では実装しない ([ideology.md](../ideology.md) の「目的とスコープ」)
 - `.proto` ファイルは proto2 記法で書かれており、protobuf 3 系のツールで扱う場合も 2.x の規則が適用される
 
 ## 汎用データ型 (Mysqlx.Datatypes)
@@ -111,7 +111,7 @@
 
 - `namespace` には `"sql"` (SQL ステートメントの実行) のほかに `"mysqlx"` (管理コマンドの実行) がある
   - `"mysqlx"` では `stmt` にコマンド名を指定し、`args` には名前付き引数を持つ `Object` を 1 つ渡す
-  - コマンドは 14 個 (`ping` / `list_clients` / `kill_client` / `create_collection` / `drop_collection` / `ensure_collection` / `modify_collection_options` / `get_collection_options` / `create_collection_index` / `drop_collection_index` / `list_objects` / `enable_notices` / `disable_notices` / `list_notices`) で、minesql が実装するのはコレクション系を除く 6 個 ([dispatcher/](../dispatcher/README.md))
+  - コマンドは 14 個 (`ping` / `list_clients` / `kill_client` / `create_collection` / `drop_collection` / `ensure_collection` / `modify_collection_options` / `get_collection_options` / `create_collection_index` / `drop_collection_index` / `list_objects` / `enable_notices` / `disable_notices` / `list_notices`) で、MineSQL が実装するのはコレクション系を除く 6 個 ([dispatcher/](../dispatcher/README.md))
   - 参照:
     - [mysqlx-protocol-xplugin.dox の namespace の説明](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/doc/mysqlx-protocol-xplugin.dox#L36-L51)
 
@@ -212,7 +212,7 @@
 - 条件 (`EXPECT_NO_ERROR` など) を満たさなくなると、ブロック内の後続のメッセージはすべて `Error` で失敗する
 - 振る舞いの詳細は [dispatcher/](../dispatcher/README.md) を参照
 
-## minesql で実装しない機能
+## MineSQL で実装しない機能
 
 - CRUD (mysqlx_crud.proto + mysqlx_expr.proto): SQL ステートメントを経由せずに `Find` / `Insert` / `Update` / `Delete` とビュー操作を直接表現する X DevAPI 用のメッセージ群
 - プリペアドステートメント (mysqlx_prepare.proto): クライアントが採番した `stmt_id` で `Prepare` / `Execute` / `Deallocate` を行う

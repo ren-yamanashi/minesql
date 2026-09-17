@@ -110,5 +110,5 @@ protocol/ の [メッセージのやり取りの規則](../protocol/communicatio
 - `StmtExecute` の namespace `mysqlx` で、SQL ではなくコマンド名と名前付き引数を送る経路
 - 実装するのは接続と Notice に関する 6 つ: `ping`、`list_clients`、`kill_client`、`enable_notices`、`disable_notices`、`list_notices` ([SDR-0005](../sdr/0005.管理コマンドは接続系とNotice系の6つを実装する.md))
 - `list_clients` が返すのは同じアカウントの接続だけで、`kill_client` も同じアカウントの接続だけを閉じられる ([SDR-0018](../sdr/0018.権限は全体権限だけを持つ.md))
-  - MySQL では `SUPER` を持つアカウントは全接続を見て kill できるが、minesql はその権限を持たない
+  - MySQL では `SUPER` を持つアカウントは全接続を見て kill できるが、MineSQL はその権限を持たない
 - レスポンスは SQL ステートメントと同じ形 (リザルトセットがあれば列定義 → 行 → `FetchDone`、最後に `StmtExecuteOk`) で返す

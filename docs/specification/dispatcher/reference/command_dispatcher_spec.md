@@ -175,7 +175,7 @@
 ## SQL 層での実行
 
 - ディスパッチャは SQL 層に「内部セッション上でステートメントを実行し、結果をコールバックで返す」ことだけを依頼する
-  - minesql ではこの依頼先が SQL 層 (parser/ 以降) に直結する
+  - MineSQL ではこの依頼先が SQL 層 (parser/ 以降) に直結する
 - MySQL では、この依頼はプラグイン向けの command service を通り、`COM_*` 層 (classic protocol と共通のコマンドの入口) に入る
   - X Plugin が使う `COM_*` は `COM_QUERY` (SQL ステートメント)、`COM_RESET_CONNECTION` (`Session.Reset` の `keep_open`)、`COM_INIT_DB` (既定スキーマの切り替え)、`COM_STMT_PREPARE` / `EXECUTE` / `FETCH` / `CLOSE` (プロトコルのプリペアドステートメント、実装対象外) だけ
   - command service は内部セッションをスレッドに結び付け、コールバック集を proxy の `Protocol` として差し込んでから、classic protocol と同じ `dispatch_command` を呼ぶ

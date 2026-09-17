@@ -9,7 +9,7 @@
 ## 目的とスコープ
 
 - 目的
-  - minesql は MySQL (InnoDB) を参考モデルにして、小さい MySQL をゼロから作る学習用の RDB
+  - MineSQL は MySQL (InnoDB) を参考モデルにして、小さい MySQL をゼロから作る学習用の RDB
   - 最終的には「作って学ぶ MySQL」(仮) のようなオンラインブックとしてまとめる予定で、仕様書はその下敷きになる
   - そのために、MySQL 8.4 の X Protocol / X Plugin の挙動を「実装の根拠にできる精度」で整理する
 - 読者を意識する
@@ -38,7 +38,7 @@
 - 読む順で分ける: 概要 (位置づけ) → 論理モデル / 流れ (2026-09-12 変更: 詳細仕様は読む順に含めない)
   - ディレクトリごとに README を置き、読む順と各文書の内容を示す
   - protocol/: `x_protocol.md` (概要) → `communication_flow.md` (流れ) → `message_spec.md` (詳細)
-    - `message_spec.md` は外部との契約 (メッセージ定義とエンコーディング) で minesql の判断で変わらないため、他の詳細仕様と違って読む順に含める (2026-09-12 確定)
+    - `message_spec.md` は外部との契約 (メッセージ定義とエンコーディング) で MineSQL の判断で変わらないため、他の詳細仕様と違って読む順に含める (2026-09-12 確定)
   - connection/: `x_plugin.md` (要件) → `connection_handler.md` (論理モデル) → `authentication.md` (認証)、詳細は `reference/connection_handler_spec.md`
   - parser/: `sql_parser.md` (論理モデル)、詳細は `reference/sql_parser_spec.md`
   - X Plugin 全体の要件 (`x_plugin.md`) は connection/ に置いたままにし、dispatcher/ からは connection/ の文書を参照する (2026-09-08 確定)
@@ -112,6 +112,6 @@
 - X DevAPI: クライアント側の API 仕様
   - MySQL Shell や各言語の Connector が実装し、内部で X Protocol を使って通信する
 - コネクションハンドラー: X Plugin のうち、接続の受付からセッションの確立・切断までを担う部分
-  - minesql では X Plugin 型のハンドラーを 1 つ作ればよく、classic 用のハンドラーに相当するものは不要
+  - MineSQL では X Plugin 型のハンドラーを 1 つ作ればよく、classic 用のハンドラーに相当するものは不要
 - 内部セッション: 実行ユーザーと実行状態を持ち、その利用者として SQL を実行する SQL 層側の場
   - 実装上は THD で、X Plugin のセッションと 1 対 1 に対応する

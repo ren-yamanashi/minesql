@@ -34,7 +34,7 @@ flowchart TB
     executor -->|"実行結果"| dispatcher
     dispatcher -->|"レスポンス"| conn
     conn -->|"メッセージ (X Protocol)"| client
-    dict -.->|"システム表として格納"| engine
+    dict -.->|"格納"| engine
 ```
 
 ※プロトコル (X Protocol) は図の箱ではなく、クライアントとサーバーの間で交わすメッセージの規約で、コネクションハンドラーとコマンドディスパッチャが使う

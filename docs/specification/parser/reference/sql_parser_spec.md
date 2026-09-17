@@ -1,7 +1,7 @@
 # SQL パーサーの詳細仕様
 
 - [sql_parser.md](../sql_parser.md) の論理モデルに対する詳細仕様
-- MySQL 8.4 (commit `aa461240`) の `sql/sql_yacc.yy` (文法)、`sql/sql_lex.cc` と `strings/sql_chars.cc` (字句解析器)、`sql/lex.h` (キーワード表) を参照し、minesql の文法ファイルに写す規則と写さない規則を理由つきで記録する
+- MySQL 8.4 (commit `aa461240`) の `sql/sql_yacc.yy` (文法)、`sql/sql_lex.cc` と `strings/sql_chars.cc` (字句解析器)、`sql/lex.h` (キーワード表) を参照し、MineSQL の文法ファイルに写す規則と写さない規則を理由つきで記録する
 - 構成: 構文の範囲 → 字句規則 → 演算子の優先順位 → 式の規則 → ステートメントごとの規則 → 構文エラー
 
 ## 構文の範囲
@@ -14,11 +14,11 @@
     - [create_table_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2430)、[drop_table_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2447)、[create (CREATE DATABASE を含む)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2425)、[drop_database_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2435)、[use](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2538)
     - [commit](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2424)、[rollback](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2478)、[start](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2531)、[begin_stmt (simple_statement_or_begin)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2397-L2400)
 - 写す単位は `sql_yacc.yy` の規則 (非終端記号) で、規則ごとに選択肢を「採用する / 外す」に分ける
-  - 採用した選択肢は、規則の名前と並びを変えずに写す (規則末尾のアクションだけを minesql の AST ノードの生成に置き換える)
+  - 採用した選択肢は、規則の名前と並びを変えずに写す (規則末尾のアクションだけを MineSQL の AST ノードの生成に置き換える)
   - 外した選択肢は書かないので、その構文は構文エラーになる (MySQL は受理するので、その分だけ応答が異なる)
 - 外す理由は次の 7 つのどれかで、以降の表では記号で示す
   - A: [issue #120](https://github.com/ren-yamanashi/minesql/issues/120) の「やらないこと」に挙がっている機能の構文
-  - B: 対応する実装が minesql にない機能の構文 (何を含めないかは [SDR-0011](../../sdr/0011.文法に含める構文の範囲.md))
+  - B: 対応する実装が MineSQL にない機能の構文 (何を含めないかは [SDR-0011](../../sdr/0011.文法に含める構文の範囲.md))
   - C: 8.4 で非推奨 (deprecated) になっている別表記
   - D: MySQL 自身が読み飛ばす、または挙動に影響しない構文
   - E: `sql_mode` に依存する分岐のうち、8.4 の既定値では選ばれない側の挙動 ([SDR-0013](../../sdr/0013.sql_modeの既定値に固定し非推奨と無視される構文は採らない.md))
@@ -60,9 +60,9 @@
     - 参照:
       - [state_map の `#`](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/strings/sql_chars.cc#L100-L114)
       - [MY_LEX_COMMENT](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.cc#L1879-L1885)
-- MySQL 固有のコメントは、minesql では通常のコメントとして読み飛ばす
+- MySQL 固有のコメントは、MineSQL では通常のコメントとして読み飛ばす
   - `/*!50708 ... */` (実行コメント): MySQL は 5 桁または 6 桁のバージョン番号が自身のバージョン以下なら中身を SQL として読む
-    - minesql は MySQL のバージョン番号を持たないため、MySQL 以外のサーバーと同じく読み飛ばす
+    - MineSQL は MySQL のバージョン番号を持たないため、MySQL 以外のサーバーと同じく読み飛ばす
     - 参照:
       - [バージョンコメントの判定](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.cc#L1897-L1960)
   - `/*+ ... */` (オプティマイザヒント): MySQL はヒント用の別の構文解析器に渡す
@@ -80,7 +80,7 @@
   - 数字で始まる語は、数値リテラルとして読み切れなければ識別子になる (`1abc` は識別子、`1e5` と `0x1F` はリテラル)
     - 参照:
       - [MY_LEX_NUMBER_IDENT](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.cc#L1641-L1692)
-  - `$` で始まる語は 8.4 で非推奨 (警告つきで受理) のため、minesql では採用しない (理由 C)
+  - `$` で始まる語は 8.4 で非推奨 (警告つきで受理) のため、MineSQL では採用しない (理由 C)
     - `$` は 2 文字目以降にだけ使える
     - 参照:
       - [MY_LEX_IDENT_OR_DOLLAR_QUOTED_TEXT の警告](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.cc#L2125-L2143)
@@ -106,7 +106,7 @@
       - [table_wild](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14867-L14879)
 - 名前の妥当性 (空でないこと、末尾が空白でないこと、64 文字以内であること) の検査は字句規則に含めない
   - MySQL でも構文解析の後 (文脈化と DDL の処理) で検査している
-  - minesql ではプリペア (名前解決) の責務とする
+  - MineSQL ではプリペア (名前解決) の責務とする
   - 参照:
     - [table.cc の check_table_name](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/table.cc#L3749-L3774)
     - [parse_tree_helpers.cc での ER_TOO_LONG_IDENT](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/parse_tree_helpers.cc#L430)
@@ -116,22 +116,22 @@
 
 - 判定の仕方: 識別子と同じ規則で語を切り出したあと、キーワード表を大文字小文字を区別せずに引く
   - 表にあればその語のトークンを返し、なければ識別子のトークンを返す
-  - MySQL は語の直後が `(` かどうかで関数名の表も引くが、minesql は関数呼び出しを文法に含めないため ([SDR-0011](../../sdr/0011.文法に含める構文の範囲.md))、この区別を持たない
+  - MySQL は語の直後が `(` かどうかで関数名の表も引くが、MineSQL は関数呼び出しを文法に含めないため ([SDR-0011](../../sdr/0011.文法に含める構文の範囲.md))、この区別を持たない
   - 参照:
     - [find_keyword](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.cc#L905-L936)
     - [識別子の切り出し後のキーワード判定](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.cc#L1578-L1584)
     - [lex.h のキーワード表 symbols](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/lex.h#L61)
-- 表の範囲: minesql の文法に現れる語だけをキーワードにする
-  - MySQL の予約語であっても minesql の文法に現れない語 (`WINDOW`、`CUBE` など) は、minesql では識別子として扱う
+- 表の範囲: MineSQL の文法に現れる語だけをキーワードにする
+  - MySQL の予約語であっても MineSQL の文法に現れない語 (`WINDOW`、`CUBE` など) は、MineSQL では識別子として扱う
     - この範囲にする理由は [SDR-0012](../../sdr/0012.キーワード表は文法が使う語だけにする.md)
 - 予約語と非予約語
   - MySQL では、キーワードのうち `ident_keyword` 規則に現れる語 (非予約語) は識別子としても使え、現れない語 (予約語) は引用しないと識別子に使えない
-  - minesql でも同じ区分に従い、非予約語は `ident_keyword` 相当の規則で識別子として受理する
+  - MineSQL でも同じ区分に従い、非予約語は `ident_keyword` 相当の規則で識別子として受理する
   - 参照:
     - [ident と ident_keyword](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L15092-L15102)
     - [ident_keyword とその分類の説明](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L15217-L15223)
     - [ident_keywords_unambiguous](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L15311)
-- minesql のキーワード表 (区分は MySQL の `ident_keyword` に現れるかどうかで判定した)
+- MineSQL のキーワード表 (区分は MySQL の `ident_keyword` に現れるかどうかで判定した)
 
 | 使う場所 | 予約語 | 非予約語 (識別子にも使える) |
 | --- | --- | --- |
@@ -143,11 +143,11 @@
 
 - 補足
   - `NULL` は NULL リテラルとしては外すが (理由 A)、列属性 `NOT NULL` のためにキーワードとしては持つ
-  - `VARCHARACTER` は MySQL のキーワード表で `VARCHAR` と同じトークンに写される同義語で、minesql でも同じ扱いにする
+  - `VARCHARACTER` は MySQL のキーワード表で `VARCHAR` と同じトークンに写される同義語で、MineSQL でも同じ扱いにする
     - 参照:
       - [lex.h の VARCHAR / VARCHARACTER](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/lex.h#L778-L779)
   - `TABLES` は `DROP TABLES` の同義語として使う (`table_or_tables` 規則)
-  - `SCHEMA` は MySQL のキーワード表で `DATABASE` と同じトークンに写される同義語で、minesql でも同じ扱いにする
+  - `SCHEMA` は MySQL のキーワード表で `DATABASE` と同じトークンに写される同義語で、MineSQL でも同じ扱いにする
     - 参照:
       - [lex.h の SCHEMA](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/lex.h#L607)
 
@@ -238,7 +238,7 @@
 
 - MySQL は式の演算子の優先順位と結合性を、文法ファイル冒頭の `%left` / `%right` / `%nonassoc` 宣言で与えている (下の行ほど優先順位が高い)
   - 宣言には実在のトークンのほかに、規則の `%prec` で優先順位を借りるためだけの擬似トークン (`CONDITIONLESS_JOIN`、`NEG`、`PREFER_PARENTHESES`、`EMPTY_FROM_CLAUSE`、`KEYWORD_USED_AS_IDENT` / `KEYWORD_USED_AS_KEYWORD`) が混じっている
-  - minesql の文法ファイルにはこの宣言を同じ順序で転記し、外した構文にしか使わない行を除く
+  - MineSQL の文法ファイルにはこの宣言を同じ順序で転記し、外した構文にしか使わない行を除く
   - 参照:
     - [優先順位の宣言](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L1479-L1515)
     - [KEYWORD_USED_AS_IDENT の説明](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L1463-L1478)
@@ -246,7 +246,7 @@
     - [PREFER_PARENTHESES の説明 (query_expression の前のコメント)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L9737-L9768)
     - [EMPTY_FROM_CLAUSE と INTO の説明 (select_stmt_with_into の前のコメント)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L9685-L9716)
 
-| 行 | MySQL の宣言 | minesql | 備考 |
+| 行 | MySQL の宣言 | MineSQL | 備考 |
 | --- | --- | --- | --- |
 | 1479 | `%left KEYWORD_USED_AS_IDENT` | 外す | `BIT` 型など、`%prec KEYWORD_USED_AS_KEYWORD` を使う規則を写さない (B) |
 | 1480 | `%nonassoc TEXT_STRING` | 外す | 同上 |
@@ -279,7 +279,7 @@
 | 1515 | `%right INTO` | 外す | `INTO` 句 (B) |
 
 - MySQL は `%expect 59` で 59 個の shift/reduce 衝突を許容している
-  - minesql は `%expect` を書かず、衝突 0 を生成時の合格条件にする
+  - MineSQL は `%expect` を書かず、衝突 0 を生成時の合格条件にする
   - 外した宣言を除いたことで衝突が出た場合は、この表を見直して更新する (宣言を黙って戻さない)
   - 参照:
     - [%expect](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L567)
@@ -300,7 +300,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
   - [expr](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L10077-L10126)
   - [or](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L10313-L10316)、[and](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L10318-L10324)、[not](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L10326-L10329)
 
-| 選択肢 | minesql | 備考 |
+| 選択肢 | MineSQL | 備考 |
 | --- | --- | --- |
 | `expr or expr` | 採用 | `or` は `OR` のみ (`OR2_SYM` は C) |
 | `expr XOR expr` | 採用 | |
@@ -316,7 +316,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
   - [bool_pri](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L10128-L10155)
   - [comp_op](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L10336-L10344)、[all_or_any](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L10346-L10349)
 
-| 選択肢 | minesql | 備考 |
+| 選択肢 | MineSQL | 備考 |
 | --- | --- | --- |
 | `bool_pri IS [not] NULL` | 外す | A |
 | `bool_pri comp_op predicate` | 採用 | `comp_op` は `=` `>=` `>` `<=` `<` `<>` (`!=` は同じトークン) で、`<=>` を外す (A) |
@@ -329,10 +329,10 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
   - [predicate](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L10157-L10246)
   - [expr_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11699-L11715)
 
-| 選択肢 | minesql | 備考 |
+| 選択肢 | MineSQL | 備考 |
 | --- | --- | --- |
 | `bit_expr [not] IN table_subquery` | 外す | A |
-| `bit_expr [not] IN '(' expr ')'` | 採用 | MySQL は 1 要素の IN を専用のノード (`PTI_handle_sql2003_note184_exception`) で扱うが、minesql の AST では要素数 1 の IN として持つ |
+| `bit_expr [not] IN '(' expr ')'` | 採用 | MySQL は 1 要素の IN を専用のノード (`PTI_handle_sql2003_note184_exception`) で扱うが、MineSQL の AST では要素数 1 の IN として持つ |
 | `bit_expr [not] IN '(' expr ',' expr_list ')'` | 採用 | |
 | `bit_expr MEMBER [OF] '(' simple_expr ')'` | 外す | B (JSON) |
 | `bit_expr [not] BETWEEN bit_expr AND predicate` | 採用 | |
@@ -346,7 +346,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 - 参照:
   - [bit_expr](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L10253-L10311)
 
-| 選択肢 | minesql | 備考 |
+| 選択肢 | MineSQL | 備考 |
 | --- | --- | --- |
 | `bit_expr '\|' bit_expr`、`'&'`、`SHIFT_LEFT`、`SHIFT_RIGHT`、`'^'` | 採用 | ビット演算 |
 | `bit_expr '+' bit_expr`、`'-'`、`'*'`、`'/'`、`'%'`、`DIV`、`MOD` | 採用 | 算術演算 (`%` と `MOD` は同じ剰余) |
@@ -361,7 +361,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
   - [literal_or_null](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14810-L14813)、[literal](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14780-L14808)、[NUM_literal](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14815-L14825)、[int64_literal](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14831-L14835)
   - [opt_expr](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11738-L11741)、[when_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11748-L11763)、[opt_else](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11743-L11746)
 
-| 選択肢 | minesql | 備考 |
+| 選択肢 | MineSQL | 備考 |
 | --- | --- | --- |
 | `simple_ident` (`ident`、`ident '.' ident`、`ident '.' ident '.' ident`) | 採用 | |
 | `function_call_keyword` / `function_call_nonkeyword` / `function_call_conflict` / `function_call_generic` | 外す | B (関数) |
@@ -392,11 +392,11 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 ### ステートメントの入口
 
 - MySQL の開始規則 `start_entry` は、通常の SQL のほかに、パーティション式や生成列の式だけを解析する入口 (`GRAMMAR_SELECTOR_*`) を持つ
-  - minesql は `sql_statement` だけを開始規則にする
+  - MineSQL は `sql_statement` だけを開始規則にする
 - `sql_statement` は 3 つの選択肢 (入力が空、`;` で終わる、`;` なしで終わる) を持ち、そのまま写す
   - ただし `;` の後ろで次のステートメントの解析を続ける処理 (`CLIENT_MULTI_QUERIES` 用) は写さない ([ステートメントの終端](#ステートメントの終端) を参照)
 - `simple_statement_or_begin` が `BEGIN` を他のステートメントと分けているのは、ストアドプログラムの複合文 `BEGIN ... END` と区別するため
-  - minesql にはトランザクションの `BEGIN` しかないため、この分岐は持たず、`simple_statement` の選択肢に `begin_stmt` を並べる
+  - MineSQL にはトランザクションの `BEGIN` しかないため、この分岐は持たず、`simple_statement` の選択肢に `begin_stmt` を並べる
 - 参照:
   - [start_entry](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2301-L2345)
   - [sql_statement](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2347-L2390)
@@ -405,7 +405,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 ### SELECT
 
 - 規則の連なり: `select_stmt` → `query_expression` → `query_expression_body` → `query_primary` → `query_specification`
-  - MySQL がこの段数を持つのは UNION / ORDER BY / LIMIT / 括弧つきのクエリ式を扱うためで、minesql では `query_expression` に ORDER BY と LIMIT が残るほかは、どの段も選択肢が 1 つになる
+  - MySQL がこの段数を持つのは UNION / ORDER BY / LIMIT / 括弧つきのクエリ式を扱うためで、MineSQL では `query_expression` に ORDER BY と LIMIT が残るほかは、どの段も選択肢が 1 つになる
   - 規則の名前は MySQL と対応づけるために残す
 
 | 規則 | 採用する選択肢 | 外す選択肢 |
@@ -506,7 +506,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | [update_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13411-L13428)、[update_elem](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13430-L13436)、[equal](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13305-L13308) | `,` 区切りの `simple_ident_nospvar '=' expr` | `:=` (B) |
 
 - `INSERT ... SET col = val, ...` は 1 行の `INSERT ... (col, ...) VALUES (val, ...)` と同じ意味の別表記で、MySQL も構文解析時に 1 行の値並びに組み替えている
-  - minesql のパーサーも同じく列並びと 1 行の値並びに組み替え、AST では両者を区別しない (構文上の同義語の吸収)
+  - MineSQL のパーサーも同じく列並びと 1 行の値並びに組み替え、AST では両者を区別しない (構文上の同義語の吸収)
 - 外した句と選択肢の一覧
 
 | 句 / 選択肢 | 規則 | 理由 |
@@ -528,7 +528,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | [update_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13411-L13428)、[update_elem](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13430-L13436) | `,` 区切りの `simple_ident_nospvar '=' expr` | `:=` (B)、値の `DEFAULT` (B) |
 
 - MySQL は単一テーブルと複数テーブルの UPDATE を同じ規則 (`table_reference_list`) で受理し、後の段階で区別する
-  - minesql は複数テーブルの UPDATE を実装しないため ([SDR-0011](../../sdr/0011.文法に含める構文の範囲.md))、テーブル参照の位置に `single_table` (`table_ident opt_table_alias`) を置く
+  - MineSQL は複数テーブルの UPDATE を実装しないため ([SDR-0011](../../sdr/0011.文法に含める構文の範囲.md))、テーブル参照の位置に `single_table` (`table_ident opt_table_alias`) を置く
 - 外した句と選択肢の一覧
 
 | 句 / 選択肢 | 規則 | 理由 |
@@ -596,7 +596,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 - 列定義内の `REFERENCES` について
   - MySQL の文法は列定義の末尾に `REFERENCES` 句を受理するが、アクションは `nullptr` を返して捨てており、外部キーにはならない
   - MySQL のマニュアルも「MySQL parses but ignores "inline `REFERENCES` specifications" (as defined in the SQL standard) where the references are defined as part of the column specification. MySQL accepts `REFERENCES` clauses only when specified as part of a separate `FOREIGN KEY` specification.」と説明している
-  - minesql では構文エラーにする ([SDR-0013](../../sdr/0013.sql_modeの既定値に固定し非推奨と無視される構文は採らない.md))
+  - MineSQL では構文エラーにする ([SDR-0013](../../sdr/0013.sql_modeの既定値に固定し非推奨と無視される構文は採らない.md))
   - 参照:
     - [opt_references (`Currently we ignore FK references here`)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6793-L6800)
     - [CREATE TABLE Statement (MySQL 8.4 Reference Manual)](https://dev.mysql.com/doc/refman/8.4/en/create-table.html)
@@ -619,7 +619,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 
 - 外部キーについて
   - `NO ACTION` を `RESTRICT` と並べて採用するのは、MySQL のマニュアルが「`NO ACTION`: A keyword from standard SQL. For `InnoDB`, this is equivalent to `RESTRICT`; the delete or update operation for the parent table is immediately rejected if there is a related foreign key value in the referenced table.」と説明しているため
-    - minesql の外部キーは `RESTRICT` だけを実装しており ([サポート状況](../../../feature/support-status.md))、`NO ACTION` は同じ動作の別表記として受理する
+    - MineSQL の外部キーは `RESTRICT` だけを実装しており ([サポート状況](../../../feature/support-status.md))、`NO ACTION` は同じ動作の別表記として受理する
   - `MATCH FULL | PARTIAL | SIMPLE` を外すのは、MySQL がこの句をデータディクショナリに保存するだけで、どのストレージエンジンも参照しないため
     - マニュアルは「no storage engine, including `InnoDB`, recognizes or enforces the `MATCH` clause used in referential integrity constraint definitions. Use of an explicit `MATCH` clause does not have the specified effect, and also causes `ON DELETE` and `ON UPDATE` clauses to be ignored.」と説明している
   - 参照される列の並びの省略 (`REFERENCES parent` だけの形) と、複合外部キー (列が 2 つ以上) を受理するかは、文法では MySQL と同じ形を受理したうえでプリペアで決める
@@ -656,7 +656,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | [create](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L3269-L3284) | 1 番目を `CREATE DATABASE opt_if_not_exists ident` に縮めたもの (`SCHEMA` は字句解析で `DATABASE` と同じトークンになる) | `opt_create_database_options` (B: 文字集合・照合順序・暗号化の指定)、`create` 規則の他の選択肢 (ビュー、トリガー、ユーザー、ロールなど、B) |
 | [opt_if_not_exists](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6498-L6501) | 省略、`IF NOT EXISTS` | |
 
-- MySQL の `create` 規則は `CREATE DATABASE opt_if_not_exists ident` の直後に規則の途中のアクションを持つ古い書き方で、minesql は末尾のアクションで AST ノードを作る
+- MySQL の `create` 規則は `CREATE DATABASE opt_if_not_exists ident` の直後に規則の途中のアクションを持つ古い書き方で、MineSQL は末尾のアクションで AST ノードを作る
 - 外した句と選択肢の一覧
 
 | 句 / 選択肢 | 規則 | 理由 |
@@ -676,7 +676,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | --- | --- | --- |
 | [use](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14368-L14379) | `USE ident` | |
 
-- MySQL の `use` 規則のアクションはストアドプログラムの中での `USE` を拒否する検査を持つが、minesql にはストアドプログラムがないので写さない
+- MySQL の `use` 規則のアクションはストアドプログラムの中での `USE` を拒否する検査を持つが、MineSQL にはストアドプログラムがないので写さない
 - MySQL の X Plugin は `USE` の後に `CURRENT_SCHEMA` の Notice を送らない
   - `plugin/x/src` を `CURRENT_SCHEMA` で検索して送信箇所がなく、Notice の定義に値だけがある状態
 
@@ -705,7 +705,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | [start_transaction_option](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L9213-L9226) | `WITH CONSISTENT SNAPSHOT` | `READ ONLY` / `READ WRITE` (B) |
 
 - MySQL の `begin_stmt` と `commit` / `rollback` は、parse tree を作らず規則のアクションで `LEX` に直接コマンドを書き込む古い書き方のまま残っている (`begin_stmt` は規則の途中にアクションがある)
-  - minesql では他のステートメントと同じく、規則末尾のアクションで AST ノードを作る
+  - MineSQL では他のステートメントと同じく、規則末尾のアクションで AST ノードを作る
 - 外した句と選択肢の一覧
 
 | 句 / 選択肢 | 規則 | 理由 |
@@ -729,14 +729,14 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 - エラー位置は、構文解析器がエラーを検出したときの先読みトークンの先頭
   - Bison は生成したパーサーからエラー報告関数 (`my_sql_parser_error`) を先読みトークンの位置つきで呼び、MySQL はその位置を `near` の起点にする
   - 入力の終わりでエラーになった場合 (`SELECT * FROM` のように途中で切れた入力) は `near ''` になる
-  - goyacc の生成コードは `yyLexer.Error(string)` を呼ぶだけで位置を渡さないため、minesql の字句解析器は直前に返したトークンの先頭位置を覚えておき、`Error` の中でそれを使って同じ文言を組み立てる
+  - goyacc の生成コードは `yyLexer.Error(string)` を呼ぶだけで位置を渡さないため、MineSQL の字句解析器は直前に返したトークンの先頭位置を覚えておき、`Error` の中でそれを使って同じ文言を組み立てる
   - 参照:
     - [my_sql_parser_error](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L334-L346)
     - [THD::syntax_error_at](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_class.cc#L2804-L2809)
     - [goyacc の yyLexer インターフェース (doc.go)](https://github.com/golang/tools/blob/v0.31.0/cmd/goyacc/doc.go#L27-L36)
 - 字句の誤りも同じ構文エラーとして報告する
   - MySQL では、閉じていない文字列は引用符 1 文字のトークンとして、閉じていないバッククォートと閉じていないコメントは受理不能なトークン (`ABORT_SYM`) として構文解析器に渡り、そこで構文エラーになる
-  - minesql も字句解析器ではエラーを起こさず、受理不能なトークンを返して構文解析器に判断させる (エラーの出口を 1 つにするため)
+  - MineSQL も字句解析器ではエラーを起こさず、受理不能なトークンを返して構文解析器に判断させる (エラーの出口を 1 つにするため)
   - 参照:
     - [閉じていない文字列 (get_text が失敗したら 1 文字ずつ読む)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.cc#L1861-L1865)
     - [閉じていないバッククォート](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.cc#L1736-L1739)
@@ -766,7 +766,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
   - [parse_tree_node_base.h の Parse_tree_node_tmpl](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/parse_tree_node_base.h#L231-L330)
   - [parse_tree_nodes.h の Parse_tree_root](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/parse_tree_nodes.h#L162-L175)
   - [PT_select_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/parse_tree_nodes.h#L1880)
-- AST (名前解決に進める状態の Tree): MySQL では文脈化の出力、minesql では構文解析の出力で、プリペア・最適化・実行の各段階が同じ構造を使う
+- AST (名前解決に進める状態の Tree): MySQL では文脈化の出力、MineSQL では構文解析の出力で、プリペア・最適化・実行の各段階が同じ構造を使う
   - [sql_lex.h の Query_expression](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.h#L626)
   - [Query_block](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.h#L1167)
   - [item.h の Item](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/item.h#L936)

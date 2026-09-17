@@ -6,7 +6,7 @@ MySQL X Plugin は、従来の SQL 言語に加えて、ドキュメントスト
 - プロトコルとクライアントライブラリは、プラグインによって実装されるハイレベルなインターフェースを提供する
 - このプラグインは、ドキュメントモデルのリクエストから SQL へのマッピングに必要なすべての処理を担う
 - 本文の主張に対応する MySQL のソースは [connection_handler_spec.md の「論理モデルの主張とソースの対応」](./reference/connection_handler_spec.md#論理モデルの主張とソースの対応) にまとめる
-- 以下の「要件」は [WL#8338](https://dev.mysql.com/worklog/task/?id=8338) に書かれた MySQL の X Plugin の要件の訳で、minesql がそのうちどれを採るかは [minesql での対応範囲](#minesql-での対応範囲) に示す
+- 以下の「要件」は [WL#8338](https://dev.mysql.com/worklog/task/?id=8338) に書かれた MySQL の X Plugin の要件の訳で、MineSQL がそのうちどれを採るかは [MineSQL での対応範囲](#minesql-での対応範囲) に示す
 
 ## 要件
 
@@ -88,11 +88,11 @@ MySQL X Plugin は、従来の SQL 言語に加えて、ドキュメントスト
     - `_id`: `doc` の `$._id` から抽出される生成カラムで、これが主キー
     - `_json_schema` + CHECK 制約: ドキュメントのスキーマ検証用
 
-## minesql での対応範囲
+## MineSQL での対応範囲
 
-上の要件のうち、minesql が満たすものと満たさないもの。判断の理由は SDR の列の記録を参照
+上の要件のうち、MineSQL が満たすものと満たさないもの。判断の理由は SDR の列の記録を参照
 
-| 種類 | 要件 | minesql | SDR |
+| 種類 | 要件 | MineSQL | SDR |
 | --- | --- | --- | --- |
 | 一般的な要件 | ドキュメント指向の CRUD、ドキュメントテーブルの作成、SQL を書かない操作 | 満たさない | [0002](../sdr/0002.ドキュメントモデルは実装しない.md) |
 | 一般的な要件 | 拡張 X Protocol の実装 | 満たす | [0001](../sdr/0001.実装対象はXProtocolに従うサーバー.md) |
