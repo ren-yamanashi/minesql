@@ -75,6 +75,7 @@
 | アカウント | ユーザー (アカウントを指すとき) | account (`mysql.user` の 1 行、`'user'@'host'`) | 利用者の名前とホストの組に、認証文字列と全体権限を結びつけたもの。MineSQL のホストは `%` のみ |
 | アカウント管理ステートメント | アカウント文、ユーザー管理文、DCL | account management statements (`CREATE USER` / `ALTER USER` / `DROP USER`) | アカウントを作成・変更・削除するステートメント。`GRANT` / `REVOKE` は含めない |
 | 全体権限 | グローバル権限、静的権限 | global privileges (`mysql.user` の `*_priv` 列、`GRANT ... ON *.*`) | スキーマや表を限定しない権限。MineSQL が持つ唯一の粒度で、認証の成功時に実行ユーザーへ載せる |
+| デリゲート | 結果の受け口、コールバック | command delegate (`ngs::Command_delegate`、`Streaming_command_delegate`) | ステートメントの実行 1 回につき作られ、SQL 層からのコールバック (列定義、行、完了、エラー) を受けてプロトコルのメッセージに変換して送る部品 |
 | コマンドディスパッチャ | ディスパッチャ (初出時)、コマンドディスパッチャー | command dispatcher (`Dispatcher`) | セッションが受け取ったリクエストを振り分け、SQL 層に委ねて、レスポンスを返す部分 |
 | 受け付ける / 受付 | accept する、アクセプト | accept | 接続を受け入れること。動詞は「受け付ける」、名詞は「受付」 |
 | 切断 | 接続を閉じる (曖昧なとき) | | TCP / Unix ソケット接続を閉じること。セッションを閉じることには使わない |

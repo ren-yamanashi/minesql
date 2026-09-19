@@ -231,7 +231,7 @@
 
 - ディスパッチャ (Dispatcher): リクエストを受け取り、Expect ブロックの判定を挟んでハンドラへ渡し、失敗したら `Error` を送る
   - [xpl_dispatcher.h](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/xpl_dispatcher.h#L40-L60)
-- 結果の受け口 (デリゲート): 実行 1 回につき 1 つ作られ、SQL 層からのコールバック (列定義、行、完了、エラー) を受けてプロトコルのメッセージに変換して送る
+- デリゲート (Command_delegate): 実行 1 回につき 1 つ作られ、SQL 層からのコールバック (列定義、行、完了、エラー) を受けてプロトコルのメッセージに変換して送る
   - [ngs/command_delegate.h](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/ngs/command_delegate.h#L41-L80)
 - Expect スタック: 開いている Expect ブロックの入れ子
   - [expect/expect_stack.cc](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/expect/expect_stack.cc#L34-L41)
