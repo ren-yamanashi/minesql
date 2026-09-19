@@ -21,7 +21,8 @@
 | リクエスト | 要求 | request | クライアントからサーバーへのメッセージのうち、シーケンスを開始するもの |
 | レスポンス | 応答 | response | リクエストに対してサーバーが返すメッセージ (の列) |
 | シーケンス | やり取り、メッセージ列 | message sequence | 1 つのリクエストと、それに続くレスポンスの列 |
-| 終端メッセージ | 終端、完了メッセージ | end-state | シーケンスを終わらせるメッセージ (`StmtExecuteOk`、`Ok`、`AuthenticateOk`、`Error`)。リザルトセットの終わりを示す `FetchDone` は含めない |
+| 取得完了メッセージ | 取得完了、リザルトセットの終わり、FetchDone (地の文で) | `FetchDone` | 1 つのリザルトセットの行をすべて送ったことを示すメッセージ。シーケンスはまだ終わらず、Notice と終端メッセージが続く |
+| 終端メッセージ | 終端、完了メッセージ | end-state | シーケンスを終わらせるメッセージ (`StmtExecuteOk`、`Ok`、`AuthenticateOk`、`Error`)。取得完了メッセージ (`FetchDone`) は含めない |
 | Notice | 通知 | notice | サーバーが送る、リクエストへの直接のレスポンスではないメッセージ (`Mysqlx.Notice.Frame`) |
 | 警告 | ワーニング | warning | `Warning` 型の Notice の中身。「警告の Notice」と書く |
 | capability | 機能、ケイパビリティ | capability | 接続で何ができるかを表す名前つきの値 |

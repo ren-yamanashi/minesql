@@ -9,8 +9,8 @@
 
 - リクエストメッセージの種別の判定と、ハンドラへの振り分け
 - `StmtExecute` の namespace (`sql` / `mysqlx`) の解決と、パラメータ (`args`) を埋め込んだステートメントの組み立て
-- SQL 層 (内部セッション) への実行の委譲と、実行結果の受け取り
-- 受け取った結果のプロトコルメッセージへの変換と、生成された順に送るストリーミング
+- SQL 層への実行の委譲と、実行結果の受け取り
+- 受け取った結果をプロトコルメッセージへ変換し、(ストリーミングで) 生成された順に送る
 - 実行ステータス (Affected Rows、Last Insert ID、サーバーからのメッセージ、警告) の Notice としての送出
 - 1 つのリクエストに対するレスポンスの列の終端メッセージ (`StmtExecuteOk` または `Error`) の送出
 - エラーの深刻度の決定 (シーケンスだけを中断する `ERROR` と、接続を閉じる `FATAL`)
@@ -33,7 +33,7 @@
     - SQL ステートメントの処理: `StmtExecute` を受け、namespace に応じて SQL の実行か管理コマンドの実行に分ける
     - 管理コマンドの処理: コマンド名を引き、引数を検証して実行する
     - Expect ブロックの処理: `Expect.Open` / `Expect.Close` でブロックを開閉する
-  - 内部セッション: SQL 層がセッションごとに持つ実行の文脈 (定義は [connection_handler.md のセッション](../connection/connection_handler.md#セッション-session) を参照)
+  - 内部セッション: SQL 層がセッションごとに持つ実行の文脈 (定義は [connection_handler.md の "セッション" 項目](../connection/connection_handler.md#セッション-session) を参照)
     - ディスパッチャはここにステートメントの実行を依頼し、結果をコールバックで受け取る
   - デリゲート: 実行 1 回につき 1 つ作られ、SQL 層からのコールバック (列定義、行、完了、エラー) を受けてプロトコルのメッセージに変換して送る
   - Expect スタック: 開いている Expect ブロックの入れ子
@@ -86,7 +86,7 @@ flowchart TD
 - 1 つのリクエストには必ず 1 つの終端メッセージを返す (`StmtExecuteOk` または `Error`)
   - リクエストが失敗した場合も、Expect ブロックで拒否された場合も、終端メッセージは `Error` になる
 - レスポンスの列はリクエストの順に返す (同時に 1 リクエストしか処理しないため自然に成り立つ)
-- リザルトセットの列定義、行、`FetchDone`、Notice、終端メッセージの順序は [protocol/](../protocol) に記載した規則どおりに送る
+- リザルトセットの列定義、行、取得完了メッセージ (`FetchDone`)、Notice、終端メッセージの順序は [protocol/](../protocol) に記載した規則どおりに送る
   - 警告の Notice はリザルトセットの後、実行ステータスの Notice の前にまとめて送る
 - エラーの深刻度
   - SQL の実行エラー、未知の種別、未知の namespace、管理コマンドの引数エラー、Expect ブロックの失敗は `ERROR` で、セッションは継続する
@@ -108,7 +108,7 @@ flowchart TD
 
 - 仕組み
   - `StmtExecute` の namespace `mysqlx` で、SQL ではなくコマンド名と名前付き引数を送る経路
-  - レスポンスは SQL ステートメントと同じ形 (リザルトセットがあれば列定義 → 行 → `FetchDone`、最後に `StmtExecuteOk`) で返す
+  - レスポンスは SQL ステートメントと同じ形 (リザルトセットがあれば列定義 → 行 → 取得完了メッセージ、最後に終端メッセージ) で返す
   - `list_clients` と `kill_client` の対象は、`SUPER` を持つアカウントなら全ての接続、それ以外は同じアカウントの接続に限られる
 - MineSQL での仕様
   - 実装するのは接続と Notice に関する 6 つ: `ping`、`list_clients`、`kill_client`、`enable_notices`、`disable_notices`、`list_notices` ([SDR-0005](../sdr/0005.管理コマンドは接続系とNotice系の6つを実装する.md))

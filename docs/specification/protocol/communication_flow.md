@@ -87,7 +87,7 @@ sequenceDiagram
 
 ## SQL 実行の流れ
 
-- 1 つの SQL 実行リクエストに対して「カラム定義 → 行データ → リザルトセットの終わり → 実行ステータスの Notice → 実行完了」というレスポンスの列が返る
+- 1 つの SQL 実行リクエストに対して「カラム定義 → 行データ → 取得完了メッセージ → 実行ステータスの Notice → 実行完了」というレスポンスの列が返る
 - 実行により発生した警告や Affected Rows などの実行ステータスは、リザルトセットとは別の Notice として届く
 - リザルトセットを返さないステートメント (`INSERT` など) では `ColumnMetaData` / `Row` / `FetchDone` は送られず、Notice と `StmtExecuteOk` だけが返る
 - Notice の内訳と順序
@@ -106,7 +106,7 @@ sequenceDiagram
     loop 行数分
         S-->>C: 行データ (Row)
     end
-    S-->>C: リザルトセットの終わり (FetchDone)
+    S-->>C: 取得完了メッセージ (FetchDone)
     S-->>C: Affected Rows の Notice (ROWS_AFFECTED)
     S-->>C: 実行完了 (StmtExecuteOk)
 ```
