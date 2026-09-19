@@ -65,7 +65,7 @@ sequenceDiagram
 ## メッセージのやり取りの規則
 
 - やり取りは「シーケンス」という単位で進む
-  - シーケンスとは、クライアントが送る 1 つのリクエストと、それに続いて終端 (`StmtExecuteOk`、`Ok`、`AuthenticateOk`、`Error` など) に至るまでの一連のメッセージをひとまとまりにしたもの
+  - シーケンスとは、クライアントが送る 1 つのリクエストと、それに続いて終端メッセージ (`StmtExecuteOk`、`Ok`、`AuthenticateOk`、`Error` など) に至るまでの一連のメッセージをひとまとまりにしたもの
   - フレームやパケットの分割とは無関係で、「どのリクエストにどのメッセージが属するか」という意味の上の区切り
   - 例: 
     - `StmtExecute` (SELECT) を 1 つ送ると、`ColumnMetaData` × 列数 → `Row` × 行数 → `FetchDone` → Notice → `StmtExecuteOk` が返り、このリクエスト 1 つとレスポンス全部で 1 つのシーケンス
@@ -87,7 +87,7 @@ sequenceDiagram
 
 ## SQL 実行の流れ
 
-- 1 つの SQL 実行リクエストに対して「カラム定義 → 行データ → リザルトセットの終端 → 実行ステータスの Notice → 実行完了」というレスポンスの列が返る
+- 1 つの SQL 実行リクエストに対して「カラム定義 → 行データ → リザルトセットの終わり → 実行ステータスの Notice → 実行完了」というレスポンスの列が返る
 - 実行により発生した警告や Affected Rows などの実行ステータスは、リザルトセットとは別の Notice として届く
 - リザルトセットを返さないステートメント (`INSERT` など) では `ColumnMetaData` / `Row` / `FetchDone` は送られず、Notice と `StmtExecuteOk` だけが返る
 - Notice の内訳と順序
@@ -106,7 +106,7 @@ sequenceDiagram
     loop 行数分
         S-->>C: 行データ (Row)
     end
-    S-->>C: リザルトセットの終端 (FetchDone)
+    S-->>C: リザルトセットの終わり (FetchDone)
     S-->>C: Affected Rows の Notice (ROWS_AFFECTED)
     S-->>C: 実行完了 (StmtExecuteOk)
 ```

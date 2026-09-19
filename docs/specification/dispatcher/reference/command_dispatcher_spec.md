@@ -2,7 +2,7 @@
 
 - [command_dispatcher.md](../command_dispatcher.md) の論理モデルに対する詳細仕様
 - MySQL 8.4 (commit `aa461240`) の `plugin/x/src` を参照
-- リクエストを受け取ってから終端を送るまでの順に書く
+- リクエストを受け取ってから終端メッセージを送るまでの順に書く
 
 ## 種別ごとの振り分け
 
@@ -12,7 +12,7 @@
     - [xpl_dispatcher.cc の execute](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/xpl_dispatcher.cc#L33-L44)
     - [dispatch](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/xpl_dispatcher.cc#L46-L119)
 
-| 種別 (値) | 処理 | 終端 | 更新される状態変数 |
+| 種別 (値) | 処理 | 終端メッセージ | 更新される状態変数 |
 | --- | --- | --- | --- |
 | `SQL_STMT_EXECUTE` (12) | namespace に応じて SQL の実行、または管理コマンドの実行 | `StmtExecuteOk` / `Error` | `Mysqlx_stmt_execute_sql` / `Mysqlx_stmt_execute_mysqlx` |
 | `EXPECT_OPEN` (24) / `EXPECT_CLOSE` (25) | Expect ブロックの開閉 | `Ok` / `Error` | `Mysqlx_expect_open` / `Mysqlx_expect_close` |
