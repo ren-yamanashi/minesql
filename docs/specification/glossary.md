@@ -68,6 +68,7 @@
 | 接続 | コネクション、クライアント (X Plugin 内部の要素を指すとき) | connection (X Plugin の実装上は `Client`) | 受け付けた TCP / Unix ソケット接続 1 本と、それに対応するサーバー側の要素 |
 | セッション | | session (`Session`) | 認証を経て確立する、利用者としてコマンドを実行する文脈 |
 | コネクションハンドラー | 接続層、コネクションハンドラ | connection handler | 接続の受付からセッションの確立・切断までを担う部分 |
+| ハンドラ | 種別ごとの処理、ハンドラー | handler | ディスパッチャがリクエストの種別ごとに持つ処理の単位 (SQL ステートメント、管理コマンド、Expect ブロック)。認証メカニズムのものは「認証ハンドラ」と呼び分ける |
 | 認証ハンドラ | 認証プラグイン (X Plugin 側を指すとき)、SASL ハンドラ | authentication handler (`iface::Authentication`、`Sasl_*_auth`) | 認証メカニズム 1 つ分のやり取り (チャレンジの生成、応答の受け取り) を進める部品。`AuthenticateStart` ごとに作られる |
 | アカウント照合 | 認証チェック、資格情報の検証 | account verification (`Account_verification_handler`) | 資格情報をアカウント情報 (MySQL では `mysql.user`) と突き合わせる処理 |
 | SHA256 パスワードキャッシュ | パスワードキャッシュ | `SHA256_password_cache` | `SHA256_MEMORY` の照合に使う、利用者ごとのパスワードのハッシュを保持するサーバー内のキャッシュ |
