@@ -81,7 +81,7 @@ flowchart TD
 
 ## ディスパッチャが保証する規則
 
-protocol/ の [メッセージのやり取りの規則](../protocol/communication_flow.md#メッセージのやり取りの規則) を、サーバー側で守る立場から言い直したもの
+[プロトコル - メッセージのやり取りの規則](../protocol/communication_flow.md#メッセージのやり取りの規則) を、サーバー側で守る立場から言い直したもの
 
 - 1 つのリクエストには必ず 1 つの終端メッセージを返す (`StmtExecuteOk` または `Error`)
   - リクエストが失敗した場合も、Expect ブロックで拒否された場合も、終端メッセージは `Error` になる
