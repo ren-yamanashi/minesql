@@ -214,7 +214,8 @@ sequenceDiagram
 
 | 種類 | 要件 | MineSQL | SDR |
 | --- | --- | --- | --- |
-| `sha256_password` のアカウント | `PLAIN` 認証 | 該当なし (`caching_sha2_password` のアカウントへの `PLAIN` 認証は満たす) | [0015](../sdr/0015.認証の方式.md) |
+| 認証プラグイン | `sha256_password` のアカウントの認証 | 該当なし (アカウントの認証プラグインは `caching_sha2_password` のみ) | [0015](../sdr/0015.認証の方式.md) |
+| 認証プラグイン | 新しい接続時とセッションのリセット後の `PLAIN` 認証 | 満たす | [0015](../sdr/0015.認証の方式.md) |
 | 認証全般 | ハッシュが一致しなければ失敗、いずれの失敗条件にも該当しなければ成功 | 満たす | [0015](../sdr/0015.認証の方式.md) |
 | 認証全般 | ロック、オフラインモード、パスワードの期限、`ssl/tls` オプションによる失敗と、期限切れの `Notice` | 満たさない | [0015](../sdr/0015.認証の方式.md) |
 | 認証資格情報のキャッシュ | 安全な接続上の `PLAIN` の成功でキャッシュに保存する、一致するエントリがあれば `PLAIN` は成功する、`SHA256_MEMORY` はキャッシュのエントリと一致すれば成功する、`SHA256_MEMORY` は安全でない接続でも安全な接続でも動作する | 満たす | [0015](../sdr/0015.認証の方式.md)、[0016](../sdr/0016.TLS接続を実装する.md) |
@@ -224,7 +225,7 @@ sequenceDiagram
 | エッジケース | SQL からキャッシュにアクセスできない、キャッシュを永続化しない | 満たす |  |
 | キャッシュの無効化 | `DROP USER` / `ALTER USER` | 満たす | [0017](../sdr/0017.アカウント管理ステートメントを対象に含める.md) |
 | キャッシュの無効化 | `SET PASSWORD` / `RENAME USER` / `IDENTIFIED` を伴う `GRANT` / `FLUSH PRIVILEGES` | 該当なし | [0017](../sdr/0017.アカウント管理ステートメントを対象に含める.md) |
-| libmysqlxclient | `SHA256_MEMORY` への対応 | 該当なし | [0001](../sdr/0001.実装対象はXProtocolに従うサーバー.md) |
+| クライアントライブラリ | MySQL のクライアントライブラリ (libmysqlxclient) の `SHA256_MEMORY` への対応 | 該当なし (クライアントは作らず、公式のクライアントを使う) | [0001](../sdr/0001.実装対象はXProtocolに従うサーバー.md) |
 | `caching_sha2_password` プラグイン | サーバー側の `caching_sha2_password`、`authentication_string` へのハッシュの保存 (`sha256_password` と同様の手法)、高コストな認証 (平文) | 満たす | [0015](../sdr/0015.認証の方式.md) |
 | `caching_sha2_password` プラグイン | クライアント側の `caching_sha2_password`、`MYSQL_OPT_GET_SERVER_PUBLIC_KEY`、RSA 鍵ペアによるパスワードの交換 | 該当なし | [0001](../sdr/0001.実装対象はXProtocolに従うサーバー.md) |
 | `caching_sha2_password` プラグイン | メモリ上のキャッシュと高速認証 (スクランブル) | 該当なし |  |
