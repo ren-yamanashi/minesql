@@ -42,7 +42,7 @@
 | 文脈化 | コンテキスト化、contextualize (地の文で) | contextualization (`contextualize`) | MySQL のパーサーで、parse tree を根から辿り、各ノードを文脈 (どのクエリブロックの中か、内部セッションの実行状態) に当てはめて AST を組み立てる段階。MineSQL は持たず、構文解析が AST を直接作る |
 | AST | 構文の木、木 | abstract syntax tree (MySQL では parse tree と、文脈化後の AST を区別する) | パーサーの出力。MineSQL では MySQL の `Query_block` / `Item` に相当する構造を未解決の状態で作ったもので、プリペアが同じノードに解決結果を書き込み、最適化と実行も同じ構造を使う |
 | Tree | 木、木構造 | tree | ノードの入れ子で表した構造。「構文木」「式の Tree」のように使う |
-| クエリブロック | SELECT 単位、クエリ単位 | query block (`Query_block`) | 1 つの SELECT に対応する意味の単位 (テーブル一覧、選択リスト、条件、グループ化、並び替え、件数制限) |
+| クエリブロック | SELECT 単位、クエリ単位 | query block (`Query_block`) | 1 つの SELECT に対応する意味の単位 (テーブル一覧、select list、条件、グループ化、並び替え、件数制限) |
 | プリペア | 準備、準備フェーズ、resolve | prepare (`Sql_cmd_dml::prepare`) | AST に対して名前解決と型決定を行う段階。データディクショナリを参照するのはここ |
 | 実行コマンド | コマンドオブジェクト、ステートメントオブジェクト | `Sql_cmd` | ステートメント 1 つのプリペアと実行の操作を持つオブジェクト。パーサーの出口で AST を包んで作り、SQL 層はこれの `prepare` → `execute` を呼ぶ |
 | パラメータ | 引数 (プレースホルダに入る値を指すとき) | `StmtExecute.args` (`sql` namespace) | ステートメント中のプレースホルダ `?` を置き換える値。管理コマンドに渡す名前付きの値は「引数」と呼ぶ |
@@ -97,7 +97,8 @@
 | 非予約語 | | non-reserved keyword (`ident_keyword`) | キーワードのうち、識別子としても使える語 |
 | 識別子 | 名前 (構文の話をするとき) | identifier (`IDENT` / `IDENT_QUOTED`) | テーブル名、列名、別名などを表す語。引用なしと引用あり (バッククォート) がある |
 | リテラル | 定数、即値 | literal | 文字列、数値、真偽値をそのまま書いた値 |
-| 句 | 節 | clause | ステートメントを構成する単位 (SELECT の選択リスト、FROM、WHERE など)。MineSQL の AST はこの単位で構成する |
+| select list | 選択リスト、SELECT リスト、射影、出力列 | select list | `SELECT` と `FROM` の間に並べた、結果の列になる式の並び (`SELECT name, id + 1 FROM users` の `name, id + 1`) |
+| 句 | 節 | clause | ステートメントを構成する単位 (SELECT の select list、FROM、WHERE など)。MineSQL の AST はこの単位で構成する |
 | 規則 | プロダクション、生成規則 | grammar rule (`sql_yacc.yy` の非終端記号の定義) | 文法ファイルの 1 つの定義。複数の選択肢を持つ |
 | 選択肢 | 代替、右辺 | alternative | 規則の中で `\|` で区切られた 1 つの形 |
 | 優先順位 | 結合の強さ | precedence (`%left` / `%right` / `%nonassoc`) | 演算子どうしの結び付きの順序。同じ順位での左右の結び付き方は結合性と呼ぶ |

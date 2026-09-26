@@ -21,6 +21,22 @@
 - AST: 構文解析の出力で、句の単位で構成した未解決のクエリブロックと式
   - プリペアが同じノードに解決結果を書き込み、オプティマイザとエグゼキュータも同じ構造を使う
 - 実行コマンド (Sql_cmd): ステートメント 1 つのプリペアと実行の操作を持つオブジェクトで、パーサーがステートメントの種別に対応するものを作り、AST を持たせて返す
+  - 例: `SELECT name FROM users WHERE id = 1` からは、次のような SELECT 用の実行コマンドができる
+
+    ```text
+    実行コマンド (SELECT)
+      AST:
+        select list: [name]
+        FROM:        [users]
+        WHERE:       id = 1
+    ```
+
+  - 例: `CREATE TABLE users (id INT, name VARCHAR(20))` からは、表の定義を持つ CREATE TABLE 用の実行コマンドができる
+
+    ```text
+    実行コマンド (CREATE TABLE)
+      表の定義: users (id INT, name VARCHAR(20))
+    ```
 
 ## 処理の流れ
 
@@ -95,7 +111,7 @@ flowchart TD
 ## MineSQL での段階の切り方
 
 - パーサーは「ステートメントの文字列 → AST を持つ実行コマンド」までを担い、MySQL の文脈化に相当する段階を持たない ([SDR-0008](../sdr/0008.パーサーの出力は未解決のクエリブロックと式で文脈化を持たない.md))
-  - AST は句の単位で構成する (SELECT なら選択リスト / FROM / WHERE / ORDER BY / LIMIT を持つノード)
+  - AST は句の単位で構成する (SELECT なら select list / FROM / WHERE / ORDER BY / LIMIT を持つノード)
     - 構文規則の形をそのまま写した Tree を別に持たない
   - AST は MySQL の AST に相当する構造を、未解決の状態で作ったもの
     - パーサーは解決結果の欄 (列への束縛、型) に一切書かず、未解決の印のまま返す

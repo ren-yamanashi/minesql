@@ -416,7 +416,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | [query_primary](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L9831-L9851) | `query_specification` | `table_value_constructor` (`VALUES ROW(...)`、B)、`explicit_table` (`TABLE t`、B) |
 | [query_specification](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L9853-L9903) | 2 番目の選択肢を `SELECT select_item_list opt_from_clause opt_where_clause` に縮めたもの | 1 番目の選択肢 (`into_clause` 入り、B)、`select_options` (下記)、`opt_group_clause` / `opt_having_clause` (A)、`opt_window_clause` (A)、`opt_qualify_clause` (B) |
 
-- 選択リスト
+- select list
 
 | 規則 | 採用する選択肢 | 外す選択肢 |
 | --- | --- | --- |
