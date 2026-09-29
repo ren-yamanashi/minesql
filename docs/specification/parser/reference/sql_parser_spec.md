@@ -99,7 +99,7 @@
   - 識別子の直後の `.` に識別子の文字が続くとき、次の語はキーワードであっても識別子として読む (`t.key` を引用なしで書ける)
     - 参照:
       - [MY_LEX_IDENT_SEP と MY_LEX_IDENT_START](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.cc#L1625-L1639)
-  - 採用する形は `テーブル名.列名`、`スキーマ名.テーブル名`、`スキーマ名.テーブル名.列名`、`テーブル名.*`、`スキーマ名.テーブル名.*` (MySQL の規則と同じ)
+  - 採用する形は `テーブル名.カラム名`、`スキーマ名.テーブル名`、`スキーマ名.テーブル名.カラム名`、`テーブル名.*`、`スキーマ名.テーブル名.*` (MySQL の規則と同じ)
     - 参照:
       - [table_ident](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14924-L14939)
       - [simple_ident_q](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14911-L14922)
@@ -142,7 +142,7 @@
 | ORDER BY / LIMIT / ロック読み取り / トランザクションのオプション | `ORDER` `BY` `ASC` `DESC` `LIMIT` `FOR` `LOCK` `WITH` | `OFFSET` `SHARE` `MODE` `CONSISTENT` `SNAPSHOT` |
 
 - 補足
-  - `NULL` は NULL リテラルとしては外すが (理由 A)、列属性 `NOT NULL` のためにキーワードとしては持つ
+  - `NULL` は NULL リテラルとしては外すが (理由 A)、カラム属性 `NOT NULL` のためにキーワードとしては持つ
   - `VARCHARACTER` は MySQL のキーワード表で `VARCHAR` と同じトークンに写される同義語で、MineSQL でも同じ扱いにする
     - 参照:
       - [lex.h の VARCHAR / VARCHARACTER](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/lex.h#L778-L779)
@@ -251,7 +251,7 @@
 | 1479 | `%left KEYWORD_USED_AS_IDENT` | 外す | `BIT` 型など、`%prec KEYWORD_USED_AS_KEYWORD` を使う規則を写さない (B) |
 | 1480 | `%nonassoc TEXT_STRING` | 外す | 同上 |
 | 1481 | `%left KEYWORD_USED_AS_KEYWORD` | 外す | 同上 |
-| 1488 | `%right UNIQUE_SYM KEY_SYM` | 採用 | 列属性の `UNIQUE KEY` を `UNIQUE` と `KEY` の 2 属性より優先させる |
+| 1488 | `%right UNIQUE_SYM KEY_SYM` | 採用 | カラム属性の `UNIQUE KEY` を `UNIQUE` と `KEY` の 2 属性より優先させる |
 | 1490 | `%left UNION_SYM EXCEPT_SYM` | 外す | A (UNION)、B (EXCEPT) |
 | 1491 | `%left INTERSECT_SYM` | 外す | B |
 | 1492 | `%left CONDITIONLESS_JOIN` | 採用 | 条件のない JOIN の還元を、後続の `ON` を見るまで遅らせる擬似トークン |
@@ -381,17 +381,17 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | `BINARY simple_expr` | 外す | C |
 | `CAST (...)` / `CONVERT (...)` | 外す | B (型変換と文字集合) |
 | `CASE opt_expr when_list opt_else END` | 採用 | 単純 CASE (`CASE x WHEN ...`) と検索 CASE (`CASE WHEN ...`) の両方 |
-| `DEFAULT '(' simple_ident ')'` / `VALUES '(' simple_ident_nospvar ')'` | 外す | B (列の既定値、`ON DUPLICATE KEY UPDATE`) |
+| `DEFAULT '(' simple_ident ')'` / `VALUES '(' simple_ident_nospvar ')'` | 外す | B (カラムの既定値、`ON DUPLICATE KEY UPDATE`) |
 | `INTERVAL expr interval '+' expr` | 外す | B |
 | `simple_ident JSON_SEPARATOR_SYM ...` / `JSON_UNQUOTED_SEPARATOR_SYM ...` | 外す | B (JSON) |
 
 ## ステートメントごとの規則
 
-各ステートメントについて、写す規則の連なりと、規則ごとの「採用する選択肢 / 外す選択肢」を示す。表の「外す」列の括弧は [構文の範囲](#構文の範囲) の理由の記号
+各ステートメントについて、写す規則の連なりと、規則ごとの「採用する選択肢 / 外す選択肢」を示す。表の「外す」の欄の括弧は [構文の範囲](#構文の範囲) の理由の記号
 
 ### ステートメントの入口
 
-- MySQL の開始規則 `start_entry` は、通常の SQL のほかに、パーティション式や生成列の式だけを解析する入口 (`GRAMMAR_SELECTOR_*`) を持つ
+- MySQL の開始規則 `start_entry` は、通常の SQL のほかに、パーティション式や生成カラムの式だけを解析する入口 (`GRAMMAR_SELECTOR_*`) を持つ
   - MineSQL は `sql_statement` だけを開始規則にする
 - `sql_statement` は 3 つの選択肢 (入力が空、`;` で終わる、`;` なしで終わる) を持ち、そのまま写す
   - ただし `;` の後ろで次のステートメントの解析を続ける処理 (`CLIENT_MULTI_QUERIES` 用) は写さない ([ステートメントの終端](#ステートメントの終端) を参照)
@@ -432,7 +432,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | [from_clause](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L9910-L9912)、[from_tables](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L9914-L9917) | `FROM table_reference_list` | `FROM DUAL` (G: FROM を省略した形と同じ) |
 | [table_reference_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L9919-L9932) | 2 つすべて (`,` 区切りの並び) | |
 | [table_reference](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11765-L11778) | `table_factor`、`joined_table` | `'{' OJ esc_table_reference '}'` (B: ODBC) |
-| [joined_table](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11862-L11894) | `table_reference inner_join_type table_reference ON expr`、`table_reference inner_join_type table_reference %prec CONDITIONLESS_JOIN` | `USING '(' using_list ')'` の 2 つ (B: 結合列の暗黙の解決)、`outer_join_type` の 2 つ (A)、`natural_join_type` (B) |
+| [joined_table](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11862-L11894) | `table_reference inner_join_type table_reference ON expr`、`table_reference inner_join_type table_reference %prec CONDITIONLESS_JOIN` | `USING '(' using_list ')'` の 2 つ (B: 結合カラムの暗黙の解決)、`outer_join_type` の 2 つ (A)、`natural_join_type` (B) |
 | [inner_join_type](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11902-L11906) | `JOIN`、`INNER JOIN`、`CROSS JOIN` (いずれも同じ内部結合) | `STRAIGHT_JOIN` (B: 結合順序の指示) |
 | [table_factor](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11961-L11970) | `single_table`、`single_table_parens`、`joined_table_parens` | `derived_table` (A)、`table_reference_list_parens` (G: `(t1, t2)` は `t1 CROSS JOIN t2` と同じ)、`table_function` (B: `JSON_TABLE`) |
 | [single_table](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11987-L11992) | `table_ident opt_table_alias` | `opt_use_partition` (A)、`opt_key_definition` (B: インデックスヒント)、`opt_tablesample_clause` (B) |
@@ -486,7 +486,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | `{ OJ ... }` | [table_reference](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11765-L11778) | B |
 | `LEFT [OUTER] JOIN` / `RIGHT [OUTER] JOIN` | [outer_join_type](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11908-L11911) | A |
 | `NATURAL [INNER \| LEFT \| RIGHT] JOIN` | [natural_join_type](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11896-L11900) | B |
-| `JOIN ... USING (列並び)` | [joined_table](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11862-L11894)、[using_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L12241) | B |
+| `JOIN ... USING (カラム並び)` | [joined_table](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11862-L11894)、[using_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L12241) | B |
 | `STRAIGHT_JOIN` | [inner_join_type](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11902-L11906) | B |
 | `PARTITION (...)` | [opt_use_partition](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11927-L11930) | A |
 | インデックスヒント (`USE INDEX` など) | [opt_key_definition](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L12197-L12199) | B |
@@ -498,15 +498,15 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | --- | --- | --- |
 | [insert_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13064-L13120) | 1 番目 (`INSERT opt_INTO table_ident insert_from_constructor`) と 2 番目 (`INSERT opt_INTO table_ident SET update_list`) | 3 番目 (`insert_query_expression`、B: `INSERT ... SELECT`)、`insert_lock_option`、`opt_ignore`、`opt_use_partition`、`opt_values_reference`、`opt_insert_update_list` (下記) |
 | [opt_INTO](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13196-L13199) | 省略、`INTO` | |
-| [insert_from_constructor](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13201-L13218) | 3 つすべて (列並びなし、`()`、`(insert_columns)`) | |
+| [insert_from_constructor](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13201-L13218) | 3 つすべて (カラム並びなし、`()`、`(insert_columns)`) | |
 | [insert_columns](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13238-L13252)、[insert_column](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14863-L14865) | `,` 区切りの `simple_ident_nospvar` (`ident`、`ident '.' ident`) | |
 | [insert_values](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13254-L13259)、[value_or_values](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13269-L13272) | `VALUES values_list`、`VALUE values_list` (同義語) | |
 | [values_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13274)、[row_value](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13315-L13317)、[opt_values](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13323-L13331)、[values](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13333-L13347) | `,` 区切りの `'(' opt_values ')'` (空の `()` を含む) | |
-| [expr_or_default](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13349-L13355) | `expr` | `DEFAULT` (B: 列の既定値) |
+| [expr_or_default](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13349-L13355) | `expr` | `DEFAULT` (B: カラムの既定値) |
 | [update_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13411-L13428)、[update_elem](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13430-L13436)、[equal](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13305-L13308) | `,` 区切りの `simple_ident_nospvar '=' expr` | `:=` (B) |
 
 - `INSERT ... SET col = val, ...` は 1 行の `INSERT ... (col, ...) VALUES (val, ...)` と同じ意味の別表記で、MySQL も構文解析時に 1 行の値並びに組み替えている
-  - MineSQL のパーサーも同じく列並びと 1 行の値並びに組み替え、AST では両者を区別しない (構文上の同義語の吸収)
+  - MineSQL のパーサーも同じくカラム並びと 1 行の値並びに組み替え、AST では両者を区別しない (構文上の同義語の吸収)
 - 外した句と選択肢の一覧
 
 | 句 / 選択肢 | 規則 | 理由 |
@@ -516,7 +516,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | `IGNORE` | [opt_ignore](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L9036-L9039) | B (エラーの警告への格下げ) |
 | `PARTITION (...)` | [opt_use_partition](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L11927-L11930) | A |
 | `INSERT ... SELECT` | [insert_query_expression](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13220-L13236) | B |
-| `AS 別名 [(列並び)]` (行の別名) | [opt_values_reference](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13357-L13373) | F (`ON DUPLICATE KEY UPDATE` と組) |
+| `AS 別名 [(カラム並び)]` (行の別名) | [opt_values_reference](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13357-L13373) | F (`ON DUPLICATE KEY UPDATE` と組) |
 | `ON DUPLICATE KEY UPDATE` | [opt_insert_update_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13375) | B |
 | 値の `DEFAULT` | [expr_or_default](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13349-L13355) | B |
 
@@ -563,25 +563,25 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | [opt_if_not_exists](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6498-L6501) | 省略、`IF NOT EXISTS` | |
 | [table_element_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6766-L6779)、[table_element](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6781-L6784) | `,` 区切りの `column_def` / `table_constraint_def` | |
 
-- 列定義
+- カラム定義
 
 | 規則 | 採用する選択肢 | 外す選択肢 |
 | --- | --- | --- |
-| [column_def](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6786-L6791) | `ident field_def` | `opt_references` (D: 列定義内の `REFERENCES` は MySQL 自身が読み飛ばす) |
-| [field_def](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6868-L6892) | `type opt_column_attribute_list` | 生成列 (`[GENERATED ALWAYS] AS (expr) [VIRTUAL \| STORED]`、B) |
+| [column_def](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6786-L6791) | `ident field_def` | `opt_references` (D: カラム定義内の `REFERENCES` は MySQL 自身が読み飛ばす) |
+| [field_def](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6868-L6892) | `type opt_column_attribute_list` | 生成カラム (`[GENERATED ALWAYS] AS (expr) [VIRTUAL \| STORED]`、B) |
 | [type](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6905-L7113) | `varchar field_length` | `opt_charset_with_opt_binary` (B: 文字集合と照合順序)、その他のすべての型 (A) |
 | [varchar](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7120-L7123) | `CHAR VARYING`、`VARCHAR` (字句解析で `VARCHARACTER` も `VARCHAR` になる) | |
 | [field_length](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7238-L7242) | 4 つすべて (`'(' NUM ')'` と、大きな数のトークン `LONG_NUM` / `ULONGLONG_NUM` / `DECIMAL_NUM` の形) | |
 | [opt_column_attribute_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7258-L7261)、[column_attribute_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7263-L7299) | 属性の並び (`[NOT] ENFORCED` の並びの検査は `CHECK` と一緒に外す) | |
 | [column_attribute](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7301-L7401) | `NOT NULL`、`[PRIMARY] KEY`、`UNIQUE`、`UNIQUE KEY` | 下記 |
 
-- 列定義で外した属性の一覧
+- カラム定義で外した属性の一覧
 
 | 属性 | 理由 |
 | --- | --- |
-| `NULL` | A (列は常に NOT NULL) |
+| `NULL` | A (カラムは常に NOT NULL) |
 | `NOT SECONDARY` | B (セカンダリエンジン) |
-| `DEFAULT 値` / `DEFAULT (式)` | B (列の既定値) |
+| `DEFAULT 値` / `DEFAULT (式)` | B (カラムの既定値) |
 | `ON UPDATE NOW()` | B |
 | `AUTO_INCREMENT` / `SERIAL DEFAULT VALUE` | B (自動採番) |
 | `COMMENT '...'` | B |
@@ -590,11 +590,11 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | `SRID` | B (空間データ) |
 | `[CONSTRAINT [名前]] CHECK (式)` と `[NOT] ENFORCED` | B (検査制約) |
 | `ENGINE_ATTRIBUTE` / `SECONDARY_ENGINE_ATTRIBUTE` | B |
-| `VISIBLE` / `INVISIBLE` | B (不可視列) |
-| 列定義内の `REFERENCES ...` | D |
+| `VISIBLE` / `INVISIBLE` | B (不可視カラム) |
+| カラム定義内の `REFERENCES ...` | D |
 
-- 列定義内の `REFERENCES` について
-  - MySQL の文法は列定義の末尾に `REFERENCES` 句を受理するが、アクションは `nullptr` を返して捨てており、外部キーにはならない
+- カラム定義内の `REFERENCES` について
+  - MySQL の文法はカラム定義の末尾に `REFERENCES` 句を受理するが、アクションは `nullptr` を返して捨てており、外部キーにはならない
   - MySQL のマニュアルも「MySQL parses but ignores "inline `REFERENCES` specifications" (as defined in the SQL standard) where the references are defined as part of the column specification. MySQL accepts `REFERENCES` clauses only when specified as part of a separate `FOREIGN KEY` specification.」と説明している
   - MineSQL では構文エラーにする ([SDR-0013](../../sdr/0013.sql_modeの既定値に固定し非推奨と無視される構文は採らない.md))
   - 参照:
@@ -622,7 +622,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
     - MineSQL の外部キーは `RESTRICT` だけを実装しており ([サポート状況](../../../feature/support-status.md))、`NO ACTION` は同じ動作の別表記として受理する
   - `MATCH FULL | PARTIAL | SIMPLE` を外すのは、MySQL がこの句をデータディクショナリに保存するだけで、どのストレージエンジンも参照しないため
     - マニュアルは「no storage engine, including `InnoDB`, recognizes or enforces the `MATCH` clause used in referential integrity constraint definitions. Use of an explicit `MATCH` clause does not have the specified effect, and also causes `ON DELETE` and `ON UPDATE` clauses to be ignored.」と説明している
-  - 参照される列の並びの省略 (`REFERENCES parent` だけの形) と、複合外部キー (列が 2 つ以上) を受理するかは、文法では MySQL と同じ形を受理したうえでプリペアで決める
+  - 参照されるカラムの並びの省略 (`REFERENCES parent` だけの形) と、複合外部キー (カラムが 2 つ以上) を受理するかは、文法では MySQL と同じ形を受理したうえでプリペアで決める
   - 参照:
     - [FOREIGN KEY Constraints (MySQL 8.4 Reference Manual)](https://dev.mysql.com/doc/refman/8.4/en/create-table-foreign-keys.html)
     - [dd_table.cc での MATCH の保存](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/dd/dd_table.cc#L1182-L1194)
@@ -633,8 +633,8 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | --- | --- | --- |
 | `USING BTREE \| HASH` / `TYPE BTREE \| HASH` | [opt_index_name_and_type](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7834-L7838) | B (インデックスの種類は B+Tree だけ) |
 | `KEY_BLOCK_SIZE` / `COMMENT` / `VISIBLE` / `INVISIBLE` / `ENGINE_ATTRIBUTE` | [opt_index_options](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7771-L7774) | B |
-| 列の `ASC` / `DESC` | [key_part](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7877-L7896) | B |
-| 列のプレフィックス長 `col(10)` | 同上 | B |
+| カラムの `ASC` / `DESC` | [key_part](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7877-L7896) | B |
+| カラムのプレフィックス長 `col(10)` | 同上 | B |
 | 式によるキー `((expr))` | [key_part_with_expression](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7914-L7922) | B |
 | `FULLTEXT` / `SPATIAL` | [table_constraint_def](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6802-L6843) | B |
 | `CHECK (式)` | [check_constraint](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6845-L6847) | B |

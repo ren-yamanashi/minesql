@@ -59,8 +59,8 @@
 ### 実行とリザルトセットのストリーミング
 
 - 組み立てたステートメントを内部セッションで実行し、結果はコールバックで受け取る (仕組みは後述の「SQL 層での実行」)
-  - `compact_metadata` が真なら、列定義は `type` だけを設定して送る
-- 列定義: SQL 層から列ごとの定義を受け取って `ColumnMetaData` に変換し、全列が揃った時点でまとめて送ってフラッシュする
+  - `compact_metadata` が真なら、カラム定義は `type` だけを設定して送る
+- カラム定義: SQL 層からカラムごとの定義を受け取って `ColumnMetaData` に変換し、全カラムが揃った時点でまとめて送ってフラッシュする
   - 変換の内容 (型の対応、フラグ、`catalog` の固定値 `"def"`) は [message_spec.md の ColumnMetaData](../../protocol/message_spec.md#columnmetadata) を参照
   - 送信に失敗した場合は SQL 層に `ER_IO_WRITE_ERROR` "Connection reset by peer" を報告して実行を中断する
 - 行: 1 行分の値を受け取るたびに `Row` を送る
@@ -180,7 +180,7 @@
   - X Plugin が使う `COM_*` は `COM_QUERY` (SQL ステートメント)、`COM_RESET_CONNECTION` (`Session.Reset` の `keep_open`)、`COM_INIT_DB` (既定スキーマの切り替え)、`COM_STMT_PREPARE` / `EXECUTE` / `FETCH` / `CLOSE` (プロトコルのプリペアドステートメント、実装対象外) だけ
   - command service は内部セッションをスレッドに結び付け、コールバック集を proxy の `Protocol` として差し込んでから、classic protocol と同じ `dispatch_command` を呼ぶ
 - コールバックは 3 群に分かれる
-  - メタデータ: リザルトセットの開始、列ごとの定義、メタデータの終了
+  - メタデータ: リザルトセットの開始、カラムごとの定義、メタデータの終了
   - データ: 行の開始と終了、値の型ごとの受け渡し (NULL、整数、小数、浮動小数点、日付時刻、文字列)
   - ステータス: 完了 (Affected Rows、Last Insert ID、警告数、サーバーの状態フラグ、メッセージ)、エラー、シャットダウン、接続の生存確認
 - 接続の生存確認のコールバックでは、ソケットの状態に加えて読み取り前のチェック (kill やシャットダウンの検知) も実行する
@@ -231,7 +231,7 @@
 
 - ディスパッチャ (Dispatcher): リクエストを受け取り、Expect ブロックの判定を挟んでハンドラへ渡し、失敗したら `Error` を送る
   - [xpl_dispatcher.h](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/xpl_dispatcher.h#L40-L60)
-- デリゲート (Command_delegate): 実行 1 回につき 1 つ作られ、SQL 層からのコールバック (列定義、行、完了、エラー) を受けてプロトコルのメッセージに変換して送る
+- デリゲート (Command_delegate): 実行 1 回につき 1 つ作られ、SQL 層からのコールバック (カラム定義、行、完了、エラー) を受けてプロトコルのメッセージに変換して送る
   - [ngs/command_delegate.h](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/ngs/command_delegate.h#L41-L80)
 - Expect スタック: 開いている Expect ブロックの入れ子
   - [expect/expect_stack.cc](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/expect/expect_stack.cc#L34-L41)
