@@ -43,7 +43,7 @@
 | AST | 構文の木、木 | abstract syntax tree (MySQL では parse tree と、文脈化後の AST を区別する) | パーサーの出力。MineSQL では MySQL の `Query_block` / `Item` に相当する構造を未解決の状態で作ったもので、プリペアが同じノードに解決結果を書き込み、最適化と実行も同じ構造を使う |
 | Tree | 木、木構造 | tree | ノードの入れ子で表した構造。「構文木」「式の Tree」のように使う |
 | クエリブロック | SELECT 単位、クエリ単位 | query block (`Query_block`) | 1 つの SELECT に対応する意味の単位 (テーブル一覧、select list、条件、グループ化、並び替え、件数制限) |
-| 未解決 | 未束縛、unresolved | unresolved | AST のノードのうち、書かれた名前がどの表・どの列を指すか、式の値の型が何かがまだ決まっていない状態。プリペアが決めると解決済みになる |
+| 未解決 | 未束縛、unresolved | unresolved | AST のノードのうち、書かれた名前がどのテーブル・どのカラムを指すか、式の値の型が何かがまだ決まっていない状態。プリペアが決めると解決済みになる |
 | プリペア | 準備、準備フェーズ、resolve | prepare (`Sql_cmd_dml::prepare`) | AST に対して名前解決と型決定を行う段階。データディクショナリを参照するのはここ |
 | 実行コマンド | コマンドオブジェクト、ステートメントオブジェクト | `Sql_cmd` | ステートメント 1 つのプリペアと実行の操作を持つオブジェクト。パーサーの出口で AST を包んで作り、SQL 層はこれの `prepare` → `execute` を呼ぶ |
 | パラメータ | 引数 (プレースホルダに入る値を指すとき) | `StmtExecute.args` (`sql` namespace) | ステートメント中のプレースホルダ `?` を置き換える値。管理コマンドに渡す名前付きの値は「引数」と呼ぶ |
@@ -54,11 +54,21 @@
 | SQL 層 | コアサーバー、サーバー本体、SQL エンジン | | SQL パーサーからエグゼキュータまで (ステートメントを解析・最適化・実行するモジュール群) の総称 |
 | 内部セッション | THD、サーバーセッション | internal session (`srv_session`、実装上は THD) | SQL 層がセッションごとに持つ実行の文脈。実行ユーザーと実行状態 (セッション変数、一時テーブルなど) を保持し、SQL はこの文脈で実行される |
 | 実行ユーザー | 身元、セキュリティコンテキスト (MySQL の用語) | security context (`priv_user`) | 内部セッションが SQL を実行するときの利用者。認証の成功後に設定され、権限の判定や `CURRENT_USER()` の値になる |
-| データディクショナリ | 辞書、カタログ (単独では使わない)、メタデータストア | data dictionary (MineSQL の実装は `internal/storage/dictionary` の `Catalog`) | テーブル・列・インデックス・制約・ユーザーの定義を保持する場所。名前解決と型決定はここを引いて行う |
-| スキーマ | データベース (MySQL では `SCHEMA` と `DATABASE` は同義) | schema / database | 表の名前空間。システム表はシステムスキーマ `mysql` に置く |
-| システムスキーマ | `mysql` データベース、mysql スキーマ | the mysql system schema | サーバー自身が使う表 (システム表) を置くスキーマ `mysql` のこと。MySQL のマニュアルが system schema と呼ぶのはこのスキーマで、監視用のビューを集めた `sys` スキーマや `information_schema` / `performance_schema` とは別物 |
+| データディクショナリ | 辞書、カタログ (単独では使わない)、メタデータストア | data dictionary (`sql/dd`) | スキーマ・テーブル・カラム・インデックスの定義を保持し、名前解決と DDL に提供する部分。アカウントはシステムテーブルに置き、ここには含めない |
+| ディクショナリテーブル | DD テーブル、データディクショナリテーブル | dictionary table (`mysql.tables` など) | 定義を行として持つテーブル。システムスキーマ `mysql` にあり、利用者からは見えない。`mysql.user` などのシステムテーブルとは別物 |
+| ディクショナリオブジェクト | DD オブジェクト、メタデータオブジェクト | dictionary object (`dd::Schema`、`dd::Table`) | ディクショナリテーブルの行を組み立てた、定義のメモリ上の表現。テーブルのオブジェクトはカラムとインデックスを含む |
+| オブジェクトキャッシュ | ディクショナリキャッシュ、DD キャッシュ | shared dictionary cache (`Shared_dictionary_cache`) | 読み込み済みのディクショナリオブジェクトを全ての接続で共有して保持するキャッシュ |
+| ディクショナリクライアント | キャッシュクライアント、DD クライアント | dictionary client (`Dictionary_client`) | 内部セッションごとに 1 つある、定義の取得・保存・変更・削除の窓口 |
+| 起動時の初期化 | bootstrap (地の文で)、ブートストラップ | bootstrap (`dd::bootstrap`) | 初回の起動でディクショナリテーブルと `mysql` スキーマを作り、2 回目以降は既存のディクショナリテーブルを開いて定義を読める状態にする手順 |
+| 原子的な DDL | Atomic DDL、アトミック DDL | atomic DDL | 1 つの DDL のディクショナリテーブルの変更とストレージエンジンの操作を、まとめて確定するか、まとめて残さないかのどちらかにすること。利用者のトランザクションに DDL を含められること (トランザクショナルな DDL) とは別 |
+| 暗黙のコミット | 自動コミット (この意味では使わない) | implicit commit | DDL などの実行前後に、そのセッションで進行中のトランザクションが自動的にコミットされること |
+| DDL ログ | | DDL log (`mysql.innodb_ddl_log`) | 原子的な DDL のために、ストレージエンジン側の戻せない操作を記録しておく隠しテーブル。コミット後の後始末と、失敗やクラッシュ後の取り消しに使う |
+| テーブル | 表 | table | 行とカラムからなるデータの入れ物で、スキーマに属する。文書内の表 (markdown の表) は「表」、tablespace は「表領域」と書き、この語は使わない |
+| カラム | 列、フィールド | column | テーブルを構成する縦の項目 (行と対)。文書内の表の縦の項目を指すときは「欄」と書く |
+| スキーマ | データベース (MySQL では `SCHEMA` と `DATABASE` は同義) | schema / database | テーブルの名前空間。システムテーブルはシステムスキーマ `mysql` に置く |
+| システムスキーマ | `mysql` データベース、mysql スキーマ | the mysql system schema | サーバー自身が使うテーブル (システムテーブル) を置くスキーマ `mysql` のこと。MySQL のマニュアルが system schema と呼ぶのはこのスキーマで、監視用のビューを集めた `sys` スキーマや `information_schema` / `performance_schema` とは別物 |
 | 既定スキーマ | カレントスキーマ、デフォルトデータベース | default schema (`AuthenticateStart.schema`、Notice の `CURRENT_SCHEMA`) | 修飾のないテーブル名を解決するスキーマ。接続時に決まる |
-| システム表 | システムテーブル、メタデータテーブル | system table (`mysql.user` など) | サーバー自身が使う表。普通の表として同じストレージに置く |
+| システムテーブル | システムテーブル、メタデータテーブル | system table (`mysql.user` など) | サーバー自身が使うテーブル。普通のテーブルとして同じストレージに置く |
 | ロック読み取り | ロック付き読み取り、ロッキングリード | locking read (`SELECT ... FOR UPDATE`) | 読んだ行にロックを取る SELECT。`FOR UPDATE` は排他ロック、`FOR SHARE` (同義語 `LOCK IN SHARE MODE`) は共有ロックを取る |
 
 ## 接続とディスパッチ
@@ -77,8 +87,8 @@
 | SHA256 パスワードキャッシュ | パスワードキャッシュ | `SHA256_password_cache` | `SHA256_MEMORY` の照合に使う、利用者ごとのパスワードのハッシュを保持するサーバー内のキャッシュ |
 | アカウント | ユーザー (アカウントを指すとき) | account (`mysql.user` の 1 行、`'user'@'host'`) | 利用者の名前とホストの組に、認証文字列と全体権限を結びつけたもの。MineSQL のホストは `%` のみ |
 | アカウント管理ステートメント | アカウント文、ユーザー管理文、DCL | account management statements (`CREATE USER` / `ALTER USER` / `DROP USER`) | アカウントを作成・変更・削除するステートメント。`GRANT` / `REVOKE` は含めない |
-| 全体権限 | グローバル権限、静的権限 | global privileges (`mysql.user` の `*_priv` 列、`GRANT ... ON *.*`) | スキーマや表を限定しない権限。MineSQL が持つ唯一の粒度で、認証の成功時に実行ユーザーへ載せる |
-| デリゲート | 結果の受け口、コールバック | command delegate (`ngs::Command_delegate`、`Streaming_command_delegate`) | ステートメントの実行 1 回につき作られ、SQL 層からのコールバック (列定義、行、完了、エラー) を受けてプロトコルのメッセージに変換して送る部品 |
+| 全体権限 | グローバル権限、静的権限 | global privileges (`mysql.user` の `*_priv` カラム、`GRANT ... ON *.*`) | スキーマやテーブルを限定しない権限。MineSQL が持つ唯一の粒度で、認証の成功時に実行ユーザーへ載せる |
+| デリゲート | 結果の受け口、コールバック | command delegate (`ngs::Command_delegate`、`Streaming_command_delegate`) | ステートメントの実行 1 回につき作られ、SQL 層からのコールバック (カラム定義、行、完了、エラー) を受けてプロトコルのメッセージに変換して送る部品 |
 | コマンドディスパッチャ | ディスパッチャ (初出時)、コマンドディスパッチャー | command dispatcher (`Dispatcher`) | セッションが受け取ったリクエストを振り分け、SQL 層に委ねて、レスポンスを返す部分 |
 | 受け付ける / 受付 | accept する、アクセプト | accept | 接続を受け入れること。動詞は「受け付ける」、名詞は「受付」 |
 | 切断 | 接続を閉じる (曖昧なとき) | | TCP / Unix ソケット接続を閉じること。セッションを閉じることには使わない |
@@ -96,9 +106,9 @@
 | キーワード | 予約語 (非予約語を含めて指すとき) | keyword (`lex.h` の `symbols`) | キーワード表に載っている語。予約語と非予約語に分かれる |
 | 予約語 | | reserved word | キーワードのうち、引用しないと識別子に使えない語 |
 | 非予約語 | | non-reserved keyword (`ident_keyword`) | キーワードのうち、識別子としても使える語 |
-| 識別子 | 名前 (構文の話をするとき) | identifier (`IDENT` / `IDENT_QUOTED`) | テーブル名、列名、別名などを表す語。引用なしと引用あり (バッククォート) がある |
+| 識別子 | 名前 (構文の話をするとき) | identifier (`IDENT` / `IDENT_QUOTED`) | テーブル名、カラム名、別名などを表す語。引用なしと引用あり (バッククォート) がある |
 | リテラル | 定数、即値 | literal | 文字列、数値、真偽値をそのまま書いた値 |
-| select list | 選択リスト、SELECT リスト、射影、出力列 | select list | `SELECT` と `FROM` の間に並べた、結果の列になる式の並び (`SELECT name, id + 1 FROM users` の `name, id + 1`) |
+| select list | 選択リスト、SELECT リスト、射影、出力カラム | select list | `SELECT` と `FROM` の間に並べた、結果のカラムになる式の並び (`SELECT name, id + 1 FROM users` の `name, id + 1`) |
 | 句 | 節 | clause | ステートメントを構成する単位 (SELECT の select list、FROM、WHERE など)。MineSQL の AST はこの単位で構成する |
 | 規則 | プロダクション、生成規則 | grammar rule (`sql_yacc.yy` の非終端記号の定義) | 文法ファイルの 1 つの定義。複数の選択肢を持つ |
 | 選択肢 | 代替、右辺 | alternative | 規則の中で `\|` で区切られた 1 つの形 |

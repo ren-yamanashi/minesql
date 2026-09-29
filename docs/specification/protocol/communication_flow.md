@@ -68,7 +68,7 @@ sequenceDiagram
   - シーケンスとは、クライアントが送る 1 つのリクエストと、それに続いて終端メッセージ (`StmtExecuteOk`、`Ok`、`AuthenticateOk`、`Error` など) に至るまでの一連のメッセージをひとまとまりにしたもの
   - フレームやパケットの分割とは無関係で、「どのリクエストにどのメッセージが属するか」という意味の上の区切り
   - 例: 
-    - `StmtExecute` (SELECT) を 1 つ送ると、`ColumnMetaData` × 列数 → `Row` × 行数 → `FetchDone` → Notice → `StmtExecuteOk` が返り、このリクエスト 1 つとレスポンス全部で 1 つのシーケンス
+    - `StmtExecute` (SELECT) を 1 つ送ると、`ColumnMetaData` × カラム数 → `Row` × 行数 → `FetchDone` → Notice → `StmtExecuteOk` が返り、このリクエスト 1 つとレスポンス全部で 1 つのシーケンス
     - `CapabilitiesGet` → `Capabilities` の 1 往復で 1 つのシーケンス
     - `AuthenticateStart` から `AuthenticateOk` (または `Error`) までが 1 つのシーケンス
       - 途中で `AuthenticateContinue` をクライアントが送り返す往復も同じシーケンスに含まれる

@@ -23,7 +23,7 @@ X Protocol の周辺には名前の似た用語が 3 つあり、それぞれ層
 - X Plugin: サーバー側の実装
   - X Protocol を待ち受けるサーバー側エンドポイントで、接続受付・capability・認証・Notice などのプロトコル処理全般を担う
   - 素の SQL 実行 (`StmtExecute`) に加えて、MySQL をドキュメントストアとして使うためのドキュメントモデルインターフェースを提供する
-    - CRUD メッセージ (`Mysqlx.Crud.Find` / `Insert` / `Update` / `Delete`) や `create_collection` などの管理コマンドを、JSON 列を持つ通常の InnoDB テーブルに対する SQL に変換して実行する
+    - CRUD メッセージ (`Mysqlx.Crud.Find` / `Insert` / `Update` / `Delete`) や `create_collection` などの管理コマンドを、JSON カラムを持つ通常の InnoDB テーブルに対する SQL に変換して実行する
     - JSON 型や JSON 関数は X Plugin ではなく MySQL サーバーが元々持つ機能であり、X Plugin が足しているのは「SQL を書かずにそれを操作できるプロトコル面」のみ
 - X DevAPI: クライアント側の API 仕様
   - MySQL Shell や各言語の Connector が実装する API で、内部で X Protocol を使って通信する

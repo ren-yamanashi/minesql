@@ -47,7 +47,7 @@ flowchart TB
 | コネクションハンドラー | 接続の受付から認証、セッションの確立と切断まで | [connection/](./connection/README.md) |
 | コマンドディスパッチャ | メッセージの種別ごとの振り分けと、実行結果のレスポンスとしての返送 | [dispatcher/](./dispatcher/README.md) |
 | SQL パーサー | ステートメントの文字列から AST を作り、実行コマンドに包む | [parser/](./parser/README.md) |
-| データディクショナリ | スキーマ・テーブル・列・インデックスの定義の保持 | `dictionary/` |
+| データディクショナリ | スキーマ・テーブル・カラム・インデックスの定義の保持 | [dictionary/](./dictionary/README.md) |
 | プリペア | 名前解決と型決定、権限の検査 | `prepare/` |
 | オプティマイザ | 実行計画の選択 | `optimizer/` |
 | エグゼキュータ | 実行計画の実行と結果の返送 | `executor/` |
