@@ -138,7 +138,7 @@
 | ステートメントの先頭と句 | `SELECT` `FROM` `WHERE` `INSERT` `INTO` `VALUES` `SET` `UPDATE` `DELETE` `CREATE` `DROP` `TABLE` `USE` | `BEGIN` `START` `TRANSACTION` `COMMIT` `ROLLBACK` `WORK` `TABLES` `VALUE` |
 | テーブル参照 | `AS` `JOIN` `INNER` `CROSS` `ON` | |
 | 式 | `AND` `OR` `XOR` `NOT` `IS` `TRUE` `FALSE` `IN` `BETWEEN` `LIKE` `DIV` `MOD` `CASE` `WHEN` `THEN` `ELSE` | `END` `ESCAPE` |
-| テーブルとスキーマの定義 | `IF` `EXISTS` `PRIMARY` `KEY` `UNIQUE` `INDEX` `FOREIGN` `REFERENCES` `CONSTRAINT` `RESTRICT` `NULL` `VARCHAR` `VARCHARACTER` `CHAR` `VARYING` `DATABASE` `SCHEMA` | `NO` `ACTION` |
+| テーブルとスキーマの定義 | `IF` `EXISTS` `PRIMARY` `KEY` `UNIQUE` `INDEX` `FOREIGN` `REFERENCES` `CONSTRAINT` `RESTRICT` `NULL` `VARCHAR` `VARCHARACTER` `CHAR` `VARYING` `INT` `DATABASE` `SCHEMA` | `NO` `ACTION` |
 | ORDER BY / LIMIT / ロック読み取り / トランザクションのオプション | `ORDER` `BY` `ASC` `DESC` `LIMIT` `FOR` `LOCK` `WITH` | `OFFSET` `SHARE` `MODE` `CONSISTENT` `SNAPSHOT` |
 
 - 補足
@@ -569,8 +569,11 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | --- | --- | --- |
 | [column_def](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6786-L6791) | `ident field_def` | `opt_references` (D: カラム定義内の `REFERENCES` は MySQL 自身が読み飛ばす) |
 | [field_def](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6868-L6892) | `type opt_column_attribute_list` | 生成カラム (`[GENERATED ALWAYS] AS (expr) [VIRTUAL \| STORED]`、B) |
-| [type](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6905-L7113) | `varchar field_length` | `opt_charset_with_opt_binary` (B: 文字集合と照合順序)、その他のすべての型 (A) |
+| [type](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6905-L7113) | `varchar field_length`、`int_type opt_field_length field_options` (`opt_field_length` と `field_options` は空の形だけ) | `opt_charset_with_opt_binary` (B: 文字集合と照合順序)、その他のすべての型 (A) |
 | [varchar](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7120-L7123) | `CHAR VARYING`、`VARCHAR` (字句解析で `VARCHARACTER` も `VARCHAR` になる) | |
+| [int_type](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7133-L7139) | `INT` | `TINYINT` / `SMALLINT` / `MEDIUMINT` / `BIGINT` (B: 大きさの違う整数型は [SDR-0023](../../sdr/0023.データ型はVARCHARとINTを持つ.md) で外した) |
+| [opt_field_length](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7244-L7247) | 空 | `field_length` (C: 整数の表示幅は非推奨) |
+| [field_options](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7214-L7236) | 空 | `UNSIGNED` (B)、`ZEROFILL` (C: 非推奨)、`SIGNED` (D: MySQL 自身が読み飛ばす) |
 | [field_length](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7238-L7242) | 4 つすべて (`'(' NUM ')'` と、大きな数のトークン `LONG_NUM` / `ULONGLONG_NUM` / `DECIMAL_NUM` の形) | |
 | [opt_column_attribute_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7258-L7261)、[column_attribute_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7263-L7299) | 属性の並び (`[NOT] ENFORCED` の並びの検査は `CHECK` と一緒に外す) | |
 | [column_attribute](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7301-L7401) | `NOT NULL`、`[PRIMARY] KEY`、`UNIQUE`、`UNIQUE KEY` | 下記 |
