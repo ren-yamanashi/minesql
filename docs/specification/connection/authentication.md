@@ -38,7 +38,7 @@ flowchart TD
   - 作れる認証メカニズムは接続の種類 (安全かどうか) で決まり、同じ一覧が capability `authentication.mechanisms` でクライアントに通知される
   - 一覧にないメカニズム名は FATAL の `Error` (`ER_NOT_SUPPORTED_AUTH_MODE`) で、接続は閉じられる
 - MineSQL での仕様
-  - 認証メカニズムは `MYSQL41` / `PLAIN` / `SHA256_MEMORY` の 3 つ ([SDR-0015](../sdr/0015.認証の方式.md))
+  - 認証メカニズムは `MYSQL41` / `PLAIN` / `SHA256_MEMORY` の 3 つ
   - 安全でない接続 (TLS なしの TCP) で使えるのは `MYSQL41` と `SHA256_MEMORY`、安全な接続 (TLS または Unix ソケット) では `PLAIN` も使える
 
 ### アカウント照合 (Account_verification_handler)
@@ -48,11 +48,10 @@ flowchart TD
   - アカウント情報は `mysql.user` にあり、内部セッションで検索して取る (通常のステートメントと同じ経路で実行する SELECT)
   - 照合の計算はアカウントの認証プラグインの種類ごとの検証器が行う (`mysql_native_password` 用、`caching_sha2_password` 用、キャッシュ用など)
 - MineSQL での仕様
-  - アカウントの認証プラグインは `caching_sha2_password` のみで、認証文字列は `$A$005$` + 20 バイトの salt + ダイジェスト (SHA256 を 5000 回反復) の形式 ([SDR-0015](../sdr/0015.認証の方式.md))
-  - `user` テーブルの行が持つのは認証文字列と全体権限 (MySQL はさらにプラグイン名、ロック状態、パスワードの期限、TLS の要件を持つ)
-  - このテーブルと初期アカウントは起動時の bootstrap で作る ([SDR-0014](../sdr/0014.スキーマを持つ.md))
-  - アカウントはアカウント管理ステートメント (`CREATE USER` / `ALTER USER` / `DROP USER`) で増減し、ホストは `%` のみ (user@host のパターン照合は行わない、[SDR-0017](../sdr/0017.アカウント管理ステートメントを対象に含める.md))
-  - MySQL が user@host のパターン照合と権限の読み出しに使う ACL キャッシュ (起動時に `mysql.user` をメモリに読み込んだもの) は持たず、認証のたびにテーブルを引く ([SDR-0015](../sdr/0015.認証の方式.md))
+  - アカウントの認証プラグインは `caching_sha2_password` のみ
+  - 照合する相手は `minesql.user` の行の認証文字列
+  - ホストは `%` のみ (仮) で、user@host のパターン照合は行わない
+  - MySQL が user@host のパターン照合と権限の読み出しに使う ACL キャッシュ (起動時に `mysql.user` をメモリに読み込んだもの) は持たず、認証のたびにテーブルを引く
 
 ### SHA256 パスワードキャッシュ (SHA256_password_cache)
 
@@ -61,9 +60,9 @@ flowchart TD
   - 値が入るのは、その利用者が平文で照合できるメカニズム (`PLAIN` など) で一度成功したとき
   - 永続化しないので、サーバーの再起動で空になる
   - したがって `SHA256_MEMORY` は「平文の認証を一度通した後の 2 回目以降」を速く安全にするためのメカニズムで、キャッシュが空なら失敗する
-  - MySQL では、資格情報の変更、アカウントの改名や削除、`FLUSH PRIVILEGES` で該当のエントリが消える (SQL 層の監査イベントを受けて消す)
+  - MySQL では、資格情報の変更、アカウントの改名や削除、`FLUSH PRIVILEGES` で該当のエントリが消える (アカウント管理ステートメントの実行がサーバー側で出す監査イベントを受けて消す)
 - MineSQL での仕様
-  - 資格情報の変更 (`ALTER USER ... IDENTIFIED BY`) とアカウントの削除 (`DROP USER`) で、その利用者のエントリが消える ([SDR-0017](../sdr/0017.アカウント管理ステートメントを対象に含める.md))
+  - 資格情報の変更 (`ALTER USER ... IDENTIFIED BY`) とアカウントの削除 (`DROP USER`) で、その利用者のエントリが消える
   - 監査の枠組みは持たず、アカウント管理ステートメントの実行時に直接消す
 
 ### 内部セッションの実行ユーザー (security context)
@@ -72,7 +71,7 @@ flowchart TD
   - 照合の間はシステムユーザー (MySQL では `mysql.session`@`localhost`) として動き、成功したら認証した利用者に切り替える
   - 既定スキーマの指定があればそれも設定する
 - MineSQL での仕様
-  - 切り替えのときに、同じ行の全体権限を実行ユーザーに載せる ([SDR-0018](../sdr/0018.権限は全体権限だけを持つ.md))
+  - 切り替えのときに、同じ行の全体権限を実行ユーザーに載せる
 
 ## 処理の流れ
 
