@@ -110,6 +110,7 @@ flowchart TD
   - `StmtExecute` の namespace `mysqlx` で、SQL ではなくコマンド名と名前付き引数を送る経路
   - レスポンスは SQL ステートメントと同じ形 (リザルトセットがあればカラム定義 → 行 → 取得完了メッセージ、最後に終端メッセージ) で返す
   - `list_clients` と `kill_client` の対象は、`SUPER` を持つアカウントなら全ての接続、それ以外は同じアカウントの接続に限られる
+  - `kill_client` は、対象が自分自身の接続なら直接閉じ、他の接続なら要求元の内部セッションで `KILL` ステートメントを実行してから閉じる
 - MineSQL での仕様
   - 実装するのは接続と Notice に関する 6 つ: `ping`、`list_clients`、`kill_client`、`enable_notices`、`disable_notices`、`list_notices` ([SDR-0005](../sdr/0005.管理コマンドは接続系とNotice系の6つを実装する.md))
   - `SUPER` に相当する権限を持たないため、`list_clients` と `kill_client` の対象は常に同じアカウントの接続だけ ([SDR-0018](../sdr/0018.権限は全体権限だけを持つ.md))

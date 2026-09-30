@@ -42,6 +42,6 @@
 - 内部セッションの実行ユーザー (security context): 照合の間はシステムユーザー (`mysql.session`@`localhost`) として動き、成功したら認証した利用者に切り替え、既定スキーマの指定があればそれも設定する
   - [sql_data_context.cc の authenticate_internal](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sql_data_context.cc#L257-L300)
   - [switch_to_user](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sql_data_context.cc#L445-L499)
-- 成功時に、照合で読んだ `mysql.user` の行から全体権限を実行ユーザーに載せる (MySQL は ACL キャッシュから載せる)
+- 成功時に、照合で読んだ `minesql.user` の行から全体権限を実行ユーザーに載せる (MySQL は ACL キャッシュから載せる)
   - [sql_auth_cache.cc の acl_getroot (ログイン時に全体権限を実行ユーザーへ設定)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/auth/sql_auth_cache.cc#L1549-L1596)
   - [security_context_imp.cc の security_context_lookup (X Plugin の switch_to_user が至る)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/server_component/security_context_imp.cc#L182)

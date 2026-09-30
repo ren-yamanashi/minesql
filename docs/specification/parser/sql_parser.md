@@ -108,6 +108,7 @@ flowchart TD
   - `CREATE SCHEMA` / `DROP SCHEMA` / `USE`
   - トランザクション制御 (`BEGIN`、`START TRANSACTION [WITH CONSISTENT SNAPSHOT]`、`COMMIT`、`ROLLBACK`)
   - アカウント管理ステートメント (`CREATE USER` / `ALTER USER` / `DROP USER`) と `GRANT` / `REVOKE`
+  - `KILL [CONNECTION] id` (接続の切断)
 - これらのステートメントは、MySQL の構文規則にできるだけ従う
   - 従う範囲は、ステートメントの構文、式の階層と演算子の優先順位、字句規則 (識別子と引用、文字列・数値リテラル、コメント、識別子としても使えるキーワード)
 - 対応しないもの

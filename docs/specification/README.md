@@ -48,7 +48,7 @@ flowchart TB
 | コマンドディスパッチャ | メッセージの種別ごとの振り分けと、実行結果のレスポンスとしての返送 | [dispatcher/](./dispatcher/README.md) |
 | SQL パーサー | ステートメントの文字列から AST を作り、実行コマンドに包む | [parser/](./parser/README.md) |
 | データディクショナリ | スキーマ・テーブル・カラム・インデックスの定義の保持 | [dictionary/](./dictionary/README.md) |
-| プリペア | 名前解決と型決定、権限の検査 | `prepare/` |
+| プリペア | 名前解決と型決定、権限の検査 | [prepare/](./prepare/README.md) |
 | オプティマイザ | 実行計画の選択 | `optimizer/` |
 | エグゼキュータ | 実行計画の実行と結果の返送 | `executor/` |
 | ストレージエンジン | 行とインデックスの永続化、トランザクション、ロック、ログ | `storage/` |

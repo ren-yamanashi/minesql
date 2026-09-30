@@ -55,11 +55,11 @@
 | 内部セッション | THD、サーバーセッション | internal session (`srv_session`、実装上は THD) | SQL 層がセッションごとに持つ実行の文脈。実行ユーザーと実行状態 (セッション変数、一時テーブルなど) を保持し、SQL はこの文脈で実行される |
 | 実行ユーザー | 身元、セキュリティコンテキスト (MySQL の用語) | security context (`priv_user`) | 内部セッションが SQL を実行するときの利用者。認証の成功後に設定され、権限の判定や `CURRENT_USER()` の値になる |
 | データディクショナリ | 辞書、カタログ (単独では使わない)、メタデータストア | data dictionary (`sql/dd`) | スキーマ・テーブル・カラム・インデックスの定義を保持し、名前解決と DDL に提供する部分。アカウントはシステムテーブルに置き、ここには含めない |
-| ディクショナリテーブル | DD テーブル、データディクショナリテーブル | dictionary table (`mysql.tables` など) | 定義を行として持つテーブル。システムスキーマ `mysql` にあり、利用者からは見えない。`mysql.user` などのシステムテーブルとは別物 |
+| ディクショナリテーブル | DD テーブル、データディクショナリテーブル | dictionary table (`mysql.tables` など) | 定義を行として持つテーブル。MySQL では `mysql` スキーマ、MineSQL では `minesql` スキーマにあり、利用者からは見えない。`user` などのシステムテーブルとは別物 |
 | ディクショナリオブジェクト | DD オブジェクト、メタデータオブジェクト | dictionary object (`dd::Schema`、`dd::Table`) | ディクショナリテーブルの行を組み立てた、定義のメモリ上の表現。テーブルのオブジェクトはカラムとインデックスを含む |
 | オブジェクトキャッシュ | ディクショナリキャッシュ、DD キャッシュ | shared dictionary cache (`Shared_dictionary_cache`) | 読み込み済みのディクショナリオブジェクトを全ての接続で共有して保持するキャッシュ |
 | ディクショナリクライアント | キャッシュクライアント、DD クライアント | dictionary client (`Dictionary_client`) | 内部セッションごとに 1 つある、定義の取得・保存・変更・削除の窓口 |
-| 起動時の初期化 | bootstrap (地の文で)、ブートストラップ | bootstrap (`dd::bootstrap`) | 初回の起動でディクショナリテーブルと `mysql` スキーマを作り、2 回目以降は既存のディクショナリテーブルを開いて定義を読める状態にする手順 |
+| 起動時の初期化 | bootstrap (地の文で)、ブートストラップ | bootstrap (`dd::bootstrap`) | 初回の起動でディクショナリテーブルと `minesql` スキーマ (MySQL では `mysql`) を作り、2 回目以降は既存のディクショナリテーブルを開いて定義を読める状態にする手順 |
 | 原子的な DDL | Atomic DDL、アトミック DDL | atomic DDL | 1 つの DDL のディクショナリテーブルの変更とストレージエンジンの操作を、まとめて確定するか、まとめて残さないかのどちらかにすること。利用者のトランザクションに DDL を含められること (トランザクショナルな DDL) とは別 |
 | 暗黙のコミット | 自動コミット (この意味では使わない) | implicit commit | DDL などの実行前後に、そのセッションで進行中のトランザクションが自動的にコミットされること |
 | DDL ログ | | DDL log (`mysql.innodb_ddl_log`) | 原子的な DDL のために、ストレージエンジン側の戻せない操作を記録しておく隠しテーブル。コミット後の後始末と、失敗やクラッシュ後の取り消しに使う |
@@ -67,10 +67,14 @@
 | カラム | 列、フィールド | column | テーブルを構成する縦の項目 (行と対)。文書内の表の縦の項目を指すときは「欄」と書く |
 | 行 | レコード (ページ上の物理形式を指すとき以外)、タプル | row (`Row` メッセージ、Affected Rows) | テーブルの横 1 件のデータ。SQL、プロトコル、ディクショナリの文脈で使う。文書内の表の行は「表の行」(DB のものは「テーブルの行」) と書けば区別できる |
 | レコード | 行 (ページ上の物理形式を指すとき) | record (InnoDB の `rec_t`) | 行をページに格納した物理形式で、ストレージの文脈で使う。SQL、プロトコル、ディクショナリの文脈では「行」を使う |
-| スキーマ | データベース (MySQL では `SCHEMA` と `DATABASE` は同義) | schema / database | テーブルの名前空間。システムテーブルはシステムスキーマ `mysql` に置く |
-| システムスキーマ | `mysql` データベース、mysql スキーマ | the mysql system schema | サーバー自身が使うテーブル (システムテーブル) を置くスキーマ `mysql` のこと。MySQL のマニュアルが system schema と呼ぶのはこのスキーマで、監視用のビューを集めた `sys` スキーマや `information_schema` / `performance_schema` とは別物 |
+| スキーマ | データベース (MySQL では `SCHEMA` と `DATABASE` は同義) | schema / database | テーブルの名前空間。システムテーブルは `minesql` スキーマに置く |
+| `mysql` スキーマ | システムスキーマ、`mysql` データベース、mysql システムスキーマ (マニュアルの節名) | the mysql system schema | MySQL がシステムテーブルとディクショナリテーブルを置くスキーマ (MineSQL の対応物は `minesql` スキーマ)。MySQL のマニュアルが system schema と呼ぶのはこのスキーマで、監視用のビューを集めた `sys` スキーマや `information_schema` / `performance_schema` とは別物 |
+| `minesql` スキーマ | システムスキーマ、`mysql` スキーマ (MineSQL のものを指すとき) | | MineSQL がシステムテーブル (`user`) とディクショナリテーブルを置くスキーマ。MySQL の `mysql` スキーマに相当し、名前は写さない |
 | 既定スキーマ | カレントスキーマ、デフォルトデータベース | default schema (`AuthenticateStart.schema`、Notice の `CURRENT_SCHEMA`) | 修飾のないテーブル名を解決するスキーマ。接続時に決まる |
 | システムテーブル | システムテーブル、メタデータテーブル | system table (`mysql.user` など) | サーバー自身が使うテーブル。普通のテーブルとして同じストレージに置く |
+| 名前解決の文脈 | スコープ、名前空間 (名前解決の話をするとき) | name resolution context (`Name_resolution_context`) | クエリブロックごとに持つ、見えているテーブルの一覧。カラム名を探す範囲で、外側の文脈を辿れる |
+| 型決定 | 型解決、型推論 | type resolution (`resolve_type`) | 式の各ノードの型を、型の規則に従って決める段階。プリペアが行う |
+| 結合の単純化 | 結合の平坦化、ON の WHERE への移動 | join simplification | プリペアの最後に、内部結合の ON 条件を WHERE に合流させ、FROM の入れ子を平坦なテーブルの並びにする変換。MySQL では外部結合の内部結合化も同じ段階で行う |
 | ロック読み取り | ロック付き読み取り、ロッキングリード | locking read (`SELECT ... FOR UPDATE`) | 読んだ行にロックを取る SELECT。`FOR UPDATE` は排他ロック、`FOR SHARE` (同義語 `LOCK IN SHARE MODE`) は共有ロックを取る |
 
 ## 接続とディスパッチ

@@ -6,8 +6,8 @@
 
 ## 構文の範囲
 
-- 対象のステートメントは SELECT / INSERT / UPDATE / DELETE / CREATE TABLE / DROP TABLE / CREATE SCHEMA / DROP SCHEMA / USE / トランザクション制御 (BEGIN、START TRANSACTION、COMMIT、ROLLBACK) の 10 種
-  - MySQL の `simple_statement` (ステートメントの一覧) の選択肢のうち、この 10 種に対応するものだけを写す
+- 対象のステートメントは SELECT / INSERT / UPDATE / DELETE / CREATE TABLE / DROP TABLE / CREATE SCHEMA / DROP SCHEMA / USE / トランザクション制御 (BEGIN、START TRANSACTION、COMMIT、ROLLBACK) / KILL の 11 種
+  - MySQL の `simple_statement` (ステートメントの一覧) の選択肢のうち、この 11 種に対応するものだけを写す
   - 参照:
     - [simple_statement](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2403)
     - [select_stmt の選択肢](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2480)、[insert_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2460)、[update_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2537)、[delete_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2432)
@@ -135,7 +135,7 @@
 
 | 使う場所 | 予約語 | 非予約語 (識別子にも使える) |
 | --- | --- | --- |
-| ステートメントの先頭と句 | `SELECT` `FROM` `WHERE` `INSERT` `INTO` `VALUES` `SET` `UPDATE` `DELETE` `CREATE` `DROP` `TABLE` `USE` | `BEGIN` `START` `TRANSACTION` `COMMIT` `ROLLBACK` `WORK` `TABLES` `VALUE` |
+| ステートメントの先頭と句 | `SELECT` `FROM` `WHERE` `INSERT` `INTO` `VALUES` `SET` `UPDATE` `DELETE` `CREATE` `DROP` `TABLE` `USE` `KILL` | `BEGIN` `START` `TRANSACTION` `COMMIT` `CONNECTION` `ROLLBACK` `WORK` `TABLES` `VALUE` |
 | テーブル参照 | `AS` `JOIN` `INNER` `CROSS` `ON` | |
 | 式 | `AND` `OR` `XOR` `NOT` `IS` `TRUE` `FALSE` `IN` `BETWEEN` `LIKE` `DIV` `MOD` `CASE` `WHEN` `THEN` `ELSE` | `END` `ESCAPE` |
 | テーブルとスキーマの定義 | `IF` `EXISTS` `PRIMARY` `KEY` `UNIQUE` `INDEX` `FOREIGN` `REFERENCES` `CONSTRAINT` `RESTRICT` `NULL` `VARCHAR` `VARCHARACTER` `CHAR` `VARYING` `INT` `DATABASE` `SCHEMA` | `NO` `ACTION` |
@@ -717,6 +717,17 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | `AND [NO] CHAIN` | [opt_chain](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L17270-L17274) | B |
 | `[NO] RELEASE` | [opt_release](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L17276-L17280) | B |
 | `ROLLBACK TO SAVEPOINT` / `SAVEPOINT` / `RELEASE SAVEPOINT` | [rollback の 2 番目](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L17299-L17316)、[savepoint](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L17318)、[release](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L17327) | B |
+
+### KILL
+
+| 規則 | 採用する選択肢 | 外す選択肢 |
+| --- | --- | --- |
+| [kill](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14348-L14358) | `KILL kill_option expr` | |
+| [kill_option](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14360-L14364) | 省略、`CONNECTION` | `QUERY` (B: 実行中のステートメントの中断。[SDR-0027](../../sdr/0027.KILLステートメントを対象に含める.md)) |
+
+- `expr` は MySQL と同じく規則のまま写し、値が接続の識別子として妥当かは実行で判定する
+- 参照:
+  - [simple_statement の kill の選択肢](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2462)
 
 ## 構文エラー
 
