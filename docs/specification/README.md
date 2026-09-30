@@ -21,7 +21,7 @@ flowchart TB
         end
 
         dict["データディクショナリ"]
-        account["アカウントと権限"]
+        acl["ACL"]
         engine[("ストレージエンジン")]
     end
 
@@ -37,8 +37,8 @@ flowchart TB
     exec -- "NO (DDL): 定義の変更" --> dict
     exec -- "NO (トランザクション制御)" --> engine
     exec -- "NO (KILL)" --> conn
-    exec -- "NO (アカウント管理、GRANT / REVOKE)" --> account
-    account -->|"minesql.user の行の変更"| engine
+    exec -- "NO (アカウント管理、GRANT / REVOKE)" --> acl
+    acl -->|"minesql.user の行の変更"| engine
     session -->|"実行結果"| dispatcher
     dispatcher -->|"レスポンス"| conn
     conn -->|"メッセージ (X Protocol)"| client
@@ -57,7 +57,7 @@ flowchart TB
 | 内部セッション | ステートメントの実行の入口 (パーサー → プリペアの操作 → 実行の操作) と、セッションごとの実行の文脈 | [session/](./session/README.md) |
 | SQL パーサー | ステートメントの文字列から AST を作り、実行コマンドに包む | [parser/](./parser/README.md) |
 | データディクショナリ | スキーマ・テーブル・カラム・インデックスの定義の保持 | [dictionary/](./dictionary/README.md) |
-| アカウントと権限 | アカウントと全体権限の保持、アカウント管理ステートメントと `GRANT` / `REVOKE` の実行、権限の検査の規則 | [account/](./account/README.md) |
+| ACL | アカウントと全体権限の保持、アカウント管理ステートメントと `GRANT` / `REVOKE` の実行、権限の検査の規則 | [acl/](./acl/README.md) |
 | プリペア | 名前解決と型決定、権限の検査 | [prepare/](./prepare/README.md) |
 | オプティマイザ | 実行計画の選択 | `optimizer/` |
 | エグゼキュータ | 実行計画の実行と結果の返送 | `executor/` |

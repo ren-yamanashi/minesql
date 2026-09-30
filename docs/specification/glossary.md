@@ -96,6 +96,7 @@
 | SHA256 パスワードキャッシュ | パスワードキャッシュ | `SHA256_password_cache` | `SHA256_MEMORY` の照合に使う、利用者ごとのパスワードのハッシュを保持するサーバー内のキャッシュ |
 | アカウント | ユーザー (アカウントを指すとき) | account (`mysql.user` の 1 行、`'user'@'host'`) | 利用者の名前とホストの組に、認証文字列と全体権限を結びつけたもの。MineSQL のホストは `%` のみ |
 | アカウント管理ステートメント | アカウント文、ユーザー管理文、DCL | account management statements (`CREATE USER` / `ALTER USER` / `DROP USER`) | アカウントを作成・変更・削除するステートメント。`GRANT` / `REVOKE` は含めない |
+| ACL | アクセス制御、権限システム、アカウントと権限 | ACL (`sql/auth` の `acl_*`。Access Control List) | アカウントと全体権限を保持し、アカウント管理ステートメントと `GRANT` / `REVOKE` を実行し、権限の検査の規則を定めるモジュール。MySQL のソースがこの部分をこう呼ぶ |
 | 全体権限 | グローバル権限、静的権限 | global privileges (`mysql.user` の `*_priv` カラム、`GRANT ... ON *.*`) | スキーマやテーブルを限定しない権限。MineSQL が持つ唯一の粒度で、認証の成功時に実行ユーザーに設定する |
 | デリゲート | 結果の受け口、コールバック | command delegate (`ngs::Command_delegate`、`Streaming_command_delegate`) | ステートメントの実行 1 回につき作られ、内部セッションからのコールバック (カラム定義、行、完了、エラー) を受けてプロトコルのメッセージに変換して送る部品 |
 | コマンドディスパッチャ | ディスパッチャ (初出時)、コマンドディスパッチャー | command dispatcher (`Dispatcher`) | セッションが受け取ったリクエストを振り分け、内部セッションに委ねて、レスポンスを返す部分 |
