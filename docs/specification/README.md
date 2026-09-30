@@ -12,14 +12,16 @@ flowchart TB
         conn["コネクションハンドラー"]
         dispatcher["コマンドディスパッチャ"]
 
-        subgraph sqlproc["ステートメントの処理"]
+        subgraph session["内部セッション"]
             parser["SQL パーサー"]
             prepare["プリペア"]
+            exec{"実行コマンドが DML か"}
             optimizer["オプティマイザ"]
             executor["エグゼキュータ"]
         end
 
         dict["データディクショナリ"]
+        account["アカウントと権限"]
         engine[("ストレージエンジン")]
     end
 
@@ -27,17 +29,23 @@ flowchart TB
     conn -->|"認証後のメッセージ"| dispatcher
     dispatcher -->|"ステートメント"| parser
     parser -->|"実行コマンド (未解決の AST)"| prepare
-    prepare -->|"解決済みの AST"| optimizer
     prepare -->|"定義の参照"| dict
+    prepare -->|"解決済みの AST"| exec
+    exec -- "YES" --> optimizer
     optimizer -->|"実行計画"| executor
     executor -->|"行の読み書き"| engine
-    executor -->|"実行結果"| dispatcher
+    exec -- "NO (DDL): 定義の変更" --> dict
+    exec -- "NO (トランザクション制御)" --> engine
+    exec -- "NO (KILL)" --> conn
+    exec -- "NO (アカウント管理、GRANT / REVOKE)" --> account
+    account -->|"minesql.user の行の変更"| engine
+    session -->|"実行結果"| dispatcher
     dispatcher -->|"レスポンス"| conn
     conn -->|"メッセージ (X Protocol)"| client
     dict -.->|"格納"| engine
 ```
 
-※プロトコル (X Protocol) は図の箱ではなく、クライアントとサーバーの間で交わすメッセージの規約で、コネクションハンドラーとコマンドディスパッチャが使う
+※プロトコル (X Protocol) は、クライアントとサーバーの間で交わすメッセージの規約で、コネクションハンドラーとコマンドディスパッチャが使う
 
 ## モジュール
 
@@ -46,11 +54,12 @@ flowchart TB
 | プロトコル | クライアントとサーバーの間で交わすメッセージの形式と流れの規約 (X Protocol) | [protocol/](./protocol/README.md) |
 | コネクションハンドラー | 接続の受付から認証、セッションの確立と切断まで | [connection/](./connection/README.md) |
 | コマンドディスパッチャ | メッセージの種別ごとの振り分けと、実行結果のレスポンスとしての返送 | [dispatcher/](./dispatcher/README.md) |
+| 内部セッション | ステートメントの実行の入口 (パーサー → プリペアの操作 → 実行の操作) と、セッションごとの実行の文脈 | [session/](./session/README.md) |
 | SQL パーサー | ステートメントの文字列から AST を作り、実行コマンドに包む | [parser/](./parser/README.md) |
 | データディクショナリ | スキーマ・テーブル・カラム・インデックスの定義の保持 | [dictionary/](./dictionary/README.md) |
+| アカウントと権限 | アカウントと全体権限の保持、アカウント管理ステートメントと `GRANT` / `REVOKE` の実行、権限の検査の規則 | [account/](./account/README.md) |
 | プリペア | 名前解決と型決定、権限の検査 | [prepare/](./prepare/README.md) |
 | オプティマイザ | 実行計画の選択 | `optimizer/` |
 | エグゼキュータ | 実行計画の実行と結果の返送 | `executor/` |
 | ストレージエンジン | 行とインデックスの永続化、トランザクション、ロック、ログ | `storage/` |
 
-- SQL パーサーからエグゼキュータまで (ステートメントの処理) を「SQL 層」と総称する

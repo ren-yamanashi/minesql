@@ -43,14 +43,14 @@
 
 ### ステートメントの組み立て (args の埋め込み)
 
-- `stmt` の文字列中のプレースホルダ `?` を、`args` の値で先頭から順に置き換えた 1 つの SQL ステートメント字列を作り、SQL 層にはその文字列だけを渡す (SQL 層側にパラメータは渡さない)
+- `stmt` の文字列中のプレースホルダ `?` を、`args` の値で先頭から順に置き換えた 1 つの SQL ステートメント字列を作り、内部セッションにはその文字列だけを渡す (内部セッション側にパラメータは渡さない)
   - 引用符 (`'`、`"`)、識別子の引用 (`` ` ``)、コメント (`/* */`、`-- ` (後ろに空白)、`#`) の内側にある `?` はプレースホルダとして扱わない
 - 値の埋め込み方
   - 文字列: MySQL の規則でエスケープし、単引用符で囲む
   - NULL: `NULL` というリテラルをそのまま埋め込む
   - 数値・真偽値: そのまま埋め込む
 - `args` がプレースホルダより多い場合は `Error` (`ER_X_CMD_NUM_ARGUMENTS` "Too many arguments") を返す
-  - 少ない場合は検査せず、残った `?` を含むステートメントがそのまま SQL 層に渡る (SQL 層の構文エラーになる)
+  - 少ない場合は検査せず、残った `?` を含むステートメントがそのまま内部セッションに渡る (パーサーの構文エラーになる)
 - 参照:
   - [sql_statement_builder.cc の build](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sql_statement_builder.cc#L37-L68)
   - [query_formatter.cc のプレースホルダ探索](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/query_formatter.cc#L39-L178)
@@ -58,11 +58,11 @@
 
 ### 実行とリザルトセットのストリーミング
 
-- 組み立てたステートメントを内部セッションで実行し、結果はコールバックで受け取る (仕組みは後述の「SQL 層での実行」)
+- 組み立てたステートメントを内部セッションで実行し、結果はコールバックで受け取る (仕組みは後述の「内部セッションでの実行」)
   - `compact_metadata` が真なら、カラム定義は `type` だけを設定して送る
-- カラム定義: SQL 層からカラムごとの定義を受け取って `ColumnMetaData` に変換し、全カラムが揃った時点でまとめて送ってフラッシュする
+- カラム定義: 内部セッションからカラムごとの定義を受け取って `ColumnMetaData` に変換し、全カラムが揃った時点でまとめて送ってフラッシュする
   - 変換の内容 (型の対応、フラグ、`catalog` の固定値 `"def"`) は [message_spec.md の ColumnMetaData](../../protocol/message_spec.md#columnmetadata) を参照
-  - 送信に失敗した場合は SQL 層に `ER_IO_WRITE_ERROR` "Connection reset by peer" を報告して実行を中断する
+  - 送信に失敗した場合は内部セッションに `ER_IO_WRITE_ERROR` "Connection reset by peer" を報告して実行を中断する
 - 行: 1 行分の値を受け取るたびに `Row` を送る
   - 行を送るたびに接続の生存と kill を確認する (長いリザルトセットの途中でも kill やシャットダウンを検知できる)
   - 行の途中でエラーが起きた場合は作りかけの行を破棄する
@@ -96,7 +96,7 @@
 
 ### エラー時の挙動
 
-- SQL 層がエラーを返した場合、複数リザルトセットの途中なら `FetchDoneMoreResultsets` を送ってから、`Error` を送る
+- 内部セッションがエラーを返した場合、複数リザルトセットの途中なら `FetchDoneMoreResultsets` を送ってから、`Error` を送る
 - 実行中に内部セッションが KILL されていた場合は、エラーを `FATAL` に格上げしてセッションを閉じる
 - 参照:
   - [streaming_command_delegate.cc の handle_error](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/streaming_command_delegate.cc#L525-L534)
@@ -172,10 +172,10 @@
   - [Expectation::set / unset](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/expect/expect.cc#L164-L212)
   - [xpl_dispatcher.cc の on_expect_open / on_expect_close](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/xpl_dispatcher.cc#L122-L134)
 
-## SQL 層での実行
+## 内部セッションでの実行
 
-- ディスパッチャは SQL 層に「内部セッション上でステートメントを実行し、結果をコールバックで返す」ことだけを依頼する
-  - MineSQL ではこの依頼先が SQL 層 (parser/ 以降) に直結する
+- ディスパッチャは内部セッションに「ステートメントを実行し、結果をコールバックで返す」ことだけを依頼する
+  - MineSQL ではこの依頼先が内部セッション ([session/](../../session/README.md)) に直結する
 - MySQL では、この依頼はプラグイン向けの command service を通り、`COM_*` 層 (classic protocol と共通のコマンドの入口) に入る
   - X Plugin が使う `COM_*` は `COM_QUERY` (SQL ステートメント)、`COM_RESET_CONNECTION` (`Session.Reset` の `keep_open`)、`COM_INIT_DB` (既定スキーマの切り替え)、`COM_STMT_PREPARE` / `EXECUTE` / `FETCH` / `CLOSE` (プロトコルのプリペアドステートメント、実装対象外) だけ
   - command service は内部セッションをスレッドに結び付け、コールバック集を proxy の `Protocol` として差し込んでから、classic protocol と同じ `dispatch_command` を呼ぶ
@@ -200,11 +200,11 @@
 | 未知の種別 | `ERROR` | 1047 `ER_UNKNOWN_COM_ERROR` "Unexpected message received" |
 | 未知の namespace | `ERROR` | `ER_X_INVALID_NAMESPACE` "Unknown namespace %s" |
 | `args` がプレースホルダより多い | `ERROR` | `ER_X_CMD_NUM_ARGUMENTS` "Too many arguments" |
-| SQL 層の実行エラー (構文エラー、権限エラーなど) | `ERROR` | SQL 層のエラーをそのまま返す |
+| 内部セッションでの実行エラー (構文エラー、権限エラーなど) | `ERROR` | 内部セッションのエラーをそのまま返す |
 | 管理コマンドの名前・引数の誤り | `ERROR` | `ER_X_INVALID_ADMIN_COMMAND` / `ER_X_CMD_INVALID_ARGUMENT` / `ER_X_BAD_NOTICE` / `ER_X_CANNOT_DISABLE_NOTICE` |
 | Expect ブロックの失敗・誤用 | `ERROR` | `ER_X_EXPECT_NO_ERROR_FAILED` / `ER_X_EXPECT_NOT_OPEN` / `ER_X_EXPECT_BAD_CONDITION` / `ER_X_EXPECT_BAD_CONDITION_VALUE` |
-| 実行中に内部セッションが KILL された | `FATAL` | SQL 層のエラーを `FATAL` に格上げ |
-| SQL 層との連携の失敗 (実行の依頼自体が失敗、利用者の切り替えの失敗) | `ERROR` または `FATAL` | `ER_X_SERVICE_ERROR` |
+| 実行中に内部セッションが KILL された | `FATAL` | 内部セッションのエラーを `FATAL` に格上げ |
+| 内部セッションとの連携の失敗 (実行の依頼自体が失敗、利用者の切り替えの失敗) | `ERROR` または `FATAL` | `ER_X_SERVICE_ERROR` |
 
 - `ERROR` ではシーケンスだけが中断され、セッションは次のリクエストを受け付ける
 - `FATAL` ではセッションが閉じられ、接続の終了処理に入る ([connection/ の接続のライフサイクル](../../connection/reference/connection_handler_spec.md#接続のライフサイクル))
@@ -231,7 +231,7 @@
 
 - ディスパッチャ (Dispatcher): リクエストを受け取り、Expect ブロックの判定を挟んでハンドラへ渡し、失敗したら `Error` を送る
   - [xpl_dispatcher.h](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/xpl_dispatcher.h#L40-L60)
-- デリゲート (Command_delegate): 実行 1 回につき 1 つ作られ、SQL 層からのコールバック (カラム定義、行、完了、エラー) を受けてプロトコルのメッセージに変換して送る
+- デリゲート (Command_delegate): 実行 1 回につき 1 つ作られ、内部セッションからのコールバック (カラム定義、行、完了、エラー) を受けてプロトコルのメッセージに変換して送る
   - [ngs/command_delegate.h](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/ngs/command_delegate.h#L41-L80)
 - Expect スタック: 開いている Expect ブロックの入れ子
   - [expect/expect_stack.cc](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/expect/expect_stack.cc#L34-L41)

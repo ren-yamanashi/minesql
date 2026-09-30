@@ -206,12 +206,11 @@
   - [mysqlx_expect.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_expect.proto)
 - 複数のメッセージをパイプラインで送る際の実行条件を `Open` / `Close` で囲んで指定する
 - 条件 (`EXPECT_NO_ERROR` など) を満たさなくなると、ブロック内の後続のメッセージはすべて `Error` で失敗する
-- 振る舞いの詳細は [dispatcher/](../dispatcher/README.md) を参照
 
 ## MineSQL で実装しない機能
 
 - CRUD (mysqlx_crud.proto + mysqlx_expr.proto): SQL ステートメントを経由せずに `Find` / `Insert` / `Update` / `Delete` とビュー操作を直接表現する X DevAPI 用のメッセージ群
-- プリペアドステートメント (mysqlx_prepare.proto): クライアントが採番した `stmt_id` で `Prepare` / `Execute` / `Deallocate` を行う
+- プリペアドステートメント (mysqlx_prepare.proto): クライアントが採番した `stmt_id` を付けて `Prepare` / `Execute` / `Deallocate` を送る
 - カーソル (mysqlx_cursor.proto): プリペアドステートメントのリザルトセットを `Open` / `Fetch` で分割取得する
 - 圧縮 (mysqlx_connection.proto の `Compression`): 圧縮したメッセージ列を運ぶコンテナで、クライアント (種別 46)・サーバー (種別 19) の双方向で使い、アルゴリズムは認証前に capability `compression` で合意する
 

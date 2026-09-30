@@ -6,13 +6,14 @@
 
 ## 構文の範囲
 
-- 対象のステートメントは SELECT / INSERT / UPDATE / DELETE / CREATE TABLE / DROP TABLE / CREATE SCHEMA / DROP SCHEMA / USE / トランザクション制御 (BEGIN、START TRANSACTION、COMMIT、ROLLBACK) / KILL の 11 種
-  - MySQL の `simple_statement` (ステートメントの一覧) の選択肢のうち、この 11 種に対応するものだけを写す
+- 対象のステートメントは SELECT / INSERT / UPDATE / DELETE / CREATE TABLE / DROP TABLE / CREATE SCHEMA / DROP SCHEMA / USE / トランザクション制御 (BEGIN、START TRANSACTION、COMMIT、ROLLBACK) / アカウント管理ステートメント (CREATE USER、ALTER USER、DROP USER) / GRANT / REVOKE / KILL の 13 種
+  - MySQL の `simple_statement` (ステートメントの一覧) の選択肢のうち、この 13 種に対応するものだけを写す
   - 参照:
     - [simple_statement](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2403)
     - [select_stmt の選択肢](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2480)、[insert_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2460)、[update_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2537)、[delete_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2432)
     - [create_table_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2430)、[drop_table_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2447)、[create (CREATE DATABASE を含む)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2425)、[drop_database_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2435)、[use](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2538)
     - [commit](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2424)、[rollback](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2478)、[start](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2531)、[begin_stmt (simple_statement_or_begin)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2397-L2400)
+    - [create の CREATE USER の選択肢](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L3287-L3290)、[alter_user_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2415)、[drop_user_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2449)、[grant](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2456)、[revoke](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2477)、[kill](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2462)
 - 写す単位は `sql_yacc.yy` の規則 (非終端記号) で、規則ごとに選択肢を「採用する / 外す」に分ける
   - 採用した選択肢は、規則の名前と並びを変えずに写す (規則末尾のアクションだけを MineSQL の AST ノードの生成に置き換える)
   - 外した選択肢は書かないので、その構文は構文エラーになる (MySQL は受理するので、その分だけ応答が異なる)
@@ -26,7 +27,7 @@
   - G: 標準 SQL にない MySQL 独自の別表記で、同じ意味の書き方が他にあるもの
 - 次の 4 つは、対応する機能とあわせて文法に含める
   - SELECT の `ORDER BY`
-    - インデックスの順序で満たすかソート (ファイルソート) するかはプリペア以降 (最適化) の判断で、文法は MySQL と同じ形を受理する
+    - インデックスの順序で満たすかソート (ファイルソート) するかはプリペア以降 (オプティマイザ) の判断で、文法は MySQL と同じ形を受理する
   - SELECT の `LIMIT`
   - `START TRANSACTION WITH CONSISTENT SNAPSHOT`
   - `SELECT ... FOR UPDATE` と `SELECT ... FOR SHARE` (`LOCK IN SHARE MODE` は `FOR SHARE` の同義語)
@@ -139,6 +140,7 @@
 | テーブル参照 | `AS` `JOIN` `INNER` `CROSS` `ON` | |
 | 式 | `AND` `OR` `XOR` `NOT` `IS` `TRUE` `FALSE` `IN` `BETWEEN` `LIKE` `DIV` `MOD` `CASE` `WHEN` `THEN` `ELSE` | `END` `ESCAPE` |
 | テーブルとスキーマの定義 | `IF` `EXISTS` `PRIMARY` `KEY` `UNIQUE` `INDEX` `FOREIGN` `REFERENCES` `CONSTRAINT` `RESTRICT` `NULL` `VARCHAR` `VARCHARACTER` `CHAR` `VARYING` `INT` `DATABASE` `SCHEMA` | `NO` `ACTION` |
+| アカウント管理と権限 | `ALTER` `GRANT` `REVOKE` `TO` `OPTION` `ALL` | `USER` `IDENTIFIED` `PRIVILEGES` |
 | ORDER BY / LIMIT / ロック読み取り / トランザクションのオプション | `ORDER` `BY` `ASC` `DESC` `LIMIT` `FOR` `LOCK` `WITH` | `OFFSET` `SHARE` `MODE` `CONSISTENT` `SNAPSHOT` |
 
 - 補足
@@ -718,6 +720,60 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | `[NO] RELEASE` | [opt_release](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L17276-L17280) | B |
 | `ROLLBACK TO SAVEPOINT` / `SAVEPOINT` / `RELEASE SAVEPOINT` | [rollback の 2 番目](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L17299-L17316)、[savepoint](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L17318)、[release](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L17327) | B |
 
+### アカウント管理ステートメント (CREATE USER / ALTER USER / DROP USER)
+
+採る形は `CREATE USER user IDENTIFIED BY 'password'`、`ALTER USER user IDENTIFIED BY 'password'`、`DROP USER user` だけ ([SDR-0017](../../sdr/0017.アカウント管理ステートメントを対象に含める.md))。`user` は `'名前'@'ホスト'` の形も受理し、ホストの値の検査 (`%` のみ) は実行の操作で行う
+
+| 規則 | 採用する選択肢 | 外す選択肢 |
+| --- | --- | --- |
+| [create の CREATE USER の選択肢](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L3287-L3290) | `CREATE USER opt_if_not_exists create_user_list default_role_clause require_clause connect_options opt_account_lock_password_expire_options opt_user_attribute` (省略可能な部分はすべて空の形だけ) | |
+| [opt_if_not_exists](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6498-L6501) | 空 | `IF NOT EXISTS` (B) |
+| [create_user_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L17155-L17166) | `,` 区切りの `create_user` | |
+| [create_user](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L16818-L16846) | `user identification opt_create_user_with_mfa` (`opt_create_user_with_mfa` は空だけ) | `user identified_with_plugin opt_initial_auth` (B: 認証プラグインの指定)、`user opt_create_user_with_mfa` (B: パスワードなしのアカウント) |
+| [identification](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L16863-L16870) | `identified_by_password` | `identified_by_random_password` (B)、`identified_with_plugin` 系の 4 つ (B: 認証プラグインの指定) |
+| [identified_by_password](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L16872-L16883) | `IDENTIFIED BY TEXT_STRING_password` | |
+| [opt_create_user_with_mfa](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L16848-L16861) | 空 | `AND identification [AND identification]` (B: 多要素認証) |
+| [default_role_clause](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L3448-L3458) | 空 | `DEFAULT ROLE role_list` (B: ロール) |
+| [require_clause](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L17201-L17219) | 空 | `REQUIRE ...` (B: TLS の要件。[SDR-0016](../../sdr/0016.TLS接続を実装する.md)) |
+| [connect_options](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L8514-L8517) | 空 | `WITH connect_option_list` (B: 接続数などの資源制限) |
+| [opt_account_lock_password_expire_options](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L8374-L8377) | 空 | `ACCOUNT LOCK` / `PASSWORD EXPIRE` など (B) |
+| [opt_user_attribute](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L8352-L8373) | 空 | `ATTRIBUTE` / `COMMENT` (B) |
+| [user](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L15163-L15178) | `user_ident_or_text` | `CURRENT_USER [()]` (B: 関数) |
+| [user_ident_or_text](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L15150-L15161) | `ident_or_text`、`ident_or_text '@' ident_or_text` | |
+| [alter_user_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L8245-L8325) | `alter_user_command alter_user_list require_clause connect_options opt_account_lock_password_expire_options opt_user_attribute` (省略可能な部分はすべて空の形だけ) | `USER()` を対象にする形 (B: 関数)、`DEFAULT ROLE` の形 (B: ロール)、認証要素の登録の形 (B: 多要素認証) |
+| [alter_user_command](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L8342-L8350) | `ALTER USER if_exists` (`if_exists` は空だけ) | `IF EXISTS` (B) |
+| [alter_user_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L17168-L17179) | `,` 区切りの `alter_user` | |
+| [alter_user](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L16978-L17153) | `user identified_by_password opt_retain_current_password` (`opt_retain_current_password` は空だけ) | `REPLACE '現在のパスワード'` (B)、`RETAIN CURRENT PASSWORD` (B)、`identified_by_random_password` (B)、`identified_with_plugin` 系 (B: 認証プラグインの指定)、`DISCARD OLD PASSWORD` (B)、`ADD` / `MODIFY` / `DROP factor` (B: 多要素認証) |
+| [drop_user_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L12856-L12865) | `DROP USER if_exists user_list` (`if_exists` は空だけ) | `IF EXISTS` (B) |
+| [user_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L16745-L16758) | `,` 区切りの `user` | |
+
+- 参照:
+  - [simple_statement の alter_user_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2415)、[drop_user_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2449)
+  - [TEXT_STRING_password](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L15064)、[ident_or_text](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L15138)、[if_exists](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13021-L13024)
+  - 外した規則: [user_func](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L8551)、[opt_replace_password](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L8327)、[opt_retain_current_password](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L16775)、[opt_user_registration](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L16785-L16816)、[role_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L16760)
+
+### GRANT / REVOKE
+
+採る形は `GRANT 権限の並び | ALL [PRIVILEGES] ON *.* TO user_list [WITH GRANT OPTION]` と `REVOKE 権限の並び | ALL [PRIVILEGES] ON *.* FROM user_list` だけで、権限は 8 つ ([SDR-0018](../../sdr/0018.権限は全体権限だけを持つ.md))
+
+| 規則 | 採用する選択肢 | 外す選択肢 |
+| --- | --- | --- |
+| [grant](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L16458-L16510) | `GRANT role_or_privilege_list ON opt_acl_type grant_ident TO user_list grant_options opt_grant_as`、`GRANT ALL opt_privileges ON opt_acl_type grant_ident TO user_list grant_options opt_grant_as` (`opt_acl_type` と `opt_grant_as` は空だけ) | `GRANT role_or_privilege_list TO user_list opt_with_admin_option` (B: ロール)、`GRANT PROXY ON ...` (B: プロキシユーザー) |
+| [revoke](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L16389-L16456) | `REVOKE if_exists role_or_privilege_list ON opt_acl_type grant_ident FROM user_list opt_ignore_unknown_user`、`REVOKE if_exists ALL opt_privileges ON opt_acl_type grant_ident FROM user_list opt_ignore_unknown_user` (`if_exists`、`opt_acl_type`、`opt_ignore_unknown_user` は空だけ) | ロールの `REVOKE ... FROM` (B: ロール)、`REVOKE ALL [PRIVILEGES], GRANT OPTION FROM` (G: `REVOKE ALL ON *.*` と `REVOKE GRANT OPTION ON *.*` で同じことができる)、`REVOKE PROXY` (B)、`IF EXISTS` (B)、`IGNORE UNKNOWN USER` (B) |
+| [role_or_privilege_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L16524-L16537) | `,` 区切りの `role_or_privilege` | |
+| [role_or_privilege](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L16539-L16628) | `SELECT opt_column_list`、`INSERT opt_column_list`、`UPDATE opt_column_list`、`DELETE`、`CREATE`、`DROP`、`GRANT OPTION`、`CREATE USER` (`opt_column_list` は空だけ) | ロール名の 2 つの形 (B: ロール)、他の 24 の権限 (B: 持たない権限)。このうち `SUPER` は 8.4 で非推奨でもある (C) |
+| [opt_column_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L17181) | 空 | `(カラムの並び)` (B: カラム単位の権限) |
+| [opt_privileges](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L16519-L16522) | 省略、`PRIVILEGES` | |
+| [opt_acl_type](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L16512-L16517) | 空 | `TABLE` / `FUNCTION` / `PROCEDURE` (B) |
+| [grant_ident](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L16678-L16743) | `'*' '.' '*'` | `'*'` と `schema '.' '*'` (B: スキーマ単位の権限)、`ident` と `schema '.' ident` (B: テーブル単位の権限) |
+| [grant_options](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L17221-L17225) | 省略、`WITH GRANT OPTION` | |
+| [opt_grant_as](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L17247) | 空 | `AS user opt_with_roles` (B: ロール) |
+
+- `user_list` と `user` は [アカウント管理ステートメント](#アカウント管理ステートメント-create-user--alter-user--drop-user) と同じ
+- 参照:
+  - [simple_statement の grant](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2456)、[revoke](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2477)
+  - 外した規則: [opt_with_admin_option](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L16630-L16633)、[opt_ignore_unknown_user](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13026)
+
 ### KILL
 
 | 規則 | 採用する選択肢 | 外す選択肢 |
@@ -780,7 +836,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
   - [parse_tree_node_base.h の Parse_tree_node_tmpl](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/parse_tree_node_base.h#L231-L330)
   - [parse_tree_nodes.h の Parse_tree_root](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/parse_tree_nodes.h#L162-L175)
   - [PT_select_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/parse_tree_nodes.h#L1880)
-- AST (名前解決に進める状態の Tree): MySQL では文脈化の出力、MineSQL では構文解析の出力で、プリペア・最適化・実行の各段階が同じ構造を使う
+- AST (名前解決に進める状態の Tree): MySQL では文脈化の出力、MineSQL では構文解析の出力で、プリペア・オプティマイザ・エグゼキュータの各段階が同じ構造を使う
   - [sql_lex.h の Query_expression](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.h#L626)
   - [Query_block](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.h#L1167)
   - [item.h の Item](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/item.h#L936)
