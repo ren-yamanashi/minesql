@@ -2,8 +2,6 @@
 
 ## 全体像
 
-クライアントからのメッセージは次の順に流れる
-
 ```mermaid
 flowchart TB
     client["クライアント (MySQL Shell など)"]
@@ -15,7 +13,7 @@ flowchart TB
         subgraph session["内部セッション"]
             parser["SQL パーサー"]
             prepare["プリペア"]
-            exec{"実行コマンドが DML か"}
+            exec{"SQL コマンドが DML か"}
             optimizer["オプティマイザ"]
             executor["エグゼキュータ"]
         end
@@ -28,38 +26,35 @@ flowchart TB
     client -->|"メッセージ (X Protocol)"| conn
     conn -->|"認証後のメッセージ"| dispatcher
     dispatcher -->|"ステートメント"| parser
-    parser -->|"実行コマンド (未解決の AST)"| prepare
+    parser -->|"SQL コマンド"| prepare
     prepare -->|"定義の参照"| dict
-    prepare -->|"解決済みの AST"| exec
+    prepare -->|"プリペア済みの SQL コマンド"| exec
     exec -- "YES" --> optimizer
     optimizer -->|"実行計画"| executor
     executor -->|"行の読み書き"| engine
-    exec -- "NO (DDL): 定義の変更" --> dict
+    exec -- "NO (DDL)" --> dict
     exec -- "NO (トランザクション制御)" --> engine
     exec -- "NO (KILL)" --> conn
-    exec -- "NO (アカウント管理、GRANT / REVOKE)" --> acl
-    acl -->|"minesql.user の行の変更"| engine
+    exec -- "NO (アカウント操作)" --> acl
+    acl -->|"アカウントと権限の永続化"| engine
     session -->|"実行結果"| dispatcher
     dispatcher -->|"レスポンス"| conn
     conn -->|"メッセージ (X Protocol)"| client
-    dict -.->|"格納"| engine
+    dict -.->|"定義の永続化"| engine
 ```
-
-※プロトコル (X Protocol) は、クライアントとサーバーの間で交わすメッセージの規約で、コネクションハンドラーとコマンドディスパッチャが使う
 
 ## モジュール
 
 | モジュール | 何をするか | 仕様の場所 |
 | --- | --- | --- |
-| プロトコル | クライアントとサーバーの間で交わすメッセージの形式と流れの規約 (X Protocol) | [protocol/](./protocol/README.md) |
-| コネクションハンドラー | 接続の受付から認証、セッションの確立と切断まで | [connection/](./connection/README.md) |
-| コマンドディスパッチャ | メッセージの種別ごとの振り分けと、実行結果のレスポンスとしての返送 | [dispatcher/](./dispatcher/README.md) |
-| 内部セッション | ステートメントの実行の入口 (パーサー → プリペアの操作 → 実行の操作) と、セッションごとの実行の文脈 | [session/](./session/README.md) |
-| SQL パーサー | ステートメントの文字列から AST を作り、実行コマンドに包む | [parser/](./parser/README.md) |
-| データディクショナリ | スキーマ・テーブル・カラム・インデックスの定義の保持 | [dictionary/](./dictionary/README.md) |
-| ACL | アカウントと全体権限の保持、アカウント管理ステートメントと `GRANT` / `REVOKE` の実行、権限の検査の規則 | [acl/](./acl/README.md) |
-| プリペア | 名前解決と型決定、権限の検査 | [prepare/](./prepare/README.md) |
-| オプティマイザ | 実行計画の選択 | `optimizer/` |
-| エグゼキュータ | 実行計画の実行と結果の返送 | `executor/` |
-| ストレージエンジン | 行とインデックスの永続化、トランザクション、ロック、ログ | `storage/` |
-
+| プロトコル | クライアントとサーバーの間で交わすメッセージの形式や処理に関する規約を定める | [protocol/](./protocol/README.md) |
+| コネクションハンドラー | 接続を受け付けて認証し、セッションの確立および切断をする | [connection/](./connection/README.md) |
+| コマンドディスパッチャ | 認証済みのセッションが受け取ったリクエストを、適切なハンドラに振り分ける | [dispatcher/](./dispatcher/README.md) |
+| 内部セッション | 受け取ったステートメントを SQL パーサー、プリペア、実行の順に処理する。<br/>また、その実行に必要なセッションの状態を保持する | [session/](./session/README.md) |
+| SQL パーサー | ステートメントを解析し、SQL コマンドを作る | [parser/](./parser/README.md) |
+| データディクショナリ | スキーマ、テーブル、カラム、インデックスなどの定義を、ストレージエンジンの中のディクショナリテーブルに永続化する | [dictionary/](./dictionary/README.md) |
+| ACL | アカウントと権限に関する情報をストレージエンジンに永続化する。<br/>また、どのステートメントにどの権限が要るかを定める | [acl/](./acl/README.md) |
+| プリペア | SQL コマンドを実行の前に検査し、名前や型などを解決する | [prepare/](./prepare/README.md) |
+| オプティマイザ | ステートメントの実行計画を立てる | `optimizer/` |
+| エグゼキュータ | 実行計画に沿ってクエリを実行する | `executor/` |
+| ストレージエンジン | データを永続化し、トランザクション、ロック、ログなどを管理する | `storage/` |
