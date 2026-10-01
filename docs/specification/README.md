@@ -40,7 +40,7 @@ flowchart TB
     session -->|"実行結果"| dispatcher
     dispatcher -->|"レスポンス"| conn
     conn -->|"メッセージ (X Protocol)"| client
-    dict -.->|"定義の永続化"| engine
+    dict -->|"定義の永続化"| engine
 ```
 
 ## モジュール
