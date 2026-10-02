@@ -103,6 +103,25 @@ struct Message {
 - protobuf のシリアライズ結果は型情報を含まないので、受信側は `message_type` の値でペイロードの型を決める
   - `message_type` の値に対応する実際の型定義は `.proto` ファイルに定義されている
 
+### フレームの例
+
+`SELECT * FROM t WHERE id = ?` に引数 1 を付けて送るときのフレーム
+
+```txt
+length       = message_type と message_payload の長さの合計
+message_type = 12 // ClientMessages.Type の SQL_STMT_EXECUTE
+message_payload = StmtExecute {
+  stmt    = "SELECT * FROM t WHERE id = ?"
+  args[0] = Any {
+    type   = SCALAR
+    scalar = Scalar { type = V_SINT, v_signed_int = 1 }
+  }
+}
+```
+
+- `message_type` でペイロード全体の型 (`StmtExecute`) が決まる
+- ペイロードの中で、capability の値、SQL のパラメータ、Notice の値のように、送るまで型が決まらない値は、汎用型 (`Any`) になる
+
 ## 参考資料
 
 - [MySQL Server Doxygen: X Protocol (8.4.11)](https://dev.mysql.com/doc/dev/mysql-server/8.4.11/page_mysqlx_protocol.html)

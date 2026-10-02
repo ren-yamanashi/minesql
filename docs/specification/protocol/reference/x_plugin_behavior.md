@@ -1,6 +1,6 @@
 # X Plugin のメッセージ処理の振る舞い (補足)
 
-- [message_spec.md](../message_spec.md) から分けた、X Plugin の実装の振る舞いの記録 (実測値、doc コメントと実装の差、状態ごとの例外的な応答)
+- [message_spec.md](./message_spec.md) から分けた、X Plugin の実装の振る舞いの記録 (実測値、doc コメントと実装の差、状態ごとの例外的な応答)
 - `.proto` ファイルが定める契約ではないが、クライアントはこの振る舞いも前提にしうるため、MineSQL も互換の要件として同じ応答をする
 - 実装時の参照資料で、読む順には含めない
 
@@ -223,7 +223,7 @@ capabilities {
   - [custom_command_delegates.cc の try_send_notices](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/custom_command_delegates.cc#L113-L128)
   - [streaming_command_delegate.cc の defer_on_warning](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/streaming_command_delegate.cc#L556-L579)
 
-### [message_spec.md](../message_spec.md) より
+### [message_spec.md](./message_spec.md) より
 
 - `CapabilitiesSet`: capability の変更をリクエストし、`Ok` または `Error` が返る (例: `tls: true` を送って TLS 接続へ切り替える)
   - [configurator.cc の存在しない名前の扱い](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/capabilities/configurator.cc#L91-L92)
