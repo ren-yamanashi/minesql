@@ -8,7 +8,7 @@
 sequenceDiagram
     participant C as クライアント
     participant S as サーバー
-    C->>S: 接続 (TCP 33060 への connect、または Unix ソケット)
+    C->>S: 接続
     Note over C,S: 1. 接続確立 (サーバーが accept)
     S-->>C: Notice: ServerHello (リクエストへのレスポンスではない)
     Note over C,S: 2. capability ネゴシエーション (任意)
@@ -52,7 +52,7 @@ sequenceDiagram
 
 ### 4. コマンドフェーズ
 
-- クライアントが SQL 実行などのリクエストを送り、サーバーのレスポンスを受け取ることを繰り返す (詳細は後述の「SQL 実行の流れ」にて記載)
+- クライアントが SQL 実行などのリクエストを送り、サーバーのレスポンスを受け取ることを繰り返す (詳細は後述)
 
 ### 5. 終了
 
@@ -63,7 +63,7 @@ sequenceDiagram
 ## SQL 実行の流れ
 
 - 1 つの SQL 実行リクエストに対して「カラム定義 → 行データ → 取得完了メッセージ → 実行ステータスの Notice → 実行完了」という一連のレスポンスが返る
-- 警告や Affected Rows などの実行ステータスは、リザルトセットとは別の Notice で届く
+- 警告や Affected Rows などの実行ステータスは、リザルトセット (カラム定義、行データ、取得完了メッセージ) とは別の Notice で届く
 - リザルトセットを返さないステートメント (`INSERT` など) では `ColumnMetaData` / `Row` / `FetchDone` は送られず、Notice と `StmtExecuteOk` だけが返る
 - Notice の内訳と順序
   - `ROWS_AFFECTED` はステートメントの種類によらず常に送られる

@@ -4,8 +4,8 @@
 
 - MySQL の X Protocol は MySQL 5.7.12 で導入された通信プロトコル
 - X Protocol は Protocol Buffers でデータをシリアライズする
-  - メッセージの構造を `.proto` ファイルで定義してバイナリで運ぶので、各言語のコネクタを同じ定義から生成できる
-  - 型の定義は https://github.com/mysql/mysql-server/tree/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf
+  - メッセージの構造は `.proto` ファイルで定義されており、`protoc` コンパイラで各言語向けにコンパイルすることでコネクタを生成できる
+  - 型の定義: https://github.com/mysql/mysql-server/tree/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf
 
 ### Protocol Buffers (protobuf)
 
@@ -21,14 +21,13 @@ X Protocol の周辺には名前の似た用語が 3 つあり、それぞれ層
 - X Protocol: 通信規約
   - TCP または Unix ソケット上を流れるフレーム + protobuf メッセージの規約
 - X Plugin: サーバー側の実装
-  - X Protocol を待ち受けるサーバー側エンドポイントで、接続受付・capability・認証 などのプロトコル処理全般を担う
+  - X Protocol の接続を待ち受けるサーバー側エンドポイントで、接続受付・capability・認証 などのプロトコル処理全般を担う
   - 素の SQL 実行に加えて、MySQL をドキュメントストアとして使うためのドキュメントモデルインターフェースを提供する
     - CRUD メッセージ (`Mysqlx.Crud.Find` / `Insert` / `Update` / `Delete`) や `create_collection` などの管理コマンドを、JSON カラムを持つ通常の InnoDB テーブルに対する SQL に変換して実行する
-    - JSON 型と JSON 関数は MySQL サーバーが元々持つ機能で、X Plugin が足すのは SQL を書かずにそれらを操作するためのメッセージだけ
+    - JSON 型と JSON 関数は MySQL サーバーが元々持つ機能で、X Plugin を使用することで SQL を書かずに (CRUD メッセージで) それらを操作することが可能になる
 - X DevAPI: クライアント側の API 仕様
-  - MySQL Shell や各言語の Connector が実装する API で、内部で X Protocol を使って通信する
+  - MySQL Shell や各言語のコネクタが実装する API で、内部で X Protocol を使って通信する
   - コレクションもリレーショナルテーブルも、SQL を書かずにメソッドチェーンの CRUD で操作できる
-    - コレクションへの操作は、上の CRUD メッセージとしてサーバーに送られる
   - X DevAPI を使わずに、`.proto` からコードを生成して X Protocol で直接通信することもできる
 
 ## 主な特徴
@@ -43,13 +42,13 @@ classic protocol での課題と、その課題を X Protocol がどう解消し
 
 ### メッセージの解釈
 
-- classic protocol の場合は、同じレスポンスのバイト列でも直前に送ったコマンドによってその意味が変わるので、クライアントが読み分けを手で実装する必要があった
-- X Protocol は、メッセージの先頭に種別が付いていて、種別ごとの読み方は `.proto` から生成したコードで定義されているので、クライアントは先頭の種別を見れば読み方が分かる
+- classic protocol の場合は、同じレスポンスのバイト列でも直前に送ったコマンドによってその意味が変わるので、クライアントがその読み分けを手で実装する必要があった
+- X Protocol は、メッセージの先頭に種別が付いていて、種別ごとの読み方は `.proto` から生成したコードで定義されているので、クライアントはメッセージ先頭の種別を見れば読み方が分かる
 
 ### リクエストとレスポンスの対応付け
 
 - classic protocol は、1 コマンド送った後レスポンスを受け取ってから次のコマンドを送る前提で設計されているので、コマンドのたびに往復の待ちが発生する
-- X Protocol では、どのリクエストもレスポンスの最後に来るメッセージが決まっていて (`StmtExecute` なら `StmtExecuteOk` か `Error`)、レスポンスはリクエストの順に返るので、クライアントはレスポンスを待たずに次のリクエストを送っても、返ってきたレスポンスをリクエストごとに区切れる
+- X Protocol では、どのリクエストもレスポンスの最後に来るメッセージが決まっていて (`StmtExecute` なら `StmtExecuteOk` か `Error`)、かつレスポンスはリクエストの順に返るので、クライアントはレスポンスを待たずに次のリクエストを送っても、返ってきたレスポンスをリクエストごとに区切れる
   - レスポンスを待たずに次のリクエストを送れるので往復の待ち時間を減らせる
 
 ### capability の表現
