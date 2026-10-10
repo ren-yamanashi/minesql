@@ -108,7 +108,7 @@
 
 - `stmt` にコマンド名 (大文字小文字を区別しない)、`args` に名前付き引数を持つ `Object` を 1 つ渡す
 - 共通の前処理
-  - パスワードが期限切れの利用者は `Error` (`ER_MUST_CHANGE_PASSWORD`)
+  - パスワードが期限切れのアカウントは `Error` (`ER_MUST_CHANGE_PASSWORD`)
   - コマンド名が空なら `Error` (`ER_INTERNAL_ERROR`)、未知なら `Error` (`ER_X_INVALID_ADMIN_COMMAND` "Invalid %s command %s")
   - 引数の過不足や型違いは `Error` (`ER_X_CMD_INVALID_ARGUMENT`)
 - 参照:
@@ -125,7 +125,7 @@
 | `disable_notices` | `notice` (文字列のリスト、必須) | `StmtExecuteOk` のみ |
 | `list_notices` | なし | リザルトセット (`notice` BYTES、`enabled` SINT) + `FetchDone` + `StmtExecuteOk` |
 
-- `list_clients` の可視範囲: リクエスト元に SUPER 権限があれば全接続、なければ自分と同じ利用者で認証済みの接続だけを列挙する
+- `list_clients` の可視範囲: リクエスト元に SUPER 権限があれば全接続、なければ自分と同じアカウントで認証済みの接続だけを列挙する
   - `user` と `sql_session` (内部セッションの ID) は認証済みの接続にだけ入り、未認証の接続では NULL
 - Notice の設定
   - 切り替えられる Notice は `warnings` (既定で有効) と、グループレプリケーション関連の 4 つ (既定で無効)
@@ -208,7 +208,7 @@
 | 管理コマンドの名前・引数の誤り | `ERROR` | `ER_X_INVALID_ADMIN_COMMAND` / `ER_X_CMD_INVALID_ARGUMENT` / `ER_X_BAD_NOTICE` / `ER_X_CANNOT_DISABLE_NOTICE` |
 | Expect ブロックの失敗・誤用 | `ERROR` | `ER_X_EXPECT_NO_ERROR_FAILED` / `ER_X_EXPECT_NOT_OPEN` / `ER_X_EXPECT_BAD_CONDITION` / `ER_X_EXPECT_BAD_CONDITION_VALUE` |
 | 実行中に内部セッションが KILL された | `FATAL` | 内部セッションのエラーを `FATAL` に格上げ |
-| 内部セッションとの連携の失敗 (実行の依頼自体が失敗、利用者の切り替えの失敗) | `ERROR` または `FATAL` | `ER_X_SERVICE_ERROR` |
+| 内部セッションとの連携の失敗 (実行の依頼自体が失敗、実行ユーザーの切り替えの失敗) | `ERROR` または `FATAL` | `ER_X_SERVICE_ERROR` |
 
 - `ERROR` ではシーケンスだけが中断され、セッションは次のリクエストを受け付ける
 - `FATAL` ではセッションが閉じられ、接続の終了処理に入る ([connection/ の接続のライフサイクル](../../connection/reference/connection_handler_spec.md#接続のライフサイクル))
