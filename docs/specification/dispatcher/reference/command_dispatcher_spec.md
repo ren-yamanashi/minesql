@@ -7,7 +7,8 @@
 ## 種別ごとの振り分け
 
 - セッションは `Session.Close` / `Connection.Close` / `Session.Reset` と kill 済みの確認を自分で処理し、それ以外のリクエストをディスパッチャに渡す
-- ディスパッチャは Expect ブロックの事前判定を通したリクエストを種別で振り分け、処理がエラーを返したら `Error` を送り、Expect ブロックの事後判定を行う
+- ディスパッチャは、Expect ブロックの事前判定を通したリクエストを種別で振り分ける
+  - 処理がエラーを返したら `Error` を送り、Expect ブロックの事後判定をする
   - 参照:
     - [xpl_dispatcher.cc の execute](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/xpl_dispatcher.cc#L33-L44)
     - [dispatch](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/xpl_dispatcher.cc#L46-L119)
@@ -31,7 +32,7 @@
 
 ## StmtExecute の処理
 
-- メッセージの定義は [mysqlx_sql.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_sql.proto#L38-L77)、フィールドの意味は [message_spec.md](../../protocol/message_spec.md#sql-実行-sqlstmtexecute) を参照
+- メッセージの定義は [mysqlx_sql.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_sql.proto#L38-L77)、フィールドの意味は [message_spec.md](../../protocol/reference/message_spec.md#sql-実行-sqlstmtexecute) を参照
 
 ### namespace の判定
 
@@ -43,7 +44,8 @@
 
 ### ステートメントの組み立て (args の埋め込み)
 
-- `stmt` の文字列中のプレースホルダ `?` を、`args` の値で先頭から順に置き換えた 1 つの SQL ステートメント字列を作り、内部セッションにはその文字列だけを渡す (内部セッション側にパラメータは渡さない)
+- `stmt` の文字列中のプレースホルダ `?` を `args` の値で先頭から順に置き換え、1 つの SQL ステートメントの文字列を作る
+  - 内部セッションにはその文字列だけを渡す (パラメータは渡さない)
   - 引用符 (`'`、`"`)、識別子の引用 (`` ` ``)、コメント (`/* */`、`-- ` (後ろに空白)、`#`) の内側にある `?` はプレースホルダとして扱わない
 - 値の埋め込み方
   - 文字列: MySQL の規則でエスケープし、単引用符で囲む
@@ -61,7 +63,7 @@
 - 組み立てたステートメントを内部セッションで実行し、結果はコールバックで受け取る (仕組みは後述の「内部セッションでの実行」)
   - `compact_metadata` が真なら、カラム定義は `type` だけを設定して送る
 - カラム定義: 内部セッションからカラムごとの定義を受け取って `ColumnMetaData` に変換し、全カラムが揃った時点でまとめて送ってフラッシュする
-  - 変換の内容 (型の対応、フラグ、`catalog` の固定値 `"def"`) は [message_spec.md の ColumnMetaData](../../protocol/message_spec.md#columnmetadata) を参照
+  - 変換の内容 (型の対応、フラグ、`catalog` の固定値 `"def"`) は [message_spec.md の ColumnMetaData](../../protocol/reference/message_spec.md#columnmetadata) を参照
   - 送信に失敗した場合は内部セッションに `ER_IO_WRITE_ERROR` "Connection reset by peer" を報告して実行を中断する
 - 行: 1 行分の値を受け取るたびに `Row` を送る
   - 行を送るたびに接続の生存と kill を確認する (長いリザルトセットの途中でも kill やシャットダウンを検知できる)
@@ -156,7 +158,8 @@
   - 失敗中のブロックの中で `Open` が来た場合は、失敗状態のブロックを積んだうえで `Error` を返す (対応する `Close` で正しく取り出せるようにするため)
   - 成功なら `Ok`
 - 事前判定: 一番内側のブロックが失敗状態なら、`Expect.Open` / `Expect.Close` 以外のリクエストはすべてそのブロックの失敗理由の `Error` で拒否する
-- 事後判定: リクエストがエラーになったとき、一番内側のブロックが `no_error` を持ちまだ失敗していなければ、`Error` (`ER_X_EXPECT_NO_ERROR_FAILED` "Expectation failed: no_error") を理由に失敗状態にする
+- 事後判定: リクエストがエラーになったとき、一番内側のブロックが `no_error` を持ちまだ失敗していなければ、そのブロックを失敗状態にする
+  - 失敗の理由は `Error` (`ER_X_EXPECT_NO_ERROR_FAILED` "Expectation failed: no_error")
 - `Expect.Close`
   - ブロックが開いていなければ `Error` (`ER_X_EXPECT_NOT_OPEN` "Expect block currently not open")
   - 一番内側のブロックを取り出し、失敗状態だったならその失敗理由の `Error`、そうでなければ `Ok` を返す
@@ -177,8 +180,9 @@
 - ディスパッチャは内部セッションに「ステートメントを実行し、結果をコールバックで返す」ことだけを依頼する
   - MineSQL ではこの依頼先が内部セッション ([session/](../../session/README.md)) に直結する
 - MySQL では、この依頼はプラグイン向けの command service を通り、`COM_*` 層 (classic protocol と共通のコマンドの入口) に入る
-  - X Plugin が使う `COM_*` は `COM_QUERY` (SQL ステートメント)、`COM_RESET_CONNECTION` (`Session.Reset` の `keep_open`)、`COM_INIT_DB` (既定スキーマの切り替え)、`COM_STMT_PREPARE` / `EXECUTE` / `FETCH` / `CLOSE` (プロトコルのプリペアドステートメント、実装対象外) だけ
-  - command service は内部セッションをスレッドに結び付け、コールバック集を proxy の `Protocol` として差し込んでから、classic protocol と同じ `dispatch_command` を呼ぶ
+  - X Plugin が使う `COM_*` は `COM_QUERY` (SQL ステートメント)、`COM_RESET_CONNECTION` (`Session.Reset` の `keep_open`)、`COM_INIT_DB` (デフォルトスキーマの切り替え)、`COM_STMT_PREPARE` / `EXECUTE` / `FETCH` / `CLOSE` (プロトコルのプリペアドステートメント、実装対象外) だけ
+  - command service は内部セッションをスレッドに結び付け、コールバック集を proxy の `Protocol` として設定する
+    - その後、classic protocol と同じ `dispatch_command` を呼ぶ
 - コールバックは 3 群に分かれる
   - メタデータ: リザルトセットの開始、カラムごとの定義、メタデータの終了
   - データ: 行の開始と終了、値の型ごとの受け渡し (NULL、整数、小数、浮動小数点、日付時刻、文字列)

@@ -21,8 +21,10 @@
   - 参照:
     - [socket_acceptors_task.cc の prepare_listeners](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/ngs/socket_acceptors_task.cc#L145-L200)
     - [server_builder.cc の backlog](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/builder/server_builder.cc#L57-L66)
-- accept の開始はプラグインのロード時ではなく、サーバー起動完了の通知 (audit の SERVER_STARTUP イベント) を受けてから (プラグインのロード時点ではサーバーがまだ SQL を実行できる状態にないため)
-  - 通知を受けて開始するのは SHA256 パスワードキャッシュのモジュールで、それが無効な場合だけ、srv_session サービスが利用可能になるのを待つ遅延起動に切り替わる
+- accept の開始はプラグインのロード時ではなく、サーバー起動完了の通知 (audit の SERVER_STARTUP イベント) を受けてから
+  - プラグインのロード時点では、サーバーがまだ SQL を実行できる状態にないため
+  - この通知を受け取るのは SHA256 パスワードキャッシュのモジュール
+    - そのモジュールが無効なときだけ、srv_session サービスが利用可能になるのを待ってから開始する (遅延起動)
   - 加えて accept のたびに srv_session サービスが利用可能かを待つ
   - 参照:
     - [module_cache.cc の起動イベント処理](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/module_cache.cc#L46-L53)
@@ -53,7 +55,8 @@
   - 参照:
     - [server.cc の on_accept](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/server.cc#L350-L401)
     - [restart_client_supervision_timer](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/server.cc#L296-L300)
-- サーバー全体の `max_connections` との関係: X の接続数は `mysqlx_max_connections` で独立に数えるが、内部セッションを開く際にサーバー全体の接続数制限にも掛かる (超過時は `ER_CON_COUNT_ERROR` がクライアントに返る)
+- サーバー全体の `max_connections` との関係: X の接続数は `mysqlx_max_connections` で独立に数えるが、内部セッションを開くときにサーバー全体の接続数制限にも掛かる
+  - 超過時は `ER_CON_COUNT_ERROR` がクライアントに返る
   - 参照:
     - [system_variables.cc の max_connections の説明](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/variables/system_variables.cc#L122-L130)
     - [sql_data_context.cc](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sql_data_context.cc#L111-L112)
@@ -84,7 +87,7 @@
 - ワーカースレッド上の処理の流れ
   1. 接続元アドレスの取得と名前解決
      - Unix ソケットならホスト名は localhost、TCP なら相手のアドレスとポートを取る
-     - サーバー全体の `skip_name_resolve` が OFF なら逆引きでホスト名を求め、そのホストが接続失敗の累積でブロックされていれば接続を閉じる
+     - サーバー全体の `skip_name_resolve` が OFF なら逆引きでホスト名を得て、そのホストが接続失敗の累積でブロックされていれば接続を閉じる
   2. 受付処理: 状態を `accepted` にし、エンコーダを作り、セッションを事前に生成する
      - ここで内部セッション (THD) を開く (失敗時は Fatal エラーを返して切断)
      - `mysqlx_enable_hello_notice` が ON なら `ServerHello` の Notice を送る
@@ -119,7 +122,8 @@
     - 認証失敗は最大 3 回まで許容し (それまでは通常エラーで、別のメカニズムでの再試行が可能)、3 回目の失敗は Fatal エラーで切断する
   - 認証成功時: クライアント ID の Notice を送り、接続を `running` にしてから `AuthenticateOk` を返す (`Mysqlx_sessions_accepted` と `Mysqlx_sessions` を加算)
   - `ready`: `Session.Close` / `Connection.Close` / `Session.Reset` はセッション自身が処理し、それ以外はディスパッチャに渡す
-    - メッセージを受け取るたびに、処理の前に内部セッションが KILL 済みかを確認し、済みなら `ER_QUERY_INTERRUPTED` の Fatal エラーを返してセッションを閉じる
+    - メッセージを受け取るたびに、処理の前に内部セッションが KILL 済みかを確認する
+      - 済みなら `ER_QUERY_INTERRUPTED` の Fatal エラーを返してセッションを閉じる
     - 致命的エラーはセッションを閉じる
   - 参照:
     - [session.cc の handle_auth_message](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/session.cc#L141-L202)
@@ -133,7 +137,8 @@
     - 接続は `accepted_with_session` (セッション再生成後) になる
     - この状態で受け付けるのは `CapabilitiesSet` (`session_connect_attrs` のみ) と認証メッセージだけ
       - 認証メッセージ以外を送ると Fatal エラーを返して切断する
-      - 例外として、`session_connect_attrs` 以外を含む `CapabilitiesSet` には Fatal エラーを返すだけで接続は閉じず、クライアントが FATAL の規約どおり閉じるのを待つ
+      - 例外として、`session_connect_attrs` 以外を含む `CapabilitiesSet` には Fatal エラーを返すだけで接続は閉じない
+        - クライアントが FATAL の規約どおり閉じるのを待つ
     - 再認証が成功しても接続の状態は `accepted_with_session` のままで、以後の判定はセッションの状態 (`authenticating` / `ready`) による
       - そのため、接続の状態が `running` であることを前提にした処理 (アイドル中の kill 検知、kill / シャットダウン時の警告 Notice) は働かない
   - 参照:
@@ -178,7 +183,8 @@
 - kill
   - 管理コマンド `kill_client` で他の接続を閉じられる (`Mysqlx_sessions_killed` を加算)
     - 他の接続なら、リクエスト元のセッションで対象の内部セッションに `KILL <id>` ステートメントを実行してから接続を閉じる
-    - 自分自身なら、プラグイン内部のユーザーで別の内部セッションを開き、そこから自分の内部セッションに `KILL <id>` ステートメントを実行してから閉じる (機構は同じ)
+    - 自分自身なら、プラグイン内部のユーザーで別の内部セッションを開く
+      - そこから自分の内部セッションに `KILL <id>` ステートメントを実行してから閉じる (機構は同じ)
     - 実体が `KILL` ステートメントなので、classic protocol の接続から `KILL <id>` を実行した場合も同じ経路で閉じる
     - `KILL QUERY` は実行中のステートメントを止めるだけで、接続は閉じない
   - 検知経路は 2 つ

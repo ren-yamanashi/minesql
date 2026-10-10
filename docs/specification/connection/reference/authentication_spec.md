@@ -16,7 +16,9 @@
   - [session.cc の未対応メカニズムの応答](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/session.cc#L155-L162)
 - 成功時は `SessionStateChanged` (`CLIENT_ID_ASSIGNED`) の Notice を送ってから `AuthenticateOk` を返し、セッションが利用可能になる
   - [session.cc の on_auth_success](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/session.cc#L204-L214)
-- 失敗は 1 セッションにつき 3 回まで、3 回目の `Error` は FATAL で打ち切り、セッションを閉じた / リセットした後は新しいセッションになるため回数は 0 から数え直す
+- 失敗は 1 セッションにつき 3 回まで
+  - 3 回目の `Error` は FATAL で打ち切る
+  - セッションを閉じた / リセットした後は新しいセッションになるため、回数は 0 から数え直す
   - [session.cc の on_auth_failure_impl](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/session.cc#L222-L247)
   - [session.h の k_max_auth_attempts](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/session.h#L125)
   - [client.cc の on_session_reset (リセット時に新しいセッションを作る)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/client.cc#L524-L532)
@@ -27,7 +29,7 @@
 - 認証ハンドラ (Authentication): `AuthenticateStart` で指定された認証メカニズムに対応するものが 1 つ作られ、成功または失敗で消える
   - [auth_challenge_response.h の Sasl_challenge_response_auth (やり取りの説明)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/auth_challenge_response.h#L42-L68)
   - [auth_plain.cc の Sasl_plain_auth](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/auth_plain.cc#L49-L62)
-- アカウント照合 (Account_verification_handler): 資格情報を「既定スキーマ \0 ユーザー名 \0 パスワード (または計算値)」に分解し、アカウント情報を取り出して照合する
+- アカウント照合 (Account_verification_handler): 資格情報を「デフォルトスキーマ \0 ユーザー名 \0 パスワード (または計算値)」に分解し、アカウント情報を取り出して照合する
   - [account_verification_handler.cc の authenticate (資格情報の分解)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/account_verification_handler.cc#L39-L70)
   - [verify_account (照合と各種の検査)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/account_verification_handler.cc#L125-L181)
   - [get_account_record (mysql.user の検索)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/account_verification_handler.cc#L183-L244)
@@ -39,9 +41,10 @@
   - [cache_based_verification.cc の照合](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/cache_based_verification.cc#L70-L91)
   - [sha2_plain_verification.cc の成功時のキャッシュ登録](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sha2_plain_verification.cc#L81-L85)
   - [module_cache.cc のキャッシュの消去](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/module_cache.cc#L82-L96)
-- 内部セッションの実行ユーザー (security context): 照合の間はシステムユーザー (`mysql.session`@`localhost`) として動き、成功したら認証した利用者に切り替え、既定スキーマの指定があればそれも設定する
+- 内部セッションの実行ユーザー (security context): 照合の間はシステムユーザー (`mysql.session`@`localhost`) として動く
+  - 成功したら認証した利用者に切り替え、デフォルトスキーマの指定があればそれも設定する
   - [sql_data_context.cc の authenticate_internal](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sql_data_context.cc#L257-L300)
   - [switch_to_user](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sql_data_context.cc#L445-L499)
-- 成功時に、照合で読んだ `minesql.user` の行の全体権限を実行ユーザーに設定する (MySQL は ACL キャッシュの値を設定する)
-  - [sql_auth_cache.cc の acl_getroot (ログイン時に全体権限を実行ユーザーへ設定)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/auth/sql_auth_cache.cc#L1549-L1596)
+- 成功時に、照合で読んだ `minesql.user` の行のグローバル権限を実行ユーザーに設定する (MySQL は ACL キャッシュの値を設定する)
+  - [sql_auth_cache.cc の acl_getroot (ログイン時にグローバル権限を実行ユーザーへ設定)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/auth/sql_auth_cache.cc#L1549-L1596)
   - [security_context_imp.cc の security_context_lookup (X Plugin の switch_to_user が至る)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/server_component/security_context_imp.cc#L182)

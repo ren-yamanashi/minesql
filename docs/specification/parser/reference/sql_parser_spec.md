@@ -6,7 +6,13 @@
 
 ## 構文の範囲
 
-- 対象のステートメントは SELECT / INSERT / UPDATE / DELETE / CREATE TABLE / DROP TABLE / CREATE SCHEMA / DROP SCHEMA / USE / トランザクション制御 (BEGIN、START TRANSACTION、COMMIT、ROLLBACK) / アカウント管理ステートメント (CREATE USER、ALTER USER、DROP USER) / GRANT / REVOKE / KILL の 13 種
+- 対象のステートメントは次の 13 種
+  - SELECT / INSERT / UPDATE / DELETE
+  - CREATE TABLE / DROP TABLE / CREATE SCHEMA / DROP SCHEMA / USE
+  - トランザクション制御 (BEGIN、START TRANSACTION、COMMIT、ROLLBACK)
+  - アカウント管理ステートメント (CREATE USER、ALTER USER、DROP USER)
+  - GRANT / REVOKE
+  - KILL
   - MySQL の `simple_statement` (ステートメントの一覧) の選択肢のうち、この 13 種に対応するものだけを写す
   - 参照:
     - [simple_statement](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2403)
@@ -35,7 +41,7 @@
 
 ## 字句規則
 
-字句解析器は入力の文字列を先頭から読み、トークン (キーワード、識別子、リテラル、記号) を 1 つずつ返す。MySQL では文字の種類ごとに開始状態を引く表 (`state_map`) と、識別子に使える文字の表 (`ident_map`) を文字集合ごとに持ち、`lex_one_token` がその状態機械を回す
+字句解析器は入力の文字列を先頭から読み、トークン (キーワード、識別子、リテラル、記号) を 1 つずつ返す。MySQL は、文字の種類ごとに開始状態を引く表 (`state_map`) と識別子に使える文字の表 (`ident_map`) を文字集合ごとに持つ。`lex_one_token` がこの表に従う状態機械を動かす
 
 - 参照:
   - [sql_chars.cc の init_state_maps](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/strings/sql_chars.cc#L65-L131)
@@ -222,7 +228,8 @@
 
 - 1 回の解析で受け取るのは 1 つのステートメントで、末尾の `;` は省略できる
   - `;` の後ろに別のステートメントが続いていれば構文エラー
-  - MySQL では `;` の後ろに続きを許すかをクライアントの capability `CLIENT_MULTI_QUERIES` で決めており、X Plugin はこの capability を持たないため、X Protocol 経由では MySQL でも同じ挙動になる
+  - MySQL では `;` の後ろに続きを許すかをクライアントの capability `CLIENT_MULTI_QUERIES` で決める
+    - X Plugin はこの capability を持たないため、X Protocol 経由では MySQL でも同じ挙動になる
   - 参照:
     - [sql_statement 規則](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2347-L2390)
     - [X Plugin が名乗るクライアントの capability](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/streaming_command_delegate.cc#L371-L374)
@@ -407,7 +414,8 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 ### SELECT
 
 - 規則の連なり: `select_stmt` → `query_expression` → `query_expression_body` → `query_primary` → `query_specification`
-  - MySQL がこの段数を持つのは UNION / ORDER BY / LIMIT / 括弧つきのクエリ式を扱うためで、MineSQL では `query_expression` に ORDER BY と LIMIT が残るほかは、どの段も選択肢が 1 つになる
+  - MySQL がこの段数を持つのは UNION / ORDER BY / LIMIT / 括弧つきのクエリ式を扱うため
+    - MineSQL では `query_expression` に ORDER BY と LIMIT が残るほかは、どの段も選択肢が 1 つになる
   - 規則の名前は MySQL と対応づけるために残す
 
 | 規則 | 採用する選択肢 | 外す選択肢 |
@@ -754,7 +762,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 
 ### GRANT / REVOKE
 
-採る形は `GRANT 権限の並び | ALL [PRIVILEGES] ON *.* TO user_list [WITH GRANT OPTION]` と `REVOKE 権限の並び | ALL [PRIVILEGES] ON *.* FROM user_list` だけで、権限は 8 つ ([SDR-0018](../../sdr/0018.権限は全体権限だけを持つ.md))
+採る形は `GRANT 権限の並び | ALL [PRIVILEGES] ON *.* TO user_list [WITH GRANT OPTION]` と `REVOKE 権限の並び | ALL [PRIVILEGES] ON *.* FROM user_list` だけで、権限は 8 つ ([SDR-0018](../../sdr/0018.権限はグローバル権限だけを持つ.md))
 
 | 規則 | 採用する選択肢 | 外す選択肢 |
 | --- | --- | --- |
@@ -799,13 +807,16 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 - エラー位置は、構文解析器がエラーを検出したときの先読みトークンの先頭
   - Bison は生成したパーサーからエラー報告関数 (`my_sql_parser_error`) を先読みトークンの位置つきで呼び、MySQL はその位置を `near` の起点にする
   - 入力の終わりでエラーになった場合 (`SELECT * FROM` のように途中で切れた入力) は `near ''` になる
-  - goyacc の生成コードは `yyLexer.Error(string)` を呼ぶだけで位置を渡さないため、MineSQL の字句解析器は直前に返したトークンの先頭位置を覚えておき、`Error` の中でそれを使って同じ文言を組み立てる
+  - goyacc の生成コードは `yyLexer.Error(string)` を呼ぶだけで位置を渡さない
+    - そのため MineSQL の字句解析器は直前に返したトークンの先頭位置を覚えておき、`Error` の中でそれを使って同じ文言を組み立てる
   - 参照:
     - [my_sql_parser_error](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L334-L346)
     - [THD::syntax_error_at](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_class.cc#L2804-L2809)
     - [goyacc の yyLexer インターフェース (doc.go)](https://github.com/golang/tools/blob/v0.31.0/cmd/goyacc/doc.go#L27-L36)
 - 字句の誤りも同じ構文エラーとして報告する
-  - MySQL では、閉じていない文字列は引用符 1 文字のトークンとして、閉じていないバッククォートと閉じていないコメントは受理不能なトークン (`ABORT_SYM`) として構文解析器に渡り、そこで構文エラーになる
+  - MySQL では、どれも構文解析器に渡ってそこで構文エラーになる
+    - 閉じていない文字列は引用符 1 文字のトークンとして渡る
+    - 閉じていないバッククォートと閉じていないコメントは受理不能なトークン (`ABORT_SYM`) として渡る
   - MineSQL も字句解析器ではエラーを起こさず、受理不能なトークンを返して構文解析器に判断させる (エラーの出口を 1 つにするため)
   - 参照:
     - [閉じていない文字列 (get_text が失敗したら 1 文字ずつ読む)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.cc#L1861-L1865)
@@ -825,7 +836,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 
 ### [sql_parser.md](../sql_parser.md) より
 
-- 字句解析器 (lexer): 入力の文字列と読み取り位置を持ち、求められるたびに次のトークンを 1 つ返す
+- 字句解析器 (lexer): 入力の文字列と読み取り位置を持ち、要求されるたびに次のトークンを 1 つ返す
   - [sql_lex.cc の my_sql_parser_lex / lex_one_token](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.cc#L1367-L1436)
   - [sql_lex.h の Lex_input_stream](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.h#L3296-L3303)
   - [lex.h のキーワード表](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/lex.h)
@@ -840,9 +851,10 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
   - [sql_lex.h の Query_expression](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.h#L626)
   - [Query_block](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.h#L1167)
   - [item.h の Item](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/item.h#L936)
-- 実行コマンド (`Sql_cmd`): ステートメント 1 つのプリペアと実行の手順を表すオブジェクト
+- SQL コマンド (`Sql_cmd`): ステートメント 1 つのプリペアと実行の手順を表すオブジェクト
   - [parse_tree_nodes.cc の PT_select_stmt::make_cmd](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/parse_tree_nodes.cc#L761-L806)
-- MySQL では、ディスパッチャから渡されたステートメントを `dispatch_sql_command` が受け、`parse_sql` が字句解析から実行コマンドの生成までを行い、`mysql_execute_command` が実行コマンドを実行する
+- MySQL では、ディスパッチャから渡されたステートメントを `dispatch_sql_command` が受ける
+  - `parse_sql` が字句解析から SQL コマンドの生成までを受け持ち、`mysql_execute_command` が SQL コマンドを実行する
   - [sql_parse.cc の dispatch_sql_command](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_parse.cc#L5275)
   - [parse_sql](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_parse.cc#L7098)
   - [mysql_execute_command](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_parse.cc#L2909)

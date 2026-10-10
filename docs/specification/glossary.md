@@ -46,15 +46,15 @@
 | 未解決 | 未束縛、unresolved | unresolved | AST のノードのうち、書かれた名前がどのテーブル・どのカラムを指すか、式の値の型が何かがまだ決まっていない状態。プリペアが決めると解決済みになる |
 | プリペア | 準備、準備フェーズ、resolve | prepare (`Sql_cmd_dml::prepare`) | AST に対して名前解決と型決定を行う段階。データディクショナリを参照するのはここ |
 | オプティマイザ | 最適化 (段階を指すとき)、最適化器、プランナー | optimizer (Query Optimizer) | 解決済みの AST から実行計画を選ぶモジュールと、その段階 |
-| エグゼキュータ | 実行 (段階を指すとき)、実行器、実行エンジン | executor (Query Executor) | 実行計画を実行し、結果を返すモジュールと、その段階。実行コマンドの実行の操作のうち DML の部分を担う |
-| 実行コマンド | コマンドオブジェクト、ステートメントオブジェクト | `Sql_cmd` | ステートメント 1 つのプリペアと実行の操作を持つオブジェクト。パーサーの出口で AST を包んで作り、内部セッションがこれの `prepare` → `execute` を呼ぶ |
+| エグゼキュータ | 実行 (段階を指すとき)、実行器、実行エンジン | executor (Query Executor) | 実行計画を実行し、結果を返すモジュールと、その段階。SQL コマンドの実行の操作のうち DML の部分を担う |
+| SQL コマンド | 実行コマンド、コマンドオブジェクト、ステートメントオブジェクト | `Sql_cmd` | ステートメント 1 つの AST を持ち、プリペアと実行の 2 つの操作を持つもの。ステートメントの文字列そのものではない。パーサーの出口で AST から作り、内部セッションがその `prepare` → `execute` を呼ぶ |
 | パラメータ | 引数 (プレースホルダに入る値を指すとき) | `StmtExecute.args` (`sql` namespace) | ステートメント中のプレースホルダ `?` を置き換える値。管理コマンドに渡す名前付きの値は「引数」と呼ぶ |
 | プレースホルダ | ワイルドカード | placeholder (`?`) | ステートメント中でパラメータが入る位置 |
 | Affected Rows | 影響行数、影響を受けた行数 | `ROWS_AFFECTED` | ステートメントが変更した行数。Notice の `SessionStateChanged` で送られる |
 | Last Insert ID | 生成された ID、自動採番値、auto-generated ID | `GENERATED_INSERT_ID` (X Protocol の Notice)、`last_insert_id` (classic の OK パケット)、`LAST_INSERT_ID()` | 直前のステートメントで AUTO_INCREMENT により生成された値。Notice の `SessionStateChanged` で送られる |
 | 実行ステータス | 実行結果の付帯情報 | (`ROWS_AFFECTED` / `GENERATED_INSERT_ID` / `PRODUCED_MESSAGE`) | リザルトセットとは別に Notice で届く、実行に関する情報の総称 |
-| 内部セッション | THD、サーバーセッション | internal session (`srv_session`、実装上は THD) | セッションごとに 1 つある、ステートメントの実行の入口と実行の文脈。実行ユーザー、既定スキーマ、トランザクションの状態、診断、kill の要求を保持し、SQL はこの文脈で実行される |
-| 実行の文脈 | セッション状態、コンテキスト | (THD が持つ状態) | 内部セッションが持つ、実行ユーザーと全体権限、既定スキーマ、トランザクションの状態、診断 (エラーと警告)、kill の要求の集まり |
+| 内部セッション | THD、サーバーセッション | internal session (`srv_session`、実装上は THD) | セッションごとに 1 つあり、受け取ったステートメントをパーサーで解析し、プリペアしてから実行する部分。実行ユーザー、デフォルトスキーマ、トランザクションの状態、エラーと警告、kill の要求を持ち、SQL はこの状態のもとで実行される |
+| 実行の文脈 | セッション状態、コンテキスト | (THD が持つ状態) | 内部セッションが持つ、実行ユーザーとグローバル権限、デフォルトスキーマ、トランザクションの状態、診断 (エラーと警告)、kill の要求の集まり |
 | 実行ユーザー | 身元、セキュリティコンテキスト (MySQL の用語) | security context (`priv_user`) | 内部セッションが SQL を実行するときの利用者。認証の成功後に設定され、権限の判定や `CURRENT_USER()` の値になる |
 | データディクショナリ | 辞書、カタログ (単独では使わない)、メタデータストア | data dictionary (`sql/dd`) | スキーマ・テーブル・カラム・インデックスの定義を保持し、名前解決と DDL に提供する部分。アカウントはシステムテーブルに置き、ここには含めない |
 | ディクショナリテーブル | DD テーブル、データディクショナリテーブル | dictionary table (`mysql.tables` など) | 定義を行として持つテーブル。MySQL では mysql スキーマ、MineSQL では minesql スキーマにあり、利用者からは見えない。`user` などのシステムテーブルとは別物 |
@@ -70,9 +70,9 @@
 | 行 | レコード (ページ上の物理形式を指すとき以外)、タプル | row (`Row` メッセージ、Affected Rows) | テーブルの横 1 件のデータ。SQL、プロトコル、ディクショナリの文脈で使う。文書内の表の行は「表の行」(DB のものは「テーブルの行」) と書けば区別できる |
 | レコード | 行 (ページ上の物理形式を指すとき) | record (InnoDB の `rec_t`) | 行をページに格納した物理形式で、ストレージの文脈で使う。SQL、プロトコル、ディクショナリの文脈では「行」を使う |
 | スキーマ | データベース (MySQL では `SCHEMA` と `DATABASE` は同義) | schema / database | テーブルの名前空間。システムテーブルは minesql スキーマに置く |
-| mysql スキーマ | システムスキーマ、mysql データベース、mysql システムスキーマ (マニュアルの節名) | the mysql system schema | MySQL がシステムテーブルとディクショナリテーブルを置くスキーマ (MineSQL の対応物は minesql スキーマ)。MySQL のマニュアルが system schema と呼ぶのはこのスキーマで、監視用のビューを集めた `sys` スキーマや `information_schema` / `performance_schema` とは別物 |
+| mysql スキーマ | システムスキーマ、mysql データベース、mysql システムスキーマ (マニュアルの節名) | the mysql system schema | MySQL がシステムテーブルとディクショナリテーブルを置くスキーマ (MineSQL の対応物は minesql スキーマ)。MySQL のマニュアルが system schema と呼ぶのはこのスキーマで、監視用のビューを集めた `sys` スキーマや `information_schema` / `performance_schema` とは別のスキーマ |
 | minesql スキーマ | システムスキーマ、mysql スキーマ (MineSQL のものを指すとき) | | MineSQL がシステムテーブル (`user`) とディクショナリテーブルを置くスキーマ。MySQL の mysql スキーマに相当し、名前は写さない |
-| 既定スキーマ | カレントスキーマ、デフォルトデータベース | default schema (`AuthenticateStart.schema`、Notice の `CURRENT_SCHEMA`) | 修飾のないテーブル名を解決するスキーマ。接続時に決まる |
+| デフォルトスキーマ | 既定スキーマ、カレントスキーマ、デフォルトデータベース | default schema (`AuthenticateStart.schema`、Notice の `CURRENT_SCHEMA`) | スキーマ名を付けずに書いたテーブル名を、どのスキーマで探すかを決めるスキーマ。接続時の指定で決まり、`USE` で切り替わる |
 | システムテーブル | システムテーブル、メタデータテーブル | system table (`mysql.user` など) | サーバー自身が使うテーブル。普通のテーブルとして同じストレージに置く |
 | 名前解決の文脈 | スコープ、名前空間 (名前解決の話をするとき) | name resolution context (`Name_resolution_context`) | クエリブロックごとに持つ、見えているテーブルの一覧。カラム名を探す範囲で、外側の文脈を辿れる |
 | 型決定 | 型解決、型推論 | type resolution (`resolve_type`) | 式の各ノードの型を、型の規則に従って決める段階。プリペアが行う |
@@ -94,10 +94,10 @@
 | 監査イベント | 監査通知、audit event | audit event (`MYSQL_AUDIT_*`) | MySQL がサーバー内の出来事 (接続、ステートメントの実行、アカウントの変更など) を登録済みのプラグインに知らせる通知。X Plugin はアカウントの変更の通知を受けて SHA256 パスワードキャッシュのエントリを消す。MineSQL はこの仕組みを持たない |
 | アカウント照合 | 認証チェック、資格情報の検証 | account verification (`Account_verification_handler`) | 資格情報をアカウント情報 (MySQL では `mysql.user`) と突き合わせる処理 |
 | SHA256 パスワードキャッシュ | パスワードキャッシュ | `SHA256_password_cache` | `SHA256_MEMORY` の照合に使う、利用者ごとのパスワードのハッシュを保持するサーバー内のキャッシュ |
-| アカウント | ユーザー (アカウントを指すとき) | account (`mysql.user` の 1 行、`'user'@'host'`) | 利用者の名前とホストの組に、認証文字列と全体権限を結びつけたもの。MineSQL のホストは `%` のみ |
+| アカウント | ユーザー (アカウントを指すとき) | account (`mysql.user` の 1 行、`'user'@'host'`) | 利用者の名前とホストの組に、認証文字列とグローバル権限を結びつけたもの。MineSQL のホストは `%` のみ |
 | アカウント管理ステートメント | アカウント文、ユーザー管理文、DCL | account management statements (`CREATE USER` / `ALTER USER` / `DROP USER`) | アカウントを作成・変更・削除するステートメント。`GRANT` / `REVOKE` は含めない |
-| ACL | アクセス制御、権限システム、アカウントと権限 | ACL (`sql/auth` の `acl_*`。Access Control List) | アカウントと全体権限を保持し、アカウント管理ステートメントと `GRANT` / `REVOKE` を実行し、権限の検査の規則を定めるモジュール。MySQL のソースがこの部分をこう呼ぶ |
-| 全体権限 | グローバル権限、静的権限 | global privileges (`mysql.user` の `*_priv` カラム、`GRANT ... ON *.*`) | スキーマやテーブルを限定しない権限。MineSQL が持つ唯一の粒度で、認証の成功時に実行ユーザーに設定する |
+| ACL | アクセス制御、権限システム、アカウントと権限 | ACL (`sql/auth` の `acl_*`。Access Control List) | アカウントとグローバル権限を `minesql.user` テーブルに保存し、アカウント管理ステートメントと `GRANT` / `REVOKE` を実行し、権限の検査の規則を定めるモジュール。MySQL のソースがこの部分をこう呼ぶ |
+| グローバル権限 | 全体権限、静的権限 | global privileges (`mysql.user` の `*_priv` カラム、`GRANT ... ON *.*`) | スキーマやテーブルを限定しない権限。MineSQL が持つ唯一の粒度で、認証の成功時に実行ユーザーに設定する |
 | デリゲート | 結果の受け口、コールバック | command delegate (`ngs::Command_delegate`、`Streaming_command_delegate`) | ステートメントの実行 1 回につき作られ、内部セッションからのコールバック (カラム定義、行、完了、エラー) を受けてプロトコルのメッセージに変換して送る部品 |
 | コマンドディスパッチャ | ディスパッチャ (初出時)、コマンドディスパッチャー | command dispatcher (`Dispatcher`) | セッションが受け取ったリクエストを振り分け、内部セッションに委ねて、レスポンスを返す部分 |
 | 受け付ける / 受付 | accept する、アクセプト | accept | 接続を受け入れること。動詞は「受け付ける」、名詞は「受付」 |
