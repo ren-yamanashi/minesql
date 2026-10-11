@@ -255,7 +255,7 @@
   - [接続一覧 (client_list.cc)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/ngs/client_list.cc#L48-L88)
 - 接続 (Client): 受け付けた接続 1 本につき 1 つ生まれ、接続が閉じると消える
   - [server_factory.cc の create_client](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/server/server_factory.cc#L36-L52)
-- セッション (Session): 接続の受付時に用意され、認証を経て利用可能になり、閉じられるまで続く
+- セッション (Session): 接続の受付時に用意され、認証を経て状態がコマンド受付中になり、閉じられるまで続く
   - [sql_data_context.cc の init](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sql_data_context.cc#L93-L125)
 - acceptor スレッド (スケジューラ名 `network`): listen ソケットのイベントループを回し、accept とタイマー (接続タイムアウトの監視、終了したワーカーの回収) を処理する
   - [module_mysqlx.cc のタスク登録](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/module_mysqlx.cc#L169-L170)

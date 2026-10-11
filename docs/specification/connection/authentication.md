@@ -113,7 +113,7 @@ sequenceDiagram
     alt 成功
         S->>I: 実行ユーザーを認証したアカウントに切り替え、グローバル権限を設定する
         S-->>C: Notice: SessionStateChanged (CLIENT_ID_ASSIGNED)
-        S->>S: セッションを利用可能にする
+        S->>S: セッションの状態をコマンド受付中にする
         S-->>C: AuthenticateOk
     else 失敗 (1〜2 回目は ERROR、3 回目は FATAL)
         S-->>C: Error (ER_ACCESS_DENIED_ERROR)
@@ -124,13 +124,13 @@ sequenceDiagram
 図の段階ごとの補足
 
 - 「検証器で照合」: 検査するのはパスワードの一致だけで、比べる相手と計算は認証メカニズムごとに違う
-  - `MYSQL41`: salt に対する応答 (`mysql_native_password` の方式で SHA1 から計算した値) を `minesql.user` の認証文字列と比べる
-    - アカウントの認証プラグインは `caching_sha2_password` なので照合は成り立たず、チャレンジを返したうえで access denied になる
+  - `MYSQL41`: `mysql_native_password` のアカウント向けのメカニズムで、MineSQL のアカウントは全て `caching_sha2_password` なので照合は成り立たない
+    - メカニズムとしては受け付け、チャレンジを返したうえで access denied にする (一覧にないメカニズムだと FATAL で接続が閉じるため、クライアントが別のメカニズムを試せるようにしておく)
   - `SHA256_MEMORY`: 応答 `XOR(SHA256(password), SHA256(SHA256(SHA256(password)) + nonce))` を SHA256 パスワードキャッシュの値 (`SHA256(SHA256(password))`) と比べる
     - キャッシュにそのアカウントのエントリがなければ失敗する
   - `PLAIN`: 資格情報のパスワード (平文) を `minesql.user` の認証文字列と比べ、合えば SHA256 パスワードキャッシュに登録する
     - キャッシュに同じ値のエントリがあれば、認証文字列との照合を省いて成功にする
-- 「成功」の分岐: `SessionStateChanged` (`CLIENT_ID_ASSIGNED`) の Notice を送り、セッションを利用可能にしてから `AuthenticateOk` を返す
+- 「成功」の分岐: `SessionStateChanged` (`CLIENT_ID_ASSIGNED`) の Notice を送り、セッションの状態をコマンド受付中にしてから `AuthenticateOk` を返す
   - 以後、接続は認証したアカウントとしてコマンドを実行する
 - 「失敗」の分岐: 失敗は 1 セッションにつき 3 回まで
   - 3 回目の失敗の `Error` は FATAL になり、サーバーは認証を打ち切って接続を閉じる (途中で別のメカニズムに切り替えて試すことはできる)
