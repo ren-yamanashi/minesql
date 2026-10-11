@@ -92,7 +92,7 @@
 | ハンドラ | 種別ごとの処理、ハンドラー | handler | ディスパッチャがリクエストの種別ごとに持つ処理の単位 (SQL ステートメント、管理コマンド、Expect ブロック)。認証メカニズムのものは「認証ハンドラ」と呼び分ける |
 | 認証ハンドラ | 認証プラグイン (X Plugin 側を指すとき)、SASL ハンドラ | authentication handler (`iface::Authentication`、`Sasl_*_auth`) | 認証メカニズム 1 つ分のやり取り (チャレンジの生成、応答の受け取り) を進める部品。`AuthenticateStart` ごとに作られる |
 | 監査イベント | 監査通知、audit event | audit event (`MYSQL_AUDIT_*`) | MySQL がサーバー内の出来事 (接続、ステートメントの実行、アカウントの変更など) を登録済みのプラグインに知らせる通知。X Plugin はアカウントの変更の通知を受けて SHA256 パスワードキャッシュのエントリを消す。MineSQL はこの仕組みを持たない |
-| アカウント照合 | 認証チェック、資格情報の検証 | account verification (`Account_verification_handler`) | 資格情報をアカウント情報 (MySQL では `mysql.user`) と突き合わせる処理 |
+| アカウント照合ハンドラ | アカウント照合 (構成要素を指すとき)、認証チェック、資格情報の検証 | account verification (`Account_verification_handler`) | 資格情報をアカウント情報 (MySQL では `mysql.user` の行) と比べ、結果を返すもの |
 | SHA256 パスワードキャッシュ | パスワードキャッシュ | `SHA256_password_cache` | `SHA256_MEMORY` の照合に使う、アカウントごとのパスワードのハッシュを保持するサーバー内のキャッシュ |
 | アカウント | ユーザー (アカウントを指すとき) | account (`mysql.user` の 1 行、`'user'@'host'`) | 利用者の名前とホストの組に、認証文字列とグローバル権限を結びつけたもの。MineSQL のホストは `%` のみ |
 | アカウント管理ステートメント | アカウント文、ユーザー管理文、DCL | account management statements (`CREATE USER` / `ALTER USER` / `DROP USER`) | アカウントを作成・変更・削除するステートメント。`GRANT` / `REVOKE` は含めない |
