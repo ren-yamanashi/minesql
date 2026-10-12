@@ -29,7 +29,7 @@ flowchart TD
 
 ### 認証ハンドラ (Authentication)
 
-- 仕組み
+- MySQL での仕様
   - `AuthenticateStart` で指定された認証メカニズムに対応するものが 1 つ作られ、成功または失敗で消える
   - 認証メカニズムの実装は 2 種類に分かれる
     - チャレンジレスポンス型 (`MYSQL41`、`SHA256_MEMORY`): サーバーが 20 バイトの salt を送り、クライアントはパスワードのハッシュと salt から計算した値を返す
@@ -38,17 +38,17 @@ flowchart TD
   - 作れる認証メカニズムは、接続が安全かどうかで決まる (TLS または Unix ソケットなら安全、TLS なしの TCP なら安全でない)
     - その接続で作れるメカニズムの一覧が、そのまま capability `authentication.mechanisms` の値になる (TLS に切り替えると `PLAIN` が加わる)
   - 一覧にないメカニズム名は FATAL の `Error` (`ER_NOT_SUPPORTED_AUTH_MODE`) になり、その後接続は閉じられる
-- MineSQL での仕様
+- MineSQL 特有の仕様
   - 認証メカニズムは `MYSQL41` / `PLAIN` / `SHA256_MEMORY` の 3 つ
   - 安全でない接続 (TLS なしの TCP) で使えるのは `MYSQL41` と `SHA256_MEMORY`、安全な接続 (TLS または Unix ソケット) では `PLAIN` も使える
 
 ### アカウント照合ハンドラ (Account_verification_handler)
 
-- 仕組み
+- MySQL での仕様
   - 資格情報を「デフォルトスキーマ \0 ユーザー名 \0 パスワード (または計算値)」に分解し、アカウント情報を取り出して照合する (`\0` は NUL 文字)
   - アカウント情報は `mysql.user` にあり、内部セッションで検索して取得する
   - 照合の計算はアカウントの認証プラグインの種類ごとの検証器が行う (`mysql_native_password` 用、`caching_sha2_password` 用、キャッシュ用など)
-- MineSQL での仕様
+- MineSQL 特有の仕様
   - アカウントの認証プラグインは `caching_sha2_password` のみ
   - 照合する相手は `minesql.user` の行の認証文字列
   - ホストは `%` のみ (仮) で、user@host のパターン照合は行わない
@@ -59,7 +59,7 @@ flowchart TD
 
 ### SHA256 パスワードキャッシュ (SHA256_password_cache)
 
-- 仕組み
+- MySQL での仕様
   - `SHA256_MEMORY` の照合に使う値 (パスワードを SHA256 でハッシュ化した値をもう一度 SHA256 でハッシュ化した値) をアカウントごとに保持し、全ての接続で共有する
   - キャッシュにそのアカウントのエントリが作られるのは、平文で照合できるメカニズム (`PLAIN`) で一度成功したとき
   - 永続化しないので、サーバーの再起動で空になる
@@ -70,18 +70,18 @@ flowchart TD
         - MySQL では、`ALTER USER` / `DROP USER` を実行したサーバー本体は自分の ACL キャッシュを更新できるが、SHA256 パスワードキャッシュのエントリは消せない
         - このキャッシュは X Plugin のもので、本体は X Plugin を知らないため
         - そこで本体は監査イベントで X Plugin に知らせ、それを受け取った X Plugin がエントリを消す
-- MineSQL での仕様
+- MineSQL 特有の仕様
   - 資格情報の変更 (`ALTER USER ... IDENTIFIED BY`) とアカウントの削除 (`DROP USER`) で、そのアカウントのエントリが消える
   - 監査の枠組みは持たず、アカウント管理ステートメントの実行時に直接消す
     - MySQL では上述 (`以下、上記の補足` の bullet 以下の部分) の通り 監査イベントを通じて SHA256 パスワードキャッシュのエントリを更新するが、MineSQL では ACL も認証も同じプログラムの中にあるので、`ALTER USER` / `DROP USER` の実行の操作が `minesql.user` の行を書き換えるのと同時に、SHA256 パスワードキャッシュのエントリも直接消せる
 
 ### 内部セッションの実行ユーザー (security context)
 
-- 仕組み
+- MySQL での仕様
   - セッションは、照合の間は実行ユーザーをシステムユーザー (MySQL では `mysql.session`@`localhost`) にし、照合が成功したら認証したアカウントにする
     - 照合の間だけシステムユーザーにするのは、照合のために `minesql.user` を検索する SELECT を、まだ誰でもない状態で (どのアカウントか判明していない接続が) 実行できるようにするため
   - 資格情報にデフォルトスキーマの情報が含まれていれば、切り替えの後にそのスキーマをデフォルトスキーマにする (`USE` と同じ)
-- MineSQL での仕様
+- MineSQL 特有の仕様
   - 実行ユーザーを認証したアカウントにするときに、そのアカウントの行にあるグローバル権限 (e.g. `SELECT` / `INSERT` / `CREATE` / `CREATE USER` の Y / N) を実行ユーザーに写す
     - 以後のステートメントの権限の検査は、`minesql.user` を読み直さずにこの写しを見るため
     - 写すのは認証のときだけなので、`GRANT` / `REVOKE` の効果は次の接続から現れる
