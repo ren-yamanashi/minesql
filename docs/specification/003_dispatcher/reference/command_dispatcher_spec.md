@@ -32,7 +32,7 @@
 
 ## StmtExecute の処理
 
-- メッセージの定義は [mysqlx_sql.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_sql.proto#L38-L77)、フィールドの意味は [message_spec.md](../../protocol/reference/message_spec.md#sql-実行-sqlstmtexecute) を参照
+- メッセージの定義は [mysqlx_sql.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_sql.proto#L38-L77)、フィールドの意味は [message_spec.md](../../001_protocol/reference/message_spec.md#sql-実行-sqlstmtexecute) を参照
 
 ### namespace の判定
 
@@ -63,7 +63,7 @@
 - 組み立てたステートメントを内部セッションで実行し、結果はコールバックで受け取る (仕組みは後述の「内部セッションでの実行」)
   - `compact_metadata` が真なら、カラム定義は `type` だけを設定して送る
 - カラム定義: 内部セッションからカラムごとの定義を受け取って `ColumnMetaData` に変換し、全カラムが揃った時点でまとめて送ってフラッシュする
-  - 変換の内容 (型の対応、フラグ、`catalog` の固定値 `"def"`) は [message_spec.md の ColumnMetaData](../../protocol/reference/message_spec.md#columnmetadata) を参照
+  - 変換の内容 (型の対応、フラグ、`catalog` の固定値 `"def"`) は [message_spec.md の ColumnMetaData](../../001_protocol/reference/message_spec.md#columnmetadata) を参照
   - 送信に失敗した場合は内部セッションに `ER_IO_WRITE_ERROR` "Connection reset by peer" を報告して実行を中断する
 - 行: 1 行分の値を受け取るたびに `Row` を送る
   - 行を送るたびに接続の生存と kill を確認する (長いリザルトセットの途中でも kill やシャットダウンを検知できる)
@@ -120,7 +120,7 @@
 | --- | --- | --- |
 | `ping` | なし | `StmtExecuteOk` のみ |
 | `list_clients` | なし | リザルトセット (`client_id` UINT、`user` BYTES、`host` BYTES、`sql_session` UINT) + `FetchDone` + `StmtExecuteOk` |
-| `kill_client` | `id` (uint、必須) | `StmtExecuteOk` のみ (対象の接続を閉じる挙動は [connection/ の kill](../../connection/reference/connection_handler_spec.md#タイムアウトと強制切断) を参照) |
+| `kill_client` | `id` (uint、必須) | `StmtExecuteOk` のみ (対象の接続を閉じる挙動は [002_connection/ の kill](../../002_connection/reference/connection_handler_spec.md#タイムアウトと強制切断) を参照) |
 | `enable_notices` | `notice` (文字列のリスト、必須) | `StmtExecuteOk` のみ |
 | `disable_notices` | `notice` (文字列のリスト、必須) | `StmtExecuteOk` のみ |
 | `list_notices` | なし | リザルトセット (`notice` BYTES、`enabled` SINT) + `FetchDone` + `StmtExecuteOk` |
@@ -178,7 +178,7 @@
 ## 内部セッションでの実行
 
 - ディスパッチャは内部セッションに「ステートメントを実行し、結果をコールバックで返す」ことだけを依頼する
-  - MineSQL ではこの依頼先が内部セッション ([session/](../../session/README.md)) に直結する
+  - MineSQL ではこの依頼先が内部セッション ([004_session/](../../004_session/README.md)) に直結する
 - MySQL では、この依頼はプラグイン向けの command service を通り、`COM_*` 層 (classic protocol と共通のコマンドの入口) に入る
   - X Plugin が使う `COM_*` は `COM_QUERY` (SQL ステートメント)、`COM_RESET_CONNECTION` (`Session.Reset` の `keep_open`)、`COM_INIT_DB` (デフォルトスキーマの切り替え)、`COM_STMT_PREPARE` / `EXECUTE` / `FETCH` / `CLOSE` (プロトコルのプリペアドステートメント、実装対象外) だけ
   - command service は内部セッションをスレッドに結び付け、コールバック集を proxy の `Protocol` として設定する
@@ -211,7 +211,7 @@
 | 内部セッションとの連携の失敗 (実行の依頼自体が失敗、実行ユーザーの切り替えの失敗) | `ERROR` または `FATAL` | `ER_X_SERVICE_ERROR` |
 
 - `ERROR` ではシーケンスだけが中断され、セッションは次のリクエストを受け付ける
-- `FATAL` ではセッションが閉じられ、接続の終了処理に入る ([connection/ の接続のライフサイクル](../../connection/reference/connection_handler_spec.md#接続のライフサイクル))
+- `FATAL` ではセッションが閉じられ、接続の終了処理に入る ([002_connection/ の接続のライフサイクル](../../002_connection/reference/connection_handler_spec.md#接続のライフサイクル))
 - 参照:
   - [sql_data_context.cc の execute_server_command (KILL 時の格上げ)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sql_data_context.cc#L632-L658)
   - [switch_to_user (FATAL の `ER_X_SERVICE_ERROR`)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/src/sql_data_context.cc#L445-L455)
