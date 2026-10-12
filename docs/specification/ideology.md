@@ -3,7 +3,7 @@
 `docs/specification/` の仕様書を書くとき、読むときの方針。仕様を整理する中で固まったもので、以後の仕様書にも適用する
 
 - 新しく確定した方針は、この文書に追記する
-- 実装する / しないの判断と、その理由・比べた案・経緯は [sdr/](./sdr/README.md) に 1 判断 1 ファイルで記録する
+- 実装する / しないの判断と、その理由・比べた案・経緯は [sdr/](../design-records/sdr/README.md) に 1 判断 1 ファイルで記録する
   - 仕様書には「何を満たすか」だけを書き、判断の経緯を書かない
 
 ## 目的とスコープ
@@ -23,36 +23,36 @@
 - 正とするもの: ローカルの mysql-server 8.4 (commit `aa461240`)
   - プロトコルは `.proto` ファイル、サーバーの挙動は `plugin/x/src` を正とする
   - マニュアル・WL・公式ブログは理解の助けにし、最終的な根拠にはしない
-- スコープの要点 (判断ごとの理由と経緯は [sdr/](./sdr/README.md))
-  - 実装対象は X Protocol に従うサーバー (X Plugin に相当する層) で、classic protocol は対比にとどめる ([SDR-0001](./sdr/0001.実装対象はXProtocolに従うサーバー.md))
-  - 実装しないもの: ドキュメントモデル ([SDR-0002](./sdr/0002.ドキュメントモデルは実装しない.md))、プロトコルのプリペアドステートメントとカーソル ([SDR-0003](./sdr/0003.プロトコルのプリペアドステートメントとカーソルは実装しない.md))、classic の COM コマンド層 ([SDR-0006](./sdr/0006.classicのCOMコマンド層は作らない.md))
-  - 実装するもの: Expect ブロック ([SDR-0004](./sdr/0004.Expectブロックを実装する.md))、接続系と Notice 系の管理コマンド 6 つ ([SDR-0005](./sdr/0005.管理コマンドは接続系とNotice系の6つを実装する.md))、TLS 接続 ([SDR-0016](./sdr/0016.TLS接続を実装する.md))
-  - SQL パーサー: MySQL の構文規則に従う ([SDR-0007](./sdr/0007.SQLパーサーはMySQLの構文規則に従う.md))、出力は未解決のクエリブロックと式で文脈化を持たない ([SDR-0008](./sdr/0008.パーサーの出力は未解決のクエリブロックと式で文脈化を持たない.md))、出口は SQL コマンド ([SDR-0009](./sdr/0009.パーサーの出口はSQLコマンドにする.md))、goyacc で生成し字句解析器は手書き ([SDR-0010](./sdr/0010.パーサーはgoyaccで生成し字句解析器は手書きにする.md))、文法に含める構文の範囲 ([SDR-0011](./sdr/0011.文法に含める構文の範囲.md))、キーワード表は文法が使う語だけ ([SDR-0012](./sdr/0012.キーワード表は文法が使う語だけにする.md))、`sql_mode` の既定値に固定し非推奨と無視される構文は採らない ([SDR-0013](./sdr/0013.sql_modeの既定値に固定し非推奨と無視される構文は採らない.md))
-  - スキーマを持ち、minesql スキーマ (MySQL の mysql スキーマに相当) にシステムテーブルを置く ([SDR-0014](./sdr/0014.スキーマを持つ.md))
-  - 認証は 3 メカニズム、`caching_sha2_password` のみ、`minesql.user` を SQL で検索して照合する ([SDR-0015](./sdr/0015.認証の方式.md))
-  - アカウント管理ステートメント (`CREATE USER` / `ALTER USER` / `DROP USER`) を対象に含める ([SDR-0017](./sdr/0017.アカウント管理ステートメントを対象に含める.md))
-  - 権限はグローバル権限だけを持ち、8 つの権限と `GRANT` / `REVOKE ... ON *.*` を対象にし、kill と接続の一覧は同じアカウントの接続のみ ([SDR-0018](./sdr/0018.権限はグローバル権限だけを持つ.md))
-  - データディクショナリ: ディクショナリテーブルはストレージエンジンのテーブルとして持ち ([SDR-0019](./sdr/0019.ディクショナリテーブルはストレージエンジンのテーブルとして持つ.md))、オブジェクトキャッシュを持ち ([SDR-0020](./sdr/0020.ディクショナリオブジェクトのキャッシュを持つ.md))、DDL は原子的に実行する ([SDR-0021](./sdr/0021.DDLは原子的に実行する.md))
-    - SDI と `information_schema` は実装しない ([SDR-0022](./sdr/0022.SDIとinformation_schemaは実装しない.md))
-  - データ型は `VARCHAR` と `INT` (符号付き 4 バイト) の 2 つ ([SDR-0023](./sdr/0023.データ型はVARCHARとINTを持つ.md))
-  - 型の規則は MySQL に合わせ、内部の値の型は整数・浮動小数点・文字列の 3 つで、小数は浮動小数点で持つ ([SDR-0024](./sdr/0024.型の規則はMySQLに合わせ小数は浮動小数点で持つ.md))
-  - 名前解決の規則は MySQL に合わせ、識別子は大文字小文字を区別しない ([SDR-0025](./sdr/0025.名前解決の規則はMySQLに合わせ識別子は大文字小文字を区別しない.md))
-  - プリペアは全種別で入口で権限を検査し、DML だけが名前解決・型決定と結合の単純化まで行う ([SDR-0026](./sdr/0026.プリペアで行うことの範囲.md))
+- スコープの要点 (判断ごとの理由と経緯は [sdr/](../design-records/sdr/README.md))
+  - 実装対象は X Protocol に従うサーバー (X Plugin に相当する層) で、classic protocol は対比にとどめる ([SDR-0001](../design-records/sdr/0001.実装対象はXProtocolに従うサーバー.md))
+  - 実装しないもの: ドキュメントモデル ([SDR-0002](../design-records/sdr/0002.ドキュメントモデルは実装しない.md))、プロトコルのプリペアドステートメントとカーソル ([SDR-0003](../design-records/sdr/0003.プロトコルのプリペアドステートメントとカーソルは実装しない.md))、classic の COM コマンド層 ([SDR-0006](../design-records/sdr/0006.classicのCOMコマンド層は作らない.md))
+  - 実装するもの: Expect ブロック ([SDR-0004](../design-records/sdr/0004.Expectブロックを実装する.md))、接続系と Notice 系の管理コマンド 6 つ ([SDR-0005](../design-records/sdr/0005.管理コマンドは接続系とNotice系の6つを実装する.md))、TLS 接続 ([SDR-0016](../design-records/sdr/0016.TLS接続を実装する.md))
+  - SQL パーサー: MySQL の構文規則に従う ([SDR-0007](../design-records/sdr/0007.SQLパーサーはMySQLの構文規則に従う.md))、出力は未解決のクエリブロックと式で文脈化を持たない ([SDR-0008](../design-records/sdr/0008.パーサーの出力は未解決のクエリブロックと式で文脈化を持たない.md))、出口は SQL コマンド ([SDR-0009](../design-records/sdr/0009.パーサーの出口はSQLコマンドにする.md))、goyacc で生成し字句解析器は手書き ([SDR-0010](../design-records/sdr/0010.パーサーはgoyaccで生成し字句解析器は手書きにする.md))、文法に含める構文の範囲 ([SDR-0011](../design-records/sdr/0011.文法に含める構文の範囲.md))、キーワード表は文法が使う語だけ ([SDR-0012](../design-records/sdr/0012.キーワード表は文法が使う語だけにする.md))、`sql_mode` の既定値に固定し非推奨と無視される構文は採らない ([SDR-0013](../design-records/sdr/0013.sql_modeの既定値に固定し非推奨と無視される構文は採らない.md))
+  - スキーマを持ち、minesql スキーマ (MySQL の mysql スキーマに相当) にシステムテーブルを置く ([SDR-0014](../design-records/sdr/0014.スキーマを持つ.md))
+  - 認証は 3 メカニズム、`caching_sha2_password` のみ、`minesql.user` を SQL で検索して照合する ([SDR-0015](../design-records/sdr/0015.認証の方式.md))
+  - アカウント管理ステートメント (`CREATE USER` / `ALTER USER` / `DROP USER`) を対象に含める ([SDR-0017](../design-records/sdr/0017.アカウント管理ステートメントを対象に含める.md))
+  - 権限はグローバル権限だけを持ち、8 つの権限と `GRANT` / `REVOKE ... ON *.*` を対象にし、kill と接続の一覧は同じアカウントの接続のみ ([SDR-0018](../design-records/sdr/0018.権限はグローバル権限だけを持つ.md))
+  - データディクショナリ: ディクショナリテーブルはストレージエンジンのテーブルとして持ち ([SDR-0019](../design-records/sdr/0019.ディクショナリテーブルはストレージエンジンのテーブルとして持つ.md))、オブジェクトキャッシュを持ち ([SDR-0020](../design-records/sdr/0020.ディクショナリオブジェクトのキャッシュを持つ.md))、DDL は原子的に実行する ([SDR-0021](../design-records/sdr/0021.DDLは原子的に実行する.md))
+    - SDI と `information_schema` は実装しない ([SDR-0022](../design-records/sdr/0022.SDIとinformation_schemaは実装しない.md))
+  - データ型は `VARCHAR` と `INT` (符号付き 4 バイト) の 2 つ ([SDR-0023](../design-records/sdr/0023.データ型はVARCHARとINTを持つ.md))
+  - 型の規則は MySQL に合わせ、内部の値の型は整数・浮動小数点・文字列の 3 つで、小数は浮動小数点で持つ ([SDR-0024](../design-records/sdr/0024.型の規則はMySQLに合わせ小数は浮動小数点で持つ.md))
+  - 名前解決の規則は MySQL に合わせ、識別子は大文字小文字を区別しない ([SDR-0025](../design-records/sdr/0025.名前解決の規則はMySQLに合わせ識別子は大文字小文字を区別しない.md))
+  - プリペアは全種別で入口で権限を検査し、DML だけが名前解決・型決定と結合の単純化まで行う ([SDR-0026](../design-records/sdr/0026.プリペアで行うことの範囲.md))
     - プリペアが定義を取得し、実行の操作がテーブルをロックする
-  - `KILL [CONNECTION] id` を対象に含め、`kill_client` は内部で `KILL` を実行する ([SDR-0027](./sdr/0027.KILLステートメントを対象に含める.md))
+  - `KILL [CONNECTION] id` を対象に含め、`kill_client` は内部で `KILL` を実行する ([SDR-0027](../design-records/sdr/0027.KILLステートメントを対象に含める.md))
   - 上記以外の「やらないこと」は [issue #120](https://github.com/ren-yamanashi/minesql/issues/120) が正
 
 ## 文書の構成
 
 - 読む順で分ける: 概要 (位置づけ) → 論理モデル / 流れ (2026-09-12 変更: 詳細仕様は読む順に含めない)
   - ディレクトリごとに README を置き、読む順と各文書の内容を示す
-  - protocol/: `x_protocol.md` (概要) → `communication_flow.md` (流れ)
-    - `message_spec.md` (各メッセージの詳細) は `protocol/reference/` に置き、読む順に含めない (2026-10-03 変更)
+  - 001_protocol/: `x_protocol.md` (概要) → `communication_flow.md` (流れ)
+    - `message_spec.md` (各メッセージの詳細) は `001_protocol/reference/` に置き、読む順に含めない (2026-10-03 変更)
       - 2026-09-12 には「外部との契約で MineSQL の判断で変わらないため読む順に含める」としたが、変わらないことと読む順に要ることは別で、内容 (フィールド、ビット値、種別値の一覧) は実装時に参照する資料の粒度だった
-  - connection/: `x_plugin.md` (要件) → `connection_handler.md` (論理モデル) → `authentication.md` (認証)
-  - parser/: `sql_parser.md` (論理モデル)
-  - X Plugin 全体の要件 (`x_plugin.md`) は connection/ に置く (2026-09-08 確定)
-    - dispatcher/ から「要件は x_plugin.md を参照」と指す文は置かない (2026-09-30 変更)
+  - 002_connection/: `x_plugin.md` (要件) → `connection_handler.md` (論理モデル) → `authentication.md` (認証)
+  - 005_parser/: `sql_parser.md` (論理モデル)
+  - X Plugin 全体の要件 (`x_plugin.md`) は 002_connection/ に置く (2026-09-08 確定)
+    - 003_dispatcher/ から「要件は x_plugin.md を参照」と指す文は置かない (2026-09-30 変更)
 - 論理モデル側に書くこと: 責務 (担うこと / 担わないこと)、構成要素 (状態と寿命を持ち振る舞いの主体となるもの)、実行モデル (スレッド)、処理の流れ、状態遷移、守る境界の種類
   - 数値・条件・カウンタ・ソースの細部は書かない
   - 他の文書に「…は xxx が定める」「…は xxx を参照」と委ねる文は書かず、自分の文書に必要な事実だけを書く (2026-09-30 確定)
@@ -115,8 +115,8 @@
   - flowchart は「段階と分岐」
   - stateDiagram は「状態と遷移」
 - 参加者名は誤認を避ける
-  - プロトコルの図 (protocol/) では、プロトコルの端点として「クライアント」「サーバー」と書く
-  - X Plugin 内部の要素「接続 (Client)」が同じ図に登場する場合 (connection/) は、接続元を「クライアントプログラム」と書いて区別する
+  - プロトコルの図 (001_protocol/) では、プロトコルの端点として「クライアント」「サーバー」と書く
+  - X Plugin 内部の要素「接続 (Client)」が同じ図に登場する場合 (002_connection/) は、接続元を「クライアントプログラム」と書いて区別する
 - 図の中の境界: box で「クライアント側 / サーバー側 › X Plugin / サーバー側 › X Plugin の外」を分け、X Plugin が mysqld と同じプロセス内にあることを Note で示す (mermaid の box は入れ子にできない)
 - 概念モデル (`docs/model/`) の語彙 (接続、セッション) と仕様書の論理名を一致させる
 

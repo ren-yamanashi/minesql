@@ -25,10 +25,10 @@
   - 外した選択肢は書かないので、その構文は構文エラーになる (MySQL は受理するので、その分だけ応答が異なる)
 - 外す理由は次の 7 つのどれかで、以降の表では記号で示す
   - A: [issue #120](https://github.com/ren-yamanashi/minesql/issues/120) の「やらないこと」に挙がっている機能の構文
-  - B: 対応する実装が MineSQL にない機能の構文 (何を含めないかは [SDR-0011](../../sdr/0011.文法に含める構文の範囲.md))
+  - B: 対応する実装が MineSQL にない機能の構文 (何を含めないかは [SDR-0011](../../../design-records/sdr/0011.文法に含める構文の範囲.md))
   - C: 8.4 で非推奨 (deprecated) になっている別表記
   - D: MySQL 自身が読み飛ばす、または挙動に影響しない構文
-  - E: `sql_mode` に依存する分岐のうち、8.4 の既定値では選ばれない側の挙動 ([SDR-0013](../../sdr/0013.sql_modeの既定値に固定し非推奨と無視される構文は採らない.md))
+  - E: `sql_mode` に依存する分岐のうち、8.4 の既定値では選ばれない側の挙動 ([SDR-0013](../../../design-records/sdr/0013.sql_modeの既定値に固定し非推奨と無視される構文は採らない.md))
   - F: 外した他の構文と組でしか意味を持たない構文
   - G: 標準 SQL にない MySQL 独自の別表記で、同じ意味の書き方が他にあるもの
 - 次の 4 つは、対応する機能とあわせて文法に含める
@@ -123,14 +123,14 @@
 
 - 判定の仕方: 識別子と同じ規則で語を切り出したあと、キーワード表を大文字小文字を区別せずに検索する
   - 表にあればその語のトークンを返し、なければ識別子のトークンを返す
-  - MySQL は語の直後が `(` かどうかで関数名の表も検索するが、MineSQL は関数呼び出しを文法に含めないため ([SDR-0011](../../sdr/0011.文法に含める構文の範囲.md))、この区別を持たない
+  - MySQL は語の直後が `(` かどうかで関数名の表も検索するが、MineSQL は関数呼び出しを文法に含めないため ([SDR-0011](../../../design-records/sdr/0011.文法に含める構文の範囲.md))、この区別を持たない
   - 参照:
     - [find_keyword](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.cc#L905-L936)
     - [識別子の切り出し後のキーワード判定](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.cc#L1578-L1584)
     - [lex.h のキーワード表 symbols](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/lex.h#L61)
 - 表の範囲: MineSQL の文法に現れる語だけをキーワードにする
   - MySQL の予約語であっても MineSQL の文法に現れない語 (`WINDOW`、`CUBE` など) は、MineSQL では識別子として扱う
-    - この範囲にする理由は [SDR-0012](../../sdr/0012.キーワード表は文法が使う語だけにする.md)
+    - この範囲にする理由は [SDR-0012](../../../design-records/sdr/0012.キーワード表は文法が使う語だけにする.md)
 - 予約語と非予約語
   - MySQL では、キーワードのうち `ident_keyword` 規則に現れる語 (非予約語) は識別子としても使え、現れない語 (予約語) は引用しないと識別子に使えない
   - MineSQL でも同じ区分に従い、非予約語は `ident_keyword` 相当の規則で識別子として受理する
@@ -538,7 +538,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | [update_list](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13411-L13428)、[update_elem](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L13430-L13436) | `,` 区切りの `simple_ident_nospvar '=' expr` | `:=` (B)、値の `DEFAULT` (B) |
 
 - MySQL は単一テーブルと複数テーブルの UPDATE を同じ規則 (`table_reference_list`) で受理し、後の段階で区別する
-  - MineSQL は複数テーブルの UPDATE を実装しないため ([SDR-0011](../../sdr/0011.文法に含める構文の範囲.md))、テーブル参照の位置に `single_table` (`table_ident opt_table_alias`) を置く
+  - MineSQL は複数テーブルの UPDATE を実装しないため ([SDR-0011](../../../design-records/sdr/0011.文法に含める構文の範囲.md))、テーブル参照の位置に `single_table` (`table_ident opt_table_alias`) を置く
 - 外した句と選択肢の一覧
 
 | 句 / 選択肢 | 規則 | 理由 |
@@ -581,7 +581,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | [field_def](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6868-L6892) | `type opt_column_attribute_list` | 生成カラム (`[GENERATED ALWAYS] AS (expr) [VIRTUAL \| STORED]`、B) |
 | [type](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6905-L7113) | `varchar field_length`、`int_type opt_field_length field_options` (`opt_field_length` と `field_options` は空の形だけ) | `opt_charset_with_opt_binary` (B: 文字集合と照合順序)、その他のすべての型 (A) |
 | [varchar](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7120-L7123) | `CHAR VARYING`、`VARCHAR` (字句解析で `VARCHARACTER` も `VARCHAR` になる) | |
-| [int_type](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7133-L7139) | `INT` | `TINYINT` / `SMALLINT` / `MEDIUMINT` / `BIGINT` (B: 大きさの違う整数型は [SDR-0023](../../sdr/0023.データ型はVARCHARとINTを持つ.md) で外した) |
+| [int_type](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7133-L7139) | `INT` | `TINYINT` / `SMALLINT` / `MEDIUMINT` / `BIGINT` (B: 大きさの違う整数型は [SDR-0023](../../../design-records/sdr/0023.データ型はVARCHARとINTを持つ.md) で外した) |
 | [opt_field_length](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7244-L7247) | 空 | `field_length` (C: 整数の表示幅は非推奨) |
 | [field_options](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7214-L7236) | 空 | `UNSIGNED` (B)、`ZEROFILL` (C: 非推奨)、`SIGNED` (D: MySQL 自身が読み飛ばす) |
 | [field_length](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L7238-L7242) | 4 つすべて (`'(' NUM ')'` と、大きな数のトークン `LONG_NUM` / `ULONGLONG_NUM` / `DECIMAL_NUM` の形) | |
@@ -609,7 +609,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 - カラム定義内の `REFERENCES` について
   - MySQL の文法はカラム定義の末尾に `REFERENCES` 句を受理するが、アクションは `nullptr` を返して捨てており、外部キーにはならない
   - MySQL のマニュアルも「MySQL parses but ignores "inline `REFERENCES` specifications" (as defined in the SQL standard) where the references are defined as part of the column specification. MySQL accepts `REFERENCES` clauses only when specified as part of a separate `FOREIGN KEY` specification.」と説明している
-  - MineSQL では構文エラーにする ([SDR-0013](../../sdr/0013.sql_modeの既定値に固定し非推奨と無視される構文は採らない.md))
+  - MineSQL では構文エラーにする ([SDR-0013](../../../design-records/sdr/0013.sql_modeの既定値に固定し非推奨と無視される構文は採らない.md))
   - 参照:
     - [opt_references (`Currently we ignore FK references here`)](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L6793-L6800)
     - [CREATE TABLE Statement (MySQL 8.4 Reference Manual)](https://dev.mysql.com/doc/refman/8.4/en/create-table.html)
@@ -730,7 +730,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 
 ### アカウント管理ステートメント (CREATE USER / ALTER USER / DROP USER)
 
-採る形は `CREATE USER user IDENTIFIED BY 'password'`、`ALTER USER user IDENTIFIED BY 'password'`、`DROP USER user` だけ ([SDR-0017](../../sdr/0017.アカウント管理ステートメントを対象に含める.md))。`user` は `'名前'@'ホスト'` の形も受理し、ホストの値の検査 (`%` のみ) は実行の操作で行う
+採る形は `CREATE USER user IDENTIFIED BY 'password'`、`ALTER USER user IDENTIFIED BY 'password'`、`DROP USER user` だけ ([SDR-0017](../../../design-records/sdr/0017.アカウント管理ステートメントを対象に含める.md))。`user` は `'名前'@'ホスト'` の形も受理し、ホストの値の検査 (`%` のみ) は実行の操作で行う
 
 | 規則 | 採用する選択肢 | 外す選択肢 |
 | --- | --- | --- |
@@ -742,7 +742,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | [identified_by_password](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L16872-L16883) | `IDENTIFIED BY TEXT_STRING_password` | |
 | [opt_create_user_with_mfa](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L16848-L16861) | 空 | `AND identification [AND identification]` (B: 多要素認証) |
 | [default_role_clause](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L3448-L3458) | 空 | `DEFAULT ROLE role_list` (B: ロール) |
-| [require_clause](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L17201-L17219) | 空 | `REQUIRE ...` (B: TLS の要件。[SDR-0016](../../sdr/0016.TLS接続を実装する.md)) |
+| [require_clause](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L17201-L17219) | 空 | `REQUIRE ...` (B: TLS の要件。[SDR-0016](../../../design-records/sdr/0016.TLS接続を実装する.md)) |
 | [connect_options](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L8514-L8517) | 空 | `WITH connect_option_list` (B: 接続数などの資源制限) |
 | [opt_account_lock_password_expire_options](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L8374-L8377) | 空 | `ACCOUNT LOCK` / `PASSWORD EXPIRE` など (B) |
 | [opt_user_attribute](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L8352-L8373) | 空 | `ATTRIBUTE` / `COMMENT` (B) |
@@ -762,7 +762,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 
 ### GRANT / REVOKE
 
-採る形は `GRANT 権限の並び | ALL [PRIVILEGES] ON *.* TO user_list [WITH GRANT OPTION]` と `REVOKE 権限の並び | ALL [PRIVILEGES] ON *.* FROM user_list` だけで、権限は 8 つ ([SDR-0018](../../sdr/0018.権限はグローバル権限だけを持つ.md))
+採る形は `GRANT 権限の並び | ALL [PRIVILEGES] ON *.* TO user_list [WITH GRANT OPTION]` と `REVOKE 権限の並び | ALL [PRIVILEGES] ON *.* FROM user_list` だけで、権限は 8 つ ([SDR-0018](../../../design-records/sdr/0018.権限はグローバル権限だけを持つ.md))
 
 | 規則 | 採用する選択肢 | 外す選択肢 |
 | --- | --- | --- |
@@ -787,7 +787,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 | 規則 | 採用する選択肢 | 外す選択肢 |
 | --- | --- | --- |
 | [kill](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14348-L14358) | `KILL kill_option expr` | |
-| [kill_option](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14360-L14364) | 省略、`CONNECTION` | `QUERY` (B: 実行中のステートメントの中断。[SDR-0027](../../sdr/0027.KILLステートメントを対象に含める.md)) |
+| [kill_option](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14360-L14364) | 省略、`CONNECTION` | `QUERY` (B: 実行中のステートメントの中断。[SDR-0027](../../../design-records/sdr/0027.KILLステートメントを対象に含める.md)) |
 
 - `expr` は MySQL と同じく規則のまま写し、値が接続の識別子として妥当かは実行で判定する
 - 参照:
