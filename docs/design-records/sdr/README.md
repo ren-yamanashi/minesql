@@ -2,7 +2,7 @@
 
 SDR (Specification Decision Record) は、`docs/specification/` の仕様書に現れる要件のうち、判断を伴ったものの記録。実装の判断の記録 (`docs/adr/` の ADR) と区別するために名前を分けている。1 判断 1 ファイルで、Motivation (なぜ決める必要があったか) → Decisions (決めたこと) → Context (背景、比べた案、結論) → Result (反映先の文書) の順に書く
 
-仕様書には「何を満たすか」だけを書き、「なぜそう決めたか」「何を捨てたか」はここに置く。書き方の思想は [ideology.md](../ideology.md) を参照
+仕様書には「何を満たすか」だけを書き、「なぜそう決めたか」「何を捨てたか」はここに置く。書き方の思想は [ideology.md](../../specification/ideology.md) を参照
 
 | 番号 | 種類 | 題 | 要旨 |
 | --- | --- | --- | --- |
