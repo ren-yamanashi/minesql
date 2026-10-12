@@ -48,7 +48,7 @@
   - ディレクトリごとに README を置き、読む順と各文書の内容を示す
   - protocol/: `x_protocol.md` (概要) → `communication_flow.md` (流れ)
     - `message_spec.md` (各メッセージの詳細) は `protocol/reference/` に置き、読む順に含めない (2026-10-03 変更)
-      - 2026-09-12 には「外部との契約で MineSQL の判断で変わらないため読む順に含める」としたが、変わらないことと読む順に要ることは別で、内容 (フィールド、ビット値、種別値の一覧) は実装時に引く参照資料の粒度だった
+      - 2026-09-12 には「外部との契約で MineSQL の判断で変わらないため読む順に含める」としたが、変わらないことと読む順に要ることは別で、内容 (フィールド、ビット値、種別値の一覧) は実装時に参照する資料の粒度だった
   - connection/: `x_plugin.md` (要件) → `connection_handler.md` (論理モデル) → `authentication.md` (認証)
   - parser/: `sql_parser.md` (論理モデル)
   - X Plugin 全体の要件 (`x_plugin.md`) は connection/ に置く (2026-09-08 確定)

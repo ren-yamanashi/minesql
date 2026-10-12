@@ -49,7 +49,7 @@ flowchart TB
 | --- | --- | --- |
 | プロトコル | クライアントとサーバーの間で交わすメッセージの形式や処理に関する規約を定める | [protocol/](./protocol/README.md) |
 | コネクションハンドラー | 接続を受け付けて認証し、セッションの確立および切断をする | [connection/](./connection/README.md) |
-| コマンドディスパッチャ | 認証済みのセッションが受け取ったリクエストを、適切なハンドラに振り分ける | [dispatcher/](./dispatcher/README.md) |
+| コマンドディスパッチャ | 認証済みのセッションが受け取ったリクエストを、種別ごとのリクエストハンドラに振り分ける | [dispatcher/](./dispatcher/README.md) |
 | 内部セッション | 受け取ったステートメントを SQL パーサーで解析し、プリペアしてから実行する。<br/>また、その実行に必要なセッションの状態を保持する | [session/](./session/README.md) |
 | SQL パーサー | ステートメントを解析し、SQL コマンドを作る | [parser/](./parser/README.md) |
 | データディクショナリ | スキーマ、テーブル、カラム、インデックスなどの定義を、ストレージエンジンに永続化する | [dictionary/](./dictionary/README.md) |

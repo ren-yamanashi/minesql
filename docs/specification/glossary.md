@@ -54,7 +54,8 @@
 | Last Insert ID | 生成された ID、自動採番値、auto-generated ID | `GENERATED_INSERT_ID` (X Protocol の Notice)、`last_insert_id` (classic の OK パケット)、`LAST_INSERT_ID()` | 直前のステートメントで AUTO_INCREMENT により生成された値。Notice の `SessionStateChanged` で送られる |
 | 実行ステータス | 実行結果の付帯情報 | (`ROWS_AFFECTED` / `GENERATED_INSERT_ID` / `PRODUCED_MESSAGE`) | リザルトセットとは別に Notice で届く、実行に関する情報の総称 |
 | 内部セッション | THD、サーバーセッション | internal session (`srv_session`、実装上は THD) | セッションごとに 1 つあり、受け取ったステートメントをパーサーで解析し、プリペアしてから実行する部分。実行ユーザー、デフォルトスキーマ、トランザクションの状態、エラーと警告、kill の要求を持ち、SQL はこの状態のもとで実行される |
-| 実行の文脈 | セッション状態、コンテキスト | (THD が持つ状態) | 内部セッションが持つ、実行ユーザーとグローバル権限、デフォルトスキーマ、トランザクションの状態、診断 (エラーと警告)、kill の要求の集まり |
+| 実行の文脈 | セッション状態、コンテキスト | (THD が持つ状態) | 内部セッションが持つ、実行ユーザーとグローバル権限、デフォルトスキーマ、トランザクションの状態、診断領域 (エラーと警告)、kill の要求の集まり |
+| 診断領域 | 診断、エラーと警告の記録 | diagnostics area (`Diagnostics_area`) | 内部セッションが持つ、現在のステートメントのエラー (1 つ) と警告 (並び) の記録。ステートメントごとにリセットする |
 | 実行ユーザー | 身元、セキュリティコンテキスト (MySQL の用語) | security context (`priv_user`) | 内部セッションが SQL を実行するときのアカウント。認証の成功後に設定され、権限の判定や `CURRENT_USER()` の値になる |
 | データディクショナリ | 辞書、カタログ (単独では使わない)、メタデータストア | data dictionary (`sql/dd`) | スキーマ・テーブル・カラム・インデックスの定義を保持し、名前解決と DDL に提供する部分。アカウントはシステムテーブルに置き、ここには含めない |
 | ディクショナリテーブル | DD テーブル、データディクショナリテーブル | dictionary table (`mysql.tables` など) | 定義を行として持つテーブル。MySQL では mysql スキーマ、MineSQL では minesql スキーマにあり、利用者からは見えない。`user` などのシステムテーブルとは別物 |
