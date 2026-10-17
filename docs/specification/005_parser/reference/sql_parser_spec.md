@@ -730,7 +730,7 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 
 ### アカウント管理ステートメント (CREATE USER / ALTER USER / DROP USER)
 
-採る形は `CREATE USER user IDENTIFIED BY 'password'`、`ALTER USER user IDENTIFIED BY 'password'`、`DROP USER user` だけ ([SDR-0017](../../../design-records/sdr/0017.アカウント管理ステートメントを対象に含める.md))。`user` は `'名前'@'ホスト'` の形も受理し、ホストの値の検査 (`%` のみ) は実行の操作で行う
+採る形は `CREATE USER user IDENTIFIED BY 'password'`、`ALTER USER user IDENTIFIED BY 'password'`、`DROP USER user` だけ ([SDR-0017](../../../design-records/sdr/0017.アカウント管理ステートメントを対象に含める.md))。`user` は `'名前'@'ホスト'` の形も受理し、ホストの値の検査 (`%` のみ) は実行時に行う
 
 | 規則 | 採用する選択肢 | 外す選択肢 |
 | --- | --- | --- |

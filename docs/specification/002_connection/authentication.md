@@ -73,7 +73,7 @@ flowchart TD
 - MineSQL 特有の仕様
   - 資格情報の変更 (`ALTER USER ... IDENTIFIED BY`) とアカウントの削除 (`DROP USER`) で、そのアカウントのエントリが消える
   - 監査の枠組みは持たず、アカウント管理ステートメントの実行時に直接消す
-    - MySQL では上述 (`以下、上記の補足` の bullet 以下の部分) の通り 監査イベントを通じて SHA256 パスワードキャッシュのエントリを更新するが、MineSQL では ACL も認証も同じプログラムの中にあるので、`ALTER USER` / `DROP USER` の実行の操作が `minesql.user` の行を書き換えるのと同時に、SHA256 パスワードキャッシュのエントリも直接消せる
+    - MySQL では上述 (`以下、上記の補足` の bullet 以下の部分) の通り 監査イベントを通じて SHA256 パスワードキャッシュのエントリを更新するが、MineSQL では ACL も認証も同じプログラムの中にあるので、`ALTER USER` / `DROP USER` の実行操作が `minesql.user` の行を書き換えるのと同時に、SHA256 パスワードキャッシュのエントリも直接消せる
 
 ### 内部セッションの実行ユーザー (security context)
 
