@@ -22,7 +22,7 @@
 - 暗黙のコミットは入口が種別のフラグで判定し、前と後で行う
   - [stmt_causes_implicit_commit](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_parse.cc#L404)
   - [前のコミット](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_parse.cc#L3221-L3238)、[後のコミット](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_parse.cc#L4993)
-- SQL コマンドを持つ文はその `execute` を呼び、持たない文は種別の分岐から直接処理を呼ぶ
+- SQL コマンドを持つステートメントはその SQL コマンドを実行し、持たないステートメントは種別の分岐から直接処理を呼ぶ
   - [m_sql_cmd->execute の呼び出し](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_parse.cc#L3672)
   - [SQLCOM_KILL](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_parse.cc#L4227-L4245)、[SQLCOM_BEGIN / SQLCOM_COMMIT](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_parse.cc#L4260-L4273)、[SQLCOM_CREATE_USER](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_parse.cc#L3956)、[SQLCOM_GRANT](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_parse.cc#L4006)
 - 実行コンテキストが持つもの
