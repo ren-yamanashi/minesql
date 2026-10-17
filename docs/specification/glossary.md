@@ -39,9 +39,9 @@
 | 採用する語 | 使わない言い換え | 英語 / ソース上の名前 | 意味・使い分け |
 | --- | --- | --- | --- |
 | ステートメント | 文、クエリ | statement | 実行する SQL の 1 単位。SQL であることを強調するときは「SQL ステートメント」 |
-| 文脈化 | コンテキスト化、contextualize (地の文で) | contextualization (`contextualize`) | MySQL のパーサーで、parse tree を根から辿り、各ノードを文脈 (どのクエリブロックの中か、内部セッションの実行状態) に当てはめて AST を組み立てる段階。MineSQL は持たず、構文解析が AST を直接作る |
-| AST | 構文の木、木 | abstract syntax tree (MySQL では parse tree と、文脈化後の AST を区別する) | パーサーの出力。MineSQL では MySQL の `Query_block` / `Item` に相当する構造を未解決の状態で作ったもので、プリペアが同じノードに解決結果を書き込み、オプティマイザとエグゼキュータも同じ構造を使う |
-| Tree | 木、木構造 | tree | ノードの入れ子で表した構造。「構文木」「式の Tree」のように使う |
+| コンテキスト化 | 文脈化、contextualize (地の文で) | contextualization (`contextualize`) | MySQL のパーサーで、parse tree をルートノードから辿り、各ノードをコンテキスト (どのクエリブロックの中か、内部セッションの実行状態) に当てはめて AST を組み立てる段階。MineSQL は持たず、構文解析が AST を直接作る |
+| AST | 構文木、構文ツリー | abstract syntax tree (MySQL では parse tree と、コンテキスト化後の AST を区別する) | パーサーの出力。MineSQL では MySQL の `Query_block` / `Item` に相当する構造を未解決の状態で作ったもので、プリペアが同じノードに解決結果を書き込み、オプティマイザとエグゼキュータも同じ構造を使う |
+| ツリー | 木、木構造、Tree | tree | ノードの入れ子で表した構造。「式のツリー」のように使う |
 | クエリブロック | SELECT 単位、クエリ単位 | query block (`Query_block`) | 1 つの SELECT に対応する意味の単位 (テーブル一覧、select list、条件、グループ化、並び替え、件数制限) |
 | 未解決 | 未束縛、unresolved | unresolved | AST のノードのうち、書かれた名前がどのテーブル・どのカラムを指すか、式の値の型が何かがまだ決まっていない状態。プリペアが決めると解決済みになる |
 | プリペア | 準備、準備フェーズ、resolve | prepare (`Sql_cmd_dml::prepare`) | AST に対して名前解決と型決定を行う段階。データディクショナリを参照するのはここ |
@@ -77,7 +77,7 @@
 | minesql スキーマ | システムスキーマ、mysql スキーマ (MineSQL のものを指すとき) | | MineSQL がシステムテーブル (`user`) とディクショナリテーブルを置くスキーマ。MySQL の mysql スキーマに相当し、名前は写さない |
 | デフォルトスキーマ | 既定スキーマ、カレントスキーマ、デフォルトデータベース | default schema (`AuthenticateStart.schema`、Notice の `CURRENT_SCHEMA`) | スキーマ名を付けずに書いたテーブル名を、どのスキーマで探すかを決めるスキーマ。接続時の指定で決まり、`USE` で切り替わる |
 | システムテーブル | システムテーブル、メタデータテーブル | system table (`mysql.user` など) | サーバー自身が使うテーブル。普通のテーブルとして同じストレージに置く |
-| 名前解決の文脈 | スコープ、名前空間 (名前解決の話をするとき) | name resolution context (`Name_resolution_context`) | クエリブロックごとに持つ、見えているテーブルの一覧。カラム名を探す範囲で、外側の文脈を辿れる |
+| 名前解決コンテキスト | 名前解決の文脈、スコープ、名前空間 (名前解決の話をするとき) | name resolution context (`Name_resolution_context`) | クエリブロックごとに持つ、見えているテーブルの一覧。カラム名を探す範囲で、外側のコンテキストを辿れる |
 | 型決定 | 型解決、型推論 | type resolution (`resolve_type`) | 式の各ノードの型を、型の規則に従って決める段階。プリペアが行う |
 | 結合の単純化 | 結合の平坦化、ON の WHERE への移動 | join simplification | プリペアの最後に、内部結合の ON 条件を WHERE に移し、FROM の入れ子を平坦なテーブルの並びにする変換。MySQL では外部結合の内部結合化も同じ段階で行う |
 | ロック読み取り | ロック付き読み取り、ロッキングリード | locking read (`SELECT ... FOR UPDATE`) | 読んだ行にロックを取る SELECT。`FOR UPDATE` は排他ロック、`FOR SHARE` (同義語 `LOCK IN SHARE MODE`) は共有ロックを取る |

@@ -17,7 +17,7 @@
   - 以下の「文書の構成」「書き方」「図」の規則は、この読者を想定して決めている
 - スコープが狭いことと、拡張可能性を考慮しないことは別 (2026-09-12 確定)
   - 何かを対象外にする判断では「対象外だから不要」で終わらせず、後から入れる場合に何が変わるか (どの約束を守っていれば追加だけで済むか) を併記する
-  - 例: SQL パーサーが parse tree と文脈化を持たないのは、サブクエリや HAVING を文法とプリペアの追加だけで足せるようにするため
+  - 例: SQL パーサーが parse tree とコンテキスト化を持たないのは、サブクエリや HAVING を文法とプリペアの追加だけで足せるようにするため
     - 守る約束は「ノードは周囲を知らずに作れる」「周囲に依存する判断はプリペアで行う」の 2 つ
   - 理由: 本の実装は章ごとに段階的に増やしていくものなので、初期のスコープで下した判断が後の章の足かせにならないようにする
 - 正とするもの: ローカルの mysql-server 8.4 (commit `aa461240`)
@@ -27,7 +27,7 @@
   - 実装対象は X Protocol に従うサーバー (X Plugin に相当する層) で、classic protocol は対比にとどめる ([SDR-0001](../design-records/sdr/0001.実装対象はXProtocolに従うサーバー.md))
   - 実装しないもの: ドキュメントモデル ([SDR-0002](../design-records/sdr/0002.ドキュメントモデルは実装しない.md))、プロトコルのプリペアドステートメントとカーソル ([SDR-0003](../design-records/sdr/0003.プロトコルのプリペアドステートメントとカーソルは実装しない.md))、classic の COM コマンド層 ([SDR-0006](../design-records/sdr/0006.classicのCOMコマンド層は作らない.md))
   - 実装するもの: Expect ブロック ([SDR-0004](../design-records/sdr/0004.Expectブロックを実装する.md))、接続系と Notice 系の管理コマンド 6 つ ([SDR-0005](../design-records/sdr/0005.管理コマンドは接続系とNotice系の6つを実装する.md))、TLS 接続 ([SDR-0016](../design-records/sdr/0016.TLS接続を実装する.md))
-  - SQL パーサー: MySQL の構文規則に従う ([SDR-0007](../design-records/sdr/0007.SQLパーサーはMySQLの構文規則に従う.md))、出力は未解決のクエリブロックと式で文脈化を持たない ([SDR-0008](../design-records/sdr/0008.パーサーの出力は未解決のクエリブロックと式で文脈化を持たない.md))、出口は SQL コマンド ([SDR-0009](../design-records/sdr/0009.パーサーの出口はSQLコマンドにする.md))、goyacc で生成し字句解析器は手書き ([SDR-0010](../design-records/sdr/0010.パーサーはgoyaccで生成し字句解析器は手書きにする.md))、文法に含める構文の範囲 ([SDR-0011](../design-records/sdr/0011.文法に含める構文の範囲.md))、キーワード表は文法が使う語だけ ([SDR-0012](../design-records/sdr/0012.キーワード表は文法が使う語だけにする.md))、`sql_mode` の既定値に固定し非推奨と無視される構文は採らない ([SDR-0013](../design-records/sdr/0013.sql_modeの既定値に固定し非推奨と無視される構文は採らない.md))
+  - SQL パーサー: MySQL の構文規則に従う ([SDR-0007](../design-records/sdr/0007.SQLパーサーはMySQLの構文規則に従う.md))、出力は未解決のクエリブロックと式でコンテキスト化を持たない ([SDR-0008](../design-records/sdr/0008.パーサーの出力は未解決のクエリブロックと式でコンテキスト化を持たない.md))、出口は SQL コマンド ([SDR-0009](../design-records/sdr/0009.パーサーの出口はSQLコマンドにする.md))、goyacc で生成し字句解析器は手書き ([SDR-0010](../design-records/sdr/0010.パーサーはgoyaccで生成し字句解析器は手書きにする.md))、文法に含める構文の範囲 ([SDR-0011](../design-records/sdr/0011.文法に含める構文の範囲.md))、キーワード表は文法が使う語だけ ([SDR-0012](../design-records/sdr/0012.キーワード表は文法が使う語だけにする.md))、`sql_mode` の既定値に固定し非推奨と無視される構文は採らない ([SDR-0013](../design-records/sdr/0013.sql_modeの既定値に固定し非推奨と無視される構文は採らない.md))
   - スキーマを持ち、minesql スキーマ (MySQL の mysql スキーマに相当) にシステムテーブルを置く ([SDR-0014](../design-records/sdr/0014.スキーマを持つ.md))
   - 認証は 3 メカニズム、`caching_sha2_password` のみ、`minesql.user` を SQL で検索して照合する ([SDR-0015](../design-records/sdr/0015.認証の方式.md))
   - アカウント管理ステートメント (`CREATE USER` / `ALTER USER` / `DROP USER`) を対象に含める ([SDR-0017](../design-records/sdr/0017.アカウント管理ステートメントを対象に含める.md))

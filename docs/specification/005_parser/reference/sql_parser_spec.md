@@ -112,7 +112,7 @@
       - [simple_ident_q](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14911-L14922)
       - [table_wild](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L14867-L14879)
 - 名前の妥当性 (空でないこと、末尾が空白でないこと、64 文字以内であること) の検査は字句規則に含めない
-  - MySQL でも構文解析の後 (文脈化と DDL の処理) で検査している
+  - MySQL でも構文解析の後 (コンテキスト化と DDL の処理) で検査している
   - MineSQL ではプリペア (名前解決) の責務とする
   - 参照:
     - [table.cc の check_table_name](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/table.cc#L3749-L3774)
@@ -843,11 +843,11 @@ MySQL の式は `expr` (論理演算) → `bool_pri` (比較) → `predicate` (I
 - 構文解析器 (parser): 文法規則の集合で、トークン列から parse tree を組み立てる
   - [sql_yacc.yy の宣言部](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L553-L567)
   - [start_entry / sql_statement 規則](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_yacc.yy#L2301-L2347)
-- parse tree (MySQL のみ): 構文解析の出力で、ステートメントの構造をそのまま写した一時的な Tree
+- parse tree (MySQL のみ): 構文解析の出力で、ステートメントの構造をそのまま写した一時的なツリー
   - [parse_tree_node_base.h の Parse_tree_node_tmpl](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/parse_tree_node_base.h#L231-L330)
   - [parse_tree_nodes.h の Parse_tree_root](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/parse_tree_nodes.h#L162-L175)
   - [PT_select_stmt](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/parse_tree_nodes.h#L1880)
-- AST (名前解決に進める状態の Tree): MySQL では文脈化の出力、MineSQL では構文解析の出力で、プリペア・オプティマイザ・エグゼキュータの各段階が同じ構造を使う
+- AST (名前解決に進める状態のツリー): MySQL ではコンテキスト化の出力、MineSQL では構文解析の出力で、プリペア・オプティマイザ・エグゼキュータの各段階が同じ構造を使う
   - [sql_lex.h の Query_expression](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.h#L626)
   - [Query_block](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/sql_lex.h#L1167)
   - [item.h の Item](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/sql/item.h#L936)

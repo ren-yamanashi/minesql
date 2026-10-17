@@ -16,7 +16,7 @@
 | [mysqlx_notice.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_notice.proto) | `Mysqlx.Notice` | Notice (`Frame` と 5 種類のペイロード) |
 | [mysqlx_expect.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_expect.proto) | `Mysqlx.Expect` | Expect ブロック (`Open` / `Close`) |
 | [mysqlx_crud.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_crud.proto) | `Mysqlx.Crud` | CRUD 操作 (`Find` / `Insert` / `Update` / `Delete`、ビュー操作) |
-| [mysqlx_expr.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_expr.proto) | `Mysqlx.Expr` | 式の Tree (CRUD のフィルタ条件や射影で使う) |
+| [mysqlx_expr.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_expr.proto) | `Mysqlx.Expr` | 式のツリー (CRUD のフィルタ条件や射影で使う) |
 | [mysqlx_prepare.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_prepare.proto) | `Mysqlx.Prepare` | プリペアドステートメント (`Prepare` / `Execute` / `Deallocate`) |
 | [mysqlx_cursor.proto](https://github.com/mysql/mysql-server/blob/aa461240270d809bcac336483b886b3d1789d4d9/plugin/x/protocol/protobuf/mysqlx_cursor.proto) | `Mysqlx.Cursor` | カーソル (`Open` / `Fetch` / `Close`) |
 
