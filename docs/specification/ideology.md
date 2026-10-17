@@ -38,7 +38,7 @@
   - 型の規則は MySQL に合わせ、内部の値の型は整数・浮動小数点・文字列の 3 つで、小数は浮動小数点で持つ ([SDR-0024](../design-records/sdr/0024.型の規則はMySQLに合わせ小数は浮動小数点で持つ.md))
   - 名前解決の規則は MySQL に合わせ、識別子は大文字小文字を区別しない ([SDR-0025](../design-records/sdr/0025.名前解決の規則はMySQLに合わせ識別子は大文字小文字を区別しない.md))
   - プリペアは全種別で入口で権限を検査し、DML だけが名前解決・型決定と結合の単純化まで行う ([SDR-0026](../design-records/sdr/0026.プリペアで行うことの範囲.md))
-    - プリペアが定義を取得し、実行の操作がテーブルをロックする
+    - プリペアが定義を取得し、テーブルのロックは実行時に行う
   - `KILL [CONNECTION] id` を対象に含め、`kill_client` は内部で `KILL` を実行する ([SDR-0027](../design-records/sdr/0027.KILLステートメントを対象に含める.md))
   - 上記以外の「やらないこと」は [issue #120](https://github.com/ren-yamanashi/minesql/issues/120) が正
 
