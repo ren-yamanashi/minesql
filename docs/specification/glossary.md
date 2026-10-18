@@ -63,7 +63,7 @@
 | ディクショナリテーブル | DD テーブル、データディクショナリテーブル | dictionary table (`mysql.tables` など) | 定義を行として持つテーブル。MySQL では mysql スキーマ、MineSQL では minesql スキーマにあり、利用者からは見えない。`user` などのシステムテーブルとは別物 |
 | ディクショナリオブジェクト | DD オブジェクト、メタデータオブジェクト | dictionary object (`dd::Schema`、`dd::Table`) | ディクショナリテーブルの行を組み立てた、定義のメモリ上の表現。テーブルのオブジェクトはカラムとインデックスを含む |
 | オブジェクトキャッシュ | ディクショナリキャッシュ、DD キャッシュ | shared dictionary cache (`Shared_dictionary_cache`) | 読み込み済みのディクショナリオブジェクトを全ての接続で共有して保持するキャッシュ |
-| ディクショナリクライアント | キャッシュクライアント、DD クライアント | dictionary client (`Dictionary_client`) | 定義の取得・保存・変更・削除の操作をまとめたもので、内部セッションごとに 1 つある |
+| ディクショナリクライアント | キャッシュクライアント、DD クライアント | dictionary client (`Dictionary_client`) | 定義の取得・保存・変更・削除の操作をまとめたもので、内部セッションごとに 1 つある。使用中のオブジェクト (取得してまだ解放していないもの) の一覧を持ち、同じ定義の再取得に使う。MySQL では local object registry |
 | 起動時の初期化 | bootstrap (地の文で)、ブートストラップ | bootstrap (`dd::bootstrap`) | 初回の起動でディクショナリテーブルと minesql スキーマ (MySQL では mysql) を作り、2 回目以降は既存のディクショナリテーブルを開いて定義を読める状態にする手順 |
 | 原子的な DDL | Atomic DDL、アトミック DDL | atomic DDL | 1 つの DDL のディクショナリテーブルの変更とストレージエンジンの操作を、まとめて確定するか、まとめて残さないかのどちらかにすること。利用者のトランザクションに DDL を含められること (トランザクショナルな DDL) とは別 |
 | 暗黙のコミット | 自動コミット (この意味では使わない) | implicit commit | DDL などの実行前後に、そのセッションで進行中のトランザクションが自動的にコミットされること |
@@ -76,7 +76,7 @@
 | mysql スキーマ | システムスキーマ、mysql データベース、mysql システムスキーマ (マニュアルの節名) | the mysql system schema | MySQL がシステムテーブルとディクショナリテーブルを置くスキーマ (MineSQL の対応物は minesql スキーマ)。MySQL のマニュアルが system schema と呼ぶのはこのスキーマで、監視用のビューを集めた `sys` スキーマや `information_schema` / `performance_schema` とは別のスキーマ |
 | minesql スキーマ | システムスキーマ、mysql スキーマ (MineSQL のものを指すとき) | | MineSQL がシステムテーブル (`user`) とディクショナリテーブルを置くスキーマ。MySQL の mysql スキーマに相当し、名前は写さない |
 | デフォルトスキーマ | 既定スキーマ、カレントスキーマ、デフォルトデータベース | default schema (`AuthenticateStart.schema`、Notice の `CURRENT_SCHEMA`) | スキーマ名を付けずに書いたテーブル名を、どのスキーマで探すかを決めるスキーマ。接続時の指定で決まり、`USE` で切り替わる |
-| システムテーブル | システムテーブル、メタデータテーブル | system table (`mysql.user` など) | サーバー自身が使うテーブル。普通のテーブルとして同じストレージに置く |
+| システムテーブル | システムテーブル、メタデータテーブル | system table (`mysql.user` など) | アカウントと権限、設定、ログなど、サーバーの動作に必要な情報を持つテーブル。定義を持つディクショナリテーブルとは区別する |
 | 名前解決コンテキスト | 名前解決の文脈、スコープ、名前空間 (名前解決の話をするとき) | name resolution context (`Name_resolution_context`) | クエリブロックごとに持つ、見えているテーブルの一覧。カラム名を探す範囲で、外側のコンテキストを辿れる |
 | 型決定 | 型解決、型推論 | type resolution (`resolve_type`) | 式の各ノードの型を、型の規則に従って決める段階。プリペアが行う |
 | 結合の単純化 | 結合の平坦化、ON の WHERE への移動 | join simplification | プリペアの最後に、内部結合の ON 条件を WHERE に移し、FROM の入れ子を平坦なテーブルの並びにする変換。MySQL では外部結合の内部結合化も同じ段階で行う |

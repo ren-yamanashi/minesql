@@ -20,6 +20,10 @@
   - 例: SQL パーサーが parse tree とコンテキスト化を持たないのは、サブクエリや HAVING を文法とプリペアの追加だけで足せるようにするため
     - 守る約束は「ノードは周囲を知らずに作れる」「周囲に依存する判断はプリペアで行う」の 2 つ
   - 理由: 本の実装は章ごとに段階的に増やしていくものなので、初期のスコープで下した判断が後の章の足かせにならないようにする
+- 対象にするかが決まっていないものは、対象に含める側に置く (2026-10-18 確定)
+  - 対象外は [issue #120](https://github.com/ren-yamanashi/minesql/issues/120) の「やらないこと」に載せたものだけで、それ以外は対象
+  - 対象だが範囲を決めていないものは、同じ issue の「どこまでやるか検討中のもの」に置く
+  - 理由: やらないことを特殊ケースとして列挙する運用なので、未決のものを対象外にすると「列挙にないものは対象」という前提と食い違う
 - 正とするもの: ローカルの mysql-server 8.4 (commit `aa461240`)
   - プロトコルは `.proto` ファイル、サーバーの挙動は `plugin/x/src` を正とする
   - マニュアル・WL・公式ブログは理解の助けにし、最終的な根拠にはしない
@@ -31,7 +35,7 @@
   - スキーマを持ち、minesql スキーマ (MySQL の mysql スキーマに相当) にシステムテーブルを置く ([SDR-0014](../design-records/sdr/0014.スキーマを持つ.md))
   - 認証は 3 メカニズム、`caching_sha2_password` のみ、`minesql.user` を SQL で検索して照合する ([SDR-0015](../design-records/sdr/0015.認証の方式.md))
   - アカウント管理ステートメント (`CREATE USER` / `ALTER USER` / `DROP USER`) を対象に含める ([SDR-0017](../design-records/sdr/0017.アカウント管理ステートメントを対象に含める.md))
-  - 権限はグローバル権限だけを持ち、8 つの権限と `GRANT` / `REVOKE ... ON *.*` を対象にし、kill と接続の一覧は同じアカウントの接続のみ ([SDR-0018](../design-records/sdr/0018.権限はグローバル権限だけを持つ.md))
+  - 権限はグローバル権限だけを持ち、9 つの権限と `GRANT` / `REVOKE ... ON *.*` を対象にし、kill と接続の一覧は同じアカウントの接続のみ ([SDR-0018](../design-records/sdr/0018.権限はグローバル権限だけを持つ.md))
   - データディクショナリ: ディクショナリテーブルはストレージエンジンのテーブルとして持ち ([SDR-0019](../design-records/sdr/0019.ディクショナリテーブルはストレージエンジンのテーブルとして持つ.md))、オブジェクトキャッシュを持ち ([SDR-0020](../design-records/sdr/0020.ディクショナリオブジェクトのキャッシュを持つ.md))、DDL は原子的に実行する ([SDR-0021](../design-records/sdr/0021.DDLは原子的に実行する.md))
     - SDI と `information_schema` は実装しない ([SDR-0022](../design-records/sdr/0022.SDIとinformation_schemaは実装しない.md))
   - データ型は `VARCHAR` と `INT` (符号付き 4 バイト) の 2 つ ([SDR-0023](../design-records/sdr/0023.データ型はVARCHARとINTを持つ.md))
@@ -40,6 +44,8 @@
   - プリペアは全種別で入口で権限を検査し、DML だけが名前解決・型決定と結合の単純化まで行う ([SDR-0026](../design-records/sdr/0026.プリペアで行うことの範囲.md))
     - プリペアが定義を取得し、テーブルのロックは実行時に行う
   - `KILL [CONNECTION] id` を対象に含め、`kill_client` は内部で `KILL` を実行する ([SDR-0027](../design-records/sdr/0027.KILLステートメントを対象に含める.md))
+  - `ALTER TABLE` を対象に含める ([SDR-0011](../design-records/sdr/0011.文法に含める構文の範囲.md))
+    - 受け付ける変更の種類と実行の方式は、ストレージエンジンの仕様とあわせて決める
   - 上記以外の「やらないこと」は [issue #120](https://github.com/ren-yamanashi/minesql/issues/120) が正
 
 ## 文書の構成

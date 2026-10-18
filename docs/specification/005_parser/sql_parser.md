@@ -115,7 +115,7 @@ MySQL 5.6 までの構文解析器は、構文を読みながら、読み取っ�
 - 対応するステートメント
   - `SELECT` (`INNER JOIN`、`ORDER BY`、`LIMIT`、`FOR UPDATE` / `FOR SHARE` を含む)
   - `INSERT` / `UPDATE` / `DELETE`
-  - `CREATE TABLE` / `DROP TABLE`
+  - `CREATE TABLE` / `ALTER TABLE` / `DROP TABLE`
   - `CREATE SCHEMA` / `DROP SCHEMA` / `USE`
   - トランザクション制御 (`BEGIN`、`START TRANSACTION [WITH CONSISTENT SNAPSHOT]`、`COMMIT`、`ROLLBACK`)
   - アカウント管理ステートメント (`CREATE USER` / `ALTER USER` / `DROP USER`) と `GRANT` / `REVOKE`
