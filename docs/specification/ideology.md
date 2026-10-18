@@ -36,7 +36,7 @@
   - 認証は 3 メカニズム、`caching_sha2_password` のみ、`minesql.user` を SQL で検索して照合する ([SDR-0015](../design-records/sdr/0015.認証の方式.md))
   - アカウント管理ステートメント (`CREATE USER` / `ALTER USER` / `DROP USER`) を対象に含める ([SDR-0017](../design-records/sdr/0017.アカウント管理ステートメントを対象に含める.md))
   - 権限はグローバル権限だけを持ち、9 つの権限と `GRANT` / `REVOKE ... ON *.*` を対象にし、kill と接続の一覧は同じアカウントの接続のみ ([SDR-0018](../design-records/sdr/0018.権限はグローバル権限だけを持つ.md))
-  - データディクショナリ: ディクショナリテーブルはストレージエンジンのテーブルとして持ち ([SDR-0019](../design-records/sdr/0019.ディクショナリテーブルはストレージエンジンのテーブルとして持つ.md))、オブジェクトキャッシュを持ち ([SDR-0020](../design-records/sdr/0020.ディクショナリオブジェクトのキャッシュを持つ.md))、DDL は原子的に実行する ([SDR-0021](../design-records/sdr/0021.DDLは原子的に実行する.md))
+  - データディクショナリ: ディクショナリテーブルはストレージエンジンのテーブルとして持ち、minesql スキーマのテーブルは固定 ID の共有テーブルスペースに置き ([SDR-0019](../design-records/sdr/0019.ディクショナリテーブルはストレージエンジンのテーブルとして持つ.md))、オブジェクトキャッシュを持ち ([SDR-0020](../design-records/sdr/0020.ディクショナリオブジェクトのキャッシュを持つ.md))、DDL は原子的に実行する ([SDR-0021](../design-records/sdr/0021.DDLは原子的に実行する.md))
     - SDI と `information_schema` は実装しない ([SDR-0022](../design-records/sdr/0022.SDIとinformation_schemaは実装しない.md))
   - データ型は `VARCHAR` と `INT` (符号付き 4 バイト) の 2 つ ([SDR-0023](../design-records/sdr/0023.データ型はVARCHARとINTを持つ.md))
   - 型の規則は MySQL に合わせ、内部の値の型は整数・浮動小数点・文字列の 3 つで、小数は浮動小数点で持つ ([SDR-0024](../design-records/sdr/0024.型の規則はMySQLに合わせ小数は浮動小数点で持つ.md))
